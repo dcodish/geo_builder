@@ -1,0 +1,53 @@
+{
+  "app": {
+    "title": "Geo Builder",
+    "subtitle": "Build geometry step by step"
+  },
+  "input": {
+    "placeholder": "Describe your shape... (e.g., \"Triangle ABC where AB=5\")",
+    "send": "Send",
+    "loading": "Thinking..."
+  },
+  "steps": {
+    "title": "Steps",
+    "empty": "Start by describing a shape"
+  },
+  "theorems": {
+    "title": "Theorems & Insights",
+    "empty": "Add more details to see relevant theorems",
+    "confidence": {
+      "definite": "Applies",
+      "possible": "May apply"
+    }
+  },
+  "canvas": {
+    "reset": "Reset view",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out"
+  },
+  "actions": {
+    "undo": "Undo",
+    "redo": "Redo",
+    "clear": "Clear all",
+    "flip": "Flip",
+    "language": "עברית"
+  },
+  "geometry": {
+    "triangle": "Triangle",
+    "quadrilateral": "Quadrilateral",
+    "parallelogram": "Parallelogram",
+    "rectangle": "Rectangle",
+    "rhombus": "Rhombus",
+    "square": "Square",
+    "trapezoid": "Trapezoid",
+    "kite": "Kite",
+    "side": "Side",
+    "angle": "Angle",
+    "height": "Height",
+    "median": "Median",
+    "bisector": "Angle bisector",
+    "perpBisector": "Perpendicular bisector",
+    "midsegment": "Midsegment",
+    "diagonal": "Diagonal"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "app": {
+    "title": "בונה גיאומטריה",
+    "subtitle": "בנה צורות גיאומטריות צעד אחר צעד"
+  },
+  "input": {
+    "placeholder": "תאר את הצורה... (לדוגמה: \"משולש ABC כאשר AB=5\")",
+    "send": "שלח",
+    "loading": "חושב..."
+  },
+  "steps": {
+    "title": "צעדים",
+    "empty": "התחל בתיאור צורה"
+  },
+  "theorems": {
+    "title": "משפטים ותובנות",
+    "empty": "הוסף פרטים נוספים כדי לראות משפטים רלוונטיים",
+    "confidence": {
+      "definite": "חל",
+      "possible": "עשוי לחול"
+    }
+  },
+  "canvas": {
+    "reset": "אפס תצוגה",
+    "zoomIn": "הגדל",
+    "zoomOut": "הקטן"
+  },
+  "actions": {
+    "undo": "בטל",
+    "redo": "חזור",
+    "clear": "נקה הכל",
+    "flip": "הפוך",
+    "language": "English"
+  },
+  "geometry": {
+    "triangle": "משולש",
+    "quadrilateral": "מרובע",
+    "parallelogram": "מקבילית",
+    "rectangle": "מלבן",
+    "rhombus": "מעוין",
+    "square": "ריבוע",
+    "trapezoid": "טרפז",
+    "kite": "עפיפון",
+    "side": "צלע",
+    "angle": "זווית",
+    "height": "גובה",
+    "median": "תיכון",
+    "bisector": "חוצה זווית",
+    "perpBisector": "אנך אמצעי",
+    "midsegment": "קטע אמצעי",
+    "diagonal": "אלכסון"
+  }
+}
