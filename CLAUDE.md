@@ -19,6 +19,10 @@ The original implementation was a *shape-template matcher* that dead-ended (coul
 
 **Next step (resume here):** Phase 2 (minimal SVG renderer) → Phase 5a (general quadrilateral + arbitrary segment + line∩line) → reproduce corpus **Q1** side-by-side with its image. The build is on branch `rebuild-foundation`.
 
+## Project memory (rule)
+
+All durable project context lives **in this repo** — it syncs via Dropbox, so it travels to any machine David works from. The assistant's machine-local memory does **not** travel, so **never rely on it for this project.** At session start, read [`docs/PROJECT-MEMORY.md`](docs/PROJECT-MEMORY.md). Record decisions in the ADR log ([`docs/06-decisions.md`](docs/06-decisions.md)), status in the plan ([`docs/09-implementation-plan.md`](docs/09-implementation-plan.md)), and operational notes in `docs/PROJECT-MEMORY.md` — not only in local memory.
+
 ## Documentation
 
 Full project docs live in [`docs/`](docs/) — vision, functional + non-functional requirements, design/architecture, glossary, and the decision log (ADRs). Start at [`docs/README.md`](docs/README.md). These are the authoritative, detailed source; this file is the quick orientation and points there for depth. **Keep both in sync as the design evolves**, and add an ADR to `docs/06-decisions.md` for any significant decision.
