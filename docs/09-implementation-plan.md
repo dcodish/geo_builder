@@ -2,7 +2,7 @@
 
 _Last updated: 2026-06-10._
 
-> **Status:** Phases 0–3 complete (engine M1; SVG renderer; store + app shell — milestone M2). **Next:** Phase 4 (grammar parser) → Phase 5a → reproduce corpus Q1. Work is on branch `rebuild-foundation`.
+> **Status:** Phases 0–4 complete (engine M1; renderer; store/shell M2; grammar parser — milestone M3, the text box is live). **Next:** Phase 5a (general quadrilateral + arbitrary segment + line∩line) → reproduce corpus Q1. Work is on branch `rebuild-foundation`.
 
 ## Purpose
 
@@ -72,13 +72,15 @@ Scaffold, archive of the old implementation, the `docs/` set, lint config, and t
 
 ---
 
-### Phase 4 — Grammar parser
+### Phase 4 — Grammar parser ✅ complete
 
+- **Status:** done — `src/parser/parse.ts` (the `utterance → command[]` boundary) + `src/parser/__tests__/phase4.test.ts` (25/25 green); `App.tsx` text input is **live** and example chips run through the parser; typecheck/build clean. Milestone M3 reached.
 - **Goal:** real natural-language input, free and offline.
-- **Builds:** Hebrew/English grammar parser → commands; input affordances (examples / clarification on miss); replaces the hardcoded command lists. (LLM fallback is Phase 7.)
+- **Builds:** Hebrew/English grammar parser → commands; input affordances (clickable examples; "couldn't read that" hint on miss); replaced the hardcoded command lists. (LLM fallback is Phase 7.)
 - **Depends on:** Phase 3 (commands flow into the store).
 - **Requirements:** FR-IN-1, -3, -4, -5; FR-IN-2 (local path); US-1, US-7.
-- **Gate:** parser table tests (He + En across v1 vocabulary); negative cases return "not handled"; boundary dispatch test; measured miss-rate.
+- **Gate:** ✅ parser table tests (He + En for square, point-on-segment, point-by-distances, free point, angle); negative cases return `not-handled` (the fallback boundary); parse→engine end-to-end; coverage measure on the in-grammar sample. Build clean.
+- **Scope note:** the grammar covers the **engine's current vocabulary** only. Higher-level phrasings ("triangle ABC", circles, parallel/perpendicular, …) deliberately return `not-handled` and widen **in lock-step with the engine in Phase 5** — the grammar table grows as each construct lands. Genuine miss-rate against real inputs is measured once the corpus is automatable (post-Phase-5).
 - **Risk:** R2 (parser coverage vs fallback rate / cost).
 
 ---

@@ -9,10 +9,10 @@
  * same pipeline. i18n is wired with Hebrew default and RTL. Old UI lives in
  * /archive for reference.
  */
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
-import type { Command, Id } from '@/engine';
+import { parse } from '@/parser';
 import { Figure } from '@/render';
 import { introducedIds, replay, useGeoStore } from '@/store/geoStore';
 
@@ -31,6 +31,22 @@ export default function App() {
   const canUndo = useStore(useGeoStore.temporal, (s) => s.pastStates.length > 0);
   const canRedo = useStore(useGeoStore.temporal, (s) => s.futureStates.length > 0);
 
+  const [text, setText] = useState('');
+  const [notUnderstood, setNotUnderstood] = useState(false);
+
+  // The single text → command[] path: parse, then run each command through the
+  // store. Out-of-grammar input shows a hint (Phase 7 will escalate to the LLM).
+  function submit(utterance: string) {
+    const r = parse(utterance);
+    if (!r.ok) {
+      setNotUnderstood(true);
+      return;
+    }
+    setNotUnderstood(false);
+    r.commands.forEach((c) => execute(c, utterance));
+    setText('');
+  }
+
   // Figure + per-fact status are derived from the fact list.
   const { construction, positions, status, lastError } = useMemo(() => replay(facts), [facts]);
 
@@ -46,28 +62,7 @@ export default function App() {
   }, [i18n, i18n.language]);
 
   const branchId = construction.objects.find((o) => o.kind === 'intersection')?.id;
-  const has = (id: Id) => construction.objects.some((o) => o.id === id);
-  const isEmpty = construction.objects.length === 0;
-
-  // Quick facts are gated to the states where they apply (the engine's
-  // commandConflict guard is the real safety net behind this).
-  const QUICK: { key: string; enabled: boolean; run: () => void }[] = [
-    { key: 'demo.square', enabled: !has('A'), run: () => execute({ type: 'square', ids: ['A', 'B', 'C', 'D'] }, t('demo.square')) },
-    { key: 'demo.pointOn', enabled: has('A') && has('D') && !has('G'), run: () => execute({ type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 }, t('demo.pointOn')) },
-    { key: 'demo.badAngle', enabled: has('G'), run: () => execute({ type: 'set-angle', vertex: 'A', ray1: 'G', ray2: 'B', value: 37 }, t('demo.badAngle')) },
-    {
-      key: 'demo.triangle',
-      enabled: isEmpty,
-      run: () => {
-        const tri: Command[] = [
-          { type: 'free-point', id: 'A', x: 0, y: 0 },
-          { type: 'free-point', id: 'B', x: 6, y: 0 },
-          { type: 'point-by-distances', id: 'C', from1: 'A', dist1: 5, from2: 'B', dist2: 5, branch: 0 },
-        ];
-        tri.forEach((c) => execute(c, t('demo.triangle')));
-      },
-    },
-  ];
+  const examples = t('examples.items', { returnObjects: true }) as string[];
 
   return (
     <div style={page}>
@@ -85,17 +80,37 @@ export default function App() {
         <Figure construction={construction} positions={positions} width={560} height={560} highlight={highlight} />
 
         <aside style={sidebar}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <input style={input} placeholder={t('input.placeholder')} disabled />
-            <span style={{ fontSize: 11, color: '#94a3b8' }}>{t('input.disabledNote')}</span>
-          </div>
+          <form
+            style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (text.trim()) submit(text);
+            }}
+          >
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                style={input}
+                placeholder={t('input.placeholder')}
+                value={text}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  if (notUnderstood) setNotUnderstood(false);
+                }}
+                autoFocus
+              />
+              <button type="submit" style={sendBtn} disabled={!text.trim()}>
+                {t('input.send')}
+              </button>
+            </div>
+            {notUnderstood && <span style={{ fontSize: 12, color: '#b45309' }}>{t('input.notUnderstood')}</span>}
+          </form>
 
           <div>
-            <div style={sectionLabel}>{t('demo.heading')}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {QUICK.map((q) => (
-                <button key={q.key} type="button" style={q.enabled ? quick : quickDisabled} disabled={!q.enabled} onClick={q.run}>
-                  {t(q.key)}
+            <div style={sectionLabel}>{t('examples.heading')}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {examples.map((ex) => (
+                <button key={ex} type="button" style={chip} onClick={() => submit(ex)} dir="auto">
+                  {ex}
                 </button>
               ))}
             </div>
@@ -166,12 +181,32 @@ const main: React.CSSProperties = { display: 'flex', gap: 24, alignItems: 'flex-
 const sidebar: React.CSSProperties = { width: 340, display: 'flex', flexDirection: 'column', gap: 16 };
 const sectionLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 };
 const input: React.CSSProperties = {
+  flex: 1,
   padding: '10px 12px',
   fontSize: 14,
   borderRadius: 8,
   border: '1px solid #cbd5e1',
-  background: '#f1f5f9',
-  color: '#94a3b8',
+  background: '#fff',
+  color: '#0f172a',
+};
+const sendBtn: React.CSSProperties = {
+  padding: '10px 16px',
+  fontSize: 14,
+  borderRadius: 8,
+  border: '1px solid #2563eb',
+  background: '#2563eb',
+  color: '#fff',
+  cursor: 'pointer',
+};
+const chip: React.CSSProperties = {
+  padding: '6px 10px',
+  fontSize: 12,
+  borderRadius: 999,
+  border: '1px solid #bfdbfe',
+  background: '#eff6ff',
+  color: '#1e40af',
+  cursor: 'pointer',
+  fontFamily: 'ui-monospace, monospace',
 };
 const stepList: React.CSSProperties = { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 };
 const errorBanner: React.CSSProperties = {
@@ -189,22 +224,6 @@ const ghost: React.CSSProperties = {
   border: '1px solid #cbd5e1',
   background: '#fff',
   cursor: 'pointer',
-};
-const quick: React.CSSProperties = {
-  padding: '8px 12px',
-  fontSize: 13,
-  borderRadius: 8,
-  border: '1px solid #bfdbfe',
-  background: '#eff6ff',
-  cursor: 'pointer',
-  textAlign: 'start',
-};
-const quickDisabled: React.CSSProperties = {
-  ...quick,
-  border: '1px solid #e2e8f0',
-  background: '#f8fafc',
-  color: '#cbd5e1',
-  cursor: 'not-allowed',
 };
 const del: React.CSSProperties = {
   border: 'none',

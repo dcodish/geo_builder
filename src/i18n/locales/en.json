@@ -4,17 +4,21 @@
     "subtitle": "Build geometry step by step"
   },
   "input": {
-    "placeholder": "Describe your shape... (e.g., \"Triangle ABC where AB=5\")",
-    "send": "Send",
+    "placeholder": "Type a fact, e.g. \"square ABCD\" or \"point G on AD\"",
+    "send": "Add",
     "loading": "Thinking...",
-    "disabledNote": "Typing comes in Phase 4 — use the quick facts below for now."
+    "notUnderstood": "I couldn't read that yet — try one of the examples below."
   },
-  "demo": {
-    "heading": "Quick facts",
-    "square": "Square ABCD",
-    "pointOn": "Point G on AD",
-    "badAngle": "Set angle GAB = 37° (contradiction)",
-    "triangle": "Triangle: C is 5 from A and 5 from B"
+  "examples": {
+    "heading": "Examples — click to try, or type your own",
+    "items": [
+      "square ABCD",
+      "point G on AD at 40%",
+      "point A at (0,0)",
+      "point B at (6,0)",
+      "C is 5 from A and 5 from B",
+      "angle GAB = 37"
+    ]
   },
   "steps": {
     "title": "Steps",
