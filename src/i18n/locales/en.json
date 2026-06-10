@@ -6,7 +6,15 @@
   "input": {
     "placeholder": "Describe your shape... (e.g., \"Triangle ABC where AB=5\")",
     "send": "Send",
-    "loading": "Thinking..."
+    "loading": "Thinking...",
+    "disabledNote": "Typing comes in Phase 4 — use the quick facts below for now."
+  },
+  "demo": {
+    "heading": "Quick facts",
+    "square": "Square ABCD",
+    "pointOn": "Point G on AD",
+    "badAngle": "Set angle GAB = 37° (contradiction)",
+    "triangle": "Triangle: C is 5 from A and 5 from B"
   },
   "steps": {
     "title": "Steps",
@@ -30,6 +38,7 @@
     "redo": "Redo",
     "clear": "Clear all",
     "flip": "Flip",
+    "another": "Show another configuration",
     "language": "עברית"
   },
   "geometry": {

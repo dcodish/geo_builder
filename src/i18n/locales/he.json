@@ -6,7 +6,15 @@
   "input": {
     "placeholder": "תאר את הצורה... (לדוגמה: \"משולש ABC כאשר AB=5\")",
     "send": "שלח",
-    "loading": "חושב..."
+    "loading": "חושב...",
+    "disabledNote": "הקלדה תגיע בשלב 4 — השתמש בעובדות המהירות בינתיים."
+  },
+  "demo": {
+    "heading": "עובדות מהירות",
+    "square": "ריבוע ABCD",
+    "pointOn": "נקודה G על AD",
+    "badAngle": "קבע זווית GAB = 37° (סתירה)",
+    "triangle": "משולש: C במרחק 5 מ-A ומ-B"
   },
   "steps": {
     "title": "צעדים",
@@ -30,6 +38,7 @@
     "redo": "חזור",
     "clear": "נקה הכל",
     "flip": "הפוך",
+    "another": "הצג תצורה אחרת",
     "language": "English"
   },
   "geometry": {

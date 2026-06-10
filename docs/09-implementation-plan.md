@@ -2,7 +2,7 @@
 
 _Last updated: 2026-06-10._
 
-> **Status:** Phases 0–2 complete (engine core proven at M1; SVG renderer green). **Next:** Phase 3 (store & app shell) → Phase 5a → reproduce corpus Q1. Work is on branch `rebuild-foundation`.
+> **Status:** Phases 0–3 complete (engine M1; SVG renderer; store + app shell — milestone M2). **Next:** Phase 4 (grammar parser) → Phase 5a → reproduce corpus Q1. Work is on branch `rebuild-foundation`.
 
 ## Purpose
 
@@ -60,13 +60,15 @@ Scaffold, archive of the old implementation, the `docs/` set, lint config, and t
 
 ---
 
-### Phase 3 — Store & app shell
+### Phase 3 — Store & app shell ✅ complete
 
+- **Status:** done — `src/store/geoStore.ts` (Zustand + `zundo` temporal) + `src/store/__tests__/phase3.test.ts` (9/9 green); `App.tsx` rebuilt as the store-driven shell (canvas + step log + undo/redo/clear + alternatives toggle + language toggle, Hebrew default / RTL); typecheck/build clean. Milestone M2 reached.
 - **Goal:** a usable loop — drive the engine + renderer through real app state.
-- **Builds:** Zustand store (+ `zundo`); `executeCommand` pipeline (apply→validate→solve→recompute→history); undo/redo; clear; error-step handling (keep prior figure on failure); minimal UI shell (input field, canvas, step list); i18n wired (Hebrew default, RTL).
+- **Builds:** Zustand store (+ `zundo`); `execute` pipeline (apply→evaluate→keep-prior-on-error→log); undo/redo; clear; error-step handling (keep prior figure on failure, surface message, cleared by next success); minimal UI shell (canvas, step list, controls); i18n wired (Hebrew default, RTL via `document.dir`).
 - **Depends on:** Phases 1–2.
 - **Requirements:** FR-HS-1, -2, -3; FR-EN-10; FR-I18N-1, -2; US-5, US-6, US-8.
-- **Gate:** store integration tests (pipeline, undo/redo, clear, error step); i18n key-parity test; manual end-to-end of a hardcoded scenario through the UI.
+- **Gate:** ✅ store integration tests (pipeline, stability, keep-prior-on-error, undo/redo, clear, alternatives); i18n key-parity test; build clean. **Manual e2e:** the text input is disabled (parser is Phase 4); a "quick facts" row drives the same store pipeline so the loop is exercisable in the browser now.
+- **Note:** positions are **not** stored — they're derived from the construction via `evaluate` in the view, so undo history stays minimal and state/coordinates can't drift. The error banner is excluded from temporal history (`partialize`).
 
 ---
 
