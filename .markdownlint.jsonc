@@ -1,0 +1,11 @@
+{
+  // Markdown conventions for this repo's docs (docs/, CLAUDE.md, etc.).
+  // The rules below are purely stylistic and not worth enforcing on
+  // hand-written design documents — disabling them keeps the editor quiet
+  // without churning prose. Tighten any of these if you prefer stricter style.
+  "MD013": false, // line-length — prose and tables legitimately run long
+  "MD040": false, // fenced-code-language — ASCII diagrams have no language
+  "MD049": false, // emphasis-style — allow either * or _ for italics
+  "MD050": false, // strong-style — allow either ** or __ for bold
+  "MD060": false  // table-column-style — pipe spacing
+}

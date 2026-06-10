@@ -12,7 +12,6 @@
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "jsxgraph": "^1.12.0",
     "zustand": "^5.0.3",
     "zundo": "^2.3.0",
     "i18next": "^24.2.2",

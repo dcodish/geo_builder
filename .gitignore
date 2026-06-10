@@ -3,3 +3,9 @@ dist
 .env
 .env.local
 *.local
+
+# Editor / atomic-write temp and backup files
+*.tmp.*
+*~
+*.bak
+*.swp
