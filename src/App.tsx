@@ -33,7 +33,7 @@ export default function App() {
 
   const [text, setText] = useState('');
   const [notUnderstood, setNotUnderstood] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
+  const [showHelp, setShowHelp] = useState(true); // visible by default so supported commands are discoverable
   const he = i18n.language === 'he';
 
   // The single text → command[] path: parse, then run each command through the
