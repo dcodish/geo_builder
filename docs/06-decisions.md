@@ -138,7 +138,7 @@ _Last updated: 2026-06-10. Each entry records a decision, its context, and conse
 
 ## ADR-012 — Constraints may solve a free DOF constructively (Phase 5)
 
-**Status:** Accepted (2026-06-10) · **planned for Phase 5** (not yet implemented)
+**Status:** Accepted (2026-06-10) · **first slice implemented** — an angle whose vertex is a point-on-segment now solves the parameter `t` (deterministic scan + bisection, branch-indexed, reverts on delete via replay). Remaining cases (on-segment as a *ray*, free-point DOFs, distance/parallel/perpendicular drivers) still to come.
 
 **Context.** Phase 1 implemented the angle constraint as a satisfiability **check** only: the referenced points are already determined, so a constraint can only confirm or contradict. This collides with the vision (FR-EN-3/-4/-5: distance, angle, right-angle, parallel, perpendicular, equal-segments are meant to *shape* the figure). Concretely: with a square `TYUI` and `G` on `IU` at the default midpoint, `angle UGY = 50°` is rejected (the figure says 63.4°) — even though `G` has one free parameter and sliding it to `t≈0.16` would make the angle exactly 50°. The engine never looked, because it doesn't *solve* constraints.
 

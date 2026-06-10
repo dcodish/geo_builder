@@ -10,7 +10,7 @@
 import type { Command, Construction, Id, Vec } from './types';
 import { applyCommand } from './apply';
 import { evaluate } from './evaluate';
-import { circleCircleIntersect, dist } from './geometry';
+import { circleCircleIntersect, dist, solveAngleOnSegment } from './geometry';
 
 export interface StepOk {
   ok: true;
@@ -113,23 +113,36 @@ export function build(cmds: Command[], start: Construction = emptyConstruction()
   return { construction: cur, positions: e.positions };
 }
 
-/** Number of valid solution branches for an intersection point (0/1/2). */
+/** Number of valid solution branches for a branchable point (0/1/2). */
 export function branchCount(c: Construction, id: Id): number {
   const o = c.objects.find((x) => x.id === id);
-  if (!o || o.kind !== 'intersection') return 0;
+  if (!o) return 0;
   const e = evaluate(c);
   if (!e.ok) return 0;
-  const c1 = e.positions.get(o.center1);
-  const c2 = e.positions.get(o.center2);
-  if (!c1 || !c2) return 0;
-  return circleCircleIntersect(c1, o.radius1, c2, o.radius2).length;
+  if (o.kind === 'intersection') {
+    const c1 = e.positions.get(o.center1);
+    const c2 = e.positions.get(o.center2);
+    if (!c1 || !c2) return 0;
+    return circleCircleIntersect(c1, o.radius1, c2, o.radius2).length;
+  }
+  if (o.kind === 'on-seg-angle') {
+    const a = e.positions.get(o.a);
+    const b = e.positions.get(o.b);
+    const r1 = e.positions.get(o.r1);
+    const r2 = e.positions.get(o.r2);
+    if (!a || !b || !r1 || !r2) return 0;
+    return solveAngleOnSegment(a, b, r1, r2, o.value).length;
+  }
+  return 0;
 }
 
-/** Advance an intersection point to its next solution branch (wraps). */
+/** Advance a branchable point (intersection or angle-solved) to its next solution branch (wraps). */
 export function cycleAlternative(c: Construction, id: Id): Construction {
   const n = branchCount(c, id) || 1;
   const objects = c.objects.map((o) =>
-    o.id === id && o.kind === 'intersection' ? { ...o, branch: (o.branch + 1) % n } : o,
+    o.id === id && (o.kind === 'intersection' || o.kind === 'on-seg-angle')
+      ? { ...o, branch: (o.branch + 1) % n }
+      : o,
   );
   return { ...c, objects };
 }

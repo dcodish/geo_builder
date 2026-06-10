@@ -61,6 +61,58 @@ export function lineLineIntersect(a: Vec, b: Vec, c: Vec, d: Vec): Vec | null {
   return add(a, scale(r, t));
 }
 
+/**
+ * Solve for parameters t ∈ [tMin,tMax] where the point P(t) = a + t·(b−a) makes
+ * ∠(r1, P(t), r2) equal `value` degrees. Deterministic: scan for sign changes of
+ * angle(t)−value, then bisect each bracket (ADR-012 constraint-driven DOF). May
+ * return 0, 1, or 2 solutions; returned ascending. Non-finite samples (P at r1/r2)
+ * are skipped.
+ */
+export function solveAngleOnSegment(
+  a: Vec,
+  b: Vec,
+  r1: Vec,
+  r2: Vec,
+  value: number,
+  tMin = 0,
+  tMax = 1,
+  steps = 256,
+): number[] {
+  const f = (t: number): number => angleDeg(add(a, scale(sub(b, a), t)), r1, r2) - value;
+  const roots: number[] = [];
+  let pt = tMin;
+  let pf = f(tMin);
+  for (let i = 1; i <= steps; i++) {
+    const t = tMin + ((tMax - tMin) * i) / steps;
+    const ft = f(t);
+    if (isFinite(pf) && isFinite(ft) && pf !== 0 && (pf < 0) !== (ft < 0)) {
+      // bisect the bracket [pt, t]
+      let lo = pt;
+      let hi = t;
+      let flo = pf;
+      for (let k = 0; k < 60; k++) {
+        const mid = (lo + hi) / 2;
+        const fm = f(mid);
+        if (!isFinite(fm)) {
+          lo = mid;
+          continue;
+        }
+        if (flo < 0 === fm < 0) {
+          lo = mid;
+          flo = fm;
+        } else {
+          hi = mid;
+        }
+      }
+      const r = (lo + hi) / 2;
+      if (!roots.some((o) => Math.abs(o - r) < 1e-7)) roots.push(r);
+    }
+    pt = t;
+    pf = ft;
+  }
+  return roots;
+}
+
 export function circleCircleIntersect(c1: Vec, r1: number, c2: Vec, r2: number): Vec[] {
   const d = dist(c1, c2);
   if (d < 1e-9) return []; // concentric — no discrete intersection
