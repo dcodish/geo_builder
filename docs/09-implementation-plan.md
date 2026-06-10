@@ -2,7 +2,7 @@
 
 _Last updated: 2026-06-10._
 
-> **Status:** Phases 0–4 complete (M1–M3). **Phase 5a complete** (quad, parallelogram, segment, line∩line; **Q1 reproduced**). **Polygon family added** — triangle, rectangle, rhombus, trapezoid (engine + grammar + tests). **In-app command reference** added (`parser/catalog.ts` → help panel; discoverability). **Next (Phase 5b):** parallel-line construct, perpendicular + foot, angle bisector, point-on-ray/extension, right-triangle → Q2–Q4; then 5c (circles), 5d (constraint-driven DOF). Work is on branch `rebuild-foundation`.
+> **Status:** Phases 0–4 complete (M1–M3). **Phase 5a complete** (quad, parallelogram, segment, line∩line; **Q1 reproduced**). **Polygon family** — triangle, rectangle, rhombus, trapezoid. **In-app command reference** (`parser/catalog.ts` → help panel). **Phase 5d first slice** — angle whose vertex is on-segment solves the point (ADR-012). 98 tests green. **Next (Phase 5b):** a **line** object → parallel-line + perpendicular + foot, angle bisector, point-on-ray/extension, right-triangle → Q2–Q4; then 5c (circles); finish 5d. Work is on branch `rebuild-foundation`.
 
 ## Purpose
 
