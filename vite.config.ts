@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -11,4 +12,8 @@ export default defineConfig({
     },
   },
   cacheDir: path.resolve(process.env.LOCALAPPDATA || '', 'vite-cache/geo-builder'),
+  test: {
+    // archive/ holds the old implementation for reference only — never run or typecheck its tests.
+    exclude: ['**/node_modules/**', '**/dist/**', 'archive/**'],
+  },
 });

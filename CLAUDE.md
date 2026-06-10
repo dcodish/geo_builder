@@ -8,12 +8,16 @@ Geo Builder is a browser app where Israeli high-school students describe a geome
 
 The defining interaction: a student adds information incrementally — "square ABCD" → "point G on AD" → "angle GAB = 37°" — and the figure forms and adapts as constraints accumulate. When a construction has more than one valid drawing, one is shown and the student can press a button to cycle to an alternative configuration.
 
-## Current state: from-scratch rebuild in progress
+## Current state (rebuild in progress — gate-driven, see [docs/09-implementation-plan.md](docs/09-implementation-plan.md))
 
-**The geometry engine is being rebuilt from scratch.** The original implementation was a *shape-template matcher* (it recognized "this is a square/triangle" and placed vertices analytically) and dead-ended: it couldn't represent free points, points-on-objects, arbitrary accumulating constraints, or enumerate alternative configurations.
+The original implementation was a *shape-template matcher* that dead-ended (couldn't represent free points, points-on-objects, accumulating constraints, or alternative configurations). Rebuilding from scratch as a constructive engine. **Phase 1 (engine core) is complete; the app UI is still a placeholder.**
 
-- **`src/` currently holds only scaffolding** — React bootstrap (`main.tsx`), a placeholder `App.tsx`, i18n setup, and styles. The engine, store, parser, renderer, and UI described below are **the target design, not yet built**. Don't go looking for them yet.
-- **`archive/`** holds the entire old template-based implementation (engine, store, JSXGraph canvas, LLM service, components, types). It's outside `src/`, so it is **not compiled or bundled** — keep it only as reference. Useful references in there: the old Claude tool schema (`archive/src/services/llm/`) and theorem predicates (`archive/src/engine/theorems/`).
+- **`src/engine/`** — the constructive engine: dependency-graph data model (`types.ts`), pure `geometry.ts`, `applyCommand` reducer, topological `evaluate` (with over-constraint detection), and `step` (apply/keep-prior, `cycleAlternative`, `branchCount`). Tested in `src/engine/__tests__/phase1.test.ts` — **6/6 green** (build+stability, alternatives, over-constraint, determinism, idempotency); milestone M1 reached. Supported constructs **so far**: `square`, point-on-segment, circle∩circle intersection, angle-check. Breadth comes in Phase 5.
+- **`src/` app shell** — `main.tsx`, placeholder `App.tsx`, i18n, styles. The **renderer, store, parser, and UI are not built yet** (Phases 2–4).
+- **`archive/`** holds the entire old template-based implementation — outside `src/`, **not compiled or bundled, and excluded from tests** (`vite.config.ts`). Reference only; useful bits: the old Claude tool schema (`archive/src/services/llm/`) and theorem predicates (`archive/src/engine/theorems/`).
+- **Validation corpus:** `docs/sample questions/` holds 7 real bagrut problems (text + image). The plan is corpus-driven — we reproduce each *figure* (never solve) and compare to the official image.
+
+**Next step (resume here):** Phase 2 (minimal SVG renderer) → Phase 5a (general quadrilateral + arbitrary segment + line∩line) → reproduce corpus **Q1** side-by-side with its image. The build is on branch `rebuild-foundation`.
 
 ## Documentation
 

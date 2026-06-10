@@ -1,6 +1,6 @@
 # 04 — Design & Architecture
 
-_Last updated: 2026-06-10. Status: target design (not yet implemented)._
+_Last updated: 2026-06-10. Status: design; engine core (Phase 1) implemented in `src/engine/`, renderer/store/parser/UI still pending._
 
 ## 1. Guiding principles
 

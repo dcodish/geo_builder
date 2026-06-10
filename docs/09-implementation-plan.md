@@ -2,6 +2,8 @@
 
 _Last updated: 2026-06-10._
 
+> **Status:** Phases 0–1 complete (engine core proven, milestone M1) — paused here. **Next:** Phase 2 (minimal SVG renderer) → Phase 5a → reproduce corpus Q1. Work is on branch `rebuild-foundation`.
+
 ## Purpose
 
 The phased plan for building v1: what each phase delivers, what it depends on, which requirements it satisfies, and the gate that closes it. This is the authoritative plan; [Design §10](04-design.md) is the one-line summary and [Testing §Per-step gates](08-testing-strategy.md) holds the detailed acceptance criteria.
@@ -13,6 +15,17 @@ The phased plan for building v1: what each phase delivers, what it depends on, w
 - **Vertical proof, then breadth.** Phases 1–3 prove the full pipeline on a thin slice; Phase 5 widens coverage to all of v1.
 - No time estimates here — sequencing and dependencies only. (Estimates can be added if scheduling is needed.)
 
+## Validation corpus (real questions drive the build)
+
+Correctness is judged against **real bagrut questions** (text + official image) in [`sample questions/`](sample%20questions/), not only self-authored fixtures. For each, we reproduce the **figure from the givens** — never the algebra (solving is a non-goal; see [Vision](01-vision.md)).
+
+- **Multi-stage.** A question's later parts (ב, ג, ד…) add givens — the figure accumulates them, which is the incremental model itself (FR-EN-7). A corpus entry captures the figure at each relevant stage; the engine must stay stable as stages accumulate.
+- **Comparison is visual/structural, human-judged**, up to the figure's free transforms (placement, rotation, scale, reflection) and the chosen alternative branch — not pixel-matching. "Match" = a valid drawing of the givens, consistent with the official image.
+- **Before the parser (Phase 4):** questions are **hand-encoded** into commands (we play the parser); the engine → render → eyeball loop validates the engine early. After Phase 4 the same corpus becomes an automatic text→image test.
+- Each reproduced figure is frozen as a **golden fixture**.
+
+**Current corpus:** 7 questions — two parallelograms, one rhombus, one right triangle (Q1–Q4), and three circle problems (Q5–Q7: a triangle inscribed with an arc-midpoint; a chord and diameter intersecting, plus a parallel-line∩circle point; an inscribed triangle with a tangent at a point). Together they exercise the full v1 construct vocabulary (table in Phase 5).
+
 ## Phases
 
 ### Phase 0 — Foundation ✅ (complete)
@@ -21,8 +34,9 @@ Scaffold, archive of the old implementation, the `docs/` set, lint config, and t
 
 ---
 
-### Phase 1 — Engine core (make-or-break)
+### Phase 1 — Engine core (make-or-break) ✅ complete
 
+- **Status:** done — `src/engine/` + `src/engine/__tests__/phase1.test.ts` (6/6 green); milestone M1 reached. Supported constructs so far: `square`, point-on-segment, circle∩circle intersection, angle-check.
 - **Goal:** prove the constructive model end-to-end on fixtures, no parser/UI.
 - **Builds:** the dependency-graph data model; `applyCommand` reducer; topological evaluation; point kinds (free / on-segment / intersection); branch selection + cycle; over-constraint detection; structural stability (persistent DOF + branch indices).
 - **Depends on:** Phase 0.
@@ -39,6 +53,7 @@ Scaffold, archive of the old implementation, the `docs/` set, lint config, and t
 - **Depends on:** Phase 1 (consumes computed figures).
 - **Requirements:** FR-RN-1, -2, -3, -4.
 - **Gate:** renderer component tests (figure → expected SVG nodes); transform unit tests; visual check of F1/F2.
+- **Enables the validation loop:** with the renderer, hand-encoded corpus questions can be rendered and compared to their official images — validating the engine *before* the parser exists.
 - **Risk:** low — pure consumer of engine output; renderer is swappable.
 
 ---
@@ -64,13 +79,37 @@ Scaffold, archive of the old implementation, the `docs/` set, lint config, and t
 
 ---
 
-### Phase 5 — Full v1 coverage
+### Phase 5 — Full v1 coverage (corpus-driven)
 
-- **Goal:** widen the engine + parser + renderer to the whole v1 scope.
-- **Builds:** circles; midpoints, foot-of-perpendicular, on-circle points; special lines (height, median, angle bisector, perpendicular bisector, midsegment); equal-segments and remaining constraints; broader figures.
-- **Depends on:** Phases 1–4.
-- **Requirements:** FR-EN-3, -4, -5 (full); broader FR-IN coverage.
-- **Gate:** solve-correctness across the expanded fixture set; stability still holds; parser table extended.
+Widen the engine and renderer (and, after Phase 4, the parser) to the construct vocabulary the real corpus demands. Derived from the current 4 questions:
+
+| Construct | Appears in | In engine now |
+|---|---|:--:|
+| General quadrilateral (parallelogram, rhombus; → rectangle / square / trapezoid / kite) | Q1, Q2, Q3 | ✗ (square only) |
+| Arbitrary segment between two points (diagonal, cevian) | all | ✗ (trivial) |
+| Point on a segment at a given ratio | Q1, Q3 | ✓ |
+| Angle bisector (constructive line) | Q2, Q4 | ✗ |
+| Line–line intersection point | Q2, Q4 | ✗ (circle∩circle only) |
+| Point on an extension / ray (t ∉ [0,1]) | Q2, Q3 | ✗ |
+| Perpendicular + foot / distance to a line | Q3, Q4 | ✗ |
+| Right-triangle construction | Q4 | ✗ |
+| Parallel-line construction | Q6 (+ quads) | ✗ |
+| Circle (center + radius) | Q5, Q6, Q7 | ✗ |
+| Point on a circle / inscribed vertex | Q5, Q6, Q7 | ✗ |
+| Arc midpoint | Q5 | ✗ |
+| Diameter (chord through the centre) | Q6, Q7 | ✗ |
+| Line∩circle intersection | Q6 | ✗ (circle∩circle only) |
+| Tangent to a circle at a point | Q7 | ✗ |
+
+Sub-phases — each ends by **reproducing its corpus questions** (gated per [Testing](08-testing-strategy.md)):
+
+- **5a — Quads & segments:** general quadrilateral + arbitrary segment + line–line intersection → reproduce **Q1**.
+- **5b — Bisectors, extensions, perpendiculars:** angle bisector, point-on-ray/extension, perpendicular + foot, right-triangle construction → reproduce **Q2, Q3, Q4**.
+- **5c — Circles:** circle (center + radius), point-on-circle / inscribed vertices, chord & diameter, arc midpoint, line∩circle, tangent-at-a-point → reproduce **Q5, Q6, Q7**.
+
+- **Depends on:** Phases 1–4 (engine + renderer; parser for the automatic path).
+- **Requirements:** FR-EN-3, -4, -5 (full).
+- **Gate:** every corpus figure reproduced (visual match up to free transforms / branch); solve-correctness on fixtures; stability holds.
 
 ---
 
