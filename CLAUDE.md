@@ -10,14 +10,15 @@ The defining interaction: a student adds information incrementally — "square A
 
 ## Current state (rebuild in progress — gate-driven, see [docs/09-implementation-plan.md](docs/09-implementation-plan.md))
 
-The original implementation was a *shape-template matcher* that dead-ended (couldn't represent free points, points-on-objects, accumulating constraints, or alternative configurations). Rebuilding from scratch as a constructive engine. **Phase 1 (engine core) is complete; the app UI is still a placeholder.**
+The original implementation was a *shape-template matcher* that dead-ended (couldn't represent free points, points-on-objects, accumulating constraints, or alternative configurations). Rebuilding from scratch as a constructive engine. **Phases 1–2 (engine core + SVG renderer) are complete; the app shell is a thin Phase-2 demo, not yet a real store-driven UI.**
 
 - **`src/engine/`** — the constructive engine: dependency-graph data model (`types.ts`), pure `geometry.ts`, `applyCommand` reducer, topological `evaluate` (with over-constraint detection), and `step` (apply/keep-prior, `cycleAlternative`, `branchCount`). Tested in `src/engine/__tests__/phase1.test.ts` — **6/6 green** (build+stability, alternatives, over-constraint, determinism, idempotency); milestone M1 reached. Supported constructs **so far**: `square`, point-on-segment, circle∩circle intersection, angle-check. Breadth comes in Phase 5.
-- **`src/` app shell** — `main.tsx`, placeholder `App.tsx`, i18n, styles. The **renderer, store, parser, and UI are not built yet** (Phases 2–4).
+- **`src/render/`** — the SVG renderer (Phase 2): pure `transform.ts` (isotropic fit, centred, Y-flipped world→screen) and `scene.ts` (`Construction` + `positions` → flat primitives, no React), with `Figure.tsx` a thin declarative SVG map over the scene plus pan/zoom/reset. Tested in `src/render/__tests__/phase2.test.tsx` — **9/9 green** (transform, scene "figure → nodes", DOM-free static render via `react-dom/server`; no jsdom). The renderer is a **pure consumer** of engine output and swappable.
+- **`src/` app shell** — `main.tsx`, i18n, styles, and `App.tsx` now a **live Phase-2 demo** wiring engine → `Figure` (F2 triangle with a working "show another configuration" toggle). The **store, parser, and real UI are not built yet** (Phases 3–4).
 - **`archive/`** holds the entire old template-based implementation — outside `src/`, **not compiled or bundled, and excluded from tests** (`vite.config.ts`). Reference only; useful bits: the old Claude tool schema (`archive/src/services/llm/`) and theorem predicates (`archive/src/engine/theorems/`).
 - **Validation corpus:** `docs/sample questions/` holds 7 real bagrut problems (text + image). The plan is corpus-driven — we reproduce each *figure* (never solve) and compare to the official image.
 
-**Next step (resume here):** Phase 2 (minimal SVG renderer) → Phase 5a (general quadrilateral + arbitrary segment + line∩line) → reproduce corpus **Q1** side-by-side with its image. The build is on branch `rebuild-foundation`.
+**Next step (resume here):** Phase 3 (Zustand store + app shell: command pipeline, undo/redo, error-step handling, i18n wired) → Phase 5a (general quadrilateral + arbitrary segment + line∩line) → reproduce corpus **Q1** side-by-side with its image. The build is on branch `rebuild-foundation`.
 
 ## Project memory (rule)
 

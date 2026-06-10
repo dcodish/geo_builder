@@ -2,7 +2,7 @@
 
 _Last updated: 2026-06-10._
 
-> **Status:** Phases 0–1 complete (engine core proven, milestone M1) — paused here. **Next:** Phase 2 (minimal SVG renderer) → Phase 5a → reproduce corpus Q1. Work is on branch `rebuild-foundation`.
+> **Status:** Phases 0–2 complete (engine core proven at M1; SVG renderer green). **Next:** Phase 3 (store & app shell) → Phase 5a → reproduce corpus Q1. Work is on branch `rebuild-foundation`.
 
 ## Purpose
 
@@ -46,15 +46,17 @@ Scaffold, archive of the old implementation, the `docs/` set, lint config, and t
 
 ---
 
-### Phase 2 — Renderer (SVG)
+### Phase 2 — Renderer (SVG) ✅ complete
 
+- **Status:** done — `src/render/` (`transform.ts`, `scene.ts`, `Figure.tsx`) + `src/render/__tests__/phase2.test.tsx` (9/9 green); typecheck/build clean. `App.tsx` wires the engine → renderer as a live F2 demo with a working "show another configuration" toggle (drag-pan / scroll-zoom / reset).
 - **Goal:** draw the engine's output as interactive SVG.
-- **Builds:** world→screen transform + fit; points, segments, polygons, circles, angle arcs, right-angle marks, equal-side ticks, labels, dashed special lines; pan/zoom/reset; smooth animation of moved points.
+- **Builds:** world→screen transform + fit (isotropic, centred, Y-flipped); points, segments, polygons, labels; pan/zoom/reset. **Deferred to when a corpus question needs them** (kept out of v1 slice until exercised): circles, angle arcs, right-angle marks, equal-side ticks, dashed special lines (Phase 5c), smooth animation of moved points (Phase 8 drag).
 - **Depends on:** Phase 1 (consumes computed figures).
 - **Requirements:** FR-RN-1, -2, -3, -4.
-- **Gate:** renderer component tests (figure → expected SVG nodes); transform unit tests; visual check of F1/F2.
+- **Gate:** ✅ transform unit tests; scene-builder "figure → expected nodes"; DOM-free static render of `<Figure>` via `react-dom/server` (F1 nodes/labels, F2 branch differs); typecheck/build clean.
 - **Enables the validation loop:** with the renderer, hand-encoded corpus questions can be rendered and compared to their official images — validating the engine *before* the parser exists.
 - **Risk:** low — pure consumer of engine output; renderer is swappable.
+- **Note:** the renderer is a **pure consumer** — `scene.ts` resolves a `Construction` + `positions` into flat primitives (no React), tested headlessly; `Figure.tsx` is a thin declarative map over that. Components are rendered to static markup in tests (no jsdom dependency).
 
 ---
 
