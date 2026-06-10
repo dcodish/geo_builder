@@ -33,6 +33,20 @@ export function angleDeg(vertex: Vec, p1: Vec, p2: Vec): number {
  * deterministically ordered: index 0 is on the +perpendicular side of the
  * c1→c2 axis, index 1 on the −side. Used as the solution branches.
  */
+/**
+ * Intersection of the (infinite) line through a→b and the line through c→d.
+ * Returns null when the lines are parallel or coincident (no single point).
+ */
+export function lineLineIntersect(a: Vec, b: Vec, c: Vec, d: Vec): Vec | null {
+  const r = sub(b, a); // direction of line 1
+  const s = sub(d, c); // direction of line 2
+  const denom = r.x * s.y - r.y * s.x; // r × s
+  if (Math.abs(denom) < 1e-12) return null; // parallel/coincident
+  const ac = sub(c, a);
+  const t = (ac.x * s.y - ac.y * s.x) / denom;
+  return add(a, scale(r, t));
+}
+
 export function circleCircleIntersect(c1: Vec, r1: number, c2: Vec, r2: number): Vec[] {
   const d = dist(c1, c2);
   if (d < 1e-9) return []; // concentric — no discrete intersection

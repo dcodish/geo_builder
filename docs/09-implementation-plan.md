@@ -2,7 +2,7 @@
 
 _Last updated: 2026-06-10._
 
-> **Status:** Phases 0–4 complete (engine M1; renderer; store/shell M2; grammar parser — milestone M3, the text box is live). **Next:** Phase 5a (general quadrilateral + arbitrary segment + line∩line) → reproduce corpus Q1. Work is on branch `rebuild-foundation`.
+> **Status:** Phases 0–4 complete (M1–M3). **Phase 5a complete** — general quadrilateral, parallelogram, arbitrary segment, line∩line; **corpus Q1 reproduced** end-to-end from typed He/En utterances (8 engine + parser tests green). **Next:** Phase 5b (bisectors, extensions, perpendiculars → Q2–Q4). Work is on branch `rebuild-foundation`.
 
 ## Purpose
 
@@ -109,7 +109,7 @@ Widen the engine and renderer (and, after Phase 4, the parser) to the construct 
 
 Sub-phases — each ends by **reproducing its corpus questions** (gated per [Testing](08-testing-strategy.md)):
 
-- **5a — Quads & segments:** general quadrilateral + arbitrary segment + line–line intersection → reproduce **Q1**.
+- **5a — Quads & segments:** ✅ **complete** — general quadrilateral (4 free vertices), parallelogram (A,B,C free + D derived = A+C−B), arbitrary segment (undirected, idempotent id), line–line intersection (parallel ⇒ unconstructible). Grammar + renderer widened in lock-step (`isGeoPoint` is the single source of truth for point kinds). **Q1 reproduced** from typed utterances in both locales (`src/engine/__tests__/phase5a.test.ts`); structural assertions (parallelogram valid, E on AC between, segments AC/BE/BD present). Full suite 83/83, build clean.
 - **5b — Bisectors, extensions, perpendiculars:** angle bisector, point-on-ray/extension, perpendicular + foot, right-triangle construction → reproduce **Q2, Q3, Q4**.
 - **5c — Circles:** circle (center + radius), point-on-circle / inscribed vertices, chord & diameter, arc midpoint, line∩circle, tangent-at-a-point → reproduce **Q5, Q6, Q7**.
 - **5d — Constraint-driven DOF ([ADR-012](06-decisions.md)):** make constraints *shape* the figure, not just validate it — when a constraint references a point with a free DOF (on-object `t`, or a free point), solve that DOF deterministically (analytic / bounded 1-D); multiple solutions become alternatives; over-constraint still fires when nothing is free. Sequenced alongside the constructs that need it (e.g. angle/length driving a point-on-segment or free point). Today's behaviour (constraints = checks over fully-determined points) holds until this lands.

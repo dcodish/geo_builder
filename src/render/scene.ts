@@ -10,6 +10,7 @@
  */
 
 import type { Construction, Id, Vec } from '@/engine/types';
+import { isGeoPoint } from '@/engine/types';
 
 export interface ScenePoint {
   id: Id;
@@ -33,9 +34,6 @@ export interface Scene {
   polygons: ScenePolygon[];
 }
 
-const isPointKind = (kind: string): boolean =>
-  kind === 'free-point' || kind === 'on-segment' || kind === 'derived' || kind === 'intersection';
-
 /** Resolve a construction + computed positions into drawable primitives. */
 export function buildScene(c: Construction, positions: Map<Id, Vec>): Scene {
   const points: ScenePoint[] = [];
@@ -43,7 +41,7 @@ export function buildScene(c: Construction, positions: Map<Id, Vec>): Scene {
   const polygons: ScenePolygon[] = [];
 
   for (const o of c.objects) {
-    if (isPointKind(o.kind)) {
+    if (isGeoPoint(o)) {
       const pos = positions.get(o.id);
       if (pos) points.push({ id: o.id, pos, label: o.id });
       continue;

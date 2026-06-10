@@ -6,8 +6,8 @@
  */
 
 import type { Construction, GeoPoint, Id, Vec } from './types';
-import { ANGLE_EPS } from './types';
-import { add, angleDeg, circleCircleIntersect, rot90, scale, sub } from './geometry';
+import { ANGLE_EPS, isGeoPoint } from './types';
+import { add, angleDeg, circleCircleIntersect, lineLineIntersect, rot90, scale, sub } from './geometry';
 
 export interface EvalOk {
   ok: true;
@@ -21,10 +21,7 @@ export type EvalResult = EvalOk | EvalErr;
 
 export function evaluate(c: Construction): EvalResult {
   const pos = new Map<Id, Vec>();
-  const points = c.objects.filter(
-    (o): o is GeoPoint =>
-      o.kind === 'free-point' || o.kind === 'on-segment' || o.kind === 'derived' || o.kind === 'intersection',
-  );
+  const points = c.objects.filter(isGeoPoint);
   const remaining = new Set(points.map((p) => p.id));
 
   let progressed = true;
@@ -97,6 +94,25 @@ function tryEval(p: GeoPoint, pos: Map<Id, Vec>): Vec | 'pending' | string {
         return `cannot construct ${p.id}: the two distance circles do not intersect`;
       }
       return sols[p.branch % sols.length];
+    }
+
+    case 'parallelogram-vertex': {
+      const a = pos.get(p.a);
+      const b = pos.get(p.b);
+      const c = pos.get(p.c);
+      if (!a || !b || !c) return 'pending';
+      return { x: a.x + c.x - b.x, y: a.y + c.y - b.y }; // a + c − b
+    }
+
+    case 'line-line-intersection': {
+      const a = pos.get(p.a);
+      const b = pos.get(p.b);
+      const c = pos.get(p.c);
+      const d = pos.get(p.d);
+      if (!a || !b || !c || !d) return 'pending';
+      const hit = lineLineIntersect(a, b, c, d);
+      if (!hit) return `cannot construct ${p.id}: lines ${p.a}${p.b} and ${p.c}${p.d} are parallel`;
+      return hit;
     }
   }
 }

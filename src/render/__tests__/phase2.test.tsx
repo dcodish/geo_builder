@@ -88,7 +88,7 @@ describe('scene — figure → primitives', () => {
     const scene = buildScene(construction, positions);
 
     expect(scene.points.map((p) => p.id).sort()).toEqual(['A', 'B', 'C', 'D', 'G']);
-    expect(scene.segments.map((s) => s.id).sort()).toEqual(['seg-AB', 'seg-BC', 'seg-CD', 'seg-DA']);
+    expect(scene.segments.map((s) => s.id).sort()).toEqual(['seg-AB', 'seg-AD', 'seg-BC', 'seg-CD']);
     expect(scene.polygons).toHaveLength(1);
     expect(scene.polygons[0].points).toHaveLength(4);
     // every scene position is a real coordinate

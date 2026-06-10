@@ -10,6 +10,18 @@ function addObj(objects: GeoObject[], o: GeoObject): void {
   if (!objects.some((x) => x.id === o.id)) objects.push(o);
 }
 
+/** A segment is undirected: normalise endpoint order so seg AB === seg BA (idempotent). */
+function segment(x: Id, y: Id): GeoObject {
+  const [p, q] = [x, y].sort();
+  return { kind: 'segment', id: `seg-${p}${q}`, a: p, b: q };
+}
+
+/** The 4 boundary segments + the polygon for a quad a→b→c→d. */
+function quadEdges(objects: GeoObject[], a: Id, b: Id, c: Id, d: Id): void {
+  for (const [x, y] of [[a, b], [b, c], [c, d], [d, a]] as const) addObj(objects, segment(x, y));
+  addObj(objects, { kind: 'polygon', id: `poly-${a}${b}${c}${d}`, vertices: [a, b, c, d] });
+}
+
 export function applyCommand(prev: Construction, cmd: Command): Construction {
   const objects = [...prev.objects];
   const constraints = [...prev.constraints];
@@ -35,17 +47,43 @@ export function applyCommand(prev: Construction, cmd: Command): Construction {
       addObj(objects, { kind: 'free-point', id: b, x: side, y: 0 });
       addObj(objects, { kind: 'derived', id: c, rule: 'square-c', a, b });
       addObj(objects, { kind: 'derived', id: d, rule: 'square-d', a, b });
-      const seg = (x: Id, y: Id): void => addObj(objects, { kind: 'segment', id: `seg-${x}${y}`, a: x, b: y });
-      seg(a, b);
-      seg(b, c);
-      seg(c, d);
-      seg(d, a);
-      addObj(objects, { kind: 'polygon', id: `poly-${a}${b}${c}${d}`, vertices: [a, b, c, d] });
+      quadEdges(objects, a, b, c, d);
+      break;
+    }
+
+    case 'quadrilateral': {
+      // A general (irregular, convex) quadrilateral: 4 free vertices.
+      const [a, b, c, d] = cmd.ids;
+      addObj(objects, { kind: 'free-point', id: a, x: 0, y: 0 });
+      addObj(objects, { kind: 'free-point', id: b, x: 6, y: 1 });
+      addObj(objects, { kind: 'free-point', id: c, x: 5, y: 5 });
+      addObj(objects, { kind: 'free-point', id: d, x: 1, y: 4 });
+      quadEdges(objects, a, b, c, d);
+      break;
+    }
+
+    case 'parallelogram': {
+      // A,B,C carry the parallelogram's freedom; D is derived (D = A + C − B),
+      // so ABCD stays a parallelogram for any A,B,C.
+      const [a, b, c, d] = cmd.ids;
+      addObj(objects, { kind: 'free-point', id: a, x: 0, y: 4 });
+      addObj(objects, { kind: 'free-point', id: b, x: 6, y: 4 });
+      addObj(objects, { kind: 'free-point', id: c, x: 7, y: 0 });
+      addObj(objects, { kind: 'parallelogram-vertex', id: d, a, b, c });
+      quadEdges(objects, a, b, c, d);
       break;
     }
 
     case 'point-on-segment':
       addObj(objects, { kind: 'on-segment', id: cmd.id, a: cmd.a, b: cmd.b, t: cmd.t ?? 0.5 });
+      break;
+
+    case 'line-line-intersection':
+      addObj(objects, { kind: 'line-line-intersection', id: cmd.id, a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      break;
+
+    case 'segment':
+      addObj(objects, segment(cmd.a, cmd.b));
       break;
 
     case 'point-by-distances':

@@ -63,6 +63,19 @@ describe('parser — angle constraint (he/en)', () => {
   it('hebrew, labels before keyword', () => one('GAB = 37 זווית', a));
 });
 
+describe('parser — Phase-5a constructs (he/en)', () => {
+  it('parallelogram', () => one('parallelogram ABCD', { type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] }));
+  it('parallelogram (hebrew, reversed)', () => one('ABCD מקבילית', { type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] }));
+  it('quadrilateral', () => one('quadrilateral PQRS', { type: 'quadrilateral', ids: ['P', 'Q', 'R', 'S'] }));
+  it('segment', () => one('segment AC', { type: 'segment', a: 'A', b: 'C' }));
+  it('diagonal synonym', () => one('diagonal BD', { type: 'segment', a: 'B', b: 'D' }));
+  it('segment (hebrew)', () => one('קטע AC', { type: 'segment', a: 'A', b: 'C' }));
+  it('line∩line intersection (english)', () =>
+    one('E is the intersection of AC and BD', { type: 'line-line-intersection', id: 'E', a: 'A', b: 'C', c: 'B', d: 'D' }));
+  it('line∩line intersection (hebrew)', () =>
+    one('M חיתוך AC ו-BD', { type: 'line-line-intersection', id: 'M', a: 'A', b: 'C', c: 'B', d: 'D' }));
+});
+
 describe('parser — out-of-grammar returns not-handled (the fallback boundary)', () => {
   for (const bad of [
     '',

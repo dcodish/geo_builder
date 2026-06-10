@@ -41,11 +41,41 @@ function labelRun(s: string, n: number): Id[] | null {
   return null;
 }
 
+/** A quad-shape rule factory: keyword (either order) + 4 labels → command. */
+const quadShape =
+  (re: RegExp, make: (ids: [Id, Id, Id, Id]) => Command): Rule =>
+  (s) => {
+    if (!re.test(s)) return null;
+    const ids = labelRun(s.replace(re, ' '), 4);
+    return ids ? [make([ids[0], ids[1], ids[2], ids[3]])] : null;
+  };
+
 /** "square ABCD" / "ריבוע ABCD" — keyword and labels in either order. */
-const square: Rule = (s) => {
-  if (!/(?:square|ריבוע)/i.test(s)) return null;
-  const ids = labelRun(s.replace(/square|ריבוע/gi, ' '), 4);
-  return ids ? [{ type: 'square', ids: [ids[0], ids[1], ids[2], ids[3]] }] : null;
+const square = quadShape(/square|ריבוע/gi, (ids) => ({ type: 'square', ids }));
+
+/** "parallelogram ABCD" / "מקבילית ABCD" — A,B,C free, D derived. */
+const parallelogram = quadShape(/parallelogram|מקבילית/gi, (ids) => ({ type: 'parallelogram', ids }));
+
+/** "quadrilateral ABCD" / "מרובע ABCD" — a general quad (4 free vertices). */
+const quadrilateral = quadShape(/quadrilateral|quad|מרובע/gi, (ids) => ({ type: 'quadrilateral', ids }));
+
+/** "segment AC" / "diagonal AC" / "קטע AC" / "אלכסון AC" — connect two points. */
+const segment: Rule = (s) => {
+  if (!/segment|diagonal|connect|קטע|אלכסון|חבר/i.test(s)) return null;
+  const ids = labelRun(s.replace(/segment|diagonal|connect|קטע|אלכסון|חבר/gi, ' '), 2);
+  return ids ? [{ type: 'segment', a: ids[0], b: ids[1] }] : null;
+};
+
+/** "E is the intersection of AC and BD" / "E = AC ∩ BD" / "E חיתוך AC ו-BD". */
+const lineLineIntersection: Rule = (s) => {
+  if (!/intersection|∩|חיתוך|נחתך/i.test(s)) return null;
+  // Drop filler words so they aren't mistaken for two-letter line labels ("of"!).
+  const t = s.replace(/\b(?:is|the|of|between|הוא|בין)\b/gi, ' ');
+  const m = t.match(
+    /\b([A-Za-z])\b.*?(?:intersection|∩|חיתוך|נחתך).*?\b([A-Za-z])\s*([A-Za-z])\b.*?\b([A-Za-z])\s*([A-Za-z])\b/i,
+  );
+  if (!m) return null;
+  return [{ type: 'line-line-intersection', id: up(m[1]), a: up(m[2]), b: up(m[3]), c: up(m[4]), d: up(m[5]) }];
 };
 
 /** "angle GAB = 37" / "זווית GAB = 37" (any order) — middle letter is the vertex. */
@@ -117,7 +147,17 @@ const freePoint: Rule = (s) => {
 
 // Order matters: the most specific keyword-anchored rules run first; the
 // coordinate rule (freePoint) is last because it's the loosest.
-const RULES: Rule[] = [square, angle, pointOnSegment, pointByDistances, freePoint];
+const RULES: Rule[] = [
+  square,
+  parallelogram,
+  quadrilateral,
+  lineLineIntersection,
+  angle,
+  segment,
+  pointOnSegment,
+  pointByDistances,
+  freePoint,
+];
 
 export function parse(raw: string): ParseResult {
   const s = raw.trim().replace(/\s+/g, ' ');

@@ -55,7 +55,46 @@ export interface IntersectionPoint {
   branch: number;
 }
 
-export type GeoPoint = FreePoint | OnSegmentPoint | DerivedPoint | IntersectionPoint;
+/** 0 DOF — the 4th vertex of parallelogram a→b→c→(this): pos = a + c − b. */
+export interface ParallelogramVertex {
+  kind: 'parallelogram-vertex';
+  id: Id;
+  a: Id;
+  b: Id;
+  c: Id;
+}
+
+/** 0 DOF — intersection of line (a,b) with line (c,d). Parallel lines ⇒ unconstructible. */
+export interface LineLineIntersection {
+  kind: 'line-line-intersection';
+  id: Id;
+  a: Id;
+  b: Id;
+  c: Id;
+  d: Id;
+}
+
+export type GeoPoint =
+  | FreePoint
+  | OnSegmentPoint
+  | DerivedPoint
+  | IntersectionPoint
+  | ParallelogramVertex
+  | LineLineIntersection;
+
+/** The object kinds that are points (carry a computed position). Single source of truth. */
+const POINT_KINDS: ReadonlySet<string> = new Set([
+  'free-point',
+  'on-segment',
+  'derived',
+  'intersection',
+  'parallelogram-vertex',
+  'line-line-intersection',
+]);
+
+export function isGeoPoint(o: GeoObject): o is GeoPoint {
+  return POINT_KINDS.has(o.kind);
+}
 
 export interface Segment {
   kind: 'segment';
@@ -95,9 +134,13 @@ export interface Construction {
 /** Commands the engine applies. The parser (Phase 4) will produce these. */
 export type Command =
   | { type: 'square'; ids: [Id, Id, Id, Id]; side?: number }
+  | { type: 'quadrilateral'; ids: [Id, Id, Id, Id] }
+  | { type: 'parallelogram'; ids: [Id, Id, Id, Id] }
   | { type: 'free-point'; id: Id; x: number; y: number }
   | { type: 'point-on-segment'; id: Id; a: Id; b: Id; t?: number }
   | { type: 'point-by-distances'; id: Id; from1: Id; dist1: number; from2: Id; dist2: number; branch?: number }
+  | { type: 'line-line-intersection'; id: Id; a: Id; b: Id; c: Id; d: Id }
+  | { type: 'segment'; a: Id; b: Id }
   | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number };
 
 /** Tolerances. */

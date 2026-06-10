@@ -12,12 +12,12 @@
   "examples": {
     "heading": "Examples — click to try, or type your own",
     "items": [
+      "parallelogram ABCD",
+      "segment AC",
+      "point E on AC at 45%",
+      "segment BE",
       "square ABCD",
-      "point G on AD at 40%",
-      "point A at (0,0)",
-      "point B at (6,0)",
-      "C is 5 from A and 5 from B",
-      "angle GAB = 37"
+      "point G on AD at 40%"
     ]
   },
   "steps": {
