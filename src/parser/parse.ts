@@ -27,23 +27,35 @@ type Rule = (s: string) => Command[] | null;
 const up = (c: string): Id => c.toUpperCase();
 const num = String.raw`(-?\d+(?:\.\d+)?)`;
 
-/** "square ABCD" / "ריבוע ABCD" */
+/**
+ * Find a run of `n` point labels, as a contiguous token ("ABCD") or `n`
+ * space-separated single letters ("A B C D"), anywhere in `s`. Returns them
+ * uppercased, or null. Strip keywords from `s` first so a Latin keyword's own
+ * letters (e.g. "square") aren't mistaken for labels.
+ */
+function labelRun(s: string, n: number): Id[] | null {
+  const contiguous = s.match(new RegExp(String.raw`\b[A-Za-z]{${n}}\b`));
+  if (contiguous) return contiguous[0].toUpperCase().split('') as Id[];
+  const spaced = s.match(new RegExp(Array.from({ length: n }, () => String.raw`\b([A-Za-z])\b`).join(String.raw`\s+`)));
+  if (spaced) return spaced.slice(1, n + 1).map(up);
+  return null;
+}
+
+/** "square ABCD" / "ריבוע ABCD" — keyword and labels in either order. */
 const square: Rule = (s) => {
-  const m = s.match(/(?:square|ריבוע)\s+([A-Za-z])\s*([A-Za-z])\s*([A-Za-z])\s*([A-Za-z])\b/i);
-  if (!m) return null;
-  return [{ type: 'square', ids: [up(m[1]), up(m[2]), up(m[3]), up(m[4])] }];
+  if (!/(?:square|ריבוע)/i.test(s)) return null;
+  const ids = labelRun(s.replace(/square|ריבוע/gi, ' '), 4);
+  return ids ? [{ type: 'square', ids: [ids[0], ids[1], ids[2], ids[3]] }] : null;
 };
 
-/** "angle GAB = 37" / "זווית GAB = 37" — middle letter is the vertex. */
+/** "angle GAB = 37" / "זווית GAB = 37" (any order) — middle letter is the vertex. */
 const angle: Rule = (s) => {
-  const m = s.match(
-    new RegExp(
-      String.raw`(?:angle|זווית)\s+([A-Za-z])\s*([A-Za-z])\s*([A-Za-z])\s*(?:=|:|is|equals|שווה|ל-?|של)?\s*${num}\s*(?:°|deg|degrees|מעלות)?`,
-      'i',
-    ),
-  );
-  if (!m) return null;
-  return [{ type: 'set-angle', vertex: up(m[2]), ray1: up(m[1]), ray2: up(m[3]), value: parseFloat(m[4]) }];
+  if (!/(?:angle|זווית)/i.test(s)) return null;
+  const stripped = s.replace(/angle|זווית/gi, ' ');
+  const ids = labelRun(stripped, 3);
+  const valM = stripped.match(new RegExp(num));
+  if (!ids || !valM) return null;
+  return [{ type: 'set-angle', vertex: ids[1], ray1: ids[0], ray2: ids[2], value: parseFloat(valM[1]) }];
 };
 
 /** "point G on AD" / "נקודה G על AD" with optional ratio "at 40%" / "ב-40%". */

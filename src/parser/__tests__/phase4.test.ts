@@ -26,6 +26,9 @@ describe('parser — square (he/en)', () => {
   it('hebrew', () => one('ריבוע ABCD', sq));
   it('spaced labels', () => one('square A B C D', sq));
   it('lowercase normalises to capitals', () => one('square abcd', sq));
+  it('hebrew, labels before keyword', () => one('ABCD ריבוע', sq));
+  it('english, labels before keyword', () => one('ABCD square', sq));
+  it('does not mistake the keyword letters for labels', () => one('square ABCD', sq));
 });
 
 describe('parser — point on segment (he/en)', () => {
@@ -56,6 +59,8 @@ describe('parser — angle constraint (he/en)', () => {
   it('english =', () => one('angle GAB = 37', a));
   it('english with degrees', () => one('angle GAB is 37 degrees', a));
   it('hebrew', () => one('זווית GAB = 37', a));
+  it('labels before keyword', () => one('GAB = 37 angle', a));
+  it('hebrew, labels before keyword', () => one('GAB = 37 זווית', a));
 });
 
 describe('parser — out-of-grammar returns not-handled (the fallback boundary)', () => {
