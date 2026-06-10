@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { Command, Construction, Id, Vec } from '@/engine';
-import { applyCommand, applyStep, branchCount, emptyConstruction, evaluate } from '@/engine';
+import { applyCommand, applyStep, branchCount, deepEqual, emptyConstruction, evaluate } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -96,7 +96,15 @@ export const useGeoStore = create<GeoState>()(
       selectedId: null,
 
       execute: (cmd, utterance) => {
-        set({ facts: [...get().facts, { id: nanoid(), cmd, utterance, enabled: true }] });
+        const facts = get().facts;
+        // Idempotent (FR-EN-9): re-issuing an identical command adds no duplicate
+        // fact. If that fact was deselected, re-issuing turns it back on.
+        const dup = facts.find((f) => deepEqual(f.cmd, cmd));
+        if (dup) {
+          if (!dup.enabled) set({ facts: facts.map((f) => (f.id === dup.id ? { ...f, enabled: true } : f)) });
+          return;
+        }
+        set({ facts: [...facts, { id: nanoid(), cmd, utterance, enabled: true }] });
       },
 
       toggle: (id) => {

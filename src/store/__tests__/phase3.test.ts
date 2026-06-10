@@ -33,6 +33,21 @@ describe('store — replay pipeline', () => {
     expect(evaluate(derived().construction).ok).toBe(true);
   });
 
+  it('re-issuing an identical command adds no duplicate fact (idempotent)', () => {
+    s().execute(SQUARE, 'square ABCD');
+    s().execute(SQUARE, 'square ABCD');
+    expect(s().facts).toHaveLength(1);
+  });
+
+  it('re-issuing a deselected fact turns it back on instead of duplicating', () => {
+    s().execute(SQUARE);
+    s().toggle(s().facts[0].id);
+    expect(s().facts[0].enabled).toBe(false);
+    s().execute(SQUARE);
+    expect(s().facts).toHaveLength(1);
+    expect(s().facts[0].enabled).toBe(true);
+  });
+
   it('accumulates facts without disturbing earlier objects (stability)', () => {
     s().execute(SQUARE);
     const before = replay(s().facts).positions;

@@ -27,8 +27,8 @@ export type StepResult = StepOk | StepErr;
 
 export const emptyConstruction = (): Construction => ({ objects: [], constraints: [] });
 
-/** Deep structural equality for plain geo objects/values. */
-function deepEqual(a: unknown, b: unknown): boolean {
+/** Deep structural equality for plain geo objects/values (commands, objects). */
+export function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
   if (Array.isArray(a) || Array.isArray(b)) {

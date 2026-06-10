@@ -11,6 +11,7 @@ export {
   branchCount,
   commandConflict,
   cycleAlternative,
+  deepEqual,
   maxDelta,
   emptyConstruction,
 } from './step';

@@ -52,7 +52,7 @@ export default function App() {
   // Quick facts are gated to the states where they apply (the engine's
   // commandConflict guard is the real safety net behind this).
   const QUICK: { key: string; enabled: boolean; run: () => void }[] = [
-    { key: 'demo.square', enabled: isEmpty || has('A'), run: () => execute({ type: 'square', ids: ['A', 'B', 'C', 'D'] }, t('demo.square')) },
+    { key: 'demo.square', enabled: !has('A'), run: () => execute({ type: 'square', ids: ['A', 'B', 'C', 'D'] }, t('demo.square')) },
     { key: 'demo.pointOn', enabled: has('A') && has('D') && !has('G'), run: () => execute({ type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 }, t('demo.pointOn')) },
     { key: 'demo.badAngle', enabled: has('G'), run: () => execute({ type: 'set-angle', vertex: 'A', ray1: 'G', ray2: 'B', value: 37 }, t('demo.badAngle')) },
     {
