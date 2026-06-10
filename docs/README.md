@@ -13,6 +13,8 @@ Living project documentation. Status: **design phase** (last updated 2026-06-10)
 | 05 | [Glossary](05-glossary.md) | Shared vocabulary for the domain and the system |
 | 06 | [Decisions (ADR log)](06-decisions.md) | Key decisions and the reasoning behind each |
 | 07 | [Theorem Reference](07-theorem-reference.md) | The official bagrut theorem list (109 + appendices), bilingual, IDs + role tags — canonical source for the theorem feature |
+| 08 | [Testing Strategy](08-testing-strategy.md) | Test levels, per-layer coverage, golden fixtures, requirement→test traceability, and the "definition of ready" gate |
+| 09 | [Implementation Plan](09-implementation-plan.md) | Phased build plan: scope, dependencies, requirement coverage, per-phase gates, and milestones |
 
 ## How to use these
 

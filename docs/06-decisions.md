@@ -85,3 +85,15 @@ _Last updated: 2026-06-10. Each entry records a decision, its context, and conse
 **Decision.** Use **Opus 4.8** for planning. Fable 5 is a marginal upgrade at ~2× cost for a task Opus 4.8 already handles at a high level; planning is low-volume and the operator's own dev cost, so the gap isn't worth it. (Distinct from the *app's* runtime model, which is Haiku — see ADR-003.)
 
 **Consequences.** None material; revisit only if a planning task proves genuinely frontier-hard.
+
+---
+
+## ADR-008 — Tests gate the build; "ready" has a definition
+
+**Status:** Accepted (2026-06-10)
+
+**Context.** The operator wants a testing strategy and a defined set of passing tests before anything is called "ready" — trustworthy "ready", not optimistic claims.
+
+**Decision.** Adopt [`08-testing-strategy.md`](08-testing-strategy.md): Vitest for unit/integration/component, fast-check for invariants (proposed), Playwright for headline E2E (proposed). The engine (pure, deterministic) is tested hardest; the LLM fallback is **mocked** — no live API calls in CI. Each build step has an acceptance gate; nothing is "ready" until its gate passes, `tsc`/build are clean, and results are reported honestly (no skipped/`.only` specs hiding gaps).
+
+**Consequences.** Slower per-step but trustworthy completion. Adds dev dependencies (fast-check, RTL/jsdom, Playwright). The stability regression is re-established as a first-class test (it guarded the old code too).

@@ -19,6 +19,10 @@ The defining interaction: a student adds information incrementally — "square A
 
 Full project docs live in [`docs/`](docs/) — vision, functional + non-functional requirements, design/architecture, glossary, and the decision log (ADRs). Start at [`docs/README.md`](docs/README.md). These are the authoritative, detailed source; this file is the quick orientation and points there for depth. **Keep both in sync as the design evolves**, and add an ADR to `docs/06-decisions.md` for any significant decision.
 
+## Testing & definition of ready
+
+Test strategy and per-step acceptance gates live in [`docs/08-testing-strategy.md`](docs/08-testing-strategy.md). **Working rule for this repo: do not report a feature or build step as "ready" until its acceptance gate passes** — tests green, `tsc`/build clean, results shown honestly (no skipped/`.only` specs hiding gaps). The engine is pure and deterministic and is tested hardest; the LLM fallback is mocked (no live API calls in tests). The **stability** regression (existing points must not jump when a fact is added) is a first-class test.
+
 ## Commands
 
 - `npm run dev` — Vite dev server

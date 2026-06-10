@@ -104,7 +104,9 @@ proxy/           server-side API proxy (key custody, gate, rate-limit) — deplo
 
 ## 10. Build order (de-risk the core first)
 
-1. **Engine core slice** — dependency graph + topological eval + free/on-segment/intersection points + one branch toggle. Prove `square → G on AD → angle → alternative` from a hardcoded command list. *Make-or-break.*
+> The full phased plan (scope, dependencies, requirement coverage, per-phase gates, milestones) is in [`09-implementation-plan.md`](09-implementation-plan.md). The list below is the summary.
+
+1. **Engine core slice** — dependency graph + topological eval + free/on-segment/intersection points + branch cycle. Prove it on fixtures (build + stability; a genuine two-branch construction; a contradiction) from hardcoded command lists. *Make-or-break.*
 2. **SVG renderer** for that slice.
 3. **Grammar parser** → commands (replaces the hardcoded list).
 4. **Expand** objects/constraints/special-lines to the full v1 scope.
