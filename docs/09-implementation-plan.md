@@ -62,13 +62,13 @@ Scaffold, archive of the old implementation, the `docs/` set, lint config, and t
 
 ### Phase 3 — Store & app shell ✅ complete
 
-- **Status:** done — `src/store/geoStore.ts` (Zustand + `zundo` temporal) + `src/store/__tests__/phase3.test.ts` (9/9 green); `App.tsx` rebuilt as the store-driven shell (canvas + step log + undo/redo/clear + alternatives toggle + language toggle, Hebrew default / RTL); typecheck/build clean. Milestone M2 reached.
+- **Status:** done — `src/store/geoStore.ts` (Zustand + `zundo` temporal) + `src/store/__tests__/phase3.test.ts` (13/13 green); `App.tsx` rebuilt as the store-driven shell (canvas + fact list + undo/redo/clear + alternatives toggle + language toggle, Hebrew default / RTL); typecheck/build clean. Milestone M2 reached. **The fact list is the source of truth and the figure is derived by replay** — each fact can be selected (highlighted on canvas), deselected (kept but off; dependents auto-drop, reversibly), or deleted (ADR-010).
 - **Goal:** a usable loop — drive the engine + renderer through real app state.
 - **Builds:** Zustand store (+ `zundo`); `execute` pipeline (apply→evaluate→keep-prior-on-error→log); undo/redo; clear; error-step handling (keep prior figure on failure, surface message, cleared by next success); minimal UI shell (canvas, step list, controls); i18n wired (Hebrew default, RTL via `document.dir`).
 - **Depends on:** Phases 1–2.
 - **Requirements:** FR-HS-1, -2, -3; FR-EN-10; FR-I18N-1, -2; US-5, US-6, US-8.
-- **Gate:** ✅ store integration tests (pipeline, stability, keep-prior-on-error, undo/redo, clear, alternatives); i18n key-parity test; build clean. **Manual e2e:** the text input is disabled (parser is Phase 4); a "quick facts" row drives the same store pipeline so the loop is exercisable in the browser now.
-- **Note:** positions are **not** stored — they're derived from the construction via `evaluate` in the view, so undo history stays minimal and state/coordinates can't drift. The error banner is excluded from temporal history (`partialize`).
+- **Gate:** ✅ store integration tests (replay pipeline, stability, keep-prior-on-error, select/deselect/delete + dependent auto-drop, undo/redo incl. undo-a-deselect, clear, alternatives); i18n key-parity test; build clean. **Manual e2e:** the text input is disabled (parser is Phase 4); a "quick facts" row drives the same store pipeline so the loop is exercisable in the browser now.
+- **Note:** the fact list is the source of truth; the figure (and per-fact status) is **derived by `replay`** in the view — positions are never stored, so undo can't desync coordinates from facts. Selection is excluded from temporal history (`partialize` + `equality` guard).
 
 ---
 

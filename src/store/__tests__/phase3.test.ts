@@ -1,14 +1,14 @@
 /**
  * Phase-3 acceptance gate (docs/09-implementation-plan.md §Phase 3).
- * Store pipeline (apply/evaluate/log), keep-prior-on-error, undo/redo, clear,
- * alternatives cycling, and i18n key-parity. The engine is exercised through
- * the store exactly as the UI will drive it.
+ * Fact-list store: replay pipeline, keep-prior-on-error, undo/redo, clear,
+ * alternatives, and per-fact select/deselect/delete (ADR-010). Plus i18n
+ * key-parity. The engine is exercised through the store exactly as the UI drives it.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { Command } from '@/engine';
 import { evaluate } from '@/engine';
-import { useGeoStore } from '../geoStore';
+import { replay, useGeoStore } from '../geoStore';
 import he from '@/i18n/locales/he.json';
 import en from '@/i18n/locales/en.json';
 
@@ -17,94 +17,138 @@ const G_ON_AD: Command = { type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t:
 const BAD_ANGLE: Command = { type: 'set-angle', vertex: 'A', ray1: 'G', ray2: 'B', value: 37 };
 
 const s = () => useGeoStore.getState();
-const ids = () => s().construction.objects.map((o) => o.id);
+const derived = () => replay(s().facts);
+const ids = () => derived().construction.objects.map((o) => o.id);
 
 beforeEach(() => {
   s().clear();
 });
 
-describe('store — command pipeline', () => {
-  it('applies a successful command and logs it', () => {
+describe('store — replay pipeline', () => {
+  it('applies a fact and reflects it in the derived figure', () => {
     s().execute(SQUARE, 'square ABCD');
     expect(ids()).toContain('A');
-    expect(s().steps).toHaveLength(1);
-    expect(s().steps[0].status).toBe('ok');
-    expect(s().steps[0].utterance).toBe('square ABCD');
-    expect(s().lastError).toBeNull();
-    // construction is renderable
-    const e = evaluate(s().construction);
-    expect(e.ok).toBe(true);
+    expect(s().facts).toHaveLength(1);
+    expect(derived().status[s().facts[0].id]).toBe('ok');
+    expect(evaluate(derived().construction).ok).toBe(true);
   });
 
-  it('accumulates facts without disturbing earlier objects (stability through the store)', () => {
+  it('accumulates facts without disturbing earlier objects (stability)', () => {
     s().execute(SQUARE);
-    const before = evaluate(s().construction);
+    const before = replay(s().facts).positions;
     s().execute(G_ON_AD);
-    const after = evaluate(s().construction);
-    if (!before.ok || !after.ok) throw new Error('eval failed');
+    const after = replay(s().facts).positions;
     for (const id of ['A', 'B', 'C', 'D']) {
-      expect(after.positions.get(id)).toEqual(before.positions.get(id));
+      expect(after.get(id)).toEqual(before.get(id));
     }
     expect(ids()).toContain('G');
   });
 });
 
 describe('store — keep prior figure on contradiction (FR-EN-8/-10)', () => {
-  it('records the rejection, keeps the construction, surfaces the error', () => {
+  it('flags the bad fact, keeps the figure, surfaces the error', () => {
     s().execute(SQUARE);
     s().execute(G_ON_AD);
-    const kept = s().construction;
+    const kept = replay(s().facts).construction;
     s().execute(BAD_ANGLE, 'angle GAB = 37');
 
-    expect(s().construction).toBe(kept); // unchanged reference — figure preserved
-    expect(s().lastError).toMatch(/over-constrained/i);
-    expect(s().steps).toHaveLength(3);
-    expect(s().steps[2].status).toMatch(/over-constrained/i);
+    const d = derived();
+    expect(d.construction.objects.map((o) => o.id).sort()).toEqual(kept.objects.map((o) => o.id).sort());
+    expect(d.lastError).toMatch(/over-constrained/i);
+    expect(d.status[s().facts[2].id]).toMatch(/over-constrained/i);
+  });
+});
+
+describe('store — select / deselect / delete (ADR-010)', () => {
+  it('deselecting a fact drops it from the figure but keeps it in the list (reversible)', () => {
+    s().execute(SQUARE);
+    s().execute(G_ON_AD);
+    const gFactId = s().facts[1].id;
+
+    s().toggle(gFactId);
+    expect(s().facts).toHaveLength(2); // still listed
+    expect(s().facts[1].enabled).toBe(false);
+    expect(ids()).not.toContain('G'); // gone from the figure
+    expect(derived().status[gFactId]).toBe('disabled');
+
+    s().toggle(gFactId); // re-select
+    expect(ids()).toContain('G'); // back
   });
 
-  it('clears the error on the next successful step', () => {
+  it('deselecting a depended-on fact auto-drops its dependents, reversibly', () => {
     s().execute(SQUARE);
-    s().execute(BAD_ANGLE); // references G which doesn't exist yet → rejected
-    expect(s().lastError).not.toBeNull();
     s().execute(G_ON_AD);
-    expect(s().lastError).toBeNull();
+    const squareFactId = s().facts[0].id;
+
+    s().toggle(squareFactId); // turn the square off
+    expect(ids()).not.toContain('A');
+    expect(ids()).not.toContain('G'); // G can't resolve without A/D
+    expect(derived().status[s().facts[1].id]).toMatch(/unresolved|already|construct/i);
+
+    s().toggle(squareFactId); // turn it back on
+    expect(ids()).toContain('A');
+    expect(ids()).toContain('G'); // dependent restored
+  });
+
+  it('deletes a fact permanently', () => {
+    s().execute(SQUARE);
+    s().execute(G_ON_AD);
+    s().remove(s().facts[1].id);
+    expect(s().facts).toHaveLength(1);
+    expect(ids()).not.toContain('G');
+  });
+
+  it('select highlights a fact and clears when re-selected; deleting clears selection', () => {
+    s().execute(SQUARE);
+    const id = s().facts[0].id;
+    s().select(id);
+    expect(s().selectedId).toBe(id);
+    s().select(id);
+    expect(s().selectedId).toBeNull();
+    s().select(id);
+    s().remove(id);
+    expect(s().selectedId).toBeNull();
   });
 });
 
 describe('store — undo / redo', () => {
-  it('undoes and redoes a step', () => {
+  it('undoes and redoes adding a fact', () => {
     s().execute(SQUARE);
     s().execute(G_ON_AD);
     expect(ids()).toContain('G');
 
     useGeoStore.temporal.getState().undo();
     expect(ids()).not.toContain('G');
-    expect(ids()).toContain('A');
-    expect(s().steps).toHaveLength(1);
+    expect(s().facts).toHaveLength(1);
 
     useGeoStore.temporal.getState().redo();
     expect(ids()).toContain('G');
-    expect(s().steps).toHaveLength(2);
   });
 
-  it('does not track the transient error banner in history', () => {
+  it('undoes a deselect (toggle is tracked in history)', () => {
     s().execute(SQUARE);
-    const pastBefore = useGeoStore.temporal.getState().pastStates.length;
-    s().execute(BAD_ANGLE); // rejected — changes steps + lastError
-    // exactly one new history entry (the step log), not an extra one for the error
-    const pastAfter = useGeoStore.temporal.getState().pastStates.length;
-    expect(pastAfter).toBe(pastBefore + 1);
+    s().execute(G_ON_AD);
+    s().toggle(s().facts[1].id);
+    expect(ids()).not.toContain('G');
+    useGeoStore.temporal.getState().undo();
+    expect(ids()).toContain('G');
+  });
+
+  it('does not track the transient selection in history', () => {
+    s().execute(SQUARE);
+    const past = useGeoStore.temporal.getState().pastStates.length;
+    s().select(s().facts[0].id);
+    expect(useGeoStore.temporal.getState().pastStates.length).toBe(past);
   });
 });
 
 describe('store — clear', () => {
-  it('empties the construction and wipes history', () => {
+  it('empties facts and wipes history', () => {
     s().execute(SQUARE);
     s().execute(G_ON_AD);
     s().clear();
-    expect(s().construction.objects).toHaveLength(0);
-    expect(s().steps).toHaveLength(0);
-    expect(s().lastError).toBeNull();
+    expect(s().facts).toHaveLength(0);
+    expect(s().selectedId).toBeNull();
     expect(useGeoStore.temporal.getState().pastStates).toHaveLength(0);
   });
 });
@@ -117,20 +161,13 @@ describe('store — alternatives', () => {
       { type: 'point-by-distances', id: 'C', from1: 'A', dist1: 5, from2: 'B', dist2: 5, branch: 0 },
     ];
     base.forEach((c) => s().execute(c));
-    const C0 = evaluate(s().construction);
-    if (!C0.ok) throw new Error('eval failed');
-    const y0 = C0.positions.get('C')!.y;
+    const y0 = replay(s().facts).positions.get('C')!.y;
 
     s().cycleAlt('C');
-    const C1 = evaluate(s().construction);
-    if (!C1.ok) throw new Error('eval failed');
-    expect(Math.sign(C1.positions.get('C')!.y)).toBe(-Math.sign(y0));
+    expect(Math.sign(replay(s().facts).positions.get('C')!.y)).toBe(-Math.sign(y0));
 
-    // cycling is undoable like any step
-    useGeoStore.temporal.getState().undo();
-    const back = evaluate(s().construction);
-    if (!back.ok) throw new Error('eval failed');
-    expect(back.positions.get('C')!.y).toBeCloseTo(y0, 9);
+    s().cycleAlt('C'); // two branches → back to the first
+    expect(replay(s().facts).positions.get('C')!.y).toBeCloseTo(y0, 9);
   });
 });
 
@@ -143,8 +180,6 @@ describe('i18n — key parity (he ⇄ en)', () => {
   };
 
   it('has identical key sets in both locales', () => {
-    const hk = paths(he).sort();
-    const ek = paths(en).sort();
-    expect(hk).toEqual(ek);
+    expect(paths(he).sort()).toEqual(paths(en).sort());
   });
 });

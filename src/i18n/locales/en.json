@@ -39,6 +39,8 @@
     "clear": "Clear all",
     "flip": "Flip",
     "another": "Show another configuration",
+    "delete": "Delete",
+    "toggle": "Include / exclude this fact",
     "language": "עברית"
   },
   "geometry": {

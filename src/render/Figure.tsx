@@ -19,6 +19,8 @@ export interface FigureProps {
   width?: number;
   height?: number;
   padding?: number;
+  /** Object ids to accent (e.g. those introduced by the selected fact). */
+  highlight?: Set<Id>;
 }
 
 interface View {
@@ -29,13 +31,17 @@ interface View {
 
 const IDENTITY: View = { zoom: 1, panX: 0, panY: 0 };
 
+const ACCENT = '#f59e0b';
+
 export function Figure({
   construction,
   positions,
   width = 600,
   height = 600,
   padding = 48,
+  highlight,
 }: FigureProps) {
+  const lit = (id: string): boolean => !!highlight && highlight.has(id);
   const [view, setView] = useState<View>(IDENTITY);
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
 
@@ -88,9 +94,9 @@ export function Figure({
               key={poly.id}
               data-id={poly.id}
               points={poly.points.map((p) => screenStr(transform.toScreen(p))).join(' ')}
-              fill="#3b82f6"
-              fillOpacity={0.08}
-              stroke="#2563eb"
+              fill={lit(poly.id) ? ACCENT : '#3b82f6'}
+              fillOpacity={lit(poly.id) ? 0.14 : 0.08}
+              stroke={lit(poly.id) ? ACCENT : '#2563eb'}
               strokeWidth={stroke}
               strokeLinejoin="round"
             />
@@ -107,8 +113,8 @@ export function Figure({
                 y1={a.y}
                 x2={b.x}
                 y2={b.y}
-                stroke="#334155"
-                strokeWidth={stroke}
+                stroke={lit(seg.id) ? ACCENT : '#334155'}
+                strokeWidth={lit(seg.id) ? stroke * 2 : stroke}
                 strokeLinecap="round"
               />
             );
@@ -118,13 +124,14 @@ export function Figure({
             const s = transform.toScreen(pt.pos);
             return (
               <g key={pt.id} data-id={pt.id}>
-                <circle cx={s.x} cy={s.y} r={r} fill="#0f172a" />
+                <circle cx={s.x} cy={s.y} r={lit(pt.id) ? r * 1.6 : r} fill={lit(pt.id) ? ACCENT : '#0f172a'} />
                 <text
                   x={s.x + r * 1.8}
                   y={s.y - r * 1.4}
                   fontSize={fontSize}
                   fontFamily="system-ui, sans-serif"
-                  fill="#0f172a"
+                  fontWeight={lit(pt.id) ? 700 : 400}
+                  fill={lit(pt.id) ? '#b45309' : '#0f172a'}
                 >
                   {pt.label}
                 </text>

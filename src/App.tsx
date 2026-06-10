@@ -1,52 +1,56 @@
 /**
  * App shell (Phase 3) — the usable build loop, driven by the store.
  *
- * Layout: canvas (engine → renderer) + a sidebar with the step log, undo/redo/
- * clear, and an alternatives toggle. A text input is present but disabled — the
- * parser that turns typed Hebrew/English into commands is Phase 4; until then a
- * row of "quick facts" drives the same store pipeline so the loop (accumulate,
- * stay stable, reject contradictions, undo) is exercisable end to end. i18n is
- * wired with Hebrew default and RTL. Old UI lives in /archive for reference.
+ * The fact list is the source of truth; the figure is derived by replaying the
+ * enabled facts (see store `replay`). Each fact can be selected (highlighted on
+ * the canvas), deselected (kept but turned off — the figure re-derives, and any
+ * fact depending on it auto-drops), or deleted. A text input is present but
+ * disabled — the parser is Phase 4; until then a row of "quick facts" drives the
+ * same pipeline. i18n is wired with Hebrew default and RTL. Old UI lives in
+ * /archive for reference.
  */
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
-import type { Command, Id, Vec } from '@/engine';
-import { evaluate } from '@/engine';
+import type { Command, Id } from '@/engine';
 import { Figure } from '@/render';
-import { useGeoStore } from '@/store/geoStore';
+import { introducedIds, replay, useGeoStore } from '@/store/geoStore';
 
 export default function App() {
   const { t, i18n } = useTranslation();
-  const construction = useGeoStore((s) => s.construction);
-  const steps = useGeoStore((s) => s.steps);
-  const lastError = useGeoStore((s) => s.lastError);
+  const facts = useGeoStore((s) => s.facts);
+  const selectedId = useGeoStore((s) => s.selectedId);
   const execute = useGeoStore((s) => s.execute);
+  const toggle = useGeoStore((s) => s.toggle);
+  const remove = useGeoStore((s) => s.remove);
+  const select = useGeoStore((s) => s.select);
   const cycleAlt = useGeoStore((s) => s.cycleAlt);
   const clear = useGeoStore((s) => s.clear);
 
   const { undo, redo } = useGeoStore.temporal.getState();
-  const canUndo = useStore(useGeoStore.temporal, (t) => t.pastStates.length > 0);
-  const canRedo = useStore(useGeoStore.temporal, (t) => t.futureStates.length > 0);
+  const canUndo = useStore(useGeoStore.temporal, (s) => s.pastStates.length > 0);
+  const canRedo = useStore(useGeoStore.temporal, (s) => s.futureStates.length > 0);
 
-  // Keep the document direction in sync with the active language (RTL for he).
+  // Figure + per-fact status are derived from the fact list.
+  const { construction, positions, status, lastError } = useMemo(() => replay(facts), [facts]);
+
+  // Highlight the objects introduced by the selected fact.
+  const highlight = useMemo(() => {
+    const f = facts.find((x) => x.id === selectedId);
+    return f ? new Set(introducedIds(f.cmd)) : undefined;
+  }, [facts, selectedId]);
+
   useEffect(() => {
     document.documentElement.dir = i18n.dir();
     document.documentElement.lang = i18n.language;
   }, [i18n, i18n.language]);
 
-  const positions = useMemo(() => {
-    const e = evaluate(construction);
-    return e.ok ? e.positions : new Map<Id, Vec>();
-  }, [construction]);
-
   const branchId = construction.objects.find((o) => o.kind === 'intersection')?.id;
   const has = (id: Id) => construction.objects.some((o) => o.id === id);
   const isEmpty = construction.objects.length === 0;
 
-  // Each quick fact is enabled only when it actually applies, so the demo can't
-  // be driven into a nonsensical sequence (e.g. a triangle reusing the square's
-  // A/B/C). The engine's commandConflict guard is the real safety net behind it.
+  // Quick facts are gated to the states where they apply (the engine's
+  // commandConflict guard is the real safety net behind this).
   const QUICK: { key: string; enabled: boolean; run: () => void }[] = [
     { key: 'demo.square', enabled: isEmpty || has('A'), run: () => execute({ type: 'square', ids: ['A', 'B', 'C', 'D'] }, t('demo.square')) },
     { key: 'demo.pointOn', enabled: has('A') && has('D') && !has('G'), run: () => execute({ type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 }, t('demo.pointOn')) },
@@ -67,7 +71,7 @@ export default function App() {
 
   return (
     <div style={page}>
-      <header style={header}>
+      <header style={headerRow}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{t('app.title')}</h1>
           <p style={{ color: '#64748b', margin: '4px 0 0', fontSize: 13 }}>{t('app.subtitle')}</p>
@@ -78,10 +82,9 @@ export default function App() {
       </header>
 
       <div style={main}>
-        <Figure construction={construction} positions={positions} width={560} height={560} />
+        <Figure construction={construction} positions={positions} width={560} height={560} highlight={highlight} />
 
         <aside style={sidebar}>
-          {/* Text input — disabled until the Phase-4 parser exists. */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <input style={input} placeholder={t('input.placeholder')} disabled />
             <span style={{ fontSize: 11, color: '#94a3b8' }}>{t('input.disabledNote')}</span>
@@ -91,13 +94,7 @@ export default function App() {
             <div style={sectionLabel}>{t('demo.heading')}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {QUICK.map((q) => (
-                <button
-                  key={q.key}
-                  type="button"
-                  style={q.enabled ? quick : quickDisabled}
-                  disabled={!q.enabled}
-                  onClick={q.run}
-                >
+                <button key={q.key} type="button" style={q.enabled ? quick : quickDisabled} disabled={!q.enabled} onClick={q.run}>
                   {t(q.key)}
                 </button>
               ))}
@@ -108,42 +105,46 @@ export default function App() {
 
           <div>
             <div style={sectionLabel}>{t('steps.title')}</div>
-            {steps.length === 0 ? (
+            {facts.length === 0 ? (
               <p style={{ color: '#94a3b8', fontSize: 13, margin: 0 }}>{t('steps.empty')}</p>
             ) : (
-              <ol style={stepList}>
-                {steps.map((s, i) => (
-                  <li key={i} style={stepRow(s.status === 'ok')}>
-                    <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>
-                      {s.utterance ?? s.cmd.type}
-                    </span>
-                    {s.status === 'ok' ? (
-                      <span style={{ color: '#16a34a', fontSize: 12 }}>✓</span>
-                    ) : (
-                      <span style={{ color: '#dc2626', fontSize: 11 }}>✗</span>
-                    )}
-                  </li>
-                ))}
-              </ol>
+              <ul style={stepList}>
+                {facts.map((f) => {
+                  const st = status[f.id];
+                  const state = !f.enabled ? 'disabled' : st === 'ok' ? 'ok' : 'broken';
+                  return (
+                    <li key={f.id} style={factRow(state, f.id === selectedId)}>
+                      <input
+                        type="checkbox"
+                        checked={f.enabled}
+                        title={t('actions.toggle')}
+                        onChange={() => toggle(f.id)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <button type="button" style={factLabel(state)} onClick={() => select(f.id)} title={typeof st === 'string' && state === 'broken' ? st : undefined}>
+                        {f.utterance ?? f.cmd.type}
+                      </button>
+                      <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}>
+                        {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
+                      </span>
+                      <button type="button" style={del} title={t('actions.delete')} onClick={() => remove(f.id)}>
+                        ×
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </div>
 
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button type="button" style={ghost} disabled={!canUndo} onClick={() => undo()}>
-              {t('actions.undo')}
-            </button>
-            <button type="button" style={ghost} disabled={!canRedo} onClick={() => redo()}>
-              {t('actions.redo')}
-            </button>
-            <button type="button" style={ghost} onClick={clear}>
-              {t('actions.clear')}
-            </button>
+            <button type="button" style={ghost} disabled={!canUndo} onClick={() => undo()}>{t('actions.undo')}</button>
+            <button type="button" style={ghost} disabled={!canRedo} onClick={() => redo()}>{t('actions.redo')}</button>
+            <button type="button" style={ghost} onClick={clear}>{t('actions.clear')}</button>
           </div>
 
           {branchId && (
-            <button type="button" style={alt} onClick={() => cycleAlt(branchId)}>
-              {t('actions.another')}
-            </button>
+            <button type="button" style={alt} onClick={() => cycleAlt(branchId)}>{t('actions.another')}</button>
           )}
         </aside>
       </div>
@@ -160,9 +161,9 @@ const page: React.CSSProperties = {
   flexDirection: 'column',
   gap: 16,
 };
-const header: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' };
+const headerRow: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' };
 const main: React.CSSProperties = { display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' };
-const sidebar: React.CSSProperties = { width: 320, display: 'flex', flexDirection: 'column', gap: 16 };
+const sidebar: React.CSSProperties = { width: 340, display: 'flex', flexDirection: 'column', gap: 16 };
 const sectionLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 };
 const input: React.CSSProperties = {
   padding: '10px 12px',
@@ -205,6 +206,15 @@ const quickDisabled: React.CSSProperties = {
   color: '#cbd5e1',
   cursor: 'not-allowed',
 };
+const del: React.CSSProperties = {
+  border: 'none',
+  background: 'transparent',
+  color: '#94a3b8',
+  fontSize: 18,
+  lineHeight: 1,
+  cursor: 'pointer',
+  padding: '0 2px',
+};
 const alt: React.CSSProperties = {
   padding: '10px 14px',
   fontSize: 14,
@@ -214,15 +224,29 @@ const alt: React.CSSProperties = {
   color: '#fff',
   cursor: 'pointer',
 };
-function stepRow(ok: boolean): React.CSSProperties {
+function factRow(state: 'ok' | 'disabled' | 'broken', selected: boolean): React.CSSProperties {
+  const border = selected ? '#f59e0b' : state === 'broken' ? '#fecaca' : '#e2e8f0';
+  const bg = selected ? '#fffbeb' : state === 'broken' ? '#fef2f2' : '#f8fafc';
   return {
     display: 'flex',
-    justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
-    padding: '6px 10px',
+    padding: '6px 8px',
     borderRadius: 6,
-    border: `1px solid ${ok ? '#e2e8f0' : '#fecaca'}`,
-    background: ok ? '#f8fafc' : '#fef2f2',
+    border: `1px solid ${border}`,
+    background: bg,
+  };
+}
+function factLabel(state: 'ok' | 'disabled' | 'broken'): React.CSSProperties {
+  return {
+    flex: 1,
+    textAlign: 'start',
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    fontFamily: 'ui-monospace, monospace',
+    fontSize: 12,
+    color: state === 'disabled' ? '#94a3b8' : '#0f172a',
+    textDecoration: state === 'disabled' ? 'line-through' : 'none',
   };
 }

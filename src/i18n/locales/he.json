@@ -39,6 +39,8 @@
     "clear": "נקה הכל",
     "flip": "הפוך",
     "another": "הצג תצורה אחרת",
+    "delete": "מחק",
+    "toggle": "כלול / החרג עובדה זו",
     "language": "English"
   },
   "geometry": {
