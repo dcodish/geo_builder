@@ -9,7 +9,7 @@ import type { Command, Id, Vec } from '../types';
 import { LEN_EPS } from '../types';
 import { applyCommand } from '../apply';
 import { evaluate } from '../evaluate';
-import { applyStep, build, branchCount, cycleAlternative, maxDelta, emptyConstruction } from '../step';
+import { applyStep, build, branchCount, commandConflict, cycleAlternative, maxDelta, emptyConstruction } from '../step';
 import { angleDeg, cross, dist } from '../geometry';
 
 /** Evaluate or throw — convenience for assertions. */
@@ -121,5 +121,44 @@ describe('idempotency (FR-EN-9)', () => {
     const once = applyCommand(emptyConstruction(), SQUARE);
     const twice = applyCommand(once, SQUARE);
     expect(twice.objects.length).toBe(once.objects.length);
+  });
+
+  it('re-issuing the identical command through the pipeline is an accepted no-op', () => {
+    const r1 = applyStep(emptyConstruction(), SQUARE);
+    const r2 = applyStep(r1.construction, SQUARE);
+    expect(r2.ok).toBe(true);
+    if (r2.ok) expect(r2.construction.objects.length).toBe(r1.construction.objects.length);
+  });
+});
+
+describe('redefinition conflict — an id cannot be redefined as something different', () => {
+  it('rejects re-declaring an existing point with a different definition (keeps prior)', () => {
+    // Square defines C as a derived corner; trying to make C "5 from A and 5 from B"
+    // (and B at a different position) is a contradiction, not a silent no-op.
+    const base = build([SQUARE]);
+    const r = applyStep(base.construction, {
+      type: 'point-by-distances',
+      id: 'C',
+      from1: 'A',
+      dist1: 5,
+      from2: 'B',
+      dist2: 5,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toMatch(/already defined/i);
+      expect(r.construction).toBe(base.construction); // prior figure preserved
+    }
+    expect(commandConflict(base.construction, { type: 'free-point', id: 'B', x: 6, y: 0 })).toMatch(
+      /already defined/i,
+    );
+  });
+
+  it('allows a command that only adds new objects, and a re-issue of the same definition', () => {
+    const base = build([SQUARE]);
+    // G on AD is new → no conflict.
+    expect(commandConflict(base.construction, { type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 })).toBeNull();
+    // The same square again → every produced object matches → no conflict.
+    expect(commandConflict(base.construction, SQUARE)).toBeNull();
   });
 });

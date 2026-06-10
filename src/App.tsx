@@ -41,13 +41,19 @@ export default function App() {
   }, [construction]);
 
   const branchId = construction.objects.find((o) => o.kind === 'intersection')?.id;
+  const has = (id: Id) => construction.objects.some((o) => o.id === id);
+  const isEmpty = construction.objects.length === 0;
 
-  const QUICK: { key: string; run: () => void }[] = [
-    { key: 'demo.square', run: () => execute({ type: 'square', ids: ['A', 'B', 'C', 'D'] }, t('demo.square')) },
-    { key: 'demo.pointOn', run: () => execute({ type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 }, t('demo.pointOn')) },
-    { key: 'demo.badAngle', run: () => execute({ type: 'set-angle', vertex: 'A', ray1: 'G', ray2: 'B', value: 37 }, t('demo.badAngle')) },
+  // Each quick fact is enabled only when it actually applies, so the demo can't
+  // be driven into a nonsensical sequence (e.g. a triangle reusing the square's
+  // A/B/C). The engine's commandConflict guard is the real safety net behind it.
+  const QUICK: { key: string; enabled: boolean; run: () => void }[] = [
+    { key: 'demo.square', enabled: isEmpty || has('A'), run: () => execute({ type: 'square', ids: ['A', 'B', 'C', 'D'] }, t('demo.square')) },
+    { key: 'demo.pointOn', enabled: has('A') && has('D') && !has('G'), run: () => execute({ type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 }, t('demo.pointOn')) },
+    { key: 'demo.badAngle', enabled: has('G'), run: () => execute({ type: 'set-angle', vertex: 'A', ray1: 'G', ray2: 'B', value: 37 }, t('demo.badAngle')) },
     {
       key: 'demo.triangle',
+      enabled: isEmpty,
       run: () => {
         const tri: Command[] = [
           { type: 'free-point', id: 'A', x: 0, y: 0 },
@@ -85,7 +91,13 @@ export default function App() {
             <div style={sectionLabel}>{t('demo.heading')}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {QUICK.map((q) => (
-                <button key={q.key} type="button" style={quick} onClick={q.run}>
+                <button
+                  key={q.key}
+                  type="button"
+                  style={q.enabled ? quick : quickDisabled}
+                  disabled={!q.enabled}
+                  onClick={q.run}
+                >
                   {t(q.key)}
                 </button>
               ))}
@@ -185,6 +197,13 @@ const quick: React.CSSProperties = {
   background: '#eff6ff',
   cursor: 'pointer',
   textAlign: 'start',
+};
+const quickDisabled: React.CSSProperties = {
+  ...quick,
+  border: '1px solid #e2e8f0',
+  background: '#f8fafc',
+  color: '#cbd5e1',
+  cursor: 'not-allowed',
 };
 const alt: React.CSSProperties = {
   padding: '10px 14px',

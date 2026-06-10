@@ -27,18 +27,56 @@ export type StepResult = StepOk | StepErr;
 
 export const emptyConstruction = (): Construction => ({ objects: [], constraints: [] });
 
+/** Deep structural equality for plain geo objects/values. */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, (b as unknown[])[i]));
+  }
+  const ka = Object.keys(a as object);
+  const kb = Object.keys(b as object);
+  if (ka.length !== kb.length) return false;
+  return ka.every((k) => deepEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+}
+
+/**
+ * A command may introduce new objects, but it must not *redefine* an existing
+ * one. Re-issuing the identical definition is an idempotent no-op (FR-EN-9);
+ * issuing a different definition for an id that already exists is a conflict
+ * (e.g. "C is the square's corner" vs "C is 5 from A and 5 from B"). Returns a
+ * message describing the first such clash, or null if the command is consistent.
+ *
+ * The candidate objects are produced against an empty construction so we compare
+ * against the command's *canonical* definition, independent of evaluation.
+ */
+export function commandConflict(prev: Construction, cmd: Command): string | null {
+  const produced = applyCommand(emptyConstruction(), cmd).objects;
+  for (const o of produced) {
+    const existing = prev.objects.find((x) => x.id === o.id);
+    if (existing && !deepEqual(existing, o)) {
+      return `'${o.id}' is already defined — it can't be redefined as something different`;
+    }
+  }
+  return null;
+}
+
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
+  const prevEval = evaluate(prev);
+  const prevPositions = prevEval.ok ? prevEval.positions : new Map<Id, Vec>();
+
+  // Reject a redefinition conflict before mutating anything (keep prior figure).
+  const conflict = commandConflict(prev, cmd);
+  if (conflict) {
+    return { ok: false, error: conflict, construction: prev, positions: prevPositions };
+  }
+
   const next = applyCommand(prev, cmd);
   const res = evaluate(next);
   if (!res.ok) {
-    const prevEval = evaluate(prev);
-    return {
-      ok: false,
-      error: res.error,
-      construction: prev,
-      positions: prevEval.ok ? prevEval.positions : new Map(),
-    };
+    return { ok: false, error: res.error, construction: prev, positions: prevPositions };
   }
   return { ok: true, construction: next, positions: res.positions };
 }

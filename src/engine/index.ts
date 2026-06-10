@@ -9,6 +9,7 @@ export {
   applyStep,
   build,
   branchCount,
+  commandConflict,
   cycleAlternative,
   maxDelta,
   emptyConstruction,

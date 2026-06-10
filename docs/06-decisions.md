@@ -97,3 +97,15 @@ _Last updated: 2026-06-10. Each entry records a decision, its context, and conse
 **Decision.** Adopt [`08-testing-strategy.md`](08-testing-strategy.md): Vitest for unit/integration/component, fast-check for invariants (proposed), Playwright for headline E2E (proposed). The engine (pure, deterministic) is tested hardest; the LLM fallback is **mocked** — no live API calls in CI. Each build step has an acceptance gate; nothing is "ready" until its gate passes, `tsc`/build are clean, and results are reported honestly (no skipped/`.only` specs hiding gaps).
 
 **Consequences.** Slower per-step but trustworthy completion. Adds dev dependencies (fast-check, RTL/jsdom, Playwright). The stability regression is re-established as a first-class test (it guarded the old code too).
+
+---
+
+## ADR-009 — Redefining an existing object is a conflict, not a silent no-op
+
+**Status:** Accepted (2026-06-10)
+
+**Context.** Idempotency (FR-EN-9) was implemented by `addObj` skipping any object whose id already exists. That conflated two different cases: re-issuing the *identical* definition (a legitimate no-op) and issuing a *different* definition for an existing id (a contradiction). The latter was silently dropped — surfaced when a demo "triangle" reused the square's `A/B/C`: declaring `C` as "5 from A and 5 from B" while `C` was already the square's derived corner was ignored, yet the step still reported success. An accepted ✓ for an impossible fact is both wrong and misleading.
+
+**Decision.** A command may **introduce** new objects but may not **redefine** an existing one. The pipeline (`applyStep`) calls `commandConflict(prev, cmd)` before mutating: it produces the command's canonical objects (against an empty construction) and, for any id already present, compares structurally — identical ⇒ idempotent no-op (accepted), different ⇒ rejected with "'X' is already defined…", keeping the prior figure (same path as over-constraint, FR-EN-8). `addObj`'s skip-if-present remains, but it is now only ever reached for genuine duplicates because conflicts are caught upstream. Considered and rejected: treating a redefinition as an in-place *move* — that conflates declaration with dragging (a Phase-8 interaction), and makes the build-by-facts flow unpredictable.
+
+**Consequences.** Contradictory redefinitions are now caught as a distinct, explained failure class. Demo quick-facts are additionally gated in the UI so an inapplicable command can't be issued in the first place (defence in depth; the engine guard is the real safety net). Covered by engine tests (conflict rejected + prior kept; pure-add and identical re-issue still pass).
