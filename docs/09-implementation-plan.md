@@ -112,10 +112,11 @@ Sub-phases — each ends by **reproducing its corpus questions** (gated per [Tes
 - **5a — Quads & segments:** general quadrilateral + arbitrary segment + line–line intersection → reproduce **Q1**.
 - **5b — Bisectors, extensions, perpendiculars:** angle bisector, point-on-ray/extension, perpendicular + foot, right-triangle construction → reproduce **Q2, Q3, Q4**.
 - **5c — Circles:** circle (center + radius), point-on-circle / inscribed vertices, chord & diameter, arc midpoint, line∩circle, tangent-at-a-point → reproduce **Q5, Q6, Q7**.
+- **5d — Constraint-driven DOF ([ADR-012](06-decisions.md)):** make constraints *shape* the figure, not just validate it — when a constraint references a point with a free DOF (on-object `t`, or a free point), solve that DOF deterministically (analytic / bounded 1-D); multiple solutions become alternatives; over-constraint still fires when nothing is free. Sequenced alongside the constructs that need it (e.g. angle/length driving a point-on-segment or free point). Today's behaviour (constraints = checks over fully-determined points) holds until this lands.
 
 - **Depends on:** Phases 1–4 (engine + renderer; parser for the automatic path).
 - **Requirements:** FR-EN-3, -4, -5 (full).
-- **Gate:** every corpus figure reproduced (visual match up to free transforms / branch); solve-correctness on fixtures; stability holds.
+- **Gate:** every corpus figure reproduced (visual match up to free transforms / branch); solve-correctness on fixtures (incl. constraint-driven DOF: a referenced free parameter is solved to satisfy the constraint, with branches); stability holds.
 
 ---
 

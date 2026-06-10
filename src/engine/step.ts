@@ -56,6 +56,10 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
   for (const o of produced) {
     const existing = prev.objects.find((x) => x.id === o.id);
     if (existing && !deepEqual(existing, o)) {
+      // Repositioning a free point is a move, not a conflict (ADR-011); only a
+      // *definitional* change (different kind, or redefining a derived/on-object
+      // point) conflicts. Validity of the move is left to evaluate().
+      if (existing.kind === 'free-point' && o.kind === 'free-point') continue;
       return `'${o.id}' is already defined — it can't be redefined as something different`;
     }
   }

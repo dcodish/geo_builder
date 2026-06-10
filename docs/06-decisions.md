@@ -102,7 +102,7 @@ _Last updated: 2026-06-10. Each entry records a decision, its context, and conse
 
 ## ADR-009 — Redefining an existing object is a conflict, not a silent no-op
 
-**Status:** Accepted (2026-06-10)
+**Status:** Accepted (2026-06-10) · **Amended by [ADR-011](#adr-011--re-placing-a-free-point-is-a-move) (free points are an exception — re-placing one is a move).**
 
 **Context.** Idempotency (FR-EN-9) was implemented by `addObj` skipping any object whose id already exists. That conflated two different cases: re-issuing the *identical* definition (a legitimate no-op) and issuing a *different* definition for an existing id (a contradiction). The latter was silently dropped — surfaced when a demo "triangle" reused the square's `A/B/C`: declaring `C` as "5 from A and 5 from B" while `C` was already the square's derived corner was ignored, yet the step still reported success. An accepted ✓ for an impossible fact is both wrong and misleading.
 
@@ -121,3 +121,27 @@ _Last updated: 2026-06-10. Each entry records a decision, its context, and conse
 **Decision.** Make the **ordered list of facts the source of truth**; derive the figure by **replaying the enabled facts** through the engine (`replay`). Each fact carries an `enabled` flag. Three operations: **select** (highlight the objects the fact introduced, on the canvas — UI-only, not undoable), **deselect/select** (toggle `enabled`; the figure re-derives), **delete** (remove the fact). When a deselected/deleted fact is depended on by a later fact, the dependent **auto-drops** (it fails to apply during replay and is flagged inactive) and is **restored** when the dependency returns — chosen over *blocking* the action or *cascading* deletes, because it best serves "experiment and see the impact" and loses nothing (reversible). Branch choices for alternatives live in the fact's command, so cycling = editing that fact and re-deriving. Undo/redo tracks the fact list (toggle/add/delete/cycle are all fact edits); selection is excluded from history via `partialize` + an `equality` guard so highlighting doesn't pollute undo.
 
 **Consequences.** Deselect is trivially reversible; delete is clean; the model is closer to the constructive ideal (a program of construction steps, not a baked figure). Positions stay derived (not stored), so undo can't desync coordinates from facts. Slightly more compute (replay on every change) — negligible at v1 sizes; can be memoized/incrementalised later if needed. This generalises naturally to future reordering/editing of facts.
+
+---
+
+## ADR-011 — Re-placing a free point is a move
+
+**Status:** Accepted (2026-06-10) · amends [ADR-009](#adr-009--redefining-an-existing-object-is-a-conflict-not-a-silent-no-op)
+
+**Context.** ADR-009 treated *any* re-declaration of an existing id as a conflict, explicitly rejecting the "in-place move" reading. In use that surprised: a `square ABCD` places `B` at the default `(5,0)`; typing `point B at (6,0)` was rejected as "B is already defined," even though B is a **free** point and relocating it is geometrically fine (the square just resizes — `C`,`D` are derived from `A`,`B`). The user asked "what prevents B being at (6,0)?" — and the honest answer was "only our guard, not geometry."
+
+**Decision.** A **free point** (and only a free point) may be re-placed: re-issuing `free-point` for an existing free point **updates its coordinates** — a *move* — provided the resulting figure stays valid (`evaluate` still succeeds; an over-constraint or broken dependency rejects and keeps the prior figure). Re-declaring a **derived / on-object / intersection** point as something different remains a conflict (ADR-009 stands for those): those points are *defined* by other objects, so "moving" them is meaningless. In the store, a reposition **updates the existing free-point fact in place** rather than stacking rows, and is undoable/deletable like any fact (deleting the move reverts to the original definition). This is distinct from, and complementary to, **drag** (Phase 8): drag is a pointer gesture on the canvas; this is the typed/command path to the same end.
+
+**Consequences.** Typed repositioning works and reads naturally; the build-by-facts flow stays predictable because only free points (the things that genuinely have positional freedom) can move. When constraint-driven solving lands ([ADR-012](#adr-012--constraints-may-solve-a-free-dof-constructively-phase-5)), a move that would violate a constraint is rejected by the same `evaluate` gate. Covered by engine + store tests (move resizes the square and stays valid; derived points still conflict; deleting the move reverts).
+
+---
+
+## ADR-012 — Constraints may solve a free DOF constructively (Phase 5)
+
+**Status:** Accepted (2026-06-10) · **planned for Phase 5** (not yet implemented)
+
+**Context.** Phase 1 implemented the angle constraint as a satisfiability **check** only: the referenced points are already determined, so a constraint can only confirm or contradict. This collides with the vision (FR-EN-3/-4/-5: distance, angle, right-angle, parallel, perpendicular, equal-segments are meant to *shape* the figure). Concretely: with a square `TYUI` and `G` on `IU` at the default midpoint, `angle UGY = 50°` is rejected (the figure says 63.4°) — even though `G` has one free parameter and sliding it to `t≈0.16` would make the angle exactly 50°. The engine never looked, because it doesn't *solve* constraints.
+
+**Decision.** When a constraint references a point that still has a **free degree of freedom** (a point-on-object's parameter `t`, or a free point), the engine will **solve that DOF** so the constraint is satisfied — keeping within the constructive model rather than adding a general solver. Approach: targeted, **deterministic** solves — analytic where possible, otherwise bounded 1-D root-finding over the parameter range — applied as a construction step that sets the DOF. Multiple solutions (e.g. two `t` values giving the same angle) become **alternatives** (branch indices, like intersections — [ADR-001](#adr-001)/FR-ALT). **Over-constraint detection still fires** when *nothing* is free to absorb the constraint (the current behaviour, for fully-determined references). Explicitly **rejected**: a general numeric residual solver over arbitrary constraint sets — that reintroduces the instability / figure-jumping / fuzzy-alternatives that ADR-001 chose the constructive model to avoid. This widens in lock-step with the rest of Phase 5.
+
+**Consequences.** Constraints become *constructive* (they place geometry), matching how students think ("make this angle 50°") and how GeoGebra-style tools behave. Determinism and structural stability are preserved because each solve is local, bounded, and branch-indexed. Requires deciding, per constraint type, which DOF it consumes and how to enumerate solution branches — designed construct-by-construct in Phase 5. Until then, constraints over fully-determined points remain checks (today's behaviour), and the angle-on-a-free-`t` case is **not yet** supported.

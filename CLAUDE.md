@@ -20,7 +20,7 @@ The original implementation was a *shape-template matcher* that dead-ended (coul
 - **`archive/`** holds the entire old template-based implementation — outside `src/`, **not compiled or bundled, and excluded from tests** (`vite.config.ts`). Reference only; useful bits: the old Claude tool schema (`archive/src/services/llm/`) and theorem predicates (`archive/src/engine/theorems/`).
 - **Validation corpus:** `docs/sample questions/` holds 7 real bagrut problems (text + image). The plan is corpus-driven — we reproduce each *figure* (never solve) and compare to the official image.
 
-**Next step (resume here):** Phase 5a — widen the **engine and parser together**: general quadrilateral + arbitrary segment between two points + line∩line intersection, then reproduce corpus **Q1** side-by-side with its image. (Phase 5 is corpus-driven; each construct lands in the engine, renderer, and grammar in lock-step.) The build is on branch `rebuild-foundation`.
+**Next step (resume here):** Phase 5a — widen the **engine and parser together**: general quadrilateral + arbitrary segment between two points + line∩line intersection, then reproduce corpus **Q1** side-by-side with its image. (Phase 5 is corpus-driven; each construct lands in the engine, renderer, and grammar in lock-step.) Phase **5d** adds **constraint-driven DOF solving** ([ADR-012](docs/06-decisions.md)) — making constraints *shape* the figure (e.g. `angle UGY = 50°` slides an on-segment point to satisfy it) rather than only validating; today constraints over fully-determined points are checks. Free-point **moves** are already supported ([ADR-011](docs/06-decisions.md)). The build is on branch `rebuild-foundation`.
 
 ## Project memory (rule)
 

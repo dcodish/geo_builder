@@ -149,9 +149,32 @@ describe('redefinition conflict — an id cannot be redefined as something diffe
       expect(r.error).toMatch(/already defined/i);
       expect(r.construction).toBe(base.construction); // prior figure preserved
     }
-    expect(commandConflict(base.construction, { type: 'free-point', id: 'B', x: 6, y: 0 })).toMatch(
-      /already defined/i,
-    );
+    // Turning a derived point (C) into a free one is still a conflict…
+    expect(commandConflict(base.construction, { type: 'free-point', id: 'C', x: 1, y: 1 })).toMatch(/already defined/i);
+    // …but re-placing the free point B is a move, not a conflict (ADR-011).
+    expect(commandConflict(base.construction, { type: 'free-point', id: 'B', x: 6, y: 0 })).toBeNull();
+  });
+
+  it('repositions a free point instead of conflicting (a move, ADR-011)', () => {
+    // The square defines B as a free point at (5,0); re-placing it at (6,0) moves
+    // it and the square resizes (C, D are derived from A, B) — still valid.
+    const base = build([SQUARE]);
+    const r = applyStep(base.construction, { type: 'free-point', id: 'B', x: 6, y: 0 });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.positions.get('B')).toEqual({ x: 6, y: 0 });
+      // still a square: equal sides, right angle
+      const A = r.positions.get('A')!, B = r.positions.get('B')!, C = r.positions.get('C')!;
+      expect(dist(B, C)).toBeCloseTo(dist(A, B), 9);
+      expect(angleDeg(A, B, C)).toBeCloseTo(45, 6); // ∠BAC = half the right angle ⇒ square diagonal
+    }
+  });
+
+  it('still refuses to turn a derived point into a free one', () => {
+    const base = build([SQUARE]); // C is derived (square corner)
+    const r = applyStep(base.construction, { type: 'free-point', id: 'C', x: 1, y: 1 });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/already defined/i);
   });
 
   it('allows a command that only adds new objects, and a re-issue of the same definition', () => {

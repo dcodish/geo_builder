@@ -15,9 +15,16 @@ export function applyCommand(prev: Construction, cmd: Command): Construction {
   const constraints = [...prev.constraints];
 
   switch (cmd.type) {
-    case 'free-point':
-      addObj(objects, { kind: 'free-point', id: cmd.id, x: cmd.x, y: cmd.y });
+    case 'free-point': {
+      // A free point may be (re)placed: if it already exists as a free point,
+      // update its coordinates — a *move* (ADR-011). Conflicts with non-free
+      // points of the same id are caught upstream by commandConflict.
+      const fp: GeoObject = { kind: 'free-point', id: cmd.id, x: cmd.x, y: cmd.y };
+      const i = objects.findIndex((o) => o.id === cmd.id);
+      if (i === -1) objects.push(fp);
+      else if (objects[i].kind === 'free-point') objects[i] = fp;
       break;
+    }
 
     case 'square': {
       // Two free points (A,B) carry the square's 4 DOF (position, rotation,

@@ -104,6 +104,15 @@ export const useGeoStore = create<GeoState>()(
           if (!dup.enabled) set({ facts: facts.map((f) => (f.id === dup.id ? { ...f, enabled: true } : f)) });
           return;
         }
+        // Repositioning a free point already governed by a prior free-point fact
+        // updates that fact in place (a move), rather than stacking rows (ADR-011).
+        if (cmd.type === 'free-point') {
+          const prev = facts.find((f) => f.cmd.type === 'free-point' && f.cmd.id === cmd.id);
+          if (prev) {
+            set({ facts: facts.map((f) => (f.id === prev.id ? { ...f, cmd, utterance, enabled: true } : f)) });
+            return;
+          }
+        }
         set({ facts: [...facts, { id: nanoid(), cmd, utterance, enabled: true }] });
       },
 

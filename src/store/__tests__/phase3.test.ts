@@ -60,6 +60,24 @@ describe('store — replay pipeline', () => {
   });
 });
 
+describe('store — repositioning a free point is a move (ADR-011)', () => {
+  it('re-placing an existing free point updates its fact in place (no new row) and moves it', () => {
+    s().execute({ type: 'free-point', id: 'A', x: 0, y: 0 });
+    s().execute({ type: 'free-point', id: 'A', x: 4, y: 1 }); // move A
+    expect(s().facts).toHaveLength(1); // updated in place, not stacked
+    expect(replay(s().facts).positions.get('A')).toEqual({ x: 4, y: 1 });
+  });
+
+  it('deleting the move reverts a square vertex placed by the square fact', () => {
+    s().execute(SQUARE); // B at (5,0)
+    s().execute({ type: 'free-point', id: 'B', x: 6, y: 0 }); // separate move fact
+    expect(s().facts).toHaveLength(2);
+    expect(replay(s().facts).positions.get('B')).toEqual({ x: 6, y: 0 });
+    s().remove(s().facts[1].id); // delete the move
+    expect(replay(s().facts).positions.get('B')).toEqual({ x: 5, y: 0 }); // back to the square's B
+  });
+});
+
 describe('store — keep prior figure on contradiction (FR-EN-8/-10)', () => {
   it('flags the bad fact, keeps the figure, surfaces the error', () => {
     s().execute(SQUARE);
