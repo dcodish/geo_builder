@@ -137,6 +137,7 @@ Sub-phases — each ends by **reproducing its corpus questions** (gated per [Tes
 - **Depends on:** Phase 4 (the boundary it plugs into).
 - **Requirements:** FR-IN-2 (fallback path); NFR-SE-1, -2; NFR-CT-1, -2, -3.
 - **Gate:** boundary dispatch test (parser-first; fallback mocked); **bundle check — built client contains no key**; calls target the proxy; optional manual live smoke (env-gated).
+- **Why after Phase 5 (sequencing rationale, confirmed 2026-06-10):** the LLM can only emit commands the **engine** supports, so its value scales with the vocabulary — with the few constructs available pre-Phase-5 the grammar already covers most natural phrasings, and freeform input has little to map onto. Until then the **grammar is the primary path** (parser-first, ADR-002) and is kept *tight-but-forgiving*: it absorbs cheap **structural** variation (word/keyword order, spacing, synonyms) but is **not** hand-extended toward freeform phrasing — that long tail is precisely the LLM's job, not more regex.
 
 ---
 
