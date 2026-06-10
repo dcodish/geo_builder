@@ -22,6 +22,12 @@ function quadEdges(objects: GeoObject[], a: Id, b: Id, c: Id, d: Id): void {
   addObj(objects, { kind: 'polygon', id: `poly-${a}${b}${c}${d}`, vertices: [a, b, c, d] });
 }
 
+/** The 3 boundary segments + the polygon for a triangle a→b→c. */
+function triEdges(objects: GeoObject[], a: Id, b: Id, c: Id): void {
+  for (const [x, y] of [[a, b], [b, c], [c, a]] as const) addObj(objects, segment(x, y));
+  addObj(objects, { kind: 'polygon', id: `poly-${a}${b}${c}`, vertices: [a, b, c] });
+}
+
 export function applyCommand(prev: Construction, cmd: Command): Construction {
   const objects = [...prev.objects];
   const constraints = [...prev.constraints];
@@ -71,6 +77,49 @@ export function applyCommand(prev: Construction, cmd: Command): Construction {
       addObj(objects, { kind: 'free-point', id: c, x: 7, y: 0 });
       addObj(objects, { kind: 'parallelogram-vertex', id: d, a, b, c });
       quadEdges(objects, a, b, c, d);
+      break;
+    }
+
+    case 'rectangle': {
+      // A,B free base; C,D offset perpendicular to AB by a default height.
+      const [a, b, c, d] = cmd.ids;
+      const h = 4;
+      addObj(objects, { kind: 'free-point', id: a, x: 0, y: 0 });
+      addObj(objects, { kind: 'free-point', id: b, x: 6, y: 0 });
+      addObj(objects, { kind: 'perp-offset', id: c, anchor: b, from: a, to: b, dist: h });
+      addObj(objects, { kind: 'perp-offset', id: d, anchor: a, from: a, to: b, dist: h });
+      quadEdges(objects, a, b, c, d);
+      break;
+    }
+
+    case 'rhombus': {
+      // A,B free (side AB); D rotated off A by a default angle; C closes the rhombus.
+      const [a, b, c, d] = cmd.ids;
+      addObj(objects, { kind: 'free-point', id: a, x: 0, y: 0 });
+      addObj(objects, { kind: 'free-point', id: b, x: 5, y: 0 });
+      addObj(objects, { kind: 'rotated', id: d, pivot: a, from: a, to: b, angleDeg: 60, scale: 1 });
+      addObj(objects, { kind: 'parallelogram-vertex', id: c, a: b, b: a, c: d }); // C = B + D − A
+      quadEdges(objects, a, b, c, d);
+      break;
+    }
+
+    case 'trapezoid': {
+      // A,B,D free; C offset from D parallel to AB (so AB ∥ DC), shorter by default.
+      const [a, b, c, d] = cmd.ids;
+      addObj(objects, { kind: 'free-point', id: a, x: 0, y: 4 });
+      addObj(objects, { kind: 'free-point', id: b, x: 6, y: 4 });
+      addObj(objects, { kind: 'free-point', id: d, x: 1, y: 0 });
+      addObj(objects, { kind: 'scaled-offset', id: c, anchor: d, from: a, to: b, k: 0.6 });
+      quadEdges(objects, a, b, c, d);
+      break;
+    }
+
+    case 'triangle': {
+      const [a, b, c] = cmd.ids;
+      addObj(objects, { kind: 'free-point', id: a, x: 0, y: 0 });
+      addObj(objects, { kind: 'free-point', id: b, x: 6, y: 0 });
+      addObj(objects, { kind: 'free-point', id: c, x: 2, y: 4 });
+      triEdges(objects, a, b, c);
       break;
     }
 

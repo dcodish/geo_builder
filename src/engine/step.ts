@@ -57,7 +57,14 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
   // free point only for new ids), so a base free-point never conflicts — only
   // the shape's own derived corners can (ADR-013). The default coordinates a
   // shape gives a *new* base vertex are an initializer, not a definition.
-  const isShape = cmd.type === 'square' || cmd.type === 'quadrilateral' || cmd.type === 'parallelogram';
+  const isShape =
+    cmd.type === 'square' ||
+    cmd.type === 'quadrilateral' ||
+    cmd.type === 'parallelogram' ||
+    cmd.type === 'rectangle' ||
+    cmd.type === 'rhombus' ||
+    cmd.type === 'trapezoid' ||
+    cmd.type === 'triangle';
   const produced = applyCommand(emptyConstruction(), cmd).objects;
   for (const o of produced) {
     const existing = prev.objects.find((x) => x.id === o.id);

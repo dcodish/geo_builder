@@ -74,13 +74,47 @@ export interface LineLineIntersection {
   d: Id;
 }
 
+/** 0 DOF — `anchor` offset perpendicular to from→to by `dist` (rectangle corners). */
+export interface PerpOffsetVertex {
+  kind: 'perp-offset';
+  id: Id;
+  anchor: Id;
+  from: Id;
+  to: Id;
+  dist: number;
+}
+
+/** 0 DOF — `pivot` + scale · Rot(angleDeg) · (to − from) (rhombus / rotated corners). */
+export interface RotatedVertex {
+  kind: 'rotated';
+  id: Id;
+  pivot: Id;
+  from: Id;
+  to: Id;
+  angleDeg: number;
+  scale: number;
+}
+
+/** 0 DOF — `anchor` + k · (to − from): a point offset parallel to from→to (trapezoid). */
+export interface ScaledOffsetVertex {
+  kind: 'scaled-offset';
+  id: Id;
+  anchor: Id;
+  from: Id;
+  to: Id;
+  k: number;
+}
+
 export type GeoPoint =
   | FreePoint
   | OnSegmentPoint
   | DerivedPoint
   | IntersectionPoint
   | ParallelogramVertex
-  | LineLineIntersection;
+  | LineLineIntersection
+  | PerpOffsetVertex
+  | RotatedVertex
+  | ScaledOffsetVertex;
 
 /** The object kinds that are points (carry a computed position). Single source of truth. */
 const POINT_KINDS: ReadonlySet<string> = new Set([
@@ -90,6 +124,9 @@ const POINT_KINDS: ReadonlySet<string> = new Set([
   'intersection',
   'parallelogram-vertex',
   'line-line-intersection',
+  'perp-offset',
+  'rotated',
+  'scaled-offset',
 ]);
 
 export function isGeoPoint(o: GeoObject): o is GeoPoint {
@@ -136,6 +173,10 @@ export type Command =
   | { type: 'square'; ids: [Id, Id, Id, Id]; side?: number }
   | { type: 'quadrilateral'; ids: [Id, Id, Id, Id] }
   | { type: 'parallelogram'; ids: [Id, Id, Id, Id] }
+  | { type: 'rectangle'; ids: [Id, Id, Id, Id] }
+  | { type: 'rhombus'; ids: [Id, Id, Id, Id] }
+  | { type: 'trapezoid'; ids: [Id, Id, Id, Id] }
+  | { type: 'triangle'; ids: [Id, Id, Id] }
   | { type: 'free-point'; id: Id; x: number; y: number }
   | { type: 'point-on-segment'; id: Id; a: Id; b: Id; t?: number }
   | { type: 'point-by-distances'; id: Id; from1: Id; dist1: number; from2: Id; dist2: number; branch?: number }

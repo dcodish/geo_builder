@@ -81,8 +81,8 @@ describe('parser — out-of-grammar returns not-handled (the fallback boundary)'
     '',
     'hello there',
     'draw something nice',
-    'triangle ABC', // Phase-5 construct — intentionally not handled yet
-    'circle centred at A',
+    'circle centred at A', // Phase-5c construct — intentionally not handled yet
+    'BC parallel to AD', // Phase-5b — not handled yet
     'make it bigger',
   ]) {
     it(`"${bad}"`, () => {

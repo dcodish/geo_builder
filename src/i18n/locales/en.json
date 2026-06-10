@@ -20,6 +20,12 @@
       "point G on AD at 40%"
     ]
   },
+  "help": {
+    "show": "What can I type?",
+    "hide": "Hide",
+    "title": "Things you can type",
+    "comingSoon": "Coming soon"
+  },
   "steps": {
     "title": "Steps",
     "empty": "Start by describing a shape"

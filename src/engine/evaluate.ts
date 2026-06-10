@@ -7,7 +7,7 @@
 
 import type { Construction, GeoPoint, Id, Vec } from './types';
 import { ANGLE_EPS, isGeoPoint } from './types';
-import { add, angleDeg, circleCircleIntersect, lineLineIntersect, rot90, scale, sub } from './geometry';
+import { add, angleDeg, circleCircleIntersect, lineLineIntersect, rot90, rotate, scale, sub, unit } from './geometry';
 
 export interface EvalOk {
   ok: true;
@@ -113,6 +113,30 @@ function tryEval(p: GeoPoint, pos: Map<Id, Vec>): Vec | 'pending' | string {
       const hit = lineLineIntersect(a, b, c, d);
       if (!hit) return `cannot construct ${p.id}: lines ${p.a}${p.b} and ${p.c}${p.d} are parallel`;
       return hit;
+    }
+
+    case 'perp-offset': {
+      const anchor = pos.get(p.anchor);
+      const from = pos.get(p.from);
+      const to = pos.get(p.to);
+      if (!anchor || !from || !to) return 'pending';
+      return add(anchor, scale(unit(rot90(sub(to, from))), p.dist)); // anchor + n̂·dist
+    }
+
+    case 'rotated': {
+      const pivot = pos.get(p.pivot);
+      const from = pos.get(p.from);
+      const to = pos.get(p.to);
+      if (!pivot || !from || !to) return 'pending';
+      return add(pivot, scale(rotate(sub(to, from), p.angleDeg), p.scale)); // pivot + s·Rot(θ)(to−from)
+    }
+
+    case 'scaled-offset': {
+      const anchor = pos.get(p.anchor);
+      const from = pos.get(p.from);
+      const to = pos.get(p.to);
+      if (!anchor || !from || !to) return 'pending';
+      return add(anchor, scale(sub(to, from), p.k)); // anchor + k·(to−from)
     }
   }
 }

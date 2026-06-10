@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
-import { parse } from '@/parser';
+import { COMMAND_CATALOG, parse } from '@/parser';
 import { Figure } from '@/render';
 import { introducedIds, replay, useGeoStore } from '@/store/geoStore';
 
@@ -33,6 +33,8 @@ export default function App() {
 
   const [text, setText] = useState('');
   const [notUnderstood, setNotUnderstood] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const he = i18n.language === 'he';
 
   // The single text → command[] path: parse, then run each command through the
   // store. Out-of-grammar input shows a hint (Phase 7 will escalate to the LLM).
@@ -103,7 +105,36 @@ export default function App() {
               </button>
             </div>
             {notUnderstood && <span style={{ fontSize: 12, color: '#b45309' }}>{t('input.notUnderstood')}</span>}
+            <button
+              type="button"
+              onClick={() => setShowHelp((v) => !v)}
+              style={{ alignSelf: 'flex-start', border: 'none', background: 'none', color: '#2563eb', fontSize: 12, cursor: 'pointer', padding: 0 }}
+            >
+              {showHelp ? t('help.hide') : t('help.show')}
+            </button>
           </form>
+
+          {showHelp && (
+            <div style={helpPanel}>
+              <div style={sectionLabel}>{t('help.title')}</div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {COMMAND_CATALOG.filter((c) => c.supported).map((c) => (
+                  <li key={c.en} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <button type="button" style={helpExample} onClick={() => submit(he ? c.he : c.en)} dir="auto">
+                      {he ? c.he : c.en}
+                    </button>
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>{he ? c.descHe : c.descEn}</span>
+                  </li>
+                ))}
+              </ul>
+              <div style={{ ...sectionLabel, marginTop: 10 }}>{t('help.comingSoon')}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                {COMMAND_CATALOG.filter((c) => !c.supported).map((c) => (
+                  <span key={c.en} style={comingSoon} dir="auto">{he ? c.he : c.en}</span>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div>
             <div style={sectionLabel}>{t('examples.heading')}</div>
@@ -206,6 +237,32 @@ const chip: React.CSSProperties = {
   background: '#eff6ff',
   color: '#1e40af',
   cursor: 'pointer',
+  fontFamily: 'ui-monospace, monospace',
+};
+const helpPanel: React.CSSProperties = {
+  border: '1px solid #e2e8f0',
+  borderRadius: 8,
+  background: '#fafafa',
+  padding: 12,
+  maxHeight: 320,
+  overflowY: 'auto',
+};
+const helpExample: React.CSSProperties = {
+  textAlign: 'start',
+  border: 'none',
+  background: 'none',
+  color: '#1e40af',
+  cursor: 'pointer',
+  fontFamily: 'ui-monospace, monospace',
+  fontSize: 13,
+  padding: 0,
+};
+const comingSoon: React.CSSProperties = {
+  padding: '3px 8px',
+  fontSize: 11,
+  borderRadius: 999,
+  border: '1px dashed #cbd5e1',
+  color: '#94a3b8',
   fontFamily: 'ui-monospace, monospace',
 };
 const stepList: React.CSSProperties = { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 };

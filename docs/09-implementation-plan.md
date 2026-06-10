@@ -2,7 +2,7 @@
 
 _Last updated: 2026-06-10._
 
-> **Status:** Phases 0–4 complete (M1–M3). **Phase 5a complete** — general quadrilateral, parallelogram, arbitrary segment, line∩line; **corpus Q1 reproduced** end-to-end from typed He/En utterances (8 engine + parser tests green). **Next:** Phase 5b (bisectors, extensions, perpendiculars → Q2–Q4). Work is on branch `rebuild-foundation`.
+> **Status:** Phases 0–4 complete (M1–M3). **Phase 5a complete** (quad, parallelogram, segment, line∩line; **Q1 reproduced**). **Polygon family added** — triangle, rectangle, rhombus, trapezoid (engine + grammar + tests). **In-app command reference** added (`parser/catalog.ts` → help panel; discoverability). **Next (Phase 5b):** parallel-line construct, perpendicular + foot, angle bisector, point-on-ray/extension, right-triangle → Q2–Q4; then 5c (circles), 5d (constraint-driven DOF). Work is on branch `rebuild-foundation`.
 
 ## Purpose
 

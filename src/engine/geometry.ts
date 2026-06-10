@@ -12,6 +12,20 @@ export const rot90 = (v: Vec): Vec => ({ x: -v.y, y: v.x });
 export const len = (v: Vec): number => Math.hypot(v.x, v.y);
 export const dist = (a: Vec, b: Vec): number => Math.hypot(a.x - b.x, a.y - b.y);
 
+/** Unit vector in the direction of v (zero vector maps to zero). */
+export const unit = (v: Vec): Vec => {
+  const l = len(v);
+  return l < 1e-12 ? { x: 0, y: 0 } : { x: v.x / l, y: v.y / l };
+};
+
+/** Rotate v counter-clockwise by `deg` degrees. */
+export function rotate(v: Vec, deg: number): Vec {
+  const r = (deg * Math.PI) / 180;
+  const c = Math.cos(r);
+  const s = Math.sin(r);
+  return { x: v.x * c - v.y * s, y: v.x * s + v.y * c };
+}
+
 /** Signed cross product (a−o) × (b−o); zero ⇒ o,a,b collinear. */
 export const cross = (o: Vec, a: Vec, b: Vec): number =>
   (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);

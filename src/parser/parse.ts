@@ -50,14 +50,35 @@ const quadShape =
     return ids ? [make([ids[0], ids[1], ids[2], ids[3]])] : null;
   };
 
+/** A triangle rule factory: keyword (either order) + 3 labels → command. */
+const triShape =
+  (re: RegExp, make: (ids: [Id, Id, Id]) => Command): Rule =>
+  (s) => {
+    if (!re.test(s)) return null;
+    const ids = labelRun(s.replace(re, ' '), 3);
+    return ids ? [make([ids[0], ids[1], ids[2]])] : null;
+  };
+
 /** "square ABCD" / "ריבוע ABCD" — keyword and labels in either order. */
 const square = quadShape(/square|ריבוע/gi, (ids) => ({ type: 'square', ids }));
 
 /** "parallelogram ABCD" / "מקבילית ABCD" — A,B,C free, D derived. */
 const parallelogram = quadShape(/parallelogram|מקבילית/gi, (ids) => ({ type: 'parallelogram', ids }));
 
+/** "rectangle ABCD" / "מלבן ABCD". */
+const rectangle = quadShape(/rectangle|מלבן/gi, (ids) => ({ type: 'rectangle', ids }));
+
+/** "rhombus ABCD" / "מעוין ABCD". */
+const rhombus = quadShape(/rhombus|מעוין/gi, (ids) => ({ type: 'rhombus', ids }));
+
+/** "trapezoid ABCD" / "trapezium ABCD" / "טרפז ABCD". */
+const trapezoid = quadShape(/trapezoid|trapezium|טרפז/gi, (ids) => ({ type: 'trapezoid', ids }));
+
 /** "quadrilateral ABCD" / "מרובע ABCD" — a general quad (4 free vertices). */
 const quadrilateral = quadShape(/quadrilateral|quad|מרובע/gi, (ids) => ({ type: 'quadrilateral', ids }));
+
+/** "triangle ABC" / "משולש ABC" — 3 free vertices. */
+const triangle = triShape(/triangle|משולש/gi, (ids) => ({ type: 'triangle', ids }));
 
 /** "segment AC" / "diagonal AC" / "קטע AC" / "אלכסון AC" — connect two points. */
 const segment: Rule = (s) => {
@@ -150,7 +171,11 @@ const freePoint: Rule = (s) => {
 const RULES: Rule[] = [
   square,
   parallelogram,
+  rectangle,
+  rhombus,
+  trapezoid,
   quadrilateral,
+  triangle,
   lineLineIntersection,
   angle,
   segment,
