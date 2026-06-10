@@ -47,6 +47,40 @@ describe('parallelogram', () => {
   });
 });
 
+describe('shapes compose on existing points (ADR-013)', () => {
+  it('builds a square on an existing edge of a parallelogram (the ADFG case)', () => {
+    // parallelogram ABCD, then square ADFG sharing side A–D. D is the
+    // parallelogram's derived vertex; the square reuses A and D, derives F, G.
+    const r1 = applyStep(emptyConstruction(), { type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] });
+    const r2 = applyStep(r1.construction, { type: 'square', ids: ['A', 'D', 'F', 'G'] });
+    expect(r2.ok).toBe(true);
+    if (!r2.ok) return;
+
+    const A = r2.positions.get('A')!, D = r2.positions.get('D')!, F = r2.positions.get('F')!, G = r2.positions.get('G')!;
+    // A and D are unchanged (reused, not redefined)
+    expect(A).toEqual(r1.positions.get('A'));
+    expect(D).toEqual(r1.positions.get('D'));
+    // ADFG is a genuine square built on edge AD
+    expect(dist(D, F)).toBeCloseTo(dist(A, D), 9);
+    expect(dist(F, G)).toBeCloseTo(dist(A, D), 9);
+    expect(dist(G, A)).toBeCloseTo(dist(A, D), 9);
+    // right angle at A between AD and AG
+    expect(Math.abs(sub(D, A).x * sub(G, A).x + sub(D, A).y * sub(G, A).y)).toBeLessThan(1e-9);
+    // the shared edge A–D is a single segment; both polygons exist
+    expect(r2.construction.objects.filter((o) => o.kind === 'segment' && o.id === 'seg-AD')).toHaveLength(1);
+    expect(r2.construction.objects.filter((o) => o.kind === 'polygon')).toHaveLength(2);
+  });
+
+  it('still rejects a shape whose derived corner would redefine an existing point', () => {
+    // square ABCD defines C (derived); a parallelogram reusing C as its *derived*
+    // 4th vertex with a different parentage must still conflict.
+    const base = build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }]);
+    const r = applyStep(base.construction, { type: 'parallelogram', ids: ['P', 'Q', 'R', 'C'] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/already defined/i);
+  });
+});
+
 describe('general quadrilateral', () => {
   it('builds 4 free vertices, 4 sides, and a polygon', () => {
     const { construction, positions } = build([{ type: 'quadrilateral', ids: ['P', 'Q', 'R', 'S'] }]);

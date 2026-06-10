@@ -52,16 +52,21 @@ export function deepEqual(a: unknown, b: unknown): boolean {
  * against the command's *canonical* definition, independent of evaluation.
  */
 export function commandConflict(prev: Construction, cmd: Command): string | null {
+  // A shape (square/quad/parallelogram) may be *built on existing points*: its
+  // base corners reference whatever point already carries that id (creating a
+  // free point only for new ids), so a base free-point never conflicts — only
+  // the shape's own derived corners can (ADR-013). The default coordinates a
+  // shape gives a *new* base vertex are an initializer, not a definition.
+  const isShape = cmd.type === 'square' || cmd.type === 'quadrilateral' || cmd.type === 'parallelogram';
   const produced = applyCommand(emptyConstruction(), cmd).objects;
   for (const o of produced) {
     const existing = prev.objects.find((x) => x.id === o.id);
-    if (existing && !deepEqual(existing, o)) {
-      // Repositioning a free point is a move, not a conflict (ADR-011); only a
-      // *definitional* change (different kind, or redefining a derived/on-object
-      // point) conflicts. Validity of the move is left to evaluate().
-      if (existing.kind === 'free-point' && o.kind === 'free-point') continue;
-      return `'${o.id}' is already defined — it can't be redefined as something different`;
+    if (!existing || deepEqual(existing, o)) continue;
+    if (o.kind === 'free-point') {
+      if (isShape) continue; // base corner reuses any existing point (composition)
+      if (existing.kind === 'free-point') continue; // free-point command = move (ADR-011)
     }
+    return `'${o.id}' is already defined — it can't be redefined as something different`;
   }
   return null;
 }
