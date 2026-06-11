@@ -6,3 +6,5 @@ export { buildScene, scenePositions } from './scene';
 export type { Scene, ScenePoint, SceneSegment, ScenePolygon } from './scene';
 export { boundsOf, fitTransform } from './transform';
 export type { Box, Viewport, Transform } from './transform';
+export { findSegmentCrossings } from './intersections';
+export type { Crossing } from './intersections';

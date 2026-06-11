@@ -54,6 +54,7 @@
     "edit": "Edit",
     "confirmEdit": "Confirm",
     "cancelEdit": "Cancel",
+    "markIntersection": "Create intersection point",
     "language": "עברית"
   },
   "geometry": {

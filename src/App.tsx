@@ -12,8 +12,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
+import { isGeoPoint } from '@/engine';
 import { COMMAND_CATALOG, parse } from '@/parser';
 import { Figure } from '@/render';
+import type { Crossing } from '@/render';
 import { introducedIds, replay, useGeoStore } from '@/store/geoStore';
 
 export default function App() {
@@ -78,6 +80,25 @@ export default function App() {
   // Figure + per-fact status are derived from the fact list.
   const { construction, positions, status, lastError } = useMemo(() => replay(facts), [facts]);
 
+  // Snap-to-intersection: a clicked crossing becomes a real named point. Pick the
+  // first free single capital letter, then create it via the same command path.
+  function markIntersection(x: Crossing) {
+    const used = new Set(construction.objects.filter(isGeoPoint).map((o) => o.id));
+    let id = '';
+    for (let k = 0; k < 26; k++) {
+      const ch = String.fromCharCode(65 + k);
+      if (!used.has(ch)) {
+        id = ch;
+        break;
+      }
+    }
+    if (!id) return; // A–Z all taken (won't happen in practice)
+    const utterance = he
+      ? `${id} = חיתוך ${x.a}${x.b} ו-${x.c}${x.d}`
+      : `${id} = intersection of ${x.a}${x.b} and ${x.c}${x.d}`;
+    execute({ type: 'line-line-intersection', id, a: x.a, b: x.b, c: x.c, d: x.d }, utterance);
+  }
+
   // Highlight the objects introduced by the selected fact.
   const highlight = useMemo(() => {
     const f = facts.find((x) => x.id === selectedId);
@@ -105,7 +126,15 @@ export default function App() {
       </header>
 
       <div style={main}>
-        <Figure construction={construction} positions={positions} width={560} height={560} highlight={highlight} />
+        <Figure
+          construction={construction}
+          positions={positions}
+          width={560}
+          height={560}
+          highlight={highlight}
+          onPickIntersection={markIntersection}
+          intersectionLabel={t('actions.markIntersection')}
+        />
 
         <aside style={sidebar}>
           <form

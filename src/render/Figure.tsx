@@ -11,6 +11,8 @@
 import { useMemo, useRef, useState } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
 import { buildScene, scenePositions } from './scene';
+import { findSegmentCrossings } from './intersections';
+import type { Crossing } from './intersections';
 import { fitTransform } from './transform';
 
 export interface FigureProps {
@@ -21,6 +23,14 @@ export interface FigureProps {
   padding?: number;
   /** Object ids to accent (e.g. those introduced by the selected fact). */
   highlight?: Set<Id>;
+  /**
+   * When provided, unmarked crossings of declared segments are offered as
+   * hollow dots; clicking one calls this with the crossing so the host can
+   * create a named intersection point. Omit to disable the affordance.
+   */
+  onPickIntersection?: (crossing: Crossing) => void;
+  /** Tooltip for the crossing dots (host supplies the localized string). */
+  intersectionLabel?: string;
 }
 
 interface View {
@@ -40,16 +50,20 @@ export function Figure({
   height = 600,
   padding = 48,
   highlight,
+  onPickIntersection,
+  intersectionLabel,
 }: FigureProps) {
   const lit = (id: string): boolean => !!highlight && highlight.has(id);
   const [view, setView] = useState<View>(IDENTITY);
+  const [hotCross, setHotCross] = useState<number | null>(null);
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
 
-  const { scene, transform } = useMemo(() => {
+  const { scene, transform, crossings } = useMemo(() => {
     const s = buildScene(construction, positions);
     const t = fitTransform(scenePositions(s), { width, height, padding });
-    return { scene: s, transform: t };
-  }, [construction, positions, width, height, padding]);
+    const x = onPickIntersection ? findSegmentCrossings(construction, positions) : [];
+    return { scene: s, transform: t, crossings: x };
+  }, [construction, positions, width, height, padding, onPickIntersection]);
 
   // Point radius in px, kept visually constant by dividing out the pan/zoom scale.
   const r = 4 / view.zoom;
@@ -110,6 +124,33 @@ export function Figure({
               />
             );
           })}
+
+          {/* Unmarked crossings of declared segments: faint hollow dots, brighter
+              on hover; clicking promotes one to a real named intersection point. */}
+          {onPickIntersection &&
+            crossings.map((x, i) => {
+              const s = transform.toScreen(x.pos);
+              const hot = hotCross === i;
+              return (
+                <circle
+                  key={`x-${x.a}${x.b}-${x.c}${x.d}`}
+                  data-crossing={`${x.a}${x.b}x${x.c}${x.d}`}
+                  cx={s.x}
+                  cy={s.y}
+                  r={hot ? r * 1.5 : r * 1.1}
+                  fill="#fff"
+                  stroke={hot ? '#2563eb' : '#93c5fd'}
+                  strokeWidth={hot ? stroke * 1.5 : stroke}
+                  style={{ cursor: 'pointer' }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseEnter={() => setHotCross(i)}
+                  onMouseLeave={() => setHotCross((h) => (h === i ? null : h))}
+                  onClick={() => onPickIntersection(x)}
+                >
+                  {intersectionLabel && <title>{intersectionLabel}</title>}
+                </circle>
+              );
+            })}
 
           {scene.points.map((pt) => {
             const s = transform.toScreen(pt.pos);
