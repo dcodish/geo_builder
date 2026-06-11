@@ -2,11 +2,11 @@
 
 _Last updated: 2026-06-11._
 
-> **Status:** Phases 0–4 complete (M1–M3). **Phase 5a complete** (quad, parallelogram, segment, line∩line; **Q1 reproduced**). **Phase 5b complete** ([ADR-019](06-decisions.md#adr-019)) — a **`Line`** object (through / bisector / perpendicular / parallel → `(anchor,dir)`), the points it produces (line∩line of two lines, foot of ⟂, midpoint), point-on-extension, and **right-triangle**; **Q2, Q3, Q4 reproduced** from typed He/En utterances. **Polygon family** — triangle, rectangle, rhombus, trapezoid. **159 tests green, build clean** on `rebuild-foundation` (GitHub backup: `dcodish/geo_builder`).
+> **Status:** Phases 0–4 complete (M1–M3). **Phase 5a complete** (quad, parallelogram, segment, line∩line; **Q1 reproduced**). **Phase 5b complete** ([ADR-019](06-decisions.md#adr-019)) — a **`Line`** object (through / bisector / perpendicular / parallel → `(anchor,dir)`), the points it produces (line∩line of two lines, foot of ⟂, midpoint), point-on-extension, and **right-triangle**; **Q2, Q3, Q4 reproduced**. **Phase 5c complete** ([ADR-020](06-decisions.md#adr-020)) — a drawn **`Circle`** object (centre + radius), circle-dependent points (on-circle/inscribed, antipode/diameter, arc-midpoint, line∩circle) + the **tangent** line spec; the renderer now draws circles; **Q5, Q6, Q7 reproduced** from typed He/En utterances. **The full v1 construct vocabulary (Q1–Q7) is now covered.** **173 tests green, build clean** on `rebuild-foundation` (GitHub backup: `dcodish/geo_builder`).
 >
 > **Session 2026-06-11 banked a large hardening + UX pass** (all from a code review + manual stress-testing, no new corpus coverage): ADR-014 generic constraint solving + DOF-selection fix; parser misparse defense; ADR-015 edit-a-fact-in-place; ADR-016 snap-to-intersection; renderer lines-only + smart label placement; categorized commands coverage-map panel; and a deep **shape-composition** sweep — ADR-013 amendments (similarity-fit so composed shapes don't degenerate; vertex-order independence), ADR-017 (no two nodes may coincide + flip to avoid), empty-side composition + `flip` flag so any shape lands away from existing geometry, and textbook-clean upright templates. Plus **ADR-018** (direction only, not built): *alternatives = samples of the figure's residual freedom* — cycling should re-sample free DOFs so an underdetermined figure visibly wanders and converges as facts accumulate.
 >
-> **Next (resume here):** corpus track is **Phase 5c** — circles (centre+radius, point-on-circle / inscribed vertices, chord & diameter, arc midpoint, line∩circle, tangent) → reproduce Q5–Q7. Then **finish 5d** (distance/parallel/perpendicular *constraints*, single-bisector, free-point drivers — the phrasings 5b deliberately left out of grammar). Cross-cutting: **ADR-018 Stage 1** (pinned-vs-free point distinction + seeded DOF sampler for "show another configuration") — pairs naturally with 5d.
+> **Next (resume here):** the **corpus is fully reproduced (Q1–Q7)** — no new constructs remain for v1. Remaining work is cross-cutting: **finish 5d** (distance/parallel/perpendicular *constraints*, single-bisector, free-point drivers — the phrasings 5b/5c deliberately left out of grammar) on the generic mechanism of [ADR-014](06-decisions.md#adr-014); and **ADR-018 Stage 1** (pinned-vs-free point distinction + seeded DOF sampler for "show another configuration"), which pairs naturally with 5d. Then **Phase 6 (theorems)**. Optional polish: draw a bare/clipped line (visible tangent or bisector); right-angle and equal-length tick marks.
 
 ## Purpose
 
@@ -103,19 +103,19 @@ Widen the engine and renderer (and, after Phase 4, the parser) to the construct 
 | Point on an extension / ray (t ∉ [0,1]) | Q2, Q3 | ✓ (5b) |
 | Perpendicular + foot / distance to a line | Q3, Q4 | ✓ (5b foot) |
 | Right-triangle construction | Q4 | ✓ (5b) |
-| Parallel-line construction | Q6 (+ quads) | ◐ (engine `Line` kind; no parser yet) |
-| Circle (center + radius) | Q5, Q6, Q7 | ✗ |
-| Point on a circle / inscribed vertex | Q5, Q6, Q7 | ✗ |
-| Arc midpoint | Q5 | ✗ |
-| Diameter (chord through the centre) | Q6, Q7 | ✗ |
-| Line∩circle intersection | Q6 | ✗ (circle∩circle only) |
-| Tangent to a circle at a point | Q7 | ✗ |
+| Parallel-line construction | Q6 (+ quads) | ✓ (5c parser: line∥AB ∩ circle) |
+| Circle (center + radius) | Q5, Q6, Q7 | ✓ (5c) |
+| Point on a circle / inscribed vertex | Q5, Q6, Q7 | ✓ (5c) |
+| Arc midpoint | Q5 | ✓ (5c) |
+| Diameter (chord through the centre) | Q6, Q7 | ✓ (5c) |
+| Line∩circle intersection | Q6 | ✓ (5c) |
+| Tangent to a circle at a point | Q7 | ✓ (5c) |
 
 Sub-phases — each ends by **reproducing its corpus questions** (gated per [Testing](08-testing-strategy.md)):
 
 - **5a — Quads & segments:** ✅ **complete** — general quadrilateral (4 free vertices), parallelogram (A,B,C free + D derived = A+C−B), arbitrary segment (undirected, idempotent id), line–line intersection (parallel ⇒ unconstructible). Grammar + renderer widened in lock-step (`isGeoPoint` is the single source of truth for point kinds). **Q1 reproduced** from typed utterances in both locales (`src/engine/__tests__/phase5a.test.ts`); structural assertions (parallelogram valid, E on AC between, segments AC/BE/BD present). Full suite 83/83, build clean.
 - **5b — Bisectors, extensions, perpendiculars:** ✅ **complete** ([ADR-019](06-decisions.md#adr-019)) — a first-class **`Line`** object (`through` / `bisector` / `perpendicular` / `parallel`, resolved to an `(anchor, dir)` pair in the same topological sweep as points; **not rendered** — scaffolding only), the points it yields (`line-intersection` of two lines, `foot` of a perpendicular, `midpoint`), point-on-extension (on-segment `t > 1`), and `right-triangle` (right angle at the last vertex; A,C free + B derived ⟂). Grammar widened in lock-step (bisector-meet, foot, midpoint, extension, right-triangle; a *single* bisector and the parallel/⟂ *constraints* stay deferred to 5d). **Q2, Q3, Q4 reproduced** from typed He/En utterances (`src/engine/__tests__/phase5b.test.ts`, 11) with structural assertions (bisector-meet equidistant/incenter, foot ⟂ + collinear, ratio on segment, right angle preserved under a leg move). Catalog flipped + a guard test that every supported example parses both locales. Full suite 159/159, build clean.
-- **5c — Circles:** circle (center + radius), point-on-circle / inscribed vertices, chord & diameter, arc midpoint, line∩circle, tangent-at-a-point → reproduce **Q5, Q6, Q7**.
+- **5c — Circles:** ✅ **complete** ([ADR-020](06-decisions.md#adr-020)) — a first-class **drawn `Circle`** (centre + radius, by length or through a point; resolved in the same interleaved sweep as lines/points), circle-dependent points (`on-circle`/inscribed with golden-angle auto-spread, `antipode`/diameter, `arc-midpoint`, `line-circle`) and the **tangent** line spec (⟂ to the radius). The renderer draws circles (outline, fit-aware). An inscribed polygon reuses the existing shape rules on `on-circle` points (composition, ADR-013). Grammar widened in lock-step (circle, inscribed triangle/quad, chord, diameter, arc-midpoint, point-on-circle, tangent∩line, bisector∩segment, parallel∩circle). **Q5, Q6, Q7 reproduced** from typed He/En utterances (`phase5c.corpus.test.ts`, 6) on top of unit tests (`phase5c.test.ts`, 8); circle render test added. Full suite 173/173, build clean.
 - **5d — Constraint-driven DOF ([ADR-012](06-decisions.md)):** make constraints *shape* the figure, not just validate it — when a constraint references a point with a free DOF (on-object `t`, or a free point), solve that DOF deterministically (analytic / bounded 1-D); multiple solutions become alternatives; over-constraint still fires when nothing is free. Sequenced alongside the constructs that need it (e.g. angle/length driving a point-on-segment or free point). Today's behaviour (constraints = checks over fully-determined points) holds until this lands.
 
 - **Depends on:** Phases 1–4 (engine + renderer; parser for the automatic path).

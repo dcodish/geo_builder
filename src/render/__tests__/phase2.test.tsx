@@ -181,6 +181,26 @@ describe('Figure — static SVG render (no DOM)', () => {
     }
   });
 
+  it('draws a circle (outline) with its inscribed points (Phase 5c)', () => {
+    const { construction, positions } = build([
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
+      { type: 'point-on-circle', id: 'A', circle: 'circle-O' },
+      { type: 'point-on-circle', id: 'B', circle: 'circle-O' },
+    ]);
+    // scene exposes the circle with the right radius
+    const scene = buildScene(construction, positions);
+    expect(scene.circles).toHaveLength(1);
+    expect(scene.circles[0].r).toBeCloseTo(5, 9);
+    // the fit encloses the circle's extent, not just the two inscribed points
+    const xs = scenePositions(scene).map((p) => p.x);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThanOrEqual(10);
+
+    const html = renderToStaticMarkup(<Figure construction={construction} positions={positions} />);
+    // one unfilled circle outline + the centre O + 2 inscribed points = 4 <circle>
+    expect((html.match(/<circle/g) ?? []).length).toBe(4);
+    expect(html).toContain('fill="none"'); // the circle outline is not filled
+  });
+
   it('renders both alternative branches of the F2 construction differently', () => {
     const base: Command[] = [
       { type: 'free-point', id: 'A', x: 0, y: 0 },

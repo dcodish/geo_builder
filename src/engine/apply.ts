@@ -172,6 +172,16 @@ function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Ve
   }
 }
 
+/** The golden angle — spreads N points around a circle so none coincide and they look even. */
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+
+/** A default angle for the next point on `circle`, spread from any already on it (top-first). */
+function nextTheta(objects: GeoObject[], circle: Id): number {
+  let n = 0;
+  for (const o of objects) if (o.kind === 'on-circle' && o.circle === circle) n++;
+  return Math.PI / 2 + n * GOLDEN_ANGLE;
+}
+
 /** A segment is undirected: normalise endpoint order so seg AB === seg BA (idempotent). */
 function segment(x: Id, y: Id): GeoObject {
   const [p, q] = [x, y].sort();
@@ -334,6 +344,40 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'midpoint':
       addObj(objects, { kind: 'midpoint', id: cmd.id, a: cmd.a, b: cmd.b });
+      break;
+
+    case 'circle':
+      placeBase(objects, [{ id: cmd.center, x: 0, y: 0 }], pos); // create the centre if new
+      addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'length', value: cmd.radius } });
+      break;
+
+    case 'circle-through':
+      placeBase(objects, [{ id: cmd.center, x: 0, y: 0 }], pos);
+      addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.through } });
+      break;
+
+    case 'point-on-circle':
+      addObj(objects, { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: cmd.theta ?? nextTheta(objects, cmd.circle) });
+      break;
+
+    case 'diameter': {
+      // D on the circle (a spread default angle), E its antipode, segment DE through the centre.
+      addObj(objects, { kind: 'on-circle', id: cmd.id1, circle: cmd.circle, theta: cmd.theta ?? nextTheta(objects, cmd.circle) });
+      addObj(objects, { kind: 'antipode', id: cmd.id2, circle: cmd.circle, of: cmd.id1 });
+      addObj(objects, segment(cmd.id1, cmd.id2));
+      break;
+    }
+
+    case 'arc-midpoint':
+      addObj(objects, { kind: 'arc-midpoint', id: cmd.id, circle: cmd.circle, from: cmd.from, to: cmd.to, branch: cmd.branch ?? 0 });
+      break;
+
+    case 'line-circle-intersection':
+      addObj(objects, { kind: 'line-circle', id: cmd.id, line: cmd.line, circle: cmd.circle, branch: cmd.branch ?? 0 });
+      break;
+
+    case 'tangent':
+      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'tangent', circle: cmd.circle, at: cmd.at } });
       break;
 
     case 'point-by-distances':

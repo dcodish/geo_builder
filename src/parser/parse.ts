@@ -33,6 +33,18 @@ type Rule = (s: string) => Command[] | null | 'stop';
 const up = (c: string): Id => c.toUpperCase();
 const num = String.raw`(-?\d+(?:\.\d+)?)`;
 
+/** Deterministic circle id from its centre letter — so "circle O" is referenceable by name. */
+const circleId = (center: string): Id => `circle-${center.toUpperCase()}`;
+/** The centre letter of a circle named in `s` ("circle O" / "מעגל O" / "centered at O" / "שמרכזו O"). */
+const circleCenter = (s: string): string | null => {
+  const m =
+    s.match(/(?:cent\w*\s+(?:at\s+)?|שמרכזו\s*|מרכזו\s*|סביב\s+)([A-Za-z])\b/i) ??
+    s.match(/(?:circle|מעגל)\s+([A-Za-z])\b/i);
+  return m ? m[1] : null;
+};
+/** Remove a "circle X" / "מעגל X" mention so its centre letter isn't read as a figure label. */
+const dropCircleRef = (s: string): string => s.replace(/(?:circle|מעגל)\s+[A-Za-z]\b/gi, ' ');
+
 /**
  * English filler words, lowercase only — typed fillers are lowercase, while
  * uppercase pairs like "ON" must stay readable as point labels (O, N).
@@ -267,9 +279,150 @@ const freePoint: Rule = (s) => {
   return [{ type: 'free-point', id: up(m[1]), x: parseFloat(m[2]), y: parseFloat(m[3]) }];
 };
 
+// ── Phase 5c — circles ──────────────────────────────────────────────────────
+
+/** "circle centered at O radius 5" / "circle O radius 5" / "מעגל שמרכזו O רדיוסו 5". */
+const circle: Rule = (s) => {
+  if (!/circle|מעגל/i.test(s)) return null;
+  const rM = s.match(new RegExp(String.raw`(?:radius|רדיוס\S*)\s*${num}`, 'i'));
+  const thrM = s.match(/(?:through|העובר\s*דרך|דרך)\s+([A-Za-z])\b/i);
+  const centered = /cent(?:er|re)d?|מרכז\w*|סביב/i.test(s);
+  if (!rM && !thrM && !centered) return null; // a bare "circle O" reference, not a definition
+  const center = circleCenter(s);
+  if (!center) return null;
+  if (thrM && !rM) return [{ type: 'circle-through', id: circleId(center), center: up(center), through: up(thrM[1]) }];
+  return [{ type: 'circle', id: circleId(center), center: up(center), radius: rM ? parseFloat(rM[1]) : 5 }];
+};
+
+/** "triangle ABC inscribed in circle O radius 5" / "המשולש ABC חסום במעגל שמרכזו O" — circle + on-circle vertices + polygon. */
+const inscribedPolygon: Rule = (s) => {
+  if (!/inscribed|חסום/i.test(s)) return null;
+  const isTri = /triangle|משולש/i.test(s);
+  const isQuad = /quad|מרובע/i.test(s);
+  if (!isTri && !isQuad) return null;
+  const center = circleCenter(s);
+  if (!center) return null;
+  const rM = s.match(new RegExp(String.raw`(?:radius|רדיוס\S*)\s*${num}`, 'i'));
+  const n = isTri ? 3 : 4;
+  // strip keywords + the circle reference + the centre letter, then read the n vertex labels
+  const rest = dropCircleRef(s)
+    .replace(new RegExp(String.raw`\b${center}\b`, 'gi'), ' ')
+    .replace(/triangle|משולש|quad\w*|מרובע|inscribed|חסום|circle|מעגל|cent\w*|radius|רדיוס\w*|שמרכזו|מרכזו|העובר|דרך/gi, ' ');
+  const ids = labelRun(rest, n);
+  if (!ids) return null;
+  const circ = circleId(center);
+  const cmds: Command[] = [{ type: 'circle', id: circ, center: up(center), radius: rM ? parseFloat(rM[1]) : 5 }];
+  for (const id of ids) cmds.push({ type: 'point-on-circle', id, circle: circ });
+  cmds.push(isTri ? { type: 'triangle', ids: [ids[0], ids[1], ids[2]] } : { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] });
+  return cmds;
+};
+
+/** "chord AB in circle O" / "מיתר AB במעגל O" — both endpoints on the circle + the segment. */
+const chord: Rule = (s) => {
+  if (!/chord|מיתר/i.test(s)) return null;
+  const center = circleCenter(s);
+  if (!center) return null;
+  const ids = labelRun(dropCircleRef(s).replace(/chord|מיתר/gi, ' '), 2);
+  if (!ids) return null;
+  const circ = circleId(center);
+  return [
+    { type: 'point-on-circle', id: ids[0], circle: circ },
+    { type: 'point-on-circle', id: ids[1], circle: circ },
+    { type: 'segment', a: ids[0], b: ids[1] },
+  ];
+};
+
+/** "diameter DE in circle O" / "קוטר DE במעגל O" — a point on the circle + its antipode + the segment. */
+const diameter: Rule = (s) => {
+  if (!/diameter|קוטר/i.test(s)) return null;
+  const center = circleCenter(s);
+  if (!center) return null;
+  const ids = labelRun(dropCircleRef(s).replace(/diameter|קוטר/gi, ' '), 2);
+  if (!ids) return null;
+  return [{ type: 'diameter', id1: ids[0], id2: ids[1], circle: circleId(center) }];
+};
+
+/** "M is the midpoint of arc BC in circle O" / "M אמצע הקשת BC במעגל O". */
+const arcMidpoint: Rule = (s) => {
+  if (!/arc|קשת/i.test(s)) return null;
+  const center = circleCenter(s);
+  if (!center) return null;
+  const m = dropCircleRef(s).match(/([A-Za-z])\b.*?(?:midpoint|אמצע).*?(?:arc|הקשת|קשת)\s*([A-Za-z])\s*([A-Za-z])\b/i);
+  if (!m) return null;
+  return [{ type: 'arc-midpoint', id: up(m[1]), circle: circleId(center), from: up(m[2]), to: up(m[3]) }];
+};
+
+/** "A is on circle O" / "A על מעגל O" — a single inscribed point. */
+const pointOnCircle: Rule = (s) => {
+  if (!/circle|מעגל/i.test(s)) return null;
+  const m = s.match(/([A-Za-z])\b.*?(?:on|על).*?(?:circle|מעגל)\s+([A-Za-z])\b/i);
+  if (!m) return null;
+  return [{ type: 'point-on-circle', id: up(m[1]), circle: circleId(m[2]) }];
+};
+
+/** "E is the intersection of the tangent to circle O at D and AB" — tangent line ∩ a segment line. */
+const tangentLineIntersection: Rule = (s) => {
+  if (!/tangent|משיק/i.test(s)) return null;
+  const center = circleCenter(s);
+  const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z])\b/i);
+  const pairM = s.match(/(?:and|with|עם|ו-?)\s*([A-Za-z])\s*([A-Za-z])\b/i);
+  if (!center || !atM || !pairM) return null;
+  const at = up(atM[1]);
+  const resM = dropCircleRef(s).replace(/tangent|משיק|\bat\s+[A-Za-z]\b|בנקודה\s*[A-Za-z]\b/gi, ' ').match(/([A-Za-z])\b/);
+  if (!resM) return null;
+  const tanId = `tan-${at}`;
+  const abId = `line-${up(pairM[1])}${up(pairM[2])}`;
+  return [
+    { type: 'tangent', id: tanId, circle: circleId(center), at },
+    { type: 'line-through', id: abId, a: up(pairM[1]), b: up(pairM[2]) },
+    { type: 'line-intersection', id: up(resM[1]), line1: tanId, line2: abId },
+  ];
+};
+
+/** "F is the intersection of the bisector of angle ADB and AB" — one bisector ∩ a segment line. */
+const bisectorSegmentIntersection: Rule = (s) => {
+  if (!BISECTOR_KW.test(s)) return null;
+  if (!(INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s))) return null;
+  const stripped = s
+    .replace(/bisectors?|angles?|of|the|is|are|and|with|זווית|הזוויות|חוצי|חוצה|חוצ|intersection|intersect\w*|meets?|עם|חיתוך|נחתך\w*|נקודת|המפגש|של/gi, ' ')
+    .replace(/-/g, ' ');
+  const labels = stripped.match(/\b[A-Za-z]{1,3}\b/g) ?? [];
+  const point = labels.find((l) => l.length === 1);
+  const triple = labels.find((l) => l.length === 3);
+  const pair = labels.find((l) => l.length === 2);
+  if (!point || !triple || !pair) return null; // two triples ⇒ the two-bisector meet handles it
+  const t = triple.toUpperCase();
+  const pr = pair.toUpperCase();
+  return [
+    { type: 'bisector', id: `bis-${t}`, vertex: t[1], p: t[0], q: t[2] },
+    { type: 'line-through', id: `line-${pr}`, a: pr[0], b: pr[1] },
+    { type: 'line-intersection', id: up(point), line1: `bis-${t}`, line2: `line-${pr}` },
+  ];
+};
+
+/** "G is where the line through F parallel to AB meets circle O" — a parallel line ∩ the circle. */
+const parallelCircleIntersection: Rule = (s) => {
+  if (!/parallel|מקביל/i.test(s) || !/circle|מעגל/i.test(s)) return null;
+  const center = circleCenter(s);
+  const throughM = s.match(/(?:through|דרך)\s+([A-Za-z])\b/i);
+  const toM = s.match(/(?:parallel\s+to|מקביל\s*ל-?)\s*([A-Za-z])\s*([A-Za-z])\b/i);
+  if (!center || !throughM || !toM) return null;
+  const resM = dropCircleRef(s).replace(/through\s+[A-Za-z]\b|דרך\s+[A-Za-z]\b/gi, ' ').match(/([A-Za-z])\b/);
+  if (!resM) return null;
+  const through = up(throughM[1]);
+  const a = up(toM[1]);
+  const b = up(toM[2]);
+  const lineId = `par-${through}-${a}${b}`;
+  return [
+    { type: 'parallel-line', id: lineId, through, a, b },
+    { type: 'line-circle-intersection', id: up(resM[1]), line: lineId, circle: circleId(center), branch: 0 },
+  ];
+};
+
 // Order matters: the most specific keyword-anchored rules run first; the
 // coordinate rule (freePoint) is last because it's the loosest.
 const RULES: Rule[] = [
+  inscribedPolygon, // before the shape rules ("triangle ABC inscribed …" contains "triangle")
   square,
   parallelogram,
   rectangle,
@@ -278,12 +431,20 @@ const RULES: Rule[] = [
   quadrilateral,
   rightTriangle, // before `triangle` ("right triangle" contains "triangle")
   triangle,
-  bisectorIntersection, // before `lineLineIntersection`/`angle` (shares their keywords)
+  bisectorIntersection, // two bisectors meet — before the one-bisector and generic intersections
+  bisectorSegmentIntersection, // one bisector ∩ a segment
+  tangentLineIntersection, // tangent ∩ a segment
+  parallelCircleIntersection, // a parallel line ∩ the circle
   lineLineIntersection,
   angle,
+  arcMidpoint, // circle constructs (own keywords) before the generic point rules
+  diameter,
+  chord,
+  circle,
   foot, // before `pointOnSegment`
   midpoint,
   pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)
+  pointOnCircle, // "A on circle O" — before segment/pointOnSegment
   segment,
   pointOnSegment,
   pointByDistances,

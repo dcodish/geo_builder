@@ -5,7 +5,7 @@
  * non-finite coords, or a contradicted constraint = over-constraint, FR-EN-8).
  */
 
-import type { Construction, GeoPoint, Id, Line, Vec } from './types';
+import type { Circle, Construction, GeoPoint, Id, Line, Vec } from './types';
 import { ANGLE_EPS, LEN_EPS, isGeoPoint } from './types';
 import {
   add,
@@ -13,6 +13,7 @@ import {
   circleCircleIntersect,
   footOnLine,
   len,
+  lineCircleIntersect,
   lineLineIntersect,
   rot90,
   rotate,
@@ -26,6 +27,12 @@ import { describeConstraint, solvedOnSegmentCandidates } from './solve';
 interface ResolvedLine {
   anchor: Vec;
   dir: Vec;
+}
+
+/** A resolved circle: its centre position and radius. */
+interface ResolvedCircle {
+  center: Vec;
+  r: number;
 }
 
 export interface EvalOk {
@@ -43,20 +50,33 @@ export type EvalResult = EvalOk | EvalErr;
 export function evaluate(c: Construction): EvalResult {
   const pos = new Map<Id, Vec>();
   const lines = new Map<Id, ResolvedLine>();
+  const circles = new Map<Id, ResolvedCircle>();
   const points = c.objects.filter(isGeoPoint);
   const lineObjs = c.objects.filter((o): o is Line => o.kind === 'line');
+  const circleObjs = c.objects.filter((o): o is Circle => o.kind === 'circle');
   const remaining = new Set(points.map((p) => p.id));
   const remainingLines = new Set(lineObjs.map((l) => l.id));
+  const remainingCircles = new Set(circleObjs.map((o) => o.id));
 
-  // One fixed-point sweep resolves points and lines together: a line needs its
-  // referenced points, and a line-intersection point needs its lines, so they
-  // interleave until nothing new resolves.
+  // One fixed-point sweep resolves circles, lines, and points together: a circle
+  // needs its centre point; a tangent line needs its circle; an on-circle /
+  // line∩circle point needs its circle (and line). They interleave until nothing
+  // new resolves.
   let progressed = true;
-  while ((remaining.size > 0 || remainingLines.size > 0) && progressed) {
+  while ((remaining.size > 0 || remainingLines.size > 0 || remainingCircles.size > 0) && progressed) {
     progressed = false;
+    for (const o of circleObjs) {
+      if (!remainingCircles.has(o.id)) continue;
+      const r = resolveCircle(o, pos);
+      if (r === 'pending') continue;
+      if (typeof r === 'string') return { ok: false, error: r };
+      circles.set(o.id, r);
+      remainingCircles.delete(o.id);
+      progressed = true;
+    }
     for (const l of lineObjs) {
       if (!remainingLines.has(l.id)) continue;
-      const r = resolveLine(l, pos);
+      const r = resolveLine(l, pos, circles);
       if (r === 'pending') continue;
       if (typeof r === 'string') return { ok: false, error: r };
       lines.set(l.id, r);
@@ -65,7 +85,7 @@ export function evaluate(c: Construction): EvalResult {
     }
     for (const p of points) {
       if (!remaining.has(p.id)) continue;
-      const r = tryEval(p, pos, lines);
+      const r = tryEval(p, pos, lines, circles);
       if (r === 'pending') continue;
       if (typeof r === 'string') return { ok: false, error: r };
       pos.set(p.id, r);
@@ -73,8 +93,8 @@ export function evaluate(c: Construction): EvalResult {
       progressed = true;
     }
   }
-  if (remaining.size > 0 || remainingLines.size > 0) {
-    const stuck = [...remaining, ...remainingLines];
+  if (remaining.size > 0 || remainingLines.size > 0 || remainingCircles.size > 0) {
+    const stuck = [...remaining, ...remainingLines, ...remainingCircles];
     return { ok: false, error: `unresolved dependencies for: ${stuck.join(', ')}` };
   }
 
@@ -114,8 +134,23 @@ export function evaluate(c: Construction): EvalResult {
   return { ok: true, positions: pos };
 }
 
+/** Resolve one circle to its centre and radius: a {@link ResolvedCircle}, 'pending', or an error string. */
+function resolveCircle(c: Circle, pos: Map<Id, Vec>): ResolvedCircle | 'pending' | string {
+  const center = pos.get(c.center);
+  if (!center) return 'pending';
+  if (c.radius.via === 'length') {
+    if (c.radius.value <= 0) return `circle ${c.id}: radius must be positive`;
+    return { center, r: c.radius.value };
+  }
+  const p = pos.get(c.radius.point);
+  if (!p) return 'pending';
+  const r = len(sub(p, center));
+  if (r < 1e-9) return `circle ${c.id}: the point on it coincides with the centre`;
+  return { center, r };
+}
+
 /** Resolve one line to an (anchor, dir): a {@link ResolvedLine}, 'pending', or an error string. */
-function resolveLine(l: Line, pos: Map<Id, Vec>): ResolvedLine | 'pending' | string {
+function resolveLine(l: Line, pos: Map<Id, Vec>, circles: Map<Id, ResolvedCircle>): ResolvedLine | 'pending' | string {
   const s = l.spec;
   switch (s.via) {
     case 'through': {
@@ -148,11 +183,24 @@ function resolveLine(l: Line, pos: Map<Id, Vec>): ResolvedLine | 'pending' | str
       const dir = unit(base);
       return { anchor: t, dir: s.via === 'perpendicular' ? rot90(dir) : dir };
     }
+    case 'tangent': {
+      const c = circles.get(s.circle);
+      const at = pos.get(s.at);
+      if (!c || !at) return 'pending';
+      const radial = sub(at, c.center);
+      if (len(radial) < 1e-9) return `cannot take a tangent at the centre of ${s.circle}`;
+      return { anchor: at, dir: unit(rot90(radial)) }; // ⟂ to the radius at `at`
+    }
   }
 }
 
 /** Resolve one point: a Vec, 'pending' (deps not ready yet), or an error string. */
-function tryEval(p: GeoPoint, pos: Map<Id, Vec>, lines: Map<Id, ResolvedLine>): Vec | 'pending' | string {
+function tryEval(
+  p: GeoPoint,
+  pos: Map<Id, Vec>,
+  lines: Map<Id, ResolvedLine>,
+  circles: Map<Id, ResolvedCircle>,
+): Vec | 'pending' | string {
   switch (p.kind) {
     case 'free-point':
       return { x: p.x, y: p.y };
@@ -261,6 +309,42 @@ function tryEval(p: GeoPoint, pos: Map<Id, Vec>, lines: Map<Id, ResolvedLine>): 
       const b = pos.get(p.b);
       if (!a || !b) return 'pending';
       return scale(add(a, b), 0.5);
+    }
+
+    case 'on-circle': {
+      const c = circles.get(p.circle);
+      if (!c) return 'pending';
+      return add(c.center, { x: c.r * Math.cos(p.theta), y: c.r * Math.sin(p.theta) });
+    }
+
+    case 'antipode': {
+      const c = circles.get(p.circle);
+      const of = pos.get(p.of);
+      if (!c || !of) return 'pending';
+      return sub(scale(c.center, 2), of); // 2·centre − of
+    }
+
+    case 'arc-midpoint': {
+      const c = circles.get(p.circle);
+      const from = pos.get(p.from);
+      const to = pos.get(p.to);
+      if (!c || !from || !to) return 'pending';
+      const u1 = unit(sub(from, c.center));
+      const u2 = unit(sub(to, c.center));
+      let bis = add(u1, u2); // points to the midpoint of the arc between from→to
+      if (len(bis) < 1e-9) bis = rot90(u1); // from/to antipodal → arc midpoint is perpendicular
+      const dir = unit(bis);
+      const sign = p.branch % 2 === 1 ? -1 : 1; // the other arc's midpoint is antipodal
+      return add(c.center, scale(dir, sign * c.r));
+    }
+
+    case 'line-circle': {
+      const l = lines.get(p.line);
+      const c = circles.get(p.circle);
+      if (!l || !c) return 'pending';
+      const sols = lineCircleIntersect(l.anchor, l.dir, c.center, c.r);
+      if (sols.length === 0) return `cannot construct ${p.id}: line ${p.line} does not meet circle ${p.circle}`;
+      return sols[p.branch % sols.length];
     }
   }
 }

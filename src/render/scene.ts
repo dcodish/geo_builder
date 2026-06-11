@@ -11,7 +11,7 @@
 
 import type { Construction, Id, Vec } from '@/engine/types';
 import { isGeoPoint } from '@/engine/types';
-import { sub, unit } from '@/engine/geometry';
+import { dist, sub, unit } from '@/engine/geometry';
 
 export interface ScenePoint {
   id: Id;
@@ -36,10 +36,17 @@ export interface ScenePolygon {
   points: Vec[];
 }
 
+export interface SceneCircle {
+  id: Id;
+  center: Vec;
+  r: number;
+}
+
 export interface Scene {
   points: ScenePoint[];
   segments: SceneSegment[];
   polygons: ScenePolygon[];
+  circles: SceneCircle[];
 }
 
 /** Resolve a construction + computed positions into drawable primitives. */
@@ -47,6 +54,7 @@ export function buildScene(c: Construction, positions: Map<Id, Vec>): Scene {
   const points: ScenePoint[] = [];
   const segments: SceneSegment[] = [];
   const polygons: ScenePolygon[] = [];
+  const circles: SceneCircle[] = [];
 
   // Per-vertex directions to every point it shares a segment with — the lines a
   // label must avoid. Built from all segments (edges *and* diagonals) up front.
@@ -82,10 +90,22 @@ export function buildScene(c: Construction, positions: Map<Id, Vec>): Scene {
       if (pts.every((p): p is Vec => !!p)) {
         polygons.push({ id: o.id, points: pts as Vec[] });
       }
+      continue;
+    }
+    if (o.kind === 'circle') {
+      const center = positions.get(o.center);
+      if (!center) continue;
+      let r: number | undefined;
+      if (o.radius.via === 'length') r = o.radius.value;
+      else {
+        const p = positions.get(o.radius.point);
+        if (p) r = dist(center, p);
+      }
+      if (r !== undefined && isFinite(r) && r > 0) circles.push({ id: o.id, center, r });
     }
   }
 
-  return { points, segments, polygons };
+  return { points, segments, polygons, circles };
 }
 
 /**
@@ -112,7 +132,16 @@ function outwardDir(dirs: Vec[] | undefined): Vec {
   return { x: Math.cos(mid), y: Math.sin(mid) };
 }
 
-/** Every resolved point position in the scene — the input to `fitTransform`. */
+/**
+ * Every position the fit must enclose — the points, plus each circle's extent
+ * (centre ± r on both axes) so a circle is never clipped by the viewport even
+ * when few points lie on it.
+ */
 export function scenePositions(scene: Scene): Vec[] {
-  return scene.points.map((p) => p.pos);
+  const ps = scene.points.map((p) => p.pos);
+  for (const c of scene.circles) {
+    ps.push({ x: c.center.x - c.r, y: c.center.y }, { x: c.center.x + c.r, y: c.center.y });
+    ps.push({ x: c.center.x, y: c.center.y - c.r }, { x: c.center.x, y: c.center.y + c.r });
+  }
+  return ps;
 }

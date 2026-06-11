@@ -69,7 +69,9 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     cmd.type === 'trapezoid' ||
     cmd.type === 'triangle' ||
     cmd.type === 'right-triangle' ||
-    cmd.type === 'segment'; // a segment reuses (or creates) its endpoints, like a shape's base
+    cmd.type === 'segment' || // a segment reuses (or creates) its endpoints, like a shape's base
+    cmd.type === 'circle' ||
+    cmd.type === 'circle-through'; // a circle reuses (or creates) its centre
   const produced = applyCommand(emptyConstruction(), cmd).objects;
   for (const o of produced) {
     const existing = prev.objects.find((x) => x.id === o.id);
@@ -210,14 +212,19 @@ export function branchCount(c: Construction, id: Id): number {
     const ts = solvedOnSegmentCandidates(o, e.positions);
     return ts === 'pending' ? 0 : ts.length;
   }
+  // Both arcs of a circle have a midpoint; a line meets a circle in up to two points.
+  if (o.kind === 'arc-midpoint' || o.kind === 'line-circle') return 2;
   return 0;
 }
 
-/** Advance a branchable point (intersection or angle-solved) to its next solution branch (wraps). */
+/** The branchable point kinds whose `branch` index "show another configuration" cycles. */
+const BRANCHABLE = new Set(['intersection', 'on-segment-solved', 'arc-midpoint', 'line-circle']);
+
+/** Advance a branchable point to its next solution branch (wraps). */
 export function cycleAlternative(c: Construction, id: Id): Construction {
   const n = branchCount(c, id) || 1;
   const objects = c.objects.map((o) =>
-    o.id === id && (o.kind === 'intersection' || o.kind === 'on-segment-solved')
+    o.id === id && BRANCHABLE.has(o.kind) && 'branch' in o
       ? { ...o, branch: (o.branch + 1) % n }
       : o,
   );

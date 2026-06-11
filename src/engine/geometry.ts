@@ -128,6 +128,24 @@ export function solveParam(
   return roots;
 }
 
+/**
+ * Intersection points of the (infinite) line through `anchor` with direction
+ * `dir` and the circle (center, r). 0/1/2 results, ordered by the line parameter
+ * `t` ascending so the branch index is deterministic.
+ */
+export function lineCircleIntersect(anchor: Vec, dir: Vec, center: Vec, r: number): Vec[] {
+  const d = unit(dir);
+  const f = sub(anchor, center);
+  const b = 2 * (f.x * d.x + f.y * d.y);
+  const c = f.x * f.x + f.y * f.y - r * r; // a = d·d = 1
+  const disc = b * b - 4 * c;
+  if (disc < -1e-9) return [];
+  const s = disc > 0 ? Math.sqrt(disc) : 0;
+  const t1 = (-b - s) / 2;
+  if (s < 1e-9) return [add(anchor, scale(d, t1))]; // tangent — single point
+  return [add(anchor, scale(d, t1)), add(anchor, scale(d, (-b + s) / 2))];
+}
+
 export function circleCircleIntersect(c1: Vec, r1: number, c2: Vec, r2: number): Vec[] {
   const d = dist(c1, c2);
   if (d < 1e-9) return []; // concentric — no discrete intersection

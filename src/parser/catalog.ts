@@ -74,8 +74,10 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'constraints', supported: false, phase: '5d', en: 'AB perpendicular to CD', he: 'AB מאונך ל-CD', descEn: 'Force a right angle between two lines.', descHe: 'אילוץ זווית ישרה בין שני ישרים.' },
 
   // ── Circles ─────────────────────────────────────────────────────────────
-  { category: 'circles', supported: false, phase: '5c', en: 'circle centered at O radius 5', he: 'מעגל סביב O רדיוס 5', descEn: 'A circle from a centre and radius.', descHe: 'מעגל לפי מרכז ורדיוס.' },
-  { category: 'circles', supported: false, phase: '5c', en: 'A is on the circle', he: 'A על המעגל', descEn: 'A point on a circle / inscribed vertex.', descHe: 'נקודה על מעגל / קודקוד חסום.' },
-  { category: 'circles', supported: false, phase: '5c', en: 'diameter AB', he: 'קוטר AB', descEn: 'A chord through the centre.', descHe: 'מיתר העובר במרכז.' },
-  { category: 'circles', supported: false, phase: '5c', en: 'tangent at A', he: 'משיק ב-A', descEn: 'A tangent to a circle at a point.', descHe: 'משיק למעגל בנקודה.' },
+  { category: 'circles', supported: true, en: 'circle centered at O radius 5', he: 'מעגל סביב O רדיוס 5', descEn: 'A circle from a centre and radius.', descHe: 'מעגל לפי מרכז ורדיוס.' },
+  { category: 'circles', supported: true, en: 'A is on circle O', he: 'A על מעגל O', descEn: 'A point on a circle / inscribed vertex.', descHe: 'נקודה על מעגל / קודקוד חסום.' },
+  { category: 'circles', supported: true, en: 'triangle ABC inscribed in circle O', he: 'משולש ABC חסום במעגל O', descEn: 'A triangle with all vertices on a circle.', descHe: 'משולש שכל קודקודיו על מעגל.' },
+  { category: 'circles', supported: true, en: 'diameter AB in circle O', he: 'קוטר AB במעגל O', descEn: 'A chord through the centre.', descHe: 'מיתר העובר במרכז.' },
+  { category: 'circles', supported: true, en: 'M is the midpoint of arc BC in circle O', he: 'M אמצע הקשת BC במעגל O', descEn: 'The midpoint of an arc.', descHe: 'אמצע הקשת.' },
+  { category: 'circles', supported: true, en: 'E is the intersection of the tangent to circle O at A and BC', he: 'E חיתוך המשיק למעגל O בנקודה A עם BC', descEn: 'Where a tangent at a point meets a line.', descHe: 'מפגש משיק בנקודה עם ישר.' },
 ];

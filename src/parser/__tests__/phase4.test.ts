@@ -82,8 +82,8 @@ describe('parser — out-of-grammar returns not-handled (the fallback boundary)'
     '',
     'hello there',
     'draw something nice',
-    'circle centred at A', // Phase-5c construct — intentionally not handled yet
-    'BC parallel to AD', // Phase-5b — not handled yet
+    'draw a circle somewhere', // a circle with no centre named — nothing to build
+    'BC parallel to AD', // the parallel *constraint* — still Phase 5d, not handled
     'make it bigger',
   ]) {
     it(`"${bad}"`, () => {
@@ -124,13 +124,11 @@ describe('parser — misparse defense (out-of-grammar must not half-parse)', () 
     'AD חוצה את הזווית BAC',
     'BC parallel to AD',
     'BC מקביל ל-AD',
-    // Phase-5c constructs
-    'circle centered at O radius 5',
-    'מעגל סביב O רדיוס 5',
+    // A circle through three points (circumscribed) is a different construct (3-point
+    // circle / circumcentre) we don't build yet — distinct from "circle centred at O".
     'circle through A B C',
     // recognised intersection keyword but unreadable sentence → stop, not "segment"
     'the diagonals intersect somewhere',
-    'the bisector of angle ABC meets AC at D',
   ]) {
     it(`"${u}"`, () => {
       const r = parse(u);

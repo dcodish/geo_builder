@@ -103,6 +103,25 @@ export function Figure({
         onPointerUp={onPointerUp}
       >
         <g transform={`translate(${view.panX} ${view.panY}) scale(${view.zoom})`}>
+          {/* Circles are drawn first (outline only) so chords/segments sit on top.
+              The world→screen fit is isotropic, so a world radius scales by
+              `transform.scale`. */}
+          {scene.circles.map((circ) => {
+            const c = transform.toScreen(circ.center);
+            return (
+              <circle
+                key={circ.id}
+                data-id={circ.id}
+                cx={c.x}
+                cy={c.y}
+                r={circ.r * transform.scale}
+                fill="none"
+                stroke={lit(circ.id) ? ACCENT : '#334155'}
+                strokeWidth={lit(circ.id) ? stroke * 2 : stroke}
+              />
+            );
+          })}
+
           {/* Shapes are drawn as outlines only: every edge is a `segment`, so the
               figure is just its lines. Polygons stay in the scene (for future
               hit-testing) but are not filled or stroked. A selected fact is shown

@@ -146,10 +146,12 @@ export const useGeoStore = create<GeoState>()(
         const facts = get().facts;
         const { construction } = replay(facts);
         const n = branchCount(construction, pointId) || 1;
+        // The commands that carry a `branch` index the student can cycle.
+        const branchable = new Set(['point-by-distances', 'arc-midpoint', 'line-circle-intersection']);
         set({
           facts: facts.map((f) =>
-            f.enabled && f.cmd.type === 'point-by-distances' && f.cmd.id === pointId
-              ? { ...f, cmd: { ...f.cmd, branch: ((f.cmd.branch ?? 0) + 1) % n } }
+            f.enabled && branchable.has(f.cmd.type) && 'id' in f.cmd && f.cmd.id === pointId
+              ? { ...f, cmd: { ...f.cmd, branch: (((f.cmd as { branch?: number }).branch ?? 0) + 1) % n } }
               : f,
           ),
         });

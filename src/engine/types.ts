@@ -152,6 +152,41 @@ export interface MidpointPoint {
   b: Id;
 }
 
+/** 1 DOF — a point on `circle` at angle `theta` (radians) from the centre. Like on-segment, but angular. */
+export interface OnCirclePoint {
+  kind: 'on-circle';
+  id: Id;
+  circle: Id;
+  theta: number;
+}
+
+/** 0 DOF — the antipode of `of` on `circle` (a diameter's far end): 2·centre − of. */
+export interface AntipodePoint {
+  kind: 'antipode';
+  id: Id;
+  circle: Id;
+  of: Id;
+}
+
+/** 0 DOF — midpoint of the arc from `from` to `to` on `circle`; `branch` selects which of the two arcs. */
+export interface ArcMidpointPoint {
+  kind: 'arc-midpoint';
+  id: Id;
+  circle: Id;
+  from: Id;
+  to: Id;
+  branch: number;
+}
+
+/** 0 DOF — a crossing of `line` with `circle`; 0/1/2 solutions, `branch` selects. */
+export interface LineCirclePoint {
+  kind: 'line-circle';
+  id: Id;
+  line: Id;
+  circle: Id;
+  branch: number;
+}
+
 export type GeoPoint =
   | FreePoint
   | OnSegmentPoint
@@ -165,7 +200,11 @@ export type GeoPoint =
   | SolvedOnSegmentPoint
   | LineIntersectionPoint
   | FootPoint
-  | MidpointPoint;
+  | MidpointPoint
+  | OnCirclePoint
+  | AntipodePoint
+  | ArcMidpointPoint
+  | LineCirclePoint;
 
 /** The object kinds that are points (carry a computed position). Single source of truth. */
 const POINT_KINDS: ReadonlySet<string> = new Set([
@@ -182,6 +221,10 @@ const POINT_KINDS: ReadonlySet<string> = new Set([
   'line-intersection',
   'foot',
   'midpoint',
+  'on-circle',
+  'antipode',
+  'arc-midpoint',
+  'line-circle',
 ]);
 
 export function isGeoPoint(o: GeoObject): o is GeoPoint {
@@ -213,7 +256,8 @@ export type LineSpec =
   | { via: 'through'; a: Id; b: Id } // the line through points a and b
   | { via: 'bisector'; vertex: Id; p: Id; q: Id } // internal bisector of ∠(p–vertex–q)
   | { via: 'perpendicular'; through: Id; a: Id; b: Id } // ⟂ to line a→b, through `through`
-  | { via: 'parallel'; through: Id; a: Id; b: Id }; // ∥ to line a→b, through `through`
+  | { via: 'parallel'; through: Id; a: Id; b: Id } // ∥ to line a→b, through `through`
+  | { via: 'tangent'; circle: Id; at: Id }; // tangent to `circle` at point `at` (⟂ to the radius there)
 
 /** An (infinite) line, defined by a {@link LineSpec}. Scaffolding — not rendered. */
 export interface Line {
@@ -222,7 +266,20 @@ export interface Line {
   spec: LineSpec;
 }
 
-export type GeoObject = GeoPoint | Segment | Polygon | Line;
+/** How a {@link Circle}'s radius is set: a fixed length, or the distance to a point on it. */
+export type RadiusSpec =
+  | { via: 'length'; value: number }
+  | { via: 'through'; point: Id };
+
+/** A circle: a centre point and a {@link RadiusSpec}. Unlike a line, a circle **is** drawn. */
+export interface Circle {
+  kind: 'circle';
+  id: Id;
+  center: Id;
+  radius: RadiusSpec;
+}
+
+export type GeoObject = GeoPoint | Segment | Polygon | Line | Circle;
 
 /**
  * Angle constraint. In Phase 1 it is used as a satisfiability *check* for
@@ -267,7 +324,15 @@ export type Command =
   | { type: 'line-through'; id: Id; a: Id; b: Id }
   | { type: 'line-intersection'; id: Id; line1: Id; line2: Id }
   | { type: 'foot'; id: Id; from: Id; a: Id; b: Id }
-  | { type: 'midpoint'; id: Id; a: Id; b: Id };
+  | { type: 'midpoint'; id: Id; a: Id; b: Id }
+  // Phase 5c — circles and the points they produce.
+  | { type: 'circle'; id: Id; center: Id; radius: number }
+  | { type: 'circle-through'; id: Id; center: Id; through: Id }
+  | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number }
+  | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
+  | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }
+  | { type: 'line-circle-intersection'; id: Id; line: Id; circle: Id; branch?: number }
+  | { type: 'tangent'; id: Id; circle: Id; at: Id };
 
 /** Tolerances. */
 export const LEN_EPS = 1e-6; // coordinate closeness (units)
