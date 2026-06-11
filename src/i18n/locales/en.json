@@ -23,8 +23,10 @@
   "help": {
     "show": "What can I type?",
     "hide": "Hide",
-    "title": "Things you can type",
-    "comingSoon": "Coming soon"
+    "title": "Commands",
+    "comingSoon": "Coming soon",
+    "wired": "✓ available",
+    "soon": "○ coming"
   },
   "steps": {
     "title": "Steps",

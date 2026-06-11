@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { isGeoPoint } from '@/engine';
-import { COMMAND_CATALOG, parse } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse } from '@/parser';
 import { Figure } from '@/render';
 import type { Crossing } from '@/render';
 import { introducedIds, replay, useGeoStore } from '@/store/geoStore';
@@ -171,23 +171,42 @@ export default function App() {
 
           {showHelp && (
             <div style={helpPanel}>
-              <div style={sectionLabel}>{t('help.title')}</div>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {COMMAND_CATALOG.filter((c) => c.supported).map((c) => (
-                  <li key={c.en} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    <button type="button" style={helpExample} onClick={() => submit(he ? c.he : c.en)} dir="auto">
-                      {he ? c.he : c.en}
-                    </button>
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>{he ? c.descHe : c.descEn}</span>
-                  </li>
-                ))}
-              </ul>
-              <div style={{ ...sectionLabel, marginTop: 10 }}>{t('help.comingSoon')}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {COMMAND_CATALOG.filter((c) => !c.supported).map((c) => (
-                  <span key={c.en} style={comingSoon} dir="auto">{he ? c.he : c.en}</span>
-                ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <span style={sectionLabel}>{t('help.title')}</span>
+                <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                  {t('help.wired')} · {t('help.soon')}
+                </span>
               </div>
+              {CATEGORY_ORDER.map((cat) => {
+                const items = COMMAND_CATALOG.filter((c) => c.category === cat);
+                if (items.length === 0) return null;
+                // wired first, then planned
+                const ordered = [...items].sort((a, b) => Number(b.supported) - Number(a.supported));
+                return (
+                  <div key={cat} style={{ marginTop: 10 }}>
+                    <div style={catHeading}>{he ? CATEGORY_LABELS[cat].he : CATEGORY_LABELS[cat].en}</div>
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {ordered.map((c) => (
+                        <li key={c.en} style={cmdRow}>
+                          <span style={{ width: 12, color: c.supported ? '#16a34a' : '#cbd5e1', fontSize: 12 }}>
+                            {c.supported ? '✓' : '○'}
+                          </span>
+                          {c.supported ? (
+                            <button type="button" style={helpExample} onClick={() => submit(he ? c.he : c.en)} dir="auto" title={he ? c.descHe : c.descEn}>
+                              {he ? c.he : c.en}
+                            </button>
+                          ) : (
+                            <span style={cmdSoon} dir="auto" title={he ? c.descHe : c.descEn}>
+                              {he ? c.he : c.en}
+                            </span>
+                          )}
+                          {!c.supported && c.phase && <span style={phaseTag}>{c.phase}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -344,13 +363,28 @@ const helpExample: React.CSSProperties = {
   fontSize: 13,
   padding: 0,
 };
-const comingSoon: React.CSSProperties = {
-  padding: '3px 8px',
+const catHeading: React.CSSProperties = {
   fontSize: 11,
-  borderRadius: 999,
-  border: '1px dashed #cbd5e1',
-  color: '#94a3b8',
+  fontWeight: 700,
+  color: '#64748b',
+  textTransform: 'uppercase',
+  letterSpacing: 0.4,
+  marginBottom: 4,
+};
+const cmdRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
+const cmdSoon: React.CSSProperties = {
+  flex: 1,
   fontFamily: 'ui-monospace, monospace',
+  fontSize: 13,
+  color: '#94a3b8',
+};
+const phaseTag: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 600,
+  color: '#94a3b8',
+  border: '1px solid #e2e8f0',
+  borderRadius: 4,
+  padding: '0 4px',
 };
 const stepList: React.CSSProperties = { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 };
 const errorBanner: React.CSSProperties = {
