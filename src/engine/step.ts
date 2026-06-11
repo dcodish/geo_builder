@@ -10,7 +10,8 @@
 import type { Command, Construction, Id, Vec } from './types';
 import { applyCommand } from './apply';
 import { evaluate } from './evaluate';
-import { circleCircleIntersect, dist, solveAngleOnSegment } from './geometry';
+import { circleCircleIntersect, dist } from './geometry';
+import { solvedOnSegmentCandidates } from './solve';
 
 export interface StepOk {
   ok: true;
@@ -125,13 +126,9 @@ export function branchCount(c: Construction, id: Id): number {
     if (!c1 || !c2) return 0;
     return circleCircleIntersect(c1, o.radius1, c2, o.radius2).length;
   }
-  if (o.kind === 'on-seg-angle') {
-    const a = e.positions.get(o.a);
-    const b = e.positions.get(o.b);
-    const r1 = e.positions.get(o.r1);
-    const r2 = e.positions.get(o.r2);
-    if (!a || !b || !r1 || !r2) return 0;
-    return solveAngleOnSegment(a, b, r1, r2, o.value).length;
+  if (o.kind === 'on-segment-solved') {
+    const ts = solvedOnSegmentCandidates(o, e.positions);
+    return ts === 'pending' ? 0 : ts.length;
   }
   return 0;
 }
@@ -140,7 +137,7 @@ export function branchCount(c: Construction, id: Id): number {
 export function cycleAlternative(c: Construction, id: Id): Construction {
   const n = branchCount(c, id) || 1;
   const objects = c.objects.map((o) =>
-    o.id === id && (o.kind === 'intersection' || o.kind === 'on-seg-angle')
+    o.id === id && (o.kind === 'intersection' || o.kind === 'on-segment-solved')
       ? { ...o, branch: (o.branch + 1) % n }
       : o,
   );

@@ -33,6 +33,14 @@ _The **travelling memory** for this repo. Because the repo syncs (Dropbox), anyt
   - **Notable bugs fixed from real use:** duplicate fact rows on re-issue (idempotent `execute`); `square ADFG` on a parallelogram rejected (→ ADR-013); `ABCD ריבוע` order rejected (order-independent grammar); `angle BEA=90` rejected (→ 5d slice).
   - **Resume here (next):** Phase 5b proper — a **line** object to enable **parallel-line** ("BC ∥ AD") and **perpendicular + foot**, then **angle bisector** and **right-triangle** → reproduce **Q2–Q4**; then 5c (circles → Q5–Q7). Also pending: the rest of 5d (on-segment as a ray, free-point/length/parallel drivers).
 
+- **2026-06-11 — Design-review fixes (pre-5b hardening).** An architecture review flagged structural issues; all fixed before starting 5b. End state: **118 tests green, build clean.**
+  - **ADR-014** — constraint-driven solving refactored from a bespoke point kind per (carrier × constraint) into one generic mechanism: `solve.ts` (constraint refs / residual / description) + `solveParam` (generic deterministic 1-D root finder) + a generic `on-segment-solved` carrier kind that embeds the driving constraint. New constraints = new residual cases, not new point kinds.
+  - **DOF selection fixed** — `set-angle` now drives the first referenced point (vertex → ray1 → ray2) that has a free DOF, not only the vertex. "∠GBA = 37°" with G on AD (vertex determined, freedom in the ray point) now solves; previously it was wrongly rejected.
+  - **Vision example corrected** — the docs' flagship "∠GAB = 37°" was geometrically impossible (G on AD ⇒ ∠GAB = 90° for every t); docs now use the satisfiable "∠GBA = 37°", and the impossible variant became a 5d test of the honest "cannot place" rejection.
+  - **Parser misparse defense** — the dangerous failure is the silent half-parse, not the miss: added lines-first intersection phrasing ("האלכסונים AC ו-BD נחתכים בנקודה E"; note נחתך final-ך ≠ נחתכ in inflected forms), lowercase filler-word stripping in `labelRun` ("connect A to B" no longer reads T,O), word-bounded segment labels in point-on-segment ("F on the extension of AD" escalates instead of reading "th"), and a stop-on-unreadable guard (a recognised intersection keyword with an unreadable sentence aborts the parse rather than letting `segment` half-parse it). Negative corpus in `phase4.test.ts` pins all of it.
+  - **GitHub backup remote added** — private repo, `git push` now backs up history beyond Dropbox.
+  - Review watch-items recorded for later phases: 5c must handle both circle dependency directions (inscribed vs circumscribed phrasings); Phase-6 theorem detection should derive "definite" structurally or by jiggle-testing free DOFs, never from one drawing's coordinates.
+
 ## Resume pointer
 
 See the **Status** line at the top of [09-implementation-plan.md](09-implementation-plan.md) and the "Current state / Next step" section in [../CLAUDE.md](../CLAUDE.md).

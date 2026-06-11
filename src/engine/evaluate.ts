@@ -15,10 +15,10 @@ import {
   rot90,
   rotate,
   scale,
-  solveAngleOnSegment,
   sub,
   unit,
 } from './geometry';
+import { describeConstraint, solvedOnSegmentCandidates } from './solve';
 
 export interface EvalOk {
   ok: true;
@@ -150,17 +150,15 @@ function tryEval(p: GeoPoint, pos: Map<Id, Vec>): Vec | 'pending' | string {
       return add(anchor, scale(sub(to, from), p.k)); // anchor + k·(to−from)
     }
 
-    case 'on-seg-angle': {
-      const a = pos.get(p.a);
-      const b = pos.get(p.b);
-      const r1 = pos.get(p.r1);
-      const r2 = pos.get(p.r2);
-      if (!a || !b || !r1 || !r2) return 'pending';
-      const ts = solveAngleOnSegment(a, b, r1, r2, p.value);
+    case 'on-segment-solved': {
+      const ts = solvedOnSegmentCandidates(p, pos);
+      if (ts === 'pending') return 'pending';
       if (ts.length === 0) {
-        return `cannot place ${p.id} on segment ${p.a}${p.b} so that ∠${p.r1}${p.id}${p.r2} = ${p.value}°`;
+        return `cannot place ${p.id} on segment ${p.a}${p.b} so that ${describeConstraint(p.constraint)}`;
       }
       const t = ts[p.branch % ts.length];
+      const a = pos.get(p.a)!;
+      const b = pos.get(p.b)!;
       return add(a, scale(sub(b, a), t));
     }
   }

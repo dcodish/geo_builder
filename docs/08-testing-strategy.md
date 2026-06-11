@@ -72,7 +72,7 @@ A shared set of canonical figures, expressed as command sequences, reused across
 
 - **F1 — Square + point on side:** square ABCD; G on AD. _(stability)_
 - **F2 — Two-configuration construction:** a point at the intersection of a circle and a line (or an SSA triangle). _(branches / alternatives)_
-- **F3 — Contradiction:** square ABCD, then angle GAB = 37° with G on AD — impossible, since AD⊥AB forces 90°. _(over-constraint)_
+- **F3 — Contradiction:** square ABCD, then angle DAB = 37° — every referenced point is determined and the corner is 90°, so the check rejects. _(over-constraint)_ The G-referencing variant (angle GAB = 37° with G on AD) now exercises the *solver*: the engine drives G's `t`, finds ∠GAB is 90° for every position, and rejects with "cannot place" — covered by the Phase-5d gate.
 - **F4 — Isosceles triangle:** AB = AC. _(theorem detection: #22)_
 - **F5 — Cyclic quadrilateral:** opposite angles sum to 180°. _(theorem #87)_
 - _(extend as v1 coverage grows)_

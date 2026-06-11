@@ -93,6 +93,54 @@ describe('parser — out-of-grammar returns not-handled (the fallback boundary)'
   }
 });
 
+describe('parser — lines-first intersection phrasing (he/en)', () => {
+  const e: Command = { type: 'line-line-intersection', id: 'E', a: 'A', b: 'C', c: 'B', d: 'D' };
+  it('english', () => one('the diagonals AC and BD intersect at point E', e));
+  it('hebrew (inflected נחתכים)', () => one('האלכסונים AC ו-BD נחתכים בנקודה E', e));
+});
+
+describe('parser — filler words are not labels', () => {
+  it('"connect A to B" reads A,B — not T,O', () =>
+    one('connect A to B', { type: 'segment', a: 'A', b: 'B' }));
+  it('uppercase ON is still a label pair (segment ON)', () =>
+    one('segment ON', { type: 'segment', a: 'O', b: 'N' }));
+});
+
+/**
+ * Misparse defense: the dangerous failure is not the miss (a miss escalates to
+ * the Phase-7 fallback) but the silent HALF-parse that draws a wrong figure.
+ * Every utterance here mentions an out-of-grammar construct (or an unreadable
+ * phrasing of an in-grammar one) and must return not-handled — never a
+ * partial command.
+ */
+describe('parser — misparse defense (out-of-grammar must not half-parse)', () => {
+  for (const u of [
+    // Phase-5b constructs — must escalate, not half-parse
+    'perpendicular from A to BC',
+    'אנך מ-A ל-BC',
+    'AD bisects angle BAC',
+    'AD חוצה את הזווית BAC',
+    'M is the midpoint of AB',
+    'M אמצע AB',
+    'BC parallel to AD',
+    'BC מקביל ל-AD',
+    'point F on the extension of AD',
+    // Phase-5c constructs
+    'circle centered at O radius 5',
+    'מעגל סביב O רדיוס 5',
+    'circle through A B C',
+    // recognised intersection keyword but unreadable sentence → stop, not "segment"
+    'the diagonals intersect somewhere',
+    'the bisector of angle ABC meets AC at D',
+  ]) {
+    it(`"${u}"`, () => {
+      const r = parse(u);
+      expect(r.ok, `"${u}" must not be (mis)parsed`).toBe(false);
+      if (!r.ok) expect(r.reason).toBe('not-handled');
+    });
+  }
+});
+
 describe('parser → engine (end to end)', () => {
   it('a typed sequence parses into commands the engine builds', () => {
     const utterances = [

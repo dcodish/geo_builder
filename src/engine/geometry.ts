@@ -62,23 +62,19 @@ export function lineLineIntersect(a: Vec, b: Vec, c: Vec, d: Vec): Vec | null {
 }
 
 /**
- * Solve for parameters t ∈ [tMin,tMax] where the point P(t) = a + t·(b−a) makes
- * ∠(r1, P(t), r2) equal `value` degrees. Deterministic: scan for sign changes of
- * angle(t)−value, then bisect each bracket (ADR-012 constraint-driven DOF). May
- * return 0, 1, or 2 solutions; returned ascending. Non-finite samples (P at r1/r2)
- * are skipped.
+ * All roots of a scalar residual f over t ∈ [tMin,tMax]. Deterministic: scan a
+ * fixed grid for sign changes, then bisect each bracket (ADR-012/ADR-014 —
+ * constraint-driven DOF). Returns the roots ascending; each is a solution
+ * *branch*. Non-finite samples (e.g. an angle measured at a coincident point)
+ * are skipped. f is any constraint residual (0 ⇔ satisfied) — the solver is
+ * generic over the constraint type.
  */
-export function solveAngleOnSegment(
-  a: Vec,
-  b: Vec,
-  r1: Vec,
-  r2: Vec,
-  value: number,
+export function solveParam(
+  f: (t: number) => number,
   tMin = 0,
   tMax = 1,
   steps = 256,
 ): number[] {
-  const f = (t: number): number => angleDeg(add(a, scale(sub(b, a), t)), r1, r2) - value;
   const roots: number[] = [];
   let pt = tMin;
   let pf = f(tMin);

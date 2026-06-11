@@ -14,7 +14,8 @@ import en from '@/i18n/locales/en.json';
 
 const SQUARE: Command = { type: 'square', ids: ['A', 'B', 'C', 'D'] };
 const G_ON_AD: Command = { type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 };
-const BAD_ANGLE: Command = { type: 'set-angle', vertex: 'A', ray1: 'G', ray2: 'B', value: 37 };
+// All referenced points are determined square corners → a pure check: 90 ≠ 37.
+const BAD_ANGLE: Command = { type: 'set-angle', vertex: 'A', ray1: 'D', ray2: 'B', value: 37 };
 
 const s = () => useGeoStore.getState();
 const derived = () => replay(s().facts);
@@ -83,7 +84,7 @@ describe('store — keep prior figure on contradiction (FR-EN-8/-10)', () => {
     s().execute(SQUARE);
     s().execute(G_ON_AD);
     const kept = replay(s().facts).construction;
-    s().execute(BAD_ANGLE, 'angle GAB = 37');
+    s().execute(BAD_ANGLE, 'angle DAB = 37');
 
     const d = derived();
     expect(d.construction.objects.map((o) => o.id).sort()).toEqual(kept.objects.map((o) => o.id).sort());

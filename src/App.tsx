@@ -63,7 +63,7 @@ export default function App() {
     document.documentElement.lang = i18n.language;
   }, [i18n, i18n.language]);
 
-  const branchId = construction.objects.find((o) => o.kind === 'intersection' || o.kind === 'on-seg-angle')?.id;
+  const branchId = construction.objects.find((o) => o.kind === 'intersection' || o.kind === 'on-segment-solved')?.id;
   const examples = t('examples.items', { returnObjects: true }) as string[];
 
   return (

@@ -33,7 +33,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { en: 'point A at (0,0)', he: 'נקודה A ב-(0,0)', descEn: 'A free point at coordinates.', descHe: 'נקודה חופשית בקואורדינטות.', supported: true },
   { en: 'C is 5 from A and 5 from B', he: 'C במרחק 5 מ-A ו-5 מ-B', descEn: 'A point at given distances from two points.', descHe: 'נקודה במרחקים נתונים משתי נקודות.', supported: true },
   { en: 'M is the intersection of AC and BD', he: 'M חיתוך AC ו-BD', descEn: 'Where two lines cross.', descHe: 'נקודת חיתוך של שני ישרים.', supported: true },
-  { en: 'angle GAB = 37', he: 'זווית GAB = 37', descEn: 'Set an angle (currently checked, not yet solved).', descHe: 'קביעת זווית (כרגע נבדקת, עדיין לא נפתרת).', supported: true },
+  { en: 'angle GBA = 37', he: 'זווית GBA = 37', descEn: 'Set an angle — if a referenced point can slide (e.g. on a segment), it moves to satisfy the angle; otherwise the angle is checked.', descHe: 'קביעת זווית — אם נקודה שבזווית יכולה לזוז (למשל על קטע), היא תוזז כך שהזווית תתקיים; אחרת הזווית נבדקת.', supported: true },
 
   // Planned — engine support is on the way (Phase 5b/5c). Shown so the roadmap is visible.
   { en: 'BC parallel to AD', he: 'BC מקביל ל-AD', descEn: 'A line parallel to another.', descHe: 'ישר מקביל לישר אחר.', supported: false },

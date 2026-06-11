@@ -1,8 +1,11 @@
 /**
- * Phase-5d (first slice): a constraint *drives* a free DOF (ADR-012).
- * An angle whose vertex is a point-on-segment solves the point's position so the
- * angle holds, instead of merely checking it. Covers the reported case
- * "angle BEA = 90" with E on AC (→ E becomes the foot of the perpendicular).
+ * Phase-5d: a constraint *drives* a free DOF (ADR-012/ADR-014).
+ * An angle that references a point-on-segment — as its vertex OR as a ray
+ * endpoint — solves that point's parameter so the angle holds, instead of
+ * merely checking it. Covers the reported case "angle BEA = 90" with E on AC
+ * (→ E becomes the foot of the perpendicular), the ray-endpoint case
+ * "angle GBA = 37" with G on AD, and the degenerate case where the angle is
+ * insensitive to the free parameter (no solution → clean rejection).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -53,13 +56,42 @@ describe('angle drives a point-on-segment (ADR-012)', () => {
     }
   });
 
-  it('still checks (and can reject) an angle whose vertex is already determined', () => {
-    // vertex A is a fixed square corner → angle is a check, 90 ≠ 37 → rejected.
-    const sq = build([
+  it('solves a point referenced as a ray endpoint, not only as the vertex', () => {
+    // Square ABCD (A=(0,0), B=(5,0), D=(0,5)), G on AD. The angle's vertex B is
+    // determined; the free DOF is in ray-point G. ∠GBA = 37° ⇒ t = tan 37°.
+    const { positions } = build([
+      { type: 'square', ids: ['A', 'B', 'C', 'D'] },
+      { type: 'point-on-segment', id: 'G', a: 'A', b: 'D' },
+      { type: 'set-angle', vertex: 'B', ray1: 'G', ray2: 'A', value: 37 },
+    ]);
+    const A = positions.get('A')!, D = positions.get('D')!, B = positions.get('B')!, G = positions.get('G')!;
+    expect(angleDeg(B, G, A)).toBeCloseTo(37, 4);
+    // G still lies on AD
+    expect(cross(A, D, G)).toBeCloseTo(0, 6);
+    expect(dist(A, G) + dist(G, D)).toBeCloseTo(dist(A, D), 6);
+    expect(dist(A, G) / dist(A, D)).toBeCloseTo(Math.tan((37 * Math.PI) / 180), 4);
+  });
+
+  it('rejects cleanly when the angle is insensitive to the free parameter', () => {
+    // G on side AD: ray A→G lies along A→D for every t, so ∠GAB is the square's
+    // corner (90°) no matter where G slides — 37° has no solution. The engine
+    // tries to drive G, finds no t, and keeps the prior figure.
+    const base = build([
       { type: 'square', ids: ['A', 'B', 'C', 'D'] },
       { type: 'point-on-segment', id: 'G', a: 'A', b: 'D' },
     ]);
-    const r = applyStep(sq.construction, { type: 'set-angle', vertex: 'A', ray1: 'G', ray2: 'B', value: 37 });
+    const r = applyStep(base.construction, { type: 'set-angle', vertex: 'A', ray1: 'G', ray2: 'B', value: 37 });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toMatch(/cannot place/i);
+      expect(r.construction).toBe(base.construction);
+    }
+  });
+
+  it('still checks (and can reject) an angle whose references are all determined', () => {
+    // Every corner of the square is determined → the angle is a check, 90 ≠ 37.
+    const sq = build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }]);
+    const r = applyStep(sq.construction, { type: 'set-angle', vertex: 'A', ray1: 'D', ray2: 'B', value: 37 });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/over-constrained/i);
   });
@@ -70,7 +102,7 @@ describe('angle drives a point-on-segment (ADR-012)', () => {
       { type: 'point-on-segment', id: 'E', a: 'A', b: 'C' },
       { type: 'set-angle', vertex: 'E', ray1: 'B', ray2: 'A', value: 90 },
     ]);
-    expect(withSolve.construction.objects.find((o) => o.id === 'E')!.kind).toBe('on-seg-angle');
+    expect(withSolve.construction.objects.find((o) => o.id === 'E')!.kind).toBe('on-segment-solved');
 
     // Without the angle command, E is a plain on-segment point again (default midpoint).
     const withoutAngle = build([

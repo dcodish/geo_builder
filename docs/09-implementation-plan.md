@@ -1,8 +1,8 @@
 # 09 — Implementation Plan
 
-_Last updated: 2026-06-10._
+_Last updated: 2026-06-11._
 
-> **Status:** Phases 0–4 complete (M1–M3). **Phase 5a complete** (quad, parallelogram, segment, line∩line; **Q1 reproduced**). **Polygon family** — triangle, rectangle, rhombus, trapezoid. **In-app command reference** (`parser/catalog.ts` → help panel). **Phase 5d first slice** — angle whose vertex is on-segment solves the point (ADR-012). 98 tests green. **Next (Phase 5b):** a **line** object → parallel-line + perpendicular + foot, angle bisector, point-on-ray/extension, right-triangle → Q2–Q4; then 5c (circles); finish 5d. Work is on branch `rebuild-foundation`.
+> **Status:** Phases 0–4 complete (M1–M3). **Phase 5a complete** (quad, parallelogram, segment, line∩line; **Q1 reproduced**). **Polygon family** — triangle, rectangle, rhombus, trapezoid. **In-app command reference** (`parser/catalog.ts` → help panel). **Phase 5d generalised ([ADR-014](06-decisions.md))** — constraint-driven solving is one generic mechanism (carrier + residual + `solveParam`); an angle drives an on-segment point referenced as its vertex *or* a ray endpoint. **Parser misparse defense** — lines-first intersection phrasing, filler-word stripping, stop-on-unreadable guard, negative corpus. 118 tests green. **Next (Phase 5b):** a **line** object → parallel-line + perpendicular + foot, angle bisector, point-on-ray/extension, right-triangle → Q2–Q4; then 5c (circles); finish 5d (distance/parallel residuals, free-point drivers). Work is on branch `rebuild-foundation` (remote: GitHub backup).
 
 ## Purpose
 

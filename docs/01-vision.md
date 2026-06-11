@@ -31,7 +31,7 @@ The user enters information **incrementally**, and the figure builds up and adap
 
 1. "ריבוע ABCD" (square ABCD) → a square is drawn.
 2. "נקודה G על AD" (point G on AD) → G appears somewhere on side AD.
-3. "הזווית GAB שווה ל-37°" → the figure adapts to satisfy it (or reports a contradiction).
+3. "הזווית GBA שווה ל-37°" → the figure adapts: G slides along AD until the angle holds (or the system reports that no position works).
 
 Two consequences define the product:
 

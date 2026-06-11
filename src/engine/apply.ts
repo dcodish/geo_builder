@@ -4,7 +4,7 @@
  * (FR-EN-9). No positions are computed here — that is the evaluator's job.
  */
 
-import type { Command, Construction, GeoObject, Id } from './types';
+import type { Command, Constraint, Construction, GeoObject, Id } from './types';
 
 function addObj(objects: GeoObject[], o: GeoObject): void {
   if (!objects.some((x) => x.id === o.id)) objects.push(o);
@@ -149,24 +149,22 @@ export function applyCommand(prev: Construction, cmd: Command): Construction {
       break;
 
     case 'set-angle': {
-      // If the angle's vertex is a point-on-segment, the constraint *drives* its
-      // position: upgrade it to a solved point (ADR-012). Otherwise the vertex is
-      // already determined, so the angle is a check (over-constraint detection).
-      const i = objects.findIndex((o) => o.id === cmd.vertex);
-      if (i >= 0 && objects[i].kind === 'on-segment') {
-        const seg = objects[i] as Extract<GeoObject, { kind: 'on-segment' }>;
-        objects[i] = {
-          kind: 'on-seg-angle',
-          id: seg.id,
-          a: seg.a,
-          b: seg.b,
-          r1: cmd.ray1,
-          r2: cmd.ray2,
-          value: cmd.value,
-          branch: 0,
-        };
+      // If any point the angle references still has a free DOF (an on-segment
+      // parameter t), the constraint *drives* it: that point is upgraded to a
+      // solved point and the angle places it (ADR-012/ADR-014). The driven
+      // point is chosen deterministically — vertex first, then ray1, then ray2.
+      // When every referenced point is already determined, the angle is a
+      // check (over-constraint detection). A point that is already solved by
+      // an earlier constraint has no DOF left, so it counts as determined.
+      const con: Constraint = { type: 'angle', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, value: cmd.value };
+      const driven = [cmd.vertex, cmd.ray1, cmd.ray2]
+        .map((id) => objects.findIndex((o) => o.id === id))
+        .find((i) => i >= 0 && objects[i].kind === 'on-segment');
+      if (driven !== undefined) {
+        const seg = objects[driven] as Extract<GeoObject, { kind: 'on-segment' }>;
+        objects[driven] = { kind: 'on-segment-solved', id: seg.id, a: seg.a, b: seg.b, constraint: con, branch: 0 };
       } else {
-        constraints.push({ type: 'angle', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, value: cmd.value });
+        constraints.push(con);
       }
       break;
     }

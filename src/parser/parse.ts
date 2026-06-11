@@ -22,21 +22,35 @@ export type ParseResult =
   | { ok: true; commands: Command[] }
   | { ok: false; reason: 'not-handled' };
 
-type Rule = (s: string) => Command[] | null;
+/**
+ * 'stop' = the rule recognised its keyword but could not read the sentence:
+ * abort the whole parse (→ not-handled, the fallback boundary) instead of
+ * letting a weaker rule half-parse the utterance. A half-parse that silently
+ * drops part of a fact is worse than a miss — it draws a wrong figure.
+ */
+type Rule = (s: string) => Command[] | null | 'stop';
 
 const up = (c: string): Id => c.toUpperCase();
 const num = String.raw`(-?\d+(?:\.\d+)?)`;
 
 /**
+ * English filler words, lowercase only — typed fillers are lowercase, while
+ * uppercase pairs like "ON" must stay readable as point labels (O, N).
+ */
+const FILLER = /\b(?:to|the|and|of|is|are|at|on|in|with|from|that|so|such)\b/g;
+
+/**
  * Find a run of `n` point labels, as a contiguous token ("ABCD") or `n`
  * space-separated single letters ("A B C D"), anywhere in `s`. Returns them
  * uppercased, or null. Strip keywords from `s` first so a Latin keyword's own
- * letters (e.g. "square") aren't mistaken for labels.
+ * letters (e.g. "square") aren't mistaken for labels; lowercase filler words
+ * are stripped here so "connect A to B" can't read "to" as the labels T,O.
  */
 function labelRun(s: string, n: number): Id[] | null {
-  const contiguous = s.match(new RegExp(String.raw`\b[A-Za-z]{${n}}\b`));
+  const t = s.replace(FILLER, ' ');
+  const contiguous = t.match(new RegExp(String.raw`\b[A-Za-z]{${n}}\b`));
   if (contiguous) return contiguous[0].toUpperCase().split('') as Id[];
-  const spaced = s.match(new RegExp(Array.from({ length: n }, () => String.raw`\b([A-Za-z])\b`).join(String.raw`\s+`)));
+  const spaced = t.match(new RegExp(Array.from({ length: n }, () => String.raw`\b([A-Za-z])\b`).join(String.raw`\s+`)));
   if (spaced) return spaced.slice(1, n + 1).map(up);
   return null;
 }
@@ -87,16 +101,36 @@ const segment: Rule = (s) => {
   return ids ? [{ type: 'segment', a: ids[0], b: ids[1] }] : null;
 };
 
-/** "E is the intersection of AC and BD" / "E = AC ∩ BD" / "E חיתוך AC ו-BD". */
+/**
+ * Line–line intersection, both phrasing directions:
+ *   point-first — "E is the intersection of AC and BD" / "E = AC ∩ BD" / "E חיתוך AC ו-BD"
+ *   lines-first — "AC and BD intersect at E" / "האלכסונים AC ו-BD נחתכים בנקודה E"
+ * (Hebrew needs both נחתך and נחתכ: the final-form ך differs from the כ that
+ * inflected forms like נחתכים carry.) If an intersection keyword is present but
+ * neither pattern reads, the parse STOPS — otherwise the `segment` rule would
+ * half-parse "the diagonals AC and BD intersect at E" into just "segment AC",
+ * silently dropping the intersection point.
+ */
+const INTERSECT_KW = /intersect|∩|חיתוך|נחתך|נחתכ|נפגש|\bmeets?\b/i;
 const lineLineIntersection: Rule = (s) => {
-  if (!/intersection|∩|חיתוך|נחתך/i.test(s)) return null;
+  if (!INTERSECT_KW.test(s)) return null;
   // Drop filler words so they aren't mistaken for two-letter line labels ("of"!).
-  const t = s.replace(/\b(?:is|the|of|between|הוא|בין)\b/gi, ' ');
-  const m = t.match(
+  const t = s.replace(/\b(?:is|the|of|between|at|point|הוא|בין|בנקודה|נקודה)\b/gi, ' ');
+  const pointFirst = t.match(
     /\b([A-Za-z])\b.*?(?:intersection|∩|חיתוך|נחתך).*?\b([A-Za-z])\s*([A-Za-z])\b.*?\b([A-Za-z])\s*([A-Za-z])\b/i,
   );
-  if (!m) return null;
-  return [{ type: 'line-line-intersection', id: up(m[1]), a: up(m[2]), b: up(m[3]), c: up(m[4]), d: up(m[5]) }];
+  if (pointFirst) {
+    const m = pointFirst;
+    return [{ type: 'line-line-intersection', id: up(m[1]), a: up(m[2]), b: up(m[3]), c: up(m[4]), d: up(m[5]) }];
+  }
+  const linesFirst = t.match(
+    /\b([A-Za-z])\s*([A-Za-z])\b.*?\b([A-Za-z])\s*([A-Za-z])\b.*?(?:intersect\w*|∩|חיתוך|נחתך|נחתכ|נפגש|meets?).*?\b([A-Za-z])\b/i,
+  );
+  if (linesFirst) {
+    const m = linesFirst;
+    return [{ type: 'line-line-intersection', id: up(m[5]), a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]) }];
+  }
+  return 'stop';
 };
 
 /** "angle GAB = 37" / "זווית GAB = 37" (any order) — middle letter is the vertex. */
@@ -109,11 +143,15 @@ const angle: Rule = (s) => {
   return [{ type: 'set-angle', vertex: ids[1], ray1: ids[0], ray2: ids[2], value: parseFloat(valM[1]) }];
 };
 
-/** "point G on AD" / "נקודה G על AD" with optional ratio "at 40%" / "ב-40%". */
+/**
+ * "point G on AD" / "נקודה G על AD" with optional ratio "at 40%" / "ב-40%".
+ * The segment labels are word-bounded so "F on the extension of AD" can't read
+ * "th" of "the" as a segment — that phrasing escapes to the fallback instead.
+ */
 const pointOnSegment: Rule = (s) => {
   const m = s.match(
     new RegExp(
-      String.raw`(?:point\s+|נקודה\s+)?([A-Za-z])\s+(?:on|על)\s+([A-Za-z])\s*([A-Za-z])(?:\s+(?:at|ב-?)?\s*${num}\s*(%)?)?`,
+      String.raw`(?:point\s+|נקודה\s+)?([A-Za-z])\s+(?:on|על)\s+([A-Za-z])\s*([A-Za-z])\b(?:\s+(?:at|ב-?)?\s*${num}\s*(%)?)?`,
       'i',
     ),
   );
@@ -189,6 +227,7 @@ export function parse(raw: string): ParseResult {
   if (!s) return { ok: false, reason: 'not-handled' };
   for (const rule of RULES) {
     const commands = rule(s);
+    if (commands === 'stop') break; // recognised but unreadable — escalate, don't half-parse
     if (commands) return { ok: true, commands };
   }
   return { ok: false, reason: 'not-handled' };

@@ -106,20 +106,21 @@ export interface ScaledOffsetVertex {
 }
 
 /**
- * A point on segment a→b whose parameter is **solved** so that ∠(r1, this, r2)
- * equals `value` (ADR-012 — a constraint driving a free DOF). `branch` selects
- * among multiple positions that satisfy the angle. This is what a `set-angle`
- * whose vertex is a point-on-segment upgrades into: the constraint *places* the
- * point instead of merely checking it.
+ * A point on segment a→b whose parameter t is **solved** so that the embedded
+ * constraint holds (ADR-012/ADR-014 — a constraint driving a free DOF). The
+ * constraint references this point's id (as the vertex or a ray endpoint — any
+ * role); the solver finds every t ∈ [0,1] satisfying it and `branch` selects
+ * among the solutions. This is what a constraint command upgrades a plain
+ * on-segment point into: the constraint *places* the point instead of merely
+ * checking it. Generic over the constraint type — new constraints add a
+ * residual case (solve.ts), not a new point kind.
  */
-export interface OnSegmentAnglePoint {
-  kind: 'on-seg-angle';
+export interface SolvedOnSegmentPoint {
+  kind: 'on-segment-solved';
   id: Id;
   a: Id;
   b: Id;
-  r1: Id;
-  r2: Id;
-  value: number;
+  constraint: Constraint;
   branch: number;
 }
 
@@ -133,7 +134,7 @@ export type GeoPoint =
   | PerpOffsetVertex
   | RotatedVertex
   | ScaledOffsetVertex
-  | OnSegmentAnglePoint;
+  | SolvedOnSegmentPoint;
 
 /** The object kinds that are points (carry a computed position). Single source of truth. */
 const POINT_KINDS: ReadonlySet<string> = new Set([
@@ -146,7 +147,7 @@ const POINT_KINDS: ReadonlySet<string> = new Set([
   'perp-offset',
   'rotated',
   'scaled-offset',
-  'on-seg-angle',
+  'on-segment-solved',
 ]);
 
 export function isGeoPoint(o: GeoObject): o is GeoPoint {

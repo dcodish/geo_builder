@@ -2,6 +2,7 @@
 
 export * from './types';
 export * from './geometry';
+export * from './solve';
 export { applyCommand } from './apply';
 export { evaluate } from './evaluate';
 export type { EvalResult, EvalOk, EvalErr } from './evaluate';

@@ -91,8 +91,11 @@ describe('F3 — contradiction is rejected and the prior figure is kept (over-co
   it('rejects an impossible angle and preserves the square', () => {
     const base = build([SQUARE, { type: 'point-on-segment', id: 'G', a: 'A', b: 'D' }]);
 
-    // G is on AD, so ∠GAB is the square's corner = 90°; setting it to 37° is impossible.
-    const r = applyStep(base.construction, { type: 'set-angle', vertex: 'A', ray1: 'G', ray2: 'B', value: 37 });
+    // ∠DAB is the square's corner = 90°; every referenced point is determined,
+    // so the angle is a pure check — setting it to 37° is over-constrained.
+    // (The G-referencing variant, where the engine *drives* G's parameter and
+    // finds no solution, is covered in phase5d.test.ts.)
+    const r = applyStep(base.construction, { type: 'set-angle', vertex: 'A', ray1: 'D', ray2: 'B', value: 37 });
 
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/over-constrained/i);
