@@ -299,6 +299,12 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
 
     case 'segment':
+      // A standalone segment creates its endpoints if they don't exist yet (a
+      // free segment to start a figure), and reuses them when they do — fitted
+      // to the prior figure like a shape's base vertices (ADR-013). Without this
+      // a bare "segment AB" would add an unresolvable segment that silently
+      // doesn't draw.
+      placeBase(objects, [{ id: cmd.a, x: 0, y: 0 }, { id: cmd.b, x: 5, y: 0 }], pos);
       addObj(objects, segment(cmd.a, cmd.b));
       break;
 

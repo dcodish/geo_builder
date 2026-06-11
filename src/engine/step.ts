@@ -68,7 +68,8 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     cmd.type === 'rhombus' ||
     cmd.type === 'trapezoid' ||
     cmd.type === 'triangle' ||
-    cmd.type === 'right-triangle';
+    cmd.type === 'right-triangle' ||
+    cmd.type === 'segment'; // a segment reuses (or creates) its endpoints, like a shape's base
   const produced = applyCommand(emptyConstruction(), cmd).objects;
   for (const o of produced) {
     const existing = prev.objects.find((x) => x.id === o.id);

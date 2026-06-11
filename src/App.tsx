@@ -42,6 +42,13 @@ export default function App() {
   const [editError, setEditError] = useState(false);
   const he = i18n.language === 'he';
 
+  // Base text direction for a mixed He/En string (geometry labels, numbers, and
+  // operators are Latin/neutral even inside Hebrew). `dir="auto"` keys only off
+  // the FIRST strong char, so a Hebrew phrase starting with a point label ("C
+  // במרחק…") wrongly gets an LTR base and reorders into garbage. Decide by
+  // content instead: any Hebrew letter ⇒ RTL base, else LTR.
+  const textDir = (s: string): 'rtl' | 'ltr' => (/[֐-׿]/.test(s) ? 'rtl' : 'ltr');
+
   // Inline fact editing: open the row as a text field pre-filled with its
   // phrasing, re-parse on confirm, and update the fact in place (ADR-015).
   function startEdit(id: string, utterance: string | undefined) {
@@ -149,6 +156,7 @@ export default function App() {
                 style={input}
                 placeholder={t('input.placeholder')}
                 value={text}
+                dir={textDir(text)}
                 onChange={(e) => {
                   setText(e.target.value);
                   if (notUnderstood) setNotUnderstood(false);
@@ -192,11 +200,11 @@ export default function App() {
                             {c.supported ? '✓' : '○'}
                           </span>
                           {c.supported ? (
-                            <button type="button" style={helpExample} onClick={() => submit(he ? c.he : c.en)} dir="auto" title={he ? c.descHe : c.descEn}>
+                            <button type="button" style={helpExample} onClick={() => submit(he ? c.he : c.en)} dir={textDir(he ? c.he : c.en)} title={he ? c.descHe : c.descEn}>
                               {he ? c.he : c.en}
                             </button>
                           ) : (
-                            <span style={cmdSoon} dir="auto" title={he ? c.descHe : c.descEn}>
+                            <span style={cmdSoon} dir={textDir(he ? c.he : c.en)} title={he ? c.descHe : c.descEn}>
                               {he ? c.he : c.en}
                             </span>
                           )}
@@ -214,7 +222,7 @@ export default function App() {
             <div style={sectionLabel}>{t('examples.heading')}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {examples.map((ex) => (
-                <button key={ex} type="button" style={chip} onClick={() => submit(ex)} dir="auto">
+                <button key={ex} type="button" style={chip} onClick={() => submit(ex)} dir={textDir(ex)}>
                   {ex}
                 </button>
               ))}
@@ -248,7 +256,7 @@ export default function App() {
                           <input
                             autoFocus
                             value={editText}
-                            dir="auto"
+                            dir={textDir(editText)}
                             onChange={(e) => {
                               setEditText(e.target.value);
                               if (editError) setEditError(false);
@@ -268,7 +276,7 @@ export default function App() {
                         </>
                       ) : (
                         <>
-                          <button type="button" style={factLabel(state)} onClick={() => select(f.id)} title={typeof st === 'string' && state === 'broken' ? st : undefined}>
+                          <button type="button" style={factLabel(state)} onClick={() => select(f.id)} dir={textDir(f.utterance ?? f.cmd.type)} title={typeof st === 'string' && state === 'broken' ? st : undefined}>
                             {f.utterance ?? f.cmd.type}
                           </button>
                           <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}>

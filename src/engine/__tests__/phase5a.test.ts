@@ -113,6 +113,28 @@ describe('arbitrary segment', () => {
     const b = build([{ type: 'segment', a: 'C', b: 'A' }], a.construction);
     expect(b.construction.objects.filter((o) => o.kind === 'segment' && o.id === 'seg-AC')).toHaveLength(1);
   });
+
+  it('a standalone segment creates its endpoints (a free segment to build on)', () => {
+    // "segment AB" with nothing prior: A and B are created as free points so the
+    // segment actually draws, rather than silently referencing missing points.
+    const { construction, positions } = build([{ type: 'segment', a: 'A', b: 'B' }]);
+    expect(positions.get('A')).toBeTruthy();
+    expect(positions.get('B')).toBeTruthy();
+    expect(dist(positions.get('A')!, positions.get('B')!)).toBeGreaterThan(0); // distinct endpoints
+    expect(construction.objects.filter((o) => o.kind === 'free-point')).toHaveLength(2);
+    expect(construction.objects.some((o) => o.kind === 'segment' && o.id === 'seg-AB')).toBe(true);
+  });
+
+  it('reuses an existing endpoint and only creates the missing one', () => {
+    // triangle ABC exists; "segment AX" reuses A, creates X — A is not redefined.
+    const base = build([{ type: 'triangle', ids: ['A', 'B', 'C'] }]);
+    const r = applyStep(base.construction, { type: 'segment', a: 'A', b: 'X' });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.positions.get('A')).toEqual(base.positions.get('A')); // A reused, unmoved
+    expect(r.positions.get('X')).toBeTruthy(); // X created
+    expect(r.construction.objects.some((o) => o.kind === 'segment' && o.id === 'seg-AX')).toBe(true);
+  });
 });
 
 describe('line∩line intersection', () => {
