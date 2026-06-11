@@ -34,13 +34,14 @@ export interface OnSegmentPoint {
   t: number;
 }
 
-/** 0 DOF — computed from parents by a named rule. */
+/** 0 DOF — computed from parents by a named rule. `flip` mirrors it to the other side of a→b. */
 export interface DerivedPoint {
   kind: 'derived';
   id: Id;
   rule: 'square-c' | 'square-d';
   a: Id;
   b: Id;
+  flip?: boolean;
 }
 
 /** 0 DOF — a circle∩circle intersection; `branch` selects which solution. */
@@ -74,7 +75,7 @@ export interface LineLineIntersection {
   d: Id;
 }
 
-/** 0 DOF — `anchor` offset perpendicular to from→to by `dist` (rectangle corners). */
+/** 0 DOF — `anchor` offset perpendicular to from→to by `dist` (rectangle corners). `flip` negates the offset. */
 export interface PerpOffsetVertex {
   kind: 'perp-offset';
   id: Id;
@@ -82,9 +83,10 @@ export interface PerpOffsetVertex {
   from: Id;
   to: Id;
   dist: number;
+  flip?: boolean;
 }
 
-/** 0 DOF — `pivot` + scale · Rot(angleDeg) · (to − from) (rhombus / rotated corners). */
+/** 0 DOF — `pivot` + scale · Rot(angleDeg) · (to − from) (rhombus / rotated corners). `flip` negates the angle. */
 export interface RotatedVertex {
   kind: 'rotated';
   id: Id;
@@ -93,6 +95,7 @@ export interface RotatedVertex {
   to: Id;
   angleDeg: number;
   scale: number;
+  flip?: boolean;
 }
 
 /** 0 DOF — `anchor` + k · (to − from): a point offset parallel to from→to (trapezoid). */

@@ -107,7 +107,7 @@ function tryEval(p: GeoPoint, pos: Map<Id, Vec>): Vec | 'pending' | string {
       const a = pos.get(p.a);
       const b = pos.get(p.b);
       if (!a || !b) return 'pending';
-      const perp = rot90(sub(b, a)); // R90(B − A)
+      const perp = scale(rot90(sub(b, a)), p.flip ? -1 : 1); // ±R90(B − A)
       return p.rule === 'square-c' ? add(b, perp) : add(a, perp);
     }
 
@@ -146,7 +146,7 @@ function tryEval(p: GeoPoint, pos: Map<Id, Vec>): Vec | 'pending' | string {
       const from = pos.get(p.from);
       const to = pos.get(p.to);
       if (!anchor || !from || !to) return 'pending';
-      return add(anchor, scale(unit(rot90(sub(to, from))), p.dist)); // anchor + n̂·dist
+      return add(anchor, scale(unit(rot90(sub(to, from))), p.flip ? -p.dist : p.dist)); // anchor ± n̂·dist
     }
 
     case 'rotated': {
@@ -154,7 +154,7 @@ function tryEval(p: GeoPoint, pos: Map<Id, Vec>): Vec | 'pending' | string {
       const from = pos.get(p.from);
       const to = pos.get(p.to);
       if (!pivot || !from || !to) return 'pending';
-      return add(pivot, scale(rotate(sub(to, from), p.angleDeg), p.scale)); // pivot + s·Rot(θ)(to−from)
+      return add(pivot, scale(rotate(sub(to, from), p.flip ? -p.angleDeg : p.angleDeg), p.scale)); // pivot + s·Rot(±θ)(to−from)
     }
 
     case 'scaled-offset': {

@@ -62,12 +62,13 @@ export function normalizeShapeComposition(prev: Construction, cmd: Command): Com
 }
 
 /**
- * Reflect a composed shape's *new* free vertices across the edge through its two
- * reused points, putting the shape on the *other* side — the fallback when the
- * default side would drop new vertices on top of existing geometry (the user
- * rule: never stack two nodes). Returns null when it doesn't apply (not a shape,
- * or not built on exactly two existing points). Derived corners are untouched —
- * they recompute from the reflected free vertices.
+ * Mirror a composed shape to the *other* side of the edge through its two reused
+ * points: reflect its new **free** vertices, and toggle the `flip` of its new
+ * **derived** corners (square/rectangle/rhombus, whose side is set by a rule, not
+ * a free vertex). Together this flips the whole shape across the edge while
+ * keeping vertex labels fixed. Used to put a composed shape on the side away from
+ * existing geometry (textbook look) and to dodge coincident nodes (ADR-013/017).
+ * Returns null when it doesn't apply (not a shape on exactly two existing points).
  */
 export function mirrorComposition(
   prev: Construction,
@@ -84,12 +85,17 @@ export function mirrorComposition(
   const prevIds = new Set(prev.objects.map((o) => o.id));
   let changed = false;
   const objects = next.objects.map((o) => {
-    if (o.kind === 'free-point' && !prevIds.has(o.id)) {
+    if (prevIds.has(o.id)) return o; // reused — leave alone
+    if (o.kind === 'free-point') {
       const r = reflectAcross({ x: o.x, y: o.y }, a, b);
       changed = true;
       return { ...o, x: r.x, y: r.y };
     }
-    return o;
+    if (o.kind === 'derived' || o.kind === 'perp-offset' || o.kind === 'rotated') {
+      changed = true;
+      return { ...o, flip: !o.flip };
+    }
+    return o; // parallelogram-vertex / scaled-offset / segment / polygon follow their inputs
   });
   return changed ? { ...next, objects } : null;
 }
@@ -212,11 +218,12 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     }
 
     case 'quadrilateral': {
-      // A general (irregular, convex) quadrilateral: 4 free vertices.
+      // A general (irregular, convex) quadrilateral: 4 free vertices. Base AB on
+      // the x-axis; the top is uneven so it doesn't read as a special quad.
       const [a, b, c, d] = cmd.ids;
       placeBase(
         objects,
-        [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 1 }, { id: c, x: 5, y: 5 }, { id: d, x: 1, y: 4 }],
+        [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 5, y: 5 }, { id: d, x: 1, y: 4 }],
         pos,
       );
       quadEdges(objects, a, b, c, d);
@@ -225,9 +232,10 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'parallelogram': {
       // A,B,C carry the parallelogram's freedom; D is derived (D = A + C − B),
-      // so ABCD stays a parallelogram for any A,B,C.
+      // so ABCD stays a parallelogram for any A,B,C. Base AB on the x-axis, body
+      // built upward and leaning right (textbook orientation).
       const [a, b, c, d] = cmd.ids;
-      placeBase(objects, [{ id: a, x: 0, y: 4 }, { id: b, x: 6, y: 4 }, { id: c, x: 7, y: 0 }], pos);
+      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 8, y: 4 }], pos);
       addObj(objects, { kind: 'parallelogram-vertex', id: d, a, b, c });
       quadEdges(objects, a, b, c, d);
       break;
@@ -255,9 +263,10 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     }
 
     case 'trapezoid': {
-      // A,B,D free; C offset from D parallel to AB (so AB ∥ DC), shorter by default.
+      // A,B,D free; C offset from D parallel to AB (so AB ∥ DC), shorter by
+      // default. Long base AB on the x-axis, shorter top DC above it.
       const [a, b, c, d] = cmd.ids;
-      placeBase(objects, [{ id: a, x: 0, y: 4 }, { id: b, x: 6, y: 4 }, { id: d, x: 1, y: 0 }], pos);
+      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: d, x: 1, y: 4 }], pos);
       addObj(objects, { kind: 'scaled-offset', id: c, anchor: d, from: a, to: b, k: 0.6 });
       quadEdges(objects, a, b, c, d);
       break;

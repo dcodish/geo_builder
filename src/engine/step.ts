@@ -8,8 +8,10 @@
  */
 
 import type { Command, Construction, Id, Vec } from './types';
+import { LEN_EPS, isGeoPoint } from './types';
 import { applyCommand, mirrorComposition, normalizeShapeComposition } from './apply';
 import { evaluate } from './evaluate';
+import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist } from './geometry';
 import { solvedOnSegmentCandidates } from './solve';
 
@@ -101,21 +103,77 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   const next = applyCommand(prev, ncmd, prevPositions);
   const res = evaluate(next);
 
-  // If a composed shape's default side drops new vertices onto existing points,
-  // flip it to the other side rather than stacking nodes (the user rule). Only
-  // a coincidence triggers this; a clean mirror is used silently.
-  if (!res.ok && res.coincide) {
-    const mirrored = mirrorComposition(prev, ncmd, next, prevPositions);
-    if (mirrored) {
-      const alt = evaluate(mirrored);
-      if (alt.ok) return { ok: true, construction: mirrored, positions: alt.positions };
-    }
+  // For a shape built on an existing edge, also consider its mirror (the other
+  // side of that edge) and choose the valid placement that sits *away* from
+  // existing geometry — a textbook look, and never stacking nodes (ADR-013/017).
+  const mirrored = mirrorComposition(prev, ncmd, next, prevPositions);
+  if (mirrored) {
+    const alt = evaluate(mirrored);
+    const choice = chooseComposition(prev, ncmd, prevPositions, next, res, mirrored, alt);
+    if (choice) return { ok: true, construction: choice.construction, positions: choice.positions };
+    // neither side is valid → fall through and report the default's error
   }
 
   if (!res.ok) {
     return { ok: false, error: res.error, construction: prev, positions: prevPositions };
   }
   return { ok: true, construction: next, positions: res.positions };
+}
+
+const centroid = (ps: Vec[]): Vec => ({
+  x: ps.reduce((s, p) => s + p.x, 0) / ps.length,
+  y: ps.reduce((s, p) => s + p.y, 0) / ps.length,
+});
+
+/**
+ * Pick between a composed shape's default placement and its mirror: take the one
+ * that is valid (evaluates, no coincident nodes) and, when both are, sits on the
+ * side of the base edge *away* from the existing geometry. Returns null when
+ * neither is valid (the caller then surfaces the default's error).
+ */
+function chooseComposition(
+  prev: Construction,
+  cmd: Command,
+  prevPos: Map<Id, Vec>,
+  def: Construction,
+  defEval: EvalResult,
+  mir: Construction,
+  mirEval: EvalResult,
+): { construction: Construction; positions: Map<Id, Vec> } | null {
+  if (defEval.ok && mirEval.ok) {
+    const flip = preferMirror(prev, cmd, prevPos, defEval.positions);
+    return flip
+      ? { construction: mir, positions: mirEval.positions }
+      : { construction: def, positions: defEval.positions };
+  }
+  if (defEval.ok) return { construction: def, positions: defEval.positions };
+  if (mirEval.ok) return { construction: mir, positions: mirEval.positions };
+  return null;
+}
+
+/** True when the default placement lands on the same side of the base edge as the existing geometry (so flip). */
+function preferMirror(prev: Construction, cmd: Command, prevPos: Map<Id, Vec>, defPos: Map<Id, Vec>): boolean {
+  if (!('ids' in cmd)) return false;
+  const anchors = (cmd.ids as Id[]).filter((id) => prev.objects.some((o) => o.id === id));
+  if (anchors.length !== 2) return false;
+  const A = prevPos.get(anchors[0]);
+  const B = prevPos.get(anchors[1]);
+  if (!A || !B) return false;
+  const signed = (p: Vec) => (B.x - A.x) * (p.y - A.y) - (B.y - A.y) * (p.x - A.x); // side of edge AB
+
+  const existing = prev.objects
+    .filter(isGeoPoint)
+    .map((o) => prevPos.get(o.id))
+    .filter((p): p is Vec => !!p && Math.abs(signed(p)) > LEN_EPS); // off-edge only
+  if (existing.length === 0) return false; // nothing to avoid → keep default
+
+  const prevIds = new Set(prev.objects.map((o) => o.id));
+  const newPts = [...defPos].filter(([id]) => !prevIds.has(id)).map(([, p]) => p);
+  if (newPts.length === 0) return false;
+
+  const sideExisting = Math.sign(signed(centroid(existing)));
+  const sideNew = Math.sign(signed(centroid(newPts)));
+  return sideNew !== 0 && sideNew === sideExisting;
 }
 
 /** Apply a sequence expecting success; throws on unexpected failure (for fixtures/tests). */

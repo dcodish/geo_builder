@@ -226,15 +226,34 @@ describe('shape composition — never place two nodes on the same point', () => 
     expect(isParallelogram(C, D, T, Y)).toBe(true);
   });
 
-  it('errors (keeps prior) when no placement avoids a coincidence', () => {
-    // Two squares on the same edge land identically (a square's far corners are
-    // fixed by the edge, and there is no free vertex to flip) → coincidence.
-    const b = build(base); // square CDFG already there
-    const r = applyStep(b.construction, { type: 'square', ids: ['C', 'D', 'P', 'Q'] });
+  it('puts a second square on the *other* side of a shared edge (flips, no coincidence)', () => {
+    const setup = build([
+      { type: 'free-point', id: 'C', x: 0, y: 0 },
+      { type: 'free-point', id: 'D', x: 6, y: 0 },
+      { type: 'square', ids: ['C', 'D', 'F', 'G'] }, // one side of CD
+    ]);
+    const r = applyStep(setup.construction, { type: 'square', ids: ['C', 'D', 'P', 'Q'] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(coincident(r.positions)).toBe(false);
+    // F,G and P,Q are on opposite sides of CD (their y-signs differ)
+    const F = r.positions.get('F')!;
+    const P = r.positions.get('P')!;
+    expect(Math.sign(F.y)).toBe(-Math.sign(P.y));
+  });
+
+  it('errors (keeps prior) when both sides of the edge are already occupied', () => {
+    const setup = build([
+      { type: 'free-point', id: 'C', x: 0, y: 0 },
+      { type: 'free-point', id: 'D', x: 6, y: 0 },
+      { type: 'square', ids: ['C', 'D', 'F', 'G'] }, // side 1
+      { type: 'square', ids: ['C', 'D', 'P', 'Q'] }, // flips to side 2
+    ]);
+    const r = applyStep(setup.construction, { type: 'square', ids: ['C', 'D', 'X', 'Y'] }); // nowhere left
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.error).toMatch(/same point/i);
-      expect(r.construction).toBe(b.construction); // prior kept
+      expect(r.construction).toBe(setup.construction); // prior kept
     }
   });
 });
@@ -281,8 +300,9 @@ describe('shape composition — built on a derived vertex (ADR-013, evaluated-po
       { type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] },
       { type: 'parallelogram', ids: ['D', 'C', 'E', 'F'] },
     ];
+    const baseD = build([{ type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] }]).positions.get('D')!;
     const [D, C, E, F] = at(cmds, ['D', 'C', 'E', 'F']);
-    expect(D).toEqual({ x: 1, y: 0 }); // the first parallelogram's derived vertex
+    expect(D).toEqual(baseD); // reuses the first parallelogram's derived vertex (fit read its computed position)
     expect(isParallelogram(D, C, E, F)).toBe(true);
   });
 });
