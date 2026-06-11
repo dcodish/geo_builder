@@ -6,7 +6,7 @@
  */
 
 import type { Construction, GeoPoint, Id, Vec } from './types';
-import { ANGLE_EPS, isGeoPoint } from './types';
+import { ANGLE_EPS, LEN_EPS, isGeoPoint } from './types';
 import {
   add,
   angleDeg,
@@ -27,6 +27,8 @@ export interface EvalOk {
 export interface EvalErr {
   ok: false;
   error: string;
+  /** True when the failure is two distinct points sharing a location. */
+  coincide?: boolean;
 }
 export type EvalResult = EvalOk | EvalErr;
 
@@ -54,6 +56,19 @@ export function evaluate(c: Construction): EvalResult {
 
   for (const v of pos.values()) {
     if (!isFinite(v.x) || !isFinite(v.y)) return { ok: false, error: 'non-finite position computed' };
+  }
+
+  // No two distinct points may share a location — that is a degenerate figure
+  // (two labels on one spot). Flagged so the step can try to reposition, or fail.
+  const placed = [...pos.entries()];
+  for (let i = 0; i < placed.length; i++) {
+    for (let j = i + 1; j < placed.length; j++) {
+      const [idA, a] = placed[i];
+      const [idB, b] = placed[j];
+      if (Math.hypot(a.x - b.x, a.y - b.y) < LEN_EPS) {
+        return { ok: false, error: `${idA} and ${idB} would be at the same point`, coincide: true };
+      }
+    }
   }
 
   for (const con of c.constraints) {

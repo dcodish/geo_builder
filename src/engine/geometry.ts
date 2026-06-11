@@ -30,6 +30,16 @@ export function rotate(v: Vec, deg: number): Vec {
 export const cross = (o: Vec, a: Vec, b: Vec): number =>
   (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 
+/** Reflect point p across the line through a and b (a degenerate a≈b returns p). */
+export function reflectAcross(p: Vec, a: Vec, b: Vec): Vec {
+  const d = sub(b, a);
+  const dd = d.x * d.x + d.y * d.y;
+  if (dd < 1e-18) return p;
+  const t = ((p.x - a.x) * d.x + (p.y - a.y) * d.y) / dd;
+  const foot = { x: a.x + t * d.x, y: a.y + t * d.y };
+  return { x: 2 * foot.x - p.x, y: 2 * foot.y - p.y };
+}
+
 /** Measure of angle ∠(p1–vertex–p2) in degrees, range [0, 180]. */
 export function angleDeg(vertex: Vec, p1: Vec, p2: Vec): number {
   const u = sub(p1, vertex);

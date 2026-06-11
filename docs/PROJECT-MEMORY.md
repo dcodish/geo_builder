@@ -52,6 +52,8 @@ _The **travelling memory** for this repo. Because the repo syncs (Dropbox), anyt
 
 - **2026-06-11 (cont.) — composition order-independence (ADR-013 amendment 2, found in manual testing).** `trapezoid ABCD` then `ריבוע RTCD` (a square on side DC, new corners named first) was rejected "C is already defined" — the existing C,D fell on the square's *derived* slots, and a shape can reuse existing points only at *free base* slots. Fix: `normalizeShapeComposition` (apply.ts) cyclically rotates the vertex tuple so existing points land on free slots before the conflict check + build (a rotation = same polygon, different start vertex). Diagonal pairs / all-vertices-declared still conflict (no rotation frees them). 147 tests green, build clean.
 
+- **2026-06-11 (cont.) — no two nodes on the same point (ADR-017, found in manual testing).** A 3rd shape on edge CD (`מקבילית ABCD`, `ריבוע CDFG`, `מקבילית CDTY`) placed T,Y exactly on A,B — the fit rebuilt the first parallelogram on itself. Two layers: (1) `evaluate` now fails any figure with two coincident distinct points (`coincide:true`, keeps prior, explains) — a general invariant; (2) `applyStep` auto-retries a colliding composed shape with `mirrorComposition` (reflect its new free vertices across the reused edge → other side). Default side preferred; flip only on collision; if no free vertex to flip (2nd square on an edge) it errors honestly. 149 tests green, build clean.
+
 ## Resume pointer
 
 See the **Status** line at the top of [09-implementation-plan.md](09-implementation-plan.md) and the "Current state / Next step" section in [../CLAUDE.md](../CLAUDE.md).

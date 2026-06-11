@@ -196,6 +196,49 @@ describe('shape composition — the shared edge need not be named first (ADR-013
   });
 });
 
+// --- never stack two nodes on the same point ---------------------------------
+
+const dist = (a: Vec, b: Vec): number => len(sub(a, b));
+const coincident = (pos: Map<Id, Vec>): boolean => {
+  const ps = [...pos.values()];
+  for (let i = 0; i < ps.length; i++)
+    for (let j = i + 1; j < ps.length; j++) if (dist(ps[i], ps[j]) < 1e-6) return true;
+  return false;
+};
+
+describe('shape composition — never place two nodes on the same point', () => {
+  // The reported figure: a parallelogram and a square already sit on both sides of
+  // edge CD; a third parallelogram on CD would land its new vertices exactly on
+  // the first parallelogram's A,B. It must flip to the open side, not stack.
+  const base: Command[] = [
+    { type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] },
+    { type: 'square', ids: ['C', 'D', 'F', 'G'] },
+  ];
+
+  it('flips a colliding composed shape to the other side instead of stacking', () => {
+    const { positions } = build([...base, { type: 'parallelogram', ids: ['C', 'D', 'T', 'Y'] }]);
+    expect(coincident(positions)).toBe(false); // no two points share a location
+    // T and Y are not on top of A and B any more
+    expect(dist(positions.get('T')!, positions.get('A')!)).toBeGreaterThan(1e-6);
+    expect(dist(positions.get('Y')!, positions.get('B')!)).toBeGreaterThan(1e-6);
+    // still a valid parallelogram CDTY
+    const [C, D, T, Y] = ['C', 'D', 'T', 'Y'].map((id) => positions.get(id)!);
+    expect(isParallelogram(C, D, T, Y)).toBe(true);
+  });
+
+  it('errors (keeps prior) when no placement avoids a coincidence', () => {
+    // Two squares on the same edge land identically (a square's far corners are
+    // fixed by the edge, and there is no free vertex to flip) → coincidence.
+    const b = build(base); // square CDFG already there
+    const r = applyStep(b.construction, { type: 'square', ids: ['C', 'D', 'P', 'Q'] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.error).toMatch(/same point/i);
+      expect(r.construction).toBe(b.construction); // prior kept
+    }
+  });
+});
+
 // --- the fit must handle a rotated / scaled base edge, not only horizontal --
 
 describe('shape composition — the template is fitted (rotation + scale) to a non-axis-aligned edge', () => {

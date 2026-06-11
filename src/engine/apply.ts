@@ -9,7 +9,7 @@
  */
 
 import type { Command, Constraint, Construction, GeoObject, Id, Vec } from './types';
-import { add, sub } from './geometry';
+import { add, reflectAcross, sub } from './geometry';
 
 function addObj(objects: GeoObject[], o: GeoObject): void {
   if (!objects.some((x) => x.id === o.id)) objects.push(o);
@@ -59,6 +59,39 @@ export function normalizeShapeComposition(prev: Construction, cmd: Command): Com
     }
   }
   return best === ids ? cmd : ({ ...cmd, ids: best } as Command);
+}
+
+/**
+ * Reflect a composed shape's *new* free vertices across the edge through its two
+ * reused points, putting the shape on the *other* side — the fallback when the
+ * default side would drop new vertices on top of existing geometry (the user
+ * rule: never stack two nodes). Returns null when it doesn't apply (not a shape,
+ * or not built on exactly two existing points). Derived corners are untouched —
+ * they recompute from the reflected free vertices.
+ */
+export function mirrorComposition(
+  prev: Construction,
+  cmd: Command,
+  next: Construction,
+  pos: Map<Id, Vec>,
+): Construction | null {
+  if (!('ids' in cmd)) return null;
+  const existing = (cmd.ids as Id[]).filter((id) => prev.objects.some((o) => o.id === id));
+  if (existing.length !== 2) return null;
+  const a = pos.get(existing[0]);
+  const b = pos.get(existing[1]);
+  if (!a || !b) return null;
+  const prevIds = new Set(prev.objects.map((o) => o.id));
+  let changed = false;
+  const objects = next.objects.map((o) => {
+    if (o.kind === 'free-point' && !prevIds.has(o.id)) {
+      const r = reflectAcross({ x: o.x, y: o.y }, a, b);
+      changed = true;
+      return { ...o, x: r.x, y: r.y };
+    }
+    return o;
+  });
+  return changed ? { ...next, objects } : null;
 }
 
 /** A free base vertex of a shape template: its id and canonical coordinates. */

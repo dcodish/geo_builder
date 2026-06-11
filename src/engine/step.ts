@@ -8,7 +8,7 @@
  */
 
 import type { Command, Construction, Id, Vec } from './types';
-import { applyCommand, normalizeShapeComposition } from './apply';
+import { applyCommand, mirrorComposition, normalizeShapeComposition } from './apply';
 import { evaluate } from './evaluate';
 import { circleCircleIntersect, dist } from './geometry';
 import { solvedOnSegmentCandidates } from './solve';
@@ -100,6 +100,18 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   // absolute template defaults.
   const next = applyCommand(prev, ncmd, prevPositions);
   const res = evaluate(next);
+
+  // If a composed shape's default side drops new vertices onto existing points,
+  // flip it to the other side rather than stacking nodes (the user rule). Only
+  // a coincidence triggers this; a clean mirror is used silently.
+  if (!res.ok && res.coincide) {
+    const mirrored = mirrorComposition(prev, ncmd, next, prevPositions);
+    if (mirrored) {
+      const alt = evaluate(mirrored);
+      if (alt.ok) return { ok: true, construction: mirrored, positions: alt.positions };
+    }
+  }
+
   if (!res.ok) {
     return { ok: false, error: res.error, construction: prev, positions: prevPositions };
   }
