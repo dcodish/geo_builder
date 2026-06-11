@@ -17,7 +17,7 @@ _The **travelling memory** for this repo. Because the repo syncs (Dropbox), anyt
 - **Protected PDFs (e.g. the bagrut list):** the Read tool refuses the copy-protected `5pts_GeometryList_Teachers.pdf`. Extract text with PyMuPDF (`python -c "import fitz; ..."`) and write to a UTF-8 file — the Windows console is cp1255 and chokes on symbol chars.
 - **Validation corpus:** `sample questions/` holds real bagrut problems (text + image). We reproduce the **figure** from the givens (never solve) and compare visually to the official image. Questions are **multi-stage** — later parts add givens; the figure accumulates them.
 - **Tooling:** tests run with `npx vitest run`; `archive/` is excluded from tests and not compiled (`vite.config.ts`). On a fresh machine, run `npm install` before testing (`node_modules` is not in git).
-- **Git:** work is on branch `rebuild-foundation`; no remote yet — history currently survives only via Dropbox-synced `.git`. Consider adding a private GitHub remote for a real backup.
+- **Git:** work is on branch `rebuild-foundation`; backed up to the private GitHub remote `https://github.com/dcodish/geo_builder` (origin; both `main` and `rebuild-foundation` pushed, 2026-06-11). Push after committing so the backup stays current — Dropbox-synced `.git` is not a real backup.
 - **Shell CWD gotcha (Windows):** a `cd` inside a Bash tool call into `docs/sample questions/` made later `vitest`/`tsc` runs resolve from there ("No test files found", phantom `tsconfig.json` errors). Fix: prefix the command with `Set-Location "c:\Users\User\Dropbox\projects\geo_builder"`. The CRLF warnings on commit are harmless (Windows checkout, LF in repo).
 
 ## Session log
