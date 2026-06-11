@@ -71,11 +71,23 @@ describe('shapes compose on existing points (ADR-013)', () => {
     expect(r2.construction.objects.filter((o) => o.kind === 'polygon')).toHaveLength(2);
   });
 
-  it('still rejects a shape whose derived corner would redefine an existing point', () => {
-    // square ABCD defines C (derived); a parallelogram reusing C as its *derived*
-    // 4th vertex with a different parentage must still conflict.
+  it('reuses an existing point named in a derived slot by rotating it to a base slot', () => {
+    // square ABCD defines C (derived). "parallelogram PQRC" names C last — where a
+    // parallelogram's derived 4th vertex sits. The vertices rotate so C becomes a
+    // base corner (reused) and the new P is derived: it builds, order-independent.
     const base = build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }]);
     const r = applyStep(base.construction, { type: 'parallelogram', ids: ['P', 'Q', 'R', 'C'] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.positions.get('C')).toEqual(base.positions.get('C')); // C reused, unmoved
+    for (const id of ['P', 'Q', 'R']) expect(r.positions.get(id)).toBeTruthy();
+  });
+
+  it('still rejects when no vertex order avoids redefining an existing point', () => {
+    // Re-declaring all four of the square's vertices as a parallelogram forces the
+    // parallelogram's derived 4th corner onto an existing point — no rotation helps.
+    const base = build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }]);
+    const r = applyStep(base.construction, { type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/already defined/i);
   });

@@ -15,6 +15,52 @@ function addObj(objects: GeoObject[], o: GeoObject): void {
   if (!objects.some((x) => x.id === o.id)) objects.push(o);
 }
 
+/**
+ * Which vertex-tuple positions of each shape are *derived* corners (computed
+ * from the base edge), as opposed to free base vertices. A composed shape can
+ * reuse existing points only at *free* slots (ADR-013), so an existing vertex
+ * landing on a derived slot is a conflict. Triangle/quadrilateral have no
+ * derived vertices and so never conflict.
+ */
+const DERIVED_SLOTS: Partial<Record<Command['type'], number[]>> = {
+  square: [2, 3],
+  rectangle: [2, 3],
+  rhombus: [2, 3],
+  parallelogram: [3],
+  trapezoid: [2],
+};
+
+/**
+ * Pick the cyclic rotation of a shape's vertex list that puts existing points on
+ * *free* slots, not derived ones — so a shape built on an existing edge attaches
+ * regardless of where that edge sits in the name (ADR-013, amendment). A polygon
+ * is a cycle, so rotating the vertex tuple is the *same* shape with a different
+ * start vertex; choosing the rotation whose derived slots are all-new lets e.g.
+ * `square RTCD` build on the existing edge CD (rotated to base CDRT) instead of
+ * failing because C,D fell on the derived corners. Prefers the as-typed order;
+ * rotates only when it strictly reduces derived-slot clashes.
+ */
+export function normalizeShapeComposition(prev: Construction, cmd: Command): Command {
+  const slots = DERIVED_SLOTS[cmd.type];
+  if (!slots || !('ids' in cmd)) return cmd;
+  const ids = cmd.ids as Id[];
+  const n = ids.length;
+  const exists = (id: Id) => prev.objects.some((o) => o.id === id);
+  let bestBad = slots.filter((s) => exists(ids[s])).length;
+  if (bestBad === 0) return cmd; // as-typed order already clash-free
+  let best = ids;
+  for (let r = 1; r < n; r++) {
+    const rot = ids.map((_, i) => ids[(i + r) % n]);
+    const bad = slots.filter((s) => exists(rot[s])).length;
+    if (bad < bestBad) {
+      bestBad = bad;
+      best = rot;
+      if (bad === 0) break;
+    }
+  }
+  return best === ids ? cmd : ({ ...cmd, ids: best } as Command);
+}
+
 /** A free base vertex of a shape template: its id and canonical coordinates. */
 type BaseVertex = { id: Id; x: number; y: number };
 

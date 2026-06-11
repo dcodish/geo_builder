@@ -8,7 +8,7 @@
  */
 
 import type { Command, Construction, Id, Vec } from './types';
-import { applyCommand } from './apply';
+import { applyCommand, normalizeShapeComposition } from './apply';
 import { evaluate } from './evaluate';
 import { circleCircleIntersect, dist } from './geometry';
 import { solvedOnSegmentCandidates } from './solve';
@@ -84,8 +84,13 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   const prevEval = evaluate(prev);
   const prevPositions = prevEval.ok ? prevEval.positions : new Map<Id, Vec>();
 
+  // Rotate a shape's vertices so an existing edge lands on its free base slots —
+  // lets a shape build on an existing edge wherever that edge sits in the name
+  // (ADR-013, amendment). Both the conflict check and the build see this order.
+  const ncmd = normalizeShapeComposition(prev, cmd);
+
   // Reject a redefinition conflict before mutating anything (keep prior figure).
-  const conflict = commandConflict(prev, cmd);
+  const conflict = commandConflict(prev, ncmd);
   if (conflict) {
     return { ok: false, error: conflict, construction: prev, positions: prevPositions };
   }
@@ -93,7 +98,7 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   // Pass the prior figure's positions so a shape built on existing points is
   // fitted to them (non-degenerate composition, ADR-013) rather than keeping
   // absolute template defaults.
-  const next = applyCommand(prev, cmd, prevPositions);
+  const next = applyCommand(prev, ncmd, prevPositions);
   const res = evaluate(next);
   if (!res.ok) {
     return { ok: false, error: res.error, construction: prev, positions: prevPositions };

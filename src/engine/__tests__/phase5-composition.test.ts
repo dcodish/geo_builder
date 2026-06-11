@@ -19,6 +19,7 @@ import { describe, it, expect } from 'vitest';
 import type { Command, GeoObject, Id, Vec } from '../types';
 import { isGeoPoint } from '../types';
 import { applyStep, build } from '../step';
+import { evaluate } from '../evaluate';
 
 // --- pure (x,y) predicates -------------------------------------------------
 
@@ -143,6 +144,55 @@ describe('shape composition — each shape is valid standalone and on an existin
   it('triangle on an existing edge', () => {
     const [A, B, D] = at([TRIANGLE, { type: 'triangle', ids: ['A', 'B', 'D'] }], ['A', 'B', 'D']);
     expect(isNonDegenerateTriangle(A, B, D)).toBe(true);
+  });
+});
+
+// --- attaching on an existing edge regardless of where it sits in the name --
+
+describe('shape composition — the shared edge need not be named first (ADR-013 amendment)', () => {
+  // Reproduces the reported failure: a trapezoid, then a square on its side DC
+  // named "RTCD" — the shared vertices C,D land on the square's *derived* slots,
+  // which used to be rejected ("C is already defined"). The vertices rotate so
+  // the existing edge becomes the base.
+  const TRAP: Command = { type: 'trapezoid', ids: ['A', 'B', 'C', 'D'] };
+
+  it('square RTCD builds on the trapezoid edge C–D instead of being rejected', () => {
+    const r = applyStep(build([TRAP]).construction, { type: 'square', ids: ['R', 'T', 'C', 'D'] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const e = evaluate(r.construction);
+    expect(e.ok).toBe(true);
+    if (!e.ok) return;
+    const [C, D, R, T] = ['C', 'D', 'R', 'T'].map((id) => e.positions.get(id)!);
+    // C,D are the trapezoid's vertices, reused; R,T are the square's new corners
+    expect(isSquare(C, D, R, T) || isSquare(D, C, T, R) || isSquare(R, T, C, D)).toBe(true);
+    // the shared edge is one segment, not duplicated
+    expect(r.construction.objects.filter((o) => o.id === 'seg-CD')).toHaveLength(1);
+  });
+
+  it('reuses the trapezoid C,D (does not move them) and adds exactly R,T', () => {
+    const before = at([TRAP], ['C', 'D']);
+    const after = build([TRAP, { type: 'square', ids: ['R', 'T', 'C', 'D'] }]);
+    const pos = after.positions;
+    expect(pos.get('C')).toEqual(before[0]);
+    expect(pos.get('D')).toEqual(before[1]);
+    expect(pointIds(after.construction.objects)).toEqual(new Set(['A', 'B', 'C', 'D', 'R', 'T']));
+  });
+
+  it('order-independent: naming the shared edge first (CDRT) gives the same square', () => {
+    const last = build([TRAP, { type: 'square', ids: ['R', 'T', 'C', 'D'] }]).positions;
+    const first = build([TRAP, { type: 'square', ids: ['C', 'D', 'R', 'T'] }]).positions;
+    for (const id of ['C', 'D', 'R', 'T']) {
+      expect(last.get(id)).toEqual(first.get(id));
+    }
+  });
+
+  it('still rejects when the two existing vertices are a diagonal (no edge to build on)', () => {
+    // A square ABCD, then "square AXCY" reusing the diagonal pair A,C — no cyclic
+    // rotation puts a *diagonal* on the adjacent base slots, so it stays a conflict.
+    const sq = build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }]);
+    const r = applyStep(sq.construction, { type: 'square', ids: ['A', 'X', 'C', 'Y'] });
+    expect(r.ok).toBe(false);
   });
 });
 
