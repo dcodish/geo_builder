@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { Command, Construction, Id, Vec } from '@/engine';
-import { applyCommand, applyStep, branchCount, deepEqual, emptyConstruction, evaluate } from '@/engine';
+import { applyCommand, applySeed, applyStep, branchCount, deepEqual, emptyConstruction, evaluate, freeDofs } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -42,8 +42,13 @@ export interface Derived {
   lastError: string | null;
 }
 
-/** Replay the enabled facts in order; disabled or unsatisfiable facts are flagged, not fatal. */
-export function replay(facts: Fact[]): Derived {
+/**
+ * Replay the enabled facts in order; disabled or unsatisfiable facts are flagged,
+ * not fatal. `seed` samples the figure's residual freedom (ADR-018): the final
+ * figure's non-pinned free points are perturbed deterministically, so the figure
+ * is re-drawn while still satisfying every fact. seed 0 = the canonical default.
+ */
+export function replay(facts: Fact[], seed = 0): Derived {
   let cur = emptyConstruction();
   const status: Record<string, FactStatus> = {};
   let lastError: string | null = null;
@@ -61,8 +66,9 @@ export function replay(facts: Fact[]): Derived {
       lastError = r.error;
     }
   }
-  const e = evaluate(cur);
-  return { construction: cur, positions: e.ok ? e.positions : new Map(), status, lastError };
+  const figure = applySeed(cur, seed);
+  const e = evaluate(figure);
+  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError };
 }
 
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */
@@ -74,6 +80,8 @@ export interface GeoState {
   facts: Fact[];
   /** The fact currently selected for inspection (highlighted on the canvas); UI-only, not undoable. */
   selectedId: string | null;
+  /** Sampling seed for the figure's residual freedom (ADR-018); UI-only, not undoable. 0 = canonical. */
+  seed: number;
 
   /** Append a fact (enabled). */
   execute: (cmd: Command, utterance?: string) => void;
@@ -87,6 +95,8 @@ export interface GeoState {
   select: (id: string | null) => void;
   /** Advance an intersection point to its next configuration (stored in the fact's command). */
   cycleAlt: (pointId: Id) => void;
+  /** Re-sample the figure's residual freedom — a different valid drawing (ADR-018). */
+  resample: () => void;
   /** Reset to no facts and wipe undo/redo history. */
   clear: () => void;
 }
@@ -96,6 +106,7 @@ export const useGeoStore = create<GeoState>()(
     (set, get) => ({
       facts: [],
       selectedId: null,
+      seed: 0,
 
       execute: (cmd, utterance) => {
         const facts = get().facts;
@@ -157,8 +168,22 @@ export const useGeoStore = create<GeoState>()(
         });
       },
 
+      resample: () => {
+        const facts = get().facts;
+        if (freeDofs(replay(facts).construction).length === 0) return; // fully determined — nothing to vary
+        let s = get().seed;
+        for (let k = 0; k < 16; k++) {
+          s += 1;
+          if (evaluate(replay(facts, s).construction).ok) {
+            set({ seed: s });
+            return;
+          }
+        }
+        set({ seed: s }); // give up gracefully after a few degenerate draws
+      },
+
       clear: () => {
-        set({ facts: [], selectedId: null });
+        set({ facts: [], selectedId: null, seed: 0 });
         useGeoStore.temporal.getState().clear();
       },
     }),

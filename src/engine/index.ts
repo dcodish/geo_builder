@@ -17,3 +17,4 @@ export {
   emptyConstruction,
 } from './step';
 export type { StepResult, StepOk, StepErr } from './step';
+export { applySeed, freeDofs } from './sample';

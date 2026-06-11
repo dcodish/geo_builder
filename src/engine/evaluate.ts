@@ -6,10 +6,9 @@
  */
 
 import type { Circle, Construction, GeoPoint, Id, Line, Vec } from './types';
-import { ANGLE_EPS, LEN_EPS, isGeoPoint } from './types';
+import { LEN_EPS, isGeoPoint } from './types';
 import {
   add,
-  angleDeg,
   circleCircleIntersect,
   footOnLine,
   len,
@@ -21,7 +20,7 @@ import {
   sub,
   unit,
 } from './geometry';
-import { describeConstraint, solvedOnSegmentCandidates } from './solve';
+import { constraintRefs, describeConstraint, residual, residualTolerance, solvedOnSegmentCandidates } from './solve';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
 interface ResolvedLine {
@@ -116,18 +115,11 @@ export function evaluate(c: Construction): EvalResult {
   }
 
   for (const con of c.constraints) {
-    const pv = pos.get(con.vertex);
-    const p1 = pos.get(con.ray1);
-    const p2 = pos.get(con.ray2);
-    if (!pv || !p1 || !p2) {
-      return { ok: false, error: `angle constraint references an unknown point` };
+    for (const id of constraintRefs(con)) {
+      if (!pos.get(id)) return { ok: false, error: `${describeConstraint(con)} references an unknown point` };
     }
-    const measured = angleDeg(pv, p1, p2);
-    if (Math.abs(measured - con.value) > ANGLE_EPS) {
-      return {
-        ok: false,
-        error: `over-constrained: angle ${con.ray1}${con.vertex}${con.ray2} is ${measured.toFixed(1)}°, but was set to ${con.value}°`,
-      };
+    if (Math.abs(residual(con, (id) => pos.get(id)!)) > residualTolerance(con)) {
+      return { ok: false, error: `over-constrained: ${describeConstraint(con)} cannot hold` };
     }
   }
 

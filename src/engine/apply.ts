@@ -10,6 +10,29 @@
 
 import type { Command, Constraint, Construction, GeoObject, Id, Vec } from './types';
 import { add, reflectAcross, sub } from './geometry';
+import { constraintRefs } from './solve';
+
+/**
+ * A constraint either *drives* a free DOF or *checks* the figure (ADR-012/014).
+ * If any point it references still has a free DOF (an on-segment parameter t),
+ * the constraint drives it: that point is upgraded to a solved carrier and the
+ * constraint places it. The driven point is chosen deterministically — the
+ * first referenced point that is a plain on-segment. When every referenced point
+ * is already determined, the constraint is pushed as a check (over-constraint
+ * detection in `evaluate`). Generic over the constraint type — new constraints
+ * add a residual case in solve.ts, not logic here.
+ */
+function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Constraint): void {
+  const driven = constraintRefs(con)
+    .map((id) => objects.findIndex((o) => o.id === id))
+    .find((i) => i >= 0 && objects[i].kind === 'on-segment');
+  if (driven !== undefined) {
+    const seg = objects[driven] as Extract<GeoObject, { kind: 'on-segment' }>;
+    objects[driven] = { kind: 'on-segment-solved', id: seg.id, a: seg.a, b: seg.b, constraint: con, branch: 0 };
+  } else {
+    constraints.push(con);
+  }
+}
 
 function addObj(objects: GeoObject[], o: GeoObject): void {
   if (!objects.some((x) => x.id === o.id)) objects.push(o);
@@ -208,8 +231,9 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     case 'free-point': {
       // A free point may be (re)placed: if it already exists as a free point,
       // update its coordinates — a *move* (ADR-011). Conflicts with non-free
-      // points of the same id are caught upstream by commandConflict.
-      const fp: GeoObject = { kind: 'free-point', id: cmd.id, x: cmd.x, y: cmd.y };
+      // points of the same id are caught upstream by commandConflict. An explicit
+      // placement is *pinned* — the sampler never moves it (ADR-018).
+      const fp: GeoObject = { kind: 'free-point', id: cmd.id, x: cmd.x, y: cmd.y, pinned: true };
       const i = objects.findIndex((o) => o.id === cmd.id);
       if (i === -1) objects.push(fp);
       else if (objects[i].kind === 'free-point') objects[i] = fp;
@@ -393,26 +417,25 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       });
       break;
 
-    case 'set-angle': {
-      // If any point the angle references still has a free DOF (an on-segment
-      // parameter t), the constraint *drives* it: that point is upgraded to a
-      // solved point and the angle places it (ADR-012/ADR-014). The driven
-      // point is chosen deterministically — vertex first, then ray1, then ray2.
-      // When every referenced point is already determined, the angle is a
-      // check (over-constraint detection). A point that is already solved by
-      // an earlier constraint has no DOF left, so it counts as determined.
-      const con: Constraint = { type: 'angle', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, value: cmd.value };
-      const driven = [cmd.vertex, cmd.ray1, cmd.ray2]
-        .map((id) => objects.findIndex((o) => o.id === id))
-        .find((i) => i >= 0 && objects[i].kind === 'on-segment');
-      if (driven !== undefined) {
-        const seg = objects[driven] as Extract<GeoObject, { kind: 'on-segment' }>;
-        objects[driven] = { kind: 'on-segment-solved', id: seg.id, a: seg.a, b: seg.b, constraint: con, branch: 0 };
-      } else {
-        constraints.push(con);
-      }
+    case 'set-angle':
+      driveOrCheck(objects, constraints, { type: 'angle', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, value: cmd.value });
       break;
-    }
+
+    case 'set-distance':
+      driveOrCheck(objects, constraints, { type: 'distance', a: cmd.a, b: cmd.b, value: cmd.value });
+      break;
+
+    case 'set-equal':
+      driveOrCheck(objects, constraints, { type: 'equal', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      break;
+
+    case 'set-parallel':
+      driveOrCheck(objects, constraints, { type: 'parallel', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      break;
+
+    case 'set-perpendicular':
+      driveOrCheck(objects, constraints, { type: 'perpendicular', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      break;
   }
 
   return { objects, constraints };

@@ -17,12 +17,19 @@ export interface Vec {
 
 export type Id = string;
 
-/** 2 DOF — placed directly; the x/y are its free parameters. */
+/**
+ * 2 DOF — placed directly; the x/y are its free parameters. `pinned` marks a
+ * point the *student* fixed (an explicit "point A at (x,y)"): it never varies.
+ * A point the *engine* defaulted (a shape's unspecified base vertex, a segment's
+ * auto-created endpoint) is **not** pinned — it is residual freedom the sampler
+ * may re-draw ([ADR-018](docs/06-decisions.md#adr-018)).
+ */
 export interface FreePoint {
   kind: 'free-point';
   id: Id;
   x: number;
   y: number;
+  pinned?: boolean;
 }
 
 /** 1 DOF — lies on segment a→b at parameter t (0 = a, 1 = b). */
@@ -294,7 +301,47 @@ export interface AngleConstraint {
   value: number;
 }
 
-export type Constraint = AngleConstraint;
+/** |a→b| = value. */
+export interface DistanceConstraint {
+  type: 'distance';
+  a: Id;
+  b: Id;
+  value: number;
+}
+
+/** |a→b| = |c→d| (two equal segments). */
+export interface EqualConstraint {
+  type: 'equal';
+  a: Id;
+  b: Id;
+  c: Id;
+  d: Id;
+}
+
+/** a→b ∥ c→d. */
+export interface ParallelConstraint {
+  type: 'parallel';
+  a: Id;
+  b: Id;
+  c: Id;
+  d: Id;
+}
+
+/** a→b ⟂ c→d. */
+export interface PerpendicularConstraint {
+  type: 'perpendicular';
+  a: Id;
+  b: Id;
+  c: Id;
+  d: Id;
+}
+
+export type Constraint =
+  | AngleConstraint
+  | DistanceConstraint
+  | EqualConstraint
+  | ParallelConstraint
+  | PerpendicularConstraint;
 
 export interface Construction {
   objects: GeoObject[];
@@ -317,6 +364,10 @@ export type Command =
   | { type: 'line-line-intersection'; id: Id; a: Id; b: Id; c: Id; d: Id }
   | { type: 'segment'; a: Id; b: Id }
   | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number }
+  | { type: 'set-distance'; a: Id; b: Id; value: number }
+  | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id }
+  | { type: 'set-parallel'; a: Id; b: Id; c: Id; d: Id }
+  | { type: 'set-perpendicular'; a: Id; b: Id; c: Id; d: Id }
   // Phase 5b — lines (scaffolding) and the points they produce.
   | { type: 'bisector'; id: Id; vertex: Id; p: Id; q: Id }
   | { type: 'perpendicular-line'; id: Id; through: Id; a: Id; b: Id }

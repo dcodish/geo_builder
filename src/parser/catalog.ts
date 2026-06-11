@@ -60,7 +60,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
 
   // ── Lines & perpendiculars ──────────────────────────────────────────────
   { category: 'lines', supported: true, en: 'segment AC', he: 'קטע AC', descEn: 'Connect two points (also: diagonal AC).', descHe: 'חיבור שתי נקודות (גם: אלכסון AC).' },
-  { category: 'lines', supported: false, phase: '5b', en: 'BC parallel to AD', he: 'BC מקביל ל-AD', descEn: 'A line parallel to another.', descHe: 'ישר מקביל לישר אחר.' },
+  { category: 'lines', supported: true, en: 'BC parallel to AD', he: 'BC מקביל ל-AD', descEn: 'Make two segments parallel (drives a sliding point, else checks).', descHe: 'הקבלת שני קטעים (מזיז נקודה שיכולה לזוז, אחרת נבדק).' },
   { category: 'lines', supported: true, en: 'F is the foot of the perpendicular from C to AD', he: 'F רגל האנך מ-C ל-AD', descEn: 'The foot of a perpendicular dropped onto a line.', descHe: 'רגל אנך המורד אל ישר.' },
   { category: 'lines', supported: true, en: 'E is where the bisectors of BAC and BCA meet', he: 'E חיתוך חוצי הזוויות BAC ו-BCA', descEn: 'The point where two angle bisectors cross.', descHe: 'הנקודה שבה נחתכים שני חוצי זווית.' },
   { category: 'lines', supported: false, phase: '5b', en: 'median from A in ABC', he: 'תיכון מ-A במשולש ABC', descEn: 'A median (to the opposite midpoint).', descHe: 'תיכון (לאמצע הצלע שממול).' },
@@ -69,9 +69,9 @@ export const COMMAND_CATALOG: CommandDoc[] = [
 
   // ── Constraints ─────────────────────────────────────────────────────────
   { category: 'constraints', supported: true, en: 'angle GBA = 37', he: 'זווית GBA = 37', descEn: 'Set an angle — a point that can slide moves to satisfy it; otherwise it is checked.', descHe: 'קביעת זווית — נקודה שיכולה לזוז תוזז כדי לקיימה; אחרת היא נבדקת.' },
-  { category: 'constraints', supported: false, phase: '5d', en: 'AB = 6', he: 'AB = 6', descEn: 'Fix a segment length.', descHe: 'קביעת אורך קטע.' },
-  { category: 'constraints', supported: false, phase: '5d', en: 'AB = CD', he: 'AB = CD', descEn: 'Make two segments equal.', descHe: 'השוואת אורכי שני קטעים.' },
-  { category: 'constraints', supported: false, phase: '5d', en: 'AB perpendicular to CD', he: 'AB מאונך ל-CD', descEn: 'Force a right angle between two lines.', descHe: 'אילוץ זווית ישרה בין שני ישרים.' },
+  { category: 'constraints', supported: true, en: 'AB = 6', he: 'AB = 6', descEn: 'Fix a segment length (drives a sliding point, else checks).', descHe: 'קביעת אורך קטע (מזיז נקודה שיכולה לזוז, אחרת נבדק).' },
+  { category: 'constraints', supported: true, en: 'AB = CD', he: 'AB = CD', descEn: 'Make two segments equal.', descHe: 'השוואת אורכי שני קטעים.' },
+  { category: 'constraints', supported: true, en: 'AB perpendicular to CD', he: 'AB מאונך ל-CD', descEn: 'Force a right angle between two segments.', descHe: 'אילוץ זווית ישרה בין שני קטעים.' },
 
   // ── Circles ─────────────────────────────────────────────────────────────
   { category: 'circles', supported: true, en: 'circle centered at O radius 5', he: 'מעגל סביב O רדיוס 5', descEn: 'A circle from a centre and radius.', descHe: 'מעגל לפי מרכז ורדיוס.' },

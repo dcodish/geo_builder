@@ -95,12 +95,18 @@ export function solveParam(
   steps = 256,
 ): number[] {
   const roots: number[] = [];
+  const addRoot = (r: number) => {
+    if (!roots.some((o) => Math.abs(o - r) < 1e-7)) roots.push(r);
+  };
   let pt = tMin;
   let pf = f(tMin);
+  if (isFinite(pf) && pf === 0) addRoot(tMin); // an endpoint that is exactly a root
   for (let i = 1; i <= steps; i++) {
     const t = tMin + ((tMax - tMin) * i) / steps;
     const ft = f(t);
-    if (isFinite(pf) && isFinite(ft) && pf !== 0 && (pf < 0) !== (ft < 0)) {
+    if (isFinite(ft) && ft === 0) {
+      addRoot(t); // sample lands exactly on a root (e.g. a symmetric configuration)
+    } else if (isFinite(pf) && isFinite(ft) && pf !== 0 && (pf < 0) !== (ft < 0)) {
       // bisect the bracket [pt, t]
       let lo = pt;
       let hi = t;
@@ -119,8 +125,7 @@ export function solveParam(
           hi = mid;
         }
       }
-      const r = (lo + hi) / 2;
-      if (!roots.some((o) => Math.abs(o - r) < 1e-7)) roots.push(r);
+      addRoot((lo + hi) / 2);
     }
     pt = t;
     pf = ft;

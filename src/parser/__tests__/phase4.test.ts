@@ -83,7 +83,6 @@ describe('parser — out-of-grammar returns not-handled (the fallback boundary)'
     'hello there',
     'draw something nice',
     'draw a circle somewhere', // a circle with no centre named — nothing to build
-    'BC parallel to AD', // the parallel *constraint* — still Phase 5d, not handled
     'make it bigger',
   ]) {
     it(`"${bad}"`, () => {
@@ -116,14 +115,13 @@ describe('parser — filler words are not labels', () => {
  */
 describe('parser — misparse defense (out-of-grammar must not half-parse)', () => {
   for (const u of [
-    // Still out of grammar — a *single* bisector fact and the parallel/perpendicular
-    // constraints are constraint-style (Phase 5d), so they escalate rather than draw.
+    // Still out of grammar. The *foot* phrasing "perpendicular from A to BC" (one
+    // segment, unnamed foot) is distinct from the "AB ⟂ CD" constraint we now do;
+    // a *single* bisector fact still escalates (a 1-DOF placement, not a meet).
     'perpendicular from A to BC',
     'אנך מ-A ל-BC',
     'AD bisects angle BAC',
     'AD חוצה את הזווית BAC',
-    'BC parallel to AD',
-    'BC מקביל ל-AD',
     // A circle through three points (circumscribed) is a different construct (3-point
     // circle / circumcentre) we don't build yet — distinct from "circle centred at O".
     'circle through A B C',

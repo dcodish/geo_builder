@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
-import { isGeoPoint } from '@/engine';
+import { freeDofs, isGeoPoint } from '@/engine';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse } from '@/parser';
 import { Figure } from '@/render';
 import type { Crossing } from '@/render';
@@ -28,6 +28,8 @@ export default function App() {
   const remove = useGeoStore((s) => s.remove);
   const select = useGeoStore((s) => s.select);
   const cycleAlt = useGeoStore((s) => s.cycleAlt);
+  const resample = useGeoStore((s) => s.resample);
+  const seed = useGeoStore((s) => s.seed);
   const clear = useGeoStore((s) => s.clear);
 
   const { undo, redo } = useGeoStore.temporal.getState();
@@ -85,7 +87,7 @@ export default function App() {
   }
 
   // Figure + per-fact status are derived from the fact list.
-  const { construction, positions, status, lastError } = useMemo(() => replay(facts), [facts]);
+  const { construction, positions, status, lastError } = useMemo(() => replay(facts, seed), [facts, seed]);
 
   // Snap-to-intersection: a clicked crossing becomes a real named point. Pick the
   // first free single capital letter, then create it via the same command path.
@@ -303,8 +305,10 @@ export default function App() {
             <button type="button" style={ghost} onClick={clear}>{t('actions.clear')}</button>
           </div>
 
-          {branchId && (
-            <button type="button" style={alt} onClick={() => cycleAlt(branchId)}>{t('actions.another')}</button>
+          {(branchId || freeDofs(construction).length > 0) && (
+            <button type="button" style={alt} onClick={() => (branchId ? cycleAlt(branchId) : resample())}>
+              {t('actions.another')}
+            </button>
           )}
         </aside>
       </div>

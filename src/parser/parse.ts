@@ -267,6 +267,36 @@ const pointByDistances: Rule = (s) => {
   ];
 };
 
+/** "AB = CD" — two segments equal in length. */
+const equalSegments: Rule = (s) => {
+  const m = s.match(/\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*\b([A-Za-z])\s*([A-Za-z])\b/);
+  return m ? [{ type: 'set-equal', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]) }] : null;
+};
+
+/** "AB = 6" — fix a segment's length. */
+const distanceConstraint: Rule = (s) => {
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*${num}\b`));
+  return m ? [{ type: 'set-distance', a: up(m[1]), b: up(m[2]), value: parseFloat(m[3]) }] : null;
+};
+
+/** "AB parallel to CD" / "AB ∥ CD" / "AB מקביל ל-CD". */
+const parallelConstraint: Rule = (s) => {
+  if (!/parallel|∥|מקביל/i.test(s)) return null;
+  // strip the keyword AND filler words (so "to"/"of" aren't read as 2-letter labels)
+  const t = s.replace(/parallel(?:\s*to)?|∥|מקביל(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
+  const m = t.match(/\b([A-Za-z])\s*([A-Za-z])\b.*?\b([A-Za-z])\s*([A-Za-z])\b/);
+  return m ? [{ type: 'set-parallel', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]) }] : null;
+};
+
+/** "AB perpendicular to CD" / "AB ⊥ CD" / "AB מאונך ל-CD" — two *named* segments (not the foot phrasing). */
+const perpendicularConstraint: Rule = (s) => {
+  if (!/perpendicular|⊥|מאונך/i.test(s)) return null;
+  const t = s.replace(/perpendicular(?:\s*to)?|⊥|מאונך(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
+  if ((t.match(/\b[A-Za-z]\s*[A-Za-z]\b/g) ?? []).length < 2) return null; // "perpendicular from A to BC" is the foot, not this
+  const m = t.match(/\b([A-Za-z])\s*([A-Za-z])\b.*?\b([A-Za-z])\s*([A-Za-z])\b/);
+  return m ? [{ type: 'set-perpendicular', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]) }] : null;
+};
+
 /** "point A at (0,0)" / "נקודה A ב-(0,0)" / "A = (3, 4)" */
 const freePoint: Rule = (s) => {
   const m = s.match(
@@ -437,6 +467,8 @@ const RULES: Rule[] = [
   parallelCircleIntersection, // a parallel line ∩ the circle
   lineLineIntersection,
   angle,
+  parallelConstraint, // ∥ / ⟂ constraints (keyword-anchored) — before the loose "XY = …" rules
+  perpendicularConstraint,
   arcMidpoint, // circle constructs (own keywords) before the generic point rules
   diameter,
   chord,
@@ -447,6 +479,8 @@ const RULES: Rule[] = [
   pointOnCircle, // "A on circle O" — before segment/pointOnSegment
   segment,
   pointOnSegment,
+  equalSegments, // "AB = CD" — before distance (numeric RHS) and freePoint (coord RHS)
+  distanceConstraint, // "AB = 6"
   pointByDistances,
   freePoint,
 ];
