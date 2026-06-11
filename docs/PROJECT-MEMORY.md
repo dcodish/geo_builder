@@ -56,6 +56,20 @@ _The **travelling memory** for this repo. Because the repo syncs (Dropbox), anyt
 
 - **2026-06-11 (cont.) — textbook-clean defaults + empty-side composition (ADR-017 amendment).** Operator wants shapes to look like textbook figures (upright, base horizontal). Required two things together: (1) a `flip` flag on the derived corner kinds (`derived`/`perp-offset`/`rotated`) so square/rectangle/rhombus can mirror to either side of their base edge without relabelling — `mirrorComposition` now reflects free vertices *and* toggles `flip`, mirroring the whole shape; (2) `chooseComposition` in `applyStep` evaluates both default and mirror and picks the side *away* from existing geometry (not only on collision). This decoupled composition from template tuning, so the standalone templates were normalised to base-on-x-axis / built-upward (parallelogram/trapezoid were base-at-top; quad had a tilted base). Net: a square on a parallelogram's edge flips to the empty side; standalone shapes are upright. NOTE the renderer auto-centres/scales, so world origin doesn't fix screen position — orientation + proportions are what matter. 150 tests green, build clean.
 
+### Session wrap — 2026-06-11 (end)
+
+One long session: a **code review** (Fable) of the build, then **manual stress-testing** that surfaced a string of real bugs — mostly in **shape composition**, which is now clearly the richest/least-specified corner of the engine. End state: **150 tests green** (from 98 at the 06-10 wrap), build clean, all committed on `rebuild-foundation`, pushed to GitHub `dcodish/geo_builder`. **No new corpus coverage** — this was all hardening + UX, so the corpus track is still at **Q1 (5a)**.
+
+What landed, in order (each its own commit + ADR where noted): ADR-014 generic constraint solving + DOF-selection fix; parser misparse defense; ADR-013 amend-1 (similarity-fit composition, fixes degenerate parallelogram-on-edge); ADR-015 edit-a-fact-in-place (✎ on each row); ADR-016 snap-to-intersection; renderer lines-only + largest-empty-wedge label placement; categorized **Commands** coverage-map panel; ADR-013 amend-2 (vertex-order-independent composition); ADR-017 (coincidence invariant + mirror); empty-side composition + `flip` flag + textbook-upright templates. Captured-but-not-built: **ADR-018** (alternatives = sampling residual freedom).
+
+**The five composition bugs (pattern worth remembering):** (1) free non-base vertex kept absolute default → degenerate collapse; (2) shared edge had to be named first; (3) third shape rebuilt on top of an existing one (coincident nodes); (4) composed shape overlapped instead of taking the empty side; (5) standalone shapes drawn base-at-top / tilted. All fixed. **5b will add lines/perpendiculars that attach to existing geometry the same way — expect similar edge cases.**
+
+**Resume here next session:**
+
+1. **Decide the track** — corpus **Phase 5b** (line object → parallel, perpendicular+foot, bisector, ray/extension, right-triangle → Q2–Q4), or cross-cutting **ADR-018 Stage 1** (pinned-vs-free points + seeded DOF sampler for "show another configuration"), which pairs with 5d. Operator leaned toward more **stress-testing** first.
+2. **Read first:** this file + [09-implementation-plan.md](09-implementation-plan.md) Status line + [06-decisions.md](06-decisions.md) ADR-013…018 + `../CLAUDE.md`.
+3. **Sanity check:** `npm install` (fresh machine), `npx vitest run` (expect 150 green), `npm run dev`.
+
 ## Resume pointer
 
-See the **Status** line at the top of [09-implementation-plan.md](09-implementation-plan.md) and the "Current state / Next step" section in [../CLAUDE.md](../CLAUDE.md).
+See the **Status** line at the top of [09-implementation-plan.md](09-implementation-plan.md), the **Session wrap — 2026-06-11** entry just above, and the "Current state / Next step" section in [../CLAUDE.md](../CLAUDE.md). Branch `rebuild-foundation`; GitHub remote `dcodish/geo_builder` (push after committing — Dropbox `.git` is sync, not backup).
