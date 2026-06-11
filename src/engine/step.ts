@@ -90,7 +90,10 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     return { ok: false, error: conflict, construction: prev, positions: prevPositions };
   }
 
-  const next = applyCommand(prev, cmd);
+  // Pass the prior figure's positions so a shape built on existing points is
+  // fitted to them (non-degenerate composition, ADR-013) rather than keeping
+  // absolute template defaults.
+  const next = applyCommand(prev, cmd, prevPositions);
   const res = evaluate(next);
   if (!res.ok) {
     return { ok: false, error: res.error, construction: prev, positions: prevPositions };

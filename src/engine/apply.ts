@@ -1,13 +1,89 @@
 /**
  * applyCommand: pure reducer turning one Command into a new Construction.
  * Object IDs are deterministic, so re-issuing a command is idempotent
- * (FR-EN-9). No positions are computed here — that is the evaluator's job.
+ * (FR-EN-9). The evaluator computes the figure's positions; the one thing
+ * chosen here is the *initial* coordinates of a shape's new free vertices —
+ * a parameter of the graph, not a derived position — which is why `pos` (the
+ * already-known positions of prior objects) is threaded in: a shape built on
+ * existing points is fitted to them, instead of keeping absolute defaults.
  */
 
-import type { Command, Constraint, Construction, GeoObject, Id } from './types';
+import type { Command, Constraint, Construction, GeoObject, Id, Vec } from './types';
+import { add, sub } from './geometry';
 
 function addObj(objects: GeoObject[], o: GeoObject): void {
   if (!objects.some((x) => x.id === o.id)) objects.push(o);
+}
+
+/** A free base vertex of a shape template: its id and canonical coordinates. */
+type BaseVertex = { id: Id; x: number; y: number };
+
+/**
+ * A similarity transform (rotate + uniform scale + translate) that maps a
+ * shape's canonical template onto whatever base vertices already exist (its
+ * "anchors"). With ≥2 anchors it is fully determined; with 1 it is a pure
+ * translation; with 0 it is the identity (the standalone case → raw template).
+ *
+ * This is what keeps a shape *built on existing points* (ADR-013) a valid,
+ * non-degenerate instance of its template. Without it, new free vertices keep
+ * their absolute defaults regardless of where the reused vertices are — e.g. a
+ * parallelogram on an existing horizontal edge leaves its third vertex on that
+ * same line, collapsing the figure to a segment.
+ */
+function fitTemplate(template: BaseVertex[], pos: Map<Id, Vec>): (p: BaseVertex) => Vec {
+  const anchors = template
+    .map((t) => ({ t, p: pos.get(t.id) }))
+    .filter((a): a is { t: BaseVertex; p: Vec } => a.p !== undefined);
+
+  if (anchors.length === 0) return (p) => ({ x: p.x, y: p.y });
+  if (anchors.length === 1) {
+    const d = sub(anchors[0].p, anchors[0].t);
+    return (p) => add(p, d);
+  }
+
+  // ≥2 anchors: the farthest-apart pair (in template space) defines the frame.
+  let a = anchors[0];
+  let b = anchors[1];
+  let best = -1;
+  for (let i = 0; i < anchors.length; i++)
+    for (let j = i + 1; j < anchors.length; j++) {
+      const d2 = (anchors[i].t.x - anchors[j].t.x) ** 2 + (anchors[i].t.y - anchors[j].t.y) ** 2;
+      if (d2 > best) {
+        best = d2;
+        a = anchors[i];
+        b = anchors[j];
+      }
+    }
+  const tv = sub(b.t, a.t); // template edge
+  const pv = sub(b.p, a.p); // its image in the actual figure
+  const tLen2 = tv.x * tv.x + tv.y * tv.y;
+  if (tLen2 < 1e-18 || pv.x * pv.x + pv.y * pv.y < 1e-18) {
+    const d = sub(a.p, a.t); // coincident anchors → fall back to translation
+    return (p) => add(p, d);
+  }
+  // The complex ratio pv / tv = re + i·im encodes the scale·rotation.
+  const re = (pv.x * tv.x + pv.y * tv.y) / tLen2;
+  const im = (pv.y * tv.x - pv.x * tv.y) / tLen2;
+  return (p) => {
+    const dx = p.x - a.t.x;
+    const dy = p.y - a.t.y;
+    return { x: a.p.x + re * dx - im * dy, y: a.p.y + im * dx + re * dy };
+  };
+}
+
+/**
+ * Add a shape's free base vertices: a new id is placed via the template fitted
+ * to the existing anchors; an id that already exists is reused untouched (its
+ * own definition stands — ADR-013). Derived vertices are added separately and
+ * follow these by their rules.
+ */
+function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Vec>): void {
+  const fit = fitTemplate(template, pos);
+  for (const t of template) {
+    if (objects.some((o) => o.id === t.id)) continue; // reuse existing
+    const v = fit(t);
+    objects.push({ kind: 'free-point', id: t.id, x: v.x, y: v.y });
+  }
 }
 
 /** A segment is undirected: normalise endpoint order so seg AB === seg BA (idempotent). */
@@ -28,7 +104,7 @@ function triEdges(objects: GeoObject[], a: Id, b: Id, c: Id): void {
   addObj(objects, { kind: 'polygon', id: `poly-${a}${b}${c}`, vertices: [a, b, c] });
 }
 
-export function applyCommand(prev: Construction, cmd: Command): Construction {
+export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec> = new Map()): Construction {
   const objects = [...prev.objects];
   const constraints = [...prev.constraints];
 
@@ -49,8 +125,7 @@ export function applyCommand(prev: Construction, cmd: Command): Construction {
       // size); C and D are derived to make it a square for any A,B.
       const [a, b, c, d] = cmd.ids;
       const side = cmd.side ?? 5;
-      addObj(objects, { kind: 'free-point', id: a, x: 0, y: 0 });
-      addObj(objects, { kind: 'free-point', id: b, x: side, y: 0 });
+      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: side, y: 0 }], pos);
       addObj(objects, { kind: 'derived', id: c, rule: 'square-c', a, b });
       addObj(objects, { kind: 'derived', id: d, rule: 'square-d', a, b });
       quadEdges(objects, a, b, c, d);
@@ -60,10 +135,11 @@ export function applyCommand(prev: Construction, cmd: Command): Construction {
     case 'quadrilateral': {
       // A general (irregular, convex) quadrilateral: 4 free vertices.
       const [a, b, c, d] = cmd.ids;
-      addObj(objects, { kind: 'free-point', id: a, x: 0, y: 0 });
-      addObj(objects, { kind: 'free-point', id: b, x: 6, y: 1 });
-      addObj(objects, { kind: 'free-point', id: c, x: 5, y: 5 });
-      addObj(objects, { kind: 'free-point', id: d, x: 1, y: 4 });
+      placeBase(
+        objects,
+        [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 1 }, { id: c, x: 5, y: 5 }, { id: d, x: 1, y: 4 }],
+        pos,
+      );
       quadEdges(objects, a, b, c, d);
       break;
     }
@@ -72,9 +148,7 @@ export function applyCommand(prev: Construction, cmd: Command): Construction {
       // A,B,C carry the parallelogram's freedom; D is derived (D = A + C − B),
       // so ABCD stays a parallelogram for any A,B,C.
       const [a, b, c, d] = cmd.ids;
-      addObj(objects, { kind: 'free-point', id: a, x: 0, y: 4 });
-      addObj(objects, { kind: 'free-point', id: b, x: 6, y: 4 });
-      addObj(objects, { kind: 'free-point', id: c, x: 7, y: 0 });
+      placeBase(objects, [{ id: a, x: 0, y: 4 }, { id: b, x: 6, y: 4 }, { id: c, x: 7, y: 0 }], pos);
       addObj(objects, { kind: 'parallelogram-vertex', id: d, a, b, c });
       quadEdges(objects, a, b, c, d);
       break;
@@ -84,8 +158,7 @@ export function applyCommand(prev: Construction, cmd: Command): Construction {
       // A,B free base; C,D offset perpendicular to AB by a default height.
       const [a, b, c, d] = cmd.ids;
       const h = 4;
-      addObj(objects, { kind: 'free-point', id: a, x: 0, y: 0 });
-      addObj(objects, { kind: 'free-point', id: b, x: 6, y: 0 });
+      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }], pos);
       addObj(objects, { kind: 'perp-offset', id: c, anchor: b, from: a, to: b, dist: h });
       addObj(objects, { kind: 'perp-offset', id: d, anchor: a, from: a, to: b, dist: h });
       quadEdges(objects, a, b, c, d);
@@ -95,8 +168,7 @@ export function applyCommand(prev: Construction, cmd: Command): Construction {
     case 'rhombus': {
       // A,B free (side AB); D rotated off A by a default angle; C closes the rhombus.
       const [a, b, c, d] = cmd.ids;
-      addObj(objects, { kind: 'free-point', id: a, x: 0, y: 0 });
-      addObj(objects, { kind: 'free-point', id: b, x: 5, y: 0 });
+      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 5, y: 0 }], pos);
       addObj(objects, { kind: 'rotated', id: d, pivot: a, from: a, to: b, angleDeg: 60, scale: 1 });
       addObj(objects, { kind: 'parallelogram-vertex', id: c, a: b, b: a, c: d }); // C = B + D − A
       quadEdges(objects, a, b, c, d);
@@ -106,9 +178,7 @@ export function applyCommand(prev: Construction, cmd: Command): Construction {
     case 'trapezoid': {
       // A,B,D free; C offset from D parallel to AB (so AB ∥ DC), shorter by default.
       const [a, b, c, d] = cmd.ids;
-      addObj(objects, { kind: 'free-point', id: a, x: 0, y: 4 });
-      addObj(objects, { kind: 'free-point', id: b, x: 6, y: 4 });
-      addObj(objects, { kind: 'free-point', id: d, x: 1, y: 0 });
+      placeBase(objects, [{ id: a, x: 0, y: 4 }, { id: b, x: 6, y: 4 }, { id: d, x: 1, y: 0 }], pos);
       addObj(objects, { kind: 'scaled-offset', id: c, anchor: d, from: a, to: b, k: 0.6 });
       quadEdges(objects, a, b, c, d);
       break;
@@ -116,9 +186,7 @@ export function applyCommand(prev: Construction, cmd: Command): Construction {
 
     case 'triangle': {
       const [a, b, c] = cmd.ids;
-      addObj(objects, { kind: 'free-point', id: a, x: 0, y: 0 });
-      addObj(objects, { kind: 'free-point', id: b, x: 6, y: 0 });
-      addObj(objects, { kind: 'free-point', id: c, x: 2, y: 4 });
+      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 2, y: 4 }], pos);
       triEdges(objects, a, b, c);
       break;
     }
