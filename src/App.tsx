@@ -21,6 +21,7 @@ export default function App() {
   const facts = useGeoStore((s) => s.facts);
   const selectedId = useGeoStore((s) => s.selectedId);
   const execute = useGeoStore((s) => s.execute);
+  const update = useGeoStore((s) => s.update);
   const toggle = useGeoStore((s) => s.toggle);
   const remove = useGeoStore((s) => s.remove);
   const select = useGeoStore((s) => s.select);
@@ -34,7 +35,32 @@ export default function App() {
   const [text, setText] = useState('');
   const [notUnderstood, setNotUnderstood] = useState(false);
   const [showHelp, setShowHelp] = useState(true); // visible by default so supported commands are discoverable
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [editError, setEditError] = useState(false);
   const he = i18n.language === 'he';
+
+  // Inline fact editing: open the row as a text field pre-filled with its
+  // phrasing, re-parse on confirm, and update the fact in place (ADR-015).
+  function startEdit(id: string, utterance: string | undefined) {
+    setEditingId(id);
+    setEditText(utterance ?? '');
+    setEditError(false);
+  }
+  function cancelEdit() {
+    setEditingId(null);
+    setEditText('');
+    setEditError(false);
+  }
+  function commitEdit(id: string) {
+    const r = parse(editText);
+    if (!r.ok || r.commands.length !== 1) {
+      setEditError(true);
+      return;
+    }
+    update(id, r.commands[0], editText.trim());
+    cancelEdit();
+  }
 
   // The single text → command[] path: parse, then run each command through the
   // store. Out-of-grammar input shows a hint (Phase 7 will escalate to the LLM).
@@ -158,6 +184,7 @@ export default function App() {
                 {facts.map((f) => {
                   const st = status[f.id];
                   const state = !f.enabled ? 'disabled' : st === 'ok' ? 'ok' : 'broken';
+                  const editing = editingId === f.id;
                   return (
                     <li key={f.id} style={factRow(state, f.id === selectedId)}>
                       <input
@@ -165,17 +192,48 @@ export default function App() {
                         checked={f.enabled}
                         title={t('actions.toggle')}
                         onChange={() => toggle(f.id)}
-                        style={{ cursor: 'pointer' }}
+                        disabled={editing}
+                        style={{ cursor: editing ? 'default' : 'pointer' }}
                       />
-                      <button type="button" style={factLabel(state)} onClick={() => select(f.id)} title={typeof st === 'string' && state === 'broken' ? st : undefined}>
-                        {f.utterance ?? f.cmd.type}
-                      </button>
-                      <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}>
-                        {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
-                      </span>
-                      <button type="button" style={del} title={t('actions.delete')} onClick={() => remove(f.id)}>
-                        ×
-                      </button>
+                      {editing ? (
+                        <>
+                          <input
+                            autoFocus
+                            value={editText}
+                            dir="auto"
+                            onChange={(e) => {
+                              setEditText(e.target.value);
+                              if (editError) setEditError(false);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') commitEdit(f.id);
+                              if (e.key === 'Escape') cancelEdit();
+                            }}
+                            style={{ ...editInput, borderColor: editError ? '#dc2626' : '#cbd5e1' }}
+                          />
+                          <button type="button" style={iconBtn('#16a34a')} title={t('actions.confirmEdit')} onClick={() => commitEdit(f.id)}>
+                            ✓
+                          </button>
+                          <button type="button" style={iconBtn('#94a3b8')} title={t('actions.cancelEdit')} onClick={cancelEdit}>
+                            ×
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button type="button" style={factLabel(state)} onClick={() => select(f.id)} title={typeof st === 'string' && state === 'broken' ? st : undefined}>
+                            {f.utterance ?? f.cmd.type}
+                          </button>
+                          <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}>
+                            {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
+                          </span>
+                          <button type="button" style={iconBtn('#64748b')} title={t('actions.edit')} onClick={() => startEdit(f.id, f.utterance)}>
+                            ✎
+                          </button>
+                          <button type="button" style={del} title={t('actions.delete')} onClick={() => remove(f.id)}>
+                            ×
+                          </button>
+                        </>
+                      )}
                     </li>
                   );
                 })}
@@ -291,6 +349,26 @@ const del: React.CSSProperties = {
   cursor: 'pointer',
   padding: '0 2px',
 };
+const editInput: React.CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  padding: '4px 8px',
+  fontSize: 12,
+  fontFamily: 'ui-monospace, monospace',
+  borderRadius: 6,
+  border: '1px solid #cbd5e1',
+  background: '#fff',
+  color: '#0f172a',
+};
+const iconBtn = (color: string): React.CSSProperties => ({
+  border: 'none',
+  background: 'transparent',
+  color,
+  fontSize: 14,
+  lineHeight: 1,
+  cursor: 'pointer',
+  padding: '0 2px',
+});
 const alt: React.CSSProperties = {
   padding: '10px 14px',
   fontSize: 14,

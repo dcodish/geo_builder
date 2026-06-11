@@ -11,11 +11,19 @@
 
 import type { Construction, Id, Vec } from '@/engine/types';
 import { isGeoPoint } from '@/engine/types';
+import { sub, unit } from '@/engine/geometry';
 
 export interface ScenePoint {
   id: Id;
   pos: Vec;
   label: string;
+  /**
+   * Unit vector (world space, y-up) pointing into the largest angular gap
+   * between the segments meeting at this vertex — i.e. the most open direction,
+   * away from every incident line. The renderer places the label along it so a
+   * label never sits on an edge and lands on the outer side of the figure.
+   */
+  labelDir: Vec;
 }
 export interface SceneSegment {
   id: Id;
@@ -40,10 +48,27 @@ export function buildScene(c: Construction, positions: Map<Id, Vec>): Scene {
   const segments: SceneSegment[] = [];
   const polygons: ScenePolygon[] = [];
 
+  // Per-vertex directions to every point it shares a segment with — the lines a
+  // label must avoid. Built from all segments (edges *and* diagonals) up front.
+  const incident = new Map<Id, Vec[]>();
+  const addIncident = (id: Id, d: Vec) => {
+    const list = incident.get(id);
+    if (list) list.push(d);
+    else incident.set(id, [d]);
+  };
+  for (const o of c.objects) {
+    if (o.kind !== 'segment') continue;
+    const a = positions.get(o.a);
+    const b = positions.get(o.b);
+    if (!a || !b) continue;
+    addIncident(o.a, unit(sub(b, a)));
+    addIncident(o.b, unit(sub(a, b)));
+  }
+
   for (const o of c.objects) {
     if (isGeoPoint(o)) {
       const pos = positions.get(o.id);
-      if (pos) points.push({ id: o.id, pos, label: o.id });
+      if (pos) points.push({ id: o.id, pos, label: o.id, labelDir: outwardDir(incident.get(o.id)) });
       continue;
     }
     if (o.kind === 'segment') {
@@ -61,6 +86,30 @@ export function buildScene(c: Construction, positions: Map<Id, Vec>): Scene {
   }
 
   return { points, segments, polygons };
+}
+
+/**
+ * The bisector of the widest angular gap between the given directions — the most
+ * open direction around a vertex. With no incident lines it defaults to up-right;
+ * with one it points opposite; with two collinear it points perpendicular. This
+ * is what keeps a label off the figure's edges and on its outer side.
+ */
+function outwardDir(dirs: Vec[] | undefined): Vec {
+  if (!dirs || dirs.length === 0) return { x: Math.SQRT1_2, y: Math.SQRT1_2 };
+  const angles = dirs.map((d) => Math.atan2(d.y, d.x)).sort((p, q) => p - q);
+  let bestStart = angles[0];
+  let bestGap = -1;
+  for (let i = 0; i < angles.length; i++) {
+    const a0 = angles[i];
+    const a1 = i + 1 < angles.length ? angles[i + 1] : angles[0] + 2 * Math.PI;
+    const gap = a1 - a0;
+    if (gap > bestGap) {
+      bestGap = gap;
+      bestStart = a0;
+    }
+  }
+  const mid = bestStart + bestGap / 2;
+  return { x: Math.cos(mid), y: Math.sin(mid) };
 }
 
 /** Every resolved point position in the scene — the input to `fitTransform`. */

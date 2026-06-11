@@ -51,6 +51,9 @@
     "another": "הצג תצורה אחרת",
     "delete": "מחק",
     "toggle": "כלול / החרג עובדה זו",
+    "edit": "ערוך",
+    "confirmEdit": "אישור",
+    "cancelEdit": "ביטול",
     "language": "English"
   },
   "geometry": {

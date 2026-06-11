@@ -77,6 +77,8 @@ export interface GeoState {
 
   /** Append a fact (enabled). */
   execute: (cmd: Command, utterance?: string) => void;
+  /** Replace a fact's command *in place* (same list position) — an edit (ADR-015). */
+  update: (id: string, cmd: Command, utterance?: string) => void;
   /** Flip a fact's selected/deselected state. */
   toggle: (id: string) => void;
   /** Remove a fact permanently. */
@@ -114,6 +116,15 @@ export const useGeoStore = create<GeoState>()(
           }
         }
         set({ facts: [...facts, { id: nanoid(), cmd, utterance, enabled: true }] });
+      },
+
+      update: (id, cmd, utterance) => {
+        // Replace the fact's command at its existing position. Because replay
+        // applies it where it already sits (before any dependents), changing a
+        // parameter just re-derives downstream; an incompatible change makes
+        // dependents auto-drop, reversibly — no redefinition conflict, since the
+        // edited id isn't yet present at its own slot during replay (ADR-015).
+        set({ facts: get().facts.map((f) => (f.id === id ? { ...f, cmd, utterance } : f)) });
       },
 
       toggle: (id) => {

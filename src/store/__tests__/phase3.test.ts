@@ -79,6 +79,48 @@ describe('store — repositioning a free point is a move (ADR-011)', () => {
   });
 });
 
+describe('store — edit a fact in place (ADR-015)', () => {
+  it('changing a point-on-segment ratio re-derives without a redefinition conflict', () => {
+    s().execute(SQUARE);
+    s().execute({ type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.2 });
+    const gFactId = s().facts[1].id;
+    const before = replay(s().facts).positions.get('G')!;
+
+    s().update(gFactId, { type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 }, 'point G on AD at 40%');
+
+    expect(s().facts).toHaveLength(2); // edited in place, not appended
+    const d = replay(s().facts);
+    expect(d.status[gFactId]).toBe('ok'); // not an "already defined" conflict
+    const after = d.positions.get('G')!;
+    // G moved further along AD (its distance from A grew from 0.2 to 0.4 of |AD|)
+    const A = d.positions.get('A')!;
+    expect(Math.hypot(after.x - A.x, after.y - A.y)).toBeGreaterThan(Math.hypot(before.x - A.x, before.y - A.y));
+  });
+
+  it('a dependent of the edited fact follows the edit', () => {
+    s().execute(SQUARE);
+    s().execute({ type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.2 });
+    s().execute({ type: 'segment', a: 'B', b: 'G' }); // depends on G
+    const gFactId = s().facts[1].id;
+
+    s().update(gFactId, { type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.6 });
+    const d = replay(s().facts);
+    expect(d.status[gFactId]).toBe('ok');
+    expect(d.construction.objects.some((o) => o.id === 'seg-BG')).toBe(true); // dependent still present
+  });
+
+  it('the edit is undoable', () => {
+    s().execute(SQUARE);
+    s().execute({ type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.2 });
+    const gFactId = s().facts[1].id;
+    s().update(gFactId, { type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 });
+
+    useGeoStore.temporal.getState().undo();
+    const g = s().facts.find((f) => f.id === gFactId)!;
+    expect(g.cmd).toMatchObject({ type: 'point-on-segment', t: 0.2 }); // reverted to the original ratio
+  });
+});
+
 describe('store — keep prior figure on contradiction (FR-EN-8/-10)', () => {
   it('flags the bad fact, keeps the figure, surfaces the error', () => {
     s().execute(SQUARE);

@@ -98,6 +98,59 @@ describe('scene — figure → primitives', () => {
     }
   });
 
+  it('points a label into the open side, away from the incident edges', () => {
+    // A unit square ABCD. Each corner has two edges 90° apart; the label must go
+    // into the opposite (outer) 270° wedge — i.e. diagonally away from the centre.
+    const sq = {
+      objects: [
+        { kind: 'free-point', id: 'A', x: 0, y: 0 },
+        { kind: 'free-point', id: 'B', x: 2, y: 0 },
+        { kind: 'free-point', id: 'C', x: 2, y: 2 },
+        { kind: 'free-point', id: 'D', x: 0, y: 2 },
+        { kind: 'segment', id: 'seg-AB', a: 'A', b: 'B' },
+        { kind: 'segment', id: 'seg-BC', a: 'B', b: 'C' },
+        { kind: 'segment', id: 'seg-CD', a: 'C', b: 'D' },
+        { kind: 'segment', id: 'seg-AD', a: 'A', b: 'D' },
+      ],
+      constraints: [],
+    } as const;
+    const pos = new Map(sq.objects.filter((o) => 'x' in o).map((o) => [o.id, { x: o.x, y: o.y }]));
+    const scene = buildScene(sq as never, pos as never);
+    const centre = { x: 1, y: 1 };
+    for (const p of scene.points) {
+      // the label direction points outward: away from the square's centre
+      const out = { x: p.pos.x - centre.x, y: p.pos.y - centre.y };
+      expect(p.labelDir.x * out.x + p.labelDir.y * out.y).toBeGreaterThan(0);
+    }
+    // A at the origin has edges along +x and +y → label heads toward (−,−)
+    const A = scene.points.find((p) => p.id === 'A')!;
+    expect(A.labelDir.x).toBeLessThan(0);
+    expect(A.labelDir.y).toBeLessThan(0);
+  });
+
+  it('places a midpoint label perpendicular to its line (two opposite edges)', () => {
+    // M on segment A—B, collinear: the only open wedges are the two perpendicular
+    // sides, so the label must leave the line (non-zero perpendicular component).
+    const con = {
+      objects: [
+        { kind: 'free-point', id: 'A', x: 0, y: 0 },
+        { kind: 'free-point', id: 'B', x: 4, y: 0 },
+        { kind: 'on-segment', id: 'M', a: 'A', b: 'B', t: 0.5 },
+        { kind: 'segment', id: 'seg-AM', a: 'A', b: 'M' },
+        { kind: 'segment', id: 'seg-BM', a: 'B', b: 'M' },
+      ],
+      constraints: [],
+    } as const;
+    const pos = new Map<string, { x: number; y: number }>([
+      ['A', { x: 0, y: 0 }],
+      ['B', { x: 4, y: 0 }],
+      ['M', { x: 2, y: 0 }],
+    ]);
+    const scene = buildScene(con as never, pos as never);
+    const M = scene.points.find((p) => p.id === 'M')!;
+    expect(Math.abs(M.labelDir.y)).toBeGreaterThan(0.9); // essentially vertical (off the line)
+  });
+
   it('skips objects whose endpoints have no computed position', () => {
     // A segment referencing a missing point must not be drawn at a bogus spot.
     const construction = {
@@ -114,13 +167,13 @@ describe('scene — figure → primitives', () => {
 });
 
 describe('Figure — static SVG render (no DOM)', () => {
-  it('emits a polygon, four segments, and labelled points for F1', () => {
+  it('emits lines (no fill) and labelled points for F1', () => {
     const { construction, positions } = f1();
     const html = renderToStaticMarkup(<Figure construction={construction} positions={positions} />);
 
     expect(html).toContain('<svg');
-    expect((html.match(/<polygon/g) ?? []).length).toBe(1);
-    expect((html.match(/<line/g) ?? []).length).toBe(4);
+    expect((html.match(/<polygon/g) ?? []).length).toBe(0); // outlines only — no filled polygon
+    expect((html.match(/<line/g) ?? []).length).toBe(4); // edges carried by segments
     expect((html.match(/<circle/g) ?? []).length).toBe(5); // 5 points
     // labels present
     for (const id of ['A', 'B', 'C', 'D', 'G']) {

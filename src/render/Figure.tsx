@@ -89,19 +89,10 @@ export function Figure({
         onPointerUp={onPointerUp}
       >
         <g transform={`translate(${view.panX} ${view.panY}) scale(${view.zoom})`}>
-          {scene.polygons.map((poly) => (
-            <polygon
-              key={poly.id}
-              data-id={poly.id}
-              points={poly.points.map((p) => screenStr(transform.toScreen(p))).join(' ')}
-              fill={lit(poly.id) ? ACCENT : '#3b82f6'}
-              fillOpacity={lit(poly.id) ? 0.14 : 0.08}
-              stroke={lit(poly.id) ? ACCENT : '#2563eb'}
-              strokeWidth={stroke}
-              strokeLinejoin="round"
-            />
-          ))}
-
+          {/* Shapes are drawn as outlines only: every edge is a `segment`, so the
+              figure is just its lines. Polygons stay in the scene (for future
+              hit-testing) but are not filled or stroked. A selected fact is shown
+              by accenting its segments and points, not by a fill. */}
           {scene.segments.map((seg) => {
             const a = transform.toScreen(seg.a);
             const b = transform.toScreen(seg.b);
@@ -122,12 +113,20 @@ export function Figure({
 
           {scene.points.map((pt) => {
             const s = transform.toScreen(pt.pos);
+            // World→screen is uniform scale + Y-flip, so a world direction maps
+            // to (dx, −dy) on screen; place the label that way along labelDir.
+            const sd = unitVec({ x: pt.labelDir.x, y: -pt.labelDir.y });
+            const off = r * 2.6;
+            const anchor = sd.x > 0.3 ? 'start' : sd.x < -0.3 ? 'end' : 'middle';
+            const baseline = sd.y > 0.3 ? 'hanging' : sd.y < -0.3 ? 'auto' : 'middle';
             return (
               <g key={pt.id} data-id={pt.id}>
                 <circle cx={s.x} cy={s.y} r={lit(pt.id) ? r * 1.6 : r} fill={lit(pt.id) ? ACCENT : '#0f172a'} />
                 <text
-                  x={s.x + r * 1.8}
-                  y={s.y - r * 1.4}
+                  x={s.x + sd.x * off}
+                  y={s.y + sd.y * off}
+                  textAnchor={anchor}
+                  dominantBaseline={baseline}
                   fontSize={fontSize}
                   fontFamily="system-ui, sans-serif"
                   fontWeight={lit(pt.id) ? 700 : 400}
@@ -162,5 +161,8 @@ export function Figure({
   );
 }
 
-const screenStr = (v: Vec): string => `${v.x},${v.y}`;
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
+const unitVec = (v: Vec): Vec => {
+  const l = Math.hypot(v.x, v.y);
+  return l < 1e-9 ? { x: 0, y: 0 } : { x: v.x / l, y: v.y / l };
+};
