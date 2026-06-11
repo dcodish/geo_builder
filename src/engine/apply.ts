@@ -28,6 +28,7 @@ const DERIVED_SLOTS: Partial<Record<Command['type'], number[]>> = {
   rhombus: [2, 3],
   parallelogram: [3],
   trapezoid: [2],
+  'right-triangle': [1], // B is the derived right-angle vertex (legs CA ⟂ CB)
 };
 
 /**
@@ -279,6 +280,16 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
     }
 
+    case 'right-triangle': {
+      // Right angle at C (the last id). Legs CA and CB: A and C are free, B is
+      // derived perpendicular to CA at C — so ∠C stays 90° for any A, C.
+      const [a, b, c] = cmd.ids;
+      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: c, x: 0, y: 4 }], pos);
+      addObj(objects, { kind: 'perp-offset', id: b, anchor: c, from: c, to: a, dist: 5 });
+      triEdges(objects, a, b, c);
+      break;
+    }
+
     case 'point-on-segment':
       addObj(objects, { kind: 'on-segment', id: cmd.id, a: cmd.a, b: cmd.b, t: cmd.t ?? 0.5 });
       break;
@@ -289,6 +300,34 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'segment':
       addObj(objects, segment(cmd.a, cmd.b));
+      break;
+
+    case 'bisector':
+      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'bisector', vertex: cmd.vertex, p: cmd.p, q: cmd.q } });
+      break;
+
+    case 'perpendicular-line':
+      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'perpendicular', through: cmd.through, a: cmd.a, b: cmd.b } });
+      break;
+
+    case 'parallel-line':
+      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'parallel', through: cmd.through, a: cmd.a, b: cmd.b } });
+      break;
+
+    case 'line-through':
+      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'through', a: cmd.a, b: cmd.b } });
+      break;
+
+    case 'line-intersection':
+      addObj(objects, { kind: 'line-intersection', id: cmd.id, line1: cmd.line1, line2: cmd.line2 });
+      break;
+
+    case 'foot':
+      addObj(objects, { kind: 'foot', id: cmd.id, from: cmd.from, a: cmd.a, b: cmd.b });
+      break;
+
+    case 'midpoint':
+      addObj(objects, { kind: 'midpoint', id: cmd.id, a: cmd.a, b: cmd.b });
       break;
 
     case 'point-by-distances':

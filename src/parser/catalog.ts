@@ -42,6 +42,7 @@ export const CATEGORY_LABELS: Record<Category, { en: string; he: string }> = {
 export const COMMAND_CATALOG: CommandDoc[] = [
   // ── Shapes ──────────────────────────────────────────────────────────────
   { category: 'shapes', supported: true, en: 'triangle ABC', he: 'משולש ABC', descEn: 'A triangle (3 free vertices).', descHe: 'משולש (3 קודקודים חופשיים).' },
+  { category: 'shapes', supported: true, en: 'right triangle ABC', he: 'משולש ישר-זווית ABC', descEn: 'A right triangle (right angle at the last vertex).', descHe: 'משולש ישר-זווית (הזווית הישרה בקודקוד האחרון).' },
   { category: 'shapes', supported: true, en: 'square ABCD', he: 'ריבוע ABCD', descEn: 'A square.', descHe: 'ריבוע.' },
   { category: 'shapes', supported: true, en: 'rectangle ABCD', he: 'מלבן ABCD', descEn: 'A rectangle.', descHe: 'מלבן.' },
   { category: 'shapes', supported: true, en: 'rhombus ABCD', he: 'מעוין ABCD', descEn: 'A rhombus (4 equal sides).', descHe: 'מעוין (4 צלעות שוות).' },
@@ -54,14 +55,14 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'points', supported: true, en: 'point E on AC at 40%', he: 'נקודה E על AC ב-40%', descEn: 'A point on a segment (ratio optional).', descHe: 'נקודה על קטע (יחס לא חובה).' },
   { category: 'points', supported: true, en: 'C is 5 from A and 5 from B', he: 'C במרחק 5 מ-A ו-5 מ-B', descEn: 'A point at given distances from two points.', descHe: 'נקודה במרחקים נתונים משתי נקודות.' },
   { category: 'points', supported: true, en: 'M is the intersection of AC and BD', he: 'M חיתוך AC ו-BD', descEn: 'Where two lines cross (or click the dot on a crossing).', descHe: 'נקודת חיתוך של שני ישרים (או לחיצה על הסימון בהצטלבות).' },
-  { category: 'points', supported: false, phase: '5b', en: 'M is the midpoint of AB', he: 'M אמצע AB', descEn: 'The midpoint of a segment.', descHe: 'אמצע הקטע.' },
-  { category: 'points', supported: false, phase: '5b', en: 'point F on the extension of AD', he: 'נקודה F על המשך AD', descEn: 'A point beyond a segment, on its ray.', descHe: 'נקודה על המשך הקטע (מעבר לקצה).' },
+  { category: 'points', supported: true, en: 'M is the midpoint of AB', he: 'M אמצע AB', descEn: 'The midpoint of a segment.', descHe: 'אמצע הקטע.' },
+  { category: 'points', supported: true, en: 'point F on the extension of AD', he: 'נקודה F על המשך AD', descEn: 'A point beyond a segment, on its ray.', descHe: 'נקודה על המשך הקטע (מעבר לקצה).' },
 
   // ── Lines & perpendiculars ──────────────────────────────────────────────
   { category: 'lines', supported: true, en: 'segment AC', he: 'קטע AC', descEn: 'Connect two points (also: diagonal AC).', descHe: 'חיבור שתי נקודות (גם: אלכסון AC).' },
   { category: 'lines', supported: false, phase: '5b', en: 'BC parallel to AD', he: 'BC מקביל ל-AD', descEn: 'A line parallel to another.', descHe: 'ישר מקביל לישר אחר.' },
-  { category: 'lines', supported: false, phase: '5b', en: 'perpendicular from A to BC', he: 'אנך מ-A ל-BC', descEn: 'A perpendicular and its foot.', descHe: 'אנך והרגל שלו.' },
-  { category: 'lines', supported: false, phase: '5b', en: 'bisector of angle ABC', he: 'חוצה זווית ABC', descEn: 'An angle bisector.', descHe: 'חוצה זווית.' },
+  { category: 'lines', supported: true, en: 'F is the foot of the perpendicular from C to AD', he: 'F רגל האנך מ-C ל-AD', descEn: 'The foot of a perpendicular dropped onto a line.', descHe: 'רגל אנך המורד אל ישר.' },
+  { category: 'lines', supported: true, en: 'E is where the bisectors of BAC and BCA meet', he: 'E חיתוך חוצי הזוויות BAC ו-BCA', descEn: 'The point where two angle bisectors cross.', descHe: 'הנקודה שבה נחתכים שני חוצי זווית.' },
   { category: 'lines', supported: false, phase: '5b', en: 'median from A in ABC', he: 'תיכון מ-A במשולש ABC', descEn: 'A median (to the opposite midpoint).', descHe: 'תיכון (לאמצע הצלע שממול).' },
   { category: 'lines', supported: false, phase: '5b', en: 'height from A in ABC', he: 'גובה מ-A במשולש ABC', descEn: 'An altitude and its foot.', descHe: 'גובה והרגל שלו.' },
   { category: 'lines', supported: false, phase: '5b', en: 'perpendicular bisector of AB', he: 'אנך אמצעי ל-AB', descEn: 'The perpendicular bisector of a segment.', descHe: 'האנך האמצעי של הקטע.' },

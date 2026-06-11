@@ -40,6 +40,15 @@ export function reflectAcross(p: Vec, a: Vec, b: Vec): Vec {
   return { x: 2 * foot.x - p.x, y: 2 * foot.y - p.y };
 }
 
+/** Foot of the perpendicular from p onto the (infinite) line a→b (degenerate a≈b returns a). */
+export function footOnLine(p: Vec, a: Vec, b: Vec): Vec {
+  const d = sub(b, a);
+  const dd = d.x * d.x + d.y * d.y;
+  if (dd < 1e-18) return a;
+  const t = ((p.x - a.x) * d.x + (p.y - a.y) * d.y) / dd;
+  return add(a, scale(d, t));
+}
+
 /** Measure of angle ∠(p1–vertex–p2) in degrees, range [0, 180]. */
 export function angleDeg(vertex: Vec, p1: Vec, p2: Vec): number {
   const u = sub(p1, vertex);

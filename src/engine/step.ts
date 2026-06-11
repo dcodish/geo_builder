@@ -67,7 +67,8 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     cmd.type === 'rectangle' ||
     cmd.type === 'rhombus' ||
     cmd.type === 'trapezoid' ||
-    cmd.type === 'triangle';
+    cmd.type === 'triangle' ||
+    cmd.type === 'right-triangle';
   const produced = applyCommand(emptyConstruction(), cmd).objects;
   for (const o of produced) {
     const existing = prev.objects.find((x) => x.id === o.id);

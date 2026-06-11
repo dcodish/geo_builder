@@ -5,12 +5,14 @@
  * non-finite coords, or a contradicted constraint = over-constraint, FR-EN-8).
  */
 
-import type { Construction, GeoPoint, Id, Vec } from './types';
+import type { Construction, GeoPoint, Id, Line, Vec } from './types';
 import { ANGLE_EPS, LEN_EPS, isGeoPoint } from './types';
 import {
   add,
   angleDeg,
   circleCircleIntersect,
+  footOnLine,
+  len,
   lineLineIntersect,
   rot90,
   rotate,
@@ -19,6 +21,12 @@ import {
   unit,
 } from './geometry';
 import { describeConstraint, solvedOnSegmentCandidates } from './solve';
+
+/** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
+interface ResolvedLine {
+  anchor: Vec;
+  dir: Vec;
+}
 
 export interface EvalOk {
   ok: true;
@@ -34,15 +42,30 @@ export type EvalResult = EvalOk | EvalErr;
 
 export function evaluate(c: Construction): EvalResult {
   const pos = new Map<Id, Vec>();
+  const lines = new Map<Id, ResolvedLine>();
   const points = c.objects.filter(isGeoPoint);
+  const lineObjs = c.objects.filter((o): o is Line => o.kind === 'line');
   const remaining = new Set(points.map((p) => p.id));
+  const remainingLines = new Set(lineObjs.map((l) => l.id));
 
+  // One fixed-point sweep resolves points and lines together: a line needs its
+  // referenced points, and a line-intersection point needs its lines, so they
+  // interleave until nothing new resolves.
   let progressed = true;
-  while (remaining.size > 0 && progressed) {
+  while ((remaining.size > 0 || remainingLines.size > 0) && progressed) {
     progressed = false;
+    for (const l of lineObjs) {
+      if (!remainingLines.has(l.id)) continue;
+      const r = resolveLine(l, pos);
+      if (r === 'pending') continue;
+      if (typeof r === 'string') return { ok: false, error: r };
+      lines.set(l.id, r);
+      remainingLines.delete(l.id);
+      progressed = true;
+    }
     for (const p of points) {
       if (!remaining.has(p.id)) continue;
-      const r = tryEval(p, pos);
+      const r = tryEval(p, pos, lines);
       if (r === 'pending') continue;
       if (typeof r === 'string') return { ok: false, error: r };
       pos.set(p.id, r);
@@ -50,8 +73,9 @@ export function evaluate(c: Construction): EvalResult {
       progressed = true;
     }
   }
-  if (remaining.size > 0) {
-    return { ok: false, error: `unresolved dependencies for: ${[...remaining].join(', ')}` };
+  if (remaining.size > 0 || remainingLines.size > 0) {
+    const stuck = [...remaining, ...remainingLines];
+    return { ok: false, error: `unresolved dependencies for: ${stuck.join(', ')}` };
   }
 
   for (const v of pos.values()) {
@@ -90,8 +114,45 @@ export function evaluate(c: Construction): EvalResult {
   return { ok: true, positions: pos };
 }
 
+/** Resolve one line to an (anchor, dir): a {@link ResolvedLine}, 'pending', or an error string. */
+function resolveLine(l: Line, pos: Map<Id, Vec>): ResolvedLine | 'pending' | string {
+  const s = l.spec;
+  switch (s.via) {
+    case 'through': {
+      const a = pos.get(s.a);
+      const b = pos.get(s.b);
+      if (!a || !b) return 'pending';
+      const dir = sub(b, a);
+      if (len(dir) < 1e-9) return `cannot build line ${l.id}: ${s.a} and ${s.b} coincide`;
+      return { anchor: a, dir: unit(dir) };
+    }
+    case 'bisector': {
+      const v = pos.get(s.vertex);
+      const p = pos.get(s.p);
+      const q = pos.get(s.q);
+      if (!v || !p || !q) return 'pending';
+      const u1 = unit(sub(p, v));
+      const u2 = unit(sub(q, v));
+      const bis = add(u1, u2); // the internal-bisector direction
+      if (len(bis) < 1e-9) return `cannot bisect ∠${s.p}${s.vertex}${s.q}: the rays are opposite`;
+      return { anchor: v, dir: unit(bis) };
+    }
+    case 'perpendicular':
+    case 'parallel': {
+      const t = pos.get(s.through);
+      const a = pos.get(s.a);
+      const b = pos.get(s.b);
+      if (!t || !a || !b) return 'pending';
+      const base = sub(b, a);
+      if (len(base) < 1e-9) return `cannot build line ${l.id}: ${s.a} and ${s.b} coincide`;
+      const dir = unit(base);
+      return { anchor: t, dir: s.via === 'perpendicular' ? rot90(dir) : dir };
+    }
+  }
+}
+
 /** Resolve one point: a Vec, 'pending' (deps not ready yet), or an error string. */
-function tryEval(p: GeoPoint, pos: Map<Id, Vec>): Vec | 'pending' | string {
+function tryEval(p: GeoPoint, pos: Map<Id, Vec>, lines: Map<Id, ResolvedLine>): Vec | 'pending' | string {
   switch (p.kind) {
     case 'free-point':
       return { x: p.x, y: p.y };
@@ -175,6 +236,31 @@ function tryEval(p: GeoPoint, pos: Map<Id, Vec>): Vec | 'pending' | string {
       const a = pos.get(p.a)!;
       const b = pos.get(p.b)!;
       return add(a, scale(sub(b, a), t));
+    }
+
+    case 'line-intersection': {
+      const l1 = lines.get(p.line1);
+      const l2 = lines.get(p.line2);
+      if (!l1 || !l2) return 'pending';
+      const hit = lineLineIntersect(l1.anchor, add(l1.anchor, l1.dir), l2.anchor, add(l2.anchor, l2.dir));
+      if (!hit) return `cannot construct ${p.id}: lines ${p.line1} and ${p.line2} are parallel`;
+      return hit;
+    }
+
+    case 'foot': {
+      const from = pos.get(p.from);
+      const a = pos.get(p.a);
+      const b = pos.get(p.b);
+      if (!from || !a || !b) return 'pending';
+      if (len(sub(b, a)) < 1e-9) return `cannot drop a perpendicular to ${p.a}${p.b}: they coincide`;
+      return footOnLine(from, a, b);
+    }
+
+    case 'midpoint': {
+      const a = pos.get(p.a);
+      const b = pos.get(p.b);
+      if (!a || !b) return 'pending';
+      return scale(add(a, b), 0.5);
     }
   }
 }

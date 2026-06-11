@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import type { Command } from '@/engine';
 import { build } from '@/engine';
 import { parse } from '../parse';
+import { COMMAND_CATALOG } from '../catalog';
 
 /** Parse and expect exactly one command equal to `expected`. */
 function one(input: string, expected: Command) {
@@ -115,16 +116,14 @@ describe('parser — filler words are not labels', () => {
  */
 describe('parser — misparse defense (out-of-grammar must not half-parse)', () => {
   for (const u of [
-    // Phase-5b constructs — must escalate, not half-parse
+    // Still out of grammar — a *single* bisector fact and the parallel/perpendicular
+    // constraints are constraint-style (Phase 5d), so they escalate rather than draw.
     'perpendicular from A to BC',
     'אנך מ-A ל-BC',
     'AD bisects angle BAC',
     'AD חוצה את הזווית BAC',
-    'M is the midpoint of AB',
-    'M אמצע AB',
     'BC parallel to AD',
     'BC מקביל ל-AD',
-    'point F on the extension of AD',
     // Phase-5c constructs
     'circle centered at O radius 5',
     'מעגל סביב O רדיוס 5',
@@ -175,5 +174,14 @@ describe('parser — coverage on the in-grammar sample', () => {
     ];
     const handled = sample.filter((u) => parse(u).ok).length;
     expect(handled).toBe(sample.length);
+  });
+
+  // The catalog is the user-facing reference *and* the coverage map: an entry
+  // marked supported must parse in both locales, or the help panel lies.
+  it('every supported catalog example parses (He + En)', () => {
+    for (const c of COMMAND_CATALOG.filter((c) => c.supported)) {
+      expect(parse(c.en).ok, `EN catalog example should parse: "${c.en}"`).toBe(true);
+      expect(parse(c.he).ok, `HE catalog example should parse: "${c.he}"`).toBe(true);
+    }
   });
 });

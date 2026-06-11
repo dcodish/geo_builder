@@ -133,6 +133,69 @@ const lineLineIntersection: Rule = (s) => {
   return 'stop';
 };
 
+/** "right triangle ABC" / "משולש ישר-זווית ABC" — right angle at the last named vertex. */
+const rightTriangle: Rule = (s) => {
+  if (!/right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זווית/i.test(s)) return null;
+  const cleaned = s.replace(/right[\s-]?angled|right[\s-]?angle|right|triangle|משולש|ישר[\s-]?זווית|זווית|ישרה/gi, ' ');
+  const ids = labelRun(cleaned, 3);
+  return ids ? [{ type: 'right-triangle', ids: [ids[0], ids[1], ids[2]] }] : null;
+};
+
+const BISECTOR_KW = /bisector|חוצ/i; // English "bisector"; Hebrew חוצה / חוצי
+
+/**
+ * "E is the intersection of the bisectors of angle BAC and angle BCA" /
+ * "E חיתוך חוצי הזוויות BAC ו-BCA" — the meet of two angle bisectors. Builds two
+ * bisector lines (each vertex is the triple's middle letter) and the point where
+ * they cross. The bisector lines are scaffolding — only the point is named/drawn.
+ */
+const bisectorIntersection: Rule = (s) => {
+  if (!BISECTOR_KW.test(s)) return null;
+  const meet = INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s);
+  // Strip every keyword word so only the point label + the two angle triples remain.
+  const kw =
+    /bisectors?|angles?|intersection|intersect\w*|meets?|points?|of|the|is|are|and|זווית|הזוויות|חוצי|חוצה|חוצ|חיתוך|נחתכים|נקודת|המפגש|מפגש|נפגשים|של|הם|בנקודה/gi;
+  const labels = s.replace(kw, ' ').replace(/-/g, ' ').match(/\b[A-Za-z]{1,3}\b/g) ?? [];
+  const point = labels.find((l) => l.length === 1);
+  const triples = labels.filter((l) => l.length === 3).map((l) => l.toUpperCase());
+  if (!meet || !point || triples.length < 2) return null;
+  const [t1, t2] = triples;
+  return [
+    { type: 'bisector', id: `bis-${t1}`, vertex: t1[1], p: t1[0], q: t1[2] },
+    { type: 'bisector', id: `bis-${t2}`, vertex: t2[1], p: t2[0], q: t2[2] },
+    { type: 'line-intersection', id: up(point), line1: `bis-${t1}`, line2: `bis-${t2}` },
+  ];
+};
+
+/** "F is the foot of the perpendicular from C to AD" / "F רגל האנך מ-C ל-AD". */
+const foot: Rule = (s) => {
+  if (!/\bfoot\b|רגל/i.test(s)) return null;
+  const en = s.match(
+    new RegExp(String.raw`([A-Za-z])\b.*?\bfoot\b.*?from\s+([A-Za-z])\b.*?to\s+([A-Za-z])\s*([A-Za-z])\b`, 'i'),
+  );
+  const he = s.match(
+    new RegExp(String.raw`([A-Za-z])\b.*?רגל.*?(?:מהנקודה\s*|מ-?\s*)([A-Za-z])\b.*?(?:אל\s*|ל-?\s*)([A-Za-z])\s*([A-Za-z])\b`),
+  );
+  const m = en ?? he;
+  return m ? [{ type: 'foot', id: up(m[1]), from: up(m[2]), a: up(m[3]), b: up(m[4]) }] : null;
+};
+
+/** "M is the midpoint of AB" / "M אמצע AB". */
+const midpoint: Rule = (s) => {
+  if (!/midpoint|אמצע/i.test(s)) return null;
+  const m = s.match(new RegExp(String.raw`([A-Za-z])\b.*?(?:midpoint|אמצע).*?\b([A-Za-z])\s*([A-Za-z])\b`, 'i'));
+  return m ? [{ type: 'midpoint', id: up(m[1]), a: up(m[2]), b: up(m[3]) }] : null;
+};
+
+/** "F on the extension of AD" / "F על המשך AD" — a point on the ray beyond the far end (t > 1). */
+const pointOnExtension: Rule = (s) => {
+  if (!/extension|המשך/i.test(s)) return null;
+  const m = s.match(
+    new RegExp(String.raw`(?:point\s+|נקודה\s+)?([A-Za-z])\b.*?(?:extension|המשך).*?\b([A-Za-z])\s*([A-Za-z])\b`, 'i'),
+  );
+  return m ? [{ type: 'point-on-segment', id: up(m[1]), a: up(m[2]), b: up(m[3]), t: 1.3 }] : null;
+};
+
 /** "angle GAB = 37" / "זווית GAB = 37" (any order) — middle letter is the vertex. */
 const angle: Rule = (s) => {
   if (!/(?:angle|זווית)/i.test(s)) return null;
@@ -213,9 +276,14 @@ const RULES: Rule[] = [
   rhombus,
   trapezoid,
   quadrilateral,
+  rightTriangle, // before `triangle` ("right triangle" contains "triangle")
   triangle,
+  bisectorIntersection, // before `lineLineIntersection`/`angle` (shares their keywords)
   lineLineIntersection,
   angle,
+  foot, // before `pointOnSegment`
+  midpoint,
+  pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)
   segment,
   pointOnSegment,
   pointByDistances,

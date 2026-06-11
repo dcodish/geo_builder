@@ -127,6 +127,31 @@ export interface SolvedOnSegmentPoint {
   branch: number;
 }
 
+/** 0 DOF — the crossing of two {@link Line} objects (by id). Parallel ⇒ unconstructible. */
+export interface LineIntersectionPoint {
+  kind: 'line-intersection';
+  id: Id;
+  line1: Id;
+  line2: Id;
+}
+
+/** 0 DOF — foot of the perpendicular from `from` onto the (infinite) line a→b. */
+export interface FootPoint {
+  kind: 'foot';
+  id: Id;
+  from: Id;
+  a: Id;
+  b: Id;
+}
+
+/** 0 DOF — the midpoint of a→b. */
+export interface MidpointPoint {
+  kind: 'midpoint';
+  id: Id;
+  a: Id;
+  b: Id;
+}
+
 export type GeoPoint =
   | FreePoint
   | OnSegmentPoint
@@ -137,7 +162,10 @@ export type GeoPoint =
   | PerpOffsetVertex
   | RotatedVertex
   | ScaledOffsetVertex
-  | SolvedOnSegmentPoint;
+  | SolvedOnSegmentPoint
+  | LineIntersectionPoint
+  | FootPoint
+  | MidpointPoint;
 
 /** The object kinds that are points (carry a computed position). Single source of truth. */
 const POINT_KINDS: ReadonlySet<string> = new Set([
@@ -151,6 +179,9 @@ const POINT_KINDS: ReadonlySet<string> = new Set([
   'rotated',
   'scaled-offset',
   'on-segment-solved',
+  'line-intersection',
+  'foot',
+  'midpoint',
 ]);
 
 export function isGeoPoint(o: GeoObject): o is GeoPoint {
@@ -170,7 +201,28 @@ export interface Polygon {
   vertices: Id[];
 }
 
-export type GeoObject = GeoPoint | Segment | Polygon;
+/**
+ * How a {@link Line} is constructed. Each variant resolves (in the evaluator) to
+ * an `(anchor, dir)` pair — a point on the line and a unit direction. Lines are
+ * the constructive scaffolding for crossings (a bisector ∩ a bisector, a
+ * perpendicular ∩ its target); they carry no coordinates of their own and are
+ * **not drawn** — only the segments the student names render. New line kinds add
+ * a case to {@link resolveLine}, not a new object type.
+ */
+export type LineSpec =
+  | { via: 'through'; a: Id; b: Id } // the line through points a and b
+  | { via: 'bisector'; vertex: Id; p: Id; q: Id } // internal bisector of ∠(p–vertex–q)
+  | { via: 'perpendicular'; through: Id; a: Id; b: Id } // ⟂ to line a→b, through `through`
+  | { via: 'parallel'; through: Id; a: Id; b: Id }; // ∥ to line a→b, through `through`
+
+/** An (infinite) line, defined by a {@link LineSpec}. Scaffolding — not rendered. */
+export interface Line {
+  kind: 'line';
+  id: Id;
+  spec: LineSpec;
+}
+
+export type GeoObject = GeoPoint | Segment | Polygon | Line;
 
 /**
  * Angle constraint. In Phase 1 it is used as a satisfiability *check* for
@@ -201,12 +253,21 @@ export type Command =
   | { type: 'rhombus'; ids: [Id, Id, Id, Id] }
   | { type: 'trapezoid'; ids: [Id, Id, Id, Id] }
   | { type: 'triangle'; ids: [Id, Id, Id] }
+  | { type: 'right-triangle'; ids: [Id, Id, Id] } // right angle at the last id
   | { type: 'free-point'; id: Id; x: number; y: number }
   | { type: 'point-on-segment'; id: Id; a: Id; b: Id; t?: number }
   | { type: 'point-by-distances'; id: Id; from1: Id; dist1: number; from2: Id; dist2: number; branch?: number }
   | { type: 'line-line-intersection'; id: Id; a: Id; b: Id; c: Id; d: Id }
   | { type: 'segment'; a: Id; b: Id }
-  | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number };
+  | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number }
+  // Phase 5b — lines (scaffolding) and the points they produce.
+  | { type: 'bisector'; id: Id; vertex: Id; p: Id; q: Id }
+  | { type: 'perpendicular-line'; id: Id; through: Id; a: Id; b: Id }
+  | { type: 'parallel-line'; id: Id; through: Id; a: Id; b: Id }
+  | { type: 'line-through'; id: Id; a: Id; b: Id }
+  | { type: 'line-intersection'; id: Id; line1: Id; line2: Id }
+  | { type: 'foot'; id: Id; from: Id; a: Id; b: Id }
+  | { type: 'midpoint'; id: Id; a: Id; b: Id };
 
 /** Tolerances. */
 export const LEN_EPS = 1e-6; // coordinate closeness (units)
