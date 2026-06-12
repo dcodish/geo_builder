@@ -212,13 +212,13 @@ export function branchCount(c: Construction, id: Id): number {
     const ts = solvedOnSegmentCandidates(o, e.positions);
     return ts === 'pending' ? 0 : ts.length;
   }
-  // Both arcs of a circle have a midpoint; a line meets a circle in up to two points.
-  if (o.kind === 'arc-midpoint' || o.kind === 'line-circle') return 2;
+  // Both arcs have a midpoint; a line/another circle meets a circle in up to two points.
+  if (o.kind === 'arc-midpoint' || o.kind === 'line-circle' || o.kind === 'circle-circle') return 2;
   return 0;
 }
 
 /** The branchable point kinds whose `branch` index "show another configuration" cycles. */
-const BRANCHABLE = new Set(['intersection', 'on-segment-solved', 'arc-midpoint', 'line-circle']);
+const BRANCHABLE = new Set(['intersection', 'on-segment-solved', 'arc-midpoint', 'line-circle', 'circle-circle']);
 
 /** Advance a branchable point to its next solution branch (wraps). */
 export function cycleAlternative(c: Construction, id: Id): Construction {

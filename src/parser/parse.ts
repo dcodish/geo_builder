@@ -449,6 +449,60 @@ const parallelCircleIntersection: Rule = (s) => {
   ];
 };
 
+/** "G is the intersection of circle O and circle P" / "G חיתוך מעגל O ומעגל P" — where two circles cross. */
+const circleCircleIntersection: Rule = (s) => {
+  if (!/circle|מעגל/i.test(s)) return null;
+  if (!(INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s))) return null;
+  const centers = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z])\b/gi)].map((m) => m[1]);
+  if (centers.length < 2) return null;
+  const resM = dropCircleRef(s).match(/\b([A-Za-z])\b/);
+  if (!resM) return null;
+  return [{ type: 'circle-circle-intersection', id: up(resM[1]), circle1: circleId(centers[0]), circle2: circleId(centers[1]), branch: 0 }];
+};
+
+/** "tangent to circle O at A" / "משיק למעגל O בנקודה A" — a *drawn* tangent line (⟂ the radius at A). */
+const tangentLine: Rule = (s) => {
+  if (!/tangent|משיק/i.test(s)) return null;
+  const center = circleCenter(s);
+  const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z])\b/i);
+  if (!center || !atM) return null;
+  return [{ type: 'tangent', id: `tan-${up(atM[1])}`, circle: circleId(center), at: up(atM[1]), visible: true }];
+};
+
+/** "bisector of angle ABC" / "חוצה זווית ABC" — a *drawn* angle bisector (not "AD bisects …", which places a point). */
+const bisectorLine: Rule = (s) => {
+  if (!/bisector|חוצ/i.test(s)) return null;
+  if (INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s)) return null;
+  if (/\b[A-Za-z]\s*[A-Za-z]\b\s*(?:bisects?|חוצ)/i.test(s)) return null; // "AD bisects ∠.." = placing a point (deferred)
+  const ids = labelRun(s.replace(/bisector|angle|זווית|הזווית|חוצה|חוצי|חוצ|את/gi, ' '), 3);
+  if (!ids) return null;
+  return [{ type: 'bisector', id: `bis-${ids.join('')}`, vertex: ids[1], p: ids[0], q: ids[2], visible: true }];
+};
+
+/** "line through P perpendicular to AB" / "ישר דרך P מאונך ל-AB" — a *drawn* perpendicular line through a point. */
+const perpendicularLine: Rule = (s) => {
+  if (!/perpendicular|⊥|מאונך|אנך/i.test(s)) return null;
+  const thr = s.match(/(?:through|דרך)\s+([A-Za-z])\b/i);
+  if (!thr) return null; // no "through P" ⇒ it's the ⟂ constraint or a foot, not a drawn line
+  const seg = s
+    .replace(/through\s+[A-Za-z]\b|דרך\s+[A-Za-z]\b/gi, ' ')
+    .match(/(?:perpendicular\s*to|⊥|מאונך\s*ל-?|אנך\s*ל-?)\s*([A-Za-z])\s*([A-Za-z])\b/i);
+  if (!seg) return null;
+  return [{ type: 'perpendicular-line', id: `perp-${up(thr[1])}-${up(seg[1])}${up(seg[2])}`, through: up(thr[1]), a: up(seg[1]), b: up(seg[2]), visible: true }];
+};
+
+/** "line through P parallel to AB" / "ישר דרך P מקביל ל-AB" — a *drawn* parallel line through a point. */
+const parallelLine: Rule = (s) => {
+  if (!/parallel|∥|מקביל/i.test(s)) return null;
+  const thr = s.match(/(?:through|דרך)\s+([A-Za-z])\b/i);
+  if (!thr) return null; // no "through P" ⇒ it's the ∥ constraint, not a drawn line
+  const seg = s
+    .replace(/through\s+[A-Za-z]\b|דרך\s+[A-Za-z]\b/gi, ' ')
+    .match(/(?:parallel\s*to|∥|מקביל\s*ל-?)\s*([A-Za-z])\s*([A-Za-z])\b/i);
+  if (!seg) return null;
+  return [{ type: 'parallel-line', id: `par-${up(thr[1])}-${up(seg[1])}${up(seg[2])}`, through: up(thr[1]), a: up(seg[1]), b: up(seg[2]), visible: true }];
+};
+
 // Order matters: the most specific keyword-anchored rules run first; the
 // coordinate rule (freePoint) is last because it's the loosest.
 const RULES: Rule[] = [
@@ -465,8 +519,13 @@ const RULES: Rule[] = [
   bisectorSegmentIntersection, // one bisector ∩ a segment
   tangentLineIntersection, // tangent ∩ a segment
   parallelCircleIntersection, // a parallel line ∩ the circle
+  circleCircleIntersection, // two circles cross — before the generic line∩line intersection
   lineLineIntersection,
   angle,
+  tangentLine, // a *drawn* tangent (after the tangent∩line compound)
+  bisectorLine, // a *drawn* bisector (after the bisector compounds)
+  perpendicularLine, // a *drawn* perpendicular line through a point (before the ⟂ constraint)
+  parallelLine, // a *drawn* parallel line through a point (before the ∥ constraint)
   parallelConstraint, // ∥ / ⟂ constraints (keyword-anchored) — before the loose "XY = …" rules
   perpendicularConstraint,
   arcMidpoint, // circle constructs (own keywords) before the generic point rules

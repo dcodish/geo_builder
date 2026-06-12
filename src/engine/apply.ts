@@ -343,19 +343,19 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
 
     case 'bisector':
-      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'bisector', vertex: cmd.vertex, p: cmd.p, q: cmd.q } });
+      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'bisector', vertex: cmd.vertex, p: cmd.p, q: cmd.q }, visible: cmd.visible });
       break;
 
     case 'perpendicular-line':
-      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'perpendicular', through: cmd.through, a: cmd.a, b: cmd.b } });
+      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'perpendicular', through: cmd.through, a: cmd.a, b: cmd.b }, visible: cmd.visible });
       break;
 
     case 'parallel-line':
-      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'parallel', through: cmd.through, a: cmd.a, b: cmd.b } });
+      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'parallel', through: cmd.through, a: cmd.a, b: cmd.b }, visible: cmd.visible });
       break;
 
     case 'line-through':
-      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'through', a: cmd.a, b: cmd.b } });
+      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'through', a: cmd.a, b: cmd.b }, visible: cmd.visible });
       break;
 
     case 'line-intersection':
@@ -400,8 +400,12 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       addObj(objects, { kind: 'line-circle', id: cmd.id, line: cmd.line, circle: cmd.circle, branch: cmd.branch ?? 0 });
       break;
 
+    case 'circle-circle-intersection':
+      addObj(objects, { kind: 'circle-circle', id: cmd.id, circle1: cmd.circle1, circle2: cmd.circle2, branch: cmd.branch ?? 0 });
+      break;
+
     case 'tangent':
-      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'tangent', circle: cmd.circle, at: cmd.at } });
+      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'tangent', circle: cmd.circle, at: cmd.at }, visible: cmd.visible });
       break;
 
     case 'point-by-distances':

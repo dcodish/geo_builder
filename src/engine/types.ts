@@ -194,6 +194,15 @@ export interface LineCirclePoint {
   branch: number;
 }
 
+/** 0 DOF — a crossing of two circles; 0/1/2 solutions, `branch` selects. */
+export interface CircleCirclePoint {
+  kind: 'circle-circle';
+  id: Id;
+  circle1: Id;
+  circle2: Id;
+  branch: number;
+}
+
 export type GeoPoint =
   | FreePoint
   | OnSegmentPoint
@@ -211,7 +220,8 @@ export type GeoPoint =
   | OnCirclePoint
   | AntipodePoint
   | ArcMidpointPoint
-  | LineCirclePoint;
+  | LineCirclePoint
+  | CircleCirclePoint;
 
 /** The object kinds that are points (carry a computed position). Single source of truth. */
 const POINT_KINDS: ReadonlySet<string> = new Set([
@@ -232,6 +242,7 @@ const POINT_KINDS: ReadonlySet<string> = new Set([
   'antipode',
   'arc-midpoint',
   'line-circle',
+  'circle-circle',
 ]);
 
 export function isGeoPoint(o: GeoObject): o is GeoPoint {
@@ -266,11 +277,17 @@ export type LineSpec =
   | { via: 'parallel'; through: Id; a: Id; b: Id } // ∥ to line a→b, through `through`
   | { via: 'tangent'; circle: Id; at: Id }; // tangent to `circle` at point `at` (⟂ to the radius there)
 
-/** An (infinite) line, defined by a {@link LineSpec}. Scaffolding — not rendered. */
+/**
+ * An (infinite) line, defined by a {@link LineSpec}. Scaffolding by default
+ * (not rendered) — used to produce crossings. `visible` lines the student asked
+ * to *draw* (a standalone tangent / bisector / perpendicular / parallel) are
+ * rendered, clipped to the viewport ([ADR-022](docs/06-decisions.md#adr-022)).
+ */
 export interface Line {
   kind: 'line';
   id: Id;
   spec: LineSpec;
+  visible?: boolean;
 }
 
 /** How a {@link Circle}'s radius is set: a fixed length, or the distance to a point on it. */
@@ -368,11 +385,11 @@ export type Command =
   | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-parallel'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-perpendicular'; a: Id; b: Id; c: Id; d: Id }
-  // Phase 5b — lines (scaffolding) and the points they produce.
-  | { type: 'bisector'; id: Id; vertex: Id; p: Id; q: Id }
-  | { type: 'perpendicular-line'; id: Id; through: Id; a: Id; b: Id }
-  | { type: 'parallel-line'; id: Id; through: Id; a: Id; b: Id }
-  | { type: 'line-through'; id: Id; a: Id; b: Id }
+  // Phase 5b — lines (scaffolding unless `visible`) and the points they produce.
+  | { type: 'bisector'; id: Id; vertex: Id; p: Id; q: Id; visible?: boolean }
+  | { type: 'perpendicular-line'; id: Id; through: Id; a: Id; b: Id; visible?: boolean }
+  | { type: 'parallel-line'; id: Id; through: Id; a: Id; b: Id; visible?: boolean }
+  | { type: 'line-through'; id: Id; a: Id; b: Id; visible?: boolean }
   | { type: 'line-intersection'; id: Id; line1: Id; line2: Id }
   | { type: 'foot'; id: Id; from: Id; a: Id; b: Id }
   | { type: 'midpoint'; id: Id; a: Id; b: Id }
@@ -383,7 +400,8 @@ export type Command =
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }
   | { type: 'line-circle-intersection'; id: Id; line: Id; circle: Id; branch?: number }
-  | { type: 'tangent'; id: Id; circle: Id; at: Id };
+  | { type: 'circle-circle-intersection'; id: Id; circle1: Id; circle2: Id; branch?: number }
+  | { type: 'tangent'; id: Id; circle: Id; at: Id; visible?: boolean };
 
 /** Tolerances. */
 export const LEN_EPS = 1e-6; // coordinate closeness (units)

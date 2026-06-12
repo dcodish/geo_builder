@@ -338,5 +338,14 @@ function tryEval(
       if (sols.length === 0) return `cannot construct ${p.id}: line ${p.line} does not meet circle ${p.circle}`;
       return sols[p.branch % sols.length];
     }
+
+    case 'circle-circle': {
+      const c1 = circles.get(p.circle1);
+      const c2 = circles.get(p.circle2);
+      if (!c1 || !c2) return 'pending';
+      const sols = circleCircleIntersect(c1.center, c1.r, c2.center, c2.r);
+      if (sols.length === 0) return `cannot construct ${p.id}: circles ${p.circle1} and ${p.circle2} do not meet`;
+      return sols[p.branch % sols.length];
+    }
   }
 }

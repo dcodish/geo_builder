@@ -122,6 +122,33 @@ export function Figure({
             );
           })}
 
+          {/* Visible construction lines (a standalone tangent / bisector /
+              perpendicular / parallel) — dashed, drawn behind segments. An
+              infinite line is rendered as a long segment extended through its
+              anchor along its (screen-space) direction; the SVG viewport clips it. */}
+          {scene.lines.map((ln) => {
+            const a = transform.toScreen(ln.anchor);
+            const a2 = transform.toScreen({ x: ln.anchor.x + ln.dir.x, y: ln.anchor.y + ln.dir.y });
+            const dx = a2.x - a.x;
+            const dy = a2.y - a.y;
+            const m = Math.hypot(dx, dy) || 1;
+            const ux = (dx / m) * 6000;
+            const uy = (dy / m) * 6000;
+            return (
+              <line
+                key={ln.id}
+                data-id={ln.id}
+                x1={a.x - ux}
+                y1={a.y - uy}
+                x2={a.x + ux}
+                y2={a.y + uy}
+                stroke={lit(ln.id) ? ACCENT : '#64748b'}
+                strokeWidth={lit(ln.id) ? stroke * 1.5 : stroke}
+                strokeDasharray={`${6 / view.zoom} ${5 / view.zoom}`}
+              />
+            );
+          })}
+
           {/* Shapes are drawn as outlines only: every edge is a `segment`, so the
               figure is just its lines. Polygons stay in the scene (for future
               hit-testing) but are not filled or stroked. A selected fact is shown

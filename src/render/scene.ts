@@ -9,9 +9,9 @@
  * rather than rendered at a bogus position.
  */
 
-import type { Construction, Id, Vec } from '@/engine/types';
+import type { Construction, Id, Line, Vec } from '@/engine/types';
 import { isGeoPoint } from '@/engine/types';
-import { dist, sub, unit } from '@/engine/geometry';
+import { add, dist, len, rot90, sub, unit } from '@/engine/geometry';
 
 export interface ScenePoint {
   id: Id;
@@ -42,11 +42,52 @@ export interface SceneCircle {
   r: number;
 }
 
+/** A visible (infinite) line: a point on it and a unit direction. The renderer clips it to the view. */
+export interface SceneLine {
+  id: Id;
+  anchor: Vec;
+  dir: Vec;
+}
+
 export interface Scene {
   points: ScenePoint[];
   segments: SceneSegment[];
   polygons: ScenePolygon[];
   circles: SceneCircle[];
+  lines: SceneLine[];
+}
+
+/**
+ * Resolve a visible {@link Line} to (anchor, dir) from computed positions —
+ * mirrors the engine's `resolveLine` (kept here because lines are a rendering
+ * concern; the engine doesn't expose its internal resolution). null if it can't.
+ */
+function lineGeometry(line: Line, pos: Map<Id, Vec>, circles: Map<Id, SceneCircle>): SceneLine | null {
+  const s = line.spec;
+  const g = (id: Id) => pos.get(id);
+  if (s.via === 'through') {
+    const a = g(s.a), b = g(s.b);
+    if (!a || !b || len(sub(b, a)) < 1e-9) return null;
+    return { id: line.id, anchor: a, dir: unit(sub(b, a)) };
+  }
+  if (s.via === 'bisector') {
+    const v = g(s.vertex), p = g(s.p), q = g(s.q);
+    if (!v || !p || !q) return null;
+    const bis = add(unit(sub(p, v)), unit(sub(q, v)));
+    if (len(bis) < 1e-9) return null;
+    return { id: line.id, anchor: v, dir: unit(bis) };
+  }
+  if (s.via === 'perpendicular' || s.via === 'parallel') {
+    const t = g(s.through), a = g(s.a), b = g(s.b);
+    if (!t || !a || !b || len(sub(b, a)) < 1e-9) return null;
+    const d = unit(sub(b, a));
+    return { id: line.id, anchor: t, dir: s.via === 'perpendicular' ? rot90(d) : d };
+  }
+  // tangent: ⟂ to the radius at the touch point
+  const c = circles.get(s.circle);
+  const at = g(s.at);
+  if (!c || !at || len(sub(at, c.center)) < 1e-9) return null;
+  return { id: line.id, anchor: at, dir: unit(rot90(sub(at, c.center))) };
 }
 
 /** Resolve a construction + computed positions into drawable primitives. */
@@ -55,6 +96,7 @@ export function buildScene(c: Construction, positions: Map<Id, Vec>): Scene {
   const segments: SceneSegment[] = [];
   const polygons: ScenePolygon[] = [];
   const circles: SceneCircle[] = [];
+  const lines: SceneLine[] = [];
 
   // Per-vertex directions to every point it shares a segment with — the lines a
   // label must avoid. Built from all segments (edges *and* diagonals) up front.
@@ -105,7 +147,16 @@ export function buildScene(c: Construction, positions: Map<Id, Vec>): Scene {
     }
   }
 
-  return { points, segments, polygons, circles };
+  // Visible lines (a standalone tangent / bisector / perpendicular / parallel) —
+  // resolved after circles so a tangent can read its circle.
+  const circleMap = new Map(circles.map((c) => [c.id, c]));
+  for (const o of c.objects) {
+    if (o.kind !== 'line' || !o.visible) continue;
+    const sl = lineGeometry(o, positions, circleMap);
+    if (sl) lines.push(sl);
+  }
+
+  return { points, segments, polygons, circles, lines };
 }
 
 /**

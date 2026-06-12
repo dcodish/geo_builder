@@ -359,6 +359,27 @@ const families: Family[] = [
     },
   },
   {
+    tag: 'circle-circle',
+    n: 14,
+    make: (r, i) => {
+      const ox = ri(r, -8, 8), oy = ri(r, -8, 8);
+      const rad = ri(r, 4, 9);
+      const d = ri(r, 2, 2 * rad - 2); // 0 < d < 2·rad (equal radii) ⇒ the circles cross
+      const branch = i % 2;
+      return {
+        name: `circle-circle#${i} b=${branch}`,
+        commands: [
+          fp('O', ox, oy),
+          { type: 'circle', id: 'circle-O', center: 'O', radius: rad },
+          fp('P', ox + d, oy),
+          { type: 'circle', id: 'circle-P', center: 'P', radius: rad },
+          { type: 'circle-circle-intersection', id: 'G', circle1: 'circle-O', circle2: 'circle-P', branch },
+        ],
+        check: (c) => c.onCircle('O', rad, 'G').onCircle('P', rad, 'G'),
+      };
+    },
+  },
+  {
     tag: 'tangent',
     n: 12,
     make: (r, i) => {
