@@ -14,6 +14,8 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { freeDofs, isGeoPoint } from '@/engine';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse } from '@/parser';
+import { llmParse } from '@/parser/llm';
+import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
 import type { Crossing } from '@/render';
 import { introducedIds, replay, useGeoStore } from '@/store/geoStore';
@@ -38,6 +40,7 @@ export default function App() {
 
   const [text, setText] = useState('');
   const [notUnderstood, setNotUnderstood] = useState(false);
+  const [thinking, setThinking] = useState(false); // LLM fallback in flight (Phase 7)
   const [showHelp, setShowHelp] = useState(true); // visible by default so supported commands are discoverable
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
@@ -73,17 +76,33 @@ export default function App() {
     cancelEdit();
   }
 
-  // The single text → command[] path: parse, then run each command through the
-  // store. Out-of-grammar input shows a hint (Phase 7 will escalate to the LLM).
-  function submit(utterance: string) {
+  // The text → command[] path: the deterministic parser runs first; anything it
+  // can't read escalates to the LLM proxy (Phase 7, ADR-023), which normalises
+  // the freeform input into canonical lines we re-parse. The engine never knows
+  // which path produced the commands.
+  async function submit(utterance: string) {
     const r = parse(utterance);
-    if (!r.ok) {
-      setNotUnderstood(true);
+    if (r.ok) {
+      setNotUnderstood(false);
+      r.commands.forEach((c) => execute(c, utterance));
+      setText('');
       return;
     }
+    // out of grammar → ask the LLM (using the current figure as context)
     setNotUnderstood(false);
-    r.commands.forEach((c) => execute(c, utterance));
-    setText('');
+    setThinking(true);
+    const ctx = figureContext(
+      construction.objects.filter(isGeoPoint).map((o) => o.id),
+      construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
+    );
+    const result = await llmParse(utterance, ctx);
+    setThinking(false);
+    if (result) {
+      result.commands.forEach((c) => execute(c, utterance));
+      setText('');
+    } else {
+      setNotUnderstood(true);
+    }
   }
 
   // Figure + per-fact status are derived from the fact list.
@@ -165,10 +184,11 @@ export default function App() {
                 }}
                 autoFocus
               />
-              <button type="submit" style={sendBtn} disabled={!text.trim()}>
-                {t('input.send')}
+              <button type="submit" style={sendBtn} disabled={!text.trim() || thinking}>
+                {thinking ? t('input.loading') : t('input.send')}
               </button>
             </div>
+            {thinking && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
             {notUnderstood && <span style={{ fontSize: 12, color: '#b45309' }}>{t('input.notUnderstood')}</span>}
             <button
               type="button"
