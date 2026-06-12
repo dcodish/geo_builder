@@ -80,6 +80,9 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
       if (isShape) continue; // base corner reuses any existing point (composition)
       if (existing.kind === 'free-point') continue; // free-point command = move (ADR-011)
     }
+    // A circle-point construct (tangent / arc-midpoint / point-on-circle) creates
+    // its point or reuses whatever already carries that id — never a conflict.
+    if (o.kind === 'on-circle') continue;
     return `'${o.id}' is already defined — it can't be redefined as something different`;
   }
   return null;

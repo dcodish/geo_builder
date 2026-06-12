@@ -393,6 +393,10 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     }
 
     case 'arc-midpoint':
+      // The arc endpoints must lie on the circle — create them there if missing.
+      for (const pid of [cmd.from, cmd.to]) {
+        if (!objects.some((o) => o.id === pid)) addObj(objects, { kind: 'on-circle', id: pid, circle: cmd.circle, theta: nextTheta(objects, cmd.circle) });
+      }
       addObj(objects, { kind: 'arc-midpoint', id: cmd.id, circle: cmd.circle, from: cmd.from, to: cmd.to, branch: cmd.branch ?? 0 });
       break;
 
@@ -405,6 +409,11 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
 
     case 'tangent':
+      // The point of tangency lies on the circle — create it there if it doesn't
+      // exist yet, so "tangent to circle O at A" works even before A is placed.
+      if (!objects.some((o) => o.id === cmd.at)) {
+        addObj(objects, { kind: 'on-circle', id: cmd.at, circle: cmd.circle, theta: nextTheta(objects, cmd.circle) });
+      }
       addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'tangent', circle: cmd.circle, at: cmd.at }, visible: cmd.visible });
       break;
 

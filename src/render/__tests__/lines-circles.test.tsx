@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Command, Vec } from '@/engine/types';
-import { build, evaluate } from '@/engine';
+import { applyStep, build, emptyConstruction, evaluate } from '@/engine';
 import { dist, sub } from '@/engine/geometry';
 import { buildScene } from '../scene';
 import { Figure } from '../Figure';
@@ -84,6 +84,38 @@ describe('visible construction lines', () => {
     expect(buildScene(construction, positions).lines).toHaveLength(1);
     const html = renderToStaticMarkup(<Figure construction={construction} positions={positions} />);
     expect(html).toContain('stroke-dasharray'); // construction lines are dashed
+  });
+
+  it('creates the touch point on the circle when it does not exist yet', () => {
+    // "tangent to circle O at A" with no A → A is created ON the circle + the line drawn
+    const { construction, positions } = build([
+      { type: 'free-point', id: 'O', x: 0, y: 0 },
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
+      { type: 'tangent', id: 'tan-A', circle: 'circle-O', at: 'A', visible: true },
+    ]);
+    expect(dist(positions.get('O')!, positions.get('A')!)).toBeCloseTo(5, 6); // A auto-placed on the circle
+    expect(buildScene(construction, positions).lines).toHaveLength(1);
+  });
+
+  it('the user flow (circle → tangent at A → A on circle O) has no conflict and draws', () => {
+    const cmds = ['מעגל סביב O רדיוס 5', 'משיק למעגל O בנקודה A', 'A על מעגל O'].flatMap((u) => {
+      const r = parse(u);
+      if (!r.ok) throw new Error(`failed: ${u}`);
+      return r.commands;
+    });
+    // applyStep each in order; none should fail (the later "A on circle O" reuses A)
+    let cur = emptyConstruction();
+    for (const cmd of cmds as Command[]) {
+      const r = applyStep(cur, cmd);
+      expect(r.ok, `step ${cmd.type}: ${r.ok ? '' : r.error}`).toBe(true);
+      cur = r.construction;
+    }
+    const e = evaluate(cur);
+    expect(e.ok).toBe(true);
+    if (e.ok) {
+      expect(dist(e.positions.get('O')!, e.positions.get('A')!)).toBeCloseTo(5, 6);
+      expect(buildScene(cur, e.positions).lines).toHaveLength(1);
+    }
   });
 
   it('end-to-end: a parsed standalone tangent becomes a visible line', () => {
