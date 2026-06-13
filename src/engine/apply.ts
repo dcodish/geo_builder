@@ -472,6 +472,10 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       driveOrCheck(objects, constraints, { type: 'equal', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
       break;
 
+    case 'set-ratio':
+      driveOrCheck(objects, constraints, { type: 'ratio', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d, k: cmd.k });
+      break;
+
     case 'set-parallel':
       driveOrCheck(objects, constraints, { type: 'parallel', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
       break;

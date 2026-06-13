@@ -75,6 +75,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'constraints', supported: true, en: 'angle GBA = 37', he: 'זווית GBA = 37', descEn: 'Set an angle — a point that can slide moves to satisfy it; otherwise it is checked.', descHe: 'קביעת זווית — נקודה שיכולה לזוז תוזז כדי לקיימה; אחרת היא נבדקת.' },
   { category: 'constraints', supported: true, en: 'AB = 6', he: 'AB = 6', descEn: 'Fix a segment length (drives a sliding point, else checks).', descHe: 'קביעת אורך קטע (מזיז נקודה שיכולה לזוז, אחרת נבדק).' },
   { category: 'constraints', supported: true, en: 'AB = CD', he: 'AB = CD', descEn: 'Make two segments equal.', descHe: 'השוואת אורכי שני קטעים.' },
+  { category: 'constraints', supported: true, en: 'AB = 2 AD', he: 'AB = 2 AD', descEn: 'A proportion between two lengths (|AB| = k·|CD|).', descHe: 'יחס בין שני אורכים (|AB| = k·|CD|).' },
   { category: 'constraints', supported: true, en: 'AB perpendicular to CD', he: 'AB מאונך ל-CD', descEn: 'Force a right angle between two segments.', descHe: 'אילוץ זווית ישרה בין שני קטעים.' },
 
   // ── Circles ─────────────────────────────────────────────────────────────

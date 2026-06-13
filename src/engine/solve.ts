@@ -26,6 +26,7 @@ export function constraintRefs(con: Constraint): Id[] {
     case 'distance':
       return [con.a, con.b];
     case 'equal':
+    case 'ratio':
     case 'parallel':
     case 'perpendicular':
       return [con.a, con.b, con.c, con.d];
@@ -45,6 +46,8 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
       return dist(get(con.a), get(con.b)) - con.value;
     case 'equal':
       return dist(get(con.a), get(con.b)) - dist(get(con.c), get(con.d));
+    case 'ratio':
+      return dist(get(con.a), get(con.b)) - con.k * dist(get(con.c), get(con.d));
     case 'parallel': {
       const u = unit(sub(get(con.b), get(con.a)));
       const v = unit(sub(get(con.d), get(con.c)));
@@ -65,6 +68,7 @@ export function residualTolerance(con: Constraint): number {
       return ANGLE_EPS;
     case 'distance':
     case 'equal':
+    case 'ratio':
       return 1e-6;
     case 'parallel':
     case 'perpendicular':
@@ -81,6 +85,8 @@ export function describeConstraint(con: Constraint): string {
       return `|${con.a}${con.b}| = ${con.value}`;
     case 'equal':
       return `|${con.a}${con.b}| = |${con.c}${con.d}|`;
+    case 'ratio':
+      return `|${con.a}${con.b}| = ${con.k}·|${con.c}${con.d}|`;
     case 'parallel':
       return `${con.a}${con.b} ∥ ${con.c}${con.d}`;
     case 'perpendicular':

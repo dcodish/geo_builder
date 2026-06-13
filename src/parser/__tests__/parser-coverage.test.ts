@@ -102,6 +102,11 @@ const PARSES: [string, string][] = [
   ['זווית GBA = 37', 'set-angle'],
   ['AB = 6', 'set-distance'],
   ['AB = CD', 'set-equal'],
+  ['AB = 2 AD', 'set-ratio'], // a proportion |AB| = 2·|AD| (NOT half-parsed to "AB = 2")
+  ['AB = 2AD', 'set-ratio'],
+  ['AB = 2·AD', 'set-ratio'],
+  ['2 AB = 3 CD', 'set-ratio'],
+  ['AB פי 2 מ-AD', 'set-ratio'],
   ['BC parallel to AD', 'set-parallel'],
   ['BC מקביל ל-AD', 'set-parallel'],
   ['AB perpendicular to CD', 'set-perpendicular'],

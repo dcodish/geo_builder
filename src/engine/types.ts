@@ -346,6 +346,16 @@ export interface EqualConstraint {
   d: Id;
 }
 
+/** |a→b| = k·|c→d| (a proportion between two segment lengths; equal is k = 1). */
+export interface RatioConstraint {
+  type: 'ratio';
+  a: Id;
+  b: Id;
+  c: Id;
+  d: Id;
+  k: number;
+}
+
 /** a→b ∥ c→d. */
 export interface ParallelConstraint {
   type: 'parallel';
@@ -368,6 +378,7 @@ export type Constraint =
   | AngleConstraint
   | DistanceConstraint
   | EqualConstraint
+  | RatioConstraint
   | ParallelConstraint
   | PerpendicularConstraint;
 
@@ -394,6 +405,7 @@ export type Command =
   | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number }
   | { type: 'set-distance'; a: Id; b: Id; value: number }
   | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id }
+  | { type: 'set-ratio'; a: Id; b: Id; c: Id; d: Id; k: number } // |ab| = k·|cd|
   | { type: 'set-parallel'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-perpendicular'; a: Id; b: Id; c: Id; d: Id }
   // Phase 5b — lines (scaffolding unless `visible`) and the points they produce.

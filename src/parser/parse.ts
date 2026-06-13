@@ -296,6 +296,28 @@ const pointByDistances: Rule = (s) => {
   ];
 };
 
+/**
+ * "AB = 2 AD" / "2 AB = 3 CD" / "AB = 2·AD" / "AB = 2AD" / "AB פי 2 מ-AD" — a
+ * proportion |AB| = k·|CD|. At least one numeric coefficient must be present
+ * (the coefficient-free "AB = CD" is the `equalSegments` case, k = 1). Runs before
+ * `distanceConstraint`, which would otherwise half-parse "AB = 2 AD" into "AB = 2".
+ */
+const COEF = String.raw`\d+(?:\.\d+)?`;
+const ratioConstraint: Rule = (s) => {
+  const en = s.match(
+    new RegExp(String.raw`\b(${COEF})?\s*[*·]?\s*([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})?\s*[*·]?\s*([A-Za-z])\s*([A-Za-z])\b`),
+  );
+  if (en && (en[1] || en[4])) {
+    const m = en[1] ? parseFloat(en[1]) : 1; // |AB| = (n/m)·|CD|
+    const n = en[4] ? parseFloat(en[4]) : 1;
+    return [{ type: 'set-ratio', a: up(en[2]), b: up(en[3]), c: up(en[5]), d: up(en[6]), k: n / m }];
+  }
+  // Hebrew "AB פי 2 מ-AD" — |AB| is 2× |AD|.
+  const he = s.match(new RegExp(String.raw`([A-Za-z])\s*([A-Za-z])\b[^=]*?פי\s*(${COEF})\s*מ-?\s*([A-Za-z])\s*([A-Za-z])\b`));
+  if (he) return [{ type: 'set-ratio', a: up(he[1]), b: up(he[2]), c: up(he[4]), d: up(he[5]), k: parseFloat(he[3]) }];
+  return null;
+};
+
 /** "AB = CD" — two segments equal in length. */
 const equalSegments: Rule = (s) => {
   const m = s.match(/\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*\b([A-Za-z])\s*([A-Za-z])\b/);
@@ -743,6 +765,7 @@ const RULES: Rule[] = [
   pointOnCircle, // "A on circle O" — before segment/pointOnSegment
   segment,
   pointOnSegment,
+  ratioConstraint, // "AB = 2 AD" — before equal/distance (it would half-parse "AB = 2")
   equalSegments, // "AB = CD" — before distance (numeric RHS) and freePoint (coord RHS)
   distanceConstraint, // "AB = 6"
   pointByDistances,

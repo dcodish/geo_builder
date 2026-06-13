@@ -44,6 +44,30 @@ describe('equal-segments constraint', () => {
   });
 });
 
+describe('ratio constraint (a proportion |AB| = k·|CD|)', () => {
+  it('drives an on-segment point so |AE| = 2·|EB| (E at the 2:1 point)', () => {
+    const { positions } = build([...onAB(6), { type: 'set-ratio', a: 'E', b: 'A', c: 'E', d: 'B', k: 2 }]);
+    const A = positions.get('A')!, B = positions.get('B')!, E = positions.get('E')!;
+    expect(dist(E, A)).toBeCloseTo(2 * dist(E, B), 6);
+    expect(E.x).toBeCloseTo(4, 6); // |AE|=4, |EB|=2 on A(0,0)–B(6,0)
+  });
+
+  it('parses "AE = 2 EB" and drives the same point (end to end)', () => {
+    const r = parse('AE = 2 EB');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const { positions } = build([...onAB(6), ...r.commands]);
+    expect(positions.get('E')!.x).toBeCloseTo(4, 6);
+  });
+
+  it('is an over-constraint check when both segments are fixed (keeps prior figure)', () => {
+    const sq = build([{ type: 'square', ids: ['A', 'B', 'C', 'D'], side: 5 }]); // |AB| = |BC|
+    const r = applyStep(sq.construction, { type: 'set-ratio', a: 'A', b: 'B', c: 'B', d: 'C', k: 2 }); // demands |AB| = 2|BC|
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/over-constrained/i);
+  });
+});
+
 describe('perpendicular constraint', () => {
   it('drives an on-segment point so AE ⟂ AB', () => {
     const { positions } = build([
