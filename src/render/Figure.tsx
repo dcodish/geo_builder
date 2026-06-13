@@ -84,6 +84,14 @@ export function Figure({
   const stroke = 1.5 / view.zoom;
   const fontSize = 16 / view.zoom;
 
+  // Rotate the view so segment XY reads horizontal — pick a reference segment
+  // instead of nudging the rotation slider. (rot = −angle(X→Y) lays X→Y along +x.)
+  function alignHorizontal(seg: string) {
+    const a = positions.get(seg[0]?.toUpperCase());
+    const b = positions.get(seg[1]?.toUpperCase());
+    if (a && b && (a.x !== b.x || a.y !== b.y)) setView((v) => ({ ...v, rot: normRot(-Math.atan2(b.y - a.y, b.x - a.x)) }));
+  }
+
   function onWheel(e: React.WheelEvent) {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
@@ -265,6 +273,19 @@ export function Figure({
           onChange={(e) => setView((v) => ({ ...v, rot: normRot((Number(e.target.value) * Math.PI) / 180) }))}
           onPointerDown={(e) => e.stopPropagation()}
           style={{ width: 90, cursor: 'pointer' }}
+        />
+        {/* Make a chosen segment horizontal — type its two points, e.g. "AB". */}
+        <input
+          type="text"
+          maxLength={2}
+          placeholder="⎯ AB"
+          title="Make a segment horizontal — type its two endpoints (e.g. AB) and press Enter"
+          aria-label="align segment horizontal"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') alignHorizontal((e.target as HTMLInputElement).value);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{ width: 48, padding: '3px 6px', fontSize: 12, borderRadius: 6, border: '1px solid #cbd5e1', textTransform: 'uppercase' }}
         />
       </div>
 

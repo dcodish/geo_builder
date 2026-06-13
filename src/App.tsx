@@ -44,7 +44,7 @@ export default function App() {
   const [notUnderstood, setNotUnderstood] = useState(false);
   const [thinking, setThinking] = useState(false); // LLM fallback in flight (Phase 7)
   const [llmDropped, setLlmDropped] = useState<string[]>([]); // LLM steps the engine couldn't build
-  const [showHelp, setShowHelp] = useState(true); // visible by default so supported commands are discoverable
+  const [showHelp, setShowHelp] = useState(false); // collapsed by default; "מה אפשר להקליד?" opens the command reference
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editError, setEditError] = useState(false);
