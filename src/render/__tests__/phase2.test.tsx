@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Command } from '@/engine/types';
 import { build, cycleAlternative, evaluate, emptyConstruction, applyStep } from '@/engine';
-import { boundsOf, fitTransform } from '../transform';
+import { boundsOf, fitTransform, orient } from '../transform';
 import { buildScene, scenePositions } from '../scene';
 import { Figure } from '../Figure';
 
@@ -79,6 +79,25 @@ describe('transform — fit', () => {
     expect(s.x).toBeCloseTo(300, 6);
     expect(s.y).toBeCloseTo(300, 6);
     expect(isFinite(t.scale)).toBe(true);
+  });
+});
+
+describe('transform — orientation (rotate / flip is an isometry; labels stay upright)', () => {
+  const close = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeCloseTo(0, 9);
+
+  it('rotates 90° CCW: (1,0) → (0,1)', () => {
+    close(orient({ x: 1, y: 0 }, { rot: Math.PI / 2, flipX: false, flipY: false }), { x: 0, y: 1 });
+  });
+  it('flips horizontally and vertically', () => {
+    close(orient({ x: 2, y: 3 }, { rot: 0, flipX: true, flipY: false }), { x: -2, y: 3 });
+    close(orient({ x: 2, y: 3 }, { rot: 0, flipX: false, flipY: true }), { x: 2, y: -3 });
+  });
+  it('preserves distances (it is an isometry)', () => {
+    const o = { rot: 0.7, flipX: true, flipY: false };
+    const a = orient({ x: 1, y: 2 }, o);
+    const b = orient({ x: 4, y: 6 }, o);
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeCloseTo(5, 9); // |(3,4)| = 5
   });
 });
 

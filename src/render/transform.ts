@@ -34,6 +34,35 @@ export interface Transform {
   toScreen(v: Vec): Vec;
 }
 
+/**
+ * A view orientation: rotate (radians, applied first) then optionally mirror.
+ * It's an isometry — the figure's shape is preserved, only its placement on
+ * screen changes. Applied to world points *before* the fit, so the rotated
+ * figure is re-fitted and centred, label directions are computed in the rotated
+ * frame, and (because label glyphs are never rotated) labels stay upright.
+ */
+export interface Orientation {
+  rot: number;
+  flipX: boolean;
+  flipY: boolean;
+}
+
+export const NO_ORIENT: Orientation = { rot: 0, flipX: false, flipY: false };
+
+/** Apply a view {@link Orientation} to a world point. */
+export function orient(v: Vec, o: Orientation): Vec {
+  let x = v.x;
+  let y = v.y;
+  if (o.rot) {
+    const c = Math.cos(o.rot);
+    const s = Math.sin(o.rot);
+    [x, y] = [x * c - y * s, x * s + y * c];
+  }
+  if (o.flipX) x = -x;
+  if (o.flipY) y = -y;
+  return { x, y };
+}
+
 /** Axis-aligned bounds of the points; a unit box around the origin if empty. */
 export function boundsOf(points: Vec[]): Box {
   if (points.length === 0) return { minX: -1, minY: -1, maxX: 1, maxY: 1 };

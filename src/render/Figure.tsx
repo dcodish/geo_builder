@@ -9,11 +9,12 @@
  */
 
 import { useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
 import { buildScene, scenePositions } from './scene';
 import { findSegmentCrossings } from './intersections';
 import type { Crossing } from './intersections';
-import { fitTransform } from './transform';
+import { fitTransform, orient } from './transform';
 
 export interface FigureProps {
   construction: Construction;
@@ -37,9 +38,15 @@ interface View {
   zoom: number;
   panX: number;
   panY: number;
+  /** Figure orientation: rotation (radians) + mirror flags. Labels stay upright. */
+  rot: number;
+  flipX: boolean;
+  flipY: boolean;
 }
 
-const IDENTITY: View = { zoom: 1, panX: 0, panY: 0 };
+const IDENTITY: View = { zoom: 1, panX: 0, panY: 0, rot: 0, flipX: false, flipY: false };
+const TWO_PI = 2 * Math.PI;
+const normRot = (r: number): number => ((r % TWO_PI) + TWO_PI) % TWO_PI;
 
 const ACCENT = '#f59e0b';
 
@@ -59,11 +66,18 @@ export function Figure({
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
 
   const { scene, transform, crossings } = useMemo(() => {
-    const s = buildScene(construction, positions);
+    // Rotate/flip the figure in world space, then fit — so it stays centred and
+    // labels (computed here, drawn upright) follow the new orientation.
+    const o = { rot: view.rot, flipX: view.flipX, flipY: view.flipY };
+    const oriented =
+      o.rot === 0 && !o.flipX && !o.flipY
+        ? positions
+        : new Map<Id, Vec>([...positions].map(([id, v]) => [id, orient(v, o)]));
+    const s = buildScene(construction, oriented);
     const t = fitTransform(scenePositions(s), { width, height, padding });
-    const x = onPickIntersection ? findSegmentCrossings(construction, positions) : [];
+    const x = onPickIntersection ? findSegmentCrossings(construction, oriented) : [];
     return { scene: s, transform: t, crossings: x };
-  }, [construction, positions, width, height, padding, onPickIntersection]);
+  }, [construction, positions, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY]);
 
   // Point radius in px, kept visually constant by dividing out the pan/zoom scale.
   const r = 4 / view.zoom;
@@ -227,26 +241,51 @@ export function Figure({
         </g>
       </svg>
 
-      <button
-        type="button"
-        onClick={() => setView(IDENTITY)}
-        style={{
-          position: 'absolute',
-          top: 8,
-          insetInlineEnd: 8,
-          padding: '4px 10px',
-          fontSize: 12,
-          borderRadius: 6,
-          border: '1px solid #cbd5e1',
-          background: '#f8fafc',
-          cursor: 'pointer',
-        }}
-      >
+      {/* Orientation controls — rotate / flip the whole figure; labels stay upright
+          (only the world coordinates are oriented, never the label glyphs). */}
+      <div style={{ position: 'absolute', top: 8, insetInlineStart: 8, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button type="button" style={ctrlBtn} title="Rotate 90°" aria-label="rotate 90 degrees" onClick={() => setView((v) => ({ ...v, rot: normRot(v.rot - Math.PI / 2) }))}>
+          ⟳
+        </button>
+        <button type="button" style={ctrlBtn} title="Rotate 180°" aria-label="rotate 180 degrees" onClick={() => setView((v) => ({ ...v, rot: normRot(v.rot + Math.PI) }))}>
+          180°
+        </button>
+        <button type="button" style={ctrlBtn} title="Flip horizontal" aria-label="flip horizontal" onClick={() => setView((v) => ({ ...v, flipX: !v.flipX }))}>
+          ⇄
+        </button>
+        <button type="button" style={ctrlBtn} title="Flip vertical" aria-label="flip vertical" onClick={() => setView((v) => ({ ...v, flipY: !v.flipY }))}>
+          ⇅
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={359}
+          value={Math.round((normRot(view.rot) * 180) / Math.PI)}
+          title="Rotate"
+          aria-label="rotate"
+          onChange={(e) => setView((v) => ({ ...v, rot: normRot((Number(e.target.value) * Math.PI) / 180) }))}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{ width: 90, cursor: 'pointer' }}
+        />
+      </div>
+
+      <button type="button" onClick={() => setView(IDENTITY)} style={{ ...ctrlBtn, position: 'absolute', top: 8, insetInlineEnd: 8 }}>
         Reset view
       </button>
     </div>
   );
 }
+
+const ctrlBtn: CSSProperties = {
+  padding: '4px 9px',
+  fontSize: 13,
+  lineHeight: 1,
+  minWidth: 28,
+  borderRadius: 6,
+  border: '1px solid #cbd5e1',
+  background: '#f8fafc',
+  cursor: 'pointer',
+};
 
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
 const unitVec = (v: Vec): Vec => {
