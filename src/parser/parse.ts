@@ -346,34 +346,77 @@ const circle: Rule = (s) => {
   return [{ type: 'circle', id: circleId(center), center: up(center), radius: rM ? parseFloat(rM[1]) : 5 }];
 };
 
-/** "triangle ABC inscribed in circle O radius 5" / "המשולש ABC חסום במעגל" — circle + on-circle vertices + polygon. */
+/**
+ * Vertex angles (degrees, around the centre) for each *cyclic* polygon, in
+ * vertex order A,B,C,D. A polygon is built by placing its vertices on the circle
+ * at these angles; the shape comes from the angles (the edges just connect them).
+ * `null` = no constraint, spread the vertices evenly (any triangle / general quad
+ * is cyclic). A cyclic rhombus is a square; a general trapezoid isn't cyclic, but
+ * an isosceles one is (symmetric about a diameter) — so "inscribed trapezoid"
+ * builds the isosceles one.
+ */
+const INSCRIBED_ANGLES: Record<string, number[] | null> = {
+  triangle: null,
+  quad: null,
+  square: [45, 135, 225, 315],
+  rhombus: [45, 135, 225, 315], // a cyclic rhombus is a square
+  rectangle: [40, 140, 220, 320], // diagonals are diameters
+  trapezoid: [215, 325, 60, 120], // isosceles: AB ∥ CD, symmetric about the vertical axis
+};
+
+/** "triangle ABC inscribed in circle O" / "טרפז ABCD חסום במעגל" — circle + on-circle vertices + edges. */
 const inscribedPolygon: Rule = (s) => {
   if (!/inscribed|חסום/i.test(s)) return null;
-  // A *right* triangle inscribed in a circle is a real construct the engine can't
-  // build yet (its hypotenuse must be a diameter) — don't quietly drop "right" and
-  // draw a generic inscribed triangle. Defer so right-triangle's guard escalates it.
+  // A *right* triangle inscribed in a circle (hypotenuse = diameter) isn't a
+  // construct the engine builds — defer so right-triangle's guard escalates it.
   if (/right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זווית/i.test(s)) return null;
-  const isTri = /triangle|משולש/i.test(s);
-  const isQuad = /quad|מרובע/i.test(s);
-  if (!isTri && !isQuad) return null;
-  const n = isTri ? 3 : 4;
+  const kind =
+    /triangle|משולש/i.test(s) ? 'triangle'
+    : /square|ריבוע/i.test(s) ? 'square'
+    : /rectangle|מלבן/i.test(s) ? 'rectangle'
+    : /rhombus|מעוין/i.test(s) ? 'rhombus'
+    : /trapez|טרפז/i.test(s) ? 'trapezoid'
+    : /quad|מרובע/i.test(s) ? 'quad'
+    : null;
+  if (!kind) return null;
+  const n = kind === 'triangle' ? 3 : 4;
   const named = circleCenter(s); // may be null — "inscribed in a circle" need not name the centre
   const rM = s.match(new RegExp(String.raw`(?:radius|רדיוס\S*)\s*${num}`, 'i'));
-  // strip keywords + the circle reference (+ the named centre), then read the n vertex labels
   let rest = dropCircleRef(s).replace(
-    /triangle|משולש|quad\w*|מרובע|inscribed|חסום|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
+    /triangle|משולש|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|quad\w*|מרובע|inscribed|חסום|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
     ' ',
   );
   if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
   const ids = labelRun(rest, n);
   if (!ids) return null;
+  // After the circle, the shape, and the vertices are consumed, nothing
+  // geometry-significant should remain — a constraint/extra construct means a
+  // compound ("inscribed … with AB = 6") → escalate, don't half-parse.
+  const leftover = ids.reduce(
+    (a, id) => a.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
+    rest.replace(new RegExp(String.raw`\b${ids.join('')}\b`, 'i'), ' '),
+  );
+  if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
   // No centre named ⇒ create one: a fresh label that doesn't clash with the vertices.
-  // (This is what stops "משולש ABC חסום במעגל" from silently dropping the circle.)
   const center = named ?? (['O', 'P', 'Q', 'K', 'S', 'T', 'U'].find((c) => !ids.includes(c)) ?? 'O');
   const circ = circleId(center);
+  const angles = INSCRIBED_ANGLES[kind];
   const cmds: Command[] = [{ type: 'circle', id: circ, center: up(center), radius: rM ? parseFloat(rM[1]) : 5 }];
-  for (const id of ids) cmds.push({ type: 'point-on-circle', id, circle: circ });
-  cmds.push(isTri ? { type: 'triangle', ids: [ids[0], ids[1], ids[2]] } : { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] });
+  ids.forEach((id, i) => {
+    // specific angle for a shaped cyclic polygon (square/rect/rhombus/trapezoid);
+    // omit for triangle/general-quad so they spread evenly.
+    cmds.push(
+      angles
+        ? { type: 'point-on-circle', id, circle: circ, theta: (angles[i] * Math.PI) / 180 }
+        : { type: 'point-on-circle', id, circle: circ },
+    );
+  });
+  // The edges connect the on-circle vertices; the SHAPE is set by the angles.
+  cmds.push(
+    kind === 'triangle'
+      ? { type: 'triangle', ids: [ids[0], ids[1], ids[2]] }
+      : { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
+  );
   return cmds;
 };
 

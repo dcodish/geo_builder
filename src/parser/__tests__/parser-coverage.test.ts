@@ -37,11 +37,17 @@ const PARSES: [string, string][] = [
   ['טרפז ABCD', 'trapezoid'],
   ['quadrilateral ABCD', 'quadrilateral'],
   ['מרובע ABCD', 'quadrilateral'],
-  // ── inscribed (named + UNNAMED centre — the regression) ──
+  // ── inscribed (named + UNNAMED centre; every cyclic polygon) ──
   ['triangle ABC inscribed in circle O', 'circle'],
   ['triangle ABC inscribed in a circle', 'circle'],
   ['משולש ABC חסום במעגל', 'circle'],
   ['quadrilateral ABCD inscribed in a circle', 'circle'],
+  ['square ABCD inscribed in a circle', 'circle'],
+  ['ריבוע ABCD חסום במעגל', 'circle'],
+  ['rectangle ABCD inscribed in circle O', 'circle'],
+  ['rhombus ABCD inscribed in a circle', 'circle'],
+  ['trapezoid ABCD inscribed in a circle', 'circle'],
+  ['טרפז ABCD חסום במעגל', 'circle'],
   // ── points ──
   ['point A at (0,0)', 'free-point'],
   ['נקודה A ב-(0,0)', 'free-point'],
@@ -88,14 +94,8 @@ const PARSES: [string, string][] = [
 /** Utterances that must escalate (not-handled) rather than half-parse or draw a wrong figure. */
 const ESCALATES: string[] = [
   // ── modified shapes the engine can't build → must not drop the modifier ──
-  'square ABCD inscribed in a circle',
-  'ריבוע ABCD חסום במעגל',
-  'rectangle ABCD inscribed in circle O',
-  'מלבן ABCD חסום במעגל',
-  'rhombus ABCD inscribed in a circle',
-  'מעוין ABCD חסום במעגל',
-  'trapezoid ABCD inscribed in a circle',
-  'right triangle ABC inscribed in a circle',
+  'right triangle ABC inscribed in a circle', // hypotenuse must be a diameter — not supported
+  'square ABCD inscribed in a circle with AB = 6', // inscribed + a constraint on top
   // ── shape + a constraint (compound — LLM should decompose) ──
   'square ABCD with AB = 6',
   'parallelogram ABCD where AB = CD',

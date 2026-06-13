@@ -59,11 +59,11 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
   });
 
   it('reports (not silently drops) steps the engine cannot build', async () => {
-    // "trapezoid inscribed in a circle" is a step the LLM may produce but the engine can't build.
-    mockFetch(['circle centered at O radius 5', 'trapezoid ABCD inscribed in circle O', 'segment AB']);
-    const r = await llmParse('inscribe a trapezoid', '');
+    // "circle through 3 points" (circumscribed) is a step the LLM may produce but the engine can't build.
+    mockFetch(['circle centered at O radius 5', 'circle through A B C', 'segment AB']);
+    const r = await llmParse('circle through the three vertices', '');
     expect(r!.built.map((b) => b.step)).toEqual(['circle centered at O radius 5', 'segment AB']);
-    expect(r!.dropped).toEqual(['trapezoid ABCD inscribed in circle O']);
+    expect(r!.dropped).toEqual(['circle through A B C']);
   });
 
   it('an LLM that returns nothing buildable yields empty built (caller shows "couldn\'t read")', async () => {

@@ -80,6 +80,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'circles', supported: true, en: 'circle centered at O radius 5', he: 'מעגל סביב O רדיוס 5', descEn: 'A circle from a centre and radius.', descHe: 'מעגל לפי מרכז ורדיוס.' },
   { category: 'circles', supported: true, en: 'A is on circle O', he: 'A על מעגל O', descEn: 'A point on a circle / inscribed vertex.', descHe: 'נקודה על מעגל / קודקוד חסום.' },
   { category: 'circles', supported: true, en: 'triangle ABC inscribed in circle O', he: 'משולש ABC חסום במעגל O', descEn: 'A triangle with all vertices on a circle.', descHe: 'משולש שכל קודקודיו על מעגל.' },
+  { category: 'circles', supported: true, en: 'trapezoid ABCD inscribed in a circle', he: 'טרפז ABCD חסום במעגל', descEn: 'A cyclic (isosceles) trapezoid — also square/rectangle/rhombus.', descHe: 'טרפז חסום (שווה-שוקיים) — וכן ריבוע/מלבן/מעוין.' },
   { category: 'circles', supported: true, en: 'chord AB in circle O', he: 'מיתר AB במעגל O', descEn: 'A chord of a circle (both ends on it).', descHe: 'מיתר במעגל (שני קצותיו עליו).' },
   { category: 'circles', supported: true, en: 'diameter AB in circle O', he: 'קוטר AB במעגל O', descEn: 'A chord through the centre.', descHe: 'מיתר העובר במרכז.' },
   { category: 'circles', supported: true, en: 'M is the midpoint of arc BC in circle O', he: 'M אמצע הקשת BC במעגל O', descEn: 'The midpoint of an arc.', descHe: 'אמצע הקשת.' },

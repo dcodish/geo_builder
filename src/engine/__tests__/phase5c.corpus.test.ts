@@ -42,6 +42,32 @@ describe('inscribed without naming the circle (regression — no silent half-par
   }
 });
 
+describe('inscribed cyclic polygons (square / rectangle / isosceles trapezoid)', () => {
+  const para = (a: Vec, b: Vec, c: Vec, d: Vec) => {
+    const u = sub(b, a), v = sub(d, c);
+    return Math.abs(u.x * v.y - u.y * v.x) < 1e-6; // (b−a) ∥ (d−c)
+  };
+
+  it('inscribed square: 4 equal sides, all on the circle', () => {
+    const { positions } = reproduce(['square ABCD inscribed in a circle'], 'sq');
+    const O = positions.get('O')!;
+    const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => positions.get(id)!);
+    for (const p of [A, B, C, D]) expect(dist(O, p)).toBeCloseTo(5, 6);
+    expect(dist(A, B)).toBeCloseTo(dist(B, C), 6);
+    expect(dist(B, C)).toBeCloseTo(dist(C, D), 6);
+  });
+
+  it('inscribed isosceles trapezoid: AB ∥ DC, equal legs, all on the circle', () => {
+    const { positions } = reproduce(['טרפז ABCD חסום במעגל'], 'trap');
+    const O = positions.get('O')!;
+    const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => positions.get(id)!);
+    for (const p of [A, B, C, D]) expect(dist(O, p)).toBeCloseTo(5, 6);
+    expect(para(A, B, D, C)).toBe(true); // one pair of parallel sides
+    expect(para(A, D, B, C)).toBe(false); // the other pair is NOT parallel (a trapezoid, not a parallelogram)
+    expect(dist(B, C)).toBeCloseTo(dist(D, A), 6); // isosceles — equal legs
+  });
+});
+
 describe('corpus Q5 — triangle inscribed in a circle + arc midpoint', () => {
   const EN = [
     'triangle ABC inscribed in circle O radius 5',
