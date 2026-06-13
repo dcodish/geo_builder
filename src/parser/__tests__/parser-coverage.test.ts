@@ -1,0 +1,140 @@
+/**
+ * Parser coverage matrix — the combination space, both locales.
+ *
+ * Two contracts:
+ *  (1) PARSES — every supported phrasing (and its order/spacing/filler variants)
+ *      resolves to the right command(s).
+ *  (2) ESCALATES — an utterance that carries meaning the deterministic parser
+ *      can't fully express (a modified shape, a compound, a second construct,
+ *      an unsupported construct) returns `not-handled` so it goes to the LLM —
+ *      it must NEVER silently *half-parse* (the bug that drew a bare triangle
+ *      for "משולש ABC חסום במעגל"). Half-parses draw a wrong figure; misses
+ *      escalate. This pins that boundary across the whole vocabulary.
+ */
+
+import { describe, it, expect } from 'vitest';
+import { parse } from '../parse';
+
+/** [utterance, a command type that must appear in the result]. */
+const PARSES: [string, string][] = [
+  // ── shapes (He/En, order/spacing/filler variants) ──
+  ['triangle ABC', 'triangle'],
+  ['משולש ABC', 'triangle'],
+  ['right triangle ABC', 'right-triangle'],
+  ['משולש ישר-זווית ABC', 'right-triangle'],
+  ['square ABCD', 'square'],
+  ['ריבוע ABCD', 'square'],
+  ['ABCD square', 'square'],
+  ['square A B C D', 'square'],
+  ['draw a square ABCD', 'square'],
+  ['rectangle ABCD', 'rectangle'],
+  ['מלבן ABCD', 'rectangle'],
+  ['rhombus ABCD', 'rhombus'],
+  ['מעוין ABCD', 'rhombus'],
+  ['parallelogram ABCD', 'parallelogram'],
+  ['מקבילית ABCD', 'parallelogram'],
+  ['trapezoid ABCD', 'trapezoid'],
+  ['טרפז ABCD', 'trapezoid'],
+  ['quadrilateral ABCD', 'quadrilateral'],
+  ['מרובע ABCD', 'quadrilateral'],
+  // ── inscribed (named + UNNAMED centre — the regression) ──
+  ['triangle ABC inscribed in circle O', 'circle'],
+  ['triangle ABC inscribed in a circle', 'circle'],
+  ['משולש ABC חסום במעגל', 'circle'],
+  ['quadrilateral ABCD inscribed in a circle', 'circle'],
+  // ── points ──
+  ['point A at (0,0)', 'free-point'],
+  ['נקודה A ב-(0,0)', 'free-point'],
+  ['point E on AC', 'point-on-segment'],
+  ['point E on AC at 40%', 'point-on-segment'],
+  ['נקודה E על AC ב-40%', 'point-on-segment'],
+  ['point F on the extension of AD', 'point-on-segment'],
+  ['C is 5 from A and 5 from B', 'point-by-distances'],
+  ['M is the midpoint of AB', 'midpoint'],
+  ['M אמצע AB', 'midpoint'],
+  ['M is the intersection of AC and BD', 'line-line-intersection'],
+  ['F is the foot of the perpendicular from C to AD', 'foot'],
+  // ── lines ──
+  ['segment AC', 'segment'],
+  ['diagonal AC', 'segment'],
+  ['קטע AC', 'segment'],
+  ['E is where the bisectors of BAC and BCA meet', 'line-intersection'],
+  ['bisector of angle ABC', 'bisector'],
+  ['חוצה זווית ABC', 'bisector'],
+  ['line through P perpendicular to AB', 'perpendicular-line'],
+  ['line through P parallel to AB', 'parallel-line'],
+  // ── circles ──
+  ['circle centered at O radius 5', 'circle'],
+  ['מעגל סביב O רדיוס 5', 'circle'],
+  ['A is on circle O', 'point-on-circle'],
+  ['chord AB in circle O', 'point-on-circle'],
+  ['מיתר AB במעגל O', 'segment'],
+  ['diameter AB in circle O', 'diameter'],
+  ['M is the midpoint of arc BC in circle O', 'arc-midpoint'],
+  ['tangent to circle O at A', 'tangent'],
+  ['משיק למעגל O בנקודה A', 'tangent'],
+  ['G is the intersection of circle O and circle P', 'circle-circle-intersection'],
+  // ── constraints ──
+  ['angle GBA = 37', 'set-angle'],
+  ['זווית GBA = 37', 'set-angle'],
+  ['AB = 6', 'set-distance'],
+  ['AB = CD', 'set-equal'],
+  ['BC parallel to AD', 'set-parallel'],
+  ['BC מקביל ל-AD', 'set-parallel'],
+  ['AB perpendicular to CD', 'set-perpendicular'],
+  ['AB מאונך ל-CD', 'set-perpendicular'],
+];
+
+/** Utterances that must escalate (not-handled) rather than half-parse or draw a wrong figure. */
+const ESCALATES: string[] = [
+  // ── modified shapes the engine can't build → must not drop the modifier ──
+  'square ABCD inscribed in a circle',
+  'ריבוע ABCD חסום במעגל',
+  'rectangle ABCD inscribed in circle O',
+  'מלבן ABCD חסום במעגל',
+  'rhombus ABCD inscribed in a circle',
+  'מעוין ABCD חסום במעגל',
+  'trapezoid ABCD inscribed in a circle',
+  'right triangle ABC inscribed in a circle',
+  // ── shape + a constraint (compound — LLM should decompose) ──
+  'square ABCD with AB = 6',
+  'parallelogram ABCD where AB = CD',
+  'triangle ABC with angle BAC = 37',
+  'משולש ABC עם זווית BAC = 37',
+  // ── shape + a second construct ──
+  'square ABCD and segment AC',
+  'ריבוע ABCD וקטע AC',
+  'square ABCD with point E on AB',
+  'משולש ABC עם נקודה D על AB',
+  'rectangle ABCD with diagonals',
+  // ── shape + a special line we don't build as a one-liner ──
+  'triangle ABC with a height from A',
+  'triangle ABC with a median from A',
+  // ── genuinely unsupported constructs ──
+  'circle through A B C', // 3-point (circumscribed) circle
+  'AD bisects angle BAC', // a single bisector that *places a point* (1-DOF, deferred)
+  'AD חוצה את הזווית BAC',
+  'perpendicular from A to BC', // the unnamed-foot phrasing
+  // ── nothing to build ──
+  'draw a circle somewhere',
+  'hello there',
+  'make it bigger',
+];
+
+describe('parser coverage — supported phrasings parse to the right commands', () => {
+  for (const [utterance, type] of PARSES) {
+    it(`"${utterance}" → ${type}`, () => {
+      const r = parse(utterance);
+      expect(r.ok, `"${utterance}" should parse`).toBe(true);
+      if (r.ok) expect(r.commands.map((c) => c.type)).toContain(type);
+    });
+  }
+});
+
+describe('parser coverage — out-of-scope input escalates, never half-parses', () => {
+  for (const utterance of ESCALATES) {
+    it(`"${utterance}" escalates`, () => {
+      expect(parse(utterance).ok, `"${utterance}" must NOT be (half-)parsed`).toBe(false);
+    });
+  }
+});

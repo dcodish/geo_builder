@@ -67,13 +67,31 @@ function labelRun(s: string, n: number): Id[] | null {
   return null;
 }
 
+/**
+ * Geometry-significant words/operators a *shape* rule does not itself consume —
+ * a circle, a special line, a constraint, an inscription, an angle. If any of
+ * these survives after a shape's keyword + labels are removed, the utterance
+ * carries meaning the shape rule would silently drop (e.g. "square ABCD inscribed
+ * in a circle"). Rather than half-parse, the rule aborts and the input escalates
+ * to the LLM (ADR-002/023). Latin terms are word-bounded so they don't match
+ * inside "rectangle"/"triangle"; the shape's own keyword is removed before the
+ * test, so e.g. "triangle"/"angle" there is fine.
+ */
+const SHAPE_LEFTOVER =
+  /\b(?:inscribed|circumscribed|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|points?)\b|[=⊥∥∩°]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונך|אנך|מקביל|חוצ|אמצע|תיכון|גובה|המשך|חיתוך|זווית|קטע|אלכסון|חבר|נקוד/i;
+
+/** True if, after removing the shape keyword, geometry the shape can't express remains. */
+const shapeHasLeftover = (s: string, re: RegExp): boolean => SHAPE_LEFTOVER.test(s.replace(re, ' '));
+
 /** A quad-shape rule factory: keyword (either order) + 4 labels → command. */
 const quadShape =
   (re: RegExp, make: (ids: [Id, Id, Id, Id]) => Command): Rule =>
   (s) => {
     if (!re.test(s)) return null;
     const ids = labelRun(s.replace(re, ' '), 4);
-    return ids ? [make([ids[0], ids[1], ids[2], ids[3]])] : null;
+    if (!ids) return null;
+    if (shapeHasLeftover(s, re)) return 'stop'; // don't drop a modifier — escalate
+    return [make([ids[0], ids[1], ids[2], ids[3]])];
   };
 
 /** A triangle rule factory: keyword (either order) + 3 labels → command. */
@@ -82,7 +100,9 @@ const triShape =
   (s) => {
     if (!re.test(s)) return null;
     const ids = labelRun(s.replace(re, ' '), 3);
-    return ids ? [make([ids[0], ids[1], ids[2]])] : null;
+    if (!ids) return null;
+    if (shapeHasLeftover(s, re)) return 'stop';
+    return [make([ids[0], ids[1], ids[2]])];
   };
 
 /** "square ABCD" / "ריבוע ABCD" — keyword and labels in either order. */
@@ -150,7 +170,9 @@ const rightTriangle: Rule = (s) => {
   if (!/right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זווית/i.test(s)) return null;
   const cleaned = s.replace(/right[\s-]?angled|right[\s-]?angle|right|triangle|משולש|ישר[\s-]?זווית|זווית|ישרה/gi, ' ');
   const ids = labelRun(cleaned, 3);
-  return ids ? [{ type: 'right-triangle', ids: [ids[0], ids[1], ids[2]] }] : null;
+  if (!ids) return null;
+  if (SHAPE_LEFTOVER.test(cleaned)) return 'stop'; // a modifier remains — escalate, don't half-parse
+  return [{ type: 'right-triangle', ids: [ids[0], ids[1], ids[2]] }];
 };
 
 const BISECTOR_KW = /bisector|חוצ/i; // English "bisector"; Hebrew חוצה / חוצי
@@ -327,6 +349,10 @@ const circle: Rule = (s) => {
 /** "triangle ABC inscribed in circle O radius 5" / "המשולש ABC חסום במעגל" — circle + on-circle vertices + polygon. */
 const inscribedPolygon: Rule = (s) => {
   if (!/inscribed|חסום/i.test(s)) return null;
+  // A *right* triangle inscribed in a circle is a real construct the engine can't
+  // build yet (its hypotenuse must be a diameter) — don't quietly drop "right" and
+  // draw a generic inscribed triangle. Defer so right-triangle's guard escalates it.
+  if (/right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זווית/i.test(s)) return null;
   const isTri = /triangle|משולש/i.test(s);
   const isQuad = /quad|מרובע/i.test(s);
   if (!isTri && !isQuad) return null;
