@@ -12,3 +12,6 @@ dist
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Vite temp config
+vite.config.ts.timestamp-*.mjs
