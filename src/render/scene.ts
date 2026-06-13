@@ -117,6 +117,7 @@ export function buildScene(c: Construction, positions: Map<Id, Vec>): Scene {
 
   for (const o of c.objects) {
     if (isGeoPoint(o)) {
+      if (o.id.startsWith('~')) continue; // hidden helper (a coincidence target, ADR-028) — not drawn
       const pos = positions.get(o.id);
       if (pos) points.push({ id: o.id, pos, label: o.id, labelDir: outwardDir(incident.get(o.id)) });
       continue;

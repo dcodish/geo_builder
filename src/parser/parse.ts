@@ -221,11 +221,15 @@ const foot: Rule = (s) => {
   return m ? [{ type: 'foot', id: up(m[1]), from: up(m[2]), a: up(m[3]), b: up(m[4]) }] : null;
 };
 
-/** "M is the midpoint of AB" / "M אמצע AB". */
+/** "M is the midpoint of AB" / "M אמצע AB" / "C is the midpoint of OB". */
 const midpoint: Rule = (s) => {
   if (!/midpoint|אמצע/i.test(s)) return null;
-  const m = s.match(new RegExp(String.raw`([A-Za-z])\b.*?(?:midpoint|אמצע).*?\b([A-Za-z])\s*([A-Za-z])\b`, 'i'));
-  return m ? [{ type: 'midpoint', id: up(m[1]), a: up(m[2]), b: up(m[3]) }] : null;
+  const m = s.match(/([A-Za-z])\b.*?(?:midpoint|אמצע)\s*(.*)/i);
+  if (!m) return null;
+  // strip filler ("of"!) and segment/radius words so they aren't read as labels.
+  const rest = m[2].replace(FILLER, ' ').replace(/radius|רדיוס\S*|segment|קטע/gi, ' ');
+  const seg = labelRun(rest, 2);
+  return seg ? [{ type: 'midpoint', id: up(m[1]), a: seg[0], b: seg[1] }] : null;
 };
 
 /** "F on the extension of AD" / "F על המשך AD" — a point on the ray beyond the far end (t > 1). */

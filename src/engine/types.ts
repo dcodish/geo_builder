@@ -32,13 +32,26 @@ export interface FreePoint {
   pinned?: boolean;
 }
 
-/** 1 DOF — lies on segment a→b at parameter t (0 = a, 1 = b). */
+/**
+ * A directive that a parametric point's 1 DOF is *solved* so a constraint holds —
+ * even when the constraint references DOWNSTREAM points this one only influences
+ * indirectly (e.g. an on-circle E driven so the intersection AB∩DE lands on a
+ * target). The residual is global: the figure is re-evaluated as the DOF varies
+ * ([ADR-028](docs/06-decisions.md#adr-028)). `branch` selects among multiple roots.
+ */
+export interface SolveDirective {
+  constraint: Constraint;
+  branch: number;
+}
+
+/** 1 DOF — lies on segment a→b at parameter t (0 = a, 1 = b). `solve` drives t (ADR-028). */
 export interface OnSegmentPoint {
   kind: 'on-segment';
   id: Id;
   a: Id;
   b: Id;
   t: number;
+  solve?: SolveDirective;
 }
 
 /** 0 DOF — computed from parents by a named rule. `flip` mirrors it to the other side of a→b. */
@@ -168,12 +181,13 @@ export interface CircumcenterPoint {
   c: Id;
 }
 
-/** 1 DOF — a point on `circle` at angle `theta` (radians) from the centre. Like on-segment, but angular. */
+/** 1 DOF — a point on `circle` at angle `theta` (radians) from the centre. `solve` drives theta (ADR-028). */
 export interface OnCirclePoint {
   kind: 'on-circle';
   id: Id;
   circle: Id;
   theta: number;
+  solve?: SolveDirective;
 }
 
 /** 0 DOF — the antipode of `of` on `circle` (a diameter's far end): 2·centre − of. */
@@ -374,13 +388,26 @@ export interface PerpendicularConstraint {
   d: Id;
 }
 
+/**
+ * Point p must coincide with point q (|pq| = 0). Produced when a second statement
+ * *places* an already-defined point (e.g. "C is the midpoint of OB", where C is
+ * already the intersection AB∩DE): the new placement becomes a hidden target q
+ * and this constraint drives a free DOF upstream of p so they meet ([ADR-028](docs/06-decisions.md#adr-028)).
+ */
+export interface CoincideConstraint {
+  type: 'coincide';
+  p: Id;
+  q: Id;
+}
+
 export type Constraint =
   | AngleConstraint
   | DistanceConstraint
   | EqualConstraint
   | RatioConstraint
   | ParallelConstraint
-  | PerpendicularConstraint;
+  | PerpendicularConstraint
+  | CoincideConstraint;
 
 export interface Construction {
   objects: GeoObject[];

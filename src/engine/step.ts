@@ -7,7 +7,7 @@
  * the Phase-1 gate needs.)
  */
 
-import type { Command, Construction, Id, Vec } from './types';
+import type { Command, Constraint, Construction, GeoObject, Id, Vec } from './types';
 import { LEN_EPS, isGeoPoint } from './types';
 import { applyCommand, mirrorComposition, normalizeShapeComposition } from './apply';
 import { evaluate } from './evaluate';
@@ -101,9 +101,17 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   // (ADR-013, amendment). Both the conflict check and the build see this order.
   const ncmd = normalizeShapeComposition(prev, cmd);
 
-  // Reject a redefinition conflict before mutating anything (keep prior figure).
+  // Reject a redefinition conflict before mutating anything (keep prior figure) —
+  // UNLESS the second statement *places* an already-built point, in which case it
+  // is really a constraint ("C is the midpoint of OB", where C is already AB∩DE):
+  // reinterpret it as a coincidence that drives a free DOF upstream (ADR-028).
   const conflict = commandConflict(prev, ncmd);
   if (conflict) {
+    const constrained = reinterpretAsConstraint(prev, ncmd);
+    if (constrained) {
+      const r = evaluate(constrained);
+      if (r.ok) return { ok: true, construction: constrained, positions: r.positions };
+    }
     return { ok: false, error: conflict, construction: prev, positions: prevPositions };
   }
 
@@ -128,6 +136,83 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     return { ok: false, error: res.error, construction: prev, positions: prevPositions };
   }
   return { ok: true, construction: next, positions: res.positions };
+}
+
+// ── ADR-028: a second placement of an existing point → a coincidence constraint ──
+
+/** Commands that *place a single point* `id` (so a second one is a constraint, not a redefinition). */
+const POINT_PLACEMENTS = new Set<Command['type']>([
+  'free-point', 'point-on-segment', 'point-by-distances', 'line-line-intersection',
+  'midpoint', 'foot', 'line-intersection', 'arc-midpoint', 'circumcircle',
+  'line-circle-intersection', 'circle-circle-intersection',
+]);
+
+/** The point ids an object directly depends on (for walking back to a free DOF). */
+function pointParents(o: GeoObject): Id[] {
+  switch (o.kind) {
+    case 'on-segment': case 'on-segment-solved': case 'derived': case 'midpoint': return [o.a, o.b];
+    case 'intersection': return [o.center1, o.center2];
+    case 'parallelogram-vertex': return [o.a, o.b, o.c];
+    case 'line-line-intersection': return [o.a, o.b, o.c, o.d];
+    case 'perp-offset': case 'rotated': case 'scaled-offset': return [(o as { anchor?: Id; pivot?: Id }).anchor ?? (o as { pivot: Id }).pivot, o.from, o.to];
+    case 'foot': return [o.from, o.a, o.b];
+    case 'circumcenter': return [o.a, o.b, o.c];
+    case 'antipode': return [o.of];
+    case 'arc-midpoint': return [o.from, o.to];
+    default: return []; // free-point, on-circle (a carrier itself), line/circle-derived points
+  }
+}
+
+/**
+ * The free 1-DOF ancestor (on-circle / on-segment) of `start` to drive, or null.
+ * Walks the dependency graph back from `start`; among the parametric points it
+ * reaches, picks the most-recently-added (highest index) — the DOF most likely to
+ * be the one the new fact is meant to pin down.
+ */
+function freeCarrierAncestor(objects: GeoObject[], start: Id): Id | null {
+  const byId = new Map(objects.map((o) => [o.id, o] as const));
+  const seen = new Set<Id>([start]);
+  const queue = [...pointParents(byId.get(start) as GeoObject ?? { kind: 'free-point', id: start, x: 0, y: 0 })];
+  let best = -1;
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const o = byId.get(id);
+    if (!o || !isGeoPoint(o)) continue;
+    if (o.kind === 'on-circle' || o.kind === 'on-segment') {
+      best = Math.max(best, objects.findIndex((x) => x.id === id)); // a carrier; don't recurse past it
+    } else {
+      queue.push(...pointParents(o));
+    }
+  }
+  return best >= 0 ? objects[best].id : null;
+}
+
+/**
+ * Reinterpret a redefining placement as a coincidence: keep the existing point P,
+ * add the new definition as a HIDDEN target `~P`, constrain P ≡ ~P, and mark a
+ * free upstream DOF as solved to satisfy it. Returns the new construction, or null
+ * if this can't be expressed (no single-point placement, or no free DOF upstream).
+ */
+function reinterpretAsConstraint(prev: Construction, cmd: Command): Construction | null {
+  if (!POINT_PLACEMENTS.has(cmd.type)) return null;
+  const P = (cmd as { id?: Id }).id;
+  if (!P) return null;
+  const existing = prev.objects.find((o) => o.id === P);
+  if (!existing || !isGeoPoint(existing)) return null; // only a *re*definition of an existing point
+  const H = `~${P}`;
+  if (prev.objects.some((o) => o.id === H)) return null; // already reinterpreted once
+  const carrier = freeCarrierAncestor(prev.objects, P);
+  if (!carrier) return null; // nothing free to move → a genuine over-constraint
+  const withHelper = applyCommand(prev, { ...(cmd as object), id: H } as Command); // the new def under the hidden id
+  const coincide: Constraint = { type: 'coincide', p: P, q: H };
+  const objects = withHelper.objects.map((o) =>
+    o.id === carrier && (o.kind === 'on-circle' || o.kind === 'on-segment')
+      ? { ...o, solve: { constraint: coincide, branch: 0 } }
+      : o,
+  );
+  return { objects, constraints: [...withHelper.constraints, coincide] };
 }
 
 const centroid = (ps: Vec[]): Vec => ({

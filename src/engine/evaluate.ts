@@ -5,7 +5,7 @@
  * non-finite coords, or a contradicted constraint = over-constraint, FR-EN-8).
  */
 
-import type { Circle, Construction, GeoPoint, Id, Line, Vec } from './types';
+import type { Circle, Construction, GeoObject, GeoPoint, Id, Line, Vec } from './types';
 import { LEN_EPS, isGeoPoint } from './types';
 import {
   add,
@@ -47,7 +47,91 @@ export interface EvalErr {
 }
 export type EvalResult = EvalOk | EvalErr;
 
+/**
+ * Solve every driven DOF ([ADR-028](docs/06-decisions.md#adr-028)) — a parametric
+ * point (on-circle / on-segment) whose `solve` directive says its 1 DOF is fixed
+ * so a constraint holds, possibly one referencing *downstream* points. For each,
+ * vary the DOF over its range; the residual at a trial value comes from a full
+ * `evaluateCore` of the figure with that DOF set; `solveParam` finds the roots
+ * (deterministic), and the branch index picks one. Returns the construction with
+ * those DOFs resolved to plain parameters (or unchanged if there are none).
+ */
+function resolveDriven(c: Construction): Construction {
+  const carriers = c.objects.filter(
+    (o): o is Extract<GeoObject, { kind: 'on-circle' | 'on-segment' }> =>
+      (o.kind === 'on-circle' || o.kind === 'on-segment') && o.solve !== undefined,
+  );
+  if (carriers.length === 0) return c;
+  let cur = c;
+  for (const carrier of carriers) {
+    const dir = carrier.solve!;
+    const [lo, hi] = carrier.kind === 'on-circle' ? [0, 2 * Math.PI] : [0, 1];
+    // |residual| of the driving constraint as the DOF varies — re-evaluating the
+    // whole figure each trial (the constraint may reference downstream points).
+    const f = (v: number): number => {
+      // positions WITHOUT enforcing constraints — we're searching for where the
+      // driving constraint is met, so it must not abort the trial when unmet.
+      const r = evaluateCore(withParam(cur, carrier.id, v), { skipConstraints: true });
+      if (!r.ok) return NaN;
+      for (const id of constraintRefs(dir.constraint)) if (!r.positions.has(id)) return NaN;
+      return Math.abs(residual(dir.constraint, (id) => r.positions.get(id)!));
+    };
+    const roots = drivenRoots(f, lo, hi, residualTolerance(dir.constraint));
+    if (roots.length === 0) continue; // unsolvable → leave the default; the constraint check fails honestly
+    cur = withParam(cur, carrier.id, roots[dir.branch % roots.length]);
+  }
+  return cur;
+}
+
+/**
+ * Roots of a non-negative residual `f` (a |constraint| ≥ 0) over [lo,hi]: scan a
+ * grid for local minima, refine each by ternary search, keep those that reach ~0.
+ * (sign-change bracketing in `solveParam` can't see a minimum that only *touches*
+ * zero.) Deterministic; the list is the solution branches.
+ */
+function drivenRoots(f: (v: number) => number, lo: number, hi: number, tol: number, steps = 360): number[] {
+  const val = (v: number) => {
+    const r = f(v);
+    return isFinite(r) ? r : Infinity;
+  };
+  const fs: number[] = [];
+  for (let i = 0; i <= steps; i++) fs.push(val(lo + ((hi - lo) * i) / steps));
+  const roots: number[] = [];
+  for (let i = 1; i < steps; i++) {
+    if (fs[i] === Infinity || !(fs[i] <= fs[i - 1] && fs[i] <= fs[i + 1])) continue;
+    let a = lo + ((hi - lo) * (i - 1)) / steps;
+    let b = lo + ((hi - lo) * (i + 1)) / steps;
+    for (let k = 0; k < 80; k++) {
+      const m1 = a + (b - a) / 3;
+      const m2 = b - (b - a) / 3;
+      if (val(m1) < val(m2)) b = m2;
+      else a = m1;
+    }
+    const x = (a + b) / 2;
+    if (val(x) < Math.max(tol, 1e-6) * 10 && !roots.some((o) => Math.abs(o - x) < 1e-3)) roots.push(x);
+  }
+  return roots;
+}
+
+/** Replace a carrier's parameter (theta/t) with `v` and drop its `solve` directive (now resolved). */
+function withParam(c: Construction, id: Id, v: number): Construction {
+  return {
+    ...c,
+    objects: c.objects.map((o) => {
+      if (o.id !== id) return o;
+      if (o.kind === 'on-circle') return { ...o, theta: v, solve: undefined };
+      if (o.kind === 'on-segment') return { ...o, t: v, solve: undefined };
+      return o;
+    }),
+  };
+}
+
+/** Evaluate the construction: resolve any driven DOFs, then the constructive sweep + checks. */
 export function evaluate(c: Construction): EvalResult {
+  return evaluateCore(resolveDriven(c));
+}
+
+function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): EvalResult {
   const pos = new Map<Id, Vec>();
   const lines = new Map<Id, ResolvedLine>();
   const circles = new Map<Id, ResolvedCircle>();
@@ -102,14 +186,22 @@ export function evaluate(c: Construction): EvalResult {
     if (!isFinite(v.x) || !isFinite(v.y)) return { ok: false, error: 'non-finite position computed' };
   }
 
+  // During a driven trial ([ADR-028](docs/06-decisions.md#adr-028)) we only need
+  // positions — the checks below would abort the very search that's looking for
+  // where they pass.
+  if (opts?.skipConstraints) return { ok: true, positions: pos };
+
   // No two distinct points may share a location — that is a degenerate figure
-  // (two labels on one spot). Flagged so the step can try to reposition, or fail.
+  // (two labels on one spot) — EXCEPT a pair the construction intends to coincide
+  // (a `coincide` constraint, ADR-028): their meeting is the goal, not an error.
+  const intended = (idA: Id, idB: Id): boolean =>
+    c.constraints.some((k) => k.type === 'coincide' && ((k.p === idA && k.q === idB) || (k.p === idB && k.q === idA)));
   const placed = [...pos.entries()];
   for (let i = 0; i < placed.length; i++) {
     for (let j = i + 1; j < placed.length; j++) {
       const [idA, a] = placed[i];
       const [idB, b] = placed[j];
-      if (Math.hypot(a.x - b.x, a.y - b.y) < LEN_EPS) {
+      if (Math.hypot(a.x - b.x, a.y - b.y) < LEN_EPS && !intended(idA, idB)) {
         return { ok: false, error: `${idA} and ${idB} would be at the same point`, coincide: true };
       }
     }
