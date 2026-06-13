@@ -248,10 +248,11 @@ const midpoint: Rule = (s) => {
 /** "F on the extension of AD" / "F על המשך AD" — a point on the ray beyond the far end (t > 1). */
 const pointOnExtension: Rule = (s) => {
   if (!/extension|המשך/i.test(s)) return null;
-  const m = s.match(
-    new RegExp(String.raw`(?:point\s+|נקודה\s+)?([A-Za-z])\b.*?(?:extension|המשך).*?\b([A-Za-z])\s*([A-Za-z])\b`, 'i'),
-  );
-  return m ? [{ type: 'point-on-segment', id: up(m[1]), a: up(m[2]), b: up(m[3]), t: 1.3 }] : null;
+  const m = s.match(/(?:point\s+|נקודה\s+)?([A-Za-z])\b.*?(?:extension|המשך)\s*(.*)/i);
+  if (!m) return null;
+  // strip filler ("of"!) so "of AD" reads AD, not the labels O,F of "of".
+  const seg = labelRun(m[2].replace(FILLER, ' '), 2);
+  return seg ? [{ type: 'point-on-segment', id: up(m[1]), a: seg[0], b: seg[1], t: 1.3 }] : null;
 };
 
 /** "angle GAB = 37" / "זווית GAB = 37" (any order) — middle letter is the vertex. */
@@ -573,14 +574,17 @@ const tangentLineIntersection: Rule = (s) => {
   const tanId = `tan-${at}`;
   const a = up(pairM[1]);
   const b = up(pairM[2]);
+  const e = up(resM[1]);
   const abId = `line-${a}${b}`;
   return [
     // Draw what we reference, not just the point: the tangent (visible) and the
-    // segment AB — the student should see the lines whose crossing is E.
+    // line AB drawn all the way to E (the tangent meets AB on its extension, so AB
+    // alone wouldn't reach E — segments E–A and E–B span the chord and its extension).
     { type: 'tangent', id: tanId, circle: circleId(center), at, visible: true },
-    { type: 'segment', a, b },
-    { type: 'line-through', id: abId, a, b }, // scaffolding: E may fall on the extension
-    { type: 'line-intersection', id: up(resM[1]), line1: tanId, line2: abId },
+    { type: 'line-through', id: abId, a, b }, // scaffolding for the crossing
+    { type: 'line-intersection', id: e, line1: tanId, line2: abId },
+    { type: 'segment', a: e, b: a },
+    { type: 'segment', a: e, b: b },
   ];
 };
 

@@ -76,14 +76,15 @@ describe('visible construction lines', () => {
     expect(buildScene(construction, positions).lines).toHaveLength(0);
   });
 
-  it('a drawn bisector renders as a dashed <line>', () => {
+  it('a drawn bisector renders as a regular (solid) <line>', () => {
     const { construction, positions } = build([
       { type: 'triangle', ids: ['A', 'B', 'C'] },
       { type: 'bisector', id: 'bisB', vertex: 'B', p: 'A', q: 'C', visible: true },
     ]);
     expect(buildScene(construction, positions).lines).toHaveLength(1);
     const html = renderToStaticMarkup(<Figure construction={construction} positions={positions} />);
-    expect(html).toContain('stroke-dasharray'); // construction lines are dashed
+    expect(html).toContain('<line'); // the visible line is drawn…
+    expect(html).not.toContain('stroke-dasharray'); // …as a regular solid line, not dashed
   });
 
   it('creates the touch point on the circle when it does not exist yet', () => {

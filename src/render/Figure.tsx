@@ -136,10 +136,10 @@ export function Figure({
             );
           })}
 
-          {/* Visible construction lines (a standalone tangent / bisector /
-              perpendicular / parallel) — dashed, drawn behind segments. An
-              infinite line is rendered as a long segment extended through its
-              anchor along its (screen-space) direction; the SVG viewport clips it. */}
+          {/* Visible lines (a tangent / bisector / perpendicular / parallel) — drawn
+              as a regular SOLID line. An infinite line is rendered as a long segment
+              through its anchor along its (screen-space) direction; the SVG viewport
+              clips it. */}
           {scene.lines.map((ln) => {
             const a = transform.toScreen(ln.anchor);
             const a2 = transform.toScreen({ x: ln.anchor.x + ln.dir.x, y: ln.anchor.y + ln.dir.y });
@@ -156,9 +156,8 @@ export function Figure({
                 y1={a.y - uy}
                 x2={a.x + ux}
                 y2={a.y + uy}
-                stroke={lit(ln.id) ? ACCENT : '#64748b'}
-                strokeWidth={lit(ln.id) ? stroke * 1.5 : stroke}
-                strokeDasharray={`${6 / view.zoom} ${5 / view.zoom}`}
+                stroke={lit(ln.id) ? ACCENT : '#334155'}
+                strokeWidth={lit(ln.id) ? stroke * 2 : stroke}
               />
             );
           })}
