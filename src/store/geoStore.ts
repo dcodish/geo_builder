@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { Command, Construction, Id, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, branchCount, deepEqual, emptyConstruction, evaluate, freeDofs } from '@/engine';
+import { applyCommand, applySeed, applyStep, branchCount, deepEqual, emptyConstruction, evaluate, freeDofs, isGeoPoint } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -62,9 +62,26 @@ export function replay(facts: Fact[], seed = 0): Derived {
   let cur = emptyConstruction();
   const status: Record<string, FactStatus> = {};
   let lastError: string | null = null;
+  // Point ids any earlier fact OWNS (introduces). A later fact must not silently
+  // re-create one of these as a default free point (the auto-create-endpoints
+  // affordance) when its owner failed/was removed — that would mask the breakage.
+  // Instead the dependent fact fails too, so a removed step cascades honestly.
+  const owned = new Set<Id>();
   for (const f of facts) {
+    const intro = introducedPointIds(f.cmd);
+    const claim = () => intro.forEach((id) => owned.add(id));
     if (!f.enabled) {
       status[f.id] = 'disabled';
+      claim();
+      continue;
+    }
+    // A point this fact would (re)create that an earlier fact owns but which isn't
+    // in the figure now ⇒ its definition is gone, so this fact can't build either.
+    const broken = intro.filter((id) => owned.has(id) && !cur.objects.some((o) => o.id === id));
+    if (broken.length) {
+      status[f.id] = `can't build: ${broken.join(', ')} is no longer available (an earlier step it relies on was removed or failed)`;
+      lastError = status[f.id];
+      claim();
       continue;
     }
     const r = applyStep(cur, f.cmd);
@@ -75,6 +92,7 @@ export function replay(facts: Fact[], seed = 0): Derived {
       status[f.id] = r.error; // dependencies gone, contradiction, etc. — keep prior figure
       lastError = r.error;
     }
+    claim();
   }
   const figure = applySeed(cur, seed);
   const e = evaluate(figure);
@@ -84,6 +102,11 @@ export function replay(facts: Fact[], seed = 0): Derived {
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */
 export function introducedIds(cmd: Command): Id[] {
   return applyCommand(emptyConstruction(), cmd).objects.map((o) => o.id);
+}
+
+/** The POINT ids a command would introduce (created or auto-created) — for cascade detection. */
+function introducedPointIds(cmd: Command): Id[] {
+  return applyCommand(emptyConstruction(), cmd).objects.filter(isGeoPoint).map((o) => o.id);
 }
 
 export interface GeoState {

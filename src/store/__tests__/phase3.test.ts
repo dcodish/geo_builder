@@ -247,6 +247,35 @@ describe('store — alternatives', () => {
   });
 });
 
+describe('removing an early step cascades — dependents fail honestly, no phantom rescue', () => {
+  const CIRCLE: Command = { type: 'circle', id: 'circle-O', center: 'O', radius: 5 };
+  const A_ON: Command = { type: 'point-on-circle', id: 'A', circle: 'circle-O' };
+  const B_ON: Command = { type: 'point-on-circle', id: 'B', circle: 'circle-O' };
+  const SEG_AB: Command = { type: 'segment', a: 'A', b: 'B' };
+
+  it('a segment on circle points fails when the circle is removed (not silently re-created)', () => {
+    [CIRCLE, A_ON, B_ON, SEG_AB].forEach((c) => s().execute(c));
+    s().remove(s().facts[0].id); // remove the circle
+    const d = replay(s().facts);
+    expect(d.status[s().facts[0].id]).toMatch(/unresolved|circle/i); // A can't resolve
+    expect(d.status[s().facts[2].id]).toMatch(/no longer available/i); // the segment cascades, doesn't rescue A,B
+    expect(d.construction.objects.filter((o) => o.kind === 'segment')).toHaveLength(0); // no phantom segment
+  });
+
+  it('is reversible — re-enabling the dependency brings the dependents back', () => {
+    [CIRCLE, A_ON, B_ON, SEG_AB].forEach((c) => s().execute(c));
+    s().toggle(s().facts[0].id); // disable the circle → cascade
+    expect(replay(s().facts).status[s().facts[3].id]).toMatch(/no longer available/i);
+    s().toggle(s().facts[0].id); // re-enable
+    expect(replay(s().facts).status[s().facts[3].id]).toBe('ok'); // segment AB builds again
+  });
+
+  it('a standalone segment still auto-creates its endpoints (no owner to defer to)', () => {
+    s().execute({ type: 'segment', a: 'X', b: 'Y' });
+    expect(replay(s().facts).status[s().facts[0].id]).toBe('ok');
+  });
+});
+
 describe('step grouping — one submission, one row (even if it expands to many commands)', () => {
   // An inscribed shape is many commands from ONE utterance: they share a group.
   const INSCRIBED: Command[] = [
