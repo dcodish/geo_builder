@@ -39,6 +39,19 @@ function addObj(objects: GeoObject[], o: GeoObject): void {
 }
 
 /**
+ * Add a circle, or — if one with this id already exists — REPLACE it (a resize /
+ * re-centre). Re-stating a circle with a new radius is a legitimate edit, not a
+ * conflict (a later "circle O radius 8" overrides an earlier radius 5; the points
+ * on it re-evaluate against the new radius). Circle ids are `circle-X`, points are
+ * single letters, so this never clobbers a point.
+ */
+function upsertCircle(objects: GeoObject[], o: GeoObject): void {
+  const i = objects.findIndex((x) => x.id === o.id);
+  if (i >= 0) objects[i] = o;
+  else objects.push(o);
+}
+
+/**
  * Which vertex-tuple positions of each shape are *derived* corners (computed
  * from the base edge), as opposed to free base vertices. A composed shape can
  * reuse existing points only at *free* slots (ADR-013), so an existing vertex
@@ -372,12 +385,12 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'circle':
       placeBase(objects, [{ id: cmd.center, x: 0, y: 0 }], pos); // create the centre if new
-      addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'length', value: cmd.radius } });
+      upsertCircle(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'length', value: cmd.radius } });
       break;
 
     case 'circle-through':
       placeBase(objects, [{ id: cmd.center, x: 0, y: 0 }], pos);
-      addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.through } });
+      upsertCircle(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.through } });
       break;
 
     case 'circumcircle':

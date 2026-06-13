@@ -294,6 +294,38 @@ describe('step grouping — one submission, one row (even if it expands to many 
   });
 });
 
+describe('circle resize — re-stating a circle overrides its radius (not a conflict)', () => {
+  const CIRCLE = (r: number): Command => ({ type: 'circle', id: 'circle-O', center: 'O', radius: r });
+
+  it('a standalone circle re-stated with a new radius resizes in place (one step)', () => {
+    s().execute(CIRCLE(5), 'circle O radius 5', 'g1');
+    s().execute(CIRCLE(8), 'circle O radius 8', 'g2');
+    expect(s().facts).toHaveLength(1); // collapsed like a free-point move
+    const circle = replay(s().facts).construction.objects.find((o) => o.id === 'circle-O');
+    expect(circle).toMatchObject({ radius: { via: 'length', value: 8 } });
+  });
+
+  it('resizing the circle of an inscribed shape grows its vertices (override step, no conflict)', () => {
+    // inscribed-triangle group (circle-O r5 + 3 on-circle + triangle), all one step
+    const inscribed: Command[] = [
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
+      { type: 'point-on-circle', id: 'A', circle: 'circle-O', theta: 0 },
+      { type: 'point-on-circle', id: 'B', circle: 'circle-O', theta: 2 },
+      { type: 'point-on-circle', id: 'C', circle: 'circle-O', theta: 4 },
+      { type: 'triangle', ids: ['A', 'B', 'C'] },
+    ];
+    inscribed.forEach((c) => s().execute(c, 'triangle inscribed', 'g1'));
+    expect(replay(s().facts).positions.get('A')!.x).toBeCloseTo(5, 6); // on r=5
+
+    s().execute(CIRCLE(8), 'circle O radius 8', 'g2'); // override step — must NOT conflict
+    const d = replay(s().facts);
+    expect(d.lastError).toBeNull();
+    expect(d.positions.get('A')!.x).toBeCloseTo(8, 6); // the vertex moved out to r=8
+    const facts = s().facts;
+    expect(d.status[facts[facts.length - 1].id]).toBe('ok'); // the resize step applied
+  });
+});
+
 describe('i18n — key parity (he ⇄ en)', () => {
   const paths = (obj: unknown, prefix = ''): string[] => {
     if (obj === null || typeof obj !== 'object') return [prefix];

@@ -83,6 +83,9 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     // A circle-point construct (tangent / arc-midpoint / point-on-circle) creates
     // its point or reuses whatever already carries that id — never a conflict.
     if (o.kind === 'on-circle') continue;
+    // Re-stating a circle with a new radius/centre is a RESIZE (override), not a
+    // redefinition-as-something-different — "circle O radius 8" over an earlier 5.
+    if (o.kind === 'circle' && existing.kind === 'circle') continue;
     return `'${o.id}' is already defined — it can't be redefined as something different`;
   }
   return null;

@@ -142,6 +142,19 @@ export const useGeoStore = create<GeoState>()(
             return;
           }
         }
+        // Re-stating a STANDALONE circle (its own one-command step) resizes it in
+        // place — like a free-point move. A circle that belongs to a bigger step
+        // (an inscribed shape) instead falls through to append an override step,
+        // so that step's label stays intact (the engine resizes on replay).
+        if (cmd.type === 'circle' || cmd.type === 'circle-through') {
+          const prev = facts.find(
+            (f) => (f.cmd.type === 'circle' || f.cmd.type === 'circle-through') && f.cmd.id === cmd.id,
+          );
+          if (prev && !facts.some((f) => f.id !== prev.id && groupKey(f) === groupKey(prev))) {
+            set({ facts: facts.map((f) => (f.id === prev.id ? { ...f, cmd, utterance, enabled: true } : f)) });
+            return;
+          }
+        }
         set({ facts: [...facts, { id: nanoid(), cmd, utterance, group, enabled: true }] });
       },
 
