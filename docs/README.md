@@ -16,6 +16,7 @@ Living project documentation. Status: **design phase** (last updated 2026-06-10)
 | 08 | [Testing Strategy](08-testing-strategy.md) | Test levels, per-layer coverage, golden fixtures, requirement→test traceability, and the "definition of ready" gate |
 | 09 | [Implementation Plan](09-implementation-plan.md) | Phased build plan: scope, dependencies, requirement coverage, per-phase gates, and milestones |
 | 10 | [Pedagogy](10-pedagogy.md) | The teaching charter: what students should learn, how each mechanic teaches, and the construction→theorem trigger map (Phase 6 payload) |
+| 11 | [Architecture as a Compiler](11-architecture-as-compiler.md) | A lens: the NL→commands→evaluation→render pipeline as a compiler front-end + constraint interpreter + retargetable back-end — and where new work slots in |
 | — | [Project Memory](PROJECT-MEMORY.md) | Travelling memory: where memory lives, operational notes, resume pointer (read at session start) |
 
 ## How to use these
