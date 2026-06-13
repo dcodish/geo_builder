@@ -64,6 +64,12 @@ export function applySeed(c: Construction, seed: number): Construction {
   const ct = Math.cos(theta);
   const st = Math.sin(theta);
 
+  // Free on-circle vertices: a SHARED seeded rotation (preserves their spread, so
+  // the inscribed shape never collapses to a sliver) + a small independent jitter
+  // for genuine variety. ±180° independent jitter would cluster vertices.
+  const circSpin = (mulberry32((seed * 0x9e3779b1) >>> 0)() * 2 - 1) * Math.PI;
+  const circJit = Math.PI / 6; // ±30° per-vertex
+
   const objects = c.objects.map((o) => {
     if (o.kind === 'free-point' && !o.pinned) {
       const dx = o.x - cx;
@@ -73,11 +79,11 @@ export function applySeed(c: Construction, seed: number): Construction {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
       return { ...o, x: rx + (jr() * 2 - 1) * jit, y: ry + (jr() * 2 - 1) * jit };
     }
-    // Free on-circle vertex: slide it around the circle by a seeded angle — a
-    // genuinely different inscribed figure, still valid (it stays on the circle).
+    // Free on-circle vertex: shared rotation keeps the vertices spread (a valid,
+    // non-degenerate inscribed figure); small jitter varies its shape.
     if (isFreeOnCircle(o)) {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
-      return { ...o, theta: (o as OnCirclePoint).theta + (jr() * 2 - 1) * Math.PI };
+      return { ...o, theta: (o as OnCirclePoint).theta + circSpin + (jr() * 2 - 1) * circJit };
     }
     return o;
   });

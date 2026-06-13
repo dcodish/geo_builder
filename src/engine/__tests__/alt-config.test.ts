@@ -10,7 +10,7 @@ import { parse } from '@/parser';
 import { build } from '../step';
 import { applySeed, freeDofs } from '../sample';
 import { evaluate } from '../evaluate';
-import { dist } from '../geometry';
+import { dist, angleDeg } from '../geometry';
 import type { Command } from '../types';
 
 const cmds = (u: string): Command[] => {
@@ -35,6 +35,17 @@ describe('resample varies free on-circle vertices (an inscribed triangle)', () =
       }
     }
     expect(differs).toBe(true);
+  });
+
+  it('every sampled configuration is a proper (non-sliver) triangle, never just dots', () => {
+    const { construction } = build(cmds('triangle ABC inscribed in circle O radius 5'));
+    for (let s = 0; s < 30; s++) {
+      const e = evaluate(applySeed(construction, s));
+      if (!e.ok) continue;
+      const [A, B, C] = ['A', 'B', 'C'].map((id) => e.positions.get(id)!);
+      const minAngle = Math.min(angleDeg(A, B, C), angleDeg(B, A, C), angleDeg(C, A, B));
+      expect(minAngle, `seed ${s} collapsed to a sliver`).toBeGreaterThan(10); // spread-preserving sampler
+    }
   });
 
   it('an inscribed square keeps its fixed-angle corners (not free) — stays a square', () => {
