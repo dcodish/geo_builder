@@ -164,16 +164,23 @@ const lineLineIntersection: Rule = (s) => {
   const pointFirst = t.match(
     /\b([A-Za-z])\b.*?(?:intersection|∩|חיתוך|נחתך).*?\b([A-Za-z])\s*([A-Za-z])\b.*?\b([A-Za-z])\s*([A-Za-z])\b/i,
   );
+  // Draw the two segments we reference (idempotent if they're already edges) — the
+  // student should see the lines whose crossing is the point, not just the point.
+  const cross = (id: string, a: string, b: string, c: string, d: string): Command[] => [
+    { type: 'segment', a: up(a), b: up(b) },
+    { type: 'segment', a: up(c), b: up(d) },
+    { type: 'line-line-intersection', id: up(id), a: up(a), b: up(b), c: up(c), d: up(d) },
+  ];
   if (pointFirst) {
     const m = pointFirst;
-    return [{ type: 'line-line-intersection', id: up(m[1]), a: up(m[2]), b: up(m[3]), c: up(m[4]), d: up(m[5]) }];
+    return cross(m[1], m[2], m[3], m[4], m[5]);
   }
   const linesFirst = t.match(
     /\b([A-Za-z])\s*([A-Za-z])\b.*?\b([A-Za-z])\s*([A-Za-z])\b.*?(?:intersect\w*|∩|חיתוך|נחתך|נחתכ|נפגש|meets?).*?\b([A-Za-z])\b/i,
   );
   if (linesFirst) {
     const m = linesFirst;
-    return [{ type: 'line-line-intersection', id: up(m[5]), a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]) }];
+    return cross(m[5], m[1], m[2], m[3], m[4]);
   }
   return 'stop';
 };
@@ -564,10 +571,15 @@ const tangentLineIntersection: Rule = (s) => {
     .match(/\b([A-Za-z])\b/);
   if (!resM) return null;
   const tanId = `tan-${at}`;
-  const abId = `line-${up(pairM[1])}${up(pairM[2])}`;
+  const a = up(pairM[1]);
+  const b = up(pairM[2]);
+  const abId = `line-${a}${b}`;
   return [
-    { type: 'tangent', id: tanId, circle: circleId(center), at },
-    { type: 'line-through', id: abId, a: up(pairM[1]), b: up(pairM[2]) },
+    // Draw what we reference, not just the point: the tangent (visible) and the
+    // segment AB — the student should see the lines whose crossing is E.
+    { type: 'tangent', id: tanId, circle: circleId(center), at, visible: true },
+    { type: 'segment', a, b },
+    { type: 'line-through', id: abId, a, b }, // scaffolding: E may fall on the extension
     { type: 'line-intersection', id: up(resM[1]), line1: tanId, line2: abId },
   ];
 };
@@ -587,8 +599,9 @@ const bisectorSegmentIntersection: Rule = (s) => {
   const t = triple.toUpperCase();
   const pr = pair.toUpperCase();
   return [
-    { type: 'bisector', id: `bis-${t}`, vertex: t[1], p: t[0], q: t[2] },
-    { type: 'line-through', id: `line-${pr}`, a: pr[0], b: pr[1] },
+    { type: 'bisector', id: `bis-${t}`, vertex: t[1], p: t[0], q: t[2], visible: true }, // draw the bisector
+    { type: 'segment', a: pr[0], b: pr[1] }, // draw the segment it meets
+    { type: 'line-through', id: `line-${pr}`, a: pr[0], b: pr[1] }, // scaffolding for the crossing
     { type: 'line-intersection', id: up(point), line1: `bis-${t}`, line2: `line-${pr}` },
   ];
 };
@@ -611,7 +624,8 @@ const parallelCircleIntersection: Rule = (s) => {
   const b = up(toM[2]);
   const lineId = `par-${through}-${a}${b}`;
   return [
-    { type: 'parallel-line', id: lineId, through, a, b },
+    { type: 'parallel-line', id: lineId, through, a, b, visible: true }, // draw the parallel line
+    { type: 'segment', a, b }, // draw the segment it's parallel to
     { type: 'line-circle-intersection', id: up(resM[1]), line: lineId, circle: circleId(center), branch: 0 },
   ];
 };

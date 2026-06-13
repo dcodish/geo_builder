@@ -21,6 +21,13 @@ function one(input: string, expected: Command) {
   }
 }
 
+/** Parse and expect `expected` to be among the commands (the rule may also draw referenced segments). */
+function has(input: string, expected: Command) {
+  const r = parse(input);
+  expect(r.ok, `"${input}" should parse`).toBe(true);
+  if (r.ok) expect(r.commands).toContainEqual(expected);
+}
+
 describe('parser — square (he/en)', () => {
   const sq: Command = { type: 'square', ids: ['A', 'B', 'C', 'D'] };
   it('english', () => one('square ABCD', sq));
@@ -72,9 +79,13 @@ describe('parser — Phase-5a constructs (he/en)', () => {
   it('diagonal synonym', () => one('diagonal BD', { type: 'segment', a: 'B', b: 'D' }));
   it('segment (hebrew)', () => one('קטע AC', { type: 'segment', a: 'A', b: 'C' }));
   it('line∩line intersection (english)', () =>
-    one('E is the intersection of AC and BD', { type: 'line-line-intersection', id: 'E', a: 'A', b: 'C', c: 'B', d: 'D' }));
+    has('E is the intersection of AC and BD', { type: 'line-line-intersection', id: 'E', a: 'A', b: 'C', c: 'B', d: 'D' }));
   it('line∩line intersection (hebrew)', () =>
-    one('M חיתוך AC ו-BD', { type: 'line-line-intersection', id: 'M', a: 'A', b: 'C', c: 'B', d: 'D' }));
+    has('M חיתוך AC ו-BD', { type: 'line-line-intersection', id: 'M', a: 'A', b: 'C', c: 'B', d: 'D' }));
+  it('also draws the two referenced segments', () => {
+    const r = parse('E is the intersection of AC and BD');
+    expect(r.ok && r.commands.filter((c) => c.type === 'segment').length).toBe(2); // AC and BD drawn
+  });
 });
 
 describe('parser — out-of-grammar returns not-handled (the fallback boundary)', () => {
@@ -95,8 +106,8 @@ describe('parser — out-of-grammar returns not-handled (the fallback boundary)'
 
 describe('parser — lines-first intersection phrasing (he/en)', () => {
   const e: Command = { type: 'line-line-intersection', id: 'E', a: 'A', b: 'C', c: 'B', d: 'D' };
-  it('english', () => one('the diagonals AC and BD intersect at point E', e));
-  it('hebrew (inflected נחתכים)', () => one('האלכסונים AC ו-BD נחתכים בנקודה E', e));
+  it('english', () => has('the diagonals AC and BD intersect at point E', e));
+  it('hebrew (inflected נחתכים)', () => has('האלכסונים AC ו-BD נחתכים בנקודה E', e));
 });
 
 describe('parser — filler words are not labels', () => {
