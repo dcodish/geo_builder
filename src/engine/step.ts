@@ -111,7 +111,7 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   // reinterpret it as a coincidence that drives a free DOF upstream (ADR-028).
   const conflict = commandConflict(prev, ncmd);
   if (conflict) {
-    const constrained = reinterpretAsConstraint(prev, ncmd);
+    const constrained = reinterpretAsConstraint(prev, ncmd) ?? reinterpretDiameter(prev, ncmd);
     if (constrained) {
       const r = evaluate(constrained);
       if (r.ok) return { ok: true, construction: constrained, positions: r.positions };
@@ -149,6 +149,40 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     return { ok: false, error: res.error, construction: prev, positions: prevPositions };
   }
   return { ok: true, construction: next, positions: res.positions };
+}
+
+/**
+ * "diameter AB" when A and B are BOTH already on the circle isn't a redefinition of
+ * B (its antipode) — it's the constraint that AB *is* a diameter, i.e. its midpoint
+ * is the centre. Reinterpret it as `coincide(midpoint(A,B), O)` driving a carrier, so
+ * the solver makes A,B antipodal (the recruit-DOFs fallback widens this if needed).
+ */
+function reinterpretDiameter(prev: Construction, cmd: Command): Construction | null {
+  if (cmd.type !== 'diameter') return null;
+  const a = prev.objects.find((o) => o.id === cmd.id1 && isGeoPoint(o));
+  const b = prev.objects.find((o) => o.id === cmd.id2 && isGeoPoint(o));
+  if (!a || !b) return null; // one endpoint is new ⇒ the normal diameter (creates the antipode)
+  const circle = prev.objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle);
+  if (!circle) return null;
+  const mid = `~dia${cmd.id1}${cmd.id2}`;
+  if (prev.objects.some((o) => o.id === mid)) return null; // already reinterpreted
+  // a carrier to attach the constraint to — one of the endpoints on the circle.
+  const carrier = [cmd.id1, cmd.id2].find((id) => {
+    const o = prev.objects.find((x) => x.id === id);
+    return o && (o.kind === 'on-circle' || o.kind === 'on-segment');
+  });
+  if (!carrier) return null;
+  const coincide: Constraint = { type: 'coincide', p: mid, q: circle.center };
+  const objects: GeoObject[] = [
+    ...prev.objects.map((o) =>
+      o.id === carrier && (o.kind === 'on-circle' || o.kind === 'on-segment')
+        ? { ...o, solve: { constraint: coincide, branch: 0 } }
+        : o,
+    ),
+    { kind: 'midpoint', id: mid, a: cmd.id1, b: cmd.id2 },
+    { kind: 'segment', id: `seg-${[cmd.id1, cmd.id2].sort().join('')}`, a: cmd.id1, b: cmd.id2 },
+  ];
+  return { objects, constraints: [...prev.constraints, coincide] };
 }
 
 /** Every free 1-DOF carrier (on-circle / on-segment, not pinned/driven) reachable from `start`. */

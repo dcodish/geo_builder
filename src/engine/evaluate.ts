@@ -85,7 +85,16 @@ function resolveDriven(c: Construction): Construction {
   // drives D, and D's chord length depends on where E lands): coordinate descent
   // on the joint squared residual, each DOF moved to the global minimum along it
   // (so all branches are considered) and iterated until it converges.
-  const cons = carriers.map((cr) => cr.solve!.constraint);
+  // The distinct constraints the carriers drive (a constraint shared by several
+  // carriers — e.g. recruited DOFs all driving "DE=DF" — must count once, so a
+  // second constraint on the same DOFs, like "AB is a diameter", isn't outweighed).
+  const seen = new Set<string>();
+  const cons = carriers
+    .map((cr) => cr.solve!.constraint)
+    .filter((k) => {
+      const key = JSON.stringify(k);
+      return seen.has(key) ? false : (seen.add(key), true);
+    });
   const ids = carriers.map((cr) => cr.id);
   const totalSq = (x: number[]): number => {
     const p = new Map<Id, number>(ids.map((id, i) => [id, x[i]]));

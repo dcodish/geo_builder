@@ -44,6 +44,32 @@ describe('equal-segments constraint', () => {
   });
 });
 
+describe('"diameter AB" on two existing points is a constraint (AB is a diameter), not a redefinition', () => {
+  const P = (u: string, ctx?: { circles: string[] }): Command[] => {
+    const r = parse(u, ctx);
+    if (!r.ok) throw new Error(u);
+    return r.commands;
+  };
+  it('makes two inscribed vertices antipodal (|AB| = diameter, midpoint = centre)', () => {
+    const { positions } = build([...P('triangle ABD inscribed in circle O radius 5'), ...P('diameter AB', { circles: ['O'] })]);
+    const [A, B, O] = ['A', 'B', 'O'].map((id) => positions.get(id)!);
+    expect(dist(A, B)).toBeCloseTo(10, 2); // a diameter of the radius-5 circle
+    expect(dist({ x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 }, O)).toBeCloseTo(0, 3); // midpoint is the centre
+  });
+  it('coexists with another constraint on the same vertices (DE=DF AND AB-diameter together)', () => {
+    const { positions } = build([
+      ...P('triangle ABD inscribed in circle O radius 5'),
+      ...P('the tangent at D and the extension of AB meet at E', { circles: ['O'] }),
+      ...P('point F on AB'),
+      ...P('DE=DF'),
+      ...P('diameter AB', { circles: ['O'] }),
+    ]);
+    const [A, B, D, E, F] = ['A', 'B', 'D', 'E', 'F'].map((id) => positions.get(id)!);
+    expect(dist(A, B)).toBeCloseTo(10, 1); // AB is a diameter…
+    expect(dist(D, E)).toBeCloseTo(dist(D, F), 1); // …and DE=DF still holds (jointly satisfied)
+  });
+});
+
 describe('a constraint its direct carrier cannot meet recruits other free DOFs (reconfigures)', () => {
   it('"DE = DF" with F stuck on segment AB reconfigures the triangle until it holds', () => {
     // |DF| (F on segment AB) can't reach |DE| (E far out on the tangent) in the
