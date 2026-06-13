@@ -18,16 +18,18 @@ import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
 import type { Crossing } from '@/render';
-import { introducedIds, replay, useGeoStore } from '@/store/geoStore';
+import { groupKey, introducedIds, replay, useGeoStore } from '@/store/geoStore';
+import type { Fact } from '@/store/geoStore';
+import { nanoid } from 'nanoid';
 
 export default function App() {
   const { t, i18n } = useTranslation();
   const facts = useGeoStore((s) => s.facts);
   const selectedId = useGeoStore((s) => s.selectedId);
   const execute = useGeoStore((s) => s.execute);
-  const update = useGeoStore((s) => s.update);
-  const toggle = useGeoStore((s) => s.toggle);
-  const remove = useGeoStore((s) => s.remove);
+  const setGroupEnabled = useGeoStore((s) => s.setGroupEnabled);
+  const removeGroup = useGeoStore((s) => s.removeGroup);
+  const replaceGroup = useGeoStore((s) => s.replaceGroup);
   const select = useGeoStore((s) => s.select);
   const cycleAlt = useGeoStore((s) => s.cycleAlt);
   const resample = useGeoStore((s) => s.resample);
@@ -55,10 +57,11 @@ export default function App() {
   // content instead: any Hebrew letter ⇒ RTL base, else LTR.
   const textDir = (s: string): 'rtl' | 'ltr' => (/[֐-׿]/.test(s) ? 'rtl' : 'ltr');
 
-  // Inline fact editing: open the row as a text field pre-filled with its
-  // phrasing, re-parse on confirm, and update the fact in place (ADR-015).
-  function startEdit(id: string, utterance: string | undefined) {
-    setEditingId(id);
+  // Inline step editing: open the row as a text field pre-filled with its
+  // phrasing, re-parse on confirm, and replace the whole step group in place
+  // (ADR-015; a step may expand to several commands, e.g. an inscribed shape).
+  function startEdit(key: string, utterance: string | undefined) {
+    setEditingId(key);
     setEditText(utterance ?? '');
     setEditError(false);
   }
@@ -67,13 +70,13 @@ export default function App() {
     setEditText('');
     setEditError(false);
   }
-  function commitEdit(id: string) {
+  function commitEdit(key: string) {
     const r = parse(editText);
-    if (!r.ok || r.commands.length !== 1) {
+    if (!r.ok || r.commands.length === 0) {
       setEditError(true);
       return;
     }
-    update(id, r.commands[0], editText.trim());
+    replaceGroup(key, r.commands, editText.trim());
     cancelEdit();
   }
 
@@ -86,7 +89,10 @@ export default function App() {
     setLlmDropped([]);
     const r = parse(utterance);
     if (r.ok) {
-      r.commands.forEach((c) => execute(c, utterance));
+      // One utterance → possibly many commands; tag them with one group id so
+      // they show as a single step row, not N identical rows.
+      const group = nanoid();
+      r.commands.forEach((c) => execute(c, utterance, group));
       setText('');
       return;
     }
@@ -102,9 +108,12 @@ export default function App() {
       setNotUnderstood(true);
       return;
     }
-    // Show the LLM's decomposition as separate facts, each labelled by its
-    // canonical step; report any step the engine couldn't build (ADR-023).
-    out.built.forEach((g) => g.commands.forEach((c) => execute(c, g.step)));
+    // Show the LLM's decomposition as separate steps, each labelled by its
+    // canonical step (its own group); report any step the engine couldn't build (ADR-023).
+    out.built.forEach((g) => {
+      const group = nanoid();
+      g.commands.forEach((c) => execute(c, g.step, group));
+    });
     setLlmDropped(out.dropped);
     if (out.built.length === 0) setNotUnderstood(true);
     setText('');
@@ -132,11 +141,24 @@ export default function App() {
     execute({ type: 'line-line-intersection', id, a: x.a, b: x.b, c: x.c, d: x.d }, utterance);
   }
 
-  // Highlight the objects introduced by the selected fact.
+  // Highlight every object introduced by the selected step (all its commands).
   const highlight = useMemo(() => {
-    const f = facts.find((x) => x.id === selectedId);
-    return f ? new Set(introducedIds(f.cmd)) : undefined;
+    const inGroup = facts.filter((x) => groupKey(x) === selectedId);
+    return inGroup.length ? new Set(inGroup.flatMap((x) => introducedIds(x.cmd))) : undefined;
   }, [facts, selectedId]);
+
+  // Collapse the flat fact list into step rows: all commands from one submission
+  // (same group) become one row, so an inscribed shape isn't shown as 6 rows.
+  const groups = useMemo(() => {
+    const out: { key: string; facts: Fact[] }[] = [];
+    for (const f of facts) {
+      const key = groupKey(f);
+      const last = out[out.length - 1];
+      if (last && last.key === key) last.facts.push(f);
+      else out.push({ key, facts: [f] });
+    }
+    return out;
+  }, [facts]);
 
   useEffect(() => {
     document.documentElement.dir = i18n.dir();
@@ -270,17 +292,21 @@ export default function App() {
               <p style={{ color: '#94a3b8', fontSize: 13, margin: 0 }}>{t('steps.empty')}</p>
             ) : (
               <ul style={stepList}>
-                {facts.map((f) => {
-                  const st = status[f.id];
-                  const state = !f.enabled ? 'disabled' : st === 'ok' ? 'ok' : 'broken';
-                  const editing = editingId === f.id;
+                {groups.map((g) => {
+                  const on = g.facts.every((f) => f.enabled);
+                  const anyOn = g.facts.some((f) => f.enabled);
+                  const brokenFact = g.facts.find((f) => f.enabled && status[f.id] !== 'ok');
+                  const state = !anyOn ? 'disabled' : brokenFact ? 'broken' : 'ok';
+                  const errText = brokenFact ? (status[brokenFact.id] as string) : undefined;
+                  const label = g.facts[0].utterance ?? g.facts.map((f) => f.cmd.type).join(' + ');
+                  const editing = editingId === g.key;
                   return (
-                    <li key={f.id} style={factRow(state, f.id === selectedId)}>
+                    <li key={g.key} style={factRow(state, g.key === selectedId)}>
                       <input
                         type="checkbox"
-                        checked={f.enabled}
+                        checked={on}
                         title={t('actions.toggle')}
-                        onChange={() => toggle(f.id)}
+                        onChange={() => setGroupEnabled(g.key, !on)}
                         disabled={editing}
                         style={{ cursor: editing ? 'default' : 'pointer' }}
                       />
@@ -295,12 +321,12 @@ export default function App() {
                               if (editError) setEditError(false);
                             }}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') commitEdit(f.id);
+                              if (e.key === 'Enter') commitEdit(g.key);
                               if (e.key === 'Escape') cancelEdit();
                             }}
                             style={{ ...editInput, borderColor: editError ? '#dc2626' : '#cbd5e1' }}
                           />
-                          <button type="button" style={iconBtn('#16a34a')} title={t('actions.confirmEdit')} onClick={() => commitEdit(f.id)}>
+                          <button type="button" style={iconBtn('#16a34a')} title={t('actions.confirmEdit')} onClick={() => commitEdit(g.key)}>
                             ✓
                           </button>
                           <button type="button" style={iconBtn('#94a3b8')} title={t('actions.cancelEdit')} onClick={cancelEdit}>
@@ -309,16 +335,16 @@ export default function App() {
                         </>
                       ) : (
                         <>
-                          <button type="button" style={factLabel(state)} onClick={() => select(f.id)} dir={textDir(f.utterance ?? f.cmd.type)} title={typeof st === 'string' && state === 'broken' ? st : undefined}>
-                            {f.utterance ?? f.cmd.type}
+                          <button type="button" style={factLabel(state)} onClick={() => select(g.key)} dir={textDir(label)} title={state === 'broken' ? errText : undefined}>
+                            {label}
                           </button>
                           <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}>
                             {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
                           </span>
-                          <button type="button" style={iconBtn('#64748b')} title={t('actions.edit')} onClick={() => startEdit(f.id, f.utterance)}>
+                          <button type="button" style={iconBtn('#64748b')} title={t('actions.edit')} onClick={() => startEdit(g.key, g.facts[0].utterance)}>
                             ✎
                           </button>
-                          <button type="button" style={del} title={t('actions.delete')} onClick={() => remove(f.id)}>
+                          <button type="button" style={del} title={t('actions.delete')} onClick={() => removeGroup(g.key)}>
                             ×
                           </button>
                         </>

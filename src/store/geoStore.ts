@@ -26,9 +26,19 @@ export interface Fact {
   id: string;
   /** The natural-language utterance, when it came from text (Phase 4); absent for direct commands. */
   utterance?: string;
+  /**
+   * Submission id: every command produced by ONE user input (one utterance →
+   * possibly many commands, e.g. an inscribed trapezoid = circle + 4 on-circle +
+   * quad) shares this, so the UI shows them as a SINGLE step row, not N identical
+   * rows. Absent ⇒ the fact is its own group (keyed by its `id`).
+   */
+  group?: string;
   cmd: Command;
   enabled: boolean;
 }
+
+/** The display key that groups a fact's commands into one step row. */
+export const groupKey = (f: Fact): string => f.group ?? f.id;
 
 /** Per-fact outcome after replay: applied, turned off, or why it couldn't apply. */
 export type FactStatus = 'ok' | 'disabled' | string;
@@ -83,14 +93,20 @@ export interface GeoState {
   /** Sampling seed for the figure's residual freedom (ADR-018); UI-only, not undoable. 0 = canonical. */
   seed: number;
 
-  /** Append a fact (enabled). */
-  execute: (cmd: Command, utterance?: string) => void;
+  /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
+  execute: (cmd: Command, utterance?: string, group?: string) => void;
   /** Replace a fact's command *in place* (same list position) — an edit (ADR-015). */
   update: (id: string, cmd: Command, utterance?: string) => void;
   /** Flip a fact's selected/deselected state. */
   toggle: (id: string) => void;
   /** Remove a fact permanently. */
   remove: (id: string) => void;
+  /** Enable/disable every fact in a step group at once (one undo entry). */
+  setGroupEnabled: (key: string, enabled: boolean) => void;
+  /** Delete every fact in a step group. */
+  removeGroup: (key: string) => void;
+  /** Replace a whole step group with freshly-parsed commands, in place (edit a multi-command step). */
+  replaceGroup: (key: string, cmds: Command[], utterance?: string) => void;
   /** Select a fact for inspection (or clear, if it was already selected). */
   select: (id: string | null) => void;
   /** Advance an intersection point to its next configuration (stored in the fact's command). */
@@ -108,7 +124,7 @@ export const useGeoStore = create<GeoState>()(
       selectedId: null,
       seed: 0,
 
-      execute: (cmd, utterance) => {
+      execute: (cmd, utterance, group) => {
         const facts = get().facts;
         // Idempotent (FR-EN-9): re-issuing an identical command adds no duplicate
         // fact. If that fact was deselected, re-issuing turns it back on.
@@ -126,7 +142,7 @@ export const useGeoStore = create<GeoState>()(
             return;
           }
         }
-        set({ facts: [...facts, { id: nanoid(), cmd, utterance, enabled: true }] });
+        set({ facts: [...facts, { id: nanoid(), cmd, utterance, group, enabled: true }] });
       },
 
       update: (id, cmd, utterance) => {
@@ -146,6 +162,31 @@ export const useGeoStore = create<GeoState>()(
         set({
           facts: get().facts.filter((f) => f.id !== id),
           selectedId: get().selectedId === id ? null : get().selectedId,
+        });
+      },
+
+      setGroupEnabled: (key, enabled) => {
+        set({ facts: get().facts.map((f) => (groupKey(f) === key ? { ...f, enabled } : f)) });
+      },
+
+      removeGroup: (key) => {
+        set({
+          facts: get().facts.filter((f) => groupKey(f) !== key),
+          selectedId: get().selectedId === key ? null : get().selectedId,
+        });
+      },
+
+      replaceGroup: (key, cmds, utterance) => {
+        const facts = get().facts;
+        const start = facts.findIndex((f) => groupKey(f) === key);
+        if (start < 0) return;
+        let end = start; // the group's commands are a contiguous run (appended together, edited in place)
+        while (end < facts.length && groupKey(facts[end]) === key) end++;
+        const group = cmds.length > 1 ? nanoid() : undefined; // multi-command edits stay one step
+        const replacement: Fact[] = cmds.map((cmd) => ({ id: nanoid(), cmd, utterance, group, enabled: true }));
+        set({
+          facts: [...facts.slice(0, start), ...replacement, ...facts.slice(end)],
+          selectedId: get().selectedId === key ? null : get().selectedId,
         });
       },
 

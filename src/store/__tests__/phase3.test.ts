@@ -247,6 +247,53 @@ describe('store — alternatives', () => {
   });
 });
 
+describe('step grouping — one submission, one row (even if it expands to many commands)', () => {
+  // An inscribed shape is many commands from ONE utterance: they share a group.
+  const INSCRIBED: Command[] = [
+    { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
+    { type: 'point-on-circle', id: 'A', circle: 'circle-O', theta: 0 },
+    { type: 'point-on-circle', id: 'B', circle: 'circle-O', theta: 2 },
+    { type: 'point-on-circle', id: 'C', circle: 'circle-O', theta: 4 },
+    { type: 'triangle', ids: ['A', 'B', 'C'] },
+  ];
+  const groupKeys = () => [...new Set(s().facts.map((f) => f.group ?? f.id))];
+
+  it('commands sharing a group collapse to a single step key', () => {
+    const g = 'sub-1';
+    INSCRIBED.forEach((c) => s().execute(c, 'triangle ABC inscribed in a circle', g));
+    expect(s().facts).toHaveLength(5); // five facts…
+    expect(groupKeys()).toEqual([g]); // …but one step row
+  });
+
+  it('setGroupEnabled toggles every command in the step together', () => {
+    const g = 'sub-1';
+    INSCRIBED.forEach((c) => s().execute(c, 'inscribed', g));
+    s().setGroupEnabled(g, false);
+    expect(s().facts.every((f) => !f.enabled)).toBe(true);
+    expect(replay(s().facts).construction.objects).toHaveLength(0); // nothing drawn
+    s().setGroupEnabled(g, true);
+    expect(s().facts.every((f) => f.enabled)).toBe(true);
+  });
+
+  it('removeGroup deletes the whole step', () => {
+    const g = 'sub-1';
+    INSCRIBED.forEach((c) => s().execute(c, 'inscribed', g));
+    s().removeGroup(g);
+    expect(s().facts).toHaveLength(0);
+  });
+
+  it('replaceGroup swaps the step in place, preserving position', () => {
+    s().execute({ type: 'triangle', ids: ['X', 'Y', 'Z'] }, 'triangle XYZ', 'g0');
+    const g = 'sub-1';
+    INSCRIBED.forEach((c) => s().execute(c, 'inscribed', g));
+    s().execute({ type: 'segment', a: 'A', b: 'B' }, 'segment AB', 'g2');
+    s().replaceGroup(g, [{ type: 'square', ids: ['A', 'B', 'C', 'D'] }], 'square ABCD');
+    expect(s().facts[0].cmd.type).toBe('triangle'); // first step stays first
+    expect(s().facts[1].cmd.type).toBe('square'); // the middle step is now a square
+    expect(s().facts[2].cmd.type).toBe('segment'); // last step stays last
+  });
+});
+
 describe('i18n — key parity (he ⇄ en)', () => {
   const paths = (obj: unknown, prefix = ''): string[] => {
     if (obj === null || typeof obj !== 'object') return [prefix];
