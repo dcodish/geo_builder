@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import type { Command, Vec } from '../types';
 import { build } from '../step';
 import { evaluate } from '../evaluate';
-import { dist, sub, angleDeg, cross } from '../geometry';
+import { dist, sub, angleDeg, cross, footOnLine } from '../geometry';
 import { parse } from '@/parser';
 
 const dot = (u: Vec, v: Vec) => u.x * v.x + u.y * v.y;
@@ -106,6 +106,16 @@ describe('constructible cases that used to escalate (right-tri inscribed, circum
     const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => positions.get(id)!);
     expect(collinear(B, C, D)).toBe(true);
     expect(angleDeg(A, B, D)).toBeCloseTo(angleDeg(A, D, C), 4); // ∠BAD = ∠DAC
+  });
+
+  it('circle inscribed in a triangle: the incircle is tangent to all three sides', () => {
+    // distinct from "triangle inscribed in a circle" — the circle is INSIDE the triangle
+    const { positions } = reproduce(['triangle ABC', 'circle inscribed in triangle ABC'], 'incircle');
+    const [A, B, C, I] = ['A', 'B', 'C', 'I'].map((id) => positions.get(id)!);
+    const distToSide = (p: Vec, q: Vec) => dist(I, footOnLine(I, p, q));
+    // the incenter is equidistant from all three sides ⇒ one circle is tangent to each
+    expect(distToSide(A, B)).toBeCloseTo(distToSide(B, C), 6);
+    expect(distToSide(B, C)).toBeCloseTo(distToSide(C, A), 6);
   });
 });
 

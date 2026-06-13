@@ -52,6 +52,11 @@ const PARSES: [string, string][] = [
   ['circle through A B C', 'circumcircle'], // circumscribed circle (3 points)
   ['circle circumscribing ABC', 'circumcircle'],
   ['מעגל חוסם את ABC', 'circumcircle'],
+  // ── incircle: a CIRCLE inscribed in a TRIANGLE (≠ triangle inscribed in a circle) ──
+  ['circle inscribed in triangle ABC', 'circle-through'],
+  ['incircle of triangle ABC', 'circle-through'],
+  ['מעגל חסום במשולש ABC', 'circle-through'],
+  ['circle centered at I radius r inscribed in triangle ABC', 'circle-through'],
   // ── points ──
   ['point A at (0,0)', 'free-point'],
   ['נקודה A ב-(0,0)', 'free-point'],

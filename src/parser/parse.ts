@@ -394,9 +394,23 @@ const INSCRIBED_ANGLES: Record<string, number[] | null> = {
   trapezoid: [215, 325, 60, 120], // isosceles: AB ∥ CD, symmetric about the vertical axis
 };
 
+/**
+ * Is this a *circle* inscribed in a *polygon* (the incircle), rather than a
+ * polygon inscribed in a circle? Discriminate by order: the inscribed subject
+ * comes first, so a circle word *before* the polygon word ("circle inscribed in
+ * triangle ABC" / "מעגל חסום במשולש") is the incircle — distinct from "triangle
+ * inscribed in a circle", where the polygon comes first.
+ */
+const isCircleInPolygon = (s: string): boolean => {
+  const circIdx = s.search(/incircle|\bcircle\b|מעגל/i);
+  const polyIdx = s.search(/triangle|quad\w*|square|rectangle|rhombus|trapez\w*|polygon|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז/i);
+  return circIdx >= 0 && polyIdx >= 0 && circIdx < polyIdx;
+};
+
 /** "triangle ABC inscribed in circle O" / "טרפז ABCD חסום במעגל" — circle + on-circle vertices + edges. */
 const inscribedPolygon: Rule = (s) => {
   if (!/inscribed|חסום/i.test(s)) return null;
+  if (isCircleInPolygon(s)) return null; // that's the incircle — handled by `incircle`, not here
   // A right triangle inscribed in a circle IS constructible (Thales — the
   // hypotenuse is a diameter, the right angle is on the circle): handle it.
   const kind =
@@ -449,6 +463,35 @@ const inscribedPolygon: Rule = (s) => {
       : { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
   );
   return cmds;
+};
+
+/**
+ * "circle inscribed in triangle ABC" / "incircle of triangle ABC" /
+ * "מעגל חסום במשולש ABC" — the INCIRCLE: centred at the incenter (where two angle
+ * bisectors meet), tangent to the sides. Built from existing primitives — two
+ * bisectors → their crossing (incenter) → the foot on a side (tangency point) →
+ * a circle through it. Distinct from "triangle inscribed in a circle".
+ */
+const incircle: Rule = (s) => {
+  if (!/incircle|inscribed|חסום/i.test(s)) return null;
+  if (!isCircleInPolygon(s)) return null; // only "circle in polygon", not "polygon in circle"
+  if (!/triangle|משולש/i.test(s)) return null; // v1: incircle of a triangle
+  const triPart = s.split(/triangle|משולש/i).slice(1).join(' '); // vertices follow the polygon word
+  const ids = labelRun(triPart, 3);
+  if (!ids) return null;
+  const [A, B, C] = ids;
+  const I = circleCenter(s) ?? freeLabel(ids, ['I', 'O', 'P', 'Q']); // the incenter
+  const F = freeLabel([...ids, I], ['F', 'G', 'H', 'K']); // tangency point on AB
+  const bisA = `bis-${B}${A}${C}`; // ∠BAC (vertex A)
+  const bisB = `bis-${A}${B}${C}`; // ∠ABC (vertex B)
+  return [
+    { type: 'triangle', ids: [A, B, C] }, // ensure the triangle exists
+    { type: 'bisector', id: bisA, vertex: A, p: B, q: C },
+    { type: 'bisector', id: bisB, vertex: B, p: A, q: C },
+    { type: 'line-intersection', id: I, line1: bisA, line2: bisB }, // incenter
+    { type: 'foot', id: F, from: I, a: A, b: B }, // inradius foot on side AB
+    { type: 'circle-through', id: circleId(I), center: I, through: F },
+  ];
 };
 
 /** "chord AB in circle O" / "מיתר AB במעגל O" — both endpoints on the circle + the segment. */
@@ -726,6 +769,7 @@ const bisectorPlacesPoint: Rule = (s) => {
 // Order matters: the most specific keyword-anchored rules run first; the
 // coordinate rule (freePoint) is last because it's the loosest.
 const RULES: Rule[] = [
+  incircle, // "circle inscribed in triangle ABC" — before inscribedPolygon (both match "inscribed")
   inscribedPolygon, // before the shape rules ("triangle ABC inscribed …" contains "triangle")
   // Special-line constructs whose Hebrew names a triangle ("…במשולש ABC") must
   // run before the shape rules, or `triangle` grabs the embedded משולש and stops.

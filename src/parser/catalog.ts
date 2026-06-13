@@ -84,6 +84,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'circles', supported: true, en: 'triangle ABC inscribed in circle O', he: 'משולש ABC חסום במעגל O', descEn: 'A triangle with all vertices on a circle.', descHe: 'משולש שכל קודקודיו על מעגל.' },
   { category: 'circles', supported: true, en: 'right triangle ABC inscribed in a circle', he: 'משולש ישר-זווית ABC חסום במעגל', descEn: 'A right triangle inscribed (hypotenuse is a diameter).', descHe: 'משולש ישר-זווית חסום (היתר הוא קוטר).' },
   { category: 'circles', supported: true, en: 'circle through A B C', he: 'מעגל חוסם את ABC', descEn: 'The circle through three points (circumscribed).', descHe: 'המעגל החוסם שלושה קודקודים.' },
+  { category: 'circles', supported: true, en: 'circle inscribed in triangle ABC', he: 'מעגל חסום במשולש ABC', descEn: 'The incircle — tangent to the three sides (centred at the incenter).', descHe: 'המעגל החסום — משיק לשלוש הצלעות (מרכזו מפגש חוצי הזוויות).' },
   { category: 'circles', supported: true, en: 'trapezoid ABCD inscribed in a circle', he: 'טרפז ABCD חסום במעגל', descEn: 'A cyclic (isosceles) trapezoid — also square/rectangle/rhombus.', descHe: 'טרפז חסום (שווה-שוקיים) — וכן ריבוע/מלבן/מעוין.' },
   { category: 'circles', supported: true, en: 'chord AB in circle O', he: 'מיתר AB במעגל O', descEn: 'A chord of a circle (both ends on it).', descHe: 'מיתר במעגל (שני קצותיו עליו).' },
   { category: 'circles', supported: true, en: 'diameter AB in circle O', he: 'קוטר AB במעגל O', descEn: 'A chord through the centre.', descHe: 'מיתר העובר במרכז.' },
