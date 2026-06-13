@@ -119,6 +119,27 @@ describe('constructible cases that used to escalate (right-tri inscribed, circum
   });
 });
 
+describe('re-referencing a drawn line in a later compound (tangent at D, then ∩ AB)', () => {
+  // Draw the tangent at D, THEN intersect "the tangent at D" with AB. The second
+  // statement re-references the same line (its id is its spec) — it must reuse it,
+  // not conflict, and the result point must be named E (not the 't' in "point").
+  it('builds E on AB and on the tangent, with the tangent still drawn', () => {
+    const { construction, positions } = reproduce(
+      [
+        'triangle ABD inscribed in circle O radius 5',
+        'tangent to circle O at D',
+        'point E is the intersection of the tangent to circle O at D and AB',
+      ],
+      'tangent∩',
+    );
+    const A = positions.get('A')!, B = positions.get('B')!, D = positions.get('D')!, O = positions.get('O')!, E = positions.get('E')!;
+    expect(E).toBeDefined(); // the point is named E, not T
+    expect(collinear(A, B, E)).toBe(true); // E lies on AB
+    expect(dot(sub(E, D), sub(D, O))).toBeCloseTo(0, 5); // E is on the tangent (tangent ⟂ radius OD)
+    expect(construction.objects.some((o) => o.id === 'tan-D' && o.kind === 'line' && (o as { visible?: boolean }).visible)).toBe(true);
+  });
+});
+
 describe('corpus Q5 — triangle inscribed in a circle + arc midpoint', () => {
   const EN = [
     'triangle ABC inscribed in circle O radius 5',

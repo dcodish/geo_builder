@@ -64,6 +64,21 @@ function upsertCircle(objects: GeoObject[], o: GeoObject): void {
 }
 
 /**
+ * Add a line, or reuse an existing one of the same id (its id is its spec, so it's
+ * the same line). Visibility is OR-merged: re-referencing a drawn line for a
+ * crossing keeps it drawn; re-stating a scaffolding line as a *drawn* one upgrades
+ * it. (Draw the tangent at D, then intersect "the tangent at D" with AB.)
+ */
+function addLine(objects: GeoObject[], o: Extract<GeoObject, { kind: 'line' }>): void {
+  const existing = objects.find((x) => x.id === o.id);
+  if (!existing) {
+    objects.push(o);
+    return;
+  }
+  if (existing.kind === 'line' && o.visible) existing.visible = true;
+}
+
+/**
  * Which vertex-tuple positions of each shape are *derived* corners (computed
  * from the base edge), as opposed to free base vertices. A composed shape can
  * reuse existing points only at *free* slots (ADR-013), so an existing vertex
@@ -368,19 +383,19 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
 
     case 'bisector':
-      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'bisector', vertex: cmd.vertex, p: cmd.p, q: cmd.q }, visible: cmd.visible });
+      addLine(objects, { kind: 'line', id: cmd.id, spec: { via: 'bisector', vertex: cmd.vertex, p: cmd.p, q: cmd.q }, visible: cmd.visible });
       break;
 
     case 'perpendicular-line':
-      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'perpendicular', through: cmd.through, a: cmd.a, b: cmd.b }, visible: cmd.visible });
+      addLine(objects, { kind: 'line', id: cmd.id, spec: { via: 'perpendicular', through: cmd.through, a: cmd.a, b: cmd.b }, visible: cmd.visible });
       break;
 
     case 'parallel-line':
-      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'parallel', through: cmd.through, a: cmd.a, b: cmd.b }, visible: cmd.visible });
+      addLine(objects, { kind: 'line', id: cmd.id, spec: { via: 'parallel', through: cmd.through, a: cmd.a, b: cmd.b }, visible: cmd.visible });
       break;
 
     case 'line-through':
-      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'through', a: cmd.a, b: cmd.b }, visible: cmd.visible });
+      addLine(objects, { kind: 'line', id: cmd.id, spec: { via: 'through', a: cmd.a, b: cmd.b }, visible: cmd.visible });
       break;
 
     case 'line-intersection':
@@ -456,7 +471,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       if (!objects.some((o) => o.id === cmd.at)) {
         addObj(objects, { kind: 'on-circle', id: cmd.at, circle: cmd.circle, theta: nextTheta(objects, cmd.circle) });
       }
-      addObj(objects, { kind: 'line', id: cmd.id, spec: { via: 'tangent', circle: cmd.circle, at: cmd.at }, visible: cmd.visible });
+      addLine(objects, { kind: 'line', id: cmd.id, spec: { via: 'tangent', circle: cmd.circle, at: cmd.at }, visible: cmd.visible });
       break;
 
     case 'point-by-distances':

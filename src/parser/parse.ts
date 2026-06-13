@@ -555,7 +555,13 @@ const tangentLineIntersection: Rule = (s) => {
   const pairM = s.match(/(?:and|with|עם|ו-?)\s*([A-Za-z])\s*([A-Za-z])\b/i);
   if (!center || !atM || !pairM) return null;
   const at = up(atM[1]);
-  const resM = dropCircleRef(s).replace(/tangent|משיק|\bat\s+[A-Za-z]\b|בנקודה\s*[A-Za-z]\b/gi, ' ').match(/([A-Za-z])\b/);
+  // the result point: strip the tangent/at clauses, the word "point", and filler so
+  // "point E" reads E (not the 't' in "poin·t·") — then the first lone capital.
+  const resM = dropCircleRef(s)
+    .replace(/tangent|משיק|\bat\s+[A-Za-z]\b|בנקודה\s*[A-Za-z]\b/gi, ' ')
+    .replace(/\bpoint\b|נקודה|\bintersection\b|חיתוך/gi, ' ')
+    .replace(FILLER, ' ')
+    .match(/\b([A-Za-z])\b/);
   if (!resM) return null;
   const tanId = `tan-${at}`;
   const abId = `line-${up(pairM[1])}${up(pairM[2])}`;
@@ -594,7 +600,11 @@ const parallelCircleIntersection: Rule = (s) => {
   const throughM = s.match(/(?:through|דרך)\s+([A-Za-z])\b/i);
   const toM = s.match(/(?:parallel\s+to|מקביל\s*ל-?)\s*([A-Za-z])\s*([A-Za-z])\b/i);
   if (!center || !throughM || !toM) return null;
-  const resM = dropCircleRef(s).replace(/through\s+[A-Za-z]\b|דרך\s+[A-Za-z]\b/gi, ' ').match(/([A-Za-z])\b/);
+  const resM = dropCircleRef(s)
+    .replace(/through\s+[A-Za-z]\b|דרך\s+[A-Za-z]\b/gi, ' ')
+    .replace(/\bpoint\b|נקודה/gi, ' ')
+    .replace(FILLER, ' ')
+    .match(/\b([A-Za-z])\b/);
   if (!resM) return null;
   const through = up(throughM[1]);
   const a = up(toM[1]);

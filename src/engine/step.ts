@@ -86,6 +86,10 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     // Re-stating a circle with a new radius/centre is a RESIZE (override), not a
     // redefinition-as-something-different — "circle O radius 8" over an earlier 5.
     if (o.kind === 'circle' && existing.kind === 'circle') continue;
+    // A construction line re-referenced by a later compound (draw the tangent at D,
+    // then intersect "the tangent at D" with AB) is the SAME line — its id is its
+    // spec — so reuse it instead of conflicting (visibility is kept/merged in apply).
+    if (o.kind === 'line' && existing.kind === 'line') continue;
     return `'${o.id}' is already defined — it can't be redefined as something different`;
   }
   return null;
