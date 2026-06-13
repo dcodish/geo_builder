@@ -438,12 +438,14 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
 
     case 'point-on-circle':
-      addObj(objects, { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: cmd.theta ?? nextTheta(objects, cmd.circle) });
+      // No explicit angle ⇒ a free vertex the sampler may slide (inscribed triangle,
+      // chord end); an explicit angle (an inscribed square's corner) is fixed.
+      addObj(objects, { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: cmd.theta ?? nextTheta(objects, cmd.circle), free: cmd.theta === undefined });
       break;
 
     case 'diameter': {
-      // D on the circle (a spread default angle), E its antipode, segment DE through the centre.
-      addObj(objects, { kind: 'on-circle', id: cmd.id1, circle: cmd.circle, theta: cmd.theta ?? nextTheta(objects, cmd.circle) });
+      // D on the circle (a free angle — a diameter can rotate), E its antipode, segment DE through the centre.
+      addObj(objects, { kind: 'on-circle', id: cmd.id1, circle: cmd.circle, theta: cmd.theta ?? nextTheta(objects, cmd.circle), free: cmd.theta === undefined });
       addObj(objects, { kind: 'antipode', id: cmd.id2, circle: cmd.circle, of: cmd.id1 });
       addObj(objects, segment(cmd.id1, cmd.id2));
       break;
@@ -452,7 +454,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     case 'arc-midpoint':
       // The arc endpoints must lie on the circle — create them there if missing.
       for (const pid of [cmd.from, cmd.to]) {
-        if (!objects.some((o) => o.id === pid)) addObj(objects, { kind: 'on-circle', id: pid, circle: cmd.circle, theta: nextTheta(objects, cmd.circle) });
+        if (!objects.some((o) => o.id === pid)) addObj(objects, { kind: 'on-circle', id: pid, circle: cmd.circle, theta: nextTheta(objects, cmd.circle), free: true });
       }
       addObj(objects, { kind: 'arc-midpoint', id: cmd.id, circle: cmd.circle, from: cmd.from, to: cmd.to, branch: cmd.branch ?? 0 });
       break;
@@ -469,7 +471,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // The point of tangency lies on the circle — create it there if it doesn't
       // exist yet, so "tangent to circle O at A" works even before A is placed.
       if (!objects.some((o) => o.id === cmd.at)) {
-        addObj(objects, { kind: 'on-circle', id: cmd.at, circle: cmd.circle, theta: nextTheta(objects, cmd.circle) });
+        addObj(objects, { kind: 'on-circle', id: cmd.at, circle: cmd.circle, theta: nextTheta(objects, cmd.circle), free: true });
       }
       addLine(objects, { kind: 'line', id: cmd.id, spec: { via: 'tangent', circle: cmd.circle, at: cmd.at }, visible: cmd.visible });
       break;

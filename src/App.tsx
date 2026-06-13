@@ -165,7 +165,11 @@ export default function App() {
     document.documentElement.lang = i18n.language;
   }, [i18n, i18n.language]);
 
-  const branchId = construction.objects.find((o) => o.kind === 'intersection' || o.kind === 'on-segment-solved')?.id;
+  // The first point with multiple discrete solutions — circle∩circle, line∩circle,
+  // arc-midpoint (the kinds `cycleAlt` can step). "Show another configuration"
+  // cycles its branch; with none, it re-samples the figure's free DOFs instead.
+  const BRANCHABLE_KINDS = ['intersection', 'circle-circle', 'line-circle', 'arc-midpoint'];
+  const branchId = construction.objects.find((o) => BRANCHABLE_KINDS.includes(o.kind))?.id;
   const examples = t('examples.items', { returnObjects: true }) as string[];
 
   return (

@@ -181,13 +181,20 @@ export interface CircumcenterPoint {
   c: Id;
 }
 
-/** 1 DOF — a point on `circle` at angle `theta` (radians) from the centre. `solve` drives theta (ADR-028). */
+/**
+ * 1 DOF — a point on `circle` at angle `theta` (radians) from the centre. `solve`
+ * drives theta (ADR-028). `free` marks a vertex placed at an *arbitrary* angle (an
+ * inscribed triangle's vertex, a chord end) — one the "show another configuration"
+ * sampler may slide around the circle; a point at a *fixed* angle (an inscribed
+ * square's corner, an arc endpoint) is not free.
+ */
 export interface OnCirclePoint {
   kind: 'on-circle';
   id: Id;
   circle: Id;
   theta: number;
   solve?: SolveDirective;
+  free?: boolean;
 }
 
 /** 0 DOF — the antipode of `of` on `circle` (a diameter's far end): 2·centre − of. */

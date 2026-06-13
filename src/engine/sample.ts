@@ -16,7 +16,11 @@
  * default (returns the construction unchanged).
  */
 
-import type { Construction, FreePoint, Id } from './types';
+import type { Construction, FreePoint, Id, OnCirclePoint } from './types';
+
+/** A free on-circle vertex the sampler may slide (an arbitrary-angle vertex, not driven/fixed). */
+const isFreeOnCircle = (o: { kind: string; free?: boolean; solve?: unknown }): boolean =>
+  o.kind === 'on-circle' && !!o.free && o.solve === undefined;
 
 /** mulberry32 — a tiny deterministic PRNG in [0, 1). */
 function mulberry32(a: number): () => number {
@@ -47,31 +51,40 @@ function hashId(s: string): number {
 export function applySeed(c: Construction, seed: number): Construction {
   if (!seed) return c;
   const free = c.objects.filter((o): o is FreePoint => o.kind === 'free-point' && !o.pinned);
-  if (free.length === 0) return c; // fully determined (all pinned / derived) → nothing to sample
+  const freeCircle = c.objects.filter((o): o is OnCirclePoint => isFreeOnCircle(o));
+  if (free.length === 0 && freeCircle.length === 0) return c; // fully determined → nothing to sample
 
-  const cx = free.reduce((s, p) => s + p.x, 0) / free.length;
-  const cy = free.reduce((s, p) => s + p.y, 0) / free.length;
+  // Free-point cluster: seeded spin about its centroid + per-point jitter.
+  const cx = free.length ? free.reduce((s, p) => s + p.x, 0) / free.length : 0;
+  const cy = free.length ? free.reduce((s, p) => s + p.y, 0) / free.length : 0;
   let span = 1;
   for (const p of free) span = Math.max(span, Math.abs(p.x - cx) * 2, Math.abs(p.y - cy) * 2);
   const jit = span * 0.22;
-
   const theta = (mulberry32((seed * 2654435761) >>> 0)() * 2 - 1) * Math.PI; // ±180° spin of the free cluster
   const ct = Math.cos(theta);
   const st = Math.sin(theta);
 
   const objects = c.objects.map((o) => {
-    if (o.kind !== 'free-point' || o.pinned) return o;
-    const dx = o.x - cx;
-    const dy = o.y - cy;
-    const rx = cx + (dx * ct - dy * st);
-    const ry = cy + (dx * st + dy * ct);
-    const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
-    return { ...o, x: rx + (jr() * 2 - 1) * jit, y: ry + (jr() * 2 - 1) * jit };
+    if (o.kind === 'free-point' && !o.pinned) {
+      const dx = o.x - cx;
+      const dy = o.y - cy;
+      const rx = cx + (dx * ct - dy * st);
+      const ry = cy + (dx * st + dy * ct);
+      const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
+      return { ...o, x: rx + (jr() * 2 - 1) * jit, y: ry + (jr() * 2 - 1) * jit };
+    }
+    // Free on-circle vertex: slide it around the circle by a seeded angle — a
+    // genuinely different inscribed figure, still valid (it stays on the circle).
+    if (isFreeOnCircle(o)) {
+      const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
+      return { ...o, theta: (o as OnCirclePoint).theta + (jr() * 2 - 1) * Math.PI };
+    }
+    return o;
   });
   return { ...c, objects };
 }
 
-/** The ids of the figure's non-pinned free points — its remaining degrees of freedom. */
+/** The ids of the figure's free DOFs (non-pinned free points + free on-circle vertices). */
 export function freeDofs(c: Construction): Id[] {
-  return c.objects.filter((o) => o.kind === 'free-point' && !o.pinned).map((o) => o.id);
+  return c.objects.filter((o) => (o.kind === 'free-point' && !o.pinned) || isFreeOnCircle(o)).map((o) => o.id);
 }
