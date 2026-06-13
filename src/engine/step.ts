@@ -13,7 +13,7 @@ import { applyCommand, mirrorComposition, normalizeShapeComposition } from './ap
 import { evaluate } from './evaluate';
 import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist } from './geometry';
-import { solvedOnSegmentCandidates } from './solve';
+import { constraintRefs, solvedOnSegmentCandidates } from './solve';
 
 export interface StepOk {
   ok: true;
@@ -137,9 +137,70 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   }
 
   if (!res.ok) {
+    // A constraint its direct carrier alone can't satisfy ("cannot place F on AB
+    // so |DE|=|DF|" — F is stuck on the segment) may still hold if the figure's
+    // OTHER free DOFs move too. Recruit them and solve jointly before giving up
+    // (ADR-028, extended): "find a possible configuration and use it".
+    const recruited = recruitFreeDofs(next);
+    if (recruited) {
+      const r2 = evaluate(recruited);
+      if (r2.ok) return { ok: true, construction: recruited, positions: r2.positions };
+    }
     return { ok: false, error: res.error, construction: prev, positions: prevPositions };
   }
   return { ok: true, construction: next, positions: res.positions };
+}
+
+/** Every free 1-DOF carrier (on-circle / on-segment, not pinned/driven) reachable from `start`. */
+function freeCarrierAncestors(objects: GeoObject[], start: Id): Id[] {
+  const byId = new Map(objects.map((o) => [o.id, o] as const));
+  const seen = new Set<Id>();
+  const result: Id[] = [];
+  const queue: Id[] = [start];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const o = byId.get(id);
+    if (!o || !isGeoPoint(o)) continue;
+    if ((o.kind === 'on-circle' || o.kind === 'on-segment') && (o as { solve?: unknown }).solve === undefined) {
+      result.push(id); // a free carrier — its parameter is a DOF we can move
+      continue;
+    }
+    queue.push(...pointParents(o));
+  }
+  return result;
+}
+
+/**
+ * Last resort when a constraint can't be met by its direct carrier: turn that
+ * carrier and the free DOFs the constraint transitively depends on into a set of
+ * joint carriers (all driving the same constraint), so the numeric solver
+ * (resolveDriven) can reconfigure the figure to satisfy it. Returns the recruited
+ * construction, or null if there's nothing extra to move.
+ */
+function recruitFreeDofs(c: Construction): Construction | null {
+  const solved = c.objects.filter((o): o is Extract<GeoObject, { kind: 'on-segment-solved' }> => o.kind === 'on-segment-solved');
+  if (!solved.length) return null;
+  let objects = [...c.objects];
+  const added: Constraint[] = [];
+  let changed = false;
+  for (const sp of solved) {
+    const K = sp.constraint;
+    const recruits = new Set<Id>();
+    for (const ref of constraintRefs(K)) for (const a of freeCarrierAncestors(objects, ref)) recruits.add(a);
+    recruits.delete(sp.id);
+    if (recruits.size === 0) continue;
+    changed = true;
+    added.push(K);
+    objects = objects.map((o) => {
+      if (o.id === sp.id) return { kind: 'on-segment', id: sp.id, a: sp.a, b: sp.b, t: 0.5, solve: { constraint: K, branch: 0 } };
+      if (recruits.has(o.id) && (o.kind === 'on-circle' || o.kind === 'on-segment') && o.solve === undefined)
+        return { ...o, solve: { constraint: K, branch: 0 } };
+      return o;
+    });
+  }
+  return changed ? { objects, constraints: [...c.constraints, ...added] } : null;
 }
 
 // ── ADR-028: a second placement of an existing point → a coincidence constraint ──

@@ -44,6 +44,30 @@ describe('equal-segments constraint', () => {
   });
 });
 
+describe('a constraint its direct carrier cannot meet recruits other free DOFs (reconfigures)', () => {
+  it('"DE = DF" with F stuck on segment AB reconfigures the triangle until it holds', () => {
+    // |DF| (F on segment AB) can't reach |DE| (E far out on the tangent) in the
+    // default triangle — but it CAN if the free vertices move. The engine must find that.
+    const cmds = [
+      ['triangle ABD inscribed in circle O radius 5', undefined],
+      ['the tangent at D and the extension of AB meet at E', { circles: ['O'] }],
+      ['point F on AB', undefined],
+      ['DE = DF', undefined],
+    ].flatMap(([u, ctx]) => {
+      const r = parse(u as string, ctx as { circles: string[] } | undefined);
+      if (!r.ok) throw new Error(u as string);
+      return r.commands;
+    });
+    const { positions } = build(cmds as Command[]);
+    const [A, B, D, E, F, O] = ['A', 'B', 'D', 'E', 'F', 'O'].map((id) => positions.get(id)!);
+    expect(dist(D, E)).toBeCloseTo(dist(D, F), 2); // the constraint now holds…
+    const t = (sub(F, A).x * sub(B, A).x + sub(F, A).y * sub(B, A).y) / (sub(B, A).x ** 2 + sub(B, A).y ** 2);
+    expect(t).toBeGreaterThan(-0.02); // …with F still ON segment AB…
+    expect(t).toBeLessThan(1.02);
+    for (const p of [A, B, D]) expect(dist(O, p)).toBeCloseTo(5, 2); // …and A,B,D still on the circle
+  });
+});
+
 describe('a constraint drives a FREE point, not one already pinned by another constraint', () => {
   it('"DF = DE" moves the free E, not F (which a second definition pinned)', () => {
     // F is defined twice (a point on AB, then = the tangent∩AB intersection) → pinned
