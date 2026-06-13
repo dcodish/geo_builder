@@ -153,6 +153,12 @@ const segment: Rule = (s) => {
 const INTERSECT_KW = /intersect|∩|חיתוך|נחתך|נחתכ|נפגש|\bmeets?\b/i;
 const lineLineIntersection: Rule = (s) => {
   if (!INTERSECT_KW.test(s)) return null;
+  // The operands of a plain line∩line must be point-pairs the figure already has.
+  // If they're introduced here AS constructs this rule can't build (a diameter, a
+  // chord, a radius/tangent), don't half-parse "diameter AB and chord DE meet at C"
+  // into a bare intersection that drops the diameter & chord — escalate so the
+  // operands get created (ADR-024; the LLM has the circle as context).
+  if (/\bdiameter\b|\bchord\b|\bradius\b|\btangent\b|קוטר|מיתר|רדיוס|משיק/i.test(s)) return 'stop';
   // Drop filler words so they aren't mistaken for two-letter line labels ("of"!).
   const t = s.replace(/\b(?:is|the|of|between|at|point|הוא|בין|בנקודה|נקודה)\b/gi, ' ');
   const pointFirst = t.match(

@@ -127,6 +127,10 @@ const ESCALATES: string[] = [
   'parallelogram ABCD where AB = CD',
   'triangle ABC with angle BAC = 37',
   'משולש ABC עם זווית BAC = 37',
+  // ── an intersection whose operands are themselves new constructs (diameter/chord) ──
+  // the rule must not drop "diameter"/"chord" and leave the intersection's deps unbuilt
+  'diameter AB and chord DE meet at point C',
+  'קוטר AB ומיתר DE נפגשים בנקודה C',
   // ── shape + a second construct ──
   'square ABCD and segment AC',
   'ריבוע ABCD וקטע AC',
