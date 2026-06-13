@@ -58,7 +58,23 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
     constraints.push(con); // keep it for the final verification after the driven solve
     return;
   }
-  // (3) Nothing free to move — a pure check (over-constraint detection).
+  // (3) Else drive a FREE point (2 DOF) among the refs — a shape's free vertex has
+  // no parametric DOF, so a constraint on it (e.g. "|AB| = |AC|" on a parallelogram,
+  // whose A,B,C are free) reshapes the figure by moving that vertex to the nearest
+  // satisfying spot (`resolveDriven`). Prefer a NON-pinned, not-yet-driven vertex,
+  // the most-recently-added one (keeps earlier/base vertices stable) — ADR-028.
+  const freePts = idxs.filter((i) => {
+    if (i < 0 || objects[i].kind !== 'free-point') return false;
+    const fp = objects[i] as Extract<GeoObject, { kind: 'free-point' }>;
+    return !fp.pinned && !fp.rigid && fp.solve === undefined && !pinned.has(fp.id);
+  });
+  const free = freePts.length ? freePts.reduce((a, b) => (b > a ? b : a)) : undefined;
+  if (free !== undefined) {
+    objects[free] = { ...(objects[free] as Extract<GeoObject, { kind: 'free-point' }>), solve: { constraint: con, branch: 0 } };
+    constraints.push(con); // verified after the driven solve (honest fail if unsolvable)
+    return;
+  }
+  // (4) Nothing free to move — a pure check (over-constraint detection).
   constraints.push(con);
 }
 
@@ -242,12 +258,15 @@ function fitTemplate(template: BaseVertex[], pos: Map<Id, Vec>): (p: BaseVertex)
  * own definition stands — ADR-013). Derived vertices are added separately and
  * follow these by their rules.
  */
-function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Vec>): void {
+function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Vec>, rigid = false): void {
   const fit = fitTemplate(template, pos);
   for (const t of template) {
     if (objects.some((o) => o.id === t.id)) continue; // reuse existing
     const v = fit(t);
-    objects.push({ kind: 'free-point', id: t.id, x: v.x, y: v.y });
+    // `rigid` base vertices belong to a fully-committed regular shape (a square):
+    // a constraint that contradicts the shape is a genuine over-constraint, so the
+    // solver must NOT drive them (it would silently rescale/reshape) — ADR-030.
+    objects.push({ kind: 'free-point', id: t.id, x: v.x, y: v.y, ...(rigid ? { rigid: true } : {}) });
   }
 }
 
@@ -301,7 +320,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // size); C and D are derived to make it a square for any A,B.
       const [a, b, c, d] = cmd.ids;
       const side = cmd.side ?? 5;
-      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: side, y: 0 }], pos);
+      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: side, y: 0 }], pos, true);
       addObj(objects, { kind: 'derived', id: c, rule: 'square-c', a, b });
       addObj(objects, { kind: 'derived', id: d, rule: 'square-d', a, b });
       quadEdges(objects, a, b, c, d);

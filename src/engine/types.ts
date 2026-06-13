@@ -30,6 +30,21 @@ export interface FreePoint {
   x: number;
   y: number;
   pinned?: boolean;
+  /**
+   * A base vertex of a fully-committed regular shape (a square): its equal sides and
+   * right angles are intrinsic, so a constraint that contradicts the shape is a real
+   * over-constraint — the solver must not drive it (ADR-030). Generic shapes
+   * (parallelogram, quad, triangle) leave their vertices drivable.
+   */
+  rigid?: boolean;
+  /**
+   * Drive this point's 2 DOF (x,y) so a constraint holds — the free-point analogue
+   * of the parametric `solve` directive (ADR-028). A shape's free vertices (e.g. a
+   * parallelogram's A,B,C) have no parametric DOF, so a constraint on them reshapes
+   * the figure by moving a free vertex to the nearest configuration that satisfies
+   * it (`resolveDriven` solves x,y jointly, regularised toward the current spot).
+   */
+  solve?: SolveDirective;
 }
 
 /**

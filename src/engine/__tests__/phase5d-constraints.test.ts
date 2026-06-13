@@ -35,6 +35,31 @@ describe('distance constraint', () => {
   });
 });
 
+describe('a constraint drives a FREE vertex (2 DOF) when no parametric carrier exists (ADR-030)', () => {
+  it('reshapes a parallelogram so a side equals a diagonal (|AB| = |AC|)', () => {
+    // ABCD parallelogram (A,B,C free, D derived); the diagonal AC; then |AB| = |AC|.
+    // No on-segment/on-circle DOF is referenced, so the engine moves a free vertex to
+    // the nearest configuration that satisfies it (a parallelogram with side = diagonal).
+    const pgram = build([{ type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] }, { type: 'segment', a: 'A', b: 'C' }]);
+    const r = applyStep(pgram.construction, { type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'C' });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const P = r.positions;
+    expect(dist(P.get('A')!, P.get('B')!)).toBeCloseTo(dist(P.get('A')!, P.get('C')!), 4);
+    // still a parallelogram: D = A + C − B
+    const A = P.get('A')!, B = P.get('B')!, C = P.get('C')!, D = P.get('D')!;
+    expect(D.x).toBeCloseTo(A.x + C.x - B.x, 4);
+    expect(D.y).toBeCloseTo(A.y + C.y - B.y, 4);
+  });
+
+  it('a square is rigid — the same |AB| = |AC| is rejected (committed shape, not driven)', () => {
+    const sq = build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }, { type: 'segment', a: 'A', b: 'C' }]);
+    const r = applyStep(sq.construction, { type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'C' });
+    expect(r.ok).toBe(false); // |AC| = √2·|AB| intrinsically; can't hold
+    if (!r.ok) expect(r.error).toMatch(/over-constrained/i);
+  });
+});
+
 describe('equal-segments constraint', () => {
   it('drives an on-segment point to make two segments equal (here: the midpoint)', () => {
     const { positions } = build([...onAB(10), { type: 'set-equal', a: 'E', b: 'A', c: 'E', d: 'B' }]);

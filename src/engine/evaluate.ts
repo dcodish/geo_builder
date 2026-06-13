@@ -57,6 +57,14 @@ export type EvalResult = EvalOk | EvalErr;
  * those DOFs resolved to plain parameters (or unchanged if there are none).
  */
 function resolveDriven(c: Construction): Construction {
+  // Free vertices driven by a constraint (2 DOF each) take a separate, regularised
+  // path — they have no bounded parameter range, and a single equation leaves a
+  // solution manifold, so we pick the configuration nearest the current one (ADR-028).
+  const freeCarriers = c.objects.filter(
+    (o): o is Extract<GeoObject, { kind: 'free-point' }> => o.kind === 'free-point' && o.solve !== undefined,
+  );
+  if (freeCarriers.length > 0) return resolveFreeDriven(c, freeCarriers);
+
   const carriers = c.objects.filter(
     (o): o is Extract<GeoObject, { kind: 'on-circle' | 'on-segment' }> =>
       (o.kind === 'on-circle' || o.kind === 'on-segment') && o.solve !== undefined,
@@ -131,10 +139,109 @@ function resolveDriven(c: Construction): Construction {
   return setParams(c, new Map<Id, number>(ids.map((id, i) => [id, best[i]])));
 }
 
+/**
+ * Drive one or more FREE vertices (2 DOF each) so their constraints hold, choosing
+ * the configuration NEAREST the current one — a shape's free vertex has no bounded
+ * parameter, and a single distance/ratio equation leaves a 1-parameter family of
+ * solutions, so without this regularisation the figure could jump arbitrarily far
+ * (ADR-028, free-point extension). Minimises Σ residual² + λ·Σ‖p−p₀‖² by Nelder–Mead
+ * seeded at the current positions, with the simplex step scaled to the figure.
+ */
+function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { kind: 'free-point' }>[]): Construction {
+  // Distinct constraints (a constraint shared by several driven vertices counts once).
+  const seen = new Set<string>();
+  const cons = freeCarriers
+    .map((cr) => cr.solve!.constraint)
+    .filter((k) => (seen.has(JSON.stringify(k)) ? false : (seen.add(JSON.stringify(k)), true)));
+  const ids = freeCarriers.map((cr) => cr.id);
+  const seed = freeCarriers.flatMap((cr) => [cr.x, cr.y]); // [x0,y0, x1,y1, …]
+  // A figure-scaled step & regularisation weight: the span of the seed vertices,
+  // floored so a degenerate seed still moves. λ is tiny — it only breaks ties on the
+  // solution manifold, never competing with driving the residual to ~0.
+  const span = Math.max(1, ...seed.map((v) => Math.abs(v)));
+  const place = (x: number[]): Construction =>
+    setFreePos(c, new Map(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }])));
+  // The pure constraint cost (Σ residual²) and a lightly-regularised variant that
+  // adds λ·Σ‖p−seed‖² to prefer the configuration nearest the current one.
+  const resid = (x: number[]): number => {
+    const r = evaluateCore(place(x), { skipConstraints: true });
+    if (!r.ok) return Infinity;
+    let s = 0;
+    for (const con of cons) {
+      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return Infinity;
+      const v = residual(con, (id) => r.positions.get(id)!);
+      s += v * v;
+    }
+    return s;
+  };
+  const lambda = 1e-3 / (span * span); // scale-free; only breaks ties on the solution manifold
+  const regCost = (x: number[]): number => {
+    const base = resid(x);
+    if (!isFinite(base)) return Infinity;
+    let s = base;
+    for (let i = 0; i < x.length; i++) s += lambda * (x[i] - seed[i]) * (x[i] - seed[i]);
+    return s;
+  };
+  // 1) Pick the nearest basin: regularised search from the seed and a few cardinal
+  //    restarts (so a vertex on the far side of a solution circle isn't missed).
+  const offsets = [1, -1, 0.5].flatMap((d) => [
+    seed.map((v, i) => (i % 2 === 0 ? v + d * span : v)),
+    seed.map((v, i) => (i % 2 === 1 ? v + d * span : v)),
+  ]);
+  let best = seed;
+  let bestReg = regCost(seed);
+  for (const start of [seed, ...offsets]) {
+    const x = nelderMead(regCost, start, 400, span * 0.2);
+    const fx = regCost(x);
+    if (fx < bestReg) {
+      bestReg = fx;
+      best = x;
+    }
+  }
+  // 2) Polish: drop the regulariser and minimise the pure residual from the chosen
+  //    basin, with shrinking simplex steps, so the result lands ON the constraint
+  //    (the λ term above pulls slightly off it; the check tolerance is 1e-6).
+  for (const st of [span * 0.05, span * 0.005]) best = nelderMead(resid, best, 400, st);
+  // 3) Accept only a genuine, non-degenerate solution. A constraint like AB∥BC on a
+  //    figure that can't satisfy it (or |AB|=k|CD| with no valid config) is driven
+  //    toward collapsing a segment to ~0 — a cheat that drives the residual down. If
+  //    the best is still off the constraint OR has collapsed a referenced segment,
+  //    keep the ORIGINAL figure so the honest over-constraint check reports it.
+  const r = evaluateCore(place(best), { skipConstraints: true });
+  const refIds = [...new Set(cons.flatMap((con) => constraintRefs(con)))];
+  const satisfied =
+    r.ok &&
+    cons.every((con) => {
+      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return false;
+      return Math.abs(residual(con, (id) => r.positions.get(id)!)) <= residualTolerance(con);
+    }) &&
+    !degenerateSpread(refIds.map((id) => r.positions.get(id)).filter((p): p is Vec => !!p), span);
+  return satisfied ? place(best) : place(seed);
+}
+
+/** True if any two of the constraint's referenced points have collapsed together (a near-degenerate "solution" the solver cheated to). */
+function degenerateSpread(pts: Vec[], span: number): boolean {
+  const eps = 1e-3 * span;
+  for (let i = 0; i < pts.length; i++)
+    for (let j = i + 1; j < pts.length; j++)
+      if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) < eps) return true;
+  return false;
+}
+
+/** Set free vertices to explicit positions and clear their `solve` directives (now resolved). */
+function setFreePos(c: Construction, pos: Map<Id, Vec>): Construction {
+  return {
+    ...c,
+    objects: c.objects.map((o) =>
+      o.kind === 'free-point' && pos.has(o.id) ? { ...o, x: pos.get(o.id)!.x, y: pos.get(o.id)!.y, solve: undefined } : o,
+    ),
+  };
+}
+
 /** Nelder–Mead downhill simplex — derivative-free joint minimisation of `f` from `x0`. */
-function nelderMead(f: (x: number[]) => number, x0: number[], iters = 300): number[] {
+function nelderMead(f: (x: number[]) => number, x0: number[], iters = 300, step = 0.15): number[] {
   const n = x0.length;
-  let simplex = [x0.slice(), ...x0.map((_, i) => x0.map((v, j) => (j === i ? v + 0.15 : v)))];
+  let simplex = [x0.slice(), ...x0.map((_, i) => x0.map((v, j) => (j === i ? v + step : v)))];
   let fv = simplex.map(f);
   const order = () => {
     const idx = [...fv.keys()].sort((a, b) => fv[a] - fv[b]);
