@@ -85,7 +85,7 @@ function freeLabel(used: string[], prefer: string[] = []): Id {
  * test, so e.g. "triangle"/"angle" there is fine.
  */
 const SHAPE_LEFTOVER =
-  /\b(?:inscribed|circumscribed|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|points?)\b|[=⊥∥∩°]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונך|אנך|מקביל|חוצ|אמצע|תיכון|גובה|המשך|חיתוך|זווית|קטע|אלכסון|חבר|נקוד/i;
+  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|points?)\b|[=⊥∥∩°]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונך|אנך|מקביל|חוצ|אמצע|תיכון|גובה|המשך|חיתוך|זווית|קטע|אלכסון|חבר|נקוד/i;
 
 /** True if, after removing the shape keyword, geometry the shape can't express remains. */
 const shapeHasLeftover = (s: string, re: RegExp): boolean => SHAPE_LEFTOVER.test(s.replace(re, ' '));
@@ -419,7 +419,7 @@ const isCircleInPolygon = (s: string): boolean => {
 
 /** "triangle ABC inscribed in circle O" / "טרפז ABCD חסום במעגל" — circle + on-circle vertices + edges. */
 const inscribedPolygon: Rule = (s) => {
-  if (!/inscribed|חסום/i.test(s)) return null;
+  if (!/inscrib\w*|חסום/i.test(s)) return null; // inscribed / inscribe / inscribing
   if (isCircleInPolygon(s)) return null; // that's the incircle — handled by `incircle`, not here
   // A right triangle inscribed in a circle IS constructible (Thales — the
   // hypotenuse is a diameter, the right angle is on the circle): handle it.
@@ -438,7 +438,7 @@ const inscribedPolygon: Rule = (s) => {
   const named = circleCenter(s); // may be null — "inscribed in a circle" need not name the centre
   const rM = s.match(new RegExp(String.raw`(?:radius|רדיוס\S*)\s*${num}`, 'i'));
   let rest = dropCircleRef(s).replace(
-    /right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זווית|זווית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|quad\w*|מרובע|inscribed|חסום|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
+    /right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זווית|זווית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|quad\w*|מרובע|inscrib\w*|חסום|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
     ' ',
   );
   if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
@@ -483,7 +483,7 @@ const inscribedPolygon: Rule = (s) => {
  * a circle through it. Distinct from "triangle inscribed in a circle".
  */
 const incircle: Rule = (s) => {
-  if (!/incircle|inscribed|חסום/i.test(s)) return null;
+  if (!/incircle|inscrib\w*|חסום/i.test(s)) return null;
   if (!isCircleInPolygon(s)) return null; // only "circle in polygon", not "polygon in circle"
   if (!/triangle|משולש/i.test(s)) return null; // v1: incircle of a triangle
   const triPart = s.split(/triangle|משולש/i).slice(1).join(' '); // vertices follow the polygon word

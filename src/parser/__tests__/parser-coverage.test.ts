@@ -42,6 +42,8 @@ const PARSES: [string, string][] = [
   ['triangle ABC inscribed in a circle', 'circle'],
   ['משולש ABC חסום במעגל', 'circle'],
   ['right triangle ABC inscribed in a circle', 'circle'], // Thales — hypotenuse is a diameter
+  ['inscribe triangle ABC in a circle', 'circle'], // imperative "inscribe" / "inscribing" too, not only "inscribed"
+  ['inscribing triangle ABC in a circle', 'circle'],
   ['quadrilateral ABCD inscribed in a circle', 'circle'],
   ['square ABCD inscribed in a circle', 'circle'],
   ['ריבוע ABCD חסום במעגל', 'circle'],
