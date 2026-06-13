@@ -28,7 +28,7 @@ All durable project context lives **in this repo** — it syncs via Dropbox, so 
 
 ## Documentation
 
-Full project docs live in [`docs/`](docs/) — vision, functional + non-functional requirements, design/architecture, glossary, and the decision log (ADRs). Start at [`docs/README.md`](docs/README.md). These are the authoritative, detailed source; this file is the quick orientation and points there for depth. **Keep both in sync as the design evolves**, and add an ADR to `docs/06-decisions.md` for any significant decision.
+Full project docs live in [`docs/`](docs/) — vision, functional + non-functional requirements, design/architecture, glossary, the decision log (ADRs), and the [pedagogy charter](docs/10-pedagogy.md) (what the tool should teach + the construction→theorem trigger map that drives Phase 6). Start at [`docs/README.md`](docs/README.md). These are the authoritative, detailed source; this file is the quick orientation and points there for depth. **Keep both in sync as the design evolves**, and add an ADR to `docs/06-decisions.md` for any significant decision.
 
 ## Testing & definition of ready
 
