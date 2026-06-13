@@ -23,6 +23,17 @@ import { constraintRefs } from './solve';
  * add a residual case in solve.ts, not logic here.
  */
 function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Constraint): void {
+  // A trivially-true equal/ratio — the SAME segment on both sides ("DF = DF") —
+  // constrains nothing, so it must NOT drive a carrier (which would slide it to a
+  // degenerate t, e.g. F → t=0 = A). Push it as a check; its residual is 0, so it
+  // simply passes (a ratio with k≠1 on the same segment correctly fails instead).
+  if (
+    (con.type === 'equal' || con.type === 'ratio') &&
+    ((con.a === con.c && con.b === con.d) || (con.a === con.d && con.b === con.c))
+  ) {
+    constraints.push(con);
+    return;
+  }
   const idxs = constraintRefs(con).map((id) => objects.findIndex((o) => o.id === id));
   // (1) Prefer an on-segment ref as the carrier — the constraint *places* it (its t
   // is solved in closed form, with the constraint embedded in the point).

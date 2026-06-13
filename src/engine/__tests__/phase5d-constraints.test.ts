@@ -44,6 +44,21 @@ describe('equal-segments constraint', () => {
   });
 });
 
+describe('a trivially-true equal ("DF = DF") is a no-op, not a degenerate drive', () => {
+  it('does not slide an on-segment carrier to t=0 (which collapsed F onto A)', () => {
+    // F is a point on segment AB; "DF = DF" references F but constrains nothing —
+    // it must not drive F to a degenerate position.
+    const { positions } = build([
+      { type: 'free-point', id: 'A', x: 0, y: 0 },
+      { type: 'free-point', id: 'B', x: 10, y: 0 },
+      { type: 'free-point', id: 'D', x: 5, y: 6 },
+      { type: 'point-on-segment', id: 'F', a: 'A', b: 'B', t: 0.4 },
+      { type: 'set-equal', a: 'D', b: 'F', c: 'D', d: 'F' }, // trivially true
+    ]);
+    expect(positions.get('F')!.x).toBeCloseTo(4, 6); // F stays at t=0.4 (x=4), not driven to A (x=0)
+  });
+});
+
 describe('ratio constraint (a proportion |AB| = k·|CD|)', () => {
   it('drives an on-segment point so |AE| = 2·|EB| (E at the 2:1 point)', () => {
     const { positions } = build([...onAB(6), { type: 'set-ratio', a: 'E', b: 'A', c: 'E', d: 'B', k: 2 }]);
