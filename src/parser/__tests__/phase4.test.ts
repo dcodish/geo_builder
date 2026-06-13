@@ -110,6 +110,36 @@ describe('parser — lines-first intersection phrasing (he/en)', () => {
   it('hebrew (inflected נחתכים)', () => has('האלכסונים AC ו-BD נחתכים בנקודה E', e));
 });
 
+describe('parser — implicit circle reference (the figure has one circle)', () => {
+  const ctx = { circles: ['O'] };
+  it('resolves an unnamed tangent∩line to the only circle, both phrasings + extension (He/En)', () => {
+    for (const u of [
+      'המשיק בנקודה D והמשך AB נפגשים בנקודה E', // the reported case
+      'the tangent at D and the extension of AB meet at E',
+    ]) {
+      const r = parse(u, ctx);
+      expect(r.ok, `"${u}" should parse with an implicit circle`).toBe(true);
+      if (r.ok) {
+        const types = r.commands.map((c) => c.type);
+        expect(types).toContain('line-intersection'); // E = tangent ∩ AB
+        // exactly the named points D, E (+ A, B) — no invented intermediate point
+        const ids = new Set(r.commands.flatMap((c) => Object.entries(c).filter(([k]) => /^(id|a|b|at)$/.test(k)).map(([, v]) => v)));
+        expect(ids.has('F')).toBe(false); // the LLM used to invent F — the deterministic parse never does
+      }
+    }
+  });
+  it('"chord AB" / "diameter DE" resolve the only circle', () => {
+    expect(parse('chord AB', ctx).ok).toBe(true);
+    expect(parse('diameter DE', ctx).ok).toBe(true);
+  });
+  it('with NO circle present, an unnamed tangent escalates (does not misparse)', () => {
+    expect(parse('the tangent at D and AB meet at E', { circles: [] }).ok).toBe(false);
+  });
+  it('with TWO circles, an unnamed reference is ambiguous → escalates', () => {
+    expect(parse('the tangent at D and AB meet at E', { circles: ['O', 'P'] }).ok).toBe(false);
+  });
+});
+
 describe('parser — filler words are not labels', () => {
   it('"connect A to B" reads A,B — not T,O', () =>
     one('connect A to B', { type: 'segment', a: 'A', b: 'B' }));

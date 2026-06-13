@@ -23,12 +23,23 @@ export type ParseResult =
   | { ok: false; reason: 'not-handled' };
 
 /**
+ * Figure context the parser may consult to resolve implicit references — chiefly
+ * "the circle" / a tangent/chord that doesn't name its circle, resolved to the one
+ * circle already present. Empty by default (a context-free parse).
+ */
+export interface ParseContext {
+  /** Centre letters of circles already in the figure (e.g. ['O']). */
+  circles: string[];
+}
+const NO_CONTEXT: ParseContext = { circles: [] };
+
+/**
  * 'stop' = the rule recognised its keyword but could not read the sentence:
  * abort the whole parse (→ not-handled, the fallback boundary) instead of
  * letting a weaker rule half-parse the utterance. A half-parse that silently
  * drops part of a fact is worse than a miss — it draws a wrong figure.
  */
-type Rule = (s: string) => Command[] | null | 'stop';
+type Rule = (s: string, ctx: ParseContext) => Command[] | null | 'stop';
 
 const up = (c: string): Id => c.toUpperCase();
 const num = String.raw`(-?\d+(?:\.\d+)?)`;
@@ -42,6 +53,14 @@ const circleCenter = (s: string): string | null => {
     s.match(/(?:circle|מעגל)\s+([A-Za-z])\b/i);
   return m ? m[1] : null;
 };
+/**
+ * The circle a phrase refers to: its named centre, or — when none is named and the
+ * figure has exactly ONE circle — that circle's centre (implicit "the circle"). With
+ * 0 or 2+ unnamed circles it stays null (ambiguous → the rule defers/escalates).
+ */
+const resolveCenter = (s: string, ctx: ParseContext): string | null =>
+  circleCenter(s) ?? (ctx.circles.length === 1 ? ctx.circles[0] : null);
+
 /** Remove a "circle X" / "מעגל X" mention so its centre letter isn't read as a figure label. */
 const dropCircleRef = (s: string): string => s.replace(/(?:circle|מעגל)\s+[A-Za-z]\b/gi, ' ');
 
@@ -513,9 +532,9 @@ const incircle: Rule = (s) => {
 };
 
 /** "chord AB in circle O" / "מיתר AB במעגל O" — both endpoints on the circle + the segment. */
-const chord: Rule = (s) => {
+const chord: Rule = (s, ctx) => {
   if (!/chord|מיתר/i.test(s)) return null;
-  const center = circleCenter(s);
+  const center = resolveCenter(s, ctx);
   if (!center) return null;
   const ids = labelRun(dropCircleRef(s).replace(/chord|מיתר/gi, ' '), 2);
   if (!ids) return null;
@@ -528,9 +547,9 @@ const chord: Rule = (s) => {
 };
 
 /** "diameter DE in circle O" / "קוטר DE במעגל O" — a point on the circle + its antipode + the segment. */
-const diameter: Rule = (s) => {
+const diameter: Rule = (s, ctx) => {
   if (!/diameter|קוטר/i.test(s)) return null;
-  const center = circleCenter(s);
+  const center = resolveCenter(s, ctx);
   if (!center) return null;
   const ids = labelRun(dropCircleRef(s).replace(/diameter|קוטר/gi, ' '), 2);
   if (!ids) return null;
@@ -538,9 +557,9 @@ const diameter: Rule = (s) => {
 };
 
 /** "M is the midpoint of arc BC in circle O" / "M אמצע הקשת BC במעגל O". */
-const arcMidpoint: Rule = (s) => {
+const arcMidpoint: Rule = (s, ctx) => {
   if (!/arc|קשת/i.test(s)) return null;
-  const center = circleCenter(s);
+  const center = resolveCenter(s, ctx);
   if (!center) return null;
   const m = dropCircleRef(s).match(/([A-Za-z])\b.*?(?:midpoint|אמצע).*?(?:arc|הקשת|קשת)\s*([A-Za-z])\s*([A-Za-z])\b/i);
   if (!m) return null;
@@ -555,31 +574,41 @@ const pointOnCircle: Rule = (s) => {
   return [{ type: 'point-on-circle', id: up(m[1]), circle: circleId(m[2]) }];
 };
 
-/** "E is the intersection of the tangent to circle O at D and AB" — tangent line ∩ a segment line. */
-const tangentLineIntersection: Rule = (s) => {
+/**
+ * The tangent at D and a line AB meet at E — both phrasings, He/En, with the circle
+ * named or implicit (the figure's one circle): "E is the intersection of the tangent
+ * to circle O at D and AB", "the tangent at D and the extension of AB meet at E",
+ * "המשיק בנקודה D והמשך AB נפגשים בנקודה E".
+ */
+const tangentLineIntersection: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
-  const center = circleCenter(s);
-  const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z])\b/i);
-  const pairM = s.match(/(?:and|with|עם|ו-?)\s*([A-Za-z])\s*([A-Za-z])\b/i);
-  if (!center || !atM || !pairM) return null;
+  if (!(INTERSECT_KW.test(s) || /נפגש|מפגש/.test(s))) return null; // must be an intersection (not a bare tangent)
+  const center = resolveCenter(s, ctx);
+  if (!center) return null;
+  // tangency point: the label after the tangent's "at"/"בנקודה" (the circle name may sit between).
+  const atM = s.match(/(?:tangent|משיק).*?(?:\bat\b|בנקודה|ב-)\s*([A-Za-z])\b/i);
+  if (!atM) return null;
   const at = up(atM[1]);
-  // the result point: strip the tangent/at clauses, the word "point", and filler so
-  // "point E" reads E (not the 't' in "poin·t·") — then the first lone capital.
-  const resM = dropCircleRef(s)
-    .replace(/tangent|משיק|\bat\s+[A-Za-z]\b|בנקודה\s*[A-Za-z]\b/gi, ' ')
-    .replace(/\bpoint\b|נקודה|\bintersection\b|חיתוך/gi, ' ')
-    .replace(FILLER, ' ')
-    .match(/\b([A-Za-z])\b/);
-  if (!resM) return null;
-  const tanId = `tan-${at}`;
+  // Strip the circle ref, the tangent + its "at D", and the connecting words (incl.
+  // "extension"/"המשך", so "the extension of AB" reads AB) → the line is the 2-letter
+  // pair, the result point the remaining lone letter.
+  const rest = dropCircleRef(s)
+    .replace(/tangent|משיק/gi, ' ')
+    .replace(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-?)\s*${at}\b`, 'i'), ' ')
+    .replace(/extension|המשך|intersection|חיתוך|נפגש\w*|מפגש|\bmeets?\b|\bpoint\b|בנקודה|נקודה/gi, ' ')
+    .replace(FILLER, ' ');
+  const pairM = rest.match(/\b([A-Za-z])\s*([A-Za-z])\b/);
+  if (!pairM) return null;
   const a = up(pairM[1]);
   const b = up(pairM[2]);
+  const resM = rest.replace(/\b[A-Za-z]\s*[A-Za-z]\b/, ' ').match(/\b([A-Za-z])\b/); // remove the pair, take the lone letter
+  if (!resM) return null;
   const e = up(resM[1]);
+  const tanId = `tan-${at}`;
   const abId = `line-${a}${b}`;
   return [
-    // Draw what we reference, not just the point: the tangent (visible) and the
-    // line AB drawn all the way to E (the tangent meets AB on its extension, so AB
-    // alone wouldn't reach E — segments E–A and E–B span the chord and its extension).
+    // Draw what we reference, not just the point: the tangent (trimmed to D–E by the
+    // renderer) and the line AB drawn all the way to E (E is on AB's extension).
     { type: 'tangent', id: tanId, circle: circleId(center), at, visible: true },
     { type: 'line-through', id: abId, a, b }, // scaffolding for the crossing
     { type: 'line-intersection', id: e, line1: tanId, line2: abId },
@@ -611,9 +640,9 @@ const bisectorSegmentIntersection: Rule = (s) => {
 };
 
 /** "G is where the line through F parallel to AB meets circle O" — a parallel line ∩ the circle. */
-const parallelCircleIntersection: Rule = (s) => {
+const parallelCircleIntersection: Rule = (s, ctx) => {
   if (!/parallel|מקביל/i.test(s) || !/circle|מעגל/i.test(s)) return null;
-  const center = circleCenter(s);
+  const center = resolveCenter(s, ctx);
   const throughM = s.match(/(?:through|דרך)\s+([A-Za-z])\b/i);
   const toM = s.match(/(?:parallel\s+to|מקביל\s*ל-?)\s*([A-Za-z])\s*([A-Za-z])\b/i);
   if (!center || !throughM || !toM) return null;
@@ -646,9 +675,9 @@ const circleCircleIntersection: Rule = (s) => {
 };
 
 /** "tangent to circle O at A" / "משיק למעגל O בנקודה A" — a *drawn* tangent line (⟂ the radius at A). */
-const tangentLine: Rule = (s) => {
+const tangentLine: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
-  const center = circleCenter(s);
+  const center = resolveCenter(s, ctx);
   const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z])\b/i);
   if (!center || !atM) return null;
   return [{ type: 'tangent', id: `tan-${up(atM[1])}`, circle: circleId(center), at: up(atM[1]), visible: true }];
@@ -859,11 +888,11 @@ const RULES: Rule[] = [
   freePoint,
 ];
 
-export function parse(raw: string): ParseResult {
+export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
   const s = raw.trim().replace(/\s+/g, ' ');
   if (!s) return { ok: false, reason: 'not-handled' };
   for (const rule of RULES) {
-    const commands = rule(s);
+    const commands = rule(s, ctx);
     if (commands === 'stop') break; // recognised but unreadable — escalate, don't half-parse
     if (commands) return { ok: true, commands };
   }
