@@ -49,24 +49,28 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
   const mockFetch = (steps: unknown, ok = true) =>
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok, json: async () => ({ steps }) }));
 
-  it('re-parses the LLM canonical steps into real engine commands', async () => {
+  it('re-parses the LLM canonical steps into per-step engine commands (visible decomposition)', async () => {
     mockFetch(['square ABCD', 'segment AC']);
     const r = await llmParse('make a square with one diagonal', 'The canvas is empty.');
     expect(r).not.toBeNull();
-    expect(r!.commands.map((c) => c.type)).toEqual(['square', 'segment']);
-    expect(r!.steps).toEqual(['square ABCD', 'segment AC']);
+    expect(r!.built.map((b) => b.step)).toEqual(['square ABCD', 'segment AC']);
+    expect(r!.built.flatMap((b) => b.commands).map((c) => c.type)).toEqual(['square', 'segment']);
+    expect(r!.dropped).toEqual([]);
   });
 
-  it('keeps only steps that actually parse (LLM can hallucinate phrasing)', async () => {
-    mockFetch(['triangle ABC', 'do a backflip', 'segment AB']);
-    const r = await llmParse('triangle, then a flourish, then connect AB', '');
-    expect(r!.commands.map((c) => c.type)).toEqual(['triangle', 'segment']);
-    expect(r!.steps).toEqual(['triangle ABC', 'segment AB']);
+  it('reports (not silently drops) steps the engine cannot build', async () => {
+    // "trapezoid inscribed in a circle" is a step the LLM may produce but the engine can't build.
+    mockFetch(['circle centered at O radius 5', 'trapezoid ABCD inscribed in circle O', 'segment AB']);
+    const r = await llmParse('inscribe a trapezoid', '');
+    expect(r!.built.map((b) => b.step)).toEqual(['circle centered at O radius 5', 'segment AB']);
+    expect(r!.dropped).toEqual(['trapezoid ABCD inscribed in circle O']);
   });
 
-  it('returns null when nothing usable comes back', async () => {
+  it('an LLM that returns nothing buildable yields empty built (caller shows "couldn\'t read")', async () => {
     mockFetch(['utter nonsense']);
-    expect(await llmParse('???', '')).toBeNull();
+    const r = await llmParse('???', '');
+    expect(r!.built).toEqual([]);
+    expect(r!.dropped).toEqual(['utter nonsense']);
   });
 
   it('returns null on a proxy error (no key, rate limit, network)', async () => {

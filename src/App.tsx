@@ -41,6 +41,7 @@ export default function App() {
   const [text, setText] = useState('');
   const [notUnderstood, setNotUnderstood] = useState(false);
   const [thinking, setThinking] = useState(false); // LLM fallback in flight (Phase 7)
+  const [llmDropped, setLlmDropped] = useState<string[]>([]); // LLM steps the engine couldn't build
   const [showHelp, setShowHelp] = useState(true); // visible by default so supported commands are discoverable
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
@@ -81,28 +82,32 @@ export default function App() {
   // the freeform input into canonical lines we re-parse. The engine never knows
   // which path produced the commands.
   async function submit(utterance: string) {
+    setNotUnderstood(false);
+    setLlmDropped([]);
     const r = parse(utterance);
     if (r.ok) {
-      setNotUnderstood(false);
       r.commands.forEach((c) => execute(c, utterance));
       setText('');
       return;
     }
     // out of grammar → ask the LLM (using the current figure as context)
-    setNotUnderstood(false);
     setThinking(true);
     const ctx = figureContext(
       construction.objects.filter(isGeoPoint).map((o) => o.id),
       construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
     );
-    const result = await llmParse(utterance, ctx);
+    const out = await llmParse(utterance, ctx);
     setThinking(false);
-    if (result) {
-      result.commands.forEach((c) => execute(c, utterance));
-      setText('');
-    } else {
+    if (!out || (out.built.length === 0 && out.dropped.length === 0)) {
       setNotUnderstood(true);
+      return;
     }
+    // Show the LLM's decomposition as separate facts, each labelled by its
+    // canonical step; report any step the engine couldn't build (ADR-023).
+    out.built.forEach((g) => g.commands.forEach((c) => execute(c, g.step)));
+    setLlmDropped(out.dropped);
+    if (out.built.length === 0) setNotUnderstood(true);
+    setText('');
   }
 
   // Figure + per-fact status are derived from the fact list.
@@ -181,6 +186,7 @@ export default function App() {
                 onChange={(e) => {
                   setText(e.target.value);
                   if (notUnderstood) setNotUnderstood(false);
+                  if (llmDropped.length) setLlmDropped([]);
                 }}
                 autoFocus
               />
@@ -190,6 +196,11 @@ export default function App() {
             </div>
             {thinking && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
             {notUnderstood && <span style={{ fontSize: 12, color: '#b45309' }}>{t('input.notUnderstood')}</span>}
+            {llmDropped.length > 0 && (
+              <span style={{ fontSize: 12, color: '#b45309' }} dir={textDir(llmDropped[0])}>
+                {t('input.partial')}: {llmDropped.join('; ')}
+              </span>
+            )}
             <button
               type="button"
               onClick={() => setShowHelp((v) => !v)}

@@ -5,25 +5,35 @@
  * utterance + a short figure context to the server proxy (`/api/parse`), which
  * asks Claude to normalise it into canonical command lines. Each returned line
  * is then run back through the **deterministic parser** — so only commands the
- * engine actually supports ever reach the store. The API key never touches the
- * browser; this module talks only to our own proxy.
+ * engine actually supports ever reach the store, and the student sees the
+ * decomposition (the separate canonical steps), not the opaque original. Steps
+ * the engine still can't build are reported as `dropped`, so a partial result is
+ * honest instead of silent. The API key never touches the browser.
  */
 
 import type { Command } from '@/engine';
 import { parse } from './parse';
 
-export interface LlmResult {
+/** One canonical step the LLM produced that the parser turned into engine commands. */
+export interface BuiltStep {
+  step: string;
   commands: Command[];
-  /** The canonical lines the model produced (for showing the student what was understood). */
-  steps: string[];
+}
+
+export interface LlmOutcome {
+  /** Steps that parsed — each becomes its own visible fact (labelled by the step). */
+  built: BuiltStep[];
+  /** Steps the LLM produced that the engine can't build (reported, not silently dropped). */
+  dropped: string[];
 }
 
 /**
- * Escalate one freeform utterance to the LLM proxy and convert its canonical
- * steps to engine commands. Returns null on any failure (network, no key,
- * nothing usable) — the caller then shows the "couldn't read that" hint.
+ * Escalate one freeform utterance to the LLM proxy and split its canonical steps
+ * into what we could build vs what we couldn't. Returns null only on a proxy
+ * failure (network, no key); an empty figure (LLM returned nothing) yields an
+ * outcome with empty `built` and `dropped`.
  */
-export async function llmParse(utterance: string, context: string): Promise<LlmResult | null> {
+export async function llmParse(utterance: string, context: string): Promise<LlmOutcome | null> {
   let steps: string[];
   try {
     const res = await fetch('/api/parse', {
@@ -34,21 +44,19 @@ export async function llmParse(utterance: string, context: string): Promise<LlmR
     if (!res.ok) return null;
     const data = (await res.json()) as { steps?: unknown };
     if (!Array.isArray(data.steps)) return null;
-    steps = data.steps.filter((s): s is string => typeof s === 'string');
+    steps = data.steps.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
   } catch {
     return null;
   }
 
-  // Re-parse each canonical line with the deterministic grammar — guarantees the
-  // commands are valid even though an LLM produced the phrasing.
-  const commands: Command[] = [];
-  const used: string[] = [];
+  // Re-parse each canonical line with the deterministic grammar — only lines that
+  // parse become commands; the rest are reported so a partial build is honest.
+  const built: BuiltStep[] = [];
+  const dropped: string[] = [];
   for (const step of steps) {
     const r = parse(step);
-    if (r.ok) {
-      commands.push(...r.commands);
-      used.push(step);
-    }
+    if (r.ok && r.commands.length) built.push({ step, commands: r.commands });
+    else dropped.push(step);
   }
-  return commands.length ? { commands, steps: used } : null;
+  return { built, dropped };
 }

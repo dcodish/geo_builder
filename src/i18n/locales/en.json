@@ -7,7 +7,8 @@
     "placeholder": "Type a fact, e.g. \"square ABCD\" or \"point G on AD\"",
     "send": "Add",
     "loading": "Thinking...",
-    "notUnderstood": "I couldn't read that yet — try one of the examples below."
+    "notUnderstood": "I couldn't read that yet — try one of the examples below.",
+    "partial": "Couldn't draw this part"
   },
   "examples": {
     "heading": "Examples — click to try, or type your own",
