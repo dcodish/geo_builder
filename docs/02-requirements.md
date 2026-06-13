@@ -58,6 +58,7 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 - **FR-EN-8 (Must)** — Detect contradictory / unsatisfiable input (over-constraint), reject that step, keep the previous valid figure, and report why (US-3).
 - **FR-EN-9 (Must)** — Re-issuing an equivalent command is idempotent (no duplicate objects).
 - **FR-EN-10 (Must)** — Recompute derived measures (lengths, angles, classifications) from final positions for display and theorem detection.
+- **FR-EN-11 (Must)** — A constraint added on objects that are already placed *reshapes* the figure to satisfy it, rather than only checking it: the engine drives an available degree of freedom (an on-object parameter, a free point), and when the directly-referenced object has none, it recruits a free degree of freedom from an ancestor. Multiple such constraints compose. If no assignment satisfies the constraint, it is rejected per FR-EN-8. (See [ADR-028](06-decisions.md#adr-028).)
 
 ## Alternative configurations
 
@@ -72,6 +73,7 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 - **FR-RN-3 (Must)** — Animate position changes smoothly when a step moves existing points (no instantaneous teleport).
 - **FR-RN-4 (Must)** — Fit the figure to the viewport; provide pan, zoom, and reset.
 - **FR-RN-5 (Should)** — Allow dragging free points anywhere, and on-object points along their host object.
+- **FR-RN-6 (Should)** — Provide figure-orientation controls that change only the *view*, never the engine's geometry: rotate by 90° and 180°, flip horizontally and vertically, rotate freely, align a user-named segment to horizontal (type its two endpoints), and reset. Vertex labels stay upright and readable under every orientation.
 
 ## Theorems
 

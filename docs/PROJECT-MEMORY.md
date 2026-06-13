@@ -4,6 +4,8 @@ _The **travelling memory** for this repo. Because the repo syncs (Dropbox), anyt
 
 > **Rule:** durable project context goes **in the repo** — in the formal docs, or in this file — **never only in machine-local memory.** Read this file (and `../CLAUDE.md`) at the start of every session.
 
+> **Rule (requirements stay in sync):** when a request adds or changes *what the product must do* — a new user-visible capability, or a changed Must/Should — **update [02-requirements.md](02-requirements.md) (add/edit the FR line) in the same change.** Check it as work goes along, not retroactively. Bug fixes → this file's session log only; design *choices* → an ADR; new *capabilities* → also an FR. (Backfilled 2026-06-13 after this had been skipped for the orientation/align-horizontal and constraint-adaptation work.)
+
 ## Where memory lives
 
 - **Decisions (why we chose things)** → [06-decisions.md](06-decisions.md) — the ADR log is the authoritative record. Add an ADR for any significant decision.
@@ -21,6 +23,8 @@ _The **travelling memory** for this repo. Because the repo syncs (Dropbox), anyt
 - **Shell CWD gotcha (Windows):** a `cd` inside a Bash tool call into `docs/sample questions/` made later `vitest`/`tsc` runs resolve from there ("No test files found", phantom `tsconfig.json` errors). Fix: prefix the command with `Set-Location "c:\Users\User\Dropbox\projects\geo_builder"`. The CRLF warnings on commit are harmless (Windows checkout, LF in repo).
 
 ## Session log
+
+- **2026-06-13 — Requirements backfill + sync rule.** Noticed `02-requirements.md` had not been updated alongside this session's user-visible changes. Backfilled two FR lines: **FR-RN-6** (figure-orientation controls — rotate 90°/180°, flip H/V, free rotate, align-named-segment-to-horizontal, reset; view-only, labels stay upright) and **FR-EN-11** (a constraint on already-placed objects *reshapes* the figure — drives/recruits a DOF — rather than only checking; composes; rejects per FR-EN-8; ADR-028). Added a standing **requirements-stay-in-sync rule** to the top of this file. Also removed stale `09-implementation-plan.md.tmp.*` debris from python doc-edits.
 
 - **2026-06-10 — Phases 2→5 (partial), one long session.** Built on the Phase-1 engine through to a usable, breadth-y app. End state: **98 tests green, build clean**, all on `rebuild-foundation`.
   - **Phase 2** — SVG renderer (`src/render/`): pure `transform` + `scene` + declarative `Figure` (pan/zoom/reset, highlight). Renderer is a pure, swappable consumer of engine output; tested headlessly via `react-dom/server`.
