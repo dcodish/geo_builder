@@ -62,3 +62,33 @@ describe('constraint drives an upstream free DOF (the chord moves so the interse
     expect(r.ok).toBe(false); // correctly rejected — C is a fixed corner, can't also be the midpoint of AB
   });
 });
+
+describe('a constraint drives an on-circle DOF; coupled constraints solve jointly', () => {
+  it('|ED| = 7 drives a chord endpoint (single on-circle DOF)', () => {
+    const { positions } = build(cmds(['circle centered at O radius 4', 'chord DE in circle O', 'ED = 7']));
+    const [O, D, E] = ['O', 'D', 'E'].map((id) => positions.get(id)!);
+    expect(dist(D, E)).toBeCloseTo(7, 4); // the chord reached length 7
+    expect(dist(O, D)).toBeCloseTo(4, 4); // …with D, E still on the circle
+    expect(dist(O, E)).toBeCloseTo(4, 4);
+  });
+
+  it('two coupled constraints — chord through the midpoint of OB AND of length 7 — solve together', () => {
+    const { positions } = build(
+      cmds([
+        'circle centered at O radius 4',
+        'diameter AB in circle O',
+        'chord DE in circle O',
+        'C is the intersection of AB and DE',
+        'C is the midpoint of OB', // drives one chord endpoint
+        'ED = 7', // drives the other — coupled with the line above
+      ]),
+    );
+    const [O, B, C, D, E] = ['O', 'B', 'C', 'D', 'E'].map((id) => positions.get(id)!);
+    const M = { x: (O.x + B.x) / 2, y: (O.y + B.y) / 2 };
+    expect(dist(D, E)).toBeCloseTo(7, 3); // length constraint
+    expect(dist(C, M)).toBeCloseTo(0, 3); // midpoint constraint
+    expect(dist(C, footOnLine(C, D, E))).toBeCloseTo(0, 3); // C still on the chord
+    expect(dist(O, D)).toBeCloseTo(4, 3); // D, E still on the circle
+    expect(dist(O, E)).toBeCloseTo(4, 3);
+  });
+});

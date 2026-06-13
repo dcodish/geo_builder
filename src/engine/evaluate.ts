@@ -62,25 +62,144 @@ function resolveDriven(c: Construction): Construction {
       (o.kind === 'on-circle' || o.kind === 'on-segment') && o.solve !== undefined,
   );
   if (carriers.length === 0) return c;
-  let cur = c;
-  for (const carrier of carriers) {
+  const range = (o: { kind: string }): [number, number] => (o.kind === 'on-circle' ? [0, 2 * Math.PI] : [0, 1]);
+
+  // ONE driven DOF: a plain 1-D solve, with the branch index choosing among roots
+  // (so "show another configuration" can cycle them) — the ADR-028 base case.
+  if (carriers.length === 1) {
+    const carrier = carriers[0];
     const dir = carrier.solve!;
-    const [lo, hi] = carrier.kind === 'on-circle' ? [0, 2 * Math.PI] : [0, 1];
-    // |residual| of the driving constraint as the DOF varies — re-evaluating the
-    // whole figure each trial (the constraint may reference downstream points).
+    const [lo, hi] = range(carrier);
     const f = (v: number): number => {
-      // positions WITHOUT enforcing constraints — we're searching for where the
-      // driving constraint is met, so it must not abort the trial when unmet.
-      const r = evaluateCore(withParam(cur, carrier.id, v), { skipConstraints: true });
+      const r = evaluateCore(withParam(c, carrier.id, v), { skipConstraints: true });
       if (!r.ok) return NaN;
       for (const id of constraintRefs(dir.constraint)) if (!r.positions.has(id)) return NaN;
       return Math.abs(residual(dir.constraint, (id) => r.positions.get(id)!));
     };
     const roots = drivenRoots(f, lo, hi, residualTolerance(dir.constraint));
-    if (roots.length === 0) continue; // unsolvable → leave the default; the constraint check fails honestly
-    cur = withParam(cur, carrier.id, roots[dir.branch % roots.length]);
+    if (roots.length === 0) return c; // unsolvable → keep default; the constraint check fails honestly
+    return withParam(c, carrier.id, roots[dir.branch % roots.length]);
   }
-  return cur;
+
+  // SEVERAL coupled DOFs (e.g. "C = midpoint of OB" drives E while "|ED| = 7"
+  // drives D, and D's chord length depends on where E lands): coordinate descent
+  // on the joint squared residual, each DOF moved to the global minimum along it
+  // (so all branches are considered) and iterated until it converges.
+  const cons = carriers.map((cr) => cr.solve!.constraint);
+  const ids = carriers.map((cr) => cr.id);
+  const totalSq = (x: number[]): number => {
+    const p = new Map<Id, number>(ids.map((id, i) => [id, x[i]]));
+    const r = evaluateCore(setParams(c, p), { skipConstraints: true });
+    if (!r.ok) return Infinity;
+    let s = 0;
+    for (const con of cons) {
+      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return Infinity;
+      const v = residual(con, (id) => r.positions.get(id)!);
+      s += v * v;
+    }
+    return s;
+  };
+  // 1) coordinate descent for a globally-informed start (grid argMin per DOF
+  //    considers all branches); 2) Nelder–Mead to converge out of the valley
+  //    coordinate descent stalls in (coupled residuals share a narrow trough).
+  const x = carriers.map((cr) => (cr.kind === 'on-circle' ? cr.theta : cr.t));
+  for (let iter = 0; iter < 12 && totalSq(x) > 1e-12; iter++) {
+    let improved = false;
+    for (let i = 0; i < carriers.length; i++) {
+      const [lo, hi] = range(carriers[i]);
+      const before = totalSq(x);
+      const v = argMin((t) => totalSq(x.map((xj, j) => (j === i ? t : xj))), lo, hi);
+      const trial = x.slice();
+      trial[i] = v;
+      if (totalSq(trial) < before - 1e-12) {
+        x[i] = v;
+        improved = true;
+      }
+    }
+    if (!improved) break;
+  }
+  const best = nelderMead(totalSq, x);
+  return setParams(c, new Map<Id, number>(ids.map((id, i) => [id, best[i]])));
+}
+
+/** Nelder–Mead downhill simplex — derivative-free joint minimisation of `f` from `x0`. */
+function nelderMead(f: (x: number[]) => number, x0: number[], iters = 300): number[] {
+  const n = x0.length;
+  let simplex = [x0.slice(), ...x0.map((_, i) => x0.map((v, j) => (j === i ? v + 0.15 : v)))];
+  let fv = simplex.map(f);
+  const order = () => {
+    const idx = [...fv.keys()].sort((a, b) => fv[a] - fv[b]);
+    simplex = idx.map((i) => simplex[i]);
+    fv = idx.map((i) => fv[i]);
+  };
+  for (let it = 0; it < iters; it++) {
+    order();
+    if (fv[0] < 1e-14) break;
+    const cen = x0.map((_, j) => simplex.slice(0, n).reduce((s, p) => s + p[j], 0) / n); // centroid sans worst
+    const worst = simplex[n];
+    const refl = cen.map((cj, j) => cj + (cj - worst[j]));
+    const fr = f(refl);
+    if (fr < fv[0]) {
+      const exp = cen.map((cj, j) => cj + 2 * (cj - worst[j]));
+      const fe = f(exp);
+      if (fe < fr) [simplex[n], fv[n]] = [exp, fe];
+      else [simplex[n], fv[n]] = [refl, fr];
+    } else if (fr < fv[n - 1]) {
+      [simplex[n], fv[n]] = [refl, fr];
+    } else {
+      const con = cen.map((cj, j) => cj + 0.5 * (worst[j] - cj));
+      const fc = f(con);
+      if (fc < fv[n]) [simplex[n], fv[n]] = [con, fc];
+      else
+        for (let i = 1; i <= n; i++) {
+          simplex[i] = simplex[i].map((xj, j) => simplex[0][j] + 0.5 * (xj - simplex[0][j]));
+          fv[i] = f(simplex[i]);
+        }
+    }
+  }
+  order();
+  return simplex[0];
+}
+
+/** Argument minimising `f` over [lo,hi]: grid scan for the basin, ternary-refine it. */
+function argMin(f: (v: number) => number, lo: number, hi: number, steps = 120): number {
+  let bx = lo;
+  let bf = Infinity;
+  for (let i = 0; i <= steps; i++) {
+    const x = lo + ((hi - lo) * i) / steps;
+    const fx = f(x);
+    if (isFinite(fx) && fx < bf) {
+      bf = fx;
+      bx = x;
+    }
+  }
+  let a = Math.max(lo, bx - (hi - lo) / steps);
+  let b = Math.min(hi, bx + (hi - lo) / steps);
+  const val = (x: number) => {
+    const r = f(x);
+    return isFinite(r) ? r : Infinity;
+  };
+  for (let k = 0; k < 60; k++) {
+    const m1 = a + (b - a) / 3;
+    const m2 = b - (b - a) / 3;
+    if (val(m1) < val(m2)) b = m2;
+    else a = m1;
+  }
+  return (a + b) / 2;
+}
+
+/** Set several carriers' parameters at once (each driven param resolved to a value). */
+function setParams(c: Construction, params: Map<Id, number>): Construction {
+  return {
+    ...c,
+    objects: c.objects.map((o) => {
+      if (!params.has(o.id)) return o;
+      const v = params.get(o.id)!;
+      if (o.kind === 'on-circle') return { ...o, theta: v, solve: undefined };
+      if (o.kind === 'on-segment') return { ...o, t: v, solve: undefined };
+      return o;
+    }),
+  };
 }
 
 /**

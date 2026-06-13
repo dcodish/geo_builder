@@ -23,15 +23,27 @@ import { constraintRefs } from './solve';
  * add a residual case in solve.ts, not logic here.
  */
 function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Constraint): void {
-  const driven = constraintRefs(con)
-    .map((id) => objects.findIndex((o) => o.id === id))
-    .find((i) => i >= 0 && objects[i].kind === 'on-segment');
-  if (driven !== undefined) {
-    const seg = objects[driven] as Extract<GeoObject, { kind: 'on-segment' }>;
-    objects[driven] = { kind: 'on-segment-solved', id: seg.id, a: seg.a, b: seg.b, constraint: con, branch: 0 };
-  } else {
-    constraints.push(con);
+  const idxs = constraintRefs(con).map((id) => objects.findIndex((o) => o.id === id));
+  // (1) Prefer an on-segment ref as the carrier — the constraint *places* it (its t
+  // is solved in closed form, with the constraint embedded in the point).
+  const onSeg = idxs.find((i) => i >= 0 && objects[i].kind === 'on-segment');
+  if (onSeg !== undefined) {
+    const seg = objects[onSeg] as Extract<GeoObject, { kind: 'on-segment' }>;
+    objects[onSeg] = { kind: 'on-segment-solved', id: seg.id, a: seg.a, b: seg.b, constraint: con, branch: 0 };
+    return;
   }
+  // (2) Else drive a free on-circle DOF among the refs (ADR-028) — one not already
+  // driven — so a constraint on circle points (e.g. |ED| = 7) repositions them.
+  const onCirc = idxs.find(
+    (i) => i >= 0 && objects[i].kind === 'on-circle' && (objects[i] as Extract<GeoObject, { kind: 'on-circle' }>).solve === undefined,
+  );
+  if (onCirc !== undefined) {
+    objects[onCirc] = { ...(objects[onCirc] as Extract<GeoObject, { kind: 'on-circle' }>), solve: { constraint: con, branch: 0 } };
+    constraints.push(con); // keep it for the final verification after the driven solve
+    return;
+  }
+  // (3) Nothing free to move — a pure check (over-constraint detection).
+  constraints.push(con);
 }
 
 function addObj(objects: GeoObject[], o: GeoObject): void {
