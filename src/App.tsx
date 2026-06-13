@@ -71,7 +71,7 @@ export default function App() {
     setEditError(false);
   }
   function commitEdit(key: string) {
-    const r = parse(editText, { circles: circleCenters() });
+    const r = parse(editText, parseCtx());
     if (!r.ok || r.commands.length === 0) {
       setEditError(true);
       return;
@@ -84,14 +84,17 @@ export default function App() {
   // can't read escalates to the LLM proxy (Phase 7, ADR-023), which normalises
   // the freeform input into canonical lines we re-parse. The engine never knows
   // which path produced the commands.
-  // Centre letters of circles already in the figure — lets the parser resolve "the
-  // circle" / an unnamed tangent/chord to the one circle present (implicit reference).
-  const circleCenters = () => construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : []));
+  // Figure context for the parser: the circles' centres (resolve "the circle") and
+  // the existing point ids (inscribing an existing triangle becomes its circumcircle).
+  const parseCtx = () => ({
+    circles: construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
+    points: construction.objects.filter(isGeoPoint).map((o) => o.id),
+  });
 
   async function submit(utterance: string) {
     setNotUnderstood(false);
     setLlmDropped([]);
-    const r = parse(utterance, { circles: circleCenters() });
+    const r = parse(utterance, parseCtx());
     if (r.ok) {
       // One utterance → possibly many commands; tag them with one group id so
       // they show as a single step row, not N identical rows.

@@ -29,9 +29,11 @@ export type ParseResult =
  */
 export interface ParseContext {
   /** Centre letters of circles already in the figure (e.g. ['O']). */
-  circles: string[];
+  circles?: string[];
+  /** Point ids already in the figure — so inscribing an EXISTING triangle becomes its circumcircle. */
+  points?: string[];
 }
-const NO_CONTEXT: ParseContext = { circles: [] };
+const NO_CONTEXT: ParseContext = {};
 
 /**
  * 'stop' = the rule recognised its keyword but could not read the sentence:
@@ -59,7 +61,7 @@ const circleCenter = (s: string): string | null => {
  * 0 or 2+ unnamed circles it stays null (ambiguous → the rule defers/escalates).
  */
 const resolveCenter = (s: string, ctx: ParseContext): string | null =>
-  circleCenter(s) ?? (ctx.circles.length === 1 ? ctx.circles[0] : null);
+  circleCenter(s) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
 
 /** Remove a "circle X" / "מעגל X" mention so its centre letter isn't read as a figure label. */
 const dropCircleRef = (s: string): string => s.replace(/(?:circle|מעגל)\s+[A-Za-z]\b/gi, ' ');
@@ -445,7 +447,7 @@ const isCircleInPolygon = (s: string): boolean => {
 };
 
 /** "triangle ABC inscribed in circle O" / "טרפז ABCD חסום במעגל" — circle + on-circle vertices + edges. */
-const inscribedPolygon: Rule = (s) => {
+const inscribedPolygon: Rule = (s, ctx) => {
   if (!/inscrib\w*|חסום/i.test(s)) return null; // inscribed / inscribe / inscribing
   if (isCircleInPolygon(s)) return null; // that's the incircle — handled by `incircle`, not here
   // A right triangle inscribed in a circle IS constructible (Thales — the
@@ -482,6 +484,12 @@ const inscribedPolygon: Rule = (s) => {
   // No centre named ⇒ create one: a fresh label that doesn't clash with the vertices.
   const center = named ?? (['O', 'P', 'Q', 'K', 'S', 'T', 'U'].find((c) => !ids.includes(c)) ?? 'O');
   const circ = circleId(center);
+  // Inscribing a triangle whose vertices ALREADY exist means the CIRCUMCIRCLE through
+  // them (not a fresh circle they'd be forced onto) — otherwise the new centre lands
+  // at the origin and can collide with a vertex ("A and O at the same point").
+  if (isTri && ids.every((id) => (ctx.points ?? []).includes(id))) {
+    return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2] }];
+  }
   const angles = INSCRIBED_ANGLES[kind];
   const cmds: Command[] = [{ type: 'circle', id: circ, center: up(center), radius: rM ? parseFloat(rM[1]) : 5 }];
   ids.forEach((id, i) => {

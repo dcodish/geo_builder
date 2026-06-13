@@ -119,6 +119,22 @@ describe('constructible cases that used to escalate (right-tri inscribed, circum
   });
 });
 
+describe('inscribing an EXISTING triangle is its circumcircle (not a new circle it collides with)', () => {
+  it('the circle passes through the existing vertices; the centre is distinct from them', () => {
+    const tri = parse('triangle ABD'); // make a plain triangle first
+    if (!tri.ok) throw new Error('triangle');
+    const ctx = { points: ['A', 'B', 'D'] };
+    const ins = parse('triangle ABD inscribed in a circle', ctx);
+    if (!ins.ok) throw new Error('inscribe');
+    expect(ins.commands.map((c) => c.type)).toEqual(['circumcircle']); // ← circumcircle, not circle + on-circle×3
+    const { positions } = build([...(tri.commands as Command[]), ...(ins.commands as Command[])]);
+    const [A, B, D, O] = ['A', 'B', 'D', 'O'].map((id) => positions.get(id)!);
+    expect(dist(O, A)).toBeCloseTo(dist(O, B), 6); // A, B, D equidistant from the centre (on the circumcircle)
+    expect(dist(O, B)).toBeCloseTo(dist(O, D), 6);
+    expect(dist(O, A)).toBeGreaterThan(0.1); // the centre is not on a vertex
+  });
+});
+
 describe('re-referencing a drawn line in a later compound (tangent at D, then ∩ AB)', () => {
   // Draw the tangent at D, THEN intersect "the tangent at D" with AB. The second
   // statement re-references the same line (its id is its spec) — it must reuse it,
