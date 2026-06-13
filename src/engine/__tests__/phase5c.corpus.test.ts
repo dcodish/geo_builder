@@ -26,6 +26,22 @@ function reproduce(utterances: string[], tag: string) {
   return build(commands as Command[]);
 }
 
+describe('inscribed without naming the circle (regression — no silent half-parse)', () => {
+  // "triangle ABC inscribed in a circle" with NO centre named must still draw the
+  // circle (auto-centre), not silently become a bare triangle.
+  for (const u of ['משולש ABC חסום במעגל', 'triangle ABC inscribed in a circle']) {
+    it(`"${u}" builds a real circle with A,B,C on it`, () => {
+      const { construction, positions } = reproduce([u], 'inscribed');
+      const circles = construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles).toHaveLength(1);
+      const center = positions.get((circles[0] as { center: string }).center)!;
+      for (const id of ['A', 'B', 'C']) {
+        expect(dist(center, positions.get(id)!)).toBeCloseTo(5, 6); // each vertex on the circle
+      }
+    });
+  }
+});
+
 describe('corpus Q5 — triangle inscribed in a circle + arc midpoint', () => {
   const EN = [
     'triangle ABC inscribed in circle O radius 5',

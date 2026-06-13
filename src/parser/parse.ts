@@ -324,22 +324,26 @@ const circle: Rule = (s) => {
   return [{ type: 'circle', id: circleId(center), center: up(center), radius: rM ? parseFloat(rM[1]) : 5 }];
 };
 
-/** "triangle ABC inscribed in circle O radius 5" / "המשולש ABC חסום במעגל שמרכזו O" — circle + on-circle vertices + polygon. */
+/** "triangle ABC inscribed in circle O radius 5" / "המשולש ABC חסום במעגל" — circle + on-circle vertices + polygon. */
 const inscribedPolygon: Rule = (s) => {
   if (!/inscribed|חסום/i.test(s)) return null;
   const isTri = /triangle|משולש/i.test(s);
   const isQuad = /quad|מרובע/i.test(s);
   if (!isTri && !isQuad) return null;
-  const center = circleCenter(s);
-  if (!center) return null;
-  const rM = s.match(new RegExp(String.raw`(?:radius|רדיוס\S*)\s*${num}`, 'i'));
   const n = isTri ? 3 : 4;
-  // strip keywords + the circle reference + the centre letter, then read the n vertex labels
-  const rest = dropCircleRef(s)
-    .replace(new RegExp(String.raw`\b${center}\b`, 'gi'), ' ')
-    .replace(/triangle|משולש|quad\w*|מרובע|inscribed|חסום|circle|מעגל|cent\w*|radius|רדיוס\w*|שמרכזו|מרכזו|העובר|דרך/gi, ' ');
+  const named = circleCenter(s); // may be null — "inscribed in a circle" need not name the centre
+  const rM = s.match(new RegExp(String.raw`(?:radius|רדיוס\S*)\s*${num}`, 'i'));
+  // strip keywords + the circle reference (+ the named centre), then read the n vertex labels
+  let rest = dropCircleRef(s).replace(
+    /triangle|משולש|quad\w*|מרובע|inscribed|חסום|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
+    ' ',
+  );
+  if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
   const ids = labelRun(rest, n);
   if (!ids) return null;
+  // No centre named ⇒ create one: a fresh label that doesn't clash with the vertices.
+  // (This is what stops "משולש ABC חסום במעגל" from silently dropping the circle.)
+  const center = named ?? (['O', 'P', 'Q', 'K', 'S', 'T', 'U'].find((c) => !ids.includes(c)) ?? 'O');
   const circ = circleId(center);
   const cmds: Command[] = [{ type: 'circle', id: circ, center: up(center), radius: rM ? parseFloat(rM[1]) : 5 }];
   for (const id of ids) cmds.push({ type: 'point-on-circle', id, circle: circ });
