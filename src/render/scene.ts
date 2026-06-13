@@ -148,13 +148,29 @@ export function buildScene(c: Construction, positions: Map<Id, Vec>): Scene {
     }
   }
 
-  // Visible lines (a standalone tangent / bisector / perpendicular / parallel) —
-  // resolved after circles so a tangent can read its circle.
+  // Visible lines (a tangent / bisector / perpendicular / parallel), resolved
+  // after circles so a tangent can read its circle. A line with TWO+ named points
+  // on it is drawn as the SEGMENT spanning them (trim an infinite line to its
+  // useful extent — a tangent from its touch point to where it meets a chord, a
+  // bisector from its vertex to the side it hits); with 0–1 points it stays an
+  // infinite (clipped) line, since it has no natural endpoints.
   const circleMap = new Map(circles.map((c) => [c.id, c]));
   for (const o of c.objects) {
     if (o.kind !== 'line' || !o.visible) continue;
     const sl = lineGeometry(o, positions, circleMap);
-    if (sl) lines.push(sl);
+    if (!sl) continue;
+    const on: { t: number; p: Vec }[] = [];
+    for (const pt of points) {
+      const w = sub(pt.pos, sl.anchor);
+      const perp = w.x * sl.dir.y - w.y * sl.dir.x; // signed distance from the line
+      if (Math.abs(perp) < 1e-5) on.push({ t: w.x * sl.dir.x + w.y * sl.dir.y, p: pt.pos });
+    }
+    if (on.length >= 2) {
+      on.sort((p, q) => p.t - q.t);
+      segments.push({ id: sl.id, a: on[0].p, b: on[on.length - 1].p }); // trimmed to the extreme points on it
+    } else {
+      lines.push(sl); // unbounded → an infinite clipped line
+    }
   }
 
   return { points, segments, polygons, circles, lines };

@@ -87,6 +87,25 @@ describe('visible construction lines', () => {
     expect(html).not.toContain('stroke-dasharray'); // …as a regular solid line, not dashed
   });
 
+  it('a visible line with two named points on it is trimmed to the segment between them', () => {
+    // the tangent at D + where it meets AB (E) ⇒ draw the segment D–E, not an infinite line
+    const cmds = ['triangle ABD inscribed in circle O radius 5', 'tangent to circle O at D', 'E is the intersection of the tangent to circle O at D and AB'].flatMap(
+      (u) => {
+        const r = parse(u);
+        if (!r.ok) throw new Error(u);
+        return r.commands;
+      },
+    );
+    const { construction, positions } = build(cmds as Command[]);
+    const scene = buildScene(construction, positions);
+    expect(scene.lines.find((l) => l.id === 'tan-D')).toBeUndefined(); // not an infinite line anymore
+    const seg = scene.segments.find((s) => s.id === 'tan-D');
+    expect(seg).toBeDefined(); // …it's a segment
+    const ends = [seg!.a, seg!.b];
+    const near = (p: Vec) => ends.some((e) => Math.hypot(e.x - p.x, e.y - p.y) < 1e-6);
+    expect(near(positions.get('D')!) && near(positions.get('E')!)).toBe(true); // spanning D and E
+  });
+
   it('creates the touch point on the circle when it does not exist yet', () => {
     // "tangent to circle O at A" with no A → A is created ON the circle + the line drawn
     const { construction, positions } = build([
