@@ -106,6 +106,15 @@ describe('parser — filler words are not labels', () => {
     one('segment ON', { type: 'segment', a: 'O', b: 'N' }));
 });
 
+describe('parser — an explicitly NAMED foot keeps its name (not auto-renamed)', () => {
+  // "G is the foot of the perpendicular from E to AB" must name the foot G — the
+  // altitude rule must not grab it and auto-name the foot (which collided with F).
+  it('names the foot G, not an auto letter', () =>
+    one('G is the foot of the perpendicular from E to AB', { type: 'foot', id: 'G', from: 'E', a: 'A', b: 'B' }));
+  it('the original corpus phrasing still names F', () =>
+    one('F is the foot of the perpendicular from C to AD', { type: 'foot', id: 'F', from: 'C', a: 'A', b: 'D' }));
+});
+
 /**
  * Misparse defense: the dangerous failure is not the miss (a miss escalates to
  * the Phase-7 fallback) but the silent HALF-parse that draws a wrong figure.

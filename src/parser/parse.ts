@@ -705,6 +705,11 @@ const median: Rule = (s) => {
  * the foot of the perpendicular onto the opposite side, plus the segment to it.
  */
 const altitude: Rule = (s) => {
+  // An explicitly *named* foot ("G is the foot of the perpendicular from E to AB")
+  // is the `foot` rule's job — don't grab it here and auto-name the foot (which
+  // collided with an existing point). This rule is for the height/altitude and the
+  // bare unnamed "perpendicular from A to BC".
+  if (/\bfoot\b|רגל/i.test(s)) return null;
   const isHeight = /\bheight\b|\baltitude\b|גובה/i.test(s);
   const isPerpFrom =
     /perpendicular|מאונך|אנך/i.test(s) && !/through|דרך/i.test(s) && /\bfrom\b|מ-/i.test(s);
