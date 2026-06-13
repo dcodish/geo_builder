@@ -380,6 +380,23 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.through } });
       break;
 
+    case 'circumcircle':
+      // The centre IS the circumcentre of a,b,c (a derived point); the circle
+      // passes through a. Create the three points if new (a non-degenerate
+      // spread) so "circle through A B C" also works with no prior triangle.
+      placeBase(
+        objects,
+        [
+          { id: cmd.a, x: -3, y: -2 },
+          { id: cmd.b, x: 3, y: -2 },
+          { id: cmd.c, x: 0, y: 3 },
+        ],
+        pos,
+      );
+      addObj(objects, { kind: 'circumcenter', id: cmd.center, a: cmd.a, b: cmd.b, c: cmd.c });
+      addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.a } });
+      break;
+
     case 'point-on-circle':
       addObj(objects, { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: cmd.theta ?? nextTheta(objects, cmd.circle) });
       break;

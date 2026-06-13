@@ -67,6 +67,13 @@ function labelRun(s: string, n: number): Id[] | null {
   return null;
 }
 
+/** First label from `prefer` (else any A–Z) not already in `used` — for an auto-named auxiliary point. */
+function freeLabel(used: string[], prefer: string[] = []): Id {
+  const taken = new Set(used.map((u) => u.toUpperCase()));
+  const pool = [...prefer, ...'MNPQRSTUVWXYZKLGHIJ'.split('')];
+  return (pool.find((c) => !taken.has(c.toUpperCase())) ?? 'M').toUpperCase();
+}
+
 /**
  * Geometry-significant words/operators a *shape* rule does not itself consume —
  * a circle, a special line, a constraint, an inscription, an angle. If any of
@@ -358,6 +365,7 @@ const circle: Rule = (s) => {
 const INSCRIBED_ANGLES: Record<string, number[] | null> = {
   triangle: null,
   quad: null,
+  'right-triangle': [180, 0, 90], // Thales: A,B antipodal (hypotenuse = diameter), C the right angle
   square: [45, 135, 225, 315],
   rhombus: [45, 135, 225, 315], // a cyclic rhombus is a square
   rectangle: [40, 140, 220, 320], // diagonals are diameters
@@ -367,11 +375,11 @@ const INSCRIBED_ANGLES: Record<string, number[] | null> = {
 /** "triangle ABC inscribed in circle O" / "טרפז ABCD חסום במעגל" — circle + on-circle vertices + edges. */
 const inscribedPolygon: Rule = (s) => {
   if (!/inscribed|חסום/i.test(s)) return null;
-  // A *right* triangle inscribed in a circle (hypotenuse = diameter) isn't a
-  // construct the engine builds — defer so right-triangle's guard escalates it.
-  if (/right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זווית/i.test(s)) return null;
+  // A right triangle inscribed in a circle IS constructible (Thales — the
+  // hypotenuse is a diameter, the right angle is on the circle): handle it.
   const kind =
-    /triangle|משולש/i.test(s) ? 'triangle'
+    /right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זווית/i.test(s) ? 'right-triangle'
+    : /triangle|משולש/i.test(s) ? 'triangle'
     : /square|ריבוע/i.test(s) ? 'square'
     : /rectangle|מלבן/i.test(s) ? 'rectangle'
     : /rhombus|מעוין/i.test(s) ? 'rhombus'
@@ -379,11 +387,12 @@ const inscribedPolygon: Rule = (s) => {
     : /quad|מרובע/i.test(s) ? 'quad'
     : null;
   if (!kind) return null;
-  const n = kind === 'triangle' ? 3 : 4;
+  const isTri = kind === 'triangle' || kind === 'right-triangle';
+  const n = isTri ? 3 : 4;
   const named = circleCenter(s); // may be null — "inscribed in a circle" need not name the centre
   const rM = s.match(new RegExp(String.raw`(?:radius|רדיוס\S*)\s*${num}`, 'i'));
   let rest = dropCircleRef(s).replace(
-    /triangle|משולש|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|quad\w*|מרובע|inscribed|חסום|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
+    /right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זווית|זווית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|quad\w*|מרובע|inscribed|חסום|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
     ' ',
   );
   if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
@@ -413,7 +422,7 @@ const inscribedPolygon: Rule = (s) => {
   });
   // The edges connect the on-circle vertices; the SHAPE is set by the angles.
   cmds.push(
-    kind === 'triangle'
+    isTri
       ? { type: 'triangle', ids: [ids[0], ids[1], ids[2]] }
       : { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
   );
@@ -576,10 +585,131 @@ const parallelLine: Rule = (s) => {
   return [{ type: 'parallel-line', id: `par-${up(thr[1])}-${up(seg[1])}${up(seg[2])}`, through: up(thr[1]), a: up(seg[1]), b: up(seg[2]), visible: true }];
 };
 
+/**
+ * "circle through A B C" / "circumscribed circle of ABC" / "מעגל חוסם את ABC" /
+ * "מעגל דרך A B C" — the circle determined by three points (centre = circumcentre).
+ * Distinct from circle-through (centre + ONE point): this reads exactly 3 labels.
+ */
+const circumcircle: Rule = (s) => {
+  if (!/circle|מעגל/i.test(s)) return null;
+  if (!/through|circumscrib|חוסם|דרך/i.test(s)) return null; // the 3-point cue (חוסם circumscribes ≠ חסום inscribed)
+  if (circleCenter(s)) return null; // a named centre ⇒ it's a centre-based circle, not a circumcircle
+  const rest = s.replace(/circles?|מעגל|circumscrib\w*|through|דרך|חוסם|את|of|the|around|triangle|משולש|מרובע/gi, ' ');
+  const ids = labelRun(rest, 3);
+  if (!ids) return null;
+  const center = freeLabel(ids, ['O', 'P', 'Q', 'K', 'S', 'T']);
+  return [{ type: 'circumcircle', id: circleId(center), center, a: ids[0], b: ids[1], c: ids[2] }];
+};
+
+/**
+ * "median from A in ABC" / "תיכון מ-A במשולש ABC" — the median from a vertex to the
+ * midpoint of the opposite side. Emits the triangle (idempotent if it exists),
+ * the opposite-side midpoint, and the segment to it.
+ */
+const median: Rule = (s) => {
+  if (!/\bmedian\b|תיכון/i.test(s)) return null;
+  const apexM = s.match(/(?:\bfrom\s+|מ-?)([A-Za-z])\b/i); // "from A" / "מ-A" (keyword required, not any letter)
+  // The triangle is named after "in"/"במשולש"; read it there so the apex letter isn't double-counted.
+  const triPart = s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s;
+  const tri = labelRun(triPart.replace(/triangle|the/gi, ' '), 3);
+  if (!apexM || !tri) return null;
+  const apex = up(apexM[1]);
+  const others = tri.filter((x) => x !== apex);
+  if (others.length !== 2) return null;
+  const mid = freeLabel(tri, ['M', 'N', 'P', 'Q']);
+  return [
+    { type: 'triangle', ids: [tri[0], tri[1], tri[2]] },
+    { type: 'midpoint', id: mid, a: others[0], b: others[1] },
+    { type: 'segment', a: apex, b: mid },
+  ];
+};
+
+/**
+ * "height from A in ABC" / "altitude from A in ABC" / "גובה מ-A במשולש ABC", and
+ * the bare-foot phrasing "perpendicular from A to BC" — the altitude from a vertex:
+ * the foot of the perpendicular onto the opposite side, plus the segment to it.
+ */
+const altitude: Rule = (s) => {
+  const isHeight = /\bheight\b|\baltitude\b|גובה/i.test(s);
+  const isPerpFrom =
+    /perpendicular|מאונך|אנך/i.test(s) && !/through|דרך/i.test(s) && /\bfrom\b|מ-/i.test(s);
+  if (!isHeight && !isPerpFrom) return null;
+  const apexM = s.match(/(?:\bfrom\s+|מ-?)([A-Za-z])\b/i);
+  if (!apexM) return null;
+  const apex = up(apexM[1]);
+  const sideM = s.match(/(?:\bto\s+|אל\s*|ל-?)([A-Za-z])\s*([A-Za-z])\b/i); // explicit opposite side "to BC"
+  let p: string, q: string;
+  let tri: Id[] | null = null;
+  if (sideM && up(sideM[1]) !== apex) {
+    p = up(sideM[1]);
+    q = up(sideM[2]);
+  } else {
+    const triPart = s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s;
+    tri = labelRun(triPart.replace(/triangle|the/gi, ' '), 3);
+    if (!tri) return null;
+    const others = tri.filter((x) => x !== apex);
+    if (others.length !== 2) return null;
+    [p, q] = others;
+  }
+  const f = freeLabel([apex, p, q], ['F', 'G', 'H', 'P']);
+  const cmds: Command[] = [];
+  if (tri) cmds.push({ type: 'triangle', ids: [tri[0], tri[1], tri[2]] });
+  cmds.push({ type: 'foot', id: f, from: apex, a: p, b: q });
+  cmds.push({ type: 'segment', a: apex, b: f });
+  return cmds;
+};
+
+/** "perpendicular bisector of AB" / "אנך אמצעי ל-AB" — the segment's midpoint + a drawn ⟂ line there. */
+const perpBisector: Rule = (s) => {
+  if (!/perpendicular\s+bisector|אנך\s*אמצעי|אמצעי\b/i.test(s)) return null;
+  const rest = s.replace(/perpendicular|bisector|of|the|אנך|אמצעי|אמצע|של|ל-?/gi, ' ');
+  const ids = labelRun(rest, 2);
+  if (!ids) return null;
+  const mid = freeLabel(ids, ['M', 'N', 'P', 'Q']);
+  return [
+    { type: 'midpoint', id: mid, a: ids[0], b: ids[1] },
+    { type: 'perpendicular-line', id: `perp-${mid}-${ids[0]}${ids[1]}`, through: mid, a: ids[0], b: ids[1], visible: true },
+  ];
+};
+
+/**
+ * "AD bisects angle BAC" / "AD חוצה את הזווית BAC" — the angle bisector from the
+ * vertex, with the named point D *placed* where it meets the opposite side. The
+ * bisector and opposite-side lines are scaffolding; only D and the segment show.
+ */
+const bisectorPlacesPoint: Rule = (s) => {
+  if (!/bisects?|חוצ/i.test(s)) return null;
+  if (INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s)) return null; // intersection rules own that phrasing
+  const seg = s.match(/\b([A-Za-z])\s*([A-Za-z])\b\s*(?:bisects?|חוצ\w*)/i);
+  if (!seg) return null;
+  const apex = up(seg[1]);
+  const D = up(seg[2]);
+  const after = s.slice(s.search(/bisects?|חוצ/i)).replace(/bisects?|חוצ\w*|angles?|the|את|הזווית|זווית|של/gi, ' ');
+  const tri = labelRun(after, 3);
+  if (!tri) return null;
+  const vertex = tri[1];
+  if (vertex !== apex) return null; // "AD bisects ∠BAC": the segment's first letter is the angle vertex
+  const [o1, o2] = tri.filter((t) => t !== vertex);
+  if (o2 === undefined) return null;
+  const bisId = `bis-${tri.join('')}`;
+  const lineId = `line-${o1}${o2}`;
+  return [
+    { type: 'bisector', id: bisId, vertex, p: tri[0], q: tri[2] },
+    { type: 'line-through', id: lineId, a: o1, b: o2 },
+    { type: 'line-intersection', id: D, line1: bisId, line2: lineId },
+    { type: 'segment', a: apex, b: D },
+  ];
+};
+
 // Order matters: the most specific keyword-anchored rules run first; the
 // coordinate rule (freePoint) is last because it's the loosest.
 const RULES: Rule[] = [
   inscribedPolygon, // before the shape rules ("triangle ABC inscribed …" contains "triangle")
+  // Special-line constructs whose Hebrew names a triangle ("…במשולש ABC") must
+  // run before the shape rules, or `triangle` grabs the embedded משולש and stops.
+  median,
+  altitude, // "height/altitude from A" / "perpendicular from A to BC"
+  perpBisector, // "perpendicular bisector of AB"
   square,
   parallelogram,
   rectangle,
@@ -590,6 +720,7 @@ const RULES: Rule[] = [
   triangle,
   bisectorIntersection, // two bisectors meet — before the one-bisector and generic intersections
   bisectorSegmentIntersection, // one bisector ∩ a segment
+  bisectorPlacesPoint, // "AD bisects ∠BAC" — places D on the opposite side (after the ∩ compounds)
   tangentLineIntersection, // tangent ∩ a segment
   parallelCircleIntersection, // a parallel line ∩ the circle
   circleCircleIntersection, // two circles cross — before the generic line∩line intersection
@@ -604,6 +735,7 @@ const RULES: Rule[] = [
   arcMidpoint, // circle constructs (own keywords) before the generic point rules
   diameter,
   chord,
+  circumcircle, // "circle through A B C" — before the centre-based `circle`
   circle,
   foot, // before `pointOnSegment`
   midpoint,

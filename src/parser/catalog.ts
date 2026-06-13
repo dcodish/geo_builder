@@ -66,9 +66,10 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'lines', supported: true, en: 'bisector of angle ABC', he: 'חוצה זווית ABC', descEn: 'Draw an angle bisector.', descHe: 'ציור חוצה זווית.' },
   { category: 'lines', supported: true, en: 'line through P perpendicular to AB', he: 'ישר דרך P מאונך ל-AB', descEn: 'A perpendicular line through a point.', descHe: 'ישר מאונך דרך נקודה.' },
   { category: 'lines', supported: true, en: 'line through P parallel to AB', he: 'ישר דרך P מקביל ל-AB', descEn: 'A parallel line through a point.', descHe: 'ישר מקביל דרך נקודה.' },
-  { category: 'lines', supported: false, phase: '5b', en: 'median from A in ABC', he: 'תיכון מ-A במשולש ABC', descEn: 'A median (to the opposite midpoint).', descHe: 'תיכון (לאמצע הצלע שממול).' },
-  { category: 'lines', supported: false, phase: '5b', en: 'height from A in ABC', he: 'גובה מ-A במשולש ABC', descEn: 'An altitude and its foot.', descHe: 'גובה והרגל שלו.' },
-  { category: 'lines', supported: false, phase: '5b', en: 'perpendicular bisector of AB', he: 'אנך אמצעי ל-AB', descEn: 'The perpendicular bisector of a segment.', descHe: 'האנך האמצעי של הקטע.' },
+  { category: 'lines', supported: true, en: 'median from A in ABC', he: 'תיכון מ-A במשולש ABC', descEn: 'A median (to the opposite midpoint).', descHe: 'תיכון (לאמצע הצלע שממול).' },
+  { category: 'lines', supported: true, en: 'height from A in ABC', he: 'גובה מ-A במשולש ABC', descEn: 'An altitude and its foot.', descHe: 'גובה והרגל שלו.' },
+  { category: 'lines', supported: true, en: 'perpendicular bisector of AB', he: 'אנך אמצעי ל-AB', descEn: 'The perpendicular bisector of a segment.', descHe: 'האנך האמצעי של הקטע.' },
+  { category: 'lines', supported: true, en: 'AD bisects angle BAC', he: 'AD חוצה את הזווית BAC', descEn: 'An angle bisector that places a point on the opposite side.', descHe: 'חוצה זווית הממקם נקודה על הצלע שממול.' },
 
   // ── Constraints ─────────────────────────────────────────────────────────
   { category: 'constraints', supported: true, en: 'angle GBA = 37', he: 'זווית GBA = 37', descEn: 'Set an angle — a point that can slide moves to satisfy it; otherwise it is checked.', descHe: 'קביעת זווית — נקודה שיכולה לזוז תוזז כדי לקיימה; אחרת היא נבדקת.' },
@@ -80,6 +81,8 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'circles', supported: true, en: 'circle centered at O radius 5', he: 'מעגל סביב O רדיוס 5', descEn: 'A circle from a centre and radius.', descHe: 'מעגל לפי מרכז ורדיוס.' },
   { category: 'circles', supported: true, en: 'A is on circle O', he: 'A על מעגל O', descEn: 'A point on a circle / inscribed vertex.', descHe: 'נקודה על מעגל / קודקוד חסום.' },
   { category: 'circles', supported: true, en: 'triangle ABC inscribed in circle O', he: 'משולש ABC חסום במעגל O', descEn: 'A triangle with all vertices on a circle.', descHe: 'משולש שכל קודקודיו על מעגל.' },
+  { category: 'circles', supported: true, en: 'right triangle ABC inscribed in a circle', he: 'משולש ישר-זווית ABC חסום במעגל', descEn: 'A right triangle inscribed (hypotenuse is a diameter).', descHe: 'משולש ישר-זווית חסום (היתר הוא קוטר).' },
+  { category: 'circles', supported: true, en: 'circle through A B C', he: 'מעגל חוסם את ABC', descEn: 'The circle through three points (circumscribed).', descHe: 'המעגל החוסם שלושה קודקודים.' },
   { category: 'circles', supported: true, en: 'trapezoid ABCD inscribed in a circle', he: 'טרפז ABCD חסום במעגל', descEn: 'A cyclic (isosceles) trapezoid — also square/rectangle/rhombus.', descHe: 'טרפז חסום (שווה-שוקיים) — וכן ריבוע/מלבן/מעוין.' },
   { category: 'circles', supported: true, en: 'chord AB in circle O', he: 'מיתר AB במעגל O', descEn: 'A chord of a circle (both ends on it).', descHe: 'מיתר במעגל (שני קצותיו עליו).' },
   { category: 'circles', supported: true, en: 'diameter AB in circle O', he: 'קוטר AB במעגל O', descEn: 'A chord through the centre.', descHe: 'מיתר העובר במרכז.' },

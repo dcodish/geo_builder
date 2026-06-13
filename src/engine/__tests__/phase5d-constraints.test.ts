@@ -99,8 +99,10 @@ describe('parser → constraint commands', () => {
     }
   });
 
-  it('still treats the unnamed-foot phrasing "perpendicular from A to BC" as not-handled', () => {
-    expect(parse('perpendicular from A to BC').ok).toBe(false);
+  it('the unnamed-foot phrasing "perpendicular from A to BC" now builds an altitude (foot + segment)', () => {
+    const r = parse('perpendicular from A to BC');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.commands.map((c) => c.type)).toContain('foot');
   });
 });
 

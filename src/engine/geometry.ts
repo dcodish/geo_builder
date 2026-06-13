@@ -40,6 +40,19 @@ export function reflectAcross(p: Vec, a: Vec, b: Vec): Vec {
   return { x: 2 * foot.x - p.x, y: 2 * foot.y - p.y };
 }
 
+/** Circumcentre of triangle a,b,c — equidistant from all three. null if they are collinear. */
+export function circumcenter(a: Vec, b: Vec, c: Vec): Vec | null {
+  const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+  if (Math.abs(d) < 1e-12) return null; // collinear — no circumscribed circle
+  const a2 = a.x * a.x + a.y * a.y;
+  const b2 = b.x * b.x + b.y * b.y;
+  const c2 = c.x * c.x + c.y * c.y;
+  return {
+    x: (a2 * (b.y - c.y) + b2 * (c.y - a.y) + c2 * (a.y - b.y)) / d,
+    y: (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d,
+  };
+}
+
 /** Foot of the perpendicular from p onto the (infinite) line a→b (degenerate a≈b returns a). */
 export function footOnLine(p: Vec, a: Vec, b: Vec): Vec {
   const d = sub(b, a);

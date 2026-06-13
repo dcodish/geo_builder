@@ -41,6 +41,7 @@ const PARSES: [string, string][] = [
   ['triangle ABC inscribed in circle O', 'circle'],
   ['triangle ABC inscribed in a circle', 'circle'],
   ['משולש ABC חסום במעגל', 'circle'],
+  ['right triangle ABC inscribed in a circle', 'circle'], // Thales — hypotenuse is a diameter
   ['quadrilateral ABCD inscribed in a circle', 'circle'],
   ['square ABCD inscribed in a circle', 'circle'],
   ['ריבוע ABCD חסום במעגל', 'circle'],
@@ -48,6 +49,9 @@ const PARSES: [string, string][] = [
   ['rhombus ABCD inscribed in a circle', 'circle'],
   ['trapezoid ABCD inscribed in a circle', 'circle'],
   ['טרפז ABCD חסום במעגל', 'circle'],
+  ['circle through A B C', 'circumcircle'], // circumscribed circle (3 points)
+  ['circle circumscribing ABC', 'circumcircle'],
+  ['מעגל חוסם את ABC', 'circumcircle'],
   // ── points ──
   ['point A at (0,0)', 'free-point'],
   ['נקודה A ב-(0,0)', 'free-point'],
@@ -69,6 +73,19 @@ const PARSES: [string, string][] = [
   ['חוצה זווית ABC', 'bisector'],
   ['line through P perpendicular to AB', 'perpendicular-line'],
   ['line through P parallel to AB', 'parallel-line'],
+  // ── special lines (constructible: midpoint/foot/bisector + segment) ──
+  ['median from A in ABC', 'midpoint'],
+  ['תיכון מ-A במשולש ABC', 'midpoint'],
+  ['height from A in ABC', 'foot'],
+  ['altitude from A in ABC', 'foot'],
+  ['גובה מ-A במשולש ABC', 'foot'],
+  ['perpendicular from A to BC', 'foot'],
+  ['triangle ABC with a height from A', 'foot'], // triangle + its altitude (compound handled directly)
+  ['triangle ABC with a median from A', 'midpoint'],
+  ['perpendicular bisector of AB', 'perpendicular-line'],
+  ['אנך אמצעי ל-AB', 'perpendicular-line'],
+  ['AD bisects angle BAC', 'line-intersection'],
+  ['AD חוצה את הזווית BAC', 'line-intersection'],
   // ── circles ──
   ['circle centered at O radius 5', 'circle'],
   ['מעגל סביב O רדיוס 5', 'circle'],
@@ -94,7 +111,6 @@ const PARSES: [string, string][] = [
 /** Utterances that must escalate (not-handled) rather than half-parse or draw a wrong figure. */
 const ESCALATES: string[] = [
   // ── modified shapes the engine can't build → must not drop the modifier ──
-  'right triangle ABC inscribed in a circle', // hypotenuse must be a diameter — not supported
   'square ABCD inscribed in a circle with AB = 6', // inscribed + a constraint on top
   // ── shape + a constraint (compound — LLM should decompose) ──
   'square ABCD with AB = 6',
@@ -107,14 +123,6 @@ const ESCALATES: string[] = [
   'square ABCD with point E on AB',
   'משולש ABC עם נקודה D על AB',
   'rectangle ABCD with diagonals',
-  // ── shape + a special line we don't build as a one-liner ──
-  'triangle ABC with a height from A',
-  'triangle ABC with a median from A',
-  // ── genuinely unsupported constructs ──
-  'circle through A B C', // 3-point (circumscribed) circle
-  'AD bisects angle BAC', // a single bisector that *places a point* (1-DOF, deferred)
-  'AD חוצה את הזווית BAC',
-  'perpendicular from A to BC', // the unnamed-foot phrasing
   // ── nothing to build ──
   'draw a circle somewhere',
   'hello there',

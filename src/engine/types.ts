@@ -159,6 +159,15 @@ export interface MidpointPoint {
   b: Id;
 }
 
+/** 0 DOF — the circumcentre of triangle a,b,c (equidistant from all three). Collinear ⇒ unconstructible. */
+export interface CircumcenterPoint {
+  kind: 'circumcenter';
+  id: Id;
+  a: Id;
+  b: Id;
+  c: Id;
+}
+
 /** 1 DOF — a point on `circle` at angle `theta` (radians) from the centre. Like on-segment, but angular. */
 export interface OnCirclePoint {
   kind: 'on-circle';
@@ -217,6 +226,7 @@ export type GeoPoint =
   | LineIntersectionPoint
   | FootPoint
   | MidpointPoint
+  | CircumcenterPoint
   | OnCirclePoint
   | AntipodePoint
   | ArcMidpointPoint
@@ -238,6 +248,7 @@ const POINT_KINDS: ReadonlySet<string> = new Set([
   'line-intersection',
   'foot',
   'midpoint',
+  'circumcenter',
   'on-circle',
   'antipode',
   'arc-midpoint',
@@ -396,6 +407,7 @@ export type Command =
   // Phase 5c — circles and the points they produce.
   | { type: 'circle'; id: Id; center: Id; radius: number }
   | { type: 'circle-through'; id: Id; center: Id; through: Id }
+  | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id } // circle through a,b,c (centre = circumcentre)
   | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number }
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }

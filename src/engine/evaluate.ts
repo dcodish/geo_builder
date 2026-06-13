@@ -10,6 +10,7 @@ import { LEN_EPS, isGeoPoint } from './types';
 import {
   add,
   circleCircleIntersect,
+  circumcenter,
   footOnLine,
   len,
   lineCircleIntersect,
@@ -301,6 +302,16 @@ function tryEval(
       const b = pos.get(p.b);
       if (!a || !b) return 'pending';
       return scale(add(a, b), 0.5);
+    }
+
+    case 'circumcenter': {
+      const a = pos.get(p.a);
+      const b = pos.get(p.b);
+      const c = pos.get(p.c);
+      if (!a || !b || !c) return 'pending';
+      const o = circumcenter(a, b, c);
+      if (!o) return `cannot construct ${p.id}: ${p.a}, ${p.b}, ${p.c} are collinear (no circumscribed circle)`;
+      return o;
     }
 
     case 'on-circle': {

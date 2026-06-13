@@ -59,11 +59,11 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
   });
 
   it('reports (not silently drops) steps the engine cannot build', async () => {
-    // "circle through 3 points" (circumscribed) is a step the LLM may produce but the engine can't build.
-    mockFetch(['circle centered at O radius 5', 'circle through A B C', 'segment AB']);
-    const r = await llmParse('circle through the three vertices', '');
+    // A shape carrying a constraint is a compound the deterministic parser won't build as one step.
+    mockFetch(['circle centered at O radius 5', 'square ABCD with AB = 6', 'segment AB']);
+    const r = await llmParse('a square sized 6 with a circle', '');
     expect(r!.built.map((b) => b.step)).toEqual(['circle centered at O radius 5', 'segment AB']);
-    expect(r!.dropped).toEqual(['circle through A B C']);
+    expect(r!.dropped).toEqual(['square ABCD with AB = 6']);
   });
 
   it('an LLM that returns nothing buildable yields empty built (caller shows "couldn\'t read")', async () => {

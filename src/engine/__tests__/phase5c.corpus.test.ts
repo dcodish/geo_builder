@@ -68,6 +68,47 @@ describe('inscribed cyclic polygons (square / rectangle / isosceles trapezoid)',
   });
 });
 
+describe('constructible cases that used to escalate (right-tri inscribed, circumcircle, special lines)', () => {
+  it('right triangle inscribed: vertices on the circle, right angle at C (Thales)', () => {
+    const { positions } = reproduce(['right triangle ABC inscribed in a circle'], 'rt');
+    const O = positions.get('O')!;
+    const [A, B, C] = ['A', 'B', 'C'].map((id) => positions.get(id)!);
+    for (const p of [A, B, C]) expect(dist(O, p)).toBeCloseTo(5, 6);
+    expect(angleDeg(C, A, B)).toBeCloseTo(90, 6); // right angle at C
+    expect((A.x + B.x) / 2).toBeCloseTo(O.x, 6); // AB is a diameter → its midpoint is the centre
+    expect((A.y + B.y) / 2).toBeCloseTo(O.y, 6);
+  });
+
+  it('circle through A B C: the circle is the circumcircle (equidistant from all three)', () => {
+    const { positions } = reproduce(['circle through A B C'], 'cc');
+    const O = positions.get('O')!;
+    const [A, B, C] = ['A', 'B', 'C'].map((id) => positions.get(id)!);
+    expect(dist(O, A)).toBeCloseTo(dist(O, B), 6);
+    expect(dist(O, B)).toBeCloseTo(dist(O, C), 6);
+  });
+
+  it('median from A: M is the midpoint of the opposite side BC', () => {
+    const { positions } = reproduce(['triangle ABC', 'median from A in ABC'], 'med');
+    const [B, C, M] = ['B', 'C', 'M'].map((id) => positions.get(id)!);
+    expect(M.x).toBeCloseTo((B.x + C.x) / 2, 6);
+    expect(M.y).toBeCloseTo((B.y + C.y) / 2, 6);
+  });
+
+  it('altitude from A: foot F lies on BC and AF ⟂ BC', () => {
+    const { positions } = reproduce(['triangle ABC', 'height from A in ABC'], 'alt');
+    const [A, B, C, F] = ['A', 'B', 'C', 'F'].map((id) => positions.get(id)!);
+    expect(collinear(B, C, F)).toBe(true);
+    expect(dot(sub(F, A), sub(C, B))).toBeCloseTo(0, 6); // AF ⟂ BC
+  });
+
+  it('AD bisects ∠BAC: D lands on BC and AD bisects the angle', () => {
+    const { positions } = reproduce(['triangle ABC', 'AD bisects angle BAC'], 'bis');
+    const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => positions.get(id)!);
+    expect(collinear(B, C, D)).toBe(true);
+    expect(angleDeg(A, B, D)).toBeCloseTo(angleDeg(A, D, C), 4); // ∠BAD = ∠DAC
+  });
+});
+
 describe('corpus Q5 — triangle inscribed in a circle + arc midpoint', () => {
   const EN = [
     'triangle ABC inscribed in circle O radius 5',
