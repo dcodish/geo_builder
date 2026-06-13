@@ -82,7 +82,7 @@ export function Figure({
   // Point radius in px, kept visually constant by dividing out the pan/zoom scale.
   const r = 4 / view.zoom;
   const stroke = 1.5 / view.zoom;
-  const fontSize = 14 / view.zoom;
+  const fontSize = 16 / view.zoom;
 
   function onWheel(e: React.WheelEvent) {
     e.preventDefault();
@@ -217,7 +217,7 @@ export function Figure({
             // World→screen is uniform scale + Y-flip, so a world direction maps
             // to (dx, −dy) on screen; place the label that way along labelDir.
             const sd = unitVec({ x: pt.labelDir.x, y: -pt.labelDir.y });
-            const off = r * 2.6;
+            const off = r * 2.6 + fontSize * 0.45; // clear the dot + a little gap so the label is readable
             const anchor = sd.x > 0.3 ? 'start' : sd.x < -0.3 ? 'end' : 'middle';
             const baseline = sd.y > 0.3 ? 'hanging' : sd.y < -0.3 ? 'auto' : 'middle';
             return (
