@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { Vec } from '../types';
+import type { Command, Vec } from '../types';
 import { build, applyStep, emptyConstruction } from '../step';
 import { dist, sub } from '../geometry';
 import { parse } from '@/parser';
@@ -41,6 +41,29 @@ describe('equal-segments constraint', () => {
     const A = positions.get('A')!, B = positions.get('B')!, E = positions.get('E')!;
     expect(dist(E, A)).toBeCloseTo(dist(E, B), 6);
     expect(E.x).toBeCloseTo(5, 6); // midpoint of A(0,0)–B(10,0)
+  });
+});
+
+describe('a constraint drives a FREE point, not one already pinned by another constraint', () => {
+  it('"DF = DE" moves the free E, not F (which a second definition pinned)', () => {
+    // F is defined twice (a point on AB, then = the tangent∩AB intersection) → pinned
+    // by a coincidence. "DF = DE" must drive the free E, not fight F's pin.
+    const cmds = [
+      'triangle ABD inscribed in circle O radius 5',
+      'point F on the extension of AB',
+      'tangent to circle O at D',
+      'F is the intersection of the tangent to circle O at D and AB',
+      'point E on AB',
+      'DF = DE',
+    ].flatMap((u) => {
+      const r = parse(u);
+      if (!r.ok) throw new Error(u);
+      return r.commands;
+    });
+    const { positions } = build(cmds as Command[]);
+    const [D, E, F] = ['D', 'E', 'F'].map((id) => positions.get(id)!);
+    expect(dist(D, F)).toBeCloseTo(dist(D, E), 4); // the constraint holds…
+    expect(dist(positions.get('A')!, F)).toBeGreaterThan(0.1); // …and F isn't collapsed onto A
   });
 });
 

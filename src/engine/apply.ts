@@ -35,9 +35,14 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
     return;
   }
   const idxs = constraintRefs(con).map((id) => objects.findIndex((o) => o.id === id));
+  // A point already pinned by another constraint (e.g. F fixed by a coincidence
+  // from a second definition) must not be re-driven — that would fight its pin and
+  // over-constrain ("DF = DE" should move the free E, not the pinned F).
+  const pinned = new Set(constraints.flatMap(constraintRefs));
   // (1) Prefer an on-segment ref as the carrier — the constraint *places* it (its t
-  // is solved in closed form, with the constraint embedded in the point).
-  const onSeg = idxs.find((i) => i >= 0 && objects[i].kind === 'on-segment');
+  // is solved in closed form). Pick a NON-pinned carrier first.
+  const onSegs = idxs.filter((i) => i >= 0 && objects[i].kind === 'on-segment');
+  const onSeg = onSegs.find((i) => !pinned.has(objects[i].id)) ?? onSegs[0];
   if (onSeg !== undefined) {
     const seg = objects[onSeg] as Extract<GeoObject, { kind: 'on-segment' }>;
     objects[onSeg] = { kind: 'on-segment-solved', id: seg.id, a: seg.a, b: seg.b, constraint: con, branch: 0 };
