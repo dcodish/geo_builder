@@ -876,9 +876,13 @@ const circleCircleIntersection: Rule = (s) => {
  * "circle O and circle P are tangent to each other at M" /
  * "מעגל O ומעגל P משיקים זה לזה בנקודה M" — two circles touching at one point. TWO
  * circles named + a tangent keyword (a single-circle "tangent to circle X" is the
- * tangent-LINE rule). Default external (the textbook side-by-side picture); "internally"
- * / "פנימית" gives internal tangency. Must run BEFORE tangentLine, which would
- * otherwise grab the משיק and draw a stray tangent line.
+ * tangent-LINE rule). Must run BEFORE tangentLine, which would otherwise grab the
+ * משיק and draw a stray tangent line.
+ *
+ * Internal vs external is explicit and bilingual: **internal** on "internally" /
+ * "from inside" / "פנימית" / "מבפנים" (one circle inside the other, |OP| = |r1−r2|);
+ * otherwise **external** — the default and what "externally" / "from outside" /
+ * "חיצונית" / "מבחוץ" also say (side by side, |OP| = r1+r2).
  */
 const circlesTangent: Rule = (s) => {
   if (!/tangent|משיק/i.test(s)) return null;
@@ -886,8 +890,8 @@ const circlesTangent: Rule = (s) => {
   if (centers.length < 2 || centers[0] === centers[1]) return null; // a single circle ⇒ the tangent-line rule
   const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z])\b/i);
   if (!atM) return null;
-  const external = !/\binternal\w*\b|פנימ/i.test(s);
-  return [{ type: 'circles-tangent', circle1: circleId(centers[0]), circle2: circleId(centers[1]), at: up(atM[1]), external }];
+  const internal = /\binternal\w*\b|\bfrom\s+inside\b|\binside\b|פנימ|מבפנים/i.test(s);
+  return [{ type: 'circles-tangent', circle1: circleId(centers[0]), circle2: circleId(centers[1]), at: up(atM[1]), external: !internal }];
 };
 
 /** "tangent to circle O at A" / "משיק למעגל O בנקודה A" — a *drawn* tangent line (⟂ the radius at A). */

@@ -31,6 +31,15 @@ describe('parse — circles tangent to each other', () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.commands.map((c) => c.type)).toContain('tangent');
   });
+
+  it('reads external (default) vs internal from the phrasing (He + En)', () => {
+    const ext = (u: string) => (parse(u).ok && (parse(u) as { commands: { external?: boolean }[] }).commands[0].external) === true;
+    expect(ext('circle O and circle P are tangent at M')).toBe(true); // default external
+    expect(ext('מעגל O ומעגל P משיקים זה לזה בנקודה M')).toBe(true);
+    expect(ext('circle O and circle P are tangent internally at M')).toBe(false);
+    expect(ext('circle O and circle P are tangent from inside at M')).toBe(false);
+    expect(ext('מעגל O ומעגל P משיקים מבפנים בנקודה M')).toBe(false);
+  });
 });
 
 describe('engine — externally tangent circles', () => {
@@ -55,5 +64,24 @@ describe('engine — externally tangent circles', () => {
   it('the two circles no longer overlap (sole common point is M)', () => {
     // |centres| = r1 + r2 ⇒ external tangency: they meet only at M, never crossing.
     expect(dist(pos().get('O')!, pos().get('P')!)).toBeGreaterThanOrEqual(10 - 1e-3);
+  });
+});
+
+describe('engine — internally tangent circles (one inside the other)', () => {
+  beforeEach(() => {
+    s().clear();
+    s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 8 }, 'circle O r8');
+    s().execute({ type: 'circle', id: 'circle-P', center: 'P', radius: 3 }, 'circle P r3');
+    const r = parse('מעגל O ומעגל P משיקים מבפנים בנקודה M');
+    if (r.ok) r.commands.forEach((c) => s().execute(c, 'tangent internal'));
+  });
+
+  it('centres are |r1−r2| apart and M is on both circles (P inside O)', () => {
+    const O = pos().get('O')!;
+    const P = pos().get('P')!;
+    const M = pos().get('M')!;
+    expect(dist(O, P)).toBeCloseTo(5, 3); // |8 − 3|
+    expect(dist(O, M)).toBeCloseTo(8, 3); // M on the big circle O
+    expect(dist(P, M)).toBeCloseTo(3, 3); // …and on the small circle P → internal touch
   });
 });
