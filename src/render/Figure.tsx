@@ -104,7 +104,7 @@ export function Figure({
     window.setTimeout(() => setExportFlash(''), 1400);
   }
 
-  const { scene, transform, crossings } = useMemo(() => {
+  const { scene, transform, crossings, labelDirs } = useMemo(() => {
     // Rotate/flip the figure in world space, then fit — so it stays centred and
     // labels (computed here, drawn upright) follow the new orientation.
     const o = { rot: view.rot, flipX: view.flipX, flipY: view.flipY };
@@ -115,7 +115,23 @@ export function Figure({
     const s = buildScene(construction, oriented, labels, angleMarks);
     const t = fitTransform(scenePositions(s), { width, height, padding });
     const x = onPickIntersection ? findSegmentCrossings(construction, oriented) : [];
-    return { scene: s, transform: t, crossings: x };
+
+    // Nudge each label off the lines, in screen space at a reference scale (zoom
+    // is applied later by the pan/zoom <g>, so this stays stable across zooming).
+    const REF_OFF = 12; // pointR(2)*2 + fontSize(16)*0.5 at zoom 1
+    const REF_CLEAR = 9; // ~ half a glyph
+    const obstacles: [Vec, Vec][] = s.segments.map((sg) => [t.toScreen(sg.a), t.toScreen(sg.b)]);
+    for (const ln of s.lines) {
+      const a0 = t.toScreen(ln.anchor);
+      const a1 = t.toScreen({ x: ln.anchor.x + ln.dir.x, y: ln.anchor.y + ln.dir.y });
+      const d = unitVec({ x: a1.x - a0.x, y: a1.y - a0.y });
+      obstacles.push([{ x: a0.x - d.x * 4000, y: a0.y - d.y * 4000 }, { x: a0.x + d.x * 4000, y: a0.y + d.y * 4000 }]);
+    }
+    const circScreen = s.circles.map((c) => ({ c: t.toScreen(c.center), r: c.r * t.scale }));
+    const ptScreen = s.points.map((p) => ({ id: p.id, screen: t.toScreen(p.pos), seed: unitVec({ x: p.labelDir.x, y: -p.labelDir.y }) }));
+    const labelDirs = chooseLabelDirs(ptScreen, obstacles, circScreen, REF_OFF, REF_CLEAR);
+
+    return { scene: s, transform: t, crossings: x, labelDirs };
   }, [construction, positions, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY]);
 
   // Point radius in px, kept visually constant by dividing out the pan/zoom scale.
@@ -264,9 +280,9 @@ export function Figure({
 
           {scene.points.map((pt) => {
             const s = transform.toScreen(pt.pos);
-            // World→screen is uniform scale + Y-flip, so a world direction maps
-            // to (dx, −dy) on screen; place the label that way along labelDir.
-            const sd = unitVec({ x: pt.labelDir.x, y: -pt.labelDir.y });
+            // The label direction is chosen (zoom-independent) to clear the figure's
+            // lines; fall back to the seed outward dir (Y-flipped to screen) if absent.
+            const sd = labelDirs.get(pt.id) ?? unitVec({ x: pt.labelDir.x, y: -pt.labelDir.y });
             const off = pointR * 2 + fontSize * 0.5; // clear the (small) dot + a gap so the label is readable
             const anchor = sd.x > 0.3 ? 'start' : sd.x < -0.3 ? 'end' : 'middle';
             const baseline = sd.y > 0.3 ? 'hanging' : sd.y < -0.3 ? 'auto' : 'middle';
@@ -469,3 +485,55 @@ const unitVec = (v: Vec): Vec => {
   const l = Math.hypot(v.x, v.y);
   return l < 1e-9 ? { x: 0, y: 0 } : { x: v.x / l, y: v.y / l };
 };
+
+/** Distance from point p to segment a→b (screen space). */
+function distToSeg(p: Vec, a: Vec, b: Vec): number {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const len2 = abx * abx + aby * aby;
+  const t = len2 ? clamp(((p.x - a.x) * abx + (p.y - a.y) * aby) / len2, 0, 1) : 0;
+  return Math.hypot(p.x - (a.x + t * abx), p.y - (a.y + t * aby));
+}
+
+/**
+ * Choose each vertex label's direction so it clears the figure's lines. The
+ * largest-empty-wedge seed (scene `labelDir`) only knows the segments meeting at
+ * that vertex; here we score the candidate label box against EVERY segment, line,
+ * and circle in screen space and rotate to the clearest spot — but bias toward the
+ * seed so a label only moves when it would otherwise sit on a line. Computed at a
+ * reference scale (zoom-independent) so labels don't jump when zooming.
+ */
+export function chooseLabelDirs(
+  pts: { id: Id; screen: Vec; seed: Vec }[],
+  obstacles: [Vec, Vec][],
+  circles: { c: Vec; r: number }[],
+  off: number,
+  clearR: number,
+): Map<Id, Vec> {
+  const N = 24;
+  const out = new Map<Id, Vec>();
+  for (const pt of pts) {
+    const seedAng = Math.atan2(pt.seed.y, pt.seed.x);
+    let best = pt.seed;
+    let bestScore = -Infinity;
+    for (let k = 0; k < N; k++) {
+      const ang = seedAng + (2 * Math.PI * k) / N;
+      const dir = { x: Math.cos(ang), y: Math.sin(ang) };
+      const L = { x: pt.screen.x + dir.x * off, y: pt.screen.y + dir.y * off };
+      let clr = Infinity;
+      for (const [a, b] of obstacles) clr = Math.min(clr, distToSeg(L, a, b));
+      for (const c of circles) clr = Math.min(clr, Math.abs(Math.hypot(L.x - c.c.x, L.y - c.c.y) - c.r));
+      for (const q of pts) if (q !== pt) clr = Math.min(clr, Math.hypot(L.x - q.screen.x, L.y - q.screen.y));
+      // Reward clearance up to a cap; penalise rotating away from the seed so we keep
+      // the natural (outward) placement unless a line forces a move.
+      const turn = Math.min(k, N - k) / N; // 0 (at seed) … 0.5 (opposite)
+      const score = Math.min(clr, clearR * 1.6) - turn * clearR * 1.3;
+      if (score > bestScore) {
+        bestScore = score;
+        best = dir;
+      }
+    }
+    out.set(pt.id, best);
+  }
+  return out;
+}
