@@ -522,22 +522,41 @@ const setVar: Rule = (s) => {
   return m ? [{ type: 'set-var', name: m[1], value: parseFloat(m[2]) }] : null;
 };
 
-/** "AB parallel to CD" / "AB ∥ CD" / "AB מקביל ל-CD". */
+/**
+ * "AB parallel to CD" / "AB ∥ CD" / "AB מקביל ל-CD". Naming two segments in a ∥
+ * relation also DRAWS them (segment is idempotent — a no-op if already on the
+ * figure), so "AB ∥ CD" puts both lines on the canvas without a separate request.
+ */
 const parallelConstraint: Rule = (s) => {
   if (!/parallel|∥|מקביל/i.test(s)) return null;
   // strip the keyword AND filler words (so "to"/"of" aren't read as 2-letter labels)
   const t = s.replace(/parallel(?:\s*to)?|∥|מקביל(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
   const m = t.match(/\b([A-Za-z])\s*([A-Za-z])\b.*?\b([A-Za-z])\s*([A-Za-z])\b/);
-  return m ? [{ type: 'set-parallel', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]) }] : null;
+  if (!m) return null;
+  const [a, b, c, d] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
+  return [
+    { type: 'segment', a, b },
+    { type: 'segment', a: c, b: d },
+    { type: 'set-parallel', a, b, c, d },
+  ];
 };
 
-/** "AB perpendicular to CD" / "AB ⊥ CD" / "AB מאונך ל-CD" — two *named* segments (not the foot phrasing). */
+/**
+ * "AB perpendicular to CD" / "AB ⊥ CD" / "AB מאונך ל-CD" — two *named* segments
+ * (not the foot phrasing). Like ∥, it also DRAWS both segments (idempotent).
+ */
 const perpendicularConstraint: Rule = (s) => {
   if (!/perpendicular|⊥|מאונך/i.test(s)) return null;
   const t = s.replace(/perpendicular(?:\s*to)?|⊥|מאונך(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
   if ((t.match(/\b[A-Za-z]\s*[A-Za-z]\b/g) ?? []).length < 2) return null; // "perpendicular from A to BC" is the foot, not this
   const m = t.match(/\b([A-Za-z])\s*([A-Za-z])\b.*?\b([A-Za-z])\s*([A-Za-z])\b/);
-  return m ? [{ type: 'set-perpendicular', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]) }] : null;
+  if (!m) return null;
+  const [a, b, c, d] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
+  return [
+    { type: 'segment', a, b },
+    { type: 'segment', a: c, b: d },
+    { type: 'set-perpendicular', a, b, c, d },
+  ];
 };
 
 /** "point A at (0,0)" / "נקודה A ב-(0,0)" / "A = (3, 4)" */

@@ -237,8 +237,19 @@ describe('parser → constraint commands', () => {
     for (const [utterance, expected] of cases) {
       const r = parse(utterance);
       expect(r.ok, `"${utterance}" should parse`).toBe(true);
-      if (r.ok) expect(r.commands[0]).toEqual(expected);
+      // ∥ / ⟂ also emit their two segments (drawn), so locate the constraint by type
+      // rather than assuming it's first.
+      if (r.ok) expect(r.commands.find((c) => c.type === (expected as { type: string }).type)).toEqual(expected);
     }
+  });
+
+  it('a ∥ / ⟂ relation also draws its two segments', () => {
+    const r = parse('AB ⊥ CD');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.commands.map((c) => c.type)).toEqual(['segment', 'segment', 'set-perpendicular']);
+    const segs = r.commands.filter((c) => c.type === 'segment') as { a: string; b: string }[];
+    expect(segs.map((sg) => [sg.a, sg.b])).toEqual([['A', 'B'], ['C', 'D']]);
   });
 
   it('the unnamed-foot phrasing "perpendicular from A to BC" now builds an altitude (foot + segment)', () => {

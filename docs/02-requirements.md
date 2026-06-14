@@ -46,6 +46,7 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 - **FR-IN-4 (Must)** — When input cannot be understood, show a helpful clarification message (bilingual) and leave the figure unchanged.
 - **FR-IN-5 (Should)** — Offer input affordances (examples, autocomplete, or a guided builder) so users phrase facts the parser supports.
 - **FR-IN-6 (Should)** — Accept **relational measures with named variables** that set a relation between measures *without fixing a number* (the tool draws the relation; the student solves for the unknown): a length as `coef·var` with a lowercase-latin variable (`AB = 3x`) and an angle as `coef·var` with a Greek variable (`∠ABC = 2α`); points stay uppercase so the two never collide. Two measures sharing a variable form a proportion (`AB = 3x` + `DF = x` ⇒ `|AB| = 3·|DF|`); a value given for the variable (`x = 4`) resolves every measure that uses it to an absolute size. The figure stays free until something pins the scale. (See [ADR-031](06-decisions.md#adr-031).)
+- **FR-IN-7 (Should)** — A **line relation between two named segments** (`AB ⟂ CD`, `AB ∥ CD`) also **draws** both segments, so naming a relation puts its lines on the figure without a separate "draw segment" request. Drawing is idempotent (a no-op for a segment already present).
 
 ## Construction & engine
 
