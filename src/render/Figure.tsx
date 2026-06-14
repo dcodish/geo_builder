@@ -282,6 +282,12 @@ export function Figure({
                   fontFamily="system-ui, sans-serif"
                   fontWeight={lit(pt.id) ? 700 : 400}
                   fill={lit(pt.id) ? '#b45309' : '#0f172a'}
+                  // A white halo painted UNDER the glyph keeps the label readable even when
+                  // it lands on a line (paint-order: stroke ⇒ the stroke draws first).
+                  stroke="#fff"
+                  strokeWidth={fontSize * 0.22}
+                  strokeLinejoin="round"
+                  style={{ paintOrder: 'stroke' }}
                 >
                   {pt.label}
                 </text>
@@ -309,10 +315,14 @@ export function Figure({
                   fontFamily="system-ui, sans-serif"
                   fontWeight={500}
                   fill="#1d4ed8"
+                  stroke="#fff"
+                  strokeWidth={fontSize * 0.2}
+                  strokeLinejoin="round"
                   // A measure is a math expression (12√2, 7k/5, 2α) — force LTR so the RTL (Hebrew)
                   // page context doesn't bidi-reorder its runs (12√2 was rendering as "2√12").
                   direction="ltr"
-                  style={{ pointerEvents: 'none', direction: 'ltr', unicodeBidi: 'bidi-override' }}
+                  // A white halo (paint-order: stroke) keeps it legible over a line it sits on.
+                  style={{ pointerEvents: 'none', direction: 'ltr', unicodeBidi: 'bidi-override', paintOrder: 'stroke' }}
                 >
                   {m.text}
                 </text>
