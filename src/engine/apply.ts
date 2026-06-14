@@ -564,17 +564,43 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'circles-tangent': {
       // Two circles tangent at one point: pull the centres to the touching distance
-      // (external = r1+r2, internal = |r1−r2|) and place `at` at the touch point on
-      // the centre line (a fraction r1/d from centre1). Needs concrete radii.
-      const c1 = objects.find((o) => o.id === cmd.circle1 && o.kind === 'circle') as Extract<GeoObject, { kind: 'circle' }> | undefined;
-      const c2 = objects.find((o) => o.id === cmd.circle2 && o.kind === 'circle') as Extract<GeoObject, { kind: 'circle' }> | undefined;
-      if (c1 && c2 && c1.radius.via === 'length' && c2.radius.via === 'length') {
-        const r1 = c1.radius.value;
-        const r2 = c2.radius.value;
-        const denom = cmd.external ? r1 + r2 : r1 - r2; // signed; internal needs r1≠r2
-        if (denom !== 0) {
-          addObj(objects, { kind: 'on-segment', id: cmd.at, a: c1.center, b: c2.center, t: r1 / denom });
-          driveOrCheck(objects, constraints, { type: 'distance', a: c1.center, b: c2.center, value: Math.abs(denom) });
+      // (external = r1+r2, internal = |r1−r2|) and place `at` on the centre line.
+      const idx1 = objects.findIndex((o) => o.id === cmd.circle1 && o.kind === 'circle');
+      const idx2 = objects.findIndex((o) => o.id === cmd.circle2 && o.kind === 'circle');
+      if (idx1 >= 0 && idx2 >= 0) {
+        const c1 = objects[idx1] as Extract<GeoObject, { kind: 'circle' }>;
+        let c2 = objects[idx2] as Extract<GeoObject, { kind: 'circle' }>;
+        if (c1.radius.via === 'length' && c2.radius.via === 'length') {
+          const r1 = c1.radius.value;
+          let r2 = c2.radius.value;
+          if (!cmd.external && Math.abs(r1 - r2) < 1e-6) {
+            // Internal tangency of equal circles is impossible at a *fixed* radius —
+            // but a radius is a flexible DOF, not a pin: shrink the 2nd circle so it
+            // sits inside the 1st (a default until a later constraint sizes it). The
+            // principled version (radius as a first-class solver DOF) is queued — see
+            // the radius-DOF note in PROJECT-MEMORY. (ADR-037 Amendment 1.)
+            r2 = r1 / 2;
+            c2 = { ...c2, radius: { via: 'length', value: r2 } };
+            objects[idx2] = c2;
+          }
+          if (cmd.external) {
+            const d = r1 + r2;
+            addObj(objects, { kind: 'on-segment', id: cmd.at, a: c1.center, b: c2.center, t: r1 / d });
+            driveOrCheck(objects, constraints, { type: 'distance', a: c1.center, b: c2.center, value: d });
+          } else {
+            // The bigger circle is the outer one; the touch point lies on the ray from
+            // the outer centre through the inner centre, at the outer radius.
+            const outerIs1 = r1 >= r2;
+            const ro = outerIs1 ? r1 : r2;
+            const ri = outerIs1 ? r2 : r1;
+            const co = outerIs1 ? c1.center : c2.center;
+            const ci = outerIs1 ? c2.center : c1.center;
+            const d = ro - ri;
+            if (d > 1e-9) {
+              addObj(objects, { kind: 'on-segment', id: cmd.at, a: co, b: ci, t: ro / d });
+              driveOrCheck(objects, constraints, { type: 'distance', a: co, b: ci, value: d });
+            }
+          }
         }
       }
       break;

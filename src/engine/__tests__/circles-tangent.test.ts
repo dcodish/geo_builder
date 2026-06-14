@@ -85,3 +85,23 @@ describe('engine — internally tangent circles (one inside the other)', () => {
     expect(dist(P, M)).toBeCloseTo(3, 3); // …and on the small circle P → internal touch
   });
 });
+
+describe('engine — internal tangency flexes a radius rather than failing (ADR-037 A1)', () => {
+  it('two EQUAL circles, internal → the 2nd shrinks to sit inside; M is on both', () => {
+    s().clear();
+    s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5 }, 'O');
+    s().execute({ type: 'circle', id: 'circle-P', center: 'P', radius: 5 }, 'P');
+    const r = parse('מעגל O ומעגל P משיקים מבפנים בנקודה M');
+    if (r.ok) r.commands.forEach((c) => s().execute(c, 'internal eq'));
+    const d = replay(s().facts);
+    const f = s().facts.find((x) => x.utterance === 'internal eq')!;
+    expect(d.status[f.id]).toBe('ok'); // works now — a radius is a flexible default
+    const O = d.positions.get('O')!;
+    const P = d.positions.get('P')!;
+    const M = d.positions.get('M')!;
+    // P shrank to 2.5; |OP| = 5 − 2.5 = 2.5; M on the big circle O (5) and the small P (2.5).
+    expect(dist(O, M)).toBeCloseTo(5, 3);
+    expect(dist(P, M)).toBeCloseTo(2.5, 3);
+    expect(dist(O, P)).toBeCloseTo(2.5, 3);
+  });
+});

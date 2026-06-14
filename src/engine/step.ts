@@ -96,10 +96,31 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
   return null;
 }
 
+/**
+ * Reject a `circles-tangent` the engine genuinely can't size — only the
+ * radius-through-a-point case (its radius isn't known at apply time). Equal-radii
+ * internal tangency is NOT rejected: a radius is a flexible DOF, so the apply step
+ * shrinks a circle to make it work (ADR-037 Amendment 1). Returns a message or null.
+ */
+function circlesTangentError(prev: Construction, cmd: Command): string | null {
+  if (cmd.type !== 'circles-tangent') return null;
+  const circ = (id: Id) => prev.objects.find((o) => o.id === id && o.kind === 'circle') as Extract<GeoObject, { kind: 'circle' }> | undefined;
+  const c1 = circ(cmd.circle1);
+  const c2 = circ(cmd.circle2);
+  if (!c1 || !c2) return null; // a missing circle is handled by the normal flow
+  if (c1.radius.via !== 'length' || c2.radius.via !== 'length') {
+    return 'tangent circles need a fixed radius (a radius-through-a-point circle is not supported yet)';
+  }
+  return null;
+}
+
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
   const prevEval = evaluate(prev);
   const prevPositions = prevEval.ok ? prevEval.positions : new Map<Id, Vec>();
+
+  const tangentErr = circlesTangentError(prev, cmd);
+  if (tangentErr) return { ok: false, error: tangentErr, construction: prev, positions: prevPositions };
 
   // Rotate a shape's vertices so an existing edge lands on its free base slots —
   // lets a shape build on an existing edge wherever that edge sits in the name
