@@ -8,7 +8,9 @@
     "send": "הוסף",
     "loading": "חושב...",
     "notUnderstood": "לא הצלחתי לקרוא את זה עדיין — נסה אחת מהדוגמאות למטה.",
-    "partial": "לא הצלחתי לצייר את החלק הזה"
+    "partial": "לא הצלחתי לצייר את החלק הזה",
+    "greek": "אותיות יווניות",
+    "insertGreek": "הוסף אות יוונית (משתנה לזווית, למשל ‎2α)"
   },
   "examples": {
     "heading": "דוגמאות — לחץ לניסוי, או הקלד בעצמך",
@@ -58,6 +60,7 @@
     "confirmEdit": "אישור",
     "cancelEdit": "ביטול",
     "markIntersection": "צור נקודת חיתוך",
+    "showMeasures": "הצג מידות",
     "language": "English"
   },
   "geometry": {

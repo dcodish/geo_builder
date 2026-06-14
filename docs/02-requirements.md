@@ -45,6 +45,7 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 - **FR-IN-3 (Must)** — Each submitted utterance is one **step**: it may produce several commands (e.g. "square ABCD" creates the polygon plus its right-angle/equal-side constraints).
 - **FR-IN-4 (Must)** — When input cannot be understood, show a helpful clarification message (bilingual) and leave the figure unchanged.
 - **FR-IN-5 (Should)** — Offer input affordances (examples, autocomplete, or a guided builder) so users phrase facts the parser supports.
+- **FR-IN-6 (Should)** — Accept **relational measures with named variables** that set a relation between measures *without fixing a number* (the tool draws the relation; the student solves for the unknown): a length as `coef·var` with a lowercase-latin variable (`AB = 3x`) and an angle as `coef·var` with a Greek variable (`∠ABC = 2α`); points stay uppercase so the two never collide. Two measures sharing a variable form a proportion (`AB = 3x` + `DF = x` ⇒ `|AB| = 3·|DF|`); a value given for the variable (`x = 4`) resolves every measure that uses it to an absolute size. The figure stays free until something pins the scale. (See [ADR-031](06-decisions.md#adr-031).)
 
 ## Construction & engine
 
@@ -69,7 +70,7 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 ## Rendering & interaction
 
 - **FR-RN-1 (Must)** — Render points, segments, polygons, circles, angle arcs, right-angle marks, equal-side ticks, vertex labels, and dashed special lines.
-- **FR-RN-2 (Must)** — Display constrained measures (a set distance, a set angle) on the figure.
+- **FR-RN-2 (Must)** — Display constrained measures (a set distance, a set angle) on the figure: a length along its segment, an angle at its vertex, showing the number for a numeric measure and the expression (`3x`, `2α`) for a symbolic one (the resolved number once its variable has a value). On by default, with one toggle to hide all measure labels. *(Realised — [ADR-031](06-decisions.md#adr-031).)*
 - **FR-RN-3 (Must)** — Animate position changes smoothly when a step moves existing points (no instantaneous teleport).
 - **FR-RN-4 (Must)** — Fit the figure to the viewport; provide pan, zoom, and reset.
 - **FR-RN-5 (Should)** — Allow dragging free points anywhere, and on-object points along their host object.

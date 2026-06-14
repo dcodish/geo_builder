@@ -117,6 +117,27 @@ describe('scene — figure → primitives', () => {
     }
   });
 
+  it('places measure labels: a length at the segment midpoint, an angle at the vertex (ADR-031)', () => {
+    const { construction, positions } = f1();
+    const labels = {
+      lengths: [{ a: 'A', b: 'B', text: '3x' }],
+      angles: [{ vertex: 'A', ray1: 'B', ray2: 'D', text: '37°' }],
+    };
+    const scene = buildScene(construction, positions, labels);
+    const lenM = scene.measures.find((m) => m.kind === 'length');
+    const angM = scene.measures.find((m) => m.kind === 'angle');
+    expect(lenM?.text).toBe('3x');
+    expect(angM?.text).toBe('37°');
+    // the length label sits at the midpoint of A–B
+    const a = positions.get('A')!, b = positions.get('B')!;
+    expect(lenM!.pos.x).toBeCloseTo((a.x + b.x) / 2, 6);
+    expect(lenM!.pos.y).toBeCloseTo((a.y + b.y) / 2, 6);
+    // the angle label sits at its vertex A
+    expect(angM!.pos).toEqual(positions.get('A'));
+    // with no labels argument, no measures are produced
+    expect(buildScene(construction, positions).measures).toEqual([]);
+  });
+
   it('points a label into the open side, away from the incident edges', () => {
     // A unit square ABCD. Each corner has two edges 90° apart; the label must go
     // into the opposite (outer) 270° wedge — i.e. diagonally away from the centre.

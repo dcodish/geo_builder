@@ -12,6 +12,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
 import { buildScene, scenePositions } from './scene';
+import type { MeasureLabels } from './scene';
 import { findSegmentCrossings } from './intersections';
 import type { Crossing } from './intersections';
 import { fitTransform, orient } from './transform';
@@ -32,6 +33,10 @@ export interface FigureProps {
   onPickIntersection?: (crossing: Crossing) => void;
   /** Tooltip for the crossing dots (host supplies the localized string). */
   intersectionLabel?: string;
+  /** Measure labels to print on the figure (ADR-031) — lengths along segments, angles at vertices. */
+  labels?: MeasureLabels;
+  /** Show the measure labels (default true); the host's "show measures" toggle drives this. */
+  showMeasures?: boolean;
 }
 
 interface View {
@@ -59,6 +64,8 @@ export function Figure({
   highlight,
   onPickIntersection,
   intersectionLabel,
+  labels,
+  showMeasures = true,
 }: FigureProps) {
   const lit = (id: string): boolean => !!highlight && highlight.has(id);
   const [view, setView] = useState<View>(IDENTITY);
@@ -73,11 +80,11 @@ export function Figure({
       o.rot === 0 && !o.flipX && !o.flipY
         ? positions
         : new Map<Id, Vec>([...positions].map(([id, v]) => [id, orient(v, o)]));
-    const s = buildScene(construction, oriented);
+    const s = buildScene(construction, oriented, labels);
     const t = fitTransform(scenePositions(s), { width, height, padding });
     const x = onPickIntersection ? findSegmentCrossings(construction, oriented) : [];
     return { scene: s, transform: t, crossings: x };
-  }, [construction, positions, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY]);
+  }, [construction, positions, labels, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY]);
 
   // Point radius in px, kept visually constant by dividing out the pan/zoom scale.
   const r = 4 / view.zoom;
@@ -245,6 +252,33 @@ export function Figure({
               </g>
             );
           })}
+
+          {/* Measure labels (ADR-031): a length at its segment's midpoint nudged
+              outward, an angle at its vertex nudged into the angle. Drawn upright
+              (only world coordinates were oriented), in blue to set them apart from
+              point names. Hidden when the host turns measures off. */}
+          {showMeasures &&
+            scene.measures.map((m, i) => {
+              const s = transform.toScreen(m.pos);
+              const sd = unitVec({ x: m.dir.x, y: -m.dir.y }); // world→screen Y-flip
+              const off = m.kind === 'angle' ? r * 2.4 + fontSize * 0.7 : r * 1.4 + fontSize * 0.55;
+              return (
+                <text
+                  key={`m-${i}`}
+                  x={s.x + sd.x * off}
+                  y={s.y + sd.y * off}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize={fontSize * 0.85}
+                  fontFamily="system-ui, sans-serif"
+                  fontWeight={500}
+                  fill="#1d4ed8"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {m.text}
+                </text>
+              );
+            })}
         </g>
       </svg>
 

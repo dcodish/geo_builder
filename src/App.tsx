@@ -9,7 +9,7 @@
  * same pipeline. i18n is wired with Hebrew default and RTL. Old UI lives in
  * /archive for reference.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { freeDofs, isGeoPoint } from '@/engine';
@@ -34,6 +34,8 @@ export default function App() {
   const cycleAlt = useGeoStore((s) => s.cycleAlt);
   const resample = useGeoStore((s) => s.resample);
   const seed = useGeoStore((s) => s.seed);
+  const showMeasures = useGeoStore((s) => s.showMeasures);
+  const setShowMeasures = useGeoStore((s) => s.setShowMeasures);
   const clear = useGeoStore((s) => s.clear);
 
   const { undo, redo } = useGeoStore.temporal.getState();
@@ -48,6 +50,23 @@ export default function App() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editError, setEditError] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Insert a Greek letter (angle variables are hard to type) at the input's caret —
+  // e.g. type "זווית ABC = 2" then press α (ADR-031).
+  function insertSymbol(sym: string) {
+    const el = inputRef.current;
+    const start = el?.selectionStart ?? text.length;
+    const end = el?.selectionEnd ?? text.length;
+    setText(text.slice(0, start) + sym + text.slice(end));
+    requestAnimationFrame(() => {
+      if (el) {
+        el.focus();
+        el.setSelectionRange(start + sym.length, start + sym.length);
+      }
+    });
+  }
+  const GREEK = ['α', 'β', 'γ', 'δ', 'θ'];
   const he = i18n.language === 'he';
 
   // Base text direction for a mixed He/En string (geometry labels, numbers, and
@@ -127,7 +146,7 @@ export default function App() {
   }
 
   // Figure + per-fact status are derived from the fact list.
-  const { construction, positions, status, lastError } = useMemo(() => replay(facts, seed), [facts, seed]);
+  const { construction, positions, status, lastError, labels } = useMemo(() => replay(facts, seed), [facts, seed]);
 
   // Snap-to-intersection: a clicked crossing becomes a real named point. Pick the
   // first free single capital letter, then create it via the same command path.
@@ -200,6 +219,8 @@ export default function App() {
           highlight={highlight}
           onPickIntersection={markIntersection}
           intersectionLabel={t('actions.markIntersection')}
+          labels={labels}
+          showMeasures={showMeasures}
         />
 
         <aside style={sidebar}>
@@ -212,6 +233,7 @@ export default function App() {
           >
             <div style={{ display: 'flex', gap: 6 }}>
               <input
+                ref={inputRef}
                 style={input}
                 placeholder={t('input.placeholder')}
                 value={text}
@@ -226,6 +248,15 @@ export default function App() {
               <button type="submit" style={sendBtn} disabled={!text.trim() || thinking}>
                 {thinking ? t('input.loading') : t('input.send')}
               </button>
+            </div>
+            {/* Greek-letter inserts for angle variables (∠ABC = 2α) — hard to type. */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>{t('input.greek')}:</span>
+              {GREEK.map((g) => (
+                <button key={g} type="button" title={t('input.insertGreek')} onClick={() => insertSymbol(g)} style={greekBtn}>
+                  {g}
+                </button>
+              ))}
             </div>
             {thinking && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
             {notUnderstood && <span style={{ fontSize: 12, color: '#b45309' }}>{t('input.notUnderstood')}</span>}
@@ -373,6 +404,11 @@ export default function App() {
             <button type="button" style={ghost} onClick={clear}>{t('actions.clear')}</button>
           </div>
 
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, color: '#475569', cursor: 'pointer' }}>
+            <input type="checkbox" checked={showMeasures} onChange={(e) => setShowMeasures(e.target.checked)} />
+            {t('actions.showMeasures')}
+          </label>
+
           {(branchId || freeDofs(construction).length > 0) && (
             <button type="button" style={alt} onClick={() => (branchId ? cycleAlt(branchId) : resample())}>
               {t('actions.another')}
@@ -424,6 +460,16 @@ const chip: React.CSSProperties = {
   color: '#1e40af',
   cursor: 'pointer',
   fontFamily: 'ui-monospace, monospace',
+};
+const greekBtn: React.CSSProperties = {
+  width: 26,
+  height: 26,
+  fontSize: 14,
+  borderRadius: 6,
+  border: '1px solid #cbd5e1',
+  background: '#f8fafc',
+  color: '#1d4ed8',
+  cursor: 'pointer',
 };
 const helpPanel: React.CSSProperties = {
   border: '1px solid #e2e8f0',

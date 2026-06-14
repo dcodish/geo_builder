@@ -77,6 +77,8 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'constraints', supported: true, en: 'AB = CD', he: 'AB = CD', descEn: 'Make two segments equal.', descHe: 'השוואת אורכי שני קטעים.' },
   { category: 'constraints', supported: true, en: 'AB = 2 AD', he: 'AB = 2 AD', descEn: 'A proportion between two lengths (|AB| = k·|CD|).', descHe: 'יחס בין שני אורכים (|AB| = k·|CD|).' },
   { category: 'constraints', supported: true, en: 'AB perpendicular to CD', he: 'AB מאונך ל-CD', descEn: 'Force a right angle between two segments.', descHe: 'אילוץ זווית ישרה בין שני קטעים.' },
+  { category: 'constraints', supported: true, en: 'AB = 3x', he: 'AB = 3x', descEn: 'A length as a variable (lowercase). Share it (e.g. DF = x) to set a relation; give it a value with "x = 4".', descHe: 'אורך כמשתנה (אות קטנה). שיתוף המשתנה (למשל DF = x) קובע יחס; ערך נקבע ע״י "x = 4".' },
+  { category: 'constraints', supported: true, en: 'angle ABC = 2α', he: 'זווית ABC = 2α', descEn: 'An angle as a Greek variable. Share it (e.g. ∠DEF = α) for a relation; value via "α = 30".', descHe: 'זווית כמשתנה יווני. שיתוף המשתנה (למשל ∠DEF = α) קובע יחס; ערך ע״י "α = 30".' },
 
   // ── Circles ─────────────────────────────────────────────────────────────
   { category: 'circles', supported: true, en: 'circle centered at O radius 5', he: 'מעגל סביב O רדיוס 5', descEn: 'A circle from a centre and radius.', descHe: 'מעגל לפי מרכז ורדיוס.' },

@@ -171,6 +171,8 @@ export interface GeoState {
   selectedId: string | null;
   /** Sampling seed for the figure's residual freedom (ADR-018); UI-only, not undoable. 0 = canonical. */
   seed: number;
+  /** Show measure labels on the figure (ADR-031); UI-only, not undoable. Default true. */
+  showMeasures: boolean;
 
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
   execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;
@@ -192,6 +194,8 @@ export interface GeoState {
   cycleAlt: (pointId: Id) => void;
   /** Re-sample the figure's residual freedom — a different valid drawing (ADR-018). */
   resample: () => void;
+  /** Show/hide measure labels on the figure (ADR-031). */
+  setShowMeasures: (show: boolean) => void;
   /** Reset to no facts and wipe undo/redo history. */
   clear: () => void;
 }
@@ -202,6 +206,7 @@ export const useGeoStore = create<GeoState>()(
       facts: [],
       selectedId: null,
       seed: 0,
+      showMeasures: true,
 
       execute: (cmd, utterance, group) => {
         const facts = get().facts;
@@ -314,6 +319,8 @@ export const useGeoStore = create<GeoState>()(
         }
         set({ seed: s }); // give up gracefully after a few degenerate draws
       },
+
+      setShowMeasures: (show) => set({ showMeasures: show }),
 
       clear: () => {
         set({ facts: [], selectedId: null, seed: 0 });

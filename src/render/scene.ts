@@ -49,12 +49,29 @@ export interface SceneLine {
   dir: Vec;
 }
 
+/** A measure label to print on the figure (ADR-031): a length along a segment, an angle at a vertex. */
+export interface SceneMeasure {
+  kind: 'length' | 'angle';
+  /** World anchor (y-up): a segment's midpoint, or an angle's vertex. */
+  pos: Vec;
+  /** Unit direction (y-up) to offset the text along — outward for a length, into the angle for an angle. */
+  dir: Vec;
+  text: string;
+}
+
+/** The figure context the parser/store provides for measure labels. */
+export interface MeasureLabels {
+  lengths: { a: Id; b: Id; text: string }[];
+  angles: { vertex: Id; ray1: Id; ray2: Id; text: string }[];
+}
+
 export interface Scene {
   points: ScenePoint[];
   segments: SceneSegment[];
   polygons: ScenePolygon[];
   circles: SceneCircle[];
   lines: SceneLine[];
+  measures: SceneMeasure[];
 }
 
 /**
@@ -91,7 +108,7 @@ function lineGeometry(line: Line, pos: Map<Id, Vec>, circles: Map<Id, SceneCircl
 }
 
 /** Resolve a construction + computed positions into drawable primitives. */
-export function buildScene(c: Construction, positions: Map<Id, Vec>): Scene {
+export function buildScene(c: Construction, positions: Map<Id, Vec>, labels?: MeasureLabels): Scene {
   const points: ScenePoint[] = [];
   const segments: SceneSegment[] = [];
   const polygons: ScenePolygon[] = [];
@@ -173,7 +190,37 @@ export function buildScene(c: Construction, positions: Map<Id, Vec>): Scene {
     }
   }
 
-  return { points, segments, polygons, circles, lines };
+  // Measure labels (ADR-031): a length sits at its segment's midpoint, nudged
+  // perpendicular to the OUTSIDE (away from the figure's centroid); an angle sits
+  // at its vertex, nudged along the interior bisector of its two rays.
+  const measures: SceneMeasure[] = [];
+  if (labels) {
+    const cen = points.length
+      ? { x: points.reduce((s, p) => s + p.pos.x, 0) / points.length, y: points.reduce((s, p) => s + p.pos.y, 0) / points.length }
+      : { x: 0, y: 0 };
+    for (const L of labels.lengths) {
+      const a = positions.get(L.a);
+      const b = positions.get(L.b);
+      if (!a || !b) continue;
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      let perp = unit(rot90(sub(b, a)));
+      if ((mid.x - cen.x) * perp.x + (mid.y - cen.y) * perp.y < 0) perp = { x: -perp.x, y: -perp.y }; // outward
+      measures.push({ kind: 'length', pos: mid, dir: perp, text: L.text });
+    }
+    for (const A of labels.angles) {
+      const v = positions.get(A.vertex);
+      const r1 = positions.get(A.ray1);
+      const r2 = positions.get(A.ray2);
+      if (!v || !r1 || !r2) continue;
+      const d1 = unit(sub(r1, v));
+      const d2 = unit(sub(r2, v));
+      let bis = { x: d1.x + d2.x, y: d1.y + d2.y };
+      bis = len(bis) < 1e-9 ? rot90(d1) : unit(bis); // a straight angle → perpendicular
+      measures.push({ kind: 'angle', pos: v, dir: bis, text: A.text });
+    }
+  }
+
+  return { points, segments, polygons, circles, lines, measures };
 }
 
 /**
