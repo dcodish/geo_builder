@@ -52,7 +52,10 @@ export function applySeed(c: Construction, seed: number): Construction {
   if (!seed) return c;
   const free = c.objects.filter((o): o is FreePoint => o.kind === 'free-point' && !o.pinned);
   const freeCircle = c.objects.filter((o): o is OnCirclePoint => isFreeOnCircle(o));
-  if (free.length === 0 && freeCircle.length === 0) return c; // fully determined → nothing to sample
+  const freeShape = c.objects.some(
+    (o) => (o.kind === 'rotated' || o.kind === 'perp-offset' || o.kind === 'scaled-offset') && (o as { solve?: unknown }).solve === undefined,
+  );
+  if (free.length === 0 && freeCircle.length === 0 && !freeShape) return c; // fully determined → nothing to sample
 
   // Free-point cluster: seeded spin about its centroid + per-point jitter.
   const cx = free.length ? free.reduce((s, p) => s + p.x, 0) / free.length : 0;
@@ -85,12 +88,35 @@ export function applySeed(c: Construction, seed: number): Construction {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
       return { ...o, theta: (o as OnCirclePoint).theta + circSpin + (jr() * 2 - 1) * circJit };
     }
+    // Free SHAPE-PARAMETER DOFs (ADR-033) — a rhombus's angle, a rectangle/right-triangle's
+    // offset, a trapezoid's top ratio. Varying these lets "show another configuration" reach a
+    // genuinely different SHAPE (e.g. an obtuse-angled rhombus), not just jiggled points. Skipped
+    // when the scalar is driven by a constraint (solve set) — that shape is already pinned.
+    if (o.kind === 'rotated' && o.solve === undefined) {
+      const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
+      return { ...o, angleDeg: 40 + jr() * 100 }; // ∠ ∈ [40°, 140°] — acute OR obtuse at the pivot
+    }
+    if (o.kind === 'perp-offset' && o.solve === undefined) {
+      const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
+      return { ...o, dist: o.dist * (0.55 + jr() * 1.3) }; // 0.55×–1.85× the default extent
+    }
+    if (o.kind === 'scaled-offset' && o.solve === undefined) {
+      const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
+      return { ...o, k: 0.3 + jr() * 0.55 }; // a trapezoid's top:base ratio ∈ [0.3, 0.85]
+    }
     return o;
   });
   return { ...c, objects };
 }
 
-/** The ids of the figure's free DOFs (non-pinned free points + free on-circle vertices). */
+/** The ids of the figure's free DOFs (non-pinned free points, free on-circle vertices, free shape scalars). */
 export function freeDofs(c: Construction): Id[] {
-  return c.objects.filter((o) => (o.kind === 'free-point' && !o.pinned) || isFreeOnCircle(o)).map((o) => o.id);
+  return c.objects
+    .filter(
+      (o) =>
+        (o.kind === 'free-point' && !o.pinned) ||
+        isFreeOnCircle(o) ||
+        ((o.kind === 'rotated' || o.kind === 'perp-offset' || o.kind === 'scaled-offset') && (o as { solve?: unknown }).solve === undefined),
+    )
+    .map((o) => o.id);
 }

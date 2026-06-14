@@ -60,6 +60,8 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 - **FR-EN-9 (Must)** — Re-issuing an equivalent command is idempotent (no duplicate objects).
 - **FR-EN-10 (Must)** — Recompute derived measures (lengths, angles, classifications) from final positions for display and theorem detection.
 - **FR-EN-11 (Must)** — A constraint added on objects that are already placed *reshapes* the figure to satisfy it, rather than only checking it: the engine drives an available degree of freedom (an on-object parameter, a free point), and when the directly-referenced object has none, it recruits a free degree of freedom from an ancestor. Multiple such constraints compose. If no assignment satisfies the constraint, it is rejected per FR-EN-8. (See [ADR-028](06-decisions.md#adr-028).)
+- **FR-EN-12 (Should)** — A stated *relation between two triangles* — congruence (`ABC ≅ DEF`) or similarity (`ABC ~ DEF`) — reshapes the second triangle so the relation holds (congruent ⇒ corresponding sides equal; similar ⇒ corresponding angles equal), drawing either triangle first if it isn't already present. Two disjoint shapes are placed clear of each other. (See [ADR-032](06-decisions.md#adr-032).)
+- **FR-EN-13 (Must)** — Every shape carries the degrees of freedom of the real shape, so a sizing/shaping constraint *reshapes* it rather than being a spurious over-constraint: a square resizes from a side, a rectangle's height is settable, a rhombus's angle, a trapezoid's short side, a right-triangle's leg — while the shape's defining property (equal sides, right angles, parallels) is preserved. A constraint that genuinely cannot hold (a non-90° angle in a square) is still rejected per FR-EN-8. (See [ADR-033](06-decisions.md#adr-033).)
 
 ## Alternative configurations
 
@@ -75,6 +77,7 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 - **FR-RN-4 (Must)** — Fit the figure to the viewport; provide pan, zoom, and reset.
 - **FR-RN-5 (Should)** — Allow dragging free points anywhere, and on-object points along their host object.
 - **FR-RN-6 (Should)** — Provide figure-orientation controls that change only the *view*, never the engine's geometry: rotate by 90° and 180°, flip horizontally and vertically, rotate freely, align a user-named segment to horizontal (type its two endpoints), and reset. Vertex labels stay upright and readable under every orientation.
+- **FR-RN-7 (Must)** — Draw an angle mark at a vertex **only when the student stated that angle** (never from a merely computed 90°): a *right-angle square* for an explicit right angle (`∠ABC = 90`, a perpendicular `AB ⟂ CD`, a right-triangle), an *angle arc* for any other given angle (`∠ABC = α`, `∠ABC = 37`). Toggled with the measure labels. (Realises the marks part of FR-RN-1; see [ADR-031](06-decisions.md#adr-031).)
 
 ## Theorems
 

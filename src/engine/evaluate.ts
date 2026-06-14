@@ -5,7 +5,7 @@
  * non-finite coords, or a contradicted constraint = over-constraint, FR-EN-8).
  */
 
-import type { Circle, Construction, GeoObject, GeoPoint, Id, Line, Vec } from './types';
+import type { Circle, Constraint, Construction, GeoObject, GeoPoint, Id, Line, Vec } from './types';
 import { LEN_EPS, isGeoPoint } from './types';
 import {
   add,
@@ -21,7 +21,7 @@ import {
   sub,
   unit,
 } from './geometry';
-import { constraintRefs, describeConstraint, residual, residualTolerance, solvedOnSegmentCandidates } from './solve';
+import { constraintRefs, constraintScale, describeConstraint, residual, residualTolerance, solvedOnSegmentCandidates } from './solve';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
 interface ResolvedLine {
@@ -60,9 +60,19 @@ function resolveDriven(c: Construction): Construction {
   // Free vertices driven by a constraint (2 DOF each) take a separate, regularised
   // path — they have no bounded parameter range, and a single equation leaves a
   // solution manifold, so we pick the configuration nearest the current one (ADR-028).
+  // A driveable SHAPE SCALAR (perp-offset dist / rotated angle / scaled-offset k) present ⇒ the
+  // generalized solver, which mixes it with any free-vertex / parametric carriers (ADR-033) — so a
+  // rectangle's width (free vertex) and height (perp-offset) solve together.
+  const shapeCarriers = c.objects.filter(
+    (o) => (o.kind === 'perp-offset' || o.kind === 'rotated' || o.kind === 'scaled-offset') && o.solve !== undefined,
+  );
   const freeCarriers = c.objects.filter(
     (o): o is Extract<GeoObject, { kind: 'free-point' }> => o.kind === 'free-point' && o.solve !== undefined,
   );
+  if (shapeCarriers.length > 0) {
+    const paramCarriers = c.objects.filter((o) => (o.kind === 'on-segment' || o.kind === 'on-circle') && o.solve !== undefined);
+    return resolveMixedCarriers(c, [...freeCarriers, ...paramCarriers, ...shapeCarriers]);
+  }
   if (freeCarriers.length > 0) return resolveFreeDriven(c, freeCarriers);
 
   const carriers = c.objects.filter(
@@ -213,7 +223,7 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     r.ok &&
     cons.every((con) => {
       for (const id of constraintRefs(con)) if (!r.positions.has(id)) return false;
-      return Math.abs(residual(con, (id) => r.positions.get(id)!)) <= residualTolerance(con);
+      return Math.abs(residual(con, (id) => r.positions.get(id)!)) <= residualTolerance(con, constraintScale(con, (id) => r.positions.get(id)!));
     }) &&
     !degenerateSpread(refIds.map((id) => r.positions.get(id)).filter((p): p is Vec => !!p), span);
   return satisfied ? place(best) : place(seed);
@@ -236,6 +246,132 @@ function setFreePos(c: Construction, pos: Map<Id, Vec>): Construction {
       o.kind === 'free-point' && pos.has(o.id) ? { ...o, x: pos.get(o.id)!.x, y: pos.get(o.id)!.y, solve: undefined } : o,
     ),
   };
+}
+
+// ── Generalized driver: a heterogeneous set of DOFs (free-vertex coords, parametric t/θ,
+//    and the driveable SHAPE SCALARS — perp-offset dist, rotated angle, scaled-offset k) —
+//    solved jointly. Each DOF is normalised by a per-kind scale so Nelder–Mead copes with the
+//    very different magnitudes (a coord ~10, an angle ~60°, a ratio ~0.6). ADR-033. ──
+
+/** One driveable carrier: how many params it contributes, their current values, and a normalising scale. */
+interface CarrierSpec {
+  id: Id;
+  n: number; // 2 for a free vertex (x,y); 1 otherwise
+  seed: number[];
+  scale: number[];
+}
+function carrierSpec(o: GeoObject, span: number): CarrierSpec | null {
+  const floor = Math.max(1, span * 0.1); // a per-coordinate scale floor so a near-zero coord still gets sane steps
+  switch (o.kind) {
+    // Each coordinate is normalised by its OWN magnitude (not the global span) so a small leg
+    // (CA≈4) next to a long one (CB≈19) still gets fine restart resolution — ADR-033.
+    case 'free-point': return o.solve ? { id: o.id, n: 2, seed: [o.x, o.y], scale: [Math.max(Math.abs(o.x), floor), Math.max(Math.abs(o.y), floor)] } : null;
+    case 'on-segment': return o.solve ? { id: o.id, n: 1, seed: [o.t], scale: [1] } : null;
+    case 'on-circle': return o.solve ? { id: o.id, n: 1, seed: [o.theta], scale: [1] } : null;
+    case 'perp-offset': return o.solve ? { id: o.id, n: 1, seed: [o.dist], scale: [Math.max(Math.abs(o.dist), 1)] } : null;
+    case 'rotated': return o.solve ? { id: o.id, n: 1, seed: [o.angleDeg], scale: [90] } : null;
+    case 'scaled-offset': return o.solve ? { id: o.id, n: 1, seed: [o.k], scale: [Math.max(Math.abs(o.k), 0.5)] } : null;
+    default: return null;
+  }
+}
+/** Write a carrier's resolved param(s) into the construction (clearing its solve directive). */
+function setCarrierVals(c: Construction, vals: Map<Id, number[]>): Construction {
+  return {
+    ...c,
+    objects: c.objects.map((o) => {
+      const v = vals.get(o.id);
+      if (!v) return o;
+      switch (o.kind) {
+        case 'free-point': return { ...o, x: v[0], y: v[1], solve: undefined };
+        case 'on-segment': return { ...o, t: v[0], solve: undefined };
+        case 'on-circle': return { ...o, theta: v[0], solve: undefined };
+        case 'perp-offset': return { ...o, dist: Math.max(v[0], 1e-3), solve: undefined };
+        case 'rotated': return { ...o, angleDeg: v[0], solve: undefined };
+        case 'scaled-offset': return { ...o, k: Math.max(v[0], 1e-3), solve: undefined };
+        default: return o;
+      }
+    }),
+  };
+}
+
+/**
+ * Drive a heterogeneous set of carriers so their constraints hold, choosing the configuration
+ * NEAREST the current one (regularised). Generalises {@link resolveFreeDriven} to mix free
+ * vertices with the parametric and shape-scalar DOFs — so e.g. a rectangle's width (a free
+ * vertex) and height (a perp-offset dist) solve together. Works in normalised coordinates.
+ */
+function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construction {
+  const span = Math.max(1, ...carriers.flatMap((o) => (o.kind === 'free-point' && o.solve ? [Math.abs(o.x), Math.abs(o.y)] : [])));
+  const specs = carriers.map((o) => carrierSpec(o, span)).filter((s): s is CarrierSpec => s !== null);
+  if (specs.length === 0) return c;
+  // Distinct constraints (one shared by several carriers counts once).
+  const seen = new Set<string>();
+  const cons: Constraint[] = carriers
+    .map((o) => (o as { solve?: { constraint: Constraint } }).solve!.constraint)
+    .filter((k) => (seen.has(JSON.stringify(k)) ? false : (seen.add(JSON.stringify(k)), true)));
+  // Flat layout: normalised seed `u` (each carrier's params divided by their scale, so all DOFs ~O(1)).
+  const seedU = specs.flatMap((s) => s.seed.map((v, i) => v / s.scale[i]));
+  const place = (u: number[]): Construction => {
+    const vals = new Map<Id, number[]>();
+    let k = 0;
+    for (const s of specs) {
+      vals.set(s.id, s.scale.map((sc, i) => u[k + i] * sc));
+      k += s.n;
+    }
+    return setCarrierVals(c, vals);
+  };
+  const refIds = [...new Set(cons.flatMap((con) => constraintRefs(con)))];
+  // The cost is the sum of squared RELATIVE residuals (each constraint's residual ÷ its own scale).
+  // This is un-gameable by shrinking: a wrong ratio stays ~1% relative however small you make it, so
+  // the solver can't "cheat" a length/ratio by collapsing the constrained part (and a collapse, scale→0,
+  // blows the relative residual up). It also normalises constraints of different magnitudes against
+  // each other so the joint solve doesn't favour the larger one. (ADR-033.)
+  const cost = (u: number[]): number => {
+    const r = evaluateCore(place(u), { skipConstraints: true });
+    if (!r.ok) return Infinity;
+    let s = 0;
+    for (const con of cons) {
+      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return Infinity;
+      const get = (id: Id) => r.positions.get(id)!;
+      const v = residual(con, get) / Math.max(constraintScale(con, get), 1e-9);
+      s += v * v;
+    }
+    return s;
+  };
+  const lambda = 1e-3; // tiny tie-breaker toward the seed (normalised space)
+  const regCost = (u: number[]): number => {
+    const base = cost(u);
+    if (!isFinite(base)) return Infinity;
+    let s = base;
+    for (let i = 0; i < u.length; i++) s += lambda * (u[i] - seedU[i]) * (u[i] - seedU[i]);
+    return s;
+  };
+  // 1) Nearest basin: regularised search from the seed + cardinal restarts (each DOF pushed by a
+  //    range of magnitudes in normalised units, so both a nearby and a far-off basin are tried).
+  const restarts = [0.5, 1, -1, 2, -2].flatMap((d) => seedU.map((_, j) => seedU.map((v, i) => (i === j ? v + d : v))));
+  let best = seedU;
+  let bestReg = regCost(seedU);
+  for (const start of [seedU, ...restarts]) {
+    const x = nelderMead(regCost, start, 400, 0.3);
+    const fx = regCost(x);
+    if (fx < bestReg) {
+      bestReg = fx;
+      best = x;
+    }
+  }
+  // 2) Polish on residual + degeneracy penalty (drop only the seed regulariser), shrinking the simplex
+  //    through several decades so a coupled system lands tightly ON the constraints — and stays spread.
+  for (const st of [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4]) best = nelderMead(cost, best, 500, st);
+  // 3) Accept only a genuine, non-degenerate solution; else keep the seed (honest over-constraint).
+  const r = evaluateCore(place(best), { skipConstraints: true });
+  const satisfied =
+    r.ok &&
+    cons.every((con) => {
+      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return false;
+      return Math.abs(residual(con, (id) => r.positions.get(id)!)) <= residualTolerance(con, constraintScale(con, (id) => r.positions.get(id)!));
+    }) &&
+    !degenerateSpread(refIds.map((id) => r.positions.get(id)).filter((p): p is Vec => !!p), span);
+  return satisfied ? place(best) : place(seedU);
 }
 
 /** Nelder–Mead downhill simplex — derivative-free joint minimisation of `f` from `x0`. */
@@ -446,7 +582,8 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
     for (const id of constraintRefs(con)) {
       if (!pos.get(id)) return { ok: false, error: `${describeConstraint(con)} references an unknown point` };
     }
-    if (Math.abs(residual(con, (id) => pos.get(id)!)) > residualTolerance(con)) {
+    const get = (id: Id) => pos.get(id)!;
+    if (Math.abs(residual(con, get)) > residualTolerance(con, constraintScale(con, get))) {
       return { ok: false, error: `over-constrained: ${describeConstraint(con)} cannot hold` };
     }
   }

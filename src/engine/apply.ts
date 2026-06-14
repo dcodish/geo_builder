@@ -45,7 +45,7 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
   const onSeg = onSegs.find((i) => !pinned.has(objects[i].id)) ?? onSegs[0];
   if (onSeg !== undefined) {
     const seg = objects[onSeg] as Extract<GeoObject, { kind: 'on-segment' }>;
-    objects[onSeg] = { kind: 'on-segment-solved', id: seg.id, a: seg.a, b: seg.b, constraint: con, branch: 0 };
+    objects[onSeg] = { kind: 'on-segment-solved', id: seg.id, a: seg.a, b: seg.b, constraint: con, branch: 0, t0: seg.t };
     return;
   }
   // (2) Else drive a free on-circle DOF among the refs (ADR-028) — one not already
@@ -56,6 +56,18 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
   if (onCirc !== undefined) {
     objects[onCirc] = { ...(objects[onCirc] as Extract<GeoObject, { kind: 'on-circle' }>), solve: { constraint: con, branch: 0 } };
     constraints.push(con); // keep it for the final verification after the driven solve
+    return;
+  }
+  // (2.5) Else drive a SHAPE-SCALAR DOF among the refs (ADR-033) — a perp-offset's dist
+  // (rectangle height / right-triangle leg), a rotated angle (rhombus), a scaled-offset k
+  // (trapezoid top side). These dimensions used to be frozen, so a sizing constraint on them
+  // was wrongly an over-constraint; now the solver sizes them.
+  const shapeKinds = new Set(['perp-offset', 'rotated', 'scaled-offset']);
+  const shapeRefs = idxs.filter((i) => i >= 0 && shapeKinds.has(objects[i].kind) && (objects[i] as { solve?: unknown }).solve === undefined);
+  const shapeRef = shapeRefs.find((i) => !pinned.has(objects[i].id)) ?? shapeRefs[0];
+  if (shapeRef !== undefined) {
+    objects[shapeRef] = { ...(objects[shapeRef] as GeoObject), solve: { constraint: con, branch: 0 } } as GeoObject;
+    constraints.push(con);
     return;
   }
   // (3) Else drive a FREE point (2 DOF) among the refs — a shape's free vertex has
@@ -266,13 +278,26 @@ function fitTemplate(template: BaseVertex[], pos: Map<Id, Vec>): (p: BaseVertex)
  */
 function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Vec>, rigid = false): void {
   const fit = fitTemplate(template, pos);
+  // A shape that shares NO point with the figure (0 anchors) would otherwise land on the
+  // raw template coords — exactly where a prior disjoint shape sits, so they'd collide
+  // (the ADR-017 coincidence guard then rejects it). Offset such a shape to the right of
+  // all existing geometry, so two independent shapes (e.g. the two triangles of a
+  // congruence given) can coexist. Composed shapes (≥1 shared point) are unaffected.
+  let off: Vec = { x: 0, y: 0 };
+  const sharesNone = template.every((t) => !objects.some((o) => o.id === t.id));
+  if (sharesNone && pos.size > 0) {
+    const xs = [...pos.values()].map((v) => v.x);
+    const maxX = Math.max(...xs);
+    const tMinX = Math.min(...template.map((t) => t.x));
+    off = { x: maxX - tMinX + 4, y: 0 }; // a fixed gap past the existing figure's right edge
+  }
   for (const t of template) {
     if (objects.some((o) => o.id === t.id)) continue; // reuse existing
     const v = fit(t);
     // `rigid` base vertices belong to a fully-committed regular shape (a square):
     // a constraint that contradicts the shape is a genuine over-constraint, so the
     // solver must NOT drive them (it would silently rescale/reshape) — ADR-030.
-    objects.push({ kind: 'free-point', id: t.id, x: v.x, y: v.y, ...(rigid ? { rigid: true } : {}) });
+    objects.push({ kind: 'free-point', id: t.id, x: v.x + off.x, y: v.y + off.y, ...(rigid ? { rigid: true } : {}) });
   }
 }
 
@@ -323,10 +348,13 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'square': {
       // Two free points (A,B) carry the square's 4 DOF (position, rotation,
-      // size); C and D are derived to make it a square for any A,B.
+      // size); C and D are derived to make it a square for any A,B. A,B are
+      // driveable (not rigid) so a side constraint resizes it — a shape-violating
+      // constraint (e.g. a non-90° angle) is still rejected by the solver's
+      // satisfied/degeneracy guards rather than silently distorting (ADR-033).
       const [a, b, c, d] = cmd.ids;
       const side = cmd.side ?? 5;
-      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: side, y: 0 }], pos, true);
+      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: side, y: 0 }], pos);
       addObj(objects, { kind: 'derived', id: c, rule: 'square-c', a, b });
       addObj(objects, { kind: 'derived', id: d, rule: 'square-d', a, b });
       quadEdges(objects, a, b, c, d);
@@ -358,12 +386,13 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     }
 
     case 'rectangle': {
-      // A,B free base; C,D offset perpendicular to AB by a default height.
+      // A,B free base; C offset perpendicular to AB by a (driveable) height; D = A + C − B
+      // closes the rectangle (parallelogram closure on the perpendicular side). One height
+      // DOF (C's dist) so a side constraint stays consistent (BC and AD can't diverge).
       const [a, b, c, d] = cmd.ids;
-      const h = 4;
       placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }], pos);
-      addObj(objects, { kind: 'perp-offset', id: c, anchor: b, from: a, to: b, dist: h });
-      addObj(objects, { kind: 'perp-offset', id: d, anchor: a, from: a, to: b, dist: h });
+      addObj(objects, { kind: 'perp-offset', id: c, anchor: b, from: a, to: b, dist: 4 });
+      addObj(objects, { kind: 'parallelogram-vertex', id: d, a, b, c }); // D = A + C − B
       quadEdges(objects, a, b, c, d);
       break;
     }
@@ -543,7 +572,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
 
     case 'set-ratio':
-      driveOrCheck(objects, constraints, { type: 'ratio', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d, k: cmd.k });
+      driveOrCheck(objects, constraints, { type: 'ratio', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d, k: cmd.k, ...(cmd.add ? { add: cmd.add } : {}) });
       break;
 
     case 'set-angle-ratio':

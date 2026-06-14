@@ -27,11 +27,14 @@ describe('distance constraint', () => {
     expect(dist(positions.get('A')!, positions.get('E')!)).toBeCloseTo(3, 6);
   });
 
-  it('is an over-constraint check when both points are fixed (keeps prior figure)', () => {
+  it('a side length RESIZES a square (no longer rigid — ADR-033)', () => {
     const sq = build([{ type: 'square', ids: ['A', 'B', 'C', 'D'], side: 5 }]);
     const r = applyStep(sq.construction, { type: 'set-distance', a: 'A', b: 'B', value: 7 });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/over-constrained/i);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const P = r.positions;
+    expect(dist(P.get('A')!, P.get('B')!)).toBeCloseTo(7, 3); // sized to 7×7
+    expect(dist(P.get('B')!, P.get('C')!)).toBeCloseTo(7, 3); // still a square
   });
 });
 
@@ -52,10 +55,12 @@ describe('a constraint drives a FREE vertex (2 DOF) when no parametric carrier e
     expect(D.y).toBeCloseTo(A.y + C.y - B.y, 4);
   });
 
-  it('a square is rigid — the same |AB| = |AC| is rejected (committed shape, not driven)', () => {
+  it('a square rejects an IMPOSSIBLE |AB| = |AC| (side = diagonal can\'t hold; the guard keeps prior)', () => {
+    // The square is now driveable (ADR-033), but |AC| = √2·|AB| intrinsically, so no resize
+    // satisfies side = diagonal — the satisfied/degeneracy guard rejects it honestly (not collapse).
     const sq = build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }, { type: 'segment', a: 'A', b: 'C' }]);
     const r = applyStep(sq.construction, { type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'C' });
-    expect(r.ok).toBe(false); // |AC| = √2·|AB| intrinsically; can't hold
+    expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toMatch(/over-constrained/i);
   });
 });

@@ -35,7 +35,9 @@ export interface FigureProps {
   intersectionLabel?: string;
   /** Measure labels to print on the figure (ADR-031) — lengths along segments, angles at vertices. */
   labels?: MeasureLabels;
-  /** Show the measure labels (default true); the host's "show measures" toggle drives this. */
+  /** Angle marks the student asserted — right-angle squares / angle arcs. */
+  angleMarks?: { vertex: Id; ray1: Id; ray2: Id; right: boolean }[];
+  /** Show the measure labels + angle marks (default true); the host's "show measures" toggle drives this. */
   showMeasures?: boolean;
 }
 
@@ -65,6 +67,7 @@ export function Figure({
   onPickIntersection,
   intersectionLabel,
   labels,
+  angleMarks,
   showMeasures = true,
 }: FigureProps) {
   const lit = (id: string): boolean => !!highlight && highlight.has(id);
@@ -80,11 +83,11 @@ export function Figure({
       o.rot === 0 && !o.flipX && !o.flipY
         ? positions
         : new Map<Id, Vec>([...positions].map(([id, v]) => [id, orient(v, o)]));
-    const s = buildScene(construction, oriented, labels);
+    const s = buildScene(construction, oriented, labels, angleMarks);
     const t = fitTransform(scenePositions(s), { width, height, padding });
     const x = onPickIntersection ? findSegmentCrossings(construction, oriented) : [];
     return { scene: s, transform: t, crossings: x };
-  }, [construction, positions, labels, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY]);
+  }, [construction, positions, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY]);
 
   // Point radius in px, kept visually constant by dividing out the pan/zoom scale.
   const r = 4 / view.zoom;
@@ -273,11 +276,44 @@ export function Figure({
                   fontFamily="system-ui, sans-serif"
                   fontWeight={500}
                   fill="#1d4ed8"
-                  style={{ pointerEvents: 'none' }}
+                  // A measure is a math expression (12√2, 7k/5, 2α) — force LTR so the RTL (Hebrew)
+                  // page context doesn't bidi-reorder its runs (12√2 was rendering as "2√12").
+                  direction="ltr"
+                  style={{ pointerEvents: 'none', direction: 'ltr', unicodeBidi: 'bidi-override' }}
                 >
                   {m.text}
                 </text>
               );
+            })}
+
+          {/* Angle marks the student asserted (only — never a computed 90°): a right-angle square,
+              or an angle arc sampled the short (interior) way. Same blue as the measures. */}
+          {showMeasures &&
+            scene.angleMarks.map((m, i) => {
+              const V = transform.toScreen(m.vertex);
+              const P1 = transform.toScreen(m.p1);
+              const P2 = transform.toScreen(m.p2);
+              const u1 = unitVec({ x: P1.x - V.x, y: P1.y - V.y });
+              const u2 = unitVec({ x: P2.x - V.x, y: P2.y - V.y });
+              if (m.right) {
+                const s = 3.2 * r; // right-angle square, sized like the point markers
+                const c1 = `${V.x + u1.x * s},${V.y + u1.y * s}`;
+                const c2 = `${V.x + (u1.x + u2.x) * s},${V.y + (u1.y + u2.y) * s}`;
+                const c3 = `${V.x + u2.x * s},${V.y + u2.y * s}`;
+                return <polyline key={`am-${i}`} points={`${c1} ${c2} ${c3}`} fill="none" stroke="#1d4ed8" strokeWidth={stroke} style={{ pointerEvents: 'none' }} />;
+              }
+              // arc: sample the SHORT signed angle from ray1 to ray2 (the interior angle)
+              const ar = 4.2 * r;
+              const th1 = Math.atan2(u1.y, u1.x);
+              let dth = Math.atan2(u2.y, u2.x) - th1;
+              while (dth > Math.PI) dth -= 2 * Math.PI;
+              while (dth < -Math.PI) dth += 2 * Math.PI;
+              const N = 14;
+              const pts = Array.from({ length: N + 1 }, (_, k) => {
+                const th = th1 + (dth * k) / N;
+                return `${V.x + ar * Math.cos(th)},${V.y + ar * Math.sin(th)}`;
+              }).join(' ');
+              return <polyline key={`am-${i}`} points={pts} fill="none" stroke="#1d4ed8" strokeWidth={stroke} style={{ pointerEvents: 'none' }} />;
             })}
         </g>
       </svg>

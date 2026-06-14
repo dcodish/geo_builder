@@ -53,6 +53,9 @@ export function buildSystemPrompt(): string {
     'Rules:',
     '- Each line you output MUST be one of the supported canonical forms below (you may translate He↔En and',
     '  fill in concrete labels). Do not invent new command words.',
+    '- LANGUAGE: output each step in the SAME language the student wrote in. A Hebrew request → the Hebrew',
+    '  canonical forms (right column); an English request → the English forms. Students read the steps back,',
+    '  so they must be in the student\'s language. Geometry labels (A, B, C) and numbers stay as-is.',
     '- Points are single capital letters (A, B, C, …). Reuse labels the student names; otherwise pick fresh ones.',
     '- When the request refers to objects already on the canvas, reuse their labels (given as context).',
     '- ONLY introduce points the student actually names. Do NOT invent extra/intermediate points: "the extension',
@@ -68,7 +71,8 @@ export function buildSystemPrompt(): string {
     '"draw a square and both diagonals" → ["square ABCD","segment AC","segment BD"]',
     '"a circle with a triangle inscribed in it" → ["circle centered at O radius 5","triangle ABC inscribed in circle O"]',
     '"put M in the middle of AB and connect it to C" → ["M is the midpoint of AB","segment MC"]',
-    '"מקבילית שבה AB שווה ל-6" → ["parallelogram ABCD","AB = 6"]',
+    '"מקבילית שבה AB שווה ל-6" → ["מקבילית ABCD","AB = 6"]   (Hebrew request → Hebrew steps)',
+    '"צייר משולש ABC וגובה מ-A" → ["משולש ABC","גובה מ-A במשולש ABC"]',
     '"draw the tangent to the circle at A" → ["tangent to circle O at A"]',
   ].join('\n');
 }

@@ -16,7 +16,7 @@
  * Hebrew text). Keywords are bilingual; the same rule matches either language.
  */
 
-import type { AnyCommand, Command, Id } from '@/engine';
+import { RADIUS_VAR, type AnyCommand, type Command, type Id, type SymbolicCommand } from '@/engine';
 
 export type ParseResult =
   | { ok: true; commands: AnyCommand[] }
@@ -51,7 +51,7 @@ const circleId = (center: string): Id => `circle-${center.toUpperCase()}`;
 /** The centre letter of a circle named in `s` ("circle O" / "מעגל O" / "centered at O" / "שמרכזו O"). */
 const circleCenter = (s: string): string | null => {
   const m =
-    s.match(/(?:cent\w*\s+(?:at\s+)?|שמרכזו\s*|מרכזו\s*|סביב\s+)([A-Za-z])\b/i) ??
+    s.match(/(?:cent\w*\s+(?:at\s+)?|around\s+|שמרכזו\s*|מרכזו\s*|סביב\s+)([A-Za-z])\b/i) ??
     s.match(/(?:circle|מעגל)\s+([A-Za-z])\b/i);
   return m ? m[1] : null;
 };
@@ -106,7 +106,7 @@ function freeLabel(used: string[], prefer: string[] = []): Id {
  * test, so e.g. "triangle"/"angle" there is fine.
  */
 const SHAPE_LEFTOVER =
-  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|points?)\b|[=⊥∥∩°]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונך|אנך|מקביל|חוצ|אמצע|תיכון|גובה|המשך|חיתוך|זווית|קטע|אלכסון|חבר|נקוד/i;
+  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?)\b|[=⊥∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונך|אנך|מקביל|חוצ|אמצע|תיכון|גובה|המשך|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ/i;
 
 /** True if, after removing the shape keyword, geometry the shape can't express remains. */
 const shapeHasLeftover = (s: string, re: RegExp): boolean => SHAPE_LEFTOVER.test(s.replace(re, ' '));
@@ -208,8 +208,8 @@ const lineLineIntersection: Rule = (s) => {
 
 /** "right triangle ABC" / "משולש ישר-זווית ABC" — right angle at the last named vertex. */
 const rightTriangle: Rule = (s) => {
-  if (!/right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זווית/i.test(s)) return null;
-  const cleaned = s.replace(/right[\s-]?angled|right[\s-]?angle|right|triangle|משולש|ישר[\s-]?זווית|זווית|ישרה/gi, ' ');
+  if (!/right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זוו?ית/i.test(s)) return null;
+  const cleaned = s.replace(/right[\s-]?angled|right[\s-]?angle|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|ישרה/gi, ' ');
   const ids = labelRun(cleaned, 3);
   if (!ids) return null;
   if (SHAPE_LEFTOVER.test(cleaned)) return 'stop'; // a modifier remains — escalate, don't half-parse
@@ -229,7 +229,7 @@ const bisectorIntersection: Rule = (s) => {
   const meet = INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s);
   // Strip every keyword word so only the point label + the two angle triples remain.
   const kw =
-    /bisectors?|angles?|intersection|intersect\w*|meets?|points?|of|the|is|are|and|זווית|הזוויות|חוצי|חוצה|חוצ|חיתוך|נחתכים|נקודת|המפגש|מפגש|נפגשים|של|הם|בנקודה/gi;
+    /bisectors?|angles?|intersection|intersect\w*|meets?|points?|of|the|is|are|and|זוו?ית|הזוו?יות|חוצי|חוצה|חוצ|חיתוך|נחתכים|נקודת|המפגש|מפגש|נפגשים|של|הם|בנקודה/gi;
   const labels = s.replace(kw, ' ').replace(/-/g, ' ').match(/\b[A-Za-z]{1,3}\b/g) ?? [];
   const point = labels.find((l) => l.length === 1);
   const triples = labels.filter((l) => l.length === 3).map((l) => l.toUpperCase());
@@ -276,10 +276,10 @@ const pointOnExtension: Rule = (s) => {
   return seg ? [{ type: 'point-on-segment', id: up(m[1]), a: seg[0], b: seg[1], t: 1.3 }] : null;
 };
 
-/** "angle GAB = 37" / "זווית GAB = 37" (any order) — middle letter is the vertex. */
+/** "angle GAB = 37" / "∠GAB = 37°" / "זווית GAB = 37" (any order) — middle letter is the vertex. */
 const angle: Rule = (s) => {
-  if (!/(?:angle|זווית)/i.test(s)) return null;
-  const stripped = s.replace(/angle|זווית/gi, ' ');
+  if (!/(?:angle|∠|זוו?ית)/i.test(s)) return null;
+  const stripped = s.replace(/angle|∠|זוו?ית/gi, ' ');
   const ids = labelRun(stripped, 3);
   const valM = stripped.match(new RegExp(num));
   if (!ids || !valM) return null;
@@ -357,6 +357,20 @@ const ratioConstraint: Rule = (s) => {
   return null;
 };
 
+/**
+ * "AE/ED = 2/3" / "AE/ED = 2" — a ratio of two segment LENGTHS set to a fraction:
+ * |AE|/|ED| = 2/3 ⇒ |AE| = (2/3)·|ED|. Runs before the numeric/distance rules, which
+ * would otherwise half-parse the "ED=2" in the middle and drop the rest (the bug that
+ * left a point unplaced). Drives a sliding point on either segment.
+ */
+const segmentRatio: Rule = (s) => {
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*\/\s*\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})\s*(?:\/\s*(${COEF}))?`));
+  if (!m) return null;
+  const num = parseFloat(m[5]);
+  const den = m[6] ? parseFloat(m[6]) : 1;
+  return [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: num / den }];
+};
+
 /** "AB = CD" — two segments equal in length. */
 const equalSegments: Rule = (s) => {
   const m = s.match(/\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*\b([A-Za-z])\s*([A-Za-z])\b/);
@@ -373,6 +387,10 @@ const distanceConstraint: Rule = (s) => {
 // A variable is a single LOWERCASE letter — latin for lengths (x, y), Greek for
 // angles (α, β); points stay uppercase, so the two never collide.
 const VAR = String.raw`[a-zα-ω]`;
+// A length's RHS variable also admits the reserved radius symbol R/r ("AC = 1.6R") — ADR-034.
+// (Only as a size: the `(?![a-zA-Z])` guard keeps "AB = RS"/"AB = AR" reading R as a vertex.)
+const LVAR = String.raw`[a-zα-ωR]`;
+const normVar = (v: string): string => (/^[Rr]$/.test(v) ? RADIUS_VAR : v);
 
 /**
  * "AB = 3x" / "AB = x" / "AB = 1.5y" — a segment's length as `coef·var` (a symbolic
@@ -380,12 +398,88 @@ const VAR = String.raw`[a-zα-ω]`;
  * has no variable and falls through to `distanceConstraint`. The relation only bites
  * once a second segment shares the variable (lowered to a ratio in the store).
  */
+/**
+ * "AB = π" / "AB = 2π" — a length using the constant π (≈ 3.14159), not a variable. Runs
+ * before `measureLength`, which would otherwise read π (a Greek letter) as a free variable.
+ * The base is concrete, so it lowers to a numeric `set-distance`. Only the π glyph (the
+ * toolbar button) is accepted — the word "pi" is left out as it collides with a segment "PI".
+ */
+const measurePi: Rule = (s) => {
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})?\s*[*·]?\s*π`));
+  if (!m) return null;
+  const c = m[3] ? parseFloat(m[3]) : 1;
+  return [{ type: 'measure-length', a: up(m[1]), b: up(m[2]), expr: { value: c * Math.PI, text: `${c === 1 ? '' : m[3]}π` } }];
+};
+
 const measureLength: Rule = (s) => {
   // The variable is one lowercase/Greek letter, not followed by another latin letter
   // (so "AB = CD" stays a ratio and a Greek letter — no regex word boundary — still ends cleanly).
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})?\s*[*·]?\s*(${VAR})(?![a-zA-Z])`));
+  // An optional trailing "/d" makes the coefficient a fraction ("7k/5" ⇒ coef 7/5); an optional
+  // "± c" (c a number or fraction) adds an affine constant ("k + 2", "k − 5/2"). Both are kept
+  // verbatim for the label so it reads exactly as typed, not a decimal.
+  const m = s.match(
+    new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})?\s*[*·]?\s*(${LVAR})(?![a-zA-Z])\s*(?:\/\s*(${COEF}))?\s*(?:([+\-−])\s*(${COEF})(?:\s*\/\s*(${COEF}))?)?`),
+  );
   if (!m) return null;
-  return [{ type: 'measure-length', a: up(m[1]), b: up(m[2]), expr: { coef: m[3] ? parseFloat(m[3]) : 1, var: m[4] } }];
+  const num = m[3] ? parseFloat(m[3]) : 1;
+  const den = m[5] ? parseFloat(m[5]) : 1;
+  const sign = m[6] === '+' ? 1 : -1; // '-' or '−' (minus sign)
+  const cNum = m[7] ? parseFloat(m[7]) : 0;
+  const cDen = m[8] ? parseFloat(m[8]) : 1;
+  const konst = m[6] ? (sign * cNum) / cDen : 0;
+  // Faithful label: "7k/5", "k+2", "k-5/2", etc. — built from the parts the student typed.
+  let text: string | undefined;
+  if (m[5] || m[6]) {
+    text = `${m[3] ?? ''}${m[4]}${m[5] ? `/${m[5]}` : ''}${m[6] ? ` ${m[6] === '+' ? '+' : '−'} ${m[7]}${m[8] ? `/${m[8]}` : ''}` : ''}`;
+  }
+  return [
+    {
+      type: 'measure-length',
+      a: up(m[1]),
+      b: up(m[2]),
+      expr: { coef: num / den, var: normVar(m[4]), ...(konst ? { const: konst } : {}), ...(text ? { text } : {}) },
+    },
+  ];
+};
+
+/**
+ * "AD = 12√x" / "AD = √x" / "AD = 12\sqrt{x}" / "AD = 2*sqrt(y)" — a length as
+ * `coef·√(radicand)`. Runs BEFORE the numeric/ratio rules so the radical is never
+ * dropped (the bug: "AD = 12√x" half-parsed to set-distance 12). The radicand is a
+ * single variable letter (symbolic, resolves when the var gets a value) or a number
+ * (a concrete length, e.g. 12√2). Accepts the √ glyph, LaTeX \sqrt{…}, or sqrt(…).
+ */
+const SQRT_FN = String.raw`(?:√|\\sqrt|sqrt)\s*[\{(]?\s*(${VAR}|${COEF})\s*[\})]?`;
+const measureSqrt: Rule = (s) => {
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})?\s*[*·]?\s*${SQRT_FN}`, 'i'));
+  if (!m) return null;
+  const a = up(m[1]);
+  const b = up(m[2]);
+  const coef = m[3] ? parseFloat(m[3]) : 1;
+  const radicand = m[4];
+  // Number under the radical ⇒ a concrete length, but keep "12√2" as the display (not 16.97);
+  // a letter ⇒ symbolic (pow ½), display derived as "12√x".
+  if (/^[0-9.]+$/.test(radicand)) return [{ type: 'measure-length', a, b, expr: { value: coef * Math.sqrt(parseFloat(radicand)), text: `${m[3] && coef !== 1 ? m[3] : ''}√${radicand}` } }];
+  return [{ type: 'measure-length', a, b, expr: { coef, var: radicand.toLowerCase(), pow: 0.5 } }];
+};
+
+/**
+ * "AB = x²" / "AB = 3x²" / "AB = x^2" / "AB = 2x^3" — a length as `coef·varⁿ`. Runs
+ * BEFORE `measureLength` (which would read the `x` and silently drop the `²`/`^n`).
+ * A numeric base ("AB = 5²") is a concrete length. The exponent is a ²/³ superscript
+ * or `^n`.
+ */
+const measurePower: Rule = (s) => {
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})?\s*[*·]?\s*(${VAR}|${COEF})\s*(?:([²³])|\^\s*(\d+))`, 'i'));
+  if (!m) return null;
+  const a = up(m[1]);
+  const b = up(m[2]);
+  const coef = m[3] ? parseFloat(m[3]) : 1;
+  const base = m[4];
+  const pow = m[5] ? (m[5] === '²' ? 2 : 3) : parseInt(m[6], 10);
+  const sup = pow === 2 ? '²' : pow === 3 ? '³' : `^${pow}`;
+  if (/^[0-9.]+$/.test(base)) return [{ type: 'measure-length', a, b, expr: { value: coef * Math.pow(parseFloat(base), pow), text: `${m[3] && coef !== 1 ? m[3] : ''}${base}${sup}` } }];
+  return [{ type: 'measure-length', a, b, expr: { coef, var: base.toLowerCase(), pow } }];
 };
 
 /**
@@ -394,13 +488,32 @@ const measureLength: Rule = (s) => {
  * angle ("angle ABC = 37") has no variable here and falls through to `angle`.
  */
 const measureAngle: Rule = (s) => {
-  if (!/angle|זווית|זוית/i.test(s)) return null;
-  const stripped = s.replace(/angle|זווית|זוית/gi, ' ');
+  if (!/angle|∠|זוו?ית/i.test(s)) return null;
+  const stripped = s.replace(/angle|∠|זוו?ית/gi, ' ');
   const ids = labelRun(stripped, 3);
   if (!ids) return null;
   const m = stripped.match(new RegExp(String.raw`=\s*(${COEF})?\s*[*·]?\s*(${VAR})(?![a-zA-Z])`));
   if (!m) return null; // numeric or unreadable → let `angle` take the numeric case
   return [{ type: 'measure-angle', vertex: ids[1], ray1: ids[0], ray2: ids[2], expr: { coef: m[1] ? parseFloat(m[1]) : 1, var: m[2] } }];
+};
+
+/**
+ * "AB = AC = 3x" / "AB = AC = 5" / "AB = CD = EF" — a chained equality. Split into the
+ * adjacent pairwise clauses (AB = AC, AC = 3x) and parse each, so the whole chain takes
+ * effect (the bug: a substring rule grabbed just one clause — "AC = 3x" — and the AB = AC
+ * equality was silently dropped). Fires only on ≥2 '=' and bails (→ null) unless every
+ * clause parses, so non-chain inputs fall through untouched.
+ */
+const chainedEquality: Rule = (s, ctx) => {
+  const parts = s.split('=').map((p) => p.trim());
+  if (parts.length < 3 || parts.some((p) => p === '')) return null;
+  const out: AnyCommand[] = [];
+  for (let i = 0; i < parts.length - 1; i++) {
+    const clause = parse(`${parts[i]} = ${parts[i + 1]}`, ctx);
+    if (!clause.ok) return null;
+    out.push(...clause.commands);
+  }
+  return out;
 };
 
 /** "x = 4" / "α = 30" — bind a variable to a number; resolves every measure that uses it. */
@@ -441,17 +554,33 @@ const freePoint: Rule = (s) => {
 
 // ── Phase 5c — circles ──────────────────────────────────────────────────────
 
-/** "circle centered at O radius 5" / "circle O radius 5" / "מעגל שמרכזו O רדיוסו 5". */
+// The default concrete radius a circle takes when none is given numerically (incl. a symbolic "radius R").
+const RADIUS_DEFAULT = 5;
+const RADIUS_WORD = String.raw`(?:radius|רדיוס\S*)`;
+/**
+ * Read a circle's radius from "radius 5" (numeric) or "radius R"/"radius r" (the reserved
+ * radius symbol — ADR-034). A symbol pins the variable R to the concrete default radius via
+ * a `set-var`, so a later "AC = 1.6R" resolves to |AC| = 1.6·radius while still labelling "1.6R".
+ */
+const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: boolean; varCmd?: SymbolicCommand } => {
+  const rNum = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*${num}`, 'i'));
+  if (rNum) return { radius: parseFloat(rNum[1]), numeric: true, symbolic: false };
+  const rVar = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*[Rr]\b`));
+  if (rVar) return { radius: RADIUS_DEFAULT, numeric: false, symbolic: true, varCmd: { type: 'set-var', name: RADIUS_VAR, value: RADIUS_DEFAULT } };
+  return { radius: RADIUS_DEFAULT, numeric: false, symbolic: false };
+};
+
+/** "circle centered at O radius 5" / "circle O radius R" / "מעגל שמרכזו O רדיוסו 5". */
 const circle: Rule = (s) => {
   if (!/circle|מעגל/i.test(s)) return null;
-  const rM = s.match(new RegExp(String.raw`(?:radius|רדיוס\S*)\s*${num}`, 'i'));
+  const r = parseRadius(s);
   const thrM = s.match(/(?:through|העובר\s*דרך|דרך)\s+([A-Za-z])\b/i);
-  const centered = /cent(?:er|re)d?|מרכז\w*|סביב/i.test(s);
-  if (!rM && !thrM && !centered) return null; // a bare "circle O" reference, not a definition
+  const centered = /cent(?:er|re)d?|around|מרכז\w*|סביב/i.test(s);
+  if (!r.numeric && !r.symbolic && !thrM && !centered) return null; // a bare "circle O" reference, not a definition
   const center = circleCenter(s);
   if (!center) return null;
-  if (thrM && !rM) return [{ type: 'circle-through', id: circleId(center), center: up(center), through: up(thrM[1]) }];
-  return [{ type: 'circle', id: circleId(center), center: up(center), radius: rM ? parseFloat(rM[1]) : 5 }];
+  if (thrM && !r.numeric && !r.symbolic) return [{ type: 'circle-through', id: circleId(center), center: up(center), through: up(thrM[1]) }];
+  return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius }, ...(r.varCmd ? [r.varCmd] : [])];
 };
 
 /**
@@ -493,7 +622,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // A right triangle inscribed in a circle IS constructible (Thales — the
   // hypotenuse is a diameter, the right angle is on the circle): handle it.
   const kind =
-    /right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זווית/i.test(s) ? 'right-triangle'
+    /right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זוו?ית/i.test(s) ? 'right-triangle'
     : /triangle|משולש/i.test(s) ? 'triangle'
     : /square|ריבוע/i.test(s) ? 'square'
     : /rectangle|מלבן/i.test(s) ? 'rectangle'
@@ -505,12 +634,13 @@ const inscribedPolygon: Rule = (s, ctx) => {
   const isTri = kind === 'triangle' || kind === 'right-triangle';
   const n = isTri ? 3 : 4;
   const named = circleCenter(s); // may be null — "inscribed in a circle" need not name the centre
-  const rM = s.match(new RegExp(String.raw`(?:radius|רדיוס\S*)\s*${num}`, 'i'));
+  const r = parseRadius(s);
   let rest = dropCircleRef(s).replace(
-    /right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זווית|זווית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|quad\w*|מרובע|inscrib\w*|חסום|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
+    /right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|quad\w*|מרובע|inscrib\w*|חסום|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
     ' ',
   );
   if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
+  if (r.symbolic) rest = rest.replace(/\b[Rr]\b/g, ' '); // the radius symbol is not a vertex (ADR-034)
   const ids = labelRun(rest, n);
   if (!ids) return null;
   // After the circle, the shape, and the vertices are consumed, nothing
@@ -531,7 +661,8 @@ const inscribedPolygon: Rule = (s, ctx) => {
     return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2] }];
   }
   const angles = INSCRIBED_ANGLES[kind];
-  const cmds: Command[] = [{ type: 'circle', id: circ, center: up(center), radius: rM ? parseFloat(rM[1]) : 5 }];
+  const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius }];
+  if (r.varCmd) cmds.push(r.varCmd);
   ids.forEach((id, i) => {
     // specific angle for a shaped cyclic polygon (square/rect/rhombus/trapezoid);
     // omit for triangle/general-quad so they spread evenly.
@@ -670,7 +801,7 @@ const bisectorSegmentIntersection: Rule = (s) => {
   if (!BISECTOR_KW.test(s)) return null;
   if (!(INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s))) return null;
   const stripped = s
-    .replace(/bisectors?|angles?|of|the|is|are|and|with|זווית|הזוויות|חוצי|חוצה|חוצ|intersection|intersect\w*|meets?|עם|חיתוך|נחתך\w*|נקודת|המפגש|של/gi, ' ')
+    .replace(/bisectors?|angles?|of|the|is|are|and|with|זוו?ית|הזוו?יות|חוצי|חוצה|חוצ|intersection|intersect\w*|meets?|עם|חיתוך|נחתך\w*|נקודת|המפגש|של/gi, ' ')
     .replace(/-/g, ' ');
   const labels = stripped.match(/\b[A-Za-z]{1,3}\b/g) ?? [];
   const point = labels.find((l) => l.length === 1);
@@ -736,7 +867,7 @@ const bisectorLine: Rule = (s) => {
   if (!/bisector|חוצ/i.test(s)) return null;
   if (INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s)) return null;
   if (/\b[A-Za-z]\s*[A-Za-z]\b\s*(?:bisects?|חוצ)/i.test(s)) return null; // "AD bisects ∠.." = placing a point (deferred)
-  const ids = labelRun(s.replace(/bisector|angle|זווית|הזווית|חוצה|חוצי|חוצ|את/gi, ' '), 3);
+  const ids = labelRun(s.replace(/bisector|angle|זוו?ית|הזוו?ית|חוצה|חוצי|חוצ|את/gi, ' '), 3);
   if (!ids) return null;
   return [{ type: 'bisector', id: `bis-${ids.join('')}`, vertex: ids[1], p: ids[0], q: ids[2], visible: true }];
 };
@@ -869,7 +1000,7 @@ const bisectorPlacesPoint: Rule = (s) => {
   if (!seg) return null;
   const apex = up(seg[1]);
   const D = up(seg[2]);
-  const after = s.slice(s.search(/bisects?|חוצ/i)).replace(/bisects?|חוצ\w*|angles?|the|את|הזווית|זווית|של/gi, ' ');
+  const after = s.slice(s.search(/bisects?|חוצ/i)).replace(/bisects?|חוצ\w*|angles?|the|את|הזוו?ית|זוו?ית|של/gi, ' ');
   const tri = labelRun(after, 3);
   if (!tri) return null;
   const vertex = tri[1];
@@ -886,9 +1017,92 @@ const bisectorPlacesPoint: Rule = (s) => {
   ];
 };
 
+/**
+ * The two triangles named in a relation utterance — handles "ABC ≅ DEF" (labels either
+ * side of the symbol) and the Hebrew "המשולשים ABC ו-DEF חופפים" (both before the verb).
+ * Strips the shape/relation words, then takes the first two runs of three labels.
+ */
+const twoTriangles = (s: string): [[Id, Id, Id], [Id, Id, Id]] | null => {
+  const t = s
+    .replace(/triangles?|משולשים?|המשולש\w*|congruent|similar|חופפים?|חופף|דומ\w*|are|is|the|of|to|and|של/gi, ' ')
+    .replace(/[≅~∼∽]|ל-?|ו-?/g, ' ');
+  const triples = [...t.matchAll(/\b([A-Za-z])\s*([A-Za-z])\s*([A-Za-z])\b/g)];
+  if (triples.length < 2) return null;
+  const grab = (i: number) => [up(triples[i][1]), up(triples[i][2]), up(triples[i][3])] as [Id, Id, Id];
+  return [grab(0), grab(1)];
+};
+
+/** Emit a `triangle` for any of the two whose vertices aren't all already in the figure. */
+const ensureTriangles = (t1: [Id, Id, Id], t2: [Id, Id, Id], ctx: ParseContext): AnyCommand[] => {
+  const has = (t: [Id, Id, Id]) => t.every((id) => ctx.points?.includes(id));
+  const out: AnyCommand[] = [];
+  if (!has(t1)) out.push({ type: 'triangle', ids: t1 });
+  if (!has(t2)) out.push({ type: 'triangle', ids: t2 });
+  return out;
+};
+
+/**
+ * "ABC ≅ DEF" / "triangle ABC congruent to triangle DEF" / "המשולשים ABC ו-DEF חופפים" —
+ * congruent triangles. Reshapes the SECOND triangle to match the first (SSS: corresponding
+ * sides equal), driving its free vertices (ADR-030/031 coupled solve). Builds either
+ * triangle first if it isn't already on the canvas.
+ */
+const congruence: Rule = (s, ctx) => {
+  if (!/≅|congruen|חופ/i.test(s)) return null;
+  const tt = twoTriangles(s);
+  if (!tt) return 'stop'; // relation named but two triangles not readable — escalate
+  const [[A, B, C], [D, E, F]] = tt;
+  return [
+    ...ensureTriangles([A, B, C], [D, E, F], ctx),
+    { type: 'set-equal', a: D, b: E, c: A, d: B }, // |DE| = |AB|
+    { type: 'set-equal', a: E, b: F, c: B, d: C }, // |EF| = |BC|
+    { type: 'set-equal', a: F, b: D, c: C, d: A }, // |FD| = |CA|
+  ];
+};
+
+/**
+ * "ABC ~ DEF" / "triangle ABC similar to triangle DEF" / "המשולשים ABC ו-DEF דומים" —
+ * similar triangles. Reshapes the SECOND to have the same angles as the first (AA), free
+ * to scale. Two angle equalities suffice.
+ */
+const similarity: Rule = (s, ctx) => {
+  if (!/[~∼∽]|similar|דומ/i.test(s)) return null;
+  const tt = twoTriangles(s);
+  if (!tt) return 'stop';
+  const [[A, B, C], [D, E, F]] = tt;
+  return [
+    ...ensureTriangles([A, B, C], [D, E, F], ctx),
+    { type: 'set-angle-ratio', v1: D, a1: E, b1: F, v2: A, a2: B, b2: C, k: 1 }, // ∠D = ∠A
+    { type: 'set-angle-ratio', v1: E, a1: D, b1: F, v2: B, a2: A, b2: C, k: 1 }, // ∠E = ∠B
+  ];
+};
+
+/**
+ * "<place a point> such that <condition>" — a compound (e.g. "point F on the extension of AD such
+ * that CF ⟂ DF"). Each half parses cleanly on its own, but together a single rule half-parses (it
+ * reads "AD ⟂ CF" and never creates F). Split on "such that" / "כך ש" and parse each side, in order
+ * (the point first, so the condition can reference it). Runs FIRST. Falls through if either half
+ * doesn't parse, so a stray "where"/"such that" never blocks the normal rules.
+ */
+const SUCH_THAT = /\bsuch that\b|\bso that\b|\bsuch_that\b|כך\s*ש(?=\s|[A-Za-z])/i;
+const compoundSuchThat: Rule = (s, ctx) => {
+  const parts = s.split(SUCH_THAT);
+  if (parts.length < 2) return null;
+  const left = parts[0].trim();
+  const right = parts.slice(1).join(' ').trim();
+  if (!left || !right) return null;
+  const lr = parse(left, ctx);
+  const rr = parse(right, ctx);
+  if (!lr.ok || !rr.ok) return null; // either half unreadable → let the other rules / LLM handle it
+  return [...lr.commands, ...rr.commands];
+};
+
 // Order matters: the most specific keyword-anchored rules run first; the
 // coordinate rule (freePoint) is last because it's the loosest.
 const RULES: Rule[] = [
+  compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
+  congruence, // "ABC ≅ DEF" — before the shape rules ("triangle ABC ≅ …" contains "triangle")
+  similarity, // "ABC ~ DEF"
   incircle, // "circle inscribed in triangle ABC" — before inscribedPolygon (both match "inscribed")
   inscribedPolygon, // before the shape rules ("triangle ABC inscribed …" contains "triangle")
   // Special-line constructs whose Hebrew names a triangle ("…במשולש ABC") must
@@ -919,6 +1133,7 @@ const RULES: Rule[] = [
   parallelLine, // a *drawn* parallel line through a point (before the ∥ constraint)
   parallelConstraint, // ∥ / ⟂ constraints (keyword-anchored) — before the loose "XY = …" rules
   perpendicularConstraint,
+  chainedEquality, // "AB = AC = 3x" — split a chain before any rule grabs a single clause
   arcMidpoint, // circle constructs (own keywords) before the generic point rules
   diameter,
   chord,
@@ -931,6 +1146,10 @@ const RULES: Rule[] = [
   segment,
   pointOnSegment,
   setVar, // "x = 4" / "α = 30" — a bare variable binding; before the numeric rules
+  segmentRatio, // "AE/ED = 2/3" — before the numeric rules (which would half-parse "ED=2")
+  measureSqrt, // "AB = 12√x" / "12√2" — before measureLength so the radical isn't dropped
+  measurePower, // "AB = x²" / "3x^2" — before measureLength so the exponent isn't dropped
+  measurePi, // "AB = 2π" — before measureLength so π isn't read as a free variable
   measureLength, // "AB = 3x" (symbolic) — before ratio/equal/distance
   ratioConstraint, // "AB = 2 AD" — before equal/distance (it would half-parse "AB = 2")
   equalSegments, // "AB = CD" — before distance (numeric RHS) and freePoint (coord RHS)

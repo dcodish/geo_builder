@@ -77,7 +77,11 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'constraints', supported: true, en: 'AB = CD', he: 'AB = CD', descEn: 'Make two segments equal.', descHe: 'השוואת אורכי שני קטעים.' },
   { category: 'constraints', supported: true, en: 'AB = 2 AD', he: 'AB = 2 AD', descEn: 'A proportion between two lengths (|AB| = k·|CD|).', descHe: 'יחס בין שני אורכים (|AB| = k·|CD|).' },
   { category: 'constraints', supported: true, en: 'AB perpendicular to CD', he: 'AB מאונך ל-CD', descEn: 'Force a right angle between two segments.', descHe: 'אילוץ זווית ישרה בין שני קטעים.' },
+  { category: 'constraints', supported: true, en: 'ABC ≅ DEF', he: 'ABC ≅ DEF', descEn: 'Congruent triangles (≅ button). Reshapes the second to match the first (equal sides).', descHe: 'משולשים חופפים (כפתור ≅). מעצב את השני כך שיהיה חופף לראשון (צלעות שוות).' },
+  { category: 'constraints', supported: true, en: 'ABC ~ DEF', he: 'ABC ~ DEF', descEn: 'Similar triangles (~ button). Reshapes the second to the same angles as the first.', descHe: 'משולשים דומים (כפתור ~). מעצב את השני לאותן זוויות כמו הראשון.' },
   { category: 'constraints', supported: true, en: 'AB = 3x', he: 'AB = 3x', descEn: 'A length as a variable (lowercase). Share it (e.g. DF = x) to set a relation; give it a value with "x = 4".', descHe: 'אורך כמשתנה (אות קטנה). שיתוף המשתנה (למשל DF = x) קובע יחס; ערך נקבע ע״י "x = 4".' },
+  { category: 'constraints', supported: true, en: 'AD = 12√x', he: 'AD = 12√x', descEn: 'A length with a square root (√ button, or \\sqrt{x}). Symbolic until x gets a value (x = 4 ⇒ 24); 12√2 is a concrete length.', descHe: 'אורך עם שורש (כפתור √, או \\sqrt{x}). סימבולי עד שנקבע ערך ל-x (x = 4 ⇒ 24); 12√2 הוא אורך מספרי.' },
+  { category: 'constraints', supported: true, en: 'AB = x²', he: 'AB = x²', descEn: 'A length raised to a power (x² button, or x^3). Resolves when x gets a value.', descHe: 'אורך בחזקה (כפתור x², או x^3). מתורגם למספר כשנקבע ערך ל-x.' },
   { category: 'constraints', supported: true, en: 'angle ABC = 2α', he: 'זווית ABC = 2α', descEn: 'An angle as a Greek variable. Share it (e.g. ∠DEF = α) for a relation; value via "α = 30".', descHe: 'זווית כמשתנה יווני. שיתוף המשתנה (למשל ∠DEF = α) קובע יחס; ערך ע״י "α = 30".' },
 
   // ── Circles ─────────────────────────────────────────────────────────────

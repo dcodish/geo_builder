@@ -73,4 +73,38 @@ describe('applySeed', () => {
     if (!r2.ok) return;
     expect(freeDofs(r2.construction)).toEqual(['B']);
   });
+
+  it('varies a free shape DOF (ADR-033) — a rhombus reaches an OBTUSE angle across seeds', () => {
+    const { construction } = build([{ type: 'rhombus', ids: ['A', 'B', 'C', 'D'] }]);
+    const angles: number[] = [];
+    for (let seed = 0; seed < 12; seed++) {
+      const e = evaluate(applySeed(construction, seed));
+      if (e.ok) {
+        const A = e.positions.get('A')!, B = e.positions.get('B')!, D = e.positions.get('D')!;
+        const u = sub(B, A), v = sub(D, A);
+        angles.push((Math.acos((u.x * v.x + u.y * v.y) / (Math.hypot(u.x, u.y) * Math.hypot(v.x, v.y))) * 180) / Math.PI);
+      }
+    }
+    // the default (seed 0) is acute (60°); other seeds reach obtuse — so "show another configuration"
+    // gives a genuinely different-shaped rhombus, not just a moved one (no need to force an angle).
+    expect(angles.some((a) => a > 95)).toBe(true);
+    expect(angles.some((a) => a < 85)).toBe(true);
+  });
+
+  it("a CONSTRAINED shape DOF is NOT resampled (a driven rhombus angle stays put)", () => {
+    // angle ADC = 80 drives the rhombus's `rotated` DOF → it's pinned, so the sampler leaves it.
+    const { construction } = build([{ type: 'rhombus', ids: ['A', 'B', 'C', 'D'] }, { type: 'set-angle', vertex: 'D', ray1: 'A', ray2: 'C', value: 80 }]);
+    const base = evaluate(construction);
+    const seeded = evaluate(applySeed(construction, 5));
+    const ang = (pos: Map<string, Vec>) => {
+      const D = pos.get('D')!, A = pos.get('A')!, C = pos.get('C')!;
+      const u = sub(A, D), v = sub(C, D);
+      return (Math.acos((u.x * v.x + u.y * v.y) / (Math.hypot(u.x, u.y) * Math.hypot(v.x, v.y))) * 180) / Math.PI;
+    };
+    expect(base.ok && seeded.ok).toBe(true);
+    if (base.ok && seeded.ok) {
+      expect(ang(base.positions)).toBeCloseTo(80, 0);
+      expect(ang(seeded.positions)).toBeCloseTo(80, 0); // constraint preserved under resample
+    }
+  });
 });

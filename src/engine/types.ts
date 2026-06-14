@@ -119,6 +119,9 @@ export interface PerpOffsetVertex {
   to: Id;
   dist: number;
   flip?: boolean;
+  /** When set, `dist` is a driveable DOF the solver sizes to satisfy a constraint (a rectangle's
+   * height / a right-triangle's leg). Default (unset) keeps `dist` fixed — the figure looks the same. */
+  solve?: { constraint: Constraint; branch: number };
 }
 
 /** 0 DOF — `pivot` + scale · Rot(angleDeg) · (to − from) (rhombus / rotated corners). `flip` negates the angle. */
@@ -131,6 +134,8 @@ export interface RotatedVertex {
   angleDeg: number;
   scale: number;
   flip?: boolean;
+  /** When set, `angleDeg` is a driveable DOF (a rhombus's angle). Default keeps it fixed. */
+  solve?: { constraint: Constraint; branch: number };
 }
 
 /** 0 DOF — `anchor` + k · (to − from): a point offset parallel to from→to (trapezoid). */
@@ -141,6 +146,8 @@ export interface ScaledOffsetVertex {
   from: Id;
   to: Id;
   k: number;
+  /** When set, `k` (the top-base ratio) is a driveable DOF (a trapezoid's short side). Default keeps it fixed. */
+  solve?: { constraint: Constraint; branch: number };
 }
 
 /**
@@ -160,6 +167,9 @@ export interface SolvedOnSegmentPoint {
   b: Id;
   constraint: Constraint;
   branch: number;
+  /** The point's initial parameter. When it's an EXTENSION point (t<0 or t>1) the solve searches a
+   * wider range than [0,1], so a constraint can place it beyond the segment (e.g. the ⟂ foot past D). */
+  t0?: number;
 }
 
 /** 0 DOF — the crossing of two {@link Line} objects (by id). Parallel ⇒ unconstructible. */
@@ -382,7 +392,8 @@ export interface EqualConstraint {
   d: Id;
 }
 
-/** |a→b| = k·|c→d| (a proportion between two segment lengths; equal is k = 1). */
+/** |a→b| = k·|c→d| + add (a proportion between two segment lengths; equal is k=1, add=0; an affine
+ *  relation like "CE = AD + 2" is k=1, add=2 — used to lower a measure `coef·var + const`). */
 export interface RatioConstraint {
   type: 'ratio';
   a: Id;
@@ -390,6 +401,7 @@ export interface RatioConstraint {
   c: Id;
   d: Id;
   k: number;
+  add?: number;
 }
 
 /** a→b ∥ c→d. */
@@ -467,7 +479,7 @@ export type Command =
   | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number }
   | { type: 'set-distance'; a: Id; b: Id; value: number }
   | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id }
-  | { type: 'set-ratio'; a: Id; b: Id; c: Id; d: Id; k: number } // |ab| = k·|cd|
+  | { type: 'set-ratio'; a: Id; b: Id; c: Id; d: Id; k: number; add?: number } // |ab| = k·|cd| + add
   | { type: 'set-angle-ratio'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id; k: number } // ∠1 = k·∠2
   | { type: 'set-parallel'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-perpendicular'; a: Id; b: Id; c: Id; d: Id }
@@ -495,7 +507,19 @@ export type Command =
  * named unknown (lowercase latin for lengths, Greek for angles). A bare variable
  * is `coef = 1`. Used by the symbolic-measure layer (ADR-031).
  */
-export type MeasureExpr = { value: number } | { coef: number; var: string };
+// `pow` is the exponent on the variable: absent/1 = linear (3x), 0.5 = √ (12√x), 2 = squared (x²), n = xⁿ.
+// `const` is an additive constant (the affine term): `k + 2` ⇒ {coef:1, var:'k', const:2}; `k − 5/2` ⇒ const:-2.5.
+// `text` is an optional faithful display of the original expression (e.g. "12√2", "7k/5") shown on the
+// figure while unresolved, so the label matches what the student typed rather than a decimal/derived form.
+export type MeasureExpr = { value: number; text?: string } | { coef: number; var: string; pow?: number; const?: number; text?: string };
+
+/**
+ * The reserved variable name for a circle's radius (ADR-034). `R`/`r` are never point
+ * labels in a size context: "radius R" pins this variable to the circle's (concrete)
+ * radius, and "AC = 1.6R" reads as a size relative to it. The symbol stays symbolic on
+ * the figure ("1.6R") even once its numeric value is known.
+ */
+export const RADIUS_VAR = 'R';
 
 /**
  * Store-level commands the parser may emit in addition to engine `Command`s — the

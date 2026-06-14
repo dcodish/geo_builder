@@ -67,6 +67,20 @@ export default function App() {
     });
   }
   const GREEK = ['α', 'β', 'γ', 'δ', 'θ'];
+  // Math symbols. `label` is shown on the button; `insert` is what lands in the box
+  // (x²/xⁿ show their meaning but insert just the operator so the caret sits after it).
+  const SYMBOLS: { label: string; insert: string }[] = [
+    { label: '√', insert: '√' }, // AD = 12√x
+    { label: 'x²', insert: '²' }, // AB = x²
+    { label: 'xⁿ', insert: '^' }, // AB = x^3
+    { label: 'π', insert: 'π' }, // AB = 2π
+    { label: '∠', insert: '∠' }, // ∠ABC = 37°
+    { label: '°', insert: '°' },
+    { label: '⊥', insert: '⊥' }, // AB ⊥ CD
+    { label: '∥', insert: '∥' }, // AB ∥ CD
+    { label: '≅', insert: '≅' }, // ABC ≅ DEF (congruent)
+    { label: '~', insert: '~' }, // ABC ~ DEF (similar)
+  ];
   const he = i18n.language === 'he';
 
   // Base text direction for a mixed He/En string (geometry labels, numbers, and
@@ -146,7 +160,7 @@ export default function App() {
   }
 
   // Figure + per-fact status are derived from the fact list.
-  const { construction, positions, status, lastError, labels } = useMemo(() => replay(facts, seed), [facts, seed]);
+  const { construction, positions, status, lastError, labels, angleMarks } = useMemo(() => replay(facts, seed), [facts, seed]);
 
   // Snap-to-intersection: a clicked crossing becomes a real named point. Pick the
   // first free single capital letter, then create it via the same command path.
@@ -220,6 +234,7 @@ export default function App() {
           onPickIntersection={markIntersection}
           intersectionLabel={t('actions.markIntersection')}
           labels={labels}
+          angleMarks={angleMarks}
           showMeasures={showMeasures}
         />
 
@@ -249,12 +264,21 @@ export default function App() {
                 {thinking ? t('input.loading') : t('input.send')}
               </button>
             </div>
-            {/* Greek-letter inserts for angle variables (∠ABC = 2α) — hard to type. */}
+            {/* Row 1 — Greek-letter inserts for angle variables (∠ABC = 2α), hard to type. */}
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <span style={{ fontSize: 11, color: '#94a3b8' }}>{t('input.greek')}:</span>
+              <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 70 }}>{t('input.greek')}:</span>
               {GREEK.map((g) => (
                 <button key={g} type="button" title={t('input.insertGreek')} onClick={() => insertSymbol(g)} style={greekBtn}>
                   {g}
+                </button>
+              ))}
+            </div>
+            {/* Row 2 — math symbols: roots/powers for symbolic lengths, and the ∠ ° ⊥ ∥ relation glyphs. */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 70 }}>{t('input.symbols')}:</span>
+              {SYMBOLS.map((s) => (
+                <button key={s.label} type="button" title={t('input.insertSymbol')} onClick={() => insertSymbol(s.insert)} style={greekBtn}>
+                  {s.label}
                 </button>
               ))}
             </div>

@@ -15,9 +15,9 @@
  * finer-grained pieces so it can attach a status/label to each originating fact.
  */
 
-import type { AnyCommand, Command, Id, MeasureExpr, SymbolicCommand } from './types';
+import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from './types';
 
-type Binding = { kind: 'len' | 'ang'; refs: Id[]; coef: number };
+type Binding = { kind: 'len' | 'ang'; refs: Id[]; coef: number; pow?: number; affine?: boolean };
 export interface SymTab {
   vars: Map<string, { value?: number; bindings: Binding[] }>;
 }
@@ -34,7 +34,7 @@ export function buildSymTab(cmds: AnyCommand[]): SymTab {
   };
   for (const c of cmds) {
     if (c.type === 'set-var') slot(c.name).value = c.value;
-    else if (c.type === 'measure-length' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'len', refs: [c.a, c.b], coef: c.expr.coef });
+    else if (c.type === 'measure-length' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'len', refs: [c.a, c.b], coef: c.expr.coef, pow: c.expr.pow, affine: (c.expr.const ?? 0) !== 0 });
     else if (c.type === 'measure-angle' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'ang', refs: [c.vertex, c.ray1, c.ray2], coef: c.expr.coef });
   }
   return { vars };
@@ -49,11 +49,32 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       const e = cmd.expr;
       if ('value' in e) return [{ type: 'set-distance', a: cmd.a, b: cmd.b, value: e.value }];
       const info = tab.vars.get(e.var);
-      if (info?.value !== undefined) return [{ type: 'set-distance', a: cmd.a, b: cmd.b, value: e.coef * info.value }];
-      const reps = info?.bindings.filter((b) => b.kind === 'len') ?? [];
+      const konst = e.const ?? 0;
+      if (info?.value !== undefined) {
+        const len = e.coef * Math.pow(info.value, e.pow ?? 1) + konst; // 12√x with x=4 → 24; k+2 with k=4 → 6
+        return [{ type: 'set-distance', a: cmd.a, b: cmd.b, value: len }];
+      }
+      // The representative must itself be pure (an affine binding can't anchor a ratio).
+      const reps = info?.bindings.filter((b) => b.kind === 'len' && !b.affine) ?? [];
       const rep = reps[0];
       if (!rep || sameRefs(rep.refs, [cmd.a, cmd.b])) return []; // the representative (or sole binding) stays free
-      return [{ type: 'set-ratio', a: cmd.a, b: cmd.b, c: rep.refs[0], d: rep.refs[1], k: e.coef / rep.coef }];
+      // A ratio is linear only when both share the same exponent: the varⁿ cancels (12√x : 3√x = 4:1;
+      // 4x² : x² = 4:1). Mixed exponents (12√x vs 3x) are nonlinear — leave a free label, not a wrong ratio.
+      if ((rep.pow ?? 1) !== (e.pow ?? 1)) return [];
+      // With a constant the relation is AFFINE (|this| = (coef/repCoef)·|rep| + const). Only the LINEAR
+      // case (pow 1) is an affine length relation; a const with √/² would be nonlinear → leave free.
+      if (konst !== 0 && (e.pow ?? 1) !== 1) return [];
+      return [
+        {
+          type: 'set-ratio',
+          a: cmd.a,
+          b: cmd.b,
+          c: rep.refs[0],
+          d: rep.refs[1],
+          k: e.coef / rep.coef,
+          ...(konst ? { add: konst } : {}),
+        },
+      ];
     }
     case 'measure-angle': {
       const e = cmd.expr;
@@ -82,6 +103,15 @@ export function lower(cmds: AnyCommand[]): Command[] {
 
 const fmtNum = (n: number): string => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(3))));
 
+/** Render a variable with its exponent: ½ → √x, 2 → x², 3 → x³, n → x^n, else x. */
+const powVar = (v: string, pow?: number): string => {
+  if (pow === undefined || pow === 1) return v;
+  if (pow === 0.5) return '√' + v;
+  if (pow === 2) return v + '²';
+  if (pow === 3) return v + '³';
+  return v + '^' + fmtNum(pow);
+};
+
 /** Is this a symbolic measure fact (carries a display label)? */
 export function isMeasure(cmd: AnyCommand): cmd is Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' }> {
   return cmd.type === 'measure-length' || cmd.type === 'measure-angle';
@@ -95,8 +125,14 @@ export function isMeasure(cmd: AnyCommand): cmd is Extract<SymbolicCommand, { ty
 export function measureLabelText(cmd: Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' }>, tab: SymTab): string {
   const e: MeasureExpr = cmd.expr;
   const isAngle = cmd.type === 'measure-angle';
-  if ('value' in e) return fmtNum(e.value) + (isAngle ? '°' : '');
+  // A concrete value: show its faithful text ("12√2", "2π") if the parser kept one, else the number.
+  if ('value' in e) return e.text ?? fmtNum(e.value) + (isAngle ? '°' : '');
+  // The radius symbol stays symbolic on the figure ("1.6R") even when its value is known (ADR-034) —
+  // it's a size relative to the radius, not a number the student picked.
+  if (e.var === RADIUS_VAR) return e.text ?? (e.coef === 1 ? '' : fmtNum(e.coef)) + powVar(e.var, e.pow);
   const info = tab.vars.get(e.var);
-  if (info?.value !== undefined) return fmtNum(e.coef * info.value) + (isAngle ? '°' : '');
-  return (e.coef === 1 ? '' : fmtNum(e.coef)) + e.var;
+  // Resolved (the variable has a value): always the computed number — the symbolic text no longer applies.
+  if (info?.value !== undefined) return fmtNum(e.coef * Math.pow(info.value, e.pow ?? 1) + (e.const ?? 0)) + (isAngle ? '°' : '');
+  // Unresolved: the faithful original ("7k/5", "k+2") if kept, else derive from coef + exponent.
+  return e.text ?? (e.coef === 1 ? '' : fmtNum(e.coef)) + powVar(e.var, e.pow);
 }

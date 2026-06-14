@@ -65,6 +65,14 @@ export interface MeasureLabels {
   angles: { vertex: Id; ray1: Id; ray2: Id; text: string }[];
 }
 
+/** A user-asserted angle mark to draw: a right-angle square (`right`) or an angle arc, at `vertex`. */
+export interface SceneAngleMark {
+  vertex: Vec;
+  p1: Vec;
+  p2: Vec;
+  right: boolean;
+}
+
 export interface Scene {
   points: ScenePoint[];
   segments: SceneSegment[];
@@ -72,6 +80,7 @@ export interface Scene {
   circles: SceneCircle[];
   lines: SceneLine[];
   measures: SceneMeasure[];
+  angleMarks: SceneAngleMark[];
 }
 
 /**
@@ -108,7 +117,12 @@ function lineGeometry(line: Line, pos: Map<Id, Vec>, circles: Map<Id, SceneCircl
 }
 
 /** Resolve a construction + computed positions into drawable primitives. */
-export function buildScene(c: Construction, positions: Map<Id, Vec>, labels?: MeasureLabels): Scene {
+export function buildScene(
+  c: Construction,
+  positions: Map<Id, Vec>,
+  labels?: MeasureLabels,
+  angleMarkSpecs?: { vertex: Id; ray1: Id; ray2: Id; right: boolean }[],
+): Scene {
   const points: ScenePoint[] = [];
   const segments: SceneSegment[] = [];
   const polygons: ScenePolygon[] = [];
@@ -220,7 +234,16 @@ export function buildScene(c: Construction, positions: Map<Id, Vec>, labels?: Me
     }
   }
 
-  return { points, segments, polygons, circles, lines, measures };
+  // Angle marks the student asserted — resolve each to its vertex + two ray points (world coords).
+  const angleMarks: SceneAngleMark[] = [];
+  for (const m of angleMarkSpecs ?? []) {
+    const v = positions.get(m.vertex);
+    const p1 = positions.get(m.ray1);
+    const p2 = positions.get(m.ray2);
+    if (v && p1 && p2 && len(sub(p1, v)) > 1e-9 && len(sub(p2, v)) > 1e-9) angleMarks.push({ vertex: v, p1, p2, right: m.right });
+  }
+
+  return { points, segments, polygons, circles, lines, measures, angleMarks };
 }
 
 /**

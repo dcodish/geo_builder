@@ -22,6 +22,8 @@ const PARSES: [string, string][] = [
   ['משולש ABC', 'triangle'],
   ['right triangle ABC', 'right-triangle'],
   ['משולש ישר-זווית ABC', 'right-triangle'],
+  ['משולש ABC ישר זוית', 'right-triangle'], // defective spelling זוית (one vav), label-first, no hyphen
+  ['משולש ישר זווית ABC', 'right-triangle'], // plene spelling, space not hyphen
   ['square ABCD', 'square'],
   ['ריבוע ABCD', 'square'],
   ['ABCD square', 'square'],
@@ -107,6 +109,7 @@ const PARSES: [string, string][] = [
   // ── constraints ──
   ['angle GBA = 37', 'set-angle'],
   ['זווית GBA = 37', 'set-angle'],
+  ['זוית GBA = 37', 'set-angle'], // defective spelling זוית (one vav)
   ['AB = 6', 'set-distance'],
   ['AB = CD', 'set-equal'],
   ['AB = 2 AD', 'set-ratio'], // a proportion |AB| = 2·|AD| (NOT half-parsed to "AB = 2")
@@ -151,6 +154,22 @@ describe('parser coverage — supported phrasings parse to the right commands', 
       const r = parse(utterance);
       expect(r.ok, `"${utterance}" should parse`).toBe(true);
       if (r.ok) expect(r.commands.map((c) => c.type)).toContain(type);
+    });
+  }
+});
+
+describe('compound "<place a point> such that <condition>" parses BOTH halves', () => {
+  for (const u of [
+    'point F on the extension of AD such that CF⊥DF',
+    'נקודה F נמצאת על המשך AD כך ש CF⊥DF',
+  ]) {
+    it(`"${u}" → point + perpendicular (F created, then CF⟂DF)`, () => {
+      const r = parse(u);
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.commands.map((c) => c.type)).toEqual(['point-on-segment', 'set-perpendicular']);
+      const perp = r.commands.find((c) => c.type === 'set-perpendicular') as { a: string; b: string; c: string; d: string };
+      expect([perp.a, perp.b, perp.c, perp.d]).toEqual(['C', 'F', 'D', 'F']); // CF ⟂ DF, not AD ⟂ CF
     });
   }
 });

@@ -43,6 +43,37 @@ export interface MeasureLabels {
   angles: { vertex: Id; ray1: Id; ray2: Id; text: string }[];
 }
 
+/**
+ * An angle MARK the user explicitly asserted — drawn on the figure: a right-angle square (`right`)
+ * or an angle arc. Sourced from the FACTS, never from a computed 90° (the operator's rule: mark it
+ * only if the student said it). `∠ABC = α/37` → arc; `∠ABC = 90`, `AB ⟂ CD`, a right-triangle → square.
+ */
+export interface AngleMark {
+  vertex: Id;
+  ray1: Id;
+  ray2: Id;
+  right: boolean;
+}
+
+/** The angle mark a single fact asserts, or null. */
+function angleMarkFor(cmd: AnyCommand): AngleMark | null {
+  switch (cmd.type) {
+    case 'measure-angle':
+      return { vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, right: false };
+    case 'set-angle':
+      return { vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, right: Math.abs(cmd.value - 90) < 1e-6 };
+    case 'right-triangle':
+      return { vertex: cmd.ids[2], ray1: cmd.ids[0], ray2: cmd.ids[1], right: true }; // right angle at the last id
+    case 'set-perpendicular': {
+      const shared = [cmd.a, cmd.b].find((x) => x === cmd.c || x === cmd.d); // AB ⟂ CD with a shared vertex
+      if (!shared) return null; // disjoint segments — the ⟂ is at an unnamed crossing; no mark
+      return { vertex: shared, ray1: cmd.a === shared ? cmd.b : cmd.a, ray2: cmd.c === shared ? cmd.d : cmd.c, right: true };
+    }
+    default:
+      return null;
+  }
+}
+
 /** The display key that groups a fact's commands into one step row. */
 export const groupKey = (f: Fact): string => f.group ?? f.id;
 
@@ -58,6 +89,8 @@ export interface Derived {
   lastError: string | null;
   /** Measure labels to print on the figure (ADR-031). */
   labels: MeasureLabels;
+  /** Angle marks the student asserted (right-angle squares / angle arcs). */
+  angleMarks: AngleMark[];
 }
 
 /**
@@ -127,7 +160,20 @@ export function replay(facts: Fact[], seed = 0): Derived {
     else if (con.type === 'angle') addMeasureLabel(lenByKey, angByKey, { type: 'measure-angle', vertex: con.vertex, ray1: con.ray1, ray2: con.ray2 }, `${fmtMeasure(con.value)}°`, true);
   }
   const labels: MeasureLabels = { lengths: [...lenByKey.values()], angles: [...angByKey.values()] };
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, labels };
+  // Angle marks the student ASSERTED (only from facts that applied, and whose points all exist) —
+  // a right-angle square or an angle arc. Deduped by vertex + ray pair.
+  const angleMarks: AngleMark[] = [];
+  const amSeen = new Set<string>();
+  for (const f of facts) {
+    if (status[f.id] !== 'ok') continue;
+    const m = angleMarkFor(f.cmd);
+    if (!m || ![m.vertex, m.ray1, m.ray2].every((id) => e.ok && e.positions.has(id))) continue;
+    const key = `${m.vertex}-${[m.ray1, m.ray2].sort().join('')}`;
+    if (amSeen.has(key)) continue;
+    amSeen.add(key);
+    angleMarks.push(m);
+  }
+  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, labels, angleMarks };
 }
 
 const fmtMeasure = (n: number): string => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(3))));

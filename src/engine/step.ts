@@ -7,7 +7,7 @@
  * the Phase-1 gate needs.)
  */
 
-import type { AnyCommand, Command, Constraint, Construction, GeoObject, Id, Vec } from './types';
+import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Vec } from './types';
 import { LEN_EPS, isGeoPoint } from './types';
 import { applyCommand, mirrorComposition, normalizeShapeComposition } from './apply';
 import { lower } from './lower';
@@ -142,7 +142,8 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     // so |DE|=|DF|" — F is stuck on the segment) may still hold if the figure's
     // OTHER free DOFs move too. Recruit them and solve jointly before giving up
     // (ADR-028, extended): "find a possible configuration and use it".
-    const recruited = recruitFreeDofs(next);
+    const newCons = next.constraints.slice(prev.constraints.length);
+    const recruited = recruitFreeDofs(next, newCons);
     if (recruited) {
       const r2 = evaluate(recruited);
       if (r2.ok) return { ok: true, construction: recruited, positions: r2.positions };
@@ -207,19 +208,76 @@ function freeCarrierAncestors(objects: GeoObject[], start: Id): Id[] {
   return result;
 }
 
+/** The points a line is built from — so a `line-intersection` can be walked back to its DOFs. */
+function lineSpecPoints(spec: LineSpec): Id[] {
+  switch (spec.via) {
+    case 'through': return [spec.a, spec.b];
+    case 'bisector': return [spec.vertex, spec.p, spec.q];
+    case 'perpendicular':
+    case 'parallel': return [spec.through, spec.a, spec.b];
+    case 'tangent': return [spec.at];
+  }
+}
+
 /**
- * Last resort when a constraint can't be met by its direct carrier: turn that
- * carrier and the free DOFs the constraint transitively depends on into a set of
- * joint carriers (all driving the same constraint), so the numeric solver
- * (resolveDriven) can reconfigure the figure to satisfy it. Returns the recruited
- * construction, or null if there's nothing extra to move.
+ * Every free, drivable DOF reachable from `start` — a free vertex (2 DOF) or a free
+ * on-segment/on-circle carrier (1 DOF) — walking through derived points AND through a
+ * `line-intersection`'s defining lines. This lets a constraint whose points are all
+ * fixed by a construction (e.g. |BD| with D = bisector∩bisector, B a ⟂-offset) still
+ * reach the free triangle legs and SIZE the figure (FR-EN-11 / ADR-032). Only DOFs not
+ * already driving something are returned.
  */
-function recruitFreeDofs(c: Construction): Construction | null {
-  const solved = c.objects.filter((o): o is Extract<GeoObject, { kind: 'on-segment-solved' }> => o.kind === 'on-segment-solved');
-  if (!solved.length) return null;
+function freeDrivableAncestors(objects: GeoObject[], start: Id): Id[] {
+  const byId = new Map(objects.map((o) => [o.id, o] as const));
+  const seen = new Set<Id>();
+  const result: Id[] = [];
+  const queue: Id[] = [start];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const o = byId.get(id);
+    if (!o) continue;
+    if (o.kind === 'line') { queue.push(...lineSpecPoints(o.spec)); continue; }
+    if (!isGeoPoint(o)) continue;
+    const free1 = (o.kind === 'on-circle' || o.kind === 'on-segment') && (o as { solve?: unknown }).solve === undefined;
+    const free2 = o.kind === 'free-point' && !(o as FreePoint).pinned && !(o as FreePoint).rigid && (o as FreePoint).solve === undefined;
+    if (free1 || free2) { result.push(id); continue; } // a terminal drivable DOF — stop here
+    // A shape-scalar DOF (perp-offset dist / rotated angle / scaled-offset k) is also drivable,
+    // but KEEP walking past it to its defining vertices (both are candidate DOFs) — ADR-033.
+    if ((o.kind === 'perp-offset' || o.kind === 'rotated' || o.kind === 'scaled-offset') && (o as { solve?: unknown }).solve === undefined) result.push(id);
+    if (o.kind === 'line-intersection') { queue.push(o.line1, o.line2); continue; }
+    queue.push(...pointParents(o));
+  }
+  return result;
+}
+
+/** Mark a free vertex / parametric / shape-scalar carrier as driving `K`. */
+function markDriven(o: GeoObject, K: Constraint): GeoObject {
+  if (
+    o.kind === 'free-point' || o.kind === 'on-circle' || o.kind === 'on-segment' ||
+    o.kind === 'perp-offset' || o.kind === 'rotated' || o.kind === 'scaled-offset'
+  )
+    return { ...o, solve: { constraint: K, branch: 0 } };
+  return o;
+}
+
+/**
+ * Last resort when a constraint can't be met by its direct carrier: turn the free DOFs
+ * the constraint transitively depends on into joint carriers, so the numeric solver
+ * (resolveDriven) can reconfigure the figure to satisfy it. Two cases:
+ *  (A) an on-segment-solved carrier exists but can't satisfy alone → recruit its other free ancestors;
+ *  (B) a just-added constraint has NO carrier (all its refs are derived — e.g. |BD| where B,D are
+ *      construction points) → recruit ONE distinct free ancestor per constraint, so each gets its own
+ *      carrier and the joint solver sizes the figure. The constraint is already present as a check.
+ * Returns the recruited construction, or null if there's nothing extra to move.
+ */
+function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construction | null {
   let objects = [...c.objects];
   const added: Constraint[] = [];
   let changed = false;
+  // (A)
+  const solved = objects.filter((o): o is Extract<GeoObject, { kind: 'on-segment-solved' }> => o.kind === 'on-segment-solved');
   for (const sp of solved) {
     const K = sp.constraint;
     const recruits = new Set<Id>();
@@ -235,7 +293,25 @@ function recruitFreeDofs(c: Construction): Construction | null {
       return o;
     });
   }
+  // (B) — recruit MORE free ancestors for each new constraint (this only runs after evaluate
+  // already failed). driveOrCheck may have picked a carrier that can't actually move the
+  // constraint (a rectangle's |AD| drives A, but |AD| is the height behind D); so we don't skip
+  // an "already-driven" constraint — we add its other reachable, not-yet-driving DOFs (the height
+  // `C`, a rhombus's `rotated` angle behind C). The joint solver moves only the ones that matter
+  // (the regulariser keeps the rest near their seed).
+  for (const K of newCons) {
+    const cand = [...new Set(constraintRefs(K).flatMap((ref) => freeDrivableAncestors(objects, ref)))].filter((id) => !isSolving(objects, id));
+    if (cand.length === 0) continue;
+    changed = true;
+    objects = objects.map((o) => (cand.includes(o.id) ? markDriven(o, K) : o));
+  }
   return changed ? { objects, constraints: [...c.constraints, ...added] } : null;
+}
+
+/** Is point `id` already driving some constraint? */
+function isSolving(objects: GeoObject[], id: Id): boolean {
+  const o = objects.find((x) => x.id === id);
+  return !!o && (o as { solve?: unknown }).solve !== undefined;
 }
 
 // ── ADR-028: a second placement of an existing point → a coincidence constraint ──
