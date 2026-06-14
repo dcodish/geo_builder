@@ -1207,17 +1207,18 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
 }
 
 /**
- * Detect a RELABEL request — "rename E to G" / "relabel E as G" / "rename E G",
- * Hebrew "שנה שם E ל-G" / "שנה E ל-G" / "החלף E ב-G". This is a store-level
- * operation (rewrite the point's letter across every fact), not a geometry
- * command, so it's handled outside `parse` (the App intercepts it). Returns the
- * uppercased point letters, or null when the utterance isn't a rename.
+ * Detect a RELABEL request — "rename E to G" / "relabel E as G" / "replace E with G"
+ * / "rename E G", Hebrew "שנה שם E ל-G" / "שנה E ל-G" / "החלף E ב-G" / "החלף את E עם G".
+ * This is a store-level operation (rewrite the point's letter across every fact),
+ * not a geometry command, so it's handled outside `parse` (the App intercepts it).
+ * Returns the uppercased point letters, or null when the utterance isn't a rename.
+ * Connectors are optional and varied: to/as/into/with/with-arrow, ל-/ב-/עם.
  */
 export function parseRename(raw: string): { from: Id; to: Id } | null {
   const s = raw.trim().replace(/\s+/g, ' ');
   const m =
-    s.match(/(?:rename|relabel)\s+([A-Za-z])\b(?:\s+(?:to|as|into|->|→|=))?\s+([A-Za-z])\b/i) ??
-    s.match(/(?:שנה|החלף)\s*(?:שם\s*)?(?:את\s*)?([A-Za-z])\s*(?:ל-?|ב-?|→|=)?\s*([A-Za-z])\b/i);
+    s.match(/(?:rename|relabel|replace|swap)\s+([A-Za-z])\b(?:\s+(?:to|as|into|with|by|->|→|=))?\s+([A-Za-z])\b/i) ??
+    s.match(/(?:שנה|החלף)\s*(?:שם\s*)?(?:את\s*)?([A-Za-z])\s*(?:ל-?|ב-?|עם|→|=)?\s*([A-Za-z])\b/i);
   if (!m) return null;
   const from = up(m[1]);
   const to = up(m[2]);

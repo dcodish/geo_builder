@@ -31,6 +31,10 @@ describe('parseRename — the relabel phrasings', () => {
     expect(parseRename('שנה שם E ל-G')).toEqual({ from: 'E', to: 'G' });
     expect(parseRename('שנה E ל G')).toEqual({ from: 'E', to: 'G' });
     expect(parseRename('החלף E ב-G')).toEqual({ from: 'E', to: 'G' });
+    expect(parseRename('החלף את F עם E')).toEqual({ from: 'F', to: 'E' }); // "replace F with E" — עם connector
+  });
+  it('reads "replace … with …"', () => {
+    expect(parseRename('replace F with E')).toEqual({ from: 'F', to: 'E' });
   });
   it('is not a rename → null (so the parser/LLM handle it)', () => {
     expect(parseRename('square ABCD')).toBeNull();
