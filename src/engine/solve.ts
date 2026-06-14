@@ -30,6 +30,8 @@ export function constraintRefs(con: Constraint): Id[] {
     case 'parallel':
     case 'perpendicular':
       return [con.a, con.b, con.c, con.d];
+    case 'angle-ratio':
+      return [con.v1, con.a1, con.b1, con.v2, con.a2, con.b2];
     case 'coincide':
       return [con.p, con.q];
   }
@@ -50,6 +52,8 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
       return dist(get(con.a), get(con.b)) - dist(get(con.c), get(con.d));
     case 'ratio':
       return dist(get(con.a), get(con.b)) - con.k * dist(get(con.c), get(con.d));
+    case 'angle-ratio':
+      return angleDeg(get(con.v1), get(con.a1), get(con.b1)) - con.k * angleDeg(get(con.v2), get(con.a2), get(con.b2));
     case 'coincide':
       return dist(get(con.p), get(con.q)); // 0 ⇔ the two points meet
     case 'parallel': {
@@ -77,6 +81,8 @@ export function residualTolerance(con: Constraint): number {
     case 'parallel':
     case 'perpendicular':
       return 1e-6;
+    case 'angle-ratio':
+      return ANGLE_EPS;
     case 'coincide':
       return 1e-4; // a driven numeric solve won't hit exact zero — a looser "they meet"
   }
@@ -93,6 +99,8 @@ export function describeConstraint(con: Constraint): string {
       return `|${con.a}${con.b}| = |${con.c}${con.d}|`;
     case 'ratio':
       return `|${con.a}${con.b}| = ${con.k}·|${con.c}${con.d}|`;
+    case 'angle-ratio':
+      return `∠${con.a1}${con.v1}${con.b1} = ${con.k}·∠${con.a2}${con.v2}${con.b2}`;
     case 'parallel':
       return `${con.a}${con.b} ∥ ${con.c}${con.d}`;
     case 'perpendicular':

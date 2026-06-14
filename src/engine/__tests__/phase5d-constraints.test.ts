@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { Command, Vec } from '../types';
+import type { AnyCommand, Command, Vec } from '../types';
 import { build, applyStep, emptyConstruction } from '../step';
 import { dist, sub } from '../geometry';
 import { parse } from '@/parser';
@@ -70,7 +70,7 @@ describe('equal-segments constraint', () => {
 });
 
 describe('"diameter AB" on two existing points is a constraint (AB is a diameter), not a redefinition', () => {
-  const P = (u: string, ctx?: { circles: string[] }): Command[] => {
+  const P = (u: string, ctx?: { circles: string[] }): AnyCommand[] => {
     const r = parse(u, ctx);
     if (!r.ok) throw new Error(u);
     return r.commands;

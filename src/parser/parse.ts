@@ -16,10 +16,10 @@
  * Hebrew text). Keywords are bilingual; the same rule matches either language.
  */
 
-import type { Command, Id } from '@/engine';
+import type { AnyCommand, Command, Id } from '@/engine';
 
 export type ParseResult =
-  | { ok: true; commands: Command[] }
+  | { ok: true; commands: AnyCommand[] }
   | { ok: false; reason: 'not-handled' };
 
 /**
@@ -41,7 +41,7 @@ const NO_CONTEXT: ParseContext = {};
  * letting a weaker rule half-parse the utterance. A half-parse that silently
  * drops part of a fact is worse than a miss — it draws a wrong figure.
  */
-type Rule = (s: string, ctx: ParseContext) => Command[] | null | 'stop';
+type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop';
 
 const up = (c: string): Id => c.toUpperCase();
 const num = String.raw`(-?\d+(?:\.\d+)?)`;
@@ -367,6 +367,46 @@ const equalSegments: Rule = (s) => {
 const distanceConstraint: Rule = (s) => {
   const m = s.match(new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*${num}\b`));
   return m ? [{ type: 'set-distance', a: up(m[1]), b: up(m[2]), value: parseFloat(m[3]) }] : null;
+};
+
+// ── Symbolic measures (ADR-031): a named unknown shared across statements. ──
+// A variable is a single LOWERCASE letter — latin for lengths (x, y), Greek for
+// angles (α, β); points stay uppercase, so the two never collide.
+const VAR = String.raw`[a-zα-ω]`;
+
+/**
+ * "AB = 3x" / "AB = x" / "AB = 1.5y" — a segment's length as `coef·var` (a symbolic
+ * size, not a number). Runs before the numeric/ratio rules; a numeric RHS ("AB = 5")
+ * has no variable and falls through to `distanceConstraint`. The relation only bites
+ * once a second segment shares the variable (lowered to a ratio in the store).
+ */
+const measureLength: Rule = (s) => {
+  // The variable is one lowercase/Greek letter, not followed by another latin letter
+  // (so "AB = CD" stays a ratio and a Greek letter — no regex word boundary — still ends cleanly).
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})?\s*[*·]?\s*(${VAR})(?![a-zA-Z])`));
+  if (!m) return null;
+  return [{ type: 'measure-length', a: up(m[1]), b: up(m[2]), expr: { coef: m[3] ? parseFloat(m[3]) : 1, var: m[4] } }];
+};
+
+/**
+ * "angle ABC = 2α" / "זווית ABC = α" — an angle as `coef·var`. Runs before `angle`,
+ * which would otherwise read the coefficient as the angle's degree value. A numeric
+ * angle ("angle ABC = 37") has no variable here and falls through to `angle`.
+ */
+const measureAngle: Rule = (s) => {
+  if (!/angle|זווית|זוית/i.test(s)) return null;
+  const stripped = s.replace(/angle|זווית|זוית/gi, ' ');
+  const ids = labelRun(stripped, 3);
+  if (!ids) return null;
+  const m = stripped.match(new RegExp(String.raw`=\s*(${COEF})?\s*[*·]?\s*(${VAR})(?![a-zA-Z])`));
+  if (!m) return null; // numeric or unreadable → let `angle` take the numeric case
+  return [{ type: 'measure-angle', vertex: ids[1], ray1: ids[0], ray2: ids[2], expr: { coef: m[1] ? parseFloat(m[1]) : 1, var: m[2] } }];
+};
+
+/** "x = 4" / "α = 30" — bind a variable to a number; resolves every measure that uses it. */
+const setVar: Rule = (s) => {
+  const m = s.match(new RegExp(String.raw`^\s*(${VAR})\s*=\s*${num}\s*$`));
+  return m ? [{ type: 'set-var', name: m[1], value: parseFloat(m[2]) }] : null;
 };
 
 /** "AB parallel to CD" / "AB ∥ CD" / "AB מקביל ל-CD". */
@@ -871,6 +911,7 @@ const RULES: Rule[] = [
   parallelCircleIntersection, // a parallel line ∩ the circle
   circleCircleIntersection, // two circles cross — before the generic line∩line intersection
   lineLineIntersection,
+  measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,
   tangentLine, // a *drawn* tangent (after the tangent∩line compound)
   bisectorLine, // a *drawn* bisector (after the bisector compounds)
@@ -889,6 +930,8 @@ const RULES: Rule[] = [
   pointOnCircle, // "A on circle O" — before segment/pointOnSegment
   segment,
   pointOnSegment,
+  setVar, // "x = 4" / "α = 30" — a bare variable binding; before the numeric rules
+  measureLength, // "AB = 3x" (symbolic) — before ratio/equal/distance
   ratioConstraint, // "AB = 2 AD" — before equal/distance (it would half-parse "AB = 2")
   equalSegments, // "AB = CD" — before distance (numeric RHS) and freePoint (coord RHS)
   distanceConstraint, // "AB = 6"

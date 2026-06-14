@@ -63,12 +63,18 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
   // whose A,B,C are free) reshapes the figure by moving that vertex to the nearest
   // satisfying spot (`resolveDriven`). Prefer a NON-pinned, not-yet-driven vertex,
   // the most-recently-added one (keeps earlier/base vertices stable) — ADR-028.
-  const freePts = idxs.filter((i) => {
+  const cand = idxs.filter((i) => {
     if (i < 0 || objects[i].kind !== 'free-point') return false;
     const fp = objects[i] as Extract<GeoObject, { kind: 'free-point' }>;
-    return !fp.pinned && !fp.rigid && fp.solve === undefined && !pinned.has(fp.id);
+    return !fp.pinned && !fp.rigid && fp.solve === undefined;
   });
-  const free = freePts.length ? freePts.reduce((a, b) => (b > a ? b : a)) : undefined;
+  // Prefer a vertex no other constraint references, but fall back to any free one —
+  // so a SECOND constraint sharing all its vertices (e.g. two angles of a triangle)
+  // still gets a distinct carrier and the two are solved jointly (resolveDriven),
+  // rather than the second finding everything "pinned" and failing as a check.
+  const notPinned = cand.filter((i) => !pinned.has(objects[i].id));
+  const pool = notPinned.length ? notPinned : cand;
+  const free = pool.length ? pool.reduce((a, b) => (b > a ? b : a)) : undefined;
   if (free !== undefined) {
     objects[free] = { ...(objects[free] as Extract<GeoObject, { kind: 'free-point' }>), solve: { constraint: con, branch: 0 } };
     constraints.push(con); // verified after the driven solve (honest fail if unsolvable)
@@ -538,6 +544,13 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'set-ratio':
       driveOrCheck(objects, constraints, { type: 'ratio', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d, k: cmd.k });
+      break;
+
+    case 'set-angle-ratio':
+      driveOrCheck(objects, constraints, {
+        type: 'angle-ratio',
+        v1: cmd.v1, a1: cmd.a1, b1: cmd.b1, v2: cmd.v2, a2: cmd.a2, b2: cmd.b2, k: cmd.k,
+      });
       break;
 
     case 'set-parallel':

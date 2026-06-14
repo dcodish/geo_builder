@@ -7,9 +7,10 @@
  * the Phase-1 gate needs.)
  */
 
-import type { Command, Constraint, Construction, GeoObject, Id, Vec } from './types';
+import type { AnyCommand, Command, Constraint, Construction, GeoObject, Id, Vec } from './types';
 import { LEN_EPS, isGeoPoint } from './types';
 import { applyCommand, mirrorComposition, normalizeShapeComposition } from './apply';
+import { lower } from './lower';
 import { evaluate } from './evaluate';
 import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist } from './geometry';
@@ -371,12 +372,12 @@ function preferMirror(prev: Construction, cmd: Command, prevPos: Map<Id, Vec>, d
 }
 
 /** Apply a sequence expecting success; throws on unexpected failure (for fixtures/tests). */
-export function build(cmds: Command[], start: Construction = emptyConstruction()): {
+export function build(cmds: AnyCommand[], start: Construction = emptyConstruction()): {
   construction: Construction;
   positions: Map<Id, Vec>;
 } {
   let cur = start;
-  for (const cmd of cmds) {
+  for (const cmd of lower(cmds)) {
     const r = applyStep(cur, cmd);
     if (!r.ok) throw new Error(`unexpected failure on '${cmd.type}': ${r.error}`);
     cur = r.construction;

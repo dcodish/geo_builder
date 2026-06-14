@@ -11,13 +11,13 @@
  * honest instead of silent. The API key never touches the browser.
  */
 
-import type { Command } from '@/engine';
+import type { AnyCommand } from '@/engine';
 import { parse } from './parse';
 
 /** One canonical step the LLM produced that the parser turned into engine commands. */
 export interface BuiltStep {
   step: string;
-  commands: Command[];
+  commands: AnyCommand[];
 }
 
 export interface LlmOutcome {

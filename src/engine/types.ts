@@ -410,6 +410,18 @@ export interface PerpendicularConstraint {
   d: Id;
 }
 
+/** ∠(a1·v1·b1) = k·∠(a2·v2·b2) — a proportion between two angles (equal is k = 1). */
+export interface AngleRatioConstraint {
+  type: 'angle-ratio';
+  v1: Id;
+  a1: Id;
+  b1: Id;
+  v2: Id;
+  a2: Id;
+  b2: Id;
+  k: number;
+}
+
 /**
  * Point p must coincide with point q (|pq| = 0). Produced when a second statement
  * *places* an already-defined point (e.g. "C is the midpoint of OB", where C is
@@ -429,6 +441,7 @@ export type Constraint =
   | RatioConstraint
   | ParallelConstraint
   | PerpendicularConstraint
+  | AngleRatioConstraint
   | CoincideConstraint;
 
 export interface Construction {
@@ -455,6 +468,7 @@ export type Command =
   | { type: 'set-distance'; a: Id; b: Id; value: number }
   | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-ratio'; a: Id; b: Id; c: Id; d: Id; k: number } // |ab| = k·|cd|
+  | { type: 'set-angle-ratio'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id; k: number } // ∠1 = k·∠2
   | { type: 'set-parallel'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-perpendicular'; a: Id; b: Id; c: Id; d: Id }
   // Phase 5b — lines (scaffolding unless `visible`) and the points they produce.
@@ -475,6 +489,29 @@ export type Command =
   | { type: 'line-circle-intersection'; id: Id; line: Id; circle: Id; branch?: number }
   | { type: 'circle-circle-intersection'; id: Id; circle1: Id; circle2: Id; branch?: number }
   | { type: 'tangent'; id: Id; circle: Id; at: Id; visible?: boolean };
+
+/**
+ * A measure's value: either a literal number, or `coef · var` where `var` is a
+ * named unknown (lowercase latin for lengths, Greek for angles). A bare variable
+ * is `coef = 1`. Used by the symbolic-measure layer (ADR-031).
+ */
+export type MeasureExpr = { value: number } | { coef: number; var: string };
+
+/**
+ * Store-level commands the parser may emit in addition to engine `Command`s — the
+ * symbolic-measure vocabulary ([ADR-031](docs/06-decisions.md#adr-031)). The engine
+ * never sees these: the store's `replay` LOWERS them (via a symbol table) into
+ * engine commands (`set-distance`/`set-ratio`/`set-angle`/`set-angle-ratio`) and a
+ * display-label map. `measure-length`/`measure-angle` annotate a segment/angle with
+ * a (possibly symbolic) size; `set-var` binds a variable to a number.
+ */
+export type SymbolicCommand =
+  | { type: 'measure-length'; a: Id; b: Id; expr: MeasureExpr }
+  | { type: 'measure-angle'; vertex: Id; ray1: Id; ray2: Id; expr: MeasureExpr }
+  | { type: 'set-var'; name: string; value: number };
+
+/** What the parser produces and a `Fact` stores: engine commands plus the symbolic layer. */
+export type AnyCommand = Command | SymbolicCommand;
 
 /** Tolerances. */
 export const LEN_EPS = 1e-6; // coordinate closeness (units)

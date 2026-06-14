@@ -18,8 +18,8 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
-import type { Command, Construction, Id, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, branchCount, deepEqual, emptyConstruction, evaluate, freeDofs, isGeoPoint } from '@/engine';
+import type { AnyCommand, Command, Construction, Id, Vec } from '@/engine';
+import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, deepEqual, emptyConstruction, evaluate, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -33,8 +33,14 @@ export interface Fact {
    * rows. Absent ⇒ the fact is its own group (keyed by its `id`).
    */
   group?: string;
-  cmd: Command;
+  cmd: AnyCommand;
   enabled: boolean;
+}
+
+/** A measure label to print on the figure (ADR-031): a length along a segment, or an angle at a vertex. */
+export interface MeasureLabels {
+  lengths: { a: Id; b: Id; text: string }[];
+  angles: { vertex: Id; ray1: Id; ray2: Id; text: string }[];
 }
 
 /** The display key that groups a fact's commands into one step row. */
@@ -50,6 +56,8 @@ export interface Derived {
   status: Record<string, FactStatus>;
   /** The most recent enabled fact that failed, for the error banner (or null). */
   lastError: string | null;
+  /** Measure labels to print on the figure (ADR-031). */
+  labels: MeasureLabels;
 }
 
 /**
@@ -62,21 +70,32 @@ export function replay(facts: Fact[], seed = 0): Derived {
   let cur = emptyConstruction();
   const status: Record<string, FactStatus> = {};
   let lastError: string | null = null;
+  // Symbol table over the ENABLED facts, so a value given later (`x = 4`) resolves an
+  // earlier `AB = 3x`, and two segments sharing a variable become a proportion (ADR-031).
+  const symtab = buildSymTab(facts.filter((f) => f.enabled).map((f) => f.cmd));
+  const lenByKey = new Map<string, MeasureLabels['lengths'][number]>();
+  const angByKey = new Map<string, MeasureLabels['angles'][number]>();
   // Point ids any earlier fact OWNS (introduces). A later fact must not silently
   // re-create one of these as a default free point (the auto-create-endpoints
   // affordance) when its owner failed/was removed — that would mask the breakage.
   // Instead the dependent fact fails too, so a removed step cascades honestly.
   const owned = new Set<Id>();
   for (const f of facts) {
-    const intro = introducedPointIds(f.cmd);
+    // Lower the fact to the engine command(s) it produces (symbolic measures →
+    // ratio/distance/angle/[]; engine commands pass through). 0 commands ⇒ a label-
+    // only / data-only fact (a free representative or `set-var`) — applied as a no-op.
+    const engineCmds = lowerOne(f.cmd, symtab);
+    const intro = engineCmds.flatMap(introducedPointIds);
     const claim = () => intro.forEach((id) => owned.add(id));
     if (!f.enabled) {
       status[f.id] = 'disabled';
       claim();
       continue;
     }
-    // A point this fact would (re)create that an earlier fact owns but which isn't
-    // in the figure now ⇒ its definition is gone, so this fact can't build either.
+    // A measure annotates the figure regardless of whether it adds a constraint.
+    if (isMeasure(f.cmd)) addMeasureLabel(lenByKey, angByKey, f.cmd, measureLabelText(f.cmd, symtab));
+    // A point a lowered command would (re)create that an earlier fact owns but which
+    // isn't in the figure now ⇒ its definition is gone, so this fact can't build either.
     const broken = intro.filter((id) => owned.has(id) && !cur.objects.some((o) => o.id === id));
     if (broken.length) {
       status[f.id] = `can't build: ${broken.join(', ')} is no longer available (an earlier step it relies on was removed or failed)`;
@@ -84,23 +103,60 @@ export function replay(facts: Fact[], seed = 0): Derived {
       claim();
       continue;
     }
-    const r = applyStep(cur, f.cmd);
-    if (r.ok) {
-      cur = r.construction;
-      status[f.id] = 'ok';
-    } else {
-      status[f.id] = r.error; // dependencies gone, contradiction, etc. — keep prior figure
-      lastError = r.error;
+    let ok = true;
+    for (const ec of engineCmds) {
+      const r = applyStep(cur, ec);
+      if (r.ok) cur = r.construction;
+      else {
+        status[f.id] = r.error; // dependencies gone, contradiction, etc. — keep prior figure
+        lastError = r.error;
+        ok = false;
+        break;
+      }
     }
+    if (ok) status[f.id] = 'ok';
     claim();
   }
   const figure = applySeed(cur, seed);
   const e = evaluate(figure);
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError };
+  // Numeric measures (a plain `AB = 5` / `∠ABC = 37`, and symbolic ones once resolved)
+  // surface as distance/angle constraints — label them from the figure, filling any
+  // key a symbolic fact didn't already own (FR-RN-2).
+  for (const con of figure.constraints) {
+    if (con.type === 'distance') addMeasureLabel(lenByKey, angByKey, { type: 'measure-length', a: con.a, b: con.b }, fmtMeasure(con.value), true);
+    else if (con.type === 'angle') addMeasureLabel(lenByKey, angByKey, { type: 'measure-angle', vertex: con.vertex, ray1: con.ray1, ray2: con.ray2 }, `${fmtMeasure(con.value)}°`, true);
+  }
+  const labels: MeasureLabels = { lengths: [...lenByKey.values()], angles: [...angByKey.values()] };
+  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, labels };
+}
+
+const fmtMeasure = (n: number): string => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(3))));
+
+/** Record a measure label; `fillOnly` writes only if that segment/angle isn't already labelled (numeric fallback). */
+function addMeasureLabel(
+  lenByKey: Map<string, MeasureLabels['lengths'][number]>,
+  angByKey: Map<string, MeasureLabels['angles'][number]>,
+  m: { type: 'measure-length'; a: Id; b: Id } | { type: 'measure-angle'; vertex: Id; ray1: Id; ray2: Id },
+  text: string,
+  fillOnly = false,
+): void {
+  if (m.type === 'measure-angle') {
+    const key = `${m.vertex}:${[m.ray1, m.ray2].sort().join('')}`;
+    if (fillOnly && angByKey.has(key)) return;
+    angByKey.set(key, { vertex: m.vertex, ray1: m.ray1, ray2: m.ray2, text });
+  } else {
+    const key = [m.a, m.b].sort().join('');
+    if (fillOnly && lenByKey.has(key)) return;
+    lenByKey.set(key, { a: m.a, b: m.b, text });
+  }
 }
 
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */
-export function introducedIds(cmd: Command): Id[] {
+export function introducedIds(cmd: AnyCommand): Id[] {
+  // A symbolic measure introduces no objects; highlight the points it annotates instead.
+  if (cmd.type === 'measure-length') return [cmd.a, cmd.b];
+  if (cmd.type === 'measure-angle') return [cmd.vertex, cmd.ray1, cmd.ray2];
+  if (cmd.type === 'set-var') return [];
   return applyCommand(emptyConstruction(), cmd).objects.map((o) => o.id);
 }
 
@@ -117,9 +173,9 @@ export interface GeoState {
   seed: number;
 
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
-  execute: (cmd: Command, utterance?: string, group?: string) => void;
+  execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;
   /** Replace a fact's command *in place* (same list position) — an edit (ADR-015). */
-  update: (id: string, cmd: Command, utterance?: string) => void;
+  update: (id: string, cmd: AnyCommand, utterance?: string) => void;
   /** Flip a fact's selected/deselected state. */
   toggle: (id: string) => void;
   /** Remove a fact permanently. */
@@ -129,7 +185,7 @@ export interface GeoState {
   /** Delete every fact in a step group. */
   removeGroup: (key: string) => void;
   /** Replace a whole step group with freshly-parsed commands, in place (edit a multi-command step). */
-  replaceGroup: (key: string, cmds: Command[], utterance?: string) => void;
+  replaceGroup: (key: string, cmds: AnyCommand[], utterance?: string) => void;
   /** Select a fact for inspection (or clear, if it was already selected). */
   select: (id: string | null) => void;
   /** Advance an intersection point to its next configuration (stored in the fact's command). */
