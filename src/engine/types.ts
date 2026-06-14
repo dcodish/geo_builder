@@ -258,6 +258,19 @@ export interface CircleCirclePoint {
   branch: number;
 }
 
+/**
+ * 0 DOF — a fixed marker on a drawn `line`, at signed `offset` along the line's
+ * direction from its anchor. Used to name a drawn line by two points (e.g. a
+ * tangent "CD" at T → C, D at ±offset from T along the tangent). The line's
+ * anchor/direction come from its `LineSpec`; this point just rides it.
+ */
+export interface OnLinePoint {
+  kind: 'on-line';
+  id: Id;
+  line: Id;
+  offset: number;
+}
+
 export type GeoPoint =
   | FreePoint
   | OnSegmentPoint
@@ -277,7 +290,8 @@ export type GeoPoint =
   | AntipodePoint
   | ArcMidpointPoint
   | LineCirclePoint
-  | CircleCirclePoint;
+  | CircleCirclePoint
+  | OnLinePoint;
 
 /** The object kinds that are points (carry a computed position). Single source of truth. */
 const POINT_KINDS: ReadonlySet<string> = new Set([
@@ -300,6 +314,7 @@ const POINT_KINDS: ReadonlySet<string> = new Set([
   'arc-midpoint',
   'line-circle',
   'circle-circle',
+  'on-line',
 ]);
 
 export function isGeoPoint(o: GeoObject): o is GeoPoint {
@@ -500,7 +515,8 @@ export type Command =
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }
   | { type: 'line-circle-intersection'; id: Id; line: Id; circle: Id; branch?: number }
   | { type: 'circle-circle-intersection'; id: Id; circle1: Id; circle2: Id; branch?: number }
-  | { type: 'tangent'; id: Id; circle: Id; at: Id; visible?: boolean };
+  | { type: 'tangent'; id: Id; circle: Id; at: Id; visible?: boolean }
+  | { type: 'point-on-line'; id: Id; line: Id; offset: number }; // a fixed marker on a drawn line (names it by a point)
 
 /**
  * A measure's value: either a literal number, or `coef · var` where `var` is a

@@ -854,12 +854,28 @@ const circleCircleIntersection: Rule = (s) => {
 };
 
 /** "tangent to circle O at A" / "משיק למעגל O בנקודה A" — a *drawn* tangent line (⟂ the radius at A). */
+const TANGENT_MARK = 5; // offset of a named tangent's endpoint markers (±) from the tangency point
+
 const tangentLine: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   const center = resolveCenter(s, ctx);
   const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z])\b/i);
   if (!center || !atM) return null;
-  return [{ type: 'tangent', id: `tan-${up(atM[1])}`, circle: circleId(center), at: up(atM[1]), visible: true }];
+  const T = up(atM[1]);
+  const lineId = `tan-${T}`;
+  const cmds: AnyCommand[] = [{ type: 'tangent', id: lineId, circle: circleId(center), at: T, visible: true }];
+  // If the line is *named* by two points ("הישר CD משיק…" / "line CD tangent…"),
+  // create them as fixed markers on the tangent at ±offset from the tangency point
+  // T (the line's anchor), so they're referenceable (e.g. a later AC, TC).
+  const named = dropCircleRef(s)
+    .replace(/(?:\bat\b|בנקודה|ב-?)\s*[A-Za-z]\b/gi, ' ')
+    .replace(/tangent|משיק\S*|\bline\b|הישר|הקו|למעגל|מעגל/gi, ' ');
+  const pts = labelRun(named, 2);
+  if (pts && pts[0] !== T && pts[1] !== T && pts[0] !== up(center) && pts[1] !== up(center)) {
+    cmds.push({ type: 'point-on-line', id: pts[0], line: lineId, offset: TANGENT_MARK });
+    cmds.push({ type: 'point-on-line', id: pts[1], line: lineId, offset: -TANGENT_MARK });
+  }
+  return cmds;
 };
 
 /** "bisector of angle ABC" / "חוצה זווית ABC" — a *drawn* angle bisector (not "AD bisects …", which places a point). */

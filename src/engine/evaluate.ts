@@ -752,6 +752,12 @@ function tryEval(
       return hit;
     }
 
+    case 'on-line': {
+      const l = lines.get(p.line);
+      if (!l) return 'pending';
+      return add(l.anchor, scale(l.dir, p.offset)); // anchor + offset·dir (dir is unit)
+    }
+
     case 'foot': {
       const from = pos.get(p.from);
       const a = pos.get(p.a);

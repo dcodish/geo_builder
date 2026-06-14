@@ -546,6 +546,10 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       addLine(objects, { kind: 'line', id: cmd.id, spec: { via: 'tangent', circle: cmd.circle, at: cmd.at }, visible: cmd.visible });
       break;
 
+    case 'point-on-line':
+      addObj(objects, { kind: 'on-line', id: cmd.id, line: cmd.line, offset: cmd.offset });
+      break;
+
     case 'point-by-distances':
       addObj(objects, {
         kind: 'intersection',
