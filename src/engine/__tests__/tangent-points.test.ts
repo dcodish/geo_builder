@@ -68,4 +68,22 @@ describe('engine — C and D land on the tangent, symmetric about T', () => {
     const f = s().facts.find((x) => x.utterance === 'segment TC')!;
     expect(replay(s().facts).status[f.id]).toBe('ok');
   });
+
+  it('a marker is DRIVABLE: a later constraint slides C along the tangent (ADR-036)', () => {
+    // M=(0,0), T=(5,0) (θ=0), tangent vertical; C starts at T+5·(0,1)=(5,5).
+    const C0 = pos().get('C')!;
+    expect(C0).toEqual({ x: 5, y: 5 });
+    // A fixed point off the tangent; AC ⊥ TC forces C to the foot of ⟂ from A onto the
+    // tangent. With A=(0,10) and the tangent x=5, that foot is (5,10).
+    s().execute({ type: 'free-point', id: 'A', x: 0, y: 10 }, 'A');
+    s().execute({ type: 'set-perpendicular', a: 'A', b: 'C', c: 'T', d: 'C' }, 'AC ⟂ TC');
+    const C1 = pos().get('C')!;
+    const A = pos().get('A')!;
+    const T = pos().get('T')!;
+    expect(C1.x).toBeCloseTo(5, 4); // stayed ON the tangent
+    expect(C1.y).toBeCloseTo(10, 3); // slid up to the perpendicular foot
+    const AC = { x: C1.x - A.x, y: C1.y - A.y };
+    const TC = { x: C1.x - T.x, y: C1.y - T.y };
+    expect(Math.abs(dot(AC, TC))).toBeLessThan(1e-3); // AC ⟂ TC now holds
+  });
 });

@@ -69,9 +69,15 @@ function resolveDriven(c: Construction): Construction {
   const freeCarriers = c.objects.filter(
     (o): o is Extract<GeoObject, { kind: 'free-point' }> => o.kind === 'free-point' && o.solve !== undefined,
   );
-  if (shapeCarriers.length > 0) {
+  // An on-line marker's offset is UNBOUNDED (it slides along an infinite line), so it
+  // can't use the bracketed range-solve below — route it (and anything it must solve
+  // jointly with) through the seed/scale optimizer (ADR-036).
+  const onLineCarriers = c.objects.filter(
+    (o): o is Extract<GeoObject, { kind: 'on-line' }> => o.kind === 'on-line' && o.solve !== undefined,
+  );
+  if (shapeCarriers.length > 0 || onLineCarriers.length > 0) {
     const paramCarriers = c.objects.filter((o) => (o.kind === 'on-segment' || o.kind === 'on-circle') && o.solve !== undefined);
-    return resolveMixedCarriers(c, [...freeCarriers, ...paramCarriers, ...shapeCarriers]);
+    return resolveMixedCarriers(c, [...freeCarriers, ...paramCarriers, ...shapeCarriers, ...onLineCarriers]);
   }
   if (freeCarriers.length > 0) return resolveFreeDriven(c, freeCarriers);
 
@@ -271,6 +277,7 @@ function carrierSpec(o: GeoObject, span: number): CarrierSpec | null {
     case 'perp-offset': return o.solve ? { id: o.id, n: 1, seed: [o.dist], scale: [Math.max(Math.abs(o.dist), 1)] } : null;
     case 'rotated': return o.solve ? { id: o.id, n: 1, seed: [o.angleDeg], scale: [90] } : null;
     case 'scaled-offset': return o.solve ? { id: o.id, n: 1, seed: [o.k], scale: [Math.max(Math.abs(o.k), 0.5)] } : null;
+    case 'on-line': return o.solve ? { id: o.id, n: 1, seed: [o.offset], scale: [Math.max(Math.abs(o.offset), floor)] } : null;
     default: return null;
   }
 }
@@ -288,6 +295,7 @@ function setCarrierVals(c: Construction, vals: Map<Id, number[]>): Construction 
         case 'perp-offset': return { ...o, dist: Math.max(v[0], 1e-3), solve: undefined };
         case 'rotated': return { ...o, angleDeg: v[0], solve: undefined };
         case 'scaled-offset': return { ...o, k: Math.max(v[0], 1e-3), solve: undefined };
+        case 'on-line': return { ...o, offset: v[0], solve: undefined };
         default: return o;
       }
     }),

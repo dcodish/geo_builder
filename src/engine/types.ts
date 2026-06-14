@@ -259,16 +259,19 @@ export interface CircleCirclePoint {
 }
 
 /**
- * 0 DOF — a fixed marker on a drawn `line`, at signed `offset` along the line's
- * direction from its anchor. Used to name a drawn line by two points (e.g. a
- * tangent "CD" at T → C, D at ±offset from T along the tangent). The line's
- * anchor/direction come from its `LineSpec`; this point just rides it.
+ * 1 DOF — a marker on a drawn `line`, at signed `offset` along the line's
+ * direction from its anchor. Names a drawn line by two points (e.g. a tangent
+ * "CD" at T → C, D at ±offset from T along the tangent). Default it just sits at
+ * its `offset`; when a later constraint references it, `solve` slides the offset
+ * ALONG the line so the constraint holds (ADR-036) — the on-segment analogue for
+ * an infinite line. The anchor/direction come from the line's `LineSpec`.
  */
 export interface OnLinePoint {
   kind: 'on-line';
   id: Id;
   line: Id;
   offset: number;
+  solve?: SolveDirective;
 }
 
 export type GeoPoint =

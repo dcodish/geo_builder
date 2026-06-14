@@ -48,6 +48,18 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
     objects[onSeg] = { kind: 'on-segment-solved', id: seg.id, a: seg.a, b: seg.b, constraint: con, branch: 0, t0: seg.t };
     return;
   }
+  // (1.5) Else drive an ON-LINE offset DOF (ADR-036) — a marker on a drawn line (a
+  // tangent's named endpoint) is an explicit slider, so it's preferred over a
+  // structural point that merely happens to be drivable (an on-circle tangency
+  // point, a free vertex): "AC ⟂ TC" moves the marker C, not the tangency point T.
+  const onLine = idxs.find(
+    (i) => i >= 0 && objects[i].kind === 'on-line' && (objects[i] as Extract<GeoObject, { kind: 'on-line' }>).solve === undefined,
+  );
+  if (onLine !== undefined) {
+    objects[onLine] = { ...(objects[onLine] as Extract<GeoObject, { kind: 'on-line' }>), solve: { constraint: con, branch: 0 } };
+    constraints.push(con);
+    return;
+  }
   // (2) Else drive a free on-circle DOF among the refs (ADR-028) — one not already
   // driven — so a constraint on circle points (e.g. |ED| = 7) repositions them.
   const onCirc = idxs.find(
