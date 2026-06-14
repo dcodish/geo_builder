@@ -519,7 +519,8 @@ export type Command =
   | { type: 'line-circle-intersection'; id: Id; line: Id; circle: Id; branch?: number }
   | { type: 'circle-circle-intersection'; id: Id; circle1: Id; circle2: Id; branch?: number }
   | { type: 'tangent'; id: Id; circle: Id; at: Id; visible?: boolean }
-  | { type: 'point-on-line'; id: Id; line: Id; offset: number }; // a fixed marker on a drawn line (names it by a point)
+  | { type: 'point-on-line'; id: Id; line: Id; offset: number } // a fixed marker on a drawn line (names it by a point)
+  | { type: 'circles-tangent'; circle1: Id; circle2: Id; at: Id; external: boolean }; // two circles touch at one point `at`
 
 /**
  * A measure's value: either a literal number, or `coef · var` where `var` is a

@@ -99,4 +99,5 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'circles', supported: true, en: 'tangent to circle O at A', he: 'משיק למעגל O בנקודה A', descEn: 'Draw the tangent at a point on a circle.', descHe: 'ציור המשיק בנקודה על המעגל.' },
   { category: 'circles', supported: true, en: 'E is the intersection of the tangent to circle O at A and BC', he: 'E חיתוך המשיק למעגל O בנקודה A עם BC', descEn: 'Where a tangent at a point meets a line.', descHe: 'מפגש משיק בנקודה עם ישר.' },
   { category: 'circles', supported: true, en: 'G is the intersection of circle O and circle P', he: 'G חיתוך מעגל O ומעגל P', descEn: 'Where two circles cross.', descHe: 'נקודת חיתוך של שני מעגלים.' },
+  { category: 'circles', supported: true, en: 'circle O and circle P are tangent at M', he: 'מעגל O ומעגל P משיקים זה לזה בנקודה M', descEn: 'Two circles touching at one point M (external; the centres move to touch).', descHe: 'שני מעגלים משיקים זה לזה בנקודה אחת M (חיצונית; המרכזים זזים כדי להשיק).' },
 ];

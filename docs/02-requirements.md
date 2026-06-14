@@ -52,7 +52,7 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 
 - **FR-EN-1 (Must)** — Build the figure incrementally: each new object may be defined in relation to objects already present.
 - **FR-EN-2 (Must)** — Support free points; points constrained to lie on a segment, line, or circle; and derived points (intersection of two objects, midpoint of a segment, foot of a perpendicular).
-- **FR-EN-3 (Must)** — Support shapes: triangle, quadrilateral, circle.
+- **FR-EN-3 (Must)** — Support shapes: triangle, quadrilateral, circle. Two circles can be stated **tangent to each other** at a point (external by default, internal on request); the engine moves a centre so they touch at exactly that point. (See [ADR-037](06-decisions.md#adr-037).)
 - **FR-EN-4 (Must)** — Support constraints: distance, angle measure, right angle, parallel, perpendicular, equal segments.
 - **FR-EN-5 (Must)** — Support special lines: height, median, angle bisector, perpendicular bisector, midsegment.
 - **FR-EN-6 (Must)** — Compute positions for all objects that are consistent with the current facts.

@@ -562,6 +562,24 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       addObj(objects, { kind: 'on-line', id: cmd.id, line: cmd.line, offset: cmd.offset });
       break;
 
+    case 'circles-tangent': {
+      // Two circles tangent at one point: pull the centres to the touching distance
+      // (external = r1+r2, internal = |r1−r2|) and place `at` at the touch point on
+      // the centre line (a fraction r1/d from centre1). Needs concrete radii.
+      const c1 = objects.find((o) => o.id === cmd.circle1 && o.kind === 'circle') as Extract<GeoObject, { kind: 'circle' }> | undefined;
+      const c2 = objects.find((o) => o.id === cmd.circle2 && o.kind === 'circle') as Extract<GeoObject, { kind: 'circle' }> | undefined;
+      if (c1 && c2 && c1.radius.via === 'length' && c2.radius.via === 'length') {
+        const r1 = c1.radius.value;
+        const r2 = c2.radius.value;
+        const denom = cmd.external ? r1 + r2 : r1 - r2; // signed; internal needs r1≠r2
+        if (denom !== 0) {
+          addObj(objects, { kind: 'on-segment', id: cmd.at, a: c1.center, b: c2.center, t: r1 / denom });
+          driveOrCheck(objects, constraints, { type: 'distance', a: c1.center, b: c2.center, value: Math.abs(denom) });
+        }
+      }
+      break;
+    }
+
     case 'point-by-distances':
       addObj(objects, {
         kind: 'intersection',

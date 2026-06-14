@@ -872,6 +872,24 @@ const circleCircleIntersection: Rule = (s) => {
   return [{ type: 'circle-circle-intersection', id: up(resM[1]), circle1: circleId(centers[0]), circle2: circleId(centers[1]), branch: 0 }];
 };
 
+/**
+ * "circle O and circle P are tangent to each other at M" /
+ * "מעגל O ומעגל P משיקים זה לזה בנקודה M" — two circles touching at one point. TWO
+ * circles named + a tangent keyword (a single-circle "tangent to circle X" is the
+ * tangent-LINE rule). Default external (the textbook side-by-side picture); "internally"
+ * / "פנימית" gives internal tangency. Must run BEFORE tangentLine, which would
+ * otherwise grab the משיק and draw a stray tangent line.
+ */
+const circlesTangent: Rule = (s) => {
+  if (!/tangent|משיק/i.test(s)) return null;
+  const centers = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z])\b/gi)].map((m) => up(m[1]));
+  if (centers.length < 2 || centers[0] === centers[1]) return null; // a single circle ⇒ the tangent-line rule
+  const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z])\b/i);
+  if (!atM) return null;
+  const external = !/\binternal\w*\b|פנימ/i.test(s);
+  return [{ type: 'circles-tangent', circle1: circleId(centers[0]), circle2: circleId(centers[1]), at: up(atM[1]), external }];
+};
+
 /** "tangent to circle O at A" / "משיק למעגל O בנקודה A" — a *drawn* tangent line (⟂ the radius at A). */
 const TANGENT_MARK = 5; // offset of a named tangent's endpoint markers (±) from the tangency point
 
@@ -1195,6 +1213,7 @@ const RULES: Rule[] = [
   bisectorPlacesPoint, // "AD bisects ∠BAC" — places D on the opposite side (after the ∩ compounds)
   tangentLineIntersection, // tangent ∩ a segment
   parallelCircleIntersection, // a parallel line ∩ the circle
+  circlesTangent, // two circles tangent to each other — before tangentLine (which would grab the משיק)
   circleCircleIntersection, // two circles cross — before the generic line∩line intersection
   lineLineIntersection,
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
