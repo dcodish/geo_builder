@@ -91,8 +91,9 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 - **FR-HS-2 (Must)** — Support undo/redo of steps.
 - **FR-HS-3 (Must)** — Provide "clear / start over".
 - **FR-HS-4 (Should)** — Persist the current construction across page reloads (local only).
-- **FR-HS-5 (Should)** — Export the current figure as a clean, print-ready image (SVG and/or PNG) for use in exams, worksheets, and books. Primary value for the author audience (see [Vision](01-vision.md)).
+- **FR-HS-5 (Should)** — Export the current figure as a clean, print-ready image (SVG and/or PNG) for use in exams, worksheets, and books. Primary value for the author audience (see [Vision](01-vision.md)). *(Realised — PNG **save** and **copy-to-clipboard** from the canvas, over-sampled 2× on a white background.)*
 - **FR-HS-6 (Later)** — Share a figure via link.
+- **FR-HS-7 (Should)** — **Relabel** a point everywhere (`rename E to G` / `שנה שם E ל-G`) so the lettering can match a textbook figure, without changing the geometry. The rename rewrites that letter across every step and is undoable; it refuses to relabel onto a letter already in use (no silent merge of two points). Pairs with the naming-order + orientation levers documented in [12-letter-placement.md](12-letter-placement.md). (See [ADR-035](06-decisions.md#adr-035).)
 
 ## Internationalization
 

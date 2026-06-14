@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { freeDofs, isGeoPoint } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -36,6 +36,7 @@ export default function App() {
   const seed = useGeoStore((s) => s.seed);
   const showMeasures = useGeoStore((s) => s.showMeasures);
   const setShowMeasures = useGeoStore((s) => s.setShowMeasures);
+  const rename = useGeoStore((s) => s.rename);
   const clear = useGeoStore((s) => s.clear);
 
   const { undo, redo } = useGeoStore.temporal.getState();
@@ -46,6 +47,7 @@ export default function App() {
   const [notUnderstood, setNotUnderstood] = useState(false);
   const [thinking, setThinking] = useState(false); // LLM fallback in flight (Phase 7)
   const [llmDropped, setLlmDropped] = useState<string[]>([]); // LLM steps the engine couldn't build
+  const [renameNote, setRenameNote] = useState(''); // why a relabel was a no-op (target taken / no such point)
   const [showHelp, setShowHelp] = useState(false); // collapsed by default; "מה אפשר להקליד?" opens the command reference
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
@@ -127,6 +129,16 @@ export default function App() {
   async function submit(utterance: string) {
     setNotUnderstood(false);
     setLlmDropped([]);
+    setRenameNote('');
+    // A relabel ("rename E to G" / "שנה שם E ל-G") is a store operation, not a
+    // geometry command — handle it before the parser so it never enters the figure.
+    const ren = parseRename(utterance);
+    if (ren) {
+      const res = rename(ren.from, ren.to);
+      if (res.ok) setText('');
+      else setRenameNote(t(`input.rename_${res.reason}`, { from: ren.from, to: ren.to }));
+      return;
+    }
     const r = parse(utterance, parseCtx());
     if (r.ok) {
       // One utterance → possibly many commands; tag them with one group id so
@@ -257,6 +269,7 @@ export default function App() {
                   setText(e.target.value);
                   if (notUnderstood) setNotUnderstood(false);
                   if (llmDropped.length) setLlmDropped([]);
+                  if (renameNote) setRenameNote('');
                 }}
                 autoFocus
               />
@@ -284,6 +297,7 @@ export default function App() {
             </div>
             {thinking && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
             {notUnderstood && <span style={{ fontSize: 12, color: '#b45309' }}>{t('input.notUnderstood')}</span>}
+            {renameNote && <span style={{ fontSize: 12, color: '#b45309' }} dir={textDir(renameNote)}>{renameNote}</span>}
             {llmDropped.length > 0 && (
               <span style={{ fontSize: 12, color: '#b45309' }} dir={textDir(llmDropped[0])}>
                 {t('input.partial')}: {llmDropped.join('; ')}

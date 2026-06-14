@@ -73,7 +73,36 @@ export function Figure({
   const lit = (id: string): boolean => !!highlight && highlight.has(id);
   const [view, setView] = useState<View>(IDENTITY);
   const [hotCross, setHotCross] = useState<number | null>(null);
+  const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>('');
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  async function saveImage() {
+    if (!svgRef.current) return;
+    try {
+      const blob = await svgToPng(svgRef.current);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'figure.png';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setExportFlash('err');
+      window.setTimeout(() => setExportFlash(''), 1400);
+    }
+  }
+  async function copyImage() {
+    if (!svgRef.current) return;
+    try {
+      const blob = await svgToPng(svgRef.current);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      setExportFlash('ok');
+    } catch {
+      setExportFlash('err');
+    }
+    window.setTimeout(() => setExportFlash(''), 1400);
+  }
 
   const { scene, transform, crossings } = useMemo(() => {
     // Rotate/flip the figure in world space, then fit — so it stays centred and
@@ -90,7 +119,10 @@ export function Figure({
   }, [construction, positions, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY]);
 
   // Point radius in px, kept visually constant by dividing out the pan/zoom scale.
+  // `r` sizes the marks/crossings/measure offsets; `pointR` is the small textbook-
+  // style vertex marker (a big disc around each letter reads as "computer-drawn").
   const r = 4 / view.zoom;
+  const pointR = 2 / view.zoom;
   const stroke = 1.5 / view.zoom;
   const fontSize = 16 / view.zoom;
 
@@ -123,6 +155,7 @@ export function Figure({
   return (
     <div style={{ position: 'relative', width, height }}>
       <svg
+        ref={svgRef}
         width={width}
         height={height}
         viewBox={`0 0 ${width} ${height}`}
@@ -234,12 +267,12 @@ export function Figure({
             // World→screen is uniform scale + Y-flip, so a world direction maps
             // to (dx, −dy) on screen; place the label that way along labelDir.
             const sd = unitVec({ x: pt.labelDir.x, y: -pt.labelDir.y });
-            const off = r * 2.6 + fontSize * 0.45; // clear the dot + a little gap so the label is readable
+            const off = pointR * 2 + fontSize * 0.5; // clear the (small) dot + a gap so the label is readable
             const anchor = sd.x > 0.3 ? 'start' : sd.x < -0.3 ? 'end' : 'middle';
             const baseline = sd.y > 0.3 ? 'hanging' : sd.y < -0.3 ? 'auto' : 'middle';
             return (
               <g key={pt.id} data-id={pt.id}>
-                <circle cx={s.x} cy={s.y} r={lit(pt.id) ? r * 1.6 : r} fill={lit(pt.id) ? ACCENT : '#0f172a'} />
+                <circle cx={s.x} cy={s.y} r={lit(pt.id) ? pointR * 2 : pointR} fill={lit(pt.id) ? ACCENT : '#0f172a'} />
                 <text
                   x={s.x + sd.x * off}
                   y={s.y + sd.y * off}
@@ -359,11 +392,55 @@ export function Figure({
         />
       </div>
 
-      <button type="button" onClick={() => setView(IDENTITY)} style={{ ...ctrlBtn, position: 'absolute', top: 8, insetInlineEnd: 8 }}>
-        Reset view
-      </button>
+      <div style={{ position: 'absolute', top: 8, insetInlineEnd: 8, display: 'flex', gap: 4, alignItems: 'center' }}>
+        <button
+          type="button"
+          style={{ ...ctrlBtn, ...(exportFlash === 'ok' ? { background: '#dcfce7', borderColor: '#86efac' } : exportFlash === 'err' ? { background: '#fee2e2', borderColor: '#fca5a5' } : null) }}
+          title="Copy image to clipboard"
+          aria-label="copy image to clipboard"
+          onClick={copyImage}
+        >
+          {exportFlash === 'ok' ? '✓' : exportFlash === 'err' ? '✕' : '⧉'}
+        </button>
+        <button type="button" style={ctrlBtn} title="Save image (PNG)" aria-label="save image as PNG" onClick={saveImage}>
+          ⤓
+        </button>
+        <button type="button" onClick={() => setView(IDENTITY)} style={ctrlBtn}>
+          Reset view
+        </button>
+      </div>
     </div>
   );
+}
+
+/**
+ * Rasterise the live SVG figure to a PNG blob — for "save image" / "copy image".
+ * Browser-only (uses Image/canvas/DOM); never called during the SSR render tests.
+ * A white rect is painted first so the PNG isn't transparent; `scale` over-samples
+ * for a crisp result. `encodeURIComponent` (not btoa) carries Hebrew labels safely.
+ */
+async function svgToPng(svg: SVGSVGElement, scale = 2): Promise<Blob> {
+  const w = Number(svg.getAttribute('width')) || svg.clientWidth || 600;
+  const h = Number(svg.getAttribute('height')) || svg.clientHeight || 600;
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  const data = new XMLSerializer().serializeToString(clone);
+  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data)}`;
+  const img = new Image();
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('svg load failed'));
+    img.src = url;
+  });
+  const canvas = document.createElement('canvas');
+  canvas.width = w * scale;
+  canvas.height = h * scale;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('no 2d context');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png'));
 }
 
 const ctrlBtn: CSSProperties = {

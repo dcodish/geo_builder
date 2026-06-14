@@ -211,6 +211,40 @@ function introducedPointIds(cmd: Command): Id[] {
   return applyCommand(emptyConstruction(), cmd).objects.filter(isGeoPoint).map((o) => o.id);
 }
 
+/**
+ * Every point id that appears in a command, created or referenced. Point ids are
+ * always single uppercase letters; line ids ("bis-…") and circle ids ("circle-O")
+ * are multi-character, so a single-letter test isolates points cleanly. The
+ * measure `expr` is skipped — it carries a variable/text, never a point id.
+ */
+function commandPointIds(cmd: AnyCommand): Id[] {
+  const out: Id[] = [];
+  const take = (v: unknown) => {
+    if (typeof v === 'string' && /^[A-Z]$/.test(v)) out.push(v);
+  };
+  for (const [k, v] of Object.entries(cmd)) {
+    if (k === 'expr') continue;
+    if (Array.isArray(v)) v.forEach(take);
+    else take(v);
+  }
+  return out;
+}
+
+/** Rewrite one point letter to another across a single command (exact-match on the single-letter id). */
+function renameInCommand(cmd: AnyCommand, from: Id, to: Id): AnyCommand {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(cmd)) {
+    if (k === 'expr') out[k] = v; // a measure expr holds a variable/text, not point ids — never rewrite
+    else if (typeof v === 'string') out[k] = v === from ? to : v;
+    else if (Array.isArray(v)) out[k] = v.map((e) => (e === from ? to : e));
+    else out[k] = v;
+  }
+  return out as AnyCommand;
+}
+
+/** Outcome of a relabel request, so the UI can explain a no-op. */
+export type RenameResult = { ok: true } | { ok: false; reason: 'same' | 'no-source' | 'target-taken' };
+
 export interface GeoState {
   facts: Fact[];
   /** The fact currently selected for inspection (highlighted on the canvas); UI-only, not undoable. */
@@ -242,6 +276,8 @@ export interface GeoState {
   resample: () => void;
   /** Show/hide measure labels on the figure (ADR-031). */
   setShowMeasures: (show: boolean) => void;
+  /** Relabel a point everywhere (e.g. E → G) — rewrites every fact, one undo entry. */
+  rename: (from: Id, to: Id) => RenameResult;
   /** Reset to no facts and wipe undo/redo history. */
   clear: () => void;
 }
@@ -367,6 +403,27 @@ export const useGeoStore = create<GeoState>()(
       },
 
       setShowMeasures: (show) => set({ showMeasures: show }),
+
+      rename: (from, to) => {
+        const F = from.toUpperCase();
+        const T = to.toUpperCase();
+        if (F === T) return { ok: false, reason: 'same' };
+        const facts = get().facts;
+        const all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
+        if (!all.has(F)) return { ok: false, reason: 'no-source' };
+        if (all.has(T)) return { ok: false, reason: 'target-taken' }; // would merge two distinct points
+        set({
+          facts: facts.map((f) => ({
+            ...f,
+            cmd: renameInCommand(f.cmd, F, T),
+            // The step row shows the utterance; relabel the letter there too (uppercase
+            // point letters only — Hebrew words and lowercase keywords are untouched).
+            utterance: f.utterance ? f.utterance.split(F).join(T) : f.utterance,
+          })),
+          selectedId: null,
+        });
+        return { ok: true };
+      },
 
       clear: () => {
         set({ facts: [], selectedId: null, seed: 0 });

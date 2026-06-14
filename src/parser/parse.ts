@@ -917,8 +917,45 @@ const circumcircle: Rule = (s) => {
  * midpoint of the opposite side. Emits the triangle (idempotent if it exists),
  * the opposite-side midpoint, and the segment to it.
  */
-const median: Rule = (s) => {
+const median: Rule = (s, ctx) => {
   if (!/\bmedian\b|תיכון/i.test(s)) return null;
+
+  // An explicitly named opposite side: "to side BC" / "to BC" / "לצלע BC" / "אל BC" / "ל-BC".
+  const sideM = s.match(/(?:\bto\s+(?:side\s+)?|לצלע\s*|אל\s*|ל-?)([A-Za-z])\s*([A-Za-z])\b/i);
+  const side = sideM ? ([up(sideM[1]), up(sideM[2])] as [Id, Id]) : null;
+
+  // Named form "AD תיכון" / "median AD": the median segment is named apex-first,
+  // foot second, so D is the student's chosen name for the opposite-side midpoint.
+  // Strip the keyword and any explicit-side phrase so only the median pair remains.
+  let body = s.replace(/\bmedian\b|תיכון/gi, ' ');
+  if (sideM) body = body.replace(sideM[0], ' ');
+  const seg = labelRun(body, 2);
+  if (seg && seg[0] !== seg[1]) {
+    const apex = seg[0];
+    const foot = seg[1];
+    let opp = side;
+    if (!opp) {
+      // No side stated: derive the opposite side from a triangle named in the
+      // utterance ("AD median in ABC"), else from the figure when it's a single
+      // triangle (apex + exactly two other points). Otherwise escalate, never guess.
+      const triPart = s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ');
+      const tri = triPart ? labelRun(triPart.replace(/triangle|the/gi, ' '), 3) : null;
+      if (tri && tri.includes(apex)) {
+        opp = tri.filter((x) => x !== apex) as [Id, Id];
+      } else {
+        const pts = (ctx.points ?? []).filter((x) => x !== apex);
+        if (pts.length !== 2) return null;
+        opp = [pts[0], pts[1]];
+      }
+    }
+    if (opp[0] === apex || opp[1] === apex) return null;
+    return [
+      { type: 'midpoint', id: foot, a: opp[0], b: opp[1] },
+      { type: 'segment', a: apex, b: foot },
+    ];
+  }
+
+  // Classic form "median from A in ABC" / "תיכון מ-A במשולש ABC" — auto-named midpoint.
   const apexM = s.match(/(?:\bfrom\s+|מ-?)([A-Za-z])\b/i); // "from A" / "מ-A" (keyword required, not any letter)
   // The triangle is named after "in"/"במשולש"; read it there so the apex letter isn't double-counted.
   const triPart = s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s;
@@ -1167,4 +1204,22 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
     if (commands) return { ok: true, commands };
   }
   return { ok: false, reason: 'not-handled' };
+}
+
+/**
+ * Detect a RELABEL request — "rename E to G" / "relabel E as G" / "rename E G",
+ * Hebrew "שנה שם E ל-G" / "שנה E ל-G" / "החלף E ב-G". This is a store-level
+ * operation (rewrite the point's letter across every fact), not a geometry
+ * command, so it's handled outside `parse` (the App intercepts it). Returns the
+ * uppercased point letters, or null when the utterance isn't a rename.
+ */
+export function parseRename(raw: string): { from: Id; to: Id } | null {
+  const s = raw.trim().replace(/\s+/g, ' ');
+  const m =
+    s.match(/(?:rename|relabel)\s+([A-Za-z])\b(?:\s+(?:to|as|into|->|→|=))?\s+([A-Za-z])\b/i) ??
+    s.match(/(?:שנה|החלף)\s*(?:שם\s*)?(?:את\s*)?([A-Za-z])\s*(?:ל-?|ב-?|→|=)?\s*([A-Za-z])\b/i);
+  if (!m) return null;
+  const from = up(m[1]);
+  const to = up(m[2]);
+  return from === to ? null : { from, to };
 }

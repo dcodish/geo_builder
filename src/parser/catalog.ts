@@ -67,6 +67,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'lines', supported: true, en: 'line through P perpendicular to AB', he: 'ישר דרך P מאונך ל-AB', descEn: 'A perpendicular line through a point.', descHe: 'ישר מאונך דרך נקודה.' },
   { category: 'lines', supported: true, en: 'line through P parallel to AB', he: 'ישר דרך P מקביל ל-AB', descEn: 'A parallel line through a point.', descHe: 'ישר מקביל דרך נקודה.' },
   { category: 'lines', supported: true, en: 'median from A in ABC', he: 'תיכון מ-A במשולש ABC', descEn: 'A median (to the opposite midpoint).', descHe: 'תיכון (לאמצע הצלע שממול).' },
+  { category: 'lines', supported: true, en: 'AD median to BC', he: 'AD תיכון לצלע BC', descEn: 'A median you name (D = midpoint of BC).', descHe: 'תיכון בשם שתבחר (D = אמצע BC).' },
   { category: 'lines', supported: true, en: 'height from A in ABC', he: 'גובה מ-A במשולש ABC', descEn: 'An altitude and its foot.', descHe: 'גובה והרגל שלו.' },
   { category: 'lines', supported: true, en: 'perpendicular bisector of AB', he: 'אנך אמצעי ל-AB', descEn: 'The perpendicular bisector of a segment.', descHe: 'האנך האמצעי של הקטע.' },
   { category: 'lines', supported: true, en: 'AD bisects angle BAC', he: 'AD חוצה את הזווית BAC', descEn: 'An angle bisector that places a point on the opposite side.', descHe: 'חוצה זווית הממקם נקודה על הצלע שממול.' },

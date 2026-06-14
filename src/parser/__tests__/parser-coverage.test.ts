@@ -91,6 +91,11 @@ const PARSES: [string, string][] = [
   ['perpendicular from A to BC', 'foot'],
   ['triangle ABC with a height from A', 'foot'], // triangle + its altitude (compound handled directly)
   ['triangle ABC with a median from A', 'midpoint'],
+  // named median segment "AD" (D = the student's name for the opposite-side midpoint)
+  ['AD median to BC', 'midpoint'],
+  ['AD median to side BC', 'midpoint'],
+  ['AD תיכון לצלע BC', 'midpoint'],
+  ['AD median in ABC', 'midpoint'], // opposite side read from the named triangle
   ['perpendicular bisector of AB', 'perpendicular-line'],
   ['אנך אמצעי ל-AB', 'perpendicular-line'],
   ['AD bisects angle BAC', 'line-intersection'],
@@ -172,6 +177,46 @@ describe('compound "<place a point> such that <condition>" parses BOTH halves', 
       expect([perp.a, perp.b, perp.c, perp.d]).toEqual(['C', 'F', 'D', 'F']); // CF ⟂ DF, not AD ⟂ CF
     });
   }
+});
+
+describe('named median "AD תיכון" honors the named foot D and the stated/contextual side', () => {
+  // Explicit side: D = midpoint of BC, segment A–D — no context needed.
+  for (const u of ['AD median to BC', 'AD תיכון לצלע BC', 'median AD to side BC']) {
+    it(`"${u}" → midpoint D of BC + segment AD`, () => {
+      const r = parse(u);
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const mid = r.commands.find((c) => c.type === 'midpoint') as { id: string; a: string; b: string };
+      expect(mid).toBeTruthy();
+      expect(mid.id).toBe('D'); // the student's name, not an auto "M"
+      expect([mid.a, mid.b].sort()).toEqual(['B', 'C']);
+      const seg = r.commands.find((c) => c.type === 'segment') as { a: string; b: string };
+      expect([seg.a, seg.b].sort()).toEqual(['A', 'D']);
+    });
+  }
+
+  // Bare form on an existing triangle: the opposite side comes from figure context.
+  it('"AD תיכון" with triangle ABC in context → D = midpoint of BC', () => {
+    const r = parse('AD תיכון', { points: ['A', 'B', 'C'] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const mid = r.commands.find((c) => c.type === 'midpoint') as { id: string; a: string; b: string };
+    expect(mid.id).toBe('D');
+    expect([mid.a, mid.b].sort()).toEqual(['B', 'C']);
+  });
+
+  // Ambiguous bare form (no side, no single-triangle context) must escalate, never guess.
+  it('"AD תיכון" with no resolvable side escalates', () => {
+    expect(parse('AD תיכון', { points: ['A', 'B', 'C', 'E', 'F'] }).ok).toBe(false);
+  });
+
+  // The classic auto-named form is unchanged.
+  it('"median from A in ABC" still auto-names the midpoint and emits the triangle', () => {
+    const r = parse('median from A in ABC');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.commands.map((c) => c.type)).toEqual(['triangle', 'midpoint', 'segment']);
+  });
 });
 
 describe('parser coverage — out-of-scope input escalates, never half-parses', () => {
