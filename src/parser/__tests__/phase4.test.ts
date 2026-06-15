@@ -63,12 +63,44 @@ describe('parser — free point (he/en)', () => {
 });
 
 describe('parser — angle constraint (he/en)', () => {
-  const a: Command = { type: 'set-angle', vertex: 'A', ray1: 'G', ray2: 'B', value: 37 };
-  it('english =', () => one('angle GAB = 37', a));
-  it('english with degrees', () => one('angle GAB is 37 degrees', a));
-  it('hebrew', () => one('זווית GAB = 37', a));
-  it('labels before keyword', () => one('GAB = 37 angle', a));
-  it('hebrew, labels before keyword', () => one('GAB = 37 זווית', a));
+  // Stating the angle also draws its two arms (AG, AB) — the vertex A is the middle letter (FR-IN-7).
+  const expected: Command[] = [
+    { type: 'segment', a: 'A', b: 'G' },
+    { type: 'segment', a: 'A', b: 'B' },
+    { type: 'set-angle', vertex: 'A', ray1: 'G', ray2: 'B', value: 37 },
+  ];
+  const arms = (input: string) => {
+    const r = parse(input);
+    expect(r.ok, `"${input}" should parse`).toBe(true);
+    if (r.ok) expect(r.commands).toEqual(expected);
+  };
+  it('english =', () => arms('angle GAB = 37'));
+  it('english with degrees', () => arms('angle GAB is 37 degrees'));
+  it('hebrew', () => arms('זווית GAB = 37'));
+  it('labels before keyword', () => arms('GAB = 37 angle'));
+  it('hebrew, labels before keyword', () => arms('GAB = 37 זווית'));
+});
+
+describe('parser — distance/equal givens draw their segments (FR-IN-7)', () => {
+  it('"AB = 6" draws AB then constrains it', () => {
+    const r = parse('AB = 6');
+    expect(r.ok).toBe(true);
+    if (r.ok)
+      expect(r.commands).toEqual([
+        { type: 'segment', a: 'A', b: 'B' },
+        { type: 'set-distance', a: 'A', b: 'B', value: 6 },
+      ]);
+  });
+  it('"AB = CD" draws both compared segments then sets them equal', () => {
+    const r = parse('AB = CD');
+    expect(r.ok).toBe(true);
+    if (r.ok)
+      expect(r.commands).toEqual([
+        { type: 'segment', a: 'A', b: 'B' },
+        { type: 'segment', a: 'C', b: 'D' },
+        { type: 'set-equal', a: 'A', b: 'B', c: 'C', d: 'D' },
+      ]);
+  });
 });
 
 describe('parser — Phase-5a constructs (he/en)', () => {

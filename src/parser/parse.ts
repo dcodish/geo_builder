@@ -286,14 +286,24 @@ const pointOnExtension: Rule = (s) => {
   return seg ? [{ type: 'point-on-segment', id: up(m[1]), a: seg[0], b: seg[1], t: 1.3 }] : null;
 };
 
-/** "angle GAB = 37" / "∠GAB = 37°" / "זווית GAB = 37" (any order) — middle letter is the vertex. */
+/**
+ * "angle GAB = 37" / "∠GAB = 37°" / "זווית GAB = 37" (any order) — middle letter is the vertex.
+ * Stating the angle also DRAWS its two arms (vertex→ray1, vertex→ray2) so the angle is visible
+ * even on a standalone configuration; `segment` is idempotent, so on an existing corner where the
+ * arms are already edges these are no-ops (mirrors the ∥/⟂ draw-its-segments convenience, FR-IN-7).
+ */
 const angle: Rule = (s) => {
   if (!/(?:angle|∠|זוו?ית)/i.test(s)) return null;
   const stripped = s.replace(/angle|∠|זוו?ית/gi, ' ');
   const ids = labelRun(stripped, 3);
   const valM = stripped.match(new RegExp(num));
   if (!ids || !valM) return null;
-  return [{ type: 'set-angle', vertex: ids[1], ray1: ids[0], ray2: ids[2], value: parseFloat(valM[1]) }];
+  const [r1, v, r2] = ids;
+  return [
+    { type: 'segment', a: v, b: r1 },
+    { type: 'segment', a: v, b: r2 },
+    { type: 'set-angle', vertex: v, ray1: r1, ray2: r2, value: parseFloat(valM[1]) },
+  ];
 };
 
 /**
@@ -381,16 +391,30 @@ const segmentRatio: Rule = (s) => {
   return [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: num / den }];
 };
 
-/** "AB = CD" — two segments equal in length. */
+/**
+ * "AB = CD" — two segments equal in length. Also DRAWS both named segments (idempotent),
+ * so the equality puts the two compared sides on the canvas (FR-IN-7).
+ */
 const equalSegments: Rule = (s) => {
   const m = s.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
-  return m ? [{ type: 'set-equal', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]) }] : null;
+  if (!m) return null;
+  const [a, b, c, d] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
+  return [
+    { type: 'segment', a, b },
+    { type: 'segment', a: c, b: d },
+    { type: 'set-equal', a, b, c, d },
+  ];
 };
 
-/** "AB = 6" — fix a segment's length. */
+/** "AB = 6" — fix a segment's length. Also DRAWS the named segment (idempotent), FR-IN-7. */
 const distanceConstraint: Rule = (s) => {
   const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${num}\b`));
-  return m ? [{ type: 'set-distance', a: up(m[1]), b: up(m[2]), value: parseFloat(m[3]) }] : null;
+  if (!m) return null;
+  const [a, b] = [up(m[1]), up(m[2])];
+  return [
+    { type: 'segment', a, b },
+    { type: 'set-distance', a, b, value: parseFloat(m[3]) },
+  ];
 };
 
 // ── Symbolic measures (ADR-031): a named unknown shared across statements. ──

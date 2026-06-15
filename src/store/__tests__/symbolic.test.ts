@@ -33,7 +33,8 @@ describe('symbolic length relations', () => {
 
   it('a bare "AB = 5" is still a numeric distance (no variable)', () => {
     const r = parse('AB = 5');
-    expect(r.ok && r.commands[0]).toEqual({ type: 'set-distance', a: 'A', b: 'B', value: 5 });
+    // The length given also draws the named segment (FR-IN-7); the constraint is the set-distance.
+    expect(r.ok && r.commands.find((c) => c.type === 'set-distance')).toEqual({ type: 'set-distance', a: 'A', b: 'B', value: 5 });
   });
 
   it('two segments sharing a variable form a proportion (|AB| = 3·|AD|)', () => {
@@ -243,7 +244,8 @@ describe('π constant', () => {
 describe('∠ and ° angle glyphs', () => {
   it('"∠ABC = 37°" parses like the word "angle" (∠ trigger, ° ignored)', () => {
     const r = parse('∠ABC = 37°');
-    expect(r.ok && r.commands[0]).toEqual({ type: 'set-angle', vertex: 'B', ray1: 'A', ray2: 'C', value: 37 });
+    // A numeric angle also draws its two arms (FR-IN-7); the constraint is the set-angle.
+    expect(r.ok && r.commands.find((c) => c.type === 'set-angle')).toEqual({ type: 'set-angle', vertex: 'B', ray1: 'A', ray2: 'C', value: 37 });
   });
 
   it('"∠ABC = 2α" parses as a symbolic angle', () => {
@@ -262,7 +264,7 @@ describe('symbolic angle relations (Greek variables)', () => {
 
   it('a numeric "angle ABC = 50" stays a numeric angle (no variable)', () => {
     const r = parse('angle ABC = 50');
-    expect(r.ok && r.commands[0]).toEqual({ type: 'set-angle', vertex: 'B', ray1: 'A', ray2: 'C', value: 50 });
+    expect(r.ok && r.commands.find((c) => c.type === 'set-angle')).toEqual({ type: 'set-angle', vertex: 'B', ray1: 'A', ray2: 'C', value: 50 });
   });
 
   it('two angles sharing a variable form a proportion (∠ABC = 2·∠ACB)', () => {
@@ -300,7 +302,10 @@ describe('symbolic angle relations (Greek variables)', () => {
 describe('chained equality "AB = AC = 3x"', () => {
   it('splits a symbolic chain into the equality AND the measure (the dropped-clause bug)', () => {
     const r = parse('AB = AC = 3x');
+    // The "AB = AC" clause also draws both equal segments (FR-IN-7) before the set-equal/measure.
     expect(r.ok && r.commands).toEqual([
+      { type: 'segment', a: 'A', b: 'B' },
+      { type: 'segment', a: 'A', b: 'C' },
       { type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'C' },
       { type: 'measure-length', a: 'A', b: 'C', expr: { coef: 3, var: 'x' } },
     ]);
@@ -346,8 +351,9 @@ describe('reserved radius symbol R/r (ADR-034)', () => {
 
   it('R stays a vertex inside a letter-run ("PQRS", "AB = RS", "AB = AR")', () => {
     expect(parse('quadrilateral PQRS')).toEqual({ ok: true, commands: [{ type: 'quadrilateral', ids: ['P', 'Q', 'R', 'S'] }] });
-    expect(parse('AB = RS')).toEqual({ ok: true, commands: [{ type: 'set-equal', a: 'A', b: 'B', c: 'R', d: 'S' }] });
-    expect(parse('AB = AR')).toEqual({ ok: true, commands: [{ type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'R' }] });
+    // R stays a vertex (not the radius var); the equality also draws both segments (FR-IN-7).
+    expect(parse('AB = RS')).toEqual({ ok: true, commands: [{ type: 'segment', a: 'A', b: 'B' }, { type: 'segment', a: 'R', b: 'S' }, { type: 'set-equal', a: 'A', b: 'B', c: 'R', d: 'S' }] });
+    expect(parse('AB = AR')).toEqual({ ok: true, commands: [{ type: 'segment', a: 'A', b: 'B' }, { type: 'segment', a: 'A', b: 'R' }, { type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'R' }] });
   });
 
   it('constrains the figure to 1.6·radius and keeps the label symbolic ("1.6R")', () => {
