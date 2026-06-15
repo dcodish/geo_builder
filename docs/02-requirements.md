@@ -79,7 +79,7 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 - **FR-RN-3 (Must)** — Animate position changes smoothly when a step moves existing points (no instantaneous teleport).
 - **FR-RN-4 (Must)** — Fit the figure to the viewport; provide pan, zoom, and reset.
 - **FR-RN-5 (Should)** — Allow dragging free points anywhere, and on-object points along their host object.
-- **FR-RN-6 (Should)** — Provide figure-orientation controls that change only the *view*, never the engine's geometry: rotate by 90° and 180°, flip horizontally and vertically, rotate freely, align a user-named segment to horizontal (type its two endpoints), and reset. Vertex labels stay upright and readable under every orientation.
+- **FR-RN-6 (Should)** — Provide figure-orientation controls that change only the *view*, never the engine's geometry: rotate by 90° and 180°, flip horizontally and vertically, rotate freely, align a user-named segment to horizontal (type its two endpoints), and reset. Vertex labels stay upright and readable under every orientation. **Align-to-horizontal is a *standing* request:** it remembers the chosen segment and re-applies on every change, so the segment stays horizontal as later constraints reshape the figure (a manual rotation adds as an offset on top); reset clears it.
 - **FR-RN-7 (Must)** — Draw an angle mark at a vertex **only when the student stated that angle** (never from a merely computed 90°): a *right-angle square* for an explicit right angle (`∠ABC = 90`, a perpendicular `AB ⟂ CD`, a right-triangle), an *angle arc* for any other given angle (`∠ABC = α`, `∠ABC = 37`). Toggled with the measure labels. (Realises the marks part of FR-RN-1; see [ADR-031](06-decisions.md#adr-031).)
 
 ## Theorems

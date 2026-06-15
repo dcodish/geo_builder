@@ -49,6 +49,17 @@ export interface Orientation {
 
 export const NO_ORIENT: Orientation = { rot: 0, flipX: false, flipY: false };
 
+/**
+ * The view rotation that lays segment a→b horizontal (a→b along +x): −atan2(Δy, Δx).
+ * 0 for a degenerate/absent segment. A standing "align segment horizontal" request stores
+ * the segment and recomputes this from the CURRENT positions every render, so it persists
+ * as the figure reshapes under new constraints (rather than freezing one angle).
+ */
+export function alignRotation(a: Vec | undefined, b: Vec | undefined): number {
+  if (!a || !b || (a.x === b.x && a.y === b.y)) return 0;
+  return -Math.atan2(b.y - a.y, b.x - a.x);
+}
+
 /** Apply a view {@link Orientation} to a world point. */
 export function orient(v: Vec, o: Orientation): Vec {
   let x = v.x;

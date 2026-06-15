@@ -15,7 +15,7 @@ import { buildScene, scenePositions } from './scene';
 import type { MeasureLabels } from './scene';
 import { findSegmentCrossings } from './intersections';
 import type { Crossing } from './intersections';
-import { fitTransform, orient } from './transform';
+import { alignRotation, fitTransform, orient } from './transform';
 
 export interface FigureProps {
   construction: Construction;
@@ -49,6 +49,12 @@ interface View {
   rot: number;
   flipX: boolean;
   flipY: boolean;
+  /**
+   * A standing "lay this segment horizontal" request (two point ids). It is re-applied on
+   * every render from the CURRENT positions, so the chosen segment stays horizontal as the
+   * figure reshapes under new constraints. `rot` is then an extra manual offset on top.
+   */
+  alignSeg?: [string, string];
 }
 
 const IDENTITY: View = { zoom: 1, panX: 0, panY: 0, rot: 0, flipX: false, flipY: false };
@@ -124,8 +130,11 @@ export function Figure({
 
   const { scene, transform, crossings, labelDirs } = useMemo(() => {
     // Rotate/flip the figure in world space, then fit — so it stays centred and
-    // labels (computed here, drawn upright) follow the new orientation.
-    const o = { rot: view.rot, flipX: view.flipX, flipY: view.flipY };
+    // labels (computed here, drawn upright) follow the new orientation. A standing
+    // "align segment horizontal" request is recomputed from the CURRENT positions each
+    // render, so the segment stays horizontal as the figure reshapes; view.rot adds on top.
+    const base = view.alignSeg ? alignRotation(positions.get(view.alignSeg[0]), positions.get(view.alignSeg[1])) : 0;
+    const o = { rot: normRot(base + view.rot), flipX: view.flipX, flipY: view.flipY };
     const oriented =
       o.rot === 0 && !o.flipX && !o.flipY
         ? positions
@@ -150,7 +159,7 @@ export function Figure({
     const labelDirs = chooseLabelDirs(ptScreen, obstacles, circScreen, REF_OFF, REF_CLEAR);
 
     return { scene: s, transform: t, crossings: x, labelDirs };
-  }, [construction, positions, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY]);
+  }, [construction, positions, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg]);
 
   // Point radius in px, kept visually constant by dividing out the pan/zoom scale.
   // `r` sizes the marks/crossings/measure offsets; `pointR` is the small textbook-
@@ -160,12 +169,16 @@ export function Figure({
   const stroke = 1.5 / view.zoom;
   const fontSize = 16 / view.zoom;
 
-  // Rotate the view so segment XY reads horizontal — pick a reference segment
-  // instead of nudging the rotation slider. (rot = −angle(X→Y) lays X→Y along +x.)
+  // Lay segment XY horizontal — pick a reference segment instead of nudging the slider.
+  // Store the SEGMENT (not a fixed angle) as a standing request, recomputed each render
+  // (above), so it stays horizontal as the figure reshapes; reset the manual offset to 0.
   function alignHorizontal(seg: string) {
-    const a = positions.get(seg[0]?.toUpperCase());
-    const b = positions.get(seg[1]?.toUpperCase());
-    if (a && b && (a.x !== b.x || a.y !== b.y)) setView((v) => ({ ...v, rot: normRot(-Math.atan2(b.y - a.y, b.x - a.x)) }));
+    const a0 = seg[0]?.toUpperCase();
+    const b0 = seg[1]?.toUpperCase();
+    if (!a0 || !b0) return;
+    const a = positions.get(a0);
+    const b = positions.get(b0);
+    if (a && b && (a.x !== b.x || a.y !== b.y)) setView((v) => ({ ...v, alignSeg: [a0, b0], rot: 0 }));
   }
 
   function onWheel(e: React.WheelEvent) {

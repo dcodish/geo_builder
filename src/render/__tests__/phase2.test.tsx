@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { Command } from '@/engine/types';
 import { build, cycleAlternative, evaluate, emptyConstruction, applyStep } from '@/engine';
-import { boundsOf, fitTransform, orient } from '../transform';
+import { alignRotation, boundsOf, fitTransform, orient } from '../transform';
 import { buildScene, scenePositions } from '../scene';
 import { Figure } from '../Figure';
 
@@ -36,6 +36,35 @@ describe('transform — bounds', () => {
 
   it('falls back to a unit box when empty', () => {
     expect(boundsOf([])).toEqual({ minX: -1, minY: -1, maxX: 1, maxY: 1 });
+  });
+});
+
+describe('transform — alignRotation (persistent align-segment-horizontal)', () => {
+  const isHorizontal = (a: { x: number; y: number }, b: { x: number; y: number }, rot: number) => {
+    const oa = orient(a, { rot, flipX: false, flipY: false });
+    const ob = orient(b, { rot, flipX: false, flipY: false });
+    return { dy: ob.y - oa.y, dx: ob.x - oa.x };
+  };
+
+  it('lays a segment horizontal whatever the figure orientation — so it recomputes, not freezes', () => {
+    // A→B pointing up-right; the rotation must lay it along +x.
+    const r1 = isHorizontal({ x: 1, y: 2 }, { x: 4, y: 5 }, alignRotation({ x: 1, y: 2 }, { x: 4, y: 5 }));
+    expect(r1.dy).toBeCloseTo(0, 9);
+    expect(r1.dx).toBeGreaterThan(0);
+
+    // After a reshape the SAME segment now points up-left: recomputing gives a different
+    // rotation that STILL lays it horizontal (this is what makes the alignment persist).
+    const rotA = alignRotation({ x: 1, y: 2 }, { x: 4, y: 5 });
+    const rotB = alignRotation({ x: 0, y: 0 }, { x: -3, y: 6 });
+    expect(rotB).not.toBeCloseTo(rotA, 3);
+    const r2 = isHorizontal({ x: 0, y: 0 }, { x: -3, y: 6 }, rotB);
+    expect(r2.dy).toBeCloseTo(0, 9);
+    expect(r2.dx).toBeGreaterThan(0);
+  });
+
+  it('returns 0 for a degenerate or absent segment', () => {
+    expect(alignRotation({ x: 1, y: 1 }, { x: 1, y: 1 })).toBe(0);
+    expect(alignRotation(undefined, { x: 1, y: 1 })).toBe(0);
   });
 });
 
