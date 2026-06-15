@@ -103,6 +103,36 @@ describe('parser — distance/equal givens draw their segments (FR-IN-7)', () =>
   });
 });
 
+describe('parser — a drawn perpendicular/parallel line NAMED by points creates markers (ADR-036)', () => {
+  it('"line PQ through P perpendicular to AB" marks the far end Q on the line', () => {
+    const r = parse('line PQ through P perpendicular to AB');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const line = r.commands.find((c) => c.type === 'perpendicular-line') as { id: string; through: string };
+    expect(line.through).toBe('P');
+    const mark = r.commands.find((c) => c.type === 'point-on-line') as { id: string; line: string };
+    expect(mark).toBeDefined();
+    expect(mark.id).toBe('Q'); // P is the anchor (through-point); Q is the named far end
+    expect(mark.line).toBe(line.id);
+  });
+
+  it('"line PQ through P parallel to AB" marks the far end Q (Hebrew too)', () => {
+    for (const u of ['line PQ through P parallel to AB', 'הישר PQ דרך P מקביל ל-AB']) {
+      const r = parse(u);
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) continue;
+      expect((r.commands.find((c) => c.type === 'parallel-line') as { through: string }).through).toBe('P');
+      expect((r.commands.find((c) => c.type === 'point-on-line') as { id: string }).id).toBe('Q');
+    }
+  });
+
+  it('an UNNAMED perpendicular line ("line through P perpendicular to AB") creates NO marker', () => {
+    const r = parse('line through P perpendicular to AB');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.commands.some((c) => c.type === 'point-on-line')).toBe(false);
+  });
+});
+
 describe('parser — Phase-5a constructs (he/en)', () => {
   it('parallelogram', () => one('parallelogram ABCD', { type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] }));
   it('parallelogram (hebrew, reversed)', () => one('ABCD מקבילית', { type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] }));

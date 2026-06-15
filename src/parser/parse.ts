@@ -1021,7 +1021,41 @@ const circlesTangent: Rule = (s) => {
 };
 
 /** "tangent to circle O at A" / "משיק למעגל O בנקודה A" — a *drawn* tangent line (⟂ the radius at A). */
-const TANGENT_MARK = 5; // offset of a named tangent's endpoint markers (±) from the tangency point
+const LINE_MARK = 5; // offset of a drawn line's named endpoint markers from the line's anchor
+
+/**
+ * When a drawn line is NAMED by extra point labels (beyond the points that define it), create
+ * them as on-line markers so they're referenceable later (ADR-036). One label → a single marker
+ * at +offset from the line's anchor; two → a straddling pair at ±offset (a tangent's "CD" around
+ * the tangency point, the line's anchor). Used by the tangent, perpendicular- and parallel-line rules.
+ */
+function lineMarkers(lineId: Id, labels: Id[]): AnyCommand[] {
+  if (labels.length === 1) return [{ type: 'point-on-line', id: labels[0], line: lineId, offset: LINE_MARK }];
+  if (labels.length >= 2)
+    return [
+      { type: 'point-on-line', id: labels[0], line: lineId, offset: LINE_MARK },
+      { type: 'point-on-line', id: labels[1], line: lineId, offset: -LINE_MARK },
+    ];
+  return [];
+}
+
+/**
+ * The point labels immediately NAMING a drawn line — the 1–2 labels right after the line word
+ * ("line PQ …" / "הישר PQ …"), excluding the points that already define the line. Anchored on the
+ * line word so it can't misfire on an English keyword; returns [] when the line isn't named by points.
+ */
+function lineNameLabels(s: string, exclude: Id[]): Id[] {
+  const m = s.match(/(?:\bline\b|\bray\b|הישר|ישר|הקו|\bקו\b|קרן)\s+\b([A-Za-z]\d*)(?:\s*([A-Za-z]\d*))?\b/i);
+  if (!m) return [];
+  const ex = new Set(exclude.map((e) => e.toUpperCase()));
+  const out: Id[] = [];
+  for (const tok of [m[1], m[2]]) {
+    if (!tok) continue;
+    const u = up(tok);
+    if (!ex.has(u) && !out.includes(u)) out.push(u);
+  }
+  return out;
+}
 
 const tangentLine: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
@@ -1039,8 +1073,7 @@ const tangentLine: Rule = (s, ctx) => {
     .replace(/tangent|משיק\S*|\bline\b|הישר|הקו|למעגל|מעגל/gi, ' ');
   const pts = labelRun(named, 2);
   if (pts && pts[0] !== T && pts[1] !== T && pts[0] !== up(center) && pts[1] !== up(center)) {
-    cmds.push({ type: 'point-on-line', id: pts[0], line: lineId, offset: TANGENT_MARK });
-    cmds.push({ type: 'point-on-line', id: pts[1], line: lineId, offset: -TANGENT_MARK });
+    cmds.push(...lineMarkers(lineId, [pts[0], pts[1]]));
   }
   return cmds;
 };
@@ -1064,7 +1097,13 @@ const perpendicularLine: Rule = (s) => {
     .replace(/through\s+[A-Za-z]\d*\b|דרך\s+[A-Za-z]\d*\b/gi, ' ')
     .match(/(?:perpendicular\s*to|⊥|מאונך\s*ל-?|אנך\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!seg) return null;
-  return [{ type: 'perpendicular-line', id: `perp-${up(thr[1])}-${up(seg[1])}${up(seg[2])}`, through: up(thr[1]), a: up(seg[1]), b: up(seg[2]), visible: true }];
+  const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
+  const lineId = `perp-${P}-${a}${b}`;
+  // If the line is also NAMED ("line PQ through P ⟂ AB"), mark its far end(s) on it (ADR-036).
+  return [
+    { type: 'perpendicular-line', id: lineId, through: P, a, b, visible: true },
+    ...lineMarkers(lineId, lineNameLabels(s, [P, a, b])),
+  ];
 };
 
 /** "line through P parallel to AB" / "ישר דרך P מקביל ל-AB" — a *drawn* parallel line through a point. */
@@ -1076,7 +1115,13 @@ const parallelLine: Rule = (s) => {
     .replace(/through\s+[A-Za-z]\d*\b|דרך\s+[A-Za-z]\d*\b/gi, ' ')
     .match(/(?:parallel\s*to|∥|מקביל\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!seg) return null;
-  return [{ type: 'parallel-line', id: `par-${up(thr[1])}-${up(seg[1])}${up(seg[2])}`, through: up(thr[1]), a: up(seg[1]), b: up(seg[2]), visible: true }];
+  const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
+  const lineId = `par-${P}-${a}${b}`;
+  // If the line is also NAMED ("line PQ through P ∥ AB"), mark its far end(s) on it (ADR-036).
+  return [
+    { type: 'parallel-line', id: lineId, through: P, a, b, visible: true },
+    ...lineMarkers(lineId, lineNameLabels(s, [P, a, b])),
+  ];
 };
 
 /**
