@@ -105,3 +105,62 @@ describe('engine — internal tangency flexes a radius rather than failing (ADR-
     expect(dist(O, P)).toBeCloseTo(2.5, 3);
   });
 });
+
+describe('engine — the inner radius is a first-class DOF (ADR-037 A2 / radius-as-DOF)', () => {
+  const setup = () => {
+    s().clear();
+    s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5 }, 'O');
+    s().execute({ type: 'circle', id: 'circle-P', center: 'P', radius: 5 }, 'P');
+    const r = parse('מעגל O ומעגל P משיקים מבפנים בנקודה M');
+    if (r.ok) r.commands.forEach((c) => s().execute(c, 'internal eq'));
+  };
+
+  it('the inner circle carries a DERIVED radius (no hidden ½ length pinned on it)', () => {
+    setup();
+    const c = replay(s().facts).construction.objects.find((o) => o.id === 'circle-P')!;
+    // Honest: the radius is not a frozen length but derives from the centre gap.
+    expect(c.kind === 'circle' && c.radius).toMatchObject({ via: 'tangent-inner', outer: 'circle-O' });
+    // …and the drawn radius matches reality (= r(outer) − |OP|), not the typed 5.
+    const d = replay(s().facts);
+    const ri = dist(d.positions.get('P')!, d.positions.get('M')!);
+    expect(ri).toBeCloseTo(5 - dist(d.positions.get('O')!, d.positions.get('P')!), 6);
+  });
+
+  it('"show another configuration" varies the inner radius while staying tangent', () => {
+    setup();
+    const facts = s().facts;
+    const radii: number[] = [];
+    for (let seed = 0; seed < 30; seed++) {
+      const d = replay(facts, seed);
+      if (!d.positions.get('O') || !d.positions.get('P') || !d.positions.get('M')) continue;
+      const O = d.positions.get('O')!;
+      const P = d.positions.get('P')!;
+      const M = d.positions.get('M')!;
+      const ri = dist(P, M); // the inner circle's actual radius (M is on it)
+      // INVARIANT under every seed: M on the outer circle (5), and internal tangency
+      // |OP| + r_inner = r_outer (collinear, P between O and M).
+      expect(dist(O, M)).toBeCloseTo(5, 4);
+      expect(dist(O, P) + ri).toBeCloseTo(5, 4);
+      radii.push(ri);
+    }
+    // The inner radius genuinely flexes across seeds — it is not stuck at the 2.5 default.
+    expect(Math.max(...radii) - Math.min(...radii)).toBeGreaterThan(0.3);
+  });
+
+  it('EXTERNAL tangency keeps the typed radii (a radius only flexes when forced)', () => {
+    s().clear();
+    s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5 }, 'O');
+    s().execute({ type: 'circle', id: 'circle-P', center: 'P', radius: 5 }, 'P');
+    const r = parse('מעגל O ומעגל P משיקים זה לזה בנקודה M'); // external (default)
+    if (r.ok) r.commands.forEach((c) => s().execute(c, 'external eq'));
+    const c = replay(s().facts).construction.objects.find((o) => o.id === 'circle-P')!;
+    expect(c.kind === 'circle' && c.radius).toMatchObject({ via: 'length', value: 5 }); // untouched
+  });
+
+  it('a plain circle with nothing driving it keeps its typed radius', () => {
+    s().clear();
+    s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5 }, 'O');
+    const c = replay(s().facts).construction.objects.find((o) => o.id === 'circle-O')!;
+    expect(c.kind === 'circle' && c.radius).toMatchObject({ via: 'length', value: 5 });
+  });
+});

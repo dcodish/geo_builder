@@ -259,6 +259,18 @@ export interface CircleCirclePoint {
 }
 
 /**
+ * 0 DOF — the point on `circle` in the direction of `toward`: centre + r·unit(toward − centre).
+ * Used for the tangency point of two tangent circles (the touch on the outer circle, on the ray
+ * toward the inner centre), so it tracks the figure when a free centre is resampled (ADR-037 A2).
+ */
+export interface RadialTowardPoint {
+  kind: 'radial-toward';
+  id: Id;
+  circle: Id;
+  toward: Id;
+}
+
+/**
  * 1 DOF — a marker on a drawn `line`, at signed `offset` along the line's
  * direction from its anchor. Names a drawn line by two points (e.g. a tangent
  * "CD" at T → C, D at ±offset from T along the tangent). Default it just sits at
@@ -294,6 +306,7 @@ export type GeoPoint =
   | ArcMidpointPoint
   | LineCirclePoint
   | CircleCirclePoint
+  | RadialTowardPoint
   | OnLinePoint;
 
 /** The object kinds that are points (carry a computed position). Single source of truth. */
@@ -317,6 +330,7 @@ const POINT_KINDS: ReadonlySet<string> = new Set([
   'arc-midpoint',
   'line-circle',
   'circle-circle',
+  'radial-toward',
   'on-line',
 ]);
 
@@ -368,7 +382,12 @@ export interface Line {
 /** How a {@link Circle}'s radius is set: a fixed length, or the distance to a point on it. */
 export type RadiusSpec =
   | { via: 'length'; value: number }
-  | { via: 'through'; point: Id };
+  | { via: 'through'; point: Id }
+  // The largest circle that sits inside `outer` and is internally tangent to it, given
+  // wherever this circle's centre lands: r = r(outer) − |centre − centre(outer)|. The
+  // radius is thus a DOF the figure flexes (the centre is free), not a fixed pin — so two
+  // equal circles CAN be made internally tangent (ADR-037 Amendment 2 / radius-as-DOF).
+  | { via: 'tangent-inner'; outer: Id };
 
 /** A circle: a centre point and a {@link RadiusSpec}. Unlike a line, a circle **is** drawn. */
 export interface Circle {

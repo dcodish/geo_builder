@@ -569,19 +569,27 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       const idx2 = objects.findIndex((o) => o.id === cmd.circle2 && o.kind === 'circle');
       if (idx1 >= 0 && idx2 >= 0) {
         const c1 = objects[idx1] as Extract<GeoObject, { kind: 'circle' }>;
-        let c2 = objects[idx2] as Extract<GeoObject, { kind: 'circle' }>;
+        const c2 = objects[idx2] as Extract<GeoObject, { kind: 'circle' }>;
         if (c1.radius.via === 'length' && c2.radius.via === 'length') {
           const r1 = c1.radius.value;
-          let r2 = c2.radius.value;
+          const r2 = c2.radius.value;
           if (!cmd.external && Math.abs(r1 - r2) < 1e-6) {
-            // Internal tangency of equal circles is impossible at a *fixed* radius —
-            // but a radius is a flexible DOF, not a pin: shrink the 2nd circle so it
-            // sits inside the 1st (a default until a later constraint sizes it). The
-            // principled version (radius as a first-class solver DOF) is queued — see
-            // the radius-DOF note in PROJECT-MEMORY. (ADR-037 Amendment 1.)
-            r2 = r1 / 2;
-            c2 = { ...c2, radius: { via: 'length', value: r2 } };
-            objects[idx2] = c2;
+            // Equal circles can't be internally tangent at a FIXED radius — but a radius is
+            // a flexible DOF (operator: "radius should be a DOF and not fixed"). Make the 2nd
+            // circle the largest one that fits inside the 1st and touches it (`tangent-inner`),
+            // so its radius DERIVES from the centre gap. Seed the 2nd centre at a gap of r1/2
+            // (⇒ inner radius r1/2); the centre stays a free DOF the sampler varies, the touch
+            // point tracks it, and the drawn radius is honest — no hidden ½. (ADR-037 Amend 2.)
+            objects[idx2] = { ...c2, radius: { via: 'tangent-inner', outer: c1.id } };
+            const ciIdx = objects.findIndex((o) => o.id === c2.center && o.kind === 'free-point');
+            const innerFree = ciIdx >= 0 ? (objects[ciIdx] as Extract<GeoObject, { kind: 'free-point' }>) : undefined;
+            if (innerFree && !innerFree.pinned) {
+              const oc = objects.find((o) => o.id === c1.center && o.kind === 'free-point') as Extract<GeoObject, { kind: 'free-point' }> | undefined;
+              objects[ciIdx] = { ...innerFree, x: (oc?.x ?? 0) + r1 / 2, y: oc?.y ?? 0 };
+            }
+            // Touch point: on the OUTER circle, on the ray toward the inner centre (tracks resample).
+            addObj(objects, { kind: 'radial-toward', id: cmd.at, circle: c1.id, toward: c2.center });
+            break;
           }
           if (cmd.external) {
             const d = r1 + r2;

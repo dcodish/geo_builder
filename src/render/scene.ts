@@ -171,7 +171,16 @@ export function buildScene(
       if (!center) continue;
       let r: number | undefined;
       if (o.radius.via === 'length') r = o.radius.value;
-      else {
+      else if (o.radius.via === 'tangent-inner') {
+        // Derived: the largest circle inside `outer`, tangent to it (r = r(outer) − gap).
+        const outerSpec = o.radius.outer;
+        const outer = c.objects.find((x) => x.id === outerSpec && x.kind === 'circle') as Extract<typeof o, { kind: 'circle' }> | undefined;
+        const oc = outer ? positions.get(outer.center) : undefined;
+        if (outer && oc && outer.radius.via === 'length') {
+          const ri = outer.radius.value - dist(center, oc);
+          if (ri > 0) r = ri;
+        }
+      } else {
         const p = positions.get(o.radius.point);
         if (p) r = dist(center, p);
       }

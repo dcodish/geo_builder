@@ -530,7 +530,7 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
     progressed = false;
     for (const o of circleObjs) {
       if (!remainingCircles.has(o.id)) continue;
-      const r = resolveCircle(o, pos);
+      const r = resolveCircle(o, pos, circles);
       if (r === 'pending') continue;
       if (typeof r === 'string') return { ok: false, error: r };
       circles.set(o.id, r);
@@ -600,12 +600,19 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
 }
 
 /** Resolve one circle to its centre and radius: a {@link ResolvedCircle}, 'pending', or an error string. */
-function resolveCircle(c: Circle, pos: Map<Id, Vec>): ResolvedCircle | 'pending' | string {
+function resolveCircle(c: Circle, pos: Map<Id, Vec>, circles: Map<Id, ResolvedCircle>): ResolvedCircle | 'pending' | string {
   const center = pos.get(c.center);
   if (!center) return 'pending';
   if (c.radius.via === 'length') {
     if (c.radius.value <= 0) return `circle ${c.id}: radius must be positive`;
     return { center, r: c.radius.value };
+  }
+  if (c.radius.via === 'tangent-inner') {
+    const outer = circles.get(c.radius.outer); // resolved earlier in the sweep (it's a plain circle)
+    if (!outer) return 'pending';
+    const r = outer.r - len(sub(center, outer.center)); // largest circle inside `outer`, tangent to it
+    if (r < 1e-9) return `circle ${c.id}: its centre is too far from ${c.radius.outer} to sit inside it`;
+    return { center, r };
   }
   const p = pos.get(c.radius.point);
   if (!p) return 'pending';
@@ -835,6 +842,15 @@ function tryEval(
       const sols = circleCircleIntersect(c1.center, c1.r, c2.center, c2.r);
       if (sols.length === 0) return `cannot construct ${p.id}: circles ${p.circle1} and ${p.circle2} do not meet`;
       return sols[p.branch % sols.length];
+    }
+
+    case 'radial-toward': {
+      const c = circles.get(p.circle);
+      const t = pos.get(p.toward);
+      if (!c || !t) return 'pending';
+      const d = sub(t, c.center);
+      if (len(d) < 1e-9) return `cannot place ${p.id}: ${p.toward} is at the centre of ${p.circle}`;
+      return add(c.center, scale(unit(d), c.r)); // on the circle, toward `toward`
     }
   }
 }

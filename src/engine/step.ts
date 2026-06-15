@@ -108,7 +108,10 @@ function circlesTangentError(prev: Construction, cmd: Command): string | null {
   const c1 = circ(cmd.circle1);
   const c2 = circ(cmd.circle2);
   if (!c1 || !c2) return null; // a missing circle is handled by the normal flow
-  if (c1.radius.via !== 'length' || c2.radius.via !== 'length') {
+  // A radius-through-a-point circle has no length known at apply time, so it can't be sized
+  // for tangency. A `tangent-inner` radius is our own internal state (a re-applied tangency) —
+  // allow it. Only `through` is the genuinely unsupported case.
+  if (c1.radius.via === 'through' || c2.radius.via === 'through') {
     return 'tangent circles need a fixed radius (a radius-through-a-point circle is not supported yet)';
   }
   return null;
