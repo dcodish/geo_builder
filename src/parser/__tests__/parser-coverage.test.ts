@@ -180,6 +180,27 @@ describe('compound "<place a point> such that <condition>" parses BOTH halves', 
   }
 });
 
+describe('tangent that CUTS a line creates the intersection (not a tangent named by two points)', () => {
+  // "חותך" (cuts) is an intersection keyword: the tangent at C ∩ the line/extension AB = E.
+  // Regression: without "חותך", this fell to the bare tangentLine rule, which named the tangent
+  // by A,B (clobbering existing vertices) instead of creating E.
+  for (const u of [
+    'משיק למעגל O בנקודה C חותך את המשך AB בנקודה E',
+    'the tangent to circle O at C cuts the extension of AB at E',
+  ]) {
+    it(`"${u}" → E = tangent∩AB (A, B untouched)`, () => {
+      const r = parse(u);
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const li = r.commands.find((c) => c.type === 'line-intersection') as { id: string } | undefined;
+      expect(li?.id).toBe('E'); // the intersection point is E
+      // A and B are referenced (line-through AB), NEVER recreated as markers on the tangent.
+      expect(r.commands.some((c) => c.type === 'point-on-line')).toBe(false);
+      expect(r.commands.some((c) => c.type === 'line-through')).toBe(true);
+    });
+  }
+});
+
 describe('named median "AD תיכון" honors the named foot D and the stated/contextual side', () => {
   // Explicit side: D = midpoint of BC, segment A–D — no context needed.
   for (const u of ['AD median to BC', 'AD תיכון לצלע BC', 'median AD to side BC']) {

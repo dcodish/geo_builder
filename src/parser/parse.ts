@@ -181,7 +181,7 @@ const segment: Rule = (s) => {
  * half-parse "the diagonals AC and BD intersect at E" into just "segment AC",
  * silently dropping the intersection point.
  */
-const INTERSECT_KW = /intersect|∩|חיתוך|נחתך|נחתכ|נפגש|\bmeets?\b/i;
+const INTERSECT_KW = /intersect|∩|חיתוך|נחתך|נחתכ|נפגש|חות[כך]|\bcuts?\b|\bmeets?\b/i; // incl. "חותך" (cuts) / "cuts"
 const lineLineIntersection: Rule = (s) => {
   if (!INTERSECT_KW.test(s)) return null;
   // The operands of a plain line∩line must be point-pairs the figure already has.
