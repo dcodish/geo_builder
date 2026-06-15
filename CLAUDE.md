@@ -34,6 +34,8 @@ Full project docs live in [`docs/`](docs/) — vision, functional + non-function
 
 Test strategy and per-step acceptance gates live in [`docs/08-testing-strategy.md`](docs/08-testing-strategy.md). **Working rule for this repo: do not report a feature or build step as "ready" until its acceptance gate passes** — tests green, `tsc`/build clean, results shown honestly (no skipped/`.only` specs hiding gaps). The engine is pure and deterministic and is tested hardest; the LLM fallback is mocked (no live API calls in tests). The **stability** regression (existing points must not jump when a fact is added) is a first-class test.
 
+**Rule (reported bugs become regression scenarios — NON-NEGOTIABLE):** whenever the operator reports a problem and it is diagnosed from the debug log (`logs/debug-log.jsonl`), the fix is **not complete** until the *exact utterance sequence* they entered is captured as an end-to-end scenario in [`src/__tests__/scenarios.test.ts`](src/__tests__/scenarios.test.ts) (and indexed in [`docs/test-scenarios.md`](docs/test-scenarios.md)) — replayed through the real parse-with-context → fact list → `replay` path and asserted. Analysis + fix + unit test is **not enough**: the operator's actual sequence must become permanent regression coverage so what worked before keeps working. Steps that escalate to the LLM are recorded as the canonical commands the log shows (the LLM is mocked). This is in addition to, not a replacement for, the per-fix unit test.
+
 ## Commands
 
 - `npm run dev` — Vite dev server
