@@ -230,9 +230,14 @@ function replaceCyclicForDiameter(prev: Construction, cmd: Command): Constructio
     theta.set(order[i].id, a0 + Math.PI + Math.PI * (arc2Span ? acc / arc2Span : (i - pD) / (N - pD)));
   }
 
-  const objects: GeoObject[] = prev.objects.map((o) =>
-    o.kind === 'on-circle' && theta.has(o.id) ? { ...o, theta: theta.get(o.id)!, solve: undefined } : o,
-  );
+  const objects: GeoObject[] = prev.objects.map((o) => {
+    // D becomes the ANTIPODE of A — so the diameter is PERSISTENT: if a later constraint
+    // (e.g. ∠BDA = 24°) moves a vertex, D still sits diametrically opposite A, and D is no
+    // longer a free on-circle vertex such a constraint could grab and scramble.
+    if (o.id === cmd.id2 && o.kind === 'on-circle') return { kind: 'antipode', id: o.id, circle: o.circle, of: cmd.id1 };
+    if (o.kind === 'on-circle' && theta.has(o.id)) return { ...o, theta: theta.get(o.id)!, solve: undefined };
+    return o;
+  });
   // Draw the diameter AD (dedupe — the polygon edge may already be present).
   const segId = `seg-${[cmd.id1, cmd.id2].sort().join('')}`;
   if (!objects.some((o) => o.id === segId)) objects.push({ kind: 'segment', id: segId, a: cmd.id1, b: cmd.id2 });

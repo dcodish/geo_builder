@@ -178,8 +178,13 @@ export function solvedOnSegmentCandidates(
     .filter((id) => id !== p.id)
     .map((id) => pos.get(id))
     .filter((v): v is Vec => !!v);
-  return roots.filter((t) => {
+  const cands = roots.filter((t) => {
     const self = add(a, scale(sub(b, a), t));
     return others.every((o) => dist(self, o) > 1e-4 * segLen);
   });
+  // Order by proximity to the initial parameter so branch 0 is the solution NEAREST where
+  // the point started — an extension point (t0>1, e.g. F on the continuation of CB) keeps
+  // its root on the extension rather than snapping to a closer one on the segment proper.
+  if (p.t0 !== undefined) cands.sort((x, y) => Math.abs(x - p.t0!) - Math.abs(y - p.t0!));
+  return cands;
 }

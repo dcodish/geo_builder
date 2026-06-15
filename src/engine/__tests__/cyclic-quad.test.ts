@@ -88,4 +88,33 @@ describe('a diameter stated on a cyclic quad reshapes the whole quad (stays conv
     expect(scene.segments.filter((s) => s.id === 'seg-AD')).toHaveLength(1);
     expect(scene.circles).toHaveLength(0);
   });
+
+  it('the bagrut figure (cyclic quad, AD diameter, F on CB-extension ⟂, ∠BDA=24°) stays intact', () => {
+    // textbook 4.ד: ABCD cyclic with AD a diameter; F on the continuation of CB with FB⊥FA;
+    // then ∠BDA = 24°. The angle must NUDGE B, keeping the diameter, Thales, and F on the extension.
+    const r = parse('מרובע ABCD בר חסימה במעגל');
+    if (!r.ok) throw new Error('cyclic quad did not parse');
+    const cid = (r.commands.find((c) => c.type === 'circle') as { id: string }).id;
+    const { positions } = build([
+      ...r.commands,
+      { type: 'diameter', id1: 'A', id2: 'D', circle: cid },
+      { type: 'point-on-segment', id: 'F', a: 'C', b: 'B', t: 1.3 }, // on the EXTENSION of CB (t>1)
+      { type: 'segment', a: 'F', b: 'B' },
+      { type: 'segment', a: 'F', b: 'A' },
+      { type: 'set-perpendicular', a: 'F', b: 'B', c: 'F', d: 'A' },
+      { type: 'set-angle', vertex: 'D', ray1: 'B', ray2: 'A', value: 24 },
+    ]);
+    const [A, B, C, D, F, O] = ['A', 'B', 'C', 'D', 'F', 'O'].map((id) => positions.get(id)!);
+
+    // AD is STILL a diameter after the angle step (A, D antipodal about O).
+    expect(O.x).toBeCloseTo((A.x + D.x) / 2, 6);
+    expect(O.y).toBeCloseTo((A.y + D.y) / 2, 6);
+    // ∠BDA = 24° (the given) and ∠ABD = 90° (Thales — the angle on a diameter).
+    expect(angleAt(B, D, A)).toBeCloseTo(24, 2);
+    expect(angleAt(A, B, D)).toBeCloseTo(90, 2);
+    // F stayed on the CONTINUATION of CB (beyond B), not on segment CB, and ∠AFB = 90°.
+    const t = ((F.x - C.x) * (B.x - C.x) + (F.y - C.y) * (B.y - C.y)) / ((B.x - C.x) ** 2 + (B.y - C.y) ** 2);
+    expect(t).toBeGreaterThan(1);
+    expect(angleAt(A, F, B)).toBeCloseTo(90, 2);
+  });
 });
