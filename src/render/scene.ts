@@ -167,6 +167,7 @@ export function buildScene(
       continue;
     }
     if (o.kind === 'circle') {
+      if (o.hidden) continue; // a cyclic polygon's circumcircle: constrains the vertices, not drawn
       const center = positions.get(o.center);
       if (!center) continue;
       let r: number | undefined;

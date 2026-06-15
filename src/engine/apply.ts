@@ -494,7 +494,13 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'circle':
       placeBase(objects, [{ id: cmd.center, x: 0, y: 0 }], pos); // create the centre if new
-      upsertCircle(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'length', value: cmd.radius } });
+      upsertCircle(objects, {
+        kind: 'circle',
+        id: cmd.id,
+        center: cmd.center,
+        radius: { via: 'length', value: cmd.radius },
+        ...(cmd.hidden ? { hidden: true } : {}),
+      });
       break;
 
     case 'circle-through':

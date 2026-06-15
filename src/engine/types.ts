@@ -389,12 +389,16 @@ export type RadiusSpec =
   // equal circles CAN be made internally tangent (ADR-037 Amendment 2 / radius-as-DOF).
   | { via: 'tangent-inner'; outer: Id };
 
-/** A circle: a centre point and a {@link RadiusSpec}. Unlike a line, a circle **is** drawn. */
+/** A circle: a centre point and a {@link RadiusSpec}. Unlike a line, a circle **is** drawn —
+ *  unless `hidden`, in which case it constrains its on-circle points but is not rendered (a
+ *  "cyclic"/בר-חסימה quad: the vertices are concyclic so opposite angles sum to 180°, with no
+ *  circle drawn). */
 export interface Circle {
   kind: 'circle';
   id: Id;
   center: Id;
   radius: RadiusSpec;
+  hidden?: boolean;
 }
 
 export type GeoObject = GeoPoint | Segment | Polygon | Line | Circle;
@@ -529,7 +533,7 @@ export type Command =
   | { type: 'foot'; id: Id; from: Id; a: Id; b: Id }
   | { type: 'midpoint'; id: Id; a: Id; b: Id }
   // Phase 5c — circles and the points they produce.
-  | { type: 'circle'; id: Id; center: Id; radius: number }
+  | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean }
   | { type: 'circle-through'; id: Id; center: Id; through: Id }
   | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id } // circle through a,b,c (centre = circumcentre)
   | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number }

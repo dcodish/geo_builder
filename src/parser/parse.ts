@@ -621,6 +621,11 @@ const circle: Rule = (s) => {
  * an isosceles one is (symmetric about a diameter) — so "inscribed trapezoid"
  * builds the isosceles one.
  */
+/** A generic CONVEX cyclic quad: four vertices in cyclic order at irregular angles (so it
+ *  reads as a general cyclic quadrilateral, not a square). Convex order is what makes the
+ *  opposite-angles-sum-to-180° theorem hold — a golden-angle spread interleaves them (crossed). */
+const CYCLIC_QUAD_ANGLES = [30, 105, 195, 295];
+
 const INSCRIBED_ANGLES: Record<string, number[] | null> = {
   triangle: null,
   quad: null,
@@ -646,8 +651,12 @@ const isCircleInPolygon = (s: string): boolean => {
 
 /** "triangle ABC inscribed in circle O" / "טרפז ABCD חסום במעגל" — circle + on-circle vertices + edges. */
 const inscribedPolygon: Rule = (s, ctx) => {
-  if (!/inscrib\w*|חסום/i.test(s)) return null; // inscribed / inscribe / inscribing
+  if (!/inscrib\w*|חסום|בר[\s-]?חסימה|\bcyclic\b|concyclic/i.test(s)) return null; // inscribed / inscribable / cyclic / בר-חסימה
   if (isCircleInPolygon(s)) return null; // that's the incircle — handled by `incircle`, not here
+  // "cyclic" / "בר חסימה" / "inscribable" = the vertices are CONCYCLIC (opposite angles sum to
+  // 180°), but the circumscribing circle is NOT drawn — only the polygon. (vs "inscribed"/"חסום",
+  // which draws the circle.)
+  const hidden = /בר[\s-]?חסימה|\bcyclic\b|concyclic|inscribable/i.test(s);
   // A right triangle inscribed in a circle IS constructible (Thales — the
   // hypotenuse is a diameter, the right angle is on the circle): handle it.
   const kind =
@@ -665,7 +674,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   const named = circleCenter(s); // may be null — "inscribed in a circle" need not name the centre
   const r = parseRadius(s);
   let rest = dropCircleRef(s).replace(
-    /right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|quad\w*|מרובע|inscrib\w*|חסום|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
+    /right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|quad\w*|מרובע|inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
     ' ',
   );
   if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
@@ -689,8 +698,10 @@ const inscribedPolygon: Rule = (s, ctx) => {
   if (isTri && ids.every((id) => (ctx.points ?? []).includes(id))) {
     return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2] }];
   }
-  const angles = INSCRIBED_ANGLES[kind];
-  const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius }];
+  // A cyclic (hidden-circle) quad needs CONVEX vertex order for the opposite-angles theorem;
+  // the default general-quad spread (golden angle) would interleave them into a crossed quad.
+  const angles = hidden && kind === 'quad' ? CYCLIC_QUAD_ANGLES : INSCRIBED_ANGLES[kind];
+  const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, ...(hidden ? { hidden: true } : {}) }];
   if (r.varCmd) cmds.push(r.varCmd);
   ids.forEach((id, i) => {
     // specific angle for a shaped cyclic polygon (square/rect/rhombus/trapezoid);
