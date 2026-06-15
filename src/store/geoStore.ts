@@ -245,6 +245,38 @@ function renameInCommand(cmd: AnyCommand, from: Id, to: Id): AnyCommand {
 /** Outcome of a relabel request, so the UI can explain a no-op. */
 export type RenameResult = { ok: true } | { ok: false; reason: 'same' | 'no-source' | 'target-taken' };
 
+/** Outcome of a merge request (fold one point into another), so the UI can explain a no-op. */
+export type MergeResult = { ok: true } | { ok: false; reason: 'same' | 'no-source' | 'no-target' | 'source-in-shape' };
+
+/**
+ * A command that has collapsed to a geometric no-op because two of its required-distinct
+ * points became the same id (the typical fallout of folding F into E: a `segment EF` → `EE`,
+ * an `angle EFG` → `EEG`). Such facts are dropped during a merge so the figure stays clean.
+ */
+function collapsedDegenerate(cmd: AnyCommand): boolean {
+  const c = cmd as Record<string, Id | undefined>;
+  switch (cmd.type) {
+    case 'segment':
+    case 'set-distance':
+    case 'point-on-segment':
+    case 'foot':
+    case 'midpoint':
+      return c.a === c.b;
+    case 'set-equal':
+    case 'set-ratio':
+    case 'set-parallel':
+    case 'set-perpendicular':
+      return c.a === c.b || c.c === c.d;
+    case 'set-angle':
+    case 'measure-angle':
+      return c.vertex === c.ray1 || c.vertex === c.ray2 || c.ray1 === c.ray2;
+    case 'measure-length':
+      return c.a === c.b;
+    default:
+      return false;
+  }
+}
+
 export interface GeoState {
   facts: Fact[];
   /** The fact currently selected for inspection (highlighted on the canvas); UI-only, not undoable. */
@@ -278,6 +310,9 @@ export interface GeoState {
   setShowMeasures: (show: boolean) => void;
   /** Relabel a point everywhere (e.g. E → G) — rewrites every fact, one undo entry. */
   rename: (from: Id, to: Id) => RenameResult;
+  /** Fold one point into another (e.g. F → E, both already present) — drops F's definition,
+   *  rewrites F→E everywhere, drops facts that collapsed; one undo entry. */
+  merge: (from: Id, to: Id) => MergeResult;
   /** Reset to no facts and wipe undo/redo history. */
   clear: () => void;
 }
@@ -422,6 +457,31 @@ export const useGeoStore = create<GeoState>()(
           })),
           selectedId: null,
         });
+        return { ok: true };
+      },
+
+      merge: (from, to) => {
+        const F = from.toUpperCase();
+        const T = to.toUpperCase();
+        if (F === T) return { ok: false, reason: 'same' };
+        const facts = get().facts;
+        const all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
+        if (!all.has(F)) return { ok: false, reason: 'no-source' };
+        if (!all.has(T)) return { ok: false, reason: 'no-target' }; // merging into a NEW letter is a rename, not a merge
+        // F must have its OWN single-point definition (a command with `id === F`) to fold;
+        // a shape vertex (in an `ids[]` tuple) or an auto-created endpoint has none and can't
+        // be cleanly absorbed without tearing apart the construct that introduced it.
+        const defining = facts.find((f) => (f.cmd as { id?: Id }).id === F);
+        if (!defining) return { ok: false, reason: 'source-in-shape' };
+        const merged = facts
+          .filter((f) => f.id !== defining.id) // drop F's own definition — T survives, F is absorbed
+          .map((f) => ({
+            ...f,
+            cmd: renameInCommand(f.cmd, F, T),
+            utterance: f.utterance ? f.utterance.split(F).join(T) : f.utterance,
+          }))
+          .filter((f) => !collapsedDegenerate(f.cmd)); // drop facts that collapsed (segment EF → EE, …)
+        set({ facts: merged, selectedId: null });
         return { ok: true };
       },
 

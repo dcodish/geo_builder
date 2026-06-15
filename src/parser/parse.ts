@@ -1421,3 +1421,21 @@ export function parseRename(raw: string): { from: Id; to: Id } | null {
   const to = up(m[2]);
   return from === to ? null : { from, to };
 }
+
+/**
+ * Detect a MERGE request — "merge F into E" / "merge F with E" / "merge F and E" / "fold F into E"
+ * / "combine F and E", Hebrew "מזג F ל-E" / "מזג F עם E" / "מזג F ו-E" / "אחד F ל-E".
+ * Distinct from a rename: a merge FOLDS two *existing* points into one (E survives), so the
+ * keywords (merge/fold/combine/unify, מזג/אחד) never overlap with the relabel keywords. Like
+ * rename it is a store operation, handled outside `parse` (the App intercepts it before parsing).
+ */
+export function parseMerge(raw: string): { from: Id; to: Id } | null {
+  const s = raw.trim().replace(/\s+/g, ' ');
+  const m =
+    s.match(/(?:merge|fold|combine|unify)\s+([A-Za-z]\d*)\b(?:\s+(?:into|with|and|to|->|→))?\s+([A-Za-z]\d*)\b/i) ??
+    s.match(/(?:מזג|אחד)\s*(?:את\s*)?([A-Za-z]\d*)\s*(?:ל-?|עם|ו-?|→)?\s*([A-Za-z]\d*)\b/i);
+  if (!m) return null;
+  const from = up(m[1]);
+  const to = up(m[2]);
+  return from === to ? null : { from, to };
+}

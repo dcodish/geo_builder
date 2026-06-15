@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { freeDofs, isGeoPoint } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -38,6 +38,7 @@ export default function App() {
   const showMeasures = useGeoStore((s) => s.showMeasures);
   const setShowMeasures = useGeoStore((s) => s.setShowMeasures);
   const rename = useGeoStore((s) => s.rename);
+  const merge = useGeoStore((s) => s.merge);
   const clear = useGeoStore((s) => s.clear);
 
   const { undo, redo } = useGeoStore.temporal.getState();
@@ -161,6 +162,16 @@ export default function App() {
       logDebug({ kind: 'input', utterance, locale, source: 'rename', rename: ren, result: res.ok ? 'ok' : res.reason });
       if (res.ok) setText('');
       else setRenameNote(t(`input.rename_${res.reason}`, { from: ren.from, to: ren.to }));
+      return;
+    }
+    // A merge ("merge F into E" / "מזג F ל-E") folds two existing points into one — also a
+    // store operation, handled before the parser. Distinct from rename (the target survives).
+    const mrg = parseMerge(utterance);
+    if (mrg) {
+      const res = merge(mrg.from, mrg.to);
+      logDebug({ kind: 'input', utterance, locale, source: 'merge', rename: mrg, result: res.ok ? 'ok' : res.reason });
+      if (res.ok) setText('');
+      else setRenameNote(t(`input.merge_${res.reason}`, { from: mrg.from, to: mrg.to }));
       return;
     }
     const r = parse(utterance, parseCtx());

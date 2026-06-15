@@ -114,6 +114,7 @@ On-demand, **opt-in** annotation of what the figure geometrically *is* — disti
 - **FR-HS-5 (Should)** — Export the current figure as a clean, print-ready image (SVG and/or PNG) for use in exams, worksheets, and books. Primary value for the author audience (see [Vision](01-vision.md)). *(Realised — PNG **save** and **copy-to-clipboard** from the canvas, over-sampled 2× on a white background.)*
 - **FR-HS-6 (Later)** — Share a figure via link.
 - **FR-HS-7 (Should)** — **Relabel** a point everywhere (`rename E to G` / `שנה שם E ל-G`) so the lettering can match a textbook figure, without changing the geometry. The rename rewrites that letter across every step and is undoable; it refuses to relabel onto a letter already in use (no silent merge of two points). Pairs with the naming-order + orientation levers documented in [12-letter-placement.md](12-letter-placement.md). (See [ADR-035](06-decisions.md#adr-035).)
+- **FR-HS-8 (Should)** — **Merge** two *existing* points into one (`merge F into E` / `מזג F ל-E`) — the explicit fold the rename deliberately refuses. The target survives; the source's own definition is dropped, every reference to the source is rewritten to the target, and any fact that collapses (a `segment EF` → `EE`) is removed. Undoable as one step. Refuses to fold a **shape vertex** (it has no standalone definition to drop — edit the shape instead) and refuses when either point is missing (merging into a *new* letter is a rename, not a merge).
 
 ## Internationalization
 
