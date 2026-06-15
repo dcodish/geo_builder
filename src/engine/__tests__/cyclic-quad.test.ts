@@ -139,3 +139,51 @@ describe('a diameter stated on a cyclic quad reshapes the whole quad (stays conv
     expect(angleAt(A, F, B)).toBeCloseTo(90, 2);
   });
 });
+
+describe('a segment that BISECTS an angle (all points exist) is a coupled constraint', () => {
+  it('"AC bisects ∠ECD" parses to the angle-equality ∠ECA = ∠ACD', () => {
+    for (const u of ['AC bisects angle ECD', 'AC חוצה את הזווית ECD']) {
+      const r = parse(u);
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const c = r.commands[0] as { type: string; v1: string; a1: string; b1: string; a2: string; b2: string; k: number };
+      expect(c.type).toBe('set-angle-ratio');
+      expect([c.a1, c.b1, c.b2, c.k]).toEqual(['E', 'A', 'D', 1]); // ∠(E,C,A) = ∠(A,C,D)
+    }
+  });
+
+  it('two coupled constraints (AB=CB AND AC bisects ∠ECD) jointly reshape the cyclic quad — convex, not collapsed', () => {
+    // The tangent-chord figure: inscribed quad, diagonals meet at F, tangent at C meets the
+    // AB-extension at E, then AB=CB and AC bisects ∠ECD. Both constraints must hold together and
+    // the quad must stay CONVEX (the joint solve used to drive one vertex onto another).
+    const r = parse('ABCD חסום במעגל');
+    if (!r.ok) throw new Error('inscribed quad did not parse');
+    const cid = (r.commands.find((c) => c.type === 'circle') as { id: string }).id;
+    const { positions } = build([
+      ...r.commands,
+      { type: 'segment', a: 'A', b: 'C' },
+      { type: 'segment', a: 'B', b: 'D' },
+      { type: 'line-line-intersection', id: 'F', a: 'A', b: 'C', c: 'B', d: 'D' },
+      { type: 'tangent', id: 'tan-C', circle: cid, at: 'C', visible: true },
+      { type: 'line-through', id: 'line-AB', a: 'A', b: 'B' },
+      { type: 'line-intersection', id: 'E', line1: 'tan-C', line2: 'line-AB' },
+      { type: 'segment', a: 'E', b: 'A' },
+      { type: 'segment', a: 'E', b: 'B' },
+      { type: 'set-equal', a: 'A', b: 'B', c: 'C', d: 'B' }, // AB = CB
+      { type: 'set-angle-ratio', v1: 'C', a1: 'E', b1: 'A', v2: 'C', a2: 'A', b2: 'D', k: 1 }, // AC bisects ∠ECD
+    ]);
+    const [A, B, C, D, E, O] = ['A', 'B', 'C', 'D', 'E', 'O'].map((id) => positions.get(id)!);
+
+    // Both givens hold simultaneously.
+    expect(dist(A, B)).toBeCloseTo(dist(C, B), 4); // AB = CB
+    expect(angleAt(E, C, A)).toBeCloseTo(angleAt(A, C, D), 3); // ∠ECA = ∠ACD (AC bisects ∠ECD)
+
+    // …and the quad is still CONVEX (vertices in cyclic order, none collapsed onto another).
+    const ang = (p: { x: number; y: number }) => (Math.atan2(p.y - O.y, p.x - O.x) + 2 * Math.PI) % (2 * Math.PI);
+    const order = [A, B, C, D].map(ang);
+    for (let i = 0; i < 4; i++) {
+      const gap = (order[(i + 1) % 4] - order[i] + 2 * Math.PI) % (2 * Math.PI);
+      expect(gap).toBeGreaterThan((15 * Math.PI) / 180); // ≥15° apart — convex, not a sliver/crossed
+    }
+  });
+});

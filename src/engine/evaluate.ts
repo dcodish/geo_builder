@@ -120,6 +120,13 @@ function resolveDriven(c: Construction): Construction {
       return seen.has(key) ? false : (seen.add(key), true);
     });
   const ids = carriers.map((cr) => cr.id);
+  // The constraints' referenced points, and the pairs a `coincide` constraint INTENDS to merge
+  // (those must be exempt from the degeneracy barrier below — ADR-028's hidden `~` targets).
+  const refIds = [...new Set(cons.flatMap(constraintRefs))];
+  const coincidePairs = new Set(
+    c.constraints.filter((k) => k.type === 'coincide').map((k) => [k.p, k.q].sort().join('|')),
+  );
+  const seed = carriers.map((cr) => (cr.kind === 'on-circle' ? cr.theta : cr.t));
   const totalSq = (x: number[]): number => {
     const p = new Map<Id, number>(ids.map((id, i) => [id, x[i]]));
     const r = evaluateCore(setParams(c, p), { skipConstraints: true });
@@ -130,8 +137,45 @@ function resolveDriven(c: Construction): Construction {
       const v = residual(con, (id) => r.positions.get(id)!);
       s += v * v;
     }
+    // Degeneracy barrier: steer the joint search away from COLLAPSING two referenced points
+    // together (a cheat that satisfies an angle/equal constraint by merging vertices — e.g.
+    // driving C onto D). Skip pairs a coincide constraint deliberately merges.
+    const pts = refIds.map((id) => r.positions.get(id)).filter((v): v is Vec => !!v);
+    let span = 1;
+    for (const v of pts) span = Math.max(span, Math.abs(v.x), Math.abs(v.y));
+    const minSep = 0.04 * span;
+    for (let i = 0; i < refIds.length; i++) {
+      for (let j = i + 1; j < refIds.length; j++) {
+        if (coincidePairs.has([refIds[i], refIds[j]].sort().join('|'))) continue;
+        const a = r.positions.get(refIds[i]);
+        const b = r.positions.get(refIds[j]);
+        if (!a || !b) continue;
+        const dd = Math.hypot(a.x - b.x, a.y - b.y);
+        if (dd < minSep) s += (minSep / Math.max(dd, minSep * 1e-3) - 1) ** 2;
+      }
+    }
     return s;
   };
+  // Does `x` satisfy every constraint within tolerance AND avoid degeneracy (totalSq ~ 0
+  // includes the degeneracy barrier, so a satisfied-but-collapsed config is rejected)?
+  const accept = (x: number[]): boolean => {
+    const r = evaluateCore(setParams(c, new Map<Id, number>(ids.map((id, i) => [id, x[i]]))), { skipConstraints: true });
+    if (!r.ok) return false;
+    const ok = cons.every((con) => {
+      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return false;
+      const get = (id: Id) => r.positions.get(id)!;
+      return Math.abs(residual(con, get)) <= residualTolerance(con, constraintScale(con, get));
+    });
+    return ok && totalSq(x) < 1e-3;
+  };
+
+  // NEAR FIRST: a local solve from the seed. When the current figure already has a valid
+  // solution nearby (a cyclic quad needing only a small reshape), this keeps its convex
+  // vertex order instead of jumping to a far, tangled branch. Accept it only if it truly
+  // satisfies the constraints and isn't degenerate; otherwise fall through to the global search.
+  const local = nelderMead(totalSq, seed.slice(), 500, 0.12);
+  if (accept(local)) return setParams(c, new Map<Id, number>(ids.map((id, i) => [id, local[i]])));
+
   // 1) coordinate descent for a globally-informed start (grid argMin per DOF
   //    considers all branches); 2) Nelder–Mead to converge out of the valley
   //    coordinate descent stalls in (coupled residuals share a narrow trough).

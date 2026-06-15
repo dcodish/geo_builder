@@ -1187,17 +1187,27 @@ const bisectorPlacesPoint: Rule = (s) => {
   const tri = labelRun(after, 3);
   if (!tri) return null;
   const vertex = tri[1];
-  if (vertex !== apex) return null; // "AD bisects ∠BAC": the segment's first letter is the angle vertex
-  const [o1, o2] = tri.filter((t) => t !== vertex);
-  if (o2 === undefined) return null;
-  const bisId = `bis-${tri.join('')}`;
-  const lineId = `line-${o1}${o2}`;
-  return [
-    { type: 'bisector', id: bisId, vertex, p: tri[0], q: tri[2] },
-    { type: 'line-through', id: lineId, a: o1, b: o2 },
-    { type: 'line-intersection', id: D, line1: bisId, line2: lineId },
-    { type: 'segment', a: apex, b: D },
-  ];
+  if (vertex === apex) {
+    // "AD bisects ∠BAC": the segment's FIRST letter is the angle vertex → place D where the
+    // bisector meets the opposite side (a new point).
+    const [o1, o2] = tri.filter((t) => t !== vertex);
+    if (o2 === undefined) return null;
+    const bisId = `bis-${tri.join('')}`;
+    const lineId = `line-${o1}${o2}`;
+    return [
+      { type: 'bisector', id: bisId, vertex, p: tri[0], q: tri[2] },
+      { type: 'line-through', id: lineId, a: o1, b: o2 },
+      { type: 'line-intersection', id: D, line1: bisId, line2: lineId },
+      { type: 'segment', a: apex, b: D },
+    ];
+  }
+  if (vertex === D) {
+    // "AC bisects ∠ECD": the angle's vertex (C) is the segment's SECOND letter, and the bisecting
+    // ray runs from the vertex through the EXISTING point `apex` (A). All points exist ⇒ this is a
+    // CONSTRAINT: the two half-angles are equal, ∠(ray1,vertex,apex) = ∠(apex,vertex,ray2).
+    return [{ type: 'set-angle-ratio', v1: vertex, a1: tri[0], b1: apex, v2: vertex, a2: apex, b2: tri[2], k: 1 }];
+  }
+  return null;
 };
 
 /**
