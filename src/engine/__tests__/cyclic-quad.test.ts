@@ -57,6 +57,23 @@ describe('cyclic quadrilateral (בר חסימה) — concyclic, circle not drawn
     expect(circle.hidden).toBeUndefined();
     expect(buildScene(construction, positions).circles).toHaveLength(1);
   });
+
+  // The shape word may be OMITTED ("ABCD חסום במעגל") — infer the polygon from the label
+  // count so inscribed-vs-cyclic stays deterministic (drawn vs hidden), not an LLM guess.
+  it.each([
+    ['ABCD חסום במעגל', false, 1], // inscribed → circle DRAWN
+    ['ABCD בר חסימה', true, 0], // cyclic → circle HIDDEN
+    ['ABCD inscribed in a circle', false, 1],
+    ['ABCD cyclic', true, 0],
+  ])('"%s" parses deterministically (hidden=%s, drawn circles=%i) — no LLM', (utterance, hidden, drawn) => {
+    const r = parse(utterance);
+    expect(r.ok).toBe(true); // handled by the grammar, never falls through to the LLM
+    if (!r.ok) return;
+    const circle = r.commands.find((c) => c.type === 'circle') as { hidden?: boolean };
+    expect(circle.hidden ?? false).toBe(hidden);
+    const { construction, positions } = build(r.commands);
+    expect(buildScene(construction, positions).circles).toHaveLength(drawn);
+  });
 });
 
 describe('a diameter stated on a cyclic quad reshapes the whole quad (stays convex)', () => {

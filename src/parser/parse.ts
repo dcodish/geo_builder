@@ -659,7 +659,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   const hidden = /בר[\s-]?חסימה|\bcyclic\b|concyclic|inscribable/i.test(s);
   // A right triangle inscribed in a circle IS constructible (Thales — the
   // hypotenuse is a diameter, the right angle is on the circle): handle it.
-  const kind =
+  let kind =
     /right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זוו?ית/i.test(s) ? 'right-triangle'
     : /triangle|משולש/i.test(s) ? 'triangle'
     : /square|ריבוע/i.test(s) ? 'square'
@@ -668,6 +668,16 @@ const inscribedPolygon: Rule = (s, ctx) => {
     : /trapez|טרפז/i.test(s) ? 'trapezoid'
     : /quad|מרובע/i.test(s) ? 'quad'
     : null;
+  if (!kind) {
+    // No explicit shape word ("ABCD חסום במעגל" / "ABCD בר חסימה") — infer from a bare label
+    // run: 4 letters ⇒ quadrilateral, 3 ⇒ triangle. Keeps the inscribed-vs-cyclic distinction
+    // deterministic (drawn vs hidden circle) instead of falling through to the LLM.
+    const bare = dropCircleRef(s).replace(
+      /inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך|\bin\b|\ba\b|\bthe\b/gi,
+      ' ',
+    );
+    kind = labelRun(bare, 4) ? 'quad' : labelRun(bare, 3) ? 'triangle' : null;
+  }
   if (!kind) return null;
   const isTri = kind === 'triangle' || kind === 'right-triangle';
   const n = isTri ? 3 : 4;
