@@ -12,8 +12,11 @@
  * ABC", circles, …) map to constructs that arrive in Phase 5 and are
  * deliberately *not handled* yet — the grammar widens alongside the engine.
  *
- * Point labels are single Latin capitals (geometry convention, including inside
- * Hebrew text). Keywords are bilingual; the same rule matches either language.
+ * Point labels are Latin capitals (geometry convention, including inside Hebrew
+ * text), each optionally carrying a digit subscript — a point token is `[A-Za-z]\d*`,
+ * so `O1`/`O2` are distinct ids (the canonical id stays ASCII "O1"; the renderer
+ * draws the digit as a subscript). "ABCD" still reads as four points (letters carry
+ * no digits). Keywords are bilingual; the same rule matches either language.
  */
 
 import { RADIUS_VAR, type AnyCommand, type Command, type Id, type SymbolicCommand } from '@/engine';
@@ -51,8 +54,8 @@ const circleId = (center: string): Id => `circle-${center.toUpperCase()}`;
 /** The centre letter of a circle named in `s` ("circle O" / "מעגל O" / "centered at O" / "שמרכזו O"). */
 const circleCenter = (s: string): string | null => {
   const m =
-    s.match(/(?:cent\w*\s+(?:at\s+)?|around\s+|שמרכזו\s*|מרכזו\s*|סביב\s+)([A-Za-z])\b/i) ??
-    s.match(/(?:circle|מעגל)\s+([A-Za-z])\b/i);
+    s.match(/(?:cent\w*\s+(?:at\s+)?|around\s+|שמרכזו\s*|מרכזו\s*|סביב\s+)([A-Za-z]\d*)\b/i) ??
+    s.match(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/i);
   return m ? m[1] : null;
 };
 /**
@@ -64,7 +67,7 @@ const resolveCenter = (s: string, ctx: ParseContext): string | null =>
   circleCenter(s) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
 
 /** Remove a "circle X" / "מעגל X" mention so its centre letter isn't read as a figure label. */
-const dropCircleRef = (s: string): string => s.replace(/(?:circle|מעגל)\s+[A-Za-z]\b/gi, ' ');
+const dropCircleRef = (s: string): string => s.replace(/(?:circle|מעגל)\s+[A-Za-z]\d*\b/gi, ' ');
 
 /**
  * English filler words, lowercase only — typed fillers are lowercase, while
@@ -73,17 +76,24 @@ const dropCircleRef = (s: string): string => s.replace(/(?:circle|מעגל)\s+[A
 const FILLER = /\b(?:to|the|and|of|is|are|at|on|in|with|from|that|so|such)\b/g;
 
 /**
- * Find a run of `n` point labels, as a contiguous token ("ABCD") or `n`
- * space-separated single letters ("A B C D"), anywhere in `s`. Returns them
+ * Find a run of `n` point labels, as a contiguous token ("ABCD", "O1O2") or `n`
+ * space-separated tokens ("A B C D", "O1 O2"), anywhere in `s`. A point token is a
+ * letter + optional digit subscript (`[A-Za-z]\d*`), so "ABCD" stays four points
+ * (letters carry no digits) while "O1O2"/"O1 O2" read as two. Returns them
  * uppercased, or null. Strip keywords from `s` first so a Latin keyword's own
  * letters (e.g. "square") aren't mistaken for labels; lowercase filler words
  * are stripped here so "connect A to B" can't read "to" as the labels T,O.
  */
+const PT = String.raw`[A-Za-z]\d*`; // a point token: a letter + an optional digit subscript (O, O1, A12)
 function labelRun(s: string, n: number): Id[] | null {
   const t = s.replace(FILLER, ' ');
-  const contiguous = t.match(new RegExp(String.raw`\b[A-Za-z]{${n}}\b`));
-  if (contiguous) return contiguous[0].toUpperCase().split('') as Id[];
-  const spaced = t.match(new RegExp(Array.from({ length: n }, () => String.raw`\b([A-Za-z])\b`).join(String.raw`\s+`)));
+  // A single word of exactly n tokens ("ABCD", "O1O2") — split it back into tokens.
+  const contiguous = t.match(new RegExp(String.raw`\b(?:${PT}){${n}}\b`));
+  if (contiguous) {
+    const toks = contiguous[0].match(new RegExp(PT, 'g'));
+    if (toks && toks.length === n) return toks.map(up);
+  }
+  const spaced = t.match(new RegExp(Array.from({ length: n }, () => String.raw`\b(${PT})\b`).join(String.raw`\s+`)));
   if (spaced) return spaced.slice(1, n + 1).map(up);
   return null;
 }
@@ -183,7 +193,7 @@ const lineLineIntersection: Rule = (s) => {
   // Drop filler words so they aren't mistaken for two-letter line labels ("of"!).
   const t = s.replace(/\b(?:is|the|of|between|at|point|הוא|בין|בנקודה|נקודה)\b/gi, ' ');
   const pointFirst = t.match(
-    /\b([A-Za-z])\b.*?(?:intersection|∩|חיתוך|נחתך).*?\b([A-Za-z])\s*([A-Za-z])\b.*?\b([A-Za-z])\s*([A-Za-z])\b/i,
+    /\b([A-Za-z]\d*)\b.*?(?:intersection|∩|חיתוך|נחתך).*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
   );
   // Draw the two segments we reference (idempotent if they're already edges) — the
   // student should see the lines whose crossing is the point, not just the point.
@@ -197,7 +207,7 @@ const lineLineIntersection: Rule = (s) => {
     return cross(m[1], m[2], m[3], m[4], m[5]);
   }
   const linesFirst = t.match(
-    /\b([A-Za-z])\s*([A-Za-z])\b.*?\b([A-Za-z])\s*([A-Za-z])\b.*?(?:intersect\w*|∩|חיתוך|נחתך|נחתכ|נפגש|meets?).*?\b([A-Za-z])\b/i,
+    /\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?(?:intersect\w*|∩|חיתוך|נחתך|נחתכ|נפגש|meets?).*?\b([A-Za-z]\d*)\b/i,
   );
   if (linesFirst) {
     const m = linesFirst;
@@ -246,10 +256,10 @@ const bisectorIntersection: Rule = (s) => {
 const foot: Rule = (s) => {
   if (!/\bfoot\b|רגל/i.test(s)) return null;
   const en = s.match(
-    new RegExp(String.raw`([A-Za-z])\b.*?\bfoot\b.*?from\s+([A-Za-z])\b.*?to\s+([A-Za-z])\s*([A-Za-z])\b`, 'i'),
+    new RegExp(String.raw`([A-Za-z]\d*)\b.*?\bfoot\b.*?from\s+([A-Za-z]\d*)\b.*?to\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`, 'i'),
   );
   const he = s.match(
-    new RegExp(String.raw`([A-Za-z])\b.*?רגל.*?(?:מהנקודה\s*|מ-?\s*)([A-Za-z])\b.*?(?:אל\s*|ל-?\s*)([A-Za-z])\s*([A-Za-z])\b`),
+    new RegExp(String.raw`([A-Za-z]\d*)\b.*?רגל.*?(?:מהנקודה\s*|מ-?\s*)([A-Za-z]\d*)\b.*?(?:אל\s*|ל-?\s*)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`),
   );
   const m = en ?? he;
   return m ? [{ type: 'foot', id: up(m[1]), from: up(m[2]), a: up(m[3]), b: up(m[4]) }] : null;
@@ -258,7 +268,7 @@ const foot: Rule = (s) => {
 /** "M is the midpoint of AB" / "M אמצע AB" / "C is the midpoint of OB". */
 const midpoint: Rule = (s) => {
   if (!/midpoint|אמצע/i.test(s)) return null;
-  const m = s.match(/([A-Za-z])\b.*?(?:midpoint|אמצע)\s*(.*)/i);
+  const m = s.match(/([A-Za-z]\d*)\b.*?(?:midpoint|אמצע)\s*(.*)/i);
   if (!m) return null;
   // strip filler ("of"!) and segment/radius words so they aren't read as labels.
   const rest = m[2].replace(FILLER, ' ').replace(/radius|רדיוס\S*|segment|קטע/gi, ' ');
@@ -269,7 +279,7 @@ const midpoint: Rule = (s) => {
 /** "F on the extension of AD" / "F על המשך AD" — a point on the ray beyond the far end (t > 1). */
 const pointOnExtension: Rule = (s) => {
   if (!/extension|המשך/i.test(s)) return null;
-  const m = s.match(/(?:point\s+|נקודה\s+)?([A-Za-z])\b.*?(?:extension|המשך)\s*(.*)/i);
+  const m = s.match(/(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\b.*?(?:extension|המשך)\s*(.*)/i);
   if (!m) return null;
   // strip filler ("of"!) so "of AD" reads AD, not the labels O,F of "of".
   const seg = labelRun(m[2].replace(FILLER, ' '), 2);
@@ -294,7 +304,7 @@ const angle: Rule = (s) => {
 const pointOnSegment: Rule = (s) => {
   const m = s.match(
     new RegExp(
-      String.raw`(?:point\s+|נקודה\s+)?([A-Za-z])\s+(?:on|על)\s+([A-Za-z])\s*([A-Za-z])\b(?:\s+(?:at|ב-?)?\s*${num}\s*(%)?)?`,
+      String.raw`(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\s+(?:on|על)\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\b(?:\s+(?:at|ב-?)?\s*${num}\s*(%)?)?`,
       'i',
     ),
   );
@@ -312,13 +322,13 @@ const pointOnSegment: Rule = (s) => {
 const pointByDistances: Rule = (s) => {
   const en = s.match(
     new RegExp(
-      String.raw`(?:point\s+)?([A-Za-z])\s+(?:is\s+)?${num}\s+from\s+([A-Za-z])\s+and\s+${num}\s+from\s+([A-Za-z])`,
+      String.raw`(?:point\s+)?([A-Za-z]\d*)\s+(?:is\s+)?${num}\s+from\s+([A-Za-z]\d*)\s+and\s+${num}\s+from\s+([A-Za-z]\d*)`,
       'i',
     ),
   );
   const he = s.match(
     new RegExp(
-      String.raw`(?:נקודה\s+)?([A-Za-z])\s+במרחק\s+${num}\s+מ-?\s*([A-Za-z])\s+ו-?\s*${num}\s+מ-?\s*([A-Za-z])`,
+      String.raw`(?:נקודה\s+)?([A-Za-z]\d*)\s+במרחק\s+${num}\s+מ-?\s*([A-Za-z]\d*)\s+ו-?\s*${num}\s+מ-?\s*([A-Za-z]\d*)`,
     ),
   );
   const m = en ?? he;
@@ -344,7 +354,7 @@ const pointByDistances: Rule = (s) => {
 const COEF = String.raw`\d+(?:\.\d+)?`;
 const ratioConstraint: Rule = (s) => {
   const en = s.match(
-    new RegExp(String.raw`\b(${COEF})?\s*[*·]?\s*([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})?\s*[*·]?\s*([A-Za-z])\s*([A-Za-z])\b`),
+    new RegExp(String.raw`\b(${COEF})?\s*[*·]?\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`),
   );
   if (en && (en[1] || en[4])) {
     const m = en[1] ? parseFloat(en[1]) : 1; // |AB| = (n/m)·|CD|
@@ -352,7 +362,7 @@ const ratioConstraint: Rule = (s) => {
     return [{ type: 'set-ratio', a: up(en[2]), b: up(en[3]), c: up(en[5]), d: up(en[6]), k: n / m }];
   }
   // Hebrew "AB פי 2 מ-AD" — |AB| is 2× |AD|.
-  const he = s.match(new RegExp(String.raw`([A-Za-z])\s*([A-Za-z])\b[^=]*?פי\s*(${COEF})\s*מ-?\s*([A-Za-z])\s*([A-Za-z])\b`));
+  const he = s.match(new RegExp(String.raw`([A-Za-z]\d*)\s*([A-Za-z]\d*)\b[^=]*?פי\s*(${COEF})\s*מ-?\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`));
   if (he) return [{ type: 'set-ratio', a: up(he[1]), b: up(he[2]), c: up(he[4]), d: up(he[5]), k: parseFloat(he[3]) }];
   return null;
 };
@@ -364,7 +374,7 @@ const ratioConstraint: Rule = (s) => {
  * left a point unplaced). Drives a sliding point on either segment.
  */
 const segmentRatio: Rule = (s) => {
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*\/\s*\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})\s*(?:\/\s*(${COEF}))?`));
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*\/\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})\s*(?:\/\s*(${COEF}))?`));
   if (!m) return null;
   const num = parseFloat(m[5]);
   const den = m[6] ? parseFloat(m[6]) : 1;
@@ -373,13 +383,13 @@ const segmentRatio: Rule = (s) => {
 
 /** "AB = CD" — two segments equal in length. */
 const equalSegments: Rule = (s) => {
-  const m = s.match(/\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*\b([A-Za-z])\s*([A-Za-z])\b/);
+  const m = s.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
   return m ? [{ type: 'set-equal', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]) }] : null;
 };
 
 /** "AB = 6" — fix a segment's length. */
 const distanceConstraint: Rule = (s) => {
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*${num}\b`));
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${num}\b`));
   return m ? [{ type: 'set-distance', a: up(m[1]), b: up(m[2]), value: parseFloat(m[3]) }] : null;
 };
 
@@ -405,7 +415,7 @@ const normVar = (v: string): string => (/^[Rr]$/.test(v) ? RADIUS_VAR : v);
  * toolbar button) is accepted — the word "pi" is left out as it collides with a segment "PI".
  */
 const measurePi: Rule = (s) => {
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})?\s*[*·]?\s*π`));
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*π`));
   if (!m) return null;
   const c = m[3] ? parseFloat(m[3]) : 1;
   return [{ type: 'measure-length', a: up(m[1]), b: up(m[2]), expr: { value: c * Math.PI, text: `${c === 1 ? '' : m[3]}π` } }];
@@ -418,7 +428,7 @@ const measureLength: Rule = (s) => {
   // "± c" (c a number or fraction) adds an affine constant ("k + 2", "k − 5/2"). Both are kept
   // verbatim for the label so it reads exactly as typed, not a decimal.
   const m = s.match(
-    new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})?\s*[*·]?\s*(${LVAR})(?![a-zA-Z])\s*(?:\/\s*(${COEF}))?\s*(?:([+\-−])\s*(${COEF})(?:\s*\/\s*(${COEF}))?)?`),
+    new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*(${LVAR})(?![a-zA-Z])\s*(?:\/\s*(${COEF}))?\s*(?:([+\-−])\s*(${COEF})(?:\s*\/\s*(${COEF}))?)?`),
   );
   if (!m) return null;
   const num = m[3] ? parseFloat(m[3]) : 1;
@@ -451,7 +461,7 @@ const measureLength: Rule = (s) => {
  */
 const SQRT_FN = String.raw`(?:√|\\sqrt|sqrt)\s*[\{(]?\s*(${VAR}|${COEF})\s*[\})]?`;
 const measureSqrt: Rule = (s) => {
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})?\s*[*·]?\s*${SQRT_FN}`, 'i'));
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*${SQRT_FN}`, 'i'));
   if (!m) return null;
   const a = up(m[1]);
   const b = up(m[2]);
@@ -470,7 +480,7 @@ const measureSqrt: Rule = (s) => {
  * or `^n`.
  */
 const measurePower: Rule = (s) => {
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z])\s*([A-Za-z])\b\s*=\s*(${COEF})?\s*[*·]?\s*(${VAR}|${COEF})\s*(?:([²³])|\^\s*(\d+))`, 'i'));
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*(${VAR}|${COEF})\s*(?:([²³])|\^\s*(\d+))`, 'i'));
   if (!m) return null;
   const a = up(m[1]);
   const b = up(m[2]);
@@ -531,7 +541,7 @@ const parallelConstraint: Rule = (s) => {
   if (!/parallel|∥|מקביל/i.test(s)) return null;
   // strip the keyword AND filler words (so "to"/"of" aren't read as 2-letter labels)
   const t = s.replace(/parallel(?:\s*to)?|∥|מקביל(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
-  const m = t.match(/\b([A-Za-z])\s*([A-Za-z])\b.*?\b([A-Za-z])\s*([A-Za-z])\b/);
+  const m = t.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
   if (!m) return null;
   const [a, b, c, d] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
   return [
@@ -548,8 +558,8 @@ const parallelConstraint: Rule = (s) => {
 const perpendicularConstraint: Rule = (s) => {
   if (!/perpendicular|⊥|מאונך/i.test(s)) return null;
   const t = s.replace(/perpendicular(?:\s*to)?|⊥|מאונך(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
-  if ((t.match(/\b[A-Za-z]\s*[A-Za-z]\b/g) ?? []).length < 2) return null; // "perpendicular from A to BC" is the foot, not this
-  const m = t.match(/\b([A-Za-z])\s*([A-Za-z])\b.*?\b([A-Za-z])\s*([A-Za-z])\b/);
+  if ((t.match(/\b[A-Za-z]\d*\s*[A-Za-z]\d*\b/g) ?? []).length < 2) return null; // "perpendicular from A to BC" is the foot, not this
+  const m = t.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
   if (!m) return null;
   const [a, b, c, d] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
   return [
@@ -563,7 +573,7 @@ const perpendicularConstraint: Rule = (s) => {
 const freePoint: Rule = (s) => {
   const m = s.match(
     new RegExp(
-      String.raw`(?:point\s+|נקודה\s+|place\s+)?([A-Za-z])\s*(?:at|ב-?|=)\s*\(?\s*${num}\s*,\s*${num}\s*\)?`,
+      String.raw`(?:point\s+|נקודה\s+|place\s+)?([A-Za-z]\d*)\s*(?:at|ב-?|=)\s*\(?\s*${num}\s*,\s*${num}\s*\)?`,
       'i',
     ),
   );
@@ -593,7 +603,7 @@ const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: b
 const circle: Rule = (s) => {
   if (!/circle|מעגל/i.test(s)) return null;
   const r = parseRadius(s);
-  const thrM = s.match(/(?:through|העובר\s*דרך|דרך)\s+([A-Za-z])\b/i);
+  const thrM = s.match(/(?:through|העובר\s*דרך|דרך)\s+([A-Za-z]\d*)\b/i);
   const centered = /cent(?:er|re)d?|around|מרכז\w*|סביב/i.test(s);
   if (!r.numeric && !r.symbolic && !thrM && !centered) return null; // a bare "circle O" reference, not a definition
   const center = circleCenter(s);
@@ -759,7 +769,7 @@ const arcMidpoint: Rule = (s, ctx) => {
   if (!/arc|קשת/i.test(s)) return null;
   const center = resolveCenter(s, ctx);
   if (!center) return null;
-  const m = dropCircleRef(s).match(/([A-Za-z])\b.*?(?:midpoint|אמצע).*?(?:arc|הקשת|קשת)\s*([A-Za-z])\s*([A-Za-z])\b/i);
+  const m = dropCircleRef(s).match(/([A-Za-z]\d*)\b.*?(?:midpoint|אמצע).*?(?:arc|הקשת|קשת)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!m) return null;
   return [{ type: 'arc-midpoint', id: up(m[1]), circle: circleId(center), from: up(m[2]), to: up(m[3]) }];
 };
@@ -767,7 +777,7 @@ const arcMidpoint: Rule = (s, ctx) => {
 /** "A is on circle O" / "A על מעגל O" — a single inscribed point. */
 const pointOnCircle: Rule = (s) => {
   if (!/circle|מעגל/i.test(s)) return null;
-  const m = s.match(/([A-Za-z])\b.*?(?:on|על).*?(?:circle|מעגל)\s+([A-Za-z])\b/i);
+  const m = s.match(/([A-Za-z]\d*)\b.*?(?:on|על).*?(?:circle|מעגל)\s+([A-Za-z]\d*)\b/i);
   if (!m) return null;
   return [{ type: 'point-on-circle', id: up(m[1]), circle: circleId(m[2]) }];
 };
@@ -784,7 +794,7 @@ const tangentLineIntersection: Rule = (s, ctx) => {
   const center = resolveCenter(s, ctx);
   if (!center) return null;
   // tangency point: the label after the tangent's "at"/"בנקודה" (the circle name may sit between).
-  const atM = s.match(/(?:tangent|משיק).*?(?:\bat\b|בנקודה|ב-)\s*([A-Za-z])\b/i);
+  const atM = s.match(/(?:tangent|משיק).*?(?:\bat\b|בנקודה|ב-)\s*([A-Za-z]\d*)\b/i);
   if (!atM) return null;
   const at = up(atM[1]);
   // Strip the circle ref, the tangent + its "at D", and the connecting words (incl.
@@ -795,11 +805,11 @@ const tangentLineIntersection: Rule = (s, ctx) => {
     .replace(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-?)\s*${at}\b`, 'i'), ' ')
     .replace(/extension|המשך|intersection|חיתוך|נפגש\w*|מפגש|\bmeets?\b|\bpoint\b|בנקודה|נקודה/gi, ' ')
     .replace(FILLER, ' ');
-  const pairM = rest.match(/\b([A-Za-z])\s*([A-Za-z])\b/);
+  const pairM = rest.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
   if (!pairM) return null;
   const a = up(pairM[1]);
   const b = up(pairM[2]);
-  const resM = rest.replace(/\b[A-Za-z]\s*[A-Za-z]\b/, ' ').match(/\b([A-Za-z])\b/); // remove the pair, take the lone letter
+  const resM = rest.replace(/\b[A-Za-z]\d*\s*[A-Za-z]\d*\b/, ' ').match(/\b([A-Za-z]\d*)\b/); // remove the pair, take the lone letter
   if (!resM) return null;
   const e = up(resM[1]);
   const tanId = `tan-${at}`;
@@ -841,14 +851,14 @@ const bisectorSegmentIntersection: Rule = (s) => {
 const parallelCircleIntersection: Rule = (s, ctx) => {
   if (!/parallel|מקביל/i.test(s) || !/circle|מעגל/i.test(s)) return null;
   const center = resolveCenter(s, ctx);
-  const throughM = s.match(/(?:through|דרך)\s+([A-Za-z])\b/i);
-  const toM = s.match(/(?:parallel\s+to|מקביל\s*ל-?)\s*([A-Za-z])\s*([A-Za-z])\b/i);
+  const throughM = s.match(/(?:through|דרך)\s+([A-Za-z]\d*)\b/i);
+  const toM = s.match(/(?:parallel\s+to|מקביל\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!center || !throughM || !toM) return null;
   const resM = dropCircleRef(s)
-    .replace(/through\s+[A-Za-z]\b|דרך\s+[A-Za-z]\b/gi, ' ')
+    .replace(/through\s+[A-Za-z]\d*\b|דרך\s+[A-Za-z]\d*\b/gi, ' ')
     .replace(/\bpoint\b|נקודה/gi, ' ')
     .replace(FILLER, ' ')
-    .match(/\b([A-Za-z])\b/);
+    .match(/\b([A-Za-z]\d*)\b/);
   if (!resM) return null;
   const through = up(throughM[1]);
   const a = up(toM[1]);
@@ -865,9 +875,9 @@ const parallelCircleIntersection: Rule = (s, ctx) => {
 const circleCircleIntersection: Rule = (s) => {
   if (!/circle|מעגל/i.test(s)) return null;
   if (!(INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s))) return null;
-  const centers = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z])\b/gi)].map((m) => m[1]);
+  const centers = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => m[1]);
   if (centers.length < 2) return null;
-  const resM = dropCircleRef(s).match(/\b([A-Za-z])\b/);
+  const resM = dropCircleRef(s).match(/\b([A-Za-z]\d*)\b/);
   if (!resM) return null;
   return [{ type: 'circle-circle-intersection', id: up(resM[1]), circle1: circleId(centers[0]), circle2: circleId(centers[1]), branch: 0 }];
 };
@@ -886,9 +896,9 @@ const circleCircleIntersection: Rule = (s) => {
  */
 const circlesTangent: Rule = (s) => {
   if (!/tangent|משיק/i.test(s)) return null;
-  const centers = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z])\b/gi)].map((m) => up(m[1]));
+  const centers = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
   if (centers.length < 2 || centers[0] === centers[1]) return null; // a single circle ⇒ the tangent-line rule
-  const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z])\b/i);
+  const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i);
   if (!atM) return null;
   const internal = /\binternal\w*\b|\bfrom\s+inside\b|\binside\b|פנימ|מבפנים/i.test(s);
   return [{ type: 'circles-tangent', circle1: circleId(centers[0]), circle2: circleId(centers[1]), at: up(atM[1]), external: !internal }];
@@ -900,7 +910,7 @@ const TANGENT_MARK = 5; // offset of a named tangent's endpoint markers (±) fro
 const tangentLine: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   const center = resolveCenter(s, ctx);
-  const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z])\b/i);
+  const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i);
   if (!center || !atM) return null;
   const T = up(atM[1]);
   const lineId = `tan-${T}`;
@@ -909,7 +919,7 @@ const tangentLine: Rule = (s, ctx) => {
   // create them as fixed markers on the tangent at ±offset from the tangency point
   // T (the line's anchor), so they're referenceable (e.g. a later AC, TC).
   const named = dropCircleRef(s)
-    .replace(/(?:\bat\b|בנקודה|ב-?)\s*[A-Za-z]\b/gi, ' ')
+    .replace(/(?:\bat\b|בנקודה|ב-?)\s*[A-Za-z]\d*\b/gi, ' ')
     .replace(/tangent|משיק\S*|\bline\b|הישר|הקו|למעגל|מעגל/gi, ' ');
   const pts = labelRun(named, 2);
   if (pts && pts[0] !== T && pts[1] !== T && pts[0] !== up(center) && pts[1] !== up(center)) {
@@ -923,7 +933,7 @@ const tangentLine: Rule = (s, ctx) => {
 const bisectorLine: Rule = (s) => {
   if (!/bisector|חוצ/i.test(s)) return null;
   if (INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s)) return null;
-  if (/\b[A-Za-z]\s*[A-Za-z]\b\s*(?:bisects?|חוצ)/i.test(s)) return null; // "AD bisects ∠.." = placing a point (deferred)
+  if (/\b[A-Za-z]\d*\s*[A-Za-z]\d*\b\s*(?:bisects?|חוצ)/i.test(s)) return null; // "AD bisects ∠.." = placing a point (deferred)
   const ids = labelRun(s.replace(/bisector|angle|זוו?ית|הזוו?ית|חוצה|חוצי|חוצ|את/gi, ' '), 3);
   if (!ids) return null;
   return [{ type: 'bisector', id: `bis-${ids.join('')}`, vertex: ids[1], p: ids[0], q: ids[2], visible: true }];
@@ -932,11 +942,11 @@ const bisectorLine: Rule = (s) => {
 /** "line through P perpendicular to AB" / "ישר דרך P מאונך ל-AB" — a *drawn* perpendicular line through a point. */
 const perpendicularLine: Rule = (s) => {
   if (!/perpendicular|⊥|מאונך|אנך/i.test(s)) return null;
-  const thr = s.match(/(?:through|דרך)\s+([A-Za-z])\b/i);
+  const thr = s.match(/(?:through|דרך)\s+([A-Za-z]\d*)\b/i);
   if (!thr) return null; // no "through P" ⇒ it's the ⟂ constraint or a foot, not a drawn line
   const seg = s
-    .replace(/through\s+[A-Za-z]\b|דרך\s+[A-Za-z]\b/gi, ' ')
-    .match(/(?:perpendicular\s*to|⊥|מאונך\s*ל-?|אנך\s*ל-?)\s*([A-Za-z])\s*([A-Za-z])\b/i);
+    .replace(/through\s+[A-Za-z]\d*\b|דרך\s+[A-Za-z]\d*\b/gi, ' ')
+    .match(/(?:perpendicular\s*to|⊥|מאונך\s*ל-?|אנך\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!seg) return null;
   return [{ type: 'perpendicular-line', id: `perp-${up(thr[1])}-${up(seg[1])}${up(seg[2])}`, through: up(thr[1]), a: up(seg[1]), b: up(seg[2]), visible: true }];
 };
@@ -944,11 +954,11 @@ const perpendicularLine: Rule = (s) => {
 /** "line through P parallel to AB" / "ישר דרך P מקביל ל-AB" — a *drawn* parallel line through a point. */
 const parallelLine: Rule = (s) => {
   if (!/parallel|∥|מקביל/i.test(s)) return null;
-  const thr = s.match(/(?:through|דרך)\s+([A-Za-z])\b/i);
+  const thr = s.match(/(?:through|דרך)\s+([A-Za-z]\d*)\b/i);
   if (!thr) return null; // no "through P" ⇒ it's the ∥ constraint, not a drawn line
   const seg = s
-    .replace(/through\s+[A-Za-z]\b|דרך\s+[A-Za-z]\b/gi, ' ')
-    .match(/(?:parallel\s*to|∥|מקביל\s*ל-?)\s*([A-Za-z])\s*([A-Za-z])\b/i);
+    .replace(/through\s+[A-Za-z]\d*\b|דרך\s+[A-Za-z]\d*\b/gi, ' ')
+    .match(/(?:parallel\s*to|∥|מקביל\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!seg) return null;
   return [{ type: 'parallel-line', id: `par-${up(thr[1])}-${up(seg[1])}${up(seg[2])}`, through: up(thr[1]), a: up(seg[1]), b: up(seg[2]), visible: true }];
 };
@@ -978,7 +988,7 @@ const median: Rule = (s, ctx) => {
   if (!/\bmedian\b|תיכון/i.test(s)) return null;
 
   // An explicitly named opposite side: "to side BC" / "to BC" / "לצלע BC" / "אל BC" / "ל-BC".
-  const sideM = s.match(/(?:\bto\s+(?:side\s+)?|לצלע\s*|אל\s*|ל-?)([A-Za-z])\s*([A-Za-z])\b/i);
+  const sideM = s.match(/(?:\bto\s+(?:side\s+)?|לצלע\s*|אל\s*|ל-?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   const side = sideM ? ([up(sideM[1]), up(sideM[2])] as [Id, Id]) : null;
 
   // Named form "AD תיכון" / "median AD": the median segment is named apex-first,
@@ -1013,7 +1023,7 @@ const median: Rule = (s, ctx) => {
   }
 
   // Classic form "median from A in ABC" / "תיכון מ-A במשולש ABC" — auto-named midpoint.
-  const apexM = s.match(/(?:\bfrom\s+|מ-?)([A-Za-z])\b/i); // "from A" / "מ-A" (keyword required, not any letter)
+  const apexM = s.match(/(?:\bfrom\s+|מ-?)([A-Za-z]\d*)\b/i); // "from A" / "מ-A" (keyword required, not any letter)
   // The triangle is named after "in"/"במשולש"; read it there so the apex letter isn't double-counted.
   const triPart = s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s;
   const tri = labelRun(triPart.replace(/triangle|the/gi, ' '), 3);
@@ -1044,10 +1054,10 @@ const altitude: Rule = (s) => {
   const isPerpFrom =
     /perpendicular|מאונך|אנך/i.test(s) && !/through|דרך/i.test(s) && /\bfrom\b|מ-/i.test(s);
   if (!isHeight && !isPerpFrom) return null;
-  const apexM = s.match(/(?:\bfrom\s+|מ-?)([A-Za-z])\b/i);
+  const apexM = s.match(/(?:\bfrom\s+|מ-?)([A-Za-z]\d*)\b/i);
   if (!apexM) return null;
   const apex = up(apexM[1]);
-  const sideM = s.match(/(?:\bto\s+|אל\s*|ל-?)([A-Za-z])\s*([A-Za-z])\b/i); // explicit opposite side "to BC"
+  const sideM = s.match(/(?:\bto\s+|אל\s*|ל-?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // explicit opposite side "to BC"
   let p: string, q: string;
   let tri: Id[] | null = null;
   if (sideM && up(sideM[1]) !== apex) {
@@ -1090,7 +1100,7 @@ const perpBisector: Rule = (s) => {
 const bisectorPlacesPoint: Rule = (s) => {
   if (!/bisects?|חוצ/i.test(s)) return null;
   if (INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s)) return null; // intersection rules own that phrasing
-  const seg = s.match(/\b([A-Za-z])\s*([A-Za-z])\b\s*(?:bisects?|חוצ\w*)/i);
+  const seg = s.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:bisects?|חוצ\w*)/i);
   if (!seg) return null;
   const apex = up(seg[1]);
   const D = up(seg[2]);
@@ -1120,7 +1130,7 @@ const twoTriangles = (s: string): [[Id, Id, Id], [Id, Id, Id]] | null => {
   const t = s
     .replace(/triangles?|משולשים?|המשולש\w*|congruent|similar|חופפים?|חופף|דומ\w*|are|is|the|of|to|and|של/gi, ' ')
     .replace(/[≅~∼∽]|ל-?|ו-?/g, ' ');
-  const triples = [...t.matchAll(/\b([A-Za-z])\s*([A-Za-z])\s*([A-Za-z])\b/g)];
+  const triples = [...t.matchAll(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/g)];
   if (triples.length < 2) return null;
   const grab = (i: number) => [up(triples[i][1]), up(triples[i][2]), up(triples[i][3])] as [Id, Id, Id];
   return [grab(0), grab(1)];
@@ -1178,7 +1188,7 @@ const similarity: Rule = (s, ctx) => {
  * (the point first, so the condition can reference it). Runs FIRST. Falls through if either half
  * doesn't parse, so a stray "where"/"such that" never blocks the normal rules.
  */
-const SUCH_THAT = /\bsuch that\b|\bso that\b|\bsuch_that\b|כך\s*ש(?=\s|[A-Za-z])/i;
+const SUCH_THAT = /\bsuch that\b|\bso that\b|\bsuch_that\b|כך\s*ש(?=\s|[A-Za-z]\d*)/i;
 const compoundSuchThat: Rule = (s, ctx) => {
   const parts = s.split(SUCH_THAT);
   if (parts.length < 2) return null;
@@ -1275,8 +1285,8 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
 export function parseRename(raw: string): { from: Id; to: Id } | null {
   const s = raw.trim().replace(/\s+/g, ' ');
   const m =
-    s.match(/(?:rename|relabel|replace|swap)\s+([A-Za-z])\b(?:\s+(?:to|as|into|with|by|->|→|=))?\s+([A-Za-z])\b/i) ??
-    s.match(/(?:שנה|החלף)\s*(?:שם\s*)?(?:את\s*)?([A-Za-z])\s*(?:ל-?|ב-?|עם|→|=)?\s*([A-Za-z])\b/i);
+    s.match(/(?:rename|relabel|replace|swap)\s+([A-Za-z]\d*)\b(?:\s+(?:to|as|into|with|by|->|→|=))?\s+([A-Za-z]\d*)\b/i) ??
+    s.match(/(?:שנה|החלף)\s*(?:שם\s*)?(?:את\s*)?([A-Za-z]\d*)\s*(?:ל-?|ב-?|עם|→|=)?\s*([A-Za-z]\d*)\b/i);
   if (!m) return null;
   const from = up(m[1]);
   const to = up(m[2]);
