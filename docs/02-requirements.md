@@ -84,9 +84,25 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 
 ## Theorems
 
-- **FR-TH-1 (Must)** — Detect theorems relevant to the current figure and list them, most-relevant first.
-- **FR-TH-2 (Must)** — Distinguish definite matches from possible ones.
-- **FR-TH-3 (Must)** — Present each theorem bilingually (He/En), with its statement.
+- **FR-TH-1 (Must)** — When a fact is entered, run detection over the **entire accumulated figure** (all enabled facts), and surface what has **changed**: theorems whose hypothesis is now satisfied, and confidence/relevance updates to theorems already shown. The **analysis is whole-figure** — a theorem's hypothesis may span several facts and only become satisfied (or only change tier) when a specific *later* fact lands, so looking only at the last fact is wrong. The **presentation is delta-based** — the feed updates in place rather than re-listing everything, so it never floods. A fact may legitimately surface nothing (construction primitives and definitions carry no theorem); that is expected, not a failure.
+- **FR-TH-2 (Must)** — Surfaced theorems accumulate in a **growing feed** alongside the canvas. Each entry is **attributed to the fact that completed (or last changed) it** and persists as the figure grows; disabling/removing a fact removes or downgrades the theorems that depended on it (mirrors the dependent-drop semantics of FR-EN-9). A theorem already shown is **not duplicated** when a later fact re-touches it — the existing entry **updates in place** (re-highlights, or changes tier per FR-TH-3).
+- **FR-TH-3 (Must)** — Each entry carries a **confidence tier**, **recomputed every step** as the figure grows (a *possible* match becomes *certain* when its completing fact arrives, and can drop again if that fact is removed), driving both ordering and visual treatment, highest first:
+  - **Certain** — the hypothesis is fully met by the construction (green). *e.g. a diameter is present → Theorem 103.*
+  - **Possible** — would hold only in a more special case, one given away (amber). *e.g. two equal sides given → isosceles is **certain**, equilateral is **possible**.*
+  - **Recall** — a related theorem the configuration evokes but does not satisfy (grey; optional, may be suppressed to avoid noise).
+
+  The tier may be painted as a representative score (e.g. 100% / ~60%) for the UI, but it is an **ordinal tier**, not a computed probability — we stay exact and citable (Pedagogy §5.4). Structural detection (ADR-038) does not produce a continuous likelihood.
+- **FR-TH-4 (Must)** — Each feed entry is **traceable**: selecting it highlights on the canvas the exact objects/facts that satisfied the hypothesis (Pedagogy §5.3).
+- **FR-TH-5 (Must)** — Present each theorem bilingually (He/En) with its exact catalog statement ([07](07-theorem-reference.md)) and its **official bagrut number**. Surface **P** (use-it) and **C** (recognition/converse) theorems; **never** surface **O**-tagged items, definitions, or area/perimeter formulas.
+- **FR-TH-6 (Should)** — Within a single fact's surfacing, order most-relevant-first and **cap** the count so one fact never floods the feed.
+
+## Reveal — figure unmasking (deferred, own phase)
+
+On-demand, **opt-in** annotation of what the figure geometrically *is* — distinct from theorem surfacing (which is structural and automatic). Deliberately a **separate, later phase** ([Plan Phase 9](09-implementation-plan.md#phase-9--reveal--figure-unmasking-deferred)): it ships independently of Phase 6, and pedagogically it must **never** clue the student unbidden.
+
+- **FR-RV-1 (Later)** — Provide a **Reveal** control that, only when the student presses it, annotates the current figure with everything it geometrically exhibits: equal segments (tick marks), equal and right angles (arc/right-angle marks), and measured lengths/angles.
+- **FR-RV-2 (Later)** — Reveal is **strictly opt-in and reversible**: nothing is annotated until requested, and it can be toggled off. No geometric fact is ever surfaced automatically (this is the boundary that keeps "students reach their own conclusions without unsolicited clues" — Pedagogy §5.1).
+- **FR-RV-3 (Later)** — Reveal is powered by **geometric (coordinate) analysis** of the computed figure — the layer deliberately deferred from theorem detection in [ADR-038](06-decisions.md#adr-038). It catches emergent/coincidental equalities a structural pass cannot.
 
 ## History & session
 

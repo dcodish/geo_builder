@@ -126,11 +126,11 @@ Sub-phases — each ends by **reproducing its corpus questions** (gated per [Tes
 
 ### Phase 6 — Theorems
 
-- **Goal:** surface relevant theorems as the figure is built.
-- **Builds:** `detect(figure)` predicates against the catalog ([07](07-theorem-reference.md)); theorem panel UI (definite-first, bilingual, citable by official number).
-- **Depends on:** Phase 5 (needs the full computed figure).
-- **Requirements:** FR-TH-1, -2, -3; US-4.
-- **Gate:** theorem-detection tests vs the catalog — expected P/C IDs surface with correct confidence; O-tagged, definitions, and formulas never surface.
+- **Goal:** surface relevant theorems as the figure is built — **structurally**, from what the student typed (ADR-038).
+- **Builds:** **structural** matchers against the catalog ([07](07-theorem-reference.md)), one per theorem keyed on construct + parent-relationship (the [Pedagogy §4 trigger map](10-pedagogy.md#4-construction--theorem-triggers-the-pedagogical-payload) is the spec), **re-run over the whole accumulated figure each step** (a hypothesis can span facts; a later fact can complete it or change its tier); an **accumulating theorem feed** beside the canvas that surfaces the **diff** — newly-satisfied theorems and confidence/relevance changes — each entry attributed to its completing fact, deduped/updated-in-place, **confidence-tier ordered/coloured** (certain/possible/recall), traceable (highlights the satisfying objects), bilingual, citable by official number.
+- **Depends on:** Phase 5 (needs the full construct vocabulary in the dependency graph). Does **not** depend on coordinate analysis — that is Phase 9.
+- **Requirements:** FR-TH-1, -2, -3, -4, -5, -6; US-4.
+- **Gate:** theorem-detection tests vs the catalog — expected **P/C** IDs surface with the correct **tier**; **O**-tagged items, definitions, and area/perimeter formulas **never** surface; each surfaced entry traces to its triggering fact.
 
 ---
 
@@ -152,6 +152,16 @@ Sub-phases — each ends by **reproducing its corpus questions** (gated per [Tes
 - **Depends on:** Phases 2–6.
 - **Requirements:** FR-HS-4, -5; FR-RN-5; NFR-AC-1, -2; US-9, US-10, US-12.
 - **Gate:** export produces a valid image of the figure; persistence survives reload; headline flows pass (Playwright); accessibility checks.
+
+---
+
+### Phase 9 — Reveal / figure unmasking (deferred)
+
+- **Goal:** let a student, **on demand**, unmask what the figure geometrically *is* — equal segments, equal/right angles, measured lengths/angles — without ever being clued unbidden (Pedagogy §5.1).
+- **Builds:** **geometric (coordinate) analysis** of the computed figure (the layer deferred from theorem detection in [ADR-038](06-decisions.md#adr-038)); a **Reveal** toggle that annotates the canvas with tick/arc/right-angle marks and measures; strictly opt-in and reversible.
+- **Depends on:** Phase 5 (computed coordinates); independent of Phase 6 — theorems and Reveal ship separately, neither blocks the other.
+- **Requirements:** FR-RV-1, -2, -3.
+- **Gate:** nothing is annotated until Reveal is pressed; pressing it marks all equal segments/angles and measures the figure exhibits; toggling off clears them. No geometric fact is ever surfaced automatically.
 
 ## Milestones
 

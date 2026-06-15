@@ -13,5 +13,8 @@ dist
 # TypeScript incremental build info
 *.tsbuildinfo
 
+# Dev debug log (server-written session log; reconstruct figures from it)
+logs/
+
 # Vite temp config
 vite.config.ts.timestamp-*.mjs

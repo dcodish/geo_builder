@@ -48,7 +48,7 @@ As the figure takes shape, the system **surfaces the theorems whose hypotheses t
 - **Property (P) vs converse/characterization (C)** — these teach different moves:
   - **P** ("if the figure has X, then Y holds") — *use* a configuration to get a new fact. The forward step of solving.
   - **C** ("a figure with X **is** a Y" / "Y ⇒ X") — *recognize / justify a classification*. The step that lets a student name what they're looking at and justify it. Surfacing converses is how the tool helps students **identify** a figure's type, not just compute with it.
-- **Definite vs possible matches** (FR-TH-2). A theorem whose hypothesis is *certainly* met vs one that *would* apply in a more special case. Distinguishing them trains rigor — "do I actually know this is isosceles, or does it just look it?"
+- **Definite vs possible matches** (FR-TH-3). A theorem whose hypothesis is *certainly* met vs one that *would* apply in a more special case. Distinguishing them trains rigor — "do I actually know this is isosceles, or does it just look it?" Surfaced as **confidence tiers** — *certain / possible / recall* — that order and colour the feed (highest, green, first), not a fabricated percentage ([ADR-038](06-decisions.md#adr-038)).
 - **Most-relevant first; don't flood** (FR-TH-1). A wall of 20 theorems teaches nothing. Surface the few the latest fact makes relevant.
 
 **It surfaces; it does not solve or prove** ([Vision non-goals](01-vision.md)). The tool points at the theorem that applies and the facts that triggered it — *the student still does the reasoning.* We are deliberately not building a "find x" solver or a proof engine. The pedagogical bet is that *seeing the right theorem at the right moment, attached to the data that earned it*, is what's missing — not the answer.
@@ -84,7 +84,7 @@ The teaching: the student sees *why* "right angle" and "on the circle" went toge
 | A **line parallel to one side of a triangle** cutting the others | **73** (extended Thales — proportional segments) | P |
 | A transversal across **parallel lines** | **4** (alternate equal), **6** (corresponding equal), **8** (co-interior 180°); converses **5/7/9** when the equality is *given* | P, C |
 
-> These are design intentions, not yet implemented detection. Phase 6's `detect(figure)` predicates ([plan](09-implementation-plan.md#phase-6--theorems)) realise this table; the gate is that the listed **P/C** IDs surface (with correct definite/possible confidence) and that **O**-tagged items, definitions, and area/perimeter formulas **never** surface.
+> These are design intentions, not yet implemented detection. Phase 6's **structural** `detect(fact, figure)` matchers ([plan](09-implementation-plan.md#phase-6--theorems), [ADR-038](06-decisions.md#adr-038)) realise this table — keyed on the *typed construct and its parents*, so a theorem is raised by **what the student built**, not by a coordinate coincidence. The gate: the listed **P/C** IDs surface (with correct certain/possible tier) and **O**-tagged items, definitions, and area/perimeter formulas **never** surface. Coordinate-level *coincidences* (a chord that happens to pass through the centre) are out of scope for Phase 6 — they live behind the **opt-in Reveal** feature ([Phase 9](09-implementation-plan.md#phase-9--reveal--figure-unmasking-deferred)), never auto-surfaced.
 
 ---
 

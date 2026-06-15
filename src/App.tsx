@@ -20,6 +20,7 @@ import { Figure } from '@/render';
 import type { Crossing } from '@/render';
 import { groupKey, introducedIds, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
+import { logDebug } from '@/debug/sessionLog';
 import { nanoid } from 'nanoid';
 
 export default function App() {
@@ -53,6 +54,26 @@ export default function App() {
   const [editText, setEditText] = useState('');
   const [editError, setEditError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Debug log (dev only): snapshot the fact list + per-fact status whenever the
+  // figure changes (any submit / edit / delete / undo / clear / resample), so a
+  // session can be reconstructed later from logs/debug-log.jsonl. Best-effort.
+  useEffect(() => {
+    const snapshot = () => {
+      const st = useGeoStore.getState();
+      const { status, lastError } = replay(st.facts, st.seed);
+      logDebug({
+        kind: 'figure',
+        seed: st.seed,
+        lastError: lastError ?? null,
+        facts: st.facts.map((f) => ({ id: f.id, group: f.group, enabled: f.enabled, utterance: f.utterance, cmd: f.cmd, status: status[f.id] })),
+      });
+    };
+    snapshot(); // initial state (e.g. a restored session)
+    return useGeoStore.subscribe((s, prev) => {
+      if (s.facts !== prev.facts || s.seed !== prev.seed) snapshot();
+    });
+  }, []);
 
   // Insert a Greek letter (angle variables are hard to type) at the input's caret —
   // e.g. type "זווית ABC = 2" then press α (ADR-031).
@@ -130,11 +151,13 @@ export default function App() {
     setNotUnderstood(false);
     setLlmDropped([]);
     setRenameNote('');
+    const locale = i18n.language?.startsWith('he') ? 'he' : 'en';
     // A relabel ("rename E to G" / "שנה שם E ל-G") is a store operation, not a
     // geometry command — handle it before the parser so it never enters the figure.
     const ren = parseRename(utterance);
     if (ren) {
       const res = rename(ren.from, ren.to);
+      logDebug({ kind: 'input', utterance, locale, source: 'rename', rename: ren, result: res.ok ? 'ok' : res.reason });
       if (res.ok) setText('');
       else setRenameNote(t(`input.rename_${res.reason}`, { from: ren.from, to: ren.to }));
       return;
@@ -145,6 +168,7 @@ export default function App() {
       // they show as a single step row, not N identical rows.
       const group = nanoid();
       r.commands.forEach((c) => execute(c, utterance, group));
+      logDebug({ kind: 'input', utterance, locale, source: 'parser', commands: r.commands });
       setText('');
       return;
     }
@@ -157,6 +181,7 @@ export default function App() {
     const out = await llmParse(utterance, ctx);
     setThinking(false);
     if (!out || (out.built.length === 0 && out.dropped.length === 0)) {
+      logDebug({ kind: 'input', utterance, locale, source: 'llm', result: 'not-understood' });
       setNotUnderstood(true);
       return;
     }
@@ -166,6 +191,7 @@ export default function App() {
       const group = nanoid();
       g.commands.forEach((c) => execute(c, g.step, group));
     });
+    logDebug({ kind: 'input', utterance, locale, source: 'llm', built: out.built.map((g) => g.step), dropped: out.dropped });
     setLlmDropped(out.dropped);
     if (out.built.length === 0) setNotUnderstood(true);
     setText('');
