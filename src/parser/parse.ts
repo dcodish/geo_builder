@@ -722,6 +722,62 @@ const inscribedPolygon: Rule = (s, ctx) => {
 };
 
 /**
+ * "semicircle with diameter AB" / "חצי מעגל שקוטרו AB" / "half circle on AB" (or bare
+ * "semicircle"/"חצי מעגל"). A 180° arc on a diameter: a HIDDEN circle keeps the two ends
+ * antipodal (so the figure is a clean half-circle, not a full one), the arc draws the upper
+ * half, and the diameter AB is drawn. The centre point is shown. Optional "radius r".
+ */
+const semicircle: Rule = (s, ctx) => {
+  if (!/semicircle|half[\s-]?circle|חצי[\s-]?מעגל|חצי[\s-]?עיגול/i.test(s)) return null;
+  const r = parseRadius(s);
+  const stripped = dropCircleRef(s).replace(
+    /semicircle|half[\s-]?circle|חצי[\s-]?מעגל|חצי[\s-]?עיגול|diameter|קוטר|שקוטרו|על|\bon\b|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
+    ' ',
+  );
+  const dia = labelRun(stripped, 2);
+  const [a, b] = dia ?? ['A', 'B'];
+  const leftover = [a, b].reduce((acc, id) => acc.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '), stripped);
+  if (SHAPE_LEFTOVER.test(leftover)) return 'stop'; // a compound ("semicircle … with AC=5") → escalate, don't half-parse
+  const center = ['O', 'P', 'Q', 'M', 'N', 'S'].find((c) => c !== a && c !== b && !(ctx.points ?? []).includes(c)) ?? 'O';
+  const circ = circleId(center);
+  const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, hidden: true }];
+  if (r.varCmd) cmds.push(r.varCmd);
+  cmds.push(
+    { type: 'point-on-circle', id: up(a), circle: circ, theta: Math.PI }, // left end of the diameter
+    { type: 'point-on-circle', id: up(b), circle: circ, theta: 0 }, // right end
+    { type: 'arc', id: `arc-${up(b)}${up(a)}`, center: up(center), from: up(b), to: up(a) }, // CCW B→A = the upper half
+    { type: 'segment', a: up(a), b: up(b) }, // the diameter
+  );
+  return cmds;
+};
+
+/**
+ * "quarter circle" / "רבע מעגל" (optionally "quarter circle OAB" naming centre + the two ends).
+ * A 90° arc with its two bounding radii drawn; a HIDDEN circle keeps the ends on it. Optional "radius r".
+ */
+const quarterCircle: Rule = (s) => {
+  if (!/quarter[\s-]?circle|רבע[\s-]?מעגל|רבע[\s-]?עיגול/i.test(s)) return null;
+  const r = parseRadius(s);
+  const stripped = dropCircleRef(s).replace(
+    /quarter[\s-]?circle|רבע[\s-]?מעגל|רבע[\s-]?עיגול|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
+    ' ',
+  );
+  const named = labelRun(stripped, 3); // "OAB" ⇒ centre O + ends A,B; else default
+  const [center, a, b] = named ?? ['O', 'A', 'B'];
+  const circ = circleId(center);
+  const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, hidden: true }];
+  if (r.varCmd) cmds.push(r.varCmd);
+  cmds.push(
+    { type: 'point-on-circle', id: up(a), circle: circ, theta: 0 },
+    { type: 'point-on-circle', id: up(b), circle: circ, theta: Math.PI / 2 },
+    { type: 'arc', id: `arc-${up(a)}${up(b)}`, center: up(center), from: up(a), to: up(b) }, // CCW 0°→90°
+    { type: 'segment', a: up(center), b: up(a) }, // a bounding radius
+    { type: 'segment', a: up(center), b: up(b) }, // the other bounding radius
+  );
+  return cmds;
+};
+
+/**
  * "circle inscribed in triangle ABC" / "incircle of triangle ABC" /
  * "מעגל חסום במשולש ABC" — the INCIRCLE: centred at the incenter (where two angle
  * bisectors meet), tangent to the sides. Built from existing primitives — two
@@ -1218,6 +1274,8 @@ const RULES: Rule[] = [
   compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
   congruence, // "ABC ≅ DEF" — before the shape rules ("triangle ABC ≅ …" contains "triangle")
   similarity, // "ABC ~ DEF"
+  semicircle, // "חצי מעגל" / "semicircle" — before `circle` (contains "מעגל") and the shape rules
+  quarterCircle, // "רבע מעגל" / "quarter circle" — same
   incircle, // "circle inscribed in triangle ABC" — before inscribedPolygon (both match "inscribed")
   inscribedPolygon, // before the shape rules ("triangle ABC inscribed …" contains "triangle")
   // Special-line constructs whose Hebrew names a triangle ("…במשולש ABC") must

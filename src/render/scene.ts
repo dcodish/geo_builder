@@ -42,6 +42,18 @@ export interface SceneCircle {
   r: number;
 }
 
+/** A drawn arc (world, y-up): from `from` to `to` around `center`, radius `r`. The
+ *  `largeArc`/`sweep` are SVG arc flags computed for the CCW(world)→CW(screen) arc. */
+export interface SceneArc {
+  id: Id;
+  center: Vec;
+  from: Vec;
+  to: Vec;
+  r: number;
+  largeArc: 0 | 1;
+  sweep: 0 | 1;
+}
+
 /** A visible (infinite) line: a point on it and a unit direction. The renderer clips it to the view. */
 export interface SceneLine {
   id: Id;
@@ -78,9 +90,23 @@ export interface Scene {
   segments: SceneSegment[];
   polygons: ScenePolygon[];
   circles: SceneCircle[];
+  arcs: SceneArc[];
   lines: SceneLine[];
   measures: SceneMeasure[];
   angleMarks: SceneAngleMark[];
+}
+
+/** Resolve an {@link Arc} object to a drawable {@link SceneArc}, or null if a referenced point is missing/degenerate. */
+function arcGeometry(center: Vec, from: Vec, to: Vec, id: Id): SceneArc | null {
+  const r = len(sub(from, center));
+  if (r < 1e-9) return null;
+  const angA = Math.atan2(from.y - center.y, from.x - center.x);
+  const angB = Math.atan2(to.y - center.y, to.x - center.x);
+  let span = (angB - angA) % (2 * Math.PI); // CCW span from `from` to `to` (world, y-up)
+  if (span <= 1e-9) span += 2 * Math.PI;
+  // The renderer flips Y to screen (y-down), where SVG sweep-flag 1 is *clockwise*. A
+  // world-CCW arc traverses right→top→left (visually counter-clockwise on screen) ⇒ sweep 0.
+  return { id, center, from, to, r, largeArc: span > Math.PI ? 1 : 0, sweep: 0 };
 }
 
 /**
@@ -127,6 +153,7 @@ export function buildScene(
   const segments: SceneSegment[] = [];
   const polygons: ScenePolygon[] = [];
   const circles: SceneCircle[] = [];
+  const arcs: SceneArc[] = [];
   const lines: SceneLine[] = [];
 
   // Per-vertex directions to every point it shares a segment with — the lines a
@@ -186,6 +213,15 @@ export function buildScene(
         if (p) r = dist(center, p);
       }
       if (r !== undefined && isFinite(r) && r > 0) circles.push({ id: o.id, center, r });
+    }
+    if (o.kind === 'arc') {
+      const center = positions.get(o.center);
+      const from = positions.get(o.from);
+      const to = positions.get(o.to);
+      if (center && from && to) {
+        const a = arcGeometry(center, from, to, o.id);
+        if (a) arcs.push(a);
+      }
     }
   }
 
@@ -253,7 +289,7 @@ export function buildScene(
     if (v && p1 && p2 && len(sub(p1, v)) > 1e-9 && len(sub(p2, v)) > 1e-9) angleMarks.push({ vertex: v, p1, p2, right: m.right });
   }
 
-  return { points, segments, polygons, circles, lines, measures, angleMarks };
+  return { points, segments, polygons, circles, arcs, lines, measures, angleMarks };
 }
 
 /**
@@ -290,6 +326,19 @@ export function scenePositions(scene: Scene): Vec[] {
   for (const c of scene.circles) {
     ps.push({ x: c.center.x - c.r, y: c.center.y }, { x: c.center.x + c.r, y: c.center.y });
     ps.push({ x: c.center.x, y: c.center.y - c.r }, { x: c.center.x, y: c.center.y + c.r });
+  }
+  // An arc's extent: its endpoints plus any axis-extreme (0/90/180/270°) the arc actually sweeps.
+  for (const a of scene.arcs) {
+    ps.push(a.from, a.to);
+    const angA = Math.atan2(a.from.y - a.center.y, a.from.x - a.center.x);
+    let span = (Math.atan2(a.to.y - a.center.y, a.to.x - a.center.x) - angA) % (2 * Math.PI);
+    if (span <= 1e-9) span += 2 * Math.PI;
+    for (let k = 0; k < 4; k++) {
+      const ca = (k * Math.PI) / 2;
+      let d = (ca - angA) % (2 * Math.PI);
+      if (d < 0) d += 2 * Math.PI;
+      if (d <= span + 1e-9) ps.push({ x: a.center.x + a.r * Math.cos(ca), y: a.center.y + a.r * Math.sin(ca) });
+    }
   }
   return ps;
 }

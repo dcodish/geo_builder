@@ -503,6 +503,10 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       });
       break;
 
+    case 'arc':
+      addObj(objects, { kind: 'arc', id: cmd.id, center: cmd.center, from: cmd.from, to: cmd.to });
+      break;
+
     case 'circle-through':
       placeBase(objects, [{ id: cmd.center, x: 0, y: 0 }], pos);
       upsertCircle(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.through } });

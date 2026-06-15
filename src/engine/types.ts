@@ -401,7 +401,22 @@ export interface Circle {
   hidden?: boolean;
 }
 
-export type GeoObject = GeoPoint | Segment | Polygon | Line | Circle;
+/**
+ * A drawn circular arc: the part of the circle centred at `center` running from
+ * point `from` to point `to`, the **counter-clockwise** way (world, y-up). `from`
+ * and `to` are equidistant from `center` (its radius). Used for a semicircle (a
+ * 180° arc on a diameter) and a quarter circle (a 90° arc). Like a segment it
+ * carries no position of its own — it is drawn from its referenced points.
+ */
+export interface Arc {
+  kind: 'arc';
+  id: Id;
+  center: Id;
+  from: Id;
+  to: Id;
+}
+
+export type GeoObject = GeoPoint | Segment | Polygon | Line | Circle | Arc;
 
 /**
  * Angle constraint. In Phase 1 it is used as a satisfiability *check* for
@@ -538,6 +553,7 @@ export type Command =
   | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id } // circle through a,b,c (centre = circumcentre)
   | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number }
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
+  | { type: 'arc'; id: Id; center: Id; from: Id; to: Id } // a drawn arc (CCW from→to): semicircle / quarter circle
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }
   | { type: 'line-circle-intersection'; id: Id; line: Id; circle: Id; branch?: number }
   | { type: 'circle-circle-intersection'; id: Id; circle1: Id; circle2: Id; branch?: number }

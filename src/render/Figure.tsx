@@ -221,6 +221,24 @@ export function Figure({
             );
           })}
 
+          {/* Arcs (a semicircle / quarter circle) — an SVG elliptical-arc path between the
+              two endpoints; the radius scales isotropically like a circle. */}
+          {scene.arcs.map((arc) => {
+            const a = transform.toScreen(arc.from);
+            const b = transform.toScreen(arc.to);
+            const rs = arc.r * transform.scale;
+            return (
+              <path
+                key={arc.id}
+                data-id={arc.id}
+                d={`M ${a.x} ${a.y} A ${rs} ${rs} 0 ${arc.largeArc} ${arc.sweep} ${b.x} ${b.y}`}
+                fill="none"
+                stroke={lit(arc.id) ? ACCENT : '#334155'}
+                strokeWidth={lit(arc.id) ? stroke * 2 : stroke}
+              />
+            );
+          })}
+
           {/* Visible lines (a tangent / bisector / perpendicular / parallel) — drawn
               as a regular SOLID line. An infinite line is rendered as a long segment
               through its anchor along its (screen-space) direction; the SVG viewport
