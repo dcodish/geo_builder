@@ -75,16 +75,20 @@ function resolveDriven(c: Construction): Construction {
   const onLineCarriers = c.objects.filter(
     (o): o is Extract<GeoObject, { kind: 'on-line' }> => o.kind === 'on-line' && o.solve !== undefined,
   );
-  if (shapeCarriers.length > 0 || onLineCarriers.length > 0) {
-    const paramCarriers = c.objects.filter((o) => (o.kind === 'on-segment' || o.kind === 'on-circle') && o.solve !== undefined);
+  const paramCarriers = c.objects.filter(
+    (o): o is Extract<GeoObject, { kind: 'on-circle' | 'on-segment' }> =>
+      (o.kind === 'on-circle' || o.kind === 'on-segment') && o.solve !== undefined,
+  );
+  // Any heterogeneous mix — shape scalars, on-line offsets, OR free vertices together with a
+  // parametric (on-segment/on-circle) DOF — must use the generalized joint solver. The pure
+  // free-vertex path below IGNORES parametric carriers, so e.g. "|BP|=3|PD|" (which recruits a
+  // triangle's vertices AND the on-segment E that actually moves P) would drop E and fail.
+  if (shapeCarriers.length > 0 || onLineCarriers.length > 0 || (freeCarriers.length > 0 && paramCarriers.length > 0)) {
     return resolveMixedCarriers(c, [...freeCarriers, ...paramCarriers, ...shapeCarriers, ...onLineCarriers]);
   }
   if (freeCarriers.length > 0) return resolveFreeDriven(c, freeCarriers);
 
-  const carriers = c.objects.filter(
-    (o): o is Extract<GeoObject, { kind: 'on-circle' | 'on-segment' }> =>
-      (o.kind === 'on-circle' || o.kind === 'on-segment') && o.solve !== undefined,
-  );
+  const carriers = paramCarriers;
   if (carriers.length === 0) return c;
   const range = (o: { kind: string }): [number, number] => (o.kind === 'on-circle' ? [0, 2 * Math.PI] : [0, 1]);
 

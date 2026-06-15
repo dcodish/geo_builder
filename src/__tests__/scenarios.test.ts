@@ -96,6 +96,24 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'median-ratio-drives-E',
+    title: 'triangle, median BD, E on BC, P = AE∩BD, then |BP|=3|PD| — slides E to satisfy it',
+    guards: 'a ratio constraint on a derived point P recruited the triangle vertices but the joint solver ignored the on-segment DOF (E) that actually moves P (mixed free+parametric carriers routed to the free-only solver) → over-constrained.',
+    steps: [
+      'משולש ABC',
+      'BD תיכון לצלע AC',
+      'E על BC',
+      // "AE ו-BD נחתכים בנקודה P" (operator typo "נחכתכים" → LLM produced this command)
+      { llm: [{ type: 'line-line-intersection', id: 'P', a: 'A', b: 'E', c: 'B', d: 'D' }] },
+      'BP=3PD',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const B = at(fig, 'B'), P = at(fig, 'P'), D = at(fig, 'D');
+      expect(dist(B, P) / dist(P, D)).toBeCloseTo(3, 2); // |BP| = 3·|PD| (E slid; P at the 3:1 point on BD)
+    },
+  },
+  {
     id: 'tangent-chord-bisector',
     title: 'cyclic quad, diagonals meet F, tangent at C cuts AB-extension at E, AB=CB, AC bisects ∠ECD',
     guards: 'coupled constraints (AB=CB AND the bisector) drove one cyclic vertex onto another / a crossed quad; "AC bisects ∠ECD" was unparsed and silently dropped; "חותך" was not an intersection keyword (clobbered A,B).',

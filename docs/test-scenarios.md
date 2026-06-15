@@ -22,6 +22,19 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `median-ratio-drives-E` — a ratio on a derived point slides the DOF behind it
+**Steps**
+1. `משולש ABC`
+2. `BD תיכון לצלע AC`
+3. `E על BC`
+4. `AE ו-BD נחתכים בנקודה P` *(operator typo "נחכתכים" → LLM → `P = AE∩BD`)*
+5. `BP=3PD`
+
+**Guards against:** a ratio constraint on a derived point (P = AE∩BD) recruited the triangle's
+vertices but the joint solver dropped the on-segment DOF (E) that actually moves P — mixed
+free + parametric carriers were routed to the free-vertex-only solver → "over-constrained."
+**Asserts:** `|BP| = 3·|PD|` (E slid so P lands at the 3:1 point on BD).
+
 ### `tangent-chord-bisector` — cyclic quad + two coupled constraints
 **Steps**
 1. `ABCD חסום במעגל`

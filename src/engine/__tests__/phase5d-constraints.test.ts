@@ -271,6 +271,22 @@ describe('stability', () => {
   });
 });
 
+describe('a ratio on a derived point recruits AND drives the parametric DOF behind it', () => {
+  it('|BP| = 3·|PD| where P = AE∩BD slides the on-segment E (mixed free+param carriers, not the free-only path)', () => {
+    const { positions } = build([
+      { type: 'triangle', ids: ['A', 'B', 'C'] },
+      { type: 'midpoint', id: 'D', a: 'A', b: 'C' }, // median foot
+      { type: 'segment', a: 'B', b: 'D' },
+      { type: 'point-on-segment', id: 'E', a: 'B', b: 'C' }, // the free DOF
+      { type: 'segment', a: 'A', b: 'E' },
+      { type: 'line-line-intersection', id: 'P', a: 'A', b: 'E', c: 'B', d: 'D' },
+      { type: 'set-ratio', a: 'B', b: 'P', c: 'P', d: 'D', k: 3 }, // |BP| = 3·|PD|
+    ]);
+    const B = positions.get('B')!, P = positions.get('P')!, D = positions.get('D')!;
+    expect(dist(B, P) / dist(P, D)).toBeCloseTo(3, 3); // satisfied — was "over-constrained" before the routing fix
+  });
+});
+
 // keep the empty-import-free check honest
 it('emptyConstruction is the zero figure', () => {
   expect(emptyConstruction()).toEqual({ objects: [], constraints: [] });
