@@ -58,3 +58,34 @@ describe('cyclic quadrilateral (בר חסימה) — concyclic, circle not drawn
     expect(buildScene(construction, positions).circles).toHaveLength(1);
   });
 });
+
+describe('a diameter stated on a cyclic quad reshapes the whole quad (stays convex)', () => {
+  it('"AD is a diameter" → A,D antipodal and all four vertices stay spread (no collapsed corner)', () => {
+    const r = parse('מרובע ABCD בר חסימה במעגל');
+    if (!r.ok) throw new Error('cyclic quad did not parse');
+    const circle = r.commands.find((c) => c.type === 'circle') as { id: string };
+    // Apply the diameter on two vertices of the cyclic quad (the bug: it shoved A onto B).
+    const { construction, positions } = build([...r.commands, { type: 'diameter', id1: 'A', id2: 'D', circle: circle.id }]);
+    const O = positions.get('O')!;
+    const pts = ['A', 'B', 'C', 'D'].map((id) => positions.get(id)!);
+    const ang = (p: { x: number; y: number }) => Math.atan2(p.y - O.y, p.x - O.x);
+
+    // AD is now a diameter: A and D antipodal (∠AOD = 180°).
+    const aod = Math.abs(ang(pts[0]) - ang(pts[3]));
+    expect(Math.min(aod, 2 * Math.PI - aod)).toBeCloseTo(Math.PI, 4);
+
+    // …and no two vertices collapsed together — every adjacent angular gap is wide
+    // (the old behaviour put A ~10° from B). All four remain on the circle.
+    const sorted = pts.map(ang).map((a) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)).sort((x, y) => x - y);
+    for (let i = 0; i < 4; i++) {
+      const gap = (sorted[(i + 1) % 4] - sorted[i] + 2 * Math.PI) % (2 * Math.PI);
+      expect(gap).toBeGreaterThan((20 * Math.PI) / 180); // ≥ 20° apart — a real quad, not a sliver
+    }
+    for (const p of pts) expect(Math.hypot(p.x - O.x, p.y - O.y)).toBeCloseTo(5, 6);
+
+    // The diameter segment AD is present exactly once (no duplicate), circle still hidden.
+    const scene = buildScene(construction, positions);
+    expect(scene.segments.filter((s) => s.id === 'seg-AD')).toHaveLength(1);
+    expect(scene.circles).toHaveLength(0);
+  });
+});

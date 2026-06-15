@@ -136,7 +136,7 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   // reinterpret it as a coincidence that drives a free DOF upstream (ADR-028).
   const conflict = commandConflict(prev, ncmd);
   if (conflict) {
-    const constrained = reinterpretAsConstraint(prev, ncmd) ?? reinterpretDiameter(prev, ncmd);
+    const constrained = reinterpretAsConstraint(prev, ncmd) ?? replaceCyclicForDiameter(prev, ncmd) ?? reinterpretDiameter(prev, ncmd);
     if (constrained) {
       const r = evaluate(constrained);
       if (r.ok) return { ok: true, construction: constrained, positions: r.positions };
@@ -183,6 +183,62 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
  * is the centre. Reinterpret it as `coincide(midpoint(A,B), O)` driving a carrier, so
  * the solver makes A,B antipodal (the recruit-DOFs fallback widens this if needed).
  */
+/**
+ * "diameter AD" where A and D are two vertices of a CYCLIC polygon (≥3 on-circle
+ * points on the same circle): re-place ALL the polygon's vertices so A and D are
+ * antipodal (AD becomes a diameter) while preserving their cyclic order and relative
+ * spacing — a clean convex figure. This replaces the generic driven path, which
+ * could only move ONE vertex and would shove it onto a neighbour (a degenerate quad).
+ * Returns the reshaped construction, or null to fall through to the normal handling.
+ */
+function replaceCyclicForDiameter(prev: Construction, cmd: Command): Construction | null {
+  if (cmd.type !== 'diameter') return null;
+  type OnC = Extract<GeoObject, { kind: 'on-circle' }>;
+  const verts = prev.objects.filter((o): o is OnC => o.kind === 'on-circle' && o.circle === cmd.circle);
+  if (verts.length < 3) return null; // not a cyclic polygon → let reinterpretDiameter handle it
+  if (!verts.some((v) => v.id === cmd.id1) || !verts.some((v) => v.id === cmd.id2)) return null;
+  // If any vertex is already driven by another constraint (e.g. a chord with |DE|=|DF|),
+  // re-placing it would break that — defer to the generic coupled driven path instead.
+  const ids = new Set(verts.map((v) => v.id));
+  if (prev.constraints.some((c) => constraintRefs(c).some((id) => ids.has(id)))) return null;
+
+  const norm = (t: number) => ((t % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  const sorted = [...verts].sort((p, q) => norm(p.theta) - norm(q.theta));
+  const iA = sorted.findIndex((v) => v.id === cmd.id1);
+  const N = sorted.length;
+  const order = Array.from({ length: N }, (_, k) => sorted[(iA + k) % N]); // A first, then CCW
+  const pD = order.findIndex((v) => v.id === cmd.id2);
+  if (pD <= 0) return null;
+  const gaps = Array.from({ length: N }, (_, i) => norm(order[(i + 1) % N].theta - order[i].theta)); // order[i] → order[i+1]
+  const arc1Span = gaps.slice(0, pD).reduce((s, g) => s + g, 0); // A → D (carries B, C, …)
+  const arc2Span = gaps.slice(pD).reduce((s, g) => s + g, 0); // D → A (the other arc, wrapping)
+
+  // Anchor A; put D antipodal; redistribute each arc's interior vertices across a
+  // half-circle in proportion to their original gaps (keeps the figure's character).
+  const theta = new Map<Id, number>();
+  const a0 = norm(order[0].theta);
+  theta.set(order[0].id, a0);
+  let acc = 0;
+  for (let i = 1; i < pD; i++) {
+    acc += gaps[i - 1];
+    theta.set(order[i].id, a0 + Math.PI * (arc1Span ? acc / arc1Span : i / pD));
+  }
+  theta.set(order[pD].id, a0 + Math.PI);
+  acc = 0;
+  for (let i = pD + 1; i < N; i++) {
+    acc += gaps[i - 1];
+    theta.set(order[i].id, a0 + Math.PI + Math.PI * (arc2Span ? acc / arc2Span : (i - pD) / (N - pD)));
+  }
+
+  const objects: GeoObject[] = prev.objects.map((o) =>
+    o.kind === 'on-circle' && theta.has(o.id) ? { ...o, theta: theta.get(o.id)!, solve: undefined } : o,
+  );
+  // Draw the diameter AD (dedupe — the polygon edge may already be present).
+  const segId = `seg-${[cmd.id1, cmd.id2].sort().join('')}`;
+  if (!objects.some((o) => o.id === segId)) objects.push({ kind: 'segment', id: segId, a: cmd.id1, b: cmd.id2 });
+  return { objects, constraints: prev.constraints };
+}
+
 function reinterpretDiameter(prev: Construction, cmd: Command): Construction | null {
   if (cmd.type !== 'diameter') return null;
   const a = prev.objects.find((o) => o.id === cmd.id1 && isGeoPoint(o));
