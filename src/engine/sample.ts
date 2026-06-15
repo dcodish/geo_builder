@@ -16,11 +16,14 @@
  * default (returns the construction unchanged).
  */
 
-import type { Construction, FreePoint, Id, OnCirclePoint } from './types';
+import type { Construction, FreePoint, Id, OnCirclePoint, OnLinePoint } from './types';
 
 /** A free on-circle vertex the sampler may slide (an arbitrary-angle vertex, not driven/fixed). */
 const isFreeOnCircle = (o: { kind: string; free?: boolean; solve?: unknown }): boolean =>
   o.kind === 'on-circle' && !!o.free && o.solve === undefined;
+
+/** A free on-line marker the sampler may slide along its line (not yet driven by a constraint — ADR-036). */
+const isFreeOnLine = (o: { kind: string; solve?: unknown }): boolean => o.kind === 'on-line' && o.solve === undefined;
 
 /** mulberry32 — a tiny deterministic PRNG in [0, 1). */
 function mulberry32(a: number): () => number {
@@ -52,10 +55,11 @@ export function applySeed(c: Construction, seed: number): Construction {
   if (!seed) return c;
   const free = c.objects.filter((o): o is FreePoint => o.kind === 'free-point' && !o.pinned);
   const freeCircle = c.objects.filter((o): o is OnCirclePoint => isFreeOnCircle(o));
+  const freeLine = c.objects.filter((o): o is OnLinePoint => isFreeOnLine(o));
   const freeShape = c.objects.some(
     (o) => (o.kind === 'rotated' || o.kind === 'perp-offset' || o.kind === 'scaled-offset') && (o as { solve?: unknown }).solve === undefined,
   );
-  if (free.length === 0 && freeCircle.length === 0 && !freeShape) return c; // fully determined → nothing to sample
+  if (free.length === 0 && freeCircle.length === 0 && freeLine.length === 0 && !freeShape) return c; // fully determined → nothing to sample
 
   // Free-point cluster: seeded spin about its centroid + per-point jitter.
   const cx = free.length ? free.reduce((s, p) => s + p.x, 0) / free.length : 0;
@@ -88,6 +92,13 @@ export function applySeed(c: Construction, seed: number): Construction {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
       return { ...o, theta: (o as OnCirclePoint).theta + circSpin + (jr() * 2 - 1) * circJit };
     }
+    // Free on-line marker (ADR-036): slide it along its line by scaling the signed offset.
+    // Sign is preserved so a pair straddling the anchor (a tangent's C at +offset, D at −offset)
+    // keeps straddling — the segment between them still spans the touch point, just a different length.
+    if (isFreeOnLine(o)) {
+      const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
+      return { ...o, offset: (o as OnLinePoint).offset * (0.4 + jr() * 2) }; // 0.4×–2.4× the default extent, sign kept
+    }
     // Free SHAPE-PARAMETER DOFs (ADR-033) — a rhombus's angle, a rectangle/right-triangle's
     // offset, a trapezoid's top ratio. Varying these lets "show another configuration" reach a
     // genuinely different SHAPE (e.g. an obtuse-angled rhombus), not just jiggled points. Skipped
@@ -109,13 +120,14 @@ export function applySeed(c: Construction, seed: number): Construction {
   return { ...c, objects };
 }
 
-/** The ids of the figure's free DOFs (non-pinned free points, free on-circle vertices, free shape scalars). */
+/** The ids of the figure's free DOFs (non-pinned free points, free on-circle vertices, free on-line markers, free shape scalars). */
 export function freeDofs(c: Construction): Id[] {
   return c.objects
     .filter(
       (o) =>
         (o.kind === 'free-point' && !o.pinned) ||
         isFreeOnCircle(o) ||
+        isFreeOnLine(o) ||
         ((o.kind === 'rotated' || o.kind === 'perp-offset' || o.kind === 'scaled-offset') && (o as { solve?: unknown }).solve === undefined),
     )
     .map((o) => o.id);

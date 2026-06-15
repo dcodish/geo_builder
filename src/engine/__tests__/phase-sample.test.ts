@@ -91,6 +91,31 @@ describe('applySeed', () => {
     expect(angles.some((a) => a < 85)).toBe(true);
   });
 
+  it('slides a free on-line marker along its line across seeds (ADR-036), and lists it as a DOF', () => {
+    // A, B pinned (explicit placements); the only freedom is P's offset along line AB.
+    const { construction, positions } = build([
+      { type: 'free-point', id: 'A', x: 0, y: 0 },
+      { type: 'free-point', id: 'B', x: 10, y: 0 },
+      { type: 'line-through', id: 'line-AB', a: 'A', b: 'B' },
+      { type: 'point-on-line', id: 'P', line: 'line-AB', offset: 3 },
+    ]);
+    expect(freeDofs(construction)).toEqual(['P']); // the marker is the figure's lone free DOF
+    const xs = new Set<number>();
+    for (let seed = 1; seed < 8; seed++) {
+      const e = evaluate(applySeed(construction, seed));
+      if (e.ok) {
+        const P = e.positions.get('P')!;
+        expect(P.y).toBeCloseTo(0, 9); // stays ON the line (y = 0 for the x-axis line AB)
+        expect(P.x).toBeGreaterThan(0); // sign of the offset is preserved (same side of the anchor)
+        xs.add(Math.round(P.x * 1000));
+      }
+    }
+    expect(xs.size).toBeGreaterThan(1); // genuinely different positions → "show another configuration" varies it
+    // …and a sampled position differs from the canonical (seed-0) default.
+    const def = positions.get('P')!;
+    expect([...xs].some((x) => Math.abs(x / 1000 - def.x) > 1e-6)).toBe(true);
+  });
+
   it("a CONSTRAINED shape DOF is NOT resampled (a driven rhombus angle stays put)", () => {
     // angle ADC = 80 drives the rhombus's `rotated` DOF → it's pinned, so the sampler leaves it.
     const { construction } = build([{ type: 'rhombus', ids: ['A', 'B', 'C', 'D'] }, { type: 'set-angle', vertex: 'D', ray1: 'A', ray2: 'C', value: 80 }]);
