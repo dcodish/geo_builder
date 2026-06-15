@@ -17,6 +17,6 @@ export {
   emptyConstruction,
 } from './step';
 export type { StepResult, StepOk, StepErr } from './step';
-export { applySeed, freeDofs } from './sample';
+export { applySeed, freeDofs, freeDofCount } from './sample';
 export { lower, lowerOne, buildSymTab, measureLabelText, isMeasure } from './lower';
 export type { SymTab } from './lower';

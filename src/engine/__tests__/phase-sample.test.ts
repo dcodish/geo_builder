@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Vec } from '../types';
 import { build, applyStep, emptyConstruction } from '../step';
-import { applySeed, freeDofs } from '../sample';
+import { applySeed, freeDofs, freeDofCount } from '../sample';
 import { evaluate } from '../evaluate';
 import { dist, sub } from '../geometry';
 
@@ -114,6 +114,30 @@ describe('applySeed', () => {
     // …and a sampled position differs from the canonical (seed-0) default.
     const def = positions.get('P')!;
     expect([...xs].some((x) => Math.abs(x / 1000 - def.x) > 1e-6)).toBe(true);
+  });
+
+  it('freeDofCount (ADR-018 Stage 3): a lone square has 4 DOF (place/rotate/scale); pinning both base vertices → 0', () => {
+    expect(freeDofCount(build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }]).construction)).toBe(4);
+    const pinned = build([
+      { type: 'square', ids: ['A', 'B', 'C', 'D'] },
+      { type: 'free-point', id: 'A', x: 0, y: 0 },
+      { type: 'free-point', id: 'B', x: 6, y: 0 },
+    ]);
+    expect(freeDofCount(pinned.construction)).toBe(0); // fully determined → the "✓ determined" cue
+    expect(freeDofs(pinned.construction)).toHaveLength(0);
+  });
+
+  it('ADR-018 Stage 2 — a constraint-driven free vertex is pruned from the DOF count and the sampler', () => {
+    // Parallelogram A,B,C free (D derived) → 6 DOF. |AB| = |AC| drives ONE free vertex (ADR-030),
+    // so it stops being a sampled DOF: the count drops by 2 and freeDofs loses it.
+    const pgram = build([{ type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] }, { type: 'segment', a: 'A', b: 'C' }]);
+    expect(freeDofCount(pgram.construction)).toBe(6);
+    expect(freeDofs(pgram.construction).sort()).toEqual(['A', 'B', 'C']);
+    const r = applyStep(pgram.construction, { type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'C' });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(freeDofCount(r.construction)).toBe(4); // the driven vertex no longer counts
+    expect(freeDofs(r.construction)).toHaveLength(2);
   });
 
   it("a CONSTRAINED shape DOF is NOT resampled (a driven rhombus angle stays put)", () => {

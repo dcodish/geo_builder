@@ -63,6 +63,8 @@
     "clear": "Clear all",
     "flip": "Flip",
     "another": "Show another configuration",
+    "dof": "Degrees of freedom: {{count}}",
+    "determined": "✓ Fully determined",
     "delete": "Delete",
     "toggle": "Include / exclude this fact",
     "edit": "Edit",

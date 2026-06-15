@@ -53,7 +53,7 @@ function hashId(s: string): number {
  */
 export function applySeed(c: Construction, seed: number): Construction {
   if (!seed) return c;
-  const free = c.objects.filter((o): o is FreePoint => o.kind === 'free-point' && !o.pinned);
+  const free = c.objects.filter((o): o is FreePoint => o.kind === 'free-point' && !o.pinned && o.solve === undefined);
   const freeCircle = c.objects.filter((o): o is OnCirclePoint => isFreeOnCircle(o));
   const freeLine = c.objects.filter((o): o is OnLinePoint => isFreeOnLine(o));
   const freeShape = c.objects.some(
@@ -78,7 +78,7 @@ export function applySeed(c: Construction, seed: number): Construction {
   const circJit = Math.PI / 6; // ±30° per-vertex
 
   const objects = c.objects.map((o) => {
-    if (o.kind === 'free-point' && !o.pinned) {
+    if (o.kind === 'free-point' && !o.pinned && o.solve === undefined) {
       const dx = o.x - cx;
       const dy = o.y - cy;
       const rx = cx + (dx * ct - dy * st);
@@ -120,15 +120,32 @@ export function applySeed(c: Construction, seed: number): Construction {
   return { ...c, objects };
 }
 
-/** The ids of the figure's free DOFs (non-pinned free points, free on-circle vertices, free on-line markers, free shape scalars). */
+/**
+ * How many degrees of freedom an object still contributes to the figure (0 if determined).
+ * A non-pinned, non-driven free point carries 2 (its x,y); a free parametric DOF — an on-circle
+ * angle, an on-line offset, or a shape scalar — carries 1. A point/scalar that a constraint
+ * drives (`solve` set) is determined, so it contributes 0 (ADR-018 Stage 2: constraints prune
+ * the sampled DOFs automatically). A pinned point contributes 0.
+ */
+function freeDofWeight(o: Construction['objects'][number]): number {
+  const driven = (o as { solve?: unknown }).solve !== undefined;
+  if (o.kind === 'free-point') return o.pinned || driven ? 0 : 2;
+  if (isFreeOnCircle(o) || isFreeOnLine(o)) return 1;
+  if ((o.kind === 'rotated' || o.kind === 'perp-offset' || o.kind === 'scaled-offset') && !driven) return 1;
+  return 0;
+}
+
+/** The ids of the figure's free DOFs (non-pinned/non-driven free points, free on-circle/on-line markers, free shape scalars). */
 export function freeDofs(c: Construction): Id[] {
-  return c.objects
-    .filter(
-      (o) =>
-        (o.kind === 'free-point' && !o.pinned) ||
-        isFreeOnCircle(o) ||
-        isFreeOnLine(o) ||
-        ((o.kind === 'rotated' || o.kind === 'perp-offset' || o.kind === 'scaled-offset') && (o as { solve?: unknown }).solve === undefined),
-    )
-    .map((o) => o.id);
+  return c.objects.filter((o) => freeDofWeight(o) > 0).map((o) => o.id);
+}
+
+/**
+ * The figure's total remaining degrees of freedom — a free point counts 2 (placement/size/rotation
+ * for a lone shape), a free parametric/shape DOF counts 1. 0 = fully determined (a single rigid
+ * drawing). Drives the "degrees of freedom remaining" cue (ADR-018 Stage 3) so the student watches
+ * the figure's freedom shrink as facts accumulate, and sees it stop when determined.
+ */
+export function freeDofCount(c: Construction): number {
+  return c.objects.reduce((n, o) => n + freeDofWeight(o), 0);
 }

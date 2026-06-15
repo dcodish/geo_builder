@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
-import { freeDofs, isGeoPoint } from '@/engine';
+import { freeDofs, freeDofCount, isGeoPoint } from '@/engine';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
@@ -489,6 +489,14 @@ export default function App() {
             <button type="button" style={alt} onClick={() => (branchId ? cycleAlt(branchId) : resample())}>
               {t('actions.another')}
             </button>
+          )}
+
+          {/* ADR-018 Stage 3 — the figure's remaining freedom, shrinking as facts accumulate
+              until it reads "fully determined" (a single rigid drawing). */}
+          {facts.length > 0 && (
+            <span style={{ fontSize: 12, color: freeDofCount(construction) > 0 ? '#2563eb' : '#16a34a' }}>
+              {freeDofCount(construction) > 0 ? t('actions.dof', { count: freeDofCount(construction) }) : t('actions.determined')}
+            </span>
           )}
         </aside>
       </div>

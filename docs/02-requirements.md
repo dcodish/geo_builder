@@ -72,6 +72,7 @@ IDs are stable references (`FR-<area>-<n>`). "Must" = v1; "Should" = desirable i
 - **FR-ALT-1 (Must)** — When a construction step has multiple valid solutions (e.g. the two intersections of a line and a circle), choose one deterministically and render it.
 - **FR-ALT-2 (Must)** — Provide a control to **cycle to the next alternative configuration** when one exists; indicate when none does.
 - **FR-ALT-3 (Should)** — The chosen alternative persists across subsequent steps (cycling doesn't reset when a new fact is added).
+- **FR-ALT-4 (Should)** — Show the figure's **remaining degrees of freedom** as a running cue (`Degrees of freedom: N` while underdetermined; `✓ fully determined` at 0), so the student sees the freedom shrink as facts accumulate and stop when the figure is a single rigid drawing. A free point counts 2; a free parametric/shape DOF counts 1; a DOF a constraint drives or the student pinned counts 0. *(Realised — [ADR-018](06-decisions.md#adr-018) Stage 3.)*
 
 ## Rendering & interaction
 
