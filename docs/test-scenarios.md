@@ -22,6 +22,26 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `alpha-less-than-beta-reshapes` — "α<β" actively reshapes the figure
+**Steps**
+1. `triangle ABC`
+2. `BD תיכון לצלע AC`
+3. `E על BC`
+4. `AE ו BD נחתכים בנקודה P`
+5. `BP=3PD`
+6. `AB=k`
+7. `∠BAP=α`
+8. `∠ABP=β`
+9. `α<β`
+10. `AE⊥BD`
+
+**Guards against:** an ordering between two named measures (`α<β`) was unparsed (it escalated to
+the LLM, which gave up); and even understood, an inequality has no dedicated carrier, so the joint
+solver ignored it and the figure kept a misleading ∠BAP > ∠ABP that "show another configuration"
+rarely escaped (≈3.6 % of seeds). ADR-039.
+**Asserts:** the givens still hold (`|BP|=3|PD|`, `AE⊥BD`) **and** the assumption is now true and
+visible on the figure — ∠BAP strictly < ∠ABP with a clear gap.
+
 ### `median-ratio-drives-E` — a ratio on a derived point slides the DOF behind it
 **Steps**
 1. `משולש ABC`

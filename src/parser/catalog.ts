@@ -84,6 +84,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'constraints', supported: true, en: 'AD = 12√x', he: 'AD = 12√x', descEn: 'A length with a square root (√ button, or \\sqrt{x}). Symbolic until x gets a value (x = 4 ⇒ 24); 12√2 is a concrete length.', descHe: 'אורך עם שורש (כפתור √, או \\sqrt{x}). סימבולי עד שנקבע ערך ל-x (x = 4 ⇒ 24); 12√2 הוא אורך מספרי.' },
   { category: 'constraints', supported: true, en: 'AB = x²', he: 'AB = x²', descEn: 'A length raised to a power (x² button, or x^3). Resolves when x gets a value.', descHe: 'אורך בחזקה (כפתור x², או x^3). מתורגם למספר כשנקבע ערך ל-x.' },
   { category: 'constraints', supported: true, en: 'angle ABC = 2α', he: 'זווית ABC = 2α', descEn: 'An angle as a Greek variable. Share it (e.g. ∠DEF = α) for a relation; value via "α = 30".', descHe: 'זווית כמשתנה יווני. שיתוף המשתנה (למשל ∠DEF = α) קובע יחס; ערך ע״י "α = 30".' },
+  { category: 'constraints', supported: true, en: 'α < β', he: 'α < β', descEn: 'An ordering between two named measures (< button). Reshapes the figure so the relation holds visibly (e.g. the angle labelled α comes out smaller).', descHe: 'יחס סדר בין שני מדדים בעלי שם (כפתור <). מעצב מחדש את הצורה כך שהיחס יתקיים באופן נראה (למשל הזווית שסומנה α תֵצא קטנה יותר).' },
 
   // ── Circles ─────────────────────────────────────────────────────────────
   { category: 'circles', supported: true, en: 'circle centered at O radius 5', he: 'מעגל סביב O רדיוס 5', descEn: 'A circle from a centre and radius.', descHe: 'מעגל לפי מרכז ורדיוס.' },

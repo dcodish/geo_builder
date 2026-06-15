@@ -56,6 +56,25 @@ export type EvalResult = EvalOk | EvalErr;
  * (deterministic), and the branch index picks one. Returns the construction with
  * those DOFs resolved to plain parameters (or unchanged if there are none).
  */
+/**
+ * Append the construction's inequality (order) constraints to a carrier-derived constraint set.
+ * An order constraint ("α < β", ADR-039) is satisfied by a whole REGION, so it never gets a
+ * dedicated 1-DOF carrier — but it must still be minimised JOINTLY with whatever DOFs are already
+ * moving (e.g. the free vertices a |BP|=3|PD| recruited), so the solver picks the part of the
+ * existing solution family where the order holds. Dedup against the carriers' own constraints.
+ */
+function withOrderCons(cons: Constraint[], c: Construction): Constraint[] {
+  const seen = new Set(cons.map((k) => JSON.stringify(k)));
+  for (const k of c.constraints) {
+    if (k.type !== 'angle-order' && k.type !== 'length-order') continue;
+    const key = JSON.stringify(k);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    cons.push(k);
+  }
+  return cons;
+}
+
 function resolveDriven(c: Construction): Construction {
   // Free vertices driven by a constraint (2 DOF each) take a separate, regularised
   // path — they have no bounded parameter range, and a single equation leaves a
@@ -123,6 +142,7 @@ function resolveDriven(c: Construction): Construction {
       const key = JSON.stringify(k);
       return seen.has(key) ? false : (seen.add(key), true);
     });
+  withOrderCons(cons, c); // also minimise any "α < β" ordering jointly with these carriers (ADR-039)
   const ids = carriers.map((cr) => cr.id);
   // The constraints' referenced points, and the pairs a `coincide` constraint INTENDS to merge
   // (those must be exempt from the degeneracy barrier below — ADR-028's hidden `~` targets).
@@ -217,6 +237,7 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   const cons = freeCarriers
     .map((cr) => cr.solve!.constraint)
     .filter((k) => (seen.has(JSON.stringify(k)) ? false : (seen.add(JSON.stringify(k)), true)));
+  withOrderCons(cons, c); // also minimise any "α < β" ordering jointly with these vertices (ADR-039)
   const ids = freeCarriers.map((cr) => cr.id);
   const seed = freeCarriers.flatMap((cr) => [cr.x, cr.y]); // [x0,y0, x1,y1, …]
   // A figure-scaled step & regularisation weight: the span of the seed vertices,
@@ -365,6 +386,7 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
   const cons: Constraint[] = carriers
     .map((o) => (o as { solve?: { constraint: Constraint } }).solve!.constraint)
     .filter((k) => (seen.has(JSON.stringify(k)) ? false : (seen.add(JSON.stringify(k)), true)));
+  withOrderCons(cons, c); // also minimise any "α < β" ordering jointly with these carriers (ADR-039)
   // Flat layout: normalised seed `u` (each carrier's params divided by their scale, so all DOFs ~O(1)).
   const seedU = specs.flatMap((s) => s.seed.map((v, i) => v / s.scale[i]));
   const place = (u: number[]): Construction => {

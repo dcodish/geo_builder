@@ -202,7 +202,7 @@ export function introducedIds(cmd: AnyCommand): Id[] {
   // A symbolic measure introduces no objects; highlight the points it annotates instead.
   if (cmd.type === 'measure-length') return [cmd.a, cmd.b];
   if (cmd.type === 'measure-angle') return [cmd.vertex, cmd.ray1, cmd.ray2];
-  if (cmd.type === 'set-var') return [];
+  if (cmd.type === 'set-var' || cmd.type === 'measure-order') return []; // a relation over variables — no object to highlight
   return applyCommand(emptyConstruction(), cmd).objects.map((o) => o.id);
 }
 

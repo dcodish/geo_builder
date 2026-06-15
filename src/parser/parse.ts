@@ -533,6 +533,19 @@ const setVar: Rule = (s) => {
 };
 
 /**
+ * "α < β" / "x > y" / "α ≤ β" — an ORDERING between two named measures (ADR-039). The two
+ * single-letter variables are resolved to their measures by the symbol table during lowering; this
+ * actively reshapes the figure so the relation holds visibly (e.g. ∠BAP comes out smaller than ∠ABP).
+ * Both sides must be a *bare* variable (no coefficient) — `2α < β` and numeric comparisons fall through.
+ */
+const measureOrder: Rule = (s) => {
+  const m = s.match(new RegExp(String.raw`^\s*(${VAR})\s*(<=|>=|<|>|≤|≥)\s*(${VAR})\s*$`));
+  if (!m) return null;
+  const op = m[2] === '≤' ? '<=' : m[2] === '≥' ? '>=' : (m[2] as '<' | '>' | '<=' | '>=');
+  return [{ type: 'measure-order', left: m[1], op, right: m[3] }];
+};
+
+/**
  * "AB parallel to CD" / "AB ∥ CD" / "AB מקביל ל-CD". Naming two segments in a ∥
  * relation also DRAWS them (segment is idempotent — a no-op if already on the
  * figure), so "AB ∥ CD" puts both lines on the canvas without a separate request.
@@ -1341,6 +1354,7 @@ const RULES: Rule[] = [
   pointOnCircle, // "A on circle O" — before segment/pointOnSegment
   segment,
   pointOnSegment,
+  measureOrder, // "α < β" — an inequality between two named measures (before setVar/numeric rules)
   setVar, // "x = 4" / "α = 30" — a bare variable binding; before the numeric rules
   segmentRatio, // "AE/ED = 2/3" — before the numeric rules (which would half-parse "ED=2")
   measureSqrt, // "AB = 12√x" / "12√2" — before measureLength so the radical isn't dropped

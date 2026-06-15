@@ -96,6 +96,35 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'alpha-less-than-beta-reshapes',
+    title: 'Q5 median figure + "α<β" actively reshapes so ∠BAP comes out smaller than ∠ABP',
+    guards: 'an inequality between two named measures ("α<β") was unparsed (escalated to the LLM, which gave up); even understood, it had no carrier and was ignored by the joint solver, so the figure kept a misleading ∠BAP > ∠ABP that "show another configuration" rarely escaped (ADR-039).',
+    steps: [
+      'triangle ABC',
+      'BD תיכון לצלע AC',
+      'E על BC',
+      'AE ו BD נחתכים בנקודה P',
+      'BP=3PD',
+      'AB=k',
+      '∠BAP=α',
+      '∠ABP=β',
+      'α<β',
+      'AE⊥BD',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), D = at(fig, 'D'), E = at(fig, 'E'), P = at(fig, 'P');
+      // The stated givens still hold…
+      expect(dist(B, P) / dist(P, D)).toBeCloseTo(3, 2); // |BP| = 3·|PD|
+      const dot = (E.x - A.x) * (D.x - B.x) + (E.y - A.y) * (D.y - B.y);
+      expect(Math.abs(dot) / (dist(A, E) * dist(B, D))).toBeLessThan(0.02); // AE ⟂ BD
+      // …and the assumption α<β is now true on the figure (∠BAP strictly < ∠ABP, with a visible gap).
+      const alpha = angle(B, A, P), beta = angle(A, B, P);
+      expect(alpha).toBeLessThan(beta);
+      expect(beta - alpha).toBeGreaterThan(1); // at least the MIN_GAP — not a misleading near-tie
+    },
+  },
+  {
     id: 'median-ratio-drives-E',
     title: 'triangle, median BD, E on BC, P = AE∩BD, then |BP|=3|PD| — slides E to satisfy it',
     guards: 'a ratio constraint on a derived point P recruited the triangle vertices but the joint solver ignored the on-segment DOF (E) that actually moves P (mixed free+parametric carriers routed to the free-only solver) → over-constrained.',

@@ -103,6 +103,7 @@ export default function App() {
     { label: '∥', insert: '∥' }, // AB ∥ CD
     { label: '≅', insert: '≅' }, // ABC ≅ DEF (congruent)
     { label: '~', insert: '~' }, // ABC ~ DEF (similar)
+    { label: '<', insert: '<' }, // α < β (order between two named measures)
   ];
   const he = i18n.language === 'he';
 

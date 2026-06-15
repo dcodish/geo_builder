@@ -502,6 +502,34 @@ export interface CoincideConstraint {
   q: Id;
 }
 
+/**
+ * An ORDER (inequality) between two angles — the angle (v1,a1,b1) must be the SMALLER
+ * one. Used to enforce a stated assumption like "α < β" (ADR-039). Unlike an equality,
+ * an inequality is satisfied by a whole REGION of configurations, so it can't be solved
+ * by the bracketing root-finder; it rides the optimizer (resolveMixedCarriers) as a
+ * one-sided residual that drives a free DOF toward a visibly-smaller v1 angle. It's
+ * accepted as soon as the strict inequality holds with a small gap, but the solver aims
+ * for a clearly-visible margin so the figure isn't misleading.
+ */
+export interface AngleOrderConstraint {
+  type: 'angle-order';
+  v1: Id;
+  a1: Id;
+  b1: Id;
+  v2: Id;
+  a2: Id;
+  b2: Id;
+}
+
+/** An ORDER (inequality) between two segment lengths — |ab| must be the SHORTER (ADR-039). See {@link AngleOrderConstraint}. */
+export interface LengthOrderConstraint {
+  type: 'length-order';
+  a: Id;
+  b: Id;
+  c: Id;
+  d: Id;
+}
+
 export type Constraint =
   | AngleConstraint
   | DistanceConstraint
@@ -510,7 +538,9 @@ export type Constraint =
   | ParallelConstraint
   | PerpendicularConstraint
   | AngleRatioConstraint
-  | CoincideConstraint;
+  | CoincideConstraint
+  | AngleOrderConstraint
+  | LengthOrderConstraint;
 
 export interface Construction {
   objects: GeoObject[];
@@ -537,6 +567,8 @@ export type Command =
   | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-ratio'; a: Id; b: Id; c: Id; d: Id; k: number; add?: number } // |ab| = k·|cd| + add
   | { type: 'set-angle-ratio'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id; k: number } // ∠1 = k·∠2
+  | { type: 'set-angle-order'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id } // ∠1 < ∠2 (∠1 is the smaller)
+  | { type: 'set-length-order'; a: Id; b: Id; c: Id; d: Id } // |ab| < |cd| (ab is the shorter)
   | { type: 'set-parallel'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-perpendicular'; a: Id; b: Id; c: Id; d: Id }
   // Phase 5b — lines (scaffolding unless `visible`) and the points they produce.
@@ -591,7 +623,10 @@ export const RADIUS_VAR = 'R';
 export type SymbolicCommand =
   | { type: 'measure-length'; a: Id; b: Id; expr: MeasureExpr }
   | { type: 'measure-angle'; vertex: Id; ray1: Id; ray2: Id; expr: MeasureExpr }
-  | { type: 'set-var'; name: string; value: number };
+  | { type: 'set-var'; name: string; value: number }
+  // An ordering between two named measures — "α < β" / "x > y" (ADR-039). Lowered (lower.ts) to a
+  // `set-angle-order`/`set-length-order` once the symbol table says which measure each variable names.
+  | { type: 'measure-order'; left: string; op: '<' | '>' | '<=' | '>='; right: string };
 
 /** What the parser produces and a `Fact` stores: engine commands plus the symbolic layer. */
 export type AnyCommand = Command | SymbolicCommand;
@@ -599,3 +634,17 @@ export type AnyCommand = Command | SymbolicCommand;
 /** Tolerances. */
 export const LEN_EPS = 1e-6; // coordinate closeness (units)
 export const ANGLE_EPS = 0.5; // degrees
+
+/**
+ * Inequality (order) constraint tuning (ADR-039). An ordering like "α < β" is satisfied by a
+ * whole region, so two thresholds decouple "looks clearly smaller" from "is at all smaller":
+ *  - MARGIN is the *target* gap the optimizer drives toward (so the figure isn't misleadingly close);
+ *  - MIN_GAP is the *acceptance* threshold (any strict gap ≥ this passes), so a figure whose geometry
+ *    only allows a small gap is still accepted rather than wrongly flagged a contradiction.
+ * The order residual is `max(0, smaller − larger + MARGIN)`; its tolerance is `MARGIN − MIN_GAP`, so
+ * `residual ≤ tol ⇔ smaller ≤ larger − MIN_GAP`.
+ */
+export const ORDER_ANGLE_MARGIN_DEG = 8; // degrees — the visible gap the solver aims for
+export const ORDER_ANGLE_MIN_GAP_DEG = 1; // degrees — accept any config at least this much in order
+export const ORDER_LEN_MARGIN_FRAC = 0.12; // fraction of the longer length — visible target gap
+export const ORDER_LEN_MIN_FRAC = 0.02; // fraction — acceptance threshold

@@ -90,6 +90,22 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
         { type: 'set-angle-ratio', v1: cmd.vertex, a1: cmd.ray1, b1: cmd.ray2, v2: rep.refs[0], a2: rep.refs[1], b2: rep.refs[2], k: e.coef / rep.coef },
       ];
     }
+    case 'measure-order': {
+      // "α < β" / "x > y" — order the two measures the variables name. Resolve each variable to its
+      // first binding (the measure it was attached to) and emit a set-angle-order / set-length-order.
+      const L = tab.vars.get(cmd.left)?.bindings[0];
+      const R = tab.vars.get(cmd.right)?.bindings[0];
+      if (!L || !R || L.kind !== R.kind) return []; // undefined, or comparing an angle to a length → no-op
+      // Only a bare variable (coef 1, linear, no constant) maps an inequality cleanly to its measure.
+      const simple = (b: Binding) => b.coef === 1 && (b.pow ?? 1) === 1 && !b.affine;
+      if (!simple(L) || !simple(R)) return [];
+      const leftSmaller = cmd.op === '<' || cmd.op === '<=';
+      const small = leftSmaller ? L : R;
+      const large = leftSmaller ? R : L;
+      if (L.kind === 'ang')
+        return [{ type: 'set-angle-order', v1: small.refs[0], a1: small.refs[1], b1: small.refs[2], v2: large.refs[0], a2: large.refs[1], b2: large.refs[2] }];
+      return [{ type: 'set-length-order', a: small.refs[0], b: small.refs[1], c: large.refs[0], d: large.refs[1] }];
+    }
     default:
       return [cmd as Command];
   }

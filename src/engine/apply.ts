@@ -667,6 +667,18 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     case 'set-perpendicular':
       driveOrCheck(objects, constraints, { type: 'perpendicular', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
       break;
+
+    // An ORDER (inequality) is satisfied by a whole region, so it has no sign-change for the bracketing
+    // carrier path driveOrCheck would pick — push it as a pure CHECK. If the current figure already
+    // satisfies it, evaluate passes untouched; if not, applyStep's recruitFreeDofs grabs the free DOFs
+    // it transitively depends on and the optimizer reshapes the figure into the satisfying region (ADR-039).
+    case 'set-angle-order':
+      constraints.push({ type: 'angle-order', v1: cmd.v1, a1: cmd.a1, b1: cmd.b1, v2: cmd.v2, a2: cmd.a2, b2: cmd.b2 });
+      break;
+
+    case 'set-length-order':
+      constraints.push({ type: 'length-order', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      break;
   }
 
   return { objects, constraints };

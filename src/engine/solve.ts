@@ -15,7 +15,13 @@
  */
 
 import type { Constraint, Id, SolvedOnSegmentPoint, Vec } from './types';
-import { ANGLE_EPS } from './types';
+import {
+  ANGLE_EPS,
+  ORDER_ANGLE_MARGIN_DEG,
+  ORDER_ANGLE_MIN_GAP_DEG,
+  ORDER_LEN_MARGIN_FRAC,
+  ORDER_LEN_MIN_FRAC,
+} from './types';
 import { add, angleDeg, dist, scale, solveParam, sub, unit } from './geometry';
 
 /** The point ids a constraint references. */
@@ -34,6 +40,10 @@ export function constraintRefs(con: Constraint): Id[] {
       return [con.v1, con.a1, con.b1, con.v2, con.a2, con.b2];
     case 'coincide':
       return [con.p, con.q];
+    case 'angle-order':
+      return [con.v1, con.a1, con.b1, con.v2, con.a2, con.b2];
+    case 'length-order':
+      return [con.a, con.b, con.c, con.d];
   }
 }
 
@@ -75,6 +85,17 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
       const v = unit(dv);
       return u.x * v.x + u.y * v.y; // cos∠ → 0 when ⟂
     }
+    // ONE-SIDED residuals (≥ 0): zero across the whole satisfying region, positive (and increasing)
+    // as the order is violated. The solver descends them like any other residual, but — being flat at
+    // 0 — they have no sign change for the bracketing root-finder, so an order constraint is only ever
+    // driven through the optimizer (it's pushed as a check; recruitFreeDofs supplies the carriers).
+    case 'angle-order':
+      // 0 once ∠1 is at least MARGIN below ∠2. Driving toward 0 aims for a clearly-visible gap.
+      return Math.max(0, angleDeg(get(con.v1), get(con.a1), get(con.b1)) - angleDeg(get(con.v2), get(con.a2), get(con.b2)) + ORDER_ANGLE_MARGIN_DEG);
+    case 'length-order': {
+      const longer = dist(get(con.c), get(con.d));
+      return Math.max(0, dist(get(con.a), get(con.b)) - longer + ORDER_LEN_MARGIN_FRAC * longer);
+    }
   }
 }
 
@@ -101,6 +122,10 @@ export function constraintScale(con: Constraint, get: (id: Id) => Vec): number {
       return dist(get(con.c), get(con.d));
     case 'ratio':
       return Math.abs(con.k * dist(get(con.c), get(con.d)) + (con.add ?? 0));
+    case 'length-order':
+      return Math.max(dist(get(con.c), get(con.d)), 1e-9); // relative to the longer length
+    case 'angle-order':
+      return 90; // an order residual is ≤ MARGIN degrees — scale it like a right angle so it sits ~O(0.1) alongside relative length residuals
     default:
       return 1; // angle / angle-ratio / parallel / perpendicular / coincide are scale-free (or fixed)
   }
@@ -121,6 +146,11 @@ export function residualTolerance(con: Constraint, scale = 1): number {
       return ANGLE_EPS;
     case 'coincide':
       return 1e-4; // a driven numeric solve won't hit exact zero — a looser "they meet"
+    case 'angle-order':
+      // Accept any config at least MIN_GAP in order: residual ≤ (MARGIN−MIN_GAP) ⇔ ∠1 ≤ ∠2 − MIN_GAP.
+      return ORDER_ANGLE_MARGIN_DEG - ORDER_ANGLE_MIN_GAP_DEG;
+    case 'length-order':
+      return (ORDER_LEN_MARGIN_FRAC - ORDER_LEN_MIN_FRAC) * scale; // scale = the longer length (constraintScale)
   }
 }
 
@@ -143,6 +173,10 @@ export function describeConstraint(con: Constraint): string {
       return `${con.a}${con.b} ⟂ ${con.c}${con.d}`;
     case 'coincide':
       return `${con.p} coincides with ${con.q}`;
+    case 'angle-order':
+      return `∠${con.a1}${con.v1}${con.b1} < ∠${con.a2}${con.v2}${con.b2}`;
+    case 'length-order':
+      return `|${con.a}${con.b}| < |${con.c}${con.d}|`;
   }
 }
 

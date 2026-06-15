@@ -357,3 +357,39 @@ describe('reserved radius symbol R/r (ADR-034)', () => {
     expect(d.labels.lengths).toContainEqual({ a: 'A', b: 'C', text: '1.6R' }); // not "8"
   });
 });
+
+// ── ADR-039: inequality (order) between two named measures — "α < β" ──────────
+describe('symbolic order (inequality) relations', () => {
+  const ang = (p: Map<string, { x: number; y: number }>, v: string, a: string, b: string) => angleDeg(p.get(v)!, p.get(a)!, p.get(b)!);
+
+  it('parses "α < β" to a measure-order command', () => {
+    const r = parse('α < β');
+    expect(r.ok && r.commands[0]).toEqual({ type: 'measure-order', left: 'α', op: '<', right: 'β' });
+  });
+
+  it('reads ≤ / ≥ / > and the ascii <= forms', () => {
+    expect(parse('α ≤ β')).toEqual({ ok: true, commands: [{ type: 'measure-order', left: 'α', op: '<=', right: 'β' }] });
+    expect(parse('x>y')).toEqual({ ok: true, commands: [{ type: 'measure-order', left: 'x', op: '>', right: 'y' }] });
+    expect(parse('x >= y')).toEqual({ ok: true, commands: [{ type: 'measure-order', left: 'x', op: '>=', right: 'y' }] });
+  });
+
+  it('an undefined-variable ordering is a harmless no-op (lowers to nothing)', () => {
+    const d = replay(facts('triangle ABC', 'α < β'));
+    expect(d.lastError).toBeNull();
+  });
+
+  it('actively reshapes so the angle labelled α comes out smaller than β', () => {
+    const d = replay(facts('triangle ABC', '∠ABC = α', '∠BCA = β', 'α < β'));
+    expect(d.lastError).toBeNull();
+    const a = ang(d.positions, 'B', 'A', 'C'); // α = ∠ABC
+    const b = ang(d.positions, 'C', 'B', 'A'); // β = ∠BCA
+    expect(a).toBeLessThan(b);
+    expect(b - a).toBeGreaterThan(1);
+  });
+
+  it('orders lengths too ("x < y" makes |labelled-x| shorter)', () => {
+    const d = replay(facts('triangle ABC', 'AB = x', 'BC = y', 'x < y'));
+    expect(d.lastError).toBeNull();
+    expect(len(d.positions, 'A', 'B')).toBeLessThan(len(d.positions, 'B', 'C'));
+  });
+});
