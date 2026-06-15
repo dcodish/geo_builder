@@ -51,11 +51,15 @@ describe('cyclic quadrilateral (בר חסימה) — concyclic, circle not drawn
     });
   }
 
-  it('"מרובע ABCD חסום במעגל" (inscribed) still DRAWS the circle', () => {
+  it('"מרובע ABCD חסום במעגל" (inscribed) DRAWS the circle and is CONVEX (not crossed)', () => {
     const { commands, construction, positions } = buildFrom('מרובע ABCD חסום במעגל');
     const circle = commands.find((c) => c.type === 'circle') as { hidden?: boolean };
     expect(circle.hidden).toBeUndefined();
     expect(buildScene(construction, positions).circles).toHaveLength(1);
+    // The inscribed quad must be CONVEX too (opposite angles 180°) — the golden-angle
+    // spread used to interleave the vertices into a crossed quad.
+    const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => positions.get(id)!);
+    expect(angleAt(D, A, B) + angleAt(B, C, D)).toBeCloseTo(180, 4);
   });
 
   // The shape word may be OMITTED ("ABCD חסום במעגל") — infer the polygon from the label

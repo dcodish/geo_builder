@@ -709,8 +709,10 @@ const inscribedPolygon: Rule = (s, ctx) => {
     return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2] }];
   }
   // A cyclic (hidden-circle) quad needs CONVEX vertex order for the opposite-angles theorem;
-  // the default general-quad spread (golden angle) would interleave them into a crossed quad.
-  const angles = hidden && kind === 'quad' ? CYCLIC_QUAD_ANGLES : INSCRIBED_ANGLES[kind];
+  // the default general-quad spread (golden angle) would interleave the vertices into a
+  // CROSSED quad. Use a convex, ordered angle set for ANY general quad — inscribed (drawn
+  // circle) or cyclic (hidden) — so ABCD is always a proper convex quadrilateral.
+  const angles = kind === 'quad' ? CYCLIC_QUAD_ANGLES : INSCRIBED_ANGLES[kind];
   const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, ...(hidden ? { hidden: true } : {}) }];
   if (r.varCmd) cmds.push(r.varCmd);
   ids.forEach((id, i) => {
