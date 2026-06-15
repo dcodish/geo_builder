@@ -9,7 +9,7 @@
  */
 
 import { useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
 import { buildScene, scenePositions } from './scene';
 import type { MeasureLabels } from './scene';
@@ -56,6 +56,24 @@ const TWO_PI = 2 * Math.PI;
 const normRot = (r: number): number => ((r % TWO_PI) + TWO_PI) % TWO_PI;
 
 const ACCENT = '#f59e0b';
+
+/**
+ * Render a point label with a subscripted digit suffix: a canonical ASCII id like
+ * "O1" draws as "O₁" (base + a smaller, lowered `<tspan>`). Presentation only — the
+ * id stays "O1" everywhere else. A plain label (no trailing digits) renders as-is.
+ */
+function subscriptLabel(label: string, fontSize: number): ReactNode {
+  const m = /^(.*?)(\d+)$/.exec(label);
+  if (!m || !m[1]) return label; // no trailing digits (or all digits) → render verbatim
+  return (
+    <>
+      {m[1]}
+      <tspan fontSize={fontSize * 0.7} dy={fontSize * 0.16}>
+        {m[2]}
+      </tspan>
+    </>
+  );
+}
 
 export function Figure({
   construction,
@@ -305,7 +323,7 @@ export function Figure({
                   strokeLinejoin="round"
                   style={{ paintOrder: 'stroke' }}
                 >
-                  {pt.label}
+                  {subscriptLabel(pt.label, fontSize)}
                 </text>
               </g>
             );

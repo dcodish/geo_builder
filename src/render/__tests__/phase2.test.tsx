@@ -241,6 +241,18 @@ describe('Figure — static SVG render (no DOM)', () => {
     expect(html).toContain('fill="none"'); // the circle outline is not filled
   });
 
+  it('draws a subscripted point label (O1) with the digit in a lowered <tspan>', () => {
+    const { construction, positions } = build([
+      { type: 'circle', id: 'circle-O1', center: 'O1', radius: 5 },
+      { type: 'point-on-circle', id: 'A1', circle: 'circle-O1' },
+    ]);
+    const html = renderToStaticMarkup(<Figure construction={construction} positions={positions} />);
+    // the canonical ids stay "O1"/"A1", but each renders as base + a subscript <tspan>.
+    expect(html).toMatch(/>O<tspan[^>]*>1<\/tspan>/); // centre O₁
+    expect(html).toMatch(/>A<tspan[^>]*>1<\/tspan>/); // point A₁
+    expect(html).not.toContain('>O1</text>'); // never the flat "O1"
+  });
+
   it('renders both alternative branches of the F2 construction differently', () => {
     const base: Command[] = [
       { type: 'free-point', id: 'A', x: 0, y: 0 },
