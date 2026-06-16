@@ -107,6 +107,13 @@ were unsupported and half-parsed to a single wrong tangent. Built via the Thales
 (A,B = circle O ∩ circle-on-diameter-OE).
 **Asserts:** A,B on the circle; E outside; EA⟂OA and EB⟂OB (true tangents); |EA|=|EB|.
 
+### `single-tangent-from-external-point` — one tangent from an external point
+**Steps:** `מעגל סביב O רדיוס 5`, `מנקודה E מחוץ למעגל יוצא חותך למעגל בנקודות A ו B`, `ED משיק למעגל`.
+**Guards against:** a SINGLE tangent from an external point being unsupported — the LLM dropped
+"ED משיק למעגל" and turned "מנקודה E … משיק" into a circle-through that redefined circle-O. The
+existing external E is now the apex and D the computed touch point.
+**Asserts:** D on the circle; ED ⟂ OD (a true tangent).
+
 ### `two-secants-from-same-point` — two secants sharing one external point
 **Steps:** `circle O radius 5`, `from a point E outside circle O a line cuts the circle at A and B`,
 `from E a line cuts the circle at C and D`.

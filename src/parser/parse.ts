@@ -1151,6 +1151,54 @@ const tangentsFromExternal: Rule = (s, ctx) => {
   return out;
 };
 
+/**
+ * A SINGLE tangent from an external point: "ED משיק למעגל" / "מנקודה E יוצא משיק למעגל" /
+ * "tangent from E to circle O" / "from E a tangent touches the circle at D". One of the two tangent
+ * lines from the existing external point E, touching at a point on the circle (named or auto). Same
+ * Thales-circle construction as the two-tangent rule, taking one branch. Runs after the two-tangent
+ * rule and before the single `tangentLine` (tangent AT a point already on the circle, via "at/בנקודה").
+ */
+const tangentFromExternal: Rule = (s, ctx) => {
+  if (!/tangent|משיק/i.test(s)) return null;
+  if (/\btwo\b|שני|שתי|משיקים/i.test(s)) return null; // plural → the two-tangent rule
+  const named = circleCenter(s);
+  const center = named && /^[A-Z]/.test(named) ? named : ctx.circles?.length === 1 ? ctx.circles[0] : null;
+  if (!center) return null;
+  const have = new Set(ctx.points ?? []);
+  const labels = (s.match(/[A-Z]\d*/g) ?? []).filter((l) => l !== center); // uppercase tokens = point labels
+  const atM = s.match(/(?:\bat\b|בנקודה)\s*([A-Za-z]\d*)/i); // "at D" / "בנקודה D" → the touch point (NOT the apex)
+  const atPoint = atM ? up(atM[1]) : null;
+  // The apex is the EXISTING external point — explicit "from E" / "מנקודה E" wins; else the single
+  // existing point that isn't introduced as the touch ("at …"). If none exists, defer (it's a
+  // tangent AT a point on the circle, or needs the LLM).
+  const fromM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?|מנקודה|\bמ-)\s*([A-Za-z]\d*)/i);
+  const fromName = fromM ? up(fromM[1]) : null;
+  let apex: Id | null = null;
+  let placeApex = false;
+  if (fromName) {
+    apex = fromName; // explicit "from E" — the apex; place it externally if it doesn't exist yet
+    placeApex = !have.has(fromName);
+  } else {
+    const existing = labels.filter((l) => have.has(l) && l !== atPoint); // a named pair "ED" — the existing one is the apex
+    if (existing.length === 1) apex = existing[0];
+  }
+  if (!apex) return null;
+  const newLabel = labels.find((l) => l !== apex && !have.has(l));
+  const touch = newLabel ?? (atPoint && !have.has(atPoint) ? atPoint : freeLabel([...have, ...labels, center], ['T', 'S', 'D', 'F']));
+  const circ = circleId(center);
+  const mid = freeLabel([...have, apex, touch, center], ['M', 'N', 'K', 'L']);
+  const aux = `circle-${mid}`;
+  const out: AnyCommand[] = [];
+  if (placeApex) out.push({ type: 'free-point', id: apex, x: 12, y: 0 }); // the external apex, if new
+  out.push(
+    { type: 'midpoint', id: mid, a: center, b: apex }, // centre of the Thales circle on O-apex
+    { type: 'circle-through', id: aux, center: mid, through: center, hidden: true },
+    { type: 'circle-circle-intersection', id: touch, circle1: circ, circle2: aux, branch: 0 }, // the touch point
+    { type: 'segment', a: apex, b: touch }, // the tangent
+  );
+  return out;
+};
+
 const tangentLine: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   const center = resolveCenter(s, ctx);
@@ -1565,6 +1613,7 @@ const RULES: Rule[] = [
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,
   tangentsFromExternal, // TWO tangents from an external point — before the single tangentLine
+  tangentFromExternal, // ONE tangent from an external point — before tangentLine (tangent AT a point)
   tangentLine, // a *drawn* tangent (after the tangent∩line compound)
   bisectorLine, // a *drawn* bisector (after the bisector compounds)
   parallelConstraint, // ∥ / ⟂ constraints (keyword-anchored) — before the loose "XY = …" rules

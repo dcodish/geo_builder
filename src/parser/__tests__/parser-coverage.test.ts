@@ -110,6 +110,8 @@ const PARSES: [string, string][] = [
   ['מנקודה E מחוץ למעגל O ישר חותך את המעגל בנקודות A ו-B', 'point-on-segment'], // E on the extension (external)
   ['from point E outside circle O two tangents touch the circle at A and B', 'circle-circle-intersection'], // two tangents from external point
   ['מנקודה E מחוץ למעגל O שני משיקים נוגעים במעגל בנקודות A ו-B', 'circle-circle-intersection'],
+  ['from point E a tangent touches circle O at D', 'segment'], // single tangent from external point (E placed)
+  ['מנקודה E משיק נוגע במעגל O בנקודה D', 'segment'],
   ['diameter AB in circle O', 'diameter'],
   ['M is the midpoint of arc BC in circle O', 'arc-midpoint'],
   ['tangent to circle O at A', 'tangent'],

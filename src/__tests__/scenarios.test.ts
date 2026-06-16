@@ -253,6 +253,26 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'single-tangent-from-external-point',
+    title: '"ED משיק למעגל" after a secant from E — a single tangent from the external point',
+    guards:
+      'a SINGLE tangent from an external point was unsupported (only two-tangents and tangent-at-a-point). The LLM dropped "ED משיק למעגל" and turned "מנקודה E … משיק" into a circle-through that redefined circle-O. Now the existing external E is the apex and D the computed touch point.',
+    steps: [
+      'מעגל סביב O רדיוס 5',
+      'מנקודה E מחוץ למעגל יוצא חותך למעגל בנקודות A ו B', // secant → E external
+      'ED משיק למעגל', // single tangent from E, touching at D
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      for (const id of ['O', 'E', 'D']) expect(fig.positions.has(id), `point ${id}`).toBe(true);
+      const O = at(fig, 'O'), E = at(fig, 'E'), D = at(fig, 'D');
+      expect(dist(O, D)).toBeCloseTo(dist(O, at(fig, 'A')), 3); // D on the circle
+      // a tangent ⟂ its radius: ED ⟂ OD.
+      const perp = Math.abs((D.x - O.x) * (D.x - E.x) + (D.y - O.y) * (D.y - E.y)) / (dist(O, D) * dist(E, D));
+      expect(perp).toBeLessThan(1e-3);
+    },
+  },
+  {
     id: 'two-secants-from-same-point',
     title: 'two secants from the same external point E (E reused, not moved)',
     guards:
