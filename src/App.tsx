@@ -486,7 +486,19 @@ export default function App() {
           </label>
 
           {(branchId || freeDofs(construction).length > 0) && (
-            <button type="button" style={alt} onClick={() => (branchId ? cycleAlt(branchId) : resample())}>
+            <button
+              type="button"
+              style={alt}
+              // Explore the WHOLE configuration space: resample the continuous free DOFs (so free
+              // points / on-circle vertices actually move) AND cycle a discrete branch if there is
+              // one. Previously this did branch-cycling EXCLUSIVELY whenever any branch existed, so a
+              // figure with both (e.g. a circle∩circle point + free secant ends) only flipped between
+              // 2 branch options and never varied its free DOFs.
+              onClick={() => {
+                resample(); // no-op when there are no free DOFs
+                if (branchId) cycleAlt(branchId);
+              }}
+            >
               {t('actions.another')}
             </button>
           )}

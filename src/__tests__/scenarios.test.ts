@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
 import { replay, polygonsConvex, useGeoStore } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
-import { isGeoPoint } from '@/engine';
+import { isGeoPoint, freeDofs } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 
 type Step = string | { llm: AnyCommand[] };
@@ -417,5 +417,37 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       expect(dist(at(fig, 'B'), at(fig, 'D'))).toBeCloseTo(10, 3);
     }
     st.clear();
+  });
+
+  it('[secant-tangent-resample] a figure with BOTH a branch and free DOFs varies its free DOFs, not only the branch', () => {
+    // circle + secant from E + tangent from E + ∠DOA=2α. D is a circle∩circle (BRANCHABLE) and A,B
+    // are free on-circle. The "show another configuration" button used to cycle the branch
+    // EXCLUSIVELY when any branch existed, so A,B stayed fixed (only 2 options). The figure must in
+    // fact have free DOFs that resampling varies, alongside the discrete branch.
+    const steps = [
+      'מעגל O שרדיוסו R',
+      'מנקודה E מחוץ למעגל O ישר חותך את המעגל בנקודות A ו-B',
+      'מנקודה E משיק נוגע במעגל O בנקודה D',
+      '∠DOA=2α',
+    ];
+    const facts: Fact[] = [];
+    let g = 0;
+    for (const u of steps) {
+      const r = parse(u, ctxOf(facts));
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return;
+      const group = `g${g++}`;
+      for (const cmd of r.commands) facts.push({ id: `${group}.${facts.length}`, utterance: u, group, cmd, enabled: true });
+    }
+    const base = replay(facts);
+    // BOTH kinds of freedom coexist: a branchable point AND continuous free DOFs.
+    expect(base.construction.objects.some((o) => o.kind === 'circle-circle')).toBe(true);
+    expect(freeDofs(base.construction).length).toBeGreaterThan(0);
+    // Resampling (what the button now also does) moves the free on-circle points A,B — not fixed.
+    const moved = [1, 2, 3, 4, 5].some((seed) => {
+      const f = replay(facts, seed);
+      return dist(f.positions.get('A')!, base.positions.get('A')!) > 1e-3 || dist(f.positions.get('B')!, base.positions.get('B')!) > 1e-3;
+    });
+    expect(moved).toBe(true);
   });
 });
