@@ -568,9 +568,16 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       addLine(objects, { kind: 'line', id: cmd.id, spec: { via: 'tangent', circle: cmd.circle, at: cmd.at }, visible: cmd.visible });
       break;
 
-    case 'point-on-line':
-      addObj(objects, { kind: 'on-line', id: cmd.id, line: cmd.line, offset: cmd.offset });
+    case 'point-on-line': {
+      // Create the marker, or — if a LOOSE free point already carries this id (a bare "segment CD"
+      // then "CD ⟂ AB at F") — REPOSITION it onto the line, so naming a drawn line by existing
+      // points pins them to it (ADR-036). A structural point (derived) is left untouched.
+      const onLine: GeoObject = { kind: 'on-line', id: cmd.id, line: cmd.line, offset: cmd.offset };
+      const idx = objects.findIndex((o) => o.id === cmd.id);
+      if (idx < 0) objects.push(onLine);
+      else if (objects[idx].kind === 'free-point') objects[idx] = onLine;
       break;
+    }
 
     case 'circles-tangent': {
       // Two circles tangent at one point: pull the centres to the touching distance

@@ -1108,25 +1108,17 @@ const perpendicularLine: Rule = (s, ctx) => {
   const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
   const names = lineNameLabels(s, [P, a, b]);
   const have = new Set(ctx.points ?? []);
-  // If the NAMED line already exists ("segment CD" drawn, then "CD ⟂ AB cutting at E"), this is a
-  // CONSTRAINT on the existing segment, not a construction: make CD ⟂ AB, and the cut-point is their
-  // intersection (created if new). Don't re-create C/D as markers, and don't anchor on a yet-unmade E.
-  if (names.length === 2 && names.every((n) => have.has(n))) {
-    const [n1, n2] = names;
-    const out: AnyCommand[] = [
-      { type: 'segment', a: n1, b: n2 }, // idempotent
-      { type: 'set-perpendicular', a: n1, b: n2, c: a, d: b }, // CD ⟂ AB
-    ];
-    if (!have.has(P)) out.push({ type: 'line-line-intersection', id: P, a: n1, b: n2, c: a, d: b }); // E = CD ∩ AB
-    return out;
-  }
   const lineId = `perp-${P}-${a}${b}`;
-  // Otherwise CONSTRUCT: a drawn perpendicular through P; a NAME ("line PQ … ⟂ AB", or a leading
-  // "DE ⟂ AB at C") marks its far end(s) on it (ADR-036) — they straddle the through-point.
-  return [
-    { type: 'perpendicular-line', id: lineId, through: P, a, b, visible: true },
-    ...lineMarkers(lineId, names),
-  ];
+  // CONSTRUCT a perpendicular through the cut-point P, with the named endpoints as markers straddling
+  // it (ADR-036). The cut-point P is on the reference AB: create it there if it doesn't exist yet (the
+  // foot). The markers REUSE the named points if they already exist — a bare "segment CD" then
+  // "CD ⟂ AB at F" REPOSITIONS C,D onto the perpendicular (apply replaces the loose free points), so
+  // CD becomes the perpendicular crossing AB at F, centred on it (clean cross), without redefinition errors.
+  const out: AnyCommand[] = [];
+  if (!have.has(P)) out.push({ type: 'point-on-segment', id: P, a, b }); // the foot on AB, if new
+  out.push({ type: 'perpendicular-line', id: lineId, through: P, a, b, visible: true });
+  out.push(...lineMarkers(lineId, names));
+  return out;
 };
 
 /** "line through P parallel to AB" / "ישר דרך P מקביל ל-AB" / "DE מקביל ל-AB בנקודה C" — a *drawn* parallel line through a point. */

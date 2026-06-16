@@ -255,9 +255,9 @@ const SCENARIOS: Scenario[] = [
   },
   {
     id: 'existing-segment-perpendicular-cuts-at-new-point',
-    title: '"CD אנך ל-AB וחותך אותו בנקודה E" with CD drawn → constrain CD ⟂ AB, create E = CD∩AB',
+    title: '"CD אנך ל-AB וחותך אותו בנקודה E" with CD drawn → CD repositioned to a clean ⟂ cross at E',
     guards:
-      'the MIRROR of perpendicular-cuts-at-existing-point: here the NAME (CD) already exists and the cut-point (E) is NEW. The rule anchored the perpendicular on the not-yet-made E ("unresolved dependencies for perp-E-AB") and re-created C,D as markers ("\'C\'/\'D\' is already defined"). It now sees CD exists → constrains it ⟂ AB and makes E their intersection.',
+      'the MIRROR of perpendicular-cuts-at-existing-point: the NAME (CD) already exists and the cut-point (E) is NEW. Originally the rule anchored the perpendicular on the not-yet-made E ("unresolved dependencies") and re-created C,D ("already defined"); a constraint-only fix made CD ⟂ AB but the segments did NOT visually cross (E floated off both). The construct path now REPOSITIONS the loose C,D onto the perpendicular through E (E on AB, C,D straddling it) for a clean centred cross.',
     steps: [
       { llm: [{ type: 'segment', a: 'A', b: 'B' }] }, // "AB"
       { llm: [{ type: 'segment', a: 'C', b: 'D' }] }, // "CD"
@@ -266,10 +266,14 @@ const SCENARIOS: Scenario[] = [
     check(fig) {
       allStepsOk(fig); // no "unresolved dependencies" / "already defined"
       for (const id of ['C', 'D', 'E']) expect(fig.positions.has(id), `point ${id}`).toBe(true);
-      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
-      // CD ⟂ AB — compare directions by the normalised dot (|cos θ| ≈ 0), not the raw dot (which scales with length).
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E');
       const cos = ((B.x - A.x) * (D.x - C.x) + (B.y - A.y) * (D.y - C.y)) / (dist(A, B) * dist(C, D));
-      expect(Math.abs(cos)).toBeLessThan(1e-3);
+      expect(Math.abs(cos)).toBeLessThan(1e-3); // CD ⟂ AB
+      // A CLEAN cross: E lies ON segment AB and BETWEEN C and D (the segments actually cross at E).
+      const paramOn = (X: Vec, p: Vec, q: Vec) => ((X.x - p.x) * (q.x - p.x) + (X.y - p.y) * (q.y - p.y)) / dist(p, q) ** 2;
+      const tAB = paramOn(E, A, B), tCD = paramOn(E, C, D);
+      expect(tAB).toBeGreaterThan(0); expect(tAB).toBeLessThan(1); // E on segment AB
+      expect(tCD).toBeGreaterThan(0); expect(tCD).toBeLessThan(1); // E between C and D (CD spans E)
     },
   },
   {

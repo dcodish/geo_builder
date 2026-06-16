@@ -109,13 +109,14 @@ it (|CA|=|CB|, |DA|=|DB|) so the existing line becomes the ⊥-bisector. (If C,D
 instead construct the bisector and name it CD with markers.)
 **Asserts:** no over-constraint; C and D each equidistant from A and B (⇒ CD is the ⊥-bisector of AB).
 
-### `existing-segment-perpendicular-cuts-at-new-point` — existing CD ⟂ AB, cut-point E is new
+### `existing-segment-perpendicular-cuts-at-new-point` — a loose CD becomes a clean ⟂ cross at a new E
 **Steps:** `AB` *(→ segment AB)*, `CD` *(→ segment CD)*, `CD אנך ל AB וחותך אותו בנקודה E`.
-**Guards against:** the MIRROR of the case below — here the NAME (CD) already exists and the cut-point
-(E) is new. The rule anchored the perpendicular on the not-yet-made E (`unresolved dependencies for
-perp-E-AB`) and re-created C,D as markers (`'C'/'D' is already defined`). It now sees CD exists →
-*constrains* it ⟂ AB and makes E = CD ∩ AB.
-**Asserts:** no error; C, D, E all present; CD ⟂ AB.
+**Guards against:** the NAME (CD) already exists and the cut-point (E) is new. Originally the rule
+anchored the perpendicular on the not-yet-made E (`unresolved dependencies`) and re-created C,D
+(`already defined`); a constraint-only fix made CD ⟂ AB but the segments did **not** visually cross
+(E floated off both). The construct path now **repositions** the loose C,D onto the perpendicular
+through E (E created on AB, C,D straddling it — an `on-line` marker may replace a loose free point).
+**Asserts:** no error; CD ⟂ AB; E lies **on** segment AB **and between** C and D (a real centred cross).
 
 ### `perpendicular-cuts-at-existing-point` — a perpendicular through an EXISTING point, no redefinition
 **Steps:** `ישר AB` *(→ segment AB)*, `C על AB`, `ישר ED אנך לAB וחותך אותו בנקודה C`.

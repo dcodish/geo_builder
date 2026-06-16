@@ -84,6 +84,10 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     // A circle-point construct (tangent / arc-midpoint / point-on-circle) creates
     // its point or reuses whatever already carries that id — never a conflict.
     if (o.kind === 'on-circle') continue;
+    // A line-marker (on-line) may REPOSITION an existing loose point onto its line — naming a
+    // drawn perpendicular/tangent "CD" after a free "segment CD" pins C,D to the line (ADR-011
+    // spirit; the actual move happens in apply, which replaces a free point with the marker).
+    if (o.kind === 'on-line' && (!existing || existing.kind === 'free-point')) continue;
     // Re-stating a circle with a new radius/centre is a RESIZE (override), not a
     // redefinition-as-something-different — "circle O radius 8" over an earlier 5.
     if (o.kind === 'circle' && existing.kind === 'circle') continue;
