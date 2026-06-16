@@ -127,17 +127,33 @@ describe('applySeed', () => {
     expect(freeDofs(pinned.construction)).toHaveLength(0);
   });
 
-  it('ADR-018 Stage 2 — a constraint-driven free vertex is pruned from the DOF count and the sampler', () => {
-    // Parallelogram A,B,C free (D derived) → 6 DOF. |AB| = |AC| drives ONE free vertex (ADR-030),
-    // so it stops being a sampled DOF: the count drops by 2 and freeDofs loses it.
+  it('ADR-018 Stage 2 — a constraint removes ONE DOF from the count, not a whole vertex', () => {
+    // Parallelogram A,B,C free (D derived) → 6 DOF. |AB| = |AC| is ONE scalar constraint, so it
+    // removes exactly 1 DOF → 5 (NOT 4 — the constraint marks a vertex with `solve`, but a
+    // `solve`-marked free point keeps residual freedom; it is not "fully determined").
     const pgram = build([{ type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] }, { type: 'segment', a: 'A', b: 'C' }]);
     expect(freeDofCount(pgram.construction)).toBe(6);
     expect(freeDofs(pgram.construction).sort()).toEqual(['A', 'B', 'C']);
     const r = applyStep(pgram.construction, { type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'C' });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(freeDofCount(r.construction)).toBe(4); // the driven vertex no longer counts
-    expect(freeDofs(r.construction)).toHaveLength(2);
+    expect(freeDofCount(r.construction)).toBe(5); // 6 − 1 (one constraint), not 6 − 2
+    // The free vertices are still SAMPLABLE (they have residual freedom — re-solving from a
+    // perturbed start gives a different valid parallelogram that still satisfies |AB| = |AC|).
+    expect(freeDofs(r.construction).sort()).toEqual(['A', 'B', 'C']);
+  });
+
+  it('a single perpendicularity constraint over four free vertices removes ONE DOF (the reported bug)', () => {
+    // segment AB + segment CD + CD ⟂ AB: 4 free points = 8 raw DOF, one ⟂ constraint → 7.
+    // (Regression: the ⟂ marked all four vertices with `solve`, and the old count read 0 — "fully
+    // determined" — when the figure is plainly free.)
+    const r = build([
+      { type: 'segment', a: 'A', b: 'B' },
+      { type: 'segment', a: 'C', b: 'D' },
+      { type: 'set-perpendicular', a: 'C', b: 'D', c: 'A', d: 'B' },
+    ]);
+    expect(freeDofCount(r.construction)).toBe(7);
+    expect(freeDofs(r.construction).sort()).toEqual(['A', 'B', 'C', 'D']); // all four still samplable
   });
 
   it("a CONSTRAINED shape DOF is NOT resampled (a driven rhombus angle stays put)", () => {

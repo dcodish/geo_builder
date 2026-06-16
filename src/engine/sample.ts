@@ -16,7 +16,7 @@
  * default (returns the construction unchanged).
  */
 
-import type { Construction, FreePoint, Id, OnCirclePoint, OnLinePoint } from './types';
+import type { Constraint, Construction, FreePoint, Id, OnCirclePoint, OnLinePoint } from './types';
 
 /** A free on-circle vertex the sampler may slide (an arbitrary-angle vertex, not driven/fixed). */
 const isFreeOnCircle = (o: { kind: string; free?: boolean; solve?: unknown }): boolean =>
@@ -53,7 +53,10 @@ function hashId(s: string): number {
  */
 export function applySeed(c: Construction, seed: number): Construction {
   if (!seed) return c;
-  const free = c.objects.filter((o): o is FreePoint => o.kind === 'free-point' && !o.pinned && o.solve === undefined);
+  // A non-pinned free point is perturbed even when a constraint drives it: one scalar constraint
+  // under-determines a 2-DOF point, so it keeps residual freedom, and re-solving from the perturbed
+  // start yields a DIFFERENT valid configuration (the constraint is re-enforced by `evaluate`).
+  const free = c.objects.filter((o): o is FreePoint => o.kind === 'free-point' && !o.pinned);
   const freeCircle = c.objects.filter((o): o is OnCirclePoint => isFreeOnCircle(o));
   const freeLine = c.objects.filter((o): o is OnLinePoint => isFreeOnLine(o));
   const freeShape = c.objects.some(
@@ -78,7 +81,7 @@ export function applySeed(c: Construction, seed: number): Construction {
   const circJit = Math.PI / 6; // ±30° per-vertex
 
   const objects = c.objects.map((o) => {
-    if (o.kind === 'free-point' && !o.pinned && o.solve === undefined) {
+    if (o.kind === 'free-point' && !o.pinned) {
       const dx = o.x - cx;
       const dy = o.y - cy;
       const rx = cx + (dx * ct - dy * st);
@@ -121,31 +124,56 @@ export function applySeed(c: Construction, seed: number): Construction {
 }
 
 /**
- * How many degrees of freedom an object still contributes to the figure (0 if determined).
- * A non-pinned, non-driven free point carries 2 (its x,y); a free parametric DOF — an on-circle
- * angle, an on-line offset, or a shape scalar — carries 1. A point/scalar that a constraint
- * drives (`solve` set) is determined, so it contributes 0 (ADR-018 Stage 2: constraints prune
- * the sampled DOFs automatically). A pinned point contributes 0.
+ * The ids of the figure's SAMPLABLE free DOFs — what "show another configuration" can vary. A
+ * non-pinned free point qualifies *even when a constraint drives it* (it keeps residual freedom,
+ * so re-solving from a perturbed start gives a different valid drawing); a free on-circle / on-line
+ * marker and an *un-driven* shape scalar each qualify. A fully-consumed parametric scalar (a driven
+ * on-segment/on-circle carrier, or a driven shape scalar) does NOT — perturbing it is a no-op.
  */
-function freeDofWeight(o: Construction['objects'][number]): number {
-  const driven = (o as { solve?: unknown }).solve !== undefined;
-  if (o.kind === 'free-point') return o.pinned || driven ? 0 : 2;
-  if (isFreeOnCircle(o) || isFreeOnLine(o)) return 1;
-  if ((o.kind === 'rotated' || o.kind === 'perp-offset' || o.kind === 'scaled-offset') && !driven) return 1;
-  return 0;
+export function freeDofs(c: Construction): Id[] {
+  return c.objects
+    .filter(
+      (o) =>
+        (o.kind === 'free-point' && !o.pinned) ||
+        isFreeOnCircle(o) ||
+        isFreeOnLine(o) ||
+        ((o.kind === 'rotated' || o.kind === 'perp-offset' || o.kind === 'scaled-offset') && (o as { solve?: unknown }).solve === undefined),
+    )
+    .map((o) => o.id);
 }
 
-/** The ids of the figure's free DOFs (non-pinned/non-driven free points, free on-circle/on-line markers, free shape scalars). */
-export function freeDofs(c: Construction): Id[] {
-  return c.objects.filter((o) => freeDofWeight(o) > 0).map((o) => o.id);
+/** The raw movable DOF an object carries before constraints: a free point 2 (x,y), a parametric/shape DOF 1, else 0. */
+function rawMovableDof(o: Construction['objects'][number]): number {
+  if (o.kind === 'free-point') return (o as FreePoint).pinned ? 0 : 2;
+  if (o.kind === 'on-segment' || o.kind === 'on-circle' || o.kind === 'on-line') return 1;
+  if (o.kind === 'rotated' || o.kind === 'perp-offset' || o.kind === 'scaled-offset') return 1;
+  return 0; // derived points, pinned points, lines, circles, segments — fully determined
+}
+
+/** DOF a constraint removes: an equality removes 1; a `coincide` pins both coords (2); an ORDER/inequality removes 0 (it's a region, ADR-039). */
+function dofRemoved(con: Constraint): number {
+  if (con.type === 'angle-order' || con.type === 'length-order') return 0;
+  if (con.type === 'coincide') return 2;
+  return 1;
 }
 
 /**
- * The figure's total remaining degrees of freedom — a free point counts 2 (placement/size/rotation
- * for a lone shape), a free parametric/shape DOF counts 1. 0 = fully determined (a single rigid
- * drawing). Drives the "degrees of freedom remaining" cue (ADR-018 Stage 3) so the student watches
- * the figure's freedom shrink as facts accumulate, and sees it stop when determined.
+ * The figure's total remaining degrees of freedom = (raw movable DOF) − (DOF the constraints remove).
+ * This is the honest count: one scalar constraint (e.g. `CD ⟂ AB`) removes ONE DOF even though the
+ * joint solver marks several referenced vertices with `solve` — a `solve`-marked free point is NOT
+ * determined, it just participates in the solve. 0 = a single rigid drawing (up to placement). Drives
+ * the "degrees of freedom remaining" cue (ADR-018 Stage 3) so freedom visibly shrinks as facts
+ * accumulate. Constraints are gathered from BOTH the checked list and the `solve` directives (a
+ * driven constraint lives only in `solve`), deduped by identity.
  */
 export function freeDofCount(c: Construction): number {
-  return c.objects.reduce((n, o) => n + freeDofWeight(o), 0);
+  const raw = c.objects.reduce((n, o) => n + rawMovableDof(o), 0);
+  const cons = new Set<Constraint>(c.constraints);
+  for (const o of c.objects) {
+    const sv = (o as { solve?: { constraint: Constraint } }).solve;
+    if (sv?.constraint) cons.add(sv.constraint);
+  }
+  let removed = 0;
+  for (const con of cons) removed += dofRemoved(con);
+  return Math.max(0, raw - removed);
 }
