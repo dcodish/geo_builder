@@ -1040,12 +1040,16 @@ function lineMarkers(lineId: Id, labels: Id[]): AnyCommand[] {
 }
 
 /**
- * The point labels immediately NAMING a drawn line — the 1–2 labels right after the line word
- * ("line PQ …" / "הישר PQ …"), excluding the points that already define the line. Anchored on the
- * line word so it can't misfire on an English keyword; returns [] when the line isn't named by points.
+ * The point labels NAMING a drawn line — the 1–2 labels right after the line word ("line PQ …" /
+ * "הישר PQ …"), OR leading the utterance immediately before the relation keyword ("DE ⟂ AB …" /
+ * "DE אנך ל-AB …"), excluding the points that already define the line. Both forms are anchored (on
+ * the line word, or on the relation keyword) so they can't misfire on an English keyword; returns
+ * [] when the line isn't named by points.
  */
 function lineNameLabels(s: string, exclude: Id[]): Id[] {
-  const m = s.match(/(?:\bline\b|\bray\b|הישר|ישר|הקו|\bקו\b|קרן)\s+\b([A-Za-z]\d*)(?:\s*([A-Za-z]\d*))?\b/i);
+  const m =
+    s.match(/(?:\bline\b|\bray\b|הישר|ישר|הקו|\bקו\b|קרן)\s+\b([A-Za-z]\d*)(?:\s*([A-Za-z]\d*))?\b/i) ??
+    s.match(/^\s*\b([A-Za-z]\d*)(?:\s*([A-Za-z]\d*))?\b\s*(?=perpendicular|⊥|מאונך|אנך|parallel|∥|מקביל)/i);
   if (!m) return [];
   const ex = new Set(exclude.map((e) => e.toUpperCase()));
   const out: Id[] = [];
@@ -1088,31 +1092,36 @@ const bisectorLine: Rule = (s) => {
   return [{ type: 'bisector', id: `bis-${ids.join('')}`, vertex: ids[1], p: ids[0], q: ids[2], visible: true }];
 };
 
-/** "line through P perpendicular to AB" / "ישר דרך P מאונך ל-AB" — a *drawn* perpendicular line through a point. */
+// The point a drawn line passes through: "through P" / "at P" / "דרך P" / "בנקודה P" (at point P).
+// "at"/"בנקודה" lets "DE ⟂ AB at C" / "DE אנך ל-AB בנקודה C" name the foot as the through-point.
+const THROUGH_PT = String.raw`(?:through|\bat\b|דרך|בנקודה)\s+([A-Za-z]\d*)\b`;
+
+/** "line through P perpendicular to AB" / "ישר דרך P מאונך ל-AB" / "DE אנך ל-AB בנקודה C" — a *drawn* perpendicular line through a point. */
 const perpendicularLine: Rule = (s) => {
   if (!/perpendicular|⊥|מאונך|אנך/i.test(s)) return null;
-  const thr = s.match(/(?:through|דרך)\s+([A-Za-z]\d*)\b/i);
-  if (!thr) return null; // no "through P" ⇒ it's the ⟂ constraint or a foot, not a drawn line
+  const thr = s.match(new RegExp(THROUGH_PT, 'i'));
+  if (!thr) return null; // no through-point ⇒ it's the ⟂ constraint or a foot, not a drawn line
   const seg = s
-    .replace(/through\s+[A-Za-z]\d*\b|דרך\s+[A-Za-z]\d*\b/gi, ' ')
+    .replace(new RegExp(THROUGH_PT, 'gi'), ' ') // drop the through-clause so its point isn't read as the segment
     .match(/(?:perpendicular\s*to|⊥|מאונך\s*ל-?|אנך\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!seg) return null;
   const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
   const lineId = `perp-${P}-${a}${b}`;
-  // If the line is also NAMED ("line PQ through P ⟂ AB"), mark its far end(s) on it (ADR-036).
+  // If the line is also NAMED ("line PQ through P ⟂ AB", or a leading "DE ⟂ AB at C"), mark its
+  // far end(s) on it (ADR-036) — D, E straddle the through-point so they're referenceable.
   return [
     { type: 'perpendicular-line', id: lineId, through: P, a, b, visible: true },
     ...lineMarkers(lineId, lineNameLabels(s, [P, a, b])),
   ];
 };
 
-/** "line through P parallel to AB" / "ישר דרך P מקביל ל-AB" — a *drawn* parallel line through a point. */
+/** "line through P parallel to AB" / "ישר דרך P מקביל ל-AB" / "DE מקביל ל-AB בנקודה C" — a *drawn* parallel line through a point. */
 const parallelLine: Rule = (s) => {
   if (!/parallel|∥|מקביל/i.test(s)) return null;
-  const thr = s.match(/(?:through|דרך)\s+([A-Za-z]\d*)\b/i);
-  if (!thr) return null; // no "through P" ⇒ it's the ∥ constraint, not a drawn line
+  const thr = s.match(new RegExp(THROUGH_PT, 'i'));
+  if (!thr) return null; // no through-point ⇒ it's the ∥ constraint, not a drawn line
   const seg = s
-    .replace(/through\s+[A-Za-z]\d*\b|דרך\s+[A-Za-z]\d*\b/gi, ' ')
+    .replace(new RegExp(THROUGH_PT, 'gi'), ' ')
     .match(/(?:parallel\s*to|∥|מקביל\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!seg) return null;
   const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];

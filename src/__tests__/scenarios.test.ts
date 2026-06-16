@@ -213,6 +213,28 @@ const SCENARIOS: Scenario[] = [
       convexQuad(fig, ['A', 'B', 'C', 'D'], 'O');
     },
   },
+  {
+    id: 'named-perpendicular-through-point',
+    title: '"DE אנך ל-AB בנקודה C" builds a named perpendicular through C with D and E placed on it',
+    guards:
+      'the parser did not handle "DE ⟂ AB at C" so it escalated; the LLM rewrote it to an UNNAMED "line through C ⟂ AB", dropping D and E. The parser now handles it deterministically (through-point via "בנקודה/at", leading line name DE).',
+    steps: [
+      { llm: [{ type: 'segment', a: 'A', b: 'B' }] }, // "ישר AB" (escalated in the log)
+      'נקודה C על AB',
+      'DE אנך לAB בנקודה C',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // The perpendicular line exists, and D, E were created ON it (straddling the foot C).
+      expect(fig.construction.objects.some((o) => o.kind === 'line')).toBe(true);
+      for (const id of ['C', 'D', 'E']) expect(fig.positions.has(id), `point ${id}`).toBe(true);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E');
+      const dot = (p: Vec, q: Vec, r: Vec, s: Vec) => (q.x - p.x) * (s.x - r.x) + (q.y - p.y) * (s.y - r.y);
+      expect(Math.abs(dot(A, B, C, D))).toBeLessThan(1e-6); // CD ⟂ AB
+      expect(Math.abs(dot(A, B, C, E))).toBeLessThan(1e-6); // CE ⟂ AB
+      expect(dist(D, E)).toBeGreaterThan(1); // D and E are distinct (straddle C), not collapsed
+    },
+  },
 ];
 
 describe('reported scenarios — end-to-end replay of real bug reports', () => {

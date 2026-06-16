@@ -92,6 +92,14 @@ cyclic/hidden form; the inscribed quad being crossed (golden-angle spread).
 **Steps:** `ABCD בר חסימה`
 **Asserts:** circle hidden, opposite angles sum to 180°, quad convex.
 
+### `named-perpendicular-through-point` — a named perpendicular keeps its endpoints
+**Steps:** `ישר AB` *(→ segment AB)*, `נקודה C על AB`, `DE אנך לAB בנקודה C`.
+**Guards against:** the parser not handling "DE ⟂ AB at C" → it escalated, and the LLM rewrote it to
+an UNNAMED "line through C ⟂ AB", **dropping D and E**. The parser now handles it deterministically
+(through-point via "בנקודה / at", leading line name "DE").
+**Asserts:** the perpendicular line through C exists, D and E are created ON it (CD ⟂ AB, CE ⟂ AB)
+and are distinct (straddle the foot C).
+
 ### `quad-diagonals-resample` — "show another configuration" keeps a quad clean & convex
 **Steps:** `מרובע ABCD`, `AC=10`, `DB=10`, then press "show another configuration" repeatedly.
 **Guards against:** the sampler landing on a self-crossing (tangled) **or** concave (dart) ABCD quad —
