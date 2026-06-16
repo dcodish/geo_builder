@@ -1411,13 +1411,18 @@ const RULES: Rule[] = [
   parallelCircleIntersection, // a parallel line ∩ the circle
   circlesTangent, // two circles tangent to each other — before tangentLine (which would grab the משיק)
   circleCircleIntersection, // two circles cross — before the generic line∩line intersection
+  // A drawn perpendicular/parallel line that "cuts" another at a point must be claimed BEFORE the
+  // generic line∩line rule: the "cuts"/"חותך" keyword otherwise makes lineLineIntersection 'stop'
+  // (it can't read "ED ⟂ AB cuts it at C") and the whole parse aborts to the LLM — which then
+  // models the foot as a second definition of C and over-constrains it. These only fire on a
+  // perpendicular/parallel keyword + an explicit through-point, so a plain intersection falls through.
+  perpendicularLine, // a *drawn* perpendicular line through a point (before the ⟂ constraint & line∩line)
+  parallelLine, // a *drawn* parallel line through a point (before the ∥ constraint & line∩line)
   lineLineIntersection,
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,
   tangentLine, // a *drawn* tangent (after the tangent∩line compound)
   bisectorLine, // a *drawn* bisector (after the bisector compounds)
-  perpendicularLine, // a *drawn* perpendicular line through a point (before the ⟂ constraint)
-  parallelLine, // a *drawn* parallel line through a point (before the ∥ constraint)
   parallelConstraint, // ∥ / ⟂ constraints (keyword-anchored) — before the loose "XY = …" rules
   perpendicularConstraint,
   chainedEquality, // "AB = AC = 3x" — split a chain before any rule grabs a single clause

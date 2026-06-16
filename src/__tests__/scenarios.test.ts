@@ -235,6 +235,29 @@ const SCENARIOS: Scenario[] = [
       expect(dist(D, E)).toBeGreaterThan(1); // D and E are distinct (straddle C), not collapsed
     },
   },
+  {
+    id: 'perpendicular-cuts-at-existing-point',
+    title: '"ישר ED אנך ל-AB וחותך אותו בנקודה C" — ED ⟂ AB through the EXISTING C, no redefinition',
+    guards:
+      'the "cuts/חותך" keyword made the generic line∩line rule "stop" (it can\'t read it) → the parse aborted to the LLM, which modelled the foot as "C על ED" — REDEFINING C (already on AB) and erroring. The perpendicular-line rule now runs before line∩line and reads "בנקודה C" as the through-point, so C is reused, not redefined.',
+    steps: [
+      { llm: [{ type: 'segment', a: 'A', b: 'B' }] }, // "ישר AB" (escalated in the log)
+      'C על AB',
+      'ישר ED אנך לAB וחותך אותו בנקודה C',
+    ],
+    check(fig) {
+      allStepsOk(fig); // critically: no "'C' is already defined" over-constraint
+      for (const id of ['C', 'D', 'E']) expect(fig.positions.has(id), `point ${id}`).toBe(true);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E');
+      const dot = (p: Vec, q: Vec, r: Vec, s: Vec) => (q.x - p.x) * (s.x - r.x) + (q.y - p.y) * (s.y - r.y);
+      expect(Math.abs(dot(A, B, C, D))).toBeLessThan(1e-6); // CD ⟂ AB (ED through C)
+      expect(Math.abs(dot(A, B, C, E))).toBeLessThan(1e-6); // CE ⟂ AB
+      // C stays ON AB (it's the foot the perpendicular passes through, not a point on ED only)
+      const tC = ((C.x - A.x) * (B.x - A.x) + (C.y - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2);
+      expect(tC).toBeGreaterThan(0);
+      expect(tC).toBeLessThan(1);
+    },
+  },
 ];
 
 describe('reported scenarios — end-to-end replay of real bug reports', () => {

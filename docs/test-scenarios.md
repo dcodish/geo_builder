@@ -100,6 +100,14 @@ an UNNAMED "line through C ⟂ AB", **dropping D and E**. The parser now handles
 **Asserts:** the perpendicular line through C exists, D and E are created ON it (CD ⟂ AB, CE ⟂ AB)
 and are distinct (straddle the foot C).
 
+### `perpendicular-cuts-at-existing-point` — a perpendicular through an EXISTING point, no redefinition
+**Steps:** `ישר AB` *(→ segment AB)*, `C על AB`, `ישר ED אנך לAB וחותך אותו בנקודה C`.
+**Guards against:** the "cuts / חותך" keyword making the generic line∩line rule *stop* (it can't read it),
+aborting the parse to the LLM, which then modelled the foot as "C על ED" — **redefining C** (already on AB)
+→ "'C' is already defined" over-constraint. The perpendicular-line rule now runs before line∩line and reads
+"בנקודה C" as the through-point, so C is reused.
+**Asserts:** no over-constraint; ED ⟂ AB through C (CD ⟂ AB, CE ⟂ AB); C stays on AB (0 < t < 1).
+
 ### `quad-diagonals-resample` — "show another configuration" keeps a quad clean & convex
 **Steps:** `מרובע ABCD`, `AC=10`, `DB=10`, then press "show another configuration" repeatedly.
 **Guards against:** the sampler landing on a self-crossing (tangled) **or** concave (dart) ABCD quad —
