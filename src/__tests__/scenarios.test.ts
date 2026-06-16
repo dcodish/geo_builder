@@ -214,6 +214,26 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'secant-from-external-point',
+    title: '"מנקודה E מחוץ למעגל … חותך … בנקודות A ו-B" — a secant from a point outside the circle',
+    guards:
+      'the parser had no "secant from an external point" construct, so it escalated; the LLM decomposed it into "E על המשך OA" — referencing A before it exists ("unresolved dependencies for E") — a circular definition. A deterministic rule now builds A,B on the circle (a chord) + E on the extension, collinear and outside.',
+    steps: [
+      'נתון מעגל O שרדיוסו R', // circle O radius R
+      'מנקודה E מחוץ למעגל מעבירים ישר שחותך את המעגל בנקודות A ו- B',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      for (const id of ['O', 'A', 'B', 'E']) expect(fig.positions.has(id), `point ${id}`).toBe(true);
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), E = at(fig, 'E');
+      expect(dist(O, A)).toBeCloseTo(dist(O, B), 3); // A, B both on the circle (equal radii)
+      expect(dist(O, E)).toBeGreaterThan(dist(O, A) + 1e-6); // E is OUTSIDE the circle
+      // E, A, B are collinear — a straight secant through the external point.
+      const sin = Math.abs((A.x - E.x) * (B.y - E.y) - (A.y - E.y) * (B.x - E.x)) / (dist(E, A) * dist(E, B));
+      expect(sin).toBeLessThan(1e-3);
+    },
+  },
+  {
     id: 'named-perpendicular-through-point',
     title: '"DE אנך ל-AB בנקודה C" builds a named perpendicular through C with D and E placed on it',
     guards:

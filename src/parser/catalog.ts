@@ -98,6 +98,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'circles', supported: true, en: 'semicircle with diameter AB', he: 'חצי מעגל שקוטרו AB', descEn: 'A half circle: a 180° arc on the diameter AB (the diameter is drawn).', descHe: 'חצי מעגל: קשת של 180° על הקוטר AB (הקוטר מצויר).' },
   { category: 'circles', supported: true, en: 'quarter circle', he: 'רבע מעגל', descEn: 'A 90° arc with its two bounding radii.', descHe: 'קשת של 90° עם שני הרדיוסים התוחמים אותה.' },
   { category: 'circles', supported: true, en: 'chord AB in circle O', he: 'מיתר AB במעגל O', descEn: 'A chord of a circle (both ends on it).', descHe: 'מיתר במעגל (שני קצותיו עליו).' },
+  { category: 'circles', supported: true, en: 'from a point E outside circle O a line cuts the circle at A and B', he: 'מנקודה E מחוץ למעגל O ישר חותך את המעגל בנקודות A ו-B', descEn: 'A secant from an external point: A,B on the circle, E outside, collinear.', descHe: 'חותך מנקודה חיצונית: A,B על המעגל, E מחוץ, על ישר אחד.' },
   { category: 'circles', supported: true, en: 'diameter AB in circle O', he: 'קוטר AB במעגל O', descEn: 'A chord through the centre.', descHe: 'מיתר העובר במרכז.' },
   { category: 'circles', supported: true, en: 'M is the midpoint of arc BC in circle O', he: 'M אמצע הקשת BC במעגל O', descEn: 'The midpoint of an arc.', descHe: 'אמצע הקשת.' },
   { category: 'circles', supported: true, en: 'tangent to circle O at A', he: 'משיק למעגל O בנקודה A', descEn: 'Draw the tangent at a point on a circle.', descHe: 'ציור המשיק בנקודה על המעגל.' },

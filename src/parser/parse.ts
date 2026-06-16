@@ -963,6 +963,38 @@ const bisectorSegmentIntersection: Rule = (s) => {
   ];
 };
 
+/**
+ * "from a point E outside the circle, a line cuts the circle at A and B" /
+ * "מנקודה E מחוץ למעגל מעבירים ישר שחותך את המעגל בנקודות A ו-B" — a SECANT from an external point.
+ * A and B are the two intersections on the circle (a chord); E is OUTSIDE, collinear with them
+ * (on the extension of the chord beyond A). Expressed with existing primitives — two on-circle
+ * points + the chord + E on the extension + the external part of the secant. Runs before the
+ * generic intersection rules (which would 'stop' on the "cuts/חותך" keyword without building A,B,E).
+ */
+const secantFromExternal: Rule = (s, ctx) => {
+  if (!/מחוץ|outside|external/i.test(s)) return null; // "outside the circle" — the external-point cue
+  if (!/חות[כך]|\bcuts?\b|\bsecant\b|\bmeets?\b|crosses|נחת/i.test(s)) return null; // a secant cut
+  // "the circle" here is usually unnamed; guard against `circleCenter` reading an English article
+  // ("the circle **a** line" → "a"): a real centre label is uppercase, an article is lowercase.
+  // Accept an uppercase named centre; otherwise fall back to the single circle in context.
+  const named = circleCenter(s);
+  const center = named && /^[A-Z]/.test(named) ? named : ctx.circles?.length === 1 ? ctx.circles[0] : null;
+  if (!center) return null;
+  const eM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?|מנקודה|מהנקודה|מ\s*נקודה)\s+([A-Za-z]\d*)/i); // external point E
+  const abM = s.match(/\b([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i); // the two intersections "A and B" / "A ו-B"
+  if (!eM || !abM) return null;
+  const E = up(eM[1]), A = up(abM[1]), B = up(abM[2]);
+  if (new Set([E, A, B]).size !== 3) return null; // need three distinct labels
+  const circ = circleId(center);
+  return [
+    { type: 'point-on-circle', id: A, circle: circ },
+    { type: 'point-on-circle', id: B, circle: circ },
+    { type: 'segment', a: A, b: B }, // the chord
+    { type: 'point-on-segment', id: E, a: B, b: A, t: 1.3 }, // E beyond A on line BA → outside the circle
+    { type: 'segment', a: E, b: A }, // the external part of the secant (E–A–B collinear)
+  ];
+};
+
 /** "G is where the line through F parallel to AB meets circle O" — a parallel line ∩ the circle. */
 const parallelCircleIntersection: Rule = (s, ctx) => {
   if (!/parallel|מקביל/i.test(s) || !/circle|מעגל/i.test(s)) return null;
@@ -1462,6 +1494,7 @@ const RULES: Rule[] = [
   tangentLineIntersection, // tangent ∩ a segment
   parallelCircleIntersection, // a parallel line ∩ the circle
   circlesTangent, // two circles tangent to each other — before tangentLine (which would grab the משיק)
+  secantFromExternal, // "from external point E a line cuts the circle at A,B" — before the generic intersections
   circleCircleIntersection, // two circles cross — before the generic line∩line intersection
   // A drawn perpendicular/parallel line that "cuts" another at a point must be claimed BEFORE the
   // generic line∩line rule: the "cuts"/"חותך" keyword otherwise makes lineLineIntersection 'stop'

@@ -92,6 +92,14 @@ cyclic/hidden form; the inscribed quad being crossed (golden-angle spread).
 **Steps:** `ABCD בר חסימה`
 **Asserts:** circle hidden, opposite angles sum to 180°, quad convex.
 
+### `secant-from-external-point` — a line from outside the circle cutting it at A, B
+**Steps:** `נתון מעגל O שרדיוסו R`, `מנקודה E מחוץ למעגל מעבירים ישר שחותך את המעגל בנקודות A ו- B`.
+**Guards against:** no "secant from an external point" construct → it escalated, and the LLM decomposed
+it into "E על המשך OA" — referencing A before it exists (a circular definition, `unresolved
+dependencies for E`). A deterministic rule now builds A,B on the circle (a chord) + E on the
+extension, collinear and outside.
+**Asserts:** A,B on the circle (equal radii); E outside (|OE| > radius); E,A,B collinear (a straight secant).
+
 ### `named-perpendicular-through-point` — a named perpendicular keeps its endpoints
 **Steps:** `ישר AB` *(→ segment AB)*, `נקודה C על AB`, `DE אנך לAB בנקודה C`.
 **Guards against:** the parser not handling "DE ⟂ AB at C" → it escalated, and the LLM rewrote it to
