@@ -121,6 +121,8 @@ const PARSES: [string, string][] = [
   ['angle GBA = 37', 'set-angle'],
   ['זווית GBA = 37', 'set-angle'],
   ['זוית GBA = 37', 'set-angle'], // defective spelling זוית (one vav)
+  ['C is the midpoint of chord AB', 'midpoint'], // a NAMED midpoint of a chord — not the chord rule
+  ['נקודה C היא אמצע מיתר AB', 'midpoint'],
   ['AB = 6', 'set-distance'],
   ['AB = CD', 'set-equal'],
   ['AB = 2 AD', 'set-ratio'], // a proportion |AB| = 2·|AD| (NOT half-parsed to "AB = 2")

@@ -1620,12 +1620,12 @@ const RULES: Rule[] = [
   perpendicularConstraint,
   chainedEquality, // "AB = AC = 3x" — split a chain before any rule grabs a single clause
   arcMidpoint, // circle constructs (own keywords) before the generic point rules
+  midpoint, // "C אמצע מיתר AB" — a NAMED midpoint, before `chord` grabs "מיתר AB" and drops C (after arcMidpoint)
   diameter,
   chord,
   circumcircle, // "circle through A B C" — before the centre-based `circle`
   circle,
   foot, // before `pointOnSegment`
-  midpoint,
   pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)
   pointOnCircle, // "A on circle O" — before segment/pointOnSegment
   segment,

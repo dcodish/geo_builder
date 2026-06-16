@@ -462,6 +462,8 @@ This requires a **pinned-vs-free distinction on points** that the engine current
 
 **Consequences.** `circle O radius R` + `AC = 1.6R` constrains `|AC| = 1.6·radius` and labels the chord "1.6R"; `AC = 2r` reads the same symbol; `R` remains a vertex inside a letter-run. With no radius-`R` circle present, `R` is an unresolved variable like any other (free representative + ratio), so it degrades gracefully to a label. 795 tests green (+6: parse of `circle … radius R`/Hebrew, `AC = 1.6R`/`2r`, R-stays-vertex, the constrained-and-labelled full flow). **Limits:** one shared radius symbol (multiple circles of different radii would alias `R`); the radius value is the concrete default (5), not itself a free DOF the "show another configuration" sampler resizes.
 
+**Amendment 1 (2026-06-16) — `R` auto-binds to the radius even when not declared.** Originally `R` only got a value when the circle was written `radius R` (which emits `set-var R = 5`); a circle declared `radius 5` (numeric) left `R` unbound, so a later `OC = 0.5R` was a free label and didn't reshape (the operator saw "nothing happened" until a second `R` measure formed a ratio). Since `R` is *reserved* for the radius, it should always mean it: `buildSymTab` now, when a measure uses `RADIUS_VAR` and no explicit value was given, binds `R` to the first numeric-radius circle's radius. So `OC = 0.5R` sizes against the radius (`|OC| = 2.5`) with no `radius R` declaration — and it drives the chord's midpoint via the derived-ancestor recruit (FR-EN-11). An explicit `set-var R` still wins (no change to the `radius R` flow).
+
 ## ADR-035 — Relabel a point as a fact-list rewrite, kept out of the engine
 
 **Status:** Accepted (2026-06-14)

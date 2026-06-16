@@ -214,6 +214,23 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'oc-half-radius-sizes-the-chord',
+    title: '"OC = 0.5R" sizes the chord (R auto-binds to the radius; "C אמצע מיתר AB" is the midpoint)',
+    guards:
+      'two bugs: (1) "C אמצע מיתר AB" was grabbed by the chord rule (created A,B + segment, DROPPED midpoint C) — midpoint now runs before chord; (2) the reserved radius symbol R was unbound unless declared, so "OC=0.5R" was a free label — R now auto-binds to the circle radius. Together: OC=0.5R drives the chord midpoint to half the radius.',
+    steps: [
+      'circle centered at O radius 5',
+      'מנקודה E מחוץ למעגל O ישר חותך את המעגל בנקודות A ו-B',
+      'נקודה C היא אמצע מיתר AB', // C = midpoint of chord AB (NOT a chord)
+      'OC=0.5R', // |OC| = half the radius — drives A,B
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('C')).toBe(true); // the midpoint was created, not dropped
+      expect(dist(at(fig, 'O'), at(fig, 'C'))).toBeCloseTo(2.5, 2); // |OC| = 0.5·R = 2.5 (R auto-bound to 5)
+    },
+  },
+  {
     id: 'secant-from-external-point',
     title: '"מנקודה E מחוץ למעגל … חותך … בנקודות A ו-B" — a secant from a point outside the circle',
     guards:

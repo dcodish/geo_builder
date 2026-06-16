@@ -37,6 +37,14 @@ export function buildSymTab(cmds: AnyCommand[]): SymTab {
     else if (c.type === 'measure-length' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'len', refs: [c.a, c.b], coef: c.expr.coef, pow: c.expr.pow, affine: (c.expr.const ?? 0) !== 0 });
     else if (c.type === 'measure-angle' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'ang', refs: [c.vertex, c.ray1, c.ray2], coef: c.expr.coef });
   }
+  // The reserved radius symbol R always denotes the circle's radius (ADR-034): if a measure uses it
+  // but no explicit value was given, bind R to the (first numeric-radius) circle's radius — so
+  // "OC = 0.5R" sizes against the radius without the student having to declare "radius R" separately.
+  const rad = vars.get(RADIUS_VAR);
+  if (rad && rad.value === undefined) {
+    const circ = cmds.find((c) => c.type === 'circle' && typeof (c as { radius?: unknown }).radius === 'number') as { radius: number } | undefined;
+    if (circ) rad.value = circ.radius;
+  }
   return { vars };
 }
 
