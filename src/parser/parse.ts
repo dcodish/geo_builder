@@ -1136,8 +1136,8 @@ const tangentsFromExternal: Rule = (s, ctx) => {
   const E = up(eM[1]), A = up(abM[1]), B = up(abM[2]);
   if (new Set([E, A, B]).size !== 3) return null;
   const circ = circleId(center);
-  const mid = freeLabel([E, A, B, center], ['M', 'N', 'K', 'L']); // centre of the Thales circle on OE (auxiliary)
-  const aux = `circle-${mid}`;
+  const mid = `~tanmid-${center}${E}`; // hidden centre of the Thales circle on O-E (scaffolding; "~" → not drawn)
+  const aux = `tanaux-${center}${E}`;
   const out: AnyCommand[] = [];
   if (!ctx.points?.includes(E)) out.push({ type: 'free-point', id: E, x: 12, y: 0 }); // the external apex, if new
   out.push(
@@ -1186,8 +1186,8 @@ const tangentFromExternal: Rule = (s, ctx) => {
   const newLabel = labels.find((l) => l !== apex && !have.has(l));
   const touch = newLabel ?? (atPoint && !have.has(atPoint) ? atPoint : freeLabel([...have, ...labels, center], ['T', 'S', 'D', 'F']));
   const circ = circleId(center);
-  const mid = freeLabel([...have, apex, touch, center], ['M', 'N', 'K', 'L']);
-  const aux = `circle-${mid}`;
+  const mid = `~tanmid-${center}${apex}`; // hidden centre of the Thales circle on O-apex (scaffolding; "~" → not drawn)
+  const aux = `tanaux-${center}${apex}`;
   const out: AnyCommand[] = [];
   if (placeApex) out.push({ type: 'free-point', id: apex, x: 12, y: 0 }); // the external apex, if new
   out.push(

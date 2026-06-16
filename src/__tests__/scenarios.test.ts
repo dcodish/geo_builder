@@ -270,6 +270,10 @@ const SCENARIOS: Scenario[] = [
       // a tangent ⟂ its radius: ED ⟂ OD.
       const perp = Math.abs((D.x - O.x) * (D.x - E.x) + (D.y - O.y) * (D.y - E.y)) / (dist(O, D) * dist(E, D));
       expect(perp).toBeLessThan(1e-3);
+      // The auxiliary Thales-circle centre is a HIDDEN helper (id starts with "~"), so it isn't drawn
+      // as a stray labelled point (scene.ts skips "~" ids) — no confusing unrequested point.
+      expect(fig.construction.objects.some((o) => o.id.startsWith('~'))).toBe(true);
+      expect([...fig.positions.keys()].some((k) => /^[A-Z]$/.test(k) && !['O', 'A', 'B', 'D', 'E'].includes(k))).toBe(false);
     },
   },
   {
