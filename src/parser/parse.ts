@@ -1041,6 +1041,35 @@ const parallelCircleIntersection: Rule = (s, ctx) => {
 };
 
 /** "G is the intersection of circle O and circle P" / "G חיתוך מעגל O ומעגל P" — where two circles cross. */
+/**
+ * "two circles intersect at A and B" / "שני מעגלים נחתכים בנקודות A ו-B" / "circles O and P meet at
+ * A and B" — CREATE both circles (overlapping, default radius) and BOTH intersection points A, B (the
+ * two branches), plus their common chord. The single-point `circleCircleIntersection` below needs the
+ * two circles to already exist and yields one point; this is the "draw two intersecting circles" opener.
+ */
+const twoCirclesMeet: Rule = (s) => {
+  if (!/\bcircles\b|שני\s+מעגל|מעגלים/i.test(s)) return null; // two circles being introduced (plural)
+  if (!(INTERSECT_KW.test(s) || /נחתכ|נפגש|מפגש|\bmeets?\b/i.test(s))) return null;
+  // the two intersection points — prefer the pair after "at"/"בנקודות" (so named centres "O and P" aren't read as the points)
+  const abM =
+    s.match(/(?:\bat\b|בנקוד\S*|points?)\s*([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)/i) ??
+    s.match(/\b([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i);
+  if (!abM) return null;
+  const A = up(abM[1]), B = up(abM[2]);
+  const named = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
+  const c1 = named[0] ?? 'O';
+  const c2 = named[1] ?? freeLabel([c1, A, B], ['P', 'Q', 'K', 'S']);
+  if (new Set([A, B, c1, c2]).size !== 4) return null;
+  const id1 = circleId(c1), id2 = circleId(c2);
+  return [
+    { type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT },
+    { type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT },
+    { type: 'circle-circle-intersection', id: A, circle1: id1, circle2: id2, branch: 0 },
+    { type: 'circle-circle-intersection', id: B, circle1: id1, circle2: id2, branch: 1 },
+    { type: 'segment', a: A, b: B }, // the common chord
+  ];
+};
+
 const circleCircleIntersection: Rule = (s) => {
   if (!/circle|מעגל/i.test(s)) return null;
   if (!(INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s))) return null;
@@ -1601,6 +1630,7 @@ const RULES: Rule[] = [
   parallelCircleIntersection, // a parallel line ∩ the circle
   circlesTangent, // two circles tangent to each other — before tangentLine (which would grab the משיק)
   secantFromExternal, // "from external point E a line cuts the circle at A,B" — before the generic intersections
+  twoCirclesMeet, // "two circles intersect at A and B" — create both circles + both intersection points
   circleCircleIntersection, // two circles cross — before the generic line∩line intersection
   // A drawn perpendicular/parallel line that "cuts" another at a point must be claimed BEFORE the
   // generic line∩line rule: the "cuts"/"חותך" keyword otherwise makes lineLineIntersection 'stop'

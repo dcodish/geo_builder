@@ -117,6 +117,8 @@ const PARSES: [string, string][] = [
   ['tangent to circle O at A', 'tangent'],
   ['משיק למעגל O בנקודה A', 'tangent'],
   ['G is the intersection of circle O and circle P', 'circle-circle-intersection'],
+  ['two circles intersect at A and B', 'circle-circle-intersection'], // creates both circles + both points
+  ['שני מעגלים נחתכים בנקודות A ו-B', 'circle-circle-intersection'],
   // ── constraints ──
   ['angle GBA = 37', 'set-angle'],
   ['זווית GBA = 37', 'set-angle'],

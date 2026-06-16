@@ -214,6 +214,24 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'two-circles-meet-at-A-and-B',
+    title: '"שני מעגלים נחתכים בנקודות A ו-B" — both circles created (overlapping) + both intersections',
+    guards:
+      'no rule for "two circles intersect at A and B" → it escalated and the LLM produced a SINGLE point G (not A AND B), and the two circles did not visibly meet. A deterministic rule now creates both circles overlapping and BOTH intersection points (the two branches).',
+    steps: ['שני מעגלים נחתכים בנקודות A ו- B'],
+    check(fig) {
+      allStepsOk(fig);
+      for (const id of ['A', 'B']) expect(fig.positions.has(id), `point ${id}`).toBe(true);
+      const centers = fig.construction.objects.filter((o) => o.kind === 'circle').map((o) => (o as { center: Id }).center);
+      expect(centers.length).toBe(2); // two circles
+      const A = at(fig, 'A'), B = at(fig, 'B');
+      expect(dist(A, B)).toBeGreaterThan(0.5); // two DISTINCT intersection points
+      for (const c of centers) {
+        expect(dist(at(fig, c), A)).toBeCloseTo(dist(at(fig, c), B), 2); // A,B equidistant from each centre ⇒ both ON each circle
+      }
+    },
+  },
+  {
     id: 'oc-half-radius-sizes-the-chord',
     title: '"OC = 0.5R" sizes the chord (R auto-binds to the radius; "C אמצע מיתר AB" is the midpoint)',
     guards:

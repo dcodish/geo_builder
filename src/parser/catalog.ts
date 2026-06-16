@@ -106,6 +106,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'circles', supported: true, en: 'tangent to circle O at A', he: 'משיק למעגל O בנקודה A', descEn: 'Draw the tangent at a point on a circle.', descHe: 'ציור המשיק בנקודה על המעגל.' },
   { category: 'circles', supported: true, en: 'E is the intersection of the tangent to circle O at A and BC', he: 'E חיתוך המשיק למעגל O בנקודה A עם BC', descEn: 'Where a tangent at a point meets a line.', descHe: 'מפגש משיק בנקודה עם ישר.' },
   { category: 'circles', supported: true, en: 'G is the intersection of circle O and circle P', he: 'G חיתוך מעגל O ומעגל P', descEn: 'Where two circles cross.', descHe: 'נקודת חיתוך של שני מעגלים.' },
+  { category: 'circles', supported: true, en: 'two circles intersect at A and B', he: 'שני מעגלים נחתכים בנקודות A ו-B', descEn: 'Two overlapping circles and both intersection points A, B.', descHe: 'שני מעגלים נחתכים ושתי נקודות החיתוך A, B.' },
   { category: 'circles', supported: true, en: 'circle O and circle P are tangent at M', he: 'מעגל O ומעגל P משיקים זה לזה בנקודה M', descEn: 'Two circles touching externally at one point M (side by side; the centres move to touch).', descHe: 'שני מעגלים משיקים זה לזה מבחוץ בנקודה אחת M (זה ליד זה; המרכזים זזים כדי להשיק).' },
   { category: 'circles', supported: true, en: 'circle O and circle P are tangent internally at M', he: 'מעגל O ומעגל P משיקים מבפנים בנקודה M', descEn: 'One circle inside the other, touching at M (needs different radii).', descHe: 'מעגל אחד בתוך השני, משיקים בנקודה M (דרושים רדיוסים שונים).' },
 ];
