@@ -1097,7 +1097,7 @@ const bisectorLine: Rule = (s) => {
 const THROUGH_PT = String.raw`(?:through|\bat\b|דרך|בנקודה)\s+([A-Za-z]\d*)\b`;
 
 /** "line through P perpendicular to AB" / "ישר דרך P מאונך ל-AB" / "DE אנך ל-AB בנקודה C" — a *drawn* perpendicular line through a point. */
-const perpendicularLine: Rule = (s) => {
+const perpendicularLine: Rule = (s, ctx) => {
   if (!/perpendicular|⊥|מאונך|אנך/i.test(s)) return null;
   const thr = s.match(new RegExp(THROUGH_PT, 'i'));
   if (!thr) return null; // no through-point ⇒ it's the ⟂ constraint or a foot, not a drawn line
@@ -1106,17 +1106,31 @@ const perpendicularLine: Rule = (s) => {
     .match(/(?:perpendicular\s*to|⊥|מאונך\s*ל-?|אנך\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!seg) return null;
   const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
+  const names = lineNameLabels(s, [P, a, b]);
+  const have = new Set(ctx.points ?? []);
+  // If the NAMED line already exists ("segment CD" drawn, then "CD ⟂ AB cutting at E"), this is a
+  // CONSTRAINT on the existing segment, not a construction: make CD ⟂ AB, and the cut-point is their
+  // intersection (created if new). Don't re-create C/D as markers, and don't anchor on a yet-unmade E.
+  if (names.length === 2 && names.every((n) => have.has(n))) {
+    const [n1, n2] = names;
+    const out: AnyCommand[] = [
+      { type: 'segment', a: n1, b: n2 }, // idempotent
+      { type: 'set-perpendicular', a: n1, b: n2, c: a, d: b }, // CD ⟂ AB
+    ];
+    if (!have.has(P)) out.push({ type: 'line-line-intersection', id: P, a: n1, b: n2, c: a, d: b }); // E = CD ∩ AB
+    return out;
+  }
   const lineId = `perp-${P}-${a}${b}`;
-  // If the line is also NAMED ("line PQ through P ⟂ AB", or a leading "DE ⟂ AB at C"), mark its
-  // far end(s) on it (ADR-036) — D, E straddle the through-point so they're referenceable.
+  // Otherwise CONSTRUCT: a drawn perpendicular through P; a NAME ("line PQ … ⟂ AB", or a leading
+  // "DE ⟂ AB at C") marks its far end(s) on it (ADR-036) — they straddle the through-point.
   return [
     { type: 'perpendicular-line', id: lineId, through: P, a, b, visible: true },
-    ...lineMarkers(lineId, lineNameLabels(s, [P, a, b])),
+    ...lineMarkers(lineId, names),
   ];
 };
 
 /** "line through P parallel to AB" / "ישר דרך P מקביל ל-AB" / "DE מקביל ל-AB בנקודה C" — a *drawn* parallel line through a point. */
-const parallelLine: Rule = (s) => {
+const parallelLine: Rule = (s, ctx) => {
   if (!/parallel|∥|מקביל/i.test(s)) return null;
   const thr = s.match(new RegExp(THROUGH_PT, 'i'));
   if (!thr) return null; // no through-point ⇒ it's the ∥ constraint, not a drawn line
@@ -1125,11 +1139,21 @@ const parallelLine: Rule = (s) => {
     .match(/(?:parallel\s*to|∥|מקביל\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!seg) return null;
   const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
+  const names = lineNameLabels(s, [P, a, b]);
+  const have = new Set(ctx.points ?? []);
+  // If the NAMED line already exists, constrain it ∥ AB (parallels don't meet AB, so no cut-point).
+  if (names.length === 2 && names.every((n) => have.has(n))) {
+    const [n1, n2] = names;
+    return [
+      { type: 'segment', a: n1, b: n2 },
+      { type: 'set-parallel', a: n1, b: n2, c: a, d: b },
+    ];
+  }
   const lineId = `par-${P}-${a}${b}`;
-  // If the line is also NAMED ("line PQ through P ∥ AB"), mark its far end(s) on it (ADR-036).
+  // Otherwise CONSTRUCT: a drawn parallel through P; a NAME marks its far end(s) on it (ADR-036).
   return [
     { type: 'parallel-line', id: lineId, through: P, a, b, visible: true },
-    ...lineMarkers(lineId, lineNameLabels(s, [P, a, b])),
+    ...lineMarkers(lineId, names),
   ];
 };
 

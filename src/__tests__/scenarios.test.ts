@@ -254,6 +254,25 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'existing-segment-perpendicular-cuts-at-new-point',
+    title: '"CD אנך ל-AB וחותך אותו בנקודה E" with CD drawn → constrain CD ⟂ AB, create E = CD∩AB',
+    guards:
+      'the MIRROR of perpendicular-cuts-at-existing-point: here the NAME (CD) already exists and the cut-point (E) is NEW. The rule anchored the perpendicular on the not-yet-made E ("unresolved dependencies for perp-E-AB") and re-created C,D as markers ("\'C\'/\'D\' is already defined"). It now sees CD exists → constrains it ⟂ AB and makes E their intersection.',
+    steps: [
+      { llm: [{ type: 'segment', a: 'A', b: 'B' }] }, // "AB"
+      { llm: [{ type: 'segment', a: 'C', b: 'D' }] }, // "CD"
+      'CD אנך ל AB וחותך אותו בנקודה E',
+    ],
+    check(fig) {
+      allStepsOk(fig); // no "unresolved dependencies" / "already defined"
+      for (const id of ['C', 'D', 'E']) expect(fig.positions.has(id), `point ${id}`).toBe(true);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      // CD ⟂ AB — compare directions by the normalised dot (|cos θ| ≈ 0), not the raw dot (which scales with length).
+      const cos = ((B.x - A.x) * (D.x - C.x) + (B.y - A.y) * (D.y - C.y)) / (dist(A, B) * dist(C, D));
+      expect(Math.abs(cos)).toBeLessThan(1e-3);
+    },
+  },
+  {
     id: 'perpendicular-cuts-at-existing-point',
     title: '"ישר ED אנך ל-AB וחותך אותו בנקודה C" — ED ⟂ AB through the EXISTING C, no redefinition',
     guards:
