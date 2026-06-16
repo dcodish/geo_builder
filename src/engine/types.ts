@@ -399,6 +399,10 @@ export interface Circle {
   center: Id;
   radius: RadiusSpec;
   hidden?: boolean;
+  /** The centre was AUTO-assigned (a circumcentre/incentre, or a defaulted "two circles" centre), not
+   *  named by the student — so the renderer hides the centre point unless other geometry uses it
+   *  (a radius/central angle drawn from it). A named centre ("circle O") is always drawn. */
+  autoCenter?: boolean;
 }
 
 /**
@@ -580,8 +584,8 @@ export type Command =
   | { type: 'foot'; id: Id; from: Id; a: Id; b: Id }
   | { type: 'midpoint'; id: Id; a: Id; b: Id }
   // Phase 5c — circles and the points they produce.
-  | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean }
-  | { type: 'circle-through'; id: Id; center: Id; through: Id; hidden?: boolean }
+  | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean; autoCenter?: boolean }
+  | { type: 'circle-through'; id: Id; center: Id; through: Id; hidden?: boolean; autoCenter?: boolean }
   | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id } // circle through a,b,c (centre = circumcentre)
   | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number }
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }

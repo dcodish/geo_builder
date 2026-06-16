@@ -103,7 +103,12 @@ const PARSES: [string, string][] = [
   // ── circles ──
   ['circle centered at O radius 5', 'circle'],
   ['מעגל סביב O רדיוס 5', 'circle'],
+  ['circle radius 5', 'circle'], // an UNNAMED circle (auto-hidden centre) — no centre named
+  ['מעגל', 'circle'], // a bare circle → a default circle with a hidden centre
+  ['circle O', 'circle'], // a standalone named circle (centre shown)
   ['A is on circle O', 'point-on-circle'],
+  ['point A on circle O', 'point-on-circle'], // the "point" prefix must not be read as the label ("t" of "point")
+  ['נקודה A על מעגל O', 'point-on-circle'],
   ['chord AB in circle O', 'point-on-circle'],
   ['מיתר AB במעגל O', 'segment'],
   ['from a point E outside circle O a line cuts the circle at A and B', 'point-on-circle'], // secant from external point

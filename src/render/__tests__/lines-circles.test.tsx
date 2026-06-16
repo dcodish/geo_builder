@@ -52,6 +52,32 @@ describe('circle ∩ circle', () => {
   });
 });
 
+describe('circle centre visibility — show if used or named', () => {
+  const drawnIds = (cmds: Command[]) => {
+    const { construction, positions } = build(cmds);
+    return buildScene(construction, positions).points.map((p) => p.id);
+  };
+  it('a NAMED centre is drawn even when nothing uses it', () => {
+    expect(drawnIds([{ type: 'circle', id: 'circle-O', center: 'O', radius: 5 }])).toContain('O');
+  });
+  it('an AUTO centre is HIDDEN when nothing is drawn from it', () => {
+    const ids = drawnIds([
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5, autoCenter: true },
+      { type: 'point-on-circle', id: 'A', circle: 'circle-O' },
+    ]);
+    expect(ids).not.toContain('O');
+    expect(ids).toContain('A');
+  });
+  it('an AUTO centre IS drawn once something uses it (a radius from it)', () => {
+    const ids = drawnIds([
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5, autoCenter: true },
+      { type: 'point-on-circle', id: 'A', circle: 'circle-O' },
+      { type: 'segment', a: 'O', b: 'A' },
+    ]);
+    expect(ids).toContain('O'); // now referenced
+  });
+});
+
 describe('visible construction lines', () => {
   it('a drawn tangent is ⟂ the radius and appears in the scene', () => {
     const { construction, positions } = build([

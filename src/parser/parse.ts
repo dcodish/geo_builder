@@ -268,7 +268,8 @@ const foot: Rule = (s) => {
 /** "M is the midpoint of AB" / "M אמצע AB" / "C is the midpoint of OB". */
 const midpoint: Rule = (s) => {
   if (!/midpoint|אמצע/i.test(s)) return null;
-  const m = s.match(/([A-Za-z]\d*)\b.*?(?:midpoint|אמצע)\s*(.*)/i);
+  // Leading \b so "point M is the midpoint …" reads M, not the "t" of "poin**t**".
+  const m = s.match(/\b([A-Za-z]\d*)\b.*?(?:midpoint|אמצע)\s*(.*)/i);
   if (!m) return null;
   // strip filler ("of"!) and segment/radius words so they aren't read as labels.
   const rest = m[2].replace(FILLER, ' ').replace(/radius|רדיוס\S*|segment|קטע/gi, ' ');
@@ -637,16 +638,30 @@ const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: b
 };
 
 /** "circle centered at O radius 5" / "circle O radius R" / "מעגל שמרכזו O רדיוסו 5". */
-const circle: Rule = (s) => {
+const circle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
   const r = parseRadius(s);
   const thrM = s.match(/(?:through|העובר\s*דרך|דרך)\s+([A-Za-z]\d*)\b/i);
   const centered = /cent(?:er|re)d?|around|מרכז\w*|סביב/i.test(s);
-  if (!r.numeric && !r.symbolic && !thrM && !centered) return null; // a bare "circle O" reference, not a definition
-  const center = circleCenter(s);
-  if (!center) return null;
-  if (thrM && !r.numeric && !r.symbolic) return [{ type: 'circle-through', id: circleId(center), center: up(center), through: up(thrM[1]) }];
-  return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius }, ...(r.varCmd ? [r.varCmd] : [])];
+  const named = circleCenter(s); // the centre the student named ("circle O" / "centered at O"), or null
+  const isDef = r.numeric || r.symbolic || !!thrM || centered;
+  if (!isDef) {
+    // No radius/centre/through given. A STANDALONE "circle" / "מעגל" / "circle O" is a circle request →
+    // draw a default one. But "A on circle O" (another label remains) or "draw a circle somewhere"
+    // (words remain) is not standalone → defer to the right rule / escalate. Strip the circle word, the
+    // named centre, and filler; if anything meaningful is left, it's not a standalone circle.
+    const leftover = s
+      .replace(/circles?|מעגל\w*/gi, ' ')
+      .replace(named ? new RegExp(String.raw`\b${named}\b`, 'gi') : /,^/, ' ')
+      .replace(FILLER, ' ')
+      .trim();
+    if (leftover) return null;
+  }
+  // An UNNAMED centre is auto-assigned and HIDDEN unless used (FR-RN-8); a named centre is shown.
+  const center = named ?? freeLabel(ctx.points ?? [], ['O', 'P', 'Q', 'K']);
+  const auto = !named;
+  if (thrM && !r.numeric && !r.symbolic) return [{ type: 'circle-through', id: circleId(center), center: up(center), through: up(thrM[1]), ...(auto ? { autoCenter: true } : {}) }];
+  return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius, ...(auto ? { autoCenter: true } : {}) }, ...(r.varCmd ? [r.varCmd] : [])];
 };
 
 /**
@@ -750,7 +765,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // CROSSED quad. Use a convex, ordered angle set for ANY general quad — inscribed (drawn
   // circle) or cyclic (hidden) — so ABCD is always a proper convex quadrilateral.
   const angles = kind === 'quad' ? CYCLIC_QUAD_ANGLES : INSCRIBED_ANGLES[kind];
-  const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, ...(hidden ? { hidden: true } : {}) }];
+  const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, ...(hidden ? { hidden: true } : {}), ...(named ? {} : { autoCenter: true }) }];
   if (r.varCmd) cmds.push(r.varCmd);
   ids.forEach((id, i) => {
     // specific angle for a shaped cyclic polygon (square/rect/rhombus/trapezoid);
@@ -851,7 +866,7 @@ const incircle: Rule = (s) => {
     { type: 'bisector', id: bisB, vertex: B, p: A, q: C },
     { type: 'line-intersection', id: I, line1: bisA, line2: bisB }, // incenter
     { type: 'foot', id: F, from: I, a: A, b: B }, // inradius foot on side AB
-    { type: 'circle-through', id: circleId(I), center: I, through: F },
+    { type: 'circle-through', id: circleId(I), center: I, through: F, ...(circleCenter(s) ? {} : { autoCenter: true }) }, // the incentre is auto unless named
   ];
 };
 
@@ -893,7 +908,8 @@ const arcMidpoint: Rule = (s, ctx) => {
 /** "A is on circle O" / "A על מעגל O" — a single inscribed point. */
 const pointOnCircle: Rule = (s) => {
   if (!/circle|מעגל/i.test(s)) return null;
-  const m = s.match(/([A-Za-z]\d*)\b.*?(?:on|על).*?(?:circle|מעגל)\s+([A-Za-z]\d*)\b/i);
+  // Leading \b on the label so "point A on circle O" reads A, not the "t" of "poin**t**".
+  const m = s.match(/\b([A-Za-z]\d*)\b.*?(?:on|על).*?(?:circle|מעגל)\s+([A-Za-z]\d*)\b/i);
   if (!m) return null;
   return [{ type: 'point-on-circle', id: up(m[1]), circle: circleId(m[2]) }];
 };
@@ -1061,9 +1077,12 @@ const twoCirclesMeet: Rule = (s) => {
   const c2 = named[1] ?? freeLabel([c1, A, B], ['P', 'Q', 'K', 'S']);
   if (new Set([A, B, c1, c2]).size !== 4) return null;
   const id1 = circleId(c1), id2 = circleId(c2);
+  // A centre the student didn't name (defaulted O/P) is auto → hidden unless used; a named one shows.
+  const auto1 = !named.includes(c1);
+  const auto2 = !named.includes(c2);
   return [
-    { type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT },
-    { type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT },
+    { type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, ...(auto1 ? { autoCenter: true } : {}) },
+    { type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT, ...(auto2 ? { autoCenter: true } : {}) },
     { type: 'circle-circle-intersection', id: A, circle1: id1, circle2: id2, branch: 0 },
     { type: 'circle-circle-intersection', id: B, circle1: id1, circle2: id2, branch: 1 },
     { type: 'segment', a: A, b: B }, // the common chord

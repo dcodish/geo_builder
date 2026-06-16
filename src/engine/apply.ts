@@ -500,6 +500,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         center: cmd.center,
         radius: { via: 'length', value: cmd.radius },
         ...(cmd.hidden ? { hidden: true } : {}),
+        ...(cmd.autoCenter ? { autoCenter: true } : {}),
       });
       break;
 
@@ -509,7 +510,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'circle-through':
       placeBase(objects, [{ id: cmd.center, x: 0, y: 0 }], pos);
-      upsertCircle(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.through }, ...(cmd.hidden ? { hidden: true } : {}) });
+      upsertCircle(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.through }, ...(cmd.hidden ? { hidden: true } : {}), ...(cmd.autoCenter ? { autoCenter: true } : {}) });
       break;
 
     case 'circumcircle':
@@ -526,7 +527,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         pos,
       );
       addObj(objects, { kind: 'circumcenter', id: cmd.center, a: cmd.a, b: cmd.b, c: cmd.c });
-      addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.a } });
+      addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.a }, autoCenter: true }); // circumcentre is auto, hidden unless used
       break;
 
     case 'point-on-circle':

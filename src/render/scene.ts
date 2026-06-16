@@ -173,9 +173,16 @@ export function buildScene(
     addIncident(o.b, unit(sub(a, b)));
   }
 
+  // An AUTO-assigned circle centre (circumcentre, incentre, a defaulted "two circles" centre) is
+  // drawn only when other geometry uses it — i.e. something is drawn FROM it (a radius, a central
+  // angle's arm). A centre the student NAMED ("circle O") is not auto, so it's always drawn.
+  const autoCenters = new Set<Id>();
+  for (const o of c.objects) if (o.kind === 'circle' && o.autoCenter) autoCenters.add(o.center);
+
   for (const o of c.objects) {
     if (isGeoPoint(o)) {
       if (o.id.startsWith('~')) continue; // hidden helper (a coincidence target, ADR-028) — not drawn
+      if (autoCenters.has(o.id) && !incident.has(o.id)) continue; // an unused auto-centre — not drawn
       const pos = positions.get(o.id);
       if (pos) points.push({ id: o.id, pos, label: o.id, labelDir: outwardDir(incident.get(o.id)) });
       continue;
