@@ -964,28 +964,49 @@ const bisectorSegmentIntersection: Rule = (s) => {
 };
 
 /**
- * "from a point E outside the circle, a line cuts the circle at A and B" /
- * "מנקודה E מחוץ למעגל מעבירים ישר שחותך את המעגל בנקודות A ו-B" — a SECANT from an external point.
- * A and B are the two intersections on the circle (a chord); E is OUTSIDE, collinear with them
- * (on the extension of the chord beyond A). Expressed with existing primitives — two on-circle
- * points + the chord + E on the extension + the external part of the secant. Runs before the
- * generic intersection rules (which would 'stop' on the "cuts/חותך" keyword without building A,B,E).
+ * A SECANT from a point outside the circle, cutting it at two points.
+ *
+ * FIRST secant (the external point E is NEW): "from a point E outside the circle, a line cuts the
+ * circle at A and B" / "מנקודה E מחוץ למעגל … חותך … בנקודות A ו-B". A,B are two on-circle points (a
+ * chord); E is placed OUTSIDE on the extension of the chord (beyond A) so it is auto-external for any
+ * circle, no coordinates needed.
+ *
+ * SECOND secant FROM THE SAME E (E already exists): "from E another line cuts the circle at C and D".
+ * Reuses the existing external E without moving it: C is a new on-circle point, the line E–C is drawn,
+ * and D is the OTHER intersection of that line with the circle (`line-circle` branch 0 — branch 1
+ * would coincide with C). No constraint is added, so E stays put. Lets several secants share one
+ * external point.
+ *
+ * Runs before the generic intersection rules (which would 'stop' on the "cuts/חותך" keyword).
  */
 const secantFromExternal: Rule = (s, ctx) => {
-  if (!/מחוץ|outside|external/i.test(s)) return null; // "outside the circle" — the external-point cue
   if (!/חות[כך]|\bcuts?\b|\bsecant\b|\bmeets?\b|crosses|נחת/i.test(s)) return null; // a secant cut
-  // "the circle" here is usually unnamed; guard against `circleCenter` reading an English article
+  const eM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?|מנקודה|מהנקודה|מ\s*נקודה)\s+([A-Za-z]\d*)/i); // the (external) point
+  if (!eM) return null;
+  // "the circle" is usually unnamed; guard against `circleCenter` reading an English article
   // ("the circle **a** line" → "a"): a real centre label is uppercase, an article is lowercase.
-  // Accept an uppercase named centre; otherwise fall back to the single circle in context.
   const named = circleCenter(s);
   const center = named && /^[A-Z]/.test(named) ? named : ctx.circles?.length === 1 ? ctx.circles[0] : null;
   if (!center) return null;
-  const eM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?|מנקודה|מהנקודה|מ\s*נקודה)\s+([A-Za-z]\d*)/i); // external point E
   const abM = s.match(/\b([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i); // the two intersections "A and B" / "A ו-B"
-  if (!eM || !abM) return null;
+  if (!abM) return null;
   const E = up(eM[1]), A = up(abM[1]), B = up(abM[2]);
   if (new Set([E, A, B]).size !== 3) return null; // need three distinct labels
   const circ = circleId(center);
+  // ANOTHER secant from an EXISTING external point: line E–A, B = the other intersection. Don't
+  // re-place E (no constraint), so the shared external point stays where the first secant put it.
+  if (ctx.points?.includes(E)) {
+    const lineId = `sec-${E}${A}`;
+    return [
+      { type: 'point-on-circle', id: A, circle: circ },
+      { type: 'line-through', id: lineId, a: E, b: A },
+      { type: 'line-circle-intersection', id: B, line: lineId, circle: circ, branch: 0 }, // the intersection ≠ A
+      { type: 'segment', a: E, b: A }, // the secant E–B–A
+    ];
+  }
+  // FIRST secant: a NEW external point — require the "outside" cue so a bare "from X cuts … at A,B"
+  // (X not yet placed) doesn't misfire. A,B a chord; E outside on the extension.
+  if (!/מחוץ|outside|external/i.test(s)) return null;
   return [
     { type: 'point-on-circle', id: A, circle: circ },
     { type: 'point-on-circle', id: B, circle: circ },
@@ -1092,6 +1113,43 @@ function lineNameLabels(s: string, exclude: Id[]): Id[] {
   }
   return out;
 }
+
+/**
+ * "from a point E outside circle O, the two tangents touch the circle at A and B" /
+ * "מנקודה E מחוץ למעגל יוצאים שני משיקים הנוגעים במעגל בנקודות A ו-B" — the TWO tangents from an
+ * external point. The touch points A,B lie on the circle AND on the circle with diameter OE (Thales:
+ * a tangent ⟂ its radius, so ∠OAE = 90°), so A,B = circle O ∩ (circle on diameter OE). Built from
+ * existing primitives: the midpoint M of OE, a HIDDEN auxiliary circle through O centred at M, the two
+ * circle∩circle touch points, and the two tangent segments EA, EB. Runs before the single `tangentLine`
+ * (tangent AT a point already on the circle). A NEW external E is placed outside (it can also pre-exist).
+ */
+const tangentsFromExternal: Rule = (s, ctx) => {
+  if (!/tangent|משיק/i.test(s)) return null;
+  if (!/\btwo\b|tangents|שני|שתי|משיקים/i.test(s)) return null; // TWO tangents from a point, not a single tangent-at-a-point
+  const eM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?|מנקודה|מהנקודה|מ\s*נקודה)\s+([A-Za-z]\d*)/i);
+  if (!eM) return null;
+  const named = circleCenter(s);
+  const center = named && /^[A-Z]/.test(named) ? named : ctx.circles?.length === 1 ? ctx.circles[0] : null;
+  if (!center) return null;
+  const abM = s.match(/\b([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i); // the two touch points "A and B"
+  if (!abM) return null;
+  const E = up(eM[1]), A = up(abM[1]), B = up(abM[2]);
+  if (new Set([E, A, B]).size !== 3) return null;
+  const circ = circleId(center);
+  const mid = freeLabel([E, A, B, center], ['M', 'N', 'K', 'L']); // centre of the Thales circle on OE (auxiliary)
+  const aux = `circle-${mid}`;
+  const out: AnyCommand[] = [];
+  if (!ctx.points?.includes(E)) out.push({ type: 'free-point', id: E, x: 12, y: 0 }); // the external apex, if new
+  out.push(
+    { type: 'midpoint', id: mid, a: center, b: E },
+    { type: 'circle-through', id: aux, center: mid, through: center, hidden: true }, // circle on diameter OE (hidden)
+    { type: 'circle-circle-intersection', id: A, circle1: circ, circle2: aux, branch: 0 }, // touch point 1
+    { type: 'circle-circle-intersection', id: B, circle1: circ, circle2: aux, branch: 1 }, // touch point 2
+    { type: 'segment', a: E, b: A }, // tangent 1
+    { type: 'segment', a: E, b: B }, // tangent 2
+  );
+  return out;
+};
 
 const tangentLine: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
@@ -1506,6 +1564,7 @@ const RULES: Rule[] = [
   lineLineIntersection,
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,
+  tangentsFromExternal, // TWO tangents from an external point — before the single tangentLine
   tangentLine, // a *drawn* tangent (after the tangent∩line compound)
   bisectorLine, // a *drawn* bisector (after the bisector compounds)
   parallelConstraint, // ∥ / ⟂ constraints (keyword-anchored) — before the loose "XY = …" rules

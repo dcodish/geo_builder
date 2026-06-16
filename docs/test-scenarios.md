@@ -100,6 +100,20 @@ dependencies for E`). A deterministic rule now builds A,B on the circle (a chord
 extension, collinear and outside.
 **Asserts:** A,B on the circle (equal radii); E outside (|OE| > radius); E,A,B collinear (a straight secant).
 
+### `two-tangents-from-external-point` — both tangents from a point outside the circle
+**Steps:** `circle O radius 5`, `from point E outside circle O two tangents touch the circle at A and B`.
+**Guards against:** only "tangent AT a point on the circle" existed; tangents FROM an external point
+were unsupported and half-parsed to a single wrong tangent. Built via the Thales circle on OE
+(A,B = circle O ∩ circle-on-diameter-OE).
+**Asserts:** A,B on the circle; E outside; EA⟂OA and EB⟂OB (true tangents); |EA|=|EB|.
+
+### `two-secants-from-same-point` — two secants sharing one external point
+**Steps:** `circle O radius 5`, `from a point E outside circle O a line cuts the circle at A and B`,
+`from E a line cuts the circle at C and D`.
+**Guards against:** a second secant from E re-placing/over-constraining E (it moved inside the circle).
+The 2nd secant reuses the existing E (line E–C + the other intersection D), no constraint, so E stays put.
+**Asserts:** all four points on the circle; E stays outside; both secants collinear through E.
+
 ### `named-perpendicular-through-point` — a named perpendicular keeps its endpoints
 **Steps:** `ישר AB` *(→ segment AB)*, `נקודה C על AB`, `DE אנך לAB בנקודה C`.
 **Guards against:** the parser not handling "DE ⟂ AB at C" → it escalated, and the LLM rewrote it to

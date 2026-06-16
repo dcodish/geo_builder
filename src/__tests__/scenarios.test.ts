@@ -234,6 +234,47 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'two-tangents-from-external-point',
+    title: '"from point E outside circle O two tangents touch the circle at A and B"',
+    guards:
+      'only "tangent AT a point on the circle" existed; tangents FROM an external point (touch points computed) were unsupported and half-parsed to a single wrong tangent. Built via the Thales circle on OE: A,B = circle O ∩ circle-on-diameter-OE.',
+    steps: ['circle O radius 5', 'from point E outside circle O two tangents touch the circle at A and B'],
+    check(fig) {
+      allStepsOk(fig);
+      for (const id of ['O', 'A', 'B', 'E']) expect(fig.positions.has(id), `point ${id}`).toBe(true);
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), E = at(fig, 'E');
+      expect(dist(O, A)).toBeCloseTo(dist(O, B), 3); // A,B on the circle
+      expect(dist(O, E)).toBeGreaterThan(dist(O, A) + 1e-6); // E outside
+      // a tangent is ⟂ its radius: EA ⟂ OA and EB ⟂ OB (normalised dot ≈ 0).
+      const perp = (T: Vec) => Math.abs((T.x - O.x) * (T.x - E.x) + (T.y - O.y) * (T.y - E.y)) / (dist(O, T) * dist(E, T));
+      expect(perp(A)).toBeLessThan(1e-3);
+      expect(perp(B)).toBeLessThan(1e-3);
+      expect(dist(E, A)).toBeCloseTo(dist(E, B), 3); // equal tangent lengths
+    },
+  },
+  {
+    id: 'two-secants-from-same-point',
+    title: 'two secants from the same external point E (E reused, not moved)',
+    guards:
+      'a second secant from E re-placed/over-constrained E (it moved inside the circle). The 2nd secant now reuses the existing E without a constraint (line E–C, the other intersection D), so the shared external point stays put.',
+    steps: [
+      'circle O radius 5',
+      'from a point E outside circle O a line cuts the circle at A and B',
+      'from E a line cuts the circle at C and D',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      for (const id of ['O', 'A', 'B', 'C', 'D', 'E']) expect(fig.positions.has(id), `point ${id}`).toBe(true);
+      const O = at(fig, 'O'), E = at(fig, 'E');
+      const r = dist(O, at(fig, 'A'));
+      for (const id of ['A', 'B', 'C', 'D']) expect(dist(O, at(fig, id))).toBeCloseTo(r, 3); // all four on the circle
+      expect(dist(O, E)).toBeGreaterThan(r + 1e-6); // E stays OUTSIDE (not moved inside)
+      const colSin = (a: Vec, b: Vec) => Math.abs((a.x - E.x) * (b.y - E.y) - (a.y - E.y) * (b.x - E.x)) / (dist(E, a) * dist(E, b));
+      expect(colSin(at(fig, 'A'), at(fig, 'B'))).toBeLessThan(1e-3); // secant 1 through E
+      expect(colSin(at(fig, 'C'), at(fig, 'D'))).toBeLessThan(1e-3); // secant 2 through E
+    },
+  },
+  {
     id: 'named-perpendicular-through-point',
     title: '"DE אנך ל-AB בנקודה C" builds a named perpendicular through C with D and E placed on it',
     guards:
