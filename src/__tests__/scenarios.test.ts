@@ -19,7 +19,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
-import { replay } from '@/store/geoStore';
+import { replay, polygonsSimple, useGeoStore } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { isGeoPoint } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
@@ -221,4 +221,33 @@ describe('reported scenarios — end-to-end replay of real bug reports', () => {
       sc.check(run(sc.steps));
     });
   }
+});
+
+/**
+ * Resampling regressions — these exercise "show another configuration" (seed > 0), which the
+ * seed-0 scenario runner above can't reach. The exact operator sequence is replayed through the
+ * real store (parse-with-context → execute → resample), as the app does.
+ */
+describe('reported scenarios — "show another configuration" keeps a polygon valid', () => {
+  it('[quad-diagonals-resample] "מרובע ABCD" + "AC=10" + "DB=10" never resamples to a self-crossing quad', () => {
+    // The operator built a general quad with both diagonals = 10; "show another configuration"
+    // landed on a tangled (self-crossing) ABCD. The sampler must only surface SIMPLE polygons.
+    const st = useGeoStore.getState();
+    st.clear();
+    for (const u of ['מרובע ABCD', 'AC=10', 'DB=10']) {
+      const r = parse(u, ctxOf(useGeoStore.getState().facts));
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return;
+      for (const cmd of r.commands) st.execute(cmd, u);
+    }
+    for (let press = 0; press < 8; press++) {
+      st.resample();
+      const seed = useGeoStore.getState().seed;
+      const fig = replay(useGeoStore.getState().facts, seed);
+      expect(polygonsSimple(useGeoStore.getState().facts, fig.positions), `press ${press + 1} (seed ${seed})`).toBe(true);
+      expect(dist(at(fig, 'A'), at(fig, 'C'))).toBeCloseTo(10, 3); // the diagonals still hold
+      expect(dist(at(fig, 'B'), at(fig, 'D'))).toBeCloseTo(10, 3);
+    }
+    st.clear();
+  });
 });

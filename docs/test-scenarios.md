@@ -91,3 +91,11 @@ cyclic/hidden form; the inscribed quad being crossed (golden-angle spread).
 ### `cyclic-quad-hidden` — concyclic convex quad, circle not drawn
 **Steps:** `ABCD בר חסימה`
 **Asserts:** circle hidden, opposite angles sum to 180°, quad convex.
+
+### `quad-diagonals-resample` — "show another configuration" never tangles a quad
+**Steps:** `מרובע ABCD`, `AC=10`, `DB=10`, then press "show another configuration" repeatedly.
+**Guards against:** the sampler landing on a self-crossing (tangled) ABCD quad — it evaluates fine
+(no coincident points) but is not a valid *drawing* of the shape. (Exercises seed > 0, which the
+seed-0 scenario runner can't reach — replayed through the real store + `resample()`.)
+**Asserts:** every resampled configuration keeps the polygon simple (`polygonsSimple`) and the
+diagonals still hold (|AC| = |BD| = 10).

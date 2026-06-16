@@ -317,6 +317,40 @@ export interface GeoState {
   clear: () => void;
 }
 
+/** Shape commands whose `ids` form a closed polygon that must stay SIMPLE (non-self-crossing). */
+const POLYGON_SHAPES = new Set(['square', 'rectangle', 'rhombus', 'parallelogram', 'trapezoid', 'quadrilateral']);
+
+/** Do segments a→b and c→d cross at an INTERIOR point (a proper crossing, not a shared/touching endpoint)? */
+function segmentsProperlyCross(a: Vec, b: Vec, c: Vec, d: Vec): boolean {
+  const o = (p: Vec, q: Vec, r: Vec) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+  const o1 = o(a, b, c), o2 = o(a, b, d), o3 = o(c, d, a), o4 = o(c, d, b);
+  return o1 !== 0 && o2 !== 0 && o3 !== 0 && o4 !== 0 && o1 !== o2 && o3 !== o4;
+}
+
+/**
+ * Every declared polygon (a shape's `ids` cycle) is SIMPLE — no two non-adjacent edges cross. A
+ * self-crossing quadrilateral ("ABCD" tangled) is a valid set of points but NOT a valid drawing of
+ * the shape, so "show another configuration" must not surface it (ADR-018 — alternatives are valid
+ * *drawings*). Triangles (3 vertices) can't self-cross, so only 4+-gons are checked.
+ */
+export function polygonsSimple(facts: Fact[], positions: Map<Id, Vec>): boolean {
+  for (const f of facts) {
+    if (!f.enabled || !POLYGON_SHAPES.has(f.cmd.type)) continue;
+    const ids = (f.cmd as { ids?: Id[] }).ids;
+    if (!ids || ids.length < 4) continue;
+    const pts = ids.map((id) => positions.get(id));
+    if (pts.some((p) => !p)) continue; // a vertex that didn't resolve — not this guard's concern
+    const n = ids.length;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 2; j < n; j++) {
+        if (i === 0 && j === n - 1) continue; // the wrap-around edge is adjacent to edge 0
+        if (segmentsProperlyCross(pts[i]!, pts[(i + 1) % n]!, pts[j]!, pts[(j + 1) % n]!)) return false;
+      }
+    }
+  }
+  return true;
+}
+
 export const useGeoStore = create<GeoState>()(
   temporal(
     (set, get) => ({
@@ -429,12 +463,15 @@ export const useGeoStore = create<GeoState>()(
         let s = get().seed;
         for (let k = 0; k < 16; k++) {
           s += 1;
-          if (evaluate(replay(facts, s).construction).ok) {
+          const r = replay(facts, s);
+          // Accept a sample only if it both evaluates AND keeps every declared polygon simple —
+          // a self-crossing quad is a valid point set but not a valid drawing (skip it).
+          if (evaluate(r.construction).ok && polygonsSimple(facts, r.positions)) {
             set({ seed: s });
             return;
           }
         }
-        set({ seed: s }); // give up gracefully after a few degenerate draws
+        set({ seed: s }); // give up gracefully after a few rejected draws
       },
 
       setShowMeasures: (show) => set({ showMeasures: show }),
