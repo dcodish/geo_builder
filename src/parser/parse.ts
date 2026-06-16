@@ -1249,16 +1249,52 @@ const altitude: Rule = (s) => {
   return cmds;
 };
 
-/** "perpendicular bisector of AB" / "אנך אמצעי ל-AB" — the segment's midpoint + a drawn ⟂ line there. */
-const perpBisector: Rule = (s) => {
+/**
+ * "perpendicular bisector of AB" / "אנך אמצעי ל-AB" — the segment's midpoint + a drawn ⟂ line there.
+ * A NAMED bisector ("CD אנך אמצעי ל-AB" / "CD perpendicular bisector of AB") puts C, D as markers on
+ * the bisector line (straddling the midpoint); the BISECTED segment is the one after the connector
+ * ("of / ל / to AB"), never the leading name — so "CD … ל AB" bisects AB, not CD.
+ */
+const perpBisector: Rule = (s, ctx) => {
   if (!/perpendicular\s+bisector|אנך\s*אמצעי|אמצעי\b/i.test(s)) return null;
-  const rest = s.replace(/perpendicular|bisector|of|the|אנך|אמצעי|אמצע|של|ל-?/gi, ' ');
-  const ids = labelRun(rest, 2);
-  if (!ids) return null;
-  const mid = freeLabel(ids, ['M', 'N', 'P', 'Q']);
+  // The bisected segment follows the connector ("of AB" / "ל-AB" / "to AB").
+  const segM = s.match(/(?:\bof\b|\bto\b|ל-?)\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  let a: Id, b: Id;
+  if (segM) {
+    [a, b] = [up(segM[1]), up(segM[2])];
+  } else {
+    // No connector — fall back to the two labels near the keyword (the un-named plain form).
+    const ids = labelRun(s.replace(/perpendicular|bisector|of|the|אנך|אמצעי|אמצע|של|ל-?/gi, ' '), 2);
+    if (!ids) return null;
+    [a, b] = ids;
+  }
+  // An optional leading NAME for the bisector line ("CD אנך אמצעי …"), excluding the bisected segment.
+  const nameM = s.match(/^\s*\b([A-Za-z]\d*)(?:\s*([A-Za-z]\d*))?\b\s*(?=perpendicular\s+bisector|אנך\s*אמצעי|אמצעי)/i);
+  const names: Id[] = [];
+  for (const tok of [nameM?.[1], nameM?.[2]]) {
+    if (!tok) continue;
+    const u = up(tok);
+    if (u !== a && u !== b && !names.includes(u)) names.push(u);
+  }
+  // If the named segment ALREADY exists ("segment CD" drawn, then "CD is the ⊥-bisector of AB"),
+  // this is a CONSTRAINT, not a construction: make each endpoint equidistant from A and B, so the
+  // existing line CD becomes the perpendicular bisector (don't re-create C/D — that would redefine them).
+  const have = new Set(ctx.points ?? []);
+  if (names.length === 2 && names.every((n) => have.has(n))) {
+    const [c, d] = names;
+    return [
+      { type: 'segment', a: c, b: d }, // idempotent — keep the segment drawn
+      { type: 'set-equal', a: c, b: a, c, d: b }, // |CA| = |CB| → C on the ⊥-bisector of AB
+      { type: 'set-equal', a: d, b: a, c: d, d: b }, // |DA| = |DB| → D on it too ⇒ line CD is the ⊥-bisector
+    ];
+  }
+  // Otherwise CONSTRUCT: the midpoint of AB + the drawn ⟂ line there; a leading name → markers on it.
+  const mid = freeLabel([a, b, ...names], ['M', 'N', 'P', 'Q']);
+  const lineId = `perp-${mid}-${a}${b}`;
   return [
-    { type: 'midpoint', id: mid, a: ids[0], b: ids[1] },
-    { type: 'perpendicular-line', id: `perp-${mid}-${ids[0]}${ids[1]}`, through: mid, a: ids[0], b: ids[1], visible: true },
+    { type: 'midpoint', id: mid, a, b },
+    { type: 'perpendicular-line', id: lineId, through: mid, a, b, visible: true },
+    ...lineMarkers(lineId, names),
   ];
 };
 

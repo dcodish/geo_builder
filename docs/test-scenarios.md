@@ -100,6 +100,15 @@ an UNNAMED "line through C ⟂ AB", **dropping D and E**. The parser now handles
 **Asserts:** the perpendicular line through C exists, D and E are created ON it (CD ⟂ AB, CE ⟂ AB)
 and are distinct (straddle the foot C).
 
+### `named-perp-bisector-of-existing-segment` — "CD is the ⊥-bisector of AB" constrains, doesn't redefine
+**Steps:** `ישר AB` *(→ segment AB)*, `ישר CD` *(→ segment CD)*, `CD אנך אמצעי ל AB`.
+**Guards against:** the perp-bisector rule (a) bisecting the leading NAME "CD" instead of the segment
+after the connector ("ל AB"), dropping AB; and (b) re-creating C,D as markers when they already exist →
+"'D' is already defined". It now reads AB as the bisected segment, and — since CD exists — *constrains*
+it (|CA|=|CB|, |DA|=|DB|) so the existing line becomes the ⊥-bisector. (If C,D did NOT exist it would
+instead construct the bisector and name it CD with markers.)
+**Asserts:** no over-constraint; C and D each equidistant from A and B (⇒ CD is the ⊥-bisector of AB).
+
 ### `perpendicular-cuts-at-existing-point` — a perpendicular through an EXISTING point, no redefinition
 **Steps:** `ישר AB` *(→ segment AB)*, `C על AB`, `ישר ED אנך לAB וחותך אותו בנקודה C`.
 **Guards against:** the "cuts / חותך" keyword making the generic line∩line rule *stop* (it can't read it),

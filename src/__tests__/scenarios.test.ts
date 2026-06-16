@@ -236,6 +236,24 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'named-perp-bisector-of-existing-segment',
+    title: '"CD אנך אמצעי ל-AB" with CD already drawn → CD becomes the ⊥-bisector of AB (a constraint)',
+    guards:
+      'the perp-bisector rule bisected the leading NAME (CD) instead of the segment after the connector (AB), and — when C,D already exist — tried to re-create them as markers → "\'D\' is already defined". It now reads AB as the bisected segment and, since CD exists, constrains it (|CA|=|CB|, |DA|=|DB|) instead of redefining C/D.',
+    steps: [
+      { llm: [{ type: 'segment', a: 'A', b: 'B' }] }, // "ישר AB"
+      { llm: [{ type: 'segment', a: 'C', b: 'D' }] }, // "ישר CD"
+      'CD אנך אמצעי ל AB',
+    ],
+    check(fig) {
+      allStepsOk(fig); // no "'D' is already defined" over-constraint
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      // CD is the perpendicular bisector of AB ⇔ C and D are each equidistant from A and B.
+      expect(dist(C, A)).toBeCloseTo(dist(C, B), 3);
+      expect(dist(D, A)).toBeCloseTo(dist(D, B), 3);
+    },
+  },
+  {
     id: 'perpendicular-cuts-at-existing-point',
     title: '"ישר ED אנך ל-AB וחותך אותו בנקודה C" — ED ⟂ AB through the EXISTING C, no redefinition',
     guards:
