@@ -74,6 +74,35 @@ describe('applySeed', () => {
     expect(freeDofs(r2.construction)).toEqual(['B']);
   });
 
+  it('on-circle resample variety scales with count: a chord (2 points) reshapes widely; a polygon (3) keeps spread', () => {
+    const O = (p: Map<string, Vec>) => p.get('O')!;
+    const gap = (p: Map<string, Vec>, x: string, y: string) => {
+      const a = p.get(x)!, b = p.get(y)!, o = O(p);
+      let g = (Math.abs(Math.atan2(a.y - o.y, a.x - o.x) - Math.atan2(b.y - o.y, b.x - o.x)) * 180) / Math.PI % 360;
+      return g > 180 ? 360 - g : g;
+    };
+    // A chord — two free on-circle points — must reshape across the full range (short AND long chords).
+    const chord = build([
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
+      { type: 'point-on-circle', id: 'A', circle: 'circle-O' },
+      { type: 'point-on-circle', id: 'B', circle: 'circle-O' },
+    ]).construction;
+    const gaps: number[] = [];
+    for (let s = 1; s < 20; s++) { const e = evaluate(applySeed(chord, s)); if (e.ok) gaps.push(gap(e.positions, 'A', 'B')); }
+    expect(Math.min(...gaps)).toBeLessThan(45); // reaches a short chord
+    expect(Math.max(...gaps)).toBeGreaterThan(140); // and a near-diameter chord
+    // An inscribed triangle — three free on-circle points — keeps its spread (no sliver) across seeds.
+    const tri = build([
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
+      { type: 'point-on-circle', id: 'A', circle: 'circle-O' },
+      { type: 'point-on-circle', id: 'B', circle: 'circle-O' },
+      { type: 'point-on-circle', id: 'C', circle: 'circle-O' },
+    ]).construction;
+    let worst = 999;
+    for (let s = 1; s < 12; s++) { const e = evaluate(applySeed(tri, s)); if (e.ok) worst = Math.min(worst, gap(e.positions, 'A', 'B'), gap(e.positions, 'B', 'C'), gap(e.positions, 'A', 'C')); }
+    expect(worst).toBeGreaterThan(20); // vertices stay spread, not collapsed to a sliver
+  });
+
   it('varies a free shape DOF (ADR-033) — a rhombus reaches an OBTUSE angle across seeds', () => {
     const { construction } = build([{ type: 'rhombus', ids: ['A', 'B', 'C', 'D'] }]);
     const angles: number[] = [];

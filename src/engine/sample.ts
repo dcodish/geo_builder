@@ -75,10 +75,13 @@ export function applySeed(c: Construction, seed: number): Construction {
   const st = Math.sin(theta);
 
   // Free on-circle vertices: a SHARED seeded rotation (preserves their spread, so
-  // the inscribed shape never collapses to a sliver) + a small independent jitter
-  // for genuine variety. ±180° independent jitter would cluster vertices.
+  // the inscribed shape never collapses to a sliver) + an independent per-vertex jitter
+  // for genuine variety. The jitter scales with COUNT: with only 1–2 free on-circle points
+  // (e.g. a secant's two ends) it's WIDE — they reshape freely (any chord), and a seed that
+  // makes them coincide is just skipped by `resample`; with 3+ (an inscribed polygon) it stays
+  // small so the shape doesn't collapse to a sliver.
   const circSpin = (mulberry32((seed * 0x9e3779b1) >>> 0)() * 2 - 1) * Math.PI;
-  const circJit = Math.PI / 6; // ±30° per-vertex
+  const circJit = freeCircle.length <= 2 ? Math.PI * 0.85 : Math.PI / 6; // ±153° for a chord/secant, ±30° for a polygon
 
   const objects = c.objects.map((o) => {
     if (o.kind === 'free-point' && !o.pinned) {
