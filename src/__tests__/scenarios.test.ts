@@ -19,7 +19,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
-import { replay, polygonsSimple, useGeoStore } from '@/store/geoStore';
+import { replay, polygonsConvex, useGeoStore } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { isGeoPoint } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
@@ -229,9 +229,10 @@ describe('reported scenarios — end-to-end replay of real bug reports', () => {
  * real store (parse-with-context → execute → resample), as the app does.
  */
 describe('reported scenarios — "show another configuration" keeps a polygon valid', () => {
-  it('[quad-diagonals-resample] "מרובע ABCD" + "AC=10" + "DB=10" never resamples to a self-crossing quad', () => {
+  it('[quad-diagonals-resample] "מרובע ABCD" + "AC=10" + "DB=10" resamples only to a clean CONVEX quad', () => {
     // The operator built a general quad with both diagonals = 10; "show another configuration"
-    // landed on a tangled (self-crossing) ABCD. The sampler must only surface SIMPLE polygons.
+    // landed first on a tangled (self-crossing) ABCD, then on a concave (dart) one. The sampler
+    // must only surface a CLEAN CONVEX drawing of the shape (rejects both).
     const st = useGeoStore.getState();
     st.clear();
     for (const u of ['מרובע ABCD', 'AC=10', 'DB=10']) {
@@ -244,7 +245,7 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       st.resample();
       const seed = useGeoStore.getState().seed;
       const fig = replay(useGeoStore.getState().facts, seed);
-      expect(polygonsSimple(useGeoStore.getState().facts, fig.positions), `press ${press + 1} (seed ${seed})`).toBe(true);
+      expect(polygonsConvex(useGeoStore.getState().facts, fig.positions), `press ${press + 1} (seed ${seed})`).toBe(true);
       expect(dist(at(fig, 'A'), at(fig, 'C'))).toBeCloseTo(10, 3); // the diagonals still hold
       expect(dist(at(fig, 'B'), at(fig, 'D'))).toBeCloseTo(10, 3);
     }
