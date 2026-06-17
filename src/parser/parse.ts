@@ -751,8 +751,9 @@ const inscribedPolygon: Rule = (s, ctx) => {
     rest.replace(new RegExp(String.raw`\b${ids.join('')}\b`, 'i'), ' '),
   );
   if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
-  // No centre named ⇒ create one: a fresh label that doesn't clash with the vertices.
-  const center = named ?? (['O', 'P', 'Q', 'K', 'S', 'T', 'U'].find((c) => !ids.includes(c)) ?? 'O');
+  // No centre named ⇒ create one: a fresh label that doesn't clash with the vertices OR with any
+  // point already in the figure (a second inscribed circle must not reuse the first's centre 'O').
+  const center = named ?? freeLabel([...ids, ...(ctx.points ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
   const circ = circleId(center);
   // Inscribing a polygon whose vertices ALREADY exist can't re-place them on a fresh circle
   // (that would detach them from their own definitions — A from segment CD, etc.). A triangle's
@@ -858,7 +859,7 @@ const quarterCircle: Rule = (s) => {
  * bisectors → their crossing (incenter) → the foot on a side (tangency point) →
  * a circle through it. Distinct from "triangle inscribed in a circle".
  */
-const incircle: Rule = (s) => {
+const incircle: Rule = (s, ctx) => {
   if (!/incircle|inscrib\w*|חסום/i.test(s)) return null;
   if (!isCircleInPolygon(s)) return null; // only "circle in polygon", not "polygon in circle"
   if (!/triangle|משולש/i.test(s)) return null; // v1: incircle of a triangle
@@ -866,8 +867,9 @@ const incircle: Rule = (s) => {
   const ids = labelRun(triPart, 3);
   if (!ids) return null;
   const [A, B, C] = ids;
-  const I = circleCenter(s) ?? freeLabel(ids, ['I', 'O', 'P', 'Q']); // the incenter
-  const F = freeLabel([...ids, I], ['F', 'G', 'H', 'K']); // tangency point on AB
+  const taken = ctx.points ?? []; // auto-named points must dodge labels already in the figure
+  const I = circleCenter(s) ?? freeLabel([...ids, ...taken], ['I', 'O', 'P', 'Q']); // the incenter
+  const F = freeLabel([...ids, I, ...taken], ['F', 'G', 'H', 'K']); // tangency point on AB
   const bisA = `bis-${B}${A}${C}`; // ∠BAC (vertex A)
   const bisB = `bis-${A}${B}${C}`; // ∠ABC (vertex B)
   return [
@@ -1368,7 +1370,7 @@ const circumcircle: Rule = (s, ctx) => {
   // (ADR-041). Only when all four already exist (else it's a fresh on-circle placement, not this rule).
   const four = labelRun(rest, 4);
   if (four && four.every((id) => (ctx.points ?? []).includes(id))) {
-    const center = freeLabel(four, ['O', 'P', 'Q', 'K', 'S', 'T']);
+    const center = freeLabel([...four, ...(ctx.points ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
     return [
       { type: 'circumcircle', id: circleId(center), center, a: four[0], b: four[1], c: four[2] },
       { type: 'set-concyclic', points: four },
@@ -1376,7 +1378,8 @@ const circumcircle: Rule = (s, ctx) => {
   }
   const ids = labelRun(rest, 3);
   if (!ids) return null;
-  const center = freeLabel(ids, ['O', 'P', 'Q', 'K', 'S', 'T']);
+  // Avoid clashing with an existing centre (a second circle gets a fresh label, not a reused 'O').
+  const center = freeLabel([...ids, ...(ctx.points ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
   return [{ type: 'circumcircle', id: circleId(center), center, a: ids[0], b: ids[1], c: ids[2] }];
 };
 

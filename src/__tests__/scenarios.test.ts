@@ -96,6 +96,28 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'second-inscribed-circle-fresh-centre',
+    title: 'a second inscribed/circumscribed circle auto-names a fresh centre instead of colliding on O',
+    guards:
+      "the inscribed/circumcircle centre auto-picker only dodged the VERTEX letters, not points already in the figure — so a second circle re-picked 'O' and hit \"'O' is already defined\". The picker now also avoids ctx.points, so the second circle gets a fresh centre (P).",
+    steps: [
+      'משולש CDE',
+      'A על CD',
+      'B על CE',
+      'מרובע ABED חסום במעגל', // first circle → centre O
+      'משולש ABC חסום במעגל', // second circle → must auto-name a FRESH centre, not reuse O
+    ],
+    check(fig) {
+      allStepsOk(fig); // no "'O' is already defined" collision
+      // Two distinct circle centres exist (O for the quad, a fresh one for the triangle).
+      const O = at(fig, 'O'), P = at(fig, 'P');
+      expect(dist(O, P)).toBeGreaterThan(1e-6);
+      // The triangle's three vertices lie on the SECOND circle (centre P).
+      const R = dist(P, at(fig, 'A'));
+      for (const id of ['A', 'B', 'C']) expect(dist(P, at(fig, id))).toBeCloseTo(R, 4);
+    },
+  },
+  {
     id: 'cyclic-quad-existing-vertices',
     title: 'a cyclic/inscribed quad whose 4 vertices already exist becomes concyclic (does not detach them)',
     guards:

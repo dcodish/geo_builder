@@ -203,6 +203,13 @@ construction, so it saw A,B,C as fresh free-points and (since A,B already existe
 flagged a false redefinition conflict, dropping the circle. Fixed by adding `circumcircle` to `isShape`.
 **Asserts:** all steps OK (no redefinition over-constraint); O is the circumcentre — |OA| = |OB| = |OC|.
 
+### `second-inscribed-circle-fresh-centre` — a 2nd inscribed circle doesn't collide on centre O
+**Steps:** `משולש CDE`, `A על CD`, `B על CE`, `מרובע ABED חסום במעגל` (1st circle → centre O), `משולש ABC חסום במעגל`.
+**Guards against:** `"'O' is already defined"`. The inscribed/circumcircle centre auto-picker only dodged the
+**vertex** letters, not points already in the figure, so the second circle re-picked `O`. The picker now also
+avoids `ctx.points`, so the second circle gets a fresh centre (P).
+**Asserts:** all steps OK; two distinct centres O, P exist; triangle ABC's three vertices lie on the 2nd circle (centre P).
+
 ### `cyclic-quad-existing-vertices` — inscribing a quad whose 4 vertices already exist (ADR-041)
 **Steps:** `משולש CED`, `A על CD`, `B על CE`, `מרובע ABDE בר חסימה` (the last is the LLM canonical line for
 "מרובע ABDE חסום במעגל", re-parsed with context).
