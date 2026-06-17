@@ -96,6 +96,46 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'cyclic-quad-existing-vertices',
+    title: 'a cyclic/inscribed quad whose 4 vertices already exist becomes concyclic (does not detach them)',
+    guards:
+      "inscribing a quad whose vertices already exist (A on CD, B on CE, D & E triangle vertices) re-placed A,B,D,E as FRESH on-circle points — detaching A from CD and B from CE. The new `concyclic` constraint (ADR-041) instead draws/hides the circumcircle through three of them and drives a free DOF (A's slide on CD) until all four share the circle.",
+    steps: [
+      'משולש CED',
+      'A על CD',
+      'B על CE',
+      'מרובע ABDE בר חסימה', // the LLM canonical line for "מרובע ABDE חסום במעגל", re-parsed with context
+    ],
+    check(fig) {
+      allStepsOk(fig); // no detach / over-constraint
+      // A stays ON segment CD (not re-pinned to a fresh circle): collinear C-A-D.
+      const C = at(fig, 'C'), D = at(fig, 'D');
+      const A = at(fig, 'A');
+      const cross = (D.x - C.x) * (A.y - C.y) - (D.y - C.y) * (A.x - C.x);
+      expect(Math.abs(cross) / (dist(C, D) || 1)).toBeLessThan(1e-3); // A on line CD
+      // All four vertices are concyclic (equidistant from the circumcentre O).
+      const O = at(fig, 'O'), R = dist(O, A);
+      for (const id of ['A', 'B', 'D', 'E']) expect(dist(O, at(fig, id))).toBeCloseTo(R, 4);
+    },
+  },
+  {
+    id: 'circle-through-four-existing-points',
+    title: '"circle through A B E D" with four existing points draws a circle + makes the fourth concyclic',
+    guards:
+      'the circumcircle rule read only the first THREE of four labels, silently dropping D — so the circle passed through A,B,E but not D. It now draws the circumcircle of three and adds a `concyclic` constraint over all four (ADR-041).',
+    steps: [
+      'משולש CED',
+      'A על CD',
+      'B על CE',
+      'circle through A B E D', // the LLM canonical line for "מעגל ABED", re-parsed with context
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), R = dist(O, at(fig, 'A'));
+      for (const id of ['A', 'B', 'E', 'D']) expect(dist(O, at(fig, id))).toBeCloseTo(R, 4); // D is on it too
+    },
+  },
+  {
     id: 'circumcircle-of-existing-points',
     title: 'a circle circumscribing a triangle whose three vertices already exist (no redefinition conflict)',
     guards:

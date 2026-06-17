@@ -202,3 +202,18 @@ from `commandConflict`'s `isShape` allow-list — and that gate runs `applyComma
 construction, so it saw A,B,C as fresh free-points and (since A,B already existed as on-segment points)
 flagged a false redefinition conflict, dropping the circle. Fixed by adding `circumcircle` to `isShape`.
 **Asserts:** all steps OK (no redefinition over-constraint); O is the circumcentre — |OA| = |OB| = |OC|.
+
+### `cyclic-quad-existing-vertices` — inscribing a quad whose 4 vertices already exist (ADR-041)
+**Steps:** `משולש CED`, `A על CD`, `B על CE`, `מרובע ABDE בר חסימה` (the last is the LLM canonical line for
+"מרובע ABDE חסום במעגל", re-parsed with context).
+**Guards against:** the quad re-placing A, B, D, E as **fresh on-circle points** — detaching A from segment
+CD and B from CE. The new `concyclic` constraint instead draws/hides the circumcircle through three of them
+and drives a free DOF (A's slide on CD) until all four share the circle.
+**Asserts:** all steps OK; A stays collinear on C–D (not re-pinned); all four equidistant from the circumcentre O.
+
+### `circle-through-four-existing-points` — "circle through A B E D" makes the 4th concyclic, not dropped
+**Steps:** `משולש CED`, `A על CD`, `B על CE`, `circle through A B E D` (the LLM canonical line for "מעגל ABED").
+**Guards against:** the `circumcircle` rule reading only the first **three** of four labels — so the circle
+passed through A, B, E but missed D. It now draws the circumcircle of three and adds a `concyclic` constraint
+over all four (ADR-041).
+**Asserts:** all steps OK; D lies on the circle too (all four equidistant from O).

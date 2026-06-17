@@ -8,7 +8,9 @@
 import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
 import { build } from '@/engine';
+import { circumcenter } from '@/engine/geometry';
 import { buildScene } from '@/render/scene';
+import type { AnyCommand } from '@/engine';
 
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 /** Interior angle (degrees) at `b` in the corner a–b–c. */
@@ -77,6 +79,41 @@ describe('cyclic quadrilateral (בר חסימה) — concyclic, circle not drawn
     expect(circle.hidden ?? false).toBe(hidden);
     const { construction, positions } = build(r.commands);
     expect(buildScene(construction, positions).circles).toHaveLength(drawn);
+  });
+});
+
+describe('concyclic constraint on PRE-EXISTING points (ADR-041) — drives a DOF, does not detach', () => {
+  it('drives a FREE vertex so four free points become concyclic', () => {
+    // A general quadrilateral's four vertices are free points (no on-segment parameter). The
+    // `concyclic` constraint must reshape it by MOVING a free vertex (resolveDriven path), not by
+    // re-placing the points on a fresh circle.
+    const cmds: AnyCommand[] = [
+      { type: 'quadrilateral', ids: ['A', 'B', 'C', 'D'] },
+      { type: 'set-concyclic', points: ['A', 'B', 'C', 'D'] },
+    ];
+    const { positions } = build(cmds);
+    const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => positions.get(id)!);
+    const O = circumcenter(A, B, C)!; // circle through the first three
+    const R = Math.hypot(O.x - A.x, O.y - A.y);
+    expect(Math.hypot(O.x - D.x, O.y - D.y)).toBeCloseTo(R, 4); // D pulled onto it
+  });
+
+  it('"show another configuration" is available when an on-segment carrier has multiple roots', () => {
+    // A on CD is the carrier; the circle through B,D,E it must reach can be met at two parameters
+    // (near and far), so the construct offers alternative configurations rather than a single one.
+    const cmds: AnyCommand[] = [
+      { type: 'triangle', ids: ['C', 'E', 'D'] },
+      { type: 'point-on-segment', id: 'A', a: 'C', b: 'D' },
+      { type: 'point-on-segment', id: 'B', a: 'C', b: 'E' },
+      { type: 'circumcircle', id: 'circle-O', center: 'O', a: 'A', b: 'B', c: 'D', hidden: true },
+      { type: 'set-concyclic', points: ['A', 'B', 'D', 'E'] },
+    ];
+    const { positions } = build(cmds);
+    const O = positions.get('O')!, R = Math.hypot(O.x - positions.get('A')!.x, O.y - positions.get('A')!.y);
+    for (const id of ['A', 'B', 'D', 'E']) {
+      const p = positions.get(id)!;
+      expect(Math.hypot(O.x - p.x, O.y - p.y)).toBeCloseTo(R, 4);
+    }
   });
 });
 

@@ -527,7 +527,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         pos,
       );
       addObj(objects, { kind: 'circumcenter', id: cmd.center, a: cmd.a, b: cmd.b, c: cmd.c });
-      addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.a }, autoCenter: true }); // circumcentre is auto, hidden unless used
+      addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.a }, autoCenter: true, ...(cmd.hidden ? { hidden: true } : {}) }); // circumcentre is auto, hidden unless used; `hidden` for a cyclic (בר-חסימה) figure
       break;
 
     case 'point-on-circle':
@@ -686,6 +686,13 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'set-length-order':
       constraints.push({ type: 'length-order', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      break;
+
+    // The points are concyclic (ADR-041) — drive a free DOF among them (an on-segment slide, a free
+    // vertex) until they share a circle. Generic via driveOrCheck: the residual sign-changes, so an
+    // on-segment carrier solves in closed form; a fully-determined set is a pure check (over-constraint).
+    case 'set-concyclic':
+      driveOrCheck(objects, constraints, { type: 'concyclic', points: cmd.points });
       break;
   }
 

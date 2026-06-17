@@ -22,7 +22,7 @@ import {
   ORDER_LEN_MARGIN_FRAC,
   ORDER_LEN_MIN_FRAC,
 } from './types';
-import { add, angleDeg, dist, scale, solveParam, sub, unit } from './geometry';
+import { add, angleDeg, circumcenter, dist, scale, solveParam, sub, unit } from './geometry';
 
 /** The point ids a constraint references. */
 export function constraintRefs(con: Constraint): Id[] {
@@ -44,7 +44,21 @@ export function constraintRefs(con: Constraint): Id[] {
       return [con.v1, con.a1, con.b1, con.v2, con.a2, con.b2];
     case 'length-order':
       return [con.a, con.b, con.c, con.d];
+    case 'concyclic':
+      return con.points;
   }
+}
+
+/**
+ * Circumcircle of a concyclic constraint's first three points (centre + radius), or null when
+ * those three are collinear/coincident (no stable circle — the residual then returns NaN so the
+ * root finder skips this position). Shared by `residual`/`constraintScale`.
+ */
+function concyclicCircle(pts: Vec[]): { o: Vec; r: number } | null {
+  if (pts.length < 4) return null; // < 4 points are always concyclic — nothing to measure
+  const o = circumcenter(pts[0], pts[1], pts[2]);
+  if (!o) return null;
+  return { o, r: dist(o, pts[0]) };
 }
 
 /**
@@ -96,6 +110,17 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
       const longer = dist(get(con.c), get(con.d));
       return Math.max(0, dist(get(con.a), get(con.b)) - longer + ORDER_LEN_MARGIN_FRAC * longer);
     }
+    case 'concyclic': {
+      // Signed (length-unit) deviation of the points beyond the first three from the circle through
+      // those three: 0 ⇔ all on one circle, and it sign-changes as a point crosses the circle (so a
+      // 1-DOF on-segment carrier brackets in closed form). NaN when the first three give no circle.
+      const pts = con.points.map(get);
+      const c = concyclicCircle(pts);
+      if (!c) return con.points.length < 4 ? 0 : NaN;
+      let s = 0;
+      for (let i = 3; i < pts.length; i++) s += dist(c.o, pts[i]) - c.r;
+      return s;
+    }
   }
 }
 
@@ -126,6 +151,10 @@ export function constraintScale(con: Constraint, get: (id: Id) => Vec): number {
       return Math.max(dist(get(con.c), get(con.d)), 1e-9); // relative to the longer length
     case 'angle-order':
       return 90; // an order residual is ≤ MARGIN degrees — scale it like a right angle so it sits ~O(0.1) alongside relative length residuals
+    case 'concyclic': {
+      const c = concyclicCircle(con.points.map(get));
+      return c ? Math.max(c.r, 1e-9) : 1; // relative to the circle's radius (a length-unit residual)
+    }
     default:
       return 1; // angle / angle-ratio / parallel / perpendicular / coincide are scale-free (or fixed)
   }
@@ -138,6 +167,7 @@ export function residualTolerance(con: Constraint, scale = 1): number {
     case 'distance':
     case 'equal':
     case 'ratio':
+    case 'concyclic':
       return Math.max(1e-6, 2e-4 * scale);
     case 'parallel':
     case 'perpendicular':
@@ -177,6 +207,8 @@ export function describeConstraint(con: Constraint): string {
       return `∠${con.a1}${con.v1}${con.b1} < ∠${con.a2}${con.v2}${con.b2}`;
     case 'length-order':
       return `|${con.a}${con.b}| < |${con.c}${con.d}|`;
+    case 'concyclic':
+      return `${con.points.join(', ')} concyclic`;
   }
 }
 

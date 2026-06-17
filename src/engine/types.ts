@@ -541,6 +541,20 @@ export interface LengthOrderConstraint {
   d: Id;
 }
 
+/**
+ * The listed points are CONCYCLIC — they all lie on one circle (ADR-041). Used when a
+ * cyclic/inscribed polygon's vertices ALREADY exist (so they can't simply be re-placed on a
+ * fresh circle): the constraint drives a free DOF among them until they share a circle. The
+ * residual is the (signed, length-unit) deviation of the points beyond the first three from the
+ * circle through those three — 0 ⇔ concyclic, and it sign-changes as a point crosses the circle,
+ * so a 1-DOF on-segment carrier is solved in closed form. Needs ≥ 4 points to bite (any 3 are
+ * trivially concyclic).
+ */
+export interface ConcyclicConstraint {
+  type: 'concyclic';
+  points: Id[];
+}
+
 export type Constraint =
   | AngleConstraint
   | DistanceConstraint
@@ -551,7 +565,8 @@ export type Constraint =
   | AngleRatioConstraint
   | CoincideConstraint
   | AngleOrderConstraint
-  | LengthOrderConstraint;
+  | LengthOrderConstraint
+  | ConcyclicConstraint;
 
 export interface Construction {
   objects: GeoObject[];
@@ -582,6 +597,7 @@ export type Command =
   | { type: 'set-length-order'; a: Id; b: Id; c: Id; d: Id } // |ab| < |cd| (ab is the shorter)
   | { type: 'set-parallel'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-perpendicular'; a: Id; b: Id; c: Id; d: Id }
+  | { type: 'set-concyclic'; points: Id[] } // the points are concyclic (drives a DOF so they share a circle)
   // Phase 5b — lines (scaffolding unless `visible`) and the points they produce.
   | { type: 'bisector'; id: Id; vertex: Id; p: Id; q: Id; visible?: boolean }
   | { type: 'perpendicular-line'; id: Id; through: Id; a: Id; b: Id; visible?: boolean }
@@ -593,7 +609,7 @@ export type Command =
   // Phase 5c — circles and the points they produce.
   | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean; autoCenter?: boolean }
   | { type: 'circle-through'; id: Id; center: Id; through: Id; hidden?: boolean; autoCenter?: boolean }
-  | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id } // circle through a,b,c (centre = circumcentre)
+  | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id; hidden?: boolean } // circle through a,b,c (centre = circumcentre); hidden for a cyclic (בר-חסימה) figure
   | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number }
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
   | { type: 'arc'; id: Id; center: Id; from: Id; to: Id } // a drawn arc (CCW from→to): semicircle / quarter circle

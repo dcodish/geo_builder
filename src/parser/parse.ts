@@ -754,11 +754,21 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // No centre named ⇒ create one: a fresh label that doesn't clash with the vertices.
   const center = named ?? (['O', 'P', 'Q', 'K', 'S', 'T', 'U'].find((c) => !ids.includes(c)) ?? 'O');
   const circ = circleId(center);
-  // Inscribing a triangle whose vertices ALREADY exist means the CIRCUMCIRCLE through
-  // them (not a fresh circle they'd be forced onto) — otherwise the new centre lands
-  // at the origin and can collide with a vertex ("A and O at the same point").
-  if (isTri && ids.every((id) => (ctx.points ?? []).includes(id))) {
+  // Inscribing a polygon whose vertices ALREADY exist can't re-place them on a fresh circle
+  // (that would detach them from their own definitions — A from segment CD, etc.). A triangle's
+  // three existing points have a unique CIRCUMCIRCLE through them. A quad's four are generally NOT
+  // concyclic, so a `concyclic` constraint drives a free DOF among them until they share one circle
+  // (ADR-041); the circle is drawn ("inscribed"/חסום) or hidden ("cyclic"/בר-חסימה).
+  const allExist = ids.every((id) => (ctx.points ?? []).includes(id));
+  if (isTri && allExist) {
     return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2] }];
+  }
+  if (allExist) {
+    return [
+      { type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2], ...(hidden ? { hidden: true } : {}) },
+      { type: 'set-concyclic', points: ids },
+      { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
+    ];
   }
   // A cyclic (hidden-circle) quad needs CONVEX vertex order for the opposite-angles theorem;
   // the default general-quad spread (golden angle) would interleave the vertices into a
@@ -1348,11 +1358,22 @@ const parallelLine: Rule = (s, ctx) => {
  * "מעגל דרך A B C" — the circle determined by three points (centre = circumcentre).
  * Distinct from circle-through (centre + ONE point): this reads exactly 3 labels.
  */
-const circumcircle: Rule = (s) => {
+const circumcircle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
   if (!/through|circumscrib|חוסם|דרך/i.test(s)) return null; // the 3-point cue (חוסם circumscribes ≠ חסום inscribed)
   if (circleCenter(s)) return null; // a named centre ⇒ it's a centre-based circle, not a circumcircle
   const rest = s.replace(/circles?|מעגל|circumscrib\w*|through|דרך|חוסם|את|of|the|around|triangle|משולש|מרובע/gi, ' ');
+  // "circle through A B C D" — FOUR existing points: a unique circle can't pass through four arbitrary
+  // points, so draw the circumcircle of three and make the fourth concyclic by driving a free DOF
+  // (ADR-041). Only when all four already exist (else it's a fresh on-circle placement, not this rule).
+  const four = labelRun(rest, 4);
+  if (four && four.every((id) => (ctx.points ?? []).includes(id))) {
+    const center = freeLabel(four, ['O', 'P', 'Q', 'K', 'S', 'T']);
+    return [
+      { type: 'circumcircle', id: circleId(center), center, a: four[0], b: four[1], c: four[2] },
+      { type: 'set-concyclic', points: four },
+    ];
+  }
   const ids = labelRun(rest, 3);
   if (!ids) return null;
   const center = freeLabel(ids, ['O', 'P', 'Q', 'K', 'S', 'T']);
