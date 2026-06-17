@@ -272,41 +272,18 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     for (let i = 0; i < x.length; i++) s += lambda * (x[i] - seed[i]) * (x[i] - seed[i]);
     return s;
   };
-  // 1) Pick the nearest basin: regularised search from the seed and a few cardinal
-  //    restarts (so a vertex on the far side of a solution circle isn't missed).
+  // Nearest basin (regularised search from the seed) + a few cardinal restarts so a vertex on the
+  // far side of a solution circle isn't missed; then polish on the pure residual (shrinking simplex)
+  // so the result lands ON the constraint; accept only a genuine, non-degenerate solution else keep
+  // the seed so the honest over-constraint check reports it. Shared scaffold — see multiStartSolve.
   const offsets = [1, -1, 0.5].flatMap((d) => [
     seed.map((v, i) => (i % 2 === 0 ? v + d * span : v)),
     seed.map((v, i) => (i % 2 === 1 ? v + d * span : v)),
   ]);
-  let best = seed;
-  let bestReg = regCost(seed);
-  for (const start of [seed, ...offsets]) {
-    const x = nelderMead(regCost, start, 400, span * 0.2);
-    const fx = regCost(x);
-    if (fx < bestReg) {
-      bestReg = fx;
-      best = x;
-    }
-  }
-  // 2) Polish: drop the regulariser and minimise the pure residual from the chosen
-  //    basin, with shrinking simplex steps, so the result lands ON the constraint
-  //    (the λ term above pulls slightly off it; the check tolerance is 1e-6).
-  for (const st of [span * 0.05, span * 0.005]) best = nelderMead(resid, best, 400, st);
-  // 3) Accept only a genuine, non-degenerate solution. A constraint like AB∥BC on a
-  //    figure that can't satisfy it (or |AB|=k|CD| with no valid config) is driven
-  //    toward collapsing a segment to ~0 — a cheat that drives the residual down. If
-  //    the best is still off the constraint OR has collapsed a referenced segment,
-  //    keep the ORIGINAL figure so the honest over-constraint check reports it.
-  const r = evaluateCore(place(best), { skipConstraints: true });
-  const refIds = [...new Set(cons.flatMap((con) => constraintRefs(con)))];
-  const satisfied =
-    r.ok &&
-    cons.every((con) => {
-      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return false;
-      return isSatisfied(con, (id) => r.positions.get(id)!);
-    }) &&
-    !degenerateSpread(refIds.map((id) => r.positions.get(id)).filter((p): p is Vec => !!p), span);
-  return satisfied ? place(best) : place(seed);
+  const best = multiStartSolve(seed, offsets, span * 0.2, regCost, resid, [span * 0.05, span * 0.005], 400, (x) =>
+    solutionAccepted(place, x, cons, span),
+  );
+  return place(best);
 }
 
 /** True if any two of the constraint's referenced points have collapsed together (a near-degenerate "solution" the solver cheated to). */
@@ -316,6 +293,55 @@ function degenerateSpread(pts: Vec[], span: number): boolean {
     for (let j = i + 1; j < pts.length; j++)
       if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) < eps) return true;
   return false;
+}
+
+/**
+ * Shared multi-start optimiser for the driven solvers (R5/[ADR-045](docs/06-decisions.md#adr-045)):
+ * a regularised search from the seed plus the given cardinal `restarts` (so a far basin isn't missed),
+ * then a polish that drops the regulariser and shrinks the simplex through `polishSteps` so the result
+ * lands tightly on the constraints. Returns the best candidate if `accept` passes, else the seed
+ * (honest over-constraint → the caller keeps the prior figure). Pure refactor of the formerly-duplicated
+ * basin-search/polish/accept loop in {@link resolveFreeDriven} and {@link resolveMixedCarriers}.
+ */
+function multiStartSolve(
+  seed: number[],
+  restarts: number[][],
+  searchStep: number,
+  regCost: (x: number[]) => number,
+  polishCost: (x: number[]) => number,
+  polishSteps: number[],
+  polishIters: number,
+  accept: (x: number[]) => boolean,
+): number[] {
+  let best = seed;
+  let bestReg = regCost(seed);
+  for (const start of [seed, ...restarts]) {
+    const x = nelderMead(regCost, start, 400, searchStep);
+    const fx = regCost(x);
+    if (fx < bestReg) {
+      bestReg = fx;
+      best = x;
+    }
+  }
+  for (const st of polishSteps) best = nelderMead(polishCost, best, polishIters, st);
+  return accept(best) ? best : seed;
+}
+
+/**
+ * A candidate `x` (mapped to a Construction by `place`) is accepted iff the figure evaluates, satisfies
+ * every constraint within tolerance, and isn't degenerate (no two referenced points collapsed together —
+ * a cheat the residual alone would reward). Shared accept gate for both driven solvers.
+ */
+function solutionAccepted(place: (x: number[]) => Construction, x: number[], cons: Constraint[], span: number): boolean {
+  const r = evaluateCore(place(x), { skipConstraints: true });
+  if (!r.ok) return false;
+  const refIds = [...new Set(cons.flatMap((con) => constraintRefs(con)))];
+  return (
+    cons.every((con) => {
+      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return false;
+      return isSatisfied(con, (id) => r.positions.get(id)!);
+    }) && !degenerateSpread(refIds.map((id) => r.positions.get(id)).filter((p): p is Vec => !!p), span)
+  );
 }
 
 /** Set free vertices to explicit positions and clear their `solve` directives (now resolved). */
@@ -403,7 +429,6 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     }
     return setCarrierVals(c, vals);
   };
-  const refIds = [...new Set(cons.flatMap((con) => constraintRefs(con)))];
   // The cost is the sum of squared RELATIVE residuals (each constraint's residual ÷ its own scale).
   // This is un-gameable by shrinking: a wrong ratio stays ~1% relative however small you make it, so
   // the solver can't "cheat" a length/ratio by collapsing the constrained part (and a collapse, scale→0,
@@ -429,32 +454,22 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     for (let i = 0; i < u.length; i++) s += lambda * (u[i] - seedU[i]) * (u[i] - seedU[i]);
     return s;
   };
-  // 1) Nearest basin: regularised search from the seed + cardinal restarts (each DOF pushed by a
-  //    range of magnitudes in normalised units, so both a nearby and a far-off basin are tried).
+  // Nearest basin (regularised search from the seed) + cardinal restarts (each DOF pushed by a range of
+  // magnitudes in normalised units, so both a nearby and a far-off basin are tried); polish on the residual
+  // + degeneracy penalty through several decades so a coupled system lands tightly ON the constraints and
+  // stays spread; accept only a genuine, non-degenerate solution else keep the seed. Shared scaffold.
   const restarts = [0.5, 1, -1, 2, -2].flatMap((d) => seedU.map((_, j) => seedU.map((v, i) => (i === j ? v + d : v))));
-  let best = seedU;
-  let bestReg = regCost(seedU);
-  for (const start of [seedU, ...restarts]) {
-    const x = nelderMead(regCost, start, 400, 0.3);
-    const fx = regCost(x);
-    if (fx < bestReg) {
-      bestReg = fx;
-      best = x;
-    }
-  }
-  // 2) Polish on residual + degeneracy penalty (drop only the seed regulariser), shrinking the simplex
-  //    through several decades so a coupled system lands tightly ON the constraints — and stays spread.
-  for (const st of [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4]) best = nelderMead(cost, best, 500, st);
-  // 3) Accept only a genuine, non-degenerate solution; else keep the seed (honest over-constraint).
-  const r = evaluateCore(place(best), { skipConstraints: true });
-  const satisfied =
-    r.ok &&
-    cons.every((con) => {
-      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return false;
-      return isSatisfied(con, (id) => r.positions.get(id)!);
-    }) &&
-    !degenerateSpread(refIds.map((id) => r.positions.get(id)).filter((p): p is Vec => !!p), span);
-  return satisfied ? place(best) : place(seedU);
+  const best = multiStartSolve(
+    seedU,
+    restarts,
+    0.3,
+    regCost,
+    cost,
+    [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4],
+    500,
+    (x) => solutionAccepted(place, x, cons, span),
+  );
+  return place(best);
 }
 
 /** Nelder–Mead downhill simplex — derivative-free joint minimisation of `f` from `x0`. */
