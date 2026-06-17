@@ -53,12 +53,12 @@ exports[`driven-solver stability snapshot (Wave-2/3 gate) > parallelogram + |AB|
     0,
   ],
   "C": [
-    5.3535,
-    2.7092,
+    5.2956,
+    2.8208,
   ],
   "D": [
-    -0.6465,
-    2.7092,
+    -0.7044,
+    2.8208,
   ],
 }
 `;

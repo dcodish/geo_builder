@@ -254,7 +254,12 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     let s = 0;
     for (const con of cons) {
       for (const id of constraintRefs(con)) if (!r.positions.has(id)) return Infinity;
-      const v = residual(con, (id) => r.positions.get(id)!);
+      const get = (id: Id) => r.positions.get(id)!;
+      // RELATIVE residual (normalised by the constraint's scale) — one residual convention across the
+      // driven solvers (matches resolveMixedCarriers), un-gameable by shrinking a segment toward 0
+      // (ADR-033 Am.1 / ADR-045 R5). The zero set is unchanged, so a single constraint lands in the
+      // same place; it only rebalances multi-constraint joint solves and the seed tie-breaker.
+      const v = residual(con, get) / Math.max(constraintScale(con, get), 1e-9);
       s += v * v;
     }
     return s;
