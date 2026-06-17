@@ -1,5 +1,43 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`driven-solver stability snapshot (Wave-2/3 gate) > circle O r5 + A,B on-circle + |AB|=7 (coupled: 2 on-circle, 1 chord constraint) 1`] = `
+{
+  "A": [
+    -3.7537,
+    3.303,
+  ],
+  "B": [
+    -3.3775,
+    -3.6868,
+  ],
+  "O": [
+    0,
+    0,
+  ],
+}
+`;
+
+exports[`driven-solver stability snapshot (Wave-2/3 gate) > circle O r5 + A,B,C on-circle + |AB|=6 + |BC|=6 (coupled: 2 chord constraints) 1`] = `
+{
+  "A": [
+    -3.9649,
+    -3.0463,
+  ],
+  "B": [
+    1.8143,
+    -4.6592,
+  ],
+  "C": [
+    4.9809,
+    0.4371,
+  ],
+  "O": [
+    0,
+    0,
+  ],
+}
+`;
+
 exports[`driven-solver stability snapshot (Wave-2/3 gate) > circle O r5 + inscribed A,B,C (on-circle golden spread) 1`] = `
 {
   "A": [

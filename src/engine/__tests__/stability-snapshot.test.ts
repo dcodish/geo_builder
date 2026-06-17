@@ -69,6 +69,31 @@ const FIGURES: { name: string; cmds: Command[] }[] = [
       { type: 'set-angle', vertex: 'P', ray1: 'D', ray2: 'C', value: 50 },
     ],
   },
+  // ── COUPLED-BLOCK path (≥2 driven parametric carriers, evaluate.ts resolveDriven) ──
+  // The Wave-2/3 gate previously had NO figure on this path — every figure above routes through
+  // the 1-DOF / free-vertex / mixed solvers. R5 Pass 2 merges this path into resolveMixedCarriers,
+  // so these two pin its CHOSEN configuration (incl. the far-branch grid-scan seeding the merge must
+  // preserve). Both drive two on-circle thetas jointly (a chord length on free-on-circle ends).
+  {
+    name: 'circle O r5 + A,B on-circle + |AB|=7 (coupled: 2 on-circle, 1 chord constraint)',
+    cmds: [
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
+      { type: 'point-on-circle', id: 'A', circle: 'circle-O' },
+      { type: 'point-on-circle', id: 'B', circle: 'circle-O' },
+      { type: 'set-distance', a: 'A', b: 'B', value: 7 },
+    ],
+  },
+  {
+    name: 'circle O r5 + A,B,C on-circle + |AB|=6 + |BC|=6 (coupled: 2 chord constraints)',
+    cmds: [
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
+      { type: 'point-on-circle', id: 'A', circle: 'circle-O' },
+      { type: 'point-on-circle', id: 'B', circle: 'circle-O' },
+      { type: 'point-on-circle', id: 'C', circle: 'circle-O' },
+      { type: 'set-distance', a: 'A', b: 'B', value: 6 },
+      { type: 'set-distance', a: 'B', b: 'C', value: 6 },
+    ],
+  },
 ];
 
 describe('driven-solver stability snapshot (Wave-2/3 gate)', () => {
