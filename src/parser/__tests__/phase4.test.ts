@@ -6,13 +6,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { Command } from '@/engine';
+import type { AnyCommand, Command } from '@/engine';
 import { build } from '@/engine';
 import { parse } from '../parse';
 import { COMMAND_CATALOG } from '../catalog';
 
 /** Parse and expect exactly one command equal to `expected`. */
-function one(input: string, expected: Command) {
+function one(input: string, expected: AnyCommand) {
   const r = parse(input);
   expect(r.ok, `"${input}" should parse`).toBe(true);
   if (r.ok) {
@@ -22,7 +22,7 @@ function one(input: string, expected: Command) {
 }
 
 /** Parse and expect `expected` to be among the commands (the rule may also draw referenced segments). */
-function has(input: string, expected: Command) {
+function has(input: string, expected: AnyCommand) {
   const r = parse(input);
   expect(r.ok, `"${input}" should parse`).toBe(true);
   if (r.ok) expect(r.commands).toContainEqual(expected);
@@ -285,5 +285,30 @@ describe('parser — coverage on the in-grammar sample', () => {
       expect(parse(c.en).ok, `EN catalog example should parse: "${c.en}"`).toBe(true);
       expect(parse(c.he).ok, `HE catalog example should parse: "${c.he}"`).toBe(true);
     }
+  });
+});
+
+// R6a — a length equation's RHS must be read WHOLE: a greedy rule can no longer grab a numeric/var
+// prefix and silently drop a trailing radical / exponent / unit (the ADR-024/026 half-parse class).
+// The greedy rules (distanceConstraint, measureLength) are anchored to end-of-input, so an unreadable
+// RHS escalates (not-handled → LLM) instead of becoming a wrong partial parse.
+describe('parser — length-equation RHS is read whole (no prefix half-parse, R6a)', () => {
+  it('√ coverage: "AB = 12√x" is a √ measure, never set-distance 12', () => {
+    one('AB = 12√x', { type: 'measure-length', a: 'A', b: 'B', expr: { coef: 12, var: 'x', pow: 0.5 } });
+  });
+
+  it('a power RHS "AB = 3x²" is read whole (pow 2), not half-parsed to "3x"', () => {
+    has('AB = 3x²', { type: 'measure-length', a: 'A', b: 'B', expr: { coef: 3, var: 'x', pow: 2 } });
+  });
+
+  it('a clean numeric RHS still works: "AB = 6" → set-distance 6', () => {
+    has('AB = 6', { type: 'set-distance', a: 'A', b: 'B', value: 6 });
+  });
+
+  it('an UNREADABLE RHS escalates instead of half-parsing: "AB = 5∛x" is NOT set-distance 5', () => {
+    const r = parse('AB = 5∛x'); // ∛ (cube root) is unhandled — must not silently become "= 5"
+    expect(r.ok).toBe(false); // not-handled → the App escalates to the LLM intact
+    // and specifically: it never produced a bare set-distance 5 (the prefix half-parse)
+    if (r.ok) expect((r as { commands: AnyCommand[] }).commands).not.toContainEqual({ type: 'set-distance', a: 'A', b: 'B', value: 5 });
   });
 });

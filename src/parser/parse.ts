@@ -420,9 +420,15 @@ const equalSegments: Rule = (s) => {
   ];
 };
 
-/** "AB = 6" — fix a segment's length. Also DRAWS the named segment (idempotent), FR-IN-7. */
+/**
+ * "AB = 6" — fix a segment's length. Also DRAWS the named segment (idempotent), FR-IN-7.
+ * The number is ANCHORED to the end of the input (`\s*$`), so a trailing radical / power / unit
+ * ("AB = 12√x", "AB = 5∛x", "AB = 6 cm") can't be silently dropped to a bare "= 6" — that
+ * numeric-prefix half-parse is the ADR-024/026 class. An unreadable RHS falls through to escalation
+ * instead of a wrong partial parse. (R6a.)
+ */
 const distanceConstraint: Rule = (s) => {
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${num}\b`));
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${num}\s*$`));
   if (!m) return null;
   const [a, b] = [up(m[1]), up(m[2])];
   return [
@@ -465,8 +471,11 @@ const measureLength: Rule = (s) => {
   // An optional trailing "/d" makes the coefficient a fraction ("7k/5" ⇒ coef 7/5); an optional
   // "± c" (c a number or fraction) adds an affine constant ("k + 2", "k − 5/2"). Both are kept
   // verbatim for the label so it reads exactly as typed, not a decimal.
+  // The RHS is ANCHORED to end-of-input (`\s*$`) so a trailing exponent/text can't be dropped:
+  // "AB = 3x²" must NOT half-parse to "3x" (measurePower runs first and owns it); a leftover suffix
+  // falls through to escalation instead of a wrong partial parse (the ADR-024/026 class). (R6a.)
   const m = s.match(
-    new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*(${LVAR})(?![a-zA-Z])\s*(?:\/\s*(${COEF}))?\s*(?:([+\-−])\s*(${COEF})(?:\s*\/\s*(${COEF}))?)?`),
+    new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*(${LVAR})(?![a-zA-Z])\s*(?:\/\s*(${COEF}))?\s*(?:([+\-−])\s*(${COEF})(?:\s*\/\s*(${COEF}))?)?\s*$`),
   );
   if (!m) return null;
   const num = m[3] ? parseFloat(m[3]) : 1;
