@@ -203,3 +203,38 @@ By operator decision (2026-06-17), **Phase 6 (theorems) is deferred** until the 
 ---
 
 **Bottom line:** the foundation is right and several layers are genuinely excellent. The instinct that the engine has been patched case-by-case is correct, but the cause is narrow and nameable — four hand-synced enumerations and one fractured solver — not the constructive model. Consolidate those toward the clean layers that already exist, and shift testing from per-figure memorization to invariants.
+
+---
+
+## 8. Progress tracker (resume pointer)
+
+_Branch `rebuild-foundation` · **959 tests green**, `tsc` + `vite build` clean · all commits pushed to GitHub `dcodish/geo_builder` · last updated 2026-06-17._
+
+**Wave 1 — DONE & pushed** (commit `0917cf2`; docs `e25b75a`):
+- [x] **R3 Piece 1** — `POINT_KINDS` compile-checked via `Record<GeoPointKind,true>`; the two inline `solve?` shapes unified to `SolveDirective`.
+- [x] **R1** — engine owns line/circle resolution (`resolveLine`/`resolveCircle` exported); renderer calls them, divergent copy deleted; fixed the tangent-inner render bug.
+- [x] **R5(1)** — one exported `isSatisfied(con,get)` replaces the 4 byte-identical gates.
+- [x] **R2** — a constraint-driven on-segment point is genuinely cyclable AND survives `replay` (`branch` on the command → `solveBranch` on the object); one engine-owned `firstCyclableBranch`.
+- [x] **Test Tier A** — determinism + build()/replay() equivalence over the 343-figure campaign.
+
+**Wave 2 — DONE & pushed:**
+- [x] **Stability snapshot harness** (`44f29f3`) — golden config of 9 driven figures; **the gate for all solver/carrier work**.
+- [x] **R4 Stage 1** (`0af6c6d`) — `commandConflict` reuse derived structurally (`reusesBase`); circumcircle false-conflict class killed.
+- [x] **R9(a)** (`253dd6b`) — LLM `absorb` registers a circumcircle centre.
+- [x] **R3 Piece 2** (`62c7b22`) — `carriers.ts` `carrierOf` exhaustive classifier; routed the drift-prone kind-lists through it. **Adversarially verified EQUIVALENT.**
+- [x] **Tier B** (`87de166`) — negative-space over-constraint coverage (guaranteed-contradiction figures).
+- [x] **R6(a)** (`ab6079c`) — anchored the greedy `=`-RHS rules; prefix half-parse class structurally closed (+ √ coverage tests).
+- [x] **R5(3)** (`791e4e3`) — `resolveFreeDriven` uses the relative residual (one convention). **Adversarially verified SAFE**; 1 snapshot figure moved to an equivalent valid config (reviewed + accepted).
+
+**Wave 3 + leftovers — NOT STARTED** (each its own focused pass; **all gated by the stability snapshot**):
+- [ ] **R5 scaffold/merge** — extract the shared Nelder-Mead scaffold across the 3 solver bodies + merge the coupled block into `resolveMixedCarriers`. ⚠️ **PORT the coupled block's full-range grid-scan SEEDING first** (`evaluate.ts:207–222`), else far-branch parametric figures (adr028-driven, cyclic-quad) regress. Also fold the coupled block's soft-barrier degeneracy onto `degenerateSpread`.
+- [ ] **R7 binding** — decide constraint→DOF binding once (retire greedy `driveOrCheck` + after-failure `recruitFreeDofs`; one ancestor walker). ⚠️ **Keep `replaceCyclicForDiameter`'s antipode pin** (or migrate it to a first-class persistent relation FIRST) — deleting it breaks bagrut-4d / cyclic-quad (audit-confirmed). Keep `driveOrCheck` as a tie-break + add a real per-DOF stay-put penalty.
+- [ ] **R8** — geometric (signed-side) branch keys; first extract the `avoid` one-off into a shared `otherCrossing`. Property test first.
+- [ ] **R4 Stage 2** — fold the five 0-DOF vertex kinds into one `DerivedVertex` (NOT a bare `Mat2` — each carries a drivable scalar). Behind corpus snapshot.
+- [ ] **R9(b)** — accumulate `circleMembers` across LLM steps (running construction + the engine's `circleMembers`).
+- [ ] **R6 full fold** — collapse all 7 `=`-RHS rules into one `parseLengthRHS`; only if a real misparse appears (anchoring already closed the harm).
+- [ ] **Test Tier C** — engine-reported `movedAncestors` diagnostic + `fast-check` stability family + the coordinate-span threshold probe (would also pin R5(3)'s one residual risk).
+
+**Open questions resolved (2026-06-17 discussion):** R2 cycling = a feature (built); thresholds = small figures, small fixed value (no relativization); scenario-growth meta-test = accepted (build once Tier-A/B exists); determinism-reuse rule = accepted. Drag/preview design = [ADR-048](06-decisions.md#adr-048) (Phase 8). **Phase 6 (theorems) is deferred** by operator decision — full working tool first; the rework above is the path to it.
+
+**To resume from home:** `git pull` on `rebuild-foundation`; read this §8 + the top of [PROJECT-MEMORY.md](PROJECT-MEMORY.md) (the 2026-06-17 Wave 1/Wave 2 session-log entries have the per-item detail + gotchas). Each ADR ([043](06-decisions.md#adr-043)–[047](06-decisions.md#adr-047)) carries an "Implemented" note matching the above. `npm install` (node_modules not in git), then `npx vitest run` should show 959 green.
