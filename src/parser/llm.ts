@@ -37,7 +37,9 @@ function absorb(cmd: AnyCommand, points: Set<string>, circles: Set<string>): voi
     if (typeof v === 'string' && /^[A-Z]$/.test(v)) points.add(v);
     else if (Array.isArray(v)) for (const e of v) if (typeof e === 'string' && /^[A-Z]$/.test(e)) points.add(e);
   }
-  if ((cmd.type === 'circle' || cmd.type === 'circle-through') && typeof cmd.center === 'string') circles.add(cmd.center);
+  // Every circle-introducing command's centre — INCLUDING circumcircle ("circle through A B C"),
+  // which was missing, so a later step that named that circle by its centre couldn't resolve it (ADR-046).
+  if ((cmd.type === 'circle' || cmd.type === 'circle-through' || cmd.type === 'circumcircle') && typeof cmd.center === 'string') circles.add(cmd.center);
 }
 
 /**
