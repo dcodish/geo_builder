@@ -22,6 +22,8 @@ export default defineConfig({
   cacheDir: path.resolve(process.env.LOCALAPPDATA || '', 'vite-cache/geo-builder'),
   test: {
     // archive/ holds the old implementation for reference only — never run or typecheck its tests.
-    exclude: ['**/node_modules/**', '**/dist/**', 'archive/**'],
+    // _node_modules_dropbox_old/ is a parked copy of node_modules (Dropbox-cloud-managed; node_modules
+    // now lives outside Dropbox via a junction) — exclude its stray third-party tests from collection.
+    exclude: ['**/node_modules/**', '**/_node_modules_dropbox_old/**', '**/dist/**', 'archive/**'],
   },
 });
