@@ -14,6 +14,7 @@ import { lower } from './lower';
 import { evaluate } from './evaluate';
 import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist } from './geometry';
+import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 import { constraintRefs, solvedOnSegmentCandidates } from './solve';
 
 export interface StepOk {
@@ -321,25 +322,23 @@ function freeDrivableAncestors(objects: GeoObject[], start: Id): Id[] {
     if (!o) continue;
     if (o.kind === 'line') { queue.push(...lineSpecPoints(o.spec)); continue; }
     if (!isGeoPoint(o)) continue;
-    const free1 = (o.kind === 'on-circle' || o.kind === 'on-segment') && (o as { solve?: unknown }).solve === undefined;
+    const free1 = isParamCarrier(o) && (o as { solve?: unknown }).solve === undefined;
     const free2 = o.kind === 'free-point' && !(o as FreePoint).pinned && !(o as FreePoint).rigid && (o as FreePoint).solve === undefined;
     if (free1 || free2) { result.push(id); continue; } // a terminal drivable DOF — stop here
     // A shape-scalar DOF (perp-offset dist / rotated angle / scaled-offset k) is also drivable,
     // but KEEP walking past it to its defining vertices (both are candidate DOFs) — ADR-033.
-    if ((o.kind === 'perp-offset' || o.kind === 'rotated' || o.kind === 'scaled-offset') && (o as { solve?: unknown }).solve === undefined) result.push(id);
+    if (isShapeCarrier(o) && (o as { solve?: unknown }).solve === undefined) result.push(id);
     if (o.kind === 'line-intersection') { queue.push(o.line1, o.line2); continue; }
     queue.push(...pointParents(o));
   }
   return result;
 }
 
-/** Mark a free vertex / parametric / shape-scalar carrier as driving `K`. */
+/** Mark a free vertex / parametric / shape-scalar carrier as driving `K`. (An on-line marker is
+ *  driven directly by `driveOrCheck`, not recruited here, so the `line` family is excluded.) */
 function markDriven(o: GeoObject, K: Constraint): GeoObject {
-  if (
-    o.kind === 'free-point' || o.kind === 'on-circle' || o.kind === 'on-segment' ||
-    o.kind === 'perp-offset' || o.kind === 'rotated' || o.kind === 'scaled-offset'
-  )
-    return { ...o, solve: { constraint: K, branch: 0 } };
+  const carrier = carrierOf(o);
+  if (carrier && carrier.family !== 'line') return { ...o, solve: { constraint: K, branch: 0 } } as GeoObject;
   return o;
 }
 

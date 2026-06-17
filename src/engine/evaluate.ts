@@ -7,6 +7,7 @@
 
 import type { Circle, Constraint, Construction, GeoObject, GeoPoint, Id, Line, Vec } from './types';
 import { LEN_EPS, isGeoPoint } from './types';
+import { isShapeCarrier } from './carriers';
 import {
   add,
   circleCircleIntersect,
@@ -83,9 +84,7 @@ function resolveDriven(c: Construction): Construction {
   // A driveable SHAPE SCALAR (perp-offset dist / rotated angle / scaled-offset k) present ⇒ the
   // generalized solver, which mixes it with any free-vertex / parametric carriers (ADR-033) — so a
   // rectangle's width (free vertex) and height (perp-offset) solve together.
-  const shapeCarriers = c.objects.filter(
-    (o) => (o.kind === 'perp-offset' || o.kind === 'rotated' || o.kind === 'scaled-offset') && o.solve !== undefined,
-  );
+  const shapeCarriers = c.objects.filter((o) => isShapeCarrier(o) && (o as { solve?: unknown }).solve !== undefined);
   const freeCarriers = c.objects.filter(
     (o): o is Extract<GeoObject, { kind: 'free-point' }> => o.kind === 'free-point' && o.solve !== undefined,
   );

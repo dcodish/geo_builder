@@ -17,6 +17,7 @@
  */
 
 import type { Constraint, Construction, FreePoint, Id, OnCirclePoint, OnLinePoint } from './types';
+import { carrierOf, isShapeCarrier } from './carriers';
 
 /** A free on-circle vertex the sampler may slide (an arbitrary-angle vertex, not driven/fixed). */
 const isFreeOnCircle = (o: { kind: string; free?: boolean; solve?: unknown }): boolean =>
@@ -59,9 +60,7 @@ export function applySeed(c: Construction, seed: number): Construction {
   const free = c.objects.filter((o): o is FreePoint => o.kind === 'free-point' && !o.pinned);
   const freeCircle = c.objects.filter((o): o is OnCirclePoint => isFreeOnCircle(o));
   const freeLine = c.objects.filter((o): o is OnLinePoint => isFreeOnLine(o));
-  const freeShape = c.objects.some(
-    (o) => (o.kind === 'rotated' || o.kind === 'perp-offset' || o.kind === 'scaled-offset') && (o as { solve?: unknown }).solve === undefined,
-  );
+  const freeShape = c.objects.some((o) => isShapeCarrier(o) && (o as { solve?: unknown }).solve === undefined);
   if (free.length === 0 && freeCircle.length === 0 && freeLine.length === 0 && !freeShape) return c; // fully determined → nothing to sample
 
   // Free-point cluster: seeded spin about its centroid + per-point jitter.
@@ -143,17 +142,17 @@ export function freeDofs(c: Construction): Id[] {
         (o.kind === 'free-point' && !o.pinned) ||
         isFreeOnCircle(o) ||
         isFreeOnLine(o) ||
-        ((o.kind === 'rotated' || o.kind === 'perp-offset' || o.kind === 'scaled-offset') && (o as { solve?: unknown }).solve === undefined),
+        (isShapeCarrier(o) && (o as { solve?: unknown }).solve === undefined),
     )
     .map((o) => o.id);
 }
 
 /** The raw movable DOF an object carries before constraints: a free point 2 (x,y), a parametric/shape DOF 1, else 0. */
 function rawMovableDof(o: Construction['objects'][number]): number {
-  if (o.kind === 'free-point') return (o as FreePoint).pinned ? 0 : 2;
-  if (o.kind === 'on-segment' || o.kind === 'on-circle' || o.kind === 'on-line') return 1;
-  if (o.kind === 'rotated' || o.kind === 'perp-offset' || o.kind === 'scaled-offset') return 1;
-  return 0; // derived points, pinned points, lines, circles, segments — fully determined
+  const carrier = carrierOf(o);
+  if (!carrier) return 0; // 0-DOF points, lines, circles, segments — fully determined
+  if (carrier.family === 'free') return (o as FreePoint).pinned ? 0 : 2; // a pinned free point is fixed
+  return carrier.dof; // parametric / on-line / shape scalar = 1
 }
 
 /** DOF a constraint removes: an equality removes 1; a `coincide` pins both coords (2); an ORDER/inequality removes 0 (it's a region, ADR-039). */
