@@ -97,6 +97,87 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'second-intersection-avoids-shared-point',
+    title: '"E on line DB" with E,B both on circle O is the OTHER crossing — never E = B, deterministic',
+    guards:
+      'modelling "E on line DB" (E on circle O, B also on circle O) as a generic driven collinearity let the numeric solve land on the DEGENERATE crossing E = B, or on the wrong side, seed-dependently — the operator saw "E on B" and "E not on the continuation of DB", and only got it right by cycling. It is really "the second intersection of line DB with circle O", so it now becomes a line∩circle that AVOIDS the shared point (B) — deterministic, and structurally never collapses onto B. Same for C on line AD (A on circle O).',
+    steps: [
+      'two circles intersect at A and B', // circle-O (r5) + circle-P (r3.6)
+      'C על מעגל O',
+      'D על מעגל P',
+      'נקודה E נמצאת על מעגל O',
+      'C על הישר AD', // C = line(A,D) ∩ O, avoid A
+      'נקודה E נמצאת על המשך הישר DB', // E = line(D,B) ∩ O, avoid B (reinterpreted from "on the extension")
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E'), O = at(fig, 'O');
+      const coll = (p: Vec, q: Vec, r: Vec) => {
+        const span = Math.max(dist(p, q), dist(q, r), dist(p, r));
+        return Math.abs((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)) / (span * span);
+      };
+      expect(coll(C, A, D), 'C, A, D collinear').toBeLessThan(1e-3);
+      expect(coll(E, D, B), 'E, D, B collinear').toBeLessThan(1e-3);
+      expect(dist(E, B), 'E is NOT the shared crossing B').toBeGreaterThan(1); // the reported symptom
+      expect(dist(C, A), 'C is NOT the shared crossing A').toBeGreaterThan(1);
+      expect(dist(O, E), 'E on circle O').toBeCloseTo(5, 4);
+      expect(dist(O, C), 'C on circle O').toBeCloseTo(5, 4);
+    },
+  },
+  {
+    id: 'two-collinear-chain-solves',
+    title: 'a CHAIN of two "line through a point" constraints solves (D on line AC, then E on line DB)',
+    guards:
+      'building on the secant figure, the operator added a SECOND collinearity ("line DB passes through E" after "line AD passes through C"). The two constraints share the carrier D, making a triangular system (D fixed by A,D,C; E then fixed by D,B,E). The joint driven solver minimised the SUM of both residuals, which pulled the shared D toward both and satisfied neither — it returned the seed and falsely reported "over-constrained: A, D, C collinear cannot hold" (even though the solver had ALREADY found an accepted solution, the polish wandered off it into a degenerate same-cost basin). Fixed with a binding-aware seed (each bounded carrier solved against the constraint IT drives) + keeping an accepted candidate through the polish (ADR-050 amendment).',
+    steps: [
+      'שני מעגלים נחתכים בנקודות A ו-B', // circle-O (r5) + circle-P (r3.6) meeting at A,B
+      { llm: [{ type: 'point-on-circle', id: 'C', circle: 'circle-O' }, { type: 'point-on-circle', id: 'D', circle: 'circle-P' }] }, // "C עם מעגל אחד ו D על מעגל שני"
+      'ישר AD עובר בנקודה C', // A, D, C collinear (drives D onto line AC)
+      'E על מעגל O', // a free point on circle O
+      'ישר DB עובר בנקודה E', // D, B, E collinear (drives E onto line DB) — was the failing step
+    ],
+    check(fig) {
+      allStepsOk(fig); // no false "over-constrained" — both collinearities hold at once
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E');
+      const O = at(fig, 'O'), P = at(fig, 'P');
+      const coll = (p: Vec, q: Vec, r: Vec) => {
+        const span = Math.max(dist(p, q), dist(q, r), dist(p, r));
+        return Math.abs((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)) / (span * span);
+      };
+      expect(coll(A, D, C), 'A, D, C collinear').toBeLessThan(1e-3);
+      expect(coll(D, B, E), 'D, B, E collinear').toBeLessThan(1e-3);
+      expect(dist(D, A), 'D ≠ A').toBeGreaterThan(0.1);
+      expect(dist(E, B), 'E ≠ B').toBeGreaterThan(0.1);
+      expect(dist(P, D), 'D on circle P').toBeCloseTo(3.6, 1);
+      expect(dist(O, E), 'E on circle O').toBeCloseTo(5, 1);
+    },
+  },
+  {
+    id: 'line-through-intersection-collinear',
+    title: '"line CE passes through A" makes C, A, E collinear (two circles meet at A,B; C on one, E on the other)',
+    guards:
+      'the operator built two circles meeting at A,B, placed C on one and E on the other, then wanted the line CE to pass through A (the classic secant-through-an-intersection-point figure). There was no way to say it: "ישר CE עובר בנקודה A" was SILENTLY DROPPED (the LLM modelled it as "A on line CE", which matched no rule), and the retry "E על המשך הצלע AC" hit "\'E\' is already defined". Both now route to the new `collinear` constraint (ADR-050): a parser rule for the line-through phrasing, and an engine reinterpretation of a redefining "P on segment" of an existing free point. The constraint drives a free DOF until the three line up, excluding the trivial collapse onto A.',
+    steps: [
+      'שני מעגלים חותכים זה את זה בנקודות A ו B', // circle-O (r5) + circle-P (r3.6), meeting at A,B
+      { llm: [{ type: 'point-on-circle', id: 'C', circle: 'circle-P' }] }, // "C על המעגל הימני"
+      { llm: [{ type: 'point-on-circle', id: 'E', circle: 'circle-O' }] }, // "E על המעגל השמאלי"
+      'ישר CE עובר בנקודה A', // the operator's exact words — was dropped, now parses to set-collinear
+    ],
+    check(fig) {
+      allStepsOk(fig); // no silent drop, no "'E' is already defined"
+      const A = at(fig, 'A'), C = at(fig, 'C'), E = at(fig, 'E'), O = at(fig, 'O'), P = at(fig, 'P');
+      const span = Math.max(dist(C, E), dist(C, A), dist(E, A));
+      const cross = (C.x - A.x) * (E.y - A.y) - (C.y - A.y) * (E.x - A.x); // 2·area of C,A,E
+      expect(Math.abs(cross) / (span * span), 'C, A, E collinear').toBeLessThan(1e-3);
+      // The OTHER crossing — neither C nor E collapsed onto the intersection point A.
+      expect(dist(E, A), 'E ≠ A').toBeGreaterThan(0.05 * span);
+      expect(dist(C, A), 'C ≠ A').toBeGreaterThan(0.05 * span);
+      // C stayed on its circle (P, r≈3.6) and E on its circle (O, r≈5).
+      expect(dist(P, C), '|PC|').toBeCloseTo(3.6, 1);
+      expect(dist(O, E), '|OE|').toBeCloseTo(5, 1);
+    },
+  },
+  {
     id: 'point-on-arc-no-midpoint-word',
     title: '"F על קשת BC" builds a FREE point on the right circle, not dropped (ADR-042)',
     guards:

@@ -67,6 +67,12 @@ export interface OnSegmentPoint {
   b: Id;
   t: number;
   /**
+   * The student gave no ratio ("G on AD", not "G on AD at 40%"), so `t` is a DEFAULT, not a stated
+   * position — a free DOF the sampler slides along the segment (ADR-052: no fixed assumptions). A stated
+   * ratio (or an extension `t>1`) is not free. Mirrors {@link OnCirclePoint.free}. Meaningless once driven.
+   */
+  free?: boolean;
+  /**
    * Desired solution branch once a constraint upgrades this to `on-segment-solved` (which root of
    * the constraint to pick). Carried from the `point-on-segment` command's `branch` so cycling "show
    * another configuration" on a driven on-segment point survives `replay` (ADR-043/R2). Named apart
@@ -415,6 +421,11 @@ export interface Line {
 /** How a {@link Circle}'s radius is set: a fixed length, or the distance to a point on it. */
 export type RadiusSpec =
   | { via: 'length'; value: number }
+  // A FREE radius DOF ([ADR-051](docs/06-decisions.md#adr-051)): `value` is the current/seed radius, but it
+  // is a driveable, sampleable degree of freedom — the solver sizes it to satisfy a constraint and the
+  // sampler varies it, so a figure with no stated radius (e.g. "two circles intersect at A and B") isn't
+  // frozen at an arbitrary number that can't hold the problem's givens. A stated radius stays `length`.
+  | { via: 'free'; value: number }
   | { via: 'through'; point: Id }
   // The largest circle that sits inside `outer` and is internally tangent to it, given
   // wherever this circle's centre lands: r = r(outer) − |centre − centre(outer)|. The
@@ -436,6 +447,10 @@ export interface Circle {
    *  named by the student — so the renderer hides the centre point unless other geometry uses it
    *  (a radius/central angle drawn from it). A named centre ("circle O") is always drawn. */
   autoCenter?: boolean;
+  /** Drive a `via:'free'` radius so a constraint holds — the circle analogue of a shape scalar's
+   *  `solve` ([ADR-051](docs/06-decisions.md#adr-051)). Set by `driveOrCheck`/`recruitFreeDofs` when a
+   *  constraint on the circle's points can only be met by resizing it; the solver sizes the radius. */
+  solve?: SolveDirective;
 }
 
 /**
@@ -581,6 +596,38 @@ export interface ConcyclicConstraint {
   points: Id[];
 }
 
+/**
+ * The three points a, b, c are COLLINEAR — c lies on the (infinite) line through a and b
+ * (equivalently all three are on one line). Used to constrain an existing point onto a line
+ * named by two others ("E on line AC", "line CE passes through A"): it drives a free DOF among
+ * the three (an on-circle / on-segment point slides until they line up) and is a pure CHECK when
+ * all three are already determined. The residual is the (scale-free) sine of ∠(b·a·c) — 0 ⇔
+ * collinear, and it sign-changes as the third point crosses the line, so a 1-DOF carrier brackets
+ * in closed form. A configuration that collapses two of the points together is rejected by the
+ * solver's degeneracy gate, so "E on line AC" finds the OTHER crossing of line AC with E's circle,
+ * not the trivial E = A. The FIRST point is the one the solver prefers to drive (driveOrCheck).
+ */
+export interface CollinearConstraint {
+  type: 'collinear';
+  a: Id;
+  b: Id;
+  c: Id;
+}
+
+/**
+ * The points are collinear AND appear IN THE LISTED ORDER along the line (ADR-050 Am.3) — "line ABE"
+ * means A, then B, then E, i.e. each interior point lies BETWEEN its neighbours. Like the other order
+ * constraints ([ADR-039](docs/06-decisions.md#adr-039)) it is an inequality satisfied by a whole region,
+ * so it has no sign change for the bracketing solver — it rides the optimizer as a one-sided residual
+ * (the sum of out-of-order overlaps of the points' projections onto the line P0→Pn-1) and is otherwise a
+ * pure check. Pairs with a {@link CollinearConstraint} (which makes them collinear); this fixes the
+ * SIDE/order, so naming the points in sequence selects the configuration (which crossing, which side).
+ */
+export interface CollinearOrderConstraint {
+  type: 'collinear-order';
+  points: Id[];
+}
+
 export type Constraint =
   | AngleConstraint
   | DistanceConstraint
@@ -592,7 +639,9 @@ export type Constraint =
   | CoincideConstraint
   | AngleOrderConstraint
   | LengthOrderConstraint
-  | ConcyclicConstraint;
+  | ConcyclicConstraint
+  | CollinearConstraint
+  | CollinearOrderConstraint;
 
 export interface Construction {
   objects: GeoObject[];
@@ -624,6 +673,8 @@ export type Command =
   | { type: 'set-parallel'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-perpendicular'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-concyclic'; points: Id[] } // the points are concyclic (drives a DOF so they share a circle)
+  | { type: 'set-collinear'; a: Id; b: Id; c: Id } // a, b, c collinear (drives a free DOF so the third lands on the line)
+  | { type: 'set-line'; points: Id[] } // "line ABE…": the points are collinear AND in the listed order (B between A and E)
   // Phase 5b — lines (scaffolding unless `visible`) and the points they produce.
   | { type: 'bisector'; id: Id; vertex: Id; p: Id; q: Id; visible?: boolean }
   | { type: 'perpendicular-line'; id: Id; through: Id; a: Id; b: Id; visible?: boolean }
@@ -633,7 +684,7 @@ export type Command =
   | { type: 'foot'; id: Id; from: Id; a: Id; b: Id }
   | { type: 'midpoint'; id: Id; a: Id; b: Id }
   // Phase 5c — circles and the points they produce.
-  | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean; autoCenter?: boolean }
+  | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean; autoCenter?: boolean; freeRadius?: boolean } // freeRadius: the radius is a DOF seeded at `radius` (ADR-051)
   | { type: 'circle-through'; id: Id; center: Id; through: Id; hidden?: boolean; autoCenter?: boolean }
   | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id; hidden?: boolean } // circle through a,b,c (centre = circumcentre); hidden for a cyclic (בר-חסימה) figure
   | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number; between?: [Id, Id] } // between = a free point on the arc from-to (ADR-042)

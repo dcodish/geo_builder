@@ -347,6 +347,35 @@ export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean 
   return true;
 }
 
+/**
+ * No two DISTINCT named points are pushed together in this draw (within ~1.5% of the figure span),
+ * EXCEPT a pair a `coincide` constraint deliberately merges (ADR-028). A resampled "other view" that
+ * collapses two points — e.g. a varied free radius ([ADR-051](docs/06-decisions.md#adr-051)) making a
+ * secant near-tangent so its crossing lands on another point — is a degenerate/confusing drawing, so the
+ * resampler skips it. Hidden helper points (`~…`) are ignored. Only used to vet ALTERNATIVE views.
+ */
+export function pointsDistinct(c: Construction, positions: Map<Id, Vec>): boolean {
+  const pts = c.objects
+    .filter((o) => isGeoPoint(o) && !o.id.startsWith('~'))
+    .map((o) => ({ id: o.id, p: positions.get(o.id) }))
+    .filter((x): x is { id: Id; p: Vec } => !!x.p);
+  if (pts.length < 2) return true;
+  const xs = pts.map((x) => x.p.x);
+  const ys = pts.map((x) => x.p.y);
+  const span = Math.max(1, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+  const minSep = 0.015 * span;
+  const coincide = new Set(
+    c.constraints.filter((k) => k.type === 'coincide').map((k) => [k.p, k.q].sort().join('|')),
+  );
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      if (coincide.has([pts[i].id, pts[j].id].sort().join('|'))) continue;
+      if (Math.hypot(pts[i].p.x - pts[j].p.x, pts[i].p.y - pts[j].p.y) < minSep) return false;
+    }
+  }
+  return true;
+}
+
 export const useGeoStore = create<GeoState>()(
   temporal(
     (set, get) => ({
@@ -460,10 +489,10 @@ export const useGeoStore = create<GeoState>()(
         for (let k = 0; k < 16; k++) {
           s += 1;
           const r = replay(facts, s);
-          // Accept a sample only if it both evaluates AND keeps every declared polygon a clean
-          // convex drawing — a self-crossing OR concave (dart) quad is a valid point set but not a
-          // valid drawing of the shape (skip it).
-          if (evaluate(r.construction).ok && polygonsConvex(facts, r.positions)) {
+          // Accept a sample only if it evaluates, keeps every declared polygon a clean convex drawing
+          // (a self-crossing/concave quad is a valid point set but not a valid drawing of the shape), AND
+          // keeps distinct points apart (a varied free radius must not collapse two points — ADR-051).
+          if (evaluate(r.construction).ok && polygonsConvex(facts, r.positions) && pointsDistinct(r.construction, r.positions)) {
             set({ seed: s });
             return;
           }

@@ -88,6 +88,7 @@ A clean `utterance → command[]` boundary. A **deterministic Hebrew/English gra
 
 ## Conventions to carry forward
 
+- **No fixed assumptions — every unstated magnitude is a free DOF, not a fixed value ([ADR-052](docs/06-decisions.md#adr-052)).** A student enters only what the question shows; the tool must assume no size/angle/position/proportion unless it was stated (a number, an angle, or a relation that forces it). A default value is allowed as a *starting* point so the figure can be drawn, but it must change on "show another configuration" or when a later constraint forces it — a fixed default silently asserts a given the question never gave (the same cardinal sin as drawing a figure that violates the givens). Conformance smell: a value counted by `rawMovableDof` but absent from `freeDofs` (so never sampled) is a default masquerading as fixed.
 - **RTL Hebrew is the default.** All user-facing strings go through `useTranslation`/`t()` (`src/i18n/`, `locales/he.json` + `en.json`). Toggling language updates `document.documentElement.dir`. The parser and any LLM fallback handle both Hebrew and English input.
 - **Deterministic element IDs** (e.g. `seg-AB`, `poly-ABC`) so re-issuing the same command is idempotent — preserve this in the new model.
 - **Stack:** React + Vite + Zustand + TypeScript. State/undo can use Zustand (+ `zundo` for temporal undo/redo, as the old store did).

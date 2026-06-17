@@ -23,6 +23,10 @@ import { carrierOf, isShapeCarrier } from './carriers';
 const isFreeOnCircle = (o: { kind: string; free?: boolean; solve?: unknown }): boolean =>
   o.kind === 'on-circle' && !!o.free && o.solve === undefined;
 
+/** A free on-segment point the sampler may slide along its segment (no stated ratio, not driven — ADR-052). */
+const isFreeOnSegment = (o: { kind: string; free?: boolean; solve?: unknown }): boolean =>
+  o.kind === 'on-segment' && !!o.free && o.solve === undefined;
+
 /** A free on-line marker the sampler may slide along its line (not yet driven by a constraint — ADR-036). */
 const isFreeOnLine = (o: { kind: string; solve?: unknown }): boolean => o.kind === 'on-line' && o.solve === undefined;
 
@@ -100,6 +104,12 @@ export function applySeed(c: Construction, seed: number): Construction {
       if ((o as OnCirclePoint).between) return { ...o, theta: jr() * 2 - 1 };
       return { ...o, theta: (o as OnCirclePoint).theta + circSpin + (jr() * 2 - 1) * circJit };
     }
+    // Free on-segment point (ADR-052): the student gave no ratio, so slide it along the segment to a
+    // genuinely different spot (kept off the endpoints so it doesn't collapse onto a or b).
+    if (isFreeOnSegment(o)) {
+      const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
+      return { ...o, t: 0.15 + jr() * 0.7 }; // t ∈ [0.15, 0.85]
+    }
     // Free on-line marker (ADR-036): slide it along its line by scaling the signed offset.
     // Sign is preserved so a pair straddling the anchor (a tangent's C at +offset, D at −offset)
     // keeps straddling — the segment between them still spans the touch point, just a different length.
@@ -123,6 +133,14 @@ export function applySeed(c: Construction, seed: number): Construction {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
       return { ...o, k: 0.3 + jr() * 0.55 }; // a trapezoid's top:base ratio ∈ [0.3, 0.85]
     }
+    // Free-radius circle (ADR-051): vary the size so "show another configuration" reaches a figure with
+    // differently-sized circles (including the OTHER one larger). A wide jitter (0.45×–1.6×) so the two
+    // circles can swap which is bigger; the resample caller's distinctness guard rejects any draw where the
+    // varied sizes push two points together (a near-tangent secant), so only clean alternatives are shown.
+    if (o.kind === 'circle' && o.radius.via === 'free' && o.solve === undefined) {
+      const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
+      return { ...o, radius: { via: 'free', value: o.radius.value * (0.45 + jr() * 1.15) } };
+    }
     return o;
   });
   return { ...c, objects };
@@ -141,8 +159,9 @@ export function freeDofs(c: Construction): Id[] {
       (o) =>
         (o.kind === 'free-point' && !o.pinned) ||
         isFreeOnCircle(o) ||
+        isFreeOnSegment(o) ||
         isFreeOnLine(o) ||
-        (isShapeCarrier(o) && (o as { solve?: unknown }).solve === undefined),
+        (isShapeCarrier(o) && (o as { solve?: unknown }).solve === undefined), // incl. a free-radius circle (ADR-051)
     )
     .map((o) => o.id);
 }
@@ -157,7 +176,7 @@ function rawMovableDof(o: Construction['objects'][number]): number {
 
 /** DOF a constraint removes: an equality removes 1; a `coincide` pins both coords (2); an ORDER/inequality removes 0 (it's a region, ADR-039). */
 function dofRemoved(con: Constraint): number {
-  if (con.type === 'angle-order' || con.type === 'length-order') return 0;
+  if (con.type === 'angle-order' || con.type === 'length-order' || con.type === 'collinear-order') return 0;
   if (con.type === 'coincide') return 2;
   return 1;
 }

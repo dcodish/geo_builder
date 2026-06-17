@@ -39,6 +39,10 @@ export interface Carrier {
  * {@link GeoObject} point kind — a new kind without a case here fails the build.
  */
 export function carrierOf(o: GeoObject): Carrier | null {
+  // A circle with a FREE radius carries one driveable scalar (its radius) — the circle analogue of a
+  // shape scalar ([ADR-051](docs/06-decisions.md#adr-051)). Classified here so it flows through the same
+  // shape-carrier paths (the joint solver, the sampler, the DOF count) as perp-offset/rotated/scaled.
+  if (o.kind === 'circle') return o.radius.via === 'free' ? { family: 'shape', dof: 1 } : null;
   if (!isGeoPoint(o)) return null;
   switch (o.kind) {
     case 'free-point':

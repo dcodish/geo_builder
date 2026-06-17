@@ -46,6 +46,10 @@ export function constraintRefs(con: Constraint): Id[] {
       return [con.a, con.b, con.c, con.d];
     case 'concyclic':
       return con.points;
+    case 'collinear':
+      return [con.a, con.b, con.c];
+    case 'collinear-order':
+      return con.points;
   }
 }
 
@@ -99,6 +103,19 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
       const v = unit(dv);
       return u.x * v.x + u.y * v.y; // cos∠ → 0 when ⟂
     }
+    case 'collinear': {
+      // sin∠(b·a·c): the two rays a→b and a→c are parallel/antiparallel exactly when the three
+      // points are collinear. Signed and ∈ [−1, 1] (like `parallel`), so it sign-changes as the
+      // third point crosses the line and the bracketing root-finder/optimizer descends it.
+      const du = sub(get(con.b), get(con.a));
+      const dv = sub(get(con.c), get(con.a));
+      // A collapsed ray has no direction — NOT a satisfied constraint. NaN so the solver skips it
+      // (else unit(0)→(0,0) is a spurious 0, snapping the driven point onto `a` — see `parallel`).
+      if (du.x * du.x + du.y * du.y < 1e-18 || dv.x * dv.x + dv.y * dv.y < 1e-18) return NaN;
+      const u = unit(du);
+      const v = unit(dv);
+      return u.x * v.y - u.y * v.x;
+    }
     // ONE-SIDED residuals (≥ 0): zero across the whole satisfying region, positive (and increasing)
     // as the order is violated. The solver descends them like any other residual, but — being flat at
     // 0 — they have no sign change for the bracketing root-finder, so an order constraint is only ever
@@ -120,6 +137,20 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
       let s = 0;
       for (let i = 3; i < pts.length; i++) s += dist(c.o, pts[i]) - c.r;
       return s;
+    }
+    case 'collinear-order': {
+      // ONE-SIDED (≥ 0): 0 once the points' projections onto the line P0→Pn-1 are strictly increasing
+      // (each ≥ MARGIN·L past the previous), positive by the total "backwards" overlap otherwise — so it
+      // pins the listed order. Like the other order residuals it has no sign change (optimizer-driven only).
+      const pts = con.points.map(get);
+      const p0 = pts[0];
+      const dir = sub(pts[pts.length - 1], p0);
+      const L = Math.hypot(dir.x, dir.y);
+      if (L < 1e-9) return 0; // the ends coincide — nothing to order
+      const proj = pts.map((p) => ((p.x - p0.x) * dir.x + (p.y - p0.y) * dir.y) / L); // signed distance along the line
+      let r = 0;
+      for (let i = 0; i + 1 < proj.length; i++) r += Math.max(0, proj[i] - proj[i + 1] + ORDER_LEN_MARGIN_FRAC * L);
+      return r;
     }
   }
 }
@@ -149,6 +180,8 @@ export function constraintScale(con: Constraint, get: (id: Id) => Vec): number {
       return Math.abs(con.k * dist(get(con.c), get(con.d)) + (con.add ?? 0));
     case 'length-order':
       return Math.max(dist(get(con.c), get(con.d)), 1e-9); // relative to the longer length
+    case 'collinear-order':
+      return Math.max(dist(get(con.points[0]), get(con.points[con.points.length - 1])), 1e-9); // relative to the line span
     case 'angle-order':
       return 90; // an order residual is ≤ MARGIN degrees — scale it like a right angle so it sits ~O(0.1) alongside relative length residuals
     case 'concyclic': {
@@ -171,6 +204,7 @@ export function residualTolerance(con: Constraint, scale = 1): number {
       return Math.max(1e-6, 2e-4 * scale);
     case 'parallel':
     case 'perpendicular':
+    case 'collinear':
       return 1e-6;
     case 'angle-ratio':
       return ANGLE_EPS;
@@ -181,6 +215,8 @@ export function residualTolerance(con: Constraint, scale = 1): number {
       return ORDER_ANGLE_MARGIN_DEG - ORDER_ANGLE_MIN_GAP_DEG;
     case 'length-order':
       return (ORDER_LEN_MARGIN_FRAC - ORDER_LEN_MIN_FRAC) * scale; // scale = the longer length (constraintScale)
+    case 'collinear-order':
+      return (ORDER_LEN_MARGIN_FRAC - ORDER_LEN_MIN_FRAC) * scale; // scale = the line span
   }
 }
 
@@ -219,6 +255,10 @@ export function describeConstraint(con: Constraint): string {
       return `|${con.a}${con.b}| < |${con.c}${con.d}|`;
     case 'concyclic':
       return `${con.points.join(', ')} concyclic`;
+    case 'collinear':
+      return `${con.a}, ${con.b}, ${con.c} collinear`;
+    case 'collinear-order':
+      return `${con.points.join('–')} in order on a line`;
   }
 }
 

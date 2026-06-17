@@ -313,6 +313,26 @@ function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Ve
   }
 }
 
+/**
+ * Is point `id` structurally known to lie on circle `circleId`? (A per-point view of the membership
+ * step.ts `circleMembers` computes for the parser.) Used to recognise the "second intersection"
+ * pattern: a collinearity whose driven point is on a circle, with the line through another point that
+ * is ALSO on that circle, is really a line∩circle crossing — see the `set-collinear` handler.
+ */
+function pointOnCircle(objects: GeoObject[], id: Id, circleId: Id): boolean {
+  const circ = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === circleId);
+  const center = circ?.center;
+  for (const o of objects) {
+    if (o.id === id) {
+      if (o.kind === 'on-circle' || o.kind === 'antipode' || o.kind === 'arc-midpoint' || o.kind === 'line-circle') return o.circle === circleId;
+      if (o.kind === 'circle-circle') return o.circle1 === circleId || o.circle2 === circleId;
+    }
+    // a,b,c of a circumcentre lie on the circle centred there.
+    if (o.kind === 'circumcenter' && center === o.id && (o.a === id || o.b === id || o.c === id)) return true;
+  }
+  return false;
+}
+
 /** The golden angle — spreads N points around a circle so none coincide and they look even. */
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
@@ -447,7 +467,18 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     }
 
     case 'point-on-segment':
-      addObj(objects, { kind: 'on-segment', id: cmd.id, a: cmd.a, b: cmd.b, t: cmd.t ?? 0.5, ...(cmd.branch !== undefined ? { solveBranch: cmd.branch } : {}) });
+      // No ratio stated (cmd.t undefined) ⇒ a FREE position on the segment (ADR-052): seed at the midpoint
+      // but let "show another configuration" slide it — the student didn't say WHERE on a→b. A stated ratio
+      // or an extension point (t>1) is a fixed position, not free.
+      addObj(objects, {
+        kind: 'on-segment',
+        id: cmd.id,
+        a: cmd.a,
+        b: cmd.b,
+        t: cmd.t ?? 0.5,
+        ...(cmd.t === undefined ? { free: true } : {}),
+        ...(cmd.branch !== undefined ? { solveBranch: cmd.branch } : {}),
+      });
       break;
 
     case 'line-line-intersection':
@@ -498,7 +529,8 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         kind: 'circle',
         id: cmd.id,
         center: cmd.center,
-        radius: { via: 'length', value: cmd.radius },
+        // freeRadius ⇒ the size is a DOF seeded at `radius` (ADR-051: no stated radius, so don't freeze it).
+        radius: cmd.freeRadius ? { via: 'free', value: cmd.radius } : { via: 'length', value: cmd.radius },
         ...(cmd.hidden ? { hidden: true } : {}),
         ...(cmd.autoCenter ? { autoCenter: true } : {}),
       });
@@ -700,7 +732,74 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     case 'set-concyclic':
       driveOrCheck(objects, constraints, { type: 'concyclic', points: cmd.points });
       break;
+
+    // a, b, c collinear (ADR-050): drive a free DOF among them (an on-circle / on-segment point
+    // slides onto the line through the other two) — the third point lands on the line. A pure check
+    // when all three are determined (e.g. "A, B, C collinear" on fixed points → over-constraint
+    // detection). Generic via driveOrCheck + the sin∠ residual in solve.ts; the FIRST point is
+    // preferred as the carrier (so "E on line AC" slides E, not A or C).
+    case 'set-collinear':
+      addCollinear(objects, constraints, cmd.a, cmd.b, cmd.c);
+      break;
+
+    // "line ABE…" (ADR-050 Am.3): the points are collinear AND in the listed order (B between A and E).
+    // Collinearity puts each later point on the line through the first two (reusing the second-intersection
+    // conversion); the order is a one-sided `collinear-order` constraint that pins the SIDE/sequence —
+    // pushed as a check that the optimizer drives a free DOF to satisfy (so naming points in order selects
+    // the configuration, e.g. which crossing). Also draws the spanning segment.
+    case 'set-line': {
+      const pts = cmd.points;
+      if (pts.length >= 2) {
+        addObj(objects, segment(pts[0], pts[pts.length - 1]));
+        for (let i = 2; i < pts.length; i++) addCollinear(objects, constraints, pts[i], pts[0], pts[1]);
+        if (pts.length >= 3) {
+          const order: Constraint = { type: 'collinear-order', points: [...pts] };
+          // Drive the order with the free PARAMETRIC carriers (on-circle/on-segment) AMONG the points, so
+          // the optimizer sequences the figure (slides an anchor until the order holds). We mark them
+          // directly rather than leaning on recruitFreeDofs, which would reach a fixed intersection point's
+          // parent CIRCLE CENTRES and distort the circles. When none are movable, it's a pure check.
+          for (const p of pts) {
+            const i = objects.findIndex((o) => o.id === p);
+            const o = i >= 0 ? objects[i] : undefined;
+            if (o && (o.kind === 'on-circle' || o.kind === 'on-segment') && (o as { solve?: unknown }).solve === undefined) {
+              objects[i] = { ...o, solve: { constraint: order, branch: 0 } };
+            }
+          }
+          constraints.push(order);
+        }
+      }
+      break;
+    }
   }
 
   return { objects, constraints };
+}
+
+/**
+ * Add a collinearity of a, b, c. When the point to drive is on a circle and the line through the other
+ * two passes through a point ALSO on that circle, this is the SECOND-INTERSECTION pattern ([ADR-050](docs/06-decisions.md#adr-050)
+ * Am.2): "P on line QR" means the OTHER crossing of line QR with the circle, so it becomes a line∩circle
+ * that AVOIDS the shared point — deterministic, never collapsing onto it — instead of a driven collinear
+ * (whose numeric solve could land on the degenerate shared-point crossing or the wrong side). E.g. "E on
+ * line DB" with E and B on circle O ⇒ E = line(D,B) ∩ O, avoiding B. Otherwise a generic driven collinear.
+ */
+function addCollinear(objects: GeoObject[], constraints: Constraint[], a: Id, b: Id, c: Id): void {
+  const refs: Id[] = [a, b, c];
+  const driven = refs.find((id) => {
+    const o = objects.find((x) => x.id === id);
+    return o?.kind === 'on-circle' && (o as { solve?: unknown }).solve === undefined;
+  });
+  const dObj = driven ? objects.find((x) => x.id === driven) : undefined;
+  const others = refs.filter((id) => id !== driven);
+  const shared = dObj && dObj.kind === 'on-circle' && others.length === 2
+    ? others.find((id) => pointOnCircle(objects, id, dObj.circle))
+    : undefined;
+  if (dObj && dObj.kind === 'on-circle' && shared) {
+    const lineId = `line-${others[0]}${others[1]}`;
+    addLine(objects, { kind: 'line', id: lineId, spec: { via: 'through', a: others[0], b: others[1] } });
+    const i = objects.findIndex((x) => x.id === driven);
+    objects[i] = { kind: 'line-circle', id: driven!, line: lineId, circle: dObj.circle, branch: 0, avoid: shared };
+  } else {
+    driveOrCheck(objects, constraints, { type: 'collinear', a, b, c });
+  }
 }

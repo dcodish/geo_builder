@@ -68,7 +68,7 @@ export type EvalResult = EvalOk | EvalErr;
 function withOrderCons(cons: Constraint[], c: Construction): Constraint[] {
   const seen = new Set(cons.map((k) => JSON.stringify(k)));
   for (const k of c.constraints) {
-    if (k.type !== 'angle-order' && k.type !== 'length-order') continue;
+    if (k.type !== 'angle-order' && k.type !== 'length-order' && k.type !== 'collinear-order') continue;
     const key = JSON.stringify(k);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -219,16 +219,38 @@ function multiStartSolve(
 ): number[] {
   let best = seed;
   let bestReg = regCost(seed);
+  // The lowest-residual candidate that ALREADY satisfies every constraint (non-degenerate). The polish
+  // below can wander OFF an accepted candidate into a degenerate same-cost basin (e.g. a collinearity has
+  // a second root where the driven point collapses onto a referenced one — cost ~0 but rejected), which
+  // would make us return the seed and report a false over-constraint. Tracking the best accepted point as
+  // we go lets us fall back to it instead of throwing away a solution we already found.
+  let accepted: number[] | null = null;
+  let acceptedCost = Infinity;
+  const consider = (x: number[]) => {
+    if (accept(x)) {
+      const pc = polishCost(x);
+      if (pc < acceptedCost) {
+        acceptedCost = pc;
+        accepted = x;
+      }
+    }
+  };
   for (const start of [seed, ...restarts]) {
+    consider(start); // a seeded restart (e.g. the grid-scan / binding-aware seed) may already be a valid solution
     const x = nelderMead(regCost, start, 400, searchStep);
     const fx = regCost(x);
     if (fx < bestReg) {
       bestReg = fx;
       best = x;
     }
+    consider(x);
   }
-  for (const st of polishSteps) best = nelderMead(polishCost, best, polishIters, st);
-  return accept(best) ? best : seed;
+  for (const st of polishSteps) {
+    best = nelderMead(polishCost, best, polishIters, st);
+    consider(best);
+  }
+  if (accept(best)) return best;
+  return accepted ?? seed; // keep an accepted solution if the polish ended on a rejected one
 }
 
 /**
@@ -307,6 +329,8 @@ function carrierSpec(o: GeoObject, span: number): CarrierSpec | null {
     case 'rotated': return o.solve ? { id: o.id, n: 1, seed: [o.angleDeg], scale: [90] } : null;
     case 'scaled-offset': return o.solve ? { id: o.id, n: 1, seed: [o.k], scale: [Math.max(Math.abs(o.k), 0.5)] } : null;
     case 'on-line': return o.solve ? { id: o.id, n: 1, seed: [o.offset], scale: [Math.max(Math.abs(o.offset), floor)] } : null;
+    // A free-radius circle's radius is a shape scalar (ADR-051) — seed at its current value, scaled by it.
+    case 'circle': return o.solve && o.radius.via === 'free' ? { id: o.id, n: 1, seed: [o.radius.value], scale: [Math.max(o.radius.value, 1)] } : null;
     default: return null;
   }
 }
@@ -325,6 +349,7 @@ function setCarrierVals(c: Construction, vals: Map<Id, number[]>): Construction 
         case 'rotated': return { ...o, angleDeg: v[0], solve: undefined };
         case 'scaled-offset': return { ...o, k: Math.max(v[0], 1e-3), solve: undefined };
         case 'on-line': return { ...o, offset: v[0], solve: undefined };
+        case 'circle': return o.radius.via === 'free' ? { ...o, radius: { via: 'free', value: Math.max(v[0], 0.2) }, solve: undefined } : o;
         default: return o;
       }
     }),
@@ -383,13 +408,15 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     for (let i = 0; i < u.length; i++) s += lambda * (u[i] - seedU[i]) * (u[i] - seedU[i]);
     return s;
   };
-  // The BOUNDED parametric carriers (on-circle θ∈[0,2π], on-segment t∈[0,1]) in u-space (scale 1 ⇒ u == θ/t).
-  const ranges: { ui: number; lo: number; hi: number }[] = [];
+  // The BOUNDED parametric carriers (on-circle θ∈[0,2π], on-segment t∈[0,1]) in u-space (scale 1 ⇒ u == θ/t),
+  // each tagged with the constraint IT drives (for the binding-aware sweep below).
+  const ranges: { ui: number; lo: number; hi: number; own: Constraint }[] = [];
   let ki = 0;
   for (const s of specs) {
-    const kind = carriers.find((o) => o.id === s.id)?.kind;
-    if (kind === 'on-circle') ranges.push({ ui: ki, lo: 0, hi: 2 * Math.PI });
-    else if (kind === 'on-segment') ranges.push({ ui: ki, lo: 0, hi: 1 });
+    const car = carriers.find((o) => o.id === s.id) as (GeoObject & { solve?: { constraint: Constraint } }) | undefined;
+    const own = car?.solve?.constraint;
+    if (own && car?.kind === 'on-circle') ranges.push({ ui: ki, lo: 0, hi: 2 * Math.PI, own });
+    else if (own && car?.kind === 'on-segment') ranges.push({ ui: ki, lo: 0, hi: 1, own });
     ki += s.n;
   }
   // When bounded parametric carriers are present, two extra steps ported from the former coupled-param
@@ -418,6 +445,33 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
       if (!improved) break;
     }
     extraRestarts.push(gridSeed);
+
+    // BINDING-AWARE seed (the triangular case the joint sum-of-squares loses): solve each bounded carrier
+    // against the constraint IT drives — others held — sweeping Gauss-Seidel style. When carrier D drives
+    // "A,D,C collinear" and carrier E drives "D,B,E collinear", D appears in BOTH residuals, so the shared
+    // `cost` pulls D toward both and satisfies neither (it returns the seed). Solving D on its OWN constraint
+    // (line AC, ignoring E) then E on its own (line DB, with D placed) recovers the exact sequential solution.
+    // For genuinely coupled systems this may not converge — it's then just one more restart the search vets.
+    const bindSeed = seedU.slice();
+    for (let iter = 0; iter < 8; iter++) {
+      let moved = false;
+      for (const { ui, lo, hi, own } of ranges) {
+        const ownResid = (t: number): number => {
+          const r = evaluateCore(place(bindSeed.map((x, j) => (j === ui ? t : x))), { skipConstraints: true });
+          if (!r.ok) return Infinity;
+          for (const id of constraintRefs(own)) if (!r.positions.has(id)) return Infinity;
+          const v = residual(own, (id) => r.positions.get(id)!);
+          return isFinite(v) ? Math.abs(v) : Infinity; // a degenerate root (collinear NaN at a collapsed ray) is skipped
+        };
+        const v = argMin(ownResid, lo, hi);
+        if (Math.abs(v - bindSeed[ui]) > 1e-9) {
+          bindSeed[ui] = v;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+    extraRestarts.push(bindSeed);
   }
   // Nearest basin (regularised search from the seed) + the grid-informed seed + cardinal restarts (each DOF
   // pushed by a range of magnitudes in normalised units); polish on the residual through several decades so
@@ -640,7 +694,7 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
 export function resolveCircle(c: Circle, pos: Map<Id, Vec>, circles: Map<Id, ResolvedCircle>): ResolvedCircle | 'pending' | string {
   const center = pos.get(c.center);
   if (!center) return 'pending';
-  if (c.radius.via === 'length') {
+  if (c.radius.via === 'length' || c.radius.via === 'free') {
     if (c.radius.value <= 0) return `circle ${c.id}: radius must be positive`;
     return { center, r: c.radius.value };
   }

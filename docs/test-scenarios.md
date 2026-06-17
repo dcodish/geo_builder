@@ -22,6 +22,55 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `second-intersection-avoids-shared-point` — "E on line DB" (E,B on circle O) is the other crossing
+**Steps**
+1. `two circles intersect at A and B`
+2. `C על מעגל O`
+3. `D על מעגל P`
+4. `נקודה E נמצאת על מעגל O`
+5. `C על הישר AD`
+6. `נקודה E נמצאת על המשך הישר DB`
+
+**Guards against:** "E on line DB" with E and B both on circle O was modelled as a generic driven
+collinearity, so the numeric solve landed on the degenerate crossing E = B or the wrong side,
+seed-dependently (the operator saw both and only fixed it by cycling). It is really the second
+intersection of line DB with circle O, so it becomes a line∩circle that AVOIDS the shared point B —
+deterministic, never E = B (ADR-050 Amendment 2). Same for C on line AD (A on circle O).
+**Asserts:** C,A,D and E,D,B each collinear; E is well away from B and C from A; both on circle O.
+
+### `two-collinear-chain-solves` — a chain of two "line through a point" constraints solves
+**Steps**
+1. `שני מעגלים נחתכים בנקודות A ו-B`
+2. *(LLM → `point-on-circle C circle-O`, `point-on-circle D circle-P`)*
+3. `ישר AD עובר בנקודה C`
+4. `E על מעגל O`
+5. `ישר DB עובר בנקודה E`
+
+**Guards against:** two collinearity constraints sharing a carrier (D fixes A,D,C; E then fixes
+D,B,E — a triangular system) failed with a false `over-constrained: A,D,C collinear cannot hold`.
+The joint driven solver minimised the SUM of both residuals, pulling the shared D toward both and
+satisfying neither, and `multiStartSolve` discarded an accepted solution when its polish wandered into
+a degenerate same-cost basin. Fixed by a binding-aware seed + keeping the best accepted candidate
+through the polish (ADR-050 Amendment 1).
+**Asserts:** both collinearities hold at once; D stayed on circle P (r≈3.6), E on circle O (r≈5);
+neither collapsed onto A/B.
+
+### `line-through-intersection-collinear` — "line CE passes through A" lines up C, A, E
+**Steps**
+1. `שני מעגלים חותכים זה את זה בנקודות A ו B`
+2. `C על המעגל הימני` *(LLM → `point-on-circle C circle-P`)*
+3. `E על המעגל השמאלי` *(LLM → `point-on-circle E circle-O`)*
+4. `ישר CE עובר בנקודה A`
+
+**Guards against:** the secant-through-an-intersection-point figure (two circles meet at A,B; C on
+one, E on the other; line CE through A) had no expressible form — `ישר CE עובר בנקודה A` was silently
+DROPPED (the LLM modelled it as "A on line CE", matching no rule), and the retry `E על המשך הצלע AC`
+hit `'E' is already defined`. Both now route to the new `collinear` constraint (ADR-050): a parser
+rule for the line-through phrasing, and an engine reinterpretation of a redefining "P on segment" of
+an existing free point.
+**Asserts:** every step applies cleanly (no drop, no redefine error); C, A, E are collinear; neither
+C nor E collapsed onto A (the OTHER crossing); C stayed on its circle (r≈3.6) and E on its (r≈5).
+
 ### `alpha-less-than-beta-reshapes` — "α<β" actively reshapes the figure
 **Steps**
 1. `triangle ABC`

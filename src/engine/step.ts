@@ -133,7 +133,11 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   // reinterpret it as a coincidence that drives a free DOF upstream (ADR-028).
   const conflict = commandConflict(prev, ncmd);
   if (conflict) {
-    const constrained = reinterpretAsConstraint(prev, ncmd) ?? replaceCyclicForDiameter(prev, ncmd) ?? reinterpretDiameter(prev, ncmd);
+    const constrained =
+      reinterpretAsConstraint(prev, ncmd) ??
+      reinterpretAsCollinear(prev, ncmd) ??
+      replaceCyclicForDiameter(prev, ncmd) ??
+      reinterpretDiameter(prev, ncmd);
     if (constrained) {
       const r = evaluate(constrained);
       if (r.ok) return { ok: true, construction: constrained, positions: r.positions };
@@ -290,6 +294,21 @@ function freeCarrierAncestors(objects: GeoObject[], start: Id): Id[] {
   return result;
 }
 
+/** The circle ids a point structurally lies on — so a constraint on it can reach a free-radius DOF (ADR-051). */
+function circlesOfPoint(o: GeoObject): Id[] {
+  switch (o.kind) {
+    case 'on-circle':
+    case 'line-circle':
+    case 'antipode':
+    case 'arc-midpoint':
+      return [o.circle];
+    case 'circle-circle':
+      return [o.circle1, o.circle2];
+    default:
+      return [];
+  }
+}
+
 /** The points a line is built from — so a `line-intersection` can be walked back to its DOFs. */
 function lineSpecPoints(spec: LineSpec): Id[] {
   switch (spec.via) {
@@ -320,6 +339,15 @@ function freeDrivableAncestors(objects: GeoObject[], start: Id): Id[] {
     seen.add(id);
     const o = byId.get(id);
     if (!o) continue;
+    // A point on a FREE-radius circle can be moved by RESIZING that circle (ADR-051) — surface the
+    // circle's radius DOF so a constraint on circle points can recruit it (sized like a shape scalar).
+    for (const cid of circlesOfPoint(o)) {
+      const circ = byId.get(cid);
+      if (circ?.kind === 'circle' && circ.radius.via === 'free' && circ.solve === undefined && !seen.has(cid)) {
+        seen.add(cid);
+        result.push(cid);
+      }
+    }
     if (o.kind === 'line') { queue.push(...lineSpecPoints(o.spec)); continue; }
     if (!isGeoPoint(o)) continue;
     const free1 = isParamCarrier(o) && (o as { solve?: unknown }).solve === undefined;
@@ -469,6 +497,26 @@ function reinterpretAsConstraint(prev: Construction, cmd: Command): Construction
       : o,
   );
   return { objects, constraints: [...withHelper.constraints, coincide] };
+}
+
+/**
+ * Reinterpret a redefining "P on segment a→b" (incl. the "on the extension of" form) as a
+ * COLLINEARITY constraint when P already exists as a free carrier: instead of erroring "P is
+ * already defined", keep P where it is and slide its own DOF until P lies on line a→b (ADR-050).
+ * This is the on-line analogue of {@link reinterpretAsConstraint} (which handles a fixed second
+ * *placement* via a coincidence): "E on line AC" where E is already a free point on a circle should
+ * move E onto the line, not redefine it at a fixed t. Returns null (→ the genuine conflict) when P
+ * isn't an existing point, has no free DOF of its own, or is already driving another constraint.
+ */
+function reinterpretAsCollinear(prev: Construction, cmd: Command): Construction | null {
+  if (cmd.type !== 'point-on-segment') return null;
+  const existing = prev.objects.find((o) => o.id === cmd.id);
+  if (!existing || !isGeoPoint(existing)) return null; // only a *re*definition of an existing point
+  // P must still carry a free 1-DOF (on-circle / on-segment) to slide onto the line; a determined
+  // or already-driven P falls through to the normal conflict (a genuine over-constraint).
+  const carrier = carrierOf(existing);
+  if (!carrier || carrier.family !== 'param' || (existing as { solve?: unknown }).solve !== undefined) return null;
+  return applyCommand(prev, { type: 'set-collinear', a: cmd.id, b: cmd.a, c: cmd.b });
 }
 
 const centroid = (ps: Vec[]): Vec => ({

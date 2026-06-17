@@ -14,6 +14,15 @@ import { isGeoPoint } from '@/engine/types';
 import { len, rot90, sub, unit } from '@/engine/geometry';
 import { resolveCircle, resolveLine, type ResolvedCircle } from '@/engine';
 
+/** A point id structurally on circle `cid` (for recovering a driven free radius from positions). */
+function pointOnCircleId(c: Construction, cid: Id): Id | null {
+  for (const o of c.objects) {
+    if ((o.kind === 'on-circle' || o.kind === 'line-circle' || o.kind === 'antipode' || o.kind === 'arc-midpoint') && o.circle === cid) return o.id;
+    if (o.kind === 'circle-circle' && (o.circle1 === cid || o.circle2 === cid)) return o.id;
+  }
+  return null;
+}
+
 export interface ScenePoint {
   id: Id;
   pos: Vec;
@@ -159,8 +168,17 @@ export function buildScene(
       progressed = false;
       for (const o of circleObjs) {
         if (resolvedCircles.has(o.id)) continue;
-        const rc = resolveCircle(o, positions, resolvedCircles);
+        let rc = resolveCircle(o, positions, resolvedCircles);
         if (rc === 'pending' || typeof rc === 'string') continue; // missing point / invalid → not drawn
+        // A FREE radius (ADR-051) the solver drove is baked into `positions` (its on-circle points sit at
+        // the solved radius) but NOT into the stored circle object, so resolveCircle returns the SEED.
+        // Recover the true radius as the distance from the centre to any point known to be on the circle,
+        // so the drawn circle matches its points. (Definition of radius — not divergent math.)
+        if (o.radius.via === 'free') {
+          const onIt = pointOnCircleId(c, o.id);
+          const pp = onIt ? positions.get(onIt) : undefined;
+          if (pp) rc = { center: rc.center, r: len(sub(pp, rc.center)) };
+        }
         resolvedCircles.set(o.id, rc);
         progressed = true;
       }

@@ -629,6 +629,54 @@ const perpendicularConstraint: Rule = (s) => {
   ];
 };
 
+/**
+ * Collinearity — three points on one line (ADR-050). Three phrasings:
+ *   - "line CE passes through A" / "ישר CE עובר בנקודה A"  → drive a point of the named line onto A
+ *   - "E on line AC"            / "E על הישר AC"           → slide the named point E onto line AC
+ *   - "A, B, C collinear"       / "A B C על ישר אחד"       → make the three line up (drive a free one)
+ * The first two NAME a line by two points, so they also DRAW that segment (idempotent), like ∥/⟂
+ * (FR-IN-7). The point listed FIRST in the emitted `set-collinear` is the one the solver prefers to
+ * move, so "E on line AC" slides E (an on-circle/on-segment point) onto the line rather than A or C.
+ */
+const collinearConstraint: Rule = (s) => {
+  // "line ABE" / "ישר ABE" / "line ABEF" — three or more points collinear AND IN ORDER (B between A and
+  // E). Uppercase labels only (so a lowercase word like "through" isn't read as labels), the whole tail
+  // after the keyword. Emits one `set-line` (collinearity + order). Two labels ("line AB") fall through.
+  const lineN = s.match(/^\s*(?:the\s+)?(?:line|ה?ישר|ה?קו)\s+((?:[A-Z]\d*\s*){3,})$/);
+  if (lineN) {
+    const pts = lineN[1].match(/[A-Z]\d*/g)?.map(up) ?? [];
+    if (pts.length >= 3) return [{ type: 'set-line', points: pts }];
+  }
+  // "line QR passes through P" / "(ה)ישר QR עובר [דרך/בנקודה] P" — drive a point OF the line (Q/R) onto P.
+  const through = s.match(
+    /(?:line|ה?ישר|ה?קו)\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\s+(?:עובר[ת]?|passes(?:\s+through)?|goes\s+through|through)\s*(?:דרך|בנקודה|נקודה|ב-?|the\s+point|point|at|in)?\s*([A-Za-z]\d*)\b/i,
+  );
+  if (through) {
+    const [Q, R, P] = [up(through[1]), up(through[2]), up(through[3])];
+    return [
+      { type: 'segment', a: Q, b: R },
+      { type: 'set-collinear', a: Q, b: R, c: P },
+    ];
+  }
+  // "P on line QR" / "P על (ה)ישר QR" — slide P onto the line through Q and R (P listed first → driven).
+  const onLine = s.match(
+    /([A-Za-z]\d*)\s+(?:is\s+|lies\s+)?(?:on|על|נמצאת?\s+על)\s+(?:the\s+)?(?:line|ה?ישר|ה?קו)\s+(?:through\s+|דרך\s+)?([A-Za-z]\d*)\s*(?:and\s+|ו-?\s*)?([A-Za-z]\d*)\b/i,
+  );
+  if (onLine) {
+    const [P, Q, R] = [up(onLine[1]), up(onLine[2]), up(onLine[3])];
+    return [
+      { type: 'segment', a: Q, b: R },
+      { type: 'set-collinear', a: P, b: Q, c: R },
+    ];
+  }
+  // "A, B, C collinear" / "A B C על ישר אחד / על אותו ישר / קו אחד".
+  if (/\bcollinear\b|same\s+line|on\s+one\s+line|על\s+(?:אות[הו]\s+)?(?:ישר|קו)(?:\s+אחד|\s+אחת)?|אות[הו]\s+(?:ישר|קו)/i.test(s)) {
+    const ids = labelRun(s.replace(/collinear|are|lie\s+on|על|אות[הו]|ה?ישר|ה?קו|אחד|אחת|same|one|line|,/gi, ' '), 3);
+    if (ids) return [{ type: 'set-collinear', a: ids[0], b: ids[1], c: ids[2] }];
+  }
+  return null;
+};
+
 /** "point A at (0,0)" / "נקודה A ב-(0,0)" / "A = (3, 4)" */
 const freePoint: Rule = (s) => {
   const m = s.match(
@@ -683,7 +731,11 @@ const circle: Rule = (s, ctx) => {
   const center = named ?? freeLabel(ctx.points ?? [], ['O', 'P', 'Q', 'K']);
   const auto = !named;
   if (thrM && !r.numeric && !r.symbolic) return [{ type: 'circle-through', id: circleId(center), center: up(center), through: up(thrM[1]), ...(auto ? { autoCenter: true } : {}) }];
-  return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius, ...(auto ? { autoCenter: true } : {}) }, ...(r.varCmd ? [r.varCmd] : [])];
+  // No size was STATED (no number, no symbolic R) ⇒ the radius is a free DOF seeded at the default, not a
+  // fixed value (ADR-051 / the no-assumptions principle): the student gave a circle, not a size. A stated
+  // numeric/symbolic radius stays fixed.
+  const freeRadius = !r.numeric && !r.symbolic;
+  return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius, ...(freeRadius ? { freeRadius: true } : {}), ...(auto ? { autoCenter: true } : {}) }, ...(r.varCmd ? [r.varCmd] : [])];
 };
 
 /**
@@ -1136,8 +1188,10 @@ const twoCirclesMeet: Rule = (s) => {
   const auto1 = !named.includes(c1);
   const auto2 = !named.includes(c2);
   return [
-    { type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, ...(auto1 ? { autoCenter: true } : {}) },
-    { type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT * 0.72, ...(auto2 ? { autoCenter: true } : {}) }, // distinct size — not a symmetric lens
+    // No radius is stated, so each circle's size is a free DOF (ADR-051) seeded at a distinct value (so it
+    // doesn't render as a symmetric lens) — the solver sizes them to the problem's givens, the sampler varies them.
+    { type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, freeRadius: true, ...(auto1 ? { autoCenter: true } : {}) },
+    { type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ...(auto2 ? { autoCenter: true } : {}) },
     { type: 'circle-circle-intersection', id: A, circle1: id1, circle2: id2, branch: 0 },
     { type: 'circle-circle-intersection', id: B, circle1: id1, circle2: id2, branch: 1 },
   ];
@@ -1724,6 +1778,9 @@ const RULES: Rule[] = [
   // perpendicular/parallel keyword + an explicit through-point, so a plain intersection falls through.
   perpendicularLine, // a *drawn* perpendicular line through a point (before the ⟂ constraint & line∩line)
   parallelLine, // a *drawn* parallel line through a point (before the ∥ constraint & line∩line)
+  // Collinearity ("E on line AC" / "line CE passes through A" / "A B C collinear") — before the
+  // generic line∩line and before pointOnSegment (whose "P on QR" would misread "P on line QR").
+  collinearConstraint,
   lineLineIntersection,
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,
