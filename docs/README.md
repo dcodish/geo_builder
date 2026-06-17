@@ -17,6 +17,8 @@ Living project documentation. Status: **design phase** (last updated 2026-06-10)
 | 09 | [Implementation Plan](09-implementation-plan.md) | Phased build plan: scope, dependencies, requirement coverage, per-phase gates, and milestones |
 | 10 | [Pedagogy](10-pedagogy.md) | The teaching charter: what students should learn, how each mechanic teaches, and the construction→theorem trigger map (Phase 6 payload) |
 | 11 | [Architecture as a Compiler](11-architecture-as-compiler.md) | A lens: the NL→commands→evaluation→render pipeline as a compiler front-end + constraint interpreter + retargetable back-end — and where new work slots in |
+| 12 | [Letter Placement](12-letter-placement.md) | The vertex/point label-placement guide |
+| 13 | [Design Audit (2026-06-17)](13-design-audit-2026-06-17.md) | Full design+development audit: the case-by-case-patching root cause, prioritized re-work/generalizations (R1–R9), and the test-strategy shift — directions captured as Proposed ADR-043…047 |
 | — | [Project Memory](PROJECT-MEMORY.md) | Travelling memory: where memory lives, operational notes, resume pointer (read at session start) |
 
 ## How to use these
