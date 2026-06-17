@@ -97,6 +97,26 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'point-on-arc-no-midpoint-word',
+    title: '"F על קשת BC" (point ON arc, no "midpoint" word) builds on the right circle, not dropped',
+    guards:
+      'the arc rule required the word midpoint/אמצע, so "F על קשת BC" (a point ON arc BC) matched no rule, escalated, and was DROPPED ("error"); a retry fell to plain point-on-circle and put F generically on the wrong circle O (near E–D). The rule now also accepts on/על and resolves to the circle holding both B and C (P).',
+    steps: [
+      'משולש CDE',
+      'A על CD',
+      'B על CE',
+      'מרובע ABED חסום במעגל', // circle-O
+      'משולש ABC חסום במעגל', // circle-P (holds B and C)
+      'F על קשת BC', // point ON arc BC — parses deterministically now (no LLM, no drop)
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const F = at(fig, 'F'), P = at(fig, 'P'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(dist(P, F)).toBeCloseTo(dist(P, at(fig, 'A')), 4); // F is on circle P
+      expect(dist(F, B)).toBeCloseTo(dist(F, C), 3); // on arc BC: equidistant from B and C (the arc point)
+    },
+  },
+  {
     id: 'arc-resolves-to-circle-holding-both-endpoints',
     title: '"arc BC" picks the circle that actually contains both B and C (not a wrongly-named one)',
     guards:

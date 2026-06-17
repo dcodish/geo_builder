@@ -920,10 +920,15 @@ const diameter: Rule = (s, ctx) => {
   return [{ type: 'diameter', id1: ids[0], id2: ids[1], circle: circleId(center) }];
 };
 
-/** "M is the midpoint of arc BC in circle O" / "M אמצע הקשת BC במעגל O". */
+/**
+ * "M is the midpoint of arc BC in circle O" / "M אמצע הקשת BC במעגל O", and also a plain
+ * "F is ON arc BC" / "F על קשת BC" (a point on the arc). Both place a point on arc BC; the
+ * connector word may be midpoint/אמצע OR on/על. (A freely-sliding point along the arc — rather
+ * than this well-defined arc point — is a future refinement; for now F sits at the arc's midpoint.)
+ */
 const arcMidpoint: Rule = (s, ctx) => {
   if (!/arc|קשת/i.test(s)) return null;
-  const m = dropCircleRef(s).match(/([A-Za-z]\d*)\b.*?(?:midpoint|אמצע).*?(?:arc|הקשת|קשת)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  const m = dropCircleRef(s).match(/([A-Za-z]\d*)\b.*?(?:midpoint|אמצע|\bon\b|על)\s*.*?(?:arc|הקשת|קשת)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!m) return null;
   const from = up(m[2]), to = up(m[3]);
   // The arc BC lives on the circle that actually contains BOTH endpoints — prefer it over a named

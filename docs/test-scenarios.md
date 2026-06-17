@@ -203,6 +203,16 @@ construction, so it saw A,B,C as fresh free-points and (since A,B already existe
 flagged a false redefinition conflict, dropping the circle. Fixed by adding `circumcircle` to `isShape`.
 **Asserts:** all steps OK (no redefinition over-constraint); O is the circumcentre — |OA| = |OB| = |OC|.
 
+### `point-on-arc-no-midpoint-word` — "F על קשת BC" (point ON arc, no "midpoint") builds, not dropped
+**Steps:** `משולש CDE`, `A על CD`, `B על CE`, `מרובע ABED חסום במעגל` (circle-O), `משולש ABC חסום במעגל`
+(circle-P), `F על קשת BC`.
+**Guards against:** the arc rule requiring the word midpoint/אמצע — so "F על קשת BC" (a point ON arc BC)
+matched no rule, escalated, and was **dropped** ("error"); a retry fell to plain `point-on-circle` and put F
+generically on the wrong circle O (near E–D). The rule now also accepts on/על and resolves (by membership)
+to the circle holding **both** B and C (P). (F sits at the arc's midpoint; a freely-sliding on-arc point is a
+future refinement.)
+**Asserts:** all steps OK (parses deterministically, no LLM); F is on circle P; F is equidistant from B and C (on arc BC).
+
 ### `arc-resolves-to-circle-holding-both-endpoints` — "arc BC" picks the circle that contains B and C
 **Steps:** `משולש CDE`, `A על CD`, `B על CE`, `מרובע ABED חסום במעגל` (circle-O), `משולש ABC חסום במעגל`
 (circle-P), `F אמצע הקשת BC במעגל O` (the LLM canonical line, with the WRONG circle O).
