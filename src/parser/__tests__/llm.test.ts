@@ -5,6 +5,8 @@
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, sep } from 'node:path';
 import { buildLlmRequest, extractSteps, LLM_MODEL, STEPS_TOOL } from '../llmShared';
 import { llmParse } from '../llm';
 
@@ -110,12 +112,21 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
 
 describe('security — the API key and SDK never reach the browser bundle', () => {
   it('no shipped file under src/ imports the Anthropic SDK or reads the API key', () => {
-    // Vite-native file read (no Node fs needed); covers everything the client bundles.
-    const files = import.meta.glob('/src/**/*.{ts,tsx}', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-    const offenders = Object.entries(files)
-      .filter(([path]) => !path.includes('/__tests__/') && !path.includes('.test.'))
-      .filter(([, src]) => src.includes('@anthropic-ai/sdk') || src.includes('ANTHROPIC_API_KEY'))
-      .map(([path]) => path);
+    // Read via Node fs (Vitest runs in Node) rather than Vite's `?raw` glob loader, which
+    // resolves to a malformed `c:\c:\…` path on Windows under concurrent workers (flaky).
+    const srcRoot = join(process.cwd(), 'src');
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+        const p = join(dir, e.name);
+        return e.isDirectory() ? walk(p) : p;
+      });
+    const offenders = walk(srcRoot)
+      .filter((p) => /\.(ts|tsx)$/.test(p))
+      .filter((p) => !p.includes(`${sep}__tests__${sep}`) && !p.includes('.test.'))
+      .filter((p) => {
+        const src = readFileSync(p, 'utf8');
+        return src.includes('@anthropic-ai/sdk') || src.includes('ANTHROPIC_API_KEY');
+      });
     expect(offenders, `client code must stay key-free: ${offenders.join(', ')}`).toEqual([]);
   });
 });
