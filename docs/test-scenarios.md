@@ -192,3 +192,13 @@ at the same point"). ADR-040: an existing crossing is a direction point (never r
 is "the OTHER crossing" (the root not coinciding with a placed point, `avoid`).
 **Asserts:** canonical + 8 resampled views all evaluate OK; C stays on the right circle P (not on O); D and E
 lie on the left circle O and stay distinct from A and B on every view.
+
+### `circumcircle-of-existing-points` — circumscribed circle of a triangle whose vertices already exist
+**Steps:** `משולש CDE`, `A על CD`, `B על CE`, `משולש ABC`, `מעגל חוסם את ABC` (the last is the LLM canonical
+line for "מעגל חוסם את משולש ABC", re-parsed with context as `llmParse` does).
+**Guards against:** `"'A' is already defined — it can't be redefined as something different"`. The
+`circumcircle` command reuses-or-creates its three points exactly like a shape/segment, but it was missing
+from `commandConflict`'s `isShape` allow-list — and that gate runs `applyCommand` against an EMPTY
+construction, so it saw A,B,C as fresh free-points and (since A,B already existed as on-segment points)
+flagged a false redefinition conflict, dropping the circle. Fixed by adding `circumcircle` to `isShape`.
+**Asserts:** all steps OK (no redefinition over-constraint); O is the circumcentre — |OA| = |OB| = |OC|.

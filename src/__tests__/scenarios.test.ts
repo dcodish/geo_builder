@@ -96,6 +96,27 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'circumcircle-of-existing-points',
+    title: 'a circle circumscribing a triangle whose three vertices already exist (no redefinition conflict)',
+    guards:
+      "the circumcircle command reuses-or-creates its three points (A,B,C) exactly like a shape/segment, but it was missing from commandConflict's `isShape` set. So when the points already existed (A on CD, B on CE), the conflict gate — which runs applyCommand against an EMPTY construction and saw them as fresh free-points — wrongly flagged \"'A' is already defined\" and the circle was dropped.",
+    steps: [
+      'משולש CDE',
+      'A על CD',
+      'B על CE',
+      'משולש ABC',
+      'מעגל חוסם את ABC', // the LLM canonical line for "מעגל חוסם את משולש ABC", re-parsed with context
+    ],
+    check(fig) {
+      allStepsOk(fig); // no "'A' is already defined" over-constraint
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      // O is the circumcentre: equidistant from all three vertices (the circle passes through each).
+      const rA = dist(O, A);
+      expect(dist(O, B)).toBeCloseTo(rA, 6);
+      expect(dist(O, C)).toBeCloseTo(rA, 6);
+    },
+  },
+  {
     id: 'alpha-less-than-beta-reshapes',
     title: 'Q5 median figure + "α<β" actively reshapes so ∠BAP comes out smaller than ∠ABP',
     guards: 'an inequality between two named measures ("α<β") was unparsed (escalated to the LLM, which gave up); even understood, it had no carrier and was ignored by the joint solver, so the figure kept a misleading ∠BAP > ∠ABP that "show another configuration" rarely escaped (ADR-039).',

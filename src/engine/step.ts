@@ -72,7 +72,8 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     cmd.type === 'right-triangle' ||
     cmd.type === 'segment' || // a segment reuses (or creates) its endpoints, like a shape's base
     cmd.type === 'circle' ||
-    cmd.type === 'circle-through'; // a circle reuses (or creates) its centre
+    cmd.type === 'circle-through' || // a circle reuses (or creates) its centre
+    cmd.type === 'circumcircle'; // a circumscribed circle reuses (or creates) its three points
   const produced = applyCommand(emptyConstruction(), cmd).objects;
   for (const o of produced) {
     const existing = prev.objects.find((x) => x.id === o.id);
