@@ -128,99 +128,12 @@ function resolveDriven(c: Construction): Construction {
     return withParam(c, carrier.id, roots[dir.branch % roots.length]);
   }
 
-  // SEVERAL coupled DOFs (e.g. "C = midpoint of OB" drives E while "|ED| = 7"
-  // drives D, and D's chord length depends on where E lands): coordinate descent
-  // on the joint squared residual, each DOF moved to the global minimum along it
-  // (so all branches are considered) and iterated until it converges.
-  // The distinct constraints the carriers drive (a constraint shared by several
-  // carriers — e.g. recruited DOFs all driving "DE=DF" — must count once, so a
-  // second constraint on the same DOFs, like "AB is a diameter", isn't outweighed).
-  const seen = new Set<string>();
-  const cons = carriers
-    .map((cr) => cr.solve!.constraint)
-    .filter((k) => {
-      const key = JSON.stringify(k);
-      return seen.has(key) ? false : (seen.add(key), true);
-    });
-  withOrderCons(cons, c); // also minimise any "α < β" ordering jointly with these carriers (ADR-039)
-  const ids = carriers.map((cr) => cr.id);
-  // The constraints' referenced points, and the pairs a `coincide` constraint INTENDS to merge
-  // (those must be exempt from the degeneracy barrier below — ADR-028's hidden `~` targets).
-  const refIds = [...new Set(cons.flatMap(constraintRefs))];
-  const coincidePairs = new Set(
-    c.constraints.filter((k) => k.type === 'coincide').map((k) => [k.p, k.q].sort().join('|')),
-  );
-  const seed = carriers.map((cr) => (cr.kind === 'on-circle' ? cr.theta : cr.t));
-  const totalSq = (x: number[]): number => {
-    const p = new Map<Id, number>(ids.map((id, i) => [id, x[i]]));
-    const r = evaluateCore(setParams(c, p), { skipConstraints: true });
-    if (!r.ok) return Infinity;
-    let s = 0;
-    for (const con of cons) {
-      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return Infinity;
-      const v = residual(con, (id) => r.positions.get(id)!);
-      s += v * v;
-    }
-    // Degeneracy barrier: steer the joint search away from COLLAPSING two referenced points
-    // together (a cheat that satisfies an angle/equal constraint by merging vertices — e.g.
-    // driving C onto D). Skip pairs a coincide constraint deliberately merges.
-    const pts = refIds.map((id) => r.positions.get(id)).filter((v): v is Vec => !!v);
-    let span = 1;
-    for (const v of pts) span = Math.max(span, Math.abs(v.x), Math.abs(v.y));
-    const minSep = 0.04 * span;
-    for (let i = 0; i < refIds.length; i++) {
-      for (let j = i + 1; j < refIds.length; j++) {
-        if (coincidePairs.has([refIds[i], refIds[j]].sort().join('|'))) continue;
-        const a = r.positions.get(refIds[i]);
-        const b = r.positions.get(refIds[j]);
-        if (!a || !b) continue;
-        const dd = Math.hypot(a.x - b.x, a.y - b.y);
-        if (dd < minSep) s += (minSep / Math.max(dd, minSep * 1e-3) - 1) ** 2;
-      }
-    }
-    return s;
-  };
-  // Does `x` satisfy every constraint within tolerance AND avoid degeneracy (totalSq ~ 0
-  // includes the degeneracy barrier, so a satisfied-but-collapsed config is rejected)?
-  const accept = (x: number[]): boolean => {
-    const r = evaluateCore(setParams(c, new Map<Id, number>(ids.map((id, i) => [id, x[i]]))), { skipConstraints: true });
-    if (!r.ok) return false;
-    const ok = cons.every((con) => {
-      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return false;
-      const get = (id: Id) => r.positions.get(id)!;
-      return isSatisfied(con, get);
-    });
-    return ok && totalSq(x) < 1e-3;
-  };
-
-  // NEAR FIRST: a local solve from the seed. When the current figure already has a valid
-  // solution nearby (a cyclic quad needing only a small reshape), this keeps its convex
-  // vertex order instead of jumping to a far, tangled branch. Accept it only if it truly
-  // satisfies the constraints and isn't degenerate; otherwise fall through to the global search.
-  const local = nelderMead(totalSq, seed.slice(), 500, 0.12);
-  if (accept(local)) return setParams(c, new Map<Id, number>(ids.map((id, i) => [id, local[i]])));
-
-  // 1) coordinate descent for a globally-informed start (grid argMin per DOF
-  //    considers all branches); 2) Nelder–Mead to converge out of the valley
-  //    coordinate descent stalls in (coupled residuals share a narrow trough).
-  const x = carriers.map((cr) => (cr.kind === 'on-circle' ? cr.theta : cr.t));
-  for (let iter = 0; iter < 12 && totalSq(x) > 1e-12; iter++) {
-    let improved = false;
-    for (let i = 0; i < carriers.length; i++) {
-      const [lo, hi] = range(carriers[i]);
-      const before = totalSq(x);
-      const v = argMin((t) => totalSq(x.map((xj, j) => (j === i ? t : xj))), lo, hi);
-      const trial = x.slice();
-      trial[i] = v;
-      if (totalSq(trial) < before - 1e-12) {
-        x[i] = v;
-        improved = true;
-      }
-    }
-    if (!improved) break;
-  }
-  const best = nelderMead(totalSq, x);
-  return setParams(c, new Map<Id, number>(ids.map((id, i) => [id, best[i]])));
+  // SEVERAL coupled driven DOFs (e.g. "C = midpoint of OB" drives E while "|ED| = 7" drives D, and D's
+  // chord length depends on where E lands): route through the one generalized joint solver (R5 Pass 2 —
+  // [ADR-045](docs/06-decisions.md#adr-045)). resolveMixedCarriers carries the ported NEAR-FIRST local
+  // accept + full-range grid-scan seeding for these bounded parametric carriers, and uses the relative
+  // residual (un-gameable by collapse) + the coincide-exempt non-degeneracy gate.
+  return resolveMixedCarriers(c, carriers);
 }
 
 /**
@@ -281,18 +194,9 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     seed.map((v, i) => (i % 2 === 1 ? v + d * span : v)),
   ]);
   const best = multiStartSolve(seed, offsets, span * 0.2, regCost, resid, [span * 0.05, span * 0.005], 400, (x) =>
-    solutionAccepted(place, x, cons, span),
+    solutionAccepted(c, place, x, cons, span),
   );
   return place(best);
-}
-
-/** True if any two of the constraint's referenced points have collapsed together (a near-degenerate "solution" the solver cheated to). */
-function degenerateSpread(pts: Vec[], span: number): boolean {
-  const eps = 1e-3 * span;
-  for (let i = 0; i < pts.length; i++)
-    for (let j = i + 1; j < pts.length; j++)
-      if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) < eps) return true;
-  return false;
 }
 
 /**
@@ -330,18 +234,43 @@ function multiStartSolve(
 /**
  * A candidate `x` (mapped to a Construction by `place`) is accepted iff the figure evaluates, satisfies
  * every constraint within tolerance, and isn't degenerate (no two referenced points collapsed together —
- * a cheat the residual alone would reward). Shared accept gate for both driven solvers.
+ * a cheat the residual alone would reward) — EXCEPT a pair a `coincide` constraint deliberately merges
+ * ([ADR-028](docs/06-decisions.md#adr-028): their meeting is the goal, e.g. "C = midpoint of OB"). Shared
+ * accept gate for both driven solvers; the coincide exemption is ported from the former coupled-param block.
  */
-function solutionAccepted(place: (x: number[]) => Construction, x: number[], cons: Constraint[], span: number): boolean {
+function solutionAccepted(c: Construction, place: (x: number[]) => Construction, x: number[], cons: Constraint[], span: number): boolean {
   const r = evaluateCore(place(x), { skipConstraints: true });
   if (!r.ok) return false;
+  const satisfied = cons.every((con) => {
+    for (const id of constraintRefs(con)) if (!r.positions.has(id)) return false;
+    return isSatisfied(con, (id) => r.positions.get(id)!);
+  });
+  if (!satisfied) return false;
+  // Non-degenerate: no two referenced points collapsed together, skipping any pair a coincide
+  // constraint intends to merge. The threshold scales to the figure's ACTUAL extent (the referenced
+  // points' coords), floored by the passed `span` — a pure-parametric figure passes span=1 (no free
+  // points), so deriving the extent here keeps the gate correct on e.g. an r5 circle where 1e-3·span
+  // would be ~200× too small. (Matches the deleted coupled block, which scaled its barrier off the
+  // referenced points' coords.)
   const refIds = [...new Set(cons.flatMap((con) => constraintRefs(con)))];
-  return (
-    cons.every((con) => {
-      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return false;
-      return isSatisfied(con, (id) => r.positions.get(id)!);
-    }) && !degenerateSpread(refIds.map((id) => r.positions.get(id)).filter((p): p is Vec => !!p), span)
+  const coincidePairs = new Set(
+    c.constraints.filter((k) => k.type === 'coincide').map((k) => [k.p, k.q].sort().join('|')),
   );
+  let figSpan = span;
+  for (const id of refIds) {
+    const p = r.positions.get(id);
+    if (p) figSpan = Math.max(figSpan, Math.abs(p.x), Math.abs(p.y));
+  }
+  const eps = 1e-3 * figSpan;
+  for (let i = 0; i < refIds.length; i++) {
+    for (let j = i + 1; j < refIds.length; j++) {
+      if (coincidePairs.has([refIds[i], refIds[j]].sort().join('|'))) continue;
+      const a = r.positions.get(refIds[i]);
+      const b = r.positions.get(refIds[j]);
+      if (a && b && Math.hypot(a.x - b.x, a.y - b.y) < eps) return false;
+    }
+  }
+  return true;
 }
 
 /** Set free vertices to explicit positions and clear their `solve` directives (now resolved). */
@@ -454,20 +383,52 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     for (let i = 0; i < u.length; i++) s += lambda * (u[i] - seedU[i]) * (u[i] - seedU[i]);
     return s;
   };
-  // Nearest basin (regularised search from the seed) + cardinal restarts (each DOF pushed by a range of
-  // magnitudes in normalised units, so both a nearby and a far-off basin are tried); polish on the residual
-  // + degeneracy penalty through several decades so a coupled system lands tightly ON the constraints and
-  // stays spread; accept only a genuine, non-degenerate solution else keep the seed. Shared scaffold.
-  const restarts = [0.5, 1, -1, 2, -2].flatMap((d) => seedU.map((_, j) => seedU.map((v, i) => (i === j ? v + d : v))));
-  const best = multiStartSolve(
-    seedU,
-    restarts,
-    0.3,
-    regCost,
-    cost,
-    [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4],
-    500,
-    (x) => solutionAccepted(place, x, cons, span),
+  // The BOUNDED parametric carriers (on-circle θ∈[0,2π], on-segment t∈[0,1]) in u-space (scale 1 ⇒ u == θ/t).
+  const ranges: { ui: number; lo: number; hi: number }[] = [];
+  let ki = 0;
+  for (const s of specs) {
+    const kind = carriers.find((o) => o.id === s.id)?.kind;
+    if (kind === 'on-circle') ranges.push({ ui: ki, lo: 0, hi: 2 * Math.PI });
+    else if (kind === 'on-segment') ranges.push({ ui: ki, lo: 0, hi: 1 });
+    ki += s.n;
+  }
+  // When bounded parametric carriers are present, two extra steps ported from the former coupled-param
+  // solver (R5 Pass 2): (1) NEAR-FIRST — a local solve from the current seed, returned if valid, so a
+  // figure needing only a small reshape keeps its current (e.g. convex cyclic-quad) configuration instead
+  // of jumping to a far branch; (2) a globally-informed GRID-SCAN seed — coordinate-descent argMin per
+  // bounded DOF over its FULL range (all branches considered), the capability the cardinal restarts alone
+  // would miss. Both are no-ops when there are no bounded params, so pure shape/on-line figures are unchanged.
+  const extraRestarts: number[][] = [];
+  if (ranges.length > 0) {
+    const near = nelderMead(cost, seedU.slice(), 500, 0.12);
+    if (solutionAccepted(c, place, near, cons, span)) return place(near);
+    const gridSeed = seedU.slice();
+    for (let iter = 0; iter < 12 && cost(gridSeed) > 1e-12; iter++) {
+      let improved = false;
+      for (const { ui, lo, hi } of ranges) {
+        const before = cost(gridSeed);
+        const v = argMin((t) => cost(gridSeed.map((x, j) => (j === ui ? t : x))), lo, hi);
+        const trial = gridSeed.slice();
+        trial[ui] = v;
+        if (cost(trial) < before - 1e-12) {
+          gridSeed[ui] = v;
+          improved = true;
+        }
+      }
+      if (!improved) break;
+    }
+    extraRestarts.push(gridSeed);
+  }
+  // Nearest basin (regularised search from the seed) + the grid-informed seed + cardinal restarts (each DOF
+  // pushed by a range of magnitudes in normalised units); polish on the residual through several decades so
+  // a coupled system lands tightly ON the constraints; accept a genuine non-degenerate solution else keep
+  // the seed. Shared scaffold.
+  const restarts = [
+    ...extraRestarts,
+    ...[0.5, 1, -1, 2, -2].flatMap((d) => seedU.map((_, j) => seedU.map((v, i) => (i === j ? v + d : v)))),
+  ];
+  const best = multiStartSolve(seedU, restarts, 0.3, regCost, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, (x) =>
+    solutionAccepted(c, place, x, cons, span),
   );
   return place(best);
 }
@@ -536,20 +497,6 @@ function argMin(f: (v: number) => number, lo: number, hi: number, steps = 120): 
     else a = m1;
   }
   return (a + b) / 2;
-}
-
-/** Set several carriers' parameters at once (each driven param resolved to a value). */
-function setParams(c: Construction, params: Map<Id, number>): Construction {
-  return {
-    ...c,
-    objects: c.objects.map((o) => {
-      if (!params.has(o.id)) return o;
-      const v = params.get(o.id)!;
-      if (o.kind === 'on-circle') return { ...o, theta: v, solve: undefined };
-      if (o.kind === 'on-segment') return { ...o, t: v, solve: undefined };
-      return o;
-    }),
-  };
 }
 
 /**
