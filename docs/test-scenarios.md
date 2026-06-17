@@ -162,3 +162,33 @@ both evaluate fine (no coincident points) but neither is a valid *drawing* of th
 seed > 0, which the seed-0 scenario runner can't reach — replayed through the real store + `resample()`.)
 **Asserts:** every resampled configuration keeps the polygon **convex** (`polygonsConvex`) and the
 diagonals still hold (|AC| = |BD| = 10).
+
+### `two-circles-show-another` — two intersecting circles, "show another" never collides A onto B
+**Steps:** `שני מעגלים נחתכים בנקודות A ו- B`, then press "show another configuration" repeatedly.
+**Guards against:** an intermittent "cannot construct B" error. A and B are the SAME circle∩circle at
+branches 0 and 1 — both already drawn — so the button cycled A's branch onto B's (n=2, 0→1), making
+A≡B and failing the second crossing. `cyclableBranch` now reports no unshown branch, so the button
+only resamples the circle centres. Also asserts the opener draws **no chord AB** and gives the two
+circles **distinct radii** (5 and 3.6) so they read as two different circles, not a symmetric lens.
+**Asserts:** `branchId` is undefined (nothing cyclable); every press evaluates OK and keeps A, B distinct.
+
+### `two-circles-then-secant-from-A` — LLM fallback re-parses its steps WITH the figure context
+**Steps:** `שני מעגלים נחתכים בנקודות A ו- B`, `C על מעגל P`, `מנקודה A ישר חותך את המעגל O בנקודות C ו-D`
+(steps 2–3 are the LLM's canonical lines the log recorded, parsed here with context exactly as `llmParse` does).
+**Guards against:** the LLM fallback re-parsing its canonical steps with **no figure context**, so
+"from A a line cuts circle O at C and D" fell to the "first secant" branch (needs an "outside" cue)
+and was **dropped** — "the next command failed". `llmParse` now threads the figure context (and
+accumulates ids across steps) into each re-parse, so the secant-from-an-existing-point branch fires.
+**Asserts:** all steps OK; D is placed and lies on the left circle O (|OD| = radius of O).
+
+### `two-circles-secant-web` — two secants from existing points stay valid across every "other view"
+**Steps:** `שני מעגלים נחתכים בנקודות A ו- B`, `C על מעגל P`, `מנקודה A ישר חותך את המעגל O בנקודות C ו-D`,
+`segment CD`, `מנקודה C ישר חותך את המעגל O בנקודות B ו-E` (steps 2–5 are the LLM canonical lines, parsed with
+context as `llmParse` does), then "show another configuration" 8×.
+**Guards against:** (1) the secant rule re-placing an existing crossing (C) onto circle O — pinning C to BOTH
+circles so it collapsed to the intersection; (2) the new crossing D/E using a fixed `line-circle` branch index
+whose root order flips as the line turns, so under resampling D/E intermittently collapsed onto A/B ("would be
+at the same point"). ADR-040: an existing crossing is a direction point (never re-placed), and the new crossing
+is "the OTHER crossing" (the root not coinciding with a placed point, `avoid`).
+**Asserts:** canonical + 8 resampled views all evaluate OK; C stays on the right circle P (not on O); D and E
+lie on the left circle O and stay distinct from A and B on every view.

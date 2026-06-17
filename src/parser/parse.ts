@@ -1009,15 +1009,22 @@ const secantFromExternal: Rule = (s, ctx) => {
   const E = up(eM[1]), A = up(abM[1]), B = up(abM[2]);
   if (new Set([E, A, B]).size !== 3) return null; // need three distinct labels
   const circ = circleId(center);
-  // ANOTHER secant from an EXISTING external point: line E–A, B = the other intersection. Don't
-  // re-place E (no constraint), so the shared external point stays where the first secant put it.
+  // A secant from an EXISTING point E: line E–A, B = the OTHER crossing. Don't re-place E (no
+  // constraint), so a shared point stays put. B is chosen as the crossing AWAY from a known point
+  // (`avoid`), which is stable under resampling — a fixed branch index intermittently flips onto the
+  // wrong root as the line turns and then B collapses onto the known point ("would be at the same point").
   if (ctx.points?.includes(E)) {
     const lineId = `sec-${E}${A}`;
+    // If A already EXISTS it is a direction point, NOT a new on-circle crossing — never re-place it on
+    // the circle (that wrongly pins it to two circles at once). Then B is the crossing away from E
+    // (E on the circle → the second crossing; E external → the far exit). If A is new, it's the
+    // near on-circle end and B is the crossing away from A.
+    const aExists = ctx.points?.includes(A);
     return [
-      { type: 'point-on-circle', id: A, circle: circ },
+      ...(aExists ? [] : [{ type: 'point-on-circle', id: A, circle: circ } as const]),
       { type: 'line-through', id: lineId, a: E, b: A },
-      { type: 'line-circle-intersection', id: B, line: lineId, circle: circ, branch: 0 }, // the intersection ≠ A
-      { type: 'segment', a: E, b: A }, // the secant E–B–A
+      { type: 'line-circle-intersection', id: B, line: lineId, circle: circ, avoid: aExists ? E : A },
+      { type: 'segment', a: E, b: A }, // the drawn secant E–A
     ];
   }
   // FIRST secant: a NEW external point — require the "outside" cue so a bare "from X cuts … at A,B"
@@ -1059,9 +1066,11 @@ const parallelCircleIntersection: Rule = (s, ctx) => {
 /** "G is the intersection of circle O and circle P" / "G חיתוך מעגל O ומעגל P" — where two circles cross. */
 /**
  * "two circles intersect at A and B" / "שני מעגלים נחתכים בנקודות A ו-B" / "circles O and P meet at
- * A and B" — CREATE both circles (overlapping, default radius) and BOTH intersection points A, B (the
- * two branches), plus their common chord. The single-point `circleCircleIntersection` below needs the
- * two circles to already exist and yields one point; this is the "draw two intersecting circles" opener.
+ * A and B" — CREATE both circles (overlapping) and BOTH intersection points A, B (the two branches).
+ * The two circles get DISTINCT default radii so they read as two different circles (not a symmetric
+ * lens). No chord AB is drawn — the student asked for two intersecting circles, not their common chord.
+ * The single-point `circleCircleIntersection` below needs the two circles to already exist and yields
+ * one point; this is the "draw two intersecting circles" opener.
  */
 const twoCirclesMeet: Rule = (s) => {
   if (!/\bcircles\b|שני\s+מעגל|מעגלים/i.test(s)) return null; // two circles being introduced (plural)
@@ -1082,10 +1091,9 @@ const twoCirclesMeet: Rule = (s) => {
   const auto2 = !named.includes(c2);
   return [
     { type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, ...(auto1 ? { autoCenter: true } : {}) },
-    { type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT, ...(auto2 ? { autoCenter: true } : {}) },
+    { type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT * 0.72, ...(auto2 ? { autoCenter: true } : {}) }, // distinct size — not a symmetric lens
     { type: 'circle-circle-intersection', id: A, circle1: id1, circle2: id2, branch: 0 },
     { type: 'circle-circle-intersection', id: B, circle1: id1, circle2: id2, branch: 1 },
-    { type: 'segment', a: A, b: B }, // the common chord
   ];
 };
 

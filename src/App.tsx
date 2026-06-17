@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
-import { freeDofs, freeDofCount, isGeoPoint } from '@/engine';
+import { cyclableBranch, freeDofs, freeDofCount, isGeoPoint } from '@/engine';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
@@ -190,7 +190,7 @@ export default function App() {
       construction.objects.filter(isGeoPoint).map((o) => o.id),
       construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
     );
-    const out = await llmParse(utterance, ctx);
+    const out = await llmParse(utterance, ctx, parseCtx());
     setThinking(false);
     if (!out || (out.built.length === 0 && out.dropped.length === 0)) {
       logDebug({ kind: 'input', utterance, locale, source: 'llm', result: 'not-understood' });
@@ -256,10 +256,14 @@ export default function App() {
   }, [i18n, i18n.language]);
 
   // The first point with multiple discrete solutions — circle∩circle, line∩circle,
-  // arc-midpoint (the kinds `cycleAlt` can step). "Show another configuration"
-  // cycles its branch; with none, it re-samples the figure's free DOFs instead.
+  // arc-midpoint (the kinds `cycleAlt` can step) — AND an unshown branch left to step to.
+  // A two-circle figure has BOTH crossings on screen (A=branch 0, B=branch 1), so cycling
+  // would only collide them — `cyclableBranch` excludes it and "show another configuration"
+  // resamples the circles instead. With no cyclable branch, it re-samples the free DOFs.
   const BRANCHABLE_KINDS = ['intersection', 'circle-circle', 'line-circle', 'arc-midpoint'];
-  const branchId = construction.objects.find((o) => BRANCHABLE_KINDS.includes(o.kind))?.id;
+  const branchId = construction.objects.find(
+    (o) => BRANCHABLE_KINDS.includes(o.kind) && cyclableBranch(construction, o.id),
+  )?.id;
   const examples = t('examples.items', { returnObjects: true }) as string[];
 
   return (

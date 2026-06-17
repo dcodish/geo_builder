@@ -568,6 +568,8 @@ export function branchCount(c: Construction, id: Id): number {
     const ts = solvedOnSegmentCandidates(o, e.positions);
     return ts === 'pending' ? 0 : ts.length;
   }
+  // A line-circle pinned to "the OTHER crossing" (avoid) is determined — not cyclable.
+  if (o.kind === 'line-circle' && o.avoid) return 1;
   // Both arcs have a midpoint; a line/another circle meets a circle in up to two points.
   if (o.kind === 'arc-midpoint' || o.kind === 'line-circle' || o.kind === 'circle-circle') return 2;
   return 0;
@@ -575,6 +577,39 @@ export function branchCount(c: Construction, id: Id): number {
 
 /** The branchable point kinds whose `branch` index "show another configuration" cycles. */
 const BRANCHABLE = new Set(['intersection', 'on-segment-solved', 'arc-midpoint', 'line-circle', 'circle-circle']);
+
+/**
+ * True when two branchable points index branches of the SAME underlying multi-solution
+ * intersection (two circles crossing, a line cutting a circle, a circle∩circle pair). When
+ * both branches of such a source are already materialised as two distinct points, cycling
+ * either one's branch just collides it onto its sibling (or relabels the pair) — not a new
+ * configuration.
+ */
+function sameBranchSource(a: GeoObject, b: GeoObject): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === 'circle-circle' && b.kind === 'circle-circle')
+    return (a.circle1 === b.circle1 && a.circle2 === b.circle2) || (a.circle1 === b.circle2 && a.circle2 === b.circle1);
+  if (a.kind === 'line-circle' && b.kind === 'line-circle') return a.line === b.line && a.circle === b.circle;
+  if (a.kind === 'intersection' && b.kind === 'intersection')
+    return (a.center1 === b.center1 && a.center2 === b.center2) || (a.center1 === b.center2 && a.center2 === b.center1);
+  return false;
+}
+
+/**
+ * Whether cycling `id`'s branch reaches a configuration not already drawn by a sibling point.
+ * For a two-circle figure where A and B are the SAME crossing at branches 0 and 1, every branch
+ * is already on screen — cycling would only collide A onto B — so this returns false and "show
+ * another configuration" resamples the circles instead of stepping a meaningless branch (ADR-022).
+ */
+export function cyclableBranch(c: Construction, id: Id): boolean {
+  const o = c.objects.find((x) => x.id === id);
+  if (!o || !('branch' in o)) return false;
+  const n = branchCount(c, id);
+  if (n <= 1) return false;
+  const occupied = new Set<number>([o.branch % n]);
+  for (const s of c.objects) if (s.id !== id && 'branch' in s && sameBranchSource(o, s)) occupied.add(s.branch % n);
+  return occupied.size < n; // an unshown branch remains
+}
 
 /** Advance a branchable point to its next solution branch (wraps). */
 export function cycleAlternative(c: Construction, id: Id): Construction {

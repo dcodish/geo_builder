@@ -11,6 +11,7 @@ export {
   build,
   branchCount,
   commandConflict,
+  cyclableBranch,
   cycleAlternative,
   deepEqual,
   maxDelta,

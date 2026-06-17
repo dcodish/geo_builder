@@ -11,6 +11,7 @@ import {
   add,
   circleCircleIntersect,
   circumcenter,
+  dist,
   footOnLine,
   len,
   lineCircleIntersect,
@@ -902,6 +903,18 @@ function tryEval(
       if (!l || !c) return 'pending';
       const sols = lineCircleIntersect(l.anchor, l.dir, c.center, c.r);
       if (sols.length === 0) return `cannot construct ${p.id}: line ${p.line} does not meet circle ${p.circle}`;
+      // "The OTHER crossing" (`avoid` set): the secant runs through a KNOWN point already on the
+      // circle (a line endpoint), so one root is that point. Drop every root that coincides with an
+      // already-placed point and keep the genuinely new crossing. This is stable as the line turns —
+      // a fixed branch index flips root order and intermittently collapses onto the known point.
+      if (p.avoid) {
+        const fresh = sols.filter((s) => ![...pos.values()].some((q) => dist(s, q) < LEN_EPS));
+        if (fresh.length) {
+          const a = pos.get(p.avoid);
+          // Deterministic among several fresh roots: farthest from `avoid`.
+          return a ? fresh.reduce((far, s) => (dist(s, a) > dist(far, a) ? s : far), fresh[0]) : fresh[p.branch % fresh.length];
+        }
+      }
       return sols[p.branch % sols.length];
     }
 

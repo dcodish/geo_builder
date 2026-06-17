@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
 import { replay, polygonsConvex, useGeoStore } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
-import { isGeoPoint, freeDofs } from '@/engine';
+import { isGeoPoint, freeDofs, cyclableBranch, evaluate } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 
 type Step = string | { llm: AnyCommand[] };
@@ -222,13 +222,35 @@ const SCENARIOS: Scenario[] = [
     check(fig) {
       allStepsOk(fig);
       for (const id of ['A', 'B']) expect(fig.positions.has(id), `point ${id}`).toBe(true);
-      const centers = fig.construction.objects.filter((o) => o.kind === 'circle').map((o) => (o as { center: Id }).center);
-      expect(centers.length).toBe(2); // two circles
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle') as { center: Id; radius: { value: number } }[];
+      expect(circles.length).toBe(2); // two circles
       const A = at(fig, 'A'), B = at(fig, 'B');
       expect(dist(A, B)).toBeGreaterThan(0.5); // two DISTINCT intersection points
-      for (const c of centers) {
-        expect(dist(at(fig, c), A)).toBeCloseTo(dist(at(fig, c), B), 2); // A,B equidistant from each centre ⇒ both ON each circle
+      for (const c of circles) {
+        expect(dist(at(fig, c.center), A)).toBeCloseTo(dist(at(fig, c.center), B), 2); // A,B equidistant from each centre ⇒ both ON each circle
       }
+      // The common chord AB is NOT drawn — the student asked for two circles, not their chord.
+      expect(fig.construction.objects.some((o) => o.kind === 'segment')).toBe(false);
+      // The two circles read as DIFFERENT circles, not a symmetric lens.
+      expect(circles[0].radius.value).not.toBeCloseTo(circles[1].radius.value, 2);
+    },
+  },
+  {
+    id: 'two-circles-then-secant-from-A',
+    title: 'two circles → point C on the right circle → a secant from existing A cuts the left circle at D',
+    guards:
+      'the LLM fallback re-parsed its canonical steps with NO figure context, so "from A a line cuts circle O at C and D" fell to the "first secant" branch (which needs an "outside" cue) and was DROPPED — "the next command failed". llmParse now threads the figure context (and accumulates ids across steps) into each re-parse, so the secant-from-an-existing-point branch fires. (Steps 2–3 are the LLM canonical lines the log recorded; parsed here with context exactly as llmParse does.)',
+    steps: [
+      'שני מעגלים נחתכים בנקודות A ו- B',
+      'C על מעגל P', // LLM canonical for "C נקודה על המעגל הימני"
+      'מנקודה A ישר חותך את המעגל O בנקודות C ו-D', // LLM canonical for "AC חותך את המעגל השמאלי בנקודה D"
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('D'), 'D placed (the step did not drop)').toBe(true);
+      // D is the OTHER crossing of line A–C with the left circle O ⇒ D is ON circle O.
+      const O = fig.construction.objects.find((o) => o.kind === 'circle' && (o as { center: Id }).center === 'O') as { radius: { value: number } };
+      expect(dist(at(fig, 'O'), at(fig, 'D'))).toBeCloseTo(O.radius.value, 2);
     },
   },
   {
@@ -488,5 +510,84 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       return dist(f.positions.get('A')!, base.positions.get('A')!) > 1e-3 || dist(f.positions.get('B')!, base.positions.get('B')!) > 1e-3;
     });
     expect(moved).toBe(true);
+  });
+
+  it('[two-circles-show-another] "שני מעגלים נחתכים" — "show another" resamples, never collides A onto B', () => {
+    // Operator report: two intersecting circles, then "show another configuration" — sometimes an
+    // error about point B, sometimes not. Root cause: A and B are the SAME circle∩circle at branches
+    // 0 and 1, both already drawn; the button cycled A's branch onto B's (n=2, 0→1), making A≡B and
+    // failing the second crossing. `cyclableBranch` now reports NO unshown branch, so the button only
+    // resamples the circle centres — A and B stay two distinct, valid crossings on every press.
+    const st = useGeoStore.getState();
+    st.clear();
+    const u = 'שני מעגלים נחתכים בנקודות A ו- B';
+    const r = parse(u, ctxOf(useGeoStore.getState().facts));
+    expect(r.ok, u).toBe(true);
+    if (!r.ok) return;
+    for (const cmd of r.commands) st.execute(cmd, u);
+
+    const BRANCHABLE_KINDS = ['intersection', 'circle-circle', 'line-circle', 'arc-midpoint'];
+    const base = replay(useGeoStore.getState().facts).construction;
+    // The button must NOT find a cyclable branch here (both crossings already on screen).
+    const branchId = base.objects.find((o) => BRANCHABLE_KINDS.includes(o.kind) && cyclableBranch(base, o.id))?.id;
+    expect(branchId).toBeUndefined();
+
+    for (let press = 0; press < 12; press++) {
+      // Mirror the App's "show another configuration": resample, then cycle only a cyclable branch.
+      st.resample();
+      const seed = useGeoStore.getState().seed;
+      const fig = replay(useGeoStore.getState().facts, seed);
+      const bid = fig.construction.objects.find((o) => BRANCHABLE_KINDS.includes(o.kind) && cyclableBranch(fig.construction, o.id))?.id;
+      if (bid) st.cycleAlt(bid);
+      const after = replay(useGeoStore.getState().facts, useGeoStore.getState().seed);
+      expect(evaluate(after.construction).ok, `press ${press + 1} (seed ${seed})`).toBe(true);
+      expect(dist(at(after, 'A'), at(after, 'B')), `press ${press + 1}`).toBeGreaterThan(0.1); // A,B stay distinct
+    }
+    st.clear();
+  });
+
+  it('[two-circles-secant-web] two secants from existing points stay valid across every "other view"', () => {
+    // Operator's book figure: two circles meet at A,B; C on the right circle; secant AC cuts the LEFT
+    // circle at D; secant CB cuts the LEFT circle at E. The LLM decomposed each secant as "from X a line
+    // cuts circle O at Y and Z". The OLD behaviour: (1) re-placed the existing Y onto circle O (pinning a
+    // point to BOTH circles, so it collapsed to the intersection), and (2) used a fixed branch index whose
+    // root order flips under resampling, so D/E intermittently collapsed onto A/B ("would be at the same
+    // point"). Now: an existing crossing is a direction point (never re-placed on the circle), and the new
+    // crossing is the root that does NOT coincide with a placed point — so it holds on EVERY view.
+    const st = useGeoStore.getState();
+    st.clear();
+    // Steps 2–5 are the LLM canonical lines the log recorded (re-parsed with context, as llmParse does).
+    const steps = [
+      'שני מעגלים נחתכים בנקודות A ו- B',
+      'C על מעגל P',
+      'מנקודה A ישר חותך את המעגל O בנקודות C ו-D',
+      'segment CD', // LLM canonical for the operator's "CD"
+      'מנקודה C ישר חותך את המעגל O בנקודות B ו-E',
+    ];
+    for (const u of steps) {
+      const r = parse(u, ctxOf(useGeoStore.getState().facts));
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return;
+      for (const cmd of r.commands) st.execute(cmd, u);
+    }
+    const radius = (fig: Derived, center: Id) =>
+      (fig.construction.objects.find((o) => o.kind === 'circle' && (o as { center: Id }).center === center) as { radius: { value: number } }).radius.value;
+
+    // Canonical view + 8 resampled "other views" all stay structurally correct.
+    for (let press = 0; press <= 8; press++) {
+      if (press > 0) st.resample();
+      const fig = replay(useGeoStore.getState().facts, useGeoStore.getState().seed);
+      expect(evaluate(fig.construction).ok, `view ${press}`).toBe(true);
+      // C stays on the RIGHT circle P only — never pinned onto circle O.
+      expect(dist(at(fig, 'P'), at(fig, 'C')), `view ${press}: C on P`).toBeCloseTo(radius(fig, 'P'), 2);
+      expect(dist(at(fig, 'O'), at(fig, 'C')), `view ${press}: C off O`).not.toBeCloseTo(radius(fig, 'O'), 1);
+      // D and E are genuine second crossings of the secants with the LEFT circle O — on it, and distinct from A/B.
+      for (const p of ['D', 'E'] as const) {
+        expect(dist(at(fig, 'O'), at(fig, p)), `view ${press}: ${p} on O`).toBeCloseTo(radius(fig, 'O'), 2);
+        expect(dist(at(fig, p), at(fig, 'A')), `view ${press}: ${p}≠A`).toBeGreaterThan(0.1);
+        expect(dist(at(fig, p), at(fig, 'B')), `view ${press}: ${p}≠B`).toBeGreaterThan(0.1);
+      }
+    }
+    st.clear();
   });
 });

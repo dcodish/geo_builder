@@ -553,7 +553,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
 
     case 'line-circle-intersection':
-      addObj(objects, { kind: 'line-circle', id: cmd.id, line: cmd.line, circle: cmd.circle, branch: cmd.branch ?? 0 });
+      addObj(objects, { kind: 'line-circle', id: cmd.id, line: cmd.line, circle: cmd.circle, branch: cmd.branch ?? 0, ...(cmd.avoid ? { avoid: cmd.avoid } : {}) });
       break;
 
     case 'circle-circle-intersection':

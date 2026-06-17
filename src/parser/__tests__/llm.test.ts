@@ -66,6 +66,33 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
     expect(r!.dropped).toEqual(['square ABCD with AB = 6']);
   });
 
+  it('threads the figure context into the re-parse — a context-dependent step builds, not drops', async () => {
+    // "another secant from the EXISTING external point A" only parses when the re-parse knows A
+    // already exists. Without the figure context (the old bug) the rule fell through to the
+    // "first secant" branch (which needs an "outside" cue) and the step was wrongly dropped.
+    const step = 'מנקודה A ישר חותך את המעגל O בנקודות C ו-D';
+    mockFetch([step]);
+    // No context → dropped (the regression's failure mode).
+    const without = await llmParse('AC cuts circle O at D', '');
+    expect(without!.dropped).toEqual([step]);
+    expect(without!.built).toEqual([]);
+    // With the figure context (A exists, circle O present) → it builds the secant.
+    mockFetch([step]);
+    const withCtx = await llmParse('AC cuts circle O at D', '', { points: ['A', 'B'], circles: ['O'] });
+    expect(withCtx!.dropped).toEqual([]);
+    expect(withCtx!.built.flatMap((b) => b.commands).map((c) => c.type)).toEqual([
+      'point-on-circle', 'line-through', 'line-circle-intersection', 'segment',
+    ]);
+  });
+
+  it('accumulates context across steps — a later step sees a point an earlier step introduced', async () => {
+    // Step 1 creates C on circle P; step 2 ("another secant from C") must see C as existing.
+    mockFetch(['C על מעגל P', 'מנקודה C ישר חותך את המעגל O בנקודות E ו-F']);
+    const r = await llmParse('a secant from C', '', { points: ['A', 'B'], circles: ['O', 'P'] });
+    expect(r!.dropped).toEqual([]); // step 2 no longer drops — C is now in context
+    expect(r!.built.map((b) => b.step)).toHaveLength(2);
+  });
+
   it('an LLM that returns nothing buildable yields empty built (caller shows "couldn\'t read")', async () => {
     mockFetch(['utter nonsense']);
     const r = await llmParse('???', '');

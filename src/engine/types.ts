@@ -240,13 +240,20 @@ export interface ArcMidpointPoint {
   branch: number;
 }
 
-/** 0 DOF — a crossing of `line` with `circle`; 0/1/2 solutions, `branch` selects. */
+/**
+ * 0 DOF — a crossing of `line` with `circle`; 0/1/2 solutions, `branch` selects.
+ * When `avoid` is set (a point id, typically the line's other, known on-circle end),
+ * the solution FARTHEST from it is chosen instead of `branch` — so "the OTHER crossing"
+ * is deterministic and stays put under resampling (the two roots' index order flips with
+ * the line's direction, so a fixed branch would intermittently collapse onto the known point).
+ */
 export interface LineCirclePoint {
   kind: 'line-circle';
   id: Id;
   line: Id;
   circle: Id;
   branch: number;
+  avoid?: Id;
 }
 
 /** 0 DOF — a crossing of two circles; 0/1/2 solutions, `branch` selects. */
@@ -591,7 +598,7 @@ export type Command =
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
   | { type: 'arc'; id: Id; center: Id; from: Id; to: Id } // a drawn arc (CCW from→to): semicircle / quarter circle
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }
-  | { type: 'line-circle-intersection'; id: Id; line: Id; circle: Id; branch?: number }
+  | { type: 'line-circle-intersection'; id: Id; line: Id; circle: Id; branch?: number; avoid?: Id }
   | { type: 'circle-circle-intersection'; id: Id; circle1: Id; circle2: Id; branch?: number }
   | { type: 'tangent'; id: Id; circle: Id; at: Id; visible?: boolean }
   | { type: 'point-on-line'; id: Id; line: Id; offset: number } // a fixed marker on a drawn line (names it by a point)
