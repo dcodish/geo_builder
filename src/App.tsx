@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
-import { cyclableBranch, freeDofs, freeDofCount, isGeoPoint } from '@/engine';
+import { circleMembers, cyclableBranch, freeDofs, freeDofCount, isGeoPoint } from '@/engine';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
@@ -147,6 +147,7 @@ export default function App() {
   const parseCtx = () => ({
     circles: construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
     points: construction.objects.filter(isGeoPoint).map((o) => o.id),
+    circleMembers: circleMembers(construction), // so "arc BC" resolves to the circle holding both B and C
   });
 
   async function submit(utterance: string) {

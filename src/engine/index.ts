@@ -10,6 +10,7 @@ export {
   applyStep,
   build,
   branchCount,
+  circleMembers,
   commandConflict,
   cyclableBranch,
   cycleAlternative,

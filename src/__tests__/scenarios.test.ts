@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
 import { replay, polygonsConvex, useGeoStore } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
-import { isGeoPoint, freeDofs, cyclableBranch, evaluate } from '@/engine';
+import { isGeoPoint, freeDofs, cyclableBranch, evaluate, circleMembers } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 
 type Step = string | { llm: AnyCommand[] };
@@ -40,6 +40,7 @@ function ctxOf(facts: Fact[]) {
   return {
     circles: construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
     points: construction.objects.filter(isGeoPoint).map((o) => o.id),
+    circleMembers: circleMembers(construction),
   };
 }
 
@@ -95,6 +96,27 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
+  {
+    id: 'arc-resolves-to-circle-holding-both-endpoints',
+    title: '"arc BC" picks the circle that actually contains both B and C (not a wrongly-named one)',
+    guards:
+      'with two circles present (O through A,B,E,D; P through A,B,C) the arc-midpoint of BC was placed on circle O — but C is not on O, so F landed in a meaningless spot. The arc rule now resolves to the circle containing BOTH endpoints (P), overriding a wrong named circle even on the LLM re-parse path.',
+    steps: [
+      'משולש CDE',
+      'A על CD',
+      'B על CE',
+      'מרובע ABED חסום במעגל', // circle-O (B on it, C is NOT)
+      'משולש ABC חסום במעגל', // circle-P (both B and C on it)
+      'F אמצע הקשת BC במעגל O', // LLM canonical with the WRONG circle O — must be corrected to P
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const F = at(fig, 'F'), P = at(fig, 'P'), O = at(fig, 'O');
+      // F is on circle P (centre P) — the one holding both B and C — not on circle O.
+      expect(dist(P, F)).toBeCloseTo(dist(P, at(fig, 'A')), 4); // |PF| = radius of P
+      expect(Math.abs(dist(O, F) - dist(O, at(fig, 'A')))).toBeGreaterThan(1e-3); // F is NOT on circle O
+    },
+  },
   {
     id: 'second-inscribed-circle-fresh-centre',
     title: 'a second inscribed/circumscribed circle auto-names a fresh centre instead of colliding on O',

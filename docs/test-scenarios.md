@@ -203,6 +203,15 @@ construction, so it saw A,B,C as fresh free-points and (since A,B already existe
 flagged a false redefinition conflict, dropping the circle. Fixed by adding `circumcircle` to `isShape`.
 **Asserts:** all steps OK (no redefinition over-constraint); O is the circumcentre — |OA| = |OB| = |OC|.
 
+### `arc-resolves-to-circle-holding-both-endpoints` — "arc BC" picks the circle that contains B and C
+**Steps:** `משולש CDE`, `A על CD`, `B על CE`, `מרובע ABED חסום במעגל` (circle-O), `משולש ABC חסום במעגל`
+(circle-P), `F אמצע הקשת BC במעגל O` (the LLM canonical line, with the WRONG circle O).
+**Guards against:** the arc-midpoint of BC landing on circle O — but C is not on O (only on P), so F sat in a
+meaningless spot ("placement of F is wrong"). The parser now carries point→circle membership
+(`ParseContext.circleMembers`, from the engine's `circleMembers`), so the arc rule resolves to the circle
+holding **both** endpoints (P) — overriding a wrong named circle even on the LLM re-parse path.
+**Asserts:** all steps OK; |PF| = radius of P (F on circle P); F is NOT on circle O.
+
 ### `second-inscribed-circle-fresh-centre` — a 2nd inscribed circle doesn't collide on centre O
 **Steps:** `משולש CDE`, `A על CD`, `B על CE`, `מרובע ABED חסום במעגל` (1st circle → centre O), `משולש ABC חסום במעגל`.
 **Guards against:** `"'O' is already defined"`. The inscribed/circumcircle centre auto-picker only dodged the

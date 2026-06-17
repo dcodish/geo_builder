@@ -553,6 +553,39 @@ export function build(cmds: AnyCommand[], start: Construction = emptyConstructio
   return { construction: cur, positions: e.positions };
 }
 
+/**
+ * For each circle in the figure, the point ids KNOWN (structurally) to lie on it — keyed by the
+ * circle's CENTRE letter (matching the parser's `ParseContext.circles`). Lets the parser resolve
+ * a phrase like "arc BC" to the circle that actually contains both B and C, disambiguating two
+ * circles and correcting a wrongly-named one. Membership comes from the object graph (on-circle,
+ * circumcentre vertices, antipode/arc/line∩circle/circle∩circle outputs), not from constraints.
+ */
+export function circleMembers(c: Construction): { center: string; points: Id[] }[] {
+  const byCenter = new Map<string, Set<Id>>();
+  const centerOf = (circleId: Id): string | null => {
+    const circ = c.objects.find((o) => o.id === circleId && o.kind === 'circle');
+    return circ && circ.kind === 'circle' ? circ.center : null;
+  };
+  const add = (center: string | null, ...pts: Id[]) => {
+    if (!center) return;
+    const set = byCenter.get(center) ?? new Set<Id>();
+    for (const p of pts) set.add(p);
+    byCenter.set(center, set);
+  };
+  for (const o of c.objects) {
+    switch (o.kind) {
+      case 'circle': add(o.center); break; // ensure the circle appears even with no known members yet
+      case 'on-circle': add(centerOf(o.circle), o.id); break;
+      case 'circumcenter': add(o.id, o.a, o.b, o.c); break; // a,b,c lie on the circle centred at o.id
+      case 'antipode': add(centerOf(o.circle), o.id, o.of); break;
+      case 'arc-midpoint': add(centerOf(o.circle), o.id, o.from, o.to); break;
+      case 'line-circle': add(centerOf(o.circle), o.id); break;
+      case 'circle-circle': add(centerOf(o.circle1), o.id); add(centerOf(o.circle2), o.id); break;
+    }
+  }
+  return [...byCenter].map(([center, points]) => ({ center, points: [...points] }));
+}
+
 /** Number of valid solution branches for a branchable point (0/1/2). */
 export function branchCount(c: Construction, id: Id): number {
   const o = c.objects.find((x) => x.id === id);

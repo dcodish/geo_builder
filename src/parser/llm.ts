@@ -74,7 +74,9 @@ export async function llmParse(utterance: string, context: string, figureCtx: Pa
   const points = new Set(figureCtx.points ?? []);
   const circles = new Set(figureCtx.circles ?? []);
   for (const step of steps) {
-    const r = parse(step, { points: [...points], circles: [...circles] });
+    // circleMembers stays the pre-escalation figure's (steps reference points that already exist),
+    // so a canonical "arc BC in circle O" still resolves to the circle that truly holds B and C.
+    const r = parse(step, { points: [...points], circles: [...circles], circleMembers: figureCtx.circleMembers });
     if (r.ok && r.commands.length) {
       built.push({ step, commands: r.commands });
       for (const c of r.commands) absorb(c, points, circles);

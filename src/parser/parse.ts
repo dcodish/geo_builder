@@ -35,7 +35,20 @@ export interface ParseContext {
   circles?: string[];
   /** Point ids already in the figure — so inscribing an EXISTING triangle becomes its circumcircle. */
   points?: string[];
+  /** For each circle (by centre letter), the points known to lie on it — lets "arc BC" resolve to
+   *  the circle that actually contains both B and C (disambiguates 2+ circles / corrects a wrong one). */
+  circleMembers?: { center: string; points: string[] }[];
 }
+
+/** The centre of a circle that contains EVERY point in `pts` (preferring `prefer` if it qualifies), else null. */
+const circleContaining = (ctx: ParseContext, pts: string[], prefer?: string | null): string | null => {
+  const has = (center: string) => {
+    const m = ctx.circleMembers?.find((e) => e.center === center);
+    return !!m && pts.every((p) => m.points.includes(p));
+  };
+  if (prefer && has(prefer)) return prefer;
+  return ctx.circleMembers?.find((e) => pts.every((p) => e.points.includes(p)))?.center ?? null;
+};
 const NO_CONTEXT: ParseContext = {};
 
 /**
@@ -910,11 +923,15 @@ const diameter: Rule = (s, ctx) => {
 /** "M is the midpoint of arc BC in circle O" / "M אמצע הקשת BC במעגל O". */
 const arcMidpoint: Rule = (s, ctx) => {
   if (!/arc|קשת/i.test(s)) return null;
-  const center = resolveCenter(s, ctx);
-  if (!center) return null;
   const m = dropCircleRef(s).match(/([A-Za-z]\d*)\b.*?(?:midpoint|אמצע).*?(?:arc|הקשת|קשת)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!m) return null;
-  return [{ type: 'arc-midpoint', id: up(m[1]), circle: circleId(center), from: up(m[2]), to: up(m[3]) }];
+  const from = up(m[2]), to = up(m[3]);
+  // The arc BC lives on the circle that actually contains BOTH endpoints — prefer it over a named
+  // circle that doesn't (a wrong LLM "in circle O" when C is only on circle P), and use it to
+  // disambiguate when two circles exist. Fall back to the named / single circle otherwise.
+  const center = circleContaining(ctx, [from, to], circleCenter(s)) ?? resolveCenter(s, ctx);
+  if (!center) return null;
+  return [{ type: 'arc-midpoint', id: up(m[1]), circle: circleId(center), from, to }];
 };
 
 /** "A is on circle O" / "A על מעגל O" — a single inscribed point. */
