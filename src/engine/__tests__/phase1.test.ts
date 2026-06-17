@@ -187,4 +187,24 @@ describe('redefinition conflict — an id cannot be redefined as something diffe
     // The same square again → every produced object matches → no conflict.
     expect(commandConflict(base.construction, SQUARE)).toBeNull();
   });
+
+  it('a reuse-or-create command never false-conflicts on a pre-existing base point (R4, ADR-043)', () => {
+    // A and B already exist as ON-SEGMENT points (not free). Any command that takes them as base
+    // points — a circle (centre), a circumcircle, a segment, a shape — REUSES them, never "already
+    // defined". This is derived structurally from apply's own output (`reusesBase`), so it holds for
+    // EVERY reuse-or-create command, not a hand-listed set (the gap that once false-conflicted a
+    // circumcircle of pre-existing vertices).
+    const base = build([
+      { type: 'triangle', ids: ['C', 'D', 'E'] },
+      { type: 'point-on-segment', id: 'A', a: 'C', b: 'D', t: 0.5 },
+      { type: 'point-on-segment', id: 'B', a: 'C', b: 'E', t: 0.5 },
+    ]);
+    expect(commandConflict(base.construction, { type: 'circumcircle', id: 'circle-O', center: 'O', a: 'A', b: 'B', c: 'C' })).toBeNull();
+    expect(commandConflict(base.construction, { type: 'segment', a: 'A', b: 'B' })).toBeNull();
+    expect(commandConflict(base.construction, { type: 'triangle', ids: ['A', 'B', 'C'] })).toBeNull();
+    expect(commandConflict(base.construction, { type: 'circle', id: 'circle-P', center: 'A', radius: 3 })).toBeNull();
+    // But genuinely redefining a non-base point as something different still conflicts (ADR-009):
+    // point-by-distances produces an intersection at 'A' (not a base free-point), so 'A' clashes.
+    expect(commandConflict(base.construction, { type: 'point-by-distances', id: 'A', from1: 'C', dist1: 9, from2: 'D', dist2: 9 })).toMatch(/already defined/i);
+  });
 });

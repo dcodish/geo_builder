@@ -56,30 +56,21 @@ export function deepEqual(a: unknown, b: unknown): boolean {
  * against the command's *canonical* definition, independent of evaluation.
  */
 export function commandConflict(prev: Construction, cmd: Command): string | null {
-  // A shape (square/quad/parallelogram) may be *built on existing points*: its
-  // base corners reference whatever point already carries that id (creating a
-  // free point only for new ids), so a base free-point never conflicts — only
-  // the shape's own derived corners can (ADR-013). The default coordinates a
-  // shape gives a *new* base vertex are an initializer, not a definition.
-  const isShape =
-    cmd.type === 'square' ||
-    cmd.type === 'quadrilateral' ||
-    cmd.type === 'parallelogram' ||
-    cmd.type === 'rectangle' ||
-    cmd.type === 'rhombus' ||
-    cmd.type === 'trapezoid' ||
-    cmd.type === 'triangle' ||
-    cmd.type === 'right-triangle' ||
-    cmd.type === 'segment' || // a segment reuses (or creates) its endpoints, like a shape's base
-    cmd.type === 'circle' ||
-    cmd.type === 'circle-through' || // a circle reuses (or creates) its centre
-    cmd.type === 'circumcircle'; // a circumscribed circle reuses (or creates) its three points
   const produced = applyCommand(emptyConstruction(), cmd).objects;
+  // A command "reuses or creates" its base points when applying it CREATES free-points — a shape's
+  // base vertices, a segment's endpoints, a circle's centre, a circumcircle's three points (all
+  // funnel through apply's `placeBase`). Those base corners reference whatever point already carries
+  // that id, so a base free-point never conflicts — only the structure's own *derived* corners can
+  // (ADR-013). This is derived STRUCTURALLY from apply's own output, not a hand-maintained
+  // command-type list: that list drifted once and caused the circumcircle false-conflict, so any new
+  // reuse-or-create command is now covered automatically (ADR-043/R4). The standalone `free-point`
+  // command is the exception — re-placing it is a MOVE (ADR-011), handled below.
+  const reusesBase = cmd.type !== 'free-point' && produced.some((o) => o.kind === 'free-point');
   for (const o of produced) {
     const existing = prev.objects.find((x) => x.id === o.id);
     if (!existing || deepEqual(existing, o)) continue;
     if (o.kind === 'free-point') {
-      if (isShape) continue; // base corner reuses any existing point (composition)
+      if (reusesBase) continue; // base corner reuses any existing point (composition)
       if (existing.kind === 'free-point') continue; // free-point command = move (ADR-011)
     }
     // A circle-point construct (tangent / arc-midpoint / point-on-circle) creates
