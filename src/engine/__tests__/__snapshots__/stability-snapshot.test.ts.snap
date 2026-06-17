@@ -1,0 +1,194 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`driven-solver stability snapshot (Wave-2/3 gate) > circle O r5 + inscribed A,B,C (on-circle golden spread) 1`] = `
+{
+  "A": [
+    0,
+    5,
+  ],
+  "B": [
+    -3.3775,
+    -3.6868,
+  ],
+  "C": [
+    4.9809,
+    0.4371,
+  ],
+  "O": [
+    0,
+    0,
+  ],
+}
+`;
+
+exports[`driven-solver stability snapshot (Wave-2/3 gate) > parallelogram (free vertices, undriven) 1`] = `
+{
+  "A": [
+    0,
+    0,
+  ],
+  "B": [
+    6,
+    0,
+  ],
+  "C": [
+    8,
+    4,
+  ],
+  "D": [
+    2,
+    4,
+  ],
+}
+`;
+
+exports[`driven-solver stability snapshot (Wave-2/3 gate) > parallelogram + |AB|=|AC| (free-vertex driven) 1`] = `
+{
+  "A": [
+    0,
+    0,
+  ],
+  "B": [
+    6,
+    0,
+  ],
+  "C": [
+    5.3535,
+    2.7092,
+  ],
+  "D": [
+    -0.6465,
+    2.7092,
+  ],
+}
+`;
+
+exports[`driven-solver stability snapshot (Wave-2/3 gate) > rectangle + |AD|=7 (perp-offset shape scalar driven) 1`] = `
+{
+  "A": [
+    0.0718,
+    -0.0579,
+  ],
+  "B": [
+    5.6708,
+    0.1026,
+  ],
+  "C": [
+    5.4702,
+    7.0997,
+  ],
+  "D": [
+    -0.1288,
+    6.9392,
+  ],
+}
+`;
+
+exports[`driven-solver stability snapshot (Wave-2/3 gate) > rhombus + angle DAB=70 (rotated shape scalar driven) 1`] = `
+{
+  "A": [
+    0,
+    0,
+  ],
+  "B": [
+    5,
+    0,
+  ],
+  "C": [
+    6.7101,
+    4.6985,
+  ],
+  "D": [
+    1.7101,
+    4.6985,
+  ],
+}
+`;
+
+exports[`driven-solver stability snapshot (Wave-2/3 gate) > square (rigid, derived corners) 1`] = `
+{
+  "A": [
+    0,
+    0,
+  ],
+  "B": [
+    5,
+    0,
+  ],
+  "C": [
+    5,
+    5,
+  ],
+  "D": [
+    0,
+    5,
+  ],
+}
+`;
+
+exports[`driven-solver stability snapshot (Wave-2/3 gate) > square + P on AB + angle DPC=50 (on-segment-solved, branch 0) 1`] = `
+{
+  "A": [
+    0,
+    0,
+  ],
+  "B": [
+    5,
+    0,
+  ],
+  "C": [
+    5,
+    5,
+  ],
+  "D": [
+    0,
+    5,
+  ],
+  "P": [
+    1.0075,
+    0,
+  ],
+}
+`;
+
+exports[`driven-solver stability snapshot (Wave-2/3 gate) > trapezoid (scaled-offset) 1`] = `
+{
+  "A": [
+    0,
+    0,
+  ],
+  "B": [
+    6,
+    0,
+  ],
+  "C": [
+    4.6,
+    4,
+  ],
+  "D": [
+    1,
+    4,
+  ],
+}
+`;
+
+exports[`driven-solver stability snapshot (Wave-2/3 gate) > triangle + E on AC at 0.4 (on-segment parametric) 1`] = `
+{
+  "A": [
+    0,
+    0,
+  ],
+  "B": [
+    6,
+    0,
+  ],
+  "C": [
+    2,
+    4,
+  ],
+  "E": [
+    0.8,
+    1.6,
+  ],
+}
+`;
