@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
-import { circleMembers, cyclableBranch, freeDofs, freeDofCount, isGeoPoint } from '@/engine';
+import { circleMembers, firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint } from '@/engine';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
@@ -256,15 +256,12 @@ export default function App() {
     document.documentElement.lang = i18n.language;
   }, [i18n, i18n.language]);
 
-  // The first point with multiple discrete solutions — circle∩circle, line∩circle,
-  // arc-midpoint (the kinds `cycleAlt` can step) — AND an unshown branch left to step to.
-  // A two-circle figure has BOTH crossings on screen (A=branch 0, B=branch 1), so cycling
-  // would only collide them — `cyclableBranch` excludes it and "show another configuration"
-  // resamples the circles instead. With no cyclable branch, it re-samples the free DOFs.
-  const BRANCHABLE_KINDS = ['intersection', 'circle-circle', 'line-circle', 'arc-midpoint'];
-  const branchId = construction.objects.find(
-    (o) => BRANCHABLE_KINDS.includes(o.kind) && cyclableBranch(construction, o.id),
-  )?.id;
+  // The first point with an unshown discrete solution to step to — circle∩circle, line∩circle,
+  // arc-midpoint, or a driven on-segment point (the kinds `cycleAlt` can step). A two-circle figure
+  // has BOTH crossings on screen (A=branch 0, B=branch 1), so cycling would only collide them —
+  // `firstCyclableBranch` excludes it and "show another configuration" resamples the circles
+  // instead. With no cyclable branch, it re-samples the free DOFs. (Single source of truth, ADR-043.)
+  const branchId = firstCyclableBranch(construction);
   const examples = t('examples.items', { returnObjects: true }) as string[];
 
   return (

@@ -184,6 +184,16 @@ export function residualTolerance(con: Constraint, scale = 1): number {
   }
 }
 
+/**
+ * Whether a constraint holds: its residual is within (scaled) tolerance. The single gate
+ * used by the evaluator's over-constraint check AND every driven-solver accept test —
+ * before this, the same `|residual| ≤ residualTolerance(constraintScale)` expression was
+ * hand-recopied at four sites (ADR-045).
+ */
+export function isSatisfied(con: Constraint, get: (id: Id) => Vec): boolean {
+  return Math.abs(residual(con, get)) <= residualTolerance(con, constraintScale(con, get));
+}
+
 /** Human-readable form of a constraint, for error messages. */
 export function describeConstraint(con: Constraint): string {
   switch (con.type) {

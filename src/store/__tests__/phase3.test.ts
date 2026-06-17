@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { Command } from '@/engine';
-import { evaluate } from '@/engine';
+import { evaluate, branchCount, dist } from '@/engine';
 import { replay, useGeoStore } from '../geoStore';
 import he from '@/i18n/locales/he.json';
 import en from '@/i18n/locales/en.json';
@@ -244,6 +244,32 @@ describe('store — alternatives', () => {
 
     s().cycleAlt('C'); // two branches → back to the first
     expect(replay(s().facts).positions.get('C')!.y).toBeCloseTo(y0, 9);
+  });
+
+  it('cycles a CONSTRAINT-DRIVEN on-segment point to its other root, and the choice survives replay (ADR-043/R2)', () => {
+    // G slides on AB; |CG| = 4 has TWO solutions on the segment (C sits 3 above the midpoint),
+    // so the driven on-segment point is genuinely branchable — and the branch lives on the
+    // point-on-segment command, so cycling it survives `replay` (it used to reset to branch 0).
+    const base: Command[] = [
+      { type: 'free-point', id: 'A', x: 0, y: 0 },
+      { type: 'free-point', id: 'B', x: 10, y: 0 },
+      { type: 'free-point', id: 'C', x: 5, y: 3 },
+      { type: 'point-on-segment', id: 'G', a: 'A', b: 'B', t: 0.5 },
+      { type: 'set-distance', a: 'C', b: 'G', value: 4 },
+    ];
+    base.forEach((c) => s().execute(c));
+    expect(branchCount(replay(s().facts).construction, 'G')).toBe(2);
+    const g0 = replay(s().facts).positions.get('G')!;
+    expect(dist(replay(s().facts).positions.get('C')!, g0)).toBeCloseTo(4, 6); // constraint holds at root 0
+
+    s().cycleAlt('G');
+    const g1 = replay(s().facts).positions.get('G')!; // re-derived from facts: the branch must survive replay
+    expect(evaluate(replay(s().facts).construction).ok).toBe(true);
+    expect(dist(g0, g1)).toBeGreaterThan(0.5); // flipped to the OTHER root
+    expect(dist(replay(s().facts).positions.get('C')!, g1)).toBeCloseTo(4, 6); // and |CG| = 4 still holds
+
+    s().cycleAlt('G'); // two roots → wraps back to the first
+    expect(dist(replay(s().facts).positions.get('G')!, g0)).toBeCloseTo(0, 6);
   });
 });
 

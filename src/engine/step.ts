@@ -645,6 +645,16 @@ export function cyclableBranch(c: Construction, id: Id): boolean {
   return occupied.size < n; // an unshown branch remains
 }
 
+/**
+ * The first object whose discrete `branch` can be stepped to a still-unshown configuration —
+ * the single source of truth for "is there an alternative to cycle?" The UI and tests call this
+ * instead of re-listing the branchable kinds (which had drifted out of sync, ADR-043). Includes
+ * `on-segment-solved`, so a driven on-segment point is offered as cyclable (R2).
+ */
+export function firstCyclableBranch(c: Construction): Id | undefined {
+  return c.objects.find((o) => BRANCHABLE.has(o.kind) && cyclableBranch(c, o.id))?.id;
+}
+
 /** Advance a branchable point to its next solution branch (wraps). */
 export function cycleAlternative(c: Construction, id: Id): Construction {
   const n = branchCount(c, id) || 1;

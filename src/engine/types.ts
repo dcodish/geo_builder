@@ -66,6 +66,14 @@ export interface OnSegmentPoint {
   a: Id;
   b: Id;
   t: number;
+  /**
+   * Desired solution branch once a constraint upgrades this to `on-segment-solved` (which root of
+   * the constraint to pick). Carried from the `point-on-segment` command's `branch` so cycling "show
+   * another configuration" on a driven on-segment point survives `replay` (ADR-043/R2). Named apart
+   * from `branch` so it doesn't join the `'branch' in o` set of *materialised* branchable points.
+   * Meaningless until driven.
+   */
+  solveBranch?: number;
   solve?: SolveDirective;
 }
 
@@ -121,7 +129,7 @@ export interface PerpOffsetVertex {
   flip?: boolean;
   /** When set, `dist` is a driveable DOF the solver sizes to satisfy a constraint (a rectangle's
    * height / a right-triangle's leg). Default (unset) keeps `dist` fixed — the figure looks the same. */
-  solve?: { constraint: Constraint; branch: number };
+  solve?: SolveDirective;
 }
 
 /** 0 DOF — `pivot` + scale · Rot(angleDeg) · (to − from) (rhombus / rotated corners). `flip` negates the angle. */
@@ -135,7 +143,7 @@ export interface RotatedVertex {
   scale: number;
   flip?: boolean;
   /** When set, `angleDeg` is a driveable DOF (a rhombus's angle). Default keeps it fixed. */
-  solve?: { constraint: Constraint; branch: number };
+  solve?: SolveDirective;
 }
 
 /** 0 DOF — `anchor` + k · (to − from): a point offset parallel to from→to (trapezoid). */
@@ -147,7 +155,7 @@ export interface ScaledOffsetVertex {
   to: Id;
   k: number;
   /** When set, `k` (the top-base ratio) is a driveable DOF (a trapezoid's short side). Default keeps it fixed. */
-  solve?: { constraint: Constraint; branch: number };
+  solve?: SolveDirective;
 }
 
 /**
@@ -323,30 +331,41 @@ export type GeoPoint =
   | RadialTowardPoint
   | OnLinePoint;
 
-/** The object kinds that are points (carry a computed position). Single source of truth. */
-const POINT_KINDS: ReadonlySet<string> = new Set([
-  'free-point',
-  'on-segment',
-  'derived',
-  'intersection',
-  'parallelogram-vertex',
-  'line-line-intersection',
-  'perp-offset',
-  'rotated',
-  'scaled-offset',
-  'on-segment-solved',
-  'line-intersection',
-  'foot',
-  'midpoint',
-  'circumcenter',
-  'on-circle',
-  'antipode',
-  'arc-midpoint',
-  'line-circle',
-  'circle-circle',
-  'radial-toward',
-  'on-line',
-]);
+/** The discriminant (`o.kind`) of every {@link GeoPoint} variant. */
+export type GeoPointKind = GeoPoint['kind'];
+
+/**
+ * The object kinds that are points (carry a computed position). Single source of truth.
+ * Declared as a `Record<GeoPointKind, true>` so its keys must EXACTLY match the
+ * {@link GeoPoint} union: a variant added to the union but forgotten here is a **compile
+ * error** (missing property), and a stray key not in the union is rejected too — never a
+ * silently-dropped DOF (ADR-043). `POINT_KINDS` is derived from its keys.
+ */
+const POINT_KIND_FLAGS: Record<GeoPointKind, true> = {
+  'free-point': true,
+  'on-segment': true,
+  'derived': true,
+  'intersection': true,
+  'parallelogram-vertex': true,
+  'line-line-intersection': true,
+  'perp-offset': true,
+  'rotated': true,
+  'scaled-offset': true,
+  'on-segment-solved': true,
+  'line-intersection': true,
+  'foot': true,
+  'midpoint': true,
+  'circumcenter': true,
+  'on-circle': true,
+  'antipode': true,
+  'arc-midpoint': true,
+  'line-circle': true,
+  'circle-circle': true,
+  'radial-toward': true,
+  'on-line': true,
+};
+
+const POINT_KINDS: ReadonlySet<string> = new Set(Object.keys(POINT_KIND_FLAGS));
 
 export function isGeoPoint(o: GeoObject): o is GeoPoint {
   return POINT_KINDS.has(o.kind);
@@ -591,7 +610,7 @@ export type Command =
   | { type: 'triangle'; ids: [Id, Id, Id] }
   | { type: 'right-triangle'; ids: [Id, Id, Id] } // right angle at the last id
   | { type: 'free-point'; id: Id; x: number; y: number }
-  | { type: 'point-on-segment'; id: Id; a: Id; b: Id; t?: number }
+  | { type: 'point-on-segment'; id: Id; a: Id; b: Id; t?: number; branch?: number } // branch: which root, once a constraint drives it (ADR-043)
   | { type: 'point-by-distances'; id: Id; from1: Id; dist1: number; from2: Id; dist2: number; branch?: number }
   | { type: 'line-line-intersection'; id: Id; a: Id; b: Id; c: Id; d: Id }
   | { type: 'segment'; a: Id; b: Id }

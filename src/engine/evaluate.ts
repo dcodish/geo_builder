@@ -22,16 +22,16 @@ import {
   sub,
   unit,
 } from './geometry';
-import { constraintRefs, constraintScale, describeConstraint, residual, residualTolerance, solvedOnSegmentCandidates } from './solve';
+import { constraintRefs, constraintScale, describeConstraint, isSatisfied, residual, residualTolerance, solvedOnSegmentCandidates } from './solve';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
-interface ResolvedLine {
+export interface ResolvedLine {
   anchor: Vec;
   dir: Vec;
 }
 
 /** A resolved circle: its centre position and radius. */
-interface ResolvedCircle {
+export interface ResolvedCircle {
   center: Vec;
   r: number;
 }
@@ -189,7 +189,7 @@ function resolveDriven(c: Construction): Construction {
     const ok = cons.every((con) => {
       for (const id of constraintRefs(con)) if (!r.positions.has(id)) return false;
       const get = (id: Id) => r.positions.get(id)!;
-      return Math.abs(residual(con, get)) <= residualTolerance(con, constraintScale(con, get));
+      return isSatisfied(con, get);
     });
     return ok && totalSq(x) < 1e-3;
   };
@@ -299,7 +299,7 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     r.ok &&
     cons.every((con) => {
       for (const id of constraintRefs(con)) if (!r.positions.has(id)) return false;
-      return Math.abs(residual(con, (id) => r.positions.get(id)!)) <= residualTolerance(con, constraintScale(con, (id) => r.positions.get(id)!));
+      return isSatisfied(con, (id) => r.positions.get(id)!);
     }) &&
     !degenerateSpread(refIds.map((id) => r.positions.get(id)).filter((p): p is Vec => !!p), span);
   return satisfied ? place(best) : place(seed);
@@ -447,7 +447,7 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     r.ok &&
     cons.every((con) => {
       for (const id of constraintRefs(con)) if (!r.positions.has(id)) return false;
-      return Math.abs(residual(con, (id) => r.positions.get(id)!)) <= residualTolerance(con, constraintScale(con, (id) => r.positions.get(id)!));
+      return isSatisfied(con, (id) => r.positions.get(id)!);
     }) &&
     !degenerateSpread(refIds.map((id) => r.positions.get(id)).filter((p): p is Vec => !!p), span);
   return satisfied ? place(best) : place(seedU);
@@ -662,7 +662,7 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
       if (!pos.get(id)) return { ok: false, error: `${describeConstraint(con)} references an unknown point` };
     }
     const get = (id: Id) => pos.get(id)!;
-    if (Math.abs(residual(con, get)) > residualTolerance(con, constraintScale(con, get))) {
+    if (!isSatisfied(con, get)) {
       return { ok: false, error: `over-constrained: ${describeConstraint(con)} cannot hold` };
     }
   }
@@ -671,7 +671,7 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
 }
 
 /** Resolve one circle to its centre and radius: a {@link ResolvedCircle}, 'pending', or an error string. */
-function resolveCircle(c: Circle, pos: Map<Id, Vec>, circles: Map<Id, ResolvedCircle>): ResolvedCircle | 'pending' | string {
+export function resolveCircle(c: Circle, pos: Map<Id, Vec>, circles: Map<Id, ResolvedCircle>): ResolvedCircle | 'pending' | string {
   const center = pos.get(c.center);
   if (!center) return 'pending';
   if (c.radius.via === 'length') {
@@ -693,7 +693,7 @@ function resolveCircle(c: Circle, pos: Map<Id, Vec>, circles: Map<Id, ResolvedCi
 }
 
 /** Resolve one line to an (anchor, dir): a {@link ResolvedLine}, 'pending', or an error string. */
-function resolveLine(l: Line, pos: Map<Id, Vec>, circles: Map<Id, ResolvedCircle>): ResolvedLine | 'pending' | string {
+export function resolveLine(l: Line, pos: Map<Id, Vec>, circles: Map<Id, ResolvedCircle>): ResolvedLine | 'pending' | string {
   const s = l.spec;
   switch (s.via) {
     case 'through': {

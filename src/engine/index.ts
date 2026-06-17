@@ -4,8 +4,8 @@ export * from './types';
 export * from './geometry';
 export * from './solve';
 export { applyCommand } from './apply';
-export { evaluate } from './evaluate';
-export type { EvalResult, EvalOk, EvalErr } from './evaluate';
+export { evaluate, resolveLine, resolveCircle } from './evaluate';
+export type { EvalResult, EvalOk, EvalErr, ResolvedLine, ResolvedCircle } from './evaluate';
 export {
   applyStep,
   build,
@@ -14,6 +14,7 @@ export {
   commandConflict,
   cyclableBranch,
   cycleAlternative,
+  firstCyclableBranch,
   deepEqual,
   maxDelta,
   emptyConstruction,

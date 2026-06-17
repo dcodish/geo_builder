@@ -443,7 +443,7 @@ export const useGeoStore = create<GeoState>()(
         const { construction } = replay(facts);
         const n = branchCount(construction, pointId) || 1;
         // The commands that carry a `branch` index the student can cycle.
-        const branchable = new Set(['point-by-distances', 'arc-midpoint', 'line-circle-intersection', 'circle-circle-intersection']);
+        const branchable = new Set(['point-by-distances', 'arc-midpoint', 'line-circle-intersection', 'circle-circle-intersection', 'point-on-segment']);
         set({
           facts: facts.map((f) =>
             f.enabled && branchable.has(f.cmd.type) && 'id' in f.cmd && f.cmd.id === pointId

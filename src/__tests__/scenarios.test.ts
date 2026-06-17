@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
 import { replay, polygonsConvex, useGeoStore } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
-import { isGeoPoint, freeDofs, cyclableBranch, evaluate, circleMembers } from '@/engine';
+import { isGeoPoint, freeDofs, firstCyclableBranch, evaluate, circleMembers } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 
 type Step = string | { llm: AnyCommand[] };
@@ -651,10 +651,9 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
     if (!r.ok) return;
     for (const cmd of r.commands) st.execute(cmd, u);
 
-    const BRANCHABLE_KINDS = ['intersection', 'circle-circle', 'line-circle', 'arc-midpoint'];
     const base = replay(useGeoStore.getState().facts).construction;
     // The button must NOT find a cyclable branch here (both crossings already on screen).
-    const branchId = base.objects.find((o) => BRANCHABLE_KINDS.includes(o.kind) && cyclableBranch(base, o.id))?.id;
+    const branchId = firstCyclableBranch(base);
     expect(branchId).toBeUndefined();
 
     for (let press = 0; press < 12; press++) {
@@ -662,7 +661,7 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       st.resample();
       const seed = useGeoStore.getState().seed;
       const fig = replay(useGeoStore.getState().facts, seed);
-      const bid = fig.construction.objects.find((o) => BRANCHABLE_KINDS.includes(o.kind) && cyclableBranch(fig.construction, o.id))?.id;
+      const bid = firstCyclableBranch(fig.construction);
       if (bid) st.cycleAlt(bid);
       const after = replay(useGeoStore.getState().facts, useGeoStore.getState().seed);
       expect(evaluate(after.construction).ok, `press ${press + 1} (seed ${seed})`).toBe(true);

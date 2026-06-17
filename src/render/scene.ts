@@ -9,9 +9,10 @@
  * rather than rendered at a bogus position.
  */
 
-import type { Construction, Id, Line, Vec } from '@/engine/types';
+import type { Construction, Id, Circle, Vec } from '@/engine/types';
 import { isGeoPoint } from '@/engine/types';
-import { add, dist, len, rot90, sub, unit } from '@/engine/geometry';
+import { len, rot90, sub, unit } from '@/engine/geometry';
+import { resolveCircle, resolveLine, type ResolvedCircle } from '@/engine';
 
 export interface ScenePoint {
   id: Id;
@@ -109,39 +110,6 @@ function arcGeometry(center: Vec, from: Vec, to: Vec, id: Id): SceneArc | null {
   return { id, center, from, to, r, largeArc: span > Math.PI ? 1 : 0, sweep: 0 };
 }
 
-/**
- * Resolve a visible {@link Line} to (anchor, dir) from computed positions —
- * mirrors the engine's `resolveLine` (kept here because lines are a rendering
- * concern; the engine doesn't expose its internal resolution). null if it can't.
- */
-function lineGeometry(line: Line, pos: Map<Id, Vec>, circles: Map<Id, SceneCircle>): SceneLine | null {
-  const s = line.spec;
-  const g = (id: Id) => pos.get(id);
-  if (s.via === 'through') {
-    const a = g(s.a), b = g(s.b);
-    if (!a || !b || len(sub(b, a)) < 1e-9) return null;
-    return { id: line.id, anchor: a, dir: unit(sub(b, a)) };
-  }
-  if (s.via === 'bisector') {
-    const v = g(s.vertex), p = g(s.p), q = g(s.q);
-    if (!v || !p || !q) return null;
-    const bis = add(unit(sub(p, v)), unit(sub(q, v)));
-    if (len(bis) < 1e-9) return null;
-    return { id: line.id, anchor: v, dir: unit(bis) };
-  }
-  if (s.via === 'perpendicular' || s.via === 'parallel') {
-    const t = g(s.through), a = g(s.a), b = g(s.b);
-    if (!t || !a || !b || len(sub(b, a)) < 1e-9) return null;
-    const d = unit(sub(b, a));
-    return { id: line.id, anchor: t, dir: s.via === 'perpendicular' ? rot90(d) : d };
-  }
-  // tangent: ⟂ to the radius at the touch point
-  const c = circles.get(s.circle);
-  const at = g(s.at);
-  if (!c || !at || len(sub(at, c.center)) < 1e-9) return null;
-  return { id: line.id, anchor: at, dir: unit(rot90(sub(at, c.center))) };
-}
-
 /** Resolve a construction + computed positions into drawable primitives. */
 export function buildScene(
   c: Construction,
@@ -179,6 +147,26 @@ export function buildScene(
   const autoCenters = new Set<Id>();
   for (const o of c.objects) if (o.kind === 'circle' && o.autoCenter) autoCenters.add(o.center);
 
+  // Resolve every circle to centre+radius via the ENGINE's resolver, so the renderer keeps no
+  // divergent copy of the radius math (ADR-044). A tiny fixed point handles a tangent-inner circle
+  // that references another. Visible lines read this map too (a tangent needs its circle). Computed
+  // from the (already-oriented) positions, so it stays correct under the view orientation.
+  const resolvedCircles = new Map<Id, ResolvedCircle>();
+  {
+    const circleObjs = c.objects.filter((o): o is Circle => o.kind === 'circle');
+    let progressed = true;
+    while (progressed) {
+      progressed = false;
+      for (const o of circleObjs) {
+        if (resolvedCircles.has(o.id)) continue;
+        const rc = resolveCircle(o, positions, resolvedCircles);
+        if (rc === 'pending' || typeof rc === 'string') continue; // missing point / invalid → not drawn
+        resolvedCircles.set(o.id, rc);
+        progressed = true;
+      }
+    }
+  }
+
   for (const o of c.objects) {
     if (isGeoPoint(o)) {
       if (o.id.startsWith('~')) continue; // hidden helper (a coincidence target, ADR-028) — not drawn
@@ -202,24 +190,8 @@ export function buildScene(
     }
     if (o.kind === 'circle') {
       if (o.hidden) continue; // a cyclic polygon's circumcircle: constrains the vertices, not drawn
-      const center = positions.get(o.center);
-      if (!center) continue;
-      let r: number | undefined;
-      if (o.radius.via === 'length') r = o.radius.value;
-      else if (o.radius.via === 'tangent-inner') {
-        // Derived: the largest circle inside `outer`, tangent to it (r = r(outer) − gap).
-        const outerSpec = o.radius.outer;
-        const outer = c.objects.find((x) => x.id === outerSpec && x.kind === 'circle') as Extract<typeof o, { kind: 'circle' }> | undefined;
-        const oc = outer ? positions.get(outer.center) : undefined;
-        if (outer && oc && outer.radius.via === 'length') {
-          const ri = outer.radius.value - dist(center, oc);
-          if (ri > 0) r = ri;
-        }
-      } else {
-        const p = positions.get(o.radius.point);
-        if (p) r = dist(center, p);
-      }
-      if (r !== undefined && isFinite(r) && r > 0) circles.push({ id: o.id, center, r });
+      const rc = resolvedCircles.get(o.id);
+      if (rc && isFinite(rc.r) && rc.r > 0) circles.push({ id: o.id, center: rc.center, r: rc.r });
     }
     if (o.kind === 'arc') {
       const center = positions.get(o.center);
@@ -232,17 +204,17 @@ export function buildScene(
     }
   }
 
-  // Visible lines (a tangent / bisector / perpendicular / parallel), resolved
-  // after circles so a tangent can read its circle. A line with TWO+ named points
-  // on it is drawn as the SEGMENT spanning them (trim an infinite line to its
-  // useful extent — a tangent from its touch point to where it meets a chord, a
-  // bisector from its vertex to the side it hits); with 0–1 points it stays an
-  // infinite (clipped) line, since it has no natural endpoints.
-  const circleMap = new Map(circles.map((c) => [c.id, c]));
+  // Visible lines (a tangent / bisector / perpendicular / parallel), resolved via the engine's
+  // own resolver (one source of truth, ADR-044) using the circle map above so a tangent can read
+  // its circle. A line with TWO+ named points on it is drawn as the SEGMENT spanning them (trim an
+  // infinite line to its useful extent — a tangent from its touch point to where it meets a chord,
+  // a bisector from its vertex to the side it hits); with 0–1 points it stays an infinite (clipped)
+  // line, since it has no natural endpoints.
   for (const o of c.objects) {
     if (o.kind !== 'line' || !o.visible) continue;
-    const sl = lineGeometry(o, positions, circleMap);
-    if (!sl) continue;
+    const rl = resolveLine(o, positions, resolvedCircles);
+    if (rl === 'pending' || typeof rl === 'string') continue;
+    const sl: SceneLine = { id: o.id, anchor: rl.anchor, dir: rl.dir };
     const on: { t: number; p: Vec }[] = [];
     for (const pt of points) {
       const w = sub(pt.pos, sl.anchor);

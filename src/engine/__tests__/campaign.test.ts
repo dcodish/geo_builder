@@ -16,6 +16,7 @@ import { build } from '../step';
 import { evaluate } from '../evaluate';
 import { applySeed } from '../sample';
 import { inv, type Inv } from './_invariants';
+import { replay, type Fact } from '@/store/geoStore';
 
 // ── deterministic PRNG (mulberry32) ─────────────────────────────────────────
 function rng(seed: number): () => number {
@@ -571,4 +572,34 @@ describe('validation campaign — 300+ generated diagrams (invariants)', () => {
       }
     });
   }
+});
+
+// ── Tier-A properties over the SAME generated corpus (ADR-047) ───────────────
+// Universal invariants that must hold for EVERY generated figure — not per-figure scenarios.
+// They catch whole CLASSES of bug the positive-only invariant checks above can't: a
+// nondeterministic build, or a divergence between the engine's `build` and the store's `replay`
+// (two independent folds — see ADR-047). (Distinctness is already guaranteed by `evaluate`'s
+// coincidence check, so a figure that builds is distinct by construction; not re-asserted here.)
+describe('campaign — Tier-A universal properties', () => {
+  const okCases = CASES.filter((tc) => evaluate(build(tc.commands).construction).ok);
+
+  it(`builds identically twice — determinism (${okCases.length} figures)`, () => {
+    for (const tc of okCases) {
+      expect(build(tc.commands).positions, tc.name).toEqual(build(tc.commands).positions);
+    }
+  });
+
+  it(`build() and the store's replay() agree — event-sourced equivalence (${okCases.length} figures)`, () => {
+    for (const tc of okCases) {
+      const built = build(tc.commands).positions;
+      const facts: Fact[] = tc.commands.map((cmd, i) => ({ id: `f${i}`, cmd, enabled: true }));
+      const replayed = replay(facts).positions;
+      expect(replayed.size, `${tc.name}: point count (build ${built.size} vs replay ${replayed.size})`).toBe(built.size);
+      for (const [id, p] of built) {
+        const q = replayed.get(id);
+        expect(q, `${tc.name}: ${id} present under replay`).toBeDefined();
+        if (q) expect(hyp(p.x - q.x, p.y - q.y), `${tc.name}: ${id} build vs replay position`).toBeLessThan(1e-6);
+      }
+    }
+  });
 });
