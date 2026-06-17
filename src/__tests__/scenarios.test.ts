@@ -98,9 +98,9 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 const SCENARIOS: Scenario[] = [
   {
     id: 'point-on-arc-no-midpoint-word',
-    title: '"F על קשת BC" (point ON arc, no "midpoint" word) builds on the right circle, not dropped',
+    title: '"F על קשת BC" builds a FREE point on the right circle, not dropped (ADR-042)',
     guards:
-      'the arc rule required the word midpoint/אמצע, so "F על קשת BC" (a point ON arc BC) matched no rule, escalated, and was DROPPED ("error"); a retry fell to plain point-on-circle and put F generically on the wrong circle O (near E–D). The rule now also accepts on/על and resolves to the circle holding both B and C (P).',
+      'the arc rule required the word midpoint/אמצע, so "F על קשת BC" (a point ON arc BC) matched no rule, escalated, and was DROPPED ("error"); a retry fell to plain point-on-circle and put F generically on the wrong circle O (near E–D). The rule now also accepts on/על → a FREE point on the arc (point-on-circle with `between`, ADR-042; default at the arc midpoint, slidable), resolved to the circle holding both B and C (P). The free-slide behaviour is covered by free-arc-point.test.ts.',
     steps: [
       'משולש CDE',
       'A על CD',

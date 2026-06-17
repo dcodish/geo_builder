@@ -873,6 +873,22 @@ function tryEval(
     case 'on-circle': {
       const c = circles.get(p.circle);
       if (!c) return 'pending';
+      if (p.between) {
+        // A free point ON the arc between two points (ADR-042): theta is a fraction in [−1,1] of the
+        // (minor) half-arc from its midpoint, so F always sits on arc from→to (never the far arc).
+        const from = pos.get(p.between[0]);
+        const to = pos.get(p.between[1]);
+        if (!from || !to) return 'pending';
+        const u1 = unit(sub(from, c.center));
+        const u2 = unit(sub(to, c.center));
+        let bis = add(u1, u2); // points to the midpoint of the minor arc from→to
+        if (len(bis) < 1e-9) bis = rot90(u1); // antipodal endpoints → arc midpoint is perpendicular
+        const baseAng = Math.atan2(bis.y, bis.x);
+        const half = Math.acos(Math.max(-1, Math.min(1, u1.x * u2.x + u1.y * u2.y))) / 2; // half the arc
+        const frac = Math.max(-1, Math.min(1, p.theta));
+        const ang = baseAng + frac * 0.92 * half; // 0.92 keeps F strictly inside (never onto from/to)
+        return add(c.center, { x: c.r * Math.cos(ang), y: c.r * Math.sin(ang) });
+      }
       return add(c.center, { x: c.r * Math.cos(p.theta), y: c.r * Math.sin(p.theta) });
     }
 

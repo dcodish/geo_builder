@@ -220,6 +220,13 @@ export interface OnCirclePoint {
   theta: number;
   solve?: SolveDirective;
   free?: boolean;
+  /**
+   * When set, this is a free point ON THE ARC between two points on the circle (`between = [from, to]`,
+   * ADR-042): `theta` is then a FRACTION in [−1, 1] of the (minor) half-arc, not an absolute angle —
+   * 0 = the arc midpoint, ±1 = near `from`/`to`. The sampler slides it within the arc; a constraint
+   * can drive it. "F is on arc BC" with F free, vs `arc-midpoint` which is the fixed midpoint.
+   */
+  between?: [Id, Id];
 }
 
 /** 0 DOF — the antipode of `of` on `circle` (a diameter's far end): 2·centre − of. */
@@ -610,7 +617,7 @@ export type Command =
   | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean; autoCenter?: boolean }
   | { type: 'circle-through'; id: Id; center: Id; through: Id; hidden?: boolean; autoCenter?: boolean }
   | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id; hidden?: boolean } // circle through a,b,c (centre = circumcentre); hidden for a cyclic (בר-חסימה) figure
-  | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number }
+  | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number; between?: [Id, Id] } // between = a free point on the arc from-to (ADR-042)
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
   | { type: 'arc'; id: Id; center: Id; from: Id; to: Id } // a drawn arc (CCW from→to): semicircle / quarter circle
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }

@@ -96,6 +96,9 @@ export function applySeed(c: Construction, seed: number): Construction {
     // non-degenerate inscribed figure); small jitter varies its shape.
     if (isFreeOnCircle(o)) {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
+      // A point ON an arc (between, ADR-042): theta is a fraction in [−1,1] of the arc, so vary it
+      // WITHIN the arc rather than spinning around the whole circle.
+      if ((o as OnCirclePoint).between) return { ...o, theta: jr() * 2 - 1 };
       return { ...o, theta: (o as OnCirclePoint).theta + circSpin + (jr() * 2 - 1) * circJit };
     }
     // Free on-line marker (ADR-036): slide it along its line by scaling the signed offset.

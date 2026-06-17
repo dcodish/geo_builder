@@ -921,22 +921,25 @@ const diameter: Rule = (s, ctx) => {
 };
 
 /**
- * "M is the midpoint of arc BC in circle O" / "M אמצע הקשת BC במעגל O", and also a plain
- * "F is ON arc BC" / "F על קשת BC" (a point on the arc). Both place a point on arc BC; the
- * connector word may be midpoint/אמצע OR on/על. (A freely-sliding point along the arc — rather
- * than this well-defined arc point — is a future refinement; for now F sits at the arc's midpoint.)
+ * Arc constructs on a circle:
+ *   - "M is the midpoint of arc BC" / "M אמצע הקשת BC" → the FIXED arc midpoint (`arc-midpoint`).
+ *   - "F is ON arc BC" / "F על קשת BC" → a FREE point on the arc (`point-on-circle` with `between`,
+ *     ADR-042): F starts at the arc midpoint but is a real DOF the student/constraints can move.
+ * The connector word (midpoint/אמצע vs on/על) selects which.
  */
 const arcMidpoint: Rule = (s, ctx) => {
   if (!/arc|קשת/i.test(s)) return null;
-  const m = dropCircleRef(s).match(/([A-Za-z]\d*)\b.*?(?:midpoint|אמצע|\bon\b|על)\s*.*?(?:arc|הקשת|קשת)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  const m = dropCircleRef(s).match(/([A-Za-z]\d*)\b.*?(midpoint|אמצע|\bon\b|על)\s*.*?(?:arc|הקשת|קשת)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!m) return null;
-  const from = up(m[2]), to = up(m[3]);
+  const id = up(m[1]), from = up(m[3]), to = up(m[4]);
   // The arc BC lives on the circle that actually contains BOTH endpoints — prefer it over a named
   // circle that doesn't (a wrong LLM "in circle O" when C is only on circle P), and use it to
   // disambiguate when two circles exist. Fall back to the named / single circle otherwise.
   const center = circleContaining(ctx, [from, to], circleCenter(s)) ?? resolveCenter(s, ctx);
   if (!center) return null;
-  return [{ type: 'arc-midpoint', id: up(m[1]), circle: circleId(center), from, to }];
+  return /midpoint|אמצע/i.test(m[2])
+    ? [{ type: 'arc-midpoint', id, circle: circleId(center), from, to }]
+    : [{ type: 'point-on-circle', id, circle: circleId(center), between: [from, to] }];
 };
 
 /** "A is on circle O" / "A על מעגל O" — a single inscribed point. */
