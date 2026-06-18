@@ -95,6 +95,17 @@ export interface Derived {
    *  put on) — empty when the drawing matches every given. "Green" requires this to be empty, not just
    *  no error: a fact can apply cleanly yet leave its relation unsatisfied (the verifier net). */
   violations: GivenViolation[];
+  /** Free-radius circles the student can dial directly (a slider per circle) — the first playable DOF. */
+  radiusDofs: RadiusDof[];
+}
+
+/** A free circle radius the student can drag: `base` is the stable seed radius (for the slider range),
+ *  `current` is the radius being drawn right now (seed-varied or dialed). */
+export interface RadiusDof {
+  circle: Id;
+  center: Id;
+  base: number;
+  current: number;
 }
 
 /**
@@ -103,7 +114,7 @@ export interface Derived {
  * figure's non-pinned free points are perturbed deterministically, so the figure
  * is re-drawn while still satisfying every fact. seed 0 = the canonical default.
  */
-export function replay(facts: Fact[], seed = 0): Derived {
+export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}): Derived {
   let cur = emptyConstruction();
   const status: Record<string, FactStatus> = {};
   let lastError: string | null = null;
@@ -159,7 +170,20 @@ export function replay(facts: Fact[], seed = 0): Derived {
     }
     claim();
   }
-  const figure = applySeed(cur, seed);
+  const sampled = applySeed(cur, seed);
+  // A dialed radius (the DOF slider) overrides the sampled value for that free circle — a viewing
+  // scratchpad (ADR-048): it's cleared by "show another configuration", never a fixed given (ADR-052).
+  const figure =
+    Object.keys(radiusOverrides).length === 0
+      ? sampled
+      : {
+          ...sampled,
+          objects: sampled.objects.map((o) =>
+            o.kind === 'circle' && o.radius.via === 'free' && radiusOverrides[o.id] !== undefined
+              ? { ...o, radius: { via: 'free' as const, value: radiusOverrides[o.id] } }
+              : o,
+          ),
+        };
   const e = evaluate(figure);
   // Numeric measures (a plain `AB = 5` / `∠ABC = 37`, and symbolic ones once resolved)
   // surface as distance/angle constraints — label them from the figure, filling any
@@ -185,7 +209,14 @@ export function replay(facts: Fact[], seed = 0): Derived {
   // Verify the OUTPUT against the ORIGINAL givens: relations the input asserted that don't actually
   // hold in the final coordinates (a point off its circle, …) — caught even when every step is 'ok'.
   const violations = e.ok ? checkGivens(applied, e.positions, e.circles) : [];
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, labels, angleMarks, violations };
+  // Free-radius circles the student can dial (base = stable seed radius for the slider range; current =
+  // what's drawn). Read from the pre-seed construction so the range doesn't shift as the value changes.
+  const radiusDofs: RadiusDof[] = cur.objects.flatMap((o) =>
+    o.kind === 'circle' && o.radius.via === 'free' && o.solve === undefined
+      ? [{ circle: o.id, center: o.center, base: o.radius.value, current: e.ok ? e.circles.get(o.id)?.r ?? o.radius.value : o.radius.value }]
+      : [],
+  );
+  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, labels, angleMarks, violations, radiusDofs };
 }
 
 const fmtMeasure = (n: number): string => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(3))));
@@ -297,6 +328,9 @@ export interface GeoState {
   seed: number;
   /** Show measure labels on the figure (ADR-031); UI-only, not undoable. Default true. */
   showMeasures: boolean;
+  /** Dialed free-circle radii (the DOF sliders): circle id → radius. A viewing scratchpad — UI-only,
+   *  not undoable, cleared by "show another configuration". */
+  radiusOverrides: Record<Id, number>;
 
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
   execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;
@@ -318,6 +352,8 @@ export interface GeoState {
   cycleAlt: (pointId: Id) => void;
   /** Re-sample the figure's residual freedom — a different valid drawing (ADR-018). */
   resample: () => void;
+  /** Dial a free circle's radius directly (a DOF slider). Cleared on resample. */
+  setRadius: (circle: Id, value: number) => void;
   /** Show/hide measure labels on the figure (ADR-031). */
   setShowMeasures: (show: boolean) => void;
   /** Relabel a point everywhere (e.g. E → G) — rewrites every fact, one undo entry. */
@@ -395,6 +431,7 @@ export const useGeoStore = create<GeoState>()(
       selectedId: null,
       seed: 0,
       showMeasures: true,
+      radiusOverrides: {},
 
       execute: (cmd, utterance, group) => {
         const facts = get().facts;
@@ -505,12 +542,14 @@ export const useGeoStore = create<GeoState>()(
           // (a self-crossing/concave quad is a valid point set but not a valid drawing of the shape), AND
           // keeps distinct points apart (a varied free radius must not collapse two points — ADR-051).
           if (evaluate(r.construction).ok && polygonsConvex(facts, r.positions) && pointsDistinct(r.construction, r.positions)) {
-            set({ seed: s });
+            set({ seed: s, radiusOverrides: {} }); // a fresh view clears any dialed radii (scratchpad reset)
             return;
           }
         }
-        set({ seed: s }); // give up gracefully after a few rejected draws
+        set({ seed: s, radiusOverrides: {} }); // give up gracefully after a few rejected draws
       },
+
+      setRadius: (circle, value) => set({ radiusOverrides: { ...get().radiusOverrides, [circle]: value } }),
 
       setShowMeasures: (show) => set({ showMeasures: show }),
 
@@ -561,7 +600,7 @@ export const useGeoStore = create<GeoState>()(
       },
 
       clear: () => {
-        set({ facts: [], selectedId: null, seed: 0 });
+        set({ facts: [], selectedId: null, seed: 0, radiusOverrides: {} });
         useGeoStore.temporal.getState().clear();
       },
     }),

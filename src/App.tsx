@@ -34,6 +34,8 @@ export default function App() {
   const select = useGeoStore((s) => s.select);
   const cycleAlt = useGeoStore((s) => s.cycleAlt);
   const resample = useGeoStore((s) => s.resample);
+  const radiusOverrides = useGeoStore((s) => s.radiusOverrides);
+  const setRadius = useGeoStore((s) => s.setRadius);
   const seed = useGeoStore((s) => s.seed);
   const showMeasures = useGeoStore((s) => s.showMeasures);
   const setShowMeasures = useGeoStore((s) => s.setShowMeasures);
@@ -55,6 +57,21 @@ export default function App() {
   const [editText, setEditText] = useState('');
   const [editError, setEditError] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Responsive canvas: the figure fills the space beside the sidebar (use the whole screen) instead
+  // of a fixed box. A ResizeObserver feeds the measured size to <Figure>, which fits isotropically.
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [canvasSize, setCanvasSize] = useState({ w: 640, h: 600 });
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (r) setCanvasSize({ w: Math.max(320, Math.floor(r.width)), h: Math.max(320, Math.floor(r.height)) });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Debug log (dev only): snapshot the fact list + per-fact status whenever the
   // figure changes (any submit / edit / delete / undo / clear / resample), so a
@@ -211,7 +228,10 @@ export default function App() {
   }
 
   // Figure + per-fact status are derived from the fact list.
-  const { construction, positions, status, lastError, labels, angleMarks, violations } = useMemo(() => replay(facts, seed), [facts, seed]);
+  const { construction, positions, status, lastError, labels, angleMarks, violations, radiusDofs } = useMemo(
+    () => replay(facts, seed, radiusOverrides),
+    [facts, seed, radiusOverrides],
+  );
 
   // Snap-to-intersection: a clicked crossing becomes a real named point. Pick the
   // first free single capital letter, then create it via the same command path.
@@ -277,18 +297,20 @@ export default function App() {
       </header>
 
       <div style={main}>
-        <Figure
-          construction={construction}
-          positions={positions}
-          width={560}
-          height={560}
-          highlight={highlight}
-          onPickIntersection={markIntersection}
-          intersectionLabel={t('actions.markIntersection')}
-          labels={labels}
-          angleMarks={angleMarks}
-          showMeasures={showMeasures}
-        />
+        <div ref={canvasRef} style={canvasWrap}>
+          <Figure
+            construction={construction}
+            positions={positions}
+            width={canvasSize.w}
+            height={canvasSize.h}
+            highlight={highlight}
+            onPickIntersection={markIntersection}
+            intersectionLabel={t('actions.markIntersection')}
+            labels={labels}
+            angleMarks={angleMarks}
+            showMeasures={showMeasures}
+          />
+        </div>
 
         <aside style={sidebar}>
           <form
@@ -523,6 +545,32 @@ export default function App() {
               {freeDofCount(construction) > 0 ? t('actions.dof', { count: freeDofCount(construction) }) : t('actions.determined')}
             </span>
           )}
+
+          {/* Playable degrees of freedom (first slice): a slider per free-circle radius. Dialing a value
+              is a viewing scratchpad — "show another configuration" resets it. */}
+          {radiusDofs.length > 0 && (
+            <div>
+              <div style={sectionLabel}>{t('dof.title')}</div>
+              {radiusDofs.map((d) => {
+                const value = radiusOverrides[d.circle] ?? d.current;
+                return (
+                  <div key={d.circle} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, minWidth: 96 }}>{t('dof.radius', { center: d.center })}</span>
+                    <input
+                      type="range"
+                      min={Math.max(0.2, d.base * 0.3)}
+                      max={d.base * 2.2}
+                      step={d.base * 0.02}
+                      value={value}
+                      onChange={(e) => setRadius(d.circle, Number(e.target.value))}
+                      style={{ flex: 1 }}
+                    />
+                    <span style={{ fontSize: 12, minWidth: 34, textAlign: 'end', color: '#64748b' }}>{value.toFixed(1)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </aside>
       </div>
     </div>
@@ -540,7 +588,10 @@ const page: React.CSSProperties = {
 };
 const headerRow: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' };
 const main: React.CSSProperties = { display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' };
-const sidebar: React.CSSProperties = { width: 340, display: 'flex', flexDirection: 'column', gap: 16 };
+// The canvas fills the space beside the sidebar and the viewport height (use the big screen);
+// it wraps below the sidebar on narrow widths. Its size is measured and passed to <Figure>.
+const canvasWrap: React.CSSProperties = { flex: '1 1 480px', minWidth: 360, height: 'calc(100vh - 132px)', minHeight: 460 };
+const sidebar: React.CSSProperties = { width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 };
 const sectionLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 };
 const input: React.CSSProperties = {
   flex: 1,

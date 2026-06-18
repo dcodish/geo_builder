@@ -47,6 +47,10 @@
   "figure": {
     "mismatch": "The figure may not match what you described:"
   },
+  "dof": {
+    "title": "Adjust the figure",
+    "radius": "radius of circle {{center}}"
+  },
   "theorems": {
     "title": "Theorems & Insights",
     "empty": "Add more details to see relevant theorems",
