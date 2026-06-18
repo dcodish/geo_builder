@@ -562,7 +562,33 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.a }, autoCenter: true, ...(cmd.hidden ? { hidden: true } : {}) }); // circumcentre is auto, hidden unless used; `hidden` for a cyclic (בר-חסימה) figure
       break;
 
-    case 'point-on-circle':
+    case 'point-on-circle': {
+      // Re-defining an EXISTING point as "on circle C" is a RELATION on that point, not a fresh
+      // vertex — and `addObj` would silently no-op it (the "green but E isn't on the circle" bug).
+      const existing = objects.find((o) => o.id === cmd.id);
+      if (existing) {
+        // (a) Already on this circle ⇒ idempotent (re-stating the same fact).
+        if (pointOnCircle(objects, cmd.id, cmd.circle)) break;
+        // (b) E sits on a segment/line one of whose ends is ALSO on C ⇒ this is the SECOND
+        // crossing of that line with C: become a line∩circle avoiding the shared end (the same
+        // reinterpretation as `addCollinear`). E.g. "E on extension AC" + "E on circle P", A on P
+        // ⇒ E = line(A,C) ∩ P, avoiding A. Drives E onto the circle instead of dropping the fact.
+        if (existing.kind === 'on-segment' || existing.kind === 'on-segment-solved') {
+          const ends = [existing.a, existing.b];
+          const shared = ends.find((id) => pointOnCircle(objects, id, cmd.circle));
+          if (shared) {
+            const other = ends.find((id) => id !== shared)!;
+            const lineId = `line-${shared}${other}`;
+            addLine(objects, { kind: 'line', id: lineId, spec: { via: 'through', a: shared, b: other } });
+            const i = objects.findIndex((o) => o.id === cmd.id);
+            objects[i] = { kind: 'line-circle', id: cmd.id, line: lineId, circle: cmd.circle, branch: 0, avoid: shared };
+            break;
+          }
+        }
+        // (c) Can't reconcile structurally here — do NOT silently drop it; the post-evaluate
+        // verifier reports that "E on circle C" doesn't hold, so it can never read as a clean green.
+        break;
+      }
       // `between` ⇒ a free point ON THE ARC between two points (theta is a fraction of the half-arc,
       // 0 = the arc midpoint — ADR-042). Else: no explicit angle ⇒ a free vertex the sampler may slide
       // (inscribed triangle, chord end); an explicit angle (an inscribed square's corner) is fixed.
@@ -573,6 +599,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
           : { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: cmd.theta ?? nextTheta(objects, cmd.circle), free: cmd.theta === undefined },
       );
       break;
+    }
 
     case 'diameter': {
       // D on the circle (a free angle — a diameter can rotate), E its antipode, segment DE through the centre.

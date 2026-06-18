@@ -194,7 +194,7 @@ const segment: Rule = (s) => {
  * half-parse "the diagonals AC and BD intersect at E" into just "segment AC",
  * silently dropping the intersection point.
  */
-const INTERSECT_KW = /intersect|∩|חיתוך|נחתך|נחתכ|נפגש|חות[כך]|\bcuts?\b|\bmeets?\b/i; // incl. "חותך" (cuts) / "cuts"
+const INTERSECT_KW = /intersect|∩|חיתוך|נחתך|נחתכ|נפגש|פוגש|פגש|חות[כך]|\bcuts?\b|\bmeets?\b/i; // incl. "חותך" (cuts), active "פוגש"/"פגש" (meets), "cuts"
 const lineLineIntersection: Rule = (s) => {
   if (!INTERSECT_KW.test(s)) return null;
   // The operands of a plain line∩line must be point-pairs the figure already has.
@@ -1208,6 +1208,86 @@ const circleCircleIntersection: Rule = (s) => {
 };
 
 /**
+ * "[the extension of] AC cuts/meets circle P at E" / "המשך AC חותך את מעגל P בנקודה E" /
+ * "AC extended meets circle P at E" — a line through two EXISTING points, extended, crossing a
+ * circle at a NEW point. One endpoint is already on the target circle (the two circles share it),
+ * so the line meets the circle there and at the new point; the new point is the crossing that
+ * AVOIDS the on-circle endpoint (deterministic — the `avoid` branch drops every already-placed
+ * root, so it can never collapse onto the shared point). Built from `line-through` +
+ * `line-circle-intersection`, and the secant chord is drawn from the off-circle end through to it.
+ *
+ * Distinct from: the EXTERNAL-point secant ("from E a line cuts …", which introduces the line's
+ * far end — guarded out by "from"/"מנקודה"); the tangent compound (guarded out by "tangent"/"משיק");
+ * and line∩line (this REQUIRES a named circle). Runs after the circle-circle rules, before the
+ * generic collinearity / line∩line (whose `INTERSECT_KW` guard would otherwise grab "חותך").
+ */
+const lineMeetsCircle: Rule = (s, ctx) => {
+  if (!INTERSECT_KW.test(s)) return null;
+  if (/tangent|משיק/i.test(s)) return null; // tangent line → tangentMeetsOtherCircle / tangentLine
+  if (/\bfrom\b|מנקודה|מהנקודה/i.test(s)) return null; // "from <point>" → the external-point secant
+  const center = circleCenter(s);
+  if (!center) return null; // must NAME a circle (else it's line∩line, a constraint, etc.)
+  const circ = circleId(center);
+  // the new crossing: the label after the "at"/"בנקודה" that FOLLOWS the circle mention
+  const ci = s.search(/(?:circle|מעגל)\s+[A-Za-z]\d*/i);
+  const atM = s.slice(ci).match(/(?:\bat\b|בנקודה|ב-)\s*([A-Za-z]\d*)\b/i);
+  if (!atM) return null;
+  const R = up(atM[1]);
+  // the line's two points: strip the circle ref + the new-point clause + connective words → the 2-label run
+  const body = dropCircleRef(s)
+    .replace(/(?:\bat\b|בנקודה|ב-)\s*[A-Za-z]\d*\b/gi, ' ')
+    .replace(/extension|extended|\bline\b|המשך|הישר|הקו|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?/gi, ' ');
+  const pr = labelRun(body, 2);
+  if (!pr || pr.includes(R)) return null;
+  const [a, b] = pr;
+  // avoid the endpoint already on the target circle (default to `a` — the avoid branch drops all
+  // placed roots regardless, so the new crossing is found either way); draw from the off-circle end.
+  const onCircle = circleContaining(ctx, [a], center) ? a : circleContaining(ctx, [b], center) ? b : a;
+  const other = onCircle === a ? b : a;
+  const lineId = `chord-${a}${b}`;
+  return [
+    { type: 'line-through', id: lineId, a, b },
+    { type: 'line-circle-intersection', id: R, line: lineId, circle: circ, avoid: onCircle },
+    { type: 'segment', a: other, b: R }, // the drawn secant: off-circle end → new crossing (through the shared point)
+  ];
+};
+
+/**
+ * "the tangent to circle O at A meets circle P at D" /
+ * "המשיק למעגל O בנקודה A חותך את מעגל P בנקודה D" — a tangent LINE to one circle (at a
+ * point A on it) that crosses the OTHER circle at a new point D. The two circles already
+ * intersect, so A lies on circle P too; the tangent at A meets P at A and at D, and D is
+ * the crossing AWAY from A (`avoid`). Built from existing primitives: the tangent line
+ * (scaffolding — the drawn chord A–D is an explicit segment) + a line∩circle pinned to the
+ * other crossing.
+ *
+ * Distinct from `circlesTangent` (two circles tangent to EACH OTHER, a state): here a
+ * MEETING keyword plus TWO adjacent "circle <C> at <P>" pairs name a crossing event, not a
+ * mutual-tangency point. Must run BEFORE `circlesTangent`, which would otherwise read the
+ * משיק + two circle names + the first "at" as mutual tangency (the misparse this fixes).
+ */
+const tangentMeetsOtherCircle: Rule = (s) => {
+  if (!/tangent|משיק/i.test(s)) return null;
+  if (!INTERSECT_KW.test(s)) return null; // a meeting EVENT (cuts/meets/חותך/פוגש), not a state
+  if (/each\s+other|זה\s+לזה/i.test(s)) return null; // mutual tangency → circlesTangent
+  // Two adjacent "circle <C> at <P>" pairs: the tangent's circle + tangency point, then the
+  // target circle + the new crossing. The adjacency (no "and"/verb between circle and "at")
+  // is what separates this from `circlesTangent`'s "circle O and circle P … at M".
+  const pairs = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b\s*(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/gi)];
+  if (pairs.length < 2) return null;
+  const c1 = up(pairs[0][1]), p1 = up(pairs[0][2]);
+  const c2 = up(pairs[1][1]), p2 = up(pairs[1][2]);
+  if (c1 === c2) return null; // two DIFFERENT circles
+  if (new Set([c1, p1, c2, p2]).size !== 4) return null; // four distinct labels
+  const lineId = `tan-${p1}`;
+  return [
+    { type: 'tangent', id: lineId, circle: circleId(c1), at: p1, visible: false }, // scaffolding for the ∩ (the drawn line is the chord)
+    { type: 'line-circle-intersection', id: p2, line: lineId, circle: circleId(c2), avoid: p1 },
+    { type: 'segment', a: p1, b: p2 }, // draw the chord p1–p2 (tangent to circle c1 at p1, a chord of c2)
+  ];
+};
+
+/**
  * "circle O and circle P are tangent to each other at M" /
  * "מעגל O ומעגל P משיקים זה לזה בנקודה M" — two circles touching at one point. TWO
  * circles named + a tangent keyword (a single-circle "tangent to circle X" is the
@@ -1767,10 +1847,12 @@ const RULES: Rule[] = [
   bisectorPlacesPoint, // "AD bisects ∠BAC" — places D on the opposite side (after the ∩ compounds)
   tangentLineIntersection, // tangent ∩ a segment
   parallelCircleIntersection, // a parallel line ∩ the circle
+  tangentMeetsOtherCircle, // tangent LINE to one circle meets the OTHER circle — before circlesTangent (which would misread it as mutual tangency)
   circlesTangent, // two circles tangent to each other — before tangentLine (which would grab the משיק)
   secantFromExternal, // "from external point E a line cuts the circle at A,B" — before the generic intersections
   twoCirclesMeet, // "two circles intersect at A and B" — create both circles + both intersection points
   circleCircleIntersection, // two circles cross — before the generic line∩line intersection
+  lineMeetsCircle, // "[extension of] AC cuts circle P at E" — a chord/line meeting a circle, before collinearity & line∩line
   // A drawn perpendicular/parallel line that "cuts" another at a point must be claimed BEFORE the
   // generic line∩line rule: the "cuts"/"חותך" keyword otherwise makes lineLineIntersection 'stop'
   // (it can't read "ED ⟂ AB cuts it at C") and the whole parse aborts to the LLM — which then

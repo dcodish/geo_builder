@@ -44,6 +44,9 @@
     "title": "Steps",
     "empty": "Start by describing a shape"
   },
+  "figure": {
+    "mismatch": "The figure may not match what you described:"
+  },
   "theorems": {
     "title": "Theorems & Insights",
     "empty": "Add more details to see relevant theorems",

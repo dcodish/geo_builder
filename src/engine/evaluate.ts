@@ -40,6 +40,9 @@ export interface ResolvedCircle {
 export interface EvalOk {
   ok: true;
   positions: Map<Id, Vec>;
+  /** Resolved centre + radius of every circle (post-solve), so callers (the givens verifier) can
+   *  check on-circle membership without re-resolving. */
+  circles: Map<Id, ResolvedCircle>;
 }
 export interface EvalErr {
   ok: false;
@@ -659,7 +662,7 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
   // During a driven trial ([ADR-028](docs/06-decisions.md#adr-028)) we only need
   // positions — the checks below would abort the very search that's looking for
   // where they pass.
-  if (opts?.skipConstraints) return { ok: true, positions: pos };
+  if (opts?.skipConstraints) return { ok: true, positions: pos, circles };
 
   // No two distinct points may share a location — that is a degenerate figure
   // (two labels on one spot) — EXCEPT a pair the construction intends to coincide
@@ -687,7 +690,7 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
     }
   }
 
-  return { ok: true, positions: pos };
+  return { ok: true, positions: pos, circles };
 }
 
 /** Resolve one circle to its centre and radius: a {@link ResolvedCircle}, 'pending', or an error string. */

@@ -21,6 +21,8 @@ export {
 } from './step';
 export type { StepResult, StepOk, StepErr } from './step';
 export { applySeed, freeDofs, freeDofCount } from './sample';
+export { checkGivens } from './verify';
+export type { GivenViolation } from './verify';
 export { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 export type { Carrier, CarrierFamily } from './carriers';
 export { lower, lowerOne, buildSymTab, measureLabelText, isMeasure } from './lower';

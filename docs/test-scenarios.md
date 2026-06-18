@@ -22,6 +22,29 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `two-circles-mutual-tangent-secants` — bagrut: two circles tangent to each other + two secants (△ABC∼△BDA, CEDF parallelogram)
+**Steps** (the operator's actual Hebrew input)
+1. `שני מעגלים נחתכים בנקודות A ו B`
+2. `המשיק למעגל O בנקודה A פוגש את מעגל P בנקודה D`
+3. `המשיק למעגל P בנקודה B פוגש את מעגל O בנקודה C`
+4. `המשך AC חותך את מעגל P בנקודה E`
+5. `המשך BD חותך את מעגל O בנקודה F`
+
+**Guards against:** the "tangent to circle X at P meets circle Y at Q" phrasing misparsed **twice**.
+(1) It contains "tangent" + two circle names + "at", so `circlesTangent` grabbed it and made the two
+circles *mutually* tangent at A — contradicting that they already **intersect** at A,B. (2) Even the
+dedicated rule first missed the active verb **"פוגש"** (meets): only `נחתך/נפגש/cuts/meets` were in the
+shared `INTERSECT_KW`, so the operator's "פוגש את מעגל P" still fell through to `circlesTangent` and D was
+never created. Fixed: `פוגש`/`פגש` added to `INTERSECT_KW`, and a dedicated rule (before `circlesTangent`)
+reads it as a tangent **line** ∩ the other circle — taking the crossing that **avoids** the shared point —
+and **draws the chord**. E,F use the new `lineMeetsCircle` rule — "[extension of] AC חותך מעגל P בנקודה E"
+parses directly (it used to escalate to the LLM, which split it into a broken "E on extension" + "E on
+circle" pair that left E floating off the circle). **No fixed assumptions** — the only free DOFs are the
+two circle radii.
+**Asserts:** every step OK (no over-constraint / no mutual-tangency misparse); C,F on circle O and D,E on
+circle P; AD ⟂ radius OA and CB ⟂ radius PB (tangency); C,A,E and D,B,F each collinear; no derived point
+collapses onto the shared crossings A,B.
+
 ### `second-intersection-avoids-shared-point` — "E on line DB" (E,B on circle O) is the other crossing
 **Steps**
 1. `two circles intersect at A and B`

@@ -97,6 +97,70 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'redefine-existing-point-onto-circle',
+    title: 'redefining an existing point as "on circle P" drives it onto the circle (never a silent no-op)',
+    guards:
+      'this is the LLM-decomposition path that produced a GREEN-but-WRONG figure. The operator typed "המשך AC חותך את מעגל P בנקודה E"; before lineMeetsCircle existed it escalated, and the LLM split it into "E על המשך AC" + "E על מעגל P". The second command (point-on-circle for the ALREADY-EXISTING E) hit addObj, which no-ops on an existing id — so the on-circle fact was SILENTLY DROPPED: every step reported ok, lastError was null, yet E sat ~7.4 from P\'s centre (radius 3.6), nowhere near the circle. Fixed in applyCommand: re-defining an existing on-segment/extension point as "on circle C" — when one of its line ends is also on C — becomes the SECOND crossing (line∩circle, avoiding the shared end), so E is driven onto the circle instead of dropped. (The post-evaluate verifier is the general net for any case this does not reconcile.)',
+    steps: [
+      'שני מעגלים נחתכים בנקודות A ו B',
+      'C על מעגל O', // a point on the left circle, so line AC exists (A is on BOTH circles)
+      'E על המשך AC', // E created as an on-extension point (the LLM\'s first half)
+      'E על מעגל P', // redefining the EXISTING E as on circle P — used to be silently dropped
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const P = at(fig, 'P'), E = at(fig, 'E'), A = at(fig, 'A'), C = at(fig, 'C');
+      expect(dist(P, E), 'E actually lands ON circle P (not silently dropped)').toBeCloseTo(dist(P, A), 3);
+      expect(dist(E, A), 'E is the OTHER crossing, not the shared point A').toBeGreaterThan(0.5);
+      const coll = (p: Vec, q: Vec, r: Vec) => {
+        const span = Math.max(dist(p, q), dist(q, r), dist(p, r));
+        return Math.abs((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)) / (span * span);
+      };
+      expect(coll(A, C, E), 'A, C, E collinear (E on line AC)').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'two-circles-mutual-tangent-secants',
+    title: 'two intersecting circles, each tangent to the other at a shared point, with two secants (bagrut: △ABC∼△BDA, CEDF parallelogram)',
+    guards:
+      'a full bagrut figure (the operator\'s actual Hebrew input): two circles meet at A,B; the tangent to the LEFT circle at A is a chord AD of the RIGHT circle (D the other crossing); the tangent to the RIGHT circle at B is a chord CB of the LEFT circle; AC extended meets the right circle again at E; BD extended meets the left circle at F. The "tangent to circle X at P meets circle Y at Q" phrasing MISPARSED twice: (1) it contains "tangent" + two circle names + "at", so circlesTangent grabbed it and made the two circles mutually tangent at A — contradicting that they already INTERSECT at A,B; (2) even the dedicated rule first missed the active verb "פוגש" (meets) — only "נחתך/נפגש/cuts/meets" were in the shared INTERSECT_KW — so the operator\'s "פוגש את מעגל P" fell through to circlesTangent and D was never created. Fixed: "פוגש"/"פגש" added to INTERSECT_KW, and a dedicated rule (before circlesTangent) reads it as a tangent LINE ∩ the other circle (the crossing that AVOIDS the shared point) and DRAWS the chord. E,F come from the existing-point secant. NO fixed assumptions — the only free DOFs are the two circle radii.',
+    steps: [
+      'שני מעגלים נחתכים בנקודות A ו B', // circle-O (left, r5) + circle-P (right, r3.6), A,B = the two crossings
+      'המשיק למעגל O בנקודה A פוגש את מעגל P בנקודה D', // AD ⟂ radius OA; D = tangent ∩ circle P, avoiding A (the "פוגש" misparse)
+      'המשיק למעגל P בנקודה B פוגש את מעגל O בנקודה C', // CB ⟂ radius PB; C = tangent ∩ circle O, avoiding B
+      'המשך AC חותך את מעגל P בנקודה E', // E = line(A,C) ∩ circle P (the crossing that isn't A) — the bagrut wording
+      'המשך BD חותך את מעגל O בנקודה F', // F = line(B,D) ∩ circle O (the crossing that isn't B)
+    ],
+    check(fig) {
+      allStepsOk(fig); // no over-constraint, no silent drop, no mutual-tangency misparse
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E'), F = at(fig, 'F');
+      const O = at(fig, 'O'), P = at(fig, 'P');
+      // membership: C,F on the left circle O; D,E on the right circle P (relative to A, which is on both)
+      const rO = dist(O, A), rP = dist(P, A);
+      expect(dist(O, C), 'C on circle O').toBeCloseTo(rO, 3);
+      expect(dist(O, F), 'F on circle O').toBeCloseTo(rO, 3);
+      expect(dist(P, D), 'D on circle P').toBeCloseTo(rP, 3);
+      expect(dist(P, E), 'E on circle P').toBeCloseTo(rP, 3);
+      // tangency: AD ⟂ radius OA at A, and CB ⟂ radius PB at B (normalised dot ≈ 0)
+      const cos = (u: Vec, v: Vec) => (u.x * v.x + u.y * v.y) / (Math.hypot(u.x, u.y) * Math.hypot(v.x, v.y));
+      const vec = (p: Vec, q: Vec): Vec => ({ x: q.x - p.x, y: q.y - p.y });
+      expect(Math.abs(cos(vec(A, D), vec(O, A))), 'AD tangent to circle O at A (⟂ radius)').toBeLessThan(1e-3);
+      expect(Math.abs(cos(vec(B, C), vec(P, B))), 'CB tangent to circle P at B (⟂ radius)').toBeLessThan(1e-3);
+      // collinearity of the two secants
+      const coll = (p: Vec, q: Vec, r: Vec) => {
+        const span = Math.max(dist(p, q), dist(q, r), dist(p, r));
+        return Math.abs((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)) / (span * span);
+      };
+      expect(coll(C, A, E), 'C, A, E collinear (secant through A)').toBeLessThan(1e-3);
+      expect(coll(D, B, F), 'D, B, F collinear (secant through B)').toBeLessThan(1e-3);
+      // none of the derived points collapsed onto the shared crossings
+      expect(dist(D, A), 'D ≠ A').toBeGreaterThan(0.5);
+      expect(dist(C, B), 'C ≠ B').toBeGreaterThan(0.5);
+      expect(dist(E, A), 'E ≠ A').toBeGreaterThan(0.5);
+      expect(dist(F, B), 'F ≠ B').toBeGreaterThan(0.5);
+    },
+  },
+  {
     id: 'second-intersection-avoids-shared-point',
     title: '"E on line DB" with E,B both on circle O is the OTHER crossing — never E = B, deterministic',
     guards:

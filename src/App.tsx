@@ -211,7 +211,7 @@ export default function App() {
   }
 
   // Figure + per-fact status are derived from the fact list.
-  const { construction, positions, status, lastError, labels, angleMarks } = useMemo(() => replay(facts, seed), [facts, seed]);
+  const { construction, positions, status, lastError, labels, angleMarks, violations } = useMemo(() => replay(facts, seed), [facts, seed]);
 
   // Snap-to-intersection: a clicked crossing becomes a real named point. Pick the
   // first free single capital letter, then create it via the same command path.
@@ -405,6 +405,17 @@ export default function App() {
           </div>
 
           {lastError && <div style={errorBanner}>⚠ {lastError}</div>}
+
+          {violations.length > 0 && (
+            <div style={warnBanner}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>⚠ {t('figure.mismatch')}</div>
+              <ul style={{ margin: 0, paddingInlineStart: 18 }}>
+                {violations.map((v) => (
+                  <li key={`${v.relation}-${v.ids.join('-')}`}>{v.message}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div>
             <div style={sectionLabel}>{t('steps.title')}</div>
@@ -618,6 +629,14 @@ const errorBanner: React.CSSProperties = {
   border: '1px solid #fecaca',
   background: '#fef2f2',
   color: '#b91c1c',
+};
+const warnBanner: React.CSSProperties = {
+  padding: '8px 12px',
+  fontSize: 13,
+  borderRadius: 8,
+  border: '1px solid #fde68a',
+  background: '#fffbeb',
+  color: '#92400e',
 };
 const ghost: React.CSSProperties = {
   padding: '8px 14px',

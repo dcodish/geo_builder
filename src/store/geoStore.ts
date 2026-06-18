@@ -18,8 +18,8 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
-import type { AnyCommand, Command, Construction, Id, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, deepEqual, emptyConstruction, evaluate, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText } from '@/engine';
+import type { AnyCommand, Command, Construction, GivenViolation, Id, Vec } from '@/engine';
+import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, deepEqual, emptyConstruction, evaluate, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -91,6 +91,10 @@ export interface Derived {
   labels: MeasureLabels;
   /** Angle marks the student asserted (right-angle squares / angle arcs). */
   angleMarks: AngleMark[];
+  /** Stated givens that DON'T actually hold in the final figure (e.g. a point off the circle it was
+   *  put on) — empty when the drawing matches every given. "Green" requires this to be empty, not just
+   *  no error: a fact can apply cleanly yet leave its relation unsatisfied (the verifier net). */
+  violations: GivenViolation[];
 }
 
 /**
@@ -113,6 +117,8 @@ export function replay(facts: Fact[], seed = 0): Derived {
   // affordance) when its owner failed/was removed — that would mask the breakage.
   // Instead the dependent fact fails too, so a removed step cascades honestly.
   const owned = new Set<Id>();
+  // Engine commands of the facts that applied — the figure's stated givens, fed to the verifier.
+  const applied: Command[] = [];
   for (const f of facts) {
     // Lower the fact to the engine command(s) it produces (symbolic measures →
     // ratio/distance/angle/[]; engine commands pass through). 0 commands ⇒ a label-
@@ -147,7 +153,10 @@ export function replay(facts: Fact[], seed = 0): Derived {
         break;
       }
     }
-    if (ok) status[f.id] = 'ok';
+    if (ok) {
+      status[f.id] = 'ok';
+      applied.push(...(engineCmds as Command[]));
+    }
     claim();
   }
   const figure = applySeed(cur, seed);
@@ -173,7 +182,10 @@ export function replay(facts: Fact[], seed = 0): Derived {
     amSeen.add(key);
     angleMarks.push(m);
   }
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, labels, angleMarks };
+  // Verify the OUTPUT against the ORIGINAL givens: relations the input asserted that don't actually
+  // hold in the final coordinates (a point off its circle, …) — caught even when every step is 'ok'.
+  const violations = e.ok ? checkGivens(applied, e.positions, e.circles) : [];
+  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, labels, angleMarks, violations };
 }
 
 const fmtMeasure = (n: number): string => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(3))));
