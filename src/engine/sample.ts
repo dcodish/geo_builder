@@ -139,7 +139,7 @@ export function applySeed(c: Construction, seed: number): Construction {
     // varied sizes push two points together (a near-tangent secant), so only clean alternatives are shown.
     if (o.kind === 'circle' && o.radius.via === 'free' && o.solve === undefined) {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
-      return { ...o, radius: { via: 'free', value: o.radius.value * (0.45 + jr() * 1.15) } };
+      return { ...o, radius: { via: 'free' as const, value: o.radius.value * (0.45 + jr() * 1.15) } };
     }
     return o;
   });

@@ -12,7 +12,7 @@ import { parse } from '@/parser';
 import { build, evaluate } from '@/engine';
 import { buildScene } from '@/render/scene';
 import { useGeoStore, replay, pointsDistinct } from '@/store/geoStore';
-import type { AnyCommand, Id, Vec } from '@/engine';
+import type { AnyCommand, Circle, Construction, Id, Vec } from '@/engine';
 
 const dist = (a: Vec, b: Vec) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -67,8 +67,10 @@ describe('engine — a free radius flexes to a constraint', () => {
 });
 
 describe('store — "show another configuration" varies the radii (and can flip which is bigger)', () => {
-  const radiusOf = (fig: { construction: { objects: { kind: string; center?: Id; radius?: { value: number } }[] } }, center: Id) =>
-    (fig.construction.objects.find((o) => o.kind === 'circle' && o.center === center) as { radius: { value: number } }).radius.value;
+  const radiusOf = (fig: { construction: Construction }, center: Id) => {
+    const circ = fig.construction.objects.find((o) => o.kind === 'circle' && o.center === center) as Circle;
+    return 'value' in circ.radius ? circ.radius.value : NaN;
+  };
 
   it('resampling produces differently-sized circles, every view clean (no collapsed points)', () => {
     const st = useGeoStore.getState();
