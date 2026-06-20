@@ -51,6 +51,11 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
   if (onSeg !== undefined) {
     const seg = objects[onSeg] as Extract<GeoObject, { kind: 'on-segment' }>;
     objects[onSeg] = { kind: 'on-segment-solved', id: seg.id, a: seg.a, b: seg.b, constraint: con, branch: seg.solveBranch ?? 0, t0: seg.t };
+    // A `concyclic` couples to the whole figure: one on-segment DOF often CAN'T make four points share a
+    // circle by itself (a rectangle too short for "EABF cyclic"). Keep it as a check too, so when the
+    // single-DOF solve finds no root, `evaluate` reports it unsatisfied and applyStep's recruit-more-DOFs
+    // fallback grows a free shape DOF (the rectangle's height) until it holds — no fixed-size assumption.
+    if (con.type === 'concyclic') constraints.push(con);
     return;
   }
   // (1.5) Else drive an ON-LINE offset DOF (ADR-036) — a marker on a drawn line (a

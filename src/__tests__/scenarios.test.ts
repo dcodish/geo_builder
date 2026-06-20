@@ -97,6 +97,26 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'concyclic-flexes-the-rectangle',
+    title: 'EABF concyclic FLEXES the rectangle (its size is a free DOF) instead of failing on the default proportions',
+    guards:
+      "the operator's figure: rectangle ABCD, E on AD, F = CE ∩ diagonal DB, then \"EABF בר חסימה במעגל\" (the four concyclic). It first ERRORED 'unresolved dependencies' — a cycle: the hidden circumcircle's centre O depends on E (it's built through E), AND F depends on E, while the constraint drives E (ADR-062 self-coupling, via a DERIVED point). Then it silently failed: EABF can only be concyclic when CE⟂BD, impossible for the DEFAULT short rectangle — but the rectangle's size is a free DOF (ADR-052), so the engine must FLEX it, not assume the default. Fixes: (1) route the self-coupled solved point numerically (breaks the cycle); (2) keep `concyclic` as a check so the recruit-DOFs fallback grows the rectangle's height until the four points share a circle.",
+    steps: ['מלבן ABCD', 'E על AD', 'CE חותך את האלכסון DB בנקודה F', 'EABF בר חסימה במעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), D = at(fig, 'D'), E = at(fig, 'E'), F = at(fig, 'F');
+      // still a rectangle (right angle at A) and E still on AD
+      expect((B.x - A.x) * (D.x - A.x) + (B.y - A.y) * (D.y - A.y), 'AB ⟂ AD (still a rectangle)').toBeCloseTo(0, 2);
+      expect(Math.abs((E.x - A.x) * (D.y - A.y) - (E.y - A.y) * (D.x - A.x)) / dist(A, D), 'E still on AD').toBeLessThan(1e-3);
+      // the four points are concyclic: F lies on the circumcircle of E, A, B
+      const ax = A.x, ay = A.y, bx = B.x, by = B.y, ex = E.x, ey = E.y;
+      const d2 = 2 * (ax * (by - ey) + bx * (ey - ay) + ex * (ay - by));
+      const ux = ((ax * ax + ay * ay) * (by - ey) + (bx * bx + by * by) * (ey - ay) + (ex * ex + ey * ey) * (ay - by)) / d2;
+      const uy = ((ax * ax + ay * ay) * (ex - bx) + (bx * bx + by * by) * (ax - ex) + (ex * ex + ey * ey) * (bx - ax)) / d2;
+      expect(dist(F, { x: ux, y: uy }), '|center-F| = circumradius (EABF concyclic)').toBeCloseTo(dist(A, { x: ux, y: uy }), 2);
+    },
+  },
+  {
     id: 'bagrut-q4-tangent-secant-perpendicular',
     title: 'bagrut Q4: circle R, tangent AB, secant AD through O (C,D), AG⟂AD, D-B-G collinear, ∠ADB=α',
     guards:

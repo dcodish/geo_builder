@@ -92,12 +92,32 @@ function resolveDriven(c: Construction): Construction {
       (o): o is Extract<GeoObject, { kind: 'on-segment-solved' }> => o.kind === 'on-segment-solved',
     );
     const solvedIds = new Set(solved.map((o) => o.id));
+    // Does point `target` transitively depend on `source`? (scrape each object's point-id fields). Catches
+    // a SELF-coupling: a solved point E whose constraint references a DERIVED point that depends on E —
+    // e.g. "EABF concyclic" drives E while F = CE∩DB depends on E, so E's closed-form needs F which needs
+    // E (a cycle the topological evaluator reports as "unresolved dependencies"). Route E numerically.
+    const byId = new Map(c.objects.map((o) => [o.id, o] as const));
+    const PT_FIELDS = ['a', 'b', 'c', 'd', 'from', 'of', 'anchor', 'pivot', 'center1', 'center2', 'through', 'vertex', 'p', 'q', 'center'] as const;
+    const dependsOn = (target: Id, source: Id): boolean => {
+      const seen = new Set<Id>();
+      const queue = [target];
+      while (queue.length) {
+        const id = queue.shift()!;
+        if (id === source) return true;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const o = byId.get(id) as Record<string, unknown> | undefined;
+        if (!o) continue;
+        for (const f of PT_FIELDS) if (typeof o[f] === 'string') queue.push(o[f] as Id);
+      }
+      return false;
+    };
     const coupledIds = new Set<Id>();
     for (const o of solved) {
-      const refs = constraintRefs(o.constraint).filter((r) => r !== o.id && solvedIds.has(r));
-      if (refs.length) {
+      const refs = constraintRefs(o.constraint).filter((r) => r !== o.id);
+      if (refs.some((r) => solvedIds.has(r) || dependsOn(r, o.id))) {
         coupledIds.add(o.id);
-        for (const r of refs) coupledIds.add(r);
+        for (const r of refs) if (solvedIds.has(r)) coupledIds.add(r);
       }
     }
     if (coupledIds.size) {

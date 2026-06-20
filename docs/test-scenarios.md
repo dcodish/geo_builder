@@ -389,3 +389,7 @@ and drives a free DOF (A's slide on CD) until all four share the circle.
 passed through A, B, E but missed D. It now draws the circumcircle of three and adds a `concyclic` constraint
 over all four (ADR-041).
 **Asserts:** all steps OK; D lies on the circle too (all four equidistant from O).
+
+### `concyclic-flexes-the-rectangle` — EABF concyclic flexes the rectangle's free size (ADR-070)
+**Steps**: `מלבן ABCD` · `E על AD` · `CE חותך את האלכסון DB בנקודה F` · `EABF בר חסימה במעגל`
+**Guards against:** "unresolved dependencies" (a cycle: the hidden circumcircle is built through E, F depends on E, the constraint drives E) AND a silent failure on the short default rectangle. Fix (ADR-070): route the self-coupled solved point numerically (breaks the cycle), and keep `concyclic` as a check so the recruit-DOFs fallback grows the rectangle's height (a free DOF, ADR-052) until the four points share a circle. **Asserts:** all steps OK; still a rectangle (AB⟂AD); E still on AD; EABF concyclic (F on the circumcircle of E,A,B).
