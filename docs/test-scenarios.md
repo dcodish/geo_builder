@@ -393,3 +393,13 @@ over all four (ADR-041).
 ### `concyclic-flexes-the-rectangle` — EABF concyclic flexes the rectangle's free size (ADR-070)
 **Steps**: `מלבן ABCD` · `E על AD` · `CE חותך את האלכסון DB בנקודה F` · `EABF בר חסימה במעגל`
 **Guards against:** "unresolved dependencies" (a cycle: the hidden circumcircle is built through E, F depends on E, the constraint drives E) AND a silent failure on the short default rectangle. Fix (ADR-070): route the self-coupled solved point numerically (breaks the cycle), and keep `concyclic` as a check so the recruit-DOFs fallback grows the rectangle's height (a free DOF, ADR-052) until the four points share a circle. **Asserts:** all steps OK; still a rectangle (AB⟂AD); E still on AD; EABF concyclic (F on the circumcircle of E,A,B).
+
+### `sqrt-times-radius` — "AB=√2R" is √2·R (radius var), not a bare √2
+**Steps:** `נתון מעגל O שרדיוסו R` · `מנקודה A מעבירים משיק למעגל בנקודה D` · `B נקודה על המעגל` · `AB` · `OB` · `OD` · `AO` · `∠AOD=α` · `∠AOB=β` · `AB=√2R`
+**Guards against:** `measureSqrt` not being anchored to end-of-input (unlike its sibling length rules), so `AB=√2R` matched only the `√2` and **silently dropped the trailing R** (the ADR-024/026 class) — AB came out ≈ 1.414 instead of √2·R. The rule now consumes an optional trailing variable that multiplies the radical and anchors the RHS, so `√2R` ⇒ `{coef: √2, var: R}`, R bound to the circle radius (5).
+**Asserts:** all steps OK; |AB| = 5√2; |OB| = 5 (B on the circle); the length label reads `√2R`.
+
+### `sqrt-times-free-radius` — "AB=√2R" + "BO=R" on a free-radius circle (ADR-071)
+**Steps:** `מעגל O` · `מנקודה A מחוץ למעגל מעבירים משיק לנקודה D` · `B על המעגל` · `AB` · `AO` · `BO` · `DO` · `AB=√2R` · `BO=R`
+**Guards against:** three stacked defects — (1) the parser dropping the trailing R in `√2R` (unanchored rule); (2) lowering freezing R to the circle's default 5 on a FREE-radius circle, turning `AB=√2R` into a fixed distance that fought the free radius (seed-fragile over-constraint, ADR-051/052); (3) the joint solver giving up. Fix (ADR-071): a first-class `length-radius` constraint that drives the radius DOF **and** the witness on-circle angle (the tangent caps the radius, so a moderate radius + the right θ satisfies it), making `BO=R` a tautology.
+**Asserts:** all steps OK; |AB| = √2·|OB| (the relation holds); labels `√2R` and `R`. A companion test `sqrt-times-free-radius-allseeds` replays the same sequence across seeds 0–8 (the over-constraint was seed-dependent).

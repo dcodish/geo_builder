@@ -20,6 +20,20 @@ import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, t
 type Binding = { kind: 'len' | 'ang'; refs: Id[]; coef: number; pow?: number; affine?: boolean };
 export interface SymTab {
   vars: Map<string, { value?: number; bindings: Binding[] }>;
+  /** The FREE-radius circle the symbol R denotes, plus a point on it that witnesses the radius
+   *  (|center→witness| = R). Set only when R has no fixed value — it lets an "AB = √2R" measure
+   *  lower to a {@link LengthRadiusConstraint} that couples the length to the free radius DOF (ADR-071). */
+  radiusCircle?: { id: Id; center: Id; witness: Id };
+}
+
+/** A point id known to lie on circle `circleId` (so its distance to the centre IS the radius), or null. */
+function pointOnCircle(cmds: AnyCommand[], circleId: Id): Id | null {
+  for (const c of cmds) {
+    if (c.type === 'point-on-circle' && c.circle === circleId) return c.id;
+    if (c.type === 'arc-midpoint' && c.circle === circleId) return c.id;
+    if (c.type === 'line-circle-intersection' && c.circle === circleId) return c.id;
+  }
+  return null;
 }
 
 const sameRefs = (a: Id[], b: Id[]): boolean => a.length === b.length && a.every((x, i) => x === b[i]);
@@ -38,14 +52,33 @@ export function buildSymTab(cmds: AnyCommand[]): SymTab {
     else if (c.type === 'measure-angle' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'ang', refs: [c.vertex, c.ray1, c.ray2], coef: c.expr.coef });
   }
   // The reserved radius symbol R always denotes the circle's radius (ADR-034): if a measure uses it
-  // but no explicit value was given, bind R to the (first numeric-radius) circle's radius — so
+  // but no explicit value was given, bind R to the (first FIXED-radius) circle's radius — so
   // "OC = 0.5R" sizes against the radius without the student having to declare "radius R" separately.
+  // A FREE-radius circle (bare "circle O", no stated size — ADR-051/052) is deliberately EXCLUDED: its
+  // radius is a free DOF, so freezing R to its default would silently pin the size the question left
+  // free and lower "AB = √2R" to a FIXED distance that fights the free radius (seed-fragile
+  // over-constraint). Left unvalued, R-measures couple through the ratio machinery instead
+  // (|BO| = (1/√2)|AB| for "AB=√2R" + "BO=R"), keeping the figure scalable.
   const rad = vars.get(RADIUS_VAR);
+  let radiusCircle: SymTab['radiusCircle'];
   if (rad && rad.value === undefined) {
-    const circ = cmds.find((c) => c.type === 'circle' && typeof (c as { radius?: unknown }).radius === 'number') as { radius: number } | undefined;
+    const circ = cmds.find(
+      (c) => c.type === 'circle' && typeof (c as { radius?: unknown }).radius === 'number' && !(c as { freeRadius?: boolean }).freeRadius,
+    ) as { radius: number } | undefined;
     if (circ) rad.value = circ.radius;
+    else {
+      // No fixed-radius circle, but R is used → it denotes a FREE-radius circle. Record it (+ a point on
+      // it that witnesses the radius) so R-measures couple to the radius DOF rather than freezing it (ADR-071).
+      const free = cmds.find((c) => c.type === 'circle' && (c as { freeRadius?: boolean }).freeRadius) as
+        | { id: Id; center: Id }
+        | undefined;
+      if (free) {
+        const witness = pointOnCircle(cmds, free.id);
+        if (witness) radiusCircle = { id: free.id, center: free.center, witness };
+      }
+    }
   }
-  return { vars };
+  return { vars, radiusCircle };
 }
 
 /** Lower one command to the engine command(s) it produces (0+). Engine commands pass through unchanged. */
@@ -56,8 +89,14 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
     case 'measure-length': {
       const e = cmd.expr;
       if ('value' in e) return [{ type: 'set-distance', a: cmd.a, b: cmd.b, value: e.value }];
-      const info = tab.vars.get(e.var);
       const konst = e.const ?? 0;
+      // |XY| = k·R against a FREE-radius circle (ADR-071): couple the length to the radius DOF. Only the
+      // LINEAR case (pow 1) is a radius multiple; a √/² power of the radius falls through to the var path.
+      if (e.var === RADIUS_VAR && tab.radiusCircle && (e.pow ?? 1) === 1) {
+        const { id, center, witness } = tab.radiusCircle;
+        return [{ type: 'set-length-radius', a: cmd.a, b: cmd.b, circle: id, center, witness, k: e.coef, ...(konst ? { add: konst } : {}) }];
+      }
+      const info = tab.vars.get(e.var);
       if (info?.value !== undefined) {
         const len = e.coef * Math.pow(info.value, e.pow ?? 1) + konst; // 12√x with x=4 → 24; k+2 with k=4 → 6
         return [{ type: 'set-distance', a: cmd.a, b: cmd.b, value: len }];

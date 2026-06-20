@@ -502,7 +502,10 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     return s;
   };
   // The BOUNDED parametric carriers (on-circle θ∈[0,2π], on-segment t∈[0,1]) in u-space (scale 1 ⇒ u == θ/t),
-  // each tagged with the constraint IT drives (for the binding-aware sweep below).
+  // each tagged with the constraint IT drives (for the binding-aware sweep below). A FREE-radius circle is
+  // included too (ADR-071): its radius is unbounded, but the constraint it drives (|XY| = k·R) has a single
+  // sign-change in the radius, so a wide bracket + the per-DOF argMin sweep solves it robustly where the
+  // cardinal-restart Nelder–Mead (reaching only ~3× the seed) misses a far root.
   const ranges: { ui: number; lo: number; hi: number; own: Constraint }[] = [];
   let ki = 0;
   for (const s of specs) {
@@ -510,6 +513,11 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     const own = car?.solve?.constraint;
     if (own && car?.kind === 'on-circle') ranges.push({ ui: ki, lo: 0, hi: 2 * Math.PI, own });
     else if (own && car?.kind === 'on-segment') ranges.push({ ui: ki, lo: 0, hi: 1, own });
+    else if (own && car?.kind === 'circle' && car.radius.via === 'free') {
+      // u = radius / scale (scale = seed radius ⇒ seed u = 1). Bracket [tiny, generous] in radius, /scale.
+      const sc = s.scale[0];
+      ranges.push({ ui: ki, lo: 0.05 / sc, hi: Math.max(sc * 30, span * 5, 200) / sc, own });
+    }
     ki += s.n;
   }
   // When bounded parametric carriers are present, two extra steps ported from the former coupled-param

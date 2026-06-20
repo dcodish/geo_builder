@@ -34,6 +34,27 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
     constraints.push(con);
     return;
   }
+  // A `length-radius` couples a length to a circle's RADIUS: drive that free-radius DOF (|ab| = k·R) plus
+  // the witness's on-circle ANGLE when it has one — NOT an arbitrary point carrier (ADR-071). The radius
+  // alone is often insufficient: another part of the figure can cap it (a tangent needs A OUTSIDE the
+  // circle, so the radius can't grow without bound), but a moderate radius + the right θ still satisfies
+  // |ab| = k·R. Driving both (2 DOF) keeps the solve well-posed; recruitFreeDofs widens it only if even
+  // that can't hold. A tautology ("BO=R", B on the circle ⇒ |BO| ≡ R) holds for every radius/θ, so the
+  // solve just keeps the seed.
+  if (con.type === 'length-radius') {
+    const ci = objects.findIndex((o) => o.id === con.circle);
+    const circ = ci >= 0 ? objects[ci] : undefined;
+    if (circ && circ.kind === 'circle' && circ.radius.via === 'free' && (circ as { solve?: unknown }).solve === undefined) {
+      objects[ci] = { ...circ, solve: { constraint: con, branch: 0 } } as GeoObject;
+    }
+    const wi = objects.findIndex((o) => o.id === con.witness);
+    const wit = wi >= 0 ? objects[wi] : undefined;
+    if (wit && wit.kind === 'on-circle' && (wit as { solve?: unknown }).solve === undefined) {
+      objects[wi] = { ...wit, solve: { constraint: con, branch: 0 } };
+    }
+    constraints.push(con); // verified after the driven solve (and the recruit-DOFs fallback if it can't hold)
+    return;
+  }
   const idxs = constraintRefs(con).map((id) => objects.findIndex((o) => o.id === id));
   // A point already pinned by another constraint (e.g. F fixed by a coincidence
   // from a second definition) must not be re-driven — that would fight its pin and
@@ -813,6 +834,13 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'set-ratio':
       driveOrCheck(objects, constraints, { type: 'ratio', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d, k: cmd.k, ...(cmd.add ? { add: cmd.add } : {}) });
+      break;
+
+    case 'set-length-radius':
+      driveOrCheck(objects, constraints, {
+        type: 'length-radius',
+        a: cmd.a, b: cmd.b, circle: cmd.circle, center: cmd.center, witness: cmd.witness, k: cmd.k, ...(cmd.add ? { add: cmd.add } : {}),
+      });
       break;
 
     case 'set-angle-ratio':

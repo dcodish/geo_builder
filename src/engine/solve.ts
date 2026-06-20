@@ -36,6 +36,8 @@ export function constraintRefs(con: Constraint): Id[] {
     case 'parallel':
     case 'perpendicular':
       return [con.a, con.b, con.c, con.d];
+    case 'length-radius':
+      return [con.a, con.b, con.center, con.witness];
     case 'angle-ratio':
       return [con.v1, con.a1, con.b1, con.v2, con.a2, con.b2];
     case 'coincide':
@@ -80,6 +82,9 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
       return dist(get(con.a), get(con.b)) - dist(get(con.c), get(con.d));
     case 'ratio':
       return dist(get(con.a), get(con.b)) - (con.k * dist(get(con.c), get(con.d)) + (con.add ?? 0));
+    case 'length-radius':
+      // |center→witness| is the radius (witness is ON the circle), so this is the ratio form |ab| = k·R.
+      return dist(get(con.a), get(con.b)) - (con.k * dist(get(con.center), get(con.witness)) + (con.add ?? 0));
     case 'angle-ratio':
       return angleDeg(get(con.v1), get(con.a1), get(con.b1)) - con.k * angleDeg(get(con.v2), get(con.a2), get(con.b2));
     case 'coincide':
@@ -178,6 +183,8 @@ export function constraintScale(con: Constraint, get: (id: Id) => Vec): number {
       return dist(get(con.c), get(con.d));
     case 'ratio':
       return Math.abs(con.k * dist(get(con.c), get(con.d)) + (con.add ?? 0));
+    case 'length-radius':
+      return Math.abs(con.k * dist(get(con.center), get(con.witness)) + (con.add ?? 0));
     case 'length-order':
       return Math.max(dist(get(con.c), get(con.d)), 1e-9); // relative to the longer length
     case 'collinear-order':
@@ -200,6 +207,7 @@ export function residualTolerance(con: Constraint, scale = 1): number {
     case 'distance':
     case 'equal':
     case 'ratio':
+    case 'length-radius':
     case 'concyclic':
       return Math.max(1e-6, 2e-4 * scale);
     case 'parallel':
@@ -241,6 +249,8 @@ export function describeConstraint(con: Constraint): string {
       return `|${con.a}${con.b}| = |${con.c}${con.d}|`;
     case 'ratio':
       return `|${con.a}${con.b}| = ${con.k}·|${con.c}${con.d}|${con.add ? ` ${con.add > 0 ? '+' : '−'} ${Math.abs(con.add)}` : ''}`;
+    case 'length-radius':
+      return `|${con.a}${con.b}| = ${con.k}·R${con.add ? ` ${con.add > 0 ? '+' : '−'} ${Math.abs(con.add)}` : ''}`;
     case 'angle-ratio':
       return `∠${con.a1}${con.v1}${con.b1} = ${con.k}·∠${con.a2}${con.v2}${con.b2}`;
     case 'parallel':

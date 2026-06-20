@@ -1115,6 +1115,31 @@ const SCENARIOS: Scenario[] = [
       expect(tC).toBeLessThan(1);
     },
   },
+  {
+    id: 'sqrt-times-free-radius',
+    title: '"AB=√2R" + "BO=R" on a FREE-radius circle — couples the length to the radius DOF, not over-constrained',
+    guards:
+      'THREE stacked defects on the operator\'s tangent figure. (1) The parser dropped the trailing R in "√2R" (matched a bare √2 — the ADR-024/026 unanchored-rule class). (2) Lowering then froze R to the circle\'s default 5 even though "מעגל O" gives a FREE radius (ADR-051/052), turning "AB=√2R" into a FIXED distance that fought the free radius → seed-fragile over-constraint. (3) Even coupled as a ratio, the joint solver gave up from most seeds. Fix (ADR-071): a first-class `length-radius` constraint that drives the circle\'s radius DOF AND the witness on-circle angle (the tangent caps the radius, so a moderate radius + the right θ satisfies |AB|=√2R), making "BO=R" a structural tautology. Relation enforced, no over-constraint.',
+    steps: [
+      'מעגל O', // a FREE-radius circle (no stated size)
+      'מנקודה A מחוץ למעגל מעבירים משיק לנקודה D',
+      'B על המעגל',
+      'AB',
+      'AO',
+      'BO',
+      'DO',
+      'AB=√2R',
+      'BO=R',
+    ],
+    check(fig) {
+      allStepsOk(fig); // no "over-constrained: |AB| = …·R cannot hold"
+      const A = at(fig, 'A'), B = at(fig, 'B'), O = at(fig, 'O');
+      const r = dist(O, B); // B is on the circle ⇒ |OB| is the radius
+      expect(dist(A, B)).toBeCloseTo(Math.SQRT2 * r, 3); // |AB| = √2·R — the relation actually holds
+      expect(fig.labels.lengths).toContainEqual({ a: 'A', b: 'B', text: '√2R' });
+      expect(fig.labels.lengths).toContainEqual({ a: 'B', b: 'O', text: 'R' });
+    },
+  },
 ];
 
 describe('reported scenarios — end-to-end replay of real bug reports', () => {
@@ -1262,5 +1287,27 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       }
     }
     st.clear();
+  });
+
+  it('[sqrt-times-free-radius-allseeds] "AB=√2R" on a free-radius tangent figure holds on EVERY view (ADR-071)', () => {
+    // The over-constraint was SEED-DEPENDENT (the seed-0 scenario above can't catch that): the radius
+    // root the relation wants is capped by the tangent (A must stay OUTSIDE the circle), so only a
+    // radius + on-circle-angle solve satisfies it. Replay the operator's exact sequence across seeds.
+    const steps = ['מעגל O', 'מנקודה A מחוץ למעגל מעבירים משיק לנקודה D', 'B על המעגל', 'AB', 'AO', 'BO', 'DO', 'AB=√2R', 'BO=R'];
+    const facts: Fact[] = [];
+    let g = 0;
+    for (const u of steps) {
+      const r = parse(u, ctxOf(facts));
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return;
+      const group = `g${g++}`;
+      for (const cmd of r.commands) facts.push({ id: `${group}.${facts.length}`, utterance: u, group, cmd, enabled: true });
+    }
+    for (let seed = 0; seed <= 8; seed++) {
+      const fig = replay(facts, seed);
+      expect(fig.lastError, `seed ${seed}`).toBeNull();
+      const r = dist(at(fig, 'O'), at(fig, 'B')); // |OB| = the (free) radius
+      expect(dist(at(fig, 'A'), at(fig, 'B')), `seed ${seed}: |AB| = √2·R`).toBeCloseTo(Math.SQRT2 * r, 2);
+    }
   });
 });

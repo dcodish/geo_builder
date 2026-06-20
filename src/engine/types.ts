@@ -519,6 +519,25 @@ export interface RatioConstraint {
   add?: number;
 }
 
+/**
+ * |a→b| = k·R (+ add), where R is the radius of a free-radius circle ([ADR-071](docs/06-decisions.md#adr-055)).
+ * The radius is witnessed as |center→witness| (witness is a point ON the circle, so that distance IS the
+ * radius), so the residual is the same length form as {@link RatioConstraint}. What makes this its own type
+ * is the DRIVE: `driveOrCheck` drives the circle's free-radius DOF (a robust 1-D solve) rather than a point
+ * carrier — coupling a length to a free radius the way "AB = √2R" intends, and making "BO = R" (B on the
+ * circle) a structural tautology instead of a joint-solve that fights the radius (the over-constraint bug).
+ */
+export interface LengthRadiusConstraint {
+  type: 'length-radius';
+  a: Id;
+  b: Id;
+  circle: Id;
+  center: Id;
+  witness: Id; // a point ON the circle, so |center→witness| = the radius
+  k: number;
+  add?: number;
+}
+
 /** a→b ∥ c→d. */
 export interface ParallelConstraint {
   type: 'parallel';
@@ -648,7 +667,8 @@ export type Constraint =
   | LengthOrderConstraint
   | ConcyclicConstraint
   | CollinearConstraint
-  | CollinearOrderConstraint;
+  | CollinearOrderConstraint
+  | LengthRadiusConstraint;
 
 export interface Construction {
   objects: GeoObject[];
@@ -674,6 +694,7 @@ export type Command =
   | { type: 'set-distance'; a: Id; b: Id; value: number }
   | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-ratio'; a: Id; b: Id; c: Id; d: Id; k: number; add?: number } // |ab| = k·|cd| + add
+  | { type: 'set-length-radius'; a: Id; b: Id; circle: Id; center: Id; witness: Id; k: number; add?: number } // |ab| = k·R (ADR-071)
   | { type: 'set-angle-ratio'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id; k: number } // ∠1 = k·∠2
   | { type: 'set-angle-order'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id } // ∠1 < ∠2 (∠1 is the smaller)
   | { type: 'set-length-order'; a: Id; b: Id; c: Id; d: Id } // |ab| < |cd| (ab is the shorter)

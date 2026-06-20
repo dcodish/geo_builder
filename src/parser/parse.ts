@@ -596,19 +596,34 @@ const measureLength: Rule = (s) => {
  * dropped (the bug: "AD = 12√x" half-parsed to set-distance 12). The radicand is a
  * single variable letter (symbolic, resolves when the var gets a value) or a number
  * (a concrete length, e.g. 12√2). Accepts the √ glyph, LaTeX \sqrt{…}, or sqrt(…).
+ * An optional trailing variable MULTIPLIES the radical ("AB = √2R" = (√2)·R, "2√3R"),
+ * the radius-times-radical idiom — the RHS is ANCHORED to end-of-input so the trailing
+ * factor can NEVER be silently dropped (the ADR-024/026 class: "√2R" used to parse as a
+ * bare "√2", discarding R).
  */
 const SQRT_FN = String.raw`(?:√|\\sqrt|sqrt)\s*[\{(]?\s*(${VAR}|${COEF})\s*[\})]?`;
 const measureSqrt: Rule = (s) => {
   if (SEG_RATIO_LHS.test(s)) return null; // don't grab the "AE=√2" fragment inside "EB/AE=√2/2"
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*${SQRT_FN}`, 'i'));
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*${SQRT_FN}\s*[*·]?\s*(${LVAR})?(?![a-zA-Z])\s*$`, 'i'));
   if (!m) return null;
   const a = up(m[1]);
   const b = up(m[2]);
   const coef = m[3] ? parseFloat(m[3]) : 1;
   const radicand = m[4];
+  const tail = m[5]; // optional variable multiplying the radical, e.g. the radius R in "√2R"
+  const radNumeric = /^[0-9.]+$/.test(radicand);
+  // A trailing variable scales the radical: "√2R" = (√2)·R, "2√3R" = (2√3)·R — a numeric
+  // coefficient (the resolved radical) times a (usually radius) variable. Only meaningful with a
+  // numeric radicand; "√x y" (two symbols multiplied) is ambiguous, so escalate rather than guess.
+  if (tail) {
+    if (!radNumeric) return null;
+    const c = coef * Math.sqrt(parseFloat(radicand));
+    const display = /^[Rr]$/.test(tail) ? 'R' : tail;
+    return [{ type: 'measure-length', a, b, expr: { coef: c, var: normVar(tail), text: `${m[3] ?? ''}√${radicand}${display}` } }];
+  }
   // Number under the radical ⇒ a concrete length, but keep "12√2" as the display (not 16.97);
   // a letter ⇒ symbolic (pow ½), display derived as "12√x".
-  if (/^[0-9.]+$/.test(radicand)) return [{ type: 'measure-length', a, b, expr: { value: coef * Math.sqrt(parseFloat(radicand)), text: `${m[3] && coef !== 1 ? m[3] : ''}√${radicand}` } }];
+  if (radNumeric) return [{ type: 'measure-length', a, b, expr: { value: coef * Math.sqrt(parseFloat(radicand)), text: `${m[3] && coef !== 1 ? m[3] : ''}√${radicand}` } }];
   return [{ type: 'measure-length', a, b, expr: { coef, var: radicand.toLowerCase(), pow: 0.5 } }];
 };
 
