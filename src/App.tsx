@@ -18,7 +18,7 @@ import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
 import type { Crossing } from '@/render';
-import { groupKey, introducedIds, replay, useGeoStore } from '@/store/geoStore';
+import { dryRunOutcome, groupKey, introducedIds, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import { logDebug } from '@/debug/sessionLog';
 import { nanoid } from 'nanoid';
@@ -48,10 +48,11 @@ export default function App() {
   const canRedo = useStore(useGeoStore.temporal, (s) => s.futureStates.length > 0);
 
   const [text, setText] = useState('');
-  const [notUnderstood, setNotUnderstood] = useState(false);
+  const [inputNote, setInputNote] = useState(''); // a problem message under the input (not-understood / built-nothing)
   const [thinking, setThinking] = useState(false); // LLM fallback in flight (Phase 7)
   const [llmDropped, setLlmDropped] = useState<string[]>([]); // LLM steps the engine couldn't build
   const [renameNote, setRenameNote] = useState(''); // why a relabel was a no-op (target taken / no such point)
+  const [altNote, setAltNote] = useState(''); // transient: "show another configuration" found no different drawing
   const [showHelp, setShowHelp] = useState(false); // collapsed by default; "מה אפשר להקליד?" opens the command reference
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
@@ -162,13 +163,16 @@ export default function App() {
   // Figure context for the parser: the circles' centres (resolve "the circle") and
   // the existing point ids (inscribing an existing triangle becomes its circumcircle).
   const parseCtx = () => ({
-    circles: construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
+    // Exclude pure SCAFFOLDING circles (a tangent's Thales aux), marked by a `~`-prefixed centre — the
+    // student never references them, so they must not make "the circle" / "chord CE" ambiguous. A real
+    // but un-drawn circle (a cyclic quad's `בר חסימה`, with a real circumcentre) IS referenced, so it stays.
+    circles: construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [o.center] : [])),
     points: construction.objects.filter(isGeoPoint).map((o) => o.id),
     circleMembers: circleMembers(construction), // so "arc BC" resolves to the circle holding both B and C
   });
 
   async function submit(utterance: string) {
-    setNotUnderstood(false);
+    setInputNote('');
     setLlmDropped([]);
     setRenameNote('');
     const locale = i18n.language?.startsWith('he') ? 'he' : 'en';
@@ -193,16 +197,26 @@ export default function App() {
       return;
     }
     const r = parse(utterance, parseCtx());
+    let weak: 'error' | 'empty' | null = null;
     if (r.ok) {
-      // One utterance → possibly many commands; tag them with one group id so
-      // they show as a single step row, not N identical rows.
-      const group = nanoid();
-      r.commands.forEach((c) => execute(c, utterance, group));
-      logDebug({ kind: 'input', utterance, locale, source: 'parser', commands: r.commands });
-      setText('');
-      return;
+      // A deterministic parse can "succeed" yet build NOTHING — apply with an error (kept-prior) or
+      // change nothing at all. Dry-run before committing so a silent fail isn't shown as success
+      // (operator request); a step that builds something commits immediately.
+      const outcome = dryRunOutcome(facts, r.commands, seed, radiusOverrides);
+      if (outcome.produced) {
+        // One utterance → possibly many commands; tag them with one group id so
+        // they show as a single step row, not N identical rows.
+        const group = nanoid();
+        r.commands.forEach((c) => execute(c, utterance, group));
+        logDebug({ kind: 'input', utterance, locale, source: 'parser', commands: r.commands });
+        setText('');
+        return;
+      }
+      weak = outcome.reason; // parsed but produced nothing → fall through to the LLM second attempt
+      logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:${outcome.reason}`, detail: outcome.detail, commands: r.commands });
     }
-    // out of grammar → ask the LLM (using the current figure as context)
+    // out of grammar, OR a deterministic parse that built nothing → ask the LLM (a SECOND try),
+    // using the current figure as context.
     setThinking(true);
     const ctx = figureContext(
       construction.objects.filter(isGeoPoint).map((o) => o.id),
@@ -210,20 +224,26 @@ export default function App() {
     );
     const out = await llmParse(utterance, ctx, parseCtx());
     setThinking(false);
-    if (!out || (out.built.length === 0 && out.dropped.length === 0)) {
-      logDebug({ kind: 'input', utterance, locale, source: 'llm', result: 'not-understood' });
-      setNotUnderstood(true);
+    // The LLM only counts if its decomposition actually BUILDS something — else it's another silent
+    // fail. Dry-run the combined commands; if neither grammar nor LLM built anything, say so plainly.
+    const llmCmds = out ? out.built.flatMap((g) => g.commands) : [];
+    const llmBuilds = out !== null && out.built.length > 0 && dryRunOutcome(facts, llmCmds, seed, radiusOverrides).produced;
+    if (!llmBuilds) {
+      logDebug({ kind: 'input', utterance, locale, source: 'llm', result: out && out.built.length ? 'built-nothing' : 'not-understood' });
+      // "produced nothing even after a retry" gets the explicit problem message; pure out-of-grammar
+      // (the grammar never matched) keeps the gentler "couldn't read that — try an example".
+      setInputNote(t(weak ? 'input.producedNothing' : 'input.notUnderstood'));
       return;
     }
-    // Show the LLM's decomposition as separate steps, each labelled by its
-    // canonical step (its own group); report any step the engine couldn't build (ADR-023).
-    out.built.forEach((g) => {
-      const group = nanoid();
-      g.commands.forEach((c) => execute(c, g.step, group));
-    });
-    logDebug({ kind: 'input', utterance, locale, source: 'llm', built: out.built.map((g) => g.step), dropped: out.dropped });
-    setLlmDropped(out.dropped);
-    if (out.built.length === 0) setNotUnderstood(true);
+    // The LLM understood the (often Hebrew) input and decomposed it into canonical steps; show it as
+    // ONE step row labelled by the STUDENT'S ORIGINAL utterance — not the LLM's English canonical lines
+    // (a Hebrew input must never surface as an English row). All built commands share one group, exactly
+    // like a deterministic multi-command parse, so editing the row re-runs the original wording. The
+    // canonical decomposition + any unbuildable steps stay in the debug log / `dropped` report.
+    const group = nanoid();
+    out!.built.forEach((g) => g.commands.forEach((c) => execute(c, utterance, group)));
+    logDebug({ kind: 'input', utterance, locale, source: 'llm', built: out!.built.map((g) => g.step), dropped: out!.dropped });
+    setLlmDropped(out!.dropped);
     setText('');
   }
 
@@ -329,7 +349,7 @@ export default function App() {
                 dir={textDir(text)}
                 onChange={(e) => {
                   setText(e.target.value);
-                  if (notUnderstood) setNotUnderstood(false);
+                  if (inputNote) setInputNote('');
                   if (llmDropped.length) setLlmDropped([]);
                   if (renameNote) setRenameNote('');
                 }}
@@ -358,7 +378,7 @@ export default function App() {
               ))}
             </div>
             {thinking && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
-            {notUnderstood && <span style={{ fontSize: 12, color: '#b45309' }}>{t('input.notUnderstood')}</span>}
+            {inputNote && <span style={{ fontSize: 12, color: '#b45309' }} dir={textDir(inputNote)}>{inputNote}</span>}
             {renameNote && <span style={{ fontSize: 12, color: '#b45309' }} dir={textDir(renameNote)}>{renameNote}</span>}
             {llmDropped.length > 0 && (
               <span style={{ fontSize: 12, color: '#b45309' }} dir={textDir(llmDropped[0])}>
@@ -530,13 +550,21 @@ export default function App() {
               // figure with both (e.g. a circle∩circle point + free secant ends) only flipped between
               // 2 branch options and never varied its free DOFs.
               onClick={() => {
-                resample(); // no-op when there are no free DOFs
-                if (branchId) cycleAlt(branchId);
+                const changed = resample(); // true if it found a genuinely different drawing
+                if (branchId) cycleAlt(branchId); // a discrete branch flip is always a real change
+                if (changed || branchId) setAltNote('');
+                else {
+                  // searched and found nothing different — tell the student something DID happen (the
+                  // figure is determined), so "show another" doesn't look like a dead button (operator).
+                  setAltNote(t('actions.onlyConfig'));
+                  window.setTimeout(() => setAltNote(''), 4000);
+                }
               }}
             >
               {t('actions.another')}
             </button>
           )}
+          {altNote && <span style={{ fontSize: 12, color: '#64748b' }}>{altNote}</span>}
 
           {/* ADR-018 Stage 3 — the figure's remaining freedom, shrinking as facts accumulate
               until it reads "fully determined" (a single rigid drawing). */}

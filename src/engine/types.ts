@@ -114,7 +114,9 @@ export interface ParallelogramVertex {
   c: Id;
 }
 
-/** 0 DOF — intersection of line (a,b) with line (c,d). Parallel lines ⇒ unconstructible. */
+/** 0 DOF — intersection of line (a,b) with line (c,d). Parallel lines ⇒ unconstructible. A DIRECTIONAL
+ *  operand ("המשך BD" beyond the 2nd point, ADR-054) is carried by a separate `collinear-order` the
+ *  command emits — which DRIVES a free DOF so the extensions reach the crossing (no manual repositioning). */
 export interface LineLineIntersection {
   kind: 'line-line-intersection';
   id: Id;
@@ -277,13 +279,18 @@ export interface LineCirclePoint {
   avoid?: Id;
 }
 
-/** 0 DOF — a crossing of two circles; 0/1/2 solutions, `branch` selects. */
+/**
+ * 0 DOF — a crossing of two circles; 0/1/2 solutions, `branch` selects. When `avoid` is set (the OTHER
+ * intersection, already placed), the crossing FARTHEST from it is chosen instead — so "the second
+ * intersection" is geometric, not a branch index that flips order as the circles move ([ADR-045](docs/06-decisions.md#adr-045) R8).
+ */
 export interface CircleCirclePoint {
   kind: 'circle-circle';
   id: Id;
   circle1: Id;
   circle2: Id;
   branch: number;
+  avoid?: Id;
 }
 
 /**
@@ -658,10 +665,10 @@ export type Command =
   | { type: 'trapezoid'; ids: [Id, Id, Id, Id] }
   | { type: 'triangle'; ids: [Id, Id, Id] }
   | { type: 'right-triangle'; ids: [Id, Id, Id] } // right angle at the last id
-  | { type: 'free-point'; id: Id; x: number; y: number }
+  | { type: 'free-point'; id: Id; x: number; y: number; free?: boolean } // free: an AUTO-placed default (a construct's apex) — a free DOF, NOT pinned (ADR-052); a student-typed "A at (x,y)" omits it and pins
   | { type: 'point-on-segment'; id: Id; a: Id; b: Id; t?: number; branch?: number } // branch: which root, once a constraint drives it (ADR-043)
   | { type: 'point-by-distances'; id: Id; from1: Id; dist1: number; from2: Id; dist2: number; branch?: number }
-  | { type: 'line-line-intersection'; id: Id; a: Id; b: Id; c: Id; d: Id }
+  | { type: 'line-line-intersection'; id: Id; a: Id; b: Id; c: Id; d: Id; dir1?: boolean; dir2?: boolean } // dir1/dir2: a "המשך" operand — A must be BEYOND the 2nd point (ADR-054)
   | { type: 'segment'; a: Id; b: Id }
   | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number }
   | { type: 'set-distance'; a: Id; b: Id; value: number }
@@ -692,7 +699,11 @@ export type Command =
   | { type: 'arc'; id: Id; center: Id; from: Id; to: Id } // a drawn arc (CCW from→to): semicircle / quarter circle
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }
   | { type: 'line-circle-intersection'; id: Id; line: Id; circle: Id; branch?: number; avoid?: Id }
-  | { type: 'circle-circle-intersection'; id: Id; circle1: Id; circle2: Id; branch?: number }
+  // "המשך AC חותך מעגל P בנקודה D" — directional extension onto a circle (ADR-054): the NEW point
+  // `id` is collinear with `a`,`b` AND beyond `b` (order a→b→id); a free-radius circle adapts so the
+  // extension actually reaches it. Distinct from `line-circle-intersection` (order-agnostic chord).
+  | { type: 'extend-onto-circle'; id: Id; a: Id; b: Id; circle: Id; branch?: number }
+  | { type: 'circle-circle-intersection'; id: Id; circle1: Id; circle2: Id; branch?: number; avoid?: Id }
   | { type: 'tangent'; id: Id; circle: Id; at: Id; visible?: boolean }
   | { type: 'point-on-line'; id: Id; line: Id; offset: number } // a fixed marker on a drawn line (names it by a point)
   | { type: 'circles-tangent'; circle1: Id; circle2: Id; at: Id; external: boolean }; // two circles touch at one point `at`

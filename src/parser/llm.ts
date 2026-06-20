@@ -42,6 +42,35 @@ function absorb(cmd: AnyCommand, points: Set<string>, circles: Set<string>): voi
   if ((cmd.type === 'circle' || cmd.type === 'circle-through' || cmd.type === 'circumcircle') && typeof cmd.center === 'string') circles.add(cmd.center);
 }
 
+/** A circle id is `circle-<centre letter>` (parser convention), so its centre is the suffix. */
+const centreOf = (circleId: string): string => circleId.replace(/^circle-/, '');
+
+/**
+ * Fold the on-circle MEMBERSHIP a built step introduced into a running map keyed by circle centre
+ * (R9(b)). Without this, a later LLM step like "M is the midpoint of arc BC" can't resolve "arc BC" to
+ * the circle an EARLIER step put B,C on (e.g. "circle through A B C") — `circleMembers` was frozen at the
+ * pre-escalation figure. Mirrors the kinds the engine's `circleMembers` reads, at the command level (so
+ * a point added to a PRIOR circle is captured too, without needing the prior figure's objects here).
+ */
+function accrueMembers(cmd: AnyCommand, members: Map<string, Set<string>>): void {
+  const add = (centre: string, pts: (string | undefined)[]) => {
+    const set = members.get(centre) ?? new Set<string>();
+    for (const p of pts) if (p) set.add(p);
+    members.set(centre, set);
+  };
+  switch (cmd.type) {
+    case 'point-on-circle': add(centreOf(cmd.circle), [cmd.id]); break;
+    case 'circle-through': add(cmd.center, [cmd.through]); break;
+    case 'circumcircle': add(cmd.center, [cmd.a, cmd.b, cmd.c]); break;
+    case 'diameter': add(centreOf(cmd.circle), [cmd.id1, cmd.id2]); break;
+    case 'arc': add(cmd.center, [cmd.from, cmd.to]); break;
+    case 'arc-midpoint': add(centreOf(cmd.circle), [cmd.from, cmd.to]); break;
+    case 'line-circle-intersection': add(centreOf(cmd.circle), [cmd.id]); break;
+    case 'circle-circle-intersection': add(centreOf(cmd.circle1), [cmd.id]); add(centreOf(cmd.circle2), [cmd.id]); break;
+    case 'tangent': add(centreOf(cmd.circle), [cmd.at]); break;
+  }
+}
+
 /**
  * Escalate one freeform utterance to the LLM proxy and split its canonical steps
  * into what we could build vs what we couldn't. Returns null only on a proxy
@@ -75,13 +104,20 @@ export async function llmParse(utterance: string, context: string, figureCtx: Pa
   const dropped: string[] = [];
   const points = new Set(figureCtx.points ?? []);
   const circles = new Set(figureCtx.circles ?? []);
+  // circleMembers ACCUMULATES across steps (R9(b)): seed from the pre-escalation figure, then fold in the
+  // on-circle membership each built step introduces — so "arc BC" in a later step resolves to the circle
+  // an earlier step put B,C on, instead of being dropped.
+  const members = new Map<string, Set<string>>();
+  for (const m of figureCtx.circleMembers ?? []) members.set(m.center, new Set(m.points));
   for (const step of steps) {
-    // circleMembers stays the pre-escalation figure's (steps reference points that already exist),
-    // so a canonical "arc BC in circle O" still resolves to the circle that truly holds B and C.
-    const r = parse(step, { points: [...points], circles: [...circles], circleMembers: figureCtx.circleMembers });
+    const circleMembers = [...members].map(([center, pts]) => ({ center, points: [...pts] }));
+    const r = parse(step, { points: [...points], circles: [...circles], circleMembers });
     if (r.ok && r.commands.length) {
       built.push({ step, commands: r.commands });
-      for (const c of r.commands) absorb(c, points, circles);
+      for (const c of r.commands) {
+        absorb(c, points, circles);
+        accrueMembers(c, members);
+      }
     } else dropped.push(step);
   }
   return { built, dropped };

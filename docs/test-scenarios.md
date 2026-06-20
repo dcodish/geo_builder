@@ -22,13 +22,62 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `symbolic-2alpha-drives-shape-not-the-fixed-point` — "2α" drives the free shape, not a fixed point (ADR-064)
+**Steps**: `משולש שווה שוקיים ABC שבו AB=AC חוסם במעגל` · `נקודה D על המשך BC` · `BD` · `DA` · `∠CAD=α` · `∠BOC=2α`
+**Guards against:** the operator's real α/2α bug (with the glyph): a central angle `∠BOC=2α` ERRORED "cannot place D on segment BC…" because `driveOrCheck` drove D (placed on the extension, t=1.3) to satisfy the relation. Fix (ADR-064): only a FREE on-segment point is driveable; a stated-ratio/extension point is a given, so the relation drives the triangle's free shape and D stays put. **Asserts:** all steps OK; ∠BOC = 2·∠CAD; D stays at t≈1.3.
+
+### `spelled-out-alpha-then-2alpha` — "alpha" / "2alpha" read as α / 2α, not 2° (ADR-063)
+**Steps**: `משולש ABC` · `∠BAC=alpha` · `∠ABC=2alpha`
+**Guards against:** spelled-out "alpha" missing the single-Greek-letter variable regex, so "2alpha" half-parsed to the NUMBER 2 (a 2° angle, dropping the variable) — the operator's "result is wrong". Fix (ADR-063): normalise spelled-out Greek names to symbols at the parse entry, bounded so a digit prefix ("2alpha") works but an uppercase point pair ("MU") and a longer word ("alphabet") don't. **Asserts:** all steps OK; ∠ABC = 2·∠BAC (ratio ≈ 2), and ∠ABC is not a tiny 2°.
+
+### `chained-equality-trisects-segment` — "AL=LK=KC" trisects AC (coupled equalities, ADR-062)
+**Steps**: `משולש ABC` · `L ו- K נקודות על AC` · `AL=LK=KC`
+**Guards against:** the chained equality erroring "unresolved dependencies for: L, K". The parser chains it (AL=LK + LK=KC), but each equality drove a different free point referencing the other → a closed-form cycle (L needs K, K needs L). Fix (ADR-062): `resolveDriven` promotes coupled solved-on-segment points to numeric carriers and joint-solves. **Asserts:** all steps OK; AL=LK=KC, each ≈ |AC|/3 (L, K trisect AC).
+
+### `perpendicular-cuts-segment-at-new-point` — "perpendicular to AC at K cuts AB at E" creates E + EK (ADR-061)
+**Steps**: `משולש ABC` · `BA=BC` · `L ו- K נקודות על AC` · `האנך ל- AC בנקודה K חותך את AB בנקודה E`
+**Guards against:** the perpendicular phrasing emitting only the line and dropping "cuts AB at E" (operator: "it just drew a line") — so E was never placed and EK never drawn. Fix (ADR-061): `perpendicularLine` detects a cut clause, builds the perpendicular as scaffolding, crosses it with AB to place E, and draws segment K–E. **Asserts:** all steps OK; seg-EK drawn; E on AB; EK ⟂ AC.
+
+### `two-points-on-one-segment` — two free points on the same segment don't collide (ADR-060)
+**Steps**: `משולש ABC` · `L על AC` · `K על AC`
+**Guards against:** the second point erroring with "L and K would be at the same point" (and the combined "L ו-K נקודות על AC" building nothing via the LLM). Root cause: a free point-on-segment always seeded t=0.5, so the second collided with the first. Fix (ADR-060): seed a new free point in the middle of the largest open gap among the segment's existing points (0.5, then 0.25, 0.75, …); plus a `pointsOnSegment` rule for the combined phrasing (the Hebrew "points" word needs `[א-ת]*`, not ASCII `\w`). **Asserts:** all steps OK; L ≠ K; both on segment AC.
+
+### `extension-meet-draws-lines-to-G` — "המשך CA ו-BD נפגשים בנקודה G" draws both lines to G (ADR-054 A2)
+**Steps**: `משולש ABC חסום במעגל שרדיוסו R` · `BC קוטר` · `D נקודה על המעגל על הקשת AB` · `המשך CA ו BD נפגשים בנקודה G`
+**Guards against:** the crossing G being placed while the drawn segments stop at the inner points (CA, BD) — the lines not reaching G (the operator had to draw CG/BG by hand). Fix (ADR-054 A2): with an extension word present, draw each line base→G (C→G, B→G) so the inner points lie on the segments (extension visible); emit the intersection (defining G) BEFORE the segments, else a segment to a not-yet-defined G creates a stray free point ("G already defined"). Plain diagonals ("M = intersection of AC and BD") stay whole. **Asserts:** all steps OK; seg-CG & seg-BG drawn; G on line CA and line BD; A between C–G and D between B–G.
+
+### `corner-tangent-circle-grows-to-vertex` — "C נמצאת על המעגל" grows the corner circle to reach C (ADR-057 A1)
+**Steps**: `מלבן ABCD` · `AB ו- AD משיקים למעגל O` · `C נמצאת על המעגל`
+**Guards against:** "point C is on the circle" building nothing (operator: "why isn't C adjusted to be on the circle?"). C is a derived rectangle vertex that can't slide onto the circle, so `point-on-circle` hit its give-up branch — but the corner circle has a FREE size DOF (the centre's slide). Fix (ADR-057 A1): when the circle's radius is set by a point T on it (`circle-through`), "P on circle" ⟺ |centre·P| = |centre·T| is pushed as an `equal` that drives the centre's free on-line offset until P lands on it, tangency preserved. Plus `pointOnCircle` now resolves a definite/unnamed circle ("על המעגל") via context. **Asserts:** all steps OK; |OC| = radius (C on the circle); still tangent to both sides (|OK| = radius; E on AB, K on AD).
+
+### `corner-tangent-circle` — "AB ו-AD משיקים למעגל O" — a circle tangent to two sides of a corner (ADR-057)
+**Steps**: `מלבן ABCD` · `AB ו- AD משיקים למעגל O`
+**Guards against:** the input escalating to the LLM and building nothing (there was no engine vocabulary for a circle constrained tangent to a GIVEN line — only tangent FROM a point). Root cause was a missing primitive, not an LLM failure. Built compositionally (no engine change, like the incircle): the centre O is a FREE point on the bisector of ∠BAD (equidistant from both sides — a free-size DOF, ADR-052), the radius comes from a circle through the foot on AB (tangent there), and tangency to AD is automatic (equidistant). E, K are the ⟂ feet onto each side. **Asserts:** all steps OK; |OE| = |OK| (tangent to both at one radius); E on AB and K on AD; OE ⟂ AB and OK ⟂ AD (a tangent radius ⟂ the side).
+
+### `perp-constraint-keeps-quad-convex` — "OD⊥AC" nudges D to the NEAR arc-midpoint, quad stays convex (ADR-056)
+**Steps**: `מרובע ABCD חסום במעגל O` · `AB קוטר` · `E על המשך AD כך ש CE⊥AE` · `OD⊥AC`
+**Guards against:** the last step "messing the shape up — it was good up to that point". `OD⊥AC` has two roots (the two arc-midpoints of AC, half a circle apart). D sat at ≈330° (already near-perpendicular) but the 1-DOF driven solve took `roots[0]` = the FAR root ≈148°, which falls between A and B and **crossed the quad**. Fix (ADR-056): when no order constraint rides the carrier, order roots by nearness to its current value, so D nudges to ≈328° (the smallest move). **Asserts:** all steps OK; ABCD still convex/in cyclic order around O; OD ⟂ AC actually holds (cos ≈ 0). "Show another configuration" still reaches the far root.
+
+### `circumcircle-of-triangle-cuts-chord` — "המעגל החוסם את משולש ABC חותך את CE בנקודה D" (circumcircle ∩ a chord)
+**Steps**: `מעגל` · `מנקודה A יוצאים שני משיקים למעגל בנקודות B ו C` · `∠CAB=90` · `מיתר CE` · `המעגל החוסם את משולש ABC חותך את CE בנקודה D`
+**Guards against:** the input didn't parse even via the LLM. Five fixes: a new `circumcircleMeetsSegment` (circumcircle + line∩circle avoiding the shared vertex); the `triangle` rule deferring on a circumscribe phrase (and the `g`-flag `re.test` lastIndex corruption it exposed); `freeLabel` no longer reusing an existing circle's centre; `parseCtx` dropping only `~`-**scaffolding** circles (a tangent's Thales aux) while keeping a real un-drawn circle (a cyclic quad's `בר חסימה`) — so `מיתר CE` resolves unambiguously; and the coincidence check exempting `~`-scaffolding points (the circumcentre legitimately lands on the hidden Thales midpoint). **Asserts:** D placed, on line CE, distinct from C. (Also answers: yes, `מיתר CE` replaces "E on the circle" + "CE".)
+
+### `directional-cut-drives-free-apex-from-far` / `directional-cut-works-when-apex-close` — directional `המשך` line∩line: the engine SOLVES the free apex
+**Steps**: `מעגל O` · *(deterministic now)* tangents from external D touch circle O at B,C · `המשך BD חותך את המשך OC בנקודה A`
+**Guards against:** `המשך` is **directional** (beyond the 2nd letter — [ADR-054](06-decisions.md#adr-054)) — A must be beyond D and beyond C. D is a **free DOF**, so the engine must SOLVE it (operator requirement: no manual repositioning). Whether the extensions meet depends on apex distance (meets when D close, ~< 1.4R; a parallel singularity sits between the close and far basins). Fix: the directional operand emits a `collinear-order` that DRIVES the free apex; AND the two-tangent construct now seeds the apex CLOSE (~1.2R) so the real figure lands clean with no driving (A=(10.7,−7.1), like the textbook). The two scenarios pin both: a far-seeded apex still gets driven to a valid A; a close apex lands clean. (An early diagnosis wrongly claimed symmetry made it impossible — it's apex-distance-dependent. Driving from a far seed lands a valid-but-ugly near-parallel A; the close default avoids it.)
+
+### `cut-form-intersection-on-extensions` — "המשך BD חותך את המשך OC בנקודה A" → A = line BD ∩ line OC
+**Steps**: `point B at (0,0)` · `point D at (2,0)` · `point O at (3,2)` · `point C at (3,1)` · `המשך BD חותך את המשך OC בנקודה A`
+**Guards against:** the parser only knew "BD **and** OC intersect at A", not "BD **cuts** OC at A" (the verb *between* the two segments), so the operator's Hebrew escalated to the LLM — which rewrote it **in English** and lossily as "point A on the extension of BD and on the extension of OC"; the parser then matched only the first clause (A on BD's extension at t=1.3) and **dropped the OC half**, placing a wrong point. Fixed by adding the **cut-form** to `lineLineIntersection` (seg1 · cut-verb · seg2 · point → line∩line), so it parses deterministically and **stays Hebrew**. **Asserts:** A on line BD AND on line OC, at the true crossing (3,0) — beyond both drawn segments.
+**Also fixed (UX):** an LLM-handled input now shows as ONE step row labelled by the **student's original utterance**, never the LLM's English canonical lines.
+
 ### `two-circles-mutual-tangent-secants` — bagrut: two circles tangent to each other + two secants (△ABC∼△BDA, CEDF parallelogram)
 **Steps** (the operator's actual Hebrew input)
 1. `שני מעגלים נחתכים בנקודות A ו B`
 2. `המשיק למעגל O בנקודה A פוגש את מעגל P בנקודה D`
 3. `המשיק למעגל P בנקודה B פוגש את מעגל O בנקודה C`
-4. `המשך AC חותך את מעגל P בנקודה E`
-5. `המשך BD חותך את מעגל O בנקודה F`
+4. `המשך CA חותך את מעגל P בנקודה E`  *(E beyond A — strict directional `המשך`, [ADR-054](06-decisions.md#adr-054))*
+5. `המשך DB חותך את מעגל O בנקודה F`  *(F beyond B)*
 
 **Guards against:** the "tangent to circle X at P meets circle Y at Q" phrasing misparsed **twice**.
 (1) It contains "tangent" + two circle names + "at", so `circlesTangent` grabbed it and made the two
@@ -37,9 +86,10 @@ dedicated rule first missed the active verb **"פוגש"** (meets): only `נחת
 shared `INTERSECT_KW`, so the operator's "פוגש את מעגל P" still fell through to `circlesTangent` and D was
 never created. Fixed: `פוגש`/`פגש` added to `INTERSECT_KW`, and a dedicated rule (before `circlesTangent`)
 reads it as a tangent **line** ∩ the other circle — taking the crossing that **avoids** the shared point —
-and **draws the chord**. E,F use the new `lineMeetsCircle` rule — "[extension of] AC חותך מעגל P בנקודה E"
-parses directly (it used to escalate to the LLM, which split it into a broken "E on extension" + "E on
-circle" pair that left E floating off the circle). **No fixed assumptions** — the only free DOFs are the
+and **draws the chord**. E,F now use the **directional** `extend-onto-circle` rule ([ADR-054](06-decisions.md#adr-054)):
+`המשך CA חותך מעגל P` places E *beyond A* (order C→A→E) on circle P, the figure adapting (a free radius grows)
+so the extension reaches it. (Originally `המשך AC` via the order-agnostic `lineMeetsCircle`; reworded to the
+strict directional form when `המשך` became directional.) **No fixed assumptions** — the only free DOFs are the
 two circle radii.
 **Asserts:** every step OK (no over-constraint / no mutual-tangency misparse); C,F on circle O and D,E on
 circle P; AD ⟂ radius OA and CB ⟂ radius PB (tangency); C,A,E and D,B,F each collinear; no derived point

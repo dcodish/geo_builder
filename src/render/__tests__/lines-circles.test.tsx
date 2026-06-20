@@ -76,6 +76,20 @@ describe('circle centre visibility — show if used or named', () => {
     ]);
     expect(ids).toContain('O'); // now referenced
   });
+  it('"show centres" reveals an unused AUTO centre (so two circles are tellable apart)', () => {
+    // operator request: with two unnamed circles (centres O, P auto), you can't tell them apart until
+    // their centres show. The toggle draws every centre with its label; off, the unused auto ones hide.
+    const cmds: Command[] = [
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5, autoCenter: true },
+      { type: 'circle', id: 'circle-P', center: 'P', radius: 4, autoCenter: true },
+    ];
+    const { construction, positions } = build(cmds);
+    const off = buildScene(construction, positions).points.map((p) => p.id);
+    const on = buildScene(construction, positions, undefined, undefined, { showCenters: true }).points.map((p) => p.id);
+    expect(off).not.toContain('O');
+    expect(off).not.toContain('P');
+    expect(on).toEqual(expect.arrayContaining(['O', 'P']));
+  });
 });
 
 describe('visible construction lines', () => {

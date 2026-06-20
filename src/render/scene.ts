@@ -125,7 +125,12 @@ export function buildScene(
   positions: Map<Id, Vec>,
   labels?: MeasureLabels,
   angleMarkSpecs?: { vertex: Id; ray1: Id; ray2: Id; right: boolean }[],
+  opts?: { showCenters?: boolean },
 ): Scene {
+  // "Show circle centres": reveal every circle's centre with its label (O, P, …), even an AUTO one
+  // that nothing is drawn from — so the student can tell two unnamed circles apart and address each
+  // (operator request). Default off keeps the clean FR-RN-8 behaviour (an unused auto-centre is hidden).
+  const showCenters = opts?.showCenters ?? false;
   const points: ScenePoint[] = [];
   const segments: SceneSegment[] = [];
   const polygons: ScenePolygon[] = [];
@@ -188,7 +193,7 @@ export function buildScene(
   for (const o of c.objects) {
     if (isGeoPoint(o)) {
       if (o.id.startsWith('~')) continue; // hidden helper (a coincidence target, ADR-028) — not drawn
-      if (autoCenters.has(o.id) && !incident.has(o.id)) continue; // an unused auto-centre — not drawn
+      if (autoCenters.has(o.id) && !incident.has(o.id) && !showCenters) continue; // an unused auto-centre — hidden unless "show centres" is on
       const pos = positions.get(o.id);
       if (pos) points.push({ id: o.id, pos, label: o.id, labelDir: outwardDir(incident.get(o.id)) });
       continue;

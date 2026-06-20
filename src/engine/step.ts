@@ -245,6 +245,22 @@ function replaceCyclicForDiameter(prev: Construction, cmd: Command): Constructio
   return { objects, constraints: prev.constraints };
 }
 
+/**
+ * The shared "reinterpret as a driven coincidence" tail (R7(2)): add `coincide(p, q)` and mark the
+ * 1-DOF `carrier` (an on-circle / on-segment point) as the DOF that solves it, so the engine moves the
+ * figure until p ≡ q instead of erroring. Used by both {@link reinterpretAsConstraint} (a redefined point
+ * ≡ its hidden re-definition) and {@link reinterpretDiameter} (a diameter's midpoint ≡ the circle centre).
+ */
+function driveCoincideOn(objects: GeoObject[], priorConstraints: Constraint[], p: Id, q: Id, carrier: Id): Construction {
+  const coincide: Constraint = { type: 'coincide', p, q };
+  const objs = objects.map((o) =>
+    o.id === carrier && (o.kind === 'on-circle' || o.kind === 'on-segment')
+      ? ({ ...o, solve: { constraint: coincide, branch: 0 } } as GeoObject)
+      : o,
+  );
+  return { objects: objs, constraints: [...priorConstraints, coincide] };
+}
+
 function reinterpretDiameter(prev: Construction, cmd: Command): Construction | null {
   if (cmd.type !== 'diameter') return null;
   const a = prev.objects.find((o) => o.id === cmd.id1 && isGeoPoint(o));
@@ -260,39 +276,71 @@ function reinterpretDiameter(prev: Construction, cmd: Command): Construction | n
     return o && (o.kind === 'on-circle' || o.kind === 'on-segment');
   });
   if (!carrier) return null;
-  const coincide: Constraint = { type: 'coincide', p: mid, q: circle.center };
+  // The diameter holds when the midpoint of AB coincides with the centre — drive a carrier to make it so.
   const objects: GeoObject[] = [
-    ...prev.objects.map((o) =>
-      o.id === carrier && (o.kind === 'on-circle' || o.kind === 'on-segment')
-        ? { ...o, solve: { constraint: coincide, branch: 0 } }
-        : o,
-    ),
+    ...prev.objects,
     { kind: 'midpoint', id: mid, a: cmd.id1, b: cmd.id2 },
     { kind: 'segment', id: `seg-${[cmd.id1, cmd.id2].sort().join('')}`, a: cmd.id1, b: cmd.id2 },
   ];
-  return { objects, constraints: [...prev.constraints, coincide] };
+  return driveCoincideOn(objects, prev.constraints, mid, circle.center, carrier);
 }
 
-/** Every free 1-DOF carrier (on-circle / on-segment, not pinned/driven) reachable from `start`. */
-function freeCarrierAncestors(objects: GeoObject[], start: Id): Id[] {
+/**
+ * THE ancestor walker (R7(1) — replaces the three near-duplicate walkers `freeCarrierAncestors` /
+ * `freeDrivableAncestors` / `freeCarrierAncestor`). Walks the dependency graph back from `start`,
+ * collecting the free DOFs it can reach:
+ *  - mode `'param'`    — free 1-DOF parametric carriers only (on-circle / on-segment, not already solving).
+ *  - mode `'drivable'` — the SUPERSET: also free vertices (2-DOF), shape scalars, and a free circle
+ *    RADIUS ([ADR-051](docs/06-decisions.md#adr-051)), traversing through `line` / `line-intersection`
+ *    definitions to reach the DOFs behind a constructed point ([ADR-032](docs/06-decisions.md#adr-032)).
+ * `includeStart` (default true) considers `start` itself; pass false to drive an ANCESTOR, not `start`.
+ * Both modes stop at (don't recurse past) a free carrier; a SOLVING carrier is walked through.
+ */
+function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', includeStart = true): Id[] {
   const byId = new Map(objects.map((o) => [o.id, o] as const));
   const seen = new Set<Id>();
   const result: Id[] = [];
-  const queue: Id[] = [start];
+  const startObj = byId.get(start);
+  const queue: Id[] = includeStart
+    ? [start]
+    : pointParents(startObj && isGeoPoint(startObj) ? startObj : ({ kind: 'free-point', id: start, x: 0, y: 0 } as GeoObject));
+  if (!includeStart) seen.add(start);
   while (queue.length) {
     const id = queue.shift()!;
     if (seen.has(id)) continue;
     seen.add(id);
     const o = byId.get(id);
-    if (!o || !isGeoPoint(o)) continue;
-    if ((o.kind === 'on-circle' || o.kind === 'on-segment') && (o as { solve?: unknown }).solve === undefined) {
-      result.push(id); // a free carrier — its parameter is a DOF we can move
+    if (!o) continue;
+    if (mode === 'drivable') {
+      // A point on a FREE-radius circle can be moved by RESIZING it — surface the radius DOF (ADR-051).
+      for (const cid of circlesOfPoint(o)) {
+        const circ = byId.get(cid);
+        if (circ?.kind === 'circle' && circ.radius.via === 'free' && circ.solve === undefined && !seen.has(cid)) {
+          seen.add(cid);
+          result.push(cid);
+        }
+      }
+      if (o.kind === 'line') { queue.push(...lineSpecPoints(o.spec)); continue; }
+    }
+    if (!isGeoPoint(o)) continue;
+    const free1 = isParamCarrier(o) && (o as { solve?: unknown }).solve === undefined;
+    if (mode === 'param') {
+      if (free1) { result.push(id); continue; } // a free 1-DOF carrier — stop here
+      queue.push(...pointParents(o));
       continue;
     }
+    const fp = o as FreePoint;
+    const free2 = o.kind === 'free-point' && !fp.pinned && !fp.rigid && fp.solve === undefined;
+    if (free1 || free2) { result.push(id); continue; } // a terminal drivable DOF
+    if (isShapeCarrier(o) && (o as { solve?: unknown }).solve === undefined) result.push(id); // shape scalar — keep walking past it too
+    if (o.kind === 'line-intersection') { queue.push(o.line1, o.line2); continue; }
     queue.push(...pointParents(o));
   }
   return result;
 }
+
+/** Every free 1-DOF carrier (on-circle / on-segment, not pinned/driven) reachable from `start`. */
+const freeCarrierAncestors = (objects: GeoObject[], start: Id): Id[] => ancestors(objects, start, 'param');
 
 /** The circle ids a point structurally lies on — so a constraint on it can reach a free-radius DOF (ADR-051). */
 function circlesOfPoint(o: GeoObject): Id[] {
@@ -321,46 +369,12 @@ function lineSpecPoints(spec: LineSpec): Id[] {
 }
 
 /**
- * Every free, drivable DOF reachable from `start` — a free vertex (2 DOF) or a free
- * on-segment/on-circle carrier (1 DOF) — walking through derived points AND through a
- * `line-intersection`'s defining lines. This lets a constraint whose points are all
- * fixed by a construction (e.g. |BD| with D = bisector∩bisector, B a ⟂-offset) still
- * reach the free triangle legs and SIZE the figure (FR-EN-11 / ADR-032). Only DOFs not
- * already driving something are returned.
+ * Every free, drivable DOF reachable from `start` — a free vertex (2 DOF), a free on-segment/on-circle
+ * carrier (1 DOF), a shape scalar, or a free circle radius — walking through derived points AND through
+ * a `line-intersection`'s defining lines, so a constraint whose points are all fixed by a construction
+ * (e.g. |BD| with D = bisector∩bisector) still reaches the free triangle legs (FR-EN-11 / ADR-032).
  */
-function freeDrivableAncestors(objects: GeoObject[], start: Id): Id[] {
-  const byId = new Map(objects.map((o) => [o.id, o] as const));
-  const seen = new Set<Id>();
-  const result: Id[] = [];
-  const queue: Id[] = [start];
-  while (queue.length) {
-    const id = queue.shift()!;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const o = byId.get(id);
-    if (!o) continue;
-    // A point on a FREE-radius circle can be moved by RESIZING that circle (ADR-051) — surface the
-    // circle's radius DOF so a constraint on circle points can recruit it (sized like a shape scalar).
-    for (const cid of circlesOfPoint(o)) {
-      const circ = byId.get(cid);
-      if (circ?.kind === 'circle' && circ.radius.via === 'free' && circ.solve === undefined && !seen.has(cid)) {
-        seen.add(cid);
-        result.push(cid);
-      }
-    }
-    if (o.kind === 'line') { queue.push(...lineSpecPoints(o.spec)); continue; }
-    if (!isGeoPoint(o)) continue;
-    const free1 = isParamCarrier(o) && (o as { solve?: unknown }).solve === undefined;
-    const free2 = o.kind === 'free-point' && !(o as FreePoint).pinned && !(o as FreePoint).rigid && (o as FreePoint).solve === undefined;
-    if (free1 || free2) { result.push(id); continue; } // a terminal drivable DOF — stop here
-    // A shape-scalar DOF (perp-offset dist / rotated angle / scaled-offset k) is also drivable,
-    // but KEEP walking past it to its defining vertices (both are candidate DOFs) — ADR-033.
-    if (isShapeCarrier(o) && (o as { solve?: unknown }).solve === undefined) result.push(id);
-    if (o.kind === 'line-intersection') { queue.push(o.line1, o.line2); continue; }
-    queue.push(...pointParents(o));
-  }
-  return result;
-}
+const freeDrivableAncestors = (objects: GeoObject[], start: Id): Id[] => ancestors(objects, start, 'drivable');
 
 /** Mark a free vertex / parametric / shape-scalar carrier as driving `K`. (An on-line marker is
  *  driven directly by `driveOrCheck`, not recruited here, so the `line` family is excluded.) */
@@ -448,29 +462,16 @@ function pointParents(o: GeoObject): Id[] {
 }
 
 /**
- * The free 1-DOF ancestor (on-circle / on-segment) of `start` to drive, or null.
- * Walks the dependency graph back from `start`; among the parametric points it
- * reaches, picks the most-recently-added (highest index) — the DOF most likely to
- * be the one the new fact is meant to pin down.
+ * The free 1-DOF ancestor (on-circle / on-segment) of `start` to drive, or null — the most-recently-
+ * added (highest index) one, the DOF most likely meant to be pinned down. Excludes `start` itself
+ * (drive an ANCESTOR). Now via the one `ancestors` walker (R7(1)); unlike the old bespoke walk it skips
+ * an already-SOLVING carrier (which couldn't be re-driven anyway) and finds a free one past it.
  */
 function freeCarrierAncestor(objects: GeoObject[], start: Id): Id | null {
-  const byId = new Map(objects.map((o) => [o.id, o] as const));
-  const seen = new Set<Id>([start]);
-  const queue = [...pointParents(byId.get(start) as GeoObject ?? { kind: 'free-point', id: start, x: 0, y: 0 })];
-  let best = -1;
-  while (queue.length) {
-    const id = queue.shift()!;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const o = byId.get(id);
-    if (!o || !isGeoPoint(o)) continue;
-    if (o.kind === 'on-circle' || o.kind === 'on-segment') {
-      best = Math.max(best, objects.findIndex((x) => x.id === id)); // a carrier; don't recurse past it
-    } else {
-      queue.push(...pointParents(o));
-    }
-  }
-  return best >= 0 ? objects[best].id : null;
+  const cands = ancestors(objects, start, 'param', false);
+  if (!cands.length) return null;
+  const idx = (id: Id) => objects.findIndex((x) => x.id === id);
+  return cands.reduce((best, id) => (idx(id) > idx(best) ? id : best), cands[0]);
 }
 
 /**
@@ -490,13 +491,7 @@ function reinterpretAsConstraint(prev: Construction, cmd: Command): Construction
   const carrier = freeCarrierAncestor(prev.objects, P);
   if (!carrier) return null; // nothing free to move → a genuine over-constraint
   const withHelper = applyCommand(prev, { ...(cmd as object), id: H } as Command); // the new def under the hidden id
-  const coincide: Constraint = { type: 'coincide', p: P, q: H };
-  const objects = withHelper.objects.map((o) =>
-    o.id === carrier && (o.kind === 'on-circle' || o.kind === 'on-segment')
-      ? { ...o, solve: { constraint: coincide, branch: 0 } }
-      : o,
-  );
-  return { objects, constraints: [...withHelper.constraints, coincide] };
+  return driveCoincideOn(withHelper.objects, withHelper.constraints, P, H, carrier);
 }
 
 /**
@@ -640,8 +635,8 @@ export function branchCount(c: Construction, id: Id): number {
     const ts = solvedOnSegmentCandidates(o, e.positions);
     return ts === 'pending' ? 0 : ts.length;
   }
-  // A line-circle pinned to "the OTHER crossing" (avoid) is determined — not cyclable.
-  if (o.kind === 'line-circle' && o.avoid) return 1;
+  // A crossing pinned to "the OTHER one" (avoid) is determined — not cyclable (line∩circle or circle∩circle).
+  if ((o.kind === 'line-circle' || o.kind === 'circle-circle') && o.avoid) return 1;
   // Both arcs have a midpoint; a line/another circle meets a circle in up to two points.
   if (o.kind === 'arc-midpoint' || o.kind === 'line-circle' || o.kind === 'circle-circle') return 2;
   return 0;

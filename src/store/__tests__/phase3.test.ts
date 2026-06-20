@@ -250,11 +250,13 @@ describe('store — alternatives', () => {
     // G slides on AB; |CG| = 4 has TWO solutions on the segment (C sits 3 above the midpoint),
     // so the driven on-segment point is genuinely branchable — and the branch lives on the
     // point-on-segment command, so cycling it survives `replay` (it used to reset to branch 0).
+    // G has NO stated ratio (free DOF, seeded at the 0.5 midpoint) — only a free on-segment point is
+    // driveable; a stated-ratio/extension point is a GIVEN the solver leaves put (ADR-064).
     const base: Command[] = [
       { type: 'free-point', id: 'A', x: 0, y: 0 },
       { type: 'free-point', id: 'B', x: 10, y: 0 },
       { type: 'free-point', id: 'C', x: 5, y: 3 },
-      { type: 'point-on-segment', id: 'G', a: 'A', b: 'B', t: 0.5 },
+      { type: 'point-on-segment', id: 'G', a: 'A', b: 'B' },
       { type: 'set-distance', a: 'C', b: 'G', value: 4 },
     ];
     base.forEach((c) => s().execute(c));

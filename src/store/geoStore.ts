@@ -180,11 +180,17 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
           ...sampled,
           objects: sampled.objects.map((o) =>
             o.kind === 'circle' && o.radius.via === 'free' && radiusOverrides[o.id] !== undefined
-              ? { ...o, radius: { via: 'free' as const, value: radiusOverrides[o.id] } }
+              ? // FIX the dialed radius (clear any `solve`): the student is choosing it, so the OTHER free
+                // DOFs re-solve AROUND it (e.g. a tangent apex moves to keep ∠CAB=90), not the radius.
+                { ...o, radius: { via: 'free' as const, value: radiusOverrides[o.id] }, solve: undefined }
               : o,
           ),
         };
   const e = evaluate(figure);
+  // A dialed radius override (or a seed) can break a figure that BUILT fine — surface that failure so the
+  // error reflects what's actually drawn (and so `setRadius` can reject an impossible dial). `lastError`
+  // was build-only, so an override that made `evaluate` fail left it null with the figure silently gone.
+  if (!e.ok && !lastError) lastError = e.error;
   // Numeric measures (a plain `AB = 5` / `∠ABC = 37`, and symbolic ones once resolved)
   // surface as distance/angle constraints — label them from the figure, filling any
   // key a symbolic fact didn't already own (FR-RN-2).
@@ -211,12 +217,53 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   const violations = e.ok ? checkGivens(applied, e.positions, e.circles) : [];
   // Free-radius circles the student can dial (base = stable seed radius for the slider range; current =
   // what's drawn). Read from the pre-seed construction so the range doesn't shift as the value changes.
+  // Show a slider only for a FREE, not-currently-driven radius — a radius the solver drives is pinned by
+  // a constraint (e.g. |OC|=9), so dialing it would just fight that constraint. (The override above still
+  // clears `solve` so a momentarily-recruited radius can be dialed with the rest re-solving around it.)
   const radiusDofs: RadiusDof[] = cur.objects.flatMap((o) =>
     o.kind === 'circle' && o.radius.via === 'free' && o.solve === undefined
       ? [{ circle: o.id, center: o.center, base: o.radius.value, current: e.ok ? e.circles.get(o.id)?.r ?? o.radius.value : o.radius.value }]
       : [],
   );
   return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, labels, angleMarks, violations, radiusDofs };
+}
+
+/** Outcome of dry-running a parsed step on top of the current facts (see {@link dryRunOutcome}). */
+export type StepOutcome = { produced: true } | { produced: false; reason: 'error' | 'empty'; detail?: string };
+
+/**
+ * Dry-run a parsed step's engine commands on top of the current facts WITHOUT committing, to decide
+ * whether it actually BUILT something. A deterministic parse can "succeed" yet silently fail — apply
+ * with an error (kept-prior), or change nothing at all — in which case the input layer gives it a
+ * SECOND try through the LLM, and surfaces an honest problem if that also fails (operator request: a
+ * step that produces nothing must never be a silent no-op). A *givens violation* is deliberately NOT
+ * "produced nothing" — the amber "may not match" cue already flags that, and the figure is still shown.
+ */
+export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, overrides: Record<Id, number> = {}): StepOutcome {
+  const labelCount = (l: MeasureLabels) => l.lengths.length + l.angles.length;
+  const before = replay(facts, seed, overrides);
+  const trial: Fact[] = commands.map((c, i) => ({ id: `~try.${i}`, group: '~try', enabled: true, cmd: c }));
+  const after = replay([...facts, ...trial], seed, overrides);
+  const errored = trial.find((f) => after.status[f.id] !== 'ok');
+  if (errored) return { produced: false, reason: 'error', detail: after.status[errored.id] };
+  // "Built something" = added a shape/constraint/label, OR RESHAPED the figure — a step like "diameter AB"
+  // on a cyclic quad adds no new object (it converts a vertex to an antipode and re-places the others), so
+  // a count-only check wrongly reads it as empty. A moved/added point at the SAME seed means it took effect.
+  const moved =
+    after.positions.size !== before.positions.size ||
+    [...after.positions].some(([id, p]) => {
+      const q = before.positions.get(id);
+      return !q || Math.hypot(p.x - q.x, p.y - q.y) > 1e-6;
+    });
+  const grew =
+    moved ||
+    after.construction.objects.length > before.construction.objects.length ||
+    after.construction.constraints.length > before.construction.constraints.length ||
+    labelCount(after.labels) > labelCount(before.labels);
+  // A bare variable binding ("x = 4") legitimately draws nothing — it's data, not a silent fail.
+  const dataOnly = commands.length > 0 && commands.every((c) => c.type === 'set-var');
+  if (!grew && !dataOnly) return { produced: false, reason: 'empty' };
+  return { produced: true };
 }
 
 const fmtMeasure = (n: number): string => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(3))));
@@ -350,8 +397,9 @@ export interface GeoState {
   select: (id: string | null) => void;
   /** Advance an intersection point to its next configuration (stored in the fact's command). */
   cycleAlt: (pointId: Id) => void;
-  /** Re-sample the figure's residual freedom — a different valid drawing (ADR-018). */
-  resample: () => void;
+  /** Re-sample the figure's residual freedom — a different valid drawing (ADR-018). Returns `true` if it
+   *  found a genuinely DIFFERENT drawing, `false` if the shape is determined (only size/placement vary). */
+  resample: () => boolean;
   /** Dial a free circle's radius directly (a DOF slider). Cleared on resample. */
   setRadius: (circle: Id, value: number) => void;
   /** Show/hide measure labels on the figure (ADR-031). */
@@ -422,6 +470,32 @@ export function pointsDistinct(c: Construction, positions: Map<Id, Vec>): boolea
     }
   }
   return true;
+}
+
+/**
+ * A similarity-INVARIANT shape fingerprint: every pairwise distance between named points, normalised by
+ * their mean. Translation, rotation, scale and reflection don't change it — so two drawings with the
+ * same fingerprint are "the same configuration" even if one is bigger or rotated. Used by `resample` to
+ * tell a genuinely DIFFERENT drawing from a mere size/rotation jitter (operator: "5 DOF but every 'show
+ * another' gives the same figure" — the remaining DOFs were only similarity transforms, not shape).
+ */
+function shapeFingerprint(c: Construction, positions: Map<Id, Vec>): number[] {
+  const pts = c.objects
+    .filter((o) => isGeoPoint(o) && !o.id.startsWith('~'))
+    .map((o) => positions.get(o.id))
+    .filter((p): p is Vec => !!p);
+  const ds: number[] = [];
+  for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) ds.push(Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y));
+  const mean = ds.reduce((a, b) => a + b, 0) / (ds.length || 1);
+  return mean > 1e-9 ? ds.map((d) => d / mean) : ds;
+}
+
+/** True if two fingerprints describe a meaningfully different drawing (>3% mean change in the distance ratios). */
+function shapeDiffers(a: number[], b: number[]): boolean {
+  if (a.length !== b.length || a.length === 0) return a.length !== b.length;
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]);
+  return s / a.length > 0.03;
 }
 
 export const useGeoStore = create<GeoState>()(
@@ -533,23 +607,39 @@ export const useGeoStore = create<GeoState>()(
 
       resample: () => {
         const facts = get().facts;
-        if (freeDofs(replay(facts).construction).length === 0) return; // fully determined — nothing to vary
+        const cur = replay(facts, get().seed);
+        if (freeDofs(cur.construction).length === 0) return false; // fully determined — nothing to vary
+        const curFp = shapeFingerprint(cur.construction, cur.positions);
         let s = get().seed;
-        for (let k = 0; k < 16; k++) {
+        for (let k = 0; k < 24; k++) {
           s += 1;
           const r = replay(facts, s);
           // Accept a sample only if it evaluates, keeps every declared polygon a clean convex drawing
-          // (a self-crossing/concave quad is a valid point set but not a valid drawing of the shape), AND
-          // keeps distinct points apart (a varied free radius must not collapse two points — ADR-051).
-          if (evaluate(r.construction).ok && polygonsConvex(facts, r.positions) && pointsDistinct(r.construction, r.positions)) {
+          // (a self-crossing/concave quad is a valid point set but not a valid drawing of the shape),
+          // keeps distinct points apart (a varied free radius must not collapse two points — ADR-051),
+          // AND is a genuinely DIFFERENT drawing (not the same shape at another size/rotation) — else the
+          // student presses "show another" and sees no change. The fingerprint is similarity-invariant.
+          if (
+            evaluate(r.construction).ok &&
+            polygonsConvex(facts, r.positions) &&
+            pointsDistinct(r.construction, r.positions) &&
+            shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions))
+          ) {
             set({ seed: s, radiusOverrides: {} }); // a fresh view clears any dialed radii (scratchpad reset)
-            return;
+            return true;
           }
         }
-        set({ seed: s, radiusOverrides: {} }); // give up gracefully after a few rejected draws
+        return false; // searched but found no shape-different drawing — the figure is determined up to size/placement
       },
 
-      setRadius: (circle, value) => set({ radiusOverrides: { ...get().radiusOverrides, [circle]: value } }),
+      setRadius: (circle, value) => {
+        const { facts, seed, radiusOverrides } = get();
+        const candidate = { ...radiusOverrides, [circle]: value };
+        // A playable DOF must not be draggable into an IMPOSSIBLE figure (operator requirement): only
+        // accept a value that still builds (replay has no error). Rejected values leave the override
+        // unchanged, so the slider effectively STOPS at the boundary of the constructible range.
+        if (replay(facts, seed, candidate).lastError === null) set({ radiusOverrides: candidate });
+      },
 
       setShowMeasures: (show) => set({ showMeasures: show }),
 

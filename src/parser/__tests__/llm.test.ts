@@ -95,6 +95,16 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
     expect(r!.built.map((b) => b.step)).toHaveLength(2);
   });
 
+  it('accumulates circle MEMBERSHIP across steps (R9(b)) — "arc BC" resolves to a circle an earlier step made', async () => {
+    // Step 1 "circle through A B C" creates a circumcircle holding A,B,C; step 2 "arc BC" must resolve to
+    // THAT circle. Before R9(b), circleMembers was frozen at the (empty) pre-escalation figure, so step 2
+    // could not find the circle holding B,C and was dropped.
+    mockFetch(['circle through A B C', 'M is the midpoint of arc BC']);
+    const r = await llmParse('circumscribe ABC then take the arc-midpoint of BC', '');
+    expect(r!.dropped).toEqual([]); // step 2 no longer drops
+    expect(r!.built.flatMap((b) => b.commands).map((c) => c.type)).toEqual(['circumcircle', 'arc-midpoint']);
+  });
+
   it('an LLM that returns nothing buildable yields empty built (caller shows "couldn\'t read")', async () => {
     mockFetch(['utter nonsense']);
     const r = await llmParse('???', '');

@@ -55,6 +55,8 @@ interface View {
    * figure reshapes under new constraints. `rot` is then an extra manual offset on top.
    */
   alignSeg?: [string, string];
+  /** Reveal every circle's centre (incl. auto-hidden ones) with its label, so two circles are tellable apart. */
+  showCenters?: boolean;
 }
 
 const IDENTITY: View = { zoom: 1, panX: 0, panY: 0, rot: 0, flipX: false, flipY: false };
@@ -139,7 +141,7 @@ export function Figure({
       o.rot === 0 && !o.flipX && !o.flipY
         ? positions
         : new Map<Id, Vec>([...positions].map(([id, v]) => [id, orient(v, o)]));
-    const s = buildScene(construction, oriented, labels, angleMarks);
+    const s = buildScene(construction, oriented, labels, angleMarks, { showCenters: view.showCenters });
     const t = fitTransform(scenePositions(s), { width, height, padding });
     const x = onPickIntersection ? findSegmentCrossings(construction, oriented) : [];
 
@@ -159,7 +161,7 @@ export function Figure({
     const labelDirs = chooseLabelDirs(ptScreen, obstacles, circScreen, REF_OFF, REF_CLEAR);
 
     return { scene: s, transform: t, crossings: x, labelDirs };
-  }, [construction, positions, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg]);
+  }, [construction, positions, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, view.showCenters]);
 
   // Point radius in px, kept visually constant by dividing out the pan/zoom scale.
   // `r` sizes the marks/crossings/measure offsets; `pointR` is the small textbook-
@@ -440,6 +442,16 @@ export function Figure({
         </button>
         <button type="button" style={ctrlBtn} title="Flip vertical" aria-label="flip vertical" onClick={() => setView((v) => ({ ...v, flipY: !v.flipY }))}>
           ⇅
+        </button>
+        <button
+          type="button"
+          style={{ ...ctrlBtn, ...(view.showCenters ? { background: '#dbeafe', borderColor: '#93c5fd' } : null) }}
+          title="Show circle centres (so two circles are tellable apart)"
+          aria-label="show circle centres"
+          aria-pressed={!!view.showCenters}
+          onClick={() => setView((v) => ({ ...v, showCenters: !v.showCenters }))}
+        >
+          ⊙
         </button>
         <input
           type="range"

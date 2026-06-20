@@ -198,11 +198,12 @@ describe('parser + engine — ordered line "line ABE" (collinear AND in order)',
     return ((b.x - a.x) * dir.x + (b.y - a.y) * dir.y) / (dir.x * dir.x + dir.y * dir.y);
   };
 
-  it('parses "line ABE" / "ישר ABE" / "line ABEF" to set-line; "line AB" (2 pts) does not', () => {
+  it('parses "line ABE" / "ישר ABE" / "line ABEF" to set-line; "line AB" (2 pts) is a plain segment', () => {
     expect(parse('line ABE')).toEqual({ ok: true, commands: [{ type: 'set-line', points: ['A', 'B', 'E'] }] });
     expect(parse('ישר ABE')).toEqual({ ok: true, commands: [{ type: 'set-line', points: ['A', 'B', 'E'] }] });
     expect(parse('line ABEF')).toEqual({ ok: true, commands: [{ type: 'set-line', points: ['A', 'B', 'E', 'F'] }] });
-    expect(parse('line AB').ok).toBe(false); // only 2 points → not the ordered-line form
+    // 2 points → NOT the ordered-line form; it's the bare-segment shorthand (draw segment AB).
+    expect(parse('line AB')).toEqual({ ok: true, commands: [{ type: 'segment', a: 'A', b: 'B' }] });
   });
 
   it('"line DBE" puts E beyond B (B between D and E) on circle O, deterministically', () => {

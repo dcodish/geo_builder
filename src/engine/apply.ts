@@ -39,9 +39,14 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
   // from a second definition) must not be re-driven — that would fight its pin and
   // over-constrain ("DF = DE" should move the free E, not the pinned F).
   const pinned = new Set(constraints.flatMap(constraintRefs));
-  // (1) Prefer an on-segment ref as the carrier — the constraint *places* it (its t
-  // is solved in closed form). Pick a NON-pinned carrier first.
-  const onSegs = idxs.filter((i) => i >= 0 && objects[i].kind === 'on-segment');
+  // (1) Prefer a FREE on-segment ref as the carrier — the constraint *places* it (its t is solved in
+  // closed form). Only `free` on-segment points (no stated ratio) may be driven: a point the student
+  // positioned explicitly — "D on the extension of BC" (t=1.3), "E on AC at 40%" — is a GIVEN, not a
+  // DOF, so an unrelated later constraint must drive the figure's real freedom (a free vertex) instead
+  // of silently relocating D (operator: a central-angle "∠BOC=2α" was dragging the fixed D and failing).
+  const onSegs = idxs.filter(
+    (i) => i >= 0 && objects[i].kind === 'on-segment' && (objects[i] as Extract<GeoObject, { kind: 'on-segment' }>).free === true,
+  );
   const onSeg = onSegs.find((i) => !pinned.has(objects[i].id)) ?? onSegs[0];
   if (onSeg !== undefined) {
     const seg = objects[onSeg] as Extract<GeoObject, { kind: 'on-segment' }>;
@@ -343,6 +348,31 @@ function nextTheta(objects: GeoObject[], circle: Id): number {
   return Math.PI / 2 + n * GOLDEN_ANGLE;
 }
 
+/**
+ * Seed `t` for a NEW free point on segment a→b that doesn't collide with free points already on it
+ * (two "point on AC" both defaulting to 0.5 → "would be at the same point"). Place it in the middle of
+ * the largest open gap between the existing parameters (normalised to a→b), so points spread out; the
+ * first lands at 0.5. The "show another configuration" sampler still slides each independently.
+ */
+function freeSegT(objects: GeoObject[], a: Id, b: Id): number {
+  const taken = objects
+    .filter((o): o is Extract<GeoObject, { kind: 'on-segment' }> => o.kind === 'on-segment' && ((o.a === a && o.b === b) || (o.a === b && o.b === a)))
+    .map((o) => (o.a === a ? o.t : 1 - o.t)) // normalise every parameter to the a→b orientation
+    .filter((t) => t > 0 && t < 1);
+  if (taken.length === 0) return 0.5;
+  const xs = [0, ...taken.sort((p, q) => p - q), 1];
+  let best = 0.5;
+  let widest = -1;
+  for (let i = 0; i < xs.length - 1; i++) {
+    const gap = xs[i + 1] - xs[i];
+    if (gap > widest) {
+      widest = gap;
+      best = (xs[i] + xs[i + 1]) / 2;
+    }
+  }
+  return best;
+}
+
 /** A segment is undirected: normalise endpoint order so seg AB === seg BA (idempotent). */
 function segment(x: Id, y: Id): GeoObject {
   const [p, q] = [x, y].sort();
@@ -369,9 +399,11 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     case 'free-point': {
       // A free point may be (re)placed: if it already exists as a free point,
       // update its coordinates — a *move* (ADR-011). Conflicts with non-free
-      // points of the same id are caught upstream by commandConflict. An explicit
-      // placement is *pinned* — the sampler never moves it (ADR-018).
-      const fp: GeoObject = { kind: 'free-point', id: cmd.id, x: cmd.x, y: cmd.y, pinned: true };
+      // points of the same id are caught upstream by commandConflict. A student's
+      // explicit placement is *pinned* — the sampler never moves it (ADR-018); but a
+      // construct's AUTO-placed default (`free`) is a real free DOF the sampler and
+      // constraints may move (ADR-052), so the seed coords are just a starting point.
+      const fp: GeoObject = { kind: 'free-point', id: cmd.id, x: cmd.x, y: cmd.y, ...(cmd.free ? {} : { pinned: true }) };
       const i = objects.findIndex((o) => o.id === cmd.id);
       if (i === -1) objects.push(fp);
       else if (objects[i].kind === 'free-point') objects[i] = fp;
@@ -467,15 +499,16 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     }
 
     case 'point-on-segment':
-      // No ratio stated (cmd.t undefined) ⇒ a FREE position on the segment (ADR-052): seed at the midpoint
-      // but let "show another configuration" slide it — the student didn't say WHERE on a→b. A stated ratio
-      // or an extension point (t>1) is a fixed position, not free.
+      // No ratio stated (cmd.t undefined) ⇒ a FREE position on the segment (ADR-052): the student didn't
+      // say WHERE on a→b, so "show another configuration" can slide it. Seed at the midpoint, but DODGE
+      // any free point already on this segment so a second "point on AC" doesn't collide with the first
+      // ("would be at the same point"). A stated ratio or an extension point (t>1) is a fixed position.
       addObj(objects, {
         kind: 'on-segment',
         id: cmd.id,
         a: cmd.a,
         b: cmd.b,
-        t: cmd.t ?? 0.5,
+        t: cmd.t ?? freeSegT(objects, cmd.a, cmd.b),
         ...(cmd.t === undefined ? { free: true } : {}),
         ...(cmd.branch !== undefined ? { solveBranch: cmd.branch } : {}),
       });
@@ -483,6 +516,12 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'line-line-intersection':
       addObj(objects, { kind: 'line-line-intersection', id: cmd.id, a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      // A "המשך" operand is DIRECTIONAL — A must be BEYOND the named 2nd point (ADR-054). Emit a
+      // `collinear-order` (A is already collinear via the crossing); when the current free DOFs put the
+      // crossing on the wrong side, recruitFreeDofs DRIVES them (e.g. pulls a free apex closer) so the
+      // extensions reach A. The free DOF is solved by the engine — the student never moves a point.
+      if (cmd.dir1) constraints.push({ type: 'collinear-order', points: [cmd.a, cmd.b, cmd.id] });
+      if (cmd.dir2) constraints.push({ type: 'collinear-order', points: [cmd.c, cmd.d, cmd.id] });
       break;
 
     case 'segment':
@@ -585,7 +624,19 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
             break;
           }
         }
-        // (c) Can't reconcile structurally here — do NOT silently drop it; the post-evaluate
+        // (c) The point is fixed/derived and can't itself slide onto the circle — but the CIRCLE may
+        // have a free SIZE DOF. When its radius is set by a point T on it (`circle-through`, e.g. the
+        // inscribed-corner circle whose centre is a free point on a bisector), "P on circle" ⟺
+        // |centre·P| = |centre·T|; push that as an `equal` so driveOrCheck grows the circle's free DOF
+        // (its centre's slide) until P lands on it — the engine ADJUSTS the circle instead of dropping
+        // the relation (operator: "why isn't C adjusted to be on the circle?"). Tangency is preserved
+        // because the centre stays on its bisector; only the size changes.
+        const circ = objects.find((o) => o.id === cmd.circle && o.kind === 'circle') as Extract<GeoObject, { kind: 'circle' }> | undefined;
+        if (circ && circ.radius.via === 'through' && circ.radius.point !== cmd.id) {
+          driveOrCheck(objects, constraints, { type: 'equal', a: circ.center, b: cmd.id, c: circ.center, d: circ.radius.point });
+          break;
+        }
+        // (d) Can't reconcile structurally here — do NOT silently drop it; the post-evaluate
         // verifier reports that "E on circle C" doesn't hold, so it can never read as a clean green.
         break;
       }
@@ -621,8 +672,41 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       addObj(objects, { kind: 'line-circle', id: cmd.id, line: cmd.line, circle: cmd.circle, branch: cmd.branch ?? 0, ...(cmd.avoid ? { avoid: cmd.avoid } : {}) });
       break;
 
+    // "המשך AC חותך מעגל P בנקודה D" (ADR-054): the new point D is on circle P, collinear with A,C, and
+    // BEYOND the 2nd named point (order A→C→D). Two structurally different cases:
+    case 'extend-onto-circle': {
+      // (1) SHARED-ENDPOINT — a line endpoint already lies on the TARGET circle (e.g. A is on circle O
+      // because it's an O∩P crossing). The line then meets the circle at that endpoint AND at exactly ONE
+      // other point, so the directional extension IS that second crossing — a DETERMINISTIC `line∩circle`
+      // that AVOIDS the shared endpoint (the same second-intersection pattern as `addCollinear` / ADR-050
+      // Am.2 / `lineMeetsCircle`). No driven solve, no radius change: with only one other crossing the
+      // "direction" is forced, and a numeric collinear solve here can collapse the new point onto the
+      // shared endpoint ("A and D would be at the same point" — the operator's crash this fixes).
+      const shared = [cmd.a, cmd.b].find((id) => pointOnCircle(objects, id, cmd.circle));
+      if (shared) {
+        const other = shared === cmd.a ? cmd.b : cmd.a;
+        const lineId = `line-${other}${shared}`;
+        addLine(objects, { kind: 'line', id: lineId, spec: { via: 'through', a: other, b: shared } });
+        addObj(objects, { kind: 'line-circle', id: cmd.id, line: lineId, circle: cmd.circle, branch: 0, avoid: shared });
+        addObj(objects, segment(cmd.a, cmd.id)); // the drawn secant (through the shared end)
+        break;
+      }
+      // (2) NEITHER endpoint on the circle — the genuinely-directional case. D is a driven free on-circle
+      // θ pinned by `collinear` to line AC and by `collinear-order` to the far side. With default radii a
+      // line AC often has NO extension crossing beyond C, so applyStep's recruitFreeDofs grabs the
+      // circle's FREE radius (via `circlesOfPoint`) and the mixed solver (honouring collinear-order) grows
+      // it until an extension root exists (the "adapt the figure" semantics, ADR-052). The radius is left
+      // untouched when a root already exists (the 1-DOF order-aware pick) or when it's a fixed size.
+      const order: Constraint = { type: 'collinear-order', points: [cmd.a, cmd.b, cmd.id] };
+      const coll: Constraint = { type: 'collinear', a: cmd.a, b: cmd.b, c: cmd.id };
+      addObj(objects, { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: nextTheta(objects, cmd.circle), free: true, solve: { constraint: coll, branch: cmd.branch ?? 0 } });
+      constraints.push(coll, order);
+      addObj(objects, segment(cmd.a, cmd.id)); // the drawn secant A → D (through B)
+      break;
+    }
+
     case 'circle-circle-intersection':
-      addObj(objects, { kind: 'circle-circle', id: cmd.id, circle1: cmd.circle1, circle2: cmd.circle2, branch: cmd.branch ?? 0 });
+      addObj(objects, { kind: 'circle-circle', id: cmd.id, circle1: cmd.circle1, circle2: cmd.circle2, branch: cmd.branch ?? 0, ...(cmd.avoid ? { avoid: cmd.avoid } : {}) });
       break;
 
     case 'tangent':

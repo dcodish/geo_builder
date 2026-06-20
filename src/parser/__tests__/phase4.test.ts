@@ -172,6 +172,29 @@ describe('parser — lines-first intersection phrasing (he/en)', () => {
   it('hebrew (inflected נחתכים)', () => has('האלכסונים AC ו-BD נחתכים בנקודה E', e));
 });
 
+describe('parser — cut-form intersection (verb BETWEEN the two segments)', () => {
+  // "BD cuts OC at A" — A = line BD ∩ line OC. The reported case: this used to escalate to the LLM,
+  // which rewrote it lossily as "A on the extension of BD" (dropping the OC half) — wrong point.
+  const a: Command = { type: 'line-line-intersection', id: 'A', a: 'B', b: 'D', c: 'O', d: 'C' };
+  it('hebrew "BD חותך את OC בנקודה A" (non-directional)', () => has('BD חותך את OC בנקודה A', a));
+  it('english "BD cuts OC at A" (non-directional)', () => has('BD cuts OC at A', a));
+  // A "המשך"/extension operand is DIRECTIONAL — A must be beyond the 2nd point (ADR-054). Detected per
+  // operand (which side of the cut verb the word falls on), so a one-sided extension only flags its side.
+  it('"המשך BD חותך את המשך OC" → both directional (dir1 + dir2)', () =>
+    has('המשך BD חותך את המשך OC בנקודה A', { ...a, dir1: true, dir2: true }));
+  it('"המשך BD חותך את OC" → only the first is directional (dir1)', () =>
+    has('המשך BD חותך את OC בנקודה A', { ...a, dir1: true }));
+  it('still routes "… cuts circle P …" to the circle rule, not line∩line', () => {
+    const r = parse('AC חותך מעגל P בנקודה E', { circles: ['P'] });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const types = r.commands.map((c) => c.type);
+      expect(types).toContain('line-circle-intersection');
+      expect(types).not.toContain('line-line-intersection');
+    }
+  });
+});
+
 describe('parser — implicit circle reference (the figure has one circle)', () => {
   const ctx = { circles: ['O'] };
   it('resolves an unnamed tangent∩line to the only circle, both phrasings + extension (He/En)', () => {

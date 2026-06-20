@@ -38,7 +38,7 @@ interface Scenario {
 function ctxOf(facts: Fact[]) {
   const { construction } = replay(facts);
   return {
-    circles: construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
+    circles: construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [o.center] : [])), // drop ~scaffolding circles (mirrors App.parseCtx)
     points: construction.objects.filter(isGeoPoint).map((o) => o.id),
     circleMembers: circleMembers(construction),
   };
@@ -97,6 +97,306 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'symbolic-2alpha-drives-shape-not-the-fixed-point',
+    title: 'a "2α" relation drives the figure\'s FREE shape, not a point the student fixed (D on the extension)',
+    guards:
+      "the operator's REAL α/2α bug (they used the α glyph): isosceles AB=AC in a circle, D placed on the extension of BC (t=1.3), ∠CAD=α, then a central angle ∠BOC=2α. It ERRORED 'cannot place D on segment BC so that ∠BOC = 2·∠CAD' — `driveOrCheck` drove D (the first on-segment ref) to satisfy the relation, but D is a GIVEN the student positioned, not a DOF, and a central angle can't be met by sliding D. Fix (ADR-064): only a FREE on-segment point (no stated ratio) is driveable; a stated-ratio/extension point is left put, so the relation drives the triangle's free shape instead and D stays at t=1.3.",
+    steps: ['משולש שווה שוקיים ABC שבו AB=AC חוסם במעגל', 'נקודה D על המשך BC', 'BD', 'DA', '∠CAD=α', '∠BOC=2α'],
+    check(fig) {
+      allStepsOk(fig);
+      const cad = angle(at(fig, 'C'), at(fig, 'A'), at(fig, 'D'));
+      const boc = angle(at(fig, 'B'), at(fig, 'O'), at(fig, 'C'));
+      expect(boc / cad, '∠BOC = 2·∠CAD').toBeCloseTo(2, 2);
+      // D stays where it was placed: t ≈ 1.3 along B→C
+      const B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      const tD = ((D.x - B.x) * (C.x - B.x) + (D.y - B.y) * (C.y - B.y)) / ((C.x - B.x) ** 2 + (C.y - B.y) ** 2);
+      expect(tD, 'D not dragged off its stated extension position').toBeCloseTo(1.3, 2);
+    },
+  },
+  {
+    id: 'spelled-out-alpha-then-2alpha',
+    title: 'spelled-out "alpha" then "2alpha" — the second angle is 2× the first (not 2°)',
+    guards:
+      "operator: \"I enter alpha for one angle then try 2alpha to another and the result is wrong.\" Spelled-out \"alpha\" (not the α symbol) missed the single-Greek-letter variable regex, and \"2alpha\" then half-parsed to the NUMBER 2 — a 2° angle, silently dropping the variable (ADR-024/026 class). Fix: normalise spelled-out Greek names to symbols at the parse entry (\"alpha\"→α, bounded by non-letter so a DIGIT prefix '2alpha' works while an uppercase point pair 'MU'/'XI' and a longer word 'alphabet' don't match).",
+    steps: ['משולש ABC', '∠BAC=alpha', '∠ABC=2alpha'],
+    check(fig) {
+      allStepsOk(fig);
+      const bac = angle(at(fig, 'B'), at(fig, 'A'), at(fig, 'C'));
+      const abc = angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C'));
+      expect(abc / bac, '∠ABC = 2·∠BAC (2α : α)').toBeCloseTo(2, 2);
+      expect(abc, 'the second angle is NOT a tiny 2° (the old misparse)').toBeGreaterThan(10);
+    },
+  },
+  {
+    id: 'chained-equality-trisects-segment',
+    title: '"AL=LK=KC" drives both free points so they trisect AC (coupled equalities solve jointly)',
+    guards:
+      "operator: \"support a case such as AL=LK=KC — multiple equalities.\" The parser already chained it (AL=LK + LK=KC), but it ERRORED 'unresolved dependencies for: L, K': each equality drove a different free on-segment point and referenced the OTHER, so L became `on-segment-solved` needing K and K needing L — a cycle the closed-form evaluator can't break. Fix: when solved-on-segment points are coupled (reference each other), `resolveDriven` promotes them to NUMERIC on-segment carriers and joint-solves (ADR-045) — the closed-form path stays for the uncoupled common case.",
+    steps: ['משולש ABC', 'L ו- K נקודות על AC', 'AL=LK=KC'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), C = at(fig, 'C'), L = at(fig, 'L'), K = at(fig, 'K');
+      const AL = dist(A, L), LK = dist(L, K), KC = dist(K, C);
+      expect(LK, 'AL = LK').toBeCloseTo(AL, 3);
+      expect(KC, 'LK = KC').toBeCloseTo(LK, 3);
+      // all three ≈ |AC|/3 (L, K trisect AC)
+      expect(AL, 'each part is a third of AC').toBeCloseTo(dist(A, C) / 3, 3);
+    },
+  },
+  {
+    id: 'perpendicular-cuts-segment-at-new-point',
+    title: '"the perpendicular to AC at K cuts AB at E" creates E and draws EK (not just a bare line)',
+    guards:
+      "the operator tried several ways to create EK and 'it just drew a line'. \"האנך ל-AC בנקודה K חותך את AB בנקודה E\" emitted ONLY the perpendicular line and dropped the \"cuts AB at E\" clause, so E was never placed and EK never drawn. Fix: `perpendicularLine` now detects a cut clause (cut verb + segment + result point — the cut verb anchors the match so the SECOND 'בנקודה' is the result, not the through-point), builds the perpendicular as SCAFFOLDING, crosses it with AB to place E, and draws the perpendicular SEGMENT K–E.",
+    steps: ['משולש ABC', 'BA=BC', 'L ו- K נקודות על AC', 'האנך ל- AC בנקודה K חותך את AB בנקודה E'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.construction.objects.some((o) => o.id === 'seg-EK'), 'segment EK drawn').toBe(true);
+      const E = at(fig, 'E'), K = at(fig, 'K'), A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      const off = (p: Vec, a: Vec, b: Vec) => Math.abs((p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)) / dist(a, b);
+      expect(off(E, A, B), 'E on AB').toBeLessThan(1e-4);
+      // EK ⟂ AC
+      const cos = ((E.x - K.x) * (C.x - A.x) + (E.y - K.y) * (C.y - A.y)) / (dist(E, K) * dist(A, C));
+      expect(Math.abs(cos), 'EK ⟂ AC').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'two-points-on-one-segment',
+    title: 'two free points on the SAME segment land at distinct spots (no "same point" error)',
+    guards:
+      "the operator's figure: triangle ABC, then \"L על AC\" then \"K על AC\" — the SECOND errored with 'L and K would be at the same point', and the combined \"L ו-K נקודות על AC\" escalated to the LLM and built nothing. Root cause: a free point-on-segment with no stated ratio always seeded t=0.5, so a second point on the same segment collided with the first (ADR-017 coincidence guard). Fix: seed a new free point in the MIDDLE of the largest open gap among the segment's existing points (`freeSegT`) — first 0.5, then 0.25, 0.75, … — so they spread. Plus a `pointsOnSegment` parser rule so \"L and K are points on AC\" / \"L ו-K נקודות על AC\" build both deterministically (the Hebrew \"points\" word needed an explicit Hebrew-letter class, not `\\w` which is ASCII-only).",
+    steps: ['משולש ABC', 'L על AC', 'K על AC'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), C = at(fig, 'C'), L = at(fig, 'L'), K = at(fig, 'K');
+      expect(dist(L, K), 'L and K are distinct points').toBeGreaterThan(0.1);
+      // both lie ON segment AC
+      const off = (p: Vec) => Math.abs((p.x - A.x) * (C.y - A.y) - (p.y - A.y) * (C.x - A.x)) / dist(A, C);
+      expect(off(L), 'L on AC').toBeLessThan(1e-6);
+      expect(off(K), 'K on AC').toBeLessThan(1e-6);
+    },
+  },
+  {
+    id: 'extension-meet-draws-lines-to-G',
+    title: '"המשך CA ו-BD נפגשים בנקודה G" draws BOTH lines through to the meeting point G',
+    guards:
+      "the operator's figure (session): triangle ABC in a circle, BC diameter, D on arc AB, then \"the extension of CA and BD meet at G\". The crossing G was placed but the drawn segments stopped at the inner points (CA, BD) — the lines didn't visually REACH G, so the operator had to draw CG/BG by hand. Fix: in `lineLineIntersection`, when an extension is named (המשך/extension), draw each line from its base THROUGH to G (C→G, B→G) instead of the bare operands — and emit the intersection (which DEFINES G) BEFORE those segments, else a segment to a not-yet-defined G would create G as a stray free point and conflict ('G is already defined'). A plain diagonals crossing (\"M = intersection of AC and BD\", no extension) is untouched — its full segments stay whole.",
+    steps: [
+      'משולש ABC חסום במעגל שרדיוסו R',
+      'BC קוטר',
+      'D נקודה על המעגל על הקשת AB',
+      'המשך CA ו BD נפגשים בנקודה G',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // both lines were drawn to G
+      expect(fig.construction.objects.some((o) => o.id === 'seg-CG'), 'segment C→G drawn').toBe(true);
+      expect(fig.construction.objects.some((o) => o.id === 'seg-BG'), 'segment B→G drawn').toBe(true);
+      const G = at(fig, 'G'), C = at(fig, 'C'), A = at(fig, 'A'), B = at(fig, 'B'), D = at(fig, 'D');
+      // G is the true crossing — on line CA and on line BD
+      const off = (p: Vec, a: Vec, b: Vec) => Math.abs((p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)) / dist(a, b);
+      expect(off(G, C, A), 'G on line CA').toBeLessThan(1e-6);
+      expect(off(G, B, D), 'G on line BD').toBeLessThan(1e-6);
+      // the inner points lie ON the drawn segments (the extension is visible): A between C,G and D between B,G
+      const param = (p: Vec, a: Vec, b: Vec) => ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / ((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+      expect(param(A, C, G), 'A between C and G').toBeGreaterThan(0);
+      expect(param(A, C, G)).toBeLessThan(1);
+      expect(param(D, B, G), 'D between B and G').toBeGreaterThan(0);
+      expect(param(D, B, G)).toBeLessThan(1);
+    },
+  },
+  {
+    id: 'corner-tangent-circle-grows-to-vertex',
+    title: '"C נמצאת על המעגל" grows the inscribed-corner circle (a free DOF) until vertex C lands on it',
+    guards:
+      "the operator's figure (session d0utx8bw): rectangle, a circle tangent to two sides at a corner, then \"point C is on the circle\" — which built NOTHING (operator: \"why isn't C adjusted to be on the circle?\"). C is a derived rectangle vertex that can't itself slide onto the circle, so the point-on-circle apply hit its give-up branch. But the corner circle has a FREE size DOF (its centre slides along the bisector). Fix: when the point can't move and the circle's radius is set by a point T on it (`circle-through`), \"P on circle\" ⟺ |centre·P| = |centre·T| is pushed as an `equal` that drives the circle's free DOF until P lands on it — tangency preserved (centre stays on its bisector, only the size changes). Plus a parser fix: `pointOnCircle` now resolves a DEFINITE/unnamed circle (\"על המעגל\" / \"is on the circle\") via the single circle in context, so the phrasing parses deterministically instead of escalating.",
+    steps: [
+      'מלבן ABCD',
+      'AB ו- AD משיקים למעגל O', // circle tangent to sides AB, AD at corner A (free size DOF)
+      'C נמצאת על המעגל', // the operator's "C is on the circle" — should GROW the circle to reach C
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), E = at(fig, 'E'), K = at(fig, 'K'), C = at(fig, 'C');
+      const A = at(fig, 'A'), B = at(fig, 'B'), D = at(fig, 'D');
+      const r = dist(O, E); // the circle's radius (E is on it)
+      expect(dist(O, C), 'C now lies on the circle (radius grew to reach it)').toBeCloseTo(r, 3);
+      // tangency to BOTH sides is preserved (the feet stay on the sides at the same radius)
+      expect(dist(O, K), 'still tangent to AD').toBeCloseTo(r, 3);
+      const off = (p: Vec, a: Vec, b: Vec) => Math.abs((p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)) / dist(a, b);
+      expect(off(E, A, B), 'E still on AB').toBeLessThan(1e-6);
+      expect(off(K, A, D), 'K still on AD').toBeLessThan(1e-6);
+    },
+  },
+  {
+    id: 'corner-tangent-circle',
+    title: '"AB ו-AD משיקים למעגל O" — a circle tangent to two sides of a corner (centre on the bisector, free size)',
+    guards:
+      "the operator's figure (session d0utx8bw): rectangle ABCD, then \"AB and AD are tangent to circle O\" — which escalated to the LLM and built NOTHING, because there was no engine vocabulary for a circle constrained tangent to a GIVEN line (only tangent FROM a point, where the circle is given). Root cause: a missing primitive, not an LLM failure. Built compositionally (no engine change, like the incircle): the centre O is a FREE point on the angle bisector of ∠BAD (the locus equidistant from both sides — [ADR-052](docs/06-decisions.md#adr-052) free-size DOF), the radius comes from a circle through the foot on AB (so it's tangent there), and tangency to AD is automatic (equidistant). The tangency points E,K are the feet of the ⟂ from O onto each side.",
+    steps: [
+      'מלבן ABCD',
+      'AB ו- AD משיקים למעגל O', // the operator's exact utterance (no tangency points named → auto-named E, K)
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), E = at(fig, 'E'), K = at(fig, 'K');
+      const A = at(fig, 'A'), B = at(fig, 'B'), D = at(fig, 'D');
+      // tangent to BOTH sides at the same radius: |OE| = |OK|
+      expect(dist(O, E), 'equal radii to both sides (tangent to both)').toBeCloseTo(dist(O, K), 4);
+      // E lies on side AB, K on side AD (the feet)
+      const off = (p: Vec, a: Vec, b: Vec) => Math.abs((p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)) / dist(a, b);
+      expect(off(E, A, B), 'E on AB').toBeLessThan(1e-6);
+      expect(off(K, A, D), 'K on AD').toBeLessThan(1e-6);
+      // OE ⟂ AB and OK ⟂ AD (a tangent radius is perpendicular to the side)
+      const dot = (u: Vec, v: Vec) => u.x * v.x + u.y * v.y;
+      expect(dot({ x: O.x - E.x, y: O.y - E.y }, { x: B.x - A.x, y: B.y - A.y }), 'OE ⟂ AB').toBeCloseTo(0, 4);
+      expect(dot({ x: O.x - K.x, y: O.y - K.y }, { x: D.x - A.x, y: D.y - A.y }), 'OK ⟂ AD').toBeCloseTo(0, 4);
+    },
+  },
+  {
+    id: 'perp-constraint-keeps-quad-convex',
+    title: '"OD⊥AC" on a cyclic quad nudges D to the NEAR arc-midpoint (quad stays convex, not crossed)',
+    guards:
+      "the operator's figure (session 691h53h0): cyclic quad ABCD in O, AB diameter, E on the extension of AD with CE⊥AE, then \"OD⊥AC\". The last step \"messed the shape up — it was good up to that point\": OD⊥AC has TWO roots (the two arc-midpoints of AC, half a circle apart). D sat at ≈330° (already nearly perpendicular), but the 1-DOF driven solve took `roots[0]` = the FAR root at ≈148° — which falls between A(30°) and B(210°), re-ordering the vertices into a CROSSED quad. Root cause: the driven solve had no stability preference, so a symmetric constraint could fling the point across the circle. Fix: when no order constraint rides the carrier, order the roots by NEARNESS to its current value, so branch 0 is the smallest move (ADR-028) — D nudges to ≈328°, the quad stays convex and OD⊥AC still holds; \"show another configuration\" still reaches the far root.",
+    steps: [
+      'מרובע ABCD חסום במעגל O', // cyclic quad in O (free radius)
+      'AB קוטר', // AB is a diameter → B = antipode of A
+      'E על המשך AD כך ש CE⊥AE', // E on the extension of AD, CE ⟂ AE
+      'OD⊥AC', // the step that used to cross the quad
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      convexQuad(fig, ['A', 'B', 'C', 'D'], 'O'); // still a simple convex quad, vertices in order
+      // OD ⟂ AC actually holds (cos of the angle between OD and AC ≈ 0)
+      const O = at(fig, 'O'), D = at(fig, 'D'), A = at(fig, 'A'), C = at(fig, 'C');
+      const u = { x: D.x - O.x, y: D.y - O.y }, w = { x: C.x - A.x, y: C.y - A.y };
+      const cos = (u.x * w.x + u.y * w.y) / (Math.hypot(u.x, u.y) * Math.hypot(w.x, w.y));
+      expect(Math.abs(cos), 'OD ⟂ AC').toBeLessThan(0.02);
+    },
+  },
+  {
+    id: 'circumcircle-of-triangle-cuts-chord',
+    title: '"המעגל החוסם את משולש ABC חותך את CE בנקודה D" — circumcircle of a triangle ∩ a chord, all deterministic/Hebrew',
+    guards:
+      "the operator's figure (session 8i10y4dp): circle, two tangents from A at B,C, ∠CAB=90, chord CE, then \"the circle circumscribing triangle ABC cuts CE at D\" — which DIDN'T parse, even via the LLM. Four gaps fixed: (1) the `triangle` rule's `shapeHasLeftover` STOPPED on the 'משולש ABC' inside 'מעגל חוסם … משולש ABC' (and the `g`-flag `re` corrupted the next call) — the rule now defers on a circumscribe phrasing, before `re.test`; (2) no circumcircle-∩-segment construct — added `circumcircleMeetsSegment` (circumcircle + line∩circle avoiding the shared vertex); (3) `freeLabel` reused an existing circle's centre ('O') for the new circumcircle — now avoids `ctx.circles`; (4) the chord 'מיתר CE' (and 'E על המעגל') were AMBIGUOUS because `parseCtx` counted the tangent construct's HIDDEN Thales aux circle — now VISIBLE circles only. Plus: the circumcentre of A,B,C lands on the hidden Thales midpoint (the circumcircle IS that Thales circle), which the coincidence check rejected — a `~`-scaffolding point may now overlap a real point.",
+    steps: [
+      'מעגל',
+      'מנקודה A יוצאים שני משיקים למעגל בנקודות B ו C', // tangents from external A → B,C on the circle
+      '∠CAB=90',
+      'מיתר CE', // chord CE — places C,E on the (single visible) circle + draws CE; no LLM
+      'המעגל החוסם את משולש ABC חותך את CE בנקודה D', // circumcircle(ABC) ∩ CE = D (the crossing that isn't C)
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const D = at(fig, 'D'), C = at(fig, 'C'), E = at(fig, 'E');
+      expect(fig.positions.has('D'), 'D placed').toBe(true);
+      // D on line CE, distinct from C
+      const cross = Math.abs((D.x - C.x) * (E.y - C.y) - (D.y - C.y) * (E.x - C.x)) / Math.max(dist(C, E), 1) ** 2;
+      expect(cross, 'D on line CE').toBeLessThan(1e-2);
+      expect(dist(D, C), 'D ≠ C (the OTHER crossing)').toBeGreaterThan(0.5);
+    },
+  },
+  {
+    id: 'directional-cut-drives-free-apex-from-far',
+    title: '"המשך BD חותך את המשך OC" with the apex D seeded FAR → the engine DRIVES the free DOF so A is still placed (no manual move)',
+    guards:
+      "the operator's real figure (session 0mjr1ots): tangents from external D touch circle O at B,C, then \"המשך BD חותך את המשך OC בנקודה A\". `המשך` is DIRECTIONAL (beyond the 2nd letter — ADR-054) — A must be beyond D and beyond C. D is a FREE DOF, so the engine must SOLVE it, not ask the user to move D (the operator's explicit requirement). The `dir1`/`dir2` flags make the command emit a `collinear-order` constraint; when a config (here a far-seeded apex) puts the crossing on the wrong side, `recruitFreeDofs` drives the free apex until the extensions reach A. (An early diagnosis wrongly claimed this was impossible-by-symmetry; it's apex-distance-dependent. The two-tangent construct's default apex is now seeded CLOSE — see the next scenario — so the normal path needs no driving; THIS scenario forces a far seed to prove the drive still lands a valid A.)",
+    steps: [
+      'מעגל O',
+      {
+        llm: [
+          { type: 'free-point', id: 'D', x: 12, y: 0 }, // FAR (~2.4R) — wrong basin; the engine must drive it
+          { type: 'midpoint', id: '~tanmid-OD', a: 'O', b: 'D' },
+          { type: 'circle-through', id: 'tanaux-OD', center: '~tanmid-OD', through: 'O', hidden: true },
+          { type: 'circle-circle-intersection', id: 'B', circle1: 'circle-O', circle2: 'tanaux-OD', branch: 0 },
+          { type: 'circle-circle-intersection', id: 'C', circle1: 'circle-O', circle2: 'tanaux-OD', branch: 1 },
+          { type: 'segment', a: 'D', b: 'B' },
+          { type: 'segment', a: 'D', b: 'C' },
+        ],
+      },
+      'המשך BD חותך את המשך OC בנקודה A',
+    ],
+    check(fig) {
+      allStepsOk(fig); // the engine solved the free DOF — A IS placed, no error, no manual repositioning
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), O = at(fig, 'O');
+      const proj = (s: Vec, e: Vec, p: Vec) => ((p.x - s.x) * (e.x - s.x) + (p.y - s.y) * (e.y - s.y)) / ((e.x - s.x) ** 2 + (e.y - s.y) ** 2);
+      expect(proj(B, D, A), 'A beyond D').toBeGreaterThan(1);
+      expect(proj(O, C, A), 'A beyond C').toBeGreaterThan(1);
+    },
+  },
+  {
+    id: 'directional-cut-works-when-apex-close',
+    title: '"המשך BD חותך את המשך OC" with the apex D CLOSE → A placed beyond D and C (the textbook figure)',
+    guards:
+      'the same tangent figure with the external point D positioned CLOSE to the circle (~1.2R, as the bagrut sketch shows) — the directional extensions beyond D and beyond C now genuinely meet, so A is placed. Proves the wrong-side case above is configuration-dependent (apex distance), not impossible. This is the figure the operator was trying to reproduce.',
+    steps: [
+      'מעגל O',
+      {
+        llm: [
+          { type: 'free-point', id: 'D', x: 6, y: 0 }, // CLOSE (~1.2R) — the textbook basin
+          { type: 'midpoint', id: '~tanmid-OD', a: 'O', b: 'D' },
+          { type: 'circle-through', id: 'tanaux-OD', center: '~tanmid-OD', through: 'O', hidden: true },
+          { type: 'circle-circle-intersection', id: 'B', circle1: 'circle-O', circle2: 'tanaux-OD', branch: 0 },
+          { type: 'circle-circle-intersection', id: 'C', circle1: 'circle-O', circle2: 'tanaux-OD', branch: 1 },
+          { type: 'segment', a: 'D', b: 'B' },
+          { type: 'segment', a: 'D', b: 'C' },
+        ],
+      },
+      'המשך BD חותך את המשך OC בנקודה A',
+    ],
+    check(fig) {
+      allStepsOk(fig); // A IS placed
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), O = at(fig, 'O');
+      const proj = (s: Vec, e: Vec, p: Vec) => ((p.x - s.x) * (e.x - s.x) + (p.y - s.y) * (e.y - s.y)) / ((e.x - s.x) ** 2 + (e.y - s.y) ** 2);
+      expect(proj(B, D, A), 'A beyond D').toBeGreaterThan(1);
+      expect(proj(O, C, A), 'A beyond C').toBeGreaterThan(1);
+    },
+  },
+  {
+    id: 'cut-form-intersection-on-extensions',
+    title: '"המשך BD חותך את המשך OC בנקודה A" → A is the line BD ∩ line OC crossing (the cut-form, kept in Hebrew)',
+    guards:
+      "the operator's input (session 0mjr1ots): the deterministic parser only knew the \"BD and OC intersect at A\" phrasing, not \"BD CUTS OC at A\" (the verb BETWEEN the two segments), so it escalated to the LLM — which rewrote it IN ENGLISH and lossily as \"point A on the extension of BD and on the extension of OC\"; the parser then matched only the first clause (A on BD's extension at t=1.3) and DROPPED the OC half, so A was a wrong point, not the intersection. Fixed by adding the cut-form to `lineLineIntersection` (seg1, cut verb, seg2, point → line∩line), so it parses deterministically, stays Hebrew, and places A correctly. (`extension`/`המשך` is irrelevant — two infinite lines meet at one point.)",
+    steps: [
+      'point B at (0,0)',
+      'point D at (2,0)', // line BD = the x-axis
+      'point O at (3,2)',
+      'point C at (3,1)', // line OC = the vertical x=3
+      'המשך BD חותך את המשך OC בנקודה A', // A = line(B,D) ∩ line(O,C) = (3,0) — beyond BOTH segments
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), O = at(fig, 'O');
+      const coll = (p: Vec, q: Vec, r: Vec) => {
+        const span = Math.max(dist(p, q), dist(q, r), dist(p, r));
+        return Math.abs((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)) / (span * span);
+      };
+      expect(coll(B, D, A), 'A on line BD').toBeLessThan(1e-3);
+      expect(coll(O, C, A), 'A on line OC').toBeLessThan(1e-3);
+      expect(A.x, 'A.x ≈ 3 (the true crossing)').toBeCloseTo(3, 3);
+      expect(A.y, 'A.y ≈ 0 (the true crossing)').toBeCloseTo(0, 3);
+    },
+  },
+  {
+    id: 'extend-onto-tangent-line-is-rejected-clearly',
+    title: 'directional "המשך CA" where line CA is the TANGENT to the target circle → rejected with a clear message, no crash',
+    guards:
+      'the operator\'s actual session (jvdi4sl7) CRASHED step 4 with "A and F would be at the same point". Diagnosed from the geometry: C was defined as "tangent to circle O at A meets circle P", so line CA IS the tangent to circle O at A (cos(CA,OA)=0) — it touches O only at A, so "המשך CA חותך מעגל O" has NO second crossing F. The figure is geometrically impossible as typed, but the engine reported it via the opaque generic coincidence check. Two fixes: (1) extend-onto-circle, when an endpoint is already on the target circle, routes to a deterministic line∩circle that AVOIDS the shared endpoint (ADR-054); (2) that path, when NO fresh crossing remains (tangent / chord), now returns a CLEAR "line is tangent … no second crossing to extend onto" message instead of collapsing F onto A. This locks that the impossible input is handled GRACEFULLY (prior figure kept, clear error), never a crash.',
+    steps: [
+      'שני מעגלים ננחתכים בנקודות A ו- B', // O (r5, free) + P (r3.6, free); A,B = the two crossings (operator's exact text)
+      'המשיק למעגל O בנקודה A חותך את מעגל P בנקודה C', // C on circle P, ON the tangent-to-O-at-A line
+      'המשיק למעגל P בנקודה B חותך את מעגל O בנקודה D', // D on circle O
+      'המשך CA חותך את מעגל O בנקודה F', // IMPOSSIBLE: line CA is tangent to O at A — no second crossing
+    ],
+    check(fig) {
+      // The impossible step is rejected GRACEFULLY: the prior figure (through D) is intact, F is NOT
+      // placed (the tangent has no second crossing), and the message names the tangent — not a crash.
+      expect(fig.positions.has('A') && fig.positions.has('D'), 'the prior figure (through D) is kept').toBe(true);
+      expect(fig.positions.has('F'), 'F is not placed — the construction is impossible').toBe(false);
+      expect(fig.lastError, 'a clear message names the tangent, not an opaque coincidence').toMatch(/tangent/i);
+    },
+  },
+  {
     id: 'redefine-existing-point-onto-circle',
     title: 'redefining an existing point as "on circle P" drives it onto the circle (never a silent no-op)',
     guards:
@@ -128,8 +428,8 @@ const SCENARIOS: Scenario[] = [
       'שני מעגלים נחתכים בנקודות A ו B', // circle-O (left, r5) + circle-P (right, r3.6), A,B = the two crossings
       'המשיק למעגל O בנקודה A פוגש את מעגל P בנקודה D', // AD ⟂ radius OA; D = tangent ∩ circle P, avoiding A (the "פוגש" misparse)
       'המשיק למעגל P בנקודה B פוגש את מעגל O בנקודה C', // CB ⟂ radius PB; C = tangent ∩ circle O, avoiding B
-      'המשך AC חותך את מעגל P בנקודה E', // E = line(A,C) ∩ circle P (the crossing that isn't A) — the bagrut wording
-      'המשך BD חותך את מעגל O בנקודה F', // F = line(B,D) ∩ circle O (the crossing that isn't B)
+      'המשך CA חותך את מעגל P בנקודה E', // E beyond A on circle P (order C→A→E) — strict directional המשך (ADR-054)
+      'המשך DB חותך את מעגל O בנקודה F', // F beyond B on circle O (order D→B→F)
     ],
     check(fig) {
       allStepsOk(fig); // no over-constraint, no silent drop, no mutual-tangency misparse

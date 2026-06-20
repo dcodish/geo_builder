@@ -81,6 +81,38 @@ function withOrderCons(cons: Constraint[], c: Construction): Constraint[] {
 }
 
 function resolveDriven(c: Construction): Construction {
+  // COUPLED solved-on-segment points: a closed-form `on-segment-solved` whose constraint references
+  // ANOTHER solved-on-segment deadlocks the topological evaluator (each needs the other's position —
+  // e.g. "AL=LK=KC" makes L solved by AL=LK and K by LK=KC, so L needs K and K needs L). Promote the
+  // coupled group back to NUMERIC on-segment carriers (kind 'on-segment' + a solve directive) and
+  // re-enter, so they fall into the joint solver below ([ADR-045](docs/06-decisions.md#adr-045)) and
+  // solve together — the closed-form path stays for the common uncoupled case.
+  {
+    const solved = c.objects.filter(
+      (o): o is Extract<GeoObject, { kind: 'on-segment-solved' }> => o.kind === 'on-segment-solved',
+    );
+    const solvedIds = new Set(solved.map((o) => o.id));
+    const coupledIds = new Set<Id>();
+    for (const o of solved) {
+      const refs = constraintRefs(o.constraint).filter((r) => r !== o.id && solvedIds.has(r));
+      if (refs.length) {
+        coupledIds.add(o.id);
+        for (const r of refs) coupledIds.add(r);
+      }
+    }
+    if (coupledIds.size) {
+      const promoted: Construction = {
+        ...c,
+        objects: c.objects.map((o) =>
+          o.kind === 'on-segment-solved' && coupledIds.has(o.id)
+            ? { kind: 'on-segment', id: o.id, a: o.a, b: o.b, t: o.t0 ?? 0.5, solve: { constraint: o.constraint, branch: o.branch } }
+            : o,
+        ),
+      };
+      return resolveDriven(promoted);
+    }
+  }
+
   // Free vertices driven by a constraint (2 DOF each) take a separate, regularised
   // path — they have no bounded parameter range, and a single equation leaves a
   // solution manifold, so we pick the configuration nearest the current one (ADR-028).
@@ -128,7 +160,45 @@ function resolveDriven(c: Construction): Construction {
     };
     const roots = drivenRoots(f, lo, hi, residualTolerance(dir.constraint));
     if (roots.length === 0) return c; // unsolvable → keep default; the constraint check fails honestly
-    return withParam(c, carrier.id, roots[dir.branch % roots.length]);
+    // A one-sided ORDER constraint owns no carrier of its own (it rides the optimizer), so when one
+    // references THIS carrier — e.g. an `extend-onto-circle`'s D, driven onto line AC by `collinear`
+    // while `collinear-order` pins it BEYOND the 2nd letter — prefer the root that satisfies the order
+    // (the FAR crossing) over the near one. This picks the right side at the CURRENT size, so a free
+    // radius is grown (by recruitFreeDofs) only when NO root satisfies the order, never to collapse the
+    // circle onto a near crossing. branch then cycles the order-sorted roots ("show another config").
+    const orderCons = c.constraints.filter(
+      (k) =>
+        (k.type === 'collinear-order' || k.type === 'angle-order' || k.type === 'length-order') &&
+        constraintRefs(k).includes(carrier.id),
+    );
+    let ordered = roots;
+    if (orderCons.length) {
+      const orderResid = (v: number): number => {
+        const r = evaluateCore(withParam(c, carrier.id, v), { skipConstraints: true });
+        if (!r.ok) return Infinity;
+        let s = 0;
+        for (const k of orderCons) {
+          for (const id of constraintRefs(k)) if (!r.positions.has(id)) return Infinity;
+          s += residual(k, (id) => r.positions.get(id)!);
+        }
+        return s;
+      };
+      ordered = [...roots].sort((a, b) => orderResid(a) - orderResid(b));
+    } else {
+      // No order preference: keep the figure STABLE — order the roots by NEARNESS to the carrier's
+      // current value, so branch 0 is the smallest move. A symmetric constraint like OD⊥AC has two roots
+      // (the two arc-midpoints, half a circle apart); without this the solve could fling the point to the
+      // FAR root, re-ordering the vertices into a crossed quad. "Show another configuration" then cycles
+      // outward to the other roots ([ADR-028](docs/06-decisions.md#adr-028) stability).
+      const seed = carrier.kind === 'on-circle' ? carrier.theta : carrier.t;
+      const span = hi - lo; // 2π (on-circle) or 1 (on-segment)
+      const near = (v: number) => {
+        const x = Math.abs(v - seed);
+        return carrier.kind === 'on-circle' ? Math.min(x, span - x) : x;
+      };
+      ordered = [...roots].sort((a, b) => near(a) - near(b));
+    }
+    return withParam(c, carrier.id, ordered[dir.branch % ordered.length]);
   }
 
   // SEVERAL coupled driven DOFs (e.g. "C = midpoint of OB" drives E while "|ED| = 7" drives D, and D's
@@ -667,7 +737,12 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
   // No two distinct points may share a location — that is a degenerate figure
   // (two labels on one spot) — EXCEPT a pair the construction intends to coincide
   // (a `coincide` constraint, ADR-028): their meeting is the goal, not an error.
+  // A `~`-prefixed SCAFFOLDING point (a hidden Thales midpoint, a reinterpret helper) carries no label
+  // and isn't drawn, so it legitimately overlaps a real point — e.g. the circumcentre of A,B,C landing
+  // on the hidden centre of the very circle they're already on (a tangent figure's Thales circle).
   const intended = (idA: Id, idB: Id): boolean =>
+    idA.startsWith('~') ||
+    idB.startsWith('~') ||
     c.constraints.some((k) => k.type === 'coincide' && ((k.p === idA && k.q === idB) || (k.p === idB && k.q === idA)));
   const placed = [...pos.entries()];
   for (let i = 0; i < placed.length; i++) {
@@ -758,6 +833,34 @@ export function resolveLine(l: Line, pos: Map<Id, Vec>, circles: Map<Id, Resolve
       return { anchor: at, dir: unit(rot90(radial)) }; // ⟂ to the radius at `at`
     }
   }
+}
+
+/**
+ * Pick "the OTHER crossing" among `sols` — the intersection to KEEP when a known reference point is one
+ * of them. Drops every root coinciding with an already-placed point and returns the fresh root FARTHEST
+ * from `avoid`. This is **geometric, not positional**: it stays put as the figure flexes, where a fixed
+ * branch index flips root order and intermittently collapses onto the known point ([ADR-045](docs/06-decisions.md#adr-045)
+ * R8). Returns null when NO fresh root remains — the figure is tangent at `avoid` (line∩circle) or the two
+ * intersections coincide (circle∩circle), so there is no genuinely new point. When `avoid`'s position
+ * isn't known yet it falls back to the `branch` index (the pre-R8 line∩circle behaviour, preserved).
+ * Shared by line∩circle and circle∩circle, retiring the line-circle-only `avoid` one-off.
+ */
+/**
+ * Order line∩circle crossings by their SIGNED position along the line's direction `dir` from `anchor`
+ * — so `branch` selects a stable geometric SIDE (branch 0 = the −dir crossing, branch 1 = the +dir one),
+ * not a position in `lineCircleIntersect`'s raw output whose order flips as the figure flexes ([ADR-045](docs/06-decisions.md#adr-045)
+ * R8). The ordering depends only on the geometry (projection onto `dir`), never on the array order in.
+ */
+export function bySide(sols: Vec[], anchor: Vec, dir: Vec): Vec[] {
+  const proj = (s: Vec) => (s.x - anchor.x) * dir.x + (s.y - anchor.y) * dir.y;
+  return [...sols].sort((p, q) => proj(p) - proj(q));
+}
+
+export function otherCrossing(sols: Vec[], placed: Vec[], avoid: Vec | undefined, branch: number): Vec | null {
+  const fresh = sols.filter((s) => !placed.some((q) => dist(s, q) < LEN_EPS));
+  if (!fresh.length) return null;
+  if (!avoid) return fresh[branch % fresh.length];
+  return fresh.reduce((far, s) => (dist(s, avoid) > dist(far, avoid) ? s : far), fresh[0]);
 }
 
 /** Resolve one point: a Vec, 'pending' (deps not ready yet), or an error string. */
@@ -942,19 +1045,19 @@ function tryEval(
       if (!l || !c) return 'pending';
       const sols = lineCircleIntersect(l.anchor, l.dir, c.center, c.r);
       if (sols.length === 0) return `cannot construct ${p.id}: line ${p.line} does not meet circle ${p.circle}`;
-      // "The OTHER crossing" (`avoid` set): the secant runs through a KNOWN point already on the
-      // circle (a line endpoint), so one root is that point. Drop every root that coincides with an
-      // already-placed point and keep the genuinely new crossing. This is stable as the line turns —
-      // a fixed branch index flips root order and intermittently collapses onto the known point.
+      // "The OTHER crossing" (`avoid` set): the secant runs through a KNOWN on-circle point (a line
+      // endpoint), so one root is that point — keep the genuinely new one (see {@link otherCrossing}).
       if (p.avoid) {
-        const fresh = sols.filter((s) => ![...pos.values()].some((q) => dist(s, q) < LEN_EPS));
-        if (fresh.length) {
-          const a = pos.get(p.avoid);
-          // Deterministic among several fresh roots: farthest from `avoid`.
-          return a ? fresh.reduce((far, s) => (dist(s, a) > dist(far, a) ? s : far), fresh[0]) : fresh[p.branch % fresh.length];
-        }
+        const kept = otherCrossing(sols, [...pos.values()], pos.get(p.avoid), p.branch);
+        if (kept) return kept;
+        // No NEW crossing: the line meets the circle ONLY at points already placed — it is tangent at
+        // `avoid` (touches just there), or both its named ends are on the circle (a chord). Report it
+        // clearly instead of collapsing the new point onto `avoid` (the tangent-extension crash).
+        return `cannot place ${p.id}: line ${p.line} is tangent to circle ${p.circle} at ${p.avoid} — it has no second crossing to extend onto`;
       }
-      return sols[p.branch % sols.length];
+      // No `avoid`: `branch` selects a stable geometric SIDE along the line's direction (R8), so cycling
+      // and re-evaluation pick the same physical crossing as the figure flexes (the raw root order flips).
+      return bySide(sols, l.anchor, l.dir)[p.branch % sols.length];
     }
 
     case 'circle-circle': {
@@ -963,6 +1066,13 @@ function tryEval(
       if (!c1 || !c2) return 'pending';
       const sols = circleCircleIntersect(c1.center, c1.r, c2.center, c2.r);
       if (sols.length === 0) return `cannot construct ${p.id}: circles ${p.circle1} and ${p.circle2} do not meet`;
+      // "The second intersection" (`avoid` set, the other crossing already placed): keep the root that
+      // isn't it — geometric, so it doesn't flip with branch order as the circles move (R8).
+      if (p.avoid) {
+        const kept = otherCrossing(sols, [...pos.values()], pos.get(p.avoid), p.branch);
+        if (kept) return kept;
+        return `cannot construct ${p.id}: circles ${p.circle1} and ${p.circle2} meet only at ${p.avoid} (they are tangent)`;
+      }
       return sols[p.branch % sols.length];
     }
 

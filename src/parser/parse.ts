@@ -129,7 +129,7 @@ function freeLabel(used: string[], prefer: string[] = []): Id {
  * test, so e.g. "triangle"/"angle" there is fine.
  */
 const SHAPE_LEFTOVER =
-  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?)\b|[=⊥∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונך|אנך|מקביל|חוצ|אמצע|תיכון|גובה|המשך|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ/i;
+  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?)\b|[=⊥⟂∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונך|אנך|מקביל|חוצ|אמצע|תיכון|גובה|המשך|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ/i;
 
 /** True if, after removing the shape keyword, geometry the shape can't express remains. */
 const shapeHasLeftover = (s: string, re: RegExp): boolean => SHAPE_LEFTOVER.test(s.replace(re, ' '));
@@ -149,6 +149,10 @@ const quadShape =
 const triShape =
   (re: RegExp, make: (ids: [Id, Id, Id]) => Command): Rule =>
   (s) => {
+    // "the circle CIRCUMSCRIBING triangle ABC …" names a circumcircle, not a free triangle — defer so the
+    // "משולש ABC" inside it doesn't make this rule `stop` (the circumcircle rules sit after the polygons).
+    // BEFORE `re.test` so the early return doesn't leave the `g`-flagged `re`'s lastIndex advanced.
+    if (/circle|מעגל/i.test(s) && /circumscrib|חוסם|\bthrough\b|דרך/i.test(s)) return null;
     if (!re.test(s)) return null;
     const ids = labelRun(s.replace(re, ' '), 3);
     if (!ids) return null;
@@ -185,12 +189,32 @@ const segment: Rule = (s) => {
 };
 
 /**
+ * A bare two-label token — "AB", "ED", "O1O2" — or a "line"-prefixed pair — "line AB" / "ישר AB" /
+ * "הישר AB" / "הקו AB" — is the student's shorthand for *draw the segment* through those two points
+ * (the app draws segments, not infinite lines). The single biggest source of needless LLM escalation
+ * (debug-log analysis 2026-06-18). Anchored to the WHOLE input (just the two labels, nothing else), so
+ * it never shadows a keyword form: "AB = 6" (distance), "AB ⟂ CD" (perpendicular), "line ABE" (ordered
+ * line, ≥3 labels), "line CE passes through A" (collinear) all still reach their own rules first. Runs
+ * LATE (just before `freePoint`) as a catch-all, so anything with structure is claimed ahead of it.
+ */
+const bareSegment: Rule = (s) => {
+  const m = s.trim().match(/^(?:line\s+|ישר\s+|הישר\s+|הקו\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)$/);
+  if (!m) return null;
+  const a = up(m[1]), b = up(m[2]);
+  if (a === b) return null; // "AA" is not a segment
+  return [{ type: 'segment', a, b }];
+};
+
+/**
  * Line–line intersection, both phrasing directions:
  *   point-first — "E is the intersection of AC and BD" / "E = AC ∩ BD" / "E חיתוך AC ו-BD"
  *   lines-first — "AC and BD intersect at E" / "האלכסונים AC ו-BD נחתכים בנקודה E"
+ *   cut-form    — "BD cuts OC at A" / "המשך BD חותך את המשך OC בנקודה A" (the verb sits BETWEEN the two
+ *                 segments: seg1 CUTS seg2 at P). "extension"/"המשך" is irrelevant — two infinite lines
+ *                 meet at one point whether or not it lies beyond the drawn segments.
  * (Hebrew needs both נחתך and נחתכ: the final-form ך differs from the כ that
  * inflected forms like נחתכים carry.) If an intersection keyword is present but
- * neither pattern reads, the parse STOPS — otherwise the `segment` rule would
+ * none of the patterns reads, the parse STOPS — otherwise the `segment` rule would
  * half-parse "the diagonals AC and BD intersect at E" into just "segment AC",
  * silently dropping the intersection point.
  */
@@ -210,11 +234,21 @@ const lineLineIntersection: Rule = (s) => {
   );
   // Draw the two segments we reference (idempotent if they're already edges) — the
   // student should see the lines whose crossing is the point, not just the point.
-  const cross = (id: string, a: string, b: string, c: string, d: string): Command[] => [
-    { type: 'segment', a: up(a), b: up(b) },
-    { type: 'segment', a: up(c), b: up(d) },
-    { type: 'line-line-intersection', id: up(id), a: up(a), b: up(b), c: up(c), d: up(d) },
-  ];
+  // When the lines are EXTENDED to meet at a named point ("המשך CA ו-BD נפגשים בנקודה G"), draw each
+  // line from its base THROUGH to the meeting point G, so the student sees the lines reaching G — not
+  // stubs that stop at the inner points (the operator drew BG/CG by hand otherwise). Without an
+  // extension it draws the operand segments as-is: diagonals crossing BETWEEN their endpoints must stay
+  // whole (drawing only to the crossing would hide half of each diagonal).
+  const extend = /המשך|extension|extended/i.test(s);
+  const cross = (id: string, a: string, b: string, c: string, d: string, dir1?: boolean, dir2?: boolean): Command[] => {
+    const inter: Command = { type: 'line-line-intersection', id: up(id), a: up(a), b: up(b), c: up(c), d: up(d), ...(dir1 ? { dir1: true } : {}), ...(dir2 ? { dir2: true } : {}) };
+    // Extension case: DEFINE G (the intersection) first, THEN draw each line's base → G. Order matters —
+    // a segment to G before G exists would create G as a stray free point and conflict with the
+    // intersection ("'G' is already defined"). Plain case: draw the operand segments, then the crossing.
+    return extend
+      ? [inter, { type: 'segment', a: up(a), b: up(id) }, { type: 'segment', a: up(c), b: up(id) }]
+      : [{ type: 'segment', a: up(a), b: up(b) }, { type: 'segment', a: up(c), b: up(d) }, inter];
+  };
   if (pointFirst) {
     const m = pointFirst;
     return cross(m[1], m[2], m[3], m[4], m[5]);
@@ -225,6 +259,21 @@ const lineLineIntersection: Rule = (s) => {
   if (linesFirst) {
     const m = linesFirst;
     return cross(m[5], m[1], m[2], m[3], m[4]);
+  }
+  // cut-form: seg1, the CUT verb, seg2, then the point — "BD חותך את OC בנקודה A" / "BD cuts OC at A".
+  // (The verb between the segments is what the lines-first form, which needs it AFTER both, misses.)
+  const cutForm = t.match(
+    /\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?(?:חות[כך]|נחתכ?\w*|נפגש\w*|פוגש\w*|cuts?|crosses?|intersects?|meets?).*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\b/i,
+  );
+  if (cutForm) {
+    const m = cutForm;
+    // A "המשך"/extension operand is DIRECTIONAL — A must be beyond its 2nd point (ADR-054). Detect it
+    // per operand by which side of the cut verb the word falls on (seg1 before, seg2 after).
+    const kw = s.match(/חות[כך]|נחתכ?\w*|נפגש\w*|פוגש\w*|cuts?|crosses?|intersects?|meets?/i);
+    const before = kw ? s.slice(0, kw.index) : s;
+    const after = kw ? s.slice((kw.index ?? 0) + kw[0].length) : '';
+    const ext = /המשך|extension|extended/i;
+    return cross(m[5], m[1], m[2], m[3], m[4], ext.test(before), ext.test(after));
   }
   return 'stop';
 };
@@ -342,6 +391,29 @@ const pointOnSegment: Rule = (s) => {
   return [{ type: 'point-on-segment', id, a, b, t }];
 };
 
+/**
+ * TWO points on one segment in a single utterance — "L and K are points on AC" / "L ו-K נקודות על AC"
+ * / "L ו-K על AC". Each is a free point on the segment (no stated ratio); the engine seeds them at
+ * DISTINCT spots so they don't collide ("would be at the same point"). Runs before the single
+ * `pointOnSegment` (which would grab just one label and drop the other) — but defers circle phrasings
+ * ("A and B on circle O") to the circle rules.
+ */
+const pointsOnSegment: Rule = (s) => {
+  if (/circle|מעגל/i.test(s)) return null; // "A and B on circle O" is two points on a CIRCLE — not here
+  // NB: `\w` is ASCII-only in JS, so the Hebrew "points" word uses an explicit Hebrew-letter class
+  // (else "נקודות" only partly matches and the rule misses).
+  const m = s.match(
+    /\b([A-Za-z]\d*)\s*(?:,|and|ו-?)\s*([A-Za-z]\d*)\b\s*(?:are\s+)?(?:points?|נקוד[א-ת]*)?\s*(?:on|על)\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+  );
+  if (!m) return null;
+  const [p1, p2, a, b] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
+  if (new Set([p1, p2, a, b]).size !== 4) return null; // four distinct labels (two points, two endpoints)
+  return [
+    { type: 'point-on-segment', id: p1, a, b },
+    { type: 'point-on-segment', id: p2, a, b },
+  ];
+};
+
 /** "C is 5 from A and 5 from B" / "C במרחק 5 מ-A ו-5 מ-B" */
 const pointByDistances: Rule = (s) => {
   const en = s.match(
@@ -397,13 +469,23 @@ const ratioConstraint: Rule = (s) => {
  * would otherwise half-parse the "ED=2" in the middle and drop the rest (the bug that
  * left a point unplaced). Drives a sliding point on either segment.
  */
+// A ratio VALUE: a number or fraction, each part optionally under a √ — "2/3", "√2/2", "1/√3", "√2".
+const RATVAL = String.raw`(√)?\s*(${COEF})\s*(?:\/\s*(√)?\s*(${COEF}))?`;
 const segmentRatio: Rule = (s) => {
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*\/\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})\s*(?:\/\s*(${COEF}))?`));
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*\/\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${RATVAL}`));
   if (!m) return null;
-  const num = parseFloat(m[5]);
-  const den = m[6] ? parseFloat(m[6]) : 1;
+  const num = m[5] ? Math.sqrt(parseFloat(m[6])) : parseFloat(m[6]); // m5 = √ on numerator
+  const den = m[8] !== undefined ? (m[7] ? Math.sqrt(parseFloat(m[8])) : parseFloat(m[8])) : 1; // m7 = √ on denominator
   return [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: num / den }];
 };
+
+/**
+ * A ratio LHS — "XY/ZW =" — so the measure-VALUE rules (a single segment "XY = …") don't grab a
+ * FRAGMENT of a ratio (the "AE=√2" inside "EB/AE=√2/2" — a silent wrong parse, the ADR-024/026 class).
+ * When this matches, only `segmentRatio` (which runs first) may handle it; an RHS it can't read then
+ * escalates honestly rather than half-parsing.
+ */
+const SEG_RATIO_LHS = new RegExp(String.raw`\b[A-Za-z]\d*\s*[A-Za-z]\d*\b\s*\/\s*\b[A-Za-z]\d*\s*[A-Za-z]\d*\b\s*=`);
 
 /**
  * "AB = CD" — two segments equal in length. Also DRAWS both named segments (idempotent),
@@ -428,6 +510,7 @@ const equalSegments: Rule = (s) => {
  * instead of a wrong partial parse. (R6a.)
  */
 const distanceConstraint: Rule = (s) => {
+  if (SEG_RATIO_LHS.test(s)) return null;
   const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${num}\s*$`));
   if (!m) return null;
   const [a, b] = [up(m[1]), up(m[2])];
@@ -459,6 +542,7 @@ const normVar = (v: string): string => (/^[Rr]$/.test(v) ? RADIUS_VAR : v);
  * toolbar button) is accepted — the word "pi" is left out as it collides with a segment "PI".
  */
 const measurePi: Rule = (s) => {
+  if (SEG_RATIO_LHS.test(s)) return null; // a ratio's RHS, not a length — let segmentRatio own it
   const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*π`));
   if (!m) return null;
   const c = m[3] ? parseFloat(m[3]) : 1;
@@ -466,6 +550,7 @@ const measurePi: Rule = (s) => {
 };
 
 const measureLength: Rule = (s) => {
+  if (SEG_RATIO_LHS.test(s)) return null;
   // The variable is one lowercase/Greek letter, not followed by another latin letter
   // (so "AB = CD" stays a ratio and a Greek letter — no regex word boundary — still ends cleanly).
   // An optional trailing "/d" makes the coefficient a fraction ("7k/5" ⇒ coef 7/5); an optional
@@ -508,6 +593,7 @@ const measureLength: Rule = (s) => {
  */
 const SQRT_FN = String.raw`(?:√|\\sqrt|sqrt)\s*[\{(]?\s*(${VAR}|${COEF})\s*[\})]?`;
 const measureSqrt: Rule = (s) => {
+  if (SEG_RATIO_LHS.test(s)) return null; // don't grab the "AE=√2" fragment inside "EB/AE=√2/2"
   const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*${SQRT_FN}`, 'i'));
   if (!m) return null;
   const a = up(m[1]);
@@ -527,6 +613,7 @@ const measureSqrt: Rule = (s) => {
  * or `^n`.
  */
 const measurePower: Rule = (s) => {
+  if (SEG_RATIO_LHS.test(s)) return null;
   const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*(${VAR}|${COEF})\s*(?:([²³])|\^\s*(\d+))`, 'i'));
   if (!m) return null;
   const a = up(m[1]);
@@ -616,8 +703,8 @@ const parallelConstraint: Rule = (s) => {
  * (not the foot phrasing). Like ∥, it also DRAWS both segments (idempotent).
  */
 const perpendicularConstraint: Rule = (s) => {
-  if (!/perpendicular|⊥|מאונך/i.test(s)) return null;
-  const t = s.replace(/perpendicular(?:\s*to)?|⊥|מאונך(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
+  if (!/perpendicular|⊥|⟂|מאונך/i.test(s)) return null; // both ⊥ (U+22A5) and ⟂ (U+27C2)
+  const t = s.replace(/perpendicular(?:\s*to)?|⊥|⟂|מאונך(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
   if ((t.match(/\b[A-Za-z]\d*\s*[A-Za-z]\d*\b/g) ?? []).length < 2) return null; // "perpendicular from A to BC" is the foot, not this
   const m = t.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
   if (!m) return null;
@@ -827,7 +914,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
   // No centre named ⇒ create one: a fresh label that doesn't clash with the vertices OR with any
   // point already in the figure (a second inscribed circle must not reuse the first's centre 'O').
-  const center = named ?? freeLabel([...ids, ...(ctx.points ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
+  const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
   const circ = circleId(center);
   // Inscribing a polygon whose vertices ALREADY exist can't re-place them on a fresh circle
   // (that would detach them from their own definitions — A from segment CD, etc.). A triangle's
@@ -850,7 +937,10 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // CROSSED quad. Use a convex, ordered angle set for ANY general quad — inscribed (drawn
   // circle) or cyclic (hidden) — so ABCD is always a proper convex quadrilateral.
   const angles = kind === 'quad' ? CYCLIC_QUAD_ANGLES : INSCRIBED_ANGLES[kind];
-  const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, ...(hidden ? { hidden: true } : {}), ...(named ? {} : { autoCenter: true }) }];
+  // No STATED radius ⇒ the circle's size is a free DOF (ADR-052) — playable/sampleable, not frozen at the
+  // default; a numeric/symbolic "radius R" stays fixed. (Matches the bare-`circle` rule.)
+  const freeRadius = !r.numeric && !r.symbolic;
+  const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, ...(freeRadius ? { freeRadius: true } : {}), ...(hidden ? { hidden: true } : {}), ...(named ? {} : { autoCenter: true }) }];
   if (r.varCmd) cmds.push(r.varCmd);
   ids.forEach((id, i) => {
     // specific angle for a shaped cyclic polygon (square/rect/rhombus/trapezoid);
@@ -956,6 +1046,50 @@ const incircle: Rule = (s, ctx) => {
   ];
 };
 
+/**
+ * "AB ו-AD משיקים למעגל O [בנקודות E ו-K]" / "AB and AD are tangent to circle O [at E and K]" —
+ * a circle tangent to TWO segments that meet at a shared vertex (a corner of a polygon). The two
+ * sides are GIVEN and the circle is constrained tangent to both — the inverse of "tangent FROM a
+ * point" (where the circle is given). The centre lies on the angle bisector at the shared vertex
+ * (the locus equidistant from both sides) with ONE free DOF — how far along, i.e. how big the
+ * inscribed-corner circle is ([ADR-052](docs/06-decisions.md#adr-052): no stated size, so it's a
+ * free DOF "show another configuration" grows/shrinks). Built entirely from primitives, like the
+ * incircle: a bisector, a FREE point on it (the centre), a circle through the foot on one side
+ * (radius = distance to that side ⇒ tangent); tangency to the other side is automatic (equidistant).
+ * The two tangency points are the feet of the ⟂ from the centre onto each side. v1 needs the sides
+ * to share a vertex (a corner); two parallel/opposite sides (no shared vertex) fall through.
+ */
+const cornerTangentCircle: Rule = (s, ctx) => {
+  if (!/tangent|משיק/i.test(s)) return null;
+  // two segments joined by "and"/"ו", both tangent to a circle: capture the 4 side labels
+  const m = s.match(/([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*(?:and|ו-?|,)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\s+(?:are\s+)?(?:tangent|משיק)/i);
+  if (!m) return null;
+  const seg1 = [up(m[1]), up(m[2])];
+  const seg2 = [up(m[3]), up(m[4])];
+  const shared = seg1.filter((x) => seg2.includes(x));
+  if (shared.length !== 1) return null; // need exactly one common vertex (the corner's two arms)
+  const vertex = shared[0];
+  const arm1 = seg1.find((x) => x !== vertex)!;
+  const arm2 = seg2.find((x) => x !== vertex)!;
+  // The circle's centre: the named one ("circle O"), else a fresh auto-name — the corner circle is a
+  // NEW object, so "AB ו-AD משיקים למעגל" (no name) is built deterministically rather than escalating
+  // (the centre is dodged against the figure's labels, like the incircle's incenter).
+  const center = circleCenter(s) ?? freeLabel([vertex, arm1, arm2, ...(ctx.points ?? [])], ['O', 'P', 'Q', 'M']);
+  // optional named tangency points: "at E and K" / "בנקודות E ו-K"
+  const tp = s.match(/(?:\bat\b|בנקוד\w*)\s+([A-Za-z]\d*)\s*(?:and|ו-?|,)\s*([A-Za-z]\d*)/i);
+  const taken = [vertex, arm1, arm2, center, ...(ctx.points ?? [])];
+  const E = tp ? up(tp[1]) : freeLabel(taken, ['E', 'F', 'G']); // tangency on side 1 (also the circle's through-point)
+  const K = tp ? up(tp[2]) : freeLabel([...taken, E], ['K', 'M', 'N']); // tangency on side 2
+  const bisId = `bis-${arm1}${vertex}${arm2}`;
+  return [
+    { type: 'bisector', id: bisId, vertex, p: arm1, q: arm2 },
+    { type: 'point-on-line', id: center, line: bisId, offset: 2 }, // the centre — a FREE DOF sliding along the bisector (seed kept small so resample stays within the sides)
+    { type: 'foot', id: E, from: center, a: vertex, b: arm1 }, // tangency point on side 1
+    { type: 'foot', id: K, from: center, a: vertex, b: arm2 }, // tangency point on side 2
+    { type: 'circle-through', id: circleId(center), center, through: E }, // r = dist(centre, side) ⇒ tangent to both
+  ];
+};
+
 /** "chord AB in circle O" / "מיתר AB במעגל O" — both endpoints on the circle + the segment. */
 const chord: Rule = (s, ctx) => {
   if (!/chord|מיתר/i.test(s)) return null;
@@ -1004,12 +1138,16 @@ const arcMidpoint: Rule = (s, ctx) => {
 };
 
 /** "A is on circle O" / "A על מעגל O" — a single inscribed point. */
-const pointOnCircle: Rule = (s) => {
+const pointOnCircle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
   // Leading \b on the label so "point A on circle O" reads A, not the "t" of "poin**t**".
-  const m = s.match(/\b([A-Za-z]\d*)\b.*?(?:on|על).*?(?:circle|מעגל)\s+([A-Za-z]\d*)\b/i);
+  const m = s.match(/\b([A-Za-z]\d*)\b.*?(?:on|על).*?(?:circle|מעגל)/i);
   if (!m) return null;
-  return [{ type: 'point-on-circle', id: up(m[1]), circle: circleId(m[2]) }];
+  // The circle: its named centre ("circle O"), or — for a DEFINITE/unnamed reference ("on the
+  // circle" / "על המעגל" / "נמצאת על המעגל") — the figure's single circle, via context.
+  const center = resolveCenter(s, ctx);
+  if (!center) return null; // 0 or 2+ unnamed circles ⇒ ambiguous → defer/escalate
+  return [{ type: 'point-on-circle', id: up(m[1]), circle: circleId(center) }];
 };
 
 /**
@@ -1193,7 +1331,8 @@ const twoCirclesMeet: Rule = (s) => {
     { type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, freeRadius: true, ...(auto1 ? { autoCenter: true } : {}) },
     { type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ...(auto2 ? { autoCenter: true } : {}) },
     { type: 'circle-circle-intersection', id: A, circle1: id1, circle2: id2, branch: 0 },
-    { type: 'circle-circle-intersection', id: B, circle1: id1, circle2: id2, branch: 1 },
+    // B is "the OTHER crossing" — geometric (avoid A), so it doesn't swap with A as the circles flex (R8).
+    { type: 'circle-circle-intersection', id: B, circle1: id1, circle2: id2, branch: 1, avoid: A },
   ];
 };
 
@@ -1221,6 +1360,40 @@ const circleCircleIntersection: Rule = (s) => {
  * and line∩line (this REQUIRES a named circle). Runs after the circle-circle rules, before the
  * generic collinearity / line∩line (whose `INTERSECT_KW` guard would otherwise grab "חותך").
  */
+/**
+ * "המשך AC חותך מעגל P בנקודה D" / "AC extended meets circle P at D" / "the extension of AC cuts
+ * circle P at D" — a DIRECTIONAL extension onto a circle ([ADR-054](docs/06-decisions.md#adr-054)).
+ * Unlike {@link lineMeetsCircle} (an order-agnostic chord that AVOIDS a shared on-circle endpoint),
+ * `המשך` is directional: the new point D is BEYOND the 2nd named point (order A→C→D for "המשך AC"),
+ * and a FREE-radius circle adapts (the joint solver grows it) so the extension actually reaches it —
+ * with default radii a line often has no extension crossing at all ("adapt the figure", ADR-052).
+ *
+ * Triggered by an extension word (המשך / extension / extended) + a NAMED circle; runs BEFORE
+ * `lineMeetsCircle` so a non-extension "line AC meets circle P" keeps the order-agnostic chord rule,
+ * and after the tangent/external-secant compounds (guarded out by "tangent"/"משיק"/"from"/"מנקודה").
+ */
+const extendOntoCircle: Rule = (s) => {
+  if (!/המשך|extension|extended/i.test(s)) return null; // directional only — a plain chord stays lineMeetsCircle
+  if (!INTERSECT_KW.test(s)) return null;
+  if (/tangent|משיק/i.test(s)) return null; // tangent compound → tangentMeetsOtherCircle / tangentLine
+  if (/\bfrom\b|מנקודה|מהנקודה/i.test(s)) return null; // "from <point>" → the external-point secant
+  const center = circleCenter(s);
+  if (!center) return null; // must NAME a circle (else pointOnExtension on a segment / line∩line)
+  // the new crossing: the label after the "at"/"בנקודה" that FOLLOWS the circle mention
+  const ci = s.search(/(?:circle|מעגל)\s+[A-Za-z]\d*/i);
+  const atM = s.slice(ci).match(/(?:\bat\b|בנקודה|ב-)\s*([A-Za-z]\d*)\b/i);
+  if (!atM) return null;
+  const R = up(atM[1]);
+  // the line's two points (document order: a then b; D lands beyond b — the 2nd letter)
+  const body = dropCircleRef(s)
+    .replace(/(?:\bat\b|בנקודה|ב-)\s*[A-Za-z]\d*\b/gi, ' ')
+    .replace(/extension|extended|\bline\b|המשך|הישר|הקו|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?/gi, ' ');
+  const pr = labelRun(body, 2);
+  if (!pr || pr.includes(R)) return null;
+  const [a, b] = pr;
+  return [{ type: 'extend-onto-circle', id: R, a, b, circle: circleId(center) }];
+};
+
 const lineMeetsCircle: Rule = (s, ctx) => {
   if (!INTERSECT_KW.test(s)) return null;
   if (/tangent|משיק/i.test(s)) return null; // tangent line → tangentMeetsOtherCircle / tangentLine
@@ -1301,6 +1474,12 @@ const tangentMeetsOtherCircle: Rule = (s) => {
  */
 const circlesTangent: Rule = (s) => {
   if (!/tangent|משיק/i.test(s)) return null;
+  // Mutual tangency is a STATE ("tangent to each other at M" / "משיקים זה לזה"), never a crossing EVENT.
+  // A cuts/meets keyword (חותך/פוגש/cuts/meets) means a tangent LINE meeting the other circle —
+  // `tangentMeetsOtherCircle` (which runs first) owns that. Guarding here stops a near-miss of that rule
+  // (e.g. a typo'd "שנקודה" for "בנקודה" that breaks its precise pair-match) from FALLING THROUGH to a
+  // wrong mutual-tangency that silently repositions the circles and draws no line — escalate instead.
+  if (INTERSECT_KW.test(s)) return null;
   const centers = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
   if (centers.length < 2 || centers[0] === centers[1]) return null; // a single circle ⇒ the tangent-line rule
   const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i);
@@ -1375,7 +1554,11 @@ const tangentsFromExternal: Rule = (s, ctx) => {
   const mid = `~tanmid-${center}${E}`; // hidden centre of the Thales circle on O-E (scaffolding; "~" → not drawn)
   const aux = `tanaux-${center}${E}`;
   const out: AnyCommand[] = [];
-  if (!ctx.points?.includes(E)) out.push({ type: 'free-point', id: E, x: 12, y: 0 }); // the external apex, if new
+  // The external apex, if new. Seeded CLOSE to the default circle (~1.2× its radius, like a textbook
+  // tangent sketch) rather than far out: a far apex puts directional follow-ups like "המשך BD חותך את
+  // המשך OC" in the wrong basin (the extensions then cross on the far side), and a close apex also gives
+  // wider, more textbook-like tangents. D stays a free DOF the solver/sampler can still move.
+  if (!ctx.points?.includes(E)) out.push({ type: 'free-point', id: E, x: 6, y: 0, free: true }); // a FREE DOF (ADR-052), not pinned — a constraint can drive it / the sampler can move it
   out.push(
     { type: 'midpoint', id: mid, a: center, b: E },
     { type: 'circle-through', id: aux, center: mid, through: center, hidden: true }, // circle on diameter OE (hidden)
@@ -1480,18 +1663,34 @@ const perpendicularLine: Rule = (s, ctx) => {
     .match(/(?:perpendicular\s*to|⊥|מאונך\s*ל-?|אנך\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!seg) return null;
   const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
-  const names = lineNameLabels(s, [P, a, b]);
   const have = new Set(ctx.points ?? []);
   const lineId = `perp-${P}-${a}${b}`;
-  // CONSTRUCT a perpendicular through the cut-point P, with the named endpoints as markers straddling
-  // it (ADR-036). The cut-point P is on the reference AB: create it there if it doesn't exist yet (the
-  // foot). The markers REUSE the named points if they already exist — a bare "segment CD" then
-  // "CD ⟂ AB at F" REPOSITIONS C,D onto the perpendicular (apply replaces the loose free points), so
-  // CD becomes the perpendicular crossing AB at F, centred on it (clean cross), without redefinition errors.
   const out: AnyCommand[] = [];
-  if (!have.has(P)) out.push({ type: 'point-on-segment', id: P, a, b }); // the foot on AB, if new
+  if (!have.has(P)) out.push({ type: 'point-on-segment', id: P, a, b }); // the through/foot point on AB, if new
+
+  // "… חותך את CD בנקודה E" / "… cuts CD at E" — the perpendicular MEETS another segment at a NEW point.
+  // Without this the rule dropped the cut and drew only a bare line (operator: "it just drew a line").
+  // Build the perpendicular as SCAFFOLDING (not a long drawn line), cross it with CD to place E, and draw
+  // the perpendicular SEGMENT P–E (e.g. EK) — that's the figure the student wants, not an infinite line.
+  // The cut verb anchors the match, so the SECOND "בנקודה"/"at" (the result point) is read, not P's.
+  const cut = s.match(
+    new RegExp(String.raw`(?:חות[כך]|נחת\w*|פוגש\w*|פגש|\bcuts?\b|\bcrosses?\b|\bmeets?\b|\bintersects?\b)\s*(?:את\s+)?(?:ה?קו\s+|ה?ישר\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?(?:בנקודה|\bat\b|ב-)\s*([A-Za-z]\d*)`, 'i'),
+  );
+  if (cut) {
+    const [c1, c2, e] = [up(cut[1]), up(cut[2]), up(cut[3])];
+    const abId = `line-${c1}${c2}`;
+    out.push({ type: 'perpendicular-line', id: lineId, through: P, a, b, visible: false }); // scaffolding for the ∩
+    out.push({ type: 'line-through', id: abId, a: c1, b: c2 }); // the segment it cuts, as a line
+    out.push({ type: 'line-intersection', id: e, line1: lineId, line2: abId }); // E = perpendicular ∩ CD
+    out.push({ type: 'segment', a: e, b: P }); // draw the perpendicular segment E–P (e.g. EK)
+    return out;
+  }
+
+  // No cut: CONSTRUCT a drawn perpendicular through P, with any named endpoints as markers straddling it
+  // (ADR-036). The markers REUSE the named points if they already exist — a bare "segment CD" then
+  // "CD ⟂ AB at F" REPOSITIONS C,D onto the perpendicular, a clean cross, without redefinition errors.
   out.push({ type: 'perpendicular-line', id: lineId, through: P, a, b, visible: true });
-  out.push(...lineMarkers(lineId, names));
+  out.push(...lineMarkers(lineId, lineNameLabels(s, [P, a, b])));
   return out;
 };
 
@@ -1528,6 +1727,39 @@ const parallelLine: Rule = (s, ctx) => {
  * "מעגל דרך A B C" — the circle determined by three points (centre = circumcentre).
  * Distinct from circle-through (centre + ONE point): this reads exactly 3 labels.
  */
+/**
+ * "the circle circumscribing triangle ABC cuts CE at D" / "המעגל החוסם את משולש ABC חותך את CE בנקודה D"
+ * — the CIRCUMCIRCLE of a triangle (through its 3 vertices), intersected with a segment at a new point.
+ * Builds the circumcircle + the crossing of line CE with it. The cut segment normally shares a vertex
+ * with the triangle (C is on the circumcircle), so D is the OTHER crossing (avoid the shared vertex).
+ * Runs before `triangle`/`circumcircle` so the compound isn't half-parsed into just the circle.
+ */
+const circumcircleMeetsSegment: Rule = (s, ctx) => {
+  if (!/circle|מעגל/i.test(s)) return null;
+  const cue = s.match(/circumscrib\w*|חוסם|\bthrough\b|דרך/i); // circumcircle cue (חוסם ≠ inscribed חסום)
+  const cut = s.match(/חות[כך]|נחתכ?\w*|נפגש\w*|פוגש\w*|cuts?|crosses?|intersects?|meets?/i);
+  const at = s.match(/(?:\bat\b|בנקודה|ב-)\s*([A-Za-z]\d*)\b/i);
+  if (!cue || !cut || !at || cut.index! < cue.index!) return null;
+  const D = up(at[1]);
+  // the triangle's 3 vertices: the labels between the cue and the cut verb ("…circumscribing [triangle] ABC cuts…").
+  const tri = labelRun(s.slice(cue.index! + cue[0].length, cut.index).replace(/triangle|משולש|את|\bof\b|\bthe\b/gi, ' '), 3);
+  if (!tri) return null;
+  const [a, b, c] = tri;
+  // the cut segment: the 2 labels between the cut verb and "at".
+  const seg = labelRun(s.slice(cut.index! + cut[0].length, at.index).replace(/את|\bthe\b|\bline\b|הישר|הקו|המשך/gi, ' '), 2);
+  if (!seg || seg.includes(D)) return null;
+  const [p, q] = seg;
+  const shared = [p, q].find((x) => [a, b, c].includes(x)) ?? p; // the endpoint already on the circumcircle
+  const center = freeLabel([a, b, c, p, q, D, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
+  const circId = circleId(center);
+  const lineId = `line-${p}${q}`;
+  return [
+    { type: 'circumcircle', id: circId, center, a, b, c },
+    { type: 'line-through', id: lineId, a: p, b: q },
+    { type: 'line-circle-intersection', id: D, line: lineId, circle: circId, avoid: shared },
+  ];
+};
+
 const circumcircle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
   if (!/through|circumscrib|חוסם|דרך/i.test(s)) return null; // the 3-point cue (חוסם circumscribes ≠ חסום inscribed)
@@ -1538,7 +1770,7 @@ const circumcircle: Rule = (s, ctx) => {
   // (ADR-041). Only when all four already exist (else it's a fresh on-circle placement, not this rule).
   const four = labelRun(rest, 4);
   if (four && four.every((id) => (ctx.points ?? []).includes(id))) {
-    const center = freeLabel([...four, ...(ctx.points ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
+    const center = freeLabel([...four, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
     return [
       { type: 'circumcircle', id: circleId(center), center, a: four[0], b: four[1], c: four[2] },
       { type: 'set-concyclic', points: four },
@@ -1547,7 +1779,7 @@ const circumcircle: Rule = (s, ctx) => {
   const ids = labelRun(rest, 3);
   if (!ids) return null;
   // Avoid clashing with an existing centre (a second circle gets a fresh label, not a reused 'O').
-  const center = freeLabel([...ids, ...(ctx.points ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
+  const center = freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
   return [{ type: 'circumcircle', id: circleId(center), center, a: ids[0], b: ids[1], c: ids[2] }];
 };
 
@@ -1828,6 +2060,7 @@ const RULES: Rule[] = [
   semicircle, // "חצי מעגל" / "semicircle" — before `circle` (contains "מעגל") and the shape rules
   quarterCircle, // "רבע מעגל" / "quarter circle" — same
   incircle, // "circle inscribed in triangle ABC" — before inscribedPolygon (both match "inscribed")
+  circumcircleMeetsSegment, // "the circle circumscribing ABC cuts CE at D" — before the shape rules (its "משולש ABC" would stop `triangle`)
   inscribedPolygon, // before the shape rules ("triangle ABC inscribed …" contains "triangle")
   // Special-line constructs whose Hebrew names a triangle ("…במשולש ABC") must
   // run before the shape rules, or `triangle` grabs the embedded משולש and stops.
@@ -1845,6 +2078,7 @@ const RULES: Rule[] = [
   bisectorIntersection, // two bisectors meet — before the one-bisector and generic intersections
   bisectorSegmentIntersection, // one bisector ∩ a segment
   bisectorPlacesPoint, // "AD bisects ∠BAC" — places D on the opposite side (after the ∩ compounds)
+  cornerTangentCircle, // "AB and AD tangent to circle O" — a circle tangent to two sides of a corner; before the tangent/line rules (the משיק keyword makes lineLineIntersection 'stop')
   tangentLineIntersection, // tangent ∩ a segment
   parallelCircleIntersection, // a parallel line ∩ the circle
   tangentMeetsOtherCircle, // tangent LINE to one circle meets the OTHER circle — before circlesTangent (which would misread it as mutual tangency)
@@ -1852,7 +2086,8 @@ const RULES: Rule[] = [
   secantFromExternal, // "from external point E a line cuts the circle at A,B" — before the generic intersections
   twoCirclesMeet, // "two circles intersect at A and B" — create both circles + both intersection points
   circleCircleIntersection, // two circles cross — before the generic line∩line intersection
-  lineMeetsCircle, // "[extension of] AC cuts circle P at E" — a chord/line meeting a circle, before collinearity & line∩line
+  extendOntoCircle, // "המשך AC חותך מעגל P בנקודה D" — DIRECTIONAL extension onto a circle (D beyond the 2nd letter), before the order-agnostic lineMeetsCircle
+  lineMeetsCircle, // "line AC meets circle P at E" — an order-agnostic chord/line meeting a circle, before collinearity & line∩line
   // A drawn perpendicular/parallel line that "cuts" another at a point must be claimed BEFORE the
   // generic line∩line rule: the "cuts"/"חותך" keyword otherwise makes lineLineIntersection 'stop'
   // (it can't read "ED ⟂ AB cuts it at C") and the whole parse aborts to the LLM — which then
@@ -1883,6 +2118,7 @@ const RULES: Rule[] = [
   pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)
   pointOnCircle, // "A on circle O" — before segment/pointOnSegment
   segment,
+  pointsOnSegment, // "L and K are points on AC" — TWO points on a segment, before the single pointOnSegment
   pointOnSegment,
   measureOrder, // "α < β" — an inequality between two named measures (before setVar/numeric rules)
   setVar, // "x = 4" / "α = 30" — a bare variable binding; before the numeric rules
@@ -1896,10 +2132,29 @@ const RULES: Rule[] = [
   distanceConstraint, // "AB = 6"
   pointByDistances,
   freePoint,
+  bareSegment, // LAST catch-all: a bare "AB" / "line AB" → draw the segment (after every keyword/structured rule)
 ];
 
+/**
+ * Spelled-out Greek letter names → their symbols, so "alpha"/"2alpha" read the same as "α"/"2α".
+ * Without this the single-Greek-letter variable regex missed "alpha", and "2alpha" then half-parsed
+ * to the NUMBER 2 (a wrong angle of 2°, silently dropping the variable — the ADR-024/026 class).
+ * Lowercase-only and word-bounded, so an UPPERCASE point pair ("MU", "XI") is never mistaken for a
+ * letter; "pi" is omitted on purpose (it collides with a segment "PI" — see {@link measurePi}).
+ */
+const GREEK_WORDS: Record<string, string> = {
+  alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', epsilon: 'ε', zeta: 'ζ', eta: 'η', theta: 'θ',
+  iota: 'ι', kappa: 'κ', lambda: 'λ', mu: 'μ', nu: 'ν', xi: 'ξ', rho: 'ρ', sigma: 'σ',
+  tau: 'τ', phi: 'φ', chi: 'χ', psi: 'ψ', omega: 'ω',
+};
+// Bounded by "not a letter" on each side rather than `\b`, so a DIGIT prefix counts ("2alpha" → "2α",
+// where `\b` would fail because digit↔letter is not a word boundary) while a letter neighbour (a longer
+// word) does not match.
+const GREEK_RE = new RegExp(String.raw`(?<![A-Za-zα-ω])(${Object.keys(GREEK_WORDS).sort((a, b) => b.length - a.length).join('|')})(?![A-Za-zα-ω])`, 'g');
+const normalizeGreek = (s: string): string => s.replace(GREEK_RE, (m) => GREEK_WORDS[m]);
+
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
-  const s = raw.trim().replace(/\s+/g, ' ');
+  const s = normalizeGreek(raw.trim().replace(/\s+/g, ' '));
   if (!s) return { ok: false, reason: 'not-handled' };
   for (const rule of RULES) {
     const commands = rule(s, ctx);
