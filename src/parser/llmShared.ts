@@ -74,6 +74,9 @@ export function buildSystemPrompt(): string {
     '"מקבילית שבה AB שווה ל-6" → ["מקבילית ABCD","AB = 6"]   (Hebrew request → Hebrew steps)',
     '"צייר משולש ABC וגובה מ-A" → ["משולש ABC","גובה מ-A במשולש ABC"]',
     '"draw the tangent to the circle at A" → ["tangent to circle O at A"]',
+    // Expand a quantifier ("each vertex") and pair things up into the supported two-tangents-meet form.
+    '"דרך כל קודקוד של משולש ABC מעבירים משיק למעגל, והמשיקים נפגשים בנקודות D E F" → ["המשיק בנקודה A והמשיק בנקודה B נפגשים בנקודה D","המשיק בנקודה B והמשיק בנקודה C נפגשים בנקודה E","המשיק בנקודה C והמשיק בנקודה A נפגשים בנקודה F"]',
+    '"tangents at each vertex of triangle ABC meet at D, E, F" → ["the tangent at A and the tangent at B meet at D","the tangent at B and the tangent at C meet at E","the tangent at C and the tangent at A meet at F"]',
   ].join('\n');
 }
 

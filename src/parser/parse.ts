@@ -227,6 +227,12 @@ const lineLineIntersection: Rule = (s) => {
   // into a bare intersection that drops the diameter & chord — escalate so the
   // operands get created (ADR-024; the LLM has the circle as context).
   if (/\bdiameter\b|\bchord\b|\bradius\b|\btangent\b|קוטר|מיתר|רדיוס|משיק/i.test(s)) return 'stop';
+  // A PERPENDICULAR/PARALLEL operand ("the perpendicular to AD") is NOT a line through two labelled
+  // points — reading "האנך ל-AD" as "line AD" silently drops the ⟂ and (when AD shares an endpoint with
+  // the other line) collapses the crossing onto that point (operator: "המשך DB והאנך לישר AD נפגשים ב-G"
+  // built a degenerate G on D). Escalate so the perpendicular is built properly (it needs a through-point;
+  // the LLM / the `perpendicular … cuts … at` form supplies it).
+  if (/\bperpendicular\b|\bparallel\b|מאונך|אנך|מקביל|[⊥⟂∥]/i.test(s)) return 'stop';
   // Drop filler words so they aren't mistaken for two-letter line labels ("of"!).
   const t = s.replace(/\b(?:is|the|of|between|at|point|הוא|בין|בנקודה|נקודה)\b/gi, ' ');
   const pointFirst = t.match(
@@ -1017,16 +1023,21 @@ const quarterCircle: Rule = (s) => {
 };
 
 /**
- * "circle inscribed in triangle ABC" / "incircle of triangle ABC" /
- * "מעגל חסום במשולש ABC" — the INCIRCLE: centred at the incenter (where two angle
- * bisectors meet), tangent to the sides. Built from existing primitives — two
- * bisectors → their crossing (incenter) → the foot on a side (tangency point) →
- * a circle through it. Distinct from "triangle inscribed in a circle".
+ * "circle inscribed in triangle ABC" / "incircle of triangle ABC" / "מעגל חסום במשולש ABC", OR the
+ * triangle-first phrasing "triangle DEF circumscribes the circle" / "משולש DEF חוסם את המעגל" — the
+ * INCIRCLE: centred at the incenter (where two angle bisectors meet), tangent to the sides. Built from
+ * existing primitives — two bisectors → their crossing (incenter) → the foot on a side (tangency point)
+ * → a circle through it. Distinct from "triangle inscribed in a circle".
  */
 const incircle: Rule = (s, ctx) => {
-  if (!/incircle|inscrib\w*|חסום/i.test(s)) return null;
-  if (!isCircleInPolygon(s)) return null; // only "circle in polygon", not "polygon in circle"
   if (!/triangle|משולש/i.test(s)) return null; // v1: incircle of a triangle
+  // EITHER "circle inscribed in triangle …" (circle-in-polygon) …
+  const circleInTri = /incircle|inscrib\w*|חסום/i.test(s) && isCircleInPolygon(s);
+  // … OR "triangle DEF circumscribes the circle" — the TRIANGLE encloses the circle (same figure). Ordered
+  // (triangle-labels … circumscribes … circle) so a CIRCLE-first "מעגל חוסם משולש" (a circumcircle) does
+  // NOT match here — only the triangle-as-subject reading does.
+  const triCircumscribes = /(?:triangle|משולש)\s+[A-Za-z]\d*.*?(?:circumscrib\w*|חוסם).*?(?:circle|מעגל)/i.test(s);
+  if (!circleInTri && !triCircumscribes) return null;
   const triPart = s.split(/triangle|משולש/i).slice(1).join(' '); // vertices follow the polygon word
   const ids = labelRun(triPart, 3);
   if (!ids) return null;
@@ -1148,6 +1159,35 @@ const pointOnCircle: Rule = (s, ctx) => {
   const center = resolveCenter(s, ctx);
   if (!center) return null; // 0 or 2+ unnamed circles ⇒ ambiguous → defer/escalate
   return [{ type: 'point-on-circle', id: up(m[1]), circle: circleId(center) }];
+};
+
+/**
+ * TWO tangents to the circle, at two points ON it, meeting at a third point — "the tangent at A and the
+ * tangent at C meet at D" / "המשיק [מ/ב]נקודה A והמשיק [מ/ב]נקודה C נפגשים בנקודה D" (the pole of chord
+ * AC). A,C are on the circle (an inscribed triangle's vertices); each tangent is ⟂ the radius there, and
+ * D is their crossing. Built from the `tangent` line spec + a `line-intersection`. Before
+ * `tangentLineIntersection` (tangent ∩ a SEGMENT) and the single-tangent rules.
+ */
+const twoTangentsMeet: Rule = (s, ctx) => {
+  if (!/tangent|משיק/i.test(s)) return null;
+  if (!(INTERSECT_KW.test(s) || /נפגש|מפגש/.test(s))) return null;
+  // the two tangency points: a label after each "tangent at/from"/"משיק [מ/ב]נקוד[ה]" (typo מנקדה allowed)
+  const pts = [...s.matchAll(/(?:tangent|משיק)[^A-Za-z]{0,14}?(?:\bat\b|\bfrom\b|בנקודה|מנקודה|מנקדה)\s*([A-Za-z]\d*)/gi)].map((m) => up(m[1]));
+  if (pts.length < 2) return null; // need TWO tangents (one tangent ∩ a segment is tangentLineIntersection)
+  const center = resolveCenter(s, ctx);
+  if (!center) return null;
+  // the meeting point: "meet at D" / "נפגשים בנקודה D" / "חותך … D"
+  const meetM = s.match(/(?:נפגש\w*|מפגש|פוגש\w*|\bmeets?\b|\bintersects?\b|חות[כך])[^A-Za-z]{0,14}?(?:בנקודה|\bat\b|ב-)\s*([A-Za-z]\d*)/i);
+  if (!meetM) return null;
+  const [A, C] = [pts[0], pts[1]];
+  const D = up(meetM[1]);
+  if (new Set([A, C, D]).size !== 3) return null;
+  const circ = circleId(center);
+  return [
+    { type: 'tangent', id: `tan-${A}`, circle: circ, at: A, visible: true },
+    { type: 'tangent', id: `tan-${C}`, circle: circ, at: C, visible: true },
+    { type: 'line-intersection', id: D, line1: `tan-${A}`, line2: `tan-${C}` },
+  ];
 };
 
 /**
@@ -1674,7 +1714,7 @@ const perpendicularLine: Rule = (s, ctx) => {
   // the perpendicular SEGMENT P–E (e.g. EK) — that's the figure the student wants, not an infinite line.
   // The cut verb anchors the match, so the SECOND "בנקודה"/"at" (the result point) is read, not P's.
   const cut = s.match(
-    new RegExp(String.raw`(?:חות[כך]|נחת\w*|פוגש\w*|פגש|\bcuts?\b|\bcrosses?\b|\bmeets?\b|\bintersects?\b)\s*(?:את\s+)?(?:ה?קו\s+|ה?ישר\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?(?:בנקודה|\bat\b|ב-)\s*([A-Za-z]\d*)`, 'i'),
+    new RegExp(String.raw`(?:חות[כך]|נחת\w*|פוגש\w*|פגש|\bcuts?\b|\bcrosses?\b|\bmeets?\b|\bintersects?\b)\s*(?:את\s+)?(?:ה?קו\s+|ה?ישר\s+|ה?משך\s+|extension\s+(?:of\s+)?|extended\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?(?:בנקודה|\bat\b|ב-)\s*([A-Za-z]\d*)`, 'i'),
   );
   if (cut) {
     const [c1, c2, e] = [up(cut[1]), up(cut[2]), up(cut[3])];
@@ -2079,6 +2119,7 @@ const RULES: Rule[] = [
   bisectorSegmentIntersection, // one bisector ∩ a segment
   bisectorPlacesPoint, // "AD bisects ∠BAC" — places D on the opposite side (after the ∩ compounds)
   cornerTangentCircle, // "AB and AD tangent to circle O" — a circle tangent to two sides of a corner; before the tangent/line rules (the משיק keyword makes lineLineIntersection 'stop')
+  twoTangentsMeet, // TWO tangents (at two on-circle points) meeting at a point — before tangent∩segment
   tangentLineIntersection, // tangent ∩ a segment
   parallelCircleIntersection, // a parallel line ∩ the circle
   tangentMeetsOtherCircle, // tangent LINE to one circle meets the OTHER circle — before circlesTangent (which would misread it as mutual tangency)

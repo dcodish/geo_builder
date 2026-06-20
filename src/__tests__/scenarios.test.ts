@@ -97,6 +97,61 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'triangle-circumscribes-circle-is-incircle',
+    title: '"משולש DEF חוסם את המעגל" builds the INCIRCLE (tangent to the sides), not a circumcircle',
+    guards:
+      "operator: \"no ability to say משולש DEF חוסם את המעגל\". It was misparsed to a CIRCUMCIRCLE (circle through D,E,F) — backwards. \"Triangle circumscribes the circle\" is the same figure as \"circle inscribed in the triangle\" (the incircle, tangent to the 3 sides). Fix: the `incircle` rule now also matches the triangle-first phrasing, ORDERED (triangle-labels … חוסם/circumscribes … circle) so a circle-first \"מעגל חוסם משולש\" (a real circumcircle) is NOT captured.",
+    steps: ['משולש DEF חוסם את המעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      // the incircle is centred at the incenter I, tangent to side DE at its foot G
+      const I = at(fig, 'I'), D = at(fig, 'D'), E = at(fig, 'E'), G = at(fig, 'G');
+      const off = Math.abs((G.x - D.x) * (E.y - D.y) - (G.y - D.y) * (E.x - D.x)) / dist(D, E);
+      expect(off, 'tangency point G lies on side DE').toBeLessThan(1e-4);
+      // I is equidistant from all three sides (the inradius) — check vs side DF too
+      const F = at(fig, 'F');
+      const distToLine = (p: Vec, a: Vec, b: Vec) => Math.abs((p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)) / dist(a, b);
+      expect(distToLine(I, D, F), 'inradius to DF = inradius to DE').toBeCloseTo(dist(I, G), 3);
+    },
+  },
+  {
+    id: 'tangential-triangle-via-llm-decomposition',
+    title: '"a tangent through each vertex of ABC, meeting at D E F" decomposes to 3 two-tangent-meets (the tangential triangle)',
+    guards:
+      "operator's long sentence — \"דרך כל קודקוד של משולש ABC מעבירים משיק למעגל; המשיקים נפגשים ב-D E F\" — asking whether the LLM can break it down. It can: the building blocks (`twoTangentsMeet`, ADR-066) are in the LLM's catalog, so it decomposes the quantifier into THREE 'tangent at X and tangent at Y meet at Z' lines (a prompt example now guides this). These are the canonical lines the LLM emits; replayed here they build the tangential triangle DEF, each side tangent to the circle.",
+    steps: [
+      'משולש ABC חסום במעגל',
+      'המשיק בנקודה A והמשיק בנקודה B נפגשים בנקודה D',
+      'המשיק בנקודה B והמשיק בנקודה C נפגשים בנקודה E',
+      'המשיק בנקודה C והמשיק בנקודה A נפגשים בנקודה F',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O');
+      const dot = (u: Vec, v: Vec) => (u.x * v.x + u.y * v.y) / (dist({ x: 0, y: 0 }, u) * dist({ x: 0, y: 0 }, v));
+      // D,E,F all placed, and every tangent line is ⟂ its radius (a real tangent at each touch point)
+      for (const [v, p] of [['A', 'D'], ['B', 'D'], ['B', 'E'], ['C', 'E'], ['C', 'F'], ['A', 'F']] as [Id, Id][]) {
+        const V = at(fig, v), P = at(fig, p);
+        expect(Math.abs(dot({ x: P.x - V.x, y: P.y - V.y }, { x: V.x - O.x, y: V.y - O.y })), `${p}${v} tangent at ${v}`).toBeLessThan(1e-3);
+      }
+    },
+  },
+  {
+    id: 'two-tangents-meet-at-a-point',
+    title: '"המשיק מנקודה A והמשיק מנקודה C נפגשים בנקודה D" — two tangents meet at the pole D',
+    guards:
+      "operator: two tangents meeting at a point used to work but now escalated to the LLM and built nothing — there was no rule for tangent∩tangent (only tangent∩segment). Fix: a `twoTangentsMeet` rule builds the tangent at each on-circle point + their `line-intersection`. A, C are inscribed-triangle vertices on the circle; D is the pole of chord AC.",
+    steps: ['משולש ABC חסום במעגל', 'המשיק מנקודה A והמשיק מנקודה C נפגשים בנקודה D'],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), C = at(fig, 'C'), D = at(fig, 'D');
+      const dot = (u: Vec, v: Vec) => (u.x * v.x + u.y * v.y) / (dist({ x: 0, y: 0 }, u) * dist({ x: 0, y: 0 }, v));
+      // DA ⟂ OA and DC ⟂ OC — each line through D is tangent at its point (⟂ the radius)
+      expect(Math.abs(dot({ x: D.x - A.x, y: D.y - A.y }, { x: A.x - O.x, y: A.y - O.y })), 'DA tangent at A').toBeLessThan(1e-3);
+      expect(Math.abs(dot({ x: D.x - C.x, y: D.y - C.y }, { x: C.x - O.x, y: C.y - O.y })), 'DC tangent at C').toBeLessThan(1e-3);
+    },
+  },
+  {
     id: 'symbolic-2alpha-drives-shape-not-the-fixed-point',
     title: 'a "2α" relation drives the figure\'s FREE shape, not a point the student fixed (D on the extension)',
     guards:

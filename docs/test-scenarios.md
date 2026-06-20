@@ -22,6 +22,22 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `triangle-circumscribes-circle-is-incircle` — "משולש DEF חוסם את המעגל" is the incircle (ADR-066)
+**Steps**: `משולש DEF חוסם את המעגל`
+**Guards against:** the triangle-first "circumscribes" phrasing being misparsed to a circumcircle (circle through D,E,F). Fix (ADR-066): the `incircle` rule matches it (ordered, so a circle-first "מעגל חוסם משולש" stays a circumcircle). **Asserts:** all steps OK; the incircle's tangency point G lies on side DE; the inradius to DF equals the inradius to DE.
+
+### `perpendicular-cuts-extension` (unit: perpendicular-cuts-extension.test.ts) — ⟂ operand never read as a plain line (ADR-067)
+**Steps**: parse `המשך DB והאנך לישר AD נפגשים בנקודה G` (defers) + `האנך ל-AD בנקודה A חותך את המשך DB בנקודה G` (builds).
+**Guards against:** the generic line∩line rule dropping "אנך" and reading "the perpendicular to AD" as "line AD" — which, since AD and DB share D, collapsed G onto D (degenerate, then "DG" failed). Fix (ADR-067): `lineLineIntersection` defers on a ⟂/∥ modifier; the `perpendicular … cuts … at` form accepts a "המשך"/extension target. **Asserts:** the ambiguous one-liner escalates; the explicit form builds G = (⟂ to AD at A) ∩ line DB (GA ⟂ AD, G on line DB).
+
+### `tangential-triangle-via-llm-decomposition` — a tangent through each vertex, meeting at D E F (ADR-066)
+**Steps**: `משולש ABC חסום במעגל` · `המשיק בנקודה A והמשיק בנקודה B נפגשים בנקודה D` · `…B…C…E` · `…C…A…F`
+**Guards against:** the operator's long sentence ("a tangent through each vertex … meeting at D E F") having no path. It decomposes (via the LLM) into 3 two-tangent-meet lines — the building blocks now in the catalog. These canonical lines, replayed, build the tangential triangle DEF. **Asserts:** all steps OK; all six tangent segments ⟂ their radius (genuine tangents).
+
+### `two-tangents-meet-at-a-point` — "המשיק מנקודה A והמשיק מנקודה C נפגשים בנקודה D" (ADR-066)
+**Steps**: `משולש ABC חסום במעגל` · `המשיק מנקודה A והמשיק מנקודה C נפגשים בנקודה D`
+**Guards against:** two tangents meeting at a point escalating to the LLM and building nothing (no tangent∩tangent rule). Fix (ADR-066): `twoTangentsMeet` builds the tangent at each on-circle point + their `line-intersection`. **Asserts:** all steps OK; DA ⟂ OA and DC ⟂ OC (each line through D is a genuine tangent).
+
 ### `symbolic-2alpha-drives-shape-not-the-fixed-point` — "2α" drives the free shape, not a fixed point (ADR-064)
 **Steps**: `משולש שווה שוקיים ABC שבו AB=AC חוסם במעגל` · `נקודה D על המשך BC` · `BD` · `DA` · `∠CAD=α` · `∠BOC=2α`
 **Guards against:** the operator's real α/2α bug (with the glyph): a central angle `∠BOC=2α` ERRORED "cannot place D on segment BC…" because `driveOrCheck` drove D (placed on the extension, t=1.3) to satisfy the relation. Fix (ADR-064): only a FREE on-segment point is driveable; a stated-ratio/extension point is a given, so the relation drives the triangle's free shape and D stays put. **Asserts:** all steps OK; ∠BOC = 2·∠CAD; D stays at t≈1.3.
