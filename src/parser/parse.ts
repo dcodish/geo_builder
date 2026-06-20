@@ -807,7 +807,10 @@ const circle: Rule = (s, ctx) => {
   const thrM = s.match(/(?:through|העובר\s*דרך|דרך)\s+([A-Za-z]\d*)\b/i);
   const centered = /cent(?:er|re)d?|around|מרכז\w*|סביב/i.test(s);
   const named = circleCenter(s); // the centre the student named ("circle O" / "centered at O"), or null
-  const isDef = r.numeric || r.symbolic || !!thrM || centered;
+  // `centered` alone is NOT a circle definition unless a centre is actually NAMED ("מעגל שמרכזו O"):
+  // a REFERENCE to an existing circle's centre — "מרכז המעגל" / "the centre of the circle", no letter —
+  // must not auto-create a phantom circle (operator: "ישר AD עובר דרך מרכז המעגל" built a stray circle P).
+  const isDef = r.numeric || r.symbolic || !!thrM || (centered && !!named);
   if (!isDef) {
     // No radius/centre/through given. A STANDALONE "circle" / "מעגל" / "circle O" is a circle request →
     // draw a default one. But "A on circle O" (another label remains) or "draw a circle somewhere"
@@ -1434,6 +1437,40 @@ const extendOntoCircle: Rule = (s) => {
   return [{ type: 'extend-onto-circle', id: R, a, b, circle: circleId(center) }];
 };
 
+/**
+ * A NAMED line (two existing points) cutting the circle at TWO points — "AO חותך את המעגל בנקודות C ו-D"
+ * / "the line AO cuts the circle at C and D". A secant whose line is given by its two points (e.g. an
+ * external point A and the centre O), crossing the circle at both roots. Distinct from `lineMeetsCircle`
+ * (ONE new crossing, the other endpoint already on the circle) and `secantFromExternal` ("from a point …").
+ */
+const lineCutsCircleTwice: Rule = (s, ctx) => {
+  if (!INTERSECT_KW.test(s)) return null;
+  if (/tangent|משיק/i.test(s)) return null;
+  if (/\bfrom\b|מנקודה|מהנקודה/i.test(s)) return null; // "from <point>" → secantFromExternal
+  // TWO crossing labels: "at C and D" / "בנקודות C ו-D"
+  const twoM = s.match(/(?:\bat\b|בנקודות?|ב-)\s*([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i);
+  if (!twoM) return null;
+  const center = resolveCenter(s, ctx); // a named circle, or the figure's single circle
+  if (!center) return null;
+  const [C, D] = [up(twoM[1]), up(twoM[2])];
+  // the line's two points: strip the circle ref + the two-crossing clause + connectives → the 2-label run
+  const body = dropCircleRef(s)
+    .replace(/(?:\bat\b|בנקודות?|ב-)\s*[A-Za-z]\d*\s*(?:\band\b|ו-?|,)\s*[A-Za-z]\d*\b/gi, ' ')
+    .replace(/\bline\b|הישר|הקו|ישר|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?|המשך|extension|extended/gi, ' ');
+  const pr = labelRun(body, 2);
+  if (!pr || pr.includes(C) || pr.includes(D)) return null; // the line's points must differ from the crossings
+  const [a, b] = pr;
+  const circ = circleId(center);
+  const lineId = `sec-${a}${b}`;
+  return [
+    { type: 'line-through', id: lineId, a, b },
+    { type: 'line-circle-intersection', id: C, line: lineId, circle: circ, branch: 0 },
+    { type: 'line-circle-intersection', id: D, line: lineId, circle: circ, branch: 1 },
+    { type: 'segment', a, b: C },
+    { type: 'segment', a, b: D }, // the visible secant: external end → each crossing (collinear, spans the line)
+  ];
+};
+
 const lineMeetsCircle: Rule = (s, ctx) => {
   if (!INTERSECT_KW.test(s)) return null;
   if (/tangent|משיק/i.test(s)) return null; // tangent line → tangentMeetsOtherCircle / tangentLine
@@ -1648,7 +1685,7 @@ const tangentFromExternal: Rule = (s, ctx) => {
   const mid = `~tanmid-${center}${apex}`; // hidden centre of the Thales circle on O-apex (scaffolding; "~" → not drawn)
   const aux = `tanaux-${center}${apex}`;
   const out: AnyCommand[] = [];
-  if (placeApex) out.push({ type: 'free-point', id: apex, x: 12, y: 0 }); // the external apex, if new
+  if (placeApex) out.push({ type: 'free-point', id: apex, x: 12, y: 0, free: true }); // the external apex, if new — a FREE DOF (ADR-052): its distance from O is unstated, so a later given (∠ADB = α, |AG| = …) can flex it
   out.push(
     { type: 'midpoint', id: mid, a: center, b: apex }, // centre of the Thales circle on O-apex
     { type: 'circle-through', id: aux, center: mid, through: center, hidden: true },
@@ -2128,6 +2165,7 @@ const RULES: Rule[] = [
   twoCirclesMeet, // "two circles intersect at A and B" — create both circles + both intersection points
   circleCircleIntersection, // two circles cross — before the generic line∩line intersection
   extendOntoCircle, // "המשך AC חותך מעגל P בנקודה D" — DIRECTIONAL extension onto a circle (D beyond the 2nd letter), before the order-agnostic lineMeetsCircle
+  lineCutsCircleTwice, // "AO cuts the circle at C and D" — a named line crossing the circle at BOTH roots; before lineMeetsCircle (one crossing)
   lineMeetsCircle, // "line AC meets circle P at E" — an order-agnostic chord/line meeting a circle, before collinearity & line∩line
   // A drawn perpendicular/parallel line that "cuts" another at a point must be claimed BEFORE the
   // generic line∩line rule: the "cuts"/"חותך" keyword otherwise makes lineLineIntersection 'stop'

@@ -26,6 +26,14 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 **Steps**: `משולש DEF חוסם את המעגל`
 **Guards against:** the triangle-first "circumscribes" phrasing being misparsed to a circumcircle (circle through D,E,F). Fix (ADR-066): the `incircle` rule matches it (ordered, so a circle-first "מעגל חוסם משולש" stays a circumcircle). **Asserts:** all steps OK; the incircle's tangency point G lies on side DE; the inradius to DF equals the inradius to DE.
 
+### `bagrut-q4-tangent-secant-perpendicular` — the real textbook figure, with its symbolic given (ADR-069)
+**Steps**: `מעגל שרדיוסו R ומרכזו O` · `מנקודה A יוצא משיק למעגל בנקודה B` · `המשך AO חותך את המעגל בנקודות C ו D` · `G על המשך DB` · `DG` · `AG⊥AD` · `∠ADB=α`
+**Guards against:** the claim that the engine can't build a real bagrut problem. It can — with the book's OWN given, the SYMBOLIC `∠ADB=α` (a label, not a number). The operator's numeric experiments (AG=8 AND AC=0.5DC) over-constrained a shape-determined figure; the α-labelled form builds. Also exercises lineCutsCircleTwice (ADR-068) + the now-free external apex (ADR-069). **Asserts:** all steps OK; C,D on the circle and on line AO; AG ⟂ AD; D, B, G collinear.
+
+### `line-through-center-and-secant` (unit: line-through-center-and-secant.test.ts) — no phantom circle; named line cuts twice (ADR-068)
+**Steps**: parse `ישר AD עובר דרך מרכז המעגל` (no phantom circle) + `AO חותך את המעגל בנקודות C ו-D` (builds the secant).
+**Guards against:** (1) a centre reference ("מרכז המעגל") auto-creating a phantom circle P; (2) a named line cutting the circle at two points having no rule. Fix (ADR-068): `centred` is a circle definition only with a NAMED centre; new `lineCutsCircleTwice` builds line-through + both line-circle crossings. **Asserts:** the centre-reference doesn't build a circle; the secant builds C, D on the circle, collinear with A–O; one-crossing still routes to `lineMeetsCircle`.
+
 ### `perpendicular-cuts-extension` (unit: perpendicular-cuts-extension.test.ts) — ⟂ operand never read as a plain line (ADR-067)
 **Steps**: parse `המשך DB והאנך לישר AD נפגשים בנקודה G` (defers) + `האנך ל-AD בנקודה A חותך את המשך DB בנקודה G` (builds).
 **Guards against:** the generic line∩line rule dropping "אנך" and reading "the perpendicular to AD" as "line AD" — which, since AD and DB share D, collapsed G onto D (degenerate, then "DG" failed). Fix (ADR-067): `lineLineIntersection` defers on a ⟂/∥ modifier; the `perpendicular … cuts … at` form accepts a "המשך"/extension target. **Asserts:** the ambiguous one-liner escalates; the explicit form builds G = (⟂ to AD at A) ∩ line DB (GA ⟂ AD, G on line DB).

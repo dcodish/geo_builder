@@ -97,6 +97,35 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'bagrut-q4-tangent-secant-perpendicular',
+    title: 'bagrut Q4: circle R, tangent AB, secant AD through O (C,D), AG⟂AD, D-B-G collinear, ∠ADB=α',
+    guards:
+      "the real textbook figure (operator showed the page). Circle radius R, external A; AB tangent at B; AD passes through the centre O and cuts the circle at C and D; AG ⟂ AD; D, B, G are collinear; ∠ADB = α. The given is the SYMBOLIC angle α (a label, not a number) — the figure is parametrised by it, not by a stated size. Earlier numeric experiments (AG=8 AND AC=0.5DC together) over-constrained the shape-determined figure; the book's α-labelled form builds cleanly. Also exercises the secant-through-centre (lineCutsCircleTwice, ADR-068) and the now-FREE external apex (ADR-052).",
+    steps: [
+      'מעגל שרדיוסו R ומרכזו O',
+      'מנקודה A יוצא משיק למעגל בנקודה B',
+      'המשך AO חותך את המעגל בנקודות C ו D',
+      'G על המשך DB',
+      'DG',
+      'AG⊥AD',
+      '∠ADB=α',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), G = at(fig, 'G');
+      // C, D on the circle, both on line AO (the secant through the centre)
+      expect(dist(O, C), '|OC| = |OD| (both on the circle)').toBeCloseTo(dist(O, D), 2);
+      const onAO = (p: Vec) => Math.abs((p.x - A.x) * (O.y - A.y) - (p.y - A.y) * (O.x - A.x)) / dist(A, O);
+      expect(onAO(C), 'C on line AO').toBeLessThan(1e-3);
+      expect(onAO(D), 'D on line AO').toBeLessThan(1e-3);
+      // AG ⟂ AD
+      expect((G.x - A.x) * (D.x - A.x) + (G.y - A.y) * (D.y - A.y), 'AG ⟂ AD').toBeCloseTo(0, 2);
+      // D, B, G collinear (the problem's "on one line")
+      const off = Math.abs((G.x - D.x) * (B.y - D.y) - (G.y - D.y) * (B.x - D.x)) / dist(D, B);
+      expect(off, 'D, B, G collinear').toBeLessThan(1e-2);
+    },
+  },
+  {
     id: 'triangle-circumscribes-circle-is-incircle',
     title: '"משולש DEF חוסם את המעגל" builds the INCIRCLE (tangent to the sides), not a circumcircle',
     guards:
