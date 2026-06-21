@@ -11,8 +11,10 @@ import { describe, it, expect } from 'vitest';
 import type { Command, Vec } from '../types';
 import { build } from '../step';
 import { evaluate } from '../evaluate';
+import { checkGivens } from '../verify';
 import { dist, sub, angleDeg, cross, footOnLine } from '../geometry';
 import { parse } from '@/parser';
+import { expect as vitestExpect } from 'vitest';
 
 const dot = (u: Vec, v: Vec) => u.x * v.x + u.y * v.y;
 const collinear = (a: Vec, b: Vec, q: Vec) => Math.abs(cross(a, b, q)) < 1e-6;
@@ -22,8 +24,16 @@ function reproduce(utterances: string[], tag: string) {
     const r = parse(u);
     if (!r.ok) throw new Error(`${tag}: failed to parse "${u}"`);
     return r.commands;
-  });
-  return build(commands as Command[]);
+  }) as Command[];
+  const result = build(commands);
+  // SELF-VERIFY: every reproduced corpus figure must satisfy its OWN stated givens (the comprehensive
+  // ADR-053 verifier). A figure that builds but silently violates a relation is caught here, not in review.
+  const ev = evaluate(result.construction);
+  if (ev.ok) {
+    const v = checkGivens(commands, ev.positions, ev.circles);
+    vitestExpect(v, `${tag}: figure does not satisfy its givens: ${JSON.stringify(v.map((x) => x.message))}`).toEqual([]);
+  }
+  return result;
 }
 
 describe('inscribed without naming the circle (regression — no silent half-parse)', () => {
