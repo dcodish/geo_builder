@@ -22,6 +22,14 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `r7-concyclic-after-competing-distances` — "ABHD concyclic" holds after HF=4/GE=5 (R7 joint re-bind, ADR-045)
+**Steps**: `מקבילית ABCD` · `F על המשך הצלע AB` · `E על המשך הצלע BA` · `FE` · `EC חותך את AD בנקודה G` · `FD חותך את הצלע BC בנקודה H` · `HF=4` · `GE=5` · `מרובע ABHD בר חסימה במעגל`
+**Guards against:** a later constraint falsely reporting "over-constrained" because earlier constraints (HF=4, GE=5) greedily claimed every free DOF it could reach (the R7 binding bug — the figure had 6 DOF and the constraint builds fine alone). Fix (ADR-045 amendment): the joint re-bind re-points one over-subscribed claimed DOF so the new constraint joins the joint solve. **Asserts:** all steps OK; ABHD genuinely concyclic (D on the circumcircle of A,B,H); HF=4 and GE=5 still hold.
+
+### `r7-equal-after-competing-distances` — "BH=FH" holds after HF=4/GE=5 (R7 joint re-bind, ADR-045)
+**Steps**: same figure, ending in `BH=FH` instead.
+**Guards against:** the same R7 binding bug for an equal-length constraint. **Asserts:** all steps OK; |BH|=|FH|; HF=4 and GE=5 preserved.
+
 ### `triangle-circumscribes-circle-is-incircle` — "משולש DEF חוסם את המעגל" is the incircle (ADR-066)
 **Steps**: `משולש DEF חוסם את המעגל`
 **Guards against:** the triangle-first "circumscribes" phrasing being misparsed to a circumcircle (circle through D,E,F). Fix (ADR-066): the `incircle` rule matches it (ordered, so a circle-first "מעגל חוסם משולש" stays a circumcircle). **Asserts:** all steps OK; the incircle's tangency point G lies on side DE; the inradius to DF equals the inradius to DE.

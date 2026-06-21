@@ -97,6 +97,46 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'r7-concyclic-after-competing-distances',
+    title: 'R7 joint re-bind: "ABHD concyclic" holds AFTER HF=4/GE=5 already claimed the parallelogram DOFs',
+    guards:
+      "operator session qm0gbjhr: parallelogram ABCD, F/E on the extensions, G=EC∩AD, H=FD∩BC, then HF=4 and GE=5, then \"מרובע ABHD בר חסימה במעגל\". It FALSELY reported 'over-constrained: A,B,H,D concyclic cannot hold' (and the LLM built nothing) — yet the figure had 6 free DOF, and the concyclic constraint builds fine on its own. Root cause (R7 / ADR-045 step 3): the greedy two-phase binding — HF=4 and GE=5 had CLAIMED every free vertex the concyclic could reach, so the ancestor walker returned EMPTY and the constraint got no carrier. Fix: the joint re-bind re-points one OVER-SUBSCRIBED claimed DOF (HF=4 had 4 carriers) to the new constraint so it joins the joint solve while every existing constraint keeps a carrier; all three then hold simultaneously.",
+    steps: [
+      'מקבילית ABCD', 'F על המשך הצלע AB', 'E על המשך הצלע BA', 'FE',
+      'EC חותך את AD בנקודה G', 'FD חותך את הצלע BC בנקודה H', 'HF=4', 'GE=5',
+      'מרובע ABHD בר חסימה במעגל',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), H = at(fig, 'H'), D = at(fig, 'D');
+      // ABHD concyclic: D lies on the circumcircle of A,B,H
+      const d2 = 2 * (A.x * (B.y - H.y) + B.x * (H.y - A.y) + H.x * (A.y - B.y));
+      const ux = ((A.x * A.x + A.y * A.y) * (B.y - H.y) + (B.x * B.x + B.y * B.y) * (H.y - A.y) + (H.x * H.x + H.y * H.y) * (A.y - B.y)) / d2;
+      const uy = ((A.x * A.x + A.y * A.y) * (H.x - B.x) + (B.x * B.x + B.y * B.y) * (A.x - H.x) + (H.x * H.x + H.y * H.y) * (B.x - A.x)) / d2;
+      expect(dist(D, { x: ux, y: uy }), '|center-D| = circumradius (ABHD concyclic)').toBeCloseTo(dist(A, { x: ux, y: uy }), 2);
+      // the earlier givens STILL hold (the joint solve satisfied all three together)
+      expect(dist(at(fig, 'H'), at(fig, 'F')), 'HF = 4 preserved').toBeCloseTo(4, 2);
+      expect(dist(at(fig, 'G'), at(fig, 'E')), 'GE = 5 preserved').toBeCloseTo(5, 2);
+    },
+  },
+  {
+    id: 'r7-equal-after-competing-distances',
+    title: 'R7 joint re-bind: "BH=FH" holds AFTER HF=4/GE=5 already claimed the parallelogram DOFs',
+    guards:
+      "operator session qm0gbjhr (same figure): after HF=4 and GE=5, \"BH=FH\" FALSELY reported 'over-constrained: |BH| = |FH| cannot hold' — but it builds fine on its own; the earlier distances had claimed every reachable DOF. Same R7 joint re-bind fix: re-point an over-subscribed claimed DOF so |BH|=|FH| joins the joint solve; |HF|=4 and |GE|=5 stay satisfied.",
+    steps: [
+      'מקבילית ABCD', 'F על המשך הצלע AB', 'E על המשך הצלע BA', 'FE',
+      'EC חותך את AD בנקודה G', 'FD חותך את הצלע BC בנקודה H', 'HF=4', 'GE=5',
+      'BH=FH',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'B'), at(fig, 'H')), '|BH| = |FH|').toBeCloseTo(dist(at(fig, 'F'), at(fig, 'H')), 2);
+      expect(dist(at(fig, 'H'), at(fig, 'F')), 'HF = 4 preserved').toBeCloseTo(4, 2);
+      expect(dist(at(fig, 'G'), at(fig, 'E')), 'GE = 5 preserved').toBeCloseTo(5, 2);
+    },
+  },
+  {
     id: 'concyclic-flexes-the-rectangle',
     title: 'EABF concyclic FLEXES the rectangle (its size is a free DOF) instead of failing on the default proportions',
     guards:

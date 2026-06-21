@@ -296,7 +296,7 @@ function reinterpretDiameter(prev: Construction, cmd: Command): Construction | n
  * `includeStart` (default true) considers `start` itself; pass false to drive an ANCESTOR, not `start`.
  * Both modes stop at (don't recurse past) a free carrier; a SOLVING carrier is walked through.
  */
-function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', includeStart = true): Id[] {
+function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', includeStart = true, includeSolving = false): Id[] {
   const byId = new Map(objects.map((o) => [o.id, o] as const));
   const seen = new Set<Id>();
   const result: Id[] = [];
@@ -305,6 +305,9 @@ function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', 
     ? [start]
     : pointParents(startObj && isGeoPoint(startObj) ? startObj : ({ kind: 'free-point', id: start, x: 0, y: 0 } as GeoObject));
   if (!includeStart) seen.add(start);
+  // `includeSolving` also surfaces carriers a constraint ALREADY drives (their `solve` is set) — used by
+  // the R7 joint re-bind to find a CLAIMED-but-shareable DOF when no free one is reachable (ADR-045).
+  const avail = (o: GeoObject) => (o as { solve?: unknown }).solve === undefined || includeSolving;
   while (queue.length) {
     const id = queue.shift()!;
     if (seen.has(id)) continue;
@@ -315,7 +318,7 @@ function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', 
       // A point on a FREE-radius circle can be moved by RESIZING it — surface the radius DOF (ADR-051).
       for (const cid of circlesOfPoint(o)) {
         const circ = byId.get(cid);
-        if (circ?.kind === 'circle' && circ.radius.via === 'free' && circ.solve === undefined && !seen.has(cid)) {
+        if (circ?.kind === 'circle' && circ.radius.via === 'free' && avail(circ) && !seen.has(cid)) {
           seen.add(cid);
           result.push(cid);
         }
@@ -323,16 +326,16 @@ function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', 
       if (o.kind === 'line') { queue.push(...lineSpecPoints(o.spec)); continue; }
     }
     if (!isGeoPoint(o)) continue;
-    const free1 = isParamCarrier(o) && (o as { solve?: unknown }).solve === undefined;
+    const free1 = isParamCarrier(o) && avail(o);
     if (mode === 'param') {
       if (free1) { result.push(id); continue; } // a free 1-DOF carrier — stop here
       queue.push(...pointParents(o));
       continue;
     }
     const fp = o as FreePoint;
-    const free2 = o.kind === 'free-point' && !fp.pinned && !fp.rigid && fp.solve === undefined;
+    const free2 = o.kind === 'free-point' && !fp.pinned && !fp.rigid && avail(fp);
     if (free1 || free2) { result.push(id); continue; } // a terminal drivable DOF
-    if (isShapeCarrier(o) && (o as { solve?: unknown }).solve === undefined) result.push(id); // shape scalar — keep walking past it too
+    if (isShapeCarrier(o) && avail(o)) result.push(id); // shape scalar — keep walking past it too
     if (o.kind === 'line-intersection') { queue.push(o.line1, o.line2); continue; }
     queue.push(...pointParents(o));
   }
@@ -423,9 +426,31 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
   // (the regulariser keeps the rest near their seed).
   for (const K of newCons) {
     const cand = [...new Set(constraintRefs(K).flatMap((ref) => freeDrivableAncestors(objects, ref)))].filter((id) => !isSolving(objects, id));
-    if (cand.length === 0) continue;
-    changed = true;
-    objects = objects.map((o) => (cand.includes(o.id) ? markDriven(o, K) : o));
+    if (cand.length > 0) {
+      changed = true;
+      objects = objects.map((o) => (cand.includes(o.id) ? markDriven(o, K) : o));
+      continue;
+    }
+    // (C) R7 JOINT RE-BIND ([ADR-045](docs/06-decisions.md#adr-045) step 3): no FREE DOF is reachable —
+    // every DOF K could move is already CLAIMED by an earlier constraint (e.g. HF=4/GE=5 took a
+    // parallelogram's free vertices, so a later "ABHD concyclic" finds them all busy). The figure can
+    // still flex IF some claimed DOF's constraint is OVER-SUBSCRIBED (≥2 carriers = slack): re-point one
+    // such DOF to K so K joins the joint solve while every existing constraint keeps a carrier. If no
+    // reachable DOF has slack, the system is genuinely over-constrained — leave it to fail honestly.
+    const carrierCount = new Map<Constraint, number>();
+    for (const o of objects) {
+      const sv = (o as { solve?: { constraint: Constraint } }).solve;
+      if (sv) carrierCount.set(sv.constraint, (carrierCount.get(sv.constraint) ?? 0) + 1);
+    }
+    const reach = new Set(constraintRefs(K).flatMap((ref) => ancestors(objects, ref, 'drivable', true, true)));
+    const steal = objects.find((o) => {
+      const sv = (o as { solve?: { constraint: Constraint } }).solve;
+      return reach.has(o.id) && sv && (carrierCount.get(sv.constraint) ?? 0) >= 2;
+    });
+    if (steal) {
+      changed = true;
+      objects = objects.map((o) => (o.id === steal.id ? markDriven(o, K) : o)); // K already in c.constraints (pushed as a check)
+    }
   }
   return changed ? { objects, constraints: [...c.constraints, ...added] } : null;
 }
