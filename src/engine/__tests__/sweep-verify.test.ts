@@ -22,6 +22,11 @@ const SWEEP: { name: string; steps: string[] }[] = [
   { name: 'שווה-שוקיים AB=AC', steps: ['משולש ABC', 'AB = AC'] },
   { name: 'ratio |AB|=2|AC|', steps: ['triangle ABC', 'AB = 2 AC'] },
   { name: 'two distances |AB|=5,|AC|=5', steps: ['triangle ABC', 'AB = 5', 'AC = 5'] },
+  // R7 (ADR-074 generalised): three stated sides / two-angles+side fully determine a triangle — these
+  // used to FALSELY over-constrain (greedy bind claimed two vertices; the third constraint found none).
+  { name: 'equilateral (3 stated sides)', steps: ['triangle ABC', 'AB = 5', 'AC = 5', 'BC = 5'] },
+  { name: 'scalene (3 distinct stated sides)', steps: ['triangle ABC', 'AB = 6', 'BC = 5', 'AC = 4'] },
+  { name: 'AAS (two angles + a side)', steps: ['triangle ABC', 'angle ABC = 50', 'angle BCA = 60', 'BC = 8'] },
   // ── angle / angle-ratio ──
   { name: 'angle ∠BAC=50', steps: ['triangle ABC', 'angle BAC = 50'] },
   { name: 'זווית ∠BAC=50', steps: ['משולש ABC', 'זווית BAC = 50'] },

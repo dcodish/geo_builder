@@ -379,6 +379,27 @@ function lineSpecPoints(spec: LineSpec): Id[] {
  */
 const freeDrivableAncestors = (objects: GeoObject[], start: Id): Id[] => ancestors(objects, start, 'drivable');
 
+/**
+ * A reference a blocked constraint's claimer can be RE-POINTED to instead (the "free the blocker"
+ * alternative): an unclaimed, movable, non-`line` carrier — a free vertex, an extension/free on-segment,
+ * a free on-circle, or a shape scalar / free-radius circle. A PINNED point or a STATED-ratio on-segment
+ * (a position the student fixed) is NOT recruitable (ADR-064). Generalises the ADR-074 extension-only case.
+ */
+function recruitableFreeDof(o: GeoObject): boolean {
+  const c = carrierOf(o);
+  if (!c || c.family === 'line' || (o as { solve?: unknown }).solve !== undefined) return false;
+  switch (o.kind) {
+    case 'free-point':
+      return !o.pinned && !o.rigid;
+    case 'on-segment':
+      return o.free === true || o.extension === true;
+    case 'on-circle':
+      return o.free === true;
+    default:
+      return true; // perp-offset / rotated / scaled-offset / free-radius circle
+  }
+}
+
 /** Mark a free vertex / parametric / shape-scalar carrier as driving `K`. (An on-line marker is
  *  driven directly by `driveOrCheck`, not recruited here, so the `line` family is excluded.) */
 function markDriven(o: GeoObject, K: Constraint): GeoObject {
@@ -433,26 +454,20 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
       objects = objects.map((o) => (cand.includes(o.id) ? markDriven(o, K) : o));
     }
     // (D) FREE THE BLOCKER (R7(3) / [ADR-074](docs/06-decisions.md#adr-074)): K needs a free DOF that an
-    // EARLIER constraint K1 already CLAIMED (the greedy apply-time pick), and K1 references a default-
-    // EXTENSION on-segment ("G on the extension of DB", t a 1.3 default — recruitable, ADR-052) it could
-    // drive INSTEAD. Re-point K1 → that extension point and release the claimed DOF to K, so both keep a
-    // carrier and the joint solver redistributes (e.g. AG⟂AD drives G, freeing the apex A for ∠ADB).
-    // This is the joint binding the greedy per-constraint pick can't reach; it runs ONLY on the failure
-    // path, so eagerly-satisfied figures (a stated-extension point a relation must NOT drag, ADR-064) are
-    // untouched — they never reach the recruit. The extension `t` is otherwise left put (not eager).
+    // EARLIER constraint K1 already CLAIMED (the greedy apply-time pick), and K1 references ANOTHER free
+    // DOF it could drive INSTEAD. Re-point K1 → that alternative and release the claimed DOF to K, so both
+    // keep a carrier and the joint solver redistributes. Two instances of one pattern: AG⟂AD drives its
+    // extension point G, freeing the apex A for ∠ADB (ADR-074); and |AB|=5 drives vertex A, freeing B for
+    // |BC|=5 so an equilateral / AAS triangle (every side or two-angles+side stated) solves instead of
+    // falsely over-constraining. Runs ONLY on the failure path, so eagerly-satisfied figures (e.g. a
+    // stated-extension point a relation must NOT drag, ADR-064) never reach it and are untouched.
     const reachable = new Set(constraintRefs(K).flatMap((ref) => ancestors(objects, ref, 'drivable', true, true)));
     for (const x of objects) {
       if (!reachable.has(x.id)) continue;
       const sv = (x as { solve?: { constraint: Constraint } }).solve;
       if (!sv || sv.constraint === K) continue; // x must be CLAIMED by a DIFFERENT constraint K1
       const K1 = sv.constraint;
-      const alt = objects.find(
-        (o) =>
-          o.kind === 'on-segment' &&
-          (o as Extract<GeoObject, { kind: 'on-segment' }>).extension === true &&
-          (o as { solve?: unknown }).solve === undefined &&
-          constraintRefs(K1).includes(o.id),
-      );
+      const alt = objects.find((o) => o.id !== x.id && recruitableFreeDof(o) && constraintRefs(K1).includes(o.id));
       if (!alt) continue;
       objects = objects.map((o) =>
         o.id === alt.id ? ({ ...o, solve: { constraint: K1, branch: 0 } } as GeoObject) : o.id === x.id ? markDriven(o, K) : o,
