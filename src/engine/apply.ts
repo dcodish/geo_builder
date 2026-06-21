@@ -536,6 +536,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         b: cmd.b,
         t: cmd.t ?? freeSegT(objects, cmd.a, cmd.b),
         ...(cmd.t === undefined ? { free: true } : {}),
+        ...(cmd.extension ? { extension: true } : {}),
         ...(cmd.branch !== undefined ? { solveBranch: cmd.branch } : {}),
       });
       break;

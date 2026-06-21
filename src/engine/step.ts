@@ -425,12 +425,43 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
   // `C`, a rhombus's `rotated` angle behind C). The joint solver moves only the ones that matter
   // (the regulariser keeps the rest near their seed).
   for (const K of newCons) {
+    let did = false;
     const cand = [...new Set(constraintRefs(K).flatMap((ref) => freeDrivableAncestors(objects, ref)))].filter((id) => !isSolving(objects, id));
     if (cand.length > 0) {
       changed = true;
+      did = true;
       objects = objects.map((o) => (cand.includes(o.id) ? markDriven(o, K) : o));
-      continue;
     }
+    // (D) FREE THE BLOCKER (R7(3) / [ADR-074](docs/06-decisions.md#adr-074)): K needs a free DOF that an
+    // EARLIER constraint K1 already CLAIMED (the greedy apply-time pick), and K1 references a default-
+    // EXTENSION on-segment ("G on the extension of DB", t a 1.3 default — recruitable, ADR-052) it could
+    // drive INSTEAD. Re-point K1 → that extension point and release the claimed DOF to K, so both keep a
+    // carrier and the joint solver redistributes (e.g. AG⟂AD drives G, freeing the apex A for ∠ADB).
+    // This is the joint binding the greedy per-constraint pick can't reach; it runs ONLY on the failure
+    // path, so eagerly-satisfied figures (a stated-extension point a relation must NOT drag, ADR-064) are
+    // untouched — they never reach the recruit. The extension `t` is otherwise left put (not eager).
+    const reachable = new Set(constraintRefs(K).flatMap((ref) => ancestors(objects, ref, 'drivable', true, true)));
+    for (const x of objects) {
+      if (!reachable.has(x.id)) continue;
+      const sv = (x as { solve?: { constraint: Constraint } }).solve;
+      if (!sv || sv.constraint === K) continue; // x must be CLAIMED by a DIFFERENT constraint K1
+      const K1 = sv.constraint;
+      const alt = objects.find(
+        (o) =>
+          o.kind === 'on-segment' &&
+          (o as Extract<GeoObject, { kind: 'on-segment' }>).extension === true &&
+          (o as { solve?: unknown }).solve === undefined &&
+          constraintRefs(K1).includes(o.id),
+      );
+      if (!alt) continue;
+      objects = objects.map((o) =>
+        o.id === alt.id ? ({ ...o, solve: { constraint: K1, branch: 0 } } as GeoObject) : o.id === x.id ? markDriven(o, K) : o,
+      );
+      changed = true;
+      did = true;
+      break;
+    }
+    if (did) continue;
     // (C) R7 JOINT RE-BIND ([ADR-045](docs/06-decisions.md#adr-045) step 3): no FREE DOF is reachable —
     // every DOF K could move is already CLAIMED by an earlier constraint (e.g. HF=4/GE=5 took a
     // parallelogram's free vertices, so a later "ABHD concyclic" finds them all busy). The figure can

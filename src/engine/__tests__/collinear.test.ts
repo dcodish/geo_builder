@@ -133,7 +133,7 @@ describe('engine — collinearity drives a free DOF', () => {
     const r = parse('E על המשך הצלע AC');
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.commands).toContainEqual({ type: 'point-on-segment', id: 'E', a: 'A', b: 'C', t: 1.3 });
+    expect(r.commands).toContainEqual({ type: 'point-on-segment', id: 'E', a: 'A', b: 'C', t: 1.3, extension: true });
     const { positions } = build([...secantFigure(), ...r.commands]);
     collinearNonDegenerate(positions, 'E', 'A', 'C');
   });

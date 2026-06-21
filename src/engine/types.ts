@@ -73,6 +73,15 @@ export interface OnSegmentPoint {
    */
   free?: boolean;
   /**
+   * Placed "on the extension of a→b" (t>1) with NO stated distance — so its position is an UNSTATED
+   * default (ADR-052), but it is NOT eagerly driven like a `free` interior point (that would let an
+   * unrelated relation grab a point the student positioned — the ADR-064 trap). Instead it is a
+   * RECRUITABLE carrier: only on the failure path (a step already over-constrained) may the joint
+   * re-bind drive it, so a constraint whose natural carrier IS this point (e.g. "AG ⟂ AD" with G on
+   * the extension) can use it, freeing a shape DOF an unrelated relation needs (ADR-074 / R7(3)).
+   */
+  extension?: boolean;
+  /**
    * Desired solution branch once a constraint upgrades this to `on-segment-solved` (which root of
    * the constraint to pick). Carried from the `point-on-segment` command's `branch` so cycling "show
    * another configuration" on a driven on-segment point survives `replay` (ADR-043/R2). Named apart
@@ -686,7 +695,7 @@ export type Command =
   | { type: 'triangle'; ids: [Id, Id, Id] }
   | { type: 'right-triangle'; ids: [Id, Id, Id] } // right angle at the last id
   | { type: 'free-point'; id: Id; x: number; y: number; free?: boolean } // free: an AUTO-placed default (a construct's apex) — a free DOF, NOT pinned (ADR-052); a student-typed "A at (x,y)" omits it and pins
-  | { type: 'point-on-segment'; id: Id; a: Id; b: Id; t?: number; branch?: number } // branch: which root, once a constraint drives it (ADR-043)
+  | { type: 'point-on-segment'; id: Id; a: Id; b: Id; t?: number; branch?: number; extension?: boolean } // branch: which root, once a constraint drives it (ADR-043); extension: an unstated t>1 default, recruitable not eager (ADR-073)
   | { type: 'point-by-distances'; id: Id; from1: Id; dist1: number; from2: Id; dist2: number; branch?: number }
   | { type: 'line-line-intersection'; id: Id; a: Id; b: Id; c: Id; d: Id; dir1?: boolean; dir2?: boolean } // dir1/dir2: a "המשך" operand — A must be BEYOND the 2nd point (ADR-054)
   | { type: 'segment'; a: Id; b: Id }

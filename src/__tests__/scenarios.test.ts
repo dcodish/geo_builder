@@ -186,6 +186,36 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'bagrut-q4-numeric-angle-drives-the-figure',
+    title: 'bagrut Q4 with a NUMERIC ∠ADB=30 (not symbolic α): the figure flexes to the stated angle (R7 / ADR-074)',
+    guards:
+      "the same bagrut tangent-secant-perpendicular figure as `bagrut-q4-tangent-secant-perpendicular`, but ∠ADB is given a NUMBER (30°) instead of the symbolic α. It used to ERROR 'over-constrained: ∠ADB = 30° cannot hold' and stay rigidly at the seed (19.86°) — a R7 BINDING failure (not convergence: with the apex unclaimed the solve reaches any angle exactly). The greedy `AG⊥AD` claimed the free apex A, and `G על המשך DB` froze G at the default extension t=1.3, so ∠ADB had no DOF left. Fix (ADR-074 / R7(3)): on the failure path the recruit FREES THE BLOCKER — re-points AG⊥AD to its extension operand G (a recruitable default-extension DOF) and releases A for ∠ADB — and the joint solve reaches the stated angle. ADR-064 (a stated-extension point a relation must NOT drag) is untouched because it succeeds eagerly and never reaches the recruit. Verified across 25°/30°/40°.",
+    steps: [
+      'מעגל שרדיוסו R ומרכזו O',
+      'מנקודה A יוצא משיק למעגל בנקודה B',
+      'המשך AO חותך את המעגל בנקודות C ו D',
+      'G על המשך DB',
+      'DG',
+      'AG⊥AD',
+      '∠ADB=30',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), G = at(fig, 'G');
+      // the figure adapted to the STATED angle (was stuck at 19.86° / over-constrained)
+      expect(angle(A, D, B), '∠ADB = 30° (the stated given holds)').toBeCloseTo(30, 0);
+      // AG ⟂ AD still holds (its carrier G slid to keep it)
+      expect((G.x - A.x) * (D.x - A.x) + (G.y - A.y) * (D.y - A.y), 'AG ⟂ AD').toBeCloseTo(0, 1);
+      // D, B, G collinear
+      const off = Math.abs((G.x - D.x) * (B.y - D.y) - (G.y - D.y) * (B.x - D.x)) / dist(D, B);
+      expect(off, 'D, B, G collinear').toBeLessThan(1e-1);
+      // C, D still on the circle and on line AO (the secant through the centre)
+      expect(dist(O, C), '|OC| = |OD| (both on the circle)').toBeCloseTo(dist(O, D), 1);
+      const onAO = (p: Vec) => Math.abs((p.x - A.x) * (O.y - A.y) - (p.y - A.y) * (O.x - A.x)) / dist(A, O);
+      expect(onAO(D), 'D on line AO').toBeLessThan(1e-2);
+    },
+  },
+  {
     id: 'triangle-circumscribes-circle-is-incircle',
     title: '"משולש DEF חוסם את המעגל" builds the INCIRCLE (tangent to the sides), not a circumcircle',
     guards:

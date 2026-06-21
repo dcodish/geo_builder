@@ -352,7 +352,7 @@ const pointOnExtension: Rule = (s) => {
   if (!m) return null;
   // strip filler ("of"!) so "of AD" reads AD, not the labels O,F of "of".
   const seg = labelRun(m[2].replace(FILLER, ' '), 2);
-  return seg ? [{ type: 'point-on-segment', id: up(m[1]), a: seg[0], b: seg[1], t: 1.3 }] : null;
+  return seg ? [{ type: 'point-on-segment', id: up(m[1]), a: seg[0], b: seg[1], t: 1.3, extension: true }] : null;
 };
 
 /**
