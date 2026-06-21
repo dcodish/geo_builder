@@ -89,12 +89,32 @@ export function applySeed(c: Construction, seed: number): Construction {
 
   // Free on-circle vertices: a SHARED seeded rotation (preserves their spread, so
   // the inscribed shape never collapses to a sliver) + an independent per-vertex jitter
-  // for genuine variety. The jitter scales with COUNT: with only 1–2 free on-circle points
-  // (e.g. a secant's two ends) it's WIDE — they reshape freely (any chord), and a seed that
-  // makes them coincide is just skipped by `resample`; with 3+ (an inscribed polygon) it stays
-  // small so the shape doesn't collapse to a sliver.
+  // for genuine variety. The jitter width is decided PER POINT by whether the point is a
+  // co-vertex of a genuine INSCRIBED POLYGON (a declared polygon with ≥3 free-on-circle
+  // vertices, at risk of collapsing to a sliver): such a vertex stays TIGHT (±30°); a free
+  // on-circle point that is NOT in one — a lone chord end, a secant's crossing — ranges WIDE
+  // (±153°) so it can reshape freely (a short chord, a point on the far arc). A seed that
+  // makes two coincide is just skipped by `resample`. Previously the width keyed off the TOTAL
+  // count of free on-circle points, so a chord (C,D) plus an unrelated secant point (A) read as
+  // "3 → a polygon" and was wrongly pinned tight — the chord could never get short enough to
+  // draw a clean tangent/secant figure (the Q4 BKCD case).
+  const isFreeOn = (id: Id) => freeCircle.some((fc) => fc.id === id);
+  const inscribedPolyVerts = new Set<Id>(); // vertices of a genuine inscribed polygon (≥3 free-on-circle vertices)
+  let anyPolyTouchesCircle = false; // does ANY declared polygon include a free on-circle vertex?
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon') continue;
+    const freeOn = o.vertices.filter(isFreeOn);
+    if (freeOn.length >= 1) anyPolyTouchesCircle = true;
+    if (freeOn.length >= 3) for (const v of freeOn) inscribedPolyVerts.add(v);
+  }
   const circSpin = (mulberry32((seed * 0x9e3779b1) >>> 0)() * 2 - 1) * Math.PI;
-  const circJit = freeCircle.length <= 2 ? Math.PI * 0.85 : Math.PI / 6; // ±153° for a chord/secant, ±30° for a polygon
+  // TIGHT (±30°, protect the spread) iff the point is a vertex of a genuine inscribed polygon, OR — when
+  // the figure declares NO polygon on the circle at all (no structural grouping to trust) — the legacy
+  // fallback: 3+ free on-circle points read as an implicit inscribed cluster. A chord/secant point (e.g.
+  // Q4's C,D in trapezoid BKCD — only 2 on-circle vertices — plus a lone secant point A) ranges WIDE
+  // (±153°) so the chord can get short enough to draw a clean tangent/secant figure.
+  const circJitOf = (id: Id) =>
+    inscribedPolyVerts.has(id) || (!anyPolyTouchesCircle && freeCircle.length >= 3) ? Math.PI / 6 : Math.PI * 0.85;
 
   const objects = c.objects.map((o) => {
     if (o.kind === 'free-point' && !o.pinned) {
@@ -112,7 +132,7 @@ export function applySeed(c: Construction, seed: number): Construction {
       // A point ON an arc (between, ADR-042): theta is a fraction in [−1,1] of the arc, so vary it
       // WITHIN the arc rather than spinning around the whole circle.
       if ((o as OnCirclePoint).between) return { ...o, theta: jr() * 2 - 1 };
-      return { ...o, theta: (o as OnCirclePoint).theta + circSpin + (jr() * 2 - 1) * circJit };
+      return { ...o, theta: (o as OnCirclePoint).theta + circSpin + (jr() * 2 - 1) * circJitOf(o.id) };
     }
     // Free on-segment point (ADR-052): the student gave no ratio, so slide it along the segment to a
     // genuinely different spot (kept off the endpoints so it doesn't collapse onto a or b).

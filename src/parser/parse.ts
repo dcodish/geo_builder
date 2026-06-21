@@ -2347,13 +2347,54 @@ const GREEK_WORDS: Record<string, string> = {
 const GREEK_RE = new RegExp(String.raw`(?<![A-Za-zα-ω])(${Object.keys(GREEK_WORDS).sort((a, b) => b.length - a.length).join('|')})(?![A-Za-zα-ω])`, 'g');
 const normalizeGreek = (s: string): string => s.replace(GREEK_RE, (m) => GREEK_WORDS[m]);
 
+/** The circle a command CONSUMES (references but doesn't define), or null. */
+const consumedCircleId = (cmd: AnyCommand): Id | null =>
+  cmd.type === 'point-on-circle' ||
+  cmd.type === 'tangent' ||
+  cmd.type === 'arc-midpoint' ||
+  cmd.type === 'line-circle-intersection' ||
+  cmd.type === 'diameter' ||
+  cmd.type === 'extend-onto-circle'
+    ? cmd.circle
+    : null;
+
+/** The circle a command DEFINES (creates), or null. */
+const definedCircleId = (cmd: AnyCommand): Id | null =>
+  cmd.type === 'circle' || cmd.type === 'circle-through' || cmd.type === 'circumcircle' ? cmd.id : null;
+
+/**
+ * Materialise an IMPLICIT circle. A decomposition — typically the LLM fallback reordering a whole problem
+ * — treats the circle as *given* ("CD is a chord IN the circle", "KB tangent to circle O at K", "A on
+ * circle O") and emits the consuming step WITHOUT one that creates the circle (the problem says "the
+ * circle"; the implicit object is never stated). When such a step references a `circle-<centre>` that is
+ * neither in the figure (`ctx.circles`) nor defined by the same utterance, PREPEND a free circle (free
+ * centre + free radius, ADR-052 — the radius is unstated, so don't freeze it) so the build doesn't collapse
+ * with an undefined centre. This lives in the PARSER (interpreting natural input), so the engine stays
+ * strict: a referenced-but-removed circle still cascades honestly (explicit removal is not silently rescued).
+ */
+function withImplicitCircles(commands: AnyCommand[], ctx: ParseContext): AnyCommand[] {
+  const have = new Set((ctx.circles ?? []).map((c) => c.toUpperCase()));
+  const definedHere = new Set(commands.map(definedCircleId).filter((x): x is Id => x !== null));
+  const prefix: AnyCommand[] = [];
+  const created = new Set<string>();
+  for (const cmd of commands) {
+    const cid = consumedCircleId(cmd);
+    if (!cid || !cid.startsWith('circle-') || definedHere.has(cid) || created.has(cid)) continue;
+    const center = cid.slice('circle-'.length).toUpperCase();
+    if (!center || have.has(center)) continue;
+    prefix.push({ type: 'circle', id: cid, center, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true });
+    created.add(cid);
+  }
+  return prefix.length ? [...prefix, ...commands] : commands;
+}
+
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
   const s = normalizeGreek(raw.trim().replace(/\s+/g, ' '));
   if (!s) return { ok: false, reason: 'not-handled' };
   for (const rule of RULES) {
     const commands = rule(s, ctx);
     if (commands === 'stop') break; // recognised but unreadable — escalate, don't half-parse
-    if (commands) return { ok: true, commands };
+    if (commands) return { ok: true, commands: withImplicitCircles(commands, ctx) };
   }
   return { ok: false, reason: 'not-handled' };
 }

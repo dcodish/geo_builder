@@ -590,6 +590,11 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
 
     case 'circle':
+      // An `ifAbsent` circle is the parser's auto-materialised IMPLICIT circle (a decomposition referenced
+      // "circle O" without creating it). Skip it when that circle already exists, so it never CLOBBERS a
+      // real one with the default free radius (e.g. when a later "chord … in circle O" is parsed without
+      // the circle in context). When truly absent, fall through and create it.
+      if (cmd.ifAbsent && objects.some((o) => o.kind === 'circle' && o.id === cmd.id)) break;
       placeBase(objects, [{ id: cmd.center, x: 0, y: 0 }], pos); // create the centre if new
       upsertCircle(objects, {
         kind: 'circle',
@@ -661,6 +666,18 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         const circ = objects.find((o) => o.id === cmd.circle && o.kind === 'circle') as Extract<GeoObject, { kind: 'circle' }> | undefined;
         if (circ && circ.radius.via === 'through' && circ.radius.point !== cmd.id) {
           driveOrCheck(objects, constraints, { type: 'equal', a: circ.center, b: cmd.id, c: circ.center, d: circ.radius.point });
+          break;
+        }
+        // (c2) The point is a NON-PINNED free vertex (e.g. a quadrilateral corner) and the circle's size is
+        // not pinned by a through-point: model it honestly as a point that SLIDES ON the circle. Convert the
+        // free point to an on-circle point so it is genuinely on the circle (0 residual) and the joint solver
+        // places its angle — with the free centre/radius and the other free DOFs — to satisfy the accumulated
+        // constraints. This is the "shapes carry their true DOF" model: declaring a quad's C,D "on circle O"
+        // makes CD a real chord instead of leaving the corners adrift (the verifier's "C is not on circle O").
+        // A through-radius circle (handled by (c)) is excluded — there the CIRCLE grows to the fixed vertex.
+        if (circ && existing.kind === 'free-point' && !(existing as Extract<GeoObject, { kind: 'free-point' }>).pinned) {
+          const i = objects.findIndex((o) => o.id === cmd.id);
+          objects[i] = { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: nextTheta(objects, cmd.circle), free: true };
           break;
         }
         // (d) Can't reconcile structurally here — do NOT silently drop it; the post-evaluate
