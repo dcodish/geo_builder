@@ -32,6 +32,9 @@ interface Scenario {
   guards: string;
   steps: Step[];
   check: (fig: Derived) => void;
+  /** Opt out of the blanket "the figure satisfies its stated givens" assertion (rare — only when a
+   *  scenario intentionally builds a figure the verifier flags, e.g. a documented known-limitation). */
+  expectViolations?: boolean;
 }
 
 /** The figure context the app feeds the parser: circle centres + existing point ids. */
@@ -1215,7 +1218,13 @@ const SCENARIOS: Scenario[] = [
 describe('reported scenarios — end-to-end replay of real bug reports', () => {
   for (const sc of SCENARIOS) {
     it(`[${sc.id}] ${sc.title}`, () => {
-      sc.check(run(sc.steps));
+      const fig = run(sc.steps);
+      sc.check(fig);
+      // Every scenario must also SATISFY ITS STATED GIVENS (the ADR-053 verifier, now comprehensive):
+      // a green figure that silently violates a distance/angle/∥/⟂/collinear/on-circle relation is a bug.
+      if (!sc.expectViolations) {
+        expect(fig.violations, `givens not satisfied: ${JSON.stringify(fig.violations.map((v) => v.message))}`).toEqual([]);
+      }
     });
   }
 });

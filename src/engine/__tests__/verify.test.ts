@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
 import { build, evaluate, checkGivens } from '@/engine';
-import type { Command } from '@/engine';
+import type { Command, Id } from '@/engine';
 
 const cmdsOf = (u: string): Command[] => {
   const r = parse(u);
@@ -48,5 +48,40 @@ describe('checkGivens — does the figure satisfy its stated givens?', () => {
     if (!ev.ok) return;
     // B is constructed exactly on both circles — must pass clean.
     expect(checkGivens(cmds, ev.positions, ev.circles).some((x) => x.ids.includes('B'))).toBe(false);
+  });
+});
+
+// Comprehensive metric / incidence verification (ADR-053 extended): re-derive each asserted relation
+// and check it against the final coordinates. A built figure passes clean; a tampered point is flagged
+// with the right relation type — proving the new checks actually fire (not silently skip).
+describe('checkGivens — metric & incidence relations', () => {
+  /** Build a figure, assert it verifies clean, then tamper `move` and assert the relation is flagged. */
+  const probe = (cmds: Command[], move: Id, rel: string) => {
+    const { construction } = build(cmds);
+    const ev = evaluate(construction);
+    expect(ev.ok, 'figure builds').toBe(true);
+    if (!ev.ok) return;
+    expect(checkGivens(cmds, ev.positions, ev.circles), 'the built figure satisfies its givens').toEqual([]);
+    const tampered = new Map(ev.positions);
+    const p = tampered.get(move)!;
+    tampered.set(move, { x: p.x + 7, y: p.y + 9 }); // shove it well past any tolerance
+    const v = checkGivens(cmds, tampered, ev.circles);
+    expect(v.some((x) => x.relation === rel), `a broken ${rel} relation is flagged`).toBe(true);
+  };
+
+  it('flags a violated DISTANCE given (and passes a satisfied one)', () => {
+    probe([{ type: 'triangle', ids: ['A', 'B', 'C'] }, { type: 'set-distance', a: 'A', b: 'B', value: 6 }], 'B', 'distance');
+  });
+  it('flags a violated ANGLE given', () => {
+    probe([{ type: 'triangle', ids: ['A', 'B', 'C'] }, { type: 'set-angle', vertex: 'B', ray1: 'A', ray2: 'C', value: 50 }], 'A', 'angle');
+  });
+  it('flags a violated PERPENDICULAR given', () => {
+    probe([{ type: 'quadrilateral', ids: ['A', 'B', 'C', 'D'] }, { type: 'set-perpendicular', a: 'A', b: 'B', c: 'C', d: 'D' }], 'B', 'perpendicular');
+  });
+  it('flags a violated PARALLEL given', () => {
+    probe([{ type: 'quadrilateral', ids: ['A', 'B', 'C', 'D'] }, { type: 'set-parallel', a: 'A', b: 'B', c: 'D', d: 'C' }], 'B', 'parallel');
+  });
+  it('flags a violated EQUAL-segments given', () => {
+    probe([{ type: 'triangle', ids: ['A', 'B', 'C'] }, { type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'C' }], 'B', 'equal');
   });
 });
