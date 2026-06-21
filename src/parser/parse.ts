@@ -842,11 +842,13 @@ const circle: Rule = (s, ctx) => {
   const center = named ?? freeLabel(ctx.points ?? [], ['O', 'P', 'Q', 'K']);
   const auto = !named;
   if (thrM && !r.numeric && !r.symbolic) return [{ type: 'circle-through', id: circleId(center), center: up(center), through: up(thrM[1]), ...(auto ? { autoCenter: true } : {}) }];
-  // No size was STATED (no number, no symbolic R) ⇒ the radius is a free DOF seeded at the default, not a
-  // fixed value (ADR-051 / the no-assumptions principle): the student gave a circle, not a size. A stated
-  // numeric/symbolic radius stays fixed.
-  const freeRadius = !r.numeric && !r.symbolic;
-  return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius, ...(freeRadius ? { freeRadius: true } : {}), ...(auto ? { autoCenter: true } : {}) }, ...(r.varCmd ? [r.varCmd] : [])];
+  // No NUMERIC size was stated ⇒ the radius is a free DOF seeded at the default, not a fixed value
+  // (ADR-052, the no-assumptions principle): the student gave a circle, not a size. A SYMBOLIC radius
+  // "R" is an UNKNOWN magnitude too — also free — that R then DENOTES; R is left UNVALUED (no set-var)
+  // so a later "AB = √2R" couples to the free-radius DOF via the radius-circle machinery (ADR-071)
+  // instead of freezing it to the default. Only a NUMERIC radius ("radius 5") is fixed.
+  const freeRadius = !r.numeric;
+  return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius, ...(freeRadius ? { freeRadius: true } : {}), ...(auto ? { autoCenter: true } : {}) }];
 };
 
 /**
@@ -961,11 +963,11 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // CROSSED quad. Use a convex, ordered angle set for ANY general quad — inscribed (drawn
   // circle) or cyclic (hidden) — so ABCD is always a proper convex quadrilateral.
   const angles = kind === 'quad' ? CYCLIC_QUAD_ANGLES : INSCRIBED_ANGLES[kind];
-  // No STATED radius ⇒ the circle's size is a free DOF (ADR-052) — playable/sampleable, not frozen at the
-  // default; a numeric/symbolic "radius R" stays fixed. (Matches the bare-`circle` rule.)
-  const freeRadius = !r.numeric && !r.symbolic;
+  // No NUMERIC radius ⇒ the circle's size is a free DOF (ADR-052) — playable/sampleable, not frozen at the
+  // default. A SYMBOLIC "radius R" is also free, with R left UNVALUED so an "AB = √2R" couples to the
+  // radius DOF (ADR-071); only a NUMERIC radius is fixed. (Matches the bare-`circle` rule.)
+  const freeRadius = !r.numeric;
   const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, ...(freeRadius ? { freeRadius: true } : {}), ...(hidden ? { hidden: true } : {}), ...(named ? {} : { autoCenter: true }) }];
-  if (r.varCmd) cmds.push(r.varCmd);
   ids.forEach((id, i) => {
     // specific angle for a shaped cyclic polygon (square/rect/rhombus/trapezoid);
     // omit for triangle/general-quad so they spread evenly.

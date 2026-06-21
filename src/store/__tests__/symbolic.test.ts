@@ -326,17 +326,19 @@ describe('chained equality "AB = AC = 3x"', () => {
 });
 
 describe('reserved radius symbol R/r (ADR-034)', () => {
-  it('"circle O radius R" pins R to the circle radius (a set-var), not a node', () => {
+  it('"circle O radius R" FREES the radius (R denotes the free DOF; ADR-052/071), no fixed set-var', () => {
     const r = parse('circle O radius R');
+    // A symbolic radius is an unknown magnitude → a free DOF that R denotes; R is left UNVALUED (no
+    // set-var) so a later "AB = √2R" couples to the free radius rather than freezing it (ADR-071).
     expect(r.ok && r.commands).toEqual([
-      { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
-      { type: 'set-var', name: 'R', value: 5 },
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true },
     ]);
   });
 
-  it('"מעגל סביב O רדיוס R" (Hebrew) does the same', () => {
+  it('"מעגל סביב O רדיוס R" (Hebrew) does the same (free radius, no set-var)', () => {
     const r = parse('מעגל סביב O רדיוס R');
-    expect(r.ok && r.commands.map((c) => c.type)).toEqual(['circle', 'set-var']);
+    expect(r.ok && r.commands.map((c) => c.type)).toEqual(['circle']);
+    expect(r.ok && r.commands[0]).toMatchObject({ type: 'circle', freeRadius: true });
   });
 
   it('"AC = 1.6R" is a size relative to the radius (var R), not "set-distance AC=1"', () => {
@@ -356,11 +358,14 @@ describe('reserved radius symbol R/r (ADR-034)', () => {
     expect(parse('AB = AR')).toEqual({ ok: true, commands: [{ type: 'segment', a: 'A', b: 'B' }, { type: 'segment', a: 'A', b: 'R' }, { type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'R' }] });
   });
 
-  it('constrains the figure to 1.6·radius and keeps the label symbolic ("1.6R")', () => {
+  it('constrains the figure to 1.6·radius (scale-free) and keeps the label symbolic ("1.6R")', () => {
     const d = replay(facts('circle O radius R', 'triangle ABC inscribed in circle O', 'AC = 1.6R'));
     expect(d.lastError).toBeNull();
-    expect(len(d.positions, 'A', 'C')).toBeCloseTo(1.6 * 5, 3); // |AC| = 1.6 × radius
-    expect(d.labels.lengths).toContainEqual({ a: 'A', b: 'C', text: '1.6R' }); // not "8"
+    // The radius is now a FREE DOF (ADR-052), so AC=1.6R fixes the RATIO of AC to the radius, not an
+    // absolute length: |AC| = 1.6 × radius whatever the radius comes out to (A is on circle O ⇒ |OA| = r).
+    const radius = len(d.positions, 'O', 'A');
+    expect(len(d.positions, 'A', 'C')).toBeCloseTo(1.6 * radius, 2);
+    expect(d.labels.lengths).toContainEqual({ a: 'A', b: 'C', text: '1.6R' }); // symbolic, not a number
   });
 });
 
