@@ -250,6 +250,22 @@ describe('Figure — static SVG render (no DOM)', () => {
     }
   });
 
+  it('hides a point label + dot when in `hidden`, drawing a clickable ghost instead (FR-RN-10)', () => {
+    const { construction, positions } = f1();
+    const noop = () => {};
+    const ren = () => ({ ok: true });
+    // editable (host wired the menu): each point gets a transparent hit-target; labels still show by default.
+    const shown = renderToStaticMarkup(<Figure construction={construction} positions={positions} onToggleHidden={noop} onRename={ren} />);
+    expect(shown).toContain('>G</text>');
+    expect((shown.match(/fill="transparent"/g) ?? []).length).toBe(5); // one hit-target per point
+
+    // G hidden: its label is gone and a faint dashed ghost ring is drawn; the other labels remain.
+    const hid = renderToStaticMarkup(<Figure construction={construction} positions={positions} hidden={new Set(['G'])} onToggleHidden={noop} onRename={ren} />);
+    expect(hid).not.toContain('>G</text>');
+    expect(hid).toContain('stroke-dasharray'); // the ghost ring
+    for (const id of ['A', 'B', 'C', 'D']) expect(hid).toContain(`>${id}</text>`);
+  });
+
   it('draws a circle (outline) with its inscribed points (Phase 5c)', () => {
     const { construction, positions } = build([
       { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },

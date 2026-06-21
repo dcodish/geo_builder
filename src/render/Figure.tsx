@@ -39,6 +39,16 @@ export interface FigureProps {
   angleMarks?: { vertex: Id; ray1: Id; ray2: Id; right: boolean }[];
   /** Show the measure labels + angle marks (default true); the host's "show measures" toggle drives this. */
   showMeasures?: boolean;
+  /** Point ids whose label + dot are hidden — drawn instead as a faint clickable ghost (FR-RN-10). */
+  hidden?: Set<Id>;
+  /** Relabel a point (clicked on the canvas) — the host wires the store's `rename`; the result drives an
+   *  inline note (e.g. the new letter is already taken). When provided (with `onToggleHidden`), points
+   *  become clickable and open the edit menu. */
+  onRename?: (from: Id, to: Id) => { ok: boolean; reason?: string };
+  /** Hide/show a point's label + dot (clicked on the canvas) — the host wires the store's `toggleHidden`. */
+  onToggleHidden?: (id: Id) => void;
+  /** Localised strings for the on-canvas point-edit menu (rename / hide / show / the no-op reasons). */
+  pointMenuText?: { rename: string; hide: string; show: string; apply: string; taken: string; bad: string };
 }
 
 interface View {
@@ -95,13 +105,36 @@ export function Figure({
   labels,
   angleMarks,
   showMeasures = true,
+  hidden,
+  onRename,
+  onToggleHidden,
+  pointMenuText,
 }: FigureProps) {
   const lit = (id: string): boolean => !!highlight && highlight.has(id);
+  const isHidden = (id: string): boolean => !!hidden && hidden.has(id);
+  const editable = !!onToggleHidden || !!onRename; // points are clickable only when the host wires the edit menu
   const [view, setView] = useState<View>(IDENTITY);
   const [hotCross, setHotCross] = useState<number | null>(null);
   const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>('');
+  // The on-canvas point-edit menu: which point, where (container px), and a transient note (e.g. "taken").
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [renameVal, setRenameVal] = useState('');
+  const [menuNote, setMenuNote] = useState('');
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+
+  function openMenu(id: string, screen: Vec) {
+    setMenu({ id, x: view.panX + screen.x * view.zoom, y: view.panY + screen.y * view.zoom });
+    setRenameVal('');
+    setMenuNote('');
+  }
+  function applyRename(id: string) {
+    const to = renameVal.trim().toUpperCase();
+    if (!to || !onRename) return;
+    const res = onRename(id, to);
+    if (res.ok) setMenu(null);
+    else setMenuNote(res.reason === 'target-taken' ? (pointMenuText?.taken ?? 'taken') : (pointMenuText?.bad ?? ''));
+  }
 
   async function saveImage() {
     if (!svgRef.current) return;
@@ -331,33 +364,60 @@ export function Figure({
 
           {scene.points.map((pt) => {
             const s = transform.toScreen(pt.pos);
+            const hide = isHidden(pt.id);
             // The label direction is chosen (zoom-independent) to clear the figure's
             // lines; fall back to the seed outward dir (Y-flipped to screen) if absent.
             const sd = labelDirs.get(pt.id) ?? unitVec({ x: pt.labelDir.x, y: -pt.labelDir.y });
             const off = pointR * 2 + fontSize * 0.5; // clear the (small) dot + a gap so the label is readable
             const anchor = sd.x > 0.3 ? 'start' : sd.x < -0.3 ? 'end' : 'middle';
             const baseline = sd.y > 0.3 ? 'hanging' : sd.y < -0.3 ? 'auto' : 'middle';
+            // A generous transparent hit-target so the (tiny) dot/ghost is easy to click.
+            const hitR = Math.max(r * 2.5, 9 / view.zoom);
             return (
               <g key={pt.id} data-id={pt.id}>
-                <circle cx={s.x} cy={s.y} r={lit(pt.id) ? pointR * 2 : pointR} fill={lit(pt.id) ? ACCENT : '#0f172a'} />
-                <text
-                  x={s.x + sd.x * off}
-                  y={s.y + sd.y * off}
-                  textAnchor={anchor}
-                  dominantBaseline={baseline}
-                  fontSize={fontSize}
-                  fontFamily="system-ui, sans-serif"
-                  fontWeight={lit(pt.id) ? 700 : 400}
-                  fill={lit(pt.id) ? '#b45309' : '#0f172a'}
-                  // A white halo painted UNDER the glyph keeps the label readable even when
-                  // it lands on a line (paint-order: stroke ⇒ the stroke draws first).
-                  stroke="#fff"
-                  strokeWidth={fontSize * 0.22}
-                  strokeLinejoin="round"
-                  style={{ paintOrder: 'stroke' }}
-                >
-                  {subscriptLabel(pt.label, fontSize)}
-                </text>
+                {hide ? (
+                  // A HIDDEN point: a faint dashed ghost ring (no label, no solid dot) — unobtrusive but
+                  // clickable, so "click there again" brings the label + dot back (FR-RN-10).
+                  <circle cx={s.x} cy={s.y} r={pointR * 1.8} fill="none" stroke="#cbd5e1" strokeWidth={stroke} strokeDasharray={`${stroke * 1.5} ${stroke * 1.5}`} />
+                ) : (
+                  <>
+                    <circle cx={s.x} cy={s.y} r={lit(pt.id) ? pointR * 2 : pointR} fill={lit(pt.id) ? ACCENT : '#0f172a'} />
+                    <text
+                      x={s.x + sd.x * off}
+                      y={s.y + sd.y * off}
+                      textAnchor={anchor}
+                      dominantBaseline={baseline}
+                      fontSize={fontSize}
+                      fontFamily="system-ui, sans-serif"
+                      fontWeight={lit(pt.id) ? 700 : 400}
+                      fill={lit(pt.id) ? '#b45309' : '#0f172a'}
+                      // A white halo painted UNDER the glyph keeps the label readable even when
+                      // it lands on a line (paint-order: stroke ⇒ the stroke draws first).
+                      stroke="#fff"
+                      strokeWidth={fontSize * 0.22}
+                      strokeLinejoin="round"
+                      style={{ paintOrder: 'stroke' }}
+                    >
+                      {subscriptLabel(pt.label, fontSize)}
+                    </text>
+                  </>
+                )}
+                {editable && (
+                  <circle
+                    cx={s.x}
+                    cy={s.y}
+                    r={hitR}
+                    fill="transparent"
+                    style={{ cursor: 'pointer' }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openMenu(pt.id, s);
+                    }}
+                  >
+                    <title>{pt.label}</title>
+                  </circle>
+                )}
               </g>
             );
           })}
@@ -427,6 +487,69 @@ export function Figure({
             })}
         </g>
       </svg>
+
+      {/* On-canvas point-edit menu (FR-RN-10): click a point to rename it or hide/show its label+dot.
+          A transparent backdrop closes it on an outside click. */}
+      {menu && editable && (
+        <>
+          <div style={{ position: 'absolute', inset: 0 }} onClick={() => setMenu(null)} />
+          <div
+            style={{
+              position: 'absolute',
+              insetInlineStart: clamp(menu.x + 8, 0, width - 150),
+              top: clamp(menu.y + 8, 0, height - 80),
+              background: '#fff',
+              border: '1px solid #cbd5e1',
+              borderRadius: 8,
+              boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+              padding: 8,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              zIndex: 10,
+              minWidth: 132,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{menu.id}</div>
+            {onRename && !isHidden(menu.id) && (
+              <div style={{ display: 'flex', gap: 4 }}>
+                <input
+                  autoFocus
+                  value={renameVal}
+                  maxLength={3}
+                  placeholder={pointMenuText?.rename ?? 'rename'}
+                  onChange={(e) => {
+                    setRenameVal(e.target.value);
+                    if (menuNote) setMenuNote('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') applyRename(menu.id);
+                    if (e.key === 'Escape') setMenu(null);
+                  }}
+                  style={{ width: 64, padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid #cbd5e1', textTransform: 'uppercase' }}
+                />
+                <button type="button" style={ctrlBtn} title={pointMenuText?.apply ?? 'apply'} onClick={() => applyRename(menu.id)}>
+                  ✓
+                </button>
+              </div>
+            )}
+            {menuNote && <div style={{ fontSize: 11, color: '#dc2626' }}>{menuNote}</div>}
+            {onToggleHidden && (
+              <button
+                type="button"
+                style={{ ...ctrlBtn, textAlign: 'start' }}
+                onClick={() => {
+                  onToggleHidden(menu.id);
+                  setMenu(null);
+                }}
+              >
+                {isHidden(menu.id) ? (pointMenuText?.show ?? 'show') : (pointMenuText?.hide ?? 'hide')}
+              </button>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Orientation controls — rotate / flip the whole figure; labels stay upright
           (only the world coordinates are oriented, never the label glyphs). */}

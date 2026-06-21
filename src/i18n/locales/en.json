@@ -83,6 +83,14 @@
     "showMeasures": "Show measures",
     "language": "עברית"
   },
+  "pointMenu": {
+    "rename": "letter",
+    "hide": "Hide label",
+    "show": "Show label",
+    "apply": "Apply",
+    "taken": "Letter already used",
+    "bad": "Invalid letter"
+  },
   "geometry": {
     "triangle": "Triangle",
     "quadrilateral": "Quadrilateral",

@@ -83,6 +83,14 @@
     "showMeasures": "הצג מידות",
     "language": "English"
   },
+  "pointMenu": {
+    "rename": "אות",
+    "hide": "הסתר תווית",
+    "show": "הצג תווית",
+    "apply": "החל",
+    "taken": "האות כבר בשימוש",
+    "bad": "אות לא תקינה"
+  },
   "geometry": {
     "triangle": "משולש",
     "quadrilateral": "מרובע",

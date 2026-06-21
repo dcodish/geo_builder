@@ -378,6 +378,10 @@ export interface GeoState {
   /** Dialed free-circle radii (the DOF sliders): circle id → radius. A viewing scratchpad — UI-only,
    *  not undoable, cleared by "show another configuration". */
   radiusOverrides: Record<Id, number>;
+  /** Point ids whose label + vertex dot are hidden on the figure — a DISPLAY preference (the point still
+   *  participates in the construction; segments through it still draw). UI-only, not undoable: the student
+   *  un-hides by clicking the ghost again. Rewritten by `rename`/`merge` so it tracks the renamed letter. */
+  hidden: Id[];
 
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
   execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;
@@ -404,6 +408,8 @@ export interface GeoState {
   setRadius: (circle: Id, value: number) => void;
   /** Show/hide measure labels on the figure (ADR-031). */
   setShowMeasures: (show: boolean) => void;
+  /** Toggle a point's label + dot hidden/shown on the figure (a display preference, not geometry). */
+  toggleHidden: (id: Id) => void;
   /** Relabel a point everywhere (e.g. E → G) — rewrites every fact, one undo entry. */
   rename: (from: Id, to: Id) => RenameResult;
   /** Fold one point into another (e.g. F → E, both already present) — drops F's definition,
@@ -506,6 +512,7 @@ export const useGeoStore = create<GeoState>()(
       seed: 0,
       showMeasures: true,
       radiusOverrides: {},
+      hidden: [],
 
       execute: (cmd, utterance, group) => {
         const facts = get().facts;
@@ -643,6 +650,12 @@ export const useGeoStore = create<GeoState>()(
 
       setShowMeasures: (show) => set({ showMeasures: show }),
 
+      toggleHidden: (id) => {
+        const I = id.toUpperCase();
+        const h = get().hidden;
+        set({ hidden: h.includes(I) ? h.filter((x) => x !== I) : [...h, I] });
+      },
+
       rename: (from, to) => {
         const F = from.toUpperCase();
         const T = to.toUpperCase();
@@ -659,6 +672,7 @@ export const useGeoStore = create<GeoState>()(
             // point letters only — Hebrew words and lowercase keywords are untouched).
             utterance: f.utterance ? f.utterance.split(F).join(T) : f.utterance,
           })),
+          hidden: get().hidden.map((h) => (h === F ? T : h)), // a hidden point keeps its hidden state under the new letter
           selectedId: null,
         });
         return { ok: true };
@@ -685,12 +699,12 @@ export const useGeoStore = create<GeoState>()(
             utterance: f.utterance ? f.utterance.split(F).join(T) : f.utterance,
           }))
           .filter((f) => !collapsedDegenerate(f.cmd)); // drop facts that collapsed (segment EF → EE, …)
-        set({ facts: merged, selectedId: null });
+        set({ facts: merged, hidden: [...new Set(get().hidden.map((h) => (h === F ? T : h)))], selectedId: null });
         return { ok: true };
       },
 
       clear: () => {
-        set({ facts: [], selectedId: null, seed: 0, radiusOverrides: {} });
+        set({ facts: [], selectedId: null, seed: 0, radiusOverrides: {}, hidden: [] });
         useGeoStore.temporal.getState().clear();
       },
     }),

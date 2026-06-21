@@ -41,6 +41,8 @@ export default function App() {
   const setShowMeasures = useGeoStore((s) => s.setShowMeasures);
   const rename = useGeoStore((s) => s.rename);
   const merge = useGeoStore((s) => s.merge);
+  const hidden = useGeoStore((s) => s.hidden);
+  const toggleHidden = useGeoStore((s) => s.toggleHidden);
   const clear = useGeoStore((s) => s.clear);
 
   const { undo, redo } = useGeoStore.temporal.getState();
@@ -278,6 +280,8 @@ export default function App() {
     return inGroup.length ? new Set(inGroup.flatMap((x) => introducedIds(x.cmd))) : undefined;
   }, [facts, selectedId]);
 
+  const hiddenSet = useMemo(() => new Set(hidden), [hidden]);
+
   // Collapse the flat fact list into step rows: all commands from one submission
   // (same group) become one row, so an inscribed shape isn't shown as 6 rows.
   const groups = useMemo(() => {
@@ -329,6 +333,17 @@ export default function App() {
             labels={labels}
             angleMarks={angleMarks}
             showMeasures={showMeasures}
+            hidden={hiddenSet}
+            onRename={rename}
+            onToggleHidden={toggleHidden}
+            pointMenuText={{
+              rename: t('pointMenu.rename'),
+              hide: t('pointMenu.hide'),
+              show: t('pointMenu.show'),
+              apply: t('pointMenu.apply'),
+              taken: t('pointMenu.taken'),
+              bad: t('pointMenu.bad'),
+            }}
           />
         </div>
 
