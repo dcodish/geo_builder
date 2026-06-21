@@ -27,6 +27,16 @@ const isFreeOnCircle = (o: { kind: string; free?: boolean; solve?: unknown }): b
 const isFreeOnSegment = (o: { kind: string; free?: boolean; solve?: unknown }): boolean =>
   o.kind === 'on-segment' && !!o.free && o.solve === undefined;
 
+/**
+ * An EXTENSION on-segment point ("F on the extension of AD", t>1) with no stated distance and not
+ * currently driven: its distance beyond the segment is UNSTATED, so it's a free DOF the sampler must
+ * vary (ADR-052) — even though it's NOT eagerly driven (the ADR-074 distinction). This closes the
+ * ADR-052 smell where such a point was counted by `rawMovableDof` but never sampled (a default
+ * masquerading as fixed). A RECRUITED extension point (solve set) is excluded — it's driven, not free.
+ */
+const isSamplableExtension = (o: { kind: string; extension?: boolean; solve?: unknown }): boolean =>
+  o.kind === 'on-segment' && !!(o as { extension?: boolean }).extension && o.solve === undefined;
+
 /** A free on-line marker the sampler may slide along its line (not yet driven by a constraint — ADR-036). */
 const isFreeOnLine = (o: { kind: string; solve?: unknown }): boolean => o.kind === 'on-line' && o.solve === undefined;
 
@@ -110,6 +120,12 @@ export function applySeed(c: Construction, seed: number): Construction {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
       return { ...o, t: 0.15 + jr() * 0.7 }; // t ∈ [0.15, 0.85]
     }
+    // Extension point (ADR-052/ADR-074): the distance beyond the segment is unstated, so slide it ALONG
+    // the extension — kept past the far end (t > 1) so it stays "on the extension", just a different length.
+    if (isSamplableExtension(o)) {
+      const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
+      return { ...o, t: 1.15 + jr() * 1.05 }; // t ∈ [1.15, 2.2], still beyond the segment
+    }
     // Free on-line marker (ADR-036): slide it along its line by scaling the signed offset.
     // Sign is preserved so a pair straddling the anchor (a tangent's C at +offset, D at −offset)
     // keeps straddling — the segment between them still spans the touch point, just a different length.
@@ -160,6 +176,7 @@ export function freeDofs(c: Construction): Id[] {
         (o.kind === 'free-point' && !o.pinned) ||
         isFreeOnCircle(o) ||
         isFreeOnSegment(o) ||
+        isSamplableExtension(o) ||
         isFreeOnLine(o) ||
         (isShapeCarrier(o) && (o as { solve?: unknown }).solve === undefined), // incl. a free-radius circle (ADR-051)
     )

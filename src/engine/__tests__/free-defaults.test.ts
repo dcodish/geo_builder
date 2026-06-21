@@ -55,4 +55,23 @@ describe('ADR-052 — a point on a segment with no stated ratio is a free DOF', 
     expect(tAlong(replay(facts), 'A', 'B', 'G')).toBeCloseTo(0.4, 6);
     useGeoStore.getState().clear();
   });
+
+  // ADR-074 / ADR-052: an EXTENSION point's distance beyond the segment is unstated, so it is a free DOF
+  // the sampler varies — even though it is NOT eagerly driven (the ADR-074 distinction). At seed 0 it sits
+  // at its default; "show another configuration" slides it, always staying past the far end (t > 1).
+  it('"point G on the extension of AB" is samplable — varies across views, stays beyond B (t>1)', () => {
+    enter(['triangle ABC', 'point G on the extension of AB']);
+    const facts = useGeoStore.getState().facts;
+    expect(freeDofs(replay(facts).construction), 'extension point is a samplable free DOF').toContain('G');
+    expect(tAlong(replay(facts, 0), 'A', 'B', 'G'), 'seed 0 = default extension t').toBeCloseTo(1.3, 6);
+    const ts = new Set<number>();
+    for (let press = 1; press <= 8; press++) {
+      useGeoStore.getState().resample();
+      const t = tAlong(replay(facts, useGeoStore.getState().seed), 'A', 'B', 'G');
+      expect(t, `view ${press}: G stays on the extension (beyond B)`).toBeGreaterThan(1);
+      ts.add(Math.round(t * 10));
+    }
+    expect(ts.size, 'G occupies several distinct positions along the extension across views').toBeGreaterThan(2);
+    useGeoStore.getState().clear();
+  });
 });
