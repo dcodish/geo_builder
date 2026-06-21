@@ -58,3 +58,39 @@ describe('store.toggleHidden — hide/show a point label', () => {
     expect(s().hidden).toEqual([]);
   });
 });
+
+describe('store.toggleSegHidden / toggleSegDashed — per-segment display style', () => {
+  it('toggles a segment hidden, then back off (drops the entry when clear)', () => {
+    s().execute(SQUARE, 'square ABCD');
+    expect(s().segStyle).toEqual({});
+    s().toggleSegHidden('seg-AB');
+    expect(s().segStyle['seg-AB']).toEqual({ hidden: true });
+    s().toggleSegHidden('seg-AB');
+    expect(s().segStyle['seg-AB']).toBeUndefined(); // both flags off → entry removed
+  });
+
+  it('hidden and dashed are independent flags on the same segment', () => {
+    s().execute(SQUARE, 'square ABCD');
+    s().toggleSegDashed('seg-AB');
+    expect(s().segStyle['seg-AB']).toEqual({ dashed: true });
+    s().toggleSegHidden('seg-AB');
+    expect(s().segStyle['seg-AB']).toEqual({ dashed: true, hidden: true });
+    s().toggleSegHidden('seg-AB'); // un-hide keeps dashed remembered
+    expect(s().segStyle['seg-AB']).toEqual({ dashed: true });
+  });
+
+  it('rename rewrites the seg-id key (re-sorted endpoints) so the style tracks the renamed point', () => {
+    s().execute(SQUARE, 'square ABCD');
+    s().toggleSegDashed('seg-AB');
+    s().rename('A', 'E'); // seg AB → endpoints E,B → sorted → seg-BE
+    expect(s().segStyle['seg-AB']).toBeUndefined();
+    expect(s().segStyle['seg-BE']).toEqual({ dashed: true });
+  });
+
+  it('clear resets the segment styles', () => {
+    s().execute(SQUARE, 'square ABCD');
+    s().toggleSegDashed('seg-AB');
+    s().clear();
+    expect(s().segStyle).toEqual({});
+  });
+});

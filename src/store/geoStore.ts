@@ -320,6 +320,37 @@ function commandPointIds(cmd: AnyCommand): Id[] {
   return out;
 }
 
+/** Flip one display flag (hidden/dashed) on a segment's style entry, keeping only the TRUE flags
+ *  (so the entry stays minimal — `{dashed:true}`, not `{dashed:true,hidden:false}`); drop it when empty. */
+function setSegFlag(style: Record<Id, { hidden?: boolean; dashed?: boolean }>, id: Id, flag: 'hidden' | 'dashed'): Record<Id, { hidden?: boolean; dashed?: boolean }> {
+  const cur = style[id] ?? {};
+  const next: { hidden?: boolean; dashed?: boolean } = { ...cur, [flag]: !cur[flag] };
+  const clean: { hidden?: boolean; dashed?: boolean } = {};
+  if (next.hidden) clean.hidden = true;
+  if (next.dashed) clean.dashed = true;
+  const out = { ...style };
+  if (!clean.hidden && !clean.dashed) delete out[id];
+  else out[id] = clean;
+  return out;
+}
+
+/** Rewrite a seg-id key (`seg-AB`) under a point rename — re-derive it from the renamed, re-sorted
+ *  endpoints so it still matches the renderer's id. Best-effort: only the common single-letter-endpoints
+ *  case (a subscripted/multi-char endpoint keeps its old key — a minor cosmetic staleness). */
+function renameSegKey(key: Id, from: Id, to: Id): Id {
+  if (!key.startsWith('seg-')) return key;
+  const ep = key.slice(4);
+  if (ep.length !== 2) return key;
+  const a = ep[0] === from ? to : ep[0];
+  const b = ep[1] === from ? to : ep[1];
+  return `seg-${[a, b].sort().join('')}`;
+}
+
+/** Apply a point rename to every seg-id key in a segment-style map. */
+function renameSegStyle(style: Record<Id, { hidden?: boolean; dashed?: boolean }>, from: Id, to: Id): Record<Id, { hidden?: boolean; dashed?: boolean }> {
+  return Object.fromEntries(Object.entries(style).map(([k, v]) => [renameSegKey(k, from, to), v]));
+}
+
 /** Rewrite one point letter to another across a single command (exact-match on the single-letter id). */
 function renameInCommand(cmd: AnyCommand, from: Id, to: Id): AnyCommand {
   const out: Record<string, unknown> = {};
@@ -382,6 +413,9 @@ export interface GeoState {
    *  participates in the construction; segments through it still draw). UI-only, not undoable: the student
    *  un-hides by clicking the ghost again. Rewritten by `rename`/`merge` so it tracks the renamed letter. */
   hidden: Id[];
+  /** Per-segment display style (keyed by seg id, e.g. `seg-AB`) — hidden and/or dashed. A DISPLAY
+   *  preference like {@link hidden}: UI-only, not undoable; rewritten by `rename`/`merge`; reset by `clear`. */
+  segStyle: Record<Id, { hidden?: boolean; dashed?: boolean }>;
 
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
   execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;
@@ -410,6 +444,10 @@ export interface GeoState {
   setShowMeasures: (show: boolean) => void;
   /** Toggle a point's label + dot hidden/shown on the figure (a display preference, not geometry). */
   toggleHidden: (id: Id) => void;
+  /** Toggle a segment hidden/shown on the figure (a display preference, not geometry). */
+  toggleSegHidden: (id: Id) => void;
+  /** Toggle a segment dashed/solid on the figure (a display preference, not geometry). */
+  toggleSegDashed: (id: Id) => void;
   /** Relabel a point everywhere (e.g. E → G) — rewrites every fact, one undo entry. */
   rename: (from: Id, to: Id) => RenameResult;
   /** Fold one point into another (e.g. F → E, both already present) — drops F's definition,
@@ -513,6 +551,7 @@ export const useGeoStore = create<GeoState>()(
       showMeasures: true,
       radiusOverrides: {},
       hidden: [],
+      segStyle: {},
 
       execute: (cmd, utterance, group) => {
         const facts = get().facts;
@@ -656,6 +695,9 @@ export const useGeoStore = create<GeoState>()(
         set({ hidden: h.includes(I) ? h.filter((x) => x !== I) : [...h, I] });
       },
 
+      toggleSegHidden: (id) => set({ segStyle: setSegFlag(get().segStyle, id, 'hidden') }),
+      toggleSegDashed: (id) => set({ segStyle: setSegFlag(get().segStyle, id, 'dashed') }),
+
       rename: (from, to) => {
         const F = from.toUpperCase();
         const T = to.toUpperCase();
@@ -673,6 +715,7 @@ export const useGeoStore = create<GeoState>()(
             utterance: f.utterance ? f.utterance.split(F).join(T) : f.utterance,
           })),
           hidden: get().hidden.map((h) => (h === F ? T : h)), // a hidden point keeps its hidden state under the new letter
+          segStyle: renameSegStyle(get().segStyle, F, T), // a styled segment keeps its style under the renamed endpoint
           selectedId: null,
         });
         return { ok: true };
@@ -699,12 +742,12 @@ export const useGeoStore = create<GeoState>()(
             utterance: f.utterance ? f.utterance.split(F).join(T) : f.utterance,
           }))
           .filter((f) => !collapsedDegenerate(f.cmd)); // drop facts that collapsed (segment EF → EE, …)
-        set({ facts: merged, hidden: [...new Set(get().hidden.map((h) => (h === F ? T : h)))], selectedId: null });
+        set({ facts: merged, hidden: [...new Set(get().hidden.map((h) => (h === F ? T : h)))], segStyle: renameSegStyle(get().segStyle, F, T), selectedId: null });
         return { ok: true };
       },
 
       clear: () => {
-        set({ facts: [], selectedId: null, seed: 0, radiusOverrides: {}, hidden: [] });
+        set({ facts: [], selectedId: null, seed: 0, radiusOverrides: {}, hidden: [], segStyle: {} });
         useGeoStore.temporal.getState().clear();
       },
     }),

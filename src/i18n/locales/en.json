@@ -91,6 +91,12 @@
     "taken": "Letter already used",
     "bad": "Invalid letter"
   },
+  "segMenu": {
+    "hide": "Hide segment",
+    "show": "Show segment",
+    "dashed": "Dashed",
+    "solid": "Solid"
+  },
   "geometry": {
     "triangle": "Triangle",
     "quadrilateral": "Quadrilateral",

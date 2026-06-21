@@ -49,6 +49,14 @@ export interface FigureProps {
   onToggleHidden?: (id: Id) => void;
   /** Localised strings for the on-canvas point-edit menu (rename / hide / show / the no-op reasons). */
   pointMenuText?: { rename: string; hide: string; show: string; apply: string; taken: string; bad: string };
+  /** Per-segment display style (keyed by seg id) — hidden and/or dashed (FR-RN-10). */
+  segStyle?: Record<Id, { hidden?: boolean; dashed?: boolean }>;
+  /** Hide/show a segment (clicked on the canvas) — the host wires the store's `toggleSegHidden`. */
+  onToggleSegHidden?: (id: Id) => void;
+  /** Make a segment dashed/solid (clicked on the canvas) — the host wires the store's `toggleSegDashed`. */
+  onToggleSegDashed?: (id: Id) => void;
+  /** Localised strings for the on-canvas segment menu. */
+  segMenuText?: { hide: string; show: string; dashed: string; solid: string };
 }
 
 interface View {
@@ -109,22 +117,29 @@ export function Figure({
   onRename,
   onToggleHidden,
   pointMenuText,
+  segStyle,
+  onToggleSegHidden,
+  onToggleSegDashed,
+  segMenuText,
 }: FigureProps) {
   const lit = (id: string): boolean => !!highlight && highlight.has(id);
   const isHidden = (id: string): boolean => !!hidden && hidden.has(id);
+  const segOf = (id: string) => segStyle?.[id] ?? {};
   const editable = !!onToggleHidden || !!onRename; // points are clickable only when the host wires the edit menu
+  const segEditable = !!onToggleSegHidden || !!onToggleSegDashed; // ditto for segments
   const [view, setView] = useState<View>(IDENTITY);
   const [hotCross, setHotCross] = useState<number | null>(null);
   const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>('');
-  // The on-canvas point-edit menu: which point, where (container px), and a transient note (e.g. "taken").
-  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  // The on-canvas edit menu: a point (rename / hide) or a segment (hide / dashed), where (container px),
+  // and a transient note (e.g. "taken").
+  const [menu, setMenu] = useState<{ kind: 'point' | 'segment'; id: string; x: number; y: number } | null>(null);
   const [renameVal, setRenameVal] = useState('');
   const [menuNote, setMenuNote] = useState('');
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  function openMenu(id: string, screen: Vec) {
-    setMenu({ id, x: view.panX + screen.x * view.zoom, y: view.panY + screen.y * view.zoom });
+  function openMenu(kind: 'point' | 'segment', id: string, screen: Vec) {
+    setMenu({ kind, id, x: view.panX + screen.x * view.zoom, y: view.panY + screen.y * view.zoom });
     setRenameVal('');
     setMenuNote('');
   }
@@ -320,18 +335,47 @@ export function Figure({
           {scene.segments.map((seg) => {
             const a = transform.toScreen(seg.a);
             const b = transform.toScreen(seg.b);
+            const st = segOf(seg.id);
+            const dash = st.dashed ? `${6 / view.zoom} ${5 / view.zoom}` : undefined;
             return (
-              <line
-                key={seg.id}
-                data-id={seg.id}
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke={lit(seg.id) ? ACCENT : '#334155'}
-                strokeWidth={lit(seg.id) ? stroke * 2 : stroke}
-                strokeLinecap="round"
-              />
+              <g key={seg.id} data-id={seg.id}>
+                {st.hidden ? (
+                  // A HIDDEN segment: a very faint dashed ghost — invisible-ish but clickable, so the
+                  // toggle is reversible right on the line (FR-RN-10). The endpoints (points) are unaffected.
+                  segEditable && (
+                    <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#e2e8f0" strokeWidth={stroke} strokeDasharray={`${stroke * 1.5} ${stroke * 3}`} />
+                  )
+                ) : (
+                  <line
+                    x1={a.x}
+                    y1={a.y}
+                    x2={b.x}
+                    y2={b.y}
+                    stroke={lit(seg.id) ? ACCENT : '#334155'}
+                    strokeWidth={lit(seg.id) ? stroke * 2 : stroke}
+                    strokeLinecap="round"
+                    strokeDasharray={dash}
+                  />
+                )}
+                {segEditable && (
+                  // A wide transparent hit-line so the thin segment is easy to click → the segment menu.
+                  <line
+                    x1={a.x}
+                    y1={a.y}
+                    x2={b.x}
+                    y2={b.y}
+                    stroke="transparent"
+                    strokeWidth={Math.max(stroke * 6, 10 / view.zoom)}
+                    strokeLinecap="round"
+                    style={{ cursor: 'pointer' }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openMenu('segment', seg.id, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+                    }}
+                  />
+                )}
+              </g>
             );
           })}
 
@@ -412,7 +456,7 @@ export function Figure({
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
-                      openMenu(pt.id, s);
+                      openMenu('point', pt.id, s);
                     }}
                   >
                     <title>{pt.label}</title>
@@ -488,9 +532,9 @@ export function Figure({
         </g>
       </svg>
 
-      {/* On-canvas point-edit menu (FR-RN-10): click a point to rename it or hide/show its label+dot.
-          A transparent backdrop closes it on an outside click. */}
-      {menu && editable && (
+      {/* On-canvas edit menu (FR-RN-10): click a POINT to rename it or hide/show its label+dot, or a
+          SEGMENT to hide/show it or make it dashed/solid. A transparent backdrop closes it on outside click. */}
+      {menu && (menu.kind === 'point' ? editable : segEditable) && (
         <>
           <div style={{ position: 'absolute', inset: 0 }} onClick={() => setMenu(null)} />
           <div
@@ -511,41 +555,51 @@ export function Figure({
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{menu.id}</div>
-            {onRename && !isHidden(menu.id) && (
-              <div style={{ display: 'flex', gap: 4 }}>
-                <input
-                  autoFocus
-                  value={renameVal}
-                  maxLength={3}
-                  placeholder={pointMenuText?.rename ?? 'rename'}
-                  onChange={(e) => {
-                    setRenameVal(e.target.value);
-                    if (menuNote) setMenuNote('');
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') applyRename(menu.id);
-                    if (e.key === 'Escape') setMenu(null);
-                  }}
-                  style={{ width: 64, padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid #cbd5e1', textTransform: 'uppercase' }}
-                />
-                <button type="button" style={ctrlBtn} title={pointMenuText?.apply ?? 'apply'} onClick={() => applyRename(menu.id)}>
-                  ✓
-                </button>
-              </div>
-            )}
-            {menuNote && <div style={{ fontSize: 11, color: '#dc2626' }}>{menuNote}</div>}
-            {onToggleHidden && (
-              <button
-                type="button"
-                style={{ ...ctrlBtn, textAlign: 'start' }}
-                onClick={() => {
-                  onToggleHidden(menu.id);
-                  setMenu(null);
-                }}
-              >
-                {isHidden(menu.id) ? (pointMenuText?.show ?? 'show') : (pointMenuText?.hide ?? 'hide')}
-              </button>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{menu.kind === 'point' ? menu.id : menu.id.replace(/^seg-/, '')}</div>
+            {menu.kind === 'point' ? (
+              <>
+                {onRename && !isHidden(menu.id) && (
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <input
+                      autoFocus
+                      value={renameVal}
+                      maxLength={3}
+                      placeholder={pointMenuText?.rename ?? 'rename'}
+                      onChange={(e) => {
+                        setRenameVal(e.target.value);
+                        if (menuNote) setMenuNote('');
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') applyRename(menu.id);
+                        if (e.key === 'Escape') setMenu(null);
+                      }}
+                      style={{ width: 64, padding: '3px 6px', fontSize: 13, borderRadius: 6, border: '1px solid #cbd5e1', textTransform: 'uppercase' }}
+                    />
+                    <button type="button" style={ctrlBtn} title={pointMenuText?.apply ?? 'apply'} onClick={() => applyRename(menu.id)}>
+                      ✓
+                    </button>
+                  </div>
+                )}
+                {menuNote && <div style={{ fontSize: 11, color: '#dc2626' }}>{menuNote}</div>}
+                {onToggleHidden && (
+                  <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onToggleHidden(menu.id); setMenu(null); }}>
+                    {isHidden(menu.id) ? (pointMenuText?.show ?? 'show') : (pointMenuText?.hide ?? 'hide')}
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                {onToggleSegHidden && (
+                  <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onToggleSegHidden(menu.id); setMenu(null); }}>
+                    {segOf(menu.id).hidden ? (segMenuText?.show ?? 'show') : (segMenuText?.hide ?? 'hide')}
+                  </button>
+                )}
+                {onToggleSegDashed && !segOf(menu.id).hidden && (
+                  <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onToggleSegDashed(menu.id); setMenu(null); }}>
+                    {segOf(menu.id).dashed ? (segMenuText?.solid ?? 'solid') : (segMenuText?.dashed ?? 'dashed')}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </>

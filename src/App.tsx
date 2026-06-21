@@ -43,6 +43,9 @@ export default function App() {
   const merge = useGeoStore((s) => s.merge);
   const hidden = useGeoStore((s) => s.hidden);
   const toggleHidden = useGeoStore((s) => s.toggleHidden);
+  const segStyle = useGeoStore((s) => s.segStyle);
+  const toggleSegHidden = useGeoStore((s) => s.toggleSegHidden);
+  const toggleSegDashed = useGeoStore((s) => s.toggleSegDashed);
   const clear = useGeoStore((s) => s.clear);
 
   const { undo, redo } = useGeoStore.temporal.getState();
@@ -343,6 +346,15 @@ export default function App() {
               apply: t('pointMenu.apply'),
               taken: t('pointMenu.taken'),
               bad: t('pointMenu.bad'),
+            }}
+            segStyle={segStyle}
+            onToggleSegHidden={toggleSegHidden}
+            onToggleSegDashed={toggleSegDashed}
+            segMenuText={{
+              hide: t('segMenu.hide'),
+              show: t('segMenu.show'),
+              dashed: t('segMenu.dashed'),
+              solid: t('segMenu.solid'),
             }}
           />
         </div>

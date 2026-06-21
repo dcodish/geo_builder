@@ -91,6 +91,12 @@
     "taken": "האות כבר בשימוש",
     "bad": "אות לא תקינה"
   },
+  "segMenu": {
+    "hide": "הסתר קטע",
+    "show": "הצג קטע",
+    "dashed": "מקווקו",
+    "solid": "רציף"
+  },
   "geometry": {
     "triangle": "משולש",
     "quadrilateral": "מרובע",

@@ -266,6 +266,27 @@ describe('Figure — static SVG render (no DOM)', () => {
     for (const id of ['A', 'B', 'C', 'D']) expect(hid).toContain(`>${id}</text>`);
   });
 
+  it('styles a segment dashed and hides another (FR-RN-10)', () => {
+    const { construction, positions } = f1(); // edges seg-AB, seg-AD, seg-BC, seg-CD
+    const noop = () => {};
+    // a solid baseline (no seg props) has no dashed visible edges
+    const plain = renderToStaticMarkup(<Figure construction={construction} positions={positions} />);
+    expect(plain).not.toContain('stroke-dasharray');
+
+    const styled = renderToStaticMarkup(
+      <Figure
+        construction={construction}
+        positions={positions}
+        segStyle={{ 'seg-AB': { dashed: true }, 'seg-CD': { hidden: true } }}
+        onToggleSegHidden={noop}
+        onToggleSegDashed={noop}
+      />,
+    );
+    expect(styled).toContain('stroke-dasharray'); // AB dashed (and CD's faint ghost) are dashed strokes
+    // a transparent hit-line per segment so each is clickable (4 edges in F1)
+    expect((styled.match(/stroke="transparent"/g) ?? []).length).toBe(4);
+  });
+
   it('draws a circle (outline) with its inscribed points (Phase 5c)', () => {
     const { construction, positions } = build([
       { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
