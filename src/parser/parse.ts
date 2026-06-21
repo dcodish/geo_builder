@@ -284,6 +284,44 @@ const lineLineIntersection: Rule = (s) => {
   return 'stop';
 };
 
+/**
+ * "the diameter of the circle from F cuts side AC at E" /
+ * "קוטר המעגל היוצא מנקודה F חותך את הצלע AC בנקודה E" — the diameter through an ON-CIRCLE point F
+ * (the line F–O through the centre) meeting a SIDE (segment) XY at a new point E. E is the crossing
+ * of line F–O with line XY; because the target is the *side* (segment), E is constrained to lie
+ * BETWEEN X and Y (`set-line [X,E,Y]`), a soft order constraint — so when the current drawing would
+ * put the crossing on the segment's *extension*, the figure FLEXES a free DOF (the triangle reshapes,
+ * F moving with it) to bring E onto the side, rather than silently dropping E off the segment (ADR-077).
+ * Draws the diameter chord F–E. Must run BEFORE `lineLineIntersection` (which `stop`s on "קוטר") and
+ * `diameter` (which would misread the extra labels as the diameter's two endpoints).
+ */
+const diameterCutsSegment: Rule = (s, ctx) => {
+  if (!/diameter|קוטר/i.test(s)) return null;
+  if (!INTERSECT_KW.test(s)) return null; // a "diameter … cuts …", not a bare "diameter AB"
+  const center = resolveCenter(s, ctx);
+  if (!center) return null;
+  // F = the on-circle point the diameter goes FROM ("from F" / "מנקודה F" / "היוצא מ-F")
+  const fromM = s.match(/(?:from(?:\s+(?:the\s+)?point)?|מ-?נקודה|מהנקודה|היוצא\s+מ-?)\s*([A-Za-z]\d*)/i);
+  if (!fromM) return null;
+  const F = up(fromM[1]);
+  // Everything AFTER the cut verb names the target side XY and the result point E.
+  const kw = s.match(INTERSECT_KW);
+  const after = kw ? s.slice((kw.index ?? 0) + kw[0].length) : '';
+  const seg = labelRun(after.replace(/את|\bthe\b|\bside\b|הצלע|הקטע|\bline\b|הישר|הקו|בנקודה|\bat\b/gi, ' '), 2);
+  const atM = after.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i);
+  if (!seg || !atM) return null;
+  const [X, Y] = seg;
+  const E = up(atM[1]);
+  if (new Set([F, X, Y, E, up(center)]).size < 5) return null; // F, X, Y, E, O all distinct
+  const isSide = /\bside\b|הצלע|הקטע|\bsegment\b/i.test(after); // a SIDE/segment ⇒ keep E on it
+  const out: AnyCommand[] = [
+    { type: 'line-line-intersection', id: E, a: F, b: up(center), c: X, d: Y, dir1: true }, // E on the diameter F–O, beyond O
+  ];
+  if (isSide) out.push({ type: 'set-line', points: [X, E, Y] }); // E between X and Y ⇒ flex the figure onto the side
+  out.push({ type: 'segment', a: F, b: E }); // draw the diameter chord
+  return out;
+};
+
 /** "right triangle ABC" / "משולש ישר-זווית ABC" — right angle at the last named vertex. */
 const rightTriangle: Rule = (s) => {
   if (!/right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זוו?ית/i.test(s)) return null;
@@ -418,6 +456,37 @@ const pointsOnSegment: Rule = (s) => {
     { type: 'point-on-segment', id: p1, a, b },
     { type: 'point-on-segment', id: p2, a, b },
   ];
+};
+
+/**
+ * A LIST of points placed PAIRWISE on a LIST of segments in one utterance —
+ * "points F, G, H are on the sides AB, AC, CB" / "נקודות F, G, H נמצאות על הצלעות/הישרים AB, AC, CB"
+ * → F on AB, G on AC, H on CB. The N point labels before "on"/"על" map one-to-one to the N
+ * two-letter segments after it, so the right side carries exactly 2·N point labels (chunked into
+ * pairs). Each point is free on its side; a triangle's "side"/"line" AB is the segment through A,B,
+ * so both "הצלעות" (sides) and "הישרים" (lines) read as point-on-segment. Runs before
+ * `pointsOnSegment` (TWO points on ONE segment) and the singular `pointOnSegment`; defers circle
+ * phrasings. Labels are taken UPPERCASE-only so lowercase words ("points", "on", "sides", "lines")
+ * aren't read as labels (the geometry convention; mirrors `tangentFromExternal`). Without this the
+ * figure-defining "mark F,G,H on the three sides" step must escalate to the LLM, which is unreliable
+ * for it (it built nothing on the "הישרים" wording — operator session svjp9x5e).
+ */
+const pointsOnSegments: Rule = (s) => {
+  if (/circle|מעגל/i.test(s)) return null; // points on a CIRCLE → the circle rules
+  const m = s.match(/^(.*?)(?:\bon\b|על)\s+(.*)$/i);
+  if (!m) return null;
+  const pts = (m[1].match(/[A-Z]\d*/g) ?? []).map(up); // point labels before "on"
+  const segLabels = (m[2].match(/[A-Z]\d*/g) ?? []).map(up); // segment endpoint labels after it
+  if (pts.length < 2 || segLabels.length !== 2 * pts.length) return null; // N points ↔ N two-letter segments
+  if (new Set(pts).size !== pts.length) return null; // the points are distinct
+  const out: AnyCommand[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = segLabels[2 * i];
+    const b = segLabels[2 * i + 1];
+    if (a === b) return null; // a segment's two endpoints must differ
+    out.push({ type: 'point-on-segment', id: pts[i], a, b });
+  }
+  return out;
 };
 
 /** "C is 5 from A and 5 from B" / "C במרחק 5 מ-A ו-5 מ-B" */
@@ -1719,16 +1788,36 @@ const tangentLine: Rule = (s, ctx) => {
   if (!center || !atM) return null;
   const T = up(atM[1]);
   const lineId = `tan-${T}`;
-  const cmds: AnyCommand[] = [{ type: 'tangent', id: lineId, circle: circleId(center), at: T, visible: true }];
-  // If the line is *named* by two points ("הישר CD משיק…" / "line CD tangent…"),
-  // create them as fixed markers on the tangent at ±offset from the tangency point
-  // T (the line's anchor), so they're referenceable (e.g. a later AC, TC).
+  // The 1–2 point labels NAMING the line ("הישר CD משיק…" / "AB משיק…"), excluding the
+  // tangency point T and the centre.
   const named = dropCircleRef(s)
     .replace(/(?:\bat\b|בנקודה|ב-?)\s*[A-Za-z]\d*\b/gi, ' ')
     .replace(/tangent|משיק\S*|\bline\b|הישר|הקו|למעגל|מעגל/gi, ' ');
   const pts = labelRun(named, 2);
-  if (pts && pts[0] !== T && pts[1] !== T && pts[0] !== up(center) && pts[1] !== up(center)) {
-    cmds.push(...lineMarkers(lineId, [pts[0], pts[1]]));
+  const naming = pts && pts[0] !== T && pts[1] !== T && pts[0] !== up(center) && pts[1] !== up(center) ? pts : null;
+  const have = new Set(ctx.points ?? []);
+
+  // An EXISTING line declared tangent ("AB משיק … בנקודה F", with A, B and the touch point F
+  // all already placed): this is a tangency CONSTRAINT on the existing segment — NOT a freshly
+  // drawn tangent. Adapt the circle so its radius O–T is ⟂ to the existing line (T is already on
+  // the circle, here via the inscribed-quad's concyclic given). We must NEVER re-create A, B as
+  // markers on a new tangent line: A is an ancestor of the circle (O = circumcentre of points on
+  // A's sides), so a `point-on-line A → tan-F → circle-O → … → A` edge closes a dependency cycle
+  // and the step fails with "unresolved dependencies" instead of flexing the figure (ADR-075).
+  // Scope: assumes T is already on the circle (true for the marked-touch-point case); a tangency
+  // point not yet on the circle is a follow-up.
+  if (naming && have.has(naming[0]) && have.has(naming[1]) && have.has(T)) {
+    return [{ type: 'set-perpendicular', a: up(center), b: T, c: naming[0], d: naming[1] }];
+  }
+
+  // Otherwise a DRAWN tangent line. If it is *named* by point labels ("הישר CD משיק…" /
+  // "line CD tangent…"), add the NEW ones as ±offset markers along the tangent (ADR-036) so
+  // they're referenceable later — but skip any pre-existing label, so we never redefine (and
+  // cycle through) an existing point.
+  const cmds: AnyCommand[] = [{ type: 'tangent', id: lineId, circle: circleId(center), at: T, visible: true }];
+  if (naming) {
+    const fresh = naming.filter((p) => !have.has(p));
+    if (fresh.length) cmds.push(...lineMarkers(lineId, fresh));
   }
   return cmds;
 };
@@ -2194,6 +2283,7 @@ const RULES: Rule[] = [
   // Collinearity ("E on line AC" / "line CE passes through A" / "A B C collinear") — before the
   // generic line∩line and before pointOnSegment (whose "P on QR" would misread "P on line QR").
   collinearConstraint,
+  diameterCutsSegment, // "קוטר … מנקודה F חותך את הצלע AC בנקודה E" — before lineLineIntersection (which stops on "קוטר") and `diameter`
   lineLineIntersection,
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,
@@ -2214,6 +2304,7 @@ const RULES: Rule[] = [
   pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)
   pointOnCircle, // "A on circle O" — before segment/pointOnSegment
   segment,
+  pointsOnSegments, // "F, G, H on AB, AC, CB" — N points placed PAIRWISE on N segments, before the others
   pointsOnSegment, // "L and K are points on AC" — TWO points on a segment, before the single pointOnSegment
   pointOnSegment,
   measureOrder, // "α < β" — an inequality between two named measures (before setVar/numeric rules)

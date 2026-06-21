@@ -53,6 +53,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   // ── Points ──────────────────────────────────────────────────────────────
   { category: 'points', supported: true, en: 'point A at (0,0)', he: 'נקודה A ב-(0,0)', descEn: 'A free point at coordinates.', descHe: 'נקודה חופשית בקואורדינטות.' },
   { category: 'points', supported: true, en: 'point E on AC at 40%', he: 'נקודה E על AC ב-40%', descEn: 'A point on a segment (ratio optional).', descHe: 'נקודה על קטע (יחס לא חובה).' },
+  { category: 'points', supported: true, en: 'points F, G, H on AB, AC, CB', he: 'נקודות F, G, H על AB, AC, CB', descEn: 'Several points, each on its own side/line (paired in order).', descHe: 'כמה נקודות, כל אחת על הצלע/הישר שלה (בהתאמה לפי הסדר).' },
   { category: 'points', supported: true, en: 'C is 5 from A and 5 from B', he: 'C במרחק 5 מ-A ו-5 מ-B', descEn: 'A point at given distances from two points.', descHe: 'נקודה במרחקים נתונים משתי נקודות.' },
   { category: 'points', supported: true, en: 'M is the intersection of AC and BD', he: 'M חיתוך AC ו-BD', descEn: 'Where two lines cross (or click the dot on a crossing).', descHe: 'נקודת חיתוך של שני ישרים (או לחיצה על הסימון בהצטלבות).' },
   { category: 'points', supported: true, en: 'M is the midpoint of AB', he: 'M אמצע AB', descEn: 'The midpoint of a segment.', descHe: 'אמצע הקטע.' },
@@ -109,6 +110,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'circles', supported: true, en: 'from point E outside circle O two tangents touch the circle at A and B', he: 'מנקודה E מחוץ למעגל O שני משיקים נוגעים במעגל בנקודות A ו-B', descEn: 'The two tangents from an external point, touching at A and B (EA⟂OA, EB⟂OB).', descHe: 'שני המשיקים מנקודה חיצונית, נוגעים ב-A ו-B (EA⟂OA, EB⟂OB).' },
   { category: 'circles', supported: true, en: 'from point E a tangent touches circle O at D', he: 'מנקודה E משיק נוגע במעגל O בנקודה D', descEn: 'A single tangent from an external point, touching at D (ED⟂OD).', descHe: 'משיק יחיד מנקודה חיצונית, נוגע ב-D (ED⟂OD).' },
   { category: 'circles', supported: true, en: 'diameter AB in circle O', he: 'קוטר AB במעגל O', descEn: 'A chord through the centre.', descHe: 'מיתר העובר במרכז.' },
+  { category: 'circles', supported: true, en: 'the diameter of circle O from F cuts side AC at E', he: 'קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E', descEn: 'The diameter through an on-circle point meets a side at E; E stays on the segment (the figure flexes).', descHe: 'הקוטר היוצא מנקודה שעל המעגל פוגש צלע בנקודה E; E נשארת על הקטע (הצורה מסתגלת).' },
   { category: 'circles', supported: true, en: 'M is the midpoint of arc BC in circle O', he: 'M אמצע הקשת BC במעגל O', descEn: 'The midpoint of an arc.', descHe: 'אמצע הקשת.' },
   { category: 'circles', supported: true, en: 'tangent to circle O at A', he: 'משיק למעגל O בנקודה A', descEn: 'Draw the tangent at a point on a circle.', descHe: 'ציור המשיק בנקודה על המעגל.' },
   { category: 'circles', supported: true, en: 'E is the intersection of the tangent to circle O at A and BC', he: 'E חיתוך המשיק למעגל O בנקודה A עם BC', descEn: 'Where a tangent at a point meets a line.', descHe: 'מפגש משיק בנקודה עם ישר.' },

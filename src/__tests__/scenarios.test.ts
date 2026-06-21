@@ -100,6 +100,58 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'diameter-from-point-cuts-side-onto-segment',
+    title: '"the diameter from F cuts side AC at E" — E lands ON segment AC (the figure flexes), and "קוטר" parses',
+    guards:
+      "operator session 59tzde4c: right-triangle ABC, F/G/H on the sides, inscribed quad GCHF, AB tangent at F, then \"קוטר המעגל היוצא מנקודה F חותך את הצלע AC בנקודה E\". TWO problems: (1) the \"קוטר … cuts …\" phrasing escalated to the LLM (which built nothing) — `lineLineIntersection` `stop`s on \"קוטר\" and there was no diameter-cuts-a-side rule; (2) the operator's manual workaround (line∩line of FO with AC) put E on the CONTINUATION of AC, not the segment, because nothing constrained the crossing to the side. Fix (ADR-077): a `diameterCutsSegment` rule emits the diameter-line (F–O) ∩ line AC PLUS a `set-line [A,E,C]` order constraint, so when the crossing would fall on the extension the figure FLEXES a free DOF (the triangle reshapes, F moving with it) to bring E onto the side.",
+    steps: [
+      'משולש ABC ישר זוית',
+      'נקודות F, G, H נמצאות על הצלעות AB, AC, BC',
+      'מרובע GCHF חסום במעגל',
+      'AB משיק למעגל בנקודה F',
+      'קוטר המעגל היוצא מנקודה F חותך את הצלע AC בנקודה E',
+    ],
+    check(fig) {
+      allStepsOk(fig); // the "קוטר" step parses + builds (no LLM, no error)
+      const A = at(fig, 'A'), C = at(fig, 'C'), E = at(fig, 'E'), F = at(fig, 'F'), O = at(fig, 'O');
+      // E lies on SEGMENT AC (parameter s ∈ [0,1]), not its extension
+      const ac = { x: C.x - A.x, y: C.y - A.y };
+      const ae = { x: E.x - A.x, y: E.y - A.y };
+      const s = (ae.x * ac.x + ae.y * ac.y) / (ac.x * ac.x + ac.y * ac.y);
+      expect(s, 'E is on segment AC (0 ≤ s ≤ 1)').toBeGreaterThanOrEqual(0);
+      expect(s, 'E is on segment AC (0 ≤ s ≤ 1)').toBeLessThanOrEqual(1);
+      // E is on the diameter line F–O (collinear with F and O)
+      const cross = (F.x - O.x) * (E.y - O.y) - (F.y - O.y) * (E.x - O.x);
+      const scaleSq = ((F.x - O.x) ** 2 + (F.y - O.y) ** 2) * ((E.x - O.x) ** 2 + (E.y - O.y) ** 2);
+      expect(Math.abs(cross) / Math.sqrt(scaleSq || 1), 'E collinear with F,O (on the diameter)').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'existing-line-tangent-adapts-the-circle',
+    title: '"AB tangent at F" on an EXISTING line flexes the circle (radius OF ⟂ AB), it does not redraw AB',
+    guards:
+      "operator session ze5qda8y: right-triangle ABC, F/G/H on sides AB/AC/CB, quad GCHF inscribed (circumcircle of G,C,H + F concyclic), then \"AB משיק למעגל בנקודה F\". It ERRORED 'unresolved dependencies for: A,B,F,G,H,O,tan-F,circle-O' (then the LLM built nothing) — because the tangentLine rule treated the EXISTING segment AB as a new drawn tangent and re-created A,B as point-on-line markers on tan-F, closing a dependency cycle A→tan-F→circle-O→O=circumcentre(G,C,H)→G(on AC)→A. There was also no path that reads 'existing line tangent to circle' as a CONSTRAINT that flexes the circle. Fix (ADR-075): when the naming labels (A,B) and the touch point (F) all pre-exist, emit set-perpendicular(O,F,A,B) — the radius ⟂ the existing line, i.e. tangency — instead of constructing a tangent + markers. The circle then adapts: F on circle AND OF ⟂ AB.",
+    steps: [
+      'משולש ABC ישר זוית',
+      'נקודות F, G, H נמצאות על הישרים AB, AC, CB', // ADR-076: N points pairwise on N segments (was LLM → built-nothing)
+      'מרובע GCHF חסום במעגל',
+      'AB משיק למעגל בנקודה F',
+    ],
+    check(fig) {
+      allStepsOk(fig); // no "unresolved dependencies" — the step builds instead of cycling
+      // the three points landed on their respective sides (the pairwise points-on-segments parse)
+      for (const id of ['F', 'G', 'H']) expect(fig.positions.has(id), `${id} placed`).toBe(true);
+      const O = at(fig, 'O'), F = at(fig, 'F'), A = at(fig, 'A'), B = at(fig, 'B'), G = at(fig, 'G');
+      // radius O–F is perpendicular to line A–B (AB is tangent at F)
+      const r = { x: F.x - O.x, y: F.y - O.y };
+      const ab = { x: B.x - A.x, y: B.y - A.y };
+      const cos = (r.x * ab.x + r.y * ab.y) / (Math.hypot(r.x, r.y) * Math.hypot(ab.x, ab.y));
+      expect(Math.abs(cos), 'OF ⟂ AB (tangency)').toBeLessThan(1e-4);
+      // F is on the circle: |OF| equals the circumradius (|OG|, G a circumcentre vertex)
+      expect(dist(O, F), '|OF| = circumradius ⇒ F on circle').toBeCloseTo(dist(O, G), 3);
+    },
+  },
+  {
     id: 'r7-concyclic-after-competing-distances',
     title: 'R7 joint re-bind: "ABHD concyclic" holds AFTER HF=4/GE=5 already claimed the parallelogram DOFs',
     guards:
