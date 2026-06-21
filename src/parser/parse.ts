@@ -285,15 +285,18 @@ const lineLineIntersection: Rule = (s) => {
 };
 
 /**
- * "the diameter of the circle from F cuts side AC at E" /
- * "קוטר המעגל היוצא מנקודה F חותך את הצלע AC בנקודה E" — the diameter through an ON-CIRCLE point F
- * (the line F–O through the centre) meeting a SIDE (segment) XY at a new point E. E is the crossing
- * of line F–O with line XY; because the target is the *side* (segment), E is constrained to lie
- * BETWEEN X and Y (`set-line [X,E,Y]`), a soft order constraint — so when the current drawing would
- * put the crossing on the segment's *extension*, the figure FLEXES a free DOF (the triangle reshapes,
- * F moving with it) to bring E onto the side, rather than silently dropping E off the segment (ADR-077).
- * Draws the diameter chord F–E. Must run BEFORE `lineLineIntersection` (which `stop`s on "קוטר") and
- * `diameter` (which would misread the extra labels as the diameter's two endpoints).
+ * "the diameter of the circle from F cuts AC at E" /
+ * "קוטר המעגל היוצא מנקודה F חותך את AC בנקודה E" — the diameter through an ON-CIRCLE point F
+ * (the line F–O through the centre) meeting a side XY at a new point E. E is the crossing of line
+ * F–O with line XY; and — because in a figure a bare "AC" (like "the side AC") is the SEGMENT/edge —
+ * E is constrained to lie BETWEEN X and Y by DEFAULT (`set-line [X,E,Y]`, a soft order constraint):
+ * when the current drawing would put the crossing on the segment's extension, the figure FLEXES a
+ * free DOF (the triangle reshapes, F moving with it) to bring E onto the side, rather than silently
+ * dropping E off it (ADR-077). Two opt-outs carried by the operand wording: "המשך AC" / "the
+ * EXTENSION of AC" puts E BEYOND the segment (order [X,Y,E] via dir2), and "הישר AC" / "the LINE AC"
+ * (the infinite line) leaves E free anywhere along it. Draws the diameter chord F–E. Must run BEFORE
+ * `lineLineIntersection` (which `stop`s on "קוטר") and `diameter` (which would misread the extra
+ * labels as the diameter's two endpoints).
  */
 const diameterCutsSegment: Rule = (s, ctx) => {
   if (!/diameter|קוטר/i.test(s)) return null;
@@ -313,11 +316,15 @@ const diameterCutsSegment: Rule = (s, ctx) => {
   const [X, Y] = seg;
   const E = up(atM[1]);
   if (new Set([F, X, Y, E, up(center)]).size < 5) return null; // F, X, Y, E, O all distinct
-  const isSide = /\bside\b|הצלע|הקטע|\bsegment\b/i.test(after); // a SIDE/segment ⇒ keep E on it
+  // A bare "AC" (like "the side AC") is the SEGMENT between X and Y — keep E ON it by default (operator
+  // principle, 2026-06-21). Two opt-outs: "המשך AC" / "the EXTENSION of AC" puts E BEYOND the segment
+  // (order [X,Y,E] via dir2), and "הישר AC" / "the LINE AC" leaves E free anywhere on the infinite line.
+  const isExtension = /המשך|extension|extended/i.test(after);
+  const isLine = /\bline\b|הישר|הקו/i.test(after);
   const out: AnyCommand[] = [
-    { type: 'line-line-intersection', id: E, a: F, b: up(center), c: X, d: Y, dir1: true }, // E on the diameter F–O, beyond O
+    { type: 'line-line-intersection', id: E, a: F, b: up(center), c: X, d: Y, dir1: true, ...(isExtension ? { dir2: true } : {}) },
   ];
-  if (isSide) out.push({ type: 'set-line', points: [X, E, Y] }); // E between X and Y ⇒ flex the figure onto the side
+  if (!isExtension && !isLine) out.push({ type: 'set-line', points: [X, E, Y] }); // default: E between X and Y (on the segment)
   out.push({ type: 'segment', a: F, b: E }); // draw the diameter chord
   return out;
 };

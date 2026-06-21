@@ -103,13 +103,13 @@ const SCENARIOS: Scenario[] = [
     id: 'diameter-from-point-cuts-side-onto-segment',
     title: '"the diameter from F cuts side AC at E" — E lands ON segment AC (the figure flexes), and "קוטר" parses',
     guards:
-      "operator session 59tzde4c: right-triangle ABC, F/G/H on the sides, inscribed quad GCHF, AB tangent at F, then \"קוטר המעגל היוצא מנקודה F חותך את הצלע AC בנקודה E\". TWO problems: (1) the \"קוטר … cuts …\" phrasing escalated to the LLM (which built nothing) — `lineLineIntersection` `stop`s on \"קוטר\" and there was no diameter-cuts-a-side rule; (2) the operator's manual workaround (line∩line of FO with AC) put E on the CONTINUATION of AC, not the segment, because nothing constrained the crossing to the side. Fix (ADR-077): a `diameterCutsSegment` rule emits the diameter-line (F–O) ∩ line AC PLUS a `set-line [A,E,C]` order constraint, so when the crossing would fall on the extension the figure FLEXES a free DOF (the triangle reshapes, F moving with it) to bring E onto the side.",
+      "operator sessions 59tzde4c / 50w3vlt3: right-triangle ABC, F/G/H on the sides, inscribed quad GCHF, AB tangent at F, then \"קוטר המעגל מנקודה F חותך את AC בנקודה E\" (a BARE \"AC\", no \"הצלע\"). THREE problems across the sessions: (1) the \"קוטר … cuts …\" phrasing escalated to the LLM (which built nothing) — `lineLineIntersection` `stop`s on \"קוטר\" and there was no diameter-cuts-a-side rule; (2) the line∩line crossing put E on the CONTINUATION of AC, not the segment, because nothing constrained the crossing to the side; (3) ADR-077's first cut only constrained E to the segment when \"הצלע\"/\"side\" was EXPLICIT — but a bare \"AC\" in a figure IS the side, so E went back to the extension. Fix (ADR-077 + amendment): a `diameterCutsSegment` rule emits the diameter-line (F–O) ∩ line AC PLUS a `set-line [A,E,C]` order constraint BY DEFAULT (only an explicit \"the LINE AC\" opts out), so when the crossing would fall on the extension the figure FLEXES a free DOF (the triangle reshapes, F moving with it) to bring E onto the side.",
     steps: [
       'משולש ABC ישר זוית',
-      'נקודות F, G, H נמצאות על הצלעות AB, AC, BC',
+      'נקודות F, G, H נמצאות על AB, AC, CB',
       'מרובע GCHF חסום במעגל',
       'AB משיק למעגל בנקודה F',
-      'קוטר המעגל היוצא מנקודה F חותך את הצלע AC בנקודה E',
+      'קוטר המעגל מנקודה F חותך את AC בנקודה E',
     ],
     check(fig) {
       allStepsOk(fig); // the "קוטר" step parses + builds (no LLM, no error)
