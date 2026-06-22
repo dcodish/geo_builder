@@ -321,6 +321,16 @@ aborting the parse to the LLM, which then modelled the foot as "C על ED" — *
 "בנקודה C" as the through-point, so C is reused.
 **Asserts:** no over-constraint; ED ⟂ AB through C (CD ⟂ AB, CE ⟂ AB); C stays on AB (0 < t < 1).
 
+### `constrained-inscribed-quad-stays-convex` — a constrained cyclic quad draws convex, not crossed (ADR-097)
+**Steps:** `מרובע BCED חסום במעגל` · `המשך BD והמשך CE נפגשים שנקודה A` · `AE=2CE` · `AD=CE`
+**Guards against:** the figure drew a CROSSED (bowtie) quad while the cue read "5 DOF" and "show another configuration" said impossible. Root cause (ADR-097): the general inscribed quad pinned its vertices at the convex-default angles (`free=false` — an ADR-052 violation), so the constraint solver could only move E,D and was boxed into a crossed branch (a convex solution exists only when all four vertices are free). Fix: general-quad vertices are FREE (convex angles are a starting position); the driven solver prefers a convex branch and, on a convex-failing coupled solve, RECRUITS the polygon's free vertices so it reshapes convex.
+**Asserts:** all steps OK; BCED in convex cyclic order around O; |AE| = 2·|CE| and |AD| = |CE| hold; verifier green.
+
+### `constrained-inscribed-quad-resample` — the same figure offers different convex drawings
+**Steps:** the four steps above, then press "show another configuration" repeatedly (seed > 0, via the real store + `resample()`).
+**Guards against:** "5 DOF but impossible" — the pinned vertices left only similarity DOF, so resample never found a different drawing. With the vertices freed (ADR-097), resampling must surface a genuinely different drawing.
+**Asserts:** resample finds ≥1 different view; every resampled configuration is **convex** and still satisfies |AE| = 2·|CE| and |AD| = |CE|.
+
 ### `quad-diagonals-resample` — "show another configuration" keeps a quad clean & convex
 **Steps:** `מרובע ABCD`, `AC=10`, `DB=10`, then press "show another configuration" repeatedly.
 **Guards against:** the sampler landing on a self-crossing (tangled) **or** concave (dart) ABCD quad —
@@ -418,6 +428,11 @@ over all four (ADR-041).
 **Steps:** `נתון מעגל O שרדיוסו R` · `מנקודה A מעבירים משיק למעגל בנקודה D` · `B נקודה על המעגל` · `AB` · `OB` · `OD` · `AO` · `∠AOD=α` · `∠AOB=β` · `AB=√2R`
 **Guards against:** `measureSqrt` not being anchored to end-of-input (unlike its sibling length rules), so `AB=√2R` matched only the `√2` and **silently dropped the trailing R** (the ADR-024/026 class) — AB came out ≈ 1.414 instead of √2·R. The rule now consumes an optional trailing variable that multiplies the radical and anchors the RHS, so `√2R` ⇒ `{coef: √2, var: R}`, R bound to the circle radius (5).
 **Asserts:** all steps OK; |AB| = 5√2; |OB| = 5 (B on the circle); the length label reads `√2R`.
+
+### `point-is-meeting-of-line-with-circle` — the noun/definitional form of line∩circle
+**Steps:** `מעגל O שרדיוסו R` · `נקודה A על המעגל` · `נקודה E היא מפגש של AO עם המעגל`
+**Guards against:** the verb forms (`AO חותך/פוגש את המעגל בנקודה E`, `AO meets the circle at E`) worked, but the **definitional noun form** `E היא מפגש של AO עם המעגל` returned `not-handled` and escalated to the LLM. Two parser gaps: `INTERSECT_KW` lacked the **noun** `מפגש`/`meeting` (it had only the verb forms `נפגש`/`פוגש`), and `crossingAfterCircle` only finds a point named **after** the circle, whereas here E is declared **first**. Fix: `lineMeetsCircle` also accepts the noun keyword, and a new `leadingNamedPoint` helper reads the point named ahead of the construction (`[נקודה] E היא …` / `point E is …`).
+**Asserts:** all steps OK; E and A are equidistant from O (both on the circle); E is a distinct crossing (not A again); A, O, E are collinear (E lies on line AO).
 
 ### `sqrt-times-free-radius` — "AB=√2R" + "BO=R" on a free-radius circle (ADR-071)
 **Steps:** `מעגל O` · `מנקודה A מחוץ למעגל מעבירים משיק לנקודה D` · `B על המעגל` · `AB` · `AO` · `BO` · `DO` · `AB=√2R` · `BO=R`

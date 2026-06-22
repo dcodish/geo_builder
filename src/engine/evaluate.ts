@@ -286,10 +286,16 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     seed.map((v, i) => (i % 2 === 0 ? v + d * span : v)),
     seed.map((v, i) => (i % 2 === 1 ? v + d * span : v)),
   ]);
-  const best = multiStartSolve(seed, offsets, span * 0.2, regCost, resid, [span * 0.05, span * 0.005], 400, (x) =>
-    solutionAccepted(c, place, x, cons, span),
-  );
-  return place(best);
+  // Convex-first (ADR-097): prefer a configuration whose declared polygons are convex; fall back to the
+  // relaxed accept only if no convex solution is reachable. A no-op when the figure declares no ≥4-gon.
+  const finish = (requireConvex: boolean): { x: number[]; ok: boolean } => {
+    const best = multiStartSolve(seed, offsets, span * 0.2, regCost, resid, [span * 0.05, span * 0.005], 400, (x) =>
+      solutionAccepted(c, place, x, cons, span, requireConvex),
+    );
+    return { x: best, ok: solutionAccepted(c, place, best, cons, span, requireConvex) };
+  };
+  const conv = finish(true);
+  return place(conv.ok ? conv.x : finish(false).x);
 }
 
 /**
@@ -347,13 +353,41 @@ function multiStartSolve(
 }
 
 /**
+ * Every declared polygon with ≥4 vertices is CONVEX in its given vertex order under `positions` —
+ * the engine's counterpart to the store's `polygonsConvex`, run on a Construction's `polygon` objects.
+ * Triangles (and any <4-gon) are trivially convex and skipped; a polygon with an unresolved vertex is
+ * ignored (not this gate's concern). The driven solvers use this to PREFER a convex drawing of a
+ * declared shape (convex-by-default — FR-EN-16 / [ADR-018](docs/06-decisions.md#adr-018)), so a coupled
+ * constraint solve doesn't land on a crossed/concave branch when a convex solution is reachable.
+ */
+function declaredPolygonsConvex(c: Construction, positions: Map<Id, Vec>): boolean {
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon' || o.vertices.length < 4) continue;
+    const pts = o.vertices.map((id) => positions.get(id));
+    if (pts.some((p) => !p)) continue; // a vertex that didn't resolve — not this guard's concern
+    const n = pts.length;
+    let sign = 0;
+    for (let i = 0; i < n; i++) {
+      const A = pts[i]!, B = pts[(i + 1) % n]!, C = pts[(i + 2) % n]!;
+      const turn = Math.sign((B.x - A.x) * (C.y - B.y) - (B.y - A.y) * (C.x - B.x));
+      if (turn === 0) return false; // a collinear (degenerate) corner
+      if (sign === 0) sign = turn;
+      else if (turn !== sign) return false; // a reflex turn → concave (or crossed)
+    }
+  }
+  return true;
+}
+
+/**
  * A candidate `x` (mapped to a Construction by `place`) is accepted iff the figure evaluates, satisfies
  * every constraint within tolerance, and isn't degenerate (no two referenced points collapsed together —
  * a cheat the residual alone would reward) — EXCEPT a pair a `coincide` constraint deliberately merges
- * ([ADR-028](docs/06-decisions.md#adr-028): their meeting is the goal, e.g. "C = midpoint of OB"). Shared
- * accept gate for both driven solvers; the coincide exemption is ported from the former coupled-param block.
+ * ([ADR-028](docs/06-decisions.md#adr-028): their meeting is the goal, e.g. "C = midpoint of OB"). When
+ * `requireConvex` is set, a candidate whose declared polygon is crossed/concave is also rejected (the
+ * convex-preferring first pass — ADR-097). Shared accept gate for both driven solvers; the coincide
+ * exemption is ported from the former coupled-param block.
  */
-function solutionAccepted(c: Construction, place: (x: number[]) => Construction, x: number[], cons: Constraint[], span: number): boolean {
+function solutionAccepted(c: Construction, place: (x: number[]) => Construction, x: number[], cons: Constraint[], span: number, requireConvex = false): boolean {
   const r = evaluateCore(place(x), { skipConstraints: true });
   if (!r.ok) return false;
   const satisfied = cons.every((con) => {
@@ -361,6 +395,7 @@ function solutionAccepted(c: Construction, place: (x: number[]) => Construction,
     return isSatisfied(con, (id) => r.positions.get(id)!);
   });
   if (!satisfied) return false;
+  if (requireConvex && !declaredPolygonsConvex(c, r.positions)) return false;
   // Non-degenerate: no two referenced points collapsed together, skipping any pair a coincide
   // constraint intends to merge. The threshold scales to the figure's ACTUAL extent (the referenced
   // points' coords), floored by the passed `span` — a pure-parametric figure passes span=1 (no free
@@ -456,136 +491,183 @@ function setCarrierVals(c: Construction, vals: Map<Id, number[]>): Construction 
  * vertex) and height (a perp-offset dist) solve together. Works in normalised coordinates.
  */
 function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construction {
-  const span = Math.max(1, ...carriers.flatMap((o) => (o.kind === 'free-point' && o.solve ? [Math.abs(o.x), Math.abs(o.y)] : [])));
-  const specs = carriers.map((o) => carrierSpec(o, span)).filter((s): s is CarrierSpec => s !== null);
-  if (specs.length === 0) return c;
-  // Distinct constraints (one shared by several carriers counts once).
-  const seen = new Set<string>();
-  const cons: Constraint[] = carriers
-    .map((o) => (o as { solve?: { constraint: Constraint } }).solve!.constraint)
-    .filter((k) => (seen.has(JSON.stringify(k)) ? false : (seen.add(JSON.stringify(k)), true)));
-  withOrderCons(cons, c); // also minimise any "α < β" ordering jointly with these carriers (ADR-039)
-  // Flat layout: normalised seed `u` (each carrier's params divided by their scale, so all DOFs ~O(1)).
-  const seedU = specs.flatMap((s) => s.seed.map((v, i) => v / s.scale[i]));
-  const place = (u: number[]): Construction => {
-    const vals = new Map<Id, number[]>();
-    let k = 0;
+  // Solve a given carrier list: returns the chosen construction and whether a solution was ACCEPTED
+  // (under `requireConvex`). Extra carriers with NO `solve` directive (recruited free polygon vertices)
+  // contribute DOF but no constraint — they give the joint solve room to land on a CONVEX branch (ADR-097).
+  const solveFor = (carrierList: GeoObject[], requireConvex: boolean): { result: Construction; ok: boolean } => {
+    const span = Math.max(1, ...carrierList.flatMap((o) => (o.kind === 'free-point' && o.solve ? [Math.abs(o.x), Math.abs(o.y)] : [])));
+    // A spec for each carrier: a constraint-carrier via carrierSpec, or a recruited FREE on-circle vertex
+    // (no solve) as a plain bounded θ DOF.
+    const specs = carrierList
+      .map((o): CarrierSpec | null => carrierSpec(o, span) ?? (o.kind === 'on-circle' ? { id: o.id, n: 1, seed: [o.theta], scale: [1] } : null))
+      .filter((s): s is CarrierSpec => s !== null);
+    if (specs.length === 0) return { result: c, ok: false };
+    // Distinct constraints (one shared by several carriers counts once); only carriers that DRIVE one
+    // contribute (recruited free vertices don't).
+    const seen = new Set<string>();
+    const cons: Constraint[] = carrierList
+      .flatMap((o) => { const k = (o as { solve?: { constraint: Constraint } }).solve?.constraint; return k ? [k] : []; })
+      .filter((k) => (seen.has(JSON.stringify(k)) ? false : (seen.add(JSON.stringify(k)), true)));
+    withOrderCons(cons, c); // also minimise any "α < β" ordering jointly with these carriers (ADR-039)
+    // Flat layout: normalised seed `u` (each carrier's params divided by their scale, so all DOFs ~O(1)).
+    const seedU = specs.flatMap((s) => s.seed.map((v, i) => v / s.scale[i]));
+    const place = (u: number[]): Construction => {
+      const vals = new Map<Id, number[]>();
+      let k = 0;
+      for (const s of specs) {
+        vals.set(s.id, s.scale.map((sc, i) => u[k + i] * sc));
+        k += s.n;
+      }
+      return setCarrierVals(c, vals);
+    };
+    // The cost is the sum of squared RELATIVE residuals (each constraint's residual ÷ its own scale).
+    // This is un-gameable by shrinking: a wrong ratio stays ~1% relative however small you make it, so
+    // the solver can't "cheat" a length/ratio by collapsing the constrained part (and a collapse, scale→0,
+    // blows the relative residual up). It also normalises constraints of different magnitudes against
+    // each other so the joint solve doesn't favour the larger one. (ADR-033.)
+    const cost = (u: number[]): number => {
+      const r = evaluateCore(place(u), { skipConstraints: true });
+      if (!r.ok) return Infinity;
+      let s = 0;
+      for (const con of cons) {
+        for (const id of constraintRefs(con)) if (!r.positions.has(id)) return Infinity;
+        const get = (id: Id) => r.positions.get(id)!;
+        const v = residual(con, get) / Math.max(constraintScale(con, get), 1e-9);
+        s += v * v;
+      }
+      return s;
+    };
+    const lambda = 1e-3; // tiny tie-breaker toward the seed (normalised space)
+    const regCost = (u: number[]): number => {
+      const base = cost(u);
+      if (!isFinite(base)) return Infinity;
+      let s = base;
+      for (let i = 0; i < u.length; i++) s += lambda * (u[i] - seedU[i]) * (u[i] - seedU[i]);
+      return s;
+    };
+    // The BOUNDED parametric carriers (on-circle θ∈[0,2π], on-segment t∈[0,1]) in u-space (scale 1 ⇒ u == θ/t),
+    // each tagged with the constraint IT drives (for the binding-aware sweep below) — a recruited free vertex
+    // has no `own`. A FREE-radius circle is included too (ADR-071): its radius is unbounded, but the constraint
+    // it drives (|XY| = k·R) has a single sign-change in the radius, so a wide bracket + the per-DOF argMin
+    // sweep solves it robustly where the cardinal-restart Nelder–Mead (reaching only ~3× the seed) misses a root.
+    const ranges: { ui: number; lo: number; hi: number; own?: Constraint }[] = [];
+    let ki = 0;
     for (const s of specs) {
-      vals.set(s.id, s.scale.map((sc, i) => u[k + i] * sc));
-      k += s.n;
-    }
-    return setCarrierVals(c, vals);
-  };
-  // The cost is the sum of squared RELATIVE residuals (each constraint's residual ÷ its own scale).
-  // This is un-gameable by shrinking: a wrong ratio stays ~1% relative however small you make it, so
-  // the solver can't "cheat" a length/ratio by collapsing the constrained part (and a collapse, scale→0,
-  // blows the relative residual up). It also normalises constraints of different magnitudes against
-  // each other so the joint solve doesn't favour the larger one. (ADR-033.)
-  const cost = (u: number[]): number => {
-    const r = evaluateCore(place(u), { skipConstraints: true });
-    if (!r.ok) return Infinity;
-    let s = 0;
-    for (const con of cons) {
-      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return Infinity;
-      const get = (id: Id) => r.positions.get(id)!;
-      const v = residual(con, get) / Math.max(constraintScale(con, get), 1e-9);
-      s += v * v;
-    }
-    return s;
-  };
-  const lambda = 1e-3; // tiny tie-breaker toward the seed (normalised space)
-  const regCost = (u: number[]): number => {
-    const base = cost(u);
-    if (!isFinite(base)) return Infinity;
-    let s = base;
-    for (let i = 0; i < u.length; i++) s += lambda * (u[i] - seedU[i]) * (u[i] - seedU[i]);
-    return s;
-  };
-  // The BOUNDED parametric carriers (on-circle θ∈[0,2π], on-segment t∈[0,1]) in u-space (scale 1 ⇒ u == θ/t),
-  // each tagged with the constraint IT drives (for the binding-aware sweep below). A FREE-radius circle is
-  // included too (ADR-071): its radius is unbounded, but the constraint it drives (|XY| = k·R) has a single
-  // sign-change in the radius, so a wide bracket + the per-DOF argMin sweep solves it robustly where the
-  // cardinal-restart Nelder–Mead (reaching only ~3× the seed) misses a far root.
-  const ranges: { ui: number; lo: number; hi: number; own: Constraint }[] = [];
-  let ki = 0;
-  for (const s of specs) {
-    const car = carriers.find((o) => o.id === s.id) as (GeoObject & { solve?: { constraint: Constraint } }) | undefined;
-    const own = car?.solve?.constraint;
-    if (own && car?.kind === 'on-circle') ranges.push({ ui: ki, lo: 0, hi: 2 * Math.PI, own });
-    else if (own && car?.kind === 'on-segment') ranges.push({ ui: ki, lo: 0, hi: 1, own });
-    else if (own && car?.kind === 'circle' && car.radius.via === 'free') {
-      // u = radius / scale (scale = seed radius ⇒ seed u = 1). Bracket [tiny, generous] in radius, /scale.
-      const sc = s.scale[0];
-      ranges.push({ ui: ki, lo: 0.05 / sc, hi: Math.max(sc * 30, span * 5, 200) / sc, own });
-    }
-    ki += s.n;
-  }
-  // When bounded parametric carriers are present, two extra steps ported from the former coupled-param
-  // solver (R5 Pass 2): (1) NEAR-FIRST — a local solve from the current seed, returned if valid, so a
-  // figure needing only a small reshape keeps its current (e.g. convex cyclic-quad) configuration instead
-  // of jumping to a far branch; (2) a globally-informed GRID-SCAN seed — coordinate-descent argMin per
-  // bounded DOF over its FULL range (all branches considered), the capability the cardinal restarts alone
-  // would miss. Both are no-ops when there are no bounded params, so pure shape/on-line figures are unchanged.
-  const extraRestarts: number[][] = [];
-  if (ranges.length > 0) {
-    const near = nelderMead(cost, seedU.slice(), 500, 0.12);
-    if (solutionAccepted(c, place, near, cons, span)) return place(near);
-    const gridSeed = seedU.slice();
-    for (let iter = 0; iter < 12 && cost(gridSeed) > 1e-12; iter++) {
-      let improved = false;
-      for (const { ui, lo, hi } of ranges) {
-        const before = cost(gridSeed);
-        const v = argMin((t) => cost(gridSeed.map((x, j) => (j === ui ? t : x))), lo, hi);
-        const trial = gridSeed.slice();
-        trial[ui] = v;
-        if (cost(trial) < before - 1e-12) {
-          gridSeed[ui] = v;
-          improved = true;
-        }
+      const car = carrierList.find((o) => o.id === s.id) as (GeoObject & { solve?: { constraint: Constraint } }) | undefined;
+      const own = car?.solve?.constraint;
+      if (car?.kind === 'on-circle') ranges.push({ ui: ki, lo: 0, hi: 2 * Math.PI, own });
+      else if (own && car?.kind === 'on-segment') ranges.push({ ui: ki, lo: 0, hi: 1, own });
+      else if (own && car?.kind === 'circle' && car.radius.via === 'free') {
+        // u = radius / scale (scale = seed radius ⇒ seed u = 1). Bracket [tiny, generous] in radius, /scale.
+        const sc = s.scale[0];
+        ranges.push({ ui: ki, lo: 0.05 / sc, hi: Math.max(sc * 30, span * 5, 200) / sc, own });
       }
-      if (!improved) break;
+      ki += s.n;
     }
-    extraRestarts.push(gridSeed);
+    // When bounded parametric carriers are present, two extra steps ported from the former coupled-param
+    // solver (R5 Pass 2): (1) NEAR-FIRST — a local solve from the current seed, returned if valid, so a
+    // figure needing only a small reshape keeps its current (e.g. convex cyclic-quad) configuration instead
+    // of jumping to a far branch; (2) a globally-informed GRID-SCAN seed — coordinate-descent argMin per
+    // bounded DOF over its FULL range (all branches considered), the capability the cardinal restarts alone
+    // would miss. Both are no-ops when there are no bounded params, so pure shape/on-line figures are unchanged.
+    const extraRestarts: number[][] = [];
+    let near: number[] | null = null;
+    if (ranges.length > 0) {
+      near = nelderMead(cost, seedU.slice(), 500, 0.12);
+      const gridSeed = seedU.slice();
+      for (let iter = 0; iter < 12 && cost(gridSeed) > 1e-12; iter++) {
+        let improved = false;
+        for (const { ui, lo, hi } of ranges) {
+          const before = cost(gridSeed);
+          const v = argMin((t) => cost(gridSeed.map((x, j) => (j === ui ? t : x))), lo, hi);
+          const trial = gridSeed.slice();
+          trial[ui] = v;
+          if (cost(trial) < before - 1e-12) {
+            gridSeed[ui] = v;
+            improved = true;
+          }
+        }
+        if (!improved) break;
+      }
+      extraRestarts.push(gridSeed);
 
-    // BINDING-AWARE seed (the triangular case the joint sum-of-squares loses): solve each bounded carrier
-    // against the constraint IT drives — others held — sweeping Gauss-Seidel style. When carrier D drives
-    // "A,D,C collinear" and carrier E drives "D,B,E collinear", D appears in BOTH residuals, so the shared
-    // `cost` pulls D toward both and satisfies neither (it returns the seed). Solving D on its OWN constraint
-    // (line AC, ignoring E) then E on its own (line DB, with D placed) recovers the exact sequential solution.
-    // For genuinely coupled systems this may not converge — it's then just one more restart the search vets.
-    const bindSeed = seedU.slice();
-    for (let iter = 0; iter < 8; iter++) {
-      let moved = false;
-      for (const { ui, lo, hi, own } of ranges) {
-        const ownResid = (t: number): number => {
-          const r = evaluateCore(place(bindSeed.map((x, j) => (j === ui ? t : x))), { skipConstraints: true });
-          if (!r.ok) return Infinity;
-          for (const id of constraintRefs(own)) if (!r.positions.has(id)) return Infinity;
-          const v = residual(own, (id) => r.positions.get(id)!);
-          return isFinite(v) ? Math.abs(v) : Infinity; // a degenerate root (collinear NaN at a collapsed ray) is skipped
-        };
-        const v = argMin(ownResid, lo, hi);
-        if (Math.abs(v - bindSeed[ui]) > 1e-9) {
-          bindSeed[ui] = v;
-          moved = true;
+      // BINDING-AWARE seed (the triangular case the joint sum-of-squares loses): solve each bounded carrier
+      // against the constraint IT drives — others held — sweeping Gauss-Seidel style. When carrier D drives
+      // "A,D,C collinear" and carrier E drives "D,B,E collinear", D appears in BOTH residuals, so the shared
+      // `cost` pulls D toward both and satisfies neither (it returns the seed). Solving D on its OWN constraint
+      // (line AC, ignoring E) then E on its own (line DB, with D placed) recovers the exact sequential solution.
+      // For genuinely coupled systems this may not converge — it's then just one more restart the search vets.
+      const bindSeed = seedU.slice();
+      for (let iter = 0; iter < 8; iter++) {
+        let moved = false;
+        for (const { ui, lo, hi, own } of ranges) {
+          if (!own) continue; // a recruited free vertex drives no constraint — skip the Gauss-Seidel sweep
+          const ownResid = (t: number): number => {
+            const r = evaluateCore(place(bindSeed.map((x, j) => (j === ui ? t : x))), { skipConstraints: true });
+            if (!r.ok) return Infinity;
+            for (const id of constraintRefs(own)) if (!r.positions.has(id)) return Infinity;
+            const v = residual(own, (id) => r.positions.get(id)!);
+            return isFinite(v) ? Math.abs(v) : Infinity; // a degenerate root (collinear NaN at a collapsed ray) is skipped
+          };
+          const v = argMin(ownResid, lo, hi);
+          if (Math.abs(v - bindSeed[ui]) > 1e-9) {
+            bindSeed[ui] = v;
+            moved = true;
+          }
         }
+        if (!moved) break;
       }
-      if (!moved) break;
+      extraRestarts.push(bindSeed);
     }
-    extraRestarts.push(bindSeed);
+    // Nearest basin (regularised search from the seed) + the grid-informed seed + cardinal restarts (each DOF
+    // pushed by a range of magnitudes in normalised units); polish on the residual through several decades so
+    // a coupled system lands tightly ON the constraints; accept a genuine non-degenerate solution else keep
+    // the seed. Shared scaffold.
+    const restarts = [
+      ...extraRestarts,
+      ...[0.5, 1, -1, 2, -2].flatMap((d) => seedU.map((_, j) => seedU.map((v, i) => (i === j ? v + d : v)))),
+    ];
+    if (near && solutionAccepted(c, place, near, cons, span, requireConvex)) return { result: place(near), ok: true };
+    const best = multiStartSolve(seedU, restarts, 0.3, regCost, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, (x) =>
+      solutionAccepted(c, place, x, cons, span, requireConvex),
+    );
+    return { result: place(best), ok: solutionAccepted(c, place, best, cons, span, requireConvex) };
+  };
+
+  // Convex-by-default (FR-EN-16 / [ADR-018](docs/06-decisions.md#adr-018)): a declared polygon should read
+  // CONVEX in its given vertex order. (1) Try a convex-required solve with the directly-referenced carriers.
+  // (2) If no convex solution is reachable that way, RECRUIT the declared polygons' other FREE on-circle
+  // vertices (ADR-097: a general inscribed quad's vertices are free DOFs, not fixed) and retry convex — the
+  // extra freedom lets a constrained quad reshape to a convex drawing instead of a crossed one. (3) Only if
+  // still no convex solution exists fall back to the relaxed accept with the original carriers — so a figure
+  // that genuinely has no convex drawing still solves. When no ≥4-gon is declared, `declaredPolygonsConvex`
+  // is always true ⇒ step (1) succeeds immediately and behaviour is unchanged.
+  const conv = solveFor(carriers, true);
+  if (conv.ok) return conv.result;
+  const extra = freePolygonVerticesToRecruit(c, carriers);
+  if (extra.length) {
+    const conv2 = solveFor([...carriers, ...extra], true);
+    if (conv2.ok) return conv2.result;
   }
-  // Nearest basin (regularised search from the seed) + the grid-informed seed + cardinal restarts (each DOF
-  // pushed by a range of magnitudes in normalised units); polish on the residual through several decades so
-  // a coupled system lands tightly ON the constraints; accept a genuine non-degenerate solution else keep
-  // the seed. Shared scaffold.
-  const restarts = [
-    ...extraRestarts,
-    ...[0.5, 1, -1, 2, -2].flatMap((d) => seedU.map((_, j) => seedU.map((v, i) => (i === j ? v + d : v)))),
-  ];
-  const best = multiStartSolve(seedU, restarts, 0.3, regCost, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, (x) =>
-    solutionAccepted(c, place, x, cons, span),
+  return solveFor(carriers, false).result;
+}
+
+/**
+ * Free on-circle vertices (ADR-097: `free` and not yet driven) of any declared polygon (≥4 vertices) that
+ * also contains one of `carriers` — candidates to recruit into a convex-failing joint solve so the polygon
+ * can reshape to a convex drawing. Excludes vertices already among the carriers.
+ */
+function freePolygonVerticesToRecruit(c: Construction, carriers: GeoObject[]): GeoObject[] {
+  const carrierIds = new Set(carriers.map((o) => o.id));
+  const wanted = new Set<Id>();
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon' || o.vertices.length < 4) continue;
+    if (!o.vertices.some((v) => carrierIds.has(v))) continue; // only polygons touched by a current carrier
+    for (const v of o.vertices) if (!carrierIds.has(v)) wanted.add(v);
+  }
+  return c.objects.filter(
+    (o): o is GeoObject => o.kind === 'on-circle' && !!(o as { free?: boolean }).free && (o as { solve?: unknown }).solve === undefined && wanted.has(o.id),
   );
-  return place(best);
 }
 
 /** Nelder–Mead downhill simplex — derivative-free joint minimisation of `f` from `x0`. */

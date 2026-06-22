@@ -100,6 +100,20 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'constrained-inscribed-quad-stays-convex',
+    title: '"מרובע BCED חסום במעגל" + external A=BD∩CE + AE=2CE + AD=CE — the constrained cyclic quad draws CONVEX, not crossed',
+    guards:
+      'Operator report: this figure drew a CROSSED (bowtie) quad and "show another configuration" said impossible while the cue read "5 DOF". Root cause: the general inscribed quad pinned its vertices at the convex-default angles (free=false — an ADR-052 violation), so the constraint solver could only move E,D and was boxed into a crossed branch (a convex solution exists only when all four are free). Fix (ADR-097): the general-quad vertices are FREE (the convex angles are a STARTING position), and on a convex-failing coupled solve the solver RECRUITS the polygon\'s free vertices (ADR-097 convexity preference) so it reshapes to a convex drawing; B,C become samplable so "show another" works.',
+    steps: ['מרובע BCED חסום במעגל', 'המשך BD והמשך CE נפגשים שנקודה A', 'AE=2CE', 'AD=CE'],
+    check(fig) {
+      allStepsOk(fig);
+      convexQuad(fig, ['B', 'C', 'E', 'D'], 'O', 5); // BCED in convex cyclic order around O (was crossed)
+      const A = at(fig, 'A'), C = at(fig, 'C'), E = at(fig, 'E'), D = at(fig, 'D');
+      expect(dist(A, E)).toBeCloseTo(2 * dist(C, E), 3); // AE = 2·CE holds
+      expect(dist(A, D)).toBeCloseTo(dist(C, E), 3); // AD = CE holds
+    },
+  },
+  {
     id: 'two-tangents-one-touch-already-exists',
     title: '"two tangents from E at A and D" where A is an existing on-circle point (a diameter endpoint)',
     guards:
@@ -1431,6 +1445,27 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'point-is-meeting-of-line-with-circle',
+    title: '"נקודה E היא מפגש של AO עם המעגל" — the NOUN/definitional form of line∩circle',
+    guards:
+      'the verb forms ("AO חותך/פוגש את המעגל בנקודה E") worked, but the definitional noun form failed → not-handled (escalated to the LLM). Two parser gaps: INTERSECT_KW lacked the noun "מפגש"/"meeting", and `crossingAfterCircle` only finds a point named AFTER the circle, while here E is declared FIRST. Fix: lineMeetsCircle accepts the noun keyword and `leadingNamedPoint` reads the point ahead of the construction.',
+    steps: [
+      'מעגל O שרדיוסו R', // a circle centred at O
+      'נקודה A על המעגל', // A on the circle ⇒ AO is a radius
+      'נקודה E היא מפגש של AO עם המעגל', // E = where line AO meets the circle again (the antipode)
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      for (const id of ['O', 'A', 'E']) expect(fig.positions.has(id), `point ${id}`).toBe(true);
+      const O = at(fig, 'O'), A = at(fig, 'A'), E = at(fig, 'E');
+      expect(dist(O, E)).toBeCloseTo(dist(O, A), 3); // A and E both on the circle (equal radii)
+      expect(dist(A, E)).toBeGreaterThan(1e-6); // E is a DISTINCT crossing, not A again
+      // A, O, E are collinear — E lies on the line AO.
+      const sin = Math.abs((O.x - A.x) * (E.y - A.y) - (O.y - A.y) * (E.x - A.x)) / (dist(A, O) * dist(A, E));
+      expect(sin).toBeLessThan(1e-3);
+    },
+  },
+  {
     id: 'sqrt-times-free-radius',
     title: '"AB=√2R" + "BO=R" on a FREE-radius circle — couples the length to the radius DOF, not over-constrained',
     guards:
@@ -1497,6 +1532,33 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       expect(dist(at(fig, 'A'), at(fig, 'C'))).toBeCloseTo(10, 3); // the diagonals still hold
       expect(dist(at(fig, 'B'), at(fig, 'D'))).toBeCloseTo(10, 3);
     }
+    st.clear();
+  });
+
+  it('[constrained-inscribed-quad-resample] the constrained cyclic quad offers DIFFERENT convex drawings', () => {
+    // Same figure as the seed-0 scenario. The operator saw "5 DOF" but "show another configuration"
+    // said impossible — because the quad's vertices were pinned, leaving only similarity DOF. With the
+    // vertices freed (ADR-097), resampling must find a genuinely different drawing, each still CONVEX
+    // and satisfying AE=2CE / AD=CE.
+    const st = useGeoStore.getState();
+    st.clear();
+    for (const u of ['מרובע BCED חסום במעגל', 'המשך BD והמשך CE נפגשים שנקודה A', 'AE=2CE', 'AD=CE']) {
+      const r = parse(u, ctxOf(useGeoStore.getState().facts));
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return;
+      for (const cmd of r.commands) st.execute(cmd, u);
+    }
+    let found = 0;
+    for (let press = 0; press < 8; press++) {
+      if (!st.resample()) continue; // resample found another view
+      found++;
+      const seed = useGeoStore.getState().seed;
+      const fig = replay(useGeoStore.getState().facts, seed);
+      expect(polygonsConvex(useGeoStore.getState().facts, fig.positions), `press ${press + 1} (seed ${seed})`).toBe(true);
+      expect(dist(at(fig, 'A'), at(fig, 'E'))).toBeCloseTo(2 * dist(at(fig, 'C'), at(fig, 'E')), 2);
+      expect(dist(at(fig, 'A'), at(fig, 'D'))).toBeCloseTo(dist(at(fig, 'C'), at(fig, 'E')), 2);
+    }
+    expect(found, '"show another configuration" found at least one different convex drawing').toBeGreaterThan(0);
     st.clear();
   });
 

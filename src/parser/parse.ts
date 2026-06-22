@@ -101,6 +101,17 @@ const crossingAfterCircle = (s: string): string | null => {
   return m ? up(m[1]) : null;
 };
 
+/** The new point named BEFORE the construction in a definitional/noun phrasing —
+ *  "[ה]נקודה E היא …" / "point E is …" / a leading "E is …"/"E = …". Lets the
+ *  noun form ("E is the intersection/מפגש of AB with the circle") name its result
+ *  point, mirroring `crossingAfterCircle` for the verb form ("… circle at E"). */
+const leadingNamedPoint = (s: string): string | null => {
+  const m =
+    s.match(/(?:^|\s)(?:ה?נקוד[הת]|point)\s+([A-Za-z]\d*)\b/i) ??
+    s.match(/^\s*([A-Za-z]\d*)\s*(?:\bis\b|היא|הוא|=)/i);
+  return m ? up(m[1]) : null;
+};
+
 /** Remove a "circle X" / "מעגל X" mention so its centre letter isn't read as a figure label. */
 const dropCircleRef = (s: string): string => s.replace(/(?:circle|מעגל)\s+[A-Za-z]\d*\b/gi, ' ');
 
@@ -1103,12 +1114,16 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // radius DOF (ADR-071); only a NUMERIC radius is fixed. (Matches the bare-`circle` rule.)
   const freeRadius = !r.numeric;
   const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, ...(freeRadius ? { freeRadius: true } : {}), ...(hidden ? { hidden: true } : {}), ...(named ? {} : { autoCenter: true }) }];
+  // A GENERAL quad's vertex angles are UNSTATED (ADR-052) — the convex spread is only a STARTING
+  // position, so the vertices stay FREE (samplable + drivable to a convex constraint-satisfying figure).
+  // A SHAPED cyclic polygon (square/rect/rhombus/trapezoid) has angles INTRINSIC to the shape → fixed.
+  const freeAngles = kind === 'quad';
   ids.forEach((id, i) => {
-    // specific angle for a shaped cyclic polygon (square/rect/rhombus/trapezoid);
-    // omit for triangle/general-quad so they spread evenly.
+    // specific angle for a shaped cyclic polygon (square/rect/rhombus/trapezoid) or the general quad's
+    // convex-default start; omit for triangle so it spreads evenly via nextTheta.
     cmds.push(
       angles
-        ? { type: 'point-on-circle', id, circle: circ, theta: (angles[i] * Math.PI) / 180 }
+        ? { type: 'point-on-circle', id, circle: circ, theta: (angles[i] * Math.PI) / 180, ...(freeAngles ? { free: true } : {}) }
         : { type: 'point-on-circle', id, circle: circ },
     );
   });
@@ -1691,18 +1706,23 @@ const extensionMeetsExistingPoint: Rule = (s, ctx) => {
 };
 
 const lineMeetsCircle: Rule = (s, ctx) => {
-  if (!INTERSECT_KW.test(s)) return null;
+  // verb form ("AB cuts/meets the circle") OR noun/definitional form ("E is the מפגש/meeting/intersection of AB with the circle")
+  if (!INTERSECT_KW.test(s) && !/מפגש|\bmeeting\b/i.test(s)) return null;
   if (/tangent|משיק/i.test(s)) return null; // tangent line → tangentMeetsOtherCircle / tangentLine
   if (/\bfrom\b|מנקודה|מהנקודה/i.test(s)) return null; // "from <point>" → the external-point secant
   const center = resolveMentionedCircle(s, ctx); // a named circle, or "the circle" when there's exactly one
   if (!center) return null; // must REFER to a circle (else it's line∩line, a constraint, etc.)
   const circ = circleId(center);
-  // the new crossing: the label after the "at"/"בנקודה" that FOLLOWS the circle mention
-  const R = crossingAfterCircle(s);
+  // the new crossing: the label after the "at"/"בנקודה" that follows the circle (verb form),
+  // else the point named ahead of the construction (noun form: "[נקודה] E היא …")
+  const R = crossingAfterCircle(s) ?? leadingNamedPoint(s);
   if (!R) return null;
-  // the line's two points: strip the circle ref + the new-point clause + connective words → the 2-label run
+  // the line's two points: strip the circle ref + the new-point clause (both a trailing "at E"
+  // and a leading "[נקודה] E היא") + connective words → the 2-label run
   const body = dropCircleRef(s)
     .replace(/(?:\bat\b|בנקודה|ב-)\s*[A-Za-z]\d*\b/gi, ' ')
+    .replace(/(?:^|\s)(?:ה?נקוד[הת]|point)\s+[A-Za-z]\d*\b/gi, ' ')
+    .replace(new RegExp(String.raw`^\s*${R}\s*(?:\bis\b|היא|הוא|=)`, 'i'), ' ')
     .replace(/extension|extended|\bline\b|המשך|הישר|הקו|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?/gi, ' ');
   const pr = labelRun(body, 2);
   if (!pr || pr.includes(R)) return null;

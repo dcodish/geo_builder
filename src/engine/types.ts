@@ -725,7 +725,7 @@ export type Command =
   | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean; autoCenter?: boolean; freeRadius?: boolean; ifAbsent?: boolean } // freeRadius: radius is a DOF (ADR-051); ifAbsent: a parser-injected implicit circle — skip if it already exists (don't clobber a real one)
   | { type: 'circle-through'; id: Id; center: Id; through: Id; hidden?: boolean; autoCenter?: boolean }
   | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id; hidden?: boolean } // circle through a,b,c (centre = circumcentre); hidden for a cyclic (בר-חסימה) figure
-  | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number; between?: [Id, Id] } // between = a free point on the arc from-to (ADR-042)
+  | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number; free?: boolean; between?: [Id, Id] } // theta = a STARTING angle; free:true keeps it a samplable/drivable DOF even with a start angle (ADR-097); between = a free point on the arc from-to (ADR-042)
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
   | { type: 'arc'; id: Id; center: Id; from: Id; to: Id } // a drawn arc (CCW from→to): semicircle / quarter circle
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }

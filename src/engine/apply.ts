@@ -702,12 +702,14 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       }
       // `between` ⇒ a free point ON THE ARC between two points (theta is a fraction of the half-arc,
       // 0 = the arc midpoint — ADR-042). Else: no explicit angle ⇒ a free vertex the sampler may slide
-      // (inscribed triangle, chord end); an explicit angle (an inscribed square's corner) is fixed.
+      // (inscribed triangle, chord end); an explicit angle (an inscribed square's corner) is fixed —
+      // UNLESS `cmd.free` is set, where the angle is just a STARTING position the figure may sample/drive
+      // (a general inscribed quad's convex-default angles, ADR-097): free even though theta is given.
       addObj(
         objects,
         cmd.between
           ? { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: 0, free: true, between: cmd.between }
-          : { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: cmd.theta ?? nextTheta(objects, cmd.circle), free: cmd.theta === undefined },
+          : { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: cmd.theta ?? nextTheta(objects, cmd.circle), free: cmd.free ?? cmd.theta === undefined },
       );
       break;
     }
