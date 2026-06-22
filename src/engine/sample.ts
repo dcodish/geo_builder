@@ -17,6 +17,7 @@
  */
 
 import type { Constraint, Construction, FreePoint, Id, OnCirclePoint, OnLinePoint } from './types';
+import { isGeoPoint } from './types';
 import { carrierOf, isShapeCarrier } from './carriers';
 
 /** A free on-circle vertex the sampler may slide (an arbitrary-angle vertex, not driven/fixed). */
@@ -229,13 +230,42 @@ function dofRemoved(con: Constraint): number {
 }
 
 /**
- * The figure's total remaining degrees of freedom = (raw movable DOF) − (DOF the constraints remove).
- * This is the honest count: one scalar constraint (e.g. `CD ⟂ AB`) removes ONE DOF even though the
- * joint solver marks several referenced vertices with `solve` — a `solve`-marked free point is NOT
- * determined, it just participates in the solve. 0 = a single rigid drawing (up to placement). Drives
- * the "degrees of freedom remaining" cue (ADR-018 Stage 3) so freedom visibly shrinks as facts
- * accumulate. Constraints are gathered from BOTH the checked list and the `solve` directives (a
- * driven constraint lives only in `solve`), deduped by identity.
+ * The dimension of the SIMILARITY gauge that is still FREE in the figure — the placement/rotation/scale
+ * freedom that doesn't change the SHAPE (ADR-101). A figure with no absolute anchor can be translated
+ * (2), rotated (1), and (when no length is fixed) scaled (1) without violating any given. Subtracting
+ * this from the raw count gives the *shape* degrees of freedom, so a figure that is rigid UP TO
+ * SIMILARITY reads 0 ("✓ fully determined") instead of 3–4. The gauge shrinks as the figure is anchored:
+ *  - translation (2): gone once any point is PINNED (an explicit `point A at (x,y)`).
+ *  - rotation (1): present once ≥2 points exist (there's an orientation), gone once ≥2 points are pinned.
+ *  - scale (1): present while NO absolute size is fixed; gone when a numeric distance, a fixed-length
+ *    radius, or ≥2 pinned points fixes it (those length constraints are ALREADY in the constraint count,
+ *    so the gauge must NOT also subtract scale then — no double-count).
+ */
+function similarityGauge(c: Construction, cons: Set<Constraint>): number {
+  const pts = c.objects.filter((o) => isGeoPoint(o) && !o.id.startsWith('~'));
+  const npts = pts.length;
+  if (npts === 0) return 0;
+  const pinned = pts.filter((p) => p.kind === 'free-point' && (p as FreePoint).pinned).length;
+  const hasCircle = c.objects.some((o) => o.kind === 'circle');
+  const scaleFixed =
+    pinned >= 2 ||
+    [...cons].some((k) => k.type === 'distance') || // a numeric length pins the scale (already in `removed`)
+    c.objects.some((o) => o.kind === 'circle' && o.radius.via === 'length'); // a numeric radius
+  const t = pinned === 0 ? 2 : 0;
+  const r = npts >= 2 && pinned <= 1 ? 1 : 0;
+  const s = (npts >= 2 || hasCircle) && !scaleFixed ? 1 : 0;
+  return t + r + s;
+}
+
+/**
+ * The figure's remaining SHAPE degrees of freedom = (raw movable DOF) − (DOF the constraints remove) −
+ * (the free similarity gauge). Counting the SHAPE freedom (modulo place/rotate/scale) means a figure
+ * that is rigid up to similarity reads 0 — so "✓ fully determined" fires when the SHAPE is pinned down,
+ * not only when points carry absolute coordinates (ADR-101, refining ADR-018 Stage 3). The raw count is
+ * honest: one scalar constraint (e.g. `CD ⟂ AB`) removes ONE DOF even though the joint solver marks
+ * several referenced vertices with `solve` — a `solve`-marked free point is NOT determined, it just
+ * participates in the solve. Constraints are gathered from BOTH the checked list and the `solve`
+ * directives (a driven constraint lives only in `solve`), deduped by identity.
  */
 export function freeDofCount(c: Construction): number {
   const raw = c.objects.reduce((n, o) => n + rawMovableDof(o), 0);
@@ -246,5 +276,5 @@ export function freeDofCount(c: Construction): number {
   }
   let removed = 0;
   for (const con of cons) removed += dofRemoved(con);
-  return Math.max(0, raw - removed);
+  return Math.max(0, raw - removed - similarityGauge(c, cons));
 }

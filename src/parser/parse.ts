@@ -471,6 +471,36 @@ const angle: Rule = (s) => {
 };
 
 /**
+ * "∠ABC = ∠DEF" / "angle ABC = angle DEF" / "זווית ABC = זווית DEF" — an angle EQUALITY between two
+ * named angles (the middle letter is the vertex), with an optional coefficient on the right ("∠ABC =
+ * 2∠DEF"). Emits the engine's angle-ratio constraint ∠1 = k·∠2 (k defaults to 1) — the same relation
+ * `similarity` uses — so on an under-determined figure it drives a free DOF until the angles match, and
+ * on a determined one it's a check (the givens verifier flags it if it can't hold). Both arms of each
+ * angle are drawn (idempotent) so the stated angles are visible. A single angle with a numeric or
+ * symbolic VALUE is handled by `angle` / `measureAngle`; this fires only when BOTH sides are angles.
+ */
+const angleEquality: Rule = (s) => {
+  if (!/(?:angle|∠|∢|זוו?ית)/i.test(s)) return null;
+  const parts = s.split('=');
+  if (parts.length !== 2) return null; // a single '=' (a chain "∠1=∠2=∠3" is handled by chainedEquality)
+  const strip = (p: string) => p.replace(/angle|∠|∢|זוו?ית/gi, ' ');
+  const left = labelRun(strip(parts[0]), 3);
+  const right = labelRun(strip(parts[1]), 3); // null for a numeric/symbolic RHS ("= 37°", "= 2α") → defer to angle/measureAngle
+  if (!left || !right) return null;
+  const coefM = parts[1].match(new RegExp(String.raw`(${COEF})\s*[*·]?\s*(?:angle|∠|∢|זוו?ית)`, 'i')); // "= 2∠DEF"
+  const k = coefM ? parseFloat(coefM[1]) : 1;
+  const [a1, v1, b1] = left;
+  const [a2, v2, b2] = right;
+  return [
+    { type: 'segment', a: v1, b: a1 },
+    { type: 'segment', a: v1, b: b1 },
+    { type: 'segment', a: v2, b: a2 },
+    { type: 'segment', a: v2, b: b2 },
+    { type: 'set-angle-ratio', v1, a1, b1, v2, a2, b2, k },
+  ];
+};
+
+/**
  * "point G on AD" / "נקודה G על AD" with optional ratio "at 40%" / "ב-40%".
  * The segment labels are word-bounded so "F on the extension of AD" can't read
  * "th" of "the" as a segment — that phrasing escapes to the fallback instead.
@@ -1088,6 +1118,19 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // point already in the figure (a second inscribed circle must not reuse the first's centre 'O').
   const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
   const circ = circleId(center);
+  // Inscribing in an EXISTING named circle ("מרובע EBAD חסום במעגל O" where O is already drawn): do NOT
+  // re-create the circle — that re-emits `circumcircle`/`circle` for circle-O and redefines its centre
+  // ("'O' is already defined"). The intent is "these vertices lie on THIS circle": assert membership per
+  // vertex (idempotent for a point already on it — an intersection / line∩circle — and converting a free
+  // one to slide on it) and draw the polygon. Works whether the vertices pre-exist or are fresh.
+  if (named != null && (ctx.circles ?? []).some((c) => up(c) === up(named))) {
+    return [
+      ...ids.map((id): AnyCommand => ({ type: 'point-on-circle', id, circle: circ })),
+      isTri
+        ? { type: 'triangle', ids: [ids[0], ids[1], ids[2]] }
+        : { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
+    ];
+  }
   // Inscribing a polygon whose vertices ALREADY exist can't re-place them on a fresh circle
   // (that would detach them from their own definitions — A from segment CD, etc.). A triangle's
   // three existing points have a unique CIRCUMCIRCLE through them. A quad's four are generally NOT
@@ -2498,6 +2541,7 @@ const RULES: Rule[] = [
   collinearConstraint,
   diameterCutsSegment, // "קוטר … מנקודה F חותך את הצלע AC בנקודה E" — before lineLineIntersection (which stops on "קוטר") and `diameter`
   lineLineIntersection,
+  angleEquality, // "∠ABC = ∠DEF" (two angles equal) — before measureAngle/angle, which expect a value RHS
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,
   tangentsFromExternal, // TWO tangents from an external point — before the single tangentLine

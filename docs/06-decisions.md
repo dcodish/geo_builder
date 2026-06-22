@@ -1425,3 +1425,71 @@ These reinforce the [N1 calibration point](PROJECT-MEMORY.md): the LLM cannot re
 **Result.** The figure now draws **convex** (BCED in cyclic order), both constraints hold (AE=2·CE, AD=CE), the verifier is green, and `freeDofs` includes B,C → "show another configuration" offers 12/16 convex alternatives (was 0). **1245 tests green, build clean.** Locked by scenarios `constrained-inscribed-quad-stays-convex` (seed 0) and `constrained-inscribed-quad-resample` ("show another").
 
 **Deferred (build when a corpus problem needs it).** The explicit concave OPT-IN — a stated reflex angle (`∠BCD=220°`, the precise mechanism) and/or the `קעור`/"concave" keyword (FR-EN-16 sugar, cycling which vertex is reflex). Not built now: no current corpus problem needs a non-determined concave quad.
+
+---
+
+## ADR-098 — a free point's placement is SAMPLED to satisfy a directional extension ("המשך"), never DRIVEN across the tangent degeneracy
+
+**Status.** Accepted (2026-06-22).
+
+**Context.** Operator (session `n19qmb3t`): two circles meet at A,B; `נקודה C על מעגל P` (C a **free** point on circle P); `המשך CA חותך מעגל O בנקודה D`; `המשך CB חותך מעגל O בנקודה E`. Report: *"point C is not positioned in a place that can satisfy the input."* Traced through the real pipeline: at the sampled C (top of circle P) C is **outside** circle O, so on line CB the *far* crossing of circle O **is B itself** — the only other crossing falls **between C and B**, so E landed on the near side and the directional `המשך` ("beyond B") was violated. The figure nonetheless showed **green (verified)**. For *both* extensions to reach circle O's far side, C must sit on a specific arc (each named endpoint the **near** crossing); a valid placement exists (≈8% of sampled seeds) but the default/sampled one wasn't it.
+
+**Root cause (three converging gaps).**
+1. The `extend-onto-circle` **shared-endpoint branch** ([apply.ts](../src/engine/apply.ts)) deterministically picks "the other crossing, avoiding the shared endpoint" with **no record of the directional intent** (unlike the neither-on-circle branch, which emits `collinear-order`).
+2. C's **free θ was sampled blind** to the order — `resample` accepted on convexity/distinctness/shape-differs only, never "does each extension reach the far side."
+3. The **verifier re-derived neither** the on-circle membership nor the order for `extend-onto-circle`, and order constraints were treated as soft selectors — so the wrong-side figure was a silent green.
+
+The existing `two-circles-mutual-tangent-secants` scenario was found to have the **same latent wrong-side bug** at seed 0 (its check asserted collinearity but never order).
+
+**Decision (operator chose SAMPLE/GATE, never drive).** C is genuinely a free DOF, so its value is **sampled** to a satisfying placement — *not* solved. Adding `collinear-order` to the construction was rejected: `evaluate` hard-fails on every constraint, so it would trigger `recruitFreeDofs` to **drive** C across the E=B tangent degeneracy (a collapse the deterministic branch was built to avoid). Instead:
+1. **Verifier** ([verify.ts](../src/engine/verify.ts)) re-derives `extend-onto-circle`'s on-circle membership AND a **hard directional-order check** (the new point must be beyond the second endpoint along a→b) — re-derived from the command stream, independent of how the point was built. A wrong-side figure now goes **amber**, not silent-green.
+2. **Sampler gate** ([geoStore.ts](../src/store/geoStore.ts)) — `resample` ("show another configuration") and a new `firstSatisfyingSeed` accept a seed only if every extension reaches the far side by a **clean margin** (`extensionsClear`, beyond the endpoint by ≥5% of the figure span — rejects a near-tangent secant whose new point nearly collapses onto the endpoint). The sampling bar is stricter than the verifier's amber bar (a marginal-but-genuinely-beyond figure is valid, not "wrong").
+3. **Auto-pick the default** — `execute` auto-advances the seed to the first satisfying configuration when a new step leaves the current view wrong; the scenario harness `run()` mirrors this (returns 0 for any figure without an extension, so non-extension scenarios are unchanged).
+
+**Result.** The operator's exact sequence now auto-advances to a valid default (both D beyond A and E beyond B, verifier clean); the latent mutual-tangent bug is fixed and that scenario now asserts the order. Locked by `free-point-on-circle-both-extensions-reach-far-side` (replay path) + `free-on-circle-extensions-auto-advance` (store path) + order assertions on `two-circles-mutual-tangent-secants`. **1247 tests green, build clean.**
+
+**Known broader gap (deferred).** A constraint that needs to drive a free point *across* a tangent degeneracy (where the two crossings merge) is still out of reach — here it's avoided by sampling because the figure is under-determined. A figure that is *determined* into such a configuration would need a different mechanism.
+
+---
+
+## ADR-099 — inscribing in an EXISTING named circle asserts membership, never re-creates the circle
+
+**Status.** Accepted (2026-06-22).
+
+**Context.** Operator (session `99j7krj3`, the full bagrut Q4): two circles meet at A,B; C on the right circle; `המשך CA`/`המשך CB` put D,E on the LEFT circle O; then `מרובע EBAD חסום במעגל O` ("quadrilateral EBAD inscribed in circle O") → **weak:error → LLM built-nothing** (twice). The four vertices E,B,A,D and circle O all **already exist** (A,B are O∩P; D,E are line∩O — so all four are already ON circle O).
+
+**Root cause.** The `inscribedPolygon` rule, on `allExist`, always emitted `circumcircle(circle-O, E,B,A)` to build the circumscribing circle — but circle O **already exists**, so the command re-created it and **redefined its centre O** (`'O' is already defined — it can't be redefined as something different`), and the whole step was dropped. The rule discriminated on whether the *vertices* exist, never on whether the *named circle* exists.
+
+**Decision.** When the inscribe phrase names a circle that **already exists**, the rule does **not** re-create it. It asserts membership per vertex — `point-on-circle id circle-O`, which is **idempotent** for a point already on the circle (an intersection / `line∩circle` / through-point, ADR-093) and **converts** a free vertex to slide on it — and draws the polygon. Works whether the vertices pre-exist or are fresh. The create-a-new-circle paths (a `circumcircle` through three existing points, or a fresh circle for new vertices) are unchanged for the circle-does-not-exist case.
+
+**Result.** `מרובע EBAD חסום במעגל O` now builds: E,B,A,D asserted on the existing O (idempotent), the quad drawn, **no duplicate circle**. The book's part-א theorem holds in the resulting figure (∠EDA = ∠CBA, exactly, across configurations). Locked by scenario `inscribe-existing-points-in-existing-circle`. **1248 tests green, build clean.**
+
+---
+
+## ADR-100 — angle EQUALITY ("∠ABC = ∠DEF") is a parser rule over the existing angle-ratio constraint
+
+**Status.** Accepted (2026-06-22).
+
+**Context.** Operator (sessions `99j7krj3`/`f2gyj40u`, bagrut Q4): typing an **angle equality** — `∠GEC=∠CBA`, `∠GEC=∠CHA` (the proof's relations) — returned **not-understood**, then escalated to the LLM (also not-understood). The `angle` rule only matches a numeric value (`∠GAB = 37`), and `measureAngle` only a symbolic value (`∠ABC = 2α`); a *two-angle* equality matched neither and fell through.
+
+**Root cause.** A **parser gap**, not an engine gap. The engine already represents angle equality — `set-angle-ratio` with `k = 1` (`∠1 = k·∠2`), the exact relation the `similarity` rule emits for AA. There was simply no rule for the bare "∠ … = ∠ …" phrasing.
+
+**Decision.** Add an `angleEquality` rule (before `measureAngle`/`angle`): split on the single `=`, read a 3-letter angle (middle letter = vertex) on each side, and emit `set-angle-ratio {v1,a1,b1, v2,a2,b2, k}`. Supports Hebrew "זווית" and the `∠`/`∢` symbol, and an optional coefficient on the right (`∠ABC = 2∠DEF` → `k = 2`). Both arms of each angle are drawn (idempotent segments), mirroring the `angle` rule. It fires only when **both** sides are angles — a numeric RHS (`= 37`) still routes to `angle`, a symbolic RHS (`= 2α`) to `measureAngle`, and a bare segment equality (`AB = CD`, no angle marker) is untouched. On an under-determined figure the constraint drives a free DOF until the angles match; on a determined one it is a check (the givens verifier flags it if it cannot hold).
+
+**Result.** `∠GEC=∠CBA` and the like now parse and apply. Exercised end-to-end with the book's own part-א theorem `∠EDA = ∠CBA` on the Q4 figure (parses, applies, holds for every configuration). Locked by `parser/__tests__/angle-equality.test.ts` (8 cases) + scenario `angle-equality-on-q4`. **1257 tests green, build clean.**
+
+**Note (DOF cue).** The operator also questioned the "8 degrees of freedom" cue on the Q4 figure. Verified: 8 was correct under the *then* convention (raw − constraints, counting the placement+rotation+scale gauge — "a lone square has 4 DOF"). The genuine *shape* freedom (modulo similarity) is 8 − 4 = 4; the operator chose to switch the cue to report that shape DOF — see [ADR-101](#adr-101).
+
+---
+
+## ADR-101 — the "degrees of freedom" cue reports SHAPE DOF (modulo similarity), so a determined shape reads 0
+
+**Status.** Accepted (2026-06-22). Refines [ADR-018](#adr-018) Stage 3.
+
+**Context.** Operator, on the bagrut-Q4 figure: *"check dof — it says 8 but I'm not sure this is the case."* The cue counted **raw movable DOF − constraints** (ADR-018 Stage 3), which includes the full **placement + rotation + scale** freedom: the Q4 figure's 8 = O(2) + P(2) + radius-O(1) + radius-P(1) + C(1) + F(1). Two problems: (1) the number is **inflated** by the 4-dimensional similarity gauge, so it doesn't match a student's sense of "how much about the *shape* is still free" (genuine shape DOF = 8 − 4 = 4); (2) the **"✓ fully determined"** emphasis (FR-ALT-4, fires at count = 0) was **unreachable** for any normal figure — even a rigid SSS triangle showed 3 (its placement gauge), and the badge only appeared if points were pinned to absolute coordinates (which the bagrut workflow never does).
+
+**Decision (operator chose "switch to shape-DOF").** `freeDofCount` now subtracts the FREE part of the similarity gauge: **shape DOF = raw − constraints − gauge**, where `gauge = translation(2, gone once any point is pinned) + rotation(1, present with ≥2 points, gone with ≥2 pins) + scale(1, present until a numeric distance / fixed-length radius / ≥2 pins fixes it)`. Length constraints that pin scale are ALREADY in the constraint count, so the gauge omits scale then (no double-count). Result: a figure rigid **up to similarity** reads **0** → "✓ fully determined" fires when the SHAPE is pinned down, not only when coordinates are. The samplable-DOF *list* (`freeDofs`) is unchanged, so "show another configuration" still varies place/size (a determined shape can still be shown at other sizes/orientations).
+
+**Worked values.** lone square → 0 (was 4); square + AB=5 → 0; triangle → 2 (its two angles; was 6); SSS triangle → 0 (was 3); single circle → 0; parallelogram → 2 (was 6); parallelogram + |AB|=|AC| → 1; segment+segment+⟂ → 3 (was 7); **bagrut Q4 → 4** (was 8). Locked by the updated `phase-sample.test.ts`.
+
+**Trade-off / note.** "✓ fully determined" can now coexist with an active "show another configuration" button (the shape is fixed, but its similarity image — size/orientation/position — can still vary, which is meaningful when no size was stated, ADR-052). This is intended: "determined" describes the *shape*, not the page placement.

@@ -152,8 +152,12 @@ describe('applySeed', () => {
     expect([...xs].some((x) => Math.abs(x / 1000 - def.x) > 1e-6)).toBe(true);
   });
 
-  it('freeDofCount (ADR-018 Stage 3): a lone square has 4 DOF (place/rotate/scale); pinning both base vertices → 0', () => {
-    expect(freeDofCount(build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }]).construction)).toBe(4);
+  it('freeDofCount (ADR-101): a lone square is SHAPE-determined → 0 (its size/place are the similarity gauge)', () => {
+    // SHAPE degrees of freedom, modulo place/rotate/scale (ADR-101). A lone square HAS a fixed shape, so
+    // it reads 0 ("✓ fully determined") even though its size/position are free — those 4 raw DOF (a base
+    // point 2 + a side's direction & length 2) ARE exactly the similarity gauge. Pinning both base
+    // vertices removes them too (and the raw DOF), so it stays 0.
+    expect(freeDofCount(build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }]).construction)).toBe(0);
     const pinned = build([
       { type: 'square', ids: ['A', 'B', 'C', 'D'] },
       { type: 'free-point', id: 'A', x: 0, y: 0 },
@@ -163,32 +167,33 @@ describe('applySeed', () => {
     expect(freeDofs(pinned.construction)).toHaveLength(0);
   });
 
-  it('ADR-018 Stage 2 — a constraint removes ONE DOF from the count, not a whole vertex', () => {
-    // Parallelogram A,B,C free (D derived) → 6 DOF. |AB| = |AC| is ONE scalar constraint, so it
-    // removes exactly 1 DOF → 5 (NOT 4 — the constraint marks a vertex with `solve`, but a
+  it('ADR-018 Stage 2 / ADR-101 — a constraint removes ONE shape DOF, not a whole vertex', () => {
+    // Parallelogram A,B,C free (D derived) → 6 raw DOF − 4 similarity gauge = 2 SHAPE DOF (its angle and
+    // side-ratio). |AB| = |AC| is ONE scalar constraint (relative — does NOT pin scale), so it removes
+    // exactly 1 more → 1 shape DOF (NOT 0 — the constraint marks a vertex with `solve`, but a
     // `solve`-marked free point keeps residual freedom; it is not "fully determined").
     const pgram = build([{ type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] }, { type: 'segment', a: 'A', b: 'C' }]);
-    expect(freeDofCount(pgram.construction)).toBe(6);
+    expect(freeDofCount(pgram.construction)).toBe(2);
     expect(freeDofs(pgram.construction).sort()).toEqual(['A', 'B', 'C']);
     const r = applyStep(pgram.construction, { type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'C' });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(freeDofCount(r.construction)).toBe(5); // 6 − 1 (one constraint), not 6 − 2
+    expect(freeDofCount(r.construction)).toBe(1); // 2 − 1 (one relative constraint)
     // The free vertices are still SAMPLABLE (they have residual freedom — re-solving from a
     // perturbed start gives a different valid parallelogram that still satisfies |AB| = |AC|).
     expect(freeDofs(r.construction).sort()).toEqual(['A', 'B', 'C']);
   });
 
-  it('a single perpendicularity constraint over four free vertices removes ONE DOF (the reported bug)', () => {
-    // segment AB + segment CD + CD ⟂ AB: 4 free points = 8 raw DOF, one ⟂ constraint → 7.
-    // (Regression: the ⟂ marked all four vertices with `solve`, and the old count read 0 — "fully
-    // determined" — when the figure is plainly free.)
+  it('a single perpendicularity constraint over four free vertices removes ONE shape DOF', () => {
+    // segment AB + segment CD + CD ⟂ AB: 4 free points = 8 raw DOF − 4 similarity gauge = 4 shape DOF;
+    // one ⟂ constraint (relative, no scale pin) → 3. (Regression: the ⟂ marked all four vertices with
+    // `solve`, and the old count read 0 — "fully determined" — when the figure is plainly free.)
     const r = build([
       { type: 'segment', a: 'A', b: 'B' },
       { type: 'segment', a: 'C', b: 'D' },
       { type: 'set-perpendicular', a: 'C', b: 'D', c: 'A', d: 'B' },
     ]);
-    expect(freeDofCount(r.construction)).toBe(7);
+    expect(freeDofCount(r.construction)).toBe(3);
     expect(freeDofs(r.construction).sort()).toEqual(['A', 'B', 'C', 'D']); // all four still samplable
   });
 

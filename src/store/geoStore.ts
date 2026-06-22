@@ -228,6 +228,60 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, labels, angleMarks, violations, radiusDofs };
 }
 
+/** The (a, b, id) triples every enabled `extend-onto-circle` step asserts ("המשך a·b onto a circle at id"). */
+function extensionTriples(facts: Fact[]): { a: Id; b: Id; id: Id }[] {
+  return facts.flatMap((f) => (f.enabled && f.cmd.type === 'extend-onto-circle' ? [{ a: f.cmd.a, b: f.cmd.b, id: f.cmd.id }] : []));
+}
+
+/** The figure's overall scale (bounding-box diagonal of all placed points) — the yardstick a clearance
+ *  margin is measured against, so it's robust whether the extension's base segment is long or short. */
+function figureSpan(fig: Derived): number {
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  for (const p of fig.positions.values()) {
+    minx = Math.min(minx, p.x); miny = Math.min(miny, p.y);
+    maxx = Math.max(maxx, p.x); maxy = Math.max(maxy, p.y);
+  }
+  return Number.isFinite(minx) ? Math.hypot(maxx - minx, maxy - miny) || 1 : 1;
+}
+
+/**
+ * True when every "המשך" extension reaches the far side of its circle by a CLEAN margin — the new point is
+ * beyond the named endpoint (the directional given, ADR-098) AND clear of it by a visible fraction of the
+ * figure, so a near-tangent secant whose new point nearly collapses onto the endpoint is rejected. This is
+ * the SAMPLING bar (auto-pick + "show another"); the verifier's amber check stays looser (a marginal but
+ * genuinely-beyond figure is valid, not "wrong"), so we never flag a figure we'd still draw.
+ */
+function extensionsClear(facts: Fact[], fig: Derived): boolean {
+  const margin = 0.05 * figureSpan(fig);
+  for (const { a, b, id } of extensionTriples(facts)) {
+    const pa = fig.positions.get(a), pb = fig.positions.get(b), pid = fig.positions.get(id);
+    if (!pa || !pb || !pid) return false;
+    const abx = pb.x - pa.x, aby = pb.y - pa.y;
+    const abl = Math.hypot(abx, aby);
+    if (abl < 1e-9) return false;
+    const beyond = ((pid.x - pb.x) * abx + (pid.y - pb.y) * aby) / abl; // signed distance of id past b along a→b
+    if (beyond < Math.max(0.5, margin)) return false;
+  }
+  return true;
+}
+
+/**
+ * The first seed in [from, from+budget) whose replay BUILDS and lets every extension reach the far side
+ * cleanly, else `from`. A point on a circle whose secant(s) must each extend onto another circle is a FREE
+ * DOF: only a subset of placements lets "המשך" reach the far side (the apex must sit so the named endpoint
+ * is the NEAR crossing). We SAMPLE such a placement here rather than DRIVE the point across the tangent
+ * degeneracy where the far crossing collapses onto the endpoint (ADR-098). Used to auto-pick the default
+ * configuration after a step and to gate "show another configuration".
+ */
+export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120): number {
+  if (extensionTriples(facts).length === 0) return from; // no extension → nothing to satisfy; keep the seed
+  for (let s = from; s < from + budget; s++) {
+    const fig = replay(facts, s);
+    if (fig.lastError === null && extensionsClear(facts, fig)) return s;
+  }
+  return from;
+}
+
 /** Outcome of dry-running a parsed step on top of the current facts (see {@link dryRunOutcome}). */
 export type StepOutcome = { produced: true } | { produced: false; reason: 'error' | 'empty'; detail?: string };
 
@@ -591,7 +645,19 @@ export const useGeoStore = create<GeoState>()(
             return;
           }
         }
-        set({ facts: [...facts, { id: nanoid(), cmd, utterance, group, enabled: true }] });
+        const next = [...facts, { id: nanoid(), cmd, utterance, group, enabled: true }];
+        set({ facts: next });
+        // A new step can make the CURRENT sample violate an extension's directional order — a free point
+        // on a circle (e.g. C) landing where "המשך" can't reach the far side of the target circle. Rather
+        // than drive that point across a degeneracy, auto-advance to the first configuration that honours
+        // every extension (sampling the free DOF, ADR-098). Only when the current view is actually broken,
+        // searching upward from the current seed so an already-valid hand-picked view is kept.
+        const seed = get().seed;
+        const fig = replay(next, seed);
+        if (fig.lastError === null && !extensionsClear(next, fig)) {
+          const s = firstSatisfyingSeed(next, seed);
+          if (s !== seed) set({ seed: s, radiusOverrides: {} });
+        }
       },
 
       update: (id, cmd, utterance) => {
@@ -676,6 +742,7 @@ export const useGeoStore = create<GeoState>()(
             evaluate(r.construction).ok &&
             polygonsConvex(facts, r.positions) &&
             pointsDistinct(r.construction, r.positions) &&
+            extensionsClear(facts, r) && // a varied view must still let every "המשך" reach the far side (ADR-098)
             shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions))
           ) {
             set({ seed: s, radiusOverrides: {} }); // a fresh view clears any dialed radii (scratchpad reset)

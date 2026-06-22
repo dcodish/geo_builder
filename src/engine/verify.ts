@@ -65,6 +65,7 @@ function onCircleRefs(commands: Command[]): { point: Id; circle: Id }[] {
       case 'point-on-circle':
       case 'line-circle-intersection':
       case 'arc-midpoint':
+      case 'extend-onto-circle':
         out.push({ point: c.id, circle: c.circle });
         break;
       case 'circle-circle-intersection':
@@ -143,6 +144,30 @@ export function checkGivens(
     if (!Number.isFinite(r)) continue; // a degenerate config (collapsed ray/circle) — NaN, not a measurable miss
     if (!isSatisfied(con, get)) {
       violations.push({ relation: con.type, ids: refs, message: `${describeConstraint(con)} does not hold in the final figure` });
+    }
+  }
+
+  // An `extend-onto-circle` ("המשך AB onto the circle at C") asserts a DIRECTIONAL extension: the new
+  // point lies BEYOND the second endpoint (order a→b→id), not between a and b. Unlike the generic order
+  // SELECTORS above (which only pick a "visibly smaller" gap), the direction here is a HARD given — the
+  // student said "המשך"/extend — so a figure where the new point fell on the NEAR side is genuinely wrong
+  // and must be flagged, even when every step applied ok. (This happens when the apex is outside the
+  // target circle, so the line's far crossing IS the shared endpoint and the only "other" crossing sits
+  // between the apex and the endpoint — the figure is satisfiable only at a DIFFERENT placement of the
+  // upstream free DOF, which the sampler/auto-seed must find. ADR-098.)
+  for (const cmd of commands) {
+    if (cmd.type !== 'extend-onto-circle') continue;
+    const a = positions.get(cmd.a);
+    const b = positions.get(cmd.b);
+    const id = positions.get(cmd.id);
+    if (!a || !b || !id) continue;
+    const dot = (id.x - b.x) * (b.x - a.x) + (id.y - b.y) * (b.y - a.y); // > 0 ⇔ id is beyond b along a→b
+    if (dot <= 0) {
+      violations.push({
+        relation: 'collinear-order',
+        ids: [cmd.a, cmd.b, cmd.id],
+        message: `${cmd.id} should lie on the extension of ${cmd.a}${cmd.b} beyond ${cmd.b}, but it landed between ${cmd.a} and ${cmd.b}`,
+      });
     }
   }
 

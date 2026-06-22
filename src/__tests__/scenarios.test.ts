@@ -19,7 +19,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
-import { replay, polygonsConvex, useGeoStore } from '@/store/geoStore';
+import { replay, polygonsConvex, useGeoStore, firstSatisfyingSeed } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { isGeoPoint, freeDofs, firstCyclableBranch, evaluate, circleMembers } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
@@ -66,7 +66,11 @@ function run(steps: Step[]): Derived {
     const group = `g${g++}`;
     for (const cmd of commands) facts.push({ id: `${group}.${facts.length}`, utterance, group, cmd, enabled: true });
   }
-  return replay(facts);
+  // Mirror the app: when a figure has free DOFs whose default placement breaks an extension's directional
+  // order ("המשך" must reach the far side), the store auto-advances to the first satisfying configuration.
+  // `firstSatisfyingSeed` returns 0 for any figure without that issue, so non-extension scenarios are
+  // unchanged. (ADR-098.)
+  return replay(facts, firstSatisfyingSeed(facts));
 }
 
 // ── check helpers ──────────────────────────────────────────────────────────
@@ -99,6 +103,79 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
+  {
+    id: 'angle-equality-on-q4',
+    title: 'bagrut Q4 + the part-א relation "∠EDA = ∠CBA" — angle EQUALITY now parses and holds',
+    guards:
+      'operator (session 99j7krj3/f2gyj40u): typing an angle EQUALITY ("∠GEC=∠CBA", "∠GEC=∠CHA") returned not-understood — the `angle` rule needs a numeric value, so a two-angle equality fell through to the LLM (also not-understood). The engine already had the relation (`set-angle-ratio` k=1, as similar-triangles uses); the gap was purely the parser. Fix (ADR-100): an `angleEquality` rule reads "∠ABC = ∠DEF" (Hebrew "זווית"/∠, optional coefficient "= 2∠DEF") → set-angle-ratio. Here it is exercised end-to-end with the book\'s own part-א theorem ∠EDA=∠CBA on the Q4 figure: it parses (no LLM), applies, and HOLDS (a true relation for every configuration).',
+    steps: [
+      'שני מעגלים נחתכים בנקודות A ו B',
+      'נקודה C על מעגל P',
+      'המשך CA חותך את מעגל O בנקודה D',
+      'המשך CB חותך את מעגל O בנקודה E',
+      'מרובע EBAD חסום במעגל O',
+      '∠EDA = ∠CBA',
+    ],
+    check(fig) {
+      allStepsOk(fig); // the angle-equality step parses (no escalation) and applies
+      // The relation was recorded as an angle-ratio (k=1) constraint…
+      expect(fig.construction.constraints.some((k) => k.type === 'angle-ratio')).toBe(true);
+      // …and actually holds in the drawing (∠EDA = ∠CBA — the book's part-א), verifier clean (blanket check).
+      expect(angle(at(fig, 'E'), at(fig, 'D'), at(fig, 'A'))).toBeCloseTo(angle(at(fig, 'C'), at(fig, 'B'), at(fig, 'A')), 1);
+    },
+  },
+  {
+    id: 'inscribe-existing-points-in-existing-circle',
+    title: 'bagrut Q4: "מרובע EBAD חסום במעגל O" where E,B,A,D and circle O ALREADY exist — draw the quad, don\'t re-create O',
+    guards:
+      'operator session (99j7krj3, 2026-06-22), the full bagrut Q4: two circles meet at A,B; C on the right circle; CA/CB extended hit the LEFT circle O at D,E; then "מרובע EBAD חסום במעגל O" → weak:error → LLM built-nothing (twice). Root cause (ADR-099): the inscribe rule emitted `circumcircle(circle-O, E,B,A)` to build the circumscribing circle — but circle O ALREADY exists, so re-creating it redefined its centre ("\'O\' is already defined") and the whole step was dropped. E,B,A,D are already ON circle O by their own construction (A,B are O∩P; D,E are line∩O), so the intent is just "draw the quad inscribed in the EXISTING O". Fix: when the named circle already exists, the rule asserts membership per vertex (`point-on-circle`, idempotent for a point already on it — ADR-093 — and converting a free one to slide on it) and draws the polygon, never re-creating the circle.',
+    steps: [
+      'שני מעגלים נחתכים בנקודות A ו B',
+      'נקודה C על מעגל P',
+      'המשך CA חותך את מעגל O בנקודה D',
+      'המשך CB חותך את מעגל O בנקודה E',
+      'מרובע EBAD חסום במעגל O',
+    ],
+    check(fig) {
+      allStepsOk(fig); // the inscribe step no longer errors / drops
+      // Exactly two circles (O and P) — O was NOT duplicated.
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles.length, 'still two circles (O not re-created)').toBe(2);
+      // All four quad vertices lie on circle O, and the quad EBAD is drawn.
+      const O = at(fig, 'O'), rO = dist(O, at(fig, 'A'));
+      for (const id of ['E', 'B', 'A', 'D']) expect(dist(O, at(fig, id)), `${id} on circle O`).toBeCloseTo(rO, 2);
+      expect(fig.construction.objects.some((o) => o.kind === 'polygon' && (o as { vertices: Id[] }).vertices.join('') === 'EBAD'), 'quad EBAD drawn').toBe(true);
+      // The book's part-א theorem holds in the correct figure: ∠EDA = ∠CBA (inscribed angles on arc EA... / cyclic).
+      expect(angle(at(fig, 'E'), at(fig, 'D'), at(fig, 'A'))).toBeCloseTo(angle(at(fig, 'C'), at(fig, 'B'), at(fig, 'A')), 1);
+    },
+  },
+  {
+    id: 'free-point-on-circle-both-extensions-reach-far-side',
+    title: 'two circles meet at A,B; C free on circle P; "המשך CA"→D and "המשך CB"→E both reach the FAR side of circle O',
+    guards:
+      'operator report (session n19qmb3t, 2026-06-22): "point C is not positioned in a place that can satisfy the input". Two circles meet at A,B; C is a FREE point on circle P; "המשך CA חותך מעגל O בנקודה D" and "המשך CB חותך מעגל O בנקודה E". At the default/sampled C (top of circle P) C is OUTSIDE circle O, so on line CB the far crossing IS B — the only OTHER crossing falls BETWEEN C and B, so E is on the near side and "המשך" (beyond B) is violated, yet the figure showed GREEN (verified). Root cause (ADR-098): the extend-onto-circle SHARED-ENDPOINT branch deterministically picks the other crossing with NO record of the directional intent, the free θ of C was sampled blind to it, AND the verifier re-derived neither the membership nor the order — three gaps. Fix (operator chose SAMPLE/GATE, never drive): the verifier now re-derives both (a wrong-side figure goes amber), the sampler/“show another” gate on the order, and the app/`run()` auto-advance to the first configuration where BOTH extensions reach the far side. C is a free DOF — sampled to a satisfying placement, never driven across the E=B tangent degeneracy.',
+    steps: [
+      'שני מעגלים נחתכים בנקודות A ו B',
+      'נקודה C על מעגל P',
+      'המשך CA חותך את מעגל O בנקודה D',
+      'המשך CB חותך את מעגל O בנקודה E',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E');
+      // D, E land ON circle O (relative to A, which is on it).
+      const rO = dist(O, A);
+      expect(dist(O, D), 'D on circle O').toBeCloseTo(rO, 3);
+      expect(dist(O, E), 'E on circle O').toBeCloseTo(rO, 3);
+      // The directional givens: D beyond A (order C→A→D) and E beyond B (order C→B→E) — the reported bug.
+      const beyond = (a: Vec, b: Vec, id: Vec) => (id.x - b.x) * (b.x - a.x) + (id.y - b.y) * (b.y - a.y) > 0;
+      expect(beyond(C, A, D), 'D is beyond A (המשך CA)').toBe(true);
+      expect(beyond(C, B, E), 'E is beyond B (המשך CB)').toBe(true);
+      // Neither derived point collapsed onto the shared crossing it extends through.
+      expect(dist(D, A), 'D ≠ A').toBeGreaterThan(0.5);
+      expect(dist(E, B), 'E ≠ B').toBeGreaterThan(0.5);
+    },
+  },
   {
     id: 'constrained-inscribed-quad-stays-convex',
     title: '"מרובע BCED חסום במעגל" + external A=BD∩CE + AE=2CE + AD=CE — the constrained cyclic quad draws CONVEX, not crossed',
@@ -886,6 +963,11 @@ const SCENARIOS: Scenario[] = [
       };
       expect(coll(C, A, E), 'C, A, E collinear (secant through A)').toBeLessThan(1e-3);
       expect(coll(D, B, F), 'D, B, F collinear (secant through B)').toBeLessThan(1e-3);
+      // DIRECTIONAL order (ADR-098): "המשך CA" puts E BEYOND A (order C→A→E), "המשך DB" puts F beyond B —
+      // not on the near side between the apex and the shared point (the latent wrong-side this fix catches).
+      const beyond = (a: Vec, b: Vec, id: Vec) => (id.x - b.x) * (b.x - a.x) + (id.y - b.y) * (b.y - a.y) > 0;
+      expect(beyond(C, A, E), 'E is beyond A (המשך CA)').toBe(true);
+      expect(beyond(D, B, F), 'F is beyond B (המשך DB)').toBe(true);
       // none of the derived points collapsed onto the shared crossings
       expect(dist(D, A), 'D ≠ A').toBeGreaterThan(0.5);
       expect(dist(C, B), 'C ≠ B').toBeGreaterThan(0.5);
@@ -1624,6 +1706,34 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       expect(evaluate(after.construction).ok, `press ${press + 1} (seed ${seed})`).toBe(true);
       expect(dist(at(after, 'A'), at(after, 'B')), `press ${press + 1}`).toBeGreaterThan(0.1); // A,B stay distinct
     }
+    st.clear();
+  });
+
+  it('[free-on-circle-extensions-auto-advance] the store auto-advances the seed so both "המשך" extensions reach the far side', () => {
+    // The operator's exact sequence (session n19qmb3t) through the REAL store path (execute), which the
+    // run()/replay scenario above can't exercise: C is a FREE point on circle P, so at the default seed
+    // its placement can leave "המשך CB" with no crossing beyond B (E lands between C and B). The store's
+    // execute now AUTO-ADVANCES the seed to the first configuration where BOTH extensions reach the far
+    // side cleanly — the student sees a valid default, never the wrong-side figure (ADR-098).
+    const st = useGeoStore.getState();
+    st.clear();
+    const steps = [
+      'שני מעגלים נחתכים בנקודות A ו B',
+      'נקודה C על מעגל P',
+      'המשך CA חותך את מעגל O בנקודה D',
+      'המשך CB חותך את מעגל O בנקודה E',
+    ];
+    for (const u of steps) {
+      const r = parse(u, ctxOf(useGeoStore.getState().facts));
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return;
+      for (const cmd of r.commands) st.execute(cmd, u);
+    }
+    const fig = replay(useGeoStore.getState().facts, useGeoStore.getState().seed);
+    expect(fig.violations, `givens not satisfied: ${JSON.stringify(fig.violations.map((v) => v.message))}`).toEqual([]);
+    const beyond = (a: Vec, b: Vec, id: Vec) => (id.x - b.x) * (b.x - a.x) + (id.y - b.y) * (b.y - a.y) > 0;
+    expect(beyond(at(fig, 'C'), at(fig, 'A'), at(fig, 'D')), 'D beyond A (המשך CA)').toBe(true);
+    expect(beyond(at(fig, 'C'), at(fig, 'B'), at(fig, 'E')), 'E beyond B (המשך CB)').toBe(true);
     st.clear();
   });
 
