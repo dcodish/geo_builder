@@ -69,6 +69,49 @@ describe('parse — an EXISTING line declared tangent is a constraint, not a dra
   });
 });
 
+/**
+ * "KB tangent at K" — the tangent's touch point K is also an ENDPOINT of the named segment KB (the
+ * segment IS the tangent, touching at its end). The greedy `tangentFromExternal` used to misread this as
+ * a tangent FROM external point B, inventing a NEW touch point (a Thales circle∩circle) and ignoring K
+ * entirely — so KB was never made tangent. Now it routes to a tangency relation: K on the circle + radius
+ * O–K ⟂ KB, and the figure flexes to make it a real tangent. ADR-081.
+ */
+describe('parse — a segment tangent at its OWN endpoint (KB tangent at K)', () => {
+  const ctx = { circles: ['O'], points: ['B', 'K', 'C', 'D', 'O'], circleMembers: [{ center: 'O', points: ['C', 'D'] }] };
+
+  it('emits point-on-circle K + set-perpendicular(O,K,K,B), NOT a tangent-from-external (no invented touch)', () => {
+    for (const u of ['KB משיק למעגל O בנקודה K', 'KB tangent to circle O at K', 'הצלע KB משיקה למעגל בנקודה K']) {
+      const r = parse(u, ctx);
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) continue;
+      expect(r.commands, u).toEqual([
+        { type: 'point-on-circle', id: 'K', circle: 'circle-O' },
+        { type: 'set-perpendicular', a: 'O', b: 'K', c: 'K', d: 'B' },
+      ]);
+      // none of the tangent-from-external scaffolding (the invented touch point / Thales circle)
+      expect(r.commands.some((c) => c.type === 'circle-circle-intersection' || c.type === 'circle-through'), u).toBe(false);
+    }
+  });
+
+  it('builds a real tangent: K lands on the circle and OK ⟂ KB', () => {
+    s().clear();
+    s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true }, 'circle O');
+    s().execute({ type: 'point-on-circle', id: 'K', circle: 'circle-O' }, 'K on O');
+    s().execute({ type: 'free-point', id: 'B', x: 12, y: 0, free: true }, 'B');
+    s().execute({ type: 'segment', a: 'K', b: 'B' }, 'KB');
+    const r = parse('KB משיק למעגל O בנקודה K', { circles: ['O'], points: ['B', 'K', 'O'] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    r.commands.forEach((c) => s().execute(c, 'KB tangent at K'));
+    const p = pos();
+    const O = p.get('O')!, K = p.get('K')!, B = p.get('B')!;
+    expect(dist(O, K)).toBeCloseTo(5, 3); // K is on the circle
+    const OK = { x: K.x - O.x, y: K.y - O.y }, KB = { x: B.x - K.x, y: B.y - K.y };
+    expect(dot(OK, KB) / (Math.hypot(OK.x, OK.y) * Math.hypot(KB.x, KB.y))).toBeCloseTo(0, 4); // OK ⟂ KB → tangent
+    expect(replay(s().facts).violations).toEqual([]); // verified
+  });
+});
+
 describe('engine — C and D land on the tangent, symmetric about T', () => {
   beforeEach(() => {
     s().execute({ type: 'circle', id: 'circle-M', center: 'M', radius: 5 }, 'circle M');

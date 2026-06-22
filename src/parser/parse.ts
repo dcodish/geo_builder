@@ -1757,6 +1757,11 @@ const tangentFromExternal: Rule = (s, ctx) => {
   const labels = (s.match(/[A-Z]\d*/g) ?? []).filter((l) => l !== center); // uppercase tokens = point labels
   const atM = s.match(/(?:\bat\b|בנקודה)\s*([A-Za-z]\d*)/i); // "at D" / "בנקודה D" → the touch point (NOT the apex)
   const atPoint = atM ? up(atM[1]) : null;
+  // "tangent AT an EXISTING point" — e.g. "KB tangent at K", K already placed — is NOT a tangent FROM an
+  // external apex: its touch point is GIVEN, which this Thales construction can't honour (it computes its
+  // own touch and would invent a new point, ignoring K). Defer to `tangentLine`, which reads the named
+  // segment KB as tangent at its endpoint K (put K on the circle + radius O–K ⟂ KB).
+  if (atPoint && have.has(atPoint)) return null;
   // The apex is the EXISTING external point — explicit "from E" / "מנקודה E" wins; else the single
   // existing point that isn't introduced as the touch ("at …"). If none exists, defer (it's a
   // tangent AT a point on the circle, or needs the LLM).
@@ -1815,6 +1820,18 @@ const tangentLine: Rule = (s, ctx) => {
   // point not yet on the circle is a follow-up.
   if (naming && have.has(naming[0]) && have.has(naming[1]) && have.has(T)) {
     return [{ type: 'set-perpendicular', a: up(center), b: T, c: naming[0], d: naming[1] }];
+  }
+
+  // An EXISTING segment tangent at its OWN ENDPOINT — "KB משיק … בנקודה K", where the named line's two
+  // labels INCLUDE the touch point T as an endpoint (vs ADR-075's separate touch F on line CD). The segment
+  // IS the tangent, touching at its end: put T ON the circle and constrain the radius O–T ⟂ the segment, so
+  // the figure flexes to make KB tangent at K (verified: |OK| = radius, OK ⟂ KB). Without this the greedy
+  // `tangentFromExternal` misread "KB at K" as a tangent FROM B to an invented point, ignoring K (ADR-081).
+  if (pts && have.has(pts[0]) && have.has(pts[1]) && (pts[0] === T || pts[1] === T)) {
+    return [
+      { type: 'point-on-circle', id: T, circle: circleId(center) }, // the touch point lies on the circle
+      { type: 'set-perpendicular', a: up(center), b: T, c: pts[0], d: pts[1] }, // radius O–T ⟂ the tangent segment
+    ];
   }
 
   // Otherwise a DRAWN tangent line. If it is *named* by point labels ("הישר CD משיק…" /
