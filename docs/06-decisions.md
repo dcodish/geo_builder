@@ -1318,3 +1318,79 @@ The rule fires **only for an EXISTING circle** (named, a bare centre-letter that
 **Why "new" and "unconsumed".** A typo'd keyword that drops a clause leaves the label it introduced **orphaned** — it appears in the text but in no command. Requiring the label to be **NEW** avoids a false escalation when a command merely doesn't re-reference an **existing** point (e.g. a tangent at an already-placed point — that label is context, not dropped). Validated across 12 real per-step sequences: **zero false positives**; the typo flags `["D"]`, the correctly-spelled twin flags `[]`.
 
 **Result.** "מנוקדה D …" no longer commits a tangent-without-D; it escalates to the LLM (which normalises the typo and emits the full tangent + apex). The grammar stays strict (no fuzzy keyword matching — that long tail is the LLM's job). **1232 tests green, build clean.** Locked by `dropped-labels.test.ts` (the operator's exact typo flags D; the correct spelling and existing-label/​id-embedded cases flag nothing). The end-to-end LLM recovery is exercised in the app (the fallback is mocked in tests, per the no-autonomous-API rule).
+
+## ADR-090 — a circle DEFINED BY its diameter AB (centre = midpoint of AB)
+
+**Status:** Accepted (2026-06-22, operator session).
+
+**Context.** After a triangle ABC, the operator tried 5+ ways to make a circle whose diameter is AB and **none worked**: the define phrasings ("AB קוטר של מעגל", "מעגל שבו AB קוטר", "circle with diameter AB") were **not-handled** (→ LLM, nothing), and "AB קוטר של מעגל O" **misrouted** to the `diameter` rule — which adds a diameter to an EXISTING circle by making one endpoint a free on-circle point and the other its antipode. With A,B already existing (triangle vertices) that re-creation **errored** ("…no longer available"). There was no construct for a circle *defined by* its diameter (the inverse of `diameter`).
+
+**Decision.** Add a `circleOnDiameter` rule for the **define** phrasings — "of/with/whose diameter", He+En ("של מעגל" / "שקוטרו" / "מעגל שבו … קוטר" / "circle with diameter" / "is the diameter of"). It emits **segment AB → midpoint(centre) → circle-through(centre, A)**: the centre is the **midpoint of AB**, the radius is |AB|/2, and A,B are the diameter's endpoints (B on the circle by the midpoint relation). The segment both **creates A,B if new** (`midpoint` needs them) and draws the diameter. Works whether A,B are new or pre-existing; the centre is the named circle ("circle O" → O is the centre/midpoint) or auto.
+
+**Distinguishing define from add.** The discriminator is the **phrasing**, not whether the circle exists: a positive define marker (of/with/whose-diameter) is required, so the **add** phrasing "diameter DE **in** circle O" / "קוטר DE **במעגל** O" (and the cyclic-quad "AD קוטר במעגל ABCD") is left to `diameter`. Runs before `diameter` and `circle`.
+
+**Result.** All five define phrasings build a circle with AB as a true diameter (|OA|=|OB|, centre at the midpoint), He+En, new or existing A,B — including the operator's exact "triangle ABC → AB קוטר של מעגל O". The add-a-diameter path and the Q6 / adr028 / bagrut-4d diameter tests are unchanged. **1235 tests green, build clean.** Locked by `circle-on-diameter.test.ts` (define phrasings → segment/midpoint/circle-through; add phrasing → diameter) and the `circle-defined-by-its-diameter` scenario. Diagnosed from `logs/debug-log.jsonl`.
+
+## ADR-091 — midpoint creates its endpoints; a circle defined by centre/radius + diameter
+
+**Status:** Accepted (2026-06-22, operator session).
+
+**Context.** Two failures the operator hit, both **standard constructs that escalated to the LLM (which built nothing)** when they should be handled deterministically:
+1. "B אמצע הקטע AC" on an empty figure → `midpoint` → **"unresolved dependencies for: B"**. `midpoint` (unlike `segment`) did not create its endpoints, so with A,C absent there was nothing to bisect.
+2. "AB קוטר במעגל שמרכזו O ורדיוסו R" (AB is a diameter in a circle whose centre is O, radius R) → routed to `diameter` (the "במעגל" = *in* a circle) → **"'B' is already defined"** (it tried to make the existing B an antipode), although the circle was being **defined** by its centre/radius.
+
+These reinforce the [N1 calibration point](PROJECT-MEMORY.md): the LLM cannot rescue a STRUCTURAL gap (it would emit the same midpoint and hit the same wall), and core constructs should not depend on it anyway. The LLM *was* reached in both cases (the log shows `src:llm`) and built nothing.
+
+**Decision.**
+1. **`midpoint` creates its endpoints when new.** "B is the midpoint of segment AC" implies the segment AC: when an endpoint is not already in the figure, `midpoint` prepends an (idempotent) `segment` that creates + draws AC; when both endpoints exist it emits just the midpoint (unchanged — no surprise segment on existing figures).
+2. **`circleOnDiameter`'s define-markers ([ADR-090](#adr-090)) now include a centre/radius specification** (שמרכזו / ורדיוסו / centered / radius). You describe a circle's centre/radius when **defining** it, so "AB קוטר **במעגל שמרכזו O ורדיוסו R**" is a define (centre O = midpoint of AB), not an add — while plain "diameter X **in** circle O" (no centre/radius clause) still routes to `diameter`. The label extraction strips the centre/radius clause so only the diameter's endpoints feed `labelRun`.
+
+**Result.** "B אמצע הקטע AC" builds B at the midpoint of a freshly-created AC; "AB קוטר במעגל שמרכזו O ורדיוסו R" builds a circle centred at the midpoint of AB (|OA|=|OB|), no "already defined" error. The add-a-diameter path (incl. the cyclic-quad "AD קוטר במעגל ABCD") is unchanged. **1235 tests green, build clean.** Locked by the `midpoint-creates-its-endpoints` and `diameter-in-a-circle-defined-by-centre-radius` scenarios + the extended `circle-on-diameter.test.ts`. Diagnosed from `logs/debug-log.jsonl`.
+
+## ADR-092 — "AB קוטר במעגל O" / bare "AB קוטר": a GIVEN diameter defines the circle
+
+**Status:** Accepted (2026-06-22, operator session).
+
+**Context.** Continuing [ADR-090](#adr-090)/[ADR-091](#adr-091): after "B אמצע צלע AC" (so A,B exist), the operator typed **"AB קוטר במעגל O"** and it ERRORED **"'B' is already defined"** — the "במעגל" (in a circle) routed it to `diameter` (add-to-existing, which makes B an antipode), but circle O didn't exist and A,B were GIVEN points. Bare **"AB קוטר"** was not-handled. The earlier define-marker discriminator (of/with/centre/radius) didn't cover the plain "in circle O" / bare phrasing.
+
+**Decision.** The real discriminator is **whether there's an existing circle to attach the diameter to**, not just the phrasing. `circleOnDiameter` now also fires for a **GIVEN diameter**: both endpoints already exist AND the referenced circle is missing (a named circle that doesn't exist, or no circle at all) — then "AB קוטר [במעגל O]" means "make a circle with diameter AB" (centre = midpoint AB). The circle keyword is no longer required in this given-diameter case (bare "AB קוטר" works). Three guards keep the add-path intact: a named-and-existing circle returns early (→ `diameter`); a cyclic "AD קוטר במעגל ABCD" (circle exists, ctx.circles non-empty) stays `diameter`; and "diameter DE in circle O" with NEW endpoints (endpointsExist=false) stays `diameter`.
+
+**Result.** "AB קוטר במעגל O" and bare "AB קוטר" (with A,B placed) define a circle with AB as diameter (|OA|=|OB|, centre at the midpoint); the cyclic add-a-diameter and the new-points "diameter DE in circle O" paths are unchanged. **1237 tests green, build clean.** Locked by the `given-diameter-defines-circle` scenario + the extended `circle-on-diameter.test.ts` (given-diameter block). Diagnosed from `logs/debug-log.jsonl`. (Reinforces the recurring lesson: a STANDARD construct that escalates to the LLM and "builds nothing" is a parser gap to close, not the LLM's job.)
+
+## ADR-093 — a circle's through-point counts as ON the circle (no tangent-at-the-through-point cycle)
+
+**Status:** Accepted (2026-06-22, operator session).
+
+**Context.** Figure: B = midpoint of AC; "AB קוטר" → circle O with diameter AB, built as `circle-through(O, A)` so **A is the through-point that defines O's radius**; a tangent from E at D; C on the extension of ED; then **"EA משיק למעגל בנקודה A"** (EA tangent at A). It ERRORED **"unresolved dependencies for: A, B, O, …, circle-O, …"** (then the LLM built nothing). The operator correctly noted this is **not a new construct** — it is the existing tangent-at-a-point ([ADR-081](#adr-081)).
+
+**Root cause.** The tangent-at-an-endpoint path emits `point-on-circle A` + `set-perpendicular(O, A, E, A)`. `pointOnCircle` recognised on-circle/antipode/arc-midpoint/line-circle/circle-circle/circumcentre members but **not a `circle-through` point** — even though that point lies on the circle by construction. So the idempotent case (a) was missed, and the apply fell to case (c2), which **converted A into an on-circle point**. But A also *defines* the circle's radius (`radius.via='through', point=A`), so A now depended on circle-O and circle-O on A → a **dependency cycle** → "unresolved dependencies".
+
+**Decision.** `pointOnCircle` now returns true when `id` is the circle's through-point (`radius.via === 'through' && radius.point === id`). A through-point IS on its circle, so "P on circle" for that point becomes the **idempotent no-op** (case a) instead of a re-definition — no cycle. Only the tangency constraint (OA ⟂ EA) is then added, flexing the figure to a real tangent at A.
+
+**Result.** The operator's exact sequence builds; OA ⟂ EA holds (true tangent at A). General fix (any tangent/relation naming a circle's through-point), correct everywhere `pointOnCircle` is used (it's a true predicate now). **1239 tests green, build clean** (no regressions — case (c) grow-to-a-different-point and (c2) free-vertex-slide are unaffected; through-point is caught earlier). Locked by the `tangent-at-a-diameter-endpoint-no-cycle` scenario. Diagnosed from `logs/debug-log.jsonl`.
+
+## ADR-094 — two tangents from an external point when a touch point already exists
+
+**Status:** Accepted (2026-06-22, operator session).
+
+**Context.** Figure: B=mid AC; "AB קוטר" → circle O with A a diameter endpoint already ON it; then **"מנקודה E יוצאים משיקים למעגל בנקודות A ו D"** (from E, two tangents touching at A and D) → ERRORED **"'A' is already defined"** → LLM built nothing. `tangentsFromExternal` builds the two touch points with a Thales **circle∩circle** (`circle-circle-intersection id:A`, `id:D`), which RE-CREATES A — conflicting with the existing A. The single-tangent case already deferred for an existing touch ([ADR-081](#adr-081)) and the through-point cycle was fixed ([ADR-093](#adr-093)), but the **two-tangent** rule had neither.
+
+**Decision.** When EITHER named touch point already exists, `tangentsFromExternal` falls back to the tangency-**constraint** form (the two-tangent generalisation of ADR-081/093): for each touch P, emit `point-on-circle P` (idempotent if P is already on the circle — ADR-093 — or created with a free θ if new) + `set-perpendicular(O, P, E, P)` (EP ⟂ OP) + segment E–P. The figure then flexes so both EA and ED are real tangents from E, distinct (different seeds/solver branches), both on the circle. When BOTH touch points are new, the proven deterministic **Thales** construction is unchanged.
+
+**Result.** "two tangents from E at A and D" (A an existing diameter endpoint, D new) builds: OA ⟂ AE and OD ⟂ DE (both tangent), A ≠ D, both on the circle. The all-new two-tangent path (FR-EN-18) is unchanged. **1240 tests green, build clean.** Locked by the `two-tangents-one-touch-already-exists` scenario.
+
+**Process note (operator feedback).** Verified through a harness that mirrors **`App.submit`** exactly — `parseCtx` → the dropped-label gate → `dryRunOutcome` → `execute` through the store — not just the `parse → replay` path. A `parse → replay` test confirms the *engine* builds the commands, but the **app** can still refuse to commit (a `dryRunOutcome` error escalates to the LLM, which builds nothing → "doesn't build"). The app-path harness reproduces that exactly, so a fix is only called done when the operator's verbatim utterance **commits** through it.
+
+## ADR-095 — a constraint on a secant crossing can drive the free DOFs upstream of it
+
+**Status:** Accepted (2026-06-22, operator session).
+
+**Context.** A tangent/secant figure — circle O, external B, tangent BC, secant B→A→E (A,E on the circle), chord CD ∥ EA, K = ED∩AC, |AK|=3, |ED|=7 — then **"∠CAE = 45"** → **"over-constrained: ∠CAE = 45° cannot hold"** (→ LLM, nothing). The operator's question: what's wrong with the angle. A scan proved it is **NOT** genuinely over-determined: the figure has free DOFs (the external point B, the free radius), and ∠CAE ranges ~2°–143° across them — **45° is reachable**.
+
+**Root cause.** ∠CAE references C, A, E — all derived (C a tangent point, A a secant crossing) or already consumed (E). `driveOrCheck` finds no directly-referenced free carrier → pushes it as a check → over-constraint. The failure-path `recruitFreeDofs` should then drive the *upstream* free DOFs (B, radius) — but the ancestor walker `ancestors`/`pointParents` had **no case for `line-circle` (or `circle-circle`) points**: they hit `pointParents`'s `default → []` and the walk **dead-ended**, so `freeDrivableAncestors` returned `[]` and recruit found nothing (verified by instrumenting: `cand = []`).
+
+**Decision.** In the `ancestors` walk's `drivable` mode, traverse a **secant crossing** (`line-circle`) through its **line** (→ the line's points → the external apex B). A `circle-circle` crossing is deliberately **not** traversed: its Thales-aux chain reaches too many DOFs and **over-recruits** (it broke the [ADR-093](#adr-093) collinear step in testing) — and the secant path already reaches the apex, so the angle is satisfiable without it.
+
+**Result.** "∠CAE = 45" now builds: the angle comes out 45.00°, with |AK|=3, |ED|=7, CD∥EA all intact — the solver drives B (recruited via the secant) to the reachable 45° configuration. **1242 tests green, build clean** (the over-recruiting circle∩circle variant was caught by the ADR-093 regression and dropped). Locked by `recruit-through-secant.test.ts`.
+
+**Process note.** This was validated the right way after the operator's "test it yourself" feedback: (1) a scan proved 45° reachable (so it's a solver gap, not a true over-constraint); (2) instrumenting `recruitFreeDofs` showed `cand=[]` (the walk dead-ended) — pinpointing the cause; (3) the first fix (also traversing circle∩circle) was REJECTED by the full suite (ADR-093 regression), and narrowed to secant-only. A green unit test plus the full suite — not a claim — is the bar.

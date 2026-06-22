@@ -324,6 +324,16 @@ function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', 
         }
       }
       if (o.kind === 'line') { queue.push(...lineSpecPoints(o.spec)); continue; }
+      // Traverse a SECANT crossing (line∩circle) to the DOFs behind it — its line's points — so a constraint
+      // on such a derived point can reach the free apex upstream (ADR-095): e.g. "∠CAE = 45" on the secant
+      // point A (= line BE ∩ circle) must reach the external point B to be driven; without this the walk
+      // dead-ended (pointParents has no case for it) and the angle falsely over-constrained. (A circle∩circle
+      // crossing is deliberately NOT traversed: its Thales-aux chain reaches too many DOFs and over-recruits,
+      // breaking sibling constraints — the secant path already reaches the apex.)
+      if (o.kind === 'line-circle') {
+        queue.push(o.line);
+        continue;
+      }
     }
     if (!isGeoPoint(o)) continue;
     const free1 = isParamCarrier(o) && avail(o);

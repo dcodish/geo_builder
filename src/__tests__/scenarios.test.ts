@@ -100,6 +100,91 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'two-tangents-one-touch-already-exists',
+    title: '"two tangents from E at A and D" where A is an existing on-circle point (a diameter endpoint)',
+    guards:
+      "operator session: B mid AC, \"AB קוטר\" (circle O, A a diameter endpoint on it), then \"מנקודה E יוצאים משיקים למעגל בנקודות A ו D\" → ERRORED \"'A' is already defined\" → LLM built nothing. `tangentsFromExternal` builds the two touch points via a Thales circle∩circle, which RE-CREATES A — conflicting with the existing A (ADR-094). Fix: when EITHER touch point already exists, fall back to the tangency-CONSTRAINT form (the two-tangent generalisation of ADR-081/093): each touch P is point-on-circle (idempotent if already on it) + set-perpendicular(O,P,E,P), so both EA and ED are real tangents and the figure flexes. The all-new two-tangent case keeps the Thales construction. Verified through the real App.submit pipeline (parse → gates → execute), not just parse→replay.",
+    steps: ['B אמצע AC', 'AB קוטר', 'מנקודה E יוצאים משיקים למעגל בנקודות A ו D'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), D = at(fig, 'D'), E = at(fig, 'E');
+      const perp = (X: Vec) => (X.x - O.x) * (E.x - X.x) + (X.y - O.y) * (E.y - X.y);
+      expect(Math.abs(perp(A)), 'EA ⟂ OA (tangent at A)').toBeLessThan(1e-2);
+      expect(Math.abs(perp(D)), 'ED ⟂ OD (tangent at D)').toBeLessThan(1e-2);
+      expect(dist(A, D), 'A and D are distinct touch points').toBeGreaterThan(0.1);
+      expect(dist(O, A), 'A,D both on the circle').toBeCloseTo(dist(O, D), 2);
+    },
+  },
+  {
+    id: 'tangent-at-a-diameter-endpoint-no-cycle',
+    title: '"EA משיק למעגל בנקודה A" where A is a diameter endpoint (the circle\'s through-point) — no dependency cycle',
+    guards:
+      "operator session: B midpoint of AC, then \"AB קוטר\" (circle O with diameter AB, so A is the through-point defining O's radius), a tangent from E at D, C on the extension of ED, then \"EA משיק למעגל בנקודה A\" → ERRORED \"unresolved dependencies for: A,B,O,…,circle-O,…\" and the LLM built nothing. NOT a new construct — it's tangent-at-a-point (ADR-081). Root cause (ADR-093): the rule emits `point-on-circle A`, but A DEFINES circle O's radius (`circle-through` point), and `pointOnCircle` didn't recognise a through-point as on the circle, so the apply converted A to an on-circle point → A→circle-O→A cycle. Fix: `pointOnCircle` now treats a circle's through-point as on it, so `point-on-circle A` is idempotent (A is already on the circle) and only the tangency constraint (OA ⟂ EA) is added.",
+    steps: ['B אמצע AC', 'AB קוטר', 'מנקודה E מעבירים משיק למעגל בנקודה D', 'נקודה C נמצאת על המשך הצלע ED', 'EA משיק למעגל בנקודה A'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), E = at(fig, 'E');
+      const dot = (A.x - O.x) * (E.x - A.x) + (A.y - O.y) * (E.y - A.y);
+      expect(Math.abs(dot), 'OA ⟂ EA (tangent at A)').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'midpoint-creates-its-endpoints',
+    title: '"B אמצע הקטע AC" on an empty figure creates A,C (and the segment) — B is their midpoint',
+    guards:
+      "operator session: \"B אמצע הקטע AC\" on an empty figure ERRORED \"unresolved dependencies for: B\" and escalated to the LLM (which built nothing) — because `midpoint` (unlike `segment`) did not create its endpoints, so with A,C absent the midpoint had nothing to bisect. Root cause (ADR-091): a missing-endpoint gap, not an LLM job — \"B is the midpoint of segment AC\" implies the segment AC. Fix: when an endpoint is NEW, `midpoint` prepends a (idempotent) segment that creates + draws AC; when both exist it emits just the midpoint (unchanged).",
+    steps: ['B אמצע הקטע AC'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(B.x, 'B is the midpoint of AC (x)').toBeCloseTo((A.x + C.x) / 2, 3);
+      expect(B.y, 'B is the midpoint of AC (y)').toBeCloseTo((A.y + C.y) / 2, 3);
+    },
+  },
+  {
+    id: 'given-diameter-defines-circle',
+    title: '"AB קוטר במעגל O" with A,B already placed defines a circle on diameter AB (centre O = midpoint)',
+    guards:
+      "operator session: after \"B אמצע צלע AC\" (so A,B exist), \"AB קוטר במעגל O\" ERRORED \"'B' is already defined\" — the \"במעגל\" (in a circle) routed it to `diameter` (add-to-existing, which makes B an antipode), but the circle O didn't exist and A,B were GIVEN points. Bare \"AB קוטר\" was not-handled. Fix (ADR-092): circleOnDiameter also fires for a GIVEN diameter — both endpoints already exist AND there is no existing circle to attach to — so it defines a circle with AB as its diameter (centre = midpoint of AB), even without a define-marker. The cyclic \"AD קוטר במעגל ABCD\" (circle exists) and \"diameter DE in circle O\" (new points) still route to `diameter`.",
+    steps: ['B אמצע צלע AC', 'AB קוטר במעגל O'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B');
+      expect(dist(O, A), 'A,B equidistant from O (AB a diameter)').toBeCloseTo(dist(O, B), 3);
+      expect(O.x, 'O at midpoint of AB (x)').toBeCloseTo((A.x + B.x) / 2, 3);
+      expect(O.y, 'O at midpoint of AB (y)').toBeCloseTo((A.y + B.y) / 2, 3);
+    },
+  },
+  {
+    id: 'diameter-in-a-circle-defined-by-centre-radius',
+    title: '"AB קוטר במעגל שמרכזו O ורדיוסו R" defines a circle with AB as diameter (centre O = midpoint AB)',
+    guards:
+      "operator session: \"AB קוטר במעגל שמרכזו O ורדיוסו R\" (AB is a diameter in a circle whose centre is O and radius R) ERRORED \"'B' is already defined\" — the \"במעגל\" (in a circle) routed it to `diameter` (add-to-existing, which makes B an antipode) although the circle was being DEFINED by its centre/radius, and A,B already existed. Fix (ADR-091): `circleOnDiameter`'s define-markers now include the centre/radius specification (שמרכזו / ורדיוסו / centered / radius) — you describe a circle's centre/radius when DEFINING it — so it builds a circle centred at the midpoint of AB. Plain \"diameter X in circle O\" (no centre/radius clause) still routes to `diameter`.",
+    steps: ['קטע AB', 'AB קוטר במעגל שמרכזו O ורדיוסו R'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B');
+      expect(dist(O, A), 'A,B equidistant from O (AB a diameter)').toBeCloseTo(dist(O, B), 3);
+      expect(O.x, 'O at midpoint of AB (x)').toBeCloseTo((A.x + B.x) / 2, 3);
+      expect(O.y, 'O at midpoint of AB (y)').toBeCloseTo((A.y + B.y) / 2, 3);
+    },
+  },
+  {
+    id: 'circle-defined-by-its-diameter',
+    title: '"AB קוטר של מעגל O" builds a circle whose diameter is AB (centre = midpoint of AB)',
+    guards:
+      "operator session: after triangle ABC, the operator tried 5+ ways to make a circle with AB as its diameter — \"AB קוטר של מעגל\", \"AB קוטר של מעגל O\", \"מעגל שבו AB קוטר\" — and ALL failed (the unnamed/define phrasings were not-handled; \"AB קוטר של מעגל O\" misrouted to the `diameter` rule which tries to re-create A as an on-circle point and ERRORED because A,B already exist). Root cause (ADR-090): there was no construct for a circle DEFINED BY its diameter — only `diameter` (adds a diameter to an EXISTING circle). Fix: a `circleOnDiameter` rule for the DEFINE phrasings (of/with/whose-diameter, He+En) → segment AB + midpoint(centre) + circle-through, so the centre is the midpoint of AB and A,B are the diameter's endpoints; works whether A,B are new or pre-existing. The add-phrasing \"diameter DE in circle O\" still routes to `diameter`.",
+    steps: ['משולש ABC', 'AB קוטר של מעגל O'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B');
+      // O is the midpoint of AB, and A,B are equidistant from O (AB is a diameter)
+      expect(dist(O, A), 'A on circle').toBeCloseTo(dist(O, B), 3);
+      expect(O.x, 'O at midpoint of AB (x)').toBeCloseTo((A.x + B.x) / 2, 3);
+      expect(O.y, 'O at midpoint of AB (y)').toBeCloseTo((A.y + B.y) / 2, 3);
+    },
+  },
+  {
     id: 'set-circle-radius-by-value-no-segment',
     title: '"radius of circle P is 4" sets an existing circle\'s radius by value — no segment, no invented point',
     guards:

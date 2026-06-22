@@ -353,6 +353,11 @@ function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Ve
 function pointOnCircle(objects: GeoObject[], id: Id, circleId: Id): boolean {
   const circ = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === circleId);
   const center = circ?.center;
+  // The through-point that DEFINES this circle's radius (`circle-through`, e.g. a diameter endpoint or an
+  // incircle's foot) lies ON the circle by construction — so "P on circle" for that very point is already
+  // true. Recognising it makes the apply path idempotent instead of re-adding it as an on-circle point,
+  // which would invert the dependency (P → circle → P) and crash with "unresolved dependencies" (ADR-093).
+  if (circ && circ.radius.via === 'through' && circ.radius.point === id) return true;
   for (const o of objects) {
     if (o.id === id) {
       if (o.kind === 'on-circle' || o.kind === 'antipode' || o.kind === 'arc-midpoint' || o.kind === 'line-circle') return o.circle === circleId;

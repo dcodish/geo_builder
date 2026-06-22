@@ -401,7 +401,7 @@ const foot: Rule = (s) => {
 };
 
 /** "M is the midpoint of AB" / "M אמצע AB" / "C is the midpoint of OB". */
-const midpoint: Rule = (s) => {
+const midpoint: Rule = (s, ctx) => {
   if (!/midpoint|אמצע/i.test(s)) return null;
   // Leading \b so "point M is the midpoint …" reads M, not the "t" of "poin**t**".
   const m = s.match(/\b([A-Za-z]\d*)\b.*?(?:midpoint|אמצע)\s*(.*)/i);
@@ -409,7 +409,15 @@ const midpoint: Rule = (s) => {
   // strip filler ("of"!) and segment/radius words so they aren't read as labels.
   const rest = m[2].replace(FILLER, ' ').replace(/radius|רדיוס\S*|segment|קטע/gi, ' ');
   const seg = labelRun(rest, 2);
-  return seg ? [{ type: 'midpoint', id: up(m[1]), a: seg[0], b: seg[1] }] : null;
+  if (!seg) return null;
+  // "B is the midpoint of segment AC" implies the segment AC. If an endpoint is NEW, draw the segment first
+  // (idempotent; it also CREATES the endpoints, which `midpoint` needs — else "unresolved dependencies"
+  // when A,C don't exist yet, ADR-091). When both already exist, emit just the midpoint (no extra segment).
+  const have = new Set(ctx.points ?? []);
+  const out: AnyCommand[] = [];
+  if (!have.has(seg[0]) || !have.has(seg[1])) out.push({ type: 'segment', a: seg[0], b: seg[1] });
+  out.push({ type: 'midpoint', id: up(m[1]), a: seg[0], b: seg[1] });
+  return out;
 };
 
 /** "F on the extension of AD" / "F על המשך AD" — a point on the ray beyond the far end (t > 1). */
@@ -1263,6 +1271,50 @@ const chord: Rule = (s, ctx) => {
   ];
 };
 
+/**
+ * A circle DEFINED BY its diameter AB (Thales circle) — "circle with diameter AB" / "AB is the diameter of
+ * circle O" / "מעגל שקוטרו AB" / "AB קוטר של מעגל [O]" / "מעגל שבו AB קוטר" (ADR-090). The circle's centre is
+ * the MIDPOINT of AB and its radius is |AB|/2, so A and B are the diameter's endpoints (on the circle). This
+ * is the INVERSE of `diameter` (which adds a diameter to an EXISTING circle): here the circle is created from
+ * AB. Fires only when the circle does NOT already exist (a named-and-existing circle → `diameter` adds to it).
+ * Built from primitives: midpoint = centre, then circle-through that centre and A (radius |centre·A|; B is on
+ * it by the midpoint relation). Works whether A,B are new (created by `midpoint`) or pre-existing.
+ */
+const circleOnDiameter: Rule = (s, ctx) => {
+  if (!/diameter|קוטר/i.test(s)) return null;
+  const named = circleCenter(s);
+  const circles = ctx.circles ?? [];
+  if (named && circles.some((c) => up(c) === up(named))) return null; // the named circle EXISTS → `diameter` adds to it
+  // The diameter's two endpoints. Strip keywords AND the centre/radius CLAUSE ("שמרכזו O", "ורדיוסו R",
+  // "centered at O", "radius R") + the named centre label, so only the endpoints remain for labelRun (not O/R).
+  let body = dropCircleRef(s).replace(
+    /diameter|קוטר\S*|circles?|מעגל|\bwith\b|\bof\b|\bthe\b|\ba\b|\bis\b|\bas\b|של|שבו|שקוטר\S*|שמרכז\S*|מרכז\S*|ורדיוס\S*|רדיוס\S*|cent(?:er|re)\w*|\bradius\b|\band\b|בו|הוא|היא/gi,
+    ' ',
+  );
+  if (named) body = body.replace(new RegExp(String.raw`\b${named}\b`, 'g'), ' '); // drop the centre label
+  const ids = labelRun(body, 2);
+  if (!ids) return null;
+  // Fire to DEFINE a circle from AB in two situations (the INVERSE of `diameter`, which adds a diameter to an
+  // EXISTING circle): (1) an explicit DEFINE phrasing — "of/with/whose diameter", or a centre/radius spec
+  // ("שמרכזו O ורדיוסו R" / "centered … radius"), which you give when defining a circle; OR (2) a GIVEN
+  // diameter — both endpoints already exist AND there is no existing circle this phrase attaches to, so
+  // "AB קוטר [במעגל O]" with A,B placed means "make a circle with diameter AB". Plain "diameter DE in circle O"
+  // (D,E new, or an existing circle) stays with `diameter`.
+  const DEFINE = /של\s*ה?מעגל|שקוטר|מעגל\s+שבו|שמרכז|רדיוסו|circle\s+with\b|with\s+(?:a\s+|the\s+)?diameter|diameter\s+of|is\s+(?:a\s+|the\s+)?diameter|cent(?:er|re)d|radius/i;
+  const endpointsExist = ids.every((p) => (ctx.points ?? []).some((q) => up(q) === up(p)));
+  const referencedCircleMissing = named ? true : circles.length === 0; // (a named-and-existing circle already returned above)
+  const givenDiameter = endpointsExist && referencedCircleMissing;
+  if (!DEFINE.test(s) && !givenDiameter) return null;
+  if (!/circle|מעגל/i.test(s) && !givenDiameter) return null; // need a circle word, unless it's a clear given diameter ("AB קוטר")
+  const centre = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...circles], ['O', 'P', 'M', 'Q', 'K']);
+  const auto = !named;
+  return [
+    { type: 'segment', a: ids[0], b: ids[1] }, // the diameter AB (idempotent; creates A,B if they're new — `midpoint` needs them)
+    { type: 'midpoint', id: up(centre), a: ids[0], b: ids[1] }, // the centre is the midpoint of the diameter
+    { type: 'circle-through', id: circleId(centre), center: up(centre), through: ids[0], ...(auto ? { autoCenter: true } : {}) }, // radius |centre·A|; B is on it
+  ];
+};
+
 /** "diameter DE in circle O" / "קוטר DE במעגל O" — a point on the circle + its antipode + the segment. */
 const diameter: Rule = (s, ctx) => {
   if (!/diameter|קוטר/i.test(s)) return null;
@@ -1793,14 +1845,32 @@ const tangentsFromExternal: Rule = (s, ctx) => {
   const E = up(eM[1]), A = up(abM[1]), B = up(abM[2]);
   if (new Set([E, A, B]).size !== 3) return null;
   const circ = circleId(center);
-  const mid = `~tanmid-${center}${E}`; // hidden centre of the Thales circle on O-E (scaffolding; "~" → not drawn)
-  const aux = `tanaux-${center}${E}`;
   const out: AnyCommand[] = [];
   // The external apex, if new. Seeded CLOSE to the default circle (~1.2× its radius, like a textbook
   // tangent sketch) rather than far out: a far apex puts directional follow-ups like "המשך BD חותך את
   // המשך OC" in the wrong basin (the extensions then cross on the far side), and a close apex also gives
-  // wider, more textbook-like tangents. D stays a free DOF the solver/sampler can still move.
-  if (!ctx.points?.includes(E)) out.push({ type: 'free-point', id: E, x: 6, y: 0, free: true }); // a FREE DOF (ADR-052), not pinned — a constraint can drive it / the sampler can move it
+  // wider, more textbook-like tangents. The touch points stay free DOFs the solver/sampler can still move.
+  if (!ctx.points?.includes(E)) out.push({ type: 'free-point', id: E, x: 6, y: 0, free: true }); // a FREE DOF (ADR-052)
+
+  // If EITHER touch point ALREADY EXISTS (e.g. A is a diameter endpoint already on the circle), the Thales
+  // circle∩circle construction can't be used — it would RE-CREATE that point ("'A' is already defined",
+  // ADR-094). Fall back to the tangency-CONSTRAINT form (the two-tangent generalisation of ADR-081/093):
+  // each touch P is on the circle with EP ⟂ OP, the figure flexing so both are real tangents from E.
+  if ([A, B].some((p) => ctx.points?.includes(p))) {
+    for (const P of [A, B]) {
+      out.push(
+        { type: 'point-on-circle', id: P, circle: circ }, // idempotent if P already on the circle (ADR-093); creates it (free θ) if new
+        { type: 'set-perpendicular', a: up(center), b: P, c: E, d: P }, // EP ⟂ OP — tangent at P
+        { type: 'segment', a: E, b: P },
+      );
+    }
+    return out;
+  }
+
+  // Both touch points NEW → the deterministic Thales construction (the two touch points lie on the circle
+  // with diameter OE; ∠OPE = 90°), taking both branches for the two distinct tangents.
+  const mid = `~tanmid-${center}${E}`; // hidden centre of the Thales circle on O-E (scaffolding; "~" → not drawn)
+  const aux = `tanaux-${center}${E}`;
   out.push(
     { type: 'midpoint', id: mid, a: center, b: E },
     { type: 'circle-through', id: aux, center: mid, through: center, hidden: true }, // circle on diameter OE (hidden)
@@ -2419,6 +2489,7 @@ const RULES: Rule[] = [
   chainedEquality, // "AB = AC = 3x" — split a chain before any rule grabs a single clause
   arcMidpoint, // circle constructs (own keywords) before the generic point rules
   midpoint, // "C אמצע מיתר AB" — a NAMED midpoint, before `chord` grabs "מיתר AB" and drops C (after arcMidpoint)
+  circleOnDiameter, // "circle with diameter AB" / "AB קוטר של מעגל" — a circle DEFINED by its diameter (centre = midpoint AB); before `diameter` (add-to-existing) and `circle`
   diameter,
   chord,
   circumcircle, // "circle through A B C" — before the centre-based `circle`
