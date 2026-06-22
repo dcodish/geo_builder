@@ -130,16 +130,23 @@ describe('applySeed', () => {
     ]);
     expect(freeDofs(construction)).toEqual(['P']); // the marker is the figure's lone free DOF
     const xs = new Set<number>();
-    for (let seed = 1; seed < 8; seed++) {
+    let sawPos = false;
+    let sawNeg = false;
+    for (let seed = 1; seed < 12; seed++) {
       const e = evaluate(applySeed(construction, seed));
       if (e.ok) {
         const P = e.positions.get('P')!;
         expect(P.y).toBeCloseTo(0, 9); // stays ON the line (y = 0 for the x-axis line AB)
-        expect(P.x).toBeGreaterThan(0); // sign of the offset is preserved (same side of the anchor)
+        expect(Math.abs(P.x)).toBeGreaterThan(1e-6); // never collapses onto the anchor
+        if (P.x > 0) sawPos = true;
+        else sawNeg = true;
         xs.add(Math.round(P.x * 1000));
       }
     }
     expect(xs.size).toBeGreaterThan(1); // genuinely different positions → "show another configuration" varies it
+    // ADR-085: a LONE marker's side is not fixed — it samples to BOTH sides of the anchor (a fixed side
+    // would be a fixed assumption, ADR-052). A ±pair, by contrast, keeps its relative signs (tested elsewhere).
+    expect(sawPos && sawNeg).toBe(true);
     // …and a sampled position differs from the canonical (seed-0) default.
     const def = positions.get('P')!;
     expect([...xs].some((x) => Math.abs(x / 1000 - def.x) > 1e-6)).toBe(true);

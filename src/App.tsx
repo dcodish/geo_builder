@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { circleMembers, firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, droppedNewLabels } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -46,6 +46,8 @@ export default function App() {
   const segStyle = useGeoStore((s) => s.segStyle);
   const toggleSegHidden = useGeoStore((s) => s.toggleSegHidden);
   const toggleSegDashed = useGeoStore((s) => s.toggleSegDashed);
+  const hiddenCircles = useGeoStore((s) => s.hiddenCircles);
+  const toggleCircleHidden = useGeoStore((s) => s.toggleCircleHidden);
   const clear = useGeoStore((s) => s.clear);
 
   const { undo, redo } = useGeoStore.temporal.getState();
@@ -201,24 +203,35 @@ export default function App() {
       else setRenameNote(t(`input.merge_${res.reason}`, { from: mrg.from, to: mrg.to }));
       return;
     }
-    const r = parse(utterance, parseCtx());
-    let weak: 'error' | 'empty' | null = null;
+    const pctx = parseCtx();
+    const r = parse(utterance, pctx);
+    let weak: 'error' | 'empty' | 'dropped' | null = null;
     if (r.ok) {
-      // A deterministic parse can "succeed" yet build NOTHING — apply with an error (kept-prior) or
-      // change nothing at all. Dry-run before committing so a silent fail isn't shown as success
-      // (operator request); a step that builds something commits immediately.
-      const outcome = dryRunOutcome(facts, r.commands, seed, radiusOverrides);
-      if (outcome.produced) {
-        // One utterance → possibly many commands; tag them with one group id so
-        // they show as a single step row, not N identical rows.
-        const group = nanoid();
-        r.commands.forEach((c) => execute(c, utterance, group));
-        logDebug({ kind: 'input', utterance, locale, source: 'parser', commands: r.commands });
-        setText('');
-        return;
+      // A typo in a keyword (e.g. "מנוקדה" for "מנקודה") can make a rule match PARTIALLY, silently dropping
+      // a NEW label it introduced ("from D …") — committing a wrong/partial figure. When the parse leaves a
+      // new input label unused, escalate to the LLM (whose job is freeform/typo input) instead of committing
+      // the partial parse (ADR-089). An EXISTING label a command doesn't re-name is fine (context).
+      const dropped = droppedNewLabels(utterance, r.commands, pctx.points ?? []);
+      if (dropped.length === 0) {
+        // A deterministic parse can "succeed" yet build NOTHING — apply with an error (kept-prior) or
+        // change nothing at all. Dry-run before committing so a silent fail isn't shown as success
+        // (operator request); a step that builds something commits immediately.
+        const outcome = dryRunOutcome(facts, r.commands, seed, radiusOverrides);
+        if (outcome.produced) {
+          // One utterance → possibly many commands; tag them with one group id so
+          // they show as a single step row, not N identical rows.
+          const group = nanoid();
+          r.commands.forEach((c) => execute(c, utterance, group));
+          logDebug({ kind: 'input', utterance, locale, source: 'parser', commands: r.commands });
+          setText('');
+          return;
+        }
+        weak = outcome.reason; // parsed but produced nothing → fall through to the LLM second attempt
+        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:${outcome.reason}`, detail: outcome.detail, commands: r.commands });
+      } else {
+        weak = 'dropped'; // a typo dropped a new label → escalate rather than commit the partial parse
+        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${dropped.join(',')}`, commands: r.commands });
       }
-      weak = outcome.reason; // parsed but produced nothing → fall through to the LLM second attempt
-      logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:${outcome.reason}`, detail: outcome.detail, commands: r.commands });
     }
     // out of grammar, OR a deterministic parse that built nothing → ask the LLM (a SECOND try),
     // using the current figure as context.
@@ -284,6 +297,7 @@ export default function App() {
   }, [facts, selectedId]);
 
   const hiddenSet = useMemo(() => new Set(hidden), [hidden]);
+  const hiddenCircleSet = useMemo(() => new Set(hiddenCircles), [hiddenCircles]);
 
   // Collapse the flat fact list into step rows: all commands from one submission
   // (same group) become one row, so an inscribed shape isn't shown as 6 rows.
@@ -356,6 +370,9 @@ export default function App() {
               dashed: t('segMenu.dashed'),
               solid: t('segMenu.solid'),
             }}
+            hiddenCircles={hiddenCircleSet}
+            onToggleCircleHidden={toggleCircleHidden}
+            circleMenuText={{ hide: t('segMenu.hide'), show: t('segMenu.show') }}
           />
         </div>
 

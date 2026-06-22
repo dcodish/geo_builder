@@ -367,11 +367,22 @@ function pointOnCircle(objects: GeoObject[], id: Id, circleId: Id): boolean {
 /** The golden angle — spreads N points around a circle so none coincide and they look even. */
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
-/** A default angle for the next point on `circle`, spread from any already on it (top-first). */
+/**
+ * A small bounded asymmetry added to alternate on-circle points (ADR-085). Pure golden-angle steps give
+ * 3 points TWO EQUAL gaps → an isosceles triangle with the apex at the arc-midpoint of the opposite side,
+ * which (a) asserts AB=BC — a "fixed assumption" the student never stated ([ADR-052]) — and (b) makes the
+ * tangent at that apex EXACTLY parallel to the opposite chord, so "tangent at B meets CA" degenerates at
+ * the default view. Skewing alternate points breaks the equal gaps → a generic SCALENE default; it is
+ * bounded (does not accumulate over many points) so larger inscribed polygons stay well-spread.
+ */
+const SCALENE_SKEW = 0.35;
+
+/** A default angle for the next point on `circle`, spread from any already on it (top-first), with a
+ *  bounded alternating skew so the default is a GENERIC (scalene) figure, not a special symmetric one. */
 function nextTheta(objects: GeoObject[], circle: Id): number {
   let n = 0;
   for (const o of objects) if (o.kind === 'on-circle' && o.circle === circle) n++;
-  return Math.PI / 2 + n * GOLDEN_ANGLE;
+  return Math.PI / 2 + n * GOLDEN_ANGLE + (n % 2) * SCALENE_SKEW;
 }
 
 /**
@@ -845,6 +856,24 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     case 'set-distance':
       driveOrCheck(objects, constraints, { type: 'distance', a: cmd.a, b: cmd.b, value: cmd.value });
       break;
+
+    case 'set-radius': {
+      // Set a circle's radius BY VALUE, without inventing a point or drawing a radius segment (ADR-087).
+      // Resolve per how the circle's radius is defined: a `through` circle (its radius is |centre·point|,
+      // e.g. an incircle through its tangent foot) becomes a distance constraint that FLEXES the figure; a
+      // `free`-radius DOF and a `length` radius are simply set to the stated value (a stated size is a given,
+      // ADR-052). `tangent-inner` (radius derived from another circle) has no own size to pin → leave to the
+      // verifier to flag if it cannot hold.
+      const circ = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle);
+      if (circ) {
+        if (circ.radius.via === 'through') {
+          driveOrCheck(objects, constraints, { type: 'distance', a: circ.center, b: circ.radius.point, value: cmd.value });
+        } else if (circ.radius.via === 'free' || circ.radius.via === 'length') {
+          circ.radius = { via: 'length', value: cmd.value };
+        }
+      }
+      break;
+    }
 
     case 'set-equal':
       driveOrCheck(objects, constraints, { type: 'equal', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });

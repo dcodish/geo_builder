@@ -79,6 +79,28 @@ const circleCenter = (s: string): string | null => {
 const resolveCenter = (s: string, ctx: ParseContext): string | null =>
   circleCenter(s) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
 
+/** True when the utterance explicitly refers to a circle — named ("circle O") or definite ("the circle" / "המעגל"). */
+const mentionsCircle = (s: string): boolean => /circle|מעגל/i.test(s);
+
+/**
+ * The circle a rule that is NOT gated on a circle-specific keyword (a generic "X cuts Y") should act on:
+ * the named centre, or — when the utterance explicitly says "the circle" / "המעגל" and the figure holds
+ * exactly ONE circle — that circle. Unlike `resolveCenter`, it does NOT grab the single circle for an
+ * utterance that never mentions a circle, so a plain line∩line / point-on-extension is not misread as a
+ * circle intersection. (Operator principle: with one circle in the diagram you needn't name it.)
+ */
+const resolveMentionedCircle = (s: string, ctx: ParseContext): string | null =>
+  circleCenter(s) ?? (mentionsCircle(s) && ctx.circles?.length === 1 ? ctx.circles[0] : null);
+
+/** The crossing point named AFTER the circle word ("… circle [O] at R" / "… [ה]מעגל [O] בנקודה R"),
+ *  with the circle's NAME optional so "the circle" / "המעגל" anchors too (operator: one circle → no name). */
+const crossingAfterCircle = (s: string): string | null => {
+  const ci = s.search(/(?:circle|מעגל)(?:\s+[A-Za-z]\d*)?/i);
+  if (ci < 0) return null;
+  const m = s.slice(ci).match(/(?:\bat\b|בנקודה|ב-)\s*([A-Za-z]\d*)\b/i);
+  return m ? up(m[1]) : null;
+};
+
 /** Remove a "circle X" / "מעגל X" mention so its centre letter isn't read as a figure label. */
 const dropCircleRef = (s: string): string => s.replace(/(?:circle|מעגל)\s+[A-Za-z]\d*\b/gi, ' ');
 
@@ -391,13 +413,22 @@ const midpoint: Rule = (s) => {
 };
 
 /** "F on the extension of AD" / "F על המשך AD" — a point on the ray beyond the far end (t > 1). */
-const pointOnExtension: Rule = (s) => {
+const pointOnExtension: Rule = (s, ctx) => {
   if (!/extension|המשך/i.test(s)) return null;
   const m = s.match(/(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\b.*?(?:extension|המשך)\s*(.*)/i);
   if (!m) return null;
   // strip filler ("of"!) so "of AD" reads AD, not the labels O,F of "of".
   const seg = labelRun(m[2].replace(FILLER, ' '), 2);
-  return seg ? [{ type: 'point-on-segment', id: up(m[1]), a: seg[0], b: seg[1], t: 1.3, extension: true }] : null;
+  if (!seg) return null;
+  const id = up(m[1]);
+  // "C on the extension of DA" beyond A → order D→A→C. If C ALREADY EXISTS (e.g. an inscribed vertex still
+  // on the circle), creating it afresh as an off-object on-segment point would keep it pinned to its prior
+  // carrier and the apply path picks the WRONG (near) intersection, losing the order. Emit an ORDERED
+  // collinearity instead: the existing point is DRIVEN, on whatever carrier it already has, to sit beyond
+  // the far end IN ORDER (seg[0]→seg[1]→id) — so an on-circle C becomes the FAR secant point, not the near
+  // one, and C stays on the circle (ADR-086). A genuinely NEW point is still created on the extension.
+  if ((ctx.points ?? []).includes(id)) return [{ type: 'set-line', points: [seg[0], seg[1], id] }];
+  return [{ type: 'point-on-segment', id, a: seg[0], b: seg[1], t: 1.3, extension: true }];
 };
 
 /**
@@ -925,6 +956,26 @@ const circle: Rule = (s, ctx) => {
   // instead of freezing it to the default. Only a NUMERIC radius ("radius 5") is fixed.
   const freeRadius = !r.numeric;
   return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius, ...(freeRadius ? { freeRadius: true } : {}), ...(auto ? { autoCenter: true } : {}) }];
+};
+
+/**
+ * "the radius of circle P is 4" / "רדיוס מעגל P הוא 4" / "radius of P = 4" — set an EXISTING circle's radius
+ * to a value, with NO segment drawn and NO point invented (ADR-087). Distinct from circle CREATION
+ * ("circle O radius 5"): fires only when the named circle ALREADY EXISTS — otherwise it falls through to
+ * `circle`. The circle is named ("circle P" / "מעגל P"), a bare label that is a known circle centre, or
+ * the single circle in context. The engine sizes it by flexing the figure (an incircle stays the incircle).
+ */
+const setRadius: Rule = (s, ctx) => {
+  if (!/radius|רדיוס/i.test(s)) return null;
+  const valM = s.replace(/[A-Z]\d*/g, ' ').match(new RegExp(num)); // value with circle labels (e.g. P1) stripped first
+  if (!valM) return null; // a magnitude must be given
+  let center = circleCenter(s);
+  if (!center) {
+    const labels = (s.match(/[A-Z]\d*/g) ?? []).map(up);
+    center = (ctx.circles ?? []).find((c) => labels.includes(up(c))) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
+  }
+  if (!center || !(ctx.circles ?? []).some((c) => up(c) === up(center))) return null; // EXISTING circle only (creation → `circle`)
+  return [{ type: 'set-radius', circle: circleId(center), value: parseFloat(valM[1]) }];
 };
 
 /**
@@ -1508,18 +1559,16 @@ const circleCircleIntersection: Rule = (s) => {
  * `lineMeetsCircle` so a non-extension "line AC meets circle P" keeps the order-agnostic chord rule,
  * and after the tangent/external-secant compounds (guarded out by "tangent"/"משיק"/"from"/"מנקודה").
  */
-const extendOntoCircle: Rule = (s) => {
+const extendOntoCircle: Rule = (s, ctx) => {
   if (!/המשך|extension|extended/i.test(s)) return null; // directional only — a plain chord stays lineMeetsCircle
   if (!INTERSECT_KW.test(s)) return null;
   if (/tangent|משיק/i.test(s)) return null; // tangent compound → tangentMeetsOtherCircle / tangentLine
   if (/\bfrom\b|מנקודה|מהנקודה/i.test(s)) return null; // "from <point>" → the external-point secant
-  const center = circleCenter(s);
-  if (!center) return null; // must NAME a circle (else pointOnExtension on a segment / line∩line)
+  const center = resolveMentionedCircle(s, ctx); // a named circle, or "the circle" when there's exactly one
+  if (!center) return null; // must REFER to a circle (else pointOnExtension on a segment / line∩line)
   // the new crossing: the label after the "at"/"בנקודה" that FOLLOWS the circle mention
-  const ci = s.search(/(?:circle|מעגל)\s+[A-Za-z]\d*/i);
-  const atM = s.slice(ci).match(/(?:\bat\b|בנקודה|ב-)\s*([A-Za-z]\d*)\b/i);
-  if (!atM) return null;
-  const R = up(atM[1]);
+  const R = crossingAfterCircle(s);
+  if (!R) return null;
   // the line's two points (document order: a then b; D lands beyond b — the 2nd letter)
   const body = dropCircleRef(s)
     .replace(/(?:\bat\b|בנקודה|ב-)\s*[A-Za-z]\d*\b/gi, ' ')
@@ -1564,18 +1613,41 @@ const lineCutsCircleTwice: Rule = (s, ctx) => {
   ];
 };
 
+/**
+ * "the extension of CA meets THE TANGENT (or a drawn line) at D" / "המשך CA נפגש עם המשיק בנקודה D",
+ * where D ALREADY exists (e.g. the marker the tangent placed for its external apex — ADR-084). The object
+ * D "meets" is the very line D already lies on, so it needs no id: this only has to put D on the EXTENSION
+ * of CA (order C→A→D, ADR-054), and that drives D's existing on-line DOF to the crossing. Scoped tight so
+ * it can't mis-grab a plain line∩line cut-form: requires the extension word, a tangent/line OBJECT (not a
+ * second segment), a "meets/at D" with D EXISTING, and a circle must NOT be mentioned (that's
+ * extendOntoCircle / lineMeetsCircle). A NEW crossing point is left to the intersection constructs.
+ */
+const extensionMeetsExistingPoint: Rule = (s, ctx) => {
+  if (!/המשך|extension|extended/i.test(s)) return null;
+  if (mentionsCircle(s)) return null; // a circle target → extendOntoCircle / lineMeetsCircle
+  if (!/tangent|משיק|\bline\b|הישר|הקו/i.test(s)) return null; // the object D lives on (not a 2nd segment → line∩line)
+  if (!INTERSECT_KW.test(s)) return null; // a "meets/cuts" phrasing
+  const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i);
+  if (!atM) return null;
+  const D = up(atM[1]);
+  if (!(ctx.points ?? []).includes(D)) return null; // only CONSTRAIN an existing point (a new crossing is the intersection construct)
+  const segM = s.match(/(?:המשך|extension(?:\s+of)?|extended)\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  if (!segM) return null;
+  const [X, Y] = [up(segM[1]), up(segM[2])];
+  if (X === D || Y === D) return null;
+  return [{ type: 'set-line', points: [X, Y, D] }]; // D on the extension of XY, in order X→Y→D
+};
+
 const lineMeetsCircle: Rule = (s, ctx) => {
   if (!INTERSECT_KW.test(s)) return null;
   if (/tangent|משיק/i.test(s)) return null; // tangent line → tangentMeetsOtherCircle / tangentLine
   if (/\bfrom\b|מנקודה|מהנקודה/i.test(s)) return null; // "from <point>" → the external-point secant
-  const center = circleCenter(s);
-  if (!center) return null; // must NAME a circle (else it's line∩line, a constraint, etc.)
+  const center = resolveMentionedCircle(s, ctx); // a named circle, or "the circle" when there's exactly one
+  if (!center) return null; // must REFER to a circle (else it's line∩line, a constraint, etc.)
   const circ = circleId(center);
   // the new crossing: the label after the "at"/"בנקודה" that FOLLOWS the circle mention
-  const ci = s.search(/(?:circle|מעגל)\s+[A-Za-z]\d*/i);
-  const atM = s.slice(ci).match(/(?:\bat\b|בנקודה|ב-)\s*([A-Za-z]\d*)\b/i);
-  if (!atM) return null;
-  const R = up(atM[1]);
+  const R = crossingAfterCircle(s);
+  if (!R) return null;
   // the line's two points: strip the circle ref + the new-point clause + connective words → the 2-label run
   const body = dropCircleRef(s)
     .replace(/(?:\bat\b|בנקודה|ב-)\s*[A-Za-z]\d*\b/gi, ' ')
@@ -1796,18 +1868,34 @@ const tangentFromExternal: Rule = (s, ctx) => {
 const tangentLine: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   const center = resolveCenter(s, ctx);
+  if (!center) return null;
   const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i);
-  if (!center || !atM) return null;
-  const T = up(atM[1]);
-  const lineId = `tan-${T}`;
+  const have = new Set(ctx.points ?? []);
   // The 1–2 point labels NAMING the line ("הישר CD משיק…" / "AB משיק…"), excluding the
-  // tangency point T and the centre.
+  // tangency point (the "at X" clause) and the centre.
   const named = dropCircleRef(s)
     .replace(/(?:\bat\b|בנקודה|ב-?)\s*[A-Za-z]\d*\b/gi, ' ')
     .replace(/tangent|משיק\S*|\bline\b|הישר|הקו|למעגל|מעגל/gi, ' ');
   const pts = labelRun(named, 2);
+
+  // The touch point T. Usually named explicitly ("… at K" / "בנקודה K"). But a student commonly OMITS it
+  // when it is geometrically forced — "KB משיק למעגל" / "KB tangent to the circle" where K is ALREADY on
+  // the circle: the only possible tangency point is that on-circle endpoint, so naming it is redundant.
+  // When there is no "at" clause, INFER T from the named segment's endpoint that already lies on THIS
+  // circle (exactly one — both endpoints on the circle would make the segment a chord, not a tangent, so
+  // don't infer). Without this the natural phrasing falls through every tangent rule (tangentFromExternal
+  // bails because both endpoints already exist, so there is no unique external apex) and escalates to the
+  // LLM, which returns "not-understood" / "built-nothing" — the engine builds it perfectly once it has the
+  // command (ADR-082; the explicit-"at K" path is ADR-081).
+  const members = new Set((ctx.circleMembers?.find((e) => up(e.center) === up(center))?.points ?? []).map(up));
+  let T = atM ? up(atM[1]) : null;
+  if (!T && pts) {
+    const onCircle = pts.filter((p) => members.has(p));
+    if (onCircle.length === 1) T = onCircle[0];
+  }
+  if (!T) return null;
+  const lineId = `tan-${T}`;
   const naming = pts && pts[0] !== T && pts[1] !== T && pts[0] !== up(center) && pts[1] !== up(center) ? pts : null;
-  const have = new Set(ctx.points ?? []);
 
   // An EXISTING line declared tangent ("AB משיק … בנקודה F", with A, B and the touch point F
   // all already placed): this is a tangency CONSTRAINT on the existing segment — NOT a freshly
@@ -1842,6 +1930,15 @@ const tangentLine: Rule = (s, ctx) => {
   if (naming) {
     const fresh = naming.filter((p) => !have.has(p));
     if (fresh.length) cmds.push(...lineMarkers(lineId, fresh));
+  }
+  // A NAMED external point the tangent emanates FROM — "מנקודה D יוצא משיק … בנקודה B" / "from D a tangent
+  // … at B": D lies ON the tangent line (the external apex). Create it as a free marker sliding along the
+  // tangent so it appears IMMEDIATELY; a later fact ("the extension of CA meets the tangent at D") then
+  // drives that DOF to the crossing (ADR-084). Only when new and distinct from the touch point.
+  const fromM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?|מנקודה|מהנקודה|\bמ-)\s*([A-Za-z]\d*)/i);
+  const apex = fromM ? up(fromM[1]) : null;
+  if (apex && apex !== T && !have.has(apex) && !cmds.some((c) => c.type === 'point-on-line' && (c as { id: Id }).id === apex)) {
+    cmds.push(...lineMarkers(lineId, [apex]));
   }
   return cmds;
 };
@@ -2262,6 +2359,7 @@ const compoundSuchThat: Rule = (s, ctx) => {
 // coordinate rule (freePoint) is last because it's the loosest.
 const RULES: Rule[] = [
   compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
+  setRadius, // "radius of circle P is 4" — set an EXISTING circle's radius; before `circle` (creation) and the shape rules (which 'stop' on רדיוס)
   congruence, // "ABC ≅ DEF" — before the shape rules ("triangle ABC ≅ …" contains "triangle")
   similarity, // "ABC ~ DEF"
   semicircle, // "חצי מעגל" / "semicircle" — before `circle` (contains "מעגל") and the shape rules
@@ -2297,6 +2395,7 @@ const RULES: Rule[] = [
   extendOntoCircle, // "המשך AC חותך מעגל P בנקודה D" — DIRECTIONAL extension onto a circle (D beyond the 2nd letter), before the order-agnostic lineMeetsCircle
   lineCutsCircleTwice, // "AO cuts the circle at C and D" — a named line crossing the circle at BOTH roots; before lineMeetsCircle (one crossing)
   lineMeetsCircle, // "line AC meets circle P at E" — an order-agnostic chord/line meeting a circle, before collinearity & line∩line
+  extensionMeetsExistingPoint, // "המשך CA נפגש עם המשיק בנקודה D" — drive an EXISTING D (a tangent's apex marker) onto the extension of CA; before line∩line ("חותך"/"נפגש" would otherwise 'stop' it)
   // A drawn perpendicular/parallel line that "cuts" another at a point must be claimed BEFORE the
   // generic line∩line rule: the "cuts"/"חותך" keyword otherwise makes lineLineIntersection 'stop'
   // (it can't read "ED ⟂ AB cuts it at C") and the whole parse aborts to the LLM — which then
@@ -2414,6 +2513,22 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
     if (commands) return { ok: true, commands: withImplicitCircles(commands, ctx) };
   }
   return { ok: false, reason: 'not-handled' };
+}
+
+/**
+ * Uppercase point labels that the utterance NAMES but the parsed commands neither reference nor already
+ * have in the figure — a sign the deterministic parse silently DROPPED part of the input (ADR-089).
+ * Almost always a TYPO in a keyword (e.g. "מנוקדה" for "מנקודה") that made a rule match partially: the
+ * label it introduced ("from D …") fell out, so a wrong/partial figure would be committed. The caller
+ * (App.submit) treats a non-empty result as a weak parse and ESCALATES to the LLM (whose job is exactly
+ * freeform/typo input) instead of committing. A label that ALREADY EXISTS but a command doesn't re-name
+ * is NOT dropped (it's context, e.g. a tangent at an existing point) — only genuinely NEW labels count.
+ */
+export function droppedNewLabels(utterance: string, commands: AnyCommand[], existingPoints: Id[] = []): Id[] {
+  const have = new Set(existingPoints.map((p) => p.toUpperCase()));
+  const used = new Set(JSON.stringify(commands).match(/[A-Z]\d*/g) ?? []); // every label the commands reference (incl. inside ids like circle-P / tan-B)
+  const inputLabels = [...new Set(utterance.match(/[A-Z]\d*/g) ?? [])];
+  return inputLabels.filter((L) => !have.has(L) && !used.has(L));
 }
 
 /**

@@ -1203,3 +1203,118 @@ The three outcomes map to three repair moves: `not-handled` → **rephrase** the
 **Result.** "KB tangent at K" (He/En, with/without "הצלע") now emits `point-on-circle K` + `set-perpendicular(O,K,K,B)`; a clean build lands K on the circle with OK ⟂ KB (verified, no violations). **1213 tests green, build clean.** Locked by `tangent-points.test.ts` (routing for the three phrasings — no invented touch / Thales scaffolding — plus an end-to-end build asserting K-on-circle and OK⟂KB); the full external-tangent suite is unaffected (those name a NEW/auto touch point, so the guard doesn't fire).
 
 **Scope.** This fixes the tangent *phrasing* generically. It does NOT make the whole live-Haiku reading-order Q4 build succeed: that decomposition still applies `KB∥CD` to a free quad **before** the chord, which over-constrains trapezoid-first ("KB ∥ CD cannot hold") and cascades to the secant — the deeper reorder problem owned by [ADR-073](#adr-073). With this fix the tangent STEP itself now builds cleanly (was the bogus B–T construction).
+
+## ADR-082 — "KB tangent to the circle" with NO explicit touch point: infer it from the on-circle endpoint
+
+**Status:** Accepted (2026-06-22, operator sessions `xstllu0i` / `mmfbpvaz`).
+
+**Context.** This is the SAME tangent reported broken "3rd or 4th time" — each prior fix ([ADR-075](#adr-075), [ADR-081](#adr-081)) handled a tangent phrased with an explicit touch point ("KB tangent **at K**" / "בנקודה K"), but the operator kept typing the natural form **without** it: "**KB משיק למעגל**" / "KB tangent to the circle". The debug log shows this exact step returning `not-understood` / `built-nothing` after the figure already had quad BKCD, KB∥CD, and triangle KCD inscribed in circle O (so K is on the circle). The point was never that KB *cannot* be tangent — fed the command the engine builds it perfectly (K on circle, ∠OKB = 90°, KB∥CD, **verifier clean**). The point was that the natural utterance never reached the engine.
+
+**Root cause (parser, not engine).** `tangentLine` derived the touch point T **only** from an explicit `at`/`בנקודה` clause and bailed at the top otherwise: `if (!center || !atM) return null`. So the entire ADR-075/081 endpoint-tangency logic sat behind a gate the natural phrasing never opened. `tangentFromExternal` couldn't catch it either: both K and B already exist as quad vertices, so there is no *unique* external apex (its existing-point heuristic needs exactly one) and it returned null. Nothing handled it → LLM → "not-understood". The defect was a **missing inference**: a tangent whose touch point is an endpoint *already on the circle* needs no naming — geometrically the touch can only be that endpoint.
+
+**Decision.** In `tangentLine`, when there is no `at` clause, **infer T from the named segment's endpoint that is a member of THIS circle** (via `ctx.circleMembers`). Guard: **exactly one** endpoint may be on the circle — both on it would make the segment a chord (crosses at two points), not a tangent, so we do not infer. With T inferred, the existing [ADR-081](#adr-081) branch fires unchanged, emitting `point-on-circle T` + `set-perpendicular(O, T, P, Q)`. Purely additive: when an `at` clause is present the behaviour is byte-identical to before; when it is absent and no endpoint is on the circle, the rule still returns null (a genuine external tangent stays with `tangentFromExternal`, or escalates) — no regression.
+
+**Result.** The exact failing utterance "KB משיק למעגל" (and "KB tangent to the circle") now parses and builds a true tangent end-to-end: K on the circle (|OK|=|OC|=|OD|), OK ⟂ KB, KB ∥ CD, **zero verifier violations**. **1214 tests green, build clean.** Locked by a real end-to-end regression scenario — the operator's exact 4-utterance sequence — in `scenarios.test.ts` (`segment-tangent-no-explicit-touch-point`), replayed through the live parse-with-context → fact list → `replay` path. Diagnosed from `logs/debug-log.jsonl`.
+
+**Why the earlier fixes kept "missing."** Each addressed a real but *different* sub-phrasing of the same figure (separate touch F on a line — ADR-075; touch named at an existing endpoint — ADR-081), and each was unit-true. None covered the touch-point-**omitted** case, which is the form a student actually types when the touch is obvious. Lesson reinforced (CLAUDE.md "root cause, never patch"): a green unit test on a phrasing variant is **not** proof the *feature* — "a segment tangent to a circle" — works; the operator's verbatim utterance through the real pipeline is the bar.
+
+## ADR-083 — "one circle → no name": a definite "the circle" / "המעגל" resolves to the single circle
+
+**Status:** Accepted (2026-06-22, operator principle).
+
+**Context.** Operator: *"when there is only ONE circle in the diagram, I should not have to say its name."* Surfaced while completing the full bagrut Q4 (after the [ADR-082](#adr-082) tangent fix): the secant step **"BD חותך את המעגל בנקודה A"** — "BD cuts **the** circle at A", definite article, no name — returned `not-handled` and escalated to the LLM, even though the figure held exactly one circle.
+
+**Root cause.** The single-crossing circle-intersection rules `lineMeetsCircle` and `extendOntoCircle` required a NAMED circle in **two** places: (1) the centre came from `circleCenter(s)` (named-only) — they deliberately avoided `resolveCenter`'s single-circle fallback so a plain line∩line / point-on-extension isn't misread as a circle cut; and (2) the crossing-point anchor `(?:circle|מעגל)\s+[A-Za-z]\d*` demanded a **name letter** after the circle word to locate the "at X" that follows the circle mention. Both fail on "the circle" / "המעגל" (no name letter; in Hebrew "מעגל" is followed by "בנקודה", not a label). So the natural definite form never matched.
+
+**Decision.** Honour the principle **without** re-opening the line∩line false-grab. Two shared helpers in the parser:
+- `resolveMentionedCircle(s, ctx)` — the named centre, or the single circle **only when the utterance mentions a circle at all** (`/circle|מעגל/`, i.e. named *or* the definite "the circle"). Unlike `resolveCenter`, it does **not** grab the single circle for an utterance that never says "circle" — so a bare "AC cuts BD at E" stays a line∩line.
+- `crossingAfterCircle(s)` — finds the "at X" / "בנקודה X" that follows the circle word, with the **name optional** (`(?:circle|מעגל)(?:\s+[A-Za-z]\d*)?`), so the definite form anchors too.
+
+Applied to `lineMeetsCircle` and `extendOntoCircle` (the only two rules that bailed on a missing name; the chord, tangent, two-crossing-secant, and external-tangent rules already fell back to the single circle). Scope-limited on purpose: a rule gated only on a generic keyword (here `INTERSECT_KW`) must see an explicit circle mention before it claims the single circle.
+
+**Result.** "BD חותך את המעגל בנקודה A" (He/En, unnamed) now parses and builds — A lands on the circle, the [ADR-082](#adr-082) tangent and KB∥CD givens still hold, **verifier clean** — so the full Q4 completes deterministically. A plain "AC חותך את BD בנקודה E" with one circle present is **still** a `line-line-intersection`, not a chord (no false grab). Named circles are unchanged. **1219 tests green, build clean.** Locked by `unnamed-circle.test.ts` (positive definite/named + the NEGATIVE line∩line guard, He/En) and the end-to-end `unnamed-circle-secant-full-q4` scenario.
+
+## ADR-084 — a tangent's named external point appears immediately, then a later fact drives it to the crossing
+
+**Status:** Accepted (2026-06-22, operator session `nhm9154u` / `twiwst5h`).
+
+**Context.** Triangle ABC inscribed in circle O, then the operator built a tangent in the natural two-step way:
+1. "מנקודה D יוצא משיק למעגל בנקודה B" — *from point D* a tangent touches at B.
+2. "המשך CA נפגש עם המשיק בנקודה D" — the *extension of CA* meets *the tangent* at D.
+
+Step 1 drew the tangent at B but **dropped D** (operator: "still didnt create point D and just created a tangent line"); step 2 was `not-handled` → LLM → built nothing. The engine was never the obstacle — the **one-sentence** form ("המשיק בנקודה B והמשך CA נפגשים בנקודה D") already builds D as a `line-intersection` of the tangent and line CA. The gap was purely parsing the **split, accumulating** phrasing (the tool's core interaction model, FR-EN-7).
+
+**Decision (operator's call: D appears at step 2).** Two scoped parser changes, no engine change and **no parse-context plumbing**:
+- `tangentLine` now creates the **named external apex** ("from D" / "מנקודה D …") as a free **`point-on-line` marker on the tangent** when it is new and ≠ the touch point. So D appears immediately and slides along the tangent (a genuine 1-DOF, [ADR-052](#adr-052)).
+- A tight new rule `extensionMeetsExistingPoint` reads "the extension of CA meets the tangent at **D**" (D **existing**) as **`set-line [C, A, D]`** — D is *already* on the tangent, so the only new information is "D on the CA extension", and that **drives D's on-line DOF to the crossing**, in order C→A→D (the directional `המשך`, [ADR-054](#adr-054)). It needs no reference to the tangent line's id — which is exactly why no context plumbing is required.
+
+**Why no tangent-line id in context.** Because step 1 puts D *on* the tangent, step 2 never has to name the tangent: constraining D to the CA extension intersects the two automatically. The rule is scoped to avoid mis-grabbing a plain line∩line cut-form: it fires only on an extension word + a tangent/line object (not a second segment) + a "meets/at D" where **D already exists** (a new crossing is left to the intersection constructs) + **no circle mention** ([ADR-083](#adr-083) owns the circle case).
+
+**Result.** The operator's exact three utterances now build end-to-end: after step 2 **D exists** on the tangent; after step 3 it is pinned with DB ⟂ OB (true tangent), D collinear with C,A, and D beyond A (the extension) — **verifier clean**. Proven first at the engine level (a `point-on-line` marker driven by `set-line` lands on the tangent∩CA crossing) before any parser rule was written. **1219 tests green, build clean** (no regressions — the apex marker and the new rule are both additive). Locked by the `tangent-from-external-D-then-pinned-by-extension` end-to-end scenario. Diagnosed from `logs/debug-log.jsonl`.
+
+## ADR-085 — the default inscribed figure is generically scalene, and a lone on-line marker may flip sides
+
+**Status:** Accepted (2026-06-22, operator session `vob7kih2`).
+
+**Context.** After [ADR-084](#adr-084) the operator reported two things on the same figure (triangle ABC inscribed, tangent at B, D where the extension of CA meets it): (1) the one-sentence form "המשיק למעגל בנקודה B והמשך CA נפגשים בנקודה D" **errored** "cannot construct D: lines tan-B and line-CA are parallel"; (2) D always appeared on the **same side** of B across "show another configuration".
+
+**Root cause — one flaw, two symptoms: fixed defaults ([ADR-052](#adr-052)).**
+- On-circle points are placed by a golden-angle spread (`nextTheta`). For exactly 3 points that yields **two equal gaps** → an **isosceles** triangle whose apex B sits at the **arc-midpoint of AC**. Two consequences: it silently asserts AB=BC (a given the student never stated), and — by the tangent–chord relation — the **tangent at an arc-midpoint is exactly parallel to the chord**. So at the default seed tangent@B ∥ CA, and the deterministic `line-intersection` (tangent ∩ line CA) has no solution → the error. (Measured: seed 0 gave AB=BC=9.32, angle(tan@B, CA)=0.00°.) This is long-standing, not a regression from ADR-084 — but ADR-081 newly routes the tangent through the path that *surfaces* it instead of silently drawing a wrong tangent.
+- The tangent's external apex marker (ADR-084) is a single `point-on-line` at a fixed `+offset`; the sampler scaled its magnitude but **preserved its sign** (a rule meant to keep a ±*pair* straddling the anchor), so a *lone* marker was stuck on one side.
+
+**Decision.**
+- **Scalene default:** add a small **bounded alternating skew** to `nextTheta` (`+ (n % 2) * SCALENE_SKEW`, `SCALENE_SKEW = 0.35`). It breaks the equal-gap symmetry so 3 points form a generic scalene triangle (tangent@B ∦ CA), and being bounded it does not accumulate over larger inscribed polygons. (Operator chose this general root fix over a localized per-construct workaround.)
+- **Lone-marker sign:** in the sampler, when a line carries **only one** free on-line marker, let "show another configuration" **flip its sign** (either side of the anchor); a line with a **±pair** keeps the old sign-preserving behaviour so the pair keeps straddling.
+
+**Result.** The default inscribed triangle is scalene (e.g. 9.81/8.55/6.75); the one-shot "tangent meets CA" builds at the default seed (D is the genuine tangent∩CA intersection); the split form still builds; and D now samples to **both** sides of B. **1220 tests green, build clean.** Fallout was exactly the 2 coordinate snapshots in `stability-snapshot.test.ts` (intended placement change → updated with `-u`) and the ADR-036 on-line marker test (updated to assert the new both-sides behaviour). Locked by `scalene-default.test.ts` (distinct sides + non-parallel tangent), the updated `phase-sample.test.ts` (lone marker → both sides), and the `inscribed-triangle-scalene-tangent-meets-CA` end-to-end scenario. Diagnosed from `logs/debug-log.jsonl`.
+
+## ADR-086 — "C on the extension of DA" when C already exists drives it in ORDER (D→A→C), not to the near intersection
+
+**Status:** Accepted (2026-06-22, operator session).
+
+**Context.** Triangle ABC inscribed, tangent at B from D, then "C נמצאת על המשך DA" ("C is on the continuation of DA"). The operator wanted C **beyond A** (order D→A→C). It aligned D, A, C collinear but in the **wrong order** — C landed *between* D and A (parameter 0.18 along D→A), at the near secant intersection.
+
+**Root cause.** `pointOnExtension` always emitted `point-on-segment {id, a, b, t: 1.3, extension: true}` — a *fresh* off-object point beyond the far end. But C **already existed** as an on-circle vertex (from the inscribed triangle). Re-issuing it as a new on-segment point did not move it off the circle; the apply path kept C on the circle and reduced the fact to a bare collinearity, which the solver satisfied at the **near** of the two line∩circle intersections, **dropping the requested order** (t=1.3 was meaningless for a point pinned to the circle).
+
+**Decision.** In `pointOnExtension`, branch on whether the named point already exists (`ctx.points`):
+- **New point** → unchanged: `point-on-segment … extension` (created beyond the far end).
+- **Existing point** → emit an **ordered collinearity `set-line [a, b, id]`** (here `[D, A, C]`). The point is *driven*, on whatever carrier it already has, to lie collinear **and in order** a→b→id — so an on-circle C becomes the **far** secant point (beyond A), staying on the circle, in the order the student asked.
+
+**Result.** "C נמצאת על המשך DA" now yields D(0) → A(1.0) → **C(1.22)** along D→A (C beyond A), collinear, C still on the circle (|OC|=|OA|). Proven at the engine level (`set-line [D,A,C]` gives the right order) before changing the parser. **1223 tests green, build clean**, no regressions (the new-point path is untouched). Locked by the `existing-vertex-on-extension-keeps-order` end-to-end scenario. Diagnosed from `logs/debug-log.jsonl`. Generalises the [ADR-050](#adr-050)/ADR-054 collinear-order family to the "X on the extension of YZ" phrasing when X pre-exists.
+
+## ADR-087 — set a circle's radius BY VALUE (no segment, no invented point)
+
+**Status:** Accepted (2026-06-22, operator session).
+
+**Context.** Incircle P of a triangle, then "רדיוס מעגל P הוא 4" ("the radius of circle P is 4") → built-nothing (escalated to the LLM). To set the size the operator had to invent a point and write "PF=4" — which both forced a name (F) and **drew the radius segment**. There was no way to state an *existing* circle's radius by value: the `circle` rule only reads a radius at creation ("circle O radius 5"), and a constructed circle's size is determined by its construction.
+
+**Decision.** Add a first-class **`set-radius {circle, value}`** command + a `setRadius` parser rule ("radius of circle P is 4" / "רדיוס מעגל P (הוא) 4" / "radius of P = 4", He/En). The engine resolves it per the circle's `RadiusSpec`:
+- `via: 'through'` (an incircle's radius is |centre · its tangent foot|) → a **`distance(centre, point, value)` constraint** that *flexes the figure* to the stated size (the incircle stays the incircle; the triangle resizes — ADR-052).
+- `via: 'free' | 'length'` → set the radius to `{via:'length', value}` (a stated size is a given).
+- `via: 'tangent-inner'` → no own size to pin; left for the verifier to flag if it can't hold.
+
+The rule fires **only for an EXISTING circle** (named, a bare centre-letter that is a known circle, or the single circle) — a fresh "circle O radius 5" still falls through to `circle` (creation). It runs before `circle` and the shape rules (which 'stop' on רדיוס).
+
+**Result.** "רדיוס מעגל P הוא 4" now resolves the incircle's radius to exactly 4.000 with **no segment drawn and no point invented** (He + En). **1228 tests green, build clean.** Locked by the `set-circle-radius-by-value-no-segment` scenario. Proven engine-first (a distance constraint on centre·foot sets the radius) before the parser rule. Diagnosed from `logs/debug-log.jsonl`.
+
+## ADR-088 — hide a circle (a display preference, like hiding a line/segment)
+
+**Status:** Accepted (2026-06-22, operator session).
+
+**Context.** Segments and point labels can be hidden on the canvas (click → context menu → hide, FR-RN-10), but **circles could not** — an auxiliary/construction circle always drew. The operator asked for "the ability to hide a circle in a similar way to what we have with a line."
+
+**Decision.** Mirror the segment-hide exactly. Store: a `hiddenCircles: Id[]` **display set** + `toggleCircleHidden(id)` — UI-only, excluded from temporal history by `partialize`, rewritten by `rename`/`merge` (a hidden `circle-F` tracks to `circle-T`), reset by `clear`. Render: a hidden circle draws as a faint dashed **ghost** (still clickable, so the toggle is reversible) instead of the solid outline; circles get a wide transparent **hit-ring** so the outline is clickable, opening the existing on-canvas menu with a `circle` kind (operator chose click→menu over a text command). The engine is untouched — the circle still constrains its points; only the drawing is suppressed (distinct from the construction-level `Circle.hidden` used for a cyclic-quad's undrawn circle).
+
+**Result.** Clicking a circle opens a menu with hide/show; a hidden circle vanishes (faint ghost) but its geometry holds. **1228 tests green, build clean.** Locked by `hidden.test.ts` (toggle / rename-rewrite / clear) + the unchanged phase-2 render tests; typecheck clean with the new `Figure` props.
+
+## ADR-089 — a typo that makes a rule match PARTIALLY (dropping a new label) escalates to the LLM
+
+**Status:** Accepted (2026-06-22, operator session).
+
+**Context.** The operator typed "**מנוקדה** D יוצא משיק למעגל בנקודה B" — a typo of "מנקודה" (the ק/ו swapped). The deterministic parser still matched the tangent rule on the correctly-spelled tail ("…בנקודה B"), drew the tangent at B, but **silently dropped the "from D" apex** (the typo'd "מנוקדה D" wasn't recognised). It then **committed that partial figure** instead of escalating to the LLM — whose job is exactly freeform/typo input ([ADR-023](#adr-023); the operator's standing note: typo-tolerance is the LLM's role, not the grammar's). This is the [N1 escalation-calibration gap](PROJECT-MEMORY.md): a parser-handled-but-subtly-wrong parse never escalates.
+
+**Decision.** Add a parser→LLM escalation **gate**: after a successful deterministic parse, if the utterance names a **NEW** uppercase point label (not already in the figure) that the emitted commands **never reference**, treat the parse as **weak** and escalate to the LLM rather than commit. The signal is `droppedNewLabels(utterance, commands, existingPoints)`: input labels minus (labels used anywhere in the commands, incl. inside ids like `circle-P`/`tan-B`) minus (labels already in the figure). Wired into `App.submit` alongside the existing dry-run gate.
+
+**Why "new" and "unconsumed".** A typo'd keyword that drops a clause leaves the label it introduced **orphaned** — it appears in the text but in no command. Requiring the label to be **NEW** avoids a false escalation when a command merely doesn't re-reference an **existing** point (e.g. a tangent at an already-placed point — that label is context, not dropped). Validated across 12 real per-step sequences: **zero false positives**; the typo flags `["D"]`, the correctly-spelled twin flags `[]`.
+
+**Result.** "מנוקדה D …" no longer commits a tangent-without-D; it escalates to the LLM (which normalises the typo and emits the full tangent + apex). The grammar stays strict (no fuzzy keyword matching — that long tail is the LLM's job). **1232 tests green, build clean.** Locked by `dropped-labels.test.ts` (the operator's exact typo flags D; the correct spelling and existing-label/​id-embedded cases flag nothing). The end-to-end LLM recovery is exercised in the app (the fallback is mocked in tests, per the no-autonomous-API rule).

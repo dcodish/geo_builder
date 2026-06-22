@@ -57,6 +57,12 @@ export interface FigureProps {
   onToggleSegDashed?: (id: Id) => void;
   /** Localised strings for the on-canvas segment menu. */
   segMenuText?: { hide: string; show: string; dashed: string; solid: string };
+  /** Circle ids hidden on the figure (a display preference, like {@link segStyle}'s hidden). */
+  hiddenCircles?: Set<Id>;
+  /** Hide/show a circle (clicked on the canvas) — the host wires the store's `toggleCircleHidden`. */
+  onToggleCircleHidden?: (id: Id) => void;
+  /** Localised strings for the on-canvas circle menu. */
+  circleMenuText?: { hide: string; show: string };
 }
 
 interface View {
@@ -121,24 +127,29 @@ export function Figure({
   onToggleSegHidden,
   onToggleSegDashed,
   segMenuText,
+  hiddenCircles,
+  onToggleCircleHidden,
+  circleMenuText,
 }: FigureProps) {
   const lit = (id: string): boolean => !!highlight && highlight.has(id);
   const isHidden = (id: string): boolean => !!hidden && hidden.has(id);
   const segOf = (id: string) => segStyle?.[id] ?? {};
+  const circHidden = (id: string): boolean => !!hiddenCircles && hiddenCircles.has(id);
   const editable = !!onToggleHidden || !!onRename; // points are clickable only when the host wires the edit menu
   const segEditable = !!onToggleSegHidden || !!onToggleSegDashed; // ditto for segments
+  const circEditable = !!onToggleCircleHidden; // ditto for circles
   const [view, setView] = useState<View>(IDENTITY);
   const [hotCross, setHotCross] = useState<number | null>(null);
   const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>('');
   // The on-canvas edit menu: a point (rename / hide) or a segment (hide / dashed), where (container px),
   // and a transient note (e.g. "taken").
-  const [menu, setMenu] = useState<{ kind: 'point' | 'segment'; id: string; x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<{ kind: 'point' | 'segment' | 'circle'; id: string; x: number; y: number } | null>(null);
   const [renameVal, setRenameVal] = useState('');
   const [menuNote, setMenuNote] = useState('');
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  function openMenu(kind: 'point' | 'segment', id: string, screen: Vec) {
+  function openMenu(kind: 'point' | 'segment' | 'circle', id: string, screen: Vec) {
     setMenu({ kind, id, x: view.panX + screen.x * view.zoom, y: view.panY + screen.y * view.zoom });
     setRenameVal('');
     setMenuNote('');
@@ -270,17 +281,36 @@ export function Figure({
               `transform.scale`. */}
           {scene.circles.map((circ) => {
             const c = transform.toScreen(circ.center);
+            const r = circ.r * transform.scale;
             return (
-              <circle
-                key={circ.id}
-                data-id={circ.id}
-                cx={c.x}
-                cy={c.y}
-                r={circ.r * transform.scale}
-                fill="none"
-                stroke={lit(circ.id) ? ACCENT : '#334155'}
-                strokeWidth={lit(circ.id) ? stroke * 2 : stroke}
-              />
+              <g key={circ.id} data-id={circ.id}>
+                {circHidden(circ.id) ? (
+                  // A HIDDEN circle: a faint dashed ghost — near-invisible but clickable, so the toggle is
+                  // reversible right on the outline (mirrors a hidden segment). Its points still constrain.
+                  circEditable && (
+                    <circle cx={c.x} cy={c.y} r={r} fill="none" stroke="#e2e8f0" strokeWidth={stroke} strokeDasharray={`${stroke * 1.5} ${stroke * 3}`} />
+                  )
+                ) : (
+                  <circle cx={c.x} cy={c.y} r={r} fill="none" stroke={lit(circ.id) ? ACCENT : '#334155'} strokeWidth={lit(circ.id) ? stroke * 2 : stroke} />
+                )}
+                {circEditable && (
+                  // A wide transparent hit-ring so the thin outline is easy to click → the circle menu.
+                  <circle
+                    cx={c.x}
+                    cy={c.y}
+                    r={r}
+                    fill="none"
+                    stroke="transparent"
+                    strokeWidth={Math.max(stroke * 6, 10 / view.zoom)}
+                    style={{ cursor: 'pointer' }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openMenu('circle', circ.id, { x: c.x, y: c.y - r });
+                    }}
+                  />
+                )}
+              </g>
             );
           })}
 
@@ -534,7 +564,7 @@ export function Figure({
 
       {/* On-canvas edit menu (FR-RN-10): click a POINT to rename it or hide/show its label+dot, or a
           SEGMENT to hide/show it or make it dashed/solid. A transparent backdrop closes it on outside click. */}
-      {menu && (menu.kind === 'point' ? editable : segEditable) && (
+      {menu && (menu.kind === 'point' ? editable : menu.kind === 'segment' ? segEditable : circEditable) && (
         <>
           <div style={{ position: 'absolute', inset: 0 }} onClick={() => setMenu(null)} />
           <div
@@ -555,7 +585,7 @@ export function Figure({
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{menu.kind === 'point' ? menu.id : menu.id.replace(/^seg-/, '')}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{menu.kind === 'point' ? menu.id : menu.kind === 'segment' ? menu.id.replace(/^seg-/, '') : menu.id.replace(/^circle-/, '⊙ ')}</div>
             {menu.kind === 'point' ? (
               <>
                 {onRename && !isHidden(menu.id) && (
@@ -587,7 +617,7 @@ export function Figure({
                   </button>
                 )}
               </>
-            ) : (
+            ) : menu.kind === 'segment' ? (
               <>
                 {onToggleSegHidden && (
                   <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onToggleSegHidden(menu.id); setMenu(null); }}>
@@ -597,6 +627,14 @@ export function Figure({
                 {onToggleSegDashed && !segOf(menu.id).hidden && (
                   <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onToggleSegDashed(menu.id); setMenu(null); }}>
                     {segOf(menu.id).dashed ? (segMenuText?.solid ?? 'solid') : (segMenuText?.dashed ?? 'dashed')}
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                {onToggleCircleHidden && (
+                  <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onToggleCircleHidden(menu.id); setMenu(null); }}>
+                    {circHidden(menu.id) ? (circleMenuText?.show ?? 'show') : (circleMenuText?.hide ?? 'hide')}
                   </button>
                 )}
               </>

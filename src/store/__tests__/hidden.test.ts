@@ -94,3 +94,30 @@ describe('store.toggleSegHidden / toggleSegDashed — per-segment display style'
     expect(s().segStyle).toEqual({});
   });
 });
+
+describe('store.toggleCircleHidden — hide/show a circle (ADR-088)', () => {
+  const CIRCLE: Command = { type: 'circle', id: 'circle-O', center: 'O', radius: 5 };
+
+  it('toggles a circle in and out of the hidden set', () => {
+    s().execute(CIRCLE, 'circle O radius 5');
+    expect(s().hiddenCircles).toEqual([]);
+    s().toggleCircleHidden('circle-O');
+    expect(s().hiddenCircles).toEqual(['circle-O']);
+    s().toggleCircleHidden('circle-O'); // toggles back off
+    expect(s().hiddenCircles).toEqual([]);
+  });
+
+  it('rename rewrites the hidden circle id so it stays hidden under the renamed centre', () => {
+    s().execute(CIRCLE, 'circle O radius 5');
+    s().toggleCircleHidden('circle-O');
+    s().rename('O', 'G');
+    expect(s().hiddenCircles).toEqual(['circle-G']);
+  });
+
+  it('is UI-only — not restored by undo, reset by clear', () => {
+    s().execute(CIRCLE, 'circle O radius 5');
+    s().toggleCircleHidden('circle-O');
+    s().clear();
+    expect(s().hiddenCircles).toEqual([]);
+  });
+});

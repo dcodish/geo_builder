@@ -3,12 +3,12 @@
 exports[`driven-solver stability snapshot (Wave-2/3 gate) > circle O r5 + A,B on-circle + |AB|=7 (coupled: 2 on-circle, 1 chord constraint) 1`] = `
 {
   "A": [
-    -3.7537,
-    3.303,
+    -4.6587,
+    1.8157,
   ],
   "B": [
-    -3.3775,
-    -3.6868,
+    -1.9085,
+    -4.6214,
   ],
   "O": [
     0,
@@ -45,8 +45,8 @@ exports[`driven-solver stability snapshot (Wave-2/3 gate) > circle O r5 + inscri
     5,
   ],
   "B": [
-    -3.3775,
-    -3.6868,
+    -1.9085,
+    -4.6214,
   ],
   "C": [
     4.9809,

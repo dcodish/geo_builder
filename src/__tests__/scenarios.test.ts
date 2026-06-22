@@ -100,6 +100,111 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'set-circle-radius-by-value-no-segment',
+    title: '"radius of circle P is 4" sets an existing circle\'s radius by value — no segment, no invented point',
+    guards:
+      "operator session (2026-06-22): incircle P of triangle BDA, then \"רדיוס מעגל P הוא 4\" → built-nothing (escalated to the LLM). To set the radius the operator had to invent a point and write \"PF=4\", which drew the radius segment. Fix (ADR-087): a `setRadius` parser rule + a `set-radius` engine command. For a through-radius circle (the incircle's radius is |P·foot|) it adds a distance constraint that FLEXES the figure to the stated size; for a free/length radius it sets the value. No segment is drawn and no point is invented. Fires only for an EXISTING circle (creation 'circle O radius 5' still goes to `circle`).",
+    steps: ['משולש BDA', 'מעגל P חסום במשולש BDA', 'רדיוס מעגל P הוא 4'],
+    check: (fig) => {
+      allStepsOk(fig);
+      // the incircle's radius (|centre · its tangent foot|) is now 4
+      const circ = fig.construction.objects.find((o) => o.kind === 'circle' && o.id === 'circle-P') as { center: Id; radius: { via: string; point?: Id } } | undefined;
+      expect(circ?.radius.via).toBe('through');
+      const P = at(fig, 'P'), F = at(fig, circ!.radius.point!);
+      expect(dist(P, F), 'radius set to 4').toBeCloseTo(4, 2);
+      // no radius segment was drawn (no segment touches the centre P)
+      const drewRadiusSeg = fig.construction.objects.some((o) => o.kind === 'segment' && ((o as { a: Id }).a === 'P' || (o as { b: Id }).b === 'P'));
+      expect(drewRadiusSeg, 'no radius segment drawn').toBe(false);
+    },
+  },
+  {
+    id: 'existing-vertex-on-extension-keeps-order',
+    title: '"C on the continuation of DA" puts an EXISTING on-circle C beyond A (order D→A→C), not at the near intersection',
+    guards:
+      "operator session (2026-06-22): triangle ABC inscribed, tangent at B from D, then \"C נמצאת על המשך DA\" (C on the continuation of DA). It aligned D,A,C but in the WRONG order — C landed BETWEEN D and A (param 0.18), not beyond A as asked. Root cause (ADR-086): `pointOnExtension` always emitted `point-on-segment … extension` (t=1.3), but C already existed as an on-circle vertex, so the apply path kept C on the circle and read it as a bare collinearity — picking the NEAR secant intersection and dropping the order. Fix: when the named point ALREADY EXISTS, emit an ORDERED collinearity `set-line [D, A, C]` instead, which drives the existing point (on whatever carrier it has — here the circle) to sit beyond the far end in order. C stays on the circle as the FAR secant point. A genuinely new point is still created on the extension.",
+    steps: ['משולש ABC חסום במעגל', 'מנקודה D יוצא משיק למעגל בנקודה B', 'C נמצאת על המשך DA', 'DA'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const D = at(fig, 'D'), A = at(fig, 'A'), C = at(fig, 'C'), O = at(fig, 'O');
+      // collinear, and A strictly between D and C (order D→A→C — the "continuation of DA")
+      const cross = (A.x - D.x) * (C.y - D.y) - (A.y - D.y) * (C.x - D.x);
+      expect(Math.abs(cross), 'D,A,C collinear').toBeLessThan(1e-2);
+      const ux = A.x - D.x, uy = A.y - D.y, L2 = ux * ux + uy * uy;
+      const parC = ((C.x - D.x) * ux + (C.y - D.y) * uy) / L2; // D=0, A=1
+      expect(parC, 'C beyond A on ray D→A (param > 1)').toBeGreaterThan(1);
+      // C is still on the circle (the far secant point), not pulled off it
+      expect(dist(O, C), 'C still on circle').toBeCloseTo(dist(O, A), 2);
+    },
+  },
+  {
+    id: 'inscribed-triangle-scalene-tangent-meets-CA',
+    title: 'inscribed triangle is scalene by default, so "tangent at B meets the extension of CA at D" builds at the default view',
+    guards:
+      "operator session vob7kih2 (2026-06-22): triangle ABC inscribed, then the one-sentence \"המשיק למעגל בנקודה B והמשך CA נפגשים בנקודה D\" ERRORED \"cannot construct D: lines tan-B and line-CA are parallel\". Root cause (ADR-085): the inscribed triangle defaulted to ISOSCELES — pure golden-angle spacing gives 3 points two equal gaps, putting B at the arc-midpoint of AC (AB=BC), and the tangent at an arc-midpoint is EXACTLY parallel to the chord, so the deterministic line∩line had no solution at the default seed. That isosceles default is itself a fixed assumption the student never stated (ADR-052). Fix: a bounded alternating skew in `nextTheta` makes the default a GENERIC scalene triangle, so tangent@B ∦ CA and D builds. (Operator also reported D always landing on one side — fixed separately by sampling a lone on-line marker's sign, see phase-sample.test.ts.)",
+    steps: ['משולש ABC חסום במעגל', 'המשיק למעגל בנקודה B והמשך CA נפגשים בנקודה D'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), B = at(fig, 'B'), A = at(fig, 'A'), C = at(fig, 'C'), D = at(fig, 'D');
+      // D is the genuine intersection: on the tangent at B (DB ⟂ OB) and collinear with C, A
+      const dot = (u: Vec, v: Vec) => u.x * v.x + u.y * v.y;
+      expect(Math.abs(dot({ x: D.x - B.x, y: D.y - B.y }, { x: O.x - B.x, y: O.y - B.y })), 'D on tangent at B').toBeLessThan(1e-3);
+      const cross = (A.x - C.x) * (D.y - C.y) - (A.y - C.y) * (D.x - C.x);
+      expect(Math.abs(cross), 'D collinear with C,A').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'tangent-from-external-D-then-pinned-by-extension',
+    title: '"from D a tangent at B" creates D on the tangent immediately; "extension of CA meets the tangent at D" pins it',
+    guards:
+      "operator session nhm9154u / twiwst5h (2026-06-22): triangle ABC inscribed in circle O, then \"מנקודה D יוצא משיק למעגל בנקודה B\" (from point D a tangent touches at B) drew the tangent at B but DROPPED D (operator: \"still didnt create point D and just created a tangent line\"), and the defining step \"המשך CA נפגש עם המשיק בנקודה D\" (the extension of CA meets the tangent at D) was not-handled → escalated to the LLM → built nothing. The engine fully supports the figure (the one-sentence form already built D as a line∩line). Fix (ADR-084, operator chose \"D appears at step 2\"): (1) `tangentLine` creates the NAMED external apex D as a free marker ON the tangent line (point-on-line), so it shows immediately and slides; (2) a tight `extensionMeetsExistingPoint` rule reads \"extension of CA meets the tangent at [existing] D\" as set-line [C,A,D] — D is already on the tangent, so this only has to put it on the CA extension, which DRIVES its on-line DOF to the crossing (order C→A→D). No parse-context plumbing needed.",
+    steps: ['משולש ABC חסום במעגל', 'מנקודה D יוצא משיק למעגל בנקודה B', 'המשך CA נפגש עם המשיק בנקודה D'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), B = at(fig, 'B'), A = at(fig, 'A'), C = at(fig, 'C'), D = at(fig, 'D');
+      // D exists, lies on the tangent at B (⟂ the radius OB) and on the extension of CA, beyond A
+      const dot = (u: Vec, v: Vec) => u.x * v.x + u.y * v.y;
+      expect(Math.abs(dot({ x: D.x - B.x, y: D.y - B.y }, { x: O.x - B.x, y: O.y - B.y })), 'D on tangent (DB ⟂ OB)').toBeLessThan(1e-3);
+      const cross = (A.x - C.x) * (D.y - C.y) - (A.y - C.y) * (D.x - C.x);
+      expect(Math.abs(cross), 'D collinear with C,A').toBeLessThan(1e-3);
+      expect(dot({ x: D.x - A.x, y: D.y - A.y }, { x: A.x - C.x, y: A.y - C.y }), 'D beyond A (CA extension)').toBeGreaterThan(0);
+    },
+  },
+  {
+    id: 'unnamed-circle-secant-full-q4',
+    title: '"one circle → no name": "BD חותך את המעגל בנקודה A" (the definite "the circle") resolves to the single circle',
+    guards:
+      "operator principle (2026-06-22): \"when there is only ONE circle in the diagram, I should not have to say its name.\" The full bagrut Q4 (quad BKCD, KB∥CD, triangle KCD inscribed, KB tangent, then the secant BD cutting the circle at A) couldn't be completed because the secant step \"BD חותך את המעגל בנקודה A\" used the DEFINITE article (\"המעגל\" / \"the circle\", no name) and returned not-handled → escalated to the LLM. Root cause: `lineMeetsCircle` / `extendOntoCircle` resolved the circle via `circleCenter` (NAMED only) AND anchored the crossing point on \"circle <name>\" (a name letter required after the circle word) — both failed for \"the circle\". Fix (ADR-083): a `resolveMentionedCircle` helper resolves the single circle when the utterance mentions a circle at all (named OR definite), and a `crossingAfterCircle` helper anchors the \"at X\" with the name optional. Guarded against the line∩line false-grab — an utterance mentioning NO circle still must not be read as a circle cut (see unnamed-circle.test.ts NEGATIVE case).",
+    steps: ['מרובע BKCD', 'KB מקביל ל CD', 'משולש KCD חסום במעגל', 'KB משיק למעגל', 'BD חותך את המעגל בנקודה A'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), K = at(fig, 'K'), B = at(fig, 'B'), C = at(fig, 'C'), A = at(fig, 'A');
+      // the unnamed secant landed A on the circle, and the tangent/parallel givens still hold
+      expect(dist(O, A), 'A on circle (|OA| = |OC|)').toBeCloseTo(dist(O, C), 3);
+      const dot = (u: Vec, v: Vec) => u.x * v.x + u.y * v.y;
+      expect(Math.abs(dot({ x: K.x - O.x, y: K.y - O.y }, { x: B.x - K.x, y: B.y - K.y })), 'OK ⟂ KB (tangent)').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'segment-tangent-no-explicit-touch-point',
+    title: '"KB משיק למעגל" (tangent to the circle, NO "at K") — the touch point is inferred from the on-circle endpoint',
+    guards:
+      "operator sessions xstllu0i / mmfbpvaz (2026-06-22): quad BKCD, KB ∥ CD, triangle KCD inscribed in circle O, then \"KB משיק למעגל\" — repeatedly reported as STILL broken after the ADR-081 fix. The ADR-081/075 endpoint-tangency paths in `tangentLine` were ALL gated behind an explicit \"at X\" / \"בנקודה X\" clause (`if (!center || !atM) return null`). The student's natural phrasing OMITS the touch point because it is geometrically forced — K is already on the circle (inscribed-triangle vertex), so the only possible tangency point IS K. With no \"at\" clause the rule bailed; `tangentFromExternal` also bailed (both K,B already exist → no unique external apex); so it fell through to the LLM, which returned \"not-understood\" / \"built-nothing\". The ENGINE was never the problem — fed the command it builds a true tangent (K on circle, OK⟂KB, KB∥CD, verifier clean). Fix (ADR-082): when there is no \"at\" clause, INFER the touch from the named segment's endpoint that is a member of THIS circle (exactly one — both endpoints on it would be a chord, not a tangent). Then the existing ADR-081 branch emits point-on-circle K + set-perpendicular(O,K,K,B).",
+    steps: ['מרובע BKCD', 'KB מקביל ל CD', 'משולש KCD חסום במעגל', 'KB משיק למעגל'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), K = at(fig, 'K'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      // K lies on the circle (its radius equals the other inscribed vertices')
+      expect(dist(O, K), 'K on circle (|OK| = |OC|)').toBeCloseTo(dist(O, C), 3);
+      expect(dist(O, K), 'K on circle (|OK| = |OD|)').toBeCloseTo(dist(O, D), 3);
+      // OK ⟂ KB — a real tangent at K
+      const dot = (u: Vec, v: Vec) => u.x * v.x + u.y * v.y;
+      expect(Math.abs(dot({ x: K.x - O.x, y: K.y - O.y }, { x: B.x - K.x, y: B.y - K.y })), 'OK ⟂ KB (tangent)').toBeLessThan(1e-3);
+      // KB ∥ CD still holds
+      const cross = (B.x - K.x) * (D.y - C.y) - (B.y - K.y) * (D.x - C.x);
+      expect(Math.abs(cross), 'KB ∥ CD').toBeLessThan(1e-3);
+    },
+  },
+  {
     id: 'diameter-from-point-cuts-side-onto-segment',
     title: '"the diameter from F cuts side AC at E" — E lands ON segment AC (the figure flexes), and "קוטר" parses',
     guards:

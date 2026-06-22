@@ -416,6 +416,10 @@ export interface GeoState {
   /** Per-segment display style (keyed by seg id, e.g. `seg-AB`) — hidden and/or dashed. A DISPLAY
    *  preference like {@link hidden}: UI-only, not undoable; rewritten by `rename`/`merge`; reset by `clear`. */
   segStyle: Record<Id, { hidden?: boolean; dashed?: boolean }>;
+  /** Circle ids (e.g. `circle-O`) hidden on the figure — a DISPLAY preference like {@link hidden} (the
+   *  circle still constrains its points; it's just not drawn). UI-only, not undoable; rewritten by
+   *  `rename`/`merge` (the id carries the centre letter); reset by `clear`. (ADR-088) */
+  hiddenCircles: Id[];
 
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
   execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;
@@ -448,6 +452,8 @@ export interface GeoState {
   toggleSegHidden: (id: Id) => void;
   /** Toggle a segment dashed/solid on the figure (a display preference, not geometry). */
   toggleSegDashed: (id: Id) => void;
+  /** Toggle a circle hidden/shown on the figure (a display preference, not geometry). */
+  toggleCircleHidden: (id: Id) => void;
   /** Relabel a point everywhere (e.g. E → G) — rewrites every fact, one undo entry. */
   rename: (from: Id, to: Id) => RenameResult;
   /** Fold one point into another (e.g. F → E, both already present) — drops F's definition,
@@ -552,6 +558,7 @@ export const useGeoStore = create<GeoState>()(
       radiusOverrides: {},
       hidden: [],
       segStyle: {},
+      hiddenCircles: [],
 
       execute: (cmd, utterance, group) => {
         const facts = get().facts;
@@ -698,6 +705,11 @@ export const useGeoStore = create<GeoState>()(
       toggleSegHidden: (id) => set({ segStyle: setSegFlag(get().segStyle, id, 'hidden') }),
       toggleSegDashed: (id) => set({ segStyle: setSegFlag(get().segStyle, id, 'dashed') }),
 
+      toggleCircleHidden: (id) => {
+        const h = get().hiddenCircles;
+        set({ hiddenCircles: h.includes(id) ? h.filter((x) => x !== id) : [...h, id] });
+      },
+
       rename: (from, to) => {
         const F = from.toUpperCase();
         const T = to.toUpperCase();
@@ -716,6 +728,7 @@ export const useGeoStore = create<GeoState>()(
           })),
           hidden: get().hidden.map((h) => (h === F ? T : h)), // a hidden point keeps its hidden state under the new letter
           segStyle: renameSegStyle(get().segStyle, F, T), // a styled segment keeps its style under the renamed endpoint
+          hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)), // a hidden circle tracks its renamed centre
           selectedId: null,
         });
         return { ok: true };
@@ -742,12 +755,12 @@ export const useGeoStore = create<GeoState>()(
             utterance: f.utterance ? f.utterance.split(F).join(T) : f.utterance,
           }))
           .filter((f) => !collapsedDegenerate(f.cmd)); // drop facts that collapsed (segment EF → EE, …)
-        set({ facts: merged, hidden: [...new Set(get().hidden.map((h) => (h === F ? T : h)))], segStyle: renameSegStyle(get().segStyle, F, T), selectedId: null });
+        set({ facts: merged, hidden: [...new Set(get().hidden.map((h) => (h === F ? T : h)))], segStyle: renameSegStyle(get().segStyle, F, T), hiddenCircles: [...new Set(get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)))], selectedId: null });
         return { ok: true };
       },
 
       clear: () => {
-        set({ facts: [], selectedId: null, seed: 0, radiusOverrides: {}, hidden: [], segStyle: {} });
+        set({ facts: [], selectedId: null, seed: 0, radiusOverrides: {}, hidden: [], segStyle: {}, hiddenCircles: [] });
         useGeoStore.temporal.getState().clear();
       },
     }),

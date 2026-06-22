@@ -701,6 +701,7 @@ export type Command =
   | { type: 'segment'; a: Id; b: Id }
   | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number }
   | { type: 'set-distance'; a: Id; b: Id; value: number }
+  | { type: 'set-radius'; circle: Id; value: number } // a circle's radius = value (no segment drawn — ADR-087)
   | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-ratio'; a: Id; b: Id; c: Id; d: Id; k: number; add?: number } // |ab| = k·|cd| + add
   | { type: 'set-length-radius'; a: Id; b: Id; circle: Id; center: Id; witness: Id; k: number; add?: number } // |ab| = k·R (ADR-071)

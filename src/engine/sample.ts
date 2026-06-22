@@ -116,6 +116,13 @@ export function applySeed(c: Construction, seed: number): Construction {
   const circJitOf = (id: Id) =>
     inscribedPolyVerts.has(id) || (!anyPolyTouchesCircle && freeCircle.length >= 3) ? Math.PI / 6 : Math.PI * 0.85;
 
+  // How many free on-line markers sit on each line. A LONE marker (e.g. a tangent's single external apex,
+  // ADR-084) may flip to EITHER side of the anchor — a fixed side is a fixed assumption (ADR-085); a ±PAIR
+  // (a named line "CD": C at +offset, D at −offset) must keep its relative signs so the segment between
+  // them keeps straddling the anchor.
+  const onLinePerLine = new Map<Id, number>();
+  for (const o of c.objects) if (isFreeOnLine(o)) onLinePerLine.set((o as OnLinePoint).line, (onLinePerLine.get((o as OnLinePoint).line) ?? 0) + 1);
+
   const objects = c.objects.map((o) => {
     if (o.kind === 'free-point' && !o.pinned) {
       const dx = o.x - cx;
@@ -146,12 +153,15 @@ export function applySeed(c: Construction, seed: number): Construction {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
       return { ...o, t: 1.15 + jr() * 1.05 }; // t ∈ [1.15, 2.2], still beyond the segment
     }
-    // Free on-line marker (ADR-036): slide it along its line by scaling the signed offset.
-    // Sign is preserved so a pair straddling the anchor (a tangent's C at +offset, D at −offset)
-    // keeps straddling — the segment between them still spans the touch point, just a different length.
+    // Free on-line marker (ADR-036): slide it along its line by scaling the signed offset. A LONE marker may
+    // also FLIP sides (ADR-085 — a fixed side is a fixed assumption, ADR-052); a ±PAIR keeps its signs so the
+    // segment between them keeps straddling the anchor (a tangent's C at +offset, D at −offset).
     if (isFreeOnLine(o)) {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
-      return { ...o, offset: (o as OnLinePoint).offset * (0.4 + jr() * 2) }; // 0.4×–2.4× the default extent, sign kept
+      const mag = 0.4 + jr() * 2; // 0.4×–2.4× the default extent
+      const lone = (onLinePerLine.get((o as OnLinePoint).line) ?? 0) <= 1;
+      const sign = lone && jr() < 0.5 ? -1 : 1; // a lone marker may sit on either side of the anchor
+      return { ...o, offset: (o as OnLinePoint).offset * mag * sign };
     }
     // Free SHAPE-PARAMETER DOFs (ADR-033) — a rhombus's angle, a rectangle/right-triangle's
     // offset, a trapezoid's top ratio. Varying these lets "show another configuration" reach a
