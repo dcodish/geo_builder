@@ -104,6 +104,33 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'q4-constraints-order-independent',
+    title: 'full bagrut Q4 builds with CE⟂AB entered BEFORE the size givens (CD=36, DE=18) — order-independent',
+    guards:
+      "operator (session zqvtvh15): building the full Q4, CE⟂AB failed 'over-constrained' because it was entered before CD=36, DE=18 — without the sizes the figure is an under-determined coupled solve the engine can't land, but WITH them it's determinate and the ⟂ solves. The operator's principle: the diagram must build the SAME regardless of entry order. Fix (ADR-104): after the in-order pass, replay RETRIES still-failed CONSTRAINT-only facts against the now-complete figure, to a fixpoint — so a constraint typed too early is effectively re-ordered to AFTER the givens that pin it. Here CE⟂AB defers past CD=36/DE=18 and then holds. (Builds on ADR-103, which made the circle CENTRES drivable so |CD|=36 is reachable at all.)",
+    steps: [
+      'שני מעגלים נחתכים בנקודות A ו B',
+      'נקודה C על מעגל P',
+      'המשך CA חותך את מעגל O בנקודה D',
+      'המשך CB חותך את מעגל O בנקודה E',
+      'נקודה G על המשך DE',
+      'CG חותך את מעגל P בנקודה F',
+      'AF ו BC נחתכים בנקודה H',
+      '∠GEC = ∠CHA',
+      'CE⊥AB', // entered BEFORE the sizes — used to fail; now deferred until CD/DE pin the figure
+      'CD=36',
+      'DE=18',
+    ],
+    check(fig) {
+      allStepsOk(fig); // every step ends 'ok' — CE⟂AB resolved after the sizes via the retry
+      const C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E'), A = at(fig, 'A'), B = at(fig, 'B');
+      expect(dist(C, D)).toBeCloseTo(36, 0); // |CD| = 36
+      expect(dist(D, E)).toBeCloseTo(18, 0); // |DE| = 18
+      const dot = (E.x - C.x) * (B.x - A.x) + (E.y - C.y) * (B.y - A.y);
+      expect(Math.abs(dot) / (Math.hypot(E.x - C.x, E.y - C.y) * Math.hypot(B.x - A.x, B.y - A.y))).toBeLessThan(0.02); // CE ⟂ AB
+    },
+  },
+  {
     id: 'distance-drives-circle-centres-apart',
     title: 'bagrut Q4: "CD=36" across two intersecting circles spreads the circle centres so it holds',
     guards:

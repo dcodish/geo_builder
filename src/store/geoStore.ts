@@ -170,6 +170,44 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
     }
     claim();
   }
+  // ORDER-INDEPENDENCE ([ADR-104](docs/06-decisions.md#adr-104)): a CONSTRAINT that couldn't be satisfied
+  // at its position — an under-determined solve the engine can't pin down yet — may become solvable once
+  // LATER facts add givens that remove the slack (e.g. "CE⟂AB" entered before "CD=36, DE=18": with the
+  // sizes the figure is determinate and the ⟂ solves; without them it's an unconstrained coupled solve the
+  // solver can't land). So after the in-order pass, RETRY the still-failed constraint-only facts against the
+  // now-complete figure, to a fixpoint — applying such a constraint LAST is exactly the working reordering.
+  // Only pure constraints (no NEW points) are retried: re-ordering a point-introducing fact to the end would
+  // strand its dependents. A genuinely contradictory constraint simply keeps failing. This makes the figure
+  // build the same whatever order the constraints were typed (the operator's "order shouldn't matter").
+  const deferrable = (f: Fact): boolean => {
+    if (!f.enabled || status[f.id] === 'ok' || status[f.id] === 'disabled') return false;
+    const ec = lowerOne(f.cmd, symtab);
+    return ec.length > 0 && ec.every((c) => introducedPointIds(c).length === 0);
+  };
+  for (let pass = 0; pass < facts.length && facts.some(deferrable); pass++) {
+    let progressed = false;
+    for (const f of facts) {
+      if (!deferrable(f)) continue;
+      const engineCmds = lowerOne(f.cmd, symtab);
+      let trial = cur;
+      let ok = true;
+      for (const ec of engineCmds) {
+        const r = applyStep(trial, ec);
+        if (r.ok) trial = r.construction;
+        else { ok = false; break; }
+      }
+      if (ok) {
+        cur = trial;
+        status[f.id] = 'ok';
+        applied.push(...(engineCmds as Command[]));
+        progressed = true;
+      }
+    }
+    if (!progressed) break;
+  }
+  // `lastError` now reflects whatever genuinely remains unsatisfiable after the retries (null if all clear).
+  const stillFailed = facts.find((f) => f.enabled && status[f.id] !== 'ok' && status[f.id] !== 'disabled');
+  lastError = stillFailed ? status[stillFailed.id] : null;
   const sampled = applySeed(cur, seed);
   // A dialed radius (the DOF slider) overrides the sampled value for that free circle — a viewing
   // scratchpad (ADR-048): it's cleared by "show another configuration", never a fixed given (ADR-052).
