@@ -254,7 +254,7 @@ function replaceCyclicForDiameter(prev: Construction, cmd: Command): Constructio
 function driveCoincideOn(objects: GeoObject[], priorConstraints: Constraint[], p: Id, q: Id, carrier: Id): Construction {
   const coincide: Constraint = { type: 'coincide', p, q };
   const objs = objects.map((o) =>
-    o.id === carrier && (o.kind === 'on-circle' || o.kind === 'on-segment')
+    o.id === carrier && (o.kind === 'on-circle' || o.kind === 'on-segment' || o.kind === 'free-point')
       ? ({ ...o, solve: { constraint: coincide, branch: 0 } } as GeoObject)
       : o,
   );
@@ -576,19 +576,25 @@ function freeCarrierAncestor(objects: GeoObject[], start: Id): Id | null {
  */
 function reinterpretAsConstraint(prev: Construction, cmd: Command): Construction | null {
   if (!POINT_PLACEMENTS.has(cmd.type)) return null;
+  if (cmd.type === 'point-on-segment') return null; // a "P on segment" redefinition is a COLLINEARITY → reinterpretAsCollinear owns it
   const P = (cmd as { id?: Id }).id;
   if (!P) return null;
   const existing = prev.objects.find((o) => o.id === P);
   if (!existing || !isGeoPoint(existing)) return null; // only a *re*definition of an existing point
   const H = `~${P}`;
   if (prev.objects.some((o) => o.id === H)) return null; // already reinterpreted once
-  // "A is the midpoint of CD" where A is ALREADY a free point ON segment CD ("A על CD" first): drive A's
-  // OWN `t` to the midpoint, rather than an ancestor (ADR-107 Am.). Scoped to `midpoint` so the
-  // point-on-segment redefinition (→ reinterpretAsCollinear) and the second-placement-pins-via-ancestor
-  // cases (ADR-028) keep their behaviour. A DERIVED midpoint target still falls back to a free ancestor.
-  const ownParam =
-    cmd.type === 'midpoint' && (existing.kind === 'on-segment' || existing.kind === 'on-circle') && (existing as { solve?: unknown }).solve === undefined ? P : null;
-  const carrier = ownParam ?? freeCarrierAncestor(prev.objects, P);
+  // GENERAL "use the existing point" rule: a second statement that would re-place an EXISTING point P
+  // ("A is the midpoint of CD", "F is the foot from C to AB", "P is the intersection of …") is a
+  // CONSTRAINT on P, not a redefinition. Prefer P's OWN free 1-DOF as the carrier — a non-extension
+  // on-segment `t` or an on-circle `θ` — so P slides to the stated spot directly (an EXTENSION point is
+  // excluded: its t>1 clamp can't reach an interior target — drive an ancestor instead). A DERIVED P (an
+  // intersection with no own DOF) falls back to a free ancestor (the ADR-028 "C = midpoint of OB" case).
+  const ownFree =
+    (existing as { solve?: unknown }).solve === undefined &&
+    ((existing.kind === 'on-segment' && !(existing as { extension?: boolean }).extension) ||
+      existing.kind === 'on-circle' ||
+      (existing.kind === 'free-point' && !(existing as { pinned?: boolean }).pinned && !(existing as { rigid?: boolean }).rigid));
+  const carrier = (ownFree ? P : null) ?? freeCarrierAncestor(prev.objects, P);
   if (!carrier) return null; // nothing free to move → a genuine over-constraint
   const withHelper = applyCommand(prev, { ...(cmd as object), id: H } as Command); // the new def under the hidden id
   return driveCoincideOn(withHelper.objects, withHelper.constraints, P, H, carrier);
