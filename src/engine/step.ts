@@ -582,7 +582,13 @@ function reinterpretAsConstraint(prev: Construction, cmd: Command): Construction
   if (!existing || !isGeoPoint(existing)) return null; // only a *re*definition of an existing point
   const H = `~${P}`;
   if (prev.objects.some((o) => o.id === H)) return null; // already reinterpreted once
-  const carrier = freeCarrierAncestor(prev.objects, P);
+  // "A is the midpoint of CD" where A is ALREADY a free point ON segment CD ("A על CD" first): drive A's
+  // OWN `t` to the midpoint, rather than an ancestor (ADR-107 Am.). Scoped to `midpoint` so the
+  // point-on-segment redefinition (→ reinterpretAsCollinear) and the second-placement-pins-via-ancestor
+  // cases (ADR-028) keep their behaviour. A DERIVED midpoint target still falls back to a free ancestor.
+  const ownParam =
+    cmd.type === 'midpoint' && (existing.kind === 'on-segment' || existing.kind === 'on-circle') && (existing as { solve?: unknown }).solve === undefined ? P : null;
+  const carrier = ownParam ?? freeCarrierAncestor(prev.objects, P);
   if (!carrier) return null; // nothing free to move → a genuine over-constraint
   const withHelper = applyCommand(prev, { ...(cmd as object), id: H } as Command); // the new def under the hidden id
   return driveCoincideOn(withHelper.objects, withHelper.constraints, P, H, carrier);

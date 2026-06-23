@@ -104,6 +104,21 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'midpoint-of-existing-on-segment-point',
+    title: '"A אמצע CD" when A is ALREADY a free point on CD drives A to the midpoint, not "already defined"',
+    guards:
+      'operator (session lqtx8fn5): A was placed on side CD ("A ו E נמצאות על הצלעות CD ו BD"), then "A אמצע CD" (A is the midpoint of CD) → weak:error → built-nothing ("\'A\' is already defined"). The midpoint redefinition went to `reinterpretAsConstraint`, but `freeCarrierAncestor` searched only A\'s ANCESTORS (C,D — free vertices, not param carriers), never A itself, so it found no carrier and gave up. Fix (ADR-107 Am.): for a `midpoint` redefinition, use A\'s OWN free on-segment DOF as the carrier — drive A\'s t to the midpoint of CD (the operator\'s working "AD=AC" was the manual equivalent). Scoped to `midpoint` so the collinear/second-placement reinterpretations are unaffected.',
+    steps: ['משולש BCD', 'A על CD', 'A אמצע CD'],
+    check(fig) {
+      allStepsOk(fig); // no "'A' is already defined"
+      const A = at(fig, 'A'), C = at(fig, 'C'), D = at(fig, 'D');
+      expect(dist(A, C), 'A is the midpoint of CD: |AC| = |AD|').toBeCloseTo(dist(A, D), 3);
+      // A stayed ON segment CD (collinear, between C and D at t≈0.5).
+      const t = ((A.x - C.x) * (D.x - C.x) + (A.y - C.y) * (D.y - C.y)) / ((D.x - C.x) ** 2 + (D.y - C.y) ** 2);
+      expect(t).toBeCloseTo(0.5, 2);
+    },
+  },
+  {
     id: 'bisector-onto-existing-point',
     title: '"EG חוצה זוית DEF" when G already exists (placed on DF) CONSTRAINS G to the bisector, not re-creates it',
     guards:
