@@ -18,7 +18,7 @@ import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
 import type { Crossing } from '@/render';
-import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, replay, useGeoStore } from '@/store/geoStore';
+import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import { logDebug } from '@/debug/sessionLog';
 import { nanoid } from 'nanoid';
@@ -34,6 +34,7 @@ export default function App() {
   const select = useGeoStore((s) => s.select);
   const cycleAlt = useGeoStore((s) => s.cycleAlt);
   const resample = useGeoStore((s) => s.resample);
+  const autoResolve = useGeoStore((s) => s.autoResolve);
   const radiusOverrides = useGeoStore((s) => s.radiusOverrides);
   const setRadius = useGeoStore((s) => s.setRadius);
   const seed = useGeoStore((s) => s.seed);
@@ -179,6 +180,26 @@ export default function App() {
     circleMembers: circleMembers(construction), // so "arc BC" resolves to the circle holding both B and C
   });
 
+  // After a step commits, VERIFY the figure meets every requirement; if not, auto-search alternative
+  // configurations (seeds + branches) for one that does (ADR-106). The search is synchronous and can be
+  // slow on a heavy figure, so it runs behind a "thinking" state painted first (double rAF). Only fires
+  // when the figure is actually short of its requirements — a clean (or under-determined PENDING) figure
+  // pays nothing.
+  const resolveAfterCommit = () => {
+    const st = useGeoStore.getState();
+    if (meetsRequirements(st.facts, st.seed)) return;
+    setThinking(true);
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        try {
+          autoResolve();
+        } finally {
+          setThinking(false);
+        }
+      }),
+    );
+  };
+
   async function submit(utterance: string) {
     setInputNote('');
     setLlmDropped([]);
@@ -225,6 +246,7 @@ export default function App() {
           r.commands.forEach((c) => execute(c, utterance, group));
           logDebug({ kind: 'input', utterance, locale, source: 'parser', commands: r.commands });
           setText('');
+          resolveAfterCommit();
           return;
         }
         // A cleanly-parsed CONSTRAINT that errored only because it can't be satisfied AT THIS POSITION (an
@@ -237,6 +259,7 @@ export default function App() {
           r.commands.forEach((c) => execute(c, utterance, group));
           logDebug({ kind: 'input', utterance, locale, source: 'parser', result: 'deferred-constraint', detail: outcome.detail, commands: r.commands });
           setText('');
+          resolveAfterCommit();
           return;
         }
         weak = outcome.reason; // parsed but produced nothing → fall through to the LLM second attempt
@@ -276,6 +299,7 @@ export default function App() {
     logDebug({ kind: 'input', utterance, locale, source: 'llm', built: out!.built.map((g) => g.step), dropped: out!.dropped });
     setLlmDropped(out!.dropped);
     setText('');
+    resolveAfterCommit();
   }
 
   // Figure + per-fact status are derived from the fact list.

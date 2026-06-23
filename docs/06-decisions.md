@@ -1543,3 +1543,21 @@ The existing `two-circles-mutual-tangent-secants` scenario was found to have the
 **Decision (feedback).** "Show another configuration" runs a synchronous multi-seed search that can take a moment on a heavy figure and froze the UI silently. The button now paints a **busy state first** (double `requestAnimationFrame` so the "thinking…" label + disabled button render before the blocking search) then runs the search. (Engine-side; the search itself stays synchronous and deterministic.)
 
 **Result.** **1264 tests green, build clean.** The extension-clamp is general — any constraint-driven extension point now stays on its extension (the directional given), not just this figure.
+
+---
+
+## ADR-106 — verify-then-search: before drawing, auto-search seeds + branches for a configuration that meets every requirement
+
+**Status.** Accepted (2026-06-23).
+
+**Context.** Operator: *"do we have a mechanism that, before drawing the solution, checks it meets all requirements and if not loops on other options?"* We had the **check** — the givens verifier ([verify.ts](../src/engine/verify.ts), [ADR-053](#adr-053)) re-derives every stated relation and reports `violations` — but it only **reported** (amber). Auto-looping existed only in pieces: the per-step multi-start (`solutionAccepted`), `firstSatisfyingSeed` (extension orders only, [ADR-098](#adr-098)), deferral ([ADR-104](#adr-104)). Nothing ran the **full** verifier and then searched alternative configurations for a clean one. The operator chose to build it over **seeds AND discrete branches**.
+
+**Decision.** A general pre-draw resolver in [geoStore.ts](../src/store/geoStore.ts):
+- `meetsRequirements(facts, seed)` — the unified bar: builds, **verifier-clean** (`violations` empty), every extension reaches its far side, points distinct, declared polygons convex. (A genuinely under-determined **pending** figure passes — its unsatisfied constraint is not a violation, [ADR-104]; there's nothing to search for.)
+- `findValidConfig(facts, fromSeed)` — if the current config doesn't meet the bar, loop: first the **current branches** over a wide seed sweep (continuous DOFs), then **alternative discrete branch combinations** (which intersection / arc side / root — bounded to the first few branchable points and capped combinations) each over a short seed sweep. Returns the chosen facts (branches set) + seed, or null. Deterministic.
+- `autoResolve()` store action — applies the found config (sets the branch facts + seed), or keeps the current figure (amber) if none found in budget.
+- Wired into `App.submit`: after each step commits, `resolveAfterCommit()` runs `autoResolve` **behind a "thinking" state** (the search is synchronous and can be slow on a heavy figure; double-`requestAnimationFrame` paints the busy state first). It fires **only** when the freshly-built figure falls short — a clean or pending figure pays nothing.
+
+**Result.** A figure that builds but doesn't satisfy a given (e.g. a wrong branch where the verifier flags a distance/angle) now auto-corrects to a verifier-clean drawing when one exists among the seeds/branches, before the student sees it; otherwise it stays amber (honest). Locked by `store/__tests__/auto-resolve.test.ts` (branch-flip + store action + clean-figure no-op). **1267 tests green, build clean.**
+
+**Scope / limits.** The search is bounded (≈40 current-branch seeds + ≤16 branch combos × 6 seeds) — it is not an exhaustive solver; a deeply under-determined coupled figure can still need the operator to add givens (it then shows pending/amber). It prefers the current branch assignment and only changes branches when the current can't be made clean.

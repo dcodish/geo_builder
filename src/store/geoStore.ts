@@ -376,6 +376,60 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120): numb
   return from;
 }
 
+/** Branchable derived-point command types — the discrete "alternatives" a figure can have (which of two
+ *  intersections, which arc side, which extension root). */
+const BRANCHABLE = new Set<AnyCommand['type']>(['point-by-distances', 'arc-midpoint', 'line-circle-intersection', 'circle-circle-intersection', 'point-on-segment']);
+
+/**
+ * Does the figure at this (facts, seed) meet EVERY requirement — it BUILDS, the givens verifier is clean,
+ * every extension reaches its far side, the points are distinct, and declared polygons draw convex? This is
+ * the bar the auto-resolver searches for before drawing ([ADR-106](docs/06-decisions.md#adr-106)). A
+ * genuinely under-determined PENDING figure also passes (its unsatisfied constraint is not a violation —
+ * it's waiting for more givens, ADR-104 — so there is nothing to search for).
+ */
+export function meetsRequirements(facts: Fact[], seed = 0): boolean {
+  const fig = replay(facts, seed);
+  return (
+    fig.lastError === null &&
+    fig.violations.length === 0 &&
+    extensionsClear(facts, fig) &&
+    pointsDistinct(fig.construction, fig.positions) &&
+    polygonsConvex(facts, fig.positions)
+  );
+}
+
+/**
+ * Before drawing, VERIFY the figure meets every requirement and, if not, LOOP over alternative
+ * configurations — continuous (seeds) AND discrete (branch choices: which intersection / arc side / root) —
+ * for one that does ([ADR-106](docs/06-decisions.md#adr-106)). Returns the chosen facts (branches set) +
+ * seed, or null if none is found within budget (the caller keeps the current figure, flagged amber). The
+ * CURRENT branch assignment is tried first and most widely; the combinatorics of alternative branches are
+ * bounded. Deterministic.
+ */
+export function findValidConfig(facts: Fact[], fromSeed = 0): { facts: Fact[]; seed: number } | null {
+  for (let s = fromSeed; s < fromSeed + 40; s++) if (meetsRequirements(facts, s)) return { facts, seed: s };
+  // Discrete branch alternatives — vary which intersection/side each branchable point takes.
+  const base = replay(facts).construction;
+  const branchy = facts
+    .map((f, i) => ({ f, i }))
+    .filter(({ f }) => f.enabled && BRANCHABLE.has(f.cmd.type) && 'id' in f.cmd)
+    .map(({ f, i }) => ({ i, count: Math.max(1, branchCount(base, (f.cmd as { id: Id }).id)) }))
+    .filter((x) => x.count > 1)
+    .slice(0, 4); // bound the combinatorics — vary the first few branchable points
+  if (branchy.length === 0) return null;
+  let combos: number[][] = [[]];
+  for (const { count } of branchy) combos = combos.flatMap((c) => Array.from({ length: count }, (_, b) => [...c, b]));
+  for (const combo of combos.slice(0, 16)) {
+    // skip the current assignment (already swept above)
+    const fc = facts.map((f, idx) => {
+      const k = branchy.findIndex((x) => x.i === idx);
+      return k >= 0 ? ({ ...f, cmd: { ...f.cmd, branch: combo[k] } } as Fact) : f;
+    });
+    for (let s = 0; s < 6; s++) if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
+  }
+  return null;
+}
+
 /** Outcome of dry-running a parsed step on top of the current facts (see {@link dryRunOutcome}). */
 export type StepOutcome = { produced: true } | { produced: false; reason: 'error' | 'empty'; detail?: string };
 
@@ -590,6 +644,10 @@ export interface GeoState {
   /** Re-sample the figure's residual freedom — a different valid drawing (ADR-018). Returns `true` if it
    *  found a genuinely DIFFERENT drawing, `false` if the shape is determined (only size/placement vary). */
   resample: () => boolean;
+  /** Before drawing, if the figure doesn't meet every requirement, search alternative configurations
+   *  (seeds + branches) for one that does and apply it ([ADR-106](docs/06-decisions.md#adr-106)).
+   *  Returns `true` if the figure now meets every requirement, `false` if none was found (kept as-is). */
+  autoResolve: () => boolean;
   /** Dial a free circle's radius directly (a DOF slider). Cleared on resample. */
   setRadius: (circle: Id, value: number) => void;
   /** Show/hide measure labels on the figure (ADR-031). */
@@ -844,6 +902,17 @@ export const useGeoStore = create<GeoState>()(
           }
         }
         return false; // searched but found no shape-different drawing — the figure is determined up to size/placement
+      },
+
+      autoResolve: () => {
+        const { facts, seed } = get();
+        if (meetsRequirements(facts, seed)) return true; // already meets every requirement — nothing to search
+        const found = findValidConfig(facts, 0);
+        if (found) {
+          set({ facts: found.facts, seed: found.seed, radiusOverrides: {} });
+          return true;
+        }
+        return false; // no fully-valid configuration found in budget — keep the current figure (shown amber)
       },
 
       setRadius: (circle, value) => {
