@@ -271,6 +271,24 @@ function extensionTriples(facts: Fact[]): { a: Id; b: Id; id: Id }[] {
   return facts.flatMap((f) => (f.enabled && f.cmd.type === 'extend-onto-circle' ? [{ a: f.cmd.a, b: f.cmd.b, id: f.cmd.id }] : []));
 }
 
+/** Relation (constraint) command types `replay` can DEFER and retry — they assert a relation without
+ *  introducing a point, so a step that can't be satisfied at its position may solve once LATER givens pin
+ *  the figure ([ADR-104](docs/06-decisions.md#adr-104)). */
+const DEFERRABLE_CONSTRAINTS = new Set<AnyCommand['type']>([
+  'set-perpendicular', 'set-parallel', 'set-distance', 'set-angle', 'set-angle-ratio', 'set-equal',
+  'set-ratio', 'set-collinear', 'set-concyclic', 'set-line', 'set-length-radius', 'set-angle-order', 'set-length-order',
+]);
+
+/**
+ * Does this parsed step carry a constraint the engine can DEFER? If so, the input layer should COMMIT it
+ * even when it can't be satisfied YET (a dry-run "error") — `replay` retries it after later givens pin the
+ * figure (ADR-104) — instead of escalating an unsatisfiable-but-correctly-parsed constraint to the LLM
+ * (which would just re-emit it, or drop it). A genuinely contradictory constraint then surfaces honestly
+ * as a failing step rather than a misleading "couldn't read that".
+ */
+export const hasDeferrableConstraint = (commands: AnyCommand[]): boolean =>
+  commands.some((c) => DEFERRABLE_CONSTRAINTS.has(c.type));
+
 /** The figure's overall scale (bounding-box diagonal of all placed points) — the yardstick a clearance
  *  margin is measured against, so it's robust whether the extension's base segment is long or short. */
 function figureSpan(fig: Derived): number {

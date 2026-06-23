@@ -18,8 +18,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parse } from '@/parser';
-import { replay, polygonsConvex, useGeoStore, firstSatisfyingSeed } from '@/store/geoStore';
+import { parse, droppedNewLabels } from '@/parser';
+import { replay, polygonsConvex, useGeoStore, firstSatisfyingSeed, dryRunOutcome, hasDeferrableConstraint } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { isGeoPoint, freeDofs, firstCyclableBranch, evaluate, circleMembers } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
@@ -1631,6 +1631,55 @@ describe('reported scenarios — end-to-end replay of real bug reports', () => {
       }
     });
   }
+});
+
+/**
+ * App.submit-faithful regression — the SCENARIOS above use parse→replay, which does NOT exercise the
+ * input gate (droppedNewLabels → dryRunOutcome → commit-or-escalate). A constraint that can't solve at its
+ * position dry-run-errors, and the gate used to ESCALATE it to the LLM (dropping it) instead of committing
+ * it for deferral — so the operator's "CE⟂AB before the sizes" never even entered the fact list. This test
+ * mirrors App.submit exactly (ADR-104) to lock that such a constraint is COMMITTED and later resolved.
+ */
+describe('reported scenarios — App.submit gate commits a deferrable constraint (ADR-104)', () => {
+  it('[q4-commit-deferred-perpendicular] CE⟂AB typed before CD=36/DE=18 commits and resolves through the real submit gate', () => {
+    const st = useGeoStore.getState();
+    st.clear();
+    // Mirror App.submit's deterministic path for each utterance.
+    const submit = (utterance: string, llm?: AnyCommand[]) => {
+      const facts = useGeoStore.getState().facts;
+      const ctx = ctxOf(facts);
+      const r = parse(utterance, ctx);
+      let commands: AnyCommand[] | null = null;
+      if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0) {
+        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
+        if (outcome.produced || (outcome.reason === 'error' && hasDeferrableConstraint(r.commands))) commands = r.commands;
+      }
+      if (!commands) commands = llm ?? null; // LLM second attempt (mocked: pass the canonical commands)
+      expect(commands, `step did not commit: ${utterance}`).not.toBeNull();
+      const group = `g${utterance}`;
+      for (const c of commands!) useGeoStore.getState().execute(c, utterance, group);
+    };
+    submit('שני מעגלים נחתכים בנקודות A ו B'); // (deterministic two-circles)
+    submit('נקודה C על מעגל P');
+    submit('המשך CA חותך את מעגל O בנקודה D');
+    submit('המשך CB חותך את מעגל O בנקודה E');
+    submit('נקודה G על המשך DE');
+    submit('CG חותך את מעגל P בנקודה F');
+    submit('AF ו BC נחתכים בנקודה H');
+    submit('∠GEC = ∠CHA');
+    submit('CE⊥AB'); // ← the step that used to escalate-and-drop; now commits for deferral
+    submit('CD=36');
+    submit('DE=18');
+    const fig = replay(useGeoStore.getState().facts, useGeoStore.getState().seed);
+    for (const [id, s] of Object.entries(fig.status)) expect(s, `status ${id}`).toBe('ok');
+    expect(fig.lastError).toBeNull();
+    const C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E'), A = at(fig, 'A'), B = at(fig, 'B');
+    expect(dist(C, D)).toBeCloseTo(36, 0);
+    expect(dist(D, E)).toBeCloseTo(18, 0);
+    const dot = (E.x - C.x) * (B.x - A.x) + (E.y - C.y) * (B.y - A.y);
+    expect(Math.abs(dot) / (Math.hypot(E.x - C.x, E.y - C.y) * Math.hypot(B.x - A.x, B.y - A.y))).toBeLessThan(0.02);
+    st.clear();
+  });
 });
 
 /**

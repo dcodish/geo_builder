@@ -18,7 +18,7 @@ import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
 import type { Crossing } from '@/render';
-import { dryRunOutcome, groupKey, introducedIds, replay, useGeoStore } from '@/store/geoStore';
+import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import { logDebug } from '@/debug/sessionLog';
 import { nanoid } from 'nanoid';
@@ -223,6 +223,18 @@ export default function App() {
           const group = nanoid();
           r.commands.forEach((c) => execute(c, utterance, group));
           logDebug({ kind: 'input', utterance, locale, source: 'parser', commands: r.commands });
+          setText('');
+          return;
+        }
+        // A cleanly-parsed CONSTRAINT that errored only because it can't be satisfied AT THIS POSITION (an
+        // under-determined coupled solve before its pinning givens arrive — e.g. "CE⟂AB" before "CD=36,
+        // DE=18") is NOT an LLM problem: the LLM would re-emit the same command, or drop it. Commit it so
+        // `replay`'s deferral retries it once the later givens pin the figure (ADR-104) — order-independence.
+        // A genuine contradiction then surfaces honestly as a failing step instead of "couldn't read that".
+        if (outcome.reason === 'error' && hasDeferrableConstraint(r.commands)) {
+          const group = nanoid();
+          r.commands.forEach((c) => execute(c, utterance, group));
+          logDebug({ kind: 'input', utterance, locale, source: 'parser', result: 'deferred-constraint', detail: outcome.detail, commands: r.commands });
           setText('');
           return;
         }
