@@ -504,7 +504,9 @@ export function Figure({
             scene.measures.map((m, i) => {
               const s = transform.toScreen(m.pos);
               const sd = unitVec({ x: m.dir.x, y: -m.dir.y }); // world→screen Y-flip
-              const off = m.kind === 'angle' ? r * 2.4 + fontSize * 0.7 : r * 1.4 + fontSize * 0.55;
+              // An angle value sits FURTHER into the wedge (just inside its bigger arc, below) and is drawn a
+              // bit LARGER than a length, so it's clear WHICH angle it labels and легible (operator request).
+              const off = m.kind === 'angle' ? r * 4.2 + fontSize * 0.7 : r * 1.4 + fontSize * 0.55;
               return (
                 <text
                   key={`m-${i}`}
@@ -512,7 +514,7 @@ export function Figure({
                   y={s.y + sd.y * off}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fontSize={fontSize * 0.85}
+                  fontSize={fontSize * (m.kind === 'angle' ? 1.05 : 0.85)}
                   fontFamily="system-ui, sans-serif"
                   fontWeight={500}
                   fill="#1d4ed8"
@@ -540,14 +542,15 @@ export function Figure({
               const u1 = unitVec({ x: P1.x - V.x, y: P1.y - V.y });
               const u2 = unitVec({ x: P2.x - V.x, y: P2.y - V.y });
               if (m.right) {
-                const s = 3.2 * r; // right-angle square, sized like the point markers
+                const s = 4 * r; // right-angle square — a touch larger so it reads clearly (operator request)
                 const c1 = `${V.x + u1.x * s},${V.y + u1.y * s}`;
                 const c2 = `${V.x + (u1.x + u2.x) * s},${V.y + (u1.y + u2.y) * s}`;
                 const c3 = `${V.x + u2.x * s},${V.y + u2.y * s}`;
                 return <polyline key={`am-${i}`} points={`${c1} ${c2} ${c3}`} fill="none" stroke="#1d4ed8" strokeWidth={stroke} style={{ pointerEvents: 'none' }} />;
               }
-              // arc: sample the SHORT signed angle from ray1 to ray2 (the interior angle)
-              const ar = 4.2 * r;
+              // arc: sample the SHORT signed angle from ray1 to ray2 (the interior angle). Drawn well clear
+              // of the vertex so it's obvious WHICH angle is marked, not a tiny nick at the corner (operator).
+              const ar = 6.5 * r;
               const th1 = Math.atan2(u1.y, u1.x);
               let dth = Math.atan2(u2.y, u2.x) - th1;
               while (dth > Math.PI) dth -= 2 * Math.PI;
