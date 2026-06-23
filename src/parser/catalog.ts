@@ -88,6 +88,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'constraints', supported: true, en: 'AB = x²', he: 'AB = x²', descEn: 'A length raised to a power (x² button, or x^3). Resolves when x gets a value.', descHe: 'אורך בחזקה (כפתור x², או x^3). מתורגם למספר כשנקבע ערך ל-x.' },
   { category: 'constraints', supported: true, en: 'angle ABC = 2α', he: 'זווית ABC = 2α', descEn: 'An angle as a Greek variable. Share it (e.g. ∠DEF = α) for a relation; value via "α = 30".', descHe: 'זווית כמשתנה יווני. שיתוף המשתנה (למשל ∠DEF = α) קובע יחס; ערך ע״י "α = 30".' },
   { category: 'constraints', supported: true, en: 'α < β', he: 'α < β', descEn: 'An ordering between two named measures (< button). Reshapes the figure so the relation holds visibly (e.g. the angle labelled α comes out smaller).', descHe: 'יחס סדר בין שני מדדים בעלי שם (כפתור <). מעצב מחדש את הצורה כך שהיחס יתקיים באופן נראה (למשל הזווית שסומנה α תֵצא קטנה יותר).' },
+  { category: 'constraints', supported: true, en: 'angle ABC is obtuse', he: 'זווית ABC קהה', descEn: 'Make an angle obtuse (>90°) — or acute (<90°) with "acute". Reshapes the figure so it holds; a single vertex ("∠C") works too.', descHe: 'הפיכת זווית לקהה (>90°) — או חדה (<90°) עם "חדה". מעצב מחדש את הצורה כך שיתקיים; אפשר גם קודקוד יחיד ("∠C").' },
 
   // ── Circles ─────────────────────────────────────────────────────────────
   { category: 'circles', supported: true, en: 'circle centered at O radius 5', he: 'מעגל סביב O רדיוס 5', descEn: 'A circle from a centre and radius.', descHe: 'מעגל לפי מרכז ורדיוס.' },

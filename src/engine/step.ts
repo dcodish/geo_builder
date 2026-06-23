@@ -725,6 +725,24 @@ export function circleMembers(c: Construction): { center: string; points: Id[] }
   return [...byCenter].map(([center, points]) => ({ center, points: [...points] }));
 }
 
+/**
+ * For each point, the points it is directly joined to — by a drawn segment OR a polygon edge. Lets the
+ * parser resolve a SINGLE-VERTEX angle ("∠C") to its two arms (the two points C is connected to), so
+ * "∠C קהה" (obtuse) / "∠C חדה" (acute) can name the interior angle without spelling all three letters.
+ */
+export function pointNeighbors(c: Construction): Record<Id, Id[]> {
+  const nb = new Map<Id, Set<Id>>();
+  const add = (x: Id, y: Id) => {
+    (nb.get(x) ?? nb.set(x, new Set()).get(x)!).add(y);
+    (nb.get(y) ?? nb.set(y, new Set()).get(y)!).add(x);
+  };
+  for (const o of c.objects) {
+    if (o.kind === 'segment') add(o.a, o.b);
+    else if (o.kind === 'polygon') for (let i = 0; i < o.vertices.length; i++) add(o.vertices[i], o.vertices[(i + 1) % o.vertices.length]);
+  }
+  return Object.fromEntries([...nb].map(([k, set]) => [k, [...set]]));
+}
+
 /** Number of valid solution branches for a branchable point (0/1/2). */
 export function branchCount(c: Construction, id: Id): number {
   const o = c.objects.find((x) => x.id === id);

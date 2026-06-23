@@ -11,6 +11,7 @@ export {
   build,
   branchCount,
   circleMembers,
+  pointNeighbors,
   commandConflict,
   cyclableBranch,
   cycleAlternative,

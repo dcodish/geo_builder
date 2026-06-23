@@ -38,6 +38,9 @@ export interface ParseContext {
   /** For each circle (by centre letter), the points known to lie on it — lets "arc BC" resolve to
    *  the circle that actually contains both B and C (disambiguates 2+ circles / corrects a wrong one). */
   circleMembers?: { center: string; points: string[] }[];
+  /** For each point, the points it's joined to (segment / polygon edge) — lets a single-vertex angle
+   *  ("∠C") resolve its two arms, so "∠C קהה/חדה" (obtuse/acute) works without spelling all three. */
+  neighbors?: Record<string, string[]>;
 }
 
 /** The centre of a circle that contains EVERY point in `pts` (preferring `prefer` if it qualifies), else null. */
@@ -468,6 +471,33 @@ const angle: Rule = (s) => {
     { type: 'segment', a: v, b: r2 },
     { type: 'set-angle', vertex: v, ray1: r1, ray2: r2, value: parseFloat(valM[1]) },
   ];
+};
+
+/**
+ * "∠ABC קהה" / "זווית C חדה" / "angle ABC is obtuse" — an angle's ACUTENESS: obtuse (>90°, "קהה") or acute
+ * (<90°, "חדה"). Names the angle by its three letters (vertex = middle) OR by a SINGLE vertex ("∠C"), whose
+ * two arms are resolved from the figure (the points C is joined to). Emits a one-sided angle constraint that
+ * reshapes the figure so the angle falls on the requested side (ADR-108). Draws the arms (idempotent).
+ */
+const angleAcuteness: Rule = (s, ctx) => {
+  const obtuse = /קהה|obtuse/i.test(s);
+  const acute = /חדה|acute/i.test(s);
+  if (obtuse === acute) return null; // need exactly one of obtuse/acute (and not both)
+  const stripped = s.replace(/angle|∠|∢|זוו?ית|הזוו?ית|קהה|obtuse|חדה|acute|is|the|של|את/gi, ' ');
+  const tri = labelRun(stripped, 3);
+  if (tri) {
+    return [
+      { type: 'segment', a: tri[1], b: tri[0] },
+      { type: 'segment', a: tri[1], b: tri[2] },
+      { type: 'set-angle-acuteness', vertex: tri[1], ray1: tri[0], ray2: tri[2], obtuse },
+    ];
+  }
+  const one = labelRun(stripped, 1);
+  if (one) {
+    const nb = (ctx.neighbors ?? {})[one[0]] ?? [];
+    if (nb.length === 2) return [{ type: 'set-angle-acuteness', vertex: one[0], ray1: nb[0], ray2: nb[1], obtuse }];
+  }
+  return null;
 };
 
 /**
@@ -2551,6 +2581,7 @@ const RULES: Rule[] = [
   collinearConstraint,
   diameterCutsSegment, // "קוטר … מנקודה F חותך את הצלע AC בנקודה E" — before lineLineIntersection (which stops on "קוטר") and `diameter`
   lineLineIntersection,
+  angleAcuteness, // "∠ABC קהה/חדה" (obtuse/acute) — before the value-based angle rules
   angleEquality, // "∠ABC = ∠DEF" (two angles equal) — before measureAngle/angle, which expect a value RHS
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,

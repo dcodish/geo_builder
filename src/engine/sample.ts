@@ -224,7 +224,7 @@ function rawMovableDof(o: Construction['objects'][number]): number {
 
 /** DOF a constraint removes: an equality removes 1; a `coincide` pins both coords (2); an ORDER/inequality removes 0 (it's a region, ADR-039). */
 function dofRemoved(con: Constraint): number {
-  if (con.type === 'angle-order' || con.type === 'length-order' || con.type === 'collinear-order') return 0;
+  if (con.type === 'angle-order' || con.type === 'length-order' || con.type === 'collinear-order' || con.type === 'angle-acuteness') return 0;
   if (con.type === 'coincide') return 2;
   return 1;
 }

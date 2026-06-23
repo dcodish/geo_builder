@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { parse, droppedNewLabels } from '@/parser';
 import { replay, polygonsConvex, useGeoStore, firstSatisfyingSeed, dryRunOutcome, hasDeferrableConstraint } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
-import { isGeoPoint, freeDofs, firstCyclableBranch, evaluate, circleMembers } from '@/engine';
+import { isGeoPoint, freeDofs, firstCyclableBranch, evaluate, circleMembers, pointNeighbors } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 
 type Step = string | { llm: AnyCommand[] };
@@ -44,6 +44,7 @@ function ctxOf(facts: Fact[]) {
     circles: construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [o.center] : [])), // drop ~scaffolding circles (mirrors App.parseCtx)
     points: construction.objects.filter(isGeoPoint).map((o) => o.id),
     circleMembers: circleMembers(construction),
+    neighbors: pointNeighbors(construction),
   };
 }
 
@@ -103,6 +104,17 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
+  {
+    id: 'obtuse-acute-angle',
+    title: '"∠C קהה" (obtuse) / "∠C חדה" (acute) reshape the triangle so ∠ACB is >90° / <90°',
+    guards:
+      'operator: "∠C קהה" (∠C is obtuse) returned not-understood — no support for זווית קהה/חדה (obtuse/acute). Added (ADR-108): a one-sided angle constraint (>90°/<90°) modelled like the ADR-039 orderings — it reshapes the figure (drives a free DOF) so the angle falls on the requested side, removing 0 DOF. The parser reads both "∠ABC קהה" and the single-vertex "∠C קהה" (arms resolved from the figure\'s neighbours).',
+    steps: ['משולש ABC', '∠C קהה'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'A'), at(fig, 'C'), at(fig, 'B')), '∠ACB is obtuse').toBeGreaterThan(90);
+    },
+  },
   {
     id: 'midpoint-of-existing-on-segment-point',
     title: '"A אמצע CD" when A is ALREADY a free point on CD drives A to the midpoint, not "already defined"',

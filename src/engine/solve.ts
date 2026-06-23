@@ -52,6 +52,8 @@ export function constraintRefs(con: Constraint): Id[] {
       return [con.a, con.b, con.c];
     case 'collinear-order':
       return con.points;
+    case 'angle-acuteness':
+      return [con.vertex, con.ray1, con.ray2];
   }
 }
 
@@ -157,6 +159,12 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
       for (let i = 0; i + 1 < proj.length; i++) r += Math.max(0, proj[i] - proj[i + 1] + ORDER_LEN_MARGIN_FRAC * L);
       return r;
     }
+    case 'angle-acuteness': {
+      // ONE-SIDED (≥ 0): 0 once the angle is at least MARGIN past 90° on the requested side. Obtuse aims
+      // ∠ ABOVE 90 (residual shrinks as ∠ grows); acute aims ∠ BELOW 90. Optimizer-driven, like the orders.
+      const a = angleDeg(get(con.vertex), get(con.ray1), get(con.ray2));
+      return con.obtuse ? Math.max(0, 90 + ORDER_ANGLE_MARGIN_DEG - a) : Math.max(0, a - (90 - ORDER_ANGLE_MARGIN_DEG));
+    }
   }
 }
 
@@ -190,6 +198,7 @@ export function constraintScale(con: Constraint, get: (id: Id) => Vec): number {
     case 'collinear-order':
       return Math.max(dist(get(con.points[0]), get(con.points[con.points.length - 1])), 1e-9); // relative to the line span
     case 'angle-order':
+    case 'angle-acuteness':
       return 90; // an order residual is ≤ MARGIN degrees — scale it like a right angle so it sits ~O(0.1) alongside relative length residuals
     case 'concyclic': {
       const c = concyclicCircle(con.points.map(get));
@@ -219,7 +228,9 @@ export function residualTolerance(con: Constraint, scale = 1): number {
     case 'coincide':
       return 1e-4; // a driven numeric solve won't hit exact zero — a looser "they meet"
     case 'angle-order':
-      // Accept any config at least MIN_GAP in order: residual ≤ (MARGIN−MIN_GAP) ⇔ ∠1 ≤ ∠2 − MIN_GAP.
+    case 'angle-acuteness':
+      // Accept any config at least MIN_GAP past the bound: residual ≤ (MARGIN−MIN_GAP) ⇔ the angle is at
+      // least MIN_GAP° on the requested side of 90° (clearly obtuse / acute), not merely touching it.
       return ORDER_ANGLE_MARGIN_DEG - ORDER_ANGLE_MIN_GAP_DEG;
     case 'length-order':
       return (ORDER_LEN_MARGIN_FRAC - ORDER_LEN_MIN_FRAC) * scale; // scale = the longer length (constraintScale)
@@ -269,6 +280,8 @@ export function describeConstraint(con: Constraint): string {
       return `${con.a}, ${con.b}, ${con.c} collinear`;
     case 'collinear-order':
       return `${con.points.join('–')} in order on a line`;
+    case 'angle-acuteness':
+      return `∠${con.ray1}${con.vertex}${con.ray2} is ${con.obtuse ? 'obtuse' : 'acute'}`;
   }
 }
 

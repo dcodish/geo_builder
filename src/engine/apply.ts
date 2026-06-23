@@ -924,6 +924,13 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       constraints.push({ type: 'length-order', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
       break;
 
+    // "∠ABC is obtuse/acute" ("זווית קהה/חדה"): a one-sided angle constraint (>90° / <90°) that reshapes the
+    // figure (recruitFreeDofs drives a free DOF) until the angle is on the requested side. Its arms are drawn
+    // by the parser (segment commands), as for `set-angle`.
+    case 'set-angle-acuteness':
+      constraints.push({ type: 'angle-acuteness', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, obtuse: cmd.obtuse });
+      break;
+
     // The points are concyclic (ADR-041) — drive a free DOF among them (an on-segment slide, a free
     // vertex) until they share a circle. Generic via driveOrCheck: the residual sign-changes, so an
     // on-segment carrier solves in closed form; a fully-determined set is a pure check (over-constraint).

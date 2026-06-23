@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
-import { circleMembers, firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint } from '@/engine';
+import { circleMembers, firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, pointNeighbors } from '@/engine';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, droppedNewLabels } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
@@ -178,6 +178,7 @@ export default function App() {
     circles: construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [o.center] : [])),
     points: construction.objects.filter(isGeoPoint).map((o) => o.id),
     circleMembers: circleMembers(construction), // so "arc BC" resolves to the circle holding both B and C
+    neighbors: pointNeighbors(construction), // so a single-vertex angle ("∠C קהה/חדה") finds its two arms
   });
 
   // After a step commits, VERIFY the figure meets every requirement; if not, auto-search alternative

@@ -71,7 +71,7 @@ export type EvalResult = EvalOk | EvalErr;
 function withOrderCons(cons: Constraint[], c: Construction): Constraint[] {
   const seen = new Set(cons.map((k) => JSON.stringify(k)));
   for (const k of c.constraints) {
-    if (k.type !== 'angle-order' && k.type !== 'length-order' && k.type !== 'collinear-order') continue;
+    if (k.type !== 'angle-order' && k.type !== 'length-order' && k.type !== 'collinear-order' && k.type !== 'angle-acuteness') continue;
     const key = JSON.stringify(k);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -193,7 +193,7 @@ function resolveDriven(c: Construction): Construction {
     // circle onto a near crossing. branch then cycles the order-sorted roots ("show another config").
     const orderCons = c.constraints.filter(
       (k) =>
-        (k.type === 'collinear-order' || k.type === 'angle-order' || k.type === 'length-order') &&
+        (k.type === 'collinear-order' || k.type === 'angle-order' || k.type === 'length-order' || k.type === 'angle-acuteness') &&
         constraintRefs(k).includes(carrier.id),
     );
     let ordered = roots;

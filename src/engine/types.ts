@@ -663,6 +663,21 @@ export interface CollinearOrderConstraint {
   points: Id[];
 }
 
+/**
+ * The ACUTENESS of an angle — ∠(ray1,vertex,ray2) must be OBTUSE (> 90°) or ACUTE (< 90°). Like the other
+ * order/inequality constraints ([ADR-039](docs/06-decisions.md#adr-039)) it is satisfied by a whole region
+ * (one side of 90°), so it has no sign change — it rides the optimizer as a one-sided residual and actively
+ * reshapes the figure (drives a free DOF) so the angle falls on the requested side. "זווית קהה" = obtuse,
+ * "זווית חדה" = acute. ([ADR-108](docs/06-decisions.md#adr-108).)
+ */
+export interface AngleAcutenessConstraint {
+  type: 'angle-acuteness';
+  vertex: Id;
+  ray1: Id;
+  ray2: Id;
+  obtuse: boolean; // true = obtuse (>90°); false = acute (<90°)
+}
+
 export type Constraint =
   | AngleConstraint
   | DistanceConstraint
@@ -677,6 +692,7 @@ export type Constraint =
   | ConcyclicConstraint
   | CollinearConstraint
   | CollinearOrderConstraint
+  | AngleAcutenessConstraint
   | LengthRadiusConstraint;
 
 export interface Construction {
@@ -708,6 +724,7 @@ export type Command =
   | { type: 'set-angle-ratio'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id; k: number } // ∠1 = k·∠2
   | { type: 'set-angle-order'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id } // ∠1 < ∠2 (∠1 is the smaller)
   | { type: 'set-length-order'; a: Id; b: Id; c: Id; d: Id } // |ab| < |cd| (ab is the shorter)
+  | { type: 'set-angle-acuteness'; vertex: Id; ray1: Id; ray2: Id; obtuse: boolean } // ∠ obtuse (>90°) / acute (<90°) — "זווית קהה/חדה"
   | { type: 'set-parallel'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-perpendicular'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'set-concyclic'; points: Id[] } // the points are concyclic (drives a DOF so they share a circle)
