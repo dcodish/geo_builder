@@ -164,7 +164,12 @@ function resolveDriven(c: Construction): Construction {
 
   const carriers = paramCarriers;
   if (carriers.length === 0) return c;
-  const range = (o: { kind: string }): [number, number] => (o.kind === 'on-circle' ? [0, 2 * Math.PI] : [0, 1]);
+  // An on-circle carrier ranges over the full circle; an on-segment over its interior [0,1] — EXCEPT an
+  // EXTENSION point ("E on the extension of DC", t>1), which lives BEYOND the segment by definition, so a
+  // constraint that DRIVES it (e.g. ∠CAE=50 driving E) must search t>1, not clamp E back between the
+  // endpoints (the operator's "E didn't stay after D/C"). (ADR-105.)
+  const range = (o: { kind: string; extension?: boolean }): [number, number] =>
+    o.kind === 'on-circle' ? [0, 2 * Math.PI] : o.extension ? [1.02, 12] : [0, 1];
 
   // ONE driven DOF: a plain 1-D solve, with the branch index choosing among roots
   // (so "show another configuration" can cycle them) — the ADR-028 base case.
@@ -471,7 +476,11 @@ function setCarrierVals(c: Construction, vals: Map<Id, number[]>): Construction 
       if (!v) return o;
       switch (o.kind) {
         case 'free-point': return { ...o, x: v[0], y: v[1], solve: undefined };
-        case 'on-segment': return { ...o, t: v[0], solve: undefined };
+        // An EXTENSION point lives BEYOND the segment (t>1); HARD-clamp it there so the (unbounded) joint
+        // optimizer can't pull a driven extension point back between the endpoints to satisfy a constraint —
+        // it must keep E on the extension and move the figure's OTHER DOFs instead (ADR-105). A plain
+        // on-segment point is unclamped.
+        case 'on-segment': return { ...o, t: o.extension ? Math.max(v[0], 1.02) : v[0], solve: undefined };
         case 'on-circle': return { ...o, theta: v[0], solve: undefined };
         case 'perp-offset': return { ...o, dist: Math.max(v[0], 1e-3), solve: undefined };
         case 'rotated': return { ...o, angleDeg: v[0], solve: undefined };
@@ -556,7 +565,10 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
       const car = carrierList.find((o) => o.id === s.id) as (GeoObject & { solve?: { constraint: Constraint } }) | undefined;
       const own = car?.solve?.constraint;
       if (car?.kind === 'on-circle') ranges.push({ ui: ki, lo: 0, hi: 2 * Math.PI, own });
-      else if (own && car?.kind === 'on-segment') ranges.push({ ui: ki, lo: 0, hi: 1, own });
+      // An EXTENSION on-segment carrier (t>1, beyond the segment) is searched past 1, not clamped to the
+      // interior — so a constraint driving it keeps it on the extension (ADR-105). A plain free on-segment
+      // stays in [0,1].
+      else if (own && car?.kind === 'on-segment') ranges.push({ ui: ki, lo: car.extension ? 1.02 : 0, hi: car.extension ? 12 : 1, own });
       else if (own && car?.kind === 'circle' && car.radius.via === 'free') {
         // u = radius / scale (scale = seed radius ⇒ seed u = 1). Bracket [tiny, generous] in radius, /scale.
         const sc = s.scale[0];

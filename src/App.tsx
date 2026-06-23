@@ -57,6 +57,7 @@ export default function App() {
   const [text, setText] = useState('');
   const [inputNote, setInputNote] = useState(''); // a problem message under the input (not-understood / built-nothing)
   const [thinking, setThinking] = useState(false); // LLM fallback in flight (Phase 7)
+  const [resampling, setResampling] = useState(false); // "show another configuration" search in flight (synchronous; we paint a busy state first)
   const [llmDropped, setLlmDropped] = useState<string[]>([]); // LLM steps the engine couldn't build
   const [renameNote, setRenameNote] = useState(''); // why a relabel was a no-op (target taken / no such point)
   const [altNote, setAltNote] = useState(''); // transient: "show another configuration" found no different drawing
@@ -602,26 +603,42 @@ export default function App() {
             <button
               type="button"
               style={alt}
+              disabled={resampling}
               // Explore the WHOLE configuration space: resample the continuous free DOFs (so free
               // points / on-circle vertices actually move) AND cycle a discrete branch if there is
               // one. Previously this did branch-cycling EXCLUSIVELY whenever any branch existed, so a
               // figure with both (e.g. a circle∩circle point + free secant ends) only flipped between
               // 2 branch options and never varied its free DOFs.
               onClick={() => {
-                const changed = resample(); // true if it found a genuinely different drawing
-                if (branchId) cycleAlt(branchId); // a discrete branch flip is always a real change
-                if (changed || branchId) setAltNote('');
-                else {
-                  // searched and found nothing different — tell the student something DID happen (the
-                  // figure is determined), so "show another" doesn't look like a dead button (operator).
-                  setAltNote(t('actions.onlyConfig'));
-                  window.setTimeout(() => setAltNote(''), 4000);
-                }
+                if (resampling) return;
+                // The search is SYNCHRONOUS and can take a moment on a heavy figure (it replays + verifies
+                // many candidate seeds), which would freeze the UI with no feedback. Paint a "working" state
+                // FIRST (double rAF = after the next paint), then run the blocking search (operator: "no sign
+                // of the system thinking").
+                setResampling(true);
+                requestAnimationFrame(() =>
+                  requestAnimationFrame(() => {
+                    try {
+                      const changed = resample(); // true if it found a genuinely different drawing
+                      if (branchId) cycleAlt(branchId); // a discrete branch flip is always a real change
+                      if (changed || branchId) setAltNote('');
+                      else {
+                        // searched and found nothing different — tell the student something DID happen (the
+                        // figure is determined), so "show another" doesn't look like a dead button (operator).
+                        setAltNote(t('actions.onlyConfig'));
+                        window.setTimeout(() => setAltNote(''), 4000);
+                      }
+                    } finally {
+                      setResampling(false);
+                    }
+                  }),
+                );
               }}
             >
-              {t('actions.another')}
+              {resampling ? t('input.loading') : t('actions.another')}
             </button>
           )}
+          {resampling && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
           {altNote && <span style={{ fontSize: 12, color: '#64748b' }}>{altNote}</span>}
 
           {/* ADR-018 Stage 3 — the figure's remaining freedom, shrinking as facts accumulate

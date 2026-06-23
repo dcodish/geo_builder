@@ -104,6 +104,28 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'driven-extension-point-stays-beyond',
+    title: '"E on the extension of DC" driven by ∠CAE=50 stays BEYOND C (on the extension), not pulled between D and C',
+    guards:
+      'operator (session 3yvigwa7): triangle ABC inscribed, D = arc-midpoint of BC, E on the extension of chord DC, then ∠CAE=50. E ended up BETWEEN D and C (param 0.16), not on the extension — "point E didn\'t respect that it needed to be after D". Root cause (ADR-105): ∠CAE=50 DRIVES E, and the driven solver searched/placed an on-segment carrier in [0,1] (the interior), ignoring that E is an EXTENSION point (t>1 by definition) — the unbounded joint optimiser then pulled E back between the endpoints to satisfy the angle. Fix: an extension on-segment carrier is searched past 1 (single-carrier range + mixed-carrier range) AND hard-clamped to t≥1.02 in setCarrierVals, so the optimiser must keep E on the extension and move the figure\'s OTHER free DOFs (the triangle) to satisfy the angle.',
+    steps: [
+      'משולש ABC חסום במעגל O',
+      'D אמצע קשת BC',
+      '∠ABC=60',
+      '∠BAC=α',
+      { llm: [{ type: 'point-on-segment', id: 'E', a: 'D', b: 'C', t: 1.3, extension: true }] }, // "E נמצאת על המשך המיתר DC" (deterministic parse dropped E → LLM)
+      '∠CAE=50',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E');
+      // E is on the EXTENSION of DC beyond C: its parameter along D→C exceeds 1.
+      const t = ((E.x - D.x) * (C.x - D.x) + (E.y - D.y) * (C.y - D.y)) / ((C.x - D.x) ** 2 + (C.y - D.y) ** 2);
+      expect(t, 'E is beyond C on the extension of DC').toBeGreaterThan(1);
+      expect(angle(C, A, E), 'the driven ∠CAE = 50 still holds').toBeCloseTo(50, 0);
+    },
+  },
+  {
     id: 'q4-constraints-order-independent',
     title: 'full bagrut Q4 builds with CE⟂AB entered BEFORE the size givens (CD=36, DE=18) — order-independent',
     guards:
