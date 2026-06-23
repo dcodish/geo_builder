@@ -1493,3 +1493,19 @@ The existing `two-circles-mutual-tangent-secants` scenario was found to have the
 **Worked values.** lone square → 0 (was 4); square + AB=5 → 0; triangle → 2 (its two angles; was 6); SSS triangle → 0 (was 3); single circle → 0; parallelogram → 2 (was 6); parallelogram + |AB|=|AC| → 1; segment+segment+⟂ → 3 (was 7); **bagrut Q4 → 4** (was 8). Locked by the updated `phase-sample.test.ts`.
 
 **Trade-off / note.** "✓ fully determined" can now coexist with an active "show another configuration" button (the shape is fixed, but its similarity image — size/orientation/position — can still vary, which is meaningful when no size was stated, ADR-052). This is intended: "determined" describes the *shape*, not the page placement.
+
+---
+
+## ADR-103 — a constraint can drive a circle's CENTRE, not only its radius
+
+**Status.** Accepted (2026-06-23). Closes (in part) the ADR-095 "known broader gap".
+
+**Context.** Operator (session `zqvtvh15`, bagrut Q4): two circles meet at A,B; C on circle P; D = CA extended onto circle O; then a size given — `CD = 36` (and ultimately `CE⟂AB` with `CD=36, DE=18`, part ד) — failed **"over-constrained: |CD| = 36 cannot hold"**. The figure is small by default (|CD| ≈ 8).
+
+**Root cause.** `recruitFreeDofs` (via `ancestors` in `drivable` mode) surfaced a circle's free **radius** as a DOF ([ADR-051](#adr-051)) but **never its free centre**, and `ancestors` does **not** traverse a circle∩circle point (the [ADR-095](#adr-095) over-recruit guard). So the circle **centres** O, P — free points — were unreachable from a constraint on A/B/C/D (points that ride the circles). With the centres pinned a fixed gap apart, the **circle∩circle geometry caps |CD|** (~8 here) no matter how large the radii grow — so |CD| = 36 was genuinely unsolvable for the engine, even though a real configuration exists (the centres just need to spread; with centres free, |CD| reaches 40+).
+
+**Decision.** In `ancestors` (drivable mode), where a point's circle's free **radius** is surfaced as a DOF, also surface the circle's **centre** when it is a free, non-pinned point. A constraint on a point that lies on a circle can then drive the centre as well as the radius. This is the **targeted** form of the ADR-095 gap (surface the specific centre DOF rather than blanket-traversing a circle∩circle's Thales-aux chain), so it doesn't over-recruit: the joint solver's regulariser keeps a surfaced-but-unneeded centre near its seed, and **the full suite stayed green** (the ADR-095 regression the blanket traversal caused did not recur).
+
+**Result.** `CD = 36` now solves (the centres spread; |CD| = 36, verifier green), and the **full bagrut-Q4 given set** — `∠GEC=∠CHA`, `CD=36`, `DE=18`, `CE⟂AB` — builds when the size givens precede the ⟂. Locked by `engine/__tests__/recruit-circle-center.test.ts` (the |CD|=36 unit + the full-Q4 build) and scenario `distance-drives-circle-centres-apart`. **1260 tests green, build clean.**
+
+**Known remaining limitation (tracked, not fixed here).** Entering `CE⟂AB` **before** the size givens (`CD=36, DE=18`) — an under-determined coupled solve over C's angle + both circle centres + radii + the extension point G, coupled through the G→F→H derived chain — still does **not** converge from the default seed (a feasible configuration exists; the local/coordinate-descent/binding multi-start can't reach it). Adding the sizes first makes it solve. A coordinate-descent angular sweep over the on-circle DOF and an extension-carrier grid-scan range fix were tried and did **not** crack this case, so they were not shipped. Robustly solving the bare under-determined coupled system would need a stronger global solver (deferred).

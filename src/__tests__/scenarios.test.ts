@@ -104,6 +104,24 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'distance-drives-circle-centres-apart',
+    title: 'bagrut Q4: "CD=36" across two intersecting circles spreads the circle centres so it holds',
+    guards:
+      'operator session (zqvtvh15, bagrut Q4): after two circles meet at A,B; C on circle P; D = CA extended onto circle O, a size given like CD=36 (and ultimately CE⟂AB with CD=36, DE=18) failed "over-constrained: |CD|=36 cannot hold". Root cause (ADR-103): recruitFreeDofs surfaced a circle\'s free RADIUS but never its free CENTRE, and `ancestors` does not traverse a circle∩circle point — so the centres O,P were unreachable. Pinned a fixed gap apart, the circle∩circle geometry caps |CD| (~8 here) however large the radii grow, so |CD|=36 was unreachable though a real configuration exists (the centres just spread). Fix: surface a circle\'s free, non-pinned centre as a drivable DOF alongside its radius. (Known remaining limitation: entering CE⟂AB BEFORE the size givens is an under-determined coupled solve that still does not converge — the sizes must precede the ⟂; tracked separately.)',
+    steps: [
+      'שני מעגלים נחתכים בנקודות A ו B',
+      'נקודה C על מעגל P',
+      'המשך CA חותך את מעגל O בנקודה D',
+      'CD=36',
+    ],
+    check(fig) {
+      allStepsOk(fig); // no longer over-constrained
+      const C = at(fig, 'C'), D = at(fig, 'D'), O = at(fig, 'O'), P = at(fig, 'P');
+      expect(dist(C, D)).toBeCloseTo(36, 0); // |CD| = 36 holds (verifier also green via the blanket check)
+      expect(dist(O, P), 'the circle centres spread to make room (the DOF the fix unlocked)').toBeGreaterThan(8);
+    },
+  },
+  {
     id: 'angle-equality-on-q4',
     title: 'bagrut Q4 + the part-א relation "∠EDA = ∠CBA" — angle EQUALITY now parses and holds',
     guards:

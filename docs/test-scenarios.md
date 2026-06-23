@@ -22,6 +22,10 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `distance-drives-circle-centres-apart` — "CD=36" spreads two circles' centres so the distance holds (ADR-103)
+**Steps**: `שני מעגלים נחתכים בנקודות A ו B` · `נקודה C על מעגל P` · `המשך CA חותך את מעגל O בנקודה D` · `CD=36`
+**Guards against:** a size given on points that ride two intersecting circles (bagrut Q4: `CD=36`, ultimately `CE⟂AB` with `CD=36, DE=18`) failing "over-constrained: |CD|=36 cannot hold". Root cause (ADR-103): `recruitFreeDofs` surfaced a circle's free RADIUS but never its free CENTRE, and `ancestors` doesn't traverse a circle∩circle point — so the centres O,P were unreachable. Pinned a fixed gap apart, the circle∩circle geometry caps |CD| (~8) however large the radii grow. Fix: surface a circle's free, non-pinned centre as a drivable DOF alongside its radius. **Asserts:** all steps OK; |CD|=36 holds (verifier green); the centres spread (|OP|>8). **Known limit:** entering `CE⟂AB` BEFORE the sizes is an under-determined coupled solve that still doesn't converge — sizes must precede the ⟂ (the full-Q4 build is covered in `engine/__tests__/recruit-circle-center.test.ts`).
+
 ### `angle-equality-on-q4` — "∠EDA = ∠CBA" (angle EQUALITY) parses and holds on the Q4 figure (ADR-100)
 **Steps**: `שני מעגלים נחתכים בנקודות A ו B` · `נקודה C על מעגל P` · `המשך CA חותך את מעגל O בנקודה D` · `המשך CB חותך את מעגל O בנקודה E` · `מרובע EBAD חסום במעגל O` · `∠EDA = ∠CBA`
 **Guards against:** an angle EQUALITY (`∠GEC=∠CBA`, the operator's proof relations) returning not-understood — the `angle` rule needs a numeric value, so a two-angle equality fell through to the LLM. The engine already had the relation (`set-angle-ratio` k=1, as similar-triangles uses); only the parser lacked it. Fix (ADR-100): an `angleEquality` rule reads "∠ABC = ∠DEF" (Hebrew "זווית"/∠, optional coefficient "= 2∠DEF") → set-angle-ratio. Exercised with the book's part-א theorem ∠EDA=∠CBA. **Asserts:** all steps OK (no LLM); an `angle-ratio` constraint is recorded; ∠EDA=∠CBA holds in the figure; verifier clean. (Parser cases in `parser/__tests__/angle-equality.test.ts`.)

@@ -315,12 +315,25 @@ function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', 
     const o = byId.get(id);
     if (!o) continue;
     if (mode === 'drivable') {
-      // A point on a FREE-radius circle can be moved by RESIZING it — surface the radius DOF (ADR-051).
+      // A point on a circle can be moved by RESIZING the circle (its free radius — ADR-051) OR by MOVING
+      // its centre (a free, non-pinned centre point — ADR-103). The latter matters when a constraint needs
+      // more reach than resizing gives: e.g. |CD|=36 where C,D ride two circles whose centres sit a fixed
+      // gap apart — growing the radii alone caps |CD| (the circle∩circle geometry is bounded by the centre
+      // gap), so the centres must spread. Surfacing the centre here is the targeted form of the ADR-095
+      // gap (a constraint on a circle∩circle/derived-circle point couldn't reach the upstream circle DOFs);
+      // the joint solver's regulariser keeps a surfaced-but-unneeded centre near its seed, so this doesn't
+      // perturb figures that don't need it.
       for (const cid of circlesOfPoint(o)) {
         const circ = byId.get(cid);
-        if (circ?.kind === 'circle' && circ.radius.via === 'free' && avail(circ) && !seen.has(cid)) {
+        if (circ?.kind !== 'circle') continue;
+        if (circ.radius.via === 'free' && avail(circ) && !seen.has(cid)) {
           seen.add(cid);
           result.push(cid);
+        }
+        const ctr = byId.get(circ.center);
+        if (ctr && ctr.kind === 'free-point' && !ctr.pinned && !ctr.rigid && avail(ctr) && !seen.has(ctr.id)) {
+          seen.add(ctr.id);
+          result.push(ctr.id);
         }
       }
       if (o.kind === 'line') { queue.push(...lineSpecPoints(o.spec)); continue; }
