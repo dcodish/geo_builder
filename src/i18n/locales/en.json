@@ -46,7 +46,8 @@
     "empty": "Start by describing a shape"
   },
   "figure": {
-    "mismatch": "The figure may not match what you described:"
+    "mismatch": "The figure may not match what you described:",
+    "pending": "This relation is recorded but not determined yet — add the remaining givens (lengths/angles) to pin the figure, and it will resolve on its own."
   },
   "dof": {
     "title": "Adjust the figure",

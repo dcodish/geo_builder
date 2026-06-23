@@ -278,7 +278,7 @@ export default function App() {
   }
 
   // Figure + per-fact status are derived from the fact list.
-  const { construction, positions, status, lastError, labels, angleMarks, violations, radiusDofs } = useMemo(
+  const { construction, positions, status, lastError, pending, labels, angleMarks, violations, radiusDofs } = useMemo(
     () => replay(facts, seed, radiusOverrides),
     [facts, seed, radiusOverrides],
   );
@@ -503,6 +503,8 @@ export default function App() {
           </div>
 
           {lastError && <div style={errorBanner}>⚠ {lastError}</div>}
+
+          {pending && <div style={infoBanner}>ⓘ {t('figure.pending')}</div>}
 
           {violations.length > 0 && (
             <div style={warnBanner}>
@@ -772,6 +774,14 @@ const warnBanner: React.CSSProperties = {
   border: '1px solid #fde68a',
   background: '#fffbeb',
   color: '#92400e',
+};
+const infoBanner: React.CSSProperties = {
+  padding: '8px 12px',
+  fontSize: 13,
+  borderRadius: 8,
+  border: '1px solid #bfdbfe',
+  background: '#eff6ff',
+  color: '#1d4ed8',
 };
 const ghost: React.CSSProperties = {
   padding: '8px 14px',

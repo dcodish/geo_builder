@@ -1680,6 +1680,37 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
     expect(Math.abs(dot) / (Math.hypot(E.x - C.x, E.y - C.y) * Math.hypot(B.x - A.x, B.y - A.y))).toBeLessThan(0.02);
     st.clear();
   });
+
+  it('[pending-vs-contradiction] CE⟂AB before sizes is PENDING (info, no red error); ∠DAB=37 on a square is a hard contradiction', () => {
+    // PENDING: the Q4 ⟂ entered before the sizes flexes as the free DOFs move → it's "not determined yet",
+    // shown as an info banner, NOT the red "over-constrained" error (ADR-104). It resolves once sizes come.
+    const q4: AnyCommand[] = [
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true, autoCenter: true },
+      { type: 'circle', id: 'circle-P', center: 'P', radius: 3.6, freeRadius: true, autoCenter: true },
+      { type: 'circle-circle-intersection', id: 'A', circle1: 'circle-O', circle2: 'circle-P', branch: 0 },
+      { type: 'circle-circle-intersection', id: 'B', circle1: 'circle-O', circle2: 'circle-P', branch: 1, avoid: 'A' },
+      { type: 'point-on-circle', id: 'C', circle: 'circle-P' },
+      { type: 'extend-onto-circle', id: 'D', a: 'C', b: 'A', circle: 'circle-O' },
+      { type: 'extend-onto-circle', id: 'E', a: 'C', b: 'B', circle: 'circle-O' },
+      { type: 'point-on-segment', id: 'G', a: 'D', b: 'E', t: 1.3, extension: true },
+      { type: 'line-through', id: 'chord-CG', a: 'C', b: 'G' },
+      { type: 'line-circle-intersection', id: 'F', line: 'chord-CG', circle: 'circle-P', avoid: 'C' },
+      { type: 'line-line-intersection', id: 'H', a: 'A', b: 'F', c: 'B', d: 'C' },
+      { type: 'set-angle-ratio', v1: 'E', a1: 'G', b1: 'C', v2: 'H', a2: 'C', b2: 'A', k: 1 },
+      { type: 'set-perpendicular', a: 'C', b: 'E', c: 'A', d: 'B' },
+    ] as AnyCommand[];
+    const fq = replay(q4.map((cmd, i) => ({ id: 'p' + i, group: 'g' + i, enabled: true, utterance: '', cmd } as Fact)));
+    expect(fq.pending, 'CE⟂AB before sizes is pending').toBe(true);
+    expect(fq.lastError, 'no red error while pending').toBeNull();
+    // CONTRADICTION: ∠DAB on a square is structurally 90°, so "= 37" can never hold — a hard error, NOT pending.
+    const sq: AnyCommand[] = [
+      { type: 'square', ids: ['A', 'B', 'C', 'D'] },
+      { type: 'set-angle', vertex: 'A', ray1: 'D', ray2: 'B', value: 37 },
+    ] as AnyCommand[];
+    const fs = replay(sq.map((cmd, i) => ({ id: 's' + i, group: 'g' + i, enabled: true, utterance: '', cmd } as Fact)));
+    expect(fs.pending, '∠DAB=37 on a square is NOT pending (rigid contradiction)').toBe(false);
+    expect(fs.lastError, 'it surfaces as a hard error').toMatch(/over-constrained/i);
+  });
 });
 
 /**

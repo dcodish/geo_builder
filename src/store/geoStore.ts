@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, deepEqual, emptyConstruction, evaluate, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText } from '@/engine';
+import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, deepEqual, emptyConstruction, evaluate, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, residual } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -87,6 +87,10 @@ export interface Derived {
   status: Record<string, FactStatus>;
   /** The most recent enabled fact that failed, for the error banner (or null). */
   lastError: string | null;
+  /** A constraint is recorded but not yet satisfiable because the figure is still under-determined — it
+   *  will resolve once the remaining givens (sizes/angles) are added ([ADR-104](docs/06-decisions.md#adr-104)).
+   *  This is an INFO state ("add the remaining givens"), not the red `lastError` (a genuine contradiction). */
+  pending: boolean;
   /** Measure labels to print on the figure (ADR-031). */
   labels: MeasureLabels;
   /** Angle marks the student asserted (right-angle squares / angle arcs). */
@@ -205,9 +209,17 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
     }
     if (!progressed) break;
   }
-  // `lastError` now reflects whatever genuinely remains unsatisfiable after the retries (null if all clear).
-  const stillFailed = facts.find((f) => f.enabled && status[f.id] !== 'ok' && status[f.id] !== 'disabled');
-  lastError = stillFailed ? status[stillFailed.id] : null;
+  // Classify what (if anything) remains unsatisfiable after the retries. A still-failed step that is a
+  // DEFERRABLE constraint while the figure is still UNDER-DETERMINED isn't a contradiction — it's just
+  // waiting for the givens that pin the figure (ADR-104), so it's a PENDING info state, not a red error.
+  // A genuine failure (a non-deferrable step, or any failure once the figure is fully determined) stays a
+  // hard `lastError`.
+  const failedFacts = facts.filter((f) => f.enabled && status[f.id] !== 'ok' && status[f.id] !== 'disabled');
+  const pending = failedFacts.length > 0 && failedFacts.every((f) => {
+    const ec = lowerOne(f.cmd, symtab);
+    return hasDeferrableConstraint(ec) && constraintIsPending(cur, ec); // a deferrable constraint that still FLEXES (not a rigid contradiction)
+  });
+  lastError = !pending && failedFacts.length ? status[failedFacts[failedFacts.length - 1].id] : null;
   const sampled = applySeed(cur, seed);
   // A dialed radius (the DOF slider) overrides the sampled value for that free circle — a viewing
   // scratchpad (ADR-048): it's cleared by "show another configuration", never a fixed given (ADR-052).
@@ -263,7 +275,7 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
       ? [{ circle: o.id, center: o.center, base: o.radius.value, current: e.ok ? e.circles.get(o.id)?.r ?? o.radius.value : o.radius.value }]
       : [],
   );
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, labels, angleMarks, violations, radiusDofs };
+  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, pending, labels, angleMarks, violations, radiusDofs };
 }
 
 /** The (a, b, id) triples every enabled `extend-onto-circle` step asserts ("המשך a·b onto a circle at id"). */
@@ -288,6 +300,32 @@ const DEFERRABLE_CONSTRAINTS = new Set<AnyCommand['type']>([
  */
 export const hasDeferrableConstraint = (commands: AnyCommand[]): boolean =>
   commands.some((c) => DEFERRABLE_CONSTRAINTS.has(c.type));
+
+/**
+ * Is a still-failed constraint merely PENDING (satisfiable once more givens pin the figure) rather than a
+ * genuine CONTRADICTION? A constraint is pending iff its value still FLEXES as the figure's free DOFs move
+ * — then later givens can drive it to hold (or determine it). If its value is INVARIANT (e.g. ∠DAB on a
+ * square is structurally 90°, so "∠DAB = 37" is impossible no matter what else is added), it's a real
+ * contradiction → a hard error. We detect this by re-deriving the constraint (`applyCommand` on the
+ * figure WITHOUT it) and measuring its residual across a few sampled configurations: a spread ⇒ flexible
+ * ⇒ pending; ~constant ⇒ rigid ⇒ contradiction. (ADR-104.)
+ */
+function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
+  const probe = cmds.reduce((c, cmd) => applyCommand(c, cmd), cur);
+  const newCons = probe.constraints.slice(cur.constraints.length);
+  if (newCons.length === 0) return false;
+  return newCons.some((con) => {
+    const vals: number[] = [];
+    for (const s of [0, 1, 2, 3, 4]) {
+      const e = evaluate(applySeed(cur, s));
+      if (e.ok) {
+        const r = residual(con, (id) => e.positions.get(id)!);
+        if (Number.isFinite(r)) vals.push(r);
+      }
+    }
+    return vals.length >= 2 && Math.max(...vals) - Math.min(...vals) > 0.05; // the relation flexes ⇒ pending
+  });
+}
 
 /** The figure's overall scale (bounding-box diagonal of all placed points) — the yardstick a clearance
  *  margin is measured against, so it's robust whether the extension's base segment is long or short. */
