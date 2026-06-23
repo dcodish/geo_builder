@@ -2374,7 +2374,7 @@ const perpBisector: Rule = (s, ctx) => {
  * vertex, with the named point D *placed* where it meets the opposite side. The
  * bisector and opposite-side lines are scaffolding; only D and the segment show.
  */
-const bisectorPlacesPoint: Rule = (s) => {
+const bisectorPlacesPoint: Rule = (s, ctx) => {
   if (!/bisects?|חוצ/i.test(s)) return null;
   if (INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s)) return null; // intersection rules own that phrasing
   const seg = s.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:bisects?|חוצ\w*)/i);
@@ -2386,10 +2386,20 @@ const bisectorPlacesPoint: Rule = (s) => {
   if (!tri) return null;
   const vertex = tri[1];
   if (vertex === apex) {
-    // "AD bisects ∠BAC": the segment's FIRST letter is the angle vertex → place D where the
-    // bisector meets the opposite side (a new point).
+    // "AD bisects ∠BAC": the segment's FIRST letter is the angle vertex.
     const [o1, o2] = tri.filter((t) => t !== vertex);
     if (o2 === undefined) return null;
+    // If the bisector-foot point D ALREADY EXISTS (e.g. "G on DF" was placed first, then "EG bisects ∠DEF"),
+    // DON'T re-create it — that's a redefinition conflict ("'G' is already defined"). It's a CONSTRAINT:
+    // EG bisects ∠DEF ⇔ ∠(o1, vertex, D) = ∠(D, vertex, o2), which drives the existing point (on its
+    // segment DOF) onto the bisector. (ADR-107.)
+    if ((ctx.points ?? []).includes(D)) {
+      return [
+        { type: 'set-angle-ratio', v1: vertex, a1: o1, b1: D, v2: vertex, a2: D, b2: o2, k: 1 },
+        { type: 'segment', a: apex, b: D },
+      ];
+    }
+    // …else place D where the bisector meets the opposite side (a new point).
     const bisId = `bis-${tri.join('')}`;
     const lineId = `line-${o1}${o2}`;
     return [

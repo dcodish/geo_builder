@@ -1561,3 +1561,15 @@ The existing `two-circles-mutual-tangent-secants` scenario was found to have the
 **Result.** A figure that builds but doesn't satisfy a given (e.g. a wrong branch where the verifier flags a distance/angle) now auto-corrects to a verifier-clean drawing when one exists among the seeds/branches, before the student sees it; otherwise it stays amber (honest). Locked by `store/__tests__/auto-resolve.test.ts` (branch-flip + store action + clean-figure no-op). **1267 tests green, build clean.**
 
 **Scope / limits.** The search is bounded (≈40 current-branch seeds + ≤16 branch combos × 6 seeds) — it is not an exhaustive solver; a deeply under-determined coupled figure can still need the operator to add givens (it then shows pending/amber). It prefers the current branch assignment and only changes branches when the current can't be made clean.
+
+---
+
+## ADR-107 — "XY bisects ∠… " onto an EXISTING point is a constraint, not a re-created intersection
+
+**Status.** Accepted (2026-06-23).
+
+**Context.** Operator (session `86cympns`): `G על DF` placed G on segment DF; then `EG חוצה זוית DEF` ("EG bisects ∠DEF") → **weak:error → built-nothing**. The angle-bisector treatment exists (`bisectorPlacesPoint`), but its "the segment's first letter is the angle vertex" branch always **created** the bisector-foot point as a `line∩line` (bisector ∩ the opposite side) — re-creating the already-placed G → **"'G' is already defined"**.
+
+**Decision.** In that branch, if the foot point **already exists** (in `ctx.points`), don't re-create it — emit the bisector **constraint** instead: `∠(o1, vertex, D) = ∠(D, vertex, o2)` (a `set-angle-ratio`, k=1, i.e. ∠DEG = ∠GEF), which **drives the existing point** (here G, a free DOF on segment DF) onto the bisector. A genuinely new foot point is still constructed as before. (The rule gains `ctx`.)
+
+**Result.** `EG חוצה זוית DEF` with a pre-existing G now builds: G is driven so EG bisects ∠DEF (∠DEG = ∠GEF), G staying on DF. Locked by scenario `bisector-onto-existing-point`. **1267 tests green, build clean.** (Same family as [ADR-086](#adr-086): a relation onto an EXISTING point is a constraint that drives it, not a redefinition.)

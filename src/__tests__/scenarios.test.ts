@@ -104,6 +104,22 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'bisector-onto-existing-point',
+    title: '"EG חוצה זוית DEF" when G already exists (placed on DF) CONSTRAINS G to the bisector, not re-creates it',
+    guards:
+      'operator (session 86cympns): G was placed on DF ("G על DF"), then "EG חוצה זוית DEF" (EG bisects ∠DEF) → weak:error → LLM built-nothing. The angle-bisector treatment exists, but `bisectorPlacesPoint`\'s "the segment\'s first letter is the vertex" branch always CREATED the bisector-foot point via a line∩line — re-creating the already-placed G → "\'G\' is already defined". Fix (ADR-107): when that foot point ALREADY EXISTS, emit the bisector CONSTRAINT instead — ∠(D,E,G) = ∠(G,E,F) (set-angle-ratio k=1) — which drives the existing G (on its segment DOF) onto the bisector. (Distilled to the core figure; the operator\'s full figure added a rhombus + ratios around it.)',
+    steps: ['משולש DEF', 'G על DF', 'EG חוצה זוית DEF'],
+    check(fig) {
+      allStepsOk(fig); // no "'G' is already defined"
+      const D = at(fig, 'D'), E = at(fig, 'E'), F = at(fig, 'F'), G = at(fig, 'G');
+      expect(angle(D, E, G), 'EG bisects ∠DEF: ∠DEG = ∠GEF').toBeCloseTo(angle(G, E, F), 1);
+      // G stayed on segment DF (the bisector of a triangle's apex meets the opposite side between its ends).
+      const tg = ((G.x - D.x) * (F.x - D.x) + (G.y - D.y) * (F.y - D.y)) / ((F.x - D.x) ** 2 + (F.y - D.y) ** 2);
+      expect(tg).toBeGreaterThan(0);
+      expect(tg).toBeLessThan(1);
+    },
+  },
+  {
     id: 'driven-extension-point-stays-beyond',
     title: '"E on the extension of DC" driven by ∠CAE=50 stays BEYOND C (on the extension), not pulled between D and C',
     guards:
