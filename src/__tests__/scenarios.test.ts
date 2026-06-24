@@ -1767,6 +1767,102 @@ const SCENARIOS: Scenario[] = [
       expect(fig.labels.lengths).toContainEqual({ a: 'B', b: 'O', text: 'R' });
     },
   },
+  {
+    id: 'corner-tangent-on-existing-circle',
+    title: '"AB ו AD משיקים למעגל O" where O already exists — tangency CONSTRAINT, not a fresh circle that re-radiuses O',
+    guards:
+      'operator session fn2wt71w (2026-06-24): kite ABCD, triangle BCD inscribed in circle O (the two-tangents-from-A figure), then "AB ו AD משיקים למעגל O". The hard "\'O\' is already defined" crash was a STALE dev server (the ADR-107 placement fix postdated the running server); on HEAD it stopped crashing but `cornerTangentCircle` still re-CONSTRUCTED a corner circle — a free centre on the angle bisector + a `circle-through` the foot — which RE-RADIUSED the existing circle O and kicked the inscribed B,C,D OFF it (verifier amber: "B should lie on circle O … but is 4.25 from centre"). Root cause: the rule never checked whether the named circle already exists. Fix (ADR-115): when circle O is already in context, emit a tangency CONSTRAINT per arm — each arm tangent at its tip (the on-circle touch point), radius O–tip ⟂ the arm (set-perpendicular) — instead of building a new circle. Mirrors tangentLine\'s existing-line branch (ADR-082) and ADR-099.',
+    steps: [
+      // The kite (explicit-equality suffix) escalates to the LLM; captured as the commands the log shows.
+      { llm: [
+        { type: 'quadrilateral', ids: ['A', 'B', 'C', 'D'] },
+        { type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'D' },
+        { type: 'set-equal', a: 'C', b: 'B', c: 'C', d: 'D' },
+        { type: 'segment', a: 'A', b: 'B' },
+        { type: 'segment', a: 'A', b: 'D' },
+        { type: 'segment', a: 'B', b: 'C' },
+        { type: 'segment', a: 'D', b: 'C' },
+        { type: 'set-equal', a: 'B', b: 'C', c: 'D', d: 'C' },
+      ] },
+      'משולש BCD חסום במעגל O',
+      'AB ו AD משיקים למעגל O',
+    ],
+    check(fig) {
+      allStepsOk(fig); // no "'O' is already defined", no over-constraint
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      // circle O still passes through ALL of B, C, D (not re-radiused to the tangent foot) — equal radii.
+      const r = dist(O, B);
+      expect(dist(O, C)).toBeCloseTo(r, 4);
+      expect(dist(O, D)).toBeCloseTo(r, 4);
+      // AB tangent at B and AD tangent at D: the radius is ⟂ the side (dot ≈ 0).
+      const dot = (p: Vec, q: Vec, u: Vec, v: Vec) => (q.x - p.x) * (v.x - u.x) + (q.y - p.y) * (v.y - u.y);
+      expect(Math.abs(dot(O, B, A, B)) / (r * dist(A, B))).toBeLessThan(1e-3);
+      expect(Math.abs(dot(O, D, A, D)) / (r * dist(A, D))).toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'triangle-circumscribes-existing-circle',
+    title: '"משולש DEF חוסם את המעגל O" where O already exists — incircle CONSTRAINT (sides tangent), not a fresh circle that re-radiuses O',
+    guards:
+      'audit sibling of corner-tangent-on-existing-circle (same root cause, different rule). Circle O is the circumcircle of an earlier triangle ABC; then "triangle DEF circumscribes circle O" made O the incircle of DEF. The `incircle` rule re-DERIVED the incentre (bisector∩bisector) + a `circle-through` the foot, RE-RADIUSING the existing O so A,B,C fell off it (verifier amber). Fix (ADR-115): when circle O already exists, emit a tangency CONSTRAINT — for each side, the FOOT of ⟂ from O onto it is forced ONTO the circle (distance(O,side)=radius ⇒ tangent); the triangle flexes around the fixed circle. Same existing-circle guard as the corner case.',
+    steps: [
+      'משולש ABC',
+      'מעגל חוסם את משולש ABC',
+      'משולש DEF חוסם את המעגל O',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      // O still passes through the ORIGINAL triangle's vertices (not re-radiused to DEF's inradius).
+      const r = dist(O, A);
+      expect(dist(O, B)).toBeCloseTo(r, 4);
+      expect(dist(O, C)).toBeCloseTo(r, 4);
+      // Each side of DEF is tangent to O: distance from O to the line equals the radius.
+      const distToLine = (p: Vec, q: Vec) => {
+        const L = dist(p, q);
+        return Math.abs((q.x - p.x) * (p.y - O.y) - (p.x - O.x) * (q.y - p.y)) / L;
+      };
+      const D = at(fig, 'D'), E = at(fig, 'E'), F = at(fig, 'F');
+      for (const [p, q] of [[D, E], [E, F], [F, D]] as [Vec, Vec][]) expect(distToLine(p, q)).toBeCloseTo(r, 3);
+    },
+  },
+  {
+    id: 'arc-ratio-and-implicit-tangent-q4',
+    title: 'bagrut Q4: "AB ו AD משיקים למעגל" (no name) + textbook "קשת DE = 2 קשת CE" — implicit-circle tangent makes NO spurious E, and the arc ratio holds',
+    guards:
+      'operator session 6ai22ulh (2026-06-24, bagrut Q4): two stacked gaps. (1) The textbook given is `⌢DE = 2⌢CE` (arc DE = 2·arc CE) but there was NO `קשת`/arc term, so it could not be entered. (2) Trying it as central angles, the student typed "AB ו AD משיקים למעגל" WITHOUT naming O; the ADR-115 fix only caught the NAMED circle, so this fell through to `cornerTangentCircle`\'s build-a-new-corner-circle path, which created spurious feet E, K + an auxiliary circle P — HIJACKING the label E, so the arc/angle constraint referenced a pinned tangent-foot E that "would not move". Fix: (a) ADR-116 — an `arcEquality` rule maps arc-measure ratios to the central-angle ratio (arc XY ≡ ∠XOY) → `set-angle-ratio`; (b) ADR-115 Am. — the existing-circle guard resolves the circle IMPLICITLY (named, or THE one circle), so the unnamed tangent constrains circle O and creates no points. With both, E is free for "המשך BO חותך את המעגל בנקודה E", and arc DE = 2·arc CE drives the figure (∠DOE = 2∠COE holds).',
+    steps: [
+      // The kite (דלתון, AB=AD) escalates to the LLM; captured as its decomposition.
+      { llm: [
+        { type: 'quadrilateral', ids: ['A', 'B', 'C', 'D'] },
+        { type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'D' },
+        { type: 'segment', a: 'A', b: 'B' },
+        { type: 'segment', a: 'A', b: 'D' },
+        { type: 'segment', a: 'B', b: 'C' },
+        { type: 'segment', a: 'D', b: 'C' },
+      ] },
+      'משולש BCD חסום במעגל O',
+      'AB ו AD משיקים למעגל', // NO name — must constrain the one circle, not spawn a corner circle
+      'המשך BO חותך את המעגל בנקודה E',
+      'קשת DE = 2 קשת CE', // textbook arc-measure given
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // The unnamed tangent created NO spurious points — only the figure's real labels exist.
+      for (const id of ['K', 'P']) expect(fig.positions.has(id), `no spurious ${id}`).toBe(false);
+      expect(fig.positions.has('E')).toBe(true); // E is the BO-extension crossing, not a tangent foot
+      const O = at(fig, 'O'), B = at(fig, 'B'), D = at(fig, 'D');
+      // circle O still passes through its members (the tangent is a constraint, not a rebuild).
+      const r = dist(O, B);
+      expect(dist(O, D)).toBeCloseTo(r, 4);
+      expect(dist(O, at(fig, 'C'))).toBeCloseTo(r, 4);
+      expect(dist(O, at(fig, 'E'))).toBeCloseTo(r, 4); // E on the circle
+      // arc DE = 2·arc CE  ⇔  central ∠DOE = 2·∠COE.
+      const ang = (a: Vec, o: Vec, b: Vec) => angle(a, o, b);
+      const E = at(fig, 'E'), C = at(fig, 'C');
+      expect(ang(D, O, E)).toBeCloseTo(2 * ang(C, O, E), 1);
+    },
+  },
 ];
 
 describe('reported scenarios — end-to-end replay of real bug reports', () => {

@@ -474,3 +474,18 @@ over all four (ADR-041).
 **Steps:** `מעגל O` · `מנקודה A מחוץ למעגל מעבירים משיק לנקודה D` · `B על המעגל` · `AB` · `AO` · `BO` · `DO` · `AB=√2R` · `BO=R`
 **Guards against:** three stacked defects — (1) the parser dropping the trailing R in `√2R` (unanchored rule); (2) lowering freezing R to the circle's default 5 on a FREE-radius circle, turning `AB=√2R` into a fixed distance that fought the free radius (seed-fragile over-constraint, ADR-051/052); (3) the joint solver giving up. Fix (ADR-071): a first-class `length-radius` constraint that drives the radius DOF **and** the witness on-circle angle (the tangent caps the radius, so a moderate radius + the right θ satisfies it), making `BO=R` a tautology.
 **Asserts:** all steps OK; |AB| = √2·|OB| (the relation holds); labels `√2R` and `R`. A companion test `sqrt-times-free-radius-allseeds` replays the same sequence across seeds 0–8 (the over-constraint was seed-dependent).
+
+### `corner-tangent-on-existing-circle` — "AB ו AD משיקים למעגל O" where O already exists (ADR-115)
+**Steps:** `ABCD דלתון - AB=AD ו BC=DC` (→LLM: quad + the two equal-pair constraints + sides) · `משולש BCD חסום במעגל O` · `AB ו AD משיקים למעגל O`
+**Guards against:** `cornerTangentCircle` re-CONSTRUCTING a corner circle (free centre on the angle bisector + `circle-through` the foot) on a circle O that ALREADY exists — which re-radiused O and kicked the inscribed B,C,D off it (originally a stale-server `'O' is already defined` crash; on HEAD a verifier-amber wrong figure). Fix (ADR-115): when O exists, emit a tangency CONSTRAINT per arm — each tangent at its tip, radius O–tip ⟂ the arm.
+**Asserts:** all steps OK; |OB|=|OC|=|OD| (O keeps all three members); OB⟂AB and OD⟂AD (tangent at the tips).
+
+### `triangle-circumscribes-existing-circle` — "משולש DEF חוסם את המעגל O" where O already exists (ADR-115)
+**Steps:** `משולש ABC` · `מעגל חוסם את משולש ABC` · `משולש DEF חוסם את המעגל O`
+**Guards against:** the audit sibling — the `incircle` rule re-deriving the incentre (bisector∩bisector + `circle-through` the foot) on an existing circle O, re-radiusing it so A,B,C fell off. Fix (ADR-115): build the DUAL — three free touch points on O, a tangent at each, the named vertices as the pairwise tangent intersections (deterministic; the foot-on-circle alternative over-constrains the third side).
+**Asserts:** all steps OK; |OA|=|OB|=|OC| (O keeps the original triangle's vertices); each side of DEF is at distance = radius from O (tangent).
+
+### `arc-ratio-and-implicit-tangent-q4` — bagrut Q4 arc given + implicit-circle tangent (ADR-116, ADR-115 Am.)
+**Steps:** `מרובע ABCD דלתון - AB=AD` (→LLM: quad + AB=AD + sides) · `משולש BCD חסום במעגל O` · `AB ו AD משיקים למעגל` (NO name) · `המשך BO חותך את המעגל בנקודה E` · `קשת DE = 2 קשת CE`
+**Guards against:** two gaps from the operator's Q4 session — (1) no `קשת`/arc term for the textbook `⌢DE = 2⌢CE`; (2) the UNNAMED tangent (`למעגל`, one circle present) fell through ADR-115's named-only guard and spawned spurious tangent feet E, K + an auxiliary circle P, hijacking the label E so the constraint referenced a pinned point that "would not move". Fix: ADR-116 maps arc-measure ratios to the central-angle ratio (arc XY ≡ ∠XOY → `set-angle-ratio`); ADR-115 Am. resolves the tangent's circle implicitly (named OR the one circle) so the unnamed tangent constrains O and creates no points.
+**Asserts:** all steps OK; points K and P do NOT exist (no spurious tangent circle); E is on circle O; circle O keeps its members (C, D, E, B at radius); arc DE = 2·arc CE holds (central ∠DOE = 2∠COE).

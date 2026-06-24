@@ -643,6 +643,33 @@ const angleEquality: Rule = (s) => {
 };
 
 /**
+ * "⌢DE = 2⌢CE" / "arc DE = 2 arc CE" / "קשת DE = 2 קשת CE" — an ARC-measure equality/ratio on a circle
+ * ([ADR-116](docs/06-decisions.md#adr-116)). An arc's measure equals its CENTRAL angle, so arc XY on the
+ * circle centred at O ≡ ∠XOY; the relation becomes the engine's angle-ratio on the two central angles (the
+ * same `set-angle-ratio` as `angleEquality`, ADR-100). On an under-determined figure it drives a free
+ * on-circle DOF until the arcs hold; on a determined one the givens verifier checks it. The circle is
+ * resolved implicitly (ADR-029): the named circle, or THE one circle in the figure. No radii are drawn — the
+ * arc lives on the circle boundary, not as central radii (matches the textbook figure). The arc endpoints are
+ * assumed on that circle (true in the corpus). Runs before `angleEquality` (its own `arc`/`קשת` keyword).
+ */
+const arcEquality: Rule = (s, ctx) => {
+  if (!/arc|קשת|⌢/i.test(s)) return null;
+  if (/midpoint|אמצע/i.test(s)) return null; // "midpoint of arc …" → arcMidpoint, not a measure relation
+  const parts = s.split('=');
+  if (parts.length !== 2) return null; // a single '=' relation
+  const center = resolveCenter(s, ctx);
+  if (!center) return null; // need the circle's centre to form the central angle
+  const O = up(center);
+  const strip = (p: string) => dropCircleRef(p).replace(/arcs?|הקשת|קשת|⌢|⏜|\bin\b|\bof\b|ב-?/gi, ' ');
+  const left = labelRun(strip(parts[0]), 2);
+  const right = labelRun(strip(parts[1]), 2);
+  if (!left || !right) return null;
+  const coefM = parts[1].match(new RegExp(String.raw`(${COEF})\s*[*·]?\s*(?:arcs?|קשת|⌢)`, 'i')); // "= 2 arc CE"
+  const k = coefM ? parseFloat(coefM[1]) : 1;
+  return [{ type: 'set-angle-ratio', v1: O, a1: left[0], b1: left[1], v2: O, a2: right[0], b2: right[1], k }];
+};
+
+/**
  * "point G on AD" / "נקודה G על AD" with optional ratio "at 40%" / "ב-40%".
  * The segment labels are word-bounded so "F on the extension of AD" can't read
  * "th" of "the" as a segment — that phrasing escapes to the fallback instead.
@@ -1460,6 +1487,29 @@ const incircle: Rule = (s, ctx) => {
   if (!ids) return null;
   const [A, B, C] = ids;
   const taken = ctx.points ?? []; // auto-named points must dodge labels already in the figure
+  // EXISTING circle as the incircle — "משולש DEF חוסם את המעגל O" where circle O is ALREADY in the figure
+  // (here O is also the circumcircle of an earlier triangle). The triangle's three sides are tangent to the
+  // existing O, NOT a fresh incircle whose centre/radius are DERIVED from the triangle. Re-deriving it
+  // (incenter = bisector∩bisector + circle-through the foot) RE-RADIUSES the existing circle and kicks its
+  // members off it ([ADR-115](docs/06-decisions.md#adr-115); verifier caught it amber). Build the DUAL instead:
+  // three FREE touch points on the existing circle, the tangent line at each, and the named vertices as the
+  // pairwise tangent intersections — so DEF circumscribes O DETERMINISTICALLY (no coupled solve; three feet
+  // forced onto the circle over-constrains the per-constraint driver). Mirrors `cornerTangentCircle`'s
+  // existing-circle branch and the pole-of-chord two-tangent rule.
+  const namedCenter = circleCenter(s);
+  if (namedCenter && (ctx.circles ?? []).some((c) => up(c) === up(namedCenter))) {
+    const O = up(namedCenter);
+    const circ = circleId(O);
+    const touch: Id[] = []; // three fresh, distinct touch-point labels, each dodging the figure + prior touches
+    for (let i = 0; i < 3; i++) touch.push(freeLabel([...ids, O, ...taken, ...touch], ['P', 'Q', 'S', 'T', 'U', 'V']));
+    const verts: [Id, Id, Id] = [A, B, C]; // the student's named vertices = pairwise tangent intersections
+    return [
+      ...touch.map((t, i): AnyCommand => ({ type: 'point-on-circle', id: t, circle: circ, free: true, theta: 0.4 + (i * 2 * Math.PI) / 3 })),
+      ...touch.map((t): AnyCommand => ({ type: 'tangent', id: `tan-${t}`, circle: circ, at: t })), // scaffolding lines
+      ...verts.map((v, i): AnyCommand => ({ type: 'line-intersection', id: v, line1: `tan-${touch[i]}`, line2: `tan-${touch[(i + 1) % 3]}` })),
+      { type: 'triangle', ids: [A, B, C] }, // the drawn sides DE, EF, FD (each tangent to O)
+    ];
+  }
   const I = circleCenter(s) ?? freeLabel([...ids, ...taken], ['I', 'O', 'P', 'Q']); // the incenter
   const F = freeLabel([...ids, I, ...taken], ['F', 'G', 'H', 'K']); // tangency point on AB
   const bisA = `bis-${B}${A}${C}`; // ∠BAC (vertex A)
@@ -1499,6 +1549,35 @@ const cornerTangentCircle: Rule = (s, ctx) => {
   const vertex = shared[0];
   const arm1 = seg1.find((x) => x !== vertex)!;
   const arm2 = seg2.find((x) => x !== vertex)!;
+  // EXISTING circle declared tangent to two sides — "AB ו-AD משיקים למעגל O" where circle O is ALREADY in the
+  // figure (e.g. the circumcircle of an inscribed triangle in the two-tangents-from-A kite). This is a tangency
+  // CONSTRAINT on the existing circle, NOT the construction of a fresh corner circle: re-creating it (a free
+  // centre on the bisector + circle-through the foot) RE-RADIUSES the existing circle and kicks its inscribed
+  // points off it ([ADR-115](docs/06-decisions.md#adr-115); the verifier caught it amber). Each arm is tangent
+  // at its TIP — the non-shared endpoint, the touch point (the shared vertex is the external apex, off the
+  // circle). Put the tip on the circle if it isn't already, then constrain radius O–tip ⟂ that arm (the ADR-082
+  // dual, per arm). The circle is resolved like ADR-029's implicit reference — the NAMED circle if it exists,
+  // else THE one circle when the figure has exactly one (so "AB ו-AD משיקים למעגל" with NO name and a single
+  // circle present still constrains it instead of spawning a spurious corner circle that hijacks labels like E
+  // — the exact misfire in the operator's bagrut-Q4 session). Mirrors `tangentLine`/ADR-099.
+  const namedCenter = circleCenter(s);
+  const existingCenter =
+    namedCenter && (ctx.circles ?? []).some((c) => up(c) === up(namedCenter))
+      ? up(namedCenter)
+      : !namedCenter && (ctx.circles ?? []).length === 1
+        ? up(ctx.circles![0])
+        : null;
+  if (existingCenter) {
+    const O = existingCenter;
+    const members = new Set((ctx.circleMembers?.find((e) => up(e.center) === O)?.points ?? []).map(up));
+    const cmds: AnyCommand[] = [];
+    for (const tip of [arm1, arm2]) {
+      cmds.push({ type: 'segment', a: vertex, b: tip }); // draw the tangent side (idempotent if already an edge)
+      if (!members.has(tip)) cmds.push({ type: 'point-on-circle', id: tip, circle: circleId(O) }); // tip is the touch point
+      cmds.push({ type: 'set-perpendicular', a: O, b: tip, c: vertex, d: tip }); // radius O–tip ⟂ the side ⇒ tangent at tip
+    }
+    return cmds;
+  }
   // The circle's centre: the named one ("circle O"), else a fresh auto-name — the corner circle is a
   // NEW object, so "AB ו-AD משיקים למעגל" (no name) is built deterministically rather than escalating
   // (the centre is dodged against the figure's labels, like the incircle's incenter).
@@ -2762,6 +2841,7 @@ const RULES: Rule[] = [
   diameterCutsSegment, // "קוטר … מנקודה F חותך את הצלע AC בנקודה E" — before lineLineIntersection (which stops on "קוטר") and `diameter`
   lineLineIntersection,
   angleAcuteness, // "∠ABC קהה/חדה" (obtuse/acute) — before the value-based angle rules
+  arcEquality, // "⌢DE = 2⌢CE" / "קשת DE = 2 קשת CE" (arc-measure ratio → central-angle ratio) — own keyword, before angleEquality
   angleEquality, // "∠ABC = ∠DEF" (two angles equal) — before measureAngle/angle, which expect a value RHS
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,
