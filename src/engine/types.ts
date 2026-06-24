@@ -710,6 +710,7 @@ export type Command =
   | { type: 'trapezoid'; ids: [Id, Id, Id, Id] }
   | { type: 'triangle'; ids: [Id, Id, Id] }
   | { type: 'right-triangle'; ids: [Id, Id, Id] } // right angle at the last id
+  | { type: 'polygon'; ids: Id[] } // a generic n-gon (n ≥ 3): n boundary segments + the polygon object; its vertices are placed by prior commands (e.g. a regular polygon's on-circle vertices)
   | { type: 'free-point'; id: Id; x: number; y: number; free?: boolean } // free: an AUTO-placed default (a construct's apex) — a free DOF, NOT pinned (ADR-052); a student-typed "A at (x,y)" omits it and pins
   | { type: 'point-on-segment'; id: Id; a: Id; b: Id; t?: number; branch?: number; extension?: boolean } // branch: which root, once a constraint drives it (ADR-043); extension: an unstated t>1 default, recruitable not eager (ADR-073)
   | { type: 'point-by-distances'; id: Id; from1: Id; dist1: number; from2: Id; dist2: number; branch?: number }

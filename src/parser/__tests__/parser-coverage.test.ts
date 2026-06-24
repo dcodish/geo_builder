@@ -39,6 +39,28 @@ const PARSES: [string, string][] = [
   ['טרפז ABCD', 'trapezoid'],
   ['quadrilateral ABCD', 'quadrilateral'],
   ['מרובע ABCD', 'quadrilateral'],
+  // ── named shapes decomposed to primitives (ADR-110): kite / isosceles / equilateral / iso-trapezoid ──
+  ['kite ABCD', 'set-equal'],
+  ['דלתון ABCD', 'set-equal'],
+  ['isosceles triangle ABC', 'set-equal'],
+  ['משולש שווה שוקיים ABC', 'set-equal'],
+  ['equilateral triangle ABC', 'set-equal'],
+  ['משולש שווה צלעות ABC', 'set-equal'],
+  ['isosceles trapezoid ABCD', 'set-equal'],
+  ['טרפז שווה שוקיים ABCD', 'set-equal'],
+  // ── regular polygons (ADR-111): n≥5 → generic polygon; regular triangle/quad → equilateral/square ──
+  ['regular pentagon ABCDE', 'polygon'],
+  ['מחומש משוכלל ABCDE', 'polygon'],
+  ['regular hexagon ABCDEF', 'polygon'],
+  ['משושה משוכלל ABCDEF', 'polygon'],
+  ['regular octagon ABCDEFGH', 'polygon'],
+  ['regular 5-gon ABCDE', 'polygon'],
+  ['regular polygon ABCDE', 'polygon'], // generic — n read from the label run
+  ['regular quadrilateral ABCD', 'square'],
+  ['regular triangle ABC', 'set-equal'], // = equilateral
+  // ── triangle midsegment ──
+  ['midsegment to BC in triangle ABC', 'midpoint'],
+  ['קטע האמצעים לצלע BC במשולש ABC', 'midpoint'],
   // ── inscribed (named + UNNAMED centre; every cyclic polygon) ──
   ['triangle ABC inscribed in circle O', 'circle'],
   ['triangle ABC inscribed in a circle', 'circle'],
@@ -149,6 +171,8 @@ const ESCALATES: string[] = [
   'square ABCD inscribed in a circle with AB = 6', // inscribed + a constraint on top
   // ── shape + a constraint (compound — LLM should decompose) ──
   'square ABCD with AB = 6',
+  'kite ABCD with AB = 6', // a named-shape macro + an extra constraint must not half-parse
+  'regular pentagon ABCDE with AB = 6',
   'parallelogram ABCD where AB = CD',
   'triangle ABC with angle BAC = 37',
   'משולש ABC עם זווית BAC = 37',

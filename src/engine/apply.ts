@@ -433,6 +433,12 @@ function triEdges(objects: GeoObject[], a: Id, b: Id, c: Id): void {
   addObj(objects, { kind: 'polygon', id: `poly-${a}${b}${c}`, vertices: [a, b, c] });
 }
 
+/** The n boundary segments + the polygon for an n-gon v0→v1→…→v(n-1)→v0 (generalises quadEdges/triEdges). */
+function polyEdges(objects: GeoObject[], ids: Id[]): void {
+  for (let i = 0; i < ids.length; i++) addObj(objects, segment(ids[i], ids[(i + 1) % ids.length]));
+  addObj(objects, { kind: 'polygon', id: `poly-${ids.join('')}`, vertices: [...ids] });
+}
+
 export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec> = new Map()): Construction {
   const objects = [...prev.objects];
   const constraints = [...prev.constraints];
@@ -529,6 +535,13 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       triEdges(objects, a, b, c);
       break;
     }
+
+    case 'polygon':
+      // A generic n-gon. Unlike square/triangle, it does NOT own its vertices' placement — they are created
+      // by prior commands (e.g. a regular polygon's on-circle vertices). This case only wires the n boundary
+      // segments + the polygon object.
+      polyEdges(objects, cmd.ids);
+      break;
 
     case 'right-triangle': {
       // Right angle at C (the last id). Legs CA and CB: A and C are free, B is

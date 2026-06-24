@@ -105,6 +105,36 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'kite-named-shape',
+    title: '"דלתון ABCD" builds a kite (two pairs of equal adjacent sides) from the named shape alone',
+    guards:
+      'gap audit (theorem list): no דלתון/kite construct existed. Added (ADR-110) as a parser-macro — a general quadrilateral + |AB|=|AD| + |CB|=|CD| constraints flex the free quad into a kite, no new engine construct.',
+    steps: ['דלתון ABCD'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      expect(dist(A, B), '|AB| = |AD|').toBeCloseTo(dist(A, D), 3);
+      expect(dist(C, B), '|CB| = |CD|').toBeCloseTo(dist(C, D), 3);
+    },
+  },
+  {
+    id: 'regular-hexagon',
+    title: '"regular hexagon ABCDEF" builds a 6-gon with equal sides and 120° interior angles',
+    guards:
+      'gap audit (theorem list): the polygon family capped at 4 vertices. Added (ADR-111) a generic `polygon` command + a regularPolygon rule that places n equally-spaced vertices on a hidden free-radius circle.',
+    steps: ['regular hexagon ABCDEF'],
+    check(fig) {
+      allStepsOk(fig);
+      const ids: Id[] = ['A', 'B', 'C', 'D', 'E', 'F'];
+      const pts = ids.map((id) => at(fig, id));
+      const side = dist(pts[0], pts[1]);
+      for (let i = 0; i < 6; i++) expect(dist(pts[i], pts[(i + 1) % 6]), `side ${i}`).toBeCloseTo(side, 3);
+      for (let i = 0; i < 6; i++) {
+        expect(angle(pts[(i + 5) % 6], pts[i], pts[(i + 1) % 6]), `interior angle ${i}`).toBeCloseTo(120, 1);
+      }
+    },
+  },
+  {
     id: 'obtuse-acute-angle',
     title: '"∠C קהה" (obtuse) / "∠C חדה" (acute) reshape the triangle so ∠ACB is >90° / <90°',
     guards:

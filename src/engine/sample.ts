@@ -41,6 +41,20 @@ const isSamplableExtension = (o: { kind: string; extension?: boolean; solve?: un
 /** A free on-line marker the sampler may slide along its line (not yet driven by a constraint — ADR-036). */
 const isFreeOnLine = (o: { kind: string; solve?: unknown }): boolean => o.kind === 'on-line' && o.solve === undefined;
 
+/**
+ * A PINNED parametric point — on-circle/on-segment whose position is FIXED: an explicit θ/t that is neither
+ * a free/samplable DOF nor a samplable extension nor currently driven by a constraint. It is geometrically
+ * rigid (like a pinned free point), so it carries NO movable shape DOF ([ADR-112](docs/06-decisions.md#adr-112)) — a regular polygon's
+ * equally-spaced corners and an inscribed square's vertices are pinned this way. A DRIVEN parametric point
+ * (solve set) is NOT pinned: it still counts 1 raw, balanced by the constraint that drives it.
+ */
+const isPinnedParam = (o: { kind: string; free?: boolean; solve?: unknown; extension?: boolean }): boolean =>
+  (o.kind === 'on-circle' || o.kind === 'on-segment') &&
+  o.solve === undefined &&
+  !isFreeOnCircle(o) &&
+  !isFreeOnSegment(o) &&
+  !isSamplableExtension(o);
+
 /** mulberry32 — a tiny deterministic PRNG in [0, 1). */
 function mulberry32(a: number): () => number {
   return () => {
@@ -219,6 +233,7 @@ function rawMovableDof(o: Construction['objects'][number]): number {
   const carrier = carrierOf(o);
   if (!carrier) return 0; // 0-DOF points, lines, circles, segments — fully determined
   if (carrier.family === 'free') return (o as FreePoint).pinned ? 0 : 2; // a pinned free point is fixed
+  if (carrier.family === 'param' && isPinnedParam(o)) return 0; // a pinned on-circle/on-segment point is rigid (ADR-112)
   return carrier.dof; // parametric / on-line / shape scalar = 1
 }
 

@@ -49,6 +49,11 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'shapes', supported: true, en: 'parallelogram ABCD', he: 'מקבילית ABCD', descEn: 'A parallelogram.', descHe: 'מקבילית.' },
   { category: 'shapes', supported: true, en: 'trapezoid ABCD', he: 'טרפז ABCD', descEn: 'A trapezoid (one pair of parallel sides).', descHe: 'טרפז (זוג צלעות מקבילות).' },
   { category: 'shapes', supported: true, en: 'quadrilateral ABCD', he: 'מרובע ABCD', descEn: 'A general quadrilateral.', descHe: 'מרובע כללי.' },
+  { category: 'shapes', supported: true, en: 'kite ABCD', he: 'דלתון ABCD', descEn: 'A kite — two pairs of equal adjacent sides (|AB|=|AD|, |CB|=|CD|).', descHe: 'דלתון — שני זוגות של צלעות סמוכות שוות (|AB|=|AD|, |CB|=|CD|).' },
+  { category: 'shapes', supported: true, en: 'isosceles triangle ABC', he: 'משולש שווה שוקיים ABC', descEn: 'An isosceles triangle (|AB|=|AC|, apex A).', descHe: 'משולש שווה שוקיים (|AB|=|AC|, ראש A).' },
+  { category: 'shapes', supported: true, en: 'equilateral triangle ABC', he: 'משולש שווה צלעות ABC', descEn: 'An equilateral triangle (all sides equal).', descHe: 'משולש שווה צלעות (כל הצלעות שוות).' },
+  { category: 'shapes', supported: true, en: 'isosceles trapezoid ABCD', he: 'טרפז שווה שוקיים ABCD', descEn: 'An isosceles trapezoid (AB∥DC, equal legs |AD|=|BC|).', descHe: 'טרפז שווה שוקיים (AB∥DC, שוקיים שוות |AD|=|BC|).' },
+  { category: 'shapes', supported: true, en: 'regular pentagon ABCDE', he: 'מחומש משוכלל ABCDE', descEn: 'A regular polygon — equal sides and angles (pentagon/hexagon/…).', descHe: 'מצולע משוכלל — צלעות וזוויות שוות (מחומש/משושה/…).' },
 
   // ── Points ──────────────────────────────────────────────────────────────
   { category: 'points', supported: true, en: 'point A at (0,0)', he: 'נקודה A ב-(0,0)', descEn: 'A free point at coordinates.', descHe: 'נקודה חופשית בקואורדינטות.' },
@@ -73,6 +78,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'lines', supported: true, en: 'AD median to BC', he: 'AD תיכון לצלע BC', descEn: 'A median you name (D = midpoint of BC).', descHe: 'תיכון בשם שתבחר (D = אמצע BC).' },
   { category: 'lines', supported: true, en: 'height from A in ABC', he: 'גובה מ-A במשולש ABC', descEn: 'An altitude and its foot.', descHe: 'גובה והרגל שלו.' },
   { category: 'lines', supported: true, en: 'perpendicular bisector of AB', he: 'אנך אמצעי ל-AB', descEn: 'The perpendicular bisector of a segment.', descHe: 'האנך האמצעי של הקטע.' },
+  { category: 'lines', supported: true, en: 'midsegment to BC in triangle ABC', he: 'קטע האמצעים לצלע BC במשולש ABC', descEn: 'The triangle midsegment — joins the midpoints of the two sides meeting at the apex.', descHe: 'קטע האמצעים במשולש — מחבר את אמצעי שתי הצלעות הנפגשות בקודקוד שממול.' },
   { category: 'lines', supported: true, en: 'AD bisects angle BAC', he: 'AD חוצה את הזווית BAC', descEn: 'An angle bisector that places a point on the opposite side.', descHe: 'חוצה זווית הממקם נקודה על הצלע שממול.' },
 
   // ── Constraints ─────────────────────────────────────────────────────────

@@ -22,6 +22,14 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `kite-named-shape` — "דלתון ABCD" builds a kite from the named shape alone (ADR-110)
+**Steps**: `דלתון ABCD`
+**Guards against:** the theorem-list audit found no kite/דלתון construct. Added (ADR-110) as a parser MACRO — a general `quadrilateral` + `|AB|=|AD|` + `|CB|=|CD|` constraints flex the free quad into a kite (axis AC), reusing the tested constraint solver with no new engine construct. The same pattern delivers isosceles/equilateral triangle and isosceles trapezoid. **Asserts:** all steps OK; |AB|=|AD| and |CB|=|CD| hold (verifier green).
+
+### `regular-hexagon` — "regular hexagon ABCDEF" builds a 6-gon with equal sides + 120° angles (ADR-111)
+**Steps**: `regular hexagon ABCDEF`
+**Guards against:** the polygon family capping at 4 vertices. Added (ADR-111) a generic `polygon` command + a `regularPolygon` rule that places n equally-spaced vertices on a hidden, free-radius circle (corners pinned → rigid up to similarity, ADR-112). **Asserts:** all steps OK; all 6 sides equal; all 6 interior angles ≈120°.
+
 ### `q4-constraints-order-independent` — full Q4 builds with CE⟂AB entered BEFORE the sizes (ADR-104)
 **Steps**: `שני מעגלים נחתכים בנקודות A ו B` · `נקודה C על מעגל P` · `המשך CA חותך את מעגל O בנקודה D` · `המשך CB חותך את מעגל O בנקודה E` · `נקודה G על המשך DE` · `CG חותך את מעגל P בנקודה F` · `AF ו BC נחתכים בנקודה H` · `∠GEC = ∠CHA` · `CE⊥AB` · `CD=36` · `DE=18`
 **Guards against:** `CE⟂AB` failing "over-constrained" when entered BEFORE `CD=36, DE=18` — without the sizes it's an under-determined coupled solve the engine can't land; with them it's determinate. The operator's principle: the diagram must build the same regardless of entry order. Fix (ADR-104): after the in-order pass, `replay` RETRIES still-failed CONSTRAINT-only facts against the now-complete figure to a fixpoint, so a constraint typed too early is effectively re-ordered after the givens that pin it. Verified order-independent across five orderings (the others in `recruit-circle-center.test.ts` / engine tests). **Asserts:** all steps OK; |CD|=36, |DE|=18, CE⟂AB all hold; verifier green.

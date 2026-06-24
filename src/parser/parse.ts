@@ -217,6 +217,112 @@ const quadrilateral = quadShape(/quadrilateral|quad|מרובע/gi, (ids) => ({ t
 /** "triangle ABC" / "משולש ABC" — 3 free vertices. */
 const triangle = triShape(/triangle|משולש/gi, (ids) => ({ type: 'triangle', ids }));
 
+/**
+ * A named-shape MACRO ([ADR-110](docs/06-decisions.md#adr-110)): a keyword (He/En) + n labels decomposed into a sequence of
+ * already-supported canonical commands — e.g. a kite = a general quad + two equal-adjacent-side
+ * constraints. The figure is built from declared relationships on existing primitives (the constraint
+ * solver does the work), so no new engine construct is needed. Mirrors `quadShape`/`triShape` (label run +
+ * SHAPE_LEFTOVER escalation) but `trigger` (what fires the rule) and `strip` (every keyword word to remove
+ * before reading labels) are separate, because a shape like "isosceles triangle" fires on "isosceles" yet
+ * must strip "triangle" too.
+ */
+const shapeMacro =
+  (trigger: RegExp, strip: RegExp, n: number, make: (ids: Id[]) => AnyCommand[], defer?: (s: string) => boolean): Rule =>
+  (s) => {
+    if (defer?.(s)) return null; // a downstream rule owns this phrasing (e.g. a triangle through/around a circle)
+    if (!trigger.test(s)) return null;
+    const bare = s.replace(strip, ' ');
+    const ids = labelRun(bare, n);
+    if (!ids) return null;
+    // After keyword + labels are consumed, nothing geometry-significant should remain — a constraint/extra
+    // construct ("kite ABCD with AB = 6") means a compound → escalate, don't half-parse (mirrors inscribedPolygon).
+    const leftover = ids.reduce(
+      (a, id) => a.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
+      bare.replace(new RegExp(String.raw`\b${ids.join('')}\b`, 'i'), ' '),
+    );
+    if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
+    return make(ids);
+  };
+
+/** "kite ABCD" / "דלתון ABCD" (also "עפיפון") → a general quad with two pairs of equal ADJACENT sides
+ *  (|AB|=|AD| meeting at A, |CB|=|CD| meeting at C — axis AC). The constraints flex the free quad into a kite. */
+const kite = shapeMacro(/kite|דלתון|עפיפון/i, /kite|דלתון|עפיפון/gi, 4, (ids) => [
+  { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
+  { type: 'set-equal', a: ids[0], b: ids[1], c: ids[0], d: ids[3] }, // |AB| = |AD|
+  { type: 'set-equal', a: ids[2], b: ids[1], c: ids[2], d: ids[3] }, // |CB| = |CD|
+]);
+
+/** A triangle phrasing that names a circle it is THROUGH / circumscribes belongs to the circumcircle/incircle
+ *  rules downstream — defer (matches the `triShape` guard) so "isosceles triangle ABC … חוסם במעגל" isn't
+ *  half-claimed by the macro. (Inscribed/"חסום" is NOT here — that escalates as a genuine compound.) */
+const triThroughCircle = (s: string): boolean =>
+  /circle|מעגל/i.test(s) && /circumscrib\w*|חוסם|\bthrough\b|דרך/i.test(s);
+
+/** "isosceles triangle ABC" / "משולש שווה שוקיים ABC" → a triangle + |AB|=|AC| (apex = first vertex, base BC). */
+const isoscelesTriangle = shapeMacro(
+  /isosceles|שווה[\s-]?שוקיים/i,
+  /isosceles|triangle|שווה[\s-]?שוקיים|משולש/gi,
+  3,
+  (ids) => [
+    { type: 'triangle', ids: [ids[0], ids[1], ids[2]] },
+    { type: 'set-equal', a: ids[0], b: ids[1], c: ids[0], d: ids[2] }, // |AB| = |AC|
+  ],
+  triThroughCircle,
+);
+
+/** "equilateral triangle ABC" / "משולש שווה צלעות ABC" → a triangle + all three sides equal. */
+const equilateral = shapeMacro(
+  /equilateral|שווה[\s-]?צלעות/i,
+  /equilateral|triangle|שווה[\s-]?צלעות|משולש/gi,
+  3,
+  (ids) => [
+    { type: 'triangle', ids: [ids[0], ids[1], ids[2]] },
+    { type: 'set-equal', a: ids[0], b: ids[1], c: ids[1], d: ids[2] }, // |AB| = |BC|
+    { type: 'set-equal', a: ids[1], b: ids[2], c: ids[2], d: ids[0] }, // |BC| = |CA|
+  ],
+  triThroughCircle,
+);
+
+/** "isosceles trapezoid ABCD" / "טרפז שווה שוקיים ABCD" → a trapezoid (AB∥DC) + equal legs |AD|=|BC|.
+ *  Fires only when BOTH the isosceles and the trapezoid keyword are present (either order). */
+const isoscelesTrapezoid = shapeMacro(
+  /(?:isosceles|שווה[\s-]?שוקיים)[\s\S]*(?:trapezoid|trapezium|טרפז)|(?:trapezoid|trapezium|טרפז)[\s\S]*(?:isosceles|שווה[\s-]?שוקיים)/i,
+  /isosceles|שווה[\s-]?שוקיים|trapezoid|trapezium|טרפז/gi,
+  4,
+  (ids) => [
+    { type: 'trapezoid', ids: [ids[0], ids[1], ids[2], ids[3]] },
+    { type: 'set-equal', a: ids[0], b: ids[3], c: ids[1], d: ids[2] }, // |AD| = |BC| (the two legs; AB ∥ DC)
+  ],
+);
+
+/**
+ * "the midsegment to BC in triangle ABC" / "קטע האמצעים לצלע BC במשולש ABC" — the segment joining the
+ * midpoints of the two sides meeting at the apex (the triangle vertex NOT on the named base). Decomposes
+ * to two `midpoint`s + a `segment` (all already supported). The triangle must be named (3 labels) and the
+ * base a side of it; the triangle is created first if it isn't already in the figure. Unusual phrasings
+ * (a trapezoid midsegment, an un-named triangle) fall through to the LLM net.
+ */
+const midsegment: Rule = (s, ctx) => {
+  if (!/midsegment|mid-?segment|midline|קטע\s+ה?אמצעים/i.test(s)) return null;
+  const triM = s.match(/(?:triangle|משולש)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)/i);
+  const baseM = s.match(/(?:parallel\s+to|to|מקביל\s*ל-?|לצלע|ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  if (!triM || !baseM) return null;
+  const tri = [up(triM[1]), up(triM[2]), up(triM[3])];
+  const base = [up(baseM[1]), up(baseM[2])];
+  if (!base.every((x) => tri.includes(x)) || base[0] === base[1]) return null; // base must be a side of the triangle
+  const apex = tri.find((v) => !base.includes(v));
+  if (!apex) return null;
+  const m1 = freeLabel([...tri, ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']);
+  const m2 = freeLabel([...tri, m1, ...(ctx.points ?? [])], ['N', 'P', 'Q', 'S']);
+  const have = new Set(ctx.points ?? []);
+  const out: AnyCommand[] = [];
+  if (!tri.every((v) => have.has(v))) out.push({ type: 'triangle', ids: [tri[0], tri[1], tri[2]] });
+  out.push({ type: 'midpoint', id: m1, a: apex, b: base[0] });
+  out.push({ type: 'midpoint', id: m2, a: apex, b: base[1] });
+  out.push({ type: 'segment', a: m1, b: m2 });
+  return out;
+};
+
 /** "segment AC" / "diagonal AC" / "קטע AC" / "אלכסון AC" — connect two points. */
 const segment: Rule = (s) => {
   if (!/segment|diagonal|connect|קטע|אלכסון|חבר/i.test(s)) return null;
@@ -1206,6 +1312,68 @@ const inscribedPolygon: Rule = (s, ctx) => {
       ? { type: 'triangle', ids: [ids[0], ids[1], ids[2]] }
       : { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
   );
+  return cmds;
+};
+
+/** Polygon name → vertex count. "regular triangle/quadrilateral" route to equilateral/square. */
+const POLY_NAME_N: Record<string, number> = {
+  triangle: 3, quadrilateral: 4,
+  pentagon: 5, hexagon: 6, heptagon: 7, octagon: 8, nonagon: 9, decagon: 10, hendecagon: 11, dodecagon: 12,
+};
+/** Hebrew polygon names (n ≥ 5). מחומש=5 משושה=6 משובע=7 משומן=8 מתושע=9 מעושר=10. */
+const HE_POLY_NAME_N: Record<string, number> = {
+  מחומש: 5, משושה: 6, משובע: 7, משומן: 8, מתושע: 9, מעושר: 10,
+};
+const POLY_STRIP =
+  /regular|polygon|מצולע|משוכלל|equilateral|triangle|משולש|quadrilateral|מרובע|square|ריבוע|pentagon|hexagon|heptagon|octagon|nonagon|decagon|hendecagon|dodecagon|מחומש|משושה|משובע|משומן|מתושע|מעושר|\d+\s*-?\s*gon|\bgon\b/gi;
+
+/**
+ * "regular pentagon ABCDE" / "מחומש משוכלל ABCDE" / "regular polygon ABCDE" / "regular 7-gon ABCDEFG"
+ * ([ADR-111](docs/06-decisions.md#adr-111)) — a REGULAR n-gon: n vertices EQUALLY spaced on an (undrawn) circle whose radius is a
+ * free, samplable DOF (ADR-052). Reuses the inscribed-polygon machinery; the corners are pinned (theta set,
+ * not `free`) because a regular polygon is rigid up to similarity. Only fires when regularity is explicit
+ * ("regular"/"משוכלל"/an n-gon form) so a bare "pentagon" (possibly irregular) is left to the LLM net.
+ * n=3 → equilateral, n=4 → square (the canonical shapes); n ≥ 5 → the generic `polygon` command.
+ */
+const regularPolygon: Rule = (s, ctx) => {
+  if (!/\bregular\b|משוכלל/i.test(s) && !/\b\d+\s*-?\s*gon\b/i.test(s)) return null;
+  let n: number | null = null;
+  for (const [name, k] of Object.entries(POLY_NAME_N)) if (new RegExp(String.raw`\b${name}\b`, 'i').test(s)) { n = k; break; }
+  if (n === null) for (const [name, k] of Object.entries(HE_POLY_NAME_N)) if (s.includes(name)) { n = k; break; }
+  if (n === null) { const g = s.match(/\b(\d+)\s*-?\s*gon\b/i); if (g) n = parseInt(g[1], 10); }
+  const r = parseRadius(s);
+  const named = circleCenter(s);
+  let rest = dropCircleRef(s).replace(POLY_STRIP, ' ');
+  if (r.symbolic) rest = rest.replace(/\b[Rr]\b/g, ' ');
+  if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
+  // Generic "regular polygon ABCDE": no name/number, so read n from the label run (largest wins).
+  if (n === null) for (let k = 12; k >= 3; k--) if (labelRun(rest, k)) { n = k; break; }
+  if (n === null || n < 3) return null;
+  const ids = labelRun(rest, n);
+  if (!ids) return null; // need n explicit labels — else escalate
+  const leftover = ids.reduce(
+    (a, id) => a.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
+    rest.replace(new RegExp(String.raw`\b${ids.join('')}\b`, 'i'), ' '),
+  );
+  if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
+  // Routing: a regular triangle is equilateral; a regular quadrilateral is a square.
+  if (n === 3) return [
+    { type: 'triangle', ids: [ids[0], ids[1], ids[2]] },
+    { type: 'set-equal', a: ids[0], b: ids[1], c: ids[1], d: ids[2] },
+    { type: 'set-equal', a: ids[1], b: ids[2], c: ids[2], d: ids[0] },
+  ];
+  if (n === 4) return [{ type: 'square', ids: [ids[0], ids[1], ids[2], ids[3]] }];
+  // n ≥ 5: vertices on a HIDDEN circle at equal spacing; free radius unless a numeric one is given.
+  const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
+  const circ = circleId(center);
+  const cmds: AnyCommand[] = [
+    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(named ? {} : { autoCenter: true }) },
+  ];
+  ids.forEach((id, i) => {
+    const deg = 90 + (360 * i) / n; // start at the top, equal 360/n spacing; theta PINNED (rigid corners)
+    cmds.push({ type: 'point-on-circle', id, circle: circ, theta: (deg * Math.PI) / 180 });
+  });
+  cmds.push({ type: 'polygon', ids });
   return cmds;
 };
 
@@ -2545,12 +2713,18 @@ const RULES: Rule[] = [
   median,
   altitude, // "height/altitude from A" / "perpendicular from A to BC"
   perpBisector, // "perpendicular bisector of AB"
+  midsegment, // "midsegment to BC in triangle ABC" — a triangle construct ("במשולש"); before the shapes AND before segment/midpoint (its "קטע"/"אמצע" keywords)
+  regularPolygon, // "regular pentagon ABCDE" / "מחומש משוכלל" — before square (it also routes "regular triangle/quadrilateral")
   square,
   parallelogram,
   rectangle,
   rhombus,
+  kite, // "kite ABCD" / "דלתון ABCD" — a special quad (decomposes to quad + equal adjacent sides)
+  isoscelesTrapezoid, // before `trapezoid` ("isosceles trapezoid" contains "trapezoid"/"טרפז")
   trapezoid,
   quadrilateral,
+  equilateral, // before `triangle` ("equilateral triangle" contains "triangle"/"משולש")
+  isoscelesTriangle, // before `triangle`; after `isoscelesTrapezoid` (both match "isosceles")
   rightTriangle, // before `triangle` ("right triangle" contains "triangle")
   triangle,
   bisectorIntersection, // two bisectors meet — before the one-bisector and generic intersections
