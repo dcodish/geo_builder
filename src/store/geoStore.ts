@@ -134,6 +134,22 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   const owned = new Set<Id>();
   // Engine commands of the facts that applied — the figure's stated givens, fed to the verifier.
   const applied: Command[] = [];
+  // A named-shape MACRO emits a DEFAULT equal-pair for an isosceles triangle (|AB|=|AC|) tagged `soft`,
+  // because "isosceles" only says SOME two sides are equal — which pair is the student's to state, not ours
+  // to assume ([ADR-052](docs/06-decisions.md#adr-052)). So the soft default must YIELD to an explicit
+  // equality the student gives among the SAME triangle's sides ("AB=BC"): otherwise the two stack into an
+  // EQUILATERAL triangle never asked for ([ADR-114](docs/06-decisions.md#adr-114)). Pre-scan (position-
+  // independent, so it works whether the explicit pair was typed before or after the shape): drop a soft
+  // equality whose 3 vertices wholly contain another enabled, explicit (non-soft) set-equal.
+  const softEqVerts = (c: AnyCommand): Set<Id> | null =>
+    c.type === 'set-equal' && c.soft ? new Set<Id>([c.a, c.b, c.c, c.d]) : null;
+  const explicitEqWithin = (cmds: AnyCommand[], V: Set<Id>): boolean =>
+    cmds.some((c) => c.type === 'set-equal' && !c.soft && [c.a, c.b, c.c, c.d].every((id) => V.has(id)));
+  const supersededSoft = new Set<string>();
+  for (const f of facts) {
+    const V = f.enabled ? softEqVerts(f.cmd) : null;
+    if (V && facts.some((g) => g !== f && g.enabled && explicitEqWithin(lowerOne(g.cmd, symtab), V))) supersededSoft.add(f.id);
+  }
   for (const f of facts) {
     // Lower the fact to the engine command(s) it produces (symbolic measures →
     // ratio/distance/angle/[]; engine commands pass through). 0 commands ⇒ a label-
@@ -144,6 +160,12 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
     if (!f.enabled) {
       status[f.id] = 'disabled';
       claim();
+      continue;
+    }
+    // A SOFT default equal-pair the student's explicit equality overrides (ADR-114) — step aside (no-op).
+    // Not pushed to `applied`: |AB|=|AC| was never a stated given, so the verifier must not check it.
+    if (supersededSoft.has(f.id)) {
+      status[f.id] = 'ok';
       continue;
     }
     // A measure annotates the figure regardless of whether it adds a constraint.

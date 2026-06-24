@@ -22,6 +22,14 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `isosceles-explicit-pair-overrides-default` — "משולש שווה שוקיים ABC" + "AB=BC" stays isosceles, not equilateral (ADR-114)
+**Steps**: `ABC משולש שווה שוקיים` · `AB=BC` · `AK תיכון` · _(LLM)_ `L = mid AB, segment CL` · `D = חיתוך AK ו-CL`
+**Guards against:** the isosceles macro hard-coded `|AB|=|AC|` ("apex = first vertex"). "Isosceles" only asserts SOME two sides equal — which pair is the student's to state (ADR-052) — so `משולש שווה שוקיים ABC` then `AB=BC` stacked `|AB|=|AC|` + `|AB|=|BC|` into an **equilateral** triangle the student never asked for. Fix (ADR-114): the macro's default pair is `soft`, and `replay` drops it when an explicit equality on the same triangle is given, so the stated pair wins. **Asserts:** all steps OK; `|AB|=|BC|` (the stated pair) holds; `|AC|` differs (not equilateral).
+
+### `perpendicular-from-midpoint-flexes-rhombus` — a constraint flexes the rhombus angle to land G on a diagonal's extension (ADR-113)
+**Steps**: `ABCD מעוין` · `F אמצע BC` · `E אמצע AB` · _(LLM)_ `K = AC ∩ BD` · `G על המשך BD` · `GE⊥AB`
+**Guards against:** `GE⊥AB` failing *"over-constrained: GE ⟂ AB cannot hold"* (session `oew743rq`). With `AB` horizontal and `E` its midpoint, `GE⊥AB` forces `G` directly above `E`; on line `BD` that crossing sits beyond `D` only when the rhombus angle at `A` is **< 60°** (at 60° the unique solution is the degenerate `G=D`). So the figure must **flex the rhombus angle** jointly with `G`'s extension parameter — but the drivable-ancestor walk **stopped at the free param carrier `G`** and never reached the shape DOF (the rhombus angle, carried by `D` = `G`'s parent) behind it, so the recruiter could only slide `G` onto `D`. A `git bisect` proved this never worked (back to 2026-06-17 it failed with "D and G would be at the same point"). Fix (ADR-113): in `drivable` mode, record a free on-segment carrier **and keep walking past it** to the DOFs behind its segment. **Asserts:** all steps OK; `GE⟂AB` holds exactly (cos≈0); `G` strictly beyond `D` (param `t>1.02`) and distinct from `D`.
+
 ### `kite-named-shape` — "דלתון ABCD" builds a kite from the named shape alone (ADR-110)
 **Steps**: `דלתון ABCD`
 **Guards against:** the theorem-list audit found no kite/דלתון construct. Added (ADR-110) as a parser MACRO — a general `quadrilateral` + `|AB|=|AD|` + `|CB|=|CD|` constraints flex the free quad into a kite (axis AC), reusing the tested constraint solver with no new engine construct. The same pattern delivers isosceles/equilateral triangle and isosceles trapezoid. **Asserts:** all steps OK; |AB|=|AD| and |CB|=|CD| hold (verifier green).

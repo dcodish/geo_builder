@@ -105,6 +105,61 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'isosceles-explicit-pair-overrides-default',
+    title: '"משולש שווה שוקיים ABC" + "AB=BC" stays isosceles with AB=BC — the assumed |AB|=|AC| yields (no equilateral)',
+    guards:
+      'the isosceles macro hard-coded |AB|=|AC| (apex = first vertex). "Isosceles" only asserts SOME two sides equal — which pair is the student\'s to state (ADR-052). So "משולש שווה שוקיים ABC" then "AB=BC" stacked |AB|=|AC| + |AB|=|BC| into an EQUILATERAL triangle the student never asked for. ADR-114: the macro\'s default pair is `soft` and the store drops it when an explicit equality on the same triangle is given, so the stated pair wins. (session yi4p8150)',
+    steps: [
+      'ABC משולש שווה שוקיים',
+      'AB=BC',
+      'AK תיכון',
+      { llm: [
+        { type: 'midpoint', id: 'L', a: 'A', b: 'B' },
+        { type: 'segment', a: 'C', b: 'L' },
+      ] },
+      'D = חיתוך AK ו-CL',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(dist(A, B), 'the stated pair |AB| = |BC| holds').toBeCloseTo(dist(B, C), 3);
+      expect(Math.abs(dist(A, B) - dist(A, C)), 'NOT equilateral — |AC| differs').toBeGreaterThan(0.3);
+    },
+  },
+  {
+    id: 'perpendicular-from-midpoint-flexes-rhombus',
+    title: 'rhombus + E mid AB + G on the EXTENSION of BD + "GE⊥AB" — the rhombus angle flexes so G lands strictly beyond D',
+    guards:
+      'over-constrained: GE ⟂ AB cannot hold (session oew743rq). The drivable-ancestor walk stopped at the free param carrier G and never reached the shape DOF (the rhombus angle, carried by D = G\'s parent) behind it — so the recruiter could only slide G to the degenerate G=D and falsely over-constrained. ADR-113: in `drivable` mode keep walking past a free on-segment carrier to the DOFs behind its segment, so the rhombus angle flexes (G lands beyond D with GE⟂AB). Confirmed this never worked (git bisect to 2026-06-17: same figure failed with "D and G would be at the same point").',
+    steps: [
+      'ABCD מעוין',
+      'F אמצע BC',
+      'E אמצע AB',
+      { llm: [
+        { type: 'segment', a: 'A', b: 'C' },
+        { type: 'segment', a: 'B', b: 'D' },
+        { type: 'line-line-intersection', id: 'K', a: 'A', b: 'C', c: 'B', d: 'D' },
+      ] },
+      'G על המשך BD',
+      'GE⊥AB',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), D = at(fig, 'D'), E = at(fig, 'E'), G = at(fig, 'G');
+      // GE ⟂ AB: (G − E) · (B − A) ≈ 0
+      const ge = { x: G.x - E.x, y: G.y - E.y };
+      const ab = { x: B.x - A.x, y: B.y - A.y };
+      const cos = (ge.x * ab.x + ge.y * ab.y) / (Math.hypot(ge.x, ge.y) * Math.hypot(ab.x, ab.y));
+      expect(Math.abs(cos), 'GE ⟂ AB').toBeLessThan(1e-3);
+      // G is strictly BEYOND D on ray B→D (the extension, param t > 1) and distinct from D
+      const bd = { x: D.x - B.x, y: D.y - B.y };
+      const bg = { x: G.x - B.x, y: G.y - B.y };
+      const t = (bg.x * bd.x + bg.y * bd.y) / (bd.x * bd.x + bd.y * bd.y);
+      expect(t, 'G on the extension (t > 1)').toBeGreaterThan(1.02);
+      expect(dist(G, D), 'G distinct from D').toBeGreaterThan(0.1);
+    },
+  },
+  {
     id: 'kite-named-shape',
     title: '"דלתון ABCD" builds a kite (two pairs of equal adjacent sides) from the named shape alone',
     guards:

@@ -294,7 +294,8 @@ function reinterpretDiameter(prev: Construction, cmd: Command): Construction | n
  *    RADIUS ([ADR-051](docs/06-decisions.md#adr-051)), traversing through `line` / `line-intersection`
  *    definitions to reach the DOFs behind a constructed point ([ADR-032](docs/06-decisions.md#adr-032)).
  * `includeStart` (default true) considers `start` itself; pass false to drive an ANCESTOR, not `start`.
- * Both modes stop at (don't recurse past) a free carrier; a SOLVING carrier is walked through.
+ * `param` mode stops at a free carrier; `drivable` mode records a free on-segment carrier but keeps
+ * walking PAST it to the shape DOFs behind its segment (ADR-113). A SOLVING carrier is walked through.
  */
 function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', includeStart = true, includeSolving = false): Id[] {
   const byId = new Map(objects.map((o) => [o.id, o] as const));
@@ -357,7 +358,18 @@ function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', 
     }
     const fp = o as FreePoint;
     const free2 = o.kind === 'free-point' && !fp.pinned && !fp.rigid && avail(fp);
-    if (free1 || free2) { result.push(id); continue; } // a terminal drivable DOF
+    // A free 1-DOF param carrier is itself drivable, but an on-segment point also RIDES a segment whose
+    // ENDPOINTS may carry free shape DOFs — so in the joint-solve `drivable` mode, surface BOTH: push the
+    // carrier AND keep walking past it to its parents ([ADR-113](docs/06-decisions.md#adr-113)). Without
+    // this the walk stopped at the carrier and a constraint needing an upstream shape to flex could only
+    // slide the point and falsely over-constrained — e.g. GE⟂AB with G on the EXTENSION of a rhombus
+    // diagonal BD: the only solution at the rigid rhombus is the degenerate G=D, so the rhombus angle
+    // (carried by D, G's parent) must flex for G to land strictly beyond D. (`pointParents` of an
+    // on-circle carrier is [], so this is effectively scoped to on-segment/extension points; the circle
+    // DOFs behind an on-circle point are already surfaced above. Only the failure path uses `drivable`,
+    // and the joint solver's regulariser keeps a surfaced-but-unneeded parent at its seed.)
+    if (free1) { result.push(id); queue.push(...pointParents(o)); continue; }
+    if (free2) { result.push(id); continue; } // a free vertex (2 DOF) is terminal — no parents
     if (isShapeCarrier(o) && avail(o)) result.push(id); // shape scalar — keep walking past it too
     if (o.kind === 'line-intersection') { queue.push(o.line1, o.line2); continue; }
     queue.push(...pointParents(o));

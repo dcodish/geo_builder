@@ -258,14 +258,20 @@ const kite = shapeMacro(/kite|דלתון|עפיפון/i, /kite|דלתון|עפי
 const triThroughCircle = (s: string): boolean =>
   /circle|מעגל/i.test(s) && /circumscrib\w*|חוסם|\bthrough\b|דרך/i.test(s);
 
-/** "isosceles triangle ABC" / "משולש שווה שוקיים ABC" → a triangle + |AB|=|AC| (apex = first vertex, base BC). */
+/** "isosceles triangle ABC" / "משולש שווה שוקיים ABC" → a triangle + a SOFT default |AB|=|AC| (apex = first
+ *  vertex, base BC). "Isosceles" only asserts that SOME two sides are equal; which pair is the student's to
+ *  state, not ours to assume ([ADR-052](docs/06-decisions.md#adr-052)). So the default pair is `soft`
+ *  ([ADR-114](docs/06-decisions.md#adr-114)) — the store drops it the moment the student gives an explicit
+ *  equality among the SAME triangle's sides ("AB=BC"), so that becomes the isosceles pair instead of stacking
+ *  with |AB|=|AC| into an EQUILATERAL the student never asked for. With no explicit pair it stands, so the
+ *  triangle still draws isosceles. (`equilateral` below is NOT soft — all three sides equal is unambiguous.) */
 const isoscelesTriangle = shapeMacro(
   /isosceles|שווה[\s-]?שוקיים/i,
   /isosceles|triangle|שווה[\s-]?שוקיים|משולש/gi,
   3,
   (ids) => [
     { type: 'triangle', ids: [ids[0], ids[1], ids[2]] },
-    { type: 'set-equal', a: ids[0], b: ids[1], c: ids[0], d: ids[2] }, // |AB| = |AC|
+    { type: 'set-equal', a: ids[0], b: ids[1], c: ids[0], d: ids[2], soft: true }, // default |AB| = |AC| (yields to an explicit pair)
   ],
   triThroughCircle,
 );
