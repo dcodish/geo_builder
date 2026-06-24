@@ -489,3 +489,8 @@ over all four (ADR-041).
 **Steps:** `מרובע ABCD דלתון - AB=AD` (→LLM: quad + AB=AD + sides) · `משולש BCD חסום במעגל O` · `AB ו AD משיקים למעגל` (NO name) · `המשך BO חותך את המעגל בנקודה E` · `קשת DE = 2 קשת CE`
 **Guards against:** two gaps from the operator's Q4 session — (1) no `קשת`/arc term for the textbook `⌢DE = 2⌢CE`; (2) the UNNAMED tangent (`למעגל`, one circle present) fell through ADR-115's named-only guard and spawned spurious tangent feet E, K + an auxiliary circle P, hijacking the label E so the constraint referenced a pinned point that "would not move". Fix: ADR-116 maps arc-measure ratios to the central-angle ratio (arc XY ≡ ∠XOY → `set-angle-ratio`); ADR-115 Am. resolves the tangent's circle implicitly (named OR the one circle) so the unnamed tangent constrains O and creates no points.
 **Asserts:** all steps OK; points K and P do NOT exist (no spurious tangent circle); E is on circle O; circle O keeps its members (C, D, E, B at radius); arc DE = 2·arc CE holds (central ∠DOE = 2∠COE).
+
+### `equilateral-triangle-inscribed` — equilateral qualifier applied to an inscribed triangle (ADR-117)
+**Steps:** `ABC משולש שווה צלעות חסום במעגל`
+**Guards against:** `inscribedPolygon` silently dropping the triangle shape word — it detects quad shapes (square/rhombus/…) but ignored equilateral/isosceles, and "שווה צלעות" isn't a SHAPE_LEFTOVER token, so it built a GENERIC inscribed triangle (not equilateral) instead of constraining or escalating. Fix (ADR-117): detect equilateral/isosceles and append the macros' equal-side constraints to the inscribe, flexing the on-circle vertices into shape.
+**Asserts:** all steps OK; |AB|=|BC|=|CA| (equilateral); the circle's centre O exists.

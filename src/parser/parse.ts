@@ -1265,10 +1265,22 @@ const inscribedPolygon: Rule = (s, ctx) => {
   if (!kind) return null;
   const isTri = kind === 'triangle' || kind === 'right-triangle';
   const n = isTri ? 3 : 4;
+  // A NAMED triangle SHAPE on the inscribe — "equilateral/isosceles triangle inscribed in a circle"
+  // ([ADR-117](docs/06-decisions.md#adr-117)). The inscribe places the vertices on the circle; the shape adds
+  // the same equal-side relations the standalone macros (ADR-110) emit, so the constraint solver flexes the
+  // inscribed triangle into shape. Was silently DROPPED: "שווה צלעות"/"equilateral" is not a SHAPE_LEFTOVER
+  // token, so it parsed as a GENERIC inscribed triangle (no equal sides) rather than escalating.
+  const triShape: 'equilateral' | 'isosceles' | null = isTri
+    ? /equilateral|שווה[\s-]?צלעות/i.test(s)
+      ? 'equilateral'
+      : /isosceles|שווה[\s-]?שוקיים/i.test(s)
+        ? 'isosceles'
+        : null
+    : null;
   const named = circleCenter(s); // may be null — "inscribed in a circle" need not name the centre
   const r = parseRadius(s);
   let rest = dropCircleRef(s).replace(
-    /right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|quad\w*|מרובע|inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
+    /equilateral|שווה[\s-]?צלעות|isosceles|שווה[\s-]?שוקיים|right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|quad\w*|מרובע|inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
     ' ',
   );
   if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
@@ -1283,6 +1295,18 @@ const inscribedPolygon: Rule = (s, ctx) => {
     rest.replace(new RegExp(String.raw`\b${ids.join('')}\b`, 'i'), ' '),
   );
   if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
+  // The equal-side relations for a named inscribed triangle shape (ADR-117), appended to whichever branch
+  // builds the figure. Equilateral = both adjacent pairs equal; isosceles = a SOFT default |AB|=|AC| that
+  // yields to an explicit pair (ADR-114), matching the standalone macros. Empty for a plain/quad inscribe.
+  const shapeCmds = (v: Id[]): AnyCommand[] =>
+    triShape === 'equilateral'
+      ? [
+          { type: 'set-equal', a: v[0], b: v[1], c: v[1], d: v[2] }, // |AB| = |BC|
+          { type: 'set-equal', a: v[1], b: v[2], c: v[2], d: v[0] }, // |BC| = |CA|
+        ]
+      : triShape === 'isosceles'
+        ? [{ type: 'set-equal', a: v[0], b: v[1], c: v[0], d: v[2], soft: true }] // default |AB| = |AC|
+        : [];
   // No centre named ⇒ create one: a fresh label that doesn't clash with the vertices OR with any
   // point already in the figure (a second inscribed circle must not reuse the first's centre 'O').
   const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
@@ -1298,6 +1322,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
       isTri
         ? { type: 'triangle', ids: [ids[0], ids[1], ids[2]] }
         : { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
+      ...shapeCmds(ids),
     ];
   }
   // Inscribing a polygon whose vertices ALREADY exist can't re-place them on a fresh circle
@@ -1307,7 +1332,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // (ADR-041); the circle is drawn ("inscribed"/חסום) or hidden ("cyclic"/בר-חסימה).
   const allExist = ids.every((id) => (ctx.points ?? []).includes(id));
   if (isTri && allExist) {
-    return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2] }];
+    return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2] }, ...shapeCmds(ids)];
   }
   if (allExist) {
     return [
@@ -1345,6 +1370,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
       ? { type: 'triangle', ids: [ids[0], ids[1], ids[2]] }
       : { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
   );
+  cmds.push(...shapeCmds(ids));
   return cmds;
 };
 

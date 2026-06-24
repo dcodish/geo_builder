@@ -48,6 +48,11 @@ const PARSES: [string, string][] = [
   ['משולש שווה צלעות ABC', 'set-equal'],
   ['isosceles trapezoid ABCD', 'set-equal'],
   ['טרפז שווה שוקיים ABCD', 'set-equal'],
+  // a named triangle shape ON an inscribe carries its equal-side relations (ADR-117), not just a generic triangle
+  ['equilateral triangle ABC inscribed in a circle', 'set-equal'],
+  ['ABC משולש שווה צלעות חסום במעגל', 'set-equal'],
+  ['isosceles triangle ABC inscribed in a circle', 'set-equal'],
+  ['משולש שווה שוקיים ABC חסום במעגל', 'set-equal'],
   // ── regular polygons (ADR-111): n≥5 → generic polygon; regular triangle/quad → equilateral/square ──
   ['regular pentagon ABCDE', 'polygon'],
   ['מחומש משוכלל ABCDE', 'polygon'],

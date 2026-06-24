@@ -1863,6 +1863,21 @@ const SCENARIOS: Scenario[] = [
       expect(ang(D, O, E)).toBeCloseTo(2 * ang(C, O, E), 1);
     },
   },
+  {
+    id: 'equilateral-triangle-inscribed',
+    title: '"ABC משולש שווה צלעות חסום במעגל" — the equilateral qualifier is applied to an inscribed triangle, not silently dropped',
+    guards:
+      'operator session dhhj7wo3 (2026-06-24): "ABC משולש שווה צלעות חסום במעגל" (equilateral triangle inscribed in a circle) built a GENERIC inscribed triangle — `inscribedPolygon` detects quad shapes (square/rhombus/…) via `kind` but ignored the triangle shape word, and "שווה צלעות" is not a SHAPE_LEFTOVER token so it neither constrained nor escalated — it was silently dropped (the triangle was not equilateral). Fix (ADR-117): `inscribedPolygon` detects equilateral/isosceles and appends the equal-side constraints the standalone macros (ADR-110) emit, so the inscribed triangle flexes into shape.',
+    steps: ['ABC משולש שווה צלעות חסום במעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      // all three sides equal (equilateral) and the vertices lie on a circle.
+      expect(dist(A, B)).toBeCloseTo(dist(B, C), 3);
+      expect(dist(B, C)).toBeCloseTo(dist(C, A), 3);
+      expect([...fig.positions.keys()]).toContain('O'); // the circumscribing circle's centre exists
+    },
+  },
 ];
 
 describe('reported scenarios — end-to-end replay of real bug reports', () => {
