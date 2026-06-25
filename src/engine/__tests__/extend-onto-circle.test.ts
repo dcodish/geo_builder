@@ -84,4 +84,27 @@ describe('extend-onto-circle — directional extension onto a circle', () => {
     if (!ev.ok) return;
     expect(checkGivens(program as Command[], ev.positions, ev.circles), 'D genuinely on circle P — no givens violated').toEqual([]);
   });
+
+  it('an EXISTING target point is PINNED by the extension — not a silent no-op (ADR-124)', () => {
+    // The target may already exist: an earlier "chord A D" placed D as a free on-circle point of P, and the
+    // student then pins it with "extend C A onto circle P at D" (asserting C,A,D collinear). Before ADR-124
+    // re-creating D silently no-op'd — addObj keeps the FIRST definition and the shared-endpoint path (A is
+    // an O∩P crossing, so on circle P) pushes no constraints — so the directional coupling was dropped to
+    // NOTHING and D stayed wherever the chord step left it (the operator's "C-A-D not respected"). Now an
+    // existing target is a CONSTRAINT: collinear + beyond-the-2nd-letter order, driving the free on-circle
+    // D's θ onto line CA on the FAR side of A. (Two circles O,P meet at A,B; D loose on P, C loose on O.)
+    const cmds: AnyCommand[] = [
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true, autoCenter: true },
+      { type: 'circle', id: 'circle-P', center: 'P', radius: 3.6, freeRadius: true, autoCenter: true },
+      { type: 'circle-circle-intersection', id: 'A', circle1: 'circle-O', circle2: 'circle-P', branch: 0 },
+      { type: 'circle-circle-intersection', id: 'B', circle1: 'circle-O', circle2: 'circle-P', branch: 1, avoid: 'A' },
+      { type: 'point-on-circle', id: 'D', circle: 'circle-P' }, // D loose on P (the earlier "chord A D")
+      { type: 'point-on-circle', id: 'C', circle: 'circle-O' }, // C loose on O
+      { type: 'extend-onto-circle', id: 'D', a: 'C', b: 'A', circle: 'circle-P' },
+    ];
+    const { positions } = build(cmds);
+    const A = at(positions, 'A'), C = at(positions, 'C'), D = at(positions, 'D');
+    expect(collinear(C, A, D), 'C,A,D collinear — the extension is applied to the existing D').toBeLessThan(1e-2);
+    expect(proj(C, A, D), 'D beyond A (order C→A→D), not the near crossing').toBeGreaterThan(1);
+  });
 });
