@@ -73,10 +73,10 @@ export interface SceneLine {
 
 /** A measure label to print on the figure (ADR-031): a length along a segment, an angle at a vertex. */
 export interface SceneMeasure {
-  kind: 'length' | 'angle';
-  /** World anchor (y-up): a segment's midpoint, or an angle's vertex. */
+  kind: 'length' | 'angle' | 'area';
+  /** World anchor (y-up): a segment's midpoint, an angle's vertex, or a polygon's centroid (area). */
   pos: Vec;
-  /** Unit direction (y-up) to offset the text along — outward for a length, into the angle for an angle. */
+  /** Unit direction (y-up) to offset the text along — outward for a length, into the angle for an angle, none for area. */
   dir: Vec;
   text: string;
 }
@@ -85,6 +85,7 @@ export interface SceneMeasure {
 export interface MeasureLabels {
   lengths: { a: Id; b: Id; text: string }[];
   angles: { vertex: Id; ray1: Id; ray2: Id; text: string }[];
+  areas?: { ids: Id[]; text: string }[]; // a polygon's area label at its centroid (ADR-118); optional for back-compat
 }
 
 /** A user-asserted angle mark to draw: a right-angle square (`right`) or an angle arc, at `vertex`. */
@@ -279,6 +280,13 @@ export function buildScene(
       let bis = { x: d1.x + d2.x, y: d1.y + d2.y };
       bis = len(bis) < 1e-9 ? rot90(d1) : unit(bis); // a straight angle → perpendicular
       measures.push({ kind: 'angle', pos: v, dir: bis, text: A.text });
+    }
+    // An area label sits at the polygon's centroid (ADR-118) — no offset direction.
+    for (const Ar of labels.areas ?? []) {
+      const verts = Ar.ids.map((id) => positions.get(id)).filter((p): p is Vec => !!p);
+      if (verts.length < 3) continue;
+      const c = { x: verts.reduce((s, p) => s + p.x, 0) / verts.length, y: verts.reduce((s, p) => s + p.y, 0) / verts.length };
+      measures.push({ kind: 'area', pos: c, dir: { x: 0, y: 0 }, text: Ar.text });
     }
   }
 

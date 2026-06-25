@@ -53,6 +53,17 @@ const PARSES: [string, string][] = [
   ['ABC משולש שווה צלעות חסום במעגל', 'set-equal'],
   ['isosceles triangle ABC inscribed in a circle', 'set-equal'],
   ['משולש שווה שוקיים ABC חסום במעגל', 'set-equal'],
+  // ── area givens (ADR-118): absolute value, ratio, and a letter label; He + En + compact S-notation ──
+  ['SABC = 13', 'measure-area'],
+  ['שטח המשולש ABC הוא 13', 'measure-area'],
+  ['area of triangle ABC = 13', 'measure-area'],
+  ['שטח הדלתון ABCD הוא 25√3', 'measure-area'],
+  ['SABC = S', 'measure-area'],
+  ['נסמן את שטח המשולש CEK ב-S', 'measure-area'],
+  ['SABC/SDEF = 3/4', 'set-area-ratio'],
+  ['שטח המשולש ABF גדול פי 2 משטח המשולש BFE', 'set-area-ratio'],
+  ['שטח המשולש ADE רבע משטח המשולש ABC', 'set-area-ratio'],
+  ['היחס בין שטח המשולש BDC ובין שטח המשולש BDA הוא 1.8', 'set-area-ratio'],
   // ── regular polygons (ADR-111): n≥5 → generic polygon; regular triangle/quad → equilateral/square ──
   ['regular pentagon ABCDE', 'polygon'],
   ['מחומש משוכלל ABCDE', 'polygon'],

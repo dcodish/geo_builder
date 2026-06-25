@@ -1878,6 +1878,39 @@ const SCENARIOS: Scenario[] = [
       expect([...fig.positions.keys()]).toContain('O'); // the circumscribing circle's centre exists
     },
   },
+  {
+    id: 'area-absolute-sets-scale-not-shape',
+    title: 'area given (ADR-118): "שטח המשולש ABC הוא 13" on an equilateral inscribed triangle sets the SIZE, keeps the shape',
+    guards:
+      'area support (ADR-118). A LONE absolute area pins the figure\'s SCALE (the similarity gauge), not its shape — an equilateral triangle stays equilateral, just resized so its area is 13. Verifies the area holds (shoelace) and the on-figure label is emitted.',
+    steps: ['ABC משולש שווה צלעות חסום במעגל', 'שטח המשולש ABC הוא 13'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      // still equilateral (shape preserved) …
+      expect(dist(A, B)).toBeCloseTo(dist(B, C), 3);
+      expect(dist(B, C)).toBeCloseTo(dist(C, A), 3);
+      // … and its area is exactly 13 (shoelace via the equilateral formula).
+      const s = dist(A, B);
+      expect((Math.sqrt(3) / 4) * s * s).toBeCloseTo(13, 2);
+      expect(fig.labels.areas).toContainEqual({ ids: ['A', 'B', 'C'], text: '13' });
+    },
+  },
+  {
+    id: 'area-ratio-reshapes',
+    title: 'area ratio (ADR-118): "שטח המשולש ABF גדול פי 2 משטח המשולש BFE" makes area(ABF) = 2·area(BFE)',
+    guards:
+      'area RATIO support (ADR-118) — the natural-language "גדול פי 2 מ" (2× larger) form from the bagrut corpus. A dimensionless area ratio drives a shape DOF until area(ABF) = 2·area(BFE) holds; the verifier re-derives it.',
+    steps: ['משולש ABF', 'משולש BFE', 'שטח המשולש ABF גדול פי 2 משטח המשולש BFE'],
+    check(fig) {
+      allStepsOk(fig);
+      const areaT = (x: Id, y: Id, z: Id) => {
+        const p = at(fig, x), q = at(fig, y), r = at(fig, z);
+        return Math.abs((q.x - p.x) * (r.y - p.y) - (r.x - p.x) * (q.y - p.y)) / 2;
+      };
+      expect(areaT('A', 'B', 'F')).toBeCloseTo(2 * areaT('B', 'F', 'E'), 2);
+    },
+  },
 ];
 
 describe('reported scenarios — end-to-end replay of real bug reports', () => {

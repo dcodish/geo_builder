@@ -41,6 +41,7 @@ export interface Fact {
 export interface MeasureLabels {
   lengths: { a: Id; b: Id; text: string }[];
   angles: { vertex: Id; ray1: Id; ray2: Id; text: string }[];
+  areas: { ids: Id[]; text: string }[]; // a polygon's area label, printed at its centroid (ADR-118)
 }
 
 /**
@@ -127,6 +128,7 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   const symtab = buildSymTab(facts.filter((f) => f.enabled).map((f) => f.cmd));
   const lenByKey = new Map<string, MeasureLabels['lengths'][number]>();
   const angByKey = new Map<string, MeasureLabels['angles'][number]>();
+  const areaByKey = new Map<string, MeasureLabels['areas'][number]>();
   // Point ids any earlier fact OWNS (introduces). A later fact must not silently
   // re-create one of these as a default free point (the auto-create-endpoints
   // affordance) when its owner failed/was removed — that would mask the breakage.
@@ -169,7 +171,7 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
       continue;
     }
     // A measure annotates the figure regardless of whether it adds a constraint.
-    if (isMeasure(f.cmd)) addMeasureLabel(lenByKey, angByKey, f.cmd, measureLabelText(f.cmd, symtab));
+    if (isMeasure(f.cmd)) addMeasureLabel(lenByKey, angByKey, areaByKey, f.cmd, measureLabelText(f.cmd, symtab));
     // A point a lowered command would (re)create that an earlier fact owns but which
     // isn't in the figure now ⇒ its definition is gone, so this fact can't build either.
     const broken = intro.filter((id) => owned.has(id) && !cur.objects.some((o) => o.id === id));
@@ -267,10 +269,11 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   // surface as distance/angle constraints — label them from the figure, filling any
   // key a symbolic fact didn't already own (FR-RN-2).
   for (const con of figure.constraints) {
-    if (con.type === 'distance') addMeasureLabel(lenByKey, angByKey, { type: 'measure-length', a: con.a, b: con.b }, fmtMeasure(con.value), true);
-    else if (con.type === 'angle') addMeasureLabel(lenByKey, angByKey, { type: 'measure-angle', vertex: con.vertex, ray1: con.ray1, ray2: con.ray2 }, `${fmtMeasure(con.value)}°`, true);
+    if (con.type === 'distance') addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-length', a: con.a, b: con.b }, fmtMeasure(con.value), true);
+    else if (con.type === 'angle') addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: con.vertex, ray1: con.ray1, ray2: con.ray2 }, `${fmtMeasure(con.value)}°`, true);
+    else if (con.type === 'area') addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-area', ids: con.ids }, fmtMeasure(con.value), true);
   }
-  const labels: MeasureLabels = { lengths: [...lenByKey.values()], angles: [...angByKey.values()] };
+  const labels: MeasureLabels = { lengths: [...lenByKey.values()], angles: [...angByKey.values()], areas: [...areaByKey.values()] };
   // Angle marks the student ASSERTED (only from facts that applied, and whose points all exist) —
   // a right-angle square or an angle arc. Deduped by vertex + ray pair.
   const angleMarks: AngleMark[] = [];
@@ -496,11 +499,19 @@ const fmtMeasure = (n: number): string => (Number.isInteger(n) ? String(n) : Str
 function addMeasureLabel(
   lenByKey: Map<string, MeasureLabels['lengths'][number]>,
   angByKey: Map<string, MeasureLabels['angles'][number]>,
-  m: { type: 'measure-length'; a: Id; b: Id } | { type: 'measure-angle'; vertex: Id; ray1: Id; ray2: Id },
+  areaByKey: Map<string, MeasureLabels['areas'][number]>,
+  m:
+    | { type: 'measure-length'; a: Id; b: Id }
+    | { type: 'measure-angle'; vertex: Id; ray1: Id; ray2: Id }
+    | { type: 'measure-area'; ids: Id[] },
   text: string,
   fillOnly = false,
 ): void {
-  if (m.type === 'measure-angle') {
+  if (m.type === 'measure-area') {
+    const key = m.ids.join(''); // the polygon, in boundary order (ABC ≠ ACB — different shape)
+    if (fillOnly && areaByKey.has(key)) return;
+    areaByKey.set(key, { ids: m.ids, text });
+  } else if (m.type === 'measure-angle') {
     const key = `${m.vertex}:${[m.ray1, m.ray2].sort().join('')}`;
     if (fillOnly && angByKey.has(key)) return;
     angByKey.set(key, { vertex: m.vertex, ray1: m.ray1, ray2: m.ray2, text });
@@ -516,6 +527,7 @@ export function introducedIds(cmd: AnyCommand): Id[] {
   // A symbolic measure introduces no objects; highlight the points it annotates instead.
   if (cmd.type === 'measure-length') return [cmd.a, cmd.b];
   if (cmd.type === 'measure-angle') return [cmd.vertex, cmd.ray1, cmd.ray2];
+  if (cmd.type === 'measure-area') return cmd.ids; // highlight the polygon the area annotates
   if (cmd.type === 'set-var' || cmd.type === 'measure-order') return []; // a relation over variables — no object to highlight
   return applyCommand(emptyConstruction(), cmd).objects.map((o) => o.id);
 }

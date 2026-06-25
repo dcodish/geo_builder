@@ -22,7 +22,7 @@ import {
   ORDER_LEN_MARGIN_FRAC,
   ORDER_LEN_MIN_FRAC,
 } from './types';
-import { add, angleDeg, circumcenter, dist, scale, solveParam, sub, unit } from './geometry';
+import { add, angleDeg, circumcenter, dist, polygonArea, scale, solveParam, sub, unit } from './geometry';
 
 /** The point ids a constraint references. */
 export function constraintRefs(con: Constraint): Id[] {
@@ -54,6 +54,10 @@ export function constraintRefs(con: Constraint): Id[] {
       return con.points;
     case 'angle-acuteness':
       return [con.vertex, con.ray1, con.ray2];
+    case 'area':
+      return con.ids;
+    case 'area-ratio':
+      return [...con.ids1, ...con.ids2];
   }
 }
 
@@ -165,6 +169,11 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
       const a = angleDeg(get(con.vertex), get(con.ray1), get(con.ray2));
       return con.obtuse ? Math.max(0, 90 + ORDER_ANGLE_MARGIN_DEG - a) : Math.max(0, a - (90 - ORDER_ANGLE_MARGIN_DEG));
     }
+    case 'area':
+      // signed: area − value (area is length²). Passes through the target with a sign change as a DOF varies.
+      return polygonArea(con.ids.map(get)) - con.value;
+    case 'area-ratio':
+      return polygonArea(con.ids1.map(get)) - con.k * polygonArea(con.ids2.map(get));
   }
 }
 
@@ -204,6 +213,10 @@ export function constraintScale(con: Constraint, get: (id: Id) => Vec): number {
       const c = concyclicCircle(con.points.map(get));
       return c ? Math.max(c.r, 1e-9) : 1; // relative to the circle's radius (a length-unit residual)
     }
+    case 'area':
+      return Math.max(Math.abs(con.value), 1e-9); // area² units — relative to the target area
+    case 'area-ratio':
+      return Math.max(con.k * polygonArea(con.ids2.map(get)), 1e-9); // relative to the (scaled) reference area
     default:
       return 1; // angle / angle-ratio / parallel / perpendicular / coincide are scale-free (or fixed)
   }
@@ -218,6 +231,8 @@ export function residualTolerance(con: Constraint, scale = 1): number {
     case 'ratio':
     case 'length-radius':
     case 'concyclic':
+    case 'area':
+    case 'area-ratio':
       return Math.max(1e-6, 2e-4 * scale);
     case 'parallel':
     case 'perpendicular':
@@ -282,6 +297,10 @@ export function describeConstraint(con: Constraint): string {
       return `${con.points.join('–')} in order on a line`;
     case 'angle-acuteness':
       return `∠${con.ray1}${con.vertex}${con.ray2} is ${con.obtuse ? 'obtuse' : 'acute'}`;
+    case 'area':
+      return `area(${con.ids.join('')}) = ${con.value}`;
+    case 'area-ratio':
+      return `area(${con.ids1.join('')}) = ${con.k}·area(${con.ids2.join('')})`;
   }
 }
 

@@ -506,7 +506,8 @@ export function Figure({
               const sd = unitVec({ x: m.dir.x, y: -m.dir.y }); // world→screen Y-flip
               // An angle value sits FURTHER into the wedge (just inside its bigger arc, below) and is drawn a
               // bit LARGER than a length, so it's clear WHICH angle it labels and легible (operator request).
-              const off = m.kind === 'angle' ? r * 4.2 + fontSize * 0.7 : r * 1.4 + fontSize * 0.55;
+              // An AREA label sits AT the polygon's centroid (no offset).
+              const off = m.kind === 'area' ? 0 : m.kind === 'angle' ? r * 4.2 + fontSize * 0.7 : r * 1.4 + fontSize * 0.55;
               return (
                 <text
                   key={`m-${i}`}

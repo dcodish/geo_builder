@@ -17,7 +17,7 @@
 
 import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from './types';
 
-type Binding = { kind: 'len' | 'ang'; refs: Id[]; coef: number; pow?: number; affine?: boolean };
+type Binding = { kind: 'len' | 'ang' | 'area'; refs: Id[]; coef: number; pow?: number; affine?: boolean };
 export interface SymTab {
   vars: Map<string, { value?: number; bindings: Binding[] }>;
   /** The FREE-radius circle the symbol R denotes, plus a point on it that witnesses the radius
@@ -50,6 +50,7 @@ export function buildSymTab(cmds: AnyCommand[]): SymTab {
     if (c.type === 'set-var') slot(c.name).value = c.value;
     else if (c.type === 'measure-length' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'len', refs: [c.a, c.b], coef: c.expr.coef, pow: c.expr.pow, affine: (c.expr.const ?? 0) !== 0 });
     else if (c.type === 'measure-angle' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'ang', refs: [c.vertex, c.ray1, c.ray2], coef: c.expr.coef });
+    else if (c.type === 'measure-area' && 'var' in c.expr) slot(c.expr.var).bindings.push({ kind: 'area', refs: c.ids, coef: c.expr.coef, pow: c.expr.pow, affine: (c.expr.const ?? 0) !== 0 });
   }
   // The reserved radius symbol R always denotes the circle's radius (ADR-034): if a measure uses it
   // but no explicit value was given, bind R to the (first FIXED-radius) circle's radius — so
@@ -123,6 +124,22 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
         },
       ];
     }
+    case 'measure-area': {
+      // Mirrors `measure-length` but for a polygon's area (ADR-118): a value → `set-area`; a SHARED variable
+      // → `set-area-ratio` against the representative area binding; the representative / a lone label stays free.
+      const e = cmd.expr;
+      if ('value' in e) return [{ type: 'set-area', ids: cmd.ids, value: e.value }];
+      const konst = e.const ?? 0;
+      const info = tab.vars.get(e.var);
+      if (info?.value !== undefined) {
+        return [{ type: 'set-area', ids: cmd.ids, value: e.coef * Math.pow(info.value, e.pow ?? 1) + konst }];
+      }
+      const reps = info?.bindings.filter((b) => b.kind === 'area' && !b.affine) ?? [];
+      const rep = reps[0];
+      if (!rep || sameRefs(rep.refs, cmd.ids)) return []; // the representative (or a lone "SABC = S" label) stays free
+      if ((rep.pow ?? 1) !== (e.pow ?? 1) || konst !== 0) return []; // mixed exponent / affine → not a clean ratio
+      return [{ type: 'set-area-ratio', ids1: cmd.ids, ids2: rep.refs, k: e.coef / rep.coef }];
+    }
     case 'measure-angle': {
       const e = cmd.expr;
       const angle = (value: number): Command => ({ type: 'set-angle', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, value });
@@ -176,8 +193,8 @@ const powVar = (v: string, pow?: number): string => {
 };
 
 /** Is this a symbolic measure fact (carries a display label)? */
-export function isMeasure(cmd: AnyCommand): cmd is Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' }> {
-  return cmd.type === 'measure-length' || cmd.type === 'measure-angle';
+export function isMeasure(cmd: AnyCommand): cmd is Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' | 'measure-area' }> {
+  return cmd.type === 'measure-length' || cmd.type === 'measure-angle' || cmd.type === 'measure-area';
 }
 
 /**
@@ -185,7 +202,7 @@ export function isMeasure(cmd: AnyCommand): cmd is Extract<SymbolicCommand, { ty
  * its variable has a value (the user's choice — "3x" → "12"), else the expression
  * ("3x", "2α"). Angles get a trailing degree sign only when numeric/resolved.
  */
-export function measureLabelText(cmd: Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' }>, tab: SymTab): string {
+export function measureLabelText(cmd: Extract<SymbolicCommand, { type: 'measure-length' | 'measure-angle' | 'measure-area' }>, tab: SymTab): string {
   const e: MeasureExpr = cmd.expr;
   const isAngle = cmd.type === 'measure-angle';
   // A concrete value: show its faithful text ("12√2", "2π") if the parser kept one, else the number.

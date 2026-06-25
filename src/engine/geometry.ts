@@ -12,6 +12,17 @@ export const rot90 = (v: Vec): Vec => ({ x: -v.y, y: v.x });
 export const len = (v: Vec): number => Math.hypot(v.x, v.y);
 export const dist = (a: Vec, b: Vec): number => Math.hypot(a.x - b.x, a.y - b.y);
 
+/** Area of the polygon with the given vertices in boundary order (shoelace formula, unsigned).
+ *  Works for any simple polygon (n ≥ 3); a self-crossing or degenerate order gives a smaller/zero area. */
+export const polygonArea = (pts: Vec[]): number => {
+  let s = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const j = (i + 1) % pts.length;
+    s += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+  }
+  return Math.abs(s) / 2;
+};
+
 /** Unit vector in the direction of v (zero vector maps to zero). */
 export const unit = (v: Vec): Vec => {
   const l = len(v);

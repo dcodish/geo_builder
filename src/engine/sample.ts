@@ -264,7 +264,7 @@ function similarityGauge(c: Construction, cons: Set<Constraint>): number {
   const hasCircle = c.objects.some((o) => o.kind === 'circle');
   const scaleFixed =
     pinned >= 2 ||
-    [...cons].some((k) => k.type === 'distance') || // a numeric length pins the scale (already in `removed`)
+    [...cons].some((k) => k.type === 'distance' || k.type === 'area') || // a numeric length OR area pins the scale (already in `removed`; ADR-118)
     c.objects.some((o) => o.kind === 'circle' && o.radius.via === 'length'); // a numeric radius
   const t = pinned === 0 ? 2 : 0;
   const r = npts >= 2 && pinned <= 1 ? 1 : 0;

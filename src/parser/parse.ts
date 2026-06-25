@@ -19,7 +19,7 @@
  * no digits). Keywords are bilingual; the same rule matches either language.
  */
 
-import { RADIUS_VAR, type AnyCommand, type Command, type Id, type SymbolicCommand } from '@/engine';
+import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
 
 export type ParseResult =
   | { ok: true; commands: AnyCommand[] }
@@ -878,6 +878,99 @@ const measurePi: Rule = (s) => {
   if (!m) return null;
   const c = m[3] ? parseFloat(m[3]) : 1;
   return [{ type: 'measure-length', a: up(m[1]), b: up(m[2]), expr: { value: c * Math.PI, text: `${c === 1 ? '' : m[3]}π` } }];
+};
+
+// ── AREA measures & relations ([ADR-118](docs/06-decisions.md#adr-118)) ────────────────────────────────
+// Hebrew shape nouns / English shape words that may sit between the area marker and the vertex letters.
+const AREA_SHAPE = String.raw`(?:ה?(?:משולש|מרובע|דלתון|עפיפון|מלבן|מקבילית|טרפז|מעוין|ריבוע)|triangle|quadrilateral|rectangle|parallelogram|trapez\w*|rhombus|kite|square)`;
+
+/** Every "area of a polygon" reference in `s`, in order. Forms: compact `SABC`; verbose `שטח [ה<shape>] ABC`
+ *  / `area [of] [the] [<shape>] ABC`. Returns each polygon's vertex ids with the marker's string position. */
+function areaReferences(s: string): { ids: Id[]; at: number }[] {
+  const refs: { ids: Id[]; at: number }[] = [];
+  const seen = new Set<number>();
+  // verbose marker: שטח / area, then optional filler + shape word, then the 3–4 vertex labels.
+  const reKw = /שטח|\barea\b/gi;
+  let m: RegExpExecArray | null;
+  while ((m = reKw.exec(s)) !== null) {
+    const after = s.slice(m.index + m[0].length).replace(new RegExp(String.raw`^(?:\s+(?:of|the|של|ה))*\s*${AREA_SHAPE}?\s*`, 'i'), '');
+    // Read ONLY the leading vertex run (the labels right after the shape word) — never scan ahead, or a later
+    // filler word ("area", "of") would be read as labels (the word "area" → A,R,E,A bug).
+    const lead = after.match(/^((?:[A-Za-z]\d*\s*){3,4})/);
+    const ids = lead ? (labelRun(lead[1], 4) ?? labelRun(lead[1], 3)) : null;
+    if (ids) refs.push({ ids, at: m.index });
+  }
+  // compact S-notation: S immediately followed by 3–4 uppercase vertex labels (SABC / SABCD).
+  const reS = /\bS((?:[A-Z]\d*){3,4})\b/g;
+  while ((m = reS.exec(s)) !== null) {
+    const ids = labelRun(m[1], 4) ?? labelRun(m[1], 3);
+    if (ids && !seen.has(m.index)) refs.push({ ids, at: m.index });
+  }
+  return refs.sort((a, b) => a.at - b.at);
+}
+
+/** Numerator/denominator under optional √, computed from a {@link RATVAL} match starting at group `g`. */
+const ratvalAt = (m: RegExpMatchArray, g: number): number => {
+  const numr = m[g] ? Math.sqrt(parseFloat(m[g + 1])) : parseFloat(m[g + 1]);
+  const den = m[g + 3] !== undefined ? (m[g + 2] ? Math.sqrt(parseFloat(m[g + 3])) : parseFloat(m[g + 3])) : 1;
+  return numr / den;
+};
+
+/** The ratio coefficient k for "area(P1) = k·area(P2)" from the connective between two area refs. */
+function areaRatioK(s: string): number {
+  // Hebrew fraction words get no `\b` — JS word boundaries don't fire around non-ASCII letters.
+  if (/רבע/.test(s) || /\bquarter\b/i.test(s)) return 1 / 4;
+  if (/שליש/.test(s) || /\bthird\b/i.test(s)) return 1 / 3;
+  if (/חצי|מחצית/.test(s) || /\bhalf\b/i.test(s)) return 1 / 2;
+  const pi = s.match(new RegExp(String.raw`(?:פי|times)\s*(${COEF})`, 'i')); // "גדול פי 2 מ" / "2 times"
+  if (pi) return parseFloat(pi[1]);
+  const eq = s.match(new RegExp(String.raw`(?:=|הוא|\bis\b)\s*${RATVAL}`, 'i')); // "= 3/4" / "הוא 1.8"
+  if (eq) return ratvalAt(eq, 1);
+  const coef = s.match(new RegExp(String.raw`=\s*(${COEF})\s*(?:S[A-Z]|שטח|area)`, 'i')); // "= 2 SDEF" / "= 2 area DEF"
+  if (coef) return parseFloat(coef[1]);
+  return 1; // equal areas
+}
+
+/** The value/label on the RHS of a single-area measure: a number, radical, variable, or power. */
+function parseAreaExpr(rhs: string): MeasureExpr | null {
+  const t = rhs.trim();
+  let m = t.match(new RegExp(String.raw`^(${COEF})?\s*√\s*(${COEF})$`)); // 25√3 / √3
+  if (m) {
+    const c = m[1] ? parseFloat(m[1]) : 1;
+    return { value: c * Math.sqrt(parseFloat(m[2])), text: `${m[1] && c !== 1 ? m[1] : ''}√${m[2]}` };
+  }
+  m = t.match(/^(\d+(?:\.\d+)?)?\s*([A-Za-z])\s*(?:²|\^\s*2)$/); // p² / 2p²
+  if (m) return { coef: m[1] ? parseFloat(m[1]) : 1, var: m[2], pow: 2 };
+  m = t.match(new RegExp(String.raw`^(${COEF})$`)); // 13 / 1.8
+  if (m) return { value: parseFloat(m[1]) };
+  m = t.match(/^(\d+(?:\.\d+)?)?\s*([A-Za-z])$/); // S / 2S  (a label/variable)
+  if (m) return { coef: m[1] ? parseFloat(m[1]) : 1, var: m[2] };
+  return null;
+}
+
+/**
+ * Area givens (ADR-118): an absolute area (`SABC = 13`, `שטח המשולש ABC הוא 25√3`), an area RATIO
+ * (`SABC/SDEF = 3/4`, `שטח ABF גדול פי 2 משטח BFE`, `שטח ADE רבע משטח ABC`, `היחס בין שטח X ובין שטח Y הוא r`),
+ * or an area LABEL (`SABC = S`, `נסמן את שטח ABCD ב-S`). An area's measure is the polygon's shoelace area; a
+ * lone absolute area drives the figure's SCALE, a ratio drives a SHAPE DOF (ADR-052/ADR-101). Two area refs →
+ * `set-area-ratio`; one ref + value/variable → `measure-area` (lowered like a length, so a shared variable
+ * makes two areas a ratio). Runs before the length/distance rules (its LHS is a polygon, not a 2-pt segment).
+ */
+const area: Rule = (s) => {
+  if (!/שטח|\barea\b/i.test(s) && !/\bS[A-Z]/.test(s)) return null;
+  const refs = areaReferences(s);
+  if (refs.length === 0) return null;
+  if (refs.length >= 2) {
+    // area(first) = k·area(second). For an explicit "SABC/SDEF = r" the ratio is area1/area2 = r ⇒ k = r.
+    return [{ type: 'set-area-ratio', ids1: refs[0].ids, ids2: refs[1].ids, k: areaRatioK(s) }];
+  }
+  // A single area + a value/label. The RHS follows '=', 'הוא'/'is', 'ב-'/'by' (the נסמן/denote label form).
+  // Hebrew connectives get no `\b` — JS word boundaries don't fire around non-ASCII letters.
+  const rhs = s.match(/(?:=|הוא|שווה|\bis\b|\bequals?\b)\s*(.+)$/i) ?? s.match(/(?:ב-?|\bby\b)\s*([A-Za-z])\s*$/i);
+  if (!rhs) return null;
+  const expr = parseAreaExpr(rhs[1]);
+  if (!expr) return null;
+  return [{ type: 'measure-area', ids: refs[0].ids, expr }];
 };
 
 const measureLength: Rule = (s) => {
@@ -2814,6 +2907,7 @@ const RULES: Rule[] = [
   setRadius, // "radius of circle P is 4" — set an EXISTING circle's radius; before `circle` (creation) and the shape rules (which 'stop' on רדיוס)
   congruence, // "ABC ≅ DEF" — before the shape rules ("triangle ABC ≅ …" contains "triangle")
   similarity, // "ABC ~ DEF"
+  area, // "שטח המשולש ABC = 13" / "SABC/SDEF = 3/4" (ADR-118) — BEFORE the shape rules, which would otherwise build the named shape and drop the area
   semicircle, // "חצי מעגל" / "semicircle" — before `circle` (contains "מעגל") and the shape rules
   quarterCircle, // "רבע מעגל" / "quarter circle" — same
   incircle, // "circle inscribed in triangle ABC" — before inscribedPolygon (both match "inscribed")

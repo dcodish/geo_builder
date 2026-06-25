@@ -494,3 +494,13 @@ over all four (ADR-041).
 **Steps:** `ABC משולש שווה צלעות חסום במעגל`
 **Guards against:** `inscribedPolygon` silently dropping the triangle shape word — it detects quad shapes (square/rhombus/…) but ignored equilateral/isosceles, and "שווה צלעות" isn't a SHAPE_LEFTOVER token, so it built a GENERIC inscribed triangle (not equilateral) instead of constraining or escalating. Fix (ADR-117): detect equilateral/isosceles and append the macros' equal-side constraints to the inscribe, flexing the on-circle vertices into shape.
 **Asserts:** all steps OK; |AB|=|BC|=|CA| (equilateral); the circle's centre O exists.
+
+### `area-absolute-sets-scale-not-shape` — a lone area sets size, keeps shape (ADR-118)
+**Steps:** `ABC משולש שווה צלעות חסום במעגל` · `שטח המשולש ABC הוא 13`
+**Guards against:** area being treated as a shape constraint. A lone absolute area pins the figure's SCALE (the similarity gauge), not its shape — the triangle stays equilateral, resized so its area is 13.
+**Asserts:** all steps OK; |AB|=|BC|=|CA| (still equilateral); area = 13 (shoelace); the on-figure label `{ids:[A,B,C], text:'13'}` is emitted.
+
+### `area-ratio-reshapes` — an area ratio drives a shape DOF (ADR-118)
+**Steps:** `משולש ABF` · `משולש BFE` · `שטח המשולש ABF גדול פי 2 משטח המשולש BFE`
+**Guards against:** the natural-language area-ratio phrasing ("גדול פי 2 מ" = 2× larger) not parsing / not reshaping. A dimensionless area ratio drives a shape DOF until it holds.
+**Asserts:** all steps OK; area(ABF) = 2·area(BFE).

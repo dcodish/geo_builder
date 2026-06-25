@@ -52,6 +52,8 @@ function assertedRelations(commands: Command[]): Constraint[] {
       case 'set-perpendicular': out.push({ type: 'perpendicular', a: c.a, b: c.b, c: c.c, d: c.d }); break;
       case 'set-concyclic': out.push({ type: 'concyclic', points: c.points }); break;
       case 'set-collinear': out.push({ type: 'collinear', a: c.a, b: c.b, c: c.c }); break;
+      case 'set-area': out.push({ type: 'area', ids: c.ids, value: c.value }); break;
+      case 'set-area-ratio': out.push({ type: 'area-ratio', ids1: c.ids1, ids2: c.ids2, k: c.k }); break;
     }
   }
   return out;

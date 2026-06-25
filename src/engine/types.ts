@@ -547,6 +547,23 @@ export interface LengthRadiusConstraint {
   add?: number;
 }
 
+/** area(polygon `ids`) = value — the shoelace area of the named polygon ([ADR-118](docs/06-decisions.md#adr-118)).
+ *  A LONE absolute area drives the figure's free SCALE DOF (invisible after the viewport fit, ADR-052/ADR-101);
+ *  paired with another given it drives a SHAPE DOF. `ids` are the vertices in boundary order (n ≥ 3). */
+export interface AreaConstraint {
+  type: 'area';
+  ids: Id[];
+  value: number;
+}
+
+/** area(`ids1`) = k·area(`ids2`) — a DIMENSIONLESS ratio between two polygon areas (always a shape relation). */
+export interface AreaRatioConstraint {
+  type: 'area-ratio';
+  ids1: Id[];
+  ids2: Id[];
+  k: number;
+}
+
 /** a→b ∥ c→d. */
 export interface ParallelConstraint {
   type: 'parallel';
@@ -693,7 +710,9 @@ export type Constraint =
   | CollinearConstraint
   | CollinearOrderConstraint
   | AngleAcutenessConstraint
-  | LengthRadiusConstraint;
+  | LengthRadiusConstraint
+  | AreaConstraint
+  | AreaRatioConstraint;
 
 export interface Construction {
   objects: GeoObject[];
@@ -719,6 +738,8 @@ export type Command =
   | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number }
   | { type: 'set-distance'; a: Id; b: Id; value: number }
   | { type: 'set-radius'; circle: Id; value: number } // a circle's radius = value (no segment drawn — ADR-087)
+  | { type: 'set-area'; ids: Id[]; value: number } // area of polygon `ids` = value (ADR-118)
+  | { type: 'set-area-ratio'; ids1: Id[]; ids2: Id[]; k: number } // area(ids1) = k·area(ids2)
   | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id; soft?: boolean } // soft: a DEFAULT equal-pair a named-shape macro picks when the student didn't say which sides are equal (e.g. isosceles |AB|=|AC|); the store drops it if an explicit equality on the same triangle is stated (ADR-114). The engine treats it as an ordinary equality.
   | { type: 'set-ratio'; a: Id; b: Id; c: Id; d: Id; k: number; add?: number } // |ab| = k·|cd| + add
   | { type: 'set-length-radius'; a: Id; b: Id; circle: Id; center: Id; witness: Id; k: number; add?: number } // |ab| = k·R (ADR-071)
@@ -787,6 +808,9 @@ export const RADIUS_VAR = 'R';
 export type SymbolicCommand =
   | { type: 'measure-length'; a: Id; b: Id; expr: MeasureExpr }
   | { type: 'measure-angle'; vertex: Id; ray1: Id; ray2: Id; expr: MeasureExpr }
+  // The (possibly symbolic) AREA of a named polygon ([ADR-118](docs/06-decisions.md#adr-118)). Lowered like
+  // `measure-length`: a value → `set-area`; a shared variable → `set-area-ratio` against the representative.
+  | { type: 'measure-area'; ids: Id[]; expr: MeasureExpr }
   | { type: 'set-var'; name: string; value: number }
   // An ordering between two named measures — "α < β" / "x > y" (ADR-039). Lowered (lower.ts) to a
   // `set-angle-order`/`set-length-order` once the symbol table says which measure each variable names.

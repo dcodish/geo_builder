@@ -903,6 +903,14 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       driveOrCheck(objects, constraints, { type: 'ratio', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d, k: cmd.k, ...(cmd.add ? { add: cmd.add } : {}) });
       break;
 
+    case 'set-area':
+      driveOrCheck(objects, constraints, { type: 'area', ids: cmd.ids, value: cmd.value });
+      break;
+
+    case 'set-area-ratio':
+      driveOrCheck(objects, constraints, { type: 'area-ratio', ids1: cmd.ids1, ids2: cmd.ids2, k: cmd.k });
+      break;
+
     case 'set-length-radius':
       driveOrCheck(objects, constraints, {
         type: 'length-radius',
