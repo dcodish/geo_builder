@@ -105,6 +105,69 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'circumcircle-cuts-segment-d-on-side',
+    title: '"the circumcircle of ABC cuts CE at D" lands D ON segment CE (not its extension), across configs',
+    guards:
+      'operator session (circle O, two tangents from A at B,C, ∠CAB=90, chords CE/BE, then "המעגל שחוסם את משולש ABC חותך את CE בנקודה D"): "all worked well but the last view violates the rule that D is on CE". Root cause (ADR-127): `circumcircleMeetsSegment` built D as a `line-circle-intersection` on the INFINITE line through C,E with NO order constraint, so the default seed happened to put D on the segment but "show another configuration" (a re-sampled config) slid D onto the extension (t up to 4.3). The first attempted fix — appending a `set-line [C,D,E]` — FAILED: `set-line` calls `addCollinear`, which mis-picks the free on-circle endpoint C as the driven point and tries the second-intersection conversion → "unresolved dependencies for E, D, line-CE, line-CD" (D is ALREADY collinear, being a point on the line). Fix: carry the order on the `line-circle-intersection` itself (a new `order` field) → a `collinear-order [C,D,E]` constraint and nothing else; its residual is folded into the joint minimisation, so the figure flexes the free DOFs (the chord endpoints) to keep D between C and E in EVERY config. (Note: the operator\'s actual run had a typo "חותרך" that escalated to the LLM; the corrected spelling here exercises the deterministic rule the fix lives in.)',
+    steps: [
+      'circle O radius 5',
+      'מנקודה A יוצאים שני משיקים למעגל',
+      '∠CAB=90',
+      'CE ו BE מיתרים במעגל',
+      'EB',
+      'המעגל שחוסם את משולש ABC חותך את CE בנקודה D',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const C = at(fig, 'C'), E = at(fig, 'E'), D = at(fig, 'D');
+      // D lies ON segment CE: collinear with C,E AND the projection parameter t ∈ [0,1].
+      const ce = { x: E.x - C.x, y: E.y - C.y };
+      const cd = { x: D.x - C.x, y: D.y - C.y };
+      const offLine = Math.abs(cd.x * ce.y - cd.y * ce.x) / Math.hypot(ce.x, ce.y);
+      expect(offLine, 'D collinear with C,E').toBeLessThan(1e-3);
+      const t = (cd.x * ce.x + cd.y * ce.y) / (ce.x * ce.x + ce.y * ce.y);
+      expect(t, 'D on segment CE (0 ≤ t ≤ 1), not the extension').toBeGreaterThanOrEqual(0);
+      expect(t, 'D on segment CE (0 ≤ t ≤ 1), not the extension').toBeLessThanOrEqual(1);
+    },
+  },
+  {
+    id: 'two-tangents-from-point-unnamed-touch',
+    title: '"מנקודה A יוצאים שני משיקים למעגל O" (touch points NOT named) builds the two tangents',
+    guards:
+      'operator session gd0kkj: "מנקודה A יוצאים שני משיקים למעגל O" ("from A, two tangents go out to circle O") fell to the LLM and built nothing, while a previous question worked — because that one NAMED the touch points ("…בנקודות B ו C"). Root cause (ADR-126): `tangentsFromExternal` REQUIRED a named touch-point pair (`if (!abM) return null`), so the natural unnamed phrasing bailed the rule entirely. Fix: when the touch points are not named, AUTO-name two fresh ones and build the Thales construction (the two tangents from the external point). The named form is unchanged.',
+    steps: ['circle O radius 5', 'מנקודה A יוצאים שני משיקים למעגל O'],
+    check(fig) {
+      allStepsOk(fig);
+      // Two tangent touch points were built and both lie ON circle O (radius 5 from the centre).
+      const touch = fig.construction.objects.filter((o) => o.kind === 'circle-circle');
+      expect(touch.length, 'two tangents → two touch points').toBe(2);
+      const O = at(fig, 'O');
+      for (const t of touch) expect(dist(at(fig, t.id), O), `touch point ${t.id} on circle O`).toBeCloseTo(5, 2);
+    },
+  },
+  {
+    id: 'named-incenter-of-incircle',
+    title: '"M מרכז המעגל החסום במשולש BDC" names the incentre M and builds ONE incircle (no duplicate)',
+    guards:
+      'operator session djvbb7: "M מרכז המעגל החסום במשולש BDC" ("M is the centre of the circle inscribed in triangle BDC") put the centre at O, not M, and the tangency point on BD flipped letters (G→F) when hidden. Root cause (ADR-125): the `incircle` rule only caught a named centre phrased "circle M"/"centred at M" (circleCenter) — NOT the subject form "M [is the] centre of …", so the leading label M was DROPPED, the dropped-label gate (ADR-089) escalated to the LLM, and the LLM built a SECOND complete incircle (centre O, foot G, circle-O) stacked on the parser\'s (centre I, foot F, circle-I) — hence the wrong centre and the two duplicated feet flipping when hidden. Fix: `incenterLabel` captures the subject-named incentre, so M is honoured, nothing is dropped, no escalation, ONE incircle.',
+    steps: ['מלבן DCBA', 'BD', 'M מרכז המעגל החסום במשולש BDC'],
+    check(fig) {
+      allStepsOk(fig);
+      // The incentre is named M (not auto I / O), and exactly ONE circle was built (no duplicate).
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles.length, 'exactly one incircle (no duplicate from an LLM escalation)').toBe(1);
+      expect((circles[0] as { center: Id }).center, 'the circle is centred on the named incentre M').toBe('M');
+      // M is the incentre of triangle BDC ⇒ equidistant from its three sides.
+      const M = at(fig, 'M');
+      const distToLine = (m: Vec, p: Vec, q: Vec) => Math.abs((m.x - p.x) * (q.y - p.y) - (m.y - p.y) * (q.x - p.x)) / dist(p, q);
+      const dBD = distToLine(M, at(fig, 'B'), at(fig, 'D'));
+      const dDC = distToLine(M, at(fig, 'D'), at(fig, 'C'));
+      const dCB = distToLine(M, at(fig, 'C'), at(fig, 'B'));
+      expect(dDC, 'M equidistant from BD and DC (incentre)').toBeCloseTo(dBD, 3);
+      expect(dCB, 'M equidistant from BD and CB (incentre)').toBeCloseTo(dBD, 3);
+    },
+  },
+  {
     id: 'area-ratio-converges-points-allowed',
     title: 'kite inscribed + "area NCE = ¼ area ACD" — the ratio resolves; N lands on the centre O (allowed, noticed)',
     guards:

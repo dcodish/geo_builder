@@ -75,6 +75,22 @@ const circleCenter = (s: string): string | null => {
   return m ? m[1] : null;
 };
 /**
+ * The incentre letter a student NAMES as the SUBJECT of an incircle phrasing — "M מרכז המעגל החסום
+ * במשולש BDC" / "M is the centre of the circle inscribed in triangle ABC" / "incentre M of …". This
+ * label sits BEFORE the centre word (or right after "incentre"), so `circleCenter` ("circle M" /
+ * "centred at M") never catches it — it would be DROPPED, escalate to the LLM, and build a duplicate
+ * incircle ([ADR-125](docs/06-decisions.md#adr-125)). Returns the label, or null.
+ */
+const incenterLabel = (s: string): string | null => {
+  const m =
+    // leading subject: "M מרכז…" / "M is the [in]centre…"
+    s.match(/^\s*([A-Za-z]\d*)\s+(?:is\s+|הוא\s+|הינו\s+)?(?:the\s+)?(?:in)?cent(?:er|re)\b/i) ??
+    s.match(/^\s*([A-Za-z]\d*)\s+מרכז/i) ??
+    // trailing: "incentre M" / "incenter is M"
+    s.match(/incent(?:er|re)\s+(?:is\s+)?([A-Za-z]\d*)\b/i);
+  return m ? m[1] : null;
+};
+/**
  * The circle a phrase refers to: its named centre, or — when none is named and the
  * figure has exactly ONE circle — that circle's centre (implicit "the circle"). With
  * 0 or 2+ unnamed circles it stays null (ambiguous → the rule defers/escalates).
@@ -1632,7 +1648,17 @@ const incircle: Rule = (s, ctx) => {
       { type: 'triangle', ids: [A, B, C] }, // the drawn sides DE, EF, FD (each tangent to O)
     ];
   }
-  const I = circleCenter(s) ?? freeLabel([...ids, ...taken], ['I', 'O', 'P', 'Q']); // the incenter
+  // The incentre: the student's named one — either "circle M" (circleCenter) OR the subject form
+  // "M [is the] centre of the inscribed circle" (incenterLabel) — else an auto label. A named incentre
+  // must dodge the triangle's own vertices (a vertex can't be the incentre).
+  const namedInc = (() => {
+    const c = circleCenter(s);
+    if (c && !ids.includes(up(c))) return up(c);
+    const il = incenterLabel(s);
+    if (il && !ids.includes(up(il))) return up(il);
+    return null;
+  })();
+  const I = namedInc ?? freeLabel([...ids, ...taken], ['I', 'O', 'P', 'Q']); // the incenter
   const F = freeLabel([...ids, I, ...taken], ['F', 'G', 'H', 'K']); // tangency point on AB
   const bisA = `bis-${B}${A}${C}`; // ∠BAC (vertex A)
   const bisB = `bis-${A}${B}${C}`; // ∠ABC (vertex B)
@@ -1642,7 +1668,7 @@ const incircle: Rule = (s, ctx) => {
     { type: 'bisector', id: bisB, vertex: B, p: A, q: C },
     { type: 'line-intersection', id: I, line1: bisA, line2: bisB }, // incenter
     { type: 'foot', id: F, from: I, a: A, b: B }, // inradius foot on side AB
-    { type: 'circle-through', id: circleId(I), center: I, through: F, ...(circleCenter(s) ? {} : { autoCenter: true }) }, // the incentre is auto unless named
+    { type: 'circle-through', id: circleId(I), center: I, through: F, ...(namedInc ? {} : { autoCenter: true }) }, // the incentre is auto unless named
   ];
 };
 
@@ -2308,11 +2334,22 @@ const tangentsFromExternal: Rule = (s, ctx) => {
   const named = circleCenter(s);
   const center = named && /^[A-Z]/.test(named) ? named : ctx.circles?.length === 1 ? ctx.circles[0] : null;
   if (!center) return null;
-  const abM = s.match(/\b([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i); // the two touch points "A and B"
-  if (!abM) return null;
-  const E = up(eM[1]), A = up(abM[1]), B = up(abM[2]);
-  if (new Set([E, A, B]).size !== 3) return null;
+  const E = up(eM[1]);
   const circ = circleId(center);
+  // The two touch points: named explicitly ("…at A and B" / "…בנקודות A ו-B"), else AUTO-named — the
+  // student needn't name them. "מנקודה A יוצאים שני משיקים למעגל O" / "two tangents from A to circle O"
+  // just wants the two tangent lines drawn ([ADR-126]); previously a missing touch-point pair bailed the
+  // rule to the LLM (which built nothing).
+  const abM = s.match(/\b([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i); // a named pair "A and B", if any
+  let A: Id, B: Id;
+  if (abM && new Set([E, up(abM[1]), up(abM[2])]).size === 3 && ![up(abM[1]), up(abM[2])].includes(up(center))) {
+    A = up(abM[1]);
+    B = up(abM[2]);
+  } else {
+    const taken0 = [E, up(center), ...(ctx.points ?? [])];
+    A = freeLabel(taken0, ['T', 'S', 'U', 'V', 'W', 'G', 'H']);
+    B = freeLabel([...taken0, A], ['S', 'U', 'V', 'W', 'G', 'H', 'T']);
+  }
   const out: AnyCommand[] = [];
   // The external apex, if new. Seeded CLOSE to the default circle (~1.2× its radius, like a textbook
   // tangent sketch) rather than far out: a far apex puts directional follow-ups like "המשך BD חותך את
@@ -2592,13 +2629,17 @@ const circumcircleMeetsSegment: Rule = (s, ctx) => {
   if (!seg || seg.includes(D)) return null;
   const [p, q] = seg;
   const shared = [p, q].find((x) => [a, b, c].includes(x)) ?? p; // the endpoint already on the circumcircle
+  const other = shared === p ? q : p; // the segment's OTHER endpoint
   const center = freeLabel([a, b, c, p, q, D, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
   const circId = circleId(center);
   const lineId = `line-${p}${q}`;
   return [
     { type: 'circumcircle', id: circId, center, a, b, c },
     { type: 'line-through', id: lineId, a: p, b: q },
-    { type: 'line-circle-intersection', id: D, line: lineId, circle: circId, avoid: shared },
+    // D = the OTHER crossing (avoid the shared vertex), constrained to lie ON segment CE (order C→D→E),
+    // not on the line's extension — the circle "cuts CE" at an interior point (segment-reference principle,
+    // ADR-127). The order is carried on the intersection itself so D stays on the side across configs.
+    { type: 'line-circle-intersection', id: D, line: lineId, circle: circId, avoid: shared, order: [shared, D, other] },
   ];
 };
 

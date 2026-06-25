@@ -768,7 +768,10 @@ export type Command =
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
   | { type: 'arc'; id: Id; center: Id; from: Id; to: Id } // a drawn arc (CCW from→to): semicircle / quarter circle
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }
-  | { type: 'line-circle-intersection'; id: Id; line: Id; circle: Id; branch?: number; avoid?: Id }
+  // `order` (e.g. [C, id, E]) keeps the crossing ON the segment between two of the line's points (the
+  // circle "cuts CE at D" ⇒ D between C and E), via a `collinear-order` constraint — D is already
+  // collinear (it's on the line), so only the side/order is constrained ([ADR-127]).
+  | { type: 'line-circle-intersection'; id: Id; line: Id; circle: Id; branch?: number; avoid?: Id; order?: Id[] }
   // "המשך AC חותך מעגל P בנקודה D" — directional extension onto a circle (ADR-054): the NEW point
   // `id` is collinear with `a`,`b` AND beyond `b` (order a→b→id); a free-radius circle adapts so the
   // extension actually reaches it. Distinct from `line-circle-intersection` (order-agnostic chord).

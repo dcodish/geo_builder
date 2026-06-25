@@ -289,11 +289,10 @@ export function Figure({
             return (
               <g key={circ.id} data-id={circ.id}>
                 {circHidden(circ.id) ? (
-                  // A HIDDEN circle: a faint dashed ghost — near-invisible but clickable, so the toggle is
-                  // reversible right on the outline (mirrors a hidden segment). Its points still constrain.
-                  circEditable && (
-                    <circle cx={c.x} cy={c.y} r={r} fill="none" stroke="#e2e8f0" strokeWidth={stroke} strokeDasharray={`${stroke * 1.5} ${stroke * 3}`} />
-                  )
+                  // A HIDDEN circle draws NOTHING — truly invisible (operator: "hide should hide"). It stays
+                  // reversible because the always-present transparent hit-ring below remains clickable on the
+                  // circle's former outline → the menu's "show". Its points still constrain the figure.
+                  null
                 ) : (
                   <circle cx={c.x} cy={c.y} r={r} fill="none" stroke={lit(circ.id) ? ACCENT : '#334155'} strokeWidth={lit(circ.id) ? stroke * 2 : stroke} />
                 )}

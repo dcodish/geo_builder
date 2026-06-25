@@ -745,6 +745,12 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'line-circle-intersection':
       addObj(objects, { kind: 'line-circle', id: cmd.id, line: cmd.line, circle: cmd.circle, branch: cmd.branch ?? 0, ...(cmd.avoid ? { avoid: cmd.avoid } : {}) });
+      // Keep the crossing ON the segment (the circle "cuts CE at D" ⇒ D between C and E). D is already
+      // collinear (it's a point on the line), so we add ONLY the side/order constraint — NOT `addCollinear`
+      // (which would mis-drive a free on-circle endpoint, ADR-127). The order's residual is folded into the
+      // joint minimisation, so the solver/sampler flexes the free DOFs (the segment's endpoints) to satisfy
+      // it across configurations, not just the default seed.
+      if (cmd.order && cmd.order.length >= 3) constraints.push({ type: 'collinear-order', points: [...cmd.order] });
       break;
 
     // "המשך AC חותך מעגל P בנקודה D" (ADR-054): the new point D is on circle P, collinear with A,C, and
