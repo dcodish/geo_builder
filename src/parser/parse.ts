@@ -214,8 +214,9 @@ const trapezoid = quadShape(/trapezoid|trapezium|טרפז/gi, (ids) => ({ type: 
 /** "quadrilateral ABCD" / "מרובע ABCD" — a general quad (4 free vertices). */
 const quadrilateral = quadShape(/quadrilateral|quad|מרובע/gi, (ids) => ({ type: 'quadrilateral', ids }));
 
-/** "triangle ABC" / "משולש ABC" — 3 free vertices. */
-const triangle = triShape(/triangle|משולש/gi, (ids) => ({ type: 'triangle', ids }));
+/** "triangle ABC" / "משולש ABC" / "△ABC" — 3 free vertices. (`△`/`▲` is the toolbar triangle glyph,
+ *  the construction counterpart of `∠` for angles, so `△ABC` builds a triangle like `∠ABC` states an angle.) */
+const triangle = triShape(/triangle|משולש|[△▲]/gi, (ids) => ({ type: 'triangle', ids }));
 
 /**
  * A named-shape MACRO ([ADR-110](docs/06-decisions.md#adr-110)): a keyword (He/En) + n labels decomposed into a sequence of
@@ -901,7 +902,9 @@ function areaReferences(s: string): { ids: Id[]; at: number }[] {
     if (ids) refs.push({ ids, at: m.index });
   }
   // compact S-notation: S immediately followed by 3–4 uppercase vertex labels (SABC / SABCD).
-  const reS = /\bS((?:[A-Z]\d*){3,4})\b/g;
+  // `(?<![A-Za-z])` (not `\b`) so a COEFFICIENT glued to the marker is allowed — "4SNCE" (the ratio
+  // `SACD = 4SNCE`) must still find SNCE, where `\b` failed because digit↔S is not a word boundary.
+  const reS = /(?<![A-Za-z])S((?:[A-Z]\d*){3,4})\b/g;
   while ((m = reS.exec(s)) !== null) {
     const ids = labelRun(m[1], 4) ?? labelRun(m[1], 3);
     if (ids && !seen.has(m.index)) refs.push({ ids, at: m.index });
@@ -2828,7 +2831,7 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
 const twoTriangles = (s: string): [[Id, Id, Id], [Id, Id, Id]] | null => {
   const t = s
     .replace(/triangles?|משולשים?|המשולש\w*|congruent|similar|חופפים?|חופף|דומ\w*|are|is|the|of|to|and|של/gi, ' ')
-    .replace(/[≅~∼∽]|ל-?|ו-?/g, ' ');
+    .replace(/[≅~∼∽△▲]|ל-?|ו-?/g, ' ');
   const triples = [...t.matchAll(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/g)];
   if (triples.length < 2) return null;
   const grab = (i: number) => [up(triples[i][1]), up(triples[i][2]), up(triples[i][3])] as [Id, Id, Id];
@@ -3019,6 +3022,19 @@ const GREEK_WORDS: Record<string, string> = {
 const GREEK_RE = new RegExp(String.raw`(?<![A-Za-zα-ω])(${Object.keys(GREEK_WORDS).sort((a, b) => b.length - a.length).join('|')})(?![A-Za-zα-ω])`, 'g');
 const normalizeGreek = (s: string): string => s.replace(GREEK_RE, (m) => GREEK_WORDS[m]);
 
+/**
+ * Area subscript notation → the glued compact form. Students (and textbooks) write an area as the
+ * subscripted `S_{ABC}` (the toolbar `S_{}` button inserts exactly this) or `S_ABC`; the area rule reads
+ * the glued `SABC` (ADR-118). Rewrite `S_{ABC}` / `S_ABC` → `SABC` up front so all three are equivalent.
+ * Scoped to `S_` followed by 3–4 uppercase vertex labels, so it can't touch anything else (ADR-121).
+ */
+const normalizeAreaSubscript = (s: string): string =>
+  s
+    // `(?<![A-Za-z])` (not `\b`) so a coefficient glued to the marker is handled — "4S_{NCE}" (in the
+    // ratio `S_{ACD}=4S_{NCE}`) must normalise too, where `\b` failed because digit↔S is no boundary.
+    .replace(/(?<![A-Za-z])S_\{((?:[A-Z]\d*){3,4})\}/g, 'S$1') // S_{ABC} → SABC
+    .replace(/(?<![A-Za-z])S_((?:[A-Z]\d*){3,4})\b/g, 'S$1'); // S_ABC → SABC
+
 /** The circle a command CONSUMES (references but doesn't define), or null. */
 const consumedCircleId = (cmd: AnyCommand): Id | null =>
   cmd.type === 'point-on-circle' ||
@@ -3060,13 +3076,48 @@ function withImplicitCircles(commands: AnyCommand[], ctx: ParseContext): AnyComm
   return prefix.length ? [...prefix, ...commands] : commands;
 }
 
+/**
+ * A point named as a CHORD endpoint lies ON the circle — in ANY phrasing, not only the standalone
+ * `chord` rule. When "chord"/"מיתר" appears together with a relation ("CD and AF are parallel chords",
+ * "the chord AB equals the chord CD", "chord AB ⟂ chord CD"), the relational rule wins the first-match
+ * race (it runs before `chord` and only understands plain segments), silently dropping the on-circle
+ * membership — the endpoints would end up free points joined by segments, NOT points on the circle
+ * (operator session sflkyd0r: "CD ו AF מיתרים המקבילים זה לזה" → segments + ∥ only). The fix is one
+ * general post-pass, not a per-relation special case: every SEGMENT endpoint in a chord-flavoured
+ * utterance is asserted on the resolved circle. Idempotent (the standalone `chord` rule's own
+ * membership is deduped); a circle CENTRE is excluded so "radius OE" keeps O off the circle; a chord's
+ * MIDPOINT is never a segment endpoint, so "C אמצע מיתר AB" puts A,B — not C — on the circle. Matches
+ * the standalone rule's unconditional semantics (a chord's endpoints are on the circle whether they are
+ * new or already placed). (ADR-119)
+ */
+function withChordMembership(commands: AnyCommand[], s: string, ctx: ParseContext): AnyCommand[] {
+  if (!/chord|מיתר/i.test(s)) return commands;
+  const center = resolveCenter(s, ctx);
+  if (!center) return commands; // no circle to anchor the chord on — leave the parse untouched
+  const circ = circleId(center);
+  const centers = new Set([center, ...(ctx.circles ?? [])].map(up));
+  const already = new Set(
+    commands.flatMap((c) => (c.type === 'point-on-circle' && c.circle === circ ? [up(c.id)] : [])),
+  );
+  const endpoints: Id[] = [];
+  for (const c of commands) {
+    if (c.type !== 'segment') continue;
+    for (const id of [c.a, c.b]) {
+      const U = up(id);
+      if (!centers.has(U) && !already.has(U) && !endpoints.includes(U)) endpoints.push(U);
+    }
+  }
+  if (!endpoints.length) return commands;
+  return [...endpoints.map((id): AnyCommand => ({ type: 'point-on-circle', id, circle: circ })), ...commands];
+}
+
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
-  const s = normalizeGreek(raw.trim().replace(/\s+/g, ' '));
+  const s = normalizeAreaSubscript(normalizeGreek(raw.trim().replace(/\s+/g, ' ')));
   if (!s) return { ok: false, reason: 'not-handled' };
   for (const rule of RULES) {
     const commands = rule(s, ctx);
     if (commands === 'stop') break; // recognised but unreadable — escalate, don't half-parse
-    if (commands) return { ok: true, commands: withImplicitCircles(commands, ctx) };
+    if (commands) return { ok: true, commands: withImplicitCircles(withChordMembership(commands, s, ctx), ctx) };
   }
   return { ok: false, reason: 'not-handled' };
 }
@@ -3098,12 +3149,30 @@ export function droppedNewLabels(utterance: string, commands: AnyCommand[], exis
 export function parseRename(raw: string): { from: Id; to: Id } | null {
   const s = raw.trim().replace(/\s+/g, ' ');
   const m =
-    s.match(/(?:rename|relabel|replace|swap)\s+([A-Za-z]\d*)\b(?:\s+(?:to|as|into|with|by|->|→|=))?\s+([A-Za-z]\d*)\b/i) ??
+    s.match(/(?:rename|relabel|replace)\s+([A-Za-z]\d*)\b(?:\s+(?:to|as|into|with|by|->|→|=))?\s+([A-Za-z]\d*)\b/i) ??
     s.match(/(?:שנה|החלף)\s*(?:שם\s*)?(?:את\s*)?([A-Za-z]\d*)\s*(?:ל-?|ב-?|עם|→|=)?\s*([A-Za-z]\d*)\b/i);
   if (!m) return null;
   const from = up(m[1]);
   const to = up(m[2]);
   return from === to ? null : { from, to };
+}
+
+/**
+ * Detect a SWAP request — EXCHANGE two existing labels (A ↔ B), which {@link parseRename} can't express
+ * (rename refuses a taken target, to avoid an accidental merge). "swap C and D" / "swap C with/for D" /
+ * "swap C ↔ D"; Hebrew "החלף בין C ל-D" / "החלף בין C ו-D" / "החלף בין C לבין D" (the word בין /
+ * "between" is what marks it a swap, so the plain "החלף E ב-G" replace-rename above is untouched). A
+ * store operation, intercepted by the App BEFORE the parser (and before parseRename). (ADR-122.)
+ */
+export function parseSwap(raw: string): { a: Id; b: Id } | null {
+  const s = raw.trim().replace(/\s+/g, ' ');
+  const m =
+    s.match(/\bswap\s+([A-Za-z]\d*)\s*(?:and|with|for|↔|<->|→)\s*([A-Za-z]\d*)\b/i) ??
+    s.match(/(?:החלף|החליפי)\s+בין\s+([A-Za-z]\d*)\s*(?:לבין|ל-?|ו-?|↔|→)\s*([A-Za-z]\d*)\b/i);
+  if (!m) return null;
+  const a = up(m[1]);
+  const b = up(m[2]);
+  return a === b ? null : { a, b };
 }
 
 /**

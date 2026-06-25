@@ -39,6 +39,10 @@ export interface SceneSegment {
   id: Id;
   a: Vec;
   b: Vec;
+  /** Endpoint point-ids (a named segment only — a line-derived trimmed segment leaves these unset),
+   *  so the segment menu can offer "swap endpoints" (ADR-122). */
+  aId?: Id;
+  bId?: Id;
 }
 export interface ScenePolygon {
   id: Id;
@@ -202,7 +206,7 @@ export function buildScene(
     if (o.kind === 'segment') {
       const a = positions.get(o.a);
       const b = positions.get(o.b);
-      if (a && b) segments.push({ id: o.id, a, b });
+      if (a && b) segments.push({ id: o.id, a, b, aId: o.a, bId: o.b });
       continue;
     }
     if (o.kind === 'polygon') {

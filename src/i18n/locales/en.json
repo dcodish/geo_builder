@@ -11,8 +11,10 @@
     "producedNothing": "I understood that but it didn't build anything on the figure — I tried rephrasing it too. Check the names/relations, or word it differently.",
     "partial": "Couldn't draw this part",
     "rename_no-source": "There's no point {{from}} to rename.",
-    "rename_target-taken": "{{to}} is already a point — pick a free letter.",
+    "rename_target-taken": "{{to}} is already a point — pick a free letter, or swap them (click the segment → Swap endpoints, or type \"swap {{from}} and {{to}}\").",
     "rename_same": "{{from}} and {{to}} are the same letter.",
+    "swap_same": "{{from}} and {{to}} are the same point.",
+    "swap_no-source": "To swap, both {{from}} and {{to}} must already exist.",
     "merge_no-source": "There's no point {{from}} to merge.",
     "merge_no-target": "There's no point {{to}} to merge into — both points must already exist (use \"rename\" to relabel).",
     "merge_source-in-shape": "{{from}} is a shape vertex and can't be folded — edit the shape instead.",
@@ -47,7 +49,8 @@
   },
   "figure": {
     "mismatch": "The figure may not match what you described:",
-    "pending": "This relation is recorded but not determined yet — add the remaining givens (lengths/angles) to pin the figure, and it will resolve on its own."
+    "pending": "This relation is recorded but not determined yet — add the remaining givens (lengths/angles) to pin the figure, and it will resolve on its own.",
+    "converge": "{{a}} and {{b}} have landed at the same point."
   },
   "dof": {
     "title": "Adjust the figure",
@@ -96,7 +99,8 @@
     "hide": "Hide segment",
     "show": "Show segment",
     "dashed": "Dashed",
-    "solid": "Solid"
+    "solid": "Solid",
+    "swap": "Swap endpoints"
   },
   "geometry": {
     "triangle": "Triangle",

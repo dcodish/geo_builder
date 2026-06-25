@@ -43,6 +43,10 @@ export interface EvalOk {
   /** Resolved centre + radius of every circle (post-solve), so callers (the givens verifier) can
    *  check on-circle membership without re-resolving. */
   circles: Map<Id, ResolvedCircle>;
+  /** Distinct points the geometry drove to the same location — allowed (not a failure), surfaced as a
+   *  notice so the student knows two labels converged ([ADR-123](docs/06-decisions.md#adr-124)). Omitted
+   *  when none. A `~`-scaffolding / `coincide`-constraint pair is intended and never listed. */
+  coincidences?: [Id, Id][];
 }
 export interface EvalErr {
   ok: false;
@@ -856,24 +860,25 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
   // where they pass.
   if (opts?.skipConstraints) return { ok: true, positions: pos, circles };
 
-  // No two distinct points may share a location — that is a degenerate figure
-  // (two labels on one spot) — EXCEPT a pair the construction intends to coincide
-  // (a `coincide` constraint, ADR-028): their meeting is the goal, not an error.
-  // A `~`-prefixed SCAFFOLDING point (a hidden Thales midpoint, a reinterpret helper) carries no label
-  // and isn't drawn, so it legitimately overlaps a real point — e.g. the circumcentre of A,B,C landing
-  // on the hidden centre of the very circle they're already on (a tangent figure's Thales circle).
+  // Two distinct points sharing a location is normally a degenerate figure — but when the geometry or a
+  // constraint genuinely drives them together (e.g. a derived intersection landing on a circle's centre
+  // because a stated area/length ratio works out that way), that is a LEGITIMATE configuration, not a
+  // contradiction. Per the operator's rule: do NOT hard-fail — ALLOW it and surface a NOTICE ("highlight a
+  // possible error but allow it — part of the building experimentation"). Default collisions are avoided
+  // UPSTREAM (the sampler seeds points apart, shape composition flips to the non-stacking side), so this
+  // only fires on a FORCED coincidence. A `~`-scaffolding point or a `coincide`-constraint pair is fully
+  // intended — no notice. ([ADR-123](docs/06-decisions.md#adr-124).)
   const intended = (idA: Id, idB: Id): boolean =>
     idA.startsWith('~') ||
     idB.startsWith('~') ||
     c.constraints.some((k) => k.type === 'coincide' && ((k.p === idA && k.q === idB) || (k.p === idB && k.q === idA)));
+  const coincidences: [Id, Id][] = [];
   const placed = [...pos.entries()];
   for (let i = 0; i < placed.length; i++) {
     for (let j = i + 1; j < placed.length; j++) {
       const [idA, a] = placed[i];
       const [idB, b] = placed[j];
-      if (Math.hypot(a.x - b.x, a.y - b.y) < LEN_EPS && !intended(idA, idB)) {
-        return { ok: false, error: `${idA} and ${idB} would be at the same point`, coincide: true };
-      }
+      if (Math.hypot(a.x - b.x, a.y - b.y) < LEN_EPS && !intended(idA, idB)) coincidences.push([idA, idB]);
     }
   }
 
@@ -887,7 +892,7 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
     }
   }
 
-  return { ok: true, positions: pos, circles };
+  return { ok: true, positions: pos, circles, ...(coincidences.length ? { coincidences } : {}) };
 }
 
 /** Resolve one circle to its centre and radius: a {@link ResolvedCircle}, 'pending', or an error string. */

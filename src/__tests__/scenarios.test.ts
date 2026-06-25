@@ -105,6 +105,67 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'area-ratio-converges-points-allowed',
+    title: 'kite inscribed + "area NCE = ¼ area ACD" — the ratio resolves; N lands on the centre O (allowed, noticed)',
+    guards:
+      'operator session id4dn4a2: "S_{ACD}=4S_{NCE}" didn\'t parse (ADR-121 Am.) and "שטח משולש NCE = רבע שטח משולש ACD" applied but errored "O and N would be at the same point". Diagnosis: △NCE ~ △ACD structurally (right kite ⇒ ∠ADC=90° = ∠NEC, shared ∠C), so the area ratio ¼ ⟺ the linear ratio CN/CA = ½; and because AC is a diameter (Thales), O is its midpoint, so CN/CA=½ places N EXACTLY on O. The solver was fine (CN/CA=0.3/0.4/0.6/0.7 all converge) — only the coincidence guard hard-failed at the ½ (N=O) value. ADR-123: a FORCED coincidence is ALLOWED with a notice (O was never user-defined; the guard hard-fail was wrong here), while default collisions stay avoided. So the figure now builds with N on O and the area ratio satisfied.',
+    steps: [
+      'ABCD דלתון חסום במעגל',
+      'AB=AD',
+      'CB=CD',
+      'E על DC',
+      'BE⊥DC',
+      'AC',
+      'N = חיתוך BE ו-AC',
+      'שטח משולש NCE= רבע שטח משולש ACD',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const area = (ids: Id[]) => { let s = 0; for (let i = 0; i < ids.length; i++) { const a = at(fig, ids[i]), b = at(fig, ids[(i + 1) % ids.length]); s += a.x * b.y - b.x * a.y; } return Math.abs(s) / 2; };
+      expect(area(['N', 'C', 'E']) / area(['A', 'C', 'D']), 'area(NCE) = ¼ area(ACD)').toBeCloseTo(0.25, 2);
+      expect(dist(at(fig, 'N'), at(fig, 'O')), 'N converged onto the centre O').toBeLessThan(1e-3);
+      expect(fig.coincidences.some(([a, b]) => (a === 'N' && b === 'O') || (a === 'O' && b === 'N')), 'the N=O coincidence is surfaced as a notice').toBe(true);
+    },
+  },
+  {
+    id: 'congruent-triangles-word-form',
+    title: '"משולש ABC חופף למשולש GHT" builds both triangles and makes GHT congruent to ABC (SSS)',
+    guards:
+      'operator question (2026-06-25): "do we support congruent/similar triangles? if a user writes משולש ABC חופף למשולש GHT what happens?". Congruence/similarity already exist (ADR-032): the `congruence` rule (≅ / congruent / חופף) reshapes the SECOND triangle to match the first via SSS (three set-equal). Locked here at BUILD level (the operator\'s exact phrasing) so the corresponding-sides equality is permanent. Related (ADR-120): the △ triangle glyph is now a parser keyword + a toolbar button, so "△ABC" builds a triangle and "△ABC ≅ △DEF" works (covered by catalog-coverage).',
+    steps: ['משולש ABC חופף למשולש GHT'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      const G = at(fig, 'G'), H = at(fig, 'H'), T = at(fig, 'T');
+      expect(dist(G, H), '|GH| = |AB|').toBeCloseTo(dist(A, B), 3);
+      expect(dist(H, T), '|HT| = |BC|').toBeCloseTo(dist(B, C), 3);
+      expect(dist(T, G), '|TG| = |CA|').toBeCloseTo(dist(C, A), 3);
+    },
+  },
+  {
+    id: 'parallel-chords-keep-circle-membership',
+    title: '"AB diameter" then "CD ו AF מיתרים המקבילים" — C,D,F land ON circle O (not free points), CD ∥ AF',
+    guards:
+      'operator session sflkyd0r: after "AB קוטר במעגל" (circle O + diameter AB), "CD ו AF מיתרים המקבילים זה לזה" parsed to two PLAIN segments + set-parallel — the chord membership was DROPPED, so C,D,A,F were free points NOT on circle O. Root cause: parse is first-match-wins and `parallelConstraint` (which only understands plain segments) runs BEFORE the `chord` rule and claimed the whole utterance; and even `chord` itself handles only ONE chord. Fix (ADR-119): a centralised post-pass `withChordMembership` — in any chord-flavoured utterance with a resolvable circle, every SEGMENT endpoint is asserted ON the circle (idempotent; a circle CENTRE is excluded so "radius OE" keeps O off; a chord MIDPOINT is not a segment endpoint, so "C אמצע מיתר AB" puts A,B not C on the circle). General across parallel / ⟂ chords (and any future relation that draws its operands as segments).',
+    steps: [
+      { llm: [
+        { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
+        { type: 'diameter', id1: 'A', id2: 'B', circle: 'circle-O' },
+      ] },
+      'CD ו AF מיתרים המקבילים זה לזה',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O');
+      const rO = dist(O, at(fig, 'A'));
+      for (const id of ['C', 'D', 'F'] as Id[]) expect(dist(O, at(fig, id)), `${id} on circle O`).toBeCloseTo(rO, 3);
+      const C = at(fig, 'C'), D = at(fig, 'D'), A = at(fig, 'A'), F = at(fig, 'F');
+      const cd = { x: D.x - C.x, y: D.y - C.y }, af = { x: F.x - A.x, y: F.y - A.y };
+      const sin = Math.abs(cd.x * af.y - cd.y * af.x) / (Math.hypot(cd.x, cd.y) * Math.hypot(af.x, af.y));
+      expect(sin, 'CD ∥ AF').toBeLessThan(1e-3);
+    },
+  },
+  {
     id: 'isosceles-explicit-pair-overrides-default',
     title: '"משולש שווה שוקיים ABC" + "AB=BC" stays isosceles with AB=BC — the assumed |AB|=|AC| yields (no equilateral)',
     guards:

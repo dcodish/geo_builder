@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { circleMembers, firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, pointNeighbors } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, droppedNewLabels } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -41,6 +41,7 @@ export default function App() {
   const showMeasures = useGeoStore((s) => s.showMeasures);
   const setShowMeasures = useGeoStore((s) => s.setShowMeasures);
   const rename = useGeoStore((s) => s.rename);
+  const swap = useGeoStore((s) => s.swap);
   const merge = useGeoStore((s) => s.merge);
   const hidden = useGeoStore((s) => s.hidden);
   const toggleHidden = useGeoStore((s) => s.toggleHidden);
@@ -105,22 +106,26 @@ export default function App() {
 
   // Insert a Greek letter (angle variables are hard to type) at the input's caret —
   // e.g. type "זווית ABC = 2" then press α (ADR-031).
-  function insertSymbol(sym: string) {
+  // `caret` (when given) is where the caret lands WITHIN the inserted text — e.g. "S_{}" inserts the
+  // template and drops the caret between the braces so the student types the vertices next. Defaults to
+  // the end of the insertion.
+  function insertSymbol(sym: string, caret?: number) {
     const el = inputRef.current;
     const start = el?.selectionStart ?? text.length;
     const end = el?.selectionEnd ?? text.length;
     setText(text.slice(0, start) + sym + text.slice(end));
+    const pos = start + (caret ?? sym.length);
     requestAnimationFrame(() => {
       if (el) {
         el.focus();
-        el.setSelectionRange(start + sym.length, start + sym.length);
+        el.setSelectionRange(pos, pos);
       }
     });
   }
   const GREEK = ['α', 'β', 'γ', 'δ', 'θ'];
   // Math symbols. `label` is shown on the button; `insert` is what lands in the box
   // (x²/xⁿ show their meaning but insert just the operator so the caret sits after it).
-  const SYMBOLS: { label: string; insert: string }[] = [
+  const SYMBOLS: { label: string; insert: string; caret?: number }[] = [
     { label: '√', insert: '√' }, // AD = 12√x
     { label: 'x²', insert: '²' }, // AB = x²
     { label: 'xⁿ', insert: '^' }, // AB = x^3
@@ -129,9 +134,11 @@ export default function App() {
     { label: '°', insert: '°' },
     { label: '⊥', insert: '⊥' }, // AB ⊥ CD
     { label: '∥', insert: '∥' }, // AB ∥ CD
+    { label: '△', insert: '△' }, // △ABC (triangle) / △ABC ≅ △DEF
     { label: '≅', insert: '≅' }, // ABC ≅ DEF (congruent)
     { label: '~', insert: '~' }, // ABC ~ DEF (similar)
     { label: '<', insert: '<' }, // α < β (order between two named measures)
+    { label: 'S_{}', insert: 'S_{}', caret: 3 }, // area: S_{ABC} = 13 — caret lands between the braces
   ];
   const he = i18n.language === 'he';
 
@@ -206,6 +213,17 @@ export default function App() {
     setLlmDropped([]);
     setRenameNote('');
     const locale = i18n.language?.startsWith('he') ? 'he' : 'en';
+    // A swap ("swap C and D" / "החלף בין C ל-D") EXCHANGES two existing labels — a store
+    // operation, handled before the parser (and before rename, whose taken-target guard would
+    // otherwise reject it). Lets the student flip which end of a chord is C vs D (ADR-122).
+    const swp = parseSwap(utterance);
+    if (swp) {
+      const res = swap(swp.a, swp.b);
+      logDebug({ kind: 'input', utterance, locale, source: 'swap', rename: { from: swp.a, to: swp.b }, result: res.ok ? 'ok' : res.reason });
+      if (res.ok) setText('');
+      else setRenameNote(t(`input.swap_${res.reason}`, { from: swp.a, to: swp.b }));
+      return;
+    }
     // A relabel ("rename E to G" / "שנה שם E ל-G") is a store operation, not a
     // geometry command — handle it before the parser so it never enters the figure.
     const ren = parseRename(utterance);
@@ -304,7 +322,7 @@ export default function App() {
   }
 
   // Figure + per-fact status are derived from the fact list.
-  const { construction, positions, status, lastError, pending, labels, angleMarks, violations, radiusDofs } = useMemo(
+  const { construction, positions, status, lastError, pending, labels, angleMarks, violations, radiusDofs, coincidences } = useMemo(
     () => replay(facts, seed, radiusOverrides),
     [facts, seed, radiusOverrides],
   );
@@ -402,11 +420,13 @@ export default function App() {
             segStyle={segStyle}
             onToggleSegHidden={toggleSegHidden}
             onToggleSegDashed={toggleSegDashed}
+            onSwap={swap}
             segMenuText={{
               hide: t('segMenu.hide'),
               show: t('segMenu.show'),
               dashed: t('segMenu.dashed'),
               solid: t('segMenu.solid'),
+              swap: t('segMenu.swap'),
             }}
             hiddenCircles={hiddenCircleSet}
             onToggleCircleHidden={toggleCircleHidden}
@@ -454,7 +474,7 @@ export default function App() {
             <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 70 }}>{t('input.symbols')}:</span>
               {SYMBOLS.map((s) => (
-                <button key={s.label} type="button" title={t('input.insertSymbol')} onClick={() => insertSymbol(s.insert)} style={greekBtn}>
+                <button key={s.label} type="button" title={t('input.insertSymbol')} onClick={() => insertSymbol(s.insert, s.caret)} style={greekBtn}>
                   {s.label}
                 </button>
               ))}
@@ -531,6 +551,12 @@ export default function App() {
           {lastError && <div style={errorBanner}>⚠ {lastError}</div>}
 
           {pending && <div style={infoBanner}>ⓘ {t('figure.pending')}</div>}
+
+          {coincidences.length > 0 && (
+            <div style={infoBanner}>
+              ⓘ {coincidences.map(([a, b]) => t('figure.converge', { a, b })).join(' ')}
+            </div>
+          )}
 
           {violations.length > 0 && (
             <div style={warnBanner}>

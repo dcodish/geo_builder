@@ -159,7 +159,12 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     const alt = evaluate(mirrored);
     const choice = chooseComposition(prev, ncmd, prevPositions, next, res, mirrored, alt);
     if (choice) return { ok: true, construction: choice.construction, positions: choice.positions };
-    // neither side is valid → fall through and report the default's error
+    // No coincidence-free placement. If a side merely STACKS (evaluates ok but two nodes coincide), this is
+    // a default collision the composition can't dodge → keep prior with a clear message (ADR-123: avoid
+    // default collisions; a constraint-DRIVEN coincidence is allowed below, not here). Otherwise fall
+    // through to report the default's genuine error.
+    const stack = (res.ok && res.coincidences?.length ? res.coincidences : alt.ok && alt.coincidences?.length ? alt.coincidences : null);
+    if (stack) return { ok: false, error: `${stack[0][0]} and ${stack[0][1]} would be at the same point`, construction: prev, positions: prevPositions };
   }
 
   if (!res.ok) {
@@ -652,14 +657,19 @@ function chooseComposition(
   mir: Construction,
   mirEval: EvalResult,
 ): { construction: Construction; positions: Map<Id, Vec> } | null {
-  if (defEval.ok && mirEval.ok) {
+  // A composition must not default two nodes onto each other — a placement that COINCIDES is not "clean"
+  // even though `evaluate` now allows a coincidence (a constraint-DRIVEN one is fine, but a default-placement
+  // one is avoidable: flip to the other side). So prefer a coincidence-free side; if neither is clean, this
+  // composition can't avoid a collision → null (applyStep keeps prior). ([ADR-123](docs/06-decisions.md#adr-124).)
+  const clean = (e: EvalResult): e is Extract<EvalResult, { ok: true }> => e.ok && !(e.coincidences && e.coincidences.length > 0);
+  if (clean(defEval) && clean(mirEval)) {
     const flip = preferMirror(prev, cmd, prevPos, defEval.positions);
     return flip
       ? { construction: mir, positions: mirEval.positions }
       : { construction: def, positions: defEval.positions };
   }
-  if (defEval.ok) return { construction: def, positions: defEval.positions };
-  if (mirEval.ok) return { construction: mir, positions: mirEval.positions };
+  if (clean(defEval)) return { construction: def, positions: defEval.positions };
+  if (clean(mirEval)) return { construction: mir, positions: mirEval.positions };
   return null;
 }
 

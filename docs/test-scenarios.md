@@ -22,6 +22,18 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `area-ratio-converges-points-allowed` — kite + "area NCE = ¼ area ACD" resolves with N landing on the centre O (ADR-121 Am./123)
+**Steps**: `ABCD דלתון חסום במעגל` · `AB=AD` · `CB=CD` · `E על DC` · `BE⊥DC` · `AC` · `N = חיתוך BE ו-AC` · `שטח משולש NCE= רבע שטח משולש ACD`
+**Guards against:** the area-ratio given failed two ways (session id4dn4a2): `S_{ACD}=4S_{NCE}` didn't parse (coefficient glued to the marker — ADR-121 Am.), and the verbose form errored "O and N would be at the same point". △NCE~△ACD is structural (right kite ⇒ ∠ADC=∠NEC=90°, shared ∠C), so ¼ ⟺ CN/CA=½; AC is a diameter (Thales) ⇒ O is the midpoint of AC ⇒ CN/CA=½ places N exactly on O. The solver was fine (other ratios converge) — only the coincidence guard hard-failed at N=O. Fix (ADR-123): a forced coincidence is allowed with a notice (O was never user-defined), default collisions stay avoided. **Asserts:** all steps OK; `area(NCE)=¼ area(ACD)`; `|NO|≈0`; the N=O coincidence is surfaced.
+
+### `congruent-triangles-word-form` — "משולש ABC חופף למשולש GHT" makes GHT congruent to ABC (SSS) (ADR-032/120)
+**Steps**: `משולש ABC חופף למשולש GHT`
+**Guards against:** operator question "do we support congruent/similar triangles?". Congruence (`חופף`/`≅`/congruent) and similarity (`דומה`/`~`/similar) are supported (ADR-032): `congruence` reshapes the 2nd triangle to match the 1st by SSS. Locked at BUILD level so corresponding sides stay equal. (ADR-120 also makes the `△` glyph a parser keyword + toolbar button so `△ABC` builds a triangle and `△ABC ≅ △DEF` works — covered by catalog-coverage.) **Asserts:** all steps OK; `|GH|=|AB|`, `|HT|=|BC|`, `|TG|=|CA|`.
+
+### `parallel-chords-keep-circle-membership` — "CD ו AF מיתרים מקבילים" puts C,D,F ON circle O, not free points (ADR-119)
+**Steps**: _(LLM)_ `circle O + diameter AB` · `CD ו AF מיתרים המקבילים זה לזה`
+**Guards against:** after `AB קוטר במעגל`, the chords-with-a-relation utterance parsed to two PLAIN segments + `set-parallel` — the `מיתר`/chord membership was dropped, so C,D,A,F were free points NOT on circle O. Root cause: `parse` is first-match-wins, `parallelConstraint` (plain segments only) runs before the `chord` rule and claims the utterance; and `chord` itself handles only one chord. Fix (ADR-119): a centralised post-pass `withChordMembership` — every SEGMENT endpoint in a chord-flavoured utterance with a resolvable circle is asserted on the circle (idempotent; centre excluded; a midpoint is not a segment endpoint). General across parallel/⟂ chords. **Asserts:** all steps OK; `|OC|=|OD|=|OF|=r`; `CD ∥ AF`.
+
 ### `isosceles-explicit-pair-overrides-default` — "משולש שווה שוקיים ABC" + "AB=BC" stays isosceles, not equilateral (ADR-114)
 **Steps**: `ABC משולש שווה שוקיים` · `AB=BC` · `AK תיכון` · _(LLM)_ `L = mid AB, segment CL` · `D = חיתוך AK ו-CL`
 **Guards against:** the isosceles macro hard-coded `|AB|=|AC|` ("apex = first vertex"). "Isosceles" only asserts SOME two sides equal — which pair is the student's to state (ADR-052) — so `משולש שווה שוקיים ABC` then `AB=BC` stacked `|AB|=|AC|` + `|AB|=|BC|` into an **equilateral** triangle the student never asked for. Fix (ADR-114): the macro's default pair is `soft`, and `replay` drops it when an explicit equality on the same triangle is given, so the stated pair wins. **Asserts:** all steps OK; `|AB|=|BC|` (the stated pair) holds; `|AC|` differs (not equilateral).

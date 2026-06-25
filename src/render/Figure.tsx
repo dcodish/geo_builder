@@ -55,8 +55,11 @@ export interface FigureProps {
   onToggleSegHidden?: (id: Id) => void;
   /** Make a segment dashed/solid (clicked on the canvas) — the host wires the store's `toggleSegDashed`. */
   onToggleSegDashed?: (id: Id) => void;
+  /** Swap a segment's two endpoint labels (A ↔ B) — the host wires the store's `swap`. Lets the student
+   *  flip which end is which (e.g. a chord's C/D) without the rename "target taken" dead-end (ADR-122). */
+  onSwap?: (a: Id, b: Id) => { ok: boolean; reason?: string };
   /** Localised strings for the on-canvas segment menu. */
-  segMenuText?: { hide: string; show: string; dashed: string; solid: string };
+  segMenuText?: { hide: string; show: string; dashed: string; solid: string; swap: string };
   /** Circle ids hidden on the figure (a display preference, like {@link segStyle}'s hidden). */
   hiddenCircles?: Set<Id>;
   /** Hide/show a circle (clicked on the canvas) — the host wires the store's `toggleCircleHidden`. */
@@ -126,6 +129,7 @@ export function Figure({
   segStyle,
   onToggleSegHidden,
   onToggleSegDashed,
+  onSwap,
   segMenuText,
   hiddenCircles,
   onToggleCircleHidden,
@@ -633,6 +637,18 @@ export function Figure({
                     {segOf(menu.id).dashed ? (segMenuText?.solid ?? 'solid') : (segMenuText?.dashed ?? 'dashed')}
                   </button>
                 )}
+                {onSwap && (() => {
+                  // Swap the segment's two endpoint LABELS (e.g. a chord's C ↔ D) — the menu header already
+                  // shows which segment. Only a named segment carries its endpoint ids (a line-derived one doesn't).
+                  const seg = scene.segments.find((sg) => sg.id === menu.id);
+                  if (!seg?.aId || !seg.bId) return null;
+                  const { aId, bId } = seg;
+                  return (
+                    <button type="button" style={{ ...ctrlBtn, textAlign: 'start' }} onClick={() => { onSwap(aId, bId); setMenu(null); }}>
+                      {segMenuText?.swap ?? 'swap'}
+                    </button>
+                  );
+                })()}
               </>
             ) : (
               <>

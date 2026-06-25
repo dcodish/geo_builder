@@ -102,6 +102,9 @@ export interface Derived {
   violations: GivenViolation[];
   /** Free-radius circles the student can dial directly (a slider per circle) — the first playable DOF. */
   radiusDofs: RadiusDof[];
+  /** Pairs of distinct points the geometry drove to the same location — allowed, shown as a notice so the
+   *  student knows two labels converged (e.g. a derived point landing on a circle's centre). [ADR-123] */
+  coincidences: [Id, Id][];
 }
 
 /** A free circle radius the student can drag: `base` is the stable seed radius (for the slider range),
@@ -300,7 +303,10 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
       ? [{ circle: o.id, center: o.center, base: o.radius.value, current: e.ok ? e.circles.get(o.id)?.r ?? o.radius.value : o.radius.value }]
       : [],
   );
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, pending, labels, angleMarks, violations, radiusDofs };
+  // Distinct points the geometry drove onto the same spot — allowed (not an error), surfaced as a notice
+  // so the student knows two labels converged ([ADR-123](docs/06-decisions.md#adr-124)).
+  const coincidences: [Id, Id][] = e.ok ? e.coincidences ?? [] : [];
+  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, pending, labels, angleMarks, violations, radiusDofs, coincidences };
 }
 
 /** The (a, b, id) triples every enabled `extend-onto-circle` step asserts ("המשך a·b onto a circle at id"). */
@@ -418,7 +424,7 @@ export function meetsRequirements(facts: Fact[], seed = 0): boolean {
     fig.lastError === null &&
     fig.violations.length === 0 &&
     extensionsClear(facts, fig) &&
-    pointsDistinct(fig.construction, fig.positions) &&
+    pointsDistinct(fig.construction, fig.positions, fig.coincidences) &&
     polygonsConvex(facts, fig.positions)
   );
 }
@@ -599,8 +605,22 @@ function renameInCommand(cmd: AnyCommand, from: Id, to: Id): AnyCommand {
   return out as AnyCommand;
 }
 
+/**
+ * Rewrite a point label in the DISPLAYED utterance, matching WHOLE labels only. A label is a capital
+ * letter + optional digits (`C`, `C1`, `O1`), so renaming `C`→`D` must NOT touch the `C` inside a `C1`.
+ * The previous `utterance.split(from).join(to)` did a substring replace and corrupted multi-char labels
+ * (it turned `CC1`→`DD1` during a swap-via-temp dance — operator report 2026-06-25). The `(?!\d)` guard
+ * stops the match from eating into a subscripted label; the commands themselves are rewritten by id
+ * (`renameInCommand`), so this only keeps the row text in sync.
+ */
+const relabelUtterance = (utt: string | undefined, from: Id, to: Id): string | undefined =>
+  utt ? utt.replace(new RegExp(from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!\\d)', 'g'), to) : utt;
+
 /** Outcome of a relabel request, so the UI can explain a no-op. */
 export type RenameResult = { ok: true } | { ok: false; reason: 'same' | 'no-source' | 'target-taken' };
+
+/** Outcome of a swap request (exchange two existing labels), so the UI can explain a no-op. */
+export type SwapResult = { ok: true } | { ok: false; reason: 'same' | 'no-source' };
 
 /** Outcome of a merge request (fold one point into another), so the UI can explain a no-op. */
 export type MergeResult = { ok: true } | { ok: false; reason: 'same' | 'no-source' | 'no-target' | 'source-in-shape' };
@@ -696,6 +716,8 @@ export interface GeoState {
   toggleCircleHidden: (id: Id) => void;
   /** Relabel a point everywhere (e.g. E → G) — rewrites every fact, one undo entry. */
   rename: (from: Id, to: Id) => RenameResult;
+  /** Exchange two existing labels (A ↔ B) everywhere — what rename can't do (taken target). One undo entry. */
+  swap: (a: Id, b: Id) => SwapResult;
   /** Fold one point into another (e.g. F → E, both already present) — drops F's definition,
    *  rewrites F→E everywhere, drops facts that collapsed; one undo entry. */
   merge: (from: Id, to: Id) => MergeResult;
@@ -740,7 +762,7 @@ export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean 
  * secant near-tangent so its crossing lands on another point — is a degenerate/confusing drawing, so the
  * resampler skips it. Hidden helper points (`~…`) are ignored. Only used to vet ALTERNATIVE views.
  */
-export function pointsDistinct(c: Construction, positions: Map<Id, Vec>): boolean {
+export function pointsDistinct(c: Construction, positions: Map<Id, Vec>, allowed: [Id, Id][] = []): boolean {
   const pts = c.objects
     .filter((o) => isGeoPoint(o) && !o.id.startsWith('~'))
     .map((o) => ({ id: o.id, p: positions.get(o.id) }))
@@ -750,9 +772,13 @@ export function pointsDistinct(c: Construction, positions: Map<Id, Vec>): boolea
   const ys = pts.map((x) => x.p.y);
   const span = Math.max(1, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
   const minSep = 0.015 * span;
-  const coincide = new Set(
-    c.constraints.filter((k) => k.type === 'coincide').map((k) => [k.p, k.q].sort().join('|')),
-  );
+  // A `coincide` constraint deliberately merges a pair; an `allowed` pair is a coincidence the geometry
+  // FORCED that the engine now permits (ADR-123) — neither is an avoidable near-collision to reject, so a
+  // figure that genuinely requires them still "meets requirements" (no futile auto-resolve search).
+  const coincide = new Set([
+    ...c.constraints.filter((k) => k.type === 'coincide').map((k) => [k.p, k.q].sort().join('|')),
+    ...allowed.map(([p, q]) => [p, q].sort().join('|')),
+  ]);
   for (let i = 0; i < pts.length; i++) {
     for (let j = i + 1; j < pts.length; j++) {
       if (coincide.has([pts[i].id, pts[j].id].sort().join('|'))) continue;
@@ -927,7 +953,7 @@ export const useGeoStore = create<GeoState>()(
           if (
             evaluate(r.construction).ok &&
             polygonsConvex(facts, r.positions) &&
-            pointsDistinct(r.construction, r.positions) &&
+            pointsDistinct(r.construction, r.positions, r.coincidences) &&
             extensionsClear(facts, r) && // a varied view must still let every "המשך" reach the far side (ADR-098)
             shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions))
           ) {
@@ -986,13 +1012,38 @@ export const useGeoStore = create<GeoState>()(
           facts: facts.map((f) => ({
             ...f,
             cmd: renameInCommand(f.cmd, F, T),
-            // The step row shows the utterance; relabel the letter there too (uppercase
-            // point letters only — Hebrew words and lowercase keywords are untouched).
-            utterance: f.utterance ? f.utterance.split(F).join(T) : f.utterance,
+            // The step row shows the utterance; relabel the letter there too (whole labels only,
+            // so a `C1`/`O1` isn't corrupted — Hebrew words and lowercase keywords are untouched).
+            utterance: relabelUtterance(f.utterance, F, T),
           })),
           hidden: get().hidden.map((h) => (h === F ? T : h)), // a hidden point keeps its hidden state under the new letter
           segStyle: renameSegStyle(get().segStyle, F, T), // a styled segment keeps its style under the renamed endpoint
           hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)), // a hidden circle tracks its renamed centre
+          selectedId: null,
+        });
+        return { ok: true };
+      },
+
+      /**
+       * SWAP two EXISTING labels (A↔B) across every fact — the natural "put C where D is, and D where
+       * C is" that `rename` can't do (it refuses a taken target, to avoid an accidental merge). Built on
+       * the rename primitives via a `\0` sentinel so the two exchanges don't collide. (ADR-122.)
+       */
+      swap: (a, b) => {
+        const A = a.toUpperCase();
+        const B = b.toUpperCase();
+        if (A === B) return { ok: false, reason: 'same' };
+        const facts = get().facts;
+        const all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
+        if (!all.has(A) || !all.has(B)) return { ok: false, reason: 'no-source' }; // both must exist
+        const TMP = '\u0000'; // a sentinel that can never be a real label or appear in an utterance
+        const swapCmd = (cmd: AnyCommand) => renameInCommand(renameInCommand(renameInCommand(cmd, A, TMP), B, A), TMP, B);
+        const swapUtt = (u: string | undefined) => relabelUtterance(relabelUtterance(relabelUtterance(u, A, TMP), B, A), TMP, B);
+        set({
+          facts: facts.map((f) => ({ ...f, cmd: swapCmd(f.cmd), utterance: swapUtt(f.utterance) })),
+          hidden: get().hidden.map((h) => (h === A ? B : h === B ? A : h)),
+          segStyle: renameSegStyle(renameSegStyle(renameSegStyle(get().segStyle, A, TMP), B, A), TMP, B),
+          hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${A}` ? `circle-${B}` : c === `circle-${B}` ? `circle-${A}` : c)),
           selectedId: null,
         });
         return { ok: true };
