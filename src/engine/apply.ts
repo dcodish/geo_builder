@@ -750,6 +750,29 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     // "המשך AC חותך מעגל P בנקודה D" (ADR-054): the new point D is on circle P, collinear with A,C, and
     // BEYOND the 2nd named point (order A→C→D). Two structurally different cases:
     case 'extend-onto-circle': {
+      const order: Constraint = { type: 'collinear-order', points: [cmd.a, cmd.b, cmd.id] };
+      const coll: Constraint = { type: 'collinear', a: cmd.a, b: cmd.b, c: cmd.id };
+
+      // (0) TARGET ALREADY EXISTS — e.g. an earlier "chord A D" placed D as a free on-circle point and the
+      // student now pins it with "extend C A onto the circle at D" (asserting the figure THEOREM that C,A,D
+      // are collinear). Re-creating D would SILENTLY NO-OP — addObj keeps the first definition and case (1)
+      // below pushes no constraints, so the whole directional coupling is dropped and D stays wherever the
+      // earlier construction left it (the operator's "C-A-D not respected", ADR-124). So when D exists, the
+      // extension is a CONSTRAINT on it — collinear with A,C and BEYOND the 2nd letter — never a re-build.
+      // If D is a free on-circle point of THIS circle, drive its θ with the same order-aware far-crossing
+      // solve the fresh case (2) uses (so it lands past A, not on the near crossing); for any other carrier
+      // the constraints alone flex the figure (the global solver / recruiter owns the DOF).
+      const existingIdx = objects.findIndex((o) => o.id === cmd.id);
+      if (existingIdx >= 0) {
+        const existing = objects[existingIdx];
+        if (existing.kind === 'on-circle' && existing.circle === cmd.circle && existing.free) {
+          objects[existingIdx] = { ...existing, solve: { constraint: coll, branch: cmd.branch ?? 0 } };
+        }
+        constraints.push(coll, order);
+        addObj(objects, segment(cmd.a, cmd.id)); // the drawn secant A → D
+        break;
+      }
+
       // (1) SHARED-ENDPOINT — a line endpoint already lies on the TARGET circle (e.g. A is on circle O
       // because it's an O∩P crossing). The line then meets the circle at that endpoint AND at exactly ONE
       // other point, so the directional extension IS that second crossing — a DETERMINISTIC `line∩circle`
@@ -772,8 +795,6 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // circle's FREE radius (via `circlesOfPoint`) and the mixed solver (honouring collinear-order) grows
       // it until an extension root exists (the "adapt the figure" semantics, ADR-052). The radius is left
       // untouched when a root already exists (the 1-DOF order-aware pick) or when it's a fixed size.
-      const order: Constraint = { type: 'collinear-order', points: [cmd.a, cmd.b, cmd.id] };
-      const coll: Constraint = { type: 'collinear', a: cmd.a, b: cmd.b, c: cmd.id };
       addObj(objects, { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: nextTheta(objects, cmd.circle), free: true, solve: { constraint: coll, branch: cmd.branch ?? 0 } });
       constraints.push(coll, order);
       addObj(objects, segment(cmd.a, cmd.id)); // the drawn secant A → D (through B)
