@@ -96,7 +96,17 @@
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
     "emptyTitle": "Start here",
-    "emptyHint": "Describe a shape to begin, e.g.:"
+    "emptyHint": "Describe a shape to begin, e.g.:",
+    "rotate90": "Rotate 90°",
+    "rotate180": "Rotate 180°",
+    "flipH": "Flip horizontal",
+    "flipV": "Flip vertical",
+    "centers": "Show circle centres",
+    "rotate": "Rotate",
+    "alignSeg": "Make a segment horizontal — type its two endpoints (e.g. AB) and press Enter",
+    "copyImage": "Copy image",
+    "saveImage": "Save image",
+    "copied": "Copied"
   },
   "actions": {
     "undo": "Undo",

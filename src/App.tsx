@@ -483,6 +483,19 @@ export default function App() {
             hiddenCircles={hiddenCircleSet}
             onToggleCircleHidden={toggleCircleHidden}
             circleMenuText={{ hide: t('segMenu.hide'), show: t('segMenu.show') }}
+            toolbarText={{
+              rotate90: t('canvas.rotate90'),
+              rotate180: t('canvas.rotate180'),
+              flipH: t('canvas.flipH'),
+              flipV: t('canvas.flipV'),
+              centers: t('canvas.centers'),
+              rotate: t('canvas.rotate'),
+              alignSeg: t('canvas.alignSeg'),
+              copyImage: t('canvas.copyImage'),
+              saveImage: t('canvas.saveImage'),
+              copied: t('canvas.copied'),
+              reset: t('canvas.reset'),
+            }}
           />
           {/* Empty canvas → a call to action so a new user knows what to do. The
               container ignores pointer events (so panning isn't blocked); the
@@ -828,7 +841,10 @@ const headerRow: React.CSSProperties = { display: 'flex', justifyContent: 'space
 const main: React.CSSProperties = { display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' };
 // The canvas fills the space beside the sidebar and the viewport height (use the big screen);
 // it wraps below the sidebar on narrow widths. Its size is measured and passed to <Figure>.
-const canvasWrap: React.CSSProperties = { position: 'relative', flex: '1 1 480px', minWidth: 360, height: 'calc(100vh - 132px)', minHeight: 460 };
+// `order` puts the canvas on the LEFT and the sidebar on the RIGHT under RTL (Hebrew):
+// in an RTL flex row, order:1 sits at the right edge, order:2 to its left. (Operator: in
+// Hebrew the canvas should be on the left.)
+const canvasWrap: React.CSSProperties = { order: 2, position: 'relative', flex: '1 1 480px', minWidth: 360, height: 'calc(100vh - 132px)', minHeight: 460 };
 // Centered call-to-action shown over the blank canvas; pointer-events off so it never
 // blocks the figure (the example buttons re-enable them).
 const emptyOverlay: React.CSSProperties = {
@@ -853,7 +869,7 @@ const emptyChip: React.CSSProperties = {
   cursor: 'pointer',
   fontFamily: 'ui-monospace, monospace',
 };
-const sidebar: React.CSSProperties = { width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 };
+const sidebar: React.CSSProperties = { order: 1, width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 };
 const sectionLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 };
 const input: React.CSSProperties = {
   flex: 1,

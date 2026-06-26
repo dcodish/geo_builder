@@ -66,6 +66,21 @@ export interface FigureProps {
   onToggleCircleHidden?: (id: Id) => void;
   /** Localised strings for the on-canvas circle menu. */
   circleMenuText?: { hide: string; show: string };
+  /** Localised strings for the figure's own toolbar (rotate/flip/centres/export/reset).
+   *  Optional — falls back to English so the renderer stays usable standalone (tests). */
+  toolbarText?: {
+    rotate90: string;
+    rotate180: string;
+    flipH: string;
+    flipV: string;
+    centers: string;
+    rotate: string;
+    alignSeg: string;
+    copyImage: string;
+    saveImage: string;
+    copied: string;
+    reset: string;
+  };
 }
 
 interface View {
@@ -134,7 +149,24 @@ export function Figure({
   hiddenCircles,
   onToggleCircleHidden,
   circleMenuText,
+  toolbarText,
 }: FigureProps) {
+  // English fallbacks so the renderer works standalone (e.g. the SSR render tests, which
+  // pass no toolbarText); the host (App) supplies localized Hebrew strings.
+  const tt = {
+    rotate90: 'Rotate 90°',
+    rotate180: 'Rotate 180°',
+    flipH: 'Flip horizontal',
+    flipV: 'Flip vertical',
+    centers: 'Show circle centres',
+    rotate: 'Rotate',
+    alignSeg: 'Make a segment horizontal — type its two endpoints (e.g. AB) and press Enter',
+    copyImage: 'Copy image',
+    saveImage: 'Save image',
+    copied: 'Copied',
+    reset: 'Reset view',
+    ...toolbarText,
+  };
   const lit = (id: string): boolean => !!highlight && highlight.has(id);
   const isHidden = (id: string): boolean => !!hidden && hidden.has(id);
   const segOf = (id: string) => segStyle?.[id] ?? {};
@@ -665,23 +697,23 @@ export function Figure({
       {/* Orientation controls — rotate / flip the whole figure; labels stay upright
           (only the world coordinates are oriented, never the label glyphs). */}
       <div style={{ position: 'absolute', top: 8, insetInlineStart: 8, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button type="button" style={ctrlBtn} title="Rotate 90°" aria-label="rotate 90 degrees" onClick={() => setView((v) => ({ ...v, rot: normRot(v.rot - Math.PI / 2) }))}>
+        <button type="button" style={ctrlBtn} title={tt.rotate90} aria-label={tt.rotate90} onClick={() => setView((v) => ({ ...v, rot: normRot(v.rot - Math.PI / 2) }))}>
           ⟳
         </button>
-        <button type="button" style={ctrlBtn} title="Rotate 180°" aria-label="rotate 180 degrees" onClick={() => setView((v) => ({ ...v, rot: normRot(v.rot + Math.PI) }))}>
+        <button type="button" style={ctrlBtn} title={tt.rotate180} aria-label={tt.rotate180} onClick={() => setView((v) => ({ ...v, rot: normRot(v.rot + Math.PI) }))}>
           180°
         </button>
-        <button type="button" style={ctrlBtn} title="Flip horizontal" aria-label="flip horizontal" onClick={() => setView((v) => ({ ...v, flipX: !v.flipX }))}>
+        <button type="button" style={ctrlBtn} title={tt.flipH} aria-label={tt.flipH} onClick={() => setView((v) => ({ ...v, flipX: !v.flipX }))}>
           ⇄
         </button>
-        <button type="button" style={ctrlBtn} title="Flip vertical" aria-label="flip vertical" onClick={() => setView((v) => ({ ...v, flipY: !v.flipY }))}>
+        <button type="button" style={ctrlBtn} title={tt.flipV} aria-label={tt.flipV} onClick={() => setView((v) => ({ ...v, flipY: !v.flipY }))}>
           ⇅
         </button>
         <button
           type="button"
           style={{ ...ctrlBtn, ...(view.showCenters ? { background: '#dbeafe', borderColor: '#93c5fd' } : null) }}
-          title="Show circle centres (so two circles are tellable apart)"
-          aria-label="show circle centres"
+          title={tt.centers}
+          aria-label={tt.centers}
           aria-pressed={!!view.showCenters}
           onClick={() => setView((v) => ({ ...v, showCenters: !v.showCenters }))}
         >
@@ -692,8 +724,8 @@ export function Figure({
           min={0}
           max={359}
           value={Math.round((normRot(view.rot) * 180) / Math.PI)}
-          title="Rotate"
-          aria-label="rotate"
+          title={tt.rotate}
+          aria-label={tt.rotate}
           onChange={(e) => setView((v) => ({ ...v, rot: normRot((Number(e.target.value) * Math.PI) / 180) }))}
           onPointerDown={(e) => e.stopPropagation()}
           style={{ width: 90, cursor: 'pointer' }}
@@ -703,8 +735,8 @@ export function Figure({
           type="text"
           maxLength={2}
           placeholder="⎯ AB"
-          title="Make a segment horizontal — type its two endpoints (e.g. AB) and press Enter"
-          aria-label="align segment horizontal"
+          title={tt.alignSeg}
+          aria-label={tt.alignSeg}
           onKeyDown={(e) => {
             if (e.key === 'Enter') alignHorizontal((e.target as HTMLInputElement).value);
           }}
@@ -713,21 +745,22 @@ export function Figure({
         />
       </div>
 
-      <div style={{ position: 'absolute', top: 8, insetInlineEnd: 8, display: 'flex', gap: 4, alignItems: 'center' }}>
+      <div style={{ position: 'absolute', top: 8, insetInlineEnd: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
+        {/* Export — most-used by teachers, so these are prominent labeled buttons. */}
         <button
           type="button"
-          style={{ ...ctrlBtn, ...(exportFlash === 'ok' ? { background: '#dcfce7', borderColor: '#86efac' } : exportFlash === 'err' ? { background: '#fee2e2', borderColor: '#fca5a5' } : null) }}
-          title="Copy image to clipboard"
-          aria-label="copy image to clipboard"
+          style={{ ...exportBtn, ...(exportFlash === 'ok' ? { background: '#dcfce7', borderColor: '#86efac', color: '#166534' } : exportFlash === 'err' ? { background: '#fee2e2', borderColor: '#fca5a5', color: '#991b1b' } : null) }}
+          title={tt.copyImage}
+          aria-label={tt.copyImage}
           onClick={copyImage}
         >
-          {exportFlash === 'ok' ? '✓' : exportFlash === 'err' ? '✕' : '⧉'}
+          {exportFlash === 'ok' ? `✓ ${tt.copied}` : exportFlash === 'err' ? '✕' : `⧉ ${tt.copyImage}`}
         </button>
-        <button type="button" style={ctrlBtn} title="Save image (PNG)" aria-label="save image as PNG" onClick={saveImage}>
-          ⤓
+        <button type="button" style={exportBtn} title={tt.saveImage} aria-label={tt.saveImage} onClick={saveImage}>
+          ⤓ {tt.saveImage}
         </button>
-        <button type="button" onClick={() => setView(IDENTITY)} style={ctrlBtn}>
-          Reset view
+        <button type="button" onClick={() => setView(IDENTITY)} style={ctrlBtn} title={tt.reset} aria-label={tt.reset}>
+          ↺
         </button>
       </div>
     </div>
@@ -773,6 +806,22 @@ const ctrlBtn: CSSProperties = {
   border: '1px solid #cbd5e1',
   background: '#f8fafc',
   cursor: 'pointer',
+};
+// The export (copy / download) buttons — prominent + labeled, since teachers rely on them most.
+const exportBtn: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  padding: '6px 12px',
+  fontSize: 13,
+  fontWeight: 600,
+  lineHeight: 1,
+  borderRadius: 8,
+  border: '1px solid #2563eb',
+  background: '#eff6ff',
+  color: '#1e40af',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
 };
 
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
