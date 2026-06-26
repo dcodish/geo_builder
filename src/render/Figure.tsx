@@ -39,6 +39,8 @@ export interface FigureProps {
   angleMarks?: { vertex: Id; ray1: Id; ray2: Id; right: boolean }[];
   /** Show the measure labels + angle marks (default true); the host's "show measures" toggle drives this. */
   showMeasures?: boolean;
+  /** Reveal every circle's centre + label (ADR-059); driven by the host's "show centres" toggle. */
+  showCenters?: boolean;
   /** Point ids whose label + dot are hidden — drawn instead as a faint clickable ghost (FR-RN-10). */
   hidden?: Set<Id>;
   /** Relabel a point (clicked on the canvas) — the host wires the store's `rename`; the result drives an
@@ -73,8 +75,8 @@ export interface FigureProps {
     rotate180: string;
     flipH: string;
     flipV: string;
-    centers: string;
     rotate: string;
+    transform: string;
     alignSeg: string;
     copyImage: string;
     saveImage: string;
@@ -97,8 +99,6 @@ interface View {
    * figure reshapes under new constraints. `rot` is then an extra manual offset on top.
    */
   alignSeg?: [string, string];
-  /** Reveal every circle's centre (incl. auto-hidden ones) with its label, so two circles are tellable apart. */
-  showCenters?: boolean;
 }
 
 const IDENTITY: View = { zoom: 1, panX: 0, panY: 0, rot: 0, flipX: false, flipY: false };
@@ -138,6 +138,7 @@ export function Figure({
   angleMarks,
   showMeasures = true,
   hidden,
+  showCenters = false,
   onRename,
   onToggleHidden,
   pointMenuText,
@@ -158,8 +159,8 @@ export function Figure({
     rotate180: 'Rotate 180°',
     flipH: 'Flip horizontal',
     flipV: 'Flip vertical',
-    centers: 'Show circle centres',
     rotate: 'Rotate',
+    transform: 'Rotate & align',
     alignSeg: 'Make a segment horizontal — type its two endpoints (e.g. AB) and press Enter',
     copyImage: 'Copy image',
     saveImage: 'Save image',
@@ -177,6 +178,7 @@ export function Figure({
   const [view, setView] = useState<View>(IDENTITY);
   const [hotCross, setHotCross] = useState<number | null>(null);
   const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>('');
+  const [showOrient, setShowOrient] = useState(false); // the rotate/flip/align cluster — collapsed by default (declutter)
   // The on-canvas edit menu: a point (rename / hide) or a segment (hide / dashed), where (container px),
   // and a transient note (e.g. "taken").
   const [menu, setMenu] = useState<{ kind: 'point' | 'segment' | 'circle'; id: string; x: number; y: number } | null>(null);
@@ -236,7 +238,7 @@ export function Figure({
       o.rot === 0 && !o.flipX && !o.flipY
         ? positions
         : new Map<Id, Vec>([...positions].map(([id, v]) => [id, orient(v, o)]));
-    const s = buildScene(construction, oriented, labels, angleMarks, { showCenters: view.showCenters });
+    const s = buildScene(construction, oriented, labels, angleMarks, { showCenters });
     const t = fitTransform(scenePositions(s), { width, height, padding });
     const x = onPickIntersection ? findSegmentCrossings(construction, oriented) : [];
 
@@ -256,7 +258,7 @@ export function Figure({
     const labelDirs = chooseLabelDirs(ptScreen, obstacles, circScreen, REF_OFF, REF_CLEAR);
 
     return { scene: s, transform: t, crossings: x, labelDirs };
-  }, [construction, positions, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, view.showCenters]);
+  }, [construction, positions, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, showCenters]);
 
   // Point radius in px, kept visually constant by dividing out the pan/zoom scale.
   // `r` sizes the marks/crossings/measure offsets; `pointR` is the small textbook-
@@ -694,55 +696,59 @@ export function Figure({
         </>
       )}
 
-      {/* Orientation controls — rotate / flip the whole figure; labels stay upright
-          (only the world coordinates are oriented, never the label glyphs). */}
-      <div style={{ position: 'absolute', top: 8, insetInlineStart: 8, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button type="button" style={ctrlBtn} title={tt.rotate90} aria-label={tt.rotate90} onClick={() => setView((v) => ({ ...v, rot: normRot(v.rot - Math.PI / 2) }))}>
-          ⟳
-        </button>
-        <button type="button" style={ctrlBtn} title={tt.rotate180} aria-label={tt.rotate180} onClick={() => setView((v) => ({ ...v, rot: normRot(v.rot + Math.PI) }))}>
-          180°
-        </button>
-        <button type="button" style={ctrlBtn} title={tt.flipH} aria-label={tt.flipH} onClick={() => setView((v) => ({ ...v, flipX: !v.flipX }))}>
-          ⇄
-        </button>
-        <button type="button" style={ctrlBtn} title={tt.flipV} aria-label={tt.flipV} onClick={() => setView((v) => ({ ...v, flipY: !v.flipY }))}>
-          ⇅
-        </button>
+      {/* Orientation controls — rotate / flip / align the whole figure (labels stay upright). These are
+          secondary, so they're collapsed behind a single labeled toggle to keep the canvas uncluttered. */}
+      <div style={{ position: 'absolute', top: 8, insetInlineStart: 8, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
         <button
           type="button"
-          style={{ ...ctrlBtn, ...(view.showCenters ? { background: '#dbeafe', borderColor: '#93c5fd' } : null) }}
-          title={tt.centers}
-          aria-label={tt.centers}
-          aria-pressed={!!view.showCenters}
-          onClick={() => setView((v) => ({ ...v, showCenters: !v.showCenters }))}
+          style={{ ...ctrlBtn, ...(showOrient ? { background: '#dbeafe', borderColor: '#93c5fd' } : null) }}
+          title={tt.transform}
+          aria-label={tt.transform}
+          aria-expanded={showOrient}
+          onClick={() => setShowOrient((v) => !v)}
         >
-          ⊙
+          ⟳ {tt.transform} {showOrient ? '▴' : '▾'}
         </button>
-        <input
-          type="range"
-          min={0}
-          max={359}
-          value={Math.round((normRot(view.rot) * 180) / Math.PI)}
-          title={tt.rotate}
-          aria-label={tt.rotate}
-          onChange={(e) => setView((v) => ({ ...v, rot: normRot((Number(e.target.value) * Math.PI) / 180) }))}
-          onPointerDown={(e) => e.stopPropagation()}
-          style={{ width: 90, cursor: 'pointer' }}
-        />
-        {/* Make a chosen segment horizontal — type its two points, e.g. "AB". */}
-        <input
-          type="text"
-          maxLength={2}
-          placeholder="⎯ AB"
-          title={tt.alignSeg}
-          aria-label={tt.alignSeg}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') alignHorizontal((e.target as HTMLInputElement).value);
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          style={{ width: 48, padding: '3px 6px', fontSize: 12, borderRadius: 6, border: '1px solid #cbd5e1', textTransform: 'uppercase' }}
-        />
+        {showOrient && (
+          <div style={orientPopover}>
+            <button type="button" style={ctrlBtn} title={tt.rotate90} aria-label={tt.rotate90} onClick={() => setView((v) => ({ ...v, rot: normRot(v.rot - Math.PI / 2) }))}>
+              ⟳
+            </button>
+            <button type="button" style={ctrlBtn} title={tt.rotate180} aria-label={tt.rotate180} onClick={() => setView((v) => ({ ...v, rot: normRot(v.rot + Math.PI) }))}>
+              180°
+            </button>
+            <button type="button" style={ctrlBtn} title={tt.flipH} aria-label={tt.flipH} onClick={() => setView((v) => ({ ...v, flipX: !v.flipX }))}>
+              ⇄
+            </button>
+            <button type="button" style={ctrlBtn} title={tt.flipV} aria-label={tt.flipV} onClick={() => setView((v) => ({ ...v, flipY: !v.flipY }))}>
+              ⇅
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={359}
+              value={Math.round((normRot(view.rot) * 180) / Math.PI)}
+              title={tt.rotate}
+              aria-label={tt.rotate}
+              onChange={(e) => setView((v) => ({ ...v, rot: normRot((Number(e.target.value) * Math.PI) / 180) }))}
+              onPointerDown={(e) => e.stopPropagation()}
+              style={{ width: 90, cursor: 'pointer' }}
+            />
+            {/* Make a chosen segment horizontal — type its two points, e.g. "AB". */}
+            <input
+              type="text"
+              maxLength={2}
+              placeholder="⎯ AB"
+              title={tt.alignSeg}
+              aria-label={tt.alignSeg}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') alignHorizontal((e.target as HTMLInputElement).value);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              style={{ width: 48, padding: '3px 6px', fontSize: 12, borderRadius: 6, border: '1px solid #cbd5e1', textTransform: 'uppercase' }}
+            />
+          </div>
+        )}
       </div>
 
       <div style={{ position: 'absolute', top: 8, insetInlineEnd: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -806,6 +812,19 @@ const ctrlBtn: CSSProperties = {
   border: '1px solid #cbd5e1',
   background: '#f8fafc',
   cursor: 'pointer',
+};
+// The collapsible rotate/flip/align cluster.
+const orientPopover: CSSProperties = {
+  display: 'flex',
+  gap: 4,
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  maxWidth: 250,
+  background: '#fff',
+  border: '1px solid #e2e8f0',
+  borderRadius: 8,
+  padding: 6,
+  boxShadow: '0 4px 14px rgba(0,0,0,0.08)',
 };
 // The export (copy / download) buttons — prominent + labeled, since teachers rely on them most.
 const exportBtn: CSSProperties = {

@@ -662,6 +662,9 @@ export interface GeoState {
   seed: number;
   /** Show measure labels on the figure (ADR-031); UI-only, not undoable. Default true. */
   showMeasures: boolean;
+  /** Reveal every circle's centre + label (ADR-059); UI-only, not undoable. Default false.
+   *  A display preference grouped with `showMeasures` in the sidebar (was a ⊙ button on the canvas). */
+  showCenters: boolean;
   /** Dialed free-circle radii (the DOF sliders): circle id → radius. A viewing scratchpad — UI-only,
    *  not undoable, cleared by "show another configuration". */
   radiusOverrides: Record<Id, number>;
@@ -706,6 +709,8 @@ export interface GeoState {
   setRadius: (circle: Id, value: number) => void;
   /** Show/hide measure labels on the figure (ADR-031). */
   setShowMeasures: (show: boolean) => void;
+  /** Show/hide every circle's centre + label (ADR-059). */
+  setShowCenters: (show: boolean) => void;
   /** Toggle a point's label + dot hidden/shown on the figure (a display preference, not geometry). */
   toggleHidden: (id: Id) => void;
   /** Toggle a segment hidden/shown on the figure (a display preference, not geometry). */
@@ -821,6 +826,7 @@ export const useGeoStore = create<GeoState>()(
       selectedId: null,
       seed: 0,
       showMeasures: true,
+      showCenters: false,
       radiusOverrides: {},
       hidden: [],
       segStyle: {},
@@ -985,6 +991,7 @@ export const useGeoStore = create<GeoState>()(
       },
 
       setShowMeasures: (show) => set({ showMeasures: show }),
+      setShowCenters: (show) => set({ showCenters: show }),
 
       toggleHidden: (id) => {
         const I = id.toUpperCase();

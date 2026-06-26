@@ -83,6 +83,9 @@
     "title": "Adjust the figure",
     "radius": "radius of circle {{center}}"
   },
+  "display": {
+    "title": "Display"
+  },
   "theorems": {
     "title": "Theorems & Insights",
     "empty": "Add more details to see relevant theorems",
@@ -103,6 +106,7 @@
     "flipV": "Flip vertical",
     "centers": "Show circle centres",
     "rotate": "Rotate",
+    "transform": "Rotate & align",
     "alignSeg": "Make a segment horizontal — type its two endpoints (e.g. AB) and press Enter",
     "copyImage": "Copy image",
     "saveImage": "Save image",

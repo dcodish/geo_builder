@@ -41,6 +41,8 @@ export default function App() {
   const seed = useGeoStore((s) => s.seed);
   const showMeasures = useGeoStore((s) => s.showMeasures);
   const setShowMeasures = useGeoStore((s) => s.setShowMeasures);
+  const showCenters = useGeoStore((s) => s.showCenters);
+  const setShowCenters = useGeoStore((s) => s.setShowCenters);
   const rename = useGeoStore((s) => s.rename);
   const swap = useGeoStore((s) => s.swap);
   const merge = useGeoStore((s) => s.merge);
@@ -67,6 +69,7 @@ export default function App() {
   const [helpOpen, setHelpOpen] = useState(false); // the help modal ("עזרה") — guide + command reference
   const [helpTab, setHelpTab] = useState<'guide' | 'commands'>('guide');
   const [aboutOpen, setAboutOpen] = useState(false); // the "מה זה?" intro modal (first load + reopenable)
+  const [showSymbols, setShowSymbols] = useState(false); // the Greek/symbol insert rows — collapsed by default (advanced)
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editError, setEditError] = useState(false);
@@ -458,6 +461,7 @@ export default function App() {
             labels={labels}
             angleMarks={angleMarks}
             showMeasures={showMeasures}
+            showCenters={showCenters}
             hidden={hiddenSet}
             onRename={rename}
             onToggleHidden={toggleHidden}
@@ -488,8 +492,8 @@ export default function App() {
               rotate180: t('canvas.rotate180'),
               flipH: t('canvas.flipH'),
               flipV: t('canvas.flipV'),
-              centers: t('canvas.centers'),
               rotate: t('canvas.rotate'),
+              transform: t('canvas.transform'),
               alignSeg: t('canvas.alignSeg'),
               copyImage: t('canvas.copyImage'),
               saveImage: t('canvas.saveImage'),
@@ -542,24 +546,33 @@ export default function App() {
                 {thinking ? t('input.loading') : t('input.send')}
               </button>
             </div>
-            {/* Row 1 — Greek-letter inserts for angle variables (∠ABC = 2α), hard to type. */}
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 70 }}>{t('input.greek')}:</span>
-              {GREEK.map((g) => (
-                <button key={g} type="button" title={t('input.insertGreek')} onClick={() => insertSymbol(g)} style={greekBtn}>
-                  {g}
-                </button>
-              ))}
-            </div>
-            {/* Row 2 — math symbols: roots/powers for symbolic lengths, and the ∠ ° ⊥ ∥ relation glyphs. */}
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 70 }}>{t('input.symbols')}:</span>
-              {SYMBOLS.map((s) => (
-                <button key={s.label} type="button" title={t('input.insertSymbol')} onClick={() => insertSymbol(s.insert, s.caret)} style={greekBtn}>
-                  {s.label}
-                </button>
-              ))}
-            </div>
+            {/* Greek + math-symbol inserts — advanced (only for symbolic lengths / angle variables /
+                relation glyphs), so collapsed behind a toggle to keep the input area clean. */}
+            <button type="button" onClick={() => setShowSymbols((v) => !v)} style={symbolsToggle}>
+              Ω {t('input.symbols')} {showSymbols ? '▴' : '▾'}
+            </button>
+            {showSymbols && (
+              <>
+                {/* Row 1 — Greek-letter inserts for angle variables (∠ABC = 2α), hard to type. */}
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 70 }}>{t('input.greek')}:</span>
+                  {GREEK.map((g) => (
+                    <button key={g} type="button" title={t('input.insertGreek')} onClick={() => insertSymbol(g)} style={greekBtn}>
+                      {g}
+                    </button>
+                  ))}
+                </div>
+                {/* Row 2 — math symbols: roots/powers for symbolic lengths, and the ∠ ° ⊥ ∥ relation glyphs. */}
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 70 }}>{t('input.symbols')}:</span>
+                  {SYMBOLS.map((s) => (
+                    <button key={s.label} type="button" title={t('input.insertSymbol')} onClick={() => insertSymbol(s.insert, s.caret)} style={greekBtn}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             {thinking && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
             {inputNote && <span style={{ fontSize: 12, color: '#b45309' }} dir={textDir(inputNote)}>{inputNote}</span>}
             {renameNote && <span style={{ fontSize: 12, color: '#b45309' }} dir={textDir(renameNote)}>{renameNote}</span>}
@@ -678,10 +691,21 @@ export default function App() {
             <button type="button" style={ghost} onClick={clear}>{t('actions.clear')}</button>
           </div>
 
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, color: '#475569', cursor: 'pointer' }}>
-            <input type="checkbox" checked={showMeasures} onChange={(e) => setShowMeasures(e.target.checked)} />
-            {t('actions.showMeasures')}
-          </label>
+          {/* Display options — what to show on the figure (grouped together; ⊙ centres used to be a
+              cryptic button on the canvas — now it sits next to "show measures"). */}
+          <div>
+            <div style={sectionLabel}>{t('display.title')}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={displayToggle}>
+                <input type="checkbox" checked={showMeasures} onChange={(e) => setShowMeasures(e.target.checked)} />
+                {t('actions.showMeasures')}
+              </label>
+              <label style={displayToggle}>
+                <input type="checkbox" checked={showCenters} onChange={(e) => setShowCenters(e.target.checked)} />
+                {t('canvas.centers')}
+              </label>
+            </div>
+          </div>
 
           {(branchId || freeDofs(construction).length > 0) && (
             <button
@@ -871,6 +895,8 @@ const emptyChip: React.CSSProperties = {
 };
 const sidebar: React.CSSProperties = { order: 1, width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 };
 const sectionLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 };
+const displayToggle: React.CSSProperties = { display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, color: '#475569', cursor: 'pointer' };
+const symbolsToggle: React.CSSProperties = { alignSelf: 'flex-start', border: 'none', background: 'none', color: '#2563eb', fontSize: 12, cursor: 'pointer', padding: 0 };
 const input: React.CSSProperties = {
   flex: 1,
   padding: '10px 12px',
