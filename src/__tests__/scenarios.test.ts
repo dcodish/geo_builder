@@ -732,6 +732,40 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'inscribed-trapezoid-stays-a-trapezoid-when-flexed',
+    title: 'inscribed trapezoid keeps AB ∥ CD when a later given (BE=BC) flexes the figure — the engine doesn\'t "forget it\'s a trapezoid"',
+    guards:
+      'operator session su2xwopc: "טרפז ABCD חסום במעגל" (trapezoid inscribed in a circle), then a tangent-meets-line construction giving E, then "BE=BC". By the third step the figure stopped looking like a trapezoid. Root cause: the inscribed trapezoid encoded AB ∥ CD ONLY as fixed starting vertex angles ([215,325,60,120], isosceles) with NO `set-parallel` constraint and non-free vertices, so a later given that drove an on-circle vertex (BE=BC slides C/B off its angle) destroyed the parallelism — nothing persisted the trapezoid property. Fix: like ADR-117 for inscribed triangles, the inscribed trapezoid now emits a persistent `set-parallel(A,B,C,D)` (shapeCmds) AND its vertices are FREE (the base ratio/height are unstated DOFs, ADR-052), so the figure flexes to satisfy later givens WHILE keeping AB ∥ CD (cyclic + parallel ⇒ isosceles automatically).',
+    steps: ['טרפז ABCD חסום במעגל', 'המשיק למעגל בנקודה C והמשך AB נפגשים בנקודה E', 'BE=BC'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E');
+      // AB ∥ CD still holds — the figure is still a trapezoid after BE=BC flexed it
+      const cross = (B.x - A.x) * (D.y - C.y) - (B.y - A.y) * (D.x - C.x);
+      expect(Math.abs(cross), 'AB ∥ CD survives the flex (still a trapezoid)').toBeLessThan(1e-2);
+      // all four vertices stay on the circle, and the stated BE = BC holds
+      const rA = dist(O, A);
+      for (const [id, p] of [['B', B], ['C', C], ['D', D]] as const) expect(dist(O, p), `${id} on circle O`).toBeCloseTo(rA, 2);
+      expect(dist(B, E), 'BE = BC (the stated given)').toBeCloseTo(dist(B, C), 2);
+    },
+  },
+  {
+    id: 'unlabeled-inscribed-quad-auto-names-vertices',
+    title: '"מרובע חסום במעגל" (inscribed quad, NO vertex labels) builds deterministically with auto-named A,B,C,D',
+    guards:
+      'operator session lag0hgpa: "מרובע חסום במעגל" (a quadrilateral inscribed in a circle, with NO vertex labels) "doesn\'t work" — it fell through the deterministic parser to the LLM, because every polygon rule required an explicit label run (only `circle`/`מעגל`, which has no vertices, worked bare). A bare shape is a common, simple input the offline parser should own. Fix: a shape rule with NO labels and nothing else geometry-significant left over now auto-names its vertices A,B,C,… (skipping existing points), across the standalone, inscribed, and regular-polygon families, He + En. A PARTIAL label run still escalates.',
+    steps: ['מרובע חסום במעגל'],
+    check: (fig) => {
+      allStepsOk(fig);
+      // The four auto-named vertices A,B,C,D were built and all lie on the (auto-centred) circle O.
+      const O = at(fig, 'O');
+      const r = dist(O, at(fig, 'A'));
+      for (const id of ['A', 'B', 'C', 'D']) expect(dist(O, at(fig, id)), `${id} on circle O`).toBeCloseTo(r, 6);
+      // …and they form a (convex) quadrilateral.
+      expect(fig.construction.objects.some((o) => o.kind === 'polygon'), 'a quadrilateral was built').toBe(true);
+    },
+  },
+  {
     id: 'diameter-from-point-cuts-side-onto-segment',
     title: '"the diameter from F cuts side AC at E" — E lands ON segment AC (the figure flexes), and "קוטר" parses',
     guards:

@@ -170,6 +170,40 @@ function freeLabel(used: string[], prefer: string[] = []): Id {
   return (pool.find((c) => !taken.has(c.toUpperCase())) ?? 'M').toUpperCase();
 }
 
+/** The first `n` vertex labels — A, B, C, D, … in order, skipping any already in `used` — for a polygon
+ *  the student drew WITHOUT naming its vertices ("מרובע חסום במעגל" / "square"). The convention is to name
+ *  vertices alphabetically; this just supplies that default so a bare shape is deterministic, not an LLM
+ *  escalation. The labels are shown on the canvas, so later references ("AB", "∠ABC") work as usual. */
+function autoVertexLabels(n: number, used: string[] = []): Id[] {
+  const taken = new Set(used.map((u) => u.toUpperCase()));
+  const out: Id[] = [];
+  for (let c = 0; out.length < n && c < 26; c++) {
+    const ch = String.fromCharCode(65 + c); // 'A' + c
+    if (!taken.has(ch)) out.push(ch);
+  }
+  return out;
+}
+
+/** Did the student write an explicit vertex label? Vertex labels are UPPERCASE Latin (the parser's
+ *  convention), so an uppercase letter means "named" while lowercase prose remnants ("inscribed in a
+ *  circle" → "in a") and Hebrew do not — this is what tells a deliberately-unlabeled shape (auto-name it)
+ *  from a PARTIAL/typo'd label run (escalate). Used only to decide auto-naming, never to read the labels. */
+const namesVertices = (s: string): boolean => /[A-Z]/.test(s);
+
+/**
+ * Vertex labels for an n-vertex shape rule: the run the student wrote, or — when they named NONE and
+ * nothing else geometry-significant remains — auto-named vertices (A,B,C,…). Returns null when SOME but
+ * not a clean run of n labels is present (a typo / compound) OR a leftover survives (a circle/constraint
+ * belongs to another rule), so the caller defers/escalates exactly as before. `bare` is the utterance with
+ * the shape's own keyword(s) already stripped; `hasLeftover` is the rule's SHAPE_LEFTOVER verdict.
+ */
+function shapeLabels(bare: string, n: number, ctx: ParseContext, hasLeftover: boolean): Id[] | null {
+  const ids = labelRun(bare, n);
+  if (ids) return ids;
+  if (hasLeftover || namesVertices(bare)) return null; // defer (leftover) / escalate (partial labels)
+  return autoVertexLabels(n, ctx.points ?? []);
+}
+
 /**
  * Geometry-significant words/operators a *shape* rule does not itself consume —
  * a circle, a special line, a constraint, an inscription, an angle. If any of
@@ -189,26 +223,28 @@ const shapeHasLeftover = (s: string, re: RegExp): boolean => SHAPE_LEFTOVER.test
 /** A quad-shape rule factory: keyword (either order) + 4 labels → command. */
 const quadShape =
   (re: RegExp, make: (ids: [Id, Id, Id, Id]) => Command): Rule =>
-  (s) => {
+  (s, ctx) => {
     if (!re.test(s)) return null;
-    const ids = labelRun(s.replace(re, ' '), 4);
+    const leftover = shapeHasLeftover(s, re);
+    const ids = shapeLabels(s.replace(re, ' '), 4, ctx, leftover); // explicit run, or auto-named A,B,C,D for a bare shape
     if (!ids) return null;
-    if (shapeHasLeftover(s, re)) return 'stop'; // don't drop a modifier — escalate
+    if (leftover) return 'stop'; // labels + a modifier left over → don't drop it, escalate
     return [make([ids[0], ids[1], ids[2], ids[3]])];
   };
 
 /** A triangle rule factory: keyword (either order) + 3 labels → command. */
 const triShape =
   (re: RegExp, make: (ids: [Id, Id, Id]) => Command): Rule =>
-  (s) => {
+  (s, ctx) => {
     // "the circle CIRCUMSCRIBING triangle ABC …" names a circumcircle, not a free triangle — defer so the
     // "משולש ABC" inside it doesn't make this rule `stop` (the circumcircle rules sit after the polygons).
     // BEFORE `re.test` so the early return doesn't leave the `g`-flagged `re`'s lastIndex advanced.
     if (/circle|מעגל/i.test(s) && /circumscrib|חוסם|\bthrough\b|דרך/i.test(s)) return null;
     if (!re.test(s)) return null;
-    const ids = labelRun(s.replace(re, ' '), 3);
+    const leftover = shapeHasLeftover(s, re);
+    const ids = shapeLabels(s.replace(re, ' '), 3, ctx, leftover); // explicit run, or auto-named A,B,C for a bare shape
     if (!ids) return null;
-    if (shapeHasLeftover(s, re)) return 'stop';
+    if (leftover) return 'stop';
     return [make([ids[0], ids[1], ids[2]])];
   };
 
@@ -245,12 +281,17 @@ const triangle = triShape(/triangle|משולש|[△▲]/gi, (ids) => ({ type: 't
  */
 const shapeMacro =
   (trigger: RegExp, strip: RegExp, n: number, make: (ids: Id[]) => AnyCommand[], defer?: (s: string) => boolean): Rule =>
-  (s) => {
+  (s, ctx) => {
     if (defer?.(s)) return null; // a downstream rule owns this phrasing (e.g. a triangle through/around a circle)
     if (!trigger.test(s)) return null;
     const bare = s.replace(strip, ' ');
     const ids = labelRun(bare, n);
-    if (!ids) return null;
+    if (!ids) {
+      // No label run. Auto-name a bare named shape ("דלתון" → A,B,C,D) when the student named NO labels and
+      // nothing geometry-significant remains; a partial run / leftover defers or escalates exactly as before.
+      if (namesVertices(bare) || SHAPE_LEFTOVER.test(bare)) return null;
+      return make(autoVertexLabels(n, ctx.points ?? []));
+    }
     // After keyword + labels are consumed, nothing geometry-significant should remain — a constraint/extra
     // construct ("kite ABCD with AB = 6") means a compound → escalate, don't half-parse (mirrors inscribedPolygon).
     const leftover = ids.reduce(
@@ -1397,7 +1438,12 @@ const inscribedPolygon: Rule = (s, ctx) => {
   );
   if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
   if (r.symbolic) rest = rest.replace(/\b[Rr]\b/g, ' '); // the radius symbol is not a vertex (ADR-034)
-  const ids = labelRun(rest, n);
+  // The vertices the student named, or — when the shape word is explicit but UNLABELED ("מרובע חסום
+  // במעגל" / "triangle inscribed in a circle") — auto-named A,B,C(,D), avoiding existing points and the
+  // named centre. A PARTIAL label run (some letters but not n) stays a defer/escalate (a typo / compound).
+  const ids =
+    labelRun(rest, n) ??
+    (namesVertices(rest) ? null : autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])]));
   if (!ids) return null;
   // After the circle, the shape, and the vertices are consumed, nothing
   // geometry-significant should remain — a constraint/extra construct means a
@@ -1418,7 +1464,13 @@ const inscribedPolygon: Rule = (s, ctx) => {
         ]
       : triShape === 'isosceles'
         ? [{ type: 'set-equal', a: v[0], b: v[1], c: v[0], d: v[2], soft: true }] // default |AB| = |AC|
-        : [];
+        : kind === 'trapezoid'
+          ? // A trapezoid is DEFINED by AB ∥ CD. Encode it as a persistent constraint (not just the fixed
+            // starting angles), so the property survives when a LATER given flexes the free on-circle vertices
+            // (without it, a constraint like "BE=BC" slides a vertex off its angle and the trapezoid is lost —
+            // the engine "forgets it's a trapezoid"). Cyclic + AB∥CD ⇒ isosceles automatically.
+            [{ type: 'set-parallel', a: v[0], b: v[1], c: v[2], d: v[3] }]
+          : [];
   // No centre named ⇒ create one: a fresh label that doesn't clash with the vertices OR with any
   // point already in the figure (a second inscribed circle must not reuse the first's centre 'O').
   const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
@@ -1451,6 +1503,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
       { type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2], ...(hidden ? { hidden: true } : {}) },
       { type: 'set-concyclic', points: ids },
       { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
+      ...shapeCmds(ids), // a trapezoid keeps AB ∥ CD even when inscribed from existing points
     ];
   }
   // A cyclic (hidden-circle) quad needs CONVEX vertex order for the opposite-angles theorem;
@@ -1465,8 +1518,11 @@ const inscribedPolygon: Rule = (s, ctx) => {
   const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, ...(freeRadius ? { freeRadius: true } : {}), ...(hidden ? { hidden: true } : {}), ...(named ? {} : { autoCenter: true }) }];
   // A GENERAL quad's vertex angles are UNSTATED (ADR-052) — the convex spread is only a STARTING
   // position, so the vertices stay FREE (samplable + drivable to a convex constraint-satisfying figure).
-  // A SHAPED cyclic polygon (square/rect/rhombus/trapezoid) has angles INTRINSIC to the shape → fixed.
-  const freeAngles = kind === 'quad';
+  // A RIGID cyclic shape (square/rect/rhombus) has angles INTRINSIC to the shape → fixed. A TRAPEZOID is
+  // NOT rigid (its base ratio / height are unstated DOFs, ADR-052) and its only fixed property — AB ∥ CD —
+  // is now carried by a `set-parallel` constraint (shapeCmds), so its vertices are FREE too: they keep the
+  // isosceles starting angles but can flex to satisfy later givens while the parallel constraint persists.
+  const freeAngles = kind === 'quad' || kind === 'trapezoid';
   ids.forEach((id, i) => {
     // specific angle for a shaped cyclic polygon (square/rect/rhombus/trapezoid) or the general quad's
     // convex-default start; omit for triangle so it spreads evenly via nextTheta.
@@ -1520,8 +1576,15 @@ const regularPolygon: Rule = (s, ctx) => {
   // Generic "regular polygon ABCDE": no name/number, so read n from the label run (largest wins).
   if (n === null) for (let k = 12; k >= 3; k--) if (labelRun(rest, k)) { n = k; break; }
   if (n === null || n < 3) return null;
-  const ids = labelRun(rest, n);
-  if (!ids) return null; // need n explicit labels — else escalate
+  // The named vertices, or — when the n-gon is named/numbered but UNLABELED ("regular pentagon",
+  // "מחומש משוכלל") — auto-named A,B,C,… (n is known from the name, so we can). A partial run / a leftover
+  // still escalates. (A generic "regular polygon" with no labels already returned null above: n is unknown.)
+  const ids =
+    labelRun(rest, n) ??
+    (!namesVertices(rest) && !SHAPE_LEFTOVER.test(rest)
+      ? autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])])
+      : null);
+  if (!ids) return null;
   const leftover = ids.reduce(
     (a, id) => a.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
     rest.replace(new RegExp(String.raw`\b${ids.join('')}\b`, 'i'), ' '),
