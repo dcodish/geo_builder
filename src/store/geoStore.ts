@@ -66,6 +66,7 @@ function angleMarkFor(cmd: AnyCommand): AngleMark | null {
     case 'right-triangle':
       return { vertex: cmd.ids[2], ray1: cmd.ids[0], ray2: cmd.ids[1], right: true }; // right angle at the last id
     case 'set-perpendicular': {
+      if (cmd.implicit) return null; // a tangency's radius⟂line is structural, not a stated right angle — no mark
       const shared = [cmd.a, cmd.b].find((x) => x === cmd.c || x === cmd.d); // AB ⟂ CD with a shared vertex
       if (!shared) return null; // disjoint segments — the ⟂ is at an unnamed crossing; no mark
       return { vertex: shared, ray1: cmd.a === shared ? cmd.b : cmd.a, ray2: cmd.c === shared ? cmd.d : cmd.c, right: true };

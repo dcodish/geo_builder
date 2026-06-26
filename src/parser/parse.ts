@@ -1722,7 +1722,7 @@ const cornerTangentCircle: Rule = (s, ctx) => {
     for (const tip of [arm1, arm2]) {
       cmds.push({ type: 'segment', a: vertex, b: tip }); // draw the tangent side (idempotent if already an edge)
       if (!members.has(tip)) cmds.push({ type: 'point-on-circle', id: tip, circle: circleId(O) }); // tip is the touch point
-      cmds.push({ type: 'set-perpendicular', a: O, b: tip, c: vertex, d: tip }); // radius O–tip ⟂ the side ⇒ tangent at tip
+      cmds.push({ type: 'set-perpendicular', a: O, b: tip, c: vertex, d: tip, implicit: true }); // radius O–tip ⟂ the side ⇒ tangent at tip (structural, no right-angle mark)
     }
     return cmds;
   }
@@ -2365,7 +2365,7 @@ const tangentsFromExternal: Rule = (s, ctx) => {
     for (const P of [A, B]) {
       out.push(
         { type: 'point-on-circle', id: P, circle: circ }, // idempotent if P already on the circle (ADR-093); creates it (free θ) if new
-        { type: 'set-perpendicular', a: up(center), b: P, c: E, d: P }, // EP ⟂ OP — tangent at P
+        { type: 'set-perpendicular', a: up(center), b: P, c: E, d: P, implicit: true }, // EP ⟂ OP — tangent at P (structural, no right-angle mark)
         { type: 'segment', a: E, b: P },
       );
     }
@@ -2482,7 +2482,7 @@ const tangentLine: Rule = (s, ctx) => {
   // Scope: assumes T is already on the circle (true for the marked-touch-point case); a tangency
   // point not yet on the circle is a follow-up.
   if (naming && have.has(naming[0]) && have.has(naming[1]) && have.has(T)) {
-    return [{ type: 'set-perpendicular', a: up(center), b: T, c: naming[0], d: naming[1] }];
+    return [{ type: 'set-perpendicular', a: up(center), b: T, c: naming[0], d: naming[1], implicit: true }];
   }
 
   // An EXISTING segment tangent at its OWN ENDPOINT — "KB משיק … בנקודה K", where the named line's two
@@ -2493,7 +2493,7 @@ const tangentLine: Rule = (s, ctx) => {
   if (pts && have.has(pts[0]) && have.has(pts[1]) && (pts[0] === T || pts[1] === T)) {
     return [
       { type: 'point-on-circle', id: T, circle: circleId(center) }, // the touch point lies on the circle
-      { type: 'set-perpendicular', a: up(center), b: T, c: pts[0], d: pts[1] }, // radius O–T ⟂ the tangent segment
+      { type: 'set-perpendicular', a: up(center), b: T, c: pts[0], d: pts[1], implicit: true }, // radius O–T ⟂ the tangent segment (structural, no right-angle mark)
     ];
   }
 

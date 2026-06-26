@@ -528,3 +528,8 @@ over all four (ADR-041).
 **Steps:** `משולש ABF` · `משולש BFE` · `שטח המשולש ABF גדול פי 2 משטח המשולש BFE`
 **Guards against:** the natural-language area-ratio phrasing ("גדול פי 2 מ" = 2× larger) not parsing / not reshaping. A dimensionless area ratio drives a shape DOF until it holds.
 **Asserts:** all steps OK; area(ABF) = 2·area(BFE).
+
+### `collinear-flexes-redundant-carrier-kite-tangents` — a redundant constraint lends its hoarded DOF so a collinearity solves (ADR-130)
+**Steps:** `דלתון ABCD` · `משולש BCD חסום במעגל` · `AD ו AB משיקים למעגל` · `E על קשת BC` · `קשת BE שווה פעמיים קשת EC` (→LLM: `set-angle-ratio ∠BOE = 2∠EOC`) · `AC` · `E נמצאת על המשך DO`
+**Guards against:** the greedy one-carrier-per-constraint solver falsely reporting `over-constrained` (and misclassifying it as a "pending — add givens" red message) on a fully-determined, solvable figure. The two tangencies claimed A,B, the kite's AB=AD/CB=CD claimed C,D, the arc-ratio claimed E — every DOF busy when the collinear `D,O,E` arrived, and the recruiter's steal only fired for an over-subscribed (≥2-carrier) constraint. The figure is solvable because the kite's AB=AD is REDUNDANT (implied by the two equal tangents from A). Fix (ADR-130): case (E) in `recruitFreeDofs` lends a reachable claimed carrier to the new constraint and accepts the first lend under which the WHOLE system evaluates valid (self-verifying).
+**Asserts:** all steps OK; D,O,E collinear (E is the antipode of D); B,C,D,E all on circle O (equal radii); arc BE = 2·arc EC (∠BOE = 2∠EOC) still holds.

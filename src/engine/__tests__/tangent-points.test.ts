@@ -48,7 +48,7 @@ describe('parse — an EXISTING line declared tangent is a constraint, not a dra
     const r = parse('AB משיק למעגל בנקודה F', { circles: ['O'], points: ['A', 'B', 'F', 'O'] });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.commands).toEqual([{ type: 'set-perpendicular', a: 'O', b: 'F', c: 'A', d: 'B' }]);
+    expect(r.commands).toEqual([{ type: 'set-perpendicular', a: 'O', b: 'F', c: 'A', d: 'B', implicit: true }]);
     // crucially, NO point-on-line that would redefine the existing A/B (the dependency cycle)
     expect(r.commands.some((c) => c.type === 'point-on-line')).toBe(false);
   });
@@ -57,7 +57,7 @@ describe('parse — an EXISTING line declared tangent is a constraint, not a dra
     const r = parse('AB is tangent to circle O at F', { circles: ['O'], points: ['A', 'B', 'F', 'O'] });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.commands).toEqual([{ type: 'set-perpendicular', a: 'O', b: 'F', c: 'A', d: 'B' }]);
+    expect(r.commands).toEqual([{ type: 'set-perpendicular', a: 'O', b: 'F', c: 'A', d: 'B', implicit: true }]);
   });
 
   it('but a tangent named by NEW points still draws the tangent + markers (unchanged)', () => {
@@ -86,7 +86,7 @@ describe('parse — a segment tangent at its OWN endpoint (KB tangent at K)', ()
       if (!r.ok) continue;
       expect(r.commands, u).toEqual([
         { type: 'point-on-circle', id: 'K', circle: 'circle-O' },
-        { type: 'set-perpendicular', a: 'O', b: 'K', c: 'K', d: 'B' },
+        { type: 'set-perpendicular', a: 'O', b: 'K', c: 'K', d: 'B', implicit: true },
       ]);
       // none of the tangent-from-external scaffolding (the invented touch point / Thales circle)
       expect(r.commands.some((c) => c.type === 'circle-circle-intersection' || c.type === 'circle-through'), u).toBe(false);

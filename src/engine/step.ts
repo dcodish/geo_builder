@@ -536,6 +536,27 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
     if (steal) {
       changed = true;
       objects = objects.map((o) => (o.id === steal.id ? markDriven(o, K) : o)); // K already in c.constraints (pushed as a check)
+      continue;
+    }
+    // (E) REDUNDANT-CARRIER LEND: no free DOF and no over-subscribed carrier — yet the figure may still be
+    // solvable when an earlier constraint K1 is REDUNDANT (already implied by the rest, e.g. a kite's `AB=AD`
+    // implied by two tangencies AB,AD to the circle). The greedy assignment gave K1 a private carrier it
+    // doesn't actually need, exhausting the DOF the new constraint K wants. Try LENDING each reachable claimed
+    // carrier to K (K1 stays a check) and accept the FIRST lend under which the WHOLE system — every
+    // constraint, K and K1 included — evaluates valid. Self-verifying: a lend that breaks K1 fails `evaluate`
+    // and is rejected, so this never yields a wrong figure; it only recovers a real configuration the greedy
+    // carrier model couldn't reach. Runs last, only on the failure path.
+    const lendable = objects
+      .map((o, i) => ({ o, i }))
+      .filter(({ o }) => {
+        const sv = (o as { solve?: { constraint: Constraint } }).solve;
+        return reach.has(o.id) && sv && sv.constraint !== K;
+      })
+      .sort((a, b) => b.i - a.i); // try the most-recently-added carrier first (keeps base geometry stable)
+    for (const { o } of lendable) {
+      const trial = objects.map((x) => (x.id === o.id ? markDriven(x, K) : x));
+      const r = evaluate({ objects: trial, constraints: [...c.constraints, ...added] });
+      if (r.ok) { objects = trial; changed = true; break; }
     }
   }
   return changed ? { objects, constraints: [...c.constraints, ...added] } : null;

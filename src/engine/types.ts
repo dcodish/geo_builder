@@ -748,7 +748,10 @@ export type Command =
   | { type: 'set-length-order'; a: Id; b: Id; c: Id; d: Id } // |ab| < |cd| (ab is the shorter)
   | { type: 'set-angle-acuteness'; vertex: Id; ray1: Id; ray2: Id; obtuse: boolean } // ∠ obtuse (>90°) / acute (<90°) — "זווית קהה/חדה"
   | { type: 'set-parallel'; a: Id; b: Id; c: Id; d: Id }
-  | { type: 'set-perpendicular'; a: Id; b: Id; c: Id; d: Id }
+  // `implicit` ⇒ the perpendicularity is structurally implied (a radius ⟂ a tangent line), NOT a
+  // right angle the student stated; it constrains the figure but draws no right-angle mark (a
+  // computed 90° is never marked — only a stated one).
+  | { type: 'set-perpendicular'; a: Id; b: Id; c: Id; d: Id; implicit?: boolean }
   | { type: 'set-concyclic'; points: Id[] } // the points are concyclic (drives a DOF so they share a circle)
   | { type: 'set-collinear'; a: Id; b: Id; c: Id } // a, b, c collinear (drives a free DOF so the third lands on the line)
   | { type: 'set-line'; points: Id[] } // "line ABE…": the points are collinear AND in the listed order (B between A and E)

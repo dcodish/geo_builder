@@ -697,6 +697,38 @@ const SCENARIOS: Scenario[] = [
       // KB ∥ CD still holds
       const cross = (B.x - K.x) * (D.y - C.y) - (B.y - K.y) * (D.x - C.x);
       expect(Math.abs(cross), 'KB ∥ CD').toBeLessThan(1e-3);
+      // The tangency's radius⟂line is structural, NOT a stated right angle — so NO right-angle mark
+      // is drawn at the touch point K (a computed 90° is never marked; the student said "tangent").
+      expect(fig.angleMarks.filter((m) => m.right), 'a tangent draws no right-angle (90°) mark').toEqual([]);
+    },
+  },
+  {
+    id: 'collinear-flexes-redundant-carrier-kite-tangents',
+    title: '"E on the extension of DO" (E antipode of D) solves on a kite+tangents+arc figure — a redundant constraint lends its hoarded DOF',
+    guards:
+      'operator session rw2ypbgq: kite ABCD, circumcircle O of BCD, AD & AB tangent to O, E on arc BC with arc BE = 2·arc EC, then "E על המשך DO" (E on the extension of DO → D,O,E collinear). Reported WRONG: the input went red with the misleading "recorded but doesn\'t affect yet — add givens" (pending) message, though the figure is fully determined and solvable (D,E both on O ⇒ collinear D-O-E means E is the antipode of D; a valid kite exists). Root cause (ADR-130): the solver assigns each constraint one private free-DOF carrier; the two tangencies claimed A,B, the kite\'s AB=AD/CB=CD claimed C,D, the arc-ratio claimed E — every DOF busy. The collinear arrived with no free DOF, and the recruiter\'s steal only fired for an OVER-subscribed (≥2-carrier) constraint; here every constraint had exactly one. Yet the system IS solvable because the kite\'s AB=AD is REDUNDANT (implied by the two equal tangents from A). Fix: case (E) in recruitFreeDofs LENDS a reachable claimed carrier to the new constraint and accepts the first lend under which the WHOLE system evaluates valid (self-verifying — a lend that breaks its old constraint fails and is rejected).',
+    steps: [
+      'דלתון ABCD',
+      'משולש BCD חסום במעגל',
+      'AD ו AB משיקים למעגל',
+      'E על קשת BC',
+      // "קשת BE שווה פעמיים קשת EC" (arc BE = 2 arc EC) escalated to the LLM; the canonical command it
+      // produced (per the figure log) is the central-angle ratio ∠BOE = 2∠EOC.
+      { llm: [{ type: 'set-angle-ratio', v1: 'O', a1: 'B', b1: 'E', v2: 'O', a2: 'E', b2: 'C', k: 2 }] },
+      'AC',
+      'E נמצאת על המשך DO',
+    ],
+    check: (fig) => {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), D = at(fig, 'D'), E = at(fig, 'E'), B = at(fig, 'B'), C = at(fig, 'C');
+      // D, O, E collinear — E is the antipode of D through the centre
+      const cross = (E.x - D.x) * (O.y - D.y) - (E.y - D.y) * (O.x - D.x);
+      expect(Math.abs(cross), 'D, O, E collinear (E on the extension of DO)').toBeLessThan(1e-2);
+      // B, C, D, E all lie on circle O (equal radii) — the figure flexed without breaking membership
+      const rD = dist(O, D);
+      for (const [id, p] of [['E', E], ['B', B], ['C', C]] as const) expect(dist(O, p), `${id} on circle O`).toBeCloseTo(rD, 2);
+      // arc BE = 2·arc EC still holds (central angles ∠BOE = 2∠EOC)
+      expect(angle(B, O, E), 'arc BE = 2·arc EC (∠BOE = 2∠EOC)').toBeCloseTo(2 * angle(E, O, C), 1);
     },
   },
   {
