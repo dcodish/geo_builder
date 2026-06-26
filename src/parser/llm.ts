@@ -83,7 +83,9 @@ function accrueMembers(cmd: AnyCommand, members: Map<string, Set<string>>): void
 export async function llmParse(utterance: string, context: string, figureCtx: ParseContext = {}): Promise<LlmOutcome | null> {
   let steps: string[];
   try {
-    const res = await fetch('/api/parse', {
+    // Base-relative so it works under the deployed subpath: dev -> /api/parse,
+    // prod (base '/geo-builder/') -> /geo-builder/api/parse. BASE_URL has a trailing slash.
+    const res = await fetch(`${import.meta.env.BASE_URL}api/parse`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ utterance, context }),
