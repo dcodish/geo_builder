@@ -18,6 +18,7 @@ import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
 import type { Crossing } from '@/render';
+import { Modal } from '@/ui/Modal';
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import { logDebug } from '@/debug/sessionLog';
@@ -63,7 +64,9 @@ export default function App() {
   const [llmDropped, setLlmDropped] = useState<string[]>([]); // LLM steps the engine couldn't build
   const [renameNote, setRenameNote] = useState(''); // why a relabel was a no-op (target taken / no such point)
   const [altNote, setAltNote] = useState(''); // transient: "show another configuration" found no different drawing
-  const [showHelp, setShowHelp] = useState(false); // collapsed by default; "מה אפשר להקליד?" opens the command reference
+  const [helpOpen, setHelpOpen] = useState(false); // the help modal ("עזרה") — guide + command reference
+  const [helpTab, setHelpTab] = useState<'guide' | 'commands'>('guide');
+  const [aboutOpen, setAboutOpen] = useState(false); // the "מה זה?" intro modal (first load + reopenable)
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editError, setEditError] = useState(false);
@@ -83,6 +86,24 @@ export default function App() {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Show the "what is this?" intro once, on a visitor's first load (persisted in
+  // localStorage). It stays reopenable from the header button afterwards.
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem('geo_intro_seen')) setAboutOpen(true);
+    } catch {
+      /* private mode / no storage — just don't auto-open */
+    }
+  }, []);
+  function dismissAbout() {
+    setAboutOpen(false);
+    try {
+      localStorage.setItem('geo_intro_seen', '1');
+    } catch {
+      /* ignore */
+    }
+  }
 
   // Debug log (dev only): snapshot the fact list + per-fact status whenever the
   // figure changes (any submit / edit / delete / undo / clear / resample), so a
@@ -381,6 +402,32 @@ export default function App() {
   const branchId = firstCyclableBranch(construction);
   const examples = t('examples.items', { returnObjects: true }) as string[];
 
+  // The command reference (the coverage map): every construct grouped by category,
+  // wired ones clickable to try. Lives in the help modal's "פקודות" tab. Clicking an
+  // example also closes the modal so the figure is visible.
+  const commandCatalog = () => (
+    <div>
+      {CATEGORY_ORDER.map((cat) => {
+        const items = COMMAND_CATALOG.filter((c) => c.category === cat && c.supported);
+        if (items.length === 0) return null;
+        return (
+          <div key={cat} style={{ marginTop: 10 }}>
+            <div style={catHeading}>{he ? CATEGORY_LABELS[cat].he : CATEGORY_LABELS[cat].en}</div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {items.map((c) => (
+                <li key={c.en} style={cmdRow}>
+                  <button type="button" style={helpExample} onClick={() => { submit(he ? c.he : c.en); setHelpOpen(false); }} dir={textDir(he ? c.he : c.en)} title={he ? c.descHe : c.descEn}>
+                    {he ? c.he : c.en}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div style={page}>
       <header style={headerRow}>
@@ -388,9 +435,14 @@ export default function App() {
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{t('app.title')}</h1>
           <p style={{ color: '#64748b', margin: '4px 0 0', fontSize: 13 }}>{t('app.subtitle')}</p>
         </div>
-        <button type="button" style={ghost} onClick={() => i18n.changeLanguage(i18n.language === 'he' ? 'en' : 'he')}>
-          {t('actions.language')}
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button type="button" style={ghost} onClick={() => { setHelpTab('guide'); setHelpOpen(true); }}>
+            {t('header.help')}
+          </button>
+          <button type="button" style={ghost} onClick={() => setAboutOpen(true)}>
+            {t('header.about')}
+          </button>
+        </div>
       </header>
 
       <div style={main}>
@@ -432,6 +484,22 @@ export default function App() {
             onToggleCircleHidden={toggleCircleHidden}
             circleMenuText={{ hide: t('segMenu.hide'), show: t('segMenu.show') }}
           />
+          {/* Empty canvas → a call to action so a new user knows what to do. The
+              container ignores pointer events (so panning isn't blocked); the
+              example buttons re-enable them. */}
+          {facts.length === 0 && (
+            <div style={emptyOverlay}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#334155' }}>{t('canvas.emptyTitle')}</div>
+              <div style={{ fontSize: 14, color: '#64748b' }}>{t('canvas.emptyHint')}</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', pointerEvents: 'auto' }}>
+                {examples.slice(0, 3).map((ex) => (
+                  <button key={ex} type="button" style={emptyChip} onClick={() => submit(ex)} dir={textDir(ex)}>
+                    {ex}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <aside style={sidebar}>
@@ -487,55 +555,7 @@ export default function App() {
                 {t('input.partial')}: {llmDropped.join('; ')}
               </span>
             )}
-            <button
-              type="button"
-              onClick={() => setShowHelp((v) => !v)}
-              style={{ alignSelf: 'flex-start', border: 'none', background: 'none', color: '#2563eb', fontSize: 12, cursor: 'pointer', padding: 0 }}
-            >
-              {showHelp ? t('help.hide') : t('help.show')}
-            </button>
           </form>
-
-          {showHelp && (
-            <div style={helpPanel}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <span style={sectionLabel}>{t('help.title')}</span>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                  {t('help.wired')} · {t('help.soon')}
-                </span>
-              </div>
-              {CATEGORY_ORDER.map((cat) => {
-                const items = COMMAND_CATALOG.filter((c) => c.category === cat);
-                if (items.length === 0) return null;
-                // wired first, then planned
-                const ordered = [...items].sort((a, b) => Number(b.supported) - Number(a.supported));
-                return (
-                  <div key={cat} style={{ marginTop: 10 }}>
-                    <div style={catHeading}>{he ? CATEGORY_LABELS[cat].he : CATEGORY_LABELS[cat].en}</div>
-                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {ordered.map((c) => (
-                        <li key={c.en} style={cmdRow}>
-                          <span style={{ width: 12, color: c.supported ? '#16a34a' : '#cbd5e1', fontSize: 12 }}>
-                            {c.supported ? '✓' : '○'}
-                          </span>
-                          {c.supported ? (
-                            <button type="button" style={helpExample} onClick={() => submit(he ? c.he : c.en)} dir={textDir(he ? c.he : c.en)} title={he ? c.descHe : c.descEn}>
-                              {he ? c.he : c.en}
-                            </button>
-                          ) : (
-                            <span style={cmdSoon} dir={textDir(he ? c.he : c.en)} title={he ? c.descHe : c.descEn}>
-                              {he ? c.he : c.en}
-                            </span>
-                          )}
-                          {!c.supported && c.phase && <span style={phaseTag}>{c.phase}</span>}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })}
-            </div>
-          )}
 
           <div>
             <div style={sectionLabel}>{t('examples.heading')}</div>
@@ -727,8 +747,72 @@ export default function App() {
           )}
         </aside>
       </div>
+
+      {/* "מה זה?" — first-load intro (dismiss persisted), reopenable from the header. */}
+      <Modal
+        open={aboutOpen}
+        onClose={dismissAbout}
+        title={t('about.title')}
+        footer={
+          <button type="button" style={sendBtn} onClick={dismissAbout}>
+            {t('about.close')}
+          </button>
+        }
+      >
+        <p style={{ marginTop: 0 }}>{t('about.lead')}</p>
+        <ul style={{ margin: '8px 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {(t('about.points', { returnObjects: true }) as string[]).map((p) => (
+            <li key={p}>{p}</li>
+          ))}
+        </ul>
+        <div style={{ fontWeight: 600, marginTop: 12 }}>{t('about.tryTitle')}</div>
+        <ol style={{ margin: '6px 0 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {(t('about.trySteps', { returnObjects: true }) as string[]).map((s) => (
+            <li key={s} dir={textDir(s)} style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>
+              {s}
+            </li>
+          ))}
+        </ol>
+      </Modal>
+
+      {/* "עזרה" — a short guide + the full command reference, in two tabs. */}
+      <Modal open={helpOpen} onClose={() => setHelpOpen(false)} title={t('header.help')} width={640}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          <button type="button" style={tabBtn(helpTab === 'guide')} onClick={() => setHelpTab('guide')}>
+            {t('help.guideTab')}
+          </button>
+          <button type="button" style={tabBtn(helpTab === 'commands')} onClick={() => setHelpTab('commands')}>
+            {t('help.commandsTab')}
+          </button>
+        </div>
+        {helpTab === 'guide' ? (
+          <div>
+            <p style={{ marginTop: 0, fontWeight: 600 }}>{t('help.guideLead')}</p>
+            <ul style={{ margin: 0, paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {(t('help.guidePoints', { returnObjects: true }) as string[]).map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          commandCatalog()
+        )}
+      </Modal>
     </div>
   );
+}
+
+function tabBtn(active: boolean): React.CSSProperties {
+  return {
+    padding: '6px 14px',
+    fontSize: 13,
+    fontWeight: 600,
+    borderRadius: 8,
+    border: `1px solid ${active ? '#2563eb' : '#cbd5e1'}`,
+    background: active ? '#eff6ff' : '#fff',
+    color: active ? '#1e40af' : '#475569',
+    cursor: 'pointer',
+  };
 }
 
 const page: React.CSSProperties = {
@@ -744,7 +828,31 @@ const headerRow: React.CSSProperties = { display: 'flex', justifyContent: 'space
 const main: React.CSSProperties = { display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' };
 // The canvas fills the space beside the sidebar and the viewport height (use the big screen);
 // it wraps below the sidebar on narrow widths. Its size is measured and passed to <Figure>.
-const canvasWrap: React.CSSProperties = { flex: '1 1 480px', minWidth: 360, height: 'calc(100vh - 132px)', minHeight: 460 };
+const canvasWrap: React.CSSProperties = { position: 'relative', flex: '1 1 480px', minWidth: 360, height: 'calc(100vh - 132px)', minHeight: 460 };
+// Centered call-to-action shown over the blank canvas; pointer-events off so it never
+// blocks the figure (the example buttons re-enable them).
+const emptyOverlay: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 12,
+  textAlign: 'center',
+  pointerEvents: 'none',
+  padding: 24,
+};
+const emptyChip: React.CSSProperties = {
+  padding: '8px 14px',
+  fontSize: 14,
+  borderRadius: 999,
+  border: '1px solid #bfdbfe',
+  background: '#eff6ff',
+  color: '#1e40af',
+  cursor: 'pointer',
+  fontFamily: 'ui-monospace, monospace',
+};
 const sidebar: React.CSSProperties = { width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 };
 const sectionLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 };
 const input: React.CSSProperties = {
@@ -785,14 +893,6 @@ const greekBtn: React.CSSProperties = {
   color: '#1d4ed8',
   cursor: 'pointer',
 };
-const helpPanel: React.CSSProperties = {
-  border: '1px solid #e2e8f0',
-  borderRadius: 8,
-  background: '#fafafa',
-  padding: 12,
-  maxHeight: 320,
-  overflowY: 'auto',
-};
 const helpExample: React.CSSProperties = {
   textAlign: 'start',
   border: 'none',
@@ -812,20 +912,6 @@ const catHeading: React.CSSProperties = {
   marginBottom: 4,
 };
 const cmdRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
-const cmdSoon: React.CSSProperties = {
-  flex: 1,
-  fontFamily: 'ui-monospace, monospace',
-  fontSize: 13,
-  color: '#94a3b8',
-};
-const phaseTag: React.CSSProperties = {
-  fontSize: 10,
-  fontWeight: 600,
-  color: '#94a3b8',
-  border: '1px solid #e2e8f0',
-  borderRadius: 4,
-  padding: '0 4px',
-};
 const stepList: React.CSSProperties = { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 };
 const errorBanner: React.CSSProperties = {
   padding: '8px 12px',

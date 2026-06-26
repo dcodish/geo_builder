@@ -3,6 +3,22 @@
     "title": "Geo Builder",
     "subtitle": "Build geometry step by step"
   },
+  "header": {
+    "about": "What is Geo Builder?",
+    "help": "Help"
+  },
+  "about": {
+    "title": "What is Geo Builder?",
+    "lead": "An intuitive tool for building geometry diagrams — describe a construction in plain language and watch the figure build, step by step.",
+    "points": [
+      "For high-school students preparing for the geometry matriculation (bagrut), and for teachers who need to sketch a figure quickly and simply.",
+      "Add one fact at a time — the figure adapts as the givens accumulate.",
+      "It draws the figure from what you describe — it does not solve problems."
+    ],
+    "tryTitle": "Enter the given data exactly as it appears in the question:",
+    "trySteps": ["square ABCD", "point G on AD", "angle GBA = 37°"],
+    "close": "Got it — let's start"
+  },
   "input": {
     "placeholder": "Type a fact, e.g. \"square ABCD\" or \"point G on AD\"",
     "send": "Add",
@@ -41,7 +57,18 @@
     "title": "Commands",
     "comingSoon": "Coming soon",
     "wired": "✓ available",
-    "soon": "○ coming"
+    "soon": "○ coming",
+    "guideTab": "Guide",
+    "commandsTab": "Commands",
+    "guideLead": "How to use the tool:",
+    "guidePoints": [
+      "Type one fact at a time (e.g. \"square ABCD\", then \"point G on AD\"). The figure updates immediately.",
+      "Click a point, segment or circle on the figure to rename, hide, or swap endpoints.",
+      "\"Show another configuration\" — shows a different valid drawing of the same construction, when several exist.",
+      "\"Undo\" / \"Clear all\" — step back or start over.",
+      "Download or copy the figure as an image from the buttons above the figure.",
+      "Couldn't understand it? Reword it, or use the \"Commands\" tab."
+    ]
   },
   "steps": {
     "title": "Steps",
@@ -67,7 +94,9 @@
   "canvas": {
     "reset": "Reset view",
     "zoomIn": "Zoom in",
-    "zoomOut": "Zoom out"
+    "zoomOut": "Zoom out",
+    "emptyTitle": "Start here",
+    "emptyHint": "Describe a shape to begin, e.g.:"
   },
   "actions": {
     "undo": "Undo",
