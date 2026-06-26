@@ -7,8 +7,9 @@
 #   systemctl status geo-proxy        # should be active (running)
 #
 # The API key is NOT in this file — it lives in the root-only EnvironmentFile
-# (geo-proxy.env, mode 600). Update the proxy with:
-#   scp dist-server/proxy.mjs root@themathbible.com:/var/www/vhosts/themathbible.com/geo-proxy/
+# (geo-proxy.env, mode 600; systemd reads it as root, then drops to www-data).
+# Update the proxy with:
+#   scp dist-server/proxy.mjs root@themathbible.com:/var/www/geo-proxy/
 #   systemctl restart geo-proxy
 
 [Unit]
@@ -17,9 +18,13 @@ After=network.target
 
 [Service]
 Type=simple
-# Use the absolute path to node on the box (check with: which node).
-ExecStart=/usr/bin/node /var/www/vhosts/themathbible.com/geo-proxy/proxy.mjs
-EnvironmentFile=/var/www/vhosts/themathbible.com/geo-proxy/geo-proxy.env
+# Mirrors the box's existing Flask apps (run as www-data). systemd reads the
+# EnvironmentFile as root before dropping privileges, so the key file stays
+# root-only and www-data never reads it directly.
+User=www-data
+Group=www-data
+ExecStart=/usr/bin/node /var/www/geo-proxy/proxy.mjs
+EnvironmentFile=/var/www/geo-proxy/geo-proxy.env
 Environment=PORT=8788
 Environment=HOST=127.0.0.1
 Restart=on-failure
