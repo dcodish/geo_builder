@@ -20,7 +20,7 @@
     "close": "Got it — let's start"
   },
   "input": {
-    "placeholder": "Type a fact, e.g. \"square ABCD\" or \"point G on AD\"",
+    "placeholder": "Describe a step — e.g. \"square ABCD\" or \"point G on AD\"",
     "send": "Add",
     "loading": "Thinking...",
     "notUnderstood": "I couldn't read that yet — try one of the examples below.",
@@ -72,7 +72,10 @@
   },
   "steps": {
     "title": "Steps",
-    "empty": "Start by describing a shape"
+    "empty": "Start by describing a shape",
+    "statusOk": "OK",
+    "statusBroken": "problem",
+    "statusOff": "excluded"
   },
   "figure": {
     "mismatch": "The figure may not match what you described:",
@@ -118,6 +121,7 @@
     "clear": "Clear all",
     "flip": "Flip",
     "another": "Show another configuration",
+    "anotherHint": "Same shape — drawn differently",
     "onlyConfig": "No other configuration — the shape is determined (only size/position can change)",
     "dof": "Degrees of freedom: {{count}}",
     "determined": "✓ Fully determined",

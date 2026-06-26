@@ -620,6 +620,13 @@ export default function App() {
             {facts.length === 0 ? (
               <p style={{ color: '#94a3b8', fontSize: 13, margin: 0 }}>{t('steps.empty')}</p>
             ) : (
+              <>
+              {/* What the status marks mean — a quick legend so ✓ / ✗ / ○ aren't cryptic. */}
+              <div style={legend}>
+                <span><span style={{ color: '#16a34a' }}>✓</span> {t('steps.statusOk')}</span>
+                <span><span style={{ color: '#dc2626' }}>✗</span> {t('steps.statusBroken')}</span>
+                <span><span style={{ color: '#94a3b8' }}>○</span> {t('steps.statusOff')}</span>
+              </div>
               <ul style={stepList}>
                 {groups.map((g) => {
                   const on = g.facts.every((f) => f.enabled);
@@ -682,6 +689,7 @@ export default function App() {
                   );
                 })}
               </ul>
+              </>
             )}
           </div>
 
@@ -712,6 +720,7 @@ export default function App() {
               type="button"
               style={alt}
               disabled={resampling}
+              title={t('actions.anotherHint')}
               // Explore the WHOLE configuration space: resample the continuous free DOFs (so free
               // points / on-circle vertices actually move) AND cycle a discrete branch if there is
               // one. Previously this did branch-cycling EXCLUSIVELY whenever any branch existed, so a
@@ -954,6 +963,7 @@ const catHeading: React.CSSProperties = {
   marginBottom: 4,
 };
 const cmdRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
+const legend: React.CSSProperties = { display: 'flex', gap: 12, fontSize: 11, color: '#94a3b8', margin: '0 0 6px' };
 const stepList: React.CSSProperties = { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 };
 const errorBanner: React.CSSProperties = {
   padding: '8px 12px',
