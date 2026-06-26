@@ -794,6 +794,19 @@ export default function App() {
         </aside>
       </div>
 
+      <footer style={footerRow}>
+        <span>
+          {t('footer.by')} <strong style={{ color: '#334155' }}>{t('footer.name')}</strong>
+        </span>
+        <span aria-hidden style={{ color: '#cbd5e1' }}>·</span>
+        <span>
+          {t('footer.contact')}:{' '}
+          <a href="mailto:david.codish@gmail.com" style={{ color: '#2563eb', textDecoration: 'none' }}>
+            david.codish@gmail.com
+          </a>
+        </span>
+      </footer>
+
       {/* "מה זה?" — first-load intro (dismiss persisted), reopenable from the header. */}
       <Modal
         open={aboutOpen}
@@ -872,12 +885,24 @@ const page: React.CSSProperties = {
 };
 const headerRow: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' };
 const main: React.CSSProperties = { display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' };
+const footerRow: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: 8,
+  paddingTop: 10,
+  borderTop: '1px solid #e2e8f0',
+  fontSize: 13,
+  color: '#64748b',
+};
 // The canvas fills the space beside the sidebar and the viewport height (use the big screen);
 // it wraps below the sidebar on narrow widths. Its size is measured and passed to <Figure>.
 // `order` puts the canvas on the LEFT and the sidebar on the RIGHT under RTL (Hebrew):
 // in an RTL flex row, order:1 sits at the right edge, order:2 to its left. (Operator: in
 // Hebrew the canvas should be on the left.)
-const canvasWrap: React.CSSProperties = { order: 2, position: 'relative', flex: '1 1 480px', minWidth: 360, height: 'calc(100vh - 132px)', minHeight: 460 };
+// Height budget: 100vh minus the page padding, header, footer, and the inter-row gaps — so the canvas
+// fills the viewport and the whole page (header → canvas → footer) fits WITHOUT scrolling.
+const canvasWrap: React.CSSProperties = { order: 2, position: 'relative', flex: '1 1 480px', minWidth: 360, height: 'calc(100vh - 180px)', minHeight: 460 };
 // Centered call-to-action shown over the blank canvas; pointer-events off so it never
 // blocks the figure (the example buttons re-enable them).
 const emptyOverlay: React.CSSProperties = {

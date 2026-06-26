@@ -3,6 +3,11 @@
     "title": "Geo Builder",
     "subtitle": "Build geometry step by step"
   },
+  "footer": {
+    "by": "Developed by",
+    "name": "Dr. David Codish",
+    "contact": "Questions"
+  },
   "header": {
     "about": "What is Geo Builder?",
     "help": "Help"
@@ -43,12 +48,12 @@
   "examples": {
     "heading": "Examples — click to try, or type your own",
     "items": [
+      "trapezoid ABCD inscribed in a circle",
       "parallelogram ABCD",
-      "segment AC",
-      "point E on AC at 45%",
-      "segment BE",
+      "two circles intersect",
       "square ABCD",
-      "point G on AD at 40%"
+      "triangle ABC",
+      "circle O radius 5"
     ]
   },
   "help": {

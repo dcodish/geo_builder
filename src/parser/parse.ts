@@ -2099,18 +2099,23 @@ const parallelCircleIntersection: Rule = (s, ctx) => {
  * The single-point `circleCircleIntersection` below needs the two circles to already exist and yields
  * one point; this is the "draw two intersecting circles" opener.
  */
-const twoCirclesMeet: Rule = (s) => {
+const twoCirclesMeet: Rule = (s, ctx) => {
   if (!/\bcircles\b|שני\s+מעגל|מעגלים/i.test(s)) return null; // two circles being introduced (plural)
   if (!(INTERSECT_KW.test(s) || /נחתכ|נפגש|מפגש|\bmeets?\b/i.test(s))) return null;
-  // the two intersection points — prefer the pair after "at"/"בנקודות" (so named centres "O and P" aren't read as the points)
-  const abM =
-    s.match(/(?:\bat\b|בנקוד\S*|points?)\s*([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)/i) ??
-    s.match(/\b([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i);
-  if (!abM) return null;
-  const A = up(abM[1]), B = up(abM[2]);
   const named = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
   const c1 = named[0] ?? 'O';
-  const c2 = named[1] ?? freeLabel([c1, A, B], ['P', 'Q', 'K', 'S']);
+  const c2 = named[1] ?? freeLabel([c1, ...(ctx.points ?? [])], ['P', 'Q', 'K', 'S']);
+  // The two intersection points: the pair after "at"/"בנקודות", or a bare "X and Y" that ISN'T the
+  // named centres — else AUTO-name them A,B (the student drew "two intersecting circles" without naming the
+  // crossings; ADR-132). Avoid the centres and any existing points.
+  const atM = s.match(/(?:\bat\b|בנקוד\S*|points?)\s*([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)/i);
+  const bareM = s.match(/\b([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i);
+  const pair: [Id, Id] | null = atM
+    ? [up(atM[1]), up(atM[2])]
+    : bareM && !named.includes(up(bareM[1])) && !named.includes(up(bareM[2]))
+      ? [up(bareM[1]), up(bareM[2])]
+      : null;
+  const [A, B] = pair ?? autoVertexLabels(2, [c1, c2, ...(ctx.points ?? [])]);
   if (new Set([A, B, c1, c2]).size !== 4) return null;
   const id1 = circleId(c1), id2 = circleId(c2);
   // A centre the student didn't name (defaulted O/P) is auto → hidden unless used; a named one shows.

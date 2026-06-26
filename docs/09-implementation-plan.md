@@ -204,3 +204,8 @@ Sub-phases — each ends by **reproducing its corpus questions** (gated per [Tes
 | Stability (NFR-ST) | 1 (held to throughout) |
 
 Every "Must" requirement lands by **M4**; the rest by **M5**.
+
+## Planned, not started
+
+- **Textbook-statement export (FR-HS-9 / [ADR-133](06-decisions.md#adr-133)).** A "decompiler" reverse stage: `figure/relations → verbal givens` in a textbook register, LLM-backed, behind a **premium feature flag** (NFR-FG-1–3) — on for local dev, off (shown as a paid option) in the default production build. **Requirement captured; not built.** Develop and test locally (deterministic relation-serialiser unit-tested; LLM styling mocked, Opus-as-oracle per repo policy); ship with the flag off until there's a billing/licensing story.
+- **Ground-truth relations layer / "view relations" (FR-RV-1–6 / [ADR-134](06-decisions.md#adr-134)).** An on-press layer that shows the relations the givens FORCE — equal sides (ticks), equal angles (arcs), definitive values + area ratios, and a similar/congruent-triangles list beside the canvas. Method: **sample the figure across its free DOFs and keep only relations invariant across all samples** (ground truths, not drawing coincidences); scale-invariant facts (angles, ratios, equalities, similarity, area ratios) show always, absolute sizes only when scale-anchored. Read-only consumer of the engine (no engine edits). **Requirement captured + decided; not built.** First slice: equal-sides/equal-angles ticks/arcs over the appears-only universe; then values/area ratios; then the similar-triangles list. Watch: correctness depends on the sampler exercising every DOF (an ADR-052 audit).

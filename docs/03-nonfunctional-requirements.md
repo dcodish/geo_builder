@@ -40,6 +40,14 @@ Quality attributes and constraints. IDs are stable references (`NFR-<area>-<n>`)
 - **NFR-CT-2** — Total LLM API spend is **bounded and cannot surprise the operator**: enforced via a prepaid credit ceiling, a Console monthly spend limit, and usage alerts.
 - **NFR-CT-3** — The LLM model for parsing is the cheapest sufficient one (`claude-haiku-4-5`); `max_tokens` and prompt size are kept minimal.
 
+## Feature gating & tiers
+
+For capabilities that are expensive (extra LLM spend) or commercial (premium/paid), the build must be able to **ship with the feature visibly present but closed**, while the same code path is **fully usable in local development**. Introduced for the textbook-statement export (FR-HS-9); the mechanism is general.
+
+- **NFR-FG-1** — A capability can be gated by a single **feature flag** resolved at build/runtime (e.g. an env-driven config such as `VITE_FEATURE_<NAME>` baked at build, optionally overridable per-deployment). The flag has two effects that must always agree: it controls whether the feature **does any work** (no gated LLM/API call may fire when the flag is off) **and** how the UI presents it.
+- **NFR-FG-2** — When a **premium** feature is **off** (the default production build), the UI must **indicate it is a paid option** (a clear, non-deceptive affordance — e.g. a disabled control with an "upgrade / paid feature" label), never silently hide it and never fail with an error on click. When **on** (local development, or a licensed build), the feature works normally.
+- **NFR-FG-3** — A gated premium feature must **not increase cost or attack surface when off**: its server endpoint (if any) is not reachable / does nothing in a build where the flag is off, so toggling visibility can never leak paid functionality or run up API spend (composes with NFR-CT-2 and NFR-SE-2).
+
 ## Security & privacy
 
 - **NFR-SE-1** — The Claude API key is **never shipped to the browser**; all API calls go through a server-side proxy that holds the key.

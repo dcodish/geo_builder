@@ -54,6 +54,25 @@ describe('unlabeled standalone shapes auto-name their vertices', () => {
   });
 });
 
+describe('two intersecting circles auto-name their crossing points', () => {
+  it('"שני מעגלים נחתכים" / "two circles intersect" (no points named) → two circles + crossings A,B', () => {
+    for (const u of ['שני מעגלים נחתכים', 'two circles intersect']) {
+      expect(types(u), u).toEqual(['circle', 'circle', 'circle-circle-intersection', 'circle-circle-intersection']);
+      const r = parse(u, {});
+      if (!r.ok) throw new Error('parse failed: ' + u);
+      const crossings = r.commands.filter((c) => c.type === 'circle-circle-intersection').map((c) => (c as { id: string }).id);
+      expect(crossings, u).toEqual(['A', 'B']);
+    }
+  });
+
+  it('explicitly named crossings are still honoured', () => {
+    const r = parse('שני מעגלים נחתכים בנקודות C ו-D', {});
+    if (!r.ok) throw new Error('parse failed');
+    const crossings = r.commands.filter((c) => c.type === 'circle-circle-intersection').map((c) => (c as { id: string }).id);
+    expect(crossings).toEqual(['C', 'D']);
+  });
+});
+
 describe('explicit and partial labels are unchanged', () => {
   it('a full label run is honoured', () => {
     expect(idsOf('מרובע ABCD חסום במעגל')).toEqual(['A', 'B', 'C', 'D']);
