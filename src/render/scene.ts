@@ -12,7 +12,7 @@
 import type { Construction, Id, Circle, Vec } from '@/engine/types';
 import { isGeoPoint } from '@/engine/types';
 import { len, rot90, sub, unit } from '@/engine/geometry';
-import { resolveCircle, resolveLine, type ResolvedCircle } from '@/engine';
+import { resolveCircle, resolveLine, type DefiniteAngle, type RelationsResult, type ResolvedCircle } from '@/engine';
 
 /** A point id structurally on circle `cid` (for recovering a driven free radius from positions). */
 function pointOnCircleId(c: Construction, cid: Id): Id | null {
@@ -98,6 +98,43 @@ export interface SceneAngleMark {
   p1: Vec;
   p2: Vec;
   right: boolean;
+}
+
+/** A relations-layer EQUAL-SEGMENT mark: draw `count` hatch ticks across the midpoint of segment a–b
+ *  (1 tick for the first equality class, 2 for the second, …) — the standard textbook "these are equal". */
+export interface SceneEqualTick {
+  a: Vec;
+  b: Vec;
+  count: number;
+}
+
+/** A relations-layer EQUAL-ANGLE mark: draw `count` concentric arcs at `vertex` between the rays to p1, p2.
+ *  `startArc` is how many arc-rings precede this mark AT THE SAME VERTEX — the renderer offsets the arcs
+ *  outward by it so several equal-angle marks at one vertex don't overlap (a different class would otherwise
+ *  draw at the same radius and hide the inner one). */
+export interface SceneEqualAngle {
+  vertex: Vec;
+  p1: Vec;
+  p2: Vec;
+  count: number;
+  startArc: number;
+}
+
+/** A relations-layer DEFINITIVE-VALUE label: print `text` (e.g. "60°") inside the angle at `vertex`. `rank`
+ *  is the label's index AMONG the values sharing this vertex (0,1,2,…) — the renderer pushes higher ranks
+ *  further out along the bisector so several angle values at one busy vertex don't overlap. */
+export interface SceneAngleValue {
+  vertex: Vec;
+  p1: Vec;
+  p2: Vec;
+  text: string;
+  rank: number;
+}
+
+export interface RelationMarks {
+  ticks: SceneEqualTick[];
+  angles: SceneEqualAngle[];
+  values: SceneAngleValue[];
 }
 
 export interface Scene {
@@ -355,4 +392,85 @@ export function scenePositions(scene: Scene): Vec[] {
     }
   }
   return ps;
+}
+
+/**
+ * Resolve a {@link RelationsResult} + the current `positions` into world-space marks the renderer draws
+ * (the "view relations" layer, [ADR-134](docs/06-decisions.md#adr-134)). The equality-class INDEX picks the
+ * tick/arc count — class 0 → 1 mark, class 1 → 2, … — so each equal-group reads as a distinct textbook
+ * notation. The relation says WHICH ids are equal; the marks are placed on the CURRENT drawing's positions.
+ * A degenerate or missing endpoint is skipped rather than drawn at a bogus spot (mirrors the scene builder).
+ */
+export function relationMarks(relations: RelationsResult, positions: Map<Id, Vec>): RelationMarks {
+  const ticks: SceneEqualTick[] = [];
+  relations.equalSegments.forEach((cls, i) => {
+    for (const [a, b] of cls) {
+      const pa = positions.get(a);
+      const pb = positions.get(b);
+      if (pa && pb && len(sub(pa, pb)) > 1e-9) ticks.push({ a: pa, b: pb, count: i + 1 });
+    }
+  });
+  // Equal-angle arcs, staggered per vertex: each mark starts beyond the rings already drawn at its vertex
+  // (its own `count` rings + a 1-ring gap), so two marks at one vertex (e.g. ∠BDE and ∠ADE) never collide.
+  const angles: SceneEqualAngle[] = [];
+  const perVertexArcs = new Map<Id, number>();
+  relations.equalAngles.forEach((cls, i) => {
+    const count = i + 1;
+    for (const { vertex, a, b } of cls) {
+      const pv = positions.get(vertex);
+      const pa = positions.get(a);
+      const pb = positions.get(b);
+      if (pv && pa && pb && len(sub(pa, pv)) > 1e-9 && len(sub(pb, pv)) > 1e-9) {
+        const startArc = perVertexArcs.get(vertex) ?? 0;
+        perVertexArcs.set(vertex, startArc + count + 1); // +1 ring of separation before the next mark here
+        angles.push({ vertex: pv, p1: pa, p2: pb, count, startArc });
+      }
+    }
+  });
+  // Value labels, ranked PER VERTEX (smallest angle first → tightest near the corner) so several values at
+  // one busy vertex are pushed to staggered radii and don't overlap. A COMPOSITE angle (= the sum of finer
+  // definite parts at the same vertex) is dropped first — the student reads the total from the parts.
+  const values: SceneAngleValue[] = [];
+  const perVertex = new Map<Id, number>();
+  for (const { vertex, a, b, valueDeg } of atomicDefiniteAngles(relations.definiteAngles).sort((x, y) => x.valueDeg - y.valueDeg)) {
+    const pv = positions.get(vertex);
+    const pa = positions.get(a);
+    const pb = positions.get(b);
+    if (pv && pa && pb && len(sub(pa, pv)) > 1e-9 && len(sub(pb, pv)) > 1e-9) {
+      const rank = perVertex.get(vertex) ?? 0;
+      perVertex.set(vertex, rank + 1);
+      values.push({ vertex: pv, p1: pa, p2: pb, text: formatDeg(valueDeg), rank });
+    }
+  }
+  return { ticks, angles, values };
+}
+
+/** A definitive angle value for display: an integer when it's within 0.1° of one (60°), else one decimal. */
+function formatDeg(v: number): string {
+  const rounded = Math.round(v);
+  return `${Math.abs(v - rounded) < 0.1 ? rounded : v.toFixed(1)}°`;
+}
+
+/**
+ * Keep only the ATOMIC definite angles — drop one that is the SUM of two finer definite angles at the same
+ * vertex (∠ABD = ∠ABC + ∠CBD, all three forced), since the student reads the total from the parts. The
+ * value-sum test (`vac + vcb ≈ vab`) implies the splitter ray C lies inside the wedge, so no ray directions
+ * are needed; a composite tiled into 3+ parts is dropped too (each 2-split it contains is definite). (ADR-134.)
+ */
+function atomicDefiniteAngles(defs: DefiniteAngle[]): DefiniteAngle[] {
+  const key = (x: Id, y: Id) => (x < y ? `${x}|${y}` : `${y}|${x}`);
+  const byVertex = new Map<Id, DefiniteAngle[]>();
+  for (const d of defs) (byVertex.get(d.vertex) ?? byVertex.set(d.vertex, []).get(d.vertex)!).push(d);
+  return defs.filter((d) => {
+    const sib = byVertex.get(d.vertex)!;
+    const val = new Map(sib.map((s) => [key(s.a, s.b), s.valueDeg]));
+    const endpoints = new Set(sib.flatMap((s) => [s.a, s.b]));
+    for (const c of endpoints) {
+      if (c === d.a || c === d.b) continue;
+      const vac = val.get(key(d.a, c));
+      const vcb = val.get(key(c, d.b));
+      if (vac !== undefined && vcb !== undefined && Math.abs(vac + vcb - d.valueDeg) < 0.2) return false; // composite
+    }
+    return true;
+  });
 }

@@ -18,8 +18,8 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
-import type { AnyCommand, Command, Construction, GivenViolation, Id, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, deepEqual, emptyConstruction, evaluate, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, residual } from '@/engine';
+import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, Vec } from '@/engine';
+import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, deepEqual, detectRelations, emptyConstruction, evaluate, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, residual } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -680,6 +680,12 @@ export interface GeoState {
    *  circle still constrains its points; it's just not drawn). UI-only, not undoable; rewritten by
    *  `rename`/`merge` (the id carries the centre letter); reset by `clear`. (ADR-088) */
   hiddenCircles: Id[];
+  /** The "view relations" ground-truth layer ([ADR-134](docs/06-decisions.md#adr-134)): the detected
+   *  equalities, cached with the EXACT `facts` array they were computed from. UI-only, not undoable.
+   *  Ground truths are invariant across configurations, so the layer survives "show another configuration"
+   *  (seed change keeps the same `facts` ref); any FACT change makes a new `facts` array, so a selector that
+   *  checks `relations.facts === facts` auto-clears it (no edits to the mutating actions needed). */
+  relations: { result: RelationsResult; facts: Fact[] } | null;
 
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
   execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;
@@ -697,6 +703,11 @@ export interface GeoState {
   replaceGroup: (key: string, cmds: AnyCommand[], utterance?: string) => void;
   /** Select a fact for inspection (or clear, if it was already selected). */
   select: (id: string | null) => void;
+  /** Compute the ground-truth relations of the current figure and turn the layer ON (ADR-134). Synchronous
+   *  (samples the figure); the caller paints a busy state first. A no-op-safe re-press recomputes. */
+  viewRelations: () => void;
+  /** Turn the relations layer off. */
+  clearRelations: () => void;
   /** Advance an intersection point to its next configuration (stored in the fact's command). */
   cycleAlt: (pointId: Id) => void;
   /** Re-sample the figure's residual freedom — a different valid drawing (ADR-018). Returns `true` if it
@@ -832,6 +843,7 @@ export const useGeoStore = create<GeoState>()(
       hidden: [],
       segStyle: {},
       hiddenCircles: [],
+      relations: null,
 
       execute: (cmd, utterance, group) => {
         const facts = get().facts;
@@ -927,6 +939,17 @@ export const useGeoStore = create<GeoState>()(
       select: (id) => {
         set({ selectedId: get().selectedId === id ? null : id });
       },
+
+      viewRelations: () => {
+        const facts = get().facts;
+        // Detect on the UNSEEDED construction (seed 0) — detection samples it across its own seeds, so the
+        // result is seed-independent. Cache the `facts` ref so the layer auto-invalidates on any fact change.
+        const { construction } = replay(facts, 0);
+        const result = detectRelations(construction);
+        set({ relations: { result, facts } });
+      },
+
+      clearRelations: () => set({ relations: null }),
 
       cycleAlt: (pointId) => {
         const facts = get().facts;
@@ -1083,7 +1106,7 @@ export const useGeoStore = create<GeoState>()(
       },
 
       clear: () => {
-        set({ facts: [], selectedId: null, seed: 0, radiusOverrides: {}, hidden: [], segStyle: {}, hiddenCircles: [] });
+        set({ facts: [], selectedId: null, seed: 0, radiusOverrides: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null });
         useGeoStore.temporal.getState().clear();
       },
     }),

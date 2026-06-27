@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { parse, droppedNewLabels } from '@/parser';
 import { replay, polygonsConvex, useGeoStore, firstSatisfyingSeed, dryRunOutcome, hasDeferrableConstraint } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
-import { isGeoPoint, freeDofs, firstCyclableBranch, evaluate, circleMembers, pointNeighbors } from '@/engine';
+import { isGeoPoint, freeDofs, freeDofCount, applySeed, firstCyclableBranch, evaluate, circleMembers, pointNeighbors, detectRelations } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 
 type Step = string | { llm: AnyCommand[] };
@@ -104,6 +104,61 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
+  {
+    id: 'diameter-on-existing-chord-is-a-constraint',
+    title: '"AB is a diameter" of an EXISTING circle whose endpoints A,B already exist makes the chord a diameter (∠ at the far vertex → 90°), not a re-creation that errors',
+    guards:
+      'operator session ylea4zal: "AB קוטר במעגל P" (AB is a diameter of circle P) FAILED with "\'B\' is already defined — it can\'t be redefined as something different" → built-nothing. Diagnosed from the log: the figure\'s circle really was P (a circumcircle through A,B,D, centre P a derived circumcentre), and A,B already existed on it — but the `diameter` rule emits the `diameter` command, whose apply re-creates A as a fresh on-circle point and B as "the antipode of A" (apply.ts), which collides with the already-existing A,B. Root cause: a `diameter` declared over points that already exist on the circle must be a CONSTRAINT on the existing chord, never a re-creation — the same "declaration against an existing circle/points is a constraint" pattern as ADR-080/092/099/115. Fix (ADR-137): when both endpoints already exist, the `diameter` rule emits `set-collinear [A, centre, B]` — the centre is equidistant from A,B (both on the circle), so collinearity forces the centre to their midpoint ⇒ AB passes through the centre ⇒ a diameter. The engine flexes the figure to satisfy it (numerically for a derived circumcentre — no dependency cycle — or by converting a free on-circle endpoint to the other\'s antipode). NOTE: the current parser auto-names the inscribed circle O (not P, and via on-circle points rather than a circumcircle — a representation drift since the session), so this scenario references the circle by its actual name O; the circumcircle-named-P representation is locked separately as a unit test.',
+    steps: ['משולש ABC חסום במעגל', 'AB קוטר במעגל O'],
+    check(fig) {
+      allStepsOk(fig);
+      // AB is now a genuine diameter: the third vertex C sees AB at 90° (Thales), in EVERY configuration,
+      // and the centre O lies on segment AB. (Asserting across seeds proves it's a real constraint, not a
+      // lucky default.)
+      for (let s = 0; s < 5; s++) {
+        const e = evaluate(applySeed(fig.construction, s));
+        expect(e.ok, `seed ${s} evaluates`).toBe(true);
+        if (!e.ok) continue;
+        const A = e.positions.get('A')!, B = e.positions.get('B')!, C = e.positions.get('C')!, O = e.positions.get('O')!;
+        expect(angle(A, C, B), `seed ${s}: ∠ACB = 90 (AB is a diameter)`).toBeCloseTo(90, 0);
+        const ab = { x: B.x - A.x, y: B.y - A.y };
+        const off = Math.abs((O.x - A.x) * ab.y - (O.y - A.y) * ab.x) / Math.hypot(ab.x, ab.y);
+        expect(off, `seed ${s}: centre O lies on AB`).toBeLessThan(1e-3);
+      }
+    },
+  },
+  {
+    id: 'order-only-solve-stays-samplable',
+    title: 'an inscribed triangle + tangent∩extension stays UNDETERMINED — no "forced" angle numbers, vertices still vary',
+    guards:
+      'operator (manual test, screenshot): an inscribed triangle ADB + "the tangent at D and the extension of AB meet at E" showed every angle as a definite number (51.8°, 65°, …) in the "view relations" layer even though the figure has 2 free DOF ("the shape is not defined, so this should not have happened"). This is the ADR-136 false-positive again, via a THIRD cause that ADR-136\'s lone-triangle test missed: the SECOND step\'s `line-intersection E` carries `collinear-order [A,B,E]` (ADR-135 — E must land BEYOND B). Applying that order RECRUITED the triangle\'s now-`free` on-circle vertices A,D,B (+ centre O + free-radius circle) and marked each with `solve`, RE-freezing the very vertices ADR-136 had un-frozen. But an order/region constraint removes 0 DOF (ADR-039, `dofRemoved`) — the carriers stay free WITHIN the region. The sampler predicates (`isFreeOnCircle` etc.) excluded any point with `solve` set, so all 16 relation-samples were IDENTICAL → every angle read "definitive", and "show another configuration" could not vary the triangle. The exact ADR-052 smell: vertices counted by the DOF cue (reads 2) but absent from `freeDofs` (read only [O]). Fix (ADR-136 Am. 2): a carrier whose `solve` is ONLY an order/region constraint is NOT consumed — it stays free/samplable; `evaluate` re-enforces the order from the perturbed seed (an in-region perturbation has 0 residual), so the triangle varies while E stays beyond B in every config.',
+    steps: ['משולש ADB חסום במעגל', 'המשיק בנקודה D והמשך AB נפגשים בנקודה E'],
+    check(fig) {
+      allStepsOk(fig);
+      // The figure is genuinely under-determined (a generic inscribed triangle): the cue counts shape DOF…
+      expect(freeDofCount(fig.construction), 'inscribed triangle keeps shape DOF').toBeGreaterThan(0);
+      // …and the triangle's on-circle vertices are SAMPLABLE (the regression: they were frozen by an order-only `solve`).
+      const fd = new Set(freeDofs(fig.construction));
+      for (const v of ['A', 'D', 'B']) expect(fd.has(v), `vertex ${v} is a samplable free DOF`).toBe(true);
+      // So the "view relations" layer reports NO forced angle value (it was wrongly reporting 7).
+      expect(detectRelations(fig.construction).definiteAngles, 'no angle is forced in an under-determined figure').toHaveLength(0);
+      // The shape actually varies across configs, yet the order (E beyond B on line AB) holds every time.
+      const tOf = (pos: Map<Id, Vec>) => {
+        const A = pos.get('A')!, B = pos.get('B')!, E = pos.get('E')!;
+        const ab = { x: B.x - A.x, y: B.y - A.y };
+        return ((E.x - A.x) * ab.x + (E.y - A.y) * ab.y) / (ab.x * ab.x + ab.y * ab.y);
+      };
+      const angles = new Set<number>();
+      for (let s = 0; s < 8; s++) {
+        const e = evaluate(applySeed(fig.construction, s));
+        expect(e.ok, `seed ${s} evaluates`).toBe(true);
+        if (!e.ok) continue;
+        expect(tOf(e.positions), `seed ${s}: E stays beyond B (collinear-order holds)`).toBeGreaterThan(1);
+        angles.add(Math.round(angle(e.positions.get('A')!, e.positions.get('D')!, e.positions.get('B')!)));
+      }
+      expect(angles.size, 'the inscribed triangle takes genuinely different shapes across seeds').toBeGreaterThan(2);
+    },
+  },
   {
     id: 'circumcircle-cuts-segment-d-on-side',
     title: '"the circumcircle of ABC cuts CE at D" lands D ON segment CE (not its extension), across configs',
@@ -747,6 +802,41 @@ const SCENARIOS: Scenario[] = [
       const rA = dist(O, A);
       for (const [id, p] of [['B', B], ['C', C], ['D', D]] as const) expect(dist(O, p), `${id} on circle O`).toBeCloseTo(rA, 2);
       expect(dist(B, E), 'BE = BC (the stated given)').toBeCloseTo(dist(B, C), 2);
+    },
+  },
+  {
+    id: 'tangent-meets-extension-lands-on-named-side',
+    title: '"the tangent at D and the EXTENSION of AB meet at E" puts E beyond B (on AB\'s extension), not the wrong side',
+    guards:
+      'operator session efm2i69l: triangle ABD inscribed, then "המשיק למעגל בנקודה D והמשך AB נפגשים בנקודה E", F on AB, DE=FE, DF. E landed beyond A (the BA side), not on the continuation of AB (beyond B) as asked. Root cause: `tangentLineIntersection` built E as a `line-intersection` on the INFINITE line A–B with NO order — so the crossing fell wherever the geometry put it (here beyond A). The directional "המשך AB" (E beyond the 2nd letter) was dropped. Fix: carry an `order:[A,B,E]` on the `line-intersection` (the proven ADR-127 mechanism, shared with `line-circle-intersection`) → a `collinear-order` whose residual folds into the joint solve, flexing the inscribed triangle so E lands beyond B in the default config — no sampler search, no perf hit, no broad `set-line`.',
+    steps: ['משולש ABD חסום במעגל', 'המשיק למעגל בנקודה D והמשך AB נפגשים בנקודה E', 'F על AB', 'DE=FE', 'DF'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), E = at(fig, 'E');
+      // E is on the EXTENSION of AB beyond B: its parameter along A→B exceeds 1.
+      const t = ((E.x - A.x) * (B.x - A.x) + (E.y - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2);
+      expect(t, 'E is beyond B on the continuation of AB (t > 1)').toBeGreaterThan(1);
+      // E, A, B are collinear (E really is on line AB)
+      const cross = (B.x - A.x) * (E.y - A.y) - (B.y - A.y) * (E.x - A.x);
+      expect(Math.abs(cross) / dist(A, B) ** 2, 'E collinear with A, B').toBeLessThan(1e-2);
+    },
+  },
+  {
+    id: 'relations-layer-tangent-chord-angle',
+    title: 'the "view relations" layer surfaces the TANGENT-CHORD angle (∠ between tangent DE and chord DB = inscribed ∠DAB) and no FALSE relations',
+    guards:
+      'operator session r4vs1i0y (testing the relations layer, ADR-134/136): on a free inscribed triangle ABD + a tangent at D meeting AB\'s extension at E, (1) the layer first reported many angles as forced that are NOT — root cause (ADR-136): the inscribed triangle\'s vertices had no samplable theta (ADR-052), so the shape was frozen and every angle looked invariant; fixed by making the vertices free + a scalene default, and the detector now merges same-direction rays + drops degenerate angles. (2) Then it MISSED ∠EDB = ∠DAB (the tangent-chord angle) — the angle universe was built only from segments/polygon edges, so the drawn tangent line D–E was not an "edge"; fixed by also connecting points that lie on a VISIBLE line (the tangent\'s touch point D + the crossing E).',
+    steps: ['משולש ABD חסום במעגל', 'המשיק בנקודה D והמשך AB נפגשים בנקודה E'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const rel = detectRelations(fig.construction);
+      // the tangent-chord angle is a ground truth: ∠DAB (at A, rays to D,B) = ∠EDB (at D, rays to E,B)
+      const key = (a: { vertex: Id; a: Id; b: Id }) => `${[a.a, a.b].sort().join('')}@${a.vertex}`;
+      const classes = rel.equalAngles.map((cls) => new Set(cls.map(key)));
+      const hasTangentChord = classes.some((s) => s.has('BD@A') && s.has('BE@D')); // ∠DAB ≡ ∠EDB
+      expect(hasTangentChord, '∠DAB = ∠EDB (tangent-chord) is surfaced').toBe(true);
+      // …and NO absolute angle VALUE is forced (the triangle's shape is free — nothing is "definitely 44°")
+      expect(rel.definiteAngles, 'no false definite angle on a free figure').toEqual([]);
     },
   },
   {

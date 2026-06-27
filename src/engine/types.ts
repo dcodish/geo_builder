@@ -760,7 +760,10 @@ export type Command =
   | { type: 'perpendicular-line'; id: Id; through: Id; a: Id; b: Id; visible?: boolean }
   | { type: 'parallel-line'; id: Id; through: Id; a: Id; b: Id; visible?: boolean }
   | { type: 'line-through'; id: Id; a: Id; b: Id; visible?: boolean }
-  | { type: 'line-intersection'; id: Id; line1: Id; line2: Id }
+  // `order` (optional, e.g. [A, B, id]) carries a directional ON-LINE order — "המשך AB meets … at id" puts
+  // id BEYOND B — as a `collinear-order` whose residual flexes the figure to keep id on the named side in
+  // every config (the ADR-127 mechanism, shared with line-circle-intersection; no sampler search).
+  | { type: 'line-intersection'; id: Id; line1: Id; line2: Id; order?: Id[] }
   | { type: 'foot'; id: Id; from: Id; a: Id; b: Id }
   | { type: 'midpoint'; id: Id; a: Id; b: Id }
   // Phase 5c — circles and the points they produce.

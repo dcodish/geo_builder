@@ -608,6 +608,10 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'line-intersection':
       addObj(objects, { kind: 'line-intersection', id: cmd.id, line1: cmd.line1, line2: cmd.line2 });
+      // A directional "המשך AB meets … at id" carries an order (id beyond the 2nd point). id is ALREADY
+      // collinear (it's the crossing of the two lines), so add ONLY the side/order constraint — its residual
+      // folds into the joint solve and flexes the free DOFs to keep id on the named extension (ADR-127).
+      if (cmd.order && cmd.order.length >= 3) constraints.push({ type: 'collinear-order', points: [...cmd.order] });
       break;
 
     case 'foot':

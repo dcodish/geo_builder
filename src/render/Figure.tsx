@@ -11,8 +11,9 @@
 import { useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
-import { buildScene, scenePositions } from './scene';
+import { buildScene, relationMarks, scenePositions } from './scene';
 import type { MeasureLabels } from './scene';
+import type { RelationsResult } from '@/engine';
 import { findSegmentCrossings } from './intersections';
 import type { Crossing } from './intersections';
 import { alignRotation, fitTransform, orient } from './transform';
@@ -37,6 +38,9 @@ export interface FigureProps {
   labels?: MeasureLabels;
   /** Angle marks the student asserted — right-angle squares / angle arcs. */
   angleMarks?: { vertex: Id; ray1: Id; ray2: Id; right: boolean }[];
+  /** The "view relations" ground-truth layer (ADR-134): equal-segment ticks + equal-angle arcs. When set,
+   *  it's drawn on the current figure; omit/undefined = layer off. */
+  relations?: RelationsResult | null;
   /** Show the measure labels + angle marks (default true); the host's "show measures" toggle drives this. */
   showMeasures?: boolean;
   /** Reveal every circle's centre + label (ADR-059); driven by the host's "show centres" toggle. */
@@ -136,6 +140,7 @@ export function Figure({
   intersectionLabel,
   labels,
   angleMarks,
+  relations,
   showMeasures = true,
   hidden,
   showCenters = false,
@@ -227,7 +232,7 @@ export function Figure({
     window.setTimeout(() => setExportFlash(''), 1400);
   }
 
-  const { scene, transform, crossings, labelDirs } = useMemo(() => {
+  const { scene, transform, crossings, labelDirs, relMarks } = useMemo(() => {
     // Rotate/flip the figure in world space, then fit — so it stays centred and
     // labels (computed here, drawn upright) follow the new orientation. A standing
     // "align segment horizontal" request is recomputed from the CURRENT positions each
@@ -241,6 +246,9 @@ export function Figure({
     const s = buildScene(construction, oriented, labels, angleMarks, { showCenters });
     const t = fitTransform(scenePositions(s), { width, height, padding });
     const x = onPickIntersection ? findSegmentCrossings(construction, oriented) : [];
+    // The "view relations" marks use the SAME oriented positions as the scene, so the ticks/arcs land on the
+    // drawn segments/angles under any orientation (ADR-134).
+    const relMarks = relations ? relationMarks(relations, oriented) : null;
 
     // Nudge each label off the lines, in screen space at a reference scale (zoom
     // is applied later by the pan/zoom <g>, so this stays stable across zooming).
@@ -257,8 +265,8 @@ export function Figure({
     const ptScreen = s.points.map((p) => ({ id: p.id, screen: t.toScreen(p.pos), seed: unitVec({ x: p.labelDir.x, y: -p.labelDir.y }) }));
     const labelDirs = chooseLabelDirs(ptScreen, obstacles, circScreen, REF_OFF, REF_CLEAR);
 
-    return { scene: s, transform: t, crossings: x, labelDirs };
-  }, [construction, positions, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, showCenters]);
+    return { scene: s, transform: t, crossings: x, labelDirs, relMarks };
+  }, [construction, positions, labels, angleMarks, relations, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, showCenters]);
 
   // Point radius in px, kept visually constant by dividing out the pan/zoom scale.
   // `r` sizes the marks/crossings/measure offsets; `pointR` is the small textbook-
@@ -267,6 +275,12 @@ export function Figure({
   const pointR = 2 / view.zoom;
   const stroke = 1.5 / view.zoom;
   const fontSize = 16 / view.zoom;
+  const REL = '#0d9488'; // the "view relations" layer colour (teal) — distinct from the blue stated-angle marks
+  // One colour PER equality class, so equal segments / equal angles that share a colour are read as equal at
+  // a glance even where their marks overlap (operator request). Avoids the stated-angle blue (#1d4ed8). The
+  // class index is `count − 1` (class 0 → 1 tick/arc, class 1 → 2, …).
+  const REL_PALETTE = ['#0d9488', '#7c3aed', '#db2777', '#ea580c', '#ca8a04', '#0891b2', '#65a30d', '#be123c'];
+  const relColor = (count: number) => REL_PALETTE[(count - 1) % REL_PALETTE.length];
 
   // Lay segment XY horizontal — pick a reference segment instead of nudging the slider.
   // Store the SEGMENT (not a fixed angle) as a standing request, recomputed each render
@@ -600,6 +614,95 @@ export function Figure({
               }).join(' ');
               return <polyline key={`am-${i}`} points={pts} fill="none" stroke="#1d4ed8" strokeWidth={stroke} style={{ pointerEvents: 'none' }} />;
             })}
+
+          {/* "view relations" ground-truth layer (ADR-134): equal-segment ticks + equal-angle arcs. The
+              equality-class count (1/2/3 ticks-or-arcs) distinguishes one equal-group from another. */}
+          {relMarks && (
+            <g style={{ pointerEvents: 'none' }}>
+              {relMarks.ticks.flatMap((tk, i) => {
+                const A = transform.toScreen(tk.a);
+                const B = transform.toScreen(tk.b);
+                const L = Math.hypot(B.x - A.x, B.y - A.y) || 1;
+                const ux = (B.x - A.x) / L;
+                const uy = (B.y - A.y) / L;
+                const nx = -uy; // perpendicular to the segment (the hatch direction)
+                const ny = ux;
+                const mx = (A.x + B.x) / 2;
+                const my = (A.y + B.y) / 2;
+                const half = 1.8 * r; // hatch half-length
+                const spacing = 1.7 * r; // gap between the ticks of one group, centred on the midpoint
+                return Array.from({ length: tk.count }, (_, k) => {
+                  const off = (k - (tk.count - 1) / 2) * spacing;
+                  const cx = mx + ux * off;
+                  const cy = my + uy * off;
+                  return (
+                    <line
+                      key={`rt-${i}-${k}`}
+                      x1={cx - nx * half}
+                      y1={cy - ny * half}
+                      x2={cx + nx * half}
+                      y2={cy + ny * half}
+                      stroke={relColor(tk.count)}
+                      strokeWidth={stroke * 1.4}
+                      strokeLinecap="round"
+                    />
+                  );
+                });
+              })}
+              {relMarks.angles.flatMap((an, i) => {
+                const V = transform.toScreen(an.vertex);
+                const P1 = transform.toScreen(an.p1);
+                const P2 = transform.toScreen(an.p2);
+                const u1 = unitVec({ x: P1.x - V.x, y: P1.y - V.y });
+                const u2 = unitVec({ x: P2.x - V.x, y: P2.y - V.y });
+                const th1 = Math.atan2(u1.y, u1.x);
+                let dth = Math.atan2(u2.y, u2.x) - th1; // the short signed (interior) angle
+                while (dth > Math.PI) dth -= 2 * Math.PI;
+                while (dth < -Math.PI) dth += 2 * Math.PI;
+                const N = 14;
+                return Array.from({ length: an.count }, (_, k) => {
+                  const ar = 4.5 * r + (an.startArc + k) * 1.5 * r; // concentric arcs, staggered past other marks at this vertex
+                  const pts = Array.from({ length: N + 1 }, (_, j) => {
+                    const th = th1 + (dth * j) / N;
+                    return `${V.x + ar * Math.cos(th)},${V.y + ar * Math.sin(th)}`;
+                  }).join(' ');
+                  return <polyline key={`ra-${i}-${k}`} points={pts} fill="none" stroke={relColor(an.count)} strokeWidth={stroke * 1.4} />;
+                });
+              })}
+              {/* Definitive angle VALUES (e.g. "60°") — printed inside the angle along its bisector, with a
+                  white halo so the number reads over the figure's lines. */}
+              {relMarks.values.map((vl, i) => {
+                const V = transform.toScreen(vl.vertex);
+                const P1 = transform.toScreen(vl.p1);
+                const P2 = transform.toScreen(vl.p2);
+                const u1 = unitVec({ x: P1.x - V.x, y: P1.y - V.y });
+                const u2 = unitVec({ x: P2.x - V.x, y: P2.y - V.y });
+                const bl = Math.hypot(u1.x + u2.x, u1.y + u2.y) || 1;
+                // Beyond the equal-angle arcs, into the angle's interior; each successive value at the SAME
+                // vertex (rank 1, 2, …) is pushed further out along its bisector so they don't overlap.
+                const off = (8.5 + vl.rank * 4.2) * r;
+                const lx = V.x + ((u1.x + u2.x) / bl) * off;
+                const ly = V.y + ((u1.y + u2.y) / bl) * off;
+                return (
+                  <text
+                    key={`rv-${i}`}
+                    x={lx}
+                    y={ly}
+                    fontSize={fontSize * 0.78}
+                    fill={REL}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    stroke="#fff"
+                    strokeWidth={stroke * 2.2}
+                    paintOrder="stroke"
+                    style={{ pointerEvents: 'none', fontWeight: 600 }}
+                  >
+                    {vl.text}
+                  </text>
+                );
+              })}
+            </g>
+          )}
         </g>
       </svg>
 

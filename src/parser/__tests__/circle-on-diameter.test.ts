@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
-import type { AnyCommand } from '@/engine';
+import { replay } from '@/store/geoStore';
+import type { Fact } from '@/store/geoStore';
+import type { AnyCommand, Vec } from '@/engine';
 
 /**
  * ADR-090 — a circle DEFINED BY its diameter AB (centre = midpoint of AB). The inverse of `diameter`
@@ -46,5 +48,39 @@ describe('circle on diameter AB (ADR-090)', () => {
       expect(t, u).not.toContain('circle-through');
     }
     // (the cyclic-quad add case "AD קוטר במעגל ABCD" needs the circle in context — covered by the bagrut-4d scenario)
+  });
+});
+
+/**
+ * ADR-137 — "AB is a diameter" of an EXISTING circle whose endpoints A,B ALREADY EXIST is a CONSTRAINT on the
+ * existing chord (the centre lies on AB ⇒ AB passes through the centre ⇒ a diameter), never a re-creation of
+ * A,B (which errors "'B' is already defined"). Locks the operator's literal representation: a CIRCUMCIRCLE
+ * named P (centre = derived circumcentre). The string-pipeline case (named on-circle) is the
+ * `diameter-on-existing-chord-is-a-constraint` scenario.
+ */
+describe('diameter on an existing chord is a constraint (ADR-137)', () => {
+  const ang = (a: Vec, b: Vec, c: Vec) => {
+    const u = { x: a.x - b.x, y: a.y - b.y }, w = { x: c.x - b.x, y: c.y - b.y };
+    return (Math.acos(Math.max(-1, Math.min(1, (u.x * w.x + u.y * w.y) / (Math.hypot(u.x, u.y) * Math.hypot(w.x, w.y))))) * 180) / Math.PI;
+  };
+
+  it('"AB קוטר במעגל P" on a CIRCUMCIRCLE (derived centre) emits set-collinear and makes AB a diameter (∠ACB→90°)', () => {
+    // The operator's representation: a circumcircle through A,B,C, centre P a derived circumcentre.
+    const setup: AnyCommand[] = [{ type: 'circumcircle', id: 'circle-P', center: 'P', a: 'A', b: 'B', c: 'C' } as AnyCommand];
+    const ctx = { circles: ['P'], points: ['A', 'B', 'C', 'P'], circleMembers: [] as { center: string; points: string[] }[] };
+    const r = parse('AB קוטר במעגל P', ctx);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // a constraint, NOT a re-creating `diameter`/`circle-through`
+    expect(r.commands).toEqual([{ type: 'set-collinear', a: 'A', b: 'P', c: 'B' }]);
+    // and it builds a genuine diameter without the "'B' is already defined" error
+    const facts: Fact[] = [...setup, ...r.commands].map((cmd, i) => ({ id: `f${i}`, group: 'g', utterance: 'u', cmd, enabled: true }));
+    const fig = replay(facts, 0);
+    expect(fig.lastError).toBeNull();
+    const A = fig.positions.get('A')!, B = fig.positions.get('B')!, C = fig.positions.get('C')!, P = fig.positions.get('P')!;
+    expect(ang(A, C, B), '∠ACB = 90 (Thales — AB is a diameter)').toBeCloseTo(90, 0);
+    const ab = { x: B.x - A.x, y: B.y - A.y };
+    const off = Math.abs((P.x - A.x) * ab.y - (P.y - A.y) * ab.x) / Math.hypot(ab.x, ab.y);
+    expect(off, 'centre P lies on AB').toBeLessThan(1e-3);
   });
 });

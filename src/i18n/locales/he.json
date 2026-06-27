@@ -137,6 +137,11 @@
     "cancelEdit": "ביטול",
     "markIntersection": "צרו נקודת חיתוך",
     "showMeasures": "הציגו מידות",
+    "viewRelations": "הצג קשרים",
+    "hideRelations": "הסתר קשרים",
+    "analysing": "מנתח…",
+    "relationsHint": "סמן אילו צלעות וזוויות שוות בכל ציור אפשרי של הצורה",
+    "relationsNone": "לא נמצאו צלעות או זוויות שוות בהכרח",
     "language": "English"
   },
   "pointMenu": {

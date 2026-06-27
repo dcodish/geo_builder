@@ -55,10 +55,18 @@ describe('parse — diameter from a point cuts a side at a new point', () => {
     expect(r.commands[0]).toEqual({ type: 'line-line-intersection', id: 'E', a: 'F', b: 'O', c: 'A', d: 'C', dir1: true, dir2: true });
   });
 
-  it('a bare "diameter AB" (no cut) is still the plain diameter rule', () => {
-    const r = parse('diameter AB', { circles: ['O'], points: ['A', 'B', 'O'] });
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.commands).toEqual([{ type: 'diameter', id1: 'A', id2: 'B', circle: 'circle-O' }]);
+  it('a bare "diameter AB" (no cut) is the diameter rule, NOT diameterCutsSegment', () => {
+    // A,B do NOT exist yet ⇒ the plain `diameter` command (create the diameter on circle O).
+    const fresh = parse('diameter AB', { circles: ['O'], points: ['O'] });
+    expect(fresh.ok).toBe(true);
+    if (!fresh.ok) return;
+    expect(fresh.commands).toEqual([{ type: 'diameter', id1: 'A', id2: 'B', circle: 'circle-O' }]);
+    // A,B ALREADY EXIST on circle O ⇒ "AB is a diameter" is a CONSTRAINT on the existing chord (the centre
+    // lies on AB), never a re-creation of A,B (which errors "'B' is already defined"). [ADR-137] Either way
+    // it is the diameter family, NOT diameterCutsSegment (no line-line-intersection).
+    const existing = parse('diameter AB', { circles: ['O'], points: ['A', 'B', 'O'] });
+    expect(existing.ok).toBe(true);
+    if (!existing.ok) return;
+    expect(existing.commands).toEqual([{ type: 'set-collinear', a: 'A', b: 'O', c: 'B' }]);
   });
 });

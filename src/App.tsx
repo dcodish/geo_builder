@@ -53,6 +53,9 @@ export default function App() {
   const toggleSegDashed = useGeoStore((s) => s.toggleSegDashed);
   const hiddenCircles = useGeoStore((s) => s.hiddenCircles);
   const toggleCircleHidden = useGeoStore((s) => s.toggleCircleHidden);
+  const relations = useGeoStore((s) => s.relations);
+  const viewRelations = useGeoStore((s) => s.viewRelations);
+  const clearRelations = useGeoStore((s) => s.clearRelations);
   const clear = useGeoStore((s) => s.clear);
 
   const { undo, redo } = useGeoStore.temporal.getState();
@@ -63,6 +66,7 @@ export default function App() {
   const [inputNote, setInputNote] = useState(''); // a problem message under the input (not-understood / built-nothing)
   const [thinking, setThinking] = useState(false); // LLM fallback in flight (Phase 7)
   const [resampling, setResampling] = useState(false); // "show another configuration" search in flight (synchronous; we paint a busy state first)
+  const [analysing, setAnalysing] = useState(false); // "view relations" detection in flight (synchronous; paint a busy state first)
   const [llmDropped, setLlmDropped] = useState<string[]>([]); // LLM steps the engine couldn't build
   const [renameNote, setRenameNote] = useState(''); // why a relabel was a no-op (target taken / no such point)
   const [altNote, setAltNote] = useState(''); // transient: "show another configuration" found no different drawing
@@ -351,6 +355,11 @@ export default function App() {
     [facts, seed, radiusOverrides],
   );
 
+  // The "view relations" layer is shown only while its cached result still matches the CURRENT facts —
+  // any fact change makes a new `facts` array (≠ the cached ref), so the layer auto-clears (ADR-134). Ground
+  // truths are invariant across configurations, so it deliberately survives "show another configuration".
+  const relationsLayer = relations && relations.facts === facts ? relations.result : null;
+
   // Snap-to-intersection: a clicked crossing becomes a real named point. Pick the
   // first free single capital letter, then create it via the same command path.
   function markIntersection(x: Crossing) {
@@ -460,6 +469,7 @@ export default function App() {
             intersectionLabel={t('actions.markIntersection')}
             labels={labels}
             angleMarks={angleMarks}
+            relations={relationsLayer}
             showMeasures={showMeasures}
             showCenters={showCenters}
             hidden={hiddenSet}
@@ -766,6 +776,42 @@ export default function App() {
             </span>
           )}
 
+          {/* "View relations" — the ground-truth layer (ADR-134): on press, mark every equal side / equal
+              angle the givens FORCE (ticks / arcs). A button, not a live toggle; the detection samples the
+              figure, so we paint a busy state first. Dismiss with the same button; a new fact auto-clears it. */}
+          {facts.length > 0 && (
+            <button
+              type="button"
+              style={relationsLayer ? relBtnOn : alt}
+              disabled={analysing}
+              title={t('actions.relationsHint')}
+              onClick={() => {
+                if (analysing) return;
+                if (relationsLayer) {
+                  clearRelations();
+                  return;
+                }
+                // Synchronous detection (samples + replays the figure) — paint a "working" state FIRST
+                // (double rAF) so a heavy figure doesn't freeze with no feedback, then run it.
+                setAnalysing(true);
+                requestAnimationFrame(() =>
+                  requestAnimationFrame(() => {
+                    try {
+                      viewRelations();
+                    } finally {
+                      setAnalysing(false);
+                    }
+                  }),
+                );
+              }}
+            >
+              {analysing ? t('actions.analysing') : relationsLayer ? t('actions.hideRelations') : t('actions.viewRelations')}
+            </button>
+          )}
+          {relationsLayer && relationsLayer.equalSegments.length === 0 && relationsLayer.equalAngles.length === 0 && (
+            <span style={{ fontSize: 12, color: '#64748b' }}>{t('actions.relationsNone')}</span>
+          )}
+
           {/* Playable degrees of freedom (first slice): a slider per free-circle radius. Dialing a value
               is a viewing scratchpad — "show another configuration" resets it. */}
           {radiusDofs.length > 0 && (
@@ -1060,6 +1106,8 @@ const alt: React.CSSProperties = {
   color: '#fff',
   cursor: 'pointer',
 };
+// The "view relations" button while the layer is ON — teal, matching the on-figure tick/arc colour.
+const relBtnOn: React.CSSProperties = { ...alt, border: '1px solid #0d9488', background: '#0d9488' };
 function factRow(state: 'ok' | 'disabled' | 'broken', selected: boolean): React.CSSProperties {
   const border = selected ? '#f59e0b' : state === 'broken' ? '#fecaca' : '#e2e8f0';
   const bg = selected ? '#fffbeb' : state === 'broken' ? '#fef2f2' : '#f8fafc';

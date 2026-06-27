@@ -20,13 +20,33 @@ import type { Constraint, Construction, FreePoint, Id, OnCirclePoint, OnLinePoin
 import { isGeoPoint } from './types';
 import { carrierOf, isShapeCarrier } from './carriers';
 
+/**
+ * An ORDER/REGION constraint ('angle-order' / 'length-order' / 'collinear-order' / 'angle-acuteness')
+ * removes 0 DOF ([ADR-039](docs/06-decisions.md#adr-039); cf. `dofRemoved`): it pins the carrier into a
+ * valid REGION, not to a point, so a carrier whose `solve` directive is ONLY such a constraint keeps its
+ * full DOF — it is NOT consumed. Such a carrier must stay free/samplable: the order is re-enforced by
+ * `evaluate` from the perturbed seed (a perturbation that keeps the order has 0 residual, so the figure
+ * still varies WITHIN the region). Treating an order-only `solve` as "driven/fixed" is the ADR-052 smell —
+ * a shape DOF the cue counts but the sampler can never move, so the relations layer mistakes the one drawn
+ * configuration for a forced one (e.g. an inscribed triangle whose `A,B,E` collinear-order recruited its
+ * vertices froze them out of sampling, so every angle read as "definitive").
+ */
+const isOrderOnlySolve = (o: { solve?: unknown }): boolean => {
+  const k = (o as { solve?: { constraint?: Constraint } }).solve?.constraint?.type;
+  return k === 'angle-order' || k === 'length-order' || k === 'collinear-order' || k === 'angle-acuteness';
+};
+
+/** A carrier's DOF is NOT consumed by a constraint: either undriven, or driven only by an order/region
+ *  constraint (which removes 0 DOF). Such a carrier stays free for sampling. */
+const notConsumed = (o: { solve?: unknown }): boolean => o.solve === undefined || isOrderOnlySolve(o);
+
 /** A free on-circle vertex the sampler may slide (an arbitrary-angle vertex, not driven/fixed). */
 const isFreeOnCircle = (o: { kind: string; free?: boolean; solve?: unknown }): boolean =>
-  o.kind === 'on-circle' && !!o.free && o.solve === undefined;
+  o.kind === 'on-circle' && !!o.free && notConsumed(o);
 
 /** A free on-segment point the sampler may slide along its segment (no stated ratio, not driven — ADR-052). */
 const isFreeOnSegment = (o: { kind: string; free?: boolean; solve?: unknown }): boolean =>
-  o.kind === 'on-segment' && !!o.free && o.solve === undefined;
+  o.kind === 'on-segment' && !!o.free && notConsumed(o);
 
 /**
  * An EXTENSION on-segment point ("F on the extension of AD", t>1) with no stated distance and not
@@ -36,10 +56,10 @@ const isFreeOnSegment = (o: { kind: string; free?: boolean; solve?: unknown }): 
  * masquerading as fixed). A RECRUITED extension point (solve set) is excluded — it's driven, not free.
  */
 const isSamplableExtension = (o: { kind: string; extension?: boolean; solve?: unknown }): boolean =>
-  o.kind === 'on-segment' && !!(o as { extension?: boolean }).extension && o.solve === undefined;
+  o.kind === 'on-segment' && !!(o as { extension?: boolean }).extension && notConsumed(o);
 
 /** A free on-line marker the sampler may slide along its line (not yet driven by a constraint — ADR-036). */
-const isFreeOnLine = (o: { kind: string; solve?: unknown }): boolean => o.kind === 'on-line' && o.solve === undefined;
+const isFreeOnLine = (o: { kind: string; solve?: unknown }): boolean => o.kind === 'on-line' && notConsumed(o);
 
 /**
  * A PINNED parametric point — on-circle/on-segment whose position is FIXED: an explicit θ/t that is neither
@@ -89,7 +109,7 @@ export function applySeed(c: Construction, seed: number): Construction {
   const free = c.objects.filter((o): o is FreePoint => o.kind === 'free-point' && !o.pinned);
   const freeCircle = c.objects.filter((o): o is OnCirclePoint => isFreeOnCircle(o));
   const freeLine = c.objects.filter((o): o is OnLinePoint => isFreeOnLine(o));
-  const freeShape = c.objects.some((o) => isShapeCarrier(o) && (o as { solve?: unknown }).solve === undefined);
+  const freeShape = c.objects.some((o) => isShapeCarrier(o) && notConsumed(o as { solve?: unknown }));
   if (free.length === 0 && freeCircle.length === 0 && freeLine.length === 0 && !freeShape) return c; // fully determined → nothing to sample
 
   // Free-point cluster: seeded spin about its centroid + per-point jitter.
@@ -181,16 +201,17 @@ export function applySeed(c: Construction, seed: number): Construction {
     // Free SHAPE-PARAMETER DOFs (ADR-033) — a rhombus's angle, a rectangle/right-triangle's
     // offset, a trapezoid's top ratio. Varying these lets "show another configuration" reach a
     // genuinely different SHAPE (e.g. an obtuse-angled rhombus), not just jiggled points. Skipped
-    // when the scalar is driven by a constraint (solve set) — that shape is already pinned.
-    if (o.kind === 'rotated' && o.solve === undefined) {
+    // when the scalar is CONSUMED by a constraint — but an order-only `solve` leaves it free (region,
+    // 0 DOF removed), so the order is re-enforced by `evaluate` from the perturbed seed.
+    if (o.kind === 'rotated' && notConsumed(o)) {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
       return { ...o, angleDeg: 40 + jr() * 100 }; // ∠ ∈ [40°, 140°] — acute OR obtuse at the pivot
     }
-    if (o.kind === 'perp-offset' && o.solve === undefined) {
+    if (o.kind === 'perp-offset' && notConsumed(o)) {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
       return { ...o, dist: o.dist * (0.55 + jr() * 1.3) }; // 0.55×–1.85× the default extent
     }
-    if (o.kind === 'scaled-offset' && o.solve === undefined) {
+    if (o.kind === 'scaled-offset' && notConsumed(o)) {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
       return { ...o, k: 0.3 + jr() * 0.55 }; // a trapezoid's top:base ratio ∈ [0.3, 0.85]
     }
@@ -198,7 +219,7 @@ export function applySeed(c: Construction, seed: number): Construction {
     // differently-sized circles (including the OTHER one larger). A wide jitter (0.45×–1.6×) so the two
     // circles can swap which is bigger; the resample caller's distinctness guard rejects any draw where the
     // varied sizes push two points together (a near-tangent secant), so only clean alternatives are shown.
-    if (o.kind === 'circle' && o.radius.via === 'free' && o.solve === undefined) {
+    if (o.kind === 'circle' && o.radius.via === 'free' && notConsumed(o)) {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
       return { ...o, radius: { via: 'free' as const, value: o.radius.value * (0.45 + jr() * 1.15) } };
     }
@@ -223,7 +244,7 @@ export function freeDofs(c: Construction): Id[] {
         isFreeOnSegment(o) ||
         isSamplableExtension(o) ||
         isFreeOnLine(o) ||
-        (isShapeCarrier(o) && (o as { solve?: unknown }).solve === undefined), // incl. a free-radius circle (ADR-051)
+        (isShapeCarrier(o) && notConsumed(o as { solve?: unknown })), // incl. a free-radius circle (ADR-051)
     )
     .map((o) => o.id);
 }

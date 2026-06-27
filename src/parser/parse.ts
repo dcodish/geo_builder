@@ -1364,7 +1364,11 @@ const setRadius: Rule = (s, ctx) => {
 const CYCLIC_QUAD_ANGLES = [30, 105, 195, 295];
 
 const INSCRIBED_ANGLES: Record<string, number[] | null> = {
-  triangle: null,
+  // A SCALENE default spread (uneven gaps) so a general inscribed triangle is scalene, not equilateral —
+  // and an EXPLICIT theta the sampler can perturb. Without a theta the vertices have nothing to vary, so the
+  // triangle's shape was frozen across every "configuration" (an ADR-052 violation that also made the
+  // relations layer report incidental angles as forced). The vertices are `free` (see `freeAngles`).
+  triangle: [70, 175, 300],
   quad: null,
   'right-triangle': [180, 0, 90], // Thales: A,B antipodal (hypotenuse = diameter), C the right angle
   square: [45, 135, 225, 315],
@@ -1522,7 +1526,9 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // NOT rigid (its base ratio / height are unstated DOFs, ADR-052) and its only fixed property — AB ∥ CD —
   // is now carried by a `set-parallel` constraint (shapeCmds), so its vertices are FREE too: they keep the
   // isosceles starting angles but can flex to satisfy later givens while the parallel constraint persists.
-  const freeAngles = kind === 'quad' || kind === 'trapezoid';
+  // A general TRIANGLE is also free (any triangle is cyclic — its 3 vertex angles are unstated DOFs, ADR-052);
+  // a RIGHT-triangle inscribed stays fixed (its angles are pinned by Thales, kind 'right-triangle').
+  const freeAngles = kind === 'quad' || kind === 'trapezoid' || kind === 'triangle';
   ids.forEach((id, i) => {
     // specific angle for a shaped cyclic polygon (square/rect/rhombus/trapezoid) or the general quad's
     // convex-default start; omit for triangle so it spreads evenly via nextTheta.
@@ -1867,13 +1873,26 @@ const circleOnDiameter: Rule = (s, ctx) => {
   ];
 };
 
-/** "diameter DE in circle O" / "קוטר DE במעגל O" — a point on the circle + its antipode + the segment. */
+/** "diameter DE in circle O" / "קוטר DE במעגל O" — a point on the circle + its antipode + the segment.
+ *  But when BOTH endpoints ALREADY EXIST (they're points on the circle), "AB is a diameter" is a CONSTRAINT
+ *  on the existing chord, never a re-creation of A,B (which conflicts — "'B' is already defined", the
+ *  operator's `AB קוטר במעגל P` failure). It's the same "declaration against an existing circle/points is a
+ *  constraint" pattern as ADR-080 (existing vertex on a circle), ADR-092 (a given diameter), ADR-099
+ *  (inscribe in an existing circle), ADR-115 (tangency to an existing circle). "AB is a diameter" ⟺ the
+ *  centre lies on AB; since the centre is equidistant from A and B (both on the circle), collinearity of
+ *  A·centre·B forces the centre to their MIDPOINT ⇒ AB passes through the centre ⇒ a diameter. So emit
+ *  `set-collinear [A, centre, B]`: the engine flexes the figure to satisfy it — numerically driving the
+ *  free DOFs when the centre is derived (a circumcircle's circumcentre, no dependency cycle), or converting
+ *  a free on-circle endpoint to the other's antipode when the centre is independent. [ADR-137] */
 const diameter: Rule = (s, ctx) => {
   if (!/diameter|קוטר/i.test(s)) return null;
   const center = resolveCenter(s, ctx);
   if (!center) return null;
   const ids = labelRun(dropCircleRef(s).replace(/diameter|קוטר/gi, ' '), 2);
   if (!ids) return null;
+  const exists = (p: string) => (ctx.points ?? []).some((q) => up(q) === up(p));
+  if (exists(ids[0]) && exists(ids[1]))
+    return [{ type: 'set-collinear', a: up(ids[0]), b: up(center), c: up(ids[1]) }];
   return [{ type: 'diameter', id1: ids[0], id2: ids[1], circle: circleId(center) }];
 };
 
@@ -1973,12 +1992,16 @@ const tangentLineIntersection: Rule = (s, ctx) => {
   const e = up(resM[1]);
   const tanId = `tan-${at}`;
   const abId = `line-${a}${b}`;
+  // "המשך AB" / "extension of AB" is DIRECTIONAL — E is beyond the SECOND letter (order a→b→e). Carry that as
+  // the crossing's `order` so the figure flexes to put E on AB's extension (not the wrong side); without it
+  // the tangent ∩ the infinite line can land beyond a. (ADR-127's order mechanism; folds into the solver.)
+  const directional = /extension|המשך/i.test(s);
   return [
     // Draw what we reference, not just the point: the tangent (trimmed to D–E by the
     // renderer) and the line AB drawn all the way to E (E is on AB's extension).
     { type: 'tangent', id: tanId, circle: circleId(center), at, visible: true },
     { type: 'line-through', id: abId, a, b }, // scaffolding for the crossing
-    { type: 'line-intersection', id: e, line1: tanId, line2: abId },
+    { type: 'line-intersection', id: e, line1: tanId, line2: abId, ...(directional ? { order: [a, b, e] } : {}) },
     { type: 'segment', a: e, b: a },
     { type: 'segment', a: e, b: b },
   ];
