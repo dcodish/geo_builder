@@ -99,4 +99,35 @@ describe('relationMarks', () => {
     const m = relationMarks(rel, p);
     expect(m.ticks).toEqual([]); // AB degenerate, CD missing D → both skipped
   });
+
+  it('a definite VALUE supersedes its equal-angle arc — no double-marking (ADR-134)', () => {
+    // Both ∠ABX and ∠CBY are equal AND each a definite 30°. The two "30°" labels already convey equality,
+    // so NO equal-arc is drawn (the operator's "DEC and ECB show twice as equal").
+    const rel: RelationsResult = {
+      equalSegments: [],
+      equalAngles: [[{ vertex: 'B', a: 'A', b: 'X' }, { vertex: 'B', a: 'C', b: 'Y' }]],
+      definiteAngles: [
+        { vertex: 'B', a: 'A', b: 'X', valueDeg: 30 },
+        { vertex: 'B', a: 'C', b: 'Y', valueDeg: 30 },
+      ],
+      samplesUsed: 8,
+    };
+    const p = pos([['A', [1, 0]], ['X', [1, 1]], ['C', [-1, 0]], ['Y', [-1, 1]], ['B', [0, 0]]]);
+    const m = relationMarks(rel, p);
+    expect(m.values.map((v) => v.text)).toEqual(['30°', '30°']);
+    expect(m.angles).toEqual([]); // the equal-arc is suppressed (both shown as values)
+  });
+
+  it('equal angles that are NOT definite still get arcs (the only equality signal)', () => {
+    const rel: RelationsResult = {
+      equalSegments: [],
+      equalAngles: [[{ vertex: 'B', a: 'A', b: 'X' }, { vertex: 'D', a: 'C', b: 'Y' }]],
+      definiteAngles: [], // they float (e.g. isosceles base angles) → arcs are the only way to show equality
+      samplesUsed: 8,
+    };
+    const p = pos([['A', [1, 0]], ['X', [1, 1]], ['B', [0, 0]], ['C', [3, 0]], ['Y', [3, 1]], ['D', [2, 0]]]);
+    const m = relationMarks(rel, p);
+    expect(m.angles).toHaveLength(2); // both arcs kept
+    expect(m.values).toEqual([]);
+  });
 });

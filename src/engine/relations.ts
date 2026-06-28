@@ -30,6 +30,24 @@ import { dist, sub, len } from './geometry';
  * is what lets the angle universe see the TANGENT-CHORD angle (∠ between the tangent DE and a chord DB).
  * Used for ANGLES only — segment lengths stay the drawn `segment`s. (FR-RV-6 "what appears", ADR-134.)
  */
+/**
+ * A point that lies ON a segment/line is connected — for ANGLE enumeration ONLY — to that host's two
+ * endpoints, so an angle between the host line and another ray from the point is seen. Without this a
+ * perpendicular FOOT (or any "F on AB") has only its OFF-line neighbour in the graph (e.g. the altitude
+ * AF), so the right angle it makes with the host line (∠AFB = 90°) is never enumerated and the foot's 90°
+ * goes unmarked. The endpoints are NOT added to the SEGMENT universe (no fake edge) — only to the angle
+ * graph; at the endpoint the collinear ray to this point merges (same direction) with the ray to the far
+ * endpoint, so no spurious angle appears there — only the genuine angles AT the on-host point are added.
+ */
+function onHostEdges(c: Construction): [Id, Id][] {
+  const edges: [Id, Id][] = [];
+  for (const o of c.objects) {
+    if (o.kind === 'on-segment' || o.kind === 'on-segment-solved' || o.kind === 'midpoint') edges.push([o.id, o.a], [o.id, o.b]);
+    else if (o.kind === 'foot') edges.push([o.id, o.a], [o.id, o.b]); // the foot lies on the line (a,b)
+  }
+  return edges;
+}
+
 function visibleLineEdges(c: Construction): [Id, Id][] {
   const byId = new Map(c.objects.map((o) => [o.id, o] as const));
   const isPt = (id: Id) => byId.has(id) && isGeoPoint(byId.get(id)!);
@@ -219,7 +237,7 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
   // lengths above stay on the drawn `segment`s only.
   const nbAng: Record<Id, Set<Id>> = {};
   for (const [k, vs] of Object.entries(nb)) nbAng[k] = new Set(vs);
-  for (const [x, y] of visibleLineEdges(c0)) {
+  for (const [x, y] of [...visibleLineEdges(c0), ...onHostEdges(c0)]) {
     (nbAng[x] ??= new Set()).add(y);
     (nbAng[y] ??= new Set()).add(x);
   }

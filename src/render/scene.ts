@@ -417,34 +417,24 @@ export function relationMarks(relations: RelationsResult, positions: Map<Id, Vec
       if (pa && pb && len(sub(pa, pb)) > 1e-9) ticks.push({ a: pa, b: pb, count: i + 1 });
     }
   });
-  // Equal-angle arcs, staggered per vertex: each mark starts beyond the rings already drawn at its vertex
-  // (its own `count` rings + a 1-ring gap), so two marks at one vertex (e.g. ∠BDE and ∠ADE) never collide.
-  const angles: SceneEqualAngle[] = [];
-  const perVertexArcs = new Map<Id, number>();
-  relations.equalAngles.forEach((cls, i) => {
-    const count = i + 1;
-    for (const { vertex, a, b } of cls) {
-      const pv = positions.get(vertex);
-      const pa = positions.get(a);
-      const pb = positions.get(b);
-      if (pv && pa && pb && len(sub(pa, pv)) > 1e-9 && len(sub(pb, pv)) > 1e-9) {
-        const startArc = perVertexArcs.get(vertex) ?? 0;
-        perVertexArcs.set(vertex, startArc + count + 1); // +1 ring of separation before the next mark here
-        angles.push({ vertex: pv, p1: pa, p2: pb, count, startArc });
-      }
-    }
-  });
-  // Value labels, ranked PER VERTEX (smallest angle first → tightest near the corner) so several values at
-  // one busy vertex are pushed to staggered radii and don't overlap. A COMPOSITE angle (= the sum of finer
-  // definite parts at the same vertex) is dropped first — the student reads the total from the parts.
+  // Value labels + right-angle squares FIRST (definite measures), so the equal-angle arcs below can skip any
+  // angle whose value is already shown — an angle drawn as "60°" (or a right-angle knee) needs no ALSO-equal
+  // arc: two angles both labelled the same number already read as equal, and stacking an arc on top double-
+  // marks them (the operator's "DEC and ECB show twice as equal"). Ranked PER VERTEX (smallest first →
+  // tightest near the corner) so several values at one busy vertex stagger and don't overlap. A COMPOSITE
+  // angle (= the sum of finer definite parts at the same vertex) is dropped first — the student reads it
+  // from the parts.
   const values: SceneAngleValue[] = [];
   const rightAngles: SceneAngleMark[] = [];
   const perVertex = new Map<Id, number>();
+  const shownKey = (v: Id, a: Id, b: Id) => `${v}|${a < b ? `${a}|${b}` : `${b}|${a}`}`;
+  const shown = new Set<string>(); // angles whose definite value/right-angle is displayed — skip their equal-arc
   for (const { vertex, a, b, valueDeg } of atomicDefiniteAngles(relations.definiteAngles).sort((x, y) => x.valueDeg - y.valueDeg)) {
     const pv = positions.get(vertex);
     const pa = positions.get(a);
     const pb = positions.get(b);
     if (pv && pa && pb && len(sub(pa, pv)) > 1e-9 && len(sub(pb, pv)) > 1e-9) {
+      shown.add(shownKey(vertex, a, b));
       // A forced 90° draws the textbook right-angle SQUARE (the "knee"), not a "90°" number (operator request).
       if (Math.abs(valueDeg - 90) < 0.5) {
         rightAngles.push({ vertex: pv, p1: pa, p2: pb, right: true });
@@ -453,6 +443,29 @@ export function relationMarks(relations: RelationsResult, positions: Map<Id, Vec
       const rank = perVertex.get(vertex) ?? 0;
       perVertex.set(vertex, rank + 1);
       values.push({ vertex: pv, p1: pa, p2: pb, text: formatDeg(valueDeg), rank });
+    }
+  }
+  // Equal-angle arcs, staggered per vertex: each mark starts beyond the rings already drawn at its vertex
+  // (its own `count` rings + a 1-ring gap), so two marks at one vertex (e.g. ∠BDE and ∠ADE) never collide.
+  // An angle already shown as a definite value/right-angle is dropped (no double-mark); a class left with
+  // fewer than two members then carries no equality and is skipped entirely. Classes are renumbered over the
+  // SURVIVING ones so the arc-stroke counts stay 1,2,3… (no gaps from fully-suppressed classes).
+  const angles: SceneEqualAngle[] = [];
+  const perVertexArcs = new Map<Id, number>();
+  let drawnClass = 0;
+  for (const cls of relations.equalAngles) {
+    const visible = cls.filter((r) => !shown.has(shownKey(r.vertex, r.a, r.b)));
+    if (visible.length < 2) continue; // every (or all-but-one) member is already shown as a value
+    const count = ++drawnClass;
+    for (const { vertex, a, b } of visible) {
+      const pv = positions.get(vertex);
+      const pa = positions.get(a);
+      const pb = positions.get(b);
+      if (pv && pa && pb && len(sub(pa, pv)) > 1e-9 && len(sub(pb, pv)) > 1e-9) {
+        const startArc = perVertexArcs.get(vertex) ?? 0;
+        perVertexArcs.set(vertex, startArc + count + 1); // +1 ring of separation before the next mark here
+        angles.push({ vertex: pv, p1: pa, p2: pb, count, startArc });
+      }
     }
   }
   return { ticks, angles, values, rightAngles };
