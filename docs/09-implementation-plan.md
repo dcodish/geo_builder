@@ -135,6 +135,7 @@ Sub-phases — each ends by **reproducing its corpus questions** (gated per [Tes
 - **Depends on:** Phase 5 (needs the full construct vocabulary in the dependency graph). Does **not** depend on coordinate analysis — that is Phase 9.
 - **Requirements:** FR-TH-1, -2, -3, -4, -5, -6; US-4.
 - **Gate:** theorem-detection tests vs the catalog — expected **P/C** IDs surface with the correct **tier**; **O**-tagged items, definitions, and area/perimeter formulas **never** surface; each surfaced entry traces to its triggering fact.
+- **Follow-on (deferred):** once detection is in place, **link detected shapes/theorems out to the geometry book** on the same site (FR-REF-1) — keyed off this phase's detection + the shared bagrut numbering.
 
 ---
 
@@ -152,9 +153,9 @@ Sub-phases — each ends by **reproducing its corpus questions** (gated per [Tes
 ### Phase 8 — Export, polish, deploy
 
 - **Goal:** the author use-case and release readiness.
-- **Builds:** image export (SVG/PNG) for authors; local persistence (survive reload); drag free/on-object points to explore; accessibility pass; deploy.
+- **Builds:** image export (SVG/PNG) for authors; local persistence (survive reload); **save-to-file / load-from-file** of a figure (serialize the ordered fact list, replay on load — FR-HS-10); drag free/on-object points to explore; accessibility pass; deploy.
 - **Depends on:** Phases 2–6.
-- **Requirements:** FR-HS-4, -5; FR-RN-5; NFR-AC-1, -2; US-9, US-10, US-12.
+- **Requirements:** FR-HS-4, -5, -10; FR-RN-5; NFR-AC-1, -2; US-9, US-10, US-12, US-14.
 - **Gate:** export produces a valid image of the figure; persistence survives reload; headline flows pass (Playwright); accessibility checks.
 
 ---
