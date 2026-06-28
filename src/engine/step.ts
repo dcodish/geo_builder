@@ -516,7 +516,17 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
       did = true;
       break;
     }
-    if (did) continue;
+    // VERIFY before skipping the redundancy cases ([ADR-139](docs/06-decisions.md#adr-139)). Case (B) can
+    // recruit a DECOY free DOF — a free ancestor of K that does NOT free the genuinely-contested carrier
+    // (e.g. a kite+tangents figure where the 2nd tangency `OD⟂AD` needs D's θ, but D is double-booked by the
+    // REDUNDANT kite `AB=AD`: case (B) grabs the apex `A` instead). That decoy both sets `did` (which would
+    // skip the self-verifying redundancy cases (C)/(E)) and CONSUMES the DOF that case (D) needed as its
+    // `alt` to free the blocker — so neither redundancy case runs and the figure falsely over-constrains.
+    // So `did` only earns a skip when the recruitment ACTUALLY makes the whole system valid; otherwise fall
+    // through to (C)/(E), which are self-verifying (a lend is accepted only if `evaluate` passes) and so can
+    // never rescue a genuinely-impossible figure. Costs one extra `evaluate` per recruited constraint, on
+    // the already-failing path only — recruitFreeDofs runs only after `evaluate` already failed once.
+    if (did && evaluate({ objects, constraints: [...c.constraints, ...added] }).ok) continue;
     // (C) R7 JOINT RE-BIND ([ADR-045](docs/06-decisions.md#adr-045) step 3): no FREE DOF is reachable —
     // every DOF K could move is already CLAIMED by an earlier constraint (e.g. HF=4/GE=5 took a
     // parallelogram's free vertices, so a later "ABHD concyclic" finds them all busy). The figure can
@@ -536,7 +546,12 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
     if (steal) {
       changed = true;
       objects = objects.map((o) => (o.id === steal.id ? markDriven(o, K) : o)); // K already in c.constraints (pushed as a check)
-      continue;
+      // VERIFY, as for case (B)/(D) above ([ADR-139](docs/06-decisions.md#adr-139)): a steal that doesn't
+      // resolve the over-constraint — e.g. a DEGENERATE self-steal where K is itself the over-subscribed
+      // constraint (driveOrCheck gave it a carrier at apply-time AND case (B) added the decoy A, so K has 2
+      // carriers and `steal` re-points one of K's own carriers back to K, a no-op) — must NOT pre-empt the
+      // self-verifying redundant-lend (E). Fall through when it doesn't help.
+      if (evaluate({ objects, constraints: [...c.constraints, ...added] }).ok) continue;
     }
     // (E) REDUNDANT-CARRIER LEND: no free DOF and no over-subscribed carrier — yet the figure may still be
     // solvable when an earlier constraint K1 is REDUNDANT (already implied by the rest, e.g. a kite's `AB=AD`

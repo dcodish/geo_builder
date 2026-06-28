@@ -2081,6 +2081,24 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'kite-tangents-redundant-equality-not-over-constrained',
+    title: '"דלתון ABCD" + "B,C,D on circle O" + "AB,AD tangent" no longer FALSELY over-constrains (ADR-139/140)',
+    guards:
+      'operator session 5anuc529: the figure errored "over-constrained: |AB| = |AD| cannot hold" at the tangent step. Two root causes, both fixed: (ADR-139) the recruiter\'s case (B) recruited a DECOY free DOF (the apex A) for the 2nd tangency `OD⟂AD`, which set `did` (skipping the redundant-lend case (E)) AND consumed A (defeating case (D)); the fix verifies a recruit before letting it skip the self-verifying redundancy cases. (ADR-140) `point-on-circle` on the constraint-DRIVEN vertex D dropped its `solve`, so the conversion rolled back and D never reached the circle; the fix preserves the `solve`. With both, the over-constraint is GONE and AB,AD are real tangents (B,D on the circle, radius ⟂ each side, |AB|=|AD|). KNOWN PARKED LIMITATION: the parser drops "B,C,D on circle O" membership (defect a) so C is not asserted on the circle here, and the fully-membership variant does not converge in the joint solver (defect d, 0/24 seeds) — see the 2026-06-28 session-log entry. This scenario locks the recruiter+conversion half (the over-constraint fix).',
+    steps: ['ABCD דלתון', 'נקודות B C D על מעגל שמרכזו O', 'AB ו AD משיקים למעגל'],
+    check(fig) {
+      allStepsOk(fig); // the false "over-constrained: |AB| = |AD| cannot hold" is gone
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), D = at(fig, 'D');
+      // AB and AD are genuine tangents: B,D on circle O (equal radii) and the radius ⟂ the side.
+      expect(dist(O, D)).toBeCloseTo(dist(O, B), 3);
+      const dot = (p: Vec, q: Vec, u: Vec, v: Vec) => (q.x - p.x) * (v.x - u.x) + (q.y - p.y) * (v.y - u.y);
+      expect(Math.abs(dot(O, B, A, B)) / (dist(O, B) * dist(A, B))).toBeLessThan(1e-3);
+      expect(Math.abs(dot(O, D, A, D)) / (dist(O, D) * dist(A, D))).toBeLessThan(1e-3);
+      // the kite's redundant apex equality holds (two tangents from A are equal).
+      expect(dist(A, D)).toBeCloseTo(dist(A, B), 3);
+    },
+  },
+  {
     id: 'triangle-circumscribes-existing-circle',
     title: '"משולש DEF חוסם את המעגל O" where O already exists — incircle CONSTRAINT (sides tangent), not a fresh circle that re-radiuses O',
     guards:

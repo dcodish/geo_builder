@@ -8,7 +8,7 @@
  * existing points is fitted to them, instead of keeping absolute defaults.
  */
 
-import type { Command, Constraint, Construction, GeoObject, Id, Vec } from './types';
+import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, Vec } from './types';
 import { add, reflectAcross, sub } from './geometry';
 import { constraintRefs } from './solve';
 
@@ -710,7 +710,13 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         // A through-radius circle (handled by (c)) is excluded — there the CIRCLE grows to the fixed vertex.
         if (circ && existing.kind === 'free-point' && !(existing as Extract<GeoObject, { kind: 'free-point' }>).pinned) {
           const i = objects.findIndex((o) => o.id === cmd.id);
-          objects[i] = { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: nextTheta(objects, cmd.circle), free: true };
+          // PRESERVE a `solve` the free vertex already carries ([ADR-140](docs/06-decisions.md#adr-140)): a
+          // kite/shape vertex may already DRIVE an equality (e.g. D drives `AB=AD`). Dropping its carrier role
+          // on conversion would leave that equality without a carrier, so the conversion's `evaluate` fails and
+          // the whole `point-on-circle` fact is rolled back — the point can never reach the circle. Carried
+          // over, D still drives `AB=AD`, now via its on-circle θ (it slides on the circle to keep |AD|=|AB|).
+          const solve = (existing as { solve?: SolveDirective }).solve;
+          objects[i] = { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: nextTheta(objects, cmd.circle), free: true, ...(solve ? { solve } : {}) };
           break;
         }
         // (d) Can't reconcile structurally here — do NOT silently drop it; the post-evaluate
