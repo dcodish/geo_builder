@@ -135,6 +135,9 @@ export interface RelationMarks {
   ticks: SceneEqualTick[];
   angles: SceneEqualAngle[];
   values: SceneAngleValue[];
+  /** Forced RIGHT angles (≈90°): drawn as a right-angle SQUARE (the "knee" symbol), the textbook notation,
+   *  instead of a "90°" value label (operator request). Reuses the stated-mark square renderer. */
+  rightAngles: SceneAngleMark[];
 }
 
 export interface Scene {
@@ -431,18 +434,24 @@ export function relationMarks(relations: RelationsResult, positions: Map<Id, Vec
   // one busy vertex are pushed to staggered radii and don't overlap. A COMPOSITE angle (= the sum of finer
   // definite parts at the same vertex) is dropped first — the student reads the total from the parts.
   const values: SceneAngleValue[] = [];
+  const rightAngles: SceneAngleMark[] = [];
   const perVertex = new Map<Id, number>();
   for (const { vertex, a, b, valueDeg } of atomicDefiniteAngles(relations.definiteAngles).sort((x, y) => x.valueDeg - y.valueDeg)) {
     const pv = positions.get(vertex);
     const pa = positions.get(a);
     const pb = positions.get(b);
     if (pv && pa && pb && len(sub(pa, pv)) > 1e-9 && len(sub(pb, pv)) > 1e-9) {
+      // A forced 90° draws the textbook right-angle SQUARE (the "knee"), not a "90°" number (operator request).
+      if (Math.abs(valueDeg - 90) < 0.5) {
+        rightAngles.push({ vertex: pv, p1: pa, p2: pb, right: true });
+        continue;
+      }
       const rank = perVertex.get(vertex) ?? 0;
       perVertex.set(vertex, rank + 1);
       values.push({ vertex: pv, p1: pa, p2: pb, text: formatDeg(valueDeg), rank });
     }
   }
-  return { ticks, angles, values };
+  return { ticks, angles, values, rightAngles };
 }
 
 /** A definitive angle value for display: an integer when it's within 0.1° of one (60°), else one decimal. */

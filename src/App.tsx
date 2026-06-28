@@ -623,7 +623,7 @@ export default function App() {
               <div style={{ fontWeight: 600, marginBottom: 4 }}>⚠ {t('figure.mismatch')}</div>
               <ul style={{ margin: 0, paddingInlineStart: 18 }}>
                 {violations.map((v) => (
-                  <li key={`${v.relation}-${v.ids.join('-')}`}>{v.message}</li>
+                  <li key={`${v.relation}-${v.ids.join('-')}`}>{t(v.messageKey, v.params)}</li>
                 ))}
               </ul>
             </div>

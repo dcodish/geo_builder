@@ -56,6 +56,21 @@ describe('relationMarks', () => {
     expect(m.values[0].vertex).toEqual({ x: 0, y: 0 });
   });
 
+  it('a forced 90° becomes a right-angle SQUARE (the "knee"), NOT a "90°" value label (operator request)', () => {
+    const rel: RelationsResult = {
+      equalSegments: [],
+      equalAngles: [],
+      definiteAngles: [{ vertex: 'B', a: 'A', b: 'C', valueDeg: 90.00001 }],
+      samplesUsed: 8,
+    };
+    const p = pos([['A', [1, 0]], ['B', [0, 0]], ['C', [0, 1]]]);
+    const m = relationMarks(rel, p);
+    expect(m.values, 'no "90°" text').toEqual([]);
+    expect(m.rightAngles, 'a right-angle square instead').toHaveLength(1);
+    expect(m.rightAngles[0].right).toBe(true);
+    expect(m.rightAngles[0].vertex).toEqual({ x: 0, y: 0 });
+  });
+
   it('drops a COMPOSITE angle value (the sum of finer definite parts at the same vertex)', () => {
     // at B: ∠ABC = 22.5, ∠CBD = 45, and the total ∠ABD = 67.5 — show only the parts, not the total
     const rel: RelationsResult = {

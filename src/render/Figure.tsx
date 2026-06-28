@@ -701,6 +701,20 @@ export function Figure({
                   </text>
                 );
               })}
+              {/* Forced RIGHT angles (≈90°) drawn as the textbook right-angle SQUARE (the "knee"), not a
+                  "90°" number (operator request) — same square as a stated mark, in the relations colour. */}
+              {relMarks.rightAngles.map((m, i) => {
+                const V = transform.toScreen(m.vertex);
+                const P1 = transform.toScreen(m.p1);
+                const P2 = transform.toScreen(m.p2);
+                const u1 = unitVec({ x: P1.x - V.x, y: P1.y - V.y });
+                const u2 = unitVec({ x: P2.x - V.x, y: P2.y - V.y });
+                const s = 4 * r;
+                const c1 = `${V.x + u1.x * s},${V.y + u1.y * s}`;
+                const c2 = `${V.x + (u1.x + u2.x) * s},${V.y + (u1.y + u2.y) * s}`;
+                const c3 = `${V.x + u2.x * s},${V.y + u2.y * s}`;
+                return <polyline key={`rr-${i}`} points={`${c1} ${c2} ${c3}`} fill="none" stroke={REL} strokeWidth={stroke} style={{ pointerEvents: 'none' }} />;
+              })}
             </g>
           )}
         </g>

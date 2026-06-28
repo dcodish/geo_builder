@@ -85,7 +85,14 @@
   "figure": {
     "mismatch": "The figure may not match what you described:",
     "pending": "This relation is recorded but not determined yet — add the remaining givens (lengths/angles) to pin the figure, and it will resolve on its own.",
-    "converge": "{{a}} and {{b}} have landed at the same point."
+    "converge": "{{a}} and {{b}} have landed at the same point.",
+    "v": {
+      "onCircle": "{{point}} should lie on circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
+      "tangent": "tangency point {{point}} should lie on circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
+      "constraint": "{{desc}} does not hold in the final figure",
+      "orderBeyond": "{{id}} should lie on the extension of {{seg}} beyond {{b}}, but it landed between {{a}} and {{b}}",
+      "collinear": "{{pts}} should be collinear, but {{point}} is {{offset}} off the line"
+    }
   },
   "dof": {
     "title": "Adjust the figure",

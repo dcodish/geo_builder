@@ -21,8 +21,11 @@ export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
   relation: 'on-circle' | 'tangent' | Constraint['type'];
   ids: Id[];
-  /** Human-readable, e.g. "E should lie on circle-P (radius 3.60) but is 7.42 from its centre". */
+  /** English fallback, e.g. "E should lie on circle P (radius 3.60) but is 7.42 from its centre". */
   message: string;
+  /** i18n key + params so the UI renders the message in the active language (the engine has no locale). */
+  messageKey: string;
+  params: Record<string, string>;
 }
 
 /**
@@ -89,6 +92,8 @@ const onCircleTol = (r: number) => Math.max(0.05, r * 0.02);
 
 /** Friendly circle name for messages: `circle-P` → `circle P`. */
 const circleLabel = (id: Id) => id.replace(/^circle-/, 'circle ');
+/** The circle's bare letter (e.g. `circle-P` → `P`) for the i18n `params` (the locale supplies "circle"/"מעגל"). */
+const circleName = (id: Id) => id.replace(/^circle-/, '');
 
 /**
  * Check the figure's final coordinates against the relations its commands ASSERT. Returns the
@@ -115,6 +120,8 @@ export function checkGivens(
         relation: 'on-circle',
         ids: [point, circle],
         message: `${point} should lie on ${circleLabel(circle)} (radius ${c.r.toFixed(2)}) but is ${d.toFixed(2)} from its centre`,
+        messageKey: 'figure.v.onCircle',
+        params: { point, circle: circleName(circle), radius: c.r.toFixed(2), dist: d.toFixed(2) },
       });
     }
   }
@@ -130,6 +137,8 @@ export function checkGivens(
         relation: 'tangent',
         ids: [cmd.at, cmd.circle],
         message: `tangency point ${cmd.at} should lie on ${circleLabel(cmd.circle)} (radius ${c.r.toFixed(2)}) but is ${d.toFixed(2)} from its centre`,
+        messageKey: 'figure.v.tangent',
+        params: { point: cmd.at, circle: circleName(cmd.circle), radius: c.r.toFixed(2), dist: d.toFixed(2) },
       });
     }
   }
@@ -145,7 +154,7 @@ export function checkGivens(
     const r = residual(con, get);
     if (!Number.isFinite(r)) continue; // a degenerate config (collapsed ray/circle) — NaN, not a measurable miss
     if (!isSatisfied(con, get)) {
-      violations.push({ relation: con.type, ids: refs, message: `${describeConstraint(con)} does not hold in the final figure` });
+      violations.push({ relation: con.type, ids: refs, message: `${describeConstraint(con)} does not hold in the final figure`, messageKey: 'figure.v.constraint', params: { desc: describeConstraint(con) } });
     }
   }
 
@@ -169,6 +178,8 @@ export function checkGivens(
         relation: 'collinear-order',
         ids: [cmd.a, cmd.b, cmd.id],
         message: `${cmd.id} should lie on the extension of ${cmd.a}${cmd.b} beyond ${cmd.b}, but it landed between ${cmd.a} and ${cmd.b}`,
+        messageKey: 'figure.v.orderBeyond',
+        params: { id: cmd.id, seg: `${cmd.a}${cmd.b}`, a: cmd.a, b: cmd.b },
       });
     }
   }
@@ -191,6 +202,8 @@ export function checkGivens(
           relation: 'collinear',
           ids: pts,
           message: `${pts.join('–')} should be collinear, but ${pts[i]} is ${offset.toFixed(2)} off the line`,
+          messageKey: 'figure.v.collinear',
+          params: { pts: pts.join('–'), point: pts[i], offset: offset.toFixed(2) },
         });
       }
     }
