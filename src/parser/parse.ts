@@ -2348,6 +2348,11 @@ const tangentMeetsOtherCircle: Rule = (s) => {
  */
 const circlesTangent: Rule = (s) => {
   if (!/tangent|משיק/i.test(s)) return null;
+  // A "chord" word means a CHORD of one circle tangent to the OTHER (`tangentChord`, which runs first) —
+  // never mutual tangency. Guarding here stops a chord whose far endpoint / labels don't all match
+  // `tangentChord`'s shape from FALLING THROUGH to a wrong mutual-tangency that drops the chord (and
+  // contradicts "the circles intersect") — escalate instead. (Operator session vk346px4.)
+  if (/chord|מיתר/i.test(s)) return null;
   // Mutual tangency is a STATE ("tangent to each other at M" / "משיקים זה לזה"), never a crossing EVENT.
   // A cuts/meets keyword (חותך/פוגש/cuts/meets) means a tangent LINE meeting the other circle —
   // `tangentMeetsOtherCircle` (which runs first) owns that. Guarding here stops a near-miss of that rule
@@ -2360,6 +2365,48 @@ const circlesTangent: Rule = (s) => {
   if (!atM) return null;
   const internal = /\binternal\w*\b|\bfrom\s+inside\b|\binside\b|פנימ|מבפנים/i.test(s);
   return [{ type: 'circles-tangent', circle1: circleId(centers[0]), circle2: circleId(centers[1]), at: up(atM[1]), external: !internal }];
+};
+
+/**
+ * "the chord AD in circle P is tangent to circle O at A" /
+ * "המיתר AD במעגל P משיק למעגל O בנקודה A" — a CHORD of one (host) circle that is TANGENT to
+ * ANOTHER circle at one of its endpoints. Distinct from `circlesTangent` (the two circles tangent
+ * to EACH OTHER — a state) and from `tangentMeetsOtherCircle` (a tangent LINE that CUTS the other
+ * circle): here a "chord" word names a chord of the HOST circle (named BEFORE the tangent keyword),
+ * and "tangent to circle Y at Z" makes that chord touch the OTHER circle Y at its endpoint Z. The
+ * touch point Z lies on both circles (a shared intersection), so the tangency is radius(Y-centre →
+ * Z) ⟂ the chord. Both endpoints are placed on the host circle; the far endpoint is the new DOF the
+ * ⟂ drives so the chord touches Y at Z.
+ *
+ * Without this the two "circle X" mentions + the tangent keyword fall through to `circlesTangent`,
+ * which reads them as mutual tangency — silently dropping the chord's far endpoint and the chord
+ * itself, and asserting a tangency that contradicts "the circles intersect" (operator session
+ * vk346px4). Must run BEFORE `circlesTangent` (and `chord`, which would drop the tangency).
+ */
+const tangentChord: Rule = (s) => {
+  if (!/chord|מיתר/i.test(s)) return null;
+  if (!/tangent|משיק/i.test(s)) return null;
+  if (INTERSECT_KW.test(s)) return null; // a CUTTING event ("חותך"/"meets") → tangentMeetsOtherCircle owns it
+  // Split at the tangent keyword: the chord + its host circle precede it; the tangency circle + point follow.
+  const ti = s.search(/tangent|משיק/i);
+  const before = s.slice(0, ti);
+  const after = s.slice(ti);
+  const host = circleCenter(before); // the chord's host circle ("…במעגל P משיק…")
+  const target = circleCenter(after); // the circle it is tangent to ("…משיק למעגל O…")
+  if (!host || !target || up(host) === up(target)) return null; // two DIFFERENT named circles
+  const ends = labelRun(dropCircleRef(before).replace(/chord|מיתר/gi, ' '), 2); // the chord's endpoints
+  if (!ends) return null;
+  const zM = after.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i); // the touch point ("…at A" / "…בנקודה A")
+  const Z = zM ? up(zM[1]) : null;
+  if (!Z || !ends.includes(Z)) return null; // the touch point must be one of the chord's own endpoints
+  const hostCirc = circleId(host);
+  return [
+    { type: 'point-on-circle', id: ends[0], circle: hostCirc }, // both endpoints lie on the HOST circle (a chord)
+    { type: 'point-on-circle', id: ends[1], circle: hostCirc },
+    { type: 'point-on-circle', id: Z, circle: circleId(target) }, // the touch point lies on the TARGET circle (idempotent at a shared intersection)
+    { type: 'set-perpendicular', a: up(target), b: Z, c: ends[0], d: ends[1], implicit: true }, // radius(target→Z) ⟂ the chord ⇒ tangent at Z
+    { type: 'segment', a: ends[0], b: ends[1] }, // draw the chord
+  ];
 };
 
 /** "tangent to circle O at A" / "משיק למעגל O בנקודה A" — a *drawn* tangent line (⟂ the radius at A). */
@@ -3069,6 +3116,7 @@ const RULES: Rule[] = [
   twoTangentsMeet, // TWO tangents (at two on-circle points) meeting at a point — before tangent∩segment
   tangentLineIntersection, // tangent ∩ a segment
   parallelCircleIntersection, // a parallel line ∩ the circle
+  tangentChord, // a CHORD of one circle tangent to the OTHER at its endpoint — before circlesTangent/chord (which drop the tangency or the chord)
   tangentMeetsOtherCircle, // tangent LINE to one circle meets the OTHER circle — before circlesTangent (which would misread it as mutual tangency)
   circlesTangent, // two circles tangent to each other — before tangentLine (which would grab the משיק)
   secantFromExternal, // "from external point E a line cuts the circle at A,B" — before the generic intersections

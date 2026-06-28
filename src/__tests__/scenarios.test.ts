@@ -105,6 +105,33 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'chord-tangent-to-other-circle-at-endpoint',
+    title: '"the chord AD in circle P is tangent to circle O at A" creates D on circle P, draws the chord AD, and makes OA ⟂ AD (tangent) — not a mutual-tangency that drops D',
+    guards:
+      'operator session vk346px4 (two intersecting circles O,P; chord CB tangent to P at B; then "המיתר AD במעגל P משיק למעגל O בנקודה A"). The last step parsed to a single `circles-tangent` between circle-P and circle-O — point D and the chord AD were DROPPED entirely, and it asserted the two circles are tangent to EACH OTHER, contradicting the opening "two circles intersect". Status showed green ✓ while nothing new appeared on the canvas. Root cause: `circlesTangent` fires on any "two `מעגל X` tokens + a `משיק` keyword", but here one circle mention ("במעגל P") is the chord\'s HOST, not a second tangent circle — the rule can\'t tell them apart and throws away the chord. The deterministic parser also had NO tangent-chord construct at all (the symmetric step-2 chord only worked via the LLM). Fix: a new `tangentChord` rule (splits at the tangent keyword → host circle before, tangency circle + point after) emits both endpoints on the host circle + radius(target→Z) ⟂ the chord + the segment; and a `chord`/`מיתר` guard on `circlesTangent` so a chord phrasing can never become mutual tangency.',
+    steps: [
+      'שני מעגלים נחתכים',
+      // Step 2 in the live session was "המיתר CB משיק למעל P בנקודה B" — the "למעל" typo made it
+      // out-of-grammar so it escalated to the LLM. Captured here as the canonical commands the log shows.
+      { llm: [
+        { type: 'point-on-circle', id: 'C', circle: 'circle-O' },
+        { type: 'point-on-circle', id: 'B', circle: 'circle-P' },
+        { type: 'set-perpendicular', a: 'P', b: 'B', c: 'C', d: 'B', implicit: true },
+        { type: 'segment', a: 'C', b: 'B' },
+      ] },
+      'CB',
+      'המיתר AD במעגל P משיק למעגל O בנקודה A',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // D was created (the bug dropped it) and lies on circle P (a real chord endpoint).
+      const D = at(fig, 'D'), A = at(fig, 'A'), O = at(fig, 'O'), Pc = at(fig, 'P');
+      expect(dist(D, Pc)).toBeCloseTo(dist(A, Pc), 3); // |PD| = |PA| ⇒ D on circle P
+      // The chord AD is tangent to circle O at A: radius OA ⟂ the chord AD (∠OAD = 90°).
+      expect(angle(O, A, D)).toBeCloseTo(90, 1);
+    },
+  },
+  {
     id: 'diameter-on-existing-chord-is-a-constraint',
     title: '"AB is a diameter" of an EXISTING circle whose endpoints A,B already exist makes the chord a diameter (∠ at the far vertex → 90°), not a re-creation that errors',
     guards:
