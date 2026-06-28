@@ -111,6 +111,13 @@ ssh root@themathbible.com 'systemctl restart geo-proxy'
   Rotating `IP_HASH_SALT` resets unique-visitor counts (old/new hashes won't match).
 - The admin session is a stateless signed cookie (8 h); `ADMIN_BASE` must match the
   public path (`/geo-builder/admin`) so the cookie scopes and redirects resolve.
+- **Stale-figure-after-deploy = browser cache.** `scp` never deletes old hashed
+  bundles, and without a Cache-Control header on `index.html` a browser keeps the
+  old entry point and loads a stale (still-present) `index-*.js` — the app renders
+  with old code (e.g. missing the latest relations marks). The `<Directory>` cache
+  block in `apache-geo-builder.conf` fixes it (no-cache HTML, immutable assets). For
+  a one-off check, hard-refresh (`Ctrl+Shift+R`). Old bundles are left in place so
+  in-flight cached pages don't break; they age out as caches revalidate.
 - **Persistence caveat:** the ProxyPass lines are appended directly to
   `vhost_ssl.conf`. If a future Plesk domain reconfigure regenerates that file and
   drops them, the static app keeps working but the LLM fallback 404s (the client
