@@ -39,11 +39,12 @@ const PARSES: [string, string][] = [
   ['טרפז ABCD', 'trapezoid'],
   ['quadrilateral ABCD', 'quadrilateral'],
   ['מרובע ABCD', 'quadrilateral'],
-  // ── named shapes decomposed to primitives (ADR-110): kite / isosceles / equilateral / iso-trapezoid ──
-  ['kite ABCD', 'set-equal'],
-  ['דלתון ABCD', 'set-equal'],
-  ['isosceles triangle ABC', 'set-equal'],
-  ['משולש שווה שוקיים ABC', 'set-equal'],
+  // ── named shapes (ADR-110): equilateral / iso-trapezoid → set-equal. kite / isosceles are a cyclable
+  //    VARIANT (ADR-138) — a single `shape-variant` command `replay` expands to base + the chosen equal pair. ──
+  ['kite ABCD', 'shape-variant'],
+  ['דלתון ABCD', 'shape-variant'],
+  ['isosceles triangle ABC', 'shape-variant'],
+  ['משולש שווה שוקיים ABC', 'shape-variant'],
   ['equilateral triangle ABC', 'set-equal'],
   ['משולש שווה צלעות ABC', 'set-equal'],
   ['isosceles trapezoid ABCD', 'set-equal'],

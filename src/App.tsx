@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
-import { circleMembers, firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, pointNeighbors } from '@/engine';
+import { circleMembers, firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, pointNeighbors, VARIANT_COUNT } from '@/engine';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
@@ -34,6 +34,7 @@ export default function App() {
   const replaceGroup = useGeoStore((s) => s.replaceGroup);
   const select = useGeoStore((s) => s.select);
   const cycleAlt = useGeoStore((s) => s.cycleAlt);
+  const cycleVariant = useGeoStore((s) => s.cycleVariant);
   const resample = useGeoStore((s) => s.resample);
   const autoResolve = useGeoStore((s) => s.autoResolve);
   const radiusOverrides = useGeoStore((s) => s.radiusOverrides);
@@ -412,6 +413,9 @@ export default function App() {
   // `firstCyclableBranch` excludes it and "show another configuration" resamples the circles
   // instead. With no cyclable branch, it re-samples the free DOFs. (Single source of truth, ADR-043.)
   const branchId = firstCyclableBranch(construction);
+  // A kite/isosceles whose equal-pair is a cyclable VARIANT (ADR-138) — so "show another configuration"
+  // offers to flip which sides are equal even when the shape is otherwise determined.
+  const hasVariant = facts.some((f) => f.enabled && f.cmd.type === 'shape-variant' && VARIANT_COUNT[f.cmd.shape] > 1);
   const examples = t('examples.items', { returnObjects: true }) as string[];
 
   // The command reference (the coverage map): every construct grouped by category,
@@ -725,7 +729,7 @@ export default function App() {
             </div>
           </div>
 
-          {(branchId || freeDofs(construction).length > 0) && (
+          {(branchId || hasVariant || freeDofs(construction).length > 0) && (
             <button
               type="button"
               style={alt}
@@ -748,7 +752,8 @@ export default function App() {
                     try {
                       const changed = resample(); // true if it found a genuinely different drawing
                       if (branchId) cycleAlt(branchId); // a discrete branch flip is always a real change
-                      if (changed || branchId) setAltNote('');
+                      const flipped = cycleVariant(); // also cycle the equal-pair of a kite/isosceles (ADR-138)
+                      if (changed || branchId || flipped) setAltNote('');
                       else {
                         // searched and found nothing different — tell the student something DID happen (the
                         // figure is determined), so "show another" doesn't look like a dead button (operator).

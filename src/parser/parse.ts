@@ -302,12 +302,11 @@ const shapeMacro =
     return make(ids);
   };
 
-/** "kite ABCD" / "דלתון ABCD" (also "עפיפון") → a general quad with two pairs of equal ADJACENT sides
- *  (|AB|=|AD| meeting at A, |CB|=|CD| meeting at C — axis AC). The constraints flex the free quad into a kite. */
+/** "kite ABCD" / "דלתון ABCD" (also "עפיפון") → a `shape-variant` whose equal-pair AXIS is a cyclable choice
+ *  ([ADR-138](docs/06-decisions.md#adr-138)): variant 0 = axis AC (|AB|=|AD|, |CB|=|CD|), variant 1 = axis BD.
+ *  `replay` expands it to a free quad + the selected pair; an explicit `AB=BC` pins the other axis. */
 const kite = shapeMacro(/kite|דלתון|עפיפון/i, /kite|דלתון|עפיפון/gi, 4, (ids) => [
-  { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
-  { type: 'set-equal', a: ids[0], b: ids[1], c: ids[0], d: ids[3] }, // |AB| = |AD|
-  { type: 'set-equal', a: ids[2], b: ids[1], c: ids[2], d: ids[3] }, // |CB| = |CD|
+  { type: 'shape-variant', shape: 'kite', ids: [ids[0], ids[1], ids[2], ids[3]], variant: 0 },
 ]);
 
 /** A triangle phrasing that names a circle it is THROUGH / circumscribes belongs to the circumcircle/incircle
@@ -316,21 +315,17 @@ const kite = shapeMacro(/kite|דלתון|עפיפון/i, /kite|דלתון|עפי
 const triThroughCircle = (s: string): boolean =>
   /circle|מעגל/i.test(s) && /circumscrib\w*|חוסם|\bthrough\b|דרך/i.test(s);
 
-/** "isosceles triangle ABC" / "משולש שווה שוקיים ABC" → a triangle + a SOFT default |AB|=|AC| (apex = first
- *  vertex, base BC). "Isosceles" only asserts that SOME two sides are equal; which pair is the student's to
- *  state, not ours to assume ([ADR-052](docs/06-decisions.md#adr-052)). So the default pair is `soft`
- *  ([ADR-114](docs/06-decisions.md#adr-114)) — the store drops it the moment the student gives an explicit
- *  equality among the SAME triangle's sides ("AB=BC"), so that becomes the isosceles pair instead of stacking
- *  with |AB|=|AC| into an EQUILATERAL the student never asked for. With no explicit pair it stands, so the
- *  triangle still draws isosceles. (`equilateral` below is NOT soft — all three sides equal is unambiguous.) */
+/** "isosceles triangle ABC" / "משולש שווה שוקיים ABC" → a `shape-variant` whose APEX is a cyclable choice
+ *  ([ADR-138](docs/06-decisions.md#adr-138), subsuming the ADR-114 soft default): variant 0 = apex A
+ *  (|AB|=|AC|), variant 1 = apex B, variant 2 = apex C. "Isosceles" only asserts SOME two sides equal; which
+ *  pair is the student's to state ([ADR-052](docs/06-decisions.md#adr-052)). `replay` expands to a triangle +
+ *  the selected pair; an explicit equality among the sides ("AB=BC") PINS the matching apex (so it doesn't
+ *  stack into an equilateral). With no explicit pair it draws apex A. (`equilateral` below is unambiguous.) */
 const isoscelesTriangle = shapeMacro(
   /isosceles|שווה[\s-]?שוקיים/i,
   /isosceles|triangle|שווה[\s-]?שוקיים|משולש/gi,
   3,
-  (ids) => [
-    { type: 'triangle', ids: [ids[0], ids[1], ids[2]] },
-    { type: 'set-equal', a: ids[0], b: ids[1], c: ids[0], d: ids[2], soft: true }, // default |AB| = |AC| (yields to an explicit pair)
-  ],
+  (ids) => [{ type: 'shape-variant', shape: 'isosceles', ids: [ids[0], ids[1], ids[2]], variant: 0 }],
   triThroughCircle,
 );
 

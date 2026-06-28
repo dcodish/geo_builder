@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, deepEqual, detectRelations, emptyConstruction, evaluate, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, residual } from '@/engine';
+import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, deepEqual, detectRelations, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, residual, VARIANT_COUNT } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -156,11 +156,18 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
     const V = f.enabled ? softEqVerts(f.cmd) : null;
     if (V && facts.some((g) => g !== f && g.enabled && explicitEqWithin(lowerOne(g.cmd, symtab), V))) supersededSoft.add(f.id);
   }
+  // Explicit `set-equal`s the student/LLM gave (NOT a shape-variant macro's own pairs) — they PIN the matching
+  // variant of a kite/isosceles `shape-variant` and suppress re-emitting that pair ([ADR-138](docs/06-decisions.md#adr-138)).
+  const explicitEqs = facts
+    .filter((f) => f.enabled && f.cmd.type !== 'shape-variant')
+    .flatMap((f) => lowerOne(f.cmd, symtab))
+    .filter((c): c is Extract<Command, { type: 'set-equal' }> => c.type === 'set-equal');
   for (const f of facts) {
     // Lower the fact to the engine command(s) it produces (symbolic measures →
-    // ratio/distance/angle/[]; engine commands pass through). 0 commands ⇒ a label-
-    // only / data-only fact (a free representative or `set-var`) — applied as a no-op.
-    const engineCmds = lowerOne(f.cmd, symtab);
+    // ratio/distance/angle/[]; engine commands pass through; a `shape-variant` → base shape + the
+    // variant-selected equal pairs, with an explicit equality pinning the variant — ADR-138).
+    // 0 commands ⇒ a label-only / data-only fact (a free representative or `set-var`) — applied as a no-op.
+    const engineCmds = f.cmd.type === 'shape-variant' ? expandShapeVariant(f.cmd, explicitEqs) : lowerOne(f.cmd, symtab);
     const intro = engineCmds.flatMap(introducedPointIds);
     const claim = () => intro.forEach((id) => owned.add(id));
     if (!f.enabled) {
@@ -536,6 +543,7 @@ export function introducedIds(cmd: AnyCommand): Id[] {
   if (cmd.type === 'measure-angle') return [cmd.vertex, cmd.ray1, cmd.ray2];
   if (cmd.type === 'measure-area') return cmd.ids; // highlight the polygon the area annotates
   if (cmd.type === 'set-var' || cmd.type === 'measure-order') return []; // a relation over variables — no object to highlight
+  if (cmd.type === 'shape-variant') return cmd.ids; // the named shape's vertices (ADR-138)
   return applyCommand(emptyConstruction(), cmd).objects.map((o) => o.id);
 }
 
@@ -710,6 +718,10 @@ export interface GeoState {
   clearRelations: () => void;
   /** Advance an intersection point to its next configuration (stored in the fact's command). */
   cycleAlt: (pointId: Id) => void;
+  /** Step the equal-pair VARIANT of a kite/isosceles shape ([ADR-138](docs/06-decisions.md#adr-138)) — so
+   *  "show another configuration" also cycles WHICH sides are equal. Returns `true` if it stepped a variant
+   *  (always a real change), `false` if no cyclable (≥2-variant) shape is present. */
+  cycleVariant: () => boolean;
   /** Re-sample the figure's residual freedom — a different valid drawing (ADR-018). Returns `true` if it
    *  found a genuinely DIFFERENT drawing, `false` if the shape is determined (only size/placement vary). */
   resample: () => boolean;
@@ -964,6 +976,18 @@ export const useGeoStore = create<GeoState>()(
               : f,
           ),
         });
+      },
+
+      cycleVariant: () => {
+        const facts = get().facts;
+        // Step the FIRST cyclable variant shape (kite: 2 axes; isosceles: 3 apexes). The variant lives in the
+        // fact's command (survives replay/undo — positions are never stored), so this is a pure fact rewrite,
+        // like cycleAlt's branch step. Not gated by `shapeDiffers`: a pair flip is always a genuine change.
+        const target = facts.find((f) => f.enabled && f.cmd.type === 'shape-variant' && VARIANT_COUNT[f.cmd.shape] > 1);
+        if (!target || target.cmd.type !== 'shape-variant') return false;
+        const count = VARIANT_COUNT[target.cmd.shape];
+        set({ facts: facts.map((f) => (f === target && f.cmd.type === 'shape-variant' ? { ...f, cmd: { ...f.cmd, variant: (f.cmd.variant + 1) % count } } : f)) });
+        return true;
       },
 
       resample: () => {

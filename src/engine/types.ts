@@ -823,7 +823,13 @@ export type SymbolicCommand =
   | { type: 'set-var'; name: string; value: number }
   // An ordering between two named measures — "α < β" / "x > y" (ADR-039). Lowered (lower.ts) to a
   // `set-angle-order`/`set-length-order` once the symbol table says which measure each variable names.
-  | { type: 'measure-order'; left: string; op: '<' | '>' | '<=' | '>='; right: string };
+  | { type: 'measure-order'; left: string; op: '<' | '>' | '<=' | '>='; right: string }
+  // A named shape whose EQUAL-PAIR is an ambiguous, cyclable VARIANT ([ADR-138](docs/06-decisions.md#adr-138)):
+  // a kite (which diagonal is the axis of symmetry — 2 variants) or an isosceles triangle (which vertex is the
+  // apex — 3). `replay` EXPANDS it to the base shape (quad/triangle) + the variant-selected equal-pair
+  // `set-equal`s; an explicit `set-equal` on the shape's sides PINS the matching variant (and that pair is not
+  // re-emitted). `variant` is the persisted, cyclable index ("show another configuration" steps it).
+  | { type: 'shape-variant'; shape: 'kite' | 'isosceles'; ids: Id[]; variant: number };
 
 /** What the parser produces and a `Fact` stores: engine commands plus the symbolic layer. */
 export type AnyCommand = Command | SymbolicCommand;

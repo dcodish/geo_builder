@@ -30,3 +30,5 @@ export { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 export type { Carrier, CarrierFamily } from './carriers';
 export { lower, lowerOne, buildSymTab, measureLabelText, isMeasure } from './lower';
 export type { SymTab } from './lower';
+export { expandShapeVariant, eqMatchesPair, VARIANT_COUNT } from './shapeVariants';
+export type { VariantShape } from './shapeVariants';

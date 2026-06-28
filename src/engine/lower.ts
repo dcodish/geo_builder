@@ -16,6 +16,7 @@
  */
 
 import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from './types';
+import { expandShapeVariant } from './shapeVariants';
 
 type Binding = { kind: 'len' | 'ang' | 'area'; refs: Id[]; coef: number; pow?: number; affine?: boolean };
 export interface SymTab {
@@ -170,6 +171,11 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
         return [{ type: 'set-angle-order', v1: small.refs[0], a1: small.refs[1], b1: small.refs[2], v2: large.refs[0], a2: large.refs[1], b2: large.refs[2] }];
       return [{ type: 'set-length-order', a: small.refs[0], b: small.refs[1], c: large.refs[0], d: large.refs[1] }];
     }
+    case 'shape-variant':
+      // The base shape + the variant-selected equal pairs (ADR-138). This fallback (no explicit equalities)
+      // is the whole-list `lower()` / direct-caller path; `replay` calls `expandShapeVariant` itself with the
+      // figure's explicit `set-equal`s so an explicit pair can PIN the variant.
+      return expandShapeVariant(cmd, []);
     default:
       return [cmd as Command];
   }
