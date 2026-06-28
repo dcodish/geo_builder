@@ -385,6 +385,7 @@ const midsegment: Rule = (s, ctx) => {
 /** "segment AC" / "diagonal AC" / "קטע AC" / "אלכסון AC" — connect two points. */
 const segment: Rule = (s) => {
   if (!/segment|diagonal|connect|קטע|אלכסון|חבר/i.test(s)) return null;
+  if (POINT_ON_CARRIER.test(s)) return null; // "E on segment AC" is a point ON the carrier — pointOnSegment owns it
   const ids = labelRun(s.replace(/segment|diagonal|connect|קטע|אלכסון|חבר/gi, ' '), 2);
   return ids ? [{ type: 'segment', a: ids[0], b: ids[1] }] : null;
 };
@@ -723,6 +724,30 @@ const arcEquality: Rule = (s, ctx) => {
 };
 
 /**
+ * The descriptor nouns that can NAME the carrier a point rides on — chord/side/segment/diagonal in
+ * both languages. A "line"/"ישר" carrier is deliberately absent: it has distinct infinite-line
+ * semantics handled by `collinearConstraint`.
+ */
+const CARRIER_NOUN = String.raw`chord|side|segment|diagonal|מיתר|ה?צלע|ה?קטע|ה?אלכסון`;
+
+/**
+ * An OPTIONAL carrier noun between "on"/"על" and the two endpoint labels — "E on chord AC" /
+ * "E על מיתר AC" / "E על הצלע AC". Without it a Hebrew noun like מיתר wedged between "על" and "AC"
+ * makes the point-on rules miss.
+ */
+const SEG_NOUN = String.raw`(?:(?:the\s+)?(?:${CARRIER_NOUN})\s+)?`;
+
+/**
+ * True when the utterance is "<point> on <carrier> AB" — a point ON a named carrier, which must be
+ * claimed by the point-on rules, NOT by the carrier-DEFINING rules (`segment`/`chord`). Those strip
+ * their own keyword and grab the bare "AB" run, silently dropping the named rider point.
+ */
+const POINT_ON_CARRIER = new RegExp(
+  String.raw`[A-Za-z]\d*\s+(?:on|על)\s+(?:the\s+)?(?:${CARRIER_NOUN})\s`,
+  'i',
+);
+
+/**
  * "point G on AD" / "נקודה G על AD" with optional ratio "at 40%" / "ב-40%".
  * The segment labels are word-bounded so "F on the extension of AD" can't read
  * "th" of "the" as a segment — that phrasing escapes to the fallback instead.
@@ -730,7 +755,7 @@ const arcEquality: Rule = (s, ctx) => {
 const pointOnSegment: Rule = (s) => {
   const m = s.match(
     new RegExp(
-      String.raw`(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\s+(?:on|על)\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\b(?:\s+(?:at|ב-?)?\s*${num}\s*(%)?)?`,
+      String.raw`(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\s+(?:on|על)\s+${SEG_NOUN}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b(?:\s+(?:at|ב-?)?\s*${num}\s*(%)?)?`,
       'i',
     ),
   );
@@ -756,7 +781,10 @@ const pointsOnSegment: Rule = (s) => {
   // NB: `\w` is ASCII-only in JS, so the Hebrew "points" word uses an explicit Hebrew-letter class
   // (else "נקודות" only partly matches and the rule misses).
   const m = s.match(
-    /\b([A-Za-z]\d*)\s*(?:,|and|ו-?)\s*([A-Za-z]\d*)\b\s*(?:are\s+)?(?:points?|נקוד[א-ת]*)?\s*(?:on|על)\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+    new RegExp(
+      String.raw`\b([A-Za-z]\d*)\s*(?:,|and|ו-?)\s*([A-Za-z]\d*)\b\s*(?:are\s+)?(?:points?|נקוד[א-ת]*)?\s*(?:on|על)\s+${SEG_NOUN}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`,
+      'i',
+    ),
   );
   if (!m) return null;
   const [p1, p2, a, b] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
@@ -1812,6 +1840,10 @@ const cornerTangentCircle: Rule = (s, ctx) => {
 /** "chord AB in circle O" / "מיתר AB במעגל O" — both endpoints on the circle + the segment. */
 const chord: Rule = (s, ctx) => {
   if (!/chord|מיתר/i.test(s)) return null;
+  // "E על מיתר AC" is a POINT ON a chord, not a chord DEFINITION — let pointOnSegment handle it (and
+  // withChordMembership still puts the endpoints on the circle). Without this guard `chord` grabs the
+  // "AC" run and silently drops the named point E.
+  if (POINT_ON_CARRIER.test(s)) return null;
   const center = resolveCenter(s, ctx);
   if (!center) return null;
   const ids = labelRun(dropCircleRef(s).replace(/chord|מיתר/gi, ' '), 2);
@@ -3295,8 +3327,12 @@ function withChordMembership(commands: AnyCommand[], s: string, ctx: ParseContex
   );
   const endpoints: Id[] = [];
   for (const c of commands) {
-    if (c.type !== 'segment') continue;
-    for (const id of [c.a, c.b]) {
+    // The chord's endpoints are its carrier's two ends — whether the carrier is a `segment` or the
+    // `a,b` of a `point-on-segment` ("E על מיתר AC"). The rider point (the on-segment `id`) is NOT an
+    // endpoint, so it stays off the circle, matching the midpoint exclusion below.
+    const pair = c.type === 'segment' || c.type === 'point-on-segment' ? [c.a, c.b] : null;
+    if (!pair) continue;
+    for (const id of pair) {
       const U = up(id);
       if (!centers.has(U) && !already.has(U) && !endpoints.includes(U)) endpoints.push(U);
     }

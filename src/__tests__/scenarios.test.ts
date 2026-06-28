@@ -105,6 +105,30 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'point-on-chord-named-carrier',
+    title: '"E על מיתר AC" — a point ON a named carrier (chord) parses to point-on-segment; E is not dropped, A/C stay on the circle',
+    guards:
+      'operator-reported: "E על מיתר AC" was not-understood. Root cause: the point-on rules required the two carrier labels to come IMMEDIATELY after על/on, so a descriptor noun (מיתר/chord, צלע/side, קטע/segment, אלכסון/diagonal) wedged between the connector and the labels made them miss — and worse, with a circle in context the `chord` (and `segment`) carrier-DEFINING rule grabbed the bare "AC" run and silently DROPPED the named rider point E. Fix: a shared CARRIER_NOUN set — `SEG_NOUN` lets the point-on rules skip the noun, and `POINT_ON_CARRIER` makes the carrier-defining rules bail on a "<point> on <carrier> AB" utterance so point-on wins. `withChordMembership` now also reads a point-on-segment carrier so A,C still land on the circle.',
+    steps: [
+      'מעגל O', // circle O (so the chord endpoints have a circle to live on)
+      'מיתר AC', // chord AC — A,C on circle O + segment AC
+      'E על מיתר AC', // E ON chord AC — must parse to point-on-segment, NOT drop E
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('E'), 'E placed (not dropped)').toBe(true);
+      const A = at(fig, 'A'), C = at(fig, 'C'), E = at(fig, 'E'), O = at(fig, 'O');
+      // E lies on segment AC (zero cross-product, between the ends)
+      const cross = Math.abs((E.x - A.x) * (C.y - A.y) - (E.y - A.y) * (C.x - A.x)) / Math.max(dist(A, C), 1) ** 2;
+      expect(cross, 'E on line AC').toBeLessThan(1e-2);
+      const tDot = ((E.x - A.x) * (C.x - A.x) + (E.y - A.y) * (C.y - A.y)) / dist(A, C) ** 2;
+      expect(tDot, 'E between A and C').toBeGreaterThan(-1e-6);
+      expect(tDot, 'E between A and C').toBeLessThan(1 + 1e-6);
+      // the chord endpoints are on circle O (radius = |OA| = |OC|)
+      expect(Math.abs(dist(O, A) - dist(O, C)), 'A,C equidistant from O (on the circle)').toBeLessThan(1e-6);
+    },
+  },
+  {
     id: 'two-tangent-circles-then-size-given-flexes-radii',
     title: '"two circles tangent externally" then "OP = 4" RESIZES the radii (r1+r2 = |OP|) instead of over-constraining — the radii are free DOFs, not pinned at 5/3',
     guards:
