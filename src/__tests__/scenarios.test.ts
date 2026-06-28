@@ -174,6 +174,29 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'extension-onto-circle-side-inferred-from-circle',
+    title: 'bagrut Q4: a reversed "המשך BD" (typo for DB) still builds clean — the circle disambiguates the extension side',
+    guards:
+      'operator session 1dugj1cw (bagrut Q4: two circles meet at A,B; AD tangent to the left circle at A; CB tangent to the right at B; F on the extension of BD onto the left circle; E on the extension of CA onto the right circle). The original figure has F BEYOND B (D→B→F), so the input should read "המשך DB" — but the operator wrote "המשך BD", which the parser reads as beyond D. That direction is geometrically impossible (D is on a tangent to the left circle, so always OUTSIDE it ⇒ line BD can only re-cross it behind B, never beyond D), so `firstSatisfyingSeed` could satisfy NO seed and the WHOLE figure drifted — E also landed wrong (the verifier flagged both). Root cause (ADR-142): for the SHARED-ENDPOINT extend-onto-circle (a line endpoint already on the target circle), the other crossing is UNIQUE — the side is forced by the geometry, not the BD/DB letter order. Fix: `extensionsClear` (the seed-gate) and the givens-verifier both accept the new point on EITHER extension when an endpoint is on the circle (flag only a genuinely-between point); a neither-on-circle driven extension stays strict. So the typo builds clean and the seed search finds a config where E is also beyond A.',
+    steps: [
+      'שני מעגלים נחתכים בנקודות A ו B',
+      'המשיק למעגל O בנקודה A חותך את מעגל P בנקודה D',
+      'המשיק למעגל P בנקודה B חותך את מעגל O בנקודה C',
+      'נקודה F נמצאת על המשך הצלע BD וחותכת את מעגל O בנקודה F', // reversed "BD" — the circle disambiguates
+      'DF',
+      'המשך הצלע CA חותך את מעגל P בנקודה E',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations, 'the reversed-direction typo no longer falsely flags').toHaveLength(0);
+      // F is the unique crossing of line BD with circle O — beyond B (t<0 on B→D), the side the circle forces.
+      const t = (a: Vec, b: Vec, p: Vec) => ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / ((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+      expect(t(at(fig, 'B'), at(fig, 'D'), at(fig, 'F')), 'F on the B-side extension').toBeLessThan(0);
+      // E reaches beyond A (the cascade is gone — the seed search succeeds once F is accepted).
+      expect(t(at(fig, 'C'), at(fig, 'A'), at(fig, 'E')), 'E beyond A').toBeGreaterThan(1);
+    },
+  },
+  {
     id: 'circumcircle-cuts-segment-d-on-side',
     title: '"the circumcircle of ABC cuts CE at D" lands D ON segment CE (not its extension), across configs',
     guards:

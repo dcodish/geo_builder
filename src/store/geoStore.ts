@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, residual, VARIANT_COUNT } from '@/engine';
+import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, circleMembers, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, residual, VARIANT_COUNT } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -317,9 +317,9 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, pending, labels, angleMarks, violations, radiusDofs, coincidences };
 }
 
-/** The (a, b, id) triples every enabled `extend-onto-circle` step asserts ("המשך a·b onto a circle at id"). */
-function extensionTriples(facts: Fact[]): { a: Id; b: Id; id: Id }[] {
-  return facts.flatMap((f) => (f.enabled && f.cmd.type === 'extend-onto-circle' ? [{ a: f.cmd.a, b: f.cmd.b, id: f.cmd.id }] : []));
+/** The (a, b, id, circle) triples every enabled `extend-onto-circle` step asserts ("המשך a·b onto `circle` at id"). */
+function extensionTriples(facts: Fact[]): { a: Id; b: Id; id: Id; circle: Id }[] {
+  return facts.flatMap((f) => (f.enabled && f.cmd.type === 'extend-onto-circle' ? [{ a: f.cmd.a, b: f.cmd.b, id: f.cmd.id, circle: f.cmd.circle }] : []));
 }
 
 /** Relation (constraint) command types `replay` can DEFER and retry — they assert a relation without
@@ -384,16 +384,34 @@ function figureSpan(fig: Derived): number {
  * the SAMPLING bar (auto-pick + "show another"); the verifier's amber check stays looser (a marginal but
  * genuinely-beyond figure is valid, not "wrong"), so we never flag a figure we'd still draw.
  */
-function extensionsClear(facts: Fact[], fig: Derived): boolean {
+function extensionsClear(facts: Fact[], fig: Derived, relax = false): boolean {
   const margin = 0.05 * figureSpan(fig);
-  for (const { a, b, id } of extensionTriples(facts)) {
+  const triples = extensionTriples(facts);
+  if (triples.length === 0) return true;
+  // Only the RELAXED pass needs the shared-endpoint test (ADR-142); the strict pass is pure direction.
+  const members = relax ? circleMembers(fig.construction) : [];
+  const centreOf = (cid: Id) => (fig.construction.objects.find((o) => o.id === cid && o.kind === 'circle') as { center?: Id } | undefined)?.center;
+  for (const { a, b, id, circle } of triples) {
     const pa = fig.positions.get(a), pb = fig.positions.get(b), pid = fig.positions.get(id);
     if (!pa || !pb || !pid) return false;
     const abx = pb.x - pa.x, aby = pb.y - pa.y;
     const abl = Math.hypot(abx, aby);
     if (abl < 1e-9) return false;
-    const beyond = ((pid.x - pb.x) * abx + (pid.y - pb.y) * aby) / abl; // signed distance of id past b along a→b
-    if (beyond < Math.max(0.5, margin)) return false;
+    const beyondB = ((pid.x - pb.x) * abx + (pid.y - pb.y) * aby) / abl; // signed distance of id past b along a→b
+    // STRICT (the primary bar): the new point must reach beyond the named 2nd endpoint b — so a free DOF is
+    // SAMPLED so "המשך" reaches the FAR side when that is achievable (ADR-098). The RELAXED fallback only
+    // applies for a SHARED-ENDPOINT extension (a line endpoint already on the circle ⇒ the other crossing is
+    // UNIQUE, so the side is forced by the geometry, not the BD/DB letter order): then the new point on EITHER
+    // extension counts (ADR-142). Used by firstSatisfyingSeed's second pass when NO seed satisfies strict.
+    let reach = beyondB;
+    if (relax) {
+      const memberPts = members.find((m) => m.center === centreOf(circle))?.points ?? [];
+      if (memberPts.includes(a) || memberPts.includes(b)) {
+        const beyondA = -((pid.x - pa.x) * abx + (pid.y - pa.y) * aby) / abl; // signed distance of id past a
+        reach = Math.max(beyondB, beyondA);
+      }
+    }
+    if (reach < Math.max(0.5, margin)) return false;
   }
   return true;
 }
@@ -408,9 +426,19 @@ function extensionsClear(facts: Fact[], fig: Derived): boolean {
  */
 export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120): number {
   if (extensionTriples(facts).length === 0) return from; // no extension → nothing to satisfy; keep the seed
+  // Pass 1 — STRICT: a seed where every extension reaches beyond its named 2nd endpoint (drives a free point so
+  // "המשך" reaches the far side when that's achievable, ADR-098).
   for (let s = from; s < from + budget; s++) {
     const fig = replay(facts, s);
     if (fig.lastError === null && extensionsClear(facts, fig)) return s;
+  }
+  // Pass 2 — RELAXED FALLBACK ([ADR-142](docs/06-decisions.md#adr-142)): no seed satisfies the strict direction
+  // (the named side is geometrically impossible — e.g. a reversed "המשך BD" whose unique crossing is beyond B),
+  // so accept a shared-endpoint extension on EITHER side. A one-letter typo then no longer cascades; the circle
+  // disambiguates the side. The strict pass is always tried FIRST, so this never weakens an achievable figure.
+  for (let s = from; s < from + budget; s++) {
+    const fig = replay(facts, s);
+    if (fig.lastError === null && extensionsClear(facts, fig, true)) return s;
   }
   return from;
 }

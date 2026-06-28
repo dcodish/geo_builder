@@ -172,8 +172,17 @@ export function checkGivens(
     const b = positions.get(cmd.b);
     const id = positions.get(cmd.id);
     if (!a || !b || !id) continue;
-    const dot = (id.x - b.x) * (b.x - a.x) + (id.y - b.y) * (b.y - a.y); // > 0 ⇔ id is beyond b along a→b
-    if (dot <= 0) {
+    // SHARED-ENDPOINT ([ADR-142](docs/06-decisions.md#adr-142)): when a line endpoint already lies on the
+    // target circle, the line meets the circle at that endpoint AND exactly ONE other point, so the extension
+    // SIDE is forced by the geometry — not by the letter order. A reversed "המשך BD" vs "DB" then describes
+    // the SAME unique crossing, so accept the new point on EITHER extension; flag only one genuinely BETWEEN
+    // a and b. A NEITHER-on-circle extension is genuinely directional (a driven far crossing) → keep strict.
+    const c = circles.get(cmd.circle);
+    const onCirc = (p: Vec) => !!c && Math.abs(dist(p, c.center) - c.r) <= onCircleTol(c.r);
+    const ab2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
+    const t = ab2 < 1e-18 ? 0.5 : ((id.x - a.x) * (b.x - a.x) + (id.y - a.y) * (b.y - a.y)) / ab2; // id's param on a→b
+    const wrong = onCirc(a) || onCirc(b) ? t > 0.001 && t < 0.999 : t <= 1; // shared: between is wrong; else: must be beyond b
+    if (wrong) {
       violations.push({
         relation: 'collinear-order',
         ids: [cmd.a, cmd.b, cmd.id],
