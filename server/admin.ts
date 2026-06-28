@@ -21,6 +21,9 @@ import { eventsLogPath, type UsageEvent } from './eventLog';
 const SESSION_MS = 8 * 60 * 60 * 1000; // 8 h
 const COOKIE = 'geo_admin';
 
+// Anthropic Console usage/cost page — the LLM fallback (Haiku) spend lives here.
+const API_COST_URL = 'https://console.anthropic.com/settings/usage';
+
 export interface AdminOpts {
   username: string;
   password: string;
@@ -241,6 +244,7 @@ const PAGE_HEAD = `<!doctype html><html lang="he" dir="rtl"><head><meta charset=
   .muted{color:#9ca3af}
   .top{display:flex;justify-content:flex-start;gap:12px;align-items:center;margin-bottom:16px}
   .btn{background:#ef4444;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;text-decoration:none;cursor:pointer}
+  .btn2{background:#0ea5e9;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;text-decoration:none;cursor:pointer}
   .login{max-width:340px;margin:80px auto;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:24px}
   .login input{width:100%;padding:8px 10px;margin:6px 0 14px;border:1px solid #d1d5db;border-radius:6px;font-size:14px}
   .login button{width:100%;background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:9px;font-size:14px;cursor:pointer}
@@ -304,6 +308,7 @@ function dashboard(base: string, s: Stats): string {
     PAGE_HEAD +
     `<div class="top">
        <h1 style="flex:1">Geo Builder — דוח שימוש</h1>
+       <a class="btn2" href="${API_COST_URL}" target="_blank" rel="noopener">💰 עלות API</a>
        <a class="btn" href="${esc(base)}/logout">יציאה</a>
      </div>
      <div class="sub">טווח נתונים: ${esc(range)}</div>

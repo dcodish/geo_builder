@@ -100,6 +100,7 @@ describe('admin auth gate', () => {
     await run(mockReq('GET', '/admin', [], { cookie }), res, logPath);
     expect(res.statusCode).toBe(200);
     expect(res.body).toContain('דוח שימוש'); // dashboard heading
+    expect(res.body).toContain('console.anthropic.com/settings/usage'); // API-cost link
   });
 
   it('rejects a tampered cookie (falls back to the login form)', async () => {
