@@ -6,10 +6,18 @@ the architecture. Two-file deploy; the key never leaves the server.
 
 ```
 Browser ──/geo-builder/*──────────────► httpdocs/geo-builder/  (static dist/)
-        └─/geo-builder/api/parse──► Apache ──► 127.0.0.1:8788 (geo-proxy.service)
-                                                      │ ANTHROPIC_API_KEY (env file)
-                                                      └─► Anthropic Haiku
+        ├─/geo-builder/api/parse──► Apache ──► 127.0.0.1:8788 (geo-proxy.service)
+        │                                             │ ANTHROPIC_API_KEY (env file)
+        │                                             └─► Anthropic Haiku
+        ├─/geo-builder/api/log────► Apache ──► 127.0.0.1:8788 ─► events.jsonl (hashed IP)
+        └─/geo-builder/admin──────► Apache ──► 127.0.0.1:8788 ─► usage dashboard (login)
 ```
+
+The same Node service now also hosts a **usage-event sink** (`/api/log`) and a
+**password-protected admin dashboard** (`/admin`) — see [ADR-146](../docs/06-decisions.md#adr-146).
+The SPA fire-and-forgets one lean event per user action; the proxy hashes the
+visitor IP (never stores it raw) and appends to `events.jsonl`, which the dashboard
+aggregates.
 
 > **This box serves via Apache, not nginx** — nginx is disabled/off (since 2026-04).
 > The reverse proxy goes in the **HTTPS Apache** include (`vhost_ssl.conf`), where the
@@ -21,7 +29,8 @@ Browser ──/geo-builder/*──────────────► httpdo
 | --- | --- |
 | Static app | `/var/www/vhosts/themathbible.com/httpdocs/geo-builder/` |
 | Proxy bundle | `/var/www/geo-proxy/proxy.mjs` |
-| Key env file | `/var/www/geo-proxy/geo-proxy.env` (mode 600) |
+| Key + admin env file | `/var/www/geo-proxy/geo-proxy.env` (mode 600) |
+| Usage events | `/var/www/geo-proxy/events.jsonl` (written by the service) |
 | systemd unit | `/etc/systemd/system/geo-proxy.service` |
 
 ## One-time setup (Phase B)
@@ -30,9 +39,19 @@ Browser ──/geo-builder/*──────────────► httpdo
 2. Create the proxy dir + key file (root-only):
    ```sh
    ssh root@themathbible.com 'mkdir -p /var/www/geo-proxy'
-   # On the server, write the env file (NEVER commit the key):
-   printf 'ANTHROPIC_API_KEY=sk-ant-...\n' > /var/www/geo-proxy/geo-proxy.env
+   # On the server, write the env file (NEVER commit secrets). The admin/analytics
+   # vars are read only by this proxy process; pick long random values for the salts.
+   cat > /var/www/geo-proxy/geo-proxy.env <<'EOF'
+   ANTHROPIC_API_KEY=sk-ant-...
+   IP_HASH_SALT=<long-random-string>
+   EVENTS_LOG_PATH=/var/www/geo-proxy/events.jsonl
+   ADMIN_USERNAME=<pick-a-name>
+   ADMIN_PASSWORD=<pick-a-strong-password>
+   ADMIN_COOKIE_SECRET=<long-random-string>
+   ADMIN_BASE=/geo-builder/admin
+   EOF
    chmod 600 /var/www/geo-proxy/geo-proxy.env
+   chown www-data:www-data /var/www/geo-proxy   # the service writes events.jsonl as www-data
    ```
 3. Install + start the service:
    ```sh
@@ -44,7 +63,7 @@ Browser ──/geo-builder/*──────────────► httpdo
    ```sh
    CONF=/var/www/vhosts/system/themathbible.com/conf/vhost_ssl.conf
    cp -a "$CONF" "$CONF.bak-$(date +%s)"
-   cat deploy/apache-geo-builder.conf >> "$CONF"   # (the two ProxyPass lines)
+   cat deploy/apache-geo-builder.conf >> "$CONF"   # (the six ProxyPass lines)
    apache2ctl -t && systemctl reload apache2
    ```
    (Equivalently via Plesk: *Apache & nginx Settings → Additional directives for HTTPS*.)
@@ -74,6 +93,10 @@ ssh root@themathbible.com 'systemctl restart geo-proxy'
   the figure builds and the [Anthropic Console](https://console.anthropic.com/settings/usage)
   logs a Haiku call.
 - Set the Console **spend limit + alert** before sharing the URL (cost control).
+- Open `https://themathbible.com/geo-builder/admin`, log in with `ADMIN_USERNAME`/
+  `ADMIN_PASSWORD`: the visit you just made should appear in the dashboard. Confirm
+  `events.jsonl` stores `iph` (a hash) and **never a raw IP**:
+  `ssh root@themathbible.com "tail -1 /var/www/geo-proxy/events.jsonl"`.
 
 ## Notes
 
@@ -83,6 +106,11 @@ ssh root@themathbible.com 'systemctl restart geo-proxy'
   sets automatically.
 - Logs: `journalctl -u geo-proxy -f`.
 - No `npm install` on the server — the SDK is bundled into `proxy.mjs`.
+- **Usage events** accumulate in `events.jsonl`; the service self-rotates it past
+  50 MB (keeps one `events.jsonl.1`). IPs are stored only as a salted hash (`iph`).
+  Rotating `IP_HASH_SALT` resets unique-visitor counts (old/new hashes won't match).
+- The admin session is a stateless signed cookie (8 h); `ADMIN_BASE` must match the
+  public path (`/geo-builder/admin`) so the cookie scopes and redirects resolve.
 - **Persistence caveat:** the ProxyPass lines are appended directly to
   `vhost_ssl.conf`. If a future Plesk domain reconfigure regenerates that file and
   drops them, the static app keeps working but the LLM fallback 404s (the client

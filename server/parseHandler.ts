@@ -18,36 +18,12 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { buildLlmRequest, extractSteps } from '../src/parser/llmShared';
+import { clientIp, makeRateLimiter, readBody } from './http';
 
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 30; // requests/minute/IP
 const MAX_BODY = 4096; // bytes
-const hits = new Map<string, number[]>();
-
-function rateLimited(ip: string): boolean {
-  const now = Date.now();
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-  recent.push(now);
-  hits.set(ip, recent);
-  return recent.length > MAX_PER_WINDOW;
-}
-
-/**
- * The client IP for rate-limiting. Behind the production reverse proxy every
- * request's `socket.remoteAddress` is the proxy's loopback (127.0.0.1), which
- * would collapse the per-IP limiter into one global bucket — so prefer the
- * `X-Forwarded-For` / `X-Real-IP` header the proxy sets. Safe to trust because
- * the server binds to loopback and only the reverse proxy can reach it; in dev
- * (no header) it falls back to the socket address.
- */
-function clientIp(req: IncomingMessage): string {
-  const xff = req.headers?.['x-forwarded-for'];
-  const fwd = Array.isArray(xff) ? xff[0] : xff;
-  if (fwd) return fwd.split(',')[0].trim();
-  const real = req.headers?.['x-real-ip'];
-  if (typeof real === 'string' && real) return real;
-  return req.socket?.remoteAddress ?? 'local';
-}
+const rateLimited = makeRateLimiter(MAX_PER_WINDOW, WINDOW_MS);
 
 export interface ParseHandlerOpts {
   /** The Anthropic key, resolved by the host. When absent the handler answers 503. */
@@ -73,13 +49,8 @@ export async function handleParse(
 
   if (rateLimited(clientIp(req))) return send(429, { error: 'rate-limited' });
 
-  let body = '';
-  let size = 0;
-  for await (const chunk of req) {
-    size += (chunk as Buffer).length;
-    if (size > MAX_BODY) return send(413, { error: 'too-large' });
-    body += chunk;
-  }
+  const body = await readBody(req, MAX_BODY);
+  if (body === null) return send(413, { error: 'too-large' });
 
   let utterance = '';
   let context = '';

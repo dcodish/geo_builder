@@ -16,17 +16,32 @@
  *   ANTHROPIC_API_KEY  (required for live parsing; absent -> 503 from the handler)
  *   PORT   (default 8788)
  *   HOST   (default 127.0.0.1 — bind to loopback; only the reverse proxy reaches it)
+ *   IP_HASH_SALT   (salt for the hashed visitor id on /api/log; absent -> a default)
+ *   EVENTS_LOG_PATH (usage-event JSONL; default ./logs/events.jsonl)
+ *   ADMIN_USERNAME / ADMIN_PASSWORD   (the /admin dashboard login)
+ *   ADMIN_COOKIE_SECRET  (signs the admin session cookie)
+ *   ADMIN_BASE   (public base path the browser sees; default /geo-builder/admin)
  */
 
 import { createServer } from 'node:http';
 import { handleParse } from './parseHandler';
+import { handleLog } from './eventLog';
+import { handleAdmin } from './admin';
 
 const PORT = Number(process.env.PORT ?? 8788);
 const HOST = process.env.HOST ?? '127.0.0.1';
 const apiKey = process.env.ANTHROPIC_API_KEY;
+const ipSalt = process.env.IP_HASH_SALT || 'geo-builder-default-salt';
+const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+const adminPassword = process.env.ADMIN_PASSWORD || '';
+const adminCookieSecret = process.env.ADMIN_COOKIE_SECRET || ipSalt;
+const adminBase = process.env.ADMIN_BASE || '/geo-builder/admin';
 
 if (!apiKey) {
   console.error('[geo-proxy] WARNING: ANTHROPIC_API_KEY is not set — /api/parse will return 503.');
+}
+if (!adminPassword) {
+  console.error('[geo-proxy] WARNING: ADMIN_PASSWORD is not set — the /admin dashboard is effectively locked.');
 }
 
 const server = createServer((req, res) => {
@@ -38,6 +53,19 @@ const server = createServer((req, res) => {
   }
   if (path.endsWith('/api/parse')) {
     void handleParse(req, res, { apiKey });
+    return;
+  }
+  if (path.endsWith('/api/log')) {
+    void handleLog(req, res, { ipSalt });
+    return;
+  }
+  if (path.includes('/admin')) {
+    void handleAdmin(req, res, {
+      username: adminUsername,
+      password: adminPassword,
+      cookieSecret: adminCookieSecret,
+      base: adminBase,
+    });
     return;
   }
   res.statusCode = 404;
