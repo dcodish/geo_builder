@@ -160,6 +160,20 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'equality-recruitment-not-forced',
+    title: 'equality-recruited carriers are sampled — "DE=EF" + "DF=DB" no longer report false "definite" angles',
+    guards:
+      'operator (2026-06-27, "view relations" on this tangent/secant figure): after the two equality givens the layer printed MANY definite angle numbers on an under-determined figure. CONFIRMED real this session by an independent (engine-free) variety trace — ∠A(B,D) ranges 0.5°–114° across valid configs while DE=EF and DF=DB both hold, so the angles are NOT forced. Root cause (ADR-141, the deeper sibling of ADR-136 Am.2): `applySeed` only perturbs carriers whose `solve` is undefined/order-only, so an EQUALITY-driven parametric carrier (on-circle θ / on-segment t) was FROZEN. The two equalities removed 2 DOF but RECRUITED ~6 carriers (A,B,D,F + the centre/circle); the residual (recruited > removed) freedom hid in the frozen set, so every sample was identical and every angle read "definitive" (11 of them). Fix: perturb a driven parametric carrier about its CURRENT θ/t (keeping its `solve`) ONLY when its constraint is OVER-recruited (carriers > dofRemoved) AND the figure is genuinely under-determined (freeDofCount>0); `evaluate` re-solves to a different valid config where residual freedom exists, and snaps back in-basin where it does not (so a fully-consumed `|AB|=|AC|` does NOT flip to the mirror). Cannot introduce a false negative: re-solving stays valid, so a genuinely-forced relation still holds in every sample.',
+    steps: ['משולש ABC חסום במעגל', 'המשיק בנקודה D והמשך AB נפגשים בנקודה E', 'AD', 'DB', 'נקודה F על AB', 'DE=EF', 'DF', 'DF=DB'],
+    check(fig) {
+      allStepsOk(fig);
+      // The figure keeps shape freedom (the equality-recruited carriers WERE the hidden DOF) …
+      expect(freeDofCount(fig.construction), 'the figure is under-determined').toBeGreaterThan(0);
+      // … so the "view relations" layer reports NO forced angle value (was 11 false ones before ADR-141).
+      expect(detectRelations(fig.construction).definiteAngles, 'no angle forced in an under-determined figure').toHaveLength(0);
+    },
+  },
+  {
     id: 'circumcircle-cuts-segment-d-on-side',
     title: '"the circumcircle of ABC cuts CE at D" lands D ON segment CE (not its extension), across configs',
     guards:

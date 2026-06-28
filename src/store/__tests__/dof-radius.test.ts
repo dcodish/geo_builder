@@ -53,16 +53,17 @@ describe('radius DOF sliders', () => {
     run('משולש ABC');
     expect(s().resample(), 'a free triangle varies').toBe(true);
 
-    // A figure whose SHAPE is pinned (the constraints fix it; only size/rotation remain) → resample
-    // searches and finds nothing different, returning false so the UI can say "no other configuration".
+    // A figure RIGID up to similarity (a square — only size/rotation/place free) → resample searches and
+    // finds nothing different, returning false so the UI can say "no other configuration".
     s().clear();
-    ctxRun('משולש ABC חסום במעגל');
-    ctxRun('AB=AC');
-    s().execute({ type: 'point-on-segment', id: 'D', a: 'B', b: 'C', t: 1.3 });
-    ctxRun('∠CAD=α');
-    ctxRun('∠BAC=2α'); // ∠BAC = 2·∠CAD fixes the apex angle → shape determined
+    run('ריבוע ABCD');
     expect(replay(s().facts).lastError, 'the figure builds').toBeNull();
-    expect(s().resample(), 'shape-determined ⇒ no different configuration').toBe(false);
+    expect(s().resample(), 'a square is determined ⇒ no different configuration').toBe(false);
+    // NOTE: the previous example here — inscribed `AB=AC` + `∠BAC = 2∠CAD` — was assumed shape-determined,
+    // but it is genuinely UNDER-determined (freeDofCount 1; ∠BAC ranges ~39°–67° across valid configs). The
+    // old assertion only held because the equality-recruited carriers were FROZEN out of sampling — the exact
+    // [ADR-141](docs/06-decisions.md#adr-141) bug. With that fixed, its hidden DOF is sampled and resample
+    // (correctly) finds a different drawing, so it is no longer a valid "determined" example.
   });
 
   it('refuses to dial a radius that makes the figure IMPOSSIBLE (a DOF can\'t be moved into an invalid state)', () => {

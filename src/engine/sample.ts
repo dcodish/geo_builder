@@ -75,6 +75,22 @@ const isPinnedParam = (o: { kind: string; free?: boolean; solve?: unknown; exten
   !isFreeOnSegment(o) &&
   !isSamplableExtension(o);
 
+/**
+ * A parametric carrier (on-circle θ / on-segment t) that a CONSUMING constraint drives — an EQUALITY, not an
+ * order/region one (order-only is already samplable via `notConsumed`). One scalar equality removes 1 DOF, but
+ * the joint solver may RECRUIT several carriers for a single equality (the ADR-136/ADR-138 over-recruitment
+ * family), so the recruited set holds residual freedom INVISIBLE to the sampler — every sample is identical and
+ * the relations layer reads angles as "definite" that actually vary ([ADR-141](docs/06-decisions.md#adr-141);
+ * the confirmed `DE=EF`+`DF=DB` false positives). Perturbing its θ/t while KEEPING the `solve` lets `evaluate`
+ * re-solve from a different start: a fully-consumed single carrier just snaps back (harmless on a determined
+ * figure); an over-recruited one reaches a genuinely different valid config (correct sampling). This MIRRORS
+ * the driven-FREE-POINT perturbation already done in `applySeed` (a 2-DOF point under one scalar constraint
+ * keeps residual freedom), extended to the 1-DOF parametric carriers. It cannot introduce a false NEGATIVE:
+ * re-solving stays in the valid-config space, so a genuinely-forced relation (true in EVERY valid config) holds.
+ */
+const isDrivenParam = (o: { kind: string; solve?: unknown }): boolean =>
+  (o.kind === 'on-circle' || o.kind === 'on-segment') && o.solve !== undefined && !isOrderOnlySolve(o);
+
 /** mulberry32 — a tiny deterministic PRNG in [0, 1). */
 function mulberry32(a: number): () => number {
   return () => {
@@ -158,6 +174,27 @@ export function applySeed(c: Construction, seed: number): Construction {
   const onLinePerLine = new Map<Id, number>();
   for (const o of c.objects) if (isFreeOnLine(o)) onLinePerLine.set((o as OnLinePoint).line, (onLinePerLine.get((o as OnLinePoint).line) ?? 0) + 1);
 
+  // How many carriers each constraint drives — so a DRIVEN parametric carrier is perturbed (ADR-141) ONLY
+  // when its constraint is OVER-RECRUITED (more carriers than the DOF it removes), i.e. the recruited set
+  // genuinely holds residual freedom. A constraint with EXACTLY `dofRemoved` carriers is fully consumed —
+  // its carrier is determined, so perturbing it would only jump to a different discrete root (the mirror
+  // config of an inscribed `|AB|=|AC|`), spuriously reading as "another configuration". Only the residual
+  // (over-recruited) carriers carry the hidden freedom the relations layer must sample.
+  const carrierCount = new Map<Constraint, number>();
+  for (const o of c.objects) {
+    const sv = (o as { solve?: { constraint: Constraint } }).solve;
+    if (sv) carrierCount.set(sv.constraint, (carrierCount.get(sv.constraint) ?? 0) + 1);
+  }
+  const isOverRecruited = (o: { kind: string; solve?: unknown }): boolean => {
+    const sv = (o as { solve?: { constraint: Constraint } }).solve;
+    return !!sv && (carrierCount.get(sv.constraint) ?? 0) > dofRemoved(sv.constraint);
+  };
+  // Only worth perturbing a driven carrier when the figure is genuinely UNDER-DETERMINED (has residual shape
+  // freedom). A figure rigid up to similarity (`freeDofCount` 0) has no hidden freedom — its over-recruited
+  // carriers are coupled-solve artefacts (e.g. an angle-ratio's joint carriers), not free DOFs, so perturbing
+  // them would only flip to a different discrete root and spuriously read as "another configuration".
+  const figUnderDetermined = freeDofCount(c) > 0;
+
   const objects = c.objects.map((o) => {
     if (o.kind === 'free-point' && !o.pinned) {
       const dx = o.x - cx;
@@ -187,6 +224,25 @@ export function applySeed(c: Construction, seed: number): Construction {
     if (isSamplableExtension(o)) {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
       return { ...o, t: 1.15 + jr() * 1.05 }; // t ∈ [1.15, 2.2], still beyond the segment
+    }
+    // A DRIVEN parametric carrier (equality over-recruitment, ADR-141): perturb its starting θ/t about its
+    // CURRENT value and KEEP the `solve`, so `evaluate` re-solves to a DIFFERENT valid config when residual
+    // freedom exists, and snaps back when it doesn't. The perturbation is deliberately SMALL (a local jitter,
+    // NOT the wide free-vertex spin) so a FULLY-CONSUMED carrier re-solves within the same root basin (it
+    // snaps back to the determined value) instead of jumping to a DIFFERENT root — e.g. an inscribed
+    // `|AB|=|AC|` whose carrier, perturbed widely, would flip to the mirror config and spuriously read as
+    // "another configuration". An over-recruited carrier keeps residual freedom, so even this small nudge —
+    // the regulariser re-anchors to the perturbed seed — yields a genuinely different valid drawing.
+    if (figUnderDetermined && isDrivenParam(o) && isOverRecruited(o)) {
+      const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
+      if (o.kind === 'on-circle') {
+        const cur = (o as OnCirclePoint).theta;
+        if ((o as OnCirclePoint).between) return { ...o, theta: Math.max(-1, Math.min(1, cur + (jr() * 2 - 1) * 0.4)) };
+        return { ...o, theta: cur + (jr() * 2 - 1) * 0.3 }; // ±0.3 rad about the current angle (stays in-basin)
+      }
+      const seg = o as { t: number; extension?: boolean };
+      if (seg.extension) return { ...o, t: Math.max(1.05, seg.t + (jr() * 2 - 1) * 0.4) };
+      return { ...o, t: Math.max(0.05, Math.min(0.95, seg.t + (jr() * 2 - 1) * 0.25)) }; // ±0.25 about current t, on-segment
     }
     // Free on-line marker (ADR-036): slide it along its line by scaling the signed offset. A LONE marker may
     // also FLIP sides (ADR-085 — a fixed side is a fixed assumption, ADR-052); a ±PAIR keeps its signs so the
