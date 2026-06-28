@@ -24,7 +24,7 @@ export type { StepResult, StepOk, StepErr } from './step';
 export { applySeed, freeDofs, freeDofCount } from './sample';
 export { checkGivens } from './verify';
 export type { GivenViolation } from './verify';
-export { detectRelations } from './relations';
+export { detectRelations, detectRelationsAcross } from './relations';
 export type { RelationsResult, SegmentRef, AngleRef, DefiniteAngle, DetectOptions } from './relations';
 export { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 export type { Carrier, CarrierFamily } from './carriers';

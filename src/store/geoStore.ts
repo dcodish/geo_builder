@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, deepEqual, detectRelations, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, residual, VARIANT_COUNT } from '@/engine';
+import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, residual, VARIANT_COUNT } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -536,6 +536,28 @@ function addMeasureLabel(
   }
 }
 
+/**
+ * The variant-alternative fact lists of a figure ([ADR-138](docs/06-decisions.md#adr-138)): the current
+ * config, plus — for each cyclable `shape-variant` fact (kite 2 axes, isosceles 3 apexes) — the config with
+ * that shape stepped to each OTHER variant (the others held at their current value). The relations layer
+ * samples across these so the equal-pair of a kite/isosceles isn't reported as FORCED — it is the student's
+ * free choice (ADR-052), not a ground truth. Bounded by the SUM of the variant counts, not their product.
+ */
+function variantConfigs(facts: Fact[]): Fact[][] {
+  const variantFacts = facts.filter((f) => f.enabled && f.cmd.type === 'shape-variant' && VARIANT_COUNT[f.cmd.shape] > 1);
+  if (variantFacts.length === 0) return [facts];
+  const configs: Fact[][] = [facts];
+  for (const vf of variantFacts) {
+    if (vf.cmd.type !== 'shape-variant') continue;
+    const count = VARIANT_COUNT[vf.cmd.shape];
+    for (let v = 0; v < count; v++) {
+      if (v === vf.cmd.variant) continue; // the current variant is already in `configs`
+      configs.push(facts.map((f) => (f === vf && f.cmd.type === 'shape-variant' ? { ...f, cmd: { ...f.cmd, variant: v } } : f)));
+    }
+  }
+  return configs;
+}
+
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */
 export function introducedIds(cmd: AnyCommand): Id[] {
   // A symbolic measure introduces no objects; highlight the points it annotates instead.
@@ -954,10 +976,12 @@ export const useGeoStore = create<GeoState>()(
 
       viewRelations: () => {
         const facts = get().facts;
-        // Detect on the UNSEEDED construction (seed 0) — detection samples it across its own seeds, so the
-        // result is seed-independent. Cache the `facts` ref so the layer auto-invalidates on any fact change.
-        const { construction } = replay(facts, 0);
-        const result = detectRelations(construction);
+        // Sample across the seed-0 construction of EACH variant alternative (ADR-138) — detection samples each
+        // across its own seeds, so the result is seed- AND variant-independent, and a kite/isosceles equal-pair
+        // (a free choice) is not reported as forced. Cache the `facts` ref so the layer auto-invalidates on any
+        // fact change. (With no variant shape this is exactly the single seed-0 construction as before.)
+        const constructions = variantConfigs(facts).map((vf) => replay(vf, 0).construction);
+        const result = detectRelationsAcross(constructions);
         set({ relations: { result, facts } });
       },
 

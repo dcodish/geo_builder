@@ -55,6 +55,25 @@ describe('cycleVariant — no-op when no variant shape', () => {
   });
 });
 
+describe('B2 — viewRelations samples across variants', () => {
+  it('a lone kite reports NO forced segment-equality (the equal-pair is a free choice, ADR-138)', () => {
+    s().execute({ type: 'shape-variant', shape: 'kite', ids: ['A', 'B', 'C', 'D'], variant: 0 } as AnyCommand, 'kite', 'g');
+    s().viewRelations();
+    // axis-AC's |AB|=|AD| holds in the drawn config but not axis-BD — so across the variants nothing is forced.
+    expect(s().relations!.result.equalSegments).toEqual([]);
+  });
+
+  it('a rhombus (no variant) still reports its four equal sides', () => {
+    // Built from primitives (parser-independent): a quad with all four sides equal.
+    s().execute({ type: 'quadrilateral', ids: ['A', 'B', 'C', 'D'] } as AnyCommand, 'q', 'g');
+    s().execute({ type: 'set-equal', a: 'A', b: 'B', c: 'B', d: 'C' } as AnyCommand, 'q', 'g');
+    s().execute({ type: 'set-equal', a: 'B', b: 'C', c: 'C', d: 'D' } as AnyCommand, 'q', 'g');
+    s().execute({ type: 'set-equal', a: 'C', b: 'D', c: 'D', d: 'A' } as AnyCommand, 'q', 'g');
+    s().viewRelations();
+    expect(s().relations!.result.equalSegments.length).toBeGreaterThan(0); // the equal sides ARE forced
+  });
+});
+
 describe('cycleVariant survives undo (the variant lives in the fact)', () => {
   it('undo reverts the variant flip', () => {
     s().execute({ type: 'shape-variant', shape: 'kite', ids: ['A', 'B', 'C', 'D'], variant: 0 } as AnyCommand, 'kite', 'g');

@@ -121,21 +121,37 @@ function classesBy(n: number, sameAcrossSamples: (i: number, j: number) => boole
  * `replay(facts, 0).construction`); this samples it with its own seeds, never mutating it.
  */
 export function detectRelations(c: Construction, opts: DetectOptions = {}): RelationsResult {
+  return detectRelationsAcross([c], opts);
+}
+
+/**
+ * Like {@link detectRelations} but samples across SEVERAL constructions — the variant alternatives of an
+ * ambiguous named shape ([ADR-138](docs/06-decisions.md#adr-138): a kite's two axes, an isosceles triangle's
+ * three apexes). The equal-pair is a FREE choice, so a relation is a ground truth only if it holds across the
+ * variants too — sampling each variant config across its own seeds and pooling the positions makes a pair
+ * that holds only in the drawn variant (e.g. |AB|=|AD| in a kite's axis-AC config) correctly NOT forced.
+ * `constructions[0]` supplies the object UNIVERSE (the variants share the same vertices/edges — only their
+ * equalities differ). With one construction this is exactly the original single-config detection.
+ */
+export function detectRelationsAcross(constructions: Construction[], opts: DetectOptions = {}): RelationsResult {
   const N = opts.samples ?? 16;
   const lengthTol = opts.lengthTol ?? 1e-3;
   const angleTol = opts.angleTol ?? (Math.PI / 180) * 0.1;
+  const c0 = constructions[0];
 
-  // 1. Sample valid configurations. A determined figure (no free DOF) returns the same drawing each seed,
-  //    which is correct — its single configuration IS the only valid drawing, so every relation in it is a
-  //    ground truth.
+  // 1. Sample valid configurations across every variant config × its own seeds. A determined figure (no free
+  //    DOF, single variant) returns the same drawing each seed, which is correct — its single configuration
+  //    IS the only valid drawing, so every relation in it is a ground truth.
   const samples: Map<Id, Vec>[] = [];
-  for (let s = 0; s < N; s++) {
-    const r = evaluate(applySeed(c, s));
-    if (r.ok) samples.push(r.positions);
+  for (const c of constructions) {
+    for (let s = 0; s < N; s++) {
+      const r = evaluate(applySeed(c, s));
+      if (r.ok) samples.push(r.positions);
+    }
   }
   if (samples.length === 0) return { equalSegments: [], equalAngles: [], definiteAngles: [], samplesUsed: 0 };
 
-  const nb = pointNeighbors(c);
+  const nb = pointNeighbors(c0);
 
   // 2. The segment universe — the figure's edges (segment + polygon), canonicalised and deduped.
   const segs: SegmentRef[] = [];
@@ -203,7 +219,7 @@ export function detectRelations(c: Construction, opts: DetectOptions = {}): Rela
   // lengths above stay on the drawn `segment`s only.
   const nbAng: Record<Id, Set<Id>> = {};
   for (const [k, vs] of Object.entries(nb)) nbAng[k] = new Set(vs);
-  for (const [x, y] of visibleLineEdges(c)) {
+  for (const [x, y] of visibleLineEdges(c0)) {
     (nbAng[x] ??= new Set()).add(y);
     (nbAng[y] ??= new Set()).add(x);
   }

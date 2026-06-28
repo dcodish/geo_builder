@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
 import { replay, type Fact } from '@/store/geoStore';
-import { detectRelations, freeDofs, freeDofCount, isGeoPoint, circleMembers, pointNeighbors } from '@/engine';
+import { detectRelations, detectRelationsAcross, freeDofs, freeDofCount, isGeoPoint, circleMembers, pointNeighbors } from '@/engine';
 import type { AnyCommand, SegmentRef, AngleRef } from '@/engine';
 
 let n = 0;
@@ -136,5 +136,26 @@ describe('determined figures still work (single configuration)', () => {
     const r = detectRelations(build('square ABCD'));
     expect(r.samplesUsed).toBeGreaterThan(0);
     expect(r.equalSegments.map(segClassKeys)).toContainEqual(['AB', 'AD', 'BC', 'CD']);
+  });
+});
+
+describe('ADR-138 B2 — a variant shape reports no FORCED equal-pair across its variants', () => {
+  const kite = (variant: number) =>
+    replay(
+      [{ id: `kv${variant}`, group: 'k', utterance: 'kite', cmd: { type: 'shape-variant', shape: 'kite', ids: ['A', 'B', 'C', 'D'], variant }, enabled: true } as Fact],
+      0,
+    ).construction;
+
+  it('a kite equal-pair is forced in ONE config but NOT across its two axes', () => {
+    const v0 = kite(0); // axis AC: |AB|=|AD|, |CB|=|CD|
+    const v1 = kite(1); // axis BD: |AB|=|BC|, |AD|=|DC|
+    // a single config reads the drawn pair as forced (the pre-B2 behaviour)
+    expect(detectRelations(v0).equalSegments.length).toBeGreaterThan(0);
+    // across BOTH variants, no segment-pair holds in every drawing — the equal-pair is the student's free choice
+    expect(detectRelationsAcross([v0, v1]).equalSegments).toEqual([]);
+  });
+
+  it('a non-variant figure is unaffected (a square still reports its four equal sides)', () => {
+    expect(detectRelationsAcross([build('square ABCD')]).equalSegments.length).toBeGreaterThan(0);
   });
 });
