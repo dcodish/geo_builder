@@ -143,6 +143,45 @@ export function checkGivens(
     }
   }
 
+  // Two mutually-tangent circles must touch: their centres sit r1±r2 apart (external = sum, internal =
+  // difference) AND the touch point `at` lies on BOTH circles. Both halves are checked: a silently-dropped
+  // or contradicted tangency ("OP=4 over-constrained") trips the centre-distance test; an `at` driven off a
+  // circle (e.g. a stated-radius pair where "OM=3" can't move the touch point that sits at radius 5) trips
+  // the membership test — that figure looks tangent yet the labelled touch point isn't on the circle.
+  for (const cmd of commands) {
+    if (cmd.type !== 'circles-tangent') continue;
+    const a = circles.get(cmd.circle1);
+    const b = circles.get(cmd.circle2);
+    if (!a || !b) continue;
+    const d = dist(a.center, b.center);
+    const target = cmd.external ? a.r + b.r : Math.abs(a.r - b.r);
+    if (Math.abs(d - target) > Math.max(0.05, target * 0.02)) {
+      violations.push({
+        relation: 'tangent',
+        ids: [cmd.circle1, cmd.circle2, cmd.at],
+        message: `circles ${circleName(cmd.circle1)} and ${circleName(cmd.circle2)} should be ${cmd.external ? 'externally' : 'internally'} tangent (centres ${target.toFixed(2)} apart) but they are ${d.toFixed(2)} apart`,
+        messageKey: 'figure.v.circlesTangent',
+        params: { c1: circleName(cmd.circle1), c2: circleName(cmd.circle2), kind: cmd.external ? 'external' : 'internal', target: target.toFixed(2), dist: d.toFixed(2) },
+      });
+      continue; // the centres are wrong — a touch-point miss is a redundant second flag for the same fault
+    }
+    const at = positions.get(cmd.at);
+    if (!at) continue;
+    for (const c of [a, b]) {
+      const off = dist(at, c.center);
+      if (Math.abs(off - c.r) > onCircleTol(c.r)) {
+        violations.push({
+          relation: 'tangent',
+          ids: [cmd.at, cmd.circle1, cmd.circle2],
+          message: `the touch point ${cmd.at} should lie on both tangent circles (radius ${c.r.toFixed(2)}) but is ${off.toFixed(2)} from a centre`,
+          messageKey: 'figure.v.tangent',
+          params: { point: cmd.at, circle: circleName(c === a ? cmd.circle1 : cmd.circle2), radius: c.r.toFixed(2), dist: off.toFixed(2) },
+        });
+        break;
+      }
+    }
+  }
+
   // Every metric / incidence relation the commands assert (distance, angle, equal, ratio, ∥, ⟂, collinear,
   // concyclic, …) — checked against the final coordinates with the engine's own `isSatisfied` tolerance,
   // so a relation the solver accepted passes and only a genuinely-off (silently dropped, mis-built, or

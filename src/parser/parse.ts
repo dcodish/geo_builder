@@ -2346,7 +2346,7 @@ const tangentMeetsOtherCircle: Rule = (s) => {
  * otherwise **external** — the default and what "externally" / "from outside" /
  * "חיצונית" / "מבחוץ" also say (side by side, |OP| = r1+r2).
  */
-const circlesTangent: Rule = (s) => {
+const circlesTangent: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   // A "chord" word means a CHORD of one circle tangent to the OTHER (`tangentChord`, which runs first) —
   // never mutual tangency. Guarding here stops a chord whose far endpoint / labels don't all match
@@ -2359,12 +2359,31 @@ const circlesTangent: Rule = (s) => {
   // (e.g. a typo'd "שנקודה" for "בנקודה" that breaks its precise pair-match) from FALLING THROUGH to a
   // wrong mutual-tangency that silently repositions the circles and draws no line — escalate instead.
   if (INTERSECT_KW.test(s)) return null;
-  const centers = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
-  if (centers.length < 2 || centers[0] === centers[1]) return null; // a single circle ⇒ the tangent-line rule
-  const atM = s.match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i);
-  if (!atM) return null;
+  // Either two NAMED circles ("circle O and circle P …") or a plural "two circles"/"שני מעגלים …" with no
+  // names — the latter ("שני מעגלים משיקים מבחוץ") used to fall through to the LLM, which pinned default
+  // radii (5/3) and broke ADR-052. Handle it deterministically with FREE radii instead.
+  const named = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
+  const plural = /\bcircles\b|מעגלים|שני\s+מעגל|שתי\s+מעגל/i.test(s);
+  if (named.length < 2 && !plural) return null; // a single circle ⇒ the tangent-line rule
+  if (named.length >= 2 && named[0] === named[1]) return null;
+  const c1 = named[0] ?? 'O';
+  const c2 = named[1] ?? freeLabel([c1, ...(ctx.points ?? [])], ['P', 'Q', 'K', 'S']);
+  if (c1 === c2) return null;
   const internal = /\binternal\w*\b|\bfrom\s+inside\b|\binside\b|פנימ|מבפנים/i.test(s);
-  return [{ type: 'circles-tangent', circle1: circleId(centers[0]), circle2: circleId(centers[1]), at: up(atM[1]), external: !internal }];
+  // Touch point: a named "at M"/"בנקודה M", else AUTO-name it (the student drew "two tangent circles"
+  // without naming the touch) — avoiding the centres and existing points.
+  const atM = s.match(/(?:\bat\b|בנקודה|מנקודה|בנקוד\S*)\s*([A-Za-z]\d*)\b/i);
+  const at = atM ? up(atM[1]) : freeLabel([c1, c2, ...(ctx.points ?? [])], ['M', 'T', 'N', 'K']);
+  const id1 = circleId(c1), id2 = circleId(c2);
+  const have = new Set((ctx.circles ?? []).map((x) => x.toUpperCase()));
+  const cmds: AnyCommand[] = [];
+  // Each circle is a FREE-radius circle (ADR-052: unstated radius is a DOF), distinct seeds so it doesn't
+  // read as a symmetric pair. `ifAbsent` preserves a previously STATED "circle O radius 5" (its radius
+  // stays a given); a named centre shows, an unnamed default centre is auto (hidden until used).
+  if (!have.has(c1)) cmds.push({ type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, ...(!named.includes(c1) ? { autoCenter: true } : {}) });
+  if (!have.has(c2)) cmds.push({ type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ifAbsent: true, ...(!named.includes(c2) ? { autoCenter: true } : {}) });
+  cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: !internal });
+  return cmds;
 };
 
 /**

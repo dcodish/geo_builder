@@ -90,6 +90,7 @@
       "onCircle": "{{point}} should lie on circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
       "tangent": "tangency point {{point}} should lie on circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
       "constraint": "{{desc}} does not hold in the final figure",
+      "circlesTangent": "circles {{c1}} and {{c2}} should be {{kind}}ly tangent (centres {{target}} apart) but they are {{dist}} apart",
       "orderBeyond": "{{id}} should lie on the extension of {{seg}} beyond {{b}}, but it landed between {{a}} and {{b}}",
       "collinear": "{{pts}} should be collinear, but {{point}} is {{offset}} off the line"
     }

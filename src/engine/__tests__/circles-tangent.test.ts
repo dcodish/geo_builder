@@ -17,13 +17,19 @@ const dist = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.
 beforeEach(() => s().clear());
 
 describe('parse — circles tangent to each other', () => {
-  it('two circles + משיק + "at M" → a single circles-tangent command (not a tangent line)', () => {
-    const r = parse('מעגל O ומעגל P משיקים זה לזה בנקודה M');
+  it('two circles + משיק + "at M" → a circles-tangent command (not a tangent line)', () => {
+    // The circles aren't in context yet, so the rule also MATERIALISES them as FREE-radius circles
+    // (ADR-052: unstated radius is a DOF) before the tangency. With the circles already present (ctx),
+    // it emits the bare circles-tangent (tested below) — here we just confirm the relation is produced.
+    const r = parse('מעגל O ומעגל P משיקים זה לזה בנקודה M', { circles: ['O', 'P'] });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.commands.map((c) => c.type)).toEqual(['circles-tangent']);
-    const c = r.commands[0] as { circle1: string; circle2: string; at: string; external: boolean };
+    expect(r.commands.map((c) => c.type)).toContain('circles-tangent');
+    const c = r.commands.find((x) => x.type === 'circles-tangent') as { circle1: string; circle2: string; at: string; external: boolean };
     expect([c.circle1, c.circle2, c.at, c.external]).toEqual(['circle-O', 'circle-P', 'M', true]);
+    // When the circles already exist, no circle is re-created (a stated radius is preserved).
+    const r2 = parse('מעגל O ומעגל P משיקים זה לזה בנקודה M', { circles: ['O', 'P'] });
+    expect(r2.ok && r2.commands.map((x) => x.type)).toEqual(['circles-tangent']);
   });
 
   it('a single-circle "tangent to circle O at A" is still the tangent LINE rule', () => {
@@ -33,7 +39,11 @@ describe('parse — circles tangent to each other', () => {
   });
 
   it('reads external (default) vs internal from the phrasing (He + En)', () => {
-    const ext = (u: string) => (parse(u).ok && (parse(u) as { commands: { external?: boolean }[] }).commands[0].external) === true;
+    const ext = (u: string) => {
+      const r = parse(u);
+      const c = r.ok ? r.commands.find((x) => x.type === 'circles-tangent') : undefined;
+      return !!c && (c as { external?: boolean }).external === true;
+    };
     expect(ext('circle O and circle P are tangent at M')).toBe(true); // default external
     expect(ext('מעגל O ומעגל P משיקים זה לזה בנקודה M')).toBe(true);
     expect(ext('circle O and circle P are tangent internally at M')).toBe(false);
@@ -46,7 +56,7 @@ describe('engine — externally tangent circles', () => {
   beforeEach(() => {
     s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5 }, 'circle O');
     s().execute({ type: 'circle', id: 'circle-P', center: 'P', radius: 5 }, 'circle P');
-    const r = parse('מעגל O ומעגל P משיקים זה לזה בנקודה M');
+    const r = parse('מעגל O ומעגל P משיקים זה לזה בנקודה M', { circles: ['O', 'P'] });
     if (r.ok) r.commands.forEach((c) => s().execute(c, 'tangent circles'));
   });
 
@@ -72,7 +82,7 @@ describe('engine — internally tangent circles (one inside the other)', () => {
     s().clear();
     s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 8 }, 'circle O r8');
     s().execute({ type: 'circle', id: 'circle-P', center: 'P', radius: 3 }, 'circle P r3');
-    const r = parse('מעגל O ומעגל P משיקים מבפנים בנקודה M');
+    const r = parse('מעגל O ומעגל P משיקים מבפנים בנקודה M', { circles: ['O', 'P'] });
     if (r.ok) r.commands.forEach((c) => s().execute(c, 'tangent internal'));
   });
 
@@ -91,7 +101,7 @@ describe('engine — internal tangency flexes a radius rather than failing (ADR-
     s().clear();
     s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5 }, 'O');
     s().execute({ type: 'circle', id: 'circle-P', center: 'P', radius: 5 }, 'P');
-    const r = parse('מעגל O ומעגל P משיקים מבפנים בנקודה M');
+    const r = parse('מעגל O ומעגל P משיקים מבפנים בנקודה M', { circles: ['O', 'P'] });
     if (r.ok) r.commands.forEach((c) => s().execute(c, 'internal eq'));
     const d = replay(s().facts);
     const f = s().facts.find((x) => x.utterance === 'internal eq')!;
@@ -111,7 +121,7 @@ describe('engine — the inner radius is a first-class DOF (ADR-037 A2 / radius-
     s().clear();
     s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5 }, 'O');
     s().execute({ type: 'circle', id: 'circle-P', center: 'P', radius: 5 }, 'P');
-    const r = parse('מעגל O ומעגל P משיקים מבפנים בנקודה M');
+    const r = parse('מעגל O ומעגל P משיקים מבפנים בנקודה M', { circles: ['O', 'P'] });
     if (r.ok) r.commands.forEach((c) => s().execute(c, 'internal eq'));
   };
 
@@ -151,7 +161,7 @@ describe('engine — the inner radius is a first-class DOF (ADR-037 A2 / radius-
     s().clear();
     s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5 }, 'O');
     s().execute({ type: 'circle', id: 'circle-P', center: 'P', radius: 5 }, 'P');
-    const r = parse('מעגל O ומעגל P משיקים זה לזה בנקודה M'); // external (default)
+    const r = parse('מעגל O ומעגל P משיקים זה לזה בנקודה M', { circles: ['O', 'P'] }); // external (default)
     if (r.ok) r.commands.forEach((c) => s().execute(c, 'external eq'));
     const c = replay(s().facts).construction.objects.find((o) => o.id === 'circle-P')!;
     expect(c.kind === 'circle' && c.radius).toMatchObject({ via: 'length', value: 5 }); // untouched
@@ -162,5 +172,22 @@ describe('engine — the inner radius is a first-class DOF (ADR-037 A2 / radius-
     s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5 }, 'O');
     const c = replay(s().facts).construction.objects.find((o) => o.id === 'circle-O')!;
     expect(c.kind === 'circle' && c.radius).toMatchObject({ via: 'length', value: 5 });
+  });
+});
+
+describe('verifier — the touch point must lie on both tangent circles', () => {
+  it('a STATED-radii pair whose touch point is dragged off the circle is flagged (not silent green)', () => {
+    // Stated radii 5 and 3 (a FIXED pair): the touch point M sits at radius 5 from O, so "OM = 3" cannot
+    // move it without contradicting the given. The figure still LOOKS tangent (|OP| = 8 = 5+3) but M is no
+    // longer on circle O — the verifier must surface that, else it reads as a clean green. (The free-radius
+    // path instead resizes the circle so |OM| = 3 holds with M on it — tested above / in scenarios.)
+    s().clear();
+    s().execute({ type: 'circle', id: 'circle-O', center: 'O', radius: 5 }, 'O');
+    s().execute({ type: 'circle', id: 'circle-P', center: 'P', radius: 3 }, 'P');
+    const r = parse('מעגל O ומעגל P משיקים זה לזה בנקודה M', { circles: ['O', 'P'] });
+    if (r.ok) r.commands.forEach((c) => s().execute(c, 'tangent'));
+    s().execute({ type: 'set-distance', a: 'O', b: 'M', value: 3 }, 'OM=3');
+    const d = replay(s().facts);
+    expect(d.violations.some((v) => v.ids.includes('M'))).toBe(true);
   });
 });

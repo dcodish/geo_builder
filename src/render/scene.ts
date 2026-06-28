@@ -17,7 +17,11 @@ import { resolveCircle, resolveLine, type DefiniteAngle, type RelationsResult, t
 /** A point id structurally on circle `cid` (for recovering a driven free radius from positions). */
 function pointOnCircleId(c: Construction, cid: Id): Id | null {
   for (const o of c.objects) {
-    if ((o.kind === 'on-circle' || o.kind === 'line-circle' || o.kind === 'antipode' || o.kind === 'arc-midpoint') && o.circle === cid) return o.id;
+    // `radial-toward` is on its `circle` by construction (centre + r·unit) — and for two tangent circles it
+    // is the ONLY on-circle point, so without it the renderer can't recover a solver-driven free radius and
+    // draws the SEED instead: the circle is drawn at its default size while the touch point sits at the
+    // solved radius (a circle drawn too big with its touch point floating inside it). (ADR-144.)
+    if ((o.kind === 'on-circle' || o.kind === 'line-circle' || o.kind === 'antipode' || o.kind === 'arc-midpoint' || o.kind === 'radial-toward') && o.circle === cid) return o.id;
     if (o.kind === 'circle-circle' && (o.circle1 === cid || o.circle2 === cid)) return o.id;
   }
   return null;

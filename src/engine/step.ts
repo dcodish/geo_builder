@@ -395,6 +395,11 @@ function circlesOfPoint(o: GeoObject): Id[] {
       return [o.circle];
     case 'circle-circle':
       return [o.circle1, o.circle2];
+    // The touch point of two tangent circles lies on its `circle` (radial-toward) — so a constraint on
+    // it can reach that circle's free radius / centre (the tangency DOFs, ADR-051/ADR-052). The OTHER
+    // circle's radius is surfaced via the hidden witness point (also radial-toward, on the other circle).
+    case 'radial-toward':
+      return [o.circle];
     default:
       return [];
   }
@@ -604,6 +609,7 @@ function pointParents(o: GeoObject): Id[] {
     case 'circumcenter': return [o.a, o.b, o.c];
     case 'antipode': return [o.of];
     case 'arc-midpoint': return [o.from, o.to];
+    case 'radial-toward': return [o.toward]; // continue the walk to the other centre (its free DOF)
     default: return []; // free-point, on-circle (a carrier itself), line/circle-derived points
   }
 }

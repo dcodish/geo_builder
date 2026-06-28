@@ -189,3 +189,28 @@ describe('visible construction lines', () => {
     expect(evaluate(construction).ok).toBe(true);
   });
 });
+
+describe('tangent circles — the DRAWN radius matches a solver-driven free radius (ADR-144)', () => {
+  it('after "OM=3" circle O is drawn at radius 3 (its touch point), not the seed 5', () => {
+    // The regression behind the operator's screenshot: the touch point M (a `radial-toward` point) is the
+    // ONLY point on each tangent circle, and `pointOnCircleId` didn't recognise that kind — so the renderer
+    // could not recover the solver-driven free radius and drew the SEED (circle O big, M floating inside it),
+    // even though the ENGINE positions were correct. A positions-only test passes here; only a SCENE assertion
+    // catches it — hence this check on the drawn `SceneCircle.r`.
+    const cmds: Command[] = [
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true, autoCenter: true },
+      { type: 'circle', id: 'circle-P', center: 'P', radius: 3.6, freeRadius: true, autoCenter: true },
+      { type: 'circles-tangent', circle1: 'circle-O', circle2: 'circle-P', at: 'M', external: true },
+      { type: 'segment', a: 'O', b: 'M' },
+      { type: 'set-distance', a: 'O', b: 'M', value: 3 },
+    ];
+    const { construction, positions } = build(cmds);
+    const scene = buildScene(construction, positions);
+    const cO = scene.circles.find((c) => c.id === 'circle-O')!;
+    const cP = scene.circles.find((c) => c.id === 'circle-P')!;
+    const O = positions.get('O')!, P = positions.get('P')!, M = positions.get('M')!;
+    expect(cO.r).toBeCloseTo(dist(O, M), 3); // drawn radius = distance to its touch point M (=3), not the seed 5
+    expect(cO.r).toBeCloseTo(3, 2);
+    expect(cO.r + cP.r).toBeCloseTo(dist(O, P), 2); // external tangency: drawn radii sum to the centre distance
+  });
+});

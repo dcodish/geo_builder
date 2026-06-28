@@ -105,6 +105,22 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'two-tangent-circles-then-size-given-flexes-radii',
+    title: '"two circles tangent externally" then "OP = 4" RESIZES the radii (r1+r2 = |OP|) instead of over-constraining — the radii are free DOFs, not pinned at 5/3',
+    guards:
+      'operator session 23vqi9u8 (built "שני מעגלים משיקים מבחוץ", then OM= / OP=). The figure was created with both radii PINNED at the default seeds (5 and 3): the deterministic parser had no rule for the unnamed phrasing, so it escalated to the LLM, which emitted `circle … radius 5` / `radius 3` (FIXED) + `circles-tangent`. External tangency then forces |OP| = r1+r2 = 8 rigidly, so the student\'s own "OP = 4" was reported "over-constrained: |OP| = 8 cannot hold" — a value the student never gave (ADR-052 violation). The touch point M is also rigid at |OM| = r1 = 5, so "OM = 4" could not move it either. Root fix: (1) a deterministic `circlesTangent` rule that materialises the two circles with FREE radii (distinct seeds); (2) the engine builds external tangency as a `coincide` between the touch point seen from each circle (M = radial-toward(c1→c2), a hidden witness = radial-toward(c2→c1)), with both free radii marked as PERMANENT drivers of it — so |OP| = r1+r2 is a constraint the radii flex to satisfy, not a pinned number. "OP = 4" now resizes the radii (r1+r2 = 4) and "OM = 4" sets r1 = 4, both without over-constraining; the recruiter reaches the radii via radial-toward ancestry (circlesOfPoint/pointParents).',
+    steps: ['שני מעגלים משיקים מבחוץ', 'OP=4'],
+    check(fig) {
+      allStepsOk(fig); // no "over-constrained: |OP| = 8 cannot hold"
+      const O = at(fig, 'O'), P = at(fig, 'P'), M = at(fig, 'M');
+      // The student's size given holds, and the figure is a genuine EXTERNAL tangency at it: M lies on
+      // both circles (|OM| + |MP| = |OP|) and the radii summed to |OP| = 4 (so they flexed off the 5/3 seeds).
+      expect(dist(O, P)).toBeCloseTo(4, 2);
+      expect(dist(O, M) + dist(M, P)).toBeCloseTo(dist(O, P), 2); // M collinear & between ⇒ tangent (not crossing)
+      expect(dist(O, M)).toBeLessThan(4); // r1 shrank below its seed of 5 to make r1+r2 = 4
+    },
+  },
+  {
     id: 'chord-tangent-to-other-circle-at-endpoint',
     title: '"the chord AD in circle P is tangent to circle O at A" creates D on circle P, draws the chord AD, and makes OA ⟂ AD (tangent) — not a mutual-tangency that drops D',
     guards:

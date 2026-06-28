@@ -25,7 +25,8 @@ describe('subscripted point labels (O1, O2)', () => {
   });
 
   it('two subscripted circles tangent to each other read O1 / O2 distinctly', () => {
-    const c = ok('מעגל O1 ומעגל O2 משיקים זה לזה בנקודה M')[0] as C;
+    // The rule also materialises the two (free-radius) circles, so find the tangency among the commands.
+    const c = ok('מעגל O1 ומעגל O2 משיקים זה לזה בנקודה M').find((x) => x.type === 'circles-tangent') as C;
     expect(c.type).toBe('circles-tangent');
     expect([c.circle1, c.circle2, c.at]).toEqual(['circle-O1', 'circle-O2', 'M']);
   });

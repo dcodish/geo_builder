@@ -849,6 +849,60 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       if (idx1 >= 0 && idx2 >= 0) {
         const c1 = objects[idx1] as Extract<GeoObject, { kind: 'circle' }>;
         const c2 = objects[idx2] as Extract<GeoObject, { kind: 'circle' }>;
+        // FREE-RADIUS path ([ADR-052](docs/06-decisions.md#adr-052)): when a radius is UNSTATED it is a
+        // free DOF, so tangency is a CONSTRAINT over the free radii — |OP| = r1+r2 (external) — NOT a
+        // pinned centre distance. A `coincide` between the touch point seen from EACH circle (M on circle 1
+        // toward c2; a hidden witness on circle 2 toward c1) has residual ||OP| − (r1+r2)|: it forces the
+        // EXTERNAL relation and DRIVES the free radii/centres (recruitFreeDofs reaches them through the
+        // radial-toward points). So "two tangent circles" then "OP = 4" resizes the radii to sum to 4
+        // instead of contradicting the seeds 5/3 the student never gave (the reported over-constraint bug).
+        // Both radii STATED ⇒ fall through to the fixed path below, where |OP| is genuinely rigid.
+        if (c1.radius.via === 'free' || c2.radius.via === 'free') {
+          const rseed = (r: typeof c1.radius): number => (r.via === 'free' || r.via === 'length' ? r.value : 5);
+          const r1 = rseed(c1.radius);
+          const r2 = rseed(c2.radius);
+          // Seed c2's centre at the exact touching distance so the DEFAULT figure is already tangent (the
+          // solver re-engages only when a later constraint moves a radius / |OP|). External: r1+r2; internal: |r1−r2|.
+          const c1c = objects.find((o) => o.id === c1.center && o.kind === 'free-point') as Extract<GeoObject, { kind: 'free-point' }> | undefined;
+          const c2j = objects.findIndex((o) => o.id === c2.center && o.kind === 'free-point');
+          const c2c = c2j >= 0 ? (objects[c2j] as Extract<GeoObject, { kind: 'free-point' }>) : undefined;
+          if (c1c && c2c && !c2c.pinned) {
+            const dx = c2c.x - c1c.x, dy = c2c.y - c1c.y;
+            const L = Math.hypot(dx, dy) > 1e-6 ? Math.hypot(dx, dy) : 1;
+            const ux = Math.hypot(dx, dy) > 1e-6 ? dx / L : 1;
+            const uy = Math.hypot(dx, dy) > 1e-6 ? dy / L : 0;
+            const gap = cmd.external ? r1 + r2 : Math.abs(r1 - r2);
+            objects[c2j] = { ...c2c, x: c1c.x + ux * gap, y: c1c.y + uy * gap };
+          }
+          const wit = `~touch-${cmd.at}`;
+          if (cmd.external) {
+            // M on circle 1 toward c2; the witness on circle 2 toward c1. coincide ⇒ |OP| = r1+r2.
+            addObj(objects, { kind: 'radial-toward', id: cmd.at, circle: c1.id, toward: c2.center });
+            addObj(objects, { kind: 'radial-toward', id: wit, circle: c2.id, toward: c1.center });
+          } else {
+            // Internal: the larger (by seed) circle is OUTER; M on the outer toward the inner; the witness
+            // on the inner toward M (so the touch lands on the far side of the inner centre). coincide ⇒ |OP| = |r1−r2|.
+            const outer = r1 >= r2 ? c1 : c2;
+            const inner = r1 >= r2 ? c2 : c1;
+            addObj(objects, { kind: 'radial-toward', id: cmd.at, circle: outer.id, toward: inner.center });
+            addObj(objects, { kind: 'radial-toward', id: wit, circle: inner.id, toward: cmd.at });
+          }
+          const tcon: Constraint = { type: 'coincide', p: cmd.at, q: wit };
+          // Mark each FREE radius as a PERMANENT driver of the tangency (like length-radius / ADR-071): the
+          // touch points carry no DOF themselves, so without this the coincide is only a CHECK, satisfied at
+          // build but never re-flexed — and recruitFreeDofs widens DOFs only for a step's OWN new constraint,
+          // so a later "OP=4" (which moves a centre) would break the build-time tangency and over-constrain.
+          // Marking both radii makes them carriers in every joint solve, so |OP| changes RESHAPE the radii
+          // (proportionally) to keep r1+r2 = |OP|. (The reported "two tangent circles then OP=4" bug.)
+          for (const ix of [idx1, idx2]) {
+            const oc = objects[ix];
+            if (oc.kind === 'circle' && oc.radius.via === 'free' && (oc as { solve?: unknown }).solve === undefined) {
+              objects[ix] = { ...oc, solve: { constraint: tcon, branch: 0 } };
+            }
+          }
+          constraints.push(tcon);
+          break;
+        }
         if (c1.radius.via === 'length' && c2.radius.via === 'length') {
           const r1 = c1.radius.value;
           const r2 = c2.radius.value;
