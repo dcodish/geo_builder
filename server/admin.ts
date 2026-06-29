@@ -214,6 +214,33 @@ export function aggregate(events: UsageEvent[]): Stats {
   };
 }
 
+/** Dashboard filter state, parsed from the query string (`?since=YYYY-MM-DD&rel=<build>`). */
+export interface Filter {
+  since?: string;
+  rel?: string;
+}
+
+/** Keep only events matching the filter: on/after `since` (by day) and/or from a specific release `rel`. */
+export function filterEvents(events: UsageEvent[], f: Filter): UsageEvent[] {
+  return events.filter((e) => {
+    const day = (e.serverTs ?? e.t ?? '').slice(0, 10);
+    if (f.since && day && day < f.since) return false;
+    if (f.rel && f.rel !== 'all' && e.rel !== f.rel) return false;
+    return true;
+  });
+}
+
+/** Distinct release ids in the log, most-recently-seen first (for the filter dropdown). */
+export function releasesOf(events: UsageEvent[]): string[] {
+  const lastSeen = new Map<string, string>();
+  for (const e of events) {
+    if (!e.rel) continue;
+    const ts = e.serverTs ?? e.t ?? '';
+    if (!lastSeen.has(e.rel) || ts > lastSeen.get(e.rel)!) lastSeen.set(e.rel, ts);
+  }
+  return [...lastSeen.entries()].sort((a, b) => (a[1] < b[1] ? 1 : -1)).map(([r]) => r);
+}
+
 // ── HTML ──────────────────────────────────────────────────────────────────────
 
 const esc = (s: unknown): string =>
@@ -246,6 +273,11 @@ const PAGE_HEAD = `<!doctype html><html lang="he" dir="rtl"><head><meta charset=
   .btn{background:#ef4444;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;text-decoration:none;cursor:pointer}
   .btn2{background:#0ea5e9;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;text-decoration:none;cursor:pointer}
   .login{max-width:340px;margin:80px auto;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:24px}
+  .filters{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:13px}
+  .filters label{display:flex;align-items:center;gap:6px;color:#374151}
+  .filters select,.filters input{padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;direction:ltr}
+  .filters button{background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer}
+  .chip{background:#eef2ff;color:#3730a3;border-radius:14px;padding:4px 10px;font-size:12px;text-decoration:none}
   .login input{width:100%;padding:8px 10px;margin:6px 0 14px;border:1px solid #d1d5db;border-radius:6px;font-size:14px}
   .login button{width:100%;background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:9px;font-size:14px;cursor:pointer}
   .err{color:#b91c1c;font-size:13px;margin-bottom:8px}
@@ -301,9 +333,27 @@ function outcomeBars(outcomes: Stats['outcomes']): string {
   );
 }
 
-function dashboard(base: string, s: Stats): string {
+/** The release/date filter bar (a GET form back to the dashboard, so the cookie + auth survive). */
+function filterBar(base: string, releases: string[], cur: Filter, presets: { label: string; since: string }[]): string {
+  const relOpts = ['all', ...releases]
+    .map((r) => `<option value="${esc(r)}"${(cur.rel ?? 'all') === r ? ' selected' : ''}>${r === 'all' ? 'כל הגרסאות' : esc(r)}</option>`)
+    .join('');
+  const keepRel = cur.rel && cur.rel !== 'all' ? `&rel=${encodeURIComponent(cur.rel)}` : '';
+  const chips = presets.map((p) => `<a class="chip" href="${esc(base)}?since=${esc(p.since)}${keepRel}">${esc(p.label)}</a>`).join(' ');
+  const active = !!(cur.since || (cur.rel && cur.rel !== 'all'));
+  return `<form class="filters" method="get" action="${esc(base)}">
+      <label>גרסה <select name="rel">${relOpts}</select></label>
+      <label>מתאריך <input type="date" name="since" value="${esc(cur.since ?? '')}"></label>
+      <button type="submit">סנן</button>
+      ${chips}
+      ${active ? `<a class="chip" href="${esc(base)}">איפוס הכל</a>` : ''}
+    </form>`;
+}
+
+function dashboard(base: string, s: Stats, releases: string[], cur: Filter, presets: { label: string; since: string }[]): string {
   const fmt = (ts: string | null) => (ts ? ts.replace('T', ' ').slice(0, 16) : '—');
   const range = s.firstSeen ? `${fmt(s.firstSeen)} — ${fmt(s.lastSeen)}` : 'אין נתונים';
+  const filtered = !!(cur.since || (cur.rel && cur.rel !== 'all'));
   return (
     PAGE_HEAD +
     `<div class="top">
@@ -311,7 +361,8 @@ function dashboard(base: string, s: Stats): string {
        <a class="btn2" href="${API_COST_URL}" target="_blank" rel="noopener">💰 עלות API</a>
        <a class="btn" href="${esc(base)}/logout">יציאה</a>
      </div>
-     <div class="sub">טווח נתונים: ${esc(range)}</div>
+     <div class="sub">טווח נתונים: ${esc(range)}${filtered ? ' · <b>מסונן</b>' : ''}</div>
+     ${filterBar(base, releases, cur, presets)}
      <div class="cards">
        ${card(s.visitors, 'מבקרים ייחודיים')}
        ${card(s.sessions, 'כניסות (sessions)')}
@@ -405,6 +456,18 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
   const authed = validCookie(readCookies(req)[COOKIE], opts.cookieSecret);
   if (!authed) return send(res, 200, loginPage(base, false));
 
-  const events = await readEvents(opts.logPath ?? eventsLogPath());
-  return send(res, 200, dashboard(base, aggregate(events)));
+  const all = await readEvents(opts.logPath ?? eventsLogPath());
+  // Filter state from the query string (?since=YYYY-MM-DD&rel=<build>) — empty = show everything.
+  const q = new URLSearchParams((req.url ?? '').split('?')[1] ?? '');
+  const cur: Filter = { since: q.get('since') || undefined, rel: q.get('rel') || undefined };
+  const releases = releasesOf(all);
+  const events = filterEvents(all, cur);
+  // "since" presets, computed from the server clock (last 24h / 7d / 30d).
+  const dayMinus = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+  const presets = [
+    { label: '24 שעות', since: dayMinus(1) },
+    { label: '7 ימים', since: dayMinus(7) },
+    { label: '30 ימים', since: dayMinus(30) },
+  ];
+  return send(res, 200, dashboard(base, aggregate(events), releases, cur, presets));
 }

@@ -3,10 +3,24 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
+import { execSync } from 'node:child_process';
 import { llmProxyPlugin } from './server/llmProxy';
 import { logProxyPlugin } from './server/logProxy';
 
+// A per-build release id (git short-hash · build date), baked into the bundle as `__BUILD__` and stamped
+// on every usage event (ADR-146 analytics) so the admin dashboard can filter outcomes by release — i.e.
+// see whether a fixed error type still recurs in traffic AFTER its deploy. Falls back to 'dev'.
+const BUILD_ID = (() => {
+  try {
+    const hash = execSync('git rev-parse --short HEAD', { cwd: __dirname }).toString().trim();
+    return `${hash} · ${new Date().toISOString().slice(0, 10)}`;
+  } catch {
+    return 'dev';
+  }
+})();
+
 export default defineConfig(({ command }) => ({
+  define: { __BUILD__: JSON.stringify(BUILD_ID) },
   // Production build is served from the `/geo-builder/` subpath on themathbible.com;
   // the dev server stays at root. `import.meta.env.BASE_URL` follows this, so the
   // client's `/api/parse` fetch resolves correctly under either base.

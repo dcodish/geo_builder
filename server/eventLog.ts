@@ -43,6 +43,7 @@ export interface UsageEvent {
   ev: 'session' | 'submit';
   sid?: string;
   t?: string;
+  rel?: string; // the build release (git short-hash · date) this event came from — for the dashboard's release filter
   utterance?: string;
   locale?: string;
   source?: string;
@@ -66,6 +67,7 @@ function normalise(raw: unknown): Omit<UsageEvent, 'serverTs' | 'iph'> | null {
   const out: Omit<UsageEvent, 'serverTs' | 'iph'> = { ev };
   out.sid = str(o.sid, 16);
   out.t = str(o.t, 40);
+  out.rel = str(o.rel, 32); // stamped on BOTH session + submit so a release filter keeps session/visitor counts
   if (ev === 'submit') {
     out.utterance = str(o.utterance, MAX_UTTERANCE);
     out.locale = str(o.locale, 8);

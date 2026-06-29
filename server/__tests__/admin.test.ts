@@ -10,7 +10,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { writeFile, rm, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { handleAdmin, aggregate, type Stats } from '../admin';
+import { handleAdmin, aggregate, filterEvents, releasesOf, type Stats } from '../admin';
 import type { UsageEvent } from '../eventLog';
 
 const OPTS = { username: 'teacher', password: 's3cret', cookieSecret: 'sign-me', base: '/admin' };
@@ -184,5 +184,53 @@ describe('aggregate', () => {
     const empty = aggregate([]);
     expect(empty.visitors).toBe(0);
     expect(empty.outcomes).toEqual([]);
+  });
+});
+
+describe('dashboard filtering (release + date)', () => {
+  // two releases: r1 (an old build whose fixed error type still appears) and r2 (the post-fix build)
+  const evs: UsageEvent[] = [
+    { serverTs: '2026-06-20T09:00:00Z', iph: 'h1', ev: 'session', sid: 's1', rel: 'r1' },
+    { serverTs: '2026-06-20T09:01:00Z', iph: 'h1', ev: 'submit', sid: 's1', utterance: 'E על המיתר AC', locale: 'he', source: 'llm', result: 'not-understood', rel: 'r1' },
+    { serverTs: '2026-06-29T10:00:00Z', iph: 'h2', ev: 'session', sid: 's2', rel: 'r2' },
+    { serverTs: '2026-06-29T10:01:00Z', iph: 'h2', ev: 'submit', sid: 's2', utterance: 'ריבוע ABCD', locale: 'he', source: 'parser', result: 'ok', rel: 'r2' },
+  ];
+
+  it('filterEvents by `since` keeps only events on/after that day', () => {
+    expect(filterEvents(evs, { since: '2026-06-29' })).toHaveLength(2);
+    expect(filterEvents(evs, { since: '2026-06-20' })).toHaveLength(4);
+  });
+
+  it('filterEvents by `rel` keeps only that release; "all" keeps everything', () => {
+    expect(filterEvents(evs, { rel: 'r2' })).toHaveLength(2);
+    expect(filterEvents(evs, { rel: 'all' })).toHaveLength(4);
+  });
+
+  it('releasesOf lists distinct releases, most-recent-first', () => {
+    expect(releasesOf(evs)).toEqual(['r2', 'r1']);
+  });
+
+  it('renders the filter bar with each release as an option', async () => {
+    await writeFile(logPath, evs.map((e) => JSON.stringify(e)).join('\n'), 'utf8');
+    const login = mockRes();
+    await run(mockReq('POST', '/admin/login', ['username=teacher&password=s3cret']), login, logPath);
+    const cookie = cookieFrom(login.headers['set-cookie']);
+    const res = mockRes();
+    await run(mockReq('GET', '/admin', [], { cookie }), res, logPath);
+    expect(res.body).toContain('class="filters"');
+    expect(res.body).toContain('<option value="r2"');
+    expect(res.body).toContain('<option value="r1"');
+  });
+
+  it('filtering by ?rel=r2 drops the old release\'s events (the fixed error type disappears)', async () => {
+    await writeFile(logPath, evs.map((e) => JSON.stringify(e)).join('\n'), 'utf8');
+    const login = mockRes();
+    await run(mockReq('POST', '/admin/login', ['username=teacher&password=s3cret']), login, logPath);
+    const cookie = cookieFrom(login.headers['set-cookie']);
+    const res = mockRes();
+    await run(mockReq('GET', '/admin?rel=r2', [], { cookie }), res, logPath);
+    expect(res.body).toContain('מסונן'); // "filtered" marker shown
+    expect(res.body).toContain('ריבוע ABCD'); // r2's utterance is present
+    expect(res.body).not.toContain('E על המיתר AC'); // r1's (fixed) failure is filtered out
   });
 });

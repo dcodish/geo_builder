@@ -19,6 +19,11 @@ const sessionId = Math.random().toString(36).slice(2, 10); // one id per page lo
 let seq = 0;
 let sessionAnnounced = false; // PROD: emit the `session` marker exactly once per load
 
+// The build this page is running (git short-hash · date, injected by Vite `define`). Stamped on every
+// PROD event so the admin dashboard can filter outcomes by release (ADR-146/ADR-148 follow-up) — `typeof`
+// guard so a context without the define (some test runners) degrades to 'dev' instead of throwing.
+const REL = typeof __BUILD__ !== 'undefined' ? __BUILD__ : 'dev';
+
 // `import.meta.env.BASE_URL` is `/` in dev and `/geo-builder/` in the production
 // build, so this resolves to `/api/log` (dev Vite plugin) or `/geo-builder/api/log`
 // (prod Node proxy) automatically — the same way the `/api/parse` fetch does.
@@ -49,12 +54,13 @@ export function logDebug(event: Record<string, unknown>): void {
   const t = new Date().toISOString();
   if (!sessionAnnounced) {
     sessionAnnounced = true;
-    post({ ev: 'session', sid: sessionId, t });
+    post({ ev: 'session', sid: sessionId, t, rel: REL });
   }
   post({
     ev: 'submit',
     sid: sessionId,
     t,
+    rel: REL,
     utterance: event.utterance,
     locale: event.locale,
     source: event.source,
