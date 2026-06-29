@@ -2583,6 +2583,42 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
     st.clear();
   });
 
+  it('[re-entry-noop-message] re-typing an existing construct is a friendly no-op, not an escalation (ADR-156)', () => {
+    const st = useGeoStore.getState();
+    st.clear();
+    // Mirror App.submit's classification of the deterministic path: commit | noop ("already drawn") | escalate.
+    const classify = (utterance: string): { kind: 'commit' | 'noop' | 'escalate'; commands?: AnyCommand[] } => {
+      const facts = useGeoStore.getState().facts;
+      const ctx = ctxOf(facts);
+      const r = parse(utterance, ctx);
+      if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0) {
+        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
+        if (outcome.produced || (outcome.reason === 'error' && hasDeferrableConstraint(r.commands))) return { kind: 'commit', commands: r.commands };
+        if (outcome.reason === 'empty') {
+          const existing = new Set((ctx.points ?? []).map((p) => p.toUpperCase()));
+          const newLabels = [...new Set(utterance.match(/[A-Z]\d*/g) ?? [])].filter((l) => !existing.has(l));
+          if (newLabels.length === 0) return { kind: 'noop' };
+        }
+      }
+      return { kind: 'escalate' };
+    };
+    const commit = (u: string) => {
+      const res = classify(u);
+      expect(res.kind, `first ${u}`).toBe('commit');
+      res.commands!.forEach((c) => useGeoStore.getState().execute(c, u, 'g-' + u));
+    };
+    // re-typing a shape → no-op (not escalate)
+    commit('square ABCD');
+    expect(classify('square ABCD').kind, 're-typed square is a no-op').toBe('noop');
+    // re-inscribing points already on a circle → no-op (no duplicate, no escalate)
+    st.clear();
+    commit('מרובע ABCD חסום במעגל');
+    expect(classify('מרובע ABCD חסום במעגל').kind, 're-inscribe is a no-op').toBe('noop');
+    // a genuinely NEW construct still commits (the no-op gate doesn't swallow real work)
+    expect(classify('E על AB').kind, 'a new point still commits').toBe('commit');
+    st.clear();
+  });
+
   it('[pending-vs-contradiction] CE⟂AB before sizes is PENDING (info, no red error); ∠DAB=37 on a square is a hard contradiction', () => {
     // PENDING: the Q4 ⟂ entered before the sizes flexes as the free DOFs move → it's "not determined yet",
     // shown as an info banner, NOT the red "over-constrained" error (ADR-104). It resolves once sizes come.

@@ -30,6 +30,7 @@
     "loading": "Thinking...",
     "notUnderstood": "I couldn't read that yet — try one of the examples below.",
     "producedNothing": "I understood that but it didn't build anything on the figure — I tried rephrasing it too. Check the names/relations, or word it differently.",
+    "alreadyDrawn": "That's already on the figure — nothing to add.",
     "partial": "Couldn't draw this part",
     "rename_no-source": "There's no point {{from}} to rename.",
     "rename_target-taken": "{{to}} is already a point — pick a free letter, or swap them (click the segment → Swap endpoints, or type \"swap {{from}} and {{to}}\").",

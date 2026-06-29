@@ -312,6 +312,21 @@ export default function App() {
           resolveAfterCommit();
           return;
         }
+        // A clean RE-ENTRY of things that already exist (re-typing a shape, re-inscribing points already on
+        // the circle) parses fine but produces nothing NEW. That's not a failure and must not escalate to the
+        // LLM (which would just say "couldn't build"): tell the student it's already drawn. Signal: produced
+        // nothing, NOT an error, and the utterance introduces no new label (every label it names already
+        // exists). (ADR-156 follow-up — the friendly no-op message.)
+        if (outcome.reason === 'empty') {
+          const existing = new Set((pctx.points ?? []).map((p) => p.toUpperCase()));
+          const newLabels = [...new Set(utterance.match(/[A-Z]\d*/g) ?? [])].filter((l) => !existing.has(l));
+          if (newLabels.length === 0) {
+            logDebug({ kind: 'input', utterance, locale, source: 'parser', result: 'noop-exists', commands: r.commands });
+            setInputNote(t('input.alreadyDrawn'));
+            setText('');
+            return;
+          }
+        }
         weak = outcome.reason; // parsed but produced nothing → fall through to the LLM second attempt
         logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:${outcome.reason}`, detail: outcome.detail, commands: r.commands });
       } else {
