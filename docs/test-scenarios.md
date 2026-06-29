@@ -134,6 +134,10 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 **Steps**: `משולש DEF חוסם את המעגל`
 **Guards against:** the triangle-first "circumscribes" phrasing being misparsed to a circumcircle (circle through D,E,F). Fix (ADR-066): the `incircle` rule matches it (ordered, so a circle-first "מעגל חוסם משולש" stays a circumcircle). **Asserts:** all steps OK; the incircle's tangency point G lies on side DE; the inradius to DF equals the inradius to DE.
 
+### `incircle-has-three-tangency-points` — the incircle marks all three touch points (ADR-151)
+**Steps**: `משולש ABC` · `משולש ABC חוסם מעגל`
+**Guards against:** the general incircle branch materialising only the single radius foot, so a student saw one tangency mark instead of three. Fix (ADR-151): build a ⟂ foot on each of the three sides (F on AB, G on BC, H on CA); F also defines the radius, the other two land on the circle automatically (the incentre is equidistant). **Asserts:** all steps OK; each foot lies on its side; all three feet are the same distance from the incentre (on the circle).
+
 ### `bagrut-q4-tangent-secant-perpendicular` — the real textbook figure, with its symbolic given (ADR-069)
 **Steps**: `מעגל שרדיוסו R ומרכזו O` · `מנקודה A יוצא משיק למעגל בנקודה B` · `המשך AO חותך את המעגל בנקודות C ו D` · `G על המשך DB` · `DG` · `AG⊥AD` · `∠ADB=α`
 **Guards against:** the claim that the engine can't build a real bagrut problem. It can — with the book's OWN given, the SYMBOLIC `∠ADB=α` (a label, not a number). The operator's numeric experiments (AG=8 AND AC=0.5DC) over-constrained a shape-determined figure; the α-labelled form builds. Also exercises lineCutsCircleTwice (ADR-068) + the now-free external apex (ADR-069). **Asserts:** all steps OK; C,D on the circle and on line AO; AG ⟂ AD; D, B, G collinear.

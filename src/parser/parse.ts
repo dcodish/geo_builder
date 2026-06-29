@@ -1834,8 +1834,15 @@ const incircle: Rule = (s, ctx) => {
     if (il && !ids.includes(up(il))) return up(il);
     return null;
   })();
-  const I = namedInc ?? freeLabel([...ids, ...taken], ['I', 'O', 'P', 'Q']); // the incenter
+  const I = namedInc ?? freeLabel([...ids, ...taken], ['O', 'P', 'Q', 'I']); // the incentre — a circle centre defaults to O (the convention), I only if O is taken
+  // The incircle is tangent to ALL THREE sides, so it has three touch points — materialise each as the foot
+  // of the ⟂ from the incentre onto that side. One of them (F, on AB) also defines the radius (circle-through);
+  // the other two are derived points that land ON the circle automatically (the incentre is equidistant from
+  // every side). Earlier this only drew the single radius foot, so a student saw one tangency mark instead of
+  // three. The labels dodge the figure + each other.
   const F = freeLabel([...ids, I, ...taken], ['F', 'G', 'H', 'K']); // tangency point on AB
+  const G = freeLabel([...ids, I, F, ...taken], ['G', 'H', 'K', 'L']); // tangency point on BC
+  const H = freeLabel([...ids, I, F, G, ...taken], ['H', 'K', 'L', 'N']); // tangency point on CA
   const bisA = `bis-${B}${A}${C}`; // ∠BAC (vertex A)
   const bisB = `bis-${A}${B}${C}`; // ∠ABC (vertex B)
   return [
@@ -1843,8 +1850,10 @@ const incircle: Rule = (s, ctx) => {
     { type: 'bisector', id: bisA, vertex: A, p: B, q: C },
     { type: 'bisector', id: bisB, vertex: B, p: A, q: C },
     { type: 'line-intersection', id: I, line1: bisA, line2: bisB }, // incenter
-    { type: 'foot', id: F, from: I, a: A, b: B }, // inradius foot on side AB
+    { type: 'foot', id: F, from: I, a: A, b: B }, // inradius foot on side AB (also the circle's through-point)
     { type: 'circle-through', id: circleId(I), center: I, through: F, ...(namedInc ? {} : { autoCenter: true }) }, // the incentre is auto unless named
+    { type: 'foot', id: G, from: I, a: B, b: C }, // tangency on side BC (lands on the circle)
+    { type: 'foot', id: H, from: I, a: C, b: A }, // tangency on side CA (lands on the circle)
   ];
 };
 

@@ -121,7 +121,7 @@ describe('constructible cases that used to escalate (right-tri inscribed, circum
   it('circle inscribed in a triangle: the incircle is tangent to all three sides', () => {
     // distinct from "triangle inscribed in a circle" — the circle is INSIDE the triangle
     const { positions } = reproduce(['triangle ABC', 'circle inscribed in triangle ABC'], 'incircle');
-    const [A, B, C, I] = ['A', 'B', 'C', 'I'].map((id) => positions.get(id)!);
+    const [A, B, C, I] = ['A', 'B', 'C', 'O'].map((id) => positions.get(id)!); // centre defaults to O
     const distToSide = (p: Vec, q: Vec) => dist(I, footOnLine(I, p, q));
     // the incenter is equidistant from all three sides ⇒ one circle is tangent to each
     expect(distToSide(A, B)).toBeCloseTo(distToSide(B, C), 6);

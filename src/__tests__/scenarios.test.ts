@@ -1235,14 +1235,36 @@ const SCENARIOS: Scenario[] = [
     steps: ['משולש DEF חוסם את המעגל'],
     check(fig) {
       allStepsOk(fig);
-      // the incircle is centred at the incenter I, tangent to side DE at its foot G
-      const I = at(fig, 'I'), D = at(fig, 'D'), E = at(fig, 'E'), G = at(fig, 'G');
+      // the incircle is centred at the incentre O (a circle centre defaults to O), tangent to side DE at its foot G
+      const I = at(fig, 'O'), D = at(fig, 'D'), E = at(fig, 'E'), G = at(fig, 'G');
       const off = Math.abs((G.x - D.x) * (E.y - D.y) - (G.y - D.y) * (E.x - D.x)) / dist(D, E);
       expect(off, 'tangency point G lies on side DE').toBeLessThan(1e-4);
       // I is equidistant from all three sides (the inradius) — check vs side DF too
       const F = at(fig, 'F');
       const distToLine = (p: Vec, a: Vec, b: Vec) => Math.abs((p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)) / dist(a, b);
       expect(distToLine(I, D, F), 'inradius to DF = inradius to DE').toBeCloseTo(dist(I, G), 3);
+    },
+  },
+  {
+    id: 'incircle-has-three-tangency-points',
+    title: '"משולש ABC חוסם מעגל" on an existing triangle marks ALL THREE tangency points (one per side)',
+    guards:
+      "operator (screenshot): the incircle of an existing triangle ABC only drew ONE tangency point (F on one side) — it should mark all three (the incircle touches every side). Root cause (ADR-151): the general incircle branch materialised only the single radius foot; fix builds three feet (one ⟂ foot per side), the other two landing on the circle automatically (the incentre is equidistant).",
+    steps: ['משולש ABC', 'משולש ABC חוסם מעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const I = at(fig, 'O'); // incentre = circle centre (defaults to O)
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      const F = at(fig, 'F'), G = at(fig, 'G'), H = at(fig, 'H'); // three tangency feet
+      const distToLine = (p: Vec, a: Vec, b: Vec) => Math.abs((p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)) / dist(a, b);
+      // each foot lies on its side
+      expect(distToLine(F, A, B), 'F on side AB').toBeLessThan(1e-4);
+      expect(distToLine(G, B, C), 'G on side BC').toBeLessThan(1e-4);
+      expect(distToLine(H, C, A), 'H on side CA').toBeLessThan(1e-4);
+      // all three are the same distance from the incentre (they lie on the circle)
+      const r = dist(I, F);
+      expect(dist(I, G), 'G on the circle (same inradius)').toBeCloseTo(r, 4);
+      expect(dist(I, H), 'H on the circle (same inradius)').toBeCloseTo(r, 4);
     },
   },
   {
