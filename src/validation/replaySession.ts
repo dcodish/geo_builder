@@ -63,6 +63,7 @@ function ctxFrom(before: Derived) {
     points: construction.objects.filter(isGeoPoint).map((o) => o.id),
     circleMembers: circleMembers(construction),
     neighbors: pointNeighbors(construction),
+    lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])),
   };
 }
 

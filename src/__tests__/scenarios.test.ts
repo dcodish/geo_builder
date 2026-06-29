@@ -45,6 +45,7 @@ function ctxOf(facts: Fact[]) {
     points: construction.objects.filter(isGeoPoint).map((o) => o.id),
     circleMembers: circleMembers(construction),
     neighbors: pointNeighbors(construction),
+    lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])),
   };
 }
 
@@ -120,6 +121,23 @@ const SCENARIOS: Scenario[] = [
       expect(circ!.autoCenter, 'its centre is now revealed (autoCenter cleared)').toBeFalsy();
       // the inscribed vertices are still ON the circle (radius spec was not clobbered)
       for (const v of ['A', 'B', 'C', 'D']) expect(fig.positions.has(v), `${v} present`).toBe(true);
+    },
+  },
+  {
+    id: 're-entry-reuses-no-duplicate-circles',
+    title: 'Re-entering "inscribe ABCD in a circle" reuses the circle (no stacked O/P/Q); the incircle is a distinct circle',
+    guards:
+      'operator-reported (local test): inscribe typed repeatedly then incircle showed "O and P on the same point" — each re-inscribe minted a NEW circumcircle (O, P, Q), all landing on the same circumcentre, because an auto-named centre re-picks a fresh freeLabel and defeats the deterministic-id idempotency. Root fix (ADR-156): a construct reuses an existing object satisfying its definition — re-inscribing points already on a circle reuses that circle; re-issuing the incircle reuses its deterministic bisectors. Result: ONE circumcircle + ONE incircle, no coincidence.',
+    steps: [
+      'מרובע ABCD חסום במעגל', // inscribe → circle O, A,B,C,D on it
+      'מרובע ABCD חסום במעגל', // RE-inscribe → must reuse circle O (no circle P)
+      'מעגל חסום במרובע ABCD', // the incircle → a distinct circle (bicentric quad)
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles.length, 'exactly one circumcircle + one incircle — no duplicates').toBe(2);
+      expect(fig.coincidences, 'no two centres stacked on the same point').toEqual([]);
     },
   },
   {

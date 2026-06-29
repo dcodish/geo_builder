@@ -216,6 +216,7 @@ export default function App() {
     points: construction.objects.filter(isGeoPoint).map((o) => o.id),
     circleMembers: circleMembers(construction), // so "arc BC" resolves to the circle holding both B and C
     neighbors: pointNeighbors(construction), // so a single-vertex angle ("∠C קהה/חדה") finds its two arms
+    lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // so a construct reuses itself on re-entry (idempotency)
   });
 
   // After a step commits, VERIFY the figure meets every requirement; if not, auto-search alternative

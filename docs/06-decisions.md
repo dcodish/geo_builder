@@ -2253,3 +2253,15 @@ Today the kite macro emits **two HARD equalities** pinned to axis AC (`parse.ts`
 **Decision.** (1) `circleCenter` is keyword-order-independent (ADR-152). (2) The `altitude` rule, when no side is stated and the figure has >2 other points, reads the opposite side off the adjacency (`ctx.neighbors`): the apex's UNIQUE triangle (two neighbours that are also joined to each other) gives the opposite side. Apex in 2+ triangles (ambiguous) DEFERS rather than guess a side (ADR-052, no assumptions). The well-specified "גובה מנקודה D לצלע AB" was never affected.
 
 **Consequence.** Locked by scenario `altitude-from-vertex-infers-triangle` + `production-feedback.test.ts`.
+
+## ADR-156 — Re-entry is idempotent: a construct reuses an existing object instead of minting an auto-named duplicate
+
+**Context.** Operator (local test): inscribing a quad in a circle several times then adding an incircle showed "O and P are on the same point" with stacked centre labels. Root cause: the design's idempotency relies on **deterministic IDs** (`poly-ABCD`, `seg-AB`) — re-issuing a shape/segment collides on the same id and is a no-op. But a circle's id derives from its **centre letter**, and an UNNAMED centre is auto-assigned with `freeLabel`, which picks a *fresh* letter each time (O, then P because O is taken, then Q…). So each re-entry of an auto-named circle construct created a NEW circle; for inscribe/circumcircle all the new centres are the same circumcentre → they coincide ("O and P same point"). The general principle: **auto-naming defeats deterministic-id idempotency.**
+
+**Decision.** A circle-defining construct must **reuse an existing object that already satisfies its definition** rather than auto-name a new one:
+- *points-on-a-circle* (inscribe / circumcircle, `inscribedPolygon` allExist branch): if the points are already all on an existing circle (`circleContaining` over `ctx.circleMembers`), reuse it — re-assert only the (deterministic) shape, create no circle. Skipped if the student named a *different* circle.
+- *incircle*: its angle-bisector ids are deterministic; if both already exist (new `ctx.lines`), the incircle of that polygon was already built → re-assert the shape only, no duplicate incentre/circle.
+
+`ParseContext` gained `lines` (existing line ids), built in `App.parseCtx` + the scenario/harness ctx builders.
+
+**Consequence.** Re-inscribing reuses the circle (one circumcircle, not O/P/Q); re-issuing the incircle reuses it; a genuine bicentric quad (inscribe + incircle) is one circumcircle + one incircle with no coincidence. Locked by scenario `re-entry-reuses-no-duplicate-circles` + `production-feedback.test.ts`. **Not addressed here (separate, error-message layer):** a fully-idempotent re-entry that now produces nothing still escalates to the "couldn't build" path instead of a friendly "already drawn" — that's the App.submit messaging the parallel session owns.

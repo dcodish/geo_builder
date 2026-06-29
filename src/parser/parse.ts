@@ -41,6 +41,10 @@ export interface ParseContext {
   /** For each point, the points it's joined to (segment / polygon edge) — lets a single-vertex angle
    *  ("∠C") resolve its two arms, so "∠C קהה/חדה" (obtuse/acute) works without spelling all three. */
   neighbors?: Record<string, string[]>;
+  /** Ids of lines already in the figure (e.g. `bis-DAB`, `perp-…`) — lets a construct detect that it was
+   *  ALREADY built (its deterministic scaffolding lines exist) and REUSE rather than mint a duplicate
+   *  auto-named copy (the idempotency root-cause fix). */
+  lines?: string[];
 }
 
 /** The centre of a circle that contains EVERY point in `pts` (preferring `prefer` if it qualifies), else null. */
@@ -1665,6 +1669,14 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // concyclic, so a `concyclic` constraint drives a free DOF among them until they share one circle
   // (ADR-041); the circle is drawn ("inscribed"/חסום) or hidden ("cyclic"/בר-חסימה).
   const allExist = ids.every((id) => (ctx.points ?? []).includes(id));
+  // IDEMPOTENT re-inscribe: if these points are ALREADY all on an existing circle, REUSE it — re-issuing the
+  // inscribe must not mint a duplicate circumcircle with a fresh auto-centre (O→P→Q stacking on the same
+  // circumcentre — the "O and P on the same point" bug). Only the shape is re-asserted (deterministic ids →
+  // no duplicate). Skipped when the student named a DIFFERENT circle than the one they're on. [ADR-156]
+  const onCircle = circleContaining(ctx, ids, named);
+  if (allExist && onCircle && (!named || up(named) === up(onCircle))) {
+    return isTri ? [{ type: 'triangle', ids: [ids[0], ids[1], ids[2]] }, ...shapeCmds(ids)] : [{ type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] }, ...shapeCmds(ids)];
+  }
   if (isTri && allExist) {
     return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2] }, ...shapeCmds(ids)];
   }
@@ -1941,6 +1953,11 @@ const incircle: Rule = (s, ctx) => {
   const [b1p, b1q] = nb(1);
   const bis0 = `bis-${a0p}${v[0]}${a0q}`; // bisector of the interior angle at v0
   const bis1 = `bis-${b1p}${v[1]}${b1q}`; // bisector of the interior angle at v1
+  // IDEMPOTENT re-entry: these bisector ids are DETERMINISTIC, so if both already exist the incircle of THIS
+  // polygon was already built — re-asserting it must not mint a duplicate incentre + circle (a fresh auto-named
+  // O→P). Just re-assert the shape. [ADR-156]
+  const lines = new Set(ctx.lines ?? []);
+  if (lines.has(bis0) && lines.has(bis1)) return [shapeCmd];
   const cmds: AnyCommand[] = [
     shapeCmd,
     { type: 'bisector', id: bis0, vertex: v[0], p: a0p, q: a0q },

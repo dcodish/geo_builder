@@ -85,6 +85,29 @@ describe('production feedback (2nd batch) — circle centre is keyword-order-ind
   }
 });
 
+describe('production feedback (2nd batch) — re-entry reuses, never duplicates (idempotency, ADR-156)', () => {
+  // Root cause of "O and P on the same point": an AUTO-named object (a circle's auto centre) re-picks a fresh
+  // freeLabel on re-entry (O→P→Q), defeating the deterministic-id idempotency that protects shapes/segments.
+  // The fix: a construct reuses an existing object that already satisfies its definition.
+  it('re-inscribing points already on a circle reuses it — no duplicate circumcircle', () => {
+    const ctx = { points: ['A', 'B', 'C', 'D'], circles: ['O'], circleMembers: [{ center: 'O', points: ['A', 'B', 'C', 'D'] }], neighbors: {}, lines: [] } as never;
+    const r = parse('מרובע ABCD חסום במעגל', ctx);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect((r.commands as AnyCommand[]).some((c) => c.type === 'circumcircle' || c.type === 'circle')).toBe(false);
+  });
+  it('re-issuing the incircle of the same triangle reuses it — no duplicate incentre/circle', () => {
+    // the deterministic bisectors of triangle ABC already exist → reuse (no new circle-through / line-intersection)
+    const ctx = { points: ['A', 'B', 'C'], circles: ['O'], circleMembers: [], neighbors: {}, lines: ['bis-CAB', 'bis-ABC'] } as never;
+    const r = parse('circle inscribed in triangle ABC', ctx);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const t = (r.commands as AnyCommand[]).map((c) => c.type);
+      expect(t).not.toContain('circle-through');
+      expect(t).not.toContain('line-intersection');
+    }
+  });
+});
+
 describe('production feedback (2nd batch) — generic incircle (circle inscribed in any polygon)', () => {
   // The incircle generalised from triangle-only to triangle/quad/trapezoid/rhombus/square (operator
   // feature). A quad flexes to TANGENTIAL: bisectors at two adjacent vertices → incentre, foot on each
