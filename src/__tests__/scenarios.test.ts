@@ -2620,6 +2620,28 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
     st.clear();
   });
 
+  it('[shape-cannot-morph-into-another] a trapezoid cannot be turned into a square/rectangle/rhombus/parallelogram (ADR-157)', () => {
+    // PRINCIPLE: a named shape is immutable once drawn — re-declaring its vertices as a different, incompatible
+    // shape is a CONTRADICTION and is refused (not silently morphed). We deliberately have no "morph" capability.
+    const st = useGeoStore.getState();
+    for (const target of ['square ABCD', 'rectangle ABCD', 'rhombus ABCD', 'parallelogram ABCD']) {
+      st.clear();
+      const base = parse('trapezoid ABCD', ctxOf(useGeoStore.getState().facts));
+      expect(base.ok).toBe(true);
+      if (base.ok) base.commands.forEach((c) => useGeoStore.getState().execute(c, 'trapezoid ABCD', 'g'));
+      const facts = useGeoStore.getState().facts;
+      const r = parse(target, ctxOf(facts));
+      expect(r.ok, `${target} parses`).toBe(true);
+      if (r.ok) {
+        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
+        // refused as a contradiction — NOT produced (no silent morph), and a deferrable constraint must not sneak it in
+        expect(outcome.produced, `${target} must NOT reshape the trapezoid`).toBe(false);
+        expect(outcome.reason === 'error' && !hasDeferrableConstraint(r.commands), `${target} is a hard conflict`).toBe(true);
+      }
+    }
+    st.clear();
+  });
+
   it('[contradiction-message] making an existing trapezoid a square reports a CONFLICT, not "produced nothing" (ADR-156)', () => {
     const st = useGeoStore.getState();
     st.clear();
