@@ -22,6 +22,7 @@ import { Modal } from '@/ui/Modal';
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import { logDebug } from '@/debug/sessionLog';
+import { humanizeError } from '@/i18n/humanizeError';
 import { nanoid } from 'nanoid';
 
 export default function App() {
@@ -608,7 +609,7 @@ export default function App() {
             </div>
           </div>
 
-          {lastError && <div style={errorBanner}>⚠ {lastError}</div>}
+          {lastError && <div style={errorBanner}>⚠ {humanizeError(lastError, t)}</div>}
 
           {pending && <div style={infoBanner}>ⓘ {t('figure.pending')}</div>}
 
@@ -647,7 +648,7 @@ export default function App() {
                   const anyOn = g.facts.some((f) => f.enabled);
                   const brokenFact = g.facts.find((f) => f.enabled && status[f.id] !== 'ok');
                   const state = !anyOn ? 'disabled' : brokenFact ? 'broken' : 'ok';
-                  const errText = brokenFact ? (status[brokenFact.id] as string) : undefined;
+                  const errText = brokenFact ? humanizeError(status[brokenFact.id] as string, t) : undefined;
                   const label = g.facts[0].utterance ?? g.facts.map((f) => f.cmd.type).join(' + ');
                   const editing = editingId === g.key;
                   return (

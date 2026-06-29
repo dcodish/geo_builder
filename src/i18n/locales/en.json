@@ -95,6 +95,21 @@
       "collinear": "{{pts}} should be collinear, but {{point}} is {{offset}} off the line"
     }
   },
+  "errors": {
+    "overConstrained": "Can't do that: {{what}} contradicts an earlier given — they can't both hold.",
+    "unknownPoint": "{{what}} refers to a point that hasn't been defined yet. Create it first.",
+    "unresolvedDeps": "This step relies on {{ids}}, which aren't defined yet (or an earlier step it depends on failed). Define them first.",
+    "noLongerAvailable": "Can't build: {{ids}} is no longer available — an earlier step it relies on was removed or failed.",
+    "sameSpot": "With these givens {{a}} and {{b}} land at the same place. Check whether you meant a single point, or add a given that separates them.",
+    "alreadyDefined": "{{id}} is already defined and can't be redefined as something different. To change it, edit or delete the earlier step.",
+    "cannotPlaceOnSegment": "I couldn't place {{id}} on segment {{seg}} so that {{what}} holds — there may be no such position on the segment.",
+    "circlesDontMeet": "Can't build {{id}}: circles {{c1}} and {{c2}} don't intersect. The sizes may need adjusting.",
+    "tangentNoSecondCrossing": "Can't place {{id}}: the line is tangent to the circle (touches at one point) — there's no second crossing to extend onto.",
+    "tangentAtCentre": "Can't draw a tangent at the centre of circle {{circle}}.",
+    "towardAtCentre": "Can't place {{id}}: {{toward}} is at the circle's centre, so the direction is undefined.",
+    "tangentNeedsFixedRadius": "Tangent circles need a fixed radius — a circle whose radius is set by a point isn't supported yet.",
+    "nonFinite": "I couldn't compute a final position for the figure — the givens may conflict. Check the givens."
+  },
   "dof": {
     "title": "Adjust the figure",
     "radius": "radius of circle {{center}}"
