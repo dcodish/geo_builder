@@ -22,6 +22,18 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `named-midsegment-keeps-its-endpoint-names` — "PQ קטע אמצעים לצלע BC במשולש ABC" keeps endpoints P,Q (was auto-renamed M,N) (ADR-150)
+**Steps**: `משולש ABC` · `PQ קטע אמצעים לצלע BC במשולש ABC`
+**Guards against:** sibling of the named-altitude bug (ADR-149), found by auditing every rule that auto-names a derived point. The `midsegment` rule always auto-named its two endpoints (M,N via `freeLabel`) and had no named-form path, so "PQ קטע אמצעים …" silently renamed the student's P,Q. Fix: the rule reads a leading or keyword-first named pair (**uppercase labels only**, so a lowercase connector like "to BC" is never misread as labels T,O) that isn't the triangle's own vertices. **Asserts:** all steps OK; endpoints named P,Q; no M,N fabricated; P=mid(AB), Q=mid(AC); PQ ∥ BC (the midsegment theorem holds).
+
+### `named-altitude-keyword-first-keeps-foot` — "הגובה CD במשולש ABC" (keyword-first order) keeps foot D (ADR-150)
+**Steps**: `משולש ABC` · `הגובה CD במשולש ABC`
+**Guards against:** completes the ADR-149 fix — the first pass only caught the name-FIRST order ("CD גובה"); the keyword-FIRST order ("הגובה CD" / "the altitude CD") was still not-handled → escalated to the LLM → "altitude from C" → foot auto-named F → the original CF symptom. The named-segment detection now matches either word order (uppercase labels immediately after the keyword, so a lowercase connector is never read as a name). **Asserts:** all steps OK; foot named D, no F fabricated; D on line AB; CD ⟂ AB.
+
+### `named-altitude-keeps-its-foot-name` — "CD גובה במשולש ABC" keeps the foot D (was silently renamed CF) (ADR-149)
+**Steps**: `משולש ABC` · `CD גובה במשולש ABC`
+**Guards against:** operator manual test (2026-06-29) — asked for **CD** to be a גובה (altitude); the figure built but the segment came out **CF**, dropping the student's foot letter `D`. Root cause: the `altitude` rule derived the apex only from a "from/מ" phrase and **always auto-named the foot** via `freeLabel` (→ `F`); a leading *named* altitude segment ("CD גובה …", where C is the apex/vertex and D the foot) returned `not-handled` → escalated to the LLM → rephrased to "altitude from C" → foot named `F` → `segment CF`. Fix: the `altitude` rule now recognises a leading named altitude segment (height/altitude/גובה **only** — "EF אנך ל AB" stays the ⟂ constraint, handled later) and uses the second letter as the foot id instead of auto-naming it. **Asserts:** all steps OK; the foot is named `D` and no `F` was fabricated; `D` on line `AB`; `CD ⟂ AB`.
+
 ### `point-on-chord-named-carrier` — "E על מיתר AC" (a point ON a named carrier) parses; E is not dropped (ADR-147)
 **Steps**: `מעגל O` · `מיתר AC` · `E על מיתר AC`
 **Guards against:** operator-reported "E על מיתר AC was not-understood". The point-on rules required the carrier's two labels to come **immediately** after על/on, so a descriptor noun (`מיתר`/chord, `צלע`/side, `קטע`/segment, `אלכסון`/diagonal — He or En) wedged between the connector and the labels made them miss; worse, with a circle in context the `chord`/`segment` carrier-**defining** rule grabbed the bare "AC" run and **silently dropped** the named rider point E. Root fix: a shared `CARRIER_NOUN` set — `SEG_NOUN` lets the point-on rules skip the noun, and `POINT_ON_CARRIER` makes the carrier-defining rules bail on a `<point> on <carrier> AB` utterance so point-on wins; `withChordMembership` now also reads a `point-on-segment` carrier, so A,C still land on the circle. **Asserts:** all steps OK; E placed (not dropped), on segment AC and between A,C; A,C equidistant from O (on the circle).

@@ -241,6 +241,77 @@ describe('parser — an explicitly NAMED foot keeps its name (not auto-renamed)'
     one('F is the foot of the perpendicular from C to AD', { type: 'foot', id: 'F', from: 'C', a: 'A', b: 'D' }));
 });
 
+describe('parser — a NAMED altitude segment honours the foot the student gave', () => {
+  // "CD גובה …" names the altitude segment: C is the apex (vertex), D is the FOOT on the opposite
+  // side. The foot must be named D, NOT auto-named F (the "asked for CD, got CF" bug). Before the fix
+  // these phrasings were not-handled → the LLM rephrased to "altitude from C" → the foot became F.
+  const cmds = (input: string, ctx?: Parameters<typeof parse>[1]) => {
+    const r = parse(input, ctx);
+    expect(r.ok, `"${input}" should parse`).toBe(true);
+    return r.ok ? r.commands : [];
+  };
+  const footD = { type: 'foot', id: 'D', from: 'C', a: 'A', b: 'B' };
+  const segCD = { type: 'segment', a: 'C', b: 'D' };
+  it('"CD גובה ל AB" → foot D on AB (not an auto-named F)', () =>
+    expect(cmds('CD גובה ל AB', { points: ['A', 'B', 'C'] })).toEqual([footD, segCD]));
+  it('"CD גובה במשולש ABC" → triangle + foot D + segment CD', () =>
+    expect(cmds('CD גובה במשולש ABC', { points: ['A', 'B', 'C'] })).toEqual([{ type: 'triangle', ids: ['A', 'B', 'C'] }, footD, segCD]));
+  it('English "CD is the altitude in ABC" names the foot D', () =>
+    expect(cmds('CD is the altitude in ABC', { points: ['A', 'B', 'C'] })).toEqual([{ type: 'triangle', ids: ['A', 'B', 'C'] }, footD, segCD]));
+  // the bare "CD גובה" (no side/triangle stated) derives the opposite side from the EXISTING triangle in
+  // context — this is the form the operator actually typed, which used to escalate to the LLM → foot F.
+  it('bare "CD גובה" on an existing triangle ABC → foot D (side from context, no triangle re-emit)', () =>
+    expect(cmds('CD גובה', { points: ['A', 'B', 'C'] })).toEqual([footD, segCD]));
+  it('bare "CD גובה" with NO triangle in context is not-handled (correctly escalates)', () =>
+    expect(parse('CD גובה', { points: [] }).ok).toBe(false));
+  // keyword-FIRST order (the name follows the keyword) must keep the foot too — the original CF symptom
+  it('"הגובה CD במשולש ABC" (keyword-first) names the foot D', () =>
+    expect(cmds('הגובה CD במשולש ABC', { points: ['A', 'B', 'C'] })).toEqual([{ type: 'triangle', ids: ['A', 'B', 'C'] }, footD, segCD]));
+  it('English "the altitude CD in ABC" (keyword-first) names the foot D', () =>
+    expect(cmds('the altitude CD in ABC', { points: ['A', 'B', 'C'] })).toEqual([{ type: 'triangle', ids: ['A', 'B', 'C'] }, footD, segCD]));
+  it('a lowercase connector after the keyword is NOT read as a name ("height from A to BC" → auto F)', () =>
+    expect(cmds('height from A to BC')).toEqual([{ type: 'foot', id: 'F', from: 'A', a: 'B', b: 'C' }, { type: 'segment', a: 'A', b: 'F' }]));
+  it('the unnamed "גובה מ-A במשולש ABC" still auto-names the foot F (unchanged)', () =>
+    expect(cmds('גובה מ-A במשולש ABC', { points: ['A', 'B', 'C'] })).toEqual([
+      { type: 'triangle', ids: ['A', 'B', 'C'] },
+      { type: 'foot', id: 'F', from: 'A', a: 'B', b: 'C' },
+      { type: 'segment', a: 'A', b: 'F' },
+    ]));
+  it('"EF אנך ל AB" stays the ⟂ CONSTRAINT — the named-foot form never steals it', () =>
+    expect(cmds('EF אנך ל AB', { points: ['A', 'B', 'E', 'F'] })).toEqual([
+      { type: 'segment', a: 'E', b: 'F' },
+      { type: 'segment', a: 'A', b: 'B' },
+      { type: 'set-perpendicular', a: 'E', b: 'F', c: 'A', d: 'B' },
+    ]));
+});
+
+describe('parser — a NAMED midsegment honours its endpoint labels', () => {
+  // "PQ קטע אמצעים …" names the midsegment's two endpoints (the midpoints of the apex's sides). They
+  // must be named P,Q, NOT auto-named M,N (the altitude "CD→CF" bug class).
+  const cmds = (input: string, ctx?: Parameters<typeof parse>[1]) => {
+    const r = parse(input, ctx);
+    expect(r.ok, `"${input}" should parse`).toBe(true);
+    return r.ok ? r.commands : [];
+  };
+  const namedPQ = [
+    { type: 'midpoint', id: 'P', a: 'A', b: 'B' },
+    { type: 'midpoint', id: 'Q', a: 'A', b: 'C' },
+    { type: 'segment', a: 'P', b: 'Q' },
+  ];
+  it('"PQ קטע אמצעים לצלע BC במשולש ABC" → midpoints named P,Q (not M,N)', () =>
+    expect(cmds('PQ קטע אמצעים לצלע BC במשולש ABC', { points: ['A', 'B', 'C'] })).toEqual(namedPQ));
+  it('keyword-first "קטע האמצעים PQ לצלע BC במשולש ABC" names P,Q', () =>
+    expect(cmds('קטע האמצעים PQ לצלע BC במשולש ABC', { points: ['A', 'B', 'C'] })).toEqual(namedPQ));
+  it('English "PQ is the midsegment to BC in triangle ABC" names P,Q', () =>
+    expect(cmds('PQ is the midsegment to BC in triangle ABC', { points: ['A', 'B', 'C'] })).toEqual(namedPQ));
+  it('the unnamed "the midsegment to BC in triangle ABC" still auto-names M,N (connector "to" is not a name)', () =>
+    expect(cmds('the midsegment to BC in triangle ABC', { points: ['A', 'B', 'C'] })).toEqual([
+      { type: 'midpoint', id: 'M', a: 'A', b: 'B' },
+      { type: 'midpoint', id: 'N', a: 'A', b: 'C' },
+      { type: 'segment', a: 'M', b: 'N' },
+    ]));
+});
+
 /**
  * Misparse defense: the dangerous failure is not the miss (a miss escalates to
  * the Phase-7 fallback) but the silent HALF-parse that draws a wrong figure.

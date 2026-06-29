@@ -105,6 +105,68 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'named-altitude-keeps-its-foot-name',
+    title: '"משולש ABC" → "CD גובה" — the named altitude on an existing triangle keeps its foot D (was silently renamed CF)',
+    guards:
+      'operator-reported (2026-06-29, session 243yyqae): with triangle ABC already drawn, "CD גובה" built the altitude but the segment came out as CF. TWO root causes: (1) the `altitude` rule derived the apex only from a "from/מ" phrase and ALWAYS auto-named the foot via freeLabel (→ F), so a NAMED altitude segment ("CD גובה", C=apex/vertex, D=foot) lost the D; (2) — the one that kept biting after the first fix — the rule required the opposite side/triangle to be stated IN the utterance and had no figure-context fallback, so the bare "CD גובה" (triangle already on the canvas) returned not-handled → escalated to the LLM → "גובה מ-C במשולש ABC" → foot auto-named F → segment CF. Fix: the altitude rule (a) recognises a named altitude segment in either word order (height/altitude/גובה only — "EF אנך ל AB" stays the ⟂ constraint), and (b) derives the opposite side from the figure context when unstated (mirrors the `median` rule), so "CD גובה" on an existing triangle parses deterministically and keeps D.',
+    steps: [
+      'משולש ABC', // triangle ABC
+      'CD גובה', // the EXACT utterance — opposite side derived from the existing triangle; foot must be D, not F
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('D'), 'the foot is named D (the student\'s letter)').toBe(true);
+      expect(fig.positions.has('F'), 'no auto-named foot F was fabricated').toBe(false);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      // D is the foot of the perpendicular from C onto AB: on line AB and CD ⟂ AB.
+      const onAB = Math.abs((D.x - A.x) * (B.y - A.y) - (D.y - A.y) * (B.x - A.x)) / Math.max(dist(A, B), 1) ** 2;
+      expect(onAB, 'D on line AB').toBeLessThan(1e-3);
+      const cd = { x: D.x - C.x, y: D.y - C.y }, ab = { x: B.x - A.x, y: B.y - A.y };
+      expect(Math.abs(cd.x * ab.x + cd.y * ab.y) / (Math.hypot(cd.x, cd.y) * Math.hypot(ab.x, ab.y) + 1e-9), 'CD ⟂ AB').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'named-midsegment-keeps-its-endpoint-names',
+    title: '"PQ קטע אמצעים לצלע BC במשולש ABC" — the named midsegment keeps endpoints P,Q (was auto-renamed M,N)',
+    guards:
+      'Sibling of the named-altitude bug (ADR-149), found by auditing every rule that auto-names a derived point: the `midsegment` rule always auto-named its two endpoints (M,N via freeLabel) and had no named-form path, so "PQ קטע אמצעים …" silently renamed the student\'s P,Q to M,N. Fix: the rule reads a leading or keyword-first named pair (uppercase labels only, so a lowercase connector like "to BC" is never misread as labels T,O) that isn\'t the triangle\'s own vertices. Asserts the endpoints are P,Q, no M,N fabricated, P=mid(AB), Q=mid(AC), and PQ ∥ BC (the midsegment theorem holds).',
+    steps: [
+      'משולש ABC', // triangle ABC
+      'PQ קטע אמצעים לצלע BC במשולש ABC', // PQ is the midsegment to BC — endpoints must be P,Q
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('P') && fig.positions.has('Q'), 'endpoints named P,Q').toBe(true);
+      expect(fig.positions.has('M') || fig.positions.has('N'), 'no auto-named M,N fabricated').toBe(false);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), P = at(fig, 'P'), Q = at(fig, 'Q');
+      const mid = (u: Vec, v: Vec) => ({ x: (u.x + v.x) / 2, y: (u.y + v.y) / 2 });
+      expect(dist(P, mid(A, B)), 'P = midpoint of AB').toBeLessThan(1e-9);
+      expect(dist(Q, mid(A, C)), 'Q = midpoint of AC').toBeLessThan(1e-9);
+      const pq = { x: Q.x - P.x, y: Q.y - P.y }, bc = { x: C.x - B.x, y: C.y - B.y };
+      expect(Math.abs(pq.x * bc.y - pq.y * bc.x) / (Math.hypot(pq.x, pq.y) * Math.hypot(bc.x, bc.y) + 1e-9), 'PQ ∥ BC').toBeLessThan(1e-9);
+    },
+  },
+  {
+    id: 'named-altitude-keyword-first-keeps-foot',
+    title: '"הגובה CD במשולש ABC" (keyword-first word order) — the named altitude keeps foot D',
+    guards:
+      'Completes the ADR-149 fix: the first pass only caught the name-FIRST order ("CD גובה"); the keyword-FIRST order ("הגובה CD" / "the altitude CD") was still not-handled → escalated to the LLM → "altitude from C" → foot auto-named F → the original CF symptom. The named-segment detection now matches either word order (uppercase labels immediately after the keyword, so a lowercase connector is never read as a name).',
+    steps: [
+      'משולש ABC',
+      'הגובה CD במשולש ABC', // keyword-first named altitude — foot must be D, not F
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('D'), 'foot named D').toBe(true);
+      expect(fig.positions.has('F'), 'no auto-named F').toBe(false);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      const onAB = Math.abs((D.x - A.x) * (B.y - A.y) - (D.y - A.y) * (B.x - A.x)) / Math.max(dist(A, B), 1) ** 2;
+      expect(onAB, 'D on line AB').toBeLessThan(1e-3);
+      const cd = { x: D.x - C.x, y: D.y - C.y }, ab = { x: B.x - A.x, y: B.y - A.y };
+      expect(Math.abs(cd.x * ab.x + cd.y * ab.y) / (Math.hypot(cd.x, cd.y) * Math.hypot(ab.x, ab.y) + 1e-9), 'CD ⟂ AB').toBeLessThan(1e-3);
+    },
+  },
+  {
     id: 'bagrut-chord-diameter-perp-session',
     title:
       'real production session: "AB קוטר במעגל" → "D אמצע הרדיוס OB" → "AC מיתר" → "E על המיתר AC" → "DE מקביל ל BC" → "ED=EC" → "F על AB" → "EF אנך ל AB" builds a valid figure (no step escalates)',

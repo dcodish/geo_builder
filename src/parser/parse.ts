@@ -63,6 +63,10 @@ const NO_CONTEXT: ParseContext = {};
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop';
 
 const up = (c: string): Id => c.toUpperCase();
+/** A captured token is a real vertex label only if it's already UPPERCASE (the parser's convention).
+ *  Lets a NAMED-segment rule (altitude/midsegment) tell a student label ("CD") from a lowercase connector
+ *  word the regex would otherwise read as two single-letter labels ("to" → T,O, "in" → I,N). */
+const isUpperLabel = (c: string | undefined): boolean => !!c && c === c.toUpperCase() && /[A-Z]/.test(c);
 const num = String.raw`(-?\d+(?:\.\d+)?)`;
 
 /** Deterministic circle id from its centre letter — so "circle O" is referenceable by name. */
@@ -371,8 +375,24 @@ const midsegment: Rule = (s, ctx) => {
   if (!base.every((x) => tri.includes(x)) || base[0] === base[1]) return null; // base must be a side of the triangle
   const apex = tri.find((v) => !base.includes(v));
   if (!apex) return null;
-  const m1 = freeLabel([...tri, ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']);
-  const m2 = freeLabel([...tri, m1, ...(ctx.points ?? [])], ['N', 'P', 'Q', 'S']);
+  // A NAMED midsegment — "MN קטע אמצעים …" (name-first) or "קטע האמצעים MN …" / "the midsegment MN …"
+  // (keyword-first) — names its two endpoints (the midpoints of the apex's two sides). Honour the labels
+  // the student gave instead of auto-naming them (the altitude "CD→CF" bug class). The named pair must
+  // NOT be the triangle's own vertices, and the keyword-first labels must sit immediately after the
+  // keyword (whitespace only) so the unnamed "…to BC in triangle ABC" is never read as a name.
+  const nmM =
+    s.match(/^\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)/i) ??
+    s.match(/(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)\s+\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  // The named pair must be UPPERCASE labels (not a lowercase connector like "to BC" → T,O) and NOT the
+  // triangle's own vertices (that's the triangle/base, not the endpoints).
+  const namedM = nmM && isUpperLabel(nmM[1]) && isUpperLabel(nmM[2]) ? nmM : null;
+  let m1: Id, m2: Id;
+  if (namedM && up(namedM[1]) !== up(namedM[2]) && !tri.includes(up(namedM[1])) && !tri.includes(up(namedM[2]))) {
+    [m1, m2] = [up(namedM[1]), up(namedM[2])];
+  } else {
+    m1 = freeLabel([...tri, ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']);
+    m2 = freeLabel([...tri, m1, ...(ctx.points ?? [])], ['N', 'P', 'Q', 'S']);
+  }
   const have = new Set(ctx.points ?? []);
   const out: AnyCommand[] = [];
   if (!tri.every((v) => have.has(v))) out.push({ type: 'triangle', ids: [tri[0], tri[1], tri[2]] });
@@ -2988,7 +3008,7 @@ const median: Rule = (s, ctx) => {
  * the bare-foot phrasing "perpendicular from A to BC" — the altitude from a vertex:
  * the foot of the perpendicular onto the opposite side, plus the segment to it.
  */
-const altitude: Rule = (s) => {
+const altitude: Rule = (s, ctx) => {
   // An explicitly *named* foot ("G is the foot of the perpendicular from E to AB")
   // is the `foot` rule's job — don't grab it here and auto-name the foot (which
   // collided with an existing point). This rule is for the height/altitude and the
@@ -3000,11 +3020,36 @@ const altitude: Rule = (s) => {
   // has no "from"/"מ" apex, so `apexM` is null there and the rule bows out.
   const isPerpFrom = /perpendicular|מאונך|אנך/i.test(s) && !/through|דרך/i.test(s);
   if (!isHeight && !isPerpFrom) return null;
-  // Apex: "from D" / "from point D" / "מD" / "מ-D" / "מנקודה D" (the descriptor noun נקודה/point is tolerated,
-  // matching the chord-carrier handling — students write "מנקודה D", not the bare "מ-D").
+  // A NAMED altitude segment — "CD גובה …" (name-first) or "הגובה CD …" / "the altitude CD …"
+  // (keyword-first) — names BOTH the apex (the vertex) and the FOOT (where it lands on the opposite
+  // side). The student named the segment, so honour the foot they gave instead of auto-naming it (the
+  // "asked for CD, got CF" bug). ONLY for the height/altitude keyword: "EF אנך ל AB" is the ⟂
+  // CONSTRAINT (perpendicularConstraint, which runs later) — the perpendicular form never reads a
+  // name, or it would steal the constraint and fabricate a spurious foot.
+  let apex: Id;
+  let namedFoot: Id | null = null;
+  // The classic UNNAMED form gives the apex via "from D" / "from point D" / "מD" / "מ-D" / "מנקודה D"
+  // (the descriptor noun נקודה/point tolerated) and auto-names the foot. Detect it first so the
+  // keyword-first named branch never misreads "גובה מ-A ל BC" — there the apex is given, not a name.
   const apexM = s.match(/(?:\bfrom\s+(?:the\s+)?(?:point\s+)?|מ-?\s*(?:ה?נקודה\s+)?)([A-Za-z]\d*)\b/i);
-  if (!apexM) return null;
-  const apex = up(apexM[1]);
+  // The named segment, in either word order. The keyword-first form requires the two labels to sit
+  // IMMEDIATELY after the keyword (whitespace only) so "גובה מ-A ל BC" / "altitude from A to BC" — where
+  // a connector word/letter intervenes — can never be read as a name (and the !apexM guard backs that up).
+  // The pair must be UPPERCASE (the parser's vertex-label convention): without this, a lowercase connector
+  // like "to"/"in" sitting after the keyword is misread as two single-letter labels (T,O / I,N).
+  const nm =
+    isHeight && !apexM
+      ? (s.match(/^\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:height|altitude|גובה)/i) ?? // name-first "CD גובה …"
+        s.match(/(?:height|altitude|גובה)\s+\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i)) // keyword-first "הגובה CD …"
+      : null;
+  const named = nm && isUpperLabel(nm[1]) && isUpperLabel(nm[2]) ? nm : null;
+  if (named) {
+    apex = up(named[1]);
+    namedFoot = up(named[2]);
+  } else {
+    if (!apexM) return null;
+    apex = up(apexM[1]);
+  }
   // Opposite side: "to BC" / "to side BC" / "ל BC" / "ל-BC" / "לצלע BC" / "לקטע BC" (descriptor noun tolerated).
   const sideM = s.match(/(?:\bto\s+(?:the\s+)?(?:side\s+)?|אל\s*(?:ה?צלע\s+)?|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // explicit opposite side "to BC"
   let p: string, q: string;
@@ -3013,14 +3058,25 @@ const altitude: Rule = (s) => {
     p = up(sideM[1]);
     q = up(sideM[2]);
   } else {
+    // Opposite side from a triangle NAMED in the utterance — after "in"/"במשולש"/"משולש", or anywhere in
+    // the string (the compound "triangle ABC with a height from A", which has no "in"). The apex must be
+    // one of its vertices (else `others` ≠ 2). If no usable triangle is stated, fall back to the FIGURE
+    // CONTEXT — the two points that, with the apex, are the only ones — so the bare "CD גובה" on an
+    // already-drawn triangle parses deterministically instead of escalating to the LLM (which strips the
+    // named foot → the "CF" bug). Mirrors the `median` rule's context fallback.
     const triPart = s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s;
     tri = labelRun(triPart.replace(/triangle|the/gi, ' '), 3);
-    if (!tri) return null;
-    const others = tri.filter((x) => x !== apex);
-    if (others.length !== 2) return null;
-    [p, q] = others;
+    const others = tri?.filter((x) => x !== apex) ?? [];
+    if (tri && others.length === 2) {
+      [p, q] = others as [Id, Id];
+    } else {
+      tri = null; // no triangle stated — derive the side from context, and don't re-emit a triangle
+      const pts = (ctx.points ?? []).filter((x) => x !== apex && x !== namedFoot);
+      if (pts.length !== 2) return null;
+      [p, q] = [pts[0], pts[1]];
+    }
   }
-  const f = freeLabel([apex, p, q], ['F', 'G', 'H', 'P']);
+  const f = namedFoot ?? freeLabel([apex, p, q], ['F', 'G', 'H', 'P']);
   const cmds: Command[] = [];
   if (tri) cmds.push({ type: 'triangle', ids: [tri[0], tri[1], tri[2]] });
   cmds.push({ type: 'foot', id: f, from: apex, a: p, b: q });
