@@ -2636,7 +2636,7 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
         const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
         // refused as a contradiction — NOT produced (no silent morph), and a deferrable constraint must not sneak it in
         expect(outcome.produced, `${target} must NOT reshape the trapezoid`).toBe(false);
-        expect(outcome.reason === 'error' && !hasDeferrableConstraint(r.commands), `${target} is a hard conflict`).toBe(true);
+        if (!outcome.produced) expect(outcome.reason === 'error' && !hasDeferrableConstraint(r.commands), `${target} is a hard conflict`).toBe(true);
       }
     }
     st.clear();
