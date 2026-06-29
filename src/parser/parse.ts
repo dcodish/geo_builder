@@ -728,7 +728,7 @@ const arcEquality: Rule = (s, ctx) => {
  * both languages. A "line"/"ישר" carrier is deliberately absent: it has distinct infinite-line
  * semantics handled by `collinearConstraint`.
  */
-const CARRIER_NOUN = String.raw`chord|side|segment|diagonal|מיתר|ה?צלע|ה?קטע|ה?אלכסון`;
+const CARRIER_NOUN = String.raw`chord|side|segment|diagonal|ה?מיתר|ה?צלע|ה?קטע|ה?אלכסון`;
 
 /**
  * An OPTIONAL carrier noun between "on"/"על" and the two endpoint labels — "E on chord AC" /
@@ -743,7 +743,7 @@ const SEG_NOUN = String.raw`(?:(?:the\s+)?(?:${CARRIER_NOUN})\s+)?`;
  * their own keyword and grab the bare "AB" run, silently dropping the named rider point.
  */
 const POINT_ON_CARRIER = new RegExp(
-  String.raw`[A-Za-z]\d*\s+(?:on|על)\s+(?:the\s+)?(?:${CARRIER_NOUN})\s`,
+  String.raw`[A-Za-z]\d*\s+(?:(?:נקודה|נמצא[הת])\s+)?(?:on|על)\s+(?:the\s+)?(?:${CARRIER_NOUN})\s`,
   'i',
 );
 
@@ -755,7 +755,7 @@ const POINT_ON_CARRIER = new RegExp(
 const pointOnSegment: Rule = (s) => {
   const m = s.match(
     new RegExp(
-      String.raw`(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\s+(?:on|על)\s+${SEG_NOUN}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b(?:\s+(?:at|ב-?)?\s*${num}\s*(%)?)?`,
+      String.raw`(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\s+(?:(?:נקודה|נמצא[הת])\s+)?(?:on|על)\s+${SEG_NOUN}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b(?:\s+(?:at|ב-?)?\s*${num}\s*(%)?)?`,
       'i',
     ),
   );
@@ -889,6 +889,44 @@ const segmentRatio: Rule = (s) => {
   const num = m[5] ? Math.sqrt(parseFloat(m[6])) : parseFloat(m[6]); // m5 = √ on numerator
   const den = m[8] !== undefined ? (m[7] ? Math.sqrt(parseFloat(m[8])) : parseFloat(m[8])) : 1; // m7 = √ on denominator
   return [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: num / den }];
+};
+
+/**
+ * A point DIVIDING a segment in a stated ratio — "G divides DC in ratio 1:2" / "G מחלק[ת] את DC ביחס 1:2"
+ * / "the ratio DG:GC is 1:2" / "היחס בין DG ל-GC הוא 1:2". G lands on DC at t = p/(p+q) from the first
+ * endpoint (DG:GC = p:q), lowered to a `point-on-segment` with a fixed `t` (a determined parametric point).
+ * Keyword-anchored on `divides`/`מחלק` or `ratio`/`יחס` PLUS a literal `p:q`, so it never claims a plain
+ * segment, a `XY = …` equality, or a `AB/CD = …` segment-ratio (those carry no `:`-ratio + divide/ratio word).
+ */
+const RATPQ = String.raw`(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)`;
+const dividesInRatio: Rule = (s) => {
+  // (a) divider-first: "G divides DC in ratio p:q" / "G מחלקת את DC ביחס p:q".
+  const div = s.match(
+    new RegExp(
+      String.raw`([A-Za-z]\d*)\s+(?:divides?|מחלק[הת]?)\s+(?:את\s+)?(?:ה?קטע\s+|ה?צלע\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)\b[\s\S]*?(?:ratio|ביחס|יחס)\D*?${RATPQ}`,
+      'i',
+    ),
+  );
+  if (div) {
+    const p = parseFloat(div[4]), q = parseFloat(div[5]);
+    if (p + q > 0) return [{ type: 'point-on-segment', id: up(div[1]), a: up(div[2]), b: up(div[3]), t: p / (p + q) }];
+  }
+  // (b) sub-segments named: "the ratio between DG and GC is p:q" — DG,GC share the divider G; the host
+  // segment runs from DG's free end (D) to GC's free end (C). Single-letter labels (the bagrut convention).
+  const two = s.match(
+    new RegExp(String.raw`(?:ratio|יחס)[\s\S]*?\b([A-Za-z])([A-Za-z])\b\s*(?::|\/|ל-?|to|and|ו-?|,)\s*\b([A-Za-z])([A-Za-z])\b[\s\S]*?${RATPQ}`, 'i'),
+  );
+  if (two) {
+    const [a1, b1, a2, b2] = [up(two[1]), up(two[2]), up(two[3]), up(two[4])];
+    const shared = [a1, b1].find((x) => x === a2 || x === b2);
+    if (shared) {
+      const start = a1 === shared ? b1 : a1; // DG's free end (D)
+      const end = a2 === shared ? b2 : a2; // GC's free end (C)
+      const p = parseFloat(two[5]), q = parseFloat(two[6]);
+      if (p + q > 0 && start !== end) return [{ type: 'point-on-segment', id: shared, a: start, b: end, t: p / (p + q) }];
+    }
+  }
+  return null;
 };
 
 /**
@@ -1225,8 +1263,8 @@ const parallelConstraint: Rule = (s) => {
  * (not the foot phrasing). Like ∥, it also DRAWS both segments (idempotent).
  */
 const perpendicularConstraint: Rule = (s) => {
-  if (!/perpendicular|⊥|⟂|מאונך/i.test(s)) return null; // both ⊥ (U+22A5) and ⟂ (U+27C2)
-  const t = s.replace(/perpendicular(?:\s*to)?|⊥|⟂|מאונך(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
+  if (!/perpendicular|⊥|⟂|מאונך|אנך/i.test(s)) return null; // both ⊥ (U+22A5) and ⟂ (U+27C2); אנך = the noun form ("EF אנך ל AB")
+  const t = s.replace(/perpendicular(?:\s*to)?|⊥|⟂|מאונך(?:\s*ל-?)?|אנך(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
   if ((t.match(/\b[A-Za-z]\d*\s*[A-Za-z]\d*\b/g) ?? []).length < 2) return null; // "perpendicular from A to BC" is the foot, not this
   const m = t.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
   if (!m) return null;
@@ -1370,6 +1408,32 @@ const setRadius: Rule = (s, ctx) => {
   }
   if (!center || !(ctx.circles ?? []).some((c) => up(c) === up(center))) return null; // EXISTING circle only (creation → `circle`)
   return [{ type: 'set-radius', circle: circleId(center), value: parseFloat(valM[1]) }];
+};
+
+/**
+ * "OB רדיוס" / "רדיוס OB" / "הוסף רדיוס OB" — declare the segment from a circle's CENTRE to a point ON it
+ * (a drawn radius): the rim point goes on the circle and the centre→rim segment is drawn. Distinct from
+ * `setRadius` (sets the radius VALUE — needs a number) and `circle` (creates a circle — needs "מעגל"). Fires
+ * only for a BARE radius declaration whose two labels include an existing circle's centre, so it never
+ * disturbs "D אמצע הרדיוס OB" (a midpoint — claimed earlier) or "radius … = 5" (a value).
+ */
+const radiusSegment: Rule = (s, ctx) => {
+  if (!/\bradius\b|רדיוס/i.test(s)) return null;
+  if (parseRadius(s).numeric) return null; // a numeric radius → `setRadius` / `circle`
+  if (/אמצע|midpoint|=|⊥|⟂|∥|אנך|מאונך|מקביל|\bon\b|על\b/i.test(s)) return null; // not a bare radius declaration
+  const circles = (ctx.circles ?? []).map(up);
+  if (!circles.length) return null; // a radius needs a circle to belong to
+  const body = dropCircleRef(s).replace(/\bradius\b|רדיוס|\badd\b|הוסף|\bdraw\b|צייר|\bin\b|circle|מעגל/gi, ' ');
+  const ids = labelRun(body, 2);
+  if (!ids) return null;
+  const [x, y] = [up(ids[0]), up(ids[1])];
+  const centre = circles.includes(x) ? x : circles.includes(y) ? y : null;
+  if (!centre || x === y) return null;
+  const rim = centre === x ? y : x;
+  return [
+    { type: 'point-on-circle', id: rim, circle: circleId(centre) },
+    { type: 'segment', a: centre, b: rim },
+  ];
 };
 
 /**
@@ -1879,16 +1943,25 @@ const circleOnDiameter: Rule = (s, ctx) => {
   if (named) body = body.replace(new RegExp(String.raw`\b${named}\b`, 'g'), ' '); // drop the centre label
   const ids = labelRun(body, 2);
   if (!ids) return null;
-  // Fire to DEFINE a circle from AB in two situations (the INVERSE of `diameter`, which adds a diameter to an
-  // EXISTING circle): (1) an explicit DEFINE phrasing — "of/with/whose diameter", or a centre/radius spec
-  // ("שמרכזו O ורדיוסו R" / "centered … radius"), which you give when defining a circle; OR (2) a GIVEN
-  // diameter — both endpoints already exist AND there is no existing circle this phrase attaches to, so
-  // "AB קוטר [במעגל O]" with A,B placed means "make a circle with diameter AB". Plain "diameter DE in circle O"
-  // (D,E new, or an existing circle) stays with `diameter`.
+  // Fire to DEFINE a circle from AB in three situations (the INVERSE of `diameter`, which adds a diameter to
+  // an EXISTING circle): (1) an explicit DEFINE phrasing — "of/with/whose diameter", or a centre/radius spec
+  // ("שמרכזו O ורדיוסו R" / "centered … radius"), which you give when defining a circle; (2) a GIVEN diameter
+  // — both endpoints already exist AND there is no existing circle this phrase attaches to, so "AB קוטר" with
+  // A,B placed means "make a circle with diameter AB"; OR (3) a circle is explicitly mentioned/named and none
+  // exists yet — "AB קוטר במעגל" / "קוטר במעגל AB" / "AB קוטר במעגל O" as an opening statement means "make a
+  // circle whose diameter is AB" even when A,B are NEW (the common bagrut opener). An EXISTING circle (named
+  // and present, or the single unnamed one) → `diameter` adds the diameter to it.
   const DEFINE = /של\s*ה?מעגל|שקוטר|מעגל\s+שבו|שמרכז|רדיוסו|circle\s+with\b|with\s+(?:a\s+|the\s+)?diameter|diameter\s+of|is\s+(?:a\s+|the\s+)?diameter|cent(?:er|re)d|radius/i;
   const endpointsExist = ids.every((p) => (ctx.points ?? []).some((q) => up(q) === up(p)));
   const referencedCircleMissing = named ? true : circles.length === 0; // (a named-and-existing circle already returned above)
-  const givenDiameter = endpointsExist && referencedCircleMissing;
+  // DEFINE-from-new signal (vs the ADD phrasing "diameter DE in circle O"): the diameter LABELS come
+  // BEFORE the keyword ("AB קוטר") — the student says "AB is a/the diameter" — OR the circle is referred
+  // to WITHOUT a name ("קוטר במעגל AB" / "AB קוטר במעגל"). The ADD phrasing is keyword-first AND names the
+  // circle ("diameter DE in circle O"), so it's neither → stays with `diameter`.
+  const kwIdx = s.search(/diameter|קוטר/i);
+  const labelsBeforeKeyword = kwIdx > 0 && /[A-Za-z]/.test(s.slice(0, kwIdx));
+  const unnamedCircle = /circle|מעגל/i.test(s) && !named;
+  const givenDiameter = referencedCircleMissing && (endpointsExist || labelsBeforeKeyword || unnamedCircle);
   if (!DEFINE.test(s) && !givenDiameter) return null;
   if (!/circle|מעגל/i.test(s) && !givenDiameter) return null; // need a circle word, unless it's a clear given diameter ("AB קוטר")
   const centre = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...circles], ['O', 'P', 'M', 'Q', 'K']);
@@ -2922,13 +2995,18 @@ const altitude: Rule = (s) => {
   // bare unnamed "perpendicular from A to BC".
   if (/\bfoot\b|רגל/i.test(s)) return null;
   const isHeight = /\bheight\b|\baltitude\b|גובה/i.test(s);
-  const isPerpFrom =
-    /perpendicular|מאונך|אנך/i.test(s) && !/through|דרך/i.test(s) && /\bfrom\b|מ-/i.test(s);
+  // A "perpendicular FROM a point" (the altitude/foot), not the ⟂ CONSTRAINT or a through-line. The
+  // from-apex is the real discriminator (computed below as `apexM`); the ⟂ constraint ("AB אנך ל CD")
+  // has no "from"/"מ" apex, so `apexM` is null there and the rule bows out.
+  const isPerpFrom = /perpendicular|מאונך|אנך/i.test(s) && !/through|דרך/i.test(s);
   if (!isHeight && !isPerpFrom) return null;
-  const apexM = s.match(/(?:\bfrom\s+|מ-?)([A-Za-z]\d*)\b/i);
+  // Apex: "from D" / "from point D" / "מD" / "מ-D" / "מנקודה D" (the descriptor noun נקודה/point is tolerated,
+  // matching the chord-carrier handling — students write "מנקודה D", not the bare "מ-D").
+  const apexM = s.match(/(?:\bfrom\s+(?:the\s+)?(?:point\s+)?|מ-?\s*(?:ה?נקודה\s+)?)([A-Za-z]\d*)\b/i);
   if (!apexM) return null;
   const apex = up(apexM[1]);
-  const sideM = s.match(/(?:\bto\s+|אל\s*|ל-?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // explicit opposite side "to BC"
+  // Opposite side: "to BC" / "to side BC" / "ל BC" / "ל-BC" / "לצלע BC" / "לקטע BC" (descriptor noun tolerated).
+  const sideM = s.match(/(?:\bto\s+(?:the\s+)?(?:side\s+)?|אל\s*(?:ה?צלע\s+)?|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // explicit opposite side "to BC"
   let p: string, q: string;
   let tri: Id[] | null = null;
   if (sideM && up(sideM[1]) !== apex) {
@@ -3211,6 +3289,8 @@ const RULES: Rule[] = [
   foot, // before `pointOnSegment`
   pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)
   pointOnCircle, // "A on circle O" — before segment/pointOnSegment
+  radiusSegment, // "OB רדיוס" — a drawn radius (rim point on the circle + centre→rim segment); after midpoint/setRadius/circle, before `segment` (so "OB" isn't grabbed as a bare segment)
+  dividesInRatio, // "G מחלקת את DC ביחס 1:2" — a point on DC at a fixed t; keyword+`p:q` anchored, BEFORE `segment` (which would grab "הקטע DC" and drop the divider) and the numeric/ratio rules
   segment,
   pointsOnSegments, // "F, G, H on AB, AC, CB" — N points placed PAIRWISE on N segments, before the others
   pointsOnSegment, // "L and K are points on AC" — TWO points on a segment, before the single pointOnSegment

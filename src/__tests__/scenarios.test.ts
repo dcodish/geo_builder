@@ -105,6 +105,41 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'bagrut-chord-diameter-perp-session',
+    title:
+      'real production session: "AB קוטר במעגל" → "D אמצע הרדיוס OB" → "AC מיתר" → "E על המיתר AC" → "DE מקביל ל BC" → "ED=EC" → "F על AB" → "EF אנך ל AB" builds a valid figure (no step escalates)',
+    guards:
+      'Production usage analytics (2026-06-29, 57 students) showed this exact bagrut flow was the dominant FAILING session. Three deterministic gaps fixed: (1) "E על המיתר AC" — the DEFINITE article "המיתר" was missing from CARRIER_NOUN (only bare "מיתר" had ה?), so the point-on-chord rule dropped the rider E; (2) "AB קוטר במעגל" as an opener (A,B new, no circle yet) did not DEFINE a circle from its diameter; (3) "EF אנך ל AB" — the ⟂ constraint matched "מאונך" but not the noun form "אנך". Each step must now parse deterministically (no LLM escalation) and the assembled figure must satisfy every given.',
+    steps: [
+      'AB קוטר במעגל', // #3 — define a circle from diameter AB (A,B new)
+      'D אמצע הרדיוס OB', // midpoint of radius OB
+      'AC מיתר', // chord AC — A,C on circle O
+      'E על המיתר AC', // #1 — E on the DEFINITE chord "המיתר" (must place E, not drop it)
+      'DE מקביל ל BC', // DE ∥ BC
+      'ED=EC', // |ED| = |EC|
+      'F על AB', // F on AB
+      'EF אנך ל AB', // #5 — EF ⟂ AB via the noun "אנך"
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E'), F = at(fig, 'F'), O = at(fig, 'O');
+      // AB a diameter ⇒ O the midpoint ⇒ A,B,C all on circle O
+      expect(Math.abs(dist(O, A) - dist(O, B)), 'A,B on circle O (AB diameter)').toBeLessThan(1e-4);
+      expect(Math.abs(dist(O, A) - dist(O, C)), 'C on circle O (chord AC)').toBeLessThan(1e-4);
+      // D = midpoint of the radius OB
+      expect(dist(D, { x: (O.x + B.x) / 2, y: (O.y + B.y) / 2 }), 'D = midpoint of OB').toBeLessThan(1e-4);
+      // E on segment AC
+      const cross = Math.abs((E.x - A.x) * (C.y - A.y) - (E.y - A.y) * (C.x - A.x)) / Math.max(dist(A, C), 1) ** 2;
+      expect(cross, 'E on line AC (placed, not dropped)').toBeLessThan(1e-2);
+      expect(Math.abs(dist(E, D) - dist(E, C)), '|ED| = |EC|').toBeLessThan(1e-3);
+      // DE ∥ BC and EF ⟂ AB
+      const de = { x: E.x - D.x, y: E.y - D.y }, bc = { x: C.x - B.x, y: C.y - B.y };
+      expect(Math.abs(de.x * bc.y - de.y * bc.x) / (Math.hypot(de.x, de.y) * Math.hypot(bc.x, bc.y) + 1e-9), 'DE ∥ BC').toBeLessThan(1e-3);
+      const ef = { x: F.x - E.x, y: F.y - E.y }, ab = { x: B.x - A.x, y: B.y - A.y };
+      expect(Math.abs(ef.x * ab.x + ef.y * ab.y) / (Math.hypot(ef.x, ef.y) * Math.hypot(ab.x, ab.y) + 1e-9), 'EF ⟂ AB').toBeLessThan(1e-3);
+    },
+  },
+  {
     id: 'point-on-chord-named-carrier',
     title: '"E על מיתר AC" — a point ON a named carrier (chord) parses to point-on-segment; E is not dropped, A/C stay on the circle',
     guards:
