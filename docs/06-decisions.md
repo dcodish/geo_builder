@@ -2219,3 +2219,37 @@ Today the kite macro emits **two HARD equalities** pinned to axis AC (`parse.ts`
 **Amendment (centre default → O).** Operator: "why is the centre of the circle I and not O — the default should always be O." The incentre's auto-label preferred `I` (the textbook incentre letter); the project convention is that an **auto-assigned circle centre defaults to `O`** (matching `cornerTangentCircle` and the other circle rules). The preference list is now `['O', 'P', 'Q', 'I']` — `O` unless it is already taken (then `I` as the incentre-flavoured fallback). A student-named centre is still honoured. Tests reading the auto-label updated (`O`).
 
 **Result.** "משולש ABC חוסם מעגל" / "circle inscribed in triangle ABC" now shows all three tangency points (each on its side, all at the inradius from the incentre). The triangle-first scenario `triangle-circumscribes-circle-is-incircle` (ADR-066) is unaffected (its `G` is still the first foot, on side DE). Locked by scenario `incircle-has-three-tangency-points`. **Full suite green (1550), build clean.**
+
+---
+
+## ADR-152 — Name/reveal an existing circle's hidden centre (`name-center`) — ADR-148 #2 resolved
+
+**Context.** Production triage (2026-06-29, sessions `0nzwixeg`/`ea5dfjpr`): after "מרובע ABCD חסום במעגל" (a circle with a hidden auto-centre O), the student typed "O מרכז המעגל" to *name* the centre and got built-nothing. ADR-148 deferred this #2 as a "major change": no construction command names a centre, and re-creating the circle is idempotent (and would clobber the inscribed circle's radius spec, kicking its vertices off).
+
+**Decision.** A new engine command `{ type:'name-center'; center }` flips the existing circle's `autoCenter` flag OFF (so its centre shows, FR-RN-8) WITHOUT touching the radius. The parser `nameCenter` rule (before `circle`) emits it when the named centre already belongs to a circle; with no circle it bows out so `circle` CREATES one (the opener "O מרכז המעגל"); a different existing-centre label would be a rename (a store op) and defers. `circleCenter` was made keyword-ORDER-independent (letter before/after, He/En, copula+נקודה tolerated, gated on both a centre word and a circle word). `dryRunOutcome` treats `name-center` as "produced" (a visible reveal that adds no object). The `circle` rule defers a "circle inscribed in a polygon" phrasing to `incircle`.
+
+**Consequence.** "O מרכז המעגל" reveals an existing circle's centre (or creates one); the inscribed relations are preserved. Locked by scenario `name-existing-circle-centre` + `production-feedback.test.ts`.
+
+## ADR-153 — Inscribed angle on the diameter (Thales)
+
+**Context.** Operator feature request from the triage report: support "זווית היקפית נשענת על הקוטר" / "inscribed angle on the diameter".
+
+**Decision.** Operator chose REQUIRE-an-existing-circle. The `inscribedAngleOnDiameter` rule (before `diameter`) builds, on the resolved existing circle, a diameter A–B (A on circle, B antipode) + an apex C on the circle + chords A–C, B–C, and `set-angle ∠ACB = 90`. The right angle holds automatically for any C (Thales), so set-angle 90 is a check that draws the right-angle square (the teaching point). With no circle it defers.
+
+**Consequence.** ∠ACB = 90 holds, verifier clean. Locked by scenario `inscribed-angle-on-diameter-thales` + `production-feedback.test.ts`.
+
+## ADR-154 — Generic incircle: any polygon, flexing a quad to tangential
+
+**Context.** Operator feature request: generalise the incircle from triangle-only to all named shapes (original ask: `O הוא מרכז המעגל החסום בטרפז`). Principle: when a quad can adjust its sides to admit an inscribed circle, do it; if rigidly pinned and non-tangential, raise an issue.
+
+**Decision.** The `incircle` rule now detects the polygon kind (triangle/quad/trapezoid/rhombus/square/rectangle/parallelogram) + vertex count, auto-names vertices when unlabeled, and builds: the shape command (carrying its constraints) + bisectors at two ADJACENT vertices → their meet (the incentre) + a foot on every edge + `circle-through` the first foot (inradius). The three edges incident to the two bisector vertices are auto-tangent; every OTHER edge's foot is FORCED onto the circle (`point-on-circle`), flexing the polygon's free DOFs until that side is tangent too (Pitot — the quad becomes tangential). A triangle forces no edge (all auto) → unchanged. A rigidly-pinned non-tangential quad surfaces as over-constraint (the general machinery), per the operator's principle.
+
+**Consequence.** Triangle/quad/trapezoid/rhombus incircles all build with every touch point equidistant from the incentre (true incircle), verifier clean. Locked by scenario `incircle-of-trapezoid-flexes-tangential` + `production-feedback.test.ts`. The existing triangle existing-circle dual (ADR-115) is preserved (gated `n===3`).
+
+## ADR-155 — Parser coverage: keyword-order circle centre + altitude-from-a-point triangle inference
+
+**Context.** Production triage gaps. (1) "O מרכז המעגל" failed while "מרכז המעגל O" worked (see ADR-152 for the centre-naming half). (2) "גובה מנקודה D" (altitude from a vertex, no opposite side stated) failed when the figure had MORE than two other points — the rule's context fallback required the whole figure to be apex+2.
+
+**Decision.** (1) `circleCenter` is keyword-order-independent (ADR-152). (2) The `altitude` rule, when no side is stated and the figure has >2 other points, reads the opposite side off the adjacency (`ctx.neighbors`): the apex's UNIQUE triangle (two neighbours that are also joined to each other) gives the opposite side. Apex in 2+ triangles (ambiguous) DEFERS rather than guess a side (ADR-052, no assumptions). The well-specified "גובה מנקודה D לצלע AB" was never affected.
+
+**Consequence.** Locked by scenario `altitude-from-vertex-infers-triangle` + `production-feedback.test.ts`.

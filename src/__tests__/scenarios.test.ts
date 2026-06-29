@@ -105,6 +105,75 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'name-existing-circle-centre',
+    title: '"O מרכז המעגל" reveals the centre of an EXISTING inscribed circle (ADR-148 #2), without clobbering it',
+    guards:
+      'production triage (events.jsonl, 2026-06-29, sessions 0nzwixeg/ea5dfjpr): after "מרובע ABCD חסום במעגל" (a circle with a hidden auto-centre O), "O מרכז המעגל" / "מרכז המעגל O" built nothing — the student wanted to NAME/reveal the existing centre, but there was no command for it (ADR-148 deferred #2) and re-creating the circle is idempotent. Root fix: a `name-center` command flips the circle\'s `autoCenter` off (centre shows, FR-RN-8) WITHOUT touching its radius (re-emitting `circle` would clobber the inscribed-circle radius spec and kick the vertices off). The parser\'s `nameCenter` rule emits it when the named centre already belongs to a circle; with no circle yet "O מרכז המעגל" still CREATES one (order-independent `circleCenter`).',
+    steps: [
+      'מרובע ABCD חסום במעגל', // a circle with a hidden auto-centre O + A,B,C,D on it
+      'O מרכז המעגל', // name/reveal the existing centre — must NOT rebuild the circle
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const circ = fig.construction.objects.find((o) => o.kind === 'circle' && o.center === 'O') as { autoCenter?: boolean } | undefined;
+      expect(circ, 'the inscribed circle still exists, centred O').toBeTruthy();
+      expect(circ!.autoCenter, 'its centre is now revealed (autoCenter cleared)').toBeFalsy();
+      // the inscribed vertices are still ON the circle (radius spec was not clobbered)
+      for (const v of ['A', 'B', 'C', 'D']) expect(fig.positions.has(v), `${v} present`).toBe(true);
+    },
+  },
+  {
+    id: 'incircle-of-trapezoid-flexes-tangential',
+    title: '"O הוא מרכז המעגל החסום בטרפז" — the incircle of a trapezoid; the trapezoid flexes to tangential',
+    guards:
+      'operator feature request (from the triage report): generalise the incircle from triangle-only to any polygon, flexing a quad to TANGENTIAL when it can. "O הוא מרכז המעגל החסום בטרפז" auto-names trapezoid ABCD + incentre O (bisectors at two adjacent vertices), drops a foot on each side, and forces the non-auto edge\'s foot onto the incircle so the trapezoid flexes until all four sides are tangent. The four touch points end equidistant from O (a true incircle). A rigidly pinned non-tangential quad would surface as over-constraint (operator: raise an issue) — handled by the general constraint machinery.',
+    steps: ['O הוא מרכז המעגל החסום בטרפז'],
+    check(fig) {
+      allStepsOk(fig);
+      const circ = fig.construction.objects.find((o) => o.kind === 'circle' && o.center === 'O');
+      expect(circ, 'an incircle centred O').toBeTruthy();
+      const O = at(fig, 'O');
+      const feet = fig.construction.objects.filter((o) => o.kind === 'foot').map((o) => o.id);
+      expect(feet.length, 'a touch point on each of the 4 sides').toBe(4);
+      const ds = feet.map((f) => dist(O, at(fig, f)));
+      // all four touch points equidistant from O ⇒ the circle is tangent to all four sides (tangential)
+      for (const d of ds) expect(d, 'touch point on the incircle').toBeCloseTo(ds[0], 3);
+    },
+  },
+  {
+    id: 'inscribed-angle-on-diameter-thales',
+    title: '"זווית היקפית נשענת על הקוטר" on an existing circle → Thales: the inscribed angle on the diameter is 90°',
+    guards:
+      'operator feature request (from the triage report): support the inscribed-angle-on-diameter (Thales). Requires an existing circle (operator choice). Builds a diameter A–B + apex C on the circle + chords A–C, B–C, and marks ∠ACB = 90°. The right angle holds automatically for any C (Thales), so set-angle 90 is a check that draws the right-angle square.',
+    steps: [
+      'מעגל O רדיוס 5', // an existing circle
+      'זווית היקפית נשענת על הקוטר', // Thales — diameter + apex + 90° mark
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(angle(A, C, B), 'inscribed angle on the diameter is a right angle').toBeCloseTo(90, 1);
+      expect(fig.angleMarks.some((m) => m.right && m.vertex === 'C'), 'a right-angle mark at the apex C').toBe(true);
+    },
+  },
+  {
+    id: 'altitude-from-vertex-infers-triangle',
+    title: '"גובה מנקודה D" infers the opposite side from the apex\'s unique triangle, even with extra points present',
+    guards:
+      'production triage (events.jsonl, 2026-06-29): bare "גובה מנקודה D" / "הורד גובה מנקודה D" failed when the figure had MORE than two other points — the altitude rule\'s context fallback required the whole figure to be exactly apex+2. Root fix: derive the opposite side from the adjacency (ctx.neighbors) — the apex\'s UNIQUE triangle. Apex in 2+ triangles (ambiguous) still defers rather than guess a side (ADR-052). The well-specified "גובה מנקודה D לצלע AB" was never affected.',
+    steps: [
+      'משולש ABD', // triangle whose vertex D is the altitude apex
+      'קטע MN', // extra unrelated points so the figure has >2 points besides D (the old fallback failed here)
+      'גובה מנקודה D', // opposite side AB inferred from D's only triangle
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const pts = fig.construction.objects.filter(isGeoPoint).map((o) => o.id);
+      expect(pts, 'the inputs are present').toEqual(expect.arrayContaining(['A', 'B', 'D', 'M', 'N']));
+      expect(pts.length, 'a foot point was created (altitude resolved)').toBeGreaterThan(5);
+    },
+  },
+  {
     id: 'named-altitude-keeps-its-foot-name',
     title: '"משולש ABC" → "CD גובה" — the named altitude on an existing triangle keeps its foot D (was silently renamed CF)',
     guards:

@@ -640,6 +640,15 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       });
       break;
 
+    case 'name-center': {
+      // "O is the centre of the circle" — the student NAMED an existing circle's auto-hidden centre, so
+      // reveal it (FR-RN-8: a named centre always shows). Flip `autoCenter` off on the circle(s) centred at
+      // that label, leaving the radius spec untouched (re-emitting a `circle` would clobber it). No-op if no
+      // such circle (the parser only emits this when the centre exists).
+      for (const o of objects) if (o.kind === 'circle' && o.center === cmd.center && o.autoCenter) delete o.autoCenter;
+      break;
+    }
+
     case 'arc':
       addObj(objects, { kind: 'arc', id: cmd.id, center: cmd.center, from: cmd.from, to: cmd.to });
       break;

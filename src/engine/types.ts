@@ -738,6 +738,7 @@ export type Command =
   | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number }
   | { type: 'set-distance'; a: Id; b: Id; value: number }
   | { type: 'set-radius'; circle: Id; value: number } // a circle's radius = value (no segment drawn — ADR-087)
+  | { type: 'name-center'; center: Id } // reveal/name an EXISTING circle's auto-hidden centre (FR-RN-8): the student said "O is the centre of the circle" — flips the circle's autoCenter off so its centre shows, WITHOUT touching the radius
   | { type: 'set-area'; ids: Id[]; value: number } // area of polygon `ids` = value (ADR-118)
   | { type: 'set-area-ratio'; ids1: Id[]; ids2: Id[]; k: number } // area(ids1) = k·area(ids2)
   | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id; soft?: boolean } // soft: a DEFAULT equal-pair a named-shape macro picks when the student didn't say which sides are equal (e.g. isosceles |AB|=|AC|); the store drops it if an explicit equality on the same triangle is stated (ADR-114). The engine treats it as an ordinary equality.

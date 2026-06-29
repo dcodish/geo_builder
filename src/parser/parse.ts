@@ -71,12 +71,35 @@ const num = String.raw`(-?\d+(?:\.\d+)?)`;
 
 /** Deterministic circle id from its centre letter — so "circle O" is referenceable by name. */
 const circleId = (center: string): Id => `circle-${center.toUpperCase()}`;
-/** The centre letter of a circle named in `s` ("circle O" / "מעגל O" / "centered at O" / "שמרכזו O"). */
+/**
+ * The centre letter named in `s`, regardless of word order — "circle O" / "מעגל O" / "centered at O" /
+ * "שמרכזו O" / "מרכז המעגל O", AND the order-INDEPENDENT phrasings the original positional regexes
+ * missed: "O מרכז המעגל" (letter first), "O הוא מרכז המעגל", "מרכז המעגל הוא נקודה O", "O is the centre
+ * of the circle", "the centre of the circle is O" ([ADR] — keyword-order-independence, the grammar's
+ * stated property). The orderless patterns are GATED on BOTH a centre word and a circle word being
+ * present, so a "centre of segment BC" style phrase (no circle) can never have a letter mistaken for a
+ * circle centre.
+ */
 const circleCenter = (s: string): string | null => {
   const m =
     s.match(/(?:cent\w*\s+(?:at\s+)?|around\s+|שמרכזו\s*|מרכזו\s*|סביב\s+)([A-Za-z]\d*)\b/i) ??
-    s.match(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/i);
+    s.match(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/i) ??
+    orderlessCenter(s);
   return m ? m[1] : null;
+};
+/** Order-independent "X is the centre of the circle" / "מרכז המעגל [הוא] X" — see `circleCenter`. */
+const orderlessCenter = (s: string): RegExpMatchArray | null => {
+  if (!/cent(?:er|re)|מרכז/i.test(s) || !/circle|מעגל/i.test(s)) return null; // both a centre word AND a circle word
+  return (
+    // Hebrew, letter BEFORE: "O [הוא/היא/הינו] מרכז ה?מעגל" (optionally "נקודה O …")
+    s.match(/(?:^|\s)(?:ה?נקוד[הת]\s+)?([A-Za-z]\d*)\s+(?:הוא\s+|היא\s+|הינו\s+)?מרכז\s+ה?מעגל/i) ??
+    // Hebrew, letter AFTER with a copula/noun the "מעגל X" branch skips: "מרכז ה?מעגל [הוא/היא] [נקודה] O"
+    s.match(/מרכז\s+ה?מעגל\s+(?:הוא\s+|היא\s+)?(?:ה?נקוד[הת]\s+)?([A-Za-z]\d*)\b/i) ??
+    // English, letter BEFORE: "O is the centre …" (circle word guaranteed present by the gate above)
+    s.match(/(?:^|\s)([A-Za-z]\d*)\s+(?:is\s+)?(?:the\s+)?cent(?:er|re)\b/i) ??
+    // English, letter AFTER: "the centre of the circle is O"
+    s.match(/cent(?:er|re)\b[\s\S]*?\bcircle\b[\s\S]*?\bis\s+([A-Za-z]\d*)\b/i)
+  );
 };
 /**
  * The incentre letter a student NAMES as the SUBJECT of an incircle phrasing — "M מרכז המעגל החסום
@@ -1374,9 +1397,45 @@ const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: b
   return { radius: RADIUS_DEFAULT, numeric: false, symbolic: false };
 };
 
+/**
+ * "O is the centre of the circle" / "O מרכז המעגל" / "מרכז המעגל הוא נקודה O" — NAME an EXISTING circle's
+ * auto-hidden centre, revealing it (FR-RN-8: a named centre always shows). The student didn't draw a new
+ * circle, they put a name on the one already there (so they can reference it, e.g. "OB radius"). Distinct
+ * from `circle` (CREATION): fires only when the named centre ALREADY belongs to a circle in the figure —
+ * then it emits `name-center` (the engine flips that circle's `autoCenter` off, leaving the radius alone).
+ * With NO such circle it bows out so `circle` creates one (the opener "O מרכז המעגל" with no circle yet);
+ * a different existing centre label would be a rename (a store op) and also defers. Not an incircle /
+ * through / radius / inscribe phrasing (those rules own those). [ADR-148 #2, finally addressed.]
+ */
+const nameCenter: Rule = (s, ctx) => {
+  if (!/cent(?:er|re)|מרכז/i.test(s) || !mentionsCircle(s)) return null;
+  if (isCircleInPolygon(s)) return null; // incircle ("circle inscribed in …")
+  if (/inscrib\w*|חסום|חוסם|through|העובר|דרך|radius|רדיוס|=|\bon\b|על\b/i.test(s)) return null; // creation / other constructs
+  const x = circleCenter(s);
+  if (!x) return null;
+  const X = up(x);
+  // Must be JUST "the centre is X" — nothing geometric remains after stripping the centre/circle words, the
+  // label, copulas, and the descriptor noun. Otherwise it's a richer phrasing for another rule.
+  const leftover = s
+    .replace(/cent(?:er|re)|ה?מרכז/gi, ' ')
+    .replace(/circles?|ה?מעגל\w*/gi, ' ') // strip the definite article too, else "המעגל" leaves a dangling "ה"
+    .replace(new RegExp(String.raw`\b${X}\b`, 'gi'), ' ')
+    .replace(/\bpoint\b|הוא|היא|הינו|ה?נקוד[הת]|של/gi, ' ')
+    .replace(FILLER, ' ')
+    .trim();
+  if (leftover) return null;
+  const circles = (ctx.circles ?? []).map(up);
+  if (circles.includes(X)) return [{ type: 'name-center', center: X }]; // reveal the existing circle's centre
+  return null; // no circle yet → `circle` creates circle-X; a different existing centre → rename, defer
+};
+
 /** "circle centered at O radius 5" / "circle O radius R" / "מעגל שמרכזו O רדיוסו 5". */
 const circle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
+  // A "circle inscribed in a polygon" (incircle) names a centre too ("O מרכז המעגל החסום בטרפז"); now that
+  // `circleCenter` is order-independent it would resolve O here and create a PLAIN circle, stealing the
+  // incircle utterance. Defer the incircle phrasing to the `incircle` rule.
+  if (isCircleInPolygon(s)) return null;
   const r = parseRadius(s);
   const thrM = s.match(/(?:through|העובר\s*דרך|דרך)\s+([A-Za-z]\d*)\b/i);
   const centered = /cent(?:er|re)d?|around|מרכז\w*|סביב/i.test(s);
@@ -1788,19 +1847,43 @@ const quarterCircle: Rule = (s) => {
  * → a circle through it. Distinct from "triangle inscribed in a circle".
  */
 const incircle: Rule = (s, ctx) => {
-  if (!/triangle|משולש/i.test(s)) return null; // v1: incircle of a triangle
-  // EITHER "circle inscribed in triangle …" (circle-in-polygon) …
-  const circleInTri = /incircle|inscrib\w*|חסום/i.test(s) && isCircleInPolygon(s);
-  // … OR "triangle DEF circumscribes the circle" — the TRIANGLE encloses the circle (same figure). Ordered
-  // (triangle-labels … circumscribes … circle) so a CIRCLE-first "מעגל חוסם משולש" (a circumcircle) does
-  // NOT match here — only the triangle-as-subject reading does.
-  const triCircumscribes = /(?:triangle|משולש)\s+[A-Za-z]\d*.*?(?:circumscrib\w*|חוסם).*?(?:circle|מעגל)/i.test(s);
-  if (!circleInTri && !triCircumscribes) return null;
-  const triPart = s.split(/triangle|משולש/i).slice(1).join(' '); // vertices follow the polygon word
-  const ids = labelRun(triPart, 3);
+  // The INCIRCLE of a polygon (triangle / quad / trapezoid / rhombus / square / rectangle / parallelogram):
+  // EITHER "circle inscribed in <polygon>" (circle-in-polygon) …
+  const inscribed = /incircle|inscrib\w*|חסום/i.test(s) && isCircleInPolygon(s);
+  // … OR "<polygon> ABCD circumscribes the circle" — the polygon encloses the circle (same figure). Ordered
+  // (polygon-labels … circumscribes … circle) so a CIRCLE-first "מעגל חוסם משולש" (a circumcircle) does NOT
+  // match here — only the polygon-as-subject reading does.
+  const circumscribes =
+    /(?:triangle|quad\w*|square|rectangle|rhombus|trapez\w*|parallelogram|polygon|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית)\s+[A-Za-z]\d*.*?(?:circumscrib\w*|חוסם).*?(?:circle|מעגל)/i.test(s);
+  if (!inscribed && !circumscribes) return null;
+  // The polygon kind → vertex count. (Every triangle has an incircle; a quad needs to be TANGENTIAL, which
+  // the construction below flexes it to be — sum of opposite sides equal, Pitot.)
+  const kind =
+    /triangle|משולש/i.test(s) ? 'triangle'
+    : /square|ריבוע/i.test(s) ? 'square'
+    : /rectangle|מלבן/i.test(s) ? 'rectangle'
+    : /rhombus|מעוין/i.test(s) ? 'rhombus'
+    : /trapez|טרפז/i.test(s) ? 'trapezoid'
+    : /parallelogram|מקבילית/i.test(s) ? 'parallelogram'
+    : /quad\w*|מרובע/i.test(s) ? 'quad'
+    : null;
+  if (!kind) return null;
+  const n = kind === 'triangle' ? 3 : 4;
+  const taken = ctx.points ?? []; // auto-named points must dodge labels already in the figure
+  // The vertices: named in the utterance, or auto-named A,B,C(,D) — "O מרכז המעגל החסום בטרפז" names none.
+  const namedC = circleCenter(s);
+  const incLabel = incenterLabel(s);
+  let rest = dropCircleRef(s).replace(
+    /incircle|inscrib\w*|חסום|circumscrib\w*|חוסם|triangle|משולש|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|parallelogram|מקבילית|quad\w*|מרובע|polygon|circles?|מעגל\w*|cent(?:er|re)\w*|ה?מרכז\w*/gi,
+    ' ',
+  );
+  if (namedC) rest = rest.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ');
+  if (incLabel) rest = rest.replace(new RegExp(String.raw`\b${incLabel}\b`, 'gi'), ' ');
+  const ids =
+    labelRun(rest, n) ??
+    (namesVertices(rest) ? null : autoVertexLabels(n, [...taken, ...(namedC ? [namedC] : []), ...(incLabel ? [incLabel] : [])]));
   if (!ids) return null;
   const [A, B, C] = ids;
-  const taken = ctx.points ?? []; // auto-named points must dodge labels already in the figure
   // EXISTING circle as the incircle — "משולש DEF חוסם את המעגל O" where circle O is ALREADY in the figure
   // (here O is also the circumcircle of an earlier triangle). The triangle's three sides are tangent to the
   // existing O, NOT a fresh incircle whose centre/radius are DERIVED from the triangle. Re-deriving it
@@ -1811,7 +1894,7 @@ const incircle: Rule = (s, ctx) => {
   // forced onto the circle over-constrains the per-constraint driver). Mirrors `cornerTangentCircle`'s
   // existing-circle branch and the pole-of-chord two-tangent rule.
   const namedCenter = circleCenter(s);
-  if (namedCenter && (ctx.circles ?? []).some((c) => up(c) === up(namedCenter))) {
+  if (n === 3 && namedCenter && (ctx.circles ?? []).some((c) => up(c) === up(namedCenter))) {
     const O = up(namedCenter);
     const circ = circleId(O);
     const touch: Id[] = []; // three fresh, distinct touch-point labels, each dodging the figure + prior touches
@@ -1824,37 +1907,58 @@ const incircle: Rule = (s, ctx) => {
       { type: 'triangle', ids: [A, B, C] }, // the drawn sides DE, EF, FD (each tangent to O)
     ];
   }
-  // The incentre: the student's named one — either "circle M" (circleCenter) OR the subject form
-  // "M [is the] centre of the inscribed circle" (incenterLabel) — else an auto label. A named incentre
-  // must dodge the triangle's own vertices (a vertex can't be the incentre).
+  // The incentre: the student's named one — "circle M" (circleCenter) OR the subject form "M [is the] centre
+  // of the inscribed circle" (incenterLabel) — else an auto label. A named incentre dodges the polygon's vertices.
   const namedInc = (() => {
-    const c = circleCenter(s);
-    if (c && !ids.includes(up(c))) return up(c);
-    const il = incenterLabel(s);
-    if (il && !ids.includes(up(il))) return up(il);
+    if (namedC && !ids.includes(up(namedC))) return up(namedC);
+    if (incLabel && !ids.includes(up(incLabel))) return up(incLabel);
     return null;
   })();
-  const I = namedInc ?? freeLabel([...ids, ...taken], ['O', 'P', 'Q', 'I']); // the incentre — a circle centre defaults to O (the convention), I only if O is taken
-  // The incircle is tangent to ALL THREE sides, so it has three touch points — materialise each as the foot
-  // of the ⟂ from the incentre onto that side. One of them (F, on AB) also defines the radius (circle-through);
-  // the other two are derived points that land ON the circle automatically (the incentre is equidistant from
-  // every side). Earlier this only drew the single radius foot, so a student saw one tangency mark instead of
-  // three. The labels dodge the figure + each other.
-  const F = freeLabel([...ids, I, ...taken], ['F', 'G', 'H', 'K']); // tangency point on AB
-  const G = freeLabel([...ids, I, F, ...taken], ['G', 'H', 'K', 'L']); // tangency point on BC
-  const H = freeLabel([...ids, I, F, G, ...taken], ['H', 'K', 'L', 'N']); // tangency point on CA
-  const bisA = `bis-${B}${A}${C}`; // ∠BAC (vertex A)
-  const bisB = `bis-${A}${B}${C}`; // ∠ABC (vertex B)
-  return [
-    { type: 'triangle', ids: [A, B, C] }, // ensure the triangle exists
-    { type: 'bisector', id: bisA, vertex: A, p: B, q: C },
-    { type: 'bisector', id: bisB, vertex: B, p: A, q: C },
-    { type: 'line-intersection', id: I, line1: bisA, line2: bisB }, // incenter
-    { type: 'foot', id: F, from: I, a: A, b: B }, // inradius foot on side AB (also the circle's through-point)
-    { type: 'circle-through', id: circleId(I), center: I, through: F, ...(namedInc ? {} : { autoCenter: true }) }, // the incentre is auto unless named
-    { type: 'foot', id: G, from: I, a: B, b: C }, // tangency on side BC (lands on the circle)
-    { type: 'foot', id: H, from: I, a: C, b: A }, // tangency on side CA (lands on the circle)
+  const I = namedInc ?? freeLabel([...ids, ...taken], ['O', 'P', 'Q', 'I']); // a circle centre defaults to O
+
+  // The polygon's defining command (carries its constraints: trapezoid AB∥CD, rhombus equal sides, …), so the
+  // shape stays the named shape while the tangential flex below adjusts it to admit an incircle.
+  const v = ids;
+  const shapeCmd: AnyCommand =
+    kind === 'triangle' ? { type: 'triangle', ids: [v[0], v[1], v[2]] }
+    : kind === 'square' ? { type: 'square', ids: [v[0], v[1], v[2], v[3]] }
+    : kind === 'rectangle' ? { type: 'rectangle', ids: [v[0], v[1], v[2], v[3]] }
+    : kind === 'rhombus' ? { type: 'rhombus', ids: [v[0], v[1], v[2], v[3]] }
+    : kind === 'trapezoid' ? { type: 'trapezoid', ids: [v[0], v[1], v[2], v[3]] }
+    : kind === 'parallelogram' ? { type: 'parallelogram', ids: [v[0], v[1], v[2], v[3]] }
+    : { type: 'quadrilateral', ids: [v[0], v[1], v[2], v[3]] };
+
+  // Generic incircle construction. The incentre is where the angle bisectors meet — it exists for ANY triangle,
+  // and for a quad ONLY when the quad is TANGENTIAL (Pitot). We take the bisectors at two ADJACENT vertices (v0,
+  // v1): their meet I is equidistant from the three edges incident to v0/v1 (the prev-v0 edge, v0–v1, v1–v2), so
+  // the feet on those land on the incircle automatically. Every OTHER edge gets its foot FORCED onto the circle —
+  // a constraint that flexes the polygon's free DOFs until that side is tangent too (the quad becomes tangential).
+  // If the shape is rigidly pinned and not tangential, this is a genuine over-constraint and surfaces as such
+  // (operator's principle: flex when we can, raise an issue when we can't). For a triangle no edge is forced
+  // (all three are auto), so its behaviour is unchanged.
+  const nb = (i: number): [Id, Id] => [v[(i - 1 + n) % n], v[(i + 1) % n]];
+  const [a0p, a0q] = nb(0);
+  const [b1p, b1q] = nb(1);
+  const bis0 = `bis-${a0p}${v[0]}${a0q}`; // bisector of the interior angle at v0
+  const bis1 = `bis-${b1p}${v[1]}${b1q}`; // bisector of the interior angle at v1
+  const cmds: AnyCommand[] = [
+    shapeCmd,
+    { type: 'bisector', id: bis0, vertex: v[0], p: a0p, q: a0q },
+    { type: 'bisector', id: bis1, vertex: v[1], p: b1p, q: b1q },
+    { type: 'line-intersection', id: I, line1: bis0, line2: bis1 }, // the incentre
   ];
+  const feet: Id[] = [];
+  for (let e = 0; e < n; e++) {
+    const f = freeLabel([...ids, I, ...feet, ...taken], ['F', 'G', 'H', 'K', 'L', 'N', 'P', 'Q', 'S', 'T']);
+    feet.push(f);
+    cmds.push({ type: 'foot', id: f, from: I, a: v[e], b: v[(e + 1) % n] }); // touch point on edge e
+    if (e === 0) {
+      cmds.push({ type: 'circle-through', id: circleId(I), center: I, through: f, ...(namedInc ? {} : { autoCenter: true }) }); // edge v0–v1 sets the inradius
+    } else if (e !== 1 && e !== n - 1) {
+      cmds.push({ type: 'point-on-circle', id: f, circle: circleId(I) }); // a non-auto edge → force tangency (flex to tangential)
+    }
+  }
+  return cmds;
 };
 
 /**
@@ -1999,6 +2103,33 @@ const circleOnDiameter: Rule = (s, ctx) => {
     { type: 'segment', a: ids[0], b: ids[1] }, // the diameter AB (idempotent; creates A,B if they're new — `midpoint` needs them)
     { type: 'midpoint', id: up(centre), a: ids[0], b: ids[1] }, // the centre is the midpoint of the diameter
     { type: 'circle-through', id: circleId(centre), center: up(centre), through: ids[0], ...(auto ? { autoCenter: true } : {}) }, // radius |centre·A|; B is on it
+  ];
+};
+
+/**
+ * "זווית היקפית נשענת על הקוטר" / "inscribed angle on the diameter" — THALES. Requires an EXISTING circle
+ * (operator's choice): an inscribed angle subtending a diameter is a right angle. Builds, on that circle, a
+ * diameter A–B (A on the circle, B its antipode) + an apex C on the circle + the two chords A–C, B–C, and
+ * marks ∠ACB = 90°. The right angle holds automatically by Thales for any C, so `set-angle 90` is a check
+ * (it draws the right-angle square — the teaching point), not a drive. Vertices are auto-named, dodging the
+ * figure. No points named ⇒ a fresh diameter; the definite "the diameter" reusing an existing one is a later
+ * refinement. [ADR — inscribed-angle-on-diameter / Thales.]
+ */
+const inscribedAngleOnDiameter: Rule = (s, ctx) => {
+  if (!/(?:זוו?ית\s+היקפית|inscribed\s+angle)/i.test(s)) return null;
+  if (!/diameter|קוטר/i.test(s)) return null;
+  const center = resolveCenter(s, ctx); // an EXISTING circle (named, or the single one) — required
+  if (!center) return null;
+  const taken = ctx.points ?? [];
+  const A = freeLabel(taken, ['A', 'B', 'C', 'D']);
+  const B = freeLabel([...taken, A], ['B', 'C', 'D', 'E']);
+  const C = freeLabel([...taken, A, B], ['C', 'D', 'E', 'F']);
+  return [
+    { type: 'diameter', id1: A, id2: B, circle: circleId(center) }, // A on circle, B = antipode (the diameter)
+    { type: 'point-on-circle', id: C, circle: circleId(center) }, // the inscribed apex
+    { type: 'segment', a: A, b: C },
+    { type: 'segment', a: B, b: C },
+    { type: 'set-angle', vertex: C, ray1: A, ray2: B, value: 90 }, // Thales — draws the right-angle mark (a check)
   ];
 };
 
@@ -3081,8 +3212,22 @@ const altitude: Rule = (s, ctx) => {
     } else {
       tri = null; // no triangle stated — derive the side from context, and don't re-emit a triangle
       const pts = (ctx.points ?? []).filter((x) => x !== apex && x !== namedFoot);
-      if (pts.length !== 2) return null;
-      [p, q] = [pts[0], pts[1]];
+      if (pts.length === 2) {
+        [p, q] = [pts[0], pts[1]];
+      } else {
+        // More than two other points in the figure: the opposite side is unambiguous only if the apex
+        // belongs to exactly ONE triangle. Read it off the adjacency (ctx.neighbors) — two neighbours of the
+        // apex that are also joined to each other close a triangle apex–P–Q whose side opposite the apex is
+        // PQ. Exactly one such triangle → use it; zero or several → genuinely under-specified, so defer
+        // rather than guess a side (ADR-052, no assumptions). Handles "גובה מנקודה D" with extra points around.
+        const nb = ctx.neighbors ?? {};
+        const adj = (nb[apex] ?? []).filter((x) => x !== namedFoot);
+        const sides: [Id, Id][] = [];
+        for (let i = 0; i < adj.length; i++)
+          for (let j = i + 1; j < adj.length; j++) if ((nb[adj[i]] ?? []).includes(adj[j])) sides.push([up(adj[i]), up(adj[j])]);
+        if (sides.length !== 1) return null;
+        [p, q] = sides[0];
+      }
     }
   }
   const f = namedFoot ?? freeLabel([apex, p, q], ['F', 'G', 'H', 'P']);
@@ -3347,9 +3492,11 @@ const RULES: Rule[] = [
   arcMidpoint, // circle constructs (own keywords) before the generic point rules
   midpoint, // "C אמצע מיתר AB" — a NAMED midpoint, before `chord` grabs "מיתר AB" and drops C (after arcMidpoint)
   circleOnDiameter, // "circle with diameter AB" / "AB קוטר של מעגל" — a circle DEFINED by its diameter (centre = midpoint AB); before `diameter` (add-to-existing) and `circle`
+  inscribedAngleOnDiameter, // "זווית היקפית נשענת על הקוטר" (Thales) — before `diameter` (owns "קוטר") and the angle rules
   diameter,
   chord,
   circumcircle, // "circle through A B C" — before the centre-based `circle`
+  nameCenter, // "O מרכז המעגל" — reveal an EXISTING circle's hidden centre; before `circle` (which would CREATE one)
   circle,
   foot, // before `pointOnSegment`
   pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)

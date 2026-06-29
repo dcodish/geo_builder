@@ -531,7 +531,10 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, o
     labelCount(after.labels) > labelCount(before.labels);
   // A bare variable binding ("x = 4") legitimately draws nothing — it's data, not a silent fail.
   const dataOnly = commands.length > 0 && commands.every((c) => c.type === 'set-var');
-  if (!grew && !dataOnly) return { produced: false, reason: 'empty' };
+  // `name-center` REVEALS an existing circle's hidden centre — a visible change that adds no object/point
+  // and moves nothing, so the geometry checks above miss it. It still "produced" (the centre now shows).
+  const reveals = commands.some((c) => c.type === 'name-center');
+  if (!grew && !dataOnly && !reveals) return { produced: false, reason: 'empty' };
   return { produced: true };
 }
 
