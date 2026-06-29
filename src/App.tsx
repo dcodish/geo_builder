@@ -312,6 +312,16 @@ export default function App() {
           resolveAfterCommit();
           return;
         }
+        // A cleanly-PARSED command the engine CAN'T satisfy against the current figure (and not a deferrable
+        // constraint) is a CONTRADICTION with the existing data — not a phrasing problem, so the LLM can't fix
+        // it (it would re-emit the same in-grammar command). Show the SPECIFIC reason (humanized: "…contradicts
+        // an earlier given", "C is already defined — edit/delete the earlier step") instead of the generic
+        // "produced nothing". (ADR-156 follow-up — the "impossible with the current data" message.)
+        if (outcome.reason === 'error') {
+          logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `conflict:${outcome.detail ?? ''}`, commands: r.commands });
+          setInputNote(outcome.detail ? humanizeError(outcome.detail, t) : t('input.producedNothing'));
+          return; // keep the text so the student can edit/delete it
+        }
         // A clean RE-ENTRY of things that already exist (re-typing a shape, re-inscribing points already on
         // the circle) parses fine but produces nothing NEW. That's not a failure and must not escalate to the
         // LLM (which would just say "couldn't build"): tell the student it's already drawn. Signal: produced

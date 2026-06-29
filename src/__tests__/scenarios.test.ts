@@ -23,6 +23,7 @@ import { replay, polygonsConvex, useGeoStore, firstSatisfyingSeed, dryRunOutcome
 import type { Derived, Fact } from '@/store/geoStore';
 import { isGeoPoint, freeDofs, freeDofCount, applySeed, firstCyclableBranch, evaluate, circleMembers, pointNeighbors, detectRelations } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
+import { humanizeError } from '@/i18n/humanizeError';
 
 type Step = string | { llm: AnyCommand[] };
 interface Scenario {
@@ -2616,6 +2617,33 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
     expect(classify('מרובע ABCD חסום במעגל').kind, 're-inscribe is a no-op').toBe('noop');
     // a genuinely NEW construct still commits (the no-op gate doesn't swallow real work)
     expect(classify('E על AB').kind, 'a new point still commits').toBe('commit');
+    st.clear();
+  });
+
+  it('[contradiction-message] making an existing trapezoid a square reports a CONFLICT, not "produced nothing" (ADR-156)', () => {
+    const st = useGeoStore.getState();
+    st.clear();
+    // Mirror App.submit: a cleanly-parsed command that dry-run ERRORS (non-deferrable) is a contradiction with
+    // the figure → a SPECIFIC humanizable reason, NOT an escalation to the generic "produced nothing".
+    const classify = (utterance: string): { kind: 'commit' | 'conflict' | 'noop' | 'escalate'; detail?: string } => {
+      const facts = useGeoStore.getState().facts;
+      const ctx = ctxOf(facts);
+      const r = parse(utterance, ctx);
+      if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0) {
+        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
+        if (outcome.produced || (outcome.reason === 'error' && hasDeferrableConstraint(r.commands))) return { kind: 'commit' };
+        if (outcome.reason === 'error') return { kind: 'conflict', detail: outcome.detail };
+        if (outcome.reason === 'empty') return { kind: 'noop' };
+      }
+      return { kind: 'escalate' };
+    };
+    const tr = parse('טרפז ABCD', ctxOf(useGeoStore.getState().facts));
+    expect(tr.ok).toBe(true);
+    if (tr.ok) tr.commands.forEach((c) => useGeoStore.getState().execute(c, 'טרפז ABCD', 'g1'));
+    const res = classify('ריבוע ABCD'); // ask the trapezoid to become a square — impossible with the current data
+    expect(res.kind, 'a contradiction, not escalate-to-produced-nothing').toBe('conflict');
+    expect(res.detail, 'a specific reason is surfaced (humanized in the UI)').toBeTruthy();
+    expect(humanizeError(res.detail!, (k: string) => k), 'the reason maps to a clear error message').not.toBe(res.detail);
     st.clear();
   });
 
