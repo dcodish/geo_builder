@@ -49,6 +49,11 @@ const PARSES: [string, string][] = [
   ['משולש שווה צלעות ABC', 'set-equal'],
   ['isosceles trapezoid ABCD', 'set-equal'],
   ['טרפז שווה שוקיים ABCD', 'set-equal'],
+  // right trapezoid (a leg ⟂ the bases) — trapezoid + set-perpendicular; before rightTriangle (bare "ישר זווית")
+  ['right trapezoid ABCD', 'set-perpendicular'],
+  ['טרפז ישר-זווית ABCD', 'set-perpendicular'],
+  ['טרפז ישר זווית ABCD', 'set-perpendicular'], // plene spelling, space not hyphen
+  ['טרפז ABCD ישר זוית', 'set-perpendicular'], // defective spelling, label-first, no hyphen
   // a named triangle shape ON an inscribe carries its equal-side relations (ADR-117), not just a generic triangle
   ['equilateral triangle ABC inscribed in a circle', 'set-equal'],
   ['ABC משולש שווה צלעות חסום במעגל', 'set-equal'],

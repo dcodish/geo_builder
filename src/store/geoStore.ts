@@ -18,8 +18,8 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
-import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, circleMembers, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, residual, VARIANT_COUNT } from '@/engine';
+import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ShapesResult, Vec } from '@/engine';
+import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, circleMembers, deepEqual, detectRelationsAcross, detectShapesAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, residual, VARIANT_COUNT } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -156,6 +156,31 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
     const V = f.enabled ? softEqVerts(f.cmd) : null;
     if (V && facts.some((g) => g !== f && g.enabled && explicitEqWithin(lowerOne(g.cmd, symtab), V))) supersededSoft.add(f.id);
   }
+  // "right triangle ABC" pins the right angle at the LAST vertex (C) structurally (B is built ⟂ at C). But
+  // WHICH vertex is the right one is UNSTATED, so that default must YIELD to an explicit "∠ABC = 90" the
+  // student gives on a different vertex — otherwise the structural ∠C=90 and the stated ∠B=90 collide and the
+  // stated angle is refused as over-constrained ([ADR-052](docs/06-decisions.md#adr-052); same shape as the
+  // ADR-114 soft equal-pair). Pre-scan (position-independent — works whether the angle is typed before or
+  // after the triangle): if an enabled explicit 90° set-angle names one of a right-triangle's vertices,
+  // reorder its ids so that vertex is LAST (the structural right-angle vertex); the explicit angle then holds
+  // as a passing check, not a conflict.
+  const rightAngleVerts = new Set<Id>(
+    facts
+      .filter((f) => f.enabled)
+      .flatMap((f) => lowerOne(f.cmd, symtab))
+      .filter((c): c is Extract<Command, { type: 'set-angle' }> => c.type === 'set-angle' && Math.abs(c.value - 90) < 1e-6)
+      .map((c) => c.vertex),
+  );
+  const rtReorder = new Map<string, [Id, Id, Id]>();
+  for (const f of facts) {
+    if (!f.enabled || f.cmd.type !== 'right-triangle') continue;
+    const ids = f.cmd.ids;
+    const v = ids.find((id) => rightAngleVerts.has(id) && id !== ids[2]);
+    if (v) {
+      const [a, b] = ids.filter((id) => id !== v);
+      rtReorder.set(f.id, [a, b, v]); // the right-angle vertex LAST (the structural ∠ position)
+    }
+  }
   // Explicit `set-equal`s the student/LLM gave (NOT a shape-variant macro's own pairs) — they PIN the matching
   // variant of a kite/isosceles `shape-variant` and suppress re-emitting that pair ([ADR-138](docs/06-decisions.md#adr-138)).
   const explicitEqs = facts
@@ -167,7 +192,10 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
     // ratio/distance/angle/[]; engine commands pass through; a `shape-variant` → base shape + the
     // variant-selected equal pairs, with an explicit equality pinning the variant — ADR-138).
     // 0 commands ⇒ a label-only / data-only fact (a free representative or `set-var`) — applied as a no-op.
-    const engineCmds = f.cmd.type === 'shape-variant' ? expandShapeVariant(f.cmd, explicitEqs) : lowerOne(f.cmd, symtab);
+    let engineCmds = f.cmd.type === 'shape-variant' ? expandShapeVariant(f.cmd, explicitEqs) : lowerOne(f.cmd, symtab);
+    // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see pre-scan).
+    const reseat = rtReorder.get(f.id);
+    if (reseat) engineCmds = engineCmds.map((ec) => (ec.type === 'right-triangle' ? { ...ec, ids: reseat } : ec));
     const intro = engineCmds.flatMap(introducedPointIds);
     const claim = () => intro.forEach((id) => owned.add(id));
     if (!f.enabled) {
@@ -291,7 +319,11 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   const amSeen = new Set<string>();
   for (const f of facts) {
     if (status[f.id] !== 'ok') continue;
-    const m = angleMarkFor(f.cmd);
+    // Mark from the RESEATED right-triangle (ADR-163), so the right-angle knee is drawn at the vertex the
+    // figure actually built the right angle at — not the original last id. Without this the knee sits on a
+    // now-acute vertex (e.g. a leftover knee at C while ∠B is the real 90°).
+    const markCmd = rtReorder.has(f.id) && f.cmd.type === 'right-triangle' ? { ...f.cmd, ids: rtReorder.get(f.id)! } : f.cmd;
+    const m = angleMarkFor(markCmd);
     if (!m || ![m.vertex, m.ray1, m.ray2].every((id) => e.ok && e.positions.has(id))) continue;
     const key = `${m.vertex}-${[m.ray1, m.ray2].sort().join('')}`;
     if (amSeen.has(key)) continue;
@@ -748,6 +780,12 @@ export interface GeoState {
    *  checks `relations.facts === facts` auto-clears it (no edits to the mutating actions needed). */
   relations: { result: RelationsResult; facts: Fact[] } | null;
 
+  /** The "detect shapes" layer ([FR-SH](docs/02-requirements.md)): the named shapes (kite, rhombus,
+   *  isosceles triangle, …) the figure geometrically contains, cached with the EXACT `facts` array they
+   *  were computed from — same caching/auto-clear contract as `relations` (a selector checking
+   *  `shapes.facts === facts` drops it on any fact change; it survives "show another configuration"). */
+  shapes: { result: ShapesResult; facts: Fact[] } | null;
+
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
   execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;
   /** Replace a fact's command *in place* (same list position) — an edit (ADR-015). */
@@ -769,6 +807,11 @@ export interface GeoState {
   viewRelations: () => void;
   /** Turn the relations layer off. */
   clearRelations: () => void;
+  /** Detect the named shapes of the current figure and turn the badges layer ON ([FR-SH]). Synchronous
+   *  (samples the figure); the caller paints a busy state first. A re-press recomputes. */
+  detectShapes: () => void;
+  /** Turn the shape-badges layer off. */
+  clearShapes: () => void;
   /** Advance an intersection point to its next configuration (stored in the fact's command). */
   cycleAlt: (pointId: Id) => void;
   /** Step the equal-pair VARIANT of a kite/isosceles shape ([ADR-138](docs/06-decisions.md#adr-138)) — so
@@ -909,6 +952,7 @@ export const useGeoStore = create<GeoState>()(
       segStyle: {},
       hiddenCircles: [],
       relations: null,
+      shapes: null,
 
       execute: (cmd, utterance, group) => {
         const facts = get().facts;
@@ -1017,6 +1061,18 @@ export const useGeoStore = create<GeoState>()(
       },
 
       clearRelations: () => set({ relations: null }),
+
+      detectShapes: () => {
+        // Same sampling contract as viewRelations (ADR-138 variant configs, facts-keyed cache): a named shape
+        // is reported only if FORCED across every variant × seed, so it catches emergent shapes and never a
+        // coincidence of the drawing.
+        const facts = get().facts;
+        const constructions = variantConfigs(facts).map((vf) => replay(vf, 0).construction);
+        const result = detectShapesAcross(constructions);
+        set({ shapes: { result, facts } });
+      },
+
+      clearShapes: () => set({ shapes: null }),
 
       cycleAlt: (pointId) => {
         const facts = get().facts;
@@ -1185,7 +1241,7 @@ export const useGeoStore = create<GeoState>()(
       },
 
       clear: () => {
-        set({ facts: [], selectedId: null, seed: 0, radiusOverrides: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null });
+        set({ facts: [], selectedId: null, seed: 0, radiusOverrides: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, shapes: null });
         useGeoStore.temporal.getState().clear();
       },
     }),

@@ -65,6 +65,13 @@ describe('equal-segment ground truths', () => {
     expect(detectRelations(build('triangle ABC')).equalSegments).toEqual([]);
   });
 
+  it('the two halves of a diameter (radii OA, OB) are detected equal — IMPLICIT edges', () => {
+    // AB is a diameter through its midpoint/centre O; OA and OB are never DRAWN as segments, but they
+    // are visible halves of AB, so the broadened (on-host) segment universe finds them equal.
+    const classes = detectRelations(build('AB קוטר במעגל O')).equalSegments.map(segClassKeys);
+    expect(classes).toContainEqual(['AO', 'BO']);
+  });
+
   it('a general quadrilateral reports NO equal sides', () => {
     expect(detectRelations(build('quadrilateral ABCD')).equalSegments).toEqual([]);
   });

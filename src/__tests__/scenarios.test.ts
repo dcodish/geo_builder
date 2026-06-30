@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { parse, droppedNewLabels } from '@/parser';
 import { replay, polygonsConvex, useGeoStore, firstSatisfyingSeed, dryRunOutcome, hasDeferrableConstraint } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
-import { isGeoPoint, freeDofs, freeDofCount, applySeed, firstCyclableBranch, evaluate, circleMembers, pointNeighbors, detectRelations } from '@/engine';
+import { isGeoPoint, freeDofs, freeDofCount, applySeed, firstCyclableBranch, evaluate, circleMembers, pointNeighbors, detectRelations, detectShapes } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 import { humanizeError } from '@/i18n/humanizeError';
 
@@ -2531,6 +2531,58 @@ const SCENARIOS: Scenario[] = [
         return Math.abs((q.x - p.x) * (r.y - p.y) - (r.x - p.x) * (q.y - p.y)) / 2;
       };
       expect(areaT('A', 'B', 'F')).toBeCloseTo(2 * areaT('B', 'F', 'E'), 2);
+    },
+  },
+  {
+    id: 'emergent-parallelogram-between-segments',
+    title: 'detect shapes (FR-SH / ADR-162): a parallelogram formed BETWEEN segments (no polygon object) is detected',
+    guards:
+      'operator-reported (debug log session 177a8cfc, 2026-06-30): after "טרפז ABCD חסום במעגל" + "E על AB" + "ED מקביל ל BC", the figure contains a parallelogram EBCD (sides EB=part of AB, BC, CD, DE) but it was NOT badged, because the shape detector classified only DECLARED polygon objects. Root fix (ADR-162): a shared IMPLICIT edge universe (drawn segments + polygon edges + on-host splits + visible-line edges) feeds emergent triangle/quad cycle detection, so a shape that exists on the page without a polygon object is found. Also surfaces the genuine isosceles triangle ADE (since EBCD ∥-gram ⇒ DE=BC and the iso-trapezoid ⇒ AD=BC ⇒ AD=DE).',
+    steps: ['טרפז ABCD חסום במעגל', 'E על AB', 'ED מקביל ל BC'],
+    check(fig) {
+      allStepsOk(fig);
+      const keys = detectShapes(fig.construction).shapes.map((s) => `${s.type}:${[...s.vertices].sort().join('')}`);
+      expect(keys, 'emergent parallelogram BCDE detected').toContain('parallelogram:BCDE');
+      expect(keys, 'the declared inscribed trapezoid still classifies').toContain('isosceles-trapezoid:ABCD');
+    },
+  },
+  {
+    id: 'right-triangle-explicit-angle-reseats-right-vertex',
+    title: 'right triangle (ADR-052 / ADR-114 pattern): an explicit "∠ABC = 90" re-seats the right angle onto B',
+    guards:
+      'operator-reported (2026-06-30): "ABC משולש ישר זוית" pins the right angle at the LAST vertex C (B is built ⟂ at C), so a following "זווית ABC = 90" was refused "over-constrained: ∠ABC = 90° cannot hold". But WHICH vertex carries the right angle is UNSTATED (ADR-052), so the default must yield to the stated angle (same shape as the ADR-114 soft equal-pair). Root fix: a store pre-scan reorders the right-triangle ids so an explicitly-90° vertex becomes the structural right-angle vertex; the explicit angle then holds as a passing check.',
+    steps: ['ABC משולש ישר זוית', 'זווית ABC = 90'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), '∠ABC is now the right angle').toBeCloseTo(90, 3);
+      // The right-angle KNEE is drawn at the reseated vertex B only — NOT a leftover knee at the original
+      // last vertex C (where the angle is now acute). Regression for the "weird image" (two knees) report.
+      const knees = fig.angleMarks.filter((m) => m.right);
+      expect(knees.length, 'exactly one right-angle knee').toBe(1);
+      expect(knees[0].vertex, 'the knee is at the reseated right-angle vertex B').toBe('B');
+    },
+  },
+  {
+    id: 'trapezoid-constraint-morph-flags-amber',
+    title: 'right trapezoid + "∠ABC = 90" reshapes to a rectangle — allowed but flagged amber (ADR-165)',
+    guards:
+      'operator-reported (2026-06-30): "טרפז ישר זווית ABCD" (angles 90/63/117/90) then "זווית ABC = 90" silently morphed the trapezoid into a rectangle (90/90/90/90). A constraint forced the legs parallel, so the declared trapezoid is no longer one. Per the operator (allow-but-flag): the figure is geometrically valid so it is NOT refused (ADR-157 only guards re-declaring a different shape WORD), but the givens verifier now flags it amber — a declared trapezoid whose both opposite-side pairs became parallel raises figure.v.trapezoidMorph.',
+    steps: ['טרפז ישר זווית ABCD', 'זווית ABC = 90'],
+    expectViolations: true,
+    check(fig) {
+      allStepsOk(fig); // the steps APPLY cleanly — the morph is surfaced as a verifier violation, not a step error
+      expect(fig.violations.map((v) => v.messageKey)).toContain('figure.v.trapezoidMorph');
+    },
+  },
+  {
+    id: 'single-vertex-angle-on-triangle-vertex',
+    title: 'single-vertex angle (ADR-164): "זווית B = 90" resolves its arms when B has exactly two edges',
+    guards:
+      'feature (2026-06-30): a student naming an angle by ONE vertex ("∠B = 90") instead of three. The parser now resolves the arms from the figure when the vertex has exactly two edges (one possible angle) — here B in triangle ABC joins A and C — so ∠ABC is set to 90° without spelling all three letters. (When the vertex has >2 edges the parser instead returns an "ambiguous-angle" clarification asking for three letters — covered by parser/__tests__/single-vertex-angle.test.ts.)',
+    steps: ['משולש ABC', 'זווית B = 90'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), '∠ABC = 90° from the single-vertex form').toBeCloseTo(90, 3);
     },
   },
 ];

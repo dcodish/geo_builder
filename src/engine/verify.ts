@@ -197,6 +197,34 @@ export function checkGivens(
     }
   }
 
+  // A declared TRAPEZOID's identity is "exactly ONE pair of opposite sides is parallel" — its legs must NOT
+  // become parallel. A later constraint (e.g. "∠ABC = 90" on a right trapezoid that already has ∠A = ∠D = 90)
+  // can force the second pair parallel, silently turning the trapezoid into a parallelogram/rectangle. The
+  // figure is geometrically valid, so we don't refuse it ([ADR-157](docs/06-decisions.md#adr-157) is about
+  // re-declaring a different shape WORD); instead we flag it amber so the student sees the declared trapezoid
+  // is no longer one. (A genuine trapezoid keeps its legs clearly non-parallel, so this never false-fires.)
+  for (const cmd of commands) {
+    if (cmd.type !== 'trapezoid') continue;
+    const [a, b, c, d] = cmd.ids.map((id) => positions.get(id));
+    if (!a || !b || !c || !d) continue;
+    const par = (p: Vec, q: Vec, r: Vec, s: Vec) => {
+      const ux = q.x - p.x, uy = q.y - p.y, vx = s.x - r.x, vy = s.y - r.y;
+      const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
+      if (lu < 1e-9 || lv < 1e-9) return false;
+      return Math.abs(ux * vy - uy * vx) / (lu * lv) < Math.sin((Math.PI / 180) * 1); // within ~1°
+    };
+    if (par(a, b, c, d) && par(b, c, d, a)) {
+      const quad = cmd.ids.join('');
+      violations.push({
+        relation: 'parallel',
+        ids: cmd.ids,
+        message: `${quad} was declared a trapezoid but both pairs of opposite sides are now parallel — it is no longer a trapezoid`,
+        messageKey: 'figure.v.trapezoidMorph',
+        params: { quad },
+      });
+    }
+  }
+
   // An `extend-onto-circle` ("המשך AB onto the circle at C") asserts a DIRECTIONAL extension: the new
   // point lies BEYOND the second endpoint (order a→b→id), not between a and b. Unlike the generic order
   // SELECTORS above (which only pick a "visibly smaller" gap), the direction here is a HARD given — the

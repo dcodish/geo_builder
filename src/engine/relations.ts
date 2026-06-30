@@ -39,7 +39,7 @@ import { dist, sub, len } from './geometry';
  * graph; at the endpoint the collinear ray to this point merges (same direction) with the ray to the far
  * endpoint, so no spurious angle appears there — only the genuine angles AT the on-host point are added.
  */
-function onHostEdges(c: Construction): [Id, Id][] {
+export function onHostEdges(c: Construction): [Id, Id][] {
   const edges: [Id, Id][] = [];
   for (const o of c.objects) {
     if (o.kind === 'on-segment' || o.kind === 'on-segment-solved' || o.kind === 'midpoint') edges.push([o.id, o.a], [o.id, o.b]);
@@ -48,7 +48,7 @@ function onHostEdges(c: Construction): [Id, Id][] {
   return edges;
 }
 
-function visibleLineEdges(c: Construction): [Id, Id][] {
+export function visibleLineEdges(c: Construction): [Id, Id][] {
   const byId = new Map(c.objects.map((o) => [o.id, o] as const));
   const isPt = (id: Id) => byId.has(id) && isGeoPoint(byId.get(id)!);
   const edges: [Id, Id][] = [];
@@ -69,6 +69,31 @@ function visibleLineEdges(c: Construction): [Id, Id][] {
     for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) edges.push([arr[i], arr[j]]);
   }
   return edges;
+}
+
+/**
+ * The figure's **implicit edge universe** — every point-to-point connection a student visibly sees,
+ * canonicalised (a ≤ b) and deduped: the drawn `segment`s + polygon edges (`pointNeighbors`), the
+ * on-host splits (`onHostEdges` — e.g. `O–A`/`O–B` for a diameter midpoint `O`, `E–B` for `E` on `AB`),
+ * and the points sharing a drawn `line` (`visibleLineEdges`). This is the SAME set the equal-angle
+ * universe already uses; sharing it lets equal-segment detection and emergent-shape detection see the
+ * implicit geometry too (radii of a diameter, a parallelogram between segments), not only declarations.
+ */
+export function figureEdges(c: Construction): [Id, Id][] {
+  const nb = pointNeighbors(c);
+  const seen = new Set<string>();
+  const out: [Id, Id][] = [];
+  const add = (x: Id, y: Id) => {
+    if (x === y) return;
+    const [lo, hi] = x < y ? [x, y] : [y, x];
+    const key = `${lo}|${hi}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push([lo, hi]);
+  };
+  for (const [v, list] of Object.entries(nb)) for (const w of list) add(v, w);
+  for (const [x, y] of [...visibleLineEdges(c), ...onHostEdges(c)]) add(x, y);
+  return out;
 }
 
 /** An undirected segment by its two endpoints, canonical order (a ≤ b). */
@@ -171,19 +196,10 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
 
   const nb = pointNeighbors(c0);
 
-  // 2. The segment universe — the figure's edges (segment + polygon), canonicalised and deduped.
-  const segs: SegmentRef[] = [];
-  const segSeen = new Set<string>();
-  for (const [v, list] of Object.entries(nb)) {
-    for (const w of list) {
-      const [lo, hi] = v < w ? [v, w] : [w, v];
-      const key = `${lo}|${hi}`;
-      if (!segSeen.has(key)) {
-        segSeen.add(key);
-        segs.push([lo, hi]);
-      }
-    }
-  }
+  // 2. The segment universe — the figure's IMPLICIT edges (drawn segments + polygon edges + on-host
+  //    splits + visible-line edges), the same universe the angle pass uses. The on-host splits are what
+  //    let `OA`/`OB` (the two halves of a diameter through its midpoint `O`) be detected as equal radii.
+  const segs: SegmentRef[] = figureEdges(c0);
   // Length of each segment in each sample (NaN where a point is missing / the segment is degenerate).
   const segLen: number[][] = segs.map(([a, b]) =>
     samples.map((p) => {

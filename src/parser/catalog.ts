@@ -53,6 +53,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'shapes', supported: true, en: 'isosceles triangle ABC', he: 'משולש שווה שוקיים ABC', descEn: 'An isosceles triangle (|AB|=|AC|, apex A).', descHe: 'משולש שווה שוקיים (|AB|=|AC|, ראש A).' },
   { category: 'shapes', supported: true, en: 'equilateral triangle ABC', he: 'משולש שווה צלעות ABC', descEn: 'An equilateral triangle (all sides equal).', descHe: 'משולש שווה צלעות (כל הצלעות שוות).' },
   { category: 'shapes', supported: true, en: 'isosceles trapezoid ABCD', he: 'טרפז שווה שוקיים ABCD', descEn: 'An isosceles trapezoid (AB∥DC, equal legs |AD|=|BC|).', descHe: 'טרפז שווה שוקיים (AB∥DC, שוקיים שוות |AD|=|BC|).' },
+  { category: 'shapes', supported: true, en: 'right trapezoid ABCD', he: 'טרפז ישר-זווית ABCD', descEn: 'A right trapezoid (AB∥DC, a leg ⟂ the bases — right angles at A and D).', descHe: 'טרפז ישר-זווית (AB∥DC, שוק מאונך לבסיסים — זוויות ישרות ב-A וב-D).' },
   { category: 'shapes', supported: true, en: 'regular pentagon ABCDE', he: 'מחומש משוכלל ABCDE', descEn: 'A regular polygon — equal sides and angles (pentagon/hexagon/…).', descHe: 'מצולע משוכלל — צלעות וזוויות שוות (מחומש/משושה/…).' },
 
   // ── Points ──────────────────────────────────────────────────────────────

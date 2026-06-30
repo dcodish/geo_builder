@@ -23,7 +23,11 @@ import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, t
 
 export type ParseResult =
   | { ok: true; commands: AnyCommand[] }
-  | { ok: false; reason: 'not-handled' };
+  | { ok: false; reason: 'not-handled' }
+  // A rule recognised an angle named by a SINGLE vertex ("∠B = 90") but the figure has ≠2 edges there, so
+  // WHICH angle is meant is ambiguous (or its arms don't exist yet). Surfaced as a clarification — "name all
+  // three letters" — NOT escalated to the LLM (which would only guess). `vertex` is the named vertex.
+  | { ok: false; reason: 'ambiguous-angle'; vertex: string };
 
 /**
  * Figure context the parser may consult to resolve implicit references — chiefly
@@ -64,7 +68,10 @@ const NO_CONTEXT: ParseContext = {};
  * letting a weaker rule half-parse the utterance. A half-parse that silently
  * drops part of a fact is worse than a miss — it draws a wrong figure.
  */
-type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop';
+/** A rule recognised the input but needs the student to disambiguate (see `ParseResult` 'ambiguous-angle').
+ *  Returned in place of commands; `parse` turns it into the matching `{ ok:false }` clarification result. */
+type Clarify = { clarify: 'ambiguous-angle'; vertex: string };
+type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
 /** A captured token is a real vertex label only if it's already UPPERCASE (the parser's convention).
@@ -385,6 +392,20 @@ const isoscelesTrapezoid = shapeMacro(
   ],
 );
 
+/** "right trapezoid ABCD" / "טרפז ישר זווית ABCD" → a trapezoid (AB∥DC) + one leg ⟂ the bases (AD ⟂ AB),
+ *  yielding the two right angles at A and D. Fires only when BOTH the right-angle and trapezoid keywords are
+ *  present (either order). MUST precede `rightTriangle` in the rule list — that rule's guard matches a bare
+ *  "ישר זווית"/"right", so "טרפז ישר זווית ABCD" would otherwise be mis-claimed as a 3-vertex right triangle. */
+const rightTrapezoid = shapeMacro(
+  /(?:right[\s-]?(?:angled?\s*)?|ישר[\s-]?זוו?ית)[\s\S]*(?:trapezoid|trapezium|טרפז)|(?:trapezoid|trapezium|טרפז)[\s\S]*(?:right[\s-]?(?:angled?\s*)?|ישר[\s-]?זוו?ית)/i,
+  /right[\s-]?angled|right[\s-]?angle|right|ישר[\s-]?זוו?ית|זוו?ית|ישרה|trapezoid|trapezium|טרפז/gi,
+  4,
+  (ids) => [
+    { type: 'trapezoid', ids: [ids[0], ids[1], ids[2], ids[3]] },
+    { type: 'set-perpendicular', a: ids[0], b: ids[3], c: ids[0], d: ids[1] }, // AD ⟂ AB ⇒ right angles at A and D
+  ],
+);
+
 /**
  * "the midsegment to BC in triangle ABC" / "קטע האמצעים לצלע BC במשולש ABC" — the segment joining the
  * midpoints of the two sides meeting at the apex (the triangle vertex NOT on the named base). Decomposes
@@ -672,18 +693,39 @@ const pointOnExtension: Rule = (s, ctx) => {
  * even on a standalone configuration; `segment` is idempotent, so on an existing corner where the
  * arms are already edges these are no-ops (mirrors the ∥/⟂ draw-its-segments convenience, FR-IN-7).
  */
-const angle: Rule = (s) => {
+const angle: Rule = (s, ctx) => {
   if (!/(?:angle|∠|זוו?ית)/i.test(s)) return null;
   const stripped = s.replace(/angle|∠|זוו?ית/gi, ' ');
-  const ids = labelRun(stripped, 3);
   const valM = stripped.match(new RegExp(num));
-  if (!ids || !valM) return null;
-  const [r1, v, r2] = ids;
-  return [
-    { type: 'segment', a: v, b: r1 },
-    { type: 'segment', a: v, b: r2 },
-    { type: 'set-angle', vertex: v, ray1: r1, ray2: r2, value: parseFloat(valM[1]) },
-  ];
+  if (!valM) return null; // no degree value → not this rule (an equality/ratio is handled upstream)
+  const value = parseFloat(valM[1]);
+  const ids = labelRun(stripped, 3);
+  if (ids) {
+    const [r1, v, r2] = ids;
+    return [
+      { type: 'segment', a: v, b: r1 },
+      { type: 'segment', a: v, b: r2 },
+      { type: 'set-angle', vertex: v, ray1: r1, ray2: r2, value },
+    ];
+  }
+  // SINGLE-vertex form — "∠B = 90" / "זווית B = 90". Only well-defined when the named vertex has EXACTLY two
+  // edges in the figure (one possible angle): resolve its arms from `ctx.neighbors`. With a different number
+  // of edges (more = several angles to choose between; fewer = no arms to use) the intended angle is
+  // ambiguous, so ASK the student to name all three letters rather than guessing or escalating to the LLM.
+  // Gated to a CLEAN single-label utterance (exactly one label besides the value) so compounds fall through.
+  const one = labelRun(stripped, 1);
+  const labelCount = (stripped.match(/[A-Z]\d*/g) ?? []).length;
+  if (!one || labelCount !== 1) return null;
+  const v = one[0];
+  const nb = (ctx.neighbors ?? {})[v] ?? [];
+  if (nb.length === 2) {
+    return [
+      { type: 'segment', a: v, b: nb[0] },
+      { type: 'segment', a: v, b: nb[1] },
+      { type: 'set-angle', vertex: v, ray1: nb[0], ray2: nb[1], value },
+    ];
+  }
+  return { clarify: 'ambiguous-angle', vertex: v };
 };
 
 /**
@@ -3493,6 +3535,7 @@ const RULES: Rule[] = [
   rectangle,
   rhombus,
   kite, // "kite ABCD" / "דלתון ABCD" — a special quad (decomposes to quad + equal adjacent sides)
+  rightTrapezoid, // before `trapezoid` AND before `rightTriangle` (whose guard also matches a bare "ישר זווית")
   isoscelesTrapezoid, // before `trapezoid` ("isosceles trapezoid" contains "trapezoid"/"טרפז")
   trapezoid,
   quadrilateral,
@@ -3690,9 +3733,11 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
   const s = normalizeAreaSubscript(normalizeGreek(raw.trim().replace(/\s+/g, ' ')));
   if (!s) return { ok: false, reason: 'not-handled' };
   for (const rule of RULES) {
-    const commands = rule(s, ctx);
-    if (commands === 'stop') break; // recognised but unreadable — escalate, don't half-parse
-    if (commands) return { ok: true, commands: withImplicitCircles(withChordMembership(commands, s, ctx), ctx) };
+    const res = rule(s, ctx);
+    if (res === 'stop') break; // recognised but unreadable — escalate, don't half-parse
+    if (!res) continue;
+    if (Array.isArray(res)) return { ok: true, commands: withImplicitCircles(withChordMembership(res, s, ctx), ctx) };
+    return { ok: false, reason: res.clarify, vertex: res.vertex }; // a clarification request (e.g. ambiguous single-vertex angle)
   }
   return { ok: false, reason: 'not-handled' };
 }

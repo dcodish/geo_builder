@@ -592,3 +592,23 @@ over all four (ADR-041).
 **Steps:** `מרובע חסום במעגל`
 **Guards against:** an unlabeled polygon ("quadrilateral inscribed in a circle", no vertex labels) falling through the deterministic parser to the LLM. Every polygon rule required an explicit label run (only `circle`/`מעגל` worked bare). Fix (ADR-132): a shape rule with NO labels and nothing else geometry-significant left over auto-names its vertices A,B,C,… (skipping existing points), across the standalone, inscribed, named-macro and regular-polygon families, He + En. A partial label run (`מרובע ABC`) still escalates.
 **Asserts:** all steps OK; the four auto-named vertices A,B,C,D all lie on the auto-centred circle O; a quadrilateral was built.
+
+### `emergent-parallelogram-between-segments` — a parallelogram with no polygon object is detected (ADR-162)
+**Steps:** `טרפז ABCD חסום במעגל` · `E על AB` · `ED מקביל ל BC`
+**Guards against:** the shape detector seeing only DECLARED polygon objects, so a parallelogram EBCD formed BETWEEN segments (sides EB=part of AB, BC, CD, DE) — never declared as a polygon — was never badged. Fix (ADR-162): a shared implicit-edge universe (drawn segments + polygon edges + on-host splits + visible-line edges) feeds emergent triangle/quad cycle detection (conservative: named special types only, simple in every sample).
+**Asserts:** all steps OK; `detectShapes` includes `parallelogram` on {B,C,D,E} and the declared `isosceles-trapezoid` on {A,B,C,D}.
+
+### `right-triangle-explicit-angle-reseats-right-vertex` — an explicit "∠ABC = 90" re-seats the right angle (ADR-163)
+**Steps:** `ABC משולש ישר זוית` · `זווית ABC = 90`
+**Guards against:** `right-triangle ABC` pinning the right angle at the LAST vertex C structurally (B is built ⟂ at C), so a following `זווית ABC = 90` on a different vertex collided with the structural ∠C=90 and was refused "over-constrained". WHICH vertex is the right one is UNSTATED (ADR-052), so the default must yield to the stated angle (same shape as the ADR-114 soft equal-pair). Fix (ADR-163): a position-independent `replay` pre-scan reorders the right-triangle ids so an explicitly-90° vertex becomes the structural right-angle vertex; the explicit angle then holds as a passing check.
+**Asserts:** all steps OK; ∠ABC ≈ 90°.
+
+### `single-vertex-angle-on-triangle-vertex` — "זווית B = 90" resolves arms from the figure (ADR-164)
+**Steps:** `משולש ABC` · `זווית B = 90`
+**Guards against:** requiring all three letters to state an angle. The parser now resolves a single-vertex angle's two arms from the figure when the vertex has EXACTLY two edges (one possible angle — here B joins A and C in triangle ABC), so ∠ABC is set to 90° without spelling all three letters. When the vertex has >2 edges the parser returns an `ambiguous-angle` clarification asking for three letters instead of guessing or escalating to the LLM (covered by `parser/__tests__/single-vertex-angle.test.ts`).
+**Asserts:** all steps OK; ∠ABC ≈ 90°.
+
+### `trapezoid-constraint-morph-flags-amber` — a constraint that morphs a trapezoid is flagged amber (ADR-165)
+**Steps:** `טרפז ישר זווית ABCD` · `זווית ABC = 90`
+**Guards against:** a constraint silently morphing a declared named shape into a different one shown as clean green. A right trapezoid (90/63/117/90) + `∠ABC = 90` forces the legs parallel → a rectangle (90/90/90/90). ADR-157 only guards re-declaring a different shape WORD; a constraint reshape (ADR-033) slips past. Operator decision (allow-but-flag): the figure is geometrically valid so it is NOT refused, but the givens verifier raises `figure.v.trapezoidMorph` (a declared trapezoid whose both opposite-side pairs became parallel) through the amber channel.
+**Asserts:** all steps apply OK; `violations` contains `figure.v.trapezoidMorph` (so this scenario sets `expectViolations`).

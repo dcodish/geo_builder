@@ -37,6 +37,7 @@
     },
     "producedNothing": "I understood that but it didn't build anything on the figure — I tried rephrasing it too. Check the names/relations, or word it differently.",
     "alreadyDrawn": "That's already on the figure — nothing to add.",
+    "ambiguousAngle": "There's more than one angle at {{vertex}}, so I can't tell which one you mean. Name all three letters of the angle — e.g. \"∠A{{vertex}}C = 90\".",
     "partial": "Couldn't draw this part",
     "rename_no-source": "There's no point {{from}} to rename.",
     "rename_target-taken": "{{to}} is already a point — pick a free letter, or swap them (click the segment → Swap endpoints, or type \"swap {{from}} and {{to}}\").",
@@ -99,7 +100,8 @@
       "constraint": "{{desc}} does not hold in the final figure",
       "circlesTangent": "circles {{c1}} and {{c2}} should be {{kind}}ly tangent (centres {{target}} apart) but they are {{dist}} apart",
       "orderBeyond": "{{id}} should lie on the extension of {{seg}} beyond {{b}}, but it landed between {{a}} and {{b}}",
-      "collinear": "{{pts}} should be collinear, but {{point}} is {{offset}} off the line"
+      "collinear": "{{pts}} should be collinear, but {{point}} is {{offset}} off the line",
+      "trapezoidMorph": "{{quad}} was declared a trapezoid, but both pairs of opposite sides are now parallel — it is no longer a trapezoid. To change the shape, edit or delete the trapezoid step."
     }
   },
   "errors": {
@@ -206,5 +208,44 @@
     "perpBisector": "Perpendicular bisector",
     "midsegment": "Midsegment",
     "diagonal": "Diagonal"
+  },
+  "shapes": {
+    "detect": "Detect shapes",
+    "hide": "Hide shapes",
+    "analysing": "Detecting…",
+    "none": "No special shapes detected.",
+    "hint": "Detect the shapes the figure contains and link each to its page in the geometry book.",
+    "badgeHint": "Click for details and a book link",
+    "openInBook": "Open in the geometry book",
+    "name": {
+      "square": "Square",
+      "rectangle": "Rectangle",
+      "rhombus": "Rhombus",
+      "parallelogram": "Parallelogram",
+      "kite": "Kite",
+      "trapezoid": "Trapezoid",
+      "isosceles-trapezoid": "Isosceles trapezoid",
+      "right-trapezoid": "Right trapezoid",
+      "triangle": "Triangle",
+      "isosceles-triangle": "Isosceles triangle",
+      "equilateral-triangle": "Equilateral triangle",
+      "right-triangle": "Right triangle",
+      "circle": "Circle"
+    },
+    "def": {
+      "square": "A quadrilateral with all sides equal and all angles right.",
+      "rectangle": "A quadrilateral with all angles right.",
+      "rhombus": "A quadrilateral with all sides equal.",
+      "parallelogram": "A quadrilateral with both pairs of opposite sides parallel.",
+      "kite": "A quadrilateral with two pairs of adjacent equal sides.",
+      "trapezoid": "A quadrilateral with exactly one pair of parallel sides.",
+      "isosceles-trapezoid": "A trapezoid whose legs are equal.",
+      "right-trapezoid": "A trapezoid with a right angle (a leg perpendicular to the bases).",
+      "triangle": "A polygon with three sides.",
+      "isosceles-triangle": "A triangle with two equal sides.",
+      "equilateral-triangle": "A triangle with all sides equal.",
+      "right-triangle": "A triangle with one right angle.",
+      "circle": "The set of points in the plane at a fixed distance from a centre."
+    }
   }
 }

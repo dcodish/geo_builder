@@ -18,6 +18,8 @@ import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
 import type { Crossing } from '@/render';
+import type { DetectedShape } from '@/engine';
+import { bookUrl } from '@/shapes/shapeCatalog';
 import { Modal } from '@/ui/Modal';
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
@@ -67,6 +69,9 @@ export default function App() {
   const relations = useGeoStore((s) => s.relations);
   const viewRelations = useGeoStore((s) => s.viewRelations);
   const clearRelations = useGeoStore((s) => s.clearRelations);
+  const shapes = useGeoStore((s) => s.shapes);
+  const detectShapes = useGeoStore((s) => s.detectShapes);
+  const clearShapes = useGeoStore((s) => s.clearShapes);
   const clear = useGeoStore((s) => s.clear);
 
   const { undo, redo } = useGeoStore.temporal.getState();
@@ -78,6 +83,8 @@ export default function App() {
   const [thinking, setThinking] = useState(false); // LLM fallback in flight (Phase 7)
   const [resampling, setResampling] = useState(false); // "show another configuration" search in flight (synchronous; we paint a busy state first)
   const [analysing, setAnalysing] = useState(false); // "view relations" detection in flight (synchronous; paint a busy state first)
+  const [detecting, setDetecting] = useState(false); // "detect shapes" detection in flight (synchronous; paint a busy state first)
+  const [shapeModal, setShapeModal] = useState<DetectedShape | null>(null); // the shape badge whose book-link popup is open
   const [llmDropped, setLlmDropped] = useState<string[]>([]); // LLM steps the engine couldn't build
   const [renameNote, setRenameNote] = useState(''); // why a relabel was a no-op (target taken / no such point)
   const [altNote, setAltNote] = useState(''); // transient: "show another configuration" found no different drawing
@@ -299,6 +306,15 @@ export default function App() {
     await nextPaint();
     const pctx = parseCtx();
     const r = parse(utterance, pctx);
+    // A single-vertex angle ("∠B = 90") the parser flagged as ambiguous (the vertex has ≠2 edges, so WHICH
+    // angle is meant is unclear) — ask the student to name all three letters instead of escalating to the LLM
+    // (which would only guess). Keep the text so they can edit it into the three-letter form.
+    if (!r.ok && r.reason === 'ambiguous-angle') {
+      logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `ambiguous-angle:${r.vertex}` });
+      setInputNote(t('input.ambiguousAngle', { vertex: r.vertex }));
+      setThinking(false);
+      return;
+    }
     let weak: 'error' | 'empty' | 'dropped' | null = null;
     if (r.ok) {
       // A typo in a keyword (e.g. "מנוקדה" for "מנקודה") can make a rule match PARTIALLY, silently dropping
@@ -425,6 +441,9 @@ export default function App() {
   // any fact change makes a new `facts` array (≠ the cached ref), so the layer auto-clears (ADR-134). Ground
   // truths are invariant across configurations, so it deliberately survives "show another configuration".
   const relationsLayer = relations && relations.facts === facts ? relations.result : null;
+
+  // The "detect shapes" badge layer — same facts-keyed cache contract as the relations layer above.
+  const shapesLayer = shapes && shapes.facts === facts ? shapes.result : null;
 
   // Snap-to-intersection: a clicked crossing becomes a real named point. Pick the
   // first free single capital letter, then create it via the same command path.
@@ -882,6 +901,56 @@ export default function App() {
             <span style={{ fontSize: 12, color: '#64748b' }}>{t('actions.relationsNone')}</span>
           )}
 
+          {/* "Detect shapes" (FR-SH) — on press, classify every named shape the figure contains (forced
+              across samples) and list each as a badge that links to its page in the geometry book. A
+              button, not a live toggle (opt-in, same pedagogy boundary as "view relations"); a new fact
+              auto-clears the layer. */}
+          {facts.length > 0 && (
+            <button
+              type="button"
+              style={shapesLayer ? shapesBtnOn : alt}
+              disabled={detecting}
+              title={t('shapes.hint')}
+              onClick={() => {
+                if (detecting) return;
+                if (shapesLayer) {
+                  clearShapes();
+                  return;
+                }
+                setDetecting(true);
+                requestAnimationFrame(() =>
+                  requestAnimationFrame(() => {
+                    try {
+                      detectShapes();
+                    } finally {
+                      setDetecting(false);
+                    }
+                  }),
+                );
+              }}
+            >
+              {detecting ? t('shapes.analysing') : shapesLayer ? t('shapes.hide') : t('shapes.detect')}
+            </button>
+          )}
+          {shapesLayer && shapesLayer.shapes.length === 0 && (
+            <span style={{ fontSize: 12, color: '#64748b' }}>{t('shapes.none')}</span>
+          )}
+          {shapesLayer && shapesLayer.shapes.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {shapesLayer.shapes.map((sh) => (
+                <button
+                  key={`${sh.type}-${sh.label}`}
+                  type="button"
+                  style={shapeBadge}
+                  onClick={() => setShapeModal(sh)}
+                  title={t('shapes.badgeHint')}
+                >
+                  {t(`shapes.name.${sh.type}`)} {sh.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Playable degrees of freedom (first slice): a slider per free-circle radius. Dialing a value
               is a viewing scratchpad — "show another configuration" resets it. */}
           {radiusDofs.length > 0 && (
@@ -971,6 +1040,23 @@ export default function App() {
           </div>
         ) : (
           commandCatalog()
+        )}
+      </Modal>
+
+      {/* A detected-shape badge's popup (FR-SH / FR-REF-1): the shape's name, a one-line definition, and a
+          prominent link to its page in the geometry book on the same site, opening in a new tab. */}
+      <Modal
+        open={shapeModal !== null}
+        onClose={() => setShapeModal(null)}
+        title={shapeModal ? `${t(`shapes.name.${shapeModal.type}`)} ${shapeModal.label}` : ''}
+      >
+        {shapeModal && (
+          <div>
+            <p style={{ marginTop: 0 }}>{t(`shapes.def.${shapeModal.type}`)}</p>
+            <a style={bookLink} href={bookUrl(shapeModal.type)} target="_blank" rel="noopener noreferrer">
+              {t('shapes.openInBook')} ↗
+            </a>
+          </div>
         )}
       </Modal>
     </div>
@@ -1178,6 +1264,29 @@ const alt: React.CSSProperties = {
 };
 // The "view relations" button while the layer is ON — teal, matching the on-figure tick/arc colour.
 const relBtnOn: React.CSSProperties = { ...alt, border: '1px solid #0d9488', background: '#0d9488' };
+// The "detect shapes" button while the badge layer is ON — indigo, distinct from the relations teal.
+const shapesBtnOn: React.CSSProperties = { ...alt, border: '1px solid #4338ca', background: '#4338ca' };
+// A detected-shape badge chip (clickable → its book-link popup).
+const shapeBadge: React.CSSProperties = {
+  padding: '4px 10px',
+  fontSize: 13,
+  borderRadius: 999,
+  border: '1px solid #c7d2fe',
+  background: '#eef2ff',
+  color: '#3730a3',
+  cursor: 'pointer',
+};
+const bookLink: React.CSSProperties = {
+  display: 'inline-block',
+  marginTop: 8,
+  padding: '8px 14px',
+  borderRadius: 8,
+  border: '1px solid #4338ca',
+  background: '#4338ca',
+  color: '#fff',
+  textDecoration: 'none',
+  fontSize: 14,
+};
 function factRow(state: 'ok' | 'disabled' | 'broken', selected: boolean): React.CSSProperties {
   const border = selected ? '#f59e0b' : state === 'broken' ? '#fecaca' : '#e2e8f0';
   const bg = selected ? '#fffbeb' : state === 'broken' ? '#fef2f2' : '#f8fafc';
