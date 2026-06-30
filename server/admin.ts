@@ -103,13 +103,25 @@ const OUTCOME_LABELS: Record<string, string> = {
   deferred: 'נדחה (אילוץ)',
   weak: 'חלקי / נשמט',
   'llm-built': 'נותח (LLM)',
-  'not-understood': 'לא הובן',
+  'not-understood': 'לא הובן — פער אמיתי (לטיפול)',
+  'out-of-scope': 'מחוץ לתחום (לא נדרש)',
   edit: 'עריכה (שינוי שם / מיזוג)',
+};
+
+/** Hebrew labels for the out-of-scope sub-categories (the SPA's `scope:<category>` tag — see src/parser/scope.ts). */
+const SCOPE_LABELS: Record<string, string> = {
+  'angle-relation': 'יחסי זוויות / משפטים',
+  proof: 'בקשת הוכחה',
+  compute: 'בקשת חישוב / פתרון',
+  unrelated: 'לא קשור / טקסט חופשי',
 };
 
 /** Classify a `submit` event into an outcome bucket from its source + result. */
 function outcomeOf(e: UsageEvent): string {
   const r = e.result ?? 'ok';
+  // A deliberately out-of-scope input (angle relationship, proof/compute request, free text) the SPA
+  // recognised after the LLM failed — kept SEPARATE from a genuine `not-understood` gap (operator request).
+  if (e.source === 'scope') return 'out-of-scope';
   if (e.source === 'llm') return r === 'ok' ? 'llm-built' : 'not-understood';
   if (e.source === 'parser') {
     if (r.startsWith('weak')) return 'weak';
@@ -119,16 +131,29 @@ function outcomeOf(e: UsageEvent): string {
   return 'edit'; // swap / rename / merge
 }
 
+/** The out-of-scope sub-category of a `scope` event (`scope:<cat>` → `<cat>`), or null. */
+function scopeCategoryOf(e: UsageEvent): string | null {
+  if (e.source !== 'scope') return null;
+  const r = e.result ?? '';
+  return r.startsWith('scope:') ? r.slice('scope:'.length) : 'unrelated';
+}
+
 export interface Stats {
   total: number;
   sessions: number;
   visitors: number;
   submits: number;
   llmFallbacks: number;
+  /** Genuine construction gaps to IMPLEMENT (the `not-understood` bucket) — what to build next. */
+  realGaps: number;
+  /** Deliberately out-of-scope inputs we do NOT need to implement (the `out-of-scope` bucket). */
+  outOfScope: number;
   firstSeen: string | null;
   lastSeen: string | null;
   byDay: { day: string; sessions: number; submits: number }[];
   outcomes: { key: string; label: string; count: number }[];
+  /** Out-of-scope inputs broken down by sub-category (angle-relation / proof / compute / unrelated). */
+  scopeBreakdown: { key: string; label: string; count: number }[];
   langs: { he: number; en: number; other: number };
   topUtterances: { utterance: string; count: number }[];
   recent: UsageEvent[];
@@ -144,6 +169,7 @@ export function aggregate(events: UsageEvent[]): Stats {
   const visitorIds = new Set<string>();
   const byDay = new Map<string, { sessions: Set<string>; submits: number }>();
   const outcomeCount = new Map<string, number>();
+  const scopeCount = new Map<string, number>();
   const uttCount = new Map<string, number>();
   const langs = { he: 0, en: 0, other: 0 };
   let submits = 0;
@@ -168,6 +194,8 @@ export function aggregate(events: UsageEvent[]): Stats {
       bucket.submits++;
       const oc = outcomeOf(e);
       outcomeCount.set(oc, (outcomeCount.get(oc) ?? 0) + 1);
+      const sc = scopeCategoryOf(e);
+      if (sc) scopeCount.set(sc, (scopeCount.get(sc) ?? 0) + 1);
       if (e.source === 'llm') llmFallbacks++;
       if (e.locale === 'he') langs.he++;
       else if (e.locale === 'en') langs.en++;
@@ -188,6 +216,10 @@ export function aggregate(events: UsageEvent[]): Stats {
     .map((key) => ({ key, label: OUTCOME_LABELS[key], count: outcomeCount.get(key) ?? 0 }))
     .filter((o) => o.count > 0);
 
+  const scopeBreakdown = Object.keys(SCOPE_LABELS)
+    .map((key) => ({ key, label: SCOPE_LABELS[key], count: scopeCount.get(key) ?? 0 }))
+    .filter((o) => o.count > 0);
+
   const topUtterances = [...uttCount.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 15)
@@ -204,10 +236,13 @@ export function aggregate(events: UsageEvent[]): Stats {
     visitors: visitorIds.size,
     submits,
     llmFallbacks,
+    realGaps: outcomeCount.get('not-understood') ?? 0,
+    outOfScope: outcomeCount.get('out-of-scope') ?? 0,
     firstSeen,
     lastSeen,
     byDay: last30,
     outcomes,
+    scopeBreakdown,
     langs,
     topUtterances,
     recent,
@@ -368,9 +403,16 @@ function dashboard(base: string, s: Stats, releases: string[], cur: Filter, pres
        ${card(s.sessions, 'כניסות (sessions)')}
        ${card(s.submits, 'פעולות / משפטים')}
        ${card(s.llmFallbacks, 'נפילה ל-LLM')}
+       ${card(s.realGaps, 'פערים אמיתיים (לטיפול)')}
+       ${card(s.outOfScope, 'מחוץ לתחום (לא נדרש)')}
      </div>
      <div class="panel"><h2>פעילות יומית (30 ימים אחרונים)</h2>${dailyChart(s.byDay)}</div>
      <div class="panel"><h2>תוצאות ניתוח</h2>${outcomeBars(s.outcomes)}</div>
+     ${
+       s.scopeBreakdown.length
+         ? `<div class="panel"><h2>מחוץ לתחום — לפי סוג (לא נדרש מימוש)</h2>${outcomeBars(s.scopeBreakdown)}</div>`
+         : ''
+     }
      <div class="panel"><h2>שפה</h2>
        <table><tr><td>עברית</td><td class="muted">${s.langs.he}</td></tr>
        <tr><td>אנגלית</td><td class="muted">${s.langs.en}</td></tr>

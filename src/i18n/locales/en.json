@@ -29,6 +29,12 @@
     "send": "Add",
     "loading": "Thinking...",
     "notUnderstood": "I couldn't read that yet — try one of the examples below.",
+    "scope": {
+      "angle-relation": "That's an angle relationship the tool highlights for you once you draw the figure (e.g. two parallel lines and a transversal) — not something to type. Draw the figure and the relationships appear on their own.",
+      "proof": "The tool draws figures and surfaces relevant theorems — it doesn't write proofs. Enter the givens and the relevant theorems will appear as you build.",
+      "compute": "The tool draws the figure from the givens — it doesn't compute values or solve the problem. Enter the givens (lengths, angles, ratios) and the figure is built.",
+      "unrelated": "No geometric construction detected here. Describe a shape or a given — e.g. \"triangle ABC\" or \"point D on AB\"."
+    },
     "producedNothing": "I understood that but it didn't build anything on the figure — I tried rephrasing it too. Check the names/relations, or word it differently.",
     "alreadyDrawn": "That's already on the figure — nothing to add.",
     "partial": "Couldn't draw this part",

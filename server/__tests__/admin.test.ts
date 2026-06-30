@@ -140,6 +140,9 @@ describe('aggregate', () => {
     { serverTs: '2026-06-21T11:00:00Z', iph: 'h2', ev: 'session', sid: 's2' },
     { serverTs: '2026-06-21T11:01:00Z', iph: 'h2', ev: 'submit', sid: 's2', utterance: 'draw a weird thing', locale: 'en', source: 'llm', result: 'ok' },
     { serverTs: '2026-06-21T11:02:00Z', iph: 'h2', ev: 'submit', sid: 's2', utterance: 'gibberish xyz', locale: 'en', source: 'llm', result: 'not-understood' },
+    // Two deliberately out-of-scope inputs (the SPA tags these `scope:<category>`, source 'scope').
+    { serverTs: '2026-06-21T11:03:00Z', iph: 'h2', ev: 'submit', sid: 's2', utterance: 'זוויות מתחלפות', locale: 'he', source: 'scope', result: 'scope:angle-relation' },
+    { serverTs: '2026-06-21T11:04:00Z', iph: 'h2', ev: 'submit', sid: 's2', utterance: 'הוכח שהמשולש שווה שוקיים', locale: 'he', source: 'scope', result: 'scope:proof' },
   ];
 
   let s: Stats;
@@ -153,19 +156,32 @@ describe('aggregate', () => {
   });
 
   it('counts submits and LLM fallbacks', () => {
-    expect(s.submits).toBe(4);
-    expect(s.llmFallbacks).toBe(2);
+    expect(s.submits).toBe(6);
+    expect(s.llmFallbacks).toBe(2); // the two `scope` events are NOT LLM fallbacks
   });
 
   it('classifies outcomes from source + result', () => {
     const by = Object.fromEntries(s.outcomes.map((o) => [o.key, o.count]));
     expect(by.parsed).toBe(2);
     expect(by['llm-built']).toBe(1);
-    expect(by['not-understood']).toBe(1);
+    expect(by['not-understood']).toBe(1); // a genuine gap — NOT inflated by the out-of-scope inputs
+    expect(by['out-of-scope']).toBe(2);
+  });
+
+  it('separates real gaps (to implement) from out-of-scope (no need)', () => {
+    expect(s.realGaps).toBe(1); // only the genuine `not-understood`
+    expect(s.outOfScope).toBe(2);
+  });
+
+  it('breaks out-of-scope down by sub-category', () => {
+    const by = Object.fromEntries(s.scopeBreakdown.map((o) => [o.key, o.count]));
+    expect(by['angle-relation']).toBe(1);
+    expect(by.proof).toBe(1);
+    expect(by.compute).toBeUndefined(); // none in the sample → filtered out
   });
 
   it('splits language and ranks top utterances', () => {
-    expect(s.langs.he).toBe(2);
+    expect(s.langs.he).toBe(4);
     expect(s.langs.en).toBe(2);
     expect(s.topUtterances[0]).toEqual({ utterance: 'ריבוע ABCD', count: 2 });
   });
@@ -176,8 +192,8 @@ describe('aggregate', () => {
   });
 
   it('returns recent submits newest-first', () => {
-    expect(s.recent[0].utterance).toBe('gibberish xyz');
-    expect(s.recent).toHaveLength(4);
+    expect(s.recent[0].utterance).toBe('הוכח שהמשולש שווה שוקיים');
+    expect(s.recent).toHaveLength(6);
   });
 
   it('handles an empty log without throwing', () => {

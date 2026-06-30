@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { circleMembers, firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, pointNeighbors, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels, classifyOutOfScope } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -382,6 +382,19 @@ export default function App() {
     const llmCmds = out ? out.built.flatMap((g) => g.commands) : [];
     const llmBuilds = out !== null && out.built.length > 0 && dryRunOutcome(facts, llmCmds, seed, radiusOverrides).produced;
     if (!llmBuilds) {
+      // Both the grammar AND the LLM failed to BUILD anything. Distinguish a deliberately OUT-OF-SCOPE
+      // concept — a named angle/theorem relationship, a proof or compute request, or pure free text —
+      // from a GENUINE construction gap we should still implement. The out-of-scope cases get a tailored,
+      // pedagogical message (what to do instead) and a `scope:<category>` analytics tag, so the admin
+      // dashboard separates "no need to implement" from "real gap to build" (operator request). A real
+      // gap keeps the plain "couldn't read that" message and the `not-understood` tag.
+      const scope = classifyOutOfScope(utterance);
+      if (scope) {
+        logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${scope.category}` });
+        setInputNote(t(scope.messageKey));
+        setThinking(false);
+        return;
+      }
       logDebug({ kind: 'input', utterance, locale, source: 'llm', result: out && out.built.length ? 'built-nothing' : 'not-understood' });
       // "produced nothing even after a retry" gets the explicit problem message; pure out-of-grammar
       // (the grammar never matched) keeps the gentler "couldn't read that — try an example".
