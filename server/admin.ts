@@ -154,9 +154,20 @@ export interface Stats {
   outcomes: { key: string; label: string; count: number }[];
   /** Out-of-scope inputs broken down by sub-category (angle-relation / proof / compute / unrelated). */
   scopeBreakdown: { key: string; label: string; count: number }[];
+  /** Drill-down lists (the actual utterances) behind the real-gap and out-of-scope cards — grouped + counted. */
+  gapUtterances: DrillRow[];
+  scopeUtterances: DrillRow[];
   langs: { he: number; en: number; other: number };
   topUtterances: { utterance: string; count: number }[];
   recent: UsageEvent[];
+}
+
+/** One row of a card's drill-down list: a distinct utterance with how often it appeared. */
+export interface DrillRow {
+  utterance: string;
+  count: number;
+  locale: string;
+  lastSeen: string;
 }
 
 function day(ts: string | undefined): string {
@@ -171,6 +182,9 @@ export function aggregate(events: UsageEvent[]): Stats {
   const outcomeCount = new Map<string, number>();
   const scopeCount = new Map<string, number>();
   const uttCount = new Map<string, number>();
+  // Per-utterance drill maps behind the real-gap / out-of-scope cards.
+  const gapMap = new Map<string, { count: number; locale: string; lastSeen: string }>();
+  const scopeUttMap = new Map<string, { count: number; locale: string; lastSeen: string }>();
   const langs = { he: 0, en: 0, other: 0 };
   let submits = 0;
   let llmFallbacks = 0;
@@ -202,6 +216,18 @@ export function aggregate(events: UsageEvent[]): Stats {
       else langs.other++;
       const u = (e.utterance ?? '').trim();
       if (u) uttCount.set(u, (uttCount.get(u) ?? 0) + 1);
+      // Accumulate the per-utterance drill list for whichever card this falls under.
+      const drill = oc === 'not-understood' ? gapMap : oc === 'out-of-scope' ? scopeUttMap : null;
+      if (drill && u) {
+        const ts2 = e.serverTs ?? e.t ?? '';
+        const g = drill.get(u) ?? { count: 0, locale: e.locale ?? '', lastSeen: '' };
+        g.count++;
+        if (ts2 >= g.lastSeen) {
+          g.lastSeen = ts2;
+          g.locale = e.locale ?? g.locale;
+        }
+        drill.set(u, g);
+      }
     }
     byDay.set(d, bucket);
   }
@@ -219,6 +245,15 @@ export function aggregate(events: UsageEvent[]): Stats {
   const scopeBreakdown = Object.keys(SCOPE_LABELS)
     .map((key) => ({ key, label: SCOPE_LABELS[key], count: scopeCount.get(key) ?? 0 }))
     .filter((o) => o.count > 0);
+
+  // Drill lists: distinct utterances, most-frequent first then most-recent, capped so the page stays lean.
+  const toDrill = (m: Map<string, { count: number; locale: string; lastSeen: string }>): DrillRow[] =>
+    [...m.entries()]
+      .map(([utterance, v]) => ({ utterance, count: v.count, locale: v.locale, lastSeen: v.lastSeen }))
+      .sort((a, b) => b.count - a.count || (a.lastSeen < b.lastSeen ? 1 : -1))
+      .slice(0, 200);
+  const gapUtterances = toDrill(gapMap);
+  const scopeUtterances = toDrill(scopeUttMap);
 
   const topUtterances = [...uttCount.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -243,16 +278,30 @@ export function aggregate(events: UsageEvent[]): Stats {
     byDay: last30,
     outcomes,
     scopeBreakdown,
+    gapUtterances,
+    scopeUtterances,
     langs,
     topUtterances,
     recent,
   };
 }
 
-/** Dashboard filter state, parsed from the query string (`?since=YYYY-MM-DD&rel=<build>`). */
+/** Dashboard filter state, parsed from the query string (`?since=YYYY-MM-DD&rel=<build>&view=gaps`). */
 export interface Filter {
   since?: string;
   rel?: string;
+  /** Which card's drill-down list is open (`gaps` / `scope`), if any. Not a data filter — a view toggle. */
+  view?: string;
+}
+
+/** Build a dashboard query string from the filter (+ overrides), dropping empties. `view:undefined` closes a drill. */
+function queryString(cur: Filter, extra: Partial<Filter> = {}): string {
+  const f = { ...cur, ...extra };
+  const parts: string[] = [];
+  if (f.since) parts.push(`since=${encodeURIComponent(f.since)}`);
+  if (f.rel && f.rel !== 'all') parts.push(`rel=${encodeURIComponent(f.rel)}`);
+  if (f.view) parts.push(`view=${encodeURIComponent(f.view)}`);
+  return parts.length ? `?${parts.join('&')}` : '';
 }
 
 /** Keep only events matching the filter: on/after `since` (by day) and/or from a specific release `rel`. */
@@ -294,6 +343,10 @@ const PAGE_HEAD = `<!doctype html><html lang="he" dir="rtl"><head><meta charset=
   .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px;flex:1 1 140px;min-width:140px}
   .card .n{font-size:26px;font-weight:700}
   .card .l{font-size:12px;color:#6b7280;margin-top:2px}
+  a.cardlink{text-decoration:none;color:inherit;cursor:pointer;transition:border-color .12s,box-shadow .12s}
+  a.cardlink:hover{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.15)}
+  a.cardlink.active{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.25)}
+  a.cardlink .l::after{content:' ›';color:#3b82f6}
   .panel{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 18px;margin-bottom:20px}
   .panel h2{font-size:15px;margin:0 0 12px}
   table{width:100%;border-collapse:collapse;font-size:13px}
@@ -338,6 +391,27 @@ function card(n: string | number, l: string): string {
   return `<div class="card"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></div>`;
 }
 
+/** A CLICKABLE card that toggles a drill-down view (e.g. the real-gap list). `active` when its view is open. */
+function cardLink(n: string | number, l: string, href: string, active: boolean): string {
+  return `<a class="card cardlink${active ? ' active' : ''}" href="${esc(href)}"><div class="n">${esc(n)}</div><div class="l">${esc(l)}</div></a>`;
+}
+
+/** The drill-down list behind a clickable card: distinct utterances + counts, newest column, with a close link. */
+function drillPanel(title: string, rows: DrillRow[], closeHref: string, fmt: (ts: string | null) => string): string {
+  const head = `<div class="top" style="margin-bottom:8px"><h2 style="flex:1;margin:0">${esc(title)}</h2><a class="chip" href="${esc(closeHref)}">סגירה ✕</a></div>`;
+  if (!rows.length) return `<div class="panel">${head}<div class="muted">אין פריטים בטווח/הסינון הנוכחי 🎉</div></div>`;
+  const trs = rows
+    .map(
+      (r) =>
+        `<tr><td><code>${esc(r.utterance)}</code></td><td>${r.count}</td>
+         <td class="muted">${esc(r.locale)}</td><td class="muted">${esc(fmt(r.lastSeen || null))}</td></tr>`,
+    )
+    .join('');
+  return `<div class="panel">${head}
+    <table><tr><th>משפט</th><th style="width:60px">פעמים</th><th style="width:50px">שפה</th><th style="width:130px">נראה לאחרונה</th></tr>
+    ${trs}</table></div>`;
+}
+
 function dailyChart(byDay: Stats['byDay']): string {
   if (!byDay.length) return '<div class="muted">אין נתונים עדיין</div>';
   const max = Math.max(1, ...byDay.map((d) => d.submits));
@@ -373,15 +447,18 @@ function filterBar(base: string, releases: string[], cur: Filter, presets: { lab
   const relOpts = ['all', ...releases]
     .map((r) => `<option value="${esc(r)}"${(cur.rel ?? 'all') === r ? ' selected' : ''}>${r === 'all' ? 'כל הגרסאות' : esc(r)}</option>`)
     .join('');
-  const keepRel = cur.rel && cur.rel !== 'all' ? `&rel=${encodeURIComponent(cur.rel)}` : '';
-  const chips = presets.map((p) => `<a class="chip" href="${esc(base)}?since=${esc(p.since)}${keepRel}">${esc(p.label)}</a>`).join(' ');
+  // Preset chips and the form keep the open drill view, so changing the date/release re-filters the
+  // drill list in place (the operator's "the drill should take the filter into account").
+  const chips = presets.map((p) => `<a class="chip" href="${esc(base)}${esc(queryString(cur, { since: p.since }))}">${esc(p.label)}</a>`).join(' ');
   const active = !!(cur.since || (cur.rel && cur.rel !== 'all'));
+  const keepView = cur.view ? `<input type="hidden" name="view" value="${esc(cur.view)}">` : '';
   return `<form class="filters" method="get" action="${esc(base)}">
       <label>גרסה <select name="rel">${relOpts}</select></label>
       <label>מתאריך <input type="date" name="since" value="${esc(cur.since ?? '')}"></label>
+      ${keepView}
       <button type="submit">סנן</button>
       ${chips}
-      ${active ? `<a class="chip" href="${esc(base)}">איפוס הכל</a>` : ''}
+      ${active ? `<a class="chip" href="${esc(base)}${esc(queryString({ view: cur.view }))}">איפוס הכל</a>` : ''}
     </form>`;
 }
 
@@ -403,9 +480,16 @@ function dashboard(base: string, s: Stats, releases: string[], cur: Filter, pres
        ${card(s.sessions, 'כניסות (sessions)')}
        ${card(s.submits, 'פעולות / משפטים')}
        ${card(s.llmFallbacks, 'נפילה ל-LLM')}
-       ${card(s.realGaps, 'פערים אמיתיים (לטיפול)')}
-       ${card(s.outOfScope, 'מחוץ לתחום (לא נדרש)')}
+       ${cardLink(s.realGaps, 'פערים אמיתיים (לטיפול)', `${esc(base)}${queryString(cur, { view: cur.view === 'gaps' ? undefined : 'gaps' })}`, cur.view === 'gaps')}
+       ${cardLink(s.outOfScope, 'מחוץ לתחום (לא נדרש)', `${esc(base)}${queryString(cur, { view: cur.view === 'scope' ? undefined : 'scope' })}`, cur.view === 'scope')}
      </div>
+     ${
+       cur.view === 'gaps'
+         ? drillPanel('פערים אמיתיים — משפטים שלא הובנו (לטיפול)', s.gapUtterances, `${esc(base)}${queryString(cur, { view: undefined })}`, fmt)
+         : cur.view === 'scope'
+           ? drillPanel('מחוץ לתחום — משפטים שזוהו כלא-נדרשים', s.scopeUtterances, `${esc(base)}${queryString(cur, { view: undefined })}`, fmt)
+           : ''
+     }
      <div class="panel"><h2>פעילות יומית (30 ימים אחרונים)</h2>${dailyChart(s.byDay)}</div>
      <div class="panel"><h2>תוצאות ניתוח</h2>${outcomeBars(s.outcomes)}</div>
      ${
@@ -499,9 +583,14 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
   if (!authed) return send(res, 200, loginPage(base, false));
 
   const all = await readEvents(opts.logPath ?? eventsLogPath());
-  // Filter state from the query string (?since=YYYY-MM-DD&rel=<build>) — empty = show everything.
+  // Filter state from the query string (?since=YYYY-MM-DD&rel=<build>&view=gaps|scope) — empty = show everything.
   const q = new URLSearchParams((req.url ?? '').split('?')[1] ?? '');
-  const cur: Filter = { since: q.get('since') || undefined, rel: q.get('rel') || undefined };
+  const view = q.get('view');
+  const cur: Filter = {
+    since: q.get('since') || undefined,
+    rel: q.get('rel') || undefined,
+    view: view === 'gaps' || view === 'scope' ? view : undefined, // ignore unknown view values
+  };
   const releases = releasesOf(all);
   const events = filterEvents(all, cur);
   // "since" presets, computed from the server clock (last 24h / 7d / 30d).

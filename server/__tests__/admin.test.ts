@@ -180,6 +180,13 @@ describe('aggregate', () => {
     expect(by.compute).toBeUndefined(); // none in the sample → filtered out
   });
 
+  it('builds the per-card drill-down lists (utterances behind the counts)', () => {
+    expect(s.gapUtterances).toEqual([
+      { utterance: 'gibberish xyz', count: 1, locale: 'en', lastSeen: '2026-06-21T11:02:00Z' },
+    ]);
+    expect(s.scopeUtterances.map((r) => r.utterance).sort()).toEqual(['הוכח שהמשולש שווה שוקיים', 'זוויות מתחלפות']);
+  });
+
   it('splits language and ranks top utterances', () => {
     expect(s.langs.he).toBe(4);
     expect(s.langs.en).toBe(2);
@@ -248,5 +255,58 @@ describe('dashboard filtering (release + date)', () => {
     expect(res.body).toContain('מסונן'); // "filtered" marker shown
     expect(res.body).toContain('ריבוע ABCD'); // r2's utterance is present
     expect(res.body).not.toContain('E על המיתר AC'); // r1's (fixed) failure is filtered out
+  });
+});
+
+describe('drill-down into the real-gap / out-of-scope cards', () => {
+  const evs: UsageEvent[] = [
+    { serverTs: '2026-06-20T09:00:00Z', iph: 'h1', ev: 'session', sid: 's1' },
+    { serverTs: '2026-06-20T09:01:00Z', iph: 'h1', ev: 'submit', sid: 's1', utterance: 'a real gap here', locale: 'en', source: 'llm', result: 'not-understood' },
+    { serverTs: '2026-06-28T09:02:00Z', iph: 'h1', ev: 'submit', sid: 's1', utterance: 'זוויות מתחלפות', locale: 'he', source: 'scope', result: 'scope:angle-relation' },
+  ];
+
+  async function dash(url: string) {
+    await writeFile(logPath, evs.map((e) => JSON.stringify(e)).join('\n'), 'utf8');
+    const login = mockRes();
+    await run(mockReq('POST', '/admin/login', ['username=teacher&password=s3cret']), login, logPath);
+    const cookie = cookieFrom(login.headers['set-cookie']);
+    const res = mockRes();
+    await run(mockReq('GET', url, [], { cookie }), res, logPath);
+    return res;
+  }
+
+  it('the real-gaps card is a clickable link to ?view=gaps', async () => {
+    const res = await dash('/admin');
+    expect(res.body).toContain('cardlink');
+    expect(res.body).toContain('view=gaps');
+    expect(res.body).not.toContain('משפטים שלא הובנו'); // the drill panel is NOT rendered until opened
+  });
+
+  it('?view=gaps opens the drill panel listing the gap utterances', async () => {
+    const res = await dash('/admin?view=gaps');
+    expect(res.body).toContain('פערים אמיתיים — משפטים שלא הובנו'); // the drill panel title
+    expect(res.body).toContain('a real gap here');
+  });
+
+  it('?view=scope opens the out-of-scope drill panel', async () => {
+    const res = await dash('/admin?view=scope');
+    expect(res.body).toContain('מחוץ לתחום — משפטים');
+    expect(res.body).toContain('זוויות מתחלפות');
+  });
+
+  it('the drill respects the active date filter (no gaps in a later window)', async () => {
+    const res = await dash('/admin?view=gaps&since=2026-06-25');
+    expect(res.body).toContain('אין פריטים'); // the gap is older than `since` → empty drill
+    expect(res.body).not.toContain('a real gap here');
+  });
+
+  it('the filter form preserves the open view (changing the date keeps the drill open)', async () => {
+    const res = await dash('/admin?view=gaps');
+    expect(res.body).toContain('<input type="hidden" name="view" value="gaps">');
+  });
+
+  it('ignores an unknown view value', async () => {
+    const res = await dash('/admin?view=bogus');
+    expect(res.body).not.toContain('משפטים שלא הובנו');
   });
 });
