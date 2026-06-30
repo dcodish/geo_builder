@@ -215,8 +215,9 @@
     "analysing": "Detecting…",
     "none": "No special shapes detected.",
     "hint": "Detect the shapes the figure contains and link each to its page in the geometry book.",
-    "badgeHint": "Click for details and a book link",
+    "badgeHint": "Hover to highlight on the figure; click for details and a book link",
     "openInBook": "Open in the geometry book",
+    "close": "Close",
     "name": {
       "square": "Square",
       "rectangle": "Rectangle",

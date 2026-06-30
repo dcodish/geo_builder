@@ -84,7 +84,8 @@ export default function App() {
   const [resampling, setResampling] = useState(false); // "show another configuration" search in flight (synchronous; we paint a busy state first)
   const [analysing, setAnalysing] = useState(false); // "view relations" detection in flight (synchronous; paint a busy state first)
   const [detecting, setDetecting] = useState(false); // "detect shapes" detection in flight (synchronous; paint a busy state first)
-  const [shapeModal, setShapeModal] = useState<DetectedShape | null>(null); // the shape badge whose book-link popup is open
+  const [openShape, setOpenShape] = useState<DetectedShape | null>(null); // the shape badge whose inline book-link card is open
+  const [hoverShape, setHoverShape] = useState<DetectedShape | null>(null); // the shape badge being hovered (transient highlight preview)
   const [llmDropped, setLlmDropped] = useState<string[]>([]); // LLM steps the engine couldn't build
   const [renameNote, setRenameNote] = useState(''); // why a relabel was a no-op (target taken / no such point)
   const [altNote, setAltNote] = useState(''); // transient: "show another configuration" found no different drawing
@@ -445,6 +446,21 @@ export default function App() {
   // The "detect shapes" badge layer — same facts-keyed cache contract as the relations layer above.
   const shapesLayer = shapes && shapes.facts === facts ? shapes.result : null;
 
+  // Highlight the shape under the cursor (hover) or the one whose card is open: its vertices, the drawn
+  // edge segments between them, and (for a circle) the circle itself. Reuses the canvas `highlight` set,
+  // so it overrides the fact-selection highlight while a shape is active. Cleared when the layer clears.
+  const shapeHighlight = useMemo(() => {
+    const sh = shapesLayer ? (hoverShape ?? openShape) : null;
+    if (!sh) return undefined;
+    const vset = new Set(sh.vertices);
+    const ids = new Set<string>(sh.vertices);
+    for (const o of construction.objects) {
+      if (o.kind === 'segment' && vset.has(o.a) && vset.has(o.b)) ids.add(o.id);
+      else if (o.kind === 'circle' && sh.type === 'circle' && o.center === sh.vertices[0]) ids.add(o.id);
+    }
+    return ids;
+  }, [shapesLayer, hoverShape, openShape, construction]);
+
   // Snap-to-intersection: a clicked crossing becomes a real named point. Pick the
   // first free single capital letter, then create it via the same command path.
   function markIntersection(x: Crossing) {
@@ -552,7 +568,7 @@ export default function App() {
             positions={positions}
             width={canvasSize.w}
             height={canvasSize.h}
-            highlight={highlight}
+            highlight={shapeHighlight ?? highlight}
             onPickIntersection={markIntersection}
             intersectionLabel={t('actions.markIntersection')}
             labels={labels}
@@ -913,6 +929,8 @@ export default function App() {
               title={t('shapes.hint')}
               onClick={() => {
                 if (detecting) return;
+                setOpenShape(null);
+                setHoverShape(null);
                 if (shapesLayer) {
                   clearShapes();
                   return;
@@ -937,17 +955,38 @@ export default function App() {
           )}
           {shapesLayer && shapesLayer.shapes.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {shapesLayer.shapes.map((sh) => (
-                <button
-                  key={`${sh.type}-${sh.label}`}
-                  type="button"
-                  style={shapeBadge}
-                  onClick={() => setShapeModal(sh)}
-                  title={t('shapes.badgeHint')}
-                >
-                  {t(`shapes.name.${sh.type}`)} {sh.label}
-                </button>
-              ))}
+              {shapesLayer.shapes.map((sh) => {
+                const active = openShape === sh;
+                return (
+                  <button
+                    key={`${sh.type}-${sh.label}`}
+                    type="button"
+                    style={active ? shapeBadgeOn : shapeBadge}
+                    // Hover previews the highlight; click opens (toggles) the inline book-link card and
+                    // keeps the shape highlighted while the card is open.
+                    onMouseEnter={() => setHoverShape(sh)}
+                    onMouseLeave={() => setHoverShape(null)}
+                    onClick={() => setOpenShape(active ? null : sh)}
+                    title={t('shapes.badgeHint')}
+                  >
+                    {t(`shapes.name.${sh.type}`)} {sh.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {/* The clicked shape's inline card — name, definition, and the book link — shown BELOW the
+              badges so the figure (with the shape highlighted) stays visible (no figure-hiding modal). */}
+          {shapesLayer && openShape && (
+            <div style={shapeCard}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                <strong style={{ fontSize: 14 }}>{t(`shapes.name.${openShape.type}`)} {openShape.label}</strong>
+                <button type="button" style={iconBtn('#64748b')} title={t('shapes.close')} onClick={() => setOpenShape(null)}>×</button>
+              </div>
+              <p style={{ margin: '6px 0 0', fontSize: 13, color: '#334155' }}>{t(`shapes.def.${openShape.type}`)}</p>
+              <a style={bookLink} href={bookUrl(openShape.type)} target="_blank" rel="noopener noreferrer">
+                {t('shapes.openInBook')} ↗
+              </a>
             </div>
           )}
 
@@ -1043,22 +1082,6 @@ export default function App() {
         )}
       </Modal>
 
-      {/* A detected-shape badge's popup (FR-SH / FR-REF-1): the shape's name, a one-line definition, and a
-          prominent link to its page in the geometry book on the same site, opening in a new tab. */}
-      <Modal
-        open={shapeModal !== null}
-        onClose={() => setShapeModal(null)}
-        title={shapeModal ? `${t(`shapes.name.${shapeModal.type}`)} ${shapeModal.label}` : ''}
-      >
-        {shapeModal && (
-          <div>
-            <p style={{ marginTop: 0 }}>{t(`shapes.def.${shapeModal.type}`)}</p>
-            <a style={bookLink} href={bookUrl(shapeModal.type)} target="_blank" rel="noopener noreferrer">
-              {t('shapes.openInBook')} ↗
-            </a>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }
@@ -1266,7 +1289,7 @@ const alt: React.CSSProperties = {
 const relBtnOn: React.CSSProperties = { ...alt, border: '1px solid #0d9488', background: '#0d9488' };
 // The "detect shapes" button while the badge layer is ON — indigo, distinct from the relations teal.
 const shapesBtnOn: React.CSSProperties = { ...alt, border: '1px solid #4338ca', background: '#4338ca' };
-// A detected-shape badge chip (clickable → its book-link popup).
+// A detected-shape badge chip (hover → highlight on canvas; click → its inline book-link card).
 const shapeBadge: React.CSSProperties = {
   padding: '4px 10px',
   fontSize: 13,
@@ -1275,6 +1298,16 @@ const shapeBadge: React.CSSProperties = {
   background: '#eef2ff',
   color: '#3730a3',
   cursor: 'pointer',
+};
+// The chip whose inline card is open — filled indigo to mark the active selection.
+const shapeBadgeOn: React.CSSProperties = { ...shapeBadge, border: '1px solid #4338ca', background: '#4338ca', color: '#fff' };
+// The inline card under the badges with the shape's definition + book link (replaces a figure-hiding modal).
+const shapeCard: React.CSSProperties = {
+  marginTop: 6,
+  padding: '10px 12px',
+  borderRadius: 8,
+  border: '1px solid #c7d2fe',
+  background: '#f8faff',
 };
 const bookLink: React.CSSProperties = {
   display: 'inline-block',
