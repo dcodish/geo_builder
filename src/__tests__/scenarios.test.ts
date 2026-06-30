@@ -1996,6 +1996,19 @@ const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'trapezoid-dc-greater-than-ab',
+    title: 'inscribed trapezoid + "DC>AB" reshapes so |DC| > |AB| (segment-length inequality)',
+    guards: 'session ei99765k: "DC>AB" escalated to the LLM and returned not-understood — the parser only read single-letter named-measure orderings (measureOrder), so a direct segment-length inequality had no rule even though the engine already supports set-length-order/length-order (ADR-039). The default trapezoid always drew |AB| > |DC| with no way to flip it.',
+    steps: ['טרפז ABCD חסום במעגל', 'DC>AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      // The inequality now holds visibly: |DC| strictly greater than |AB|, with a real gap.
+      expect(dist(D, C)).toBeGreaterThan(dist(A, B));
+      expect(dist(D, C) - dist(A, B)).toBeGreaterThan(0.5);
+    },
+  },
+  {
     id: 'median-ratio-drives-E',
     title: 'triangle, median BD, E on BC, P = AE∩BD, then |BP|=3|PD| — slides E to satisfy it',
     guards: 'a ratio constraint on a derived point P recruited the triangle vertices but the joint solver ignored the on-segment DOF (E) that actually moves P (mixed free+parametric carriers routed to the free-only solver) → over-constrained.',

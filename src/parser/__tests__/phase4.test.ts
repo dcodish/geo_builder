@@ -39,6 +39,30 @@ describe('parser — square (he/en)', () => {
   it('does not mistake the keyword letters for labels', () => one('square ABCD', sq));
 });
 
+describe('parser — segment-length inequality "DC > AB" (he/en)', () => {
+  // |ab| is recorded first (the SHORTER); the engine reshapes so |cd| > |ab| (ADR-039).
+  const ord: AnyCommand = { type: 'set-length-order', a: 'A', b: 'B', c: 'D', d: 'C' };
+  it('symbolic, left is the larger ( DC > AB )', () => has('DC>AB', ord));
+  it('symbolic, left is the smaller ( AB < DC )', () => has('AB<DC', ord));
+  it('with bars and spaces ( |DC| ≥ |AB| )', () => has('|DC| ≥ |AB|', ord));
+  it('hebrew word form ( DC גדול מ-AB )', () => has('DC גדול מ-AB', ord));
+  it('english word form ( DC longer than AB )', () => has('DC longer than AB', ord));
+  it('also draws both segments', () => {
+    const r = parse('DC>AB');
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.commands).toContainEqual({ type: 'segment', a: 'A', b: 'B' });
+      expect(r.commands).toContainEqual({ type: 'segment', a: 'D', b: 'C' });
+    }
+  });
+  // A single-letter comparison stays a named-measure ordering, NOT a segment one.
+  it('does not hijack the single-letter "α < β" form', () => {
+    const r = parse('x<y');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.commands[0]).toEqual({ type: 'measure-order', left: 'x', op: '<', right: 'y' });
+  });
+});
+
 describe('parser — point on segment (he/en)', () => {
   it('english, no ratio (default)', () =>
     one('point G on AD', { type: 'point-on-segment', id: 'G', a: 'A', b: 'D' }));

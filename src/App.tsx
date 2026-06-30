@@ -25,6 +25,15 @@ import { logDebug } from '@/debug/sessionLog';
 import { humanizeError } from '@/i18n/humanizeError';
 import { nanoid } from 'nanoid';
 
+/**
+ * Resolve AFTER the browser has had a chance to paint. A just-set React state (e.g. a "thinking"
+ * spinner) is only committed to the DOM on the next frame; a blocking SYNCHRONOUS solve started in
+ * the same tick would freeze the thread before that paint, so the spinner never appears. Awaiting two
+ * animation frames lets React commit and the browser paint first, THEN the heavy work runs visibly
+ * behind the spinner. Mirrors the inline double-rAF the "show another configuration" path uses.
+ */
+const nextPaint = () => new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res())));
+
 export default function App() {
   const { t, i18n } = useTranslation();
   const facts = useGeoStore((s) => s.facts);
@@ -226,7 +235,12 @@ export default function App() {
   // pays nothing.
   const resolveAfterCommit = () => {
     const st = useGeoStore.getState();
-    if (meetsRequirements(st.facts, st.seed)) return;
+    // `submit` has already painted the spinner; if the figure already meets its requirements there's no
+    // search to run, so just clear it (the commit itself was the answer).
+    if (meetsRequirements(st.facts, st.seed)) {
+      setThinking(false);
+      return;
+    }
     setThinking(true);
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
@@ -275,6 +289,14 @@ export default function App() {
       else setRenameNote(t(`input.merge_${res.reason}`, { from: mrg.from, to: mrg.to }));
       return;
     }
+    // From here on the path runs SYNCHRONOUS solves — the dry-run, the commit replay, and (last) the
+    // LLM call — that can take a few seconds on a hard/over-constrained figure (e.g. an impossible
+    // "AD>BC"), freezing the UI. Paint the "thinking" state FIRST and yield a frame so the spinner is
+    // visible from the moment Submit is pressed until the answer (operator) — the same treatment the
+    // "show another configuration" path already gets. Cleared on every synchronous exit below; the
+    // commit paths hand off to `resolveAfterCommit`, which owns the spinner through any auto-resolve.
+    setThinking(true);
+    await nextPaint();
     const pctx = parseCtx();
     const r = parse(utterance, pctx);
     let weak: 'error' | 'empty' | 'dropped' | null = null;
@@ -320,6 +342,7 @@ export default function App() {
         if (outcome.reason === 'error') {
           logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `conflict:${outcome.detail ?? ''}`, commands: r.commands });
           setInputNote(outcome.detail ? humanizeError(outcome.detail, t) : t('input.producedNothing'));
+          setThinking(false);
           return; // keep the text so the student can edit/delete it
         }
         // A clean RE-ENTRY of things that already exist (re-typing a shape, re-inscribing points already on
@@ -334,6 +357,7 @@ export default function App() {
             logDebug({ kind: 'input', utterance, locale, source: 'parser', result: 'noop-exists', commands: r.commands });
             setInputNote(t('input.alreadyDrawn'));
             setText('');
+            setThinking(false);
             return;
           }
         }
@@ -345,14 +369,14 @@ export default function App() {
       }
     }
     // out of grammar, OR a deterministic parse that built nothing → ask the LLM (a SECOND try),
-    // using the current figure as context.
-    setThinking(true);
+    // using the current figure as context. The spinner is already up (painted at the top of submit) and
+    // stays up across the network call AND the post-LLM dry-run/commit below; it's cleared on the
+    // not-understood return and by `resolveAfterCommit` on success.
     const ctx = figureContext(
       construction.objects.filter(isGeoPoint).map((o) => o.id),
       construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
     );
     const out = await llmParse(utterance, ctx, parseCtx());
-    setThinking(false);
     // The LLM only counts if its decomposition actually BUILDS something — else it's another silent
     // fail. Dry-run the combined commands; if neither grammar nor LLM built anything, say so plainly.
     const llmCmds = out ? out.built.flatMap((g) => g.commands) : [];
@@ -362,6 +386,7 @@ export default function App() {
       // "produced nothing even after a retry" gets the explicit problem message; pure out-of-grammar
       // (the grammar never matched) keeps the gentler "couldn't read that — try an example".
       setInputNote(t(weak ? 'input.producedNothing' : 'input.notUnderstood'));
+      setThinking(false);
       return;
     }
     // The LLM understood the (often Hebrew) input and decomposed it into canonical steps; show it as

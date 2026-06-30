@@ -304,6 +304,19 @@ rarely escaped (≈3.6 % of seeds). ADR-039.
 **Asserts:** the givens still hold (`|BP|=3|PD|`, `AE⊥BD`) **and** the assumption is now true and
 visible on the figure — ∠BAP strictly < ∠ABP with a clear gap.
 
+### `trapezoid-dc-greater-than-ab` — "DC>AB" reshapes a trapezoid so the right side is longer
+**Steps**
+1. `טרפז ABCD חסום במעגל`
+2. `DC>AB`
+
+**Guards against:** session `ei99765k` — a segment-length inequality `DC>AB` escalated to the LLM
+and returned not-understood. The parser only read single-letter named-measure orderings
+(`measureOrder`, `α<β`), so a direct two-letter segment comparison had no rule — even though the
+engine has supported `set-length-order`/`length-order` since ADR-039. The inscribed trapezoid always
+drew `|AB|` longer than `|DC|` with no way to flip it. ADR-158 adds the `lengthOrder` rule.
+**Asserts:** every step is `ok` **and** the inequality holds visibly — `|DC|` strictly greater than
+`|AB|` with a real gap.
+
 ### `median-ratio-drives-E` — a ratio on a derived point slides the DOF behind it
 **Steps**
 1. `משולש ABC`

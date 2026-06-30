@@ -1287,6 +1287,41 @@ const measureOrder: Rule = (s) => {
 };
 
 /**
+ * "AB > CD" / "DC < AB" / "|AB| ≥ |CD|" — an ORDERING between two SEGMENT lengths (ADR-039), and the
+ * word forms "AB גדול מ CD" / "AB longer than CD" (and קטן / shorter / smaller). The two two-letter
+ * sides distinguish this from `measureOrder` (single-letter named measures). The SHORTER segment is
+ * recorded first in `set-length-order`; the solver reshapes the figure so the relation holds visibly
+ * (e.g. a trapezoid whose default drew AB longer than DC flips so |DC| > |AB|). Like ∥/⟂ it also DRAWS
+ * both segments (idempotent), so "DC > AB" needs no separate segment request.
+ */
+const lengthOrder: Rule = (s) => {
+  let a: string, b: string, c: string, d: string, leftLarger: boolean;
+  const SEG = String.raw`\|?([A-Za-z]\d*)\s*([A-Za-z]\d*)\|?`;
+  const sym = s.match(new RegExp(String.raw`^\s*${SEG}\s*(<=|>=|<|>|≤|≥)\s*${SEG}\s*$`));
+  if (sym) {
+    [a, b, c, d] = [up(sym[1]), up(sym[2]), up(sym[4]), up(sym[5])];
+    leftLarger = sym[3] === '>' || sym[3] === '>=' || sym[3] === '≥';
+  } else {
+    // word form: "AB גדול מ-CD" / "AB longer than CD" / "AB קטן מ CD" / "AB shorter than CD"
+    const big = String.raw`גדול[֐-׿]*|larger|longer|greater|bigger`;
+    const small = String.raw`קטן[֐-׿]*|smaller|shorter|less`;
+    const w = s.match(
+      new RegExp(String.raw`^\s*${SEG}\s+(?:(${big})|(${small}))\s+(?:than\s+|מ-?|מן\s+)?${SEG}\s*$`, 'i'),
+    );
+    if (!w) return null;
+    [a, b, c, d] = [up(w[1]), up(w[2]), up(w[5]), up(w[6])];
+    leftLarger = !!w[3];
+  }
+  const [sa, sb] = leftLarger ? [c, d] : [a, b]; // shorter segment
+  const [la, lb] = leftLarger ? [a, b] : [c, d]; // longer segment
+  return [
+    { type: 'segment', a: sa, b: sb },
+    { type: 'segment', a: la, b: lb },
+    { type: 'set-length-order', a: sa, b: sb, c: la, d: lb },
+  ];
+};
+
+/**
  * "AB parallel to CD" / "AB ∥ CD" / "AB מקביל ל-CD". Naming two segments in a ∥
  * relation also DRAWS them (segment is idempotent — a no-op if already on the
  * figure), so "AB ∥ CD" puts both lines on the canvas without a separate request.
@@ -3525,6 +3560,7 @@ const RULES: Rule[] = [
   pointsOnSegment, // "L and K are points on AC" — TWO points on a segment, before the single pointOnSegment
   pointOnSegment,
   measureOrder, // "α < β" — an inequality between two named measures (before setVar/numeric rules)
+  lengthOrder, // "DC > AB" — an inequality between two SEGMENT lengths (two-letter sides; after measureOrder)
   setVar, // "x = 4" / "α = 30" — a bare variable binding; before the numeric rules
   segmentRatio, // "AE/ED = 2/3" — before the numeric rules (which would half-parse "ED=2")
   measureSqrt, // "AB = 12√x" / "12√2" — before measureLength so the radical isn't dropped
