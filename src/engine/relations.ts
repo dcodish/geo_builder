@@ -44,6 +44,12 @@ export function onHostEdges(c: Construction): [Id, Id][] {
   for (const o of c.objects) {
     if (o.kind === 'on-segment' || o.kind === 'on-segment-solved' || o.kind === 'midpoint') edges.push([o.id, o.a], [o.id, o.b]);
     else if (o.kind === 'foot') edges.push([o.id, o.a], [o.id, o.b]); // the foot lies on the line (a,b)
+    // A SEGMENT-meet crossing ([ADR-166](docs/06-decisions.md#adr-166)) lies WITHIN both its operand segments
+    // (that's what `onSeg` asserts), so it SPLITS each — G on AE and BF connects to A,E,B,F. Without this the
+    // crossing has no drawn neighbour (the parser draws the whole AE/BF, not stubs to G), so an emergent shape
+    // whose sides run THROUGH the crossing (the classic "AE∩BF, DE∩CF ⇒ EGFH rhombus") is invisible to
+    // `figureEdges`. Only `onSeg` (within) crossings split cleanly; an extension/infinite meet is skipped.
+    else if (o.kind === 'line-line-intersection' && o.onSeg) edges.push([o.id, o.a], [o.id, o.b], [o.id, o.c], [o.id, o.d]);
   }
   return edges;
 }
@@ -159,6 +165,30 @@ function classesBy(n: number, sameAcrossSamples: (i: number, j: number) => boole
 }
 
 /**
+ * Drop numerically-DIVERGED samples ([ADR-166](docs/06-decisions.md#adr-166) Am.). A free-driven solve that
+ * fails to converge can return absurd coordinates (orders of magnitude beyond the figure's scale) while
+ * `evaluate` still reports `ok` — and such a garbage config poisons the "holds in EVERY sample" ground-truth
+ * test, so a genuinely-forced relation (an emergent rhombus's equal sides) reads as NOT forced. Robust scale =
+ * the median per-sample bounding-box diagonal; a sample whose diagonal exceeds 50× the median is a blown-up
+ * solve, not a valid drawing. Surfaced by the equilateral-triangle apex solver diverging at ~2/16 seeds on the
+ * bagrut-Q9 figure. Never strips below 2 samples (a robust median needs a few points).
+ */
+export function convergedSamples(samples: Map<Id, Vec>[]): Map<Id, Vec>[] {
+  if (samples.length < 3) return samples;
+  const diag = (pos: Map<Id, Vec>) => {
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    for (const p of pos.values()) { minx = Math.min(minx, p.x); miny = Math.min(miny, p.y); maxx = Math.max(maxx, p.x); maxy = Math.max(maxy, p.y); }
+    return Number.isFinite(minx) ? Math.hypot(maxx - minx, maxy - miny) : 0;
+  };
+  const ds = samples.map(diag);
+  const sorted = ds.filter((d) => d > 0).sort((a, b) => a - b);
+  if (sorted.length === 0) return samples;
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const kept = samples.filter((_, i) => ds[i] <= 50 * median);
+  return kept.length >= 2 ? kept : samples;
+}
+
+/**
  * Detect the ground-truth equalities of `c`: which edges are equal and which vertex-angles are equal,
  * each true across every sampled configuration. `c` should be the figure's construction (e.g.
  * `replay(facts, 0).construction`); this samples it with its own seeds, never mutating it.
@@ -185,13 +215,14 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
   // 1. Sample valid configurations across every variant config × its own seeds. A determined figure (no free
   //    DOF, single variant) returns the same drawing each seed, which is correct — its single configuration
   //    IS the only valid drawing, so every relation in it is a ground truth.
-  const samples: Map<Id, Vec>[] = [];
+  const rawSamples: Map<Id, Vec>[] = [];
   for (const c of constructions) {
     for (let s = 0; s < N; s++) {
       const r = evaluate(applySeed(c, s));
-      if (r.ok) samples.push(r.positions);
+      if (r.ok) rawSamples.push(r.positions);
     }
   }
+  const samples = convergedSamples(rawSamples); // drop numerically-diverged solves (ADR-166 Am.)
   if (samples.length === 0) return { equalSegments: [], equalAngles: [], definiteAngles: [], samplesUsed: 0 };
 
   const nb = pointNeighbors(c0);

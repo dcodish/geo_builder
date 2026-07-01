@@ -19,7 +19,7 @@
 import type { Construction, Id, Vec, Polygon, Circle } from './types';
 import { evaluate } from './evaluate';
 import { applySeed } from './sample';
-import { figureEdges } from './relations';
+import { figureEdges, convergedSamples } from './relations';
 import { dist, sub, len } from './geometry';
 
 /** Every named shape the layer can detect; each maps to one geometry-book page (see shapeCatalog). */
@@ -83,7 +83,7 @@ function samplePositions(constructions: Construction[], N: number): Map<Id, Vec>
       if (r.ok) out.push(r.positions);
     }
   }
-  return out;
+  return convergedSamples(out); // drop numerically-diverged solves so a real forced shape isn't masked (ADR-166 Am.)
 }
 
 /** Per-vertex coordinates of a polygon in one sample, or null if any vertex is missing/degenerate. */

@@ -571,7 +571,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
 
     case 'line-line-intersection':
-      addObj(objects, { kind: 'line-line-intersection', id: cmd.id, a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      addObj(objects, { kind: 'line-line-intersection', id: cmd.id, a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d, ...(cmd.onSeg ? { onSeg: true } : {}) });
       // A "המשך" operand is DIRECTIONAL — A must be BEYOND the named 2nd point (ADR-054). Emit a
       // `collinear-order` (A is already collinear via the crossing); when the current free DOFs put the
       // crossing on the wrong side, recruitFreeDofs DRIVES them (e.g. pulls a free apex closer) so the

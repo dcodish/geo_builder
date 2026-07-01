@@ -19,6 +19,7 @@
 import type { Constraint, Construction, FreePoint, Id, OnCirclePoint, OnLinePoint } from './types';
 import { isGeoPoint } from './types';
 import { carrierOf, isShapeCarrier } from './carriers';
+import { constraintRefs } from './solve';
 
 /**
  * An ORDER/REGION constraint ('angle-order' / 'length-order' / 'collinear-order' / 'angle-acuteness')
@@ -303,6 +304,58 @@ export function freeDofs(c: Construction): Id[] {
         (isShapeCarrier(o) && notConsumed(o as { solve?: unknown })), // incl. a free-radius circle (ADR-051)
     )
     .map((o) => o.id);
+}
+
+/**
+ * Reflection alternatives ([ADR-166](docs/06-decisions.md#adr-166)) — the discrete "which side of its base
+ * the apex sits" DOF.
+ *
+ * A free point tied to two anchors by an EQUALITY/DISTANCE (an equilateral/isosceles triangle's apex,
+ * equidistant to A and D) has TWO valid placements: the mirror images across the anchor line. The numeric
+ * solver only reaches the one nearest its seed, so the OTHER configuration — the one that makes two
+ * segments actually cross WITHIN their spans — is unreachable by the continuous sampler alone. This is an
+ * unstated discrete DOF (ADR-052), so it must be EXPLORABLE. We encode it in the seed integer's HIGH bits:
+ * the low `< REFLECT_STRIDE` part is the continuous sample (today's spin/jitter, unchanged), the high part
+ * is a bitmask over {@link reflectableFreePoints} naming which to mirror. seed < REFLECT_STRIDE ⇒ mask 0 ⇒
+ * no reflection, so every existing seed and caller is byte-for-byte unchanged; the on-segment resolver
+ * deliberately searches mask>0 seeds. (The reflection itself — mirroring the apex's solver-seed across its
+ * anchor line, which needs the evaluated anchor positions — lives in the store's `applyReflections`.)
+ */
+export const REFLECT_MAX = 4; // cap reflectable points at 4 → mask ∈ [0, 15], bounded combinatorics
+export const REFLECT_STRIDE = 1 << 20; // continuous base seed occupies [0, 2^20); mask = seed >> 20
+export const reflectMaskOf = (seed: number): number => Math.floor(seed / REFLECT_STRIDE);
+export const baseSeedOf = (seed: number): number => seed % REFLECT_STRIDE;
+export const withReflectMask = (mask: number, base: number): number => mask * REFLECT_STRIDE + base;
+
+/** The distinct points a free point is tied to by an EQUALITY/DISTANCE/RATIO (excluding itself) — the
+ *  candidate anchors of its reflection axis. An apex equidistant to A and D yields {A, D}: reflecting the
+ *  apex across line AD gives the OTHER valid solution of the symmetric constraint set (the mirror config). */
+export function reflectAnchors(c: Construction, pointId: Id): Id[] {
+  const refs = new Set<Id>();
+  const consider = (con: Constraint) => {
+    if (con.type !== 'equal' && con.type !== 'distance' && con.type !== 'ratio') return;
+    const r = constraintRefs(con);
+    if (!r.includes(pointId)) return;
+    for (const id of r) if (id !== pointId) refs.add(id);
+  };
+  for (const con of c.constraints) consider(con);
+  for (const o of c.objects) {
+    const sv = (o as { solve?: { constraint: Constraint } }).solve;
+    if (sv) consider(sv.constraint);
+  }
+  return [...refs];
+}
+
+/** Free points with a discrete REFLECTION alternative — a non-pinned free point tied by ≥1 equality/
+ *  distance to ≥2 distinct anchors (its constraint set is symmetric across the anchor line, so the mirror
+ *  placement is an equally-valid solution the solver won't reach from the default seed). Ordered by id and
+ *  capped ({@link REFLECT_MAX}) so the reflection-mask combinatorics stay bounded. */
+export function reflectableFreePoints(c: Construction): Id[] {
+  return c.objects
+    .filter((o) => o.kind === 'free-point' && !(o as FreePoint).pinned && reflectAnchors(c, o.id).length >= 2)
+    .map((o) => o.id)
+    .sort()
+    .slice(0, REFLECT_MAX);
 }
 
 /** The raw movable DOF an object carries before constraints: a free point 2 (x,y), a parametric/shape DOF 1, else 0. */

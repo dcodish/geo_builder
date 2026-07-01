@@ -516,8 +516,14 @@ const lineLineIntersection: Rule = (s) => {
   // extension it draws the operand segments as-is: diagonals crossing BETWEEN their endpoints must stay
   // whole (drawing only to the crossing would hide half of each diagonal).
   const extend = /המשך|extension|extended/i.test(s);
+  // A plain SEGMENT meet — the student named no extension ("המשך") and no infinite line ("הישר"/"line"/
+  // "ray") — must land its crossing WITHIN both segments, not on their continuation (ADR-166, the operator's
+  // rule: "two segments meet ON the segments, not the continuation"). When EITHER an extension or an
+  // infinite-line word is present the crossing is allowed off the drawn segments, so `onSeg` is dropped.
+  const infinite = /\bline\b|הישר|הקו|\bray\b|קרן/i.test(s);
+  const onSeg = !extend && !infinite;
   const cross = (id: string, a: string, b: string, c: string, d: string, dir1?: boolean, dir2?: boolean): Command[] => {
-    const inter: Command = { type: 'line-line-intersection', id: up(id), a: up(a), b: up(b), c: up(c), d: up(d), ...(dir1 ? { dir1: true } : {}), ...(dir2 ? { dir2: true } : {}) };
+    const inter: Command = { type: 'line-line-intersection', id: up(id), a: up(a), b: up(b), c: up(c), d: up(d), ...(dir1 ? { dir1: true } : {}), ...(dir2 ? { dir2: true } : {}), ...(onSeg ? { onSeg: true } : {}) };
     // Extension case: DEFINE G (the intersection) first, THEN draw each line's base → G. Order matters —
     // a segment to G before G exists would create G as a stray free point and conflict with the
     // intersection ("'G' is already defined"). Plain case: draw the operand segments, then the crossing.

@@ -107,6 +107,40 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 const SCENARIOS: Scenario[] = [
   {
+    id: 'segment-meet-lands-on-segments',
+    title: 'bagrut Q9: "AE and BF meet at G" puts G ON the segments (apexes flip inward), not on the continuation',
+    guards:
+      'operator session doykqc2m: rectangle ABCD with equilateral triangles AED, BCF on the two vertical sides, then "AE ו BF נפגשים בנקודה G" / "DE ו CF נפגשים בנקודה H" (prove EGFH is a rhombus). The figure built clean (no error) but was the MIRROR of the textbook: the triangle apexes E,F were sampled pointing OUTWARD (away from each other, outside the rectangle), so segments AE,BF diverge and never cross — G landed at the infinite-line crossing on the BACKWARD continuation (param ≈ −1 on both segments), not on the segments. Two root causes, both fixed (ADR-166): (1) a plain `line-line-intersection` (the parser now flags it `onSeg` when no "המשך"/"הישר" is named) had NO requirement that the crossing lie within both segments — added to the verifier (amber) + `meetsRequirements`; (2) the apex side is an unstated DISCRETE DOF (ADR-052) the continuous sampler could only flip by luck (~2% of seeds) and the 40-seed auto-resolver never reached — added a REFLECTION DOF encoded in the seed\'s high bits so `firstSatisfyingSeed`/`findValidConfig` mirror the apexes across their anchor line and bring the crossings onto the segments.',
+    steps: [
+      'ABCD מלבן',
+      'BCF משולש שווה צלעות',
+      'AED משולש שווה צלעות',
+      'AE ו BF נפגשים בנקודה G',
+      'DE ו CF נפגשים בנקודה H',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const within = (g: Id, a: Id, b: Id) => {
+        const A = at(fig, a), B = at(fig, b), G = at(fig, g);
+        const t = ((G.x - A.x) * (B.x - A.x) + (G.y - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2);
+        return t;
+      };
+      // G is the crossing of segments AE and BF — and it lies WITHIN both (not on the continuation).
+      for (const [g, a, b] of [['G', 'A', 'E'], ['G', 'B', 'F'], ['H', 'D', 'E'], ['H', 'C', 'F']] as [Id, Id, Id][]) {
+        const t = within(g, a, b);
+        expect(t, `${g} on segment ${a}${b} (param)`).toBeGreaterThan(0.02);
+        expect(t, `${g} on segment ${a}${b} (param)`).toBeLessThan(0.98);
+      }
+      // The emergent EGFH rhombus is DETECTED (ADR-166 Am.): the crossings G,H split their segments in the
+      // implicit-edge universe (`onHostEdges` now sees an `onSeg` line-line-intersection), detection samples
+      // the requirement-satisfying inward config, and diverged solver samples are dropped so the forced rhombus
+      // isn't masked. (The quad EGFH is listed with its cycle order E-G-F-H, i.e. vertex set EFGH.)
+      const shapes = detectShapes(fig.construction);
+      const rhombus = shapes.shapes.find((s) => (s.type === 'rhombus' || s.type === 'square') && [...s.vertices].sort().join('') === 'EFGH');
+      expect(rhombus, `EGFH detected as a rhombus (got: ${shapes.shapes.map((s) => `${s.type}:${s.label}`).join(', ')})`).toBeTruthy();
+    },
+  },
+  {
     id: 'name-existing-circle-centre',
     title: '"O מרכז המעגל" reveals the centre of an EXISTING inscribed circle (ADR-148 #2), without clobbering it',
     guards:

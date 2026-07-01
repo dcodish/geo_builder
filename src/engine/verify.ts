@@ -260,6 +260,35 @@ export function checkGivens(
     }
   }
 
+  // A plain SEGMENT meet — "AE and BF meet at G", no "המשך"/"הישר" (`onSeg`) — asserts the crossing lies
+  // WITHIN both segments, not on their continuation ([ADR-166](docs/06-decisions.md#adr-166), the operator's
+  // rule). When an apex points the wrong way the segments diverge and the infinite-line crossing lands on the
+  // backward/forward extension — the figure builds clean but is the wrong configuration. The sampler reflects
+  // the apex to fix it; if no valid config is found, flag it amber here. Tolerance is LOOSE (a crossing just
+  // past an endpoint isn't flagged — only one genuinely off the segment), mirroring the extension check.
+  for (const cmd of commands) {
+    if (cmd.type !== 'line-line-intersection' || !cmd.onSeg) continue;
+    const g = positions.get(cmd.id);
+    const param = (a: Id, b: Id): number | null => {
+      const pa = positions.get(a), pb = positions.get(b);
+      if (!pa || !pb || !g) return null;
+      const abx = pb.x - pa.x, aby = pb.y - pa.y, L = abx * abx + aby * aby;
+      return L < 1e-12 ? null : ((g.x - pa.x) * abx + (g.y - pa.y) * aby) / L;
+    };
+    const t1 = param(cmd.a, cmd.b), t2 = param(cmd.c, cmd.d);
+    const off = (t: number | null) => t !== null && (t < -0.02 || t > 1.02);
+    const seg = off(t1) ? `${cmd.a}${cmd.b}` : off(t2) ? `${cmd.c}${cmd.d}` : null;
+    if (seg) {
+      violations.push({
+        relation: 'collinear-order',
+        ids: [cmd.id, cmd.a, cmd.b, cmd.c, cmd.d],
+        message: `${cmd.id} should lie where segments ${cmd.a}${cmd.b} and ${cmd.c}${cmd.d} cross, but the crossing is on the continuation of ${seg}, not on the segment`,
+        messageKey: 'figure.v.meetOnSegment',
+        params: { id: cmd.id, seg1: `${cmd.a}${cmd.b}`, seg2: `${cmd.c}${cmd.d}` },
+      });
+    }
+  }
+
   // `line ABE…` (`set-line`) asserts the named points are COLLINEAR (its ordering is a soft selector,
   // not re-checked). Flag an interior point that sits clearly off the line through the two ends.
   for (const cmd of commands) {

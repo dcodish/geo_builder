@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ShapesResult, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, branchCount, buildSymTab, checkGivens, circleMembers, deepEqual, detectRelationsAcross, detectShapesAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, residual, VARIANT_COUNT } from '@/engine';
+import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, deepEqual, detectRelationsAcross, detectShapesAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, reflectableFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -117,11 +117,62 @@ export interface RadiusDof {
   current: number;
 }
 
+/** Reflect point `p` across the line through `a0`,`a1` (the mirror image). Degenerate axis ⇒ `p` unchanged. */
+function reflectAcross(p: Vec, a0: Vec, a1: Vec): Vec {
+  const dx = a1.x - a0.x, dy = a1.y - a0.y;
+  const L = dx * dx + dy * dy;
+  if (L < 1e-12) return p;
+  const t = ((p.x - a0.x) * dx + (p.y - a0.y) * dy) / L;
+  const fx = a0.x + t * dx, fy = a0.y + t * dy;
+  return { x: 2 * fx - p.x, y: 2 * fy - p.y };
+}
+
+/**
+ * Mirror the masked reflectable free points across their anchor line ([ADR-166](docs/06-decisions.md#adr-166)).
+ *
+ * The discrete "which side of its base an apex sits" DOF (an equilateral/isosceles triangle's apex,
+ * equidistant to two anchors) has a mirror solution the continuous solver won't reach from the default
+ * seed — so a figure asking two SEGMENTS to meet WITHIN their spans can be drawn with the apexes pointing
+ * the wrong way (the meet on the continuation). `mask` selects which {@link reflectableFreePoints} to flip:
+ * we evaluate once to learn the anchor positions, then reflect each selected free point's solved position
+ * across its anchor line and use that as the solver's seed, so it converges to the mirror configuration.
+ * mask 0 (every existing seed/caller) returns the construction unchanged — no extra evaluate, no cost.
+ */
+function applyReflections(c: Construction, mask: number): Construction {
+  if (!mask) return c;
+  const pts = reflectableFreePoints(c);
+  if (pts.length === 0) return c;
+  const e = evaluate(c);
+  if (!e.ok) return c; // can't learn the anchor lines — leave it to the continuous sampler
+  const objects = c.objects.map((o) => {
+    if (o.kind !== 'free-point') return o;
+    const idx = pts.indexOf(o.id);
+    if (idx < 0 || !(mask & (1 << idx))) return o;
+    const anchors = reflectAnchors(c, o.id)
+      .map((id) => e.positions.get(id))
+      .filter((v): v is Vec => !!v);
+    if (anchors.length < 2) return o;
+    // Pick the most-separated anchor pair → the most stable mirror line.
+    let a0 = anchors[0], a1 = anchors[1], best = -1;
+    for (let i = 0; i < anchors.length; i++)
+      for (let j = i + 1; j < anchors.length; j++) {
+        const d = (anchors[i].x - anchors[j].x) ** 2 + (anchors[i].y - anchors[j].y) ** 2;
+        if (d > best) { best = d; a0 = anchors[i]; a1 = anchors[j]; }
+      }
+    const self = e.positions.get(o.id) ?? { x: o.x, y: o.y };
+    const r = reflectAcross(self, a0, a1);
+    return { ...o, x: r.x, y: r.y };
+  });
+  return { ...c, objects };
+}
+
 /**
  * Replay the enabled facts in order; disabled or unsatisfiable facts are flagged,
  * not fatal. `seed` samples the figure's residual freedom (ADR-018): the final
  * figure's non-pinned free points are perturbed deterministically, so the figure
  * is re-drawn while still satisfying every fact. seed 0 = the canonical default.
+ * The seed's HIGH bits ({@link reflectMaskOf}) additionally select a reflection of
+ * the apex free points (ADR-166); seed < REFLECT_STRIDE ⇒ mask 0 ⇒ no reflection.
  */
 export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}): Derived {
   let cur = emptyConstruction();
@@ -283,7 +334,10 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
     return hasDeferrableConstraint(ec) && constraintIsPending(cur, ec); // a deferrable constraint that still FLEXES (not a rigid contradiction)
   });
   lastError = !pending && failedFacts.length ? status[failedFacts[failedFacts.length - 1].id] : null;
-  const sampled = applySeed(cur, seed);
+  // The seed's high bits select a reflection of the apex free points (ADR-166); the low bits are the
+  // continuous sample. Reflect first (mirrors the apexes so two segments can meet WITHIN their spans),
+  // then perturb. mask 0 — every ordinary seed — leaves `cur` untouched, so this is free for normal figures.
+  const sampled = applySeed(applyReflections(cur, reflectMaskOf(seed)), baseSeedOf(seed));
   // A dialed radius (the DOF slider) overrides the sampled value for that free circle — a viewing
   // scratchpad (ADR-048): it's cleared by "show another configuration", never a fixed given (ADR-052).
   const figure =
@@ -448,29 +502,94 @@ function extensionsClear(facts: Fact[], fig: Derived, relax = false): boolean {
   return true;
 }
 
+/** Clearance margin for a segment-meet: the crossing's param on each operand must sit in [margin, 1−margin]
+ *  to count as "on the segment" (the sampling bar; the verifier's amber check is looser — see verify.ts). */
+const WITHIN_MARGIN = 0.02;
+
+/** The param of `p`'s projection onto segment a→b (0 = at a, 1 = at b), or null if any point is unplaced. */
+function segParam(fig: Derived, a: Id, b: Id, p: Id): number | null {
+  const pa = fig.positions.get(a), pb = fig.positions.get(b), pp = fig.positions.get(p);
+  if (!pa || !pb || !pp) return null;
+  const abx = pb.x - pa.x, aby = pb.y - pa.y;
+  const L = abx * abx + aby * aby;
+  if (L < 1e-12) return null;
+  return ((pp.x - pa.x) * abx + (pp.y - pa.y) * aby) / L;
+}
+
 /**
- * The first seed in [from, from+budget) whose replay BUILDS and lets every extension reach the far side
- * cleanly, else `from`. A point on a circle whose secant(s) must each extend onto another circle is a FREE
- * DOF: only a subset of placements lets "המשך" reach the far side (the apex must sit so the named endpoint
- * is the NEAR crossing). We SAMPLE such a placement here rather than DRIVE the point across the tangent
- * degeneracy where the far crossing collapses onto the endpoint (ADR-098). Used to auto-pick the default
- * configuration after a step and to gate "show another configuration".
+ * Does every plain SEGMENT meet land WITHIN both its segments ([ADR-166](docs/06-decisions.md#adr-166))?
+ * A `line-line-intersection` flagged `onSeg` (the student named two segments, no "המשך"/"הישר") must have
+ * its crossing inside both spans, not on the continuation — the operator's rule "two segments meet ON the
+ * segments". A crossing on the backward/forward extension means the figure is the wrong configuration (an
+ * apex pointing the wrong way), which the reflection sampler should fix. A still-pending crossing (a ref
+ * unplaced) is a different failure mode, skipped here.
+ */
+export function intersectionsWithinSegments(fig: Derived, margin = WITHIN_MARGIN): boolean {
+  for (const o of fig.construction.objects) {
+    if (o.kind !== 'line-line-intersection' || !o.onSeg) continue;
+    const t1 = segParam(fig, o.a, o.b, o.id);
+    const t2 = segParam(fig, o.c, o.d, o.id);
+    if (t1 === null || t2 === null) continue;
+    if (t1 < margin || t1 > 1 - margin || t2 < margin || t2 > 1 - margin) return false;
+  }
+  return true;
+}
+
+/** The reflection mask (over {@link reflectableFreePoints}) that mirrors exactly the apex free points whose
+ *  on-segment meet currently lands off the segment — the targeted first guess for the reflection search. */
+function reflectMaskForFailing(fig: Derived): number {
+  const pts = reflectableFreePoints(fig.construction);
+  if (pts.length === 0) return 0;
+  const culprits = new Set<Id>();
+  for (const o of fig.construction.objects) {
+    if (o.kind !== 'line-line-intersection' || !o.onSeg) continue;
+    const t1 = segParam(fig, o.a, o.b, o.id);
+    const t2 = segParam(fig, o.c, o.d, o.id);
+    if (t1 !== null && (t1 < WITHIN_MARGIN || t1 > 1 - WITHIN_MARGIN)) { culprits.add(o.a); culprits.add(o.b); }
+    if (t2 !== null && (t2 < WITHIN_MARGIN || t2 > 1 - WITHIN_MARGIN)) { culprits.add(o.c); culprits.add(o.d); }
+  }
+  let mask = 0;
+  pts.forEach((id, i) => { if (culprits.has(id)) mask |= 1 << i; });
+  return mask;
+}
+
+/**
+ * The first seed whose replay BUILDS and satisfies the configuration requirements — every "המשך" extension
+ * reaches its far side cleanly (ADR-098) AND every plain segment-meet lands WITHIN its segments (ADR-166) —
+ * else `from`. Two unstated DOFs are searched: the continuous sample (seeds) and the discrete apex
+ * REFLECTION (high seed bits, {@link withReflectMask}). A point on a circle whose secant must extend onto
+ * another circle, and an apex whose side decides whether two segments cross, are both placements only a
+ * subset of configurations satisfies — we SAMPLE one rather than drive across a degeneracy. Used to auto-pick
+ * the default configuration after a step and to gate "show another configuration".
  */
 export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120): number {
-  if (extensionTriples(facts).length === 0) return from; // no extension → nothing to satisfy; keep the seed
-  // Pass 1 — STRICT: a seed where every extension reaches beyond its named 2nd endpoint (drives a free point so
-  // "המשך" reaches the far side when that's achievable, ADR-098).
-  for (let s = from; s < from + budget; s++) {
-    const fig = replay(facts, s);
-    if (fig.lastError === null && extensionsClear(facts, fig)) return s;
+  const hasExt = extensionTriples(facts).length > 0;
+  const base0 = replay(facts, from);
+  const reflectable = reflectableFreePoints(base0.construction);
+  const hasOnSeg = base0.construction.objects.some((o) => o.kind === 'line-line-intersection' && o.onSeg);
+  if (!hasExt && !hasOnSeg) return from; // nothing to satisfy → keep the seed
+  const ok = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig) && intersectionsWithinSegments(fig);
+  if (ok(base0)) return from; // the current view already satisfies every requirement
+  // Candidate seeds in priority order. When a segment-meet is off its segment the cause is almost always an
+  // apex pointing the wrong way, which plain re-seeding rarely fixes — so try the REFLECTION seeds first
+  // (targeted mask = mirror exactly the failing apexes, then the other non-empty subsets), each over a small
+  // band of continuous seeds (the apex flips inward, the seed varies the rest of the shape so the crossing
+  // lands cleanly inside). Then the plain seeds (extensions; also an on-seg figure fixable by re-seed alone).
+  const seeds: number[] = [];
+  if (hasOnSeg && reflectable.length > 0) {
+    const targeted = reflectMaskForFailing(base0);
+    const subsets = Array.from({ length: (1 << reflectable.length) - 1 }, (_, i) => i + 1);
+    const masks = [targeted, ...subsets].filter((m, i, a) => m > 0 && a.indexOf(m) === i);
+    for (const m of masks) for (let s = 0; s < 24; s++) seeds.push(withReflectMask(m, s));
   }
-  // Pass 2 — RELAXED FALLBACK ([ADR-142](docs/06-decisions.md#adr-142)): no seed satisfies the strict direction
-  // (the named side is geometrically impossible — e.g. a reversed "המשך BD" whose unique crossing is beyond B),
-  // so accept a shared-endpoint extension on EITHER side. A one-letter typo then no longer cascades; the circle
-  // disambiguates the side. The strict pass is always tried FIRST, so this never weakens an achievable figure.
+  for (let s = from; s < from + budget; s++) seeds.push(s);
+  for (const s of seeds) if (ok(replay(facts, s))) return s;
+  // RELAXED FALLBACK ([ADR-142](docs/06-decisions.md#adr-142)): no seed satisfies the strict extension
+  // direction, so accept a shared-endpoint extension on EITHER side (the strict pass above ran first, so this
+  // never weakens an achievable figure). Still requires plain segment-meets to land within.
   for (let s = from; s < from + budget; s++) {
     const fig = replay(facts, s);
-    if (fig.lastError === null && extensionsClear(facts, fig, true)) return s;
+    if (fig.lastError === null && extensionsClear(facts, fig, true) && intersectionsWithinSegments(fig)) return s;
   }
   return from;
 }
@@ -492,6 +611,7 @@ export function meetsRequirements(facts: Fact[], seed = 0): boolean {
     fig.lastError === null &&
     fig.violations.length === 0 &&
     extensionsClear(facts, fig) &&
+    intersectionsWithinSegments(fig) &&
     pointsDistinct(fig.construction, fig.positions, fig.coincidences) &&
     polygonsConvex(facts, fig.positions)
   );
@@ -506,6 +626,11 @@ export function meetsRequirements(facts: Fact[], seed = 0): boolean {
  * bounded. Deterministic.
  */
 export function findValidConfig(facts: Fact[], fromSeed = 0): { facts: Fact[]; seed: number } | null {
+  // First the targeted extension/reflection search (ADR-098/ADR-166): it explores the discrete apex
+  // REFLECTION DOF (high seed bits) that the plain seed sweep below can't reach, so a segment-meet whose
+  // apex points the wrong way is brought onto the segments in a handful of tries instead of by luck.
+  const s0 = firstSatisfyingSeed(facts, fromSeed);
+  if (meetsRequirements(facts, s0)) return { facts, seed: s0 };
   for (let s = fromSeed; s < fromSeed + 40; s++) if (meetsRequirements(facts, s)) return { facts, seed: s };
   // Discrete branch alternatives — vary which intersection/side each branchable point takes.
   const base = replay(facts).construction;
@@ -994,7 +1119,7 @@ export const useGeoStore = create<GeoState>()(
         // searching upward from the current seed so an already-valid hand-picked view is kept.
         const seed = get().seed;
         const fig = replay(next, seed);
-        if (fig.lastError === null && !extensionsClear(next, fig)) {
+        if (fig.lastError === null && (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig))) {
           const s = firstSatisfyingSeed(next, seed);
           if (s !== seed) set({ seed: s, radiusOverrides: {} });
         }
@@ -1051,11 +1176,14 @@ export const useGeoStore = create<GeoState>()(
 
       viewRelations: () => {
         const facts = get().facts;
-        // Sample across the seed-0 construction of EACH variant alternative (ADR-138) — detection samples each
-        // across its own seeds, so the result is seed- AND variant-independent, and a kite/isosceles equal-pair
-        // (a free choice) is not reported as forced. Cache the `facts` ref so the layer auto-invalidates on any
-        // fact change. (With no variant shape this is exactly the single seed-0 construction as before.)
-        const constructions = variantConfigs(facts).map((vf) => replay(vf, 0).construction);
+        // Sample across a REQUIREMENT-SATISFYING construction of EACH variant alternative (ADR-138). Detection
+        // samples each across its own seeds, so the result is seed- AND variant-independent, and a kite/isosceles
+        // equal-pair (a free choice) is not reported as forced. The base seed is `firstSatisfyingSeed`, not 0, so
+        // an on-segment meet's apexes are already flipped inward (ADR-166) — otherwise every sample is the
+        // requirement-VIOLATING outward config and an emergent shape through the crossings (EGFH) is never forced.
+        // (`firstSatisfyingSeed` returns 0 for any figure without an extension/segment-meet, so this is unchanged
+        // there.) Cache the `facts` ref so the layer auto-invalidates on any fact change.
+        const constructions = variantConfigs(facts).map((vf) => replay(vf, firstSatisfyingSeed(vf)).construction);
         const result = detectRelationsAcross(constructions);
         set({ relations: { result, facts } });
       },
@@ -1063,11 +1191,11 @@ export const useGeoStore = create<GeoState>()(
       clearRelations: () => set({ relations: null }),
 
       detectShapes: () => {
-        // Same sampling contract as viewRelations (ADR-138 variant configs, facts-keyed cache): a named shape
-        // is reported only if FORCED across every variant × seed, so it catches emergent shapes and never a
-        // coincidence of the drawing.
+        // Same sampling contract as viewRelations (ADR-138 variant configs, requirement-satisfying base seed, ADR-166,
+        // facts-keyed cache): a named shape is reported only if FORCED across every variant × seed, so it catches
+        // emergent shapes and never a coincidence of the drawing.
         const facts = get().facts;
-        const constructions = variantConfigs(facts).map((vf) => replay(vf, 0).construction);
+        const constructions = variantConfigs(facts).map((vf) => replay(vf, firstSatisfyingSeed(vf)).construction);
         const result = detectShapesAcross(constructions);
         set({ shapes: { result, facts } });
       },

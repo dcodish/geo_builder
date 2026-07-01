@@ -165,9 +165,9 @@ describe('parser — Phase-5a constructs (he/en)', () => {
   it('diagonal synonym', () => one('diagonal BD', { type: 'segment', a: 'B', b: 'D' }));
   it('segment (hebrew)', () => one('קטע AC', { type: 'segment', a: 'A', b: 'C' }));
   it('line∩line intersection (english)', () =>
-    has('E is the intersection of AC and BD', { type: 'line-line-intersection', id: 'E', a: 'A', b: 'C', c: 'B', d: 'D' }));
+    has('E is the intersection of AC and BD', { type: 'line-line-intersection', id: 'E', a: 'A', b: 'C', c: 'B', d: 'D', onSeg: true }));
   it('line∩line intersection (hebrew)', () =>
-    has('M חיתוך AC ו-BD', { type: 'line-line-intersection', id: 'M', a: 'A', b: 'C', c: 'B', d: 'D' }));
+    has('M חיתוך AC ו-BD', { type: 'line-line-intersection', id: 'M', a: 'A', b: 'C', c: 'B', d: 'D', onSeg: true }));
   it('also draws the two referenced segments', () => {
     const r = parse('E is the intersection of AC and BD');
     expect(r.ok && r.commands.filter((c) => c.type === 'segment').length).toBe(2); // AC and BD drawn
@@ -191,7 +191,7 @@ describe('parser — out-of-grammar returns not-handled (the fallback boundary)'
 });
 
 describe('parser — lines-first intersection phrasing (he/en)', () => {
-  const e: Command = { type: 'line-line-intersection', id: 'E', a: 'A', b: 'C', c: 'B', d: 'D' };
+  const e: Command = { type: 'line-line-intersection', id: 'E', a: 'A', b: 'C', c: 'B', d: 'D', onSeg: true };
   it('english', () => has('the diagonals AC and BD intersect at point E', e));
   it('hebrew (inflected נחתכים)', () => has('האלכסונים AC ו-BD נחתכים בנקודה E', e));
 });
@@ -200,8 +200,9 @@ describe('parser — cut-form intersection (verb BETWEEN the two segments)', () 
   // "BD cuts OC at A" — A = line BD ∩ line OC. The reported case: this used to escalate to the LLM,
   // which rewrote it lossily as "A on the extension of BD" (dropping the OC half) — wrong point.
   const a: Command = { type: 'line-line-intersection', id: 'A', a: 'B', b: 'D', c: 'O', d: 'C' };
-  it('hebrew "BD חותך את OC בנקודה A" (non-directional)', () => has('BD חותך את OC בנקודה A', a));
-  it('english "BD cuts OC at A" (non-directional)', () => has('BD cuts OC at A', a));
+  // No "המשך" → a plain segment meet, so onSeg is set (the crossing must lie within both segments, ADR-166).
+  it('hebrew "BD חותך את OC בנקודה A" (non-directional)', () => has('BD חותך את OC בנקודה A', { ...a, onSeg: true }));
+  it('english "BD cuts OC at A" (non-directional)', () => has('BD cuts OC at A', { ...a, onSeg: true }));
   // A "המשך"/extension operand is DIRECTIONAL — A must be beyond the 2nd point (ADR-054). Detected per
   // operand (which side of the cut verb the word falls on), so a one-sided extension only flags its side.
   it('"המשך BD חותך את המשך OC" → both directional (dir1 + dir2)', () =>
