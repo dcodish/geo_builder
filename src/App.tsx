@@ -18,7 +18,7 @@ import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
 import type { Crossing } from '@/render';
-import type { DetectedShape } from '@/engine';
+import type { DetectedShape, Id } from '@/engine';
 import { bookUrl } from '@/shapes/shapeCatalog';
 import { Modal } from '@/ui/Modal';
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
@@ -446,20 +446,28 @@ export default function App() {
   // The "detect shapes" badge layer — same facts-keyed cache contract as the relations layer above.
   const shapesLayer = shapes && shapes.facts === facts ? shapes.result : null;
 
-  // Highlight the shape under the cursor (hover) or the one whose card is open: its vertices, the drawn
-  // edge segments between them, and (for a circle) the circle itself. Reuses the canvas `highlight` set,
-  // so it overrides the fact-selection highlight while a shape is active. Cleared when the layer clears.
+  // Highlight the shape under the cursor (hover) or the one whose card is open: its vertices (dots) and,
+  // for a circle, the circle itself. Reuses the canvas `highlight` set, so it overrides the fact-selection
+  // highlight while a shape is active. Cleared when the layer clears. The boundary EDGES are highlighted
+  // separately as point-pairs (`shapeHighlightEdges`) so a sub-segment through a crossing lights up too.
   const shapeHighlight = useMemo(() => {
     const sh = shapesLayer ? (hoverShape ?? openShape) : null;
     if (!sh) return undefined;
-    const vset = new Set(sh.vertices);
     const ids = new Set<string>(sh.vertices);
-    for (const o of construction.objects) {
-      if (o.kind === 'segment' && vset.has(o.a) && vset.has(o.b)) ids.add(o.id);
-      else if (o.kind === 'circle' && sh.type === 'circle' && o.center === sh.vertices[0]) ids.add(o.id);
-    }
+    if (sh.type === 'circle') for (const o of construction.objects) if (o.kind === 'circle' && o.center === sh.vertices[0]) ids.add(o.id);
     return ids;
   }, [shapesLayer, hoverShape, openShape, construction]);
+
+  // The active shape's boundary edges as point-PAIRS (consecutive vertices, wrapping). The renderer strokes
+  // each between its endpoints' positions, so an edge that is only a PORTION of a longer drawn segment
+  // (e.g. G–C ⊂ EC, with no object of its own) is highlighted — the ADR-167-Am. fix for "CDG segments not
+  // highlighted correctly". A circle shape has no boundary edges.
+  const shapeHighlightEdges = useMemo<[Id, Id][] | undefined>(() => {
+    const sh = shapesLayer ? (hoverShape ?? openShape) : null;
+    if (!sh || sh.type === 'circle' || sh.vertices.length < 2) return undefined;
+    const v = sh.vertices;
+    return v.map((id, i) => [id, v[(i + 1) % v.length]] as [Id, Id]);
+  }, [shapesLayer, hoverShape, openShape]);
 
   // Snap-to-intersection: a clicked crossing becomes a real named point. Pick the
   // first free single capital letter, then create it via the same command path.
@@ -569,6 +577,7 @@ export default function App() {
             width={canvasSize.w}
             height={canvasSize.h}
             highlight={shapeHighlight ?? highlight}
+            highlightEdges={shapeHighlightEdges}
             onPickIntersection={markIntersection}
             intersectionLabel={t('actions.markIntersection')}
             labels={labels}
@@ -915,6 +924,9 @@ export default function App() {
           )}
           {relationsLayer && relationsLayer.equalSegments.length === 0 && relationsLayer.equalAngles.length === 0 && (
             <span style={{ fontSize: 12, color: '#64748b' }}>{t('actions.relationsNone')}</span>
+          )}
+          {relationsLayer && (relationsLayer.equalSegments.length > 0 || relationsLayer.equalAngles.length > 0) && (
+            <span style={{ fontSize: 12, color: '#64748b' }}>{t('actions.relationsHover')}</span>
           )}
 
           {/* "Detect shapes" (FR-SH) — on press, classify every named shape the figure contains (forced

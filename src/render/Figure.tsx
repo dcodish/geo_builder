@@ -11,8 +11,8 @@
 import { useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
-import { buildScene, relationMarks, scenePositions } from './scene';
-import type { MeasureLabels } from './scene';
+import { buildScene, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
+import type { MeasureLabels, RelationPick } from './scene';
 import type { RelationsResult } from '@/engine';
 import { findSegmentCrossings } from './intersections';
 import type { Crossing } from './intersections';
@@ -26,6 +26,10 @@ export interface FigureProps {
   padding?: number;
   /** Object ids to accent (e.g. those introduced by the selected fact). */
   highlight?: Set<Id>;
+  /** Point-PAIRS to accent as strokes between their positions — a shape's boundary edges, INCLUDING a
+   *  sub-segment that is only a portion of a longer drawn segment (e.g. `G–C`, a slice of `EC`) and so has
+   *  no object id of its own. Drawn on top of the base segments; used by the shape-badge highlight (ADR-167 Am.). */
+  highlightEdges?: [Id, Id][];
   /**
    * When provided, unmarked crossings of declared segments are offered as
    * hollow dots; clicking one calls this with the crossing so the host can
@@ -136,6 +140,7 @@ export function Figure({
   height = 600,
   padding = 48,
   highlight,
+  highlightEdges,
   onPickIntersection,
   intersectionLabel,
   labels,
@@ -232,7 +237,7 @@ export function Figure({
     window.setTimeout(() => setExportFlash(''), 1400);
   }
 
-  const { scene, transform, crossings, labelDirs, relMarks } = useMemo(() => {
+  const { scene, transform, crossings, labelDirs, oriented } = useMemo(() => {
     // Rotate/flip the figure in world space, then fit — so it stays centred and
     // labels (computed here, drawn upright) follow the new orientation. A standing
     // "align segment horizontal" request is recomputed from the CURRENT positions each
@@ -246,9 +251,6 @@ export function Figure({
     const s = buildScene(construction, oriented, labels, angleMarks, { showCenters });
     const t = fitTransform(scenePositions(s), { width, height, padding });
     const x = onPickIntersection ? findSegmentCrossings(construction, oriented) : [];
-    // The "view relations" marks use the SAME oriented positions as the scene, so the ticks/arcs land on the
-    // drawn segments/angles under any orientation (ADR-134).
-    const relMarks = relations ? relationMarks(relations, oriented) : null;
 
     // Nudge each label off the lines, in screen space at a reference scale (zoom
     // is applied later by the pan/zoom <g>, so this stays stable across zooming).
@@ -265,8 +267,20 @@ export function Figure({
     const ptScreen = s.points.map((p) => ({ id: p.id, screen: t.toScreen(p.pos), seed: unitVec({ x: p.labelDir.x, y: -p.labelDir.y }) }));
     const labelDirs = chooseLabelDirs(ptScreen, obstacles, circScreen, REF_OFF, REF_CLEAR);
 
-    return { scene: s, transform: t, crossings: x, labelDirs, relMarks };
-  }, [construction, positions, labels, angleMarks, relations, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, showCenters]);
+    return { scene: s, transform: t, crossings: x, labelDirs, oriented };
+  }, [construction, positions, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, showCenters]);
+
+  // "View relations" is now HOVER-DRIVEN to fight clutter (ADR-167 Am.): the resting figure is clean, and
+  // pointing at a side/angle reveals ONLY its equality class. `hoverRel` is the class under the cursor;
+  // `relMarks` draws just that class, and a hovered length class also gets accent strokes on its members.
+  const [hoverRel, setHoverRel] = useState<RelationPick | null>(null);
+  const activeHover = relations ? hoverRel : null; // ignore a stale pick once the layer is off
+  const relMarks = relations && activeHover ? relationMarks(relationsForPick(relations, activeHover), oriented) : null;
+  const relAccentEdges: [Id, Id][] =
+    relations && activeHover?.kind === 'segment' && relations.equalSegments[activeHover.classIndex]
+      ? (relations.equalSegments[activeHover.classIndex] as [Id, Id][])
+      : [];
+  const overlayEdges: [Id, Id][] = [...(highlightEdges ?? []), ...relAccentEdges];
 
   // Point radius in px, kept visually constant by dividing out the pan/zoom scale.
   // `r` sizes the marks/crossings/measure offsets; `pointR` is the small textbook-
@@ -305,11 +319,28 @@ export function Figure({
   }
   function onPointerMove(e: React.PointerEvent) {
     const d = drag.current;
-    if (!d) return;
-    setView((v) => ({ ...v, panX: d.panX + (e.clientX - d.x), panY: d.panY + (e.clientY - d.y) }));
+    if (d) {
+      setView((v) => ({ ...v, panX: d.panX + (e.clientX - d.x), panY: d.panY + (e.clientY - d.y) }));
+      return;
+    }
+    // Not dragging: while the relations layer is on, pick the equality class under the cursor (hover-to-focus).
+    if (!relations || !svgRef.current) {
+      if (hoverRel) setHoverRel(null);
+      return;
+    }
+    const rect = svgRef.current.getBoundingClientRect();
+    const sx = (e.clientX - rect.left) * (width / (rect.width || width));
+    const sy = (e.clientY - rect.top) * (height / (rect.height || height));
+    const world = transform.toWorld({ x: (sx - view.panX) / view.zoom, y: (sy - view.panY) / view.zoom });
+    const pxToWorld = 1 / (transform.scale * view.zoom);
+    const pick = relationAt(relations, oriented, world, 10 * pxToWorld, 44 * pxToWorld);
+    setHoverRel((prev) => (prev?.kind === pick?.kind && prev?.classIndex === pick?.classIndex ? prev : pick));
   }
   function onPointerUp() {
     drag.current = null;
+  }
+  function onPointerLeave() {
+    if (hoverRel) setHoverRel(null);
   }
 
   return (
@@ -326,6 +357,7 @@ export function Figure({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerLeave={onPointerLeave}
       >
         <g transform={`translate(${view.panX} ${view.panY}) scale(${view.zoom})`}>
           {/* Circles are drawn first (outline only) so chords/segments sit on top.
@@ -457,6 +489,31 @@ export function Figure({
                   />
                 )}
               </g>
+            );
+          })}
+
+          {/* Shape-badge highlight: accent each boundary edge as a stroke between its endpoints' positions,
+              so a sub-segment that is only part of a longer drawn segment (G–C ⊂ EC, with no object of its
+              own) lights up too (ADR-167 Am.). Non-interactive; sits on top of the base segments. */}
+          {overlayEdges.map(([ea, eb], i) => {
+            const pa = oriented.get(ea);
+            const pb = oriented.get(eb);
+            if (!pa || !pb) return null;
+            const a = transform.toScreen(pa);
+            const b = transform.toScreen(pb);
+            return (
+              <line
+                key={`he-${i}`}
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke={ACCENT}
+                strokeWidth={stroke * 2.5}
+                strokeLinecap="round"
+                opacity={0.9}
+                style={{ pointerEvents: 'none' }}
+              />
             );
           })}
 

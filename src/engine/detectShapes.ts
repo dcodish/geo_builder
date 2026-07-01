@@ -325,7 +325,7 @@ export function detectShapesAcross(constructions: Construction[], opts: ShapeDet
   // Emergent polygons — triangle/quad cycles over the implicit edge graph that were never declared as
   // a `polygon` (e.g. a parallelogram between segments). Conservative: only keep a NAMED special type
   // (a generic quad classifies to null and is dropped; a generic emergent triangle is dropped too).
-  const adj = adjacency(figureEdges(c0));
+  const adj = adjacency(figureEdges(c0, samples));
   if (adj.size <= 16) { // perf guard: skip enumeration on a very dense figure
     const perSampleOf = (verts: Id[]): Vec[][] | null => {
       const rows: Vec[][] = [];

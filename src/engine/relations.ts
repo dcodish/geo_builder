@@ -25,34 +25,72 @@ import { pointNeighbors } from './step';
 import { dist, sub, len } from './geometry';
 
 /**
+ * GEOMETRIC segment splitting — every point that lies ON a drawn carrier, connected to the carrier's other
+ * on-points. This REPLACES the old construction-kind whitelist (`onHostEdges`: on-segment/midpoint/foot/
+ * onSeg-intersection) with the principle "**if two nodes have a drawn line between them, they are connected**"
+ * ([ADR-167](docs/06-decisions.md#adr-167)). A *carrier* is any drawn 1-D primitive with two endpoint ids —
+ * a `segment` or a polygon edge. A point counts as ON a carrier when it is COLLINEAR with the carrier in
+ * EVERY sample (a forced fact, so not a coincidence of one drawing) AND lands within the drawn span in at
+ * least one valid config (a genuine sub-segment, not a pure extension). Whether the resulting cycle is a
+ * FORCED shape is decided downstream by the "holds in every sample" classifier — this only builds the
+ * topological edge set. A membership is kept **regardless of how the point was defined**: an intersection (onSeg or not), a
+ * foot, a midpoint, a `set-line` collinear point, or a purely emergent coincidence (a rectangle's diagonals
+ * bisecting at one point) all split the carrier they land on — no per-kind registration, so a new construct
+ * never needs adding here again. Each carrier emits every pair among {its endpoints} ∪ {its interior points},
+ * so BOTH the whole segment and every sub-segment (`E–G`, `G–C` for `G` on `EC`) become first-class edges.
+ * Used for the segment universe AND the angle graph; at a shared endpoint the collinear rays merge, so no
+ * spurious angle appears there — only the genuine angles AT the interior point.
+ */
+export function collinearSplits(c: Construction, samples: Map<Id, Vec>[]): [Id, Id][] {
+  if (samples.length === 0) return [];
+  const carriers: [Id, Id][] = [];
+  for (const o of c.objects) {
+    if (o.kind === 'segment') carriers.push([o.a, o.b]);
+    else if (o.kind === 'polygon') for (let i = 0; i < o.vertices.length; i++) carriers.push([o.vertices[i], o.vertices[(i + 1) % o.vertices.length]]);
+  }
+  const pts = c.objects.filter(isGeoPoint).map((o) => o.id);
+  const tolT = 1e-4; // projection parameter this far inside (0,1) counts as interior (not an endpoint)
+  const tolPerp = 1e-4; // perpendicular offset, relative to the carrier length, this small counts as "on the line"
+  const out: [Id, Id][] = [];
+  for (const [a, b] of carriers) {
+    const members: Id[] = [a, b];
+    for (const p of pts) {
+      if (p === a || p === b) continue;
+      // A point splits the carrier iff it is COLLINEAR (on the infinite line) in EVERY sample — that is
+      // FORCED by the givens, so it can't be a coincidence of one drawing — AND lands WITHIN the drawn span
+      // in at least one valid config (so it's a genuine sub-segment, not a pure-extension phantom). The
+      // within-span part is deliberately NOT required in every sample: a segment-meet crossing G can sit
+      // beyond an endpoint in the mirror configs the sampler also visits (`t>1`) while still being a real
+      // interior split in the requirement-satisfying config; whether the resulting cycle is a FORCED shape
+      // is then decided downstream by the "holds in every sample" classifier, not here (ADR-167).
+      let collinearAll = true;
+      let withinSome = false;
+      for (let s = 0; s < samples.length; s++) {
+        const va = samples[s].get(a), vb = samples[s].get(b), vp = samples[s].get(p);
+        if (!va || !vb || !vp) { collinearAll = false; break; }
+        const dx = vb.x - va.x, dy = vb.y - va.y;
+        const len2 = dx * dx + dy * dy;
+        if (len2 < EPS) { collinearAll = false; break; }
+        const perp = Math.abs((vp.x - va.x) * dy - (vp.y - va.y) * dx) / Math.sqrt(len2);
+        if (perp > tolPerp * Math.sqrt(len2)) { collinearAll = false; break; }
+        const t = ((vp.x - va.x) * dx + (vp.y - va.y) * dy) / len2;
+        if (t > tolT && t < 1 - tolT) withinSome = true;
+      }
+      if (collinearAll && withinSome) members.push(p);
+    }
+    if (members.length <= 2) continue; // no interior point — the whole edge alone is covered by `pointNeighbors`
+    for (let i = 0; i < members.length; i++) for (let j = i + 1; j < members.length; j++) out.push([members[i], members[j]]);
+  }
+  return out;
+}
+
+/**
  * Edges from each DRAWN (visible) line — the points that visibly lie on it, pairwise. A tangent drawn from
  * its touch point D to the crossing E is a visible edge D–E even though it's a `line`, not a `segment`; this
  * is what lets the angle universe see the TANGENT-CHORD angle (∠ between the tangent DE and a chord DB).
- * Used for ANGLES only — segment lengths stay the drawn `segment`s. (FR-RV-6 "what appears", ADR-134.)
+ * (FR-RV-6 "what appears", ADR-134.) Lines are membership-based (their on-points are structural), so they
+ * need no geometric pass; the segment/polygon carriers get {@link collinearSplits}.
  */
-/**
- * A point that lies ON a segment/line is connected — for ANGLE enumeration ONLY — to that host's two
- * endpoints, so an angle between the host line and another ray from the point is seen. Without this a
- * perpendicular FOOT (or any "F on AB") has only its OFF-line neighbour in the graph (e.g. the altitude
- * AF), so the right angle it makes with the host line (∠AFB = 90°) is never enumerated and the foot's 90°
- * goes unmarked. The endpoints are NOT added to the SEGMENT universe (no fake edge) — only to the angle
- * graph; at the endpoint the collinear ray to this point merges (same direction) with the ray to the far
- * endpoint, so no spurious angle appears there — only the genuine angles AT the on-host point are added.
- */
-export function onHostEdges(c: Construction): [Id, Id][] {
-  const edges: [Id, Id][] = [];
-  for (const o of c.objects) {
-    if (o.kind === 'on-segment' || o.kind === 'on-segment-solved' || o.kind === 'midpoint') edges.push([o.id, o.a], [o.id, o.b]);
-    else if (o.kind === 'foot') edges.push([o.id, o.a], [o.id, o.b]); // the foot lies on the line (a,b)
-    // A SEGMENT-meet crossing ([ADR-166](docs/06-decisions.md#adr-166)) lies WITHIN both its operand segments
-    // (that's what `onSeg` asserts), so it SPLITS each — G on AE and BF connects to A,E,B,F. Without this the
-    // crossing has no drawn neighbour (the parser draws the whole AE/BF, not stubs to G), so an emergent shape
-    // whose sides run THROUGH the crossing (the classic "AE∩BF, DE∩CF ⇒ EGFH rhombus") is invisible to
-    // `figureEdges`. Only `onSeg` (within) crossings split cleanly; an extension/infinite meet is skipped.
-    else if (o.kind === 'line-line-intersection' && o.onSeg) edges.push([o.id, o.a], [o.id, o.b], [o.id, o.c], [o.id, o.d]);
-  }
-  return edges;
-}
 
 export function visibleLineEdges(c: Construction): [Id, Id][] {
   const byId = new Map(c.objects.map((o) => [o.id, o] as const));
@@ -80,12 +118,14 @@ export function visibleLineEdges(c: Construction): [Id, Id][] {
 /**
  * The figure's **implicit edge universe** — every point-to-point connection a student visibly sees,
  * canonicalised (a ≤ b) and deduped: the drawn `segment`s + polygon edges (`pointNeighbors`), the
- * on-host splits (`onHostEdges` — e.g. `O–A`/`O–B` for a diameter midpoint `O`, `E–B` for `E` on `AB`),
- * and the points sharing a drawn `line` (`visibleLineEdges`). This is the SAME set the equal-angle
- * universe already uses; sharing it lets equal-segment detection and emergent-shape detection see the
- * implicit geometry too (radii of a diameter, a parallelogram between segments), not only declarations.
+ * GEOMETRIC on-carrier splits (`collinearSplits` — e.g. `O–A`/`O–B` for a diameter midpoint `O`, `E–B`
+ * for `E` on `AB`, `G–E`/`G–C` for any point `G` that lands on `EC` however it was built), and the
+ * points sharing a drawn `line` (`visibleLineEdges`). This is the SAME set the equal-angle universe uses;
+ * sharing it lets equal-segment detection and emergent-shape detection see the implicit geometry too
+ * (radii of a diameter, a parallelogram between segments), not only declarations. Needs `samples` because
+ * the splits are geometric (a point is "on" a carrier only if it is in every sampled configuration).
  */
-export function figureEdges(c: Construction): [Id, Id][] {
+export function figureEdges(c: Construction, samples: Map<Id, Vec>[]): [Id, Id][] {
   const nb = pointNeighbors(c);
   const seen = new Set<string>();
   const out: [Id, Id][] = [];
@@ -98,7 +138,7 @@ export function figureEdges(c: Construction): [Id, Id][] {
     out.push([lo, hi]);
   };
   for (const [v, list] of Object.entries(nb)) for (const w of list) add(v, w);
-  for (const [x, y] of [...visibleLineEdges(c), ...onHostEdges(c)]) add(x, y);
+  for (const [x, y] of [...visibleLineEdges(c), ...collinearSplits(c, samples)]) add(x, y);
   return out;
 }
 
@@ -225,12 +265,13 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
   const samples = convergedSamples(rawSamples); // drop numerically-diverged solves (ADR-166 Am.)
   if (samples.length === 0) return { equalSegments: [], equalAngles: [], definiteAngles: [], samplesUsed: 0 };
 
-  const nb = pointNeighbors(c0);
-
-  // 2. The segment universe — the figure's IMPLICIT edges (drawn segments + polygon edges + on-host
-  //    splits + visible-line edges), the same universe the angle pass uses. The on-host splits are what
-  //    let `OA`/`OB` (the two halves of a diameter through its midpoint `O`) be detected as equal radii.
-  const segs: SegmentRef[] = figureEdges(c0);
+  // 2. The IMPLICIT edge universe — drawn segments + polygon edges + GEOMETRIC on-carrier splits +
+  //    visible-line edges, the same universe the angle pass uses. The geometric splits (`collinearSplits`
+  //    inside `figureEdges`) are what let `OA`/`OB` (the two halves of a diameter through its midpoint `O`)
+  //    be detected as equal radii, and any emergent split (a crossing / foot / collinear point ON a drawn
+  //    segment) be seen — regardless of the point's construction kind ([ADR-167](docs/06-decisions.md#adr-167)).
+  const edges = figureEdges(c0, samples);
+  const segs: SegmentRef[] = edges;
   // Length of each segment in each sample (NaN where a point is missing / the segment is degenerate).
   const segLen: number[][] = segs.map(([a, b]) =>
     samples.map((p) => {
@@ -280,11 +321,11 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
     }
     return true;
   };
-  // The angle universe also uses the DRAWN LINES (a tangent etc.), so a tangent-chord angle is seen; segment
-  // lengths above stay on the drawn `segment`s only.
+  // The angle universe is the SAME implicit edge set (drawn segments/polygons + geometric splits + drawn
+  //  lines), so a tangent-chord angle and any angle AT an on-carrier point are both seen. Built as an
+  //  adjacency over `edges` — one source of truth with the segment universe above.
   const nbAng: Record<Id, Set<Id>> = {};
-  for (const [k, vs] of Object.entries(nb)) nbAng[k] = new Set(vs);
-  for (const [x, y] of [...visibleLineEdges(c0), ...onHostEdges(c0)]) {
+  for (const [x, y] of edges) {
     (nbAng[x] ??= new Set()).add(y);
     (nbAng[y] ??= new Set()).add(x);
   }

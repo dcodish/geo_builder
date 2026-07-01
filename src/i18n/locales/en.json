@@ -175,6 +175,7 @@
     "analysing": "Analysing…",
     "relationsHint": "Mark which sides and angles are equal in every possible drawing of the figure",
     "relationsNone": "No sides or angles are necessarily equal",
+    "relationsHover": "Hover a side or angle to see what's equal to it",
     "language": "עברית"
   },
   "pointMenu": {

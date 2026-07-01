@@ -250,6 +250,19 @@ describe('Figure — static SVG render (no DOM)', () => {
     }
   });
 
+  it("accents a shape's boundary edges as strokes between endpoints — including a sub-segment (ADR-167 Am.)", () => {
+    const { construction, positions } = f1(); // square ABCD + G on AD ⇒ A–G is a PORTION of the drawn seg-AD
+    const plain = renderToStaticMarkup(<Figure construction={construction} positions={positions} />);
+    expect(plain).not.toContain('#f59e0b'); // no accent colour without a highlight
+
+    // Highlight the boundary of a (hypothetical) shape A–G–B: A–G is a sub-segment with no object of its own.
+    const lit = renderToStaticMarkup(
+      <Figure construction={construction} positions={positions} highlightEdges={[['A', 'G'], ['G', 'B'], ['B', 'A']]} />,
+    );
+    // One accent stroke per boundary edge — drawn between the endpoints' positions, so the sub-segment lights up.
+    expect((lit.match(/stroke="#f59e0b"/g) ?? []).length).toBe(3);
+  });
+
   it('hides a point label + dot when in `hidden`, drawing a clickable ghost instead (FR-RN-10)', () => {
     const { construction, positions } = f1();
     const noop = () => {};

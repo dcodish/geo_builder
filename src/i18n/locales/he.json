@@ -175,6 +175,7 @@
     "analysing": "מנתח…",
     "relationsHint": "סמן אילו צלעות וזוויות שוות בכל ציור אפשרי של הצורה",
     "relationsNone": "לא נמצאו צלעות או זוויות שוות בהכרח",
+    "relationsHover": "רחפו מעל צלע או זווית כדי לראות מה שווה לה",
     "language": "English"
   },
   "pointMenu": {

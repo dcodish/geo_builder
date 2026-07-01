@@ -131,13 +131,40 @@ const SCENARIOS: Scenario[] = [
         expect(t, `${g} on segment ${a}${b} (param)`).toBeGreaterThan(0.02);
         expect(t, `${g} on segment ${a}${b} (param)`).toBeLessThan(0.98);
       }
-      // The emergent EGFH rhombus is DETECTED (ADR-166 Am.): the crossings G,H split their segments in the
-      // implicit-edge universe (`onHostEdges` now sees an `onSeg` line-line-intersection), detection samples
-      // the requirement-satisfying inward config, and diverged solver samples are dropped so the forced rhombus
-      // isn't masked. (The quad EGFH is listed with its cycle order E-G-F-H, i.e. vertex set EFGH.)
+      // The emergent EGFH rhombus is DETECTED (ADR-166 Am., generalised by ADR-167): the crossings G,H split
+      // their segments in the implicit-edge universe (`collinearSplits` — any point geometrically ON a drawn
+      // segment splits it, kind-independent), detection samples the requirement-satisfying inward config, and
+      // diverged solver samples are dropped so the forced rhombus isn't masked. (EGFH cycle order → vertex set EFGH.)
       const shapes = detectShapes(fig.construction);
       const rhombus = shapes.shapes.find((s) => (s.type === 'rhombus' || s.type === 'square') && [...s.vertices].sort().join('') === 'EFGH');
       expect(rhombus, `EGFH detected as a rhombus (got: ${shapes.shapes.map((s) => `${s.type}:${s.label}`).join(', ')})`).toBeTruthy();
+    },
+  },
+  {
+    id: 'emergent-shapes-through-crossings',
+    title: 'ABCD + two equilateral triangles: the emergent triangles ABH, CDG and rhombus EGFH — none declared — are all detected',
+    guards:
+      'operator deep-review session: rectangle ABCD with equilateral triangles BCE, DAF built inward on opposite sides, then "EC ו DF נפגשים בנקודה G" and "H = חיתוך BE ו-AF" (a bagrut construction). Every side of the emergent shapes runs THROUGH a crossing (G on EC/DF, H on BE/AF) or along a rectangle edge, so NONE of ABH / CDG / EGFH is a declared `polygon` — they exist only implicitly. Before [ADR-167](docs/06-decisions.md#adr-167) the implicit-edge universe was a hand-maintained whitelist of point KINDS (`onHostEdges`: on-segment/midpoint/foot/onSeg-intersection); a figure whose crossing was built by any OTHER kind fell through and its emergent shapes/relations went undetected (the "node-definition issue, again" the operator kept hitting). ADR-167 replaces the whitelist with a GEOMETRIC split: any point collinear-on a drawn segment in every sample AND within its span in some valid config splits it, regardless of construction kind. This scenario also asserts the equal-segment ground truths that ride on those splits (AH=BH=CG=DG, EG=EH=FG=FH).',
+    steps: [
+      'מלבן ABCD',
+      'משולש שווה צלעות BCE',
+      'משולש שווה צלעות DAF',
+      'EC ו DF נפגשים בנקודה G',
+      'H = חיתוך BE ו-AF',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const shapeKeys = detectShapes(fig.construction).shapes.map((s) => `${s.type}:${[...s.vertices].sort().join('')}`);
+      // The three emergent shapes, none of which is a declared polygon (only ABCD/BCE/DAF were declared).
+      expect(shapeKeys, `got: ${shapeKeys.join(', ')}`).toContain('isosceles-triangle:ABH');
+      expect(shapeKeys, `got: ${shapeKeys.join(', ')}`).toContain('isosceles-triangle:CDG');
+      expect(shapeKeys.some((k) => k === 'rhombus:EFGH' || k === 'square:EFGH'), `EGFH rhombus in ${shapeKeys.join(', ')}`).toBe(true);
+      // The equal-segment ground truths that ride on the geometric splits (a sub-segment like C–G is a
+      // portion of the drawn EC, never its own object — yet it is a first-class edge now).
+      const norm = (pairs: [Id, Id][]) => pairs.map(([a, b]) => [a, b].sort().join('')).sort().join(',');
+      const classes = detectRelations(fig.construction).equalSegments.map((cls) => norm(cls));
+      expect(classes, `equal-segment classes: ${classes.join(' | ')}`).toContain(norm([['A', 'H'], ['B', 'H'], ['C', 'G'], ['D', 'G']]));
+      expect(classes).toContain(norm([['E', 'G'], ['E', 'H'], ['F', 'G'], ['F', 'H']]));
     },
   },
   {

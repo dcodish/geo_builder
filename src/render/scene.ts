@@ -427,14 +427,25 @@ export function relationMarks(relations: RelationsResult, positions: Map<Id, Vec
   const values: SceneAngleValue[] = [];
   const rightAngles: SceneAngleMark[] = [];
   const perVertex = new Map<Id, number>();
-  const shownKey = (v: Id, a: Id, b: Id) => `${v}|${a < b ? `${a}|${b}` : `${b}|${a}`}`;
-  const shown = new Set<string>(); // angles whose definite value/right-angle is displayed — skip their equal-arc
+  // Key an angle by its WEDGE — the vertex plus its two ray DIRECTIONS (from the drawn positions), not by the
+  // point IDS. So two angles that are the SAME corner but named through different collinear points — ∠AFD and
+  // ∠GFH when H lies on FA and G on FD — collapse to one key, and "60°" is drawn once instead of "60° 60°".
+  const wedgeKey = (v: Id, a: Id, b: Id): string | null => {
+    const pv = positions.get(v), pa = positions.get(a), pb = positions.get(b);
+    if (!pv || !pa || !pb) return null;
+    const deg = (p: Vec) => Math.round(((Math.atan2(p.y - pv.y, p.x - pv.x) * 180) / Math.PI + 360) % 360);
+    const [lo, hi] = [deg(pa), deg(pb)].sort((m, n) => m - n);
+    return `${v}|${lo}|${hi}`;
+  };
+  const shown = new Set<string>(); // wedges whose definite value/right-angle is displayed — dedup + skip their equal-arc
   for (const { vertex, a, b, valueDeg } of atomicDefiniteAngles(relations.definiteAngles).sort((x, y) => x.valueDeg - y.valueDeg)) {
     const pv = positions.get(vertex);
     const pa = positions.get(a);
     const pb = positions.get(b);
     if (pv && pa && pb && len(sub(pa, pv)) > 1e-9 && len(sub(pb, pv)) > 1e-9) {
-      shown.add(shownKey(vertex, a, b));
+      const wk = wedgeKey(vertex, a, b);
+      if (wk && shown.has(wk)) continue; // this corner is already labelled (∠AFD == ∠GFH via collinear points)
+      if (wk) shown.add(wk);
       // A forced 90° draws the textbook right-angle SQUARE (the "knee"), not a "90°" number (operator request).
       if (Math.abs(valueDeg - 90) < 0.5) {
         rightAngles.push({ vertex: pv, p1: pa, p2: pb, right: true });
@@ -454,7 +465,7 @@ export function relationMarks(relations: RelationsResult, positions: Map<Id, Vec
   const perVertexArcs = new Map<Id, number>();
   let drawnClass = 0;
   for (const cls of relations.equalAngles) {
-    const visible = cls.filter((r) => !shown.has(shownKey(r.vertex, r.a, r.b)));
+    const visible = cls.filter((r) => { const wk = wedgeKey(r.vertex, r.a, r.b); return !(wk && shown.has(wk)); });
     if (visible.length < 2) continue; // every (or all-but-one) member is already shown as a value
     const count = ++drawnClass;
     for (const { vertex, a, b } of visible) {
@@ -475,6 +486,86 @@ export function relationMarks(relations: RelationsResult, positions: Map<Id, Vec
 function formatDeg(v: number): string {
   const rounded = Math.round(v);
   return `${Math.abs(v - rounded) < 0.1 ? rounded : v.toFixed(1)}°`;
+}
+
+// ── Hover-to-focus picking (the "explore equals on the diagram" interaction, ADR-167 Am.) ──────────────
+// The relations layer is a firehose when a figure is rich (every equal-length tick + equal-angle arc at once).
+// Instead of painting all of it, the canvas lets the student hover a side/angle to reveal ONLY its equality
+// class. These pure helpers answer "which relation class is under this world point?" — unit-testable, no DOM.
+
+/** Which relation the student is pointing at: one equality CLASS (its index into equalSegments/equalAngles). */
+export interface RelationPick {
+  kind: 'segment' | 'angle';
+  classIndex: number;
+}
+
+/** Distance from point `p` to the segment `a–b` (clamped to the segment, not the infinite line). */
+function distToSegment(p: Vec, a: Vec, b: Vec): number {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const l2 = dx * dx + dy * dy;
+  if (l2 < 1e-12) return Math.hypot(p.x - a.x, p.y - a.y);
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/** Whether direction to `p` from vertex `v` lies inside the (≤180°) wedge from ray→a to ray→b. */
+function inWedge(p: Vec, v: Vec, a: Vec, b: Vec): boolean {
+  const norm = (x: number) => { let y = x; while (y <= -Math.PI) y += 2 * Math.PI; while (y > Math.PI) y -= 2 * Math.PI; return y; };
+  const av = Math.atan2(a.y - v.y, a.x - v.x);
+  const bv = Math.atan2(b.y - v.y, b.x - v.x);
+  const pv = Math.atan2(p.y - v.y, p.x - v.x);
+  const span = norm(bv - av);
+  if (Math.abs(span) > Math.PI - 1e-9) return false; // a straight/reflex wedge carries no angle to point at
+  const rel = norm(pv - av);
+  return rel >= Math.min(0, span) - 1e-9 && rel <= Math.max(0, span) + 1e-9;
+}
+
+/**
+ * The equality class nearest to `world` (an oriented-space math point), or null if nothing is within reach.
+ * A SEGMENT is picked by perpendicular distance to any of its members (≤ `segReach`); an ANGLE by pointing
+ * INTO its wedge near the vertex (≤ `vertReach` from the vertex). When both are candidates the closer wins,
+ * so hovering ON a line selects the length class and hovering in an open corner selects the angle class.
+ */
+export function relationAt(
+  relations: RelationsResult,
+  positions: Map<Id, Vec>,
+  world: Vec,
+  segReach: number,
+  vertReach: number,
+): RelationPick | null {
+  let bestD = Infinity;
+  let bestPick: RelationPick | null = null;
+  const consider = (d: number, reach: number, pick: RelationPick) => {
+    if (d <= reach && d < bestD) { bestD = d; bestPick = pick; }
+  };
+  relations.equalSegments.forEach((cls, i) => {
+    for (const [a, b] of cls) {
+      const pa = positions.get(a), pb = positions.get(b);
+      if (pa && pb) consider(distToSegment(world, pa, pb), segReach, { kind: 'segment', classIndex: i });
+    }
+  });
+  relations.equalAngles.forEach((cls, j) => {
+    for (const { vertex, a, b } of cls) {
+      const pv = positions.get(vertex), pa = positions.get(a), pb = positions.get(b);
+      if (!pv || !pa || !pb) continue;
+      if (!inWedge(world, pv, pa, pb)) continue;
+      consider(Math.hypot(world.x - pv.x, world.y - pv.y), vertReach, { kind: 'angle', classIndex: j });
+    }
+  });
+  return bestPick;
+}
+
+/** Narrow a full RelationsResult to a single hovered class — everything else emptied — so `relationMarks`
+ *  draws ONLY that class's marks (the hover-focus render). Definitive angle VALUES are kept (they're facts,
+ *  not clutter) so a hovered angle can still show its measure. */
+export function relationsForPick(relations: RelationsResult, pick: RelationPick): RelationsResult {
+  if (pick.kind === 'segment') {
+    const cls = relations.equalSegments[pick.classIndex];
+    return { equalSegments: cls ? [cls] : [], equalAngles: [], definiteAngles: [], samplesUsed: relations.samplesUsed };
+  }
+  const cls = relations.equalAngles[pick.classIndex];
+  return { equalSegments: [], equalAngles: cls ? [cls] : [], definiteAngles: relations.definiteAngles, samplesUsed: relations.samplesUsed };
 }
 
 /**

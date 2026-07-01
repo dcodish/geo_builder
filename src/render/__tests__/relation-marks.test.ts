@@ -4,7 +4,7 @@
  * endpoint is skipped rather than drawn at a bogus position.
  */
 import { describe, it, expect } from 'vitest';
-import { relationMarks } from '../scene';
+import { relationMarks, relationAt, relationsForPick } from '../scene';
 import type { RelationsResult } from '@/engine';
 import type { Id, Vec } from '@/engine';
 
@@ -88,6 +88,24 @@ describe('relationMarks', () => {
     expect(m.values.map((v) => v.text).sort()).toEqual(['22.5°', '45°']); // 67.5° suppressed
   });
 
+  it('draws a corner value ONCE even when named through two collinear points (∠AFD == ∠GFH ⇒ one "60°")', () => {
+    // F's two forced 60° angles are the SAME wedge: H lies on ray F→A, G lies on ray F→D (as at a rhombus
+    // vertex whose edges run through crossings). Two "60°" labels would read as clutter / a mistake — one wedge,
+    // one value (ADR-167 Am.).
+    const rel: RelationsResult = {
+      equalSegments: [],
+      equalAngles: [],
+      definiteAngles: [
+        { vertex: 'F', a: 'A', b: 'D', valueDeg: 60 }, // rays F→A (0°) and F→D (60°)
+        { vertex: 'F', a: 'G', b: 'H', valueDeg: 60 }, // F→G (=60°, G on FD) and F→H (=0°, H on FA) — same wedge
+      ],
+      samplesUsed: 8,
+    };
+    const p = pos([['F', [0, 0]], ['A', [1, 0]], ['H', [2, 0]], ['D', [0.5, 0.8660254]], ['G', [1, 1.7320508]]]);
+    const m = relationMarks(rel, p);
+    expect(m.values.map((v) => v.text)).toEqual(['60°']); // ONE label, not "60° 60°"
+  });
+
   it('skips a segment with a missing or coincident endpoint', () => {
     const rel: RelationsResult = {
       equalSegments: [[['A', 'B'], ['C', 'D']]],
@@ -129,5 +147,46 @@ describe('relationMarks', () => {
     const m = relationMarks(rel, p);
     expect(m.angles).toHaveLength(2); // both arcs kept
     expect(m.values).toEqual([]);
+  });
+});
+
+describe('relationAt / relationsForPick — hover-to-focus picking (ADR-167 Am.)', () => {
+  const rel: RelationsResult = {
+    equalSegments: [
+      [['A', 'B'], ['C', 'D']], // class 0
+      [['E', 'F']], // class 1
+    ],
+    equalAngles: [[{ vertex: 'B', a: 'A', b: 'C' }]], // class 0: the +x→+y wedge at B
+    definiteAngles: [],
+    samplesUsed: 8,
+  };
+  const p = pos([
+    ['A', [0, 0]], ['B', [10, 0]], ['C', [0, 5]], ['D', [10, 5]], ['E', [0, 10]], ['F', [10, 10]],
+  ]);
+
+  it('picks the equal-length CLASS of the segment under the cursor', () => {
+    // near AB (class 0) …
+    expect(relationAt(rel, p, { x: 5, y: 0.3 }, 1, 2)).toEqual({ kind: 'segment', classIndex: 0 });
+    // near EF (class 1) …
+    expect(relationAt(rel, p, { x: 5, y: 10.2 }, 1, 2)).toEqual({ kind: 'segment', classIndex: 1 });
+    // far from everything → nothing
+    expect(relationAt(rel, p, { x: 5, y: 30 }, 1, 2)).toBeNull();
+  });
+
+  it('picks an equal-angle CLASS only when the cursor points INTO the wedge near the vertex', () => {
+    const q = pos([['A', [1, 0]], ['B', [0, 0]], ['C', [0, 1]]]); // wedge from +x to +y at B
+    const angleOnly: RelationsResult = { ...rel, equalSegments: [] };
+    expect(relationAt(angleOnly, q, { x: 0.3, y: 0.3 }, 0.05, 2)).toEqual({ kind: 'angle', classIndex: 0 }); // inside wedge
+    expect(relationAt(angleOnly, q, { x: -0.3, y: -0.3 }, 0.05, 2)).toBeNull(); // opposite quadrant → not the wedge
+  });
+
+  it('relationsForPick narrows to just the hovered class (values kept for an angle pick)', () => {
+    const seg = relationsForPick(rel, { kind: 'segment', classIndex: 1 });
+    expect(seg.equalSegments).toEqual([[['E', 'F']]]);
+    expect(seg.equalAngles).toEqual([]);
+    const ang = relationsForPick({ ...rel, definiteAngles: [{ vertex: 'B', a: 'A', b: 'C', valueDeg: 60 }] }, { kind: 'angle', classIndex: 0 });
+    expect(ang.equalSegments).toEqual([]);
+    expect(ang.equalAngles).toHaveLength(1);
+    expect(ang.definiteAngles).toHaveLength(1); // an angle pick keeps the definite values so a measure can show
   });
 });

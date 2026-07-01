@@ -32,6 +32,8 @@ export interface Transform {
   scale: number;
   /** Map a math point to a screen point. */
   toScreen(v: Vec): Vec;
+  /** Inverse of {@link toScreen} — map a (base, pre pan/zoom) screen point back to a math point. */
+  toWorld(s: Vec): Vec;
 }
 
 /**
@@ -120,6 +122,10 @@ export function fitTransform(points: Vec[], vp: Viewport): Transform {
     x: offX + (v.x - minX) * scale,
     y: offY + (maxY - v.y) * scale, // flip: math-up → screen-down
   });
+  const toWorld = (s: Vec): Vec => ({
+    x: minX + (s.x - offX) / scale,
+    y: maxY - (s.y - offY) / scale, // inverse of the flip
+  });
 
-  return { scale, toScreen };
+  return { scale, toScreen, toWorld };
 }
