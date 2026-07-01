@@ -19,6 +19,7 @@ Living project documentation. Status: **design phase** (last updated 2026-06-10)
 | 11 | [Architecture as a Compiler](11-architecture-as-compiler.md) | A lens: the NL→commands→evaluation→render pipeline as a compiler front-end + constraint interpreter + retargetable back-end — and where new work slots in |
 | 12 | [Letter Placement](12-letter-placement.md) | The vertex/point label-placement guide |
 | 13 | [Design Audit (2026-06-17)](13-design-audit-2026-06-17.md) | Full design+development audit: the case-by-case-patching root cause, prioritized re-work/generalizations (R1–R9), and the test-strategy shift — directions captured as Proposed ADR-043…047 |
+| 14 | [Backlog & Quick-Win Triage](14-backlog.md) | The prioritized index of open work — parked engineering threads + operator-raised N1–N6, with grounded "already done / not quick / quick win" verdicts and what to pick up next |
 | — | [Project Memory](PROJECT-MEMORY.md) | Travelling memory: where memory lives, operational notes, resume pointer (read at session start) |
 
 ## How to use these
