@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { parse, droppedNewLabels } from '@/parser';
 import { replay, polygonsConvex, useGeoStore, firstSatisfyingSeed, dryRunOutcome, hasDeferrableConstraint } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
-import { isGeoPoint, freeDofs, freeDofCount, applySeed, firstCyclableBranch, evaluate, circleMembers, pointNeighbors, detectRelations, detectShapes } from '@/engine';
+import { isGeoPoint, freeDofs, freeDofCount, applySeed, firstCyclableBranch, evaluate, circleMembers, pointNeighbors, parallelEdgePairs, detectRelations, detectShapes } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 import { humanizeError } from '@/i18n/humanizeError';
 
@@ -40,12 +40,13 @@ interface Scenario {
 
 /** The figure context the app feeds the parser: circle centres + existing point ids. */
 function ctxOf(facts: Fact[]) {
-  const { construction } = replay(facts);
+  const { construction, positions } = replay(facts);
   return {
     circles: construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [o.center] : [])), // drop ~scaffolding circles (mirrors App.parseCtx)
     points: construction.objects.filter(isGeoPoint).map((o) => o.id),
     circleMembers: circleMembers(construction),
     neighbors: pointNeighbors(construction),
+    parallels: parallelEdgePairs(construction, positions), // so "height from C" drops to a trapezoid's opposite base (ADR-169)
     lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])),
   };
 }
@@ -313,6 +314,27 @@ const SCENARIOS: Scenario[] = [
       expect(onAB, 'D on line AB').toBeLessThan(1e-3);
       const cd = { x: D.x - C.x, y: D.y - C.y }, ab = { x: B.x - A.x, y: B.y - A.y };
       expect(Math.abs(cd.x * ab.x + cd.y * ab.y) / (Math.hypot(cd.x, cd.y) * Math.hypot(ab.x, ab.y) + 1e-9), 'CD ⟂ AB').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'altitude-in-trapezoid-drops-to-opposite-base',
+    title: '"טרפז ABCD ישר זווית" → "CE גובה בטרפז" — the trapezoid height drops from C to the opposite parallel base AB',
+    guards:
+      'Session sub2ys2a: "CE גובה בטרפז" (height in a trapezoid) escalated to the LLM and returned not-understood, while "CD גובה" works on a triangle. The altitude rule inferred the opposite side ONLY via triangle logic (two neighbours of the apex that are joined to each other) — in trapezoid ABCD the apex C\'s neighbours B,D are a DIAGONAL, not an edge, so no triangle → the rule bailed. ADR-169: the height now drops to the OPPOSITE PARALLEL BASE, resolved from ctx.parallels (vertex-disjoint parallel edge-pairs derived from the figure); C sits on base DC ∥ AB so the foot lands on AB.',
+    steps: [
+      'טרפז ABCD ישר זווית', // right trapezoid ABCD (AB ∥ DC), AD ⟂ AB
+      'CE גובה בטרפז', // the EXACT utterance — foot E on the opposite base AB, segment CE ⟂ AB
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('E'), 'foot named E created (height resolved, not escalated)').toBe(true);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), E = at(fig, 'E');
+      // E lands on line AB (the opposite parallel base), not on a leg
+      const onAB = Math.abs((E.x - A.x) * (B.y - A.y) - (E.y - A.y) * (B.x - A.x)) / Math.max(dist(A, B), 1) ** 2;
+      expect(onAB, 'E on line AB (the opposite base)').toBeLessThan(1e-3);
+      // CE ⟂ AB — a genuine height
+      const ce = { x: E.x - C.x, y: E.y - C.y }, ab = { x: B.x - A.x, y: B.y - A.y };
+      expect(Math.abs(ce.x * ab.x + ce.y * ab.y) / (Math.hypot(ce.x, ce.y) * Math.hypot(ab.x, ab.y) + 1e-9), 'CE ⟂ AB').toBeLessThan(1e-3);
     },
   },
   {

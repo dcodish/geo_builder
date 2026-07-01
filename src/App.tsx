@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
-import { circleMembers, firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, pointNeighbors, VARIANT_COUNT } from '@/engine';
+import { circleMembers, firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, parallelEdgePairs, pointNeighbors, VARIANT_COUNT } from '@/engine';
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels, classifyOutOfScope } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
@@ -86,6 +86,7 @@ export default function App() {
   const [detecting, setDetecting] = useState(false); // "detect shapes" detection in flight (synchronous; paint a busy state first)
   const [openShape, setOpenShape] = useState<DetectedShape | null>(null); // the shape badge whose inline book-link card is open
   const [hoverShape, setHoverShape] = useState<DetectedShape | null>(null); // the shape badge being hovered (transient highlight preview)
+  const shapesRef = useRef<HTMLDivElement>(null); // the detected-shapes section — scrolled into view when it appears / a card opens
   const [llmDropped, setLlmDropped] = useState<string[]>([]); // LLM steps the engine couldn't build
   const [renameNote, setRenameNote] = useState(''); // why a relabel was a no-op (target taken / no such point)
   const [altNote, setAltNote] = useState(''); // transient: "show another configuration" found no different drawing
@@ -233,6 +234,7 @@ export default function App() {
     points: construction.objects.filter(isGeoPoint).map((o) => o.id),
     circleMembers: circleMembers(construction), // so "arc BC" resolves to the circle holding both B and C
     neighbors: pointNeighbors(construction), // so a single-vertex angle ("∠C קהה/חדה") finds its two arms
+    parallels: parallelEdgePairs(construction, positions), // so "height from C" drops to a trapezoid's opposite base (ADR-169)
     lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // so a construct reuses itself on re-entry (idempotency)
   });
 
@@ -379,10 +381,13 @@ export default function App() {
           }
         }
         weak = outcome.reason; // parsed but produced nothing → fall through to the LLM second attempt
-        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:${outcome.reason}`, detail: outcome.detail, commands: r.commands });
+        // `intermediate`: this weak grammar attempt ALWAYS escalates to the LLM below, whose outcome is
+        // logged as the submission's FINAL result — keep this step in the DEV trace but don't let it
+        // become a second analytics `submit` (else the dashboard double-counts the utterance). See sessionLog.
+        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:${outcome.reason}`, detail: outcome.detail, commands: r.commands, intermediate: true });
       } else {
         weak = 'dropped'; // a typo dropped a new label → escalate rather than commit the partial parse
-        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${dropped.join(',')}`, commands: r.commands });
+        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${dropped.join(',')}`, commands: r.commands, intermediate: true });
       }
     }
     // out of grammar, OR a deterministic parse that built nothing → ask the LLM (a SECOND try),
@@ -514,6 +519,15 @@ export default function App() {
     document.documentElement.dir = i18n.dir();
     document.documentElement.lang = i18n.language;
   }, [i18n, i18n.language]);
+
+  // When the shapes are detected, or a badge's book-link card opens, bring that section into view within the
+  // scrollable control column — so the badges + link are visible without the student hunting/scrolling (the
+  // canvas stays put because the column scrolls internally, not the page).
+  useEffect(() => {
+    if (shapesLayer && (shapesLayer.shapes.length > 0 || openShape)) {
+      shapesRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [shapesLayer, openShape]);
 
   // The first point with an unshown discrete solution to step to — circle∩circle, line∩circle,
   // arc-midpoint, or a driven on-segment point (the kinds `cycleAlt` can step). A two-circle figure
@@ -929,6 +943,9 @@ export default function App() {
             <span style={{ fontSize: 12, color: '#64748b' }}>{t('actions.relationsHover')}</span>
           )}
 
+          {/* The detected-shapes section — the button, badges, and inline book-link card grouped in one
+              ref'd container so it can be scrolled into view when it appears (kept on one screen). */}
+          <div ref={shapesRef} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* "Detect shapes" (FR-SH) — on press, classify every named shape the figure contains (forced
               across samples) and list each as a badge that links to its page in the geometry book. A
               button, not a live toggle (opt-in, same pedagogy boundary as "view relations"); a new fact
@@ -1001,6 +1018,7 @@ export default function App() {
               </a>
             </div>
           )}
+          </div>
 
           {/* Playable degrees of freedom (first slice): a slider per free-circle radius. Dialing a value
               is a viewing scratchpad — "show another configuration" resets it. */}
@@ -1164,7 +1182,10 @@ const emptyChip: React.CSSProperties = {
   cursor: 'pointer',
   fontFamily: 'ui-monospace, monospace',
 };
-const sidebar: React.CSSProperties = { order: 1, width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 };
+// The control column is capped to the viewport and scrolls INTERNALLY (its own overflow), so a tall stack
+// (steps + all the action buttons + the detected-shape badges/card) never pushes the whole PAGE taller than
+// the screen — the canvas and the shapes result stay on one screen (operator: "fit it all on the same screen").
+const sidebar: React.CSSProperties = { order: 1, width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16, maxHeight: 'calc(100vh - 110px)', overflowY: 'auto', paddingInlineEnd: 4 };
 const sectionLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 };
 const displayToggle: React.CSSProperties = { display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, color: '#475569', cursor: 'pointer' };
 const symbolsToggle: React.CSSProperties = { alignSelf: 'flex-start', border: 'none', background: 'none', color: '#2563eb', fontSize: 12, cursor: 'pointer', padding: 0 };
@@ -1226,7 +1247,9 @@ const catHeading: React.CSSProperties = {
 };
 const cmdRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 };
 const legend: React.CSSProperties = { display: 'flex', gap: 12, fontSize: 11, color: '#94a3b8', margin: '0 0 6px' };
-const stepList: React.CSSProperties = { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 };
+// The steps list is the tallest variable part, so it's capped and scrolls on its own — that reclaims the
+// vertical space the action buttons + detected-shape badges/card need to stay in view (see `sidebar`).
+const stepList: React.CSSProperties = { listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '32vh', overflowY: 'auto' };
 const errorBanner: React.CSSProperties = {
   padding: '8px 12px',
   fontSize: 13,

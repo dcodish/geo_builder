@@ -13,7 +13,7 @@ import { applyCommand, mirrorComposition, normalizeShapeComposition } from './ap
 import { lower } from './lower';
 import { evaluate } from './evaluate';
 import type { EvalResult } from './evaluate';
-import { circleCircleIntersect, dist } from './geometry';
+import { circleCircleIntersect, dist, sub } from './geometry';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 import { constraintRefs, solvedOnSegmentCandidates } from './solve';
 
@@ -805,6 +805,45 @@ export function pointNeighbors(c: Construction): Record<Id, Id[]> {
     else if (o.kind === 'polygon') for (let i = 0; i < o.vertices.length; i++) add(o.vertices[i], o.vertices[(i + 1) % o.vertices.length]);
   }
   return Object.fromEntries([...nb].map(([k, set]) => [k, [...set]]));
+}
+
+/**
+ * Drawn edges (segments + polygon sides) that are PARALLEL and share NO vertex in `pos` — e.g. a
+ * trapezoid's two bases `[['A','B'],['D','C']]`. Lets the parser resolve "height/altitude from a vertex"
+ * to the OPPOSITE PARALLEL BASE (the trapezoid case the triangle inference can't reach — the apex's two
+ * neighbours are a diagonal, not an edge). Geometry-derived like `circleMembers`; parallelism holds
+ * structurally for a trapezoid so one resolved snapshot suffices. Only vertex-disjoint pairs (true
+ * opposite sides, not two edges sharing a corner) are returned.
+ */
+export function parallelEdgePairs(c: Construction, pos: Map<Id, Vec>): [[Id, Id], [Id, Id]][] {
+  const edges: [Id, Id][] = [];
+  const seen = new Set<string>();
+  const addEdge = (a: Id, b: Id) => {
+    if (a === b) return;
+    const k = a < b ? `${a}|${b}` : `${b}|${a}`;
+    if (seen.has(k)) return;
+    seen.add(k);
+    edges.push([a, b]);
+  };
+  for (const o of c.objects) {
+    if (o.kind === 'segment') addEdge(o.a, o.b);
+    else if (o.kind === 'polygon') for (let i = 0; i < o.vertices.length; i++) addEdge(o.vertices[i], o.vertices[(i + 1) % o.vertices.length]);
+  }
+  const out: [[Id, Id], [Id, Id]][] = [];
+  for (let i = 0; i < edges.length; i++)
+    for (let j = i + 1; j < edges.length; j++) {
+      const [a, b] = edges[i];
+      const [d, e] = edges[j];
+      if (a === d || a === e || b === d || b === e) continue; // share a vertex — not opposite sides
+      const pa = pos.get(a), pb = pos.get(b), pd = pos.get(d), pe = pos.get(e);
+      if (!pa || !pb || !pd || !pe) continue;
+      const u = sub(pb, pa), w = sub(pe, pd);
+      const lu = Math.hypot(u.x, u.y), lw = Math.hypot(w.x, w.y);
+      if (lu < 1e-9 || lw < 1e-9) continue;
+      // |cross of unit directions| ≈ 0 ⇒ parallel (same or opposite sense). ~0.3° tolerance.
+      if (Math.abs((u.x * w.y - u.y * w.x) / (lu * lw)) < 5e-3) out.push([edges[i], edges[j]]);
+    }
+  return out;
 }
 
 /** Number of valid solution branches for a branchable point (0/1/2). */

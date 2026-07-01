@@ -12,6 +12,7 @@ export {
   branchCount,
   circleMembers,
   pointNeighbors,
+  parallelEdgePairs,
   commandConflict,
   cyclableBranch,
   cycleAlternative,

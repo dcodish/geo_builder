@@ -42,28 +42,46 @@ function post(body: Record<string, unknown>): void {
   }
 }
 
+/**
+ * Decide what a `logDebug` event contributes to PRODUCTION usage analytics: the
+ * lean `submit` payload (minus the session-scoped `sid`/`t`/`rel`, which the caller
+ * stamps), or `null` when the event is not a user submission we should count.
+ *
+ * Two kinds are dropped:
+ *   - non-`input` kinds — the frequent `kind:'figure'` snapshots are a dev-only
+ *     reconstruction trace, never analytics;
+ *   - INTERMEDIATE input steps — one user submit can log MORE than one `kind:'input'`
+ *     step: when the grammar parses only PARTIALLY (or builds nothing) it logs a
+ *     `weak` diagnostic step and then escalates to the LLM, whose outcome is logged
+ *     SEPARATELY as the submission's final result. That intermediate step belongs in
+ *     the DEV debug trace but must NOT become a second `submit`, or the dashboard
+ *     double-counts the utterance and shows a phantom "weak / dropped" row beside its
+ *     real LLM outcome. Pure so the "one submit per submission" rule is unit-tested.
+ */
+export function analyticsSubmit(event: Record<string, unknown>): Record<string, unknown> | null {
+  if (event.kind !== 'input') return null;
+  if (event.intermediate) return null;
+  return {
+    ev: 'submit',
+    utterance: event.utterance,
+    locale: event.locale,
+    source: event.source,
+    result: event.result ?? 'ok', // the happy parser path logs no `result` → treat as ok
+  };
+}
+
 /** Append one event. DEV → full debug log; PROD → lean usage analytics. */
 export function logDebug(event: Record<string, unknown>): void {
   if (import.meta.env.DEV) {
     post({ session: sessionId, seq: seq++, clientTs: new Date().toISOString(), ...event });
     return;
   }
-  // PROD: only user actions (`kind:'input'`) count toward usage analytics; the
-  // frequent `kind:'figure'` snapshots are dev-only.
-  if (event.kind !== 'input') return;
+  const lean = analyticsSubmit(event); // null unless this is a FINAL user submission
+  if (!lean) return;
   const t = new Date().toISOString();
   if (!sessionAnnounced) {
     sessionAnnounced = true;
     post({ ev: 'session', sid: sessionId, t, rel: REL });
   }
-  post({
-    ev: 'submit',
-    sid: sessionId,
-    t,
-    rel: REL,
-    utterance: event.utterance,
-    locale: event.locale,
-    source: event.source,
-    result: event.result ?? 'ok', // the happy parser path logs no `result` → treat as ok
-  });
+  post({ ...lean, sid: sessionId, t, rel: REL });
 }

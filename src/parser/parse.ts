@@ -45,6 +45,10 @@ export interface ParseContext {
   /** For each point, the points it's joined to (segment / polygon edge) — lets a single-vertex angle
    *  ("∠C") resolve its two arms, so "∠C קהה/חדה" (obtuse/acute) works without spelling all three. */
   neighbors?: Record<string, string[]>;
+  /** Vertex-disjoint PARALLEL edge-pairs in the figure (e.g. a trapezoid's bases `[['A','B'],['D','C']]`),
+   *  derived from the resolved positions — lets "height/altitude from a vertex" drop to the opposite
+   *  parallel base (the trapezoid case the triangle inference can't reach). */
+  parallels?: [[string, string], [string, string]][];
   /** Ids of lines already in the figure (e.g. `bis-DAB`, `perp-…`) — lets a construct detect that it was
    *  ALREADY built (its deterministic scaffolding lines exist) and REUSE rather than mint a duplicate
    *  auto-named copy (the idempotency root-cause fix). */
@@ -3243,10 +3247,27 @@ const median: Rule = (s, ctx) => {
   ];
 };
 
+/** The unique base OPPOSITE `apex` that a trapezoid height drops onto: among the figure's vertex-disjoint
+ *  parallel edge-pairs (`ctx.parallels`), the partner edge of a pair whose OTHER edge carries the apex.
+ *  Exactly one such base ⇒ return it (the trapezoid height); zero (a leg-only apex / a triangle, whose
+ *  parallels are empty) or several (a parallelogram's two parallel pairs) ⇒ null, so the caller defers
+ *  rather than guess a side (ADR-052 / ADR-169). */
+const oppositeParallelBase = (apex: Id, parallels?: [[string, string], [string, string]][]): [Id, Id] | null => {
+  const cands: [Id, Id][] = [];
+  for (const [e1, e2] of parallels ?? []) {
+    const in1 = e1.map(up).includes(apex), in2 = e2.map(up).includes(apex);
+    if (in1 === in2) continue; // apex on both (degenerate) or neither (a leg apex) — not this pair's base
+    const other = (in1 ? e2 : e1).map(up) as [Id, Id];
+    if (!cands.some((c) => (c[0] === other[0] && c[1] === other[1]) || (c[0] === other[1] && c[1] === other[0]))) cands.push(other);
+  }
+  return cands.length === 1 ? cands[0] : null;
+};
+
 /**
  * "height from A in ABC" / "altitude from A in ABC" / "גובה מ-A במשולש ABC", and
  * the bare-foot phrasing "perpendicular from A to BC" — the altitude from a vertex:
  * the foot of the perpendicular onto the opposite side, plus the segment to it.
+ * In a trapezoid the target is the opposite PARALLEL base (ADR-169), resolved via `ctx.parallels`.
  */
 const altitude: Rule = (s, ctx) => {
   // An explicitly *named* foot ("G is the foot of the perpendicular from E to AB")
@@ -3298,35 +3319,43 @@ const altitude: Rule = (s, ctx) => {
     p = up(sideM[1]);
     q = up(sideM[2]);
   } else {
-    // Opposite side from a triangle NAMED in the utterance — after "in"/"במשולש"/"משולש", or anywhere in
-    // the string (the compound "triangle ABC with a height from A", which has no "in"). The apex must be
-    // one of its vertices (else `others` ≠ 2). If no usable triangle is stated, fall back to the FIGURE
-    // CONTEXT — the two points that, with the apex, are the only ones — so the bare "CD גובה" on an
-    // already-drawn triangle parses deterministically instead of escalating to the LLM (which strips the
-    // named foot → the "CF" bug). Mirrors the `median` rule's context fallback.
-    const triPart = s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s;
-    tri = labelRun(triPart.replace(/triangle|the/gi, ' '), 3);
-    const others = tri?.filter((x) => x !== apex) ?? [];
-    if (tri && others.length === 2) {
-      [p, q] = others as [Id, Id];
+    // A trapezoid height: the apex sits on one parallel base and drops perpendicular to the OPPOSITE base
+    // (ADR-169). The triangle inference below can't reach it — the apex's two neighbours are a diagonal, not
+    // an edge — so try the unique opposite parallel base first (empty for a triangle, so it never interferes).
+    const base = oppositeParallelBase(apex, ctx.parallels);
+    if (base) {
+      [p, q] = base; // tri stays null — the trapezoid already exists; don't re-emit a shape
     } else {
-      tri = null; // no triangle stated — derive the side from context, and don't re-emit a triangle
-      const pts = (ctx.points ?? []).filter((x) => x !== apex && x !== namedFoot);
-      if (pts.length === 2) {
-        [p, q] = [pts[0], pts[1]];
+      // Opposite side from a triangle NAMED in the utterance — after "in"/"במשולש"/"משולש", or anywhere in
+      // the string (the compound "triangle ABC with a height from A", which has no "in"). The apex must be
+      // one of its vertices (else `others` ≠ 2). If no usable triangle is stated, fall back to the FIGURE
+      // CONTEXT — the two points that, with the apex, are the only ones — so the bare "CD גובה" on an
+      // already-drawn triangle parses deterministically instead of escalating to the LLM (which strips the
+      // named foot → the "CF" bug). Mirrors the `median` rule's context fallback.
+      const triPart = s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s;
+      tri = labelRun(triPart.replace(/triangle|the/gi, ' '), 3);
+      const others = tri?.filter((x) => x !== apex) ?? [];
+      if (tri && others.length === 2) {
+        [p, q] = others as [Id, Id];
       } else {
-        // More than two other points in the figure: the opposite side is unambiguous only if the apex
-        // belongs to exactly ONE triangle. Read it off the adjacency (ctx.neighbors) — two neighbours of the
-        // apex that are also joined to each other close a triangle apex–P–Q whose side opposite the apex is
-        // PQ. Exactly one such triangle → use it; zero or several → genuinely under-specified, so defer
-        // rather than guess a side (ADR-052, no assumptions). Handles "גובה מנקודה D" with extra points around.
-        const nb = ctx.neighbors ?? {};
-        const adj = (nb[apex] ?? []).filter((x) => x !== namedFoot);
-        const sides: [Id, Id][] = [];
-        for (let i = 0; i < adj.length; i++)
-          for (let j = i + 1; j < adj.length; j++) if ((nb[adj[i]] ?? []).includes(adj[j])) sides.push([up(adj[i]), up(adj[j])]);
-        if (sides.length !== 1) return null;
-        [p, q] = sides[0];
+        tri = null; // no triangle stated — derive the side from context, and don't re-emit a triangle
+        const pts = (ctx.points ?? []).filter((x) => x !== apex && x !== namedFoot);
+        if (pts.length === 2) {
+          [p, q] = [pts[0], pts[1]];
+        } else {
+          // More than two other points in the figure: the opposite side is unambiguous only if the apex
+          // belongs to exactly ONE triangle. Read it off the adjacency (ctx.neighbors) — two neighbours of the
+          // apex that are also joined to each other close a triangle apex–P–Q whose side opposite the apex is
+          // PQ. Exactly one such triangle → use it; zero or several → genuinely under-specified, so defer
+          // rather than guess a side (ADR-052, no assumptions). Handles "גובה מנקודה D" with extra points around.
+          const nb = ctx.neighbors ?? {};
+          const adj = (nb[apex] ?? []).filter((x) => x !== namedFoot);
+          const sides: [Id, Id][] = [];
+          for (let i = 0; i < adj.length; i++)
+            for (let j = i + 1; j < adj.length; j++) if ((nb[adj[i]] ?? []).includes(adj[j])) sides.push([up(adj[i]), up(adj[j])]);
+          if (sides.length !== 1) return null;
+          [p, q] = sides[0];
+        }
       }
     }
   }

@@ -308,6 +308,21 @@ describe('parser — a NAMED altitude segment honours the foot the student gave'
       { type: 'segment', a: 'A', b: 'B' },
       { type: 'set-perpendicular', a: 'E', b: 'F', c: 'A', d: 'B' },
     ]));
+  // ADR-169: a trapezoid height. C's neighbours (B,D) are a DIAGONAL, so the triangle inference can't reach
+  // the opposite side; ctx.parallels (AB ∥ DC) resolves it — the foot lands on the OPPOSITE base AB.
+  const trapCtx = { points: ['A', 'B', 'C', 'D'], parallels: [[['A', 'B'], ['D', 'C']]] as [[string, string], [string, string]][] };
+  it('"CE גובה בטרפז" → foot E on the opposite parallel base AB (not the leg AD)', () =>
+    expect(cmds('CE גובה בטרפז', trapCtx)).toEqual([
+      { type: 'foot', id: 'E', from: 'C', a: 'A', b: 'B' },
+      { type: 'segment', a: 'C', b: 'E' },
+    ]));
+  it('unnamed "גובה מ-A בטרפז" drops A to the opposite base DC (auto-named foot)', () =>
+    expect(cmds('גובה מ-A בטרפז', trapCtx)).toEqual([
+      { type: 'foot', id: 'F', from: 'A', a: 'D', b: 'C' },
+      { type: 'segment', a: 'A', b: 'F' },
+    ]));
+  it('a parallelogram (TWO parallel pairs) leaves the height AMBIGUOUS → not-handled (defers, ADR-052)', () =>
+    expect(parse('CE גובה', { points: ['A', 'B', 'C', 'D'], parallels: [[['A', 'B'], ['D', 'C']], [['B', 'C'], ['A', 'D']]] }).ok).toBe(false));
 });
 
 describe('parser — a NAMED midsegment honours its endpoint labels', () => {
