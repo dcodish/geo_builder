@@ -2578,3 +2578,51 @@ A reproduction (rectangle `ABCD`; equilateral `BCE`,`DAF` inward; `EC ∩ DF = G
 **Decision.** Make the durable **Plesk GUI** method ("Additional directives for HTTPS", stored in Plesk's DB → survives regeneration) the PRIMARY instruction; the direct-file append is the clearly-caveated fallback. Tighten the unit: `ProtectSystem=strict` + `ReadWritePaths=/var/www/geo-proxy` (only the events-log dir is writable), `ProtectHome=true` (hides /home + /root, incl. any personal-cloud folder, from the process), `PrivateDevices=true`. The env file stays 600 root:root (systemd reads it as root before dropping to www-data).
 
 **Consequences / tests.** Docs + unit file only (no code). `ReadWritePaths` is required for `events.jsonl` writes once `ProtectSystem=strict` is on — verify the events log still appends after deploy. Also added MD031 to `.markdownlint.jsonc` (deploy guide packs env/code blocks against list items). **No code change; server tests unaffected.**
+
+## ADR-181 — Orthography normalization at the parse boundary: maqaf + invisible bidi controls (hardening plan C1 / PAR-7)
+
+**Status:** Accepted (2026-07-02)
+
+**Context.** The 2026-07-02 review found a silent-drop class from *how text is pasted*, not what it says. Word/PDF render the Hebrew hyphen as the **maqaf** `־` (U+05BE), but the grammar's connector suffix groups (`ל-?` / `ב-?` / `מ-?`) expect an ASCII `-`; and copy-paste of mixed Hebrew/Latin text drags in invisible **bidi/zero-width control chars** (LRM/RLM, isolates, ZWSP/ZWJ, BOM, ALM). Both silently break the parser's `\s*` / optional-`-` adjacency, so e.g. `נקודה E על AC ב־40%` parsed as a point-on-segment but *dropped the 40% ratio* — a wrong figure with nothing for the verifier to catch.
+
+**Decision.** Normalize at the boundary, in the single `normalizeUtterance` (extracted in A1, run before every rule *and* the shadow-matrix guard): map `־`→`-`, then strip the invisible format chars (`U+061C`, `U+200B–200F`, `U+202A–202E`, `U+2066–2069`, `U+FEFF`). One place, whole class gone — pasted text now parses like typed text.
+
+**Why this is the root fix, not a patch.** The alternative — adding `[־]?` and `\p{Cf}?` to ~20 individual suffix groups — would be per-rule whack-a-mole and miss the next rule. The defect is that the *input alphabet* the rules assume (ASCII punctuation, no invisibles) doesn't match pasted reality; fixing the alphabet at the boundary is the correct layer.
+
+**Consequences / tests.** [orthography.test.ts](../src/parser/__tests__/orthography.test.ts) (4 tests): maqaf ratio kept (`ב־40%` → t=0.4, identical to the ASCII form); maqaf in a `ל־` connector; a bidi-wrapped utterance parses identically to clean across nine control chars; a control glued to a keyword no longer breaks the match. Shadow-matrix snapshot unchanged (winner names stable). **Parser suite green; `tsc -b` clean.**
+
+## ADR-182 — Hebrew final-letter inflection: plural ⟂ keywords (hardening plan C2 / PAR-3)
+
+**Status:** Accepted (2026-07-02)
+
+**Context.** `מאונך` (perpendicular) and `אנך` (the noun form) end in kaf-sofit `ך`; their plurals swap it for a regular kaf — `מאונכים` / `אנכים` — a DIFFERENT Unicode code point, so the singular-only keyword sets matched none of them. The exact ADR-119 scenario in its plural flavour — `המיתרים AB ו-CD מאונכים זה לזה` ("the chords AB and CD are perpendicular to each other") — silently dropped BOTH the ⟂ relation and chord CD (the `chord` rule grabbed the first pair; the plural ⟂ keyword never matched). The team already solved this class for `חות[כך]` (חותך/נחתך) but never applied it to the אנך family.
+
+**Decision.** A shared `מאונ[כך]|אנ[כך]` stem at every perpendicular-keyword site (the `perpendicularConstraint` detector + its keyword-strip, `perpendicularLine`, the named-line lookahead, the perp-from discriminator, `radiusSegment`'s bail guard, `SHAPE_LEFTOVER`, and the top-level ⟂ `stop` guard). `מקביל`/parallel ends in a non-final letter, so its plurals already matched — no change there. With the stem, `perpendicularConstraint` (which runs before `chord`) now claims the plural-chords utterance and emits its segments, and `withChordMembership`/`withCarrierMembership` re-asserts A,B,C,D on the circle.
+
+**Why this is the root fix, not a patch.** The defect is a Hebrew-morphology blind spot in the keyword alphabet, not a single utterance — the stem covers every inflection (`מאונך`/`מאונכים`/`מאונכות`) at every site. Audited siblings: only the kaf-sofit ⟂ words have this problem (משיק/קוטר/מיתר/חוצ end in non-final letters, so their plurals already matched).
+
+**Consequences / tests.** [perp-inflection.test.ts](../src/parser/__tests__/perp-inflection.test.ts) (4 tests): singular still works; plural `AB ו-CD מאונכים זה לזה` yields the ⟂ constraint over A,B,C,D; the plural-chords case keeps circle membership. Shadow-matrix probe flipped `chord`→`perpendicularConstraint` (snapshot updated). **523 parser tests green; `tsc -b` clean.**
+
+## ADR-183 — chord bails on a relation tail (the "מיתר AB=2" drop) (hardening plan C3 / PAR-1)
+
+**Status:** Accepted (2026-07-02)
+
+**Context.** Operator-flagged: `מיתר AB=2`. The `chord`/`מיתר` rule runs before every measure rule, grabs the first label pair, and returns — silently discarding a trailing `= 2`. You got a chord with no length, and (because A,B already existed) nothing escalated. The sibling `radiusSegment` already guarded against exactly this (bail on `=`/`⊥`/`∥`), proving the guard was known-needed but never applied to `chord`.
+
+**Decision.** `chord` returns `null` when the utterance carries a relation operator (`=`/`<`/`>`). Then `distanceConstraint`/`equalSegments` claims the length AND draws the segment (both already do — FR-IN-7), from which the `withCarrierMembership` post-pass re-asserts the endpoints on the circle. So `מיתר AB=2` → A,B on circle + segment AB + |AB|=2, the full correct set. (⟂/∥ chords need no guard here — those constraint rules already run before `chord`.)
+
+**Why this is the root fix, not a patch.** It removes the half-parse at its source (a carrier-noun rule must not swallow a measure it can't represent) rather than special-casing `=2`; the same guard covers `= number`, `= CD`, and order operators, and it composes with the existing measure rules + membership post-pass instead of duplicating measure parsing inside `chord`.
+
+**Consequences / tests.** [chord-relation.test.ts](../src/parser/__tests__/chord-relation.test.ts): `מיתר AB=2` / `chord AB = 6` keep the length + membership + segment; `chord AB = CD` keeps the equality + both chords on the circle; a plain `chord AB` is unaffected. **523 parser tests green; `tsc -b` clean.**
+
+## ADR-184 — carrier-membership post-pass generalized to diameters (hardening plan C4 / PAR-4)
+
+**Status:** Accepted (2026-07-02)
+
+**Context.** ADR-119's `withChordMembership` restored on-circle membership only for CHORD-flavoured utterances. Its sibling nouns dropped membership in relational phrasings: `הקוטר AB מאונך למיתר CD` gave the ⟂ but no diameter (no collinear-through-centre), and `קוטר AB = 10` (after C3's bail) gave a distance but not a diameter.
+
+**Decision.** Rename to `withCarrierMembership` and add a diameter branch. It fires only when a RELATIONAL / point-on winner produced the commands (a `CONSTRUCT` skip-set short-circuits it when a dedicated circle-construct rule — `chord`/`diameter`/`circleOnDiameter`/`diameterCutsSegment`/`pointOnCircle`/arc — already modelled the geometry, so it never double-adds). For a diameter-flavoured utterance it asserts the diameter's endpoints on the circle AND collinear-through-centre (so it's a real diameter, not a chord). A chord utterance still puts EVERY named segment on the circle (parallel/⟂ chords); a diameter-ONLY utterance asserts just the diameter itself, so a diameter ⟂ a NON-chord segment doesn't wrongly force that segment onto the circle. Also added the `[=<>]` bail to the `diameter` rule.
+
+**Why this is the root fix, not a patch.** One membership post-pass generalised across carriers, gated by the geometric shape of the winner's output, rather than a per-noun special case; the skip-set encodes the real invariant ("a construct rule already handled membership") that keeps `circleOnDiameter`/`diameterCutsSegment` untouched.
+
+**Consequences / tests.** [chord-relation.test.ts](../src/parser/__tests__/chord-relation.test.ts) diameter cases: `קוטר AB=10` → A,B on circle + collinear-through-centre O + |AB|=10; `הקוטר AB מאונך למיתר CD` → A,B,C,D on circle + AB diameter + ⟂; a plain `diameter AB` keeps exactly one collinear (no double). Fixed a regression where the generalized pass over-fired on `circleOnDiameter`/`diameterCutsSegment` (the `CONSTRUCT` skip-set). **523 parser tests green; `tsc -b` clean.**

@@ -330,10 +330,10 @@ Dependency notes: PAR-11 (shadow matrix) should land before Phase C. TST-1 (seed
 | B4 / SEC-4/5/6 | B | Limiter eviction + upstream timeout/concurrency + login throttle | MED | ½ d | ADR-178 | ✅ |
 | B5 / SEC-7 | B | Event retention + privacy note (logs-off-Dropbox = operator action) | MED | 2 h | ADR-179 | ✅ |
 | B6 / SEC-9 | B | Deploy durability (Plesk GUI) + systemd hardening | LOW | 1 h | ADR-180 | ✅ |
-| C1 / PAR-7 | C | Orthography normalization | HIGH | 1 h | | ☐ |
-| C2 / PAR-3 | C | Hebrew final-ך inflections | HIGH | 1–2 h | | ☐ |
-| C3 / PAR-1 | C | chord/diameter `=` bail | HIGH | 2 h | | ☐ |
-| C4 / PAR-4 | C | withCarrierMembership | M-H | ½ d | | ☐ |
+| C1 / PAR-7 | C | Orthography normalization | HIGH | 1 h | ADR-181 | ✅ |
+| C2 / PAR-3 | C | Hebrew final-ך inflections | HIGH | 1–2 h | ADR-182 | ✅ |
+| C3 / PAR-1 | C | chord `=` bail (מיתר AB=2) | HIGH | 2 h | ADR-183 | ✅ |
+| C4 / PAR-4 | C | withCarrierMembership + diameter `=` bail | M-H | ½ d | ADR-184 | ✅ |
 | C5 / PAR-5 | C | על guard + CARRIER_NOUN | MED | 2 h | | ☐ |
 | C6 / PAR-2 | C | Multi-statement splitter | HIGH | ½ d | | ☐ |
 | C7 / PAR-8 | C | Plural carrier nouns | MED | 2 h | | ☐ |

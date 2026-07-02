@@ -1271,27 +1271,23 @@ exports[`parser shadow-matrix — known shadow-prone probes (Phase C tracking) >
 [
   {
     "note": "PAR-1: chord swallows the "= 6" tail (length lost)",
-    "shadowedBy": [
-      "distanceConstraint",
-    ],
+    "shadowedBy": [],
     "text": "chord AB = 6",
-    "winner": "chord",
+    "winner": "distanceConstraint",
     "winnerKind": "array",
   },
   {
     "note": "PAR-1: equality + second chord lost",
     "shadowedBy": [],
     "text": "chord AB = chord CD",
-    "winner": "chord",
-    "winnerKind": "array",
+    "winner": "(none)",
+    "winnerKind": "null",
   },
   {
     "note": "PAR-1: diameter swallows the "= 10" tail",
-    "shadowedBy": [
-      "distanceConstraint",
-    ],
+    "shadowedBy": [],
     "text": "קוטר AB = 10",
-    "winner": "diameter",
+    "winner": "distanceConstraint",
     "winnerKind": "array",
   },
   {
@@ -1312,9 +1308,11 @@ exports[`parser shadow-matrix — known shadow-prone probes (Phase C tracking) >
   },
   {
     "note": "PAR-3: plural מאונכים matches no ⟂ keyword; membership dropped",
-    "shadowedBy": [],
+    "shadowedBy": [
+      "chord",
+    ],
     "text": "המיתרים AB ו-CD מאונכים זה לזה",
-    "winner": "chord",
+    "winner": "perpendicularConstraint",
     "winnerKind": "array",
   },
   {

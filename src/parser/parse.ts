@@ -257,7 +257,7 @@ function shapeLabels(bare: string, n: number, ctx: ParseContext, hasLeftover: bo
  * test, so e.g. "triangle"/"angle" there is fine.
  */
 const SHAPE_LEFTOVER =
-  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?)\b|[=⊥⟂∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונך|אנך|מקביל|חוצ|אמצע|תיכון|גובה|המשך|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ/i;
+  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?)\b|[=⊥⟂∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונ[כך]|אנ[כך]|מקביל|חוצ|אמצע|תיכון|גובה|המשך|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ/i;
 
 /** True if, after removing the shape keyword, geometry the shape can't express remains. */
 const shapeHasLeftover = (s: string, re: RegExp): boolean => SHAPE_LEFTOVER.test(s.replace(re, ' '));
@@ -506,7 +506,7 @@ const lineLineIntersection: Rule = (s) => {
   // the other line) collapses the crossing onto that point (operator: "המשך DB והאנך לישר AD נפגשים ב-G"
   // built a degenerate G on D). Escalate so the perpendicular is built properly (it needs a through-point;
   // the LLM / the `perpendicular … cuts … at` form supplies it).
-  if (/\bperpendicular\b|\bparallel\b|מאונך|אנך|מקביל|[⊥⟂∥]/i.test(s)) return 'stop';
+  if (/\bperpendicular\b|\bparallel\b|מאונ[כך]|אנ[כך]|מקביל|[⊥⟂∥]/i.test(s)) return 'stop';
   // Drop filler words so they aren't mistaken for two-letter line labels ("of"!).
   const t = s.replace(/\b(?:is|the|of|between|at|point|הוא|בין|בנקודה|נקודה)\b/gi, ' ');
   const pointFirst = t.match(
@@ -1397,8 +1397,8 @@ const parallelConstraint: Rule = (s) => {
  * (not the foot phrasing). Like ∥, it also DRAWS both segments (idempotent).
  */
 const perpendicularConstraint: Rule = (s) => {
-  if (!/perpendicular|⊥|⟂|מאונך|אנך/i.test(s)) return null; // both ⊥ (U+22A5) and ⟂ (U+27C2); אנך = the noun form ("EF אנך ל AB")
-  const t = s.replace(/perpendicular(?:\s*to)?|⊥|⟂|מאונך(?:\s*ל-?)?|אנך(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
+  if (!/perpendicular|⊥|⟂|מאונ[כך]|אנ[כך]/i.test(s)) return null; // both ⊥ (U+22A5) and ⟂ (U+27C2); אנך = the noun form ("EF אנך ל AB")
+  const t = s.replace(/perpendicular(?:\s*to)?|⊥|⟂|מאונ[כך](?:\s*ל-?)?|אנ[כך](?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
   if ((t.match(/\b[A-Za-z]\d*\s*[A-Za-z]\d*\b/g) ?? []).length < 2) return null; // "perpendicular from A to BC" is the foot, not this
   const m = t.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
   if (!m) return null;
@@ -1590,7 +1590,7 @@ const setRadius: Rule = (s, ctx) => {
 const radiusSegment: Rule = (s, ctx) => {
   if (!/\bradius\b|רדיוס/i.test(s)) return null;
   if (parseRadius(s).numeric) return null; // a numeric radius → `setRadius` / `circle`
-  if (/אמצע|midpoint|=|⊥|⟂|∥|אנך|מאונך|מקביל|\bon\b|על\b/i.test(s)) return null; // not a bare radius declaration
+  if (/אמצע|midpoint|=|⊥|⟂|∥|אנ[כך]|מאונ[כך]|מקביל|\bon\b|על\b/i.test(s)) return null; // not a bare radius declaration
   const circles = (ctx.circles ?? []).map(up);
   if (!circles.length) return null; // a radius needs a circle to belong to
   const body = dropCircleRef(s).replace(/\bradius\b|רדיוס|\badd\b|הוסף|\bdraw\b|צייר|\bin\b|circle|מעגל/gi, ' ');
@@ -2145,6 +2145,11 @@ const chord: Rule = (s, ctx) => {
   // withChordMembership still puts the endpoints on the circle). Without this guard `chord` grabs the
   // "AC" run and silently drops the named point E.
   if (POINT_ON_CARRIER.test(s)) return null;
+  // A RELATION tail ("chord AB = 6" / "chord AB = CD") is a MEASURE on the chord, not a bare chord
+  // declaration — bail so the measure/equality rule claims the length; `withChordMembership` then re-asserts
+  // the endpoints on the circle from the segment that rule draws (PAR-1). Without this the `= …` was silently
+  // dropped. (⟂/∥ chords need no guard here — those constraint rules already run before `chord`.)
+  if (/[=<>]/.test(s)) return null;
   const center = resolveCenter(s, ctx);
   if (!center) return null;
   const ids = labelRun(dropCircleRef(s).replace(/chord|מיתר/gi, ' '), 2);
@@ -2250,6 +2255,10 @@ const inscribedAngleOnDiameter: Rule = (s, ctx) => {
  *  a free on-circle endpoint to the other's antipode when the centre is independent. [ADR-137] */
 const diameter: Rule = (s, ctx) => {
   if (!/diameter|קוטר/i.test(s)) return null;
+  // A RELATION tail ("diameter AB = 10") is a MEASURE on the diameter — bail so the measure rule claims the
+  // length; `withCarrierMembership` then re-asserts A,B on the circle AND collinear-through-centre so it stays
+  // a DIAMETER (PAR-1/PAR-4). Without this the "= 10" was silently dropped.
+  if (/[=<>]/.test(s)) return null;
   const center = resolveCenter(s, ctx);
   if (!center) return null;
   const ids = labelRun(dropCircleRef(s).replace(/diameter|קוטר/gi, ' '), 2);
@@ -2826,7 +2835,7 @@ function lineMarkers(lineId: Id, labels: Id[]): AnyCommand[] {
 function lineNameLabels(s: string, exclude: Id[]): Id[] {
   const m =
     s.match(/(?:\bline\b|\bray\b|הישר|ישר|הקו|\bקו\b|קרן)\s+\b([A-Za-z]\d*)(?:\s*([A-Za-z]\d*))?\b/i) ??
-    s.match(/^\s*\b([A-Za-z]\d*)(?:\s*([A-Za-z]\d*))?\b\s*(?=perpendicular|⊥|מאונך|אנך|parallel|∥|מקביל)/i);
+    s.match(/^\s*\b([A-Za-z]\d*)(?:\s*([A-Za-z]\d*))?\b\s*(?=perpendicular|⊥|מאונ[כך]|אנ[כך]|parallel|∥|מקביל)/i);
   if (!m) return [];
   const ex = new Set(exclude.map((e) => e.toUpperCase()));
   const out: Id[] = [];
@@ -3055,12 +3064,12 @@ const THROUGH_PT = String.raw`(?:through|\bat\b|דרך|בנקודה)\s+([A-Za-z]
 
 /** "line through P perpendicular to AB" / "ישר דרך P מאונך ל-AB" / "DE אנך ל-AB בנקודה C" — a *drawn* perpendicular line through a point. */
 const perpendicularLine: Rule = (s, ctx) => {
-  if (!/perpendicular|⊥|מאונך|אנך/i.test(s)) return null;
+  if (!/perpendicular|⊥|מאונ[כך]|אנ[כך]/i.test(s)) return null;
   const thr = s.match(new RegExp(THROUGH_PT, 'i'));
   if (!thr) return null; // no through-point ⇒ it's the ⟂ constraint or a foot, not a drawn line
   const seg = s
     .replace(new RegExp(THROUGH_PT, 'gi'), ' ') // drop the through-clause so its point isn't read as the segment
-    .match(/(?:perpendicular\s*to|⊥|מאונך\s*ל-?|אנך\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+    .match(/(?:perpendicular\s*to|⊥|מאונ[כך]\s*ל-?|אנ[כך]\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!seg) return null;
   const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
   const have = new Set(ctx.points ?? []);
@@ -3279,7 +3288,7 @@ const altitude: Rule = (s, ctx) => {
   // A "perpendicular FROM a point" (the altitude/foot), not the ⟂ CONSTRAINT or a through-line. The
   // from-apex is the real discriminator (computed below as `apexM`); the ⟂ constraint ("AB אנך ל CD")
   // has no "from"/"מ" apex, so `apexM` is null there and the rule bows out.
-  const isPerpFrom = /perpendicular|מאונך|אנך/i.test(s) && !/through|דרך/i.test(s);
+  const isPerpFrom = /perpendicular|מאונ[כך]|אנ[כך]/i.test(s) && !/through|דרך/i.test(s);
   if (!isHeight && !isPerpFrom) return null;
   // A NAMED altitude segment — "CD גובה …" (name-first) or "הגובה CD …" / "the altitude CD …"
   // (keyword-first) — names BOTH the apex (the vertex) and the FOOT (where it lands on the opposite
@@ -3731,52 +3740,82 @@ function withImplicitCircles(commands: AnyCommand[], ctx: ParseContext): AnyComm
 }
 
 /**
- * A point named as a CHORD endpoint lies ON the circle — in ANY phrasing, not only the standalone
+ * CARRIER membership post-pass (`withCarrierMembership`, generalises ADR-119's chord version to diameters,
+ * PAR-4). A point named as a CHORD endpoint lies ON the circle — in ANY phrasing, not only the standalone
  * `chord` rule. When "chord"/"מיתר" appears together with a relation ("CD and AF are parallel chords",
  * "the chord AB equals the chord CD", "chord AB ⟂ chord CD"), the relational rule wins the first-match
  * race (it runs before `chord` and only understands plain segments), silently dropping the on-circle
  * membership — the endpoints would end up free points joined by segments, NOT points on the circle
  * (operator session sflkyd0r: "CD ו AF מיתרים המקבילים זה לזה" → segments + ∥ only). The fix is one
  * general post-pass, not a per-relation special case: every SEGMENT endpoint in a chord-flavoured
- * utterance is asserted on the resolved circle. Idempotent (the standalone `chord` rule's own
+ * utterance is asserted on the resolved circle. A DIAMETER-flavoured utterance additionally gets the
+ * diameter's endpoints collinear-through-centre (so "diameter AB = 10" is a real diameter, not a chord),
+ * while asserting only the diameter itself when it isn't also a chord (so a diameter ⟂ a NON-chord segment
+ * doesn't force that segment onto the circle). Idempotent (the standalone `chord`/`diameter` rules' own
  * membership is deduped); a circle CENTRE is excluded so "radius OE" keeps O off the circle; a chord's
  * MIDPOINT is never a segment endpoint, so "C אמצע מיתר AB" puts A,B — not C — on the circle. Matches
  * the standalone rule's unconditional semantics (a chord's endpoints are on the circle whether they are
  * new or already placed). (ADR-119)
  */
-function withChordMembership(commands: AnyCommand[], s: string, ctx: ParseContext): AnyCommand[] {
-  if (!/chord|מיתר/i.test(s)) return commands;
+function withCarrierMembership(commands: AnyCommand[], s: string, ctx: ParseContext): AnyCommand[] {
+  const isChord = /chord|מיתר/i.test(s);
+  const isDiameter = /diameter|קוטר/i.test(s);
+  if (!isChord && !isDiameter) return commands;
+  // If a CIRCLE-CONSTRUCT rule already handled the utterance (the standalone `chord`/`diameter`, or
+  // `circleOnDiameter`/`diameterCutsSegment`/`pointOnCircle`/arc/…), it modelled membership itself — don't
+  // double-add. Only a RELATIONAL / point-on winner (parallel/⟂/distance/equal/ratio/pointOnSegment — bare
+  // segments, no circle geometry) can have DROPPED the membership and needs it restored here.
+  const CONSTRUCT: ReadonlySet<string> = new Set([
+    'point-on-circle', 'circle', 'circle-through', 'circumcircle', 'diameter', 'arc-midpoint',
+    'line-circle-intersection', 'circle-circle-intersection', 'tangent', 'set-collinear', 'set-line',
+    'line-line-intersection', 'line-intersection',
+  ]);
+  if (commands.some((c) => CONSTRUCT.has(c.type))) return commands;
   const center = resolveCenter(s, ctx);
-  if (!center) return commands; // no circle to anchor the chord on — leave the parse untouched
+  if (!center) return commands; // no circle to anchor on — leave the parse untouched
   const circ = circleId(center);
   const centers = new Set([center, ...(ctx.circles ?? [])].map(up));
   const already = new Set(
     commands.flatMap((c) => (c.type === 'point-on-circle' && c.circle === circ ? [up(c.id)] : [])),
   );
-  const endpoints: Id[] = [];
+  // Ordered endpoint PAIRS drawn by the winning rule — a `segment` or a `point-on-segment` carrier (the
+  // on-segment RIDER `id` is NOT an endpoint, so "C אמצע מיתר AB" puts A,B — not C — on the circle). A pair
+  // touching the circle's CENTRE is a radius, not a chord — excluded (so "radius OE" keeps O off).
+  const pairs: Id[][] = [];
   for (const c of commands) {
-    // The chord's endpoints are its carrier's two ends — whether the carrier is a `segment` or the
-    // `a,b` of a `point-on-segment` ("E על מיתר AC"). The rider point (the on-segment `id`) is NOT an
-    // endpoint, so it stays off the circle, matching the midpoint exclusion below.
-    const pair = c.type === 'segment' || c.type === 'point-on-segment' ? [c.a, c.b] : null;
-    if (!pair) continue;
-    for (const id of pair) {
-      const U = up(id);
-      if (!centers.has(U) && !already.has(U) && !endpoints.includes(U)) endpoints.push(U);
-    }
+    const pair = c.type === 'segment' || c.type === 'point-on-segment' ? [up(c.a), up(c.b)] : null;
+    if (pair && !pair.some((id) => centers.has(id))) pairs.push(pair);
   }
-  if (!endpoints.length) return commands;
-  return [...endpoints.map((id): AnyCommand => ({ type: 'point-on-circle', id, circle: circ })), ...commands];
+  if (!pairs.length) return commands;
+  // A CHORD utterance puts EVERY named segment on the circle (both "parallel chords"); a diameter-ONLY
+  // utterance ("diameter AB = 10") asserts just the diameter itself (the first pair) — so an unrelated
+  // segment (a diameter ⟂ a NON-chord) isn't wrongly forced onto the circle.
+  const memberPairs = isChord ? pairs : [pairs[0]];
+  const endpoints: Id[] = [];
+  for (const [a, b] of memberPairs) for (const id of [a, b]) if (!centers.has(id) && !already.has(id) && !endpoints.includes(id)) endpoints.push(id);
+  const extra: AnyCommand[] = endpoints.map((id) => ({ type: 'point-on-circle', id, circle: circ }));
+  // A DIAMETER passes through the centre — add the collinearity so AB is a DIAMETER, not just a chord,
+  // UNLESS the winner already modelled it (the standalone `diameter` rule emits diameter/antipode/collinear).
+  const diameterModeled = commands.some((c) => c.type === 'diameter' || c.type === 'set-collinear');
+  if (isDiameter && !diameterModeled) extra.push({ type: 'set-collinear', a: pairs[0][0], b: up(center), c: pairs[0][1] });
+  return [...extra, ...commands];
 }
 
 /**
- * The single normalization applied to every utterance before the rules run — collapse whitespace, spell
- * out Greek letter words, and rewrite `S_{ABC}`/`S_ABC` area subscripts. Extracted so the shadow-matrix
- * guard (A1) analyses the SAME text the rules actually see, and so future boundary normalizations (PAR-7:
- * maqaf `־`→`-`, strip bidi controls) land in ONE place rather than per-rule. Pure.
+ * The single normalization applied to every utterance before the rules run — ORTHOGRAPHY first (PAR-7),
+ * then collapse whitespace, spell out Greek letter words, and rewrite `S_{ABC}`/`S_ABC` area subscripts.
+ * Extracted so the shadow-matrix guard (A1) analyses the SAME text the rules actually see. Pure.
+ *
+ * Orthography (PAR-7): Word/PDF paste the Hebrew MAQAF `־` (U+05BE) where the grammar's suffix groups
+ * (`ל-?`/`ב-?`/`מ-?`) expect an ASCII hyphen, and copy invisible BIDI/zero-width control chars into mixed
+ * He/Latin text — both silently break `\s*`/optional-`-` adjacency, so e.g. "נקודה E על AC ב־40%" dropped
+ * the ratio. Fixing it here, at the boundary, kills the whole class in one place instead of per-rule.
  */
 export function normalizeUtterance(raw: string): string {
-  return normalizeAreaSubscript(normalizeGreek(raw.trim().replace(/\s+/g, ' ')));
+  // maqaf U+05BE → ASCII hyphen (so the ל-?/ב-?/מ-? suffix groups match); then strip invisible format
+  // chars: ALM, ZWSP/ZWNJ/ZWJ/LRM/RLM, LRE…RLO, isolates LRI…PDI, BOM.
+  const orth = raw.replace(/־/g, '-').replace(/[؜​-‏‪-‮⁦-⁩﻿]/g, '');
+  return normalizeAreaSubscript(normalizeGreek(orth.trim().replace(/\s+/g, ' ')));
 }
 
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
@@ -3786,7 +3825,7 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
     const res = rule(s, ctx);
     if (res === 'stop') break; // recognised but unreadable — escalate, don't half-parse
     if (!res) continue;
-    if (Array.isArray(res)) return { ok: true, commands: withImplicitCircles(withChordMembership(res, s, ctx), ctx) };
+    if (Array.isArray(res)) return { ok: true, commands: withImplicitCircles(withCarrierMembership(res, s, ctx), ctx) };
     return { ok: false, reason: res.clarify, vertex: res.vertex }; // a clarification request (e.g. ambiguous single-vertex angle)
   }
   return { ok: false, reason: 'not-handled' };
