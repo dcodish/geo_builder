@@ -14,19 +14,6 @@ import { isGeoPoint } from '@/engine/types';
 import { len, rot90, sub, unit } from '@/engine/geometry';
 import { resolveCircle, resolveLine, type DefiniteAngle, type RelationsResult, type ResolvedCircle } from '@/engine';
 
-/** A point id structurally on circle `cid` (for recovering a driven free radius from positions). */
-function pointOnCircleId(c: Construction, cid: Id): Id | null {
-  for (const o of c.objects) {
-    // `radial-toward` is on its `circle` by construction (centre + r·unit) — and for two tangent circles it
-    // is the ONLY on-circle point, so without it the renderer can't recover a solver-driven free radius and
-    // draws the SEED instead: the circle is drawn at its default size while the touch point sits at the
-    // solved radius (a circle drawn too big with its touch point floating inside it). (ADR-144.)
-    if ((o.kind === 'on-circle' || o.kind === 'line-circle' || o.kind === 'antipode' || o.kind === 'arc-midpoint' || o.kind === 'radial-toward') && o.circle === cid) return o.id;
-    if (o.kind === 'circle-circle' && (o.circle1 === cid || o.circle2 === cid)) return o.id;
-  }
-  return null;
-}
-
 export interface ScenePoint {
   id: Id;
   pos: Vec;
@@ -174,7 +161,7 @@ export function buildScene(
   positions: Map<Id, Vec>,
   labels?: MeasureLabels,
   angleMarkSpecs?: { vertex: Id; ray1: Id; ray2: Id; right: boolean }[],
-  opts?: { showCenters?: boolean },
+  opts?: { showCenters?: boolean; circles?: Map<Id, ResolvedCircle> },
 ): Scene {
   // "Show circle centres": reveal every circle's centre with its label (O, P, …), even an AUTO one
   // that nothing is drawn from — so the student can tell two unnamed circles apart and address each
@@ -210,10 +197,13 @@ export function buildScene(
   const autoCenters = new Set<Id>();
   for (const o of c.objects) if (o.kind === 'circle' && o.autoCenter) autoCenters.add(o.center);
 
-  // Resolve every circle to centre+radius via the ENGINE's resolver, so the renderer keeps no
-  // divergent copy of the radius math (ADR-044). A tiny fixed point handles a tangent-inner circle
-  // that references another. Visible lines read this map too (a tangent needs its circle). Computed
-  // from the (already-oriented) positions, so it stays correct under the view orientation.
+  // Resolve every circle to centre+radius. Prefer the ENGINE's PUBLISHED map (`evaluate` already solved
+  // every free / tangent-inner radius — ADR-200/D2): the renderer is a pure consumer and no longer
+  // reconstructs a solver-driven free radius from a point on the circle. The CENTRE is read from the
+  // (already view-oriented) positions so it tracks a flip/rotation; the radius is a scalar, so the
+  // engine's orientation-invariant value is correct as-is. Direct callers that don't thread the map
+  // (some unit tests) fall back to the object's own resolver — correct for a declared `length`/`through`
+  // radius; a free radius then draws its seed (those tests supply the map when the solved value matters).
   const resolvedCircles = new Map<Id, ResolvedCircle>();
   {
     const circleObjs = c.objects.filter((o): o is Circle => o.kind === 'circle');
@@ -222,17 +212,15 @@ export function buildScene(
       progressed = false;
       for (const o of circleObjs) {
         if (resolvedCircles.has(o.id)) continue;
-        let rc = resolveCircle(o, positions, resolvedCircles);
-        if (rc === 'pending' || typeof rc === 'string') continue; // missing point / invalid → not drawn
-        // A FREE radius (ADR-051) the solver drove is baked into `positions` (its on-circle points sit at
-        // the solved radius) but NOT into the stored circle object, so resolveCircle returns the SEED.
-        // Recover the true radius as the distance from the centre to any point known to be on the circle,
-        // so the drawn circle matches its points. (Definition of radius — not divergent math.)
-        if (o.radius.via === 'free') {
-          const onIt = pointOnCircleId(c, o.id);
-          const pp = onIt ? positions.get(onIt) : undefined;
-          if (pp) rc = { center: rc.center, r: len(sub(pp, rc.center)) };
+        const published = opts?.circles?.get(o.id);
+        const center = positions.get(o.center);
+        if (published && center) {
+          resolvedCircles.set(o.id, { center, r: published.r });
+          progressed = true;
+          continue;
         }
+        const rc = resolveCircle(o, positions, resolvedCircles); // fallback: the object's declared radius
+        if (rc === 'pending' || typeof rc === 'string') continue; // missing point / invalid → not drawn
         resolvedCircles.set(o.id, rc);
         progressed = true;
       }

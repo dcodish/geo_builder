@@ -13,7 +13,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
 import { buildScene, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
 import type { MeasureLabels, RelationPick } from './scene';
-import type { RelationsResult } from '@/engine';
+import type { RelationsResult, ResolvedCircle } from '@/engine';
 import { findSegmentCrossings } from './intersections';
 import type { Crossing } from './intersections';
 import { alignRotation, fitTransform, orient } from './transform';
@@ -21,6 +21,9 @@ import { alignRotation, fitTransform, orient } from './transform';
 export interface FigureProps {
   construction: Construction;
   positions: Map<Id, Vec>;
+  /** Engine-resolved circles (centre + solved radius) from `replay`. Passed through to the scene so a
+   *  solver-driven free radius is drawn from the published value, not reconstructed (ADR-200/D2). */
+  circles?: Map<Id, ResolvedCircle>;
   width?: number;
   height?: number;
   padding?: number;
@@ -136,6 +139,7 @@ function subscriptLabel(label: string, fontSize: number): ReactNode {
 export function Figure({
   construction,
   positions,
+  circles,
   width = 600,
   height = 600,
   padding = 48,
@@ -248,7 +252,7 @@ export function Figure({
       o.rot === 0 && !o.flipX && !o.flipY
         ? positions
         : new Map<Id, Vec>([...positions].map(([id, v]) => [id, orient(v, o)]));
-    const s = buildScene(construction, oriented, labels, angleMarks, { showCenters });
+    const s = buildScene(construction, oriented, labels, angleMarks, { showCenters, circles });
     const t = fitTransform(scenePositions(s), { width, height, padding });
     const x = onPickIntersection ? findSegmentCrossings(construction, oriented) : [];
 
@@ -268,7 +272,7 @@ export function Figure({
     const labelDirs = chooseLabelDirs(ptScreen, obstacles, circScreen, REF_OFF, REF_CLEAR);
 
     return { scene: s, transform: t, crossings: x, labelDirs, oriented };
-  }, [construction, positions, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, showCenters]);
+  }, [construction, positions, circles, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, showCenters]);
 
   // "View relations" is now HOVER-DRIVEN to fight clutter (ADR-167 Am.): the resting figure is clean, and
   // pointing at a side/angle reveals ONLY its equality class. `hoverRel` is the class under the cursor;

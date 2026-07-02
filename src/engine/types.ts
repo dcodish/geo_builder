@@ -491,6 +491,93 @@ export interface Arc {
 
 export type GeoObject = GeoPoint | Segment | Polygon | Line | Circle | Arc;
 
+/** The object ids a {@link LineSpec} references (the points/circle that define the line). */
+function lineSpecRefs(spec: LineSpec): Id[] {
+  switch (spec.via) {
+    case 'through':
+      return [spec.a, spec.b];
+    case 'bisector':
+      return [spec.vertex, spec.p, spec.q];
+    case 'perpendicular':
+    case 'parallel':
+      return [spec.through, spec.a, spec.b];
+    case 'tangent':
+      return [spec.circle, spec.at];
+  }
+  const _exhaustive: never = spec;
+  return _exhaustive;
+}
+
+/**
+ * Every object id `o` **directly references** — points, lines, circles, arcs — exhaustive over ALL
+ * {@link GeoObject} kinds. The single source of truth for walking the full dependency graph
+ * (e.g. coupled-solve cycle detection in `evaluate`), replacing a hand-scraped field list that
+ * silently missed edges (`to`, `toward`, `line`, `circle1/circle2`) — the same silent-drop class the
+ * point-kind whitelist was built to prevent. The exhaustive `switch` makes a newly-added object kind a
+ * **compile error** here until its references are declared.
+ *
+ * Distinct from {@link pointParents} in `step.ts`, which is a point-only DOF-walk *policy* (it stops at
+ * on-circle / line-mediated carriers on purpose). `objectParents` chases through line/circle
+ * intermediaries, so a point coupled to another THROUGH a line∩circle / tangent / arc edge is reachable.
+ */
+export function objectParents(o: GeoObject): Id[] {
+  switch (o.kind) {
+    // points
+    case 'free-point':
+      return [];
+    case 'segment':
+    case 'on-segment':
+    case 'on-segment-solved':
+    case 'derived':
+    case 'midpoint':
+      return [o.a, o.b];
+    case 'intersection':
+      return [o.center1, o.center2];
+    case 'parallelogram-vertex':
+    case 'circumcenter':
+      return [o.a, o.b, o.c];
+    case 'line-line-intersection':
+      return [o.a, o.b, o.c, o.d];
+    case 'perp-offset':
+    case 'scaled-offset':
+      return [o.anchor, o.from, o.to];
+    case 'rotated':
+      return [o.pivot, o.from, o.to];
+    case 'foot':
+      return [o.from, o.a, o.b];
+    case 'line-intersection':
+      return [o.line1, o.line2];
+    case 'on-circle':
+      return o.between ? [o.circle, o.between[0], o.between[1]] : [o.circle];
+    case 'antipode':
+      return [o.circle, o.of];
+    case 'arc-midpoint':
+      return [o.circle, o.from, o.to];
+    case 'line-circle':
+      return [o.line, o.circle];
+    case 'circle-circle':
+      return [o.circle1, o.circle2];
+    case 'radial-toward':
+      return [o.circle, o.toward];
+    case 'on-line':
+      return [o.line];
+    // non-point objects
+    case 'polygon':
+      return o.vertices;
+    case 'line':
+      return lineSpecRefs(o.spec);
+    case 'circle':
+      return [
+        o.center,
+        ...(o.radius.via === 'through' ? [o.radius.point] : o.radius.via === 'tangent-inner' ? [o.radius.outer] : []),
+      ];
+    case 'arc':
+      return [o.center, o.from, o.to];
+  }
+  const _exhaustive: never = o;
+  return _exhaustive;
+}
+
 /**
  * Angle constraint. In Phase 1 it is used as a satisfiability *check* for
  * over-constraint detection (the referenced points are already determined by

@@ -114,6 +114,24 @@ function circlesTangentError(prev: Construction, cmd: Command): string | null {
   return null;
 }
 
+/**
+ * Reject a DIRECTION constraint whose operand segment is zero-length — its two endpoint ids are the
+ * same point, so the segment has no direction and the ∥/⟂ residual is NaN. Left to the solver this
+ * doesn't fail cleanly: `recruitFreeDofs` chases the NaN over every free DOF and the joint optimizer
+ * churns for seconds before reporting a bogus over-constraint (and in the app the config search runs
+ * that slow replay many times → a UI freeze). The degeneracy is structural (by id), so catch it here —
+ * cheaply, before any evaluate — for whatever produced it: a parser typo (a tangent line named "BB"),
+ * the LLM, or a student typing "AA ⟂ BC". A valid ∥/⟂ always names two distinct points per segment,
+ * so this never rejects a well-formed constraint.
+ */
+function degenerateConstraintError(cmd: Command): string | null {
+  if (cmd.type !== 'set-perpendicular' && cmd.type !== 'set-parallel') return null;
+  if (cmd.a !== cmd.b && cmd.c !== cmd.d) return null;
+  const rel = cmd.type === 'set-perpendicular' ? '⟂' : '∥';
+  const degenerate = cmd.a === cmd.b ? `${cmd.a}${cmd.b}` : `${cmd.c}${cmd.d}`;
+  return `${rel} needs two distinct points on each side — "${degenerate}" is a single point, not a segment`;
+}
+
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
   const prevEval = evaluate(prev);
@@ -121,6 +139,11 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
 
   const tangentErr = circlesTangentError(prev, cmd);
   if (tangentErr) return { ok: false, error: tangentErr, construction: prev, positions: prevPositions };
+
+  // A ∥/⟂ on a zero-length operand ("BB" — one point named twice) has no direction: reject it here,
+  // before the solver churns on the NaN residual (a freeze in the app's config-search loop).
+  const degenErr = degenerateConstraintError(cmd);
+  if (degenErr) return { ok: false, error: degenErr, construction: prev, positions: prevPositions };
 
   // Rotate a shape's vertices so an existing edge lands on its free base slots —
   // lets a shape build on an existing edge wherever that edge sits in the name

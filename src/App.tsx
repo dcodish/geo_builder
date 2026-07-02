@@ -440,7 +440,7 @@ export default function App() {
   }
 
   // Figure + per-fact status are derived from the fact list.
-  const { construction, positions, status, lastError, pending, labels, angleMarks, violations, radiusDofs, coincidences } = useMemo(
+  const { construction, positions, circles, status, lastError, pending, labels, angleMarks, violations, radiusDofs, coincidences } = useMemo(
     () => replay(facts, seed, radiusOverrides),
     [facts, seed, radiusOverrides],
   );
@@ -590,6 +590,7 @@ export default function App() {
           <Figure
             construction={construction}
             positions={positions}
+            circles={circles}
             width={canvasSize.w}
             height={canvasSize.h}
             highlight={shapeHighlight ?? highlight}

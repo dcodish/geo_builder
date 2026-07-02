@@ -18,7 +18,7 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
-import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ShapesResult, Vec } from '@/engine';
+import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
 import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, deepEqual, detectRelationsAcross, detectShapesAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, reflectableFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -85,6 +85,10 @@ export type FactStatus = 'ok' | 'disabled' | string;
 export interface Derived {
   construction: Construction;
   positions: Map<Id, Vec>;
+  /** Every circle's engine-resolved centre + radius (post-solve), so the renderer draws a solver-driven
+   *  free radius WITHOUT reconstructing it from a point on the circle (ADR-200/D2 — `evaluate` publishes it,
+   *  the renderer is a pure consumer). Empty when the figure failed to evaluate. */
+  circles: Map<Id, ResolvedCircle>;
   /** fact id → status. */
   status: Record<string, FactStatus>;
   /** The most recent enabled fact that failed, for the error banner (or null). */
@@ -439,7 +443,7 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   // Distinct points the geometry drove onto the same spot — allowed (not an error), surfaced as a notice
   // so the student knows two labels converged ([ADR-123](docs/06-decisions.md#adr-124)).
   const coincidences: [Id, Id][] = e.ok ? e.coincidences ?? [] : [];
-  return { construction: figure, positions: e.ok ? e.positions : new Map(), status, lastError, pending, labels, angleMarks, violations, radiusDofs, coincidences };
+  return { construction: figure, positions: e.ok ? e.positions : new Map(), circles: e.ok ? e.circles : new Map(), status, lastError, pending, labels, angleMarks, violations, radiusDofs, coincidences };
 }
 
 /** The (a, b, id, circle) triples every enabled `extend-onto-circle` step asserts ("המשך a·b onto `circle` at id"). */

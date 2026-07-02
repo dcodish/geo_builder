@@ -6,7 +6,7 @@
  */
 
 import type { Circle, Constraint, Construction, GeoObject, GeoPoint, Id, Line, Vec } from './types';
-import { LEN_EPS, isGeoPoint } from './types';
+import { LEN_EPS, isGeoPoint, objectParents } from './types';
 import { isShapeCarrier } from './carriers';
 import {
   add,
@@ -101,7 +101,10 @@ function resolveDriven(c: Construction): Construction {
     // e.g. "EABF concyclic" drives E while F = CE∩DB depends on E, so E's closed-form needs F which needs
     // E (a cycle the topological evaluator reports as "unresolved dependencies"). Route E numerically.
     const byId = new Map(c.objects.map((o) => [o.id, o] as const));
-    const PT_FIELDS = ['a', 'b', 'c', 'd', 'from', 'of', 'anchor', 'pivot', 'center1', 'center2', 'through', 'vertex', 'p', 'q', 'center'] as const;
+    // Walk the FULL object→references graph (points AND the line/circle intermediaries a point can be
+    // coupled through) via the exhaustive `objectParents` — a newly-added kind is a compile error there,
+    // not a silently-missed edge (retires the old hand-scraped `PT_FIELDS`, which dropped `to`/`toward`/
+    // `line`/`circle1/circle2` and never chased line specs → a line∩circle-mediated cycle went undetected).
     const dependsOn = (target: Id, source: Id): boolean => {
       const seen = new Set<Id>();
       const queue = [target];
@@ -110,9 +113,9 @@ function resolveDriven(c: Construction): Construction {
         if (id === source) return true;
         if (seen.has(id)) continue;
         seen.add(id);
-        const o = byId.get(id) as Record<string, unknown> | undefined;
+        const o = byId.get(id);
         if (!o) continue;
-        for (const f of PT_FIELDS) if (typeof o[f] === 'string') queue.push(o[f] as Id);
+        queue.push(...objectParents(o));
       }
       return false;
     };

@@ -193,10 +193,10 @@ describe('visible construction lines', () => {
 describe('tangent circles — the DRAWN radius matches a solver-driven free radius (ADR-144)', () => {
   it('after "OM=3" circle O is drawn at radius 3 (its touch point), not the seed 5', () => {
     // The regression behind the operator's screenshot: the touch point M (a `radial-toward` point) is the
-    // ONLY point on each tangent circle, and `pointOnCircleId` didn't recognise that kind — so the renderer
-    // could not recover the solver-driven free radius and drew the SEED (circle O big, M floating inside it),
-    // even though the ENGINE positions were correct. A positions-only test passes here; only a SCENE assertion
-    // catches it — hence this check on the drawn `SceneCircle.r`.
+    // ONLY point on each tangent circle, so a renderer reconstructing the free radius from a point could miss
+    // it and draw the SEED (circle O big, M floating inside it). Since ADR-200/D2 the renderer no longer
+    // reconstructs — `evaluate` PUBLISHES the solved radius and the scene draws it. A positions-only test
+    // passes here; only a SCENE assertion catches it — hence this check on the drawn `SceneCircle.r`.
     const cmds: Command[] = [
       { type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true, autoCenter: true },
       { type: 'circle', id: 'circle-P', center: 'P', radius: 3.6, freeRadius: true, autoCenter: true },
@@ -205,7 +205,9 @@ describe('tangent circles — the DRAWN radius matches a solver-driven free radi
       { type: 'set-distance', a: 'O', b: 'M', value: 3 },
     ];
     const { construction, positions } = build(cmds);
-    const scene = buildScene(construction, positions);
+    const ev = evaluate(construction);
+    if (!ev.ok) throw new Error(ev.error);
+    const scene = buildScene(construction, positions, undefined, undefined, { circles: ev.circles });
     const cO = scene.circles.find((c) => c.id === 'circle-O')!;
     const cP = scene.circles.find((c) => c.id === 'circle-P')!;
     const O = positions.get('O')!, P = positions.get('P')!, M = positions.get('M')!;

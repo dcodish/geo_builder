@@ -120,6 +120,31 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'degenerate-tangent-line-fails-fast-no-freeze',
+    title: 'a tangent named by one repeated point ("BB משיק … בנקודה B") fails fast, never freezes the solver',
+    guards:
+      'operator session `wetjqgsj`: two free-radius circles + `C על מעגל P` + `CA משיק למעגל O בנקודה A` (a valid tangent → `set-perpendicular(O,A,C,A)`) + `CA` + `D על מעגל O`, then `BB משיק למעגל P בנקודה B`. The last tangent is named by a DEGENERATE line "BB" (one point repeated), so the parser emitted `set-perpendicular(P,B,B,B)` whose second operand B→B is a zero-length vector (NaN direction). Left to the solver this did NOT fail cleanly — `recruitFreeDofs` chased the NaN over every free DOF and the joint optimizer churned ~4.4 s per replay before reporting a bogus over-constraint; the app runs that slow replay many times in its config-search loop, so the whole UI FROZE. Root fix (ADR-202): `applyStep` rejects a ∥/⟂ with a zero-length operand (its two endpoint ids identical) up front, before any evaluate — 4.4 s → ~15 ms with a clear message, for any source of the degeneracy (parser typo, LLM, `AA ⟂ BC`).',
+    steps: [
+      'שני מעגלים נחתכים',
+      'C על מעגל P',
+      'CA משיק למעגל O בנקודה A',
+      'CA',
+      'D על מעגל O',
+      'BB משיק למעגל P בנקודה B',
+    ],
+    expectViolations: true, // the last (degenerate) step is intentionally rejected — the figure is the prior one
+    check(fig) {
+      // The degenerate tangent is rejected with a clear message (NOT a silent freeze / bogus over-constraint).
+      expect(fig.lastError).toMatch(/distinct points|single point/);
+      // The prior figure is kept: every earlier point still has a position (no clobber, no wipe).
+      for (const id of ['O', 'P', 'A', 'B', 'C', 'D']) expect(fig.positions.has(id), `position for ${id}`).toBe(true);
+      // The valid earlier tangent (OA ⟂ CA) is unaffected — its constraint still holds in the kept figure.
+      const O = at(fig, 'O'), A = at(fig, 'A'), C = at(fig, 'C');
+      const dot = (O.x - A.x) * (C.x - A.x) + (O.y - A.y) * (C.y - A.y);
+      expect(Math.abs(dot) / (dist(O, A) * dist(C, A) || 1)).toBeLessThan(0.05); // ~perpendicular
+    },
+  },
+  {
     id: 'baseless-midsegment-places-G-on-a-side-and-alternates',
     title: 'a base-less "EG קטע אמצעים" with E on a side pins E to the midpoint and places G on one of the two other sides (cyclable)',
     guards:

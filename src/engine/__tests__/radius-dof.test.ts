@@ -60,7 +60,10 @@ describe('engine — a free radius flexes to a constraint', () => {
 
   it('the RENDERER draws the driven radius, not the stored seed', () => {
     const { construction, positions } = build([...twoCircles(), { type: 'set-distance', a: 'O', b: 'C', value: 9 }]);
-    const scene = buildScene(construction, positions);
+    // Since ADR-200/D2 the renderer draws the radius `evaluate` PUBLISHES (no reconstruction from a point).
+    const ev = evaluate(construction);
+    if (!ev.ok) throw new Error(ev.error);
+    const scene = buildScene(construction, positions, undefined, undefined, { circles: ev.circles });
     const circO = scene.circles.find((x: { id: Id }) => x.id === 'circle-O');
     expect(circO?.r).toBeCloseTo(9, 3); // the drawn circle matches its points
   });
@@ -95,6 +98,25 @@ describe('store — "show another configuration" varies the radii (and can flip 
     }
     expect(seen.size, 'radii actually vary across views').toBeGreaterThan(3);
     expect(pBigger, 'some view has circle P larger than circle O').toBeGreaterThan(0);
+    st.clear();
+  });
+
+  it('replay PUBLISHES the solver-driven radius in `circles` (the D2 contract the renderer consumes)', () => {
+    // ADR-200/D2: `replay` carries `evaluate`'s resolved circles so the renderer reads a solved free radius
+    // instead of reconstructing it. The construction object still holds the SEED (5) for a solver-driven
+    // radius, so `circles` is the only place the true value is published.
+    const st = useGeoStore.getState();
+    st.clear();
+    for (const u of ['two circles intersect at A and B', 'C על מעגל O', 'OC = 9']) {
+      const r = parse(u);
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return;
+      for (const cmd of r.commands) st.execute(cmd, u);
+    }
+    const fig = replay(useGeoStore.getState().facts, useGeoStore.getState().seed);
+    expect(fig.circles.get('circle-O')?.r).toBeCloseTo(9, 3); // published solved radius, not the seed 5
+    const objRadius = (fig.construction.objects.find((o) => o.id === 'circle-O') as Circle).radius;
+    expect('value' in objRadius ? objRadius.value : NaN).toBeCloseTo(5, 3); // object keeps the seed
     st.clear();
   });
 });

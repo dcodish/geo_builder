@@ -340,8 +340,8 @@ Dependency notes: PAR-11 (shadow matrix) should land before Phase C. TST-1 (seed
 | C8 / PAR-6 | C | Area-ref dedupe (S-leading polygon) | MED | 1 h | ADR-188 | ✅ |
 | C9 / PAR-9 | C | Structured-id rename/swap | MED | ½ d | ADR-189 | ✅ |
 | C10 / PAR-10+TST-3 | C | LLM contract tests | L-M | ½ d | ADR-190 | ✅ |
-| D1 / ENG-1 | D | dependsOn reuses pointParents | — | 2 h | | ☐ |
-| D2 / ENG-2+REN-6 | D | Publish solved radii | MED | ½ d | | ☐ |
+| D1 / ENG-1 | D | dependsOn uses exhaustive objectParents (retires PT_FIELDS) | — | 2 h | ADR-200 | ✅ |
+| D2 / ENG-2+REN-6 | D | Publish solved radii (retires pointOnCircleId) | MED | ½ d | ADR-201 | ✅ |
 | E1 / STO-1 | E | Replay memoization + DEV snapshot | MED | 2–3 h | | ☐ |
 | E2 / STO-2 | E | Bounded config search | MED | ½ d | | ☐ |
 | E3 / STO-3 | E | Race-safe cancellable LLM submit | HIGH | ½ d | | ☐ |
