@@ -235,6 +235,7 @@
       "isosceles-triangle": "Isosceles triangle",
       "equilateral-triangle": "Equilateral triangle",
       "right-triangle": "Right triangle",
+      "right-isosceles-triangle": "Right isosceles triangle",
       "circle": "Circle"
     },
     "def": {
@@ -250,6 +251,7 @@
       "isosceles-triangle": "A triangle with two equal sides.",
       "equilateral-triangle": "A triangle with all sides equal.",
       "right-triangle": "A triangle with one right angle.",
+      "right-isosceles-triangle": "A triangle with a right angle and its two legs equal (angles 45°-45°-90°).",
       "circle": "The set of points in the plane at a fixed distance from a centre."
     }
   }

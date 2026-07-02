@@ -235,6 +235,7 @@
       "isosceles-triangle": "משולש שווה שוקיים",
       "equilateral-triangle": "משולש שווה צלעות",
       "right-triangle": "משולש ישר זווית",
+      "right-isosceles-triangle": "משולש ישר זווית ושווה שוקיים",
       "circle": "מעגל"
     },
     "def": {
@@ -250,6 +251,7 @@
       "isosceles-triangle": "משולש שבו שתי צלעות שוות.",
       "equilateral-triangle": "משולש שכל צלעותיו שוות.",
       "right-triangle": "משולש שבו זווית אחת ישרה.",
+      "right-isosceles-triangle": "משולש שיש בו זווית ישרה ושתי הניצבים שווים (זוויותיו 45°-45°-90°).",
       "circle": "אוסף כל הנקודות במישור שמרחקן ממרכז נתון קבוע."
     }
   }

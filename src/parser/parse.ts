@@ -45,6 +45,9 @@ export interface ParseContext {
   /** For each point, the points it's joined to (segment / polygon edge) — lets a single-vertex angle
    *  ("∠C") resolve its two arms, so "∠C קהה/חדה" (obtuse/acute) works without spelling all three. */
   neighbors?: Record<string, string[]>;
+  /** For each FREE on-segment point, the endpoints of the side it rides (`E → ['A','C']`) — lets a base-less
+   *  midsegment ("EG קטע אמצעים" with E already on AC) resolve which side E sits on ([ADR-199](docs/06-decisions.md#adr-199)). */
+  onSegment?: Record<string, [string, string]>;
   /** Vertex-disjoint PARALLEL edge-pairs in the figure (e.g. a trapezoid's bases `[['A','B'],['D','C']]`),
    *  derived from the resolved positions — lets "height/altitude from a vertex" drop to the opposite
    *  parallel base (the trapezoid case the triangle inference can't reach). */
@@ -411,20 +414,71 @@ const rightTrapezoid = shapeMacro(
 );
 
 /**
+ * The base-less midsegment ("EG קטע אמצעים", no parallel base) — [ADR-199](docs/06-decisions.md#adr-199).
+ * Requires the named endpoint pair and figure context: exactly one endpoint (`E`) already rides a triangle
+ * side (`ctx.onSegment`), the other (`G`) is fresh. Emits a `midsegment` `shape-variant` `[P,Q,R,E,G]` (E's
+ * side PQ, third vertex R = the unique common neighbour of P,Q); its two variants place G on PR or QR. If
+ * neither endpoint is on a resolvable side, or both are (a determined midsegment, not a variant), returns
+ * null so the utterance falls through to the plain-segment rule (unchanged behaviour).
+ */
+function midsegmentBaseless(s: string, ctx: ParseContext): AnyCommand[] | null {
+  const nm =
+    s.match(/^\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)/i) ??
+    s.match(/(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)\s+\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  if (!nm || !isUpperLabel(nm[1]) || !isUpperLabel(nm[2])) return null;
+  const pair = [up(nm[1]), up(nm[2])];
+  if (pair[0] === pair[1]) return null;
+  const onSeg = ctx.onSegment ?? {};
+  const nb = ctx.neighbors ?? {};
+  // Try each endpoint as the on-side E (the other as the fresh G). G must NOT itself ride a side (else the
+  // midsegment is determined, not a variant — left to fall through) nor be one of E's own side endpoints.
+  const tryOrder = (eLbl: Id, gLbl: Id): AnyCommand[] | null => {
+    const side = onSeg[eLbl];
+    if (!side || onSeg[gLbl]) return null;
+    const [p, q] = side;
+    if (gLbl === p || gLbl === q) return null;
+    const shared = (nb[p] ?? []).filter((x) => (nb[q] ?? []).includes(x) && x !== p && x !== q);
+    if (shared.length !== 1 || shared[0] === gLbl) return null; // unique third vertex R, and G is fresh
+    return [{ type: 'shape-variant', shape: 'midsegment', ids: [p, q, shared[0], eLbl, gLbl], variant: 0 }];
+  };
+  return tryOrder(pair[0], pair[1]) ?? tryOrder(pair[1], pair[0]);
+}
+
+/**
  * "the midsegment to BC in triangle ABC" / "קטע האמצעים לצלע BC במשולש ABC" — the segment joining the
  * midpoints of the two sides meeting at the apex (the triangle vertex NOT on the named base). Decomposes
- * to two `midpoint`s + a `segment` (all already supported). The triangle must be named (3 labels) and the
- * base a side of it; the triangle is created first if it isn't already in the figure. Unusual phrasings
- * (a trapezoid midsegment, an un-named triangle) fall through to the LLM net.
+ * to two `midpoint`s + a `segment` (all already supported). The base a side of the triangle; the triangle
+ * is either named in THIS utterance (3 labels) or — the app's primary INCREMENTAL flow, where the student
+ * drew the triangle in an earlier step and now just says "GE קטע אמצעים מקביל ל AB" — resolved from the
+ * FIGURE: the apex is the unique vertex adjacent to BOTH base endpoints (`ctx.neighbors`), the same context
+ * inference altitude/single-vertex-angle use. Without a resolvable triangle (a trapezoid midsegment, no
+ * base named) it falls through to the LLM net.
+ *
+ * A THIRD form has NO base at all — "EG קטע אמצעים" where the student already placed one endpoint (`E`) on a
+ * triangle side. Then which side the OTHER endpoint (`G`) rides is genuinely unstated (ADR-052): E is the
+ * midpoint of its side, and G is the midpoint of one of the two OTHER sides. That choice is a cyclable
+ * `shape-variant` ([ADR-199](docs/06-decisions.md#adr-199)) so "show another configuration" flips G between them.
  */
 const midsegment: Rule = (s, ctx) => {
   if (!/midsegment|mid-?segment|midline|קטע\s+ה?אמצעים/i.test(s)) return null;
   const triM = s.match(/(?:triangle|משולש)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)/i);
   const baseM = s.match(/(?:parallel\s+to|to|מקביל\s*ל-?|לצלע|ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
-  if (!triM || !baseM) return null;
-  const tri = [up(triM[1]), up(triM[2]), up(triM[3])];
+  if (!baseM) return midsegmentBaseless(s, ctx);
   const base = [up(baseM[1]), up(baseM[2])];
-  if (!base.every((x) => tri.includes(x)) || base[0] === base[1]) return null; // base must be a side of the triangle
+  if (base[0] === base[1]) return null;
+  // The triangle is either NAMED here ("…in triangle ABC") or RESOLVED from the figure (incremental flow).
+  let tri: Id[];
+  if (triM) {
+    tri = [up(triM[1]), up(triM[2]), up(triM[3])];
+    if (!base.every((x) => tri.includes(x))) return null; // base must be a side of the named triangle
+  } else {
+    // Apex = the unique vertex joined to BOTH base endpoints in the current figure (the triangle the
+    // student already drew). Ambiguous (0 or ≥2 common vertices) ⇒ fall through rather than guess.
+    const nb = ctx.neighbors ?? {};
+    const shared = (nb[base[0]] ?? []).filter((x) => (nb[base[1]] ?? []).includes(x) && x !== base[0] && x !== base[1]);
+    if (shared.length !== 1) return null;
+    tri = [shared[0], base[0], base[1]];
+  }
   const apex = tri.find((v) => !base.includes(v));
   if (!apex) return null;
   // A NAMED midsegment — "MN קטע אמצעים …" (name-first) or "קטע האמצעים MN …" / "the midsegment MN …"

@@ -36,6 +36,7 @@ export type ShapeType =
   | 'isosceles-triangle'
   | 'equilateral-triangle'
   | 'right-triangle'
+  | 'right-isosceles-triangle'
   | 'circle';
 
 export interface DetectedShape {
@@ -158,11 +159,14 @@ function classifyQuad(samples: Vec[][], lengthTol: number, angleTol: number): Sh
 }
 
 /**
- * Classify one triangle: the most specific of equilateral / isosceles / (general) triangle along the
- * equal-sides axis, plus the orthogonal `right-triangle` when a right angle is forced. Returns the
- * set of badge types (1 or 2 entries) — e.g. a forced right-isosceles triangle → both.
+ * Classify one triangle into the SINGLE most-specific named type, composing the equal-sides axis
+ * (equilateral / isosceles / general) with the right-angle axis into one badge — a forced
+ * right-isosceles triangle is `right-isosceles-triangle`, a single named concept, not two separate
+ * `isosceles-triangle` + `right-triangle` badges (a right isosceles is one thing a student names,
+ * mirroring how `isosceles-trapezoid` / `right-trapezoid` are each their own type). Equilateral is
+ * never right (a 60-60-60 triangle has no right angle), so only isosceles pairs with the right axis.
  */
-function classifyTriangle(samples: Vec[][], lengthTol: number, angleTol: number): ShapeType[] {
+function classifyTriangle(samples: Vec[][], lengthTol: number, angleTol: number): ShapeType {
   const all = (pred: (p: Vec[]) => boolean) => samples.every(pred);
   const s = (p: Vec[], i: number, j: number) => dist(p[i], p[j]);
 
@@ -174,10 +178,11 @@ function classifyTriangle(samples: Vec[][], lengthTol: number, angleTol: number)
 
   const rightAngle = all((p) => [0, 1, 2].some((i) => isRight(angleAt(p[i], p[(i + 2) % 3], p[(i + 1) % 3]), angleTol)));
 
-  const out: ShapeType[] = [];
-  out.push(equilateral ? 'equilateral-triangle' : isosceles ? 'isosceles-triangle' : 'triangle');
-  if (rightAngle) out.push('right-triangle');
-  return out;
+  if (equilateral) return 'equilateral-triangle';
+  if (isosceles && rightAngle) return 'right-isosceles-triangle';
+  if (isosceles) return 'isosceles-triangle';
+  if (rightAngle) return 'right-triangle';
+  return 'triangle';
 }
 
 // ---- Emergent shapes: polygons that exist on the page but were never declared as a `polygon` ----
@@ -244,10 +249,33 @@ function polyArea(p: Vec[]): number {
   return Math.abs(s) / 2;
 }
 
+/**
+ * A vertex is "straight" when its two incident edges are collinear (interior angle ≈ 0 or π) — a
+ * degenerate corner that makes an n-gon really an (n−1)-gon. This is the case the shoelace-area test
+ * MISSES: a "quad" A-B-E-D where E lies on diagonal BD keeps triangle ABD's full area, yet B,E,D are
+ * collinear so it is not a genuine quadrilateral (it would classify as a phantom kite). Drawing both
+ * diagonals of any polygon plants their crossing point on every diagonal, spawning exactly these.
+ */
+function hasStraightVertex(p: Vec[], angleTol: number): boolean {
+  const n = p.length;
+  const sinTol = Math.sin(angleTol);
+  for (let i = 0; i < n; i++) {
+    const b = p[i];
+    const u = sub(p[(i + n - 1) % n], b); // b → prev
+    const w = sub(p[(i + 1) % n], b); // b → next
+    const lu = len(u), lw = len(w);
+    if (lu < EPS || lw < EPS) return true; // coincident consecutive vertices
+    // |sin θ| via the normalised cross product; ~0 ⇒ the corner is straight (or a fold-back spike).
+    if (Math.abs(u.x * w.y - u.y * w.x) / (lu * lw) < sinTol) return true;
+  }
+  return false;
+}
+
 /** A cycle is a genuine (non-degenerate, non-self-intersecting) polygon in EVERY sample. */
-function isSimpleEverywhere(perSample: Vec[][]): boolean {
+function isSimpleEverywhere(perSample: Vec[][], angleTol: number): boolean {
   for (const p of perSample) {
     if (polyArea(p) < 1e-6) return false; // degenerate / collinear
+    if (hasStraightVertex(p, angleTol)) return false; // a vertex on the edge between its neighbours ⇒ lower-order polygon
     if (p.length === 4) {
       // The two non-adjacent edge pairs must not cross (a bowtie ordering).
       if (segmentsProperlyCross(p[0], p[1], p[2], p[3]) || segmentsProperlyCross(p[1], p[2], p[3], p[0])) return false;
@@ -260,7 +288,7 @@ function isSimpleEverywhere(perSample: Vec[][]): boolean {
 const TYPE_ORDER: ShapeType[] = [
   'square', 'rectangle', 'rhombus', 'parallelogram', 'kite',
   'isosceles-trapezoid', 'right-trapezoid', 'trapezoid',
-  'equilateral-triangle', 'isosceles-triangle', 'right-triangle', 'triangle',
+  'equilateral-triangle', 'right-isosceles-triangle', 'isosceles-triangle', 'right-triangle', 'triangle',
   'circle',
 ];
 
@@ -312,7 +340,7 @@ export function detectShapesAcross(constructions: Construction[], opts: ShapeDet
         const t = classifyQuad(perSample, lengthTol, angleTol);
         if (t) add(t, poly.vertices, label);
       } else if (poly.vertices.length === 3) {
-        for (const t of classifyTriangle(perSample, lengthTol, angleTol)) add(t, poly.vertices, label);
+        add(classifyTriangle(perSample, lengthTol, angleTol), poly.vertices, label);
       }
       // n > 4 (e.g. a regular pentagon): no book page yet — TODO when those pages exist.
     } else if (o.kind === 'circle') {
@@ -338,15 +366,13 @@ export function detectShapesAcross(constructions: Construction[], opts: ShapeDet
     };
     for (const tri of triangleCycles(adj)) {
       const per = perSampleOf(tri);
-      if (!per || !isSimpleEverywhere(per)) continue;
-      for (const t of classifyTriangle(per, lengthTol, angleTol)) {
-        if (t === 'triangle') continue; // emergent generic triangle → no badge (conservative)
-        add(t, tri, tri.join(''));
-      }
+      if (!per || !isSimpleEverywhere(per, angleTol)) continue;
+      const t = classifyTriangle(per, lengthTol, angleTol);
+      if (t !== 'triangle') add(t, tri, tri.join('')); // emergent generic triangle → no badge (conservative)
     }
     for (const quad of quadCycles(adj)) {
       const per = perSampleOf(quad);
-      if (!per || !isSimpleEverywhere(per)) continue;
+      if (!per || !isSimpleEverywhere(per, angleTol)) continue;
       const t = classifyQuad(per, lengthTol, angleTol);
       if (t) add(t, quad, quad.join(''));
     }

@@ -120,6 +120,59 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'baseless-midsegment-places-G-on-a-side-and-alternates',
+    title: 'a base-less "EG קטע אמצעים" with E on a side pins E to the midpoint and places G on one of the two other sides (cyclable)',
+    guards:
+      "operator session `n6zuhw65`: `משולש ABC` → `E על AC` (E free on side AC) → `EG קטע אמצעים` (NO parallel base named). The utterance fell through the midsegment rule (which required a base) to the plain-segment rule → a bare `segment E-G` with G undefined; \"EG was not drawn correctly.\" A midsegment joins two MIDPOINTS, so E must be the midpoint of AC and G the midpoint of one of the other two sides (AB → EG ∥ CB, or CB → EG ∥ AB) — and WHICH is genuinely unstated (ADR-052), so it must be a cyclable alternative (operator: \"G should have been placed on either side CB or AB with ability to alternate between them\"). Root fix (ADR-199): the parser's `midsegmentBaseless` resolves E's host side from `ctx.onSegment` and the triangle from `ctx.neighbors`, and emits a `midsegment` `shape-variant` [A,C,B,E,G]; `expandShapeVariant` pins E to the midpoint (`set-equal(A,E,E,C)`) and makes G the midpoint of AB (variant 0) or CB (variant 1); `VARIANT_COUNT.midsegment = 2` so \"show another configuration\" flips G between the sides.",
+    steps: ['משולש ABC', 'E על AC', 'EG קטע אמצעים'],
+    check(fig) {
+      allStepsOk(fig);
+      // E is pinned to the midpoint of AC (|AE| = |EC|).
+      expect(dist(at(fig, 'A'), at(fig, 'E')), 'E is the midpoint of AC').toBeCloseTo(dist(at(fig, 'E'), at(fig, 'C')), 6);
+      // G is drawn, on ONE of the two other sides (AB or CB) as its midpoint.
+      expect(fig.positions.has('G'), 'G is placed').toBe(true);
+      const gMidAB = Math.abs(dist(at(fig, 'A'), at(fig, 'G')) - dist(at(fig, 'G'), at(fig, 'B'))) < 1e-6;
+      const gMidCB = Math.abs(dist(at(fig, 'C'), at(fig, 'G')) - dist(at(fig, 'G'), at(fig, 'B'))) < 1e-6;
+      expect(gMidAB || gMidCB, 'G is the midpoint of AB or of CB').toBe(true);
+      // EG is a genuine midsegment: parallel to the opposite side (CB if G on AB, AB if G on CB).
+      const eg = { x: at(fig, 'G').x - at(fig, 'E').x, y: at(fig, 'G').y - at(fig, 'E').y };
+      const base = gMidAB
+        ? { x: at(fig, 'B').x - at(fig, 'C').x, y: at(fig, 'B').y - at(fig, 'C').y }
+        : { x: at(fig, 'B').x - at(fig, 'A').x, y: at(fig, 'B').y - at(fig, 'A').y };
+      expect(Math.abs(eg.x * base.y - eg.y * base.x) / (Math.hypot(eg.x, eg.y) * Math.hypot(base.x, base.y)), 'EG ∥ the opposite side').toBeLessThan(1e-3);
+      // The variant is cyclable — a second config puts G on the OTHER side (the alternation the operator asked for).
+      const flipped = replay(
+        factsOf(['משולש ABC', 'E על AC', 'EG קטע אמצעים']).map((f) => (f.cmd.type === 'shape-variant' ? { ...f, cmd: { ...f.cmd, variant: 1 } } : f)),
+      );
+      const g2 = flipped.positions.get('G')!;
+      const g2MidAB = Math.abs(dist(flipped.positions.get('A')!, g2) - dist(g2, flipped.positions.get('B')!)) < 1e-6;
+      expect(g2MidAB, 'variant 1 lands G on the OTHER side than variant 0').toBe(!gMidAB);
+    },
+  },
+  {
+    id: 'incremental-midsegment-resolves-triangle-from-figure',
+    title: 'a midsegment named AFTER the triangle ("GE קטע אמצעים מקביל ל AB") resolves the triangle from the figure and builds the two midpoints',
+    guards:
+      "operator session `z5dkmbla`: `משולש ABC` then `GE קטע אמצעים מקביל ל AB` — a midsegment declared in a SEPARATE, later step (the app's primary incremental flow). The midsegment rule required the triangle to be NAMED in the SAME utterance (`/(?:triangle|משולש) ABC/`), so with no \"משולש ABC\" here `triM` was null and the rule bailed — the utterance fell through to the parallel-constraint rule and became a PLAIN parallel segment (`segment GE`, `segment AB`, `set-parallel`), with NO midpoints. Consequence: G,E were free points, the sides carried no equal halves, so \"view relations\" showed no equal sides/angles (the operator's report). Root fix: `midsegment` resolves the triangle from the figure (`ctx.neighbors`) when it isn't named in-utterance — the apex is the unique vertex adjacent to BOTH base endpoints — the same context inference altitude/single-vertex-angle use. GE now decomposes to midpoint(C,A)=G, midpoint(C,B)=E, segment GE, so the equal halves (AG=CG, BE=CE) and the corresponding angles are ground truths and surface in the relations layer.",
+    steps: ['משולש ABC', 'GE קטע אמצעים מקביל ל AB'],
+    check(fig) {
+      allStepsOk(fig);
+      // G is the midpoint of CA, E of CB → each side split into equal halves.
+      expect(dist(at(fig, 'A'), at(fig, 'G')), 'AG = CG (G midpoint of CA)').toBeCloseTo(dist(at(fig, 'C'), at(fig, 'G')), 6);
+      expect(dist(at(fig, 'B'), at(fig, 'E')), 'BE = CE (E midpoint of CB)').toBeCloseTo(dist(at(fig, 'C'), at(fig, 'E')), 6);
+      // GE ∥ AB (the midsegment theorem) — cross product of the direction vectors is ~0.
+      const ge = { x: at(fig, 'E').x - at(fig, 'G').x, y: at(fig, 'E').y - at(fig, 'G').y };
+      const ab = { x: at(fig, 'B').x - at(fig, 'A').x, y: at(fig, 'B').y - at(fig, 'A').y };
+      expect(Math.abs(ge.x * ab.y - ge.y * ab.x) / (Math.hypot(ge.x, ge.y) * Math.hypot(ab.x, ab.y)), 'GE ∥ AB').toBeLessThan(1e-3);
+      // The equal halves are ground-truth relations (what "view relations" shows) — the reported symptom.
+      const rel = detectRelations(fig.construction);
+      const flatEqual = rel.equalSegments.flat().map(([a, b]) => [a, b].sort().join(''));
+      expect(flatEqual, 'AG=CG surfaces as an equal-side class').toEqual(expect.arrayContaining(['AG', 'CG']));
+      expect(flatEqual, 'BE=CE surfaces as an equal-side class').toEqual(expect.arrayContaining(['BE', 'CE']));
+      expect(rel.equalAngles.length, 'corresponding equal angles surface too').toBeGreaterThan(0);
+    },
+  },
+  {
     id: 'on-segment-point-stays-within-its-segment',
     title: 'a driven on-segment point stays WITHIN its segment — the joint solver can\'t slide it onto the extension',
     guards:
@@ -259,6 +312,39 @@ export const SCENARIOS: Scenario[] = [
       const shapes = detectShapes(fig.construction);
       const rhombus = shapes.shapes.find((s) => (s.type === 'rhombus' || s.type === 'square') && [...s.vertices].sort().join('') === 'EFGH');
       expect(rhombus, `EGFH detected as a rhombus (got: ${shapes.shapes.map((s) => `${s.type}:${s.label}`).join(', ')})`).toBeTruthy();
+    },
+  },
+  {
+    id: 'square-diagonal-right-isosceles',
+    title: 'ריבוע ABCD + שטח 16 + diagonal AC: each half-triangle is ONE "right isosceles triangle" badge, not isosceles + right split',
+    guards:
+      "operator report (screenshot): a square ABCD with area 16 and its diagonal AC surfaced triangle ABC as TWO separate shape badges — 'משולש שווה שוקיים' and 'משולש ישר זווית' — where the operator expected ONE 'משולש ישר זווית ושווה שוקיים'. Root cause: classifyTriangle emitted a badge per orthogonal axis (equal-sides + right-angle) instead of composing the most-specific single named type. Fix: right-isosceles-triangle is its own ShapeType (mirroring isosceles-trapezoid/right-trapezoid), so a forced right-isosceles triangle is a single badge.",
+    steps: ['ריבוע ABCD', 'שטח ABCD הוא 16', 'AC'],
+    check(fig) {
+      allStepsOk(fig);
+      const keys = detectShapes(fig.construction).shapes.map((s) => `${s.type}:${[...s.vertices].sort().join('')}`);
+      // The square's diagonal splits it into two forced right-isosceles triangles — one composed badge each.
+      expect(keys, `got: ${keys.join(', ')}`).toContain('right-isosceles-triangle:ABC');
+      expect(keys, `got: ${keys.join(', ')}`).toContain('right-isosceles-triangle:ACD');
+      // NOT the old two-badge split.
+      expect(keys.some((k) => k.startsWith('isosceles-triangle:')), `no plain isosceles badge in ${keys.join(', ')}`).toBe(false);
+      expect(keys.some((k) => k.startsWith('right-triangle:')), `no plain right-triangle badge in ${keys.join(', ')}`).toBe(false);
+    },
+  },
+  {
+    id: 'square-both-diagonals-no-phantom-kites',
+    title: 'ריבוע ABCD + both diagonals crossing at E: no phantom "kite" badges (collinear-vertex quads)',
+    guards:
+      "operator report (screenshot): a square ABCD with both diagonals AC, BD meeting at E surfaced spurious kite badges (ABED, ABCE, ADCE, BCDE). Root cause: emergent quad detection's degeneracy gate only rejected ZERO-area cycles (shoelace); a 'quad' like A-B-E-D where E lies on diagonal BD keeps triangle ABD's area, so it passed and classifyQuad read the collinear B-E-D corner as a kite vertex. Fix (ADR-198): isSimpleEverywhere also rejects a STRAIGHT vertex (a corner collinear with its two neighbours) — such a cycle is a lower-order polygon, not a genuine quad. General: drawing both diagonals of any polygon plants their crossing on every diagonal.",
+    steps: ['ריבוע ABCD', 'AC', 'BD', 'E = חיתוך AC ו-BD'],
+    check(fig) {
+      allStepsOk(fig);
+      const keys = detectShapes(fig.construction).shapes.map((s) => `${s.type}:${[...s.vertices].sort().join('')}`);
+      expect(keys.some((k) => k.startsWith('kite:')), `no phantom kite badge in ${keys.join(', ')}`).toBe(false);
+      // The genuine content survives: the declared square + the eight right-isosceles triangles.
+      expect(keys, `got: ${keys.join(', ')}`).toContain('square:ABCD');
+      expect(keys).toContain('right-isosceles-triangle:ABE');
+      expect(keys).toContain('right-isosceles-triangle:ABC');
     },
   },
   {

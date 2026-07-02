@@ -83,9 +83,20 @@ describe('triangle classification', () => {
     expect(t).not.toContain('isosceles-triangle');
   });
   it('isosceles → isosceles-triangle', () => expect(types('isosceles triangle ABC')).toContain('isosceles-triangle'));
-  it('right triangle → triangle + right-triangle', () => {
+  it('right (scalene) triangle → a single right-triangle badge (not also a plain "triangle")', () => {
     const t = types('right triangle ABC');
     expect(t).toContain('right-triangle');
+    expect(t).not.toContain('triangle');
+    expect(t).not.toContain('right-isosceles-triangle');
+  });
+  it('right isosceles → ONE composed right-isosceles-triangle badge, not two separate ones', () => {
+    // A square's diagonal AC splits it into two forced right-isosceles triangles ABC, ACD. Each must
+    // surface as a single "right isosceles triangle" badge — not a separate isosceles + right pair.
+    const keys = shapeKeys(build('square ABCD', 'segment AC'));
+    expect(keys).toContain('right-isosceles-triangle:ABC');
+    expect(keys).toContain('right-isosceles-triangle:ACD');
+    expect(keys.some((k) => k.startsWith('isosceles-triangle:'))).toBe(false);
+    expect(keys.some((k) => k.startsWith('right-triangle:'))).toBe(false);
   });
 });
 
@@ -115,6 +126,18 @@ describe('emergent detection (the point of sampling)', () => {
 });
 
 describe('emergent detection stays conservative', () => {
+  it('a square with BOTH diagonals is NOT read as containing kites (phantom collinear-vertex quads)', () => {
+    // The diagonals cross at E; a cycle like A-B-E-D has E on segment BD (B,E,D collinear), so it is
+    // triangle ABD with a redundant vertex — its shoelace area is non-zero, so only the straight-vertex
+    // gate (not the area test) rejects it. Without the gate it classifies as a phantom kite.
+    const keys = shapeKeys(buildCtx('ריבוע ABCD', 'AC', 'BD', 'E = חיתוך AC ו-BD'));
+    expect(keys.some((k) => k.startsWith('kite:')), `no phantom kite in ${keys.join(', ')}`).toBe(false);
+    // The genuine content is still detected: the declared square + the eight right-isosceles triangles.
+    expect(keys).toContain('square:ABCD');
+    expect(keys).toContain('right-isosceles-triangle:ABE'); // a quarter triangle
+    expect(keys).toContain('right-isosceles-triangle:ABC'); // a half-square triangle
+  });
+
   it('an emergent GENERIC triangle (three free segments, no special property) gets no badge', () => {
     // Three segments forming a closed triangle, vertices free (never declared `triangle ABC`), so no
     // side/angle is forced equal → it must NOT badge a generic "triangle" (the conservative rule).

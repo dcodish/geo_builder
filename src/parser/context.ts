@@ -23,6 +23,9 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     points: construction.objects.filter(isGeoPoint).map((o) => o.id),
     circleMembers: circleMembers(construction), // "arc BC" resolves to the circle holding both B and C
     neighbors: pointNeighbors(construction), // a single-vertex angle ("∠C קהה/חדה") finds its two arms
+    onSegment: Object.fromEntries(
+      construction.objects.flatMap((o) => (o.kind === 'on-segment' ? [[o.id, [o.a, o.b]] as [Id, [Id, Id]]] : [])),
+    ), // which side a free point rides — lets a base-less midsegment (ADR-199) resolve E's host side
     parallels: parallelEdgePairs(construction, positions), // "height from C" drops to a trapezoid's opposite base (ADR-169)
     lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // idempotent construct reuse
   };

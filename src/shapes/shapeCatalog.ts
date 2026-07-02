@@ -27,6 +27,9 @@ export const SHAPE_BOOK_SLUG: Record<ShapeType, string> = {
   'isosceles-triangle': 'meshulash-shave-shokaim',
   'equilateral-triangle': 'meshulash-shave-tzlaot',
   'right-triangle': 'meshulash-yashar-zavit',
+  // No dedicated book page for a right isosceles triangle → link to the right-triangle page
+  // (משולש ישר זווית), per the operator's choice (a right-and-isosceles triangle reads there).
+  'right-isosceles-triangle': 'meshulash-yashar-zavit',
   circle: 'hamaagl-mugamim',
 };
 

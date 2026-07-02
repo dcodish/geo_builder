@@ -18,10 +18,12 @@
 
 import type { Command, Id } from './types';
 
-export type VariantShape = 'kite' | 'isosceles';
+export type VariantShape = 'kite' | 'isosceles' | 'midsegment';
 
-/** How many valid equal-pair configurations each shape has — the modulus "show another configuration" cycles. */
-export const VARIANT_COUNT: Record<VariantShape, number> = { kite: 2, isosceles: 3 };
+/** How many valid configurations each shape has — the modulus "show another configuration" cycles. A kite has
+ *  two symmetry axes, an isosceles triangle three apexes, a base-less midsegment two host sides for its free
+ *  endpoint ([ADR-199](docs/06-decisions.md#adr-199)). */
+export const VARIANT_COUNT: Record<VariantShape, number> = { kite: 2, isosceles: 3, midsegment: 2 };
 
 /** A `set-equal` argument tuple `[a,b,c,d]` meaning |ab| = |cd|. */
 type EqTuple = [Id, Id, Id, Id];
@@ -64,15 +66,35 @@ export function eqMatchesPair(eq: { a: Id; b: Id; c: Id; d: Id }, pair: EqTuple)
 }
 
 /**
+ * A base-less MIDSEGMENT ([ADR-199](docs/06-decisions.md#adr-199)) — `ids = [P, Q, R, E, G]`: the student
+ * placed `E` on side `PQ` of triangle `PQR` and called `EG` a midsegment, without naming the parallel base.
+ * A midsegment joins two MIDPOINTS, so `E` is pinned to the midpoint of `PQ` (a `set-equal` drives the free
+ * on-segment point), and `G` is the midpoint of one of the two OTHER sides — `PR` (variant 0 ⇒ EG ∥ QR) or
+ * `QR` (variant 1 ⇒ EG ∥ PR). Which side is genuinely unstated (ADR-052), so it is the cyclable variant.
+ */
+function expandMidsegment(ids: Id[], variant: number): Command[] {
+  const [p, q, r, e, g] = ids;
+  const chosen = ((variant % 2) + 2) % 2;
+  const other: [Id, Id] = chosen === 0 ? [p, r] : [q, r]; // G rides PR (v0) or QR (v1)
+  return [
+    { type: 'set-equal', a: p, b: e, c: e, d: q }, // E is the midpoint of PQ: |PE| = |EQ|
+    { type: 'midpoint', id: g, a: other[0], b: other[1] }, // G is the midpoint of the chosen other side
+    { type: 'segment', a: e, b: g }, // draw the midsegment EG
+  ];
+}
+
+/**
  * Expand a `shape-variant` command into engine commands. `explicitEqs` are the genuine `set-equal`s the
  * student/LLM gave (NOT from another shape-variant) — they (1) PIN the variant they match and (2) suppress
  * re-emitting that pair. With none, the figure uses `cmd.variant` and emits all its pairs (seed-0/variant-0
- * reproduces the historical drawing).
+ * reproduces the historical drawing). A `midsegment` variant carries no equal-pair to pin, so `explicitEqs`
+ * is unused there.
  */
 export function expandShapeVariant(
   cmd: { shape: VariantShape; ids: Id[]; variant: number },
   explicitEqs: { a: Id; b: Id; c: Id; d: Id }[],
 ): Command[] {
+  if (cmd.shape === 'midsegment') return expandMidsegment(cmd.ids, cmd.variant);
   const all = variantPairs(cmd.shape, cmd.ids);
   const n = all.length;
   const matchesAny = (pair: EqTuple) => explicitEqs.some((eq) => eqMatchesPair(eq, pair));
