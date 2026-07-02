@@ -36,13 +36,16 @@ export interface LlmOutcome {
 
 /** Fold the points/circles a built step introduced into the running parse context, so a LATER
  *  LLM step that references them ("from A …" where step 1 created A) re-parses WITH that context.
- *  Point ids are single uppercase letters (line/circle ids are multi-char); a circle's context
- *  entry is its CENTRE letter (matching App's `parseCtx`). */
-function absorb(cmd: AnyCommand, points: Set<string>, circles: Set<string>): void {
+ *  A point id is a capital letter + optional digits (`A`, `O1`, `O2`) — the subscript matters: without
+ *  it, `O1`/`O2` from an earlier step never entered the context and a later step that referenced them
+ *  degraded (PAR-10). Structured ids (`circle-…`, `bis-…`) are multi-char with a prefix, so the whole-token
+ *  test excludes them; a circle's context entry is its CENTRE letter (matching App's `parseCtx`). */
+const POINT_ID = /^[A-Z]\d*$/;
+export function absorb(cmd: AnyCommand, points: Set<string>, circles: Set<string>): void {
   for (const [k, v] of Object.entries(cmd)) {
     if (k === 'expr') continue; // a measure's expression carries a variable/text, never a point id
-    if (typeof v === 'string' && /^[A-Z]$/.test(v)) points.add(v);
-    else if (Array.isArray(v)) for (const e of v) if (typeof e === 'string' && /^[A-Z]$/.test(e)) points.add(e);
+    if (typeof v === 'string' && POINT_ID.test(v)) points.add(v);
+    else if (Array.isArray(v)) for (const e of v) if (typeof e === 'string' && POINT_ID.test(e)) points.add(e);
   }
   // Every circle-introducing command's centre — INCLUDING circumcircle ("circle through A B C"),
   // which was missing, so a later step that named that circle by its centre couldn't resolve it (ADR-046).

@@ -41,6 +41,47 @@ export const STEPS_TOOL = {
   },
 } as const;
 
+/**
+ * The few-shot examples shown in the system prompt (freeform → canonical steps). Extracted from the prompt
+ * string so a CONTRACT TEST can re-parse every `steps[i]` and catch a drifted example — one the prompt
+ * teaches the model to emit that the deterministic parser can no longer read (PAR-10). Each `steps` line is
+ * a canonical form the parser must understand; `note` is an inline parenthetical for the human reader.
+ * `ctx` seeds the re-parse when a step references an object an earlier step (or the illustrative figure)
+ * introduces — e.g. a lone "tangent to circle O at A" assumes a circle O already exists.
+ */
+export interface PromptExample {
+  freeform: string;
+  steps: string[];
+  note?: string;
+  /** Extra context the steps assume (a pre-existing circle, etc.) — for the contract test's re-parse. */
+  ctx?: { points?: string[]; circles?: string[] };
+}
+
+export const PROMPT_EXAMPLES: PromptExample[] = [
+  { freeform: 'draw a square and both diagonals', steps: ['square ABCD', 'segment AC', 'segment BD'] },
+  { freeform: 'a circle with a triangle inscribed in it', steps: ['circle centered at O radius 5', 'triangle ABC inscribed in circle O'] },
+  { freeform: 'put M in the middle of AB and connect it to C', steps: ['M is the midpoint of AB', 'segment MC'] },
+  { freeform: 'מקבילית שבה AB שווה ל-6', steps: ['מקבילית ABCD', 'AB = 6'], note: 'Hebrew request → Hebrew steps' },
+  { freeform: 'צייר משולש ABC וגובה מ-A', steps: ['משולש ABC', 'גובה מ-A במשולש ABC'] },
+  { freeform: 'draw the tangent to the circle at A', steps: ['tangent to circle O at A'], ctx: { circles: ['O'], points: ['A'] } },
+  // A named shape the deterministic parser already knows — keep it as ONE canonical line (do NOT hand-expand
+  // it into constraints; the app decomposes it). Only fall back to primitives for a shape with NO canonical
+  // form (e.g. an irregular n>4 polygon → a loop of segments).
+  { freeform: 'a kite ABCD', steps: ['kite ABCD'] },
+  { freeform: 'דלתון ABCD', steps: ['דלתון ABCD'] },
+  { freeform: 'an isosceles triangle ABC', steps: ['isosceles triangle ABC'] },
+  { freeform: 'a regular hexagon ABCDEF', steps: ['regular hexagon ABCDEF'] },
+  { freeform: 'a convex pentagon ABCDE', steps: ['segment AB', 'segment BC', 'segment CD', 'segment DE', 'segment EA'], note: 'no regular-polygon claim — just the outline' },
+  // Expand a quantifier ("each vertex") and pair things up into the supported two-tangents-meet form.
+  { freeform: 'דרך כל קודקוד של משולש ABC מעבירים משיק למעגל, והמשיקים נפגשים בנקודות D E F', steps: ['המשיק בנקודה A והמשיק בנקודה B נפגשים בנקודה D', 'המשיק בנקודה B והמשיק בנקודה C נפגשים בנקודה E', 'המשיק בנקודה C והמשיק בנקודה A נפגשים בנקודה F'], ctx: { circles: ['O'], points: ['A', 'B', 'C'] } },
+  { freeform: 'tangents at each vertex of triangle ABC meet at D, E, F', steps: ['the tangent at A and the tangent at B meet at D', 'the tangent at B and the tangent at C meet at E', 'the tangent at C and the tangent at A meet at F'], ctx: { circles: ['O'], points: ['A', 'B', 'C'] } },
+];
+
+/** Render one example back to the `"freeform" → ["step", …]` prompt line (with an optional note). */
+function renderExample(e: PromptExample): string {
+  return `"${e.freeform}" → ${JSON.stringify(e.steps)}${e.note ? `   (${e.note})` : ''}`;
+}
+
 /** Build the system prompt: the rules + the supported vocabulary (the catalog) + a few examples. */
 export function buildSystemPrompt(): string {
   const vocab = COMMAND_CATALOG.filter((c) => c.supported)
@@ -56,7 +97,8 @@ export function buildSystemPrompt(): string {
     '- LANGUAGE: output each step in the SAME language the student wrote in. A Hebrew request → the Hebrew',
     '  canonical forms (right column); an English request → the English forms. Students read the steps back,',
     '  so they must be in the student\'s language. Geometry labels (A, B, C) and numbers stay as-is.',
-    '- Points are single capital letters (A, B, C, …). Reuse labels the student names; otherwise pick fresh ones.',
+    '- Points are capital letters, optionally with a subscript (A, B, C, …, O1, O2). Reuse labels the student',
+    '  names; otherwise pick fresh ones.',
     '- When the request refers to objects already on the canvas, reuse their labels (given as context).',
     '- ONLY introduce points the student actually names. Do NOT invent extra/intermediate points: "the extension',
     '  of AB" is just the line AB — do not create a new point on it. A phrase like "the tangent at D and AB meet',
@@ -68,22 +110,7 @@ export function buildSystemPrompt(): string {
     vocab,
     '',
     'Examples (freeform → steps):',
-    '"draw a square and both diagonals" → ["square ABCD","segment AC","segment BD"]',
-    '"a circle with a triangle inscribed in it" → ["circle centered at O radius 5","triangle ABC inscribed in circle O"]',
-    '"put M in the middle of AB and connect it to C" → ["M is the midpoint of AB","segment MC"]',
-    '"מקבילית שבה AB שווה ל-6" → ["מקבילית ABCD","AB = 6"]   (Hebrew request → Hebrew steps)',
-    '"צייר משולש ABC וגובה מ-A" → ["משולש ABC","גובה מ-A במשולש ABC"]',
-    '"draw the tangent to the circle at A" → ["tangent to circle O at A"]',
-    // A named shape the deterministic parser already knows — keep it as ONE canonical line (do NOT
-    // hand-expand it into constraints; the app decomposes it). Only fall back to primitives for a shape
-    // with NO canonical form (e.g. an irregular n>4 polygon → a loop of segments).
-    '"a kite ABCD" → ["kite ABCD"]   ·   "דלתון ABCD" → ["דלתון ABCD"]',
-    '"an isosceles triangle ABC" → ["isosceles triangle ABC"]',
-    '"a regular hexagon ABCDEF" → ["regular hexagon ABCDEF"]',
-    '"a convex pentagon ABCDE" → ["segment AB","segment BC","segment CD","segment DE","segment EA"]   (no regular-polygon claim — just the outline)',
-    // Expand a quantifier ("each vertex") and pair things up into the supported two-tangents-meet form.
-    '"דרך כל קודקוד של משולש ABC מעבירים משיק למעגל, והמשיקים נפגשים בנקודות D E F" → ["המשיק בנקודה A והמשיק בנקודה B נפגשים בנקודה D","המשיק בנקודה B והמשיק בנקודה C נפגשים בנקודה E","המשיק בנקודה C והמשיק בנקודה A נפגשים בנקודה F"]',
-    '"tangents at each vertex of triangle ABC meet at D, E, F" → ["the tangent at A and the tangent at B meet at D","the tangent at B and the tangent at C meet at E","the tangent at C and the tangent at A meet at F"]',
+    ...PROMPT_EXAMPLES.map(renderExample),
   ].join('\n');
 }
 

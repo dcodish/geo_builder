@@ -1,0 +1,1010 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PAR-10 (b) — supported catalog examples parse to stable command types (He + En) > the {example → command types} map is pinned — a rule shadow that flips a line while still \`.ok\` breaks this 1`] = `
+{
+  "A is on circle O": {
+    "en": [
+      "circle",
+      "point-on-circle",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+    ],
+  },
+  "AB = 2 AD": {
+    "en": [
+      "set-ratio",
+    ],
+    "he": [
+      "set-ratio",
+    ],
+  },
+  "AB = 3x": {
+    "en": [
+      "measure-length",
+    ],
+    "he": [
+      "measure-length",
+    ],
+  },
+  "AB = 6": {
+    "en": [
+      "segment",
+      "set-distance",
+    ],
+    "he": [
+      "segment",
+      "set-distance",
+    ],
+  },
+  "AB = CD": {
+    "en": [
+      "segment",
+      "segment",
+      "set-equal",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "set-equal",
+    ],
+  },
+  "AB = x²": {
+    "en": [
+      "measure-length",
+    ],
+    "he": [
+      "measure-length",
+    ],
+  },
+  "AB and AD are tangent to circle O at E and K": {
+    "en": [
+      "bisector",
+      "point-on-line",
+      "foot",
+      "foot",
+      "circle-through",
+    ],
+    "he": [
+      "bisector",
+      "point-on-line",
+      "foot",
+      "foot",
+      "circle-through",
+    ],
+  },
+  "AB perpendicular to CD": {
+    "en": [
+      "segment",
+      "segment",
+      "set-perpendicular",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "set-perpendicular",
+    ],
+  },
+  "AC extended meets circle P at E": {
+    "en": [
+      "circle",
+      "extend-onto-circle",
+    ],
+    "he": [
+      "circle",
+      "extend-onto-circle",
+    ],
+  },
+  "AD = 12√x": {
+    "en": [
+      "measure-length",
+    ],
+    "he": [
+      "measure-length",
+    ],
+  },
+  "AD bisects angle BAC": {
+    "en": [
+      "bisector",
+      "line-through",
+      "line-intersection",
+      "segment",
+    ],
+    "he": [
+      "bisector",
+      "line-through",
+      "line-intersection",
+      "segment",
+    ],
+  },
+  "AD median to BC": {
+    "en": [
+      "midpoint",
+      "segment",
+    ],
+    "he": [
+      "midpoint",
+      "segment",
+    ],
+  },
+  "BC parallel to AD": {
+    "en": [
+      "segment",
+      "segment",
+      "set-parallel",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "set-parallel",
+    ],
+  },
+  "C is 5 from A and 5 from B": {
+    "en": [
+      "point-by-distances",
+    ],
+    "he": [
+      "point-by-distances",
+    ],
+  },
+  "E is the intersection of the tangent to circle O at A and BC": {
+    "en": [
+      "circle",
+      "tangent",
+      "line-through",
+      "line-intersection",
+      "segment",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "tangent",
+      "line-through",
+      "line-intersection",
+      "segment",
+      "segment",
+    ],
+  },
+  "E is where the bisectors of BAC and BCA meet": {
+    "en": [
+      "bisector",
+      "bisector",
+      "line-intersection",
+    ],
+    "he": [
+      "bisector",
+      "bisector",
+      "line-intersection",
+    ],
+  },
+  "E on line AC": {
+    "en": [
+      "segment",
+      "set-collinear",
+    ],
+    "he": [
+      "segment",
+      "set-collinear",
+    ],
+  },
+  "F is the foot of the perpendicular from C to AD": {
+    "en": [
+      "foot",
+    ],
+    "he": [
+      "foot",
+    ],
+  },
+  "G is the intersection of circle O and circle P": {
+    "en": [
+      "circle-circle-intersection",
+    ],
+    "he": [
+      "circle-circle-intersection",
+    ],
+  },
+  "M is the intersection of AC and BD": {
+    "en": [
+      "segment",
+      "segment",
+      "line-line-intersection",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "line-line-intersection",
+    ],
+  },
+  "M is the midpoint of AB": {
+    "en": [
+      "segment",
+      "midpoint",
+    ],
+    "he": [
+      "segment",
+      "midpoint",
+    ],
+  },
+  "M is the midpoint of arc BC in circle O": {
+    "en": [
+      "circle",
+      "arc-midpoint",
+    ],
+    "he": [
+      "circle",
+      "arc-midpoint",
+    ],
+  },
+  "O is the centre of the circle": {
+    "en": [
+      "circle",
+    ],
+    "he": [
+      "circle",
+    ],
+  },
+  "S_{ABC} = 13": {
+    "en": [
+      "measure-area",
+    ],
+    "he": [
+      "measure-area",
+    ],
+  },
+  "S_{ABC} = S": {
+    "en": [
+      "measure-area",
+    ],
+    "he": [
+      "measure-area",
+    ],
+  },
+  "S_{ABC}/S_{DEF} = 3/4": {
+    "en": [
+      "set-area-ratio",
+    ],
+    "he": [
+      "set-area-ratio",
+    ],
+  },
+  "angle ABC = 2α": {
+    "en": [
+      "measure-angle",
+    ],
+    "he": [
+      "measure-angle",
+    ],
+  },
+  "angle ABC is obtuse": {
+    "en": [
+      "segment",
+      "segment",
+      "set-angle-acuteness",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "set-angle-acuteness",
+    ],
+  },
+  "angle GBA = 37": {
+    "en": [
+      "segment",
+      "segment",
+      "set-angle",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "set-angle",
+    ],
+  },
+  "arc DE = 2 arc CE in circle O": {
+    "en": [
+      "set-angle-ratio",
+    ],
+    "he": [
+      "set-angle-ratio",
+    ],
+  },
+  "bisector of angle ABC": {
+    "en": [
+      "bisector",
+    ],
+    "he": [
+      "bisector",
+    ],
+  },
+  "chord AB in circle O": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "segment",
+    ],
+  },
+  "circle O and circle P are tangent at M": {
+    "en": [
+      "circle",
+      "circle",
+      "circles-tangent",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "circles-tangent",
+    ],
+  },
+  "circle O and circle P are tangent internally at M": {
+    "en": [
+      "circle",
+      "circle",
+      "circles-tangent",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "circles-tangent",
+    ],
+  },
+  "circle centered at O radius 5": {
+    "en": [
+      "circle",
+    ],
+    "he": [
+      "circle",
+    ],
+  },
+  "circle inscribed in trapezoid ABCD": {
+    "en": [
+      "trapezoid",
+      "bisector",
+      "bisector",
+      "line-intersection",
+      "foot",
+      "circle-through",
+      "foot",
+      "foot",
+      "point-on-circle",
+      "foot",
+    ],
+    "he": [
+      "trapezoid",
+      "bisector",
+      "bisector",
+      "line-intersection",
+      "foot",
+      "circle-through",
+      "foot",
+      "foot",
+      "point-on-circle",
+      "foot",
+    ],
+  },
+  "circle inscribed in triangle ABC": {
+    "en": [
+      "triangle",
+      "bisector",
+      "bisector",
+      "line-intersection",
+      "foot",
+      "circle-through",
+      "foot",
+      "foot",
+    ],
+    "he": [
+      "triangle",
+      "bisector",
+      "bisector",
+      "line-intersection",
+      "foot",
+      "circle-through",
+      "foot",
+      "foot",
+    ],
+  },
+  "circle through A B C": {
+    "en": [
+      "circumcircle",
+    ],
+    "he": [
+      "circumcircle",
+    ],
+  },
+  "cyclic quadrilateral ABCD": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "quadrilateral",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "quadrilateral",
+    ],
+  },
+  "diameter AB in circle O": {
+    "en": [
+      "circle",
+      "diameter",
+    ],
+    "he": [
+      "circle",
+      "diameter",
+    ],
+  },
+  "equilateral triangle ABC": {
+    "en": [
+      "triangle",
+      "set-equal",
+      "set-equal",
+    ],
+    "he": [
+      "triangle",
+      "set-equal",
+      "set-equal",
+    ],
+  },
+  "from a point E outside circle O a line cuts the circle at A and B": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "segment",
+      "point-on-segment",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "segment",
+      "point-on-segment",
+      "segment",
+    ],
+  },
+  "from point E a tangent touches circle O at D": {
+    "en": [
+      "free-point",
+      "midpoint",
+      "circle-through",
+      "circle-circle-intersection",
+      "segment",
+    ],
+    "he": [
+      "free-point",
+      "midpoint",
+      "circle-through",
+      "circle-circle-intersection",
+      "segment",
+    ],
+  },
+  "from point E outside circle O two tangents touch the circle at A and B": {
+    "en": [
+      "free-point",
+      "midpoint",
+      "circle-through",
+      "circle-circle-intersection",
+      "circle-circle-intersection",
+      "segment",
+      "segment",
+    ],
+    "he": [
+      "free-point",
+      "midpoint",
+      "circle-through",
+      "circle-circle-intersection",
+      "circle-circle-intersection",
+      "segment",
+      "segment",
+    ],
+  },
+  "height from A in ABC": {
+    "en": [
+      "triangle",
+      "foot",
+      "segment",
+    ],
+    "he": [
+      "triangle",
+      "foot",
+      "segment",
+    ],
+  },
+  "isosceles trapezoid ABCD": {
+    "en": [
+      "trapezoid",
+      "set-equal",
+    ],
+    "he": [
+      "trapezoid",
+      "set-equal",
+    ],
+  },
+  "isosceles triangle ABC": {
+    "en": [
+      "shape-variant",
+    ],
+    "he": [
+      "shape-variant",
+    ],
+  },
+  "kite ABCD": {
+    "en": [
+      "shape-variant",
+    ],
+    "he": [
+      "shape-variant",
+    ],
+  },
+  "line ABE": {
+    "en": [
+      "set-line",
+    ],
+    "he": [
+      "set-line",
+    ],
+  },
+  "line AC meets circle P at E": {
+    "en": [
+      "circle",
+      "line-through",
+      "line-circle-intersection",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "line-through",
+      "line-circle-intersection",
+      "segment",
+    ],
+  },
+  "line through P parallel to AB": {
+    "en": [
+      "parallel-line",
+    ],
+    "he": [
+      "parallel-line",
+    ],
+  },
+  "line through P perpendicular to AB": {
+    "en": [
+      "point-on-segment",
+      "perpendicular-line",
+    ],
+    "he": [
+      "point-on-segment",
+      "perpendicular-line",
+    ],
+  },
+  "median from A in ABC": {
+    "en": [
+      "triangle",
+      "midpoint",
+      "segment",
+    ],
+    "he": [
+      "triangle",
+      "midpoint",
+      "segment",
+    ],
+  },
+  "midsegment to BC in triangle ABC": {
+    "en": [
+      "triangle",
+      "midpoint",
+      "midpoint",
+      "segment",
+    ],
+    "he": [
+      "triangle",
+      "midpoint",
+      "midpoint",
+      "segment",
+    ],
+  },
+  "parallelogram ABCD": {
+    "en": [
+      "parallelogram",
+    ],
+    "he": [
+      "parallelogram",
+    ],
+  },
+  "perpendicular bisector of AB": {
+    "en": [
+      "midpoint",
+      "perpendicular-line",
+    ],
+    "he": [
+      "midpoint",
+      "perpendicular-line",
+    ],
+  },
+  "point A at (0,0)": {
+    "en": [
+      "free-point",
+    ],
+    "he": [
+      "free-point",
+    ],
+  },
+  "point E on AC at 40%": {
+    "en": [
+      "point-on-segment",
+    ],
+    "he": [
+      "point-on-segment",
+    ],
+  },
+  "point F on the extension of AD": {
+    "en": [
+      "point-on-segment",
+    ],
+    "he": [
+      "point-on-segment",
+    ],
+  },
+  "points F, G, H on AB, AC, CB": {
+    "en": [
+      "point-on-segment",
+      "point-on-segment",
+      "point-on-segment",
+    ],
+    "he": [
+      "point-on-segment",
+      "point-on-segment",
+      "point-on-segment",
+    ],
+  },
+  "quadrilateral ABCD": {
+    "en": [
+      "quadrilateral",
+    ],
+    "he": [
+      "quadrilateral",
+    ],
+  },
+  "quarter circle": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "arc",
+      "segment",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "arc",
+      "segment",
+      "segment",
+    ],
+  },
+  "rectangle ABCD": {
+    "en": [
+      "rectangle",
+    ],
+    "he": [
+      "rectangle",
+    ],
+  },
+  "regular pentagon ABCDE": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "polygon",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "polygon",
+    ],
+  },
+  "rhombus ABCD": {
+    "en": [
+      "rhombus",
+    ],
+    "he": [
+      "rhombus",
+    ],
+  },
+  "right trapezoid ABCD": {
+    "en": [
+      "trapezoid",
+      "set-perpendicular",
+    ],
+    "he": [
+      "trapezoid",
+      "set-perpendicular",
+    ],
+  },
+  "right triangle ABC": {
+    "en": [
+      "right-triangle",
+    ],
+    "he": [
+      "right-triangle",
+    ],
+  },
+  "right triangle ABC inscribed in a circle": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "triangle",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "triangle",
+    ],
+  },
+  "segment AC": {
+    "en": [
+      "segment",
+    ],
+    "he": [
+      "segment",
+    ],
+  },
+  "semicircle with diameter AB": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "arc",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "arc",
+      "segment",
+    ],
+  },
+  "square ABCD": {
+    "en": [
+      "square",
+    ],
+    "he": [
+      "square",
+    ],
+  },
+  "tangent to circle O at A": {
+    "en": [
+      "circle",
+      "tangent",
+    ],
+    "he": [
+      "circle",
+      "tangent",
+    ],
+  },
+  "the circle through A B C cuts CE at D": {
+    "en": [
+      "circumcircle",
+      "line-through",
+      "line-circle-intersection",
+    ],
+    "he": [
+      "circumcircle",
+      "line-through",
+      "line-circle-intersection",
+    ],
+  },
+  "the diameter of circle O from F cuts side AC at E": {
+    "en": [
+      "line-line-intersection",
+      "set-line",
+      "segment",
+    ],
+    "he": [
+      "line-line-intersection",
+      "set-line",
+      "segment",
+    ],
+  },
+  "the line AO cuts circle O at C and D": {
+    "en": [
+      "circle",
+      "line-through",
+      "line-circle-intersection",
+      "line-circle-intersection",
+      "segment",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "line-through",
+      "line-circle-intersection",
+      "line-circle-intersection",
+      "segment",
+      "segment",
+    ],
+  },
+  "the tangent at A and the tangent at C to circle O meet at D": {
+    "en": [
+      "circle",
+      "tangent",
+      "tangent",
+      "line-intersection",
+    ],
+    "he": [
+      "circle",
+      "tangent",
+      "tangent",
+      "line-intersection",
+    ],
+  },
+  "the tangent to circle O at A meets circle P at D": {
+    "en": [
+      "circle",
+      "circle",
+      "tangent",
+      "line-circle-intersection",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "tangent",
+      "line-circle-intersection",
+      "segment",
+    ],
+  },
+  "trapezoid ABCD": {
+    "en": [
+      "trapezoid",
+    ],
+    "he": [
+      "trapezoid",
+    ],
+  },
+  "trapezoid ABCD inscribed in a circle": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "quadrilateral",
+      "set-parallel",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "quadrilateral",
+      "set-parallel",
+    ],
+  },
+  "triangle ABC": {
+    "en": [
+      "triangle",
+    ],
+    "he": [
+      "triangle",
+    ],
+  },
+  "triangle ABC inscribed in circle O": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "triangle",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "triangle",
+    ],
+  },
+  "triangle DEF circumscribes the circle": {
+    "en": [
+      "triangle",
+      "bisector",
+      "bisector",
+      "line-intersection",
+      "foot",
+      "circle-through",
+      "foot",
+      "foot",
+    ],
+    "he": [
+      "triangle",
+      "bisector",
+      "bisector",
+      "line-intersection",
+      "foot",
+      "circle-through",
+      "foot",
+      "foot",
+    ],
+  },
+  "two circles intersect at A and B": {
+    "en": [
+      "circle",
+      "circle",
+      "circle-circle-intersection",
+      "circle-circle-intersection",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "circle-circle-intersection",
+      "circle-circle-intersection",
+    ],
+  },
+  "α < β": {
+    "en": [
+      "measure-order",
+    ],
+    "he": [
+      "measure-order",
+    ],
+  },
+  "△ABC ~ △DEF": {
+    "en": [
+      "triangle",
+      "triangle",
+      "set-angle-ratio",
+      "set-angle-ratio",
+    ],
+    "he": [
+      "triangle",
+      "triangle",
+      "set-angle-ratio",
+      "set-angle-ratio",
+    ],
+  },
+  "△ABC ≅ △DEF": {
+    "en": [
+      "triangle",
+      "triangle",
+      "set-equal",
+      "set-equal",
+      "set-equal",
+    ],
+    "he": [
+      "triangle",
+      "triangle",
+      "set-equal",
+      "set-equal",
+      "set-equal",
+    ],
+  },
+}
+`;

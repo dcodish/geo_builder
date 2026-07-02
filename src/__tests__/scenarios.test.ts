@@ -12,9 +12,14 @@
  * from the debug log, the fix is NOT done until the exact sequence is added here.
  *
  * A `Step` is either an utterance string (parsed deterministically, with the current figure as
- * context) or `{ llm: [...commands] }` — the canonical commands an LLM step produced. The LLM is
- * mocked in tests, so an out-of-grammar step is captured from the log as its commands instead of
- * being re-invoked. A string step that fails to parse FAILS the scenario (it would have escalated).
+ * context) or an LLM step. The LLM is mocked in tests, so an out-of-grammar step is captured from the log
+ * in one of two forms:
+ *   - `{ llm: ['canonical line', …] }` — the canonical command STRINGS the LLM emitted, RE-PARSED with the
+ *     live figure context exactly as `llmParse` does (TST-3). PREFERRED: a parser change that breaks a
+ *     canonical form is then caught, not masked by pre-baked commands.
+ *   - `{ llm: [...commands] }` — pre-parsed engine commands (legacy; kept for steps whose canonical form
+ *     has no clean deterministic re-parse).
+ * A string step (or a canonical LLM line) that fails to parse FAILS the scenario (it would have escalated).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -25,7 +30,7 @@ import { isGeoPoint, freeDofs, freeDofCount, applySeed, firstCyclableBranch, eva
 import type { AnyCommand, Id, Vec } from '@/engine';
 import { humanizeError } from '@/i18n/humanizeError';
 
-export type Step = string | { llm: AnyCommand[] };
+export type Step = string | { llm: AnyCommand[] } | { llm: string[] };
 export interface Scenario {
   id: string;
   title: string;
@@ -51,20 +56,25 @@ function ctxOf(facts: Fact[]) {
 export function factsOf(steps: Step[]): Fact[] {
   const facts: Fact[] = [];
   let g = 0;
+  const push = (group: string, utterance: string, cmd: AnyCommand) =>
+    facts.push({ id: `${group}.${facts.length}`, utterance, group, cmd, enabled: true });
   for (const step of steps) {
-    let commands: AnyCommand[];
-    let utterance: string;
+    const group = `g${g++}`;
     if (typeof step === 'string') {
-      utterance = step;
       const r = parse(step, ctxOf(facts));
       if (!r.ok) throw new Error(`scenario step did not parse (would escalate to the LLM): ${JSON.stringify(step)}`);
-      commands = r.commands;
+      for (const cmd of r.commands) push(group, step, cmd);
+    } else if (step.llm.length && typeof step.llm[0] === 'string') {
+      // Canonical LLM STRINGS — re-parse each with the live figure context, incrementally (a later line may
+      // reference a point an earlier line of the SAME step introduced), exactly as `llmParse` does (TST-3).
+      for (const line of step.llm as string[]) {
+        const r = parse(line, ctxOf(facts));
+        if (!r.ok) throw new Error(`scenario LLM line did not parse (canonical form drifted): ${JSON.stringify(line)}`);
+        for (const cmd of r.commands) push(group, line, cmd);
+      }
     } else {
-      utterance = '(llm step)';
-      commands = step.llm;
+      for (const cmd of step.llm as AnyCommand[]) push(group, '(llm step)', cmd);
     }
-    const group = `g${g++}`;
-    for (const cmd of commands) facts.push({ id: `${group}.${facts.length}`, utterance, group, cmd, enabled: true });
   }
   return facts;
 }
@@ -820,7 +830,7 @@ export const SCENARIOS: Scenario[] = [
       'D אמצע קשת BC',
       '∠ABC=60',
       '∠BAC=α',
-      { llm: [{ type: 'point-on-segment', id: 'E', a: 'D', b: 'C', t: 1.3, extension: true }] }, // "E נמצאת על המשך המיתר DC" (deterministic parse dropped E → LLM)
+      { llm: ['E על המשך DC'] }, // "E נמצאת על המשך המיתר DC" → LLM canonical extension line (re-parsed, TST-3)
       '∠CAE=50',
     ],
     check(fig) {
@@ -1167,9 +1177,9 @@ export const SCENARIOS: Scenario[] = [
       'משולש BCD חסום במעגל',
       'AD ו AB משיקים למעגל',
       'E על קשת BC',
-      // "קשת BE שווה פעמיים קשת EC" (arc BE = 2 arc EC) escalated to the LLM; the canonical command it
-      // produced (per the figure log) is the central-angle ratio ∠BOE = 2∠EOC.
-      { llm: [{ type: 'set-angle-ratio', v1: 'O', a1: 'B', b1: 'E', v2: 'O', a2: 'E', b2: 'C', k: 2 }] },
+      // "קשת BE שווה פעמיים קשת EC" (arc BE = 2 arc EC): the arcEquality rule (ADR-116) maps it to the
+      // central-angle ratio ∠BOE = 2∠EOC. Canonical arc line, re-parsed (TST-3).
+      { llm: ['קשת BE = 2 קשת EC'] },
       'AC',
       'E נמצאת על המשך DO',
     ],
@@ -1907,7 +1917,7 @@ export const SCENARIOS: Scenario[] = [
       'building on the secant figure, the operator added a SECOND collinearity ("line DB passes through E" after "line AD passes through C"). The two constraints share the carrier D, making a triangular system (D fixed by A,D,C; E then fixed by D,B,E). The joint driven solver minimised the SUM of both residuals, which pulled the shared D toward both and satisfied neither — it returned the seed and falsely reported "over-constrained: A, D, C collinear cannot hold" (even though the solver had ALREADY found an accepted solution, the polish wandered off it into a degenerate same-cost basin). Fixed with a binding-aware seed (each bounded carrier solved against the constraint IT drives) + keeping an accepted candidate through the polish (ADR-050 amendment).',
     steps: [
       'שני מעגלים נחתכים בנקודות A ו-B', // circle-O (r5) + circle-P (r3.6) meeting at A,B
-      { llm: [{ type: 'point-on-circle', id: 'C', circle: 'circle-O' }, { type: 'point-on-circle', id: 'D', circle: 'circle-P' }] }, // "C עם מעגל אחד ו D על מעגל שני"
+      { llm: ['C על מעגל O', 'D על מעגל P'] }, // "C עם מעגל אחד ו D על מעגל שני" → two canonical lines (re-parsed, TST-3)
       'ישר AD עובר בנקודה C', // A, D, C collinear (drives D onto line AC)
       'E על מעגל O', // a free point on circle O
       'ישר DB עובר בנקודה E', // D, B, E collinear (drives E onto line DB) — was the failing step
@@ -1935,8 +1945,8 @@ export const SCENARIOS: Scenario[] = [
       'the operator built two circles meeting at A,B, placed C on one and E on the other, then wanted the line CE to pass through A (the classic secant-through-an-intersection-point figure). There was no way to say it: "ישר CE עובר בנקודה A" was SILENTLY DROPPED (the LLM modelled it as "A on line CE", which matched no rule), and the retry "E על המשך הצלע AC" hit "\'E\' is already defined". Both now route to the new `collinear` constraint (ADR-050): a parser rule for the line-through phrasing, and an engine reinterpretation of a redefining "P on segment" of an existing free point. The constraint drives a free DOF until the three line up, excluding the trivial collapse onto A.',
     steps: [
       'שני מעגלים חותכים זה את זה בנקודות A ו B', // circle-O (r5) + circle-P (r3.6), meeting at A,B
-      { llm: [{ type: 'point-on-circle', id: 'C', circle: 'circle-P' }] }, // "C על המעגל הימני"
-      { llm: [{ type: 'point-on-circle', id: 'E', circle: 'circle-O' }] }, // "E על המעגל השמאלי"
+      { llm: ['C על מעגל P'] }, // "C על המעגל הימני" → canonical named-circle line (re-parsed, TST-3)
+      { llm: ['E על מעגל O'] }, // "E על המעגל השמאלי"
       'ישר CE עובר בנקודה A', // the operator's exact words — was dropped, now parses to set-collinear
     ],
     check(fig) {
@@ -2127,8 +2137,8 @@ export const SCENARIOS: Scenario[] = [
       'משולש ABC',
       'BD תיכון לצלע AC',
       'E על BC',
-      // "AE ו-BD נחתכים בנקודה P" (operator typo "נחכתכים" → LLM produced this command)
-      { llm: [{ type: 'line-line-intersection', id: 'P', a: 'A', b: 'E', c: 'B', d: 'D' }] },
+      // operator typo "נחכתכים" → LLM normalized to the canonical spelling (re-parsed, TST-3)
+      { llm: ['AE ו-BD נחתכים בנקודה P'] },
       'BP=3PD',
     ],
     check(fig) {
@@ -2143,8 +2153,8 @@ export const SCENARIOS: Scenario[] = [
     guards: 'coupled constraints (AB=CB AND the bisector) drove one cyclic vertex onto another / a crossed quad; "AC bisects ∠ECD" was unparsed and silently dropped; "חותך" was not an intersection keyword (clobbered A,B).',
     steps: [
       'ABCD חסום במעגל',
-      { llm: [{ type: 'segment', a: 'A', b: 'C' }] }, // "AC"
-      { llm: [{ type: 'segment', a: 'B', b: 'D' }] }, // "BD"
+      { llm: ['AC'] }, // "AC" (LLM canonical → bareSegment; re-parsed, TST-3)
+      { llm: ['BD'] }, // "BD"
       'F חיתוך AC ו-BD',
       'המשיק בנקודה C חותך את המשך AB בנקודה E',
       'AB=CB',
@@ -2356,7 +2366,7 @@ export const SCENARIOS: Scenario[] = [
     guards:
       'the parser did not handle "DE ⟂ AB at C" so it escalated; the LLM rewrote it to an UNNAMED "line through C ⟂ AB", dropping D and E. The parser now handles it deterministically (through-point via "בנקודה/at", leading line name DE).',
     steps: [
-      { llm: [{ type: 'segment', a: 'A', b: 'B' }] }, // "ישר AB" (escalated in the log)
+      { llm: ['ישר AB'] }, // "ישר AB" (escalated in the log; re-parsed, TST-3)
       'נקודה C על AB',
       'DE אנך לAB בנקודה C',
     ],
@@ -2378,8 +2388,8 @@ export const SCENARIOS: Scenario[] = [
     guards:
       'the perp-bisector rule bisected the leading NAME (CD) instead of the segment after the connector (AB), and — when C,D already exist — tried to re-create them as markers → "\'D\' is already defined". It now reads AB as the bisected segment and, since CD exists, constrains it (|CA|=|CB|, |DA|=|DB|) instead of redefining C/D.',
     steps: [
-      { llm: [{ type: 'segment', a: 'A', b: 'B' }] }, // "ישר AB"
-      { llm: [{ type: 'segment', a: 'C', b: 'D' }] }, // "ישר CD"
+      { llm: ['ישר AB'] }, // "ישר AB"
+      { llm: ['ישר CD'] }, // "ישר CD"
       'CD אנך אמצעי ל AB',
     ],
     check(fig) {
@@ -2396,8 +2406,8 @@ export const SCENARIOS: Scenario[] = [
     guards:
       'the MIRROR of perpendicular-cuts-at-existing-point: the NAME (CD) already exists and the cut-point (E) is NEW. Originally the rule anchored the perpendicular on the not-yet-made E ("unresolved dependencies") and re-created C,D ("already defined"); a constraint-only fix made CD ⟂ AB but the segments did NOT visually cross (E floated off both). The construct path now REPOSITIONS the loose C,D onto the perpendicular through E (E on AB, C,D straddling it) for a clean centred cross.',
     steps: [
-      { llm: [{ type: 'segment', a: 'A', b: 'B' }] }, // "AB"
-      { llm: [{ type: 'segment', a: 'C', b: 'D' }] }, // "CD"
+      { llm: ['AB'] }, // "AB"
+      { llm: ['CD'] }, // "CD"
       'CD אנך ל AB וחותך אותו בנקודה E',
     ],
     check(fig) {
@@ -2419,7 +2429,7 @@ export const SCENARIOS: Scenario[] = [
     guards:
       'the "cuts/חותך" keyword made the generic line∩line rule "stop" (it can\'t read it) → the parse aborted to the LLM, which modelled the foot as "C על ED" — REDEFINING C (already on AB) and erroring. The perpendicular-line rule now runs before line∩line and reads "בנקודה C" as the through-point, so C is reused, not redefined.',
     steps: [
-      { llm: [{ type: 'segment', a: 'A', b: 'B' }] }, // "ישר AB" (escalated in the log)
+      { llm: ['ישר AB'] }, // "ישר AB" (escalated in the log; re-parsed, TST-3)
       'C על AB',
       'ישר ED אנך לAB וחותך אותו בנקודה C',
     ],
