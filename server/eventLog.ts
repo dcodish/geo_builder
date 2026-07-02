@@ -14,7 +14,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createHmac } from 'node:crypto';
-import { appendFile, mkdir, rename, stat } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { clientIp, makeRateLimiter, readBody } from './http';
 
@@ -77,6 +77,45 @@ function normalise(raw: unknown): Omit<UsageEvent, 'serverTs' | 'iph'> | null {
   return out;
 }
 
+/**
+ * Drop events older than the cutoff (SEC-7 privacy retention). Pure: keeps lines whose `serverTs` is on or
+ * after `cutoffMs`; a blank line is dropped, an UNPARSEABLE line is KEPT (never lose data on one bad line).
+ * A minors'-data tool shouldn't retain student utterances + IP hashes forever; `EVENTS_RETENTION_DAYS`
+ * bounds the age, and this is applied at most once per day so it's cheap.
+ */
+export function pruneOldEvents(text: string, cutoffMs: number): string {
+  const kept = text
+    .split('\n')
+    .filter((line) => {
+      if (!line.trim()) return false;
+      try {
+        const ts = Date.parse((JSON.parse(line) as { serverTs?: string }).serverTs ?? '');
+        return !Number.isFinite(ts) || ts >= cutoffMs; // keep undated/malformed rather than silently drop
+      } catch {
+        return true;
+      }
+    })
+    .join('\n');
+  return kept ? kept + '\n' : '';
+}
+
+let lastPruneDay = '';
+/** Once per UTC day, rewrite the log without events older than `EVENTS_RETENTION_DAYS` (unset → keep all). */
+async function pruneByRetention(file: string): Promise<void> {
+  const days = Number(process.env.EVENTS_RETENTION_DAYS);
+  if (!days || !Number.isFinite(days) || days <= 0) return; // retention disabled → keep everything (no change)
+  const today = new Date().toISOString().slice(0, 10);
+  if (today === lastPruneDay) return; // already pruned today
+  lastPruneDay = today;
+  try {
+    const text = await readFile(file, 'utf8');
+    const pruned = pruneOldEvents(text, Date.now() - days * 86_400_000);
+    if (pruned.length !== text.length) await writeFile(file, pruned, 'utf8');
+  } catch {
+    /* no file yet, or a read/write race — ignore (best-effort) */
+  }
+}
+
 /** Rotate the log if it has grown past the cap (best-effort; keeps one `.1` backup). */
 async function rotateIfLarge(file: string): Promise<void> {
   try {
@@ -118,6 +157,7 @@ export async function handleLog(
   const entry: UsageEvent = { serverTs: new Date().toISOString(), iph: hashIp(ip, ipSalt), ...lean };
   try {
     await mkdir(path.dirname(file), { recursive: true });
+    await pruneByRetention(file); // age-based retention (SEC-7), at most once/day
     await rotateIfLarge(file);
     await appendFile(file, JSON.stringify(entry) + '\n', 'utf8');
   } catch {

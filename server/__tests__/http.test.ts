@@ -9,7 +9,7 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import type { IncomingMessage } from 'node:http';
-import { clientIp } from '../http';
+import { clientIp, makeRateLimiter } from '../http';
 
 /** A minimal req stub: XFF header(s) + a socket address. */
 const req = (xff?: string | string[], remote = '127.0.0.1', realIp?: string): IncomingMessage =>
@@ -59,5 +59,27 @@ describe('clientIp — trusts the last (Apache-appended) XFF hop, not the first 
     expect(clientIp(req(['1.2.3.4', '203.0.113.9']))).toBe('203.0.113.9');
     process.env.TRUSTED_PROXY_HOPS = '5';
     expect(clientIp(req('203.0.113.9'))).toBe('203.0.113.9'); // chain shorter than hops → first entry
+  });
+});
+
+describe('makeRateLimiter — evicts stale keys so the map cannot grow unbounded (SEC-4)', () => {
+  it('drops keys with no hit within the window on the periodic sweep', () => {
+    let t = 0;
+    const rl = makeRateLimiter(5, 1000, () => t);
+    rl('a');
+    rl('b');
+    rl('c');
+    expect(rl.size()).toBe(3);
+    t = 2000; // advance past the window — the next call triggers a sweep
+    rl('d'); // a,b,c are now stale → evicted; only d remains
+    expect(rl.size()).toBe(1);
+  });
+
+  it('still limits within the window (behaviour unchanged)', () => {
+    let t = 0;
+    const rl = makeRateLimiter(2, 1000, () => t);
+    expect(rl('x')).toBe(false); // 1
+    expect(rl('x')).toBe(false); // 2
+    expect(rl('x')).toBe(true); // 3 > max(2)
   });
 });

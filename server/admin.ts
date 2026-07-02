@@ -17,9 +17,14 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { eventsLogPath, type UsageEvent } from './eventLog';
+import { clientIp, makeRateLimiter } from './http';
 
 const SESSION_MS = 8 * 60 * 60 * 1000; // 8 h
 const COOKIE = 'geo_admin';
+
+// Throttle admin login attempts per client IP (SEC-6): the password compare is constant-time, but an
+// unthrottled endpoint still allows online brute-force at full speed. 10 attempts/min/IP.
+const loginLimited = makeRateLimiter(10, 60_000);
 
 // Anthropic Console usage/cost page — the LLM fallback (Haiku) spend lives here.
 const API_COST_URL = 'https://console.anthropic.com/settings/usage';
@@ -564,6 +569,7 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
 
   // login POST
   if (path.endsWith('/login') && req.method === 'POST') {
+    if (loginLimited(clientIp(req))) return send(res, 429, loginPage(base, true)); // brute-force throttle (SEC-6)
     let body = '';
     for await (const chunk of req) body += chunk;
     const params = new URLSearchParams(body);

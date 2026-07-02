@@ -33,6 +33,10 @@ async function* chunks(parts: string[]) {
   for (const p of parts) yield Buffer.from(p);
 }
 
+// Each request gets a UNIQUE client IP by default, so the module-level login rate-limiter (SEC-6) doesn't
+// accumulate across tests and spuriously 429 a later login. A test that needs several requests to share a
+// client (the brute-force test) passes an explicit `x-forwarded-for`.
+let ipCounter = 0;
 function mockReq(method: string, url: string, parts: string[] = [], headers: Record<string, string> = {}) {
   const req = chunks(parts) as AsyncGenerator<Buffer> & {
     method: string;
@@ -42,7 +46,7 @@ function mockReq(method: string, url: string, parts: string[] = [], headers: Rec
   };
   req.method = method;
   req.url = url;
-  req.socket = { remoteAddress: '127.0.0.1' };
+  req.socket = { remoteAddress: `10.9.0.${ipCounter++}` };
   req.headers = headers;
   return req;
 }
@@ -112,6 +116,16 @@ describe('admin auth gate', () => {
     const res = mockRes();
     await run(mockReq('GET', '/admin', [], { cookie: tampered }), res, logPath);
     expect(res.body).toContain('כניסת מנהל');
+  });
+
+  it('rate-limits admin-login brute-force per IP (SEC-6)', async () => {
+    // All attempts share ONE client IP (fixed XFF), so the 11th+ within the window is throttled.
+    let last = mockRes();
+    for (let i = 0; i < 12; i++) {
+      last = mockRes();
+      await run(mockReq('POST', '/admin/login', ['username=teacher&password=wrong'], { 'x-forwarded-for': '198.51.100.7' }), last, logPath);
+    }
+    expect(last.statusCode).toBe(429); // throttled (not another 401) once over the per-IP attempt limit
   });
 
   it('logout clears the cookie', async () => {

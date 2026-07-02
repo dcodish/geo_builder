@@ -47,6 +47,7 @@ const run = (req: ReturnType<typeof mockReq>, res: ReturnType<typeof mockRes>, a
 
 afterEach(() => {
   delete process.env.LLM_DAILY_MAX;
+  delete process.env.LLM_MAX_CONCURRENT;
 });
 
 describe('handleParse (shared proxy handler)', () => {
@@ -98,6 +99,14 @@ describe('handleParse (shared proxy handler)', () => {
     await run(mockReq('POST', '10.0.0.6', [JSON.stringify({ utterance: 'draw something' })]), res, 'sk-test');
     expect(res.statusCode).toBe(429);
     expect(JSON.parse(res.body)).toEqual({ error: 'daily-limit' }); // distinct from the per-IP 'rate-limited'
+  });
+
+  it('rejects over the concurrency cap with a transient 429 (rate-limited, before the SDK) — SEC-5', async () => {
+    process.env.LLM_MAX_CONCURRENT = '0'; // every dispatch is "over" the cap → blocked before the SDK
+    const res = mockRes();
+    await run(mockReq('POST', '10.0.0.7', [JSON.stringify({ utterance: 'draw something' })]), res, 'sk-test');
+    expect(res.statusCode).toBe(429);
+    expect(JSON.parse(res.body)).toEqual({ error: 'rate-limited' }); // transient busy, distinct from daily-limit
   });
 
   it('rate-limits per X-Forwarded-For client, not the (shared) reverse-proxy socket', async () => {

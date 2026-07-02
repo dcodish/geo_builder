@@ -11,7 +11,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFile, rm, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { handleLog, hashIp } from '../eventLog';
+import { handleLog, hashIp, pruneOldEvents } from '../eventLog';
 
 function mockRes() {
   return {
@@ -53,6 +53,29 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   if (logPath) await rm(path.dirname(logPath), { recursive: true, force: true }).catch(() => {});
+});
+
+describe('pruneOldEvents — age-based retention (SEC-7)', () => {
+  const line = (ts: string, u: string) => JSON.stringify({ serverTs: ts, iph: 'h', ev: 'submit', utterance: u });
+  it('drops events older than the cutoff and keeps recent ones', () => {
+    const text = [line('2026-06-01T00:00:00Z', 'old'), line('2026-07-01T00:00:00Z', 'recent'), ''].join('\n');
+    const cutoff = Date.parse('2026-06-25T00:00:00Z');
+    const kept = pruneOldEvents(text, cutoff);
+    expect(kept).toContain('recent');
+    expect(kept).not.toContain('old');
+    expect(kept.endsWith('\n')).toBe(true);
+  });
+  it('keeps an unparseable or undated line rather than losing data', () => {
+    const text = ['not json', line('2020-01-01T00:00:00Z', 'ancient'), JSON.stringify({ ev: 'submit', utterance: 'nodate' }), ''].join('\n');
+    const kept = pruneOldEvents(text, Date.parse('2026-01-01T00:00:00Z'));
+    expect(kept).toContain('not json'); // malformed → kept
+    expect(kept).toContain('nodate'); // no serverTs → kept
+    expect(kept).not.toContain('ancient'); // dated + old → dropped
+  });
+  it('an all-old log prunes to empty (no stray blank line)', () => {
+    const text = line('2020-01-01T00:00:00Z', 'x') + '\n';
+    expect(pruneOldEvents(text, Date.parse('2026-01-01T00:00:00Z'))).toBe('');
+  });
 });
 
 describe('hashIp', () => {

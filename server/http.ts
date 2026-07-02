@@ -35,20 +35,35 @@ export function clientIp(req: IncomingMessage): string {
   return req.socket?.remoteAddress ?? 'local';
 }
 
+/** A rate-limiter: call it with a key → `true` when that key is over the limit. `size()` exposes the
+ *  live bucket count (for the eviction test). */
+export type RateLimiter = ((key: string) => boolean) & { size: () => number };
+
 /**
- * A sliding-window per-key rate limiter. `make()` returns an independent limiter
- * (its own bucket map) so each route can rate-limit separately. Returns `true`
- * when the key has exceeded `max` hits within `windowMs`.
+ * A sliding-window per-key rate limiter. `make()` returns an independent limiter (its own bucket map) so
+ * each route can rate-limit separately. Returns `true` when the key has exceeded `max` hits within
+ * `windowMs`.
+ *
+ * SEC-4: the bucket map is SWEPT of stale keys at most once per window, so it can't grow unbounded from
+ * distinct keys over time (many real clients, or — before SEC-1 — a spoofed-IP flood minting a fresh key
+ * per request → OOM). `now` is injectable for deterministic eviction tests.
  */
-export function makeRateLimiter(max: number, windowMs: number): (key: string) => boolean {
+export function makeRateLimiter(max: number, windowMs: number, now: () => number = Date.now): RateLimiter {
   const hits = new Map<string, number[]>();
-  return (key: string): boolean => {
-    const now = Date.now();
-    const recent = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
-    recent.push(now);
+  let lastSweep = 0;
+  const fn = (key: string): boolean => {
+    const t = now();
+    if (t - lastSweep > windowMs) {
+      for (const [k, ts] of hits) if (ts.length === 0 || t - ts[ts.length - 1] >= windowMs) hits.delete(k);
+      lastSweep = t;
+    }
+    const recent = (hits.get(key) ?? []).filter((x) => t - x < windowMs);
+    recent.push(t);
     hits.set(key, recent);
     return recent.length > max;
   };
+  fn.size = () => hits.size;
+  return fn;
 }
 
 /** Read a request body with a hard byte cap. Resolves `null` if the cap is exceeded. */

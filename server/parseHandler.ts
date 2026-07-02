@@ -33,6 +33,10 @@ const rateLimited = makeRateLimiter(MAX_PER_WINDOW, WINDOW_MS);
 let dayKey = '';
 let dayCount = 0;
 
+// In-flight Haiku calls (SEC-5): a small concurrency cap so a burst of slow requests can't tie up the
+// event loop / multiply cost. Over the cap → a transient 429 the client shows as "service busy".
+let inFlight = 0;
+
 export interface ParseHandlerOpts {
   /** The Anthropic key, resolved by the host. When absent the handler answers 503. */
   apiKey: string | undefined;
@@ -86,16 +90,28 @@ export async function handleParse(
     logError(`[geo-llm-proxy] daily limit reached (${dayCount}/${dailyMax}) on ${today} — request blocked`);
     return send(429, { error: 'daily-limit' });
   }
-  dayCount++; // count this dispatch toward the cap (before the call, so an upstream error still counts)
 
+  // Concurrency cap (SEC-5): checked AFTER the daily ceiling but BEFORE counting a dispatch, so a
+  // rejected-for-busy request doesn't consume daily quota. Over the cap → transient 429 (client: busy).
+  const maxConcurrent = Number.isFinite(Number(process.env.LLM_MAX_CONCURRENT)) && process.env.LLM_MAX_CONCURRENT
+    ? Number(process.env.LLM_MAX_CONCURRENT)
+    : 6;
+  if (inFlight >= maxConcurrent) return send(429, { error: 'rate-limited' });
+
+  dayCount++; // count this dispatch toward the daily cap (before the call, so an upstream error still counts)
+  inFlight++;
   try {
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
-    const client = new Anthropic({ apiKey });
+    // Explicit timeout + no auto-retries (SEC-5): the SDK's multi-minute default timeout + retries would
+    // hold sockets and multiply spend on a slow/hung upstream. One attempt, ~15 s ceiling.
+    const client = new Anthropic({ apiKey, timeout: 15_000, maxRetries: 0 });
     const msg = await client.messages.create(buildLlmRequest(utterance, context));
     const steps = extractSteps(msg.content as { type: string; name?: string; input?: unknown }[]) ?? [];
     return send(200, { steps });
   } catch (e) {
     logError('[geo-llm-proxy] ' + (e instanceof Error ? e.message : String(e)));
     return send(502, { error: 'llm-failed' });
+  } finally {
+    inFlight--;
   }
 }

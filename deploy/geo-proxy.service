@@ -29,10 +29,17 @@ Environment=PORT=8788
 Environment=HOST=127.0.0.1
 Restart=on-failure
 RestartSec=2
-# Hardening: bind loopback only (the reverse proxy reaches it), drop privileges.
+# Hardening (SEC-9): bind loopback only (the reverse proxy reaches it), drop privileges, and lock the
+# filesystem down. ProtectSystem=strict makes everything read-only EXCEPT the one dir the service must
+# write (events.jsonl) — declared in ReadWritePaths. ProtectHome hides /home + /root (incl. any personal
+# cloud folders) from the process. The key file (geo-proxy.env) is 600 root:root; systemd reads it as
+# root before dropping to www-data, so www-data never reads it directly.
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=full
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/www/geo-proxy
 
 [Install]
 WantedBy=multi-user.target

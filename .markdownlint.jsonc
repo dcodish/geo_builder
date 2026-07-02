@@ -7,5 +7,8 @@
   "MD040": false, // fenced-code-language — ASCII diagrams have no language
   "MD049": false, // emphasis-style — allow either * or _ for italics
   "MD050": false, // strong-style — allow either ** or __ for bold
+  "MD022": false, // blanks-around-headings — design docs pack an ADR/## heading directly above a table/list
+  "MD031": false, // blanks-around-fences — env/code blocks butt against list items in the deploy guide
+  "MD032": false, // blanks-around-lists — same: a heading immediately above a checklist reads fine here
   "MD060": false  // table-column-style — pipe spacing
 }

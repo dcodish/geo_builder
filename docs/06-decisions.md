@@ -2544,3 +2544,37 @@ A reproduction (rectangle `ABCD`; equilateral `BCE`,`DAF` inward; `EC ∩ DF = G
 **Why this is the root fix, not a patch.** It caps the actual cost variable (total calls/day) rather than only per-IP rate, so a distributed flood is bounded too. A subtlety fixed in review: `Number(env) || 1000` treats a configured `0` as unset (0 is falsy) — parsed explicitly so `LLM_DAILY_MAX=0` can hard-disable the LLM. The throttle is surfaced as its own client signal so a rate-limited student never sees a "you did something wrong" message.
 
 **Consequences / tests.** [parseHandler.test.ts](../server/__tests__/parseHandler.test.ts): `LLM_DAILY_MAX=0` → first dispatch blocked with `{error:'daily-limit'}` (before the SDK). [llm.test.ts](../src/parser/__tests__/llm.test.ts): a 429 returns `busy: 'daily-limit'`/`'rate-limited'` (unparseable body → `rate-limited`), with empty `built`. i18n `input.serviceBusy` (he/en); deploy README documents `LLM_DAILY_MAX` + the grep. **65 server+llm tests green; `tsc -b` clean.**
+
+## ADR-178 — Server robustness: bounded rate-limiter, upstream timeout/concurrency, admin-login throttle (hardening plan B4 / SEC-4/5/6)
+
+**Status:** Accepted (2026-07-02)
+
+**Context.** Three medium server findings from the review. SEC-4: `makeRateLimiter`'s bucket `Map` never evicted stale keys → unbounded growth (a spoofed-IP flood pre-SEC-1, or just many clients over time, → OOM). SEC-5: `client.messages.create` ran with the SDK's multi-minute default timeout + auto-retries and no concurrency cap → a slow/hung upstream held sockets and multiplied spend; a burst could tie up the event loop. SEC-6: the admin login POST wasn't rate-limited (the compare is constant-time, but online brute-force ran at full speed).
+
+**Decision.** (SEC-4) `makeRateLimiter` sweeps keys with no hit within the window, at most once per window; `now` is injectable and the returned limiter exposes `size()` for a deterministic eviction test. (SEC-5) the Anthropic client is constructed with `timeout: 15_000, maxRetries: 0`, and an in-process `inFlight` counter caps concurrency (`LLM_MAX_CONCURRENT`, default 6) — over it a transient `429 rate-limited` (client shows "busy"), checked after the daily ceiling but before counting a dispatch. (SEC-6) a 10/min/IP limiter on the login POST → 429 when exceeded.
+
+**Why this is the root fix, not a patch.** Each closes the actual failure mode (unbounded memory, hung/looping upstream, unthrottled guessing) rather than masking a symptom; all three reuse the one shared limiter/IP helpers so behaviour stays consistent.
+
+**Consequences / tests.** http.test.ts (eviction + still-limits-in-window), parseHandler.test.ts (`LLM_MAX_CONCURRENT=0` → 429 rate-limited before the SDK), admin.test.ts (11th login from one IP → 429; `mockReq` now assigns a unique IP per call so the module-level login limiter doesn't leak across tests). **59 server tests green; `tsc -b` clean.**
+
+## ADR-179 — Usage-event retention + a privacy note for a minors' tool (hardening plan B5 / SEC-7)
+
+**Status:** Accepted (2026-07-02)
+
+**Context.** `events.jsonl` retained student utterances + hashed IPs indefinitely (rotation was size-only, 50 MB). For a tool aimed at high-schoolers there was no age bound and no written data policy. The verbose **debug** log (full figure snapshots, `logs/debug-log.jsonl`) was suspected of leaking student work to a personal cloud.
+
+**Decision.** Add age-based retention: `pruneOldEvents(text, cutoffMs)` (pure — drops dated events past the cutoff, KEEPS undated/malformed lines so a bad line never loses data) applied at most once per UTC day when `EVENTS_RETENTION_DAYS` is set (unset → keep-all, no behaviour change). Confirmed the full-snapshot sink (`logProxy.ts`) is a **Vite dev plugin only** — production (`standalone.ts`) never mounts it, so production stores only lean, hashed events. Documented what's stored + the retention knob + an operator action: keep the dev `logs/` folder out of personal-cloud sync (the `conflicted copy` files are the tell).
+
+**Why this is the root fix, not a patch.** The privacy risk is *unbounded retention* + *dev logs on personal cloud*; retention bounds the first at the source, and confirming/documenting the dev-only sink + the sync-exclusion addresses the second where it actually lives (the dev machine, not the server).
+
+**Consequences / tests.** eventLog.test.ts adds three `pruneOldEvents` cases (old dropped / recent+undated+malformed kept / all-old → empty, no stray blank line). Deploy README gains `EVENTS_RETENTION_DAYS` + a "Data & privacy" note. **59 server tests green; `tsc -b` clean.**
+
+## ADR-180 — Deploy durability (Plesk GUI directives) + systemd hardening (hardening plan B6 / SEC-9)
+
+**Status:** Accepted (2026-07-02)
+
+**Context.** The deploy guide led with appending the ProxyPass lines directly to `vhost_ssl.conf` — the documented Plesk-regeneration footgun (a later SSL renew / "Repair" regenerates the file and drops hand-added lines, 404-ing the proxied routes while the static app looks fine). The systemd unit had only `NoNewPrivileges`/`PrivateTmp`/`ProtectSystem=full`.
+
+**Decision.** Make the durable **Plesk GUI** method ("Additional directives for HTTPS", stored in Plesk's DB → survives regeneration) the PRIMARY instruction; the direct-file append is the clearly-caveated fallback. Tighten the unit: `ProtectSystem=strict` + `ReadWritePaths=/var/www/geo-proxy` (only the events-log dir is writable), `ProtectHome=true` (hides /home + /root, incl. any personal-cloud folder, from the process), `PrivateDevices=true`. The env file stays 600 root:root (systemd reads it as root before dropping to www-data).
+
+**Consequences / tests.** Docs + unit file only (no code). `ReadWritePaths` is required for `events.jsonl` writes once `ProtectSystem=strict` is on — verify the events log still appends after deploy. Also added MD031 to `.markdownlint.jsonc` (deploy guide packs env/code blocks against list items). **No code change; server tests unaffected.**

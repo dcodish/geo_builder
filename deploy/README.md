@@ -46,6 +46,7 @@ aggregates.
    LLM_DAILY_MAX=1000          # hard cap on Haiku calls/day (cost backstop, SEC-2); tune to taste
    IP_HASH_SALT=<long-random-string>
    EVENTS_LOG_PATH=/var/www/geo-proxy/events.jsonl
+   EVENTS_RETENTION_DAYS=90    # drop usage events older than this (privacy, SEC-7); unset = keep forever
    ADMIN_USERNAME=<pick-a-name>
    ADMIN_PASSWORD=<pick-a-strong-password>
    ADMIN_COOKIE_SECRET=<long-random-string>
@@ -59,15 +60,18 @@ aggregates.
    scp deploy/geo-proxy.service root@themathbible.com:/etc/systemd/system/
    ssh root@themathbible.com 'systemctl daemon-reload && systemctl enable --now geo-proxy && systemctl status geo-proxy --no-pager'
    ```
-4. Add the reverse-proxy rule from `deploy/apache-geo-builder.conf` to the HTTPS
-   Apache include (backup → append → validate → reload):
+4. Add the reverse-proxy rule from `deploy/apache-geo-builder.conf` (the six ProxyPass lines).
+   **PREFERRED — via Plesk (survives regeneration):** *Domains → themathbible.com → Apache & nginx
+   Settings → "Additional directives for HTTPS"* → paste the lines → OK (Plesk validates + reloads).
+   Storing them in Plesk's own field means a later SSL renew / "Repair" / hosting-setting change that
+   REGENERATES `vhost_ssl.conf` keeps them — the direct-file append below does NOT survive that (see the
+   caveat under Notes). Only fall back to editing the file directly if the GUI field is unavailable:
    ```sh
    CONF=/var/www/vhosts/system/themathbible.com/conf/vhost_ssl.conf
    cp -a "$CONF" "$CONF.bak-$(date +%s)"
-   cat deploy/apache-geo-builder.conf >> "$CONF"   # (the six ProxyPass lines)
-   apache2ctl -t && systemctl reload apache2
+   cat deploy/apache-geo-builder.conf >> "$CONF"   # NOT durable — Plesk regen drops it
+   apache2ctl -t && systemctl reload apache2       # never reload on a failed configtest
    ```
-   (Equivalently via Plesk: *Apache & nginx Settings → Additional directives for HTTPS*.)
 
 ## Each deploy (Phase C)
 
@@ -118,6 +122,16 @@ ssh root@themathbible.com 'systemctl restart geo-proxy'
 - **Usage events** accumulate in `events.jsonl`; the service self-rotates it past
   50 MB (keeps one `events.jsonl.1`). IPs are stored only as a salted hash (`iph`).
   Rotating `IP_HASH_SALT` resets unique-visitor counts (old/new hashes won't match).
+- **Data & privacy (SEC-7) — a tool for minors.** Production stores only lean events:
+  a salted **hash** of the IP (never the raw address) plus the student's utterance text
+  and outcome — no snapshots, no names. `EVENTS_RETENTION_DAYS` (above) drops events past
+  that age (applied at most once/day); leave it unset only if you truly want to keep them
+  forever. The verbose **debug log** (`logs/debug-log.jsonl`, full figure snapshots) is
+  **dev-only** — it is written by the Vite dev plugin, NOT by this production server, so no
+  student snapshots are stored in production. **Operator action:** on any dev machine, keep
+  the project's `logs/` folder OUT of a personal cloud (Dropbox selective-sync / ignore) so
+  student utterances aren't replicated to a personal account — the many `debug-log (… conflicted
+  copy …).jsonl` files are the sign this is happening.
 - The admin session is a stateless signed cookie (8 h); `ADMIN_BASE` must match the
   public path (`/geo-builder/admin`) so the cookie scopes and redirects resolve.
 - **`ADMIN_COOKIE_SECRET` is REQUIRED and must be its OWN long random string** (not reused
