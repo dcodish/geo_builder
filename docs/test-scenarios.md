@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `plural-segment-noun-points-on-sides` — "F, G, H on הקטעים AB, AC, CB" (PLURAL segment-keyword noun) places all three (ADR-187)
+**Steps**: `משולש ABC ישר זוית` · `נקודות F, G, H על הקטעים AB, AC, CB`
+
 ### `named-midsegment-keeps-its-endpoint-names` — "PQ קטע אמצעים לצלע BC במשולש ABC" keeps endpoints P,Q (was auto-renamed M,N) (ADR-150)
 **Steps**: `משולש ABC` · `PQ קטע אמצעים לצלע BC במשולש ABC`
 **Guards against:** sibling of the named-altitude bug (ADR-149), found by auditing every rule that auto-names a derived point. The `midsegment` rule always auto-named its two endpoints (M,N via `freeLabel`) and had no named-form path, so "PQ קטע אמצעים …" silently renamed the student's P,Q. Fix: the rule reads a leading or keyword-first named pair (**uppercase labels only**, so a lowercase connector like "to BC" is never misread as labels T,O) that isn't the triangle's own vertices. **Asserts:** all steps OK; endpoints named P,Q; no M,N fabricated; P=mid(AB), Q=mid(AC); PQ ∥ BC (the midsegment theorem holds).

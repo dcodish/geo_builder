@@ -110,6 +110,32 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'plural-segment-noun-points-on-sides',
+    title: 'C7/PAR-8: "F, G, H on segments AB, AC, CB" (PLURAL segment-keyword noun) places all three, not just seg-AB',
+    guards:
+      'hardening plan C7 / PAR-8 (ADR-187): `pointsOnSegments` reads UPPERCASE labels only and ignores the noun, so the "sides"/"הצלעות" form always worked — but when the plural carrier noun CONTAINS a `segment`-rule keyword ("segments" ⊃ "segment", "הקטעים" ⊃ "קטע", "diagonals" ⊃ "diagonal"), the `segment` DEFINITION rule (runs first) fired and its singular-only POINT_ON_CARRIER guard did not recognise the plural → it grabbed the first two-label run and DROPPED F,G,H (built a lone segment AB). Fix: pluralise CARRIER_NOUN so the guard recognises the plural and `segment` defers to the strictly-more-specific `pointsOnSegments`.',
+    steps: [
+      'משולש ABC ישר זוית',
+      'נקודות F, G, H על הקטעים AB, AC, CB',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // All three points landed, each on its own side (F on AB, G on AC, H on CB) — not dropped.
+      const onSide = (p: Id, a: Id, b: Id) => {
+        const A = at(fig, a), B = at(fig, b), P = at(fig, p);
+        const ab = { x: B.x - A.x, y: B.y - A.y };
+        const t = ((P.x - A.x) * ab.x + (P.y - A.y) * ab.y) / (ab.x * ab.x + ab.y * ab.y);
+        const cross = (P.x - A.x) * ab.y - (P.y - A.y) * ab.x;
+        expect(t, `${p} within segment ${a}${b}`).toBeGreaterThanOrEqual(-1e-6);
+        expect(t, `${p} within segment ${a}${b}`).toBeLessThanOrEqual(1 + 1e-6);
+        expect(Math.abs(cross) / (Math.hypot(ab.x, ab.y) || 1), `${p} collinear on ${a}${b}`).toBeLessThan(1e-3);
+      };
+      onSide('F', 'A', 'B');
+      onSide('G', 'A', 'C');
+      onSide('H', 'C', 'B');
+    },
+  },
+  {
     id: 'segment-meet-lands-on-segments',
     title: 'bagrut Q9: "AE and BF meet at G" puts G ON the segments (apexes flip inward), not on the continuation',
     guards:

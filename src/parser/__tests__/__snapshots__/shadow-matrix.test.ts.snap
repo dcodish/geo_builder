@@ -1360,10 +1360,11 @@ exports[`parser shadow-matrix — known shadow-prone probes (Phase C tracking) >
   {
     "note": "PAR-8: plural "segments" → segment steals it",
     "shadowedBy": [
-      "pointsOnSegments",
+      "pointsOnSegment",
+      "pointOnSegment",
     ],
     "text": "points F, G, H on segments AB, AC, CB",
-    "winner": "segment",
+    "winner": "pointsOnSegments",
     "winnerKind": "array",
   },
 ]

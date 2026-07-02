@@ -833,7 +833,7 @@ const arcEquality: Rule = (s, ctx) => {
  * own them once the noun is recognised. A "line"/"ישר" carrier is deliberately absent: it has distinct
  * infinite-line semantics handled by `collinearConstraint`.
  */
-const CARRIER_NOUN = String.raw`chord|side|segment|diagonal|diameter|radius|ה?מיתר|ה?צלע|ה?קטע|ה?אלכסון|ה?קוטר|ה?רדיוס`;
+const CARRIER_NOUN = String.raw`chords?|sides?|segments?|diagonals?|diameters?|radius|ה?מיתר(?:ים)?|ה?צלע(?:ות)?|ה?קטע(?:ים)?|ה?אלכסו(?:ן|נים)|ה?קוטר(?:ים)?|ה?רדיוס`;
 
 /**
  * An OPTIONAL carrier noun between "on"/"על" and the two endpoint labels — "E on chord AC" /
