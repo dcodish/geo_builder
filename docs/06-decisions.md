@@ -2626,3 +2626,22 @@ A reproduction (rectangle `ABCD`; equilateral `BCE`,`DAF` inward; `EC ∩ DF = G
 **Why this is the root fix, not a patch.** One membership post-pass generalised across carriers, gated by the geometric shape of the winner's output, rather than a per-noun special case; the skip-set encodes the real invariant ("a construct rule already handled membership") that keeps `circleOnDiameter`/`diameterCutsSegment` untouched.
 
 **Consequences / tests.** [chord-relation.test.ts](../src/parser/__tests__/chord-relation.test.ts) diameter cases: `קוטר AB=10` → A,B on circle + collinear-through-centre O + |AB|=10; `הקוטר AB מאונך למיתר CD` → A,B,C,D on circle + AB diameter + ⟂; a plain `diameter AB` keeps exactly one collinear (no double). Fixed a regression where the generalized pass over-fired on `circleOnDiameter`/`diameterCutsSegment` (the `CONSTRUCT` skip-set). **523 parser tests green; `tsc -b` clean.**
+
+## ADR-185 — point ON a diameter/radius: dead `על` guards + carrier nouns (hardening plan C5 / PAR-5)
+
+**Status:** Accepted (2026-07-02)
+
+**Context.** `נקודה D על הרדיוס OB` silently DROPPED D, and `E על הקוטר AB` mis-parsed. Two coupled root causes:
+
+1. **Dead `על\b` guards.** JS `\b` is a boundary between a `\w` char and a non-`\w` char; Hebrew letters aren't `\w`, so `על\b` only matches "על" glued to a Latin letter/digit — never the common "על " (space) form. The guards at `radiusSegment` and `nameCenter` that were meant to bail on an "on" phrasing therefore never fired, so `radiusSegment` (which runs before `pointOnSegment`) grabbed the two-letter run and dropped the rider point.
+2. **`קוטר`/`רדיוס` absent from `CARRIER_NOUN`.** `pointOnSegment`'s optional `SEG_NOUN` couldn't eat "הקוטר"/"הרדיוס", so its labels didn't align and it missed; and the `diameter` rule (also before `pointOnSegment`) claimed the utterance.
+
+**Decision.**
+- Replace `על\b` with `על(?=\s|$)` (a real word-tail lookahead) at both guard sites — `radiusSegment` now bails on a point-ON phrasing and defers to `pointOnSegment`.
+- Add `diameter|radius|ה?קוטר|ה?רדיוס` to `CARRIER_NOUN` (the diameter IS segment AB; the radius IS segment O·rim — a point on either is a point on that segment).
+- Add the `POINT_ON_CARRIER` guard to the `diameter` rule so `E על הקוטר AB` defers to `pointOnSegment`.
+- Extend the `withCarrierMembership` post-pass to RADIUS: a radius carrier's rim point (the non-centre end of a centre→rim segment/point-on) is asserted on the circle. Diameter membership (endpoints on circle + collinear-through-centre) is reused from PAR-4; the centre-touching-pair exclusion keeps the centre off the circle.
+
+**Why this is the root fix, not a patch.** The `\b`→lookahead correction fixes an entire class of dead Hebrew-word guards, not one utterance; folding diameter/radius into the shared `CARRIER_NOUN` + membership post-pass means every point-on rule (`pointOnSegment`, `pointsOnSegment`, `pointsOnSegments`) inherits the carriers at once, and the geometry (endpoints/rim on the circle) is asserted centrally rather than duplicated per rule.
+
+**Consequences / tests.** [carrier-on.test.ts](../src/parser/__tests__/carrier-on.test.ts) (4): `E על הקוטר AB` → E on segment AB + A,B on circle + collinear-through-centre O; `נקודה D על הרדיוס OB` → D on segment OB + rim B on circle (centre O excluded); a bare `OB רדיוס` still routes to `radiusSegment`. Shadow-matrix probes flipped `radiusSegment`→`pointOnSegment` and `diameter`→`pointOnSegment` (snapshot updated). **Full suite: 1728 passed / 2 skipped; `tsc -b` clean.**

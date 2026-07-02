@@ -823,11 +823,13 @@ const arcEquality: Rule = (s, ctx) => {
 };
 
 /**
- * The descriptor nouns that can NAME the carrier a point rides on — chord/side/segment/diagonal in
- * both languages. A "line"/"ישר" carrier is deliberately absent: it has distinct infinite-line
- * semantics handled by `collinearConstraint`.
+ * The descriptor nouns that can NAME the carrier a point rides on — chord/side/segment/diagonal, and
+ * (PAR-5) a circle's diameter/radius, in both languages. A point ON a diameter/radius is a point on the
+ * chord/centre→rim SEGMENT (the diameter IS segment AB; the radius IS segment OB), so the point-on rules
+ * own them once the noun is recognised. A "line"/"ישר" carrier is deliberately absent: it has distinct
+ * infinite-line semantics handled by `collinearConstraint`.
  */
-const CARRIER_NOUN = String.raw`chord|side|segment|diagonal|ה?מיתר|ה?צלע|ה?קטע|ה?אלכסון`;
+const CARRIER_NOUN = String.raw`chord|side|segment|diagonal|diameter|radius|ה?מיתר|ה?צלע|ה?קטע|ה?אלכסון|ה?קוטר|ה?רדיוס`;
 
 /**
  * An OPTIONAL carrier noun between "on"/"על" and the two endpoint labels — "E on chord AC" /
@@ -1501,7 +1503,7 @@ const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: b
 const nameCenter: Rule = (s, ctx) => {
   if (!/cent(?:er|re)|מרכז/i.test(s) || !mentionsCircle(s)) return null;
   if (isCircleInPolygon(s)) return null; // incircle ("circle inscribed in …")
-  if (/inscrib\w*|חסום|חוסם|through|העובר|דרך|radius|רדיוס|=|\bon\b|על\b/i.test(s)) return null; // creation / other constructs
+  if (/inscrib\w*|חסום|חוסם|through|העובר|דרך|radius|רדיוס|=|\bon\b|על(?=\s|$)/i.test(s)) return null; // creation / other constructs
   const x = circleCenter(s);
   if (!x) return null;
   const X = up(x);
@@ -1590,7 +1592,7 @@ const setRadius: Rule = (s, ctx) => {
 const radiusSegment: Rule = (s, ctx) => {
   if (!/\bradius\b|רדיוס/i.test(s)) return null;
   if (parseRadius(s).numeric) return null; // a numeric radius → `setRadius` / `circle`
-  if (/אמצע|midpoint|=|⊥|⟂|∥|אנ[כך]|מאונ[כך]|מקביל|\bon\b|על\b/i.test(s)) return null; // not a bare radius declaration
+  if (/אמצע|midpoint|=|⊥|⟂|∥|אנ[כך]|מאונ[כך]|מקביל|\bon\b|על(?=\s|$)/i.test(s)) return null; // not a bare radius declaration (a point ON the radius → pointOnSegment)
   const circles = (ctx.circles ?? []).map(up);
   if (!circles.length) return null; // a radius needs a circle to belong to
   const body = dropCircleRef(s).replace(/\bradius\b|רדיוס|\badd\b|הוסף|\bdraw\b|צייר|\bin\b|circle|מעגל/gi, ' ');
@@ -2255,6 +2257,10 @@ const inscribedAngleOnDiameter: Rule = (s, ctx) => {
  *  a free on-circle endpoint to the other's antipode when the centre is independent. [ADR-137] */
 const diameter: Rule = (s, ctx) => {
   if (!/diameter|קוטר/i.test(s)) return null;
+  // "E על הקוטר AB" is a POINT ON the diameter (a point on segment AB), not a diameter DEFINITION — defer
+  // to pointOnSegment (which runs later), else this rule grabs the "AB" run and drops the rider E. The
+  // `withCarrierMembership` post-pass still asserts A,B on the circle + collinear-through-centre (PAR-5).
+  if (POINT_ON_CARRIER.test(s)) return null;
   // A RELATION tail ("diameter AB = 10") is a MEASURE on the diameter — bail so the measure rule claims the
   // length; `withCarrierMembership` then re-asserts A,B on the circle AND collinear-through-centre so it stays
   // a DIAMETER (PAR-1/PAR-4). Without this the "= 10" was silently dropped.
@@ -3760,7 +3766,8 @@ function withImplicitCircles(commands: AnyCommand[], ctx: ParseContext): AnyComm
 function withCarrierMembership(commands: AnyCommand[], s: string, ctx: ParseContext): AnyCommand[] {
   const isChord = /chord|מיתר/i.test(s);
   const isDiameter = /diameter|קוטר/i.test(s);
-  if (!isChord && !isDiameter) return commands;
+  const isRadius = /\bradius\b|רדיוס/i.test(s);
+  if (!isChord && !isDiameter && !isRadius) return commands;
   // If a CIRCLE-CONSTRUCT rule already handled the utterance (the standalone `chord`/`diameter`, or
   // `circleOnDiameter`/`diameterCutsSegment`/`pointOnCircle`/arc/…), it modelled membership itself — don't
   // double-add. Only a RELATIONAL / point-on winner (parallel/⟂/distance/equal/ratio/pointOnSegment — bare
@@ -3781,23 +3788,31 @@ function withCarrierMembership(commands: AnyCommand[], s: string, ctx: ParseCont
   // Ordered endpoint PAIRS drawn by the winning rule — a `segment` or a `point-on-segment` carrier (the
   // on-segment RIDER `id` is NOT an endpoint, so "C אמצע מיתר AB" puts A,B — not C — on the circle). A pair
   // touching the circle's CENTRE is a radius, not a chord — excluded (so "radius OE" keeps O off).
-  const pairs: Id[][] = [];
+  const pairs: Id[][] = []; // chord/diameter: an endpoint pair NOT touching the centre
+  const rims: Id[] = []; // radius: the non-centre end of a centre→rim carrier ("D on radius OB" → B)
   for (const c of commands) {
-    const pair = c.type === 'segment' || c.type === 'point-on-segment' ? [up(c.a), up(c.b)] : null;
-    if (pair && !pair.some((id) => centers.has(id))) pairs.push(pair);
+    if (c.type !== 'segment' && c.type !== 'point-on-segment') continue;
+    const ab = [up(c.a), up(c.b)];
+    const centreEnds = ab.filter((id) => centers.has(id));
+    if (centreEnds.length === 0) pairs.push(ab);
+    else if (isRadius && centreEnds.length === 1) rims.push(ab.find((id) => !centers.has(id))!);
   }
-  if (!pairs.length) return commands;
+  if (!pairs.length && !rims.length) return commands;
   // A CHORD utterance puts EVERY named segment on the circle (both "parallel chords"); a diameter-ONLY
   // utterance ("diameter AB = 10") asserts just the diameter itself (the first pair) — so an unrelated
-  // segment (a diameter ⟂ a NON-chord) isn't wrongly forced onto the circle.
-  const memberPairs = isChord ? pairs : [pairs[0]];
+  // segment (a diameter ⟂ a NON-chord) isn't wrongly forced onto the circle. A pure radius utterance
+  // contributes no chord/diameter pair — only its rim point below.
+  const memberPairs = isChord ? pairs : isDiameter ? pairs.slice(0, 1) : [];
   const endpoints: Id[] = [];
   for (const [a, b] of memberPairs) for (const id of [a, b]) if (!centers.has(id) && !already.has(id) && !endpoints.includes(id)) endpoints.push(id);
+  // A RADIUS carrier's rim point ("D on radius OB" → B) lies on the circle too.
+  for (const id of rims) if (!already.has(id) && !endpoints.includes(id)) endpoints.push(id);
   const extra: AnyCommand[] = endpoints.map((id) => ({ type: 'point-on-circle', id, circle: circ }));
   // A DIAMETER passes through the centre — add the collinearity so AB is a DIAMETER, not just a chord,
   // UNLESS the winner already modelled it (the standalone `diameter` rule emits diameter/antipode/collinear).
   const diameterModeled = commands.some((c) => c.type === 'diameter' || c.type === 'set-collinear');
-  if (isDiameter && !diameterModeled) extra.push({ type: 'set-collinear', a: pairs[0][0], b: up(center), c: pairs[0][1] });
+  if (isDiameter && pairs.length && !diameterModeled) extra.push({ type: 'set-collinear', a: pairs[0][0], b: up(center), c: pairs[0][1] });
+  if (!extra.length) return commands;
   return [...extra, ...commands];
 }
 

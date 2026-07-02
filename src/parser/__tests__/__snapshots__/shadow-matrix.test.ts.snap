@@ -1329,14 +1329,14 @@ exports[`parser shadow-matrix — known shadow-prone probes (Phase C tracking) >
     "note": "PAR-5: על\\b dead guard; D dropped",
     "shadowedBy": [],
     "text": "נקודה D על הרדיוס OB",
-    "winner": "radiusSegment",
+    "winner": "pointOnSegment",
     "winnerKind": "array",
   },
   {
     "note": "PAR-5: קוטר not a CARRIER_NOUN; E dropped",
     "shadowedBy": [],
     "text": "E על הקוטר AB",
-    "winner": "diameter",
+    "winner": "pointOnSegment",
     "winnerKind": "array",
   },
   {
