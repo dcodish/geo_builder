@@ -31,17 +31,24 @@ import { handleAdmin } from './admin';
 const PORT = Number(process.env.PORT ?? 8788);
 const HOST = process.env.HOST ?? '127.0.0.1';
 const apiKey = process.env.ANTHROPIC_API_KEY;
-const ipSalt = process.env.IP_HASH_SALT || 'geo-builder-default-salt';
+const DEFAULT_SALT = 'geo-builder-default-salt';
+const ipSalt = process.env.IP_HASH_SALT || DEFAULT_SALT;
 const adminUsername = process.env.ADMIN_USERNAME || 'admin';
 const adminPassword = process.env.ADMIN_PASSWORD || '';
-const adminCookieSecret = process.env.ADMIN_COOKIE_SECRET || ipSalt;
+// The admin cookie secret must be its OWN dedicated env — NEVER derived from `ipSalt` or the committed
+// default (a forged cookie under a known/guessed secret would bypass login, SEC-3). Unset OR set to the
+// committed default ⇒ empty ⇒ the dashboard fails closed (handleAdmin's `secure` gate refuses all auth).
+const adminCookieSecret =
+  process.env.ADMIN_COOKIE_SECRET && process.env.ADMIN_COOKIE_SECRET !== DEFAULT_SALT ? process.env.ADMIN_COOKIE_SECRET : '';
 const adminBase = process.env.ADMIN_BASE || '/geo-builder/admin';
 
 if (!apiKey) {
   console.error('[geo-proxy] WARNING: ANTHROPIC_API_KEY is not set — /api/parse will return 503.');
 }
-if (!adminPassword) {
-  console.error('[geo-proxy] WARNING: ADMIN_PASSWORD is not set — the /admin dashboard is effectively locked.');
+if (!adminPassword || !adminCookieSecret) {
+  console.error(
+    '[geo-proxy] WARNING: ADMIN_PASSWORD and/or a dedicated ADMIN_COOKIE_SECRET is not set — the /admin dashboard is DISABLED (fail-closed): no login and no cookie will authenticate.',
+  );
 }
 
 const server = createServer((req, res) => {

@@ -10,18 +10,28 @@ import type { IncomingMessage } from 'node:http';
 /**
  * The client IP, for rate-limiting and (hashed) unique-visitor counting.
  *
- * Behind the production reverse proxy every request's `socket.remoteAddress` is the
- * proxy's loopback (127.0.0.1), which would collapse a per-IP limiter into one
- * global bucket — so prefer the `X-Forwarded-For` / `X-Real-IP` header Apache sets.
- * Safe to trust because the Node server binds to loopback and only the reverse
- * proxy can reach it; in dev (no header) it falls back to the socket address.
+ * Behind the production reverse proxy `socket.remoteAddress` is Apache's loopback
+ * (127.0.0.1), which would collapse a per-IP limiter into one global bucket — so we read
+ * `X-Forwarded-For`. CRITICAL: Apache `mod_proxy_http` APPENDS the connecting peer to any
+ * client-sent XFF, so the header is `<client-forgeable …>, <real client as Apache saw it>`
+ * — the trustworthy value is the **LAST** hop, NOT the first. Trusting `xff[0]` (the old bug,
+ * SEC-1) let an attacker send a fresh fake IP per request and land each in its own bucket,
+ * defeating the limiter entirely and poisoning the dashboard's unique-visitor hash. We take
+ * the hop `TRUSTED_PROXY_HOPS` (default 1 = just Apache) from the END; raise it only if another
+ * TRUSTED proxy sits in front of Apache (e.g. a CDN). `X-Real-IP` is NOT trusted — Apache does
+ * not set it here, so any value present is 100% client-supplied. In dev (no proxy, loopback-only)
+ * there is no XFF, so it falls back to the socket address.
  */
 export function clientIp(req: IncomingMessage): string {
-  const xff = req.headers?.['x-forwarded-for'];
-  const fwd = Array.isArray(xff) ? xff[0] : xff;
-  if (fwd) return fwd.split(',')[0].trim();
-  const real = req.headers?.['x-real-ip'];
-  if (typeof real === 'string' && real) return real;
+  const hops = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS) || 1);
+  const raw = req.headers?.['x-forwarded-for'];
+  const header = Array.isArray(raw) ? raw.join(',') : raw;
+  if (header) {
+    const chain = header.split(',').map((s) => s.trim()).filter(Boolean);
+    // The real client is the entry Apache appended (the last), or `hops` from the end when
+    // several trusted proxies chain; clamp to the first if the chain is shorter than declared.
+    if (chain.length) return chain[Math.max(0, chain.length - hops)];
+  }
   return req.socket?.remoteAddress ?? 'local';
 }
 

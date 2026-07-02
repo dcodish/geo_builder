@@ -546,6 +546,13 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
   const cookiePath = base; // Path attr the browser scopes the cookie to
   const path = (req.url ?? '').split('?')[0];
 
+  // Fail-closed (SEC-3): the dashboard authenticates ONLY when a username, password, AND a dedicated
+  // cookie secret are ALL configured. A missing/empty cookie secret (or unconfigured password) means
+  // admin is DISABLED — neither login NOR a (possibly forged) cookie may authenticate. `standalone.ts`
+  // never derives this secret from `ipSalt`/the committed default, so an empty `cookieSecret` genuinely
+  // means "not configured" — a forged cookie under a guessed default can no longer reach the dashboard.
+  const secure = opts.username.length > 0 && opts.password.length > 0 && opts.cookieSecret.length > 0;
+
   // logout
   if (path.endsWith('/logout')) {
     res.statusCode = 303;
@@ -560,11 +567,10 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
     let body = '';
     for await (const chunk of req) body += chunk;
     const params = new URLSearchParams(body);
-    // A blank configured password means the dashboard is unconfigured → never authenticate
-    // (otherwise a blank submission would match a blank secret).
-    const configured = opts.username.length > 0 && opts.password.length > 0;
+    // Only authenticate when securely configured (username + password + cookie secret); else 401, so an
+    // unconfigured dashboard never issues a session (SEC-3).
     const ok =
-      configured &&
+      secure &&
       safeEq(params.get('username') ?? '', opts.username) &&
       safeEq(params.get('password') ?? '', opts.password);
     if (!ok) return send(res, 401, loginPage(base, true));
@@ -578,8 +584,9 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
     return;
   }
 
-  // dashboard (auth required)
-  const authed = validCookie(readCookies(req)[COOKIE], opts.cookieSecret);
+  // dashboard (auth required). `secure &&` fails closed: with no configured cookie secret, even a
+  // well-formed cookie is rejected — a forged cookie under a guessed/default secret can't get in (SEC-3).
+  const authed = secure && validCookie(readCookies(req)[COOKIE], opts.cookieSecret);
   if (!authed) return send(res, 200, loginPage(base, false));
 
   const all = await readEvents(opts.logPath ?? eventsLogPath());

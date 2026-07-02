@@ -102,8 +102,12 @@ ssh root@themathbible.com 'systemctl restart geo-proxy'
 
 - The proxy matches any path ending in `/api/parse`, so it works whether the reverse
   proxy forwards the `/geo-builder` prefix (Apache `ProxyPass` keeps it) or strips it.
-  Rate-limiting is per-client via `X-Forwarded-For`, which Apache `mod_proxy_http`
-  sets automatically.
+  Rate-limiting (and the hashed visitor id) is per-client via `X-Forwarded-For`, which
+  Apache `mod_proxy_http` sets automatically. The proxy trusts the **LAST** hop of that
+  header (the peer Apache appended = the real client); a client-forged first entry is
+  ignored (SEC-1). If you ever put another TRUSTED proxy in front of Apache (e.g. a CDN),
+  set `TRUSTED_PROXY_HOPS` in `geo-proxy.env` to the number of trusted proxies so the real
+  client is still picked; the default (1) is correct for the plain Apache→loopback setup.
 - Logs: `journalctl -u geo-proxy -f`.
 - No `npm install` on the server — the SDK is bundled into `proxy.mjs`.
 - **Usage events** accumulate in `events.jsonl`; the service self-rotates it past
@@ -111,6 +115,11 @@ ssh root@themathbible.com 'systemctl restart geo-proxy'
   Rotating `IP_HASH_SALT` resets unique-visitor counts (old/new hashes won't match).
 - The admin session is a stateless signed cookie (8 h); `ADMIN_BASE` must match the
   public path (`/geo-builder/admin`) so the cookie scopes and redirects resolve.
+- **`ADMIN_COOKIE_SECRET` is REQUIRED and must be its OWN long random string** (not reused
+  from `IP_HASH_SALT`). The dashboard is **fail-closed** (SEC-3): if `ADMIN_PASSWORD` or a
+  dedicated `ADMIN_COOKIE_SECRET` is unset (or the secret is left at the committed default),
+  `/admin` refuses ALL authentication — no login succeeds and no cookie is accepted (so a
+  cookie forged under a guessed default can't reach it). The `/api/parse` proxy is unaffected.
 - **Stale-figure-after-deploy = browser cache.** `scp` never deletes old hashed
   bundles, and without a Cache-Control header on `index.html` a browser keeps the
   old entry point and loads a stale (still-present) `index-*.js` — the app renders

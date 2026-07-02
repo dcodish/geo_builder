@@ -324,9 +324,9 @@ Dependency notes: PAR-11 (shadow matrix) should land before Phase C. TST-1 (seed
 | A4 / TST-6 | A | Verifier tolerance pinning | — | ½ h | ADR-173 | ✅ |
 | A5 / TST-5 | A | Replay-count perf canary (→ do with E1, needs store change) | — | ½ h | | ☐ |
 | A6 / TST-7 | A | Stray file + vitest ignore + scenario-doc parity (backfilled 34, guard added) | — | ½ h | ADR-174 | ✅ |
-| B1 / SEC-1 | B | XFF last-hop | HIGH | 1 h | | ☐ |
-| B2 / SEC-2 | B | Cost gate (ceiling + code) | HIGH | ½ d | | ☐ |
-| B3 / SEC-3 | B | Fail-closed admin auth | HIGH | 1–2 h | | ☐ |
+| B1 / SEC-1 | B | XFF last-hop | HIGH | 1 h | ADR-175 | ✅ |
+| B2 / SEC-2 | B | Cost gate (ceiling + code) | HIGH | ½ d | | ☐ (decision) |
+| B3 / SEC-3 | B | Fail-closed admin auth | HIGH | 1–2 h | ADR-176 | ✅ |
 | B4 / SEC-4/5/6 | B | Limiter/timeout/login throttle | MED | ½ d | | ☐ |
 | B5 / SEC-7 | B | Data retention + logs off Dropbox | MED | 2 h | | ☐ |
 | B6 / SEC-9 | B | Deploy durability + systemd | LOW | 1 h | | ☐ |

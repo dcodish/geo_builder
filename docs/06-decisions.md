@@ -2506,3 +2506,29 @@ A reproduction (rectangle `ABCD`; equilateral `BCE`,`DAF` inward; `EC ∩ DF = G
 **Why this is the root fix, not a patch.** Backfilling alone would re-drift on the next scenario. The parity guard makes the standing rule *enforced* rather than relying on discipline — the index can no longer fall behind the code without a red test.
 
 **Consequences / tests.** Doc grows by 34 entries (98 → 132 `###`); one new test; `SCENARIOS`/`factsOf`/`Step`/`Scenario` exported (test-only). No source/behaviour change. **Parity test green (0 unindexed ids); `tsc -b` clean.**
+
+## ADR-175 — Rate-limit / visitor-hash IP: trust the LAST X-Forwarded-For hop (hardening plan B1 / SEC-1)
+
+**Status:** Accepted (2026-07-02)
+
+**Context.** The security review's top server finding. [`clientIp`](../server/http.ts) fed the per-IP rate limiter ([parseHandler.ts](../server/parseHandler.ts)) and the dashboard's hashed unique-visitor id ([eventLog.ts](../server/eventLog.ts)) from `X-Forwarded-For.split(',')[0]` — the FIRST entry. But the production topology is client → Apache (`mod_proxy_http`, `ProxyPass`) → Node on loopback, and `mod_proxy_http` **appends** the connecting peer to any client-sent XFF. So the header is `<client-forgeable …>, <real client as Apache saw it>` and the first entry is fully attacker-controlled.
+
+**Attack (this deployment).** A student sends a fresh random first XFF value per request → each lands in its own limiter bucket → the 30/min cap never trips → unbounded Haiku calls on prepaid credit; the same spoof forges/inflates the dashboard's per-visitor hash. This silently defeated the ONLY implemented cost throttle.
+
+**Decision.** Trust the **last** hop (the peer Apache appended = the real client), via a `TRUSTED_PROXY_HOPS` env (default 1 = just Apache) taken from the END of the chain — raise it only if another TRUSTED proxy (a CDN) sits in front of Apache. Drop the `X-Real-IP` fallback entirely (SEC-8: Apache doesn't set it here, so any value is 100% client-supplied). Dev (no proxy, loopback-bound) still falls back to the socket address.
+
+**Why this is the root fix, not a patch.** It encodes the actual trust boundary — "how many proxies in front are trustworthy" — instead of blindly trusting a header position a client controls. `TRUSTED_PROXY_HOPS` makes the assumption explicit, configurable, and testable, so a future topology change (CDN) is a one-line env, not a re-think.
+
+**Consequences / tests.** [server/__tests__/http.test.ts](../server/__tests__/http.test.ts) (7 tests): last-hop chosen; a rotating fake first value maps to ONE bucket; single-entry used directly; `X-Real-IP` not trusted; socket fallback; `TRUSTED_PROXY_HOPS=2`; array/short-chain clamp. Deploy README updated. **49 server tests green; `tsc -b` clean.**
+
+## ADR-176 — Admin dashboard is FAIL-CLOSED; cookie secret never derived from a default (hardening plan B3 / SEC-3)
+
+**Status:** Accepted (2026-07-02)
+
+**Context.** [standalone.ts](../server/standalone.ts) derived the admin session-cookie secret as `ADMIN_COOKIE_SECRET || ipSalt`, and `ipSalt` itself fell back to the committed constant `'geo-builder-default-salt'`. Meanwhile the dashboard guard ([admin.ts](../server/admin.ts) `handleAdmin`) authenticated on `validCookie(...)` alone — it never checked whether admin was actually configured. So an attacker could compute a valid session cookie under the known default secret and read the dashboard through the public `/geo-builder/admin` proxy — **even with a blank `ADMIN_PASSWORD`**, which `standalone.ts` warned was "effectively locked". The login path was locked; the cookie path was not.
+
+**Decision.** Fail closed. (1) `handleAdmin` computes `secure = username && password && cookieSecret` all non-empty; **both** the login (`ok = secure && …`) AND the dashboard guard (`authed = secure && validCookie(…)`) require it — a forged cookie is ignored when admin isn't securely configured. (2) `standalone.ts` no longer derives the cookie secret from `ipSalt`; an unset secret — or one left at the committed default — becomes empty, which the `secure` gate treats as "disabled". The `/api/parse` proxy is unaffected (only `/admin` fails closed).
+
+**Why this is the root fix, not a patch.** Re-adding a config check at the guard alone would leave the default-secret derivation as a latent bypass; removing the derivation alone would leave the guard trusting any validly-signed cookie. Both halves close the actual hole: "not securely configured ⇒ no authentication, by any path." The secret is now its own required input, so a misconfigured deploy is safe-by-default rather than silently world-readable.
+
+**Consequences / tests.** [admin.test.ts](../server/__tests__/admin.test.ts) adds two SEC-3 cases (a well-formed cookie rejected when the server secret is unset; login refused 401 without a secret even with correct creds); existing auth tests unchanged. Deploy README notes `ADMIN_COOKIE_SECRET` is required + dedicated. **51 server tests green; `tsc -b` clean.**

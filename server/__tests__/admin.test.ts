@@ -130,6 +130,36 @@ describe('admin auth gate', () => {
     );
     expect(res.statusCode).toBe(401);
   });
+
+  // SEC-3: a forged/valid cookie must NOT reach the dashboard when the server has no cookie secret
+  // configured. Previously the secret fell back to a committed default, so a cookie forged under that
+  // default authenticated even with a blank password ("effectively locked" was not actually locked).
+  it('rejects a well-formed cookie when the server cookie secret is UNSET (fail-closed, SEC-3)', async () => {
+    // Mint a valid cookie against the real secret via a properly-configured server…
+    const login = mockRes();
+    await run(mockReq('POST', '/admin/login', ['username=teacher&password=s3cret']), login, logPath);
+    const cookie = cookieFrom(login.headers['set-cookie']);
+    // …then present it to a server whose cookieSecret is EMPTY (the unconfigured production default now).
+    const res = mockRes();
+    await handleAdmin(
+      mockReq('GET', '/admin', [], { cookie }) as unknown as IncomingMessage,
+      res as unknown as ServerResponse,
+      { username: 'teacher', password: 's3cret', cookieSecret: '', base: '/admin', logPath },
+    );
+    expect(res.body).toContain('כניסת מנהל'); // login form, NOT the dashboard
+    expect(res.body).not.toContain('מבקרים ייחודיים'); // a dashboard-only marker (the <title> shares 'דוח שימוש')
+  });
+
+  it('login is refused (401) when the cookie secret is unset, even with correct credentials (SEC-3)', async () => {
+    const res = mockRes();
+    await handleAdmin(
+      mockReq('POST', '/admin/login', ['username=teacher&password=s3cret']) as unknown as IncomingMessage,
+      res as unknown as ServerResponse,
+      { username: 'teacher', password: 's3cret', cookieSecret: '', base: '/admin', logPath },
+    );
+    expect(res.statusCode).toBe(401);
+    expect(res.headers['set-cookie']).toBeUndefined();
+  });
 });
 
 describe('aggregate', () => {
