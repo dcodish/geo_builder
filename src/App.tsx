@@ -392,6 +392,15 @@ export default function App() {
       construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
     );
     const out = await llmParse(utterance, ctx, parseCtx());
+    // The proxy is throttling (global daily cost ceiling or per-IP limit) — NOT a parse failure. Show a
+    // "service busy, try again" message (never "couldn't understand your input" — it isn't the student's
+    // fault) and tag the analytics so the operator can see how often the ceiling is reached (SEC-2).
+    if (out?.busy) {
+      logDebug({ kind: 'input', utterance, locale, source: 'limit', result: out.busy });
+      setInputNote(t('input.serviceBusy'));
+      setThinking(false);
+      return;
+    }
     // The LLM only counts if its decomposition actually BUILDS something — else it's another silent
     // fail. Dry-run the combined commands; if neither grammar nor LLM built anything, say so plainly.
     const llmCmds = out ? out.built.flatMap((g) => g.commands) : [];

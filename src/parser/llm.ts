@@ -20,11 +20,18 @@ export interface BuiltStep {
   commands: AnyCommand[];
 }
 
+/** The proxy is throttling: `daily-limit` = the global cost ceiling was hit (SEC-2); `rate-limited` = the
+ *  per-IP limit. Both mean "service busy, try again", NOT "couldn't understand". */
+export type LlmBusy = 'daily-limit' | 'rate-limited';
+
 export interface LlmOutcome {
   /** Steps that parsed — each becomes its own visible fact (labelled by the step). */
   built: BuiltStep[];
   /** Steps the LLM produced that the engine can't build (reported, not silently dropped). */
   dropped: string[];
+  /** Set when the proxy THROTTLED instead of parsing (`built`/`dropped` empty) — the caller shows a
+   *  "service busy" message and tags the analytics so the operator can track how often the ceiling is hit. */
+  busy?: LlmBusy;
 }
 
 /** Fold the points/circles a built step introduced into the running parse context, so a LATER
@@ -90,7 +97,21 @@ export async function llmParse(utterance: string, context: string, figureCtx: Pa
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ utterance, context }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // A 429 is a THROTTLE, not a parse failure — return an empty outcome tagged `busy` so the caller
+      // shows "service busy" instead of "couldn't understand your input" (it isn't the student's fault).
+      if (res.status === 429) {
+        let busy: LlmBusy = 'rate-limited';
+        try {
+          const j = (await res.json()) as { error?: string };
+          if (j?.error === 'daily-limit') busy = 'daily-limit';
+        } catch {
+          /* unparseable body → default to the per-IP form */
+        }
+        return { built: [], dropped: [], busy };
+      }
+      return null;
+    }
     const data = (await res.json()) as { steps?: unknown };
     if (!Array.isArray(data.steps)) return null;
     steps = data.steps.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);

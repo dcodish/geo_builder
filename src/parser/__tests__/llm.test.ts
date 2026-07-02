@@ -112,11 +112,34 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
     expect(r!.dropped).toEqual(['utter nonsense']);
   });
 
-  it('returns null on a proxy error (no key, rate limit, network)', async () => {
-    mockFetch([], false);
+  it('returns null on a non-throttle proxy error (no key / 5xx / network)', async () => {
+    mockFetch([], false); // ok:false, no 429 status → a genuine failure, not a throttle
     expect(await llmParse('square', '')).toBeNull();
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
     expect(await llmParse('square', '')).toBeNull();
+  });
+
+  it('surfaces a THROTTLE (429) distinctly so the caller shows "service busy", not "couldn\'t understand" (SEC-2)', async () => {
+    const mock429 = (error: string | undefined, jsonOk = true) =>
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 429,
+          json: async () => {
+            if (!jsonOk) throw new Error('no body');
+            return { error };
+          },
+        }),
+      );
+    mock429('daily-limit');
+    expect((await llmParse('square', ''))?.busy).toBe('daily-limit'); // the global cost ceiling
+    mock429('rate-limited');
+    expect((await llmParse('square', ''))?.busy).toBe('rate-limited'); // the per-IP limit
+    mock429(undefined, false); // unparseable 429 body → default to the per-IP form
+    const busy = await llmParse('square', '');
+    expect(busy?.busy).toBe('rate-limited');
+    expect(busy?.built).toEqual([]); // a throttle carries no built steps
   });
 });
 

@@ -7,7 +7,7 @@
  * tests in `src/parser/__tests__/llm.test.ts` (the operator authorises live calls).
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { handleParse } from '../parseHandler';
 
@@ -44,6 +44,10 @@ function mockReq(method: string, ip: string, parts: string[] = [], headers: Reco
 // The mocks satisfy only the bits the handler reads; cast through the Node types.
 const run = (req: ReturnType<typeof mockReq>, res: ReturnType<typeof mockRes>, apiKey: string | undefined) =>
   handleParse(req as unknown as IncomingMessage, res as unknown as ServerResponse, { apiKey, logError: () => {} });
+
+afterEach(() => {
+  delete process.env.LLM_DAILY_MAX;
+});
 
 describe('handleParse (shared proxy handler)', () => {
   it('rejects a non-POST with 405 before reaching the key/SDK', async () => {
@@ -84,6 +88,16 @@ describe('handleParse (shared proxy handler)', () => {
     }
     // The 31st+ request in the window trips the limiter (MAX_PER_WINDOW = 30).
     expect(last.statusCode).toBe(429);
+  });
+
+  it('enforces the global daily ceiling with a DISTINCT 429 (daily-limit, not rate-limited) — SEC-2', async () => {
+    // A valid utterance that would reach Haiku is blocked BEFORE the SDK when the ceiling is hit; setting
+    // the cap to 0 makes the very first dispatch over-limit, so this never touches the live API.
+    process.env.LLM_DAILY_MAX = '0';
+    const res = mockRes();
+    await run(mockReq('POST', '10.0.0.6', [JSON.stringify({ utterance: 'draw something' })]), res, 'sk-test');
+    expect(res.statusCode).toBe(429);
+    expect(JSON.parse(res.body)).toEqual({ error: 'daily-limit' }); // distinct from the per-IP 'rate-limited'
   });
 
   it('rate-limits per X-Forwarded-For client, not the (shared) reverse-proxy socket', async () => {

@@ -29,6 +29,7 @@
     "send": "Add",
     "loading": "Thinking...",
     "notUnderstood": "I couldn't read that yet — try one of the examples below.",
+    "serviceBusy": "The parsing service is busy right now — please try again in a little while.",
     "scope": {
       "angle-relation": "That's an angle relationship the tool highlights for you once you draw the figure (e.g. two parallel lines and a transversal) — not something to type. Draw the figure and the relationships appear on their own.",
       "proof": "The tool draws figures and surfaces relevant theorems — it doesn't write proofs. Enter the givens and the relevant theorems will appear as you build.",
