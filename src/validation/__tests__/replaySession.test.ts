@@ -33,6 +33,21 @@ describe('replaySession — production session z0t3i7m1', () => {
   });
 });
 
+describe('replaySession — parse context is not missing `parallels` (ADR-171 drift fix)', () => {
+  it('classifies a trapezoid-altitude utterance as parsed, not a coverage-gap', () => {
+    // Before the shared `buildParseCtx`, the harness's own `ctxFrom` omitted `parallels`, so the
+    // altitude rule (ADR-169) could not resolve the opposite base and "CE גובה בטרפז" fell through to
+    // `coverage-gap` — a FALSE gap the shipped app never has. The step must now commit.
+    const r = replaySession([
+      'טרפז ABCD ישר זווית', // right trapezoid — AB ∥ DC, so ctx.parallels is non-empty
+      'CE גובה בטרפז', // the height from C drops to the opposite parallel base AB
+    ]);
+    expect(r.steps[0].category).toBe('ok');
+    expect(r.steps[1].category, 'trapezoid altitude must parse, not read as a coverage gap').not.toBe('coverage-gap');
+    expect(r.steps[1].committed).toBe(true);
+  });
+});
+
 describe('eventsToSessions — log ingest', () => {
   it('groups submit lines by sid in order and flags failing sessions', () => {
     const jsonl = [

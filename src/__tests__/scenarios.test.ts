@@ -18,15 +18,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parse, droppedNewLabels } from '@/parser';
-import { replay, polygonsConvex, useGeoStore, firstSatisfyingSeed, dryRunOutcome, hasDeferrableConstraint } from '@/store/geoStore';
+import { parse, droppedNewLabels, buildParseCtx } from '@/parser';
+import { replay, polygonsConvex, useGeoStore, firstSatisfyingSeed, dryRunOutcome, hasDeferrableConstraint, meetsRequirements } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
-import { isGeoPoint, freeDofs, freeDofCount, applySeed, firstCyclableBranch, evaluate, circleMembers, pointNeighbors, parallelEdgePairs, detectRelations, detectShapes } from '@/engine';
+import { isGeoPoint, freeDofs, freeDofCount, applySeed, firstCyclableBranch, evaluate, detectRelations, detectShapes } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 import { humanizeError } from '@/i18n/humanizeError';
 
-type Step = string | { llm: AnyCommand[] };
-interface Scenario {
+export type Step = string | { llm: AnyCommand[] };
+export interface Scenario {
   id: string;
   title: string;
   /** The bug this sequence guards against (for the readable record). */
@@ -38,21 +38,17 @@ interface Scenario {
   expectViolations?: boolean;
 }
 
-/** The figure context the app feeds the parser: circle centres + existing point ids. */
+/** The figure context the app feeds the parser — the shared builder (ADR-171), so scenarios can't drift
+ *  from App/production. */
 function ctxOf(facts: Fact[]) {
   const { construction, positions } = replay(facts);
-  return {
-    circles: construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [o.center] : [])), // drop ~scaffolding circles (mirrors App.parseCtx)
-    points: construction.objects.filter(isGeoPoint).map((o) => o.id),
-    circleMembers: circleMembers(construction),
-    neighbors: pointNeighbors(construction),
-    parallels: parallelEdgePairs(construction, positions), // so "height from C" drops to a trapezoid's opposite base (ADR-169)
-    lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])),
-  };
+  return buildParseCtx(construction, positions);
 }
 
-/** Replay a scenario through the real parse→fact→replay path and return the derived figure. */
-function run(steps: Step[]): Derived {
+/** Build the ordered fact list for a scenario through the real parse→fact path (no replay yet). Shared by
+ *  `run` and the seed-sweep oracle ([seed-sweep.test.ts](./seed-sweep.test.ts)), so both drive the exact
+ *  same pipeline the app does. */
+export function factsOf(steps: Step[]): Fact[] {
   const facts: Fact[] = [];
   let g = 0;
   for (const step of steps) {
@@ -70,6 +66,12 @@ function run(steps: Step[]): Derived {
     const group = `g${g++}`;
     for (const cmd of commands) facts.push({ id: `${group}.${facts.length}`, utterance, group, cmd, enabled: true });
   }
+  return facts;
+}
+
+/** Replay a scenario through the real parse→fact→replay path and return the derived figure. */
+function run(steps: Step[]): Derived {
+  const facts = factsOf(steps);
   // Mirror the app: when a figure has free DOFs whose default placement breaks an extension's directional
   // order ("המשך" must reach the far side), the store auto-advances to the first satisfying configuration.
   // `firstSatisfyingSeed` returns 0 for any figure without that issue, so non-extension scenarios are
@@ -106,7 +108,7 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 };
 
 // ── the scenarios (newest first) ───────────────────────────────────────────
-const SCENARIOS: Scenario[] = [
+export const SCENARIOS: Scenario[] = [
   {
     id: 'segment-meet-lands-on-segments',
     title: 'bagrut Q9: "AE and BF meet at G" puts G ON the segments (apexes flip inward), not on the continuation',
@@ -3064,4 +3066,102 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       expect(dist(at(fig, 'A'), at(fig, 'B')), `seed ${seed}: |AB| = √2·R`).toBeCloseTo(Math.SQRT2 * r, 2);
     }
   });
+});
+
+/**
+ * Seed-sweep oracle ([docs/15-hardening-plan.md](../../docs/15-hardening-plan.md) A2 / TST-1).
+ *
+ * The `run` test above checks each scenario at ONE seed (the app's default, `firstSatisfyingSeed`). But
+ * the dominant historical escape class is *wrong-configuration-at-another-seed* — a figure that builds
+ * clean yet is geometrically wrong in some OTHER valid draw the student can reach via "show another
+ * configuration" (ADR-085/098/127/166 all shipped past seed-0 suites). This re-runs each scenario's OWN
+ * geometric `check` — the independent oracle that already exists — at EVERY seed the app would actually
+ * DISPLAY (`meetsRequirements` true), asserting the ground-truth relations hold in every shown config, not
+ * just the default one.
+ *
+ * Scope (principled, not arbitrary): only scenarios with FREE DOFs are swept — a determined figure is
+ * seed-invariant, so the single-seed test already covers it. Heavy figures (a seed-0 replay over the
+ * threshold) are skipped and LOGGED (no silent caps — repo rule). A scenario whose `check` asserts a
+ * CONFIG-SPECIFIC fact (a branch / vertex order that legitimately varies) opts out via `seedSweepExempt`.
+ */
+/**
+ * CONFIG-SPECIFIC scenarios exempt from the seed-sweep — their `check` asserts a value that legitimately
+ * VARIES across the valid configs "show another configuration" reaches (a free radius, an unstated
+ * extension distance, an arc position, a size-dependent separation / convexity gap), so it can only hold at
+ * the default seed. Their geometric INVARIANTS (angle relations, on-circle membership, collinearity) DO
+ * hold across seeds — verified when this oracle was built; only the config-pinned numbers move. The
+ * single-seed `run` test above still guards each at its default. (Kept as ONE legible list, id → why.)
+ */
+const SEED_SWEEP_EXEMPT: Record<string, string> = {
+  'symbolic-2alpha-drives-shape-not-the-fixed-point': 'D is on an UNSTATED extension (המשך BC, no distance) — an ADR-052 free DOF, so its t legitimately varies; the ∠BOC=2∠CAD invariant holds every seed',
+  'two-collinear-chain-solves': 'the check pins circle P’s radius (|PD|≈3.6) — a free-radius DOF that varies across views',
+  'line-through-intersection-collinear': 'pins |PC| to the default free radius; the collinearity invariant holds every seed',
+  'second-intersection-avoids-shared-point': 'pins E’s distance to the default radius and a size-dependent A–C separation; E stays on the circle',
+  'redefine-existing-point-onto-circle': 'the E–A separation (>0.5) scales with the free radii; E stays ON circle P and A,C,E collinear every seed',
+  'point-on-arc-no-midpoint-word': 'a FREE point on the arc — its position varies by design (ADR-042); no fixed arc coordinate is an invariant',
+  'perp-constraint-keeps-quad-convex': 'the convex-gap threshold (15°) is stricter than the app’s displayable-convexity gate; a valid ~12° corner appears at some seeds',
+  'tangent-chord-bisector': 'same convex-gap threshold vs the displayable gate — a valid tight corner at one seed',
+};
+
+/**
+ * KNOWN-HEAVY scenarios (a single replay is slow — coupled solves / reflection sweeps / large corpora),
+ * pre-skipped so the default sweep doesn't pay their cost even to MEASURE them. The `THRESHOLD_MS` guard
+ * below still auto-catches any NEW heavy scenario. Populated from the sweep's own timing log; each is swept
+ * only in the deep pass (`SEED_SWEEP_MULT` set). Their default config is still guarded by the `run` test.
+ */
+const SEED_SWEEP_HEAVY = new Set<string>([
+  'segment-meet-lands-on-segments', 'emergent-shapes-through-crossings', 'incircle-of-trapezoid-flexes-tangential',
+  'area-ratio-converges-points-allowed', 'driven-extension-point-stays-beyond', 'q4-constraints-order-independent',
+  'collinear-flexes-redundant-carrier-kite-tangents', 'diameter-from-point-cuts-side-onto-segment',
+  'alpha-less-than-beta-reshapes', 'kite-tangents-redundant-equality-not-over-constrained',
+]);
+
+describe('reported scenarios — seed-sweep oracle (every displayable config honours the scenario check)', () => {
+  it('each free-DOF scenario passes its own check at every seed the app would display', () => {
+    const deep = !!process.env.SEED_SWEEP_MULT;
+    const N = Number(process.env.SEED_SWEEP_MULT) || 3; // seeds 0..N-1; a cross-seed bug shows at a low seed. Deep pass via env.
+    const THRESHOLD_MS = 700; // a seed-0 replay slower than this ⇒ a heavy coupled figure; skip-and-log (backstop for NEW heavies)
+    const failures: string[] = [];
+    const slowSkipped: string[] = [];
+    let determined = 0;
+    let swept = 0;
+    for (const sc of SCENARIOS) {
+      if (sc.expectViolations || SEED_SWEEP_EXEMPT[sc.id]) continue; // intentional-flag / config-specific → not this oracle
+      if (!deep && SEED_SWEEP_HEAVY.has(sc.id)) { slowSkipped.push(`${sc.id} (known-heavy)`); continue; } // pre-skip without measuring
+      let facts: Fact[];
+      try {
+        facts = factsOf(sc.steps);
+      } catch {
+        continue; // a step that doesn't parse is the `run` test's concern, not the sweep's
+      }
+      const t0 = performance.now();
+      const base = replay(facts, 0);
+      const elapsed = performance.now() - t0;
+      if (freeDofs(base.construction).length === 0) {
+        determined++;
+        continue; // seed-invariant — the single-seed test already covers it
+      }
+      if (elapsed > THRESHOLD_MS) {
+        slowSkipped.push(`${sc.id} (${Math.round(elapsed)}ms/replay)`);
+        continue; // too heavy to sweep in CI — surfaced below, never silently dropped
+      }
+      swept++;
+      for (let s = 0; s < N; s++) {
+        if (!meetsRequirements(facts, s)) continue; // the app would not display this config
+        const fig = replay(facts, s);
+        try {
+          sc.check(fig);
+        } catch (e) {
+          failures.push(`[${sc.id}] seed ${s}: ${(e as Error).message.split('\n')[0]}`);
+        }
+      }
+    }
+    // No silent caps: report coverage + what was skipped and why.
+    // eslint-disable-next-line no-console
+    console.log(
+      `seed-sweep: swept ${swept} free-DOF scenario(s) × up to ${N} seeds; ${determined} determined (seed-invariant) skipped` +
+        (slowSkipped.length ? `; ${slowSkipped.length} heavy skipped: ${slowSkipped.join(', ')}` : ''),
+    );
+    expect(failures, `configs the app would display but that fail their scenario check:\n${failures.join('\n')}`).toEqual([]);
+  }, 300_000);
 });

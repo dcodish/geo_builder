@@ -1,0 +1,1370 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (candidate shadows) per catalog utterance are stable 1`] = `
+[
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "right triangle ABC",
+    "winner": "rightTriangle",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "isosceles triangle ABC",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "משולש שווה שוקיים ABC",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "equilateral triangle ABC",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "משולש שווה צלעות ABC",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "isosceles trapezoid ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "טרפז שווה שוקיים ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "right trapezoid ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "pointsOnSegment",
+      "pointOnSegment",
+    ],
+    "text": "points F, G, H on AB, AC, CB",
+    "winner": "pointsOnSegments",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "pointsOnSegment",
+      "pointOnSegment",
+    ],
+    "text": "נקודות F, G, H על AB, AC, CB",
+    "winner": "pointsOnSegments",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "(anon)",
+      "segment",
+    ],
+    "text": "midsegment to BC in triangle ABC",
+    "winner": "midsegment",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "segment",
+    ],
+    "text": "קטע האמצעים לצלע BC במשולש ABC",
+    "winner": "midsegment",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "שטח המשולש ABC הוא 13",
+    "winner": "area",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "angle",
+    ],
+    "text": "angle ABC = 2α",
+    "winner": "measureAngle",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "angle",
+    ],
+    "text": "זווית ABC = 2α",
+    "winner": "measureAngle",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "circle",
+    ],
+    "text": "circle centered at O radius 5",
+    "winner": "setRadius",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "circle",
+    ],
+    "text": "מעגל סביב O רדיוס 5",
+    "winner": "setRadius",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "circle",
+    ],
+    "text": "O is the centre of the circle",
+    "winner": "nameCenter",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "circle",
+    ],
+    "text": "O מרכז המעגל",
+    "winner": "nameCenter",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "circle",
+    ],
+    "text": "circle through A B C",
+    "winner": "circumcircle",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "lineMeetsCircle",
+      "lineLineIntersection",
+      "circumcircle",
+      "circle",
+    ],
+    "text": "the circle through A B C cuts CE at D",
+    "winner": "circumcircleMeetsSegment",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "lineMeetsCircle",
+      "circumcircle",
+    ],
+    "text": "המעגל החוסם את משולש ABC חותך את CE בנקודה D",
+    "winner": "circumcircleMeetsSegment",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "circumcircle",
+    ],
+    "text": "triangle DEF circumscribes the circle",
+    "winner": "incircle",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "circumcircle",
+    ],
+    "text": "משולש DEF חוסם את המעגל",
+    "winner": "incircle",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "tangentLine",
+    ],
+    "text": "the tangent at A and the tangent at C to circle O meet at D",
+    "winner": "twoTangentsMeet",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "tangentLine",
+    ],
+    "text": "המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D",
+    "winner": "twoTangentsMeet",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "tangentLine",
+    ],
+    "text": "AB and AD are tangent to circle O at E and K",
+    "winner": "cornerTangentCircle",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "cyclic quadrilateral ABCD",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "מרובע ABCD בר חסימה",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "circleOnDiameter",
+      "diameter",
+    ],
+    "text": "semicircle with diameter AB",
+    "winner": "semicircle",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "circleOnDiameter",
+      "diameter",
+    ],
+    "text": "חצי מעגל שקוטרו AB",
+    "winner": "semicircle",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "lineMeetsCircle",
+      "lineLineIntersection",
+    ],
+    "text": "the line AO cuts circle O at C and D",
+    "winner": "lineCutsCircleTwice",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "tangentLine",
+    ],
+    "text": "from point E outside circle O two tangents touch the circle at A and B",
+    "winner": "tangentsFromExternal",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "diameter",
+    ],
+    "text": "the diameter of circle O from F cuts side AC at E",
+    "winner": "diameterCutsSegment",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "diameter",
+    ],
+    "text": "קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E",
+    "winner": "diameterCutsSegment",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "midpoint",
+    ],
+    "text": "M is the midpoint of arc BC in circle O",
+    "winner": "arcMidpoint",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "midpoint",
+    ],
+    "text": "M אמצע הקשת BC במעגל O",
+    "winner": "arcMidpoint",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "tangentLine",
+      "pointOnCircle",
+    ],
+    "text": "E is the intersection of the tangent to circle O at A and BC",
+    "winner": "tangentLineIntersection",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "tangentLine",
+    ],
+    "text": "E חיתוך המשיק למעגל O בנקודה A עם BC",
+    "winner": "tangentLineIntersection",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "pointOnCircle",
+    ],
+    "text": "G is the intersection of circle O and circle P",
+    "winner": "circleCircleIntersection",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "circleCircleIntersection",
+      "tangentLine",
+    ],
+    "text": "the tangent to circle O at A meets circle P at D",
+    "winner": "tangentMeetsOtherCircle",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "circleCircleIntersection",
+      "tangentLine",
+    ],
+    "text": "המשיק למעגל O בנקודה A חותך את מעגל P בנקודה D",
+    "winner": "tangentMeetsOtherCircle",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "lineMeetsCircle",
+    ],
+    "text": "AC extended meets circle P at E",
+    "winner": "extendOntoCircle",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "lineMeetsCircle",
+    ],
+    "text": "המשך AC חותך את מעגל P בנקודה E",
+    "winner": "extendOntoCircle",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "tangentLine",
+    ],
+    "text": "circle O and circle P are tangent at M",
+    "winner": "circlesTangent",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "tangentLine",
+    ],
+    "text": "מעגל O ומעגל P משיקים זה לזה בנקודה M",
+    "winner": "circlesTangent",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "tangentLine",
+    ],
+    "text": "circle O and circle P are tangent internally at M",
+    "winner": "circlesTangent",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "tangentLine",
+    ],
+    "text": "מעגל O ומעגל P משיקים מבפנים בנקודה M",
+    "winner": "circlesTangent",
+  },
+]
+`;
+
+exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utterance is stable 1`] = `
+[
+  {
+    "lang": "en",
+    "text": "triangle ABC",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "משולש ABC",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "text": "right triangle ABC",
+    "winner": "rightTriangle",
+  },
+  {
+    "lang": "he",
+    "text": "משולש ישר-זווית ABC",
+    "winner": "rightTriangle",
+  },
+  {
+    "lang": "en",
+    "text": "square ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "ריבוע ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "text": "rectangle ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "מלבן ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "text": "rhombus ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "מעוין ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "text": "parallelogram ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "מקבילית ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "text": "trapezoid ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "טרפז ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "text": "quadrilateral ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "מרובע ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "text": "kite ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "דלתון ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "text": "isosceles triangle ABC",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "משולש שווה שוקיים ABC",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "text": "equilateral triangle ABC",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "משולש שווה צלעות ABC",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "text": "isosceles trapezoid ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "טרפז שווה שוקיים ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "text": "right trapezoid ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "he",
+    "text": "טרפז ישר-זווית ABCD",
+    "winner": "(anon)",
+  },
+  {
+    "lang": "en",
+    "text": "regular pentagon ABCDE",
+    "winner": "regularPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "מחומש משוכלל ABCDE",
+    "winner": "regularPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "point A at (0,0)",
+    "winner": "freePoint",
+  },
+  {
+    "lang": "he",
+    "text": "נקודה A ב-(0,0)",
+    "winner": "freePoint",
+  },
+  {
+    "lang": "en",
+    "text": "point E on AC at 40%",
+    "winner": "pointOnSegment",
+  },
+  {
+    "lang": "he",
+    "text": "נקודה E על AC ב-40%",
+    "winner": "pointOnSegment",
+  },
+  {
+    "lang": "en",
+    "text": "points F, G, H on AB, AC, CB",
+    "winner": "pointsOnSegments",
+  },
+  {
+    "lang": "he",
+    "text": "נקודות F, G, H על AB, AC, CB",
+    "winner": "pointsOnSegments",
+  },
+  {
+    "lang": "en",
+    "text": "C is 5 from A and 5 from B",
+    "winner": "pointByDistances",
+  },
+  {
+    "lang": "he",
+    "text": "C במרחק 5 מ-A ו-5 מ-B",
+    "winner": "pointByDistances",
+  },
+  {
+    "lang": "en",
+    "text": "M is the intersection of AC and BD",
+    "winner": "lineLineIntersection",
+  },
+  {
+    "lang": "he",
+    "text": "M חיתוך AC ו-BD",
+    "winner": "lineLineIntersection",
+  },
+  {
+    "lang": "en",
+    "text": "M is the midpoint of AB",
+    "winner": "midpoint",
+  },
+  {
+    "lang": "he",
+    "text": "M אמצע AB",
+    "winner": "midpoint",
+  },
+  {
+    "lang": "en",
+    "text": "point F on the extension of AD",
+    "winner": "pointOnExtension",
+  },
+  {
+    "lang": "he",
+    "text": "נקודה F על המשך AD",
+    "winner": "pointOnExtension",
+  },
+  {
+    "lang": "en",
+    "text": "segment AC",
+    "winner": "segment",
+  },
+  {
+    "lang": "he",
+    "text": "קטע AC",
+    "winner": "segment",
+  },
+  {
+    "lang": "en",
+    "text": "BC parallel to AD",
+    "winner": "parallelConstraint",
+  },
+  {
+    "lang": "he",
+    "text": "BC מקביל ל-AD",
+    "winner": "parallelConstraint",
+  },
+  {
+    "lang": "en",
+    "text": "F is the foot of the perpendicular from C to AD",
+    "winner": "foot",
+  },
+  {
+    "lang": "he",
+    "text": "F רגל האנך מ-C ל-AD",
+    "winner": "foot",
+  },
+  {
+    "lang": "en",
+    "text": "E is where the bisectors of BAC and BCA meet",
+    "winner": "bisectorIntersection",
+  },
+  {
+    "lang": "he",
+    "text": "E חיתוך חוצי הזוויות BAC ו-BCA",
+    "winner": "bisectorIntersection",
+  },
+  {
+    "lang": "en",
+    "text": "bisector of angle ABC",
+    "winner": "bisectorLine",
+  },
+  {
+    "lang": "he",
+    "text": "חוצה זווית ABC",
+    "winner": "bisectorLine",
+  },
+  {
+    "lang": "en",
+    "text": "line through P perpendicular to AB",
+    "winner": "perpendicularLine",
+  },
+  {
+    "lang": "he",
+    "text": "ישר דרך P מאונך ל-AB",
+    "winner": "perpendicularLine",
+  },
+  {
+    "lang": "en",
+    "text": "line through P parallel to AB",
+    "winner": "parallelLine",
+  },
+  {
+    "lang": "he",
+    "text": "ישר דרך P מקביל ל-AB",
+    "winner": "parallelLine",
+  },
+  {
+    "lang": "en",
+    "text": "E on line AC",
+    "winner": "collinearConstraint",
+  },
+  {
+    "lang": "he",
+    "text": "E על הישר AC",
+    "winner": "collinearConstraint",
+  },
+  {
+    "lang": "en",
+    "text": "line ABE",
+    "winner": "collinearConstraint",
+  },
+  {
+    "lang": "he",
+    "text": "ישר ABE",
+    "winner": "collinearConstraint",
+  },
+  {
+    "lang": "en",
+    "text": "median from A in ABC",
+    "winner": "median",
+  },
+  {
+    "lang": "he",
+    "text": "תיכון מ-A במשולש ABC",
+    "winner": "median",
+  },
+  {
+    "lang": "en",
+    "text": "AD median to BC",
+    "winner": "median",
+  },
+  {
+    "lang": "he",
+    "text": "AD תיכון לצלע BC",
+    "winner": "median",
+  },
+  {
+    "lang": "en",
+    "text": "height from A in ABC",
+    "winner": "altitude",
+  },
+  {
+    "lang": "he",
+    "text": "גובה מ-A במשולש ABC",
+    "winner": "altitude",
+  },
+  {
+    "lang": "en",
+    "text": "perpendicular bisector of AB",
+    "winner": "perpBisector",
+  },
+  {
+    "lang": "he",
+    "text": "אנך אמצעי ל-AB",
+    "winner": "perpBisector",
+  },
+  {
+    "lang": "en",
+    "text": "midsegment to BC in triangle ABC",
+    "winner": "midsegment",
+  },
+  {
+    "lang": "he",
+    "text": "קטע האמצעים לצלע BC במשולש ABC",
+    "winner": "midsegment",
+  },
+  {
+    "lang": "en",
+    "text": "AD bisects angle BAC",
+    "winner": "bisectorPlacesPoint",
+  },
+  {
+    "lang": "he",
+    "text": "AD חוצה את הזווית BAC",
+    "winner": "bisectorPlacesPoint",
+  },
+  {
+    "lang": "en",
+    "text": "angle GBA = 37",
+    "winner": "angle",
+  },
+  {
+    "lang": "he",
+    "text": "זווית GBA = 37",
+    "winner": "angle",
+  },
+  {
+    "lang": "en",
+    "text": "arc DE = 2 arc CE in circle O",
+    "winner": "arcEquality",
+  },
+  {
+    "lang": "he",
+    "text": "קשת DE = 2 קשת CE במעגל O",
+    "winner": "arcEquality",
+  },
+  {
+    "lang": "en",
+    "text": "S_{ABC} = 13",
+    "winner": "area",
+  },
+  {
+    "lang": "he",
+    "text": "שטח המשולש ABC הוא 13",
+    "winner": "area",
+  },
+  {
+    "lang": "en",
+    "text": "S_{ABC}/S_{DEF} = 3/4",
+    "winner": "area",
+  },
+  {
+    "lang": "he",
+    "text": "שטח ABF גדול פי 2 משטח BFE",
+    "winner": "area",
+  },
+  {
+    "lang": "en",
+    "text": "S_{ABC} = S",
+    "winner": "area",
+  },
+  {
+    "lang": "he",
+    "text": "נסמן את שטח ABCD ב-S",
+    "winner": "area",
+  },
+  {
+    "lang": "en",
+    "text": "AB = 6",
+    "winner": "distanceConstraint",
+  },
+  {
+    "lang": "he",
+    "text": "AB = 6",
+    "winner": "distanceConstraint",
+  },
+  {
+    "lang": "en",
+    "text": "AB = CD",
+    "winner": "equalSegments",
+  },
+  {
+    "lang": "he",
+    "text": "AB = CD",
+    "winner": "equalSegments",
+  },
+  {
+    "lang": "en",
+    "text": "AB = 2 AD",
+    "winner": "ratioConstraint",
+  },
+  {
+    "lang": "he",
+    "text": "AB = 2 AD",
+    "winner": "ratioConstraint",
+  },
+  {
+    "lang": "en",
+    "text": "AB perpendicular to CD",
+    "winner": "perpendicularConstraint",
+  },
+  {
+    "lang": "he",
+    "text": "AB מאונך ל-CD",
+    "winner": "perpendicularConstraint",
+  },
+  {
+    "lang": "en",
+    "text": "△ABC ≅ △DEF",
+    "winner": "congruence",
+  },
+  {
+    "lang": "he",
+    "text": "△ABC ≅ △DEF",
+    "winner": "congruence",
+  },
+  {
+    "lang": "en",
+    "text": "△ABC ~ △DEF",
+    "winner": "similarity",
+  },
+  {
+    "lang": "he",
+    "text": "△ABC ~ △DEF",
+    "winner": "similarity",
+  },
+  {
+    "lang": "en",
+    "text": "AB = 3x",
+    "winner": "measureLength",
+  },
+  {
+    "lang": "he",
+    "text": "AB = 3x",
+    "winner": "measureLength",
+  },
+  {
+    "lang": "en",
+    "text": "AD = 12√x",
+    "winner": "measureSqrt",
+  },
+  {
+    "lang": "he",
+    "text": "AD = 12√x",
+    "winner": "measureSqrt",
+  },
+  {
+    "lang": "en",
+    "text": "AB = x²",
+    "winner": "measurePower",
+  },
+  {
+    "lang": "he",
+    "text": "AB = x²",
+    "winner": "measurePower",
+  },
+  {
+    "lang": "en",
+    "text": "angle ABC = 2α",
+    "winner": "measureAngle",
+  },
+  {
+    "lang": "he",
+    "text": "זווית ABC = 2α",
+    "winner": "measureAngle",
+  },
+  {
+    "lang": "en",
+    "text": "α < β",
+    "winner": "measureOrder",
+  },
+  {
+    "lang": "he",
+    "text": "α < β",
+    "winner": "measureOrder",
+  },
+  {
+    "lang": "en",
+    "text": "angle ABC is obtuse",
+    "winner": "angleAcuteness",
+  },
+  {
+    "lang": "he",
+    "text": "זווית ABC קהה",
+    "winner": "angleAcuteness",
+  },
+  {
+    "lang": "en",
+    "text": "circle centered at O radius 5",
+    "winner": "setRadius",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל סביב O רדיוס 5",
+    "winner": "setRadius",
+  },
+  {
+    "lang": "en",
+    "text": "A is on circle O",
+    "winner": "pointOnCircle",
+  },
+  {
+    "lang": "he",
+    "text": "A על מעגל O",
+    "winner": "pointOnCircle",
+  },
+  {
+    "lang": "en",
+    "text": "O is the centre of the circle",
+    "winner": "nameCenter",
+  },
+  {
+    "lang": "he",
+    "text": "O מרכז המעגל",
+    "winner": "nameCenter",
+  },
+  {
+    "lang": "en",
+    "text": "triangle ABC inscribed in circle O",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "משולש ABC חסום במעגל O",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "right triangle ABC inscribed in a circle",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "משולש ישר-זווית ABC חסום במעגל",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "circle through A B C",
+    "winner": "circumcircle",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל חוסם את ABC",
+    "winner": "circumcircle",
+  },
+  {
+    "lang": "en",
+    "text": "the circle through A B C cuts CE at D",
+    "winner": "circumcircleMeetsSegment",
+  },
+  {
+    "lang": "he",
+    "text": "המעגל החוסם את משולש ABC חותך את CE בנקודה D",
+    "winner": "circumcircleMeetsSegment",
+  },
+  {
+    "lang": "en",
+    "text": "circle inscribed in triangle ABC",
+    "winner": "incircle",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל חסום במשולש ABC",
+    "winner": "incircle",
+  },
+  {
+    "lang": "en",
+    "text": "triangle DEF circumscribes the circle",
+    "winner": "incircle",
+  },
+  {
+    "lang": "he",
+    "text": "משולש DEF חוסם את המעגל",
+    "winner": "incircle",
+  },
+  {
+    "lang": "en",
+    "text": "circle inscribed in trapezoid ABCD",
+    "winner": "incircle",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל חסום בטרפז ABCD",
+    "winner": "incircle",
+  },
+  {
+    "lang": "en",
+    "text": "the tangent at A and the tangent at C to circle O meet at D",
+    "winner": "twoTangentsMeet",
+  },
+  {
+    "lang": "he",
+    "text": "המשיק בנקודה A והמשיק בנקודה C למעגל O נפגשים בנקודה D",
+    "winner": "twoTangentsMeet",
+  },
+  {
+    "lang": "en",
+    "text": "AB and AD are tangent to circle O at E and K",
+    "winner": "cornerTangentCircle",
+  },
+  {
+    "lang": "he",
+    "text": "AB ו-AD משיקים למעגל O בנקודות E ו-K",
+    "winner": "cornerTangentCircle",
+  },
+  {
+    "lang": "en",
+    "text": "trapezoid ABCD inscribed in a circle",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "טרפז ABCD חסום במעגל",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "cyclic quadrilateral ABCD",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "מרובע ABCD בר חסימה",
+    "winner": "inscribedPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "semicircle with diameter AB",
+    "winner": "semicircle",
+  },
+  {
+    "lang": "he",
+    "text": "חצי מעגל שקוטרו AB",
+    "winner": "semicircle",
+  },
+  {
+    "lang": "en",
+    "text": "quarter circle",
+    "winner": "quarterCircle",
+  },
+  {
+    "lang": "he",
+    "text": "רבע מעגל",
+    "winner": "quarterCircle",
+  },
+  {
+    "lang": "en",
+    "text": "chord AB in circle O",
+    "winner": "chord",
+  },
+  {
+    "lang": "he",
+    "text": "מיתר AB במעגל O",
+    "winner": "chord",
+  },
+  {
+    "lang": "en",
+    "text": "from a point E outside circle O a line cuts the circle at A and B",
+    "winner": "secantFromExternal",
+  },
+  {
+    "lang": "he",
+    "text": "מנקודה E מחוץ למעגל O ישר חותך את המעגל בנקודות A ו-B",
+    "winner": "secantFromExternal",
+  },
+  {
+    "lang": "en",
+    "text": "the line AO cuts circle O at C and D",
+    "winner": "lineCutsCircleTwice",
+  },
+  {
+    "lang": "he",
+    "text": "הישר AO חותך את מעגל O בנקודות C ו-D",
+    "winner": "lineCutsCircleTwice",
+  },
+  {
+    "lang": "en",
+    "text": "from point E outside circle O two tangents touch the circle at A and B",
+    "winner": "tangentsFromExternal",
+  },
+  {
+    "lang": "he",
+    "text": "מנקודה E מחוץ למעגל O שני משיקים נוגעים במעגל בנקודות A ו-B",
+    "winner": "tangentsFromExternal",
+  },
+  {
+    "lang": "en",
+    "text": "from point E a tangent touches circle O at D",
+    "winner": "tangentLine",
+  },
+  {
+    "lang": "he",
+    "text": "מנקודה E משיק נוגע במעגל O בנקודה D",
+    "winner": "tangentLine",
+  },
+  {
+    "lang": "en",
+    "text": "diameter AB in circle O",
+    "winner": "diameter",
+  },
+  {
+    "lang": "he",
+    "text": "קוטר AB במעגל O",
+    "winner": "diameter",
+  },
+  {
+    "lang": "en",
+    "text": "the diameter of circle O from F cuts side AC at E",
+    "winner": "diameterCutsSegment",
+  },
+  {
+    "lang": "he",
+    "text": "קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E",
+    "winner": "diameterCutsSegment",
+  },
+  {
+    "lang": "en",
+    "text": "M is the midpoint of arc BC in circle O",
+    "winner": "arcMidpoint",
+  },
+  {
+    "lang": "he",
+    "text": "M אמצע הקשת BC במעגל O",
+    "winner": "arcMidpoint",
+  },
+  {
+    "lang": "en",
+    "text": "tangent to circle O at A",
+    "winner": "tangentLine",
+  },
+  {
+    "lang": "he",
+    "text": "משיק למעגל O בנקודה A",
+    "winner": "tangentLine",
+  },
+  {
+    "lang": "en",
+    "text": "E is the intersection of the tangent to circle O at A and BC",
+    "winner": "tangentLineIntersection",
+  },
+  {
+    "lang": "he",
+    "text": "E חיתוך המשיק למעגל O בנקודה A עם BC",
+    "winner": "tangentLineIntersection",
+  },
+  {
+    "lang": "en",
+    "text": "G is the intersection of circle O and circle P",
+    "winner": "circleCircleIntersection",
+  },
+  {
+    "lang": "he",
+    "text": "G חיתוך מעגל O ומעגל P",
+    "winner": "circleCircleIntersection",
+  },
+  {
+    "lang": "en",
+    "text": "two circles intersect at A and B",
+    "winner": "twoCirclesMeet",
+  },
+  {
+    "lang": "he",
+    "text": "שני מעגלים נחתכים בנקודות A ו-B",
+    "winner": "twoCirclesMeet",
+  },
+  {
+    "lang": "en",
+    "text": "the tangent to circle O at A meets circle P at D",
+    "winner": "tangentMeetsOtherCircle",
+  },
+  {
+    "lang": "he",
+    "text": "המשיק למעגל O בנקודה A חותך את מעגל P בנקודה D",
+    "winner": "tangentMeetsOtherCircle",
+  },
+  {
+    "lang": "en",
+    "text": "AC extended meets circle P at E",
+    "winner": "extendOntoCircle",
+  },
+  {
+    "lang": "he",
+    "text": "המשך AC חותך את מעגל P בנקודה E",
+    "winner": "extendOntoCircle",
+  },
+  {
+    "lang": "en",
+    "text": "line AC meets circle P at E",
+    "winner": "lineMeetsCircle",
+  },
+  {
+    "lang": "he",
+    "text": "הישר AC פוגש את מעגל P בנקודה E",
+    "winner": "lineMeetsCircle",
+  },
+  {
+    "lang": "en",
+    "text": "circle O and circle P are tangent at M",
+    "winner": "circlesTangent",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל O ומעגל P משיקים זה לזה בנקודה M",
+    "winner": "circlesTangent",
+  },
+  {
+    "lang": "en",
+    "text": "circle O and circle P are tangent internally at M",
+    "winner": "circlesTangent",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל O ומעגל P משיקים מבפנים בנקודה M",
+    "winner": "circlesTangent",
+  },
+]
+`;
+
+exports[`parser shadow-matrix — known shadow-prone probes (Phase C tracking) > current behaviour of each probe is pinned (flip as Phase C lands) 1`] = `
+[
+  {
+    "note": "PAR-1: chord swallows the "= 6" tail (length lost)",
+    "shadowedBy": [
+      "distanceConstraint",
+    ],
+    "text": "chord AB = 6",
+    "winner": "chord",
+    "winnerKind": "array",
+  },
+  {
+    "note": "PAR-1: equality + second chord lost",
+    "shadowedBy": [],
+    "text": "chord AB = chord CD",
+    "winner": "chord",
+    "winnerKind": "array",
+  },
+  {
+    "note": "PAR-1: diameter swallows the "= 10" tail",
+    "shadowedBy": [
+      "distanceConstraint",
+    ],
+    "text": "קוטר AB = 10",
+    "winner": "diameter",
+    "winnerKind": "array",
+  },
+  {
+    "note": "PAR-2: two comma-joined givens → only one kept",
+    "shadowedBy": [],
+    "text": "AB = 4, BC = 6",
+    "winner": "distanceConstraint",
+    "winnerKind": "array",
+  },
+  {
+    "note": "PAR-2: two angles → only the first",
+    "shadowedBy": [
+      "chainedEquality",
+    ],
+    "text": "זווית ABC = 40, זווית DEF = 60",
+    "winner": "angle",
+    "winnerKind": "array",
+  },
+  {
+    "note": "PAR-3: plural מאונכים matches no ⟂ keyword; membership dropped",
+    "shadowedBy": [],
+    "text": "המיתרים AB ו-CD מאונכים זה לזה",
+    "winner": "chord",
+    "winnerKind": "array",
+  },
+  {
+    "note": "PAR-4: diameter membership (set-collinear A,O,B) dropped",
+    "shadowedBy": [
+      "diameter",
+      "chord",
+    ],
+    "text": "הקוטר AB מאונך למיתר CD",
+    "winner": "perpendicularConstraint",
+    "winnerKind": "array",
+  },
+  {
+    "note": "PAR-5: על\\b dead guard; D dropped",
+    "shadowedBy": [],
+    "text": "נקודה D על הרדיוס OB",
+    "winner": "radiusSegment",
+    "winnerKind": "array",
+  },
+  {
+    "note": "PAR-5: קוטר not a CARRIER_NOUN; E dropped",
+    "shadowedBy": [],
+    "text": "E על הקוטר AB",
+    "winner": "diameter",
+    "winnerKind": "array",
+  },
+  {
+    "note": "PAR-6: S-leading polygon → phantom area-ratio",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "שטח מרובע SABC הוא 20",
+    "winner": "area",
+    "winnerKind": "array",
+  },
+  {
+    "note": "PAR-7: maqaf ־ breaks the ratio suffix",
+    "shadowedBy": [],
+    "text": "נקודה E על AC ב־40%",
+    "winner": "pointOnSegment",
+    "winnerKind": "array",
+  },
+  {
+    "note": "PAR-8: plural "segments" → segment steals it",
+    "shadowedBy": [
+      "pointsOnSegments",
+    ],
+    "text": "points F, G, H on segments AB, AC, CB",
+    "winner": "segment",
+    "winnerKind": "array",
+  },
+]
+`;

@@ -42,6 +42,8 @@ export default defineConfig(({ command }) => ({
     // archive/ holds the old implementation for reference only — never run or typecheck its tests.
     // _node_modules_dropbox_old/ is a parked copy of node_modules (Dropbox-cloud-managed; node_modules
     // now lives outside Dropbox via a junction) — exclude its stray third-party tests from collection.
-    exclude: ['**/node_modules/**', '**/_node_modules_dropbox_old/**', '**/dist/**', 'archive/**'],
+    // `**/*.tmp.*` — editors write atomic-save temp files (e.g. `foo.test.ts.tmp.28712.<hash>`) into the
+    // tree; exclude them so a stray copy is never collected as a duplicate test (hardening plan A6).
+    exclude: ['**/node_modules/**', '**/_node_modules_dropbox_old/**', '**/dist/**', 'archive/**', '**/*.tmp.*'],
   },
 }));

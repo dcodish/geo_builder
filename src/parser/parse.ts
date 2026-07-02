@@ -3547,7 +3547,12 @@ const compoundSuchThat: Rule = (s, ctx) => {
 
 // Order matters: the most specific keyword-anchored rules run first; the
 // coordinate rule (freePoint) is last because it's the loosest.
-const RULES: Rule[] = [
+//
+// EXPORTED for the shadow-matrix guard test only ([docs/15-hardening-plan.md](../../docs/15-hardening-plan.md)
+// A1 / PAR-11): the test runs EVERY rule against a corpus (not stopping at the first match) to detect a
+// later, more-specific rule whose output diverges from the earlier winner's — the first-match-wins
+// shadowing class behind ADR-119/077/166. Not part of the runtime API; `parse()` is the only entry point.
+export const RULES: Rule[] = [
   compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
   setRadius, // "radius of circle P is 4" — set an EXISTING circle's radius; before `circle` (creation) and the shape rules (which 'stop' on רדיוס)
   congruence, // "ABC ≅ DEF" — before the shape rules ("triangle ABC ≅ …" contains "triangle")
@@ -3764,8 +3769,18 @@ function withChordMembership(commands: AnyCommand[], s: string, ctx: ParseContex
   return [...endpoints.map((id): AnyCommand => ({ type: 'point-on-circle', id, circle: circ })), ...commands];
 }
 
+/**
+ * The single normalization applied to every utterance before the rules run — collapse whitespace, spell
+ * out Greek letter words, and rewrite `S_{ABC}`/`S_ABC` area subscripts. Extracted so the shadow-matrix
+ * guard (A1) analyses the SAME text the rules actually see, and so future boundary normalizations (PAR-7:
+ * maqaf `־`→`-`, strip bidi controls) land in ONE place rather than per-rule. Pure.
+ */
+export function normalizeUtterance(raw: string): string {
+  return normalizeAreaSubscript(normalizeGreek(raw.trim().replace(/\s+/g, ' ')));
+}
+
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
-  const s = normalizeAreaSubscript(normalizeGreek(raw.trim().replace(/\s+/g, ' ')));
+  const s = normalizeUtterance(raw);
   if (!s) return { ok: false, reason: 'not-handled' };
   for (const rule of RULES) {
     const res = rule(s, ctx);

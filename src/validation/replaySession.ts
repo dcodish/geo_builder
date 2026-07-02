@@ -25,10 +25,9 @@
  * Pure + deterministic (no I/O). The ingest side (`eventsToSessions`) lives in `sessionsFromLog.ts`.
  */
 
-import { parse, droppedNewLabels } from '@/parser';
+import { parse, droppedNewLabels, buildParseCtx } from '@/parser';
 import { replay, dryRunOutcome, hasDeferrableConstraint, introducedIds, firstSatisfyingSeed } from '@/store/geoStore';
 import type { Fact, Derived } from '@/store/geoStore';
-import { isGeoPoint, circleMembers, pointNeighbors } from '@/engine';
 import type { AnyCommand, Id } from '@/engine';
 
 export type StepCategory = 'ok' | 'ok-amber' | 'deferred' | 'empty' | 'coverage-gap' | 'edit';
@@ -54,17 +53,11 @@ export interface SessionReport {
   totals: Record<StepCategory, number>;
 }
 
-/** The figure context the app feeds the parser (mirrors `App.parseCtx` / scenarios `ctxOf`), derived
- *  from an already-computed figure so the caller reuses one `replay` for both context and `before`. */
+/** The figure context the app feeds the parser — the shared builder (ADR-171), so the triage harness
+ *  can't drift from production. (This mirror was previously missing `parallels`, misclassifying every
+ *  trapezoid-altitude utterance as a coverage gap — the drift bug the shared builder fixes.) */
 function ctxFrom(before: Derived) {
-  const { construction } = before;
-  return {
-    circles: construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [o.center] : [])),
-    points: construction.objects.filter(isGeoPoint).map((o) => o.id),
-    circleMembers: circleMembers(construction),
-    neighbors: pointNeighbors(construction),
-    lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])),
-  };
+  return buildParseCtx(before.construction, before.positions);
 }
 
 /** Replace label `from`→`to` everywhere in a fact's command + utterance (token-aware, for rename/swap). */

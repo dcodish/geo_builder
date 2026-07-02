@@ -12,8 +12,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
-import { circleMembers, firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, parallelEdgePairs, pointNeighbors, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels, classifyOutOfScope } from '@/parser';
+import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels, classifyOutOfScope, buildParseCtx } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -226,17 +226,10 @@ export default function App() {
   // which path produced the commands.
   // Figure context for the parser: the circles' centres (resolve "the circle") and
   // the existing point ids (inscribing an existing triangle becomes its circumcircle).
-  const parseCtx = () => ({
-    // Exclude pure SCAFFOLDING circles (a tangent's Thales aux), marked by a `~`-prefixed centre — the
-    // student never references them, so they must not make "the circle" / "chord CE" ambiguous. A real
-    // but un-drawn circle (a cyclic quad's `בר חסימה`, with a real circumcentre) IS referenced, so it stays.
-    circles: construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [o.center] : [])),
-    points: construction.objects.filter(isGeoPoint).map((o) => o.id),
-    circleMembers: circleMembers(construction), // so "arc BC" resolves to the circle holding both B and C
-    neighbors: pointNeighbors(construction), // so a single-vertex angle ("∠C קהה/חדה") finds its two arms
-    parallels: parallelEdgePairs(construction, positions), // so "height from C" drops to a trapezoid's opposite base (ADR-169)
-    lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // so a construct reuses itself on re-entry (idempotency)
-  });
+  // The shared figure→parser context builder (single source of truth — App, scenarios, and the triage
+  // harness all use it; the copies had drifted, ADR-171). Excludes ~scaffolding circles; supplies the
+  // circle-members / neighbours / parallels / lines hints the grammar consumes.
+  const parseCtx = () => buildParseCtx(construction, positions);
 
   // After a step commits, VERIFY the figure meets every requirement; if not, auto-search alternative
   // configurations (seeds + branches) for one that does (ADR-106). The search is synchronous and can be
