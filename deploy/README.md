@@ -43,7 +43,7 @@ aggregates.
    # vars are read only by this proxy process; pick long random values for the salts.
    cat > /var/www/geo-proxy/geo-proxy.env <<'EOF'
    ANTHROPIC_API_KEY=sk-ant-...
-   LLM_DAILY_MAX=1000          # hard cap on Haiku calls/day (cost backstop, SEC-2); tune to taste
+   LLM_DAILY_MAX=500           # hard cap on Haiku calls/day (cost backstop, SEC-2, ~$1.25/day worst-case); tune to taste
    IP_HASH_SALT=<long-random-string>
    EVENTS_LOG_PATH=/var/www/geo-proxy/events.jsonl
    EVENTS_RETENTION_DAYS=90    # drop usage events older than this (privacy, SEC-7); unset = keep forever
@@ -114,10 +114,12 @@ ssh root@themathbible.com 'systemctl restart geo-proxy'
   set `TRUSTED_PROXY_HOPS` in `geo-proxy.env` to the number of trusted proxies so the real
   client is still picked; the default (1) is correct for the plain Apache→loopback setup.
 - Logs: `journalctl -u geo-proxy -f`.
-- **Global cost ceiling (SEC-2):** `LLM_DAILY_MAX` caps total Haiku calls per UTC day (default 1000); past
-  it, `/api/parse` returns a distinct 429 and the SPA shows "service busy" (never "couldn't understand").
-  Track how often it's hit: `journalctl -u geo-proxy | grep 'daily limit'` (real users are not expected to
-  reach it — a hit usually means a bot). Raise/lower the number in `geo-proxy.env` and restart the service.
+- **Global cost ceiling (SEC-2):** `LLM_DAILY_MAX` caps total Haiku calls per UTC day (default 500,
+  ~$1.25/day worst-case at ~$0.0025/call); past it, `/api/parse` returns a distinct 429 and the SPA shows
+  "service busy" (never "couldn't understand"). Track how often it's hit: `journalctl -u geo-proxy | grep
+  'daily limit'` (real users are not expected to reach it — a hit usually means a bot). Raise/lower the
+  number in `geo-proxy.env` and restart the service. **Also set an Anthropic Console spend limit + keep the
+  account on prepaid credit** — that's the absolute backstop (this counter is in-process and resets on restart).
 - No `npm install` on the server — the SDK is bundled into `proxy.mjs`.
 - **Usage events** accumulate in `events.jsonl`; the service self-rotates it past
   50 MB (keeps one `events.jsonl.1`). IPs are stored only as a salted hash (`iph`).

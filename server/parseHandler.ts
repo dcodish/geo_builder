@@ -29,7 +29,8 @@ const rateLimited = makeRateLimiter(MAX_PER_WINDOW, WINDOW_MS);
 // over time, so a bot flooding the proxy with random input could still run up the prepaid credit. This is
 // the hard cost backstop — a cap on TOTAL calls per UTC day, in-process (a restart resets it; acceptable
 // for a cost guard). Real users are not expected to reach it. `LLM_DAILY_MAX` (read per-request so it's
-// tunable without a rebuild) defaults to 1000/day ≈ a dollar or two of Haiku worst-case.
+// tunable without a rebuild) defaults to 500/day ≈ ~$1.25 of Haiku worst-case (~$0.0025/call). The
+// Anthropic Console spend limit + prepaid credit is the absolute backstop (this counter resets on restart).
 let dayKey = '';
 let dayCount = 0;
 
@@ -78,9 +79,9 @@ export async function handleParse(
   // Global daily ceiling — checked after validation (junk never burns quota) and before the SDK call.
   // When hit, a DISTINCT 429 `daily-limit` (the client shows "service busy", not "couldn't understand")
   // and a log line so the operator can see how often it happens: `journalctl -u geo-proxy | grep 'daily limit'`.
-  // `|| 1000` would treat a configured 0 as unset (0 is falsy) — parse explicitly so 0 can hard-disable.
+  // `|| 500` would treat a configured 0 as unset (0 is falsy) — parse explicitly so 0 can hard-disable.
   const rawMax = process.env.LLM_DAILY_MAX;
-  const dailyMax = rawMax && Number.isFinite(Number(rawMax)) ? Number(rawMax) : 1000;
+  const dailyMax = rawMax && Number.isFinite(Number(rawMax)) ? Number(rawMax) : 500;
   const today = new Date().toISOString().slice(0, 10); // UTC day
   if (today !== dayKey) {
     dayKey = today;
