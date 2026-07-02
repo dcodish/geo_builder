@@ -1112,17 +1112,28 @@ const AREA_SHAPE = String.raw`(?:ה?(?:משולש|מרובע|דלתון|עפיפ
  *  / `area [of] [the] [<shape>] ABC`. Returns each polygon's vertex ids with the marker's string position. */
 function areaReferences(s: string): { ids: Id[]; at: number }[] {
   const refs: { ids: Id[]; at: number }[] = [];
-  const seen = new Set<number>();
+  const seen = new Set<number>(); // string positions of verbose-polygon FIRST vertices — the compact S-scan must skip them (PAR-6)
   // verbose marker: שטח / area, then optional filler + shape word, then the 3–4 vertex labels.
   const reKw = /שטח|\barea\b/gi;
   let m: RegExpExecArray | null;
   while ((m = reKw.exec(s)) !== null) {
-    const after = s.slice(m.index + m[0].length).replace(new RegExp(String.raw`^(?:\s+(?:of|the|של|ה))*\s*${AREA_SHAPE}?\s*`, 'i'), '');
+    const kwEnd = m.index + m[0].length;
+    const raw = s.slice(kwEnd);
+    const after = raw.replace(new RegExp(String.raw`^(?:\s+(?:of|the|של|ה))*\s*${AREA_SHAPE}?\s*`, 'i'), '');
+    const labelStart = kwEnd + (raw.length - after.length); // where the vertex run begins in `s`
     // Read ONLY the leading vertex run (the labels right after the shape word) — never scan ahead, or a later
     // filler word ("area", "of") would be read as labels (the word "area" → A,R,E,A bug).
     const lead = after.match(/^((?:[A-Za-z]\d*\s*){3,4})/);
     const ids = lead ? (labelRun(lead[1], 4) ?? labelRun(lead[1], 3)) : null;
-    if (ids) refs.push({ ids, at: m.index });
+    if (ids) {
+      refs.push({ ids, at: m.index });
+      // A verbose polygon whose FIRST vertex is "S" (e.g. "שטח מרובע SABC") would be re-read by the compact
+      // S-scan below as marker-S + polygon "ABC" — a phantom second ref that turns a lone area into a bogus
+      // area-RATIO. Record the first vertex's position so the compact scan skips it (the dead `seen` set, now
+      // populated — PAR-6). Only matters when the polygon actually starts with S; otherwise the compact scan
+      // finds no S there anyway.
+      if (up(ids[0]) === 'S') seen.add(labelStart);
+    }
   }
   // compact S-notation: S immediately followed by 3–4 uppercase vertex labels (SABC / SABCD).
   // `(?<![A-Za-z])` (not `\b`) so a COEFFICIENT glued to the marker is allowed — "4SNCE" (the ratio

@@ -337,7 +337,7 @@ Dependency notes: PAR-11 (shadow matrix) should land before Phase C. TST-1 (seed
 | C5 / PAR-5 | C | על guard + CARRIER_NOUN (diameter/radius) | MED | 2 h | ADR-185 | ✅ |
 | C6 / PAR-2 | C | Multi-statement splitter | HIGH | ½ d | ADR-186 | ✅ |
 | C7 / PAR-8 | C | Plural carrier nouns | MED | 2 h | ADR-187 | ✅ |
-| C8 / PAR-6 | C | Area-ref dedupe | MED | 1 h | | ☐ |
+| C8 / PAR-6 | C | Area-ref dedupe (S-leading polygon) | MED | 1 h | ADR-188 | ✅ |
 | C9 / PAR-9 | C | Structured-id rename/swap | MED | ½ d | | ☐ |
 | C10 / PAR-10+TST-3 | C | LLM contract tests | L-M | ½ d | | ☐ |
 | D1 / ENG-1 | D | dependsOn reuses pointParents | — | 2 h | | ☐ |

@@ -2669,3 +2669,15 @@ A reproduction (rectangle `ABCD`; equilateral `BCE`,`DAF` inward; `EC ∩ DF = G
 **Why this is the root fix, not a patch.** The defect was a singular-only guard, not a single utterance — pluralising the shared `CARRIER_NOUN` fixes the guard for every rule that consults it (`segment`, `chord`, `SEG_NOUN` in all three point-on rules) at once, rather than hoisting one rule or special-casing "segments". Chose the guard fix over re-ordering `pointsOnSegments` above `segment` so the semantic invariant ("a point-ON-carrier phrasing is not a carrier definition") is expressed where it belongs.
 
 **Consequences / tests.** [plural-carrier.test.ts](../src/parser/__tests__/plural-carrier.test.ts) (7, he+en, plural + singular no-regression incl. the final-nun `האלכסון`); end-to-end scenario `plural-segment-noun-points-on-sides`. Shadow-matrix probe flipped `segment`→`pointsOnSegments` (snapshot updated). **Full suite: 1743 passed / 2 skipped; `tsc -b` clean.**
+
+## ADR-188 — area-reference dedupe for an S-leading polygon (hardening plan C8 / PAR-6)
+
+**Status:** Accepted (2026-07-02)
+
+**Context.** `areaReferences` collects every "area of a polygon" reference — verbose (`שטח [ה<shape>] ABC` / `area of ABC`) and compact (`SABC`). A `seen` Set was declared to let the compact scan skip positions the verbose scan already claimed, but it was never populated. So a verbose polygon whose FIRST vertex is "S" was re-read by the compact scan as marker-S + polygon "ABC": `שטח מרובע SABC הוא 20` produced TWO refs — `[S,A,B,C]` (correct) and a phantom `[A,B,C]` — which the downstream logic turned into a bogus `set-area-ratio {SABC : ABC = 20}` that drove the solver into nonsense. "S" is in the auto-label pools, so a student hits this without ever choosing S.
+
+**Decision.** Populate `seen` with the string position of a verbose polygon's FIRST vertex when it is "S", so the compact scan's existing `!seen.has(m.index)` guard skips the phantom. Scoped to a first vertex of "S" (the only letter the compact marker can be), so non-S verbose polygons and genuine compact refs are untouched.
+
+**Why this is the root fix, not a patch.** It activates the dedup mechanism the function was already designed around (the dead `seen` Set) at the exact overlap it was meant to cover, rather than special-casing the `שטח … SABC` string — a genuine two-ref ratio (`SABC = 4 SNCE`), a compact area (`SABC = 20`, S = marker), and a verbose non-S area (`שטח מרובע ABCD`) all keep working because each has a distinct, non-overlapping marker position.
+
+**Consequences / tests.** [area-sabc.test.ts](../src/parser/__tests__/area-sabc.test.ts) (5): the S-leading verbose forms give a single `measure-area [S,A,B,C]` (no ratio); compact `SABC`, verbose `ABCD`, and the two-ref ratio `SABC = 4 SNCE` are unchanged. No shadow-matrix change (a helper, not a rule). **Full suite: 1749 passed / 2 skipped; `tsc -b` clean.**
