@@ -812,13 +812,27 @@ function renameSegStyle(style: Record<Id, { hidden?: boolean; dashed?: boolean }
   return Object.fromEntries(Object.entries(style).map(([k, v]) => [renameSegKey(k, from, to), v]));
 }
 
-/** Rewrite one point letter to another across a single command (exact-match on the single-letter id). */
+/**
+ * Rewrite every WHOLE point label `from`→`to` inside a string — a bare point id ("O"), OR a label EMBEDDED
+ * in a structured id ("circle-O", "bis-XOY", "line-O1O2", "tan-O", "sec-EO", "par-T-AB", "chord-AB"). A
+ * label is `[A-Z]\d*`, so guard the match: not preceded by a letter (so it's the START of a label, never
+ * mid-label) and not followed by a digit (so plain "O" ≠ the "O" of "O1"). Structured-id prefixes are
+ * lowercase + "-", so their letters are never matched. (PAR-9: `renameInCommand`'s old exact-field match
+ * left `circle-O`/`bis-…`/etc. stale under a rename — a hidden circle popped back, deterministic-id
+ * idempotency broke into duplicate constructions.)
+ */
+function relabelId(v: string, from: Id, to: Id): string {
+  return v.replace(new RegExp(String.raw`(?<![A-Za-z])${from}(?!\d)`, 'g'), to);
+}
+
+/** Rewrite one point letter to another across a single command — bare point fields AND the letters embedded
+ *  in structured ids (`circle-O`, `bis-XYZ`, …), via {@link relabelId}. The `expr` measure text is skipped. */
 function renameInCommand(cmd: AnyCommand, from: Id, to: Id): AnyCommand {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(cmd)) {
     if (k === 'expr') out[k] = v; // a measure expr holds a variable/text, not point ids — never rewrite
-    else if (typeof v === 'string') out[k] = v === from ? to : v;
-    else if (Array.isArray(v)) out[k] = v.map((e) => (e === from ? to : e));
+    else if (typeof v === 'string') out[k] = relabelId(v, from, to);
+    else if (Array.isArray(v)) out[k] = v.map((e) => (typeof e === 'string' ? relabelId(e, from, to) : e));
     else out[k] = v;
   }
   return out as AnyCommand;
