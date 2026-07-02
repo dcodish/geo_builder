@@ -2493,4 +2493,16 @@ A reproduction (rectangle `ABCD`; equilateral `BCE`,`DAF` inward; `EC ∩ DF = G
 
 **Decision.** A pinning test ([verify-tolerance.test.ts](../src/engine/__tests__/verify-tolerance.test.ts)): build a verified on-circle figure, then assert the boundary — a point displaced by HALF the tolerance stays green, one displaced by TWICE it is flagged. Widening the ladder makes the 2×-displaced case stop flagging → the test fails, forcing an explicit, reviewed change. (This pins the CURRENT ladder; whether to TIGHTEN the verifier toward the solver's tolerance is a separate future decision — the pin makes any such change deliberate.)
 
-**Consequences / tests.** Test-only; no behaviour change. **3 tests green; `tsc -b` clean.** (A5 replay-count perf canary and A6 scenario-doc parity are deferred: A5 pairs with the E-phase store replay-memoization source change; A6-parity needs the scenario doc synced first, ~26 entries behind — both tracked in [15-hardening-plan.md](15-hardening-plan.md).)
+**Consequences / tests.** Test-only; no behaviour change. **3 tests green; `tsc -b` clean.** (A5 replay-count perf canary is deferred to pair with the E-phase store replay-memoization source change; A6 scenario-doc parity is now done — see ADR-174.)
+
+## ADR-174 — Scenario-doc parity guard + backfill the drifted index (hardening plan A6 / TST-7)
+
+**Status:** Accepted (2026-07-02)
+
+**Context.** The repo's standing rule makes [docs/test-scenarios.md](../docs/test-scenarios.md) the operator's human-readable regression audit trail — one entry per end-to-end scenario. The review found it had **drifted 34 scenarios behind** the code (`SCENARIOS` in [scenarios.test.ts](../src/__tests__/scenarios.test.ts)): those tests ran and passed, but weren't indexed, so the audit trail under-reported coverage. Nothing enforced parity.
+
+**Decision.** (1) BACKFILL the 34 missing entries — generated faithfully from each scenario's own `title`/`steps`/`guards` (a throwaway generator, then removed), appended under a dated "Backfilled" note so the newest-first ordering of existing entries is preserved. (2) Add a permanent parity test: every `SCENARIOS` id must appear as a backticked token in the doc, else CI fails with the missing ids. The id regex is `[A-Za-z0-9-]+` (some ids embed uppercase point labels, e.g. `two-circles-meet-at-A-and-B` — a lowercase-only regex silently missed them, a bug the test caught on itself during development).
+
+**Why this is the root fix, not a patch.** Backfilling alone would re-drift on the next scenario. The parity guard makes the standing rule *enforced* rather than relying on discipline — the index can no longer fall behind the code without a red test.
+
+**Consequences / tests.** Doc grows by 34 entries (98 → 132 `###`); one new test; `SCENARIOS`/`factsOf`/`Step`/`Scenario` exported (test-only). No source/behaviour change. **Parity test green (0 unindexed ids); `tsc -b` clean.**
