@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Geo Builder — The Algorithms</title>
+
+<!-- Self-describing layout metadata (harmless for standalone; used if ever imported) -->
+<meta name="hz:slide-selector" content=".slide" />
+<meta name="hz:canvas-width" content="1920" />
+<meta name="hz:canvas-height" content="1080" />
+
+<!-- Adobe Fonts: IBM Plex Sans + IBM Plex Mono (degrades to the system stacks below when offline) -->
+<link rel="stylesheet" href="https://use.typekit.net/awe6fja.css" />
+
+<style>
+  :root{
+    --ink:#1E2127; --muted:#6A7280; --faint:#9AA0AA;
+    --line:#D9DBE0; --hair:#EBECEF;
+    --bg:#F4F4F1; --panel:#FFFFFF;
+    --accent:#3D4CB0;                    /* structure / arrows / kickers */
+    --free:#D1495B;                       /* 2 DOF  */
+    --onobj:#E0891E;                      /* 1 DOF  */
+    --derived:#1F9E8F;                    /* 0 DOF  */
+    --constraint:#7A4FBF;                 /* constraints */
+    --sans:"ibm-plex-sans","Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+    --mono:"ibm-plex-mono","Cascadia Code",Consolas,"Courier New",monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    background:#191b20; color:var(--ink);
+    font-family:var(--sans); overflow:hidden;
+  }
+
+  /* ---- deck shell (letterboxed, scaled to viewport) ---- */
+  .stage{
+    position:absolute; top:50%; left:50%;
+    width:1920px; height:1080px;
+    transform-origin:center center;
+  }
+  .slide{
+    position:absolute; inset:0;
+    background:var(--bg);
+    display:none;
+    overflow:hidden;
+  }
+  .slide.active{display:block}
+
+  /* ---- shared slide chrome ---- */
+  .chrome{position:absolute; top:70px; left:110px; right:110px}
+  .kicker{
+    font-family:var(--mono); font-weight:600; font-size:19px;
+    letter-spacing:2.5px; color:var(--accent); text-transform:uppercase;
+  }
+  .title{
+    margin-top:14px; font-weight:600; font-size:44px; line-height:1.12;
+    color:var(--ink); max-width:1500px;
+  }
+  .title.small{font-size:38px}
+  .bar{margin-top:20px; width:84px; height:4px; background:var(--accent); border-radius:3px}
+  .foot{
+    position:absolute; left:110px; right:110px; bottom:44px;
+    display:flex; justify-content:space-between; align-items:center;
+    font-family:var(--mono); font-size:16px; color:var(--faint);
+    border-top:1px solid var(--hair); padding-top:16px;
+  }
+  .foot .wm{color:var(--muted); letter-spacing:1px}
+  .content{position:absolute; top:238px; left:110px; right:110px; bottom:110px}
+
+  /* ---- legend ---- */
+  .legend{display:flex; gap:34px; flex-wrap:wrap; align-items:center;
+    font-size:20px; color:var(--muted)}
+  .legend .lg{display:flex; align-items:center; gap:11px}
+  .legend i{width:20px; height:20px; border-radius:50%; display:inline-block}
+  .legend i.sq{border-radius:5px}
+
+  /* ---- generic svg text classes ---- */
+  svg .bx{fill:var(--panel); stroke:var(--line); stroke-width:2}
+  svg .bx-a{fill:#F2F3FB; stroke:var(--accent); stroke-width:2}
+  svg .bx-c{fill:#F4EFFB; stroke:var(--constraint); stroke-width:2}
+  svg .bx-d{fill:#EDF8F6; stroke:var(--derived); stroke-width:2}
+  svg .btitle{font-family:var(--sans); font-weight:600; font-size:25px; fill:var(--ink)}
+  svg .bsub{font-family:var(--sans); font-weight:400; font-size:17px; fill:var(--muted)}
+  svg .tag{font-family:var(--mono); font-weight:600; font-size:14.5px; fill:var(--accent);
+    letter-spacing:1.5px}
+  svg .mono{font-family:var(--mono); font-weight:500; font-size:18px; fill:var(--derived)}
+  svg .flow{stroke:var(--accent); stroke-width:2.5; fill:none}
+  svg .flow-d{stroke:var(--accent); stroke-width:2.2; fill:none; stroke-dasharray:7 7}
+  svg .side{stroke:#B9BEC8; stroke-width:2; fill:none}
+  svg .ref{stroke:var(--constraint); stroke-width:1.6; fill:none; stroke-dasharray:4 5; opacity:.8}
+  svg .nlbl{font-family:var(--sans); font-weight:600; font-size:30px; fill:#fff}
+  svg .ncap{font-family:var(--mono); font-weight:500; font-size:15px; fill:var(--muted)}
+  svg .n-free{fill:var(--free)} svg .n-onobj{fill:var(--onobj)}
+  svg .n-derived{fill:var(--derived)} svg .n-constraint{fill:var(--constraint)}
+
+  /* ---- pseudocode ---- */
+  .cols{display:flex; gap:52px; height:100%}
+  .cols .code-wrap{flex:1.35; min-width:0}
+  .cols .notes{flex:1; min-width:0}
+  .lead{font-size:23px; line-height:1.5; color:var(--muted); margin-bottom:26px; max-width:1500px}
+  .lead b{color:var(--ink); font-weight:600}
+  ol.code{
+    list-style:none; counter-reset:ln; margin:0;
+    font-family:var(--mono); font-weight:500; font-size:22px; line-height:1.72;
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:26px 30px 26px 12px;
+  }
+  ol.code li{
+    counter-increment:ln; position:relative; padding-left:60px;
+    white-space:pre; color:#2B2F3A;
+  }
+  ol.code li::before{
+    content:counter(ln); position:absolute; left:0; width:42px;
+    text-align:right; color:#C2C5CE; font-size:15px; padding-top:2px;
+  }
+  .kw{color:var(--accent); font-weight:600}
+  .cm{color:var(--faint); font-style:italic}
+  .fn{color:var(--constraint); font-weight:600}
+  .lit{color:var(--derived)}
+  .notes h3{font-size:22px; font-weight:600; margin:0 0 6px}
+  .note{
+    background:var(--panel); border:1px solid var(--line); border-left:5px solid var(--accent);
+    border-radius:12px; padding:20px 24px; margin-bottom:20px;
+  }
+  .note.free{border-left-color:var(--free)}
+  .note.onobj{border-left-color:var(--onobj)}
+  .note.der{border-left-color:var(--derived)}
+  .note.con{border-left-color:var(--constraint)}
+  .note p{font-size:20px; line-height:1.5; color:var(--muted)}
+  .note p b{color:var(--ink); font-weight:600}
+  .note .mn{font-family:var(--mono); font-size:18px; color:var(--constraint)}
+
+  /* ---- ledger table ---- */
+  table.ledger{width:100%; border-collapse:collapse; font-size:22px; background:var(--panel);
+    border:1px solid var(--line); border-radius:14px; overflow:hidden}
+  table.ledger th, table.ledger td{padding:22px 26px; text-align:left; border-bottom:1px solid var(--hair)}
+  table.ledger thead th{background:#EEF0F7; color:var(--accent); font-weight:600; font-size:18px;
+    letter-spacing:.5px; text-transform:uppercase}
+  table.ledger tbody tr:last-child td{border-bottom:none}
+  table.ledger td.utt{font-family:var(--mono); font-size:20px; color:var(--ink)}
+  table.ledger td.num{font-family:var(--mono); font-weight:600; text-align:center; font-size:23px}
+  table.ledger .final td{background:#EDF8F6}
+  .pill{display:inline-block; padding:3px 12px; border-radius:20px; font-size:16px; font-weight:600; color:#fff}
+  .pill.free{background:var(--free)} .pill.on{background:var(--onobj)}
+  .pill.der{background:var(--derived)} .pill.con{background:var(--constraint)}
+  .determined{color:var(--derived); font-weight:600}
+
+  /* ---- title & closing ---- */
+  .hero{position:absolute; top:0; left:110px; right:110px; bottom:0; display:flex; flex-direction:column; justify-content:center}
+  .hero .ey{font-family:var(--mono); font-size:22px; letter-spacing:3px; color:var(--accent); text-transform:uppercase}
+  .hero h1{font-size:88px; font-weight:600; line-height:1.05; margin:26px 0 0; max-width:1350px}
+  .hero h1 .lite{font-weight:300; color:var(--muted)}
+  .hero .sub{font-size:30px; color:var(--muted); margin-top:34px; max-width:1150px; line-height:1.45}
+  .hero .meta{margin-top:64px; font-family:var(--mono); font-size:20px; color:var(--faint); line-height:1.8}
+  .hero .meta b{color:var(--ink); font-weight:600}
+
+  .takeaways{display:flex; flex-direction:column; gap:26px; margin-top:6px}
+  .tk{display:flex; gap:24px; align-items:flex-start}
+  .tk .no{font-family:var(--mono); font-weight:600; font-size:26px; color:var(--accent);
+    border:2px solid var(--accent); border-radius:10px; min-width:52px; height:52px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0}
+  .tk .tx{font-size:27px; line-height:1.45}
+  .tk .tx b{font-weight:600}
+  .tk .tx span{color:var(--muted); font-size:23px}
+  .statline{margin-top:52px; display:flex; gap:56px; flex-wrap:wrap}
+  .stat .v{font-family:var(--mono); font-weight:600; font-size:42px; color:var(--derived)}
+  .stat .k{font-size:19px; color:var(--muted); margin-top:2px}
+
+  /* ---- controls (outside slide roots) ---- */
+  .controls{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    display:flex; align-items:center; gap:14px; z-index:50;
+    background:rgba(25,27,32,.72); backdrop-filter:blur(4px);
+    padding:8px 14px; border-radius:40px; color:#cfd2da;
+    font-family:var(--mono); font-size:15px;
+  }
+  .controls button{
+    width:38px; height:38px; border-radius:50%; border:1px solid #444a56;
+    background:#23262e; color:#e5e7ec; font-size:20px; cursor:pointer; line-height:1;
+  }
+  .controls button:hover{background:#2e323c}
+  .controls #counter{min-width:74px; text-align:center; letter-spacing:1px}
+  .hint{position:fixed; bottom:26px; right:24px; z-index:50; color:#6b7280;
+    font-family:var(--mono); font-size:13px}
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+
+  <!-- ============================ 1 · TITLE ============================ -->
+  <section class="slide active">
+    <div class="hero">
+      <div class="ey">Constructive Geometry Engine</div>
+      <h1>Geo&nbsp;Builder<br><span class="lite">the algorithms</span></h1>
+      <div class="sub">From a natural-language description to an interactive figure that
+        <b style="color:var(--ink)">builds up one constraint at a time</b> — and adapts, branches, and stays stable as the student adds more.</div>
+      <div class="meta">
+        A degrees-of-freedom dependency model &nbsp;·&nbsp; a constraint interpreter &nbsp;·&nbsp; model enumeration<br>
+        <b>David Codish</b> &nbsp;—&nbsp; IE&amp;M, Ben-Gurion University of the Negev
+      </div>
+    </div>
+    <!-- faint DAG motif -->
+    <svg width="520" height="520" viewBox="0 0 520 520" style="position:absolute; right:60px; bottom:40px; opacity:.10">
+      <line x1="130" y1="120" x2="380" y2="120" class="side"/>
+      <line x1="130" y1="120" x2="130" y2="360" class="side"/>
+      <line x1="380" y1="120" x2="380" y2="360" class="side"/>
+      <line x1="130" y1="360" x2="380" y2="360" class="side"/>
+      <line x1="130" y1="240" x2="380" y2="120" class="side"/>
+      <circle cx="130" cy="120" r="30" class="n-free"/>
+      <circle cx="380" cy="120" r="30" class="n-free"/>
+      <circle cx="130" cy="360" r="30" class="n-derived"/>
+      <circle cx="380" cy="360" r="30" class="n-derived"/>
+      <circle cx="130" cy="240" r="24" class="n-onobj"/>
+    </svg>
+  </section>
+
+  <!-- ============================ 2 · PROBLEM / CONTRIBUTION ============================ -->
+  <section class="slide">
+    <div class="chrome">
+      <div class="kicker">The idea · 02</div>
+      <h2 class="title">Why a dependency-graph engine — and what falls out of it</h2>
+      <div class="bar"></div>
+    </div>
+    <div class="content">
+      <div style="display:flex; gap:56px; height:100%">
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:30px">
+          <div class="note free" style="border-left-width:6px">
+            <h3 style="font-size:24px; margin-bottom:8px; color:var(--free)">The dead end</h3>
+            <p style="font-size:22px">A <b>shape-template matcher</b> recognises whole figures ("this is a square"). It cannot represent a
+              <b>free point</b>, a <b>point sliding on an object</b>, <b>accumulating constraints</b>, or <b>alternative configurations</b> — so incremental building is impossible.</p>
+          </div>
+          <div class="note der" style="border-left-width:6px">
+            <h3 style="font-size:24px; margin-bottom:8px; color:var(--derived)">The move</h3>
+            <p style="font-size:22px">Every object is <b>defined in terms of earlier objects</b> and classified by its
+              <b>degrees of freedom</b>. A figure is a <b>dependency DAG</b> evaluated in topological order into coordinates.</p>
+          </div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:22px">
+          <p style="font-size:22px; color:var(--muted); line-height:1.5">Two headline behaviours are not features we bolted on — they are
+            <b style="color:var(--ink)">consequences of the representation</b>:</p>
+          <div class="note con">
+            <p><b>Alternatives.</b> An intersection has 0/1/2 solutions; a <span class="mn">branch index</span> picks one; "show another" enumerates the next — <b>model enumeration</b>, for free.</p>
+          </div>
+          <div class="note">
+            <p><b>Stability.</b> DOF parameters and branch indices <b>persist across steps</b>, so adding a constraint re-evaluates downstream objects without perturbing earlier choices — the figure never jumps.</p>
+          </div>
+          <div class="note der">
+            <p><b>Over-constraint is general.</b> If a step can't be satisfied, flag it, keep the prior figure, and explain — no per-shape special cases.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span class="wm">Geo Builder — the algorithms</span><span>2</span></div>
+  </section>
+
+  <!-- ============================ 3 · PIPELINE (FIG 1) ============================ -->
+  <section class="slide">
+    <div class="chrome">
+      <div class="kicker">Architecture · 03</div>
+      <h2 class="title">A compiler front-end feeding a constraint interpreter</h2>
+      <div class="bar"></div>
+    </div>
+    <div class="content">
+      <svg width="1700" height="760" viewBox="0 0 1700 760" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arw1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#3D4CB0"/>
+          </marker>
+        </defs>
+
+        <!-- running example ribbon -->
+        <text x="0" y="34" class="tag">running example</text>
+        <text x="185" y="36" class="mono" style="fill:var(--ink)">«ריבוע ABCD»</text>
+        <text x="360" y="36" class="ncap">→ parse →</text>
+        <text x="470" y="36" class="mono">square(A,B,C,D)</text>
+        <text x="700" y="36" class="ncap">→ evaluate →</text>
+        <text x="835" y="36" class="mono" style="fill:var(--constraint)">A(0,0) B(4,0) C(4,4) D(0,4)</text>
+        <text x="1230" y="36" class="ncap">→ render →</text>
+        <rect x="1360" y="16" width="26" height="26" fill="none" stroke="var(--ink)" stroke-width="2"/>
+
+        <!-- main pipeline row (boxes y 150..320) -->
+        <!-- Box 1 utterance -->
+        <rect x="0" y="150" width="280" height="170" rx="14" class="bx"/>
+        <text x="140" y="205" text-anchor="middle" class="btitle">Utterance</text>
+        <text x="140" y="238" text-anchor="middle" class="bsub">natural language</text>
+        <text x="140" y="262" text-anchor="middle" class="bsub">Hebrew / English</text>
+        <rect x="60" y="278" width="160" height="30" rx="8" fill="#F4F4F1"/>
+        <text x="140" y="299" text-anchor="middle" class="mono" style="font-size:15px; fill:var(--ink)">free-form text</text>
+
+        <!-- Box 2 front-end -->
+        <rect x="360" y="150" width="280" height="170" rx="14" class="bx-a"/>
+        <text x="500" y="192" text-anchor="middle" class="btitle">Front-end</text>
+        <rect x="386" y="210" width="228" height="42" rx="9" fill="#fff" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="500" y="237" text-anchor="middle" class="bsub" style="fill:var(--ink); font-weight:500">grammar parser · offline</text>
+        <rect x="386" y="260" width="228" height="42" rx="9" fill="#fff" stroke="var(--constraint)" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <text x="500" y="287" text-anchor="middle" class="bsub" style="fill:var(--constraint); font-weight:500">LLM desugarer ⤳ canonical</text>
+
+        <!-- Box 3 IR -->
+        <rect x="720" y="150" width="280" height="170" rx="14" class="bx"/>
+        <text x="860" y="205" text-anchor="middle" class="btitle">Command[ ]</text>
+        <text x="860" y="238" text-anchor="middle" class="bsub">the IR — a flat</text>
+        <text x="860" y="262" text-anchor="middle" class="bsub">instruction stream</text>
+        <rect x="770" y="278" width="180" height="30" rx="8" fill="#EDF8F6"/>
+        <text x="860" y="299" text-anchor="middle" class="mono" style="font-size:14px">point-on-segment…</text>
+
+        <!-- Box 4 interpreter -->
+        <rect x="1070" y="150" width="280" height="170" rx="14" class="bx-d"/>
+        <text x="1210" y="198" text-anchor="middle" class="btitle">Interpreter</text>
+        <text x="1210" y="230" text-anchor="middle" class="bsub">topological eval</text>
+        <text x="1210" y="254" text-anchor="middle" class="bsub">+ fixed-point sweep</text>
+        <text x="1210" y="286" text-anchor="middle" class="bsub" style="fill:var(--constraint); font-weight:500">solver: drive-or-check</text>
+
+        <!-- Box 5 renderer -->
+        <rect x="1420" y="150" width="280" height="170" rx="14" class="bx"/>
+        <text x="1560" y="205" text-anchor="middle" class="btitle">Renderer</text>
+        <text x="1560" y="238" text-anchor="middle" class="bsub">scene → SVG</text>
+        <text x="1560" y="262" text-anchor="middle" class="bsub">retargetable back-end</text>
+
+        <!-- arrows between boxes -->
+        <line x1="284" y1="235" x2="356" y2="235" class="flow" marker-end="url(#arw1)"/>
+        <line x1="644" y1="235" x2="716" y2="235" class="flow" marker-end="url(#arw1)"/>
+        <line x1="1004" y1="235" x2="1066" y2="235" class="flow" marker-end="url(#arw1)"/>
+        <line x1="1354" y1="235" x2="1416" y2="235" class="flow" marker-end="url(#arw1)"/>
+
+        <!-- phase tags under boxes -->
+        <text x="500" y="352" text-anchor="middle" class="tag">LEX · PARSE</text>
+        <text x="860" y="352" text-anchor="middle" class="tag">IR</text>
+        <text x="1210" y="352" text-anchor="middle" class="tag">EVALUATE · SOLVE</text>
+        <text x="1560" y="352" text-anchor="middle" class="tag">CODEGEN</text>
+
+        <!-- driver bar -->
+        <rect x="0" y="470" width="1700" height="150" rx="16" fill="#F7F7FB" stroke="var(--accent)" stroke-width="2" stroke-dasharray="2 0"/>
+        <text x="34" y="524" class="tag">DRIVER · INCREMENTAL REBUILD</text>
+        <text x="34" y="566" class="btitle">Store — event-sourced replay</text>
+        <text x="34" y="600" class="bsub">the ordered fact list is the source program · <tspan style="fill:var(--ink)">replay</tspan> recompiles it on every edit · positions are never stored, so state and coordinates can’t drift apart</text>
+
+        <!-- loop arrow: driver up into interpreter -->
+        <path d="M1210 470 C 1210 430, 1210 400, 1210 324" class="flow-d" marker-end="url(#arw1)"/>
+        <text x="1230" y="430" class="ncap">re-evaluate</text>
+        <!-- edit arrow: renderer/interaction down into driver -->
+        <path d="M1560 324 C 1560 400, 1560 430, 1560 470" class="flow-d" marker-end="url(#arw1)"/>
+        <text x="1435" y="430" class="ncap" style="text-anchor:end">student edits</text>
+
+        <!-- bottom principle line -->
+        <text x="0" y="690" class="bsub" style="font-size:20px">
+          <tspan style="fill:var(--ink); font-weight:600">The one rule:</tspan>
+          keep the phase boundaries clean — the parser never sees coordinates; the engine never knows which parser produced its Command[ ]; the renderer never reaches back in.</text>
+        <text x="0" y="722" class="bsub" style="font-size:20px; fill:var(--constraint)">
+          …and two divergences make it more than a compiler → <tspan style="font-weight:600">a solver lives inside</tspan>, and output is deliberately <tspan style="font-weight:600">one model from a space of valid models</tspan>.</text>
+      </svg>
+    </div>
+    <div class="foot"><span class="wm">Geo Builder — the algorithms</span><span>3</span></div>
+  </section>
+
+  <!-- ============================ 4 · DOF DAG (FIG 2, HERO) ============================ -->
+  <section class="slide">
+    <div class="chrome">
+      <div class="kicker">The representation · 04</div>
+      <h2 class="title small">The DOF-classified dependency graph — one worked example</h2>
+      <div class="bar"></div>
+    </div>
+    <div class="content">
+      <div class="legend" style="margin-bottom:6px">
+        <span class="lg"><i style="background:var(--free)"></i>free point · 2 DOF</span>
+        <span class="lg"><i style="background:var(--onobj)"></i>on-object · 1 DOF (a parameter t)</span>
+        <span class="lg"><i style="background:var(--derived)"></i>derived · 0 DOF</span>
+        <span class="lg"><i class="sq" style="background:var(--constraint)"></i>constraint</span>
+      </div>
+
+      <svg width="1700" height="660" viewBox="0 0 1700 660" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arw2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#7A4FBF"/>
+          </marker>
+          <marker id="dep2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#B9BEC8"/>
+          </marker>
+        </defs>
+
+        <!-- ===== dependency graph (left) ===== -->
+        <text x="0" y="24" class="tag">DEPENDENCY GRAPH</text>
+
+        <!-- square sides (thin) -->
+        <line x1="200" y1="150" x2="560" y2="150" class="side" marker-end="url(#dep2)"/><!-- A->B base direction -->
+        <line x1="560" y1="150" x2="560" y2="450" class="side" marker-end="url(#dep2)"/><!-- B->C -->
+        <line x1="200" y1="150" x2="200" y2="450" class="side"/><!-- A..D left edge (carries G) -->
+        <line x1="200" y1="450" x2="560" y2="450" class="side"/><!-- D-C top -->
+        <!-- dependency of D on A and B -->
+        <path d="M232 176 C 300 300, 250 380, 210 418" class="side" marker-end="url(#dep2)"/>
+        <text x="392" y="312" text-anchor="middle" class="ncap" style="fill:var(--derived)">square rule</text>
+
+        <!-- nodes -->
+        <circle cx="200" cy="150" r="40" class="n-free"/><text x="200" y="160" text-anchor="middle" class="nlbl">A</text>
+        <circle cx="560" cy="150" r="40" class="n-free"/><text x="560" y="160" text-anchor="middle" class="nlbl">B</text>
+        <circle cx="200" cy="450" r="40" class="n-derived"/><text x="200" y="460" text-anchor="middle" class="nlbl">D</text>
+        <circle cx="560" cy="450" r="40" class="n-derived"/><text x="560" y="460" text-anchor="middle" class="nlbl">C</text>
+        <!-- G on the A-D edge -->
+        <circle cx="200" cy="300" r="33" class="n-onobj"/><text x="200" y="309" text-anchor="middle" class="nlbl" style="font-size:26px">G</text>
+
+        <!-- node captions -->
+        <text x="200" y="96" text-anchor="middle" class="ncap">free · 2 DOF</text>
+        <text x="560" y="96" text-anchor="middle" class="ncap">free · 2 DOF</text>
+        <text x="200" y="510" text-anchor="middle" class="ncap">derived · 0</text>
+        <text x="560" y="510" text-anchor="middle" class="ncap">derived · 0</text>
+        <text x="118" y="270" text-anchor="end" class="ncap" style="fill:var(--onobj)">on AD</text>
+        <text x="118" y="292" text-anchor="end" class="ncap" style="fill:var(--onobj)">t ∈ [0,1]</text>
+        <text x="118" y="314" text-anchor="end" class="ncap" style="fill:var(--onobj)">1 DOF</text>
+
+        <!-- constraint node -->
+        <rect x="720" y="238" width="290" height="128" rx="16" class="bx-c"/>
+        <text x="742" y="278" class="tag" style="fill:var(--constraint)">CONSTRAINT</text>
+        <text x="742" y="316" class="btitle" style="fill:var(--constraint)">∠GBA = 37°</text>
+        <text x="742" y="348" class="bsub">refs: A · B · G</text>
+
+        <!-- drives arrow to G -->
+        <path d="M720 302 C 520 302, 420 302, 236 300" class="flow" style="stroke:var(--constraint)" marker-end="url(#arw2)"/>
+        <text x="470" y="286" text-anchor="middle" class="ncap" style="fill:var(--constraint); font-weight:600">drives t</text>
+
+        <!-- explanation under constraint -->
+        <text x="720" y="418" class="bsub" style="font-size:19px">a free DOF is present (G’s t) →</text>
+        <text x="720" y="446" class="bsub" style="font-size:19px; fill:var(--ink); font-weight:500">solve t so the angle holds.</text>
+        <text x="720" y="474" class="bsub" style="font-size:19px">no free DOF → it becomes a pure <tspan style="fill:var(--derived); font-weight:600">check</tspan>.</text>
+
+        <!-- ===== the figure it builds (right) ===== -->
+        <text x="1180" y="24" class="tag">THE FIGURE IT BUILDS</text>
+        <g>
+          <!-- square A(bl) B(br) C(tr) D(tl); side 340 -->
+          <line x1="1220" y1="500" x2="1560" y2="500" stroke="#3a3f4a" stroke-width="3"/><!-- AB -->
+          <line x1="1560" y1="500" x2="1560" y2="160" stroke="#3a3f4a" stroke-width="3"/><!-- BC -->
+          <line x1="1560" y1="160" x2="1220" y2="160" stroke="#3a3f4a" stroke-width="3"/><!-- CD -->
+          <line x1="1220" y1="160" x2="1220" y2="500" stroke="#3a3f4a" stroke-width="3"/><!-- DA -->
+          <!-- G on DA, ~0.45 from A upward: A(1220,500) D(1220,160) -> G y=500-0.45*340=347 -->
+          <line x1="1560" y1="500" x2="1220" y2="347" stroke="var(--constraint)" stroke-width="3"/><!-- BG -->
+          <!-- angle arc at B between BA (left) and BG -->
+          <path d="M1500 500 A 60 60 0 0 0 1517 460" fill="none" stroke="var(--constraint)" stroke-width="2.5"/>
+          <text x="1486" y="470" class="mono" style="font-size:17px; fill:var(--constraint)">37°</text>
+          <!-- vertices -->
+          <circle cx="1220" cy="500" r="12" class="n-free"/><text x="1206" y="534" text-anchor="middle" class="ncap" style="font-size:20px; fill:var(--ink)">A</text>
+          <circle cx="1560" cy="500" r="12" class="n-free"/><text x="1576" y="534" text-anchor="middle" class="ncap" style="font-size:20px; fill:var(--ink)">B</text>
+          <circle cx="1560" cy="160" r="12" class="n-derived"/><text x="1580" y="156" text-anchor="middle" class="ncap" style="font-size:20px; fill:var(--ink)">C</text>
+          <circle cx="1220" cy="160" r="12" class="n-derived"/><text x="1204" y="156" text-anchor="middle" class="ncap" style="font-size:20px; fill:var(--ink)">D</text>
+          <circle cx="1220" cy="347" r="11" class="n-onobj"/><text x="1198" y="353" text-anchor="middle" class="ncap" style="font-size:20px; fill:var(--onobj)">G</text>
+          <text x="1390" y="600" text-anchor="middle" class="ncap" style="font-size:18px">G slides along AD until ∠GBA = 37°</text>
+        </g>
+      </svg>
+    </div>
+    <div class="foot"><span class="wm">Geo Builder — the algorithms</span><span>4</span></div>
+  </section>
+
+  <!-- ============================ 5 · DOF LEDGER (FIG 3) ============================ -->
+  <section class="slide">
+    <div class="chrome">
+      <div class="kicker">The representation · 05</div>
+      <h2 class="title small">Watching the degrees of freedom fall — the same example, as a ledger</h2>
+      <div class="bar"></div>
+    </div>
+    <div class="content">
+      <table class="ledger">
+        <thead>
+          <tr>
+            <th style="width:26%">Utterance</th>
+            <th style="width:34%">What it adds to the graph</th>
+            <th style="width:14%; text-align:center">DOF Δ</th>
+            <th style="width:13%; text-align:center">raw DOF</th>
+            <th style="width:13%; text-align:center">shape DOF</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="utt">square ABCD</td>
+            <td>A, B <span class="pill free">free</span> · C, D <span class="pill der">derived</span></td>
+            <td class="num" style="color:var(--free)">+4</td>
+            <td class="num">4</td>
+            <td class="num">0</td>
+          </tr>
+          <tr>
+            <td class="utt">point G on AD</td>
+            <td>G <span class="pill on">on-segment</span> — one parameter <span style="font-family:var(--mono)">t</span></td>
+            <td class="num" style="color:var(--onobj)">+1</td>
+            <td class="num">5</td>
+            <td class="num">1</td>
+          </tr>
+          <tr class="final">
+            <td class="utt">∠GBA = 37°</td>
+            <td><span class="pill con">constraint</span> drives <span style="font-family:var(--mono)">t</span> → removes the free DOF</td>
+            <td class="num" style="color:var(--constraint)">−1</td>
+            <td class="num">4</td>
+            <td class="num determined">0&nbsp;✓</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="display:flex; gap:40px; margin-top:34px">
+        <div class="note der" style="flex:1">
+          <p><b>Two counts, one truth.</b> <b>Raw DOF</b> counts every movable parameter. <b>Shape DOF</b> quotients out the
+            <span class="mn">similarity gauge</span> — the 4 free choices of <b>placement</b> (2 translate + 1 rotate + 1 scale) that don't change the shape.</p>
+        </div>
+        <div class="note" style="flex:1">
+          <p>That's why the figure ends at <b>raw 4 = the gauge</b>, i.e. <b class="determined">shape DOF 0</b>: rigid up to where you put it and how big it is. This is exactly when the UI reports <b>"✓ fully determined"</b>.</p>
+        </div>
+        <div class="note onobj" style="flex:1">
+          <p><b>No fixed assumptions.</b> Every unstated magnitude stays a <b>free DOF</b> — never a silent default. "Show another configuration" resamples them; a later given may pin them.</p>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span class="wm">Geo Builder — the algorithms</span><span>5</span></div>
+  </section>
+
+  <!-- ============================ 6 · ALG 1 EVALUATE ============================ -->
+  <section class="slide">
+    <div class="chrome">
+      <div class="kicker">Algorithm 1 · 06</div>
+      <h2 class="title small">Evaluate — topological order with an interleaved fixed-point sweep</h2>
+      <div class="bar"></div>
+    </div>
+    <div class="content">
+      <div class="cols">
+        <div class="code-wrap">
+          <ol class="code">
+<li><span class="kw">function</span> <span class="fn">Evaluate</span>(commands) → positions</li>
+<li>  G     ← <span class="fn">buildDependencyGraph</span>(commands)   <span class="cm"># points, lines, circles, constraints</span></li>
+<li>  order ← <span class="fn">topologicalSort</span>(G)            <span class="cm"># parents before children</span></li>
+<li>  positions ← { }</li>
+<li>  <span class="kw">repeat</span>                                <span class="cm"># interleaved fixed point</span></li>
+<li>    changed ← <span class="lit">false</span></li>
+<li>    <span class="kw">for</span> node <span class="kw">in</span> order:</li>
+<li>      <span class="kw">if</span>   node <span class="kw">is</span> Circle <span class="kw">or</span> Line:  <span class="fn">resolve</span>(node)</li>
+<li>      <span class="kw">elif</span> node <span class="kw">is</span> DerivedPoint:  positions[node] ←</li>
+<li>            <span class="fn">f</span>(parents, branchIndex[node])   <span class="cm"># the 0/1/2-solution pick</span></li>
+<li>      <span class="kw">elif</span> node <span class="kw">is</span> Constraint:    <span class="fn">DriveOrCheck</span>(node)</li>
+<li>      changed ← changed <span class="kw">or</span> <span class="fn">updated</span>(node)</li>
+<li>  <span class="kw">until</span> <span class="kw">not</span> changed <span class="kw">or</span> iters &gt; MAX</li>
+<li>  <span class="kw">if</span> unresolved: <span class="fn">flag</span>(<span class="lit">OVER-CONSTRAINED</span> / <span class="lit">COINCIDENT</span>)</li>
+<li>  <span class="kw">return</span> positions</li>
+          </ol>
+        </div>
+        <div class="notes">
+          <div class="note">
+            <h3>Why a fixed point, not one pass?</h3>
+            <p>A line can depend on a point that depends on a circle that depends on that line's anchor. One topological pass isn't enough when object <i>kinds</i> interleave, so the sweep <b>repeats until stable</b> — circles, lines, and points resolve together.</p>
+          </div>
+          <div class="note der">
+            <h3>Deterministic &amp; pure</h3>
+            <p>No template matching, no <span class="mn">previousPositions</span> threading. Given the same graph it always yields the same coordinates — the engine is the single source of truth and is tested hardest.</p>
+          </div>
+          <div class="note con">
+            <h3>Failure is first-class</h3>
+            <p>If the sweep can't settle, it <b>flags</b> over-constraint / coincidence rather than drawing a wrong figure — general, not per-shape.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span class="wm">Geo Builder — the algorithms</span><span>6</span></div>
+  </section>
+
+  <!-- ============================ 7 · ALG 2 DRIVE-OR-CHECK ============================ -->
+  <section class="slide">
+    <div class="chrome">
+      <div class="kicker">Algorithm 2 · 07</div>
+      <h2 class="title small">DriveOrCheck — the solver inside the interpreter</h2>
+      <div class="bar"></div>
+    </div>
+    <div class="content">
+      <div class="cols">
+        <div class="code-wrap">
+          <ol class="code">
+<li><span class="kw">function</span> <span class="fn">DriveOrCheck</span>(constraint c)</li>
+<li>  refs ← <span class="fn">referencedPoints</span>(c)</li>
+<li>  free ← <span class="fn">recruitFreeDofs</span>(refs)   <span class="cm"># walk ancestors:</span></li>
+<li>       <span class="cm"># free params, radii, centres, branch DOFs —</span></li>
+<li>       <span class="cm"># keep walking PAST a free on-object carrier</span></li>
+<li> </li>
+<li>  <span class="kw">if</span> free = ∅:                     <span class="cm"># everything determined</span></li>
+<li>    r ← <span class="fn">residual</span>(c, positions)</li>
+<li>    <span class="kw">if</span> |r| &gt; ε:</li>
+<li>      <span class="fn">markOverConstrained</span>();  keep prior;  <span class="fn">explain</span>()</li>
+<li>    <span class="cm"># else: satisfied — a pure check</span></li>
+<li>  <span class="kw">else</span>:                            <span class="cm"># a DOF to drive</span></li>
+<li>    roots ← <span class="fn">solveParam</span>(free, residual(c) = 0)</li>
+<li>    branchIndex[c] ← <span class="fn">clamp</span>(branchIndex[c], roots)</li>
+<li>    <span class="fn">apply</span>(roots[branchIndex[c]])   <span class="cm"># chosen alternative</span></li>
+          </ol>
+        </div>
+        <div class="notes">
+          <div class="note onobj">
+            <h3>Drive vs. check — one rule</h3>
+            <p>If any referenced point still owns a <b>free DOF</b>, the constraint <b>solves</b> for it. If not, the same constraint becomes a <b>check</b>. One mechanism, no imperative special cases.</p>
+          </div>
+          <div class="note con">
+            <h3><span class="mn">solveParam</span></h3>
+            <p>A deterministic 1-D root finder. Multiple roots become <b>alternatives</b> (the branch index selects one). Adding a constraint is "just" a new solver case: a residual + refs + a description.</p>
+          </div>
+          <div class="note free">
+            <h3>Recruiting the right DOF</h3>
+            <p>The ancestor walk keeps going <b>past</b> a free on-object carrier to reach the shape DOF behind it — so a perpendicularity given can flex a rhombus's angle, not just slide a point onto its neighbour.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span class="wm">Geo Builder — the algorithms</span><span>7</span></div>
+  </section>
+
+  <!-- ============================ 8 · ALG 3 MODEL ENUMERATION ============================ -->
+  <section class="slide">
+    <div class="chrome">
+      <div class="kicker">Algorithm 3 · 08</div>
+      <h2 class="title small">Show-another-configuration — enumerating the space of valid drawings</h2>
+      <div class="bar"></div>
+    </div>
+    <div class="content">
+      <div class="cols">
+        <div class="code-wrap">
+          <ol class="code">
+<li><span class="kw">function</span> <span class="fn">ShowAnother</span>(figure)</li>
+<li>  <span class="cm"># output is one model from a space of models</span></li>
+<li>  <span class="kw">if</span> <span class="fn">hasNextBranch</span>(figure):</li>
+<li>    branchIndex ← branchIndex + 1    <span class="cm"># next ∩ solution</span></li>
+<li>  <span class="kw">else</span>:</li>
+<li>    seed ← <span class="fn">nextSeed</span>()               <span class="cm"># reproducible</span></li>
+<li>    <span class="fn">resample</span>(freeDofs, seed)        <span class="cm"># sizes, t, radius,</span></li>
+<li>                                     <span class="cm"># centre — continuous</span></li>
+<li>    <span class="fn">applyReflections</span>(seed.highBits) <span class="cm"># discrete mirror DOFs</span></li>
+<li> </li>
+<li>  <span class="fn">reevaluate</span>(figure)</li>
+<li>  <span class="kw">keep</span> only configs where <span class="fn">meetsRequirements</span>(figure)</li>
+<li>  <span class="cm"># e.g. a meet must land ON the segments,</span></li>
+<li>  <span class="cm"># an extension must reach the far side</span></li>
+          </ol>
+        </div>
+        <div class="notes">
+          <div class="note con">
+            <h3>Two axes of variety</h3>
+            <p><b>Branches</b> enumerate the finite 0/1/2 intersection solutions. <b>Sampling</b> varies the continuous free DOFs. Together they walk the whole valid space.</p>
+          </div>
+          <div class="note free">
+            <h3>Reflection DOFs</h3>
+            <p>Some choices are <b>discrete but unstated</b> — which side a triangle's apex falls on. Encoded in the seed's high bits so the sampler can mirror into configurations a continuous nudge would almost never reach.</p>
+          </div>
+          <div class="note der">
+            <h3>Seeded &amp; filtered</h3>
+            <p>Every configuration is reproducible from its seed, and only those that <b>satisfy the stated requirements</b> are shown — the same predicate the verifier uses.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span class="wm">Geo Builder — the algorithms</span><span>8</span></div>
+  </section>
+
+  <!-- ============================ 9 · ALG 4 REPLAY / ORDER INDEPENDENCE ============================ -->
+  <section class="slide">
+    <div class="chrome">
+      <div class="kicker">Algorithm 4 · 09</div>
+      <h2 class="title small">Replay with deferral — order-independent, event-sourced rebuild</h2>
+      <div class="bar"></div>
+    </div>
+    <div class="content">
+      <div class="cols">
+        <div class="code-wrap">
+          <ol class="code">
+<li><span class="kw">function</span> <span class="fn">Replay</span>(facts) → figure</li>
+<li>  positions ← ∅ ;  pending ← ∅</li>
+<li>  <span class="kw">for</span> fact <span class="kw">in</span> <span class="fn">enabledFacts</span>:      <span class="cm"># fact list = program</span></li>
+<li>    <span class="kw">try</span>  <span class="fn">applyStep</span>(fact)</li>
+<li>    <span class="kw">catch</span> pending.<span class="fn">add</span>(fact)      <span class="cm"># keep prior on error</span></li>
+<li> </li>
+<li>  <span class="kw">repeat</span>                            <span class="cm"># deferral to a fixpoint</span></li>
+<li>    <span class="kw">for</span> fact <span class="kw">in</span> pending:</li>
+<li>      <span class="kw">if</span> <span class="fn">applyStep</span>(fact) succeeds now:</li>
+<li>        pending.<span class="fn">remove</span>(fact)</li>
+<li>  <span class="kw">until</span> <span class="kw">no</span> change</li>
+<li> </li>
+<li>  <span class="cm"># a constraint typed BEFORE its givens</span></li>
+<li>  <span class="cm"># auto-defers until they arrive</span></li>
+          </ol>
+        </div>
+        <div class="notes">
+          <div class="note">
+            <h3>Positions are derived, never stored</h3>
+            <p>The <b>ordered fact list is the single source of truth</b>; the figure is <span class="mn">replay</span>ed from it. Undo = recompile a prefix. State and coordinates <b>cannot desync</b>.</p>
+          </div>
+          <div class="note der">
+            <h3>Order independence, for free</h3>
+            <p>Type <span class="mn">CE ⟂ AB</span> before the sizes that pin it, and the deferral loop retries it once the determining givens land. The full figure builds in <b>any entry order</b>.</p>
+          </div>
+          <div class="note onobj">
+            <h3>The honest limit</h3>
+            <p>A genuinely under-determined partial figure stays <b>pending</b> until its determining givens arrive — which is correct, not a bug.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span class="wm">Geo Builder — the algorithms</span><span>9</span></div>
+  </section>
+
+  <!-- ============================ 10 · VERIFICATION STACK (FIG 4) ============================ -->
+  <section class="slide">
+    <div class="chrome">
+      <div class="kicker">Correctness · 10</div>
+      <h2 class="title small">Two independent checks — "green" means <span style="color:var(--derived)">verified</span>, not just no-error</h2>
+      <div class="bar"></div>
+    </div>
+    <div class="content">
+      <svg width="1700" height="560" viewBox="0 0 1700 560" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arw4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#3D4CB0"/>
+          </marker>
+        </defs>
+
+        <!-- source: engine -->
+        <rect x="0" y="200" width="300" height="150" rx="14" class="bx-d"/>
+        <text x="150" y="258" text-anchor="middle" class="btitle">Engine</text>
+        <text x="150" y="292" text-anchor="middle" class="bsub">Evaluate → coordinates</text>
+        <text x="150" y="320" text-anchor="middle" class="mono" style="font-size:16px">the model under test</text>
+
+        <!-- lane A: givens verifier -->
+        <rect x="470" y="70" width="560" height="150" rx="14" class="bx"/>
+        <text x="500" y="112" class="tag">LANE A · RUNS IN PRODUCTION</text>
+        <text x="500" y="150" class="btitle">Givens verifier</text>
+        <text x="500" y="184" class="bsub">re-derives the relations the commands assert,</text>
+        <text x="500" y="208" class="bsub">checks them against the final coordinates</text>
+
+        <!-- lane B: oracle -->
+        <rect x="470" y="330" width="560" height="150" rx="14" class="bx"/>
+        <text x="500" y="372" class="tag">LANE B · DEV / CI ONLY</text>
+        <text x="500" y="410" class="btitle">Independent oracle</text>
+        <text x="500" y="444" class="bsub">closed-form recompute — imports nothing from</text>
+        <text x="500" y="468" class="bsub">the engine — diffed on 0-shape-DOF figures</text>
+
+        <!-- arrows engine -> lanes -->
+        <path d="M300 258 C 380 258, 400 145, 466 145" class="flow" marker-end="url(#arw4)"/>
+        <path d="M300 292 C 380 292, 400 405, 466 405" class="flow" marker-end="url(#arw4)"/>
+
+        <!-- verdict boxes -->
+        <rect x="1120" y="90" width="240" height="110" rx="12" fill="#EDF8F6" stroke="var(--derived)" stroke-width="2"/>
+        <text x="1240" y="140" text-anchor="middle" class="btitle" style="fill:var(--derived)">VERIFIED</text>
+        <text x="1240" y="172" text-anchor="middle" class="bsub">green · relations hold</text>
+        <rect x="1120" y="350" width="240" height="110" rx="12" fill="#FBF3E8" stroke="var(--onobj)" stroke-width="2"/>
+        <text x="1240" y="400" text-anchor="middle" class="btitle" style="fill:var(--onobj)">match ≤ tol</text>
+        <text x="1240" y="432" text-anchor="middle" class="bsub">else amber cue</text>
+        <path d="M1030 145 L 1116 145" class="flow" marker-end="url(#arw4)"/>
+        <path d="M1030 405 L 1116 405" class="flow" marker-end="url(#arw4)"/>
+
+        <!-- headline result -->
+        <rect x="1420" y="150" width="280" height="250" rx="16" fill="#F7F7FB" stroke="var(--accent)" stroke-width="2"/>
+        <text x="1560" y="196" text-anchor="middle" class="tag">SWEEP RESULT</text>
+        <text x="1560" y="256" text-anchor="middle" class="mono" style="font-size:40px; font-weight:600; fill:var(--derived)">5.6e-15</text>
+        <text x="1560" y="292" text-anchor="middle" class="bsub">worst residual</text>
+        <text x="1560" y="336" text-anchor="middle" class="mono" style="font-size:26px; font-weight:600; fill:var(--ink)">13,760</text>
+        <text x="1560" y="368" text-anchor="middle" class="bsub">figures · tol 1e-4</text>
+
+        <text x="0" y="430" class="bsub" style="font-size:20px">The verifier also folds in <tspan style="fill:var(--ink); font-weight:600">directional / order checks</tspan> (e.g. a point must lie on the correct side).</text>
+        <text x="0" y="462" class="bsub" style="font-size:20px; fill:var(--derived); font-weight:600">Finding: coordinate output — including the numeric solver paths — is exact to double precision on every covered construct.</text>
+      </svg>
+    </div>
+    <div class="foot"><span class="wm">Geo Builder — the algorithms</span><span>10</span></div>
+  </section>
+
+  <!-- ============================ 11 · CLOSING ============================ -->
+  <section class="slide">
+    <div class="chrome">
+      <div class="kicker">In one breath · 11</div>
+      <h2 class="title small">The whole design, as a single claim</h2>
+      <div class="bar"></div>
+    </div>
+    <div class="content">
+      <div class="takeaways">
+        <div class="tk"><div class="no">1</div><div class="tx"><b>One representation.</b> A DOF-classified dependency DAG — free / on-object / derived — evaluated topologically to coordinates.</div></div>
+        <div class="tk"><div class="no">2</div><div class="tx"><b>The hard features are consequences, not additions.</b> <span>Alternatives = model enumeration over branches &amp; free DOFs. Stability = persistent parameters. Order-independence = event-sourced replay with deferral.</span></div></div>
+        <div class="tk"><div class="no">3</div><div class="tx"><b>A solver lives inside the interpreter.</b> <span>The same constraint drives a free DOF or checks a determined one — no per-shape machinery.</span></div></div>
+        <div class="tk"><div class="no">4</div><div class="tx"><b>Correctness is dual-checked.</b> <span>A production givens-verifier plus an independent closed-form oracle agree to machine epsilon.</span></div></div>
+      </div>
+
+      <div class="statline">
+        <div class="stat"><div class="v">~1,700</div><div class="k">automated tests, green</div></div>
+        <div class="stat"><div class="v">Q1–Q7</div><div class="k">full bagrut corpus reproduced</div></div>
+        <div class="stat"><div class="v">He / En</div><div class="k">bilingual, offline-first parsing</div></div>
+        <div class="stat"><div class="v">5.6e-15</div><div class="k">worst oracle residual</div></div>
+      </div>
+    </div>
+    <div class="foot"><span class="wm">Geo Builder — the algorithms</span><span>11</span></div>
+  </section>
+
+</div>
+
+<!-- controls (siblings of the slide roots) -->
+<div class="controls">
+  <button id="prev" aria-label="previous">‹</button>
+  <span id="counter">1 / 11</span>
+  <button id="next" aria-label="next">›</button>
+</div>
+<div class="hint">← → to navigate · F for fullscreen</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const stage = document.getElementById('stage');
+  const counter = document.getElementById('counter');
+  let i = 0;
+
+  function show(n){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle('active', k === i));
+    counter.textContent = (i + 1) + ' / ' + slides.length;
+  }
+  function fit(){
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = 'translate(-50%,-50%) scale(' + s + ')';
+  }
+  addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { show(i + 1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { show(i - 1); e.preventDefault(); }
+    else if (e.key === 'Home') show(0);
+    else if (e.key === 'End') show(slides.length - 1);
+    else if (e.key === 'f' || e.key === 'F') { if(!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); }
+  });
+  addEventListener('resize', fit);
+  document.getElementById('prev').onclick = () => show(i - 1);
+  document.getElementById('next').onclick = () => show(i + 1);
+  fit(); show(0);
+</script>
+</body>
+</html>

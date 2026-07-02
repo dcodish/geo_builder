@@ -120,6 +120,88 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'on-segment-point-stays-within-its-segment',
+    title: 'a driven on-segment point stays WITHIN its segment — the joint solver can\'t slide it onto the extension',
+    guards:
+      "operator session `wdrfq1wf`: square ABCD, E on AB, F on DC with DF:FC=1:10, then EF ∥ BC. The parallel IS satisfiable in-segment (E slides on AB to match F's x: both at t=1/11), but the figure came back with E and F at t=−1/9 — OUTSIDE their segments, on the extension beyond A and D — so \"E on AB\" and \"F on DC\" were both silently violated (green, `violations:[]`). Root cause: the DISTANCE-based ratio |DF|=0.1·|FC| has TWO roots — internal t=1/11 AND external t=−1/9 — and the multi-carrier joint solver (`resolveMixedCarriers`) picked the external one because `setCarrierVals` clamped only an EXTENSION on-segment point (t≥1.02) and wrote a PLAIN on-segment point's t unclamped, so the unbounded search slid both points off their segments. Root fix (ADR-194): a plain on-segment point lives BETWEEN its endpoints (t∈[0,1]) by definition — clamp it there in `setCarrierVals`, so the joint search must move the figure's OTHER DOFs, landing the internal root. The impossible-⟂ sibling (ADR-193) is unaffected (⟂ is unsatisfiable at every t).",
+    steps: ['ריבוע ABCD', 'E על AB', 'F על DC כך ש DF:FC=1:10', 'EF מקביל ל BC'],
+    check(fig) {
+      allStepsOk(fig);
+      const within = (p: Id, a: Id, b: Id) => {
+        const A = at(fig, a), B = at(fig, b), P = at(fig, p);
+        const t = ((P.x - A.x) * (B.x - A.x) + (P.y - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2);
+        const cross = (P.x - A.x) * (B.y - A.y) - (P.y - A.y) * (B.x - A.x);
+        expect(t, `${p} WITHIN segment ${a}${b} (t≥0)`).toBeGreaterThanOrEqual(-1e-6);
+        expect(t, `${p} WITHIN segment ${a}${b} (t≤1)`).toBeLessThanOrEqual(1 + 1e-6);
+        expect(Math.abs(cross) / (Math.hypot(B.x - A.x, B.y - A.y) || 1), `${p} collinear on ${a}${b}`).toBeLessThan(1e-3);
+      };
+      within('E', 'A', 'B'); // E stays on AB, not its extension
+      within('F', 'D', 'C'); // F stays on DC, not its extension
+      // The stated relations hold: DF:FC = 1:10 and EF ∥ BC.
+      const df = dist(at(fig, 'D'), at(fig, 'F'));
+      const fc = dist(at(fig, 'F'), at(fig, 'C'));
+      expect(df / fc, 'DF:FC = 1:10').toBeCloseTo(0.1, 2);
+      const ef = { x: at(fig, 'F').x - at(fig, 'E').x, y: at(fig, 'F').y - at(fig, 'E').y };
+      const bc = { x: at(fig, 'C').x - at(fig, 'B').x, y: at(fig, 'C').y - at(fig, 'B').y };
+      expect(Math.abs(ef.x * bc.y - ef.y * bc.x) / (Math.hypot(ef.x, ef.y) * Math.hypot(bc.x, bc.y)), 'EF ∥ BC').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'impossible-perp-does-not-clobber-ratio-pinned-point',
+    title: 'an impossible later ⟂ hard-fails cleanly — it does NOT drag a ratio-pinned point off its position',
+    guards:
+      "operator session `vpt763yn`: square ABCD, F on CD, `DF:FC=1:4` (pins F at t=0.8, F=(1,5)), E on AB, then `FE אנך ל BC`. `FE ⟂ BC` is geometrically IMPOSSIBLE (F on the top edge, E on the bottom edge, BC vertical ⇒ FE·BC is a constant −25, zero gradient). Two reported bugs, one root cause: (1) F MOVED off its ratio position, (2) the drawn line came out PARALLEL to BC, not perpendicular. Root cause: the perpendicular drives E and the ratio drives F, both `on-segment-solved`; the joint solver (`resolveMixedCarriers`) can't satisfy the impossible ⟂ so it returns a best-effort placement (regulariser pulls F,E to the seed midpoints) and DISCARDS its `ok=false`. `setCarrierVals` then clears the solve directives, so neither driven constraint is a driver OR a check, and `evaluateCore` reports `ok` on a figure violating both — F dragged to (2.5,5), FE vertical (∥ BC). Root fix (ADR-193): `evaluate` re-verifies every DRIVEN constraint at the resolved positions (the same `isSatisfied` gate it applies to check-constraints); a driven-constraint system with no solution is honestly over-constrained, so the step hard-fails, the prior figure is kept (F stays at its ratio position), and ADR-191 group-atomicity drops the FE scaffolding. The message names the whole conflict set (`|DF| = 0.25·|FC| and FE ⟂ BC cannot hold`).",
+    steps: ['ריבוע ABCD', 'F על CD', 'DF:FC=1:4', 'E על AB', 'FE אנך ל BC'],
+    check(fig) {
+      // The ratio still pins F: DF:FC = 1:4 ⇒ |FC| = 4·|DF| (F NOT dragged to the midpoint).
+      const df = dist(at(fig, 'D'), at(fig, 'F'));
+      const fc = dist(at(fig, 'F'), at(fig, 'C'));
+      expect(fc / df, '|FC| / |DF| ≈ 4 (F stays at its ratio position, not the midpoint)').toBeCloseTo(4, 2);
+      // The impossible ⟂ hard-fails and names the conflict (incl. the perpendicular).
+      expect(fig.lastError, 'the impossible ⟂ surfaces an over-constrained error').toMatch(/over-constrained/i);
+      expect(fig.lastError, 'the message names the perpendicular').toMatch(/⟂|perpendicular|FE/i);
+      // No misleading segment drawn: the FE scaffolding of the failed group is dropped (ADR-191)…
+      expect(fig.construction.objects.some((o) => o.id === 'seg-EF' || o.id === 'seg-FE'), 'FE must not be drawn').toBe(false);
+      // …the square (incl. its BC edge) is intact, every point still placed.
+      expect(fig.construction.objects.some((o) => o.id === 'seg-BC'), 'the square keeps its BC edge').toBe(true);
+      for (const id of ['A', 'B', 'C', 'D', 'E', 'F']) expect(at(fig, id), `${id} still placed`).toBeTruthy();
+      // The failed constraint is never applied, so the verifier flags nothing (no silent violation).
+      expect(fig.violations, 'the dropped constraints leave no verifier violation').toEqual([]);
+    },
+  },
+  {
+    id: 'segment-ratio-colon-drives-division-point',
+    title: 'bare "DF:FC = 1:2" (colon-form segment ratio) drives F so |DF| = ½|FC| — no silent equality',
+    guards:
+      'operator session `o2m8f0w8`: on a square ABCD with E on AB and F on CD, "DF:FC=1:2" had NO deterministic rule (the keyword-free colon form) so it escalated to the LLM, which returned the correct "DF = FC/2" — but that then hit `equalSegments`, whose regex matched "DF = FC" and SILENTLY DROPPED the "/2", asserting |DF| = |FC| (a plain equality) instead of the 1:2 ratio. Green status, no error, wrong geometry (the ADR-024/026 half-parse class). Root fix (ADR-192): (A) `ratioConstraint` now reads a TRAILING divisor "= FC/2" → set-ratio k=½, and `equalSegments` bails on a divided RHS (`SEG_DIV_RHS` guard); (B) a new `segmentRatioColon` rule parses the bare "seg:seg = p:q" form deterministically → set-ratio k=p/q, so it never escalates. Both forms now emit the same `set-ratio(D,F,F,C, k=½)`.',
+    steps: ['ריבוע ABCD', 'E על AB', 'F על CD', 'DF:FC=1:2'],
+    check(fig) {
+      allStepsOk(fig);
+      // F lies on CD (idempotent from "F על CD") and the ratio holds: |DF| = ½·|FC| ⇒ |FC| = 2·|DF|.
+      const df = dist(at(fig, 'D'), at(fig, 'F'));
+      const fc = dist(at(fig, 'F'), at(fig, 'C'));
+      expect(fc / df, '|FC| / |DF| ≈ 2 (the 1:2 ratio, not a 1:1 equality)').toBeCloseTo(2, 3);
+    },
+  },
+  {
+    id: 'impossible-perpendicular-drops-its-segment',
+    title: 'an utterance is ATOMIC: "EF ⟂ BC" that can\'t be satisfied draws NEITHER its message NOR the auto-segment',
+    guards:
+      'operator session `8twmmb5r`: on a square ABCD with E on AB (40%) and F on DC, "EF ו BC מאונכים" is impossible (EF spans bottom→top, so it can never be ⟂ the vertical BC). The parser lowers it to a GROUP [segment EF, segment BC, set-perpendicular] (FR-IN-7 auto-draws the ⟂ pair). The set-perpendicular HARD-failed (a genuine contradiction, not a pending under-determined solve) — a message was shown — but `replay` applied each fact independently, so the scaffolding "segment EF" committed on its own and seg-EF was STILL DRAWN. Root fix: a group is atomic — a group with a hard-failed fact AND a succeeded one is poisoned and the figure is rebuilt with the whole group blocked, so seg-EF never appears (while seg-BC, SHARED with the square, is still drawn by the square). The pending/deferral case (ADR-104) is untouched.',
+    steps: ['ריבוע ABCD', 'E על צלע AB ב- 40%', 'F על DC', 'EF ו- BC מאונכים'],
+    check: (fig) => {
+      // The message is surfaced (the operator saw it) …
+      expect(fig.lastError, 'the impossible ⟂ surfaces a hard error').toMatch(/place F|⟂|perpendicular/i);
+      // … but the auto-drawn EF segment must NOT survive on its own.
+      expect(fig.construction.objects.some((o) => o.id === 'seg-EF'), 'seg-EF must not be drawn').toBe(false);
+      // The square is intact — its BC edge (which the failed utterance also named) stays.
+      expect(fig.construction.objects.some((o) => o.id === 'seg-BC'), 'the square keeps its BC edge').toBe(true);
+      for (const id of ['A', 'B', 'C', 'D', 'E', 'F']) expect(at(fig, id), `${id} still placed`).toBeTruthy();
+      // The dropped ⟂ is not in `applied`, so the verifier has nothing to flag — no silent violation either.
+      expect(fig.violations, 'the dropped constraint leaves no verifier violation').toEqual([]);
+    },
+  },
+  {
     id: 'plural-segment-noun-points-on-sides',
     title: 'C7/PAR-8: "F, G, H on segments AB, AC, CB" (PLURAL segment-keyword noun) places all three, not just seg-AB',
     guards:

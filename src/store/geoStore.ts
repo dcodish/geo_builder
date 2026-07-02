@@ -175,8 +175,6 @@ function applyReflections(c: Construction, mask: number): Construction {
  * the apex free points (ADR-166); seed < REFLECT_STRIDE ⇒ mask 0 ⇒ no reflection.
  */
 export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}): Derived {
-  let cur = emptyConstruction();
-  const status: Record<string, FactStatus> = {};
   let lastError: string | null = null;
   // Symbol table over the ENABLED facts, so a value given later (`x = 4`) resolves an
   // earlier `AB = 3x`, and two segments sharing a variable become a proportion (ADR-031).
@@ -184,13 +182,6 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   const lenByKey = new Map<string, MeasureLabels['lengths'][number]>();
   const angByKey = new Map<string, MeasureLabels['angles'][number]>();
   const areaByKey = new Map<string, MeasureLabels['areas'][number]>();
-  // Point ids any earlier fact OWNS (introduces). A later fact must not silently
-  // re-create one of these as a default free point (the auto-create-endpoints
-  // affordance) when its owner failed/was removed — that would mask the breakage.
-  // Instead the dependent fact fails too, so a removed step cascades honestly.
-  const owned = new Set<Id>();
-  // Engine commands of the facts that applied — the figure's stated givens, fed to the verifier.
-  const applied: Command[] = [];
   // A named-shape MACRO emits a DEFAULT equal-pair for an isosceles triangle (|AB|=|AC|) tagged `soft`,
   // because "isosceles" only says SOME two sides are equal — which pair is the student's to state, not ours
   // to assume ([ADR-052](docs/06-decisions.md#adr-052)). So the soft default must YIELD to an explicit
@@ -238,101 +229,149 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
     .filter((f) => f.enabled && f.cmd.type !== 'shape-variant')
     .flatMap((f) => lowerOne(f.cmd, symtab))
     .filter((c): c is Extract<Command, { type: 'set-equal' }> => c.type === 'set-equal');
-  for (const f of facts) {
-    // Lower the fact to the engine command(s) it produces (symbolic measures →
-    // ratio/distance/angle/[]; engine commands pass through; a `shape-variant` → base shape + the
-    // variant-selected equal pairs, with an explicit equality pinning the variant — ADR-138).
-    // 0 commands ⇒ a label-only / data-only fact (a free representative or `set-var`) — applied as a no-op.
-    let engineCmds = f.cmd.type === 'shape-variant' ? expandShapeVariant(f.cmd, explicitEqs) : lowerOne(f.cmd, symtab);
-    // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see pre-scan).
-    const reseat = rtReorder.get(f.id);
-    if (reseat) engineCmds = engineCmds.map((ec) => (ec.type === 'right-triangle' ? { ...ec, ids: reseat } : ec));
-    const intro = engineCmds.flatMap(introducedPointIds);
-    const claim = () => intro.forEach((id) => owned.add(id));
-    if (!f.enabled) {
-      status[f.id] = 'disabled';
-      claim();
-      continue;
-    }
-    // A SOFT default equal-pair the student's explicit equality overrides (ADR-114) — step aside (no-op).
-    // Not pushed to `applied`: |AB|=|AC| was never a stated given, so the verifier must not check it.
-    if (supersededSoft.has(f.id)) {
-      status[f.id] = 'ok';
-      continue;
-    }
-    // A measure annotates the figure regardless of whether it adds a constraint.
-    if (isMeasure(f.cmd)) addMeasureLabel(lenByKey, angByKey, areaByKey, f.cmd, measureLabelText(f.cmd, symtab));
-    // A point a lowered command would (re)create that an earlier fact owns but which
-    // isn't in the figure now ⇒ its definition is gone, so this fact can't build either.
-    const broken = intro.filter((id) => owned.has(id) && !cur.objects.some((o) => o.id === id));
-    if (broken.length) {
-      status[f.id] = `can't build: ${broken.join(', ')} is no longer available (an earlier step it relies on was removed or failed)`;
-      lastError = status[f.id];
-      claim();
-      continue;
-    }
-    let ok = true;
-    for (const ec of engineCmds) {
-      const r = applyStep(cur, ec);
-      if (r.ok) cur = r.construction;
-      else {
-        status[f.id] = r.error; // dependencies gone, contradiction, etc. — keep prior figure
-        lastError = r.error;
-        ok = false;
-        break;
-      }
-    }
-    if (ok) {
-      status[f.id] = 'ok';
-      applied.push(...(engineCmds as Command[]));
-    }
-    claim();
-  }
-  // ORDER-INDEPENDENCE ([ADR-104](docs/06-decisions.md#adr-104)): a CONSTRAINT that couldn't be satisfied
-  // at its position — an under-determined solve the engine can't pin down yet — may become solvable once
-  // LATER facts add givens that remove the slack (e.g. "CE⟂AB" entered before "CD=36, DE=18": with the
-  // sizes the figure is determinate and the ⟂ solves; without them it's an unconstrained coupled solve the
-  // solver can't land). So after the in-order pass, RETRY the still-failed constraint-only facts against the
-  // now-complete figure, to a fixpoint — applying such a constraint LAST is exactly the working reordering.
-  // Only pure constraints (no NEW points) are retried: re-ordering a point-introducing fact to the end would
-  // strand its dependents. A genuinely contradictory constraint simply keeps failing. This makes the figure
-  // build the same whatever order the constraints were typed (the operator's "order shouldn't matter").
-  const deferrable = (f: Fact): boolean => {
-    if (!f.enabled || status[f.id] === 'ok' || status[f.id] === 'disabled') return false;
-    const ec = lowerOne(f.cmd, symtab);
-    return ec.length > 0 && ec.every((c) => introducedPointIds(c).length === 0);
-  };
-  for (let pass = 0; pass < facts.length && facts.some(deferrable); pass++) {
-    let progressed = false;
+  // Build the construction by folding the enabled facts. `forced` maps a fact id to a status string that
+  // BLOCKS it (an atomic-group casualty — see the poisoning pass below): the fact is neither applied nor
+  // measured, only its owned points are claimed so genuine dependents still cascade-fail. Runs at most twice
+  // (once clean, once with the poisoned groups blocked), so the label maps are cleared on each entry.
+  const runBuild = (forced: Map<string, string>) => {
+    let cur = emptyConstruction();
+    const status: Record<string, FactStatus> = {};
+    const owned = new Set<Id>();
+    const applied: Command[] = [];
+    lenByKey.clear();
+    angByKey.clear();
+    areaByKey.clear();
     for (const f of facts) {
-      if (!deferrable(f)) continue;
-      const engineCmds = lowerOne(f.cmd, symtab);
-      let trial = cur;
+      // Lower the fact to the engine command(s) it produces (symbolic measures →
+      // ratio/distance/angle/[]; engine commands pass through; a `shape-variant` → base shape + the
+      // variant-selected equal pairs, with an explicit equality pinning the variant — ADR-138).
+      // 0 commands ⇒ a label-only / data-only fact (a free representative or `set-var`) — applied as a no-op.
+      let engineCmds = f.cmd.type === 'shape-variant' ? expandShapeVariant(f.cmd, explicitEqs) : lowerOne(f.cmd, symtab);
+      // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see pre-scan).
+      const reseat = rtReorder.get(f.id);
+      if (reseat) engineCmds = engineCmds.map((ec) => (ec.type === 'right-triangle' ? { ...ec, ids: reseat } : ec));
+      const intro = engineCmds.flatMap(introducedPointIds);
+      const claim = () => intro.forEach((id) => owned.add(id));
+      // Blocked by the atomic-group poisoning pass: don't apply/measure it, but claim its points so any
+      // dependent of a point ONLY this failed group introduced still cascades honestly.
+      if (forced.has(f.id)) {
+        status[f.id] = forced.get(f.id)!;
+        claim();
+        continue;
+      }
+      if (!f.enabled) {
+        status[f.id] = 'disabled';
+        claim();
+        continue;
+      }
+      // A SOFT default equal-pair the student's explicit equality overrides (ADR-114) — step aside (no-op).
+      // Not pushed to `applied`: |AB|=|AC| was never a stated given, so the verifier must not check it.
+      if (supersededSoft.has(f.id)) {
+        status[f.id] = 'ok';
+        continue;
+      }
+      // A measure annotates the figure regardless of whether it adds a constraint.
+      if (isMeasure(f.cmd)) addMeasureLabel(lenByKey, angByKey, areaByKey, f.cmd, measureLabelText(f.cmd, symtab));
+      // A point a lowered command would (re)create that an earlier fact owns but which
+      // isn't in the figure now ⇒ its definition is gone, so this fact can't build either.
+      const broken = intro.filter((id) => owned.has(id) && !cur.objects.some((o) => o.id === id));
+      if (broken.length) {
+        status[f.id] = `can't build: ${broken.join(', ')} is no longer available (an earlier step it relies on was removed or failed)`;
+        claim();
+        continue;
+      }
       let ok = true;
       for (const ec of engineCmds) {
-        const r = applyStep(trial, ec);
-        if (r.ok) trial = r.construction;
-        else { ok = false; break; }
+        const r = applyStep(cur, ec);
+        if (r.ok) cur = r.construction;
+        else {
+          status[f.id] = r.error; // dependencies gone, contradiction, etc. — keep prior figure
+          ok = false;
+          break;
+        }
       }
       if (ok) {
-        cur = trial;
         status[f.id] = 'ok';
         applied.push(...(engineCmds as Command[]));
-        progressed = true;
       }
+      claim();
     }
-    if (!progressed) break;
-  }
+    // ORDER-INDEPENDENCE ([ADR-104](docs/06-decisions.md#adr-104)): a CONSTRAINT that couldn't be satisfied
+    // at its position — an under-determined solve the engine can't pin down yet — may become solvable once
+    // LATER facts add givens that remove the slack (e.g. "CE⟂AB" entered before "CD=36, DE=18": with the
+    // sizes the figure is determinate and the ⟂ solves; without them it's an unconstrained coupled solve the
+    // solver can't land). So after the in-order pass, RETRY the still-failed constraint-only facts against the
+    // now-complete figure, to a fixpoint — applying such a constraint LAST is exactly the working reordering.
+    // Only pure constraints (no NEW points) are retried: re-ordering a point-introducing fact to the end would
+    // strand its dependents. A genuinely contradictory constraint simply keeps failing. This makes the figure
+    // build the same whatever order the constraints were typed (the operator's "order shouldn't matter").
+    const deferrable = (f: Fact): boolean => {
+      if (forced.has(f.id) || !f.enabled || status[f.id] === 'ok' || status[f.id] === 'disabled') return false;
+      const ec = lowerOne(f.cmd, symtab);
+      return ec.length > 0 && ec.every((c) => introducedPointIds(c).length === 0);
+    };
+    for (let pass = 0; pass < facts.length && facts.some(deferrable); pass++) {
+      let progressed = false;
+      for (const f of facts) {
+        if (!deferrable(f)) continue;
+        const engineCmds = lowerOne(f.cmd, symtab);
+        let trial = cur;
+        let ok = true;
+        for (const ec of engineCmds) {
+          const r = applyStep(trial, ec);
+          if (r.ok) trial = r.construction;
+          else { ok = false; break; }
+        }
+        if (ok) {
+          cur = trial;
+          status[f.id] = 'ok';
+          applied.push(...(engineCmds as Command[]));
+          progressed = true;
+        }
+      }
+      if (!progressed) break;
+    }
+    return { cur, status, applied };
+  };
   // Classify what (if anything) remains unsatisfiable after the retries. A still-failed step that is a
   // DEFERRABLE constraint while the figure is still UNDER-DETERMINED isn't a contradiction — it's just
   // waiting for the givens that pin the figure (ADR-104), so it's a PENDING info state, not a red error.
   // A genuine failure (a non-deferrable step, or any failure once the figure is fully determined) stays a
   // hard `lastError`.
-  const failedFacts = facts.filter((f) => f.enabled && status[f.id] !== 'ok' && status[f.id] !== 'disabled');
-  const pending = failedFacts.length > 0 && failedFacts.every((f) => {
-    const ec = lowerOne(f.cmd, symtab);
-    return hasDeferrableConstraint(ec) && constraintIsPending(cur, ec); // a deferrable constraint that still FLEXES (not a rigid contradiction)
-  });
+  const classify = (cur: Construction, status: Record<string, FactStatus>) => {
+    const failedFacts = facts.filter((f) => f.enabled && status[f.id] !== 'ok' && status[f.id] !== 'disabled');
+    const pending = failedFacts.length > 0 && failedFacts.every((f) => {
+      const ec = lowerOne(f.cmd, symtab);
+      return hasDeferrableConstraint(ec) && constraintIsPending(cur, ec); // a deferrable constraint that still FLEXES (not a rigid contradiction)
+    });
+    return { failedFacts, pending };
+  };
+  let { cur, status, applied } = runBuild(new Map());
+  let { failedFacts, pending } = classify(cur, status);
+  // ATOMIC GROUP: one utterance lowers to a GROUP of commands (e.g. "EF ⟂ BC" → segment EF + segment BC +
+  // set-perpendicular). If the constraint HARD-fails (a genuine contradiction, not a pending under-determined
+  // solve), the auto-drawn scaffolding segments must NOT survive on their own — the whole utterance failed, so
+  // it draws nothing (the operator's rule: "it gave a message but still drew the line — it should not"). Poison
+  // any group that has BOTH a hard-failed fact AND a succeeded one, then rebuild with the group blocked (a
+  // clean rebuild, not object-deletion, so a segment SHARED with an earlier shape — seg-BC of the square — is
+  // still drawn by that shape). Skipped when the figure is PENDING: a constraint that will resolve once more
+  // givens arrive keeps its scaffolding (ADR-104).
+  if (!pending && failedFacts.length) {
+    const groupErr = new Map<string, string>(); // poisoned group → the genuine error to show on every member
+    for (const f of failedFacts) {
+      const g = groupKey(f);
+      if (!groupErr.has(g)) groupErr.set(g, status[f.id] as string);
+    }
+    const forced = new Map<string, string>();
+    for (const [g, err] of groupErr) {
+      const members = facts.filter((m) => groupKey(m) === g);
+      if (members.length > 1 && members.some((m) => status[m.id] === 'ok')) for (const m of members) forced.set(m.id, err);
+    }
+    if (forced.size) {
+      ({ cur, status, applied } = runBuild(forced));
+      failedFacts = classify(cur, status).failedFacts;
+    }
+  }
   lastError = !pending && failedFacts.length ? status[failedFacts[failedFacts.length - 1].id] : null;
   // The seed's high bits select a reflection of the apex free points (ADR-166); the low bits are the
   // continuous sample. Reflect first (mirrors the apexes so two segments can meet WITHIN their spans),

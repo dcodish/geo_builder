@@ -959,20 +959,24 @@ const pointByDistances: Rule = (s) => {
 };
 
 /**
- * "AB = 2 AD" / "2 AB = 3 CD" / "AB = 2·AD" / "AB = 2AD" / "AB פי 2 מ-AD" — a
- * proportion |AB| = k·|CD|. At least one numeric coefficient must be present
- * (the coefficient-free "AB = CD" is the `equalSegments` case, k = 1). Runs before
- * `distanceConstraint`, which would otherwise half-parse "AB = 2 AD" into "AB = 2".
+ * "AB = 2 AD" / "2 AB = 3 CD" / "AB = 2·AD" / "AB = 2AD" / "AB = CD/2" / "AB פי 2 מ-AD" — a
+ * proportion |AB| = k·|CD|. At least one numeric coefficient must be present — a LEADING one
+ * (`= 2·CD`) or a TRAILING divisor (`= CD/2`, so |AB| = |CD|/2); the coefficient-free "AB = CD"
+ * is the `equalSegments` case, k = 1. The trailing `/d` form is what the LLM emits for a stated
+ * segment ratio ("DF:FC = 1:2" → "DF = FC/2"); without it, `equalSegments` grabs "DF = FC" and
+ * SILENTLY DROPS the divisor (the ADR-024/026 half-parse class). Runs before `distanceConstraint`,
+ * which would otherwise half-parse "AB = 2 AD" into "AB = 2".
  */
 const COEF = String.raw`\d+(?:\.\d+)?`;
 const ratioConstraint: Rule = (s) => {
   const en = s.match(
-    new RegExp(String.raw`\b(${COEF})?\s*[*·]?\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`),
+    new RegExp(String.raw`\b(${COEF})?\s*[*·]?\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:\/\s*(${COEF}))?`),
   );
-  if (en && (en[1] || en[4])) {
-    const m = en[1] ? parseFloat(en[1]) : 1; // |AB| = (n/m)·|CD|
+  if (en && (en[1] || en[4] || en[7])) {
+    const m = en[1] ? parseFloat(en[1]) : 1; // |m·AB| = |n·CD / d| ⇒ |AB| = (n/(m·d))·|CD|
     const n = en[4] ? parseFloat(en[4]) : 1;
-    return [{ type: 'set-ratio', a: up(en[2]), b: up(en[3]), c: up(en[5]), d: up(en[6]), k: n / m }];
+    const d = en[7] ? parseFloat(en[7]) : 1; // trailing divisor ("CD/2")
+    return [{ type: 'set-ratio', a: up(en[2]), b: up(en[3]), c: up(en[5]), d: up(en[6]), k: n / (m * d) }];
   }
   // Hebrew "AB פי 2 מ-AD" — |AB| is 2× |AD|.
   const he = s.match(new RegExp(String.raw`([A-Za-z]\d*)\s*([A-Za-z]\d*)\b[^=]*?פי\s*(${COEF})\s*מ-?\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`));
@@ -994,6 +998,26 @@ const segmentRatio: Rule = (s) => {
   const num = m[5] ? Math.sqrt(parseFloat(m[6])) : parseFloat(m[6]); // m5 = √ on numerator
   const den = m[8] !== undefined ? (m[7] ? Math.sqrt(parseFloat(m[8])) : parseFloat(m[8])) : 1; // m7 = √ on denominator
   return [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: num / den }];
+};
+
+/**
+ * "DF:FC = 1:2" — a bare ratio between two named segments, colon-form, with NO `ratio`/`divides`
+ * keyword (`dividesInRatio` owns the keyworded phrasings). |DF|:|FC| = p:q ⇒ |DF| = (p/q)·|FC|,
+ * emitted as a `set-ratio` CONSTRAINT (like `segmentRatio`, the `/`-form sibling) that drives the
+ * shared/free point so the proportion holds — it references existing endpoints, it does not create
+ * them. Anchored on the full `seg:seg = p:q` shape (both sides an `x:y`), so it never claims a lone
+ * segment, an equality, or a `p:q` that lacks two named LHS segments. Without this the utterance fell
+ * through every rule and escalated to the LLM, which returned "DF = FC/2" — then silently mis-read as
+ * a plain equality (the divisor dropped). Now deterministic and offline. (`RATPQ` defined just below.)
+ */
+const segmentRatioColon: Rule = (s) => {
+  const m = s.match(
+    new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*:\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${RATPQ}`),
+  );
+  if (!m) return null;
+  const p = parseFloat(m[5]), q = parseFloat(m[6]);
+  if (p <= 0 || q <= 0) return null;
+  return [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: p / q }];
 };
 
 /**
@@ -1043,10 +1067,18 @@ const dividesInRatio: Rule = (s) => {
 const SEG_RATIO_LHS = new RegExp(String.raw`\b[A-Za-z]\d*\s*[A-Za-z]\d*\b\s*\/\s*\b[A-Za-z]\d*\s*[A-Za-z]\d*\b\s*=`);
 
 /**
+ * A DIVIDED RHS — "= CD/2" — is a ratio (|AB| = |CD|/2), not an equality. Guards `equalSegments`
+ * from matching the "AB = CD" prefix and dropping the "/2" (the ADR-024/026 silent-half-parse class);
+ * `ratioConstraint` owns this form. Same discipline as `SEG_RATIO_LHS` on `distanceConstraint`.
+ */
+const SEG_DIV_RHS = new RegExp(String.raw`=\s*[A-Za-z]\d*\s*[A-Za-z]\d*\s*\/\s*${COEF}`);
+
+/**
  * "AB = CD" — two segments equal in length. Also DRAWS both named segments (idempotent),
  * so the equality puts the two compared sides on the canvas (FR-IN-7).
  */
 const equalSegments: Rule = (s) => {
+  if (SEG_DIV_RHS.test(s)) return null; // "= CD/2" is a ratio, not an equality — let ratioConstraint own it
   const m = s.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
   if (!m) return null;
   const [a, b, c, d] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
@@ -2478,7 +2510,7 @@ const secantFromExternal: Rule = (s, ctx) => {
     { type: 'point-on-circle', id: A, circle: circ },
     { type: 'point-on-circle', id: B, circle: circ },
     { type: 'segment', a: A, b: B }, // the chord
-    { type: 'point-on-segment', id: E, a: B, b: A, t: 1.3 }, // E beyond A on line BA → outside the circle
+    { type: 'point-on-segment', id: E, a: B, b: A, t: 1.3, extension: true }, // E beyond A on line BA → outside the circle (extension: it lives past the endpoint, t>1, not on the chord — ADR-194)
     { type: 'segment', a: E, b: A }, // the external part of the secant (E–A–B collinear)
   ];
 };
@@ -3701,6 +3733,7 @@ export const RULES: Rule[] = [
   lengthOrder, // "DC > AB" — an inequality between two SEGMENT lengths (two-letter sides; after measureOrder)
   setVar, // "x = 4" / "α = 30" — a bare variable binding; before the numeric rules
   segmentRatio, // "AE/ED = 2/3" — before the numeric rules (which would half-parse "ED=2")
+  segmentRatioColon, // "DF:FC = 1:2" — bare colon-form segment ratio (no keyword); before equal/distance
   measureSqrt, // "AB = 12√x" / "12√2" — before measureLength so the radical isn't dropped
   measurePower, // "AB = x²" / "3x^2" — before measureLength so the exponent isn't dropped
   measurePi, // "AB = 2π" — before measureLength so π isn't read as a free variable

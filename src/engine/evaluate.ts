@@ -482,9 +482,14 @@ function setCarrierVals(c: Construction, vals: Map<Id, number[]>): Construction 
         case 'free-point': return { ...o, x: v[0], y: v[1], solve: undefined };
         // An EXTENSION point lives BEYOND the segment (t>1); HARD-clamp it there so the (unbounded) joint
         // optimizer can't pull a driven extension point back between the endpoints to satisfy a constraint —
-        // it must keep E on the extension and move the figure's OTHER DOFs instead (ADR-105). A plain
-        // on-segment point is unclamped.
-        case 'on-segment': return { ...o, t: o.extension ? Math.max(v[0], 1.02) : v[0], solve: undefined };
+        // it must keep E on the extension and move the figure's OTHER DOFs instead (ADR-105). A PLAIN
+        // on-segment point lives ON the segment BETWEEN its endpoints (t∈[0,1]) BY DEFINITION — clamp it
+        // there too, so the unbounded joint search can't slide it off its segment onto the line/extension to
+        // satisfy a constraint (a DISTANCE-based ratio like DF:FC=1:10 has an INTERNAL root t=1/11 AND an
+        // EXTERNAL one t=−1/9; the point declared "on DC" must take the internal one). It must move the
+        // figure's OTHER DOFs instead. The bounded per-DOF seed already searches [0,1]; this enforces it on
+        // the final write and through the cost landscape. (ADR-194.)
+        case 'on-segment': return { ...o, t: o.extension ? Math.max(v[0], 1.02) : Math.min(1, Math.max(0, v[0])), solve: undefined };
         case 'on-circle': return { ...o, theta: v[0], solve: undefined };
         case 'perp-offset': return { ...o, dist: Math.max(v[0], 1e-3), solve: undefined };
         case 'rotated': return { ...o, angleDeg: v[0], solve: undefined };
@@ -795,9 +800,68 @@ function withParam(c: Construction, id: Id, v: number): Construction {
   };
 }
 
-/** Evaluate the construction: resolve any driven DOFs, then the constructive sweep + checks. */
+/**
+ * Every constraint that DRIVES a carrier (an `on-segment-solved`'s `.constraint`, or any object's
+ * `.solve.constraint`), deduplicated. These are the constraints `resolveDriven` is responsible for
+ * satisfying by placing the carrier — they are NOT in `c.constraints` (that's the CHECK list), so
+ * `evaluateCore`'s final loop never verifies them. Gathered from the ORIGINAL construction, before
+ * `resolveDriven` clears the solve directives.
+ */
+function drivenConstraintsOf(c: Construction): Constraint[] {
+  const out: Constraint[] = [];
+  const seen = new Set<string>();
+  for (const o of c.objects) {
+    const con =
+      o.kind === 'on-segment-solved'
+        ? o.constraint
+        : (o as { solve?: { constraint: Constraint } }).solve?.constraint;
+    if (!con) continue;
+    const key = JSON.stringify(con);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(con);
+  }
+  return out;
+}
+
+/**
+ * Evaluate the construction: resolve any driven DOFs, then the constructive sweep + checks.
+ *
+ * After `resolveDriven` places the carriers, RE-VERIFY the driven constraints actually hold. The joint
+ * solvers return a best-effort placement even when a driven-constraint system has NO solution (an
+ * impossible perpendicular, an over-constrained ratio) — `resolveMixedCarriers` discards the solve's
+ * `ok` flag and the regulariser pulls the carriers back to their seed — and `setCarrierVals` then
+ * clears the solve directives, so the unsatisfiable constraint is neither a driver nor a check and
+ * would read as `ok`. Verifying it here (the same `isSatisfied` gate `evaluateCore` applies to the
+ * check-constraints) makes such a figure honestly over-constrained, so the step hard-fails and the
+ * prior figure is kept (a carrier pinned by an EARLIER constraint isn't dragged off by a later
+ * impossible one). Consistent with `solutionAccepted`, which uses the same gate — a solve it ACCEPTED
+ * passes here unchanged; only a best-effort it rejected is now caught instead of silently accepted.
+ */
 export function evaluate(c: Construction): EvalResult {
-  return evaluateCore(resolveDriven(c));
+  const driven = drivenConstraintsOf(c);
+  const res = evaluateCore(resolveDriven(c));
+  if (!res.ok || driven.length === 0) return res;
+  // Report the whole CONFLICT SET, not one arbitrary member. When a joint solve can't satisfy an
+  // impossible constraint it drags its co-drivers off too (here the impossible ⟂ pulls F off the
+  // ratio), so several read violated at the best-effort placement. Naming just one is misleading —
+  // and picking by residual is biased (a ratio's relative residual is unbounded, while ∥/⟂ is capped
+  // at 1). But the regulariser is tiny (λ=1e-3), so a SATISFIABLE driven constraint is still driven to
+  // ~0 residual and passes `isSatisfied`; only the genuinely-conflicting ones fail it. So the set that
+  // fails `isSatisfied` IS the conflict — report them all ("X and Y cannot hold").
+  const violated: string[] = [];
+  const seenDesc = new Set<string>();
+  for (const con of driven) {
+    for (const id of constraintRefs(con)) {
+      if (!res.positions.has(id)) return { ok: false, error: `${describeConstraint(con)} references an unknown point` };
+    }
+    if (!isSatisfied(con, (id) => res.positions.get(id)!)) {
+      const d = describeConstraint(con);
+      if (!seenDesc.has(d)) { seenDesc.add(d); violated.push(d); }
+    }
+  }
+  if (violated.length) return { ok: false, error: `over-constrained: ${violated.join(' and ')} cannot hold` };
+  return res;
 }
 
 function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): EvalResult {

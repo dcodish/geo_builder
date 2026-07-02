@@ -314,5 +314,64 @@ export function checkGivens(
     }
   }
 
+  // A `point-on-segment` asserts membership: the point lies ON its segment BETWEEN the endpoints
+  // (t∈[0,1]), or — for a stated EXTENSION ("D on the extension of AB", t>1) — BEYOND the second
+  // endpoint. This is the backstop for the whole "a driven DOF slid out of its geometric domain"
+  // class ([ADR-194](docs/06-decisions.md#adr-194)): a dual-root distance/ratio can drive an
+  // on-segment point onto the external division (t<0), off the segment, and the figure would look
+  // clean. On-circle membership was already verified here; on-segment was the gap that let ADR-194
+  // slide through silently. Tolerance is LOOSE (a point just past an endpoint isn't flagged — only
+  // one genuinely off), mirroring the meet/extension checks; a point on the segment's LINE but off
+  // its span, OR off the line entirely (a redefinition that no-op'd the membership), both trip it.
+  //
+  // Only the point's OPERATIVE (last) definition is checked: a point declared on a segment/extension
+  // and then REDEFINED by a later command ("E on the extension of AC" then "E on circle P", which
+  // supersedes the placement) is verified against its real definition (the on-circle check above),
+  // not the stale on-segment one. A command "defines" a point when it OUTPUTS it (has an `id`/`ids`);
+  // a CONSTRAINT that merely references the point (set-ratio/∥ driving it, the ADR-194 case) does not
+  // — so a genuinely-drifted driven point is still caught.
+  const lastDef = new Map<Id, number>();
+  commands.forEach((c, i) => {
+    const anyC = c as Record<string, unknown>;
+    for (const f of ['id', 'id1', 'id2']) if (typeof anyC[f] === 'string') lastDef.set(anyC[f] as Id, i);
+    if (Array.isArray(anyC.ids)) for (const id of anyC.ids as Id[]) lastDef.set(id, i);
+  });
+  for (let ci = 0; ci < commands.length; ci++) {
+    const cmd = commands[ci];
+    if (cmd.type !== 'point-on-segment') continue;
+    if (lastDef.get(cmd.id) !== ci) continue; // superseded by a later definition of the same point
+    const pa = positions.get(cmd.a), pb = positions.get(cmd.b), p = positions.get(cmd.id);
+    if (!pa || !pb || !p) continue;
+    const abx = pb.x - pa.x, aby = pb.y - pa.y;
+    const L2 = abx * abx + aby * aby;
+    if (L2 < 1e-12) continue; // degenerate segment (endpoints coincide) — a different failure mode
+    const span = Math.sqrt(L2);
+    const t = ((p.x - pa.x) * abx + (p.y - pa.y) * aby) / L2;
+    const offLine = Math.abs((p.x - pa.x) * aby - (p.y - pa.y) * abx) / span; // ⟂ distance to the line
+    const tol = Math.max(0.05, 0.02 * span);
+    const seg = `${cmd.a}${cmd.b}`;
+    if (cmd.extension) {
+      // Beyond b (t≥1): flag only if it fell within/before the segment — reuse the "should be beyond" message.
+      if (offLine <= tol && t < 0.98) {
+        violations.push({
+          relation: 'collinear-order',
+          ids: [cmd.id, cmd.a, cmd.b],
+          message: `${cmd.id} should lie on the extension of ${seg} beyond ${cmd.b}, but it landed between ${cmd.a} and ${cmd.b}`,
+          messageKey: 'figure.v.orderBeyond',
+          params: { id: cmd.id, seg, a: cmd.a, b: cmd.b },
+        });
+      }
+    } else if (offLine > tol || t < -0.02 || t > 1.02) {
+      // Off the line entirely (a dropped membership) OR on the line but past an endpoint (a domain escape).
+      violations.push({
+        relation: 'collinear',
+        ids: [cmd.id, cmd.a, cmd.b],
+        message: `${cmd.id} should lie on segment ${seg} but landed off it (outside its endpoints)`,
+        messageKey: 'figure.v.onSegment',
+        params: { point: cmd.id, seg },
+      });
+    }
+  }
+
   return violations;
 }
