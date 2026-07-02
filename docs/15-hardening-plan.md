@@ -335,7 +335,7 @@ Dependency notes: PAR-11 (shadow matrix) should land before Phase C. TST-1 (seed
 | C3 / PAR-1 | C | chord `=` bail (מיתר AB=2) | HIGH | 2 h | ADR-183 | ✅ |
 | C4 / PAR-4 | C | withCarrierMembership + diameter `=` bail | M-H | ½ d | ADR-184 | ✅ |
 | C5 / PAR-5 | C | על guard + CARRIER_NOUN (diameter/radius) | MED | 2 h | ADR-185 | ✅ |
-| C6 / PAR-2 | C | Multi-statement splitter | HIGH | ½ d | | ☐ |
+| C6 / PAR-2 | C | Multi-statement splitter | HIGH | ½ d | ADR-186 | ✅ |
 | C7 / PAR-8 | C | Plural carrier nouns | MED | 2 h | | ☐ |
 | C8 / PAR-6 | C | Area-ref dedupe | MED | 1 h | | ☐ |
 | C9 / PAR-9 | C | Structured-id rename/swap | MED | ½ d | | ☐ |

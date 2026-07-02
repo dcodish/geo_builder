@@ -1292,9 +1292,11 @@ exports[`parser shadow-matrix — known shadow-prone probes (Phase C tracking) >
   },
   {
     "note": "PAR-2: two comma-joined givens → only one kept",
-    "shadowedBy": [],
+    "shadowedBy": [
+      "distanceConstraint",
+    ],
     "text": "AB = 4, BC = 6",
-    "winner": "distanceConstraint",
+    "winner": "multiStatement",
     "winnerKind": "array",
   },
   {
@@ -1303,7 +1305,7 @@ exports[`parser shadow-matrix — known shadow-prone probes (Phase C tracking) >
       "chainedEquality",
     ],
     "text": "זווית ABC = 40, זווית DEF = 60",
-    "winner": "angle",
+    "winner": "multiStatement",
     "winnerKind": "array",
   },
   {

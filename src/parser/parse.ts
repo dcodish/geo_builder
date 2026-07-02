@@ -705,6 +705,10 @@ const pointOnExtension: Rule = (s, ctx) => {
  */
 const angle: Rule = (s, ctx) => {
   if (!/(?:angle|∠|זוו?ית)/i.test(s)) return null;
+  // TWO+ angle keywords in one line ("זווית ABC = 40, זווית DEF = 60") is a multi-angle GIVENS list —
+  // the `multiStatement` splitter owns it. If it reaches here unsplit, bail rather than silently claim
+  // only the first triple (PAR-2, defence in depth); the whole then escalates instead of half-parsing.
+  if ((s.match(/angle|∠|זוו?ית/gi) ?? []).length > 1) return null;
   const stripped = s.replace(/angle|∠|זוו?ית/gi, ' ');
   const valM = stripped.match(new RegExp(num));
   if (!valM) return null; // no degree value → not this rule (an equality/ratio is handled upstream)
@@ -3560,6 +3564,30 @@ const compoundSuchThat: Rule = (s, ctx) => {
   return [...lr.commands, ...rr.commands];
 };
 
+/**
+ * Multiple independent GIVENS in one line — "AB = 4, BC = 6" / "זווית ABC = 40, זווית DEF = 60" /
+ * "AB ⟂ CD and EF ∥ GH". A single relation rule half-parses these and silently DROPS the earlier given:
+ * `distanceConstraint` anchors its value to `$` so it claims only the trailing clause; `angle` grabs only
+ * the first triple (PAR-2). Fix: split on a top-level separator (`,` `;` `וגם` `and`) and parse each piece,
+ * ALL-OR-NOTHING. To stay safe on CONSTRUCTION utterances that also carry commas ("circle through A, B, C",
+ * "F, G, H on AB, AC, CB"), split ONLY when EVERY piece both (a) carries a relation OPERATOR — not a bare
+ * shape word, so "משולש שווה שוקיים" (isosceles) isn't mistaken for an equality — and (b) parses on its own;
+ * otherwise fall through untouched. Runs right after `compoundSuchThat` (whose halves recurse back through
+ * here for any commas inside them). Each piece's parse already applied the post-passes; re-applying them on
+ * the combined result is idempotent (the `withCarrierMembership` CONSTRUCT-guard + `withImplicitCircles`
+ * seeing the prepended circle as already-defined).
+ */
+const STATEMENT_SEP = /\s*(?:,|;|וגם|\band\b)\s*/gi;
+const HAS_RELATION = /[=<>≤≥]|⟂|⊥|∥|≅|[~∼∽]|מקביל|מאונ[כך]|אנ[כך]|חופ|דומ|\bcongruen|\bsimilar|\bparallel|\bperpendicular/i;
+const multiStatement: Rule = (s, ctx) => {
+  const parts = s.split(STATEMENT_SEP).map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return null; // no top-level separator → a single statement
+  if (!parts.every((p) => HAS_RELATION.test(p))) return null; // every piece must be a relation given (not a construction)
+  const parsed = parts.map((p) => parse(p, ctx));
+  if (!parsed.every((r) => r.ok)) return null; // ALL-OR-NOTHING — any unreadable piece → don't split (let LLM handle)
+  return parsed.flatMap((r) => (r.ok ? r.commands : []));
+};
+
 // Order matters: the most specific keyword-anchored rules run first; the
 // coordinate rule (freePoint) is last because it's the loosest.
 //
@@ -3569,6 +3597,7 @@ const compoundSuchThat: Rule = (s, ctx) => {
 // shadowing class behind ADR-119/077/166. Not part of the runtime API; `parse()` is the only entry point.
 export const RULES: Rule[] = [
   compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
+  multiStatement, // "AB = 4, BC = 6" — split comma/and-joined GIVENS, parse each all-or-nothing (PAR-2)
   setRadius, // "radius of circle P is 4" — set an EXISTING circle's radius; before `circle` (creation) and the shape rules (which 'stop' on רדיוס)
   congruence, // "ABC ≅ DEF" — before the shape rules ("triangle ABC ≅ …" contains "triangle")
   similarity, // "ABC ~ DEF"
