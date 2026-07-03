@@ -134,11 +134,28 @@
     "title": "Display"
   },
   "theorems": {
-    "title": "Theorems & Insights",
+    "title": "Relevant theorems",
+    "toggle": "Show relevant theorems",
     "empty": "Add more details to see relevant theorems",
+    "new": "new",
+    "highlightHint": "Click to mark on the figure what this theorem talks about",
+    "backgroundTitle": "Background theorems",
+    "backgroundToggle": "{{count}} background theorems",
     "confidence": {
       "definite": "Applies",
       "possible": "May apply"
+    },
+    "family": {
+      "angles": "Angles",
+      "parallels": "Parallels",
+      "triangle": "Triangle",
+      "congruence": "Congruence",
+      "isosceles": "Isosceles",
+      "similarity": "Similarity",
+      "quad": "Quadrilaterals",
+      "midsegment": "Midsegment",
+      "circle": "Circle",
+      "tangent": "Tangent"
     }
   },
   "canvas": {

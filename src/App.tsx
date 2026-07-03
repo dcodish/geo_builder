@@ -20,6 +20,8 @@ import { Figure } from '@/render';
 import type { Crossing } from '@/render';
 import type { DetectedShape, Id } from '@/engine';
 import { bookUrl } from '@/shapes/shapeCatalog';
+import { detectTheorems } from '@/theorems';
+import type { TheoremFeedEntry } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
@@ -109,6 +111,9 @@ export default function App() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editError, setEditError] = useState(false);
+  const [showTheorems, setShowTheorems] = useState(true); // the live theorem feed section (Phase 6a) — on by default
+  const [theoremSel, setTheoremSel] = useState<number | null>(null); // the theorem row whose premise is highlighted on the canvas
+  const [bgOpen, setBgOpen] = useState(false); // the collapsed "background theorems" family fold is expanded
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Responsive canvas: the figure fills the space beside the sidebar (use the whole screen) instead
@@ -522,6 +527,32 @@ export default function App() {
     return v.map((id, i) => [id, v[(i + 1) % v.length]] as [Id, Id]);
   }, [shapesLayer, hoverShape, openShape]);
 
+  // The LIVE theorem feed (Phase 6a): the bagrut theorems the student's STATED givens *announce*,
+  // re-derived from scratch each step (coordinate-free — plan §7.5, so it can run live, unlike the
+  // sampled relations/shapes layers). Emergent-shape triggers ride the "detect shapes" layer when it
+  // is on — an emergent rhombus surfaces its theorems once shapes are detected. Attribution/●-new and
+  // headline-vs-background ordering come from `detectTheorems`.
+  const theoremFeed = useMemo(
+    () => detectTheorems({ facts, construction, shapes: shapesLayer?.shapes }),
+    [facts, construction, shapesLayer],
+  );
+  const headlineTheorems = useMemo(() => theoremFeed.filter((e) => e.salience === 'headline'), [theoremFeed]);
+  // Background theorems collapse into per-family fold rows (plan §5) — present but never noise.
+  const backgroundFamilies = useMemo(() => {
+    const by = new Map<TheoremFeedEntry['family'], TheoremFeedEntry[]>();
+    for (const e of theoremFeed) if (e.salience === 'background') (by.get(e.family) ?? by.set(e.family, []).get(e.family)!).push(e);
+    return [...by.entries()];
+  }, [theoremFeed]);
+  const backgroundCount = theoremFeed.length - headlineTheorems.length;
+
+  // The premise objects of the SELECTED theorem row — highlighted on the canvas (NEVER conclusion
+  // objects, plan §2). Takes precedence over the shape/fact highlight while a theorem row is picked.
+  const theoremHighlight = useMemo(() => {
+    if (theoremSel === null) return undefined;
+    const e = theoremFeed.find((x) => x.id === theoremSel);
+    return e && e.triggerObjectIds.length ? new Set<string>(e.triggerObjectIds) : undefined;
+  }, [theoremSel, theoremFeed]);
+
   // Snap-to-intersection: a clicked crossing becomes a real named point. Pick the
   // first free single capital letter, then create it via the same command path.
   function markIntersection(x: Crossing) {
@@ -588,6 +619,25 @@ export default function App() {
   const hasVariant = facts.some((f) => f.enabled && f.cmd.type === 'shape-variant' && VARIANT_COUNT[f.cmd.shape] > 1);
   const examples = t('examples.items', { returnObjects: true }) as string[];
 
+  // One theorem-feed row: a tier dot (green certain / amber possible), the statement in the current
+  // locale, and a ● "new this step" badge. Clicking toggles the premise highlight on the canvas.
+  const theoremButton = (e: TheoremFeedEntry) => {
+    const active = theoremSel === e.id;
+    return (
+      <button
+        key={e.id}
+        type="button"
+        style={active ? theoremRowOn : theoremRow}
+        title={t('theorems.highlightHint')}
+        onClick={() => setTheoremSel(active ? null : e.id)}
+      >
+        <span style={tierDot(e.tier)} aria-hidden />
+        <span style={{ flex: 1, textAlign: he ? 'right' : 'left' }}>{he ? e.he : e.en}</span>
+        {e.isNew && <span style={newBadge}>{t('theorems.new')}</span>}
+      </button>
+    );
+  };
+
   // The command reference (the coverage map): every construct grouped by category,
   // wired ones clickable to try. Lives in the help modal's "פקודות" tab. Clicking an
   // example also closes the modal so the figure is visible.
@@ -639,8 +689,8 @@ export default function App() {
             circles={circles}
             width={canvasSize.w}
             height={canvasSize.h}
-            highlight={shapeHighlight ?? highlight}
-            highlightEdges={shapeHighlightEdges}
+            highlight={theoremHighlight ?? shapeHighlight ?? highlight}
+            highlightEdges={theoremHighlight ? undefined : shapeHighlightEdges}
             onPickIntersection={markIntersection}
             intersectionLabel={t('actions.markIntersection')}
             labels={labels}
@@ -919,6 +969,10 @@ export default function App() {
                 <input type="checkbox" checked={showCenters} onChange={(e) => setShowCenters(e.target.checked)} />
                 {t('canvas.centers')}
               </label>
+              <label style={displayToggle}>
+                <input type="checkbox" checked={showTheorems} onChange={(e) => setShowTheorems(e.target.checked)} />
+                {t('theorems.toggle')}
+              </label>
             </div>
           </div>
 
@@ -1089,6 +1143,38 @@ export default function App() {
             </div>
           )}
           </div>
+
+          {/* The LIVE theorem feed (Phase 6a) — the bagrut theorems the STATED givens announce, updated
+              every step (help, don't reveal: only what the givens *announce*, never the derived "aha").
+              Headline entries are listed individually (tier dot + ● new-this-step); background theorems
+              fold into one collapsed row per family. Clicking a row highlights that theorem's PREMISE on
+              the canvas — never the conclusion. Toggled off from Display options. */}
+          {showTheorems && facts.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={sectionLabel}>{t('theorems.title')}</div>
+              {theoremFeed.length === 0 && (
+                <span style={{ fontSize: 12, color: '#64748b' }}>{t('theorems.empty')}</span>
+              )}
+              {headlineTheorems.map(theoremButton)}
+              {backgroundCount > 0 && (
+                <>
+                  <button type="button" style={bgToggle} onClick={() => setBgOpen((v) => !v)}>
+                    {bgOpen ? '▾' : '▸'} {t('theorems.backgroundToggle', { count: backgroundCount })}
+                  </button>
+                  {bgOpen && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingInlineStart: 10 }}>
+                      {backgroundFamilies.map(([family, list]) => (
+                        <div key={family} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>{t(`theorems.family.${family}`)}</div>
+                          {list.map(theoremButton)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/* Playable degrees of freedom (first slice): a slider per free-circle radius. Dialing a value
               is a viewing scratchpad — "show another configuration" resets it. */}
@@ -1408,6 +1494,54 @@ const shapeBadge: React.CSSProperties = {
 };
 // The chip whose inline card is open — filled indigo to mark the active selection.
 const shapeBadgeOn: React.CSSProperties = { ...shapeBadge, border: '1px solid #4338ca', background: '#4338ca', color: '#fff' };
+
+// A theorem-feed row (Phase 6a): a tier dot + the statement + optional ● new badge. Left-aligned text
+// block so long bilingual statements wrap cleanly; click toggles the premise highlight on the canvas.
+const theoremRow: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 8,
+  padding: '7px 10px',
+  fontSize: 12.5,
+  lineHeight: 1.4,
+  textAlign: 'start',
+  borderRadius: 8,
+  border: '1px solid #e2e8f0',
+  background: '#fff',
+  color: '#334155',
+  cursor: 'pointer',
+};
+// The selected theorem row — tinted amber-neutral to mark the active premise highlight.
+const theoremRowOn: React.CSSProperties = { ...theoremRow, border: '1px solid #2563eb', background: '#eff6ff' };
+// The tier dot: green when the theorem certainly applies now, amber for a sparing secondary condition.
+const tierDot = (tier: TheoremFeedEntry['tier']): React.CSSProperties => ({
+  flex: '0 0 auto',
+  width: 8,
+  height: 8,
+  marginTop: 5,
+  borderRadius: 999,
+  background: tier === 'certain' ? '#16a34a' : '#d97706',
+});
+// The ● "new this step" badge on a freshly-announced theorem.
+const newBadge: React.CSSProperties = {
+  flex: '0 0 auto',
+  fontSize: 10,
+  fontWeight: 700,
+  color: '#2563eb',
+  background: '#dbeafe',
+  borderRadius: 999,
+  padding: '1px 6px',
+};
+// The collapsed "background theorems (N)" fold row.
+const bgToggle: React.CSSProperties = {
+  textAlign: 'start',
+  fontSize: 12,
+  color: '#64748b',
+  background: 'none',
+  border: 'none',
+  padding: '2px 0',
+  cursor: 'pointer',
+};
 // The inline card under the badges with the shape's definition + book link (replaces a figure-hiding modal).
 const shapeCard: React.CSSProperties = {
   marginTop: 6,

@@ -134,11 +134,28 @@
     "title": "תצוגה"
   },
   "theorems": {
-    "title": "משפטים ותובנות",
+    "title": "משפטים רלוונטיים",
+    "toggle": "הציגו משפטים רלוונטיים",
     "empty": "הוסיפו פרטים נוספים כדי לראות משפטים רלוונטיים",
+    "new": "חדש",
+    "highlightHint": "לחצו כדי לסמן על השרטוט את מה שהמשפט מדבר עליו",
+    "backgroundTitle": "משפטי רקע",
+    "backgroundToggle": "{{count}} משפטי רקע",
     "confidence": {
       "definite": "חל",
       "possible": "עשוי לחול"
+    },
+    "family": {
+      "angles": "זוויות",
+      "parallels": "מקבילים",
+      "triangle": "משולש",
+      "congruence": "חפיפה",
+      "isosceles": "שווה שוקיים",
+      "similarity": "דמיון",
+      "quad": "מרובעים",
+      "midsegment": "קטע אמצעים",
+      "circle": "מעגל",
+      "tangent": "משיק"
     }
   },
   "canvas": {
