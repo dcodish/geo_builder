@@ -265,11 +265,88 @@ _Mined 2026-07-03 by five parallel agents (each read the PDF pages, transcribed,
 - **mustNotSurface:** 69 (THREE distinct pairings in one question — a strong negative test); **Appendix (O) A5/A6 — never** (altitude-to-hypotenuse geometric mean gives ד instantly).
 - _Confidence: high (the hidden cyclic⟺CE⊥BD constraint verified; check the figure's vertex order)._
 
+## B17 — two circles through A,B; chords through one intersection, third side through the other (booklet p154, PDF p173, exam 17)
+
+**Givens:** two circles meet at A and B. Chord AC of the left circle cuts the right circle at D; chord AE of the right circle cuts the left circle at F; segment CE passes through B. (א) prove △ACE ~ △BCD; (ב) given DC = FE, prove △BFE ≅ △BCD; (ג1) prove AC·BE = AE·BC; (ג2) prove AB bisects ∠CAE; (ד) prove ∠DEC = ∠FCE. Pure geometry.
+
+**Solution sketch:** (א) ∠BDC = 180°−∠ADB (1) = ∠AEB (87, cyclic ADBE); ∠C common → AA (69). (ב) same shape on the left circle (1 + 87) + included side FE = CD → ASA (19) → BE = BD, BF = BC. (ג1) the א ratio + BD = BE → AC·BE = AE·BC. (ג2) AC/AE = BC/BE with B on CE → converse bisector-ratio (77) → AB bisects ∠CAE. (ד) two 102-steps chained through ג2.
+
+- **expectSurfaced:** 87 + 102 (four stated concyclic points in each circle — key); 1 (background).
+- **solutionUses:** 1, 87, 69, 19, 77, 102.
+- **mustNotSurface:** 69 (א's task); 18–21 (ב's congruence is the task); **76/77** (no bisector is stated anywhere — ג2 is where the student PROVES one; surfacing the family gifts it).
+- _Confidence: high; double-check the printed similarity correspondence in א (A↔B, C↔C, E↔D)._
+
+## B18 — tangent at the arc-midpoint, secant extension, chords meeting inside (booklet p165, PDF p184, exam 18)
+
+**Givens:** A, B, C on a circle; E = midpoint of arc BC; the tangent at E meets the extension of chord AB at G; chords AE, BC meet at F. (א) prove △ACE ~ △AEG; AE = 3√6, AG = 6: (ב) AC; (ג) prove BC ∥ GE; S_ABF = 2·S_BFE: (ד) AB; (ה) S_ABF : S_AFC. Pure geometry.
+
+**Solution sketch:** (א) equal arcs → ∠CAE = ∠GAE (101); tangent–chord → ∠AEG = ∠ACE (107) → AA (69). (ב) AC = AE²/AG = 9. (ג) ∠GEB = ∠BAE (107) = ∠EBC (101 + 102) → alternates → BC ∥ GE (5). (ד) AF/FE = 2; extended Thales in △AGE (73) → AB = 4. (ה) three similarity steps (69 via 107/6/2+102) → S ratio = BF : FC = 4 : 9. (All five answers mutually consistent numerically.)
+
+- **expectSurfaced:** 92/94/101 (arc-midpoint stated — key); 107 + 105 (tangent stated — key); 2 (chords crossing at F, background); 102, 10 (background).
+- **solutionUses:** 101, 107, 69, 5, 102, 2, 73, 6.
+- **mustNotSurface:** 69 (א's pairing); 5/7 (ג asks to PROVE the parallel); 73 before ג lands (its ∥ premise is ג's result — step-tier); **A4 tangent–secant power — Appendix (O), never** (the solution derives GE² = GB·GA from the similarity).
+- _Confidence: high._
+
+## B19 — right triangle, cyclic quad through the right-angle vertex, tangent hypotenuse (booklet p176, PDF p195, exam 19)
+
+**Givens:** △ABC, ∠ACB = 90°; G on AC, F on AB, H on CB with GCHF inscribed in a circle; AB tangent to that circle at F; GH ∥ AB. (א) prove FG = FH; (ב1) ∠ACF; (ב2) prove △GFC ~ △FBC; the diameter from F cuts AC at E: (ג) prove ∠FEB = ∠FCB. Pure geometry.
+
+**Solution sketch:** (א) 107 + 4 → ∠FGH = ∠FHG → FG = FH (23). (ב1) ∠GFH = 90° (87, opposite the stated right angle) → right isosceles (22 + 10) → ∠ACF = ∠GHF = 45° (102). (ב2) 107 on chord FC + the 45° split → AA (69). (ג) the diameter at F ⊥ AB (105) → ∠EFB = 90°; with ∠ECB = 90° → ECBF cyclic (87) → ∠FEB = ∠FCB (102). (Coordinate-verified.)
+
+- **expectSurfaced:** 87 + 102 (GCHF STATED inscribed — key); 105 + 107 (tangent stated — key); 104 (the stated 90° at C sits inscribed in the stated circle → announces GH a diameter — canonical); 4/6/8 (GH ∥ AB stated, background); 28/31 fold, 10 (background).
+- **solutionUses:** 107, 4, 23, 87, 22, 10, 102, 69, 105, 104.
+- **mustNotSurface:** 69 (ב2's task); 22/23 on △FGH before א (FG = FH is the thing to prove); 97/94 (the alternative arc route — premise derived).
+- _Confidence: high — coordinate-verified._
+
+## B20 — tangent + secant from outside, parallel chords, late centre, concyclic O-C-E-K (booklet p186, PDF p205, exam 20)
+
+**Givens:** from external B, a tangent at C and a secant through E then A; D on the circle with CD ∥ EA; chords ED, AC meet at K. (א) prove △CEB ~ △DCE. ED = 7, AK = 3, S := S_CEK: (ב) S_CKD via S. BC = 35/√32: (ג) S_CEB via S. O the centre: (ד) prove ∠COE = ∠CKE. ∠CAE = 45°: (ה) why are O, C, E, K concyclic? Pure geometry.
+
+**Solution sketch:** (א) 107 + 4 → AA (69). (ב) 4 → equal arcs (100) → ∠AED = ∠EAC (101) → KE = KA = 3 (23) → KD = 4 → S_CKD = (4/3)S. (ג) ratio k = BC/DE = 5/√32 → S_CEB = k²·(7S/3) = 175S/96 (71). (ד) exterior angle (11) + 101 → ∠CKE = 2∠CAE; 99 → ∠COE = 2∠CAE. (ה) both 90° → each circle through C,E with a 90° angle has CE as diameter (91 + 104) → same circle.
+
+- **expectSurfaced:** 107 + 105 (tangent stated — key); 4/6/8 (parallel chords stated, background); 2 (crossing at K, background); 102 (background); 99 (key from the moment O is typed).
+- **solutionUses:** 107, 4, 69, 100, 101, 23, 71, 11, 99, 91, 104, 1.
+- **mustNotSurface:** 69 (א's pairing); 23 (the KE = KA isosceles is ב's aha); 71 before א lands; **A2/A4 — Appendix (O), never**; 104/91 before the 45° given lands (step-tier, the Q5 precedent).
+- _Confidence: high on א–ד; medium on ה's citable closing line ("the unique circle on a diameter" — definition-level; the question says "הסבירו", which tolerates it)._
+
+## B21 — two circles through A,B; the ADR-098/103 operator figure (booklet p196, PDF p215, exam 21)
+
+**Givens:** two circles meet at A, B; C on the right circle; extensions of CA, CB cut the left circle at D, E; F on arc BC; extensions of DE, CF meet at G. (א) prove ∠EDA = ∠CBA; (ב) prove GDAF is cyclic; BC ∩ AF = H, given ∠GEC = ∠CHA: (ג) prove CG/CD = GE/DE; given CE ⊥ AB, CD = 36, DE = 18: (ד) find CG, EG. Pure geometry. _(The same figure and numbers as the operator's live sessions behind ADR-098/103.)_
+
+**Solution sketch:** (א) 87 + 1. (ב) 1 + 102 → opposite angles sum 180° → cyclic (87, converse direction). (ג) the stated angle equality forces ∠FAB = ∠ACB (1, 87, 11, 10); then ∠BCF = ∠BAF (102) → CE bisects ∠DCG → bisector-ratio (76) in △DCG → CG/CD = GE/DE. (ד) CE ⊥ AB → ∠GDC = 90° (א); CG = 2·GE + Pythagoras (28) → GE = 30, CG = 60 (36-48-60).
+
+- **expectSurfaced:** 87 + 102 (stated concyclic sets, both circles — key); 1 (background); 28 (background once CE ⊥ AB is typed); 10/11 fold.
+- **solutionUses:** 87, 1, 102, 11, 10, 76, 28.
+- **mustNotSurface:** **76/77** — no bisector is stated; that CE bisects ∠DCG is exactly the ג discovery (same sharpness as trig-Q7).
+- _Confidence: high — the numbers close exactly (3-4-5), and the figure matches the operator's sessions._
+
+## B22 — cyclic quad, tangent at C, AB = CB, bisecting diagonal (booklet p206, PDF p225, exam 22)
+
+**Givens:** ABCD inscribed; diagonals meet at F; the tangent at C cuts the extension of AB at E; AB = CB. (א) prove ∠EBC = 2∠BDC. Given AC bisects ∠ECD and CD/CF = 7/4: (ב1) prove AC = AD; (ב2) AD/CD; (ב3) S_ABF : S_CBF. S := S_ABF: (ג) S_AEC via S.
+
+**Solution sketch:** (א) 94 + 101 (AB = CB) + 1 + 87. (ב1) 107 + the stated bisector → ∠ACD = ∠ADC → AC = AD (23). (ב2) DF bisects ∠ADC (from א) → 76 → AD/CD = 4/3. (ב3) shared height → 4 : 3 (76). (ג) isosceles altitude (24) + 102 + △EBC ~ △ECA (107 + 69) → S_AEC = (11/4)S. (Cyclic consistency check: 112° + 68° = 180° ✓.)
+
+- **expectSurfaced:** 87 + 102 (stated inscribed quad — key); 105 + 107 (tangent stated — key); 22 + 93/94 (AB = CB stated — key); 2, 1, 10 (background).
+- **solutionUses:** 94, 101, 1, 87, 107, 23, 76, 24, 102, 69, 10.
+- **mustNotSurface:** **76/77** (the bisector actually used is DF, whose property is DERIVED from AB = CB; the stated bisector AC is not in a 76 configuration); 69 (ג's pairing); **A4 — Appendix (O), never**.
+- _Confidence: medium-high — all answers verified numerically; double-check the ב1 tangent–chord side (∠ECA = ∠ADC vs the figure) and whether the official ג goes by trig (either route → 11S/4)._
+
+## B23 — AB diameter, cyclic CEFO, midsegment parallelogram, a common tangent (booklet p218, PDF p237, exam 23)
+
+**Givens:** △ABC inscribed in circle O, AB a diameter; E on BC, F on BO; CEFO cyclic (stated). (א) prove EF = EB. The CEFO circle cuts AC at D with ED ∥ AB: (ב1) prove EDOB is a parallelogram; (ב2) prove OD ⊥ AC. ℓ tangent at C to the big circle: (ג) prove ℓ is tangent to the CEFO circle. Pure geometry.
+
+**Solution sketch:** (א) radii-isosceles (22) + 1 + 87 → ∠EFB = ∠EBF → EF = EB (23). (ב1) 103 (AB diameter) + 6 + 102 + 99 → OD ∥ BC; with ED ∥ OB stated → parallelogram (definition; D, E emerge as the midpoints of AC, CB). (ב2) OD ∥ BC ⊥ AC (103) → OD ⊥ AC (6). (ג) ∠ODC = 90° (ב2) inscribed in the small circle → OC its diameter (104); ℓ ⊥ OC (105) → tangent to the small circle too (106). (Coordinate-verified, incl. the small circle's centre at the midpoint of OC.)
+
+- **expectSurfaced:** 103/104 (diameter stated — canonical key); 87 + 102 (CEFO stated cyclic — key); 22 (radii-isosceles, background); 4/6/8 (ED ∥ AB stated, background); 105 + 106/107 (key from the moment ℓ is typed); 10 (background).
+- **solutionUses:** 22, 1, 87, 23, 103, 6, 102, 99, 7, 104, 105, 106.
+- **mustNotSurface:** 23 on △EFB before א; 5/7 (proving parallels is ב1's work); **62/63** (D, E ARE the midpoints but nothing states it — a midsegment hint collapses ב); 44/45/47 (the parallelogram characterizations — the proof is by definition).
+- _Confidence: high — coordinate-verified; check the print that C sits on the B-side half (forces F on OB, matching the figure)._
+
 ---
 
-## Coverage read-out (updated after B1–B16; B17–B23 pending)
+## Coverage read-out (final — Q5–Q7 + B1–B23)
 
-**Grounded so far:** circle block 92/94/97–99/101–105/107–109 ✓; isosceles 22/23/24 ✓; medians/centroid **15/16/17** ✓ (B3, B7 — main events); midsegment **62/63** ✓ (B7, B14); Thales **73** ✓ (B10, B14); congruence **18/19/20** ✓ (as devices + negatives); similarity 68/69/71 ✓ (dominant negative class); bisector family 76/78/80 ✓ (with B4 vs Q7 as the surface/suppress CONTRAST pair for 76); quad characterizations **45/54/59** ✓ (as ב-chain negatives) ; kite **37/38** ✓ (B8, B14); cyclic-quad **87** ✓ (stated-premise in B12/B16, refutation in B10, iff-construction in B14); ⊥-bisector **82/83** ✓ (B2, B14); 30° pair **33/34** ✓ (B15); parallel-converses **5/7/9** as sharp negatives ✓; Appendix-(O)-never exercised in six questions ✓. **Still thin:** parallels 4–9 as a question's MAIN event; trapezoid 39–42; Thales-converse 74; 87's converse as a proof target. B17–B23 (exams 17–23) may close these; else target them in the next corpus addition.
+**Grounded (26 usable questions):** circle block 92/94/97–107 + 108/109 ✓ (87 is the single most exercised id — in ~10 questions, stated-premise AND refutation AND converse-direction); isosceles 22/23/24 ✓; medians/centroid **15/16/17** ✓ (B3, B7); midsegment **62/63** ✓ (B7, B14, + B23 as a sharp negative); Thales **73** ✓ (B10, B14, B18); congruence **18/19/20** ✓; similarity 68/69/71 ✓ (the dominant negative class — ~15 questions); bisector family **76/77/78/80** ✓ with a full CONTRAST SET for 76 (given-announced in B4; must-not-surface in Q7, B21, B22; converse 77 in B17); quad characterizations **44/45/47/54/59** ✓ (mostly negatives — by design); kite **37/38** ✓; ⊥-bisector **82/83** ✓; 30° pair **33/34** ✓; parallel-converses **5/7/9** ✓ (negatives); tangent-converse **106** ✓ (B12, B23); Appendix-(O)-never exercised in ~10 questions ✓. **Still thin (target in the next corpus addition):** parallels 4–9 as a question's MAIN event; trapezoid 39–42 (the one X'd question was exactly that — see checklist item 3); Thales-converse 74; rectangle/square characterizations 52/53/60.
 
 ## Operator review checklist (the flagged items — eyeball the printed booklet pages)
 
@@ -279,3 +356,6 @@ _Mined 2026-07-03 by five parallel agents (each read the PDF pages, transcribed,
 4. **B2:** is "M is the circumcenter of △BDC" a GIVEN (as read) or to-prove? Affects one surfacing tier only.
 5. **B11:** confirm from the figure the order C–D–E on the chord and that A, C sit on the same side of chord DB.
 6. **Judgment calls to bless (recur across entries):** (a) a question-named target shape (B14's kite) surfaces its bundle only AFTER the proof part lands; (b) 87 key-amber when four concyclic points are typed but the quad isn't drawn (B9, B13); (c) B5's 55/80 surfacing even though they literally answer ב1 (given-announced precedent).
+7. **B17 (booklet p154):** confirm the printed א similarity correspondence (A↔B, C↔C, E↔D).
+8. **B22 (booklet p206):** confirm the ב1 tangent–chord side (∠ECA = ∠ADC per the figure's side of chord CA); the official ג may route by trig — either way 11S/4.
+9. **B23 (booklet p218):** confirm C sits on the B-side half of the circle (forces F on OB, matching the read).
