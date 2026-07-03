@@ -130,6 +130,10 @@ Sub-phases — each ends by **reproducing its corpus questions** (gated per [Tes
 
 ### Phase 6 — Theorems
 
+> **Detailed pre-dev plan: [16-theorems-plan.md](16-theorems-plan.md)** (2026-07-03) — the pedagogy-first design
+> (stated-vs-derived principle, live feed + no-reveal ladder, relevancy/salience model, the v1 matcher set,
+> testing gates, 6a/6b/6c slices, and the open decisions awaiting the operator).
+
 - **Goal:** surface relevant theorems as the figure is built — **structurally**, from what the student typed (ADR-038).
 - **Builds:** **structural** matchers against the catalog ([07](07-theorem-reference.md)), one per theorem keyed on construct + parent-relationship (the [Pedagogy §4 trigger map](10-pedagogy.md#4-construction--theorem-triggers-the-pedagogical-payload) is the spec), **re-run over the whole accumulated figure each step** (a hypothesis can span facts; a later fact can complete it or change its tier); an **accumulating theorem feed** beside the canvas that surfaces the **diff** — newly-satisfied theorems and confidence/relevance changes — each entry attributed to its completing fact, deduped/updated-in-place, **confidence-tier ordered/coloured** (certain/possible/recall), traceable (highlights the satisfying objects), bilingual, citable by official number.
 - **Depends on:** Phase 5 (needs the full construct vocabulary in the dependency graph). Does **not** depend on coordinate analysis — that is Phase 9.
