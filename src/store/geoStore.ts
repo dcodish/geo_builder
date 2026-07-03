@@ -171,14 +171,52 @@ function applyReflections(c: Construction, mask: number): Construction {
 }
 
 /**
+ * Replay memoization (E1 / STO-1). `replay` is pure in `(facts, seed, radiusOverrides)` but was
+ * treated as free and called from four layers per user action (dry-run, the commit guard, the debug
+ * snapshot, render) — and the config search (`firstSatisfyingSeed`/`findValidConfig`/`meetsRequirements`)
+ * re-replays the SAME (facts, seed) pairs across its passes. A tiny cache keyed on the facts array's
+ * IDENTITY (every store action builds a new array, so a stale hit is impossible) de-duplicates them.
+ * WeakMap ⇒ a dry-run's throwaway trial array releases its entries with the array itself. The inner
+ * per-facts map is bounded (a seed sweep can visit hundreds of seeds; past the cap it resets — a cache,
+ * not a ledger). `replayStats.computes` counts REAL recomputes (cache misses) for the perf canary (A5).
+ */
+const replayCache = new WeakMap<Fact[], { snapshot: readonly Fact[]; bySeed: Map<string, Derived> }>();
+const REPLAY_CACHE_MAX = 512; // per facts-array — above this the sweep is exploring, not re-checking
+export const replayStats = { computes: 0 };
+
+export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}): Derived {
+  const key = `${seed}|${JSON.stringify(radiusOverrides)}`;
+  let entry = replayCache.get(facts);
+  // The store never mutates a facts array (every action builds a new one), but TESTS and harnesses
+  // legitimately `push` into one between replays — so a ref-keyed hit is only valid while the array
+  // still holds the SAME elements. The element-identity check (O(n) ref compares — trivial next to a
+  // replay) invalidates on push/splice/toggle-in-place; only a hand-mutation of a Fact object's own
+  // fields could evade it, which nothing does (facts are treated as immutable records).
+  const fresh = entry && entry.snapshot.length === facts.length && entry.snapshot.every((f, i) => f === facts[i]);
+  if (entry && !fresh) entry = undefined;
+  const hit = fresh ? entry!.bySeed.get(key) : undefined;
+  if (hit) return hit;
+  const out = computeReplay(facts, seed, radiusOverrides);
+  replayStats.computes++;
+  if (!entry) {
+    entry = { snapshot: facts.slice(), bySeed: new Map() };
+    replayCache.set(facts, entry);
+  }
+  if (entry.bySeed.size >= REPLAY_CACHE_MAX) entry.bySeed.clear();
+  entry.bySeed.set(key, out);
+  return out;
+}
+
+/**
  * Replay the enabled facts in order; disabled or unsatisfiable facts are flagged,
  * not fatal. `seed` samples the figure's residual freedom (ADR-018): the final
  * figure's non-pinned free points are perturbed deterministically, so the figure
  * is re-drawn while still satisfying every fact. seed 0 = the canonical default.
  * The seed's HIGH bits ({@link reflectMaskOf}) additionally select a reflection of
  * the apex free points (ADR-166); seed < REFLECT_STRIDE ⇒ mask 0 ⇒ no reflection.
+ * (Callers use the memoized {@link replay} wrapper above; this is the real build.)
  */
-export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}): Derived {
+function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}): Derived {
   let lastError: string | null = null;
   // Symbol table over the ENABLED facts, so a value given later (`x = 4`) resolves an
   // earlier `AB = 3x`, and two segments sharing a variable become a proportion (ADR-031).
@@ -608,15 +646,27 @@ function reflectMaskForFailing(fig: Derived): number {
 }
 
 /**
+ * Wall-clock budget for the synchronous config searches (E2 / STO-2). The search loops run replay after
+ * replay on the UI thread behind a spinner; on a pathologically slow figure (~1.5 s/replay was measured,
+ * ADR-123) an unbounded sweep froze the tab for tens of seconds. Past the deadline the search returns
+ * what it has — the caller keeps the current figure, honestly amber, instead of freezing. Tests run with
+ * NO deadline (vitest sets MODE 'test') so seed choices stay machine-independent and deterministic; the
+ * deadline path itself is unit-tested by passing an explicit budget.
+ */
+const SEARCH_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 2500;
+
+/**
  * The first seed whose replay BUILDS and satisfies the configuration requirements — every "המשך" extension
  * reaches its far side cleanly (ADR-098) AND every plain segment-meet lands WITHIN its segments (ADR-166) —
  * else `from`. Two unstated DOFs are searched: the continuous sample (seeds) and the discrete apex
  * REFLECTION (high seed bits, {@link withReflectMask}). A point on a circle whose secant must extend onto
  * another circle, and an apex whose side decides whether two segments cross, are both placements only a
  * subset of configurations satisfies — we SAMPLE one rather than drive across a degeneracy. Used to auto-pick
- * the default configuration after a step and to gate "show another configuration".
+ * the default configuration after a step and to gate "show another configuration". Bounded by `budgetMs`
+ * of wall-clock (E2): past the deadline it returns `from` (keep the current view, amber if short).
  */
-export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120): number {
+export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budgetMs = SEARCH_BUDGET_MS): number {
+  const deadline = Date.now() + budgetMs;
   const hasExt = extensionTriples(facts).length > 0;
   const base0 = replay(facts, from);
   const reflectable = reflectableFreePoints(base0.construction);
@@ -637,11 +687,15 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120): numb
     for (const m of masks) for (let s = 0; s < 24; s++) seeds.push(withReflectMask(m, s));
   }
   for (let s = from; s < from + budget; s++) seeds.push(s);
-  for (const s of seeds) if (ok(replay(facts, s))) return s;
+  for (const s of seeds) {
+    if (Date.now() > deadline) return from; // out of budget — keep the current view (amber if short)
+    if (ok(replay(facts, s))) return s;
+  }
   // RELAXED FALLBACK ([ADR-142](docs/06-decisions.md#adr-142)): no seed satisfies the strict extension
   // direction, so accept a shared-endpoint extension on EITHER side (the strict pass above ran first, so this
   // never weakens an achievable figure). Still requires plain segment-meets to land within.
   for (let s = from; s < from + budget; s++) {
+    if (Date.now() > deadline) return from;
     const fig = replay(facts, s);
     if (fig.lastError === null && extensionsClear(facts, fig, true) && intersectionsWithinSegments(fig)) return s;
   }
@@ -679,13 +733,18 @@ export function meetsRequirements(facts: Fact[], seed = 0): boolean {
  * CURRENT branch assignment is tried first and most widely; the combinatorics of alternative branches are
  * bounded. Deterministic.
  */
-export function findValidConfig(facts: Fact[], fromSeed = 0): { facts: Fact[]; seed: number } | null {
+export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_BUDGET_MS): { facts: Fact[]; seed: number } | null {
+  const deadline = Date.now() + budgetMs;
+  const timeLeft = () => Math.max(0, deadline - Date.now());
   // First the targeted extension/reflection search (ADR-098/ADR-166): it explores the discrete apex
   // REFLECTION DOF (high seed bits) that the plain seed sweep below can't reach, so a segment-meet whose
   // apex points the wrong way is brought onto the segments in a handful of tries instead of by luck.
-  const s0 = firstSatisfyingSeed(facts, fromSeed);
+  const s0 = firstSatisfyingSeed(facts, fromSeed, 120, timeLeft());
   if (meetsRequirements(facts, s0)) return { facts, seed: s0 };
-  for (let s = fromSeed; s < fromSeed + 40; s++) if (meetsRequirements(facts, s)) return { facts, seed: s };
+  for (let s = fromSeed; s < fromSeed + 40; s++) {
+    if (Date.now() > deadline) return null; // out of budget — caller keeps the current figure, amber
+    if (meetsRequirements(facts, s)) return { facts, seed: s };
+  }
   // Discrete branch alternatives — vary which intersection/side each branchable point takes.
   const base = replay(facts).construction;
   const branchy = facts
@@ -698,6 +757,7 @@ export function findValidConfig(facts: Fact[], fromSeed = 0): { facts: Fact[]; s
   let combos: number[][] = [[]];
   for (const { count } of branchy) combos = combos.flatMap((c) => Array.from({ length: count }, (_, b) => [...c, b]));
   for (const combo of combos.slice(0, 16)) {
+    if (Date.now() > deadline) return null;
     // skip the current assignment (already swept above)
     const fc = facts.map((f, idx) => {
       const k = branchy.findIndex((x) => x.i === idx);
@@ -817,15 +877,17 @@ function introducedPointIds(cmd: Command): Id[] {
 }
 
 /**
- * Every point id that appears in a command, created or referenced. Point ids are
- * always single uppercase letters; line ids ("bis-…") and circle ids ("circle-O")
- * are multi-character, so a single-letter test isolates points cleanly. The
+ * Every point id that appears in a command, created or referenced. A point id is an uppercase letter
+ * plus optional digits (`A`, `O1`, `O2` — the LLM path legitimately produces subscripted centres, and
+ * `absorb` was widened for them, PAR-10); line ids ("bis-…") and circle ids ("circle-O") are
+ * multi-character with a lowercase prefix, so the whole-token test isolates points cleanly. The old
+ * single-letter test made rename/swap/merge refuse a subscripted point ("no-source") — E6/STO-7. The
  * measure `expr` is skipped — it carries a variable/text, never a point id.
  */
 function commandPointIds(cmd: AnyCommand): Id[] {
   const out: Id[] = [];
   const take = (v: unknown) => {
-    if (typeof v === 'string' && /^[A-Z]$/.test(v)) out.push(v);
+    if (typeof v === 'string' && /^[A-Z]\d*$/.test(v)) out.push(v);
   };
   for (const [k, v] of Object.entries(cmd)) {
     if (k === 'expr') continue;
@@ -849,15 +911,15 @@ function setSegFlag(style: Record<Id, { hidden?: boolean; dashed?: boolean }>, i
   return out;
 }
 
-/** Rewrite a seg-id key (`seg-AB`) under a point rename — re-derive it from the renamed, re-sorted
- *  endpoints so it still matches the renderer's id. Best-effort: only the common single-letter-endpoints
- *  case (a subscripted/multi-char endpoint keeps its old key — a minor cosmetic staleness). */
+/** Rewrite a seg-id key (`seg-AB`, `seg-O1O2`) under a point rename — TOKENIZE the endpoint run
+ *  (`[A-Z]\d*` labels, the same shape `relabelId` uses) and re-derive the renamed, re-sorted key so it
+ *  still matches the renderer's id. Subscripted endpoints included (E6/STO-7 — the old 2-char slice
+ *  left them stale). */
 function renameSegKey(key: Id, from: Id, to: Id): Id {
   if (!key.startsWith('seg-')) return key;
-  const ep = key.slice(4);
-  if (ep.length !== 2) return key;
-  const a = ep[0] === from ? to : ep[0];
-  const b = ep[1] === from ? to : ep[1];
+  const eps = key.slice(4).match(/[A-Z]\d*/g);
+  if (!eps || eps.length !== 2) return key;
+  const [a, b] = eps.map((e) => (e === from ? to : e));
   return `seg-${[a, b].sort().join('')}`;
 }
 
@@ -948,7 +1010,8 @@ export interface GeoState {
   facts: Fact[];
   /** The fact currently selected for inspection (highlighted on the canvas); UI-only, not undoable. */
   selectedId: string | null;
-  /** Sampling seed for the figure's residual freedom (ADR-018); UI-only, not undoable. 0 = canonical. */
+  /** Sampling seed for the figure's residual freedom (ADR-018); 0 = canonical. IN the undo history
+   *  (E5/STO-5): undo restores the view the student actually saw, not the reverted facts at a later seed. */
   seed: number;
   /** Show measure labels on the figure (ADR-031); UI-only, not undoable. Default true. */
   showMeasures: boolean;
@@ -984,6 +1047,15 @@ export interface GeoState {
 
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
   execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;
+  /** Commit ONE user action's whole command group in ONE set — one undo entry removes the whole step
+   *  (E4/STO-4; the per-command `execute` loop recorded N entries, so one undo peeled one command off a
+   *  step whose row still showed ✓). Applies the same idempotency/move-in-place policy per command. */
+  executeMany: (cmds: AnyCommand[], utterance?: string) => void;
+  /** Undo/redo wrappers (E5/STO-5): zundo restores `facts` + `seed` (the figure the student SAW — the
+   *  seed is in the temporal state, so an auto-advanced/resampled view rolls back with its facts), and
+   *  any dialed radii are cleared (a viewing scratchpad can't outlive the state it annotated). */
+  undo: () => void;
+  redo: () => void;
   /** Replace a fact's command *in place* (same list position) — an edit (ADR-015). */
   update: (id: string, cmd: AnyCommand, utterance?: string) => void;
   /** Flip a fact's selected/deselected state. */
@@ -1135,6 +1207,62 @@ function shapeDiffers(a: number[], b: number[]): boolean {
   return s / a.length > 0.03;
 }
 
+/**
+ * Fold ONE command into the fact list per the execute policy: idempotent duplicate (FR-EN-9 — re-issuing
+ * re-enables a deselected twin, never stacks), a free-point move updates its fact in place (ADR-011), and
+ * re-stating a STANDALONE circle resizes it in place (a circle inside a bigger step falls through to an
+ * override append, keeping that step's label intact). Returns the same array when nothing changed.
+ */
+function foldFact(facts: Fact[], cmd: AnyCommand, utterance?: string, group?: string): Fact[] {
+  const dup = facts.find((f) => deepEqual(f.cmd, cmd));
+  if (dup) return dup.enabled ? facts : facts.map((f) => (f.id === dup.id ? { ...f, enabled: true } : f));
+  if (cmd.type === 'free-point') {
+    const prev = facts.find((f) => f.cmd.type === 'free-point' && f.cmd.id === cmd.id);
+    if (prev) return facts.map((f) => (f.id === prev.id ? { ...f, cmd, utterance, enabled: true } : f));
+  }
+  if (cmd.type === 'circle' || cmd.type === 'circle-through') {
+    const prev = facts.find((f) => (f.cmd.type === 'circle' || f.cmd.type === 'circle-through') && f.cmd.id === cmd.id);
+    if (prev && !facts.some((f) => f.id !== prev.id && groupKey(f) === groupKey(prev)))
+      return facts.map((f) => (f.id === prev.id ? { ...f, cmd, utterance, enabled: true } : f));
+  }
+  return [...facts, { id: nanoid(), cmd, utterance, group, enabled: true }];
+}
+
+/**
+ * Commit a batch of commands as ONE state transition (E4/STO-4): fold each through {@link foldFact}, then
+ * a single `set` carrying the new facts AND — when a newly-appended step broke an extension's directional
+ * order or a segment-meet (ADR-098/166) — the auto-advanced seed in the SAME transition, so zundo records
+ * exactly one entry per user action and undo restores both the facts and the view they were seen at (E5).
+ */
+function commitCommands(
+  get: () => GeoState,
+  set: (p: Partial<GeoState>) => void,
+  cmds: AnyCommand[],
+  utterance?: string,
+  group?: string,
+): void {
+  const facts = get().facts;
+  let next = facts;
+  for (const cmd of cmds) next = foldFact(next, cmd, utterance, group);
+  if (next === facts) return; // every command was an idempotent duplicate — nothing to record
+  const patch: Partial<GeoState> = { facts: next };
+  // The seed auto-advance applies only when the batch APPENDED a step (matching the old per-command
+  // behaviour: a free-point move / circle resize never re-seeds), and only when the current view is
+  // actually broken — searching upward from the current seed keeps a valid hand-picked view.
+  if (next.length > facts.length) {
+    const seed = get().seed;
+    const fig = replay(next, seed);
+    if (fig.lastError === null && (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig))) {
+      const s = firstSatisfyingSeed(next, seed);
+      if (s !== seed) {
+        patch.seed = s;
+        patch.radiusOverrides = {};
+      }
+    }
+  }
+  set(patch);
+}
+
 export const useGeoStore = create<GeoState>()(
   temporal(
     (set, get) => ({
@@ -1151,49 +1279,23 @@ export const useGeoStore = create<GeoState>()(
       shapes: null,
 
       execute: (cmd, utterance, group) => {
-        const facts = get().facts;
-        // Idempotent (FR-EN-9): re-issuing an identical command adds no duplicate
-        // fact. If that fact was deselected, re-issuing turns it back on.
-        const dup = facts.find((f) => deepEqual(f.cmd, cmd));
-        if (dup) {
-          if (!dup.enabled) set({ facts: facts.map((f) => (f.id === dup.id ? { ...f, enabled: true } : f)) });
-          return;
-        }
-        // Repositioning a free point already governed by a prior free-point fact
-        // updates that fact in place (a move), rather than stacking rows (ADR-011).
-        if (cmd.type === 'free-point') {
-          const prev = facts.find((f) => f.cmd.type === 'free-point' && f.cmd.id === cmd.id);
-          if (prev) {
-            set({ facts: facts.map((f) => (f.id === prev.id ? { ...f, cmd, utterance, enabled: true } : f)) });
-            return;
-          }
-        }
-        // Re-stating a STANDALONE circle (its own one-command step) resizes it in
-        // place — like a free-point move. A circle that belongs to a bigger step
-        // (an inscribed shape) instead falls through to append an override step,
-        // so that step's label stays intact (the engine resizes on replay).
-        if (cmd.type === 'circle' || cmd.type === 'circle-through') {
-          const prev = facts.find(
-            (f) => (f.cmd.type === 'circle' || f.cmd.type === 'circle-through') && f.cmd.id === cmd.id,
-          );
-          if (prev && !facts.some((f) => f.id !== prev.id && groupKey(f) === groupKey(prev))) {
-            set({ facts: facts.map((f) => (f.id === prev.id ? { ...f, cmd, utterance, enabled: true } : f)) });
-            return;
-          }
-        }
-        const next = [...facts, { id: nanoid(), cmd, utterance, group, enabled: true }];
-        set({ facts: next });
-        // A new step can make the CURRENT sample violate an extension's directional order — a free point
-        // on a circle (e.g. C) landing where "המשך" can't reach the far side of the target circle. Rather
-        // than drive that point across a degeneracy, auto-advance to the first configuration that honours
-        // every extension (sampling the free DOF, ADR-098). Only when the current view is actually broken,
-        // searching upward from the current seed so an already-valid hand-picked view is kept.
-        const seed = get().seed;
-        const fig = replay(next, seed);
-        if (fig.lastError === null && (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig))) {
-          const s = firstSatisfyingSeed(next, seed);
-          if (s !== seed) set({ seed: s, radiusOverrides: {} });
-        }
+        commitCommands(get, set, [cmd], utterance, group);
+      },
+
+      executeMany: (cmds, utterance) => {
+        // One utterance → one group id → ONE set → one undo entry for the whole step (E4/STO-4).
+        commitCommands(get, set, cmds, utterance, cmds.length > 1 ? nanoid() : undefined);
+      },
+
+      undo: () => {
+        useGeoStore.temporal.getState().undo();
+        // A dialed radius is a viewing scratchpad on the state it annotated — never carry it across (E5).
+        if (Object.keys(get().radiusOverrides).length) set({ radiusOverrides: {} });
+      },
+
+      redo: () => {
+        useGeoStore.temporal.getState().redo();
+        if (Object.keys(get().radiusOverrides).length) set({ radiusOverrides: {} });
       },
 
       update: (id, cmd, utterance) => {
@@ -1461,11 +1563,14 @@ export const useGeoStore = create<GeoState>()(
       },
     }),
     {
-      // Only the fact list participates in undo/redo — not the transient selection.
-      partialize: (s) => ({ facts: s.facts }),
-      // Skip history entries when the fact list is unchanged (e.g. selecting a
-      // fact only sets selectedId); actions that edit facts replace the array.
-      equality: (a, b) => a.facts === b.facts,
+      // The fact list AND the seed participate in undo/redo (E5/STO-5): `execute` can auto-advance the
+      // seed and `autoResolve`/`resample` set it, so restoring facts at a DIFFERENT seed showed the
+      // student a figure they never saw — undo now rolls the view back with the data. Transient
+      // selection and the dialed-radius scratchpad stay out (the store's `undo`/`redo` wrappers clear
+      // the overrides instead — a per-drag slider value must not flood the history).
+      partialize: (s) => ({ facts: s.facts, seed: s.seed }),
+      // Skip history entries when neither changed (e.g. selecting a fact only sets selectedId).
+      equality: (a, b) => a.facts === b.facts && a.seed === b.seed,
       limit: 100,
     },
   ),

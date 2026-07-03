@@ -139,15 +139,23 @@ function accrueMembers(cmd: AnyCommand, members: Map<string, Set<string>>): void
  * re-parse — without it, context-dependent rules (e.g. "another secant from the
  * existing point E") can't fire and the step is wrongly dropped.
  */
-export async function llmParse(utterance: string, context: string, figureCtx: ParseContext = {}): Promise<LlmOutcome | null> {
+export async function llmParse(
+  utterance: string,
+  context: string,
+  figureCtx: ParseContext = {},
+  opts: { signal?: AbortSignal } = {},
+): Promise<LlmOutcome | null> {
   let steps: string[];
   try {
     // Base-relative so it works under the deployed subpath: dev -> /api/parse,
     // prod (base '/geo-builder/') -> /geo-builder/api/parse. BASE_URL has a trailing slash.
+    // `signal` (E3/STO-3): the caller aborts on its ~15 s timeout or the student's cancel —
+    // a hung proxy must never leave a permanent spinner.
     const res = await fetch(`${import.meta.env.BASE_URL}api/parse`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ utterance, context }),
+      signal: opts.signal,
     });
     if (!res.ok) {
       // A 429 is a THROTTLE, not a parse failure — return an empty outcome tagged `busy` so the caller

@@ -322,7 +322,7 @@ Dependency notes: PAR-11 (shadow matrix) should land before Phase C. TST-1 (seed
 | A2 / TST-1 | A | Seed-sweep oracle | — | ½ d | ADR-172 | ✅ |
 | A3 / TST-2 | A | De-triplicate parseCtx (fixes triage bug) | — | 1–2 h | ADR-171 | ✅ |
 | A4 / TST-6 | A | Verifier tolerance pinning | — | ½ h | ADR-173 | ✅ |
-| A5 / TST-5 | A | Replay-count perf canary (→ do with E1, needs store change) | — | ½ h | | ☐ |
+| A5 / TST-5 | A | Replay-count perf canary (done with E1) | — | ½ h | ADR-204 | ✅ |
 | A6 / TST-7 | A | Stray file + vitest ignore + scenario-doc parity (backfilled 34, guard added) | — | ½ h | ADR-174 | ✅ |
 | B1 / SEC-1 | B | XFF last-hop | HIGH | 1 h | ADR-175 | ✅ |
 | B2 / SEC-2 | B | Cost gate — global daily ceiling (LLM_DAILY_MAX) + "service busy" msg | HIGH | ½ d | ADR-177 | ✅ |
@@ -344,13 +344,13 @@ Dependency notes: PAR-11 (shadow matrix) should land before Phase C. TST-1 (seed
 | D2 / ENG-2+REN-6 | D | Publish solved radii (retires pointOnCircleId) | MED | ½ d | ADR-201 | ✅ |
 | — | A–D | Degenerate-constraint guard (freeze fix, unplanned operator bug) | HIGH | — | ADR-202 | ✅ |
 | — | A–D | **Validation review of Phases A–D** — 16 verified findings (3 were regressions the phase fixes introduced; shadow gate hardened to a checked-in allowlist; degenerate guard widened to the NaN-by-id class) | — | 1 d | ADR-203 | ✅ |
-| E1 / STO-1 | E | Replay memoization + DEV snapshot | MED | 2–3 h | | ☐ |
-| E2 / STO-2 | E | Bounded config search | MED | ½ d | | ☐ |
-| E3 / STO-3 | E | Race-safe cancellable LLM submit | HIGH | ½ d | | ☐ |
-| E4 / STO-4 | E | One undo per action | MED | ½ d | | ☐ |
-| E5 / STO-5 | E | Undo restores seed/overrides | M | 2 h | | ☐ |
-| E6 / STO-6/7 | E | merge relabel + subscripted ops | LOW | 2 h | | ☐ |
-| E7 / TST-4 | E | Store round-trip PBT | — | ½ d | | ☐ |
+| E1 / STO-1 | E | Replay memoization + DEV snapshot | MED | 2–3 h | ADR-204 | ✅ |
+| E2 / STO-2 | E | Bounded config search | MED | ½ d | ADR-204 | ✅ |
+| E3 / STO-3 | E | Race-safe cancellable LLM submit | HIGH | ½ d | ADR-205 | ✅ |
+| E4 / STO-4 | E | One undo per action | MED | ½ d | ADR-205 | ✅ |
+| E5 / STO-5 | E | Undo restores seed/overrides | M | 2 h | ADR-205 | ✅ |
+| E6 / STO-6/7 | E | merge relabel (ADR-203) + subscripted ops | LOW | 2 h | ADR-206 | ✅ |
+| E7 / TST-4 | E | Store round-trip PBT | — | ½ d | ADR-206 | ✅ |
 | F1 / REN-1 | F | RTL edit-menu mirror | HIGH | 1 h | | ☐ |
 | F2 / REN-4 | F | Touch (scope decision) | MED | ½–2 d | | ☐ |
 | F3 / REN-3 | F | Clean export | MED | 2–3 h | | ☐ |

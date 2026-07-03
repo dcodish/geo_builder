@@ -25,8 +25,6 @@ import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsR
 import type { Fact } from '@/store/geoStore';
 import { logDebug } from '@/debug/sessionLog';
 import { humanizeError } from '@/i18n/humanizeError';
-import { nanoid } from 'nanoid';
-
 /**
  * Resolve AFTER the browser has had a chance to paint. A just-set React state (e.g. a "thinking"
  * spinner) is only committed to the DOM on the next frame; a blocking SYNCHRONOUS solve started in
@@ -74,13 +72,27 @@ export default function App() {
   const clearShapes = useGeoStore((s) => s.clearShapes);
   const clear = useGeoStore((s) => s.clear);
 
-  const { undo, redo } = useGeoStore.temporal.getState();
+  // The STORE's undo/redo wrappers (E5/STO-5), not raw zundo: they also clear the dialed-radius
+  // scratchpad, and the temporal state itself now carries facts + seed so the restored view matches.
+  const undo = useGeoStore((s) => s.undo);
+  const redo = useGeoStore((s) => s.redo);
+  const executeMany = useGeoStore((s) => s.executeMany);
   const canUndo = useStore(useGeoStore.temporal, (s) => s.pastStates.length > 0);
   const canRedo = useStore(useGeoStore.temporal, (s) => s.futureStates.length > 0);
 
   const [text, setText] = useState('');
   const [inputNote, setInputNote] = useState(''); // a problem message under the input (not-understood / built-nothing)
   const [thinking, setThinking] = useState(false); // LLM fallback in flight (Phase 7)
+  // Re-entry gate + abort for the submit pipeline (E3/STO-3). `busyRef` is the SYNCHRONOUS truth —
+  // React state lags a render, so two rapid example-chip clicks could both enter `submit` and race
+  // their dry-runs/commits; the ref blocks the second immediately. `llmAbortRef` lets the ~15 s
+  // timeout or the student's cancel abort a hung proxy call instead of a permanent spinner.
+  const busyRef = useRef(false);
+  const llmAbortRef = useRef<AbortController | null>(null);
+  const setBusy = (b: boolean) => {
+    busyRef.current = b;
+    setThinking(b);
+  };
   const [resampling, setResampling] = useState(false); // "show another configuration" search in flight (synchronous; we paint a busy state first)
   const [analysing, setAnalysing] = useState(false); // "view relations" detection in flight (synchronous; paint a busy state first)
   const [detecting, setDetecting] = useState(false); // "detect shapes" detection in flight (synchronous; paint a busy state first)
@@ -135,7 +147,11 @@ export default function App() {
   // Debug log (dev only): snapshot the fact list + per-fact status whenever the
   // figure changes (any submit / edit / delete / undo / clear / resample), so a
   // session can be reconstructed later from logs/debug-log.jsonl. Best-effort.
+  // Gated on DEV at the SUBSCRIPTION (E1/STO-1): in production the `figure` event is
+  // discarded by `logDebug` anyway, but the `replay` it ran first was real work on
+  // every store change — and it also closes the SEC-7 note about prod figure payloads.
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
     const snapshot = () => {
       const st = useGeoStore.getState();
       const { status, lastError } = replay(st.facts, st.seed);
@@ -241,22 +257,32 @@ export default function App() {
     // `submit` has already painted the spinner; if the figure already meets its requirements there's no
     // search to run, so just clear it (the commit itself was the answer).
     if (meetsRequirements(st.facts, st.seed)) {
-      setThinking(false);
+      setBusy(false);
       return;
     }
-    setThinking(true);
+    setBusy(true);
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         try {
-          autoResolve();
+          // autoResolve's branch/seed rewrite belongs to the SAME user action as the commit it follows —
+          // pause history so it merges into that entry instead of adding an invisible extra undo step
+          // (E4/STO-4; one undo now removes the whole action, auto-resolution included).
+          const temporal = useGeoStore.temporal.getState();
+          temporal.pause();
+          try {
+            autoResolve();
+          } finally {
+            temporal.resume();
+          }
         } finally {
-          setThinking(false);
+          setBusy(false);
         }
       }),
     );
   };
 
   async function submit(utterance: string) {
+    if (busyRef.current) return; // a submit is already in flight (E3) — chips/enter can't race a second one
     setInputNote('');
     setLlmDropped([]);
     setRenameNote('');
@@ -298,7 +324,7 @@ export default function App() {
     // visible from the moment Submit is pressed until the answer (operator) — the same treatment the
     // "show another configuration" path already gets. Cleared on every synchronous exit below; the
     // commit paths hand off to `resolveAfterCommit`, which owns the spinner through any auto-resolve.
-    setThinking(true);
+    setBusy(true);
     await nextPaint();
     const pctx = parseCtx();
     const r = parse(utterance, pctx);
@@ -308,7 +334,7 @@ export default function App() {
     if (!r.ok && r.reason === 'ambiguous-angle') {
       logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `ambiguous-angle:${r.vertex}` });
       setInputNote(t('input.ambiguousAngle', { vertex: r.vertex }));
-      setThinking(false);
+      setBusy(false);
       return;
     }
     let weak: 'error' | 'empty' | 'dropped' | null = null;
@@ -324,10 +350,8 @@ export default function App() {
         // (operator request); a step that builds something commits immediately.
         const outcome = dryRunOutcome(facts, r.commands, seed, radiusOverrides);
         if (outcome.produced) {
-          // One utterance → possibly many commands; tag them with one group id so
-          // they show as a single step row, not N identical rows.
-          const group = nanoid();
-          r.commands.forEach((c) => execute(c, utterance, group));
+          // One utterance → one BATCH commit (one group id, one set, ONE undo entry — E4/STO-4).
+          executeMany(r.commands, utterance);
           logDebug({ kind: 'input', utterance, locale, source: 'parser', commands: r.commands });
           setText('');
           resolveAfterCommit();
@@ -339,8 +363,7 @@ export default function App() {
         // `replay`'s deferral retries it once the later givens pin the figure (ADR-104) — order-independence.
         // A genuine contradiction then surfaces honestly as a failing step instead of "couldn't read that".
         if (outcome.reason === 'error' && hasDeferrableConstraint(r.commands)) {
-          const group = nanoid();
-          r.commands.forEach((c) => execute(c, utterance, group));
+          executeMany(r.commands, utterance);
           logDebug({ kind: 'input', utterance, locale, source: 'parser', result: 'deferred-constraint', detail: outcome.detail, commands: r.commands });
           setText('');
           resolveAfterCommit();
@@ -354,7 +377,7 @@ export default function App() {
         if (outcome.reason === 'error') {
           logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `conflict:${outcome.detail ?? ''}`, commands: r.commands });
           setInputNote(outcome.detail ? humanizeError(outcome.detail, t) : t('input.producedNothing'));
-          setThinking(false);
+          setBusy(false);
           return; // keep the text so the student can edit/delete it
         }
         // A clean RE-ENTRY of things that already exist (re-typing a shape, re-inscribing points already on
@@ -369,7 +392,7 @@ export default function App() {
             logDebug({ kind: 'input', utterance, locale, source: 'parser', result: 'noop-exists', commands: r.commands });
             setInputNote(t('input.alreadyDrawn'));
             setText('');
-            setThinking(false);
+            setBusy(false);
             return;
           }
         }
@@ -391,20 +414,44 @@ export default function App() {
       construction.objects.filter(isGeoPoint).map((o) => o.id),
       construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
     );
-    const out = await llmParse(utterance, ctx, parseCtx());
+    // Abortable + bounded (E3/STO-3): a hung proxy aborts after ~15 s, and the student can cancel —
+    // either way the spinner clears instead of hanging forever.
+    const controller = new AbortController();
+    llmAbortRef.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    let out: Awaited<ReturnType<typeof llmParse>>;
+    try {
+      out = await llmParse(utterance, ctx, parseCtx(), { signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+      llmAbortRef.current = null;
+    }
+    // Cancelled (student) — quietly stand down, keeping the text for a retry; timed out — an honest
+    // "service busy" (the request may still be running server-side; it isn't the student's fault).
+    if (out === null && controller.signal.aborted) {
+      logDebug({ kind: 'input', utterance, locale, source: 'limit', result: 'aborted-or-timeout', intermediate: true });
+      setInputNote(t('input.serviceBusy'));
+      setBusy(false);
+      return;
+    }
     // The proxy is throttling (global daily cost ceiling or per-IP limit) — NOT a parse failure. Show a
     // "service busy, try again" message (never "couldn't understand your input" — it isn't the student's
     // fault) and tag the analytics so the operator can see how often the ceiling is reached (SEC-2).
     if (out?.busy) {
       logDebug({ kind: 'input', utterance, locale, source: 'limit', result: out.busy });
       setInputNote(t('input.serviceBusy'));
-      setThinking(false);
+      setBusy(false);
       return;
     }
+    // RE-READ the store after the await (E3/STO-3): the dry-run below must run against the CURRENT
+    // facts — an undo/canvas action during the network call would otherwise be validated against the
+    // pre-await snapshot while `executeMany` commits onto the live list (a stale-commit race).
+    const cur = useGeoStore.getState();
     // The LLM only counts if its decomposition actually BUILDS something — else it's another silent
     // fail. Dry-run the combined commands; if neither grammar nor LLM built anything, say so plainly.
     const llmCmds = out ? out.built.flatMap((g) => g.commands) : [];
-    const llmBuilds = out !== null && out.built.length > 0 && dryRunOutcome(facts, llmCmds, seed, radiusOverrides).produced;
+    const llmBuilds =
+      out !== null && out.built.length > 0 && dryRunOutcome(cur.facts, llmCmds, cur.seed, cur.radiusOverrides).produced;
     if (!llmBuilds) {
       // Both the grammar AND the LLM failed to BUILD anything. Distinguish a deliberately OUT-OF-SCOPE
       // concept — a named angle/theorem relationship, a proof or compute request, or pure free text —
@@ -416,14 +463,14 @@ export default function App() {
       if (scope) {
         logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${scope.category}` });
         setInputNote(t(scope.messageKey));
-        setThinking(false);
+        setBusy(false);
         return;
       }
       logDebug({ kind: 'input', utterance, locale, source: 'llm', result: out && out.built.length ? 'built-nothing' : 'not-understood' });
       // "produced nothing even after a retry" gets the explicit problem message; pure out-of-grammar
       // (the grammar never matched) keeps the gentler "couldn't read that — try an example".
       setInputNote(t(weak ? 'input.producedNothing' : 'input.notUnderstood'));
-      setThinking(false);
+      setBusy(false);
       return;
     }
     // The LLM understood the (often Hebrew) input and decomposed it into canonical steps; show it as
@@ -431,8 +478,7 @@ export default function App() {
     // (a Hebrew input must never surface as an English row). All built commands share one group, exactly
     // like a deterministic multi-command parse, so editing the row re-runs the original wording. The
     // canonical decomposition + any unbuildable steps stay in the debug log / `dropped` report.
-    const group = nanoid();
-    out!.built.forEach((g) => g.commands.forEach((c) => execute(c, utterance, group)));
+    executeMany(llmCmds, utterance); // one batch → one step row AND one undo entry (E4)
     logDebug({ kind: 'input', utterance, locale, source: 'llm', built: out!.built.map((g) => g.step), dropped: out!.dropped });
     setLlmDropped(out!.dropped);
     setText('');
@@ -714,6 +760,15 @@ export default function App() {
               </>
             )}
             {thinking && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
+            {thinking && llmAbortRef.current && (
+              <button
+                type="button"
+                style={{ fontSize: 12, border: 'none', background: 'none', color: '#64748b', cursor: 'pointer', textDecoration: 'underline' }}
+                onClick={() => llmAbortRef.current?.abort()}
+              >
+                {t('input.cancel')}
+              </button>
+            )}
             {inputNote && <span style={{ fontSize: 12, color: '#b45309' }} dir={textDir(inputNote)}>{inputNote}</span>}
             {renameNote && <span style={{ fontSize: 12, color: '#b45309' }} dir={textDir(renameNote)}>{renameNote}</span>}
             {llmDropped.length > 0 && (

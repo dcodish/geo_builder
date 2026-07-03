@@ -130,6 +130,21 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
     expect(r!.dropped).toEqual(['utter nonsense']);
   });
 
+  it('threads an AbortSignal to fetch and returns null when aborted (E3/STO-3 — no permanent spinner)', async () => {
+    const fetchMock = vi.fn().mockImplementation((_url: string, init: { signal?: AbortSignal }) => {
+      // simulate a hung proxy that only ends when the caller aborts
+      return new Promise((_res, rej) => {
+        init.signal?.addEventListener('abort', () => rej(new DOMException('aborted', 'AbortError')));
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    const p = llmParse('square', '', {}, { signal: controller.signal });
+    controller.abort(); // the App's 15 s timeout / the student's cancel
+    expect(await p).toBeNull(); // resolves (not hangs), with the null the caller maps to "service busy"
+    expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal);
+  });
+
   it('returns null on a non-throttle proxy error (no key / 5xx / network)', async () => {
     mockFetch([], false); // ok:false, no 429 status → a genuine failure, not a throttle
     expect(await llmParse('square', '')).toBeNull();

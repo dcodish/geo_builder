@@ -28,6 +28,7 @@
     "placeholder": "Describe a step — e.g. \"square ABCD\" or \"point G on AD\"",
     "send": "Add",
     "loading": "Thinking...",
+    "cancel": "cancel",
     "notUnderstood": "I couldn't read that yet — try one of the examples below.",
     "serviceBusy": "The parsing service is busy right now — please try again in a little while.",
     "scope": {
