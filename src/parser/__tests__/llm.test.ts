@@ -105,6 +105,24 @@ describe('llmParse (client dispatch — fetch mocked)', () => {
     expect(r!.built.flatMap((b) => b.commands).map((c) => c.type)).toEqual(['circumcircle', 'arc-midpoint']);
   });
 
+  it('threads the caller figure hints into EVERY step and accrues them across steps (M1, review 2026-07-03)', async () => {
+    // The operator-class case: a decomposition whose step 2 is a baseless midsegment (ADR-199). Step 1
+    // creates E ON AC; step 2 ("EG קטע אמצעים") needs ctx.onSegment[E] + ctx.neighbors to resolve the
+    // triangle — hints that used to be DROPPED here, so step 2 silently degraded to a bare segment EG.
+    mockFetch(['נקודה E על AC', 'EG קטע אמצעים']);
+    const r = await llmParse('midsegment decomposition', '', {
+      points: ['A', 'B', 'C'],
+      circles: [],
+      // the caller's real-figure hints (triangle ABC drawn earlier)
+      neighbors: { A: ['B', 'C'], B: ['A', 'C'], C: ['A', 'B'] },
+    });
+    expect(r!.dropped).toEqual([]);
+    const kinds = r!.built.flatMap((b) => b.commands).map((c) => c.type);
+    // step 2 must parse as the midsegment macro (shape-variant), NOT a bare segment
+    expect(kinds).toContain('shape-variant');
+    expect(r!.built[1].commands.some((c) => c.type === 'segment' && r!.built[1].commands.length === 1)).toBe(false);
+  });
+
   it('an LLM that returns nothing buildable yields empty built (caller shows "couldn\'t read")', async () => {
     mockFetch(['utter nonsense']);
     const r = await llmParse('???', '');

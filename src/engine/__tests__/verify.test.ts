@@ -151,4 +151,22 @@ describe('checkGivens — on-segment membership', () => {
     // extension one, which the lastDef guard must suppress.
     expect(checkGivens(redefined, positions, new Map()).some((x) => x.ids.includes('E'))).toBe(false);
   });
+
+  it('a POLYGON drawn THROUGH the on-segment point does NOT supersede its membership (review 2026-07-03, E1)', () => {
+    // A shape's `ids` tuple only REFERENCES its vertices (apply wires edges; it never re-places an
+    // existing point) — so "E on AC" followed by "triangle ABE" must keep verifying E's membership.
+    // Counting `ids` as a definition silently disabled the ADR-194 backstop for exactly these figures.
+    const withPoly: Command[] = [
+      { type: 'square', ids: ['A', 'B', 'C', 'D'] },
+      { type: 'point-on-segment', id: 'E', a: 'A', b: 'C' },
+      { type: 'triangle', ids: ['A', 'B', 'E'] }, // references E — not a redefinition
+    ];
+    const { construction } = build(withPoly);
+    const ev = evaluate(construction);
+    if (!ev.ok) throw new Error('figure did not build');
+    const t = new Map(ev.positions);
+    t.set('E', { x: 50, y: 10 }); // far off segment AC
+    const v = checkGivens(withPoly, t, ev.circles);
+    expect(v.some((x) => x.messageKey === 'figure.v.onSegment' && x.ids.includes('E'))).toBe(true);
+  });
 });

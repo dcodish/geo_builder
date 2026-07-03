@@ -327,14 +327,17 @@ export function checkGivens(
   // Only the point's OPERATIVE (last) definition is checked: a point declared on a segment/extension
   // and then REDEFINED by a later command ("E on the extension of AC" then "E on circle P", which
   // supersedes the placement) is verified against its real definition (the on-circle check above),
-  // not the stale on-segment one. A command "defines" a point when it OUTPUTS it (has an `id`/`ids`);
-  // a CONSTRAINT that merely references the point (set-ratio/∥ driving it, the ADR-194 case) does not
-  // — so a genuinely-drifted driven point is still caught.
+  // not the stale on-segment one. A command "defines" a point when it OUTPUTS it under an `id` (or
+  // the diameter's `id1`/`id2`) — a placement. A shape's `ids` tuple is a REFERENCE list, never a
+  // placement: a polygon drawn THROUGH an existing on-segment point only wires edges (apply's
+  // polyEdges), so it must NOT supersede the membership — counting it did, and silently disabled
+  // this backstop for any point a later triangle/quad named (review 2026-07-03, E1). A CONSTRAINT
+  // that merely references the point (set-ratio/∥ driving it, the ADR-194 case) doesn't define
+  // either — so a genuinely-drifted driven point is still caught.
   const lastDef = new Map<Id, number>();
   commands.forEach((c, i) => {
     const anyC = c as Record<string, unknown>;
     for (const f of ['id', 'id1', 'id2']) if (typeof anyC[f] === 'string') lastDef.set(anyC[f] as Id, i);
-    if (Array.isArray(anyC.ids)) for (const id of anyC.ids as Id[]) lastDef.set(id, i);
   });
   for (let ci = 0; ci < commands.length; ci++) {
     const cmd = commands[ci];

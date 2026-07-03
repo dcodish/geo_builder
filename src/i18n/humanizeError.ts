@@ -80,6 +80,17 @@ const PATTERNS: Pattern[] = [
 
   // geoStore.ts:190 — `can't build: D is no longer available (an earlier step it relies on was removed or failed)`
   { re: /^can't build: (.+) is no longer available/, key: 'errors.noLongerAvailable', params: (m) => ({ ids: m[1] }) },
+
+  // step.ts degenerateConstraintError (ADR-202) — `⟂ needs two distinct points on each side — "BB" is a single point, not a segment`
+  {
+    re: new RegExp(`^(⟂|∥) needs two distinct points on each side ${EMDASH} "(.+)" is a single point, not a segment$`),
+    key: 'errors.degenerateSegment',
+    params: (m) => ({ rel: m[1], seg: m[2] }),
+  },
+  // step.ts degenerateConstraintError (ADR-202 Am.) — `an angle needs three distinct points — "∠ABB" repeats its vertex`
+  { re: new RegExp(`^an angle needs three distinct points ${EMDASH} "(.+)" repeats its vertex$`), key: 'errors.degenerateAngle', params: (m) => ({ angle: m[1] }) },
+  // step.ts degenerateConstraintError (ADR-202 Am.) — `collinear points must be distinct — "A" is named twice`
+  { re: new RegExp(`^collinear points must be distinct ${EMDASH} "(.+)" is named twice$`), key: 'errors.degenerateCollinear', params: (m) => ({ id: m[1] }) },
 ];
 
 /**

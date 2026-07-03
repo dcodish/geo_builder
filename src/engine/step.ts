@@ -115,21 +115,55 @@ function circlesTangentError(prev: Construction, cmd: Command): string | null {
 }
 
 /**
- * Reject a DIRECTION constraint whose operand segment is zero-length — its two endpoint ids are the
- * same point, so the segment has no direction and the ∥/⟂ residual is NaN. Left to the solver this
- * doesn't fail cleanly: `recruitFreeDofs` chases the NaN over every free DOF and the joint optimizer
- * churns for seconds before reporting a bogus over-constraint (and in the app the config search runs
- * that slow replay many times → a UI freeze). The degeneracy is structural (by id), so catch it here —
- * cheaply, before any evaluate — for whatever produced it: a parser typo (a tangent line named "BB"),
- * the LLM, or a student typing "AA ⟂ BC". A valid ∥/⟂ always names two distinct points per segment,
- * so this never rejects a well-formed constraint.
+ * Reject a constraint whose operand is STRUCTURALLY degenerate by id — a zero-length ∥/⟂ segment
+ * ("BB"), an angle whose ray repeats its vertex ("∠ABB"), or a collinearity naming the same point
+ * twice — so its residual is NaN by construction (`angleDeg` of a zero ray, `unit(0)` of a collapsed
+ * direction). Left to the solver this doesn't fail cleanly: `recruitFreeDofs` chases the NaN over
+ * every free DOF and the joint optimizer churns for seconds before reporting a bogus over-constraint
+ * (and in the app the config search runs that slow replay many times → a UI freeze — the ADR-202
+ * class; the set-angle sibling was later PROVEN reachable from typed input, ~20 s per submit, so the
+ * guard now covers the whole NaN-by-id class, not just ∥/⟂). The degeneracy is structural (by id),
+ * so catch it here — cheaply, before any evaluate — for whatever produced it: a parser typo, the
+ * LLM, or a student typing "AA ⟂ BC" / "זווית ABB = 40". A well-formed constraint always names
+ * distinct points where a direction/ray needs them, so this never rejects a valid one.
  */
 function degenerateConstraintError(cmd: Command): string | null {
-  if (cmd.type !== 'set-perpendicular' && cmd.type !== 'set-parallel') return null;
-  if (cmd.a !== cmd.b && cmd.c !== cmd.d) return null;
-  const rel = cmd.type === 'set-perpendicular' ? '⟂' : '∥';
-  const degenerate = cmd.a === cmd.b ? `${cmd.a}${cmd.b}` : `${cmd.c}${cmd.d}`;
-  return `${rel} needs two distinct points on each side — "${degenerate}" is a single point, not a segment`;
+  switch (cmd.type) {
+    case 'set-perpendicular':
+    case 'set-parallel': {
+      if (cmd.a !== cmd.b && cmd.c !== cmd.d) return null;
+      const rel = cmd.type === 'set-perpendicular' ? '⟂' : '∥';
+      const degenerate = cmd.a === cmd.b ? `${cmd.a}${cmd.b}` : `${cmd.c}${cmd.d}`;
+      return `${rel} needs two distinct points on each side — "${degenerate}" is a single point, not a segment`;
+    }
+    // An angle's ray must leave its vertex — vertex === ray ⇒ a zero ray ⇒ angleDeg is NaN.
+    case 'set-angle':
+    case 'set-angle-acuteness':
+      return cmd.vertex === cmd.ray1 || cmd.vertex === cmd.ray2
+        ? `an angle needs three distinct points — "∠${cmd.ray1}${cmd.vertex}${cmd.ray2}" repeats its vertex`
+        : null;
+    case 'set-angle-ratio':
+    case 'set-angle-order': {
+      const bad =
+        cmd.v1 === cmd.a1 || cmd.v1 === cmd.b1
+          ? `∠${cmd.a1}${cmd.v1}${cmd.b1}`
+          : cmd.v2 === cmd.a2 || cmd.v2 === cmd.b2
+            ? `∠${cmd.a2}${cmd.v2}${cmd.b2}`
+            : null;
+      return bad ? `an angle needs three distinct points — "${bad}" repeats its vertex` : null;
+    }
+    // Collinearity through a repeated point has a collapsed ray (NaN residual, see solve.ts `collinear`).
+    case 'set-collinear':
+      return cmd.a === cmd.b || cmd.a === cmd.c
+        ? `collinear points must be distinct — "${cmd.a}" is named twice`
+        : null;
+    case 'set-line': {
+      const dup = cmd.points.find((p, i) => cmd.points.indexOf(p) !== i);
+      return dup !== undefined ? `collinear points must be distinct — "${dup}" is named twice` : null;
+    }
+    default:
+      return null;
+  }
 }
 
 /** Apply one command and evaluate; keep the prior construction on failure. */
@@ -140,8 +174,8 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   const tangentErr = circlesTangentError(prev, cmd);
   if (tangentErr) return { ok: false, error: tangentErr, construction: prev, positions: prevPositions };
 
-  // A ∥/⟂ on a zero-length operand ("BB" — one point named twice) has no direction: reject it here,
-  // before the solver churns on the NaN residual (a freeze in the app's config-search loop).
+  // A constraint on a structurally degenerate operand ("BB" ∥/⟂, "∠ABB", a repeated collinear point)
+  // has a NaN residual: reject it here, before the solver churns on it (a freeze in the config search).
   const degenErr = degenerateConstraintError(cmd);
   if (degenErr) return { ok: false, error: degenErr, construction: prev, positions: prevPositions };
 

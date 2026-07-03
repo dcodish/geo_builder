@@ -360,20 +360,31 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   // clean rebuild, not object-deletion, so a segment SHARED with an earlier shape — seg-BC of the square — is
   // still drawn by that shape). Skipped when the figure is PENDING: a constraint that will resolve once more
   // givens arrive keeps its scaffolding (ADR-104).
+  //
+  // FIXPOINT, not a single round: blocking group A removes the points it owned, which can make a LATER
+  // group B — whose members built fine in round 1 — newly MIXED in the rebuild (one member loses its
+  // dependency, a sibling survives), i.e. exactly the half-drawn state this pass forbids. Re-scan and
+  // re-poison until no newly-mixed group appears (bounded by the number of groups; review 2026-07-03, S3).
   if (!pending && failedFacts.length) {
-    const groupErr = new Map<string, string>(); // poisoned group → the genuine error to show on every member
-    for (const f of failedFacts) {
-      const g = groupKey(f);
-      if (!groupErr.has(g)) groupErr.set(g, status[f.id] as string);
-    }
-    const forced = new Map<string, string>();
-    for (const [g, err] of groupErr) {
-      const members = facts.filter((m) => groupKey(m) === g);
-      if (members.length > 1 && members.some((m) => status[m.id] === 'ok')) for (const m of members) forced.set(m.id, err);
-    }
-    if (forced.size) {
+    const forced = new Map<string, string>(); // accumulated: every poisoned member across rounds
+    for (;;) {
+      const groupErr = new Map<string, string>(); // poisoned group → the genuine error to show on every member
+      for (const f of failedFacts) {
+        const g = groupKey(f);
+        if (!groupErr.has(g)) groupErr.set(g, status[f.id] as string);
+      }
+      let grew = false;
+      for (const [g, err] of groupErr) {
+        const members = facts.filter((m) => groupKey(m) === g);
+        if (members.length > 1 && members.some((m) => status[m.id] === 'ok') && !members.every((m) => forced.has(m.id))) {
+          for (const m of members) forced.set(m.id, err);
+          grew = true;
+        }
+      }
+      if (!grew) break; // no newly-mixed group — the figure is at the atomic fixpoint
       ({ cur, status, applied } = runBuild(forced));
-      failedFacts = classify(cur, status).failedFacts;
+      ({ failedFacts, pending } = classify(cur, status));
+      if (pending) break; // a deferral state emerged — keep scaffolding per ADR-104
     }
   }
   lastError = !pending && failedFacts.length ? status[failedFacts[failedFacts.length - 1].id] : null;
@@ -857,15 +868,18 @@ function renameSegStyle(style: Record<Id, { hidden?: boolean; dashed?: boolean }
 
 /**
  * Rewrite every WHOLE point label `from`→`to` inside a string — a bare point id ("O"), OR a label EMBEDDED
- * in a structured id ("circle-O", "bis-XOY", "line-O1O2", "tan-O", "sec-EO", "par-T-AB", "chord-AB"). A
- * label is `[A-Z]\d*`, so guard the match: not preceded by a letter (so it's the START of a label, never
- * mid-label) and not followed by a digit (so plain "O" ≠ the "O" of "O1"). Structured-id prefixes are
- * lowercase + "-", so their letters are never matched. (PAR-9: `renameInCommand`'s old exact-field match
- * left `circle-O`/`bis-…`/etc. stale under a rename — a hidden circle popped back, deterministic-id
- * idempotency broke into duplicate constructions.)
+ * in a structured id ("circle-O", "bis-XOY", "line-O1O2", "tan-O", "sec-EO", "par-T-AB", "chord-AB").
+ * TOKENIZE the string into label tokens (`[A-Z]\d*` — a maximal capital+digits run) and replace exact-match
+ * tokens: inside a concatenated tail like "bis-ABC" the tokens are A, B, C, so renaming B rewrites the
+ * MIDDLE letter too. (The previous lookbehind `(?<![A-Za-z])` could never match a label that follows
+ * another label, so "bis-ABC" under rename B→P kept its stale id while the bare fields renamed —
+ * deterministic-id idempotency broke into duplicate constructions, the exact PAR-9 class; review
+ * 2026-07-03, S1.) Structured-id prefixes are lowercase + "-", so they are never tokens. The swap
+ * sentinel (U+0000, not a label shape) falls back to a literal replace.
  */
 function relabelId(v: string, from: Id, to: Id): string {
-  return v.replace(new RegExp(String.raw`(?<![A-Za-z])${from}(?!\d)`, 'g'), to);
+  if (!/^[A-Z]\d*$/.test(from)) return v.split(from).join(to); // the swap TMP sentinel — literal, unique, safe
+  return v.replace(/[A-Z]\d*/g, (tok) => (tok === from ? to : tok));
 }
 
 /** Rewrite one point letter to another across a single command — bare point fields AND the letters embedded
@@ -1370,6 +1384,9 @@ export const useGeoStore = create<GeoState>()(
           hidden: get().hidden.map((h) => (h === F ? T : h)), // a hidden point keeps its hidden state under the new letter
           segStyle: renameSegStyle(get().segStyle, F, T), // a styled segment keeps its style under the renamed endpoint
           hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)), // a hidden circle tracks its renamed centre
+          // a dialed radius (keyed `circle-X`) tracks its renamed centre too — else the override orphans
+          // and the circle silently snaps back to its seed radius (review 2026-07-03, S2)
+          radiusOverrides: Object.fromEntries(Object.entries(get().radiusOverrides).map(([k, v]) => [relabelId(k, F, T), v])),
           selectedId: null,
         });
         return { ok: true };
@@ -1390,11 +1407,14 @@ export const useGeoStore = create<GeoState>()(
         const TMP = '\u0000'; // a sentinel that can never be a real label or appear in an utterance
         const swapCmd = (cmd: AnyCommand) => renameInCommand(renameInCommand(renameInCommand(cmd, A, TMP), B, A), TMP, B);
         const swapUtt = (u: string | undefined) => relabelUtterance(relabelUtterance(relabelUtterance(u, A, TMP), B, A), TMP, B);
+        const swapKey = (k: string) => relabelId(relabelId(relabelId(k, A, TMP), B, A), TMP, B);
         set({
           facts: facts.map((f) => ({ ...f, cmd: swapCmd(f.cmd), utterance: swapUtt(f.utterance) })),
           hidden: get().hidden.map((h) => (h === A ? B : h === B ? A : h)),
           segStyle: renameSegStyle(renameSegStyle(renameSegStyle(get().segStyle, A, TMP), B, A), TMP, B),
           hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${A}` ? `circle-${B}` : c === `circle-${B}` ? `circle-${A}` : c)),
+          // dialed radii (keyed `circle-X`) swap with their centres (review 2026-07-03, S2)
+          radiusOverrides: Object.fromEntries(Object.entries(get().radiusOverrides).map(([k, v]) => [swapKey(k), v])),
           selectedId: null,
         });
         return { ok: true };
@@ -1418,10 +1438,20 @@ export const useGeoStore = create<GeoState>()(
           .map((f) => ({
             ...f,
             cmd: renameInCommand(f.cmd, F, T),
-            utterance: f.utterance ? f.utterance.split(F).join(T) : f.utterance,
+            // token-aware, like rename/swap — the old substring split/join corrupted multi-char labels
+            // (`F1`→`E1` when folding F→E), and ✎-edit re-parses this text (STO-6)
+            utterance: relabelUtterance(f.utterance, F, T),
           }))
           .filter((f) => !collapsedDegenerate(f.cmd)); // drop facts that collapsed (segment EF → EE, …)
-        set({ facts: merged, hidden: [...new Set(get().hidden.map((h) => (h === F ? T : h)))], segStyle: renameSegStyle(get().segStyle, F, T), hiddenCircles: [...new Set(get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)))], selectedId: null });
+        set({
+          facts: merged,
+          hidden: [...new Set(get().hidden.map((h) => (h === F ? T : h)))],
+          segStyle: renameSegStyle(get().segStyle, F, T),
+          hiddenCircles: [...new Set(get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)))],
+          // a dialed radius follows the fold (review 2026-07-03, S2)
+          radiusOverrides: Object.fromEntries(Object.entries(get().radiusOverrides).map(([k, v]) => [relabelId(k, F, T), v])),
+          selectedId: null,
+        });
         return { ok: true };
       },
 

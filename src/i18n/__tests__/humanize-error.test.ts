@@ -31,6 +31,11 @@ const CASES: { raw: string; contains: string[] }[] = [
   { raw: "'O' is already defined — it can't be redefined as something different", contains: ['O'] },
   { raw: 'tangent circles need a fixed radius (a radius-through-a-point circle is not supported yet)', contains: [] },
   { raw: "can't build: D is no longer available (an earlier step it relies on was removed or failed)", contains: ['D'] },
+  // step.ts degenerateConstraintError (ADR-202 + Am.) — the whole NaN-by-id class
+  { raw: '⟂ needs two distinct points on each side — "BB" is a single point, not a segment', contains: ['⟂', 'BB'] },
+  { raw: '∥ needs two distinct points on each side — "CC" is a single point, not a segment', contains: ['∥', 'CC'] },
+  { raw: 'an angle needs three distinct points — "∠ABB" repeats its vertex', contains: ['∠ABB'] },
+  { raw: 'collinear points must be distinct — "A" is named twice', contains: ['A'] },
 ];
 
 describe('humanizeError', () => {

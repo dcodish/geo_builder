@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { readFile, rm, mkdtemp } from 'node:fs/promises';
+import { readFile, rm, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { handleLog, hashIp, pruneOldEvents } from '../eventLog';
@@ -87,6 +87,38 @@ describe('hashIp', () => {
   });
   it('changes with the salt (rotating the salt resets visitor identity)', () => {
     expect(hashIp('203.0.113.7', 'salt-A')).not.toBe(hashIp('203.0.113.7', 'salt-B'));
+  });
+});
+
+describe('concurrent prune + appends lose nothing (V1, review 2026-07-03)', () => {
+  it('every 204-acknowledged event survives the daily prune rewrite', async () => {
+    // The prune is a read-modify-write; before the writers were serialized, an append landing inside
+    // its window was clobbered (an event that had already received its 204 vanished from the file).
+    process.env.EVENTS_RETENTION_DAYS = '30';
+    try {
+      await writeFile(
+        logPath,
+        JSON.stringify({ serverTs: '2020-01-01T00:00:00Z', iph: 'h', ev: 'submit', utterance: 'ancient' }) + '\n',
+        'utf8',
+      );
+      const N = 30;
+      const codes = await Promise.all(
+        Array.from({ length: N }, (_, i) => {
+          const res = mockRes();
+          return run(
+            mockReq('POST', `10.0.1.${i % 250}`, [JSON.stringify({ ev: 'submit', utterance: `probe-${i}` })]),
+            res,
+            logPath,
+          ).then(() => res.statusCode);
+        }),
+      );
+      expect(codes.every((c) => c === 204)).toBe(true);
+      const text = await readFile(logPath, 'utf8');
+      for (let i = 0; i < N; i++) expect(text, `event probe-${i} was acknowledged and must survive`).toContain(`probe-${i}`);
+      expect(text).not.toContain('ancient'); // the prune itself still ran
+    } finally {
+      delete process.env.EVENTS_RETENTION_DAYS;
+    }
   });
 });
 

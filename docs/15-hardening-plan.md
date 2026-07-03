@@ -342,6 +342,8 @@ Dependency notes: PAR-11 (shadow matrix) should land before Phase C. TST-1 (seed
 | C10 / PAR-10+TST-3 | C | LLM contract tests | L-M | ½ d | ADR-190 | ✅ |
 | D1 / ENG-1 | D | dependsOn uses exhaustive objectParents (retires PT_FIELDS) | — | 2 h | ADR-200 | ✅ |
 | D2 / ENG-2+REN-6 | D | Publish solved radii (retires pointOnCircleId) | MED | ½ d | ADR-201 | ✅ |
+| — | A–D | Degenerate-constraint guard (freeze fix, unplanned operator bug) | HIGH | — | ADR-202 | ✅ |
+| — | A–D | **Validation review of Phases A–D** — 16 verified findings (3 were regressions the phase fixes introduced; shadow gate hardened to a checked-in allowlist; degenerate guard widened to the NaN-by-id class) | — | 1 d | ADR-203 | ✅ |
 | E1 / STO-1 | E | Replay memoization + DEV snapshot | MED | 2–3 h | | ☐ |
 | E2 / STO-2 | E | Bounded config search | MED | ½ d | | ☐ |
 | E3 / STO-3 | E | Race-safe cancellable LLM submit | HIGH | ½ d | | ☐ |

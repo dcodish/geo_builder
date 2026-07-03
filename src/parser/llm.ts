@@ -56,6 +56,55 @@ export function absorb(cmd: AnyCommand, points: Set<string>, circles: Set<string
 const centreOf = (circleId: string): string => circleId.replace(/^circle-/, '');
 
 /**
+ * Fold the FIGURE-DERIVED hints a built step introduced into the running parse context — the same
+ * hints `buildParseCtx` supplies from the real figure (`onSegment`, `neighbors`, `lines`), derived here
+ * at the COMMAND level because mid-decomposition there is no evaluated figure yet. Without this (and
+ * without threading the caller's hints at all — they were dropped even for step 1), a decomposition like
+ * ["נקודה E על AC", "EG קטע אמצעים"] re-parsed step 2 with no `onSegment` for E, so the baseless-
+ * midsegment rule (ADR-199) never fired and the step silently degraded to a bare segment — a WRONG
+ * figure with no dropped-step report, while typing the same two lines as separate submissions worked
+ * (review 2026-07-03, M1).
+ */
+function accrueHints(
+  cmd: AnyCommand,
+  onSegment: Record<string, [string, string]>,
+  neighbors: Record<string, string[]>,
+  lines: Set<string>,
+): void {
+  const join = (a: string, b: string) => {
+    (neighbors[a] ??= []).includes(b) || neighbors[a].push(b);
+    (neighbors[b] ??= []).includes(a) || neighbors[b].push(a);
+  };
+  switch (cmd.type) {
+    case 'point-on-segment':
+      onSegment[cmd.id] = [cmd.a, cmd.b];
+      break;
+    case 'segment':
+      join(cmd.a, cmd.b);
+      break;
+    case 'square':
+    case 'rectangle':
+    case 'rhombus':
+    case 'parallelogram':
+    case 'trapezoid':
+    case 'quadrilateral':
+    case 'triangle':
+    case 'right-triangle':
+    case 'polygon': {
+      const ids = cmd.ids;
+      for (let i = 0; i < ids.length; i++) join(ids[i], ids[(i + 1) % ids.length]);
+      break;
+    }
+    case 'bisector':
+    case 'perpendicular-line':
+    case 'parallel-line':
+    case 'line-through':
+      lines.add(cmd.id);
+      break;
+  }
+}
+
+/**
  * Fold the on-circle MEMBERSHIP a built step introduced into a running map keyed by circle centre
  * (R9(b)). Without this, a later LLM step like "M is the midpoint of arc BC" can't resolve "arc BC" to
  * the circle an EARLIER step put B,C on (e.g. "circle through A B C") — `circleMembers` was frozen at the
@@ -124,8 +173,10 @@ export async function llmParse(utterance: string, context: string, figureCtx: Pa
 
   // Re-parse each canonical line with the deterministic grammar — only lines that
   // parse become commands; the rest are reported so a partial build is honest. The
-  // figure context grows as each step is built, so a later step can reference a point
-  // an earlier step introduced.
+  // FULL figure context is threaded (the caller's buildParseCtx hints — neighbors /
+  // onSegment / parallels / lines — used to be dropped here entirely, M1) and grows
+  // as each step is built, so a later step can reference a point, a carrier, or an
+  // adjacency an earlier step introduced.
   const built: BuiltStep[] = [];
   const dropped: string[] = [];
   const points = new Set(figureCtx.points ?? []);
@@ -135,14 +186,30 @@ export async function llmParse(utterance: string, context: string, figureCtx: Pa
   // an earlier step put B,C on, instead of being dropped.
   const members = new Map<string, Set<string>>();
   for (const m of figureCtx.circleMembers ?? []) members.set(m.center, new Set(m.points));
+  // The figure-derived hints, seeded from the caller's real-figure context and accrued per built step
+  // at the command level (`parallels` needs positions, so it stays the caller's static snapshot).
+  const onSegment: Record<string, [string, string]> = { ...(figureCtx.onSegment ?? {}) };
+  const neighbors: Record<string, string[]> = Object.fromEntries(
+    Object.entries(figureCtx.neighbors ?? {}).map(([k, v]) => [k, [...v]]),
+  );
+  const lines = new Set(figureCtx.lines ?? []);
   for (const step of steps) {
     const circleMembers = [...members].map(([center, pts]) => ({ center, points: [...pts] }));
-    const r = parse(step, { points: [...points], circles: [...circles], circleMembers });
+    const r = parse(step, {
+      points: [...points],
+      circles: [...circles],
+      circleMembers,
+      onSegment,
+      neighbors,
+      parallels: figureCtx.parallels,
+      lines: [...lines],
+    });
     if (r.ok && r.commands.length) {
       built.push({ step, commands: r.commands });
       for (const c of r.commands) {
         absorb(c, points, circles);
         accrueMembers(c, members);
+        accrueHints(c, onSegment, neighbors, lines);
       }
     } else dropped.push(step);
   }

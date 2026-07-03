@@ -110,6 +110,7 @@ const OUTCOME_LABELS: Record<string, string> = {
   'llm-built': 'נותח (LLM)',
   'not-understood': 'לא הובן — פער אמיתי (לטיפול)',
   'out-of-scope': 'מחוץ לתחום (לא נדרש)',
+  throttled: 'נחסם — מגבלת עומס/תקציב (SEC-2)',
   edit: 'עריכה (שינוי שם / מיזוג)',
 };
 
@@ -127,6 +128,9 @@ function outcomeOf(e: UsageEvent): string {
   // A deliberately out-of-scope input (angle relationship, proof/compute request, free text) the SPA
   // recognised after the LLM failed — kept SEPARATE from a genuine `not-understood` gap (operator request).
   if (e.source === 'scope') return 'out-of-scope';
+  // The proxy THROTTLED the submission (daily cost ceiling / per-IP limit) — the SEC-2 tag whose whole
+  // point is operator visibility; the `edit` fallback used to swallow it (review 2026-07-03, V2).
+  if (e.source === 'limit') return 'throttled';
   if (e.source === 'llm') return r === 'ok' ? 'llm-built' : 'not-understood';
   if (e.source === 'parser') {
     if (r.startsWith('weak')) return 'weak';

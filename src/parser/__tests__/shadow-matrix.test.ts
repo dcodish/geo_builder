@@ -24,6 +24,7 @@
 import { describe, it, expect } from 'vitest';
 import { RULES, normalizeUtterance, type ParseContext } from '../parse';
 import { COMMAND_CATALOG } from '../catalog';
+import allowlist from './shadow-allowlist.json';
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 /** A permissive single-circle context: one circle O (so unnamed circle refs resolve unambiguously) and
@@ -82,6 +83,20 @@ describe('parser shadow-matrix — catalog corpus', () => {
     expect(shadows).toMatchSnapshot();
   });
 
+  it('the divergent shadow-pair SET equals the checked-in allowlist (HARD gate — `vitest -u` cannot absorb it)', () => {
+    // The plan's A1 design (docs/15-hardening-plan.md): "assert the set of (winner → shadowed-rule) pairs
+    // equals a checked-in allowlist". The snapshots above give readable per-utterance diffs, but a blanket
+    // `vitest -u` regenerates them — a genuine new shadow could be silently re-pinned (review 2026-07-03,
+    // M2). This assertion has no snapshot to update: a NEW pair fails CI with both rule names; fix the
+    // shadow, or review it and add it to shadow-allowlist.json deliberately.
+    const pairs = new Set<string>();
+    for (const { text } of corpus) {
+      const a = analyze(text);
+      for (const sb of a.shadowedBy) pairs.add(`${a.winner} → ${sb}`);
+    }
+    expect([...pairs].sort()).toEqual([...allowlist.shadowPairs].sort());
+  });
+
   it('every supported catalog utterance is claimed by SOME rule (none silently escalate)', () => {
     // A catalog construct is, by definition, supported — so a rule must claim it. If this fails, a shadow
     // or a keyword regression made a supported phrasing fall through to the LLM. (phase4 asserts .ok; this
@@ -92,29 +107,32 @@ describe('parser shadow-matrix — catalog corpus', () => {
 });
 
 /**
- * KNOWN shadow-prone inputs the 2026-07-02 review verified by executing the parser (Phase C targets). These
- * snapshot the CURRENT (some still-buggy) behaviour so the guard is green today; each Phase C fix flips one
- * entry (the snapshot diff documents the improvement) and its dedicated scenario locks the correct output.
- * Kept as an explicit list (not derived) so the intent is legible next to each utterance.
+ * KNOWN shadow-prone inputs the 2026-07-02 review verified by executing the parser (Phase C targets). Each
+ * probe pins the rule that must OWN the utterance as a HARD assertion (per the M2 hardening — the earlier
+ * snapshot form could be silently absorbed by `vitest -u`); a flip means an ordering/regex change moved the
+ * utterance to a different rule and must be a deliberate edit HERE, not a snapshot refresh. Kept as an
+ * explicit list (not derived) so the intent is legible next to each utterance.
  */
 describe('parser shadow-matrix — known shadow-prone probes (Phase C tracking)', () => {
-  const PROBES: { text: string; ctx?: ParseContext; note: string }[] = [
-    { text: 'chord AB = 6', note: 'PAR-1: chord swallows the "= 6" tail (length lost)' },
-    { text: 'chord AB = chord CD', note: 'PAR-1: equality + second chord lost' },
-    { text: 'קוטר AB = 10', note: 'PAR-1: diameter swallows the "= 10" tail' },
-    { text: 'AB = 4, BC = 6', note: 'PAR-2: two comma-joined givens → only one kept' },
-    { text: 'זווית ABC = 40, זווית DEF = 60', note: 'PAR-2: two angles → only the first' },
-    { text: 'המיתרים AB ו-CD מאונכים זה לזה', note: 'PAR-3: plural מאונכים matches no ⟂ keyword; membership dropped' },
-    { text: 'הקוטר AB מאונך למיתר CD', note: 'PAR-4: diameter membership (set-collinear A,O,B) dropped' },
-    { text: 'נקודה D על הרדיוס OB', note: 'PAR-5: על\\b dead guard; D dropped' },
-    { text: 'E על הקוטר AB', note: 'PAR-5: קוטר not a CARRIER_NOUN; E dropped' },
-    { text: 'שטח מרובע SABC הוא 20', note: 'PAR-6: S-leading polygon → phantom area-ratio' },
-    { text: 'נקודה E על AC ב־40%', note: 'PAR-7: maqaf ־ breaks the ratio suffix' },
-    { text: 'points F, G, H on segments AB, AC, CB', note: 'PAR-8: plural "segments" → segment steals it' },
+  const PROBES: { text: string; ctx?: ParseContext; note: string; owner: string }[] = [
+    { text: 'chord AB = 6', note: 'PAR-1: the length rule owns the tail (chord bails)', owner: 'distanceConstraint' },
+    { text: 'chord AB = chord CD', note: 'PAR-1/P4: noun-repeated equality owned by equalSegments', owner: 'equalSegments' },
+    { text: 'קוטר AB = 10', note: 'PAR-1: the length rule owns the tail (diameter bails)', owner: 'distanceConstraint' },
+    { text: 'AB = 4, BC = 6', note: 'PAR-2: two comma-joined givens split all-or-nothing', owner: 'multiStatement' },
+    { text: 'זווית ABC = 40, זווית DEF = 60', note: 'PAR-2: two angles split', owner: 'multiStatement' },
+    { text: 'המיתרים AB ו-CD מאונכים זה לזה', note: 'PAR-3: plural מאונכים recognised by the ⟂ rule', owner: 'perpendicularConstraint' },
+    { text: 'הקוטר AB מאונך למיתר CD', note: 'PAR-4: ⟂ rule wins; membership restored by the post-pass', owner: 'perpendicularConstraint' },
+    { text: 'נקודה D על הרדיוס OB', note: 'PAR-5: point-on-carrier owns a point on a radius', owner: 'pointOnSegment' },
+    { text: 'E על הקוטר AB', note: 'PAR-5: point-on-carrier owns a point on a diameter', owner: 'pointOnSegment' },
+    { text: 'שטח מרובע SABC הוא 20', note: 'PAR-6: the area rule owns an S-leading polygon', owner: 'area' },
+    { text: 'נקודה E על AC ב־40%', note: 'PAR-7: maqaf normalised — the ratio form parses', owner: 'pointOnSegment' },
+    { text: 'points F, G, H on segments AB, AC, CB', note: 'PAR-8: the N-points rule owns the plural', owner: 'pointsOnSegments' },
   ];
 
-  it('current behaviour of each probe is pinned (flip as Phase C lands)', () => {
-    const analysed = PROBES.map(({ text, ctx, note }) => ({ text, note, ...analyze(text, ctx ?? CTX) }));
-    expect(analysed).toMatchSnapshot();
+  it('each probe is owned by exactly the rule its fix assigned (HARD, per probe)', () => {
+    const misowned = PROBES.map(({ text, ctx, note, owner }) => ({ text, note, owner, actual: analyze(text, ctx ?? CTX).winner })).filter(
+      (p) => p.actual !== p.owner,
+    );
+    expect(misowned).toEqual([]);
   });
 });

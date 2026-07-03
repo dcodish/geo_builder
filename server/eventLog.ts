@@ -99,6 +99,19 @@ export function pruneOldEvents(text: string, cutoffMs: number): string {
   return kept ? kept + '\n' : '';
 }
 
+/**
+ * All writers to the events file run through ONE in-process queue. The prune is a read-modify-write
+ * with awaits between; a concurrent request's `appendFile` landing inside that window was CLOBBERED
+ * by the prune's rewrite (proven by probe: an event that had already received its 204 vanished —
+ * review 2026-07-03, V1). Serializing every prune/rotate/append closes the lost-write race.
+ */
+let writeQueue: Promise<unknown> = Promise.resolve();
+function serialized<T>(fn: () => Promise<T>): Promise<T> {
+  const run = writeQueue.then(fn, fn);
+  writeQueue = run.catch(() => {});
+  return run;
+}
+
 let lastPruneDay = '';
 /** Once per UTC day, rewrite the log without events older than `EVENTS_RETENTION_DAYS` (unset → keep all). */
 async function pruneByRetention(file: string): Promise<void> {
@@ -110,7 +123,12 @@ async function pruneByRetention(file: string): Promise<void> {
   try {
     const text = await readFile(file, 'utf8');
     const pruned = pruneOldEvents(text, Date.now() - days * 86_400_000);
-    if (pruned.length !== text.length) await writeFile(file, pruned, 'utf8');
+    // Atomic swap (write a sibling tmp, then rename over) so a concurrent dashboard read never sees a
+    // torn / mid-truncate file; rename replaces in place on the same filesystem.
+    if (pruned.length !== text.length) {
+      await writeFile(file + '.tmp', pruned, 'utf8');
+      await rename(file + '.tmp', file);
+    }
   } catch {
     /* no file yet, or a read/write race — ignore (best-effort) */
   }
@@ -156,10 +174,14 @@ export async function handleLog(
   const file = logPath ?? eventsLogPath();
   const entry: UsageEvent = { serverTs: new Date().toISOString(), iph: hashIp(ip, ipSalt), ...lean };
   try {
-    await mkdir(path.dirname(file), { recursive: true });
-    await pruneByRetention(file); // age-based retention (SEC-7), at most once/day
-    await rotateIfLarge(file);
-    await appendFile(file, JSON.stringify(entry) + '\n', 'utf8');
+    // One writer at a time (see `serialized`): the prune's read-modify-write and every append are
+    // mutually ordered, so no committed event can be clobbered by a concurrent prune rewrite.
+    await serialized(async () => {
+      await mkdir(path.dirname(file), { recursive: true });
+      await pruneByRetention(file); // age-based retention (SEC-7), at most once/day
+      await rotateIfLarge(file);
+      await appendFile(file, JSON.stringify(entry) + '\n', 'utf8');
+    });
   } catch {
     /* disk hiccup — logging must never surface to the user */
   }

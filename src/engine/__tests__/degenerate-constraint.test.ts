@@ -52,3 +52,48 @@ describe('ADR-202 — degenerate ∥/⟂ operand is rejected fast, not churned',
     expect(r.ok).toBe(true);
   });
 });
+
+describe('ADR-202 Am. — the whole NaN-by-id class is guarded, not only ∥/⟂ (review 2026-07-03)', () => {
+  // The set-angle sibling ADR-202 parked as "no repro" was PROVEN reachable: "זווית ABB = 40" parses
+  // to set-angle(vertex B, ray2 B), angleDeg of the zero ray is NaN, and the app's config search ran
+  // ~20 s of churn per submit, re-firing on every later utterance while the fact stayed in the list.
+  it('set-angle with a ray repeating its vertex ("∠ABB") fails immediately', () => {
+    const t0 = Date.now();
+    const r = applyStep(twoPoints(), c({ type: 'set-angle', vertex: 'B', ray1: 'A', ray2: 'B', value: 40 }));
+    const ms = Date.now() - t0;
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error).toMatch(/distinct points/);
+    expect(ms).toBeLessThan(500);
+  });
+
+  it('set-angle-ratio with a degenerate arm is rejected (either side)', () => {
+    const r1 = applyStep(twoPoints(), c({ type: 'set-angle-ratio', v1: 'A', a1: 'A', b1: 'B', v2: 'B', a2: 'A', b2: 'C', k: 2 }));
+    expect(r1.ok).toBe(false);
+    const r2 = applyStep(twoPoints(), c({ type: 'set-angle-ratio', v1: 'C', a1: 'A', b1: 'B', v2: 'B', a2: 'B', b2: 'C', k: 2 }));
+    expect(r2.ok).toBe(false);
+  });
+
+  it('set-collinear with a repeated point is rejected', () => {
+    const r = applyStep(twoPoints(), c({ type: 'set-collinear', a: 'A', b: 'A', c: 'B' }));
+    expect(r.ok).toBe(false);
+  });
+
+  it('set-line with a duplicated point is rejected', () => {
+    const r = applyStep(twoPoints(), c({ type: 'set-line', points: ['A', 'B', 'A'] }));
+    expect(r.ok).toBe(false);
+  });
+
+  it('a WELL-FORMED set-angle is NOT rejected by the guard', () => {
+    const fig = build([c({ type: 'square', ids: ['A', 'B', 'C', 'D'] })]).construction;
+    const r = applyStep(fig, c({ type: 'set-angle', vertex: 'B', ray1: 'A', ray2: 'C', value: 90 })); // true in a square
+    expect(r.ok).toBe(true);
+  });
+
+  it('a zero angle between DISTINCT coincident-direction rays is not structurally degenerate (finite, no guard)', () => {
+    // ∠ABA: ray1 === ray2 (≠ vertex) → angleDeg = 0, a finite residual — the solver fails it cleanly
+    // (or passes value 0); the guard must not reject it as NaN-degenerate.
+    const r = applyStep(twoPoints(), c({ type: 'set-angle', vertex: 'B', ray1: 'A', ray2: 'A', value: 0 }));
+    expect(r.ok).toBe(true); // ∠ABA = 0 holds trivially
+  });
+});

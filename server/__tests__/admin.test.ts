@@ -252,6 +252,18 @@ describe('aggregate', () => {
     expect(empty.visitors).toBe(0);
     expect(empty.outcomes).toEqual([]);
   });
+
+  it("files a proxy-throttle submit (source 'limit') under its own bucket, not 'edit' (V2, review 2026-07-03)", () => {
+    // The SEC-2 tag exists so the operator can SEE how often the daily ceiling / per-IP limit fires;
+    // the old unknown-source fallback buried it in the rename/merge 'edit' bar.
+    const throttled = aggregate([
+      { serverTs: '2026-06-22T10:00:00Z', iph: 'h3', ev: 'submit', sid: 's3', utterance: 'משולש ABC', locale: 'he', source: 'limit', result: 'daily-limit' },
+      { serverTs: '2026-06-22T10:01:00Z', iph: 'h3', ev: 'submit', sid: 's3', utterance: 'swap C and D', locale: 'en', source: 'swap', result: 'ok' },
+    ]);
+    const by = Object.fromEntries(throttled.outcomes.map((o) => [o.key, o.count]));
+    expect(by.throttled).toBe(1);
+    expect(by.edit).toBe(1); // real edits still land in edit
+  });
 });
 
 describe('dashboard filtering (release + date)', () => {
