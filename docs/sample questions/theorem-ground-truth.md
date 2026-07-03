@@ -2,6 +2,8 @@
 
 _Authored 2026-07-03 by the assistant (operator: "I do not know what the theorems for each question are… that is something I would want you to do"). Each question was solved offline and its solution path mapped to the official bagrut theorem ids ([07-theorem-reference](../07-theorem-reference.md)). **This is test data — it never ships into the app.** Solutions are the assistant's own reasoning; the operator should spot-check any entry that looks off (each carries a confidence note)._
 
+> **Corpus scoping (operator, 2026-07-03):** the original Q1–Q7 were chosen to test **diagram creation**, and Q1–Q4 are **trigonometry questions** (law of cosines) — trig is not this tool's theorem domain. A question with no pure-geometry content is simply **ignored for theorems**; where geometric steps exist we extract just those. So **Q1–Q4 below are secondary** (kept for their thin geometric surfacing entries; not primary gate material), **Q5–Q7 are primary**, and the **booklet corpus (B-series, below) is the baseline going forward** — question 4 of every exam in `חוברת בגרויות 571 2025.pdf` is the geometry question, and all of them are being mined into B-entries.
+
 ## How to read the three lists (they formalize "help, don't reveal")
 
 - **expectSurfaced** — ids the live feed MUST show from the question's **typed givens alone** (premise-side, per the [stated-vs-derived principle](../16-theorems-plan.md#2-the-one-principle-that-resolves-the-tension)). The corpus test asserts these ⊆ the feed.
@@ -83,6 +85,197 @@ _Authored 2026-07-03 by the assistant (operator: "I do not know what the theorem
 
 ---
 
-## Coverage read-out (for the plan's §5 matcher set)
+# B-series — the booklet corpus (question 4 of every exam in `חוברת בגרויות 571 2025.pdf`)
 
-The seven questions ground: circle block 92/94/97–99/102–105/107 ✓, isosceles 22 ✓, similarity 68/69/71 (mostly as *mustNotSurface* — good negative tests), bisector family 76/78/80 ✓, parallelogram/rhombus bundles 43–58 ✓, backgrounds 1/2/10/11/28/31 ✓. **Uncovered families needing new corpus questions:** congruence 18–21, midsegment 72/73 (Thales), quad characterizations as C-theorems (44/45/47/57–60), medians/centroid 15–17, parallels+transversal 4–9 as the main event, perpendicular-bisector 82/83, cyclic-quad 87. Source for the next ~10–15: the two PDFs already in this folder (`חוברת בגרויות 571 2025.pdf`, `דף שאלות עבודת קיץ.pdf`).
+_Mined 2026-07-03 by five parallel agents (each read the PDF pages, transcribed, solved — coordinate-verifying numeric claims — and mapped to catalog ids); reviewed and merged by the assistant. Numbered in booklet order: B1–B8 are the opening sample exams + exams 7–8; from B9 on the number matches the printed exam number. **The booklet's Q4 is the pure-geometry question** (trig lives in Q5), so almost no "(trig — out of scope)" marks were needed. Items flagged for the operator's eyeball are collected in the review checklist at the end of this file._
+
+## B1 — cyclic quadrilateral, tangent at A, double-isosceles forcing AB = AD (booklet p4, PDF p23)
+
+**Givens:** Quadrilateral ABCD is inscribed in a circle. G on side CD with AB = AG and CB = CG. The tangent at A cuts the extension of CD at L and the extension of CB at K. Tasks: (א) prove AD = AG; (ב1) prove △ABK ~ △CDA; (ב2) prove AD² = BK·CD; (ג) show S△LDA / S△KAB = LA/AK. No trig sub-parts.
+
+**Solution sketch:** (א) ∠AGC = ∠ABG + ∠GBC = ∠ABC (isosceles base angles twice, 22); ∠AGD = 180° − ∠AGC (1) = 180° − ∠ABC = ∠ADC (87) = ∠ADG → AD = AG (23). (ב1) corollary AD = AG = AB; ∠ABK = 180° − ∠ABC = ∠CDA (1 + 87); ∠KAB = ∠ACB (107) = ∠ACD (94 + 101, equal chords AB = AD) → AA (69). (ב2) ratio AB/CD = BK/DA with AB = AD → AD² = BK·CD. (ג) ∠KAB = ∠ADB (107) = ∠ABD (22, AB = AD) → BD ∥ KL (5) → equal heights over collinear bases (3) → ratio = LA/AK. (Coordinate-verified.)
+
+- **expectSurfaced:** 87 (quad stated inscribed — key); 105 + 107 (stated tangent — key); 22 (AB = AG, CB = CG stated — key); 1 (background); 91 (background).
+- **solutionUses:** 22, 1, 87, 23, 107, 94, 101, 69, 5, 3.
+- **mustNotSurface:** 23 (א's converse close); 69 (the ב pairing); 94, 101 (their premise AB = AD is derived in א); 5 (ג's parallel-discovery). Only ONE tangent exists (K, A, L collinear on it) — 108/109 must NOT fire.
+- _Confidence: high — coordinate-verified; the only judgment call is 94/101 vs. folding into 100._
+
+## B2 — rhombus, perpendicular bisector meets a diagonal, two circumcenters, BD/AC = r/R (booklet p13, PDF p32)
+
+**Givens:** rhombus ABCD; E, F midpoints of AB, BC; K = diagonals' meet. The perpendicular at E to AB cuts the extension of diagonal BD at G. (א) prove G is the circumcenter of △ABC. Given: GF cuts AC at M, the circumcenter of △BDC. (ב) prove △BKC ~ △MFC ~ △BFG. (ג1) prove MF/CF = BK/CK and MC/GB = MF/CF; (ג2) show BD/AC = r/R (r, R the two circumradii). No trig sub-parts.
+
+**Solution sketch:** (א) perpendicular at the midpoint E = the perpendicular bisector of AB → GA = GB (82); rhombus diagonals ⊥-bisect each other (46 + 56) → BD is the perpendicular bisector of AC → GA = GC (82) → G is the centre (91). (ב) ∠BKC = 90° (56); MF ⊥ BC (98, centre-to-chord-midpoint) + shared ∠C → △MFC ~ △BKC (69); GF ⊥ BC (98) + shared ∠B → △BFG ~ △BKC (69). (ג1) correspondences give MF/CF = BK/CK; composing (with 10) MC/GB = MF/BF = MF/CF (BF = CF). (ג2) BD/AC = BK/CK (46) = MC/GB = r/R. (Coordinate-verified: both ratios = b/a.)
+
+- **expectSurfaced:** rhombus bundle 55, 56 + 43, 46, 48, 50 (collapsed); 82 (a perpendicular at a STATED midpoint = a stated ⊥-bisector — key); 98 (key once "M is the circumcenter" is typed — centre + stated chord-midpoint F); 84, 91 (background).
+- **solutionUses:** 82, 56, 46, 91, 98, 69, 10.
+- **mustNotSurface:** 69 (the three-way pairing is ב's task); 85 (only ONE perpendicular bisector is drawn — surfacing the concurrency would hand over א's strategy).
+- _Confidence: high — fully coordinate-verified. Check: is M's circumcenter status a GIVEN (my reading) or to-prove? If to-prove, demote 98's M-side surfacing to post-ב._
+
+## B3 — isosceles triangle, two perpendicular medians, centroid, circle around ALKC (booklet p24, PDF p43)
+
+**Givens:** △ABC isosceles (AB = BC); medians AK, CL meet at D; AK ⊥ CL. (א) prove BD = AC. (ב) compute S(BLDK)/S(△ABC). (ג) M = centre of the circle circumscribing ALKC: (1) prove ∠AML = 90°; (2) find AM/AD. No trig sub-parts.
+
+**Solution sketch:** (א) D is the centroid; the third median BN hits AC at its midpoint (15); △ADC right at D with median DN → DN = AC/2 (31); BD = 2·DN (17) = AC. (ב) medians split into six equal areas (16) → S(BLDK) = S/3. (ג1) △ABK ≅ △CBL (SAS 18) → AK = CL → DA = DC (17) → right isosceles → ∠DCA = 45° (22 + 10); central ∠AML = 2·∠ACL = 90° (99). (ג2) with AC = 2: AD = √2 (28); AL = √10/2, R_M = √5/2 → AM/AD = √10/4 (28). (Coordinate-verified: 1/3 and √10/4.)
+
+- **expectSurfaced:** 15 + 17 + 16 (TWO medians stated meeting at D — the median/centroid family, key — mirrors the two-bisectors→80 precedent); 22 + 24 (isosceles bundle); 28 (background once AK ⊥ CL stated); at ג: 99 (central-vs-inscribed, key step-tier) + 87 + 84, 91 (background).
+- **solutionUses:** 15, 17, 31, 16, 18, 22, 10, 99, 28.
+- **mustNotSurface:** 31 (א's aha — the median-to-hypotenuse object DN is assembled, never stated); 18 (no congruent pair stated); 32 (converse — would hint the same structure).
+- _Confidence: high — coordinate-verified; ב may officially route via 17 + area formula (same family, same ratio)._
+
+## B4 — triangle on a diameter, two tangents from an external point, bisector to the chord (booklet p34, PDF p53)
+
+**Givens:** △BCF inscribed in circle O radius R; BF a diameter. From external A two tangents: one touches at B; the other cuts the extension of CF at D; AD ⊥ CD. (א) prove ∠BFC = ∠BAD. Given: K on BC with FK bisecting ∠BFC. (ב) prove KC = CF·BO/AB. (ג) prove KB·AB = 2R². (ד) why S(△BFK) > S(△KFC)? No trig sub-parts.
+
+**Solution sketch:** (א) ∠ABF = 90° (105); ∠BFD = 180° − ∠BFC (1); quad ABFD angle sum (35) → ∠BAD = ∠BFC. (ב) ∠BCF = 90° (103); AO bisects the tangents' angle (109) → ∠OAB = ½∠BFC = ∠KFC → △KCF ~ △OBA (69) → KC = CF·BO/AB. (ג) BK/KC = FB/FC (76) → KB·AB = BO·FB = 2R². (ד) shared height → ratio BK/KC = FB/FC (76); FB is the hypotenuse (103) → FB > FC (14) → greater.
+
+- **expectSurfaced:** 103/104 (diameter stated — key); 105 + 107 + 108 + 109 (TWO tangents from one point stated — full bundle, key; 109 genuinely operative); 76 (key at the step "FK bisects ∠BFC" is typed — the bisector is stated AND drawn, the exact opposite of trig-Q7); 28, 1, 35, 84, 91 (background).
+- **solutionUses:** 105, 1, 35, 103, 109, 69, 76, 14.
+- **mustNotSurface:** 69 (the ב pairing △KCF ~ △OBA is the aha); the tangent–secant power shortcut for ג is **Appendix (O) — never**.
+- _Confidence: high (symbolically verified: KB·AB = 2R² exactly). The second tangent's touch point is unnamed — a figure test must not assume it._
+
+## B5 — rhombus 60°, incircle of △ABD, tangent from C (booklet p46, PDF p65; NOTE: this exam's printed Q4 on booklet p45 is red-X'd/defaced — excluded from the 2025 focus — so its live geometry question Q5 is used instead)
+
+**Givens:** rhombus ABCD, side a, ∠BAD = 60°; circle centred M inscribed in △ABD; from C a tangent touching at K, its extension cutting AB at F. (א) r via a. (ב1) why is M on diagonal AC? (ב2) ∠ACF *(closes with a numeric arcsin — trig-flavoured)*. (ג) S_ACF *(trig — out of scope)*.
+
+**Solution sketch:** △ABD equilateral (rhombus sides + 60°, 22 + 10). (א) M = incenter (80); bisector = median = altitude (24); altitude a√3/2 (28); r = a√3/6 via the centroid split (15 + 17) or the 30° right triangle (33 + 28). (ב1) AC bisects ∠BAD (55); M on that bisector (80) → M ∈ AC. (ב2) MK ⊥ CF (105); AC = a√3 (46); MC = 2a√3/3 → sin∠ACF = r/MC = ¼. (Coordinate-verified.)
+
+- **expectSurfaced:** rhombus bundle 55, 56 + 43, 46, 48, 50 (collapsed; 55 legitimately answers ב1 — given-announced); 80 + 81 (incircle of a named triangle stated — key); 105 (tangent stated — key); 22/24 fold; 10 (background).
+- **solutionUses:** 22, 10, 80, 24, 28, 15, 17 (or 33), 55, 46, 105.
+- **mustNotSurface:** 15, 17 (no median is stated — the incenter-is-also-centroid shortcut is the א route-reveal).
+- _Confidence: high on the solution; medium on the 55/80 list boundary (they literally answer ב1 — accepted on the given-announced precedent; operator to confirm)._
+
+## B6 — diameter, two parallel chords, equal arcs, rhombus AFKC, SAS-similarity → second diameter (booklet p55, PDF p74)
+
+**Givens:** AB a diameter; chords CD ∥ AF; AB meets CD at K; arcs ⌢CA = ⌢AF. (א1) prove ∠FAB = ∠CAB; (א2) prove BK = BD. (ב) prove AFKC is a rhombus. (ג) given BD·AB = CD·AC: (1) prove △BDC ~ △CAB; (2) prove CD is a diameter. No trig sub-parts.
+
+**Solution sketch:** (א1) equal arcs → equal inscribed ∠ABC = ∠ABF (101); right angles on the diameter (103); sum (10) → equal. (א2) ∠DKB = ∠FAB (6) = ∠CAB = ∠CDB (102) → isosceles (23) → BK = BD. (ב) ∠CKA = ∠KAF (4) = ∠KAC → CA = CK (23); CA = AF (94); CK ∥ AF and CK = AF → parallelogram (45); adjacent sides equal → rhombus (59). (ג1) the stated product + equal included angles ∠BDC = ∠CAB (102) → SAS similarity (68). (ג2) correspondence → ∠DBC = 90° (103) → CD a diameter (104). (Coordinate-verified.)
+
+- **expectSurfaced:** 103/104 (diameter stated — key); 92/94 + 101 fold (equal arcs STATED — key); 4/6/8 fold (stated parallels + transversal — background); 2 (crossing at K — background); 102 (key-amber, the Q6 precedent); 84, 91 (background).
+- **solutionUses:** 101, 103, 10, 6, 102, 23, 4, 94, 45, 59, 68, 104.
+- **mustNotSurface:** 68 (ג's pairing — the equal-angle premise is derived); 45, 59 (the ב chain IS the proof); 23 (borderline, א2's step).
+- _Confidence: high — the rhombus and BK = BD verified in general position; ג's given forces the configuration (verified numerically)._
+
+## B7 — three medians, midsegment through the centroid, cyclic AEMD, √3 similarity (booklet p62, PDF p81)
+
+**Givens:** △ABC with medians CE, BD, AF (E, D, F midpoints); M their meet; AM ∩ ED = K; MF = a. For ה: a circle passes through A, E, M, D. (א) prove EK is a midsegment of △ABF. (ב) AK, KM via a. (ג) S_AKD : S_DKM. (ד) prove EK = KD. (ה1) prove △AKD ~ △EKM; (ה2) the ratio. No trig sub-parts.
+
+**Solution sketch:** ED ∥ BC, = BC/2 (62). (א) in △ABF: E a midpoint, EK ∥ BF → bisects AF (63) → midsegment. (ב) 2:1 (17) → AK = 3a/2, KM = a/2. (ג) shared apex over collinear bases → 3:1. (ד) EK = BF/2, KD = FC/2 (62 twice); BF = FC → equal. (ה1) vertical angles (2) + inscribed on chord DM (102) → AA (69). (ה2) KD² = AK·KM → KD = (√3/2)a → ratio √3. (Coordinate-verified, incl. that the cyclic given is a genuine constraint.)
+
+- **expectSurfaced:** 15 (three medians + meet stated — key), 17 (key — premise fully stated), 16 (background), 62 (ED joins two STATED midpoints — key), 10 (background); at ה: 91, 2 (background), 102 (key-amber).
+- **solutionUses:** 62, 63, 15, 17, 2, 102, 69.
+- **mustNotSurface:** 69 (ה's pairing); 63/64 (the א step — its parallel premise is itself derived via 62); **Appendix A2 (chord products) — never** (the solution derives AK·KM = EK·KD FROM the similarity, exactly like Q6).
+- _Confidence: high — all metric claims coordinate-checked._
+
+## B8 — cyclic kite (right kite), BE ⊥ DC, ¼-area similarity → N is the centre (booklet p69, PDF p88, exam 8 — the bagrut source of the ADR-123 operator figure)
+
+**Givens:** kite ABCD inscribed in a circle (AB = AD, BC = DC); E on DC with BE ⊥ DC; BE crosses diagonal AC at N *(N's clause partly clipped in the scan — inferred from the figure; flag)*. Given S_NCE = ¼·S_ACD; kite area S. (א) prove ∠ADC = 90°. (ב) prove AB = NB. (ג) prove N is the circle's centre. (ד) find ∠BCD. (ה) S_ANED via S. No trig sub-parts.
+
+**Solution sketch:** (א) ∠ABC = ∠ADC (37) + cyclic sum 180° (87) → each 90°. (ב) vertical angles (2) + right triangles (10) + AC bisects ∠BCD (38) → ∠BNA = ∠BAN → AB = NB (23). (ג) △NCE ~ △ACD (69, AA: 90° from א + shared ∠C); area ¼ → k = ½ (71) → CN = CA/2; ∠ADC = 90° → AC a diameter (104) → N = centre. (ד) NA = NB = AB → equilateral → ∠BAC = 60° (22 + 10) → ∠BCD = 60° (38). (ה) △ABC ≅ △ADC (SSS 20) → S_ACD = S/2 → S_ANED = S/2 − S/8 = 3S/8. (Coordinate-verified.)
+
+- **expectSurfaced:** kite bundle 37, 38 (shape word + stated equal pairs); 87 (inscribed-quad stated — key, it IS א's key but its premise is fully stated); 28 fold (BE ⊥ DC stated); 2, 10, 84, 91 (background).
+- **solutionUses:** 37, 87, 10, 2, 38, 23, 69, 71, 104, 22, 20.
+- **mustNotSurface:** 69, 71 (the ג crown — the ¼ given must stay a whisper); **104** (no diameter is STATED — ∠ADC = 90° is what the student proves in א; surfaceable only after א lands — a step-tier transition); 20 (ה's own step); 23 (borderline).
+- _Confidence: medium-high — fully verified numerically, but the scan clips N's defining sentence and ב was read as "AB = NB" (confirmed true in general position); eyeball booklet p69._
+
+## B9 — two intersecting circles, cross-tangent chords, emergent parallelogram CEDF (booklet p78, PDF p97, exam 9 — חורף תשפ"א 2021)
+
+**Givens:** two circles intersect at A and B. Chord AD of the right circle is tangent to the left circle at A; chord CB of the left circle is tangent to the right circle at B. The extension of chord AC cuts the right circle at E; the extension of chord BD cuts the left circle at F. (א1) prove △ABC ~ △BDA; (א2) prove ∠CED + ∠FCE = 180°; (א3) prove CEDF is a parallelogram. (ב) AC = 9, BD = 4 — the factor S_△ABC : S_△BDA (booklet answer: 9/4 ✓).
+
+**Solution sketch:** (א1) tangent–chord twice (107) → two angle equalities → AA (69). (א2) two cyclic quads (87 twice) + F–B–D collinear (1) → sum 180°. (א3) co-interior 180° → CF ∥ ED (9); equal alternates from א1 → AC ∥ BD (5); two parallel pairs → parallelogram (definition). (ב) AB² = 9·4 → AB = 6 → ratio (3/2)² = 9/4 (71).
+
+- **expectSurfaced:** 105 + 107 (two stated tangencies); circle background 84, 91.
+- **solutionUses:** 107, 69, 87, 1, 9, 5, 71.
+- **mustNotSurface:** 69, 71 (the pairing is א1's task; 71 gifts ב); 5, 9 (the parallel-converses ARE the א3 route); the two-circle line-of-centres + power relations are **Appendix (O) — never**.
+- _Confidence: high (ב matches the printed answer). 87 borderline: the four concyclic points ARE typed, but the quads are never drawn — acceptable-amber, operator to decide._
+
+## B10 — parallelogram, two midpoints, midsegment area, Thales ratio, cyclic-quad refutation (booklet p87, PDF p106, exam 10 — קיץ תשפ"א 2021 מועד א)
+
+**Givens:** parallelogram ABCD, ∠A acute; E, F midpoints of BC, CD; S_△ECF = S. (ב) L midpoint of BE; a line through L parallel to AB cuts BF at M and AD at N. (ג) given BE = EF. (א) S_ABCD via S (answer: 8S ✓). (ב) LM/MN (answer: 1/7 ✓). (ג) can ABFD be cyclic? (answer: no ✓).
+
+**Solution sketch:** (א) EF = midsegment of △BCD (62) → S_CEF = ¼·S_CBD (68/71); BD splits the parallelogram into congruent halves (43 + 20) → 8S. (ב) ABLN a parallelogram (45 → 43); extended Thales in △BCF (73): LM = AB/8; MN = 7AB/8 → 1/7. (ג) FE = ½BC → median equals half the side → ∠BFC = 90° (32); collinear (1); cyclic ⟺ ∠BAD = 90° (87 iff) — contradicts the stated acute ∠A → not cyclic.
+
+- **expectSurfaced:** parallelogram bundle 43, 46, 48, 50; at ב: 73 (the parallel-through-L is a STATED parallel cutting a drawn triangle — step-tier key); at ג: 22 (BE = EF stated).
+- **solutionUses:** 62, 68, 71, 43, 20, 45, 73, 32, 1, 87.
+- **mustNotSurface:** 32 (the ג aha — its premise is assembled, never stated); 68/69/71 initially. Borderline (deliberately in neither list): 62 — E, F are stated midpoints but the third side BD is an undrawn diagonal; surfacing 62 half-reveals א.
+- _Confidence: high (all three booklet answers reproduced)._
+
+## B11 — tangent pair at 90°, circumcircle of the contact triangle, 45° chase to BD = DE (booklet p96, PDF p115, exam 11 — קיץ תשפ"א 2021 מועד מיוחד)
+
+**Givens:** from A two tangents touch the circle at B and C; ∠CAB = 90°; BE, CE chords; the circle circumscribing △ABC cuts chord CE at D. Prove: (א) BD = DE; (ב) △ADB ~ △CEB; (ג) S_△CEB = 2·S_△ADB.
+
+**Solution sketch:** AB = AC (108) + 90° → 45° base angles (22 + 10). (א) tangent–chord → ∠BEC = 45° (107); in ω′ (circumcircle of ABC): ∠BAC = 90° → BC a diameter (104) → ∠BDC = 90° (103) → ∠BDE = 90° (1) → third angle 45° (10) → BD = DE (23). (ב) ∠ADB = ∠ACB (102) = 45° = ∠BEC; ∠DAB = ∠DCB (102) → AA (69). (ג) ratio 1/√2 (28) → areas ½ (71).
+
+- **expectSurfaced:** 108, 109, 105 (two tangents from a point — full bundle), 107; **104** (∠CAB = 90° stated + A on the STATED circumscribing circle — the canonical announcement); background 10, 84, 91.
+- **solutionUses:** 108, 22, 10, 107, 104, 103, 1, 23, 102, 69, 28, 71.
+- **mustNotSurface:** 69, 71 (the ב/ג pairing); 23 (the א closer — surfacing it next to 104 nearly spells out א).
+- _Confidence: high; double-check in the figure: order C–D–E on the chord, and A, C on the same side of chord DB (both needed for the 102 steps)._
+
+## B12 — cyclic quad on a diameter, external perpendicular, arc-midpoint chase, tangent proof (booklet p106, PDF p125, exam 12 — קיץ תשפ"א 2021 מועד ב)
+
+**Givens:** quad ABCD inscribed in circle O; AB a diameter; E on the extension of AD with CE ⊥ AE. (א) prove △CDE ~ △ABC. Given: S_△CDE/S_△ABC = 1/4 and OD ⊥ AC. (ב) prove OC ∥ AD **[the scan's glyph looked like ⊥, but the geometry PROVES ∥ — ⊥ is impossible under the stated givens, and ג depends on ∥; eyeball the printed page]**. (ג) prove CE is tangent to the circle.
+
+**Solution sketch:** (א) ∠CDE = 180° − ∠ADC (1) = ∠ABC (87); ∠DEC = 90° = ∠ACB (103) → AA (69). (ב) ratio ½ (71) → CD = R; OD ⊥ AC → OD bisects arc AC (97) → AD = DC = R (94); equilateral △ODC (22 + 10) → ∠DAC = 30° (99) = ∠OCA (22 + 10) → alternates equal → AD ∥ OC (5). (ג) CE ⊥ AD and AD ∥ OC → CE ⊥ OC (6) → tangent at C (106). *(Analytically verified: A at 180°, D at 240°, C at 300° satisfies every given.)*
+
+- **expectSurfaced:** 103/104 (diameter stated — key); **87** (quad STATED inscribed — key); 97 (OD ⊥ AC stated: a perpendicular from the centre to a chord — step-tier key); 84, 91, 1 (background).
+- **solutionUses:** 1, 87, 103, 69, 71, 97, 94, 99, 22, 10, 5, 6, 106.
+- **mustNotSurface:** 69, 71 (א's task + ב's key); **106** (the ג crown — nothing states perpendicular-to-a-radius); 5 (ב's converse — premise fully derived).
+- _Confidence: high on א/ג; medium on ב's printed wording (∥ forced; see flag)._
+
+## B13 — right triangle on a diameter, doubled cevian, cyclic-quad similarity, tangent at the far vertex (booklet p116, PDF p135, exam 13)
+
+**Givens:** △ABC inscribed, BC a diameter (radius R); G beyond A on the extension of CA with GA = AC; GB cuts the circle at D. Given: S_DBCA/S_GAD = 15. (ד) the tangent at C cuts the extension of BA at E.
+
+**Solution sketch:** (א) ∠BAC = 90° (103) → ∠BAG = 90° (1) → △ABG ≅ △ABC (SAS 18) → AB bisects ∠GBC; corollary BG = BC = 2R. (ב) ADBC cyclic (87) → ∠GDA = ∠GCB (1 + 87); ∠G common → △GBC ~ △GAD (69). (ג) S_GBC = 16·S_GAD → ratio 4 (71) → GA = R/2 → AC = R/2. (ד) tangent ⊥ diameter (105) → △BAC ~ △BCE (69); AB² = 15R²/4 (28) → area ratio 16/15 (71). *(Coordinate-checked.)*
+
+- **expectSurfaced:** 103 (diameter stated — key); 87 (key-amber — all four concyclic points typed and the quad NAMED in the ratio given); 105 at the ד step (tangent typed — step-transition); 84, 91, 10 (background).
+- **solutionUses:** 103, 1, 18, 87, 69, 71, 105, 28.
+- **mustNotSurface:** 18 (א's device — its right angle is derived); 69 (ב/ד pairings); **Appendix (O) — never**: the two-secants power at G (gifts ג) and tangent–secant at E.
+- _Confidence: high (coordinate-verified; א may officially route 27+24 — same verdict either way)._
+
+## B14 — isosceles triangle, two perpendiculars trisecting the base, kite + rectangle-of-feet, cyclic-point existence (booklet p125, PDF p144, exam 14)
+
+**Givens:** isosceles △ABC (BA = BC); D on BC with DK ⊥ AC (K on AC); E on BA with EL ⊥ AC (L on AC); given AL = LK = KC. (ב) EK ∩ DL = G; prove BDGE is a kite. (ג) AC = 45, perimeter of EDKL = 54; find BG. (ד) is there F on LINE BG making BDFE cyclic?
+
+**Solution sketch:** (א) apex altitude BM = median (24); DK ∥ BM (7) → extended Thales (73) → BD/DC = 1/2. (ב) △ALE ≅ △CKD (ASA 19; base angles 22) → BE = BD, EL = DK; △ELK ≅ △DKL (SAS 18) → GL = GK (23) → GE = GD → kite (definition). (ג) ELKD is a parallelogram (45) with a right angle → rectangle (54) → ED = 15, EL = 12; G = the rectangle's centre (46), height EL/2 = 6 (62/63); B, G on AC's perpendicular bisector (83) → collinear with M; BM = 18 (69) → BG = 12. (ד) YES: BG bisects ∠DBE (38, proven kite); choose F with ∠BDF = 90°; △BDF ≅ △BEF (SAS 18) → opposite angles 180° → cyclic (87 iff); F lands beyond G — hence "the LINE BG". *(Coordinate-checked: BD/DC = 1/2, BG = 12.)*
+
+- **expectSurfaced:** 22 (BA = BC stated — key); 24 (isosceles bundle); 10, 28 (background once the ⊥s are stated). Kite 37/38 only AFTER ב lands (the question names the kite as the target — tier transition).
+- **solutionUses:** 24, 7, 73, 22, 19, 18, 23, 45, 54, 46, 62/63, 83, 69, 38, 87 (+ 91 in the alternative ד route).
+- **mustNotSurface:** 18, 19 (nothing states congruent triangles); 23; 45, 54, 46 (the ג rectangle identification is the student's derivation); 37/38 before ב; 69.
+- _Confidence: high on all values; medium only on which ד justification the official solution uses (answer certain)._
+
+## B15 — tangent + centre-line from an external point, perpendicular at A, hidden isosceles (booklet p134, PDF p153, exam 15)
+
+**Givens:** circle radius R centre O; from external A: tangent AB at B; line AD through O cutting the circle at C then D; AG ⊥ AD with G, B, D collinear; ∠ADB = α. (ג) AG = 8, AC = ½·DC. (ד) S = S_△BDC.
+
+**Solution sketch:** (א) ∠BOA = 2α (99); △ABO right (105) → ∠GAB = 2α; ∠AGB = ∠ABG = 90° − α (10). (ב) tangent–chord ∠ABC = α (107); ∠A common → △ABC ~ △ADB (69) → AB/AC = DB/BC. (ג) ∠ABG = ∠AGB → AB = AG = 8 (23); AC = R → AO = 2R; Pythagoras (28) → R = 8√3/3. (ד1) ∠DAG = 90° = ∠DBC (103, DC a diameter) → △ADG ~ △BDC (69). (ד2) OB = ½AO → 30° (34); BC = ½DC (33), BD = R√3 (28) → ratio √3 → S_ADG = 3S (71). *(Coordinate-checked: α = 30°.)*
+
+- **expectSurfaced:** 105 + 107 (ONE tangent stated — pair only, NOT 108/109); 103 (the line through O stated → CD a stated diameter — key); 10, 28, 1 (background).
+- **solutionUses:** 99, 105, 10, 107, 69, 23, 28, 103, 34, 33, 71.
+- **mustNotSurface:** 69 (ב/ד1 pairings); 23 (AB = AG is the hidden aha unlocking ג); **Appendix (O) — never**: tangent–secant power AB² = AC·AD (gives ג in one line).
+- _Confidence: high (coordinate-verified)._
+
+## B16 — rectangle, cevian ∩ diagonal, a STATED cyclic quadrilateral (booklet p145, PDF p164, exam 16)
+
+**Givens:** rectangle ABCD; E on AD; CE cuts diagonal BD at F; quadrilateral EABF is cyclic (**stated as a given**). (ב) DE = EA → EF/FC. (ג) S = S_△DEF → S_DFC, S_BFC. (ד) similarity ratio △DAB : △BFC. (ה) DE = a: BD, and the diameter of the circle around EABF.
+
+**Solution sketch:** (א) cyclic → ∠BFC = ∠EAB = 90° (87 + 1) ; alternates (4) → △DAB ~ △BFC (69). (ב) △DEF ~ △BCF (4 + 2 → 69) → EF/FC = DE/BC = 1/2 (43). (ג) shared altitude → S_DFC = 2S; ratio ½ → S_BFC = 4S (71). (ד) ED² = EF·EC (69 via the right angles, 1); EC = ED√3 → DC = ED√2 (28) → BD = ED√6 (28) → ratio √6/2. (ה1) BD = a√6. (ה2) ∠EAB = 90° inscribed in the STATED circle → EB a diameter (104) → EB = a√3 (28). *(Coordinate-verified: the cyclic given forces CE ⊥ BD.)*
+
+- **expectSurfaced:** **87 (the cyclic quad is STATED — the rare given-announced case, key)**; **104** (the stated rectangle's right angle at A sits inscribed in the stated circle — key); rectangle bundle 52 + 43, 46, 48, 50 (collapsed); 4, 2, 10, 28 (background).
+- **solutionUses:** 87, 1, 4, 2, 69, 43, 71, 28, 104.
+- **mustNotSurface:** 69 (THREE distinct pairings in one question — a strong negative test); **Appendix (O) A5/A6 — never** (altitude-to-hypotenuse geometric mean gives ד instantly).
+- _Confidence: high (the hidden cyclic⟺CE⊥BD constraint verified; check the figure's vertex order)._
+
+---
+
+## Coverage read-out (updated after B1–B16; B17–B23 pending)
+
+**Grounded so far:** circle block 92/94/97–99/101–105/107–109 ✓; isosceles 22/23/24 ✓; medians/centroid **15/16/17** ✓ (B3, B7 — main events); midsegment **62/63** ✓ (B7, B14); Thales **73** ✓ (B10, B14); congruence **18/19/20** ✓ (as devices + negatives); similarity 68/69/71 ✓ (dominant negative class); bisector family 76/78/80 ✓ (with B4 vs Q7 as the surface/suppress CONTRAST pair for 76); quad characterizations **45/54/59** ✓ (as ב-chain negatives) ; kite **37/38** ✓ (B8, B14); cyclic-quad **87** ✓ (stated-premise in B12/B16, refutation in B10, iff-construction in B14); ⊥-bisector **82/83** ✓ (B2, B14); 30° pair **33/34** ✓ (B15); parallel-converses **5/7/9** as sharp negatives ✓; Appendix-(O)-never exercised in six questions ✓. **Still thin:** parallels 4–9 as a question's MAIN event; trapezoid 39–42; Thales-converse 74; 87's converse as a proof target. B17–B23 (exams 17–23) may close these; else target them in the next corpus addition.
+
+## Operator review checklist (the flagged items — eyeball the printed booklet pages)
+
+1. **B12 (booklet p106), part ב:** the scan glyph read like "OC ⊥ AD" but the geometry forces **OC ∥ AD** (⊥ provably impossible; ג depends on ∥). Confirm the printed wording.
+2. **B8 (booklet p69):** N's defining sentence is clipped in the scan (inferred: N = BE ∩ AC, matching the ADR-123 session figure) and ב was read as "AB = NB". Confirm both.
+3. **B5 (booklet p45–46):** the printed Q4 on p45 is red-X'd (defaced/excluded) — B5 covers that exam's Q5 instead. Confirm the X means "excluded from the 2025 focus", or supply a clean copy if you want the trapezoid Q4.
+4. **B2:** is "M is the circumcenter of △BDC" a GIVEN (as read) or to-prove? Affects one surfacing tier only.
+5. **B11:** confirm from the figure the order C–D–E on the chord and that A, C sit on the same side of chord DB.
+6. **Judgment calls to bless (recur across entries):** (a) a question-named target shape (B14's kite) surfaces its bundle only AFTER the proof part lands; (b) 87 key-amber when four concyclic points are typed but the quad isn't drawn (B9, B13); (c) B5's 55/80 surfacing even though they literally answer ב1 (given-announced precedent).
