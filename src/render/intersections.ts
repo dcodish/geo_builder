@@ -50,6 +50,20 @@ export function findSegmentCrossings(c: Construction, positions: Map<Id, Vec>): 
 
   const named = c.objects.filter(isGeoPoint).map((o) => positions.get(o.id)).filter((p): p is Vec => !!p);
 
+  // Span-relative dedupe epsilon (F7/REN-8): an absolute 1e-6 is scale-dependent — a figure whose free
+  // radius grew to hundreds of units could show a duplicate dot at a named point (1e-6 world units is
+  // sub-pixel there), while a micro-figure could swallow genuinely distinct crossings.
+  const span = (() => {
+    if (!named.length) return 1;
+    let nx = Infinity, ny = Infinity, xx = -Infinity, xy = -Infinity;
+    for (const p of named) {
+      nx = Math.min(nx, p.x); ny = Math.min(ny, p.y);
+      xx = Math.max(xx, p.x); xy = Math.max(xy, p.y);
+    }
+    return Math.hypot(xx - nx, xy - ny) || 1;
+  })();
+  const eps = Math.max(1e-9, 1e-7 * span);
+
   const out: Crossing[] = [];
   for (let i = 0; i < segs.length; i++) {
     for (let j = i + 1; j < segs.length; j++) {
@@ -59,8 +73,8 @@ export function findSegmentCrossings(c: Construction, positions: Map<Id, Vec>): 
       if (s1.a === s2.a || s1.a === s2.b || s1.b === s2.a || s1.b === s2.b) continue;
       const x = properCross(s1.pa, s1.pb, s2.pa, s2.pb);
       if (!x) continue;
-      if (named.some((p) => dist(p, x) < 1e-6)) continue; // already a named point here
-      if (out.some((o) => dist(o.pos, x) < 1e-6)) continue; // concurrent lines → one dot
+      if (named.some((p) => dist(p, x) < eps)) continue; // already a named point here
+      if (out.some((o) => dist(o.pos, x) < eps)) continue; // concurrent lines → one dot
       out.push({ pos: x, a: s1.a, b: s1.b, c: s2.a, d: s2.b });
     }
   }

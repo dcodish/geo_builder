@@ -270,6 +270,19 @@ export function buildScene(
   // infinite line to its useful extent — a tangent from its touch point to where it meets a chord,
   // a bisector from its vertex to the side it hits); with 0–1 points it stays an infinite (clipped)
   // line, since it has no natural endpoints.
+  // Span-relative incidence epsilon (F7/REN-8): the old absolute 1e-5 was scale-dependent — a figure whose
+  // free radius grew to hundreds of units stopped recognising its own on-line points, while a tiny figure
+  // could trim through near-misses. Normalize by the figure's diagonal.
+  const spanDiag = (() => {
+    if (!points.length) return 1;
+    let nx = Infinity, ny = Infinity, xx = -Infinity, xy = -Infinity;
+    for (const p of points) {
+      nx = Math.min(nx, p.pos.x); ny = Math.min(ny, p.pos.y);
+      xx = Math.max(xx, p.pos.x); xy = Math.max(xy, p.pos.y);
+    }
+    return Math.hypot(xx - nx, xy - ny) || 1;
+  })();
+  const onLineEps = Math.max(1e-9, 1e-6 * spanDiag);
   for (const o of c.objects) {
     if (o.kind !== 'line' || !o.visible) continue;
     const rl = resolveLine(o, positions, resolvedCircles);
@@ -279,7 +292,7 @@ export function buildScene(
     for (const pt of points) {
       const w = sub(pt.pos, sl.anchor);
       const perp = w.x * sl.dir.y - w.y * sl.dir.x; // signed distance from the line
-      if (Math.abs(perp) < 1e-5) on.push({ t: w.x * sl.dir.x + w.y * sl.dir.y, p: pt.pos });
+      if (Math.abs(perp) < onLineEps) on.push({ t: w.x * sl.dir.x + w.y * sl.dir.y, p: pt.pos });
     }
     if (on.length >= 2) {
       on.sort((p, q) => p.t - q.t);
@@ -415,25 +428,34 @@ export function relationMarks(relations: RelationsResult, positions: Map<Id, Vec
   const values: SceneAngleValue[] = [];
   const rightAngles: SceneAngleMark[] = [];
   const perVertex = new Map<Id, number>();
-  // Key an angle by its WEDGE — the vertex plus its two ray DIRECTIONS (from the drawn positions), not by the
-  // point IDS. So two angles that are the SAME corner but named through different collinear points — ∠AFD and
-  // ∠GFH when H lies on FA and G on FD — collapse to one key, and "60°" is drawn once instead of "60° 60°".
-  const wedgeKey = (v: Id, a: Id, b: Id): string | null => {
+  // Identify an angle by its WEDGE — the vertex plus its two ray DIRECTIONS (from the drawn positions), not
+  // by the point IDS. So two angles that are the SAME corner but named through different collinear points —
+  // ∠AFD and ∠GFH when H lies on FA and G on FD — collapse to one wedge, and "60°" is drawn once instead of
+  // "60° 60°". Matching is a TOLERANCE predicate (±1.5° per ray, with 360° wrap), not integer-rounded keys:
+  // rounding put a hard quantization boundary mid-wedge, so 59.49° vs 59.51° rays of the same corner keyed
+  // differently and double-drew (F7/REN-9).
+  const wedgeOf = (v: Id, a: Id, b: Id): { v: Id; d1: number; d2: number } | null => {
     const pv = positions.get(v), pa = positions.get(a), pb = positions.get(b);
     if (!pv || !pa || !pb) return null;
-    const deg = (p: Vec) => Math.round(((Math.atan2(p.y - pv.y, p.x - pv.x) * 180) / Math.PI + 360) % 360);
-    const [lo, hi] = [deg(pa), deg(pb)].sort((m, n) => m - n);
-    return `${v}|${lo}|${hi}`;
+    const deg = (p: Vec) => ((Math.atan2(p.y - pv.y, p.x - pv.x) * 180) / Math.PI + 360) % 360;
+    const [d1, d2] = [deg(pa), deg(pb)].sort((m, n) => m - n);
+    return { v, d1, d2 };
   };
-  const shown = new Set<string>(); // wedges whose definite value/right-angle is displayed — dedup + skip their equal-arc
+  const angNear = (x: number, y: number): boolean => {
+    const d = Math.abs(x - y) % 360;
+    return Math.min(d, 360 - d) <= 1.5;
+  };
+  const shownWedges: { v: Id; d1: number; d2: number }[] = []; // wedges whose definite value/right-angle is displayed
+  const isShown = (w: { v: Id; d1: number; d2: number }): boolean =>
+    shownWedges.some((s) => s.v === w.v && ((angNear(s.d1, w.d1) && angNear(s.d2, w.d2)) || (angNear(s.d1, w.d2) && angNear(s.d2, w.d1))));
   for (const { vertex, a, b, valueDeg } of atomicDefiniteAngles(relations.definiteAngles).sort((x, y) => x.valueDeg - y.valueDeg)) {
     const pv = positions.get(vertex);
     const pa = positions.get(a);
     const pb = positions.get(b);
     if (pv && pa && pb && len(sub(pa, pv)) > 1e-9 && len(sub(pb, pv)) > 1e-9) {
-      const wk = wedgeKey(vertex, a, b);
-      if (wk && shown.has(wk)) continue; // this corner is already labelled (∠AFD == ∠GFH via collinear points)
-      if (wk) shown.add(wk);
+      const wk = wedgeOf(vertex, a, b);
+      if (wk && isShown(wk)) continue; // this corner is already labelled (∠AFD == ∠GFH via collinear points)
+      if (wk) shownWedges.push(wk);
       // A forced 90° draws the textbook right-angle SQUARE (the "knee"), not a "90°" number (operator request).
       if (Math.abs(valueDeg - 90) < 0.5) {
         rightAngles.push({ vertex: pv, p1: pa, p2: pb, right: true });
@@ -453,7 +475,7 @@ export function relationMarks(relations: RelationsResult, positions: Map<Id, Vec
   const perVertexArcs = new Map<Id, number>();
   let drawnClass = 0;
   for (const cls of relations.equalAngles) {
-    const visible = cls.filter((r) => { const wk = wedgeKey(r.vertex, r.a, r.b); return !(wk && shown.has(wk)); });
+    const visible = cls.filter((r) => { const wk = wedgeOf(r.vertex, r.a, r.b); return !(wk && isShown(wk)); });
     if (visible.length < 2) continue; // every (or all-but-one) member is already shown as a value
     const count = ++drawnClass;
     for (const { vertex, a, b } of visible) {

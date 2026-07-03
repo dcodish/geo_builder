@@ -769,10 +769,12 @@ export default function App() {
                 {t('input.cancel')}
               </button>
             )}
-            {inputNote && <span style={{ fontSize: 12, color: '#b45309' }} dir={textDir(inputNote)}>{inputNote}</span>}
-            {renameNote && <span style={{ fontSize: 12, color: '#b45309' }} dir={textDir(renameNote)}>{renameNote}</span>}
+            {/* role="status" / aria-live (F6): a screen-reader student must HEAR that a step failed or
+                was partial — these appear after the submit completes, outside their focus. */}
+            {inputNote && <span role="status" aria-live="polite" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(inputNote)}>{inputNote}</span>}
+            {renameNote && <span role="status" aria-live="polite" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(renameNote)}>{renameNote}</span>}
             {llmDropped.length > 0 && (
-              <span style={{ fontSize: 12, color: '#b45309' }} dir={textDir(llmDropped[0])}>
+              <span role="status" aria-live="polite" style={{ fontSize: 12, color: '#b45309' }} dir={textDir(llmDropped[0])}>
                 {t('input.partial')}: {llmDropped.join('; ')}
               </span>
             )}
@@ -789,9 +791,9 @@ export default function App() {
             </div>
           </div>
 
-          {lastError && <div style={errorBanner}>⚠ {humanizeError(lastError, t)}</div>}
+          {lastError && <div role="status" aria-live="polite" style={errorBanner}>⚠ {humanizeError(lastError, t)}</div>}
 
-          {pending && <div style={infoBanner}>ⓘ {t('figure.pending')}</div>}
+          {pending && <div role="status" aria-live="polite" style={infoBanner}>ⓘ {t('figure.pending')}</div>}
 
           {coincidences.length > 0 && (
             <div style={infoBanner}>
@@ -800,7 +802,7 @@ export default function App() {
           )}
 
           {violations.length > 0 && (
-            <div style={warnBanner}>
+            <div role="status" aria-live="polite" style={warnBanner}>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>⚠ {t('figure.mismatch')}</div>
               <ul style={{ margin: 0, paddingInlineStart: 18 }}>
                 {violations.map((v) => (
@@ -866,9 +868,19 @@ export default function App() {
                         </>
                       ) : (
                         <>
-                          <button type="button" style={factLabel(state)} onClick={() => select(g.key)} dir={textDir(label)} title={state === 'broken' ? errText : undefined}>
-                            {label}
-                          </button>
+                          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                            <button type="button" style={factLabel(state)} onClick={() => select(g.key)} dir={textDir(label)} title={state === 'broken' ? errText : undefined}>
+                              {label}
+                            </button>
+                            {/* The broken-step REASON, inline (F6): it lived only in a `title` tooltip —
+                                invisible on touch and to screen readers. Shown when the row is selected
+                                (tap the row to see why it broke), keeping unselected rows compact. */}
+                            {state === 'broken' && errText && g.key === selectedId && (
+                              <span style={{ fontSize: 11, color: '#dc2626', paddingInlineStart: 6 }} dir={textDir(errText)}>
+                                {errText}
+                              </span>
+                            )}
+                          </div>
                           <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}>
                             {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
                           </span>
@@ -1243,7 +1255,9 @@ const emptyChip: React.CSSProperties = {
 // The control column is capped to the viewport and scrolls INTERNALLY (its own overflow), so a tall stack
 // (steps + all the action buttons + the detected-shape badges/card) never pushes the whole PAGE taller than
 // the screen — the canvas and the shapes result stay on one screen (operator: "fit it all on the same screen").
-const sidebar: React.CSSProperties = { order: 1, width: 400, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16, maxHeight: 'calc(100vh - 110px)', overflowY: 'auto', paddingInlineEnd: 4 };
+// `min(400px, 100%)` (F2, tablet scope): a rigid 400px overflowed viewports narrower than the column
+// itself; on a portrait tablet the canvas wraps below and the sidebar spans the width it has.
+const sidebar: React.CSSProperties = { order: 1, width: 'min(400px, 100%)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16, maxHeight: 'calc(100vh - 110px)', overflowY: 'auto', paddingInlineEnd: 4 };
 const sectionLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 };
 const displayToggle: React.CSSProperties = { display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, color: '#475569', cursor: 'pointer' };
 const symbolsToggle: React.CSSProperties = { alignSelf: 'flex-start', border: 'none', background: 'none', color: '#2563eb', fontSize: 12, cursor: 'pointer', padding: 0 };

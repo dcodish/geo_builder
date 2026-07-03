@@ -8,7 +8,7 @@
  * world→screen fit. The whole renderer is swappable behind this props shape.
  */
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
 import { buildScene, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
@@ -16,7 +16,8 @@ import type { MeasureLabels, RelationPick } from './scene';
 import type { RelationsResult, ResolvedCircle } from '@/engine';
 import { findSegmentCrossings } from './intersections';
 import type { Crossing } from './intersections';
-import { alignRotation, fitTransform, orient } from './transform';
+import { alignRotation, fitTransform, keepOrRefit, orient } from './transform';
+import type { Transform } from './transform';
 
 export interface FigureProps {
   construction: Construction;
@@ -200,6 +201,10 @@ export function Figure({
   const [menuNote, setMenuNote] = useState('');
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  // Fit hysteresis (F4/REN-5): the last adopted transform + the context it was computed under. A
+  // viewport/orientation change invalidates it (a genuine re-frame); a positions change keeps it
+  // while the figure still fits, so adding one far point doesn't shift every existing point.
+  const lastFit = useRef<{ t: Transform; key: string } | null>(null);
 
   function openMenu(kind: 'point' | 'segment' | 'circle', id: string, screen: Vec) {
     setMenu({ kind, id, x: view.panX + screen.x * view.zoom, y: view.panY + screen.y * view.zoom });
@@ -253,7 +258,14 @@ export function Figure({
         ? positions
         : new Map<Id, Vec>([...positions].map(([id, v]) => [id, orient(v, o)]));
     const s = buildScene(construction, oriented, labels, angleMarks, { showCenters, circles });
-    const t = fitTransform(scenePositions(s), { width, height, padding });
+    // View stability (F4): keep the previous fit while the figure still fits — refit only on
+    // overflow / gross shrink, or when the viewport/orientation genuinely changed.
+    const vp = { width, height, padding };
+    const fitKey = `${width}x${height}x${padding}|${o.rot.toFixed(4)}|${o.flipX}|${o.flipY}`;
+    const pts = scenePositions(s);
+    const fresh = fitTransform(pts, vp);
+    const t = lastFit.current?.key === fitKey ? keepOrRefit(lastFit.current.t, fresh, pts, vp) : fresh;
+    lastFit.current = { t, key: fitKey };
     const x = onPickIntersection ? findSegmentCrossings(construction, oriented) : [];
 
     // Nudge each label off the lines, in screen space at a reference scale (zoom
@@ -312,39 +324,111 @@ export function Figure({
     if (a && b && (a.x !== b.x || a.y !== b.y)) setView((v) => ({ ...v, alignSeg: [a0, b0], rot: 0 }));
   }
 
-  function onWheel(e: React.WheelEvent) {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-    setView((v) => ({ ...v, zoom: clamp(v.zoom * factor, 0.2, 8) }));
+  // Non-passive wheel (F5/REN-2): React 18 registers `wheel` PASSIVE, so an onWheel prop's
+  // preventDefault() is a no-op and zooming also scrolled the page. Attach natively with
+  // { passive: false } so the canvas owns the gesture.
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const onWheelNative = (e: WheelEvent) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      setView((v) => ({ ...v, zoom: clamp(v.zoom * factor, 0.2, 8) }));
+    };
+    el.addEventListener('wheel', onWheelNative, { passive: false });
+    return () => el.removeEventListener('wheel', onWheelNative);
+  }, []);
+
+  // Touch (F2/REN-4, tablet scope): track every active pointer; ONE = pan (or a tap), TWO = pinch-zoom
+  // about the fingers' midpoint. Before this, a second finger fell into the single-drag path and
+  // corrupted the pan; and the hover-driven relations layer — the pedagogical headline — was
+  // unreachable on touch (no hover), so a TAP now toggles the equality class under the finger.
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ dist: number; mid: { x: number; y: number }; zoom: number; panX: number; panY: number } | null>(null);
+  const tapStart = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null);
+
+  const pinchState = () => {
+    const pts = [...pointers.current.values()];
+    if (pts.length < 2) return null;
+    const [p, q] = pts;
+    return { dist: Math.max(10, Math.hypot(p.x - q.x, p.y - q.y)), mid: { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 } };
+  };
+
+  /** The class under a client-space point — shared by mouse hover and touch tap. */
+  function relationPickAt(clientX: number, clientY: number): RelationPick | null {
+    if (!relations || !svgRef.current) return null;
+    const rect = svgRef.current.getBoundingClientRect();
+    const sx = (clientX - rect.left) * (width / (rect.width || width));
+    const sy = (clientY - rect.top) * (height / (rect.height || height));
+    const world = transform.toWorld({ x: (sx - view.panX) / view.zoom, y: (sy - view.panY) / view.zoom });
+    const pxToWorld = 1 / (transform.scale * view.zoom);
+    // Touch aims are coarser than a cursor — widen both reaches for a finger.
+    const seg = (tapStart.current ? 16 : 10) * pxToWorld;
+    return relationAt(relations, oriented, world, seg, 44 * pxToWorld);
   }
+
   function onPointerDown(e: React.PointerEvent) {
     (e.target as Element).setPointerCapture(e.pointerId);
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const p = pinchState();
+    if (p) {
+      // second finger down → switch from pan to pinch (anchored at the current view)
+      drag.current = null;
+      pinch.current = { ...p, zoom: view.zoom, panX: view.panX, panY: view.panY };
+      tapStart.current = null;
+      return;
+    }
     drag.current = { x: e.clientX, y: e.clientY, panX: view.panX, panY: view.panY };
+    if (e.pointerType === 'touch') tapStart.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
   }
   function onPointerMove(e: React.PointerEvent) {
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pz = pinch.current;
+    if (pz) {
+      const p = pinchState();
+      if (!p) return;
+      // zoom about the fingers' midpoint: the world point under mid₀ stays under mid as it moves
+      const zoom = clamp(pz.zoom * (p.dist / pz.dist), 0.2, 8);
+      const k = zoom / pz.zoom;
+      setView((v) => ({ ...v, zoom, panX: p.mid.x - k * (pz.mid.x - pz.panX), panY: p.mid.y - k * (pz.mid.y - pz.panY) }));
+      return;
+    }
     const d = drag.current;
     if (d) {
+      const t = tapStart.current;
+      if (t && Math.hypot(e.clientX - t.x, e.clientY - t.y) > 8) t.moved = true; // a real pan, not a tap
       setView((v) => ({ ...v, panX: d.panX + (e.clientX - d.x), panY: d.panY + (e.clientY - d.y) }));
       return;
     }
+    if (e.pointerType === 'touch') return; // no hover concept on touch — taps handle the relations layer
     // Not dragging: while the relations layer is on, pick the equality class under the cursor (hover-to-focus).
-    if (!relations || !svgRef.current) {
+    if (!relations) {
       if (hoverRel) setHoverRel(null);
       return;
     }
-    const rect = svgRef.current.getBoundingClientRect();
-    const sx = (e.clientX - rect.left) * (width / (rect.width || width));
-    const sy = (e.clientY - rect.top) * (height / (rect.height || height));
-    const world = transform.toWorld({ x: (sx - view.panX) / view.zoom, y: (sy - view.panY) / view.zoom });
-    const pxToWorld = 1 / (transform.scale * view.zoom);
-    const pick = relationAt(relations, oriented, world, 10 * pxToWorld, 44 * pxToWorld);
+    const pick = relationPickAt(e.clientX, e.clientY);
     setHoverRel((prev) => (prev?.kind === pick?.kind && prev?.classIndex === pick?.classIndex ? prev : pick));
   }
-  function onPointerUp() {
+  function onPointerUp(e: React.PointerEvent) {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
+    // TAP-to-focus (touch): an un-moved touch toggles the equality class under the finger — the touch
+    // equivalent of hover-to-focus (tap the same class again, or empty canvas, to clear).
+    const t = tapStart.current;
+    if (t && t.id === e.pointerId) {
+      tapStart.current = null;
+      if (!t.moved && relations) {
+        const pick = relationPickAt(e.clientX, e.clientY);
+        setHoverRel((prev) => (pick && prev?.kind === pick.kind && prev?.classIndex === pick.classIndex ? null : pick));
+      }
+    }
     drag.current = null;
   }
-  function onPointerLeave() {
-    if (hoverRel) setHoverRel(null);
+  function onPointerLeave(e: React.PointerEvent) {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
+    // keep a TAP-selected class visible on touch (there's no hover to sustain it); clear mouse hover
+    if (hoverRel && e.pointerType !== 'touch') setHoverRel(null);
   }
 
   return (
@@ -357,7 +441,6 @@ export function Figure({
         role="img"
         aria-label="geometry figure"
         style={{ touchAction: 'none', background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0' }}
-        onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -378,7 +461,15 @@ export function Figure({
                   // circle's former outline → the menu's "show". Its points still constrain the figure.
                   null
                 ) : (
-                  <circle cx={c.x} cy={c.y} r={r} fill="none" stroke={lit(circ.id) ? ACCENT : '#334155'} strokeWidth={lit(circ.id) ? stroke * 2 : stroke} />
+                  <circle
+                    cx={c.x}
+                    cy={c.y}
+                    r={r}
+                    fill="none"
+                    stroke={lit(circ.id) ? ACCENT : '#334155'}
+                    strokeWidth={lit(circ.id) ? stroke * 2 : stroke}
+                    {...(lit(circ.id) ? { 'data-export-stroke': '#334155', 'data-export-width': stroke } : null)}
+                  />
                 )}
                 {circEditable && (
                   // A wide transparent hit-ring so the thin outline is easy to click → the circle menu.
@@ -415,6 +506,7 @@ export function Figure({
                 fill="none"
                 stroke={lit(arc.id) ? ACCENT : '#334155'}
                 strokeWidth={lit(arc.id) ? stroke * 2 : stroke}
+                {...(lit(arc.id) ? { 'data-export-stroke': '#334155', 'data-export-width': stroke } : null)}
               />
             );
           })}
@@ -441,6 +533,7 @@ export function Figure({
                 y2={a.y + uy}
                 stroke={lit(ln.id) ? ACCENT : '#334155'}
                 strokeWidth={lit(ln.id) ? stroke * 2 : stroke}
+                {...(lit(ln.id) ? { 'data-export-stroke': '#334155', 'data-export-width': stroke } : null)}
               />
             );
           })}
@@ -459,8 +552,9 @@ export function Figure({
                 {st.hidden ? (
                   // A HIDDEN segment: a very faint dashed ghost — invisible-ish but clickable, so the
                   // toggle is reversible right on the line (FR-RN-10). The endpoints (points) are unaffected.
+                  // `data-noexport`: an edit affordance, stripped from the exported PNG (F3/REN-3).
                   segEditable && (
-                    <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#e2e8f0" strokeWidth={stroke} strokeDasharray={`${stroke * 1.5} ${stroke * 3}`} />
+                    <line data-noexport="1" x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#e2e8f0" strokeWidth={stroke} strokeDasharray={`${stroke * 1.5} ${stroke * 3}`} />
                   )
                 ) : (
                   <line
@@ -472,6 +566,7 @@ export function Figure({
                     strokeWidth={lit(seg.id) ? stroke * 2 : stroke}
                     strokeLinecap="round"
                     strokeDasharray={dash}
+                    {...(lit(seg.id) ? { 'data-export-stroke': '#334155', 'data-export-width': stroke } : null)}
                   />
                 )}
                 {segEditable && (
@@ -508,6 +603,7 @@ export function Figure({
             return (
               <line
                 key={`he-${i}`}
+                data-noexport="1"
                 x1={a.x}
                 y1={a.y}
                 x2={b.x}
@@ -531,6 +627,7 @@ export function Figure({
                 <circle
                   key={`x-${x.a}${x.b}-${x.c}${x.d}`}
                   data-crossing={`${x.a}${x.b}x${x.c}${x.d}`}
+                  data-noexport="1"
                   cx={s.x}
                   cy={s.y}
                   r={hot ? r * 1.5 : r * 1.1}
@@ -564,10 +661,17 @@ export function Figure({
                 {hide ? (
                   // A HIDDEN point: a faint dashed ghost ring (no label, no solid dot) — unobtrusive but
                   // clickable, so "click there again" brings the label + dot back (FR-RN-10).
-                  <circle cx={s.x} cy={s.y} r={pointR * 1.8} fill="none" stroke="#cbd5e1" strokeWidth={stroke} strokeDasharray={`${stroke * 1.5} ${stroke * 1.5}`} />
+                  // `data-noexport`: an edit affordance, stripped from the exported PNG (F3/REN-3).
+                  <circle data-noexport="1" cx={s.x} cy={s.y} r={pointR * 1.8} fill="none" stroke="#cbd5e1" strokeWidth={stroke} strokeDasharray={`${stroke * 1.5} ${stroke * 1.5}`} />
                 ) : (
                   <>
-                    <circle cx={s.x} cy={s.y} r={lit(pt.id) ? pointR * 2 : pointR} fill={lit(pt.id) ? ACCENT : '#0f172a'} />
+                    <circle
+                      cx={s.x}
+                      cy={s.y}
+                      r={lit(pt.id) ? pointR * 2 : pointR}
+                      fill={lit(pt.id) ? ACCENT : '#0f172a'}
+                      {...(lit(pt.id) ? { 'data-export-fill': '#0f172a', 'data-export-r': pointR } : null)}
+                    />
                     <text
                       x={s.x + sd.x * off}
                       y={s.y + sd.y * off}
@@ -577,6 +681,7 @@ export function Figure({
                       fontFamily="system-ui, sans-serif"
                       fontWeight={lit(pt.id) ? 700 : 400}
                       fill={lit(pt.id) ? '#b45309' : '#0f172a'}
+                      {...(lit(pt.id) ? { 'data-export-fill': '#0f172a', 'data-export-weight': 400 } : null)}
                       // A white halo painted UNDER the glyph keeps the label readable even when
                       // it lands on a line (paint-order: stroke ⇒ the stroke draws first).
                       stroke="#fff"
@@ -677,9 +782,10 @@ export function Figure({
             })}
 
           {/* "view relations" ground-truth layer (ADR-134): equal-segment ticks + equal-angle arcs. The
-              equality-class count (1/2/3 ticks-or-arcs) distinguishes one equal-group from another. */}
+              equality-class count (1/2/3 ticks-or-arcs) distinguishes one equal-group from another.
+              `data-noexport`: an ACTIVE-HOVER visual — never baked into a worksheet PNG (F3/REN-3). */}
           {relMarks && (
-            <g style={{ pointerEvents: 'none' }}>
+            <g data-noexport="1" style={{ pointerEvents: 'none' }}>
               {relMarks.ticks.flatMap((tk, i) => {
                 const A = transform.toScreen(tk.a);
                 const B = transform.toScreen(tk.b);
@@ -789,7 +895,11 @@ export function Figure({
           <div
             style={{
               position: 'absolute',
-              insetInlineStart: clamp(menu.x + 8, 0, width - 150),
+              // PHYSICAL `left`, not `insetInlineStart` (F1/REN-1): `menu.x` is a physical left-based px
+              // coordinate from the click, but under the Hebrew-default `dir=rtl` a logical inline-start
+              // inset resolves to `right` — the menu opened MIRRORED, far from the clicked point. The
+              // fixed toolbars keep their logical insets (they're layout, not click-anchored).
+              left: clamp(menu.x + 8, 0, width - 150),
               top: clamp(menu.y + 8, 0, height - 80),
               background: '#fff',
               border: '1px solid #cbd5e1',
@@ -943,6 +1053,13 @@ export function Figure({
         <button type="button" style={exportBtn} title={tt.saveImage} aria-label={tt.saveImage} onClick={saveImage}>
           ⤓ {tt.saveImage}
         </button>
+        {/* Zoom buttons (F2) — the touch-first fallback for wheel zoom (pinch works too); handy for mice. */}
+        <button type="button" style={ctrlBtn} title="zoom in" aria-label="zoom in" onClick={() => setView((v) => ({ ...v, zoom: clamp(v.zoom * 1.25, 0.2, 8) }))}>
+          +
+        </button>
+        <button type="button" style={ctrlBtn} title="zoom out" aria-label="zoom out" onClick={() => setView((v) => ({ ...v, zoom: clamp(v.zoom / 1.25, 0.2, 8) }))}>
+          −
+        </button>
         <button type="button" onClick={() => setView(IDENTITY)} style={ctrlBtn} title={tt.reset} aria-label={tt.reset}>
           ↺
         </button>
@@ -962,6 +1079,18 @@ async function svgToPng(svg: SVGSVGElement, scale = 2): Promise<Blob> {
   const h = Number(svg.getAttribute('height')) || svg.clientHeight || 600;
   const clone = svg.cloneNode(true) as SVGSVGElement;
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  // CLEAN export (F3/REN-3): the live SVG carries interaction visuals a worksheet must not bake in —
+  // crossing suggestion dots, hidden-item ghosts, hover relation marks, highlight overlays (all tagged
+  // `data-noexport`), and selection accents (tagged with their base values). Strip / revert on the CLONE.
+  for (const el of [...clone.querySelectorAll('[data-noexport]')]) el.remove();
+  const revert = (attr: string, target: string) => {
+    for (const el of clone.querySelectorAll(`[${attr}]`)) el.setAttribute(target, el.getAttribute(attr)!);
+  };
+  revert('data-export-stroke', 'stroke');
+  revert('data-export-width', 'stroke-width');
+  revert('data-export-fill', 'fill');
+  revert('data-export-r', 'r');
+  revert('data-export-weight', 'font-weight');
   const data = new XMLSerializer().serializeToString(clone);
   const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data)}`;
   const img = new Image();
@@ -1053,7 +1182,12 @@ export function chooseLabelDirs(
 ): Map<Id, Vec> {
   const N = 24;
   const out = new Map<Id, Vec>();
-  for (const pt of pts) {
+  // Labels are placed SEQUENTIALLY and each placed label's position becomes an obstacle for the
+  // next (F7/REN-7): scoring only against lines/circles/points let two nearby points pick the
+  // same gap and STACK their labels (worst at a forced coincidence, where both letters printed
+  // exactly superimposed). Order by x then y so the pass is deterministic.
+  const placed: Vec[] = [];
+  for (const pt of [...pts].sort((p, q) => p.screen.x - q.screen.x || p.screen.y - q.screen.y)) {
     const seedAng = Math.atan2(pt.seed.y, pt.seed.x);
     let best = pt.seed;
     let bestScore = -Infinity;
@@ -1065,6 +1199,7 @@ export function chooseLabelDirs(
       for (const [a, b] of obstacles) clr = Math.min(clr, distToSeg(L, a, b));
       for (const c of circles) clr = Math.min(clr, Math.abs(Math.hypot(L.x - c.c.x, L.y - c.c.y) - c.r));
       for (const q of pts) if (q !== pt) clr = Math.min(clr, Math.hypot(L.x - q.screen.x, L.y - q.screen.y));
+      for (const p of placed) clr = Math.min(clr, Math.hypot(L.x - p.x, L.y - p.y)); // earlier labels are obstacles too
       // Reward clearance up to a cap; penalise rotating away from the seed so we keep
       // the natural (outward) placement unless a line forces a move.
       const turn = Math.min(k, N - k) / N; // 0 (at seed) … 0.5 (opposite)
@@ -1075,6 +1210,7 @@ export function chooseLabelDirs(
       }
     }
     out.set(pt.id, best);
+    placed.push({ x: pt.screen.x + best.x * off, y: pt.screen.y + best.y * off });
   }
   return out;
 }

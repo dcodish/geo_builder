@@ -129,3 +129,23 @@ export function fitTransform(points: Vec[], vp: Viewport): Transform {
 
   return { scale, toScreen, toWorld };
 }
+
+/**
+ * Fit HYSTERESIS (F4/REN-5): the engine guarantees existing points don't jump when a fact is added —
+ * but the view refit on every positions change voided that at the screen layer (one out-of-bounds
+ * extension/tangent crossing re-scaled and shifted EVERY existing point). Keep the PREVIOUS transform
+ * while the figure still fits: adopt the fresh fit only when content OVERFLOWS the viewport (allowing
+ * it to eat most of the padding first) or has SHRUNK so much the drawing wastes the screen (the fresh
+ * fit would zoom in > `SHRINK`×). Pure, so the band is unit-testable.
+ */
+export function keepOrRefit(prev: Transform | null, next: Transform, worldPts: Vec[], vp: Viewport): Transform {
+  if (!prev) return next;
+  const SHRINK = 1.6; // fresh fit would zoom in this much ⇒ the figure got small — refit
+  if (next.scale > prev.scale * SHRINK) return next;
+  const m = Math.min(8, vp.padding * 0.2); // content may eat the padding down to this margin before a refit
+  for (const p of worldPts) {
+    const s = prev.toScreen(p);
+    if (s.x < m || s.x > vp.width - m || s.y < m || s.y > vp.height - m) return next; // overflow — refit
+  }
+  return prev;
+}

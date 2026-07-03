@@ -351,12 +351,18 @@ Dependency notes: PAR-11 (shadow matrix) should land before Phase C. TST-1 (seed
 | E5 / STO-5 | E | Undo restores seed/overrides | M | 2 h | ADR-205 | ✅ |
 | E6 / STO-6/7 | E | merge relabel (ADR-203) + subscripted ops | LOW | 2 h | ADR-206 | ✅ |
 | E7 / TST-4 | E | Store round-trip PBT | — | ½ d | ADR-206 | ✅ |
-| F1 / REN-1 | F | RTL edit-menu mirror | HIGH | 1 h | | ☐ |
-| F2 / REN-4 | F | Touch (scope decision) | MED | ½–2 d | | ☐ |
-| F3 / REN-3 | F | Clean export | MED | 2–3 h | | ☐ |
-| F4 / REN-5 | F | Fit hysteresis | MED | 3 h | | ☐ |
-| F5 / REN-2 | F | Non-passive wheel | LOW | ½ h | | ☐ |
-| F6 / A11Y | F | Focus + aria-live | LOW | ½ d | | ☐ |
-| F7 / REN-7/8/9/10 | F | Renderer polish batch | LOW | ½–1 d | | ☐ |
+| F1 / REN-1 | F | RTL edit-menu mirror | HIGH | 1 h | ADR-207 | ✅ |
+| F2 / REN-4 | F | Touch — TABLET scope per operator (pinch, tap-to-focus, +/− buttons, sidebar min()) | MED | ½–2 d | ADR-207 | ✅ |
+| F3 / REN-3 | F | Clean export (data-noexport strip + accent revert) | MED | 2–3 h | ADR-207 | ✅ |
+| F4 / REN-5 | F | Fit hysteresis (`keepOrRefit`) | MED | 3 h | ADR-207 | ✅ |
+| F5 / REN-2 | F | Non-passive wheel | LOW | ½ h | ADR-207 | ✅ |
+| F6 / A11Y | F | Focus trap + aria-live + inline broken-step reason | LOW | ½ d | ADR-207 | ✅ |
+| F7 / REN-7/8/9 | F | Renderer polish (label stacking, span-relative eps, wedge tolerance) | LOW | ½–1 d | ADR-207 | ✅ |
+| REN-10 | F | Pan re-render memoization — DEFERRED (large memo-extraction refactor for a low-priority gain; see ADR-207) | LOW | ½ d | ADR-207 | ⏸ |
+
+> **Phase F acceptance note:** the pointer/pinch, export-strip, and modal-focus behaviours are browser/DOM
+> interactions headless tests can't fully cover — the **operator's manual tablet pass** (pinch-zoom,
+> tap-a-side with relations on, export with a selection active, keyboard through the intro modal) is the
+> final gate for this phase.
 
 _Repo rules for every step: fix the root cause (never a symptom patch); add an ADR to [06-decisions.md](06-decisions.md); capture the operator/utterance sequence as a scenario in [scenarios.test.ts](../src/__tests__/scenarios.test.ts) + index it in [test-scenarios.md](test-scenarios.md); do not mark ready until the gate passes (tests green, build clean, results shown honestly)._
