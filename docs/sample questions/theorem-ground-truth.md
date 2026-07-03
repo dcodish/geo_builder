@@ -60,7 +60,7 @@ _Authored 2026-07-03 by the assistant (operator: "I do not know what the theorem
 
 - **expectSurfaced:** 92/94 (arc-midpoint D stated → equal arcs ↔ chords/central angles, key); 22 (AB=AC stated, key); 99 (inscribed-vs-central — announced by the arc-midpoint-plus-inscribed configuration, key); **104 (the moment "∠ACD = 90°" is stated — an inscribed right angle announces a diameter, the operator's canonical "obvious" case)**; circle/triangle background 84, 91.
 - **solutionUses:** 99, 92, 22, 68, 71, 104, 28, 103.
-- **mustNotSurface (before the ∠ACD=90° step lands):** 104, 103 — they become key only when that given is typed (this is the plan's step-by-step tier transition in action); 68/71 (the similarity pairing is the ב "aha" — but note the question TELLS the student to prove it, so surfacing after ב's objects exist is acceptable; keep out of the initial feed).
+- **mustNotSurface (before the ∠ACD=90° step lands):** 104, 103 — they become key only when that given is typed (this is the plan's step-by-step tier transition in action); 68/71 (the similarity pairing — its premise "two similar triangles" is NEVER stated; it is derived, so it must not surface, independent of any question text per the B1 rule).
 - _Confidence: high on ids; medium on the ב SAS-vs-AA route (either way 68/69 + 22)._
 
 ## Q6 — diameter ∩ chord at a half-radius point, similar triangles, dropped perpendicular (circle sheet #3)
@@ -109,7 +109,7 @@ _Mined 2026-07-03 by five parallel agents (each read the PDF pages, transcribed,
 - **expectSurfaced:** rhombus bundle 55, 56 + 43, 46, 48, 50 (collapsed); 82 (a perpendicular at a STATED midpoint = a stated ⊥-bisector — key); 98 (key once "M is the circumcenter" is typed — centre + stated chord-midpoint F); 84, 91 (background).
 - **solutionUses:** 82, 56, 46, 91, 98, 69, 10.
 - **mustNotSurface:** 69 (the three-way pairing is ב's task); 85 (only ONE perpendicular bisector is drawn — surfacing the concurrency would hand over א's strategy).
-- _Confidence: high — fully coordinate-verified. Check: is M's circumcenter status a GIVEN (my reading) or to-prove? If to-prove, demote 98's M-side surfacing to post-ב._
+- _Confidence: high — fully coordinate-verified. RESOLVED (operator 2026-07-03): "M is the circumcenter of △BDC" is a GIVEN, so 98 surfaces the moment M is typed (no post-ב demotion)._
 
 ## B3 — isosceles triangle, two perpendicular medians, centroid, circle around ALKC (booklet p24, PDF p43)
 
@@ -133,16 +133,9 @@ _Mined 2026-07-03 by five parallel agents (each read the PDF pages, transcribed,
 - **mustNotSurface:** 69 (the ב pairing △KCF ~ △OBA is the aha); the tangent–secant power shortcut for ג is **Appendix (O) — never**.
 - _Confidence: high (symbolically verified: KB·AB = 2R² exactly). The second tangent's touch point is unnamed — a figure test must not assume it._
 
-## B5 — rhombus 60°, incircle of △ABD, tangent from C (booklet p46, PDF p65; NOTE: this exam's printed Q4 on booklet p45 is red-X'd/defaced — excluded from the 2025 focus — so its live geometry question Q5 is used instead)
+## ~~B5~~ — REMOVED (operator 2026-07-03)
 
-**Givens:** rhombus ABCD, side a, ∠BAD = 60°; circle centred M inscribed in △ABD; from C a tangent touching at K, its extension cutting AB at F. (א) r via a. (ב1) why is M on diagonal AC? (ב2) ∠ACF *(closes with a numeric arcsin — trig-flavoured)*. (ג) S_ACF *(trig — out of scope)*.
-
-**Solution sketch:** △ABD equilateral (rhombus sides + 60°, 22 + 10). (א) M = incenter (80); bisector = median = altitude (24); altitude a√3/2 (28); r = a√3/6 via the centroid split (15 + 17) or the 30° right triangle (33 + 28). (ב1) AC bisects ∠BAD (55); M on that bisector (80) → M ∈ AC. (ב2) MK ⊥ CF (105); AC = a√3 (46); MC = 2a√3/3 → sin∠ACF = r/MC = ¼. (Coordinate-verified.)
-
-- **expectSurfaced:** rhombus bundle 55, 56 + 43, 46, 48, 50 (collapsed; 55 legitimately answers ב1 — given-announced); 80 + 81 (incircle of a named triangle stated — key); 105 (tangent stated — key); 22/24 fold; 10 (background).
-- **solutionUses:** 22, 10, 80, 24, 28, 15, 17 (or 33), 55, 46, 105.
-- **mustNotSurface:** 15, 17 (no median is stated — the incenter-is-also-centroid shortcut is the א route-reveal).
-- _Confidence: high on the solution; medium on the 55/80 list boundary (they literally answer ב1 — accepted on the given-announced precedent; operator to confirm)._
+_Removed on the operator's review verdict ("remove this question"). This exam's printed Q4 (booklet p45) is the red-X'd/defaced trapezoid question, excluded from the 2025 focus; the mined substitute (that exam's live Q5 — rhombus + incircle) is dropped from the corpus rather than stand in for a Q4. **Consequence:** the corpus loses one incircle-of-a-named-triangle (80/81) example and its 55-given-announced case; the trapezoid family 39–42 stays uncovered (a fresh trapezoid question from a clean source is the intended fill — see coverage read-out)._
 
 ## B6 — diameter, two parallel chords, equal arcs, rhombus AFKC, SAS-similarity → second diameter (booklet p55, PDF p74)
 
@@ -183,10 +176,10 @@ _Mined 2026-07-03 by five parallel agents (each read the PDF pages, transcribed,
 
 **Solution sketch:** (א1) tangent–chord twice (107) → two angle equalities → AA (69). (א2) two cyclic quads (87 twice) + F–B–D collinear (1) → sum 180°. (א3) co-interior 180° → CF ∥ ED (9); equal alternates from א1 → AC ∥ BD (5); two parallel pairs → parallelogram (definition). (ב) AB² = 9·4 → AB = 6 → ratio (3/2)² = 9/4 (71).
 
-- **expectSurfaced:** 105 + 107 (two stated tangencies); circle background 84, 91.
+- **expectSurfaced:** 105 + 107 (two stated tangencies); 87 (four stated-concyclic points exist in each circle — GREEN per the B2c rule, even though the quads are never drawn); circle background 84, 91.
 - **solutionUses:** 107, 69, 87, 1, 9, 5, 71.
 - **mustNotSurface:** 69, 71 (the pairing is א1's task; 71 gifts ב); 5, 9 (the parallel-converses ARE the א3 route); the two-circle line-of-centres + power relations are **Appendix (O) — never**.
-- _Confidence: high (ב matches the printed answer). 87 borderline: the four concyclic points ARE typed, but the quads are never drawn — acceptable-amber, operator to decide._
+- _Confidence: high (ב matches the printed answer). 87 RESOLVED (operator 2026-07-03): surfaces GREEN whenever ≥4 points are stated on a circle — a drawn quad is NOT required (detectShapes also emits "מרובע חסום במעגל" for the concyclic set)._
 
 ## B10 — parallelogram, two midpoints, midsegment area, Thales ratio, cyclic-quad refutation (booklet p87, PDF p106, exam 10 — קיץ תשפ"א 2021 מועד א)
 
@@ -212,14 +205,14 @@ _Mined 2026-07-03 by five parallel agents (each read the PDF pages, transcribed,
 
 ## B12 — cyclic quad on a diameter, external perpendicular, arc-midpoint chase, tangent proof (booklet p106, PDF p125, exam 12 — קיץ תשפ"א 2021 מועד ב)
 
-**Givens:** quad ABCD inscribed in circle O; AB a diameter; E on the extension of AD with CE ⊥ AE. (א) prove △CDE ~ △ABC. Given: S_△CDE/S_△ABC = 1/4 and OD ⊥ AC. (ב) prove OC ∥ AD **[the scan's glyph looked like ⊥, but the geometry PROVES ∥ — ⊥ is impossible under the stated givens, and ג depends on ∥; eyeball the printed page]**. (ג) prove CE is tangent to the circle.
+**Givens:** quad ABCD inscribed in circle O; AB a diameter; E on the extension of AD with CE ⊥ AE. (א) prove △CDE ~ △ABC. Given: S_△CDE/S_△ABC = 1/4 and OD ⊥ AC. (ב) prove OC ∥ AD **[SOURCE-TYPO RESOLVED, 2026-07-03: the printed booklet part-ב glyph reads "⊥" (operator confirmed the print) — but ⊥ is geometrically IMPOSSIBLE and the exam's own part ג proves ∥. Two independent proofs: (1) the givens (OD⊥AC, ratio 1/4) force the unique valid inscribed order A=180°,B=0°,D=240°,C=300°, where OC=(0.5,−0.866)=AD exactly — both at −60°, parallel; ⊥ would need C,D on opposite sides of AB, i.e. a crossed quad. (2) part ג asks to prove CE tangent at C, i.e. CE⊥OC; since CE⊥AE=CE⊥AD, tangency holds iff OC∥AD — if ב were OC⊥AD, CE would be ∥OC and could never be tangent. The compilation booklet ("חוברת בגרויות 571") has a print typo in part ב; the original exam says ∥. Corpus keeps ∥.]**. (ג) prove CE is tangent to the circle.
 
 **Solution sketch:** (א) ∠CDE = 180° − ∠ADC (1) = ∠ABC (87); ∠DEC = 90° = ∠ACB (103) → AA (69). (ב) ratio ½ (71) → CD = R; OD ⊥ AC → OD bisects arc AC (97) → AD = DC = R (94); equilateral △ODC (22 + 10) → ∠DAC = 30° (99) = ∠OCA (22 + 10) → alternates equal → AD ∥ OC (5). (ג) CE ⊥ AD and AD ∥ OC → CE ⊥ OC (6) → tangent at C (106). *(Analytically verified: A at 180°, D at 240°, C at 300° satisfies every given.)*
 
 - **expectSurfaced:** 103/104 (diameter stated — key); **87** (quad STATED inscribed — key); 97 (OD ⊥ AC stated: a perpendicular from the centre to a chord — step-tier key); 84, 91, 1 (background).
 - **solutionUses:** 1, 87, 103, 69, 71, 97, 94, 99, 22, 10, 5, 6, 106.
 - **mustNotSurface:** 69, 71 (א's task + ב's key); **106** (the ג crown — nothing states perpendicular-to-a-radius); 5 (ב's converse — premise fully derived).
-- _Confidence: high on א/ג; medium on ב's printed wording (∥ forced; see flag)._
+- _Confidence: high throughout. ב's target is OC ∥ AD — proven two ways (the forced config + part ג's tangency); the booklet's printed "⊥" is a source typo (resolved 2026-07-03, see the bracketed note above). Operator may verify against the ORIGINAL exam PDF (not this compilation) if certainty is wanted._
 
 ## B13 — right triangle on a diameter, doubled cevian, cyclic-quad similarity, tangent at the far vertex (booklet p116, PDF p135, exam 13)
 
@@ -227,7 +220,7 @@ _Mined 2026-07-03 by five parallel agents (each read the PDF pages, transcribed,
 
 **Solution sketch:** (א) ∠BAC = 90° (103) → ∠BAG = 90° (1) → △ABG ≅ △ABC (SAS 18) → AB bisects ∠GBC; corollary BG = BC = 2R. (ב) ADBC cyclic (87) → ∠GDA = ∠GCB (1 + 87); ∠G common → △GBC ~ △GAD (69). (ג) S_GBC = 16·S_GAD → ratio 4 (71) → GA = R/2 → AC = R/2. (ד) tangent ⊥ diameter (105) → △BAC ~ △BCE (69); AB² = 15R²/4 (28) → area ratio 16/15 (71). *(Coordinate-checked.)*
 
-- **expectSurfaced:** 103 (diameter stated — key); 87 (key-amber — all four concyclic points typed and the quad NAMED in the ratio given); 105 at the ד step (tangent typed — step-transition); 84, 91, 10 (background).
+- **expectSurfaced:** 103 (diameter stated — key); 87 (GREEN — all four concyclic points typed and the quad NAMED in the ratio given; per the B2c rule ≥4 concyclic points suffice); 105 at the ד step (tangent typed — step-transition); 84, 91, 10 (background).
 - **solutionUses:** 103, 1, 18, 87, 69, 71, 105, 28.
 - **mustNotSurface:** 18 (א's device — its right angle is derived); 69 (ב/ד pairings); **Appendix (O) — never**: the two-secants power at G (gifts ג) and tangent–secant at E.
 - _Confidence: high (coordinate-verified; א may officially route 27+24 — same verdict either way)._
@@ -238,9 +231,9 @@ _Mined 2026-07-03 by five parallel agents (each read the PDF pages, transcribed,
 
 **Solution sketch:** (א) apex altitude BM = median (24); DK ∥ BM (7) → extended Thales (73) → BD/DC = 1/2. (ב) △ALE ≅ △CKD (ASA 19; base angles 22) → BE = BD, EL = DK; △ELK ≅ △DKL (SAS 18) → GL = GK (23) → GE = GD → kite (definition). (ג) ELKD is a parallelogram (45) with a right angle → rectangle (54) → ED = 15, EL = 12; G = the rectangle's centre (46), height EL/2 = 6 (62/63); B, G on AC's perpendicular bisector (83) → collinear with M; BM = 18 (69) → BG = 12. (ד) YES: BG bisects ∠DBE (38, proven kite); choose F with ∠BDF = 90°; △BDF ≅ △BEF (SAS 18) → opposite angles 180° → cyclic (87 iff); F lands beyond G — hence "the LINE BG". *(Coordinate-checked: BD/DC = 1/2, BG = 12.)*
 
-- **expectSurfaced:** 22 (BA = BC stated — key); 24 (isosceles bundle); 10, 28 (background once the ⊥s are stated). Kite 37/38 only AFTER ב lands (the question names the kite as the target — tier transition).
+- **expectSurfaced:** 22 (BA = BC stated — key); 24 (isosceles bundle); 10, 28 (background once the ⊥s are stated). Kite 37/38 surface only once the quad BDGE **exists and is detected as a kite in the figure** — i.e. after G = EK ∩ DL is constructed and B,D,G,E form the kite (per the B1 rule: theorems follow detectShapes, NOT a "question target"; the tool never sees the goal text). This lands late naturally because G is a late construction, not because "a proof part was reached."
 - **solutionUses:** 24, 7, 73, 22, 19, 18, 23, 45, 54, 46, 62/63, 83, 69, 38, 87 (+ 91 in the alternative ד route).
-- **mustNotSurface:** 18, 19 (nothing states congruent triangles); 23; 45, 54, 46 (the ג rectangle identification is the student's derivation); 37/38 before ב; 69.
+- **mustNotSurface:** 18, 19 (nothing states congruent triangles); 23; 45, 54, 46 (the ג rectangle identification is the student's derivation); 37/38 **before the kite is built/detected** (not tied to a question part); 69.
 - _Confidence: high on all values; medium only on which ד justification the official solution uses (answer certain)._
 
 ## B15 — tangent + centre-line from an external point, perpendicular at A, hidden isosceles (booklet p134, PDF p153, exam 15)
@@ -344,18 +337,24 @@ _Mined 2026-07-03 by five parallel agents (each read the PDF pages, transcribed,
 
 ---
 
-## Coverage read-out (final — Q5–Q7 + B1–B23)
+## Coverage read-out (final — Q5–Q7 + B1–B4, B6–B23; B5 removed)
 
-**Grounded (26 usable questions):** circle block 92/94/97–107 + 108/109 ✓ (87 is the single most exercised id — in ~10 questions, stated-premise AND refutation AND converse-direction); isosceles 22/23/24 ✓; medians/centroid **15/16/17** ✓ (B3, B7); midsegment **62/63** ✓ (B7, B14, + B23 as a sharp negative); Thales **73** ✓ (B10, B14, B18); congruence **18/19/20** ✓; similarity 68/69/71 ✓ (the dominant negative class — ~15 questions); bisector family **76/77/78/80** ✓ with a full CONTRAST SET for 76 (given-announced in B4; must-not-surface in Q7, B21, B22; converse 77 in B17); quad characterizations **44/45/47/54/59** ✓ (mostly negatives — by design); kite **37/38** ✓; ⊥-bisector **82/83** ✓; 30° pair **33/34** ✓; parallel-converses **5/7/9** ✓ (negatives); tangent-converse **106** ✓ (B12, B23); Appendix-(O)-never exercised in ~10 questions ✓. **Still thin (target in the next corpus addition):** parallels 4–9 as a question's MAIN event; trapezoid 39–42 (the one X'd question was exactly that — see checklist item 3); Thales-converse 74; rectangle/square characterizations 52/53/60.
+**Grounded (25 usable questions):** circle block 92/94/97–107 + 108/109 ✓ (87 is the single most exercised id — in ~10 questions, stated-premise AND refutation AND converse-direction); isosceles 22/23/24 ✓; medians/centroid **15/16/17** ✓ (B3, B7); midsegment **62/63** ✓ (B7, B14, + B23 as a sharp negative); Thales **73** ✓ (B10, B14, B18); congruence **18/19/20** ✓; similarity 68/69/71 ✓ (the dominant negative class — ~15 questions); bisector family **76/77/78/80** ✓ with a full CONTRAST SET for 76 (given-announced in B4; must-not-surface in Q7, B21, B22; converse 77 in B17); quad characterizations **44/45/47/54/59** ✓ (mostly negatives — by design); kite **37/38** ✓; ⊥-bisector **82/83** ✓; 30° pair **33/34** ✓; parallel-converses **5/7/9** ✓ (negatives); tangent-converse **106** ✓ (B12, B23); Appendix-(O)-never exercised in ~10 questions ✓. **Still thin (target in the next corpus addition):** parallels 4–9 as a question's MAIN event; trapezoid 39–42 (the removed B5's exam had exactly that as its X'd Q4 — a clean trapezoid question is the intended fill); the incircle-as-a-drawn-object case for 80/81 (lost with B5; 80 still covered via the two-bisectors route in Q2/Q4); Thales-converse 74; rectangle/square characterizations 52/53/60.
 
-## Operator review checklist (the flagged items — eyeball the printed booklet pages)
+## Operator review checklist — RESOLVED (operator verdicts, 2026-07-03/04)
 
-1. **B12 (booklet p106), part ב:** the scan glyph read like "OC ⊥ AD" but the geometry forces **OC ∥ AD** (⊥ provably impossible; ג depends on ∥). Confirm the printed wording.
-2. **B8 (booklet p69):** N's defining sentence is clipped in the scan (inferred: N = BE ∩ AC, matching the ADR-123 session figure) and ב was read as "AB = NB". Confirm both.
-3. **B5 (booklet p45–46):** the printed Q4 on p45 is red-X'd (defaced/excluded) — B5 covers that exam's Q5 instead. Confirm the X means "excluded from the 2025 focus", or supply a clean copy if you want the trapezoid Q4.
-4. **B2:** is "M is the circumcenter of △BDC" a GIVEN (as read) or to-prove? Affects one surfacing tier only.
-5. **B11:** confirm from the figure the order C–D–E on the chord and that A, C sit on the same side of chord DB.
-6. **Judgment calls to bless (recur across entries):** (a) a question-named target shape (B14's kite) surfaces its bundle only AFTER the proof part lands; (b) 87 key-amber when four concyclic points are typed but the quad isn't drawn (B9, B13); (c) B5's 55/80 surfacing even though they literally answer ב1 (given-announced precedent).
-7. **B17 (booklet p154):** confirm the printed א similarity correspondence (A↔B, C↔C, E↔D).
-8. **B22 (booklet p206):** confirm the ב1 tangent–chord side (∠ECA = ∠ADC per the figure's side of chord CA); the official ג may route by trig — either way 11S/4.
-9. **B23 (booklet p218):** confirm C sits on the B-side half of the circle (forces F on OB, matching the read).
+_All 12 review items adjudicated. The corpus above has been amended accordingly._
+
+1. **B12 (booklet p106), part ב — RESOLVED (source typo).** Operator confirmed the printed glyph reads "⊥". But ⊥ is geometrically impossible and the exam's own part ג (prove CE tangent) is satisfiable ONLY if **OC ∥ AD**. Re-read the actual page + re-derived the full figure: the givens force A=180°,B=0°,D=240°,C=300°, where OC and AD are the identical vector (−60°) — exactly parallel; part ג needs CE⊥OC and CE⊥AD, so OC∥AD. The compilation booklet has a print typo in ב. Corpus keeps **∥**. (Operator may cross-check the original exam PDF.)
+2. **B8 (booklet p69) — CONFIRMED.** N = BE ∩ AC and ב = "AB = NB" both correct.
+3. **B5 — REMOVED.** Operator: "remove this question." Entry deleted; the trapezoid-family (39–42) gap it never filled stays open.
+4. **B2 — RESOLVED.** Operator: "it is given." "M is the circumcenter of △BDC" is a GIVEN → 98 surfaces the moment M is typed (no post-ב demotion).
+5. **B11 — CONFIRMED.** Order C–D–E on the chord and A,C on the same side of DB both correct.
+6. **Pedagogy calls (from the B-section of the review):**
+   - **B0 — theorems can DECREASE in relevance as later givens arrive** (relevancy is re-assessed per step, not monotonic); **definitions + Appendix (O) items may appear as SUPPLEMENTAL/extra content when relevant** (previously "structurally never"). Folded into [16-theorems-plan.md](../16-theorems-plan.md).
+   - **B1 — the tool never sees the question text**, so there is NO "target shape" concept. Shapes that are **detected in the figure (detectShapes)** surface their theorems; a kite's 37/38 fire when a kite IS detected (e.g. B14 once BDGE is built), not "after a proof part."
+   - **B2c — #87 surfaces GREEN whenever ≥4 points are stated on a circle** (drawn quad NOT required); detectShapes also emits "מרובע חסום במעגל" for the concyclic set. Applied to B9, B13.
+   - **B3c — non-issue.** "We will never know what the question is, so there is no dilemma" — a given-announced theorem that happens to answer a sub-question is fine; no question-text exception is needed or possible.
+7. **B17 (booklet p154) — CONFIRMED.** Similarity correspondence A↔B, C↔C, E↔D correct.
+8. **B22 (booklet p206) — CONFIRMED.** ב1 tangent–chord side (∠ECA = ∠ADC) correct.
+9. **B23 (booklet p218) — CONFIRMED.** C on the B-side half (F on OB) correct.
