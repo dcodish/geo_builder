@@ -29,6 +29,7 @@ import type { Derived, Fact } from '@/store/geoStore';
 import { isGeoPoint, freeDofs, freeDofCount, applySeed, firstCyclableBranch, evaluate, detectRelations, detectShapes } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 import { humanizeError } from '@/i18n/humanizeError';
+import { detectTheorems } from '@/theorems';
 
 export type Step = string | { llm: AnyCommand[] } | { llm: string[] };
 export interface Scenario {
@@ -120,6 +121,83 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'parallelogram-cut-triangle-surfaces-parallels-and-similarity',
+    title: 'a parallelogram cut by BE & AD produced to F → alternate/corresponding parallels (L1) + similar triangles (L2) surface',
+    guards:
+      "operator session (2026-07-04): `מקבילית ABCD` → `E על DC` → `המשך BE ו AD נפגשים בנקודה F` (parallelogram ABCD, E on base DC, then BE and AD produced to meet at F). The operator expected the discovery feed to name the alternate/corresponding-angle theorems (זויות מתחלפות וזויות מתאימות, #4/#6) and, deeper, similar triangles. Root cause + fix (ADR-220): (1) #4/#6 were gated behind a KIND-whitelist transversal test that didn't recognise the cutting triangle FAB (its sides FA, FB + the parallelogram edge AB form a drawn-edge 3-cycle) — replaced by a coordinate-free `structuralTriangles` (any 3-cycle in the neighbour graph), so a bare trapezoid/parallelogram (a 4-cycle only, ADR-210) still suppresses 4/6 while this figure surfaces them at Declared L1; (2) the AA-similarity #69 + its ratio consequences #71 were structurally excluded (ADR-208 no-reveal) — now admitted as ENTAILED (L2) whenever a stated parallel is a side of a triangle whose apex is off the other parallel (`similarityEvidence`, the Thales / line-parallel-to-a-side config); (3) a guiding concept 'if there are parallel lines, look for similar triangles' rides the same premise. This scenario replays the exact sequence and asserts the build is geometrically correct (F collinear with B,E and with A,D) and the feed surfaces 4/6 and 69/71.",
+    steps: ['מקבילית ABCD', 'E על DC', 'המשך BE ו AD נפגשים בנקודה F'],
+    check(fig) {
+      allStepsOk(fig);
+      // Geometry: F is the meet of line BE and line AD → collinear on both.
+      const A = at(fig, 'A'), B = at(fig, 'B'), D = at(fig, 'D'), E = at(fig, 'E'), F = at(fig, 'F');
+      const collinear = (p: Vec, q: Vec, r: Vec) =>
+        Math.abs((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)) / (dist(p, q) * dist(p, r) || 1);
+      expect(collinear(B, E, F)).toBeLessThan(1e-6); // F on line BE
+      expect(collinear(A, D, F)).toBeLessThan(1e-6); // F on line AD
+      // Feed: the transversal parallels 4/6 and the entailed similarity 69/71 surface (ADR-220).
+      const facts = factsOf(['מקבילית ABCD', 'E על DC', 'המשך BE ו AD נפגשים בנקודה F']);
+      const ids = detectTheorems({ facts, construction: fig.construction }).map((e) => e.id);
+      expect(ids).toEqual(expect.arrayContaining([4, 6, 69, 71]));
+    },
+  },
+  {
+    id: 'two-circles-kite-surfaces-kite-and-isosceles-theorems',
+    title: 'two intersecting circles + their radii → the kite OAPB and its isosceles triangles surface, entailed',
+    guards:
+      "operator session (debug log 2026-07-04, the `שני מעגלים נחתכים` figure): `שני מעגלים נחתכים` (two circles → centres O,P, crossings A,B) → `AB` → `OP` → `PA` → `PB` → `OA=OB`. The operator built the classic kite OAPB (two intersecting circles) and reported the feed was thin: \"i have an isosceles triangle but no relevant theorems appear … added OA=OB and got 1 sentence but there are others … no kite theorems.\" Root cause (ADR-218): the theorem matchers only read TYPED shape/equal facts, never the circle STRUCTURE the construction already encodes — so the isosceles triangles OAB/PAB (two radii each, |OA|=|OB|, |PA|=|PB|) and the kite OAPB (two circles sharing A,B) went unrecognised because nobody typed 'isosceles'/'kite'. These are coordinate-free construction ENTAILMENTS, not measured coincidences. Fix: `isoscelesEvidence` now derives isosceles from a circle's centre + two drawn radii, `kiteEvidence` derives a kite from two circles sharing two drawn-out points, and the kite theorems 37/38 were added to the table (a pure gap). This scenario replays the operator's exact sequence and asserts the kite + isosceles theorems surface and the figure is geometrically a kite (OP ⟂ AB, both radius pairs equal).",
+    steps: ['שני מעגלים נחתכים', 'AB', 'OP', 'PA', 'PB', 'OA=OB'],
+    check(fig) {
+      allStepsOk(fig);
+      // Geometry: the kite OAPB — |OA|=|OB| and |PA|=|PB| (radii), and the main diagonal OP ⟂ the
+      // secondary diagonal AB (B3 / kite theorem 38).
+      const O = at(fig, 'O'), P = at(fig, 'P'), A = at(fig, 'A'), B = at(fig, 'B');
+      expect(Math.abs(dist(O, A) - dist(O, B))).toBeLessThan(1e-6);
+      expect(Math.abs(dist(P, A) - dist(P, B))).toBeLessThan(1e-6);
+      const dot = (P.x - O.x) * (B.x - A.x) + (P.y - O.y) * (B.y - A.y);
+      expect(Math.abs(dot) / (dist(O, P) * dist(A, B) || 1)).toBeLessThan(1e-6); // OP ⟂ AB
+      // Feed: the isosceles (22) and BOTH kite properties (37, 38) surface — entailed from the two
+      // circles + drawn radii, none of it typed as a shape word.
+      const facts = factsOf(['שני מעגלים נחתכים', 'AB', 'OP', 'PA', 'PB', 'OA=OB']);
+      const ids = detectTheorems({ facts, construction: fig.construction }).map((e) => e.id);
+      expect(ids).toEqual(expect.arrayContaining([22, 37, 38]));
+    },
+  },
+  {
+    id: 'height-in-parallelogram-builds-and-surfaces-theorems',
+    title: 'a height dropped in a parallelogram (with its diagonals) builds a clean right-angle foot',
+    guards:
+      "operator session `tzqfaub6`: `מקבילית ABCD` → `DB` → `AC` (the two diagonals) → `DE גובה על AB` (a height from D onto AB). The operator observed \"i added a height from D but no new theorem was selected\" — the theorem feed didn't react to the height. Root cause (Turn-5, 2026-07-04): a `foot` (what `גובה` lowers to) was not recognised as a right-angle premise, so Pythagoras (#28) never surfaced; and there was no \"distance between parallels\" theorem (#3) to announce a perpendicular dropped between a parallelogram's parallel sides. Fix: `rightAngleFacts` now counts a `foot` (a dropped perpendicular is a genuine right angle), #28 is a MAIN headline, #3 was added (fires when a foot's base is one parallel edge and its apex sits on the opposite one), and a new guiding-principle concept (right triangle → α / 90°−α) rides the same premise. The exact feed behaviour is asserted in `src/theorems/__tests__/matchers.test.ts`; this scenario guards that the operator's exact build stays geometrically correct (the height E is the foot of the perpendicular from D to AB).",
+    steps: ['מקבילית ABCD', 'DB', 'AC', 'DE גובה על AB'],
+    check(fig) {
+      allStepsOk(fig);
+      // The height foot E is the foot of the perpendicular from D onto line AB: DE ⟂ AB — the right
+      // angle the theorem feed reacts to. (The foot can fall on the extension of AB in an oblique
+      // parallelogram — it drops onto the infinite line, not the segment — so we assert the right
+      // angle, which holds at every seed, not segment containment.)
+      const A = at(fig, 'A'), B = at(fig, 'B'), E = at(fig, 'E'), D = at(fig, 'D');
+      const dot = (D.x - E.x) * (B.x - A.x) + (D.y - E.y) * (B.y - A.y);
+      expect(Math.abs(dot) / (dist(D, E) * dist(A, B) || 1)).toBeLessThan(1e-6); // DE ⟂ AB
+    },
+  },
+  {
+    id: 'thirty-sixty-ninety-triangle-detected-and-surfaces-33-34',
+    title: 'a size given that forces a 30-60-90 triangle is detected as that special type and surfaces #33/#34',
+    guards:
+      "operator session `x73i1cpx`: `מקבילית ABCD` → `DE גובה לצעל BC` (a height from D onto BC, foot E) → `DC=2CE`. Triangle CDE is right-angled at E with hypotenuse DC = 2·CE, so ∠DCE=60°, ∠CDE=30° — a 30-60-90. The operator reported two gaps: (1) the special 30-60-90 THEOREMS (#33 leg-opposite-30°=½-hypotenuse, #34 its converse) weren't surfaced, and (2) the shape badge said only \"CDE is a right angle\", not the special 30-60-90 TYPE. Diagnosed as two independent causes sharing the shapes layer: `classifyTriangle` had no angle-magnitude axis (30-60-90 collapsed to `right-triangle`), and theorems #33/#34 weren't in `THEOREM_TABLE`. Fix (ADR-215, operator chose \"always surface when detected\"): a `30-60-90-triangle` shape sub-type + #33/#34 firing whenever such a triangle is detected (stated OR emergent). Feed behaviour asserted in `matchers.test.ts`; classification in `detectShapes.test.ts`; this scenario guards the operator's exact end-to-end build.",
+    steps: ['מקבילית ABCD', 'DE גובה לצעל BC', 'DC=2CE'],
+    check(fig) {
+      allStepsOk(fig);
+      // Issue 2: the emergent triangle CDE is classified as the special 30-60-90 type, not plain right.
+      const shapes = detectShapes(fig.construction).shapes;
+      expect(shapes.some((s) => s.type === '30-60-90-triangle')).toBe(true);
+      // Issue 1: theorems #33 (property) and #34 (converse) surface in the feed. (The facts aren't on
+      // `Derived`, so re-derive them from the same steps — the symbolic side of this exact build.)
+      const facts = factsOf(['מקבילית ABCD', 'DE גובה לצעל BC', 'DC=2CE']);
+      const ids = detectTheorems({ facts, construction: fig.construction, shapes }).map((e) => e.id);
+      expect(ids).toEqual(expect.arrayContaining([33, 34]));
+    },
+  },
+  {
     id: 'degenerate-tangent-line-fails-fast-no-freeze',
     title: 'a tangent named by one repeated point ("BB משיק … בנקודה B") fails fast, never freezes the solver',
     guards:
@@ -172,6 +250,37 @@ export const SCENARIOS: Scenario[] = [
       const g2 = flipped.positions.get('G')!;
       const g2MidAB = Math.abs(dist(flipped.positions.get('A')!, g2) - dist(g2, flipped.positions.get('B')!)) < 1e-6;
       expect(g2MidAB, 'variant 1 lands G on the OTHER side than variant 0').toBe(!gMidAB);
+    },
+  },
+  {
+    id: 'named-midsegment-reuses-existing-midpoint-endpoint',
+    title: 'a named "EF קטע אמצעים במשולש DCA" whose endpoint E is ALREADY a midpoint reuses E (no stray M/N)',
+    guards:
+      "operator session `tg6s9dnp`: `טרפז ABCD חסום במעגל` → `AC` → `E אמצע AD` (E = midpoint of AD) → `EF קטע אמצעים במשולש DCA`. The named midsegment escalated to the LLM (the deterministic `midsegment` rule needs a `baseM` match; without one it dived into `midsegmentBaseless`, which only recognised a FREE on-segment anchor — E is a DERIVED midpoint, not free-on-segment — so it returned null → LLM). The LLM \"normalised\" it to `קטע האמצעים לצלע CA במשולש DCA`, DROPPING the student's labels EF, so the unnamed branch auto-minted midpoints M and N (with N a duplicate of the existing E): \"I now have M and N somehow.\" Root fix (ADR-199 Am.): a new `ctx.midpointOf` maps each existing midpoint to the segment it bisects; `midsegmentBaseless` anchors E from `onSegment` OR `midpointOf`, so E is reused and only the fresh F is created (F = midpoint of one of the two other sides, cyclable). No M/N, E honoured.",
+    steps: [
+      'טרפז ABCD חסום במעגל', // trapezoid ABCD inscribed in a circle (AB ∥ DC)
+      'AC', // diagonal AC
+      'E אמצע AD', // E = midpoint of AD (a derived midpoint)
+      'EF קטע אמצעים במשולש DCA', // the EXACT utterance — E reused, F fresh; NO M/N minted, no LLM escalation
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // The student's labels are honoured: E and F exist; the LLM's stray M/N never appear.
+      expect(fig.positions.has('E'), 'E honoured').toBe(true);
+      expect(fig.positions.has('F'), 'F honoured').toBe(true);
+      expect(fig.positions.has('M'), 'no stray M').toBe(false);
+      expect(fig.positions.has('N'), 'no stray N').toBe(false);
+      // E stays the midpoint of AD (reused, not recreated); F is the midpoint of one of the two other sides.
+      expect(dist(at(fig, 'A'), at(fig, 'E')), 'E midpoint of AD').toBeCloseTo(dist(at(fig, 'E'), at(fig, 'D')), 6);
+      const fMidAC = Math.abs(dist(at(fig, 'A'), at(fig, 'F')) - dist(at(fig, 'F'), at(fig, 'C'))) < 1e-6;
+      const fMidDC = Math.abs(dist(at(fig, 'D'), at(fig, 'F')) - dist(at(fig, 'F'), at(fig, 'C'))) < 1e-6;
+      expect(fMidAC || fMidDC, 'F is the midpoint of AC or of DC').toBe(true);
+      // EF is a genuine midsegment: parallel to the third side (DC if F on AC, AC if F on DC).
+      const ef = { x: at(fig, 'F').x - at(fig, 'E').x, y: at(fig, 'F').y - at(fig, 'E').y };
+      const base = fMidAC
+        ? { x: at(fig, 'C').x - at(fig, 'D').x, y: at(fig, 'C').y - at(fig, 'D').y }
+        : { x: at(fig, 'C').x - at(fig, 'A').x, y: at(fig, 'C').y - at(fig, 'A').y };
+      expect(Math.abs(ef.x * base.y - ef.y * base.x) / (Math.hypot(ef.x, ef.y) * Math.hypot(base.x, base.y)), 'EF ∥ the third side').toBeLessThan(1e-3);
     },
   },
   {
@@ -370,6 +479,37 @@ export const SCENARIOS: Scenario[] = [
       expect(keys, `got: ${keys.join(', ')}`).toContain('square:ABCD');
       expect(keys).toContain('right-isosceles-triangle:ABE');
       expect(keys).toContain('right-isosceles-triangle:ABC');
+    },
+  },
+  {
+    id: 'generic-triangle-gets-no-badge',
+    title: 'טרפז ABCD + a declared generic משולש ABD: the trapezoid badges, the plain triangle does NOT (declutter)',
+    guards:
+      "operator report (2026-07-04, latest manual test): \"the trapezoid and several triangles were not detected in the shapes. In general when detecting shapes, if there is nothing special about a triangle we don't need to show it (otherwise there are too many).\" The trapezoid detection was fine (verified across every logged figure); the real change is that a GENERIC triangle — no forced equal side / right angle / special angle — should earn no shape badge, because a figure sprouts many incidental triangles (diagonals, cevians, midsegments) and badging every plain one floods the panel and buries the shapes that carry a specific theorem. Before, a DECLARED generic triangle (a 3-vertex polygon) always badged, while an EMERGENT generic triangle was already dropped; the fix aligns the two — neither badges. Nothing is lost for the theorem feed: `table.ts` reads typed `triangle` commands directly from the facts, so the general triangle-family theorems still surface. This replays a trapezoid + a plain triangle on three of its vertices and asserts only the trapezoid badges.",
+    steps: ['טרפז ABCD', 'משולש ABD'],
+    check(fig) {
+      allStepsOk(fig);
+      const keys = detectShapes(fig.construction).shapes.map((s) => `${s.type}:${[...s.vertices].sort().join('')}`);
+      expect(keys, `got: ${keys.join(', ')}`).toContain('trapezoid:ABCD');
+      // The plain triangle ABD (and any emergent generic triangle) earns no badge.
+      expect(keys.some((k) => k.startsWith('triangle:')), `no generic triangle badge in ${keys.join(', ')}`).toBe(false);
+    },
+  },
+  {
+    id: 'emergent-trapezoid-through-a-point-on-its-side',
+    title: 'מקבילית ABCD + extend CD to E (CD=DE) + EA: the emergent trapezoid ABCE (side CE has D on it) IS detected',
+    guards:
+      "operator report (2026-07-04, screenshot): a parallelogram ABCD with side CD extended to E (CD=DE) and EA drawn. The panel showed only מקבילית ABCD; the operator said \"there is also a trapezoid ABCE\" — since AB ∥ CD and E is on line CD, AB ∥ CE, so ABCE is a genuine trapezoid the student sees. Root cause: the emergent-cycle edge graph had only ATOMIC edges, and the trapezoid's side C–E is broken by D (C–D is a parallelogram edge, D–E a segment), so C and E were never adjacent and the 4-cycle A-B-C-E could not be enumerated. `collinearSplits` (ADR-167) handles the DUAL — splitting a carrier at an interior point — but nothing MERGED a collinear chain into a through-edge. Fix: a new `collinearMerges` pass adds the through-edge C–E whenever a point D is strictly between C and E and collinear in every sample (fixpoint, so longer chains merge too); wired into `detectShapes`'s enumeration (scoped there, since a through-edge would duplicate an existing ray in the angle universe). The generic triangle ADE stays unbadged (its own rule); only the special trapezoid surfaces.",
+    steps: ['מקבילית ABCD', 'E על המשך CD כך ש CD=DE', 'EA'],
+    check(fig) {
+      allStepsOk(fig);
+      const keys = detectShapes(fig.construction).shapes.map((s) => `${s.type}:${[...s.vertices].sort().join('')}`);
+      expect(keys, `got: ${keys.join(', ')}`).toContain('parallelogram:ABCD');
+      // The emergent trapezoid — its side CE runs through D (cycle order A-B-C-E → vertex set ABCE).
+      expect(keys.some((k) => k === 'trapezoid:ABCE' || k === 'isosceles-trapezoid:ABCE' || k === 'right-trapezoid:ABCE'),
+        `emergent trapezoid ABCE detected in ${keys.join(', ')}`).toBe(true);
+      // The generic triangle ADE is still suppressed (declutter rule, ADR-221).
+      expect(keys.some((k) => k.startsWith('triangle:')), `no generic triangle badge in ${keys.join(', ')}`).toBe(false);
     },
   },
   {

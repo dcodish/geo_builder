@@ -884,7 +884,7 @@ function introducedPointIds(cmd: Command): Id[] {
  * single-letter test made rename/swap/merge refuse a subscripted point ("no-source") — E6/STO-7. The
  * measure `expr` is skipped — it carries a variable/text, never a point id.
  */
-function commandPointIds(cmd: AnyCommand): Id[] {
+export function commandPointIds(cmd: AnyCommand): Id[] {
   const out: Id[] = [];
   const take = (v: unknown) => {
     if (typeof v === 'string' && /^[A-Z]\d*$/.test(v)) out.push(v);

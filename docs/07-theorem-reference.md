@@ -264,3 +264,14 @@ _Last updated: 2026-06-10. Source: `docs/5pts_GeometryList_Teachers.pdf` — the
 | B2 | O | The angle formed by two secants meeting outside a circle equals half the difference of the intercepted arcs. | זווית חיצונית במעגל שווה למחצית הפרש שתי הקשתות הכלואות בין שוקי הזווית ובין המשכיהן. |
 | B3 | O | The line of centers of two intersecting circles perpendicularly bisects their common chord. | קטע המרכזים של שני מעגלים נחתכים חוצה את המיתר המשותף ומאונך לו. |
 | B4 | O | The point of tangency of two tangent circles lies on the line of centers (or its extension). | נקודת ההשקה של שני מעגלים המשיקים זה לזה נמצאת על קטע המרכזים או על המשכו. |
+
+## Appendix C — cyclic-configuration corollaries · מסקנות ממרובע חסום במעגל
+
+> Composed teaching statements a student may **use** directly, but which are not atomic bagrut-numbered
+> theorems (each is derivable from cited ones — e.g. a cyclic trapezoid being isosceles follows from
+> #87 + #8 + #40). These carry **geo-builder ids in the 200 band** to keep them out of the official
+> 1–109 numbering while remaining tabled/citable in the tool. Type **P** (a property). See ADR-209.
+
+| # | Type | English | עברית |
+|---|------|---------|-------|
+| 201 | P | A trapezoid inscribed in a circle is isosceles. | טרפז החסום במעגל הוא טרפז שווה שוקיים. |

@@ -30,6 +30,8 @@ export const SHAPE_BOOK_SLUG: Record<ShapeType, string> = {
   // No dedicated book page for a right isosceles triangle → link to the right-triangle page
   // (משולש ישר זווית), per the operator's choice (a right-and-isosceles triangle reads there).
   'right-isosceles-triangle': 'meshulash-yashar-zavit',
+  // A 30-60-90 is a right triangle → same right-triangle book page (where #33/#34 live).
+  '30-60-90-triangle': 'meshulash-yashar-zavit',
   circle: 'hamaagl-mugamim',
 };
 

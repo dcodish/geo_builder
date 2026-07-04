@@ -21,7 +21,11 @@
       "It draws the figure from what you describe — it does not solve problems."
     ],
     "tryTitle": "Enter the given data exactly as it appears in the question:",
-    "trySteps": ["square ABCD", "point G on AD", "angle GBA = 37°"],
+    "trySteps": [
+      "square ABCD",
+      "point G on AD",
+      "angle GBA = 37°"
+    ],
     "close": "Got it — let's start"
   },
   "input": {
@@ -136,6 +140,7 @@
   "theorems": {
     "title": "Relevant theorems",
     "toggle": "Show relevant theorems",
+    "soon": "Coming soon",
     "empty": "Add more details to see relevant theorems",
     "new": "new",
     "highlightHint": "Click to mark on the figure what this theorem talks about",
@@ -156,7 +161,19 @@
       "midsegment": "Midsegment",
       "circle": "Circle",
       "tangent": "Tangent"
+    },
+    "discovery": {
+      "label": "Discovery level",
+      "l1": "Given",
+      "l2": "Implied",
+      "l3": "Discovered",
+      "l1hint": "Theorems from what you entered",
+      "l2hint": "+ what the construction guarantees",
+      "l3hint": "+ what the diagram reveals"
     }
+  },
+  "concepts": {
+    "title": "Guiding principles"
   },
   "canvas": {
     "reset": "Reset view",
@@ -257,6 +274,7 @@
       "equilateral-triangle": "Equilateral triangle",
       "right-triangle": "Right triangle",
       "right-isosceles-triangle": "Right isosceles triangle",
+      "30-60-90-triangle": "30-60-90 triangle",
       "circle": "Circle"
     },
     "def": {
@@ -273,6 +291,7 @@
       "equilateral-triangle": "A triangle with all sides equal.",
       "right-triangle": "A triangle with one right angle.",
       "right-isosceles-triangle": "A triangle with a right angle and its two legs equal (angles 45°-45°-90°).",
+      "30-60-90-triangle": "A right triangle whose acute angles are 30° and 60°; the leg opposite the 30° angle is half the hypotenuse.",
       "circle": "The set of points in the plane at a fixed distance from a centre."
     }
   }

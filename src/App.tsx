@@ -20,8 +20,8 @@ import { Figure } from '@/render';
 import type { Crossing } from '@/render';
 import type { DetectedShape, Id } from '@/engine';
 import { bookUrl } from '@/shapes/shapeCatalog';
-import { detectTheorems } from '@/theorems';
-import type { TheoremFeedEntry } from '@/theorems';
+import { detectTheorems, detectConcepts } from '@/theorems';
+import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
@@ -35,6 +35,14 @@ import { humanizeError } from '@/i18n/humanizeError';
  * behind the spinner. Mirrors the inline double-rAF the "show another configuration" path uses.
  */
 const nextPaint = () => new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res())));
+
+/**
+ * The live theorem-discovery feed (Phase 6a) is still experimental and is NOT shipped live: it is enabled
+ * in development (`npm run dev`) but DISABLED in production builds — the "show theorems" checkbox renders
+ * greyed-out/unchecked and the feed never appears. A prod build can force it on with `VITE_ENABLE_THEOREMS=true`
+ * (so we can flip it live without a code change once it's ready). Everything else worked on ships normally.
+ */
+const THEOREMS_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_THEOREMS === 'true';
 
 export default function App() {
   const { t, i18n } = useTranslation();
@@ -111,8 +119,9 @@ export default function App() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editError, setEditError] = useState(false);
-  const [showTheorems, setShowTheorems] = useState(true); // the live theorem feed section (Phase 6a) — on by default
-  const [theoremSel, setTheoremSel] = useState<number | null>(null); // the theorem row whose premise is highlighted on the canvas
+  const [showTheorems, setShowTheorems] = useState(THEOREMS_ENABLED); // the live theorem feed (Phase 6a) — on by default in dev, OFF+disabled in prod (not shipped live yet)
+  const [discoveryLevel, setDiscoveryLevel] = useState<DiscoveryLevel>(1); // the theorem discovery dial (ADR-219) — L1 Given by default
+  const [theoremSel, setTheoremSel] = useState<TheoremId | null>(null); // the theorem row whose premise is highlighted on the canvas
   const [bgOpen, setBgOpen] = useState(false); // the collapsed "background theorems" family fold is expanded
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -536,14 +545,29 @@ export default function App() {
     () => detectTheorems({ facts, construction, shapes: shapesLayer?.shapes }),
     [facts, construction, shapesLayer],
   );
-  const headlineTheorems = useMemo(() => theoremFeed.filter((e) => e.salience === 'headline'), [theoremFeed]);
+  // The discovery dial (ADR-219): show only entries whose evidence is at or below the selected level —
+  // L1 Given / L2 Implied (+ construction entailments) / L3 Observed (+ what the coordinates reveal).
+  // `detectTheorems` stays level-complete; filtering lives here at the presentation layer.
+  const visibleTheorems = useMemo(
+    () => theoremFeed.filter((e) => e.level <= discoveryLevel),
+    [theoremFeed, discoveryLevel],
+  );
+  const headlineTheorems = useMemo(() => visibleTheorems.filter((e) => e.salience === 'headline'), [visibleTheorems]);
   // Background theorems collapse into per-family fold rows (plan §5) — present but never noise.
   const backgroundFamilies = useMemo(() => {
     const by = new Map<TheoremFeedEntry['family'], TheoremFeedEntry[]>();
-    for (const e of theoremFeed) if (e.salience === 'background') (by.get(e.family) ?? by.set(e.family, []).get(e.family)!).push(e);
+    for (const e of visibleTheorems) if (e.salience === 'background') (by.get(e.family) ?? by.set(e.family, []).get(e.family)!).push(e);
     return [...by.entries()];
-  }, [theoremFeed]);
-  const backgroundCount = theoremFeed.length - headlineTheorems.length;
+  }, [visibleTheorems]);
+  const backgroundCount = visibleTheorems.length - headlineTheorems.length;
+
+  // The guiding-principles feed (operator 2026-07-04): heuristics the configuration invites (e.g. a right
+  // triangle → name one acute angle α, the other 90°−α). Distinct from theorems — a way to set up the
+  // work, not a fact to cite — so rendered in its own 💡 section under the same Display-options toggle.
+  const conceptFeed = useMemo(
+    () => detectConcepts({ facts, construction, shapes: shapesLayer?.shapes }),
+    [facts, construction, shapesLayer],
+  );
 
   // The premise objects of the SELECTED theorem row — highlighted on the canvas (NEVER conclusion
   // objects, plan §2). Takes precedence over the shape/fact highlight while a theorem row is picked.
@@ -607,6 +631,26 @@ export default function App() {
       shapesRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
   }, [shapesLayer, openShape]);
+
+  // Discovery level 3 (Observed, ADR-219) surfaces theorems whose premise only the evaluated coordinates
+  // reveal — those matchers read the emergent detected shapes. So whenever L3 is active and the shape
+  // layer is stale (a new fact clears it, since it's keyed on `facts`), auto-run the heavy synchronous
+  // detection to keep the observed-level feed live. Paint a busy state first; the guards make it fire once
+  // per staleness (detecting-true short-circuits, then shapesLayer-truthy short-circuits).
+  useEffect(() => {
+    if (discoveryLevel !== 3 || shapesLayer || detecting || facts.length === 0) return;
+    setDetecting(true);
+    const id = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        try {
+          detectShapes();
+        } finally {
+          setDetecting(false);
+        }
+      }),
+    );
+    return () => cancelAnimationFrame(id);
+  }, [discoveryLevel, shapesLayer, detecting, facts, detectShapes]);
 
   // The first point with an unshown discrete solution to step to — circle∩circle, line∩circle,
   // arc-midpoint, or a driven on-segment point (the kinds `cycleAlt` can step). A two-circle figure
@@ -969,10 +1013,33 @@ export default function App() {
                 <input type="checkbox" checked={showCenters} onChange={(e) => setShowCenters(e.target.checked)} />
                 {t('canvas.centers')}
               </label>
-              <label style={displayToggle}>
-                <input type="checkbox" checked={showTheorems} onChange={(e) => setShowTheorems(e.target.checked)} />
+              {/* The theorem feed is not shipped live yet (Phase 6a). In production the toggle is disabled
+                  (greyed out, unchecked) so it can't be turned on; it works normally in dev. */}
+              <label style={THEOREMS_ENABLED ? displayToggle : { ...displayToggle, opacity: 0.45, cursor: 'not-allowed' }} title={THEOREMS_ENABLED ? undefined : t('theorems.soon')}>
+                <input type="checkbox" checked={showTheorems} disabled={!THEOREMS_ENABLED} onChange={(e) => setShowTheorems(e.target.checked)} />
                 {t('theorems.toggle')}
               </label>
+              {/* Discovery-level dial (ADR-219) — cumulative L1→L3 selector; each level includes the ones
+                  below. L3 (Observed) needs evaluated coordinates, so selecting it auto-runs shape detection
+                  (an effect keeps the layer live as the figure grows). Only shown while theorems are on. */}
+              {showTheorems && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginInlineStart: 22 }}>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>{t('theorems.discovery.label')}</div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {([1, 2, 3] as DiscoveryLevel[]).map((lvl) => (
+                      <button
+                        key={lvl}
+                        type="button"
+                        onClick={() => setDiscoveryLevel(lvl)}
+                        title={t(`theorems.discovery.l${lvl}hint`)}
+                        style={discoveryLevel === lvl ? discoveryBtnOn : discoveryBtn}
+                      >
+                        {t(`theorems.discovery.l${lvl}`)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1152,7 +1219,7 @@ export default function App() {
           {showTheorems && facts.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={sectionLabel}>{t('theorems.title')}</div>
-              {theoremFeed.length === 0 && (
+              {visibleTheorems.length === 0 && (
                 <span style={{ fontSize: 12, color: '#64748b' }}>{t('theorems.empty')}</span>
               )}
               {headlineTheorems.map(theoremButton)}
@@ -1173,6 +1240,21 @@ export default function App() {
                   )}
                 </>
               )}
+            </div>
+          )}
+
+          {/* The guiding-principles feed (💡) — problem-solving heuristics the configuration invites, NOT
+              bagrut theorems to cite (operator 2026-07-04). Own section, under the same Display toggle. */}
+          {showTheorems && conceptFeed.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={sectionLabel}>{t('concepts.title')}</div>
+              {conceptFeed.map((c) => (
+                <div key={c.id} style={conceptRow}>
+                  <span aria-hidden style={{ flex: '0 0 auto', marginTop: 1 }}>💡</span>
+                  <span style={{ flex: 1, textAlign: he ? 'right' : 'left' }}>{he ? c.he : c.en}</span>
+                  {c.isNew && <span style={newBadge}>{t('theorems.new')}</span>}
+                </div>
+              ))}
             </div>
           )}
 
@@ -1482,6 +1564,17 @@ const alt: React.CSSProperties = {
 const relBtnOn: React.CSSProperties = { ...alt, border: '1px solid #0d9488', background: '#0d9488' };
 // The "detect shapes" button while the badge layer is ON — indigo, distinct from the relations teal.
 const shapesBtnOn: React.CSSProperties = { ...alt, border: '1px solid #4338ca', background: '#4338ca' };
+// One segment of the discovery-level dial (ADR-219) — the cumulative L1/L2/L3 selector.
+const discoveryBtn: React.CSSProperties = {
+  padding: '4px 10px',
+  fontSize: 12,
+  borderRadius: 6,
+  border: '1px solid #cbd5e1',
+  background: '#fff',
+  color: '#475569',
+  cursor: 'pointer',
+};
+const discoveryBtnOn: React.CSSProperties = { ...discoveryBtn, border: '1px solid #7c3aed', background: '#7c3aed', color: '#fff' };
 // A detected-shape badge chip (hover → highlight on canvas; click → its inline book-link card).
 const shapeBadge: React.CSSProperties = {
   padding: '4px 10px',
@@ -1513,6 +1606,19 @@ const theoremRow: React.CSSProperties = {
 };
 // The selected theorem row — tinted amber-neutral to mark the active premise highlight.
 const theoremRowOn: React.CSSProperties = { ...theoremRow, border: '1px solid #2563eb', background: '#eff6ff' };
+// A guiding-principle (💡) row — informational, no click-to-highlight, warm neutral to read as advice.
+const conceptRow: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 8,
+  padding: '7px 10px',
+  fontSize: 12.5,
+  lineHeight: 1.4,
+  borderRadius: 8,
+  border: '1px solid #fde68a',
+  background: '#fffbeb',
+  color: '#713f12',
+};
 // The tier dot: green when the theorem certainly applies now, amber for a sparing secondary condition.
 const tierDot = (tier: TheoremFeedEntry['tier']): React.CSSProperties => ({
   flex: '0 0 auto',

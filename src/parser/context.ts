@@ -26,6 +26,9 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     onSegment: Object.fromEntries(
       construction.objects.flatMap((o) => (o.kind === 'on-segment' ? [[o.id, [o.a, o.b]] as [Id, [Id, Id]]] : [])),
     ), // which side a free point rides — lets a base-less midsegment (ADR-199) resolve E's host side
+    midpointOf: Object.fromEntries(
+      construction.objects.flatMap((o) => (o.kind === 'midpoint' ? [[o.id, [o.a, o.b]] as [Id, [Id, Id]]] : [])),
+    ), // which side an existing midpoint bisects — lets a base-less named midsegment anchor on it (ADR-199 Am.)
     parallels: parallelEdgePairs(construction, positions), // "height from C" drops to a trapezoid's opposite base (ADR-169)
     lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // idempotent construct reuse
   };

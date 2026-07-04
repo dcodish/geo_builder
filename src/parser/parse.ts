@@ -48,6 +48,10 @@ export interface ParseContext {
   /** For each FREE on-segment point, the endpoints of the side it rides (`E → ['A','C']`) — lets a base-less
    *  midsegment ("EG קטע אמצעים" with E already on AC) resolve which side E sits on ([ADR-199](docs/06-decisions.md#adr-199)). */
   onSegment?: Record<string, [string, string]>;
+  /** For each existing MIDPOINT, the segment endpoints it bisects (`E → ['A','D']`) — lets a base-less
+   *  named midsegment ("EF קטע אמצעים במשולש DCA" with E already the midpoint of AD) anchor on that side
+   *  and reuse E, instead of escalating and re-minting a fresh M/N pair ([ADR-199](docs/06-decisions.md#adr-199) Am.). */
+  midpointOf?: Record<string, [string, string]>;
   /** Vertex-disjoint PARALLEL edge-pairs in the figure (e.g. a trapezoid's bases `[['A','B'],['D','C']]`),
    *  derived from the resolved positions — lets "height/altitude from a vertex" drop to the opposite
    *  parallel base (the trapezoid case the triangle inference can't reach). */
@@ -415,11 +419,13 @@ const rightTrapezoid = shapeMacro(
 
 /**
  * The base-less midsegment ("EG קטע אמצעים", no parallel base) — [ADR-199](docs/06-decisions.md#adr-199).
- * Requires the named endpoint pair and figure context: exactly one endpoint (`E`) already rides a triangle
- * side (`ctx.onSegment`), the other (`G`) is fresh. Emits a `midsegment` `shape-variant` `[P,Q,R,E,G]` (E's
- * side PQ, third vertex R = the unique common neighbour of P,Q); its two variants place G on PR or QR. If
- * neither endpoint is on a resolvable side, or both are (a determined midsegment, not a variant), returns
- * null so the utterance falls through to the plain-segment rule (unchanged behaviour).
+ * Requires the named endpoint pair and figure context: exactly one endpoint (`E`) already sits on a triangle
+ * side — either riding it FREE (`ctx.onSegment`) or as its existing MIDPOINT (`ctx.midpointOf`, ADR-199 Am.,
+ * e.g. "E אמצע AD" then "EF קטע אמצעים במשולש DCA") — and the other (`G`) is fresh. Emits a `midsegment`
+ * `shape-variant` `[P,Q,R,E,G]` (E's side PQ, third vertex R = the unique common neighbour of P,Q); its two
+ * variants place G on PR or QR. Reusing the existing E instead of escalating (which re-mints a stray M/N pair
+ * and drops the student's own labels). If neither endpoint is on a resolvable side, or both are (a determined
+ * midsegment, not a variant), returns null so the utterance falls through to the plain-segment rule.
  */
 function midsegmentBaseless(s: string, ctx: ParseContext): AnyCommand[] | null {
   const nm =
@@ -429,12 +435,16 @@ function midsegmentBaseless(s: string, ctx: ParseContext): AnyCommand[] | null {
   const pair = [up(nm[1]), up(nm[2])];
   if (pair[0] === pair[1]) return null;
   const onSeg = ctx.onSegment ?? {};
+  const midOf = ctx.midpointOf ?? {};
   const nb = ctx.neighbors ?? {};
-  // Try each endpoint as the on-side E (the other as the fresh G). G must NOT itself ride a side (else the
-  // midsegment is determined, not a variant — left to fall through) nor be one of E's own side endpoints.
+  // The anchor E sits on a side either as a FREE rider (onSegment) or as that side's existing midpoint
+  // (midpointOf). Try each endpoint as E (the other as the fresh G). G must be genuinely fresh — neither
+  // riding a side nor an existing midpoint (else the midsegment is determined, not a variant) — nor one of
+  // E's own side endpoints.
+  const anchor = (lbl: Id): [Id, Id] | undefined => onSeg[lbl] ?? midOf[lbl];
   const tryOrder = (eLbl: Id, gLbl: Id): AnyCommand[] | null => {
-    const side = onSeg[eLbl];
-    if (!side || onSeg[gLbl]) return null;
+    const side = anchor(eLbl);
+    if (!side || anchor(gLbl)) return null;
     const [p, q] = side;
     if (gLbl === p || gLbl === q) return null;
     const shared = (nb[p] ?? []).filter((x) => (nb[q] ?? []).includes(x) && x !== p && x !== q);

@@ -56,7 +56,13 @@ export function buildMatchCtx(
   const circleObjs = construction.objects.filter((o): o is Circle => o.kind === 'circle');
   const circles = circleMembers(construction).map((cm) => {
     const obj = circleObjs.find((o) => o.center === cm.center);
-    return { id: obj?.id ?? `circle-${cm.center}`, center: cm.center, members: cm.points, hidden: !!obj?.hidden };
+    return {
+      id: obj?.id ?? `circle-${cm.center}`,
+      center: cm.center,
+      members: cm.points,
+      hidden: !!obj?.hidden,
+      autoCenter: !!obj?.autoCenter,
+    };
   });
 
   const lastGroup = enabled.length ? groupKey(enabled[enabled.length - 1]) : null;

@@ -48,7 +48,7 @@ const CORPUS: CorpusQ[] = [
     title: 'isosceles triangle inscribed, arc midpoint, 90° inscribed angle',
     neverSurface: [103, 68, 71], // no diameter is ever stated (103); the similarity pairing is derived (68/71)
     steps: [
-      { u: 'triangle ABC inscribed in circle O', expect: [99, 84, 91], absent: [104] },
+      { u: 'triangle ABC inscribed in circle O', expect: [99, 84], absent: [104, 91] }, // 91 needs a circumcircle CONSTRUCTED through 3 points, not points ON a circle (ADR-210 Am.)
       { u: 'D is the midpoint of arc BC', expect: [92, 94], absent: [104] },
       { u: 'AB = AC', expect: [22], absent: [104] }, // 104 still off — the 90° given hasn't landed
       { u: 'angle ACD = 90', expect: [104] }, // the inscribed right angle announces a diameter
@@ -61,7 +61,9 @@ const CORPUS: CorpusQ[] = [
     steps: [
       { u: 'circle O radius 4', expect: [] },
       { u: 'AB is a diameter of circle O', expect: [103, 104, 97, 98] },
-      { u: 'DE is a chord of circle O', expect: [102, 84, 91] }, // 4 concyclic points → same-chord inscribed angles
+      // 4 concyclic points → same-chord inscribed angles (102). NOT 84 (no triangle) and NOT 91 (no
+      // circumcircle CONSTRUCTED through 3 points — the chord's points are placed ON circle O; ADR-210 Am.).
+      { u: 'DE is a chord of circle O', expect: [102], absent: [84, 91] },
       { u: 'AB and DE meet at C', expect: [2] }, // two chords cross → vertical angles
       { u: 'DF perpendicular to AB', expect: [28] },
     ],
@@ -71,7 +73,7 @@ const CORPUS: CorpusQ[] = [
     title: 'inscribed triangle, tangent, isosceles, bisector-ratio chain',
     neverSurface: [76], // the sharpest no-reveal case — no bisector is ever stated
     steps: [
-      { u: 'triangle ABD inscribed in circle O', expect: [99, 84, 91, 10, 11], absent: [103, 104] },
+      { u: 'triangle ABD inscribed in circle O', expect: [99, 84, 10, 11], absent: [103, 104, 91] }, // 91 needs a constructed circumcircle (ADR-210 Am.)
       { u: 'the tangent at D meets the extension of AB at E', expect: [105, 107], absent: [103, 104] },
       { u: 'F on AB', expect: [], absent: [103, 104] },
       { u: 'DE = FE', expect: [22], absent: [103, 104] }, // 103/104 off until AB is called a diameter

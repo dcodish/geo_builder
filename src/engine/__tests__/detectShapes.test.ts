@@ -88,6 +88,13 @@ describe('triangle classification', () => {
     expect(t).toContain('right-triangle');
     expect(t).not.toContain('triangle');
     expect(t).not.toContain('right-isosceles-triangle');
+    expect(t).not.toContain('30-60-90-triangle'); // an unconstrained right triangle isn't forced to 30-60-90
+  });
+  it('a right triangle whose size given forces a 30° angle → 30-60-90-triangle badge (not plain right)', () => {
+    // מקבילית ABCD · DE גובה לצעל BC · DC=2CE ⇒ CDE is right at E with hypotenuse DC = 2·CE ⇒ 30-60-90.
+    const keys = shapeKeys(buildCtx('מקבילית ABCD', 'DE גובה לצעל BC', 'DC=2CE'));
+    expect(keys).toContain('30-60-90-triangle:CDE');
+    expect(keys.some((k) => k.startsWith('right-triangle:CDE'))).toBe(false);
   });
   it('right isosceles → ONE composed right-isosceles-triangle badge, not two separate ones', () => {
     // A square's diagonal AC splits it into two forced right-isosceles triangles ABC, ACD. Each must
@@ -154,11 +161,15 @@ describe('negatives (never a coincidence of the drawing)', () => {
     for (const q of ['square', 'rectangle', 'rhombus', 'parallelogram', 'kite', 'trapezoid', 'isosceles-trapezoid'])
       expect(t).not.toContain(q);
   });
-  it('a free (scalene) triangle is NOT isosceles/equilateral/right', () => {
+  it('a free (scalene) triangle gets NO badge (generic → nothing special to surface)', () => {
+    // A generic triangle has no forced special property, so it earns no badge — a figure sprouts many
+    // incidental triangles and badging every plain one floods the panel (operator 2026-07-04). Declared
+    // AND emergent generic triangles are both dropped; only a forced special type (isosceles / right /
+    // equilateral / 30-60-90) badges.
     const t = types('triangle ABC');
+    expect(t).not.toContain('triangle');
     expect(t).not.toContain('isosceles-triangle');
     expect(t).not.toContain('equilateral-triangle');
     expect(t).not.toContain('right-triangle');
-    expect(t).toContain('triangle'); // the general-triangle badge still surfaces (it has fundamental theorems)
   });
 });

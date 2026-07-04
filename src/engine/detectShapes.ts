@@ -19,7 +19,7 @@
 import type { Construction, Id, Vec, Polygon, Circle } from './types';
 import { evaluate } from './evaluate';
 import { applySeed } from './sample';
-import { figureEdges, convergedSamples } from './relations';
+import { figureEdges, collinearMerges, convergedSamples } from './relations';
 import { dist, sub, len } from './geometry';
 
 /** Every named shape the layer can detect; each maps to one geometry-book page (see shapeCatalog). */
@@ -37,6 +37,7 @@ export type ShapeType =
   | 'equilateral-triangle'
   | 'right-triangle'
   | 'right-isosceles-triangle'
+  | '30-60-90-triangle'
   | 'circle';
 
 export interface DetectedShape {
@@ -165,6 +166,12 @@ function classifyQuad(samples: Vec[][], lengthTol: number, angleTol: number): Sh
  * `isosceles-triangle` + `right-triangle` badges (a right isosceles is one thing a student names,
  * mirroring how `isosceles-trapezoid` / `right-trapezoid` are each their own type). Equilateral is
  * never right (a 60-60-60 triangle has no right angle), so only isosceles pairs with the right axis.
+ *
+ * The right axis carries a MAGNITUDE sub-type too: a 30-60-90 triangle (a right triangle with a 30°
+ * acute angle ⇒ the third is 60°) is its own named concept the student learns as a unit — the leg
+ * opposite the 30° is half the hypotenuse (07 #33/#34). It is never isosceles (its acute angles differ),
+ * so it slots between right-isosceles and plain right (operator 2026-07-04, "always surface the special
+ * type + its theorems"). Its emergence is legitimate — a size given like `DC=2CE` forces exactly 30°.
  */
 function classifyTriangle(samples: Vec[][], lengthTol: number, angleTol: number): ShapeType {
   const all = (pred: (p: Vec[]) => boolean) => samples.every(pred);
@@ -177,9 +184,15 @@ function classifyTriangle(samples: Vec[][], lengthTol: number, angleTol: number)
   const isosceles = e01 || e12 || e20;
 
   const rightAngle = all((p) => [0, 1, 2].some((i) => isRight(angleAt(p[i], p[(i + 2) % 3], p[(i + 1) % 3]), angleTol)));
+  // A 30° interior angle in every sample — combined with the right angle it pins the 30-60-90 type.
+  const has30 = all((p) => [0, 1, 2].some((i) => {
+    const a = angleAt(p[i], p[(i + 2) % 3], p[(i + 1) % 3]);
+    return a !== null && Math.abs(a - Math.PI / 6) < angleTol;
+  }));
 
   if (equilateral) return 'equilateral-triangle';
   if (isosceles && rightAngle) return 'right-isosceles-triangle';
+  if (rightAngle && has30) return '30-60-90-triangle';
   if (isosceles) return 'isosceles-triangle';
   if (rightAngle) return 'right-triangle';
   return 'triangle';
@@ -250,32 +263,45 @@ function polyArea(p: Vec[]): number {
 }
 
 /**
+ * `sin` threshold below which a corner counts as STRAIGHT (collinear). This is deliberately MUCH tighter
+ * than the shape-classification `angleTol` (~0.5°): a "straight vertex" means the vertex is genuinely
+ * COLLINEAR with its neighbours — a phantom corner where a point sits ON the edge between them (a crossing
+ * on a diagonal, collinear to solver precision ~1e-10). At 0.5° it also rejected a *legitimately thin*
+ * corner: a sampler-perturbed trapezoid can have a real ~0.3° corner (`sin ≈ 5e-3`) in one unlucky config,
+ * which is a valid (if narrow) quadrilateral, not a degenerate one — rejecting the whole shape for it made
+ * detection flaky per base seed (the emergent trapezoid ABCE missed at seed 2). `1e-4` (~0.006°) cleanly
+ * separates a phantom (collinear to ~1e-10) from a genuine narrow corner (≥ a few milliradians), and matches
+ * `collinearSplits`' own on-carrier `tolPerp` so the two agree on "on the line".
+ */
+const STRAIGHT_SIN_TOL = 1e-4;
+
+/**
  * A vertex is "straight" when its two incident edges are collinear (interior angle ≈ 0 or π) — a
  * degenerate corner that makes an n-gon really an (n−1)-gon. This is the case the shoelace-area test
  * MISSES: a "quad" A-B-E-D where E lies on diagonal BD keeps triangle ABD's full area, yet B,E,D are
  * collinear so it is not a genuine quadrilateral (it would classify as a phantom kite). Drawing both
  * diagonals of any polygon plants their crossing point on every diagonal, spawning exactly these.
  */
-function hasStraightVertex(p: Vec[], angleTol: number): boolean {
+function hasStraightVertex(p: Vec[]): boolean {
   const n = p.length;
-  const sinTol = Math.sin(angleTol);
   for (let i = 0; i < n; i++) {
     const b = p[i];
     const u = sub(p[(i + n - 1) % n], b); // b → prev
     const w = sub(p[(i + 1) % n], b); // b → next
     const lu = len(u), lw = len(w);
     if (lu < EPS || lw < EPS) return true; // coincident consecutive vertices
-    // |sin θ| via the normalised cross product; ~0 ⇒ the corner is straight (or a fold-back spike).
-    if (Math.abs(u.x * w.y - u.y * w.x) / (lu * lw) < sinTol) return true;
+    // |sin θ| via the normalised cross product; ~0 ⇒ the corner is collinear (a phantom vertex on the edge
+    // between its neighbours), NOT merely narrow — a real thin corner stays well above STRAIGHT_SIN_TOL.
+    if (Math.abs(u.x * w.y - u.y * w.x) / (lu * lw) < STRAIGHT_SIN_TOL) return true;
   }
   return false;
 }
 
 /** A cycle is a genuine (non-degenerate, non-self-intersecting) polygon in EVERY sample. */
-function isSimpleEverywhere(perSample: Vec[][], angleTol: number): boolean {
+function isSimpleEverywhere(perSample: Vec[][]): boolean {
   for (const p of perSample) {
     if (polyArea(p) < 1e-6) return false; // degenerate / collinear
-    if (hasStraightVertex(p, angleTol)) return false; // a vertex on the edge between its neighbours ⇒ lower-order polygon
+    if (hasStraightVertex(p)) return false; // a vertex on the edge between its neighbours ⇒ lower-order polygon
     if (p.length === 4) {
       // The two non-adjacent edge pairs must not cross (a bowtie ordering).
       if (segmentsProperlyCross(p[0], p[1], p[2], p[3]) || segmentsProperlyCross(p[1], p[2], p[3], p[0])) return false;
@@ -288,7 +314,7 @@ function isSimpleEverywhere(perSample: Vec[][], angleTol: number): boolean {
 const TYPE_ORDER: ShapeType[] = [
   'square', 'rectangle', 'rhombus', 'parallelogram', 'kite',
   'isosceles-trapezoid', 'right-trapezoid', 'trapezoid',
-  'equilateral-triangle', 'right-isosceles-triangle', 'isosceles-triangle', 'right-triangle', 'triangle',
+  'equilateral-triangle', 'right-isosceles-triangle', '30-60-90-triangle', 'isosceles-triangle', 'right-triangle', 'triangle',
   'circle',
 ];
 
@@ -340,7 +366,14 @@ export function detectShapesAcross(constructions: Construction[], opts: ShapeDet
         const t = classifyQuad(perSample, lengthTol, angleTol);
         if (t) add(t, poly.vertices, label);
       } else if (poly.vertices.length === 3) {
-        add(classifyTriangle(perSample, lengthTol, angleTol), poly.vertices, label);
+        // A generic triangle (no forced equal side / right / special angle) gets no badge — same
+        // conservative rule as the emergent path below. A figure sprouts many incidental triangles
+        // (diagonals, cevians, midsegments); badging every plain one floods the panel and buries the
+        // shapes that carry a specific theorem. The general triangle-family theorems still surface from
+        // the FACT (`table.ts` reads typed `triangle` commands directly), so nothing is lost by dropping
+        // the redundant generic badge (operator 2026-07-04).
+        const t = classifyTriangle(perSample, lengthTol, angleTol);
+        if (t !== 'triangle') add(t, poly.vertices, label);
       }
       // n > 4 (e.g. a regular pentagon): no book page yet — TODO when those pages exist.
     } else if (o.kind === 'circle') {
@@ -353,7 +386,11 @@ export function detectShapesAcross(constructions: Construction[], opts: ShapeDet
   // Emergent polygons — triangle/quad cycles over the implicit edge graph that were never declared as
   // a `polygon` (e.g. a parallelogram between segments). Conservative: only keep a NAMED special type
   // (a generic quad classifies to null and is dropped; a generic emergent triangle is dropped too).
-  const adj = adjacency(figureEdges(c0, samples));
+  // The emergent-cycle universe also gets collinear MERGES (through-edges across a point sitting on a side,
+  // e.g. `C–E` when `D` is on the straight line C–D–E) so a polygon whose side has a point on it — the
+  // trapezoid ABCE of a parallelogram with CD extended to E — is enumerable. Scoped to shape enumeration
+  // (not the shared `figureEdges`) because a through-edge duplicates an existing ray in the angle universe.
+  const adj = adjacency([...figureEdges(c0, samples), ...collinearMerges(c0, samples)]);
   if (adj.size <= 16) { // perf guard: skip enumeration on a very dense figure
     const perSampleOf = (verts: Id[]): Vec[][] | null => {
       const rows: Vec[][] = [];
@@ -366,13 +403,13 @@ export function detectShapesAcross(constructions: Construction[], opts: ShapeDet
     };
     for (const tri of triangleCycles(adj)) {
       const per = perSampleOf(tri);
-      if (!per || !isSimpleEverywhere(per, angleTol)) continue;
+      if (!per || !isSimpleEverywhere(per)) continue;
       const t = classifyTriangle(per, lengthTol, angleTol);
       if (t !== 'triangle') add(t, tri, tri.join('')); // emergent generic triangle → no badge (conservative)
     }
     for (const quad of quadCycles(adj)) {
       const per = perSampleOf(quad);
-      if (!per || !isSimpleEverywhere(per, angleTol)) continue;
+      if (!per || !isSimpleEverywhere(per)) continue;
       const t = classifyQuad(per, lengthTol, angleTol);
       if (t) add(t, quad, quad.join(''));
     }

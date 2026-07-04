@@ -85,6 +85,69 @@ export function collinearSplits(c: Construction, samples: Map<Id, Vec>[]): [Id, 
 }
 
 /**
+ * GEOMETRIC segment MERGING — the DUAL of {@link collinearSplits}. Where `collinearSplits` breaks one drawn
+ * carrier at an interior point (so a sub-segment `E–D` becomes an edge), this joins TWO+ collinear drawn
+ * segments that meet end-to-end into the through-edge spanning them. A point `D` on the straight line between
+ * `C` and `E` — with `C–D` and `D–E` both drawn (a polygon edge `CD` + a segment `DE`, say) — makes `C–E` a
+ * segment the student visibly sees as one straight line, even though no single object spans it. Without it a
+ * polygon whose SIDE has a point sitting on it is never found: the trapezoid `ABCE` (a parallelogram `ABCD`
+ * with `CD` extended to `E`, so `AB ∥ CE`) has side `C–E` broken by `D`, so `C` and `E` are not adjacent and
+ * the 4-cycle can't be enumerated — the operator's "there is also a trapezoid ABCE" miss.
+ *
+ * `D` must be STRICTLY BETWEEN `C` and `E` and the three COLLINEAR in EVERY sample (a forced contiguous span,
+ * not a coincidence). Runs to a fixpoint over the drawn-edge adjacency (each through-edge becomes a link), so
+ * a chain with several interior points (`C–D–E–F` → `C–F`) merges transitively. Emergent shapes decide
+ * downstream whether a resulting cycle is a FORCED, simple polygon; this only adds the topological edge.
+ */
+export function collinearMerges(c: Construction, samples: Map<Id, Vec>[]): [Id, Id][] {
+  if (samples.length === 0) return [];
+  const atomic: [Id, Id][] = [];
+  for (const o of c.objects) {
+    if (o.kind === 'segment') atomic.push([o.a, o.b]);
+    else if (o.kind === 'polygon') for (let i = 0; i < o.vertices.length; i++) atomic.push([o.vertices[i], o.vertices[(i + 1) % o.vertices.length]]);
+  }
+  const adj = new Map<Id, Set<Id>>();
+  const link = (x: Id, y: Id) => { (adj.get(x) ?? adj.set(x, new Set<Id>()).get(x)!).add(y); };
+  for (const [a, b] of atomic) { link(a, b); link(b, a); }
+
+  const kk = (x: Id, y: Id) => (x < y ? `${x}|${y}` : `${y}|${x}`);
+  const known = new Set<string>(atomic.map(([a, b]) => kk(a, b)));
+  const tol = 1e-4;
+
+  // `d` lies strictly between `x` and `y`, and x,d,y are collinear, in EVERY sample (a contiguous straight span).
+  const straightThrough = (x: Id, d: Id, y: Id): boolean => {
+    for (const s of samples) {
+      const vx = s.get(x), vd = s.get(d), vy = s.get(y);
+      if (!vx || !vd || !vy) return false;
+      const dx = vy.x - vx.x, dy = vy.y - vx.y;
+      const len2 = dx * dx + dy * dy;
+      if (len2 < EPS) return false;
+      const perp = Math.abs((vd.x - vx.x) * dy - (vd.y - vx.y) * dx) / Math.sqrt(len2);
+      if (perp > tol * Math.sqrt(len2)) return false;
+      const t = ((vd.x - vx.x) * dx + (vd.y - vx.y) * dy) / len2;
+      if (!(t > tol && t < 1 - tol)) return false; // strictly interior ⇒ a genuine through-point, not an endpoint
+    }
+    return true;
+  };
+
+  const merges: [Id, Id][] = [];
+  for (let pass = 0; pass <= atomic.length; pass++) { // bounded fixpoint (each pass may unlock a longer chain)
+    const added: [Id, Id][] = [];
+    for (const [d, ns] of adj) {
+      const arr = [...ns];
+      for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
+        const x = arr[i], y = arr[j];
+        if (known.has(kk(x, y))) continue;
+        if (straightThrough(x, d, y)) { known.add(kk(x, y)); added.push([x, y]); merges.push([x, y]); }
+      }
+    }
+    if (added.length === 0) break;
+    for (const [x, y] of added) { link(x, y); link(y, x); }
+  }
+  return merges;
+}
+
+/**
  * Edges from each DRAWN (visible) line — the points that visibly lie on it, pairwise. A tangent drawn from
  * its touch point D to the crossing E is a visible edge D–E even though it's a `line`, not a `segment`; this
  * is what lets the angle universe see the TANGENT-CHORD angle (∠ between the tangent DE and a chord DB).

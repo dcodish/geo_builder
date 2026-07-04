@@ -20,6 +20,7 @@ export type TheoremFamily =
   | 'triangle'
   | 'congruence'
   | 'isosceles'
+  | 'kite'
   | 'similarity'
   | 'quad'
   | 'midsegment'
@@ -37,6 +38,27 @@ export type Salience = 'headline' | 'background';
 
 /** A theorem's tier (plan §3 D3): green announces it now; amber is a sparing secondary condition. */
 export type Tier = 'certain' | 'possible';
+
+/**
+ * Discovery level (ADR-219) — HOW the tool came to know a surfaced theorem's premise. The levels are
+ * NESTED: a "show level N" dial surfaces every entry with `level ≤ N`.
+ *  - **1 Declared** — the premise is instantiated by a *stated fact* the student entered (a `set-equal`,
+ *    a shape command, `set-angle`, a declared circle's membership). Pure "help from what you said".
+ *  - **2 Entailed** — a *coordinate-free structural derivation* the student never typed: two radii ⇒ an
+ *    isosceles triangle, two intersecting circles ⇒ a kite (ADR-218). Certain, no coordinates.
+ *  - **3 Observed** — only the *evaluated coordinates* reveal it: a purely-emergent detected shape /
+ *    relation. This is where the tool "notices for you", so it is opt-in and never the L1 default.
+ * A matcher with several evidence paths reports the STRONGEST (lowest) level that fired.
+ */
+export type DiscoveryLevel = 1 | 2 | 3;
+
+/**
+ * A theorem's citable identity: an official bagrut number (1–109) or a 200-band cyclic corollary
+ * ({@link TheoremDef}), OR — for the practice-only / removed-curriculum Appendix theorems (ADR-217) —
+ * their 07 label string (`A2`…`A6`, `B3`). The appendix ids are strings so they never collide with the
+ * numbered space and are visibly "not a citable bagrut number" wherever they surface.
+ */
+export type TheoremId = number | string;
 
 /**
  * Everything premise-side, precomputed once per `detectTheorems` run (the parser-`ctx` shape).
@@ -57,8 +79,13 @@ export interface MatchCtx {
   lastGroup: string | null;
 
   // ---- derived read-only premise hints (same category as the parser's ctx) ----
-  /** Each drawn/hidden circle: its centre id and the point ids stated to lie on it (`circleMembers`). */
-  circles: { id: Id; center: Id; members: Id[]; hidden: boolean }[];
+  /**
+   * Each drawn/hidden circle: its centre id, the point ids stated to lie on it (`circleMembers`), the
+   * `hidden` flag, and `autoCenter` — true when the centre is auto-hidden (the student never named it,
+   * e.g. an inscribed figure's implicit circumscribing circle). `autoCenter` is the coordinate-free
+   * "is the centre GIVEN?" signal that gates the central-angle theorems (see `centerGiven`, ADR-210).
+   */
+  circles: { id: Id; center: Id; members: Id[]; hidden: boolean; autoCenter: boolean }[];
   /** Undirected point adjacency over drawn segments/polygon edges (`pointNeighbors`). */
   neighbors: Record<Id, Id[]>;
   /**
@@ -77,14 +104,21 @@ export interface TheoremMatch {
   triggerFactIds: string[];
   /** Premise objects to highlight on the canvas (NEVER conclusion objects — plan §2). */
   triggerObjectIds: Id[];
+  /** How the premise was known — the {@link DiscoveryLevel} the dial filters on (ADR-219). */
+  level: DiscoveryLevel;
 }
 
 /** One theorem in the table: its citable identity + the authored trigger. */
 export interface TheoremDef {
-  /** Official bagrut number (1–109) — the citable identity. */
-  id: number;
-  /** property / converse-characterization. `O` (appendix) never enters the table. */
-  type: 'P' | 'C';
+  /** Citable identity: an official bagrut number (1–109), a geo-builder cyclic-configuration corollary
+   *  in the 200 band (Appendix C of 07 — composed teaching statements, not atomic bagrut numbers; e.g.
+   *  201 = an inscribed trapezoid is isosceles; ADR-209), or an Appendix A/B label string (`A2`…`B3`;
+   *  ADR-217). See {@link TheoremId}. */
+  id: TheoremId;
+  /** property / converse-characterization / `O` = Appendix (practice-only or removed-curriculum). An `O`
+   *  entry is SUPPORTING-ONLY — it MUST carry `salience: 'background'` (never a headline); the
+   *  integrity guard enforces the invariant (ADR-217). */
+  type: 'P' | 'C' | 'O';
   salience: Salience;
   family: TheoremFamily;
   /** The EXACT catalog statements ([07](docs/07-theorem-reference.md)) — no interpolation slots, by design. */
@@ -96,13 +130,15 @@ export interface TheoremDef {
 
 /** A surfaced feed entry — a matched {@link TheoremDef} plus the run-specific attribution/ordering. */
 export interface TheoremFeedEntry {
-  id: number;
-  type: 'P' | 'C';
+  id: TheoremId;
+  type: 'P' | 'C' | 'O';
   tier: Tier;
   salience: Salience;
   family: TheoremFamily;
   en: string;
   he: string;
+  /** The discovery level this entry surfaced at (ADR-219) — the dial shows entries with `level ≤ selected`. */
+  level: DiscoveryLevel;
   triggerFactIds: string[];
   triggerObjectIds: Id[];
   /** The highest fact index among the premise facts (FR-TH-2's "the fact that completed it"). */
