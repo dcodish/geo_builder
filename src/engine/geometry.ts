@@ -23,6 +23,14 @@ export const polygonArea = (pts: Vec[]): number => {
   return Math.abs(s) / 2;
 };
 
+/** Perimeter of the polygon with the given vertices in boundary order — Σ of consecutive edge lengths
+ *  (the closing edge n→0 included). Length units (unlike {@link polygonArea}'s length²). n ≥ 2. */
+export const polygonPerimeter = (pts: Vec[]): number => {
+  let p = 0;
+  for (let i = 0; i < pts.length; i++) p += dist(pts[i], pts[(i + 1) % pts.length]);
+  return p;
+};
+
 /** Unit vector in the direction of v (zero vector maps to zero). */
 export const unit = (v: Vec): Vec => {
   const l = len(v);

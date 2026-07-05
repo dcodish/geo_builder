@@ -36,6 +36,28 @@ describe('corner-tangent circle — Q1: works with NO circle named, spacing-inde
   });
 });
 
+/**
+ * ADR-228 Am.5 — NAMED tangent points on an EXISTING circle (bagrut Q11): "AB ו BC משיקים למעגל O2 בנקודות
+ * D ו C". The named points D, C are the TANGENT POINTS on O2 (radius ⟂ the side there); the arm ENDPOINTS
+ * (A, C) are NOT forced onto O2 — so A can stay on another circle (here O1). Previously the arm endpoints
+ * were treated as the tangent points, forcing A onto O2 (a contradiction with "A on O1").
+ */
+describe('corner tangent with NAMED tangent points, arm endpoints untouched (ADR-228 Am.5)', () => {
+  const ctx = { circles: ['O1', 'O2'], points: ['O1', 'O2', 'A', 'B', 'C', 'D'], circleMembers: [{ center: 'O1', points: ['A'] }, { center: 'O2', points: ['C'] }] };
+  it('"AB ו BC משיקים למעגל O2 בנקודות D ו C" puts D (not A) on O2; A is left alone', () => {
+    const c = cmds('AB ו BC משיקים למעגל O2 בנקודות D ו C', ctx);
+    const onCircle = c.filter((x) => x.type === 'point-on-circle').map((x) => (x as { id: string }).id);
+    expect(onCircle, 'the NAMED tangent point D goes on O2').toContain('D');
+    expect(onCircle, 'A is NOT forced onto O2 (it is on O1)').not.toContain('A');
+    // the tangency is radius O2–D ⟂ the side BA, and D lies ON the side (collinear B, A, D)
+    expect(c.some((x) => x.type === 'set-perpendicular' && (x as { a: string; b: string }).a === 'O2' && (x as { b: string }).b === 'D')).toBe(true);
+    expect(c.some((x) => x.type === 'set-collinear')).toBe(true);
+    // C is already a member of O2 → no duplicate point-on-circle for it; tangent at C is radius O2–C ⟂ BC
+    expect(onCircle).not.toContain('C');
+    expect(c.some((x) => x.type === 'set-perpendicular' && (x as { b: string }).b === 'C')).toBe(true);
+  });
+});
+
 describe('segment ratio with a √ value — Q3', () => {
   const ratio = (u: string) => cmds(u)[0] as Extract<AnyCommand, { type: 'set-ratio' }>;
 

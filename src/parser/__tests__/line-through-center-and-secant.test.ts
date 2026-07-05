@@ -28,6 +28,61 @@ describe('a reference to the circle CENTRE does not create a phantom circle', ()
   });
 });
 
+/**
+ * "AB עובר דרך מרכזי המעגלים" (ADR-228 Am.4) — a line through two on-circle points that passes through BOTH
+ * circle centres. The ORDERED set-line [A, centreOfA, centreOfB, B] puts A and B at the FAR intersections,
+ * so they don't collapse onto the tangency point (which is on the centre line and on both circles).
+ */
+describe('a line through two on-circle points that crosses both centres (ADR-228 Am.4)', () => {
+  const ctx = { circles: ['O1', 'O2'], points: ['O1', 'O2', 'A', 'B', 'E'], circleMembers: [{ center: 'O1', points: ['A'] }, { center: 'O2', points: ['B'] }] };
+  it('"AB עובר דרך מרכזי המעגלים" → segment + ordered set-line [A, O1, O2, B]', () => {
+    const r = parse('AB עובר דרך מרכזי המעגלים', ctx);
+    expect(r.ok && r.commands).toEqual([
+      { type: 'segment', a: 'A', b: 'B' },
+      { type: 'set-line', points: ['A', 'O1', 'O2', 'B'] },
+    ]);
+  });
+  it('English "AB passes through the centres of the circles" → same', () => {
+    const r = parse('AB passes through the centres of the circles', ctx);
+    expect(r.ok && r.commands).toEqual([
+      { type: 'segment', a: 'A', b: 'B' },
+      { type: 'set-line', points: ['A', 'O1', 'O2', 'B'] },
+    ]);
+  });
+  it('the order pairs each endpoint with its OWN circle (A on O2, B on O1 ⇒ A adjacent O2 ⇒ [A, O2, O1, B])', () => {
+    const swapped = { ...ctx, circleMembers: [{ center: 'O1', points: ['B'] }, { center: 'O2', points: ['A'] }] };
+    const r = parse('AB עובר דרך מרכזי המעגלים', swapped);
+    expect(r.ok && r.commands).toEqual([
+      { type: 'segment', a: 'A', b: 'B' },
+      { type: 'set-line', points: ['A', 'O2', 'O1', 'B'] },
+    ]);
+  });
+  it('does NOT fire when the endpoints are not on distinct circles (e.g. "ישר AD עובר דרך מרכז המעגל")', () => {
+    const r = parse('ישר AD עובר דרך מרכז המעגל', { circles: ['O'], points: ['O', 'A', 'D'] });
+    // A,D are not on two distinct circles → this rule bows out (a phantom-circle-free defer / other rule)
+    if (r.ok) expect(r.commands.some((c) => c.type === 'set-line')).toBe(false);
+  });
+
+  // The operator tried several phrasings; ALL must reach the same ordered set-line (ADR-228 Am.4).
+  const expected = [
+    { type: 'segment', a: 'A', b: 'B' },
+    { type: 'set-line', points: ['A', 'O1', 'O2', 'B'] },
+  ];
+  it('names the centres explicitly: "AB עובר דרך O1 ו O2"', () => {
+    expect((parse('AB עובר דרך O1 ו O2', ctx) as { ok: true; commands: unknown[] }).commands).toEqual(expected);
+  });
+  it('dash list "A-O1-O2-B" (no keyword at all)', () => {
+    expect((parse('A-O1-O2-B', ctx) as { ok: true; commands: unknown[] }).commands).toEqual(expected);
+  });
+  it('dash list with the line word "ישר A-O1-O2-B"', () => {
+    expect((parse('ישר A-O1-O2-B', ctx) as { ok: true; commands: unknown[] }).commands).toEqual(expected);
+  });
+  it('a 2-label "A-B" is NOT a collinear list (it is a segment, left alone)', () => {
+    const r = parse('A-B', ctx);
+    if (r.ok) expect(r.commands.some((c) => c.type === 'set-line')).toBe(false);
+  });
+});
+
 describe('a named line cutting the circle at TWO points (secant)', () => {
   const ctx = { circles: ['O'], points: ['O', 'A'] };
   it('parses to line-through + both line-circle crossings', () => {

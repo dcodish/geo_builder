@@ -154,6 +154,22 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "shadowedBy": [
       "circle",
     ],
+    "text": "circle O with circumference 6π",
+    "winner": "circleSizeExisting",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "circle",
+    ],
+    "text": "מעגל O שהיקפו 6π",
+    "winner": "circleSizeExisting",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "circle",
+    ],
     "text": "O is the centre of the circle",
     "winner": "nameCenter",
   },
@@ -834,6 +850,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "perimeter of ABC = 20",
+    "winner": "perimeter",
+  },
+  {
+    "lang": "he",
+    "text": "היקף המשולש ABC = 20",
+    "winner": "perimeter",
+  },
+  {
+    "lang": "en",
     "text": "AB = 6",
     "winner": "distanceConstraint",
   },
@@ -961,6 +987,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "lang": "he",
     "text": "מעגל סביב O רדיוס 5",
     "winner": "setRadius",
+  },
+  {
+    "lang": "en",
+    "text": "circle O with circumference 6π",
+    "winner": "circleSizeExisting",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל O שהיקפו 6π",
+    "winner": "circleSizeExisting",
   },
   {
     "lang": "en",

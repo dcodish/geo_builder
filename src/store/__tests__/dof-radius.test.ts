@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { parse } from '@/parser';
 import { replay, useGeoStore } from '@/store/geoStore';
-import { circleMembers, isGeoPoint } from '@/engine';
+import { circleMembers, isGeoPoint, freeDofCount } from '@/engine';
 
 const s = () => useGeoStore.getState();
 const run = (u: string) => {
@@ -119,5 +119,32 @@ describe('radius DOF sliders', () => {
       expect(f.lastError, `R=${R} accepted`).toBeNull();
       expect(ang(f.positions.get('B')!, f.positions.get('A')!, f.positions.get('C')!), `∠CAB stays 90 at R=${R}`).toBeCloseTo(90, 1);
     }
+  });
+
+  // The DOF cue (freeDofCount) counts SHAPE freedom modulo the place/rotate/scale similarity gauge (ADR-101).
+  // Two tangent circles used to read 0 ("✓ fully determined") though the radius RATIO is a genuine shape DOF:
+  // rawMovableDof already counts each free radius (1), but the tangency `coincide` (of two radial-toward
+  // witnesses on the shared centre axis) was counted as removing 2 when it removes 1 (ADR-228 Am.2).
+  describe('DOF cue for tangent circles (ADR-228 Am.2)', () => {
+    const dof = (u: string | string[]): number => {
+      s().clear();
+      for (const line of Array.isArray(u) ? u : [u]) ctxRun(line);
+      return freeDofCount(replay(s().facts).construction);
+    };
+    it('a lone circle is determined up to similarity → 0', () => {
+      expect(dof('מעגל O')).toBe(0);
+    });
+    it('two externally-tangent circles → 1 (the radius ratio)', () => {
+      expect(dof('שני מעגלים O1 ו O2 משיקים מבחוץ')).toBe(1);
+    });
+    it('two internally-tangent circles → 1', () => {
+      expect(dof('שני מעגלים O1 ו O2 משיקים מבפנים')).toBe(1);
+    });
+    it('two tangent circles + one absolute radius (circumference) → still 1 (the other size)', () => {
+      expect(dof(['שני מעגלים O1 ו O2 משיקים מבחוץ', 'היקף מעגל O1 הוא 6pi'])).toBe(1);
+    });
+    it('a square is rigid up to similarity → 0 (unaffected by the fix)', () => {
+      expect(dof('ריבוע ABCD')).toBe(0);
+    });
   });
 });

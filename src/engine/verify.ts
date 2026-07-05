@@ -57,6 +57,8 @@ function assertedRelations(commands: Command[]): Constraint[] {
       case 'set-collinear': out.push({ type: 'collinear', a: c.a, b: c.b, c: c.c }); break;
       case 'set-area': out.push({ type: 'area', ids: c.ids, value: c.value }); break;
       case 'set-area-ratio': out.push({ type: 'area-ratio', ids1: c.ids1, ids2: c.ids2, k: c.k }); break;
+      case 'set-perimeter': out.push({ type: 'perimeter', ids: c.ids, value: c.value }); break;
+      case 'set-perimeter-ratio': out.push({ type: 'perimeter-ratio', ids1: c.ids1, ids2: c.ids2, k: c.k }); break;
     }
   }
   return out;

@@ -128,7 +128,8 @@
     "nonFinite": "I couldn't compute a final position for the figure — the givens may conflict. Check the givens.",
     "degenerateSegment": "{{rel}} needs two distinct points on each side — \"{{seg}}\" is a single point, not a segment.",
     "degenerateAngle": "An angle needs three distinct points — \"{{angle}}\" repeats its vertex.",
-    "degenerateCollinear": "Collinear points must be distinct — \"{{id}}\" appears twice."
+    "degenerateCollinear": "Collinear points must be distinct — \"{{id}}\" appears twice.",
+    "retryHint": "You can try a different order (enter the givens first), reword it, or build it in a few smaller steps."
   },
   "dof": {
     "title": "Adjust the figure",

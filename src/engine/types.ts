@@ -656,6 +656,24 @@ export interface AreaRatioConstraint {
   k: number;
 }
 
+/** perimeter(polygon `ids`) = value — the Σ of edge lengths (ADR-228). A circle's circumference is NOT
+ *  this constraint: a circle's size is its radius, so `circumference 6π` lowers to a numeric radius. Like a
+ *  lone {@link AreaConstraint} a LONE perimeter pins the figure's free SCALE (invisible after the fit); with
+ *  another given it drives a SHAPE DOF. `ids` are the vertices in boundary order (n ≥ 3). */
+export interface PerimeterConstraint {
+  type: 'perimeter';
+  ids: Id[];
+  value: number;
+}
+
+/** perimeter(`ids1`) = k·perimeter(`ids2`) — a DIMENSIONLESS ratio between two polygon perimeters. */
+export interface PerimeterRatioConstraint {
+  type: 'perimeter-ratio';
+  ids1: Id[];
+  ids2: Id[];
+  k: number;
+}
+
 /** a→b ∥ c→d. */
 export interface ParallelConstraint {
   type: 'parallel';
@@ -804,7 +822,9 @@ export type Constraint =
   | AngleAcutenessConstraint
   | LengthRadiusConstraint
   | AreaConstraint
-  | AreaRatioConstraint;
+  | AreaRatioConstraint
+  | PerimeterConstraint
+  | PerimeterRatioConstraint;
 
 export interface Construction {
   objects: GeoObject[];
@@ -833,6 +853,8 @@ export type Command =
   | { type: 'name-center'; center: Id } // reveal/name an EXISTING circle's auto-hidden centre (FR-RN-8): the student said "O is the centre of the circle" — flips the circle's autoCenter off so its centre shows, WITHOUT touching the radius
   | { type: 'set-area'; ids: Id[]; value: number } // area of polygon `ids` = value (ADR-118)
   | { type: 'set-area-ratio'; ids1: Id[]; ids2: Id[]; k: number } // area(ids1) = k·area(ids2)
+  | { type: 'set-perimeter'; ids: Id[]; value: number } // perimeter of polygon `ids` = value (ADR-228)
+  | { type: 'set-perimeter-ratio'; ids1: Id[]; ids2: Id[]; k: number } // perimeter(ids1) = k·perimeter(ids2)
   | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id; soft?: boolean } // soft: a DEFAULT equal-pair a named-shape macro picks when the student didn't say which sides are equal (e.g. isosceles |AB|=|AC|); the store drops it if an explicit equality on the same triangle is stated (ADR-114). The engine treats it as an ordinary equality.
   | { type: 'set-ratio'; a: Id; b: Id; c: Id; d: Id; k: number; add?: number } // |ab| = k·|cd| + add
   | { type: 'set-length-radius'; a: Id; b: Id; circle: Id; center: Id; witness: Id; k: number; add?: number } // |ab| = k·R (ADR-071)

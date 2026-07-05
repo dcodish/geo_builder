@@ -339,7 +339,15 @@ export function reflectAnchors(c: Construction, pointId: Id): Id[] {
     // anchors are its two leg endpoints (Q8, ADR-223: the shared-hypotenuse right-angle vertex must be
     // flippable to the side where the legs actually cross).
     if (con.type === 'perpendicular') {
-      if (con.a === con.c && pointId === con.a) { refs.add(con.b); refs.add(con.d); }
+      if (con.a === con.c && pointId === con.a) { refs.add(con.b); refs.add(con.d); return; }
+      // The LOOSE END of a perpendicular between two DISTINCT segments — seg(a,b) ⟂ seg(c,d) — has a mirror
+      // configuration: the OTHER perpendicular ray from its foot. Reflecting the loose end across the OTHER
+      // segment's line flips it to that opposite ray (an equally-valid ⟂ placement the continuous solver
+      // won't reach from the default seed). So its reflection anchors are the other segment's endpoints
+      // (ADR-227: "DF ⟂ AB" where a later on-segment crossing needs segment DF pointing toward it — F must
+      // be flippable to the side where AC actually crosses it).
+      if (pointId === con.b) { refs.add(con.c); refs.add(con.d); }
+      else if (pointId === con.d) { refs.add(con.a); refs.add(con.b); }
       return;
     }
     if (con.type !== 'equal' && con.type !== 'distance' && con.type !== 'ratio') return;
@@ -367,6 +375,34 @@ export function reflectableFreePoints(c: Construction): Id[] {
     .slice(0, REFLECT_MAX);
 }
 
+/**
+ * The reflectable free points that are DIRECTION HELPERS — the loose end of a perpendicular/parallel
+ * segment, tied by NO metric relation (equal/distance/ratio/angle) and not a shared-vertex right angle.
+ * Its only symmetry is the two sides of the perpendicular ray from its foot; unlike an equidistant apex it
+ * is NOT a shape vertex, so its reflection must be applied AFTER the continuous sample. `applySeed` spins
+ * the whole free-point cluster about its centroid — reflecting a helper BEFORE the spin shifts that centroid
+ * and re-shapes the actual figure (the shape that satisfied one requirement is lost when the side flips),
+ * whereas reflecting it after leaves the sampled shape intact and only mirrors the side (ADR-227).
+ */
+export function directionHelperFreePoints(c: Construction): Id[] {
+  return reflectableFreePoints(c).filter((id) => {
+    let hasPerpPar = false;
+    let hasMetric = false;
+    const consider = (con: Constraint) => {
+      if (con.type === 'perpendicular' && con.a === con.c && con.a === id) { hasMetric = true; return; } // Thales apex
+      if (con.type === 'perpendicular' || con.type === 'parallel') {
+        if (constraintRefs(con).includes(id)) hasPerpPar = true;
+        return;
+      }
+      if ((con.type === 'equal' || con.type === 'distance' || con.type === 'ratio' || con.type === 'angle') && constraintRefs(con).includes(id))
+        hasMetric = true;
+    };
+    for (const con of c.constraints) consider(con);
+    for (const o of c.objects) { const sv = (o as { solve?: { constraint: Constraint } }).solve; if (sv) consider(sv.constraint); }
+    return hasPerpPar && !hasMetric;
+  });
+}
+
 /** The raw movable DOF an object carries before constraints: a free point 2 (x,y), a parametric/shape DOF 1, else 0. */
 function rawMovableDof(o: Construction['objects'][number]): number {
   const carrier = carrierOf(o);
@@ -376,10 +412,18 @@ function rawMovableDof(o: Construction['objects'][number]): number {
   return carrier.dof; // parametric / on-line / shape scalar = 1
 }
 
-/** DOF a constraint removes: an equality removes 1; a `coincide` pins both coords (2); an ORDER/inequality removes 0 (it's a region, ADR-039). */
-function dofRemoved(con: Constraint): number {
+/** DOF a constraint removes: an equality removes 1; a `coincide` pins both coords (2); an ORDER/inequality removes 0 (it's a region, ADR-039).
+ *  `byId` (optional) lets a coincide inspect its operands: the two-circles TANGENCY device is a coincide of
+ *  two `radial-toward` witnesses that sit on the shared centre AXIS by construction, so its cross-axis
+ *  component is identically 0 — it is a SINGLE scalar equation (|O1O2| = r1±r2), not a 2-DOF point-pin.
+ *  Counting it as 1 makes two tangent circles read their true shape freedom (the radius RATIO = 1 DOF,
+ *  ADR-228 Am.2) instead of 0. A coincide between ordinary points still pins both coords (2). */
+function dofRemoved(con: Constraint, byId?: Map<Id, Construction['objects'][number]>): number {
   if (con.type === 'angle-order' || con.type === 'length-order' || con.type === 'collinear-order' || con.type === 'angle-acuteness') return 0;
-  if (con.type === 'coincide') return 2;
+  if (con.type === 'coincide') {
+    const p = byId?.get(con.p), q = byId?.get(con.q);
+    return p?.kind === 'radial-toward' && q?.kind === 'radial-toward' ? 1 : 2;
+  }
   return 1;
 }
 
@@ -403,7 +447,7 @@ function similarityGauge(c: Construction, cons: Set<Constraint>): number {
   const hasCircle = c.objects.some((o) => o.kind === 'circle');
   const scaleFixed =
     pinned >= 2 ||
-    [...cons].some((k) => k.type === 'distance' || k.type === 'area') || // a numeric length OR area pins the scale (already in `removed`; ADR-118)
+    [...cons].some((k) => k.type === 'distance' || k.type === 'area' || k.type === 'perimeter') || // a numeric length, area, OR perimeter pins the scale (already in `removed`; ADR-118/ADR-228)
     c.objects.some((o) => o.kind === 'circle' && o.radius.via === 'length'); // a numeric radius
   const t = pinned === 0 ? 2 : 0;
   const r = npts >= 2 && pinned <= 1 ? 1 : 0;
@@ -428,7 +472,8 @@ export function freeDofCount(c: Construction): number {
     const sv = (o as { solve?: { constraint: Constraint } }).solve;
     if (sv?.constraint) cons.add(sv.constraint);
   }
+  const byId = new Map(c.objects.map((o) => [o.id, o] as const));
   let removed = 0;
-  for (const con of cons) removed += dofRemoved(con);
+  for (const con of cons) removed += dofRemoved(con, byId);
   return Math.max(0, raw - removed - similarityGauge(c, cons));
 }

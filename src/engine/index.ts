@@ -22,7 +22,7 @@ export {
   emptyConstruction,
 } from './step';
 export type { StepResult, StepOk, StepErr } from './step';
-export { applySeed, freeDofs, freeDofCount, reflectableFreePoints, reflectAnchors, reflectMaskOf, baseSeedOf, withReflectMask, REFLECT_MAX, REFLECT_STRIDE } from './sample';
+export { applySeed, freeDofs, freeDofCount, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, baseSeedOf, withReflectMask, REFLECT_MAX, REFLECT_STRIDE } from './sample';
 export { checkGivens } from './verify';
 export type { GivenViolation } from './verify';
 export { detectRelations, detectRelationsAcross, figureEdges, convergedSamples } from './relations';

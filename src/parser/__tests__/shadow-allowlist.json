@@ -5,6 +5,7 @@
     "arcMidpoint → midpoint",
     "area → (anon)",
     "circleCircleIntersection → pointOnCircle",
+    "circleSizeExisting → circle",
     "circlesTangent → tangentLine",
     "circumcircle → circle",
     "circumcircleMeetsSegment → circle",

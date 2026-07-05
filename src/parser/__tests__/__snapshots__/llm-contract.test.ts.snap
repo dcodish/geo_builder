@@ -354,6 +354,14 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circles-tangent",
     ],
   },
+  "circle O with circumference 6π": {
+    "en": [
+      "circle",
+    ],
+    "he": [
+      "circle",
+    ],
+  },
   "circle centered at O radius 5": {
     "en": [
       "circle",
@@ -636,6 +644,14 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     ],
     "he": [
       "parallelogram",
+    ],
+  },
+  "perimeter of ABC = 20": {
+    "en": [
+      "set-perimeter",
+    ],
+    "he": [
+      "set-perimeter",
     ],
   },
   "perpendicular bisector of AB": {

@@ -121,6 +121,32 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'perpendicular-helper-flips-to-reach-crossing',
+    title: 'right triangle + "DF ⟂ AB" + "AC and DF meet at E": DF flips to the side where it actually crosses AC',
+    guards:
+      'operator session nc207foh: right triangle ABC, D the midpoint of hypotenuse AB, "DF אנך ל AB" (DF ⟂ AB), then "AC ו DF נחתכים בנקודה E". The step built with no error but E landed OFF both segments (param ≈ −4.2 along DF, 1.22 along AC) — the operator: "DF should have moved so it fits the input". Root cause (ADR-227): F, the loose end of the perpendicular, is a free point whose SIDE (which ray of the perpendicular from D) is an unstated DOF, but `reflectAnchors` only granted a reflection axis to a shared-vertex right angle, so F was never flippable and its side stayed anti-correlated with the triangle shape (whenever the triangle flexed so E was within AC, F pointed away). Fix: (1) the loose end of a cross-segment perpendicular is reflectable across the OTHER segment\'s line; (2) a direction-helper (perpendicular/parallel loose end, no metric constraint) reflects AFTER the continuous sample — reflecting it before shifts the free-cluster spin centroid and re-shapes the triangle, coupling the two independent DOFs. With both, the resolver finds a config where E is within both segments.',
+    steps: [
+      'משולש ישר זוית ABC',
+      { llm: ['D אמצע AB'] },
+      'DF אנך ל AB',
+      'AC ו DF נחתכים בנקודה E',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const t = (p: Id, a: Id, b: Id) => {
+        const A = at(fig, a), B = at(fig, b), P = at(fig, p);
+        return ((P.x - A.x) * (B.x - A.x) + (P.y - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2);
+      };
+      // E is the crossing of segments AC and DF — and it lies WITHIN both (0 < t < 1), not on a continuation.
+      const tAC = t('E', 'A', 'C');
+      const tDF = t('E', 'D', 'F');
+      expect(tAC, 'E on segment AC (param)').toBeGreaterThan(0.02);
+      expect(tAC, 'E on segment AC (param)').toBeLessThan(0.98);
+      expect(tDF, 'E on segment DF (param)').toBeGreaterThan(0.02);
+      expect(tDF, 'E on segment DF (param)').toBeLessThan(0.98);
+    },
+  },
+  {
     id: 'q8-similar-triangles-detected',
     title: 'bagrut Q8b: "detect shapes" surfaces △DEG ~ △CEF (opt-in similar-triangle classes)',
     guards:
@@ -3116,6 +3142,96 @@ export const SCENARIOS: Scenario[] = [
     check(fig) {
       allStepsOk(fig);
       expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C')), '∠ABC = 90° from the single-vertex form').toBeCloseTo(90, 3);
+    },
+  },
+  {
+    id: 'circle-circumference-sizes-radius',
+    title: 'circle by circumference + O_1 subscript (ADR-228): "מעגל O_1 שהיקפו 6π"',
+    guards:
+      'operator-reported (2026-07-05): "מעגל O_1 שהיקפו 6π" showed the centre as "O" (the "_1" was dropped — a point token is a letter + GLUED digits, so the underscore truncated the label) and did NOT set the radius (circumference was unhandled — it fell through to the LLM which drew a default-radius circle). Fix A: normalizePointSubscript rewrites O_1 → O1 for every label. Fix B: a circle sized by its circumference/area lowers to a NUMERIC radius (circumference 6π ⇒ r = C/2π = 3), reusing the fixed-radius path.',
+    steps: ['מעגל O_1 שהיקפו 6π'],
+    check(fig) {
+      allStepsOk(fig);
+      const circ = fig.construction.objects.find((o) => o.kind === 'circle') as { center: Id; radius: { via: string; value?: number } } | undefined;
+      expect(circ?.center, 'the subscript O_1 is preserved as O1').toBe('O1');
+      expect(circ?.radius.via, 'circumference lowers to a fixed numeric radius').toBe('length');
+      expect(circ?.radius.value, 'circumference 6π ⇒ radius 3').toBeCloseTo(3, 6);
+    },
+  },
+  {
+    id: 'tangent-circles-named-then-circumference',
+    title: 'two named tangent circles + circumference on one (ADR-228 Am.): "שני מעגלים O1 ו O2 משיקים מבחוץ" + "היקף מעגל O1 הוא 6pi"',
+    guards:
+      'operator-reported (2026-07-05): building two externally-tangent circles named O1/O2, then "היקף מעגל O1 הוא 6pi" was refused. Three root causes: (1) the tangent-circles rule read names via a per-circle "מעגל X" regex, which the PLURAL "מעגלים O1 ו O2" broke (the "ים" suffix stops the מעגל-then-space adjacency) — so O1/O2 were dropped and O/P INVENTED, meaning circle O1 never existed to reference; (2) circumference on an EXISTING circle fell to the circle CREATION rule, which re-emitted a circle command that addObj ignores (dropping the size) — it now emits set-radius; (3) "6pi" (the word) was read as plain 6, not 6π. With all three: the circles keep the names O1/O2 and O1 flexes to radius 3 (6π/2π), the pair staying externally tangent (O2 absorbs it).',
+    steps: ['שני מעגלים O1 ו O2 משיקים מבחוץ', 'היקף מעגל O1 הוא 6pi'],
+    check(fig) {
+      allStepsOk(fig);
+      const centers = fig.construction.objects.filter((o) => o.kind === 'circle').map((o) => (o as { center: Id }).center).sort();
+      expect(centers, 'circles keep the stated names O1, O2').toEqual(['O1', 'O2']);
+      // Radii read from the engine's PUBLISHED resolved-circle map (what the renderer draws — the stored
+      // construction keeps the pre-solve seed).
+      const o1 = fig.circles.get('circle-O1');
+      expect(o1?.r, 'O1 radius = circumference/2π = 3').toBeCloseTo(3, 4);
+      const cs = [...fig.circles.values()];
+      expect(cs.length).toBe(2);
+      expect(dist(cs[0].center, cs[1].center), 'externally tangent: |O1O2| = r1 + r2').toBeCloseTo(cs[0].r + cs[1].r, 2);
+      // The DOF cue reads the true shape freedom: 1 (O2's size), not "✓ fully determined" (ADR-228 Am.2).
+      expect(freeDofCount(fig.construction), 'one shape DOF remains (O2 radius)').toBe(1);
+    },
+  },
+  {
+    id: 'tangent-circles-both-radii-pinned-by-size',
+    title: 'both tangent-circle radii pinned by circumference AND area (ADR-228 Am.3): "…משיקים מבחוץ" + "היקף מעגל O1 = 6π" + "שטח O2 = 81π"',
+    guards:
+      'operator-reported (2026-07-05): after two tangent circles + "היקף מעגל O1 הוא 6π" (O1→r3), giving "שטח O2 הוא 81π" (O2→r9, area √(A/π)) over-constrained with "M/E coincides with ~touch-M cannot hold" — which also read as "an error when changing M to E" (the rename made the message say E). Root cause: the free-radius tangency is a coincide driven by whichever radius is FREE; pinning the SECOND radius left the coincide with no carrier though a free CENTRE can still satisfy |O1O2|=r1+r2. Fix (ADR-228 Am.3): set-radius, on pinning a radius that drove a tangency, recruits a free centre when no free radius remains. Also: "שטח O2" (bare, no "מעגל") now resolves the known circle. Both radii pinned, figure stays externally tangent, no error.',
+    steps: ['שני מעגלים O1 ו O2 משיקים מבחוץ', 'היקף מעגל O1 הוא 6π', 'שטח O2 הוא 81π'],
+    check(fig) {
+      allStepsOk(fig);
+      const r = (c: string) => fig.circles.get(c)?.r;
+      expect(r('circle-O1'), 'O1 radius = circumference/2π = 3').toBeCloseTo(3, 4);
+      expect(r('circle-O2'), 'O2 radius = √(area/π) = √81 = 9').toBeCloseTo(9, 4);
+      const cs = [...fig.circles.values()];
+      expect(dist(cs[0].center, cs[1].center), 'stays externally tangent: |O1O2| = 3 + 9 = 12').toBeCloseTo(12, 3);
+    },
+  },
+  {
+    id: 'line-through-both-centres-avoids-tangency-point',
+    title: 'a line through two on-circle points crossing both centres does NOT collapse them onto the tangency point (ADR-228 Am.4)',
+    guards:
+      'operator-reported (2026-07-05): two tangent circles (touch point E), A on O1, B on O2, then "AB עובר דרך מרכזי המעגלים" (AB passes through both centres) placed A AND B onto E — E is on the centre line AND on both circles, so the plain reading collapses them there (no warning). The utterance did not parse deterministically (escalated to the LLM, whose output collapsed them). Fix (ADR-228 Am.4): a new rule parses it to an ORDERED set-line [A, centreOfA, centreOfB, B] — each endpoint at the FAR intersection of the centre line with its own circle — so A and B come out DISTINCT at the diameter ends (the "find a different option when points would coincide" principle, ADR-123, realised structurally). Asserts A, B, E all distinct, A–O1–O2–B collinear, radii 3 & 9.',
+    steps: [
+      'שני מעגלים O1 ו O2 משיקים מבחוץ בנקודה E',
+      'היקף O1 הוא 6π',
+      'שטח O2 הוא 81π',
+      'A על מעגל O1',
+      'B על מעגל O2',
+      'AB עובר דרך מרכזי המעגלים',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), E = at(fig, 'E'), O1 = at(fig, 'O1'), O2 = at(fig, 'O2');
+      // A, B, E are all DISTINCT — no collapse onto the tangency point.
+      expect(dist(A, B), 'A and B distinct').toBeGreaterThan(1);
+      expect(dist(A, E), 'A not on the tangency point E').toBeGreaterThan(1);
+      expect(dist(B, E), 'B not on the tangency point E').toBeGreaterThan(1);
+      // A, O1, O2, B are collinear (the line through the two endpoints crosses both centres).
+      const cross = (p: Vec, q: Vec, r: Vec) => Math.abs((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+      expect(cross(A, O1, O2), 'A, O1, O2 collinear').toBeLessThan(0.1);
+      expect(cross(O1, O2, B), 'O1, O2, B collinear').toBeLessThan(0.1);
+      expect(fig.circles.get('circle-O1')?.r, 'O1 r=3').toBeCloseTo(3, 3);
+      expect(fig.circles.get('circle-O2')?.r, 'O2 r=9').toBeCloseTo(9, 3);
+    },
+  },
+  {
+    id: 'polygon-perimeter-sizes-figure',
+    title: 'polygon perimeter as a constraint (ADR-228): "משולש ABC" + "היקף ABC = 20"',
+    guards:
+      'feature (2026-07-05): היקף is BOTH a circle\'s circumference and a polygon\'s perimeter; on a polygon it is now a first-class perimeter constraint (sibling of area, ADR-118) — set-perimeter drives the figure so Σ of the sides equals the given, and the givens verifier re-derives and checks it. A lone perimeter pins the figure SCALE (invisible after the fit).',
+    steps: ['משולש ABC', 'היקף ABC = 20'],
+    check(fig) {
+      allStepsOk(fig);
+      const p = dist(at(fig, 'A'), at(fig, 'B')) + dist(at(fig, 'B'), at(fig, 'C')) + dist(at(fig, 'C'), at(fig, 'A'));
+      expect(p, 'the triangle perimeter equals the given 20').toBeCloseTo(20, 3);
     },
   },
 ];

@@ -46,6 +46,14 @@ const THEOREMS_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_THEO
 
 export default function App() {
   const { t, i18n } = useTranslation();
+  // A humanized build error + a gentle "try a different order/wording/smaller steps" nudge (the book often
+  // describes what's SEEN, not how to construct it, so a single complex line may not build — the hint points
+  // the student at the manual decomposition). Appended only to real errors, at the display layer, so
+  // `humanizeError` stays a pure mapping. (ADR-228 Am.6.)
+  const explainError = (raw: string | null | undefined): string => {
+    const m = humanizeError(raw, t);
+    return m ? `${m} ${t('errors.retryHint')}` : m;
+  };
   const facts = useGeoStore((s) => s.facts);
   const selectedId = useGeoStore((s) => s.selectedId);
   const execute = useGeoStore((s) => s.execute);
@@ -392,7 +400,7 @@ export default function App() {
         // "produced nothing". (ADR-156 follow-up — the "impossible with the current data" message.)
         if (outcome.reason === 'error') {
           logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `conflict:${outcome.detail ?? ''}`, commands: r.commands });
-          setInputNote(outcome.detail ? humanizeError(outcome.detail, t) : t('input.producedNothing'));
+          setInputNote(outcome.detail ? explainError(outcome.detail) : t('input.producedNothing'));
           setBusy(false);
           return; // keep the text so the student can edit/delete it
         }
@@ -894,7 +902,7 @@ export default function App() {
             </div>
           </div>
 
-          {lastError && <div role="status" aria-live="polite" style={errorBanner}>⚠ {humanizeError(lastError, t)}</div>}
+          {lastError && <div role="status" aria-live="polite" style={errorBanner}>⚠ {explainError(lastError)}</div>}
 
           {pending && <div role="status" aria-live="polite" style={infoBanner}>ⓘ {t('figure.pending')}</div>}
 
@@ -933,7 +941,7 @@ export default function App() {
                   const anyOn = g.facts.some((f) => f.enabled);
                   const brokenFact = g.facts.find((f) => f.enabled && status[f.id] !== 'ok');
                   const state = !anyOn ? 'disabled' : brokenFact ? 'broken' : 'ok';
-                  const errText = brokenFact ? humanizeError(status[brokenFact.id] as string, t) : undefined;
+                  const errText = brokenFact ? explainError(status[brokenFact.id] as string) : undefined;
                   const label = g.facts[0].utterance ?? g.facts.map((f) => f.cmd.type).join(' + ');
                   const editing = editingId === g.key;
                   return (

@@ -1335,8 +1335,13 @@ const ratvalAt = (m: RegExpMatchArray, g: number): number => {
   return numr / den;
 };
 
-/** The ratio coefficient k for "area(P1) = k·area(P2)" from the connective between two area refs. */
-function areaRatioK(s: string): number {
+/**
+ * The ratio coefficient k for "measure(P1) = k·measure(P2)" from the connective between two refs — shared by
+ * area (ADR-118) and perimeter (ADR-228). `kwAlt` is the measure keyword alternation (e.g. `S[A-Z]|שטח|area`)
+ * used only by the "= 2 <kw>DEF" coefficient form; every other connective (fraction word, "פי N", "= r") is
+ * keyword-agnostic.
+ */
+function measureRatioK(s: string, kwAlt: string): number {
   // Hebrew fraction words get no `\b` — JS word boundaries don't fire around non-ASCII letters.
   if (/רבע/.test(s) || /\bquarter\b/i.test(s)) return 1 / 4;
   if (/שליש/.test(s) || /\bthird\b/i.test(s)) return 1 / 3;
@@ -1345,10 +1350,11 @@ function areaRatioK(s: string): number {
   if (pi) return parseFloat(pi[1]);
   const eq = s.match(new RegExp(String.raw`(?:=|הוא|\bis\b)\s*${RATVAL}`, 'i')); // "= 3/4" / "הוא 1.8"
   if (eq) return ratvalAt(eq, 1);
-  const coef = s.match(new RegExp(String.raw`=\s*(${COEF})\s*(?:S[A-Z]|שטח|area)`, 'i')); // "= 2 SDEF" / "= 2 area DEF"
+  const coef = s.match(new RegExp(String.raw`=\s*(${COEF})\s*(?:${kwAlt})`, 'i')); // "= 2 SDEF" / "= 2 area DEF"
   if (coef) return parseFloat(coef[1]);
-  return 1; // equal areas
+  return 1; // equal measures
 }
+const areaRatioK = (s: string): number => measureRatioK(s, String.raw`S[A-Z]|שטח|area`);
 
 /** The value/label on the RHS of a single-area measure: a number, radical, variable, or power. */
 function parseAreaExpr(rhs: string): MeasureExpr | null {
@@ -1390,6 +1396,49 @@ const area: Rule = (s) => {
   const expr = parseAreaExpr(rhs[1]);
   if (!expr) return null;
   return [{ type: 'measure-area', ids: refs[0].ids, expr }];
+};
+
+// ── PERIMETER measures & relations ([ADR-228](docs/06-decisions.md#adr-227)) ────────────────────────────
+/** Every "perimeter of a polygon" reference in `s`, in order — verbose only ("היקף [ה<shape>] ABC" /
+ *  "perimeter [of] [the] [<shape>] ABC"). No compact single-letter marker (a bare "P" collides with point
+ *  labels), unlike area's `SABC`. Mirrors the verbose half of {@link areaReferences}. */
+function perimeterReferences(s: string): { ids: Id[]; at: number }[] {
+  const refs: { ids: Id[]; at: number }[] = [];
+  const reKw = /היקף|perimeter/gi;
+  let m: RegExpExecArray | null;
+  while ((m = reKw.exec(s)) !== null) {
+    const kwEnd = m.index + m[0].length;
+    const raw = s.slice(kwEnd);
+    const after = raw.replace(new RegExp(String.raw`^(?:\s+(?:of|the|של|ה))*\s*${AREA_SHAPE}?\s*`, 'i'), '');
+    const lead = after.match(/^((?:[A-Za-z]\d*\s*){3,4})/);
+    const ids = lead ? (labelRun(lead[1], 4) ?? labelRun(lead[1], 3)) : null;
+    if (ids) refs.push({ ids, at: m.index });
+  }
+  return refs.sort((a, b) => a.at - b.at);
+}
+
+/**
+ * Perimeter givens (ADR-228) — the polygon sibling of {@link area}: an absolute perimeter (`היקף ABC = 20`,
+ * `perimeter of the rectangle ABCD is 20`) or a perimeter RATIO (`היקף ABC = 2 היקף DEF`, `…גדול פי 2…`,
+ * `…רבע…`). `היקף` is one Hebrew word for a polygon's perimeter AND a circle's circumference; a CIRCLE's
+ * `היקף` sizes its radius (the `circle` rule owns it), so this rule bows out whenever the utterance names a
+ * circle. A lone absolute perimeter drives the figure's SCALE, a ratio drives a SHAPE DOF (ADR-052/ADR-101).
+ * Emits `set-perimeter`/`set-perimeter-ratio` directly (a symbolic-variable perimeter label escalates to the
+ * LLM — a noted follow-up). Runs before the shape rules, which would otherwise build the polygon and drop it.
+ */
+const perimeter: Rule = (s) => {
+  if (!/היקף|perimeter/i.test(s)) return null;
+  if (/circle|מעגל/i.test(s)) return null; // a circle's circumference sizes its RADIUS — `circle` owns it
+  const refs = perimeterReferences(s);
+  if (refs.length === 0) return null;
+  if (refs.length >= 2) {
+    return [{ type: 'set-perimeter-ratio', ids1: refs[0].ids, ids2: refs[1].ids, k: measureRatioK(s, String.raw`היקף|perimeter`) }];
+  }
+  const rhs = s.match(/(?:=|הוא|שווה|\bis\b|\bequals?\b)\s*(.+)$/i);
+  if (!rhs) return null;
+  const expr = parseAreaExpr(rhs[1]); // number / radical (a variable-label perimeter is out of scope → null → escalate)
+  if (!expr || !('value' in expr)) return null;
+  return [{ type: 'set-perimeter', ids: refs[0].ids, value: expr.value }];
 };
 
 const measureLength: Rule = (s) => {
@@ -1619,6 +1668,54 @@ const perpendicularConstraint: Rule = (s) => {
  * (FR-IN-7). The point listed FIRST in the emitted `set-collinear` is the one the solver prefers to
  * move, so "E on line AC" slides E (an on-circle/on-segment point) onto the line rather than A or C.
  */
+/**
+ * "AB עובר דרך מרכזי המעגלים" / "AB passes through the centres [of the circles]" (ADR-228 Am.4) — the line
+ * through the two endpoints passes through the circle centres. Fires ONLY when A and B lie on DISTINCT
+ * circles (so "the centres" resolves unambiguously to their two centres); a line through a single centre or
+ * through free points is left to other rules. The emitted `set-line` is ORDERED **[A, centreOfA, centreOfB,
+ * B]**: each endpoint sits at the FAR intersection of the centre line with its OWN circle (beyond its
+ * centre), so A and B come out distinct — NOT collapsed onto the tangency point E, which lies on the centre
+ * line AND on both circles (the degenerate reading). This is the "find a different option when points would
+ * coincide" principle (ADR-123) realised structurally by the order. Draws the segment AB too (FR-IN-7).
+ */
+const lineThroughCenters: Rule = (s, ctx) => {
+  if (!/(?:עובר[ת]?|passes|goes)/i.test(s)) return null;
+  const m = s.match(/^\s*(?:(?:the\s+)?(?:line|ה?ישר|ה?קו)\s+)?([A-Z]\d*)\s*([A-Z]\d*)\b/);
+  if (!m) return null;
+  const A = up(m[1]), B = up(m[2]);
+  if (A === B) return null;
+  const circleOf = (p: string): string | undefined => ctx.circleMembers?.find((e) => e.points.map(up).includes(p))?.center;
+  const cA = circleOf(A), cB = circleOf(B);
+  if (!cA || !cB || up(cA) === up(cB)) return null; // A and B must lie on DISTINCT circles
+  // The utterance must say it goes through the CENTRES — either the word "centre(s)"/"מרכז" ("…מרכזי
+  // המעגלים") OR by NAMING both centre labels after "through" ("AB עובר דרך O1 ו O2"). Either way the
+  // membership fixes the order, so both phrasings collapse to the same ordered set-line.
+  const afterThrough = s.replace(/^.*?(?:עובר[ת]?|passes|goes)(?:\s+through)?/i, '');
+  const namesBothCentres = new RegExp(`\\b${up(cA)}\\b`).test(afterThrough.toUpperCase()) && new RegExp(`\\b${up(cB)}\\b`).test(afterThrough.toUpperCase());
+  if (!/מרכז|cent(?:er|re)/i.test(s) && !namesBothCentres) return null;
+  return [
+    { type: 'segment', a: A, b: B },
+    { type: 'set-line', points: [A, up(cA), up(cB), B] }, // ordered ⇒ A, B at the far ends (not the touch point)
+  ];
+};
+
+/**
+ * A DASH-separated ordered collinear list — "A-O1-O2-B" / "ישר A-O1-O2-B" (ADR-228 Am.4). The dashes make
+ * the order explicit (the most direct way to say "these points are collinear, in this order"), so it lowers
+ * to `set-line` and draws the spanning segment (first→last). 3+ labels, each distinct. A 2-label "A-B" is
+ * left alone (that's a segment, handled elsewhere).
+ */
+const dashCollinear: Rule = (s) => {
+  const m = s.match(/^\s*(?:(?:the\s+)?(?:line|ה?ישר|ה?קו)\s+)?([A-Z]\d*(?:\s*-\s*[A-Z]\d*){2,})\s*$/);
+  if (!m) return null;
+  const pts = m[1].match(/[A-Z]\d*/g)?.map(up) ?? [];
+  if (pts.length < 3 || new Set(pts).size !== pts.length) return null; // 3+ DISTINCT labels
+  return [
+    { type: 'segment', a: pts[0], b: pts[pts.length - 1] },
+    { type: 'set-line', points: pts },
+  ];
+};
+
 const collinearConstraint: Rule = (s) => {
   // "line ABE" / "ישר ABE" / "line ABEF" — three or more points collinear AND IN ORDER (B between A and
   // E). Uppercase labels only (so a lowercase word like "through" isn't read as labels), the whole tail
@@ -1685,7 +1782,48 @@ const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: b
   if (rNum) return { radius: parseFloat(rNum[1]), numeric: true, symbolic: false };
   const rVar = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*[Rr]\b`));
   if (rVar) return { radius: RADIUS_DEFAULT, numeric: false, symbolic: true, varCmd: { type: 'set-var', name: RADIUS_VAR, value: RADIUS_DEFAULT } };
+  const sized = circleSizeRadius(s);
+  if (sized !== null) return { radius: sized, numeric: true, symbolic: false };
   return { radius: RADIUS_DEFAULT, numeric: false, symbolic: false };
+};
+
+// He circumference forms, LONGEST first so the possessive suffix ("שהיקפו" = "whose circumference is") is
+// consumed whole — matching just "היקף" would leave a dangling "ו" before the value. A circle's perimeter
+// is its circumference.
+const CIRCUMFERENCE_WORD = String.raw`(?:שהיקפו|היקפו|היקף|circumference|perimeter)`;
+const AREA_WORD = String.raw`(?:ששטחו|שטחו|שטח|area)`;
+/**
+ * A circle SIZED by its circumference or area rather than its radius (ADR-228): "circumference 6π" /
+ * "שהיקפו 6π" → r = C/2π; "area 9π" / "ששטחו 9π" → r = √(A/π). Both reduce to a NUMERIC radius (a circle's
+ * size IS its radius), so they flow through the same fixed-radius path as "radius 5". The stated value may
+ * carry a π factor ("6π") or be a plain number, and may follow a copula ("= 6π", "הוא 6π", "is 6π") or sit
+ * glued right after the possessive ("שהיקפו 6π"). Returns the derived radius, or null when absent. Only ever
+ * called from the `circle` rule (circle context guaranteed; a POLYGON area/perimeter is claimed earlier).
+ */
+const circleSizeRadius = (s: string): number | null => {
+  const readVal = (after: string): number | null => {
+    // copula-anchored first — skips a digit-bearing circle label ("circle O2 is 6π") the glued form would
+    // misread; else the number glued right after the possessive suffix ("שהיקפו 6π").
+    // The π factor is written as the glyph π OR the word "pi" (the toolbar inserts π; a student types "6pi").
+    // GREEK_WORDS deliberately omits "pi" (it collides with a segment "PI"), but right after a circumference/
+    // area keyword + number the context is unambiguous, so accept it here (ADR-228 Am.).
+    const cop = after.match(new RegExp(String.raw`(?:=|הוא|שווה|\bis\b|\bequals?\b|:)\s*(${COEF})\s*[*·]?\s*(π|pi)?`, 'i'));
+    const glued = after.match(new RegExp(String.raw`^\s*(${COEF})\s*[*·]?\s*(π|pi)?`, 'i'));
+    const m = cop ?? glued;
+    if (!m) return null;
+    return parseFloat(m[1]) * (m[2] ? Math.PI : 1);
+  };
+  const cm = s.match(new RegExp(CIRCUMFERENCE_WORD, 'i'));
+  if (cm) {
+    const v = readVal(s.slice(cm.index! + cm[0].length));
+    if (v !== null && v > 0) return v / (2 * Math.PI);
+  }
+  const am = s.match(new RegExp(AREA_WORD, 'i'));
+  if (am) {
+    const v = readVal(s.slice(am.index! + am[0].length));
+    if (v !== null && v > 0) return Math.sqrt(v / Math.PI);
+  }
+  return null;
 };
 
 /**
@@ -1778,6 +1916,34 @@ const setRadius: Rule = (s, ctx) => {
   }
   if (!center || !(ctx.circles ?? []).some((c) => up(c) === up(center))) return null; // EXISTING circle only (creation → `circle`)
   return [{ type: 'set-radius', circle: circleId(center), value: parseFloat(valM[1]) }];
+};
+
+/**
+ * A circumference or area given on an EXISTING circle (ADR-228 Am.): "היקף מעגל O1 הוא 6π" / "the area of
+ * circle O is 9π" SETS that circle's radius (r = C/2π or √(A/π)) via `set-radius` — flexing the circle in
+ * place. Mirrors `setRadius` (which does the same for a numeric "radius = 4"), and reuses the same
+ * `circleSizeRadius` the `circle` CREATION rule uses. Fires ONLY when the circle already exists: without it,
+ * `circle` would re-emit a `circle` command for the same id, which `addObj` ignores (keeps the first
+ * definition) — silently dropping the stated size, exactly the operator's "it won't let me set the
+ * circumference" bug. A NEW circle sized this way still flows through `circle`. Runs before `circle`.
+ */
+const circleSizeExisting: Rule = (s, ctx) => {
+  const r = circleSizeRadius(s);
+  if (r === null) return null; // no circumference/area value present
+  // Resolve the target circle: "מעגל X", else a bare label that is a KNOWN circle — so "שטח O2 הוא 81π"
+  // (the area of circle O2, no "מעגל" word) also sets its radius, not just "שטח מעגל O2 …" (mirrors how
+  // `setRadius` resolves a bare circle label). A polygon area ("שטח ABC", 3–4 vertices) is claimed earlier
+  // by the `area` rule and never reaches here; a label that is NOT a known circle bows out.
+  let center = circleCenter(s);
+  if (!center) {
+    // UPPERCASE labels only — a point/circle label is always uppercase, so this can't grab a stray letter
+    // from a lowercase keyword ("perimeter of …" → the "o" of "of" must NOT resolve circle O).
+    const labels = (s.match(/[A-Z]\d*/g) ?? []).map(up);
+    center = (ctx.circles ?? []).map(up).find((c) => labels.includes(c)) ?? null;
+  }
+  if (!center) return null;
+  if (!(ctx.circles ?? []).some((c) => up(c) === up(center))) return null; // not existing → `circle` creates it
+  return [{ type: 'set-radius', circle: circleId(center), value: r }];
 };
 
 /**
@@ -2311,11 +2477,20 @@ const cornerTangentCircle: Rule = (s, ctx) => {
   if (existingCenter) {
     const O = existingCenter;
     const members = new Set((ctx.circleMembers?.find((e) => up(e.center) === O)?.points ?? []).map(up));
+    // Named tangency points ("בנקודות D ו C" / "at D and C") pair with the two arms IN ORDER. WITHOUT names
+    // the tangent point IS the arm's own tip (tangent AT the endpoint — the ADR-115 kite case). The DISTINCTION
+    // matters: a named tangent point D on side (vertex, arm) means the LINE through vertex–arm TOUCHES O at D,
+    // so it is D that lies on O with the radius ⟂ the side — the arm ENDPOINT stays where it is (e.g. A on
+    // another circle), NOT forced onto O. (ADR-228 Am.5 — the operator's bagrut-Q11: AB tangent to O2 at D,
+    // with A on O1; the old code forced A onto O2 → contradiction.)
+    const tpM = s.match(/(?:\bat\b|בנקוד(?:ות|ה|ים)?)\s+([A-Za-z]\d*)\s*(?:and|ו-?|,)\s*([A-Za-z]\d*)/i); // בנקוד\w* fails — \w excludes Hebrew, so the suffix must be spelled out
+    const tips = tpM ? [up(tpM[1]), up(tpM[2])] : [arm1, arm2];
     const cmds: AnyCommand[] = [];
-    for (const tip of [arm1, arm2]) {
-      cmds.push({ type: 'segment', a: vertex, b: tip }); // draw the tangent side (idempotent if already an edge)
-      if (!members.has(tip)) cmds.push({ type: 'point-on-circle', id: tip, circle: circleId(O) }); // tip is the touch point
-      cmds.push({ type: 'set-perpendicular', a: O, b: tip, c: vertex, d: tip, implicit: true }); // radius O–tip ⟂ the side ⇒ tangent at tip (structural, no right-angle mark)
+    for (const [arm, T] of [[arm1, tips[0]], [arm2, tips[1]]] as const) {
+      cmds.push({ type: 'segment', a: vertex, b: arm }); // draw the tangent side (idempotent if already an edge)
+      if (!members.has(T)) cmds.push({ type: 'point-on-circle', id: T, circle: circleId(O) }); // the TANGENT POINT lies on the circle
+      cmds.push({ type: 'set-perpendicular', a: O, b: T, c: vertex, d: arm, implicit: true }); // radius O–T ⟂ the side ⇒ tangent at T (structural, no mark)
+      if (T !== arm && T !== vertex) cmds.push({ type: 'set-collinear', a: T, b: vertex, c: arm }); // T lies ON the side (line vertex–arm), the arm endpoint untouched
     }
     return cmds;
   }
@@ -2324,7 +2499,7 @@ const cornerTangentCircle: Rule = (s, ctx) => {
   // (the centre is dodged against the figure's labels, like the incircle's incenter).
   const center = circleCenter(s) ?? freeLabel([vertex, arm1, arm2, ...(ctx.points ?? [])], ['O', 'P', 'Q', 'M']);
   // optional named tangency points: "at E and K" / "בנקודות E ו-K"
-  const tp = s.match(/(?:\bat\b|בנקוד\w*)\s+([A-Za-z]\d*)\s*(?:and|ו-?|,)\s*([A-Za-z]\d*)/i);
+  const tp = s.match(/(?:\bat\b|בנקוד(?:ות|ה|ים)?)\s+([A-Za-z]\d*)\s*(?:and|ו-?|,)\s*([A-Za-z]\d*)/i); // בנקוד\w* fails — \w excludes Hebrew, so the suffix must be spelled out
   const taken = [vertex, arm1, arm2, center, ...(ctx.points ?? [])];
   const E = tp ? up(tp[1]) : freeLabel(taken, ['E', 'F', 'G']); // tangency on side 1 (also the circle's through-point)
   const K = tp ? up(tp[2]) : freeLabel([...taken, E], ['K', 'M', 'N']); // tangency on side 2
@@ -2956,7 +3131,14 @@ const circlesTangent: Rule = (s, ctx) => {
   // Either two NAMED circles ("circle O and circle P …") or a plural "two circles"/"שני מעגלים …" with no
   // names — the latter ("שני מעגלים משיקים מבחוץ") used to fall through to the LLM, which pinned default
   // radii (5/3) and broke ADR-052. Handle it deterministically with FREE radii instead.
-  const named = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
+  let named = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
+  if (named.length < 2) {
+    // PLURAL-list form: "circles O1 and O2" / "שני מעגלים O1 ו O2" — the two names follow the PLURAL noun
+    // ("מעגלים"/"circles"), which the per-circle "מעגל X" regex above misses (the "ים"/"s" plural suffix
+    // breaks the `מעגל\s+` adjacency, so the operator's stated O1/O2 were dropped and O/P invented — ADR-228 Am.).
+    const pl = s.match(/(?:circles|מעגלים|מעגלי)\s+([A-Za-z]\d*)\s*(?:ו-?|\band\b|,)\s*([A-Za-z]\d*)/i);
+    if (pl) named = [up(pl[1]), up(pl[2])];
+  }
   const plural = /\bcircles\b|מעגלים|שני\s+מעגל|שתי\s+מעגל/i.test(s);
   if (named.length < 2 && !plural) return null; // a single circle ⇒ the tangent-line rule
   if (named.length >= 2 && named[0] === named[1]) return null;
@@ -3837,6 +4019,7 @@ export const RULES: Rule[] = [
   congruence, // "ABC ≅ DEF" — before the shape rules ("triangle ABC ≅ …" contains "triangle")
   similarity, // "ABC ~ DEF"
   area, // "שטח המשולש ABC = 13" / "SABC/SDEF = 3/4" (ADR-118) — BEFORE the shape rules, which would otherwise build the named shape and drop the area
+  perimeter, // "היקף ABC = 20" / "perimeter of ABCD is 20" (ADR-228) — BEFORE the shape rules, same reason (a circle's circumference → the `circle` rule)
   semicircle, // "חצי מעגל" / "semicircle" — before `circle` (contains "מעגל") and the shape rules
   quarterCircle, // "רבע מעגל" / "quarter circle" — same
   incircle, // "circle inscribed in triangle ABC" — before inscribedPolygon (both match "inscribed")
@@ -3886,6 +4069,8 @@ export const RULES: Rule[] = [
   // perpendicular/parallel keyword + an explicit through-point, so a plain intersection falls through.
   perpendicularLine, // a *drawn* perpendicular line through a point (before the ⟂ constraint & line∩line)
   parallelLine, // a *drawn* parallel line through a point (before the ∥ constraint & line∩line)
+  dashCollinear, // "A-O1-O2-B" — a dash-separated ordered collinear list (before segment/collinear rules)
+  lineThroughCenters, // "AB עובר דרך מרכזי המעגלים" / "…דרך O1 ו O2" — the line through two on-circle points crosses both centres
   // Collinearity ("E on line AC" / "line CE passes through A" / "A B C collinear") — before the
   // generic line∩line and before pointOnSegment (whose "P on QR" would misread "P on line QR").
   collinearConstraint,
@@ -3911,6 +4096,7 @@ export const RULES: Rule[] = [
   chord,
   circumcircle, // "circle through A B C" — before the centre-based `circle`
   nameCenter, // "O מרכז המעגל" — reveal an EXISTING circle's hidden centre; before `circle` (which would CREATE one)
+  circleSizeExisting, // "היקף מעגל O1 הוא 6π" on an EXISTING circle → set-radius; before `circle` (which would re-create + drop the size)
   circle,
   foot, // before `pointOnSegment`
   pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)
@@ -3968,6 +4154,15 @@ const normalizeAreaSubscript = (s: string): string =>
     // ratio `S_{ACD}=4S_{NCE}`) must normalise too, where `\b` failed because digit↔S is no boundary.
     .replace(/(?<![A-Za-z])S_\{((?:[A-Z]\d*){3,4})\}/g, 'S$1') // S_{ABC} → SABC
     .replace(/(?<![A-Za-z])S_((?:[A-Z]\d*){3,4})\b/g, 'S$1'); // S_ABC → SABC
+
+/**
+ * Point-label subscript notation → the glued form (ADR-228). Students write a subscripted label the LaTeX
+ * way — `O_1` / `O_{1}` — but a point token is a letter + glued digits (`[A-Za-z]\d*`, so `O1`), and the
+ * underscore silently truncates it to just `O` (the `_1` dropped, e.g. "circle O_1" rendered as "O"). A
+ * common paste/typing habit, so fix it at the boundary: rewrite `X_1` / `X_{1}` → `X1` for every label.
+ * Scoped to a letter + `_` + DIGITS, so it can't touch the area marker's `S_{ABC}` (uppercase LETTERS).
+ */
+const normalizePointSubscript = (s: string): string => s.replace(/([A-Za-z])_\{?(\d+)\}?/g, '$1$2');
 
 /** The circle a command CONSUMES (references but doesn't define), or null. */
 const consumedCircleId = (cmd: AnyCommand): Id | null =>
@@ -4122,7 +4317,7 @@ export function normalizeUtterance(raw: string): string {
   // maqaf U+05BE → ASCII hyphen (so the ל-?/ב-?/מ-? suffix groups match); then strip invisible format
   // chars: ALM, ZWSP/ZWNJ/ZWJ/LRM/RLM, LRE…RLO, isolates LRI…PDI, BOM.
   const orth = raw.replace(/־/g, '-').replace(/[؜​-‏‪-‮⁦-⁩﻿]/g, '');
-  return normalizeAreaSubscript(normalizeGreek(orth.trim().replace(/\s+/g, ' ')));
+  return normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(orth.trim().replace(/\s+/g, ' '))));
 }
 
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {

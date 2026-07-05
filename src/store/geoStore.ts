@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, convergedSamples, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, reflectableFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
+import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, convergedSamples, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -426,10 +426,21 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
     }
   }
   lastError = !pending && failedFacts.length ? status[failedFacts[failedFacts.length - 1].id] : null;
-  // The seed's high bits select a reflection of the apex free points (ADR-166); the low bits are the
-  // continuous sample. Reflect first (mirrors the apexes so two segments can meet WITHIN their spans),
-  // then perturb. mask 0 — every ordinary seed — leaves `cur` untouched, so this is free for normal figures.
-  const sampled = applySeed(applyReflections(cur, reflectMaskOf(seed)), baseSeedOf(seed));
+  // The seed's high bits select a reflection of certain free points (ADR-166); the low bits are the
+  // continuous sample. The reflection is split around the sample by the kind of point being flipped:
+  //  • APEX points (equidistant / shared-vertex right angle) reflect BEFORE the sample — their mirror is a
+  //    genuine shape alternative the solver must be seeded into, then the spin explores around it.
+  //  • DIRECTION HELPERS (the loose end of a "DF ⟂ AB" perpendicular — ADR-227) reflect AFTER the sample:
+  //    they aren't shape vertices, so reflecting them before the spin would shift the free-cluster centroid
+  //    and re-shape the figure, coupling the (independent) shape DOF to the side choice. Reflecting them
+  //    after leaves the sampled shape intact and only flips the side.
+  // mask 0 — every ordinary seed — leaves the construction untouched, so this is free for normal figures.
+  const helpers = new Set(directionHelperFreePoints(cur));
+  const refl = reflectableFreePoints(cur);
+  const fullMask = reflectMaskOf(seed);
+  let preMask = 0, postMask = 0;
+  refl.forEach((id, i) => { if (fullMask & (1 << i)) (helpers.has(id) ? (postMask |= 1 << i) : (preMask |= 1 << i)); });
+  const sampled = applyReflections(applySeed(applyReflections(cur, preMask), baseSeedOf(seed)), postMask);
   // A dialed radius (the DOF slider) overrides the sampled value for that free circle — a viewing
   // scratchpad (ADR-048): it's cleared by "show another configuration", never a fixed given (ADR-052).
   const figure =

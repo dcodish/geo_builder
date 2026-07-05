@@ -144,6 +144,36 @@ function addObj(objects: GeoObject[], o: GeoObject): void {
 }
 
 /**
+ * Keep a two-circle tangency solvable after one of its radii is pinned by `set-radius` (ADR-228 Am.3).
+ * The free-radius tangency ([circles-tangent]) is a `coincide` of two `radial-toward` witnesses (residual
+ * ||O1O2| − (r1±r2)|), driven by whichever circle radius is FREE. Pinning the LAST free radius (e.g. the
+ * student sets circle O1's circumference AND circle O2's area) leaves the coincide with no carrier — it
+ * would over-constrain — though a free CENTRE can still satisfy it (move a centre so the touch distance
+ * holds). Recruit that centre so the figure re-solves by MOVING a centre instead of failing. No-op unless
+ * `con` is exactly this device (two radial-toward operands) and both its circles now have fixed radii.
+ */
+function keepTangencyDriven(objects: GeoObject[], con: Constraint): void {
+  if (con.type !== 'coincide') return;
+  const wit = [con.p, con.q]
+    .map((id) => objects.find((o) => o.id === id))
+    .filter((o): o is Extract<GeoObject, { kind: 'radial-toward' }> => o?.kind === 'radial-toward');
+  if (wit.length !== 2) return; // not the tangency device (an ordinary point-coincidence)
+  const circs = wit.map((w) => objects.find((o) => o.id === w.circle && o.kind === 'circle')) as (Extract<GeoObject, { kind: 'circle' }> | undefined)[];
+  if (circs.some((c) => c?.radius.via === 'free')) return; // a free radius still drives it — nothing to do
+  // Both radii fixed: mark a free, unpinned, not-yet-driving CENTRE as the coincide's carrier.
+  for (const c of circs) {
+    if (!c) continue;
+    const ci = objects.findIndex(
+      (o) => o.id === c.center && o.kind === 'free-point' && !(o as Extract<GeoObject, { kind: 'free-point' }>).pinned && (o as { solve?: unknown }).solve === undefined,
+    );
+    if (ci >= 0) {
+      objects[ci] = { ...(objects[ci] as Extract<GeoObject, { kind: 'free-point' }>), solve: { constraint: con, branch: 0 } };
+      return;
+    }
+  }
+}
+
+/**
  * Add a circle, or — if one with this id already exists — REPLACE it (a resize /
  * re-centre). Re-stating a circle with a new radius is a legitimate edit, not a
  * conflict (a later "circle O radius 8" overrides an earlier radius 5; the points
@@ -1017,12 +1047,19 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // `free`-radius DOF and a `length` radius are simply set to the stated value (a stated size is a given,
       // ADR-052). `tangent-inner` (radius derived from another circle) has no own size to pin → leave to the
       // verifier to flag if it cannot hold.
-      const circ = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle);
+      const idx = objects.findIndex((o) => o.kind === 'circle' && o.id === cmd.circle);
+      const circ = idx >= 0 ? (objects[idx] as Extract<GeoObject, { kind: 'circle' }>) : undefined;
       if (circ) {
         if (circ.radius.via === 'through') {
           driveOrCheck(objects, constraints, { type: 'distance', a: circ.center, b: circ.radius.point, value: cmd.value });
         } else if (circ.radius.via === 'free' || circ.radius.via === 'length') {
-          circ.radius = { via: 'length', value: cmd.value };
+          const prevSolve = (circ as { solve?: { constraint: Constraint } }).solve;
+          // Pin the radius (a stated size is a given, ADR-052) and DROP any stale driver — a fixed circle is no
+          // longer a free carrier (carrierSpec ignores a via:length radius anyway; clearing keeps it honest).
+          objects[idx] = { ...circ, radius: { via: 'length', value: cmd.value }, solve: undefined } as GeoObject;
+          // If this radius DROVE a two-circle tangency, pinning it can orphan the tangency — with BOTH radii
+          // fixed no radius can absorb |O1O2| = r1±r2 — so recruit a free CENTRE to satisfy it (ADR-228 Am.3).
+          if (prevSolve?.constraint.type === 'coincide') keepTangencyDriven(objects, prevSolve.constraint);
         }
       }
       break;
@@ -1042,6 +1079,14 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'set-area-ratio':
       driveOrCheck(objects, constraints, { type: 'area-ratio', ids1: cmd.ids1, ids2: cmd.ids2, k: cmd.k });
+      break;
+
+    case 'set-perimeter':
+      driveOrCheck(objects, constraints, { type: 'perimeter', ids: cmd.ids, value: cmd.value });
+      break;
+
+    case 'set-perimeter-ratio':
+      driveOrCheck(objects, constraints, { type: 'perimeter-ratio', ids1: cmd.ids1, ids2: cmd.ids2, k: cmd.k });
       break;
 
     case 'set-length-radius':
