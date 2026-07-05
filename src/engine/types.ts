@@ -57,6 +57,15 @@ export interface FreePoint {
 export interface SolveDirective {
   constraint: Constraint;
   branch: number;
+  /**
+   * EXTRA constraints co-driven on this carrier ([ADR-229](docs/06-decisions.md#adr-229)). A free point has
+   * 2 DOF; driving ONE scalar constraint leaves a spare DOF a SECOND scalar constraint can consume — e.g.
+   * B on the tangent-at-C line (⟂ constraint) sliding ALONG that line until line BD passes through A
+   * (collinear). The greedy model assigns one constraint per carrier, so this class read as over-constrained.
+   * Set only by the failure-path freeze-and-co-drive recruiter (self-verifying); the joint solvers fold
+   * `also` into their cost alongside the primary constraint.
+   */
+  also?: Constraint[];
 }
 
 /** 1 DOF — lies on segment a→b at parameter t (0 = a, 1 = b). `solve` drives t (ADR-028). */

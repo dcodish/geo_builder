@@ -3223,6 +3223,35 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'two-tangents-apex-collinear-with-pinned-point',
+    title: 'bagrut Q11 end-to-end (ADR-229): tangents from B at C and D + "A on the extension of BD" — the apex co-solves two constraints',
+    guards:
+      'operator-reported (2026-07-05, twice — "I don\'t understand why this is not solvable"): the full Q11 figure errored "A, B, D collinear cannot hold" at the last step. B is claimed by ONE tangency (⟂ at the fixed C) but a free point has 2 DOF — sliding ALONG the tangent line is a spare DOF the collinear constraint can consume, which the one-constraint-per-carrier model could not express; and a naive joint co-drive destabilised the unrelated circles-tangency at E. Fix (ADR-229 freeze-and-co-drive): bake the valid 7-step solution (resolveDriven), re-drive ONLY the carriers the failing constraint references (originals restored, the free host also carries K via solve.also), everything else frozen; multi-start host seeds reach the far basin; and recruitFreeDofs stops once the system evaluates valid (a sibling order-constraint\'s failed experiments were undoing the fix). The solved figure matches the closed-form answer: |AB|=30, |BC|=18, |AD|=12 (r1=3, r2=9 ⇒ |AC|=24, tangent length from A = 12).',
+    steps: [
+      'שני מעגלים O1 ו O2 משיקים מבחוץ',
+      'A על מעגל O1',
+      'C על מעגל O2',
+      'AC עובר דרך O1 ו O2',
+      'היקף מעגל O1 הוא 6π',
+      'שטח מעגל O2 = 81π',
+      'מנקודה B יוצאים שני משיקים למעגל O2 בנקודות C ו D',
+      'A נמצא על המשך BD',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      // The closed-form solution (radii pinned 3 and 9): |AC| = 24, |AD| = tangent-from-A = 12, |BC| = 18, |AB| = 30.
+      expect(dist(A, C), '|AC| = 2r1 + 2r2 = 24').toBeCloseTo(24, 2);
+      expect(dist(A, D), '|AD| = tangent length from A = 12').toBeCloseTo(12, 2);
+      expect(dist(B, C), '|BC| = 18').toBeCloseTo(18, 2);
+      expect(dist(A, B), '|AB| = 30').toBeCloseTo(30, 2);
+      // A, B, D genuinely collinear, and D on circle O2.
+      const cross = (p: Vec, q: Vec, r: Vec) => Math.abs((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+      expect(cross(A, B, D), 'A, B, D collinear').toBeLessThan(0.05);
+      expect(dist(at(fig, 'O2'), D), 'D on circle O2 (r=9)').toBeCloseTo(9, 3);
+    },
+  },
+  {
     id: 'polygon-perimeter-sizes-figure',
     title: 'polygon perimeter as a constraint (ADR-228): "משולש ABC" + "היקף ABC = 20"',
     guards:

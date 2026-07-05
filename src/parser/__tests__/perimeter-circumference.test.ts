@@ -114,4 +114,18 @@ describe('tangent circles: stated names + circumference on an existing circle (A
     const r = parse('שטח המשולש ABC הוא 13', { circles: ['O'] });
     expect(r.ok && r.commands).toEqual([{ type: 'measure-area', ids: ['A', 'B', 'C'], expr: { value: 13 } }]);
   });
+  // COPULA-LESS value after the circle name — "היקף מעגל O1 6π" (the operator typed it twice; it fell to
+  // the LLM because the value reader needed the number right after the keyword or after a copula).
+  it('copula-less "היקף מעגל O1 6pi" on an existing circle → set-radius 3', () => {
+    const r = parse('היקף מעגל O1 6pi', { circles: ['O1'] });
+    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O1', value: 3 }]);
+  });
+  it('copula-less "שטח מעגל O2 81π" on an existing circle → set-radius 9', () => {
+    const r = parse('שטח מעגל O2 81π', { circles: ['O2'] });
+    expect(r.ok && r.commands).toEqual([{ type: 'set-radius', circle: 'circle-O2', value: 9 }]);
+  });
+  it('copula-less creation "מעגל O1 שהיקפו 6π" unaffected (still a radius-3 circle)', () => {
+    const r = parse('מעגל O1 שהיקפו 6π', { circles: [] });
+    expect(r.ok && r.commands).toEqual([{ type: 'circle', id: 'circle-O1', center: 'O1', radius: 3 }]);
+  });
 });

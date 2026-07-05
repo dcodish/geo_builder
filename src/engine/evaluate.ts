@@ -84,7 +84,10 @@ function withOrderCons(cons: Constraint[], c: Construction): Constraint[] {
   return cons;
 }
 
-function resolveDriven(c: Construction): Construction {
+// Exported for the freeze-and-co-drive recruiter (ADR-229): it BAKES the current valid solution (params
+// written, directives cleared) so a failing constraint can be re-solved over a minimal sub-system while
+// every already-satisfied subsystem stays frozen at its solved position.
+export function resolveDriven(c: Construction): Construction {
   // COUPLED solved-on-segment points: a closed-form `on-segment-solved` whose constraint references
   // ANOTHER solved-on-segment deadlocks the topological evaluator (each needs the other's position —
   // e.g. "AL=LK=KC" makes L solved by AL=LK and K by LK=KC, so L needs K and K needs L). Promote the
@@ -253,7 +256,7 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   // Distinct constraints (a constraint shared by several driven vertices counts once).
   const seen = new Set<string>();
   const cons = freeCarriers
-    .map((cr) => cr.solve!.constraint)
+    .flatMap((cr) => [cr.solve!.constraint, ...(cr.solve!.also ?? [])]) // `also`: a co-driven 2nd constraint on this vertex's spare DOF (ADR-229)
     .filter((k) => (seen.has(JSON.stringify(k)) ? false : (seen.add(JSON.stringify(k)), true)));
   withOrderCons(cons, c); // also minimise any "α < β" ordering jointly with these vertices (ADR-039)
   const ids = freeCarriers.map((cr) => cr.id);
@@ -527,7 +530,7 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     // contribute (recruited free vertices don't).
     const seen = new Set<string>();
     const cons: Constraint[] = carrierList
-      .flatMap((o) => { const k = (o as { solve?: { constraint: Constraint } }).solve?.constraint; return k ? [k] : []; })
+      .flatMap((o) => { const sv = (o as { solve?: { constraint: Constraint; also?: Constraint[] } }).solve; return sv ? [sv.constraint, ...(sv.also ?? [])] : []; }) // `also`: co-driven 2nd constraint (ADR-229)
       .filter((k) => (seen.has(JSON.stringify(k)) ? false : (seen.add(JSON.stringify(k)), true)));
     withOrderCons(cons, c); // also minimise any "α < β" ordering jointly with these carriers (ADR-039)
     // Flat layout: normalised seed `u` (each carrier's params divided by their scale, so all DOFs ~O(1)).

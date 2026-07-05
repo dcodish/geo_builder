@@ -7,11 +7,11 @@
  * the Phase-1 gate needs.)
  */
 
-import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, Vec } from './types';
+import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, SolveDirective, Vec } from './types';
 import { LEN_EPS, isGeoPoint } from './types';
 import { applyCommand, mirrorComposition, normalizeShapeComposition } from './apply';
 import { lower } from './lower';
-import { evaluate } from './evaluate';
+import { evaluate, resolveDriven } from './evaluate';
 import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist, sub } from './geometry';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
@@ -553,6 +553,13 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
   // `C`, a rhombus's `rotated` angle behind C). The joint solver moves only the ones that matter
   // (the regulariser keeps the rest near their seed).
   for (const K of newCons) {
+    // Once the system already evaluates VALID (an earlier K's recruit fixed the step), STOP: the remaining
+    // new constraints are satisfied in that solution too, and the exploratory cases below MUTATE the carrier
+    // assignment even when their own verification fails (case (C) documents its steal persisting) — running
+    // them against an already-valid figure can only wreck it (observed: the (F) fix for a `collinear` was
+    // undone by the sibling `collinear-order`'s failed experiments). (ADR-229.)
+    if (changed && evaluate({ objects, constraints: [...c.constraints, ...added] }).ok) break;
+    const beforeK = objects; // snapshot for the last-resort (F) rebuild — see below
     let did = false;
     const cand = [...new Set(constraintRefs(K).flatMap((ref) => freeDrivableAncestors(objects, ref)))].filter((id) => !isSolving(objects, id));
     if (cand.length > 0) {
@@ -639,6 +646,62 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
       const trial = objects.map((x) => (x.id === o.id ? markDriven(x, K) : x));
       const r = evaluate({ objects: trial, constraints: [...c.constraints, ...added] });
       if (r.ok) { objects = trial; changed = true; break; }
+    }
+    // (F) FREEZE-AND-CO-DRIVE ([ADR-229](docs/06-decisions.md#adr-229)): every DOF is claimed and no
+    // steal/lend rescued K, but a claimed FREE POINT among K's refs has a SPARE DOF — a free point is
+    // 2 DOF and its one scalar constraint pins it only to a 1-D manifold. K can consume that spare DOF:
+    // e.g. tangents from B touch a circle at the fixed C and at D; the student then pins "A on the
+    // extension of BD" — B must slide ALONG the tangent-at-C line (its ⟂ constraint kept) until line BD
+    // passes through A, with D's tangency θ following. The earlier cases can't express this (one
+    // constraint per carrier), and re-solving the WHOLE carrier soup jointly destabilises satisfied
+    // subsystems far from K (the circles' tangency at E — the observed failure of a naive co-drive). So:
+    // (1) BAKE the current valid solution — `resolveDriven` writes every driven carrier's solved params
+    //     and clears the directives (its normal output form);
+    // (2) re-drive ONLY the carriers K references, restoring each one's ORIGINAL constraint (from the
+    //     pre-mutation snapshot — case (C)'s steal mutates even when its verification fails) and adding K
+    //     via `solve.also` on the free-point host;
+    // (3) everything else stays FROZEN at its solved position, so its constraints hold by construction.
+    // Self-verifying: kept only if the FULL system then evaluates valid — it can never corrupt a figure,
+    // only recover configurations the greedy one-constraint-per-carrier model couldn't reach. Region/order
+    // constraints are skipped (they remove no DOF; withOrderCons already folds them into every joint cost).
+    const isRegion = K.type === 'angle-order' || K.type === 'length-order' || K.type === 'collinear-order' || K.type === 'angle-acuteness';
+    if (!isRegion && !evaluate({ objects, constraints: [...c.constraints, ...added] }).ok) {
+      const claimed = new Map<Id, SolveDirective>();
+      for (const o of beforeK) {
+        const sv = (o as { solve?: SolveDirective }).solve;
+        if (sv && sv.constraint !== K) claimed.set(o.id, sv);
+      }
+      const kept = constraintRefs(K).filter((id) => claimed.has(id));
+      const hostId = kept.find((id) => beforeK.find((o) => o.id === id)?.kind === 'free-point');
+      if (kept.length && hostId) {
+        const baked = resolveDriven({ objects: beforeK, constraints: [...c.constraints, ...added] });
+        const bakedHost = baked.objects.find((o) => o.id === hostId) as Extract<GeoObject, { kind: 'free-point' }>;
+        // MULTI-START seeds for the host: the co-driven solution can be FAR from the host's current spot
+        // (B sat near the tangency point C; the valid B is ~a figure-span away along the tangent line), and
+        // the regularised joint solve only descends locally. Try the baked seed first (stability: nearest
+        // solution wins when reachable), then a deterministic compass ring scaled to the figure's extent.
+        // Every candidate is fully self-verified, so a wrong basin is simply rejected.
+        const ext = baked.objects.reduce((m, o) => (o.kind === 'free-point' ? Math.max(m, Math.abs(o.x), Math.abs(o.y)) : m), 10);
+        const hostSeeds: [number, number][] = [[bakedHost.x, bakedHost.y]];
+        for (const r of [ext * 0.5, ext]) for (let k = 0; k < 8; k++) {
+          const a = (Math.PI / 4) * k;
+          hostSeeds.push([bakedHost.x + r * Math.cos(a), bakedHost.y + r * Math.sin(a)]);
+        }
+        for (const [sx, sy] of hostSeeds) {
+          const trial = baked.objects.map((o) => {
+            if (!kept.includes(o.id)) return o; // frozen at its solved position (directive cleared by the bake)
+            const sv = claimed.get(o.id)!;
+            if (o.id === hostId) return { ...o, x: sx, y: sy, solve: { ...sv, also: [...(sv.also ?? []), K] } } as GeoObject;
+            return { ...o, solve: sv } as GeoObject;
+          });
+          const r = evaluate({ objects: trial, constraints: [...c.constraints, ...added] });
+          if (r.ok) {
+            objects = trial;
+            changed = true;
+            break;
+          }
+        }
+      }
     }
   }
   return changed ? { objects, constraints: [...c.constraints, ...added] } : null;

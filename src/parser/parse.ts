@@ -1809,7 +1809,10 @@ const circleSizeRadius = (s: string): number | null => {
     // area keyword + number the context is unambiguous, so accept it here (ADR-228 Am.).
     const cop = after.match(new RegExp(String.raw`(?:=|הוא|שווה|\bis\b|\bequals?\b|:)\s*(${COEF})\s*[*·]?\s*(π|pi)?`, 'i'));
     const glued = after.match(new RegExp(String.raw`^\s*(${COEF})\s*[*·]?\s*(π|pi)?`, 'i'));
-    const m = cop ?? glued;
+    // COPULA-LESS with the circle named between keyword and value — "היקף מעגל O1 6π" (the operator typed it
+    // twice; it fell to the LLM). The keyword is behind us, so "circle-word? + ONE label + number" is safe.
+    const named = after.match(new RegExp(String.raw`^\s*(?:circle|מעגל)?\s*[A-Z]\d*\s+(${COEF})\s*[*·]?\s*(π|pi)?`, 'i'));
+    const m = cop ?? glued ?? named;
     if (!m) return null;
     return parseFloat(m[1]) * (m[2] ? Math.PI : 1);
   };
