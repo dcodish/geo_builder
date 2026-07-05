@@ -121,6 +121,28 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'q8-similar-triangles-detected',
+    title: 'bagrut Q8b: "detect shapes" surfaces △DEG ~ △CEF (opt-in similar-triangle classes)',
+    guards:
+      'operator manual test of the full bagrut Q8 figure (session avs58sfn continued): two right triangles ABC, ABD sharing hypotenuse AB; their legs meet at E; F, G the midpoints of EB, EA; then DG and CF drawn. The operator asked why the tool doesn\'t flag △DEG and △CEF as similar (part ב asks the student to PROVE △DEG ~ △CEF). Decision (ADR-224): surface similar/congruent triangle CLASSES in the OPT-IN "detect shapes" panel (same student-initiated reveal boundary as the shape badges — naming the pair still leaves the proof to the student), NOT the always-on theorem feed (whose ADR-208 no-reveal rule stands). Reported as CLASSES (union-find over the forced-across-samples similarity relation) so a figure with many mutually-similar triangles is one legible row, not O(n²) pairs. This scenario asserts detection finds the class {CEF, DEG}.',
+    steps: ['משולש ישר זוית ABC', 'משולש ישר זוית ABD', 'AC ו DB נחתכים בנקודה E', 'F אמצע EB', 'G אמצע EA', 'DG', 'CF'],
+    check(fig) {
+      allStepsOk(fig);
+      const { similar } = detectShapes(fig.construction);
+      // The class the student must prove — {CEF, DEG} — is surfaced (as similar or congruent), in some class.
+      const hasCEFDEG = similar.some((cls) => {
+        const sets = cls.triangles.map((t) => [...t].sort().join(''));
+        return sets.includes('CEF') && sets.includes('DEG');
+      });
+      expect(hasCEFDEG, `△CEF ~ △DEG detected (got: ${similar.map((c) => c.triangles.map((t) => t.join('')).join(c.kind === 'congruent' ? '≅' : '~')).join(' | ') || 'none'})`).toBe(true);
+      // Every reported class is a real relation: ≥2 members, each a distinct 3-vertex triangle.
+      for (const cls of similar) {
+        expect(cls.triangles.length).toBeGreaterThanOrEqual(2);
+        for (const tri of cls.triangles) expect(new Set(tri).size).toBe(3);
+      }
+    },
+  },
+  {
     id: 'two-right-triangles-share-hypotenuse',
     title: 'bagrut Q8: two right triangles ABC, ABD on a shared hypotenuse AB — the SECOND right angle holds (at D) and the legs meet',
     guards:

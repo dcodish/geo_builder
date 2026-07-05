@@ -258,6 +258,8 @@
     "none": "No special shapes detected.",
     "hint": "Detect the shapes the figure contains and link each to its page in the geometry book.",
     "badgeHint": "Hover to highlight on the figure; click for details and a book link",
+    "similarTitle": "Similar / congruent triangles",
+    "similarHint": "Hover to highlight the triangles on the figure. You still have to prove the similarity/congruence.",
     "openInBook": "Open in the geometry book",
     "close": "Close",
     "name": {

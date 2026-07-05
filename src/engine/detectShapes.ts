@@ -48,8 +48,27 @@ export interface DetectedShape {
   label: string;
 }
 
+/**
+ * A class of triangles that are SIMILAR (or, tighter, CONGRUENT) to each other in EVERY sampled
+ * configuration — a structural relation, not a coincidence of one drawing (the same forced-across-samples
+ * discipline as the shape badges). Reported as a CLASS (not per-pair) so a figure with many mutually
+ * similar triangles — a square's diagonals give eight right-isosceles triangles — is one legible row, not
+ * O(n²) pairs. Every member's vertex ids are listed in CORRESPONDING order (`triangles[m][k]` ↔
+ * `triangles[0][k]`), so "△DEG ~ △CEF" reads off directly. Surfaced only in the OPT-IN "detect shapes"
+ * panel (the same student-initiated reveal boundary as the shape badges) — NOT the always-on theorem feed,
+ * whose no-reveal rule stands (ADR-208). Naming a pair similar still leaves the PROOF to the student
+ * (operator 2026-07-05).
+ */
+export interface SimilarClass {
+  kind: 'similar' | 'congruent';
+  /** Each member triangle's 3 vertex ids, all in mutually-corresponding order. */
+  triangles: Id[][];
+}
+
 export interface ShapesResult {
   shapes: DetectedShape[];
+  /** Similar/congruent triangle classes forced across every sample (ADR-224). */
+  similar: SimilarClass[];
   /** How many valid configurations were sampled (a determined figure yields identical samples). */
   samplesUsed: number;
 }
@@ -337,6 +356,83 @@ export function detectShapesAcross(constructions: Construction[], opts: ShapeDet
   return classifyShapesFromSamples(constructions[0], samplePositions(constructions, N), opts);
 }
 
+/** The three interior angles of a triangle [p0,p1,p2], indexed by vertex (angle AT vertex k). */
+function triAnglesOf(p: Vec[]): [number, number, number] {
+  return [angleAt(p[0], p[1], p[2]) ?? NaN, angleAt(p[1], p[0], p[2]) ?? NaN, angleAt(p[2], p[0], p[1]) ?? NaN];
+}
+/** Side lengths opposite each vertex k of a triangle [p0,p1,p2]. */
+function triSidesOf(p: Vec[]): [number, number, number] {
+  return [dist(p[1], p[2]), dist(p[0], p[2]), dist(p[0], p[1])];
+}
+const PERMS3: number[][] = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+interface TriSample { verts: Id[]; per: Vec[][] }
+
+/**
+ * Group triangles similar/congruent across EVERY sample into classes ([ADR-224](docs/06-decisions.md#adr-224)).
+ * Two triangles are SIMILAR iff, under some vertex correspondence, their three interior angles agree (within
+ * tol) in every sampled configuration (AA — forced, not a coincidence of one drawing); CONGRUENT iff the
+ * corresponding sides also agree. Similarity is transitive, so the "forced-similar" relation partitions the
+ * triangles into cliques (union-find); each clique of ≥2 is one class, its members re-ordered to correspond
+ * to the first (so "△DEG ~ △CEF" reads off positionally). A class is `congruent` only when every member is
+ * congruent to that reference; otherwise `similar` (the weaker statement that is still true of all).
+ */
+function detectSimilarClasses(tris: TriSample[], angleTol: number, lengthTol: number): SimilarClass[] {
+  const n = tris.length;
+  if (n < 2) return [];
+  const angles = tris.map((t) => t.per.map(triAnglesOf));
+  const sides = tris.map((t) => t.per.map(triSidesOf));
+  const usable = angles.map((rows) => rows.every((a) => a.every(Number.isFinite)));
+  // The vertex permutation of triangle j whose angles align to i across ALL samples (preferring one that
+  // fixes shared vertices, for a natural label), or null when they are not forced-similar.
+  const corr = (i: number, j: number): number[] | null => {
+    if (!usable[i] || !usable[j]) return null;
+    let best: number[] | null = null;
+    let bestScore = -1;
+    for (const perm of PERMS3) {
+      const ok = angles[i].every((ai, s) => [0, 1, 2].every((k) => Math.abs(ai[k] - angles[j][s][perm[k]]) <= angleTol));
+      if (!ok) continue;
+      let score = 0;
+      for (let k = 0; k < 3; k++) if (tris[i].verts[k] === tris[j].verts[perm[k]]) score++;
+      if (score > bestScore) { bestScore = score; best = perm; }
+    }
+    return best;
+  };
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const find = (x: number): number => (parent[x] === x ? x : (parent[x] = find(parent[x])));
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) if (corr(i, j)) parent[find(i)] = find(j);
+  const byRoot = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    const g = byRoot.get(r) ?? [];
+    g.push(i);
+    byRoot.set(r, g);
+  }
+  const congruentTo = (ref: number, m: number, perm: number[]): boolean =>
+    sides[ref].every((sr, s) => [0, 1, 2].every((k) => {
+      const a = sr[k];
+      const b = sides[m][s][perm[k]];
+      return Math.abs(a - b) <= lengthTol * Math.max(a, b, 1e-9);
+    }));
+  const classes: SimilarClass[] = [];
+  for (const members of byRoot.values()) {
+    if (members.length < 2) continue;
+    const ref = members[0];
+    const triangles: Id[][] = [tris[ref].verts.slice()];
+    let allCongruent = true;
+    for (const m of members) {
+      if (m === ref) continue;
+      const perm = corr(ref, m);
+      if (!perm) continue; // transitivity guarantees a direct correspondence; stay defensive at tol boundaries
+      triangles.push(perm.map((k) => tris[m].verts[k]));
+      if (!congruentTo(ref, m, perm)) allCongruent = false;
+    }
+    if (triangles.length < 2) continue;
+    classes.push({ kind: allCongruent ? 'congruent' : 'similar', triangles });
+  }
+  classes.sort((a, b) => a.triangles[0].join('').localeCompare(b.triangles[0].join('')));
+  return classes;
+}
+
 /**
  * Classify the named shapes forced across a PRE-COMPUTED set of samples. Split out from
  * {@link detectShapesAcross} so a caller that needs the UI to stay responsive can sample in chunks
@@ -347,7 +443,7 @@ export function detectShapesAcross(constructions: Construction[], opts: ShapeDet
 export function classifyShapesFromSamples(c0: Construction, samples: Map<Id, Vec>[], opts: ShapeDetectOptions = {}): ShapesResult {
   const lengthTol = opts.lengthTol ?? 1e-3;
   const angleTol = opts.angleTol ?? (Math.PI / 180) * 0.5;
-  if (samples.length === 0) return { shapes: [], samplesUsed: 0 };
+  if (samples.length === 0) return { shapes: [], similar: [], samplesUsed: 0 };
 
   const shapes: DetectedShape[] = [];
   const seen = new Set<string>(); // dedup by (type | sorted-vertex-set)
@@ -356,6 +452,20 @@ export function classifyShapesFromSamples(c0: Construction, samples: Map<Id, Vec
     if (seen.has(key)) return;
     seen.add(key);
     shapes.push({ type, vertices, label });
+  };
+  // Every non-degenerate triangle in the figure (declared + emergent), deduped by vertex SET — the candidate
+  // pool for similar/congruent-class detection (ADR-224). Collected regardless of whether the triangle earns
+  // a shape badge (a GENERIC triangle earns no badge but can still be similar to another). Capped so a very
+  // dense figure can't blow up the O(n²) pairing (the emergent enumeration is already gated by adj.size ≤ 16).
+  const triList: TriSample[] = [];
+  const triSeen = new Set<string>();
+  const TRI_CAP = 64;
+  const addTri = (verts: Id[], per: Vec[][]) => {
+    if (verts.length !== 3 || triList.length >= TRI_CAP) return;
+    const key = [...verts].sort().join(',');
+    if (triSeen.has(key)) return;
+    triSeen.add(key);
+    triList.push({ verts, per });
   };
 
   for (const o of c0.objects) {
@@ -382,6 +492,7 @@ export function classifyShapesFromSamples(c0: Construction, samples: Map<Id, Vec
         // the redundant generic badge (operator 2026-07-04).
         const t = classifyTriangle(perSample, lengthTol, angleTol);
         if (t !== 'triangle') add(t, poly.vertices, label);
+        addTri(poly.vertices, perSample); // collect for similar/congruent-class detection (badge or not)
       }
       // n > 4 (e.g. a regular pentagon): no book page yet — TODO when those pages exist.
     } else if (o.kind === 'circle') {
@@ -414,6 +525,7 @@ export function classifyShapesFromSamples(c0: Construction, samples: Map<Id, Vec
       if (!per || !isSimpleEverywhere(per)) continue;
       const t = classifyTriangle(per, lengthTol, angleTol);
       if (t !== 'triangle') add(t, tri, tri.join('')); // emergent generic triangle → no badge (conservative)
+      addTri(tri, per); // collect for similar/congruent-class detection (badge or not)
     }
     for (const quad of quadCycles(adj)) {
       const per = perSampleOf(quad);
@@ -424,5 +536,8 @@ export function classifyShapesFromSamples(c0: Construction, samples: Map<Id, Vec
   }
 
   shapes.sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.label.localeCompare(b.label));
-  return { shapes, samplesUsed: samples.length };
+  // Similar/congruent-class detection uses a slightly looser angle tol than the shape-badge classifier: it
+  // compares two INDEPENDENTLY-solved triangles' angles, so a hair of solver noise mustn't hide a real match.
+  const similar = detectSimilarClasses(triList, Math.max(angleTol, (Math.PI / 180) * 1), lengthTol);
+  return { shapes, similar, samplesUsed: samples.length };
 }

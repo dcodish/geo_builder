@@ -155,6 +155,31 @@ describe('emergent detection stays conservative', () => {
   });
 });
 
+describe('similar / congruent triangle classes (ADR-224)', () => {
+  /** Sorted-vertex-set representation of each similar class, for order-independent assertions. */
+  const simSets = (c: ReturnType<typeof build>) =>
+    detectShapes(c).similar.map((cls) => ({ kind: cls.kind, sets: cls.triangles.map((t) => [...t].sort().join('')).sort() }));
+
+  it("a square's two diagonals give ONE similar class of all 8 right-isosceles triangles (not O(n²) pairs)", () => {
+    const sim = simSets(buildCtx('ריבוע ABCD', 'AC', 'BD', 'E = חיתוך AC ו-BD'));
+    // Exactly one class (all 8 quarter/half triangles are 45-45-90, hence mutually similar) — the flood guard.
+    expect(sim.length, `one class, got ${JSON.stringify(sim)}`).toBe(1);
+    expect(sim[0].sets.length).toBe(8);
+    // Not all congruent (the 4 half-square triangles are bigger than the 4 quarter triangles) → 'similar'.
+    expect(sim[0].kind).toBe('similar');
+  });
+
+  it("a rectangle's diagonal splits it into two CONGRUENT triangles", () => {
+    const sim = simSets(buildCtx('מלבן ABCD', 'AC'));
+    const cong = sim.find((s) => s.kind === 'congruent' && s.sets.includes('ABC') && s.sets.includes('ACD'));
+    expect(cong, `congruent {ABC, ACD}, got ${JSON.stringify(sim)}`).toBeTruthy();
+  });
+
+  it('a lone scalene triangle yields no similar class (nothing to compare)', () => {
+    expect(detectShapes(build('triangle ABC')).similar).toEqual([]);
+  });
+});
+
 describe('negatives (never a coincidence of the drawing)', () => {
   it('a free quadrilateral is NOT classified as any named quad', () => {
     const t = types('quadrilateral ABCD');

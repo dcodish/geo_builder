@@ -18,7 +18,7 @@ import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
 import type { Crossing } from '@/render';
-import type { DetectedShape, Id } from '@/engine';
+import type { DetectedShape, Id, SimilarClass } from '@/engine';
 import { bookUrl } from '@/shapes/shapeCatalog';
 import { detectTheorems, detectConcepts } from '@/theorems';
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
@@ -108,6 +108,8 @@ export default function App() {
   const [detecting, setDetecting] = useState(false); // "detect shapes" detection in flight (synchronous; paint a busy state first)
   const [openShape, setOpenShape] = useState<DetectedShape | null>(null); // the shape badge whose inline book-link card is open
   const [hoverShape, setHoverShape] = useState<DetectedShape | null>(null); // the shape badge being hovered (transient highlight preview)
+  const [openSimilar, setOpenSimilar] = useState<SimilarClass | null>(null); // the similar/congruent-triangle row kept highlighted (click)
+  const [hoverSimilar, setHoverSimilar] = useState<SimilarClass | null>(null); // the similar-triangle row being hovered (transient preview)
   const shapesRef = useRef<HTMLDivElement>(null); // the detected-shapes section — scrolled into view when it appears / a card opens
   const [llmDropped, setLlmDropped] = useState<string[]>([]); // LLM steps the engine couldn't build
   const [renameNote, setRenameNote] = useState(''); // why a relabel was a no-op (target taken / no such point)
@@ -519,11 +521,13 @@ export default function App() {
   // separately as point-pairs (`shapeHighlightEdges`) so a sub-segment through a crossing lights up too.
   const shapeHighlight = useMemo(() => {
     const sh = shapesLayer ? (hoverShape ?? openShape) : null;
-    if (!sh) return undefined;
-    const ids = new Set<string>(sh.vertices);
-    if (sh.type === 'circle') for (const o of construction.objects) if (o.kind === 'circle' && o.center === sh.vertices[0]) ids.add(o.id);
+    const sim = shapesLayer ? (hoverSimilar ?? openSimilar) : null;
+    if (!sh && !sim) return undefined;
+    const ids = new Set<string>(sh ? sh.vertices : []);
+    if (sh?.type === 'circle') for (const o of construction.objects) if (o.kind === 'circle' && o.center === sh.vertices[0]) ids.add(o.id);
+    if (sim) for (const tri of sim.triangles) for (const v of tri) ids.add(v); // a similar-class row lights its member triangles
     return ids;
-  }, [shapesLayer, hoverShape, openShape, construction]);
+  }, [shapesLayer, hoverShape, openShape, hoverSimilar, openSimilar, construction]);
 
   // The active shape's boundary edges as point-PAIRS (consecutive vertices, wrapping). The renderer strokes
   // each between its endpoints' positions, so an edge that is only a PORTION of a longer drawn segment
@@ -531,10 +535,15 @@ export default function App() {
   // highlighted correctly". A circle shape has no boundary edges.
   const shapeHighlightEdges = useMemo<[Id, Id][] | undefined>(() => {
     const sh = shapesLayer ? (hoverShape ?? openShape) : null;
-    if (!sh || sh.type === 'circle' || sh.vertices.length < 2) return undefined;
-    const v = sh.vertices;
-    return v.map((id, i) => [id, v[(i + 1) % v.length]] as [Id, Id]);
-  }, [shapesLayer, hoverShape, openShape]);
+    const sim = shapesLayer ? (hoverSimilar ?? openSimilar) : null;
+    const edges: [Id, Id][] = [];
+    if (sh && sh.type !== 'circle' && sh.vertices.length >= 2) {
+      const v = sh.vertices;
+      for (let i = 0; i < v.length; i++) edges.push([v[i], v[(i + 1) % v.length]]);
+    }
+    if (sim) for (const tri of sim.triangles) for (let i = 0; i < 3; i++) edges.push([tri[i], tri[(i + 1) % 3]]);
+    return edges.length ? edges : undefined;
+  }, [shapesLayer, hoverShape, openShape, hoverSimilar, openSimilar]);
 
   // The LIVE theorem feed (Phase 6a): the bagrut theorems the student's STATED givens *announce*,
   // re-derived from scratch each step (coordinate-free — plan §7.5, so it can run live, unlike the
@@ -1151,6 +1160,8 @@ export default function App() {
                 if (detecting) return;
                 setOpenShape(null);
                 setHoverShape(null);
+                setOpenSimilar(null);
+                setHoverSimilar(null);
                 if (shapesLayer) {
                   clearShapes();
                   return;
@@ -1207,6 +1218,32 @@ export default function App() {
               <a style={bookLink} href={bookUrl(openShape.type)} target="_blank" rel="noopener noreferrer">
                 {t('shapes.openInBook')} ↗
               </a>
+            </div>
+          )}
+          {/* Similar / congruent triangle CLASSES (ADR-224) — one row per class ("△DEG ~ △CEF"), listed in
+              corresponding vertex order. Opt-in with the shape badges (the same student-initiated reveal
+              boundary): naming a pair similar still leaves the PROOF to the student. Hover/click lights the
+              member triangles on the canvas. */}
+          {shapesLayer && shapesLayer.similar.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={sectionLabel}>{t('shapes.similarTitle')}</div>
+              {shapesLayer.similar.map((cls, i) => {
+                const active = openSimilar === cls;
+                const sep = cls.kind === 'congruent' ? ' ≅ ' : ' ~ ';
+                return (
+                  <button
+                    key={`sim-${i}`}
+                    type="button"
+                    style={active ? shapeBadgeOn : shapeBadge}
+                    onMouseEnter={() => setHoverSimilar(cls)}
+                    onMouseLeave={() => setHoverSimilar(null)}
+                    onClick={() => setOpenSimilar(active ? null : cls)}
+                    title={t('shapes.similarHint')}
+                  >
+                    {cls.triangles.map((tri) => `△${tri.join('')}`).join(sep)}
+                  </button>
+                );
+              })}
             </div>
           )}
           </div>

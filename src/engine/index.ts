@@ -28,7 +28,7 @@ export type { GivenViolation } from './verify';
 export { detectRelations, detectRelationsAcross, figureEdges, convergedSamples } from './relations';
 export type { RelationsResult, SegmentRef, AngleRef, DefiniteAngle, DetectOptions } from './relations';
 export { detectShapes, detectShapesAcross, classifyShapesFromSamples } from './detectShapes';
-export type { ShapeType, DetectedShape, ShapesResult, ShapeDetectOptions } from './detectShapes';
+export type { ShapeType, DetectedShape, SimilarClass, ShapesResult, ShapeDetectOptions } from './detectShapes';
 export { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 export type { Carrier, CarrierFamily } from './carriers';
 export { lower, lowerOne, buildSymTab, measureLabelText, isMeasure } from './lower';
