@@ -334,11 +334,19 @@ export function detectShapes(c: Construction, opts: ShapeDetectOptions = {}): Sh
  */
 export function detectShapesAcross(constructions: Construction[], opts: ShapeDetectOptions = {}): ShapesResult {
   const N = opts.samples ?? 16;
+  return classifyShapesFromSamples(constructions[0], samplePositions(constructions, N), opts);
+}
+
+/**
+ * Classify the named shapes forced across a PRE-COMPUTED set of samples. Split out from
+ * {@link detectShapesAcross} so a caller that needs the UI to stay responsive can sample in chunks
+ * (yielding to the event loop between batches — a coupled figure's driven-constraint solve is ~15 ms
+ * per evaluate, and 16+ of them would otherwise freeze the main thread) and then run this pure, fast
+ * classification. `samples` must already be `convergedSamples`-filtered by the caller.
+ */
+export function classifyShapesFromSamples(c0: Construction, samples: Map<Id, Vec>[], opts: ShapeDetectOptions = {}): ShapesResult {
   const lengthTol = opts.lengthTol ?? 1e-3;
   const angleTol = opts.angleTol ?? (Math.PI / 180) * 0.5;
-  const c0 = constructions[0];
-
-  const samples = samplePositions(constructions, N);
   if (samples.length === 0) return { shapes: [], samplesUsed: 0 };
 
   const shapes: DetectedShape[] = [];

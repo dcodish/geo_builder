@@ -333,6 +333,15 @@ export const withReflectMask = (mask: number, base: number): number => mask * RE
 export function reflectAnchors(c: Construction, pointId: Id): Id[] {
   const refs = new Set<Id>();
   const consider = (con: Constraint) => {
+    // A right angle at a shared vertex — seg V→b ⟂ seg V→d, i.e. ∠(b·V·d)=90 (con.a===con.c===V) — is
+    // symmetric across the line through the two leg endpoints: reflecting V there gives the OTHER valid
+    // right-angle placement (Thales — the mirror arc over the same hypotenuse). So the vertex's reflection
+    // anchors are its two leg endpoints (Q8, ADR-223: the shared-hypotenuse right-angle vertex must be
+    // flippable to the side where the legs actually cross).
+    if (con.type === 'perpendicular') {
+      if (con.a === con.c && pointId === con.a) { refs.add(con.b); refs.add(con.d); }
+      return;
+    }
     if (con.type !== 'equal' && con.type !== 'distance' && con.type !== 'ratio') return;
     const r = constraintRefs(con);
     if (!r.includes(pointId)) return;

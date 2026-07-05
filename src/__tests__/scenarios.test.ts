@@ -121,6 +121,33 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'two-right-triangles-share-hypotenuse',
+    title: 'bagrut Q8: two right triangles ABC, ABD on a shared hypotenuse AB — the SECOND right angle holds (at D) and the legs meet',
+    guards:
+      'operator session avs58sfn: `משולש ABC ישר זוית` → `משולש ABD ישר זוית` → `AC ו BD נחתכים בנקודה E` (two right triangles sharing hypotenuse AB, their legs meet at E — bagrut Q8). Two bugs: (1) the knee at D was drawn but ∠ADB came out 52°, not 90°; (2) "AC and BD cannot meet". ONE root cause (ADR-223): `right-triangle`\'s vertex order is SEMANTIC (right angle at the LAST id), but it was in `DERIVED_SLOTS` so `normalizeShapeComposition` CYCLICALLY ROTATED `[A,B,D]`→`[B,D,A]` to reuse the existing edge — silently moving the right angle from D to A (∠BAD=90, knee still drawn at D). Removed right-triangle from the rotation set; the apply case now handles composition itself — it SWAPS the two interchangeable hypotenuse endpoints so a FRESH one is the derived perp-offset, and when the WHOLE hypotenuse pre-exists (this case) it asserts the right angle as a CONSTRAINT that drives the NEW vertex D onto the Thales circle (not a pre-existing leg\'s shape DOF — a stability fix), with D made reflectable across AB (its two leg endpoints) so the sampler can flip it to C\'s side where the legs actually cross. commandConflict learns the derived-vertex-on-existing-point case is a reinterpretation, not a redefinition.',
+    steps: ['משולש ABC ישר זוית', 'משולש ABD ישר זוית', 'AC ו BD נחתכים בנקודה E'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      // BOTH right angles hold — the second (at D) is the one that used to come out 52°.
+      expect(angle(A, C, B), '∠ACB').toBeCloseTo(90, 1);
+      expect(angle(A, D, B), '∠ADB').toBeCloseTo(90, 1);
+      // C and D on the SAME side of AB so the legs cross (the "cannot meet" fix).
+      const side = (X: Vec) => Math.sign((B.x - A.x) * (X.y - A.y) - (B.y - A.y) * (X.x - A.x));
+      expect(side(C), 'C and D on the same side of AB').toBe(side(D));
+      // E is the crossing of segments AC and BD — WITHIN both spans (not on a continuation).
+      const within = (a: Vec, b: Vec) => {
+        const G = at(fig, 'E');
+        return ((G.x - a.x) * (b.x - a.x) + (G.y - a.y) * (b.y - a.y)) / ((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+      };
+      for (const [p, q] of [[A, C], [B, D]] as [Vec, Vec][]) {
+        const t = within(p, q);
+        expect(t, 'E within segment param').toBeGreaterThan(0.02);
+        expect(t, 'E within segment param').toBeLessThan(0.98);
+      }
+    },
+  },
+  {
     id: 'parallelogram-cut-triangle-surfaces-parallels-and-similarity',
     title: 'a parallelogram cut by BE & AD produced to F → alternate/corresponding parallels (L1) + similar triangles (L2) surface',
     guards:
@@ -706,6 +733,36 @@ export const SCENARIOS: Scenario[] = [
       // CE ⟂ AB — a genuine height
       const ce = { x: E.x - C.x, y: E.y - C.y }, ab = { x: B.x - A.x, y: B.y - A.y };
       expect(Math.abs(ce.x * ab.x + ce.y * ab.y) / (Math.hypot(ce.x, ce.y) * Math.hypot(ab.x, ab.y) + 1e-9), 'CE ⟂ AB').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'midsegment-in-trapezoid-joins-leg-midpoints',
+    title: '"טרפז ABCD" → "קטע האמצעים בטרפז" — the trapezoid median joins the leg midpoints, parallel to the bases',
+    guards:
+      'The "קטע אמצעים" (midsegment) rule was TRIANGLE-only: it inferred the apex from two base endpoints that share a common vertex, so a trapezoid (where the two legs do NOT meet at a point) had no apex and the utterance escalated to the LLM and returned not-understood. ADR-222: a trapezoid midsegment now resolves from the figure\'s unique vertex-disjoint parallel base-pair (ctx.parallels) — the two bases AB ∥ DC give the legs AD, BC via ctx.neighbors, and the median joins their midpoints (two midpoint commands + a segment), parallel to and midway between the bases. Mirrors the ADR-169 trapezoid-altitude resolution.',
+    steps: [
+      'טרפז ABCD', // trapezoid ABCD (AB ∥ DC), legs AD and BC
+      'קטע האמצעים בטרפז', // the median — joins mid(AD) and mid(BC); no triangle, no base named
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      // Two midpoints were created (one per leg) and joined into a segment.
+      const mids = [...fig.positions.keys()].filter((id) => id !== 'A' && id !== 'B' && id !== 'C' && id !== 'D');
+      expect(mids.length, 'two leg-midpoints created').toBe(2);
+      const m1 = at(fig, mids[0]), m2 = at(fig, mids[1]);
+      // Each new point is the midpoint of a leg (AD or BC) — accept either assignment.
+      const midAD = { x: (A.x + D.x) / 2, y: (A.y + D.y) / 2 };
+      const midBC = { x: (B.x + C.x) / 2, y: (B.y + C.y) / 2 };
+      const okAssign =
+        (dist(m1, midAD) < 1e-6 && dist(m2, midBC) < 1e-6) || (dist(m1, midBC) < 1e-6 && dist(m2, midAD) < 1e-6);
+      expect(okAssign, 'the two points are the midpoints of the legs AD and BC').toBe(true);
+      // The median is parallel to the base AB (cross of unit directions ≈ 0).
+      const mn = { x: m2.x - m1.x, y: m2.y - m1.y }, ab = { x: B.x - A.x, y: B.y - A.y };
+      const cross = Math.abs(mn.x * ab.y - mn.y * ab.x) / (Math.hypot(mn.x, mn.y) * Math.hypot(ab.x, ab.y) + 1e-9);
+      expect(cross, 'median ∥ base AB').toBeLessThan(1e-6);
+      // Its length is the average of the two bases (the trapezoid median theorem).
+      expect(Math.abs(dist(m1, m2) - (dist(A, B) + dist(C, D)) / 2), 'median = (AB + DC) / 2').toBeLessThan(1e-6);
     },
   },
   {

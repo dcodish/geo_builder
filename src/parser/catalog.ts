@@ -80,6 +80,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'lines', supported: true, en: 'height from A in ABC', he: 'גובה מ-A במשולש ABC', descEn: 'An altitude and its foot.', descHe: 'גובה והרגל שלו.' },
   { category: 'lines', supported: true, en: 'perpendicular bisector of AB', he: 'אנך אמצעי ל-AB', descEn: 'The perpendicular bisector of a segment.', descHe: 'האנך האמצעי של הקטע.' },
   { category: 'lines', supported: true, en: 'midsegment to BC in triangle ABC', he: 'קטע האמצעים לצלע BC במשולש ABC', descEn: 'The triangle midsegment — joins the midpoints of the two sides meeting at the apex.', descHe: 'קטע האמצעים במשולש — מחבר את אמצעי שתי הצלעות הנפגשות בקודקוד שממול.' },
+  { category: 'lines', supported: true, en: 'midsegment of trapezoid ABCD', he: 'קטע האמצעים בטרפז ABCD', descEn: 'The trapezoid median — joins the midpoints of the two legs, parallel to and midway between the bases.', descHe: 'קטע האמצעים בטרפז — מחבר את אמצעי שתי השוקיים, מקביל לשני הבסיסים ובאמצע ביניהם.' },
   { category: 'lines', supported: true, en: 'AD bisects angle BAC', he: 'AD חוצה את הזווית BAC', descEn: 'An angle bisector that places a point on the opposite side.', descHe: 'חוצה זווית הממקם נקודה על הצלע שממול.' },
 
   // ── Constraints ─────────────────────────────────────────────────────────

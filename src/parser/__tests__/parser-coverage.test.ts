@@ -83,6 +83,9 @@ const PARSES: [string, string][] = [
   // ── triangle midsegment ──
   ['midsegment to BC in triangle ABC', 'midpoint'],
   ['קטע האמצעים לצלע BC במשולש ABC', 'midpoint'],
+  // ── trapezoid midsegment / median (ADR-222) — self-contained (names the trapezoid, builds it + the median) ──
+  ['midsegment of trapezoid ABCD', 'midpoint'],
+  ['קטע האמצעים בטרפז ABCD', 'midpoint'],
   // ── inscribed (named + UNNAMED centre; every cyclic polygon) ──
   ['triangle ABC inscribed in circle O', 'circle'],
   ['triangle ABC inscribed in a circle', 'circle'],

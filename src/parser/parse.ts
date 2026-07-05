@@ -455,6 +455,71 @@ function midsegmentBaseless(s: string, ctx: ParseContext): AnyCommand[] | null {
 }
 
 /**
+ * A trapezoid's midsegment (median) — the segment joining the midpoints of the two LEGS (the non-parallel
+ * sides), parallel to and midway between the two bases. Resolved from the FIGURE like the trapezoid altitude
+ * ([ADR-169](docs/06-decisions.md#adr-169)): the two bases are the figure's unique vertex-disjoint parallel
+ * edge-pair (`ctx.parallels`) — exactly ONE such pair means a trapezoid (a triangle has none; a
+ * parallelogram has two ⇒ which base? ambiguous ⇒ defer, ADR-052), and each leg joins a base-1 endpoint to
+ * the base-2 endpoint it is adjacent to in the figure (`ctx.neighbors`). Decomposes to two `midpoint`s (one
+ * per leg) + a `segment` — all already supported, so the constraint solver keeps it parallel to the bases
+ * and no new engine construct is needed ([ADR-222](docs/06-decisions.md#adr-222)). Honours named endpoints
+ * ("EF קטע אמצעים בטרפז", like the triangle rule). The trapezoid already exists in the figure, so no shape is
+ * re-emitted. Returns null (defer to the triangle paths / LLM) when the figure is not a resolvable trapezoid.
+ */
+function trapezoidMidsegment(s: string, ctx: ParseContext): AnyCommand[] | null {
+  let verts: Id[];
+  let legs: [Id, Id][];
+  let build: AnyCommand | null = null;
+  // (1) An EXPLICITLY NAMED trapezoid — "…בטרפז ABCD" / "…of trapezoid ABCD" (4 labels). By the shape
+  //     convention the bases are AB ∥ DC, so the legs are the other two sides BC and DA; derive them from
+  //     the vertex order (no context needed) and build the trapezoid if it isn't drawn yet. This makes the
+  //     self-contained form work (and lets the help catalog carry it).
+  const nameM = s.match(/(?:trapezoid|טרפז)\s*([A-Za-z]\d*)\s+([A-Za-z]\d*)\s+([A-Za-z]\d*)\s+([A-Za-z]\d*)/i)
+    ?? s.match(/(?:trapezoid|טרפז)\s*\b([A-Za-z])([A-Za-z])([A-Za-z])([A-Za-z])\b/i);
+  if (nameM && [1, 2, 3, 4].every((i) => isUpperLabel(nameM[i]))) {
+    const [w, x, y, z] = [up(nameM[1]), up(nameM[2]), up(nameM[3]), up(nameM[4])];
+    if (new Set([w, x, y, z]).size !== 4) return null;
+    verts = [w, x, y, z];
+    legs = [[x, y], [z, w]]; // sides XY and ZW — the legs (bases WX ∥ YZ)
+    if (!verts.every((v) => (ctx.points ?? []).includes(v))) build = { type: 'trapezoid', ids: [w, x, y, z] };
+  } else {
+    // (2) INCREMENTAL — the trapezoid is already drawn; resolve its bases from the figure's unique
+    //     vertex-disjoint parallel edge-pair, and its legs from the adjacency (ADR-169's `ctx.parallels`).
+    const pairs = ctx.parallels ?? [];
+    if (pairs.length !== 1) return null; // 0 = triangle, 2 = parallelogram (which base?) — defer, don't guess
+    const base1 = pairs[0][0].map(up) as [Id, Id];
+    const base2 = pairs[0][1].map(up) as [Id, Id];
+    const nb = ctx.neighbors ?? {};
+    // Legs: pair each base-1 endpoint with the base-2 endpoint it is joined to in the figure (an edge, not
+    // the diagonal). A clean quadrilateral gives exactly one partner per endpoint; anything else ⇒ defer.
+    legs = [];
+    for (const a of base1) {
+      const partner = base2.find((b) => (nb[a] ?? []).includes(b));
+      if (!partner) return null;
+      legs.push([a, partner]);
+    }
+    verts = [...base1, ...base2];
+  }
+  // Named endpoints — "EF קטע אמצעים …" (name-first) or "קטע האמצעים EF …" (keyword-first). Honour the
+  // student's labels (the altitude "CD→CF" bug class): UPPERCASE, distinct, and not the trapezoid's vertices.
+  const nmM =
+    s.match(/^\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:is\s+|הוא\s+)?(?:the\s+|ה)?(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)/i) ??
+    s.match(/(?:midsegment|mid-?segment|midline|קטע\s+ה?אמצעים)\s+\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  const named =
+    nmM && isUpperLabel(nmM[1]) && isUpperLabel(nmM[2]) && up(nmM[1]) !== up(nmM[2]) && !verts.includes(up(nmM[1])) && !verts.includes(up(nmM[2]))
+      ? [up(nmM[1]), up(nmM[2])]
+      : null;
+  const m1 = named ? named[0] : freeLabel([...verts, ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']);
+  const m2 = named ? named[1] : freeLabel([...verts, m1, ...(ctx.points ?? [])], ['N', 'P', 'Q', 'S']);
+  return [
+    ...(build ? [build] : []),
+    { type: 'midpoint', id: m1, a: legs[0][0], b: legs[0][1] },
+    { type: 'midpoint', id: m2, a: legs[1][0], b: legs[1][1] },
+    { type: 'segment', a: m1, b: m2 },
+  ];
+}
+
+/**
  * "the midsegment to BC in triangle ABC" / "קטע האמצעים לצלע BC במשולש ABC" — the segment joining the
  * midpoints of the two sides meeting at the apex (the triangle vertex NOT on the named base). Decomposes
  * to two `midpoint`s + a `segment` (all already supported). The base a side of the triangle; the triangle
@@ -472,6 +537,13 @@ function midsegmentBaseless(s: string, ctx: ParseContext): AnyCommand[] | null {
 const midsegment: Rule = (s, ctx) => {
   if (!/midsegment|mid-?segment|midline|קטע\s+ה?אמצעים/i.test(s)) return null;
   const triM = s.match(/(?:triangle|משולש)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)/i);
+  // A TRAPEZOID's median (leg-midpoints) — resolved from the figure's unique parallel base-pair ([ADR-222]).
+  // Only when no triangle is explicitly named (a named triangle ⇒ the triangle midsegment below); returns
+  // null for a triangle (no parallel pair) or a parallelogram (two), so it never steals those cases.
+  if (!triM) {
+    const trap = trapezoidMidsegment(s, ctx);
+    if (trap) return trap;
+  }
   const baseM = s.match(/(?:parallel\s+to|to|מקביל\s*ל-?|לצלע|ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!baseM) return midsegmentBaseless(s, ctx);
   const base = [up(baseM[1]), up(baseM[2])];

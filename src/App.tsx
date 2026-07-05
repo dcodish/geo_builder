@@ -1156,15 +1156,15 @@ export default function App() {
                   return;
                 }
                 setDetecting(true);
-                requestAnimationFrame(() =>
-                  requestAnimationFrame(() => {
-                    try {
-                      detectShapes();
-                    } finally {
-                      setDetecting(false);
-                    }
-                  }),
-                );
+                // `detectShapes` is async + chunked (yields between sample batches), so the spinner paints and
+                // the page stays responsive while a coupled figure is analysed (was a multi-second freeze).
+                void (async () => {
+                  try {
+                    await detectShapes();
+                  } finally {
+                    setDetecting(false);
+                  }
+                })();
               }}
             >
               {detecting ? t('shapes.analysing') : shapesLayer ? t('shapes.hide') : t('shapes.detect')}

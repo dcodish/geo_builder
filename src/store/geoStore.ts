@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, deepEqual, detectRelationsAcross, detectShapesAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, reflectableFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
+import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, convergedSamples, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, reflectableFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -471,6 +471,22 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
     const markCmd = rtReorder.has(f.id) && f.cmd.type === 'right-triangle' ? { ...f.cmd, ids: rtReorder.get(f.id)! } : f.cmd;
     const m = angleMarkFor(markCmd);
     if (!m || ![m.vertex, m.ray1, m.ray2].every((id) => e.ok && e.positions.has(id))) continue;
+    // HONESTY GATE (ADR-223 Am.): a right-angle SQUARE (the "knee") is placed by the COMMAND'S INTENT
+    // (`right-triangle …` / `∠=90` / `⟂`), NOT by measuring the figure — so if the solver could not
+    // realise the declared right angle (an over-constrained / amber figure), the knee would otherwise
+    // draw a 90° mark on an angle that isn't 90° (the Q8 symptom, before its root cause was fixed). Only
+    // keep the knee when the vertex ACTUALLY measures ~90° in the output coordinates; otherwise drop it
+    // (the givens verifier already flags the figure amber — a false knee must never contradict the
+    // geometry). An asserted arc (a stated non-90 value) is unaffected.
+    if (m.right && e.ok) {
+      const V = e.positions.get(m.vertex)!, A = e.positions.get(m.ray1)!, B = e.positions.get(m.ray2)!;
+      const u = { x: A.x - V.x, y: A.y - V.y }, w = { x: B.x - V.x, y: B.y - V.y };
+      const lu = Math.hypot(u.x, u.y), lw = Math.hypot(w.x, w.y);
+      if (lu > 1e-9 && lw > 1e-9) {
+        const deg = (Math.acos(Math.max(-1, Math.min(1, (u.x * w.x + u.y * w.y) / (lu * lw)))) * 180) / Math.PI;
+        if (Math.abs(deg - 90) > 1) continue; // declared right angle not realised → draw no knee
+      }
+    }
     const key = `${m.vertex}-${[m.ray1, m.ray2].sort().join('')}`;
     if (amSeen.has(key)) continue;
     amSeen.add(key);
@@ -1077,7 +1093,7 @@ export interface GeoState {
   clearRelations: () => void;
   /** Detect the named shapes of the current figure and turn the badges layer ON ([FR-SH]). Synchronous
    *  (samples the figure); the caller paints a busy state first. A re-press recomputes. */
-  detectShapes: () => void;
+  detectShapes: () => Promise<void>;
   /** Turn the shape-badges layer off. */
   clearShapes: () => void;
   /** Advance an intersection point to its next configuration (stored in the fact's command). */
@@ -1363,13 +1379,30 @@ export const useGeoStore = create<GeoState>()(
 
       clearRelations: () => set({ relations: null }),
 
-      detectShapes: () => {
+      detectShapes: async () => {
         // Same sampling contract as viewRelations (ADR-138 variant configs, requirement-satisfying base seed, ADR-166,
         // facts-keyed cache): a named shape is reported only if FORCED across every variant × seed, so it catches
         // emergent shapes and never a coincidence of the drawing.
+        //
+        // NON-BLOCKING (operator 2026-07-05): a coupled figure's driven-constraint solve is ~15 ms per evaluate
+        // (e.g. two right triangles sharing a hypotenuse, whose second right angle is a driven ⟂ constraint —
+        // ADR-223), and detection evaluates the figure N× per variant. Run synchronously that froze the main
+        // thread for a noticeable beat (the "identify shapes button stuck" report). So sample in small BATCHES,
+        // yielding to the event loop between them — the spinner paints and the page stays responsive — then run
+        // the fast, pure classification on the collected samples.
         const facts = get().facts;
+        const N = 16;
         const constructions = variantConfigs(facts).map((vf) => replay(vf, firstSatisfyingSeed(vf)).construction);
-        const result = detectShapesAcross(constructions);
+        const raw: Map<Id, Vec>[] = [];
+        for (const c of constructions) {
+          for (let s = 0; s < N; s++) {
+            const r = evaluate(applySeed(c, s));
+            if (r.ok) raw.push(r.positions);
+            if ((s & 3) === 3) await new Promise<void>((res) => setTimeout(res, 0)); // yield every 4 samples
+          }
+        }
+        if (get().facts !== facts) return; // a step/undo raced us while sampling — don't overwrite with a stale layer
+        const result = classifyShapesFromSamples(constructions[0], convergedSamples(raw));
         set({ shapes: { result, facts } });
       },
 
@@ -1411,18 +1444,15 @@ export const useGeoStore = create<GeoState>()(
         for (let k = 0; k < 24; k++) {
           s += 1;
           const r = replay(facts, s);
-          // Accept a sample only if it evaluates, keeps every declared polygon a clean convex drawing
-          // (a self-crossing/concave quad is a valid point set but not a valid drawing of the shape),
-          // keeps distinct points apart (a varied free radius must not collapse two points — ADR-051),
-          // AND is a genuinely DIFFERENT drawing (not the same shape at another size/rotation) — else the
-          // student presses "show another" and sees no change. The fingerprint is similarity-invariant.
-          if (
-            evaluate(r.construction).ok &&
-            polygonsConvex(facts, r.positions) &&
-            pointsDistinct(r.construction, r.positions, r.coincidences) &&
-            extensionsClear(facts, r) && // a varied view must still let every "המשך" reach the far side (ADR-098)
-            shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions))
-          ) {
+          // Accept an alternative view only if it MEETS EVERY REQUIREMENT — the SAME bar the initial display
+          // uses (`meetsRequirements`: builds, verifier-clean, every "המשך" reaches its far side, every
+          // on-segment crossing lands WITHIN its segments, points distinct, declared polygons convex) — AND
+          // is a genuinely DIFFERENT drawing (not the same shape at another size/rotation, else "show another"
+          // shows no change; fingerprint is similarity-invariant). Using the shared gate is the fix for the
+          // class where "show another" offered configs the initial view would never display — e.g. two right
+          // triangles sharing a hypotenuse whose legs meet at E: a seed where C,D fall on opposite sides
+          // leaves E off its segments, so E can't be where instructed and that view must not be offered (Q8).
+          if (meetsRequirements(facts, s) && shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions))) {
             set({ seed: s, radiusOverrides: {} }); // a fresh view clears any dialed radii (scratchpad reset)
             return true;
           }

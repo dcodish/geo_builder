@@ -88,6 +88,11 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     // then intersect "the tangent at D" with AB) is the SAME line — its id is its
     // spec — so reuse it instead of conflicting (visibility is kept/merged in apply).
     if (o.kind === 'line' && existing.kind === 'line') continue;
+    // A right-triangle's derived leg vertex (perp-offset, from the empty-construction probe above)
+    // may land on an existing point when the hypotenuse pre-exists (two right triangles sharing AB).
+    // apply reinterprets that as a right-angle CONSTRAINT on the new vertex rather than rebuilding
+    // the leg endpoint, so it is not a redefinition conflict (Q8, ADR-223; right angle at the last id).
+    if (cmd.type === 'right-triangle' && o.kind === 'perp-offset' && isGeoPoint(existing)) continue;
     return `'${o.id}' is already defined — it can't be redefined as something different`;
   }
   return null;

@@ -184,7 +184,13 @@ const DERIVED_SLOTS: Partial<Record<Command['type'], number[]>> = {
   rhombus: [2, 3],
   parallelogram: [3],
   trapezoid: [2],
-  'right-triangle': [1], // B is the derived right-angle vertex (legs CA ⟂ CB)
+  // NOTE: `right-triangle` is deliberately ABSENT. Its vertex order is SEMANTIC — the right
+  // angle is at the LAST id — so it is NOT rotation-invariant like the polygons above. Cyclic
+  // rotation (to reuse an existing edge) would relocate the right angle to a different vertex
+  // (`right-triangle A,B,D` → `[B,D,A]` silently moved ∠90 from D to A — Q8 bug, ADR-223). Composition on
+  // existing vertices is instead handled by the right-triangle apply case itself: it SWAPS the two
+  // interchangeable hypotenuse endpoints so a fresh one becomes the derived perp-offset, and when the
+  // whole hypotenuse pre-exists it asserts the right angle as a CONSTRAINT on the new vertex.
 };
 
 /**
@@ -544,11 +550,38 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
 
     case 'right-triangle': {
-      // Right angle at C (the last id). Legs CA and CB: A and C are free, B is
-      // derived perpendicular to CA at C — so ∠C stays 90° for any A, C.
+      // Right angle ALWAYS at c (the last id). Legs c→a and c→b; a and b are interchangeable
+      // hypotenuse endpoints. Whichever hypotenuse endpoint is FRESH can be built as the derived
+      // perp-offset (0-DOF, exact right angle at c). Swap a,b so the fresh one is the perp-offset even
+      // when the as-typed derived slot (b) already exists.
       const [a, b, c] = cmd.ids;
-      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: c, x: 0, y: 4 }], pos);
-      addObj(objects, { kind: 'perp-offset', id: b, anchor: c, from: c, to: a, dist: 5 });
+      const has = (id: Id) => objects.some((o) => o.id === id);
+      let [pa, pb] = [a, b];
+      if (has(pb) && !has(pa)) [pa, pb] = [pb, pa];
+      if (!has(pb)) {
+        // pb is fresh → build it perpendicular to c→pa at c; the right angle at c is STRUCTURAL.
+        placeBase(objects, [{ id: pa, x: 0, y: 0 }, { id: c, x: 0, y: 4 }], pos);
+        addObj(objects, { kind: 'perp-offset', id: pb, anchor: c, from: c, to: pa, dist: 5 });
+      } else {
+        // Both hypotenuse endpoints pre-exist (the shared-hypotenuse case: two right triangles on AB —
+        // Q8, ADR-223). No vertex is free to be the derived perp-offset, so enforce the right angle at c as a
+        // genuine CONSTRAINT: seg c→a ⟂ seg c→b (∠(a c b)=90). A shape declared over existing points is
+        // a constraint, not a rebuild (the ADR-099/ADR-115 family).
+        placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 3, y: 3 }], pos);
+        const con: Constraint = { type: 'perpendicular', a: c, b: a, c: c, d: b };
+        // Drive the NEW right-angle vertex c onto the Thales circle over the fixed hypotenuse — NOT a
+        // pre-existing leg's shape DOF (adding this triangle must not reshape the OTHER one built on AB;
+        // generic driveOrCheck would grab B's perp-offset `dist` first — a stability violation). Only
+        // when c is itself a fresh, movable free vertex; otherwise fall back to driveOrCheck (c
+        // pre-exists ⇒ a pure check that the existing triangle is right-angled at c).
+        const cObj = objects.find((o) => o.id === c);
+        if (cObj && cObj.kind === 'free-point' && !(cObj as Extract<GeoObject, { kind: 'free-point' }>).pinned) {
+          (cObj as Extract<GeoObject, { kind: 'free-point' }>).solve = { constraint: con, branch: 0 };
+          constraints.push(con);
+        } else {
+          driveOrCheck(objects, constraints, con);
+        }
+      }
       triEdges(objects, a, b, c);
       break;
     }

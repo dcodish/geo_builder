@@ -102,6 +102,14 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "winner": "midsegment",
   },
   {
+    "lang": "en",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "midsegment of trapezoid ABCD",
+    "winner": "midsegment",
+  },
+  {
     "lang": "he",
     "shadowedBy": [
       "(anon)",
@@ -752,6 +760,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   {
     "lang": "he",
     "text": "קטע האמצעים לצלע BC במשולש ABC",
+    "winner": "midsegment",
+  },
+  {
+    "lang": "en",
+    "text": "midsegment of trapezoid ABCD",
+    "winner": "midsegment",
+  },
+  {
+    "lang": "he",
+    "text": "קטע האמצעים בטרפז ABCD",
     "winner": "midsegment",
   },
   {

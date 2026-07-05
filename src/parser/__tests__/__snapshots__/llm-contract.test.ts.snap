@@ -602,6 +602,20 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "segment",
     ],
   },
+  "midsegment of trapezoid ABCD": {
+    "en": [
+      "trapezoid",
+      "midpoint",
+      "midpoint",
+      "segment",
+    ],
+    "he": [
+      "trapezoid",
+      "midpoint",
+      "midpoint",
+      "segment",
+    ],
+  },
   "midsegment to BC in triangle ABC": {
     "en": [
       "triangle",
