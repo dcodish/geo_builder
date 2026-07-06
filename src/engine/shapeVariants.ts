@@ -66,6 +66,33 @@ export function eqMatchesPair(eq: { a: Id; b: Id; c: Id; d: Id }, pair: EqTuple)
 }
 
 /**
+ * Does the explicit equality `setEqual` NAME one of the equal-pairs of some enabled `shape-variant` that
+ * NO existing explicit equality already asserts? Such a statement is the student CHOOSING which sides of a
+ * kite / isosceles are equal — it PINS a previously-SOFT default ([ADR-138](docs/06-decisions.md#adr-138) /
+ * design-rules M4). That is genuinely new information (soft engine guess → the student's stated choice: it
+ * flips the relation from "not forced" to "forced/reported") even though the geometry — which already used
+ * that pair as its default drawing — does not move. Without this, restating the default pair (e.g. `AB=AC`
+ * on an isosceles that soft-defaulted to apex A) is wrongly swallowed as a redundant "already drawn" no-op.
+ * A `midsegment` variant carries no equal-pair, so it never pins.
+ */
+export function pinsSoftVariant(
+  setEqual: { a: Id; b: Id; c: Id; d: Id },
+  shapeVariants: { shape: VariantShape; ids: Id[] }[],
+  explicitEqs: { a: Id; b: Id; c: Id; d: Id }[],
+): boolean {
+  const alreadyStated = (pair: EqTuple) => explicitEqs.some((eq) => eqMatchesPair(eq, pair));
+  for (const sv of shapeVariants) {
+    if (sv.shape === 'midsegment') continue;
+    for (const variant of variantPairs(sv.shape, sv.ids)) {
+      for (const pair of variant) {
+        if (eqMatchesPair(setEqual, pair) && !alreadyStated(pair)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * A base-less MIDSEGMENT ([ADR-199](docs/06-decisions.md#adr-199)) — `ids = [P, Q, R, E, G]`: the student
  * placed `E` on side `PQ` of triangle `PQR` and called `EG` a midsegment, without naming the parallel base.
  * A midsegment joins two MIDPOINTS, so `E` is pinned to the midpoint of `PQ` (a `set-equal` drives the free

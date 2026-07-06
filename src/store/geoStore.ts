@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, convergedSamples, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
+import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, convergedSamples, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
 import type { FigureFile } from './figureFile';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -871,8 +871,24 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, o
   // `name-center` REVEALS an existing circle's hidden centre — a visible change that adds no object/point
   // and moves nothing, so the geometry checks above miss it. It still "produced" (the centre now shows).
   const reveals = commands.some((c) => c.type === 'name-center');
-  if (!grew && !dataOnly && !reveals) return { produced: false, reason: 'empty' };
-  return { produced: true };
+  if (grew || dataOnly || reveals) return { produced: true };
+  // No geometric change — but a `set-equal` NAMING an enabled shape-variant's (kite/isosceles) equal-pair
+  // that no explicit equality already asserts is the student CHOOSING which sides are equal: it PINS a
+  // previously-SOFT default (ADR-138 / design-rules M4), flipping the relation from "not forced" to
+  // reported. That is genuine new information even though the figure — which drew that pair by default —
+  // does not move; committing it (not swallowing it as "already drawn") records the student's choice.
+  const enabledCmds = facts.filter((f) => f.enabled).map((f) => f.cmd);
+  const shapeVariants = enabledCmds.filter((c): c is Extract<AnyCommand, { type: 'shape-variant' }> => c.type === 'shape-variant');
+  if (shapeVariants.length > 0) {
+    const symtab = buildSymTab([...enabledCmds, ...commands]);
+    const setEqualsOf = (cmds: AnyCommand[]) =>
+      cmds.flatMap((c) => lowerOne(c, symtab)).filter((c): c is Extract<Command, { type: 'set-equal' }> => c.type === 'set-equal');
+    // Existing EXPLICIT equalities — a shape-variant's OWN default pair is excluded (it is the soft guess,
+    // not a stated choice), mirroring `replay`'s `explicitEqs`.
+    const explicitEqs = setEqualsOf(facts.filter((f) => f.enabled && f.cmd.type !== 'shape-variant').map((f) => f.cmd));
+    if (setEqualsOf(commands).some((se) => pinsSoftVariant(se, shapeVariants, explicitEqs))) return { produced: true };
+  }
+  return { produced: false, reason: 'empty' };
 }
 
 const fmtMeasure = (n: number): string => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(3))));

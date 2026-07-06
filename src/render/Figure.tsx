@@ -92,9 +92,20 @@ export interface FigureProps {
     alignSeg: string;
     copyImage: string;
     saveImage: string;
+    saveFile: string;
+    loadFile: string;
     copied: string;
     reset: string;
   };
+  /** Save the current construction to a portable .geo.json file (FR-HS-10) — the host wires App's
+   *  `saveFigure`. When provided, "save to file" / "load from file" buttons sit in the export toolbar
+   *  next to copy/save-image (where a student reaches for "save my work"). File I/O is a store operation,
+   *  so the host owns the logic; Figure just renders the buttons and calls back (like {@link onRename}). */
+  onSaveFile?: () => void;
+  /** Open a saved figure file — the host triggers its hidden <input type=file>. Pairs with {@link onSaveFile}. */
+  onLoadFile?: () => void;
+  /** Disable "save to file" (e.g. an empty figure has nothing to save). */
+  saveFileDisabled?: boolean;
 }
 
 interface View {
@@ -166,6 +177,9 @@ export function Figure({
   onToggleCircleHidden,
   circleMenuText,
   toolbarText,
+  onSaveFile,
+  onLoadFile,
+  saveFileDisabled,
 }: FigureProps) {
   // English fallbacks so the renderer works standalone (e.g. the SSR render tests, which
   // pass no toolbarText); the host (App) supplies localized Hebrew strings.
@@ -179,6 +193,8 @@ export function Figure({
     alignSeg: 'Make a segment horizontal — type its two endpoints (e.g. AB) and press Enter',
     copyImage: 'Copy image',
     saveImage: 'Save image',
+    saveFile: 'Save to file',
+    loadFile: 'Load from file',
     copied: 'Copied',
     reset: 'Reset view',
     ...toolbarText,
@@ -1039,7 +1055,27 @@ export function Figure({
         )}
       </div>
 
-      <div style={{ position: 'absolute', top: 8, insetInlineEnd: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
+      <div style={{ position: 'absolute', top: 8, insetInlineEnd: 8, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        {/* Save / load the construction as a .geo.json file (FR-HS-10) — grouped with the image exports
+            because a student reaches for "save my work" in the same place. A slate variant marks them as
+            the file pair, distinct from the blue image pair; the host owns the actual file I/O. */}
+        {onSaveFile && (
+          <button
+            type="button"
+            style={{ ...fileBtn, ...(saveFileDisabled ? { opacity: 0.5, cursor: 'default' } : null) }}
+            title={tt.saveFile}
+            aria-label={tt.saveFile}
+            disabled={saveFileDisabled}
+            onClick={onSaveFile}
+          >
+            {tt.saveFile}
+          </button>
+        )}
+        {onLoadFile && (
+          <button type="button" style={fileBtn} title={tt.loadFile} aria-label={tt.loadFile} onClick={onLoadFile}>
+            {tt.loadFile}
+          </button>
+        )}
         {/* Export — most-used by teachers, so these are prominent labeled buttons. */}
         <button
           type="button"
@@ -1148,6 +1184,14 @@ const exportBtn: CSSProperties = {
   color: '#1e40af',
   cursor: 'pointer',
   whiteSpace: 'nowrap',
+};
+// The save/load-FILE pair (FR-HS-10) — same shape as {@link exportBtn} but slate, so it reads as a
+// distinct group from the blue copy/save-IMAGE pair it sits beside in the toolbar.
+const fileBtn: CSSProperties = {
+  ...exportBtn,
+  border: '1px solid #cbd5e1',
+  background: '#f8fafc',
+  color: '#334155',
 };
 
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));

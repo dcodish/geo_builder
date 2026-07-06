@@ -3341,6 +3341,7 @@ const tangentFromExternal: Rule = (s, ctx) => {
   const center = named && /^[A-Z]/.test(named) ? named : ctx.circles?.length === 1 ? ctx.circles[0] : null;
   if (!center) return null;
   const have = new Set(ctx.points ?? []);
+  const members = new Set((ctx.circleMembers?.find((e) => up(e.center) === up(center))?.points ?? []).map(up)); // labels already ON this circle
   const labels = (s.match(/[A-Z]\d*/g) ?? []).filter((l) => l !== center); // uppercase tokens = point labels
   const atM = s.match(/(?:\bat\b|בנקודה)\s*([A-Za-z]\d*)/i); // "at D" / "בנקודה D" → the touch point (NOT the apex)
   const atPoint = atM ? up(atM[1]) : null;
@@ -3364,6 +3365,14 @@ const tangentFromExternal: Rule = (s, ctx) => {
     if (existing.length === 1) apex = existing[0];
   }
   if (!apex) return null;
+  // The external apex must lie OFF the circle. A named point already ON the circle is the tangency point,
+  // not the source of an external tangent: "BA משיק למעגל" with A on the circle is the tangent AT A (B a
+  // point along it), NOT a tangent FROM A to a second touch — a Thales aux-circle on an on-circle apex is
+  // internally tangent and collapses the computed touch onto the apex. Assign the apex role by circle
+  // MEMBERSHIP (the semantic fact), never by which label happens to pre-exist (a proxy). Defer to
+  // `tangentLine`, which reads the on-circle endpoint as the tangency point (design-rules §2.2; ADR-233 —
+  // the unclosed on-circle-endpoint + NEW-off-circle-endpoint member of the ADR-081/082 family).
+  if (members.has(apex)) return null;
   const newLabel = labels.find((l) => l !== apex && !have.has(l));
   const touch = newLabel ?? (atPoint && !have.has(atPoint) ? atPoint : freeLabel([...have, ...labels, center], ['T', 'S', 'D', 'F']));
   const circ = circleId(center);
@@ -3442,19 +3451,21 @@ const tangentLine: Rule = (s, ctx) => {
   // they're referenceable later — but skip any pre-existing label, so we never redefine (and
   // cycle through) an existing point.
   const cmds: AnyCommand[] = [{ type: 'tangent', id: lineId, circle: circleId(center), at: T, visible: true }];
-  if (naming) {
-    const fresh = naming.filter((p) => !have.has(p));
-    if (fresh.length) cmds.push(...lineMarkers(lineId, fresh));
-  }
-  // A NAMED external point the tangent emanates FROM — "מנקודה D יוצא משיק … בנקודה B" / "from D a tangent
-  // … at B": D lies ON the tangent line (the external apex). Create it as a free marker sliding along the
-  // tangent so it appears IMMEDIATELY; a later fact ("the extension of CA meets the tangent at D") then
-  // drives that DOF to the crossing (ADR-084). Only when new and distinct from the touch point.
+  // Every point the student NAMED that lies on this tangent line becomes a marker — so nothing they typed
+  // is dropped, and each is referenceable later. Three sources, unified: the touch's segment-mate ("BA" → B,
+  // the external end of the tangent AT A), the two definers of a named tangent line ("line CD tangent at A"
+  // → C, D), and an explicit external apex ("מנקודה D יוצא משיק … בנקודה B" / "from D …" → D, which a later
+  // fact like "the extension of CA meets the tangent at D" drives to the crossing, ADR-084). Fresh labels
+  // become ±offset sliders along the tangent (ADR-036 — a free DOF, ADR-052); a pre-existing label is left
+  // as-is (never redefined, so no dependency cycle). Before ADR-233 the off-circle endpoint of "BA משיק
+  // למעגל" was silently dropped when the other endpoint was the touch (design-rules §6 honesty).
   const fromM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?|מנקודה|מהנקודה|\bמ-)\s*([A-Za-z]\d*)/i);
-  const apex = fromM ? up(fromM[1]) : null;
-  if (apex && apex !== T && !have.has(apex) && !cmds.some((c) => c.type === 'point-on-line' && (c as { id: Id }).id === apex)) {
-    cmds.push(...lineMarkers(lineId, [apex]));
+  const onLine: Id[] = [];
+  for (const p of [...(pts ?? []), ...(fromM ? [up(fromM[1])] : [])]) {
+    if (p !== T && p !== up(center) && !onLine.includes(p)) onLine.push(p); // not the touch, not the centre
   }
+  const fresh = onLine.filter((p) => !have.has(p));
+  if (fresh.length) cmds.push(...lineMarkers(lineId, fresh));
   return cmds;
 };
 

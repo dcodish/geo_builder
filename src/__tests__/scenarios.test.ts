@@ -121,6 +121,29 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'segment-tangent-at-on-circle-endpoint-new-far-end',
+    title: '"BA משיק למעגל" with A already on the circle and B NEW: the tangent AT A (B a point along it), not a tangent FROM A that collapses B onto A',
+    guards:
+      'operator session `pr1y4i70` (2026-07-06): `משולש ACD` → `ACD חסום במעגל` (A, C, D on the circle) → `BA משיק למעגל`. `tangentFromExternal` read A — the one label that already existed — as the external APEX and B as a NEW touch, building the Thales aux-circle on OA. But A is ON the circle, so that aux-circle is internally tangent at A: `circle-circle-intersection` has the single root A, so the computed touch B collapsed onto A (a degenerate chord, no tangent). Root cause (ADR-233): the apex role was assigned by the PROXY "it already exists" instead of the SEMANTIC fact "it is off the circle". Fix: `tangentFromExternal` defers when its would-be apex is a circle member (an on-circle point is the TOUCH), and `tangentLine` — which then draws the tangent AT A — now materialises the OTHER named endpoint B as a ±offset slider on the tangent, so nothing the student typed is dropped. The unclosed on-circle-endpoint + NEW-off-circle-endpoint member of the ADR-081/082 family.',
+    steps: ['משולש ACD', 'ACD חסום במעגל', 'BA משיק למעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      // B is created and DISTINCT from A — the bug collapsed the computed touch B onto the on-circle apex A.
+      expect(fig.positions.has('B'), 'B is placed').toBe(true);
+      expect(dist(at(fig, 'A'), at(fig, 'B')), 'B is not collapsed onto A').toBeGreaterThan(0.5);
+      // A, C, D lie on one circle (the inscribed triangle's circumcircle); find its centre label-agnostically.
+      const circ = fig.construction.objects.find((o) => o.kind === 'circle' && !o.center.startsWith('~')) as { center: Id } | undefined;
+      expect(circ, 'the circle exists').toBeDefined();
+      const O = at(fig, circ!.center);
+      const r = dist(O, at(fig, 'A'));
+      for (const p of ['A', 'C', 'D']) expect(dist(O, at(fig, p)), `${p} on the circle`).toBeCloseTo(r, 4);
+      // BA is genuinely tangent AT A: the radius O→A ⟂ the tangent direction A→B ((A−O)·(B−A) ≈ 0).
+      const A = at(fig, 'A'), B = at(fig, 'B');
+      const dot = (A.x - O.x) * (B.x - A.x) + (A.y - O.y) * (B.y - A.y);
+      expect(Math.abs(dot) / (dist(O, A) * dist(A, B) || 1), 'BA ⟂ OA (tangent at A)').toBeLessThan(0.02);
+    },
+  },
+  {
     id: 'tangent-circle-size-given-drives-radius-not-centre',
     title: 'two tangent circles + |O1M|=9, |O2M|=16 (M the touch point) + two tangents from N to O1 at M and B',
     guards:
@@ -3548,6 +3571,49 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
     const fs = replay(sq.map((cmd, i) => ({ id: 's' + i, group: 'g' + i, enabled: true, utterance: '', cmd } as Fact)));
     expect(fs.pending, '∠DAB=37 on a square is NOT pending (rigid contradiction)').toBe(false);
     expect(fs.lastError, 'it surfaces as a hard error').toMatch(/over-constrained/i);
+  });
+
+  it('[isosceles-pin-soft-pair] "AB=AC" after "משולש שווה שוקיים" COMMITS (pins the soft pair) — was wrongly "already drawn" (session z4v1zza3)', () => {
+    // The isosceles draws with a SOFT default pair (apex A ⇒ |AB|=|AC|) that is NOT reported as forced —
+    // "which pair is equal" is genuinely unstated (ADR-052/138). When the student then states `AB=AC`
+    // (naming the pair) it happens to MATCH the hidden default, so the geometry doesn't move — and the gate
+    // used to read that as "already drawn — nothing to add", swallowing the student's choice. It is genuine
+    // new information: it PINS soft → forced. Now it COMMITS, and "show equal length" reports AB=AC.
+    const st = useGeoStore.getState();
+    st.clear();
+    const classify = (utterance: string): { kind: 'commit' | 'noop' | 'escalate'; commands?: AnyCommand[] } => {
+      const facts = useGeoStore.getState().facts;
+      const ctx = ctxOf(facts);
+      const r = parse(utterance, ctx);
+      if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0) {
+        const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
+        if (outcome.produced || (outcome.reason === 'error' && hasDeferrableConstraint(r.commands))) return { kind: 'commit', commands: r.commands };
+        if (outcome.reason === 'empty') {
+          const existing = new Set((ctx.points ?? []).map((p) => p.toUpperCase()));
+          const newLabels = [...new Set(utterance.match(/[A-Z]\d*/g) ?? [])].filter((l) => !existing.has(l));
+          if (newLabels.length === 0) return { kind: 'noop' };
+        }
+      }
+      return { kind: 'escalate' };
+    };
+    const commit = (u: string) => {
+      const res = classify(u);
+      expect(res.kind, `commit ${u}`).toBe('commit');
+      res.commands!.forEach((c) => useGeoStore.getState().execute(c, u, 'g-' + u));
+    };
+    // 1. the isosceles draws; the pair is unspecified → "show equal length" reports NOTHING forced.
+    commit('משולש ABC שווה שוקיים');
+    useGeoStore.getState().viewRelations();
+    expect(useGeoStore.getState().relations!.result.equalSegments, 'no forced equality yet (pair unspecified)').toEqual([]);
+    // 2. "AB=AC" is the student CHOOSING the pair — it COMMITS (was a "noop"/already-drawn dead-end).
+    expect(classify('AB=AC').kind, 'AB=AC pins the soft default → commits').toBe('commit');
+    commit('AB=AC');
+    // 3. now the equality IS reported (the pin flips soft → forced) and holds geometrically.
+    useGeoStore.getState().viewRelations();
+    expect(useGeoStore.getState().relations!.result.equalSegments.length, 'AB=AC now reported as forced equal').toBeGreaterThan(0);
+    const fig = replay(useGeoStore.getState().facts, useGeoStore.getState().seed);
+    expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| = |AC| holds').toBeCloseTo(dist(at(fig, 'A'), at(fig, 'C')), 3);
+    st.clear();
   });
 });
 

@@ -849,9 +849,14 @@ export default function App() {
               alignSeg: t('canvas.alignSeg'),
               copyImage: t('canvas.copyImage'),
               saveImage: t('canvas.saveImage'),
+              saveFile: t('file.save'),
+              loadFile: t('file.load'),
               copied: t('canvas.copied'),
               reset: t('canvas.reset'),
             }}
+            onSaveFile={saveFigure}
+            onLoadFile={() => fileInputRef.current?.click()}
+            saveFileDisabled={facts.length === 0}
           />
           {/* Empty canvas → a call to action so a new user knows what to do. The
               container ignores pointer events (so panning isn't blocked); the
@@ -867,6 +872,27 @@ export default function App() {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+          {/* Why a figure file couldn't be loaded (FR-HS-10) — shown right under the toolbar's
+              "load from file" button, where the action was taken. Transient (clears on next parse). */}
+          {fileNote && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 48,
+                insetInlineEnd: 8,
+                maxWidth: 260,
+                padding: '6px 10px',
+                background: '#fef2f2',
+                border: '1px solid #fca5a5',
+                borderRadius: 8,
+                color: '#991b1b',
+                fontSize: 12,
+                zIndex: 5,
+              }}
+            >
+              {fileNote}
             </div>
           )}
         </div>
@@ -1070,14 +1096,9 @@ export default function App() {
             <button type="button" style={ghost} disabled={!canUndo} onClick={() => undo()}>{t('actions.undo')}</button>
             <button type="button" style={ghost} disabled={!canRedo} onClick={() => redo()}>{t('actions.redo')}</button>
             <button type="button" style={ghost} onClick={clear}>{t('actions.clear')}</button>
-            {/* Save/load the construction as a portable .geo.json file (FR-HS-10). Load replaces the
-                current session but is ONE undo step, so nothing is lost by opening a file. */}
-            <button type="button" style={ghost} disabled={facts.length === 0} onClick={saveFigure} title={t('file.saveHint')}>
-              {t('file.save')}
-            </button>
-            <button type="button" style={ghost} onClick={() => fileInputRef.current?.click()} title={t('file.loadHint')}>
-              {t('file.load')}
-            </button>
+            {/* Save/load a figure file (FR-HS-10) now live in the canvas export toolbar, next to
+                copy/save-image — where a student reaches for "save my work". Only the hidden picker that
+                the toolbar's "load from file" button triggers stays here in the DOM. */}
             <input
               ref={fileInputRef}
               type="file"
@@ -1090,7 +1111,6 @@ export default function App() {
               }}
             />
           </div>
-          {fileNote && <span style={{ fontSize: 12, color: '#dc2626' }}>{fileNote}</span>}
 
           {/* Display options — what to show on the figure (grouped together; ⊙ centres used to be a
               cryptic button on the canvas — now it sits next to "show measures"). */}

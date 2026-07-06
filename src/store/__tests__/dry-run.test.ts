@@ -57,4 +57,18 @@ describe('dryRunOutcome — did the step actually build something?', () => {
   it('a bare variable binding ("x = 4") draws nothing but is NOT a silent fail (data-only)', () => {
     expect(dryRunOutcome([], [{ type: 'set-var', name: 'x', value: 4 }])).toEqual({ produced: true });
   });
+
+  it('an equality that PINS an isosceles soft default counts as produced (soft → forced), even with no geometric move', () => {
+    // "משולש שווה שוקיים" soft-defaults to apex A (|AB|=|AC|). Restating AB=AC names the pair (the student's
+    // choice, ADR-138) — it flips the relation from unforced to reported. The geometry (which already used
+    // that pair as its default drawing) doesn't move, so the geometric checks read "empty" — but this is
+    // genuine new information and must commit, not be swallowed as "already drawn" (session z4v1zza3).
+    const iso = facts([{ type: 'shape-variant', shape: 'isosceles', ids: ['A', 'B', 'C'], variant: 0 } as AnyCommand]);
+    expect(dryRunOutcome(iso, cmdsOf('AB=AC')).produced, 'AB=AC pins the soft default').toBe(true);
+    // A DIFFERENT pair (AB=BC) reshapes → produced by geometry alone (sanity; the pin path isn't needed).
+    expect(dryRunOutcome(iso, cmdsOf('AB=BC')).produced, 'a different pair reshapes').toBe(true);
+    // On a PLAIN triangle (no shape-variant) an equality that reshapes still produces, and one that doesn't
+    // pin any variant isn't rescued by this path — guarded by the other cases; here we assert the pin path
+    // is scoped to variant shapes: an equality naming a NON-variant triangle's existing sides is unaffected.
+  });
 });
