@@ -38,5 +38,6 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     ), // which side an existing midpoint bisects — lets a base-less named midsegment anchor on it (ADR-199 Am.)
     parallels: parallelEdgePairs(construction, positions), // "height from C" drops to a trapezoid's opposite base (ADR-169)
     lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // idempotent construct reuse
+    polygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])), // definite "the quad" binds to the existing one
   };
 }

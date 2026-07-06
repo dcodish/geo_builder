@@ -1133,6 +1133,26 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "in quadrilateral ABCD a circle is inscribed",
+    "winner": "incircle",
+  },
+  {
+    "lang": "he",
+    "text": "במרובע ABCD חסום מעגל O",
+    "winner": "incircle",
+  },
+  {
+    "lang": "en",
+    "text": "circle inscribed in kite ABCD",
+    "winner": "incircle",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל חסום בדלתון ABCD",
+    "winner": "incircle",
+  },
+  {
+    "lang": "en",
     "text": "the tangent at A and the tangent at C to circle O meet at D",
     "winner": "twoTangentsMeet",
   },

@@ -69,6 +69,10 @@ export interface ParseContext {
    *  ALREADY built (its deterministic scaffolding lines exist) and REUSE rather than mint a duplicate
    *  auto-named copy (the idempotency root-cause fix). */
   lines?: string[];
+  /** Vertex lists of polygons already in the figure — lets a DEFINITE unnamed shape reference
+   *  ("במרובע חסום מעגל" typed after מרובע ABCD exists) bind to THE existing polygon instead of minting
+   *  a fresh auto-named one (the ADR-029 implicit-reference pattern, polygon edition). */
+  polygons?: string[][];
 }
 
 /** The centre of a circle that contains EVERY point in `pts` (preferring `prefer` if it qualifies), else null. */
@@ -247,6 +251,15 @@ function autoVertexLabels(n: number, used: string[] = []): Id[] {
   }
   return out;
 }
+
+/** The vertices of THE existing polygon an unnamed DEFINITE shape reference binds to — exactly one
+ *  n-gon in the figure (zero → auto-name a fresh shape as before; two+ → ambiguous, also fall back).
+ *  "במרובע חסום מעגל" after "ABCD מרובע" means THAT quad, not a brand-new EFGH (the ADR-029
+ *  implicit-reference pattern, polygon edition). */
+const existingPolygon = (ctx: ParseContext, n: number): Id[] | null => {
+  const matches = (ctx.polygons ?? []).filter((v) => v.length === n);
+  return matches.length === 1 ? matches[0].map(up) : null;
+};
 
 /** Did the student write an explicit vertex label? Vertex labels are UPPERCASE Latin (the parser's
  *  convention), so an uppercase letter means "named" while lowercase prose remnants ("inscribed in a
@@ -2080,16 +2093,34 @@ const INSCRIBED_ANGLES: Record<string, number[] | null> = {
   kite: [90, 340, 270, 200],
 };
 
+/** The polygon words an inscription statement can name, one alternation per language — shared by the
+ *  container-marker and order tests below so the list can't drift between them (a missing word here
+ *  mis-routed "מעגל חסום בדלתון" to the CONVERSE — the kite inscribed in a circle). */
+const POLY_WORDS_EN = String.raw`triangle|quad\w*|square|rectangle|rhombus|trapez\w*|parallelogram|kite|polygon`;
+const POLY_WORDS_HE = 'משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע';
+
 /**
  * Is this a *circle* inscribed in a *polygon* (the incircle), rather than a
- * polygon inscribed in a circle? Discriminate by order: the inscribed subject
- * comes first, so a circle word *before* the polygon word ("circle inscribed in
- * triangle ABC" / "מעגל חסום במשולש") is the incircle — distinct from "triangle
- * inscribed in a circle", where the polygon comes first.
+ * polygon inscribed in a circle? The CONTAINER is the noun carrying the "in"
+ * preposition — Hebrew's ב prefix ("מעגל חסום במשולש", "במרובע ABCD חסום מעגל")
+ * or English "in [a/the] …" — wherever it sits in the sentence. Word ORDER is
+ * only a proxy for this: Hebrew passives invert freely (the bagrut-standard
+ * "במרובע ABCD חסום מעגל" puts the container FIRST), and the old order test
+ * flipped the roles on every inverted phrasing, silently building the CONVERSE
+ * figure. Order remains the fallback when neither noun carries a marker
+ * ("incircle of ABC") or both do.
  */
 const isCircleInPolygon = (s: string): boolean => {
+  // Hebrew: the ב prefix binds directly (במשולש, בטרפז — stacked prefixes like שבמרובע still contain it);
+  // "בתוך ה…" (inside the …) is the spelled-out form. English: "in/inside [a/an/the] <noun>".
+  const polyContainer = new RegExp(
+    String.raw`(?:ב|בתוך\s+ה?)(?:${POLY_WORDS_HE})|\bin(?:side)?\s+(?:an?\s+|the\s+)?(?:${POLY_WORDS_EN})`,
+    'i',
+  ).test(s);
+  const circContainer = /(?:ב|בתוך\s+ה?)מעגל|\bin(?:side)?\s+(?:an?\s+|the\s+)?circle/i.test(s);
+  if (polyContainer !== circContainer) return polyContainer;
   const circIdx = s.search(/incircle|\bcircle\b|מעגל/i);
-  const polyIdx = s.search(/triangle|quad\w*|square|rectangle|rhombus|trapez\w*|polygon|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז/i);
+  const polyIdx = s.search(new RegExp(`${POLY_WORDS_EN}|${POLY_WORDS_HE}`, 'i'));
   return circIdx >= 0 && polyIdx >= 0 && circIdx < polyIdx;
 };
 
@@ -2151,7 +2182,9 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // named centre. A PARTIAL label run (some letters but not n) stays a defer/escalate (a typo / compound).
   const ids =
     labelRun(rest, n) ??
-    (namesVertices(rest) ? null : autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])]));
+    (namesVertices(rest)
+      ? null
+      : (existingPolygon(ctx, n) ?? autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])])));
   if (!ids) return null;
   // After the circle, the shape, and the vertices are consumed, nothing
   // geometry-significant should remain — a constraint/extra construct means a
@@ -2405,7 +2438,7 @@ const incircle: Rule = (s, ctx) => {
   // (polygon-labels … circumscribes … circle) so a CIRCLE-first "מעגל חוסם משולש" (a circumcircle) does NOT
   // match here — only the polygon-as-subject reading does.
   const circumscribes =
-    /(?:triangle|quad\w*|square|rectangle|rhombus|trapez\w*|parallelogram|polygon|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית)\s+[A-Za-z]\d*.*?(?:circumscrib\w*|חוסם).*?(?:circle|מעגל)/i.test(s);
+    new RegExp(String.raw`(?:${POLY_WORDS_EN}|${POLY_WORDS_HE})\s+[A-Za-z]\d*.*?(?:circumscrib\w*|חוסם).*?(?:circle|מעגל)`, 'i').test(s);
   if (!inscribed && !circumscribes) return null;
   // The polygon kind → vertex count. (Every triangle has an incircle; a quad needs to be TANGENTIAL, which
   // the construction below flexes it to be — sum of opposite sides equal, Pitot.)
@@ -2414,6 +2447,7 @@ const incircle: Rule = (s, ctx) => {
     : /square|ריבוע/i.test(s) ? 'square'
     : /rectangle|מלבן/i.test(s) ? 'rectangle'
     : /rhombus|מעוין/i.test(s) ? 'rhombus'
+    : /kite|דלתון|עפיפון/i.test(s) ? 'kite'
     : /trapez|טרפז/i.test(s) ? 'trapezoid'
     : /parallelogram|מקבילית/i.test(s) ? 'parallelogram'
     : /quad\w*|מרובע/i.test(s) ? 'quad'
@@ -2425,14 +2459,17 @@ const incircle: Rule = (s, ctx) => {
   const namedC = circleCenter(s);
   const incLabel = incenterLabel(s);
   let rest = dropCircleRef(s).replace(
-    /incircle|inscrib\w*|חסום|circumscrib\w*|חוסם|triangle|משולש|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|parallelogram|מקבילית|quad\w*|מרובע|polygon|circles?|מעגל\w*|cent(?:er|re)\w*|ה?מרכז\w*/gi,
+    /incircle|inscrib\w*|חסום|circumscrib\w*|חוסם|triangle|משולש|square|ריבוע|rectangle|מלבן|rhombus|מעוין|kite|דלתון|עפיפון|trapez\w*|טרפז|parallelogram|מקבילית|quad\w*|מרובע|polygon|circles?|מעגל\w*|cent(?:er|re)\w*|ה?מרכז\w*/gi,
     ' ',
   );
   if (namedC) rest = rest.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ');
   if (incLabel) rest = rest.replace(new RegExp(String.raw`\b${incLabel}\b`, 'gi'), ' ');
   const ids =
     labelRun(rest, n) ??
-    (namesVertices(rest) ? null : autoVertexLabels(n, [...taken, ...(namedC ? [namedC] : []), ...(incLabel ? [incLabel] : [])]));
+    (namesVertices(rest)
+      ? null
+      : (existingPolygon(ctx, n) ??
+        autoVertexLabels(n, [...taken, ...(namedC ? [namedC] : []), ...(incLabel ? [incLabel] : [])])));
   if (!ids) return null;
   const [A, B, C] = ids;
   // EXISTING circle as the incircle — "משולש DEF חוסם את המעגל O" where circle O is ALREADY in the figure
@@ -2475,6 +2512,10 @@ const incircle: Rule = (s, ctx) => {
     : kind === 'square' ? { type: 'square', ids: [v[0], v[1], v[2], v[3]] }
     : kind === 'rectangle' ? { type: 'rectangle', ids: [v[0], v[1], v[2], v[3]] }
     : kind === 'rhombus' ? { type: 'rhombus', ids: [v[0], v[1], v[2], v[3]] }
+    // A kite is its ADR-138 shape-variant macro (expands to the quadrilateral + the equal ADJACENT pairs,
+    // axis cyclable/pinnable) — the same lowering the standalone/inscribed kite uses. Every kite is
+    // tangential (AB=AD, CB=CD ⇒ Pitot), so the tangency force below is always satisfiable.
+    : kind === 'kite' ? { type: 'shape-variant', shape: 'kite', ids: [v[0], v[1], v[2], v[3]], variant: 0 }
     : kind === 'trapezoid' ? { type: 'trapezoid', ids: [v[0], v[1], v[2], v[3]] }
     : kind === 'parallelogram' ? { type: 'parallelogram', ids: [v[0], v[1], v[2], v[3]] }
     : { type: 'quadrilateral', ids: [v[0], v[1], v[2], v[3]] };

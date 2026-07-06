@@ -148,6 +148,51 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'incircle-inverted-passive-quad',
+    title: 'במרובע ABCD חסום מעגל O — the inverted passive (container-first) reads as the INCIRCLE, not the converse',
+    guards:
+      'ADR-245: `isCircleInPolygon` discriminated the inscription roles by word ORDER, so the bagrut-standard inverted passive "במרובע ABCD חסום מעגל O" flipped subject and container and silently built the CONVERSE (quad ABCD riding circle O). The container is the noun carrying the ב prefix / "in", wherever it sits. Operator session ufxrtyp2 (2026-07-06); the sibling "במשולש ABC חסום מעגל" had built a circumcircle since 2026-06-22.',
+    steps: ['במרובע ABCD חסום מעגל O', 'OB'],
+    check(fig) {
+      allStepsOk(fig);
+      const c = fig.circles.get('circle-O');
+      expect(c, 'circle O resolved').toBeTruthy();
+      if (!c) return;
+      // The QUAD is tangential to the circle: each side's distance from O equals the radius…
+      const sides: [string, string][] = [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A']];
+      for (const [p, q] of sides) {
+        const a = at(fig, p);
+        const b = at(fig, q);
+        const off = Math.abs((b.x - a.x) * (c.center.y - a.y) - (b.y - a.y) * (c.center.x - a.x)) / dist(a, b);
+        expect(Math.abs(off - c.r), `side ${p}${q} tangent to circle O`).toBeLessThan(0.05 * c.r + 0.01);
+      }
+      // …and the vertices are NOT on the circle (the converse figure would put them there).
+      for (const p of ['A', 'B', 'C', 'D'] as const) {
+        expect(dist(at(fig, p), c.center), `${p} strictly outside circle O`).toBeGreaterThan(c.r * 1.05);
+      }
+    },
+  },
+  {
+    id: 'incircle-definite-ref-binds-existing-quad',
+    title: 'ABCD מרובע ואז "במרובע חסום מעגל" — the definite unnamed reference binds to THE existing quad',
+    guards:
+      'ADR-245: an unnamed definite shape reference ("במרובע" — THE quad) minted a fresh auto-named polygon (EFGH) instead of binding to the one already drawn; combined with the order bug it built a second quad inscribed in a circle. Exactly one existing n-gon in the figure now binds (the ADR-029 implicit-reference pattern, polygon edition). Operator session ufxrtyp2 (2026-07-06).',
+    steps: ['ABCD מרובע', 'במרובע חסום מעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('E'), 'no fresh auto-named quad (E must not exist)').toBe(false);
+      const c = fig.circles.get('circle-O');
+      expect(c, 'the incircle resolved (auto-centre O)').toBeTruthy();
+      if (!c) return;
+      for (const [p, q] of [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A']] as [string, string][]) {
+        const a = at(fig, p);
+        const b = at(fig, q);
+        const off = Math.abs((b.x - a.x) * (c.center.y - a.y) - (b.y - a.y) * (c.center.x - a.x)) / dist(a, b);
+        expect(Math.abs(off - c.r), `side ${p}${q} tangent to the incircle`).toBeLessThan(0.05 * c.r + 0.01);
+      }
+    },
+  },
+  {
     id: 'two-concentric-circles-q6',
     title: 'שני מעגלים בעלי מרכז משותף O — chords of the outer and inner circles on one line (bagrut Q6)',
     guards:
