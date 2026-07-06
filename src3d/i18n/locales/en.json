@@ -10,7 +10,9 @@
     "redo": "Redo",
     "clear": "Clear all",
     "another": "Show another configuration",
-    "resetView": "Reset view"
+    "resetView": "Reset view",
+    "save": "Save to file",
+    "load": "Load from file"
   },
   "hint": {
     "orbit": "Drag the figure to orbit · scroll to zoom"
@@ -34,7 +36,15 @@
     "needBasis": "This point needs three declared vectors (a basis) — e.g.: denote AB = u, AD = v, AA' = w",
     "noSolution": "No position of '{{id}}' satisfies the condition",
     "notOnSegment": "'{{id}}' falls outside the segment — the condition doesn't hold on the segment itself",
-    "claimRefuted": "The claim doesn't hold in the figure — check the computation"
+    "unknownPlane": "Plane '{{id}}' is not defined yet",
+    "unknownLine": "Line '{{id}}' is not defined yet",
+    "twoParams": "Only one parameter is allowed per figure (e.g. a)",
+    "noRoots": "No parameter value satisfies the stated angle — the givens contradict",
+    "notOnPlane": "'{{id}}' is not on any of the given planes — check the givens",
+    "sizeOnSolid": "A numeric size on a free-dimension solid isn't supported here yet",
+    "claimRefuted": "The claim doesn't hold in the figure — check the computation",
+    "badFile": "This is not a valid Space Builder figure file",
+    "newerSchema": "The file was saved by a newer version of the tool — refresh the page and try again"
   },
   "examples": {
     "ex1": "cube ABCD",
@@ -42,6 +52,8 @@
     "ex3": "M is the midpoint of BB'",
     "ex4": "K on AA' such that AK = 2KA'",
     "ex5": "denote AB = u, AD = v, AA' = w",
-    "ex6": "CA' is perpendicular to plane BC'D"
+    "ex6": "CA' is perpendicular to plane BC'D",
+    "ex7": "plane π1: z - 3 = 0",
+    "ex8": "A(2,-2,6) is on one of the planes"
   }
 }

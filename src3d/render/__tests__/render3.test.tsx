@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { applyCommand3 } from '../../engine/apply';
-import { evaluate3 } from '../../engine/evaluate';
+import { resolve3 } from '../../engine/evaluate';
 import { emptyConstruction3, type Command3 } from '../../engine/types';
 import Figure3 from '../Figure3';
 
@@ -20,7 +20,7 @@ describe('Figure3 (static, DOM-free)', () => {
     });
     if (!r.ok) throw new Error('apply failed');
     const html = renderToStaticMarkup(
-      <Figure3 construction={r.next} positions={evaluate3(r.next, 0)} resetLabel="reset" />,
+      <Figure3 construction={r.next} resolved={resolve3(r.next, 0)} resetLabel="reset" />,
     );
     expect(html.match(/<line /g)).toHaveLength(12);
     expect(html.match(/stroke-dasharray/g)).toHaveLength(3);
@@ -41,7 +41,7 @@ describe('Figure3 (static, DOM-free)', () => {
       c = r.next;
     }
     const html = renderToStaticMarkup(
-      <Figure3 construction={c} positions={evaluate3(c, 0)} resetLabel="reset" />,
+      <Figure3 construction={c} resolved={resolve3(c, 0)} resetLabel="reset" />,
     );
     expect(html).toContain('data-testid="vec-w"');
     const group = html.split('data-testid="vec-w"')[1].split('</g></g>')[0];
@@ -52,8 +52,9 @@ describe('Figure3 (static, DOM-free)', () => {
   });
 
   it('renders an empty construction without crashing', () => {
+    const empty = emptyConstruction3();
     const html = renderToStaticMarkup(
-      <Figure3 construction={emptyConstruction3()} positions={new Map()} resetLabel="reset" />,
+      <Figure3 construction={empty} resolved={resolve3(empty, 0)} resetLabel="reset" />,
     );
     expect(html).toContain('<svg');
   });

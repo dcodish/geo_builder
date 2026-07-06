@@ -50,6 +50,18 @@ function holdsAt(claim: Claim3, c: Construction3, pos: Positions3): boolean {
       }
       return true;
     }
+    case 'length-eq': {
+      const a = pos.get(claim.a);
+      const b = pos.get(claim.b);
+      if (!a || !b) return false;
+      return Math.abs(norm3(sub3(b, a)) - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
+    }
+    case 'area-eq': {
+      const ps = claim.ids.map((id) => pos.get(id));
+      if (ps.some((p) => !p)) return false;
+      const area = 0.5 * norm3(cross3(sub3(ps[1]!, ps[0]!), sub3(ps[2]!, ps[0]!)));
+      return Math.abs(area - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
+    }
   }
 }
 

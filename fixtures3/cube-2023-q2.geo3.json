@@ -1,0 +1,199 @@
+{
+  "schemaVersion": 1,
+  "app": "3d-builder",
+  "savedAt": "2026-07-06T18:53:12.349Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCD",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "נסמן: AB = u, AD = v, AA' = w",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "name-vector",
+          "name": "u",
+          "from": "A",
+          "to": "B"
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "D"
+        },
+        {
+          "type": "name-vector",
+          "name": "v",
+          "from": "A",
+          "to": "D"
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "A'"
+        },
+        {
+          "type": "name-vector",
+          "name": "w",
+          "from": "A",
+          "to": "A'"
+        }
+      ]
+    },
+    {
+      "utterance": "CA' מאונך למישור BC'D",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "C",
+          "b": "A'"
+        },
+        {
+          "type": "segment3",
+          "a": "B",
+          "b": "C'"
+        },
+        {
+          "type": "segment3",
+          "a": "C'",
+          "b": "D"
+        },
+        {
+          "type": "segment3",
+          "a": "D",
+          "b": "B"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "perp-plane",
+            "seg": [
+              "C",
+              "A'"
+            ],
+            "plane": [
+              "B",
+              "C'",
+              "D"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "E מפגש התיכונים של משולש BC'D",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "B",
+          "b": "C'"
+        },
+        {
+          "type": "segment3",
+          "a": "C'",
+          "b": "D"
+        },
+        {
+          "type": "segment3",
+          "a": "D",
+          "b": "B"
+        },
+        {
+          "type": "centroid3",
+          "id": "E",
+          "of": [
+            "B",
+            "C'",
+            "D"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "CE = -1/3u - 1/3v + 1/3w",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "C",
+          "b": "E"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "vec-eq",
+            "lhs": [
+              {
+                "coeff": 1,
+                "atom": {
+                  "kind": "pair",
+                  "from": "C",
+                  "to": "E"
+                }
+              }
+            ],
+            "rhs": [
+              {
+                "coeff": -0.3333333333333333,
+                "atom": {
+                  "kind": "named",
+                  "name": "u"
+                }
+              },
+              {
+                "coeff": -0.3333333333333333,
+                "atom": {
+                  "kind": "named",
+                  "name": "v"
+                }
+              },
+              {
+                "coeff": 0.3333333333333333,
+                "atom": {
+                  "kind": "named",
+                  "name": "w"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "E, C, A' על ישר אחד",
+      "cmds": [
+        {
+          "type": "claim",
+          "claim": {
+            "type": "collinear3",
+            "ids": [
+              "E",
+              "C",
+              "A'"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

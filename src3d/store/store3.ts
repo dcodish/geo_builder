@@ -24,8 +24,9 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { applyCommand3 } from '../engine/apply';
-import { checkInSpan, evaluate3 } from '../engine/evaluate';
+import { checkInSpan, resolve3, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
+import { dot3, norm3 } from '../engine/vec3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
 import { parse3 } from '../parser/parse3';
 
@@ -40,11 +41,19 @@ export type FactStatus3 = 'ok' | 'disabled' | EngineError3;
 
 export interface Derived3 {
   construction: Construction3;
+  /** The full resolved figure (positions + planes/lines/parameter) — the renderer's input. */
+  resolved: Resolved3;
+  /** Convenience alias of resolved.positions. */
   positions: Positions3;
   status: Record<string, FactStatus3>;
 }
 
-export type StoreError3 = EngineError3 | { code: 'not-understood' } | null;
+export type StoreError3 =
+  | EngineError3
+  | { code: 'not-understood' }
+  | { code: 'bad-file' }
+  | { code: 'newer-schema' }
+  | null;
 
 /**
  * Pure replay: fold the enabled facts through the reducer, evaluate — then
@@ -75,12 +84,19 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     status[f.id] = st;
   }
 
-  const positions = evaluate3(c, seed);
+  const resolved = resolve3(c, seed);
+  const positions = resolved.positions;
 
   for (const f of facts) {
     if (status[f.id] !== 'ok') continue;
     for (const cmd of f.cmds) {
       if (cmd.type === 'claim') {
+        // V2 honest boundary: a numeric size on a free-dim solid figure is a SCALE
+        // statement, not a check — refuse with a clear message rather than "refute" it.
+        if ((cmd.claim.type === 'length-eq' || cmd.claim.type === 'area-eq') && c.solids.length > 0) {
+          status[f.id] = { code: 'size-on-solid' };
+          break;
+        }
         if (!verifyClaim(cmd.claim, c, seed)) {
           status[f.id] = { code: 'claim-refuted' };
           break;
@@ -94,11 +110,30 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
             break;
           }
         }
+      } else if (cmd.type === 'plane-angle') {
+        // the stated angle admits NO parameter value — over-constrained, honestly
+        if (resolved.param && resolved.param.roots.length === 0) {
+          status[f.id] = { code: 'no-roots' };
+          break;
+        }
+      } else if (cmd.type === 'on-planes') {
+        const p = positions.get(cmd.id);
+        const names = cmd.plane === 'any' ? [...resolved.planes.keys()] : [cmd.plane];
+        const holds =
+          p !== undefined &&
+          names.some((name) => {
+            const pl = resolved.planes.get(name);
+            return pl !== undefined && Math.abs(dot3(pl.n, p) + pl.d) <= 1e-7 * (1 + norm3(pl.n));
+          });
+        if (!holds) {
+          status[f.id] = { code: 'not-on-plane', id: cmd.id };
+          break;
+        }
       }
     }
   }
 
-  return { construction: c, positions, status };
+  return { construction: c, resolved, positions, status };
 }
 
 export interface Geo3State {
@@ -111,6 +146,10 @@ export interface Geo3State {
   clear: () => void;
   resample: () => void;
   dismissError: () => void;
+  /** Load a deserialised figure — ONE undoable set (never destructive: undo restores the prior session). */
+  loadFigure: (facts: Fact3[], seed: number) => void;
+  /** Surface a file-load refusal through the normal error banner. */
+  reportLoadError: (reason: 'bad-file' | 'newer-schema') => void;
 }
 
 export const useGeo3 = create<Geo3State>()(
@@ -147,6 +186,10 @@ export const useGeo3 = create<Geo3State>()(
       resample: () => set({ seed: get().seed + 1 }),
 
       dismissError: () => set({ lastError: null }),
+
+      loadFigure: (facts, seed) => set({ facts, seed, lastError: null }),
+
+      reportLoadError: (reason) => set({ lastError: { code: reason } }),
     }),
     {
       // History tracks the durable inputs only; lastError is transient UI state,

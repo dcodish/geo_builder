@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "app": "3d-builder",
+  "savedAt": "2026-07-06T18:53:12.359Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "המישור π1: z - 3 = 0",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π1",
+          "plane": {
+            "cx": {
+              "k": 0,
+              "p": 0
+            },
+            "cy": {
+              "k": 0,
+              "p": 0
+            },
+            "cz": {
+              "k": 1,
+              "p": 0
+            },
+            "d": {
+              "k": -3,
+              "p": 0
+            },
+            "src": "z - 3 = 0"
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "המישור π2: ay + z - 8 = 0",
+      "cmds": [
+        {
+          "type": "plane3",
+          "name": "π2",
+          "plane": {
+            "cx": {
+              "k": 0,
+              "p": 0
+            },
+            "cy": {
+              "k": 0,
+              "p": 1
+            },
+            "cz": {
+              "k": 1,
+              "p": 0
+            },
+            "d": {
+              "k": -8,
+              "p": 0
+            },
+            "src": "ay + z - 8 = 0"
+          },
+          "param": "a"
+        }
+      ]
+    },
+    {
+      "utterance": "הזווית בין המישורים π1 ו-π2 היא 45",
+      "cmds": [
+        {
+          "type": "plane-angle",
+          "p1": "π1",
+          "p2": "π2",
+          "deg": 45
+        }
+      ]
+    },
+    {
+      "utterance": "A(2,-2,6) נמצאת על אחד המישורים",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 2,
+          "y": -2,
+          "z": 6
+        },
+        {
+          "type": "on-planes",
+          "id": "A",
+          "plane": "any"
+        }
+      ]
+    },
+    {
+      "utterance": "מ-A מורידים אנך למישור π1 החותך אותו בנקודה B",
+      "cmds": [
+        {
+          "type": "foot-on-plane",
+          "id": "B",
+          "from": "A",
+          "plane": "π1"
+        }
+      ]
+    },
+    {
+      "utterance": "AB = 3",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "length-eq",
+            "a": "A",
+            "b": "B",
+            "value": 3
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "ℓ ישר החיתוך בין המישורים π1 ו-π2",
+      "cmds": [
+        {
+          "type": "plane-plane-line",
+          "name": "ℓ",
+          "p1": "π1",
+          "p2": "π2"
+        }
+      ]
+    },
+    {
+      "utterance": "מ-B מעבירים אנך לישר ℓ החותך אותו בנקודה C",
+      "cmds": [
+        {
+          "type": "foot-on-line",
+          "id": "C",
+          "from": "B",
+          "line": "ℓ"
+        }
+      ]
+    },
+    {
+      "utterance": "שטח המשולש ABC = 4.5",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "segment3",
+          "a": "B",
+          "b": "C"
+        },
+        {
+          "type": "segment3",
+          "a": "C",
+          "b": "A"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "area-eq",
+            "ids": [
+              "A",
+              "B",
+              "C"
+            ],
+            "value": 4.5
+          }
+        }
+      ]
+    }
+  ]
+}

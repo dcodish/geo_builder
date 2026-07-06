@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "app": "3d-builder",
+  "savedAt": "2026-07-06T18:53:12.347Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מנסרה ישרה משולשת ABC",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "prism3",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "A'",
+            "B'",
+            "C'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "M אמצע B'C'",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "M",
+          "a": "B'",
+          "b": "C'",
+          "t": 0.5
+        }
+      ]
+    },
+    {
+      "utterance": "K על AA' כך ש-AK = 2KA'",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "K",
+          "a": "A",
+          "b": "A'",
+          "t": 0.6666666666666666
+        }
+      ]
+    },
+    {
+      "utterance": "נסמן: AA' = w, KC = v, KB = u",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "A'"
+        },
+        {
+          "type": "name-vector",
+          "name": "w",
+          "from": "A",
+          "to": "A'"
+        },
+        {
+          "type": "segment3",
+          "a": "K",
+          "b": "C"
+        },
+        {
+          "type": "name-vector",
+          "name": "v",
+          "from": "K",
+          "to": "C"
+        },
+        {
+          "type": "segment3",
+          "a": "K",
+          "b": "B"
+        },
+        {
+          "type": "name-vector",
+          "name": "u",
+          "from": "K",
+          "to": "B"
+        }
+      ]
+    },
+    {
+      "utterance": "AM = 1/2u + 1/2v + 5/3w",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "M"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "vec-eq",
+            "lhs": [
+              {
+                "coeff": 1,
+                "atom": {
+                  "kind": "pair",
+                  "from": "A",
+                  "to": "M"
+                }
+              }
+            ],
+            "rhs": [
+              {
+                "coeff": 0.5,
+                "atom": {
+                  "kind": "named",
+                  "name": "u"
+                }
+              },
+              {
+                "coeff": 0.5,
+                "atom": {
+                  "kind": "named",
+                  "name": "v"
+                }
+              },
+              {
+                "coeff": 1.6666666666666667,
+                "atom": {
+                  "kind": "named",
+                  "name": "w"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "P על AM כך ש-KP = αu + βv",
+      "cmds": [
+        {
+          "type": "point-in-span",
+          "id": "P",
+          "a": "A",
+          "b": "M",
+          "vecFrom": "K",
+          "span": [
+            "u",
+            "v"
+          ]
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "M"
+        },
+        {
+          "type": "segment3",
+          "a": "K",
+          "b": "P"
+        }
+      ]
+    },
+    {
+      "utterance": "KP = 1/5u + 1/5v",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "K",
+          "b": "P"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "vec-eq",
+            "lhs": [
+              {
+                "coeff": 1,
+                "atom": {
+                  "kind": "pair",
+                  "from": "K",
+                  "to": "P"
+                }
+              }
+            ],
+            "rhs": [
+              {
+                "coeff": 0.2,
+                "atom": {
+                  "kind": "named",
+                  "name": "u"
+                }
+              },
+              {
+                "coeff": 0.2,
+                "atom": {
+                  "kind": "named",
+                  "name": "v"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

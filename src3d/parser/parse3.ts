@@ -17,7 +17,7 @@
  *    refuse rather than silently drop it.
  */
 
-import type { Command3, Id, VecExpr } from '../engine/types';
+import type { Command3, Id, LinExpr, VecExpr } from '../engine/types';
 
 export type ParseResult3 = { ok: true; commands: Command3[] } | { ok: false; reason: 'not-handled' };
 
@@ -266,9 +266,189 @@ const bareSegment: Rule = (s) => {
   return [{ type: 'segment3', a, b }];
 };
 
+// ---------------------------------------------------------------------------
+// V2 — the algebraic lane (docs/20 §6.3, ADR-3D-004)
+// ---------------------------------------------------------------------------
+
+/** Plane names: π1 / pi1 → canonical `π1`. */
+const PLANE_NAME = /(?:π|pi|Pi|PI)\s?(\d+)/;
+const canonicalPlane = (s: string): string => `π${s.match(/\d+/)![0]}`;
+/** Line names: ℓ or l → canonical `ℓ`. */
+const LINE_NAME = /[ℓl]/;
+
+/**
+ * Parse a linear equation in x,y,z with ONE optional lowercase parameter letter
+ * (`ay + z - 8 = 0`). Returns each coefficient as a LinExpr (k + p·param).
+ * Null on anything else — never a partial read.
+ */
+export function parseLinearEq(eq: string): { cx: LinExpr; cy: LinExpr; cz: LinExpr; d: LinExpr; param?: string } | null {
+  const sides = eq.split('=');
+  if (sides.length !== 2) return null;
+  const acc: Record<'x' | 'y' | 'z' | 'c', LinExpr> = {
+    x: { k: 0, p: 0 },
+    y: { k: 0, p: 0 },
+    z: { k: 0, p: 0 },
+    c: { k: 0, p: 0 },
+  };
+  let param: string | undefined;
+  const addSide = (side: string, sign: number): boolean => {
+    const terms = side
+      .trim()
+      .split(/(?=[+-])/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    if (terms.length === 0) return false;
+    for (const term of terms) {
+      const m = term.match(/^([+-])?\s*(\d+(?:\.\d+)?)?\s*([a-w])?\s*([xyz])?$/);
+      if (!m || (m[2] === undefined && !m[3] && !m[4])) return false;
+      const sgn = sign * (m[1] === '-' ? -1 : 1);
+      const num = m[2] !== undefined ? parseFloat(m[2]) : 1;
+      if (m[3]) {
+        if (param && param !== m[3]) return false; // one parameter per figure (V2 boundary)
+        param = m[3];
+      }
+      const slot = acc[(m[4] ?? 'c') as 'x' | 'y' | 'z' | 'c'];
+      if (m[3]) slot.p += sgn * num;
+      else slot.k += sgn * num;
+    }
+    return true;
+  };
+  if (!addSide(sides[0], 1) || !addSide(sides[1], -1)) return null;
+  if ([acc.x, acc.y, acc.z].every((e) => e.k === 0 && e.p === 0)) return null; // no variable at all
+  return { cx: acc.x, cy: acc.y, cz: acc.z, d: acc.c, param };
+}
+
+/** `המישור π1: z - 3 = 0` / `plane π2: ay + z - 8 = 0`. */
+const planeByEquation: Rule = (s) => {
+  const m = s.match(new RegExp(`^(?:המישור\\s+|plane\\s+)?(${PLANE_NAME.source})\\s*:\\s*(.+)$`));
+  if (!m) return null;
+  const eq = parseLinearEq(m[m.length - 1]);
+  if (!eq) return null;
+  return [
+    {
+      type: 'plane3',
+      name: canonicalPlane(m[1]),
+      plane: { cx: eq.cx, cy: eq.cy, cz: eq.cz, d: eq.d, src: m[m.length - 1].trim() },
+      param: eq.param,
+    },
+  ];
+};
+
+const NUM = String.raw`-?\d+(?:\.\d+)?`;
+
+/** `A(2,-2,6)` (+ optional membership tail: `נמצאת על אחד המישורים` / `is on one of the planes` / `על המישור π2`). */
+const coordPoint: Rule = (s) => {
+  const m = s.match(
+    new RegExp(`^(?:הנקודה\\s+|point\\s+)?([A-Z]\\d*'?)\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)\\s*(.*)$`),
+  );
+  if (!m) return null;
+  const [, id, x, y, z, restRaw] = m;
+  const cmds: Command3[] = [{ type: 'point3', id, x: +x, y: +y, z: +z }];
+  const rest = restRaw.trim();
+  if (rest) {
+    if (/^(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?(?:על אחד המישורים|on one of the planes)$/.test(rest)) {
+      cmds.push({ type: 'on-planes', id, plane: 'any' });
+    } else {
+      const named = rest.match(new RegExp(`^(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על המישור|on plane)\\s+(${PLANE_NAME.source})$`));
+      if (!named) return null; // trailing text we don't understand — refuse the whole utterance
+      cmds.push({ type: 'on-planes', id, plane: canonicalPlane(named[1]) });
+    }
+  }
+  return cmds;
+};
+
+/** Standalone membership for an existing point. */
+const membership: Rule = (s) => {
+  const any = s.match(/^([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?(?:על אחד המישורים|on one of the planes)$/);
+  if (any) return [{ type: 'on-planes', id: any[1], plane: 'any' }];
+  const named = s.match(new RegExp(`^([A-Z]\\d*'?)\\s+(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על המישור|on plane)\\s+(${PLANE_NAME.source})$`));
+  if (named) return [{ type: 'on-planes', id: named[1], plane: canonicalPlane(named[2]) }];
+  return null;
+};
+
+/** `הזווית בין המישורים π1 ו-π2 היא 45` / `the angle between planes π1 and π2 is 45`. */
+const angleBetweenPlanes: Rule = (s) => {
+  const m = s.match(
+    new RegExp(
+      `^(?:הזווית בין המישורים|the angle between (?:the )?planes)\\s+(${PLANE_NAME.source})\\s*(?:ל|ו|and)-?\\s*(${PLANE_NAME.source})\\s*(?:היא|הוא|is|=)?\\s*(${NUM})\\s*°?$`,
+    ),
+  );
+  if (!m) return null;
+  return [{ type: 'plane-angle', p1: canonicalPlane(m[1]), p2: canonicalPlane(m[3]), deg: +m[5] }];
+};
+
+/** `מ-A מורידים אנך למישור π1 החותך אותו בנקודה B` / `from A drop a perpendicular to plane π1, it cuts it at B`. */
+const dropPerpToPlane: Rule = (s) => {
+  const he = s.match(
+    new RegExp(`^מ-?([A-Z]\\d*'?)\\s+(?:מורידים|הורידו|מוריד|מעבירים|העבירו)\\s+אנך\\s+למישור\\s+(${PLANE_NAME.source})\\b.*?בנקודה\\s+([A-Z]\\d*'?)$`),
+  );
+  const en =
+    he ??
+    s.match(new RegExp(`^from ([A-Z]\\d*'?) drop a perpendicular to (?:the )?plane (${PLANE_NAME.source})\\b.*? at ([A-Z]\\d*'?)$`));
+  if (!en) return null;
+  const [, from, plane, , foot] = en;
+  return [{ type: 'foot-on-plane', id: foot, from, plane: canonicalPlane(plane) }];
+};
+
+/** `ℓ ישר החיתוך בין המישורים π1 ו-π2` / `ℓ is the intersection line of π1 and π2`. */
+const intersectionLine: Rule = (s) => {
+  const m = s.match(
+    new RegExp(
+      `^(${LINE_NAME.source})\\s+(?:הוא\\s+)?(?:ישר\\s+החיתוך|is the (?:intersection line|line of intersection))\\s+(?:בין\\s+)?(?:המישורים\\s+|of\\s+(?:the\\s+)?(?:planes\\s+)?)?(${PLANE_NAME.source})\\s*(?:ל|ו|and)-?\\s*(${PLANE_NAME.source})$`,
+    ),
+  );
+  if (!m) return null;
+  return [{ type: 'plane-plane-line', name: 'ℓ', p1: canonicalPlane(m[2]), p2: canonicalPlane(m[4]) }];
+};
+
+/** `מ-B מעבירים אנך לישר ℓ החותך אותו בנקודה C` / `from B drop a perpendicular to line ℓ, it cuts it at C`. */
+const dropPerpToLine: Rule = (s) => {
+  // NOTE: `ℓ` is not a \w character, so `\b` after it never matches — use an explicit lookahead.
+  const he = s.match(
+    new RegExp(`^מ-?([A-Z]\\d*'?)\\s+(?:מעבירים|העבירו|מורידים|הורידו)\\s+אנך\\s+לישר\\s+(${LINE_NAME.source})(?=[\\s,.]|$).*?בנקודה\\s+([A-Z]\\d*'?)$`),
+  );
+  const en =
+    he ?? s.match(new RegExp(`^from ([A-Z]\\d*'?) drop a perpendicular to (?:the )?line (${LINE_NAME.source})(?=[\\s,.]|$).*? at ([A-Z]\\d*'?)$`));
+  if (!en) return null;
+  const [, from, , foot] = en;
+  return [{ type: 'foot-on-line', id: foot, from, line: 'ℓ' }];
+};
+
+/** `AB = 3` — a scalar length CLAIM (Lane A: all points pinned ⇒ a check, never a driver). */
+const lengthClaim: Rule = (s) => {
+  const m = s.match(new RegExp(`^([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(${NUM})$`));
+  if (!m) return null;
+  return [
+    { type: 'segment3', a: m[1], b: m[2] },
+    { type: 'claim', claim: { type: 'length-eq', a: m[1], b: m[2], value: +m[3] } },
+  ];
+};
+
+/** `שטח המשולש ABC = 4.5` / `the area of triangle ABC = 4.5` — an area CLAIM (draws the triangle). */
+const areaClaim: Rule = (s) => {
+  const m = s.match(
+    new RegExp(`^(?:שטח\\s+(?:ה?משולש\\s+)?|the area of (?:the )?triangle\\s+|area of\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(${NUM})$`),
+  );
+  if (!m) return null;
+  const [, a, b, c, value] = m;
+  return [
+    { type: 'segment3', a, b },
+    { type: 'segment3', a: b, b: c },
+    { type: 'segment3', a: c, b: a },
+    { type: 'claim', claim: { type: 'area-eq', ids: [a, b, c], value: +value } },
+  ];
+};
+
 const RULES: Rule[] = [
   cubeOrBox,
   rightPrism,
+  planeByEquation,
+  coordPoint,
+  membership, // before onSegment: `על אחד המישורים` must never read as a point-on-segment
+  angleBetweenPlanes,
+  dropPerpToPlane,
+  intersectionLine,
+  dropPerpToLine,
   nameVectors,
   centroidRule,
   perpPlaneClaim,
@@ -277,6 +457,8 @@ const RULES: Rule[] = [
   spanPoint, // MUST precede onSegment: Greek scalars would otherwise parse as a free point, silently dropping the condition
   onSegment,
   vecEqClaim,
+  areaClaim,
+  lengthClaim,
   bareSegment,
 ];
 

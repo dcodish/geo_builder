@@ -133,3 +133,81 @@ describe("GATE — 2023 קיץ א Q2 א–ב (cube, perpendicular-to-plane + cen
     expect(state().lastError).toEqual({ code: 'claim-refuted' });
   });
 });
+
+describe('GATE — 2022 חורף Q2 (the algebraic lane: planes, parameter, feet, ℓ, area)', () => {
+  beforeEach(reset);
+
+  const HE = [
+    'המישור π1: z - 3 = 0',
+    'המישור π2: ay + z - 8 = 0',
+    'הזווית בין המישורים π1 ו-π2 היא 45',
+    'A(2,-2,6) נמצאת על אחד המישורים', // selects the branch a = −1
+    'מ-A מורידים אנך למישור π1 החותך אותו בנקודה B',
+    'AB = 3', // the student's answer to ב — verified
+    'ℓ ישר החיתוך בין המישורים π1 ו-π2',
+    'מ-B מעבירים אנך לישר ℓ החותך אותו בנקודה C',
+    'שטח המשולש ABC = 4.5', // the student's answer to ד — verified
+  ];
+  const EN = [
+    'plane π1: z - 3 = 0',
+    'plane π2: ay + z - 8 = 0',
+    'the angle between planes π1 and π2 is 45',
+    'A(2,-2,6) is on one of the planes',
+    'from A drop a perpendicular to plane π1, it cuts it at B',
+    'AB = 3',
+    'ℓ is the intersection line of π1 and π2',
+    'from B drop a perpendicular to line ℓ, it cuts it at C',
+    'the area of triangle ABC = 4.5',
+  ];
+
+  for (const [name, seq] of [['Hebrew', HE], ['English', EN]] as const) {
+    it(`${name}: the full constructive chain builds, a = −1 selected, both answers verify`, () => {
+      seq.forEach(submit);
+      expect(state().facts).toHaveLength(9);
+      expectAllOk();
+      const d = derived();
+      expect(d.resolved.param).toMatchObject({ name: 'a', value: -1, roots: [-1, 1] });
+      expect(d.positions.get('B')).toEqual({ x: 2, y: -2, z: 3 });
+      expect(d.positions.get('C')).toEqual({ x: 2, y: -5, z: 3 });
+      // ℓ is echoed in parametric form via the resolved line
+      const ln = d.resolved.lines.get('ℓ')!;
+      expect(ln.anchor).toEqual({ x: 0, y: -5, z: 3 });
+      expect(Math.abs(ln.dir.x)).toBeCloseTo(1, 12);
+    });
+  }
+
+  it('a wrong |AB| answer is refused (keep-prior)', () => {
+    HE.slice(0, 5).forEach(submit);
+    submit('AB = 2');
+    expect(state().facts).toHaveLength(5);
+    expect(state().lastError).toEqual({ code: 'claim-refuted' });
+  });
+
+  it('a membership that holds on NO plane in any branch is refused', () => {
+    HE.slice(0, 3).forEach(submit);
+    submit('P(1,1,1) נמצאת על אחד המישורים');
+    expect(state().facts).toHaveLength(3);
+    expect(state().lastError).toEqual({ code: 'not-on-plane', id: 'P' });
+  });
+
+  it('an impossible stated angle is refused honestly (no parameter value satisfies it)', () => {
+    HE.slice(0, 2).forEach(submit);
+    submit('הזווית בין המישורים π1 ו-π2 היא 95');
+    expect(state().facts).toHaveLength(2);
+    expect(state().lastError).toEqual({ code: 'no-roots' });
+  });
+
+  it('without the membership given, "show another configuration" cycles the a = ±1 branches', () => {
+    [HE[0], HE[1], HE[2]].forEach(submit);
+    expect(derived().resolved.param?.value).toBe(-1);
+    useGeo3.getState().resample();
+    expect(derived().resolved.param?.value).toBe(1);
+  });
+
+  it('a numeric size claim on a free-dim SOLID figure is refused with a clear boundary message', () => {
+    submit('קובייה ABCD');
+    submit('AB = 3');
+    expect(state().facts).toHaveLength(1);
+    expect(state().lastError).toEqual({ code: 'size-on-solid' });
+  });
+});

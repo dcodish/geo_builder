@@ -41,7 +41,31 @@ export type VecExpr = VecTerm[];
 export type Claim3 =
   | { type: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // AM = ½u + ½v + 5/3·w
   | { type: 'perp-plane'; seg: [Id, Id]; plane: [Id, Id, Id] } // CA' ⊥ plane BC'D
-  | { type: 'collinear3'; ids: Id[] }; // E, C, A' on one line
+  | { type: 'collinear3'; ids: Id[] } // E, C, A' on one line
+  | { type: 'length-eq'; a: Id; b: Id; value: number } // AB = 3 (all points pinned ⇒ a CHECK)
+  | { type: 'area-eq'; ids: [Id, Id, Id]; value: number }; // שטח ABC = 4.5
+
+// ---------------------------------------------------------------------------
+// The algebraic lane (V2 — docs/20 §6.3): coefficients may carry ONE symbolic
+// parameter (the bagrut idiom: `ay + z − 8 = 0`), pinned by a stated relation.
+// ---------------------------------------------------------------------------
+
+/** A linear expression in the figure's single parameter: value = k + p·param. */
+export interface LinExpr {
+  k: number;
+  p: number;
+}
+
+/** ax+by+cz+d = 0, each coefficient a LinExpr; `src` keeps the student's given form (docs/20 §6.3). */
+export interface PlaneDef {
+  cx: LinExpr;
+  cy: LinExpr;
+  cz: LinExpr;
+  d: LinExpr;
+  src: string;
+}
+
+export type Line3Def = { kind: 'plane-plane'; p1: string; p2: string };
 
 // ---------------------------------------------------------------------------
 // Commands (what the parser emits)
@@ -111,6 +135,66 @@ export interface ClaimCommand {
   claim: Claim3;
 }
 
+// --- V2 (algebraic lane) commands ---
+
+/** `A(2,-2,6)` — a coordinate-pinned point (Lane A pins the gauge). */
+export interface Point3Command {
+  type: 'point3';
+  id: Id;
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** `המישור π1: z-3=0` — a plane by equation; the single parameter rides in the LinExprs. */
+export interface Plane3Command {
+  type: 'plane3';
+  name: string;
+  plane: PlaneDef;
+  /** The parameter letter used in the coefficients, if any. */
+  param?: string;
+}
+
+/** `הזווית בין המישורים היא 45°` — PINS the parameter (its roots are the figure's branches). */
+export interface PlaneAngleCommand {
+  type: 'plane-angle';
+  p1: string;
+  p2: string;
+  deg: number;
+  branch?: number;
+}
+
+/** `A נמצאת על אחד המישורים` — membership given; with `'any'` it also SELECTS the branch (2022-Q2). */
+export interface OnPlanesCommand {
+  type: 'on-planes';
+  id: Id;
+  plane: string | 'any';
+}
+
+/** `מ-A מורידים אנך למישור π1 החותך אותו בנקודה B` — the ⟂ foot on a plane. */
+export interface FootOnPlaneCommand {
+  type: 'foot-on-plane';
+  id: Id;
+  from: Id;
+  plane: string;
+}
+
+/** `ℓ ישר החיתוך בין π1 ל-π2` — the planes' intersection line (drawn; echoed in parametric form). */
+export interface PlanePlaneLineCommand {
+  type: 'plane-plane-line';
+  name: string;
+  p1: string;
+  p2: string;
+}
+
+/** `מ-B מעבירים אנך לישר ℓ החותך אותו ב-C` — the ⟂ foot on a line. */
+export interface FootOnLineCommand {
+  type: 'foot-on-line';
+  id: Id;
+  from: Id;
+  line: string;
+}
+
 export type Command3 =
   | SolidCommand
   | PointOnSegment3Command
@@ -118,7 +202,14 @@ export type Command3 =
   | Segment3Command
   | Centroid3Command
   | PointInSpanCommand
-  | ClaimCommand;
+  | ClaimCommand
+  | Point3Command
+  | Plane3Command
+  | PlaneAngleCommand
+  | OnPlanesCommand
+  | FootOnPlaneCommand
+  | PlanePlaneLineCommand
+  | FootOnLineCommand;
 
 // ---------------------------------------------------------------------------
 // Construction (what apply builds, what evaluate consumes)
@@ -136,7 +227,10 @@ export type PointDef =
   | { kind: 'solid-vertex'; solid: number; index: number } // owned by construction.solids[solid]
   | { kind: 'on-segment'; a: Id; b: Id; t?: number }
   | { kind: 'centroid'; of: [Id, Id, Id] }
-  | { kind: 'in-span'; a: Id; b: Id; vecFrom: Id; span: string[] };
+  | { kind: 'in-span'; a: Id; b: Id; vecFrom: Id; span: string[] }
+  | { kind: 'coord'; x: number; y: number; z: number }
+  | { kind: 'foot-plane'; from: Id; plane: string }
+  | { kind: 'foot-line'; from: Id; line: string };
 
 export interface Construction3 {
   solids: SolidObj[];
@@ -146,6 +240,16 @@ export interface Construction3 {
   vectors: Map<string, { from: Id; to: Id }>;
   /** Auxiliary drawn segments (beyond the solids' own edges). */
   segments: [Id, Id][];
+  /** V2 — planes by equation, name → def (insertion-ordered). */
+  planes: Map<string, PlaneDef>;
+  /** V2 — named lines (plane∩plane), name → def. */
+  lines: Map<string, Line3Def>;
+  /** V2 — the single symbolic parameter's letter, once one appears. */
+  param?: string;
+  /** V2 — the stated angle-between-planes givens (they pin the parameter). */
+  planeAngles: PlaneAngleCommand[];
+  /** V2 — membership givens (verify; `'any'` also selects the parameter branch). */
+  memberships: OnPlanesCommand[];
 }
 
 export const emptyConstruction3 = (): Construction3 => ({
@@ -153,6 +257,10 @@ export const emptyConstruction3 = (): Construction3 => ({
   points: new Map(),
   vectors: new Map(),
   segments: [],
+  planes: new Map(),
+  lines: new Map(),
+  planeAngles: [],
+  memberships: [],
 });
 
 // ---------------------------------------------------------------------------
@@ -164,11 +272,17 @@ export type EngineError3 =
   | { code: 'already-defined'; id: Id }
   | { code: 'unknown-point'; id: Id }
   | { code: 'unknown-vector'; id: string }
+  | { code: 'unknown-plane'; id: string }
+  | { code: 'unknown-line'; id: string }
   | { code: 'bad-solid'; kind: SolidKind }
   | { code: 'bad-name'; id: string }
   | { code: 'need-basis' } // in-span needs exactly 3 declared vectors (a basis)
   | { code: 'no-solution'; id: Id } // the driven t has no value satisfying the condition
   | { code: 'not-on-segment'; id: Id } // the driven t lands outside the stated segment
+  | { code: 'two-params' } // only ONE symbolic parameter per figure (V2 boundary)
+  | { code: 'no-roots' } // no parameter value satisfies the stated angle — over-constrained, honestly
+  | { code: 'not-on-plane'; id: Id } // a stated membership does not hold in any branch
+  | { code: 'size-on-solid' } // a numeric size on a free-dim solid figure — not supported yet (honest boundary)
   | { code: 'claim-refuted' }; // the stated answer does not hold in the figure
 
 export type ApplyResult3 = { ok: true; next: Construction3 } | { ok: false; error: EngineError3 };

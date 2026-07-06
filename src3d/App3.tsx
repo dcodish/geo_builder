@@ -5,9 +5,10 @@
  * src/ — docs/20 §12 rule 1).
  */
 
-import { useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import Figure3 from './render/Figure3';
+import { deserializeFigure3, serializeFigure3 } from './store/figureFile3';
 import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
 
 function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: StoreError3): string | null {
@@ -15,14 +16,30 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
   switch (err.code) {
     case 'not-understood':
       return t('err.notUnderstood');
+    case 'bad-file':
+      return t('err.badFile');
+    case 'newer-schema':
+      return t('err.newerSchema');
     case 'already-defined':
       return t('err.alreadyDefined', { id: err.id });
     case 'unknown-point':
       return t('err.unknownPoint', { id: err.id });
     case 'unknown-vector':
       return t('err.unknownVector', { id: err.id });
+    case 'unknown-plane':
+      return t('err.unknownPlane', { id: err.id });
+    case 'unknown-line':
+      return t('err.unknownLine', { id: err.id });
     case 'bad-solid':
       return t('err.badSolid');
+    case 'two-params':
+      return t('err.twoParams');
+    case 'no-roots':
+      return t('err.noRoots');
+    case 'not-on-plane':
+      return t('err.notOnPlane', { id: err.id });
+    case 'size-on-solid':
+      return t('err.sizeOnSolid');
     case 'bad-name':
       return t('err.badName');
     case 'need-basis':
@@ -36,7 +53,7 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
   }
 }
 
-const EXAMPLE_KEYS = ['ex1', 'ex2', 'ex3', 'ex4', 'ex5', 'ex6'] as const;
+const EXAMPLE_KEYS = ['ex1', 'ex2', 'ex3', 'ex4', 'ex5', 'ex6', 'ex7', 'ex8'] as const;
 
 export default function App3() {
   const { t } = useTranslation();
@@ -48,9 +65,31 @@ export default function App3() {
   const remove = useGeo3((s) => s.remove);
   const clear = useGeo3((s) => s.clear);
   const resample = useGeo3((s) => s.resample);
+  const loadFigure = useGeo3((s) => s.loadFigure);
+  const reportLoadError = useGeo3((s) => s.reportLoadError);
 
   const [text, setText] = useState('');
+  const fileInput = useRef<HTMLInputElement>(null);
   const derived = useMemo(() => derive3(facts, seed), [facts, seed]);
+
+  const onSaveFile = () => {
+    const blob = new Blob([serializeFigure3(facts, seed)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `figure-3d-${new Date().toISOString().slice(0, 10)}.geo3.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const onLoadFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = ''; // allow re-loading the same file
+    if (!f) return;
+    const r = deserializeFigure3(await f.text());
+    if (r.ok) loadFigure(r.facts, r.seed);
+    else reportLoadError(r.reason);
+  };
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -147,7 +186,7 @@ export default function App3() {
 
         {/* Canvas + view/session controls */}
         <section className="flex flex-1 flex-col gap-2">
-          <Figure3 construction={derived.construction} positions={derived.positions} resetLabel={t('actions.resetView')} />
+          <Figure3 construction={derived.construction} resolved={derived.resolved} resetLabel={t('actions.resetView')} />
           <p className="text-xs text-slate-400">{t('hint.orbit')}</p>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={resample} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
@@ -162,6 +201,23 @@ export default function App3() {
             <button type="button" onClick={clear} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50">
               {t('actions.clear')}
             </button>
+            <span className="mx-1 self-center text-slate-300">|</span>
+            <button
+              type="button"
+              onClick={onSaveFile}
+              disabled={facts.length === 0}
+              className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-40"
+            >
+              {t('actions.save')}
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100"
+            >
+              {t('actions.load')}
+            </button>
+            <input ref={fileInput} type="file" accept=".geo3.json,application/json,.json" className="hidden" onChange={onLoadFile} />
           </div>
         </section>
       </main>

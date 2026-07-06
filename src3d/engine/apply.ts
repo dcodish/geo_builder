@@ -42,7 +42,17 @@ function faceIndices(kind: SolidCommand['kind']): number[][] {
 }
 
 function clone(c: Construction3): Construction3 {
-  return { solids: [...c.solids], points: new Map(c.points), vectors: new Map(c.vectors), segments: [...c.segments] };
+  return {
+    solids: [...c.solids],
+    points: new Map(c.points),
+    vectors: new Map(c.vectors),
+    segments: [...c.segments],
+    planes: new Map(c.planes),
+    lines: new Map(c.lines),
+    param: c.param,
+    planeAngles: [...c.planeAngles],
+    memberships: [...c.memberships],
+  };
 }
 
 const samePair = (p: [Id, Id], a: Id, b: Id): boolean => (p[0] === a && p[1] === b) || (p[0] === b && p[1] === a);
@@ -73,6 +83,10 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
     case 'perp-plane':
       return missingPoint(c, [...claim.seg, ...claim.plane]);
     case 'collinear3':
+      return missingPoint(c, claim.ids);
+    case 'length-eq':
+      return missingPoint(c, [claim.a, claim.b]);
+    case 'area-eq':
       return missingPoint(c, claim.ids);
   }
 }
@@ -157,6 +171,71 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       const err = claimRefsError(c, cmd.claim);
       if (err) return { ok: false, error: err };
       return { ok: true, next: c }; // a claim adds nothing — it is verified by the store (derive3)
+    }
+
+    // --- V2: the algebraic lane ---
+
+    case 'point3': {
+      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'coord', x: cmd.x, y: cmd.y, z: cmd.z });
+      return { ok: true, next };
+    }
+
+    case 'plane3': {
+      if (c.planes.has(cmd.name)) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
+      if (cmd.param && c.param && cmd.param !== c.param) return { ok: false, error: { code: 'two-params' } };
+      const next = clone(c);
+      next.planes.set(cmd.name, cmd.plane);
+      if (cmd.param) next.param = cmd.param;
+      return { ok: true, next };
+    }
+
+    case 'plane-angle': {
+      for (const p of [cmd.p1, cmd.p2]) {
+        if (!c.planes.has(p)) return { ok: false, error: { code: 'unknown-plane', id: p } };
+      }
+      const next = clone(c);
+      next.planeAngles.push(cmd);
+      return { ok: true, next };
+    }
+
+    case 'on-planes': {
+      if (!c.points.has(cmd.id)) return { ok: false, error: { code: 'unknown-point', id: cmd.id } };
+      if (cmd.plane !== 'any' && !c.planes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
+      const next = clone(c);
+      next.memberships.push(cmd);
+      return { ok: true, next };
+    }
+
+    case 'foot-on-plane': {
+      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      if (!c.points.has(cmd.from)) return { ok: false, error: { code: 'unknown-point', id: cmd.from } };
+      if (!c.planes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'foot-plane', from: cmd.from, plane: cmd.plane });
+      next.segments.push([cmd.from, cmd.id]); // the dropped perpendicular is drawn
+      return { ok: true, next };
+    }
+
+    case 'plane-plane-line': {
+      if (c.lines.has(cmd.name)) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
+      for (const p of [cmd.p1, cmd.p2]) {
+        if (!c.planes.has(p)) return { ok: false, error: { code: 'unknown-plane', id: p } };
+      }
+      const next = clone(c);
+      next.lines.set(cmd.name, { kind: 'plane-plane', p1: cmd.p1, p2: cmd.p2 });
+      return { ok: true, next };
+    }
+
+    case 'foot-on-line': {
+      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      if (!c.points.has(cmd.from)) return { ok: false, error: { code: 'unknown-point', id: cmd.from } };
+      if (!c.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'foot-line', from: cmd.from, line: cmd.line });
+      next.segments.push([cmd.from, cmd.id]);
+      return { ok: true, next };
     }
   }
 }

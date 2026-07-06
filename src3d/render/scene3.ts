@@ -11,8 +11,9 @@
  * never occlude (docs/20 §11).
  */
 
+import { intersectPlanes, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
 import type { Construction3, Id, Positions3 } from '../engine/types';
-import { centroid3, cross3, dot3, lerp3, normalize3, sub3, type Vec3 } from '../engine/vec3';
+import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
 
 export interface ScenePoint3 {
@@ -58,10 +59,70 @@ export interface SceneVector3 {
   angleDeg: number;
 }
 
+/** A coordinate axis (Lane A — drawn when the figure carries algebraic objects). */
+export interface SceneAxis3 {
+  axis: 'x' | 'y' | 'z';
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  labelX: number;
+  labelY: number;
+}
+
+/** A plane's translucent patch (4 projected corners) + its name label. */
+export interface ScenePlane3 {
+  name: string;
+  corners: { x: number; y: number }[];
+  labelX: number;
+  labelY: number;
+}
+
+/** A drawn (infinite) line, clipped to the figure's neighbourhood, echoed in parametric form. */
+export interface SceneLine3 {
+  name: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  labelX: number;
+  labelY: number;
+  /** The textbook echo: `ℓ: x = (0, -5, 3) + t·(1, 0, 0)`. */
+  form: string;
+}
+
+/** A right-angle knee mark at a ⟂ foot: a 3-point screen polyline. */
+export interface SceneMark3 {
+  pts: { x: number; y: number }[];
+}
+
+/** The FOLD between two intersecting planes — drawn even before the student names ℓ
+ *  (a textbook drawing always shows where the planes meet). */
+export interface SceneSeam3 {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+/** A STATED dihedral angle (e.g. "the angle between the planes is 45°"): an arc at the seam + the value. */
+export interface SceneAngle3 {
+  pts: { x: number; y: number }[];
+  labelX: number;
+  labelY: number;
+  text: string;
+}
+
 export interface Scene3 {
   points: ScenePoint3[];
   edges: SceneEdge3[];
   vectors: SceneVector3[];
+  axes: SceneAxis3[];
+  planes: ScenePlane3[];
+  lines: SceneLine3[];
+  marks: SceneMark3[];
+  seams: SceneSeam3[];
+  angles: SceneAngle3[];
 }
 
 export interface Viewport {
@@ -168,26 +229,207 @@ function labelDir(incident: { dx: number; dy: number }[]): { dx: number; dy: num
   return { dx: Math.cos(bestMid), dy: Math.sin(bestMid) };
 }
 
+/** Round for the parametric echo — the bagrut answers are clean numbers. */
+const fmt = (x: number): string => {
+  const r = Math.round(x * 1000) / 1000;
+  return String(Object.is(r, -0) ? 0 : r);
+};
+
+/** A stable in-plane orthonormal basis for a plane's patch. */
+function planeBasis(n: Vec3): { e1: Vec3; e2: Vec3 } {
+  const nn = normalize3(n);
+  const seed = Math.abs(nn.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
+  const e1 = normalize3(cross3(nn, seed));
+  return { e1, e2: normalize3(cross3(nn, e1)) };
+}
+
+const projectOntoPlane = (p: Vec3, pl: ResolvedPlane): Vec3 =>
+  sub3(p, scale3(pl.n, (dot3(pl.n, p) + pl.d) / dot3(pl.n, pl.n)));
+
+const projectOntoLine = (p: Vec3, ln: ResolvedLine): Vec3 =>
+  add3(ln.anchor, scale3(ln.dir, dot3(sub3(p, ln.anchor), ln.dir) / Math.max(dot3(ln.dir, ln.dir), 1e-12)));
+
 export function buildScene3(
   c: Construction3,
-  positions: Positions3,
+  resolved: Resolved3,
   cam: Camera3,
   viewport: Viewport,
   zoom = 1,
 ): Scene3 {
+  const positions = resolved.positions;
   const frame = cameraFrame(cam);
+  const laneA = c.planes.size > 0 || [...c.points.values()].some((d) => d.kind === 'coord');
 
-  // Project every point; SVG y grows downward, so flip the camera-up coordinate here.
-  const proj = new Map<Id, { x: number; y: number }>();
-  for (const [id, p] of positions) {
-    const q = project3(p, frame);
-    proj.set(id, { x: q.x, y: -q.y });
+  // ---- world-space auxiliary geometry, computed BEFORE the fit so it's always in frame
+  const worldPts = [...positions.values()];
+  const center = worldPts.length ? centroid3(worldPts) : v3(0, 0, 0);
+  let radius = 1.5;
+  for (const p of worldPts) radius = Math.max(radius, dist3(p, center));
+
+  // Intersecting planes must VISIBLY cross (operator: "the visualization of planes is
+  // critical"): every pair's fold line is computed, and each such plane's patch is
+  // CENTRED on a shared focus point ON the fold, with one patch axis ALONG it — the
+  // crossing is then geometrically guaranteed on screen, not left to luck.
+  const planeEntries = [...resolved.planes.entries()];
+  const pairLines: { n1: string; n2: string; line: ResolvedLine; focus: Vec3 }[] = [];
+  for (let i = 0; i < planeEntries.length; i++) {
+    for (let j = i + 1; j < planeEntries.length; j++) {
+      const line = intersectPlanes(planeEntries[i][1], planeEntries[j][1]);
+      if (line) pairLines.push({ n1: planeEntries[i][0], n2: planeEntries[j][0], line, focus: projectOntoLine(center, line) });
+    }
   }
-  if (proj.size === 0) return { points: [], edges: [], vectors: [] };
+  const h = radius * 0.8;
+  const patchFrame = new Map<string, { center: Vec3; e1: Vec3; e2: Vec3 }>();
+  for (const { n1, n2, line, focus } of pairLines) {
+    for (const name of [n1, n2]) {
+      if (patchFrame.has(name)) continue;
+      const pl = resolved.planes.get(name)!;
+      patchFrame.set(name, { center: focus, e1: normalize3(line.dir), e2: normalize3(cross3(pl.n, line.dir)) });
+    }
+  }
+  // A patch must COVER every figure point that lies ON its plane (operator: a point
+  // "on one of the planes" drawn outside the patch visually contradicts the given).
+  // Extents grow asymmetrically from the frame centre — the fold anchoring is kept.
+  const POINT_MARGIN = radius * 0.28;
+  const patchExtent = new Map<string, { u1: number; u2: number; v1: number; v2: number }>();
+  const frameOf = (name: string, pl: ResolvedPlane) =>
+    patchFrame.get(name) ??
+    (() => {
+      const { e1, e2 } = planeBasis(pl.n);
+      return { center: projectOntoPlane(center, pl), e1, e2 };
+    })();
+  const wPlanes: { name: string; corners: Vec3[] }[] = [];
+  for (const [name, pl] of resolved.planes) {
+    const fr = frameOf(name, pl);
+    const ext = { u1: -h, u2: h, v1: -h, v2: h };
+    for (const p of positions.values()) {
+      if (Math.abs(dot3(pl.n, p) + pl.d) > 1e-6 * (1 + norm3(pl.n))) continue; // only points ON the plane
+      const q = sub3(p, fr.center);
+      const u = dot3(q, fr.e1);
+      const v = dot3(q, fr.e2);
+      ext.u1 = Math.min(ext.u1, u - POINT_MARGIN);
+      ext.u2 = Math.max(ext.u2, u + POINT_MARGIN);
+      ext.v1 = Math.min(ext.v1, v - POINT_MARGIN);
+      ext.v2 = Math.max(ext.v2, v + POINT_MARGIN);
+    }
+    patchExtent.set(name, ext);
+    const at = (u: number, v: number) => add3(fr.center, add3(scale3(fr.e1, u), scale3(fr.e2, v)));
+    wPlanes.push({ name, corners: [at(ext.u1, ext.v1), at(ext.u2, ext.v1), at(ext.u2, ext.v2), at(ext.u1, ext.v2)] });
+  }
 
-  // Isotropic fit into the viewport with a margin.
-  const xs = [...proj.values()].map((p) => p.x);
-  const ys = [...proj.values()].map((p) => p.y);
+  // The fold itself — drawn as an implicit seam unless the student has NAMED a line
+  // for that pair; its reach follows the UNION of the two patches' along-fold extents.
+  const namedPairs = new Set(
+    [...c.lines.values()].map((def) => [def.p1, def.p2].sort().join('|')),
+  );
+  const wSeams: { a: Vec3; b: Vec3 }[] = [];
+  for (const { n1, n2, line, focus } of pairLines) {
+    if (namedPairs.has([n1, n2].sort().join('|'))) continue;
+    const d = normalize3(line.dir);
+    const e1 = patchExtent.get(n1);
+    const e2 = patchExtent.get(n2);
+    const lo = Math.min(e1?.u1 ?? -h, e2?.u1 ?? -h);
+    const hi = Math.max(e1?.u2 ?? h, e2?.u2 ?? h);
+    wSeams.push({ a: add3(focus, scale3(d, lo)), b: add3(focus, scale3(d, hi)) });
+  }
+
+  // A STATED angle between planes gets a dihedral arc at the seam + its value (mark it
+  // only because the student said it — the 2-D tool's stated-angle rule).
+  const wAngles: { pts: Vec3[]; label: Vec3; text: string }[] = [];
+  for (const g of c.planeAngles) {
+    const pair = pairLines.find((p) => (p.n1 === g.p1 && p.n2 === g.p2) || (p.n1 === g.p2 && p.n2 === g.p1));
+    if (!pair) continue;
+    const pl1 = resolved.planes.get(g.p1)!;
+    const pl2 = resolved.planes.get(g.p2)!;
+    const d = normalize3(pair.line.dir);
+    const u1 = normalize3(cross3(pl1.n, d));
+    let u2 = normalize3(cross3(pl2.n, d));
+    const deg = (Math.acos(Math.max(-1, Math.min(1, dot3(u1, u2)))) * 180) / Math.PI;
+    if (Math.abs(deg - g.deg) > Math.abs(180 - deg - g.deg)) u2 = scale3(u2, -1);
+    const r = h * 0.38;
+    const pts: Vec3[] = [];
+    for (let s = 0; s <= 12; s++) {
+      const m = add3(scale3(u1, 1 - s / 12), scale3(u2, s / 12));
+      if (norm3(m) < 1e-9) continue;
+      pts.push(add3(pair.focus, scale3(normalize3(m), r)));
+    }
+    const bis = add3(u1, u2);
+    const label = add3(pair.focus, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : u1, r * 1.55));
+    wAngles.push({ pts, label, text: `${g.deg}°` });
+  }
+
+  const wLines: { name: string; a: Vec3; b: Vec3; form: string }[] = [];
+  for (const [name, ln] of resolved.lines) {
+    const mid = projectOntoLine(center, ln);
+    const reach = radius * 1.1;
+    wLines.push({
+      name,
+      a: sub3(mid, scale3(ln.dir, reach)),
+      b: add3(mid, scale3(ln.dir, reach)),
+      form: `${name}: x = (${fmt(ln.anchor.x)}, ${fmt(ln.anchor.y)}, ${fmt(ln.anchor.z)}) + t·(${fmt(ln.dir.x)}, ${fmt(ln.dir.y)}, ${fmt(ln.dir.z)})`,
+    });
+  }
+
+  const wAxes: { axis: 'x' | 'y' | 'z'; a: Vec3; b: Vec3 }[] = [];
+  if (laneA) {
+    const bboxPts = [...worldPts, v3(0, 0, 0), ...wPlanes.flatMap((p) => p.corners), ...wLines.flatMap((l) => [l.a, l.b])];
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const vals = bboxPts.map((p) => p[axis]);
+      const lo = Math.min(0, ...vals) - radius * 0.2;
+      const hi = Math.max(0, ...vals) + radius * 0.35;
+      const at = (t: number): Vec3 => v3(axis === 'x' ? t : 0, axis === 'y' ? t : 0, axis === 'z' ? t : 0);
+      wAxes.push({ axis, a: at(lo), b: at(hi) });
+    }
+  }
+
+  const wMarks: Vec3[][] = [];
+  for (const [id, def] of c.points) {
+    if (def.kind !== 'foot-plane' && def.kind !== 'foot-line') continue;
+    const foot = positions.get(id);
+    const from = positions.get(def.from);
+    if (!foot || !from || dist3(foot, from) < 1e-9) continue;
+    const leg1 = normalize3(sub3(from, foot));
+    let leg2: Vec3 | null = null;
+    if (def.kind === 'foot-line') {
+      const ln = resolved.lines.get(def.line);
+      if (ln) leg2 = ln.dir;
+    } else {
+      const pl = resolved.planes.get(def.plane);
+      if (pl) {
+        const q = sub3(projectOntoPlane(center, pl), foot);
+        leg2 = norm3(q) > 1e-6 ? normalize3(q) : planeBasis(pl.n).e1;
+      }
+    }
+    if (!leg2) continue;
+    const s = radius * 0.07;
+    wMarks.push([
+      add3(foot, scale3(leg1, s)),
+      add3(foot, add3(scale3(leg1, s), scale3(leg2, s))),
+      add3(foot, scale3(leg2, s)),
+    ]);
+  }
+
+  // ---- projection + isotropic fit (over the points AND the auxiliary geometry)
+  const projOf = (p: Vec3): { x: number; y: number } => {
+    const q = project3(p, frame);
+    return { x: q.x, y: -q.y }; // SVG y grows downward
+  };
+  const proj = new Map<Id, { x: number; y: number }>();
+  for (const [id, p] of positions) proj.set(id, projOf(p));
+  const extras = [
+    ...wPlanes.flatMap((p) => p.corners),
+    ...wLines.flatMap((l) => [l.a, l.b]),
+    ...wAxes.flatMap((a) => [a.a, a.b]),
+    ...wSeams.flatMap((s) => [s.a, s.b]),
+    ...wAngles.flatMap((a) => [...a.pts, a.label]),
+  ].map(projOf);
+  const all = [...proj.values(), ...extras];
+  if (all.length === 0) {
+    return { points: [], edges: [], vectors: [], axes: [], planes: [], lines: [], marks: [], seams: [], angles: [] };
+  }
+
+  const xs = all.map((p) => p.x);
+  const ys = all.map((p) => p.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
   const spanX = Math.max(maxX - minX, 1e-6);
@@ -199,6 +441,7 @@ export function buildScene3(
     x: viewport.width / 2 + (p.x - cx) * k,
     y: viewport.height / 2 + (p.y - cy) * k,
   });
+  const w2s = (p: Vec3) => toScreen(projOf(p));
 
   const screen = new Map<Id, { x: number; y: number }>();
   for (const [id, p] of proj) screen.set(id, toScreen(p));
@@ -301,5 +544,45 @@ export function buildScene3(
     });
   }
 
-  return { points, edges, vectors };
+  // ---- the algebraic overlay (V2): axes, plane patches, drawn lines, ⟂ marks
+  const axes: SceneAxis3[] = wAxes.map(({ axis, a, b }) => {
+    const sa = w2s(a);
+    const sb = w2s(b);
+    const d = Math.max(Math.hypot(sb.x - sa.x, sb.y - sa.y), 1e-6);
+    return {
+      axis,
+      x1: sa.x,
+      y1: sa.y,
+      x2: sb.x,
+      y2: sb.y,
+      labelX: sb.x + ((sb.x - sa.x) / d) * 12,
+      labelY: sb.y + ((sb.y - sa.y) / d) * 12,
+    };
+  });
+
+  const scenePlanes: ScenePlane3[] = wPlanes.map(({ name, corners }) => {
+    const sc = corners.map(w2s);
+    return { name, corners: sc, labelX: sc[0].x, labelY: sc[0].y - 8 };
+  });
+
+  const sceneLines: SceneLine3[] = wLines.map(({ name, a, b, form }) => {
+    const sa = w2s(a);
+    const sb = w2s(b);
+    return { name, x1: sa.x, y1: sa.y, x2: sb.x, y2: sb.y, labelX: sb.x, labelY: sb.y - 10, form };
+  });
+
+  const marks: SceneMark3[] = wMarks.map((pts) => ({ pts: pts.map(w2s) }));
+
+  const seams: SceneSeam3[] = wSeams.map(({ a, b }) => {
+    const sa = w2s(a);
+    const sb = w2s(b);
+    return { x1: sa.x, y1: sa.y, x2: sb.x, y2: sb.y };
+  });
+
+  const angles: SceneAngle3[] = wAngles.map(({ pts, label, text }) => {
+    const sl = w2s(label);
+    return { pts: pts.map(w2s), labelX: sl.x, labelY: sl.y, text };
+  });
+
+  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles };
 }

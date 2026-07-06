@@ -6,32 +6,36 @@
  */
 
 import { useMemo, useRef, useState, type PointerEvent as RPointerEvent, type WheelEvent as RWheelEvent } from 'react';
-import type { Construction3, Positions3 } from '../engine/types';
+import type { Resolved3 } from '../engine/evaluate';
+import type { Construction3 } from '../engine/types';
 import { HOME_CAMERA, MAX_PITCH, type Camera3 } from './camera';
 import { buildScene3 } from './scene3';
 
 export interface Figure3Props {
   construction: Construction3;
-  positions: Positions3;
+  resolved: Resolved3;
   width?: number;
   height?: number;
   /** Reset-view button label (i18n-injected so this component stays translation-free). */
   resetLabel?: string;
 }
 
+/** Per-index plane patch colours (translucent — patches never occlude, docs/20 §11). */
+const PLANE_COLORS = ['#0284c7', '#7c3aed', '#d97706'];
+
 const ORBIT_SPEED = 0.011; // radians per px
 
 /** Named vectors draw in their own colour (ADR-3D-003 Am.) so tail/head read instantly. */
 const VECTOR_COLOR = '#0d9488';
 
-export default function Figure3({ construction, positions, width = 640, height = 460, resetLabel = 'reset view' }: Figure3Props) {
+export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view' }: Figure3Props) {
   const [cam, setCam] = useState<Camera3>(HOME_CAMERA);
   const [zoom, setZoom] = useState(1);
   const drag = useRef<{ x: number; y: number } | null>(null);
 
   const scene = useMemo(
-    () => buildScene3(construction, positions, cam, { width, height }, zoom),
-    [construction, positions, cam, width, height, zoom],
+    () => buildScene3(construction, resolved, cam, { width, height }, zoom),
+    [construction, resolved, cam, width, height, zoom],
   );
 
   const onPointerDown = (e: RPointerEvent<SVGSVGElement>) => {
@@ -68,6 +72,101 @@ export default function Figure3({ construction, positions, width = 640, height =
         onPointerLeave={onPointerUp}
         onWheel={onWheel}
       >
+        {scene.axes.map((a) => (
+          <g key={a.axis} data-testid={`axis-${a.axis}`}>
+            <line x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="#cbd5e1" strokeWidth={1.1} />
+            <text x={a.labelX} y={a.labelY} fontSize={13} fontStyle="italic" fill="#94a3b8" textAnchor="middle" dominantBaseline="middle">
+              {a.axis}
+            </text>
+          </g>
+        ))}
+        {scene.planes.map((p, i) => (
+          <g key={p.name} data-testid={`plane-${p.name}`}>
+            <polygon
+              points={p.corners.map((c) => `${c.x},${c.y}`).join(' ')}
+              fill={PLANE_COLORS[i % PLANE_COLORS.length]}
+              fillOpacity={0.1}
+              stroke={PLANE_COLORS[i % PLANE_COLORS.length]}
+              strokeOpacity={0.35}
+              strokeWidth={1}
+            />
+            <text
+              x={p.labelX}
+              y={p.labelY}
+              fontSize={14}
+              fill={PLANE_COLORS[i % PLANE_COLORS.length]}
+              stroke="#ffffff"
+              strokeWidth={3}
+              paintOrder="stroke"
+              textAnchor="middle"
+              dominantBaseline="middle"
+            >
+              {p.name}
+            </text>
+          </g>
+        ))}
+        {scene.seams.map((s, i) => (
+          <line
+            key={`seam-${i}`}
+            data-testid="seam"
+            x1={s.x1}
+            y1={s.y1}
+            x2={s.x2}
+            y2={s.y2}
+            stroke="#64748b"
+            strokeWidth={1.2}
+          />
+        ))}
+        {scene.angles.map((a, i) => (
+          <g key={`angle-${i}`} data-testid="plane-angle">
+            <polyline
+              points={a.pts.map((p) => `${p.x},${p.y}`).join(' ')}
+              fill="none"
+              stroke="#d97706"
+              strokeWidth={1.5}
+            />
+            <text
+              x={a.labelX}
+              y={a.labelY}
+              fontSize={13.5}
+              fill="#b45309"
+              stroke="#ffffff"
+              strokeWidth={3}
+              paintOrder="stroke"
+              textAnchor="middle"
+              dominantBaseline="middle"
+            >
+              {a.text}
+            </text>
+          </g>
+        ))}
+        {scene.lines.map((l) => (
+          <g key={l.name} data-testid={`line-${l.name}`}>
+            <line x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#475569" strokeWidth={1.5} />
+            <text
+              x={l.labelX}
+              y={l.labelY}
+              fontSize={12.5}
+              fill="#475569"
+              stroke="#ffffff"
+              strokeWidth={3}
+              paintOrder="stroke"
+              textAnchor="middle"
+              dominantBaseline="middle"
+            >
+              {l.form}
+            </text>
+          </g>
+        ))}
+        {scene.marks.map((m, i) => (
+          <polyline
+            key={i}
+            points={m.pts.map((p) => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke="#1e293b"
+            strokeWidth={1.1}
+          />
+        ))}
         {scene.edges.map((e) => (
           <line
             key={e.id}

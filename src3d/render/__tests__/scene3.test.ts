@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { applyCommand3 } from '../../engine/apply';
-import { evaluate3 } from '../../engine/evaluate';
+import { evaluate3, resolve3 } from '../../engine/evaluate';
 import { emptyConstruction3, type Command3, type Construction3 } from '../../engine/types';
 import { v3 } from '../../engine/vec3';
 import { cameraFrame, HOME_CAMERA, project3 } from '../camera';
@@ -78,7 +78,7 @@ describe('buildScene3', () => {
 
   it('cube → 8 labelled points + 12 edges (3 dashed), all inside the viewport', () => {
     const c = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS });
-    const scene = buildScene3(c, evaluate3(c, 0), HOME_CAMERA, viewport);
+    const scene = buildScene3(c, resolve3(c, 0), HOME_CAMERA, viewport);
     expect(scene.points).toHaveLength(8);
     expect(scene.edges).toHaveLength(12);
     expect(scene.edges.filter((e) => e.hidden)).toHaveLength(3);
@@ -92,7 +92,7 @@ describe('buildScene3', () => {
 
   it('dashed edges are emitted FIRST so solid edges paint over them at crossings', () => {
     const c = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS });
-    const scene = buildScene3(c, evaluate3(c, 0), HOME_CAMERA, viewport);
+    const scene = buildScene3(c, resolve3(c, 0), HOME_CAMERA, viewport);
     const firstSolid = scene.edges.findIndex((e) => !e.hidden);
     expect(scene.edges.slice(0, firstSolid).every((e) => e.hidden)).toBe(true);
     expect(scene.edges.slice(firstSolid).every((e) => !e.hidden)).toBe(true);
@@ -103,7 +103,7 @@ describe('buildScene3', () => {
       { type: 'solid', kind: 'cube', ids: CUBE_IDS },
       { type: 'point-on-segment3', id: 'M', a: 'B', b: "B'", t: 0.5 },
     );
-    const scene = buildScene3(c, evaluate3(c, 0), HOME_CAMERA, viewport);
+    const scene = buildScene3(c, resolve3(c, 0), HOME_CAMERA, viewport);
     expect(scene.points.map((p) => p.id)).toContain('M');
   });
 
@@ -114,7 +114,7 @@ describe('buildScene3', () => {
       { type: 'segment3', a: 'B', b: 'D' }, // bottom-face diagonal — hidden face at home
       { type: 'segment3', a: 'B', b: "C'" }, // front-face diagonal — visible at home
     );
-    const scene = buildScene3(c, evaluate3(c, 0), HOME_CAMERA, viewport);
+    const scene = buildScene3(c, resolve3(c, 0), HOME_CAMERA, viewport);
     const byId = new Map(scene.edges.map((e) => [e.id, e.hidden]));
     expect(byId.get("seg-A'|C")).toBe(true);
     expect(byId.get('seg-B|D')).toBe(true);
@@ -127,7 +127,7 @@ describe('buildScene3', () => {
       { type: 'name-vector', name: 'u', from: 'A', to: 'B' },
       { type: 'name-vector', name: 'w', from: 'A', to: "A'" },
     );
-    const scene = buildScene3(c, evaluate3(c, 0), HOME_CAMERA, viewport);
+    const scene = buildScene3(c, resolve3(c, 0), HOME_CAMERA, viewport);
     expect(scene.vectors.map((v) => v.name).sort()).toEqual(['u', 'w']);
     const w = scene.vectors.find((v) => v.name === 'w')!;
     const a = scene.points.find((p) => p.id === 'A')!;
@@ -151,14 +151,110 @@ describe('buildScene3', () => {
       { type: 'segment3', a: 'C', b: "A'" },
       { type: 'name-vector', name: 'q', from: 'C', to: "A'" }, // the interior space diagonal
     );
-    const scene = buildScene3(c, evaluate3(c, 0), HOME_CAMERA, viewport);
+    const scene = buildScene3(c, resolve3(c, 0), HOME_CAMERA, viewport);
     expect(scene.vectors.find((v) => v.name === 'q')!.hidden).toBe(true);
+  });
+
+  it('the algebraic overlay (2022 chain): 3 axes, 2 plane patches, ℓ echoed in parametric form, 2 ⟂ marks', () => {
+    const e = (k: number, p = 0) => ({ k, p });
+    const c = build(
+      { type: 'plane3', name: 'π1', plane: { cx: e(0), cy: e(0), cz: e(1), d: e(-3), src: 'z - 3 = 0' } },
+      { type: 'plane3', name: 'π2', plane: { cx: e(0), cy: e(0, 1), cz: e(1), d: e(-8), src: 'ay + z - 8 = 0' }, param: 'a' },
+      { type: 'plane-angle', p1: 'π1', p2: 'π2', deg: 45 },
+      { type: 'point3', id: 'A', x: 2, y: -2, z: 6 },
+      { type: 'on-planes', id: 'A', plane: 'any' },
+      { type: 'foot-on-plane', id: 'B', from: 'A', plane: 'π1' },
+      { type: 'plane-plane-line', name: 'ℓ', p1: 'π1', p2: 'π2' },
+      { type: 'foot-on-line', id: 'C', from: 'B', line: 'ℓ' },
+    );
+    const scene = buildScene3(c, resolve3(c, 0), HOME_CAMERA, viewport);
+    expect(scene.axes.map((a) => a.axis)).toEqual(['x', 'y', 'z']);
+    expect(scene.planes.map((p) => p.name)).toEqual(['π1', 'π2']);
+    expect(scene.planes.every((p) => p.corners.length === 4)).toBe(true);
+    expect(scene.lines).toHaveLength(1);
+    expect(scene.lines[0].form).toBe('ℓ: x = (0, -5, 3) + t·(1, 0, 0)');
+    expect(scene.marks).toHaveLength(2); // the ⟂ knees at B and at C
+    expect(scene.seams).toHaveLength(0); // ℓ is NAMED — the drawn line replaces the implicit seam
+    expect(scene.angles).toHaveLength(1); // the stated 45° dihedral arc
+    expect(scene.angles[0].text).toBe('45°');
+    // everything sits inside the viewport (the fit includes the overlay)
+    for (const p of scene.planes.flatMap((pl) => pl.corners)) {
+      expect(p.x).toBeGreaterThan(-1);
+      expect(p.x).toBeLessThan(viewport.width + 1);
+      expect(p.y).toBeGreaterThan(-1);
+      expect(p.y).toBeLessThan(viewport.height + 1);
+    }
+    // a lane-G figure gets NO overlay
+    const cube = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS });
+    const gScene = buildScene3(cube, resolve3(cube, 0), HOME_CAMERA, viewport);
+    expect(gScene.axes).toHaveLength(0);
+    expect(gScene.planes).toHaveLength(0);
+  });
+
+  it('a plane\'s patch COVERS every point lying on it (A on π2; the feet B, C on π1)', () => {
+    const e = (k: number, p = 0) => ({ k, p });
+    const c = build(
+      { type: 'plane3', name: 'π1', plane: { cx: e(0), cy: e(0), cz: e(1), d: e(-3), src: 'z - 3 = 0' } },
+      { type: 'plane3', name: 'π2', plane: { cx: e(0), cy: e(0, 1), cz: e(1), d: e(-8), src: 'ay + z - 8 = 0' }, param: 'a' },
+      { type: 'plane-angle', p1: 'π1', p2: 'π2', deg: 45 },
+      { type: 'point3', id: 'A', x: 2, y: -2, z: 6 },
+      { type: 'on-planes', id: 'A', plane: 'any' },
+      { type: 'foot-on-plane', id: 'B', from: 'A', plane: 'π1' },
+      { type: 'plane-plane-line', name: 'ℓ', p1: 'π1', p2: 'π2' },
+      { type: 'foot-on-line', id: 'C', from: 'B', line: 'ℓ' },
+    );
+    const scene = buildScene3(c, resolve3(c, 0), HOME_CAMERA, viewport);
+    const insideQuad = (pt: { x: number; y: number }, quad: { x: number; y: number }[]): boolean => {
+      let sign = 0;
+      for (let i = 0; i < 4; i++) {
+        const a = quad[i];
+        const b = quad[(i + 1) % 4];
+        const cr = (b.x - a.x) * (pt.y - a.y) - (b.y - a.y) * (pt.x - a.x);
+        if (Math.abs(cr) < 1e-9) continue;
+        if (sign === 0) sign = Math.sign(cr);
+        else if (Math.sign(cr) !== sign) return false;
+      }
+      return true;
+    };
+    const patch = (name: string) => scene.planes.find((p) => p.name === name)!.corners;
+    const point = (id: string) => scene.points.find((p) => p.id === id)!;
+    expect(insideQuad(point('A'), patch('π2'))).toBe(true); // A lies on π2 (a = −1) — the patch must reach it
+    expect(insideQuad(point('B'), patch('π1'))).toBe(true);
+    expect(insideQuad(point('C'), patch('π1'))).toBe(true);
+    expect(insideQuad(point('C'), patch('π2'))).toBe(true); // C is on ℓ — on BOTH planes
+    expect(insideQuad(point('A'), patch('π1'))).toBe(false); // and A is NOT on π1 — no blind inflation
+  });
+
+  it('intersecting planes VISIBLY cross: shared patch focus on the fold, an implicit seam, the stated angle arc (the operator screenshot state)', () => {
+    const e = (k: number, p = 0) => ({ k, p });
+    // exactly the reported state: two planes + the 45° given, NO named ℓ, NO points yet
+    const c = build(
+      { type: 'plane3', name: 'π1', plane: { cx: e(0), cy: e(0), cz: e(1), d: e(-3), src: 'z - 3 = 0' } },
+      { type: 'plane3', name: 'π2', plane: { cx: e(0), cy: e(0, 1), cz: e(1), d: e(-8), src: 'ay + z - 8 = 0' }, param: 'a' },
+      { type: 'plane-angle', p1: 'π1', p2: 'π2', deg: 45 },
+    );
+    const scene = buildScene3(c, resolve3(c, 0), HOME_CAMERA, viewport);
+    // both patches are centred on the SAME focus point on the fold — the crossing is guaranteed on screen
+    const centerOf = (corners: { x: number; y: number }[]) => ({
+      x: corners.reduce((s, p) => s + p.x, 0) / corners.length,
+      y: corners.reduce((s, p) => s + p.y, 0) / corners.length,
+    });
+    const c1 = centerOf(scene.planes[0].corners);
+    const c2 = centerOf(scene.planes[1].corners);
+    expect(c1.x).toBeCloseTo(c2.x, 6);
+    expect(c1.y).toBeCloseTo(c2.y, 6);
+    // the fold is drawn even though ℓ was never named
+    expect(scene.seams).toHaveLength(1);
+    // and the stated 45° is marked with an arc + value at the seam
+    expect(scene.angles).toHaveLength(1);
+    expect(scene.angles[0].text).toBe('45°');
+    expect(scene.angles[0].pts.length).toBeGreaterThan(8);
   });
 
   it('labels render the prime typographically: A′ not A\'', () => {
     expect(displayLabel("A'")).toBe('A′');
     const c = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS });
-    const scene = buildScene3(c, evaluate3(c, 0), HOME_CAMERA, viewport);
+    const scene = buildScene3(c, resolve3(c, 0), HOME_CAMERA, viewport);
     expect(scene.points.map((p) => p.label)).toContain('D′');
   });
 });
