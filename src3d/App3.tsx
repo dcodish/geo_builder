@@ -42,6 +42,12 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.notOnLine', { id: err.id });
     case 'line-misses-plane':
       return t('err.lineMissesPlane', { id: err.id });
+    case 'symbolic-new-point':
+      return t('err.symbolicNewPoint', { id: err.id });
+    case 'injection-unsatisfiable':
+      return t('err.injectionUnsatisfiable');
+    case 'sign-unsatisfiable':
+      return t('err.signUnsatisfiable', { id: err.id });
     case 'size-on-solid':
       return t('err.sizeOnSolid');
     case 'bad-name':

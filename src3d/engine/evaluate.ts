@@ -13,6 +13,7 @@
  */
 
 import { sample } from './rng';
+import { solvePivot } from './solve3';
 import { decompose3 } from './vecExpr';
 import type { Construction3, Id, LinExpr, PointDef, Positions3 } from './types';
 import { add3, centroid3, cross3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -29,8 +30,15 @@ function apexFromBaseAngles(alpha: number, beta: number): { x: number; y: number
   return { x, y };
 }
 
-/** World positions of one solid's vertices, in `ids` order. `origin` separates multiple solids. */
-function solidPositions(kind: 'cube' | 'box' | 'prism3', key: string, seed: number, origin: Vec3): Vec3[] {
+/** The FREE dims a solid kind carries (sampled per seed; the pivot solves over them — ADR-3D-007). */
+export function solidDims(kind: 'cube' | 'box' | 'prism3', key: string, seed: number): number[] {
+  if (kind === 'cube') return []; // edge = the similarity gauge
+  if (kind === 'box') return [sample(seed, `${key}-depth`, 0.55, 1.7), sample(seed, `${key}-height`, 0.5, 1.4)];
+  return [rad(sample(seed, `${key}-alpha`, 38, 72)), rad(sample(seed, `${key}-beta`, 38, 72)), sample(seed, `${key}-height`, 0.65, 1.5)];
+}
+
+/** World positions of one solid's vertices, in `ids` order, from its dim vector. */
+function solidPositions(kind: 'cube' | 'box' | 'prism3', dims: number[], origin: Vec3): Vec3[] {
   const o = origin;
   if (kind === 'cube') {
     const s = 1; // scale gauge — see file header
@@ -41,17 +49,14 @@ function solidPositions(kind: 'cube' | 'box' | 'prism3', key: string, seed: numb
   }
   if (kind === 'box') {
     const a = 1; // scale gauge
-    const b = sample(seed, `${key}-depth`, 0.55, 1.7);
-    const h = sample(seed, `${key}-height`, 0.5, 1.4);
+    const [b, h] = dims;
     return [
       v3(o.x, o.y, o.z), v3(o.x + a, o.y, o.z), v3(o.x + a, o.y + b, o.z), v3(o.x, o.y + b, o.z),
       v3(o.x, o.y, o.z + h), v3(o.x + a, o.y, o.z + h), v3(o.x + a, o.y + b, o.z + h), v3(o.x, o.y + b, o.z + h),
     ];
   }
   // prism3 — right triangular prism: base ABC in the z=origin plane, tops straight up.
-  const alpha = rad(sample(seed, `${key}-alpha`, 38, 72));
-  const beta = rad(sample(seed, `${key}-beta`, 38, 72));
-  const h = sample(seed, `${key}-height`, 0.65, 1.5);
+  const [alpha, beta, h] = dims;
   const c = apexFromBaseAngles(alpha, beta);
   const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + c.x, o.y + c.y, o.z)];
   return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
@@ -80,6 +85,8 @@ export interface Resolved3 {
   lines: Map<string, ResolvedLine>;
   /** The parameter's chosen value + every root of the pinning relation (branches), when one exists. */
   param: { name: string; value: number; roots: number[] } | null;
+  /** The V4 pivot's outcome, when injections exist: how many placements converged and which was chosen. */
+  pivot: { solutions: number; chosen: number; err: number } | null;
 }
 
 const linVal = (e: LinExpr, a: number): number => e.k + e.p * a;
@@ -92,7 +99,8 @@ function planeAt(c: Construction3, name: string, a: number): ResolvedPlane {
 /** A plane's numeric form at a given parameter value (claims need to scan over the parameter). */
 export const planeAtParam = planeAt;
 
-/** A line's numeric form at a given parameter value: parametric evaluated; plane∩plane recomputed. */
+/** A line's numeric form at a given parameter value: parametric evaluated; plane∩plane recomputed.
+ *  A line between POINT-planes resolves later (they need final positions) — null here. */
 export function lineAtParam(c: Construction3, name: string, a: number): ResolvedLine | null {
   const def = c.lines.get(name);
   if (!def) return null;
@@ -102,6 +110,7 @@ export function lineAtParam(c: Construction3, name: string, a: number): Resolved
       dir: v3(linVal(def.dir[0], a), linVal(def.dir[1], a), linVal(def.dir[2], a)),
     };
   }
+  if (!c.planes.has(def.p1) || !c.planes.has(def.p2)) return null;
   return planePlaneLine(planeAt(c, def.p1, a), planeAt(c, def.p2, a));
 }
 
@@ -288,7 +297,21 @@ function solve3x3(r1: Vec3, r2: Vec3, r3: Vec3, rhs: Vec3): Vec3 | null {
   return v3(dx / det, dy / det, dz / det);
 }
 
-/** Resolve the FULL figure: parameter → planes → lines → every point in insertion order. */
+/** Newell's method — a polygon's normal from its vertex ring (internal device). */
+function newellNormal(pts: Vec3[]): Vec3 {
+  let n = v3(0, 0, 0);
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % pts.length];
+    n = v3(n.x + (p.y - q.y) * (p.z + q.z), n.y + (p.z - q.z) * (p.x + q.x), n.z + (p.x - q.x) * (p.y + q.y));
+  }
+  return n;
+}
+
+/** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span']);
+
+/** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number): Resolved3 {
   const pos: Positions3 = new Map<Id, Vec3>();
 
@@ -311,11 +334,70 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
 
   evaluateSolidsAndPoints(c, seed, pos, planes, lines);
 
+  // ---- the V4 pivot: injected coordinates pin the gauge (ADR-3D-007)
+  let pivot: Resolved3['pivot'] = null;
+  if ((c.pins.length > 0 || c.vectorPins.length > 0) && c.solids.length > 0) {
+    const dims0 = c.solids.flatMap((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed));
+    const evalCanonical = (dims: number[]): Positions3 => {
+      const p2: Positions3 = new Map<Id, Vec3>();
+      for (const [id, def] of c.points) {
+        if (def.kind === 'coord') p2.set(id, v3(def.x, def.y, def.z));
+      }
+      evaluateSolidsAndPoints(c, seed, p2, planes, lines, dims);
+      return p2;
+    };
+    const solutions = solvePivot(c, evalCanonical, dims0, seed);
+
+    const satisfiesSigns = (sol: (typeof solutions)[number]): boolean => {
+      const p2 = evalCanonical(sol.dims);
+      return c.signGivens.every((g) => {
+        const q = p2.get(g.id);
+        if (!q) return false;
+        const val = sol.transform(q)[g.axis];
+        return g.positive ? val > 1e-9 : val < -1e-9;
+      });
+    };
+    const satisfying = solutions.filter(satisfiesSigns);
+    const pool = satisfying.length > 0 ? satisfying : solutions;
+    if (pool.length > 0) {
+      const chosen = pool[seed % pool.length];
+      const finalCanonical = evalCanonical(chosen.dims);
+      for (const [id, q] of finalCanonical) {
+        const def = c.points.get(id);
+        if (def && GAUGE_KINDS.has(def.kind)) pos.set(id, chosen.transform(q));
+        else pos.set(id, q);
+      }
+      pivot = { solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err };
+    } else {
+      pivot = { solutions: 0, chosen: -1, err: Infinity };
+    }
+  }
+
+  // ---- planes through points (resolved from FINAL positions, post-pivot)
+  for (const [name, ids] of c.pointPlanes) {
+    const pts = ids.map((id) => pos.get(id)).filter((p): p is Vec3 => p !== undefined);
+    if (pts.length < 3) continue;
+    const n = newellNormal(pts);
+    if (norm3(n) < 1e-10) continue; // degenerate (collinear) — no plane
+    planes.set(name, { n, d: -dot3(n, pts[0]) });
+  }
+
+  // ---- a second line pass: lines between point-planes only became resolvable now
+  for (const [name] of c.lines) {
+    if (lines.has(name)) continue;
+    const def = c.lines.get(name)!;
+    if (def.kind === 'plane-plane' && planes.has(def.p1) && planes.has(def.p2)) {
+      const line = planePlaneLine(planes.get(def.p1)!, planes.get(def.p2)!);
+      if (line) lines.set(name, line);
+    }
+  }
+
   return {
     positions: pos,
     planes,
     lines,
     param: c.param && param ? { name: c.param, value: param.value, roots: param.roots } : null,
+    pivot,
   };
 }
 
@@ -330,11 +412,16 @@ function evaluateSolidsAndPoints(
   pos: Positions3,
   planes: Map<string, ResolvedPlane>,
   lines: Map<string, ResolvedLine>,
+  dimOverride?: number[],
 ): void {
+  let dimCursor = 0;
   c.solids.forEach((solid, i) => {
     const key = `solid-${solid.kind}-${solid.ids.join('')}`;
     const origin = v3(i * 2.5, 0, 0); // side-by-side when a figure ever holds two solids
-    const ps = solidPositions(solid.kind, key, seed, origin);
+    const own = solidDims(solid.kind, key, seed);
+    const dims = dimOverride ? dimOverride.slice(dimCursor, dimCursor + own.length) : own;
+    dimCursor += own.length;
+    const ps = solidPositions(solid.kind, dims, origin);
     solid.ids.forEach((id, j) => pos.set(id, ps[j]));
   });
 

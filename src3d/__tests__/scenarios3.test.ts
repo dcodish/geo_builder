@@ -276,3 +276,130 @@ describe('GATE — 2024 חורף Q2 (parameters in lines: the parametric ℓ, th
     expect(state().lastError).toEqual({ code: 'line-misses-plane', id: 'A' });
   });
 });
+
+describe('GATE — 2020 קיץ Q2 ג (the coordinate-injection pivot on the prism)', () => {
+  beforeEach(reset);
+
+  const HE = [
+    'מנסרה ישרה משולשת ABC',
+    "M אמצע B'C'",
+    "K על AA' כך ש-AK = 2KA'",
+    "נסמן: AA' = w, KC = v, KB = u",
+    'P על AM כך ש-KP = αu + βv',
+    'נתון: v = (10,-5,0), u = (5,5,-5), P(0,4,6)', // the exam's mid-question injection
+    'K = (-3, 4, 7)', // the student's answer to ג(3) — verified
+    'המישור KBC: x + 2y + 3z - 26 = 0', // the answer to ג(2) — verified
+  ];
+  const EN = [
+    'right triangular prism ABC',
+    "M is the midpoint of B'C'",
+    "K on AA' such that AK = 2KA'",
+    "denote AA' = w, KC = v, KB = u",
+    'P on AM such that KP = αu + βv',
+    'given: v = (10,-5,0), u = (5,5,-5), P(0,4,6)',
+    'K = (-3, 4, 7)',
+    'plane KBC: x + 2y + 3z - 26 = 0',
+  ];
+
+  for (const [name, seq] of [['Hebrew', HE], ['English', EN]] as const) {
+    it(`${name}: the injection pins the figure, K and the KBC plane equation verify`, () => {
+      seq.forEach(submit);
+      expect(state().facts).toHaveLength(8);
+      expectAllOk();
+      const d = derived();
+      expect(d.resolved.pivot?.solutions).toBeGreaterThan(0);
+      const K = d.positions.get('K')!;
+      expect(K.x).toBeCloseTo(-3, 4);
+      expect(K.y).toBeCloseTo(4, 4);
+      expect(K.z).toBeCloseTo(7, 4);
+    });
+  }
+
+  it('the prism height stays FREE after the injection — resample varies it, K does not move', () => {
+    HE.slice(0, 6).forEach(submit);
+    const h = () => {
+      const d = derived();
+      return Math.abs(d.positions.get("A'")!.z - d.positions.get('A')!.z) + Math.abs(d.positions.get("A'")!.x - d.positions.get('A')!.x);
+    };
+    const K0 = derived().positions.get('K')!;
+    const h0 = h();
+    useGeo3.getState().resample();
+    const K1 = derived().positions.get('K')!;
+    expect(Math.abs(h() - h0)).toBeGreaterThan(1e-4); // the uninjected DOF varies (ADR-052)
+    expect(K1.x).toBeCloseTo(K0.x, 4); // the determined answer does not
+    expect(K1.y).toBeCloseTo(K0.y, 4);
+  });
+
+  it('a wrong K is refused', () => {
+    HE.slice(0, 6).forEach(submit);
+    submit('K = (-3, 4, 6)');
+    expect(state().facts).toHaveLength(6);
+    expect(state().lastError).toEqual({ code: 'claim-refuted' });
+  });
+
+  it('an impossible injection is refused (no placement matches)', () => {
+    HE.slice(0, 6).forEach(submit);
+    submit('K(0, 0, 0)'); // contradicts K = P − (u+v)/5
+    expect(state().facts).toHaveLength(6);
+    expect(state().lastError).toEqual({ code: 'injection-unsatisfiable' });
+  });
+});
+
+describe("GATE — 2023 קיץ א Q2 ג–ד (partial injection, the sign branch, point-planes ℓ)", () => {
+  beforeEach(reset);
+
+  const HE = [
+    'קובייה ABCD',
+    "נסמן: AB = u, AD = v, AA' = w",
+    'D(0,0,0)',
+    'C(4,3,0)',
+    'A(3,n,p)', // the exam's parameters n, p — only x constrains
+    "שיעור ה-z של C' חיובי", // the branch given
+    'A = (3, -4, 0)', // the answer to ג(1) — verified
+    "C' = (4, 3, 5)", // the answer to ג(2) — verified
+    "ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'", // ד — echoed in parametric form
+  ];
+  const EN = [
+    'cube ABCD',
+    "denote AB = u, AD = v, AA' = w",
+    'D(0,0,0)',
+    'C(4,3,0)',
+    'A(3,n,p)',
+    "the z-coordinate of C' is positive",
+    'A = (3, -4, 0)',
+    "C' = (4, 3, 5)",
+    "ℓ is the intersection line of plane BC'D and plane BCC'B'",
+  ];
+
+  for (const [name, seq] of [['Hebrew', HE], ['English', EN]] as const) {
+    it(`${name}: the partial injection resolves n,p, the sign given selects C′, ℓ resolves through B and C′`, () => {
+      seq.forEach(submit);
+      expect(state().facts).toHaveLength(9);
+      expectAllOk();
+      const d = derived();
+      const A = d.positions.get('A')!;
+      expect(A.y).toBeCloseTo(-4, 4);
+      expect(A.z).toBeCloseTo(0, 4);
+      expect(d.positions.get("C'")!.z).toBeCloseTo(5, 4);
+      const ln = d.resolved.lines.get('ℓ')!;
+      const k = ln.dir.x / -3; // dir ∥ BC' = (−3, 4, 5)
+      expect(ln.dir.y).toBeCloseTo(4 * k, 4);
+      expect(ln.dir.z).toBeCloseTo(5 * k, 4);
+    });
+  }
+
+  it('WITHOUT the sign given, "show another configuration" flips the mirror branch', () => {
+    HE.slice(0, 5).forEach(submit);
+    const z0 = derived().positions.get("C'")!.z;
+    useGeo3.getState().resample();
+    const z1 = derived().positions.get("C'")!.z;
+    expect(Math.sign(z0) * Math.sign(z1)).toBe(-1);
+  });
+
+  it('a sign given no solution satisfies is refused', () => {
+    HE.slice(0, 5).forEach(submit);
+    submit('שיעור ה-x של C שלילי'); // C is PINNED at x=4 — no branch can flip it
+    expect(state().facts).toHaveLength(5);
+    expect(state().lastError).toEqual({ code: 'sign-unsatisfiable', id: 'C' });
+  });
+});

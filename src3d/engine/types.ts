@@ -45,7 +45,8 @@ export type Claim3 =
   | { type: 'length-eq'; a: Id; b: Id; value: number } // AB = 3 (all points pinned ⇒ a CHECK)
   | { type: 'area-eq'; ids: [Id, Id, Id]; value: number } // שטח ABC = 4.5
   | { type: 'coords-eq'; id: Id; x: number; y: number; z: number } // A = (2, 0, -10)
-  | { type: 'never-parallel'; line: string; plane: string }; // ℓ ∦ π for EVERY parameter value (2024-Q2 א)
+  | { type: 'never-parallel'; line: string; plane: string } // ℓ ∦ π for EVERY parameter value (2024-Q2 א)
+  | { type: 'plane-eq'; ids: Id[]; cx: number; cy: number; cz: number; d: number }; // המישור KBC: x+2y+3z-26=0
 
 // ---------------------------------------------------------------------------
 // The algebraic lane (V2 — docs/20 §6.3): coefficients may carry ONE symbolic
@@ -147,13 +148,42 @@ export interface ClaimCommand {
 
 // --- V2 (algebraic lane) commands ---
 
-/** `A(2,-2,6)` — a coordinate-pinned point (Lane A pins the gauge). */
+/**
+ * `A(2,-2,6)` — a coordinate point. On a NEW id it creates a pinned point (Lane A).
+ * On an EXISTING id it is a coordinate INJECTION — the V4 pivot's given (the 2-D M1
+ * principle: a statement about an existing point is a constraint). A component may
+ * be null (`A(3,n,p)` — a symbolic letter): only the numeric components constrain.
+ */
 export interface Point3Command {
   type: 'point3';
   id: Id;
+  x: number | null;
+  y: number | null;
+  z: number | null;
+}
+
+/** `נתון: v = (10,-5,0)` — inject a numeric value for a DECLARED vector (the V4 pivot). */
+export interface InjectVectorCommand {
+  type: 'inject-vector';
+  name: string;
   x: number;
   y: number;
   z: number;
+}
+
+/** `שיעור ה-z של C' חיובי` — a SIGN branch given (selects among pivot solutions). */
+export interface SignGivenCommand {
+  type: 'sign-given';
+  id: Id;
+  axis: 'x' | 'y' | 'z';
+  positive: boolean;
+}
+
+/** `המישור BC'D` — a plane through existing points (resolved from their positions). */
+export interface PlaneThroughCommand {
+  type: 'plane-through';
+  name: string;
+  ids: Id[];
 }
 
 /** `המישור π1: z-3=0` — a plane by equation; the single parameter rides in the LinExprs. */
@@ -259,7 +289,10 @@ export type Command3 =
   | Line3Command
   | LinePerpPlaneCommand
   | LinePlanePointCommand
-  | OnLineCommand;
+  | OnLineCommand
+  | InjectVectorCommand
+  | SignGivenCommand
+  | PlaneThroughCommand;
 
 // ---------------------------------------------------------------------------
 // Construction (what apply builds, what evaluate consumes)
@@ -305,6 +338,14 @@ export interface Construction3 {
   linePerps: LinePerpPlaneCommand[];
   /** V3 — membership givens on lines (verified). */
   onLines: OnLineCommand[];
+  /** V4 — coordinate injections on existing points (null components don't constrain). */
+  pins: { id: Id; x: number | null; y: number | null; z: number | null }[];
+  /** V4 — injected numeric values for declared vectors. */
+  vectorPins: { name: string; x: number; y: number; z: number }[];
+  /** V4 — sign branch givens (select among pivot solutions). */
+  signGivens: SignGivenCommand[];
+  /** V4 — planes through points, name → ids (resolved from positions after the pivot). */
+  pointPlanes: Map<string, Id[]>;
 }
 
 export const emptyConstruction3 = (): Construction3 => ({
@@ -318,6 +359,10 @@ export const emptyConstruction3 = (): Construction3 => ({
   memberships: [],
   linePerps: [],
   onLines: [],
+  pins: [],
+  vectorPins: [],
+  signGivens: [],
+  pointPlanes: new Map(),
 });
 
 // ---------------------------------------------------------------------------
@@ -341,6 +386,9 @@ export type EngineError3 =
   | { code: 'not-on-plane'; id: Id } // a stated membership does not hold in any branch
   | { code: 'not-on-line'; id: Id } // a stated on-line membership does not hold
   | { code: 'line-misses-plane'; id: Id } // ℓ ∥ π at the chosen parameter — no crossing point
+  | { code: 'symbolic-new-point'; id: Id } // a NEW point with symbolic components is under-determined
+  | { code: 'injection-unsatisfiable' } // no placement of the figure matches the injected coordinates
+  | { code: 'sign-unsatisfiable'; id: Id } // no pivot solution has the stated coordinate sign
   | { code: 'size-on-solid' } // a numeric size on a free-dim solid figure — not supported yet (honest boundary)
   | { code: 'claim-refuted' }; // the stated answer does not hold in the figure
 

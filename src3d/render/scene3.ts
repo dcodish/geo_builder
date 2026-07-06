@@ -258,7 +258,7 @@ export function buildScene3(
 ): Scene3 {
   const positions = resolved.positions;
   const frame = cameraFrame(cam);
-  const laneA = c.planes.size > 0 || [...c.points.values()].some((d) => d.kind === 'coord');
+  const laneA = c.planes.size > 0 || c.pins.length > 0 || [...c.points.values()].some((d) => d.kind === 'coord');
 
   // ---- world-space auxiliary geometry, computed BEFORE the fit so it's always in frame
   const worldPts = [...positions.values()];

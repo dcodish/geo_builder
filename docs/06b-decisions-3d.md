@@ -113,3 +113,23 @@ Locked by `figure-file3.test.ts` (round-trip incl. disabled facts + a resampled 
 **Gate:** the full 2024 chain He+En through the real submit path; wrong coordinates refused; a point off ℓ refused `not-on-line`; the refutable never-parallel case refused; the parallel cut-point case refused `line-misses-plane`. **145 src3d tests green; `vite build:3d` clean; `tsc` clean on src3d (the tree's only type errors at close were the concurrent session's in-flight `src/parser` edit).**
 
 **Out (V4 next):** the coordinate-injection pivot — gauge-free Lane-G figures receiving coordinates mid-session (2020-ג, 2023-ג–ה), symbolic point components `A(3,n,p)`, sign branch givens.
+
+---
+
+## ADR-3D-007 — V4: the coordinate-injection PIVOT (2026-07-06) — ALL FOUR corpus exams reproduce
+
+**Context.** The plan's hardest slice (docs/20 §4 — "the pivot is a first-class engine feature, not an edge case"): both mixed corpus questions inject absolute coordinates MID-QUESTION onto a gauge-free solid figure. Gate met (`scenarios3.test.ts`, He+En): 2020-ג (`נתון: v = (10,-5,0), u = (5,5,-5), P(0,4,6)` → K=(−3,4,7) and plane KBC `x+2y+3z−26=0` verify) and 2023-ג–ד (`D(0,0,0)`, `C(4,3,0)`, `A(3,n,p)` → A=(3,−4,0); the sign given selects C′=(4,3,5); ℓ = plane BC′D ∩ plane BCC′B′ resolves through B and C′). **With V4, all four corpus exams (2020/2022/2023/2024) reproduce end-to-end from typed He/En utterances — the docs/20 §8 milestone.**
+
+**Decisions:**
+
+1. **A coordinate statement about an EXISTING point is a GIVEN, never an error** (the 2-D M1 principle): `point3` on a taken id lowers to a pivot PIN instead of `already-defined`. Partial pins carry symbolic letters as nulls (`A(3,n,p)` — only x constrains); a NEW point with letters refuses `symbolic-new-point` (under-determined, honest). `נתון: …` parses a whole injection list (vectors + points) in one utterance; `inject-vector` requires a declared name.
+2. **The pivot is a numeric SIMILARITY+DIMS least-squares** (`solve3.ts`): unknowns = translate(3) + axis-angle rotate(3) + log-scale(1) + the solids' free dims; residuals = the pins (a vector pin transforms without translation). Levenberg–Marquardt with a central-difference Jacobian, deterministic 8-rotation multi-start (seed-rotated), restart-polish to ~1e-24 err. This is numeric solving (the 2-D engine's category), NOT symbolic — D3 holds.
+3. **Under-determination is welcome:** the 2020 prism height is never injected — LM's damping converges to a nearby manifold point, different seeds start elsewhere, so "show another configuration" still varies exactly what the givens never fixed (ADR-052), while K stays put (locked by the gate test).
+4. **REFLECTION is the discrete branch:** both orientations (mirror pre-transform) are solved; **sign givens** (`שיעור ה-z של C' חיובי`) select among converged solutions, else the seed cycles them (locked: without the sign given, resample flips C′.z = ±5). An unsatisfiable sign refuses `sign-unsatisfiable`; a pin set no placement satisfies refuses `injection-unsatisfiable` (keep-prior).
+5. **Planes THROUGH POINTS** (`plane-through`, Newell normal from final post-pivot positions) join the planes map — patches render, and `plane-plane-line` accepts them (a second resolution pass runs after positions, since point-planes need them). The `plane-eq` claim (`המישור KBC: x + 2y + 3z - 26 = 0`) verifies the student's equation against the named points (any scalar multiple passes; a degenerate point set or zero normal refuses).
+6. **Claim tolerance is set by the pivot's numeric floor:** a central-difference Jacobian bottoms out ~1e-6 in loosely-conditioned UNPINNED directions (A.z came back −6e-6 at some seeds), so `REL_TOL` moved 1e-7 → **2e-5** — far above the noise, orders of magnitude below any wrong bagrut answer (≥ 0.5 away). Closed-form figures still verify to ~1e-15.
+7. **The pivot transforms GAUGE-frame kinds only** (solid-vertex / on-segment / centroid / in-span); coordinate points and Lane-A derived objects are already absolute. Free on-segment sliders are not solve unknowns in V4 — a pin on one would honestly fail to converge (noted limit).
+
+**Gate:** both chains He+En through the real submit path; wrong K refused; impossible injection refused; the height-stays-free + K-stays-put resample assertion; mirror-branch cycling. **169 src3d tests green, `tsc -b` + `vite build:3d` clean.**
+
+**Out (V5 next):** corpus widening (~10 more Q2s as scenario gates), catalog panel, responsive canvas, LLM fallback behind the proxy, pyramid, image export; 2023-ה (find-a-plane) stays deferred — a construction ask the tool doesn't yet express.

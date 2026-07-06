@@ -380,14 +380,18 @@ const planeByEquation: Rule = (s) => {
 
 const NUM = String.raw`-?\d+(?:\.\d+)?`;
 
-/** `A(2,-2,6)` (+ optional membership tail: `נמצאת על אחד המישורים` / `is on one of the planes` / `על המישור π2`). */
+/** A tuple component: a number, or a lowercase letter = a symbolic unknown (V4: only numerics constrain). */
+const COMP = `(?:${NUM}|[a-w])`;
+const compVal = (t: string): number | null => (/^[a-w]$/.test(t) ? null : +t);
+
+/** `A(2,-2,6)` / `A(3,n,p)` (+ optional membership tail: `נמצאת על אחד המישורים` / `על המישור π2` / `על הישר ℓ`). */
 const coordPoint: Rule = (s) => {
   const m = s.match(
-    new RegExp(`^(?:הנקודה\\s+|point\\s+)?([A-Z]\\d*'?)\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)\\s*(.*)$`),
+    new RegExp(`^(?:הנקודה\\s+|point\\s+)?([A-Z]\\d*'?)\\s*\\(\\s*(${COMP})\\s*,\\s*(${COMP})\\s*,\\s*(${COMP})\\s*\\)\\s*(.*)$`),
   );
   if (!m) return null;
   const [, id, x, y, z, restRaw] = m;
-  const cmds: Command3[] = [{ type: 'point3', id, x: +x, y: +y, z: +z }];
+  const cmds: Command3[] = [{ type: 'point3', id, x: compVal(x), y: compVal(y), z: compVal(z) }];
   const rest = restRaw.trim();
   if (rest) {
     const onLine = rest.match(new RegExp(`^(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על הישר|on (?:the )?line)\\s+(${LINE_NAME.source})$`));
@@ -531,6 +535,84 @@ const onLineMembership: Rule = (s) => {
   return [{ type: 'on-line', id: m[1], line: 'ℓ' }];
 };
 
+// ---------------------------------------------------------------------------
+// V4 — the coordinate-injection pivot (docs/20 §4; ADR-3D-007; gate 2020-ג + 2023-ג–ד)
+// ---------------------------------------------------------------------------
+
+/**
+ * `נתון: v = (10,-5,0), u = (5,5,-5), P(0,4,6)` — the exam's mid-question injection:
+ * numeric values for declared vectors + coordinates for existing points (possibly
+ * partial: `A(3,n,p)`). One utterance, many givens.
+ */
+const injectionList: Rule = (s) => {
+  const m = s.match(/^(?:נתון|נתונים|given)\s*:?\s+(.+)$/i);
+  if (!m) return null;
+  const itemRe = new RegExp(
+    `(?:([a-w])\\s*=\\s*|([A-Z]\\d*'?)\\s*=?\\s*)\\(\\s*(${COMP})\\s*,\\s*(${COMP})\\s*,\\s*(${COMP})\\s*\\)`,
+    'g',
+  );
+  const cmds: Command3[] = [];
+  for (const g of m[1].matchAll(itemRe)) {
+    const [x, y, z] = [compVal(g[3]), compVal(g[4]), compVal(g[5])];
+    if (g[1]) {
+      if (x === null || y === null || z === null) return null; // a vector value must be numeric
+      cmds.push({ type: 'inject-vector', name: g[1], x, y, z });
+    } else {
+      cmds.push({ type: 'point3', id: g[2], x, y, z });
+    }
+  }
+  return cmds.length > 0 ? cmds : null;
+};
+
+/** Standalone `v = (10,-5,0)` — a single vector injection. */
+const vectorInjection: Rule = (s) => {
+  const m = s.match(new RegExp(`^([a-w])\\s*=\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)$`));
+  if (!m) return null;
+  return [{ type: 'inject-vector', name: m[1], x: +m[2], y: +m[3], z: +m[4] }];
+};
+
+/** `שיעור ה-z של C' חיובי` / `the z-coordinate of C' is positive` — a sign branch given. */
+const signGiven: Rule = (s) => {
+  const m =
+    s.match(/^שיעור\s+ה-?([xyz])\s+של\s+([A-Z]\d*'?)\s+(חיובי|שלילי)$/) ??
+    s.match(/^the\s+([xyz])(?:-coordinate|\s+coordinate)\s+of\s+([A-Z]\d*'?)\s+is\s+(positive|negative)$/);
+  if (!m) return null;
+  return [{ type: 'sign-given', id: m[2], axis: m[1] as 'x' | 'y' | 'z', positive: m[3] === 'חיובי' || m[3] === 'positive' }];
+};
+
+/** `ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'` — planes THROUGH POINTS, then their line. */
+const pointPlanesLine: Rule = (s) => {
+  const RUN = `(?:[A-Z]\\d*'?){3,4}`;
+  const m =
+    s.match(
+      new RegExp(
+        `^(${LINE_NAME.source})\\s+(?:הוא\\s+)?ישר\\s+החיתוך\\s+(?:בין\\s+)?המישור\\s+(${RUN})\\s+(?:ל|ו)-?(?:בין\\s+)?המישור\\s+(${RUN})$`,
+      ),
+    ) ??
+    s.match(
+      new RegExp(
+        `^(${LINE_NAME.source})\\s+is\\s+the\\s+intersection\\s+line\\s+of\\s+(?:the\\s+)?plane\\s+(${RUN})\\s+and\\s+(?:the\\s+)?plane\\s+(${RUN})$`,
+      ),
+    );
+  if (!m) return null;
+  const idsOf = (run: string) => run.match(/[A-Z]\d*'?/g)!;
+  return [
+    { type: 'plane-through', name: m[2], ids: idsOf(m[2]) },
+    { type: 'plane-through', name: m[3], ids: idsOf(m[3]) },
+    { type: 'plane-plane-line', name: 'ℓ', p1: m[2], p2: m[3] },
+  ];
+};
+
+/** `המישור KBC: x + 2y + 3z - 26 = 0` — a plane-EQUATION claim on a plane through points. */
+const planeEqClaim: Rule = (s) => {
+  const m = s.match(/^(?:המישור\s+|plane\s+)((?:[A-Z]\d*'?){3,4})\s*:\s*(.+)$/);
+  if (!m) return null;
+  const eq = parseLinearEq(m[2]);
+  if (!eq || eq.param) return null; // a claimed equation must be numeric
+  const ids = m[1].match(/[A-Z]\d*'?/g)!;
+  return [{ type: 'claim', claim: { type: 'plane-eq', ids, cx: eq.cx.k, cy: eq.cy.k, cz: eq.cz.k, d: eq.d.k } }];
+};
+
 /** `A = (2, 0, -10)` — a coordinates CLAIM (the student's answer for a derived point). */
 const coordsClaim: Rule = (s) => {
   const m = s.match(new RegExp(`^([A-Z]\\d*'?)\\s*=\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)$`));
@@ -568,7 +650,12 @@ const RULES: Rule[] = [
   rightPrism,
   parametricLine, // before planeByEquation: both carry `:`, but ℓ ≠ π so either order is safe — kept explicit
   planeByEquation,
+  planeEqClaim, // plane named by POINTS + an equation — a claim, not a definition
+  injectionList,
+  signGiven,
+  pointPlanesLine, // point-run planes before the π-name intersection rule
   coordPoint,
+  vectorInjection,
   membership, // before onSegment: `על אחד המישורים` must never read as a point-on-segment
   onLineMembership, // likewise for `על הישר ℓ`
   angleBetweenPlanes,

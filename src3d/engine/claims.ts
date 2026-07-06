@@ -12,7 +12,11 @@ import { evalExpr } from './vecExpr';
 import { cross3, dot3, norm3, sub3, v3 } from './vec3';
 import type { Claim3, Construction3, Positions3 } from './types';
 
-const REL_TOL = 1e-7;
+/** Claim tolerance. Closed-form figures verify to ~1e-15; a figure placed by the V4
+ *  NUMERIC pivot carries the finite-difference-Jacobian floor (~1e-6 in loosely
+ *  conditioned, unpinned directions) — 2e-5 sits far above that noise and far below
+ *  any wrong bagrut answer (which differs by ≥ 0.5). */
+const REL_TOL = 2e-5;
 
 /** Seeds checked for every claim: the display seed plus fixed offsets (deterministic). */
 export const claimSeeds = (seed: number): number[] => [seed, seed + 1013, seed + 2027, seed + 4057];
@@ -67,6 +71,15 @@ function holdsAt(claim: Claim3, c: Construction3, pos: Positions3): boolean {
       if (!p) return false;
       const target = v3(claim.x, claim.y, claim.z);
       return norm3(sub3(p, target)) <= REL_TOL * Math.max(norm3(target), 1);
+    }
+    case 'plane-eq': {
+      const ps = claim.ids.map((id) => pos.get(id));
+      if (ps.length < 3 || ps.some((p) => !p)) return false;
+      const n = v3(claim.cx, claim.cy, claim.cz);
+      if (norm3(n) < 1e-12) return false; // not a plane at all
+      // the named points must genuinely span a plane
+      if (norm3(cross3(sub3(ps[1]!, ps[0]!), sub3(ps[2]!, ps[0]!))) < 1e-9) return false;
+      return ps.every((p) => Math.abs(dot3(n, p!) + claim.d) <= REL_TOL * Math.max(norm3(n) * (1 + norm3(p!)), 1));
     }
     case 'never-parallel': {
       // "ℓ ∦ π for EVERY parameter value" (2024-Q2 א): parallel ⟺ dir(m)·n(m) = 0,

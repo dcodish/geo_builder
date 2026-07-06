@@ -54,6 +54,10 @@ function clone(c: Construction3): Construction3 {
     memberships: [...c.memberships],
     linePerps: [...c.linePerps],
     onLines: [...c.onLines],
+    pins: [...c.pins],
+    vectorPins: [...c.vectorPins],
+    signGivens: [...c.signGivens],
+    pointPlanes: new Map(c.pointPlanes),
   };
 }
 
@@ -96,6 +100,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       if (!c.lines.has(claim.line)) return { code: 'unknown-line', id: claim.line };
       if (!c.planes.has(claim.plane)) return { code: 'unknown-plane', id: claim.plane };
       return null;
+    case 'plane-eq':
+      return missingPoint(c, claim.ids);
   }
 }
 
@@ -184,9 +190,49 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
     // --- V2: the algebraic lane ---
 
     case 'point3': {
-      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      if (c.points.has(cmd.id)) {
+        // the id EXISTS — a coordinate statement about an existing point is a GIVEN,
+        // never an error: it becomes a pivot pin (the 2-D M1 principle; V4 ADR-3D-007)
+        const next = clone(c);
+        next.pins.push({ id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z });
+        return { ok: true, next };
+      }
+      if (cmd.x === null || cmd.y === null || cmd.z === null) {
+        return { ok: false, error: { code: 'symbolic-new-point', id: cmd.id } }; // a NEW point needs numbers
+      }
       const next = clone(c);
       next.points.set(cmd.id, { kind: 'coord', x: cmd.x, y: cmd.y, z: cmd.z });
+      return { ok: true, next };
+    }
+
+    case 'inject-vector': {
+      if (!c.vectors.has(cmd.name)) return { ok: false, error: { code: 'unknown-vector', id: cmd.name } };
+      const next = clone(c);
+      next.vectorPins.push({ name: cmd.name, x: cmd.x, y: cmd.y, z: cmd.z });
+      return { ok: true, next };
+    }
+
+    case 'sign-given': {
+      if (!c.points.has(cmd.id)) return { ok: false, error: { code: 'unknown-point', id: cmd.id } };
+      const next = clone(c);
+      next.signGivens.push(cmd);
+      return { ok: true, next };
+    }
+
+    case 'plane-through': {
+      const missing = missingPoint(c, cmd.ids);
+      if (missing) return { ok: false, error: missing };
+      if (cmd.ids.length < 3) return { ok: false, error: { code: 'unknown-point', id: cmd.ids[0] ?? '?' } };
+      const existing = c.pointPlanes.get(cmd.name);
+      if (existing) {
+        // idempotent when it names the same point set; a DIFFERENT set under the same name refuses
+        return existing.join(',') === cmd.ids.join(',')
+          ? { ok: true, next: c }
+          : { ok: false, error: { code: 'already-defined', id: cmd.name } };
+      }
+      if (c.planes.has(cmd.name)) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
+      const next = clone(c);
+      next.pointPlanes.set(cmd.name, cmd.ids);
       return { ok: true, next };
     }
 
@@ -229,7 +275,7 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
     case 'plane-plane-line': {
       if (c.lines.has(cmd.name)) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
       for (const p of [cmd.p1, cmd.p2]) {
-        if (!c.planes.has(p)) return { ok: false, error: { code: 'unknown-plane', id: p } };
+        if (!c.planes.has(p) && !c.pointPlanes.has(p)) return { ok: false, error: { code: 'unknown-plane', id: p } };
       }
       const next = clone(c);
       next.lines.set(cmd.name, { kind: 'plane-plane', p1: cmd.p1, p2: cmd.p2 });

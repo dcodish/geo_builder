@@ -132,6 +132,20 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
           status[f.id] = { code: 'not-on-line', id: cmd.id };
           break;
         }
+      } else if (cmd.type === 'inject-vector' || (cmd.type === 'point3' && c.pins.some((p) => p.id === cmd.id))) {
+        // an injection with NO satisfying placement — the pivot found nothing (honest refusal)
+        if (resolved.pivot && resolved.pivot.solutions === 0) {
+          status[f.id] = { code: 'injection-unsatisfiable' };
+          break;
+        }
+      } else if (cmd.type === 'sign-given') {
+        const p = positions.get(cmd.id);
+        const val = p?.[cmd.axis];
+        const holds = val !== undefined && (cmd.positive ? val > 1e-9 : val < -1e-9);
+        if (!holds) {
+          status[f.id] = { code: 'sign-unsatisfiable', id: cmd.id };
+          break;
+        }
       } else if (cmd.type === 'on-planes') {
         const p = positions.get(cmd.id);
         const names = cmd.plane === 'any' ? [...resolved.planes.keys()] : [cmd.plane];
