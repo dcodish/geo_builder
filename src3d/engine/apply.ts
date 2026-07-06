@@ -52,6 +52,8 @@ function clone(c: Construction3): Construction3 {
     param: c.param,
     planeAngles: [...c.planeAngles],
     memberships: [...c.memberships],
+    linePerps: [...c.linePerps],
+    onLines: [...c.onLines],
   };
 }
 
@@ -88,6 +90,12 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return missingPoint(c, [claim.a, claim.b]);
     case 'area-eq':
       return missingPoint(c, claim.ids);
+    case 'coords-eq':
+      return missingPoint(c, [claim.id]);
+    case 'never-parallel':
+      if (!c.lines.has(claim.line)) return { code: 'unknown-line', id: claim.line };
+      if (!c.planes.has(claim.plane)) return { code: 'unknown-plane', id: claim.plane };
+      return null;
   }
 }
 
@@ -235,6 +243,42 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       const next = clone(c);
       next.points.set(cmd.id, { kind: 'foot-line', from: cmd.from, line: cmd.line });
       next.segments.push([cmd.from, cmd.id]);
+      return { ok: true, next };
+    }
+
+    // --- V3: parameters in lines ---
+
+    case 'line3': {
+      if (c.lines.has(cmd.name)) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
+      if (cmd.param && c.param && cmd.param !== c.param) return { ok: false, error: { code: 'two-params' } };
+      const next = clone(c);
+      next.lines.set(cmd.name, { kind: 'parametric', anchor: cmd.anchor, dir: cmd.dir, src: cmd.src });
+      if (cmd.param) next.param = cmd.param;
+      return { ok: true, next };
+    }
+
+    case 'line-perp-plane': {
+      if (!c.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
+      if (!c.planes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
+      const next = clone(c);
+      next.linePerps.push(cmd);
+      return { ok: true, next };
+    }
+
+    case 'line-plane-point': {
+      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      if (!c.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
+      if (!c.planes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'line-plane', line: cmd.line, plane: cmd.plane });
+      return { ok: true, next };
+    }
+
+    case 'on-line': {
+      if (!c.points.has(cmd.id)) return { ok: false, error: { code: 'unknown-point', id: cmd.id } };
+      if (!c.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
+      const next = clone(c);
+      next.onLines.push(cmd);
       return { ok: true, next };
     }
   }

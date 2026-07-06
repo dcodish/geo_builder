@@ -7,9 +7,9 @@
  * 2-D tool's relation detection uses, applied to answers.
  */
 
-import { evaluate3 } from './evaluate';
+import { evaluate3, lineAtParam, planeAtParam } from './evaluate';
 import { evalExpr } from './vecExpr';
-import { cross3, dot3, norm3, sub3 } from './vec3';
+import { cross3, dot3, norm3, sub3, v3 } from './vec3';
 import type { Claim3, Construction3, Positions3 } from './types';
 
 const REL_TOL = 1e-7;
@@ -61,6 +61,29 @@ function holdsAt(claim: Claim3, c: Construction3, pos: Positions3): boolean {
       if (ps.some((p) => !p)) return false;
       const area = 0.5 * norm3(cross3(sub3(ps[1]!, ps[0]!), sub3(ps[2]!, ps[0]!)));
       return Math.abs(area - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
+    }
+    case 'coords-eq': {
+      const p = pos.get(claim.id);
+      if (!p) return false;
+      const target = v3(claim.x, claim.y, claim.z);
+      return norm3(sub3(p, target)) <= REL_TOL * Math.max(norm3(target), 1);
+    }
+    case 'never-parallel': {
+      // "ℓ ∦ π for EVERY parameter value" (2024-Q2 א): parallel ⟺ dir(m)·n(m) = 0,
+      // so the claim holds iff that residual has NO zero over the scanned range —
+      // sign changes AND near-zero touches both refute it. Parameter-scan, seed-free.
+      let prev: number | null = null;
+      for (let m = -25; m <= 25 + 1e-9; m += 0.01) {
+        const ln = lineAtParam(c, claim.line, m);
+        if (!ln) return false;
+        const pl = planeAtParam(c, claim.plane, m);
+        const scale = Math.max(norm3(ln.dir) * norm3(pl.n), 1e-12);
+        const r = dot3(ln.dir, pl.n) / scale;
+        if (Number.isNaN(r) || Math.abs(r) < 1e-4) return false; // touches parallel
+        if (prev !== null && prev * r < 0) return false; // crosses parallel between samples
+        prev = r;
+      }
+      return true;
     }
   }
 }

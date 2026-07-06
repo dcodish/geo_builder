@@ -211,3 +211,68 @@ describe('GATE — 2022 חורף Q2 (the algebraic lane: planes, parameter, feet
     expect(state().lastError).toEqual({ code: 'size-on-solid' });
   });
 });
+
+describe('GATE — 2024 חורף Q2 (parameters in lines: the parametric ℓ, the ⟂ pin, the cut point, the ד investigation)', () => {
+  beforeEach(reset);
+
+  const HE = [
+    'הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)',
+    'המישור π: 3x + my + (m+6)z + 4 = 0',
+    'ℓ אינו מקביל ל-π לכל m', // א — the probe, verified as a claim
+    'הישר ℓ ניצב למישור π', // pins m = −5 (ב)
+    'ℓ חותך את π בנקודה A',
+    'A = (2, 0, -10)', // the student's answer to ג — verified
+    'B(5,-5,-9) על הישר ℓ', // ד's investigation: the special point turns out to lie ON ℓ
+  ];
+  const EN = [
+    'line ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)',
+    'plane π: 3x + my + (m+6)z + 4 = 0',
+    'ℓ is not parallel to plane π for every m',
+    'line ℓ is perpendicular to plane π',
+    'ℓ cuts plane π at A',
+    'A = (2, 0, -10)',
+    'B(5,-5,-9) is on line ℓ',
+  ];
+
+  for (const [name, seq] of [['Hebrew', HE], ['English', EN]] as const) {
+    it(`${name}: the full sequence builds, m = −5 pinned, the answer verifies, B lands on ℓ`, () => {
+      seq.forEach(submit);
+      expect(state().facts).toHaveLength(7);
+      expectAllOk();
+      const d = derived();
+      expect(d.resolved.param).toMatchObject({ name: 'm', value: -5, roots: [-5] });
+      expect(d.positions.get('A')!.x).toBeCloseTo(2, 9);
+      expect(d.positions.get('A')!.z).toBeCloseTo(-10, 9);
+    });
+  }
+
+  it('a wrong coordinates answer is refused (keep-prior)', () => {
+    HE.slice(0, 5).forEach(submit);
+    submit('A = (2, 0, -9)');
+    expect(state().facts).toHaveLength(5);
+    expect(state().lastError).toEqual({ code: 'claim-refuted' });
+  });
+
+  it('a point NOT on ℓ is refused with not-on-line', () => {
+    HE.slice(0, 4).forEach(submit);
+    submit('C(1,1,1) על הישר ℓ');
+    expect(state().facts).toHaveLength(4);
+    expect(state().lastError).toEqual({ code: 'not-on-line', id: 'C' });
+  });
+
+  it('a never-parallel probe against a plane that CAN be parallel is refused', () => {
+    submit(HE[0]);
+    submit('המישור π2: my + z = 0');
+    submit('ℓ אינו מקביל ל-π2 לכל m');
+    expect(state().facts).toHaveLength(2);
+    expect(state().lastError).toEqual({ code: 'claim-refuted' });
+  });
+
+  it('a cut point when the line is parallel to the plane is refused honestly', () => {
+    submit('l: x = (0,0,0) + t(1,0,0)');
+    submit('המישור π1: z - 3 = 0');
+    submit('ℓ חותך את π1 בנקודה A');
+    expect(state().facts).toHaveLength(2);
+    expect(state().lastError).toEqual({ code: 'line-misses-plane', id: 'A' });
+  });
+});

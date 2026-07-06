@@ -270,16 +270,42 @@ const bareSegment: Rule = (s) => {
 // V2 — the algebraic lane (docs/20 §6.3, ADR-3D-004)
 // ---------------------------------------------------------------------------
 
-/** Plane names: π1 / pi1 → canonical `π1`. */
-const PLANE_NAME = /(?:π|pi|Pi|PI)\s?(\d+)/;
-const canonicalPlane = (s: string): string => `π${s.match(/\d+/)![0]}`;
+/** Plane names: π1 / pi1 / a bare π → canonical `π<digits?>`. */
+const PLANE_NAME = /(?:π|pi|Pi|PI)\s?(\d*)/;
+const canonicalPlane = (s: string): string => `π${s.match(/\d+/)?.[0] ?? ''}`;
 /** Line names: ℓ or l → canonical `ℓ`. */
 const LINE_NAME = /[ℓl]/;
 
+/** Parse `m-1` / `5-m` / `-2` / `2m` → a LinExpr (k + p·param). Null on anything else. */
+export function parseParamExpr(src: string): { expr: LinExpr; param?: string } | null {
+  const terms = src
+    .trim()
+    .split(/(?=[+-])/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (terms.length === 0) return null;
+  const expr: LinExpr = { k: 0, p: 0 };
+  let param: string | undefined;
+  for (const t of terms) {
+    const m = t.match(/^([+-])?\s*(\d+(?:\.\d+)?)?\s*([a-w])?$/);
+    if (!m || (m[2] === undefined && !m[3])) return null;
+    const sgn = m[1] === '-' ? -1 : 1;
+    const num = m[2] !== undefined ? parseFloat(m[2]) : 1;
+    if (m[3]) {
+      if (param && param !== m[3]) return null;
+      param = m[3];
+      expr.p += sgn * num;
+    } else {
+      expr.k += sgn * num;
+    }
+  }
+  return { expr, param };
+}
+
 /**
  * Parse a linear equation in x,y,z with ONE optional lowercase parameter letter
- * (`ay + z - 8 = 0`). Returns each coefficient as a LinExpr (k + p·param).
- * Null on anything else — never a partial read.
+ * (`ay + z - 8 = 0`, incl. parenthesised coefficients `(m+6)z`). Returns each
+ * coefficient as a LinExpr (k + p·param). Null on anything else — never a partial read.
  */
 export function parseLinearEq(eq: string): { cx: LinExpr; cy: LinExpr; cz: LinExpr; d: LinExpr; param?: string } | null {
   const sides = eq.split('=');
@@ -292,12 +318,30 @@ export function parseLinearEq(eq: string): { cx: LinExpr; cy: LinExpr; cz: LinEx
   };
   let param: string | undefined;
   const addSide = (side: string, sign: number): boolean => {
-    const terms = side
+    // parenthesised coefficients first: `(m+6)z` — the inner expr folds into the slot
+    let rest = side.trim();
+    let hadParen = false;
+    rest = rest.replace(/([+-]?)\s*\(([^()]+)\)\s*([xyz])/g, (_all, sgn: string, inner: string, varName: string) => {
+      const parsed = parseParamExpr(inner);
+      if (!parsed) return '§'; // poison — fails the term scan below
+      if (parsed.param) {
+        if (param && param !== parsed.param) return '§';
+        param = parsed.param;
+      }
+      const s2 = sign * (sgn === '-' ? -1 : 1);
+      const slot = acc[varName as 'x' | 'y' | 'z'];
+      slot.k += s2 * parsed.expr.k;
+      slot.p += s2 * parsed.expr.p;
+      hadParen = true;
+      return '';
+    });
+    if (rest.includes('§') || rest.includes('(') || rest.includes(')')) return false;
+    const terms = rest
       .trim()
       .split(/(?=[+-])/)
       .map((t) => t.trim())
       .filter(Boolean);
-    if (terms.length === 0) return false;
+    if (terms.length === 0) return hadParen;
     for (const term of terms) {
       const m = term.match(/^([+-])?\s*(\d+(?:\.\d+)?)?\s*([a-w])?\s*([xyz])?$/);
       if (!m || (m[2] === undefined && !m[3] && !m[4])) return false;
@@ -346,8 +390,11 @@ const coordPoint: Rule = (s) => {
   const cmds: Command3[] = [{ type: 'point3', id, x: +x, y: +y, z: +z }];
   const rest = restRaw.trim();
   if (rest) {
+    const onLine = rest.match(new RegExp(`^(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על הישר|on (?:the )?line)\\s+(${LINE_NAME.source})$`));
     if (/^(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?(?:על אחד המישורים|on one of the planes)$/.test(rest)) {
       cmds.push({ type: 'on-planes', id, plane: 'any' });
+    } else if (onLine) {
+      cmds.push({ type: 'on-line', id, line: 'ℓ' });
     } else {
       const named = rest.match(new RegExp(`^(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על המישור|on plane)\\s+(${PLANE_NAME.source})$`));
       if (!named) return null; // trailing text we don't understand — refuse the whole utterance
@@ -414,6 +461,83 @@ const dropPerpToLine: Rule = (s) => {
   return [{ type: 'foot-on-line', id: foot, from, line: 'ℓ' }];
 };
 
+// ---------------------------------------------------------------------------
+// V3 — parameters in lines (docs/20 §8 V3, ADR-3D-006; gate 2024-Q2)
+// ---------------------------------------------------------------------------
+
+/** `הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)` — a typed parametric line (components may carry the parameter). */
+const parametricLine: Rule = (s) => {
+  const m = s.match(new RegExp(`^(?:הישר\\s+|line\\s+)?(${LINE_NAME.source})\\s*:\\s*x\\s*=\\s*\\(([^()]*)\\)\\s*\\+\\s*t\\s*[·×*]?\\s*\\(([^()]*)\\)$`));
+  if (!m) return null;
+  const triple = (str: string) => str.split(',').map((p) => parseParamExpr(p));
+  const anchor = triple(m[2]);
+  const dir = triple(m[3]);
+  if (anchor.length !== 3 || dir.length !== 3 || [...anchor, ...dir].some((x) => !x)) return null;
+  const params = new Set([...anchor, ...dir].flatMap((x) => (x!.param ? [x!.param] : [])));
+  if (params.size > 1) return null;
+  return [
+    {
+      type: 'line3',
+      name: 'ℓ',
+      anchor: [anchor[0]!.expr, anchor[1]!.expr, anchor[2]!.expr],
+      dir: [dir[0]!.expr, dir[1]!.expr, dir[2]!.expr],
+      src: `x = (${m[2].trim()}) + t·(${m[3].trim()})`,
+      param: [...params][0],
+    },
+  ];
+};
+
+/** `הישר ℓ ניצב למישור π` — a GIVEN that pins the parameter (line ⟂ plane). */
+const linePerpPlane: Rule = (s) => {
+  const m =
+    s.match(new RegExp(`^(?:הישר\\s+)?(${LINE_NAME.source})\\s+(?:ניצב|מאונך)\\s+למישור\\s+(${PLANE_NAME.source})$`)) ??
+    s.match(new RegExp(`^(?:line\\s+)?(${LINE_NAME.source})\\s+is\\s+perpendicular\\s+to\\s+(?:the\\s+)?plane\\s+(${PLANE_NAME.source})$`));
+  if (!m) return null;
+  return [{ type: 'line-perp-plane', line: 'ℓ', plane: canonicalPlane(m[2]) }];
+};
+
+/** `ℓ חותך את π בנקודה A` / `ℓ cuts plane π at A` — the line∩plane point. */
+const lineCutsPlane: Rule = (s) => {
+  const m =
+    s.match(
+      new RegExp(`^(?:הישר\\s+)?(${LINE_NAME.source})\\s+חותך\\s+(?:את\\s+)?(?:המישור\\s+)?(${PLANE_NAME.source})\\s+בנקודה\\s+([A-Z]\\d*'?)$`),
+    ) ??
+    s.match(new RegExp(`^(?:line\\s+)?(${LINE_NAME.source})\\s+cuts\\s+(?:the\\s+)?plane\\s+(${PLANE_NAME.source})\\s+at\\s+([A-Z]\\d*'?)$`));
+  if (!m) return null;
+  return [{ type: 'line-plane-point', id: m[m.length - 1], line: 'ℓ', plane: canonicalPlane(m[2]) }];
+};
+
+/** `ℓ אינו מקביל ל-π לכל m` / `ℓ is not parallel to plane π for every m` — the 2024-א probe, a CLAIM. */
+const neverParallelClaim: Rule = (s) => {
+  const m =
+    s.match(
+      new RegExp(`^(?:הישר\\s+)?(${LINE_NAME.source})\\s+אינו\\s+מקביל\\s+ל-?(?:מישור\\s+)?(${PLANE_NAME.source})\\s+לכל\\s+([a-w])$`),
+    ) ??
+    s.match(
+      new RegExp(
+        `^(?:line\\s+)?(${LINE_NAME.source})\\s+is\\s+not\\s+parallel\\s+to\\s+(?:the\\s+)?plane\\s+(${PLANE_NAME.source})\\s+for\\s+(?:every|all|any)\\s+([a-w])$`,
+      ),
+    );
+  if (!m) return null;
+  return [{ type: 'claim', claim: { type: 'never-parallel', line: 'ℓ', plane: canonicalPlane(m[2]) } }];
+};
+
+/** Standalone `B על הישר ℓ` / `B is on line ℓ` — an on-line membership GIVEN (verified). */
+const onLineMembership: Rule = (s) => {
+  const m = s.match(
+    new RegExp(`^([A-Z]\\d*'?)\\s+(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על הישר|on (?:the )?line)\\s+(${LINE_NAME.source})$`),
+  );
+  if (!m) return null;
+  return [{ type: 'on-line', id: m[1], line: 'ℓ' }];
+};
+
+/** `A = (2, 0, -10)` — a coordinates CLAIM (the student's answer for a derived point). */
+const coordsClaim: Rule = (s) => {
+  const m = s.match(new RegExp(`^([A-Z]\\d*'?)\\s*=\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)$`));
+  if (!m) return null;
+  return [{ type: 'claim', claim: { type: 'coords-eq', id: m[1], x: +m[2], y: +m[3], z: +m[4] } }];
+};
+
 /** `AB = 3` — a scalar length CLAIM (Lane A: all points pinned ⇒ a check, never a driver). */
 const lengthClaim: Rule = (s) => {
   const m = s.match(new RegExp(`^([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(${NUM})$`));
@@ -442,10 +566,15 @@ const areaClaim: Rule = (s) => {
 const RULES: Rule[] = [
   cubeOrBox,
   rightPrism,
+  parametricLine, // before planeByEquation: both carry `:`, but ℓ ≠ π so either order is safe — kept explicit
   planeByEquation,
   coordPoint,
   membership, // before onSegment: `על אחד המישורים` must never read as a point-on-segment
+  onLineMembership, // likewise for `על הישר ℓ`
   angleBetweenPlanes,
+  linePerpPlane,
+  neverParallelClaim,
+  lineCutsPlane,
   dropPerpToPlane,
   intersectionLine,
   dropPerpToLine,
@@ -457,6 +586,7 @@ const RULES: Rule[] = [
   spanPoint, // MUST precede onSegment: Greek scalars would otherwise parse as a free point, silently dropping the condition
   onSegment,
   vecEqClaim,
+  coordsClaim,
   areaClaim,
   lengthClaim,
   bareSegment,

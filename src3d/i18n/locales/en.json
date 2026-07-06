@@ -41,6 +41,8 @@
     "twoParams": "Only one parameter is allowed per figure (e.g. a)",
     "noRoots": "No parameter value satisfies the stated angle — the givens contradict",
     "notOnPlane": "'{{id}}' is not on any of the given planes — check the givens",
+    "notOnLine": "'{{id}}' is not on the line — check the givens",
+    "lineMissesPlane": "The line is parallel to the plane at the chosen parameter value — no crossing point '{{id}}'",
     "sizeOnSolid": "A numeric size on a free-dimension solid isn't supported here yet",
     "claimRefuted": "The claim doesn't hold in the figure — check the computation",
     "badFile": "This is not a valid Space Builder figure file",

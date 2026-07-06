@@ -38,6 +38,10 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.noRoots');
     case 'not-on-plane':
       return t('err.notOnPlane', { id: err.id });
+    case 'not-on-line':
+      return t('err.notOnLine', { id: err.id });
+    case 'line-misses-plane':
+      return t('err.lineMissesPlane', { id: err.id });
     case 'size-on-solid':
       return t('err.sizeOnSolid');
     case 'bad-name':

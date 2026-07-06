@@ -94,3 +94,22 @@ Scene3 emits a new pure primitive (`SceneVector3`); Figure3 is a dumb map over i
 **The testing payoff — the fixtures net** (`src3d/__tests__/fixtures3.test.ts` over `fixtures3/*.geo3.json`): every file replays through the REAL load path asserting (1) every fact lands OK — claims verified included, and (2) **no parser drift** — each stored utterance still lowers to the stored commands (every 3-D fact is deterministic; no LLM yet). **A manual session's saved figure becomes permanent regression coverage by dropping the file in `fixtures3/`.** Seeded with the three gate figures (2020 prism, 2023 cube, 2022 planes), generated through the real pipeline (`GEN_FIXTURES3=1 npx vitest run src3d/__tests__/fixtures3.test.ts` regenerates); an empty net fails loudly.
 
 Locked by `figure-file3.test.ts` (round-trip incl. disabled facts + a resampled seed, refusal matrix, load-is-one-undo) + the net itself. **125 src3d tests green, `tsc -b` + `build:3d` clean.**
+
+---
+
+## ADR-3D-006 — V3: parameters in lines (2026-07-06)
+
+**Context.** docs/20 §8 V3, gate 2024-Q2: a TYPED parametric line whose direction carries the parameter (`x = (-1,5,-11) + t(m-1, 5-m, -2)`), a plane sharing the same `m` (incl. the parenthesised coefficient `(m+6)z`), the ⟂ given pinning m, the cut point, and the "not parallel for every m" probe. Gate met (`scenarios3.test.ts`, He+En) on the hand-worked oracles: **m = −5 (unique)**, **A = ℓ∩π = (2, 0, −10)**, and (5,−5,−9) lies ON ℓ — the ד investigation resolved by the figure.
+
+**Decisions:**
+
+1. **`Line3Def` gains a `parametric` kind** — anchor and direction as LinExpr triples, evaluated at the parameter (`lineAtParam`); the typed source form is kept for the on-canvas echo. The plane∩plane kind is unchanged; both resolve through one path.
+2. **A ⟂ given's residual `|dir(m) × n(m)|` is NON-NEGATIVE — it touches zero without a sign change**, so bisection can't find it: `paramRoots` gains a **minima-scan + ternary-refinement** root finder (`touchZeroRoots`) beside the sign-change one, and candidate roots are **cross-filtered against ALL pinning givens** (angles + ⟂s must agree). Still strictly 1-DOF numeric root-finding (D3). An unpinned parameter remains a sampled free DOF; `pinningGivens` (not just planeAngles) now decides.
+3. **The `never-parallel` probe is a CLAIM over the parameter FAMILY, not a configuration**: parallel ⟺ `dir(m)·n(m) = 0`, so the claim holds iff that (normalised) residual has no zero over the scanned range — sign changes AND near-zero touches both refute. Seed-independent by construction; the exam's `−m²+6m−15 < 0 ∀m` verifies, a plane admitting a parallel value refutes.
+4. **`line-plane-point` is honest about parallelism**: at the chosen parameter, a parallel line yields NO position and the fact refuses `line-misses-plane` (never a fake point). **`on-line` membership** is a verified given (`not-on-line` when false) — typing `B(5,-5,-9) על הישר ℓ` and having it ACCEPTED is exactly how the student discovers 2024-ד's trap (the point is on ℓ ⇒ infinitely many planes).
+5. **Parser:** `parseParamExpr` (component grammar `m-1`/`5-m`/`-2`/`2m`, one letter per figure); `parseLinearEq` handles **parenthesised coefficients** `(m+6)z` (fold-in via replace; a poison marker refuses malformed or mismatched-parameter parentheses — all-or-nothing held); plane names may now be a **bare π** (digits optional); coordinate claims `A = (2, 0, -10)` (distinct from `A(2,0,-10)` creation — the `=` is the discriminator).
+6. **Recorded trap:** an earlier poison marker written as `' '` reached the file as a NUL byte and broke exact-match editing — markers must be visible characters (now `§`).
+
+**Gate:** the full 2024 chain He+En through the real submit path; wrong coordinates refused; a point off ℓ refused `not-on-line`; the refutable never-parallel case refused; the parallel cut-point case refused `line-misses-plane`. **145 src3d tests green; `vite build:3d` clean; `tsc` clean on src3d (the tree's only type errors at close were the concurrent session's in-flight `src/parser` edit).**
+
+**Out (V4 next):** the coordinate-injection pivot — gauge-free Lane-G figures receiving coordinates mid-session (2020-ג, 2023-ג–ה), symbolic point components `A(3,n,p)`, sign branch givens.

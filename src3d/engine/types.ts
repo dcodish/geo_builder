@@ -43,7 +43,9 @@ export type Claim3 =
   | { type: 'perp-plane'; seg: [Id, Id]; plane: [Id, Id, Id] } // CA' ⊥ plane BC'D
   | { type: 'collinear3'; ids: Id[] } // E, C, A' on one line
   | { type: 'length-eq'; a: Id; b: Id; value: number } // AB = 3 (all points pinned ⇒ a CHECK)
-  | { type: 'area-eq'; ids: [Id, Id, Id]; value: number }; // שטח ABC = 4.5
+  | { type: 'area-eq'; ids: [Id, Id, Id]; value: number } // שטח ABC = 4.5
+  | { type: 'coords-eq'; id: Id; x: number; y: number; z: number } // A = (2, 0, -10)
+  | { type: 'never-parallel'; line: string; plane: string }; // ℓ ∦ π for EVERY parameter value (2024-Q2 א)
 
 // ---------------------------------------------------------------------------
 // The algebraic lane (V2 — docs/20 §6.3): coefficients may carry ONE symbolic
@@ -65,7 +67,15 @@ export interface PlaneDef {
   src: string;
 }
 
-export type Line3Def = { kind: 'plane-plane'; p1: string; p2: string };
+export type Line3Def =
+  | { kind: 'plane-plane'; p1: string; p2: string }
+  | {
+      /** A TYPED parametric line (V3, 2024-Q2): x = anchor + t·dir — components may carry the parameter. */
+      kind: 'parametric';
+      anchor: [LinExpr, LinExpr, LinExpr];
+      dir: [LinExpr, LinExpr, LinExpr];
+      src: string;
+    };
 
 // ---------------------------------------------------------------------------
 // Commands (what the parser emits)
@@ -195,6 +205,42 @@ export interface FootOnLineCommand {
   line: string;
 }
 
+// --- V3 (parameters in lines) commands ---
+
+/** `הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)` — a typed parametric line. */
+export interface Line3Command {
+  type: 'line3';
+  name: string;
+  anchor: [LinExpr, LinExpr, LinExpr];
+  dir: [LinExpr, LinExpr, LinExpr];
+  src: string;
+  /** The parameter letter used in the components, if any. */
+  param?: string;
+}
+
+/** `הישר ℓ ניצב למישור π` — PINS the parameter (dir ∥ normal; the roots are branches). */
+export interface LinePerpPlaneCommand {
+  type: 'line-perp-plane';
+  line: string;
+  plane: string;
+  branch?: number;
+}
+
+/** `ℓ חותך את π בנקודה A` — the line∩plane point. */
+export interface LinePlanePointCommand {
+  type: 'line-plane-point';
+  id: Id;
+  line: string;
+  plane: string;
+}
+
+/** `B על הישר ℓ` — a membership GIVEN on a line (verified; 2024-Q2 ד's investigation). */
+export interface OnLineCommand {
+  type: 'on-line';
+  id: Id;
+  line: string;
+}
+
 export type Command3 =
   | SolidCommand
   | PointOnSegment3Command
@@ -209,7 +255,11 @@ export type Command3 =
   | OnPlanesCommand
   | FootOnPlaneCommand
   | PlanePlaneLineCommand
-  | FootOnLineCommand;
+  | FootOnLineCommand
+  | Line3Command
+  | LinePerpPlaneCommand
+  | LinePlanePointCommand
+  | OnLineCommand;
 
 // ---------------------------------------------------------------------------
 // Construction (what apply builds, what evaluate consumes)
@@ -230,7 +280,8 @@ export type PointDef =
   | { kind: 'in-span'; a: Id; b: Id; vecFrom: Id; span: string[] }
   | { kind: 'coord'; x: number; y: number; z: number }
   | { kind: 'foot-plane'; from: Id; plane: string }
-  | { kind: 'foot-line'; from: Id; line: string };
+  | { kind: 'foot-line'; from: Id; line: string }
+  | { kind: 'line-plane'; line: string; plane: string };
 
 export interface Construction3 {
   solids: SolidObj[];
@@ -250,6 +301,10 @@ export interface Construction3 {
   planeAngles: PlaneAngleCommand[];
   /** V2 — membership givens (verify; `'any'` also selects the parameter branch). */
   memberships: OnPlanesCommand[];
+  /** V3 — line ⟂ plane givens (they pin the parameter, like planeAngles). */
+  linePerps: LinePerpPlaneCommand[];
+  /** V3 — membership givens on lines (verified). */
+  onLines: OnLineCommand[];
 }
 
 export const emptyConstruction3 = (): Construction3 => ({
@@ -261,6 +316,8 @@ export const emptyConstruction3 = (): Construction3 => ({
   lines: new Map(),
   planeAngles: [],
   memberships: [],
+  linePerps: [],
+  onLines: [],
 });
 
 // ---------------------------------------------------------------------------
@@ -282,6 +339,8 @@ export type EngineError3 =
   | { code: 'two-params' } // only ONE symbolic parameter per figure (V2 boundary)
   | { code: 'no-roots' } // no parameter value satisfies the stated angle — over-constrained, honestly
   | { code: 'not-on-plane'; id: Id } // a stated membership does not hold in any branch
+  | { code: 'not-on-line'; id: Id } // a stated on-line membership does not hold
+  | { code: 'line-misses-plane'; id: Id } // ℓ ∥ π at the chosen parameter — no crossing point
   | { code: 'size-on-solid' } // a numeric size on a free-dim solid figure — not supported yet (honest boundary)
   | { code: 'claim-refuted' }; // the stated answer does not hold in the figure
 

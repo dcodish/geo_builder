@@ -26,7 +26,7 @@ import { nanoid } from 'nanoid';
 import { applyCommand3 } from '../engine/apply';
 import { checkInSpan, resolve3, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
-import { dot3, norm3 } from '../engine/vec3';
+import { cross3, dot3, norm3, sub3 } from '../engine/vec3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
 import { parse3 } from '../parser/parse3';
 
@@ -110,10 +110,26 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
             break;
           }
         }
-      } else if (cmd.type === 'plane-angle') {
-        // the stated angle admits NO parameter value — over-constrained, honestly
+      } else if (cmd.type === 'plane-angle' || cmd.type === 'line-perp-plane') {
+        // the stated relation admits NO parameter value — over-constrained, honestly
         if (resolved.param && resolved.param.roots.length === 0) {
           status[f.id] = { code: 'no-roots' };
+          break;
+        }
+      } else if (cmd.type === 'line-plane-point') {
+        if (!positions.has(cmd.id)) {
+          status[f.id] = { code: 'line-misses-plane', id: cmd.id }; // parallel at the chosen parameter
+          break;
+        }
+      } else if (cmd.type === 'on-line') {
+        const p = positions.get(cmd.id);
+        const ln = resolved.lines.get(cmd.line);
+        const holds =
+          p !== undefined &&
+          ln !== undefined &&
+          norm3(cross3(sub3(p, ln.anchor), ln.dir)) <= 1e-7 * Math.max(norm3(sub3(p, ln.anchor)) * norm3(ln.dir), 1);
+        if (!holds) {
+          status[f.id] = { code: 'not-on-line', id: cmd.id };
           break;
         }
       } else if (cmd.type === 'on-planes') {

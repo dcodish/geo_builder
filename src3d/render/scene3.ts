@@ -320,7 +320,7 @@ export function buildScene3(
   // The fold itself — drawn as an implicit seam unless the student has NAMED a line
   // for that pair; its reach follows the UNION of the two patches' along-fold extents.
   const namedPairs = new Set(
-    [...c.lines.values()].map((def) => [def.p1, def.p2].sort().join('|')),
+    [...c.lines.values()].flatMap((def) => (def.kind === 'plane-plane' ? [[def.p1, def.p2].sort().join('|')] : [])),
   );
   const wSeams: { a: Vec3; b: Vec3 }[] = [];
   for (const { n1, n2, line, focus } of pairLines) {

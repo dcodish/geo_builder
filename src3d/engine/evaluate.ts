@@ -89,6 +89,22 @@ function planeAt(c: Construction3, name: string, a: number): ResolvedPlane {
   return { n: v3(linVal(p.cx, a), linVal(p.cy, a), linVal(p.cz, a)), d: linVal(p.d, a) };
 }
 
+/** A plane's numeric form at a given parameter value (claims need to scan over the parameter). */
+export const planeAtParam = planeAt;
+
+/** A line's numeric form at a given parameter value: parametric evaluated; plane∩plane recomputed. */
+export function lineAtParam(c: Construction3, name: string, a: number): ResolvedLine | null {
+  const def = c.lines.get(name);
+  if (!def) return null;
+  if (def.kind === 'parametric') {
+    return {
+      anchor: v3(linVal(def.anchor[0], a), linVal(def.anchor[1], a), linVal(def.anchor[2], a)),
+      dir: v3(linVal(def.dir[0], a), linVal(def.dir[1], a), linVal(def.dir[2], a)),
+    };
+  }
+  return planePlaneLine(planeAt(c, def.p1, a), planeAt(c, def.p2, a));
+}
+
 /** cos of the angle between two planes (formula-sheet form: |n1·n2|/(|n1||n2|)); NaN when degenerate. */
 function planesCos(c: Construction3, p1: string, p2: string, a: number): number {
   const r1 = planeAt(c, p1, a);
@@ -97,30 +113,16 @@ function planesCos(c: Construction3, p1: string, p2: string, a: number): number 
   return denom < 1e-12 ? NaN : Math.abs(dot3(r1.n, r2.n)) / denom;
 }
 
-/**
- * All parameter values satisfying every stated plane-angle given — grid scan +
- * bisection (the docs/20 D3 boundary: 1-DOF numeric root-finding, nothing more).
- */
-export function paramRoots(c: Construction3): number[] {
-  if (c.planeAngles.length === 0) return [];
-  const f = (a: number): number => {
-    let worst = 0;
-    for (const g of c.planeAngles) {
-      const cos = planesCos(c, g.p1, g.p2, a);
-      if (Number.isNaN(cos)) return NaN;
-      const r = cos - Math.cos((g.deg * Math.PI) / 180);
-      if (Math.abs(r) > Math.abs(worst)) worst = r;
-    }
-    return worst;
-  };
-  // sign-change scan over a generous range, then bisection
+const SCAN_LO = -25;
+const SCAN_HI = 25;
+const SCAN_STEP = 0.02;
+
+/** Sign-change roots of f over the scan range (bisection-refined). */
+function signChangeRoots(f: (a: number) => number): number[] {
   const roots: number[] = [];
-  const LO = -25;
-  const HI = 25;
-  const STEP = 0.02;
-  let prevA = LO;
-  let prevF = f(LO);
-  for (let a = LO + STEP; a <= HI + 1e-9; a += STEP) {
+  let prevA = SCAN_LO;
+  let prevF = f(SCAN_LO);
+  for (let a = SCAN_LO + SCAN_STEP; a <= SCAN_HI + 1e-9; a += SCAN_STEP) {
     const fa = f(a);
     if (!Number.isNaN(prevF) && !Number.isNaN(fa)) {
       if (prevF === 0) roots.push(prevA);
@@ -143,13 +145,85 @@ export function paramRoots(c: Construction3): number[] {
     prevA = a;
     prevF = fa;
   }
-  // dedupe near-identical roots and snap near-integers (the bagrut answers are clean)
+  return roots;
+}
+
+/**
+ * Zeros of a NON-NEGATIVE residual (e.g. |dir × n| for a ⟂ given — it touches zero
+ * without a sign change): local-minima scan + ternary refinement, accepted when the
+ * refined minimum is numerically zero.
+ */
+function touchZeroRoots(g: (a: number) => number): number[] {
+  const roots: number[] = [];
+  const N = Math.round((SCAN_HI - SCAN_LO) / SCAN_STEP);
+  const vals: number[] = [];
+  for (let i = 0; i <= N; i++) vals.push(g(SCAN_LO + i * SCAN_STEP));
+  for (let i = 1; i < N; i++) {
+    if (Number.isNaN(vals[i]) || vals[i] > vals[i - 1] || vals[i] > vals[i + 1]) continue;
+    let lo = SCAN_LO + (i - 1) * SCAN_STEP;
+    let hi = SCAN_LO + (i + 1) * SCAN_STEP;
+    for (let k = 0; k < 200; k++) {
+      const m1 = lo + (hi - lo) / 3;
+      const m2 = hi - (hi - lo) / 3;
+      if (g(m1) <= g(m2)) hi = m2;
+      else lo = m1;
+    }
+    const at = (lo + hi) / 2;
+    if (g(at) < 1e-6) roots.push(at);
+  }
+  return roots;
+}
+
+const snapAndDedupe = (roots: number[]): number[] => {
   const out: number[] = [];
   for (const r of roots) {
-    const snapped = Math.abs(r - Math.round(r)) < 1e-7 ? Math.round(r) : r;
-    if (!out.some((x) => Math.abs(x - snapped) < 1e-6)) out.push(snapped);
+    const snapped = Math.abs(r - Math.round(r)) < 1e-6 ? Math.round(r) : r;
+    if (!out.some((x) => Math.abs(x - snapped) < 1e-5)) out.push(snapped);
   }
-  return out;
+  return out.sort((a, b) => a - b);
+};
+
+/** The perpendicularity residual |dir(m) × n(m)| (0 ⟺ the line is ⟂ to the plane). */
+function perpResidual(c: Construction3, line: string, plane: string, a: number): number {
+  const ln = lineAtParam(c, line, a);
+  if (!ln) return NaN;
+  const pl = planeAt(c, plane, a);
+  return norm3(cross3(ln.dir, pl.n));
+}
+
+/** Does the parameter value satisfy EVERY pinning given (angles + ⟂s)? */
+function satisfiesAllPins(c: Construction3, a: number): boolean {
+  for (const g of c.planeAngles) {
+    const cos = planesCos(c, g.p1, g.p2, a);
+    if (Number.isNaN(cos) || Math.abs(cos - Math.cos((g.deg * Math.PI) / 180)) > 1e-6) return false;
+  }
+  for (const g of c.linePerps) {
+    const r = perpResidual(c, g.line, g.plane, a);
+    if (Number.isNaN(r) || r > 1e-5) return false;
+  }
+  return true;
+}
+
+/** How many givens pin the parameter (none ⇒ it is a free sampled DOF). */
+export const pinningGivens = (c: Construction3): number => c.planeAngles.length + c.linePerps.length;
+
+/**
+ * All parameter values satisfying EVERY pinning given — 1-DOF numeric root-finding
+ * only (the docs/20 D3 boundary): sign-change bisection for angle givens, minima
+ * scan for ⟂ givens (a non-negative residual), then cross-filtered so a root must
+ * satisfy the whole set.
+ */
+export function paramRoots(c: Construction3): number[] {
+  if (pinningGivens(c) === 0) return [];
+  const candidates: number[] = [];
+  for (const g of c.planeAngles) {
+    const target = Math.cos((g.deg * Math.PI) / 180);
+    candidates.push(...signChangeRoots((a) => planesCos(c, g.p1, g.p2, a) - target));
+  }
+  for (const g of c.linePerps) {
+    candidates.push(...touchZeroRoots((a) => perpResidual(c, g.line, g.plane, a)));
+  }
+  return snapAndDedupe(candidates.filter((a) => satisfiesAllPins(c, a)));
 }
 
 const onPlane = (p: Vec3, pl: ResolvedPlane): boolean => Math.abs(dot3(pl.n, p) + pl.d) <= 1e-7 * (1 + norm3(pl.n));
@@ -164,11 +238,11 @@ const onPlane = (p: Vec3, pl: ResolvedPlane): boolean => Math.abs(dot3(pl.n, p) 
 function chooseParam(c: Construction3, coordPos: Positions3, seed: number): { value: number; roots: number[] } | null {
   if (!c.param) return null;
   const roots = paramRoots(c);
-  if (c.planeAngles.length === 0) {
+  if (pinningGivens(c) === 0) {
     return { value: sample(seed, `param-${c.param}`, -3, 3), roots: [] };
   }
   if (roots.length === 0) return { value: NaN, roots }; // no-roots — surfaced as an honest error
-  const explicit = c.planeAngles.find((g) => g.branch !== undefined)?.branch;
+  const explicit = [...c.planeAngles, ...c.linePerps].find((g) => g.branch !== undefined)?.branch;
   if (explicit !== undefined) return { value: roots[((explicit % roots.length) + roots.length) % roots.length], roots };
   for (const m of c.memberships) {
     const p = coordPos.get(m.id);
@@ -230,8 +304,8 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   for (const name of c.planes.keys()) planes.set(name, planeAt(c, name, a));
 
   const lines = new Map<string, ResolvedLine>();
-  for (const [name, def] of c.lines) {
-    const line = planePlaneLine(planes.get(def.p1)!, planes.get(def.p2)!);
+  for (const [name] of c.lines) {
+    const line = lineAtParam(c, name, a);
     if (line) lines.set(name, line);
   }
 
@@ -286,6 +360,17 @@ function evaluateSolidsAndPoints(
       const from = pos.get(def.from);
       const line = lines.get(def.line);
       if (from && line) pos.set(id, footOnLine(from, line));
+    } else if (def.kind === 'line-plane') {
+      const line = lines.get(def.line);
+      const pl = planes.get(def.plane);
+      if (line && pl) {
+        const denom = dot3(pl.n, line.dir);
+        if (Math.abs(denom) > 1e-10 * Math.max(norm3(pl.n) * norm3(line.dir), 1e-12)) {
+          const t = -(dot3(pl.n, line.anchor) + pl.d) / denom;
+          pos.set(id, add3(line.anchor, scale3(line.dir, t)));
+        }
+        // parallel ⇒ no position — derive3 flags `line-misses-plane` honestly
+      }
     }
   }
 }

@@ -39,6 +39,10 @@ const COMMAND_TYPES = new Set<Command3['type']>([
   'foot-on-plane',
   'plane-plane-line',
   'foot-on-line',
+  'line3',
+  'line-perp-plane',
+  'line-plane-point',
+  'on-line',
 ]);
 
 export function serializeFigure3(facts: Fact3[], seed: number): string {
