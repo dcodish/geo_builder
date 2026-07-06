@@ -146,4 +146,21 @@ Locked by `figure-file3.test.ts` (round-trip incl. disabled facts + a resampled 
 
 **Corpus reality check:** cylinder/cone/sphere never appear in the 572 papers' Q2 — they belong to the 571 paper. The block ships against **curriculum/formula-sheet canonical numbers** (cone r=5,h=12 → ℓ=13, M=65π, V=100π; sphere R=3 → V=36π=M; cylinder r=3,h=7), with 571-corpus validation filed for later.
 
+<!-- ADR-3D-010 follows ADR-3D-009 at the end of this file -->
 **Decisions:** a `revolution` construct (`חרוט שקודקודו S ומרכז בסיסו O, רדיוסו 5 וגובהו 12` — cone/cylinder/sphere, axis vertical): named centre/apex are optional (an unnamed centre stays UNNAMED — no invented labels, the ADR-149 lesson) and **unstated radius/height are FREE sampled DOFs** (ADR-052) that stated numbers pin. Rendering: **sampled outlines** — horizontal circles split front-solid/back-dashed by the eye azimuth, silhouette generators (`±(ẑ×eye)`), the sphere's exact orthographic silhouette (the great circle ⊥ the eye), a dashed axis/height. **Claims:** `נפח החרוט = 100π` / `שטח המעטפת` / `שטח הפנים של הכדור` (π multiplies at parse time), verified from the formula-sheet formulas; **guards at APPLY**: not-exactly-one solid of the kind → `no-such-solid`; unstated sizes → `free-size-claim` (a value on a free-size solid is a scale statement, not a check — never mislabelled "refuted"). Gate: the cone/sphere/cylinder chains He+En + the DOF cue reading 2 (free cone) vs 0 (sized cone).
+
+---
+
+## ADR-3D-010 — V7 T1+T3: vector relations + exam terminology (2026-07-07)
+
+**Context.** Operator: "we need to support all terminology that appear in exams." Plan: docs/20 §13 (T1 vector-defined points · T2 scalar givens · T3 terminology sugar).
+
+**T1 — vector relations (`vec-rel`, the M1 shape).** A pair-LHS vector equation (`AM = ½u+½v+5/3w`, `A'K = 4/5 DN`, `DF = (k/2)DB + kDC'`, `AD = ⅔AB + ⅓AC`) lowers to a NEUTRAL `vec-rel`; **apply decides**: all points known → the V1 vec-eq claim (recorded); exactly ONE unknown point (anywhere — LHS or inside the expression) → a DEFINITION. The relation is AFFINE in the unknown, so 4 residual evaluations determine the affine map and one 3×3 solve places it. A coefficient SYMBOL (`(k/2)`, `k`, `t·BE` — `parseSymExpr`, one letter per relation, `-0` normalised for JSON round-trips) makes it a 1-parameter family: **unpinned k is a FREE sampled DOF (ADR-052)**; a ∥/⟂-to-plane condition (`EF מקביל למישור ABC` — `seg-plane-rel`, apply decides pin-vs-claim) pins it via the existing 1-DOF root finders; **two symbol-relations naming the same point = the cevian intersection**, a closed-form line∩line (must genuinely meet, else `no-solution`). Two unknown points refuse `two-unknowns`.
+
+**The class fix this exposed:** claims created INSIDE composite commands (rect-complete's right angle, vec-rel's claim conversion) escaped derive3's per-cmd verification — twice. Root fix: **apply RECORDS every claim into `Construction3.claims`**, and derive3 attributes them to facts by **count-delta** and verifies them all — a claim can no longer escape verification by being created indirectly.
+
+**T3 — terminology sugar:** on-axes phrasings (`D בראשית הצירים` → a full pin; `A על ציר ה-x החיובי` → a partial pin + sign given — pure sugar over the pivot); the vertex angle form `∠BAC = 90` (lowers to angle-between-segments); mutual-position claims `מצטלבים`/`מקבילים`/`נחתכים` (skew = not parallel ∧ not coplanar); `ABEC מלבן` completes the single unknown corner as the parallelogram point AND records the corner right angle as a claim (a non-right base refuses the "rectangle" honestly).
+
+**Gates (He, En cores):** 2021-חורף-א (C defined by `AD = ⅔AB + ⅓AC` → C=(0,5,−1) ✓, ∠BAC=90 ✓, plane `x+z+1=0` ✓, ABEC rectangle → E=(−3,5,2) ✓); 2021-קיץ-ב (the cevian pair → E=(0,4,0), F=(1.5,3,0) ✓); 2018 (box pinned by on-axes/injections, `A'K = 4/5 DN`, **NK ו-PL מצטלבים ✓**, the false `נחתכים` refused). **282 src3d tests green; `tsc -b` + `build:3d` clean.**
+
+**T2 DEFERRED (the documented remainder of §13):** scalar givens as solve residuals (`|DC⃗|=4`, `∠ADC=120°`, `u·v=24`, `AB=5` replacing `size-on-solid`), the general tetrahedron (`פירמידה ABCD` + `DC ניצב למישור ABC` as a driving given), and the rhombus-base prism — the 2023-ב and 2022-נבצרים chains wait on it. A solver rework, deliberately not rushed at the tail of this batch.

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "app": "3d-builder",
-  "savedAt": "2026-07-06T18:53:12.349Z",
+  "savedAt": "2026-07-06T21:18:29.186Z",
   "seed": 0,
   "facts": [
     {
@@ -66,11 +66,6 @@
       "cmds": [
         {
           "type": "segment3",
-          "a": "C",
-          "b": "A'"
-        },
-        {
-          "type": "segment3",
           "a": "B",
           "b": "C'"
         },
@@ -85,19 +80,15 @@
           "b": "B"
         },
         {
-          "type": "claim",
-          "claim": {
-            "type": "perp-plane",
-            "seg": [
-              "C",
-              "A'"
-            ],
-            "plane": [
-              "B",
-              "C'",
-              "D"
-            ]
-          }
+          "type": "seg-plane-rel",
+          "rel": "perp",
+          "a": "C",
+          "b": "A'",
+          "plane": [
+            "B",
+            "C'",
+            "D"
+          ]
         }
       ]
     },
@@ -134,48 +125,41 @@
       "utterance": "CE = -1/3u - 1/3v + 1/3w",
       "cmds": [
         {
-          "type": "segment3",
-          "a": "C",
-          "b": "E"
-        },
-        {
-          "type": "claim",
-          "claim": {
-            "type": "vec-eq",
-            "lhs": [
-              {
-                "coeff": 1,
-                "atom": {
-                  "kind": "pair",
-                  "from": "C",
-                  "to": "E"
-                }
-              }
-            ],
-            "rhs": [
-              {
-                "coeff": -0.3333333333333333,
-                "atom": {
-                  "kind": "named",
-                  "name": "u"
-                }
+          "type": "vec-rel",
+          "from": "C",
+          "to": "E",
+          "terms": [
+            {
+              "coeff": {
+                "k": -0.3333333333333333,
+                "p": 0
               },
-              {
-                "coeff": -0.3333333333333333,
-                "atom": {
-                  "kind": "named",
-                  "name": "v"
-                }
-              },
-              {
-                "coeff": 0.3333333333333333,
-                "atom": {
-                  "kind": "named",
-                  "name": "w"
-                }
+              "atom": {
+                "kind": "named",
+                "name": "u"
               }
-            ]
-          }
+            },
+            {
+              "coeff": {
+                "k": -0.3333333333333333,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "v"
+              }
+            },
+            {
+              "coeff": {
+                "k": 0.3333333333333333,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "w"
+              }
+            }
+          ]
         }
       ]
     },

@@ -84,7 +84,23 @@ function clone(c: Construction3): Construction3 {
     pointPlanes: new Map(c.pointPlanes),
     pointLines: new Map(c.pointLines),
     revolutions: [...c.revolutions],
+    vecDefs: [...c.vecDefs],
+    symbolPins: [...c.symbolPins],
+    claims: [...c.claims],
   };
+}
+
+/** Every point id a SymTerm list references (pair endpoints + named vectors' endpoints). */
+function relPointIds(c: Construction3, from: Id, to: Id, terms: { atom: import('./types').VecAtom }[]): Id[] {
+  const ids = [from, to];
+  for (const t of terms) {
+    if (t.atom.kind === 'pair') ids.push(t.atom.from, t.atom.to);
+    else {
+      const def = c.vectors.get(t.atom.name);
+      if (def) ids.push(def.from, def.to);
+    }
+  }
+  return ids;
 }
 
 const samePair = (p: [Id, Id], a: Id, b: Id): boolean => (p[0] === a && p[1] === b) || (p[0] === b && p[1] === a);
@@ -129,6 +145,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
     case 'plane-eq':
       return missingPoint(c, claim.ids);
     case 'angle-seg-eq':
+      return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
+    case 'lines-rel':
       return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
     case 'length-ratio':
       return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
@@ -225,7 +243,9 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
     case 'claim': {
       const err = claimRefsError(c, cmd.claim);
       if (err) return { ok: false, error: err };
-      return { ok: true, next: c }; // a claim adds nothing — it is verified by the store (derive3)
+      const next = clone(c);
+      next.claims.push(cmd.claim); // recorded — derive3 verifies EVERY recorded claim (fact-attributed)
+      return { ok: true, next };
     }
 
     // --- V2: the algebraic lane ---
@@ -380,6 +400,122 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       if (missing) return { ok: false, error: missing };
       const next = clone(c);
       next.pointLines.set(cmd.name, { a: cmd.a, b: cmd.b });
+      return { ok: true, next };
+    }
+
+    // --- V7: vector relations (the M1 reinterpretation shape) ---
+
+    case 'vec-rel': {
+      // named vectors must exist
+      for (const t of cmd.terms) {
+        if (t.atom.kind === 'named' && !c.vectors.has(t.atom.name)) {
+          return { ok: false, error: { code: 'unknown-vector', id: t.atom.name } };
+        }
+      }
+      const unknowns = [...new Set(relPointIds(c, cmd.from, cmd.to, cmd.terms).filter((id) => !c.points.has(id)))];
+      if (unknowns.length === 0) {
+        // the CEVIAN pair: a second symbol-relation naming an already vec-defined point
+        if (cmd.symbol) {
+          const target = relPointIds(c, cmd.from, cmd.to, cmd.terms).find((id) => {
+            const d = c.points.get(id);
+            return d?.kind === 'vec-defined' && c.vecDefs[d.def].symbol !== undefined && !c.symbolPins.some((p) => p.def === d.def);
+          });
+          if (target) {
+            const d = c.points.get(target) as { kind: 'vec-defined'; def: number };
+            const next = clone(c);
+            const def2 = next.vecDefs.length;
+            next.vecDefs.push({ from: cmd.from, to: cmd.to, terms: cmd.terms, unknown: target, symbol: cmd.symbol });
+            next.points.set(target, { kind: 'vec-pair', def1: d.def, def2 });
+            return { ok: true, next };
+          }
+          return { ok: false, error: { code: 'no-solution', id: cmd.from } };
+        }
+        const asClaim = applyCommand3(c, {
+          type: 'claim',
+          claim: { type: 'vec-eq', lhs: [{ coeff: 1, atom: { kind: 'pair', from: cmd.from, to: cmd.to } }], rhs: cmd.terms.map((t) => ({ coeff: t.coeff.k, atom: t.atom })) },
+        });
+        if (!asClaim.ok) return asClaim;
+        // the stated vector is drawn (the V1 auto-draw convention, preserved through the relation path)
+        if (hasSegment(asClaim.next, cmd.from, cmd.to)) return asClaim;
+        const withSeg = clone(asClaim.next);
+        withSeg.segments.push([cmd.from, cmd.to]);
+        return { ok: true, next: withSeg };
+      }
+      if (unknowns.length > 1) return { ok: false, error: { code: 'two-unknowns', id: unknowns[1] } };
+      const unknown = unknowns[0];
+      const next = clone(c);
+      const defIndex = next.vecDefs.length;
+      next.vecDefs.push({ from: cmd.from, to: cmd.to, terms: cmd.terms, unknown, symbol: cmd.symbol });
+      next.points.set(unknown, { kind: 'vec-defined', def: defIndex });
+      if (!hasSegment(next, cmd.from, cmd.to)) next.segments.push([cmd.from, cmd.to]); // the stated vector is drawn
+      return { ok: true, next };
+    }
+
+    case 'seg-plane-rel': {
+      const missingPlane = missingPoint(c, cmd.plane);
+      if (missingPlane) return { ok: false, error: missingPlane };
+      // an endpoint that is a SYMBOLIC vec-defined point → this condition PINS its symbol
+      for (const end of [cmd.a, cmd.b]) {
+        const def = c.points.get(end);
+        if (def?.kind === 'vec-defined') {
+          const vd = c.vecDefs[def.def];
+          if (vd.symbol && !c.symbolPins.some((p) => p.def === def.def)) {
+            const other = end === cmd.a ? cmd.b : cmd.a;
+            if (!c.points.has(other)) return { ok: false, error: { code: 'unknown-point', id: other } };
+            const next = clone(c);
+            next.symbolPins.push({ rel: cmd.rel, a: cmd.a, b: cmd.b, plane: cmd.plane, def: def.def });
+            next.segments.push([cmd.a, cmd.b]);
+            return { ok: true, next };
+          }
+        }
+      }
+      // otherwise: ⟂ is the existing claim; ∥-to-plane as a claim is not yet demanded
+      const missing = missingPoint(c, [cmd.a, cmd.b]);
+      if (missing) return { ok: false, error: missing };
+      if (cmd.rel === 'perp' && cmd.plane.length === 3) {
+        const asClaim = applyCommand3(c, { type: 'claim', claim: { type: 'perp-plane', seg: [cmd.a, cmd.b], plane: [cmd.plane[0], cmd.plane[1], cmd.plane[2]] } });
+        if (!asClaim.ok || hasSegment(asClaim.next, cmd.a, cmd.b)) return asClaim;
+        const withSeg = clone(asClaim.next);
+        withSeg.segments.push([cmd.a, cmd.b]); // the stated segment is drawn (V1 convention preserved)
+        return { ok: true, next: withSeg };
+      }
+      return { ok: false, error: { code: 'no-solution', id: cmd.a } };
+    }
+
+    case 'rect-complete': {
+      // `WXYZ מלבן`: exactly ONE unknown corner completes as the parallelogram point
+      // (opposite + both neighbours), then the corner right angle is VERIFIED — a base
+      // that isn't right-angled refuses the "rectangle" honestly.
+      const unknowns = cmd.ids.filter((id) => !c.points.has(id));
+      if (unknowns.length !== 1) {
+        return unknowns.length === 0
+          ? { ok: false, error: { code: 'already-defined', id: cmd.ids[0] } }
+          : { ok: false, error: { code: 'two-unknowns', id: unknowns[1] } };
+      }
+      const i = cmd.ids.indexOf(unknowns[0]);
+      const opp = cmd.ids[(i + 2) % 4];
+      const n1 = cmd.ids[(i + 1) % 4];
+      const n2 = cmd.ids[(i + 3) % 4];
+      const asDef = applyCommand3(c, {
+        type: 'vec-rel',
+        from: opp,
+        to: unknowns[0],
+        terms: [
+          { coeff: { k: 1, p: 0 }, atom: { kind: 'pair', from: opp, to: n1 } },
+          { coeff: { k: 1, p: 0 }, atom: { kind: 'pair', from: opp, to: n2 } },
+        ],
+      });
+      if (!asDef.ok) return asDef;
+      const withAngle = applyCommand3(asDef.next, {
+        type: 'claim',
+        claim: { type: 'angle-seg-eq', a1: n1, b1: opp, a2: n1, b2: unknowns[0], deg: 90 },
+      });
+      if (!withAngle.ok) return withAngle;
+      const next = clone(withAngle.next);
+      for (let j = 0; j < 4; j++) {
+        const [a, b] = [cmd.ids[j], cmd.ids[(j + 1) % 4]];
+        if (!hasSegment(next, a, b)) next.segments.push([a, b]);
+      }
       return { ok: true, next };
     }
 

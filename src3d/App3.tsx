@@ -55,6 +55,8 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.noSuchSolid', { id: err.id });
     case 'free-size-claim':
       return t('err.freeSizeClaim', { id: err.id });
+    case 'two-unknowns':
+      return t('err.twoUnknowns', { id: err.id });
     case 'size-on-solid':
       return t('err.sizeOnSolid');
     case 'bad-name':

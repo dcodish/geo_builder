@@ -58,6 +58,15 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'claims', he: 'ℓ אינו מקביל ל-π1 לכל m', en: 'ℓ is not parallel to plane π1 for every m' },
   { category: 'claims', he: 'נפח החרוט = 100π', en: 'the volume of the cone = 100π' },
   { category: 'claims', he: 'שטח המעטפת של החרוט = 65π', en: 'the lateral area of the cone = 65π' },
+  // --- V7: vector relations & exam terminology ---
+  { category: 'points', he: "A'K = 4/5 DN", en: "A'K = 4/5 DN" },
+  { category: 'points', he: "DF = (k/2)DB + kDC'", en: "DF = (k/2)DB + kDC'" },
+  { category: 'points', he: 'EF מקביל למישור ABC', en: 'EF is parallel to plane ABC' },
+  { category: 'points', he: 'ABEC מלבן', en: 'ABEC is a rectangle' },
+  { category: 'points', he: 'D בראשית הצירים', en: 'D is at the origin' },
+  { category: 'points', he: 'A על ציר ה-x החיובי', en: 'A is on the positive x-axis' },
+  { category: 'claims', he: '∠BAC = 90', en: '∠BAC = 90' },
+  { category: 'claims', he: 'NK ו-PL מצטלבים', en: 'NK and PL are skew' },
   // --- drawing ---
   { category: 'drawing', he: "קטע CA'", en: "segment CA'" },
 ];

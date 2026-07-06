@@ -17,7 +17,7 @@
  *    refuse rather than silently drop it.
  */
 
-import type { Command3, Id, LinExpr, VecExpr } from '../engine/types';
+import type { Command3, Id, LinExpr, SymTerm, VecExpr } from '../engine/types';
 
 export type ParseResult3 = { ok: true; commands: Command3[] } | { ok: false; reason: 'not-handled' };
 
@@ -231,12 +231,13 @@ const perpPlaneClaim: Rule = (s0) => {
   );
   if (!m) return null;
   const [, s1, s2, p1, p2, p3] = m;
+  // lowered as a RELATION: the engine decides — a symbol PIN when an endpoint is a
+  // symbolic vec-defined point (V7), else the V1 perp-plane claim (segments drawn by apply)
   return [
-    { type: 'segment3', a: s1, b: s2 },
     { type: 'segment3', a: p1, b: p2 },
     { type: 'segment3', a: p2, b: p3 },
     { type: 'segment3', a: p3, b: p1 },
-    { type: 'claim', claim: { type: 'perp-plane', seg: [s1, s2], plane: [p1, p2, p3] } },
+    { type: 'seg-plane-rel', rel: 'perp', a: s1, b: s2, plane: [p1, p2, p3] },
   ];
 };
 
@@ -267,16 +268,93 @@ const spanPoint: Rule = (s) => {
   ];
 };
 
-/** `AM = ½u + ½v + 5/3w` (both sides linear combinations) — the student's ANSWER, a claim. */
+/**
+ * A term whose coefficient may carry ONE scalar symbol (V7): `(k/2)DB`, `kDC`,
+ * `2k·u`, `t·BE`, plus every numeric form. Null on anything else.
+ */
+const SYM_TERM =
+  /^([+-])?\s*(?:\(([^()]+)\)\s*[·×*]?\s*)?((?:\d+(?:\.\d+)?)(?:\s*\/\s*\d+(?:\.\d+)?)?|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛])?\s*[·×*]?\s*([a-w])?\s*[·×*]?\s*(?:([A-Z]\d*'?)([A-Z]\d*'?)|([a-z]))\s*(?:\/\s*(\d+(?:\.\d+)?))?$/;
+
+export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string } | null {
+  const parts = src
+    .trim()
+    .split(/(?=[+-])/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return null;
+  const terms: SymTerm[] = [];
+  let symbol: string | undefined;
+  const bindSymbol = (letter: string): boolean => {
+    if (symbol && symbol !== letter) return false;
+    symbol = letter;
+    return true;
+  };
+  for (const part of parts) {
+    const m = part.match(SYM_TERM);
+    if (!m) return null;
+    const [, sign, paren, numRaw, symLetter, pairA, pairB, named, divisor] = m;
+    let coeff: LinExpr = { k: 1, p: 0 };
+    if (paren) {
+      const inner = paren.match(/^([a-w])\s*\/\s*(\d+(?:\.\d+)?)$/); // the (k/2) form
+      if (inner) {
+        if (!bindSymbol(inner[1])) return null;
+        coeff = { k: 0, p: 1 / +inner[2] };
+      } else {
+        const pe = parseParamExpr(paren);
+        if (!pe) return null;
+        if (pe.param && !bindSymbol(pe.param)) return null;
+        coeff = pe.expr;
+      }
+    }
+    if (numRaw !== undefined && numRaw !== '') {
+      const n = parseCoeff(numRaw);
+      if (n === null) return null;
+      coeff = { k: coeff.k * n, p: coeff.p * n };
+    }
+    if (symLetter) {
+      if (!bindSymbol(symLetter)) return null;
+      coeff = { k: 0, p: coeff.k }; // the letter multiplies the numeric part
+    }
+    if (divisor) {
+      coeff = { k: coeff.k / +divisor, p: coeff.p / +divisor };
+    }
+    const neg = (x: number) => (x === 0 ? 0 : -x); // never emit -0 (JSON round-trips it to 0)
+    const signed: LinExpr = sign === '-' ? { k: neg(coeff.k), p: neg(coeff.p) } : coeff;
+    if (pairA) terms.push({ coeff: signed, atom: { kind: 'pair', from: pairA, to: pairB } });
+    else terms.push({ coeff: signed, atom: { kind: 'named', name: named } });
+  }
+  return { terms, symbol };
+}
+
+/**
+ * `AM = ½u + ½v + 5/3w` / `DF = (k/2)DB + kDC` / `A'K = 4/5 DN` — a VECTOR
+ * RELATION: pair-LHS forms lower to `vec-rel` and the ENGINE decides claim vs
+ * definition (the M1 shape); a non-pair LHS stays a plain claim.
+ */
 const vecEqClaim: Rule = (s0) => {
   const s = stripProofPrefix(s0);
   if (GREEK.test(s)) return null; // unknown scalars belong to spanPoint, never a claim
   const parts = s.split('=');
   if (parts.length !== 2) return null;
+  const lhsPair = parts[0].trim().match(/^([A-Z]\d*'?)([A-Z]\d*'?)$/);
+  if (lhsPair) {
+    const rhs = parseSymExpr(parts[1]);
+    if (!rhs) return null;
+    return [{ type: 'vec-rel', from: lhsPair[1], to: lhsPair[2], terms: rhs.terms, symbol: rhs.symbol }];
+  }
   const lhs = parseVecExpr(parts[0]);
   const rhs = parseVecExpr(parts[1]);
   if (!lhs || !rhs) return null;
   return [...segmentsOf(lhs), ...segmentsOf(rhs), { type: 'claim', claim: { type: 'vec-eq', lhs, rhs } }];
+};
+
+/** `EF מקביל למישור ABC` / `EF is parallel to plane ABC` — pins a symbol or (⟂ only) claims. */
+const segParallelPlane: Rule = (s) => {
+  const m =
+    s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+מקביל\s+למישור\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s*$/) ??
+    s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:is\s+)?parallel\s+to\s+(?:the\s+)?plane\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s*$/);
+  if (!m) return null;
+  return [{ type: 'seg-plane-rel', rel: 'parallel', a: m[1], b: m[2], plane: [m[3], m[4], m[5]] }];
 };
 
 /** A bare auxiliary segment: `AM` / `קטע AM` / `segment CA'`. Last rule — everything else wins first. */
@@ -733,6 +811,66 @@ const lateralAreaClaim: Rule = (s) => {
   return [{ type: 'claim', claim: { type: 'lateral-area-eq', solid: REV_KIND[m[1]], value } }];
 };
 
+// --- V7 T3: exam terminology sugar ---
+
+/** `D בראשית הצירים` / `A על ציר ה-x החיובי` — on-axes phrasings lower to (partial) pins + sign givens. */
+const onAxes: Rule = (s) => {
+  const origin = s.match(/^([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+|is\s+)?(?:בראשית הצירים|at the origin)$/);
+  if (origin) return [{ type: 'point3', id: origin[1], x: 0, y: 0, z: 0 }];
+  const axis = s.match(
+    /^([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?(?:על ציר ה-?([xyz])(?:\s+(החיובי|השלילי))?|on the (positive |negative )?([xyz])[- ]axis)$/,
+  );
+  if (!axis) return null;
+  const id = axis[1];
+  const ax = (axis[2] ?? axis[5]) as 'x' | 'y' | 'z';
+  const signWord = axis[3] ?? axis[4]?.trim();
+  const zero = { x: 0 as number | null, y: 0 as number | null, z: 0 as number | null };
+  zero[ax] = null; // the on-axis coordinate stays free
+  const cmds: Command3[] = [{ type: 'point3', id, x: zero.x, y: zero.y, z: zero.z }];
+  if (signWord) cmds.push({ type: 'sign-given', id, axis: ax, positive: signWord === 'החיובי' || signWord === 'positive' });
+  return cmds;
+};
+
+/** `∠PC'C = 82.1` / `הזווית PC'C היא 90` — the vertex form lowers to the angle-between-segments claim. */
+const vertexAngleClaim: Rule = (s0) => {
+  const s = stripProofPrefix(s0);
+  const m = s.match(
+    new RegExp(`^(?:∠|הזווית\\s+|the angle\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*(?:היא|הוא|is|=)\\s*(${NUM})\\s*°?$`),
+  );
+  if (!m) return null;
+  const [, p, vertex, q, deg] = m;
+  return [
+    { type: 'segment3', a: vertex, b: p },
+    { type: 'segment3', a: vertex, b: q },
+    { type: 'claim', claim: { type: 'angle-seg-eq', a1: vertex, b1: p, a2: vertex, b2: q, deg: +deg } },
+  ];
+};
+
+/** `NK ו-PL מצטלבים` / `NK and PL are skew` (+ מקבילים/parallel, נחתכים/intersect) — mutual-position claims. */
+const mutualPositionClaim: Rule = (s0) => {
+  const s = stripProofPrefix(s0);
+  const m =
+    s.match(/^(?:הישרים\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+ו-?([A-Z]\d*'?)([A-Z]\d*'?)\s+(מצטלבים|מקבילים|נחתכים)$/) ??
+    s.match(/^(?:lines\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+and\s+([A-Z]\d*'?)([A-Z]\d*'?)\s+are\s+(skew|parallel|intersecting)$/);
+  if (!m) return null;
+  const rel = m[5] === 'מצטלבים' || m[5] === 'skew' ? 'skew' : m[5] === 'מקבילים' || m[5] === 'parallel' ? 'parallel' : 'intersect';
+  return [
+    { type: 'segment3', a: m[1], b: m[2] },
+    { type: 'segment3', a: m[3], b: m[4] },
+    { type: 'claim', claim: { type: 'lines-rel', a1: m[1], b1: m[2], a2: m[3], b2: m[4], rel } },
+  ];
+};
+
+/** `ABEC מלבן` / `ABEC is a rectangle` — completes the single unknown corner (verified right-angled). */
+const rectComplete: Rule = (s) => {
+  const m =
+    s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?מלבן$/) ??
+    s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s+is\s+a\s+rectangle$/) ??
+    s.match(/^מלבן\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)$/);
+  if (!m) return null;
+  return [{ type: 'rect-complete', ids: [m[1], m[2], m[3], m[4]] }];
+};
+
 /** `A = (2, 0, -10)` — a coordinates CLAIM (the student's answer for a derived point). */
 const coordsClaim: Rule = (s) => {
   const m = s.match(new RegExp(`^([A-Z]\\d*'?)\\s*=\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)$`));
@@ -781,10 +919,14 @@ const RULES: Rule[] = [
   segLineCutsPointPlane, // `הישר A'C חותך את המישור BC'D בנקודה K` — before the ℓ-name cut rule
   coordPoint,
   vectorInjection,
+  onAxes, // `על ציר ה-x` before the generic membership/on-segment rules
   membership, // before onSegment: `על אחד המישורים` must never read as a point-on-segment
   onLineMembership, // likewise for `על הישר ℓ`
   angleBetweenPlanes,
   angleSegClaim,
+  vertexAngleClaim,
+  mutualPositionClaim,
+  rectComplete,
   linePerpPlane,
   neverParallelClaim,
   lineCutsPlane,
@@ -794,6 +936,7 @@ const RULES: Rule[] = [
   nameVectors,
   centroidRule,
   perpPlaneClaim,
+  segParallelPlane,
   collinearClaim,
   midpoint,
   spanPoint, // MUST precede onSegment: Greek scalars would otherwise parse as a free point, silently dropping the condition

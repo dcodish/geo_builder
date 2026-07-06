@@ -54,21 +54,20 @@ describe('נסמן / denote — vector naming', () => {
 });
 
 describe('claims', () => {
-  it('vec-eq: auto-draws its pair segments, then the claim', () => {
+  it('a pair-LHS vector equation lowers to a vec-rel (the engine decides claim vs definition)', () => {
     const r = cmds('AM = 1/2u + 1/2v + 5/3w');
-    expect(r[0]).toEqual({ type: 'segment3', a: 'A', b: 'M' });
-    expect(r[1]).toMatchObject({ type: 'claim', claim: { type: 'vec-eq' } });
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ type: 'vec-rel', from: 'A', to: 'M', symbol: undefined });
   });
-  it('perp-plane, Hebrew + English + proof prefix, draws segment + plane triangle', () => {
+  it('perp-plane, Hebrew + English + proof prefix, lowers to a seg-plane-rel + the plane triangle', () => {
     for (const input of [
       "CA' מאונך למישור BC'D",
       "הוכיחו כי CA' מאונך למישור BC'D",
       "CA' is perpendicular to plane BC'D",
     ]) {
       const r = cmds(input);
-      expect(r).toHaveLength(5);
-      expect(r[0]).toEqual({ type: 'segment3', a: 'C', b: "A'" });
-      expect(r[4]).toEqual({ type: 'claim', claim: { type: 'perp-plane', seg: ['C', "A'"], plane: ['B', "C'", 'D'] } });
+      expect(r).toHaveLength(4);
+      expect(r[3]).toEqual({ type: 'seg-plane-rel', rel: 'perp', a: 'C', b: "A'", plane: ['B', "C'", 'D'] });
     }
   });
   it('collinear, Hebrew + English', () => {

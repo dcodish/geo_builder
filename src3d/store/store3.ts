@@ -67,12 +67,14 @@ export type StoreError3 =
 export function derive3(facts: Fact3[], seed: number): Derived3 {
   let c: Construction3 = emptyConstruction3();
   const status: Record<string, FactStatus3> = {};
+  const claimOwners: { factId: string; from: number; to: number }[] = [];
   for (const f of facts) {
     if (!f.enabled) {
       status[f.id] = 'disabled';
       continue;
     }
     let st: FactStatus3 = 'ok';
+    const claimsBefore = c.claims.length;
     for (const cmd of f.cmds) {
       const r = applyCommand3(c, cmd);
       if (!r.ok) {
@@ -81,27 +83,37 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
       }
       c = r.next;
     }
+    // count-delta attribution: EVERY claim recorded while this fact applied belongs to
+    // it — including claims composite commands create indirectly (none can escape)
+    if (c.claims.length > claimsBefore) claimOwners.push({ factId: f.id, from: claimsBefore, to: c.claims.length });
     status[f.id] = st;
   }
 
   const resolved = resolve3(c, seed);
   const positions = resolved.positions;
 
+  // verify every recorded claim against the FINAL figure, attributed to its fact
+  for (const owner of claimOwners) {
+    if (status[owner.factId] !== 'ok') continue;
+    for (let i = owner.from; i < owner.to; i++) {
+      const claim = c.claims[i];
+      // V2 honest boundary: a numeric size on a free-dim solid figure is a SCALE
+      // statement, not a check — refuse with a clear message rather than "refute" it.
+      if ((claim.type === 'length-eq' || claim.type === 'area-eq') && c.solids.length > 0) {
+        status[owner.factId] = { code: 'size-on-solid' };
+        break;
+      }
+      if (!verifyClaim(claim, c, seed)) {
+        status[owner.factId] = { code: 'claim-refuted' };
+        break;
+      }
+    }
+  }
+
   for (const f of facts) {
     if (status[f.id] !== 'ok') continue;
     for (const cmd of f.cmds) {
-      if (cmd.type === 'claim') {
-        // V2 honest boundary: a numeric size on a free-dim solid figure is a SCALE
-        // statement, not a check — refuse with a clear message rather than "refute" it.
-        if ((cmd.claim.type === 'length-eq' || cmd.claim.type === 'area-eq') && c.solids.length > 0) {
-          status[f.id] = { code: 'size-on-solid' };
-          break;
-        }
-        if (!verifyClaim(cmd.claim, c, seed)) {
-          status[f.id] = { code: 'claim-refuted' };
-          break;
-        }
-      } else if (cmd.type === 'point-in-span') {
+      if (cmd.type === 'point-in-span') {
         const def = c.points.get(cmd.id);
         if (def?.kind === 'in-span') {
           const verdict = checkInSpan(c, cmd.id, def, positions);
@@ -116,6 +128,32 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
           status[f.id] = { code: 'no-roots' };
           break;
         }
+      } else if (cmd.type === 'vec-rel' || cmd.type === 'seg-plane-rel') {
+        // a vec-defined/vec-pair point (or a pinned symbol) that found NO position → honest refusal
+        const ids =
+          cmd.type === 'vec-rel'
+            ? [
+                cmd.from,
+                cmd.to,
+                ...cmd.terms.flatMap((t) =>
+                  t.atom.kind === 'pair'
+                    ? [t.atom.from, t.atom.to]
+                    : (() => {
+                        const dv = c.vectors.get(t.atom.name);
+                        return dv ? [dv.from, dv.to] : [];
+                      })(),
+                ),
+              ]
+            : [cmd.a, cmd.b];
+        const missing = ids.find((id) => {
+          const def = c.points.get(id);
+          return (def?.kind === 'vec-defined' || def?.kind === 'vec-pair') && !positions.has(id);
+        });
+        if (missing) {
+          status[f.id] = { code: 'no-solution', id: missing };
+          break;
+        }
+        // (claims these relations may have recorded are verified by the count-delta pass above)
       } else if (cmd.type === 'line-plane-point') {
         if (!positions.has(cmd.id)) {
           status[f.id] = { code: 'line-misses-plane', id: cmd.id }; // parallel at the chosen parameter

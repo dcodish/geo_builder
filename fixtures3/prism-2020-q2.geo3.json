@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "app": "3d-builder",
-  "savedAt": "2026-07-06T18:53:12.347Z",
+  "savedAt": "2026-07-06T21:18:29.183Z",
   "seed": 0,
   "facts": [
     {
@@ -87,48 +87,41 @@
       "utterance": "AM = 1/2u + 1/2v + 5/3w",
       "cmds": [
         {
-          "type": "segment3",
-          "a": "A",
-          "b": "M"
-        },
-        {
-          "type": "claim",
-          "claim": {
-            "type": "vec-eq",
-            "lhs": [
-              {
-                "coeff": 1,
-                "atom": {
-                  "kind": "pair",
-                  "from": "A",
-                  "to": "M"
-                }
-              }
-            ],
-            "rhs": [
-              {
-                "coeff": 0.5,
-                "atom": {
-                  "kind": "named",
-                  "name": "u"
-                }
+          "type": "vec-rel",
+          "from": "A",
+          "to": "M",
+          "terms": [
+            {
+              "coeff": {
+                "k": 0.5,
+                "p": 0
               },
-              {
-                "coeff": 0.5,
-                "atom": {
-                  "kind": "named",
-                  "name": "v"
-                }
-              },
-              {
-                "coeff": 1.6666666666666667,
-                "atom": {
-                  "kind": "named",
-                  "name": "w"
-                }
+              "atom": {
+                "kind": "named",
+                "name": "u"
               }
-            ]
-          }
+            },
+            {
+              "coeff": {
+                "k": 0.5,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "v"
+              }
+            },
+            {
+              "coeff": {
+                "k": 1.6666666666666667,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "w"
+              }
+            }
+          ]
         }
       ]
     },
@@ -162,41 +155,31 @@
       "utterance": "KP = 1/5u + 1/5v",
       "cmds": [
         {
-          "type": "segment3",
-          "a": "K",
-          "b": "P"
-        },
-        {
-          "type": "claim",
-          "claim": {
-            "type": "vec-eq",
-            "lhs": [
-              {
-                "coeff": 1,
-                "atom": {
-                  "kind": "pair",
-                  "from": "K",
-                  "to": "P"
-                }
-              }
-            ],
-            "rhs": [
-              {
-                "coeff": 0.2,
-                "atom": {
-                  "kind": "named",
-                  "name": "u"
-                }
+          "type": "vec-rel",
+          "from": "K",
+          "to": "P",
+          "terms": [
+            {
+              "coeff": {
+                "k": 0.2,
+                "p": 0
               },
-              {
-                "coeff": 0.2,
-                "atom": {
-                  "kind": "named",
-                  "name": "v"
-                }
+              "atom": {
+                "kind": "named",
+                "name": "u"
               }
-            ]
-          }
+            },
+            {
+              "coeff": {
+                "k": 0.2,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "v"
+              }
+            }
+          ]
         }
       ]
     }

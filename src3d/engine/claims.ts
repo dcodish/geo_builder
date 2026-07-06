@@ -113,6 +113,18 @@ function holdsAt(claim: Claim3, c: Construction3, pos: Positions3): boolean {
       }
       return Math.abs(actual - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
     }
+    case 'lines-rel': {
+      const [a1, b1, a2, b2] = [claim.a1, claim.b1, claim.a2, claim.b2].map((id) => pos.get(id));
+      if (!a1 || !b1 || !a2 || !b2) return false;
+      const d1 = sub3(b1, a1);
+      const d2 = sub3(b2, a2);
+      const den = Math.max(norm3(d1) * norm3(d2), 1e-12);
+      const parallel = norm3(cross3(d1, d2)) / den <= 1e-7;
+      const coplanar = Math.abs(dot3(sub3(a2, a1), cross3(d1, d2))) / Math.max(den * norm3(sub3(a2, a1)), 1e-12) <= 1e-7;
+      if (claim.rel === 'parallel') return parallel;
+      if (claim.rel === 'intersect') return !parallel && coplanar;
+      return !parallel && !coplanar; // skew (מצטלבים)
+    }
     case 'never-parallel': {
       // "ℓ ∦ π for EVERY parameter value" (2024-Q2 א): parallel ⟺ dir(m)·n(m) = 0,
       // so the claim holds iff that residual has NO zero over the scanned range —

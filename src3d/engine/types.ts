@@ -38,6 +38,12 @@ export interface VecTerm {
 /** A linear combination Σ coeff·atom — the ONLY expression form (no CAS). */
 export type VecExpr = VecTerm[];
 
+/** A term whose coefficient may be linear in ONE scalar symbol (V7: `(k/2)·DB⃗`): coeff = k + p·symbol. */
+export interface SymTerm {
+  coeff: LinExpr;
+  atom: VecAtom;
+}
+
 export type Claim3 =
   | { type: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // AM = ½u + ½v + 5/3·w
   | { type: 'perp-plane'; seg: [Id, Id]; plane: [Id, Id, Id] } // CA' ⊥ plane BC'D
@@ -50,7 +56,8 @@ export type Claim3 =
   | { type: 'angle-seg-eq'; a1: Id; b1: Id; a2: Id; b2: Id; deg: number } // הזווית בין A'C לבין BC' היא 90 (between lines, ≤90°)
   | { type: 'length-ratio'; a1: Id; b1: Id; a2: Id; b2: Id; p: number; q: number } // A'K : A'C = 2 : 3
   | { type: 'volume-eq'; solid: string; value: number } // נפח החרוט = 100π (value in world units³, π parsed)
-  | { type: 'lateral-area-eq'; solid: string; value: number }; // שטח המעטפת של החרוט = 65π
+  | { type: 'lateral-area-eq'; solid: string; value: number } // שטח המעטפת של החרוט = 65π
+  | { type: 'lines-rel'; a1: Id; b1: Id; a2: Id; b2: Id; rel: 'skew' | 'parallel' | 'intersect' }; // NK ו-PL מצטלבים (V7 T3)
 
 // ---------------------------------------------------------------------------
 // The algebraic lane (V2 — docs/20 §6.3): coefficients may carry ONE symbolic
@@ -198,6 +205,34 @@ export interface PlaneThroughCommand {
   ids: Id[];
 }
 
+/**
+ * V7 — a vector RELATION `X⃗Y = Σ coeff·atom` (coefficients may carry ONE scalar
+ * symbol). APPLY decides its meaning (the M1 shape): all points known → a vec-eq
+ * CLAIM; exactly one unknown point → a DEFINITION (affine, one 3×3 solve; with a
+ * symbol, a 1-parameter family a later condition pins; TWO symbol-relations on the
+ * same unknown = the cevian intersection, closed form).
+ */
+export interface VecRelCommand {
+  type: 'vec-rel';
+  from: Id;
+  to: Id;
+  terms: SymTerm[];
+  symbol?: string;
+}
+
+/**
+ * V7 — a segment/vector ∥-or-⟂-to-plane RELATION. APPLY decides: when an endpoint
+ * is an unpinned symbolic vec-defined point → the condition PINS its symbol;
+ * otherwise it is a claim (⟂ only; ∥-to-plane claims arrive with demand).
+ */
+export interface SegPlaneRelCommand {
+  type: 'seg-plane-rel';
+  rel: 'parallel' | 'perp';
+  a: Id;
+  b: Id;
+  plane: Id[];
+}
+
 /** `הישר A'C` as an object (V5): a named line through two existing points. */
 export interface LineThroughCommand {
   type: 'line-through';
@@ -340,7 +375,10 @@ export type Command3 =
   | SignGivenCommand
   | PlaneThroughCommand
   | LineThroughCommand
-  | RevolutionCommand;
+  | RevolutionCommand
+  | VecRelCommand
+  | SegPlaneRelCommand
+  | { type: 'rect-complete'; ids: [Id, Id, Id, Id] }; // `ABEC מלבן` — completes the single unknown corner (V7 T3)
 
 // ---------------------------------------------------------------------------
 // Construction (what apply builds, what evaluate consumes)
@@ -363,7 +401,9 @@ export type PointDef =
   | { kind: 'foot-plane'; from: Id; plane: string }
   | { kind: 'foot-line'; from: Id; line: string }
   | { kind: 'line-plane'; line: string; plane: string }
-  | { kind: 'rev-point'; rev: number; role: 'center' | 'apex' };
+  | { kind: 'rev-point'; rev: number; role: 'center' | 'apex' }
+  | { kind: 'vec-defined'; def: number } // solved from construction.vecDefs[def]
+  | { kind: 'vec-pair'; def1: number; def2: number }; // the cevian intersection (two symbol relations)
 
 export interface Construction3 {
   solids: SolidObj[];
@@ -399,6 +439,14 @@ export interface Construction3 {
   pointLines: Map<string, { a: Id; b: Id }>;
   /** V6 — solids of revolution. */
   revolutions: RevolutionObj[];
+  /** V7 — vector definitions: `X⃗Y = Σ terms`, solving `unknown` (affine; `symbol` = the free coefficient). */
+  vecDefs: { from: Id; to: Id; terms: SymTerm[]; unknown: Id; symbol?: string }[];
+  /** V7 — conditions that PIN a vec-def's symbol (∥/⟂ to a plane through points). */
+  symbolPins: { rel: 'parallel' | 'perp'; a: Id; b: Id; plane: Id[]; def: number }[];
+  /** Every claim RECORDED by apply (incl. ones composite commands create) — derive3
+   *  attributes them to facts by count-delta and verifies them all; a claim can
+   *  never escape verification by being created indirectly. */
+  claims: Claim3[];
 }
 
 export const emptyConstruction3 = (): Construction3 => ({
@@ -418,6 +466,9 @@ export const emptyConstruction3 = (): Construction3 => ({
   pointPlanes: new Map(),
   pointLines: new Map(),
   revolutions: [],
+  vecDefs: [],
+  symbolPins: [],
+  claims: [],
 });
 
 // ---------------------------------------------------------------------------
@@ -446,6 +497,7 @@ export type EngineError3 =
   | { code: 'sign-unsatisfiable'; id: Id } // no pivot solution has the stated coordinate sign
   | { code: 'no-such-solid'; id: string } // a volume/area claim names a solid kind the figure doesn't have (or has twice)
   | { code: 'free-size-claim'; id: string } // a numeric volume/area claim on a solid whose dims are unstated
+  | { code: 'two-unknowns'; id: Id } // a vector relation with more than one undefined point
   | { code: 'size-on-solid' } // a numeric size on a free-dim solid figure — not supported yet (honest boundary)
   | { code: 'claim-refuted' }; // the stated answer does not hold in the figure
 

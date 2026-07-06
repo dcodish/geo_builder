@@ -156,7 +156,20 @@ Doc-09 discipline applies: each phase lands with its ADRs, scenario tests for ev
 - **The pivot (V4)** is the hardest engine feature; it is scheduled after both lanes stand alone, and both mixed corpus questions gate it.
 - **Non-goals:** solving/deriving answers; cross-product display; general polyhedra beyond the named family; a physics engine; 2-D-tool feature parity (theorem feed etc.) in v1 — the theorem/pedagogy analog for space waits until the core tool proves itself.
 
-## 12. Working alongside the 2-D track (parallel-work isolation rules)
+## 13. V7 — full exam-terminology coverage (planned 2026-07-07, operator: "we need to support all terminology that appear in exams") <!-- NOTE: § follows 12 logically; kept here adjacent to the phase list -->
+
+The 10-exam corpus reading gives the complete inventory of exam terminology the tool doesn't yet speak. Three tiers, executed in order; gate = the 5 not-yet-wired exams' chains expressible end-to-end (documented deferrals allowed only for find-an-example asks).
+
+**T1 — vector-defined points (the headline, 4 of 6 new exams):**
+- `vec-def` — a vector equation with KNOWN coefficients defining one unknown point anywhere in it: `A'K⃗ = ⅘·DN⃗` (K new in the LHS), `AD⃗ = ⅔u + ⅓v` (C new inside the named vector v). The relation is AFFINE in the unknown → 4 evaluations determine the affine map, one 3×3 solve places it (D3-compliant).
+- `vec-param` — an UNKNOWN coefficient symbol: `DF⃗ = (k/2)·DB⃗ + k·DC⃗` places F on a k-line; a later condition (`EF⃗ מקביל למישור ABC`, `DF ניצב למישור ACD'`) pins k by 1-DOF root-find over the condition residual.
+- The cevian pair — two `vec-param`s naming the SAME new point (`CF⃗ = k·CD⃗`, `BF⃗ = t·BE⃗`): a two-line intersection, closed form.
+
+**T2 — scalar givens drive the figure (removes the `size-on-solid` refusal):** lengths (`|DC⃗| = 4`, `AB = 5`), angles at a vertex (`∠ADC = 120°`), and dot products (`u·v = 24`) become RESIDUALS in the (generalised) pivot solve — unknowns adaptively: dims always, log-scale iff an absolute size appears, rotation+translation iff coordinate/vector pins exist. New solids the corpus demands: the **general tetrahedron** (`פירמידה ABCD`, apex FREE — 2023-ב's `DC ניצב למישור ABC` then drives it) and the **rhombus-base right prism** (`מנסרה ישרה שבסיסה מעוין`, dims = base angle + height).
+
+**T3 — terminology sugar + claims:** on-axes phrasings (`D בראשית הצירים`, `A על ציר ה-x החיובי` → partial pins + sign givens — pure sugar over the pivot); mutual-position claims (`מצטלבים` skew / `מקבילים` / `נחתכים` for two named lines); the vertex angle form `∠PC'C = 82.1` (lowers to the angle-between-segments claim); polyhedron **volume claims** (`נפח הפירמידה = 24`, divergence-theorem over faces); rectangle completion (`ABEC מלבן` → E = B+C−A, verified rectangular or refused); bare `משולש ABC` in space (free points, pinnable by injections directly — no gauge solve needed).
+
+**Deferred within V7 (documented, not silent):** find-an-example asks (2021-ב's "give coordinates for S"), the existence/symmetry argument asks, parametric representation OF a plane.
 
 The operator fixes 2-D bugs in parallel sessions on this same repo/branch. The plan is additive by design (everything new lives in `src3d/` + `space.html` + its own tests), so **source-level interference is near zero — provided these rules hold:**
 

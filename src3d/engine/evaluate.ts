@@ -365,6 +365,72 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   return dims + freeT + param;
 }
 
+// ---------------------------------------------------------------------------
+// V7 — vector-defined points (ADR-3D-010): X⃗Y = Σ coeff(k)·atom is AFFINE in the
+// one unknown point, so 4 residual evaluations determine the affine map and one
+// 3×3 solve places it. A free symbol k makes it a 1-parameter family — pinned by
+// a ∥/⟂-to-plane condition via the existing 1-DOF root finders, else SAMPLED
+// (ADR-052). Two symbol-relations on one point = a line∩line closed form.
+// ---------------------------------------------------------------------------
+
+type VecDef = Construction3['vecDefs'][number];
+
+/** Solve the relation for its unknown point at a fixed symbol value; null when degenerate. */
+function solveVecDef(c: Construction3, vd: VecDef, pos: Positions3, kValue: number): Vec3 | null {
+  const evalR = (P: Vec3): Vec3 | null => {
+    const get = (id: Id): Vec3 | undefined => (id === vd.unknown ? P : pos.get(id));
+    const from = get(vd.from);
+    const to = get(vd.to);
+    if (!from || !to) return null;
+    let acc = sub3(to, from);
+    for (const t of vd.terms) {
+      let vvec: Vec3 | null = null;
+      if (t.atom.kind === 'pair') {
+        const a = get(t.atom.from);
+        const b = get(t.atom.to);
+        vvec = a && b ? sub3(b, a) : null;
+      } else {
+        const dv = c.vectors.get(t.atom.name);
+        const a = dv && get(dv.from);
+        const b = dv && get(dv.to);
+        vvec = a && b ? sub3(b, a) : null;
+      }
+      if (!vvec) return null;
+      acc = sub3(acc, scale3(vvec, t.coeff.k + t.coeff.p * kValue));
+    }
+    return acc;
+  };
+  const r0 = evalR(v3(0, 0, 0));
+  if (!r0) return null;
+  const rx = evalR(v3(1, 0, 0));
+  const ry = evalR(v3(0, 1, 0));
+  const rz = evalR(v3(0, 0, 1));
+  if (!rx || !ry || !rz) return null;
+  const sol = decompose3(scale3(r0, -1), sub3(rx, r0), sub3(ry, r0), sub3(rz, r0));
+  return sol ? v3(sol[0], sol[1], sol[2]) : null;
+}
+
+/** The ∥/⟂-to-plane pin residual at a symbol value (normalised; NaN when unresolvable). */
+function symbolPinResidual(
+  c: Construction3,
+  pin: Construction3['symbolPins'][number],
+  vd: VecDef,
+  pos: Positions3,
+  kValue: number,
+): number {
+  const P = solveVecDef(c, vd, pos, kValue);
+  if (!P) return NaN;
+  const get = (id: Id): Vec3 | undefined => (id === vd.unknown ? P : pos.get(id));
+  const a = get(pin.a);
+  const b = get(pin.b);
+  const ring = pin.plane.map(get);
+  if (!a || !b || ring.some((p) => !p)) return NaN;
+  const n = cross3(sub3(ring[1]!, ring[0]!), sub3(ring[2]!, ring[0]!));
+  const d = sub3(b, a);
+  const den = Math.max(norm3(d) * norm3(n), 1e-12);
+  return pin.rel === 'parallel' ? dot3(d, n) / den : norm3(cross3(d, n)) / den;
+}
+
 /** Newell's method — a polygon's normal from its vertex ring (internal device). */
 function newellNormal(pts: Vec3[]): Vec3 {
   let n = v3(0, 0, 0);
@@ -539,6 +605,43 @@ function evaluateSolidsAndPoints(
       pos.set(id, centroid3(ps as Vec3[]));
     } else if (def.kind === 'in-span') {
       pos.set(id, inSpanPosition(c, def, pos));
+    } else if (def.kind === 'vec-defined') {
+      const vd = c.vecDefs[def.def];
+      let k = 0;
+      if (vd.symbol) {
+        const pin = c.symbolPins.find((p) => p.def === def.def);
+        if (pin) {
+          const resid = (kk: number) => symbolPinResidual(c, pin, vd, pos, kk);
+          const roots = pin.rel === 'parallel' ? signChangeRoots(resid) : touchZeroRoots(resid);
+          if (roots.length === 0) continue; // unsatisfiable — left unpositioned, flagged upstream
+          k = roots[0];
+        } else {
+          k = sample(seed, `sym-${vd.symbol}-${vd.unknown}`, 0.2, 0.8); // an unpinned symbol is a FREE DOF
+        }
+      }
+      const P = solveVecDef(c, vd, pos, k);
+      if (P) pos.set(id, P);
+    } else if (def.kind === 'vec-pair') {
+      // the cevian intersection: each relation traces an affine line in its own symbol
+      const lineOf = (vd: VecDef): { b: Vec3; d: Vec3 } | null => {
+        const P0 = solveVecDef(c, vd, pos, 0);
+        const P1 = solveVecDef(c, vd, pos, 1);
+        return P0 && P1 ? { b: P0, d: sub3(P1, P0) } : null;
+      };
+      const l1 = lineOf(c.vecDefs[def.def1]);
+      const l2 = lineOf(c.vecDefs[def.def2]);
+      if (!l1 || !l2) continue;
+      const w = sub3(l2.b, l1.b);
+      const a11 = dot3(l1.d, l1.d);
+      const a12 = -dot3(l1.d, l2.d);
+      const a22 = dot3(l2.d, l2.d);
+      const det = a11 * a22 - a12 * a12;
+      if (Math.abs(det) < 1e-14) continue;
+      const k = (dot3(l1.d, w) * a22 - a12 * -dot3(l2.d, w)) / det;
+      const t = (a11 * -dot3(l2.d, w) - a12 * dot3(l1.d, w)) / det;
+      const P = add3(l1.b, scale3(l1.d, k));
+      const Q = add3(l2.b, scale3(l2.d, t));
+      if (dist3(P, Q) < 1e-7 * Math.max(norm3(sub3(P, l1.b)), 1)) pos.set(id, P); // must genuinely meet
     } else if (def.kind === 'foot-plane') {
       const from = pos.get(def.from);
       const pl = planes.get(def.plane);

@@ -62,6 +62,7 @@
     "signUnsatisfiable": "No solution satisfies the stated coordinate sign of '{{id}}'",
     "noSuchSolid": "The figure doesn't have exactly one '{{id}}' — the claim is ambiguous",
     "freeSizeClaim": "The '{{id}}' has no stated sizes — give a radius/height before a volume or area claim",
+    "twoUnknowns": "A vector relation may define only one unknown point ('{{id}}' is a second)",
     "lineMissesPlane": "The line is parallel to the plane at the chosen parameter value — no crossing point '{{id}}'",
     "sizeOnSolid": "A numeric size on a free-dimension solid isn't supported here yet",
     "claimRefuted": "The claim doesn't hold in the figure — check the computation",

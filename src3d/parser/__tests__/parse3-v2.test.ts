@@ -95,9 +95,9 @@ describe('scalar claims', () => {
       { type: 'segment3', a: 'A', b: 'B' },
       { type: 'claim', claim: { type: 'length-eq', a: 'A', b: 'B', value: 3 } },
     ]);
-    // "AK = 2KA'" must stay a vec-eq claim (pair = coeff·pair), never a length claim
+    // "AK = 2KA'" must stay a vector RELATION (pair = coeff·pair), never a length claim
     const r = cmds("AK = 2KA'");
-    expect(r.at(-1)).toMatchObject({ type: 'claim', claim: { type: 'vec-eq' } });
+    expect(r.at(-1)).toMatchObject({ type: 'vec-rel', from: 'A', to: 'K' });
   });
 
   it('area claim — Hebrew and English, draws the triangle', () => {
