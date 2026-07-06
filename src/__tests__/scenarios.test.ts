@@ -121,6 +121,32 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'tangent-circle-size-given-drives-radius-not-centre',
+    title: 'two tangent circles + |O1M|=9, |O2M|=16 (M the touch point) + two tangents from N to O1 at M and B',
+    guards:
+      'operator session gzswxmq3: two circles O1,O2 tangent externally at M; the size givens "O1M=9" and "O2M=16" (M is the touch point, so |O1M| is O1\'s radius); then "from N two tangents to O1 at M and B". The final tangent step over-constrained ("|O1M|=9 cannot hold") and the second tangent was left non-perpendicular. Root cause (ADR-230): a set-distance |centre·P| where P lies on the circle IS the radius, but with the free radius already BUSY driving the tangency coincide, driveOrCheck could reach neither the radial point (not a movable carrier) nor the radius (unavailable) and fell through to the free CENTRE — which can never change |O1M| — injecting a spurious, useless centre DOF into every later solve, so the 6-DOF system (2 free centres + N + B) landed in compromise basins. Fix: route a size given on a BUSY tangency radius to the radius (pin it) and hand the coincide\'s centre-gap to a free centre (keepTangencyDriven now fires as soon as ANY tangency radius is pinned, since the remaining free radius alone can\'t satisfy a fixed centre gap). An AVAILABLE free radius (two INTERSECTING circles) is left flexible so the recruiter grows it without breaking circle∩circle.',
+    steps: [
+      'שני מעגלים O1 ו O2 משיקים מבחוץ בנקודה M',
+      'O1M=9',
+      'O2M=16',
+      'מנקודה N יוצאים שני משיקים למעגל O1 בנקודות M ו B',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // The size givens hold: |O1M| = r1 = 9, |O2M| = r2 = 16 (M on both circles at the tangency).
+      expect(dist(at(fig, 'O1'), at(fig, 'M')), '|O1M| = 9').toBeCloseTo(9, 2);
+      expect(dist(at(fig, 'O2'), at(fig, 'M')), '|O2M| = 16').toBeCloseTo(16, 2);
+      // Both tangents from N are genuinely tangent to O1: the radius to the touch point ⟂ the tangent line.
+      const perp = (touch: Id) => {
+        const O = at(fig, 'O1'), T = at(fig, touch), N = at(fig, 'N');
+        const dotv = (T.x - O.x) * (N.x - T.x) + (T.y - O.y) * (N.y - T.y);
+        return dotv / (dist(O, T) * dist(N, T)); // cos of the angle — ~0 when perpendicular
+      };
+      expect(Math.abs(perp('M')), 'NM ⟂ O1M (tangent at M)').toBeLessThan(0.02);
+      expect(Math.abs(perp('B')), 'NB ⟂ O1B (tangent at B)').toBeLessThan(0.02);
+    },
+  },
+  {
     id: 'perpendicular-helper-flips-to-reach-crossing',
     title: 'right triangle + "DF ⟂ AB" + "AC and DF meet at E": DF flips to the side where it actually crosses AC',
     guards:

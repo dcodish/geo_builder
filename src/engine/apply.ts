@@ -144,13 +144,14 @@ function addObj(objects: GeoObject[], o: GeoObject): void {
 }
 
 /**
- * Keep a two-circle tangency solvable after one of its radii is pinned by `set-radius` (ADR-228 Am.3).
- * The free-radius tangency ([circles-tangent]) is a `coincide` of two `radial-toward` witnesses (residual
- * ||O1O2| − (r1±r2)|), driven by whichever circle radius is FREE. Pinning the LAST free radius (e.g. the
- * student sets circle O1's circumference AND circle O2's area) leaves the coincide with no carrier — it
- * would over-constrain — though a free CENTRE can still satisfy it (move a centre so the touch distance
- * holds). Recruit that centre so the figure re-solves by MOVING a centre instead of failing. No-op unless
- * `con` is exactly this device (two radial-toward operands) and both its circles now have fixed radii.
+ * Keep a two-circle tangency solvable after a radius is pinned (ADR-228 Am.3 / ADR-230). The free-radius
+ * tangency ([circles-tangent]) is a `coincide` of two `radial-toward` witnesses (residual ||O1O2| − (r1±r2)|),
+ * driven by whichever circle radius is FREE, with the centre GAP left at its build-time value r1+r2. Pinning a
+ * radius makes the gap wrong: once r1 is fixed, the still-free r2 alone can satisfy |O1O2| = r1+r2 ONLY if the
+ * (fixed) gap already exceeds r1 — it usually doesn't (gap ≈ the smaller build seed), so the tangency
+ * over-constrains. The gap must become a DOF: recruit a free, unpinned CENTRE as a co-driver of the coincide so
+ * the solver spreads the centres to r1+r2. Needed as soon as ANY radius is pinned (not only the last). No-op if
+ * `con` isn't the tangency device or a centre already drives it.
  */
 function keepTangencyDriven(objects: GeoObject[], con: Constraint): void {
   if (con.type !== 'coincide') return;
@@ -158,9 +159,10 @@ function keepTangencyDriven(objects: GeoObject[], con: Constraint): void {
     .map((id) => objects.find((o) => o.id === id))
     .filter((o): o is Extract<GeoObject, { kind: 'radial-toward' }> => o?.kind === 'radial-toward');
   if (wit.length !== 2) return; // not the tangency device (an ordinary point-coincidence)
+  const key = JSON.stringify(con);
+  if (objects.some((o) => o.kind === 'free-point' && JSON.stringify((o as { solve?: { constraint: Constraint } }).solve?.constraint) === key)) return; // a centre already drives it
   const circs = wit.map((w) => objects.find((o) => o.id === w.circle && o.kind === 'circle')) as (Extract<GeoObject, { kind: 'circle' }> | undefined)[];
-  if (circs.some((c) => c?.radius.via === 'free')) return; // a free radius still drives it — nothing to do
-  // Both radii fixed: mark a free, unpinned, not-yet-driving CENTRE as the coincide's carrier.
+  // Mark a free, unpinned, not-yet-driving CENTRE as the coincide's carrier (the gap DOF).
   for (const c of circs) {
     if (!c) continue;
     const ci = objects.findIndex(
@@ -170,6 +172,78 @@ function keepTangencyDriven(objects: GeoObject[], con: Constraint): void {
       objects[ci] = { ...(objects[ci] as Extract<GeoObject, { kind: 'free-point' }>), solve: { constraint: con, branch: 0 } };
       return;
     }
+  }
+}
+
+/** The circle(s) a point structurally lies ON (its distance to their centre IS that circle's radius). */
+function circleIdsOfPointOn(o: GeoObject | undefined): Id[] {
+  switch (o?.kind) {
+    case 'on-circle':
+    case 'radial-toward':
+    case 'line-circle':
+    case 'antipode':
+    case 'arc-midpoint':
+      return [o.circle];
+    case 'circle-circle':
+      return [o.circle1, o.circle2];
+    default:
+      return [];
+  }
+}
+
+/** `ptId` lies on circle `circleId` — either structurally, or coincident (via a `coincide`, e.g. the tangency
+ *  witness `~touch-M` that shares M's position on the OTHER circle) with a point that structurally does. */
+function pointLiesOnCircle(objects: GeoObject[], constraints: Constraint[], ptId: Id, circleId: Id): boolean {
+  const eq = new Set<Id>([ptId]);
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const k of constraints) {
+      if (k.type !== 'coincide') continue;
+      if (eq.has(k.p) !== eq.has(k.q)) { eq.add(k.p); eq.add(k.q); changed = true; }
+    }
+  }
+  for (const id of eq) if (circleIdsOfPointOn(objects.find((o) => o.id === id)).includes(circleId)) return true;
+  return false;
+}
+
+/** When `|a·b|` is really the RADIUS of a circle whose free radius is BUSY driving a tangency — one endpoint is
+ *  the centre, the other lies on that circle, and the radius is `via:'free'` WITH a solve directive — return
+ *  that circle's index; else −1. This is the one case the generic path mishandles: a distance-to-a-radial point
+ *  can't drive the radial point itself (not a movable carrier), and the free radius is UNAVAILABLE (already
+ *  driving the tangency coincide), so `driveOrCheck` falls through to the circle's free CENTRE — which can never
+ *  change |centre·P| — injecting a spurious, useless centre DOF into every later solve (the false over-constraint
+ *  in two-tangent-circles + size-givens + tangents-from-a-point; ADR-230). Pinning the busy radius here frees the
+ *  coincide to a centre (`keepTangencyDriven`). An AVAILABLE free radius (e.g. two INTERSECTING circles, where the
+ *  radius must stay a flexible DOF so `circle-circle-intersection` still meets) is deliberately NOT matched — the
+ *  recruiter grows it correctly without pinning. */
+function radiusCircleForDistance(objects: GeoObject[], constraints: Constraint[], a: Id, b: Id): number {
+  for (const [centreId, ptId] of [[a, b], [b, a]] as [Id, Id][]) {
+    const i = objects.findIndex(
+      (o) =>
+        o.kind === 'circle' &&
+        o.center === centreId &&
+        o.radius.via === 'free' &&
+        (o as { solve?: unknown }).solve !== undefined &&
+        pointLiesOnCircle(objects, constraints, ptId, o.id),
+    );
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+
+/** Apply a stated RADIUS to a circle (shared by `set-radius` and a centre-to-on-circle `set-distance`). A
+ *  `through` circle's radius is |centre·point| → a distance that flexes the figure; a `free`/`length` radius is
+ *  pinned to the value (a stated size is a given, ADR-052), dropping any stale driver — and if that radius drove
+ *  a two-circle tangency, recruit a free CENTRE so the tangency survives once no free radius absorbs it (ADR-228 Am.3). */
+function applyRadiusGiven(objects: GeoObject[], constraints: Constraint[], idx: number, value: number): void {
+  const circ = objects[idx];
+  if (circ.kind !== 'circle') return;
+  if (circ.radius.via === 'through') {
+    driveOrCheck(objects, constraints, { type: 'distance', a: circ.center, b: circ.radius.point, value });
+  } else if (circ.radius.via === 'free' || circ.radius.via === 'length') {
+    const prevSolve = (circ as { solve?: { constraint: Constraint } }).solve;
+    objects[idx] = { ...circ, radius: { via: 'length', value }, solve: undefined } as GeoObject;
+    if (prevSolve?.constraint.type === 'coincide') keepTangencyDriven(objects, prevSolve.constraint);
   }
 }
 
@@ -1036,9 +1110,14 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       driveOrCheck(objects, constraints, { type: 'angle', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, value: cmd.value });
       break;
 
-    case 'set-distance':
-      driveOrCheck(objects, constraints, { type: 'distance', a: cmd.a, b: cmd.b, value: cmd.value });
+    case 'set-distance': {
+      // |centre·P| where P lies on a circle centred at `centre` IS that circle's radius — drive the radius DOF,
+      // not the free centre (which can't change the distance). Otherwise a plain positional distance. (ADR-230.)
+      const rIdx = radiusCircleForDistance(objects, constraints, cmd.a, cmd.b);
+      if (rIdx >= 0) applyRadiusGiven(objects, constraints, rIdx, cmd.value);
+      else driveOrCheck(objects, constraints, { type: 'distance', a: cmd.a, b: cmd.b, value: cmd.value });
       break;
+    }
 
     case 'set-radius': {
       // Set a circle's radius BY VALUE, without inventing a point or drawing a radius segment (ADR-087).
@@ -1048,20 +1127,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // ADR-052). `tangent-inner` (radius derived from another circle) has no own size to pin → leave to the
       // verifier to flag if it cannot hold.
       const idx = objects.findIndex((o) => o.kind === 'circle' && o.id === cmd.circle);
-      const circ = idx >= 0 ? (objects[idx] as Extract<GeoObject, { kind: 'circle' }>) : undefined;
-      if (circ) {
-        if (circ.radius.via === 'through') {
-          driveOrCheck(objects, constraints, { type: 'distance', a: circ.center, b: circ.radius.point, value: cmd.value });
-        } else if (circ.radius.via === 'free' || circ.radius.via === 'length') {
-          const prevSolve = (circ as { solve?: { constraint: Constraint } }).solve;
-          // Pin the radius (a stated size is a given, ADR-052) and DROP any stale driver — a fixed circle is no
-          // longer a free carrier (carrierSpec ignores a via:length radius anyway; clearing keeps it honest).
-          objects[idx] = { ...circ, radius: { via: 'length', value: cmd.value }, solve: undefined } as GeoObject;
-          // If this radius DROVE a two-circle tangency, pinning it can orphan the tangency — with BOTH radii
-          // fixed no radius can absorb |O1O2| = r1±r2 — so recruit a free CENTRE to satisfy it (ADR-228 Am.3).
-          if (prevSolve?.constraint.type === 'coincide') keepTangencyDriven(objects, prevSolve.constraint);
-        }
-      }
+      if (idx >= 0) applyRadiusGiven(objects, constraints, idx, cmd.value);
       break;
     }
 
