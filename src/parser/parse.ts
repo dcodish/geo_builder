@@ -1726,6 +1726,13 @@ const dashCollinear: Rule = (s) => {
 };
 
 const collinearConstraint: Rule = (s) => {
+  // A NEW point named into a collinearity ("G on line BD" where G doesn't exist yet) must be CREATED —
+  // a free point the `set-collinear` then drives onto the line (2 DOF − 1 constraint = a slider,
+  // ADR-052). Emitting the constraint alone referenced a point nothing defines: headless replay crashed
+  // in `constraintIsPending` (residual over a missing position) and the app path escalated a perfectly
+  // readable utterance (T1 wiring finding, ADR-236). `ifAbsent` makes it existence-agnostic — the parse
+  // context may not know the point (unit/harness callers), and apply skips it when the id exists.
+  const ensure = (P: Id): AnyCommand[] => [{ type: 'free-point', id: P, x: 3, y: 2, free: true, ifAbsent: true }];
   // "line ABE" / "ישר ABE" / "line ABEF" — three or more points collinear AND IN ORDER (B between A and
   // E). Uppercase labels only (so a lowercase word like "through" isn't read as labels), the whole tail
   // after the keyword. Emits one `set-line` (collinearity + order). Two labels ("line AB") fall through.
@@ -1741,6 +1748,7 @@ const collinearConstraint: Rule = (s) => {
   if (through) {
     const [Q, R, P] = [up(through[1]), up(through[2]), up(through[3])];
     return [
+      ...ensure(P),
       { type: 'segment', a: Q, b: R },
       { type: 'set-collinear', a: Q, b: R, c: P },
     ];
@@ -1752,6 +1760,7 @@ const collinearConstraint: Rule = (s) => {
   if (onLine) {
     const [P, Q, R] = [up(onLine[1]), up(onLine[2]), up(onLine[3])];
     return [
+      ...ensure(P),
       { type: 'segment', a: Q, b: R },
       { type: 'set-collinear', a: P, b: Q, c: R },
     ];
@@ -2010,6 +2019,10 @@ const INSCRIBED_ANGLES: Record<string, number[] | null> = {
   rhombus: [45, 135, 225, 315], // a cyclic rhombus is a square
   rectangle: [40, 140, 220, 320], // diagonals are diameters
   trapezoid: [215, 325, 60, 120], // isosceles: AB ∥ CD, symmetric about the vertical axis
+  // A cyclic kite is a RIGHT kite (axis = a diameter): A/C on the vertical axis, B/D mirrored across it
+  // (|AB|=|AD|, |CB|=|CD| at the start); the vertices stay FREE and the kite `shape-variant` carries the
+  // equal pairs as constraints, so later givens flex it without losing the kite (ADR-236).
+  kite: [90, 340, 270, 200],
 };
 
 /**
@@ -2041,6 +2054,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
     : /square|ריבוע/i.test(s) ? 'square'
     : /rectangle|מלבן/i.test(s) ? 'rectangle'
     : /rhombus|מעוין/i.test(s) ? 'rhombus'
+    : /kite|דלתון|עפיפון/i.test(s) ? 'kite'
     : /trapez|טרפז/i.test(s) ? 'trapezoid'
     : /quad|מרובע/i.test(s) ? 'quad'
     : null;
@@ -2072,7 +2086,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   const named = circleCenter(s); // may be null — "inscribed in a circle" need not name the centre
   const r = parseRadius(s);
   let rest = dropCircleRef(s).replace(
-    /equilateral|שווה[\s-]?צלעות|isosceles|שווה[\s-]?שוקיים|right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|trapez\w*|טרפז|quad\w*|מרובע|inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
+    /equilateral|שווה[\s-]?צלעות|isosceles|שווה[\s-]?שוקיים|right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|kite|דלתון|עפיפון|trapez\w*|טרפז|quad\w*|מרובע|inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
     ' ',
   );
   if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
@@ -2110,6 +2124,20 @@ const inscribedPolygon: Rule = (s, ctx) => {
             // the engine "forgets it's a trapezoid"). Cyclic + AB∥CD ⇒ isosceles automatically.
             [{ type: 'set-parallel', a: v[0], b: v[1], c: v[2], d: v[3] }]
           : [];
+  // The base polygon + its named-shape relations, per branch. A KITE inscribes as its `shape-variant`
+  // (which expands to the quadrilateral + the variant's equal ADJACENT pairs, axis cyclable/pinnable —
+  // ADR-138), the same macro the standalone "kite ABCD" emits. Before this the kite word was silently
+  // DROPPED — "kite ABCD inscribed in circle O" drew a GENERIC inscribed quad (the ADR-117 class, quad
+  // edition: "kite"/"דלתון" is not a SHAPE_LEFTOVER token, so it neither constrained nor escalated).
+  const basePlusShape = (v: Id[]): AnyCommand[] =>
+    kind === 'kite'
+      ? [{ type: 'shape-variant', shape: 'kite', ids: [v[0], v[1], v[2], v[3]], variant: 0 }]
+      : [
+          isTri
+            ? { type: 'triangle', ids: [v[0], v[1], v[2]] }
+            : { type: 'quadrilateral', ids: [v[0], v[1], v[2], v[3]] },
+          ...shapeCmds(v),
+        ];
   // No centre named ⇒ create one: a fresh label that doesn't clash with the vertices OR with any
   // point already in the figure (a second inscribed circle must not reuse the first's centre 'O').
   const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
@@ -2122,10 +2150,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   if (named != null && (ctx.circles ?? []).some((c) => up(c) === up(named))) {
     return [
       ...ids.map((id): AnyCommand => ({ type: 'point-on-circle', id, circle: circ })),
-      isTri
-        ? { type: 'triangle', ids: [ids[0], ids[1], ids[2]] }
-        : { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
-      ...shapeCmds(ids),
+      ...basePlusShape(ids),
     ];
   }
   // Inscribing a polygon whose vertices ALREADY exist can't re-place them on a fresh circle
@@ -2140,7 +2165,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // no duplicate). Skipped when the student named a DIFFERENT circle than the one they're on. [ADR-156]
   const onCircle = circleContaining(ctx, ids, named);
   if (allExist && onCircle && (!named || up(named) === up(onCircle))) {
-    return isTri ? [{ type: 'triangle', ids: [ids[0], ids[1], ids[2]] }, ...shapeCmds(ids)] : [{ type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] }, ...shapeCmds(ids)];
+    return basePlusShape(ids);
   }
   if (isTri && allExist) {
     return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2] }, ...shapeCmds(ids)];
@@ -2149,8 +2174,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
     return [
       { type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2], ...(hidden ? { hidden: true } : {}) },
       { type: 'set-concyclic', points: ids },
-      { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
-      ...shapeCmds(ids), // a trapezoid keeps AB ∥ CD even when inscribed from existing points
+      ...basePlusShape(ids), // a trapezoid keeps AB ∥ CD (a kite its equal pairs) even from existing points
     ];
   }
   // A cyclic (hidden-circle) quad needs CONVEX vertex order for the opposite-angles theorem;
@@ -2171,7 +2195,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // isosceles starting angles but can flex to satisfy later givens while the parallel constraint persists.
   // A general TRIANGLE is also free (any triangle is cyclic — its 3 vertex angles are unstated DOFs, ADR-052);
   // a RIGHT-triangle inscribed stays fixed (its angles are pinned by Thales, kind 'right-triangle').
-  const freeAngles = kind === 'quad' || kind === 'trapezoid' || kind === 'triangle';
+  const freeAngles = kind === 'quad' || kind === 'trapezoid' || kind === 'kite' || kind === 'triangle';
   ids.forEach((id, i) => {
     // specific angle for a shaped cyclic polygon (square/rect/rhombus/trapezoid) or the general quad's
     // convex-default start; omit for triangle so it spreads evenly via nextTheta.
@@ -2181,13 +2205,8 @@ const inscribedPolygon: Rule = (s, ctx) => {
         : { type: 'point-on-circle', id, circle: circ },
     );
   });
-  // The edges connect the on-circle vertices; the SHAPE is set by the angles.
-  cmds.push(
-    isTri
-      ? { type: 'triangle', ids: [ids[0], ids[1], ids[2]] }
-      : { type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] },
-  );
-  cmds.push(...shapeCmds(ids));
+  // The edges connect the on-circle vertices; the SHAPE is set by the angles (+ the named-shape relations).
+  cmds.push(...basePlusShape(ids));
   return cmds;
 };
 
@@ -3175,6 +3194,93 @@ const circlesTangent: Rule = (s, ctx) => {
 };
 
 /**
+ * "AB משיק משותף לשני המעגלים" / "AB is a common tangent to the two circles" — a COMMON tangent
+ * of TWO circles (ADR-239). The "common"/"משותף" word is the unique trigger; without this rule the
+ * plural "מעגלים" + משיק fell through to `circlesTangent`, which re-read the utterance as MUTUAL
+ * tangency of two NEW circles (inventing O,P and dropping the tangent line — the sq9lt4fj session
+ * escalated to the LLM instead). Two variants:
+ *
+ *  - **Two touch points** ("AB משיק משותף…"): A rides circle 1, B rides circle 2, radius ⟂ tangent
+ *    at each touch, segment AB drawn. Letter↔circle pairing follows the stated/figure order — an
+ *    unstated default; a later explicit membership statement lowers per M1 and `swap` exists.
+ *  - **At the shared touch point** ("המשיק המשותף בנקודה M…", M existing — the operator's "tangent
+ *    at intersection"): membership of M on BOTH circles + centres collinear with M (⟺ common
+ *    tangency at M; all idempotent when the circles are already tangent there) + a DRAWN tangent
+ *    line at M, any fresh naming letters as ±offset markers (ADR-036/233).
+ *
+ * "External"/"internal" ("חיצוני"/"פנימי") select a CONFIGURATION of the same assertion (same
+ * tangency constraints, different solution branch) — the solver lands on one and "show another
+ * configuration" explores; a side-of-line bias is a filed follow-up, not a dropped magnitude.
+ * Runs BEFORE `tangentChord`/`tangentMeetsOtherCircle`/`circlesTangent` (none checks "משותף").
+ */
+const commonTangent: Rule = (s, ctx) => {
+  if (!/tangent|משיק/i.test(s)) return null;
+  if (!/common|משותף|משותפ/i.test(s)) return null;
+  // The two circles: named per-circle ("למעגלים O1 ו O2" / "circles O and P"), else THE two circles
+  // when the figure has exactly two ("לשני המעגלים" — the definite form of the operator's session).
+  let named = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
+  if (named.length < 2) {
+    const pl = s.match(/(?:circles|מעגלים|מעגלי)\s+([A-Za-z]\d*)\s*(?:ו-?|\band\b|,)\s*([A-Za-z]\d*)/i);
+    if (pl) named = [up(pl[1]), up(pl[2])];
+  }
+  const centres = named.length >= 2 ? named.slice(0, 2) : (ctx.circles ?? []).length === 2 ? [ctx.circles![0], ctx.circles![1]].map(up) : null;
+  if (!centres || centres[0] === centres[1]) return null; // no two distinct circles to be common to → LLM
+  const have = new Set(ctx.points ?? []);
+  const atM = s.match(/(?:\bat\b|בנקודה)\s*([A-Za-z]\d*)\b/i);
+  const at = atM ? up(atM[1]) : null;
+  // The 1–2 labels NAMING the tangent ("AB משיק משותף…"), excluding the touch and the centres.
+  const naming = labelRun(
+    dropCircleRef(s)
+      .replace(/(?:\bat\b|בנקודה)\s*[A-Za-z]\d*\b/gi, ' ')
+      .replace(/tangent|משיק\S*|\bcommon\b|משותף|משותפת|\bline\b|הישר|הקו|למעגלים|מעגלים|לשני|המעגלים/gi, ' '),
+    2,
+  )?.filter((p) => p !== at && p !== centres[0] && p !== centres[1]);
+  const [c1, c2] = centres;
+  const id1 = circleId(c1), id2 = circleId(c2);
+  // NAMED circles that don't exist yet are created (free radius per ADR-052, `ifAbsent` keeps a stated one).
+  const haveCircles = new Set((ctx.circles ?? []).map((x) => x.toUpperCase()));
+  const mk: AnyCommand[] = [];
+  if (!haveCircles.has(c1)) mk.push({ type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true });
+  if (!haveCircles.has(c2)) mk.push({ type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ifAbsent: true });
+  if (at) {
+    // Variant 2 — the common tangent AT the shared touch point M ("tangent at the intersection").
+    const cmds: AnyCommand[] = [...mk];
+    if (have.has(at)) {
+      // M exists (typically the stated touch of "…משיקים בנקודה M"): assert its membership on BOTH
+      // circles + centres collinear with it (⟺ common tangency at M) — all idempotent when the pair
+      // is already tangent there, constraints that flex the figure when not.
+      cmds.push(
+        { type: 'point-on-circle', id: at, circle: id1 },
+        { type: 'point-on-circle', id: at, circle: id2 },
+        { type: 'set-line', points: [c1, at, c2] },
+      );
+    } else {
+      // M is new: "a common tangent at ONE point M" says the circles are TANGENT at M — the
+      // circles-tangent device owns that state (free radii, gap-driving coincide).
+      cmds.push({ type: 'circles-tangent', circle1: id1, circle2: id2, at, external: true });
+    }
+    cmds.push({ type: 'tangent', id: `tan-${at}`, circle: id1, at, visible: true });
+    const fresh = (naming ?? []).filter((p) => !have.has(p));
+    if (fresh.length) cmds.push(...lineMarkers(`tan-${at}`, fresh));
+    return cmds;
+  }
+  if (!naming || naming.length < 2) return null; // no touch labels and no touch point → LLM
+  const [A, B] = naming;
+  // Variant 1 — a common tangent touching circle 1 at A and circle 2 at B. The student stated only
+  // "AB touches both", never WHICH touch rides WHICH circle — the pairing is a soft default (`softPair`,
+  // stated/figure order) that the store SWAPS when a later explicit membership names the opposite
+  // assignment (M4: defaults yield to statements; ADR-239).
+  return [
+    ...mk,
+    { type: 'point-on-circle', id: A, circle: id1, softPair: true },
+    { type: 'point-on-circle', id: B, circle: id2, softPair: true },
+    { type: 'set-perpendicular', a: c1, b: A, c: A, d: B, implicit: true }, // radius c1→A ⟂ the tangent
+    { type: 'set-perpendicular', a: c2, b: B, c: A, d: B, implicit: true }, // radius c2→B ⟂ the tangent
+    { type: 'segment', a: A, b: B },
+  ];
+};
+
+/**
  * "the chord AD in circle P is tangent to circle O at A" /
  * "המיתר AD במעגל P משיק למעגל O בנקודה A" — a CHORD of one (host) circle that is TANGENT to
  * ANOTHER circle at one of its endpoints. Distinct from `circlesTangent` (the two circles tangent
@@ -3483,6 +3589,23 @@ const bisectorLine: Rule = (s) => {
 // "at"/"בנקודה" lets "DE ⟂ AB at C" / "DE אנך ל-AB בנקודה C" name the foot as the through-point.
 const THROUGH_PT = String.raw`(?:through|\bat\b|דרך|בנקודה)\s+([A-Za-z]\d*)\b`;
 
+/**
+ * "… cuts/meets <the line/the extension of> CD at E" — the cut-clause a drawn ⊥/∥ line compound ends
+ * with. Shared by {@link perpendicularLine} and {@link parallelLine}. The filler group must swallow
+ * EVERY article/line/extension word in BOTH languages: before it accepted only the Hebrew fillers, so
+ * "cuts line BD at G" / "cuts the extension of BD at G" failed to bind — and the rule then fell through
+ * to the ADR-036 line-NAMING fallback, which read "line BD" as the perpendicular's own name and grabbed
+ * the EXISTING point D as an on-line marker (a silently wrong figure; T1 wiring finding, ADR-236).
+ */
+const CUT_VERB = String.raw`(?:חות[כך]|נחת\w*|פוגש\w*|פגש|\bcuts?\b|\bcrosses?\b|\bmeets?\b|\bintersects?\b)`;
+const CUT_FILLER = String.raw`(?:את\s+|the\s+|line\s+|ray\s+|segment\s+|extension\s+(?:of\s+)?|extended\s+|ה?קו\s+|ה?ישר\s+|ה?משך\s+|ה?קטע\s+)*`;
+const LINE_CUT = new RegExp(String.raw`${CUT_VERB}\s*${CUT_FILLER}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?(?:בנקודה|\bat\b|ב-)\s*([A-Za-z]\d*)`, 'i');
+/** A cut verb aimed at a NAMED segment (two labels) — if this is present but {@link LINE_CUT} didn't
+ *  bind, the utterance is a cut compound we can't fully read → escalate, never half-parse. A cut verb
+ *  with a PRONOUN target ("וחותך אותו בנקודה E" — cuts IT, i.e. the reference segment) is NOT this:
+ *  that's the reposition/foot form the plain construct handles (its through-point IS the cut). */
+const LINE_CUT_TARGET = new RegExp(String.raw`${CUT_VERB}\s*${CUT_FILLER}[A-Za-z]\d*\s*[A-Za-z]\d*\b`, 'i');
+
 /** "line through P perpendicular to AB" / "ישר דרך P מאונך ל-AB" / "DE אנך ל-AB בנקודה C" — a *drawn* perpendicular line through a point. */
 const perpendicularLine: Rule = (s, ctx) => {
   if (!/perpendicular|⊥|מאונ[כך]|אנ[כך]/i.test(s)) return null;
@@ -3503,9 +3626,7 @@ const perpendicularLine: Rule = (s, ctx) => {
   // Build the perpendicular as SCAFFOLDING (not a long drawn line), cross it with CD to place E, and draw
   // the perpendicular SEGMENT P–E (e.g. EK) — that's the figure the student wants, not an infinite line.
   // The cut verb anchors the match, so the SECOND "בנקודה"/"at" (the result point) is read, not P's.
-  const cut = s.match(
-    new RegExp(String.raw`(?:חות[כך]|נחת\w*|פוגש\w*|פגש|\bcuts?\b|\bcrosses?\b|\bmeets?\b|\bintersects?\b)\s*(?:את\s+)?(?:ה?קו\s+|ה?ישר\s+|ה?משך\s+|extension\s+(?:of\s+)?|extended\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?(?:בנקודה|\bat\b|ב-)\s*([A-Za-z]\d*)`, 'i'),
-  );
+  const cut = s.match(LINE_CUT);
   if (cut) {
     const [c1, c2, e] = [up(cut[1]), up(cut[2]), up(cut[3])];
     const abId = `line-${c1}${c2}`;
@@ -3515,12 +3636,21 @@ const perpendicularLine: Rule = (s, ctx) => {
     out.push({ type: 'segment', a: e, b: P }); // draw the perpendicular segment E–P (e.g. EK)
     return out;
   }
+  // A cut verb aimed at a NAMED segment is present but the clause didn't bind (an exotic phrasing / a
+  // multi-cut compound): escalate rather than half-parse. The old fallback drew a bare line and let the
+  // ADR-036 naming read the CUT line's letters as this line's own name — grabbing an existing point onto
+  // the perpendicular (the "cuts line BD at G placed D" mis-parse). A pronoun cut ("וחותך אותו בנקודה E")
+  // falls through — that's the reposition/foot form, whose through-point IS the cut.
+  if (LINE_CUT_TARGET.test(s)) return null;
 
   // No cut: CONSTRUCT a drawn perpendicular through P, with any named endpoints as markers straddling it
   // (ADR-036). The markers REUSE the named points if they already exist — a bare "segment CD" then
   // "CD ⟂ AB at F" REPOSITIONS C,D onto the perpendicular, a clean cross, without redefinition errors.
+  // The line-NAME is read only from the text BEFORE any intersect word, so a cut-clause's letters
+  // ("…and line BD") can never be mistaken for this line's own name (ADR-236).
+  const nameScope = INTERSECT_KW.test(s) ? s.slice(0, s.search(INTERSECT_KW)) : s;
   out.push({ type: 'perpendicular-line', id: lineId, through: P, a, b, visible: true });
-  out.push(...lineMarkers(lineId, lineNameLabels(s, [P, a, b])));
+  out.push(...lineMarkers(lineId, lineNameLabels(nameScope, [P, a, b])));
   return out;
 };
 
@@ -3534,7 +3664,25 @@ const parallelLine: Rule = (s, ctx) => {
     .match(/(?:parallel\s*to|∥|מקביל\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!seg) return null;
   const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
-  const names = lineNameLabels(s, [P, a, b]);
+  const lineIdCut = `par-${P}-${a}${b}`;
+  // "the line through P parallel to AB cuts CD at E" — the parallel MEETS another segment at a new
+  // point (the ⊥ rule's cut compound, mirrored — same LINE_CUT clause, same scaffolding shape).
+  const cut = s.match(LINE_CUT);
+  if (cut) {
+    const [c1, c2, e] = [up(cut[1]), up(cut[2]), up(cut[3])];
+    const abId = `line-${c1}${c2}`;
+    return [
+      { type: 'parallel-line', id: lineIdCut, through: P, a, b, visible: false }, // scaffolding for the ∩
+      { type: 'line-through', id: abId, a: c1, b: c2 },
+      { type: 'line-intersection', id: e, line1: lineIdCut, line2: abId },
+      { type: 'segment', a: e, b: P },
+    ];
+  }
+  // A cut verb aimed at a named segment we couldn't bind → escalate, don't half-parse (see
+  // perpendicularLine — the same ADR-036 name-grab hazard, the same pronoun-cut exemption).
+  if (LINE_CUT_TARGET.test(s)) return null;
+  const nameScope = INTERSECT_KW.test(s) ? s.slice(0, s.search(INTERSECT_KW)) : s;
+  const names = lineNameLabels(nameScope, [P, a, b]);
   const have = new Set(ctx.points ?? []);
   // If the NAMED line already exists, constrain it ∥ AB (parallels don't meet AB, so no cut-point).
   if (names.length === 2 && names.every((n) => have.has(n))) {
@@ -4075,6 +4223,7 @@ export const RULES: Rule[] = [
   twoTangentsMeet, // TWO tangents (at two on-circle points) meeting at a point — before tangent∩segment
   tangentLineIntersection, // tangent ∩ a segment
   parallelCircleIntersection, // a parallel line ∩ the circle
+  commonTangent, // a COMMON tangent of two circles ("משיק משותף") — before circlesTangent (which would misread it as mutual tangency of new circles)
   tangentChord, // a CHORD of one circle tangent to the OTHER at its endpoint — before circlesTangent/chord (which drop the tangency or the chord)
   tangentMeetsOtherCircle, // tangent LINE to one circle meets the OTHER circle — before circlesTangent (which would misread it as mutual tangency)
   circlesTangent, // two circles tangent to each other — before tangentLine (which would grab the משיק)
@@ -4368,7 +4517,16 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
 export function droppedNewLabels(utterance: string, commands: AnyCommand[], existingPoints: Id[] = []): Id[] {
   const have = new Set(existingPoints.map((p) => p.toUpperCase()));
   const used = new Set(JSON.stringify(commands).match(/[A-Z]\d*/g) ?? []); // every label the commands reference (incl. inside ids like circle-P / tan-B)
-  const inputLabels = [...new Set(utterance.match(/[A-Z]\d*/g) ?? [])];
+  // Extract labels from the SAME text the rules parsed (subscripts glued, maqaf/bidi fixed — PAR-7 /
+  // ADR-228: the raw "O_1" reads as label "O" while the commands carry "O1", a guaranteed false drop),
+  // then blank the ADR-118 AREA MARKER: the `S` of the (normalized) glued `SABC` is notation, not a
+  // point label. Without the mask, a cleanly-parsed numeric area given ("S_{ABC} = 13") or S-form ratio
+  // ("S_{ACD} = 4 S_{NCE}") — whose lowered command stores no letter label — read as a dropped point
+  // "S" and escalated to the LLM for nothing (ADR-236). A bare label S ("S_{ABC} = S") is stored in the
+  // measure command, so it lands in `used` and never tripped this. The residual risk (an S-led 4-letter
+  // POINT run like "STUV" masking a genuinely dropped S) only ever suppresses a warning, never corrupts.
+  const s = normalizeUtterance(utterance).replace(/(?<![A-Za-z])S(?=(?:[A-Z]\d*){3,4}(?![A-Za-z\d]))/g, ' ');
+  const inputLabels = [...new Set(s.match(/[A-Z]\d*/g) ?? [])];
   return inputLabels.filter((L) => !have.has(L) && !used.has(L));
 }
 

@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, convergedSamples, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
+import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
 import type { FigureFile } from './figureFile';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -266,6 +266,44 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
       rtReorder.set(f.id, [a, b, v]); // the right-angle vertex LAST (the structural ∠ position)
     }
   }
+  // A common-tangent macro's touch↔circle PAIRING is a soft default (`softPair`, ADR-239): "AB משיק
+  // משותף" states only that AB touches both circles, never WHICH touch rides WHICH circle — the macro
+  // pairs them in stated order. When an explicit membership elsewhere (an untagged point-on-circle of
+  // the same touch label — e.g. "tangents from N to circle O1 at M and B" putting B on O1) names the
+  // OPPOSITE assignment, SWAP the pair — the two memberships and the group's radius-⟂ centres — so the
+  // stated pairing wins (M4 defaults-yield; position-independent, the ADR-163 pre-scan shape). If both
+  // assignments are explicitly stated the default stands and any genuine contradiction fails honestly.
+  const softPairGroups = new Map<string, { ids: Id[]; circles: Id[] }>();
+  const explicitOn = new Set<string>(); // `${point}|${circle}` from untagged memberships
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    for (const c of lowerOne(f.cmd, symtab)) {
+      if (c.type !== 'point-on-circle') continue;
+      if (c.softPair) {
+        const g = groupKey(f);
+        const e = softPairGroups.get(g) ?? { ids: [], circles: [] };
+        e.ids.push(c.id);
+        e.circles.push(c.circle);
+        softPairGroups.set(g, e);
+      } else explicitOn.add(`${c.id}|${c.circle}`);
+    }
+  }
+  const pairSwapByGroup = new Map<string, Map<Id, Id>>(); // group → circle-id swap map
+  for (const [g, e] of softPairGroups) {
+    if (e.ids.length !== 2 || e.circles[0] === e.circles[1]) continue;
+    const [X, Y] = e.ids;
+    const [cA, cB] = e.circles;
+    const opposite = explicitOn.has(`${X}|${cB}`) || explicitOn.has(`${Y}|${cA}`);
+    const stated = explicitOn.has(`${X}|${cA}`) || explicitOn.has(`${Y}|${cB}`);
+    if (opposite && !stated)
+      pairSwapByGroup.set(
+        g,
+        new Map([
+          [cA, cB],
+          [cB, cA],
+        ]),
+      );
+  }
   // Explicit `set-equal`s the student/LLM gave (NOT a shape-variant macro's own pairs) — they PIN the matching
   // variant of a kite/isosceles `shape-variant` and suppress re-emitting that pair ([ADR-138](docs/06-decisions.md#adr-138)).
   const explicitEqs = facts
@@ -293,6 +331,16 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
       // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see pre-scan).
       const reseat = rtReorder.get(f.id);
       if (reseat) engineCmds = engineCmds.map((ec) => (ec.type === 'right-triangle' ? { ...ec, ids: reseat } : ec));
+      // Swap a common-tangent group's soft touch↔circle pairing to the explicitly-stated one (ADR-239 pre-scan).
+      const pairSwap = pairSwapByGroup.get(groupKey(f));
+      if (pairSwap) {
+        const letterSwap = new Map([...pairSwap].map(([k, v]) => [k.replace(/^circle-/, ''), v.replace(/^circle-/, '')]));
+        engineCmds = engineCmds.map((ec) => {
+          if (ec.type === 'point-on-circle' && ec.softPair && pairSwap.has(ec.circle)) return { ...ec, circle: pairSwap.get(ec.circle)! };
+          if (ec.type === 'set-perpendicular' && letterSwap.has(ec.a)) return { ...ec, a: letterSwap.get(ec.a)! }; // the radius-⟂'s centre follows its touch
+          return ec;
+        });
+      }
       const intro = engineCmds.flatMap(introducedPointIds);
       const claim = () => intro.forEach((id) => owned.add(id));
       // Blocked by the atomic-group poisoning pass: don't apply/measure it, but claim its points so any
@@ -434,7 +482,13 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   // exists. Bounded (depth-capped recursive re-fold), failure-path only, deterministic; if the hoisted
   // fold builds clean it is simply the correct figure — same facts, same semantics — else the original
   // error stands.
-  if (!pending && failedFacts.length && hoistDepth < 2) {
+  //
+  // Runs from the PENDING state too (ADR-238, the two-tangent-circles corpus): `pending` means "a deferrable
+  // constraint still flexes — MAY be waiting for more givens", but when the complete given set is already
+  // here and only the ENTRY ORDER starved the carriers, the hoisted fold builds fully clean — proof the
+  // figure was never waiting. Acceptance stays strict (clean AND not pending), so a genuinely
+  // under-determined figure keeps its pending cue unchanged.
+  if (failedFacts.length && hoistDepth < 2) {
     const hoistable = failedFacts.filter((f) => {
       if (!f.enabled) return false;
       const ec = lowerOne(f.cmd, symtab);
@@ -602,6 +656,10 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
     for (const s of [0, 1, 2, 3, 4]) {
       const e = evaluate(applySeed(cur, s));
       if (e.ok) {
+        // A constraint referencing a point the figure never defined cannot be flex-probed — skip the
+        // sample instead of crashing (`residual` would read a missing position). Such a constraint then
+        // reads as NOT pending, so its failure surfaces as the honest hard error it is (ADR-236).
+        if (constraintRefs(con).some((id) => !e.positions.has(id))) continue;
         const r = residual(con, (id) => e.positions.get(id)!);
         if (Number.isFinite(r)) vals.push(r);
       }

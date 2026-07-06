@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { THEOREM_TABLE } from '../table';
+import { THEOREM_COVERAGE } from '../coverage';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const refPath = resolve(here, '../../../docs/07-theorem-reference.md');
@@ -70,6 +71,49 @@ describe('theorem table integrity vs 07-theorem-reference.md', () => {
       expect(def?.type).toBe('O');
       expect(def?.salience).toBe('background');
     }
+  });
+
+  // ===== Coverage totality (theorem-discovery v2 T1 — docs/18 §4) =====
+  // From here on, "absent from the table" is a tracked STATE, not an invisible gap: every id in 07
+  // carries an explicit disposition, and the tabled/no-reveal/supplemental kinds are equivalences,
+  // so the map can never drift from the table or the ADR-208/217 policy sets.
+  describe('coverage disposition map (THEOREM_COVERAGE)', () => {
+    const tabledIds = new Set(THEOREM_TABLE.map((t) => String(t.id)));
+
+    it('is TOTAL over 07: every reference id has a disposition', () => {
+      for (const id of REF.keys()) {
+        expect(THEOREM_COVERAGE[id], `#${id} is in 07 but has no disposition`).toBeDefined();
+      }
+    });
+
+    it('has no key outside 07', () => {
+      for (const id of Object.keys(THEOREM_COVERAGE)) {
+        expect(REF.has(id), `coverage key #${id} is not a 07 id`).toBe(true);
+      }
+    });
+
+    it("kind 'tabled' ⇔ present in THEOREM_TABLE (both directions)", () => {
+      for (const [id, d] of Object.entries(THEOREM_COVERAGE)) {
+        if (d.kind === 'tabled') expect(tabledIds.has(id), `#${id} marked tabled but absent from THEOREM_TABLE`).toBe(true);
+        else expect(tabledIds.has(id), `#${id} is in THEOREM_TABLE but marked '${d.kind}'`).toBe(false);
+      }
+    });
+
+    it("kind 'no-reveal' ⇔ the ADR-208 forbidden set {68, 70, 76}", () => {
+      const noReveal = Object.entries(THEOREM_COVERAGE)
+        .filter(([, d]) => d.kind === 'no-reveal')
+        .map(([id]) => id)
+        .sort();
+      expect(noReveal).toEqual(['68', '70', '76']);
+    });
+
+    it("kind 'supplemental' ⇔ the Appendix ids ADR-217 did NOT keep {A1, B1, B2, B4}", () => {
+      const supplemental = Object.entries(THEOREM_COVERAGE)
+        .filter(([, d]) => d.kind === 'supplemental')
+        .map(([id]) => id)
+        .sort();
+      expect(supplemental).toEqual(['A1', 'B1', 'B2', 'B4']);
+    });
   });
 
   it('excludes the forbidden derived-premise theorems (68/70/76)', () => {

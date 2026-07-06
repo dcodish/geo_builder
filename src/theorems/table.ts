@@ -384,9 +384,15 @@ function collinearFacts(ctx: MatchCtx): Fact[] {
   return factsWith(ctx, (c) => c.type === 'set-line' || c.type === 'set-collinear' || (c.type === 'point-on-segment' && !!c.extension));
 }
 
-/** Stated quadrilaterals — a `quadrilateral` command or a 4-vertex `polygon` — with their vertices. */
+/** Stated quadrilaterals — a `quadrilateral` command, a 4-vertex `polygon`, or a 4-vertex
+ *  `shape-variant` (a kite lowers to its variant macro, ADR-138; the QUAD is stated all the same —
+ *  without this, "kite ABCD inscribed in circle O" stopped announcing 87 the moment the kite word
+ *  started being honoured, ADR-236). */
 function quadFacts(ctx: MatchCtx): { fact: Fact; vertices: Id[] }[] {
-  return factsWith(ctx, (c) => c.type === 'quadrilateral' || (c.type === 'polygon' && c.ids.length === 4)).map((f) => ({
+  return factsWith(
+    ctx,
+    (c) => c.type === 'quadrilateral' || (c.type === 'polygon' && c.ids.length === 4) || (c.type === 'shape-variant' && c.ids.length === 4),
+  ).map((f) => ({
     fact: f,
     vertices: (cmdOf(f) as { ids: Id[] }).ids,
   }));

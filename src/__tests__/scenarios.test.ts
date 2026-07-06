@@ -176,6 +176,41 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'size-given-scales-similarity-gauge-figure',
+    title: 'two tangent circles + tangent pairs from N to BOTH circles + A on the extension of BN + the sizes typed LAST (the reloaded gblq4wue figure)',
+    guards:
+      'operator session gblq4wue (a saved figure reloaded, then "O2M=9" typed): two circles tangent at M; from N tangent pairs to BOTH circles (touching O1 at M,B and O2 at M,A — so NM is the common inner tangent); "A on the extension of BN" (the line BA is the common outer tangent through N); then the size "O2M=9". The size was refused "over-constrained: M coincides with its constructed target cannot hold" and stayed deferred forever. Root cause (ADR-237): the ADR-230 reroute pinned r2 correctly, but keepTangencyDriven found NO idle centre to hand the coincide\'s gap to — in this richer figure O1\'s centre already drives the A-B-N collinearity and O2\'s centre a tangency ⟂ — so the coincide stayed owned by the one remaining free radius, which cannot widen the centre gap (r ≥ 0), and the 9-DOF recruited solve never converges on what is actually a SIMILARITY-GAUGE move: the figure states no other absolute size, so the first length given is satisfiable exactly by scaling every free DOF by k = stated/measured. Fix: the step failure path tries that closed-form SCALE RESCUE (try-and-verify — accepted only if the full evaluation then holds, so any other absolute given makes it fall through unharmed). The SECOND size (O1M=16) then pins the remaining radius, orphaning the coincide into the M2/ADR-231 re-home path, and the full bagrut figure closes at |O1O2| = 25.',
+    steps: [
+      'שני מעגלים O1 ו O2 משיקים מבחוץ בנקודה M',
+      'מנקודה N יוצאים שני משיקים למעגל O1 בנקודות M ו B',
+      'מנקודה N יוצאים שני משיקים למעגל O2 בנקודות M ו A',
+      'A נמצאת על המשך BN',
+      'O2O1',
+      'O2M=9',
+      'O1M=16',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // Both stated sizes hold exactly, and the tangency keeps the centres at r1 + r2 apart.
+      expect(dist(at(fig, 'O2'), at(fig, 'M')), '|O2M| = 9').toBeCloseTo(9, 2);
+      expect(dist(at(fig, 'O1'), at(fig, 'M')), '|O1M| = 16').toBeCloseTo(16, 2);
+      expect(dist(at(fig, 'O1'), at(fig, 'O2')), '|O1O2| = r1 + r2 = 25').toBeCloseTo(25, 2);
+      // Every tangency stays genuinely tangent (radius ⟂ tangent segment at each touch point).
+      const cosAt = (centre: Id, touch: Id) => {
+        const O = at(fig, centre), T = at(fig, touch), N = at(fig, 'N');
+        return ((T.x - O.x) * (N.x - T.x) + (T.y - O.y) * (N.y - T.y)) / (dist(O, T) * dist(N, T) || 1);
+      };
+      expect(Math.abs(cosAt('O1', 'M')), 'NM ⟂ O1M').toBeLessThan(0.02);
+      expect(Math.abs(cosAt('O1', 'B')), 'NB ⟂ O1B').toBeLessThan(0.02);
+      expect(Math.abs(cosAt('O2', 'M')), 'NM ⟂ O2M').toBeLessThan(0.02);
+      expect(Math.abs(cosAt('O2', 'A')), 'NA ⟂ O2A').toBeLessThan(0.02);
+      // A, N, B collinear (the common outer tangent through N).
+      const A = at(fig, 'A'), B = at(fig, 'B'), N = at(fig, 'N');
+      const cross = (B.x - A.x) * (N.y - A.y) - (B.y - A.y) * (N.x - A.x);
+      expect(Math.abs(cross) / (dist(A, B) * dist(A, N) || 1), 'A, N, B collinear').toBeLessThan(0.03);
+    },
+  },
+  {
     id: 'perpendicular-helper-flips-to-reach-crossing',
     title: 'right triangle + "DF ⟂ AB" + "AC and DF meet at E": DF flips to the side where it actually crosses AC',
     guards:
@@ -3393,6 +3428,80 @@ export const SCENARIOS: Scenario[] = [
       expect(dist(A, B), '|AB| = 30').toBeCloseTo(30, 2);
     },
   },
+  {
+    id: 'shared-touch-tangents-sizes-last',
+    title: 'two tangent circles + tangents from N through the SHARED touch M + sizes typed LAST (ADR-238)',
+    guards:
+      "operator prod session sq9lt4fj (2026-07-06, the 'radius sizes fail' report): two circles tangent at M, tangents from N to EACH circle at M+another, A on extension BN, then O1M=9 / O2M=16 — the 2nd size was refused ('M coincides with its constructed target cannot hold', logged deferred-constraint) and circle-O2's radius collapsed to ~0.26 instead of 16. TWO root causes (ADR-238): (1) degenerate parking — the driven solve for N (carrying 'O1M ⟂ NM', a constraint with manifold slack) parked N at the regularised-NEAREST point of the ⟂ line, which is ON M (the residual's own collapse point); the wedged figure then starved/destabilised every later solve. Fixed by the anti-collapse barrier RETRY in both driven solvers. (2) HOIST was gated behind !pending, so the order-independence rescue never ran from the 'deferred-constraint' state even though re-folding the same facts sizes-first builds clean. Fixed by attempting HOIST from pending too (acceptance unchanged: clean AND not pending). Asserts the closed form: radii 9/16, |O1O2|=25, |NM|=|NB|=|NA|=√(r1·r2)=12, both tangencies genuinely ⟂.",
+    steps: [
+      'שני מעגלים O1 ו O2 משיקים מבחוץ בנקודה M',
+      'מנקודה N יוצאים שני משיקים למעגל O1 בנקודות M ו B',
+      'מנקודה N יוצאים שני משיקים למעגל O2 בנקודות M ו A',
+      'A נמצאת על המשך BN',
+      'O1M=9',
+      'O2M=16',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O1 = at(fig, 'O1'), O2 = at(fig, 'O2'), M = at(fig, 'M'), N = at(fig, 'N'), A = at(fig, 'A'), B = at(fig, 'B');
+      expect(dist(O1, M), '|O1M| = 9 (the stated radius)').toBeCloseTo(9, 2);
+      expect(dist(O2, M), '|O2M| = 16 (the stated radius)').toBeCloseTo(16, 2);
+      expect(dist(O1, O2), 'externally tangent: |O1O2| = 9 + 16').toBeCloseTo(25, 2);
+      expect(dist(N, M), '|NM| = √(r1·r2) = 12 (the classic closed form)').toBeCloseTo(12, 1);
+      expect(dist(N, B), 'equal tangents to O1: |NB| = |NM|').toBeCloseTo(dist(N, M), 2);
+      expect(dist(N, A), 'equal tangents to O2: |NA| = |NM|').toBeCloseTo(dist(N, M), 2);
+      const cosA = (p: Vec, v: Vec, q: Vec) => Math.abs(Math.cos((angle(p, v, q) * Math.PI) / 180));
+      expect(cosA(O1, B, N), 'O1B ⟂ NB (a genuine tangent, not a compromise basin)').toBeLessThan(0.01);
+      expect(cosA(O2, A, N), 'O2A ⟂ NA').toBeLessThan(0.01);
+    },
+  },
+  {
+    id: 'common-tangent-two-circles',
+    title: '"AB משיק משותף לשני המעגלים" — a common tangent construct, its soft pairing swapped by later explicit memberships (ADR-239)',
+    guards:
+      "operator prod session sq9lt4fj (2026-07-06, the 'missing construct: tangent to 2 circles' report): 'AB משיק משותף לשני המעגלים' had NO deterministic rule — the plural מעגלים + משיק would misparse via circlesTangent as MUTUAL tangency of two NEW circles (inventing O,P), so it escalated to the LLM. The commonTangent rule (before circlesTangent; unique 'משותף'/'common' trigger) decomposes to on-circle touches + radius-⟂-tangent per circle + the segment. The touch↔circle PAIRING is unstated (the student said only 'AB touches both') — a softPair default in stated order that the store pre-scan SWAPS when a later explicit membership names the opposite assignment (here 'tangents from N to O1 at M and B' puts B on O1, the reverse of the default A→O1) — M4 defaults-yield, the ADR-163 pre-scan shape. Asserts the full session builds: pairing swapped (B on O1, A on O2), both common-tangent touches genuinely ⟂, sizes land (9/16), N is AB's midpoint (|NA|=|NB|=|NM|).",
+    steps: [
+      'שני מעגלים O1 ו O2 משיקים מבחוץ בנקודה M',
+      'AB משיק משותף לשני המעגלים',
+      'מנקודה N יוצאים שני משיקים למעגל O1 בנקודות M ו B',
+      'מנקודה N יוצאים שני משיקים למעגל O2 בנקודות M ו A',
+      'A נמצאת על המשך BN',
+      'O1M=9',
+      'O2M=16',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O1 = at(fig, 'O1'), O2 = at(fig, 'O2'), M = at(fig, 'M'), N = at(fig, 'N'), A = at(fig, 'A'), B = at(fig, 'B');
+      expect(dist(O1, M), '|O1M| = 9').toBeCloseTo(9, 2);
+      expect(dist(O2, M), '|O2M| = 16').toBeCloseTo(16, 2);
+      // The soft pairing yielded to the stated one: B rides O1 (|O1B| = r1), A rides O2 (|O2A| = r2).
+      expect(dist(O1, B), 'B is the touch on circle O1 (the swap fired)').toBeCloseTo(9, 1);
+      expect(dist(O2, A), 'A is the touch on circle O2').toBeCloseTo(16, 1);
+      const cosA = (p: Vec, v: Vec, q: Vec) => Math.abs(Math.cos((angle(p, v, q) * Math.PI) / 180));
+      expect(cosA(O1, B, A), 'O1B ⟂ AB (a genuine common tangent)').toBeLessThan(0.02);
+      expect(cosA(O2, A, B), 'O2A ⟂ AB').toBeLessThan(0.02);
+      expect(dist(N, M), '|NM| = √(r1·r2) = 12').toBeCloseTo(12, 1);
+      expect(dist(N, A), 'N is the midpoint of AB: |NA| = |NM|').toBeCloseTo(dist(N, M), 1);
+      expect(dist(N, B), '|NB| = |NM|').toBeCloseTo(dist(N, M), 1);
+    },
+  },
+  {
+    id: 'common-tangent-at-shared-touch',
+    title: '"CD משיק משותף לשני המעגלים בנקודה M" — the common tangent AT the shared touch point (ADR-239 variant 2)',
+    guards:
+      "the operator's 'tangent at intersection' half of the missing-construct report (sq9lt4fj follow-up): the single common tangent at the touch point M of two tangent circles. The rule asserts M's membership on BOTH circles + centres collinear with M (all idempotent when the pair is already tangent at M) and DRAWS the tangent line at M, materialising the naming letters C,D as ±offset markers (ADR-036/233 — nothing the student typed is dropped). Asserts the line is genuinely the common tangent: CD ⟂ O1O2.",
+    steps: ['שני מעגלים O1 ו O2 משיקים מבחוץ בנקודה M', 'CD משיק משותף לשני המעגלים בנקודה M'],
+    check(fig) {
+      allStepsOk(fig);
+      const O1 = at(fig, 'O1'), O2 = at(fig, 'O2'), M = at(fig, 'M'), C = at(fig, 'C'), D = at(fig, 'D');
+      expect(dist(O1, O2), 'still externally tangent: |O1O2| = r1 + r2').toBeGreaterThan(0);
+      const cosA = (p: Vec, v: Vec, q: Vec) => Math.abs(Math.cos((angle(p, v, q) * Math.PI) / 180));
+      expect(cosA(O1, M, C), 'the tangent at M ⟂ the centre line (C side)').toBeLessThan(0.01);
+      expect(cosA(O2, M, D), 'the tangent at M ⟂ the centre line (D side)').toBeLessThan(0.01);
+      expect(dist(C, M), 'C is a marker ON the tangent, off the touch (its offset is a sampled free DOF)').toBeGreaterThan(0.05);
+      expect(dist(D, M), 'D is a marker off the touch too').toBeGreaterThan(0.05);
+    },
+  },
 ];
 
 describe('reported scenarios — end-to-end replay of real bug reports', () => {
@@ -3542,9 +3651,14 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
     st.clear();
   });
 
-  it('[pending-vs-contradiction] CE⟂AB before sizes is PENDING (info, no red error); ∠DAB=37 on a square is a hard contradiction', () => {
-    // PENDING: the Q4 ⟂ entered before the sizes flexes as the free DOFs move → it's "not determined yet",
-    // shown as an info banner, NOT the red "over-constrained" error (ADR-104). It resolves once sizes come.
+  it('[pending-vs-contradiction] CE⟂AB before sizes applies CLEAN (satisfied, no error — was pending); ∠DAB=37 on a square is a hard contradiction', () => {
+    // The Q4 ⟂ entered before the sizes used to DEFER (the ADR-104 pending info state): the early coupled
+    // solve never landed. Since ADR-238 the anti-collapse retry gives a failed driven solve a second,
+    // differently-shaped search — and this one lands: the ⟂ is satisfied IMMEDIATELY on the still-flexible
+    // figure (asserted below to solver precision), strictly better than the amber "waiting for givens".
+    // The with-sizes completion is locked separately (`q4-constraints-order-independent`). The invariant
+    // this half keeps: a SATISFIABLE early constraint is never a red error — vs the second half's rigid
+    // contradiction, which must stay red.
     const q4: AnyCommand[] = [
       { type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true, autoCenter: true },
       { type: 'circle', id: 'circle-P', center: 'P', radius: 3.6, freeRadius: true, autoCenter: true },
@@ -3561,8 +3675,14 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
       { type: 'set-perpendicular', a: 'C', b: 'E', c: 'A', d: 'B' },
     ] as AnyCommand[];
     const fq = replay(q4.map((cmd, i) => ({ id: 'p' + i, group: 'g' + i, enabled: true, utterance: '', cmd } as Fact)));
-    expect(fq.pending, 'CE⟂AB before sizes is pending').toBe(true);
-    expect(fq.lastError, 'no red error while pending').toBeNull();
+    expect(fq.lastError, 'a satisfiable early constraint is never a red error').toBeNull();
+    for (const [id, s] of Object.entries(fq.status)) expect(s, `status of ${id}`).toBe('ok');
+    expect(fq.pending, 'the ⟂ is satisfied immediately (ADR-238 retry), not deferred').toBe(false);
+    const p = (id: Id) => at(fq, id);
+    const u = { x: p('E').x - p('C').x, y: p('E').y - p('C').y };
+    const v = { x: p('B').x - p('A').x, y: p('B').y - p('A').y };
+    const cos = Math.abs((u.x * v.x + u.y * v.y) / (Math.hypot(u.x, u.y) * Math.hypot(v.x, v.y)));
+    expect(cos, 'CE ⟂ AB genuinely holds on the flexible figure (not a false green)').toBeLessThan(1e-4);
     // CONTRADICTION: ∠DAB on a square is structurally 90°, so "= 37" can never hold — a hard error, NOT pending.
     const sq: AnyCommand[] = [
       { type: 'square', ids: ['A', 'B', 'C', 'D'] },

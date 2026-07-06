@@ -73,6 +73,9 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     if (o.kind === 'free-point') {
       if (reusesBase) continue; // base corner reuses any existing point (composition)
       if (existing.kind === 'free-point') continue; // free-point command = move (ADR-011)
+      // An `ifAbsent` ensure-exists free point never conflicts — apply skips it entirely when the
+      // id already exists as anything (ADR-236; the parse context may not know the point exists).
+      if (cmd.type === 'free-point' && cmd.ifAbsent) continue;
     }
     // A circle-point construct (tangent / arc-midpoint / point-on-circle) creates
     // its point or reuses whatever already carries that id — never a conflict.
@@ -266,9 +269,70 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
       const r2 = evaluate(recruited);
       if (r2.ok) return { ok: true, construction: recruited, positions: r2.positions };
     }
+    // LAST RESORT — SCALE RESCUE (ADR-237): a figure with no absolute given yet is determined only up
+    // to SIMILARITY (the ADR-101 gauge), so its FIRST size given is a statement about SCALE —
+    // satisfiable exactly by scaling every free DOF by k = stated/measured, with stated (`length`)
+    // values held. The driven/recruited solves can't find that move (it is spread across EVERY carrier
+    // at once — the reloaded two-tangent-circles figure needed the gap, a radius, N, and both touch
+    // params to grow together, a 9-DOF walk the solver never converges on, while the scale map solves
+    // it in closed form). Runs strictly AFTER the recruiter so a figure a minimal solve can satisfy
+    // keeps the least-perturbation behavior (stability principle); try-and-verify — accepted only if
+    // the full evaluation then holds, so any other absolute given (which a global scale would break)
+    // falls through to the honest error unharmed.
+    const scaled = scaleRescue(next, newCons, prevPositions);
+    if (scaled) {
+      const rs = evaluate(scaled);
+      if (rs.ok) return { ok: true, construction: scaled, positions: rs.positions };
+    }
     return { ok: false, error: res.error, construction: prev, positions: prevPositions };
   }
   return { ok: true, construction: next, positions: res.positions };
+}
+
+/**
+ * SCALE RESCUE (ADR-237) — satisfy a failing SIZE given by scaling the whole figure.
+ *
+ * A figure with no absolute given yet is determined only up to similarity (the ADR-101 gauge): every
+ * relation it states (⟂, ∥, tangency, collinearity, equal, ratios, angles) is scale-invariant. Its
+ * first stated LENGTH therefore has an exact closed-form solution — multiply every free world-unit
+ * DOF by k = stated/measured — which the per-carrier driven solves cannot discover (the move is spread
+ * across every DOF at once). Scales: free-point coordinates, free circle radii, on-line offsets, and
+ * perp-offset legs; ratios/angles (on-segment t, on-circle θ) are dimensionless and stay; a `length`
+ * radius is a stated given and is HELD (that's what makes the map land the new given exactly).
+ *
+ * Purely try-and-verify: the caller accepts the result only if the full evaluation then holds, so a
+ * figure with any other absolute given — which a global scale would break — simply falls through to
+ * the recruiter. Bails when any free point is PINNED (a student-typed coordinate is a given: scale is
+ * not a gauge there), or when the failing step carries no positive distance whose endpoints already
+ * have positions.
+ */
+function scaleRescue(next: Construction, newCons: Constraint[], prevPositions: Map<Id, Vec>): Construction | null {
+  const distCon = newCons.find((k): k is Extract<Constraint, { type: 'distance' }> => k.type === 'distance' && k.value > 0);
+  if (!distCon) return null;
+  const pa = prevPositions.get(distCon.a);
+  const pb = prevPositions.get(distCon.b);
+  if (!pa || !pb) return null;
+  const measured = Math.hypot(pa.x - pb.x, pa.y - pb.y);
+  if (!(measured > 1e-9)) return null;
+  const k = distCon.value / measured;
+  if (!Number.isFinite(k) || k <= 0 || Math.abs(k - 1) < 1e-9) return null;
+  // A pinned free point is a stated absolute coordinate — the frame is fixed, scale is not a gauge.
+  if (next.objects.some((o) => o.kind === 'free-point' && (o as FreePoint).pinned)) return null;
+  const objects = next.objects.map((o): GeoObject => {
+    switch (o.kind) {
+      case 'free-point':
+        return { ...o, x: o.x * k, y: o.y * k };
+      case 'circle':
+        return o.radius.via === 'free' ? { ...o, radius: { via: 'free', value: o.radius.value * k } } : o;
+      case 'on-line':
+        return { ...o, offset: o.offset * k };
+      case 'perp-offset':
+        return { ...o, dist: o.dist * k };
+      default:
+        return o;
+    }
+  });
+  return { ...next, objects };
 }
 
 /**
@@ -639,7 +703,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
           o.id === alt.id ? ({ ...o, solve: { constraint: K1, branch: 0 } } as GeoObject) : o.id === x.id ? markDriven(o, K) : o,
         );
         changed = true;
-        
+
         dDid = true;
         break;
       }
@@ -828,6 +892,9 @@ function freeCarrierAncestor(objects: GeoObject[], start: Id): Id | null {
 function reinterpretAsConstraint(prev: Construction, cmd: Command): Construction | null {
   if (!POINT_PLACEMENTS.has(cmd.type)) return null;
   if (cmd.type === 'point-on-segment') return null; // a "P on segment" redefinition is a COLLINEARITY → reinterpretAsCollinear owns it
+  // An `ifAbsent` ensure-exists free point is NOT a placement statement — when the point exists it
+  // must no-op (apply skips it), never spawn a hidden coincide twin (ADR-236).
+  if (cmd.type === 'free-point' && cmd.ifAbsent) return null;
   const P = (cmd as { id?: Id }).id;
   if (!P) return null;
   const existing = prev.objects.find((o) => o.id === P);

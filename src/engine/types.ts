@@ -851,7 +851,7 @@ export type Command =
   | { type: 'triangle'; ids: [Id, Id, Id] }
   | { type: 'right-triangle'; ids: [Id, Id, Id] } // right angle at the last id
   | { type: 'polygon'; ids: Id[] } // a generic n-gon (n ≥ 3): n boundary segments + the polygon object; its vertices are placed by prior commands (e.g. a regular polygon's on-circle vertices)
-  | { type: 'free-point'; id: Id; x: number; y: number; free?: boolean } // free: an AUTO-placed default (a construct's apex) — a free DOF, NOT pinned (ADR-052); a student-typed "A at (x,y)" omits it and pins
+  | { type: 'free-point'; id: Id; x: number; y: number; free?: boolean; ifAbsent?: boolean } // free: an AUTO-placed default (a construct's apex) — a free DOF, NOT pinned (ADR-052); a student-typed "A at (x,y)" omits it and pins. ifAbsent: a parser-injected ensure-exists (a NEW point named onto a line, ADR-236) — skipped entirely when the id already exists as ANYTHING (never moves, never conflicts)
   | { type: 'point-on-segment'; id: Id; a: Id; b: Id; t?: number; branch?: number; extension?: boolean } // branch: which root, once a constraint drives it (ADR-043); extension: an unstated t>1 default, recruitable not eager (ADR-073)
   | { type: 'point-by-distances'; id: Id; from1: Id; dist1: number; from2: Id; dist2: number; branch?: number }
   | { type: 'line-line-intersection'; id: Id; a: Id; b: Id; c: Id; d: Id; dir1?: boolean; dir2?: boolean; onSeg?: boolean } // dir1/dir2: a "המשך" operand — A must be BEYOND the 2nd point (ADR-054). onSeg: a plain SEGMENT meet — the crossing must land WITHIN both segments (ADR-166)
@@ -894,7 +894,7 @@ export type Command =
   | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean; autoCenter?: boolean; freeRadius?: boolean; ifAbsent?: boolean } // freeRadius: radius is a DOF (ADR-051); ifAbsent: a parser-injected implicit circle — skip if it already exists (don't clobber a real one)
   | { type: 'circle-through'; id: Id; center: Id; through: Id; hidden?: boolean; autoCenter?: boolean }
   | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id; hidden?: boolean } // circle through a,b,c (centre = circumcentre); hidden for a cyclic (בר-חסימה) figure
-  | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number; free?: boolean; between?: [Id, Id] } // theta = a STARTING angle; free:true keeps it a samplable/drivable DOF even with a start angle (ADR-097); between = a free point on the arc from-to (ADR-042)
+  | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number; free?: boolean; between?: [Id, Id]; softPair?: boolean } // theta = a STARTING angle; free:true keeps it a samplable/drivable DOF even with a start angle (ADR-097); between = a free point on the arc from-to (ADR-042); softPair: a common-tangent macro's DEFAULT touch↔circle pairing — the store swaps the pair when a later explicit membership states the opposite assignment (ADR-239, the M4 shape)
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
   | { type: 'arc'; id: Id; center: Id; from: Id; to: Id } // a drawn arc (CCW from→to): semicircle / quarter circle
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }

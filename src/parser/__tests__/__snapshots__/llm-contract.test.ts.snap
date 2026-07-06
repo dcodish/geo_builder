@@ -74,6 +74,26 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle-through",
     ],
   },
+  "AB is a common tangent to circles O and P": {
+    "en": [
+      "circle",
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "set-perpendicular",
+      "set-perpendicular",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "set-perpendicular",
+      "set-perpendicular",
+      "segment",
+    ],
+  },
   "AB perpendicular to CD": {
     "en": [
       "segment",
@@ -148,6 +168,24 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-by-distances",
     ],
   },
+  "CD is a common tangent to circles O and P at M": {
+    "en": [
+      "circle",
+      "circle",
+      "circles-tangent",
+      "tangent",
+      "point-on-line",
+      "point-on-line",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "circles-tangent",
+      "tangent",
+      "point-on-line",
+      "point-on-line",
+    ],
+  },
   "E is the intersection of the tangent to circle O at A and BC": {
     "en": [
       "circle",
@@ -180,10 +218,12 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "E on line AC": {
     "en": [
+      "free-point",
       "segment",
       "set-collinear",
     ],
     "he": [
+      "free-point",
       "segment",
       "set-collinear",
     ],

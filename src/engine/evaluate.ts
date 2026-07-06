@@ -245,6 +245,53 @@ export function resolveDriven(c: Construction): Construction {
 }
 
 /**
+ * ANTI-COLLAPSE BARRIER for the driven basin searches (the degenerate-parking class).
+ *
+ * A driven carrier with residual manifold slack (e.g. N carrying "O1M ⟂ NM" — every point of the
+ * ⟂ line through M satisfies it) is placed by the REGULARISED search at the point nearest its seed —
+ * which can be the (near-)DEGENERATE point of its own constraint (N parked ON M: a zero-length ray,
+ * the residual's NaN hole). The figure then reads valid but is WEDGED: gradients around the collapse
+ * are singular/hypersensitive, so any later given that needs the slack direction (the two-tangent
+ * corpus: "tangents from N to the OTHER circle", then sizes) falsely over-constrains. This term makes
+ * near-collapse configurations locally expensive in the BASIN SEARCH ONLY: a soft quadratic hinge per
+ * pair of referenced/carrier points inside a small margin of the figure's extent, exempting pairs a
+ * `coincide` intends to merge (same convention as `solutionAccepted`). It is tie-break-scale — far
+ * below any genuine relative residual, so a FORCED coincidence (ADR-123, driven by a real constraint)
+ * still wins, and the pure-residual polish (which never sees the barrier) lands solutions exactly.
+ * Returns a function of evaluated positions so the callers reuse the positions their cost already
+ * computed (no second evaluateCore).
+ */
+function collapseBarrier(c: Construction, cons: Constraint[], carrierIds: Id[]): (pos: Map<Id, Vec>) => number {
+  const refIds = [...new Set([...cons.flatMap((con) => constraintRefs(con)), ...carrierIds])];
+  const exempt = new Set(c.constraints.filter((k) => k.type === 'coincide').map((k) => [k.p, k.q].sort().join('|')));
+  const pairs: [Id, Id][] = [];
+  for (let i = 0; i < refIds.length; i++)
+    for (let j = i + 1; j < refIds.length; j++)
+      if (!exempt.has([refIds[i], refIds[j]].sort().join('|'))) pairs.push([refIds[i], refIds[j]]);
+  // LINEAR hinge, decisively stronger than the λ regulariser near the margin edge — safe because this
+  // cost is only ever used by the self-verified RETRY search (a result replaces the base only when
+  // accepted AND strictly healthier; a too-aggressive push simply wastes one search).
+  const W = 0.5; // per-pair weight at full contact
+  return (pos) => {
+    let ext = 1;
+    for (const id of refIds) {
+      const p = pos.get(id);
+      if (p) ext = Math.max(ext, Math.abs(p.x), Math.abs(p.y));
+    }
+    const m = 0.05 * ext;
+    let s = 0;
+    for (const [a, b] of pairs) {
+      const p = pos.get(a);
+      const q = pos.get(b);
+      if (!p || !q) continue;
+      const d = Math.hypot(p.x - q.x, p.y - q.y);
+      if (d < m) s += W * (1 - d / m);
+    }
+    return s;
+  };
+}
+
+/**
  * Drive one or more FREE vertices (2 DOF each) so their constraints hold, choosing
  * the configuration NEAREST the current one — a shape's free vertex has no bounded
  * parameter, and a single distance/ratio equation leaves a 1-parameter family of
@@ -269,12 +316,12 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     setFreePos(c, new Map(ids.map((id, i) => [id, { x: x[2 * i], y: x[2 * i + 1] }])));
   // The pure constraint cost (Σ residual²) and a lightly-regularised variant that
   // adds λ·Σ‖p−seed‖² to prefer the configuration nearest the current one.
-  const resid = (x: number[]): number => {
+  const residFull = (x: number[]): { s: number; pos: Map<Id, Vec> | null } => {
     const r = evaluateCore(place(x), { skipConstraints: true });
-    if (!r.ok) return Infinity;
+    if (!r.ok) return { s: Infinity, pos: null };
     let s = 0;
     for (const con of cons) {
-      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return Infinity;
+      for (const id of constraintRefs(con)) if (!r.positions.has(id)) return { s: Infinity, pos: null };
       const get = (id: Id) => r.positions.get(id)!;
       // RELATIVE residual (normalised by the constraint's scale) — one residual convention across the
       // driven solvers (matches resolveMixedCarriers), un-gameable by shrinking a segment toward 0
@@ -283,8 +330,10 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
       const v = residual(con, get) / Math.max(constraintScale(con, get), 1e-9);
       s += v * v;
     }
-    return s;
+    return { s, pos: r.positions };
   };
+  const resid = (x: number[]): number => residFull(x).s;
+  const barrier = collapseBarrier(c, cons, ids);
   const lambda = 1e-3 / (span * span); // scale-free; only breaks ties on the solution manifold
   const regCost = (x: number[]): number => {
     const base = resid(x);
@@ -292,6 +341,19 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
     let s = base;
     for (let i = 0; i < x.length; i++) s += lambda * (x[i] - seed[i]) * (x[i] - seed[i]);
     return s;
+  };
+  // The barrier-augmented search cost — used ONLY by the anti-collapse RETRY (never the primary
+  // descent, whose basin choice previously-green figures depend on — see `collapseBarrier`).
+  const regCostB = (x: number[]): number => {
+    const { s: base, pos } = residFull(x);
+    if (!isFinite(base) || !pos) return Infinity;
+    let s = base + barrier(pos);
+    for (let i = 0; i < x.length; i++) s += lambda * (x[i] - seed[i]) * (x[i] - seed[i]);
+    return s;
+  };
+  const barrierAt = (x: number[]): number => {
+    const { s, pos } = residFull(x);
+    return isFinite(s) && pos ? barrier(pos) : Infinity;
   };
   // Nearest basin (regularised search from the seed) + a few cardinal restarts so a vertex on the
   // far side of a solution circle isn't missed; then polish on the pure residual (shrinking simplex)
@@ -303,14 +365,27 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   ]);
   // Convex-first (ADR-097): prefer a configuration whose declared polygons are convex; fall back to the
   // relaxed accept only if no convex solution is reachable. A no-op when the figure declares no ≥4-gon.
-  const finish = (requireConvex: boolean): { x: number[]; ok: boolean } => {
-    const best = multiStartSolve(seed, offsets, span * 0.2, regCost, resid, [span * 0.05, span * 0.005], 400, (x) =>
+  const finish = (requireConvex: boolean, useBarrier = false): { x: number[]; ok: boolean } => {
+    const best = multiStartSolve(seed, offsets, span * 0.2, useBarrier ? regCostB : regCost, resid, [span * 0.05, span * 0.005], 400, (x) =>
       solutionAccepted(c, place, x, cons, span, requireConvex),
     );
     return { x: best, ok: solutionAccepted(c, place, best, cons, span, requireConvex) };
   };
-  const conv = finish(true);
-  return place(conv.ok ? conv.x : finish(false).x);
+  // Anti-collapse retry (ADR-238): when the plain search FAILED or parked at a near-degenerate spot
+  // (barrier > 0 — e.g. a slack carrier hugging its constraint's own collapse point), re-search with the
+  // barrier-augmented cost and prefer a strictly-healthier accepted result. A healthy plain result
+  // (barrier 0 — the overwhelming case) returns untouched, so previously-green basin choices are
+  // preserved bit-for-bit; a forced coincidence (ADR-123) finds no accepted improvement and falls back.
+  const pick = (requireConvex: boolean): { x: number[]; ok: boolean } => {
+    const base = finish(requireConvex);
+    const b0 = base.ok ? barrierAt(base.x) : Infinity;
+    if (base.ok && b0 === 0) return base;
+    const retry = finish(requireConvex, true);
+    if (retry.ok && barrierAt(retry.x) < b0) return retry;
+    return base;
+  };
+  const conv = pick(true);
+  return place(conv.ok ? conv.x : pick(false).x);
 }
 
 /**
@@ -553,18 +628,20 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     // the solver can't "cheat" a length/ratio by collapsing the constrained part (and a collapse, scale→0,
     // blows the relative residual up). It also normalises constraints of different magnitudes against
     // each other so the joint solve doesn't favour the larger one. (ADR-033.)
-    const cost = (u: number[]): number => {
+    const costFull = (u: number[]): { s: number; pos: Map<Id, Vec> | null } => {
       const r = evaluateCore(place(u), { skipConstraints: true });
-      if (!r.ok) return Infinity;
+      if (!r.ok) return { s: Infinity, pos: null };
       let s = 0;
       for (const con of cons) {
-        for (const id of constraintRefs(con)) if (!r.positions.has(id)) return Infinity;
+        for (const id of constraintRefs(con)) if (!r.positions.has(id)) return { s: Infinity, pos: null };
         const get = (id: Id) => r.positions.get(id)!;
         const v = residual(con, get) / Math.max(constraintScale(con, get), 1e-9);
         s += v * v;
       }
-      return s;
+      return { s, pos: r.positions };
     };
+    const cost = (u: number[]): number => costFull(u).s;
+    const barrier = collapseBarrier(c, cons, specs.map((s) => s.id));
     const lambda = 1e-3; // tiny tie-breaker toward the seed (normalised space)
     const regCost = (u: number[]): number => {
       const base = cost(u);
@@ -572,6 +649,18 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
       let s = base;
       for (let i = 0; i < u.length; i++) s += lambda * (u[i] - seedU[i]) * (u[i] - seedU[i]);
       return s;
+    };
+    // Barrier-augmented search cost for the anti-collapse RETRY only (ADR-238 — see resolveFreeDriven).
+    const regCostB = (u: number[]): number => {
+      const { s: base, pos } = costFull(u);
+      if (!isFinite(base) || !pos) return Infinity;
+      let s = base + barrier(pos);
+      for (let i = 0; i < u.length; i++) s += lambda * (u[i] - seedU[i]) * (u[i] - seedU[i]);
+      return s;
+    };
+    const barrierAt = (u: number[]): number => {
+      const { s, pos } = costFull(u);
+      return isFinite(s) && pos ? barrier(pos) : Infinity;
     };
     // The BOUNDED parametric carriers (on-circle θ∈[0,2π], on-segment t∈[0,1]) in u-space (scale 1 ⇒ u == θ/t),
     // each tagged with the constraint IT drives (for the binding-aware sweep below) — a recruited free vertex
@@ -658,11 +747,30 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
       ...extraRestarts,
       ...[0.5, 1, -1, 2, -2].flatMap((d) => seedU.map((_, j) => seedU.map((v, i) => (i === j ? v + d : v)))),
     ];
-    if (near && solutionAccepted(c, place, near, cons, span, requireConvex)) return { result: place(near), ok: true };
-    const best = multiStartSolve(seedU, restarts, 0.3, regCost, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, (x) =>
-      solutionAccepted(c, place, x, cons, span, requireConvex),
-    );
-    return { result: place(best), ok: solutionAccepted(c, place, best, cons, span, requireConvex) };
+    const run = (rc: (u: number[]) => number): { u: number[]; ok: boolean } => {
+      const best = multiStartSolve(seedU, restarts, 0.3, rc, cost, [0.1, 0.03, 0.01, 0.003, 0.001, 3e-4, 1e-4], 500, (x) =>
+        solutionAccepted(c, place, x, cons, span, requireConvex),
+      );
+      return { u: best, ok: solutionAccepted(c, place, best, cons, span, requireConvex) };
+    };
+    if (near && solutionAccepted(c, place, near, cons, span, requireConvex)) {
+      // NEAR-FIRST stability: a small reshape keeps the current configuration — unless it parked
+      // near-degenerate (barrier > 0), where a barrier-augmented re-search may find a healthy
+      // configuration; keep `near` when it doesn't (ADR-238).
+      const bn = barrierAt(near);
+      if (bn === 0) return { result: place(near), ok: true };
+      const retry = run(regCostB);
+      return retry.ok && barrierAt(retry.u) < bn ? { result: place(retry.u), ok: true } : { result: place(near), ok: true };
+    }
+    // Plain search first (previously-green basin choices preserved); the barrier-augmented RETRY runs
+    // only when the plain result failed or parked near-degenerate (ADR-238 — see resolveFreeDriven).
+    let best = run(regCost);
+    const b0 = best.ok ? barrierAt(best.u) : Infinity;
+    if (!best.ok || b0 > 0) {
+      const retry = run(regCostB);
+      if (retry.ok && barrierAt(retry.u) < b0) best = retry;
+    }
+    return { result: place(best.u), ok: best.ok };
   };
 
   // Convex-by-default (FR-EN-16 / [ADR-018](docs/06-decisions.md#adr-018)): a declared polygon should read

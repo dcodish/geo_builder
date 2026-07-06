@@ -423,6 +423,42 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "text": "מעגל O ומעגל P משיקים מבפנים בנקודה M",
     "winner": "circlesTangent",
   },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "circlesTangent",
+      "pointOnCircle",
+    ],
+    "text": "AB is a common tangent to circles O and P",
+    "winner": "commonTangent",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "circlesTangent",
+    ],
+    "text": "AB משיק משותף למעגלים O ו-P",
+    "winner": "commonTangent",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "circlesTangent",
+      "tangentLine",
+      "pointOnCircle",
+    ],
+    "text": "CD is a common tangent to circles O and P at M",
+    "winner": "commonTangent",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "circlesTangent",
+      "tangentLine",
+    ],
+    "text": "CD משיק משותף למעגלים O ו-P בנקודה M",
+    "winner": "commonTangent",
+  },
 ]
 `;
 
@@ -1317,6 +1353,26 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "lang": "he",
     "text": "מעגל O ומעגל P משיקים מבפנים בנקודה M",
     "winner": "circlesTangent",
+  },
+  {
+    "lang": "en",
+    "text": "AB is a common tangent to circles O and P",
+    "winner": "commonTangent",
+  },
+  {
+    "lang": "he",
+    "text": "AB משיק משותף למעגלים O ו-P",
+    "winner": "commonTangent",
+  },
+  {
+    "lang": "en",
+    "text": "CD is a common tangent to circles O and P at M",
+    "winner": "commonTangent",
+  },
+  {
+    "lang": "he",
+    "text": "CD משיק משותף למעגלים O ו-P בנקודה M",
+    "winner": "commonTangent",
   },
 ]
 `;

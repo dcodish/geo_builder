@@ -151,7 +151,10 @@ function addObj(objects: GeoObject[], o: GeoObject): void {
  * (fixed) gap already exceeds r1 — it usually doesn't (gap ≈ the smaller build seed), so the tangency
  * over-constrains. The gap must become a DOF: recruit a free, unpinned CENTRE as a co-driver of the coincide so
  * the solver spreads the centres to r1+r2. Needed as soon as ANY radius is pinned (not only the last). No-op if
- * `con` isn't the tangency device or a centre already drives it.
+ * `con` isn't the tangency device or a centre already drives it. (When every centre is BUSY with another
+ * constraint the handoff comes up empty — the FIRST size given on such a figure is then satisfied by the
+ * step-level SCALE rescue instead, ADR-237; a later size that pins the remaining radius orphans the coincide
+ * into the M2/ADR-231 re-home path.)
  */
 function keepTangencyDriven(objects: GeoObject[], con: Constraint): void {
   if (con.type !== 'coincide') return;
@@ -555,6 +558,10 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
   switch (cmd.type) {
     case 'free-point': {
+      // An `ifAbsent` free point is the parser's ensure-exists (a NEW point named onto a line, whose
+      // existence the parse context may not know — ADR-236): if the id already exists as ANY object,
+      // skip entirely — never move it, never conflict (mirrors the circle command's `ifAbsent`).
+      if (cmd.ifAbsent && objects.some((o) => o.id === cmd.id)) break;
       // A free point may be (re)placed: if it already exists as a free point,
       // update its coordinates — a *move* (ADR-011). Conflicts with non-free
       // points of the same id are caught upstream by commandConflict. A student's
