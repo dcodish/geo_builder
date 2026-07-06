@@ -23,6 +23,7 @@ Living project documentation. Status: **design phase** (last updated 2026-06-10)
 | 15 | [Hardening Plan (2026-07-02)](15-hardening-plan.md) | The sequenced A–F hardening program from the multi-area Fable review — all phases complete (ADR-170…207) |
 | 16 | [Phase 6 Theorems Plan](16-theorems-plan.md) | The pedagogy-first pre-dev plan for theorem surfacing: stated-vs-derived principle, no-reveal ladder, relevancy model, matcher set, gates, slices |
 | 17 | [Design Rules](17-design-rules.md) | **Read before fixing any bug.** The operator-commissioned doctrine: class-first diagnosis, patch tripwires, the chokepoint registry, designed mechanisms M1–M4, perf rules, escalation template |
+| 18 | [Theorem Discovery v2 — Relevance Replan](18-theorem-relevance-plan.md) | **ACCEPTED, decision-complete (2026-07-06); T1 next.** The 6b+ replan after the operator's dissatisfaction review: coverage disposition map (66/109 ids absent today), evidence-predicate library, explainable rank bands + subsumption, the observed (L2/L3) lane, the principles lane (teacher tips + intent hints); all §8 decisions resolved |
 | — | [Project Memory](PROJECT-MEMORY.md) | Travelling memory: where memory lives, operational notes, resume pointer (read at session start) |
 | — | [Paper & Theory](paper/README.md) | Academic writing + the theory/algorithmic lineage behind the implementation (method↔citation mapping, paper outline, dated discussion logs) |
 

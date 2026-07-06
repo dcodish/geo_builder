@@ -1,5 +1,7 @@
 # 16 — Phase 6 Plan: Theorem Surfacing (pedagogy-first)
 
+> **2026-07-06 — superseded for 6b+ by [18-theorem-relevance-plan.md](18-theorem-relevance-plan.md)** (the relevance-first replan, drafted after the operator's dissatisfaction review: coverage disposition map, evidence-predicate library, explainable rank bands, the observed lane, and the new intent-hints layer). This document remains the authoritative record of the 6a design and its pedagogy decisions (§2, §10), which the replan preserves.
+
 _Drafted 2026-07-03 from the operator's design session. This is the detailed pre-dev plan for [Phase 6](09-implementation-plan.md#phase-6--theorems); it builds on the settled foundations — [ADR-038](06-decisions.md#adr-038) (structural-first detection), FR-TH-1..6 ([02-requirements](02-requirements.md#theorems)), and the [pedagogy charter §3–5](10-pedagogy.md) — and makes the remaining product decisions. **Nothing here touches figure-building behaviour: detection is a pure, read-only consumer of the engine's output, exactly like `detectRelations`/`detectShapes`. Any engine bug it surfaces during testing is pre-existing and gets the usual root-cause treatment.**_
 
 ---
