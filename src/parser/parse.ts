@@ -2686,8 +2686,21 @@ const diameter: Rule = (s, ctx) => {
   const ids = labelRun(dropCircleRef(s).replace(/diameter|קוטר/gi, ' '), 2);
   if (!ids) return null;
   const exists = (p: string) => (ctx.points ?? []).some((q) => up(q) === up(p));
-  if (exists(ids[0]) && exists(ids[1]))
-    return [{ type: 'set-collinear', a: up(ids[0]), b: up(center), c: up(ids[1]) }];
+  if (exists(ids[0]) && exists(ids[1])) {
+    // "XY is a diameter" entails BOTH endpoints ON the circle AND the through-centre collinearity.
+    // Existence is not membership (the ADR-233 proxy-vs-semantic lesson): an existing endpoint NOT yet
+    // on the circle (e.g. a free point some ⊥/segment given created) must be put ON it, or the
+    // constraint form silently under-asserts — the bare collinearity let "AC קוטר" verify green with
+    // A,C floating off the circle (ADR-241). Membership is idempotent for endpoints already on it
+    // (the ADR-099 lowering), so assert it for any endpoint not known to be a member.
+    const members = new Set((ctx.circleMembers?.find((e) => up(e.center) === up(center))?.points ?? []).map(up));
+    return [
+      ...ids
+        .filter((p) => !members.has(up(p)))
+        .map((p) => ({ type: 'point-on-circle' as const, id: up(p), circle: circleId(center) })),
+      { type: 'set-collinear' as const, a: up(ids[0]), b: up(center), c: up(ids[1]) },
+    ];
+  }
   return [{ type: 'diameter', id1: ids[0], id2: ids[1], circle: circleId(center) }];
 };
 
@@ -2713,17 +2726,33 @@ const arcMidpoint: Rule = (s, ctx) => {
     : [{ type: 'point-on-circle', id, circle: circleId(center), between: [from, to] }];
 };
 
-/** "A is on circle O" / "A על מעגל O" — a single inscribed point. */
+/** "A is on circle O" / "A על מעגל O" — inscribed point(s). The subject may be a LIST — "A ו C נמצאות
+ *  על המעגל" / "points A, C are on the circle" — and EVERY listed label gets the membership (the
+ *  ADR-076 uppercase-label-list convention, so "points"/"נמצאות" are never read as labels). The old
+ *  first-label-wins read silently DROPPED the co-subjects: the operator's saved figure stated
+ *  "A ו C נמצאות על המעגל" yet only A landed on the circle — C floated free, and the exported
+ *  `.geo.json` carried the partial lowering to every machine (ADR-240; the app-level droppedNewLabels
+ *  net flagged it, but the LLM round-trip re-entered this same single-subject grammar). A point named
+ *  on a CARRIER ("D על המיתר AB") is a point on that segment, not on the circle — defer to the
+ *  segment rules (`withCarrierMembership` restores the carrier's own membership). */
 const pointOnCircle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
-  // Leading \b on the label so "point A on circle O" reads A, not the "t" of "poin**t**".
-  const m = s.match(/\b([A-Za-z]\d*)\b.*?(?:on|על).*?(?:circle|מעגל)/i);
+  if (POINT_ON_CARRIER.test(s)) return null; // "D על המיתר AB במעגל O" — on the chord, NOT on the circle
+  // The subject run: everything before the on-word that precedes the circle word. Requires at least one
+  // \b-delimited label (so "point A on circle O" reads A, not the "t" of "poin**t**", and a glued pair
+  // "AB על המעגל" stays with the chord/segment readings instead of being split into A,B).
+  const m = s.match(/^(.*?\b[A-Za-z]\d*\b.*?)(?:\bon\b|על)(?=.*?(?:circle|מעגל))/i);
   if (!m) return null;
   // The circle: its named centre ("circle O"), or — for a DEFINITE/unnamed reference ("on the
   // circle" / "על המעגל" / "נמצאת על המעגל") — the figure's single circle, via context.
   const center = resolveCenter(s, ctx);
   if (!center) return null; // 0 or 2+ unnamed circles ⇒ ambiguous → defer/escalate
-  return [{ type: 'point-on-circle', id: up(m[1]), circle: circleId(center) }];
+  const ids = (m[1].match(/[A-Z]\d*/g) ?? []).map(up);
+  // A distinct uppercase run is the subject list; anything else falls back to the legacy
+  // first-single-label read (e.g. a lowercase label) so looser phrasings keep parsing as before.
+  const subjects =
+    ids.length > 0 && new Set(ids).size === ids.length ? ids : [up(m[1].match(/\b([A-Za-z]\d*)\b/)![1])];
+  return subjects.map((id) => ({ type: 'point-on-circle' as const, id, circle: circleId(center) }));
 };
 
 /**
@@ -4272,7 +4301,7 @@ export const RULES: Rule[] = [
   circle,
   foot, // before `pointOnSegment`
   pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)
-  pointOnCircle, // "A on circle O" — before segment/pointOnSegment
+  pointOnCircle, // "A on circle O" / the LIST "A ו C על המעגל" (every subject gets the membership) — before segment/pointOnSegment
   radiusSegment, // "OB רדיוס" — a drawn radius (rim point on the circle + centre→rim segment); after midpoint/setRadius/circle, before `segment` (so "OB" isn't grabbed as a bare segment)
   dividesInRatio, // "G מחלקת את DC ביחס 1:2" — a point on DC at a fixed t; keyword+`p:q` anchored, BEFORE `segment` (which would grab "הקטע DC" and drop the divider) and the numeric/ratio rules
   segment,

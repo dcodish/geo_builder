@@ -336,7 +336,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "lang": "en",
     "shadowedBy": [
       "tangentLine",
-      "pointOnCircle",
     ],
     "text": "E is the intersection of the tangent to circle O at A and BC",
     "winner": "tangentLineIntersection",
@@ -348,14 +347,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     ],
     "text": "E חיתוך המשיק למעגל O בנקודה A עם BC",
     "winner": "tangentLineIntersection",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
-      "pointOnCircle",
-    ],
-    "text": "G is the intersection of circle O and circle P",
-    "winner": "circleCircleIntersection",
   },
   {
     "lang": "en",
@@ -427,7 +418,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "lang": "en",
     "shadowedBy": [
       "circlesTangent",
-      "pointOnCircle",
     ],
     "text": "AB is a common tangent to circles O and P",
     "winner": "commonTangent",
@@ -445,7 +435,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "shadowedBy": [
       "circlesTangent",
       "tangentLine",
-      "pointOnCircle",
     ],
     "text": "CD is a common tangent to circles O and P at M",
     "winner": "commonTangent",

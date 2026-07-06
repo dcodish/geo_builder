@@ -61,12 +61,24 @@ describe('parse — diameter from a point cuts a side at a new point', () => {
     expect(fresh.ok).toBe(true);
     if (!fresh.ok) return;
     expect(fresh.commands).toEqual([{ type: 'diameter', id1: 'A', id2: 'B', circle: 'circle-O' }]);
-    // A,B ALREADY EXIST on circle O ⇒ "AB is a diameter" is a CONSTRAINT on the existing chord (the centre
-    // lies on AB), never a re-creation of A,B (which errors "'B' is already defined"). [ADR-137] Either way
-    // it is the diameter family, NOT diameterCutsSegment (no line-line-intersection).
-    const existing = parse('diameter AB', { circles: ['O'], points: ['A', 'B', 'O'] });
+    // A,B ALREADY EXIST on circle O (the membership hint says so) ⇒ "AB is a diameter" is a CONSTRAINT
+    // on the existing chord (the centre lies on AB), never a re-creation of A,B (which errors "'B' is
+    // already defined"). [ADR-137] Either way it is the diameter family, NOT diameterCutsSegment (no
+    // line-line-intersection).
+    const existing = parse('diameter AB', { circles: ['O'], points: ['A', 'B', 'O'], circleMembers: [{ center: 'O', points: ['A', 'B'] }] });
     expect(existing.ok).toBe(true);
     if (!existing.ok) return;
     expect(existing.commands).toEqual([{ type: 'set-collinear', a: 'A', b: 'O', c: 'B' }]);
+    // A,B exist but are NOT known members (free points some earlier given created) ⇒ the constraint form
+    // also asserts the memberships — existence is not membership (ADR-241); a bare collinearity would let
+    // "AB is a diameter" hold with A,B floating off the circle.
+    const free = parse('diameter AB', { circles: ['O'], points: ['A', 'B', 'O'] });
+    expect(free.ok).toBe(true);
+    if (!free.ok) return;
+    expect(free.commands).toEqual([
+      { type: 'point-on-circle', id: 'A', circle: 'circle-O' },
+      { type: 'point-on-circle', id: 'B', circle: 'circle-O' },
+      { type: 'set-collinear', a: 'A', b: 'O', c: 'B' },
+    ]);
   });
 });

@@ -1551,10 +1551,24 @@ export const useGeoStore = create<GeoState>()(
         while (end < facts.length && groupKey(facts[end]) === key) end++;
         const group = cmds.length > 1 ? nanoid() : undefined; // multi-command edits stay one step
         const replacement: Fact[] = cmds.map((cmd) => ({ id: nanoid(), cmd, utterance, group, enabled: true }));
-        set({
-          facts: [...facts.slice(0, start), ...replacement, ...facts.slice(end)],
+        const next = [...facts.slice(0, start), ...replacement, ...facts.slice(end)];
+        const patch: Partial<GeoState> = {
+          facts: next,
           selectedId: get().selectedId === key ? null : get().selectedId,
-        });
+        };
+        // Edit-path parity with the submit path (commitCommands): an edited command can break an
+        // extension's directional order or a segment-meet at the current seed just like an appended one —
+        // search upward for a satisfying view in the SAME transition (one undo restores both, ADR-241).
+        const seed = get().seed;
+        const fig = replay(next, seed);
+        if (fig.lastError === null && (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig))) {
+          const s = firstSatisfyingSeed(next, seed);
+          if (s !== seed) {
+            patch.seed = s;
+            patch.radiusOverrides = {};
+          }
+        }
+        set(patch);
       },
 
       select: (id) => {

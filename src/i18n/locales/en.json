@@ -45,6 +45,7 @@
     "alreadyDrawn": "That's already on the figure — nothing to add.",
     "ambiguousAngle": "There's more than one angle at {{vertex}}, so I can't tell which one you mean. Name all three letters of the angle — e.g. \"∠A{{vertex}}C = 90\".",
     "partial": "Couldn't draw this part",
+    "labelsDropped": "I only partly understood — I couldn't place {{labels}}. Rephrase the step (e.g. split it in two).",
     "rename_no-source": "There's no point {{from}} to rename.",
     "rename_target-taken": "{{to}} is already a point — pick a free letter, or swap them (click the segment → Swap endpoints, or type \"swap {{from}} and {{to}}\").",
     "rename_same": "{{from}} and {{to}} are the same letter.",
@@ -225,7 +226,8 @@
     "load": "Load from file",
     "loadHint": "Open a saved figure file (replaces the current construction — undo restores it)",
     "badFile": "This file is not a saved figure from this site",
-    "newerVersion": "This file was saved by a newer version of the site — refresh the page and try again"
+    "newerVersion": "This file was saved by a newer version of the site — refresh the page and try again",
+    "loadAudit": "Note: this file was saved by an older version of the tool — the figure may not match the text at step(s): {{steps}}. Click ✎ on the step to re-read it."
   },
   "pointMenu": {
     "rename": "letter",

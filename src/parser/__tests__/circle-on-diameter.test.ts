@@ -66,8 +66,11 @@ describe('diameter on an existing chord is a constraint (ADR-137)', () => {
 
   it('"AB קוטר במעגל P" on a CIRCUMCIRCLE (derived centre) emits set-collinear and makes AB a diameter (∠ACB→90°)', () => {
     // The operator's representation: a circumcircle through A,B,C, centre P a derived circumcentre.
+    // The ctx carries the MEMBERSHIP hint the app's buildParseCtx always supplies (A,B,C are on circle-P)
+    // — ADR-241 gates the bare-collinearity lowering on membership, not existence; an endpoint the hint
+    // doesn't cover would (correctly) get an extra idempotent `point-on-circle`.
     const setup: AnyCommand[] = [{ type: 'circumcircle', id: 'circle-P', center: 'P', a: 'A', b: 'B', c: 'C' } as AnyCommand];
-    const ctx = { circles: ['P'], points: ['A', 'B', 'C', 'P'], circleMembers: [] as { center: string; points: string[] }[] };
+    const ctx = { circles: ['P'], points: ['A', 'B', 'C', 'P'], circleMembers: [{ center: 'P', points: ['A', 'B', 'C'] }] };
     const r = parse('AB קוטר במעגל P', ctx);
     expect(r.ok).toBe(true);
     if (!r.ok) return;

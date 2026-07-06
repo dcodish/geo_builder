@@ -26,6 +26,7 @@ import { Modal } from '@/ui/Modal';
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import { deserializeFigure, figureFileName, serializeFigure } from '@/store/figureFile';
+import { auditLoadedFigure } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { humanizeError } from '@/i18n/humanizeError';
 /**
@@ -255,7 +256,17 @@ export default function App() {
     setEditError(false);
   }
   function commitEdit(key: string) {
-    const r = parse(editText, parseCtx());
+    // Parse against the PREFIX context — the figure as it stands BEFORE the edited step — because the
+    // replacement is spliced back at the step's original position and replayed there (ADR-015). The
+    // end-state context lied: it contains points created by LATER steps (and by the old version of this
+    // step), so context-sensitive lowering (M1 existing-id → constraint) chose a constraint form that is
+    // wrong at the replay position — editing "AB קוטר"→"AC קוטר" saw the ⊥-step's C "existing" and
+    // lowered to a bare collinearity, silently dropping the diameter's circle membership (ADR-241).
+    const facts = useGeoStore.getState().facts;
+    const start = facts.findIndex((f) => groupKey(f) === key);
+    const prefix = start >= 0 ? facts.slice(0, start) : facts;
+    const before = replay(prefix);
+    const r = parse(editText, buildParseCtx(before.construction, before.positions));
     if (!r.ok || r.commands.length === 0) {
       setEditError(true);
       return;
@@ -324,6 +335,19 @@ export default function App() {
     }
     loadFigure(r.file); // one undo restores the session that was open before
     setFileNote('');
+    // Honesty audit (ADR-242): the file replays its SAVED lowering (deterministic restore, ADR-232), so
+    // a step whose stored commands dropped a stated label, or whose utterance the current parser reads
+    // differently (a fix landed since the save), silently shows an outdated figure. Load still opens
+    // exactly as saved — but the student is told which rows to re-read (✎ edit re-parses the step
+    // against its prefix context, ADR-241). Persistent note (no 6 s auto-clear): it names a truth
+    // problem, not a file-handling hiccup.
+    const audit = auditLoadedFigure(r.file.facts);
+    if (audit.findings.length > 0) {
+      const rows = audit.findings
+        .map((f) => `${f.step}. "${f.utterance}"${f.labels.length ? ` (${f.labels.join(', ')})` : ''}`)
+        .join(' · ');
+      setFileNote(t('file.loadAudit', { steps: rows }));
+    }
   };
 
   // After a step commits, VERIFY the figure meets every requirement; if not, auto-search alternative
@@ -549,6 +573,23 @@ export default function App() {
       // "produced nothing even after a retry" gets the explicit problem message; pure out-of-grammar
       // (the grammar never matched) keeps the gentler "couldn't read that — try an example".
       setInputNote(t(weak ? 'input.producedNothing' : 'input.notUnderstood'));
+      setBusy(false);
+      return;
+    }
+    // HONESTY GATE on the LLM path (ADR-240): the grammar path refuses to commit a parse that leaves a
+    // NEW input label unused (droppedNewLabels, ADR-089) — the second attempt must hold the same line.
+    // Without it, a decomposition that loses a stated point commits a silently-partial figure: the LLM's
+    // canonical line is re-parsed by the SAME grammar that just dropped the label, so the round-trip can
+    // return the identical partial lowering ("A ו C נמצאות על המעגל" committed as A alone — the
+    // operator's saved-figure C floating off its circle). Name the lost label and keep the text to edit.
+    const stillDropped = droppedNewLabels(
+      utterance,
+      llmCmds,
+      replay(cur.facts).construction.objects.filter(isGeoPoint).map((o) => o.id),
+    );
+    if (stillDropped.length > 0) {
+      logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `dropped-labels:${stillDropped.join(',')}`, commands: llmCmds });
+      setInputNote(t('input.labelsDropped', { labels: stillDropped.join(', ') }));
       setBusy(false);
       return;
     }

@@ -31,7 +31,14 @@ import type { AnyCommand, Id, Vec } from '@/engine';
 import { humanizeError } from '@/i18n/humanizeError';
 import { detectTheorems } from '@/theorems';
 
-export type Step = string | { llm: AnyCommand[] } | { llm: string[] };
+export type Step =
+  | string
+  | { llm: AnyCommand[] }
+  | { llm: string[] }
+  /** ✎ edit of an EARLIER step (1-based index into the typed steps): re-parse the new wording against
+   *  the PREFIX context — the figure BEFORE the edited step — and splice the replacement at the step's
+   *  position, exactly as the app's commitEdit → replaceGroup does (ADR-241). */
+  | { edit: { step: number; to: string } };
 export interface Scenario {
   id: string;
   title: string;
@@ -60,6 +67,26 @@ function factsOf(steps: Step[]): Fact[] {
   const push = (group: string, utterance: string, cmd: AnyCommand) =>
     facts.push({ id: `${group}.${facts.length}`, utterance, group, cmd, enabled: true });
   for (const step of steps) {
+    if (typeof step === 'object' && 'edit' in step) {
+      // The app's ✎ path (ADR-241): parse against the PREFIX (facts before the edited group — the
+      // context the replacement is replayed in), then splice in place. An edit adds no new step group.
+      const key = `g${step.edit.step - 1}`;
+      const start = facts.findIndex((f) => f.group === key);
+      if (start < 0) throw new Error(`edit step: no step group ${key} to edit`);
+      let end = start;
+      while (end < facts.length && facts[end].group === key) end++;
+      const r = parse(step.edit.to, ctxOf(facts.slice(0, start)));
+      if (!r.ok) throw new Error(`edited step did not parse: ${JSON.stringify(step.edit.to)}`);
+      const replacement: Fact[] = r.commands.map((cmd, i) => ({
+        id: `${key}e.${i}`,
+        utterance: step.edit.to,
+        group: key,
+        cmd,
+        enabled: true,
+      }));
+      facts.splice(start, end - start, ...replacement);
+      continue;
+    }
     const group = `g${g++}`;
     if (typeof step === 'string') {
       const r = parse(step, ctxOf(facts));
@@ -120,6 +147,55 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
+  {
+    id: 'diameter-edit-rereads-at-position',
+    title: 'editing "AB קוטר" → "AC קוטר" (chord+⊥ figure): the edit re-reads at its own position and stays a real diameter',
+    guards:
+      "operator report (2026-07-06, screenshot session): מעגל O / AB קוטר / BD מיתר / BD⊥AC drew correctly; editing step 2 to \"AC קוטר\" broke the figure — A slipped off the circle and C floated far outside, with every row still ✓. Root cause (ADR-241): commitEdit re-parsed against the END-STATE figure context, where C already existed (created free by the ⊥ step's auto-segment), so the diameter rule's existing-endpoints branch (ADR-137) lowered to a bare `set-collinear A O C` — dropping the memberships — and the splice replayed that weaker command at position 2. Fix: the edit parses against the PREFIX context (the figure before the edited step — the context the replacement is replayed in), which lowers to the constructive `diameter`; plus the ADR-137 branch now asserts membership for existing endpoints not on the circle (existence ≠ membership, the ADR-233 lesson).",
+    steps: ['מעגל O', 'AB קוטר', 'BD מיתר', 'BD⊥AC', { edit: { step: 2, to: 'AC קוטר' } }],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O');
+      const r = fig.circles.get('circle-O')!.r;
+      for (const p of ['A', 'B', 'C', 'D']) expect(dist(O, at(fig, p)), `${p} on the circle`).toBeCloseTo(r, 4);
+      // AC is a true diameter: A—O—C collinear (so |AC| = 2r) …
+      expect(dist(at(fig, 'A'), at(fig, 'C')), '|AC| = 2r (through the centre)').toBeCloseTo(2 * r, 4);
+      // … and the stated BD ⊥ AC holds.
+      const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((p) => at(fig, p));
+      const dot = (B.x - D.x) * (A.x - C.x) + (B.y - D.y) * (A.y - C.y);
+      expect(Math.abs(dot) / (dist(B, D) * dist(A, C)), 'BD ⊥ AC').toBeLessThan(1e-4);
+    },
+  },
+  {
+    id: 'diameter-on-existing-free-points',
+    title: '"AC קוטר" typed AFTER "BD⊥AC" created A,C as free points: the diameter puts them ON the circle (membership, not just collinearity)',
+    guards:
+      'the no-edit member of the ADR-241 class, reachable on the plain submit path: מעגל O / BD⊥AC (creates A,C free) / AC קוטר. The diameter rule\'s ADR-137 existing-endpoints branch gated on label EXISTENCE where the semantics need circle MEMBERSHIP — "XY is a diameter" entails X,Y ∈ circle AND collinear-through-centre, but the branch emitted only the collinearity, so A and C stayed floating free with every row ✓ and the verifier green (it can only check what the commands assert). The branch now asserts `point-on-circle` for any existing endpoint not already a member (idempotent for real chord endpoints, the ADR-099 lowering).',
+    steps: ['מעגל O', 'BD⊥AC', 'AC קוטר'],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O');
+      const r = fig.circles.get('circle-O')!.r;
+      for (const p of ['A', 'C']) expect(dist(O, at(fig, p)), `${p} on the circle`).toBeCloseTo(r, 4);
+      expect(dist(at(fig, 'A'), at(fig, 'C')), '|AC| = 2r (a real diameter)').toBeCloseTo(2 * r, 4);
+      const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((p) => at(fig, p));
+      const dot = (B.x - D.x) * (A.x - C.x) + (B.y - D.y) * (A.y - C.y);
+      expect(Math.abs(dot) / (dist(B, D) * dist(A, C)), 'BD ⊥ AC').toBeLessThan(1e-4);
+    },
+  },
+  {
+    id: 'multi-point-on-circle-membership',
+    title: '"A ו C נמצאות על המעגל": EVERY listed point lands on the circle (the saved-file C that floated free)',
+    guards:
+      'operator\'s exported `.geo.json` (2026-07-06, saved on the server): מעגל O / "A ו C נמצאות על המעגל" / OC / OA / AC. The step\'s stored lowering was `point-on-circle A` ALONE — `pointOnCircle` read only the FIRST label of a multi-subject statement, and although the droppedNewLabels net flagged C and escalated, the LLM round-trip re-entered the same single-subject grammar, so the partial lowering committed and the file carried it to every machine (loading replays stored commands, never the parser — ADR-232). Root cause (ADR-240): a multi-subject membership statement parsed single-subject. The rule now reads the ADR-076 uppercase-label-list subject; the LLM commit path re-checks droppedNewLabels (the second honesty gate); load runs the drift+dropped audit (ADR-242).',
+    steps: ['מעגל O', 'A ו C נמצאות על המעגל', 'OC', 'OA', 'AC'],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O');
+      const r = fig.circles.get('circle-O')!.r;
+      for (const p of ['A', 'C']) expect(dist(O, at(fig, p)), `${p} on the circle`).toBeCloseTo(r, 4);
+    },
+  },
   {
     id: 'segment-tangent-at-on-circle-endpoint-new-far-end',
     title: '"BA משיק למעגל" with A already on the circle and B NEW: the tangent AT A (B a point along it), not a tangent FROM A that collapses B onto A',
