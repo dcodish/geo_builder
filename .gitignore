@@ -20,3 +20,4 @@ logs/
 # Vite temp config
 vite.config.ts.timestamp-*.mjs
 reports/
+dist-3d

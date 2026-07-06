@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:3d": "tsc -b && vite build --config vite.config.3d.ts",
     "build:proxy": "node server/build.mjs",
     "preview": "vite preview",
     "test": "vitest",

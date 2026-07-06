@@ -1,0 +1,47 @@
+{
+  "title": "Space Builder",
+  "tagline": "Build in 3-D space — solids, points, vectors (dev preview V0)",
+  "input": {
+    "placeholder": "Type a given, e.g.: cube ABCD",
+    "add": "Add"
+  },
+  "actions": {
+    "undo": "Undo",
+    "redo": "Redo",
+    "clear": "Clear all",
+    "another": "Show another configuration",
+    "resetView": "Reset view"
+  },
+  "hint": {
+    "orbit": "Drag the figure to orbit · scroll to zoom"
+  },
+  "facts": {
+    "empty": "No givens yet — type one or click an example",
+    "delete": "Delete",
+    "toggleTitle": "Include/exclude this given",
+    "claimVerified": "The claim was verified against the figure"
+  },
+  "status": {
+    "inactive": "Inactive — a given it depends on is off"
+  },
+  "err": {
+    "notUnderstood": "I couldn't understand that given (this version: solids, points on segments, vector naming, and claims to verify)",
+    "alreadyDefined": "'{{id}}' is already defined in the figure",
+    "unknownPoint": "Point '{{id}}' is not defined yet",
+    "unknownVector": "Vector '{{id}}' is not declared — name it first (denote AB = u)",
+    "badSolid": "The number of vertices doesn't fit the requested solid",
+    "badName": "A vector name is a single lowercase letter (e.g. u)",
+    "needBasis": "This point needs three declared vectors (a basis) — e.g.: denote AB = u, AD = v, AA' = w",
+    "noSolution": "No position of '{{id}}' satisfies the condition",
+    "notOnSegment": "'{{id}}' falls outside the segment — the condition doesn't hold on the segment itself",
+    "claimRefuted": "The claim doesn't hold in the figure — check the computation"
+  },
+  "examples": {
+    "ex1": "cube ABCD",
+    "ex2": "right triangular prism ABC",
+    "ex3": "M is the midpoint of BB'",
+    "ex4": "K on AA' such that AK = 2KA'",
+    "ex5": "denote AB = u, AD = v, AA' = w",
+    "ex6": "CA' is perpendicular to plane BC'D"
+  }
+}
