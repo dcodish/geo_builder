@@ -12,6 +12,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
+import { freeDofCount3 } from '../engine/evaluate';
 import { dist3 } from '../engine/vec3';
 import { derive3, useGeo3 } from '../store/store3';
 
@@ -401,5 +402,88 @@ describe("GATE — 2023 קיץ א Q2 ג–ד (partial injection, the sign branch
     submit('שיעור ה-x של C שלילי'); // C is PINNED at x=4 — no branch can flip it
     expect(state().facts).toHaveLength(5);
     expect(state().lastError).toEqual({ code: 'sign-unsatisfiable', id: 'C' });
+  });
+});
+
+describe('GATE — 2019 קיץ Q2 (V5: line through points cutting a point-plane, ratio + angle answers)', () => {
+  beforeEach(reset);
+
+  const HE = [
+    'קובייה ABCD',
+    'B(0,0,0)',
+    'A(6,0,0)',
+    'C(0,6,0)',
+    "שיעור ה-z של B' חיובי",
+    "הזווית בין A'C לבין BC' היא 90", // the א answer — verified
+    "הישר A'C חותך את המישור BC'D בנקודה K",
+    'K = (2, 4, 2)',
+    "A'K : A'C = 2 : 3", // the ג answer — verified
+  ];
+  const EN = [
+    'cube ABCD',
+    'B(0,0,0)',
+    'A(6,0,0)',
+    'C(0,6,0)',
+    "the z-coordinate of B' is positive",
+    "the angle between A'C and BC' is 90",
+    "line A'C cuts plane BC'D at K",
+    'K = (2, 4, 2)',
+    "A'K : A'C = 2 : 3",
+  ];
+
+  for (const [name, seq] of [['Hebrew', HE], ['English', EN]] as const) {
+    it(`${name}: the full sequence builds and every answer verifies`, () => {
+      seq.forEach(submit);
+      expect(state().facts).toHaveLength(9);
+      expectAllOk();
+      const K = derived().positions.get('K')!;
+      expect(K.x).toBeCloseTo(2, 4);
+      expect(K.y).toBeCloseTo(4, 4);
+      expect(K.z).toBeCloseTo(2, 4);
+    });
+  }
+
+  it('a wrong ratio is refused', () => {
+    HE.slice(0, 7).forEach(submit);
+    submit("A'K : A'C = 1 : 2");
+    expect(state().facts).toHaveLength(7);
+    expect(state().lastError).toEqual({ code: 'claim-refuted' });
+  });
+});
+
+describe('GATE — V6 solids-trig (cone / cylinder / sphere with stated sizes; formula-sheet answers verify)', () => {
+  beforeEach(reset);
+
+  it('Hebrew: the cone chain — free until sized, then V=100π and M=65π verify', () => {
+    submit('חרוט שקודקודו S ומרכז בסיסו O');
+    expect(state().facts).toHaveLength(1); // free-size cone builds (r,h are free DOFs)
+    submit('נפח החרוט = 100π');
+    expect(state().lastError).toEqual({ code: 'free-size-claim', id: 'cone' }); // honest: size the solid first
+    useGeo3.getState().clear();
+    submit('חרוט שקודקודו S ומרכז בסיסו O, רדיוסו 5 וגובהו 12');
+    submit('נפח החרוט = 100π');
+    submit('שטח המעטפת של החרוט = 65π');
+    expect(state().facts).toHaveLength(3);
+    expectAllOk();
+    submit('נפח החרוט = 99π');
+    expect(state().lastError).toEqual({ code: 'claim-refuted' });
+  });
+
+  it('English: sphere R=3 — volume and surface area both 36π', () => {
+    submit('sphere with center O radius 3');
+    submit('the volume of the sphere = 36π');
+    submit('the surface area of the sphere = 36π');
+    expect(state().facts).toHaveLength(3);
+    expectAllOk();
+  });
+
+  it('the DOF cue: a sized cone reads 0, a free cone reads 2', () => {
+    submit('חרוט שקודקודו S ומרכז בסיסו O');
+    const d1 = derived();
+    expect(freeDofCount3(d1.construction, d1.resolved)).toBe(2);
+    useGeo3.getState().clear();
+    submit('חרוט שקודקודו S ומרכז בסיסו O, רדיוסו 5 וגובהו 12');
+    const d2 = derived();
+    expect(freeDofCount3(d2.construction, d2.resolved)).toBe(0);
   });
 });

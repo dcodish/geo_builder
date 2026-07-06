@@ -105,6 +105,17 @@ export default function Figure3({ construction, resolved, width = 640, height = 
             </text>
           </g>
         ))}
+        {scene.curves.map((cu, i) => (
+          <polyline
+            key={`curve-${i}`}
+            points={cu.pts.map((p) => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke={cu.hidden ? '#94a3b8' : '#1e293b'}
+            strokeWidth={cu.hidden ? 1.2 : 1.6}
+            strokeDasharray={cu.hidden ? '7 5' : undefined}
+            strokeLinecap="round"
+          />
+        ))}
         {scene.seams.map((s, i) => (
           <line
             key={`seam-${i}`}

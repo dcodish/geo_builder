@@ -6,7 +6,7 @@
 import { exprPointIds, exprVectorNames } from './vecExpr';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, SolidCommand, SolidObj } from './types';
 
-const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6 };
+const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4 };
 
 /** Edge index pairs per solid kind (indices into `ids`). */
 function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
@@ -15,6 +15,18 @@ function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
       [0, 1], [1, 2], [2, 0], // base ring
       [3, 4], [4, 5], [5, 3], // top ring
       [0, 3], [1, 4], [2, 5], // verticals
+    ];
+  }
+  if (kind === 'pyramid4') {
+    return [
+      [0, 1], [1, 2], [2, 3], [3, 0], // base ring
+      [0, 4], [1, 4], [2, 4], [3, 4], // lateral edges to the apex
+    ];
+  }
+  if (kind === 'pyramid3') {
+    return [
+      [0, 1], [1, 2], [2, 0], // base ring
+      [0, 3], [1, 3], [2, 3], // lateral edges to the apex
     ];
   }
   // cube / box
@@ -32,6 +44,18 @@ function faceIndices(kind: SolidCommand['kind']): number[][] {
       [0, 1, 2], // base
       [3, 4, 5], // top
       [0, 1, 4, 3], [1, 2, 5, 4], [2, 0, 3, 5], // sides
+    ];
+  }
+  if (kind === 'pyramid4') {
+    return [
+      [0, 1, 2, 3], // base
+      [0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4], // lateral triangles
+    ];
+  }
+  if (kind === 'pyramid3') {
+    return [
+      [0, 1, 2], // base
+      [0, 1, 3], [1, 2, 3], [2, 0, 3], // lateral triangles
     ];
   }
   return [
@@ -58,6 +82,8 @@ function clone(c: Construction3): Construction3 {
     vectorPins: [...c.vectorPins],
     signGivens: [...c.signGivens],
     pointPlanes: new Map(c.pointPlanes),
+    pointLines: new Map(c.pointLines),
+    revolutions: [...c.revolutions],
   };
 }
 
@@ -102,6 +128,21 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return null;
     case 'plane-eq':
       return missingPoint(c, claim.ids);
+    case 'angle-seg-eq':
+      return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
+    case 'length-ratio':
+      return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
+    case 'volume-eq':
+    case 'lateral-area-eq': {
+      const matches = c.revolutions.filter((r) => r.kind === claim.solid);
+      if (matches.length !== 1) return { code: 'no-such-solid', id: claim.solid };
+      const r = matches[0];
+      const needsHeight = r.kind !== 'sphere';
+      if (r.radius === undefined || (needsHeight && r.height === undefined)) {
+        return { code: 'free-size-claim', id: claim.solid }; // sizes unstated ⇒ the value is a scale statement, not a check
+      }
+      return null;
+    }
   }
 }
 
@@ -313,8 +354,8 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
 
     case 'line-plane-point': {
       if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
-      if (!c.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
-      if (!c.planes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
+      if (!c.lines.has(cmd.line) && !c.pointLines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
+      if (!c.planes.has(cmd.plane) && !c.pointPlanes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
       const next = clone(c);
       next.points.set(cmd.id, { kind: 'line-plane', line: cmd.line, plane: cmd.plane });
       return { ok: true, next };
@@ -325,6 +366,32 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       if (!c.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
       const next = clone(c);
       next.onLines.push(cmd);
+      return { ok: true, next };
+    }
+
+    case 'line-through': {
+      if (c.lines.has(cmd.name) || c.pointLines.has(cmd.name)) {
+        const existing = c.pointLines.get(cmd.name);
+        return existing && existing.a === cmd.a && existing.b === cmd.b
+          ? { ok: true, next: c } // idempotent for the same pair
+          : { ok: false, error: { code: 'already-defined', id: cmd.name } };
+      }
+      const missing = missingPoint(c, [cmd.a, cmd.b]);
+      if (missing) return { ok: false, error: missing };
+      const next = clone(c);
+      next.pointLines.set(cmd.name, { a: cmd.a, b: cmd.b });
+      return { ok: true, next };
+    }
+
+    case 'revolution': {
+      const owned = [...(cmd.center ? [cmd.center] : []), ...(cmd.apex ? [cmd.apex] : [])];
+      const taken = owned.find((id) => c.points.has(id));
+      if (taken !== undefined) return { ok: false, error: { code: 'already-defined', id: taken } };
+      const next = clone(c);
+      const rev = next.revolutions.length;
+      next.revolutions.push({ kind: cmd.kind, center: cmd.center, apex: cmd.apex, radius: cmd.radius, height: cmd.height });
+      if (cmd.center) next.points.set(cmd.center, { kind: 'rev-point', rev, role: 'center' });
+      if (cmd.apex) next.points.set(cmd.apex, { kind: 'rev-point', rev, role: 'apex' });
       return { ok: true, next };
     }
   }

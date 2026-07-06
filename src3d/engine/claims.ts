@@ -81,6 +81,38 @@ function holdsAt(claim: Claim3, c: Construction3, pos: Positions3): boolean {
       if (norm3(cross3(sub3(ps[1]!, ps[0]!), sub3(ps[2]!, ps[0]!))) < 1e-9) return false;
       return ps.every((p) => Math.abs(dot3(n, p!) + claim.d) <= REL_TOL * Math.max(norm3(n) * (1 + norm3(p!)), 1));
     }
+    case 'angle-seg-eq': {
+      const [a1, b1, a2, b2] = [claim.a1, claim.b1, claim.a2, claim.b2].map((id) => pos.get(id));
+      if (!a1 || !b1 || !a2 || !b2) return false;
+      const d1 = sub3(b1, a1);
+      const d2 = sub3(b2, a2);
+      const den = norm3(d1) * norm3(d2);
+      if (den < 1e-12) return false;
+      // the angle between LINES: undirected, ≤ 90° (the textbook convention)
+      const deg = (Math.acos(Math.min(1, Math.abs(dot3(d1, d2)) / den)) * 180) / Math.PI;
+      return Math.abs(deg - claim.deg) <= 1e-3;
+    }
+    case 'length-ratio': {
+      const [a1, b1, a2, b2] = [claim.a1, claim.b1, claim.a2, claim.b2].map((id) => pos.get(id));
+      if (!a1 || !b1 || !a2 || !b2 || claim.q === 0) return false;
+      const len2 = norm3(sub3(b2, a2));
+      if (len2 < 1e-12) return false;
+      return Math.abs(norm3(sub3(b1, a1)) / len2 - claim.p / claim.q) <= REL_TOL * Math.max(claim.p / claim.q, 1);
+    }
+    case 'volume-eq':
+    case 'lateral-area-eq': {
+      const rev = c.revolutions.find((r) => r.kind === claim.solid);
+      if (!rev || rev.radius === undefined) return false; // guarded upstream (no-such-solid / free-size-claim)
+      const r = rev.radius;
+      const h = rev.height ?? 0;
+      let actual: number;
+      if (claim.type === 'volume-eq') {
+        actual = rev.kind === 'sphere' ? (4 / 3) * Math.PI * r ** 3 : rev.kind === 'cone' ? (Math.PI * r * r * h) / 3 : Math.PI * r * r * h;
+      } else {
+        actual = rev.kind === 'sphere' ? 4 * Math.PI * r * r : rev.kind === 'cone' ? Math.PI * r * Math.hypot(r, h) : 2 * Math.PI * r * h;
+      }
+      return Math.abs(actual - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
+    }
     case 'never-parallel': {
       // "ℓ ∦ π for EVERY parameter value" (2024-Q2 א): parallel ⟺ dir(m)·n(m) = 0,
       // so the claim holds iff that residual has NO zero over the scanned range —

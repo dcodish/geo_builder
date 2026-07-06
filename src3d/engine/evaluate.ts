@@ -15,8 +15,8 @@
 import { sample } from './rng';
 import { solvePivot } from './solve3';
 import { decompose3 } from './vecExpr';
-import type { Construction3, Id, LinExpr, PointDef, Positions3 } from './types';
-import { add3, centroid3, cross3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
+import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
+import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 /** Deg → rad. */
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -31,14 +31,32 @@ function apexFromBaseAngles(alpha: number, beta: number): { x: number; y: number
 }
 
 /** The FREE dims a solid kind carries (sampled per seed; the pivot solves over them — ADR-3D-007). */
-export function solidDims(kind: 'cube' | 'box' | 'prism3', key: string, seed: number): number[] {
+export function solidDims(kind: SolidKind, key: string, seed: number): number[] {
   if (kind === 'cube') return []; // edge = the similarity gauge
   if (kind === 'box') return [sample(seed, `${key}-depth`, 0.55, 1.7), sample(seed, `${key}-height`, 0.5, 1.4)];
+  if (kind === 'pyramid4') return [sample(seed, `${key}-height`, 0.8, 1.6)]; // square base side = gauge
+  if (kind === 'pyramid3')
+    return [rad(sample(seed, `${key}-alpha`, 42, 68)), rad(sample(seed, `${key}-beta`, 42, 68)), sample(seed, `${key}-height`, 0.8, 1.6)];
   return [rad(sample(seed, `${key}-alpha`, 38, 72)), rad(sample(seed, `${key}-beta`, 38, 72)), sample(seed, `${key}-height`, 0.65, 1.5)];
 }
 
+/** A revolution solid's resolved size: stated dims pin; unstated ones are FREE sampled DOFs (ADR-052). */
+export function revolutionDims(c: Construction3, i: number, seed: number): { r: number; h: number; origin: Vec3 } {
+  const rev = c.revolutions[i];
+  const key = `rev-${rev.kind}-${rev.center ?? i}`;
+  const r = rev.radius ?? sample(seed, `${key}-radius`, 0.5, 1.2);
+  const h = rev.kind === 'sphere' ? 0 : rev.height ?? sample(seed, `${key}-height`, 0.9, 1.9);
+  const origin = v3(c.solids.length * 2.5 + i * 3.2, 0, 0);
+  return { r, h, origin };
+}
+
+/** The circumcentre of base triangle A=(0,0), B=(1,0), C=(cx,cy) — a RIGHT pyramid's apex sits above it. */
+function circumcenter2(cx: number, cy: number): { x: number; y: number } {
+  return { x: 0.5, y: ((cx - 0.5) * (cx - 0.5) + cy * cy - 0.25) / (2 * cy) };
+}
+
 /** World positions of one solid's vertices, in `ids` order, from its dim vector. */
-function solidPositions(kind: 'cube' | 'box' | 'prism3', dims: number[], origin: Vec3): Vec3[] {
+function solidPositions(kind: SolidKind, dims: number[], origin: Vec3): Vec3[] {
   const o = origin;
   if (kind === 'cube') {
     const s = 1; // scale gauge — see file header
@@ -53,6 +71,24 @@ function solidPositions(kind: 'cube' | 'box' | 'prism3', dims: number[], origin:
     return [
       v3(o.x, o.y, o.z), v3(o.x + a, o.y, o.z), v3(o.x + a, o.y + b, o.z), v3(o.x, o.y + b, o.z),
       v3(o.x, o.y, o.z + h), v3(o.x + a, o.y, o.z + h), v3(o.x + a, o.y + b, o.z + h), v3(o.x, o.y + b, o.z + h),
+    ];
+  }
+  if (kind === 'pyramid4') {
+    // right square pyramid: base side 1 (gauge), apex above the base centre
+    const [h] = dims;
+    return [
+      v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1, o.y + 1, o.z), v3(o.x, o.y + 1, o.z),
+      v3(o.x + 0.5, o.y + 0.5, o.z + h),
+    ];
+  }
+  if (kind === 'pyramid3') {
+    // right triangular pyramid: apex above the base's CIRCUMCENTRE (equal lateral edges)
+    const [alpha, beta, h] = dims;
+    const c = apexFromBaseAngles(alpha, beta);
+    const cc = circumcenter2(c.x, c.y);
+    return [
+      v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + c.x, o.y + c.y, o.z),
+      v3(o.x + cc.x, o.y + cc.y, o.z + h),
     ];
   }
   // prism3 — right triangular prism: base ABC in the z=origin plane, tops straight up.
@@ -87,6 +123,8 @@ export interface Resolved3 {
   param: { name: string; value: number; roots: number[] } | null;
   /** The V4 pivot's outcome, when injections exist: how many placements converged and which was chosen. */
   pivot: { solutions: number; chosen: number; err: number } | null;
+  /** V6 — resolved solids of revolution (world centre/apex + numeric radius/height) for the renderer. */
+  revolutions: { kind: 'cylinder' | 'cone' | 'sphere'; center: Vec3; apex?: Vec3; r: number; h: number }[];
 }
 
 const linVal = (e: LinExpr, a: number): number => e.k + e.p * a;
@@ -110,6 +148,7 @@ export function lineAtParam(c: Construction3, name: string, a: number): Resolved
       dir: v3(linVal(def.dir[0], a), linVal(def.dir[1], a), linVal(def.dir[2], a)),
     };
   }
+  if (def.kind === 'through') return null; // resolved later, from final positions
   if (!c.planes.has(def.p1) || !c.planes.has(def.p2)) return null;
   return planePlaneLine(planeAt(c, def.p1, a), planeAt(c, def.p2, a));
 }
@@ -297,6 +336,35 @@ function solve3x3(r1: Vec3, r2: Vec3, r3: Vec3, rhs: Vec3): Vec3 | null {
   return v3(dx / det, dy / det, dz / det);
 }
 
+/**
+ * The figure's FREE degrees of freedom (the V5 cue, the 2-D ADR-101 idea): sampled
+ * solid dims + unstated revolution sizes + free on-segment sliders + an unpinned
+ * parameter; after a converged pivot the absolute pins consume gauge+dims
+ * (dims + 7 − pinCount, floored). An estimate by design — honest about what
+ * "show another configuration" can still vary.
+ */
+export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
+  let dims = 0;
+  c.solids.forEach((solid) => {
+    dims += solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, 0).length;
+  });
+  for (const rev of c.revolutions) {
+    if (rev.radius === undefined) dims++;
+    if (rev.kind !== 'sphere' && rev.height === undefined) dims++;
+  }
+  let freeT = 0;
+  for (const def of c.points.values()) {
+    if (def.kind === 'on-segment' && def.t === undefined) freeT++;
+  }
+  const param = c.param && pinningGivens(c) === 0 ? 1 : 0;
+  if (resolved.pivot && resolved.pivot.solutions > 0) {
+    let pinCount = c.vectorPins.length * 3;
+    for (const p of c.pins) pinCount += (p.x !== null ? 1 : 0) + (p.y !== null ? 1 : 0) + (p.z !== null ? 1 : 0);
+    return Math.max(0, dims + 7 - pinCount) + freeT + param;
+  }
+  return dims + freeT + param;
+}
+
 /** Newell's method — a polygon's normal from its vertex ring (internal device). */
 function newellNormal(pts: Vec3[]): Vec3 {
   let n = v3(0, 0, 0);
@@ -382,6 +450,13 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     planes.set(name, { n, d: -dot3(n, pts[0]) });
   }
 
+  // ---- lines THROUGH points (V5) — resolvable only from final positions
+  for (const [name, def] of c.pointLines) {
+    const a = pos.get(def.a);
+    const b = pos.get(def.b);
+    if (a && b && dist3(a, b) > 1e-12) lines.set(name, { anchor: a, dir: sub3(b, a) });
+  }
+
   // ---- a second line pass: lines between point-planes only became resolvable now
   for (const [name] of c.lines) {
     if (lines.has(name)) continue;
@@ -392,12 +467,31 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     }
   }
 
+  // ---- a FINAL fill for line∩plane points whose line/plane only just resolved
+  for (const [id, def] of c.points) {
+    if (def.kind !== 'line-plane' || pos.has(id)) continue;
+    const line = lines.get(def.line);
+    const pl = planes.get(def.plane);
+    if (!line || !pl) continue;
+    const denom = dot3(pl.n, line.dir);
+    if (Math.abs(denom) > 1e-10 * Math.max(norm3(pl.n) * norm3(line.dir), 1e-12)) {
+      const t = -(dot3(pl.n, line.anchor) + pl.d) / denom;
+      pos.set(id, add3(line.anchor, scale3(line.dir, t)));
+    }
+  }
+
+  const revolutions = c.revolutions.map((rev, i) => {
+    const { r, h, origin } = revolutionDims(c, i, seed);
+    return { kind: rev.kind, center: (rev.center && pos.get(rev.center)) || origin, apex: rev.apex ? pos.get(rev.apex) : undefined, r, h };
+  });
+
   return {
     positions: pos,
     planes,
     lines,
     param: c.param && param ? { name: c.param, value: param.value, roots: param.roots } : null,
     pivot,
+    revolutions,
   };
 }
 
@@ -425,8 +519,14 @@ function evaluateSolidsAndPoints(
     solid.ids.forEach((id, j) => pos.set(id, ps[j]));
   });
 
+  c.revolutions.forEach((rev, i) => {
+    const { h, origin } = revolutionDims(c, i, seed);
+    if (rev.center) pos.set(rev.center, origin);
+    if (rev.apex) pos.set(rev.apex, v3(origin.x, origin.y, origin.z + h));
+  });
+
   for (const [id, def] of c.points) {
-    if (def.kind === 'solid-vertex' || def.kind === 'coord') continue;
+    if (def.kind === 'solid-vertex' || def.kind === 'coord' || def.kind === 'rev-point') continue;
     if (def.kind === 'on-segment') {
       const a = pos.get(def.a);
       const b = pos.get(def.b);

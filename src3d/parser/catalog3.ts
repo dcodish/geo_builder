@@ -1,0 +1,63 @@
+/**
+ * The 3-D tool's command catalog (V5, ADR-3D-008) — the user-facing reference AND
+ * the coverage map (the 2-D `catalog.ts` pattern): every entry is a canonical He/En
+ * example the deterministic parser MUST accept (a guard test re-parses all of them),
+ * it drives the in-app commands panel, and it is the vocabulary the LLM fallback is
+ * allowed to emit.
+ */
+
+export interface CatalogEntry3 {
+  category: string;
+  he: string;
+  en: string;
+}
+
+export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
+  // --- solids ---
+  { category: 'solids', he: 'קובייה ABCD', en: 'cube ABCD' },
+  { category: 'solids', he: "תיבה ABCDA'B'C'D'", en: "box ABCDA'B'C'D'" },
+  { category: 'solids', he: 'מנסרה ישרה משולשת ABC', en: 'right triangular prism ABC' },
+  { category: 'solids', he: 'פירמידה ישרה ABCDS', en: 'right pyramid ABCDS' },
+  { category: 'solids', he: 'חרוט שקודקודו S ומרכז בסיסו O, רדיוסו 5 וגובהו 12', en: 'cone with apex S base center O radius 5 height 12' },
+  { category: 'solids', he: 'גליל שמרכז בסיסו O, רדיוסו 3 וגובהו 7', en: 'cylinder with base center O radius 3 height 7' },
+  { category: 'solids', he: 'כדור שמרכזו O ורדיוסו 3', en: 'sphere with center O radius 3' },
+  // --- points ---
+  { category: 'points', he: "M אמצע BB'", en: "M is the midpoint of BB'" },
+  { category: 'points', he: "K על AA' כך ש-AK = 2KA'", en: "K on AA' such that AK = 2KA'" },
+  { category: 'points', he: 'E על AC כך ש-AE:EC = 2:1', en: 'E on AC such that AE:EC = 2:1' },
+  { category: 'points', he: "E מפגש התיכונים של משולש BC'D", en: "E is the centroid of triangle BC'D" },
+  { category: 'points', he: 'A(2,-2,6)', en: 'A(2,-2,6)' },
+  { category: 'points', he: 'P על AM כך ש-KP = αu + βv', en: 'P on AM such that KP = αu + βv' },
+  // --- vectors ---
+  { category: 'vectors', he: "נסמן: AB = u, AD = v, AA' = w", en: "denote AB = u, AD = v, AA' = w" },
+  { category: 'vectors', he: 'נתון: v = (10,-5,0), u = (5,5,-5)', en: 'given: v = (10,-5,0), u = (5,5,-5)' },
+  // --- planes & lines ---
+  { category: 'planesLines', he: 'המישור π1: z - 3 = 0', en: 'plane π1: z - 3 = 0' },
+  { category: 'planesLines', he: 'הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)', en: 'line ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)' },
+  { category: 'planesLines', he: 'הזווית בין המישורים π1 ו-π2 היא 45', en: 'the angle between planes π1 and π2 is 45' },
+  { category: 'planesLines', he: 'הישר ℓ ניצב למישור π1', en: 'line ℓ is perpendicular to plane π1' },
+  { category: 'planesLines', he: 'מ-A מורידים אנך למישור π1 החותך אותו בנקודה B', en: 'from A drop a perpendicular to plane π1, it cuts it at B' },
+  { category: 'planesLines', he: 'מ-B מעבירים אנך לישר ℓ החותך אותו בנקודה C', en: 'from B drop a perpendicular to line ℓ, it cuts it at C' },
+  { category: 'planesLines', he: 'ℓ ישר החיתוך בין המישורים π1 ו-π2', en: 'ℓ is the intersection line of π1 and π2' },
+  { category: 'planesLines', he: "ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'", en: "ℓ is the intersection line of plane BC'D and plane BCC'B'" },
+  { category: 'planesLines', he: 'ℓ חותך את π1 בנקודה A', en: 'ℓ cuts plane π1 at A' },
+  { category: 'planesLines', he: "הישר A'C חותך את המישור BC'D בנקודה K", en: "line A'C cuts plane BC'D at K" },
+  { category: 'planesLines', he: 'A נמצאת על אחד המישורים', en: 'A is on one of the planes' },
+  { category: 'planesLines', he: 'B על הישר ℓ', en: 'B is on line ℓ' },
+  { category: 'planesLines', he: "שיעור ה-z של C' חיובי", en: "the z-coordinate of C' is positive" },
+  // --- claims (the student's answers, verified) ---
+  { category: 'claims', he: 'AM = 1/2u + 1/2v + 5/3w', en: 'AM = 1/2u + 1/2v + 5/3w' },
+  { category: 'claims', he: "CA' מאונך למישור BC'D", en: "CA' is perpendicular to plane BC'D" },
+  { category: 'claims', he: "E, C, A' על ישר אחד", en: "E, C, A' are collinear" },
+  { category: 'claims', he: 'AB = 3', en: 'AB = 3' },
+  { category: 'claims', he: 'שטח המשולש ABC = 4.5', en: 'the area of triangle ABC = 4.5' },
+  { category: 'claims', he: 'A = (2, 0, -10)', en: 'A = (2, 0, -10)' },
+  { category: 'claims', he: 'המישור KBC: x + 2y + 3z - 26 = 0', en: 'plane KBC: x + 2y + 3z - 26 = 0' },
+  { category: 'claims', he: "הזווית בין A'C לבין BC' היא 90", en: "the angle between A'C and BC' is 90" },
+  { category: 'claims', he: "A'K : A'C = 2 : 3", en: "A'K : A'C = 2 : 3" },
+  { category: 'claims', he: 'ℓ אינו מקביל ל-π1 לכל m', en: 'ℓ is not parallel to plane π1 for every m' },
+  { category: 'claims', he: 'נפח החרוט = 100π', en: 'the volume of the cone = 100π' },
+  { category: 'claims', he: 'שטח המעטפת של החרוט = 65π', en: 'the lateral area of the cone = 65π' },
+  // --- drawing ---
+  { category: 'drawing', he: "קטע CA'", en: "segment CA'" },
+];

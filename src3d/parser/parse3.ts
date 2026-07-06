@@ -77,6 +77,16 @@ const rightPrism: Rule = (s) => {
   return null;
 };
 
+/** Right pyramid: `פירמידה ישרה ABCDS` (square base + apex LAST) / `ABCS` (triangular base). Oblique refuses (ADR-052). */
+const rightPyramid: Rule = (s) => {
+  if (!/פירמידה/.test(s) && !/\bpyramid\b/i.test(s)) return null;
+  if (!/ישרה/.test(s) && !/\bright\b/i.test(s)) return null;
+  const toks = labelTokens(s);
+  if (toks.length === 5) return [{ type: 'solid', kind: 'pyramid4', ids: toks }];
+  if (toks.length === 4) return [{ type: 'solid', kind: 'pyramid3', ids: toks }];
+  return null;
+};
+
 /** `M אמצע BC` / `M is the midpoint of BC` → on-segment t = ½. */
 const midpoint: Rule = (s) => {
   if (!/אמצע/.test(s) && !/\b(midpoint|middle)\b/i.test(s)) return null;
@@ -88,11 +98,23 @@ const midpoint: Rule = (s) => {
 };
 
 /**
- * The stated-ratio clause `AK = 2KA'` (P K = c · K Q, K the new point): t from P is c/(c+1).
- * Returns the t measured from segment endpoint `a`; 'invalid' when a ratio clause is present
- * but doesn't fit the segment (never silently dropped); undefined when no clause is stated.
+ * The stated-ratio clause: `AK = 2KA'` (t from A is c/(c+1)) or the colon form
+ * `AE:EC = 2:1` (t from A is p/(p+q)). Returns the t measured from segment endpoint
+ * `a`; 'invalid' when a ratio clause is present but doesn't fit the segment (never
+ * silently dropped); undefined when no clause is stated.
  */
 function ratioT(s: string, id: Id, a: Id, b: Id): number | 'invalid' | undefined {
+  const colon = s.match(/([A-Z]\d*'?)([A-Z]\d*'?)\s*:\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/);
+  if (colon) {
+    const [, p1, x, y, q1, pNum, qNum] = colon;
+    if (x !== id || y !== id) return 'invalid';
+    const p = parseFloat(pNum);
+    const q = parseFloat(qNum);
+    if (!(p > 0) || !(q > 0)) return 'invalid';
+    if (p1 === a && q1 === b) return p / (p + q);
+    if (p1 === b && q1 === a) return q / (p + q);
+    return 'invalid';
+  }
   const m = s.match(/([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*(\d+(?:\.\d+)?)\s*[·×*]?\s*([A-Z]\d*'?)([A-Z]\d*'?)/);
   if (!m) return undefined;
   const [, p, x, num, y, q] = m;
@@ -613,6 +635,104 @@ const planeEqClaim: Rule = (s) => {
   return [{ type: 'claim', claim: { type: 'plane-eq', ids, cx: eq.cx.k, cy: eq.cy.k, cz: eq.cz.k, d: eq.d.k } }];
 };
 
+// ---------------------------------------------------------------------------
+// V5 corpus additions (2019 gate) + V6 solids of revolution (ADR-3D-008/009)
+// ---------------------------------------------------------------------------
+
+/** `הישר A'C חותך את המישור BC'D בנקודה K` — a line through two points cutting a point-plane. */
+const segLineCutsPointPlane: Rule = (s) => {
+  const RUN = `(?:[A-Z]\\d*'?){3,4}`;
+  const m =
+    s.match(new RegExp(`^הישר\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+חותך\\s+(?:את\\s+)?המישור\\s+(${RUN})\\s+בנקודה\\s+([A-Z]\\d*'?)$`)) ??
+    s.match(new RegExp(`^line\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+cuts\\s+(?:the\\s+)?plane\\s+(${RUN})\\s+at\\s+([A-Z]\\d*'?)$`));
+  if (!m) return null;
+  const [, a, b, run, id] = m;
+  const lineName = `${a}${b}`;
+  return [
+    { type: 'line-through', name: lineName, a, b },
+    { type: 'plane-through', name: run, ids: run.match(/[A-Z]\d*'?/g)! },
+    { type: 'line-plane-point', id, line: lineName, plane: run },
+  ];
+};
+
+/** `הזווית בין A'C לבין BC' היא 90` — the angle between two SEGMENT-lines (≤90°), a claim. */
+const angleSegClaim: Rule = (s0) => {
+  const s = stripProofPrefix(s0);
+  const m =
+    s.match(new RegExp(`^הזווית\\s+בין\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+(?:לבין|ל)-?\\s*([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+(?:היא|הוא)\\s+(${NUM})\\s*°?$`)) ??
+    s.match(new RegExp(`^the\\s+angle\\s+between\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+and\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+is\\s+(${NUM})\\s*°?$`));
+  if (!m) return null;
+  const [, a1, b1, a2, b2, deg] = m;
+  return [
+    { type: 'segment3', a: a1, b: b1 },
+    { type: 'segment3', a: a2, b: b2 },
+    { type: 'claim', claim: { type: 'angle-seg-eq', a1, b1, a2, b2, deg: +deg } },
+  ];
+};
+
+/** `A'K : A'C = 2 : 3` — a length-RATIO claim (draws both segments). */
+const lengthRatioClaim: Rule = (s) => {
+  const m = s.match(
+    new RegExp(`^([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*:\\s*([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*=\\s*(${NUM})\\s*:\\s*(${NUM})$`),
+  );
+  if (!m) return null;
+  const [, a1, b1, a2, b2, p, q] = m;
+  return [
+    { type: 'segment3', a: a1, b: b1 },
+    { type: 'segment3', a: a2, b: b2 },
+    { type: 'claim', claim: { type: 'length-ratio', a1, b1, a2, b2, p: +p, q: +q } },
+  ];
+};
+
+/** `חרוט שקודקודו S ומרכז בסיסו O, רדיוס הבסיס 5 וגובהו 12` — a solid of revolution; unstated sizes stay FREE. */
+const revolutionSolid: Rule = (s) => {
+  const kind = /חרוט|\bcone\b/i.test(s) ? 'cone' : /גליל|\bcylinder\b/i.test(s) ? 'cylinder' : /כדור|\bsphere\b/i.test(s) ? 'sphere' : null;
+  if (!kind) return null;
+  const apex = s.match(/(?:שקודקודו|קודקודו|apex(?:\s+is)?(?:\s+at)?)\s+([A-Z]\d*'?)/)?.[1];
+  const center = s.match(/(?:שמרכזו|מרכזו|מרכז\s+ה?בסיסו?|(?:base\s+)?cent(?:er|re)(?:\s+is)?(?:\s+at)?)\s+([A-Z]\d*'?)/)?.[1];
+  const radius = s.match(new RegExp(`(?:שרדיוסו|רדיוסו?|רדיוס\\s+ה?בסיסו?|radius(?:\\s+is)?)\\s*(?:הוא\\s*)?(${NUM})`))?.[1];
+  const height = s.match(new RegExp(`(?:שגובהו|גובהו?|height(?:\\s+is)?)\\s*(?:הוא\\s*)?(${NUM})`))?.[1];
+  // an utterance that names the solid but binds NOTHING legible refuses (never a half-read)
+  if (!apex && !center && radius === undefined && height === undefined) return null;
+  if (kind !== 'cone' && apex) return null; // only a cone has an apex
+  return [
+    {
+      type: 'revolution',
+      kind,
+      center,
+      apex,
+      radius: radius !== undefined ? +radius : undefined,
+      height: height !== undefined ? +height : undefined,
+    },
+  ];
+};
+
+const REV_KIND: Record<string, 'cylinder' | 'cone' | 'sphere'> = {
+  חרוט: 'cone', גליל: 'cylinder', כדור: 'sphere', cone: 'cone', cylinder: 'cylinder', sphere: 'sphere',
+};
+
+/** `נפח החרוט = 100π` / `the volume of the cone = 100π` — a volume claim (π multiplies). */
+const volumeClaim: Rule = (s) => {
+  const m =
+    s.match(new RegExp(`^נפח\\s+ה?(חרוט|גליל|כדור)\\s*(?:הוא\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
+    s.match(new RegExp(`^the\\s+volume\\s+of\\s+the\\s+(cone|cylinder|sphere)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`));
+  if (!m) return null;
+  const value = +m[2] * (m[3] ? Math.PI : 1);
+  return [{ type: 'claim', claim: { type: 'volume-eq', solid: REV_KIND[m[1]], value } }];
+};
+
+/** `שטח המעטפת של החרוט = 65π` (cone/cylinder) / `שטח הפנים של הכדור = 36π` (sphere) — lateral/surface area claims. */
+const lateralAreaClaim: Rule = (s) => {
+  const m =
+    s.match(new RegExp(`^שטח\\s+המעטפת\\s+של\\s+ה?(חרוט|גליל)\\s*(?:הוא\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
+    s.match(new RegExp(`^שטח\\s+הפנים\\s+של\\s+ה?(כדור)\\s*(?:הוא\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
+    s.match(new RegExp(`^the\\s+lateral\\s+area\\s+of\\s+the\\s+(cone|cylinder)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`)) ??
+    s.match(new RegExp(`^the\\s+surface\\s+area\\s+of\\s+the\\s+(sphere)\\s*(?:is\\s*)?=?\\s*(${NUM})\\s*(π|pi)?$`));
+  if (!m) return null;
+  const value = +m[2] * (m[3] ? Math.PI : 1);
+  return [{ type: 'claim', claim: { type: 'lateral-area-eq', solid: REV_KIND[m[1]], value } }];
+};
+
 /** `A = (2, 0, -10)` — a coordinates CLAIM (the student's answer for a derived point). */
 const coordsClaim: Rule = (s) => {
   const m = s.match(new RegExp(`^([A-Z]\\d*'?)\\s*=\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)$`));
@@ -648,17 +768,23 @@ const areaClaim: Rule = (s) => {
 const RULES: Rule[] = [
   cubeOrBox,
   rightPrism,
+  rightPyramid,
+  revolutionSolid,
+  volumeClaim,
+  lateralAreaClaim,
   parametricLine, // before planeByEquation: both carry `:`, but ℓ ≠ π so either order is safe — kept explicit
   planeByEquation,
   planeEqClaim, // plane named by POINTS + an equation — a claim, not a definition
   injectionList,
   signGiven,
   pointPlanesLine, // point-run planes before the π-name intersection rule
+  segLineCutsPointPlane, // `הישר A'C חותך את המישור BC'D בנקודה K` — before the ℓ-name cut rule
   coordPoint,
   vectorInjection,
   membership, // before onSegment: `על אחד המישורים` must never read as a point-on-segment
   onLineMembership, // likewise for `על הישר ℓ`
   angleBetweenPlanes,
+  angleSegClaim,
   linePerpPlane,
   neverParallelClaim,
   lineCutsPlane,
@@ -674,6 +800,7 @@ const RULES: Rule[] = [
   onSegment,
   vecEqClaim,
   coordsClaim,
+  lengthRatioClaim,
   areaClaim,
   lengthClaim,
   bareSegment,

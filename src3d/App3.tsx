@@ -5,8 +5,11 @@
  * src/ — docs/20 §12 rule 1).
  */
 
-import { useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { freeDofCount3 } from './engine/evaluate';
+import { COMMAND_CATALOG_3D } from './parser/catalog3';
+import { escalate3 } from './parser/llm3';
 import Figure3 from './render/Figure3';
 import { deserializeFigure3, serializeFigure3 } from './store/figureFile3';
 import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
@@ -48,6 +51,10 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.injectionUnsatisfiable');
     case 'sign-unsatisfiable':
       return t('err.signUnsatisfiable', { id: err.id });
+    case 'no-such-solid':
+      return t('err.noSuchSolid', { id: err.id });
+    case 'free-size-claim':
+      return t('err.freeSizeClaim', { id: err.id });
     case 'size-on-solid':
       return t('err.sizeOnSolid');
     case 'bad-name':
@@ -78,9 +85,55 @@ export default function App3() {
   const loadFigure = useGeo3((s) => s.loadFigure);
   const reportLoadError = useGeo3((s) => s.reportLoadError);
 
+  const submitSteps = useGeo3((s) => s.submitSteps);
+
   const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const canvasBox = useRef<HTMLDivElement>(null);
+  const [canvasW, setCanvasW] = useState(640);
   const derived = useMemo(() => derive3(facts, seed), [facts, seed]);
+  const dof = useMemo(() => freeDofCount3(derived.construction, derived.resolved), [derived]);
+
+  // responsive canvas: track the container's width (V5)
+  useEffect(() => {
+    const el = canvasBox.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const w = Math.round(entries[0].contentRect.width);
+      if (w > 0) setCanvasW(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const onSaveImage = () => {
+    const svg = canvasBox.current?.querySelector('svg');
+    if (!svg) return;
+    const xml = new XMLSerializer().serializeToString(svg);
+    const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml;charset=utf-8' }));
+    const img = new Image();
+    img.onload = () => {
+      const scale = 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = svg.clientWidth * scale;
+      canvas.height = svg.clientHeight * scale;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `figure-3d-${new Date().toISOString().slice(0, 10)}.png`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }, 'image/png');
+    };
+    img.src = url;
+  };
 
   const onSaveFile = () => {
     const blob = new Blob([serializeFigure3(facts, seed)], { type: 'application/json' });
@@ -101,12 +154,23 @@ export default function App3() {
     else reportLoadError(r.reason);
   };
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!text.trim()) return;
+    if (!text.trim() || busy) return;
     submit(text);
-    // clear the box only when the input was accepted
-    const err = useGeo3.getState().lastError;
+    let err = useGeo3.getState().lastError;
+    // out-of-grammar → escalate to the LLM proxy; the returned canonical lines re-parse deterministically
+    if (err?.code === 'not-understood') {
+      setBusy(true);
+      try {
+        const ctx = `Existing points: ${[...derived.construction.points.keys()].join(', ') || '(none)'}.`;
+        const steps = await escalate3(text, ctx);
+        if (steps) submitSteps(text, steps);
+        err = useGeo3.getState().lastError;
+      } finally {
+        setBusy(false);
+      }
+    }
     if (!err) setText('');
   };
 
@@ -135,8 +199,8 @@ export default function App3() {
               placeholder={t('input.placeholder')}
               className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 focus:border-sky-500 focus:outline-none"
             />
-            <button type="submit" className="rounded-xl bg-sky-600 px-4 py-2 font-medium text-white hover:bg-sky-700">
-              {t('input.add')}
+            <button type="submit" disabled={busy} className="rounded-xl bg-sky-600 px-4 py-2 font-medium text-white hover:bg-sky-700 disabled:opacity-50">
+              {busy ? t('input.thinking') : t('input.add')}
             </button>
           </form>
 
@@ -192,11 +256,44 @@ export default function App3() {
               </li>
             ))}
           </ul>
+
+          {/* the commands catalog (V5) — every supported form, clickable */}
+          <details className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium text-slate-600">{t('catalog.title')}</summary>
+            {['solids', 'points', 'vectors', 'planesLines', 'claims', 'drawing'].map((cat) => (
+              <div key={cat} className="mt-2">
+                <div className="text-xs font-bold text-slate-400">{t(`catalog.${cat}`)}</div>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {COMMAND_CATALOG_3D.filter((c) => c.category === cat).map((c) => (
+                    <button
+                      key={c.he}
+                      type="button"
+                      onClick={() => setText(c.he)}
+                      className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 hover:border-sky-400 hover:text-sky-700"
+                    >
+                      {c.he}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </details>
         </section>
 
         {/* Canvas + view/session controls */}
-        <section className="flex flex-1 flex-col gap-2">
-          <Figure3 construction={derived.construction} resolved={derived.resolved} resetLabel={t('actions.resetView')} />
+        <section className="flex min-w-0 flex-1 flex-col gap-2" ref={canvasBox}>
+          <Figure3
+            construction={derived.construction}
+            resolved={derived.resolved}
+            width={canvasW}
+            height={Math.max(320, Math.round(canvasW * 0.7))}
+            resetLabel={t('actions.resetView')}
+          />
+          {facts.length > 0 && (
+            <p className="text-xs text-slate-500" data-testid="dof-cue">
+              {dof === 0 ? t('cue.determined') : t('cue.free', { n: dof })}
+            </p>
+          )}
           <p className="text-xs text-slate-400">{t('hint.orbit')}</p>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={resample} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
@@ -228,6 +325,14 @@ export default function App3() {
               {t('actions.load')}
             </button>
             <input ref={fileInput} type="file" accept=".geo3.json,application/json,.json" className="hidden" onChange={onLoadFile} />
+            <button
+              type="button"
+              onClick={onSaveImage}
+              disabled={facts.length === 0}
+              className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-40"
+            >
+              {t('actions.saveImage')}
+            </button>
           </div>
         </section>
       </main>

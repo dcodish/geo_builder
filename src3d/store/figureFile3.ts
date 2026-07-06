@@ -46,6 +46,8 @@ const COMMAND_TYPES = new Set<Command3['type']>([
   'inject-vector',
   'sign-given',
   'plane-through',
+  'line-through',
+  'revolution',
 ]);
 
 export function serializeFigure3(facts: Fact3[], seed: number): string {

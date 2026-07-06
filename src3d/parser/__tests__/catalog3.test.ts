@@ -1,0 +1,40 @@
+/**
+ * The V5 catalog guard (the 2-D pattern): EVERY catalog example must parse in BOTH
+ * languages, and every LLM prompt example's steps must re-parse deterministically
+ * (the PAR-10 contract — the prompt can never teach the model a line the parser
+ * no longer reads).
+ */
+
+import { describe, expect, it } from 'vitest';
+import { COMMAND_CATALOG_3D } from '../catalog3';
+import { PROMPT_EXAMPLES_3D, buildSystemPrompt3, buildLlmRequest3 } from '../llmShared3';
+import { parse3 } from '../parse3';
+
+describe('catalog guard', () => {
+  for (const entry of COMMAND_CATALOG_3D) {
+    it(`He: ${entry.he}`, () => {
+      expect(parse3(entry.he).ok, entry.he).toBe(true);
+    });
+    it(`En: ${entry.en}`, () => {
+      expect(parse3(entry.en).ok, entry.en).toBe(true);
+    });
+  }
+});
+
+describe('LLM prompt contract (PAR-10)', () => {
+  for (const ex of PROMPT_EXAMPLES_3D) {
+    it(`"${ex.freeform}" steps re-parse`, () => {
+      for (const step of ex.steps) {
+        expect(parse3(step).ok, step).toBe(true);
+      }
+    });
+  }
+
+  it('the request body is well-formed and carries the 3-D vocabulary', () => {
+    const req = buildLlmRequest3('a cube', 'The canvas is empty.');
+    expect(req.model).toBe('claude-haiku-4-5');
+    expect(req.tool_choice).toEqual({ type: 'tool', name: 'emit_steps' });
+    expect(buildSystemPrompt3()).toContain('קובייה ABCD');
+    expect(buildSystemPrompt3()).toContain('the volume of the cone');
+  });
+});

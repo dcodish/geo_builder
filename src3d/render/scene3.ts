@@ -113,6 +113,12 @@ export interface SceneAngle3 {
   text: string;
 }
 
+/** A sampled curve (revolution-solid outlines, V6): dashed when `hidden` (a back arc / the axis). */
+export interface SceneCurve3 {
+  pts: { x: number; y: number }[];
+  hidden: boolean;
+}
+
 export interface Scene3 {
   points: ScenePoint3[];
   edges: SceneEdge3[];
@@ -123,6 +129,7 @@ export interface Scene3 {
   marks: SceneMark3[];
   seams: SceneSeam3[];
   angles: SceneAngle3[];
+  curves: SceneCurve3[];
 }
 
 export interface Viewport {
@@ -382,6 +389,61 @@ export function buildScene3(
     }
   }
 
+  // Revolution solids (V6): sampled outlines — base circle split front/back, the
+  // silhouette generators, the top circle (cylinder), the eye-facing silhouette
+  // circle (sphere), and a dashed axis. Textbook style, exact under orthographic
+  // projection (the cone's ±s generators are the standard-view approximation).
+  const wCurves: { pts: Vec3[]; hidden: boolean }[] = [];
+  const N = 48;
+  const circlePts = (centre: Vec3, r: number, b1: Vec3, b2: Vec3, from: number, to: number): Vec3[] => {
+    const out: Vec3[] = [];
+    for (let i = 0; i <= N; i++) {
+      const th = from + ((to - from) * i) / N;
+      out.push(add3(centre, add3(scale3(b1, r * Math.cos(th)), scale3(b2, r * Math.sin(th)))));
+    }
+    return out;
+  };
+  {
+    const eye = cameraFrame(cam).eye;
+    for (const rev of resolved.revolutions) {
+      if (!rev.center) continue;
+      // horizontal circles split front/back by the eye's ground direction
+      const g = Math.hypot(eye.x, eye.y) > 1e-9 ? normalize3(v3(eye.x, eye.y, 0)) : v3(1, 0, 0);
+      const phi = Math.atan2(g.y, g.x); // the "front" azimuth
+      const ex = v3(1, 0, 0);
+      const ey = v3(0, 1, 0);
+      const splitCircle = (centre: Vec3, r: number) => {
+        wCurves.push({ pts: circlePts(centre, r, ex, ey, phi - Math.PI / 2, phi + Math.PI / 2), hidden: false });
+        wCurves.push({ pts: circlePts(centre, r, ex, ey, phi + Math.PI / 2, phi + (3 * Math.PI) / 2), hidden: true });
+      };
+      const s = normalize3(cross3(v3(0, 0, 1), eye)); // silhouette direction on a horizontal circle
+      if (rev.kind === 'sphere') {
+        // the exact orthographic silhouette: the great circle ⊥ the eye
+        const b1 = normalize3(cross3(eye, Math.abs(eye.z) < 0.9 ? v3(0, 0, 1) : v3(1, 0, 0)));
+        const b2 = normalize3(cross3(eye, b1));
+        wCurves.push({ pts: circlePts(rev.center, rev.r, b1, b2, 0, 2 * Math.PI), hidden: false });
+        splitCircle(rev.center, rev.r); // the equator, front solid / back dashed
+      } else if (rev.kind === 'cylinder') {
+        const top = add3(rev.center, v3(0, 0, rev.h));
+        splitCircle(rev.center, rev.r);
+        wCurves.push({ pts: circlePts(top, rev.r, ex, ey, 0, 2 * Math.PI), hidden: false });
+        for (const sign of [1, -1]) {
+          const off = scale3(s, sign * rev.r);
+          wCurves.push({ pts: [add3(rev.center, off), add3(top, off)], hidden: false });
+        }
+        wCurves.push({ pts: [rev.center, top], hidden: true }); // the axis
+      } else {
+        // cone
+        const apex = rev.apex ?? add3(rev.center, v3(0, 0, rev.h));
+        splitCircle(rev.center, rev.r);
+        for (const sign of [1, -1]) {
+          wCurves.push({ pts: [apex, add3(rev.center, scale3(s, sign * rev.r))], hidden: false });
+        }
+        wCurves.push({ pts: [rev.center, apex], hidden: true }); // the height
+      }
+    }
+  }
+
   const wMarks: Vec3[][] = [];
   for (const [id, def] of c.points) {
     if (def.kind !== 'foot-plane' && def.kind !== 'foot-line') continue;
@@ -422,10 +484,11 @@ export function buildScene3(
     ...wAxes.flatMap((a) => [a.a, a.b]),
     ...wSeams.flatMap((s) => [s.a, s.b]),
     ...wAngles.flatMap((a) => [...a.pts, a.label]),
+    ...wCurves.flatMap((cu) => cu.pts),
   ].map(projOf);
   const all = [...proj.values(), ...extras];
   if (all.length === 0) {
-    return { points: [], edges: [], vectors: [], axes: [], planes: [], lines: [], marks: [], seams: [], angles: [] };
+    return { points: [], edges: [], vectors: [], axes: [], planes: [], lines: [], marks: [], seams: [], angles: [], curves: [] };
   }
 
   const xs = all.map((p) => p.x);
@@ -584,5 +647,7 @@ export function buildScene3(
     return { pts: pts.map(w2s), labelX: sl.x, labelY: sl.y, text };
   });
 
-  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles };
+  const curves: SceneCurve3[] = wCurves.map(({ pts, hidden }) => ({ pts: pts.map(w2s), hidden }));
+
+  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves };
 }

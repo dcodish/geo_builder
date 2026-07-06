@@ -18,6 +18,10 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { buildLlmRequest, extractSteps } from '../src/parser/llmShared';
+// The 3-D sibling app shares this proxy: a `tool: '3d'` field in the body selects its
+// prompt (docs/20 §6.6 — one process, one endpoint, no new infrastructure). The server
+// is the ONE place that binds both apps; src/ and src3d/ still never import each other.
+import { buildLlmRequest3 } from '../src3d/parser/llmShared3';
 import { clientIp, makeRateLimiter, readBody } from './http';
 
 const WINDOW_MS = 60_000;
@@ -67,10 +71,12 @@ export async function handleParse(
 
   let utterance = '';
   let context = '';
+  let tool = '';
   try {
-    const j = JSON.parse(body) as { utterance?: unknown; context?: unknown };
+    const j = JSON.parse(body) as { utterance?: unknown; context?: unknown; tool?: unknown };
     utterance = String(j.utterance ?? '').slice(0, 400);
     context = String(j.context ?? '').slice(0, 1000);
+    tool = String(j.tool ?? '');
   } catch {
     return send(400, { error: 'bad-json' });
   }
@@ -106,7 +112,8 @@ export async function handleParse(
     // Explicit timeout + no auto-retries (SEC-5): the SDK's multi-minute default timeout + retries would
     // hold sockets and multiply spend on a slow/hung upstream. One attempt, ~15 s ceiling.
     const client = new Anthropic({ apiKey, timeout: 15_000, maxRetries: 0 });
-    const msg = await client.messages.create(buildLlmRequest(utterance, context));
+    const request = tool === '3d' ? buildLlmRequest3(utterance, context) : buildLlmRequest(utterance, context);
+    const msg = await client.messages.create(request);
     const steps = extractSteps(msg.content as { type: string; name?: string; input?: unknown }[]) ?? [];
     return send(200, { steps });
   } catch (e) {

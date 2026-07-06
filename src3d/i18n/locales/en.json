@@ -3,7 +3,21 @@
   "tagline": "Build in 3-D space — solids, points, vectors (dev preview V0)",
   "input": {
     "placeholder": "Type a given, e.g.: cube ABCD",
-    "add": "Add"
+    "add": "Add",
+    "thinking": "Thinking…"
+  },
+  "catalog": {
+    "title": "All supported commands",
+    "solids": "Solids",
+    "points": "Points",
+    "vectors": "Vectors",
+    "planesLines": "Planes & lines",
+    "claims": "Claims to verify",
+    "drawing": "Drawing"
+  },
+  "cue": {
+    "determined": "✓ The figure is fully determined by the givens",
+    "free": "Degrees of freedom not yet pinned: {{n}}"
   },
   "actions": {
     "undo": "Undo",
@@ -12,7 +26,8 @@
     "another": "Show another configuration",
     "resetView": "Reset view",
     "save": "Save to file",
-    "load": "Load from file"
+    "load": "Load from file",
+    "saveImage": "Save image"
   },
   "hint": {
     "orbit": "Drag the figure to orbit · scroll to zoom"
@@ -45,6 +60,8 @@
     "symbolicNewPoint": "A new point '{{id}}' needs numeric coordinates — letters are only allowed for a point already in the figure",
     "injectionUnsatisfiable": "No placement of the solid matches the given coordinates — check the givens",
     "signUnsatisfiable": "No solution satisfies the stated coordinate sign of '{{id}}'",
+    "noSuchSolid": "The figure doesn't have exactly one '{{id}}' — the claim is ambiguous",
+    "freeSizeClaim": "The '{{id}}' has no stated sizes — give a radius/height before a volume or area claim",
     "lineMissesPlane": "The line is parallel to the plane at the chosen parameter value — no crossing point '{{id}}'",
     "sizeOnSolid": "A numeric size on a free-dimension solid isn't supported here yet",
     "claimRefuted": "The claim doesn't hold in the figure — check the computation",

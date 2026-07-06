@@ -46,7 +46,11 @@ export type Claim3 =
   | { type: 'area-eq'; ids: [Id, Id, Id]; value: number } // שטח ABC = 4.5
   | { type: 'coords-eq'; id: Id; x: number; y: number; z: number } // A = (2, 0, -10)
   | { type: 'never-parallel'; line: string; plane: string } // ℓ ∦ π for EVERY parameter value (2024-Q2 א)
-  | { type: 'plane-eq'; ids: Id[]; cx: number; cy: number; cz: number; d: number }; // המישור KBC: x+2y+3z-26=0
+  | { type: 'plane-eq'; ids: Id[]; cx: number; cy: number; cz: number; d: number } // המישור KBC: x+2y+3z-26=0
+  | { type: 'angle-seg-eq'; a1: Id; b1: Id; a2: Id; b2: Id; deg: number } // הזווית בין A'C לבין BC' היא 90 (between lines, ≤90°)
+  | { type: 'length-ratio'; a1: Id; b1: Id; a2: Id; b2: Id; p: number; q: number } // A'K : A'C = 2 : 3
+  | { type: 'volume-eq'; solid: string; value: number } // נפח החרוט = 100π (value in world units³, π parsed)
+  | { type: 'lateral-area-eq'; solid: string; value: number }; // שטח המעטפת של החרוט = 65π
 
 // ---------------------------------------------------------------------------
 // The algebraic lane (V2 — docs/20 §6.3): coefficients may carry ONE symbolic
@@ -76,14 +80,22 @@ export type Line3Def =
       anchor: [LinExpr, LinExpr, LinExpr];
       dir: [LinExpr, LinExpr, LinExpr];
       src: string;
+    }
+  | {
+      /** A line THROUGH two existing points (V5 — `הישר A'C`), resolved from final positions. */
+      kind: 'through';
+      a: Id;
+      b: Id;
     };
 
 // ---------------------------------------------------------------------------
 // Commands (what the parser emits)
 // ---------------------------------------------------------------------------
 
-/** V0 solid family. `cube`/`box`: 8 ids (base ABCD then tops A'B'C'D'); `prism3`: 6 ids (right triangular prism, base ABC then tops). */
-export type SolidKind = 'cube' | 'box' | 'prism3';
+/** The solid family. `cube`/`box`: 8 ids (base then primed tops); `prism3`: 6 ids (right triangular
+ *  prism); `pyramid4`/`pyramid3`: base ring then the APEX LAST — a RIGHT pyramid (apex above the
+ *  base's circumcentre, so the lateral edges are equal; stated `ישרה` required, ADR-052). */
+export type SolidKind = 'cube' | 'box' | 'prism3' | 'pyramid4' | 'pyramid3';
 
 export interface SolidCommand {
   type: 'solid';
@@ -184,6 +196,40 @@ export interface PlaneThroughCommand {
   type: 'plane-through';
   name: string;
   ids: Id[];
+}
+
+/** `הישר A'C` as an object (V5): a named line through two existing points. */
+export interface LineThroughCommand {
+  type: 'line-through';
+  name: string;
+  a: Id;
+  b: Id;
+}
+
+// --- V6 (solids of revolution — the curriculum's spatial-trig block) ---
+
+export type RevolutionKind = 'cylinder' | 'cone' | 'sphere';
+
+/**
+ * `חרוט שקודקודו S ומרכז בסיסו O, רדיוס 5, גובה 12` — a solid of revolution, axis
+ * vertical. Unstated radius/height are FREE sampled DOFs (ADR-052); stated ones pin.
+ * `center` = base centre (sphere: the centre); `apex` only for a cone.
+ */
+export interface RevolutionCommand {
+  type: 'revolution';
+  kind: RevolutionKind;
+  center?: Id;
+  apex?: Id;
+  radius?: number;
+  height?: number;
+}
+
+export interface RevolutionObj {
+  kind: RevolutionKind;
+  center?: Id;
+  apex?: Id;
+  radius?: number;
+  height?: number;
 }
 
 /** `המישור π1: z-3=0` — a plane by equation; the single parameter rides in the LinExprs. */
@@ -292,7 +338,9 @@ export type Command3 =
   | OnLineCommand
   | InjectVectorCommand
   | SignGivenCommand
-  | PlaneThroughCommand;
+  | PlaneThroughCommand
+  | LineThroughCommand
+  | RevolutionCommand;
 
 // ---------------------------------------------------------------------------
 // Construction (what apply builds, what evaluate consumes)
@@ -314,7 +362,8 @@ export type PointDef =
   | { kind: 'coord'; x: number; y: number; z: number }
   | { kind: 'foot-plane'; from: Id; plane: string }
   | { kind: 'foot-line'; from: Id; line: string }
-  | { kind: 'line-plane'; line: string; plane: string };
+  | { kind: 'line-plane'; line: string; plane: string }
+  | { kind: 'rev-point'; rev: number; role: 'center' | 'apex' };
 
 export interface Construction3 {
   solids: SolidObj[];
@@ -346,6 +395,10 @@ export interface Construction3 {
   signGivens: SignGivenCommand[];
   /** V4 — planes through points, name → ids (resolved from positions after the pivot). */
   pointPlanes: Map<string, Id[]>;
+  /** V5 — named lines through two points, resolved from final positions. */
+  pointLines: Map<string, { a: Id; b: Id }>;
+  /** V6 — solids of revolution. */
+  revolutions: RevolutionObj[];
 }
 
 export const emptyConstruction3 = (): Construction3 => ({
@@ -363,6 +416,8 @@ export const emptyConstruction3 = (): Construction3 => ({
   vectorPins: [],
   signGivens: [],
   pointPlanes: new Map(),
+  pointLines: new Map(),
+  revolutions: [],
 });
 
 // ---------------------------------------------------------------------------
@@ -389,6 +444,8 @@ export type EngineError3 =
   | { code: 'symbolic-new-point'; id: Id } // a NEW point with symbolic components is under-determined
   | { code: 'injection-unsatisfiable' } // no placement of the figure matches the injected coordinates
   | { code: 'sign-unsatisfiable'; id: Id } // no pivot solution has the stated coordinate sign
+  | { code: 'no-such-solid'; id: string } // a volume/area claim names a solid kind the figure doesn't have (or has twice)
+  | { code: 'free-size-claim'; id: string } // a numeric volume/area claim on a solid whose dims are unstated
   | { code: 'size-on-solid' } // a numeric size on a free-dim solid figure — not supported yet (honest boundary)
   | { code: 'claim-refuted' }; // the stated answer does not hold in the figure
 

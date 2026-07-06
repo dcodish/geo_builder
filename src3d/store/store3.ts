@@ -171,6 +171,8 @@ export interface Geo3State {
   seed: number;
   lastError: StoreError3;
   submit: (utterance: string) => void;
+  /** Add ONE fact from LLM-normalised canonical lines (each re-parsed deterministically; all-or-nothing). */
+  submitSteps: (utterance: string, steps: string[]) => void;
   toggle: (factId: string) => void;
   remove: (factId: string) => void;
   clear: () => void;
@@ -201,6 +203,31 @@ export const useGeo3 = create<Geo3State>()(
         const st = derive3(candidate, seed).status[fact.id];
         if (st !== 'ok' && st !== 'disabled') {
           set({ lastError: st }); // keep-prior: the bad fact is not added
+          return;
+        }
+        set({ facts: candidate, lastError: null });
+      },
+
+      submitSteps: (utterance, steps) => {
+        const all: Command3[] = [];
+        for (const step of steps) {
+          const p = parse3(step);
+          if (!p.ok) {
+            set({ lastError: { code: 'not-understood' } }); // an LLM step the parser can't read — refuse whole
+            return;
+          }
+          all.push(...p.commands);
+        }
+        if (all.length === 0) {
+          set({ lastError: { code: 'not-understood' } });
+          return;
+        }
+        const { facts, seed } = get();
+        const fact: Fact3 = { id: nanoid(8), utterance: utterance.trim(), cmds: all, enabled: true };
+        const candidate = [...facts, fact];
+        const st = derive3(candidate, seed).status[fact.id];
+        if (st !== 'ok' && st !== 'disabled') {
+          set({ lastError: st });
           return;
         }
         set({ facts: candidate, lastError: null });
