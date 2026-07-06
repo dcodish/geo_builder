@@ -19,7 +19,7 @@ import { constraintRefs, describeConstraint, isSatisfied, residual } from './sol
 
 export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
-  relation: 'on-circle' | 'tangent' | Constraint['type'];
+  relation: 'on-circle' | 'tangent' | 'radius-order' | Constraint['type'];
   ids: Id[];
   /** English fallback, e.g. "E should lie on circle P (radius 3.60) but is 7.42 from its centre". */
   message: string;
@@ -181,6 +181,26 @@ export function checkGivens(
         });
         break;
       }
+    }
+  }
+
+  // A CONCENTRIC pair's bound roles (ADR-244): the inner circle must stay STRICTLY inside the outer.
+  // The radii are free DOFs (ADR-052), so a sampled config can violate the order — `meetsRequirements`
+  // gates on a clean verifier, so the sampler / "show another configuration" skips such configs; a
+  // genuinely contradicted order (the student sized the inner bigger) surfaces amber here.
+  for (const cmd of commands) {
+    if (cmd.type !== 'set-radius-order') continue;
+    const outer = circles.get(cmd.outer);
+    const inner = circles.get(cmd.inner);
+    if (!outer || !inner) continue;
+    if (inner.r >= outer.r - Math.max(0.05, outer.r * 0.02)) {
+      violations.push({
+        relation: 'radius-order',
+        ids: [cmd.outer, cmd.inner],
+        message: `the inner circle (radius ${inner.r.toFixed(2)}) should be strictly inside the outer circle (radius ${outer.r.toFixed(2)})`,
+        messageKey: 'figure.v.radiusOrder',
+        params: { inner: circleName(cmd.inner), outer: circleName(cmd.outer), ri: inner.r.toFixed(2), ro: outer.r.toFixed(2) },
+      });
     }
   }
 

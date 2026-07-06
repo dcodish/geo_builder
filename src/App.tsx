@@ -440,6 +440,14 @@ export default function App() {
       setBusy(false);
       return;
     }
+    // A reference to a centre carrying a CONCENTRIC PAIR with no outer/inner qualifier (ADR-244) — ask
+    // WHICH circle is meant instead of picking silently or escalating to the LLM (which would only guess).
+    if (!r.ok && r.reason === 'ambiguous-circle') {
+      logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `ambiguous-circle:${r.center}` });
+      setInputNote(t('input.ambiguousCircle', { center: r.center }));
+      setBusy(false);
+      return;
+    }
     let weak: 'error' | 'empty' | 'dropped' | null = null;
     if (r.ok) {
       // A typo in a keyword (e.g. "מנוקדה" for "מנקודה") can make a rule match PARTIALLY, silently dropping
@@ -1446,9 +1454,13 @@ export default function App() {
               <div style={sectionLabel}>{t('dof.title')}</div>
               {radiusDofs.map((d) => {
                 const value = radiusOverrides[d.circle] ?? d.current;
+                // A concentric pair (ADR-244) shares a centre letter — label its sliders outer/inner.
+                const paired = radiusDofs.some((o) => o.circle !== d.circle && o.center === d.center);
+                const isInner = construction.objects.some((o) => o.kind === 'circle' && o.id === d.circle && o.innerOf);
+                const label = paired ? t(isInner ? 'dof.radiusInner' : 'dof.radiusOuter', { center: d.center }) : t('dof.radius', { center: d.center });
                 return (
                   <div key={d.circle} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, minWidth: 96 }}>{t('dof.radius', { center: d.center })}</span>
+                    <span style={{ fontSize: 12, minWidth: 96 }}>{label}</span>
                     <input
                       type="range"
                       min={Math.max(0.2, d.base * 0.3)}

@@ -105,6 +105,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
 
   // ── Circles ─────────────────────────────────────────────────────────────
   { category: 'circles', supported: true, en: 'circle centered at O radius 5', he: 'מעגל סביב O רדיוס 5', descEn: 'A circle from a centre and radius.', descHe: 'מעגל לפי מרכז ורדיוס.' },
+  { category: 'circles', supported: true, en: 'two circles with a common center O', he: 'שני מעגלים בעלי מרכז משותף O', descEn: 'Two concentric circles (both radii free). Refer to them as "the outer/inner circle"; size them with radius givens (e.g. OA=4 with A on one of them).', descHe: 'שני מעגלים קונצנטריים (שני הרדיוסים חופשיים). מתייחסים אליהם כ"המעגל החיצוני/הפנימי"; קובעים גודל בנתוני רדיוס (למשל OA=4 כאשר A על אחד מהם).' },
   { category: 'circles', supported: true, en: 'circle O with circumference 6π', he: 'מעגל O שהיקפו 6π', descEn: 'A circle sized by its circumference (6π ⇒ radius 3). Its area works too: "circle O area 9π".', descHe: 'מעגל לפי היקפו (6π ⇐ רדיוס 3). גם לפי שטחו: "מעגל O ששטחו 9π".' },
   { category: 'circles', supported: true, en: 'A is on circle O', he: 'A על מעגל O', descEn: 'A point on a circle / inscribed vertex.', descHe: 'נקודה על מעגל / קודקוד חסום.' },
   { category: 'circles', supported: true, en: 'O is the centre of the circle', he: 'O מרכז המעגל', descEn: "Name / reveal a circle's centre O (reveals an existing circle's hidden centre, or creates a circle if none exists yet).", descHe: 'מתן שם / חשיפת מרכז המעגל O (חושף מרכז מוסתר של מעגל קיים, או יוצר מעגל אם עדיין אין).' },

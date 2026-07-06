@@ -44,6 +44,7 @@
     "producedNothing": "I understood that but it didn't build anything on the figure — I tried rephrasing it too. Check the names/relations, or word it differently.",
     "alreadyDrawn": "That's already on the figure — nothing to add.",
     "ambiguousAngle": "There's more than one angle at {{vertex}}, so I can't tell which one you mean. Name all three letters of the angle — e.g. \"∠A{{vertex}}C = 90\".",
+    "ambiguousCircle": "There are two circles around {{center}}, so I can't tell which one you mean. Say \"the outer circle\" or \"the inner circle\".",
     "partial": "Couldn't draw this part",
     "labelsDropped": "I only partly understood — I couldn't place {{labels}}. Rephrase the step (e.g. split it in two).",
     "rename_no-source": "There's no point {{from}} to rename.",
@@ -110,7 +111,8 @@
       "collinear": "{{pts}} should be collinear, but {{point}} is {{offset}} off the line",
       "meetOnSegment": "{{id}} should be where segments {{seg1}} and {{seg2}} cross, but they meet on a continuation, not on the segments themselves.",
       "onSegment": "{{point}} should lie on segment {{seg}} but landed off it (outside its endpoints)",
-      "trapezoidMorph": "{{quad}} was declared a trapezoid, but both pairs of opposite sides are now parallel — it is no longer a trapezoid. To change the shape, edit or delete the trapezoid step."
+      "trapezoidMorph": "{{quad}} was declared a trapezoid, but both pairs of opposite sides are now parallel — it is no longer a trapezoid. To change the shape, edit or delete the trapezoid step.",
+      "radiusOrder": "the inner circle (radius {{ri}}) should stay inside the outer circle (radius {{ro}})"
     }
   },
   "errors": {
@@ -134,7 +136,9 @@
   },
   "dof": {
     "title": "Adjust the figure",
-    "radius": "radius of circle {{center}}"
+    "radius": "radius of circle {{center}}",
+    "radiusOuter": "outer circle radius ({{center}})",
+    "radiusInner": "inner circle radius ({{center}})"
   },
   "display": {
     "title": "Display"

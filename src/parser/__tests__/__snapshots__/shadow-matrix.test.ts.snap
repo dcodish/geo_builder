@@ -154,6 +154,14 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "shadowedBy": [
       "circle",
     ],
+    "text": "two circles with a common center O",
+    "winner": "concentricCircles",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "circle",
+    ],
     "text": "circle O with circumference 6π",
     "winner": "circleSizeExisting",
   },
@@ -1012,6 +1020,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "lang": "he",
     "text": "מעגל סביב O רדיוס 5",
     "winner": "setRadius",
+  },
+  {
+    "lang": "en",
+    "text": "two circles with a common center O",
+    "winner": "concentricCircles",
+  },
+  {
+    "lang": "he",
+    "text": "שני מעגלים בעלי מרכז משותף O",
+    "winner": "concentricCircles",
   },
   {
     "lang": "en",

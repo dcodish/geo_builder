@@ -1144,6 +1144,16 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
     }
 
+    case 'set-radius-order': {
+      // Bind a CONCENTRIC pair's roles (ADR-244): mark the inner circle so the parser context can resolve
+      // qualifier references ("המעגל הפנימי"). A REQUIREMENT, not a driven constraint — the radii stay free
+      // DOFs; the givens verifier checks inner < outer against the final radii, and `meetsRequirements`
+      // (which gates the sampler and "show another configuration") skips any order-violating config.
+      const idx = objects.findIndex((o) => o.kind === 'circle' && o.id === cmd.inner);
+      if (idx >= 0) objects[idx] = { ...objects[idx], innerOf: cmd.outer } as GeoObject;
+      break;
+    }
+
     case 'set-equal':
       driveOrCheck(objects, constraints, { type: 'equal', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
       break;

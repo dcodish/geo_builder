@@ -148,6 +148,44 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'two-concentric-circles-q6',
+    title: 'שני מעגלים בעלי מרכז משותף O — chords of the outer and inner circles on one line (bagrut Q6)',
+    guards:
+      'operator report (2026-07-06): "שני מעגלים בעלי מרכז משותף O gives me just one circle". Root cause (ADR-244): circle IDENTITY was the centre letter (`circle-<centre>`), so a second concentric circle was unrepresentable — the He phrase dead-ended at the LLM (whose improvised second circle command collapsed into a RESIZE of the first, log session 3k5jezuu), the En phrase half-parsed to ONE circle, and "המעגל החיצוני/הפנימי" silently attached to the one circle. Fix: the pair macro (`circle-O` bound outer + `circle-O-2` bound inner via `set-radius-order`), the qualifier-resolution post-pass (chokepoint — every circle rule at once), per-circle-id `circleMembers`, and the ambiguous-circle clarification for unqualified references.',
+    steps: [
+      'נתונים שני מעגלים בעלי מרכז משותף O',
+      'AD מיתר במעגל החיצוני',
+      'BC מיתר במעגל הפנימי',
+      'B ו-C על AD',
+      'E נקודה על המעגל החיצוני',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const outer = fig.circles.get('circle-O');
+      const inner = fig.circles.get('circle-O-2');
+      expect(outer, 'outer circle resolved').toBeTruthy();
+      expect(inner, 'inner circle resolved').toBeTruthy();
+      if (!outer || !inner) return;
+      expect(inner.r, 'inner strictly inside outer').toBeLessThan(outer.r);
+      // Memberships: A, D, E ride the OUTER circle; B, C the INNER (the qualifier resolution).
+      for (const [p, c] of [['A', outer], ['D', outer], ['E', outer], ['B', inner], ['C', inner]] as const) {
+        expect(Math.abs(dist(at(fig, p), c.center) - c.r), `${p} on its circle`).toBeLessThan(0.05 * c.r + 0.05);
+      }
+      // B and C lie ON segment AD (the drawing's one line A-B-C-D).
+      const a = at(fig, 'A');
+      const d = at(fig, 'D');
+      const ad2 = (d.x - a.x) ** 2 + (d.y - a.y) ** 2;
+      for (const p of ['B', 'C'] as const) {
+        const v = at(fig, p);
+        const t = ((v.x - a.x) * (d.x - a.x) + (v.y - a.y) * (d.y - a.y)) / ad2;
+        const off = Math.abs((v.x - a.x) * (d.y - a.y) - (v.y - a.y) * (d.x - a.x)) / Math.sqrt(ad2);
+        expect(t, `${p} within segment AD`).toBeGreaterThan(0.02);
+        expect(t, `${p} within segment AD`).toBeLessThan(0.98);
+        expect(off, `${p} on line AD`).toBeLessThan(0.1);
+      }
+    },
+  },
+  {
     id: 'diameter-edit-rereads-at-position',
     title: 'editing "AB קוטר" → "AC קוטר" (chord+⊥ figure): the edit re-reads at its own position and stays a real diameter',
     guards:

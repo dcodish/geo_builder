@@ -1038,6 +1038,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle-circle-intersection",
     ],
   },
+  "two circles with a common center O": {
+    "en": [
+      "circle",
+      "circle",
+      "set-radius-order",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "set-radius-order",
+    ],
+  },
   "α < β": {
     "en": [
       "measure-order",

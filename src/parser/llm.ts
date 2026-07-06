@@ -193,7 +193,13 @@ export async function llmParse(
   // on-circle membership each built step introduces — so "arc BC" in a later step resolves to the circle
   // an earlier step put B,C on, instead of being dropped.
   const members = new Map<string, Set<string>>();
-  for (const m of figureCtx.circleMembers ?? []) members.set(m.center, new Set(m.points));
+  // UNION per centre: entries are per circle id (ADR-244), so a concentric pair yields two entries with
+  // the same centre — overwriting would drop the first circle's members.
+  for (const m of figureCtx.circleMembers ?? []) {
+    const set = members.get(m.center) ?? new Set<string>();
+    for (const p of m.points) set.add(p);
+    members.set(m.center, set);
+  }
   // The figure-derived hints, seeded from the caller's real-figure context and accrued per built step
   // at the command level (`parallels` needs positions, so it stays the caller's static snapshot).
   const onSegment: Record<string, [string, string]> = { ...(figureCtx.onSegment ?? {}) };
@@ -210,6 +216,7 @@ export async function llmParse(
       onSegment,
       neighbors,
       parallels: figureCtx.parallels,
+      concentric: figureCtx.concentric, // qualifier references ("המעגל הפנימי") resolve in LLM steps too (ADR-244)
       lines: [...lines],
     });
     if (r.ok && r.commands.length) {

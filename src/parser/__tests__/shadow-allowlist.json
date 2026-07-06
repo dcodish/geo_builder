@@ -9,6 +9,7 @@
     "circumcircle → circle",
     "commonTangent → circlesTangent",
     "commonTangent → tangentLine",
+    "concentricCircles → circle",
     "circumcircleMeetsSegment → circle",
     "circumcircleMeetsSegment → circumcircle",
     "circumcircleMeetsSegment → lineLineIntersection",

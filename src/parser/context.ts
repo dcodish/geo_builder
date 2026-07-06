@@ -19,7 +19,14 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
   return {
     // Exclude pure SCAFFOLDING circles (a tangent's Thales aux), marked by a `~`-prefixed centre — the
     // student never references them, so they must not make "the circle" / "chord CE" ambiguous.
-    circles: construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [o.center] : [])),
+    // DEDUPED per centre letter (ADR-244): a concentric pair is ONE referenceable centre — "the circle" /
+    // an unnamed chord still resolves to it, and the concentric post-pass (qualifier / membership /
+    // clarify) decides WHICH of the pair. Two distinct centres stay two entries, as before.
+    circles: [...new Set(construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [o.center] : [])))],
+    // Concentric pairs (ADR-244): the bound roles, read off the inner circle's `innerOf` marker.
+    concentric: construction.objects.flatMap((o) =>
+      o.kind === 'circle' && o.innerOf ? [{ center: o.center, outer: o.innerOf, inner: o.id }] : [],
+    ),
     points: construction.objects.filter(isGeoPoint).map((o) => o.id),
     circleMembers: circleMembers(construction), // "arc BC" resolves to the circle holding both B and C
     neighbors: pointNeighbors(construction), // a single-vertex angle ("∠C קהה/חדה") finds its two arms

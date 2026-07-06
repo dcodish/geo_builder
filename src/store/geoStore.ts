@@ -692,7 +692,6 @@ function extensionsClear(facts: Fact[], fig: Derived, relax = false): boolean {
   if (triples.length === 0) return true;
   // Only the RELAXED pass needs the shared-endpoint test (ADR-142); the strict pass is pure direction.
   const members = relax ? circleMembers(fig.construction) : [];
-  const centreOf = (cid: Id) => (fig.construction.objects.find((o) => o.id === cid && o.kind === 'circle') as { center?: Id } | undefined)?.center;
   for (const { a, b, id, circle } of triples) {
     const pa = fig.positions.get(a), pb = fig.positions.get(b), pid = fig.positions.get(id);
     if (!pa || !pb || !pid) return false;
@@ -707,7 +706,8 @@ function extensionsClear(facts: Fact[], fig: Derived, relax = false): boolean {
     // extension counts (ADR-142). Used by firstSatisfyingSeed's second pass when NO seed satisfies strict.
     let reach = beyondB;
     if (relax) {
-      const memberPts = members.find((m) => m.center === centreOf(circle))?.points ?? [];
+      // Entries are per circle id (ADR-244), so match the extension's target circle exactly.
+      const memberPts = members.find((m) => m.id === circle)?.points ?? [];
       if (memberPts.includes(a) || memberPts.includes(b)) {
         const beyondA = -((pid.x - pa.x) * abx + (pid.y - pa.y) * aby) / abl; // signed distance of id past a
         reach = Math.max(beyondB, beyondA);

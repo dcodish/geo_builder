@@ -477,6 +477,10 @@ export interface Circle {
    *  named by the student — so the renderer hides the centre point unless other geometry uses it
    *  (a radius/central angle drawn from it). A named centre ("circle O") is always drawn. */
   autoCenter?: boolean;
+  /** This circle is the INNER of a concentric pair whose OUTER is the referenced circle id
+   *  ([ADR-244](../../docs/06-decisions.md#adr-244)): set by `set-radius-order`, read by the parser
+   *  context so qualifier references ("המעגל הפנימי" / "the inner circle") resolve to this circle. */
+  innerOf?: Id;
   /** Drive a `via:'free'` radius so a constraint holds — the circle analogue of a shape scalar's
    *  `solve` ([ADR-051](docs/06-decisions.md#adr-051)). Set by `driveOrCheck`/`recruitFreeDofs` when a
    *  constraint on the circle's points can only be met by resizing it; the solver sizes the radius. */
@@ -859,6 +863,10 @@ export type Command =
   | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number }
   | { type: 'set-distance'; a: Id; b: Id; value: number }
   | { type: 'set-radius'; circle: Id; value: number } // a circle's radius = value (no segment drawn — ADR-087)
+  // Bind a CONCENTRIC pair's roles: `inner` stays strictly inside `outer` (ADR-244). A REQUIREMENT, never a
+  // driven constraint — the radii stay free DOFs (ADR-052); the givens verifier flags an order-violating
+  // config, so `meetsRequirements` (sampler / "show another") skips it and a real contradiction reads amber.
+  | { type: 'set-radius-order'; outer: Id; inner: Id }
   | { type: 'name-center'; center: Id } // reveal/name an EXISTING circle's auto-hidden centre (FR-RN-8): the student said "O is the centre of the circle" — flips the circle's autoCenter off so its centre shows, WITHOUT touching the radius
   | { type: 'set-area'; ids: Id[]; value: number } // area of polygon `ids` = value (ADR-118)
   | { type: 'set-area-ratio'; ids1: Id[]; ids2: Id[]; k: number } // area(ids1) = k·area(ids2)

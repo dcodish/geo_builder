@@ -27,7 +27,11 @@ export type ParseResult =
   // A rule recognised an angle named by a SINGLE vertex ("∠B = 90") but the figure has ≠2 edges there, so
   // WHICH angle is meant is ambiguous (or its arms don't exist yet). Surfaced as a clarification — "name all
   // three letters" — NOT escalated to the LLM (which would only guess). `vertex` is the named vertex.
-  | { ok: false; reason: 'ambiguous-angle'; vertex: string };
+  | { ok: false; reason: 'ambiguous-angle'; vertex: string }
+  // The utterance references a circle at a centre that carries a CONCENTRIC PAIR (ADR-244) with no
+  // outer/inner qualifier and no disambiguating stated membership — WHICH circle is meant is the
+  // student's to say ("המעגל החיצוני"/"the inner circle"), never a silent pick or an LLM guess.
+  | { ok: false; reason: 'ambiguous-circle'; center: string };
 
 /**
  * Figure context the parser may consult to resolve implicit references — chiefly
@@ -39,9 +43,14 @@ export interface ParseContext {
   circles?: string[];
   /** Point ids already in the figure — so inscribing an EXISTING triangle becomes its circumcircle. */
   points?: string[];
-  /** For each circle (by centre letter), the points known to lie on it — lets "arc BC" resolve to
-   *  the circle that actually contains both B and C (disambiguates 2+ circles / corrects a wrong one). */
-  circleMembers?: { center: string; points: string[] }[];
+  /** For each circle (one entry per circle OBJECT), the points known to lie on it — lets "arc BC" resolve
+   *  to the circle that actually contains both B and C (disambiguates 2+ circles / corrects a wrong one).
+   *  `id` distinguishes a CONCENTRIC pair's two circles (ADR-244); optional so hand-built contexts stay valid. */
+  circleMembers?: { id?: string; center: string; points: string[] }[];
+  /** CONCENTRIC pairs in the figure (ADR-244): the shared centre letter + the bound outer/inner circle
+   *  ids — lets "המעגל החיצוני/הפנימי" / "the outer/inner circle" resolve to the right circle, and makes
+   *  an UNQUALIFIED reference to that centre a clarification request instead of a silent guess. */
+  concentric?: { center: string; outer: string; inner: string }[];
   /** For each point, the points it's joined to (segment / polygon edge) — lets a single-vertex angle
    *  ("∠C") resolve its two arms, so "∠C קהה/חדה" (obtuse/acute) works without spelling all three. */
   neighbors?: Record<string, string[]>;
@@ -64,12 +73,17 @@ export interface ParseContext {
 
 /** The centre of a circle that contains EVERY point in `pts` (preferring `prefer` if it qualifies), else null. */
 const circleContaining = (ctx: ParseContext, pts: string[], prefer?: string | null): string | null => {
-  const has = (center: string) => {
-    const m = ctx.circleMembers?.find((e) => e.center === center);
-    return !!m && pts.every((p) => m.points.includes(p));
-  };
+  const has = (center: string) => membersOfCenter(ctx, center).size > 0 && pts.every((p) => membersOfCenter(ctx, center).has(p.toUpperCase()));
   if (prefer && has(prefer)) return prefer;
   return ctx.circleMembers?.find((e) => pts.every((p) => e.points.includes(p)))?.center ?? null;
+};
+/** ALL points known on any circle at this CENTRE — the union across a concentric pair's two entries
+ *  (ADR-244: `circleMembers` is per circle id, so a per-centre "already a member?" guard must union). */
+const membersOfCenter = (ctx: ParseContext, center: string): Set<string> => {
+  const out = new Set<string>();
+  for (const e of ctx.circleMembers ?? [])
+    if (e.center.toUpperCase() === center.toUpperCase()) for (const p of e.points) out.add(p.toUpperCase());
+  return out;
 };
 const NO_CONTEXT: ParseContext = {};
 
@@ -79,9 +93,10 @@ const NO_CONTEXT: ParseContext = {};
  * letting a weaker rule half-parse the utterance. A half-parse that silently
  * drops part of a fact is worse than a miss — it draws a wrong figure.
  */
-/** A rule recognised the input but needs the student to disambiguate (see `ParseResult` 'ambiguous-angle').
- *  Returned in place of commands; `parse` turns it into the matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'ambiguous-angle'; vertex: string };
+/** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
+ *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
+ *  matching `{ ok:false }` clarification result. */
+type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -1879,6 +1894,46 @@ const nameCenter: Rule = (s, ctx) => {
   return null; // no circle yet → `circle` creates circle-X; a different existing centre → rename, defer
 };
 
+/**
+ * TWO CONCENTRIC CIRCLES — "שני מעגלים בעלי מרכז משותף O" / "two concentric circles centered at O" /
+ * "two circles with a common center O" ([ADR-244](../../docs/06-decisions.md#adr-244), the bagrut Q6
+ * family). Creates the PAIR: `circle-<C>` bound OUTER and `circle-<C>-2` bound INNER via
+ * `set-radius-order`. Binding the roles at CREATION is pure gauge — two unnamed same-centre circles are
+ * interchangeable until first referenced — so it asserts nothing the student didn't say, and it makes
+ * every later qualifier reference ("המעגל החיצוני/הפנימי", "the outer/inner circle") deterministic.
+ * Both radii stay free DOFs seeded apart (ADR-052 — the sizes and their ratio are the student's to
+ * state, e.g. "OA=4"); the verifier + sampler keep inner strictly inside outer in every shown config.
+ * Scope: a PAIR — max 2 circles per centre (operator decision, 2026-07-06); `ifAbsent` makes an
+ * existing single circle at that centre the pair's outer (its stated size kept) and a re-statement
+ * idempotent. Without this rule the En phrasing HALF-PARSED to one circle (the plain `circle` rule
+ * dropped "two") and the He phrasing dead-ended at the LLM, whose canonical grammar had no way to say
+ * it — the second circle command it improvised collapsed into a RESIZE of the first (identity = centre
+ * letter, the root cause).
+ */
+const concentricCircles: Rule = (s, ctx) => {
+  if (!/circles?|מעגל/i.test(s)) return null;
+  const he = /שני\s+ה?מעגלים|2\s+מעגלים/.test(s) && /מרכז\s+משותף|אותו\s+ה?מרכז/.test(s);
+  const heConcentric = /מעגלים\s+קונצנטריים/.test(s);
+  const en =
+    /\bconcentric\s+circles\b/i.test(s) ||
+    (/\btwo\s+circles\b/i.test(s) && /common\s+cent(?:er|re)|same\s+cent(?:er|re)/i.test(s));
+  if (!he && !heConcentric && !en) return null;
+  // The centre letter: right after "משותף"/"קונצנטריים", or via the shared centre reader ("centered at O",
+  // "common center O" — `cent\w*` covers it). Unnamed → auto-assigned and hidden until used (FR-RN-8).
+  const m = s.match(/(?:משותף|קונצנטריים)\s+([A-Za-z]\d*)(?![A-Za-z])/);
+  const named = m ? m[1] : circleCenter(s);
+  const center = named ?? freeLabel(ctx.points ?? [], ['O', 'P', 'Q', 'K']);
+  const outer = circleId(center);
+  const inner = `${outer}-2`;
+  const auto = named ? {} : { autoCenter: true as const };
+  return [
+    // Distinct free-radius seeds so the pair never draws coincident (the same reason twoCirclesMeet seeds apart).
+    { type: 'circle', id: outer, center: up(center), radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, ...auto },
+    { type: 'circle', id: inner, center: up(center), radius: RADIUS_DEFAULT * 0.55, freeRadius: true, ifAbsent: true, ...auto },
+    { type: 'set-radius-order', outer, inner },
+  ];
+};
+
 /** "circle centered at O radius 5" / "circle O radius R" / "מעגל שמרכזו O רדיוסו 5". */
 const circle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
@@ -2507,7 +2562,7 @@ const cornerTangentCircle: Rule = (s, ctx) => {
         : null;
   if (existingCenter) {
     const O = existingCenter;
-    const members = new Set((ctx.circleMembers?.find((e) => up(e.center) === O)?.points ?? []).map(up));
+    const members = membersOfCenter(ctx, O);
     // Named tangency points ("בנקודות D ו C" / "at D and C") pair with the two arms IN ORDER. WITHOUT names
     // the tangent point IS the arm's own tip (tangent AT the endpoint — the ADR-115 kite case). The DISTINCTION
     // matters: a named tangent point D on side (vertex, arm) means the LINE through vertex–arm TOUCHES O at D,
@@ -2552,9 +2607,12 @@ const cornerTangentCircle: Rule = (s, ctx) => {
  * for a form no deterministic rule reads (word-equality, operator-declared out of grammar) — the
  * utterance escalates honestly instead of HALF-parsing to a bare chord that silently drops the
  * relation and the second segment (review 2026-07-03, P3). "שווה שוקיים/צלעות" (isosceles/equilateral
- * shape words) are excluded — they're a shape modifier, not a relation.
+ * shape words) are excluded — they're a shape modifier, not a relation. A comparative INSIDE a
+ * concentric-pair circle qualifier ("במעגל הגדול/הקטן" / "the larger/smaller circle", ADR-244) is a
+ * REFERENCE, not a relation on the carrier — excluded by adjacency to the circle noun.
  */
-const CARRIER_RELATION_TAIL = /[=<>]|שווה(?!\s*(?:שוקיים|צלעות))|equals?\b|גדול|קטן|ארו[כך]|קצר|longer|shorter|larger|smaller|greater/i;
+const CARRIER_RELATION_TAIL =
+  /[=<>]|שווה(?!\s*(?:שוקיים|צלעות))|equals?\b|(?<!מעגל(?:ים)?\s+ה)(?:גדול|קטן)|ארו[כך]|קצר|(?:longer|shorter|larger|smaller|greater)(?!\s+circles?\b)/i;
 
 const chord: Rule = (s, ctx) => {
   if (!/chord|מיתר/i.test(s)) return null;
@@ -2693,7 +2751,7 @@ const diameter: Rule = (s, ctx) => {
     // constraint form silently under-asserts — the bare collinearity let "AC קוטר" verify green with
     // A,C floating off the circle (ADR-241). Membership is idempotent for endpoints already on it
     // (the ADR-099 lowering), so assert it for any endpoint not known to be a member.
-    const members = new Set((ctx.circleMembers?.find((e) => up(e.center) === up(center))?.points ?? []).map(up));
+    const members = membersOfCenter(ctx, center);
     return [
       ...ids
         .filter((p) => !members.has(up(p)))
@@ -3476,7 +3534,7 @@ const tangentFromExternal: Rule = (s, ctx) => {
   const center = named && /^[A-Z]/.test(named) ? named : ctx.circles?.length === 1 ? ctx.circles[0] : null;
   if (!center) return null;
   const have = new Set(ctx.points ?? []);
-  const members = new Set((ctx.circleMembers?.find((e) => up(e.center) === up(center))?.points ?? []).map(up)); // labels already ON this circle
+  const members = membersOfCenter(ctx, center); // labels already ON this circle
   const labels = (s.match(/[A-Z]\d*/g) ?? []).filter((l) => l !== center); // uppercase tokens = point labels
   const atM = s.match(/(?:\bat\b|בנקודה)\s*([A-Za-z]\d*)/i); // "at D" / "בנקודה D" → the touch point (NOT the apex)
   const atPoint = atM ? up(atM[1]) : null;
@@ -3546,7 +3604,7 @@ const tangentLine: Rule = (s, ctx) => {
   // bails because both endpoints already exist, so there is no unique external apex) and escalates to the
   // LLM, which returns "not-understood" / "built-nothing" — the engine builds it perfectly once it has the
   // command (ADR-082; the explicit-"at K" path is ADR-081).
-  const members = new Set((ctx.circleMembers?.find((e) => up(e.center) === up(center))?.points ?? []).map(up));
+  const members = membersOfCenter(ctx, center);
   let T = atM ? up(atM[1]) : null;
   if (!T && pts) {
     const onCircle = pts.filter((p) => members.has(p));
@@ -4222,6 +4280,7 @@ export const RULES: Rule[] = [
   perimeter, // "היקף ABC = 20" / "perimeter of ABCD is 20" (ADR-228) — BEFORE the shape rules, same reason (a circle's circumference → the `circle` rule)
   semicircle, // "חצי מעגל" / "semicircle" — before `circle` (contains "מעגל") and the shape rules
   quarterCircle, // "רבע מעגל" / "quarter circle" — same
+  concentricCircles, // "שני מעגלים בעלי מרכז משותף O" — the CONCENTRIC PAIR (ADR-244); before `circle` (which would half-parse it to ONE circle) and the two-circle rules
   incircle, // "circle inscribed in triangle ABC" — before inscribedPolygon (both match "inscribed")
   circumcircleMeetsSegment, // "the circle circumscribing ABC cuts CE at D" — before the shape rules (its "משולש ABC" would stop `triangle`)
   inscribedPolygon, // before the shape rules ("triangle ABC inscribed …" contains "triangle")
@@ -4407,6 +4466,94 @@ function withImplicitCircles(commands: AnyCommand[], ctx: ParseContext): AnyComm
 }
 
 /**
+ * The concentric-pair QUALIFIER named in the utterance ([ADR-244](../../docs/06-decisions.md#adr-244)):
+ * the Hebrew adjective FOLLOWS the circle noun ("המעגל החיצוני/הפנימי/הגדול/הקטן"), the English
+ * adjective PRECEDES it ("the outer/inner/larger/smaller circle"). ADJACENCY to the circle word is
+ * required — a bare "חיצוני" also appears in "נקודה חיצונית" (an external POINT) and must never read
+ * as a circle qualifier.
+ */
+const circleQualifier = (s: string): 'outer' | 'inner' | null => {
+  const he = s.match(/מעגל(?:ים)?\s+ה?(חיצוני|פנימי|גדול|קטן)/);
+  if (he) return he[1] === 'חיצוני' || he[1] === 'גדול' ? 'outer' : 'inner';
+  const en = s.match(/\b(outer|external|inner|internal|larg(?:er|est)?|small(?:er|est)?|big(?:ger|gest)?)\s+circles?\b/i);
+  if (en) return /^(inner|internal|small)/i.test(en[1]) ? 'inner' : 'outer';
+  return null;
+};
+
+/**
+ * CONCENTRIC-pair reference resolution post-pass ([ADR-244](../../docs/06-decisions.md#adr-244)) — the
+ * chokepoint, in the ADR-119 pattern, so EVERY circle-consuming rule gains outer/inner resolution at
+ * once instead of each rule learning the qualifier. Rules mint `circle-<centre>` — the OUTER of a pair,
+ * by the creation binding — so only a rewrite is ever needed: an INNER qualifier in the utterance
+ * redirects the refs to the pair's inner id; an OUTER qualifier confirms them. With NO qualifier,
+ * STATED membership disambiguates (a command whose named points are already members of exactly one of
+ * the pair — "קשת BC" with B,C on the inner circle); otherwise the reference is genuinely ambiguous →
+ * a clarification, never a silent pick and never an LLM guess. A `circle` CREATION with `ifAbsent`
+ * (the macro's own output / an implicit-circle prepend) is not a reference; a bare re-creation of a
+ * paired centre ("מעגל O רדיוס 4" — a RESIZE of which circle?) is ambiguous like any other reference.
+ */
+function withConcentricResolution(
+  commands: AnyCommand[],
+  s: string,
+  ctx: ParseContext,
+): AnyCommand[] | { clarify: 'ambiguous-circle'; center: string } {
+  const pairs = ctx.concentric ?? [];
+  if (!pairs.length) return commands;
+  const pairByOuter = new Map(pairs.map((p) => [p.outer, p]));
+  const CIRCLE_REF_KEYS = ['circle', 'circle1', 'circle2'];
+  const isPairRef = (cmd: AnyCommand, key: string): boolean => {
+    const v = (cmd as unknown as Record<string, unknown>)[key];
+    return typeof v === 'string' && pairByOuter.has(v);
+  };
+  const refs = commands.flatMap((cmd) => {
+    if (cmd.type === 'circle' && cmd.ifAbsent) return []; // ensure-exists, not a reference
+    const keys = CIRCLE_REF_KEYS.filter((k) => isPairRef(cmd, k));
+    // A non-ifAbsent (re)creation of a paired centre is a resize REFERENCE — route it through the same
+    // qualifier/ambiguity gate via its `id`.
+    if (!keys.length && (cmd.type === 'circle' || cmd.type === 'circle-through') && pairByOuter.has(cmd.id)) keys.push('id');
+    return keys.map((key) => ({ cmd, key }));
+  });
+  if (!refs.length) return commands;
+  const qual = circleQualifier(s);
+  const membersOf = (cid: string) =>
+    new Set((ctx.circleMembers ?? []).filter((e) => e.id === cid).flatMap((e) => e.points.map((p) => p.toUpperCase())));
+  const targets = new Map<AnyCommand, Map<string, string>>();
+  for (const { cmd, key } of refs) {
+    const pair = pairByOuter.get((cmd as unknown as Record<string, string>)[key])!;
+    let target: string | null = qual ? (qual === 'outer' ? pair.outer : pair.inner) : null;
+    if (!target) {
+      // No qualifier — stated membership picks: every point the command names that is ALREADY a member
+      // of one of the pair must side with the SAME circle.
+      const labels = Object.entries(cmd).flatMap(([k, v]) =>
+        k === 'type' || CIRCLE_REF_KEYS.includes(k)
+          ? []
+          : typeof v === 'string' && /^[A-Z]\d*$/.test(v)
+            ? [v]
+            : Array.isArray(v)
+              ? v.filter((x): x is string => typeof x === 'string' && /^[A-Z]\d*$/.test(x))
+              : [],
+      );
+      const o = membersOf(pair.outer);
+      const i = membersOf(pair.inner);
+      const known = labels.filter((l) => o.has(l) || i.has(l));
+      if (known.length && known.every((l) => o.has(l) && !i.has(l))) target = pair.outer;
+      else if (known.length && known.every((l) => i.has(l) && !o.has(l))) target = pair.inner;
+    }
+    if (!target) return { clarify: 'ambiguous-circle', center: pair.center };
+    const forCmd = targets.get(cmd) ?? new Map<string, string>();
+    forCmd.set(key, target);
+    targets.set(cmd, forCmd);
+  }
+  return commands.map((cmd) => {
+    const forCmd = targets.get(cmd);
+    if (!forCmd) return cmd;
+    const patched: Record<string, unknown> = { ...(cmd as unknown as Record<string, unknown>) };
+    for (const [key, target] of forCmd) patched[key] = target;
+    return patched as unknown as AnyCommand;
+  });
+}
+
+/**
  * CARRIER membership post-pass (`withCarrierMembership`, generalises ADR-119's chord version to diameters,
  * PAR-4). A point named as a CHORD endpoint lies ON the circle — in ANY phrasing, not only the standalone
  * `chord` rule. When "chord"/"מיתר" appears together with a relation ("CD and AF are parallel chords",
@@ -4528,8 +4675,16 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
     const res = rule(s, ctx);
     if (res === 'stop') break; // recognised but unreadable — escalate, don't half-parse
     if (!res) continue;
-    if (Array.isArray(res)) return { ok: true, commands: withImplicitCircles(withCarrierMembership(res, s, ctx), ctx) };
-    return { ok: false, reason: res.clarify, vertex: res.vertex }; // a clarification request (e.g. ambiguous single-vertex angle)
+    if (Array.isArray(res)) {
+      // Concentric resolution runs LAST (ADR-244): the other post-passes mint the pair's OUTER id
+      // (`circleId(centre)`), and this one redirects/confirms per qualifier or asks to clarify.
+      const resolved = withConcentricResolution(withImplicitCircles(withCarrierMembership(res, s, ctx), ctx), s, ctx);
+      if (Array.isArray(resolved)) return { ok: true, commands: resolved };
+      return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
+    }
+    // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).
+    if (res.clarify === 'ambiguous-angle') return { ok: false, reason: 'ambiguous-angle', vertex: res.vertex };
+    return { ok: false, reason: 'ambiguous-circle', center: res.center };
   }
   return { ok: false, reason: 'not-handled' };
 }
