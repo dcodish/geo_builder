@@ -1,0 +1,72 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-07-06T00:00:00.000Z",
+  "seed": 0,
+  "radiusOverrides": {},
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "ריבוע ABCD",
+      "group": "g0",
+      "cmd": {
+        "type": "square",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "נקודה G על AD",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "G",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.2",
+      "utterance": "זווית GBA = 37",
+      "group": "g2",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "G"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.3",
+      "utterance": "זווית GBA = 37",
+      "group": "g2",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g2.4",
+      "utterance": "זווית GBA = 37",
+      "group": "g2",
+      "cmd": {
+        "type": "set-angle",
+        "vertex": "B",
+        "ray1": "G",
+        "ray2": "A",
+        "value": 37
+      },
+      "enabled": true
+    }
+  ]
+}

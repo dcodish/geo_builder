@@ -219,6 +219,14 @@
     "relationsHover": "Hover a side or angle to see what's equal to it",
     "language": "עברית"
   },
+  "file": {
+    "save": "Save to file",
+    "saveHint": "Download the construction as a .geo.json file — open it again on any computer",
+    "load": "Load from file",
+    "loadHint": "Open a saved figure file (replaces the current construction — undo restores it)",
+    "badFile": "This file is not a saved figure from this site",
+    "newerVersion": "This file was saved by a newer version of the site — refresh the page and try again"
+  },
   "pointMenu": {
     "rename": "letter",
     "hide": "Hide label",

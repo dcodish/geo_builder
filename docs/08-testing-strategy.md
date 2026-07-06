@@ -79,6 +79,8 @@ A shared set of canonical figures, expressed as command sequences, reused across
 - **F5 — Cyclic quadrilateral:** opposite angles sum to 180°. _(theorem #87)_
 - _(extend as v1 coverage grows)_
 
+**Saved-figure fixtures net ([ADR-232](06-decisions.md#adr-232), 2026-07-06).** The FR-HS-10 save/load file format doubles as a fixtures format: every `src/__tests__/fixtures/*.geo.json` is replayed by `src/__tests__/fixtures.test.ts` through the REAL load path (raw text → `deserializeFigure` → `replay`) and asserted, with zero per-figure authoring: (1) **replays green** — builds, nothing pending, givens verifier clean (strong per ADR-053: green = every stated relation re-derived and checked), every fact ok; (2) **parser drift** — each stored utterance, re-parsed with its prefix figure context, must lower to the SAME commands (out-of-grammar = LLM-escalated, skipped). **Promotion discipline:** only add a file after eyeballing the figure against the textbook image — the net locks in current behavior, including any undetected wrongness. This net complements, never replaces, `scenarios.test.ts` (fixtures: "everything green stays green"; scenarios: figure-specific assertions).
+
 ## Requirement → test traceability
 
 | Requirement | Covered by |

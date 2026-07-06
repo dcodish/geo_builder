@@ -1,0 +1,116 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-07-06T00:00:00.000Z",
+  "seed": 0,
+  "radiusOverrides": {},
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "מעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.1",
+      "utterance": "משולש שווה צלעות ABC חסום במעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-P",
+        "center": "P",
+        "radius": 5,
+        "freeRadius": true,
+        "autoCenter": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "utterance": "משולש שווה צלעות ABC חסום במעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-P",
+        "theta": 1.2217304763960306,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.3",
+      "utterance": "משולש שווה צלעות ABC חסום במעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "B",
+        "circle": "circle-P",
+        "theta": 3.0543261909900763,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.4",
+      "utterance": "משולש שווה צלעות ABC חסום במעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-P",
+        "theta": 5.235987755982989,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.5",
+      "utterance": "משולש שווה צלעות ABC חסום במעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "triangle",
+        "ids": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.6",
+      "utterance": "משולש שווה צלעות ABC חסום במעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "set-equal",
+        "a": "A",
+        "b": "B",
+        "c": "B",
+        "d": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.7",
+      "utterance": "משולש שווה צלעות ABC חסום במעגל",
+      "group": "g1",
+      "cmd": {
+        "type": "set-equal",
+        "a": "B",
+        "b": "C",
+        "c": "C",
+        "d": "A"
+      },
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-07-06T00:00:00.000Z",
+  "seed": 0,
+  "radiusOverrides": {},
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "AB קוטר במעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "AB קוטר במעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "midpoint",
+        "id": "O",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.2",
+      "utterance": "AB קוטר במעגל O",
+      "group": "g0",
+      "cmd": {
+        "type": "circle-through",
+        "id": "circle-O",
+        "center": "O",
+        "through": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.3",
+      "utterance": "CD ו AF מיתרים המקבילים זה לזה",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "C",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.4",
+      "utterance": "CD ו AF מיתרים המקבילים זה לזה",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "D",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.5",
+      "utterance": "CD ו AF מיתרים המקבילים זה לזה",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "A",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.6",
+      "utterance": "CD ו AF מיתרים המקבילים זה לזה",
+      "group": "g1",
+      "cmd": {
+        "type": "point-on-circle",
+        "id": "F",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.7",
+      "utterance": "CD ו AF מיתרים המקבילים זה לזה",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.8",
+      "utterance": "CD ו AF מיתרים המקבילים זה לזה",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "F"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.9",
+      "utterance": "CD ו AF מיתרים המקבילים זה לזה",
+      "group": "g1",
+      "cmd": {
+        "type": "set-parallel",
+        "a": "C",
+        "b": "D",
+        "c": "A",
+        "d": "F"
+      },
+      "enabled": true
+    }
+  ]
+}

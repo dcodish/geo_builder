@@ -1,0 +1,62 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-07-06T00:00:00.000Z",
+  "seed": 0,
+  "radiusOverrides": {},
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "טרפז ישר זווית ABCD",
+      "group": "g0",
+      "cmd": {
+        "type": "trapezoid",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "טרפז ישר זווית ABCD",
+      "group": "g0",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "A",
+        "b": "D",
+        "c": "A",
+        "d": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.2",
+      "utterance": "CE גובה בטרפז",
+      "group": "g1",
+      "cmd": {
+        "type": "foot",
+        "id": "E",
+        "from": "C",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "g1.3",
+      "utterance": "CE גובה בטרפז",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "C",
+        "b": "E"
+      },
+      "enabled": true
+    }
+  ]
+}

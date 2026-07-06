@@ -20,6 +20,7 @@ import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
 import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, convergedSamples, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
+import type { FigureFile } from './figureFile';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -1251,6 +1252,10 @@ export interface GeoState {
   merge: (from: Id, to: Id) => MergeResult;
   /** Reset to no facts and wipe undo/redo history. */
   clear: () => void;
+  /** Replace the whole session with a saved figure file (FR-HS-10): the facts, the seed, the dialed
+   *  radii, and any saved display preferences — ONE state transition, so a single undo restores the
+   *  session that was open before the load (loading is never destructive). */
+  loadFigure: (file: FigureFile) => void;
 }
 
 /** Shape commands whose `ids` form a closed polygon that must stay a CLEAN convex drawing. */
@@ -1700,6 +1705,25 @@ export const useGeoStore = create<GeoState>()(
       clear: () => {
         set({ facts: [], selectedId: null, seed: 0, radiusOverrides: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, shapes: null });
         useGeoStore.temporal.getState().clear();
+      },
+
+      loadFigure: (file) => {
+        // ONE `set` — zundo records a single entry (facts + seed are the tracked slice), so undo
+        // brings back whatever session was open before the load. The dialed radii are applied but
+        // stay a scratchpad (cleared by undo/"show another", exactly as if the student dialed them).
+        set({
+          facts: file.facts,
+          seed: file.seed,
+          radiusOverrides: file.radiusOverrides,
+          selectedId: null,
+          relations: null,
+          shapes: null,
+          hidden: file.display?.hidden ?? [],
+          segStyle: file.display?.segStyle ?? {},
+          hiddenCircles: file.display?.hiddenCircles ?? [],
+          ...(file.display?.showMeasures !== undefined ? { showMeasures: file.display.showMeasures } : {}),
+          ...(file.display?.showCenters !== undefined ? { showCenters: file.display.showCenters } : {}),
+        });
       },
     }),
     {

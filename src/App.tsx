@@ -25,6 +25,7 @@ import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
+import { deserializeFigure, figureFileName, serializeFigure } from '@/store/figureFile';
 import { logDebug } from '@/debug/sessionLog';
 import { humanizeError } from '@/i18n/humanizeError';
 /**
@@ -89,6 +90,7 @@ export default function App() {
   const detectShapes = useGeoStore((s) => s.detectShapes);
   const clearShapes = useGeoStore((s) => s.clearShapes);
   const clear = useGeoStore((s) => s.clear);
+  const loadFigure = useGeoStore((s) => s.loadFigure);
 
   // The STORE's undo/redo wrappers (E5/STO-5), not raw zundo: they also clear the dialed-radius
   // scratchpad, and the temporal state itself now carries facts + seed so the restored view matches.
@@ -122,6 +124,8 @@ export default function App() {
   const [llmDropped, setLlmDropped] = useState<string[]>([]); // LLM steps the engine couldn't build
   const [renameNote, setRenameNote] = useState(''); // why a relabel was a no-op (target taken / no such point)
   const [altNote, setAltNote] = useState(''); // transient: "show another configuration" found no different drawing
+  const [fileNote, setFileNote] = useState(''); // transient: why a figure file couldn't be loaded (FR-HS-10)
+  const fileInputRef = useRef<HTMLInputElement>(null); // the hidden <input type=file> behind "load figure"
   const [helpOpen, setHelpOpen] = useState(false); // the help modal ("עזרה") — guide + command reference
   const [helpTab, setHelpTab] = useState<'guide' | 'commands'>('guide');
   const [aboutOpen, setAboutOpen] = useState(false); // the "מה זה?" intro modal (first load + reopenable)
@@ -270,6 +274,57 @@ export default function App() {
   // harness all use it; the copies had drifted, ADR-171). Excludes ~scaffolding circles; supplies the
   // circle-members / neighbours / parallels / lines hints the grammar consumes.
   const parseCtx = () => buildParseCtx(construction, positions);
+
+  // ── save / load a figure file (FR-HS-10) ─────────────────────────────────
+  // The file is the store's replay inputs (facts + seed + dialed radii) plus display preferences —
+  // no positions (the figure is re-derived on load). See src/store/figureFile.ts.
+  const saveFigure = () => {
+    const st = useGeoStore.getState();
+    const json = serializeFigure(
+      {
+        facts: st.facts,
+        seed: st.seed,
+        radiusOverrides: st.radiusOverrides,
+        display: {
+          hidden: st.hidden,
+          segStyle: st.segStyle,
+          hiddenCircles: st.hiddenCircles,
+          showMeasures: st.showMeasures,
+          showCenters: st.showCenters,
+        },
+      },
+      { locale: i18n.language, savedAt: new Date().toISOString() },
+    );
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = figureFileName(new Date());
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const noteFileProblem = (key: string) => {
+    setFileNote(t(key));
+    window.setTimeout(() => setFileNote(''), 6000);
+  };
+
+  const loadFigureFile = async (f: File) => {
+    const r = deserializeFigure(await f.text());
+    if (!r.ok) {
+      noteFileProblem(r.reason === 'newer-version' ? 'file.newerVersion' : 'file.badFile');
+      return;
+    }
+    // Smoke-replay before committing: a file that makes the derivation THROW (not merely flag a fact)
+    // must never become the session — refuse it instead of a white screen on the next render.
+    try {
+      replay(r.file.facts, r.file.seed, r.file.radiusOverrides);
+    } catch {
+      noteFileProblem('file.badFile');
+      return;
+    }
+    loadFigure(r.file); // one undo restores the session that was open before
+    setFileNote('');
+  };
 
   // After a step commits, VERIFY the figure meets every requirement; if not, auto-search alternative
   // configurations (seeds + branches) for one that does (ADR-106). The search is synchronous and can be
@@ -1015,7 +1070,27 @@ export default function App() {
             <button type="button" style={ghost} disabled={!canUndo} onClick={() => undo()}>{t('actions.undo')}</button>
             <button type="button" style={ghost} disabled={!canRedo} onClick={() => redo()}>{t('actions.redo')}</button>
             <button type="button" style={ghost} onClick={clear}>{t('actions.clear')}</button>
+            {/* Save/load the construction as a portable .geo.json file (FR-HS-10). Load replaces the
+                current session but is ONE undo step, so nothing is lost by opening a file. */}
+            <button type="button" style={ghost} disabled={facts.length === 0} onClick={saveFigure} title={t('file.saveHint')}>
+              {t('file.save')}
+            </button>
+            <button type="button" style={ghost} onClick={() => fileInputRef.current?.click()} title={t('file.loadHint')}>
+              {t('file.load')}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = ''; // so picking the SAME file again still fires a change event
+                if (f) void loadFigureFile(f);
+              }}
+            />
           </div>
+          {fileNote && <span style={{ fontSize: 12, color: '#dc2626' }}>{fileNote}</span>}
 
           {/* Display options — what to show on the figure (grouped together; ⊙ centres used to be a
               cryptic button on the canvas — now it sits next to "show measures"). */}
