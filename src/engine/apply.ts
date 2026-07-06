@@ -1114,8 +1114,14 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // |centre·P| where P lies on a circle centred at `centre` IS that circle's radius — drive the radius DOF,
       // not the free centre (which can't change the distance). Otherwise a plain positional distance. (ADR-230.)
       const rIdx = radiusCircleForDistance(objects, constraints, cmd.a, cmd.b);
-      if (rIdx >= 0) applyRadiusGiven(objects, constraints, rIdx, cmd.value);
-      else driveOrCheck(objects, constraints, { type: 'distance', a: cmd.a, b: cmd.b, value: cmd.value });
+      if (rIdx >= 0) {
+        applyRadiusGiven(objects, constraints, rIdx, cmd.value);
+        // The student stated a SEGMENT length ("O1M=9") — keep the distance itself on the record as a
+        // tautological check (the pinned radius makes it hold by construction), so the on-canvas measure
+        // label and the givens verifier still see the stated magnitude (the honesty invariant: everything
+        // the student stated stays visible — ADR-231 review F6). No carrier: nothing to drive.
+        constraints.push({ type: 'distance', a: cmd.a, b: cmd.b, value: cmd.value });
+      } else driveOrCheck(objects, constraints, { type: 'distance', a: cmd.a, b: cmd.b, value: cmd.value });
       break;
     }
 
@@ -1222,27 +1228,33 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       if (pts.length >= 2) {
         addObj(objects, segment(pts[0], pts[pts.length - 1]));
         for (let i = 2; i < pts.length; i++) addCollinear(objects, constraints, pts[i], pts[0], pts[1]);
-        if (pts.length >= 3) {
-          const order: Constraint = { type: 'collinear-order', points: [...pts] };
-          // Drive the order with the free PARAMETRIC carriers (on-circle/on-segment) AMONG the points, so
-          // the optimizer sequences the figure (slides an anchor until the order holds). We mark them
-          // directly rather than leaning on recruitFreeDofs, which would reach a fixed intersection point's
-          // parent CIRCLE CENTRES and distort the circles. When none are movable, it's a pure check.
-          for (const p of pts) {
-            const i = objects.findIndex((o) => o.id === p);
-            const o = i >= 0 ? objects[i] : undefined;
-            if (o && (o.kind === 'on-circle' || o.kind === 'on-segment') && (o as { solve?: unknown }).solve === undefined) {
-              objects[i] = { ...o, solve: { constraint: order, branch: 0 } };
-            }
-          }
-          constraints.push(order);
-        }
+        if (pts.length >= 3) addCollinearOrder(objects, constraints, pts);
       }
       break;
     }
   }
 
   return { objects, constraints };
+}
+
+/**
+ * Push a `collinear-order` over `pts` ("the points lie on one line, in this sequence"), driving it with
+ * the free PARAMETRIC carriers (on-circle/on-segment) among them, so the optimizer sequences the figure
+ * (slides an anchor until the order holds). Carriers are marked directly rather than leaning on
+ * recruitFreeDofs, which would reach a fixed intersection point's parent CIRCLE CENTRES and distort the
+ * circles; when none are movable it's a pure check. Shared by `set-line` and by the existing-point
+ * reinterpretation of "P on segment a–b" (M1, [ADR-231](../../docs/06-decisions.md#adr-231)).
+ */
+export function addCollinearOrder(objects: GeoObject[], constraints: Constraint[], pts: Id[]): void {
+  const order: Constraint = { type: 'collinear-order', points: [...pts] };
+  for (const p of pts) {
+    const i = objects.findIndex((o) => o.id === p);
+    const o = i >= 0 ? objects[i] : undefined;
+    if (o && (o.kind === 'on-circle' || o.kind === 'on-segment') && (o as { solve?: unknown }).solve === undefined) {
+      objects[i] = { ...o, solve: { constraint: order, branch: 0 } };
+    }
+  }
+  constraints.push(order);
 }
 
 /**

@@ -297,7 +297,14 @@ export function describeConstraint(con: Constraint): string {
     case 'perpendicular':
       return `${con.a}${con.b} ⟂ ${con.c}${con.d}`;
     case 'coincide':
-      return `${con.p} coincides with ${con.q}`;
+      // A `~`-prefixed side is a HIDDEN helper (a re-stated placement ~P, a tangency touch ~touch-X, a
+      // diameter midpoint ~diaAB — ADR-028/ADR-231/ADR-037): students never typed that id, so describe
+      // the visible point against "its constructed target", not the internal name.
+      return con.q.startsWith('~')
+        ? `${con.p} coincides with its constructed target`
+        : con.p.startsWith('~')
+          ? `${con.q} coincides with its constructed target`
+          : `${con.p} coincides with ${con.q}`;
     case 'angle-order':
       return `∠${con.a1}${con.v1}${con.b1} < ∠${con.a2}${con.v2}${con.b2}`;
     case 'length-order':

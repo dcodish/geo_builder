@@ -144,6 +144,12 @@ export const SCENARIOS: Scenario[] = [
       };
       expect(Math.abs(perp('M')), 'NM ⟂ O1M (tangent at M)').toBeLessThan(0.02);
       expect(Math.abs(perp('B')), 'NB ⟂ O1B (tangent at B)').toBeLessThan(0.02);
+      // The stated sizes stay VISIBLE (review F6 / ADR-231): the radius reroute must keep the student's
+      // "O1M=9"/"O2M=16" on the on-canvas measure labels (they are harvested from `distance` constraints,
+      // which the reroute now records as tautological checks alongside the radius pin).
+      const lengthKeys = fig.labels.lengths.map((l) => [l.a, l.b].sort().join(''));
+      expect(lengthKeys, 'the |O1M| label survives the radius reroute').toContain(['O1', 'M'].sort().join(''));
+      expect(lengthKeys, 'the |O2M| label survives the radius reroute').toContain(['O2', 'M'].sort().join(''));
     },
   },
   {
@@ -170,6 +176,31 @@ export const SCENARIOS: Scenario[] = [
       expect(tAC, 'E on segment AC (param)').toBeLessThan(0.98);
       expect(tDF, 'E on segment DF (param)').toBeGreaterThan(0.02);
       expect(tDF, 'E on segment DF (param)').toBeLessThan(0.98);
+    },
+  },
+  {
+    id: 'perpendicular-helper-flips-mirrored-slot',
+    title: 'the ADR-227 flip works for the MIRRORED phrasing too — "FD אנך ל AB" (loose end in the first slot)',
+    guards:
+      "review F8 (2026-07-06): the ADR-227 fix granted the reflection axis only to the SECOND letter of each segment (`con.b`/`con.d`), so \"DF ⟂ AB\" flipped but the same statement written \"FD ⟂ AB\" did not — the exact ADR-227 bug persisted for the mirrored slot. The semantic fact is 'an endpoint of one segment reflects across the other segment's line', slot-free (ADR-231): all four slots now qualify, and `directionHelperFreePoints` also reads ADR-229 co-driven (`solve.also`) constraints so a metrically co-driven helper isn't mis-classified. Same figure as `perpendicular-helper-flips-to-reach-crossing`, mirrored utterance.",
+    steps: [
+      'משולש ישר זוית ABC',
+      { llm: ['D אמצע AB'] },
+      'FD אנך ל AB',
+      'AC ו FD נחתכים בנקודה E',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const t = (p: Id, a: Id, b: Id) => {
+        const A = at(fig, a), B = at(fig, b), P = at(fig, p);
+        return ((P.x - A.x) * (B.x - A.x) + (P.y - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2);
+      };
+      const tAC = t('E', 'A', 'C');
+      const tDF = t('E', 'D', 'F');
+      expect(tAC, 'E on segment AC (param)').toBeGreaterThan(0.02);
+      expect(tAC, 'E on segment AC (param)').toBeLessThan(0.98);
+      expect(tDF, 'E on segment FD (param)').toBeGreaterThan(0.02);
+      expect(tDF, 'E on segment FD (param)').toBeLessThan(0.98);
     },
   },
   {
@@ -3287,6 +3318,56 @@ export const SCENARIOS: Scenario[] = [
       allStepsOk(fig);
       const p = dist(at(fig, 'A'), at(fig, 'B')) + dist(at(fig, 'B'), at(fig, 'C')) + dist(at(fig, 'C'), at(fig, 'A'));
       expect(p, 'the triangle perimeter equals the given 20').toBeCloseTo(20, 3);
+    },
+  },
+  {
+    id: 'existing-point-statements-lower-to-constraints',
+    title: 'a statement about an EXISTING point is a constraint, never an "already defined" conflict (M1, ADR-231)',
+    guards:
+      'operator prod session `fn34ptei` (2026-07-06): after "טרפז ABCD חסום במעגל" auto-created circle-O with centre O, "O מרכז מעגל חסום במשולש ABC" and "O על ED" both crashed \'O\' is already defined — and the mirrored order crashed the same way, so the figure was unbuildable in ANY order. Root cause (the recurring ADR-075/099/115/119/124 class): the ADR-028/050 reinterpretation mechanism was GATED — point-on-segment required the existing point to own a free param DOF, placements gave up without a free param ancestor, and the conflict branch never recruited. Fix (M1): any existing GeoPoint lowers to its defining incidences (collinear + the stated within/beyond order for על; a hidden-target coincidence for placements), the conflict branch gets the same recruitFreeDofs failure path as typed constraints, and an unsatisfiable statement reports the RELATION (honest over-constraint), never a redefinition conflict. This exact sequence contains a genuinely degenerate step (המשכי CE ו CD share C, so their crossing cannot be a distinct A) — the lock asserts the honest-error CLASS, not a buildable figure; the satisfiable members are locked in redefine-existing-point.test.ts.',
+    steps: [
+      'טרפז ABCD חסום במעגל',
+      'טרפז BCED',
+      'המשכי CE ו CD נפגשים בנקודה A',
+      'BA',
+      'AC',
+      'O מרכז מעגל חסום במשולש ABC',
+      'O על ED',
+    ],
+    expectViolations: true, // the degenerate meet + the un-flexed collinear are intentionally rejected — prior figure kept
+    check(fig) {
+      // The class assertion: NO step may report a redefinition conflict — every failure names the relation.
+      for (const [id, st] of Object.entries(fig.status)) {
+        expect(String(st), `step ${id} must not report a redefinition conflict`).not.toMatch(/already defined/i);
+      }
+      expect(fig.lastError, 'the failure names the relation that cannot hold').toMatch(/cannot hold/);
+      expect(fig.lastError).not.toMatch(/~/); // hidden helper ids never leak into a student-facing message
+      // The prior figure (trapezoid in circle + BCED) is intact — nothing was clobbered by the failed steps.
+      for (const id of ['A', 'B', 'C', 'D', 'E', 'O']) expect(fig.positions.has(id), `position for ${id}`).toBe(true);
+    },
+  },
+  {
+    id: 'q11-sizes-last-order-independence',
+    title: 'bagrut Q11 with the size givens typed LAST builds to the same closed form (order-independence, ADR-231)',
+    guards:
+      "review F1 (2026-07-06, probed): the locked Q11 order (sizes first) built, but re-ordering the same givens sizes-LAST failed 'over-constrained' — entry order changed satisfiability, breaking ADR-104's commitment (and the Am.6 UI hint 'enter the givens first' was documenting the hole). Three root fixes (ADR-231): the deferrable set is STRUCTURAL (set-radius/area/perimeter were silently missing from the hand list, so a late size could neither defer nor pend); an unowned tangency `coincide` re-homes through the general recruiter on the failure path (keepTangencyDriven's free-centre handoff was the only, insufficient path); and `replay` gained the HOIST dual of the ADR-104 deferral — a still-failed pure-relation fact is re-folded at the earliest position where its references exist, so a too-late given lands exactly where the working order put it. Locks the same closed form as `two-tangents-apex-collinear-with-pinned-point` from the reversed entry order.",
+    steps: [
+      'שני מעגלים O1 ו O2 משיקים מבחוץ',
+      'A על מעגל O1',
+      'C על מעגל O2',
+      'AC עובר דרך O1 ו O2',
+      'מנקודה B יוצאים שני משיקים למעגל O2 בנקודות C ו D',
+      'A נמצא על המשך BD',
+      'היקף מעגל O1 הוא 6π',
+      'שטח מעגל O2 = 81π',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      expect(dist(A, C), '|AC| = 2r1 + 2r2 = 24').toBeCloseTo(24, 2);
+      expect(dist(A, D), '|AD| = tangent length from A = 12').toBeCloseTo(12, 2);
+      expect(dist(B, C), '|BC| = 18').toBeCloseTo(18, 2);
+      expect(dist(A, B), '|AB| = 30').toBeCloseTo(30, 2);
     },
   },
 ];

@@ -1428,8 +1428,17 @@ function perimeterReferences(s: string): { ids: Id[]; at: number }[] {
  */
 const perimeter: Rule = (s) => {
   if (!/היקף|perimeter/i.test(s)) return null;
-  if (/circle|מעגל/i.test(s)) return null; // a circle's circumference sizes its RADIUS — `circle` owns it
   const refs = perimeterReferences(s);
+  if (/circle|מעגל/i.test(s)) {
+    // `היקף` next to a CIRCLE splits by what the keyword actually references (the semantic fact, not
+    // word presence — ADR-231/17-design-rules §2.2): a circumference form ("היקף מעגל O1 הוא 6π") has
+    // no 3–4-vertex polygon run after the keyword → the `circle` rule owns it (bow out). A POLYGON's
+    // perimeter stated alongside a circle ("היקף המשולש ABC החסום במעגל O הוא 20") is a COMPOUND
+    // (declare-inscribed + measure) this grammar doesn't split — escalate rather than fall through to
+    // a shape rule that would DROP the stated 20 (the "no stated magnitude ever vanishes" invariant).
+    if (refs.length === 0) return null;
+    return 'stop';
+  }
   if (refs.length === 0) return null;
   if (refs.length >= 2) {
     return [{ type: 'set-perimeter-ratio', ids1: refs[0].ids, ids2: refs[1].ids, k: measureRatioK(s, String.raw`היקף|perimeter`) }];

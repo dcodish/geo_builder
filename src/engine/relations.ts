@@ -235,6 +235,9 @@ export interface RelationsResult {
 export interface DetectOptions {
   /** How many seeded configurations to sample (default 16). A determined figure repeats the same drawing. */
   samples?: number;
+  /** Pre-collected sample positions (the store's shared sample core) — skips the internal sampling loop,
+   *  so the relations and shapes layers solve the figure ONCE between them instead of once each. */
+  positions?: Map<Id, Vec>[];
   /** Relative tolerance for two lengths to count as equal in a sample (default 1e-3). */
   lengthTol?: number;
   /** Absolute tolerance (radians) for two angles to count as equal in a sample (default ~0.1°). */
@@ -317,15 +320,18 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
 
   // 1. Sample valid configurations across every variant config × its own seeds. A determined figure (no free
   //    DOF, single variant) returns the same drawing each seed, which is correct — its single configuration
-  //    IS the only valid drawing, so every relation in it is a ground truth.
+  //    IS the only valid drawing, so every relation in it is a ground truth. Pre-collected positions (the
+  //    store's shared sample core) skip the loop entirely.
   const rawSamples: Map<Id, Vec>[] = [];
-  for (const c of constructions) {
-    for (let s = 0; s < N; s++) {
-      const r = evaluate(applySeed(c, s));
-      if (r.ok) rawSamples.push(r.positions);
+  if (!opts.positions) {
+    for (const c of constructions) {
+      for (let s = 0; s < N; s++) {
+        const r = evaluate(applySeed(c, s));
+        if (r.ok) rawSamples.push(r.positions);
+      }
     }
   }
-  const samples = convergedSamples(rawSamples); // drop numerically-diverged solves (ADR-166 Am.)
+  const samples = convergedSamples(opts.positions ?? rawSamples); // drop numerically-diverged solves (ADR-166 Am.)
   if (samples.length === 0) return { equalSegments: [], equalAngles: [], definiteAngles: [], samplesUsed: 0 };
 
   // 2. The IMPLICIT edge universe — drawn segments + polygon edges + GEOMETRIC on-carrier splits +

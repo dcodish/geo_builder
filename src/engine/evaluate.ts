@@ -416,8 +416,12 @@ function solutionAccepted(c: Construction, place: (x: number[]) => Construction,
   // points' coords), floored by the passed `span` — a pure-parametric figure passes span=1 (no free
   // points), so deriving the extent here keeps the gate correct on e.g. an r5 circle where 1e-3·span
   // would be ~200× too small. (Matches the deleted coupled block, which scaled its barrier off the
-  // referenced points' coords.)
-  const refIds = [...new Set(cons.flatMap((con) => constraintRefs(con)))];
+  // referenced points' coords.) The MOVED CARRIERS join the check (ADR-231): a recruited free vertex
+  // that isn't referenced by the driven constraint could otherwise collapse silently — the square whose
+  // corner is "driven" to the midpoint of its own base "solves" by shrinking the square to a point,
+  // a wrong figure the residual alone rewards.
+  const carrierIds = c.objects.filter((o) => (o as { solve?: unknown }).solve !== undefined).map((o) => o.id);
+  const refIds = [...new Set([...cons.flatMap((con) => constraintRefs(con)), ...carrierIds])];
   const coincidePairs = new Set(
     c.constraints.filter((k) => k.type === 'coincide').map((k) => [k.p, k.q].sort().join('|')),
   );
@@ -844,7 +848,25 @@ function drivenConstraintsOf(c: Construction): Constraint[] {
  * impossible one). Consistent with `solutionAccepted`, which uses the same gate — a solve it ACCEPTED
  * passes here unchanged; only a best-effort it rejected is now caught instead of silently accepted.
  */
+/**
+ * Purity memo (perf, 2026-07-06 review hotspot #3): `evaluate` is pure and deterministic in its input,
+ * and the SAME Construction reference is evaluated repeatedly — the replay fold evaluates step N's output
+ * as step N+1's `evaluate(prev)` (a flat 2× on every replay), and the recruiter/config searches re-check
+ * references they already solved. Keyed by object identity (constructions are immutable by convention —
+ * every mutation site builds new arrays), WeakMap so retired constructions are collectable. Measured on
+ * the ADR-123 heavy figure this halves a cold replay; it changes NO result, only reuse.
+ */
+const evalMemo = new WeakMap<Construction, EvalResult>();
+
 export function evaluate(c: Construction): EvalResult {
+  const hit = evalMemo.get(c);
+  if (hit) return hit;
+  const r = evaluateUncached(c);
+  evalMemo.set(c, r);
+  return r;
+}
+
+function evaluateUncached(c: Construction): EvalResult {
   const driven = drivenConstraintsOf(c);
   const res = evaluateCore(resolveDriven(c));
   if (!res.ok || driven.length === 0) return res;

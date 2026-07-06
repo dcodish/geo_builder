@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, convergedSamples, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
+import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, convergedSamples, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -216,7 +216,7 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
  * the apex free points (ADR-166); seed < REFLECT_STRIDE ⇒ mask 0 ⇒ no reflection.
  * (Callers use the memoized {@link replay} wrapper above; this is the real build.)
  */
-function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}): Derived {
+function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}, hoistDepth = 0): Derived {
   let lastError: string | null = null;
   // Symbol table over the ENABLED facts, so a value given later (`x = 4`) resolves an
   // earlier `AB = 3x`, and two segments sharing a variable become a proportion (ADR-031).
@@ -425,6 +425,43 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
       if (pending) break; // a deferral state emerged — keep scaffolding per ADR-104
     }
   }
+  // HOIST — the ORDER-INDEPENDENCE dual of the ADR-104 deferral (ADR-231, review F1). Deferral retries a
+  // too-EARLY relation LAST; a too-LATE relation — a size given typed after the solver machinery already
+  // claimed/froze the DOFs it should have pinned (Q11's "sizes last") — fails at the very end, where no
+  // later pass exists. A pure relation's position is presentation, not meaning, so re-fold the whole list
+  // with each still-failed relation fact moved to the EARLIEST position where everything it references
+  // exists. Bounded (depth-capped recursive re-fold), failure-path only, deterministic; if the hoisted
+  // fold builds clean it is simply the correct figure — same facts, same semantics — else the original
+  // error stands.
+  if (!pending && failedFacts.length && hoistDepth < 2) {
+    const hoistable = failedFacts.filter((f) => {
+      if (!f.enabled) return false;
+      const ec = lowerOne(f.cmd, symtab);
+      return ec.length > 0 && ec.every(isRelationCommand);
+    });
+    if (hoistable.length) {
+      const hoistSet = new Set(hoistable.map((f) => f.id));
+      const refsOf = (f: Fact): Id[] => lowerOne(f.cmd, symtab).flatMap((c) => commandObjectIds(c));
+      const introduced = new Set<Id>();
+      const permuted: Fact[] = [];
+      let waiting = [...hoistable];
+      for (const f of facts) {
+        if (hoistSet.has(f.id)) continue;
+        permuted.push(f);
+        if (f.enabled) for (const c of lowerOne(f.cmd, symtab)) for (const o of applyCommand(emptyConstruction(), c).objects) introduced.add(o.id);
+        const ready = waiting.filter((h) => refsOf(h).every((id) => introduced.has(id)));
+        if (ready.length) {
+          permuted.push(...ready); // earliest position where every referenced object exists; stable order
+          waiting = waiting.filter((h) => !ready.includes(h));
+        }
+      }
+      permuted.push(...waiting); // refs never all appear → keep at the end (unchanged from the failed fold)
+      if (permuted.some((f, i) => f !== facts[i])) {
+        const rescued = computeReplay(permuted, seed, radiusOverrides, hoistDepth + 1);
+        if (rescued.lastError === null && !rescued.pending) return rescued;
+      }
+    }
+  }
   lastError = !pending && failedFacts.length ? status[failedFacts[failedFacts.length - 1].id] : null;
   // The seed's high bits select a reflection of certain free points (ADR-166); the low bits are the
   // continuous sample. The reflection is split around the sample by the kind of point being flipped:
@@ -527,13 +564,15 @@ function extensionTriples(facts: Fact[]): { a: Id; b: Id; id: Id; circle: Id }[]
   return facts.flatMap((f) => (f.enabled && f.cmd.type === 'extend-onto-circle' ? [{ a: f.cmd.a, b: f.cmd.b, id: f.cmd.id, circle: f.cmd.circle }] : []));
 }
 
-/** Relation (constraint) command types `replay` can DEFER and retry — they assert a relation without
- *  introducing a point, so a step that can't be satisfied at its position may solve once LATER givens pin
- *  the figure ([ADR-104](docs/06-decisions.md#adr-104)). */
-const DEFERRABLE_CONSTRAINTS = new Set<AnyCommand['type']>([
-  'set-perpendicular', 'set-parallel', 'set-distance', 'set-angle', 'set-angle-ratio', 'set-equal',
-  'set-ratio', 'set-collinear', 'set-concyclic', 'set-line', 'set-length-radius', 'set-angle-order', 'set-length-order',
-]);
+/** Is a command a pure RELATION (deferrable / hoistable) — it asserts something about existing objects
+ *  without introducing a point, so its position in the fact list is presentation, not meaning
+ *  ([ADR-104](docs/06-decisions.md#adr-104)). STRUCTURAL, not a hand list: the vocabulary names every
+ *  relation `set-*`, and the point-introduction test is derived from apply's own output — the old
+ *  hand-maintained set silently omitted `set-radius`/`set-area`/`set-perimeter`, so a size given typed
+ *  late could neither defer nor read as pending (the 2026-07-06 review's F1; the ADR-043/R4 list-drift
+ *  class again). `set-var` is excluded — it's symbol-table data, resolved position-independently anyway. */
+const isRelationCommand = (c: AnyCommand): boolean =>
+  c.type.startsWith('set-') && c.type !== 'set-var' && introducedPointIds(c as Command).length === 0;
 
 /**
  * Does this parsed step carry a constraint the engine can DEFER? If so, the input layer should COMMIT it
@@ -542,8 +581,7 @@ const DEFERRABLE_CONSTRAINTS = new Set<AnyCommand['type']>([
  * (which would just re-emit it, or drop it). A genuinely contradictory constraint then surfaces honestly
  * as a failing step rather than a misleading "couldn't read that".
  */
-export const hasDeferrableConstraint = (commands: AnyCommand[]): boolean =>
-  commands.some((c) => DEFERRABLE_CONSTRAINTS.has(c.type));
+export const hasDeferrableConstraint = (commands: AnyCommand[]): boolean => commands.some(isRelationCommand);
 
 /**
  * Is a still-failed constraint merely PENDING (satisfiable once more givens pin the figure) rather than a
@@ -887,6 +925,59 @@ function variantConfigs(facts: Fact[]): Fact[][] {
   return configs;
 }
 
+/**
+ * Shared sample core for the detection layers (perf, 2026-07-06 review hotspot #1): ONE facts-ref-keyed
+ * sample set consumed by `viewRelations` AND `detectShapes` (which previously ran identical
+ * variantConfigs × firstSatisfyingSeed × 16-evaluate loops — pressing both solved the figure twice), with
+ * a DETERMINED-figure short-circuit: 0 shape DOF + a single variant draws identically at every seed
+ * (ADR-101 — the remaining gauge DOFs only place/rotate/scale, which every detected relation is invariant
+ * to), so ONE sample carries the full ground truth instead of 16 identical solves. The async consumer
+ * yields to the event loop between small batches (the detectShapes non-blocking contract); the sync one
+ * (viewRelations' call sites are synchronous) runs the same jobs inline. Invalidated by facts identity,
+ * like the relations/shapes layer caches.
+ */
+let sampleMemo: { facts: Fact[]; constructions: Construction[]; samples: Map<Id, Vec>[] } | null = null;
+function samplingJobs(facts: Fact[]) {
+  const constructions = variantConfigs(facts).map((vf) => replay(vf, firstSatisfyingSeed(vf)).construction);
+  const N = constructions.length === 1 && freeDofCount(constructions[0]) === 0 ? 1 : 16;
+  const raw: Map<Id, Vec>[] = [];
+  const jobs = constructions.flatMap((c) =>
+    Array.from({ length: N }, (_, s) => () => {
+      const r = evaluate(applySeed(c, s));
+      if (r.ok) raw.push(r.positions);
+    }),
+  );
+  const finish = () => (sampleMemo = { facts, constructions, samples: convergedSamples(raw) });
+  return { jobs, finish };
+}
+// Sample collection is budgeted like every other search loop (E2): a failing seed's solve costs ~10× a
+// converging one (all restarts run to exhaustion) and is then DROPPED by convergedSamples anyway — on the
+// ADR-123 heavy figure the unbudgeted loop was ~50 s of mostly-discarded work. Past the deadline, detection
+// proceeds on the samples in hand (a smaller ground-truth pool — `samplesUsed` reports it); the FIRST job
+// always runs so there is never an empty pool for a buildable figure. Tests run deadline-free (E2).
+const SAMPLE_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 5000;
+function sharedSamples(facts: Fact[]): { constructions: Construction[]; samples: Map<Id, Vec>[] } {
+  if (sampleMemo?.facts === facts) return sampleMemo;
+  const { jobs, finish } = samplingJobs(facts);
+  const deadline = Date.now() + SAMPLE_BUDGET_MS;
+  for (let i = 0; i < jobs.length; i++) {
+    if (i > 0 && Date.now() > deadline) break;
+    jobs[i]();
+  }
+  return finish();
+}
+async function sharedSamplesAsync(facts: Fact[]): Promise<{ constructions: Construction[]; samples: Map<Id, Vec>[] }> {
+  if (sampleMemo?.facts === facts) return sampleMemo;
+  const { jobs, finish } = samplingJobs(facts);
+  const deadline = Date.now() + SAMPLE_BUDGET_MS;
+  for (let i = 0; i < jobs.length; i++) {
+    if (i > 0 && Date.now() > deadline) break;
+    jobs[i]();
+    if ((i & 3) === 3) await new Promise<void>((res) => setTimeout(res, 0)); // yield every 4 samples
+  }
+  return finish();
+}
+
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */
 export function introducedIds(cmd: AnyCommand): Id[] {
   // A symbolic measure introduces no objects; highlight the points it annotates instead.
@@ -918,6 +1009,23 @@ export function commandPointIds(cmd: AnyCommand): Id[] {
   };
   for (const [k, v] of Object.entries(cmd)) {
     if (k === 'expr') continue;
+    if (Array.isArray(v)) v.forEach(take);
+    else take(v);
+  }
+  return out;
+}
+
+/** Every OBJECT id a command mentions — points (`A`, `O1`) plus prefixed object ids (`circle-O`,
+ *  `line-…`, `seg-…`, …) — the dependency set the HOIST pass needs to place a relation fact at the
+ *  earliest position where everything it references exists. Structural scan like {@link commandPointIds};
+ *  the `type`/`expr` fields are skipped (a command type or a measure expression is never an object id). */
+function commandObjectIds(cmd: AnyCommand): Id[] {
+  const out: Id[] = [];
+  const take = (v: unknown) => {
+    if (typeof v === 'string' && (/^[A-Z]\d*$/.test(v) || /^(circle|line|seg|bis|tan|poly)-/.test(v))) out.push(v);
+  };
+  for (const [k, v] of Object.entries(cmd)) {
+    if (k === 'expr' || k === 'type') continue;
     if (Array.isArray(v)) v.forEach(take);
     else take(v);
   }
@@ -1376,24 +1484,19 @@ export const useGeoStore = create<GeoState>()(
 
       viewRelations: () => {
         const facts = get().facts;
-        // Sample across a REQUIREMENT-SATISFYING construction of EACH variant alternative (ADR-138). Detection
-        // samples each across its own seeds, so the result is seed- AND variant-independent, and a kite/isosceles
-        // equal-pair (a free choice) is not reported as forced. The base seed is `firstSatisfyingSeed`, not 0, so
-        // an on-segment meet's apexes are already flipped inward (ADR-166) — otherwise every sample is the
-        // requirement-VIOLATING outward config and an emergent shape through the crossings (EGFH) is never forced.
-        // (`firstSatisfyingSeed` returns 0 for any figure without an extension/segment-meet, so this is unchanged
-        // there.) Cache the `facts` ref so the layer auto-invalidates on any fact change.
-        const constructions = variantConfigs(facts).map((vf) => replay(vf, firstSatisfyingSeed(vf)).construction);
-        const result = detectRelationsAcross(constructions);
+        // ONE shared sample set with detectShapes (perf, 2026-07-06 review hotspot #1 — the two layers ran
+        // identical variantConfigs × firstSatisfyingSeed × 16-evaluate loops, so pressing both solved the
+        // whole figure twice). Sampling contract unchanged (ADR-138 variant configs, requirement-satisfying
+        // base seed per ADR-166, facts-ref-keyed invalidation).
+        const shared = sharedSamples(facts);
+        const result = detectRelationsAcross(shared.constructions, { positions: shared.samples });
         set({ relations: { result, facts } });
       },
 
       clearRelations: () => set({ relations: null }),
 
       detectShapes: async () => {
-        // Same sampling contract as viewRelations (ADR-138 variant configs, requirement-satisfying base seed, ADR-166,
-        // facts-keyed cache): a named shape is reported only if FORCED across every variant × seed, so it catches
-        // emergent shapes and never a coincidence of the drawing.
+        // Same shared sample core as viewRelations (one solve pass between the two layers).
         //
         // NON-BLOCKING (operator 2026-07-05): a coupled figure's driven-constraint solve is ~15 ms per evaluate
         // (e.g. two right triangles sharing a hypotenuse, whose second right angle is a driven ⟂ constraint —
@@ -1402,18 +1505,9 @@ export const useGeoStore = create<GeoState>()(
         // yielding to the event loop between them — the spinner paints and the page stays responsive — then run
         // the fast, pure classification on the collected samples.
         const facts = get().facts;
-        const N = 16;
-        const constructions = variantConfigs(facts).map((vf) => replay(vf, firstSatisfyingSeed(vf)).construction);
-        const raw: Map<Id, Vec>[] = [];
-        for (const c of constructions) {
-          for (let s = 0; s < N; s++) {
-            const r = evaluate(applySeed(c, s));
-            if (r.ok) raw.push(r.positions);
-            if ((s & 3) === 3) await new Promise<void>((res) => setTimeout(res, 0)); // yield every 4 samples
-          }
-        }
+        const shared = await sharedSamplesAsync(facts);
         if (get().facts !== facts) return; // a step/undo raced us while sampling — don't overwrite with a stale layer
-        const result = classifyShapesFromSamples(constructions[0], convergedSamples(raw));
+        const result = classifyShapesFromSamples(shared.constructions[0], shared.samples);
         set({ shapes: { result, facts } });
       },
 
@@ -1452,7 +1546,12 @@ export const useGeoStore = create<GeoState>()(
         if (freeDofs(cur.construction).length === 0) return false; // fully determined — nothing to vary
         const curFp = shapeFingerprint(cur.construction, cur.positions);
         let s = get().seed;
-        for (let k = 0; k < 24; k++) {
+        // Wall-clock budget (2026-07-06 review hotspot #3): this was the ONE seed loop without a deadline —
+        // on a pathologically slow figure (~4–9 s per perturbed-seed replay was measured) 24 candidates froze
+        // the tab for tens of seconds. Same E2 convention as the other searches: past the deadline, return
+        // what we have (no change, button reads "no other configuration"). Tests run deadline-free.
+        const deadline = Date.now() + SEARCH_BUDGET_MS;
+        for (let k = 0; k < 24 && Date.now() <= deadline; k++) {
           s += 1;
           const r = replay(facts, s);
           // Accept an alternative view only if it MEETS EVERY REQUIREMENT — the SAME bar the initial display

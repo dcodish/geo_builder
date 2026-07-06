@@ -69,6 +69,17 @@ describe('polygon perimeter (ADR-228 C)', () => {
     expect(c?.some((k) => k.type === 'set-perimeter')).toBe(false);
     expect(c?.[0].type).toBe('circle');
   });
+  it('a POLYGON perimeter stated alongside a circle ESCALATES — the stated 20 must never be dropped (review F5, ADR-231)', () => {
+    // "היקף המשולש ABC החסום במעגל O הוא 20" is a COMPOUND (declare-inscribed + measure). The old
+    // word-presence bow-out (`/circle|מעגל/ → null`) let the inscribed-polygon rule claim it and the 20
+    // silently vanished (measured perimeter 25.87 — a wrong figure presented as green). The perimeter
+    // rule now splits by what the keyword references: a polygon run after היקף → this is a polygon
+    // perimeter → 'stop' (LLM decomposes the compound); no polygon run → the circle rule owns it.
+    const r = parse('היקף המשולש ABC החסום במעגל O הוא 20', { circles: [] as string[] });
+    expect(r.ok).toBe(false); // escalates — never a half-parse that drops the given
+    // The bare-circumference forms are untouched by the split:
+    expect(cmds('היקף מעגל O1 הוא 6π')?.[0].type).toBe('circle');
+  });
 });
 
 describe('tangent circles: stated names + circumference on an existing circle (ADR-228 Am.)', () => {

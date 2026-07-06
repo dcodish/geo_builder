@@ -9,7 +9,7 @@
 
 import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, SolveDirective, Vec } from './types';
 import { LEN_EPS, isGeoPoint } from './types';
-import { applyCommand, mirrorComposition, normalizeShapeComposition } from './apply';
+import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition } from './apply';
 import { lower } from './lower';
 import { evaluate, resolveDriven } from './evaluate';
 import type { EvalResult } from './evaluate';
@@ -203,6 +203,19 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     if (constrained) {
       const r = evaluate(constrained);
       if (r.ok) return { ok: true, construction: constrained, positions: r.positions };
+      // The reinterpreted statement is a CONSTRAINT whose direct carrier alone couldn't satisfy it —
+      // give it the SAME failure path a typed constraint gets (recruit the figure's other free DOFs,
+      // ADR-028 extended) before giving up. One statement, one semantics, one solve path (M1/ADR-231).
+      const newCons = constrained.constraints.slice(prev.constraints.length);
+      const recruited = recruitFreeDofs(constrained, newCons);
+      if (recruited) {
+        const r2 = evaluate(recruited);
+        if (r2.ok) return { ok: true, construction: recruited, positions: r2.positions };
+      }
+      // Surface the constraint's honest failure (over-constrained / unsatisfiable), never "already
+      // defined" — the second statement about an existing object was a constraint, not a redefinition,
+      // so the error must describe the RELATION that can't hold (M1/ADR-231).
+      return { ok: false, error: r.error, construction: prev, positions: prevPositions };
     }
     return { ok: false, error: conflict, construction: prev, positions: prevPositions };
   }
@@ -235,7 +248,20 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     // OTHER free DOFs move too. Recruit them and solve jointly before giving up
     // (ADR-028, extended): "find a possible configuration and use it".
     const newCons = next.constraints.slice(prev.constraints.length);
-    const recruited = recruitFreeDofs(next, newCons);
+    // OWNERSHIP RE-HOME (M2/ADR-231): a `coincide` is a placement obligation the engine always creates
+    // WITH an owner; a size given that pins the radius that drove it (applyRadiusGiven drops the stale
+    // directive; keepTangencyDriven's free-centre handoff can come up empty when every centre is already
+    // claimed) leaves it ORPHANED — unsatisfiable by the topological pass and invisible to the recruiter,
+    // whose list held only the NEW constraints (a `set-radius` adds none — the review's F1). Any unowned
+    // coincide joins the recruit list so the general machinery (re-point/steal/lend, cases B–F) re-homes
+    // it — the general form of the free-centre handoff.
+    const owned = new Set<Constraint>();
+    for (const o of next.objects) {
+      const sv = (o as { solve?: SolveDirective }).solve;
+      if (sv) { owned.add(sv.constraint); for (const k of sv.also ?? []) owned.add(k); }
+    }
+    const orphans = next.constraints.filter((k) => k.type === 'coincide' && !owned.has(k) && !newCons.includes(k));
+    const recruited = recruitFreeDofs(next, [...newCons, ...orphans]);
     if (recruited) {
       const r2 = evaluate(recruited);
       if (r2.ok) return { ok: true, construction: recruited, positions: r2.positions };
@@ -560,12 +586,36 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
     // undone by the sibling `collinear-order`'s failed experiments). (ADR-229.)
     if (changed && evaluate({ objects, constraints: [...c.constraints, ...added] }).ok) break;
     const beforeK = objects; // snapshot for the last-resort (F) rebuild — see below
-    let did = false;
-    const cand = [...new Set(constraintRefs(K).flatMap((ref) => freeDrivableAncestors(objects, ref)))].filter((id) => !isSolving(objects, id));
-    if (cand.length > 0) {
-      changed = true;
-      did = true;
-      objects = objects.map((o) => (cand.includes(o.id) ? markDriven(o, K) : o));
+    
+    let verified = false; // the current `objects` already evaluated VALID in a stage below
+    // (B) MINIMAL-FIRST, SELF-VERIFIED recruitment (ADR-231): try the NEWEST ref's ancestors alone
+    // before the full union of every ref's ancestors. The newest referenced object is the statement's
+    // subject ("M on CD" should move M's parents, not tear CD's endpoints loose), and over-recruiting
+    // is not merely wasteful — it changes the answer: the joint solve balloons (8-D NM where the
+    // minimal 4-D solves cleanly) and diverges into rejection or a compromise basin (the ADR-123
+    // over-recruit class, reproduced by the redefine-existing-point M1 tests). Two stages only, each
+    // one evaluate, so the failure path pays at most one extra evaluate over the old single-shot mark.
+    const objIdx = (id: Id) => objects.findIndex((o) => o.id === id);
+    const refs = [...new Set(constraintRefs(K))].sort((p, q) => objIdx(q) - objIdx(p)); // newest first
+    const minimal = refs.length > 0 ? freeDrivableAncestors(objects, refs[0]).filter((id) => !isSolving(objects, id)) : [];
+    const full = [...new Set(refs.flatMap((ref) => freeDrivableAncestors(objects, ref)))].filter((id) => !isSolving(objects, id));
+    const stages = minimal.length > 0 && minimal.length < full.length ? [minimal, full] : full.length > 0 ? [full] : [];
+    for (const cand of stages) {
+      const trial = objects.map((o) => (cand.includes(o.id) ? markDriven(o, K) : o));
+      if (evaluate({ objects: trial, constraints: [...c.constraints, ...added] }).ok) {
+        objects = trial;
+        changed = true;
+        
+        verified = true;
+        break;
+      }
+      if (cand === stages[stages.length - 1]) {
+        // No stage verified — keep the widest marking anyway (the pre-staging behavior): the
+        // downstream cases (C)–(F) re-point/lend from it, and an honest over-constraint stays honest.
+        objects = trial;
+        changed = true;
+        
+      }
     }
     // (D) FREE THE BLOCKER (R7(3) / [ADR-074](docs/06-decisions.md#adr-074)): K needs a free DOF that an
     // EARLIER constraint K1 already CLAIMED (the greedy apply-time pick), and K1 references ANOTHER free
@@ -575,20 +625,24 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
     // |BC|=5 so an equilateral / AAS triangle (every side or two-angles+side stated) solves instead of
     // falsely over-constraining. Runs ONLY on the failure path, so eagerly-satisfied figures (e.g. a
     // stated-extension point a relation must NOT drag, ADR-064) never reach it and are untouched.
-    const reachable = new Set(constraintRefs(K).flatMap((ref) => ancestors(objects, ref, 'drivable', true, true)));
-    for (const x of objects) {
-      if (!reachable.has(x.id)) continue;
-      const sv = (x as { solve?: { constraint: Constraint } }).solve;
-      if (!sv || sv.constraint === K) continue; // x must be CLAIMED by a DIFFERENT constraint K1
-      const K1 = sv.constraint;
-      const alt = objects.find((o) => o.id !== x.id && recruitableFreeDof(o) && constraintRefs(K1).includes(o.id));
-      if (!alt) continue;
-      objects = objects.map((o) =>
-        o.id === alt.id ? ({ ...o, solve: { constraint: K1, branch: 0 } } as GeoObject) : o.id === x.id ? markDriven(o, K) : o,
-      );
-      changed = true;
-      did = true;
-      break;
+    let dDid = false; // case (D) mutated the assignment (so its result is not yet evaluated)
+    if (!verified) {
+      const reachable = new Set(constraintRefs(K).flatMap((ref) => ancestors(objects, ref, 'drivable', true, true)));
+      for (const x of objects) {
+        if (!reachable.has(x.id)) continue;
+        const sv = (x as { solve?: { constraint: Constraint } }).solve;
+        if (!sv || sv.constraint === K) continue; // x must be CLAIMED by a DIFFERENT constraint K1
+        const K1 = sv.constraint;
+        const alt = objects.find((o) => o.id !== x.id && recruitableFreeDof(o) && constraintRefs(K1).includes(o.id));
+        if (!alt) continue;
+        objects = objects.map((o) =>
+          o.id === alt.id ? ({ ...o, solve: { constraint: K1, branch: 0 } } as GeoObject) : o.id === x.id ? markDriven(o, K) : o,
+        );
+        changed = true;
+        
+        dDid = true;
+        break;
+      }
     }
     // VERIFY before skipping the redundancy cases ([ADR-139](docs/06-decisions.md#adr-139)). Case (B) can
     // recruit a DECOY free DOF — a free ancestor of K that does NOT free the genuinely-contested carrier
@@ -598,9 +652,10 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
     // `alt` to free the blocker — so neither redundancy case runs and the figure falsely over-constrains.
     // So `did` only earns a skip when the recruitment ACTUALLY makes the whole system valid; otherwise fall
     // through to (C)/(E), which are self-verifying (a lend is accepted only if `evaluate` passes) and so can
-    // never rescue a genuinely-impossible figure. Costs one extra `evaluate` per recruited constraint, on
-    // the already-failing path only — recruitFreeDofs runs only after `evaluate` already failed once.
-    if (did && evaluate({ objects, constraints: [...c.constraints, ...added] }).ok) continue;
+    // never rescue a genuinely-impossible figure. The (B) stages above are already self-verified, so only a
+    // case-(D) mutation needs the extra `evaluate` here — on the already-failing path only.
+    if (verified) continue;
+    if (dDid && evaluate({ objects, constraints: [...c.constraints, ...added] }).ok) continue;
     // (C) R7 JOINT RE-BIND ([ADR-045](docs/06-decisions.md#adr-045) step 3): no FREE DOF is reachable —
     // every DOF K could move is already CLAIMED by an earlier constraint (e.g. HF=4/GE=5 took a
     // parallelogram's free vertices, so a later "ABHD concyclic" finds them all busy). The figure can
@@ -696,7 +751,19 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
           });
           const r = evaluate({ objects: trial, constraints: [...c.constraints, ...added] });
           if (r.ok) {
-            objects = trial;
+            // RESTORE the standing directives the bake cleared (review F2 / ADR-231): the freeze was for
+            // THIS solve only, but `trial` becomes the SESSION construction — committing it bare would
+            // permanently strip every frozen carrier's ownership (e.g. the tangency's radius/centre
+            // driver), so a LATER given that needs a frozen subsystem to flex would find carrier-less
+            // checks and falsely over-constrain. Re-attach each frozen carrier's original directive on
+            // top of its baked params and keep that form only if the full system still evaluates valid
+            // (the driven re-solves land on the baked roots); else keep the frozen form (never worse).
+            const restored = trial.map((o) => {
+              if (kept.includes(o.id)) return o;
+              const sv = claimed.get(o.id);
+              return sv ? ({ ...o, solve: sv } as GeoObject) : o;
+            });
+            objects = evaluate({ objects: restored, constraints: [...c.constraints, ...added] }).ok ? restored : trial;
             changed = true;
             break;
           }
@@ -779,29 +846,41 @@ function reinterpretAsConstraint(prev: Construction, cmd: Command): Construction
       existing.kind === 'on-circle' ||
       (existing.kind === 'free-point' && !(existing as { pinned?: boolean }).pinned && !(existing as { rigid?: boolean }).rigid));
   const carrier = (ownFree ? P : null) ?? freeCarrierAncestor(prev.objects, P);
-  if (!carrier) return null; // nothing free to move → a genuine over-constraint
+  // No free 1-DOF carrier in reach is NOT a reason to fall back to the "already defined" conflict
+  // (M1/ADR-231): the statement is still a constraint — append the coincidence WITHOUT a directive and
+  // let applyStep's failure path recruit the figure's drivable DOFs (shape scalars, radii, free centres —
+  // a far richer set than the param-only walk here). The one exception is a bare `free-point` COORDINATE
+  // placement: it asserts a location, not a relation — with no carrier there is nothing to solve toward
+  // (a hidden free twin would satisfy the coincidence trivially and swallow a real contradiction), so it
+  // keeps the ADR-011 semantics (free→free is a move upstream; derived→free is a genuine conflict).
+  if (!carrier && cmd.type === 'free-point') return null;
   const withHelper = applyCommand(prev, { ...(cmd as object), id: H } as Command); // the new def under the hidden id
-  return driveCoincideOn(withHelper.objects, withHelper.constraints, P, H, carrier);
+  if (carrier) return driveCoincideOn(withHelper.objects, withHelper.constraints, P, H, carrier);
+  return { objects: withHelper.objects, constraints: [...withHelper.constraints, { type: 'coincide', p: P, q: H }] };
 }
 
 /**
  * Reinterpret a redefining "P on segment a→b" (incl. the "on the extension of" form) as a
- * COLLINEARITY constraint when P already exists as a free carrier: instead of erroring "P is
- * already defined", keep P where it is and slide its own DOF until P lies on line a→b (ADR-050).
+ * COLLINEARITY + ORDER constraint on the EXISTING P: instead of erroring "P is already defined",
+ * keep P and constrain it onto the stated stretch of the line (ADR-050, generalized by M1/ADR-231).
  * This is the on-line analogue of {@link reinterpretAsConstraint} (which handles a fixed second
- * *placement* via a coincidence): "E on line AC" where E is already a free point on a circle should
- * move E onto the line, not redefine it at a fixed t. Returns null (→ the genuine conflict) when P
- * isn't an existing point, has no free DOF of its own, or is already driving another constraint.
+ * *placement* via a coincidence). ANY existing point kind qualifies — a free/derived/busy P simply
+ * makes the constraint fall to applyStep's normal solve path (own carrier → driven; otherwise the
+ * failure path recruits the figure's drivable DOFs; genuinely unsatisfiable → an honest
+ * over-constraint, never a redefinition conflict). The statement's DIRECTION is kept, per the
+ * bare-segment principle (ADR-077) and directional המשך (ADR-054): "P on a–b" means BETWEEN
+ * (order a,P,b); "P on the extension of a–b" means BEYOND b (order a,b,P).
  */
 function reinterpretAsCollinear(prev: Construction, cmd: Command): Construction | null {
   if (cmd.type !== 'point-on-segment') return null;
+  if (cmd.id === cmd.a || cmd.id === cmd.b) return null; // "A on AB" is malformed → the plain conflict
   const existing = prev.objects.find((o) => o.id === cmd.id);
   if (!existing || !isGeoPoint(existing)) return null; // only a *re*definition of an existing point
-  // P must still carry a free 1-DOF (on-circle / on-segment) to slide onto the line; a determined
-  // or already-driven P falls through to the normal conflict (a genuine over-constraint).
-  const carrier = carrierOf(existing);
-  if (!carrier || carrier.family !== 'param' || (existing as { solve?: unknown }).solve !== undefined) return null;
-  return applyCommand(prev, { type: 'set-collinear', a: cmd.id, b: cmd.a, c: cmd.b });
+  const next = applyCommand(prev, { type: 'set-collinear', a: cmd.id, b: cmd.a, c: cmd.b });
+  const objects = [...next.objects];
+  const constraints = [...next.constraints];
+  addCollinearOrder(objects, constraints, cmd.extension ? [cmd.a, cmd.b, cmd.id] : [cmd.a, cmd.id, cmd.b]);
+  return { objects, constraints };
 }
 
 const centroid = (ps: Vec[]): Vec => ({

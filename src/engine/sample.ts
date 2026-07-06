@@ -16,7 +16,7 @@
  * default (returns the construction unchanged).
  */
 
-import type { Constraint, Construction, FreePoint, Id, OnCirclePoint, OnLinePoint } from './types';
+import type { Constraint, Construction, FreePoint, Id, OnCirclePoint, OnLinePoint, SolveDirective } from './types';
 import { isGeoPoint } from './types';
 import { carrierOf, isShapeCarrier } from './carriers';
 import { constraintRefs } from './solve';
@@ -345,9 +345,12 @@ export function reflectAnchors(c: Construction, pointId: Id): Id[] {
       // segment's line flips it to that opposite ray (an equally-valid ⟂ placement the continuous solver
       // won't reach from the default seed). So its reflection anchors are the other segment's endpoints
       // (ADR-227: "DF ⟂ AB" where a later on-segment crossing needs segment DF pointing toward it — F must
-      // be flippable to the side where AC actually crosses it).
-      if (pointId === con.b) { refs.add(con.c); refs.add(con.d); }
-      else if (pointId === con.d) { refs.add(con.a); refs.add(con.b); }
+      // be flippable to the side where AC actually crosses it). The loose end may sit in EITHER slot of its
+      // segment — "FD ⟂ AB" is the same statement as "DF ⟂ AB" — so all four slots qualify (the review's F8:
+      // slot-positional coverage is a patch smell; the semantic fact is "an endpoint of one segment reflects
+      // across the other segment's line").
+      if (pointId === con.a || pointId === con.b) { refs.add(con.c); refs.add(con.d); }
+      else if (pointId === con.c || pointId === con.d) { refs.add(con.a); refs.add(con.b); }
       return;
     }
     if (con.type !== 'equal' && con.type !== 'distance' && con.type !== 'ratio') return;
@@ -357,8 +360,8 @@ export function reflectAnchors(c: Construction, pointId: Id): Id[] {
   };
   for (const con of c.constraints) consider(con);
   for (const o of c.objects) {
-    const sv = (o as { solve?: { constraint: Constraint } }).solve;
-    if (sv) consider(sv.constraint);
+    const sv = (o as { solve?: SolveDirective }).solve;
+    if (sv) { consider(sv.constraint); for (const k of sv.also ?? []) consider(k); }
   }
   return [...refs];
 }
@@ -398,7 +401,12 @@ export function directionHelperFreePoints(c: Construction): Id[] {
         hasMetric = true;
     };
     for (const con of c.constraints) consider(con);
-    for (const o of c.objects) { const sv = (o as { solve?: { constraint: Constraint } }).solve; if (sv) consider(sv.constraint); }
+    // A co-driven constraint (ADR-229 `also`) is as binding as the primary — a helper co-driven by a
+    // metric relation is NOT a pure direction helper (the review's F8 second half).
+    for (const o of c.objects) {
+      const sv = (o as { solve?: SolveDirective }).solve;
+      if (sv) { consider(sv.constraint); for (const k of sv.also ?? []) consider(k); }
+    }
     return hasPerpPar && !hasMetric;
   });
 }

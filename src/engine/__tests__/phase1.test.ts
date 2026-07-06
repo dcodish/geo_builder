@@ -135,9 +135,11 @@ describe('idempotency (FR-EN-9)', () => {
 });
 
 describe('redefinition conflict — an id cannot be redefined as something different', () => {
-  it('rejects re-declaring an existing point with a different definition (keeps prior)', () => {
-    // Square defines C as a derived corner; trying to make C "5 from A and 5 from B"
-    // (and B at a different position) is a contradiction, not a silent no-op.
+  it('rejects re-declaring an existing point with a contradicting definition (keeps prior)', () => {
+    // Square defines C as a derived corner; trying to make C "5 from A and 5 from B" contradicts the
+    // square's rigid geometry (|CA| = s√2 and |CB| = s can't both be 5). Under M1 (ADR-231) the second
+    // statement about an existing point is a CONSTRAINT, so the failure is an honest over-constraint —
+    // never an "already defined" redefinition conflict — and the prior figure is preserved.
     const base = build([SQUARE]);
     const r = applyStep(base.construction, {
       type: 'point-by-distances',
@@ -149,7 +151,8 @@ describe('redefinition conflict — an id cannot be redefined as something diffe
     });
     expect(r.ok).toBe(false);
     if (!r.ok) {
-      expect(r.error).toMatch(/already defined/i);
+      expect(r.error).toMatch(/over-constrained|cannot hold/i);
+      expect(r.error).not.toMatch(/~/); // hidden helper ids never leak into a student-facing message
       expect(r.construction).toBe(base.construction); // prior figure preserved
     }
     // Turning a derived point (C) into a free one is still a conflict…
