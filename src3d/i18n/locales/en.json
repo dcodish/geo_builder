@@ -80,5 +80,11 @@
     "ex6": "CA' is perpendicular to plane BC'D",
     "ex7": "plane π1: z - 3 = 0",
     "ex8": "A(2,-2,6) is on one of the planes"
+  },
+  "dataPanel": {
+    "toggle": "Organize the data",
+    "title": "Organize the data",
+    "hint": "derived vector, coordinate and magnitude presentations — laid out the way you would on paper",
+    "empty": "nothing stable to show yet"
   }
 }

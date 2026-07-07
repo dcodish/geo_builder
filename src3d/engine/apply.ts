@@ -587,6 +587,12 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    case 'vec-mag': {
+      const d = c.vectors.get(cmd.name);
+      if (!d) return { ok: false, error: { code: 'unknown-vector', id: cmd.name } };
+      return applyCommand3(c, { type: 'claim', claim: { type: 'length-eq', a: d.from, b: d.to, value: cmd.value } });
+    }
+
     case 'symbol-value': {
       // הציבו k = ½: pin the named parameter directly — replaces any prior pin on it
       // (the student substituting the value the earlier relation produced)

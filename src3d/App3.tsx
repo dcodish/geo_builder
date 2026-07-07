@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { dataView } from './engine/dataView';
 import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
@@ -83,6 +84,9 @@ export default function App3() {
   const { t } = useTranslation();
   const facts = useGeo3((s) => s.facts);
   const seed = useGeo3((s) => s.seed);
+  // the "organize your data" panel (ADR-3D-014): derived vector/point presentations,
+  // OPT-IN by checkbox — it shows derived results, so the student chooses to peek
+  const [showData, setShowData] = useState(false);
   const lastError = useGeo3((s) => s.lastError);
   const submit = useGeo3((s) => s.submit);
   const toggle = useGeo3((s) => s.toggle);
@@ -208,6 +212,8 @@ export default function App3() {
       if (s.facts !== prev.facts || s.seed !== prev.seed) snapshot();
     });
   }, []);
+
+  const dataPanel = useMemo(() => (showData ? dataView(derived.construction, seed) : null), [showData, derived, seed]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -420,6 +426,45 @@ export default function App3() {
               {t('actions.saveImage')}
             </button>
           </div>
+        </section>
+        {/* organize-your-data (ADR-3D-014): derived presentations, student opt-in */}
+        <section className="flex w-full flex-col gap-2 md:w-64">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" checked={showData} onChange={(e) => setShowData(e.target.checked)} />
+            {t('dataPanel.toggle')}
+          </label>
+          {showData && dataPanel && (
+            <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
+              {dataPanel.vectors.length === 0 && dataPanel.points.length === 0 ? (
+                <p className="text-slate-400">{t('dataPanel.empty')}</p>
+              ) : (
+                <ul className="flex flex-col gap-1" dir="ltr">
+                  {dataPanel.vectors.map((v) => (
+                    <li key={v.label} className="border-b border-slate-100 pb-1 last:border-0">
+                      {v.decomp && (
+                        <div>
+                          {v.label}⃗ = {v.decomp}
+                        </div>
+                      )}
+                      {v.coords && (
+                        <div>
+                          {v.label}⃗ = {v.coords}
+                        </div>
+                      )}
+                      {v.mag && (
+                        <div>
+                          {v.mag}{v.sq ? ' \u00A0·\u00A0 ' + v.sq : ''}
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                  {dataPanel.points.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </section>
       </main>
     </div>

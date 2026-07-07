@@ -376,6 +376,9 @@ export type Command3 =
   // pair or a NAMED vector (resolved to its pair at apply). Drives a symbol / the
   // dims (similarity-invariant), or verifies as a claim when everything is pinned.
   | { type: 'length-rel'; a1: Id; b1: Id; rhs: { pair: [Id, Id] } | { vec: string }; c: number }
+  // |w| = 2 — a numeric magnitude on a NAMED vector; apply resolves the pair and
+  // delegates to the ordinary length given (claim when pinned, driving pin when free)
+  | { type: 'vec-mag'; name: string; value: number }
   // הציבו k = ½ — assign the named parameter directly (replaces any prior pin on it)
   | { type: 'symbol-value'; symbol: string; value: number }
   | SolidCommand

@@ -425,6 +425,12 @@ function evalRadical(raw: string): number | null {
 const lengthRel: Rule = (s) => {
   if (VEC_MARKED) return null; // the arrow says VECTOR — vecEqClaim's territory
   const P = "([A-Z]\\d*'?)([A-Z]\\d*'?)";
+  // |w| = 2 — a numeric magnitude on a NAMED vector (resolved to its pair at apply)
+  const vm = s.match(/^\|([a-w])\|\s*(?:=|שווה\s+ל)\s*(.+)$/);
+  if (vm) {
+    const val = evalRadical(vm[2]);
+    return val === null ? null : [{ type: 'vec-mag', name: vm[1], value: val }];
+  }
   const lhs = s.match(new RegExp(`^(?:\\|${P}\\||(?:אורך|length)\\s+(?:המקצוע\\s+|הצלע\\s+|צלע\\s+)?${P})\\s*(?:=|שווה\\s+ל)\\s*(.+)$`));
   if (!lhs) return null; // bare `AS = AB` is AMBIGUOUS — parse3 surfaces the clarification, never a guess
   const a1 = lhs[1] ?? lhs[3];
