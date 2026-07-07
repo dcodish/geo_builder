@@ -54,6 +54,24 @@ describe('GATE — 2026 מועד ב Q2 (square pyramid + |EN| abs-value given)',
     expect(state().facts).toHaveLength(15);
   });
 
+  it('the coefficient commutes and radicals bind tight: |EN| = |w|·√6/4 (the operator-typed order)', () => {
+    [...SETUP, '|EN|=|w|*√6/4', ...PLACE, 'N = (6, 6, 6)'].forEach(submit);
+    expectAllOk(); // deterministic parse — no LLM round-trip for the coefficient-after form
+  });
+
+  it('AB = u without נסמן names the vector; a KNOWN name stays a claim', () => {
+    submit('פירמידה ABCDS שבסיסה ריבוע');
+    submit('AS = w'); // naming — w was unknown
+    expectAllOk();
+    submit('|EN| = |w|'); // w resolves: it was really named
+    // (E,N don't exist here — expect the honest unknown-point refusal, proving w resolved first)
+    expect(state().lastError).toEqual({ code: 'unknown-point', id: 'E' });
+    submit('AS = w'); // now w is KNOWN — the same statement is a (true) claim, not a re-name
+    expectAllOk();
+    submit('AB = w'); // a FALSE vector claim (AB⃗ ≠ AS⃗) — refused
+    expect(state().lastError).toEqual({ code: 'claim-refuted' });
+  });
+
   it('the הציבו path: k = 1/2 directly (no |EN| given) reaches the same N', () => {
     [...SETUP, ...PLACE, 'k = 1/2', 'N = (6, 6, 6)'].forEach(submit);
     expectAllOk();

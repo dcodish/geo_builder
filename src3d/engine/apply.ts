@@ -452,6 +452,20 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
     // --- V7: vector relations (the M1 reinterpretation shape) ---
 
     case 'vec-rel': {
+      // `AB = u` WITHOUT נסמן: a bare pair equated to one UNKNOWN name, coefficient 1,
+      // is the student NAMING the vector (M1 — apply decides; a KNOWN name stays a claim)
+      if (
+        cmd.terms.length === 1 &&
+        cmd.terms[0].atom.kind === 'named' &&
+        !cmd.symbol &&
+        cmd.terms[0].coeff.k === 1 &&
+        cmd.terms[0].coeff.p === 0 &&
+        !c.vectors.has(cmd.terms[0].atom.name) &&
+        c.points.has(cmd.from) &&
+        c.points.has(cmd.to)
+      ) {
+        return applyCommand3(c, { type: 'name-vector', name: cmd.terms[0].atom.name, from: cmd.from, to: cmd.to });
+      }
       // named vectors must exist
       for (const t of cmd.terms) {
         if (t.atom.kind === 'named' && !c.vectors.has(t.atom.name)) {

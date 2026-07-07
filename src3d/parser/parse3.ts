@@ -437,12 +437,20 @@ const lengthRel: Rule = (s) => {
       { type: 'segment3', a: a1, b: b1 },
       { type: 'claim', claim: { type: 'length-eq', a: a1, b: b1, value: num } },
     ];
-  // [coefficient ·]? tail — tail is |ZW|, |w|, אורך/length ZW, צלע הריבוע ABCD, or bare ZW
+  // [coefficient ·]? tail — tail is |ZW|, |w|, אורך/length ZW, צלע הריבוע ABCD, or bare ZW.
+  // The product commutes: the coefficient may come BEFORE (√6/4·|w|) or AFTER (|w|·√6/4).
   const tail = (re: string): { c: number; g: string[] } | null => {
-    const mm = r.match(new RegExp(`^(.*?)\\s*[·×*]?\\s*${re}\\s*$`));
-    if (!mm) return null;
-    const c = mm[1].trim() === '' ? 1 : evalRadical(mm[1]);
-    return c === null ? null : { c, g: mm.slice(2) };
+    let mm = r.match(new RegExp(`^(.*?)\\s*[·×*]?\\s*${re}\\s*$`));
+    if (mm) {
+      const c = mm[1].trim() === '' ? 1 : evalRadical(mm[1]);
+      if (c !== null) return { c, g: mm.slice(2) };
+    }
+    mm = r.match(new RegExp(`^${re}\\s*[·×*]?\\s*(.+)$`));
+    if (mm) {
+      const c = evalRadical(mm[mm.length - 1]);
+      if (c !== null) return { c, g: mm.slice(1, -1) };
+    }
+    return null;
   };
   let t = tail(`\\|${P}\\|`) ?? tail(`(?:אורך|length)\\s+(?:המקצוע\\s+)?${P}`);
   if (t) return [{ type: 'segment3', a: a1, b: b1 }, { type: 'length-rel', a1, b1, rhs: { pair: [t.g[0], t.g[1]] }, c: t.c }];
