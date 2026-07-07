@@ -69,6 +69,13 @@ describe('dataView — organize your data', () => {
     // SE is k-free and numeric
     const se = p.vectors.find((v) => v.label === 'SE');
     expect(se?.decomp).toBe('3/4·u − 3/4·w');
+    // the |EN| given pins k = ½ at the TANGENCY (a double root — the numerically split
+    // crossings must not leave EN "unstable"): the decomposition turns numeric
+    submit('|EN|=√6/4*|w|');
+    expect(useGeo3.getState().lastError).toBeNull();
+    const p2 = panel();
+    const en2 = p2.vectors.find((v) => v.label === 'EN');
+    expect(en2?.decomp).toBe('−1/4·u + 1/2·v + 1/4·w');
   });
 
   it('a stated magnitude prints with its square; nothing prints for an unstated one', () => {

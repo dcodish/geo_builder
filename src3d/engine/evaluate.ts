@@ -688,9 +688,32 @@ function evaluateSolidsAndPoints(
                 ? touchZeroRoots(resid)
                 : (() => {
                     // length-rel: the residual can CROSS zero or only TOUCH it — the exam
-                    // idiom |EN| = (√6/4)·|w| often states the MINIMUM (a double root)
+                    // idiom |EN| = (√6/4)·|w| states the MINIMUM (a double root at the
+                    // tangency). Numerically that minimum dips ~1e-7 below zero and shows
+                    // as TWO crossings ~1e-3 apart whose exact split varies per seed; the
+                    // TANGENCY point is the true root, so a near-zero minimum SWALLOWS its
+                    // adjacent crossing pair and is ternary-refined to machine precision.
+                    const refine = (k0: number): number => {
+                      let lo = k0 - 0.005;
+                      let hi = k0 + 0.005;
+                      for (let it = 0; it < 90; it++) {
+                        const m1 = lo + (hi - lo) / 3;
+                        const m2 = hi - (hi - lo) / 3;
+                        if (Math.abs(resid(m1)) < Math.abs(resid(m2))) hi = m2;
+                        else lo = m1;
+                      }
+                      return (lo + hi) / 2;
+                    };
                     const sc = signChangeRoots(resid);
-                    return sc.length ? sc : touchZeroRoots((kk) => Math.abs(resid(kk)));
+                    const touch = touchZeroRoots((kk) => Math.abs(resid(kk)));
+                    const out: number[] = [];
+                    const swallowed = new Set<number>();
+                    for (const t0 of touch) {
+                      for (const r of sc) if (Math.abs(r - t0) < 5e-3) swallowed.add(r);
+                      out.push(refine(t0));
+                    }
+                    for (const r of sc) if (!swallowed.has(r)) out.push(r);
+                    return [...new Set(out.map((x) => +x.toFixed(9)))].sort((a, b) => a - b);
                   })();
           if (roots.length === 0) continue; // unsatisfiable — left unpositioned, flagged upstream
           k = roots[0];

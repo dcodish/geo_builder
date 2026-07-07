@@ -41,15 +41,19 @@ export interface DataPanel {
 const EPS = 1e-6;
 
 /** Render a number cleanly: integers plain, small fractions as p/q, else 2 decimals. */
-export function cleanNum(x: number): string {
-  // tolerances sized for the pivot's numeric floor (~1e-7), far under display grain
-  if (Math.abs(x - Math.round(x)) < 1e-6) return String(Math.round(x));
+export function cleanNum(x: number, tol = 1e-5): string {
+  // default tolerance sized for the pivot's numeric floor (~1e-7), far under display
+  // grain; coefficients from a DOUBLE-ROOT solve carry the intrinsic √noise (~1e-4)
+  // and pass tol = 2e-3 (cleanCoef) — claims still guard correctness at 2e-5
+  if (Math.abs(x - Math.round(x)) < tol) return String(Math.round(x));
   for (let q = 2; q <= 24; q++) {
     const p = x * q;
-    if (Math.abs(p - Math.round(p)) < 1e-5 && Math.abs(Math.round(p)) <= 400) return `${Math.round(p)}/${q}`;
+    if (Math.abs(p - Math.round(p)) < tol && Math.abs(Math.round(p)) <= 400) return `${Math.round(p)}/${q}`;
   }
   return x.toFixed(2);
 }
+
+const cleanCoef = (x: number): string => cleanNum(x, 2e-3);
 
 const coordStr = (v: Vec3): string => `(${cleanNum(v.x)}, ${cleanNum(v.y)}, ${cleanNum(v.z)})`;
 
@@ -82,9 +86,9 @@ function solve3x3(u: Vec3, v: Vec3, w: Vec3, t: Vec3): [number, number, number] 
 function decompStr(coefs: [number, number, number], names: string[]): string {
   const parts: string[] = [];
   coefs.forEach((cf, i) => {
-    if (Math.abs(cf) < 1e-9) return;
+    if (Math.abs(cf) < 1e-3) return;
     const mag = Math.abs(cf);
-    const term = Math.abs(mag - 1) < 1e-9 ? names[i] : `${cleanNum(mag)}·${names[i]}`;
+    const term = Math.abs(mag - 1) < 2e-3 ? names[i] : `${cleanCoef(mag)}·${names[i]}`;
     parts.push(parts.length === 0 ? (cf < 0 ? `−${term}` : term) : cf < 0 ? `− ${term}` : `+ ${term}`);
   });
   return parts.length ? parts.join(' ') : '0';
@@ -94,25 +98,25 @@ function decompStr(coefs: [number, number, number], names: string[]): string {
 function decompSymStr(a: [number, number, number], b: [number, number, number], names: string[], sym: string): string {
   const parts: string[] = [];
   for (let i = 0; i < 3; i++) {
-    const ai = Math.abs(a[i]) < 1e-9 ? 0 : a[i];
-    const bi = Math.abs(b[i]) < 1e-9 ? 0 : b[i];
+    const ai = Math.abs(a[i]) < 1e-3 ? 0 : a[i];
+    const bi = Math.abs(b[i]) < 1e-3 ? 0 : b[i];
     if (ai === 0 && bi === 0) continue;
     let coef: string;
     let neg = false;
     if (bi === 0) {
       neg = ai < 0;
       const m = Math.abs(ai);
-      coef = Math.abs(m - 1) < 1e-9 ? '' : `${cleanNum(m)}·`;
+      coef = Math.abs(m - 1) < 2e-3 ? '' : `${cleanCoef(m)}·`;
     } else if (ai === 0) {
       neg = bi < 0;
       const m = Math.abs(bi);
-      coef = `${Math.abs(m - 1) < 1e-9 ? '' : cleanNum(m) + '·'}${sym}·`;
+      coef = `${Math.abs(m - 1) < 2e-3 ? '' : cleanCoef(m) + '·'}${sym}·`;
     } else if (bi > 0) {
-      const kPart = Math.abs(bi - 1) < 1e-9 ? sym : `${cleanNum(bi)}·${sym}`;
-      coef = `(${kPart} ${ai < 0 ? '−' : '+'} ${cleanNum(Math.abs(ai))})·`;
+      const kPart = Math.abs(bi - 1) < 2e-3 ? sym : `${cleanCoef(bi)}·${sym}`;
+      coef = `(${kPart} ${ai < 0 ? '−' : '+'} ${cleanCoef(Math.abs(ai))})·`;
     } else {
-      const kPart = Math.abs(bi + 1) < 1e-9 ? sym : `${cleanNum(-bi)}·${sym}`;
-      coef = `(${cleanNum(ai)} − ${kPart})·`;
+      const kPart = Math.abs(bi + 1) < 2e-3 ? sym : `${cleanCoef(-bi)}·${sym}`;
+      coef = `(${cleanCoef(ai)} − ${kPart})·`;
     }
     const term = `${coef}${names[i]}`;
     parts.push(parts.length === 0 ? (neg ? `−${term}` : term) : neg ? `− ${term}` : `+ ${term}`);
@@ -186,8 +190,11 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     });
     if (per.some((x) => !x)) return null;
     const [c0, c1, c2] = per as [number, number, number][];
-    const agree = (u: number[], v: number[]) => u.every((x, i) => near(x, v[i]));
-    return agree(c0, c1) && agree(c0, c2) ? c0 : null;
+    // agreement at the DOUBLE-ROOT precision class (k from a tangency is √noise-precise,
+    // ~1e-4); the averaged coefficients then render through the matching cleanCoef
+    const agree = (u: number[], v: number[]) => u.every((x, i) => Math.abs(x - v[i]) < 2e-3);
+    if (!agree(c0, c1) || !agree(c0, c2)) return null;
+    return c0.map((x, i) => (x + c1[i] + c2[i]) / 3) as [number, number, number];
   };
   const decompose = (a: Id, b: Id) => decomposeIn(positions, a, b);
   /** The affine-in-k form when the plain decomposition is k-dependent. */
