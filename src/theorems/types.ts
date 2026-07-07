@@ -11,7 +11,21 @@
 
 import type { Construction, Id } from '../engine/types';
 import type { Fact } from '../store/geoStore';
-import type { DetectedShape } from '../engine/detectShapes';
+import type { DetectedShape, SimilarClass } from '../engine/detectShapes';
+import type { RelationsResult } from '../engine/relations';
+
+/**
+ * The OBSERVED lane's inputs (T4, docs/18 §3): what the SAMPLED layers noticed — forced across every
+ * valid configuration, but with no symbolic derivation behind it (§7a: L3 by nature). Supplied by the
+ * caller (the App's relations/shapes layers ride the store's shared budgeted sample core, ADR-231 M3);
+ * the spine itself stays coordinate-free. Absent ⇒ the observed evidence paths simply don't fire.
+ */
+export interface ObservedInputs {
+  /** Equal-segment/angle classes + forced definite angles (`detectRelations`). */
+  relations?: RelationsResult;
+  /** Similar/congruent triangle classes forced in every sample (ADR-224). */
+  similar?: SimilarClass[];
+}
 
 /** The families theorems group into — drives the collapsed "background" family rows (plan §5). */
 export type TheoremFamily =
@@ -38,6 +52,18 @@ export type Salience = 'headline' | 'background';
 
 /** A theorem's tier (plan §3 D3): green announces it now; amber is a sparing secondary condition. */
 export type Tier = 'certain' | 'possible';
+
+/**
+ * How POINTED a theorem's premise is (T3, docs/18 §5 — authored, discrete, NO runtime score per the
+ * operator's D3 ruling):
+ *  - `pointed`  — the premise is stated *for a reason*; in real bagrut practice this given announces
+ *    this theorem (a diameter → 103/104, two tangents → 108/109, a midsegment → 62…).
+ *  - `standard` — a real configuration, commonly but not pointedly present.
+ *  - `generic`  — true of almost every figure of its family (vertical angles, angle sums).
+ * The offline corpus-frequency sheet (reports/theorem-fill-order.md) is the calibration aid; the
+ * field stays authored.
+ */
+export type Pointedness = 'pointed' | 'standard' | 'generic';
 
 /**
  * Discovery level (ADR-219) — HOW the tool came to know a surfaced theorem's premise. The levels are
@@ -88,6 +114,8 @@ export interface MatchCtx {
   circles: { id: Id; center: Id; members: Id[]; hidden: boolean; autoCenter: boolean }[];
   /** Undirected point adjacency over drawn segments/polygon edges (`pointNeighbors`). */
   neighbors: Record<Id, Id[]>;
+  /** The observed (sampled) lane's inputs — see {@link ObservedInputs}. Optional; caller-supplied. */
+  observed?: ObservedInputs;
   /**
    * Tangencies present in the figure, structurally (coordinate-free): a first-class `tangent` line
    * spec, OR the Thales external-tangent construction (a hidden through-circle passing through the
@@ -120,6 +148,14 @@ export interface TheoremDef {
    *  integrity guard enforces the invariant (ADR-217). */
   type: 'P' | 'C' | 'O';
   salience: Salience;
+  /** The authored T3 rank input (docs/18 §5) — see {@link Pointedness}. */
+  pointedness: Pointedness;
+  /**
+   * Subsumption edges (the resolved ADR-209 knob, D6): when THIS theorem fires, each listed id that
+   * also fired is demoted to the folded band and labelled "covered by #this" — demote-not-remove
+   * (it stays citable; non-monotonic relevancy keeps changes local and explained).
+   */
+  subsumes?: TheoremId[];
   family: TheoremFamily;
   /** The EXACT catalog statements ([07](docs/07-theorem-reference.md)) — no interpolation slots, by design. */
   en: string;
@@ -147,6 +183,19 @@ export interface TheoremFeedEntry {
   attributionGroup: string | null;
   /** True when this entry's attributing step IS the latest step — drives the ● marker. */
   isNew: boolean;
+  /** The authored rank input this entry carries (T3). */
+  pointedness: Pointedness;
+  /**
+   * The named rank BAND this entry sorted into (docs/18 §5 — lexicographic over discrete keys, no
+   * opaque score): 0 intent-aligned (T5 boosts) · 1 new+pointed · 2 new · 3 pointed · 4 standard ·
+   * 5 demoted (subsumption-folded). Background entries keep band for the trace but rank by the
+   * family fold as before.
+   */
+  band: 0 | 1 | 2 | 3 | 4 | 5;
+  /** The id that subsumption-demoted this entry ("covered by #X"), when band 5. */
+  demotedBy?: TheoremId;
+  /** Row-by-row explainability (dev tooltip): band name + the rules that placed it. */
+  rankTrace: string;
 }
 
-export type DetectInput = { facts: Fact[]; construction: Construction; shapes?: DetectedShape[] };
+export type DetectInput = { facts: Fact[]; construction: Construction; shapes?: DetectedShape[]; observed?: ObservedInputs; boosts?: TheoremId[] };

@@ -130,3 +130,24 @@ Recorded so they aren't lost; not commitments.
 - [02-requirements](02-requirements.md) — **FR-TH-\***, **FR-ALT-\***, **FR-EN-8**, user story **US-4**.
 - [07-theorem-reference](07-theorem-reference.md) — the canonical theorem catalog (IDs, P/C/O tags) that §4 maps onto.
 - [09-implementation-plan](09-implementation-plan.md#phase-6--theorems) — **Phase 6**, where the §4 trigger map becomes `detect(figure)`.
+
+## עקרונות — the principles catalog (T5, ADR-248)
+
+_The operator-editable source of truth for the 💡 PRINCIPLES lane (docs/18 §6): the teacher's tips —
+"whenever X is given, or emerges from the diagram, think about Y." Each row is one principle;
+`PRINCIPLE_TABLE` (src/theorems/principles.ts) must match this table BYTE-FOR-BYTE (an integrity test
+enforces it, the 07 pattern applied to the operator's own text). To add or rephrase a principle, edit
+here AND in the table — the test fails until both agree. Intent archetypes are principles whose
+trigger is a givens-constellation and whose tip is a direction-QUESTION; they never instantiate
+objects and never see the question text (the D5 guardrails)._
+
+| slug | Hebrew tip | English tip |
+|---|---|---|
+| right-triangle-complementary | משולש ישר-זווית: נסמן זווית חדה אחת ב-α, והשנייה היא 90°−α (שתי הזוויות החדות משלימות ל-90°). | Right triangle: name one acute angle α and the other is 90°−α (the two acute angles are complementary). |
+| parallels-seek-similar-triangles | אם יש ישרים מקבילים, חפשו משולשים דומים. | If the figure has parallel lines, look for similar triangles. |
+| congruence-hunt | נתונים כמה קטעים/זוויות שווים בין שני משולשים — אולי חפיפת משולשים? | Several equal segments/angles between two triangles are given — perhaps congruent triangles? |
+| bisector-setup | זווית שחוצים אותה — בדקו את משפטי חוצה הזווית. | An angle is bisected — check the angle-bisector theorems. |
+| midsegment-setup | שני אמצעי צלעות — קטע אמצעים? | Two side midpoints are given — a midsegment? |
+| thales-chain | קוטר נתון — איזו זווית היקפית נשענת עליו? | A diameter is given — which inscribed angle stands on it? |
+| power-of-a-point | שני חותכים/משיק מנקודה חיצונית — המשפטים התומכים (נספח). | Two secants / a tangent from an external point — see the supporting (appendix) product relations. |
+| median-hunt | נתון תיכון — במשולש ישר-זווית זכרו שהתיכון ליתר שווה למחציתו. | A median is given — in a right triangle remember the median to the hypotenuse equals half of it. |

@@ -20,7 +20,7 @@ import { Figure } from '@/render';
 import type { Crossing } from '@/render';
 import type { DetectedShape, Id, SimilarClass } from '@/engine';
 import { bookUrl } from '@/shapes/shapeCatalog';
-import { detectTheorems, detectConcepts } from '@/theorems';
+import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES_VISIBLE } from '@/theorems';
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
@@ -662,9 +662,26 @@ export default function App() {
   // sampled relations/shapes layers). Emergent-shape triggers ride the "detect shapes" layer when it
   // is on — an emergent rhombus surfaces its theorems once shapes are detected. Attribution/●-new and
   // headline-vs-background ordering come from `detectTheorems`.
-  const theoremFeed = useMemo(
-    () => detectTheorems({ facts, construction, shapes: shapesLayer?.shapes }),
+  // The PRINCIPLES lane (T5, ADR-248) — the operator-authored teacher tips ("whenever X is given,
+  // think about Y"), with intent archetypes as a boosting subspecies: the top active principles lift
+  // their `boosts` ids to band 0 in the theorem feed.
+  const principleFeed = useMemo(
+    () => detectPrinciples({ facts, construction, shapes: shapesLayer?.shapes }),
     [facts, construction, shapesLayer],
+  );
+  const theoremFeed = useMemo(
+    () =>
+      detectTheorems({
+        facts,
+        construction,
+        shapes: shapesLayer?.shapes,
+        // The OBSERVED lane (T4): what the sampled layers noticed — similar/congruent classes and
+        // forced relations — feeds the L3 evidence paths. Both ride the store's shared budgeted
+        // sample core; when a layer hasn't run, its observed paths simply stay silent.
+        observed: { relations: relationsLayer ?? undefined, similar: shapesLayer?.similar },
+        boosts: activeBoosts(principleFeed),
+      }),
+    [facts, construction, shapesLayer, relationsLayer, principleFeed],
   );
   // The discovery dial (ADR-219): show only entries whose evidence is at or below the selected level —
   // L1 Given / L2 Implied (+ construction entailments) / L3 Observed (+ what the coordinates reveal).
@@ -673,22 +690,20 @@ export default function App() {
     () => theoremFeed.filter((e) => e.level <= discoveryLevel),
     [theoremFeed, discoveryLevel],
   );
-  const headlineTheorems = useMemo(() => visibleTheorems.filter((e) => e.salience === 'headline'), [visibleTheorems]);
+  // The FR-TH-6 display cap (T3): at most ~7 visible headline rows before an expandable fold —
+  // bands 0-1 (intent-aligned / new+pointed) are never capped. `visibleFeed` is the shared, tested
+  // contract (the corpus flood budgets assert the same function).
+  const { visible: headlineTheorems, folded: foldedTheorems } = useMemo(() => visibleFeed(visibleTheorems), [visibleTheorems]);
+  const [moreOpen, setMoreOpen] = useState(false);
   // Background theorems collapse into per-family fold rows (plan §5) — present but never noise.
   const backgroundFamilies = useMemo(() => {
     const by = new Map<TheoremFeedEntry['family'], TheoremFeedEntry[]>();
     for (const e of visibleTheorems) if (e.salience === 'background') (by.get(e.family) ?? by.set(e.family, []).get(e.family)!).push(e);
     return [...by.entries()];
   }, [visibleTheorems]);
-  const backgroundCount = visibleTheorems.length - headlineTheorems.length;
+  const backgroundCount = useMemo(() => visibleTheorems.filter((e) => e.salience === 'background').length, [visibleTheorems]);
 
-  // The guiding-principles feed (operator 2026-07-04): heuristics the configuration invites (e.g. a right
-  // triangle → name one acute angle α, the other 90°−α). Distinct from theorems — a way to set up the
-  // work, not a fact to cite — so rendered in its own 💡 section under the same Display-options toggle.
-  const conceptFeed = useMemo(
-    () => detectConcepts({ facts, construction, shapes: shapesLayer?.shapes }),
-    [facts, construction, shapesLayer],
-  );
+
 
   // The premise objects of the SELECTED theorem row — highlighted on the canvas (NEVER conclusion
   // objects, plan §2). Takes precedence over the shape/fact highlight while a theorem row is picked.
@@ -788,16 +803,27 @@ export default function App() {
   // locale, and a ● "new this step" badge. Clicking toggles the premise highlight on the canvas.
   const theoremButton = (e: TheoremFeedEntry) => {
     const active = theoremSel === e.id;
+    // The row tooltip carries the T3 rankTrace (row-by-row explainability, docs/18 §5 — "this is
+    // first BECAUSE…"); a subsumption-DEMOTED row is muted and labelled "covered by #X" (D6).
+    const demoted = e.band === 5;
     return (
       <button
         key={e.id}
         type="button"
-        style={active ? theoremRowOn : theoremRow}
-        title={t('theorems.highlightHint')}
+        style={active ? theoremRowOn : demoted ? { ...theoremRow, opacity: 0.55 } : theoremRow}
+        title={`${t('theorems.highlightHint')}\n${e.rankTrace}`}
         onClick={() => setTheoremSel(active ? null : e.id)}
       >
         <span style={tierDot(e.tier)} aria-hidden />
-        <span style={{ flex: 1, textAlign: he ? 'right' : 'left' }}>{he ? e.he : e.en}</span>
+        <span style={{ flex: 1, textAlign: he ? 'right' : 'left' }}>
+          {/* The L3 "hint dress" (T4, docs/18 §7): an OBSERVED entry is the tool noticing for you —
+              a 💡-tinted "seen in the drawing:" prefix makes that legible. */}
+          {e.level === 3 && <span style={{ color: '#b45309', fontSize: 11 }}>💡 {t('theorems.observedPrefix')} </span>}
+          {he ? e.he : e.en}
+          {demoted && e.demotedBy !== undefined && (
+            <span style={{ fontSize: 10, color: '#94a3b8', marginInlineStart: 6 }}>{t('theorems.coveredBy', { id: e.demotedBy })}</span>
+          )}
+        </span>
         {e.isNew && <span style={newBadge}>{t('theorems.new')}</span>}
       </button>
     );
@@ -1196,6 +1222,14 @@ export default function App() {
                         style={discoveryLevel === lvl ? discoveryBtnOn : discoveryBtn}
                       >
                         {t(`theorems.discovery.l${lvl}`)}
+                        {/* The dial AFFORDANCE (D4 follow-through): with L1 kept as the default, the
+                            dial itself must say "there is more here" — a +n badge counts the entries
+                            a higher level would reveal. */}
+                        {lvl > discoveryLevel && theoremFeed.filter((e) => e.level <= lvl).length > theoremFeed.filter((e) => e.level <= discoveryLevel).length && (
+                          <span style={{ fontSize: 10, color: '#b45309', marginInlineStart: 3 }}>
+                            +{theoremFeed.filter((e) => e.level <= lvl).length - theoremFeed.filter((e) => e.level <= discoveryLevel).length}
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
@@ -1412,6 +1446,14 @@ export default function App() {
                 <span style={{ fontSize: 12, color: '#64748b' }}>{t('theorems.empty')}</span>
               )}
               {headlineTheorems.map(theoremButton)}
+              {foldedTheorems.length > 0 && (
+                <>
+                  <button type="button" style={bgToggle} onClick={() => setMoreOpen((v) => !v)}>
+                    {moreOpen ? '▾' : '▸'} {t('theorems.moreFold', { count: foldedTheorems.length })}
+                  </button>
+                  {moreOpen && foldedTheorems.map(theoremButton)}
+                </>
+              )}
               {backgroundCount > 0 && (
                 <>
                   <button type="button" style={bgToggle} onClick={() => setBgOpen((v) => !v)}>
@@ -1432,18 +1474,23 @@ export default function App() {
             </div>
           )}
 
-          {/* The guiding-principles feed (💡) — problem-solving heuristics the configuration invites, NOT
-              bagrut theorems to cite (operator 2026-07-04). Own section, under the same Display toggle. */}
-          {showTheorems && conceptFeed.length > 0 && (
+          {/* The PRINCIPLES lane (💡, T5/ADR-248) — the teacher's tips: "whenever X is given, think
+              about Y". Intent archetypes are direction-QUESTIONS derived from the stated givens'
+              shape only (never the question text, never an instantiated pair — the D5 guardrails);
+              at most a few show at once (§6 anti-flood). Same Display toggle as the theorems. */}
+          {showTheorems && principleFeed.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={sectionLabel}>{t('concepts.title')}</div>
-              {conceptFeed.map((c) => (
+              <div style={sectionLabel}>{t('principles.title')}</div>
+              {principleFeed.slice(0, PRINCIPLES_VISIBLE).map((c) => (
                 <div key={c.id} style={conceptRow}>
                   <span aria-hidden style={{ flex: '0 0 auto', marginTop: 1 }}>💡</span>
                   <span style={{ flex: 1, textAlign: he ? 'right' : 'left' }}>{he ? c.he : c.en}</span>
                   {c.isNew && <span style={newBadge}>{t('theorems.new')}</span>}
                 </div>
               ))}
+              {principleFeed.length > PRINCIPLES_VISIBLE && (
+                <span style={{ fontSize: 11, color: '#64748b' }}>{t('principles.more', { count: principleFeed.length - PRINCIPLES_VISIBLE })}</span>
+              )}
             </div>
           )}
 

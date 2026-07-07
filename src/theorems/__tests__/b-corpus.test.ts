@@ -38,7 +38,7 @@ import { replay } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import { detectShapes } from '@/engine';
 import type { AnyCommand } from '@/engine';
-import { detectTheorems } from '../detect';
+import { detectTheorems, visibleFeed } from '../detect';
 import { dispositionOf } from '../coverage';
 import type { TheoremId } from '../types';
 
@@ -509,7 +509,14 @@ describe('theorem B-corpus (T1 membership gate — 22 booklet questions)', () =>
       it('final feed membership: expected in, documented gaps out', { timeout: 120_000 }, () => {
         const { construction } = replay(facts);
         const shapes = (q.finalShapes ?? true) ? detectShapes(construction).shapes : [];
-        const feed = new Set(detectTheorems({ facts, construction, shapes }).map((e) => e.id));
+        const entries = detectTheorems({ facts, construction, shapes });
+        const feed = new Set(entries.map((e) => e.id));
+        // FLOOD BUDGET (T3, §9.3): the visible headline section respects the FR-TH-6 cap on every
+        // corpus figure — at most 7 rows unless bands 0-1 (never capped) exceed it.
+        const { visible } = visibleFeed(entries);
+        if (visible.length > 7) {
+          expect(visible.every((e) => e.band <= 1), `${q.id}: >7 visible rows must all be band ≤1`).toBe(true);
+        }
         for (const x of q.expect) {
           expect(feed.has(x), `#${x} expected in ${q.id}'s final feed`).toBe(true);
         }

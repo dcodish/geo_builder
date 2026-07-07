@@ -8,7 +8,7 @@ import type { Circle, Construction, Id, Line } from '../engine/types';
 import { circleMembers, pointNeighbors } from '../engine/step';
 import { groupKey, type Fact } from '../store/geoStore';
 import type { DetectedShape } from '../engine/detectShapes';
-import type { MatchCtx } from './types';
+import type { MatchCtx, ObservedInputs } from './types';
 
 /**
  * Tangencies in the figure, read STRUCTURALLY (no coordinates). Three construction paths produce a
@@ -125,6 +125,7 @@ export function buildMatchCtx(
   facts: Fact[],
   construction: Construction,
   shapes: DetectedShape[] = [],
+  observed?: ObservedInputs,
 ): MatchCtx {
   const enabled = facts.filter((f) => f.enabled);
 
@@ -157,6 +158,7 @@ export function buildMatchCtx(
     lastGroup,
     circles,
     neighbors: pointNeighbors(construction),
+    ...(observed ? { observed } : {}),
     tangents: tangentPoints(construction),
   };
 }

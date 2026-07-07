@@ -152,6 +152,9 @@
     "highlightHint": "Click to mark on the figure what this theorem talks about",
     "backgroundTitle": "Background theorems",
     "backgroundToggle": "{{count}} background theorems",
+    "moreFold": "{{count}} more theorems apply",
+    "coveredBy": "(covered by #{{id}})",
+    "observedPrefix": "seen in the drawing:",
     "confidence": {
       "definite": "Applies",
       "possible": "May apply"
@@ -178,6 +181,7 @@
       "l3hint": "+ what the diagram reveals"
     }
   },
+  "principles": { "title": "Principles", "more": "{{count}} more principles" },
   "concepts": {
     "title": "Guiding principles"
   },

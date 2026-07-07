@@ -59,7 +59,7 @@ function circleWithGivenCenter(ctx: MatchCtx, min: number) {
 
 /** Each stated/detected triangle's three vertex ids (premises that need a WHOLE triangle, not loose points).
  *  `stated` = a typed triangle command (Declared, L1) vs a detected/emergent one (Observed, L3) — ADR-219. */
-function triangleVertexSets(ctx: MatchCtx): { ids: Id[]; stated: boolean }[] {
+export function triangleVertexSets(ctx: MatchCtx): { ids: Id[]; stated: boolean }[] {
   const sets: { ids: Id[]; stated: boolean }[] = [];
   for (const f of ctx.facts) {
     const c = cmdOf(f);
@@ -92,7 +92,7 @@ function circumTriangle(ctx: MatchCtx): { circleId: Id; center: Id; vertices: Id
  * whereas a bare trapezoid/parallelogram is only a 4-cycle. Replaces the old KIND-whitelist for the
  * transversal test (the recurring "make it geometric, not a whitelist" fix, ADR-167). Each triple once.
  */
-function structuralTriangles(ctx: MatchCtx): Id[][] {
+export function structuralTriangles(ctx: MatchCtx): Id[][] {
   const nb = ctx.neighbors;
   const out: Id[][] = [];
   const seen = new Set<string>();
@@ -168,7 +168,7 @@ function similarityEvidence(ctx: MatchCtx): { facts: Fact[]; vertices: Id[]; lev
  *    lowers to "A, O, B collinear" (a chord through the centre IS a diameter). Recognising only the
  *    first form silently dropped the stated diameter of an inscribed figure (Q7).
  */
-function statedDiameterFacts(ctx: MatchCtx): { fact: Fact; circleId: Id; ids: Id[] }[] {
+export function statedDiameterFacts(ctx: MatchCtx): { fact: Fact; circleId: Id; ids: Id[] }[] {
   const out: { fact: Fact; circleId: Id; ids: Id[] }[] = [];
   // A stated LINE THROUGH THE CENTRE cutting the circle at two points IS a stated diameter ("the
   // line AO cuts circle O at C and D" — B15's 103 gap, ADR-244): a `line-through` with the centre as
@@ -240,7 +240,7 @@ function definingFactIds(ctx: MatchCtx, objId: Id): string[] {
  * command AND the Thales external-tangent construction). Each entry carries the tangency points and the
  * facts that defined them (for attribution).
  */
-function tangentsByCircle(ctx: MatchCtx): Map<Id, { factIds: string[]; ats: Id[] }> {
+export function tangentsByCircle(ctx: MatchCtx): Map<Id, { factIds: string[]; ats: Id[] }> {
   const byCircle = new Map<Id, { factIds: string[]; ats: Id[] }>();
   for (const t of ctx.tangents) {
     const e = byCircle.get(t.circle) ?? { factIds: [], ats: [] };
@@ -335,7 +335,21 @@ function isoscelesEvidence(ctx: MatchCtx): { facts: Fact[]; vertices: Id[]; leve
   }
   const detectedIso = ctx.shapes.filter((s) => s.type === 'isosceles-triangle' || s.type === 'equilateral-triangle' || s.type === 'right-isosceles-triangle');
   detectedIso.forEach((s) => s.vertices.forEach((v) => vertices.add(v)));
-  if (facts.length === 0 && detectedIso.length === 0 && vertices.size === 0) return null;
+  // OBSERVED (T4): an equal-SEGMENT class forced in every sample whose two members share an
+  // endpoint (the apex) — an isosceles the coordinates revealed, with no equality typed.
+  let observedRel = false;
+  for (const cls of ctx.observed?.relations?.equalSegments ?? []) {
+    for (let i = 0; i < cls.length; i++)
+      for (let j = i + 1; j < cls.length; j++) {
+        const [s1, s2] = [cls[i], cls[j]];
+        const shared = s1.filter((v) => s2.includes(v));
+        if (shared.length === 1) {
+          [...s1, ...s2].forEach((v) => vertices.add(v));
+          observedRel = true;
+        }
+      }
+  }
+  if (facts.length === 0 && detectedIso.length === 0 && !observedRel && vertices.size === 0) return null;
   // Strongest (lowest) contributing level: a typed equal-pair (Declared) beats a radii entailment
   // (Entailed) beats a purely-detected/emergent isosceles (Observed) — ADR-219.
   const level: DiscoveryLevel = declared ? 1 : entailed ? 2 : 3;
@@ -647,7 +661,7 @@ function intersectingChordFacts(ctx: MatchCtx): { fact: Fact; circleId: Id; pts:
  * two carrier endpoints both lie on one circle — a secant projected to an outside point (the parser's
  * `secantFromExternal` shape). Each carries the hub id + the circle.
  */
-function externalSecantHubs(ctx: MatchCtx): { fact: Fact; hub: Id; circleId: Id }[] {
+export function externalSecantHubs(ctx: MatchCtx): { fact: Fact; hub: Id; circleId: Id }[] {
   const out: { fact: Fact; hub: Id; circleId: Id }[] = [];
   for (const f of ctx.facts) {
     const c = cmdOf(f);
@@ -724,7 +738,7 @@ const ek = (a: Id, b: Id): string => [a, b].sort().join('|');
  * AND a hand-built "M is the midpoint of BC" + "segment AM" (§3's entailed row — same definitional
  * certainty, so both read as declared-strength evidence).
  */
-function medianFacts(ctx: MatchCtx): { facts: Fact[]; apex: Id; mid: Id; base: [Id, Id] }[] {
+export function medianFacts(ctx: MatchCtx): { facts: Fact[]; apex: Id; mid: Id; base: [Id, Id] }[] {
   const out: { facts: Fact[]; apex: Id; mid: Id; base: [Id, Id] }[] = [];
   for (const mf of factsWith(ctx, (c) => c.type === 'midpoint')) {
     const m = cmdOf(mf) as Extract<AnyCommand, { type: 'midpoint' }>;
@@ -758,7 +772,7 @@ function medianGroups(ctx: MatchCtx): { facts: Fact[]; objIds: Id[] }[] {
  * segment JOINING two STATED midpoints; hosts sharing one vertex = a triangle midsegment, disjoint
  * hosts whose four ends are a stated 4-gon = a trapezoid midsegment).
  */
-function midsegmentFacts(ctx: MatchCtx): { facts: Fact[]; kind: 'triangle' | 'trapezoid'; objIds: Id[]; level: DiscoveryLevel }[] {
+export function midsegmentFacts(ctx: MatchCtx): { facts: Fact[]; kind: 'triangle' | 'trapezoid'; objIds: Id[]; level: DiscoveryLevel }[] {
   const out: { facts: Fact[]; kind: 'triangle' | 'trapezoid'; objIds: Id[]; level: DiscoveryLevel }[] = [];
   for (const f of factsWith(ctx, (c) => c.type === 'shape-variant' && c.shape === 'midsegment')) {
     out.push({ facts: [f], kind: 'triangle', objIds: [...(cmdOf(f) as { ids: Id[] }).ids], level: 1 });
@@ -792,7 +806,7 @@ function midsegmentFacts(ctx: MatchCtx): { facts: Fact[]; kind: 'triangle' | 'tr
  * vertex AND one arm — the bisector arm). A shared vertex that is a circle CENTRE is excluded: that
  * form is ARC talk (the ADR-116 arc-equality lowering — equal central angles), not a stated bisector.
  */
-function bisectorStatements(ctx: MatchCtx): { fact: Fact; vertex: Id }[] {
+export function bisectorStatements(ctx: MatchCtx): { fact: Fact; vertex: Id }[] {
   const out: { fact: Fact; vertex: Id }[] = [];
   for (const f of ctx.facts) {
     const c = cmdOf(f);
@@ -1060,7 +1074,7 @@ const match = (
 export const THEOREM_TABLE: TheoremDef[] = [
   // ===== Angles =====
   {
-    id: 1, type: 'P', salience: 'background', family: 'angles',
+    id: 1, type: 'P', salience: 'background', pointedness: 'generic', family: 'angles',
     en: 'Angles on a straight line (a linear pair) are supplementary — they sum to 180°.',
     he: 'זוויות צמודות משלימות זו את זו ל-180°.',
     match: (ctx) => {
@@ -1069,7 +1083,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 2, type: 'P', salience: 'background', family: 'angles',
+    id: 2, type: 'P', salience: 'background', pointedness: 'generic', family: 'angles',
     en: 'Vertically opposite angles are equal.',
     he: 'זוויות קודקודיות שוות זו לזו.',
     match: (ctx) => {
@@ -1087,7 +1101,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     [4, 'If two parallel lines are cut by a transversal, alternate angles are equal.', 'אם שני ישרים מקבילים נחתכים על ידי ישר שלישי, כל שתי זוויות מתחלפות שוות זו לזו.'],
     [6, 'If two parallel lines are cut by a transversal, corresponding angles are equal.', 'אם שני ישרים מקבילים נחתכים על ידי ישר שלישי, כל שתי זוויות מתאימות שוות זו לזו.'],
   ] as [number, string, string][]).map(([id, en, he]): TheoremDef => ({
-    id, type: 'P', salience: 'background', family: 'parallels', en, he,
+    id, type: 'P', salience: 'background', pointedness: 'generic', family: 'parallels', en, he,
     match: (ctx) => {
       // 4/6 need a transversal actually cutting the parallels (a triangle — typed, structural, or
       // detected — or a drawn line), not just a stated parallel pair (ADR-210). The transversal's
@@ -1098,7 +1112,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   })),
   {
-    id: 8, type: 'P', salience: 'headline', family: 'parallels',
+    id: 8, type: 'P', salience: 'headline', pointedness: 'standard', family: 'parallels',
     en: 'If two parallel lines are cut by a transversal, each pair of co-interior (same-side) angles sums to 180°.',
     he: 'אם שני ישרים מקבילים נחתכים על ידי ישר שלישי, סכום כל זוג זוויות חד-צדדיות הוא 180°.',
     match: (ctx) => {
@@ -1111,7 +1125,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     // parallelogram side) is the "distance between parallels is constant" configuration: the foot's
     // base is one parallel edge and its apex sits on the opposite one — operator 2026-07-04, so a
     // height finally moves a headline. Byte-exact 07 statement (integrity guard).
-    id: 3, type: 'P', salience: 'headline', family: 'parallels',
+    id: 3, type: 'P', salience: 'headline', pointedness: 'standard', family: 'parallels',
     en: 'The distance between two parallel lines is constant (the perpendicular from any point on one to the other has constant length).',
     he: 'אורך האנך מנקודה על ישר לישר המקביל לו קבוע.',
     match: (ctx) => {
@@ -1146,7 +1160,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     [13, 'In a non-equilateral triangle, the larger angle lies opposite the larger side.', 'במשולש (שאינו שווה צלעות), מול הצלע הגדולה יותר מונחת זווית גדולה יותר.'],
     [14, 'In a non-equiangular triangle, the larger side lies opposite the larger angle.', 'במשולש (שאינו שווה זוויות), מול הזווית הגדולה יותר מונחת צלע גדולה יותר.'],
   ] as [number, string, string][]).map(([id, en, he]): TheoremDef => ({
-    id, type: 'P', salience: 'background', family: 'triangle', en, he,
+    id, type: 'P', salience: 'background', pointedness: 'generic', family: 'triangle', en, he,
     match: (ctx) => {
       const { facts, vertices, level } = triangleFacts(ctx);
       return facts.length || vertices.length ? match('certain', ids(facts), vertices, level) : null;
@@ -1155,7 +1169,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ===== Isosceles =====
   {
-    id: 22, type: 'P', salience: 'headline', family: 'isosceles',
+    id: 22, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'isosceles',
     en: 'In an isosceles triangle, the base angles are equal.',
     he: 'במשולש שווה שוקיים זוויות הבסיס שוות זו לזו.',
     match: (ctx) => {
@@ -1173,7 +1187,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     [37, 'In a kite, the two angles between sides of different lengths are equal.', 'זוויות הצד בדלתון שוות זו לזו.'],
     [38, 'The main diagonal of a kite bisects the apex angles, bisects the secondary diagonal, and is perpendicular to it.', 'האלכסון הראשי בדלתון חוצה את זוויות הראש, חוצה את האלכסון המשני ומאונך לו.'],
   ] as [number, string, string][]).map(([id, en, he]): TheoremDef => ({
-    id, type: 'P', salience: 'headline', family: 'kite', en, he,
+    id, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'kite', en, he,
     match: (ctx) => {
       const ev = kiteEvidence(ctx);
       return ev ? match('certain', ids(ev.facts), ev.vertices, ev.level) : null;
@@ -1189,16 +1203,20 @@ export const THEOREM_TABLE: TheoremDef[] = [
   // `similarityEvidence` (parallel-cuts-triangle), so neither surfaces without a stated parallel — the
   // Q5–Q7 corpus (no parallels) never trips them, and the sharper SAS/SSS criteria (68/70) stay excluded.
   {
-    id: 69, type: 'P', salience: 'headline', family: 'similarity',
+    id: 69, type: 'P', salience: 'headline', pointedness: 'standard', family: 'similarity',
     en: 'Similarity — Angle-Angle (AA).',
     he: 'משפט דמיון: זווית-זווית.',
     match: (ctx) => {
       const ev = similarityEvidence(ctx);
-      return ev ? match('certain', ids(ev.facts), ev.vertices, ev.level) : null;
+      if (ev) return match('certain', ids(ev.facts), ev.vertices, ev.level);
+      // OBSERVED (T4): an ADR-224 similar class forced in every sample — the tool noticed for you,
+      // so L3, amber, opt-in via the dial (never the L1 default view).
+      const cls = ctx.observed?.similar?.find((s) => s.kind === 'similar');
+      return cls ? match('possible', [], cls.triangles.flat(), 3) : null;
     },
   },
   {
-    id: 71, type: 'P', salience: 'background', family: 'similarity',
+    id: 71, type: 'P', salience: 'background', pointedness: 'standard', family: 'similarity',
     en: 'In similar triangles, the ratios of corresponding heights, angle bisectors, medians, perimeters, circumradii, and inradii all equal the similarity ratio; the ratio of areas equals its square.',
     he: 'במשולשים דומים: יחס הגבהים, חוצי הזוויות, התיכונים, ההיקפים, רדיוסי המעגלים החוסמים ורדיוסי המעגלים החסומים — שווה ליחס הדמיון; יחס השטחים שווה לריבוע יחס הדמיון.',
     match: (ctx) => {
@@ -1212,12 +1230,16 @@ export const THEOREM_TABLE: TheoremDef[] = [
     // A right angle — a right-triangle, a stated 90°, an explicit ⟂, or a dropped height/foot — makes
     // Pythagoras the MAIN theorem to reach for, so it headlines (operator 2026-07-04: a freshly-built
     // height should surface its theorem as a main entry, not fold into the background).
-    id: 28, type: 'P', salience: 'headline', family: 'triangle',
+    id: 28, type: 'P', salience: 'headline', pointedness: 'standard', family: 'triangle',
     en: 'Pythagoras — in a right triangle, the sum of the squares of the legs equals the square of the hypotenuse.',
     he: 'משפט פיתגורס: במשולש ישר זווית, סכום ריבועי הניצבים שווה לריבוע היתר.',
     match: (ctx) => {
       const fs = rightAngleFacts(ctx);
-      return fs.length ? match('certain', ids(fs), []) : null;
+      if (fs.length) return match('certain', ids(fs), []);
+      // OBSERVED (T4): a right angle FORCED in every sampled configuration (never stated) — the
+      // classic emergent Thales/inscribed 90°. L3, amber, dial-gated.
+      const forced = ctx.observed?.relations?.definiteAngles.find((a) => Math.abs(a.valueDeg - 90) < 0.5);
+      return forced ? match('possible', [], [forced.vertex, forced.a, forced.b], 3) : null;
     },
   },
 
@@ -1231,7 +1253,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     [33, 'P', 'In a right triangle with a 30° acute angle, the leg opposite it equals half the hypotenuse.', 'אם במשולש ישר זווית יש זווית חדה של 30°, אז הניצב מול זווית זו שווה למחצית היתר.'],
     [34, 'C', 'In a right triangle, if a leg equals half the hypotenuse, the angle opposite that leg is 30°.', 'אם במשולש ישר זווית ניצב שווה למחצית היתר, אז מול ניצב זה זווית שגודלה 30°.'],
   ] as [number, TheoremDef['type'], string, string][]).map(([id, type, en, he]): TheoremDef => ({
-    id, type, salience: 'headline', family: 'triangle', en, he,
+    id, type, salience: 'headline', pointedness: 'standard', family: 'triangle', en, he,
     match: (ctx) => {
       const q = shapeClassPresent(ctx, THIRTY_SIXTY_NINETY_KIND);
       return q ? match('certain', q.factIds, q.objIds, q.level) : null;
@@ -1240,7 +1262,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ===== Circle — circumscribed/points (background) =====
   {
-    id: 84, type: 'P', salience: 'background', family: 'circle',
+    id: 84, type: 'P', salience: 'background', pointedness: 'generic', family: 'circle',
     en: 'Every triangle has a circumscribed circle.',
     he: 'כל משולש ניתן לחסום במעגל.',
     match: (ctx) => {
@@ -1251,7 +1273,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 91, type: 'P', salience: 'background', family: 'circle',
+    id: 91, type: 'P', salience: 'background', pointedness: 'generic', family: 'circle',
     en: 'Through any three non-collinear points passes exactly one circle.',
     he: 'דרך כל שלוש נקודות שאינן על ישר אחד עובר מעגל אחד ויחיד.',
     match: (ctx) => {
@@ -1278,7 +1300,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
   // gap (ADR-243). 201 (Appendix C, a composed teaching corollary) stays quad-gated: it fires only when
   // the inscribed quad is a trapezoid (a `set-parallel` on its concyclic vertices).
   {
-    id: 87, type: 'C', salience: 'headline', family: 'quad',
+    id: 87, type: 'C', salience: 'headline', pointedness: 'pointed', subsumes: [99, 102], family: 'quad',
     en: 'A quadrilateral is cyclic if and only if a pair of opposite angles sums to 180°.',
     he: 'ניתן לחסום מרובע במעגל אם ורק אם סכום זוג זוויות נגדיות שווה ל-180°.',
     match: (ctx) => {
@@ -1292,7 +1314,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 201, type: 'P', salience: 'headline', family: 'quad',
+    id: 201, type: 'P', salience: 'headline', pointedness: 'pointed', subsumes: [8], family: 'quad',
     en: 'A trapezoid inscribed in a circle is isosceles.',
     he: 'טרפז החסום במעגל הוא טרפז שווה שוקיים.',
     match: (ctx) => {
@@ -1326,7 +1348,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     [39, ISO_TRAP_KIND, false, 'In an isosceles trapezoid, the angles at the same base are equal.', 'בטרפז שווה שוקיים הזוויות שליד אותו בסיס שוות זו לזו.'],
     [41, ISO_TRAP_KIND, true, 'In an isosceles trapezoid, the diagonals are equal.', 'בטרפז שווה שוקיים האלכסונים שווים זה לזה.'],
   ] as [number, Set<string>, boolean, string, string][]).map(([id, kinds, diag, en, he]): TheoremDef => ({
-    id, type: 'P', salience: 'headline', family: 'quad', en, he,
+    id, type: 'P', salience: 'headline', pointedness: 'standard', family: 'quad', en, he,
     match: (ctx) => {
       const q = shapeClassPresent(ctx, kinds);
       if (!q) return null;
@@ -1352,7 +1374,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ===== Circle — chords/arcs/centre =====
   {
-    id: 92, type: 'P', salience: 'headline', family: 'circle',
+    id: 92, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'circle',
     en: 'Two central angles are equal if and only if their corresponding arcs are equal.',
     he: 'במעגל, שתי זוויות מרכזיות שוות זו לזו אם ורק אם הקשתות המתאימות להן שוות.',
     match: (ctx) => {
@@ -1377,7 +1399,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 94, type: 'P', salience: 'headline', family: 'circle',
+    id: 94, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'circle',
     en: 'Chords are equal if and only if their corresponding arcs are equal.',
     he: 'במעגל, מיתרים שווים זה לזה אם ורק אם הקשתות המתאימות להם שוות.',
     match: (ctx) => {
@@ -1388,7 +1410,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 97, type: 'P', salience: 'background', family: 'circle',
+    id: 97, type: 'P', salience: 'background', pointedness: 'generic', family: 'circle',
     en: 'The perpendicular from the center to a chord bisects the chord, its central angle, and its arc.',
     he: 'האנך ממרכז המעגל למיתר חוצה את המיתר, את הזווית המרכזית המתאימה ואת הקשת המתאימה.',
     match: (ctx) => {
@@ -1398,7 +1420,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 98, type: 'P', salience: 'background', family: 'circle',
+    id: 98, type: 'P', salience: 'background', pointedness: 'generic', family: 'circle',
     en: 'The segment from the center that bisects a chord is perpendicular to it.',
     he: 'קטע ממרכז המעגל החוצה את המיתר מאונך למיתר.',
     match: (ctx) => {
@@ -1407,7 +1429,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 99, type: 'P', salience: 'headline', family: 'circle',
+    id: 99, type: 'P', salience: 'headline', pointedness: 'standard', family: 'circle',
     en: 'An inscribed angle equals half the central angle subtending the same arc.',
     he: 'במעגל, זווית היקפית שווה למחצית הזווית המרכזית הנשענת על אותה הקשת.',
     match: (ctx) => {
@@ -1418,7 +1440,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 102, type: 'P', salience: 'headline', family: 'circle',
+    id: 102, type: 'P', salience: 'headline', pointedness: 'standard', family: 'circle',
     en: 'Inscribed angles subtending the same chord from the same side are equal.',
     he: 'במעגל, כל הזוויות ההיקפיות הנשענות על מיתר מאותו צד של המיתר שוות זו לזו.',
     match: (ctx) => {
@@ -1430,7 +1452,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ===== Circle — diameter / Thales =====
   {
-    id: 103, type: 'P', salience: 'headline', family: 'circle',
+    id: 103, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'circle',
     en: 'An inscribed angle subtending a diameter is a right angle (90°).',
     he: 'זווית היקפית הנשענת על קוטר היא זווית ישרה (90°).',
     match: (ctx) => {
@@ -1441,7 +1463,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 104, type: 'C', salience: 'headline', family: 'circle',
+    id: 104, type: 'C', salience: 'headline', pointedness: 'pointed', family: 'circle',
     en: 'A 90° inscribed angle subtends a diameter.',
     he: 'זווית היקפית בת 90° נשענת על קוטר.',
     match: (ctx) => {
@@ -1458,7 +1480,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ===== Circle — tangents =====
   {
-    id: 105, type: 'P', salience: 'headline', family: 'tangent',
+    id: 105, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'tangent',
     en: 'A tangent to a circle is perpendicular to the radius at the point of tangency.',
     he: 'המשיק למעגל מאונך לרדיוס בנקודת ההשקה.',
     match: (ctx) => {
@@ -1470,7 +1492,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 107, type: 'P', salience: 'headline', family: 'tangent',
+    id: 107, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'tangent',
     en: 'The tangent–chord angle equals the inscribed angle subtending that chord on the other side.',
     he: 'זווית בין משיק למיתר שווה לזווית ההיקפית הנשענת על מיתר זה מצידו השני.',
     match: (ctx) => {
@@ -1484,7 +1506,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 108, type: 'P', salience: 'headline', family: 'tangent',
+    id: 108, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'tangent',
     en: 'Two tangents to a circle from the same external point are equal.',
     he: 'שני משיקים למעגל היוצאים מאותה נקודה שווים זה לזה.',
     match: (ctx) => {
@@ -1494,7 +1516,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 109, type: 'P', salience: 'headline', family: 'tangent',
+    id: 109, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'tangent',
     en: 'The segment from the center to an external point bisects the angle between the two tangents drawn from it.',
     he: 'הקטע המחבר את מרכז המעגל לנקודה ממנה יוצאים שני משיקים חוצה את הזווית שבין המשיקים.',
     match: (ctx) => {
@@ -1512,7 +1534,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
   // and can NEVER be a headline. Tier is `possible` (amber) — a secondary aid, never announced as certain.
   // Ids are the 07 Appendix LABELS (strings) so they read as "not a citable bagrut number" wherever shown.
   {
-    id: 'A2', type: 'O', salience: 'background', family: 'circle',
+    id: 'A2', type: 'O', salience: 'background', pointedness: 'generic', family: 'circle',
     en: 'Intersecting chords — the products of the two segments of each chord are equal.',
     he: 'אם שני מיתרים נחתכים, מכפלת קטעי מיתר אחד שווה למכפלת קטעי המיתר השני.',
     match: (ctx) => {
@@ -1523,7 +1545,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 'A3', type: 'O', salience: 'background', family: 'circle',
+    id: 'A3', type: 'O', salience: 'background', pointedness: 'generic', family: 'circle',
     en: 'Two secants from an external point — each secant times its external part is equal.',
     he: 'משתי חותכים מנקודה חיצונית, מכפלת חותך בחלקו החיצוני שווה למכפלת החותך השני בחלקו החיצוני.',
     match: (ctx) => {
@@ -1542,7 +1564,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 'A4', type: 'O', salience: 'background', family: 'tangent',
+    id: 'A4', type: 'O', salience: 'background', pointedness: 'generic', family: 'tangent',
     en: 'Secant and tangent from an external point — the secant times its external part equals the tangent squared.',
     he: 'מחותך ומשיק מנקודה חיצונית, מכפלת החותך בחלקו החיצוני שווה לריבוע המשיק.',
     match: (ctx) => {
@@ -1558,7 +1580,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 'A5', type: 'O', salience: 'background', family: 'triangle',
+    id: 'A5', type: 'O', salience: 'background', pointedness: 'generic', family: 'triangle',
     en: "In a right triangle, each leg is the geometric mean of the hypotenuse and the leg's projection on it.",
     he: 'במשולש ישר זווית, הניצב הוא ממוצע הנדסי של היתר ושל היטל הניצב על היתר.',
     match: (ctx) => {
@@ -1567,7 +1589,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 'A6', type: 'O', salience: 'background', family: 'triangle',
+    id: 'A6', type: 'O', salience: 'background', pointedness: 'generic', family: 'triangle',
     en: 'In a right triangle, the altitude to the hypotenuse is the geometric mean of the two projections of the legs.',
     he: 'הגובה ליתר במשולש ישר זווית הוא ממוצע הנדסי של היטלי הניצבים על היתר.',
     match: (ctx) => {
@@ -1576,7 +1598,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 'B3', type: 'O', salience: 'background', family: 'circle',
+    id: 'B3', type: 'O', salience: 'background', pointedness: 'generic', family: 'circle',
     en: 'The line of centers of two intersecting circles perpendicularly bisects their common chord.',
     he: 'קטע המרכזים של שני מעגלים נחתכים חוצה את המיתר המשותף ומאונך לו.',
     match: (ctx) => {
@@ -1592,7 +1614,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ----- Medians / centroid (15-17; family 'triangle' — no separate fold, T3 may re-family) -----
   {
-    id: 15, type: 'P', salience: 'headline', family: 'triangle',
+    id: 15, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'triangle',
     en: 'The three medians of a triangle meet at one point (the centroid).',
     he: 'שלושת התיכונים במשולש נחתכים בנקודה אחת.',
     match: (ctx) => {
@@ -1602,7 +1624,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 16, type: 'P', salience: 'background', family: 'triangle',
+    id: 16, type: 'P', salience: 'background', pointedness: 'generic', family: 'triangle',
     en: 'A median divides a triangle into two triangles of equal area.',
     he: 'תיכון במשולש מחלק את המשולש לשני משולשים שווי שטח.',
     match: (ctx) => {
@@ -1612,7 +1634,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 17, type: 'P', salience: 'headline', family: 'triangle',
+    id: 17, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'triangle',
     en: 'The centroid divides each median in ratio 2:1 (the part nearer the vertex is twice the other).',
     he: 'נקודת חיתוך התיכונים מחלקת כל תיכון ביחס 2:1 (החלק הקרוב לקודקוד ארוך פי 2 מהחלק האחר).',
     match: (ctx) => {
@@ -1627,7 +1649,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
   // (+ any shared side). A stated "△ABC ≅ △DEF" lowers to exactly 3 side equalities, so it lands as
   // a full SSS (certain); a PARTIAL constellation surfaces the specific criterion it suggests, amber.
   {
-    id: 18, type: 'P', salience: 'headline', family: 'congruence',
+    id: 18, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'congruence',
     en: 'Congruence — Side-Angle-Side (SAS).',
     he: 'משפט חפיפה: צלע-זווית-צלע.',
     match: (ctx) => {
@@ -1636,7 +1658,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 19, type: 'P', salience: 'headline', family: 'congruence',
+    id: 19, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'congruence',
     en: 'Congruence — Angle-Side-Angle (ASA).',
     he: 'משפט חפיפה: זווית-צלע-זווית.',
     match: (ctx) => {
@@ -1645,16 +1667,20 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 20, type: 'P', salience: 'headline', family: 'congruence',
+    id: 20, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'congruence',
     en: 'Congruence — Side-Side-Side (SSS).',
     he: 'משפט חפיפה: צלע-צלע-צלע.',
     match: (ctx) => {
       const e = congruenceEvidence(ctx).find((x) => x.kind === 20);
-      return e ? match(e.tier, ids(e.facts), e.objIds) : null;
+      if (e) return match(e.tier, ids(e.facts), e.objIds);
+      // OBSERVED (T4): an ADR-224 CONGRUENT class — detection verified equal corresponding sides in
+      // every sample, which is precisely SSS's premise. L3, amber, dial-gated.
+      const cls = ctx.observed?.similar?.find((s) => s.kind === 'congruent');
+      return cls ? match('possible', [], cls.triangles.flat(), 3) : null;
     },
   },
   {
-    id: 21, type: 'P', salience: 'headline', family: 'congruence',
+    id: 21, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'congruence',
     en: 'Congruence — two sides and the angle opposite the larger of the two.',
     he: 'משפט חפיפה: שתי צלעות והזווית שמול הצלע הגדולה מבין השתיים.',
     match: (ctx) => {
@@ -1665,7 +1691,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ----- Midsegments (62-67) -----
   {
-    id: 62, type: 'P', salience: 'headline', family: 'midsegment',
+    id: 62, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'midsegment',
     en: 'A triangle midsegment is parallel to the third side and equals half of it.',
     he: 'קטע אמצעים במשולש מקביל לצלע השלישית ושווה למחציתה.',
     match: (ctx) => {
@@ -1674,7 +1700,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 63, type: 'P', salience: 'background', family: 'midsegment',
+    id: 63, type: 'P', salience: 'background', pointedness: 'standard', family: 'midsegment',
     en: 'A line bisecting one side of a triangle and parallel to a second side bisects the third side.',
     he: 'ישר החוצה צלע אחת במשולש ומקביל לצלע שנייה חוצה את הצלע השלישית.',
     match: (ctx) => {
@@ -1683,7 +1709,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 64, type: 'C', salience: 'background', family: 'midsegment',
+    id: 64, type: 'C', salience: 'background', pointedness: 'standard', family: 'midsegment',
     en: 'A segment with endpoints on two sides, parallel to the third and half its length, is a midsegment.',
     he: 'קטע שקצותיו על שתי צלעות משולש, מקביל לצלע השלישית ושווה למחציתה, הוא קטע אמצעים.',
     match: (ctx) => {
@@ -1692,7 +1718,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 65, type: 'P', salience: 'headline', family: 'midsegment',
+    id: 65, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'midsegment',
     en: 'The trapezoid midsegment is parallel to the bases and equals half their sum.',
     he: 'קטע האמצעים בטרפז מקביל לבסיסים ושווה למחצית סכומם.',
     match: (ctx) => {
@@ -1701,7 +1727,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 66, type: 'P', salience: 'background', family: 'midsegment',
+    id: 66, type: 'P', salience: 'background', pointedness: 'standard', family: 'midsegment',
     en: 'In a trapezoid, a line bisecting one leg and parallel to the bases bisects the other leg.',
     he: 'בטרפז, ישר החוצה שוק אחת ומקביל לבסיסים חוצה את השוק השנייה.',
     match: (ctx) => {
@@ -1710,7 +1736,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 67, type: 'C', salience: 'background', family: 'midsegment',
+    id: 67, type: 'C', salience: 'background', pointedness: 'standard', family: 'midsegment',
     en: 'A segment joining the two legs of a trapezoid, parallel to the bases and equal to half their sum, is the midsegment.',
     he: 'קטע המחבר שתי שוקיים בטרפז, מקביל לבסיסים ושווה למחצית סכומם, הוא קטע אמצעים.',
     match: (ctx) => {
@@ -1721,7 +1747,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ----- Angle bisectors (75, 78, 80; family 'triangle' — T3 may re-family) -----
   {
-    id: 75, type: 'P', salience: 'background', family: 'triangle',
+    id: 75, type: 'P', salience: 'background', pointedness: 'generic', family: 'triangle',
     en: 'The angle bisector is the locus of all points equidistant from the sides of the angle.',
     he: 'חוצה הזווית הוא המקום הגיאומטרי של כל הנקודות הנמצאות במרחקים שווים משוקי הזווית.',
     match: (ctx) => {
@@ -1731,7 +1757,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 78, type: 'P', salience: 'headline', family: 'triangle',
+    id: 78, type: 'P', salience: 'headline', pointedness: 'standard', family: 'triangle',
     en: "Every point on an angle bisector is equidistant from the angle's sides.",
     he: 'כל נקודה על חוצה זווית נמצאת במרחקים שווים משוקי הזווית.',
     match: (ctx) => {
@@ -1741,7 +1767,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 80, type: 'P', salience: 'headline', family: 'triangle',
+    id: 80, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'triangle',
     en: 'The three angle bisectors of a triangle meet at one point — the incenter (center of the inscribed circle).',
     he: 'שלושת חוצי הזוויות של משולש נחתכים בנקודה אחת, שהיא מרכז המעגל החסום.',
     match: (ctx) => {
@@ -1756,7 +1782,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ----- Right triangle (30-32) -----
   {
-    id: 31, type: 'P', salience: 'headline', family: 'triangle',
+    id: 31, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'triangle',
     en: 'In a right triangle, the median to the hypotenuse equals half the hypotenuse.',
     he: 'במשולש ישר זווית התיכון ליתר שווה למחצית היתר.',
     match: (ctx) => {
@@ -1769,7 +1795,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 30, type: 'P', salience: 'headline', family: 'congruence',
+    id: 30, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'congruence',
     en: 'Two right triangles with an equal leg and an equal hypotenuse are congruent.',
     he: 'שני משולשים ישרי זווית שלהם ניצב שווה ויתר שווה חופפים זה לזה.',
     match: (ctx) => {
@@ -1797,7 +1823,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 32, type: 'C', salience: 'headline', family: 'triangle',
+    id: 32, type: 'C', salience: 'headline', pointedness: 'standard', family: 'triangle',
     en: 'A triangle in which a median equals half the side it bisects is right-angled.',
     he: 'משולש בו התיכון שווה למחצית הצלע אותה הוא חוצה הוא ישר זווית.',
     match: (ctx) => {
@@ -1819,7 +1845,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ----- Isosceles converses / coincidences (23-27) -----
   {
-    id: 23, type: 'C', salience: 'headline', family: 'isosceles',
+    id: 23, type: 'C', salience: 'headline', pointedness: 'standard', family: 'isosceles',
     en: 'A triangle with two equal angles is isosceles.',
     he: 'משולש שבו שתי זוויות שוות הוא משולש שווה שוקיים.',
     match: (ctx) => {
@@ -1829,7 +1855,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 24, type: 'P', salience: 'background', family: 'isosceles',
+    id: 24, type: 'P', salience: 'background', pointedness: 'generic', family: 'isosceles',
     en: 'In an isosceles triangle, the apex-angle bisector, the median to the base, and the altitude to the base coincide.',
     he: 'במשולש שווה שוקיים, חוצה זווית הראש, התיכון לבסיס והגובה לבסיס מתלכדים.',
     match: (ctx) => {
@@ -1838,7 +1864,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 25, type: 'C', salience: 'background', family: 'isosceles',
+    id: 25, type: 'C', salience: 'background', pointedness: 'standard', family: 'isosceles',
     en: 'If an angle bisector is also an altitude, the triangle is isosceles.',
     he: 'אם במשולש חוצה זווית הוא גובה, אז המשולש שווה שוקיים.',
     match: (ctx) => {
@@ -1851,7 +1877,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 26, type: 'C', salience: 'background', family: 'isosceles',
+    id: 26, type: 'C', salience: 'background', pointedness: 'standard', family: 'isosceles',
     en: 'If an angle bisector is also a median, the triangle is isosceles.',
     he: 'אם במשולש חוצה זווית הוא תיכון, אז המשולש שווה שוקיים.',
     match: (ctx) => {
@@ -1864,7 +1890,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 27, type: 'C', salience: 'background', family: 'isosceles',
+    id: 27, type: 'C', salience: 'background', pointedness: 'standard', family: 'isosceles',
     en: 'If an altitude is also a median, the triangle is isosceles.',
     he: 'אם במשולש גובה הוא תיכון, אז המשולש שווה שוקיים.',
     match: (ctx) => {
@@ -1882,7 +1908,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ----- Thales / proportion (72-74; family 'similarity' — the proportion band) -----
   {
-    id: 73, type: 'P', salience: 'headline', family: 'similarity',
+    id: 73, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'similarity',
     en: 'Extended Thales — a line parallel to one side of a triangle cuts the other two sides (or their extensions) in proportional segments.',
     he: 'משפט תאלס המורחב: ישר המקביל לאחת מצלעות המשולש חותך את שתי הצלעות האחרות (או את המשכיהן) בקטעים פרופורציוניים.',
     match: (ctx) => {
@@ -1892,7 +1918,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 72, type: 'P', salience: 'background', family: 'similarity',
+    id: 72, type: 'P', salience: 'background', pointedness: 'generic', family: 'similarity',
     en: 'Thales — two parallel lines cutting the sides of an angle cut off proportional segments.',
     he: 'משפט תאלס: שני ישרים מקבילים החותכים שוקי זווית מקצים עליהם קטעים פרופורציוניים.',
     match: (ctx) => {
@@ -1901,7 +1927,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 74, type: 'C', salience: 'background', family: 'similarity',
+    id: 74, type: 'C', salience: 'background', pointedness: 'standard', family: 'similarity',
     en: 'Converse of Thales — two lines that cut off four proportional segments on the sides of an angle are parallel.',
     he: 'משפט הפוך לתאלס: שני ישרים המקצים על שוקי זווית ארבעה קטעים פרופורציוניים הם ישרים מקבילים.',
     match: (ctx) => {
@@ -1922,7 +1948,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ----- Parallels converses (5/7/9) — amber prompts on the stated Z/F configuration -----
   {
-    id: 5, type: 'C', salience: 'headline', family: 'parallels',
+    id: 5, type: 'C', salience: 'headline', pointedness: 'standard', family: 'parallels',
     en: 'If a transversal creates a pair of equal alternate angles, the two lines are parallel.',
     he: 'שני ישרים נחתכים על ידי ישר שלישי; אם נוצרו זוג זוויות מתחלפות שוות, אז שני הישרים מקבילים.',
     match: (ctx) => {
@@ -1934,7 +1960,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 7, type: 'C', salience: 'background', family: 'parallels',
+    id: 7, type: 'C', salience: 'background', pointedness: 'standard', family: 'parallels',
     en: 'If a transversal creates a pair of equal corresponding angles, the two lines are parallel.',
     he: 'שני ישרים נחתכים על ידי ישר שלישי; אם נוצרו זוג זוויות מתאימות שוות, אז שני הישרים מקבילים.',
     match: (ctx) => {
@@ -1943,7 +1969,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 9, type: 'C', salience: 'background', family: 'parallels',
+    id: 9, type: 'C', salience: 'background', pointedness: 'standard', family: 'parallels',
     en: 'If a transversal creates co-interior angles summing to 180°, the two lines are parallel.',
     he: 'שני ישרים נחתכים על ידי ישר שלישי; אם סכום זוג זוויות חד-צדדיות הוא 180°, אז שני הישרים מקבילים.',
     match: (ctx) => {
@@ -1967,7 +1993,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ----- Circle remainder (93/95/100/101/106) -----
   {
-    id: 93, type: 'P', salience: 'headline', family: 'circle',
+    id: 93, type: 'P', salience: 'headline', pointedness: 'standard', family: 'circle',
     en: 'Two central angles are equal if and only if their corresponding chords are equal.',
     he: 'במעגל, שתי זוויות מרכזיות שוות זו לזו אם ורק אם המיתרים המתאימים להן שווים.',
     match: (ctx) => {
@@ -1979,7 +2005,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 95, type: 'P', salience: 'background', family: 'circle',
+    id: 95, type: 'P', salience: 'background', pointedness: 'generic', family: 'circle',
     en: 'Equal chords are equidistant from the center.',
     he: 'מיתרים השווים זה לזה נמצאים במרחקים שווים ממרכז המעגל.',
     match: (ctx) => {
@@ -1990,7 +2016,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 100, type: 'P', salience: 'headline', family: 'circle',
+    id: 100, type: 'P', salience: 'headline', pointedness: 'standard', family: 'circle',
     en: 'Equal inscribed angles subtend equal arcs and equal chords.',
     he: 'במעגל, לזוויות היקפיות שוות קשתות שוות ומיתרים שווים.',
     match: (ctx) => {
@@ -2005,7 +2031,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 101, type: 'P', salience: 'headline', family: 'circle',
+    id: 101, type: 'P', salience: 'headline', pointedness: 'standard', family: 'circle',
     en: 'Equal arcs subtend equal inscribed angles.',
     he: 'במעגל, לקשתות שוות מתאימות זוויות היקפיות שוות.',
     match: (ctx) => {
@@ -2022,7 +2048,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 106, type: 'C', salience: 'headline', family: 'tangent',
+    id: 106, type: 'C', salience: 'headline', pointedness: 'standard', family: 'tangent',
     en: 'A line perpendicular to a radius at its endpoint is tangent to the circle.',
     he: 'ישר המאונך לרדיוס בקצהו הוא משיק למעגל.',
     match: (ctx) => {
@@ -2056,7 +2082,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
       (r: QuadRelations) => (r.consecutiveSum180.length ? r.consecutiveSum180 : null)],
   ] as [number, Salience, string, string, (r: QuadRelations) => Fact[] | null][]).map(
     ([id, salience, en, he, pick]): TheoremDef => ({
-      id, type: 'C', salience, family: 'quad', en, he,
+      id, type: 'C', salience, pointedness: 'standard', family: 'quad', en, he,
       match: (ctx) => {
         // A GENERAL stated quad (not already a declared parallelogram — the converse prompt is
         // pointless on a shape already stated to be one).
@@ -2080,7 +2106,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
       (r: QuadRelations) => (r.adjacentSideEqs.length ? r.adjacentSideEqs : null)],
   ] as [number, string, string, (r: QuadRelations) => Fact[] | null][]).map(
     ([id, en, he, pick]): TheoremDef => ({
-      id, type: 'C', salience: 'headline', family: 'quad', en, he,
+      id, type: 'C', salience: 'headline', pointedness: 'standard', family: 'quad', en, he,
       match: (ctx) => {
         // The property stated ON a declared PARALLELOGRAM (not one already declared the target shape).
         for (const q of statedQuadShapes(ctx, ['parallelogram'])) {
@@ -2093,7 +2119,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     }),
   ),
   {
-    id: 57, type: 'C', salience: 'headline', family: 'quad',
+    id: 57, type: 'C', salience: 'headline', pointedness: 'standard', family: 'quad',
     en: 'A parallelogram in which a diagonal bisects an angle is a rhombus.',
     he: 'מקבילית שבה אלכסון הוא חוצה זווית היא מעוין.',
     match: (ctx) => {
@@ -2107,7 +2133,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 60, type: 'C', salience: 'headline', family: 'quad',
+    id: 60, type: 'C', salience: 'headline', pointedness: 'standard', family: 'quad',
     en: 'A rhombus with equal diagonals is a square.',
     he: 'מעוין שבו האלכסונים שווים הוא ריבוע.',
     match: (ctx) => {
@@ -2119,7 +2145,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 61, type: 'C', salience: 'headline', family: 'quad',
+    id: 61, type: 'C', salience: 'headline', pointedness: 'standard', family: 'quad',
     en: 'A rectangle with equal adjacent sides is a square.',
     he: 'מלבן בו הצלעות הסמוכות שוות הוא ריבוע.',
     match: (ctx) => {
@@ -2131,7 +2157,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 40, type: 'C', salience: 'headline', family: 'quad',
+    id: 40, type: 'C', salience: 'headline', pointedness: 'standard', family: 'quad',
     en: 'A trapezoid in which the angles at the same base are equal is isosceles.',
     he: 'טרפז בו הזוויות שליד אותו בסיס שוות זו לזו הוא טרפז שווה שוקיים.',
     match: (ctx) => {
@@ -2143,7 +2169,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 42, type: 'C', salience: 'headline', family: 'quad',
+    id: 42, type: 'C', salience: 'headline', pointedness: 'standard', family: 'quad',
     en: 'A trapezoid with equal diagonals is isosceles.',
     he: 'טרפז בו האלכסונים שווים זה לזה הוא טרפז שווה שוקיים.',
     match: (ctx) => {
@@ -2157,7 +2183,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ----- Angle sums (35/36) -----
   {
-    id: 35, type: 'P', salience: 'background', family: 'quad',
+    id: 35, type: 'P', salience: 'background', pointedness: 'generic', family: 'quad',
     en: 'The interior angles of a quadrilateral sum to 360°.',
     he: 'סכום הזוויות במרובע הוא 360°.',
     match: (ctx) => {
@@ -2166,7 +2192,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 36, type: 'P', salience: 'background', family: 'quad',
+    id: 36, type: 'P', salience: 'background', pointedness: 'generic', family: 'quad',
     en: 'The interior angles of a convex n-gon sum to (n−2)·180°.',
     he: 'סכום הזוויות הפנימיות של מצולע קמור הוא (n−2)·180°.',
     match: (ctx) => {
@@ -2177,7 +2203,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
 
   // ----- Perpendicular bisector, concurrency, incircle, regular polygons (82/83/85/86/81/89/90/77) -----
   {
-    id: 82, type: 'P', salience: 'headline', family: 'triangle',
+    id: 82, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'triangle',
     en: 'Every point on the perpendicular bisector of a segment is equidistant from its endpoints.',
     he: 'כל נקודה על האנך האמצעי של קטע נמצאת במרחקים שווים מקצות הקטע.',
     match: (ctx) => {
@@ -2187,7 +2213,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 83, type: 'C', salience: 'background', family: 'triangle',
+    id: 83, type: 'C', salience: 'background', pointedness: 'standard', family: 'triangle',
     en: "A point equidistant from a segment's endpoints lies on its perpendicular bisector.",
     he: 'כל נקודה הנמצאת במרחקים שווים מקצות קטע נמצאת על האנך האמצעי.',
     match: (ctx) => {
@@ -2204,7 +2230,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 85, type: 'P', salience: 'headline', family: 'triangle',
+    id: 85, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'triangle',
     en: 'The three perpendicular bisectors of a triangle meet at one point — the circumcenter.',
     he: 'במשולש, שלושת האנכים האמצעיים נחתכים בנקודה אחת, שהיא מרכז המעגל החוסם.',
     match: (ctx) => {
@@ -2220,7 +2246,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 86, type: 'P', salience: 'headline', family: 'triangle',
+    id: 86, type: 'P', salience: 'headline', pointedness: 'pointed', family: 'triangle',
     en: 'The three altitudes of a triangle meet at one point (the orthocenter).',
     he: 'שלושת הגבהים במשולש נחתכים בנקודה אחת.',
     match: (ctx) => {
@@ -2234,7 +2260,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   },
   {
-    id: 81, type: 'P', salience: 'background', family: 'circle',
+    id: 81, type: 'P', salience: 'background', pointedness: 'standard', family: 'circle',
     en: 'Every triangle has an inscribed circle.',
     he: 'בכל משולש אפשר לחסום מעגל.',
     match: (ctx) => {
@@ -2266,7 +2292,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     [89, 'Every regular polygon has a circumscribed circle.', 'כל מצולע משוכלל אפשר לחסום במעגל.'],
     [90, 'Every regular polygon has an inscribed circle.', 'בכל מצולע משוכלל אפשר לחסום מעגל.'],
   ] as [number, string, string][]).map(([id, en, he]): TheoremDef => ({
-    id, type: 'P', salience: 'background', family: 'quad', en, he,
+    id, type: 'P', salience: 'background', pointedness: 'generic', family: 'quad', en, he,
     match: (ctx) => {
       // The ADR-111 regular-polygon construct: a `polygon` (n ≥ 5) whose vertices ride one circle.
       for (const f of factsWith(ctx, (c) => c.type === 'polygon' && c.ids.length >= 5)) {
@@ -2277,7 +2303,7 @@ export const THEOREM_TABLE: TheoremDef[] = [
     },
   })),
   {
-    id: 77, type: 'C', salience: 'background', family: 'triangle',
+    id: 77, type: 'C', salience: 'background', pointedness: 'standard', family: 'triangle',
     en: 'A line through a vertex that divides the opposite side (internally) in the ratio of the other two sides is the angle bisector.',
     he: 'ישר העובר דרך קודקוד וחוצה את הצלע שמולו ביחס שתי הצלעות האחרות הוא חוצה זווית המשולש.',
     match: (ctx) => {

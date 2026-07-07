@@ -152,6 +152,9 @@
     "highlightHint": "לחצו כדי לסמן על השרטוט את מה שהמשפט מדבר עליו",
     "backgroundTitle": "משפטי רקע",
     "backgroundToggle": "{{count}} משפטי רקע",
+    "moreFold": "עוד {{count}} משפטים שחלים",
+    "coveredBy": "(מכוסה על ידי #{{id}})",
+    "observedPrefix": "נראה בשרטוט:",
     "confidence": {
       "definite": "חל",
       "possible": "עשוי לחול"
@@ -178,6 +181,7 @@
       "l3hint": "וגם מה שמתגלה מהשרטוט"
     }
   },
+  "principles": { "title": "עקרונות", "more": "עוד {{count}} עקרונות" },
   "concepts": {
     "title": "עקרונות מנחים"
   },
