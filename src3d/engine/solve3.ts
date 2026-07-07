@@ -84,7 +84,12 @@ export function leastSquares(residuals: (x: number[]) => number[], x0: number[],
       for (let k = 0; k < m; k++) bi -= J[i][k] * r[k];
       b.push(bi);
     }
-    for (let i = 0; i < n; i++) A[i][i] += lambda * (A[i][i] || 1);
+    // damping floor is ABSOLUTE: a noise-tiny diagonal (an invariant direction's
+    // cancellation residue, ~1e-20) must not be its own damping scale — λ·1e-20
+    // admits ~1e10 steps along pure noise, blowing coordinates into catastrophic-
+    // cancellation territory (the "numeric-Jacobian floor" class). Unknowns here
+    // are O(1) (world units, radians, logScale), so a unit floor is sound.
+    for (let i = 0; i < n; i++) A[i][i] += lambda * Math.max(A[i][i], 1);
     const delta = solveLinear(A, b);
     if (!delta) {
       lambda *= 10;
@@ -257,21 +262,31 @@ export function solvePivot(
     if (dims0.length === 0) return []; // nothing to flex — the condition either holds or is refused downstream
     const f = residualsFor(false); // mirror is also invariant here
     const fd = (d: number[]) => f([0, 0, 0, 0, 0, 0, 0, ...d]);
+    // regularised-nearest: the invariant residuals are ANGLE-like (length-normalized),
+    // so an unconstrained dim can drift to extremes that also shrink them (a ⟂ apex
+    // ran its free height to ~55× the base — a needle). A tiny pull toward the seed's
+    // sampled dims anchors the null-space; acceptance stays on the PRIMARY residuals.
+    const REG = 1e-4;
+    const fr = (d: number[]) => [...fd(d), ...d.map((v, i) => REG * (v - dims0[i]))];
     // dims-only multi-start: deterministic jitters around the seed's sample
     const dimStarts = [dims0, dims0.map((v) => v * 0.75), dims0.map((v) => v * 1.3), dims0.map((v, i) => (i % 2 ? v * 0.6 : v * 1.2))];
     let best: { x: number[]; err: number } | null = null;
     for (const d0 of dimStarts) {
-      let r = leastSquares(fd, d0);
+      let r = leastSquares(fr, d0);
       for (let polish = 0; polish < 3 && r.err > 1e-24 && r.err < 1e-4; polish++) {
-        const r2 = leastSquares(fd, r.x);
+        const r2 = leastSquares(fr, r.x);
         if (r2.err >= r.err * 0.99) break;
         r = r2;
       }
       if (!best || r.err < best.err) best = r;
       if (best.err < 1e-22) break;
     }
-    if (!best || best.err >= 1e-12) return [];
-    return [{ transform: (p) => p, mirror: false, dims: best.x, err: best.err }];
+    if (!best) return [];
+    const primary = fd(best.x).reduce((s, v) => s + v * v, 0);
+    // acceptance: the regulariser's pull stops LM at a primary floor of ~(REG·dims)² —
+    // 1e-10 sits above that equilibrium and far under the 2e-5 claim tolerance
+    if (primary >= 1e-10) return [];
+    return [{ transform: (p) => p, mirror: false, dims: best.x, err: primary }];
   }
 
   // deterministic multi-start: several initial rotations, seed-rotated so "show

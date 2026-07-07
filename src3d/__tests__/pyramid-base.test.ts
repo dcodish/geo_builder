@@ -78,6 +78,9 @@ describe('pyramid base shape is a stated given, not a default', () => {
     expect(Math.abs(AS.x * AB.x + AS.y * AB.y + AS.z * AB.z) / (n(AS) * n(AB))).toBeLessThan(1e-4);
     expect(Math.abs(AS.x * AD.x + AS.y * AD.y + AS.z * AD.z) / (n(AS) * n(AD))).toBeLessThan(1e-4);
     expect(n(AS)).toBeGreaterThan(0.1); // non-degenerate
+    // regularised-nearest: the free height must stay near its seed sample, not run
+    // to a needle (the angle-normalized ⟂ residual also shrinks as the apex climbs)
+    expect(n(AS)).toBeLessThan(3 * dist(A, B));
   });
 
   it('English mirror: perpendicular/parallel to the base', () => {

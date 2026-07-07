@@ -68,6 +68,7 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
   let c: Construction3 = emptyConstruction3();
   const status: Record<string, FactStatus3> = {};
   const claimOwners: { factId: string; from: number; to: number }[] = [];
+  const pinOwnerIds = new Set<string>();
   for (const f of facts) {
     if (!f.enabled) {
       status[f.id] = 'disabled';
@@ -75,6 +76,7 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     }
     let st: FactStatus3 = 'ok';
     const claimsBefore = c.claims.length;
+    const pinsBefore = c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length;
     for (const cmd of f.cmds) {
       const r = applyCommand3(c, cmd);
       if (!r.ok) {
@@ -86,6 +88,9 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     // count-delta attribution: EVERY claim recorded while this fact applied belongs to
     // it — including claims composite commands create indirectly (none can escape)
     if (c.claims.length > claimsBefore) claimOwners.push({ factId: f.id, from: claimsBefore, to: c.claims.length });
+    // pin ownership (same count-delta discipline): a fact that contributed ANY pivot
+    // pin must not read ok when the pivot finds no placement (honesty — no silent seed figure)
+    if (c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length > pinsBefore) pinOwnerIds.add(f.id);
     status[f.id] = st;
   }
 
@@ -112,6 +117,12 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
 
   for (const f of facts) {
     if (status[f.id] !== 'ok') continue;
+    // a pin-contributing fact with NO pivot placement — honest refusal, never a silent
+    // fallback to the unsolved seed figure (class: any pin kind, not only injections)
+    if (pinOwnerIds.has(f.id) && resolved.pivot && resolved.pivot.solutions === 0) {
+      status[f.id] = { code: 'injection-unsatisfiable' };
+      continue;
+    }
     for (const cmd of f.cmds) {
       if (cmd.type === 'point-in-span') {
         const def = c.points.get(cmd.id);
