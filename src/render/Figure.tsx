@@ -1003,16 +1003,18 @@ export function Figure({
       {/* Orientation controls — rotate / flip / align the whole figure (labels stay upright). These are
           secondary, so they're collapsed behind a single labeled toggle to keep the canvas uncluttered. */}
       <div style={{ position: 'absolute', top: 8, insetInlineStart: 8, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-        <button
-          type="button"
-          style={{ ...ctrlBtn, ...(showOrient ? { background: '#dbeafe', borderColor: '#93c5fd' } : null) }}
-          title={tt.transform}
-          aria-label={tt.transform}
-          aria-expanded={showOrient}
-          onClick={() => setShowOrient((v) => !v)}
-        >
-          ⟳ {tt.transform} {showOrient ? '▴' : '▾'}
-        </button>
+        <div style={toolbarTray}>
+          <button
+            type="button"
+            style={{ ...ctrlBtn, ...(showOrient ? { background: '#dbeafe', borderColor: '#93c5fd' } : null) }}
+            title={tt.transform}
+            aria-label={tt.transform}
+            aria-expanded={showOrient}
+            onClick={() => setShowOrient((v) => !v)}
+          >
+            ⟳ {tt.transform} {showOrient ? '▴' : '▾'}
+          </button>
+        </div>
         {showOrient && (
           <div style={orientPopover}>
             <button type="button" style={ctrlBtn} title={tt.rotate90} aria-label={tt.rotate90} onClick={() => setView((v) => ({ ...v, rot: normRot(v.rot - Math.PI / 2) }))}>
@@ -1055,7 +1057,10 @@ export function Figure({
         )}
       </div>
 
-      <div style={{ position: 'absolute', top: 8, insetInlineEnd: 8, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      {/* One toolbar TRAY (GUI overhaul): file pair | image pair | zoom trio, separated by thin
+          dividers inside a single rounded container — reads as one toolbar instead of seven
+          scattered buttons of three different shapes. */}
+      <div style={{ position: 'absolute', top: 8, insetInlineEnd: 8, ...toolbarTray, justifyContent: 'flex-end' }}>
         {/* Save / load the construction as a .geo.json file (FR-HS-10) — grouped with the image exports
             because a student reaches for "save my work" in the same place. A slate variant marks them as
             the file pair, distinct from the blue image pair; the host owns the actual file I/O. */}
@@ -1076,6 +1081,7 @@ export function Figure({
             {tt.loadFile}
           </button>
         )}
+        {(onSaveFile || onLoadFile) && <span style={traySep} aria-hidden />}
         {/* Export — most-used by teachers, so these are prominent labeled buttons. */}
         <button
           type="button"
@@ -1089,6 +1095,7 @@ export function Figure({
         <button type="button" style={exportBtn} title={tt.saveImage} aria-label={tt.saveImage} onClick={saveImage}>
           ⤓ {tt.saveImage}
         </button>
+        <span style={traySep} aria-hidden />
         {/* Zoom buttons (F2) — the touch-first fallback for wheel zoom (pinch works too); handy for mice. */}
         <button type="button" style={ctrlBtn} title="zoom in" aria-label="zoom in" onClick={() => setView((v) => ({ ...v, zoom: clamp(v.zoom * 1.25, 0.2, 8) }))}>
           +
@@ -1146,10 +1153,26 @@ async function svgToPng(svg: SVGSVGElement, scale = 2): Promise<Blob> {
   return await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png'));
 }
 
+// The one toolbar tray container — both canvas clusters (transform at the start edge,
+// file/export/zoom at the end edge) share it so the controls read as toolbars, not
+// scattered buttons (GUI overhaul).
+const toolbarTray: CSSProperties = {
+  display: 'flex',
+  gap: 4,
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  background: 'rgba(255,255,255,0.94)',
+  border: '1px solid #e2e8f0',
+  borderRadius: 10,
+  padding: 4,
+  boxShadow: '0 1px 4px rgba(15,23,42,0.06)',
+};
+// A thin vertical divider between tray groups (file | image | zoom).
+const traySep: CSSProperties = { width: 1, alignSelf: 'stretch', background: '#e2e8f0', margin: '2px 1px' };
 const ctrlBtn: CSSProperties = {
-  padding: '4px 9px',
+  padding: '5px 9px',
   fontSize: 13,
-  lineHeight: 1,
+  lineHeight: 1.2,
   minWidth: 28,
   borderRadius: 6,
   border: '1px solid #cbd5e1',
@@ -1173,13 +1196,13 @@ const orientPopover: CSSProperties = {
 const exportBtn: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 6,
-  padding: '6px 12px',
-  fontSize: 13,
+  gap: 5,
+  padding: '5px 10px',
+  fontSize: 12.5,
   fontWeight: 600,
-  lineHeight: 1,
-  borderRadius: 8,
-  border: '1px solid #2563eb',
+  lineHeight: 1.2,
+  borderRadius: 6,
+  border: '1px solid #bfdbfe',
   background: '#eff6ff',
   color: '#1e40af',
   cursor: 'pointer',

@@ -61,7 +61,11 @@
     "symbols": "Symbols",
     "insertSymbol": "Insert a symbol (root/power for a symbolic length, or ∠ ° ⊥ ∥)"
   },
+  "explore": {
+    "title": "Explore the figure"
+  },
   "examples": {
+    "title": "Examples",
     "heading": "Examples — click to try, or type your own",
     "items": [
       "trapezoid ABCD inscribed in a circle",

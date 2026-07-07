@@ -23,6 +23,7 @@ import { bookUrl } from '@/shapes/shapeCatalog';
 import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES_VISIBLE } from '@/theorems';
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
+import { btn, card as themeCard, color as pal, foldToggle, fs, pill, sectionTitle } from '@/ui/theme';
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import { deserializeFigure, figureFileName, serializeFigure } from '@/store/figureFile';
@@ -38,13 +39,8 @@ import { humanizeError } from '@/i18n/humanizeError';
  */
 const nextPaint = () => new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res())));
 
-/**
- * The live theorem-discovery feed (Phase 6a) is still experimental and is NOT shipped live: it is enabled
- * in development (`npm run dev`) but DISABLED in production builds — the "show theorems" checkbox renders
- * greyed-out/unchecked and the feed never appears. A prod build can force it on with `VITE_ENABLE_THEOREMS=true`
- * (so we can flip it live without a code change once it's ready). Everything else worked on ships normally.
- */
-const THEOREMS_ENABLED = import.meta.env.DEV || import.meta.env.VITE_ENABLE_THEOREMS === 'true';
+// The live theorem-discovery feed (Phase 6a/6b) SHIPS LIVE (operator, 2026-07-07 — the old
+// dev-only gate is removed): on by default everywhere, and the student can turn it off from תצוגה.
 
 export default function App() {
   const { t, i18n } = useTranslation();
@@ -131,10 +127,12 @@ export default function App() {
   const [helpTab, setHelpTab] = useState<'guide' | 'commands'>('guide');
   const [aboutOpen, setAboutOpen] = useState(false); // the "מה זה?" intro modal (first load + reopenable)
   const [showSymbols, setShowSymbols] = useState(false); // the Greek/symbol insert rows — collapsed by default (advanced)
+  const [examplesOpen, setExamplesOpen] = useState(false); // examples auto-show while the canvas is empty; fold once building starts
+  const [displayOpen, setDisplayOpen] = useState(true); // the display-options fold — OPEN by default (operator: the discovery dial is important and must stay visible); foldable for students who want the space
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editError, setEditError] = useState(false);
-  const [showTheorems, setShowTheorems] = useState(THEOREMS_ENABLED); // the live theorem feed (Phase 6a) — on by default in dev, OFF+disabled in prod (not shipped live yet)
+  const [showTheorems, setShowTheorems] = useState(true); // the live theorem feed (Phase 6a) — LIVE, on by default (operator 2026-07-07)
   const [discoveryLevel, setDiscoveryLevel] = useState<DiscoveryLevel>(1); // the theorem discovery dial (ADR-219) — L1 Given by default
   const [theoremSel, setTheoremSel] = useState<TheoremId | null>(null); // the theorem row whose premise is highlighted on the canvas
   const [bgOpen, setBgOpen] = useState(false); // the collapsed "background theorems" family fold is expanded
@@ -869,6 +867,10 @@ export default function App() {
           <button type="button" style={ghost} onClick={() => setAboutOpen(true)}>
             {t('header.about')}
           </button>
+          {/* Language toggle — the label names the OTHER language (press to switch to it). */}
+          <button type="button" style={ghost} onClick={() => i18n.changeLanguage(he ? 'en' : 'he')}>
+            {t('actions.language')}
+          </button>
         </div>
       </header>
 
@@ -974,7 +976,7 @@ export default function App() {
 
         <aside style={sidebar}>
           <form
-            style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+            style={sideCard}
             onSubmit={(e) => {
               e.preventDefault();
               if (text.trim()) submit(text);
@@ -1045,18 +1047,27 @@ export default function App() {
                 {t('input.partial')}: {llmDropped.join('; ')}
               </span>
             )}
-          </form>
 
-          <div>
-            <div style={sectionLabel}>{t('examples.heading')}</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {examples.map((ex) => (
-                <button key={ex} type="button" style={chip} onClick={() => submit(ex)} dir={textDir(ex)}>
-                  {ex}
-                </button>
-              ))}
-            </div>
-          </div>
+            {/* Examples live with the input (they ARE input). Fully shown while the canvas is
+                empty — the moment building starts they fold away to reclaim the space, and a
+                quiet toggle brings them back. */}
+            {facts.length === 0 ? (
+              <div style={{ ...sectionLabel, marginTop: 2 }}>{t('examples.heading')}</div>
+            ) : (
+              <button type="button" style={foldToggle} onClick={() => setExamplesOpen((v) => !v)}>
+                {examplesOpen ? '▾' : '▸'} {t('examples.title')}
+              </button>
+            )}
+            {(facts.length === 0 || examplesOpen) && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {examples.map((ex) => (
+                  <button key={ex} type="button" style={chip} onClick={() => submit(ex)} dir={textDir(ex)}>
+                    {ex}
+                  </button>
+                ))}
+              </div>
+            )}
+          </form>
 
           {lastError && <div role="status" aria-live="polite" style={errorBanner}>⚠ {explainError(lastError)}</div>}
 
@@ -1079,18 +1090,38 @@ export default function App() {
             </div>
           )}
 
-          <div>
-            <div style={sectionLabel}>{t('steps.title')}</div>
+          <div style={sideCard}>
+            {/* Card header: title, the figure's remaining freedom as a compact pill (was a loose
+                line floating between buttons), and undo/redo/clear as small in-context utilities
+                (they act on the step list, so they live with it — and vanish on an empty session). */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <div style={{ ...sectionLabel, flex: 1 }}>{t('steps.title')}</div>
+              {facts.length > 0 && (
+                <span style={freeDofCount(construction) > 0 ? dofPillFree : dofPillDone}>
+                  {freeDofCount(construction) > 0 ? t('actions.dof', { count: freeDofCount(construction) }) : `✓ ${t('actions.determined')}`}
+                </span>
+              )}
+              {(facts.length > 0 || canUndo || canRedo) && (
+                <span style={{ display: 'flex', gap: 4 }}>
+                  <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => undo()}>{t('actions.undo')}</button>
+                  <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => redo()}>{t('actions.redo')}</button>
+                  <button type="button" style={{ ...subtleBtn, color: pal.danger }} onClick={clear}>{t('actions.clear')}</button>
+                </span>
+              )}
+            </div>
             {facts.length === 0 ? (
               <p style={{ color: '#94a3b8', fontSize: 13, margin: 0 }}>{t('steps.empty')}</p>
             ) : (
               <>
-              {/* What the status marks mean — a quick legend so ✓ / ✗ / ○ aren't cryptic. */}
-              <div style={legend}>
-                <span><span style={{ color: '#16a34a' }}>✓</span> {t('steps.statusOk')}</span>
-                <span><span style={{ color: '#dc2626' }}>✗</span> {t('steps.statusBroken')}</span>
-                <span><span style={{ color: '#94a3b8' }}>○</span> {t('steps.statusOff')}</span>
-              </div>
+              {/* What the status marks mean — shown only when some row ISN'T a plain ✓ (an
+                  all-green list needs no legend). */}
+              {facts.some((f) => !f.enabled || (status[f.id] && status[f.id] !== 'ok')) && (
+                <div style={legend}>
+                  <span><span style={{ color: '#16a34a' }}>✓</span> {t('steps.statusOk')}</span>
+                  <span><span style={{ color: '#dc2626' }}>✗</span> {t('steps.statusBroken')}</span>
+                  <span><span style={{ color: '#94a3b8' }}>○</span> {t('steps.statusOff')}</span>
+                </div>
+              )}
               <ul style={stepList}>
                 {groups.map((g) => {
                   const on = g.facts.every((f) => f.enabled);
@@ -1167,77 +1198,28 @@ export default function App() {
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button type="button" style={ghost} disabled={!canUndo} onClick={() => undo()}>{t('actions.undo')}</button>
-            <button type="button" style={ghost} disabled={!canRedo} onClick={() => redo()}>{t('actions.redo')}</button>
-            <button type="button" style={ghost} onClick={clear}>{t('actions.clear')}</button>
-            {/* Save/load a figure file (FR-HS-10) now live in the canvas export toolbar, next to
-                copy/save-image — where a student reaches for "save my work". Only the hidden picker that
-                the toolbar's "load from file" button triggers stays here in the DOM. */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json,application/json"
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = ''; // so picking the SAME file again still fires a change event
-                if (f) void loadFigureFile(f);
-              }}
-            />
-          </div>
+          {/* Save/load a figure file (FR-HS-10) live in the canvas export toolbar, next to
+              copy/save-image — where a student reaches for "save my work". Only the hidden picker that
+              the toolbar's "load from file" button triggers stays here in the DOM. */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,application/json"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = ''; // so picking the SAME file again still fires a change event
+              if (f) void loadFigureFile(f);
+            }}
+          />
 
-          {/* Display options — what to show on the figure (grouped together; ⊙ centres used to be a
-              cryptic button on the canvas — now it sits next to "show measures"). */}
-          <div>
-            <div style={sectionLabel}>{t('display.title')}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={displayToggle}>
-                <input type="checkbox" checked={showMeasures} onChange={(e) => setShowMeasures(e.target.checked)} />
-                {t('actions.showMeasures')}
-              </label>
-              <label style={displayToggle}>
-                <input type="checkbox" checked={showCenters} onChange={(e) => setShowCenters(e.target.checked)} />
-                {t('canvas.centers')}
-              </label>
-              {/* The theorem feed is not shipped live yet (Phase 6a). In production the toggle is disabled
-                  (greyed out, unchecked) so it can't be turned on; it works normally in dev. */}
-              <label style={THEOREMS_ENABLED ? displayToggle : { ...displayToggle, opacity: 0.45, cursor: 'not-allowed' }} title={THEOREMS_ENABLED ? undefined : t('theorems.soon')}>
-                <input type="checkbox" checked={showTheorems} disabled={!THEOREMS_ENABLED} onChange={(e) => setShowTheorems(e.target.checked)} />
-                {t('theorems.toggle')}
-              </label>
-              {/* Discovery-level dial (ADR-219) — cumulative L1→L3 selector; each level includes the ones
-                  below. L3 (Observed) needs evaluated coordinates, so selecting it auto-runs shape detection
-                  (an effect keeps the layer live as the figure grows). Only shown while theorems are on. */}
-              {showTheorems && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginInlineStart: 22 }}>
-                  <div style={{ fontSize: 11, color: '#64748b' }}>{t('theorems.discovery.label')}</div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {([1, 2, 3] as DiscoveryLevel[]).map((lvl) => (
-                      <button
-                        key={lvl}
-                        type="button"
-                        onClick={() => setDiscoveryLevel(lvl)}
-                        title={t(`theorems.discovery.l${lvl}hint`)}
-                        style={discoveryLevel === lvl ? discoveryBtnOn : discoveryBtn}
-                      >
-                        {t(`theorems.discovery.l${lvl}`)}
-                        {/* The dial AFFORDANCE (D4 follow-through): with L1 kept as the default, the
-                            dial itself must say "there is more here" — a +n badge counts the entries
-                            a higher level would reveal. */}
-                        {lvl > discoveryLevel && theoremFeed.filter((e) => e.level <= lvl).length > theoremFeed.filter((e) => e.level <= discoveryLevel).length && (
-                          <span style={{ fontSize: 10, color: '#b45309', marginInlineStart: 3 }}>
-                            +{theoremFeed.filter((e) => e.level <= lvl).length - theoremFeed.filter((e) => e.level <= discoveryLevel).length}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
+          {/* ── Explore the figure — one card for everything that interrogates the BUILT figure:
+              alternative configurations, the ground-truth relations layer, shape detection, and the
+              playable radius sliders. Replaces three identical full-width purple buttons stacked
+              with loose status lines between them. */}
+          {facts.length > 0 && (
+          <div style={sideCard}>
+            <div style={sectionLabel}>{t('explore.title')}</div>
           {(branchId || hasVariant || freeDofs(construction).length > 0) && (
             <button
               type="button"
@@ -1282,21 +1264,15 @@ export default function App() {
           {resampling && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
           {altNote && <span style={{ fontSize: 12, color: '#64748b' }}>{altNote}</span>}
 
-          {/* ADR-018 Stage 3 — the figure's remaining freedom, shrinking as facts accumulate
-              until it reads "fully determined" (a single rigid drawing). */}
-          {facts.length > 0 && (
-            <span style={{ fontSize: 12, color: freeDofCount(construction) > 0 ? '#2563eb' : '#16a34a' }}>
-              {freeDofCount(construction) > 0 ? t('actions.dof', { count: freeDofCount(construction) }) : t('actions.determined')}
-            </span>
-          )}
-
-          {/* "View relations" — the ground-truth layer (ADR-134): on press, mark every equal side / equal
-              angle the givens FORCE (ticks / arcs). A button, not a live toggle; the detection samples the
-              figure, so we paint a busy state first. Dismiss with the same button; a new fact auto-clears it. */}
-          {facts.length > 0 && (
+          {/* The two analysis layers side by side — quiet outline toggles (secondary to "show
+              another configuration"); each fills with its on-canvas layer colour while active. */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {/* "View relations" — the ground-truth layer (ADR-134): on press, mark every equal side / equal
+                angle the givens FORCE (ticks / arcs). A button, not a live toggle; the detection samples the
+                figure, so we paint a busy state first. Dismiss with the same button; a new fact auto-clears it. */}
             <button
               type="button"
-              style={relationsLayer ? relBtnOn : alt}
+              style={relationsLayer ? relBtnOn : exploreToggle}
               disabled={analysing}
               title={t('actions.relationsHint')}
               onClick={() => {
@@ -1321,25 +1297,13 @@ export default function App() {
             >
               {analysing ? t('actions.analysing') : relationsLayer ? t('actions.hideRelations') : t('actions.viewRelations')}
             </button>
-          )}
-          {relationsLayer && relationsLayer.equalSegments.length === 0 && relationsLayer.equalAngles.length === 0 && (
-            <span style={{ fontSize: 12, color: '#64748b' }}>{t('actions.relationsNone')}</span>
-          )}
-          {relationsLayer && (relationsLayer.equalSegments.length > 0 || relationsLayer.equalAngles.length > 0) && (
-            <span style={{ fontSize: 12, color: '#64748b' }}>{t('actions.relationsHover')}</span>
-          )}
-
-          {/* The detected-shapes section — the button, badges, and inline book-link card grouped in one
-              ref'd container so it can be scrolled into view when it appears (kept on one screen). */}
-          <div ref={shapesRef} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* "Detect shapes" (FR-SH) — on press, classify every named shape the figure contains (forced
-              across samples) and list each as a badge that links to its page in the geometry book. A
-              button, not a live toggle (opt-in, same pedagogy boundary as "view relations"); a new fact
-              auto-clears the layer. */}
-          {facts.length > 0 && (
+            {/* "Detect shapes" (FR-SH) — on press, classify every named shape the figure contains (forced
+                across samples) and list each as a badge that links to its page in the geometry book. A
+                button, not a live toggle (opt-in, same pedagogy boundary as "view relations"); a new fact
+                auto-clears the layer. */}
             <button
               type="button"
-              style={shapesLayer ? shapesBtnOn : alt}
+              style={shapesLayer ? shapesBtnOn : exploreToggle}
               disabled={detecting}
               title={t('shapes.hint')}
               onClick={() => {
@@ -1366,7 +1330,18 @@ export default function App() {
             >
               {detecting ? t('shapes.analysing') : shapesLayer ? t('shapes.hide') : t('shapes.detect')}
             </button>
+          </div>
+
+          {relationsLayer && relationsLayer.equalSegments.length === 0 && relationsLayer.equalAngles.length === 0 && (
+            <span style={{ fontSize: 12, color: '#64748b' }}>{t('actions.relationsNone')}</span>
           )}
+          {relationsLayer && (relationsLayer.equalSegments.length > 0 || relationsLayer.equalAngles.length > 0) && (
+            <span style={{ fontSize: 12, color: '#64748b' }}>{t('actions.relationsHover')}</span>
+          )}
+
+          {/* The detected-shapes RESULTS — badges + inline book-link card + similar classes, grouped in
+              one ref'd container so it can be scrolled into view when it appears (kept on one screen). */}
+          <div ref={shapesRef} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {shapesLayer && shapesLayer.shapes.length === 0 && (
             <span style={{ fontSize: 12, color: '#64748b' }}>{t('shapes.none')}</span>
           )}
@@ -1434,14 +1409,74 @@ export default function App() {
           )}
           </div>
 
+          {/* Playable degrees of freedom (first slice): a slider per free-circle radius. Dialing a value
+              is a viewing scratchpad — "show another configuration" resets it. */}
+          {radiusDofs.length > 0 && (
+            <div>
+              <div style={sectionLabel}>{t('dof.title')}</div>
+              {radiusDofs.map((d) => {
+                const value = radiusOverrides[d.circle] ?? d.current;
+                // A concentric pair (ADR-244) shares a centre letter — label its sliders outer/inner.
+                const paired = radiusDofs.some((o) => o.circle !== d.circle && o.center === d.center);
+                const isInner = construction.objects.some((o) => o.kind === 'circle' && o.id === d.circle && o.innerOf);
+                const label = paired ? t(isInner ? 'dof.radiusInner' : 'dof.radiusOuter', { center: d.center }) : t('dof.radius', { center: d.center });
+                return (
+                  <div key={d.circle} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, minWidth: 96 }}>{label}</span>
+                    <input
+                      type="range"
+                      min={Math.max(0.2, d.base * 0.3)}
+                      max={d.base * 2.2}
+                      step={d.base * 0.02}
+                      value={value}
+                      onChange={(e) => setRadius(d.circle, Number(e.target.value))}
+                      style={{ flex: 1 }}
+                    />
+                    <span style={{ fontSize: 12, minWidth: 34, textAlign: 'end', color: '#64748b' }}>{value.toFixed(1)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          </div>
+          )}
+
           {/* The LIVE theorem feed (Phase 6a) — the bagrut theorems the STATED givens announce, updated
               every step (help, don't reveal: only what the givens *announce*, never the derived "aha").
               Headline entries are listed individually (tier dot + ● new-this-step); background theorems
               fold into one collapsed row per family. Clicking a row highlights that theorem's PREMISE on
               the canvas — never the conclusion. Toggled off from Display options. */}
           {showTheorems && facts.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ ...sideCard, gap: 6 }}>
               <div style={sectionLabel}>{t('theorems.title')}</div>
+              {/* Discovery-level dial (ADR-219) — cumulative L1→L3 selector; each level includes the ones
+                  below. L3 (Observed) needs evaluated coordinates, so selecting it auto-runs shape detection
+                  (an effect keeps the layer live as the figure grows). The dial lives WITH the feed it
+                  controls (operator: the discovery levels are important — never bury them in settings). */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11, color: '#64748b' }}>{t('theorems.discovery.label')}</span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {([1, 2, 3] as DiscoveryLevel[]).map((lvl) => (
+                    <button
+                      key={lvl}
+                      type="button"
+                      onClick={() => setDiscoveryLevel(lvl)}
+                      title={t(`theorems.discovery.l${lvl}hint`)}
+                      style={discoveryLevel === lvl ? discoveryBtnOn : discoveryBtn}
+                    >
+                      {t(`theorems.discovery.l${lvl}`)}
+                      {/* The dial AFFORDANCE (D4 follow-through): with L1 kept as the default, the
+                          dial itself must say "there is more here" — a +n badge counts the entries
+                          a higher level would reveal. */}
+                      {lvl > discoveryLevel && theoremFeed.filter((e) => e.level <= lvl).length > theoremFeed.filter((e) => e.level <= discoveryLevel).length && (
+                        <span style={{ fontSize: 10, color: '#b45309', marginInlineStart: 3 }}>
+                          +{theoremFeed.filter((e) => e.level <= lvl).length - theoremFeed.filter((e) => e.level <= discoveryLevel).length}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {visibleTheorems.length === 0 && (
                 <span style={{ fontSize: 12, color: '#64748b' }}>{t('theorems.empty')}</span>
               )}
@@ -1479,7 +1514,7 @@ export default function App() {
               shape only (never the question text, never an instantiated pair — the D5 guardrails);
               at most a few show at once (§6 anti-flood). Same Display toggle as the theorems. */}
           {showTheorems && principleFeed.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ ...sideCard, gap: 6 }}>
               <div style={sectionLabel}>{t('principles.title')}</div>
               {principleFeed.slice(0, PRINCIPLES_VISIBLE).map((c) => (
                 <div key={c.id} style={conceptRow}>
@@ -1494,35 +1529,30 @@ export default function App() {
             </div>
           )}
 
-          {/* Playable degrees of freedom (first slice): a slider per free-circle radius. Dialing a value
-              is a viewing scratchpad — "show another configuration" resets it. */}
-          {radiusDofs.length > 0 && (
-            <div>
-              <div style={sectionLabel}>{t('dof.title')}</div>
-              {radiusDofs.map((d) => {
-                const value = radiusOverrides[d.circle] ?? d.current;
-                // A concentric pair (ADR-244) shares a centre letter — label its sliders outer/inner.
-                const paired = radiusDofs.some((o) => o.circle !== d.circle && o.center === d.center);
-                const isInner = construction.objects.some((o) => o.kind === 'circle' && o.id === d.circle && o.innerOf);
-                const label = paired ? t(isInner ? 'dof.radiusInner' : 'dof.radiusOuter', { center: d.center }) : t('dof.radius', { center: d.center });
-                return (
-                  <div key={d.circle} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, minWidth: 96 }}>{label}</span>
-                    <input
-                      type="range"
-                      min={Math.max(0.2, d.base * 0.3)}
-                      max={d.base * 2.2}
-                      step={d.base * 0.02}
-                      value={value}
-                      onChange={(e) => setRadius(d.circle, Number(e.target.value))}
-                      style={{ flex: 1 }}
-                    />
-                    <span style={{ fontSize: 12, minWidth: 34, textAlign: 'end', color: '#64748b' }}>{value.toFixed(1)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {/* Display options — collapsed by default (settings, not workflow): measures, ⊙ centres,
+              and the theorem-feed toggle + discovery dial. Folding them reclaims permanent sidebar
+              space they used to occupy on every session, including empty ones. */}
+          <div>
+            <button type="button" style={foldToggle} onClick={() => setDisplayOpen((v) => !v)}>
+              {displayOpen ? '▾' : '▸'} {t('display.title')}
+            </button>
+            {displayOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingInlineStart: 12, paddingTop: 4 }}>
+                <label style={displayToggle}>
+                  <input type="checkbox" checked={showMeasures} onChange={(e) => setShowMeasures(e.target.checked)} />
+                  {t('actions.showMeasures')}
+                </label>
+                <label style={displayToggle}>
+                  <input type="checkbox" checked={showCenters} onChange={(e) => setShowCenters(e.target.checked)} />
+                  {t('canvas.centers')}
+                </label>
+                <label style={displayToggle}>
+                  <input type="checkbox" checked={showTheorems} onChange={(e) => setShowTheorems(e.target.checked)} />
+                  {t('theorems.toggle')}
+                </label>
+              </div>
+            )}
+          </div>
         </aside>
       </div>
 
@@ -1559,7 +1589,7 @@ export default function App() {
         <div style={{ fontWeight: 600, marginTop: 12 }}>{t('about.tryTitle')}</div>
         <ol style={{ margin: '6px 0 0', paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
           {(t('about.trySteps', { returnObjects: true }) as string[]).map((s) => (
-            <li key={s} dir={textDir(s)} style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>
+            <li key={s} dir={textDir(s)} style={{ fontSize: 13, color: pal.primaryInk }}>
               {s}
             </li>
           ))}
@@ -1609,12 +1639,11 @@ function tabBtn(active: boolean): React.CSSProperties {
 
 const page: React.CSSProperties = {
   minHeight: '100vh',
-  padding: 24,
-  fontFamily: 'system-ui, sans-serif',
-  color: '#0f172a',
+  padding: 20,
+  color: pal.ink, // font family comes from index.css — the ONE stack, never per-element
   display: 'flex',
   flexDirection: 'column',
-  gap: 16,
+  gap: 14,
 };
 const headerRow: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' };
 const main: React.CSSProperties = { display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' };
@@ -1650,60 +1679,42 @@ const emptyOverlay: React.CSSProperties = {
   pointerEvents: 'none',
   padding: 24,
 };
-const emptyChip: React.CSSProperties = {
-  padding: '8px 14px',
-  fontSize: 14,
-  borderRadius: 999,
-  border: '1px solid #bfdbfe',
-  background: '#eff6ff',
-  color: '#1e40af',
-  cursor: 'pointer',
-  fontFamily: 'ui-monospace, monospace',
-};
+const emptyChip: React.CSSProperties = { ...btn.chip, padding: '8px 14px', fontSize: fs.control };
 // The control column is capped to the viewport and scrolls INTERNALLY (its own overflow), so a tall stack
 // (steps + all the action buttons + the detected-shape badges/card) never pushes the whole PAGE taller than
 // the screen — the canvas and the shapes result stay on one screen (operator: "fit it all on the same screen").
 // `min(400px, 100%)` (F2, tablet scope): a rigid 400px overflowed viewports narrower than the column
 // itself; on a portrait tablet the canvas wraps below and the sidebar spans the width it has.
-const sidebar: React.CSSProperties = { order: 1, width: 'min(400px, 100%)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16, maxHeight: 'calc(100vh - 110px)', overflowY: 'auto', paddingInlineEnd: 4 };
-const sectionLabel: React.CSSProperties = { fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 };
-const displayToggle: React.CSSProperties = { display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, color: '#475569', cursor: 'pointer' };
-const symbolsToggle: React.CSSProperties = { alignSelf: 'flex-start', border: 'none', background: 'none', color: '#2563eb', fontSize: 12, cursor: 'pointer', padding: 0 };
+const sidebar: React.CSSProperties = { order: 1, width: 'min(400px, 100%)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 'calc(100vh - 110px)', overflowY: 'auto', paddingInlineEnd: 4 };
+// A sidebar section card — the visual grouping the old flat stack lacked (GUI overhaul).
+const sideCard: React.CSSProperties = themeCard;
+const sectionLabel: React.CSSProperties = sectionTitle;
+// The figure's remaining-freedom pill (steps-card header): blue while free, green when determined.
+const dofPillFree: React.CSSProperties = pill('#1d4ed8', '#dbeafe', '#93c5fd');
+const dofPillDone: React.CSSProperties = pill('#166534', '#dcfce7', '#86efac');
+// Compact in-card utility buttons (undo/redo/clear in the steps header).
+const subtleBtn: React.CSSProperties = btn.subtle;
+const subtleBtnOff: React.CSSProperties = { ...btn.subtle, opacity: 0.45, cursor: 'default' };
+const displayToggle: React.CSSProperties = { display: 'flex', gap: 6, alignItems: 'center', fontSize: fs.body, color: '#475569', cursor: 'pointer' };
+const symbolsToggle: React.CSSProperties = { alignSelf: 'flex-start', border: 'none', background: 'none', color: pal.primary, fontSize: fs.small, cursor: 'pointer', padding: 0 };
 const input: React.CSSProperties = {
   flex: 1,
   padding: '10px 12px',
-  fontSize: 14,
+  fontSize: fs.control,
   borderRadius: 8,
-  border: '1px solid #cbd5e1',
+  border: `1px solid ${pal.borderStrong}`,
   background: '#fff',
-  color: '#0f172a',
+  color: pal.ink,
 };
-const sendBtn: React.CSSProperties = {
-  padding: '10px 16px',
-  fontSize: 14,
-  borderRadius: 8,
-  border: '1px solid #2563eb',
-  background: '#2563eb',
-  color: '#fff',
-  cursor: 'pointer',
-};
-const chip: React.CSSProperties = {
-  padding: '6px 10px',
-  fontSize: 12,
-  borderRadius: 999,
-  border: '1px solid #bfdbfe',
-  background: '#eff6ff',
-  color: '#1e40af',
-  cursor: 'pointer',
-  fontFamily: 'ui-monospace, monospace',
-};
+const sendBtn: React.CSSProperties = btn.primary;
+const chip: React.CSSProperties = btn.chip;
 const greekBtn: React.CSSProperties = {
   width: 26,
   height: 26,
   fontSize: 14,
   borderRadius: 6,
-  border: '1px solid #cbd5e1',
-  background: '#f8fafc',
+  border: `1px solid ${pal.borderStrong}`,
+  background: pal.surfaceDim,
   color: '#1d4ed8',
   cursor: 'pointer',
 };
@@ -1711,10 +1722,9 @@ const helpExample: React.CSSProperties = {
   textAlign: 'start',
   border: 'none',
   background: 'none',
-  color: '#1e40af',
+  color: pal.primaryInk,
   cursor: 'pointer',
-  fontFamily: 'ui-monospace, monospace',
-  fontSize: 13,
+  fontSize: fs.body,
   padding: 0,
 };
 const catHeading: React.CSSProperties = {
@@ -1754,14 +1764,7 @@ const infoBanner: React.CSSProperties = {
   background: '#eff6ff',
   color: '#1d4ed8',
 };
-const ghost: React.CSSProperties = {
-  padding: '8px 14px',
-  fontSize: 13,
-  borderRadius: 8,
-  border: '1px solid #cbd5e1',
-  background: '#fff',
-  cursor: 'pointer',
-};
+const ghost: React.CSSProperties = btn.ghost;
 const del: React.CSSProperties = {
   border: 'none',
   background: 'transparent',
@@ -1775,12 +1778,11 @@ const editInput: React.CSSProperties = {
   flex: 1,
   minWidth: 0,
   padding: '4px 8px',
-  fontSize: 12,
-  fontFamily: 'ui-monospace, monospace',
+  fontSize: fs.small,
   borderRadius: 6,
-  border: '1px solid #cbd5e1',
+  border: `1px solid ${pal.borderStrong}`,
   background: '#fff',
-  color: '#0f172a',
+  color: pal.ink,
 };
 const iconBtn = (color: string): React.CSSProperties => ({
   border: 'none',
@@ -1791,19 +1793,14 @@ const iconBtn = (color: string): React.CSSProperties => ({
   cursor: 'pointer',
   padding: '0 2px',
 });
-const alt: React.CSSProperties = {
-  padding: '10px 14px',
-  fontSize: 14,
-  borderRadius: 8,
-  border: '1px solid #7c3aed',
-  background: '#7c3aed',
-  color: '#fff',
-  cursor: 'pointer',
-};
-// The "view relations" button while the layer is ON — teal, matching the on-figure tick/arc colour.
-const relBtnOn: React.CSSProperties = { ...alt, border: '1px solid #0d9488', background: '#0d9488' };
-// The "detect shapes" button while the badge layer is ON — indigo, distinct from the relations teal.
-const shapesBtnOn: React.CSSProperties = { ...alt, border: '1px solid #4338ca', background: '#4338ca' };
+// The headline explore action ("show another configuration") — the ONE loud violet button.
+const alt: React.CSSProperties = btn.accent;
+// The relations / shapes analysis toggles — quiet outlines beside `alt`, half-width each.
+const exploreToggle: React.CSSProperties = { ...btn.accentOutline, flex: 1 };
+// The "view relations" toggle while the layer is ON — teal, matching the on-figure tick/arc colour.
+const relBtnOn: React.CSSProperties = { ...exploreToggle, border: '1px solid #0d9488', background: '#0d9488', color: '#fff' };
+// The "detect shapes" toggle while the badge layer is ON — indigo, matching the badge colour.
+const shapesBtnOn: React.CSSProperties = { ...exploreToggle, border: '1px solid #4338ca', background: '#4338ca', color: '#fff' };
 // One segment of the discovery-level dial (ADR-219) — the cumulative L1/L2/L3 selector.
 const discoveryBtn: React.CSSProperties = {
   padding: '4px 10px',
@@ -1927,8 +1924,7 @@ function factLabel(state: 'ok' | 'disabled' | 'broken'): React.CSSProperties {
     border: 'none',
     background: 'transparent',
     cursor: 'pointer',
-    fontFamily: 'ui-monospace, monospace',
-    fontSize: 12,
+    fontSize: fs.small,
     color: state === 'disabled' ? '#94a3b8' : '#0f172a',
     textDecoration: state === 'disabled' ? 'line-through' : 'none',
   };

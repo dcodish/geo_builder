@@ -21,7 +21,14 @@
 
 html, body, #root {
   min-height: 100vh; /* grow with content — the page scrolls when the step list is long */
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* The ONE font stack (GUI overhaul): every element inherits it — no per-element
+     fontFamily overrides, so Hebrew UI text and Latin math labels share a face.
+     'Segoe UI' first (the operator/student base is Windows), then the platform faces. */
+  font-family: 'Segoe UI', system-ui, -apple-system, Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+button, input, select, textarea {
+  font-family: inherit; /* form controls don't inherit by default */
 }
 
 body {
