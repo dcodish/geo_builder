@@ -47,7 +47,8 @@ export type Disposition =
   | { kind: 'out-of-scope'; why: string };
 
 const tabled: Disposition = { kind: 'tabled' };
-const planned = (slice: FillSlice): Disposition => ({ kind: 'planned', slice });
+// (The `planned` builder retired with the T2 completion — every id is now `tabled` or carries an
+// honest `needs-construct`; the `planned` kind stays in the union for future catalog growth.)
 
 /**
  * Keyed by `String(id)` so numeric ids and the Appendix label strings share one map
@@ -61,11 +62,11 @@ export const THEOREM_COVERAGE: Record<string, Disposition> = {
   // ===== Parallels (3–9) =====
   '3': tabled,
   '4': tabled,
-  '5': planned('T2g-parallels-converses'),
+  '5': tabled,
   '6': tabled,
-  '7': planned('T2g-parallels-converses'),
+  '7': tabled,
   '8': tabled,
-  '9': planned('T2g-parallels-converses'),
+  '9': tabled,
 
   // ===== Triangle basics (10–14) =====
   '10': tabled,
@@ -75,36 +76,39 @@ export const THEOREM_COVERAGE: Record<string, Disposition> = {
   '14': tabled,
 
   // ===== Medians / centroid (15–17) =====
-  '15': planned('T2b-midsegment-median'),
-  '16': planned('T2b-midsegment-median'),
-  '17': planned('T2b-midsegment-median'),
+  '15': tabled,
+  '16': tabled,
+  '17': tabled,
 
   // ===== Congruence (18–21) =====
-  '18': planned('T2a-congruence'),
-  '19': planned('T2a-congruence'),
-  '20': planned('T2a-congruence'),
-  '21': planned('T2a-congruence'),
+  '18': tabled,
+  '19': tabled,
+  '20': tabled,
+  '21': tabled,
 
   // ===== Isosceles (22–27) =====
   '22': tabled,
-  '23': planned('T2e-isosceles'),
-  '24': planned('T2e-isosceles'),
-  '25': planned('T2e-isosceles'),
-  '26': planned('T2e-isosceles'),
-  '27': planned('T2e-isosceles'),
+  '23': tabled,
+  '24': tabled,
+  '25': tabled,
+  '26': tabled,
+  '27': tabled,
 
   // ===== Right triangle (28–34) =====
   '28': tabled,
-  '29': planned('T2d-right-triangle'),
-  '30': planned('T2d-right-triangle'),
-  '31': planned('T2d-right-triangle'),
-  '32': planned('T2d-right-triangle'),
+  '29': {
+    kind: 'needs-construct',
+    what: 'a stated a²+b²=c² squares-sum relation between three lengths has no constraint form',
+  },
+  '30': tabled,
+  '31': tabled,
+  '32': tabled,
   '33': tabled,
   '34': tabled,
 
   // ===== Angle sums (35–36) =====
-  '35': planned('T2j-sums-and-loci'),
-  '36': planned('T2j-sums-and-loci'),
+  '35': tabled,
+  '36': tabled,
 
   // ===== Kite (37–38) =====
   '37': tabled,
@@ -112,38 +116,38 @@ export const THEOREM_COVERAGE: Record<string, Disposition> = {
 
   // ===== Trapezoid (39–42) =====
   '39': tabled,
-  '40': planned('T2i-quad-converses'),
+  '40': tabled,
   '41': tabled,
-  '42': planned('T2i-quad-converses'),
+  '42': tabled,
 
   // ===== Parallelogram / rectangle / rhombus / square (43–61) =====
   '43': tabled,
-  '44': planned('T2i-quad-converses'),
-  '45': planned('T2i-quad-converses'),
+  '44': tabled,
+  '45': tabled,
   '46': tabled,
-  '47': planned('T2i-quad-converses'),
+  '47': tabled,
   '48': tabled,
-  '49': planned('T2i-quad-converses'),
+  '49': tabled,
   '50': tabled,
-  '51': planned('T2i-quad-converses'),
+  '51': tabled,
   '52': tabled,
-  '53': planned('T2i-quad-converses'),
-  '54': planned('T2i-quad-converses'),
+  '53': tabled,
+  '54': tabled,
   '55': tabled,
   '56': tabled,
-  '57': planned('T2i-quad-converses'),
-  '58': planned('T2i-quad-converses'),
-  '59': planned('T2i-quad-converses'),
-  '60': planned('T2i-quad-converses'),
-  '61': planned('T2i-quad-converses'),
+  '57': tabled,
+  '58': tabled,
+  '59': tabled,
+  '60': tabled,
+  '61': tabled,
 
   // ===== Midsegments (62–67) =====
-  '62': planned('T2b-midsegment-median'),
-  '63': planned('T2b-midsegment-median'),
-  '64': planned('T2b-midsegment-median'),
-  '65': planned('T2b-midsegment-median'),
-  '66': planned('T2b-midsegment-median'),
-  '67': planned('T2b-midsegment-median'),
+  '62': tabled,
+  '63': tabled,
+  '64': tabled,
+  '65': tabled,
+  '66': tabled,
+  '67': tabled,
 
   // ===== Similarity (68–71) — 68/70 forbidden (ADR-208), 69/71 admitted (ADR-220) =====
   '68': { kind: 'no-reveal' },
@@ -152,30 +156,33 @@ export const THEOREM_COVERAGE: Record<string, Disposition> = {
   '71': tabled,
 
   // ===== Thales / proportion (72–74) =====
-  '72': planned('T2f-thales'),
-  '73': planned('T2f-thales'),
-  '74': planned('T2f-thales'),
+  '72': tabled,
+  '73': tabled,
+  '74': tabled,
 
   // ===== Angle bisector / in-circle (75–81) — 76 forbidden (ADR-208) =====
-  '75': planned('T2c-bisector'),
+  '75': tabled,
   '76': { kind: 'no-reveal' },
-  '77': planned('T2c-bisector'),
-  '78': planned('T2c-bisector'),
-  '79': planned('T2c-bisector'),
-  '80': planned('T2c-bisector'),
-  '81': planned('T2c-bisector'),
+  '77': tabled,
+  '78': tabled,
+  '79': {
+    kind: 'needs-construct',
+    what: "the equidistant-from-the-sides premise needs a point-to-LINE distance given — no construct/parse path yet",
+  },
+  '80': tabled,
+  '81': tabled,
 
   // ===== Perpendicular bisector / concurrency / regular polygons (82–90) =====
-  '82': planned('T2j-sums-and-loci'),
-  '83': planned('T2j-sums-and-loci'),
-  '85': planned('T2j-sums-and-loci'),
-  '86': planned('T2j-sums-and-loci'),
+  '82': tabled,
+  '83': tabled,
+  '85': tabled,
+  '86': tabled,
   '88': {
     kind: 'needs-construct',
     what: 'a circle inscribed in a QUADRILATERAL (4-side tangency) — no construct/parse path yet',
   },
-  '89': planned('T2j-sums-and-loci'),
-  '90': planned('T2j-sums-and-loci'),
+  '89': tabled,
+  '90': tabled,
 
   // ===== Cyclic quadrilateral (87) =====
   '87': tabled,
@@ -184,22 +191,25 @@ export const THEOREM_COVERAGE: Record<string, Disposition> = {
   '84': tabled,
   '91': tabled,
   '92': tabled,
-  '93': planned('T2h-circle'),
+  '93': tabled,
   '94': tabled,
-  '95': planned('T2h-circle'),
-  '96': planned('T2h-circle'),
+  '95': tabled,
+  '96': {
+    kind: 'needs-construct',
+    what: 'the equidistant-chords premise needs a stated centre-to-CHORD (point-to-line) distance — no construct yet',
+  },
   '97': tabled,
   '98': tabled,
   '99': tabled,
-  '100': planned('T2h-circle'),
-  '101': planned('T2h-circle'),
+  '100': tabled,
+  '101': tabled,
   '102': tabled,
   '103': tabled,
   '104': tabled,
 
   // ===== Tangents (105–109) =====
   '105': tabled,
-  '106': planned('T2h-circle'),
+  '106': tabled,
   '107': tabled,
   '108': tabled,
   '109': tabled,

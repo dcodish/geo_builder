@@ -552,4 +552,121 @@ describe('theorem matchers (real pipeline)', () => {
       expect(at(entailed, 2)).toContain(22); // …and revealed once the dial reaches L2
     });
   });
+
+  // ===== T2 fill (ADR-243) — medians, midsegments, congruence, bisectors =====
+  describe('medians / centroid (15-17)', () => {
+    it('one named median surfaces the area-split (16) but not the concurrency family (15/17)', () => {
+      const ids = surfaced('triangle ABC', 'AD median to BC');
+      expect(ids).toContain(16);
+      expect(ids).not.toContain(15);
+      expect(ids).not.toContain(17);
+    });
+    it('two medians of ONE triangle surface the centroid family (15/17)', () => {
+      const ids = surfaced('triangle ABC', 'AK median to BC', 'CL median to AB');
+      expect(ids).toEqual(expect.arrayContaining([15, 16, 17]));
+    });
+    it('a hand-built midpoint + segment reads as a median (the entailed row)', () => {
+      const ids = surfaced('triangle ABC', 'M is the midpoint of BC', 'segment AM');
+      expect(ids).toContain(16);
+    });
+    it('a midpoint with NO segment to the apex is not a median', () => {
+      const ids = surfaced('triangle ABC', 'M is the midpoint of BC');
+      expect(ids).not.toContain(16);
+    });
+  });
+
+  describe('midsegments (62-67)', () => {
+    it('the midsegment construct surfaces the triangle family (62 headline, 63/64 background)', () => {
+      const ids = surfaced('triangle ABC', 'midsegment to BC in triangle ABC');
+      expect(ids).toEqual(expect.arrayContaining([62, 63, 64]));
+      expect(ids).not.toContain(65);
+    });
+    it('a drawn segment joining two STATED midpoints is a midsegment (L2 entailed)', () => {
+      const ids = surfaced('triangle ABC', 'D is the midpoint of AB', 'E is the midpoint of AC', 'segment DE');
+      expect(ids).toContain(62);
+    });
+    it('two stated midpoints NOT joined stay silent', () => {
+      const ids = surfaced('triangle ABC', 'D is the midpoint of AB', 'E is the midpoint of AC');
+      expect(ids).not.toContain(62);
+    });
+    it('the trapezoid midsegment surfaces 65-67, not the triangle 62', () => {
+      const ids = surfaced('trapezoid ABCD', 'E is the midpoint of AD', 'F is the midpoint of BC', 'segment EF');
+      expect(ids).toEqual(expect.arrayContaining([65, 66, 67]));
+      expect(ids).not.toContain(62);
+    });
+  });
+
+  describe('congruence criteria (18-21) — the operator "3 equal segments → חפיפה" example', () => {
+    it('a stated △ABC ≅ △DEF surfaces SSS (20) certain', () => {
+      const feed = feedOf(['triangle ABC', 'triangle DEF', 'triangle ABC congruent to triangle DEF']);
+      const e20 = feed.find((e) => e.id === 20);
+      expect(e20?.tier).toBe('certain');
+    });
+    it('three stated cross-triangle side equalities surface SSS (20)', () => {
+      const ids = surfaced('triangle ABC', 'triangle DEF', 'AB = DE', 'BC = EF', 'CA = FD');
+      expect(ids).toContain(20);
+    });
+    it('two side equalities + the INCLUDED stated angle equality surface SAS (18), amber', () => {
+      const feed = feedOf(['triangle ABC', 'triangle DEF', 'AB = DE', 'BC = EF', '∠ABC = ∠DEF']);
+      const e18 = feed.find((e) => e.id === 18);
+      expect(e18?.tier).toBe('possible');
+      expect(feed.map((e) => e.id)).not.toContain(20);
+    });
+    it('two side equalities alone surface NO criterion (the aha stays with the student)', () => {
+      const ids = surfaced('triangle ABC', 'triangle DEF', 'AB = DE', 'BC = EF');
+      for (const x of [18, 19, 20, 21]) expect(ids).not.toContain(x);
+    });
+    it('a SHARED side does not count toward the constellation (the B8/B13 no-reveal line)', () => {
+      // Two triangles over a common side + two stated equalities — the shared side's equality is the
+      // student's own observation, so no criterion may surface.
+      const ids = surfaced('triangle ABC', 'triangle ABD', 'CA = DA', 'CB = DB');
+      for (const x of [18, 19, 20, 21]) expect(ids).not.toContain(x);
+    });
+  });
+
+  describe('angle bisectors (75/78/80)', () => {
+    it('a stated bisector surfaces the equidistance pair (78 headline, 75 background)', () => {
+      const ids = surfaced('triangle ABC', 'AD bisects angle BAC');
+      expect(ids).toEqual(expect.arrayContaining([78, 75]));
+      expect(ids).not.toContain(80);
+    });
+    it('two bisectors at distinct vertices of one triangle surface the incenter concurrency (80)', () => {
+      const ids = surfaced('triangle ABC', 'E is where the bisectors of BAC and BCA meet');
+      expect(ids).toContain(80);
+    });
+  });
+
+  describe('ADR-244 evidence paths (Stage-1 worklist)', () => {
+    it('a tangency stated at an EXISTING on-circle point fires the tangent family (the B9 form)', () => {
+      const ids = surfaced('circle O', 'chord AD in circle O', 'AD is tangent to circle O at A');
+      // A is ON circle O, so this lowers to the radius-⟂ constraint (ADR-075) — path 3.
+      expect(ids).toEqual(expect.arrayContaining([105, 107]));
+    });
+    it('two constraint-form tangencies from one point fire the two-tangents pair (108/109)', () => {
+      const ids = surfaced(
+        'circle O',
+        'diameter BF in circle O',
+        'from point A outside circle O two tangents touch the circle at B and T',
+      );
+      expect(ids).toEqual(expect.arrayContaining([105, 107, 108, 109]));
+    });
+    it('a stated line THROUGH the centre cutting the circle twice is a stated diameter (103/104)', () => {
+      const ids = surfaced('circle O', 'point A at (12,0)', 'the line AO cuts circle O at C and D');
+      expect(ids).toEqual(expect.arrayContaining([103, 104]));
+    });
+    it('a stated arc EQUALITY announces the central-angle correspondence (92)', () => {
+      const ids = surfaced('circle O', 'A on circle O', 'B on circle O', 'C on circle O', 'arc AB = arc BC in circle O');
+      expect(ids).toContain(92);
+    });
+    it('a TYPED rhombus does not fire the kite family (its own bundle owns it)', () => {
+      const typed = surfaced('rhombus ABCD');
+      expect(typed).not.toContain(37);
+      expect(typed).not.toContain(38);
+    });
+    it('an ARC equality (central angles at the centre) is NOT read as a stated bisector', () => {
+      const ids = surfaced('circle O', 'A on circle O', 'B on circle O', 'C on circle O', 'arc AB = arc BC in circle O');
+      expect(ids).not.toContain(78);
+      expect(ids).not.toContain(75);
+    });
+  });
 });

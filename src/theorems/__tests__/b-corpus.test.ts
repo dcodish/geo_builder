@@ -57,6 +57,11 @@ interface BQuestion {
   never?: TheoremId[];
   /** Run detectShapes for the final feed (default true; off where cost ≫ value — see header). */
   finalShapes?: boolean;
+  /** A DOCUMENTED build failure (`replay().lastError` non-null): the figure is partial, an engine
+   *  finding is on record, and the assertion pins the message so a fix (or a new breakage) flags
+   *  loudly. Questions without this must build with NO lastError — T2 hardening (ADR-243; the T1
+   *  wiring asserted parse-commit only, which let a failing group hide). */
+  knownBuildIssue?: string;
   note?: string;
 }
 
@@ -96,9 +101,8 @@ const CORPUS: BQuestion[] = [
       'D on circle M',
       'C on circle M',
     ],
-    expect: [55, 56, 43, 46, 48, 50],
+    expect: [55, 56, 43, 46, 48, 50, 82],
     gaps: [98, 84, 91],
-    planned: [82],
     never: [69],
   },
   {
@@ -113,9 +117,8 @@ const CORPUS: BQuestion[] = [
       'AK perpendicular to CL',
       'quadrilateral ALKC inscribed in circle M',
     ],
-    expect: [22, 28, 91, 2, 10],
-    gaps: [99, 87],
-    planned: [15, 16, 17, 24],
+    expect: [22, 28, 91, 2, 10, 87, 15, 16, 17, 24],
+    gaps: [99],
     never: [69],
     note: '84 is ground-truth background but its premise is genuinely unmet (△ABC is not the inscribed shape) — omitted, not a gap.',
   },
@@ -134,11 +137,10 @@ const CORPUS: BQuestion[] = [
       'K on BC',
       'FK bisects angle BFC',
     ],
-    expect: [103, 104, 28, 84, 1],
-    // Tangency at an EXISTING on-circle point lowers to `set-perpendicular` — invisible to
-    // `tangentPoints`, so the whole tangent bundle misses (the sharpest R2 finding of this gate).
-    gaps: [105, 107, 108, 109],
-    planned: [35],
+    expect: [103, 104, 28, 84, 1, 105, 107, 108, 109, 75, 78],
+    // (The tangent bundle fires since ADR-244's radius-⟂ tangency fingerprint; the stated bisector
+    // FK fires 75/78. 35 is ground-truth background but its premise — quad ABFD — is never drawn
+    // as a quad in the wiring, so it is omitted, not a gap.)
     never: [69],
     finalShapes: false,
     note: '76 is expectSurfaced in the ground truth (stated bisector) but stays structurally excluded (no-reveal, ADR-208); the T5 principles lane is its designated carrier.',
@@ -155,9 +157,8 @@ const CORPUS: BQuestion[] = [
       'K is the intersection of AB and CD',
       'arc CA = arc AF in circle O',
     ],
-    expect: [103, 104, 94, 8, 2, 102],
-    gaps: [92, 4, 6],
-    planned: [101],
+    expect: [103, 104, 94, 8, 2, 102, 92, 101],
+    gaps: [4, 6],
     never: [],
     note: '68 (mustNot) is structurally excluded; 45/59/23 are planned converses, feed-absent today by construction.',
   },
@@ -176,9 +177,8 @@ const CORPUS: BQuestion[] = [
       'circle through A E M',
       'D on the circle',
     ],
-    expect: [91, 2, 1, 10],
+    expect: [91, 2, 1, 10, 15, 16, 17, 62],
     gaps: [102],
-    planned: [15, 16, 17, 62],
     never: [69],
   },
   {
@@ -198,7 +198,7 @@ const CORPUS: BQuestion[] = [
     ],
     expect: [87, 28, 2, 22, 94, 37, 38],
     gaps: [10, 84, 91],
-    never: [69, 71, 104],
+    never: [69, 71, 104, 20],
     finalShapes: false,
     note: '104 must stay silent — no diameter is STATED (∠ADC = 90° is what the student proves in א).',
   },
@@ -214,8 +214,7 @@ const CORPUS: BQuestion[] = [
       'AC extended meets circle P at E',
       'BD extended meets circle O at F',
     ],
-    expect: [102],
-    gaps: [105, 107, 87],
+    expect: [102, 87, 105, 107],
     never: [69, 71],
   },
   {
@@ -237,7 +236,9 @@ const CORPUS: BQuestion[] = [
       'BE = EF',
     ],
     expect: [43, 46, 48, 50, 22, 8],
-    planned: [73],
+    // 73 is tabled but silent here: the stated ∥ cuts triangle ABF whose side AF is never drawn,
+    // so the parallel-cut evidence has no triangle to bind to (a structural-triangle gate miss).
+    gaps: [73],
     never: [],
     finalShapes: false,
     note: '69/71 omitted from never — a ∥ is stated (ADR-220 admitted path).',
@@ -267,8 +268,9 @@ const CORPUS: BQuestion[] = [
       'OD perpendicular to AC',
     ],
     expect: [103, 104, 87, 97, 1, 28, 84],
-    planned: [106],
-    never: [69, 71],
+    // 106 was mis-bucketed `planned` at T1 — the ground truth lists it mustNotSurface (the ג crown:
+    // nothing STATES a ⟂-to-a-radius; OD⟂AC's D is not on the chord). Now tabled ⇒ never.
+    never: [69, 71, 106],
     note: '91 is ground-truth background but ABCD are points ON a drawn circle, not a CONSTRUCTED circumcircle — correctly absent per ADR-210 Am.',
   },
   {
@@ -286,7 +288,13 @@ const CORPUS: BQuestion[] = [
     ],
     expect: [103, 105, 107, 84, 10, 22, 1],
     gaps: [87],
-    never: [69],
+    never: [69, 18],
+    // ENGINE FINDING (ADR-243): the D-crossing group fails although the figure is constructible —
+    // G on the extension of CA with |GA| = |AC| (A the midpoint of GC) is fine on its own, but
+    // adding "line GB meets circle O at D" re-solves and reports the equality violated. D never
+    // builds, so the circle has only 3 members and 87 correctly stays a gap here (a BUILD gap, not
+    // a matcher gap). Solver-routing class (ADR-229/230 family) — filed, not fixed in T2.
+    knownBuildIssue: '|GA| = |AC| cannot hold',
   },
   {
     id: 'B14',
@@ -302,13 +310,10 @@ const CORPUS: BQuestion[] = [
       'LK = KC',
       'G is the intersection of EK and DL',
     ],
-    expect: [22, 28, 10, 2],
-    // detectShapes finds the emergent BEGD as a RHOMBUS (the trisection given genuinely forces
-    // all four sides equal — verified by hand) but the kite matchers key on type 'kite' only, so
-    // 37/38 miss: the kite⊃rhombus class-hierarchy gap.
-    gaps: [37, 38],
-    planned: [24],
-    never: [46, 69],
+    // The emergent BEGD rhombus fires 37/38 through the ADR-244 kite-class observed path; the
+    // isosceles bundle (24) and the equidistance converse (83, |BA|=|BC| with AC drawn) fire too.
+    expect: [22, 28, 10, 2, 37, 38, 24, 83],
+    never: [46, 69, 18, 19],
   },
   {
     id: 'B15',
@@ -322,10 +327,7 @@ const CORPUS: BQuestion[] = [
       'GA perpendicular to AD',
       'angle ADB = α',
     ],
-    expect: [105, 107, 28, 1],
-    // The stated line THROUGH the centre is a stated diameter (CD) but lowers to
-    // line-circle-intersections with no collinear-through-centre datum → 103 misses.
-    gaps: [103],
+    expect: [105, 107, 28, 1, 103],
     never: [69],
   },
   {
@@ -337,11 +339,11 @@ const CORPUS: BQuestion[] = [
       'F is the intersection of CE and BD',
       'cyclic quadrilateral EABF',
     ],
-    expect: [52, 43, 46, 48, 50, 2, 4, 10],
-    // `cyclic quadrilateral` lowers to circumcircle + set-concyclic — invisible to the 87
-    // matcher; the rectangle's structural right angle at A never reaches the 104 matcher; the
-    // rectangle macro emits no stated-right-angle fact for 28.
-    gaps: [87, 104, 28],
+    expect: [52, 43, 46, 48, 50, 2, 4, 10, 87],
+    // The rectangle's structural right angle at A never reaches the 104 matcher; the rectangle
+    // macro emits no stated-right-angle fact for 28. (87 fires since the ADR-243 concyclic
+    // enrichment — `cyclic quadrilateral` lowers to circumcircle + set-concyclic.)
+    gaps: [104, 28],
     never: [69],
     note: '69 holds on the L1/L2 feed; at L3 the rectangle parallels + detected triangles admit it (ADR-220).',
   },
@@ -356,9 +358,8 @@ const CORPUS: BQuestion[] = [
       'line AE meets circle O at F',
       'line CBE',
     ],
-    expect: [102, 1],
-    gaps: [87],
-    never: [69],
+    expect: [102, 1, 87],
+    never: [69, 18, 19, 20, 21],
     note: '76/77 (the ג2 no-reveal pair) are structurally excluded / planned-converse respectively.',
   },
   {
@@ -375,8 +376,7 @@ const CORPUS: BQuestion[] = [
       'the tangent at E meets the extension of AB at G',
       'F is the intersection of AE and BC',
     ],
-    expect: [92, 94, 105, 107, 2, 102],
-    planned: [101],
+    expect: [92, 94, 105, 107, 2, 102, 101],
     never: [69],
   },
   {
@@ -389,9 +389,12 @@ const CORPUS: BQuestion[] = [
       'AB is tangent to circle P at F',
       'GH parallel to AB',
     ],
-    expect: [8, 4, 6, 28, 10],
-    gaps: [87, 102, 105, 107, 104],
-    planned: [31],
+    expect: [8, 4, 6, 28, 10, 87, 102, 105, 107],
+    // 104 stays a gap: the right angle at C is STRUCTURAL (the right-triangle command), and the
+    // rightInscribed matcher reads stated `set-angle` 90° facts only.
+    gaps: [104],
+    // 31 is ground-truth "28/31 fold" but no median-to-hypotenuse is stated in the wired givens —
+    // omitted, not a gap.
     never: [94],
     note: '69/71 omitted from never — GH ∥ AB is stated (ADR-220 admitted parallel-cut).',
   },
@@ -425,8 +428,8 @@ const CORPUS: BQuestion[] = [
       'CD = 36',
       'DE = 18',
     ],
-    expect: [102, 28, 2, 10, 84],
-    gaps: [1, 87],
+    expect: [102, 28, 2, 10, 84, 87],
+    gaps: [1],
     never: [],
     note: '76 (the ג crown) is structurally excluded — the sharpest no-reveal case alongside Q7.',
   },
@@ -440,9 +443,8 @@ const CORPUS: BQuestion[] = [
       'AB = CB',
       'AC bisects angle ECD',
     ],
-    expect: [87, 102, 105, 107, 22, 94, 2, 10],
+    expect: [87, 102, 105, 107, 22, 94, 2, 10, 93, 75, 78],
     gaps: [1],
-    planned: [93],
     never: [69],
   },
   {
@@ -458,11 +460,11 @@ const CORPUS: BQuestion[] = [
       'ED parallel to AB',
       'tangent to circle O at C',
     ],
-    expect: [103, 104, 102, 22, 8, 4, 6, 105, 107, 10, 1],
-    gaps: [87],
-    planned: [106],
-    never: [],
-    note: '62/63 (the midsegment near-reveal) are planned, feed-absent by construction today. 69/71 omitted — stated ∥.',
+    expect: [103, 104, 102, 22, 8, 4, 6, 105, 107, 10, 1, 87, 73],
+    // 106 (⟂-to-radius ⇒ tangent) is correctly SILENT: the tangent is stated AS a tangent, so the
+    // converse prompt has nothing to recognise.
+    never: [62, 63],
+    note: '62/63 (the midsegment near-reveal, now tabled) must stay silent: D,E are midpoints only EMERGENTLY, never stated. 69/71 omitted — stated ∥.',
   },
 ];
 
@@ -496,6 +498,12 @@ describe('theorem B-corpus (T1 membership gate — 22 booklet questions)', () =>
             expect(feed.has(x), `#${x} must NOT surface (L1/L2) after: ${u}`).toBe(false);
           }
         }
+        // Build honesty (T2 hardening, ADR-243): the wired figure must BUILD — a failing group is a
+        // partial figure whose feed silently under-reports. A documented engine finding pins its
+        // exact message instead (so a fix, or a different breakage, flags loudly).
+        const { lastError } = replay(facts);
+        if (q.knownBuildIssue) expect(lastError, `${q.id}'s documented build issue changed`).toContain(q.knownBuildIssue);
+        else expect(lastError, `${q.id} no longer builds clean`).toBeNull();
       });
 
       it('final feed membership: expected in, documented gaps out', { timeout: 120_000 }, () => {

@@ -21,7 +21,7 @@
 import type { AnyCommand, Id } from '../engine/types';
 import type { Fact } from '../store/geoStore';
 import { commandPointIds } from '../store/geoStore';
-import type { DiscoveryLevel, MatchCtx, TheoremDef, TheoremMatch } from './types';
+import type { DiscoveryLevel, MatchCtx, Salience, TheoremDef, TheoremMatch } from './types';
 
 // ---------- premise-scan helpers (symbolic; no coordinates) ----------
 
@@ -170,6 +170,33 @@ function similarityEvidence(ctx: MatchCtx): { facts: Fact[]; vertices: Id[]; lev
  */
 function statedDiameterFacts(ctx: MatchCtx): { fact: Fact; circleId: Id; ids: Id[] }[] {
   const out: { fact: Fact; circleId: Id; ids: Id[] }[] = [];
+  // A stated LINE THROUGH THE CENTRE cutting the circle at two points IS a stated diameter ("the
+  // line AO cuts circle O at C and D" — B15's 103 gap, ADR-244): a `line-through` with the centre as
+  // an endpoint + two `line-circle-intersection`s of that line with the circle.
+  const lineThroughCentre = new Map<string, Id>(); // line id → the circle whose centre it passes through
+  for (const f of ctx.facts) {
+    const c = cmdOf(f);
+    if (c.type !== 'line-through') continue;
+    for (const circ of ctx.circles) {
+      if (c.a === circ.center || c.b === circ.center) lineThroughCentre.set(c.id, circ.id);
+    }
+  }
+  const crossingsByLine = new Map<string, { fact: Fact; pts: Id[] }>();
+  for (const f of ctx.facts) {
+    const c = cmdOf(f);
+    if (c.type !== 'line-circle-intersection') continue;
+    const circId = lineThroughCentre.get(c.line);
+    if (!circId) continue;
+    const circ = ctx.circles.find((x) => x.id === circId);
+    if (!circ || (circ.id !== c.circle && circ.center !== c.circle)) continue;
+    const e = crossingsByLine.get(c.line) ?? { fact: f, pts: [] };
+    e.fact = f; // the LATEST crossing completes the diameter (attribution)
+    e.pts.push(c.id);
+    crossingsByLine.set(c.line, e);
+  }
+  for (const [line, e] of crossingsByLine) {
+    if (e.pts.length >= 2) out.push({ fact: e.fact, circleId: lineThroughCentre.get(line)!, ids: e.pts.slice(0, 2) });
+  }
   for (const f of ctx.facts) {
     const c = cmdOf(f);
     if (c.type === 'diameter') {
@@ -351,8 +378,26 @@ function kiteEvidence(ctx: MatchCtx): { facts: Fact[]; vertices: Id[]; level: Di
         entailed = true;
       }
     }
-  if (facts.length === 0 && vertices.size === 0) return null;
-  const level: DiscoveryLevel = declared ? 1 : entailed ? 2 : 1;
+  // OBSERVED (L3): an EMERGENT kite-family shape — `detectShapes` classifies the most specific type,
+  // so B14's forced BEGD reports as a RHOMBUS and the kite matchers never saw it (the kite ⊇ rhombus
+  // hierarchy gap, ADR-244). A shape the student TYPED as rhombus/square is excluded: its own family
+  // bundle (55/56…) owns it — the kite lens adds value only for the emergent discovery.
+  let observed = false;
+  const typedQuads = new Set(
+    ctx.facts
+      .map((f) => cmdOf(f))
+      .filter((c): c is Extract<AnyCommand, { type: 'square' | 'rhombus' }> => c.type === 'square' || c.type === 'rhombus')
+      .map((c) => [...c.ids].sort().join('|')),
+  );
+  for (const s of ctx.shapes) {
+    if (s.type !== 'kite' && s.type !== 'rhombus' && s.type !== 'square') continue;
+    if (typedQuads.has([...s.vertices].sort().join('|'))) continue;
+    s.vertices.forEach((v) => vertices.add(v));
+    facts.push(...factsAmong(ctx, [...s.vertices]));
+    observed = true;
+  }
+  if (!declared && !entailed && !observed) return null;
+  const level: DiscoveryLevel = declared ? 1 : entailed ? 2 : 3;
   return { facts: [...new Map(facts.map((f) => [f.id, f])).values()], vertices: [...vertices], level };
 }
 
@@ -668,6 +713,331 @@ function altitudeToHypotenuse(ctx: MatchCtx): { factIds: string[]; objIds: Id[] 
   return null;
 }
 
+// ===== T2 evidence helpers (ADR-243) — medians, midsegments, bisectors, congruence =====
+
+/** Unordered edge key. */
+const ek = (a: Id, b: Id): string => [a, b].sort().join('|');
+
+/**
+ * Stated MEDIANS — a `midpoint` fact + a drawn segment from an opposite apex to the midpoint, with the
+ * triangle's own sides drawn (the ADR-218 DRAWN gate). Covers the named-median lowering ("AK תיכון")
+ * AND a hand-built "M is the midpoint of BC" + "segment AM" (§3's entailed row — same definitional
+ * certainty, so both read as declared-strength evidence).
+ */
+function medianFacts(ctx: MatchCtx): { facts: Fact[]; apex: Id; mid: Id; base: [Id, Id] }[] {
+  const out: { facts: Fact[]; apex: Id; mid: Id; base: [Id, Id] }[] = [];
+  for (const mf of factsWith(ctx, (c) => c.type === 'midpoint')) {
+    const m = cmdOf(mf) as Extract<AnyCommand, { type: 'midpoint' }>;
+    for (const sf of factsWith(ctx, (c) => c.type === 'segment')) {
+      const s = cmdOf(sf) as { a: Id; b: Id };
+      const apex = s.a === m.id ? s.b : s.b === m.id ? s.a : null;
+      if (!apex || apex === m.a || apex === m.b) continue;
+      if (!drawnEdge(ctx, apex, m.a) || !drawnEdge(ctx, apex, m.b)) continue; // a median OF a drawn triangle
+      if (!out.some((e) => e.apex === apex && e.mid === m.id)) out.push({ facts: [mf, sf], apex, mid: m.id, base: [m.a, m.b] });
+    }
+  }
+  return out;
+}
+
+/** Medians grouped by their triangle (vertex set) — ≥2 in one triangle announce the centroid family. */
+function medianGroups(ctx: MatchCtx): { facts: Fact[]; objIds: Id[] }[] {
+  const groups = new Map<string, { facts: Fact[]; objIds: Id[]; n: number }>();
+  for (const m of medianFacts(ctx)) {
+    const key = [m.apex, ...m.base].sort().join('|');
+    const g = groups.get(key) ?? { facts: [], objIds: [m.apex, ...m.base], n: 0 };
+    g.facts.push(...m.facts);
+    if (!g.objIds.includes(m.mid)) g.objIds.push(m.mid);
+    g.n++;
+    groups.set(key, g);
+  }
+  return [...groups.values()].filter((g) => g.n >= 2);
+}
+
+/**
+ * MIDSEGMENTS — declared (the ADR-199/222 `shape-variant` construct) or entailed (§7a L2: a drawn
+ * segment JOINING two STATED midpoints; hosts sharing one vertex = a triangle midsegment, disjoint
+ * hosts whose four ends are a stated 4-gon = a trapezoid midsegment).
+ */
+function midsegmentFacts(ctx: MatchCtx): { facts: Fact[]; kind: 'triangle' | 'trapezoid'; objIds: Id[]; level: DiscoveryLevel }[] {
+  const out: { facts: Fact[]; kind: 'triangle' | 'trapezoid'; objIds: Id[]; level: DiscoveryLevel }[] = [];
+  for (const f of factsWith(ctx, (c) => c.type === 'shape-variant' && c.shape === 'midsegment')) {
+    out.push({ facts: [f], kind: 'triangle', objIds: [...(cmdOf(f) as { ids: Id[] }).ids], level: 1 });
+  }
+  const mids = factsWith(ctx, (c) => c.type === 'midpoint').map((f) => ({ f, c: cmdOf(f) as Extract<AnyCommand, { type: 'midpoint' }> }));
+  for (let i = 0; i < mids.length; i++) {
+    for (let j = i + 1; j < mids.length; j++) {
+      const M1 = mids[i], M2 = mids[j];
+      if (!drawnEdge(ctx, M1.c.id, M2.c.id)) continue;
+      const hosts1 = [M1.c.a, M1.c.b], hosts2 = [M2.c.a, M2.c.b];
+      const shared = hosts1.filter((x) => hosts2.includes(x));
+      if (shared.length === 1) {
+        out.push({ facts: [M1.f, M2.f], kind: 'triangle', objIds: [M1.c.id, M2.c.id, ...new Set([...hosts1, ...hosts2])], level: 2 });
+      } else if (shared.length === 0) {
+        const all = [...hosts1, ...hosts2];
+        // the four host ends form ONE stated 4-gon (trapezoid/quad/shape-variant) ⇒ the legs' midsegment
+        const quad = ctx.facts.find((f) => {
+          const c = cmdOf(f) as { ids?: Id[] };
+          return Array.isArray(c.ids) && c.ids.length === 4 && all.every((v) => c.ids!.includes(v));
+        });
+        if (quad) out.push({ facts: [M1.f, M2.f, quad], kind: 'trapezoid', objIds: [M1.c.id, M2.c.id, ...all], level: 2 });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Stated ANGLE BISECTORS — a `bisector` line spec ("bisector of angle ABC", the bisector∩bisector
+ * compound) or the "AD bisects ∠BAC" lowering (a `set-angle-ratio` k=1 whose two angles share the
+ * vertex AND one arm — the bisector arm). A shared vertex that is a circle CENTRE is excluded: that
+ * form is ARC talk (the ADR-116 arc-equality lowering — equal central angles), not a stated bisector.
+ */
+function bisectorStatements(ctx: MatchCtx): { fact: Fact; vertex: Id }[] {
+  const out: { fact: Fact; vertex: Id }[] = [];
+  for (const f of ctx.facts) {
+    const c = cmdOf(f);
+    if (c.type === 'bisector') out.push({ fact: f, vertex: c.vertex });
+    else if (c.type === 'set-angle-ratio' && c.k === 1 && c.v1 === c.v2) {
+      if (ctx.circles.some((cc) => cc.center === c.v1)) continue; // central angles = arcs, not a bisector
+      if ([c.a1, c.b1].some((a) => [c.a2, c.b2].includes(a))) out.push({ fact: f, vertex: c.v1 });
+    }
+  }
+  return out;
+}
+
+/** ≥2 stated bisectors at DISTINCT vertices of one stated triangle — the incenter concurrency (80). */
+function bisectorConcurrency(ctx: MatchCtx): { facts: Fact[]; objIds: Id[] } | null {
+  const bs = bisectorStatements(ctx);
+  for (const t of triangleVertexSets(ctx)) {
+    const inTri = bs.filter((b) => t.ids.includes(b.vertex));
+    if (new Set(inTri.map((b) => b.vertex)).size >= 2) {
+      return { facts: [...inTri.map((b) => b.fact), ...factsAmong(ctx, t.ids)], objIds: [...t.ids] };
+    }
+  }
+  return null;
+}
+
+/**
+ * CONGRUENCE constellations (the operator's "3 equal segments → חפיפה" example, docs/18 R1): STATED
+ * equalities/angle-equalities distributed over two triangles (typed or structural). The stated
+ * "△ABC ≅ △DEF" lowering (3 side equalities) lands here as a full SSS — one matcher covers both
+ * paths. Returns the SPECIFIC criterion each triangle pair matches.
+ *
+ * A SHARED side deliberately does NOT count toward the constellation: its equality is the student's
+ * own observation — in B8 (the kite halves over the drawn diagonal) and B13 (△ABG/△ABC over AB) the
+ * shared-side congruence IS the proof step the feed must not gift (both are ground-truth
+ * mustNotSurface; the never-guard caught the breach when a first draft auto-paired it).
+ */
+function congruenceEvidence(ctx: MatchCtx): { kind: 18 | 19 | 20 | 21; tier: TheoremMatch['tier']; facts: Fact[]; objIds: Id[] }[] {
+  const tris: { ids: Id[] }[] = [];
+  const addTri = (idsIn: Id[]) => {
+    if (!tris.some((t) => t.ids.length === idsIn.length && idsIn.every((v) => t.ids.includes(v)))) tris.push({ ids: [...idsIn] });
+  };
+  for (const v of triangleVertexSets(ctx)) addTri(v.ids);
+  for (const s of structuralTriangles(ctx)) addTri(s);
+  if (tris.length < 2) return [];
+  const eqs = ctx.facts.filter((f) => { const c = cmdOf(f); return c.type === 'set-equal' && !c.soft; });
+  const angs = ctx.facts.filter((f) => { const c = cmdOf(f); return c.type === 'set-angle-ratio' && c.k === 1; });
+  const out: { kind: 18 | 19 | 20 | 21; tier: TheoremMatch['tier']; facts: Fact[]; objIds: Id[] }[] = [];
+  for (let i = 0; i < tris.length; i++) {
+    for (let j = i + 1; j < tris.length; j++) {
+      const [T1, T2] = [tris[i].ids, tris[j].ids];
+      const sides = (T: Id[]) => [ek(T[0], T[1]), ek(T[1], T[2]), ek(T[2], T[0])];
+      const [s1, s2] = [sides(T1), sides(T2)];
+      const paired1 = new Set<string>(), paired2 = new Set<string>();
+      const facts: Fact[] = [];
+      for (const f of eqs) {
+        const c = cmdOf(f) as Extract<AnyCommand, { type: 'set-equal' }>;
+        const [p, q] = [ek(c.a, c.b), ek(c.c, c.d)];
+        if ((s1.includes(p) && s2.includes(q)) || (s1.includes(q) && s2.includes(p))) {
+          paired1.add(s1.includes(p) ? p : q);
+          paired2.add(s2.includes(q) ? q : p);
+          facts.push(f);
+        }
+      }
+      const anglePairs: { v1: Id; v2: Id; fact: Fact }[] = [];
+      for (const f of angs) {
+        const c = cmdOf(f) as Extract<AnyCommand, { type: 'set-angle-ratio' }>;
+        const within = (T: Id[], v: Id, a: Id, b: Id) => T.includes(v) && T.includes(a) && T.includes(b);
+        if (within(T1, c.v1, c.a1, c.b1) && within(T2, c.v2, c.a2, c.b2)) anglePairs.push({ v1: c.v1, v2: c.v2, fact: f });
+        else if (within(T2, c.v1, c.a1, c.b1) && within(T1, c.v2, c.a2, c.b2)) anglePairs.push({ v1: c.v2, v2: c.v1, fact: f });
+      }
+      const nS = Math.min(paired1.size, paired2.size);
+      const objIds = [...new Set([...T1, ...T2])];
+      const allFacts = [...facts, ...anglePairs.map((a) => a.fact), ...factsAmong(ctx, T1), ...factsAmong(ctx, T2)];
+      const dedup = [...new Map(allFacts.map((f) => [f.id, f])).values()];
+      if (nS >= 3) out.push({ kind: 20, tier: 'certain', facts: dedup, objIds });
+      else if (nS === 2 && anglePairs.length >= 1) {
+        // Included angle ⇒ SAS (18); a non-included angle pair reads as the side-side-larger-angle (21).
+        const sharedVertexOf = (T: Id[], covered: Set<string>): Id | null => {
+          const cnt = new Map<Id, number>();
+          for (const e of covered) for (const v of e.split('|')) if (T.includes(v)) cnt.set(v, (cnt.get(v) ?? 0) + 1);
+          return [...cnt].find(([, n]) => n === 2)?.[0] ?? null;
+        };
+        const [sv1, sv2] = [sharedVertexOf(T1, paired1), sharedVertexOf(T2, paired2)];
+        const included = anglePairs.some((a) => a.v1 === sv1 && a.v2 === sv2);
+        out.push({ kind: included ? 18 : 21, tier: 'possible', facts: dedup, objIds });
+      } else if (anglePairs.length >= 2 && nS >= 1) {
+        out.push({ kind: 19, tier: 'possible', facts: dedup, objIds });
+      }
+    }
+  }
+  return out;
+}
+
+// ===== Stage-2 evidence helpers (ADR-245) — right triangles, ⟂-bisectors, altitudes, quad relations =====
+
+/** Stated RIGHT triangles — the `right-triangle` command (right vertex LAST) or a stated 90°
+ *  `set-angle` at a typed triangle's vertex. Returns the right vertex + the hypotenuse. */
+function rightTriangleFacts(ctx: MatchCtx): { fact: Fact; ids: Id[]; rightVertex: Id; hyp: [Id, Id] }[] {
+  const out: { fact: Fact; ids: Id[]; rightVertex: Id; hyp: [Id, Id] }[] = [];
+  for (const f of ctx.facts) {
+    const c = cmdOf(f);
+    if (c.type === 'right-triangle') out.push({ fact: f, ids: [...c.ids], rightVertex: c.ids[2], hyp: [c.ids[0], c.ids[1]] });
+  }
+  for (const t of triangleVertexSets(ctx)) {
+    for (const f of ctx.facts) {
+      const c = cmdOf(f);
+      if (c.type !== 'set-angle' || Math.abs(c.value - 90) > 1e-6) continue;
+      if (!t.ids.includes(c.vertex)) continue;
+      const others = t.ids.filter((v) => v !== c.vertex);
+      if (others.length === 2 && [c.ray1, c.ray2].every((r) => others.includes(r))) {
+        out.push({ fact: f, ids: [...t.ids], rightVertex: c.vertex, hyp: [others[0], others[1]] });
+      }
+    }
+  }
+  return out;
+}
+
+/** Stated ⟂-BISECTORS — a stated midpoint + a `perpendicular-line` through it ⟂ its own segment
+ *  (the named construct's lowering, and the ADR-236 LINE_CUT compound's scaffolding). */
+function perpBisectorFacts(ctx: MatchCtx): { facts: Fact[]; seg: [Id, Id]; through: Id }[] {
+  const out: { facts: Fact[]; seg: [Id, Id]; through: Id }[] = [];
+  for (const mf of factsWith(ctx, (c) => c.type === 'midpoint')) {
+    const m = cmdOf(mf) as Extract<AnyCommand, { type: 'midpoint' }>;
+    for (const pf of ctx.facts) {
+      const c = cmdOf(pf);
+      if (c.type !== 'perpendicular-line' || c.through !== m.id) continue;
+      if (!((c.a === m.a && c.b === m.b) || (c.a === m.b && c.b === m.a))) continue;
+      out.push({ facts: [mf, pf], seg: [m.a, m.b], through: m.id });
+    }
+  }
+  return out;
+}
+
+/** Stated ALTITUDES — `foot` facts (a vertex dropped ⟂ onto a side). */
+function altitudeFootFacts(ctx: MatchCtx): { fact: Fact; foot: Id; from: Id; base: [Id, Id] }[] {
+  return factsWith(ctx, (c) => c.type === 'foot').map((f) => {
+    const c = cmdOf(f) as Extract<AnyCommand, { type: 'foot' }>;
+    return { fact: f, foot: c.id, from: c.from, base: [c.a, c.b] as [Id, Id] };
+  });
+}
+
+/** Stated 4-gon SHAPE facts whose command type is in `types` (each carries `ids`). */
+function statedQuadShapes(ctx: MatchCtx, types: string[]): { fact: Fact; ids: Id[] }[] {
+  return ctx.facts
+    .filter((f) => types.includes(cmdOf(f).type) && Array.isArray((cmdOf(f) as { ids?: Id[] }).ids))
+    .map((f) => ({ fact: f, ids: [...(cmdOf(f) as { ids: Id[] }).ids] }));
+}
+
+/**
+ * The stated relations a quad's converse-recognition prompts read (D2): for a 4-gon V (cyclic
+ * order), which extra facts the student stated about ITS sides/diagonals/angles. Everything here is
+ * a stated fact — never a derived measurement.
+ */
+function quadStatedRelations(ctx: MatchCtx, V: Id[]) {
+  const sides = [ek(V[0], V[1]), ek(V[1], V[2]), ek(V[2], V[3]), ek(V[3], V[0])];
+  const diags = [ek(V[0], V[2]), ek(V[1], V[3])];
+  const oppPairs = [[sides[0], sides[2]], [sides[1], sides[3]]];
+  const inV = (p: Id) => V.includes(p);
+  const out = {
+    oppositeSideEqs: [] as Fact[],
+    parallelAndEqual: [] as Fact[],
+    adjacentSideEqs: [] as Fact[],
+    diagEqual: [] as Fact[],
+    diagPerp: [] as Fact[],
+    diagBisect: [] as Fact[],
+    oppositeAngleEqs: [] as Fact[],
+    baseAngleEqs: [] as Fact[], // equal angles at ADJACENT vertices (a trapezoid's same-base pair)
+    rightAngle: [] as Fact[],
+    consecutiveSum180: [] as Fact[],
+  };
+  const parallels = new Set<string>();
+  for (const f of ctx.facts) {
+    const c = cmdOf(f);
+    if (c.type === 'set-parallel') {
+      const [p, q] = [ek(c.a, c.b), ek(c.c, c.d)];
+      if (sides.includes(p) && sides.includes(q)) parallels.add([p, q].sort().join('~'));
+    }
+  }
+  const numericAngles: { v: Id; value: number; fact: Fact }[] = [];
+  for (const f of ctx.facts) {
+    const c = cmdOf(f);
+    if (c.type === 'set-equal' && !c.soft) {
+      const [p, q] = [ek(c.a, c.b), ek(c.c, c.d)];
+      if (oppPairs.some(([x, y]) => (p === x && q === y) || (p === y && q === x))) {
+        out.oppositeSideEqs.push(f);
+        if (parallels.has([p, q].sort().join('~'))) out.parallelAndEqual.push(f);
+      }
+      if (sides.includes(p) && sides.includes(q) && p !== q && p.split('|').some((v) => q.split('|').includes(v))) out.adjacentSideEqs.push(f);
+      if ((p === diags[0] && q === diags[1]) || (p === diags[1] && q === diags[0])) out.diagEqual.push(f);
+    } else if (c.type === 'set-perpendicular') {
+      const [p, q] = [ek(c.a, c.b), ek(c.c, c.d)];
+      if ((p === diags[0] && q === diags[1]) || (p === diags[1] && q === diags[0])) out.diagPerp.push(f);
+    } else if (c.type === 'set-angle-ratio' && c.k === 1 && c.v1 !== c.v2 && inV(c.v1) && inV(c.v2)) {
+      if ([c.a1, c.b1, c.a2, c.b2].every(inV)) {
+        const i1 = V.indexOf(c.v1), i2 = V.indexOf(c.v2);
+        if ((i1 + 2) % 4 === i2) out.oppositeAngleEqs.push(f);
+        else out.baseAngleEqs.push(f);
+      }
+    } else if (c.type === 'set-angle' && inV(c.vertex) && [c.ray1, c.ray2].every(inV)) {
+      if (Math.abs(c.value - 90) < 1e-6) out.rightAngle.push(f);
+      numericAngles.push({ v: c.vertex, value: c.value, fact: f });
+    }
+  }
+  // Both diagonals sharing ONE stated midpoint = "the diagonals bisect each other" (47).
+  const midsOf = new Map<Id, Set<string>>();
+  for (const mf of factsWith(ctx, (c) => c.type === 'midpoint')) {
+    const m = cmdOf(mf) as Extract<AnyCommand, { type: 'midpoint' }>;
+    const key = ek(m.a, m.b);
+    if (diags.includes(key)) {
+      (midsOf.get(m.id) ?? midsOf.set(m.id, new Set()).get(m.id)!).add(key);
+      if (midsOf.get(m.id)!.size === 2) out.diagBisect.push(mf);
+    }
+  }
+  for (let i = 0; i < numericAngles.length; i++) {
+    for (let j = i + 1; j < numericAngles.length; j++) {
+      const [x, y] = [numericAngles[i], numericAngles[j]];
+      const adjacent = Math.abs(V.indexOf(x.v) - V.indexOf(y.v)) % 2 === 1;
+      if (adjacent && Math.abs(x.value + y.value - 180) < 1e-6) out.consecutiveSum180.push(x.fact, y.fact);
+    }
+  }
+  return out;
+}
+
+/** The shape `quadStatedRelations` returns (the quad-converse prompts pick from it). */
+type QuadRelations = ReturnType<typeof quadStatedRelations>;
+
+/**
+ * A stated angle EQUALITY whose two vertices are joined by a drawn TRANSVERSAL and whose angles
+ * each open toward the other vertex — the classic Z/F configuration. The OTHER arms split the class:
+ * coinciding other-arms = two equal angles of ONE triangle (the isosceles converse, 23); distinct
+ * other-arms = the parallels-converse prompt (5/7).
+ */
+function transversalAngleEqualities(ctx: MatchCtx): { fact: Fact; v1: Id; v2: Id; sharedApex: Id | null }[] {
+  const out: { fact: Fact; v1: Id; v2: Id; sharedApex: Id | null }[] = [];
+  for (const f of ctx.facts) {
+    const c = cmdOf(f);
+    if (c.type !== 'set-angle-ratio' || c.k !== 1 || c.v1 === c.v2) continue;
+    if (!drawnEdge(ctx, c.v1, c.v2)) continue;
+    if (![c.a1, c.b1].includes(c.v2) || ![c.a2, c.b2].includes(c.v1)) continue;
+    const other1 = c.a1 === c.v2 ? c.b1 : c.a1;
+    const other2 = c.a2 === c.v1 ? c.b2 : c.a2;
+    out.push({ fact: f, v1: c.v1, v2: c.v2, sharedApex: other1 === other2 ? other1 : null });
+  }
+  return out;
+}
+
 const ids = (fs: Fact[]) => fs.map((f) => f.id);
 
 // A tiny builder to cut boilerplate. `level` defaults to 1 (Declared) — the vast majority of matchers
@@ -900,18 +1270,25 @@ export const THEOREM_TABLE: TheoremDef[] = [
   },
 
   // ===== Cyclic quadrilateral / inscribed trapezoid =====
-  // Gated on an actual QUAD (a `quadrilateral`/4-`polygon` command), not raw member count — so a triangle
-  // inscribed with a stray 4th concyclic point (Q5's arc-midpoint) never trips it. 87 is premise-announced
-  // (the student stated a quad inscribed in a circle); 201 (Appendix C, a composed teaching corollary)
-  // fires only when that quad is a trapezoid (a `set-parallel` on its concyclic vertices).
+  // 87 is premise-announced two ways: a stated QUAD on a circle (`inscribedQuads`), OR — the operator's
+  // B2c ruling (2026-07-03, ground-truth review): **≥4 points STATED on one circle**, a drawn quad NOT
+  // required ("detectShapes also emits מרובע חסום במעגל for the concyclic set"). The old quad-only gate
+  // ("a stray 4th concyclic point never trips it") predated that ruling and made 87 miss B9/B13/B17/B21
+  // (two-circle figures whose members are all stated but never drawn as a quad) — the T1 wiring's widest
+  // gap (ADR-243). 201 (Appendix C, a composed teaching corollary) stays quad-gated: it fires only when
+  // the inscribed quad is a trapezoid (a `set-parallel` on its concyclic vertices).
   {
     id: 87, type: 'C', salience: 'headline', family: 'quad',
     en: 'A quadrilateral is cyclic if and only if a pair of opposite angles sums to 180°.',
     he: 'ניתן לחסום מרובע במעגל אם ורק אם סכום זוג זוויות נגדיות שווה ל-180°.',
     match: (ctx) => {
       const qs = inscribedQuads(ctx);
-      if (!qs.length) return null;
-      return match('certain', ids(qs.map((q) => q.fact)), qs.flatMap((q) => [q.circleId, ...q.vertices]));
+      if (qs.length) return match('certain', ids(qs.map((q) => q.fact)), qs.flatMap((q) => [q.circleId, ...q.vertices]));
+      // B2c: ≥4 stated concyclic members announce the cyclic quad even with no quad drawn.
+      const bare = ctx.circles.filter((c) => c.members.length >= 4);
+      if (!bare.length) return null;
+      const factIds = [...new Set(bare.flatMap((c) => c.members.flatMap((m) => definingFactIds(ctx, m))))];
+      return match('certain', factIds, bare.flatMap((c) => [c.id, ...c.members]));
     },
   },
   {
@@ -986,7 +1363,17 @@ export const THEOREM_TABLE: TheoremDef[] = [
         const circ = ctx.circles.find((x) => x.id === c.circle || x.center === c.circle);
         return circ ? centerGiven(ctx, circ) : false;
       });
-      return fs.length && given ? match('certain', ids(fs), []) : null;
+      if (fs.length && given) return match('certain', ids(fs), []);
+      // A stated ARC EQUALITY ("arc CA = arc AF") lowers to equal CENTRAL angles (ADR-116:
+      // set-angle-ratio k=1 with both vertices at the centre) — the announcement 92 exists for,
+      // missed until ADR-244 (B6's gap). Gated on a GIVEN centre like the arc-midpoint path.
+      const arcEq = ctx.facts.filter((f) => {
+        const c = cmdOf(f);
+        if (c.type !== 'set-angle-ratio' || c.k !== 1 || c.v1 !== c.v2) return false;
+        const circ = ctx.circles.find((x) => x.center === c.v1);
+        return !!circ && centerGiven(ctx, circ) && [c.a1, c.b1, c.a2, c.b2].every((p) => circ.members.includes(p));
+      });
+      return arcEq.length ? match('certain', ids(arcEq), []) : null;
     },
   },
   {
@@ -1195,6 +1582,720 @@ export const THEOREM_TABLE: TheoremDef[] = [
     match: (ctx) => {
       const r = intersectingCircles(ctx);
       return r ? match('possible', r.factIds, r.objIds) : null;
+    },
+  },
+
+  // ===== T2 fill (ADR-243) — medians/centroid, midsegments, congruence, bisectors =====
+  // Statements byte-exact from 07 (the integrity guard enforces). Priority per the measured fill
+  // order (reports/theorem-fill-order.md): 80/15-17/62/78 top the absent-id demand; 18-21 realise
+  // the operator's own motivating example ("3 equal segments → probably congruent triangles").
+
+  // ----- Medians / centroid (15-17; family 'triangle' — no separate fold, T3 may re-family) -----
+  {
+    id: 15, type: 'P', salience: 'headline', family: 'triangle',
+    en: 'The three medians of a triangle meet at one point (the centroid).',
+    he: 'שלושת התיכונים במשולש נחתכים בנקודה אחת.',
+    match: (ctx) => {
+      // ≥2 stated medians of ONE triangle announce the concurrency (the two-bisectors→80 precedent).
+      const g = medianGroups(ctx)[0];
+      return g ? match('certain', ids(g.facts), g.objIds) : null;
+    },
+  },
+  {
+    id: 16, type: 'P', salience: 'background', family: 'triangle',
+    en: 'A median divides a triangle into two triangles of equal area.',
+    he: 'תיכון במשולש מחלק את המשולש לשני משולשים שווי שטח.',
+    match: (ctx) => {
+      const ms = medianFacts(ctx);
+      if (!ms.length) return null;
+      return match('certain', ids(ms.flatMap((m) => m.facts)), ms.flatMap((m) => [m.apex, m.mid, ...m.base]));
+    },
+  },
+  {
+    id: 17, type: 'P', salience: 'headline', family: 'triangle',
+    en: 'The centroid divides each median in ratio 2:1 (the part nearer the vertex is twice the other).',
+    he: 'נקודת חיתוך התיכונים מחלקת כל תיכון ביחס 2:1 (החלק הקרוב לקודקוד ארוך פי 2 מהחלק האחר).',
+    match: (ctx) => {
+      // Same premise as 15: the centroid exists once two medians of one triangle are stated.
+      const g = medianGroups(ctx)[0];
+      return g ? match('certain', ids(g.facts), g.objIds) : null;
+    },
+  },
+
+  // ----- Congruence criteria (18-21) -----
+  // One constellation matcher: stated equalities/angle-equalities distributed over two triangles
+  // (+ any shared side). A stated "△ABC ≅ △DEF" lowers to exactly 3 side equalities, so it lands as
+  // a full SSS (certain); a PARTIAL constellation surfaces the specific criterion it suggests, amber.
+  {
+    id: 18, type: 'P', salience: 'headline', family: 'congruence',
+    en: 'Congruence — Side-Angle-Side (SAS).',
+    he: 'משפט חפיפה: צלע-זווית-צלע.',
+    match: (ctx) => {
+      const e = congruenceEvidence(ctx).find((x) => x.kind === 18);
+      return e ? match(e.tier, ids(e.facts), e.objIds) : null;
+    },
+  },
+  {
+    id: 19, type: 'P', salience: 'headline', family: 'congruence',
+    en: 'Congruence — Angle-Side-Angle (ASA).',
+    he: 'משפט חפיפה: זווית-צלע-זווית.',
+    match: (ctx) => {
+      const e = congruenceEvidence(ctx).find((x) => x.kind === 19);
+      return e ? match(e.tier, ids(e.facts), e.objIds) : null;
+    },
+  },
+  {
+    id: 20, type: 'P', salience: 'headline', family: 'congruence',
+    en: 'Congruence — Side-Side-Side (SSS).',
+    he: 'משפט חפיפה: צלע-צלע-צלע.',
+    match: (ctx) => {
+      const e = congruenceEvidence(ctx).find((x) => x.kind === 20);
+      return e ? match(e.tier, ids(e.facts), e.objIds) : null;
+    },
+  },
+  {
+    id: 21, type: 'P', salience: 'headline', family: 'congruence',
+    en: 'Congruence — two sides and the angle opposite the larger of the two.',
+    he: 'משפט חפיפה: שתי צלעות והזווית שמול הצלע הגדולה מבין השתיים.',
+    match: (ctx) => {
+      const e = congruenceEvidence(ctx).find((x) => x.kind === 21);
+      return e ? match(e.tier, ids(e.facts), e.objIds) : null;
+    },
+  },
+
+  // ----- Midsegments (62-67) -----
+  {
+    id: 62, type: 'P', salience: 'headline', family: 'midsegment',
+    en: 'A triangle midsegment is parallel to the third side and equals half of it.',
+    he: 'קטע אמצעים במשולש מקביל לצלע השלישית ושווה למחציתה.',
+    match: (ctx) => {
+      const m = midsegmentFacts(ctx).find((x) => x.kind === 'triangle');
+      return m ? match('certain', ids(m.facts), m.objIds, m.level) : null;
+    },
+  },
+  {
+    id: 63, type: 'P', salience: 'background', family: 'midsegment',
+    en: 'A line bisecting one side of a triangle and parallel to a second side bisects the third side.',
+    he: 'ישר החוצה צלע אחת במשולש ומקביל לצלע שנייה חוצה את הצלע השלישית.',
+    match: (ctx) => {
+      const m = midsegmentFacts(ctx).find((x) => x.kind === 'triangle');
+      return m ? match('certain', ids(m.facts), m.objIds, m.level) : null;
+    },
+  },
+  {
+    id: 64, type: 'C', salience: 'background', family: 'midsegment',
+    en: 'A segment with endpoints on two sides, parallel to the third and half its length, is a midsegment.',
+    he: 'קטע שקצותיו על שתי צלעות משולש, מקביל לצלע השלישית ושווה למחציתה, הוא קטע אמצעים.',
+    match: (ctx) => {
+      const m = midsegmentFacts(ctx).find((x) => x.kind === 'triangle');
+      return m ? match('possible', ids(m.facts), m.objIds, m.level) : null;
+    },
+  },
+  {
+    id: 65, type: 'P', salience: 'headline', family: 'midsegment',
+    en: 'The trapezoid midsegment is parallel to the bases and equals half their sum.',
+    he: 'קטע האמצעים בטרפז מקביל לבסיסים ושווה למחצית סכומם.',
+    match: (ctx) => {
+      const m = midsegmentFacts(ctx).find((x) => x.kind === 'trapezoid');
+      return m ? match('certain', ids(m.facts), m.objIds, m.level) : null;
+    },
+  },
+  {
+    id: 66, type: 'P', salience: 'background', family: 'midsegment',
+    en: 'In a trapezoid, a line bisecting one leg and parallel to the bases bisects the other leg.',
+    he: 'בטרפז, ישר החוצה שוק אחת ומקביל לבסיסים חוצה את השוק השנייה.',
+    match: (ctx) => {
+      const m = midsegmentFacts(ctx).find((x) => x.kind === 'trapezoid');
+      return m ? match('certain', ids(m.facts), m.objIds, m.level) : null;
+    },
+  },
+  {
+    id: 67, type: 'C', salience: 'background', family: 'midsegment',
+    en: 'A segment joining the two legs of a trapezoid, parallel to the bases and equal to half their sum, is the midsegment.',
+    he: 'קטע המחבר שתי שוקיים בטרפז, מקביל לבסיסים ושווה למחצית סכומם, הוא קטע אמצעים.',
+    match: (ctx) => {
+      const m = midsegmentFacts(ctx).find((x) => x.kind === 'trapezoid');
+      return m ? match('possible', ids(m.facts), m.objIds, m.level) : null;
+    },
+  },
+
+  // ----- Angle bisectors (75, 78, 80; family 'triangle' — T3 may re-family) -----
+  {
+    id: 75, type: 'P', salience: 'background', family: 'triangle',
+    en: 'The angle bisector is the locus of all points equidistant from the sides of the angle.',
+    he: 'חוצה הזווית הוא המקום הגיאומטרי של כל הנקודות הנמצאות במרחקים שווים משוקי הזווית.',
+    match: (ctx) => {
+      const bs = bisectorStatements(ctx);
+      if (!bs.length) return null;
+      return match('certain', ids(bs.map((b) => b.fact)), bs.map((b) => b.vertex));
+    },
+  },
+  {
+    id: 78, type: 'P', salience: 'headline', family: 'triangle',
+    en: "Every point on an angle bisector is equidistant from the angle's sides.",
+    he: 'כל נקודה על חוצה זווית נמצאת במרחקים שווים משוקי הזווית.',
+    match: (ctx) => {
+      const bs = bisectorStatements(ctx);
+      if (!bs.length) return null;
+      return match('certain', ids(bs.map((b) => b.fact)), bs.map((b) => b.vertex));
+    },
+  },
+  {
+    id: 80, type: 'P', salience: 'headline', family: 'triangle',
+    en: 'The three angle bisectors of a triangle meet at one point — the incenter (center of the inscribed circle).',
+    he: 'שלושת חוצי הזוויות של משולש נחתכים בנקודה אחת, שהיא מרכז המעגל החסום.',
+    match: (ctx) => {
+      const c = bisectorConcurrency(ctx);
+      return c ? match('certain', ids(c.facts), c.objIds) : null;
+    },
+  },
+
+  // ===== Stage-2 fill (ADR-245) — right triangle, isosceles, Thales, parallels-converses,
+  // circle remainder, quad converses, sums & loci. Converses (type C) surface as AMBER recognition
+  // prompts the moment their property side is STATED (operator ruling D2). =====
+
+  // ----- Right triangle (30-32) -----
+  {
+    id: 31, type: 'P', salience: 'headline', family: 'triangle',
+    en: 'In a right triangle, the median to the hypotenuse equals half the hypotenuse.',
+    he: 'במשולש ישר זווית התיכון ליתר שווה למחצית היתר.',
+    match: (ctx) => {
+      // A stated right triangle + a stated median TO ITS HYPOTENUSE.
+      for (const rt of rightTriangleFacts(ctx)) {
+        const m = medianFacts(ctx).find((x) => ek(x.base[0], x.base[1]) === ek(rt.hyp[0], rt.hyp[1]) && x.apex === rt.rightVertex);
+        if (m) return match('certain', ids([rt.fact, ...m.facts]), [...rt.ids, m.mid]);
+      }
+      return null;
+    },
+  },
+  {
+    id: 30, type: 'P', salience: 'headline', family: 'congruence',
+    en: 'Two right triangles with an equal leg and an equal hypotenuse are congruent.',
+    he: 'שני משולשים ישרי זווית שלהם ניצב שווה ויתר שווה חופפים זה לזה.',
+    match: (ctx) => {
+      // TWO stated right triangles + a stated hypotenuse-pair equality + a stated leg equality.
+      const rts = rightTriangleFacts(ctx);
+      for (let i = 0; i < rts.length; i++) {
+        for (let j = i + 1; j < rts.length; j++) {
+          const [r1, r2] = [rts[i], rts[j]];
+          const hyp1 = ek(r1.hyp[0], r1.hyp[1]), hyp2 = ek(r2.hyp[0], r2.hyp[1]);
+          const legs1 = [ek(r1.rightVertex, r1.hyp[0]), ek(r1.rightVertex, r1.hyp[1])];
+          const legs2 = [ek(r2.rightVertex, r2.hyp[0]), ek(r2.rightVertex, r2.hyp[1])];
+          let hypEq: Fact | null = null;
+          let legEq: Fact | null = null;
+          for (const f of ctx.facts) {
+            const c = cmdOf(f);
+            if (c.type !== 'set-equal' || c.soft) continue;
+            const [p, q] = [ek(c.a, c.b), ek(c.c, c.d)];
+            if ((p === hyp1 && q === hyp2) || (p === hyp2 && q === hyp1)) hypEq = f;
+            if ((legs1.includes(p) && legs2.includes(q)) || (legs1.includes(q) && legs2.includes(p))) legEq = f;
+          }
+          if (hypEq && legEq) return match('possible', ids([r1.fact, r2.fact, hypEq, legEq]), [...new Set([...r1.ids, ...r2.ids])]);
+        }
+      }
+      return null;
+    },
+  },
+  {
+    id: 32, type: 'C', salience: 'headline', family: 'triangle',
+    en: 'A triangle in which a median equals half the side it bisects is right-angled.',
+    he: 'משולש בו התיכון שווה למחצית הצלע אותה הוא חוצה הוא ישר זווית.',
+    match: (ctx) => {
+      // Property side stated: a median + a stated |median| = ½·|base| ratio (k=0.5 or the reverse).
+      for (const m of medianFacts(ctx)) {
+        const med = ek(m.apex, m.mid), base = ek(m.base[0], m.base[1]);
+        for (const f of ctx.facts) {
+          const c = cmdOf(f);
+          if (c.type !== 'set-ratio' || c.add) continue;
+          const [p, q] = [ek(c.a, c.b), ek(c.c, c.d)];
+          if ((p === med && q === base && Math.abs(c.k - 0.5) < 1e-9) || (p === base && q === med && Math.abs(c.k - 2) < 1e-9)) {
+            return match('possible', ids([...m.facts, f]), [m.apex, m.mid, ...m.base]);
+          }
+        }
+      }
+      return null;
+    },
+  },
+
+  // ----- Isosceles converses / coincidences (23-27) -----
+  {
+    id: 23, type: 'C', salience: 'headline', family: 'isosceles',
+    en: 'A triangle with two equal angles is isosceles.',
+    he: 'משולש שבו שתי זוויות שוות הוא משולש שווה שוקיים.',
+    match: (ctx) => {
+      // Two stated equal angles SHARING their third arm (one triangle's base angles).
+      const hit = transversalAngleEqualities(ctx).find((e) => e.sharedApex !== null);
+      return hit ? match('possible', [hit.fact.id], [hit.v1, hit.v2, hit.sharedApex!]) : null;
+    },
+  },
+  {
+    id: 24, type: 'P', salience: 'background', family: 'isosceles',
+    en: 'In an isosceles triangle, the apex-angle bisector, the median to the base, and the altitude to the base coincide.',
+    he: 'במשולש שווה שוקיים, חוצה זווית הראש, התיכון לבסיס והגובה לבסיס מתלכדים.',
+    match: (ctx) => {
+      const ev = isoscelesEvidence(ctx);
+      return ev ? match('certain', ids(ev.facts), ev.vertices, ev.level) : null;
+    },
+  },
+  {
+    id: 25, type: 'C', salience: 'background', family: 'isosceles',
+    en: 'If an angle bisector is also an altitude, the triangle is isosceles.',
+    he: 'אם במשולש חוצה זווית הוא גובה, אז המשולש שווה שוקיים.',
+    match: (ctx) => {
+      // A stated bisector at V + a stated altitude FROM V (a foot dropped from the same vertex).
+      for (const b of bisectorStatements(ctx)) {
+        const alt = altitudeFootFacts(ctx).find((a) => a.from === b.vertex);
+        if (alt) return match('possible', ids([b.fact, alt.fact]), [b.vertex, alt.foot]);
+      }
+      return null;
+    },
+  },
+  {
+    id: 26, type: 'C', salience: 'background', family: 'isosceles',
+    en: 'If an angle bisector is also a median, the triangle is isosceles.',
+    he: 'אם במשולש חוצה זווית הוא תיכון, אז המשולש שווה שוקיים.',
+    match: (ctx) => {
+      // A stated bisector at V + a stated median FROM V.
+      for (const b of bisectorStatements(ctx)) {
+        const med = medianFacts(ctx).find((m) => m.apex === b.vertex);
+        if (med) return match('possible', ids([b.fact, ...med.facts]), [b.vertex, med.mid]);
+      }
+      return null;
+    },
+  },
+  {
+    id: 27, type: 'C', salience: 'background', family: 'isosceles',
+    en: 'If an altitude is also a median, the triangle is isosceles.',
+    he: 'אם במשולש גובה הוא תיכון, אז המשולש שווה שוקיים.',
+    match: (ctx) => {
+      // A stated altitude whose FOOT is a stated midpoint of its base.
+      for (const a of altitudeFootFacts(ctx)) {
+        const mid = factsWith(ctx, (c) => c.type === 'midpoint').find((mf) => {
+          const m = cmdOf(mf) as Extract<AnyCommand, { type: 'midpoint' }>;
+          return m.id === a.foot && ek(m.a, m.b) === ek(a.base[0], a.base[1]);
+        });
+        if (mid) return match('possible', ids([a.fact, mid]), [a.from, a.foot, ...a.base]);
+      }
+      return null;
+    },
+  },
+
+  // ----- Thales / proportion (72-74; family 'similarity' — the proportion band) -----
+  {
+    id: 73, type: 'P', salience: 'headline', family: 'similarity',
+    en: 'Extended Thales — a line parallel to one side of a triangle cuts the other two sides (or their extensions) in proportional segments.',
+    he: 'משפט תאלס המורחב: ישר המקביל לאחת מצלעות המשולש חותך את שתי הצלעות האחרות (או את המשכיהן) בקטעים פרופורציוניים.',
+    match: (ctx) => {
+      // The ADR-220 parallel-cut evidence IS extended-Thales's premise (a stated ∥ to a side).
+      const ev = similarityEvidence(ctx);
+      return ev ? match('certain', ids(ev.facts), ev.vertices, ev.level) : null;
+    },
+  },
+  {
+    id: 72, type: 'P', salience: 'background', family: 'similarity',
+    en: 'Thales — two parallel lines cutting the sides of an angle cut off proportional segments.',
+    he: 'משפט תאלס: שני ישרים מקבילים החותכים שוקי זווית מקצים עליהם קטעים פרופורציוניים.',
+    match: (ctx) => {
+      const ev = similarityEvidence(ctx);
+      return ev ? match('certain', ids(ev.facts), ev.vertices, ev.level) : null;
+    },
+  },
+  {
+    id: 74, type: 'C', salience: 'background', family: 'similarity',
+    en: 'Converse of Thales — two lines that cut off four proportional segments on the sides of an angle are parallel.',
+    he: 'משפט הפוך לתאלס: שני ישרים המקצים על שוקי זווית ארבעה קטעים פרופורציוניים הם ישרים מקבילים.',
+    match: (ctx) => {
+      // Property side stated: two set-ratio facts with the SAME k whose segments share an apex.
+      const ratios = ctx.facts.filter((f) => cmdOf(f).type === 'set-ratio');
+      for (let i = 0; i < ratios.length; i++) {
+        for (let j = i + 1; j < ratios.length; j++) {
+          const c1 = cmdOf(ratios[i]) as Extract<AnyCommand, { type: 'set-ratio' }>;
+          const c2 = cmdOf(ratios[j]) as Extract<AnyCommand, { type: 'set-ratio' }>;
+          if (c1.add || c2.add || Math.abs(c1.k - c2.k) > 1e-9) continue;
+          const shared = [c1.a, c1.b].filter((v) => [c2.a, c2.b].includes(v));
+          if (shared.length === 1) return match('possible', ids([ratios[i], ratios[j]]), [shared[0]]);
+        }
+      }
+      return null;
+    },
+  },
+
+  // ----- Parallels converses (5/7/9) — amber prompts on the stated Z/F configuration -----
+  {
+    id: 5, type: 'C', salience: 'headline', family: 'parallels',
+    en: 'If a transversal creates a pair of equal alternate angles, the two lines are parallel.',
+    he: 'שני ישרים נחתכים על ידי ישר שלישי; אם נוצרו זוג זוויות מתחלפות שוות, אז שני הישרים מקבילים.',
+    match: (ctx) => {
+      // A stated angle equality across a drawn transversal whose other arms are DISTINCT (the Z
+      // configuration). Alternate-vs-corresponding needs side-of-line info the symbolic layer lacks,
+      // so 5 and 7 both prompt on this evidence (T3's authoring may split them).
+      const hit = transversalAngleEqualities(ctx).find((e) => e.sharedApex === null);
+      return hit ? match('possible', [hit.fact.id], [hit.v1, hit.v2]) : null;
+    },
+  },
+  {
+    id: 7, type: 'C', salience: 'background', family: 'parallels',
+    en: 'If a transversal creates a pair of equal corresponding angles, the two lines are parallel.',
+    he: 'שני ישרים נחתכים על ידי ישר שלישי; אם נוצרו זוג זוויות מתאימות שוות, אז שני הישרים מקבילים.',
+    match: (ctx) => {
+      const hit = transversalAngleEqualities(ctx).find((e) => e.sharedApex === null);
+      return hit ? match('possible', [hit.fact.id], [hit.v1, hit.v2]) : null;
+    },
+  },
+  {
+    id: 9, type: 'C', salience: 'background', family: 'parallels',
+    en: 'If a transversal creates co-interior angles summing to 180°, the two lines are parallel.',
+    he: 'שני ישרים נחתכים על ידי ישר שלישי; אם סכום זוג זוויות חד-צדדיות הוא 180°, אז שני הישרים מקבילים.',
+    match: (ctx) => {
+      // Two stated NUMERIC angles at the ends of a drawn transversal summing to 180°.
+      const angles = ctx.facts
+        .map((f) => ({ f, c: cmdOf(f) }))
+        .filter((x): x is { f: Fact; c: Extract<AnyCommand, { type: 'set-angle' }> } => x.c.type === 'set-angle');
+      for (let i = 0; i < angles.length; i++) {
+        for (let j = i + 1; j < angles.length; j++) {
+          const [x, y] = [angles[i], angles[j]];
+          if (Math.abs(x.c.value + y.c.value - 180) > 1e-6) continue;
+          if (x.c.vertex === y.c.vertex || !drawnEdge(ctx, x.c.vertex, y.c.vertex)) continue;
+          if ([x.c.ray1, x.c.ray2].includes(y.c.vertex) && [y.c.ray1, y.c.ray2].includes(x.c.vertex)) {
+            return match('possible', ids([x.f, y.f]), [x.c.vertex, y.c.vertex]);
+          }
+        }
+      }
+      return null;
+    },
+  },
+
+  // ----- Circle remainder (93/95/100/101/106) -----
+  {
+    id: 93, type: 'P', salience: 'headline', family: 'circle',
+    en: 'Two central angles are equal if and only if their corresponding chords are equal.',
+    he: 'במעגל, שתי זוויות מרכזיות שוות זו לזו אם ורק אם המיתרים המתאימים להן שווים.',
+    match: (ctx) => {
+      // A CENTRAL-angle theorem → gated on a given centre (ADR-210), over the equal-chords evidence.
+      const fs = equalChordFacts(ctx);
+      if (!fs.length) return null;
+      const anyGiven = ctx.circles.some((c) => centerGiven(ctx, c));
+      return anyGiven ? match('certain', ids(fs), []) : null;
+    },
+  },
+  {
+    id: 95, type: 'P', salience: 'background', family: 'circle',
+    en: 'Equal chords are equidistant from the center.',
+    he: 'מיתרים השווים זה לזה נמצאים במרחקים שווים ממרכז המעגל.',
+    match: (ctx) => {
+      const fs = equalChordFacts(ctx);
+      if (!fs.length) return null;
+      const anyGiven = ctx.circles.some((c) => centerGiven(ctx, c));
+      return anyGiven ? match('certain', ids(fs), []) : null;
+    },
+  },
+  {
+    id: 100, type: 'P', salience: 'headline', family: 'circle',
+    en: 'Equal inscribed angles subtend equal arcs and equal chords.',
+    he: 'במעגל, לזוויות היקפיות שוות קשתות שוות ומיתרים שווים.',
+    match: (ctx) => {
+      // Stated equal INSCRIBED angles: both vertices and all arms are members of one circle.
+      for (const f of ctx.facts) {
+        const c = cmdOf(f);
+        if (c.type !== 'set-angle-ratio' || c.k !== 1 || c.v1 === c.v2) continue;
+        const circ = circleContaining(ctx, [c.v1, c.v2, c.a1, c.b1, c.a2, c.b2]);
+        if (circ) return match('certain', [f.id], [circ.id, c.v1, c.v2]);
+      }
+      return null;
+    },
+  },
+  {
+    id: 101, type: 'P', salience: 'headline', family: 'circle',
+    en: 'Equal arcs subtend equal inscribed angles.',
+    he: 'במעגל, לקשתות שוות מתאימות זוויות היקפיות שוות.',
+    match: (ctx) => {
+      // Equal ARCS stated — an arc-midpoint construct, or the ADR-116 central-angle equality form.
+      const arcs = factsWith(ctx, (c) => c.type === 'arc-midpoint');
+      const arcEq = ctx.facts.filter((f) => {
+        const c = cmdOf(f);
+        if (c.type !== 'set-angle-ratio' || c.k !== 1 || c.v1 !== c.v2) return false;
+        const circ = ctx.circles.find((x) => x.center === c.v1);
+        return !!circ && [c.a1, c.b1, c.a2, c.b2].every((p) => circ.members.includes(p));
+      });
+      const fs = [...arcs, ...arcEq];
+      return fs.length ? match('certain', ids(fs), []) : null;
+    },
+  },
+  {
+    id: 106, type: 'C', salience: 'headline', family: 'tangent',
+    en: 'A line perpendicular to a radius at its endpoint is tangent to the circle.',
+    he: 'ישר המאונך לרדיוס בקצהו הוא משיק למעגל.',
+    match: (ctx) => {
+      // The student THEMSELVES stated the ⟂-to-a-radius (a non-`implicit` set-perpendicular fact —
+      // the tangent-word lowerings mark theirs `implicit`, so a stated TANGENT doesn't echo its own
+      // converse back).
+      for (const f of ctx.facts) {
+        const c = cmdOf(f);
+        if (c.type !== 'set-perpendicular' || c.implicit) continue;
+        const sides: [Id, Id, Id, Id][] = [[c.a, c.b, c.c, c.d], [c.c, c.d, c.a, c.b]];
+        for (const [ra, rb, ta, tb] of sides) {
+          const circ = ctx.circles.find((k) => k.center === ra && k.members.includes(rb));
+          if (circ && (rb === ta || rb === tb)) return match('possible', [f.id], [circ.id, rb]);
+        }
+      }
+      return null;
+    },
+  },
+
+  // ----- Quadrilateral converses (40/42/44/45/47/49/51/53/54/57-61) — amber recognition (D2) -----
+  ...([
+    [44, 'headline', 'A quadrilateral with both pairs of opposite sides equal is a parallelogram.', 'מרובע שבו כל שתי צלעות נגדיות שוות זו לזו הוא מקבילית.',
+      (r: QuadRelations) => (r.oppositeSideEqs.length >= 2 ? r.oppositeSideEqs : null)],
+    [45, 'headline', 'A quadrilateral with one pair of sides both parallel and equal is a parallelogram.', 'מרובע שבו זוג צלעות מקבילות ושוות הוא מקבילית.',
+      (r: QuadRelations) => (r.parallelAndEqual.length ? r.parallelAndEqual : null)],
+    [47, 'headline', 'A quadrilateral whose diagonals bisect each other is a parallelogram.', 'מרובע שבו האלכסונים חוצים זה את זה הוא מקבילית.',
+      (r: QuadRelations) => (r.diagBisect.length ? r.diagBisect : null)],
+    [49, 'background', 'A quadrilateral with both pairs of opposite angles equal is a parallelogram.', 'מרובע שבו כל שתי זוויות נגדיות שוות הוא מקבילית.',
+      (r: QuadRelations) => (r.oppositeAngleEqs.length >= 2 ? r.oppositeAngleEqs : null)],
+    [51, 'background', 'A quadrilateral in which every pair of consecutive angles sums to 180° is a parallelogram.', 'מרובע שבו הסכום של כל שתי זוויות סמוכות הוא 180° הוא מקבילית.',
+      (r: QuadRelations) => (r.consecutiveSum180.length ? r.consecutiveSum180 : null)],
+  ] as [number, Salience, string, string, (r: QuadRelations) => Fact[] | null][]).map(
+    ([id, salience, en, he, pick]): TheoremDef => ({
+      id, type: 'C', salience, family: 'quad', en, he,
+      match: (ctx) => {
+        // A GENERAL stated quad (not already a declared parallelogram — the converse prompt is
+        // pointless on a shape already stated to be one).
+        for (const q of quadFacts(ctx)) {
+          const r = quadStatedRelations(ctx, q.vertices);
+          const fs = pick(r);
+          if (fs) return match('possible', ids([q.fact, ...fs]), q.vertices);
+        }
+        return null;
+      },
+    }),
+  ),
+  ...([
+    [53, 'A parallelogram with equal diagonals is a rectangle.', 'מקבילית שבה האלכסונים שווים זה לזה היא מלבן.',
+      (r: QuadRelations) => (r.diagEqual.length ? r.diagEqual : null)],
+    [54, 'A parallelogram with a right angle is a rectangle.', 'מקבילית שבה יש זווית ישרה היא מלבן.',
+      (r: QuadRelations) => (r.rightAngle.length ? r.rightAngle : null)],
+    [58, 'A parallelogram with perpendicular diagonals is a rhombus.', 'מקבילית שבה האלכסונים מאונכים זה לזה היא מעוין.',
+      (r: QuadRelations) => (r.diagPerp.length ? r.diagPerp : null)],
+    [59, 'A parallelogram with two equal adjacent sides is a rhombus.', 'מקבילית שבה שתי צלעות סמוכות שוות היא מעוין.',
+      (r: QuadRelations) => (r.adjacentSideEqs.length ? r.adjacentSideEqs : null)],
+  ] as [number, string, string, (r: QuadRelations) => Fact[] | null][]).map(
+    ([id, en, he, pick]): TheoremDef => ({
+      id, type: 'C', salience: 'headline', family: 'quad', en, he,
+      match: (ctx) => {
+        // The property stated ON a declared PARALLELOGRAM (not one already declared the target shape).
+        for (const q of statedQuadShapes(ctx, ['parallelogram'])) {
+          const r = quadStatedRelations(ctx, q.ids);
+          const fs = pick(r);
+          if (fs) return match('possible', ids([q.fact, ...fs]), q.ids);
+        }
+        return null;
+      },
+    }),
+  ),
+  {
+    id: 57, type: 'C', salience: 'headline', family: 'quad',
+    en: 'A parallelogram in which a diagonal bisects an angle is a rhombus.',
+    he: 'מקבילית שבה אלכסון הוא חוצה זווית היא מעוין.',
+    match: (ctx) => {
+      // A declared parallelogram + a stated bisector AT one of its vertices.
+      for (const q of statedQuadShapes(ctx, ['parallelogram'])) {
+        for (const b of bisectorStatements(ctx)) {
+          if (q.ids.includes(b.vertex)) return match('possible', ids([q.fact, b.fact]), q.ids);
+        }
+      }
+      return null;
+    },
+  },
+  {
+    id: 60, type: 'C', salience: 'headline', family: 'quad',
+    en: 'A rhombus with equal diagonals is a square.',
+    he: 'מעוין שבו האלכסונים שווים הוא ריבוע.',
+    match: (ctx) => {
+      for (const q of statedQuadShapes(ctx, ['rhombus'])) {
+        const r = quadStatedRelations(ctx, q.ids);
+        if (r.diagEqual.length) return match('possible', ids([q.fact, ...r.diagEqual]), q.ids);
+      }
+      return null;
+    },
+  },
+  {
+    id: 61, type: 'C', salience: 'headline', family: 'quad',
+    en: 'A rectangle with equal adjacent sides is a square.',
+    he: 'מלבן בו הצלעות הסמוכות שוות הוא ריבוע.',
+    match: (ctx) => {
+      for (const q of statedQuadShapes(ctx, ['rectangle'])) {
+        const r = quadStatedRelations(ctx, q.ids);
+        if (r.adjacentSideEqs.length) return match('possible', ids([q.fact, ...r.adjacentSideEqs]), q.ids);
+      }
+      return null;
+    },
+  },
+  {
+    id: 40, type: 'C', salience: 'headline', family: 'quad',
+    en: 'A trapezoid in which the angles at the same base are equal is isosceles.',
+    he: 'טרפז בו הזוויות שליד אותו בסיס שוות זו לזו הוא טרפז שווה שוקיים.',
+    match: (ctx) => {
+      for (const q of statedQuadShapes(ctx, ['trapezoid'])) {
+        const r = quadStatedRelations(ctx, q.ids);
+        if (r.baseAngleEqs.length) return match('possible', ids([q.fact, ...r.baseAngleEqs]), q.ids);
+      }
+      return null;
+    },
+  },
+  {
+    id: 42, type: 'C', salience: 'headline', family: 'quad',
+    en: 'A trapezoid with equal diagonals is isosceles.',
+    he: 'טרפז בו האלכסונים שווים זה לזה הוא טרפז שווה שוקיים.',
+    match: (ctx) => {
+      for (const q of statedQuadShapes(ctx, ['trapezoid'])) {
+        const r = quadStatedRelations(ctx, q.ids);
+        if (r.diagEqual.length) return match('possible', ids([q.fact, ...r.diagEqual]), q.ids);
+      }
+      return null;
+    },
+  },
+
+  // ----- Angle sums (35/36) -----
+  {
+    id: 35, type: 'P', salience: 'background', family: 'quad',
+    en: 'The interior angles of a quadrilateral sum to 360°.',
+    he: 'סכום הזוויות במרובע הוא 360°.',
+    match: (ctx) => {
+      const qs = [...quadFacts(ctx), ...statedQuadShapes(ctx, ['parallelogram', 'rectangle', 'rhombus', 'square', 'trapezoid'])];
+      return qs.length ? match('certain', ids(qs.map((q) => q.fact)), []) : null;
+    },
+  },
+  {
+    id: 36, type: 'P', salience: 'background', family: 'quad',
+    en: 'The interior angles of a convex n-gon sum to (n−2)·180°.',
+    he: 'סכום הזוויות הפנימיות של מצולע קמור הוא (n−2)·180°.',
+    match: (ctx) => {
+      const ps = factsWith(ctx, (c) => c.type === 'polygon' && c.ids.length >= 5);
+      return ps.length ? match('certain', ids(ps), []) : null;
+    },
+  },
+
+  // ----- Perpendicular bisector, concurrency, incircle, regular polygons (82/83/85/86/81/89/90/77) -----
+  {
+    id: 82, type: 'P', salience: 'headline', family: 'triangle',
+    en: 'Every point on the perpendicular bisector of a segment is equidistant from its endpoints.',
+    he: 'כל נקודה על האנך האמצעי של קטע נמצאת במרחקים שווים מקצות הקטע.',
+    match: (ctx) => {
+      const bs = perpBisectorFacts(ctx);
+      if (!bs.length) return null;
+      return match('certain', ids(bs.flatMap((b) => b.facts)), bs.flatMap((b) => [b.through, ...b.seg]));
+    },
+  },
+  {
+    id: 83, type: 'C', salience: 'background', family: 'triangle',
+    en: "A point equidistant from a segment's endpoints lies on its perpendicular bisector.",
+    he: 'כל נקודה הנמצאת במרחקים שווים מקצות קטע נמצאת על האנך האמצעי.',
+    match: (ctx) => {
+      // A stated |XA| = |XB| (shared first endpoint X) with the segment A–B drawn.
+      for (const f of ctx.facts) {
+        const c = cmdOf(f);
+        if (c.type !== 'set-equal' || c.soft) continue;
+        const pairs: [Id, Id, Id, Id][] = [[c.a, c.b, c.c, c.d], [c.b, c.a, c.c, c.d], [c.a, c.b, c.d, c.c], [c.b, c.a, c.d, c.c]];
+        for (const [x1, e1, x2, e2] of pairs) {
+          if (x1 === x2 && e1 !== e2 && drawnEdge(ctx, e1, e2)) return match('possible', [f.id], [x1, e1, e2]);
+        }
+      }
+      return null;
+    },
+  },
+  {
+    id: 85, type: 'P', salience: 'headline', family: 'triangle',
+    en: 'The three perpendicular bisectors of a triangle meet at one point — the circumcenter.',
+    he: 'במשולש, שלושת האנכים האמצעיים נחתכים בנקודה אחת, שהיא מרכז המעגל החוסם.',
+    match: (ctx) => {
+      // ≥2 stated ⟂-bisectors of two DIFFERENT sides of one stated triangle.
+      const bs = perpBisectorFacts(ctx);
+      for (const t of triangleVertexSets(ctx)) {
+        const inTri = bs.filter((b) => b.seg.every((v) => t.ids.includes(v)));
+        if (new Set(inTri.map((b) => ek(b.seg[0], b.seg[1]))).size >= 2) {
+          return match('certain', ids(inTri.flatMap((b) => b.facts)), [...t.ids]);
+        }
+      }
+      return null;
+    },
+  },
+  {
+    id: 86, type: 'P', salience: 'headline', family: 'triangle',
+    en: 'The three altitudes of a triangle meet at one point (the orthocenter).',
+    he: 'שלושת הגבהים במשולש נחתכים בנקודה אחת.',
+    match: (ctx) => {
+      // ≥2 stated altitudes from DISTINCT vertices of one stated triangle.
+      const alts = altitudeFootFacts(ctx);
+      for (const t of triangleVertexSets(ctx)) {
+        const inTri = alts.filter((a) => t.ids.includes(a.from) && a.base.every((v) => t.ids.includes(v)));
+        if (new Set(inTri.map((a) => a.from)).size >= 2) return match('certain', ids(inTri.map((a) => a.fact)), [...t.ids]);
+      }
+      return null;
+    },
+  },
+  {
+    id: 81, type: 'P', salience: 'background', family: 'circle',
+    en: 'Every triangle has an inscribed circle.',
+    he: 'בכל משולש אפשר לחסום מעגל.',
+    match: (ctx) => {
+      // The INCIRCLE fingerprint, two construction forms: (a) one circle carrying ≥3 tangencies
+      // (the ADR-115 dual, and any circle a student made tangent to three sides); (b) the fresh
+      // "circle inscribed in triangle ABC" lowering — a circle whose CENTRE rides a BISECTOR line
+      // (the ADR-020 incenter construction).
+      for (const [circleId, t] of tangentsByCircle(ctx)) {
+        if (new Set(t.ats).size >= 3) return match('certain', t.factIds, [circleId, ...t.ats]);
+      }
+      const isBisector = (lineId: Id): boolean => {
+        const line = ctx.construction.objects.find((x) => x.id === lineId);
+        return line?.kind === 'line' && (line as { spec: { via: string } }).spec.via === 'bisector';
+      };
+      for (const o of ctx.construction.objects) {
+        if (o.kind !== 'circle') continue;
+        const centre = ctx.construction.objects.find((x) => x.id === o.center);
+        // The incenter: bisector ∩ bisector (`line-intersection` of two bisector-spec lines), or a
+        // centre sliding on a single bisector (the ADR-115 corner-tangent scaffolding).
+        const onBisectors =
+          (centre?.kind === 'line-intersection' && isBisector((centre as { line1: Id }).line1) && isBisector((centre as { line2: Id }).line2)) ||
+          (centre?.kind === 'on-line' && isBisector((centre as { line: Id }).line));
+        if (onBisectors) return match('certain', definingFactIds(ctx, o.id), [o.id, o.center]);
+      }
+      return null;
+    },
+  },
+  ...([
+    [89, 'Every regular polygon has a circumscribed circle.', 'כל מצולע משוכלל אפשר לחסום במעגל.'],
+    [90, 'Every regular polygon has an inscribed circle.', 'בכל מצולע משוכלל אפשר לחסום מעגל.'],
+  ] as [number, string, string][]).map(([id, en, he]): TheoremDef => ({
+    id, type: 'P', salience: 'background', family: 'quad', en, he,
+    match: (ctx) => {
+      // The ADR-111 regular-polygon construct: a `polygon` (n ≥ 5) whose vertices ride one circle.
+      for (const f of factsWith(ctx, (c) => c.type === 'polygon' && c.ids.length >= 5)) {
+        const c = cmdOf(f) as Extract<AnyCommand, { type: 'polygon' }>;
+        if (circleContaining(ctx, c.ids)) return match('certain', [f.id], [...c.ids]);
+      }
+      return null;
+    },
+  })),
+  {
+    id: 77, type: 'C', salience: 'background', family: 'triangle',
+    en: 'A line through a vertex that divides the opposite side (internally) in the ratio of the other two sides is the angle bisector.',
+    he: 'ישר העובר דרך קודקוד וחוצה את הצלע שמולו ביחס שתי הצלעות האחרות הוא חוצה זווית המשולש.',
+    match: (ctx) => {
+      // Property side stated: a set-ratio pairing a side's two SPLITS (segments sharing a non-vertex
+      // foot) with the triangle's two OTHER sides.
+      for (const f of ctx.facts) {
+        const c = cmdOf(f);
+        if (c.type !== 'set-ratio' || c.add) continue;
+        for (const t of triangleVertexSets(ctx)) {
+          const p = [c.a, c.b], q = [c.c, c.d];
+          const isSidePair = (pr: Id[]) => pr.every((v) => t.ids.includes(v));
+          if (isSidePair(p) === isSidePair(q)) continue;
+          const splitPr = isSidePair(p) ? q : p;
+          const feet = splitPr.filter((v) => !t.ids.includes(v));
+          if (feet.length === 1) return match('possible', [f.id], [...t.ids, feet[0]]);
+        }
+      }
+      return null;
     },
   },
 ];
