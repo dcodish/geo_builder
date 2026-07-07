@@ -18,6 +18,8 @@ import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } fr
 function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: StoreError3): string | null {
   if (!err) return null;
   switch (err.code) {
+    case 'ambiguous-vector-length':
+      return t('err.ambiguousVectorLength');
     case 'not-understood':
       return t('err.notUnderstood');
     case 'bad-file':
@@ -93,6 +95,21 @@ export default function App3() {
   const submitSteps = useGeo3((s) => s.submitSteps);
 
   const [text, setText] = useState('');
+  // steps display: a VECTOR fact renders in proper notation — pairs get the arrow
+  // (SE⃗ = 3/4 SD⃗), declared vector names get the textbook underline (u̲) — the
+  // stored utterance stays untouched (the word וקטור reads as decoration).
+  const VEC_CMD_TYPES = new Set(['name-vector', 'vec-rel', 'dot-given', 'inject-vector', 'point-in-span']);
+  const factDisplay = (f: { utterance: string; cmds: { type: string; claim?: { type: string } }[] }, vecNames: Set<string>): string => {
+    const isVec = f.cmds.some((cmd) => VEC_CMD_TYPES.has(cmd.type) || (cmd.type === 'claim' && cmd.claim?.type === 'vec-eq'));
+    if (!isVec) return f.utterance;
+    let u = f.utterance.replace(/(?:^|(?<=[\s,:]))(?:ה?ו?וקטור|vectors?)\s+/gi, '');
+    u = u.replace(/([A-Z]\d*'?[A-Z]\d*'?)(?![\u20D7A-Za-z\d'])/g, '$1\u20D7');
+    if (vecNames.size > 0) {
+      const names = [...vecNames].join('|');
+      u = u.replace(new RegExp('(?:^|(?<=[\\s,:=+\\-·(]))(' + names + ')(?=$|[\\s,.·+\\-=)])', 'g'), '$1\u0332');
+    }
+    return u;
+  };
   const inputRef = useRef<HTMLInputElement>(null);
   // symbol palette (the 2-D App's pattern): insert at the caret, keep focus
   const insertSym = (sym: string, caretBack = 0) => {
@@ -311,7 +328,7 @@ export default function App3() {
                   statusDot(derived.status[f.id])
                 )}
                 <span dir="auto" className="min-w-0 flex-1 truncate text-sm">
-                  {f.utterance}
+                  {factDisplay(f, new Set(derived.construction.vectors.keys()))}
                 </span>
                 <button
                   type="button"

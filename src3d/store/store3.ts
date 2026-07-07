@@ -51,6 +51,7 @@ export interface Derived3 {
 export type StoreError3 =
   | EngineError3
   | { code: 'not-understood' }
+  | { code: 'ambiguous-vector-length' }
   | { code: 'bad-file' }
   | { code: 'newer-schema' }
   | null;
@@ -254,7 +255,7 @@ export const useGeo3 = create<Geo3State>()(
       submit: (utterance) => {
         const parsed = parse3(utterance);
         if (!parsed.ok) {
-          set({ lastError: { code: 'not-understood' } });
+          set({ lastError: { code: parsed.reason === 'ambiguous-vector-length' ? 'ambiguous-vector-length' : 'not-understood' } });
           return;
         }
         const { facts, seed } = get();

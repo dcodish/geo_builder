@@ -19,7 +19,12 @@
 
 import type { Command3, Id, LinExpr, SymTerm, VecExpr } from '../engine/types';
 
-export type ParseResult3 = { ok: true; commands: Command3[] } | { ok: false; reason: 'not-handled' };
+export type ParseResult3 =
+  | { ok: true; commands: Command3[] }
+  | { ok: false; reason: 'not-handled' }
+  // bare `AS = AB` — vector equation or length equality? NEVER assumed (operator rule):
+  // the student is asked to write וקטור AS = וקטור AB (or with the ⃗ arrow), or |AS| = |AB|.
+  | { ok: false; reason: 'ambiguous-vector-length' };
 
 const NOT_HANDLED: ParseResult3 = { ok: false, reason: 'not-handled' };
 
@@ -34,6 +39,7 @@ export function normalize3(s: string): string {
     .replace(/[′’‘`]/g, "'")
     .replace(/[→⃗⟶]/g, '')
     .replace(/[−־]/g, '-')
+    .replace(/(?:^|(?<=[\s:,]))(?:ה?ו?וקטור|vectors?)\s+/gi, '') // the vector WORD marks vector meaning (recorded before normalize), then reads as decoration
     .replace(/½/g, '1/2')
     .replace(/¼/g, '1/4')
     .replace(/¾/g, '3/4')
@@ -420,15 +426,7 @@ const lengthRel: Rule = (s) => {
   if (VEC_MARKED) return null; // the arrow says VECTOR — vecEqClaim's territory
   const P = "([A-Z]\\d*'?)([A-Z]\\d*'?)";
   const lhs = s.match(new RegExp(`^(?:\\|${P}\\||(?:אורך|length)\\s+(?:המקצוע\\s+|הצלע\\s+|צלע\\s+)?${P})\\s*(?:=|שווה\\s+ל)\\s*(.+)$`));
-  if (!lhs) {
-    const bare = s.match(new RegExp(`^${P}\\s*=\\s*${P}\\s*$`));
-    if (!bare) return null;
-    return [
-      { type: 'segment3', a: bare[1], b: bare[2] },
-      { type: 'segment3', a: bare[3], b: bare[4] },
-      { type: 'length-rel', a1: bare[1], b1: bare[2], rhs: { pair: [bare[3], bare[4]] }, c: 1 },
-    ];
-  }
+  if (!lhs) return null; // bare `AS = AB` is AMBIGUOUS — parse3 surfaces the clarification, never a guess
   const a1 = lhs[1] ?? lhs[3];
   const b1 = lhs[2] ?? lhs[4];
   const r = lhs[5].trim();
@@ -1132,9 +1130,11 @@ const RULES: Rule[] = [
 export function parse3(utterance: string): ParseResult3 {
   // an explicit vector arrow (⃗/→, stripped by normalize3) marks bare pair=pair as a
   // VECTOR equation; without it, AS = AB reads as a LENGTH equality (the bagrut default)
-  VEC_MARKED = /[→⃗⟶]/.test(utterance);
+  VEC_MARKED = /[→⃗⟶]/.test(utterance) || /(?:^|[\s:,])(?:ה?ו?וקטור|vectors?)\s/i.test(utterance);
   const s = normalize3(utterance);
   if (!s) return NOT_HANDLED;
+  if (!VEC_MARKED && /^([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*$/.test(s))
+    return { ok: false, reason: 'ambiguous-vector-length' };
   for (const rule of RULES) {
     const commands = rule(s);
     if (commands) return { ok: true, commands };

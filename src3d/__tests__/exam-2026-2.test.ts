@@ -69,9 +69,15 @@ describe('GATE — 2026 מועד ב Q2 (square pyramid + |EN| abs-value given)',
     expect(state().lastError).toEqual({ code: 'unknown-symbol', id: 'm' });
   });
 
-  it('bare AS = AB is a LENGTH equality; the ⃗ arrow makes it a vector equation', () => {
+  it('bare AS = AB asks for clarification — never assumed (operator rule); explicit forms disambiguate', () => {
     submit('פירמידה ABCDS שבסיסה ריבוע');
-    submit('AS = AB'); // length equality — must NOT be read as the vector equation AS⃗=AB⃗
+    const n = state().facts.length;
+    // ambiguous: vector equation or length equality? ask, never guess — and never the LLM
+    submit('AS = AB');
+    expect(state().facts).toHaveLength(n);
+    expect(state().lastError).toEqual({ code: 'ambiguous-vector-length' });
+    // the LENGTH forms
+    submit('|AS| = |AB|');
     expectAllOk();
     const pos = derived().positions;
     const d = (p: string, q: string) => {
@@ -80,10 +86,17 @@ describe('GATE — 2026 מועד ב Q2 (square pyramid + |EN| abs-value given)',
       return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
     };
     expect(d('A', 'S')).toBeCloseTo(d('A', 'B'), 5);
-    // the arrow form is the vector claim — false here (S ≠ B), refused
-    const n = state().facts.length;
-    submit('AS⃗ = AB⃗');
-    expect(state().facts).toHaveLength(n);
-    expect(state().lastError).toEqual({ code: 'claim-refuted' });
+    // the VECTOR forms: the ⃗ arrow and the typeable word marker (He and En) —
+    // AS⃗ = AB⃗ is a false vector claim here (S ≠ B), refused
+    const n2 = state().facts.length;
+    for (const form of ['AS⃗ = AB⃗', 'וקטור AS = וקטור AB', 'vector AS = vector AB']) {
+      submit(form);
+      expect(state().facts, form).toHaveLength(n2);
+      expect(state().lastError, form).toEqual({ code: 'claim-refuted' });
+    }
+    // and the word form still DEFINES when the target is new
+    submit('וקטור SM = 1/2 וקטור SC');
+    expect(state().lastError).toBeNull();
+    expect(derived().positions.has('M')).toBe(true);
   });
 });

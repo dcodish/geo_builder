@@ -68,7 +68,8 @@
     "claimRefuted": "The claim doesn't hold in the figure — check the computation",
     "badFile": "This is not a valid Space Builder figure file",
     "newerSchema": "The file was saved by a newer version of the tool — refresh the page and try again",
-    "unknownSymbol": "the parameter {{id}} isn't defined in the figure"
+    "unknownSymbol": "the parameter {{id}} isn't defined in the figure",
+    "ambiguousVectorLength": "vector or length? write vector AB = vector CD (or AB⃗ = CD⃗), or |AB| = |CD|"
   },
   "examples": {
     "ex1": "cube ABCD",
