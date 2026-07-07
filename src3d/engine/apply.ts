@@ -6,7 +6,7 @@
 import { exprPointIds, exprVectorNames } from './vecExpr';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, SolidCommand, SolidObj } from './types';
 
-const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8 };
+const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5 };
 
 /** Edge index pairs per solid kind (indices into `ids`). */
 function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
@@ -17,7 +17,7 @@ function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
       [0, 3], [1, 4], [2, 5], // verticals
     ];
   }
-  if (kind === 'pyramid4') {
+  if (kind === 'pyramid4' || kind === 'pyramid4g' || kind === 'pyramid4r' || kind === 'pyramid4gr') {
     return [
       [0, 1], [1, 2], [2, 3], [3, 0], // base ring
       [0, 4], [1, 4], [2, 4], [3, 4], // lateral edges to the apex
@@ -53,7 +53,7 @@ function faceIndices(kind: SolidCommand['kind']): number[][] {
       [0, 1, 4, 3], [1, 2, 5, 4], [2, 0, 3, 5], // sides
     ];
   }
-  if (kind === 'pyramid4') {
+  if (kind === 'pyramid4' || kind === 'pyramid4g' || kind === 'pyramid4r' || kind === 'pyramid4gr') {
     return [
       [0, 1, 2, 3], // base
       [0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4], // lateral triangles
@@ -120,7 +120,7 @@ function relPointIds(c: Construction3, from: Id, to: Id, terms: { atom: import('
 }
 
 /** How many FREE dims the figure's solids carry (a scalar statement on such a figure is a GIVEN, not a check). */
-const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2 };
+const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2, pyramid4g: 3, pyramid4r: 2, pyramid4gr: 4 };
 function freeDims(c: Construction3): number {
   let n = 0;
   for (const s of c.solids) n += DIM_COUNT[s.kind];
@@ -494,7 +494,11 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'seg-plane-rel': {
-      const missingPlane = missingPoint(c, cmd.plane);
+      // plane: [] is the הבסיס/"the base" sentinel — resolve it HERE (the one
+      // chokepoint) to the single solid's base ring; every kind lists its base first
+      if (cmd.plane.length === 0 && c.solids.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+      const plane = cmd.plane.length === 0 ? c.solids[0].ids.slice(0, 3) : cmd.plane;
+      const missingPlane = missingPoint(c, plane);
       if (missingPlane) return { ok: false, error: missingPlane };
       // an endpoint that is a SYMBOLIC vec-defined point → this condition PINS its symbol
       for (const end of [cmd.a, cmd.b]) {
@@ -505,7 +509,7 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
             const other = end === cmd.a ? cmd.b : cmd.a;
             if (!c.points.has(other)) return { ok: false, error: { code: 'unknown-point', id: other } };
             const next = clone(c);
-            next.symbolPins.push({ rel: cmd.rel, a: cmd.a, b: cmd.b, plane: cmd.plane, def: def.def });
+            next.symbolPins.push({ rel: cmd.rel, a: cmd.a, b: cmd.b, plane, def: def.def });
             next.segments.push([cmd.a, cmd.b]);
             return { ok: true, next };
           }
@@ -517,12 +521,12 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       // V7 T2: on a figure with FREE dims the relation is a DRIVING given (M1)
       if (freeDims(c) > 0) {
         const next = clone(c);
-        next.scalarPins.push({ kind: cmd.rel === 'perp' ? 'seg-perp-plane' : 'seg-par-plane', a: cmd.a, b: cmd.b, plane: cmd.plane });
+        next.scalarPins.push({ kind: cmd.rel === 'perp' ? 'seg-perp-plane' : 'seg-par-plane', a: cmd.a, b: cmd.b, plane });
         if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]);
         return { ok: true, next };
       }
-      if (cmd.rel === 'perp' && cmd.plane.length === 3) {
-        const asClaim = applyCommand3(c, { type: 'claim', claim: { type: 'perp-plane', seg: [cmd.a, cmd.b], plane: [cmd.plane[0], cmd.plane[1], cmd.plane[2]] } });
+      if (cmd.rel === 'perp' && plane.length === 3) {
+        const asClaim = applyCommand3(c, { type: 'claim', claim: { type: 'perp-plane', seg: [cmd.a, cmd.b], plane: [plane[0], plane[1], plane[2]] } });
         if (!asClaim.ok || hasSegment(asClaim.next, cmd.a, cmd.b)) return asClaim;
         const withSeg = clone(asClaim.next);
         withSeg.segments.push([cmd.a, cmd.b]); // the stated segment is drawn (V1 convention preserved)

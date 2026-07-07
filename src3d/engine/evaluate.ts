@@ -43,6 +43,14 @@ export function solidDims(kind: SolidKind, key: string, seed: number): number[] 
       sample(seed, `${key}-ax`, 0.2, 0.8), sample(seed, `${key}-ay`, 0.15, 0.6), sample(seed, `${key}-az`, 0.8, 1.6),
     ];
   if (kind === 'prism4r') return [rad(sample(seed, `${key}-angle`, 45, 75)), sample(seed, `${key}-height`, 0.7, 1.5)];
+  if (kind === 'pyramid4g')
+    return [sample(seed, `${key}-ax`, 0.2, 0.8), sample(seed, `${key}-ay`, 0.2, 0.8), sample(seed, `${key}-az`, 0.8, 1.6)];
+  if (kind === 'pyramid4r') return [sample(seed, `${key}-aspect`, 0.6, 1.6), sample(seed, `${key}-height`, 0.8, 1.6)];
+  if (kind === 'pyramid4gr')
+    return [
+      sample(seed, `${key}-aspect`, 0.6, 1.6),
+      sample(seed, `${key}-ax`, 0.2, 0.8), sample(seed, `${key}-ay`, 0.2, 0.8), sample(seed, `${key}-az`, 0.8, 1.6),
+    ];
   return [rad(sample(seed, `${key}-alpha`, 38, 72)), rad(sample(seed, `${key}-beta`, 38, 72)), sample(seed, `${key}-height`, 0.65, 1.5)];
 }
 
@@ -103,6 +111,30 @@ function solidPositions(kind: SolidKind, dims: number[], origin: Vec3): Vec3[] {
     const cc = apexFromBaseAngles(alpha, beta);
     return [
       v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + cc.x, o.y + cc.y, o.z),
+      v3(o.x + ax, o.y + ay, o.z + az),
+    ];
+  }
+  if (kind === 'pyramid4g') {
+    // a GENERAL square-base pyramid: unit base (gauge), apex fully free (3 dims)
+    const [ax, ay, az] = dims;
+    return [
+      v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1, o.y + 1, o.z), v3(o.x, o.y + 1, o.z),
+      v3(o.x + ax, o.y + ay, o.z + az),
+    ];
+  }
+  if (kind === 'pyramid4r') {
+    // right pyramid over a 1×b rectangle (aspect b a free DOF — square was NOT stated)
+    const [b, h] = dims;
+    return [
+      v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1, o.y + b, o.z), v3(o.x, o.y + b, o.z),
+      v3(o.x + 0.5, o.y + b / 2, o.z + h),
+    ];
+  }
+  if (kind === 'pyramid4gr') {
+    // general pyramid over a 1×b rectangle: aspect AND apex free
+    const [b, ax, ay, az] = dims;
+    return [
+      v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1, o.y + b, o.z), v3(o.x, o.y + b, o.z),
       v3(o.x + ax, o.y + ay, o.z + az),
     ];
   }

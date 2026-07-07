@@ -111,7 +111,12 @@ export type Line3Def =
 /** The solid family. `cube`/`box`: 8 ids (base then primed tops); `prism3`: 6 ids (right triangular
  *  prism); `pyramid4`/`pyramid3`: base ring then the APEX LAST — a RIGHT pyramid (apex above the
  *  base's circumcentre, so the lateral edges are equal; stated `ישרה` required, ADR-052). */
-export type SolidKind = 'cube' | 'box' | 'prism3' | 'pyramid4' | 'pyramid3' | 'tetra' | 'prism4r';
+export type SolidKind = 'cube' | 'box' | 'prism3' | 'pyramid4' | 'pyramid3' | 'tetra' | 'prism4r' | 'pyramid4g' | 'pyramid4r' | 'pyramid4gr';
+// The 4-base pyramid family: rightness (ישרה — apex above the base centre) and base shape
+// are INDEPENDENT stated givens (ADR-052). Square must be STATED (שבסיסה ריבוע); an
+// unstated base is a free-aspect rectangle DOF. pyramid4: right+square (dims [h]);
+// pyramid4r: right+rect (dims [b,h]); pyramid4g: free apex+square (dims [ax,ay,az]);
+// pyramid4gr: free apex+rect (dims [b,ax,ay,az]).
 // tetra: `פירמידה ABCD` — a GENERAL triangular pyramid (free apex, 5 dims);
 // prism4r: `מנסרה ישרה שבסיסה מעוין` — rhombus base (dims: base angle + height).
 

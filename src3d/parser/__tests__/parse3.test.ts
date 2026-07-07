@@ -104,6 +104,6 @@ describe('refusals', () => {
   it('free text and unsupported constructs → not-handled', () => {
     expect(parse3('שלום עולם')).toEqual({ ok: false, reason: 'not-handled' });
     expect(parse3('')).toEqual({ ok: false, reason: 'not-handled' });
-    expect(parse3('פירמידה SABCD')).toEqual({ ok: false, reason: 'not-handled' });
+    expect(parse3('פירמידה משושה ABCDEFG')).toEqual({ ok: false, reason: 'not-handled' }); // hex pyramid — out of scope
   });
 });

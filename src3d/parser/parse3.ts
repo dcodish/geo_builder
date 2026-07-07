@@ -81,8 +81,14 @@ const rightPrism: Rule = (s) => {
 const rightPyramid: Rule = (s) => {
   if (!/פירמידה/.test(s) && !/\bpyramid\b/i.test(s)) return null;
   const right = /ישרה/.test(s) || /\bright\b/i.test(s);
+  const square = /ריבוע/.test(s) || /\bsquare\b/i.test(s);
   const toks = labelTokens(s);
-  if (right && toks.length === 5) return [{ type: 'solid', kind: 'pyramid4', ids: toks }];
+  if (toks.length === 5) {
+    // rightness and base shape are INDEPENDENT givens (ADR-052): a square base must be
+    // STATED (שבסיסה ריבוע / with a square base); unstated = free-aspect rectangle DOF
+    const kind = right ? (square ? 'pyramid4' : 'pyramid4r') : square ? ('pyramid4g' as const) : 'pyramid4gr';
+    return [{ type: 'solid', kind, ids: toks }];
+  }
   if (right && toks.length === 4) return [{ type: 'solid', kind: 'pyramid3', ids: toks }];
   if (!right && toks.length === 4) return [{ type: 'solid', kind: 'tetra', ids: toks }]; // general — apex free
   return null;
@@ -261,9 +267,15 @@ const centroidRule: Rule = (s) => {
 const perpPlaneClaim: Rule = (s0) => {
   const s = stripProofPrefix(s0);
   const m = s.match(
-    /^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:מאונך|ניצב|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור|plane)\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s*$/,
+    /^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:מאונך|ניצב|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור|plane)\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)?\s*$/,
   );
-  if (!m) return null;
+  if (!m) {
+    // "AS ניצב לבסיס / למישור הבסיס" / "AS is perpendicular to the base" — the base
+    // sentinel plane: [] (resolved by apply from the figure's single solid)
+    const mb = s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:מאונך|ניצב|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור\s+)?ה?(?:בסיס|base)\s*$/);
+    if (!mb) return null;
+    return [{ type: 'seg-plane-rel', rel: 'perp', a: mb[1], b: mb[2], plane: [] }];
+  }
   const [, s1, s2, p1, p2, p3] = m;
   // lowered as a RELATION: the engine decides — a symbol PIN when an endpoint is a
   // symbolic vec-defined point (V7), else the V1 perp-plane claim (segments drawn by apply)
@@ -387,7 +399,13 @@ const segParallelPlane: Rule = (s) => {
   const m =
     s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+מקביל\s+למישור\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s*$/) ??
     s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:is\s+)?parallel\s+to\s+(?:the\s+)?plane\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s*$/);
-  if (!m) return null;
+  if (!m) {
+    const mb =
+      s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+מקביל\s+ל(?:מישור\s+)?ה?בסיס\s*$/) ??
+      s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:is\s+)?parallel\s+to\s+(?:the\s+)?base\s*$/i);
+    if (!mb) return null;
+    return [{ type: 'seg-plane-rel', rel: 'parallel', a: mb[1], b: mb[2], plane: [] }];
+  }
   return [{ type: 'seg-plane-rel', rel: 'parallel', a: m[1], b: m[2], plane: [m[3], m[4], m[5]] }];
 };
 

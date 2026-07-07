@@ -153,6 +153,14 @@ export function solvePivot(
   const vecPins = c.vectorPins;
   if (pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 && c.scalarPins.length === 0) return [];
 
+  // When EVERY pin is similarity-INVARIANT (angles, ⟂/∥-to-plane — no coordinate,
+  // length or dot given anywhere), the gauge is pure null-space: solving it invites
+  // the scale→0 collapse basin (all normalized residuals vanish as the figure shrinks
+  // onto a point). Freeze the gauge to identity and solve the shape dims ONLY.
+  const invariantOnly =
+    pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 &&
+    c.scalarPins.every((p) => p.kind === 'vangle' || p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane');
+
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
     const g = { ...unpack(x), mirror };
     const dims = x.slice(7);
@@ -244,6 +252,27 @@ export function solvePivot(
     }
     return out;
   };
+
+  if (invariantOnly) {
+    if (dims0.length === 0) return []; // nothing to flex — the condition either holds or is refused downstream
+    const f = residualsFor(false); // mirror is also invariant here
+    const fd = (d: number[]) => f([0, 0, 0, 0, 0, 0, 0, ...d]);
+    // dims-only multi-start: deterministic jitters around the seed's sample
+    const dimStarts = [dims0, dims0.map((v) => v * 0.75), dims0.map((v) => v * 1.3), dims0.map((v, i) => (i % 2 ? v * 0.6 : v * 1.2))];
+    let best: { x: number[]; err: number } | null = null;
+    for (const d0 of dimStarts) {
+      let r = leastSquares(fd, d0);
+      for (let polish = 0; polish < 3 && r.err > 1e-24 && r.err < 1e-4; polish++) {
+        const r2 = leastSquares(fd, r.x);
+        if (r2.err >= r.err * 0.99) break;
+        r = r2;
+      }
+      if (!best || r.err < best.err) best = r;
+      if (best.err < 1e-22) break;
+    }
+    if (!best || best.err >= 1e-12) return [];
+    return [{ transform: (p) => p, mirror: false, dims: best.x, err: best.err }];
+  }
 
   // deterministic multi-start: several initial rotations, seed-rotated so "show
   // another configuration" explores different manifold points when under-determined
