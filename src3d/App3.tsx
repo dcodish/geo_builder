@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { useTranslation } from 'react-i18next';
 import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
+import { logDebug3 } from './debug/sessionLog3';
 import { escalate3 } from './parser/llm3';
 import Figure3 from './render/Figure3';
 import { deserializeFigure3, serializeFigure3 } from './store/figureFile3';
@@ -156,11 +157,32 @@ export default function App3() {
     else reportLoadError(r.reason);
   };
 
+  // Debug log (dev only): snapshot the fact list + statuses whenever the figure
+  // changes, so a session is reconstructable from logs/debug-log-3d.jsonl.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const snapshot = () => {
+      const st = useGeo3.getState();
+      const d = derive3(st.facts, st.seed);
+      logDebug3({
+        kind: 'figure',
+        seed: st.seed,
+        lastError: st.lastError ?? null,
+        facts: st.facts.map((f) => ({ id: f.id, enabled: f.enabled, utterance: f.utterance, cmds: f.cmds, status: d.status[f.id] })),
+      });
+    };
+    snapshot();
+    return useGeo3.subscribe((s, prev) => {
+      if (s.facts !== prev.facts || s.seed !== prev.seed) snapshot();
+    });
+  }, []);
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!text.trim() || busy) return;
     submit(text);
     let err = useGeo3.getState().lastError;
+    logDebug3({ kind: 'input', utterance: text, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
     // out-of-grammar → escalate to the LLM proxy; the returned canonical lines re-parse deterministically
     if (err?.code === 'not-understood') {
       setBusy(true);
@@ -169,6 +191,7 @@ export default function App3() {
         const steps = await escalate3(text, ctx);
         if (steps) submitSteps(text, steps);
         err = useGeo3.getState().lastError;
+        logDebug3({ kind: 'input', utterance: text, source: 'llm', steps: steps ?? null, result: err ? err.code : 'ok' });
       } finally {
         setBusy(false);
       }

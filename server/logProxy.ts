@@ -45,7 +45,8 @@ export function logProxyPlugin(): Plugin {
           const obj = JSON.parse(body) as Record<string, unknown>; // validate it's JSON
           const line = JSON.stringify({ serverTs: new Date().toISOString(), ...obj }) + '\n';
           await mkdir(logDir, { recursive: true });
-          await appendFile(logPath, line, 'utf8');
+          // the 3-D app tags its events tool:'3d' → its OWN file, so traces never mix
+          await appendFile(obj.tool === '3d' ? path.join(logDir, 'debug-log-3d.jsonl') : logPath, line, 'utf8');
           return end(204);
         } catch {
           return end(400);

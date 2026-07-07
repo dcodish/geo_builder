@@ -102,6 +102,27 @@ describe('pyramid base shape is a stated given, not a default', () => {
     expect(n(AS)).toBeLessThan(3 * dist(A, B));
   });
 
+  it("height vocabulary: `AS גובה` / `AS אנך` / `AS is the height` all mean ⟂ the base", () => {
+    for (const form of ['AS גובה', 'AS אנך', 'AS גובה הפירמידה', 'AS הוא גובה', 'AS is the height', 'AS is the altitude of the pyramid', 'AS אנך לבסיס']) {
+      const r = parse3(form);
+      if (!r.ok) throw new Error(form);
+      const rel = r.commands.find((c) => c.type === 'seg-plane-rel') as { rel: string; plane: string[] };
+      expect(rel, form).toBeTruthy();
+      expect(rel.rel, form).toBe('perp');
+      expect(rel.plane, form).toEqual([]);
+    }
+    // and it BUILDS: the operator's exact sequence
+    submit('פירמידה ABCDS שבסיסה ריבוע');
+    submit('AS גובה');
+    expectAllOk();
+    const pos = derived().positions;
+    const A = pos.get('A')!;
+    const S = pos.get('S')!;
+    const B = pos.get('B')!;
+    const dot = (S.x - A.x) * (B.x - A.x) + (S.y - A.y) * (B.y - A.y) + (S.z - A.z) * (B.z - A.z);
+    expect(Math.abs(dot)).toBeLessThan(1e-3);
+  });
+
   it('English mirror: perpendicular/parallel to the base', () => {
     submit('pyramid ABCDS with a square base');
     submit('AS is perpendicular to the base');

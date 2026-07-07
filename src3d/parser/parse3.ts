@@ -284,12 +284,12 @@ const centroidRule: Rule = (s) => {
 const perpPlaneClaim: Rule = (s0) => {
   const s = stripProofPrefix(s0);
   const m = s.match(
-    /^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:מאונך|ניצב|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור|plane)\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)?\s*$/,
+    /^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:מאונך|ניצב|אנך|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור|plane)\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)?\s*$/,
   );
   if (!m) {
     // "AS ניצב לבסיס / למישור הבסיס" / "AS is perpendicular to the base" — the base
     // sentinel plane: [] (resolved by apply from the figure's single solid)
-    const mb = s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:מאונך|ניצב|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור\s+)?ה?(?:בסיס|base)\s*$/);
+    const mb = s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:מאונך|ניצב|אנך|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור\s+)?ה?(?:בסיס|base)\s*$/);
     if (!mb) return null;
     return [{ type: 'seg-plane-rel', rel: 'perp', a: mb[1], b: mb[2], plane: [] }];
   }
@@ -424,6 +424,16 @@ const segParallelPlane: Rule = (s) => {
     return [{ type: 'seg-plane-rel', rel: 'parallel', a: mb[1], b: mb[2], plane: [] }];
   }
   return [{ type: 'seg-plane-rel', rel: 'parallel', a: m[1], b: m[2], plane: [m[3], m[4], m[5]] }];
+};
+
+/** `AS גובה (הפירמידה)` / `AS אנך` / `AS is the height` — a solid's stated height: the
+ *  segment is ⟂ the base (the base-sentinel plane: [], resolved by apply). */
+const heightOfSolid: Rule = (s) => {
+  const m =
+    s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?(?:גובה|אנך)(?:\s+(?:הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?\s*$/) ??
+    s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+is\s+the\s+(?:height|altitude)(?:\s+of\s+the\s+(?:pyramid|prism))?\s*$/i);
+  if (!m) return null;
+  return [{ type: 'seg-plane-rel', rel: 'perp', a: m[1], b: m[2], plane: [] }];
 };
 
 /** A bare auxiliary segment: `AM` / `קטע AM` / `segment CA'`. Last rule — everything else wins first. */
@@ -1019,6 +1029,7 @@ const RULES: Rule[] = [
   lengthRatioClaim,
   areaClaim,
   lengthClaim,
+  heightOfSolid,
   bareSegment,
 ];
 
