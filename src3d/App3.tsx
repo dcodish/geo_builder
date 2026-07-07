@@ -206,7 +206,7 @@ export default function App3() {
             </button>
           </form>
 
-          {lastError && (
+          {lastError && !busy && (
             <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               {errorText(t, lastError)}
             </div>

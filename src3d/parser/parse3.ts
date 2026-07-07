@@ -64,6 +64,8 @@ const cubeOrBox: Rule = (s) => {
   const toks = labelTokens(s);
   if (toks.length === 8) return [{ type: 'solid', kind, ids: toks }];
   if (toks.length === 4 && toks.every(unprimed)) return [{ type: 'solid', kind, ids: [...toks, ...primeAll(toks)] }];
+  // label-less: a cube/box is fully determined — default lettering, no LLM needed
+  if (toks.length === 0) return [{ type: 'solid', kind, ids: ['A', 'B', 'C', 'D', ...primeAll(['A', 'B', 'C', 'D'])] }];
   return null;
 };
 
@@ -74,6 +76,8 @@ const rightPrism: Rule = (s) => {
   const toks = labelTokens(s);
   if (toks.length === 6) return [{ type: 'solid', kind: 'prism3', ids: toks }];
   if (toks.length === 3 && toks.every(unprimed)) return [{ type: 'solid', kind: 'prism3', ids: [...toks, ...primeAll(toks)] }];
+  if (toks.length === 0 && (/משולש/.test(s) || /\btriangular\b/i.test(s)))
+    return [{ type: 'solid', kind: 'prism3', ids: ['A', 'B', 'C', ...primeAll(['A', 'B', 'C'])] }];
   return null;
 };
 
@@ -83,6 +87,18 @@ const rightPyramid: Rule = (s) => {
   const right = /ישרה/.test(s) || /\bright\b/i.test(s);
   const square = /ריבוע/.test(s) || /\bsquare\b/i.test(s);
   const toks = labelTokens(s);
+  if (toks.length === 0) {
+    // label-less: a stated base word makes the shape determined — default lettering
+    // (base ring first, apex last), deterministic; bare 'פירמידה' stays ambiguous
+    const rect = /מלבן/.test(s) || /\brectang/i.test(s);
+    const tri = /משולש/.test(s) || /\btriangular\b/i.test(s);
+    if (tri) return [{ type: 'solid', kind: right ? 'pyramid3' : 'tetra', ids: ['A', 'B', 'C', 'D'] }];
+    if (square || rect) {
+      const kind = right ? (square ? 'pyramid4' : 'pyramid4r') : square ? ('pyramid4g' as const) : 'pyramid4gr';
+      return [{ type: 'solid', kind, ids: ['A', 'B', 'C', 'D', 'S'] }];
+    }
+    return null;
+  }
   if (toks.length === 5) {
     // rightness and base shape are INDEPENDENT givens (ADR-052): a square base must be
     // STATED (שבסיסה ריבוע / with a square base); unstated = free-aspect rectangle DOF
@@ -101,6 +117,7 @@ const rhombusPrism: Rule = (s) => {
   const toks = labelTokens(s);
   if (toks.length === 8) return [{ type: 'solid', kind: 'prism4r', ids: toks }];
   if (toks.length === 4 && toks.every(unprimed)) return [{ type: 'solid', kind: 'prism4r', ids: [...toks, ...primeAll(toks)] }];
+  if (toks.length === 0) return [{ type: 'solid', kind: 'prism4r', ids: ['A', 'B', 'C', 'D', ...primeAll(['A', 'B', 'C', 'D'])] }];
   return null;
 };
 

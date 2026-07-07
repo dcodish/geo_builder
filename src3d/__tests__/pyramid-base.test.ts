@@ -42,6 +42,25 @@ describe('pyramid base shape is a stated given, not a default', () => {
     expect(kindOf('pyramid ABCDS with a square base')).toBe('pyramid4g');
   });
 
+  it('label-less determined shapes get default lettering — no LLM round-trip', () => {
+    const first = (u: string) => {
+      const r = parse3(u);
+      if (!r.ok) throw new Error(u);
+      return r.commands[0] as { kind: string; ids: string[] };
+    };
+    expect(first('פירמידה שבסיסה ריבוע')).toEqual({ type: 'solid', kind: 'pyramid4g', ids: ['A', 'B', 'C', 'D', 'S'] });
+    expect(first('פירמידה ישרה שבסיסה ריבוע').kind).toBe('pyramid4');
+    expect(first('pyramid with a square base').kind).toBe('pyramid4g');
+    expect(first('פירמידה משולשת').kind).toBe('tetra');
+    expect(first('קובייה').ids).toHaveLength(8);
+    expect(first('מנסרה ישרה שבסיסה מעוין').kind).toBe('prism4r');
+    expect(parse3('פירמידה')).toEqual({ ok: false, reason: 'not-handled' }); // base unknown — honestly ambiguous
+    // and it BUILDS
+    submit('פירמידה שבסיסה ריבוע');
+    expectAllOk();
+    expect(derived().positions.has('S')).toBe(true);
+  });
+
   it('a right pyramid WITHOUT a stated square has a free base aspect; WITH it the base is square', () => {
     submit('פירמידה ישרה ABCDS');
     expectAllOk();
