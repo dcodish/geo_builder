@@ -139,7 +139,7 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
           status[f.id] = { code: 'no-roots' };
           break;
         }
-      } else if (cmd.type === 'vec-rel' || cmd.type === 'seg-plane-rel') {
+      } else if (cmd.type === 'vec-rel' || cmd.type === 'seg-plane-rel' || cmd.type === 'length-rel') {
         // a vec-defined/vec-pair point (or a pinned symbol) that found NO position → honest refusal
         const ids =
           cmd.type === 'vec-rel'
@@ -155,7 +155,18 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
                       })(),
                 ),
               ]
-            : [cmd.a, cmd.b];
+            : cmd.type === 'length-rel'
+              ? [
+                  cmd.a1,
+                  cmd.b1,
+                  ...('pair' in cmd.rhs
+                    ? cmd.rhs.pair
+                    : (() => {
+                        const dv = c.vectors.get((cmd.rhs as { vec: string }).vec);
+                        return dv ? [dv.from, dv.to] : [];
+                      })()),
+                ]
+              : [cmd.a, cmd.b];
         const missing = ids.find((id) => {
           const def = c.points.get(id);
           return (def?.kind === 'vec-defined' || def?.kind === 'vec-pair') && !positions.has(id);

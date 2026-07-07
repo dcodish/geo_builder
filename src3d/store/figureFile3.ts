@@ -50,6 +50,8 @@ const COMMAND_TYPES = new Set<Command3['type']>([
   'revolution',
   'vec-rel',
   'seg-plane-rel',
+  'length-rel',
+  'symbol-value',
 ]);
 
 export function serializeFigure3(facts: Fact3[], seed: number): string {

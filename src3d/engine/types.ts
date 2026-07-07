@@ -45,6 +45,8 @@ export interface SymTerm {
 }
 
 export type Claim3 =
+  | { type: 'length-rel'; a1: Id; b1: Id; a2: Id; b2: Id; c: number } // |a1b1| = c·|a2b2|
+  | { type: 'volume-eq-poly'; ids1: Id[]; ids2: Id[] } // נפח SENB = נפח CENB (two tetra volumes equal)
   | { type: 'vec-eq'; lhs: VecExpr; rhs: VecExpr } // AM = ½u + ½v + 5/3·w
   | { type: 'perp-plane'; seg: [Id, Id]; plane: [Id, Id, Id] } // CA' ⊥ plane BC'D
   | { type: 'collinear3'; ids: Id[] } // E, C, A' on one line
@@ -62,6 +64,7 @@ export type Claim3 =
 
 /** V7 T2 — a SCALAR given that DRIVES the figure (a residual in the global solve). */
 export type ScalarPin =
+  | { kind: 'length-rel'; a1: Id; b1: Id; a2: Id; b2: Id; c: number } // |a1b1| = c·|a2b2| (similarity-INVARIANT)
   | { kind: 'length'; a: Id; b: Id; value: number } // |DC| = 4
   | { kind: 'vangle'; vertex: Id; p: Id; q: Id; deg: number } // ∠ADC = 120
   | { kind: 'dot'; v1: string; v2: string; value: number } // u·v = 24
@@ -369,6 +372,12 @@ export interface OnLineCommand {
 }
 
 export type Command3 =
+  // |EN| = (√6/4)·|w| — a stated LENGTH relation (|a1b1| = c·|rhs|); rhs is a point
+  // pair or a NAMED vector (resolved to its pair at apply). Drives a symbol / the
+  // dims (similarity-invariant), or verifies as a claim when everything is pinned.
+  | { type: 'length-rel'; a1: Id; b1: Id; rhs: { pair: [Id, Id] } | { vec: string }; c: number }
+  // הציבו k = ½ — assign the named parameter directly (replaces any prior pin on it)
+  | { type: 'symbol-value'; symbol: string; value: number }
   | SolidCommand
   | PointOnSegment3Command
   | NameVectorCommand
@@ -460,7 +469,11 @@ export interface Construction3 {
   /** V7 — vector definitions: `X⃗Y = Σ terms`, solving `unknown` (affine; `symbol` = the free coefficient). */
   vecDefs: { from: Id; to: Id; terms: SymTerm[]; unknown: Id; symbol?: string }[];
   /** V7 — conditions that PIN a vec-def's symbol (∥/⟂ to a plane through points). */
-  symbolPins: { rel: 'parallel' | 'perp'; a: Id; b: Id; plane: Id[]; def: number }[];
+  symbolPins: (
+    | { rel: 'parallel' | 'perp'; a: Id; b: Id; plane: Id[]; def: number }
+    | { rel: 'length-rel'; a: Id; b: Id; pair2: [Id, Id]; c: number; def: number } // |ab| = c·|pair2| pins the symbol
+    | { rel: 'value'; value: number; def: number } // k = ½ — direct assignment
+  )[];
   /** Every claim RECORDED by apply (incl. ones composite commands create) — derive3
    *  attributes them to facts by count-delta and verifies them all; a claim can
    *  never escape verification by being created indirectly. */
@@ -523,6 +536,7 @@ export type EngineError3 =
   | { code: 'free-size-claim'; id: string } // a numeric volume/area claim on a solid whose dims are unstated
   | { code: 'two-unknowns'; id: Id } // a vector relation with more than one undefined point
   | { code: 'size-on-solid' } // a numeric size on a free-dim solid figure — not supported yet (honest boundary)
+  | { code: 'unknown-symbol'; id: string } // a value was assigned to a parameter no relation defines
   | { code: 'claim-refuted' }; // the stated answer does not hold in the figure
 
 export type ApplyResult3 = { ok: true; next: Construction3 } | { ok: false; error: EngineError3 };

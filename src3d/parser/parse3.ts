@@ -34,6 +34,11 @@ export function normalize3(s: string): string {
     .replace(/[′’‘`]/g, "'")
     .replace(/[→⃗⟶]/g, '')
     .replace(/[−־]/g, '-')
+    .replace(/½/g, '1/2')
+    .replace(/¼/g, '1/4')
+    .replace(/¾/g, '3/4')
+    .replace(/⅓/g, '1/3')
+    .replace(/⅔/g, '2/3')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -394,6 +399,82 @@ export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string }
  * RELATION: pair-LHS forms lower to `vec-rel` and the ENGINE decides claim vs
  * definition (the M1 shape); a non-pair LHS stays a plain claim.
  */
+let VEC_MARKED = false; // set per-parse; see parse3()
+
+/** Evaluate a small numeric expression with radicals: 3, 3/4, √6/4, 2√3, (√6/4). */
+function evalRadical(raw: string): number | null {
+  const s0 = raw.trim().replace(/^\((.*)\)$/, '$1').trim();
+  if (s0 === '') return null;
+  const m = s0.match(/^(\d+(?:\.\d+)?)?\s*(?:√\s*(\d+(?:\.\d+)?))?\s*(?:\/\s*(\d+(?:\.\d+)?))?$/);
+  if (!m || (!m[1] && !m[2])) return null;
+  const a = m[1] ? +m[1] : 1;
+  const r = m[2] ? Math.sqrt(+m[2]) : 1;
+  const d = m[3] ? +m[3] : 1;
+  if (d === 0) return null;
+  return (a * r) / d;
+}
+
+/** `|EN| = (√6/4)·|w|` / `|AS| = |AB|` / `אורך EN שווה לאורך AS` / bare `AS = AB` — a
+ *  LENGTH relation (never a vector equation unless an explicit ⃗ arrow was typed). */
+const lengthRel: Rule = (s) => {
+  if (VEC_MARKED) return null; // the arrow says VECTOR — vecEqClaim's territory
+  const P = "([A-Z]\\d*'?)([A-Z]\\d*'?)";
+  const lhs = s.match(new RegExp(`^(?:\\|${P}\\||(?:אורך|length)\\s+(?:המקצוע\\s+|הצלע\\s+|צלע\\s+)?${P})\\s*(?:=|שווה\\s+ל)\\s*(.+)$`));
+  if (!lhs) {
+    const bare = s.match(new RegExp(`^${P}\\s*=\\s*${P}\\s*$`));
+    if (!bare) return null;
+    return [
+      { type: 'segment3', a: bare[1], b: bare[2] },
+      { type: 'segment3', a: bare[3], b: bare[4] },
+      { type: 'length-rel', a1: bare[1], b1: bare[2], rhs: { pair: [bare[3], bare[4]] }, c: 1 },
+    ];
+  }
+  const a1 = lhs[1] ?? lhs[3];
+  const b1 = lhs[2] ?? lhs[4];
+  const r = lhs[5].trim();
+  // purely numeric RHS (`|AS| = 12`) → the ordinary length given
+  const num = evalRadical(r);
+  if (num !== null)
+    return [
+      { type: 'segment3', a: a1, b: b1 },
+      { type: 'claim', claim: { type: 'length-eq', a: a1, b: b1, value: num } },
+    ];
+  // [coefficient ·]? tail — tail is |ZW|, |w|, אורך/length ZW, צלע הריבוע ABCD, or bare ZW
+  const tail = (re: string): { c: number; g: string[] } | null => {
+    const mm = r.match(new RegExp(`^(.*?)\\s*[·×*]?\\s*${re}\\s*$`));
+    if (!mm) return null;
+    const c = mm[1].trim() === '' ? 1 : evalRadical(mm[1]);
+    return c === null ? null : { c, g: mm.slice(2) };
+  };
+  let t = tail(`\\|${P}\\|`) ?? tail(`(?:אורך|length)\\s+(?:המקצוע\\s+)?${P}`);
+  if (t) return [{ type: 'segment3', a: a1, b: b1 }, { type: 'length-rel', a1, b1, rhs: { pair: [t.g[0], t.g[1]] }, c: t.c }];
+  t = tail("\\|([a-w])\\|");
+  if (t) return [{ type: 'segment3', a: a1, b: b1 }, { type: 'length-rel', a1, b1, rhs: { vec: t.g[0] }, c: t.c }];
+  // `שווה לאורך צלע הריבוע ABCD` — any side of the named square; its first edge stands in
+  const sq = r.match(/^(?:אורך\s+)?(?:ה?צלע\s+)?(?:של\s+)?הריבוע\s+([A-Z]\d*'?)([A-Z]\d*'?)(?:[A-Z]\d*'?)*\s*$/) ?? r.match(/^(?:אורך\s+)?צלע\s+([A-Z]\d*'?)([A-Z]\d*'?)(?:[A-Z]\d*'?)*\s*$/);
+  if (sq) return [{ type: 'segment3', a: a1, b: b1 }, { type: 'length-rel', a1, b1, rhs: { pair: [sq[1], sq[2]] }, c: 1 }];
+  return null;
+};
+
+/** `k = 1/2` (הציבו) — assign the named parameter. x/y/z stay coordinates. */
+const symbolValue: Rule = (s) => {
+  const m = s.match(/^([a-w])\s*=\s*(-?\d+(?:\.\d+)?)(?:\s*\/\s*(-?\d+(?:\.\d+)?))?\s*$/);
+  if (!m || 'xyz'.includes(m[1])) return null;
+  const v = m[3] ? +m[2] / +m[3] : +m[2];
+  return [{ type: 'symbol-value', symbol: m[1], value: v }];
+};
+
+/** `נפח הפירמידה SENB שווה לנפח הפירמידה CENB` — two tetra volumes are equal (a claim). */
+const volumeEqPoly: Rule = (s) => {
+  const P4 = "((?:[A-Z]\\d*'?){4})";
+  const m =
+    s.match(new RegExp(`^נפח\\s+(?:הפירמידה\\s+)?${P4}\\s*(?:=|שווה\\s+ל-?)\\s*(?:נפח\\s+)?(?:הפירמידה\\s+)?${P4}$`)) ??
+    s.match(new RegExp(`^(?:the\\s+)?volume\\s+of\\s+(?:the\\s+)?pyramid\\s+${P4}\\s+(?:=|equals?)\\s+(?:the\\s+)?volume\\s+of\\s+(?:the\\s+)?pyramid\\s+${P4}$`, 'i'));
+  if (!m) return null;
+  const split = (g: string) => g.match(/[A-Z]\d*'?/g)!;
+  return [{ type: 'claim', claim: { type: 'volume-eq-poly', ids1: split(m[1]), ids2: split(m[2]) } }];
+};
+
 const vecEqClaim: Rule = (s0) => {
   const s = stripProofPrefix(s0);
   if (GREEK.test(s)) return null; // unknown scalars belong to spanPoint, never a claim
@@ -430,7 +511,7 @@ const segParallelPlane: Rule = (s) => {
  *  segment is ⟂ the base (the base-sentinel plane: [], resolved by apply). */
 const heightOfSolid: Rule = (s) => {
   const m =
-    s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?(?:גובה|אנך)(?:\s+(?:הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?\s*$/) ??
+    s.match(/^(?:המקצוע\s+|הצלע\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?(?:גובה|אנך)(?:\s+(?:בפירמידה|במנסרה|הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?\s*$/) ??
     s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+is\s+the\s+(?:height|altitude)(?:\s+of\s+the\s+(?:pyramid|prism))?\s*$/i);
   if (!m) return null;
   return [{ type: 'seg-plane-rel', rel: 'perp', a: m[1], b: m[2], plane: [] }];
@@ -896,6 +977,16 @@ const lateralAreaClaim: Rule = (s) => {
 const onAxes: Rule = (s) => {
   const origin = s.match(/^([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+|is\s+)?(?:בראשית הצירים|at the origin)$/);
   if (origin) return [{ type: 'point3', id: origin[1], x: 0, y: 0, z: 0 }];
+  const part = s.match(/^(?:הקודקוד\s+|הנקודה\s+)?([A-Z]\d*'?)\s+(?:נמצאת?\s+)?על\s+החלק\s+(החיובי|השלילי)\s+של\s+ציר\s+ה-?([xyz])$/);
+  if (part) {
+    const ax = part[3] as 'x' | 'y' | 'z';
+    const zero = { x: 0 as number | null, y: 0 as number | null, z: 0 as number | null };
+    zero[ax] = null;
+    return [
+      { type: 'point3', id: part[1], x: zero.x, y: zero.y, z: zero.z },
+      { type: 'sign-given', id: part[1], axis: ax, positive: part[2] === 'החיובי' },
+    ];
+  }
   const axis = s.match(
     /^([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?(?:על ציר ה-?([xyz])(?:\s+(החיובי|השלילי))?|on the (positive |negative )?([xyz])[- ]axis)$/,
   );
@@ -986,6 +1077,7 @@ const RULES: Rule[] = [
   cubeOrBox,
   rhombusPrism,
   rightPrism,
+  volumeEqPoly, // BEFORE volumePolyClaim: its RHS is a volume, not a number
   volumePolyClaim, // BEFORE rightPyramid: נפח הפירמידה ABCD must never build a pyramid
   rightPyramid,
   dotGiven,
@@ -1023,6 +1115,8 @@ const RULES: Rule[] = [
   midpoint,
   spanPoint, // MUST precede onSegment: Greek scalars would otherwise parse as a free point, silently dropping the condition
   onSegment,
+  lengthRel, // BEFORE vecEqClaim: bare AS = AB is a LENGTH equality unless ⃗-marked
+  symbolValue,
   vecEqClaim,
   coordsClaim,
   pairInjection,
@@ -1036,6 +1130,9 @@ const RULES: Rule[] = [
 // ---------------------------------------------------------------------------
 
 export function parse3(utterance: string): ParseResult3 {
+  // an explicit vector arrow (⃗/→, stripped by normalize3) marks bare pair=pair as a
+  // VECTOR equation; without it, AS = AB reads as a LENGTH equality (the bagrut default)
+  VEC_MARKED = /[→⃗⟶]/.test(utterance);
   const s = normalize3(utterance);
   if (!s) return NOT_HANDLED;
   for (const rule of RULES) {

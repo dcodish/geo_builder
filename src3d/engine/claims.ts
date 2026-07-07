@@ -119,6 +119,22 @@ function holdsAt(claim: Claim3, c: Construction3, pos: Positions3): boolean {
       const vol = Math.abs(dot3(sub3(ps[1]!, ps[0]!), cross3(sub3(ps[2]!, ps[0]!), sub3(ps[3]!, ps[0]!)))) / 6;
       return Math.abs(vol - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
     }
+    case 'length-rel': {
+      const [a1, b1, a2, b2] = [claim.a1, claim.b1, claim.a2, claim.b2].map((id) => pos.get(id));
+      if (!a1 || !b1 || !a2 || !b2) return false;
+      const target = claim.c * norm3(sub3(b2, a2));
+      return Math.abs(norm3(sub3(b1, a1)) - target) <= REL_TOL * Math.max(target, 1);
+    }
+    case 'volume-eq-poly': {
+      const vol = (ids: string[]): number | null => {
+        const ps = ids.map((id) => pos.get(id));
+        if (ps.length !== 4 || ps.some((p) => !p)) return null;
+        return Math.abs(dot3(sub3(ps[1]!, ps[0]!), cross3(sub3(ps[2]!, ps[0]!), sub3(ps[3]!, ps[0]!)))) / 6;
+      };
+      const v1 = vol(claim.ids1);
+      const v2 = vol(claim.ids2);
+      return v1 !== null && v2 !== null && Math.abs(v1 - v2) <= REL_TOL * Math.max(v1, v2, 1);
+    }
     case 'lines-rel': {
       const [a1, b1, a2, b2] = [claim.a1, claim.b1, claim.a2, claim.b2].map((id) => pos.get(id));
       if (!a1 || !b1 || !a2 || !b2) return false;

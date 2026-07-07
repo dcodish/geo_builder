@@ -28,6 +28,8 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.alreadyDefined', { id: err.id });
     case 'unknown-point':
       return t('err.unknownPoint', { id: err.id });
+    case 'unknown-symbol':
+      return t('err.unknownSymbol', { id: err.id });
     case 'unknown-vector':
       return t('err.unknownVector', { id: err.id });
     case 'unknown-plane':
@@ -91,6 +93,19 @@ export default function App3() {
   const submitSteps = useGeo3((s) => s.submitSteps);
 
   const [text, setText] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  // symbol palette (the 2-D App's pattern): insert at the caret, keep focus
+  const insertSym = (sym: string, caretBack = 0) => {
+    const el = inputRef.current;
+    const start = el?.selectionStart ?? text.length;
+    const end = el?.selectionEnd ?? text.length;
+    setText(text.slice(0, start) + sym + text.slice(end));
+    requestAnimationFrame(() => {
+      el?.focus();
+      const p = start + sym.length - caretBack;
+      el?.setSelectionRange(p, p);
+    });
+  };
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const canvasBox = useRef<HTMLDivElement>(null);
@@ -218,6 +233,7 @@ export default function App3() {
         <section className="flex w-full flex-col gap-3 md:w-96">
           <form onSubmit={onSubmit} className="flex gap-2">
             <input
+              ref={inputRef}
               dir="auto"
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -228,6 +244,34 @@ export default function App3() {
               {busy ? t('input.thinking') : t('input.add')}
             </button>
           </form>
+
+          <div className="flex flex-wrap gap-1" dir="ltr">
+            {(
+              [
+                ['⃗', '⃗', 0],
+                ['|·|', '||', 1],
+                ['√', '√', 0],
+                ['½', '½', 0],
+                ['¾', '¾', 0],
+                ['·', '·', 0],
+                ['⊥', '⊥', 0],
+                ['∠', '∠', 0],
+                ['°', '°', 0],
+                ['′', '′', 0],
+                ['ℓ', 'ℓ', 0],
+                ['π', 'π', 0],
+              ] as [string, string, number][]
+            ).map(([label, sym, back]) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => insertSym(sym, back)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-sm text-slate-600 hover:border-sky-400 hover:text-sky-700"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
           {lastError && !busy && (
             <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">

@@ -476,6 +476,15 @@ function symbolPinResidual(
   const P = solveVecDef(c, vd, pos, kValue);
   if (!P) return NaN;
   const get = (id: Id): Vec3 | undefined => (id === vd.unknown ? P : pos.get(id));
+  if (pin.rel === 'value') return kValue - pin.value;
+  if (pin.rel === 'length-rel') {
+    const a1 = get(pin.a);
+    const b1 = get(pin.b);
+    const a2 = get(pin.pair2[0]);
+    const b2 = get(pin.pair2[1]);
+    if (!a1 || !b1 || !a2 || !b2) return NaN;
+    return norm3(sub3(b1, a1)) - pin.c * norm3(sub3(b2, a2));
+  }
   const a = get(pin.a);
   const b = get(pin.b);
   const ring = pin.plane.map(get);
@@ -666,11 +675,23 @@ function evaluateSolidsAndPoints(
       let k = 0;
       if (vd.symbol) {
         const pin = c.symbolPins.find((p) => p.def === def.def);
-        if (pin && cheapSymbols) {
+        if (pin && pin.rel === 'value') {
+          k = pin.value; // direct assignment (k = ½) — free even during the cheap pass
+        } else if (pin && cheapSymbols) {
           k = 0.35; // during the pivot's residual loop: pins never reference these points — skip the root-find
         } else if (pin) {
           const resid = (kk: number) => symbolPinResidual(c, pin, vd, pos, kk);
-          const roots = pin.rel === 'parallel' ? signChangeRoots(resid) : touchZeroRoots(resid);
+          const roots =
+            pin.rel === 'parallel'
+              ? signChangeRoots(resid)
+              : pin.rel === 'perp'
+                ? touchZeroRoots(resid)
+                : (() => {
+                    // length-rel: the residual can CROSS zero or only TOUCH it — the exam
+                    // idiom |EN| = (√6/4)·|w| often states the MINIMUM (a double root)
+                    const sc = signChangeRoots(resid);
+                    return sc.length ? sc : touchZeroRoots((kk) => Math.abs(resid(kk)));
+                  })();
           if (roots.length === 0) continue; // unsatisfiable — left unpositioned, flagged upstream
           k = roots[0];
         } else {

@@ -67,7 +67,8 @@
     "sizeOnSolid": "A numeric size on a free-dimension solid isn't supported here yet",
     "claimRefuted": "The claim doesn't hold in the figure — check the computation",
     "badFile": "This is not a valid Space Builder figure file",
-    "newerSchema": "The file was saved by a newer version of the tool — refresh the page and try again"
+    "newerSchema": "The file was saved by a newer version of the tool — refresh the page and try again",
+    "unknownSymbol": "the parameter {{id}} isn't defined in the figure"
   },
   "examples": {
     "ex1": "cube ABCD",

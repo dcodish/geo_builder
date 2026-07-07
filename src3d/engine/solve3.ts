@@ -164,7 +164,7 @@ export function solvePivot(
   // onto a point). Freeze the gauge to identity and solve the shape dims ONLY.
   const invariantOnly =
     pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 &&
-    c.scalarPins.every((p) => p.kind === 'vangle' || p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane');
+    c.scalarPins.every((p) => p.kind === 'vangle' || p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane' || p.kind === 'length-rel');
 
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
     const g = { ...unpack(x), mirror };
@@ -234,6 +234,12 @@ export function solvePivot(
         const a2 = d2v && at(d2v.from);
         const b2 = d2v && at(d2v.to);
         out.push(a1 && b1 && a2 && b2 ? dot3(sub3(b1, a1), sub3(b2, a2)) - pin.value : 10);
+      } else if (pin.kind === 'length-rel') {
+        const a1 = at(pin.a1);
+        const b1 = at(pin.b1);
+        const a2 = at(pin.a2);
+        const b2 = at(pin.b2);
+        out.push(a1 && b1 && a2 && b2 ? norm3(sub3(b1, a1)) - pin.c * norm3(sub3(b2, a2)) : 10);
       } else {
         const a = at(pin.a);
         const b = at(pin.b);
@@ -303,9 +309,16 @@ export function solvePivot(
   }
 
   const results: PivotResult[] = [];
+  // Sign givens select among DISCRETE placement branches — and those are not only the
+  // two mirrors: within one mirror, different rotation BASINS are exact solutions too
+  // (D on +x with S on −z vs D on −x with S on +z). With sign givens present, keep
+  // every distinct converged solution so the selector sees the full pool; without
+  // them, the fast best-per-mirror path stands.
+  const collectAll = c.signGivens.length > 0;
   for (const mirror of [false, true]) {
     const f = residualsFor(mirror);
     let best: { x: number[]; err: number } | null = null;
+    const seen = new Set<string>();
     for (const x0 of starts) {
       let r = leastSquares(f, x0);
       // polish: restart LM (fresh damping) from the found point until it stops improving
@@ -314,12 +327,25 @@ export function solvePivot(
         if (r2.err >= r.err * 0.99) break;
         r = r2;
       }
+      if (collectAll && r.err < 1e-12) {
+        const g = { ...unpack(r.x), mirror };
+        // dedupe by the transform's ACTION (probe frame), not its parameters (axis-angle wraps)
+        const sig = [v3(0, 0, 0), v3(1, 0, 0), v3(0, 1, 0), v3(0, 0, 1)]
+          .map((p) => applyGauge(p, g))
+          .map((q) => `${q.x.toFixed(5)},${q.y.toFixed(5)},${q.z.toFixed(5)}`)
+          .join('|');
+        if (!seen.has(sig)) {
+          seen.add(sig);
+          const dims = r.x.slice(7);
+          results.push({ transform: (p) => applyGauge(p, g), mirror, dims, err: r.err });
+        }
+      }
       if (!best || r.err < best.err) best = r;
-      if (best.err < 1e-22) break;
+      if (!collectAll && best.err < 1e-22) break;
     }
-        // acceptance: per-residual ~1e-6 — far under the 2e-5 claim tolerance (the numeric-
+    // acceptance: per-residual ~1e-6 — far under the 2e-5 claim tolerance (the numeric-
     // Jacobian floor rises with mixed scalar residuals; 1e-16 was V4-era point-pins-only)
-    if (best && best.err < 1e-12) {
+    if (!collectAll && best && best.err < 1e-12) {
       const g = { ...unpack(best.x), mirror };
       const dims = best.x.slice(7);
       results.push({ transform: (p) => applyGauge(p, g), mirror, dims, err: best.err });

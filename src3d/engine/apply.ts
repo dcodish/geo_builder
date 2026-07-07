@@ -148,6 +148,10 @@ function missingPoint(c: Construction3, ids: Id[]): EngineError3 | null {
 /** Apply-time validation of a claim's references (order matters, like every fact). */
 function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
   switch (claim.type) {
+    case 'length-rel':
+      return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
+    case 'volume-eq-poly':
+      return missingPoint(c, [...claim.ids1, ...claim.ids2]);
     case 'vec-eq': {
       const pointErr = missingPoint(c, [...exprPointIds(claim.lhs), ...exprPointIds(claim.rhs)]);
       if (pointErr) return pointErr;
@@ -533,6 +537,51 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
         return { ok: true, next: withSeg };
       }
       return { ok: false, error: { code: 'no-solution', id: cmd.a } };
+    }
+
+    case 'length-rel': {
+      // |a1b1| = c·|rhs| — the abs-value given. Routing (M1): a symbolic endpoint →
+      // pins the symbol; free dims → a driving scalar pin (similarity-INVARIANT — a
+      // ratio of lengths); fully pinned → a verified claim.
+      const pair2: [Id, Id] | null =
+        'pair' in cmd.rhs
+          ? cmd.rhs.pair
+          : (() => {
+              const d = c.vectors.get((cmd.rhs as { vec: string }).vec);
+              return d ? ([d.from, d.to] as [Id, Id]) : null;
+            })();
+      if (!pair2) return { ok: false, error: { code: 'unknown-vector', id: 'vec' in cmd.rhs ? cmd.rhs.vec : '?' } };
+      const missing = missingPoint(c, [cmd.a1, cmd.b1, ...pair2]);
+      if (missing) return { ok: false, error: missing };
+      const next = clone(c);
+      if (!hasSegment(next, cmd.a1, cmd.b1)) next.segments.push([cmd.a1, cmd.b1]);
+      for (const end of [cmd.a1, cmd.b1, ...pair2]) {
+        const def = next.points.get(end);
+        if (def?.kind === 'vec-defined') {
+          const vd = next.vecDefs[def.def];
+          if (vd.symbol && !next.symbolPins.some((p) => p.def === def.def)) {
+            next.symbolPins.push({ rel: 'length-rel', a: cmd.a1, b: cmd.b1, pair2, c: cmd.c, def: def.def });
+            return { ok: true, next };
+          }
+        }
+      }
+      if (freeDims(next) > 0) {
+        next.scalarPins.push({ kind: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c });
+        return { ok: true, next };
+      }
+      next.claims.push({ type: 'length-rel', a1: cmd.a1, b1: cmd.b1, a2: pair2[0], b2: pair2[1], c: cmd.c });
+      return { ok: true, next };
+    }
+
+    case 'symbol-value': {
+      // הציבו k = ½: pin the named parameter directly — replaces any prior pin on it
+      // (the student substituting the value the earlier relation produced)
+      const idx = c.vecDefs.findIndex((vd) => vd.symbol === cmd.symbol);
+      if (idx < 0) return { ok: false, error: { code: 'unknown-symbol', id: cmd.symbol } };
+      const next = clone(c);
+      next.symbolPins = next.symbolPins.filter((p) => p.def !== idx);
+      next.symbolPins.push({ rel: 'value', value: cmd.value, def: idx });
+      return { ok: true, next };
     }
 
     case 'rect-complete': {
