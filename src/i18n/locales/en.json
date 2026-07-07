@@ -205,7 +205,11 @@
     "alignSeg": "Make a segment horizontal — type its two endpoints (e.g. AB) and press Enter",
     "copyImage": "Copy image",
     "saveImage": "Save image",
+    "saveQuestion": "Download question",
     "copied": "Copied"
+  },
+  "questionDoc": {
+    "given": "Given:"
   },
   "actions": {
     "undo": "Undo",

@@ -205,7 +205,11 @@
     "alignSeg": "יישרו קטע לאופקי — הקלידו את שני הקצוות (למשל AB) והקישו Enter",
     "copyImage": "העתיקו תמונה",
     "saveImage": "הורידו תמונה",
+    "saveQuestion": "הורידו שאלה",
     "copied": "הועתק"
+  },
+  "questionDoc": {
+    "given": "נתון:"
   },
   "actions": {
     "undo": "בטלו",

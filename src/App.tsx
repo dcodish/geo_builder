@@ -27,6 +27,7 @@ import { btn, card as themeCard, color as pal, foldToggle, fs, pill, sectionTitl
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import { deserializeFigure, figureFileName, serializeFigure } from '@/store/figureFile';
+import { questionLines } from '@/export/questionLines';
 import { auditLoadedFigure } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { humanizeError } from '@/i18n/humanizeError';
@@ -308,6 +309,30 @@ export default function App() {
     const a = document.createElement('a');
     a.href = url;
     a.download = figureFileName(new Date());
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ── download the question as a .docx (FR-HS-11, ADR-251) ────────────────
+  // Figure hands up the clean PNG (its own svgToPng export path); we pair it with
+  // the verbatim enabled utterances and pack a Word document — deterministic, no
+  // LLM (the low-tech cousin of FR-HS-9). The docx-heavy builder is dynamically
+  // imported so the library stays out of the main chunk. Errors propagate back
+  // to Figure's ✕ export flash.
+  const saveQuestion = async (png: Blob) => {
+    const { pngDimensions, questionDocxBlob, questionFileName } = await import('@/export/questionDoc');
+    const lines = questionLines(useGeoStore.getState().facts);
+    const data = new Uint8Array(await png.arrayBuffer());
+    const blob = await questionDocxBlob({
+      heading: t('questionDoc.given'),
+      lines,
+      png: { data, ...pngDimensions(data) },
+      rtl: i18n.language !== 'en',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = questionFileName(new Date());
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -926,6 +951,7 @@ export default function App() {
               alignSeg: t('canvas.alignSeg'),
               copyImage: t('canvas.copyImage'),
               saveImage: t('canvas.saveImage'),
+              saveQuestion: t('canvas.saveQuestion'),
               saveFile: t('file.save'),
               loadFile: t('file.load'),
               copied: t('canvas.copied'),
@@ -934,6 +960,8 @@ export default function App() {
             onSaveFile={saveFigure}
             onLoadFile={() => fileInputRef.current?.click()}
             saveFileDisabled={facts.length === 0}
+            onSaveQuestion={saveQuestion}
+            saveQuestionDisabled={questionLines(facts).length === 0}
           />
           {/* Empty canvas → a call to action so a new user knows what to do. The
               container ignores pointer events (so panning isn't blocked); the

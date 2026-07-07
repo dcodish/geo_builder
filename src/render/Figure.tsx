@@ -92,6 +92,7 @@ export interface FigureProps {
     alignSeg: string;
     copyImage: string;
     saveImage: string;
+    saveQuestion: string;
     saveFile: string;
     loadFile: string;
     copied: string;
@@ -106,6 +107,12 @@ export interface FigureProps {
   onLoadFile?: () => void;
   /** Disable "save to file" (e.g. an empty figure has nothing to save). */
   saveFileDisabled?: boolean;
+  /** Download the built question as a .docx (FR-HS-11): Figure rasterises the clean figure
+   *  (same svgToPng path as save-image) and hands the PNG blob up; the host builds the
+   *  document from the facts and triggers the download. Rejections show the export ✕ flash. */
+  onSaveQuestion?: (png: Blob) => Promise<void>;
+  /** Disable "download question" (no enabled utterances → nothing to print). */
+  saveQuestionDisabled?: boolean;
 }
 
 interface View {
@@ -180,6 +187,8 @@ export function Figure({
   onSaveFile,
   onLoadFile,
   saveFileDisabled,
+  onSaveQuestion,
+  saveQuestionDisabled,
 }: FigureProps) {
   // English fallbacks so the renderer works standalone (e.g. the SSR render tests, which
   // pass no toolbarText); the host (App) supplies localized Hebrew strings.
@@ -193,6 +202,7 @@ export function Figure({
     alignSeg: 'Make a segment horizontal — type its two endpoints (e.g. AB) and press Enter',
     copyImage: 'Copy image',
     saveImage: 'Save image',
+    saveQuestion: 'Download question',
     saveFile: 'Save to file',
     loadFile: 'Load from file',
     copied: 'Copied',
@@ -245,6 +255,15 @@ export function Figure({
       a.download = 'figure.png';
       a.click();
       URL.revokeObjectURL(url);
+    } catch {
+      setExportFlash('err');
+      window.setTimeout(() => setExportFlash(''), 1400);
+    }
+  }
+  async function saveQuestion() {
+    if (!svgRef.current || !onSaveQuestion) return;
+    try {
+      await onSaveQuestion(await svgToPng(svgRef.current));
     } catch {
       setExportFlash('err');
       window.setTimeout(() => setExportFlash(''), 1400);
@@ -1095,6 +1114,19 @@ export function Figure({
         <button type="button" style={exportBtn} title={tt.saveImage} aria-label={tt.saveImage} onClick={saveImage}>
           ⤓ {tt.saveImage}
         </button>
+        {/* Download the question as a Word document (FR-HS-11) — the figure beside the typed givens. */}
+        {onSaveQuestion && (
+          <button
+            type="button"
+            style={{ ...exportBtn, ...(saveQuestionDisabled ? { opacity: 0.5, cursor: 'default' } : null) }}
+            title={tt.saveQuestion}
+            aria-label={tt.saveQuestion}
+            disabled={saveQuestionDisabled}
+            onClick={saveQuestion}
+          >
+            ⤓ {tt.saveQuestion}
+          </button>
+        )}
         <span style={traySep} aria-hidden />
         {/* Zoom buttons (F2) — the touch-first fallback for wheel zoom (pinch works too); handy for mice. */}
         <button type="button" style={ctrlBtn} title="zoom in" aria-label="zoom in" onClick={() => setView((v) => ({ ...v, zoom: clamp(v.zoom * 1.25, 0.2, 8) }))}>

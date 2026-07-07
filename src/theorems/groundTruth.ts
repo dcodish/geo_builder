@@ -56,7 +56,9 @@ const LIST_KEYS = [
 export function parseGroundTruth(md: string): GroundTruthQuestion[] {
   const out: GroundTruthQuestion[] = [];
   let cur: GroundTruthQuestion | null = null;
-  for (const line of md.split('\n')) {
+  // Tolerate CRLF: a fresh git checkout on Windows (core.autocrlf) materializes the .md with
+  // \r\n, and a trailing \r defeats the `$`-anchored heading match (JS `.` never matches \r).
+  for (const line of md.split(/\r?\n/)) {
     const h = line.match(/^##\s+(Q\d+|B\d+)\s+—\s+(.+)$/);
     if (h) {
       cur = { qid: h[1], title: h[2].trim(), expectSurfaced: [], solutionUses: [], mustNotSurface: [] };
