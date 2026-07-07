@@ -64,13 +64,20 @@ describe('parser — segment-length inequality "DC > AB" (he/en)', () => {
 });
 
 describe('parser — point on segment (he/en)', () => {
+  // ADR-250: the stated carrier is DRAWN too — the batch is [segment AD, point-on-segment].
+  const carrier: Command = { type: 'segment', a: 'A', b: 'D' };
+  const withCarrier = (input: string, expected: AnyCommand) => {
+    const r = parse(input);
+    expect(r.ok, `"${input}" should parse`).toBe(true);
+    if (r.ok) expect(r.commands).toEqual([carrier, expected]);
+  };
   it('english, no ratio (default)', () =>
-    one('point G on AD', { type: 'point-on-segment', id: 'G', a: 'A', b: 'D' }));
-  it('hebrew, no ratio', () => one('נקודה G על AD', { type: 'point-on-segment', id: 'G', a: 'A', b: 'D' }));
+    withCarrier('point G on AD', { type: 'point-on-segment', id: 'G', a: 'A', b: 'D' }));
+  it('hebrew, no ratio', () => withCarrier('נקודה G על AD', { type: 'point-on-segment', id: 'G', a: 'A', b: 'D' }));
   it('english with percent', () =>
-    one('point G on AD at 40%', { type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 }));
+    withCarrier('point G on AD at 40%', { type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 }));
   it('hebrew with percent', () =>
-    one('נקודה G על AD ב-40%', { type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 }));
+    withCarrier('נקודה G על AD ב-40%', { type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 }));
 });
 
 describe('parser — point by distances (he/en)', () => {

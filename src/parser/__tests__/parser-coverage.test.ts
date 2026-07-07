@@ -236,8 +236,9 @@ describe('compound "<place a point> such that <condition>" parses BOTH halves', 
       const r = parse(u);
       expect(r.ok).toBe(true);
       if (!r.ok) return;
-      // The ⟂ relation also draws its two segments (CF, DF) so they appear on the figure.
-      expect(r.commands.map((c) => c.type)).toEqual(['point-on-segment', 'segment', 'segment', 'set-perpendicular']);
+      // The ⟂ relation also draws its two segments (CF, DF), and the stated carrier is drawn too
+      // (ADR-250): the base AD before the rider + the המשך leg D–F after it.
+      expect(r.commands.map((c) => c.type)).toEqual(['segment', 'point-on-segment', 'segment', 'segment', 'segment', 'set-perpendicular']);
       const perp = r.commands.find((c) => c.type === 'set-perpendicular') as { a: string; b: string; c: string; d: string };
       expect([perp.a, perp.b, perp.c, perp.d]).toEqual(['C', 'F', 'D', 'F']); // CF ⟂ DF, not AD ⟂ CF
     });

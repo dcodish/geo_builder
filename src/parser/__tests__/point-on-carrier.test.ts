@@ -11,7 +11,11 @@
 import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
 
-const onSeg = (id: string, a: string, b: string) => [{ type: 'point-on-segment', id, a, b }];
+// ADR-250: the stated carrier is DRAWN too — the batch is [segment, point-on-segment].
+const onSeg = (id: string, a: string, b: string) => [
+  { type: 'segment', a, b },
+  { type: 'point-on-segment', id, a, b },
+];
 
 describe('point on a named carrier', () => {
   it.each([
@@ -37,6 +41,7 @@ describe('point on a named carrier', () => {
       expect(r.commands).toEqual([
         { type: 'point-on-circle', id: 'A', circle: 'circle-O' },
         { type: 'point-on-circle', id: 'C', circle: 'circle-O' },
+        { type: 'segment', a: 'A', b: 'C' }, // the stated chord is drawn (ADR-250)
         { type: 'point-on-segment', id: 'E', a: 'A', b: 'C' },
       ]);
   });

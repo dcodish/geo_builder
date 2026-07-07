@@ -10,9 +10,13 @@ import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
 
 const ctx = { points: ['A', 'B', 'C'], circles: [] as string[] };
+// ADR-250: each stated carrier is DRAWN before its rider.
 const FGH = [
+  { type: 'segment', a: 'A', b: 'B' },
   { type: 'point-on-segment', id: 'F', a: 'A', b: 'B' },
+  { type: 'segment', a: 'A', b: 'C' },
   { type: 'point-on-segment', id: 'G', a: 'A', b: 'C' },
+  { type: 'segment', a: 'C', b: 'B' },
   { type: 'point-on-segment', id: 'H', a: 'C', b: 'B' },
 ];
 
@@ -37,6 +41,7 @@ describe('parse — N points pairwise on N segments', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.commands).toEqual([
+      { type: 'segment', a: 'A', b: 'C' }, // the stated carrier is drawn once (ADR-250)
       { type: 'point-on-segment', id: 'L', a: 'A', b: 'C' },
       { type: 'point-on-segment', id: 'K', a: 'A', b: 'C' },
     ]);
@@ -46,7 +51,10 @@ describe('parse — N points pairwise on N segments', () => {
     const r = parse('F on AB', { points: ['A', 'B'], circles: [] });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.commands).toEqual([{ type: 'point-on-segment', id: 'F', a: 'A', b: 'B' }]);
+    expect(r.commands).toEqual([
+      { type: 'segment', a: 'A', b: 'B' },
+      { type: 'point-on-segment', id: 'F', a: 'A', b: 'B' },
+    ]);
   });
 
   it('defers points on a CIRCLE (not segments)', () => {
@@ -60,6 +68,7 @@ describe('parse — N points pairwise on N segments', () => {
     const r = parse('F, G on AB', { points: ['A', 'B'], circles: [] });
     // pointsOnSegment handles "F, G on AB" (two points on segment AB)
     if (r.ok) expect(r.commands).toEqual([
+      { type: 'segment', a: 'A', b: 'B' },
       { type: 'point-on-segment', id: 'F', a: 'A', b: 'B' },
       { type: 'point-on-segment', id: 'G', a: 'A', b: 'B' },
     ]);

@@ -36,6 +36,8 @@ export interface DataPanel {
   relations: string[];
   vectors: VecEntry[];
   points: string[]; // `N(6, 6, 6)` — stable coordinates only
+  /** id → `(6, 6, 6)` for the SAME stable set — the canvas coordinate labels. */
+  pointCoords: Record<string, string>;
 }
 
 const EPS = 1e-6;
@@ -269,12 +271,17 @@ export function dataView(c: Construction3, seed: number): DataPanel {
 
   // points with STABLE coordinates (needs a frame; a pinned-only figure prints nothing sampled)
   const points: string[] = [];
+  const pointCoords: Record<string, string> = {};
   if (hasFrame) {
     for (const id of positions[0].keys()) {
       const ps = positions.map((pos) => pos.get(id));
       if (ps.some((p) => !p)) continue;
-      if (sameVec(ps[0]!, ps[1]!) && sameVec(ps[0]!, ps[2]!)) points.push(`${id}${coordStr(ps[0]!)}`);
+      if (sameVec(ps[0]!, ps[1]!) && sameVec(ps[0]!, ps[2]!)) {
+        const cs = coordStr(ps[0]!);
+        points.push(`${id}${cs}`);
+        pointCoords[id] = cs;
+      }
     }
   }
-  return { relations, vectors: entries, points };
+  return { relations, vectors: entries, points, pointCoords };
 }

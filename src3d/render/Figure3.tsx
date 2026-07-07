@@ -18,6 +18,9 @@ export interface Figure3Props {
   height?: number;
   /** Reset-view button label (i18n-injected so this component stays translation-free). */
   resetLabel?: string;
+  /** id → `(6, 6, 6)`: coordinate labels drawn under the point letters (the
+   *  organize-your-data toggle; only STABLE coordinates arrive here). */
+  coordLabels?: Record<string, string>;
 }
 
 /** Per-index plane patch colours (translucent — patches never occlude, docs/20 §11). */
@@ -28,7 +31,7 @@ const ORBIT_SPEED = 0.011; // radians per px
 /** Named vectors draw in their own colour (ADR-3D-003 Am.) so tail/head read instantly. */
 const VECTOR_COLOR = '#0d9488';
 
-export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view' }: Figure3Props) {
+export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels }: Figure3Props) {
   const [cam, setCam] = useState<Camera3>(HOME_CAMERA);
   const [zoom, setZoom] = useState(1);
   const drag = useRef<{ x: number; y: number } | null>(null);
@@ -251,6 +254,22 @@ export default function Figure3({ construction, resolved, width = 640, height = 
             >
               {p.label}
             </text>
+            {coordLabels?.[p.id] && (
+              <text
+                x={p.x + p.labelDx}
+                y={p.y + p.labelDy + 13}
+                fontSize={11}
+                fontFamily="ui-sans-serif, system-ui, sans-serif"
+                fill="#0369a1"
+                stroke="#ffffff"
+                strokeWidth={3}
+                paintOrder="stroke"
+                textAnchor="middle"
+                dominantBaseline="middle"
+              >
+                {coordLabels[p.id]}
+              </text>
+            )}
           </g>
         ))}
       </svg>
