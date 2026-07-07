@@ -32,6 +32,8 @@ export interface VecEntry {
 }
 
 export interface DataPanel {
+  /** Derived equalities among declared vectors, e.g. `|u| = |v| = |w|` (+ stated value). */
+  relations: string[];
   vectors: VecEntry[];
   points: string[]; // `N(6, 6, 6)` — stable coordinates only
 }
@@ -88,6 +90,36 @@ function decompStr(coefs: [number, number, number], names: string[]): string {
   return parts.length ? parts.join(' ') : '0';
 }
 
+/** Render Σ(aᵢ + bᵢ·k)·nameᵢ — the exam's symbolic answer shape. */
+function decompSymStr(a: [number, number, number], b: [number, number, number], names: string[], sym: string): string {
+  const parts: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    const ai = Math.abs(a[i]) < 1e-9 ? 0 : a[i];
+    const bi = Math.abs(b[i]) < 1e-9 ? 0 : b[i];
+    if (ai === 0 && bi === 0) continue;
+    let coef: string;
+    let neg = false;
+    if (bi === 0) {
+      neg = ai < 0;
+      const m = Math.abs(ai);
+      coef = Math.abs(m - 1) < 1e-9 ? '' : `${cleanNum(m)}·`;
+    } else if (ai === 0) {
+      neg = bi < 0;
+      const m = Math.abs(bi);
+      coef = `${Math.abs(m - 1) < 1e-9 ? '' : cleanNum(m) + '·'}${sym}·`;
+    } else if (bi > 0) {
+      const kPart = Math.abs(bi - 1) < 1e-9 ? sym : `${cleanNum(bi)}·${sym}`;
+      coef = `(${kPart} ${ai < 0 ? '−' : '+'} ${cleanNum(Math.abs(ai))})·`;
+    } else {
+      const kPart = Math.abs(bi + 1) < 1e-9 ? sym : `${cleanNum(-bi)}·${sym}`;
+      coef = `(${cleanNum(ai)} − ${kPart})·`;
+    }
+    const term = `${coef}${names[i]}`;
+    parts.push(parts.length === 0 ? (neg ? `−${term}` : term) : neg ? `− ${term}` : `+ ${term}`);
+  }
+  return parts.length ? parts.join(' ') : '0';
+}
+
 const near = (a: number, b: number) => Math.abs(a - b) < EPS;
 const sameVec = (a: Vec3, b: Vec3) => near(a.x, b.x) && near(a.y, b.y) && near(a.z, b.z);
 
@@ -104,7 +136,6 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   const seeds = [seed, seed + 1013, seed + 2027];
   const resolved = seeds.map((s) => resolve3(c, s));
   const positions = resolved.map((r) => r.positions);
-  const at = (i: number, id: Id): Vec3 | undefined => positions[i].get(id);
   const stablePair = (a: Id, b: Id): Vec3 | null => {
     const ds = positions.map((pos) => {
       const p = pos.get(a);
@@ -121,16 +152,33 @@ export function dataView(c: Construction3, seed: number): DataPanel {
 
   const vecNames = [...c.vectors.entries()];
   const basis = vecNames.slice(0, 3);
+
+  // ONE unpinned symbol (SN = k·SC before anything pins k): a k-dependent quantity is
+  // not unstable noise — it is AFFINE in k. Decompose at k=0 and k=1 (a value-pin on a
+  // cloned construction) and present the exam's symbolic form: (k − 3/4)·u + k·v + …
+  const freeSyms = c.vecDefs.map((vd, i) => ({ vd, i })).filter(({ vd, i }) => vd.symbol && !c.symbolPins.some((p) => p.def === i));
+  const freeSym = freeSyms.length === 1 ? freeSyms[0] : null;
+  let posAtK: Map<number, typeof positions> | null = null;
+  const positionsAtK = (kv: number) => {
+    if (!posAtK) posAtK = new Map();
+    if (!posAtK.has(kv)) {
+      posAtK.set(
+        kv,
+        seeds.map((s) => resolve3({ ...c, symbolPins: [...c.symbolPins, { rel: 'value', value: kv, def: freeSym!.i }] }, s).positions),
+      );
+    }
+    return posAtK.get(kv)!;
+  };
   // the basis is usable per-seed even when not world-stable: decompose per seed and
   // require the COEFFICIENTS to agree (affine relations are frame-invariant)
-  const decompose = (a: Id, b: Id): [number, number, number] | null => {
+  const decomposeIn = (posArr: typeof positions, a: Id, b: Id): [number, number, number] | null => {
     if (basis.length < 3) return null;
-    const per: ([number, number, number] | null)[] = positions.map((pos, i) => {
+    const per: ([number, number, number] | null)[] = posArr.map((pos) => {
       const p = pos.get(a);
       const q = pos.get(b);
       const dirs = basis.map(([, d]) => {
-        const f = at(i, d.from);
-        const t = at(i, d.to);
+        const f = pos.get(d.from);
+        const t = pos.get(d.to);
         return f && t ? sub3(t, f) : null;
       });
       if (!p || !q || dirs.some((x) => !x)) return null;
@@ -140,6 +188,17 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     const [c0, c1, c2] = per as [number, number, number][];
     const agree = (u: number[], v: number[]) => u.every((x, i) => near(x, v[i]));
     return agree(c0, c1) && agree(c0, c2) ? c0 : null;
+  };
+  const decompose = (a: Id, b: Id) => decomposeIn(positions, a, b);
+  /** The affine-in-k form when the plain decomposition is k-dependent. */
+  const decomposeSym = (a: Id, b: Id): string | null => {
+    if (!freeSym) return null;
+    const c0 = decomposeIn(positionsAtK(0), a, b);
+    const c1 = decomposeIn(positionsAtK(1), a, b);
+    if (!c0 || !c1) return null;
+    const slope = c1.map((x, i) => x - c0[i]) as [number, number, number];
+    if (slope.every((x) => Math.abs(x) < 1e-9)) return null; // not actually k-dependent
+    return decompSymStr(c0, slope, basis.map(([n]) => n), freeSym.vd.symbol!);
   };
 
   const lengths = statedLengths(c);
@@ -153,11 +212,12 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     if (seen.has(k)) return;
     seen.add(k);
     const coefs = isBasisVec ? null : decompose(a, b);
+    const symDecomp = !isBasisVec && !coefs ? decomposeSym(a, b) : null;
     const d = stablePair(a, b);
     const stated = lengths.get(k);
     const entry: VecEntry = {
       label,
-      decomp: coefs ? decompStr(coefs, basisNames) : null,
+      decomp: coefs ? decompStr(coefs, basisNames) : symDecomp,
       coords: hasFrame && d ? coordStr(d) : null,
       mag: stated !== undefined ? `|${label}| = ${cleanNum(stated)}` : null,
       sq: stated !== undefined ? `${label}² = ${cleanNum(stated * stated)}` : null,
@@ -169,6 +229,37 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   for (const [name, d] of vecNames) addEntry(name, d.from, d.to, true);
   for (const [a, b] of c.segments) addEntry(`${a}${b}`, a, b, false);
 
+  // derived magnitude equalities among the declared vectors: |u| = |v| = |w| — equal in
+  // EVERY sampled configuration (each seed has its own scale; the EQUALITY is the fact)
+  const relations: string[] = [];
+  {
+    const mags = vecNames.map(([name, d]) => ({
+      name,
+      per: positions.map((pos) => {
+        const p = pos.get(d.from);
+        const q = pos.get(d.to);
+        return p && q ? Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z) : null;
+      }),
+    }));
+    const used = new Set<string>();
+    for (let i = 0; i < mags.length; i++) {
+      if (used.has(mags[i].name) || mags[i].per.some((m) => m === null)) continue;
+      const cls = [mags[i].name];
+      for (let j = i + 1; j < mags.length; j++) {
+        if (used.has(mags[j].name) || mags[j].per.some((m) => m === null)) continue;
+        const equalEverywhere = mags[i].per.every((m, s) => Math.abs(m! - mags[j].per[s]!) <= 1e-6 * Math.max(1, m!));
+        if (equalEverywhere) {
+          cls.push(mags[j].name);
+          used.add(mags[j].name);
+        }
+      }
+      if (cls.length > 1) {
+        const stated = cls.map((n) => lengths.get(pairKey(c.vectors.get(n)!.from, c.vectors.get(n)!.to))).find((v) => v !== undefined);
+        relations.push(cls.map((n) => `|${n}|`).join(' = ') + (stated !== undefined ? ` = ${cleanNum(stated)}` : ''));
+      }
+    }
+  }
+
   // points with STABLE coordinates (needs a frame; a pinned-only figure prints nothing sampled)
   const points: string[] = [];
   if (hasFrame) {
@@ -178,5 +269,5 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       if (sameVec(ps[0]!, ps[1]!) && sameVec(ps[0]!, ps[2]!)) points.push(`${id}${coordStr(ps[0]!)}`);
     }
   }
-  return { vectors: entries, points };
+  return { relations, vectors: entries, points };
 }

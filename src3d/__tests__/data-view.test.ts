@@ -49,6 +49,28 @@ describe('dataView — organize your data', () => {
     expect(w?.coords).toBe('(0, 0, 12)');
   });
 
+  it("the operator's session: |u| = |v| = |w| surfaces, and EN shows SYMBOLICALLY in k", () => {
+    [
+      'פירמידה ABCDS שבסיסה ריבוע',
+      'AS גובה',
+      '|AS|=|AD|',
+      'SE = 3/4 SD',
+      'SN = k·SC',
+      'נסמן: AD = u, AB = v, AS = w',
+      'EN',
+    ].forEach(submit);
+    expect(useGeo3.getState().lastError).toBeNull();
+    const p = panel();
+    // square base gives |u| = |v|; the stated |AS| = |AD| joins w — all three equal
+    expect(p.relations).toContain('|u| = |v| = |w|');
+    // EN depends on the FREE k — not hidden as unstable, shown in the exam's symbolic form
+    const en = p.vectors.find((v) => v.label === 'EN');
+    expect(en?.decomp).toBe('(k − 3/4)·u + k·v + (3/4 − k)·w');
+    // SE is k-free and numeric
+    const se = p.vectors.find((v) => v.label === 'SE');
+    expect(se?.decomp).toBe('3/4·u − 3/4·w');
+  });
+
   it('a stated magnitude prints with its square; nothing prints for an unstated one', () => {
     submit('פירמידה ABCDS שבסיסה ריבוע');
     submit('AS = w');

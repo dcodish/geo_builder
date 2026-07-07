@@ -251,7 +251,7 @@ export default function App3() {
         </h1>
       </header>
 
-      <main className="mx-auto flex max-w-6xl flex-col gap-5 p-5 md:flex-row">
+      <main className="mx-auto flex max-w-screen-2xl flex-col gap-5 p-5 md:flex-row">
         {/* Input + fact list */}
         <section className="flex w-full flex-col gap-3 md:w-96">
           <form onSubmit={onSubmit} className="flex gap-2">
@@ -378,7 +378,7 @@ export default function App3() {
             construction={derived.construction}
             resolved={derived.resolved}
             width={canvasW}
-            height={Math.max(320, Math.round(canvasW * 0.7))}
+            height={Math.max(360, Math.round(canvasW * 0.72))}
             resetLabel={t('actions.resetView')}
           />
           {facts.length > 0 && (
@@ -439,6 +439,11 @@ export default function App3() {
                 <p className="text-slate-400">{t('dataPanel.empty')}</p>
               ) : (
                 <ul className="flex flex-col gap-1" dir="ltr">
+                  {dataPanel.relations.map((r) => (
+                    <li key={r} className="border-b border-slate-100 pb-1 font-medium">
+                      {r}
+                    </li>
+                  ))}
                   {dataPanel.vectors.map((v) => (
                     <li key={v.label} className="border-b border-slate-100 pb-1 last:border-0">
                       {v.decomp && (
