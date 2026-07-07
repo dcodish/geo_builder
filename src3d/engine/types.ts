@@ -57,7 +57,16 @@ export type Claim3 =
   | { type: 'length-ratio'; a1: Id; b1: Id; a2: Id; b2: Id; p: number; q: number } // A'K : A'C = 2 : 3
   | { type: 'volume-eq'; solid: string; value: number } // נפח החרוט = 100π (value in world units³, π parsed)
   | { type: 'lateral-area-eq'; solid: string; value: number } // שטח המעטפת של החרוט = 65π
-  | { type: 'lines-rel'; a1: Id; b1: Id; a2: Id; b2: Id; rel: 'skew' | 'parallel' | 'intersect' }; // NK ו-PL מצטלבים (V7 T3)
+  | { type: 'lines-rel'; a1: Id; b1: Id; a2: Id; b2: Id; rel: 'skew' | 'parallel' | 'intersect' } // NK ו-PL מצטלבים (V7 T3)
+  | { type: 'volume-poly'; ids: Id[]; value: number }; // נפח הפירמידה ABCD = 64 (tetra: |triple|/6; V7 T2)
+
+/** V7 T2 — a SCALAR given that DRIVES the figure (a residual in the global solve). */
+export type ScalarPin =
+  | { kind: 'length'; a: Id; b: Id; value: number } // |DC| = 4
+  | { kind: 'vangle'; vertex: Id; p: Id; q: Id; deg: number } // ∠ADC = 120
+  | { kind: 'dot'; v1: string; v2: string; value: number } // u·v = 24
+  | { kind: 'seg-perp-plane'; a: Id; b: Id; plane: Id[] } // DC ניצב למישור ABC (a driving given)
+  | { kind: 'seg-par-plane'; a: Id; b: Id; plane: Id[] };
 
 // ---------------------------------------------------------------------------
 // The algebraic lane (V2 — docs/20 §6.3): coefficients may carry ONE symbolic
@@ -102,7 +111,9 @@ export type Line3Def =
 /** The solid family. `cube`/`box`: 8 ids (base then primed tops); `prism3`: 6 ids (right triangular
  *  prism); `pyramid4`/`pyramid3`: base ring then the APEX LAST — a RIGHT pyramid (apex above the
  *  base's circumcentre, so the lateral edges are equal; stated `ישרה` required, ADR-052). */
-export type SolidKind = 'cube' | 'box' | 'prism3' | 'pyramid4' | 'pyramid3';
+export type SolidKind = 'cube' | 'box' | 'prism3' | 'pyramid4' | 'pyramid3' | 'tetra' | 'prism4r';
+// tetra: `פירמידה ABCD` — a GENERAL triangular pyramid (free apex, 5 dims);
+// prism4r: `מנסרה ישרה שבסיסה מעוין` — rhombus base (dims: base angle + height).
 
 export interface SolidCommand {
   type: 'solid';
@@ -378,7 +389,9 @@ export type Command3 =
   | RevolutionCommand
   | VecRelCommand
   | SegPlaneRelCommand
-  | { type: 'rect-complete'; ids: [Id, Id, Id, Id] }; // `ABEC מלבן` — completes the single unknown corner (V7 T3)
+  | { type: 'rect-complete'; ids: [Id, Id, Id, Id] } // `ABEC מלבן` — completes the single unknown corner (V7 T3)
+  | { type: 'dot-given'; v1: string; v2: string; value: number } // u·v = 24 (V7 T2)
+  | { type: 'inject-pair'; a: Id; b: Id; x: number; y: number; z: number }; // BD = (-4,5,12) — a pair-vector injection (V7 T2)
 
 // ---------------------------------------------------------------------------
 // Construction (what apply builds, what evaluate consumes)
@@ -447,6 +460,10 @@ export interface Construction3 {
    *  attributes them to facts by count-delta and verifies them all; a claim can
    *  never escape verification by being created indirectly. */
   claims: Claim3[];
+  /** V7 T2 — scalar givens driving the figure (residuals in the global solve). */
+  scalarPins: ScalarPin[];
+  /** V7 T2 — pair-vector injections (`BD = (-4,5,12)`), residuals like vectorPins. */
+  pairPins: { a: Id; b: Id; x: number; y: number; z: number }[];
 }
 
 export const emptyConstruction3 = (): Construction3 => ({
@@ -469,6 +486,8 @@ export const emptyConstruction3 = (): Construction3 => ({
   vecDefs: [],
   symbolPins: [],
   claims: [],
+  scalarPins: [],
+  pairPins: [],
 });
 
 // ---------------------------------------------------------------------------

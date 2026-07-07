@@ -77,14 +77,48 @@ const rightPrism: Rule = (s) => {
   return null;
 };
 
-/** Right pyramid: `פירמידה ישרה ABCDS` (square base + apex LAST) / `ABCS` (triangular base). Oblique refuses (ADR-052). */
+/** Right pyramid: `פירמידה ישרה ABCDS` / `ABCS`. WITHOUT ישרה, 4 ids = a GENERAL tetrahedron (V7 T2). */
 const rightPyramid: Rule = (s) => {
   if (!/פירמידה/.test(s) && !/\bpyramid\b/i.test(s)) return null;
+  const right = /ישרה/.test(s) || /\bright\b/i.test(s);
+  const toks = labelTokens(s);
+  if (right && toks.length === 5) return [{ type: 'solid', kind: 'pyramid4', ids: toks }];
+  if (right && toks.length === 4) return [{ type: 'solid', kind: 'pyramid3', ids: toks }];
+  if (!right && toks.length === 4) return [{ type: 'solid', kind: 'tetra', ids: toks }]; // general — apex free
+  return null;
+};
+
+/** `מנסרה ישרה שבסיסה מעוין ABCDA'B'C'D'` — a right prism over a rhombus (V7 T2). */
+const rhombusPrism: Rule = (s) => {
+  if ((!/מנסרה/.test(s) && !/\bprism\b/i.test(s)) || (!/מעוין/.test(s) && !/\brhombus\b/i.test(s))) return null;
   if (!/ישרה/.test(s) && !/\bright\b/i.test(s)) return null;
   const toks = labelTokens(s);
-  if (toks.length === 5) return [{ type: 'solid', kind: 'pyramid4', ids: toks }];
-  if (toks.length === 4) return [{ type: 'solid', kind: 'pyramid3', ids: toks }];
+  if (toks.length === 8) return [{ type: 'solid', kind: 'prism4r', ids: toks }];
+  if (toks.length === 4 && toks.every(unprimed)) return [{ type: 'solid', kind: 'prism4r', ids: [...toks, ...primeAll(toks)] }];
   return null;
+};
+
+/** `u·v = 24` — a dot-product GIVEN on declared vectors (V7 T2). */
+const dotGiven: Rule = (s) => {
+  const m = s.match(/^([a-w])\s*[·×*]\s*([a-w])\s*=\s*(-?\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  return [{ type: 'dot-given', v1: m[1], v2: m[2], value: +m[3] }];
+};
+
+/** `BD = (-4,5,12)` — a PAIR-vector injection (V7 T2). */
+const pairInjection: Rule = (s) => {
+  const m = s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)$/);
+  if (!m) return null;
+  return [{ type: 'inject-pair', a: m[1], b: m[2], x: +m[3], y: +m[4], z: +m[5] }];
+};
+
+/** `נפח הפירמידה ABCD = 64` — a tetrahedron volume claim (V7 T2). */
+const volumePolyClaim: Rule = (s) => {
+  const m =
+    s.match(/^נפח\s+הפירמידה\s+((?:[A-Z]\d*'?){4})\s*=\s*(-?\d+(?:\.\d+)?)$/) ??
+    s.match(/^the\s+volume\s+of\s+(?:the\s+)?pyramid\s+((?:[A-Z]\d*'?){4})\s*=\s*(-?\d+(?:\.\d+)?)$/);
+  if (!m) return null;
+  return [{ type: 'claim', claim: { type: 'volume-poly', ids: m[1].match(/[A-Z]\d*'?/g)!, value: +m[2] } }];
 };
 
 /** `M אמצע BC` / `M is the midpoint of BC` → on-segment t = ½. */
@@ -905,8 +939,11 @@ const areaClaim: Rule = (s) => {
 
 const RULES: Rule[] = [
   cubeOrBox,
+  rhombusPrism,
   rightPrism,
+  volumePolyClaim, // BEFORE rightPyramid: נפח הפירמידה ABCD must never build a pyramid
   rightPyramid,
+  dotGiven,
   revolutionSolid,
   volumeClaim,
   lateralAreaClaim,
@@ -943,6 +980,7 @@ const RULES: Rule[] = [
   onSegment,
   vecEqClaim,
   coordsClaim,
+  pairInjection,
   lengthRatioClaim,
   areaClaim,
   lengthClaim,

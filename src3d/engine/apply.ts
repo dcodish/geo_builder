@@ -6,7 +6,7 @@
 import { exprPointIds, exprVectorNames } from './vecExpr';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, SolidCommand, SolidObj } from './types';
 
-const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4 };
+const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8 };
 
 /** Edge index pairs per solid kind (indices into `ids`). */
 function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
@@ -23,10 +23,17 @@ function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
       [0, 4], [1, 4], [2, 4], [3, 4], // lateral edges to the apex
     ];
   }
-  if (kind === 'pyramid3') {
+  if (kind === 'pyramid3' || kind === 'tetra') {
     return [
       [0, 1], [1, 2], [2, 0], // base ring
       [0, 3], [1, 3], [2, 3], // lateral edges to the apex
+    ];
+  }
+  if (kind === 'prism4r') {
+    return [
+      [0, 1], [1, 2], [2, 3], [3, 0],
+      [4, 5], [5, 6], [6, 7], [7, 4],
+      [0, 4], [1, 5], [2, 6], [3, 7],
     ];
   }
   // cube / box
@@ -52,10 +59,17 @@ function faceIndices(kind: SolidCommand['kind']): number[][] {
       [0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4], // lateral triangles
     ];
   }
-  if (kind === 'pyramid3') {
+  if (kind === 'pyramid3' || kind === 'tetra') {
     return [
       [0, 1, 2], // base
       [0, 1, 3], [1, 2, 3], [2, 0, 3], // lateral triangles
+    ];
+  }
+  if (kind === 'prism4r') {
+    return [
+      [0, 1, 2, 3],
+      [4, 5, 6, 7],
+      [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7],
     ];
   }
   return [
@@ -87,6 +101,8 @@ function clone(c: Construction3): Construction3 {
     vecDefs: [...c.vecDefs],
     symbolPins: [...c.symbolPins],
     claims: [...c.claims],
+    scalarPins: [...c.scalarPins],
+    pairPins: [...c.pairPins],
   };
 }
 
@@ -101,6 +117,18 @@ function relPointIds(c: Construction3, from: Id, to: Id, terms: { atom: import('
     }
   }
   return ids;
+}
+
+/** How many FREE dims the figure's solids carry (a scalar statement on such a figure is a GIVEN, not a check). */
+const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2 };
+function freeDims(c: Construction3): number {
+  let n = 0;
+  for (const s of c.solids) n += DIM_COUNT[s.kind];
+  for (const r of c.revolutions) {
+    if (r.radius === undefined) n++;
+    if (r.kind !== 'sphere' && r.height === undefined) n++;
+  }
+  return n;
 }
 
 const samePair = (p: [Id, Id], a: Id, b: Id): boolean => (p[0] === a && p[1] === b) || (p[0] === b && p[1] === a);
@@ -150,6 +178,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
     case 'length-ratio':
       return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
+    case 'volume-poly':
+      return claim.ids.length === 4 ? missingPoint(c, claim.ids) : { code: 'no-such-solid', id: claim.ids.join('') };
     case 'volume-eq':
     case 'lateral-area-eq': {
       const matches = c.revolutions.filter((r) => r.kind === claim.solid);
@@ -244,6 +274,18 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       const err = claimRefsError(c, cmd.claim);
       if (err) return { ok: false, error: err };
       const next = clone(c);
+      // M1 (V7 T2): a scalar statement on a figure with FREE dims is a GIVEN — it
+      // drives the solve instead of being "checked" against an arbitrary sample.
+      if (freeDims(c) > 0) {
+        if (cmd.claim.type === 'length-eq') {
+          next.scalarPins.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
+          return { ok: true, next };
+        }
+        if (cmd.claim.type === 'angle-seg-eq' && cmd.claim.a1 === cmd.claim.a2) {
+          next.scalarPins.push({ kind: 'vangle', vertex: cmd.claim.a1, p: cmd.claim.b1, q: cmd.claim.b2, deg: cmd.claim.deg });
+          return { ok: true, next };
+        }
+      }
       next.claims.push(cmd.claim); // recorded — derive3 verifies EVERY recorded claim (fact-attributed)
       return { ok: true, next };
     }
@@ -472,6 +514,13 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       // otherwise: ⟂ is the existing claim; ∥-to-plane as a claim is not yet demanded
       const missing = missingPoint(c, [cmd.a, cmd.b]);
       if (missing) return { ok: false, error: missing };
+      // V7 T2: on a figure with FREE dims the relation is a DRIVING given (M1)
+      if (freeDims(c) > 0) {
+        const next = clone(c);
+        next.scalarPins.push({ kind: cmd.rel === 'perp' ? 'seg-perp-plane' : 'seg-par-plane', a: cmd.a, b: cmd.b, plane: cmd.plane });
+        if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]);
+        return { ok: true, next };
+      }
       if (cmd.rel === 'perp' && cmd.plane.length === 3) {
         const asClaim = applyCommand3(c, { type: 'claim', claim: { type: 'perp-plane', seg: [cmd.a, cmd.b], plane: [cmd.plane[0], cmd.plane[1], cmd.plane[2]] } });
         if (!asClaim.ok || hasSegment(asClaim.next, cmd.a, cmd.b)) return asClaim;
@@ -516,6 +565,23 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
         const [a, b] = [cmd.ids[j], cmd.ids[(j + 1) % 4]];
         if (!hasSegment(next, a, b)) next.segments.push([a, b]);
       }
+      return { ok: true, next };
+    }
+
+    case 'dot-given': {
+      for (const nm of [cmd.v1, cmd.v2]) {
+        if (!c.vectors.has(nm)) return { ok: false, error: { code: 'unknown-vector', id: nm } };
+      }
+      const next = clone(c);
+      next.scalarPins.push({ kind: 'dot', v1: cmd.v1, v2: cmd.v2, value: cmd.value });
+      return { ok: true, next };
+    }
+
+    case 'inject-pair': {
+      const missing = missingPoint(c, [cmd.a, cmd.b]);
+      if (missing) return { ok: false, error: missing };
+      const next = clone(c);
+      next.pairPins.push({ a: cmd.a, b: cmd.b, x: cmd.x, y: cmd.y, z: cmd.z });
       return { ok: true, next };
     }
 

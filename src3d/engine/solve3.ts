@@ -151,7 +151,7 @@ export function solvePivot(
 ): PivotResult[] {
   const pointPins = c.pins;
   const vecPins = c.vectorPins;
-  if (pointPins.length === 0 && vecPins.length === 0) return [];
+  if (pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 && c.scalarPins.length === 0) return [];
 
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
     const g = { ...unpack(x), mirror };
@@ -180,6 +180,67 @@ export function solvePivot(
       // a vector transforms without the translation
       const w = sub3(applyGauge(b, g), applyGauge(a, g));
       out.push(w.x - pin.x, w.y - pin.y, w.z - pin.z);
+    }
+    for (const pin of c.pairPins) {
+      const a = pos.get(pin.a);
+      const b = pos.get(pin.b);
+      if (!a || !b) {
+        out.push(10, 10, 10);
+        continue;
+      }
+      const w = sub3(applyGauge(b, g), applyGauge(a, g));
+      out.push(w.x - pin.x, w.y - pin.y, w.z - pin.z);
+    }
+    // scalar givens (V7 T2): lengths / vertex angles / dot products / seg-⟂/∥-plane
+    const at = (id: string): Vec3 | null => {
+      const p = pos.get(id);
+      return p ? applyGauge(p, g) : null;
+    };
+    for (const pin of c.scalarPins) {
+      if (pin.kind === 'length') {
+        const a = at(pin.a);
+        const b = at(pin.b);
+        out.push(a && b ? norm3(sub3(b, a)) - pin.value : 10);
+      } else if (pin.kind === 'vangle') {
+        const vtx = at(pin.vertex);
+        const p = at(pin.p);
+        const q = at(pin.q);
+        if (!vtx || !p || !q) {
+          out.push(10);
+          continue;
+        }
+        const d1 = sub3(p, vtx);
+        const d2 = sub3(q, vtx);
+        const den = Math.max(norm3(d1) * norm3(d2), 1e-12);
+        out.push(dot3(d1, d2) / den - Math.cos((pin.deg * Math.PI) / 180));
+      } else if (pin.kind === 'dot') {
+        const d1v = c.vectors.get(pin.v1);
+        const d2v = c.vectors.get(pin.v2);
+        const a1 = d1v && at(d1v.from);
+        const b1 = d1v && at(d1v.to);
+        const a2 = d2v && at(d2v.from);
+        const b2 = d2v && at(d2v.to);
+        out.push(a1 && b1 && a2 && b2 ? dot3(sub3(b1, a1), sub3(b2, a2)) - pin.value : 10);
+      } else {
+        const a = at(pin.a);
+        const b = at(pin.b);
+        const ring = pin.plane.map(at);
+        if (!a || !b || ring.some((p) => !p)) {
+          out.push(10, 10);
+          continue;
+        }
+        const d = sub3(b, a);
+        const e1 = sub3(ring[1]!, ring[0]!);
+        const e2 = sub3(ring[2]!, ring[0]!);
+        if (pin.kind === 'seg-perp-plane') {
+          const s1 = Math.max(norm3(d) * norm3(e1), 1e-12);
+          const s2 = Math.max(norm3(d) * norm3(e2), 1e-12);
+          out.push(dot3(d, e1) / s1, dot3(d, e2) / s2);
+        } else {
+          const n = cross3(e1, e2);
+          out.push(dot3(d, n) / Math.max(norm3(d) * norm3(n), 1e-12), 0);
+        }
+      }
     }
     return out;
   };
@@ -212,7 +273,9 @@ export function solvePivot(
       if (!best || r.err < best.err) best = r;
       if (best.err < 1e-22) break;
     }
-    if (best && best.err < 1e-16) {
+        // acceptance: per-residual ~1e-6 — far under the 2e-5 claim tolerance (the numeric-
+    // Jacobian floor rises with mixed scalar residuals; 1e-16 was V4-era point-pins-only)
+    if (best && best.err < 1e-12) {
       const g = { ...unpack(best.x), mirror };
       const dims = best.x.slice(7);
       results.push({ transform: (p) => applyGauge(p, g), mirror, dims, err: best.err });

@@ -37,6 +37,12 @@ export function solidDims(kind: SolidKind, key: string, seed: number): number[] 
   if (kind === 'pyramid4') return [sample(seed, `${key}-height`, 0.8, 1.6)]; // square base side = gauge
   if (kind === 'pyramid3')
     return [rad(sample(seed, `${key}-alpha`, 42, 68)), rad(sample(seed, `${key}-beta`, 42, 68)), sample(seed, `${key}-height`, 0.8, 1.6)];
+  if (kind === 'tetra')
+    return [
+      rad(sample(seed, `${key}-alpha`, 42, 68)), rad(sample(seed, `${key}-beta`, 42, 68)),
+      sample(seed, `${key}-ax`, 0.2, 0.8), sample(seed, `${key}-ay`, 0.15, 0.6), sample(seed, `${key}-az`, 0.8, 1.6),
+    ];
+  if (kind === 'prism4r') return [rad(sample(seed, `${key}-angle`, 45, 75)), sample(seed, `${key}-height`, 0.7, 1.5)];
   return [rad(sample(seed, `${key}-alpha`, 38, 72)), rad(sample(seed, `${key}-beta`, 38, 72)), sample(seed, `${key}-height`, 0.65, 1.5)];
 }
 
@@ -90,6 +96,23 @@ function solidPositions(kind: SolidKind, dims: number[], origin: Vec3): Vec3[] {
       v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + c.x, o.y + c.y, o.z),
       v3(o.x + cc.x, o.y + cc.y, o.z + h),
     ];
+  }
+  if (kind === 'tetra') {
+    // a GENERAL pyramid: base ABC from its angles, apex D fully free (5 dims)
+    const [alpha, beta, ax, ay, az] = dims;
+    const cc = apexFromBaseAngles(alpha, beta);
+    return [
+      v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + cc.x, o.y + cc.y, o.z),
+      v3(o.x + ax, o.y + ay, o.z + az),
+    ];
+  }
+  if (kind === 'prism4r') {
+    // right prism over a rhombus (side 1 = gauge; dims: base angle at A + height)
+    const [theta, h] = dims;
+    const dx = Math.cos(theta);
+    const dy = Math.sin(theta);
+    const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1 + dx, o.y + dy, o.z), v3(o.x + dx, o.y + dy, o.z)];
+    return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
   }
   // prism3 — right triangular prism: base ABC in the z=origin plane, tops straight up.
   const [alpha, beta, h] = dims;
@@ -443,7 +466,7 @@ function newellNormal(pts: Vec3[]): Vec3 {
 }
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair']);
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number): Resolved3 {
@@ -470,20 +493,20 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
 
   // ---- the V4 pivot: injected coordinates pin the gauge (ADR-3D-007)
   let pivot: Resolved3['pivot'] = null;
-  if ((c.pins.length > 0 || c.vectorPins.length > 0) && c.solids.length > 0) {
+  if ((c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0) && c.solids.length > 0) {
     const dims0 = c.solids.flatMap((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed));
-    const evalCanonical = (dims: number[]): Positions3 => {
+    const evalCanonical = (dims: number[], cheap = true): Positions3 => {
       const p2: Positions3 = new Map<Id, Vec3>();
       for (const [id, def] of c.points) {
         if (def.kind === 'coord') p2.set(id, v3(def.x, def.y, def.z));
       }
-      evaluateSolidsAndPoints(c, seed, p2, planes, lines, dims);
+      evaluateSolidsAndPoints(c, seed, p2, planes, lines, dims, cheap);
       return p2;
     };
     const solutions = solvePivot(c, evalCanonical, dims0, seed);
 
     const satisfiesSigns = (sol: (typeof solutions)[number]): boolean => {
-      const p2 = evalCanonical(sol.dims);
+      const p2 = evalCanonical(sol.dims, false);
       return c.signGivens.every((g) => {
         const q = p2.get(g.id);
         if (!q) return false;
@@ -495,7 +518,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     const pool = satisfying.length > 0 ? satisfying : solutions;
     if (pool.length > 0) {
       const chosen = pool[seed % pool.length];
-      const finalCanonical = evalCanonical(chosen.dims);
+      const finalCanonical = evalCanonical(chosen.dims, false);
       for (const [id, q] of finalCanonical) {
         const def = c.points.get(id);
         if (def && GAUGE_KINDS.has(def.kind)) pos.set(id, chosen.transform(q));
@@ -573,6 +596,7 @@ function evaluateSolidsAndPoints(
   planes: Map<string, ResolvedPlane>,
   lines: Map<string, ResolvedLine>,
   dimOverride?: number[],
+  cheapSymbols?: boolean,
 ): void {
   let dimCursor = 0;
   c.solids.forEach((solid, i) => {
@@ -610,7 +634,9 @@ function evaluateSolidsAndPoints(
       let k = 0;
       if (vd.symbol) {
         const pin = c.symbolPins.find((p) => p.def === def.def);
-        if (pin) {
+        if (pin && cheapSymbols) {
+          k = 0.35; // during the pivot's residual loop: pins never reference these points — skip the root-find
+        } else if (pin) {
           const resid = (kk: number) => symbolPinResidual(c, pin, vd, pos, kk);
           const roots = pin.rel === 'parallel' ? signChangeRoots(resid) : touchZeroRoots(resid);
           if (roots.length === 0) continue; // unsatisfiable — left unpositioned, flagged upstream
