@@ -377,6 +377,7 @@ export default function App3() {
           <Figure3
             construction={derived.construction}
             resolved={derived.resolved}
+            coordLabels={showData && dataPanel ? dataPanel.pointCoords : undefined}
             width={canvasW}
             height={Math.max(360, Math.round(canvasW * 0.72))}
             resetLabel={t('actions.resetView')}

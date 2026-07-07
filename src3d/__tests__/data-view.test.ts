@@ -43,6 +43,7 @@ describe('dataView — organize your data', () => {
     expect(en!.decomp).toBe('−1/4·u + 1/2·v + 1/4·w');
     expect(en!.coords).toBe('(-3, 6, 3)');
     expect(p.points).toContain('N(6, 6, 6)');
+    expect(p.pointCoords.N).toBe('(6, 6, 6)'); // feeds the on-canvas labels
     expect(p.points).toContain('E(9, 0, 3)');
     // the declared basis vectors print their coordinate form
     const w = p.vectors.find((v) => v.label === 'w');
