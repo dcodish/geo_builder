@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels, classifyOutOfScope, buildParseCtx } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels, droppedGivenNumbers, classifyOutOfScope, buildParseCtx } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -40,7 +40,7 @@ import { humanizeError } from '@/i18n/humanizeError';
 const nextPaint = () => new Promise<void>((res) => requestAnimationFrame(() => requestAnimationFrame(() => res())));
 
 // The live theorem-discovery feed (Phase 6a/6b) SHIPS LIVE (operator, 2026-07-07 — the old
-// dev-only gate is removed): on by default everywhere, and the student can turn it off from תצוגה.
+// dev-only gate is removed). OFF by default (same-day operator follow-up); the student opts in from תצוגה.
 
 export default function App() {
   const { t, i18n } = useTranslation();
@@ -132,7 +132,7 @@ export default function App() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [editError, setEditError] = useState(false);
-  const [showTheorems, setShowTheorems] = useState(true); // the live theorem feed (Phase 6a) — LIVE, on by default (operator 2026-07-07)
+  const [showTheorems, setShowTheorems] = useState(false); // the live theorem feed (Phase 6a) — live in prod but OFF by default (operator 2026-07-07); the student opts in from תצוגה
   const [discoveryLevel, setDiscoveryLevel] = useState<DiscoveryLevel>(1); // the theorem discovery dial (ADR-219) — L1 Given by default
   const [theoremSel, setTheoremSel] = useState<TheoremId | null>(null); // the theorem row whose premise is highlighted on the canvas
   const [bgOpen, setBgOpen] = useState(false); // the collapsed "background theorems" family fold is expanded
@@ -453,7 +453,11 @@ export default function App() {
       // new input label unused, escalate to the LLM (whose job is freeform/typo input) instead of committing
       // the partial parse (ADR-089). An EXISTING label a command doesn't re-name is fine (context).
       const dropped = droppedNewLabels(utterance, r.commands, pctx.points ?? []);
-      if (dropped.length === 0) {
+      // The NUMERIC sibling (ADR-250): a stated magnitude the commands don't account for means the rule
+      // consumed only part of the utterance (usually a typo'd keyword mid-sentence) — escalate, never
+      // commit the partial meaning (a "שטח… פי 2.25 משוטח…" typo used to commit as a bare triangle, ✓).
+      const droppedNums = droppedGivenNumbers(utterance, r.commands);
+      if (dropped.length === 0 && droppedNums.length === 0) {
         // A deterministic parse can "succeed" yet build NOTHING — apply with an error (kept-prior) or
         // change nothing at all. Dry-run before committing so a silent fail isn't shown as success
         // (operator request); a step that builds something commits immediately.
@@ -511,8 +515,8 @@ export default function App() {
         // become a second analytics `submit` (else the dashboard double-counts the utterance). See sessionLog.
         logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:${outcome.reason}`, detail: outcome.detail, commands: r.commands, intermediate: true });
       } else {
-        weak = 'dropped'; // a typo dropped a new label → escalate rather than commit the partial parse
-        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${dropped.join(',')}`, commands: r.commands, intermediate: true });
+        weak = 'dropped'; // a typo dropped a stated label/number → escalate rather than commit the partial parse
+        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums].join(',')}`, commands: r.commands, intermediate: true });
       }
     }
     // out of grammar, OR a deterministic parse that built nothing → ask the LLM (a SECOND try),
@@ -588,11 +592,12 @@ export default function App() {
     // canonical line is re-parsed by the SAME grammar that just dropped the label, so the round-trip can
     // return the identical partial lowering ("A ו C נמצאות על המעגל" committed as A alone — the
     // operator's saved-figure C floating off its circle). Name the lost label and keep the text to edit.
-    const stillDropped = droppedNewLabels(
-      utterance,
-      llmCmds,
-      replay(cur.facts).construction.objects.filter(isGeoPoint).map((o) => o.id),
-    );
+    const stillDropped: (string | number)[] = [
+      ...droppedNewLabels(utterance, llmCmds, replay(cur.facts).construction.objects.filter(isGeoPoint).map((o) => o.id)),
+      // the numeric honesty gate holds on the second attempt too (ADR-250): a decomposition that loses a
+      // stated magnitude must name it, never commit the partial figure
+      ...droppedGivenNumbers(utterance, llmCmds),
+    ];
     if (stillDropped.length > 0) {
       logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `dropped-labels:${stillDropped.join(',')}`, commands: llmCmds });
       setInputNote(t('input.labelsDropped', { labels: stillDropped.join(', ') }));

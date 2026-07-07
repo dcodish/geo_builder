@@ -664,11 +664,13 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "line-through",
       "line-circle-intersection",
       "segment",
+      "segment",
     ],
     "he": [
       "circle",
       "line-through",
       "line-circle-intersection",
+      "segment",
       "segment",
     ],
   },
@@ -682,10 +684,12 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "line through P perpendicular to AB": {
     "en": [
+      "segment",
       "point-on-segment",
       "perpendicular-line",
     ],
     "he": [
+      "segment",
       "point-on-segment",
       "perpendicular-line",
     ],
@@ -766,29 +770,41 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "point E on AC at 40%": {
     "en": [
+      "segment",
       "point-on-segment",
     ],
     "he": [
+      "segment",
       "point-on-segment",
     ],
   },
   "point F on the extension of AD": {
     "en": [
+      "segment",
       "point-on-segment",
+      "segment",
     ],
     "he": [
+      "segment",
       "point-on-segment",
+      "segment",
     ],
   },
   "points F, G, H on AB, AC, CB": {
     "en": [
+      "segment",
       "point-on-segment",
+      "segment",
       "point-on-segment",
+      "segment",
       "point-on-segment",
     ],
     "he": [
+      "segment",
       "point-on-segment",
+      "segment",
       "point-on-segment",
+      "segment",
       "point-on-segment",
     ],
   },

@@ -22,6 +22,17 @@
       "enabled": true
     },
     {
+      "id": "g1.1a",
+      "utterance": "נקודה G על AD",
+      "group": "g1",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
       "id": "g1.1",
       "utterance": "נקודה G על AD",
       "group": "g1",

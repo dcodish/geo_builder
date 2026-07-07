@@ -857,7 +857,15 @@ const pointOnExtension: Rule = (s, ctx) => {
   // collinearity instead: the existing point is DRIVEN, on whatever carrier it already has, to sit beyond
   // the far end IN ORDER (seg[0]→seg[1]→id) — so an on-circle C becomes the FAR secant point, not the near
   // one, and C stays on the circle (ADR-086). A genuinely NEW point is still created on the extension.
-  if ((ctx.points ?? []).includes(id)) return [{ type: 'set-line', points: [seg[0], seg[1], id] }];
+  // Either branch DRAWS the stated continuation (ADR-250, honesty §6): the base a–b plus the leg b→id,
+  // so "D on the extension of BC" shows B—C—D (the new-point branch's leg is added by the
+  // `withCarrierSegments` post-pass; the set-line branch names existing points, so draw both here).
+  if ((ctx.points ?? []).includes(id))
+    return [
+      { type: 'segment', a: seg[0], b: seg[1] },
+      { type: 'segment', a: seg[1], b: id },
+      { type: 'set-line', points: [seg[0], seg[1], id] },
+    ];
   return [{ type: 'point-on-segment', id, a: seg[0], b: seg[1], t: 1.3, extension: true }];
 };
 
@@ -3223,7 +3231,11 @@ const lineMeetsCircle: Rule = (s, ctx) => {
   return [
     { type: 'line-through', id: lineId, a, b },
     { type: 'line-circle-intersection', id: R, line: lineId, circle: circ, avoid: onCircle },
-    { type: 'segment', a: other, b: R }, // the drawn secant: off-circle end → new crossing (through the shared point)
+    // BOTH halves of the stated line are drawn (ADR-250, honesty §6): "AD חותך את המעגל ב-E" must show
+    // A—E—D whole, not just D–E — the on-circle half was silently missing and the student re-typed it
+    // (session m68n76e7). Split at the crossing, so no overlapping collinear strokes.
+    { type: 'segment', a: onCircle, b: R },
+    { type: 'segment', a: other, b: R },
   ];
 };
 
@@ -4693,6 +4705,104 @@ function withCarrierMembership(commands: AnyCommand[], s: string, ctx: ParseCont
 }
 
 /**
+ * CARRIER auto-draw post-pass (ADR-250): a stated on-segment point implies its carrier SEGMENT is part
+ * of the figure — "G on AD" draws AD; "D on the continuation of BC" draws BC AND the extension leg C→D.
+ * Honesty (design-rules §6): everything the student stated must be visible. Enforced here at the parse
+ * seam so EVERY rule that places a point on a segment is covered at once — the per-rule convention
+ * (midpoint/angle draw their implied segments) kept being forgotten: `pointOnExtension` drew NOTHING and
+ * the student had to re-type each edge by hand (session m68n76e7). `segment` is idempotent (and creates
+ * missing endpoints), so a carrier that already exists costs nothing. Ordering: the base segment goes
+ * BEFORE its rider (the rider needs the endpoints), the extension leg AFTER it (the leg references the
+ * new point).
+ */
+function withCarrierSegments(commands: AnyCommand[]): AnyCommand[] {
+  const key = (a: Id, b: Id): string => [up(a), up(b)].sort().join('|');
+  const have = new Set<string>();
+  for (const c of commands) if (c.type === 'segment') have.add(key(c.a, c.b));
+  const out: AnyCommand[] = [];
+  for (const c of commands) {
+    if (c.type === 'point-on-segment') {
+      if (!have.has(key(c.a, c.b))) {
+        have.add(key(c.a, c.b));
+        out.push({ type: 'segment', a: c.a, b: c.b });
+      }
+      out.push(c);
+      // the stated continuation leg (a→b→id): "D על המשך BC" shows B—C—D, not a floating D
+      if (c.extension && !have.has(key(c.b, c.id))) {
+        have.add(key(c.b, c.id));
+        out.push({ type: 'segment', a: c.b, b: c.id });
+      }
+      continue;
+    }
+    out.push(c);
+  }
+  return out;
+}
+
+/**
+ * Numeric values the utterance STATES but the parsed commands don't account for — the NUMERIC sibling of
+ * {@link droppedNewLabels} (ADR-089 → ADR-250). A first-match rule can claim an utterance and consume only
+ * part of it, silently dropping a stated magnitude: session m68n76e7's
+ * "שטח AEB גדול פי 2.25 משוטח משולש CED" (typo משוטח for משטח) was claimed by the TRIANGLE rule and
+ * committed as a bare △AEB — the 2.25 area ratio vanished with the row showing ✓. Design-rules §6 forbids
+ * exactly this ("no stated magnitude is ever silently dropped"); the caller escalates to the LLM (whose
+ * job is typo/freeform input) instead of committing the partial parse.
+ *
+ * "Accounted" is deliberately GENEROUS — a false account only suppresses a warning (the droppedNewLabels
+ * S-mask rationale), while a false drop would break a working input. A stated number is accounted when it
+ * appears among the commands' numeric payloads (including digits inside symbolic-string fields), as a
+ * string-array length (regular N-gon → `ids.length`), or via the standard lowerings: a fraction a/b → its
+ * value, a percent n% → n/100, a π-size nπ → n/2 (circumference → radius) or √n (area → radius).
+ * Label-glued digits (`O1`, `A2`) are subscripts, not numbers — blanked before extraction.
+ */
+export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): number[] {
+  const q = (n: number): number => Math.round(n * 1e6) / 1e6;
+  const acc = new Set<number>();
+  const walk = (v: unknown): void => {
+    if (typeof v === 'number' && Number.isFinite(v)) acc.add(q(v));
+    else if (typeof v === 'string') {
+      for (const m of v.match(/\d+(?:\.\d+)?/g) ?? []) acc.add(q(parseFloat(m)));
+    } else if (Array.isArray(v)) {
+      if (v.length && v.every((x) => typeof x === 'string')) acc.add(v.length);
+      for (const x of v) walk(x);
+    } else if (v && typeof v === 'object') {
+      for (const x of Object.values(v)) walk(x);
+    }
+  };
+  for (const c of commands) walk(c);
+  const ok = (cands: number[]): boolean => cands.some((v) => Number.isFinite(v) && acc.has(q(v)));
+  // stated numbers: blank labels FIRST (a subscript digit — O1, A2 — is part of a label, not a number)
+  const s = normalizeUtterance(utterance).replace(/[A-Za-z]\d*/g, ' ');
+  const dropped: number[] = [];
+  const seen = new Set<string>();
+  // a stated FRACTION lowers to one value (ratio 3/4 → r=0.75) — consume it whole
+  const spans: [number, number][] = [];
+  for (const m of s.matchAll(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/g)) {
+    spans.push([m.index!, m.index! + m[0].length]);
+    const a = parseFloat(m[1]);
+    const b = parseFloat(m[2]);
+    if (!ok([b !== 0 ? a / b : NaN, a, b]) && !seen.has(m[0])) {
+      seen.add(m[0]);
+      dropped.push(b !== 0 ? a / b : a);
+    }
+  }
+  for (const m of s.matchAll(/\d+(?:\.\d+)?/g)) {
+    const i = m.index!;
+    if (spans.some(([x, y]) => i >= x && i < y)) continue;
+    const n = parseFloat(m[0]);
+    const rest = s.slice(i + m[0].length);
+    const cands = [n];
+    if (/^\s*π/.test(rest)) cands.push(n / 2, Math.sqrt(n)); // nπ — circumference/area sizes lower to a radius
+    if (/^\s*%/.test(rest)) cands.push(n / 100); // n% — lowers to a fraction
+    if (!ok(cands) && !seen.has(m[0])) {
+      seen.add(m[0]);
+      dropped.push(n);
+    }
+  }
+  return dropped;
+}
+
+/**
  * The single normalization applied to every utterance before the rules run — ORTHOGRAPHY first (PAR-7),
  * then collapse whitespace, spell out Greek letter words, and rewrite `S_{ABC}`/`S_ABC` area subscripts.
  * Extracted so the shadow-matrix guard (A1) analyses the SAME text the rules actually see. Pure.
@@ -4719,7 +4829,7 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
     if (Array.isArray(res)) {
       // Concentric resolution runs LAST (ADR-244): the other post-passes mint the pair's OUTER id
       // (`circleId(centre)`), and this one redirects/confirms per qualifier or asks to clarify.
-      const resolved = withConcentricResolution(withImplicitCircles(withCarrierMembership(res, s, ctx), ctx), s, ctx);
+      const resolved = withConcentricResolution(withImplicitCircles(withCarrierMembership(withCarrierSegments(res), s, ctx), ctx), s, ctx);
       if (Array.isArray(resolved)) return { ok: true, commands: resolved };
       return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
     }
