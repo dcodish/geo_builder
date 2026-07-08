@@ -1190,6 +1190,50 @@ const areaClaim: Rule = (s) => {
   ];
 };
 
+// V8-b: a non-capturing plane-name fragment (PLANE_NAME injects an inner digit group;
+// this one doesn't, so group indices stay simple in the rel-plane / cut rules).
+const PN = "(?:π|pi|Pi|PI)\\s?\\d*";
+
+/**
+ * V8-b (G1): a plane DEFINED by a ⊥/∥ relation to an edge, through a point (⟂) or two
+ * points (∥). `מישור π העובר דרך F וניצב ל-SC` / `plane π through F perpendicular to SC`;
+ * `מישור π דרך K ו-P ומקביל ל-CD` / `plane π through K and P parallel to CD`. The
+ * through- and relation-clauses may appear in either order; an unnamed plane defaults to π.
+ */
+const relPlaneRule: Rule = (s) => {
+  if (!/מישור|\bplane\b/i.test(s)) return null;
+  const perp = /ניצב|מאונך|אנך|perpendicular|⊥/.test(s);
+  const par = /מקביל|parallel|∥/.test(s);
+  if (perp === par) return null; // exactly one relation
+  const through = s.match(/(?:דרך|through)\s+([A-Z]\d*'?)(?:\s*(?:ו-?|and|,)\s*([A-Z]\d*'?))?/);
+  if (!through) return null;
+  const edge = s.match(/(?:ניצב|מאונך|אנך|מקביל|perpendicular|parallel)\s*(?:ל|to)?\s*-?\s*(?:ה?מקצוע\s+|ה?קטע\s+|ה?ישר\s+|the\s+edge\s+|edge\s+|line\s+)?([A-Z]\d*'?)\s*([A-Z]\d*'?)(?![A-Z0-9'])/);
+  if (!edge || !edge[1] || !edge[2]) return null;
+  const nameM = s.match(new RegExp(`(?:מישור|plane)\\s+(${PN})`, 'i'));
+  const name = nameM ? canonicalPlane(nameM[1]) : 'π';
+  if (perp) return [{ type: 'rel-plane', name, rel: 'perp', through: [through[1]], a: edge[1], b: edge[2] }];
+  if (!through[2]) return null; // ∥ an edge needs TWO through-points to fix the plane (1-DOF otherwise — deferred)
+  return [{ type: 'rel-plane', name, rel: 'par', through: [through[1], through[2]], a: edge[1], b: edge[2] }];
+};
+
+/**
+ * V8-b (G2): a point where a plane crosses an edge/segment. `המישור π חותך את SA בנקודה E`
+ * / `plane π cuts SA at E` / `E חיתוך המישור π עם SA` / `E is the intersection of plane π with SA`.
+ */
+const planeCut: Rule = (s) => {
+  if (!/מישור|\bplane\b/i.test(s)) return null;
+  if (!/חות|חיתוך|נחתך|\bcuts?\b|intersect|\bmeets?\b/i.test(s)) return null;
+  let m =
+    s.match(new RegExp(`(?:ה?מישור)\\s+(${PN})\\s+חות[ךכ]\\s+(?:את\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+(?:בנקודה\\s+|ב-?)([A-Z]\\d*'?)$`)) ??
+    s.match(new RegExp(`plane\\s+(${PN})\\s+(?:cuts|intersects|meets)\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+at\\s+([A-Z]\\d*'?)$`, "i"));
+  if (m) return [{ type: "plane-cut", id: m[4], plane: canonicalPlane(m[1]), a: m[2], b: m[3] }];
+  m =
+    s.match(new RegExp(`^([A-Z]\\d*'?)\\s+(?:היא\\s+)?(?:נקודת\\s+ה?חיתוך\\s+של\\s+|ה?חיתוך\\s+(?:של\\s+)?)?(?:ה?מישור)\\s+(${PN})\\s+(?:עם|ו)\\s+(?:ה?מקצוע\\s+|ה?קטע\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)$`)) ??
+    s.match(new RegExp(`^([A-Z]\\d*'?)\\s+is\\s+the\\s+intersection\\s+of\\s+plane\\s+(${PN})\\s+with\\s+(?:the\\s+edge\\s+|edge\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)$`, "i"));
+  if (m) return [{ type: "plane-cut", id: m[1], plane: canonicalPlane(m[2]), a: m[3], b: m[4] }];
+  return null;
+};
+
 const RULES: Rule[] = [
   cubeOrBox,
   rhombusPrism,
@@ -1204,6 +1248,8 @@ const RULES: Rule[] = [
   parametricLine, // before planeByEquation: both carry `:`, but ℓ ≠ π so either order is safe — kept explicit
   planeByEquation,
   planeEqClaim, // plane named by POINTS + an equation — a claim, not a definition
+  relPlaneRule, // `מישור π דרך F וניצב ל-SC` — before planeThroughBare (which is bare points)
+  planeCut, // `המישור π חותך את SA בנקודה E` — before onSegment/coordPoint grab the tokens
   planeThroughBare, // bare `מישור ABC` — after the `:`-carrying plane rules
   injectionList,
   signGiven,

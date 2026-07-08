@@ -303,3 +303,17 @@ _(ADR numbers 016/017 were minted by a concurrent work-PC session — the usage 
 - **`diag-intersection` command** — a parallelogram's diagonals bisect, so the crossing = the midpoint of a diagonal (EXACT for the box/cube faces and square/rect/parallelogram bases this curriculum names; a general quad's crossing ≠ midpoint — filed). Apply resolves the face (4 named cyclic vertices, or the `[]` "the base" sentinel → the single solid's `faces[0]`, the [ADR-3D-011](#adr-3d-011) chokepoint) and sets the point as `on-segment` t=½ on the 1st↔3rd diagonal — **reuses the existing on-segment point kind, zero evaluate change**. Three parser forms: a NAMED quad, TWO explicit diagonals (`אלכסון AC … אלכסון BD` → midpoint of the first), or implicit `the base`.
 
 **Locked by** `v8a-apex-diagonals.test.ts` (10: apex-first parse for quad/tri bases + the named-base OBCDE case + the four apex-last regressions; diag-intersection named/sentinel/two-diagonal/En, and the no-solid honest refusal). Catalog +2 (apex-first pyramid, diagonal-intersection point). **398 src3d tests green, `tsc -b` clean.**
+
+---
+
+## ADR-3D-019 — V8-b: a plane DEFINED by ⟂/∥ to an edge + the plane∩edge crossing (2026-07-08)
+
+**Context.** The #1-frequency legacy-572 gap (G1/G2, ~6 exams: 2009-ב, 2011-חורף, 2013-חורף, 2015-קיץ, 2017-חורף). A plane could be defined only by an **equation** (`π: z−3=0`), by a **point run** (`מישור ABC`, Newell), or as a plane∩plane line — but never by the textbook phrasing "**the plane through F perpendicular to edge SC**" or "**through K, P parallel to CD**", and there was no way to place the point where such a plane **cuts an edge** of the solid (only the named-line∩plane `line-plane-point` existed).
+
+**Decisions.** Two new engine objects, both resolved from FINAL positions like a point-run plane (so they ride the pivot correctly):
+- **`rel-plane`** (a third `PlaneDef` sibling, `c.relPlanes`): `perp` = through one point, normal = the edge's direction; `par` = through two points, normal = (chord)×(edge dir). `relPlaneFromPositions` computes `{n,d}` from current coordinates; a shared `resolvedPlaneAt` tries equation → point-run → rel. Registered into the resolved `planes` map post-pivot, so it **renders as a patch** with no renderer change (the ADR-3D-004 cover rule grows it over its members). A `∥`-to-an-edge plane needs TWO through-points to be determined — one point (the "∥ a line at a stated angle" form, 2012-קיץ-ב) is deferred to V8-e with the angle constraint.
+- **`plane-cut` point** (`{plane, a, b}`): the crossing of any plane (equation / point-run / rel) with segment a–b, `t = −(n·A+d)/(n·(B−A))`; a segment parallel to the plane yields no point (degenerate, skipped). Added to `GAUGE_KINDS` so the pivot transforms it; **zero new solver code** — a pure derived point evaluated in the point loop beside `on-plane`.
+
+Parser: `relPlaneRule` (order-independent through/relation clauses, He+En, unnamed ⇒ π) + `planeCut` (four phrasings). A local non-capturing `PN` plane-name fragment avoids `PLANE_NAME`'s inner-group index shift.
+
+**Locked by** `v8b-plane-def.test.ts` (7: ⟂/∥ parse + the 1-through-point ∥ deferral; plane∩edge four phrasings; the 2009-ב build — plane ⟂ SC through F cuts SA→E=(1,½,1½), SB→D=(1.8,1.2,0), both verified on the plane; a ∥-plane crossing; the unknown-plane refusal). Catalog +3. **411 src3d tests green, `tsc -b` clean.**

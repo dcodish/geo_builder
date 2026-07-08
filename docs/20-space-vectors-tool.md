@@ -204,4 +204,4 @@ Also resolved en route: **D3 coupled-symbol call — YES** (operator, 2026-07-08
 | **V8-i** Circles in R³ | in-plane circle primitive; tangent-to-line; line∩plane membership (S2/G13) | 2016-קיץ-ב |
 | **V8-j** "Derived-solid-is-right" | a point positioned so `XABCD` becomes a right pyramid (G12) | 2019-חורף, 2019-קיץ-ב |
 
-Sequencing rationale: V8-a is cheap and removes friction across every legacy exam; V8-b is the highest-frequency real gap; V8-c is the already-greenlit solver-core change (best done early while the solver is in focus, and it clears the one deferred modern exam); the rest descend by frequency, circles (V8-i) and the niche constraint (V8-j) last. **RESUME: V8-a.**
+Sequencing rationale: V8-a is cheap and removes friction across every legacy exam; V8-b is the highest-frequency real gap; V8-c is the already-greenlit solver-core change (best done early while the solver is in focus, and it clears the one deferred modern exam); the rest descend by frequency, circles (V8-i) and the niche constraint (V8-j) last. **Progress: V8-a ✅ (ADR-3D-018), V8-b ✅ (ADR-3D-019). RESUME: V8-c.**

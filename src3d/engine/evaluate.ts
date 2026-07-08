@@ -521,8 +521,37 @@ function planeFromPointRun(c: Construction3, name: string, pos: Positions3): Res
   return { n, d: -dot3(n, pts[0]) };
 }
 
+/** A rel-plane's numeric form from CURRENT positions (V8-b, G1); null while its points
+ *  are unplaced or the relation is degenerate. */
+function relPlaneFromPositions(c: Construction3, name: string, pos: Positions3): ResolvedPlane | null {
+  const def = c.relPlanes.get(name);
+  if (!def) return null;
+  if (def.kind === 'perp') {
+    const P = pos.get(def.through);
+    const A = pos.get(def.a);
+    const B = pos.get(def.b);
+    if (!P || !A || !B) return null;
+    const n = sub3(B, A); // normal = the edge's direction
+    if (norm3(n) < 1e-10) return null;
+    return { n, d: -dot3(n, P) };
+  }
+  const P1 = pos.get(def.through[0]);
+  const P2 = pos.get(def.through[1]);
+  const A = pos.get(def.a);
+  const B = pos.get(def.b);
+  if (!P1 || !P2 || !A || !B) return null;
+  const n = cross3(sub3(P2, P1), sub3(B, A)); // ⟂ the through-chord AND the ∥-edge
+  if (norm3(n) < 1e-10) return null;
+  return { n, d: -dot3(n, P1) };
+}
+
+/** Resolve a plane by name from CURRENT positions: equation → point-run → rel. */
+function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes: Map<string, ResolvedPlane>): ResolvedPlane | null {
+  return planes.get(name) ?? planeFromPointRun(c, name, pos) ?? relPlaneFromPositions(c, name, pos);
+}
+
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut']);
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number): Resolved3 {
@@ -593,6 +622,12 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   // ---- planes through points (resolved from FINAL positions, post-pivot)
   for (const [name] of c.pointPlanes) {
     const pl = planeFromPointRun(c, name, pos);
+    if (pl) planes.set(name, pl);
+  }
+
+  // ---- rel-planes (⟂/∥ an edge), likewise resolved from final positions (V8-b)
+  for (const [name] of c.relPlanes) {
+    const pl = relPlaneFromPositions(c, name, pos);
     if (pl) planes.set(name, pl);
   }
 
@@ -709,6 +744,18 @@ function evaluateSolidsAndPoints(
         p = add3(p, scale3(up, def.side * sample(seed, `onplane-h-${id}`, 0.45, 1.05) * spread));
       }
       pos.set(id, p);
+    } else if (def.kind === 'plane-cut') {
+      // V8-b (G2): the point where a plane crosses segment a–b (the plane may be an
+      // equation, a point-run, or a ⊥/∥ rel-plane — resolved from current positions)
+      const pl = resolvedPlaneAt(c, def.plane, pos, planes);
+      const A = pos.get(def.a);
+      const B = pos.get(def.b);
+      if (!pl || !A || !B) continue;
+      const dir = sub3(B, A);
+      const denom = dot3(pl.n, dir);
+      if (Math.abs(denom) < 1e-12) continue; // segment ∥ plane — no crossing
+      const t = -(dot3(pl.n, A) + pl.d) / denom;
+      pos.set(id, add3(A, scale3(dir, t)));
     } else if (def.kind === 'centroid') {
       const ps = def.of.map((p) => pos.get(p));
       if (ps.some((p) => !p)) continue;

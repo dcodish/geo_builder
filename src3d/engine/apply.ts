@@ -97,6 +97,7 @@ function clone(c: Construction3): Construction3 {
     signGivens: [...c.signGivens],
     pointPlanes: new Map(c.pointPlanes),
     pointLines: new Map(c.pointLines),
+    relPlanes: new Map(c.relPlanes),
     revolutions: [...c.revolutions],
     vecDefs: [...c.vecDefs],
     symbolPins: [...c.symbolPins],
@@ -273,6 +274,29 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       // (1st & 3rd cyclic vertices); reuses the on-segment point kind (no eval change)
       const next = clone(c);
       next.points.set(cmd.id, { kind: 'on-segment', a: face[0], b: face[2], t: 0.5 });
+      return { ok: true, next };
+    }
+
+    case 'rel-plane': {
+      const clash = c.planes.has(cmd.name) || c.pointPlanes.has(cmd.name) || c.relPlanes.has(cmd.name) || c.lines.has(cmd.name);
+      if (clash) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
+      const missing = missingPoint(c, [...cmd.through, cmd.a, cmd.b]);
+      if (missing) return { ok: false, error: missing };
+      if (cmd.a === cmd.b) return { ok: false, error: { code: 'unknown-point', id: cmd.b } };
+      const next = clone(c);
+      if (cmd.rel === 'perp') next.relPlanes.set(cmd.name, { kind: 'perp', through: cmd.through[0], a: cmd.a, b: cmd.b });
+      else next.relPlanes.set(cmd.name, { kind: 'par', through: [cmd.through[0], cmd.through[1]], a: cmd.a, b: cmd.b });
+      return { ok: true, next };
+    }
+
+    case 'plane-cut': {
+      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      if (!c.planes.has(cmd.plane) && !c.pointPlanes.has(cmd.plane) && !c.relPlanes.has(cmd.plane))
+        return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
+      const missing = missingPoint(c, [cmd.a, cmd.b]);
+      if (missing) return { ok: false, error: missing };
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'plane-cut', plane: cmd.plane, a: cmd.a, b: cmd.b });
       return { ok: true, next };
     }
 

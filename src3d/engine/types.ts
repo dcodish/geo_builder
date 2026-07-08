@@ -107,6 +107,16 @@ export type Line3Def =
       b: Id;
     };
 
+/**
+ * V8-b (G1): a plane defined by a ⊥/∥ RELATION to a segment/edge (not by points or an
+ * equation), resolved from FINAL positions like a point-run plane.
+ *  - `perp`: through one point, normal = the direction of segment a–b (plane ⟂ that edge).
+ *  - `par`:  through two points, normal = (through₂−through₁) × dir(a–b) (plane ∥ that edge).
+ */
+export type RelPlaneDef =
+  | { kind: 'perp'; through: Id; a: Id; b: Id }
+  | { kind: 'par'; through: [Id, Id]; a: Id; b: Id };
+
 // ---------------------------------------------------------------------------
 // Commands (what the parser emits)
 // ---------------------------------------------------------------------------
@@ -427,7 +437,9 @@ export type Command3 =
   | SegPlaneRelCommand
   | { type: 'rect-complete'; ids: [Id, Id, Id, Id] } // `ABEC מלבן` — completes the single unknown corner (V7 T3)
   | { type: 'dot-given'; v1: string; v2: string; value: number } // u·v = 24 (V7 T2)
-  | { type: 'inject-pair'; a: Id; b: Id; x: number; y: number; z: number }; // BD = (-4,5,12) — a pair-vector injection (V7 T2)
+  | { type: 'inject-pair'; a: Id; b: Id; x: number; y: number; z: number } // BD = (-4,5,12) — a pair-vector injection (V7 T2)
+  | { type: 'rel-plane'; name: string; rel: 'perp' | 'par'; through: Id[]; a: Id; b: Id } // V8-b (G1): plane ⟂/∥ edge a–b
+  | { type: 'plane-cut'; id: Id; plane: string; a: Id; b: Id }; // V8-b (G2): a point = plane ∩ segment a–b
 
 // ---------------------------------------------------------------------------
 // Construction (what apply builds, what evaluate consumes)
@@ -453,6 +465,7 @@ export type PointDef =
   | { kind: 'foot-plane'; from: Id; plane: string }
   | { kind: 'foot-line'; from: Id; line: string }
   | { kind: 'line-plane'; line: string; plane: string }
+  | { kind: 'plane-cut'; plane: string; a: Id; b: Id } // V8-b (G2): a plane ∩ segment a–b
   | { kind: 'rev-point'; rev: number; role: 'center' | 'apex' }
   | { kind: 'vec-defined'; def: number } // solved from construction.vecDefs[def]
   | { kind: 'vec-pair'; def1: number; def2: number }; // the cevian intersection (two symbol relations)
@@ -489,6 +502,8 @@ export interface Construction3 {
   pointPlanes: Map<string, Id[]>;
   /** V5 — named lines through two points, resolved from final positions. */
   pointLines: Map<string, { a: Id; b: Id }>;
+  /** V8-b — planes defined by a ⊥/∥ relation to an edge, resolved from final positions. */
+  relPlanes: Map<string, RelPlaneDef>;
   /** V6 — solids of revolution. */
   revolutions: RevolutionObj[];
   /** V7 — vector definitions: `X⃗Y = Σ terms`, solving `unknown` (affine; `symbol` = the free coefficient). */
@@ -525,6 +540,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   signGivens: [],
   pointPlanes: new Map(),
   pointLines: new Map(),
+  relPlanes: new Map(),
   revolutions: [],
   vecDefs: [],
   symbolPins: [],
