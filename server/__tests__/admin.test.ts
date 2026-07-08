@@ -10,7 +10,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { writeFile, rm, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { handleAdmin, aggregate, filterEvents, releasesOf, type Stats } from '../admin';
+import { handleAdmin, aggregate, filterEvents, releasesOf, PROFILE_3D, type Stats } from '../admin';
 import type { UsageEvent } from '../eventLog';
 
 const OPTS = { username: 'teacher', password: 's3cret', cookieSecret: 'sign-me', base: '/admin' };
@@ -263,6 +263,73 @@ describe('aggregate', () => {
     const by = Object.fromEntries(throttled.outcomes.map((o) => [o.key, o.count]));
     expect(by.throttled).toBe(1);
     expect(by.edit).toBe(1); // real edits still land in edit
+  });
+});
+
+describe('the 3-D dashboard profile (PROFILE_3D)', () => {
+  // The 3-D SPA logs only `parser` / `llm` sources; a non-ok parser result is a REASONED refusal code.
+  const sample3: UsageEvent[] = [
+    { serverTs: '2026-07-08T09:00:00Z', iph: 'h1', ev: 'session', sid: 's1' },
+    { serverTs: '2026-07-08T09:01:00Z', iph: 'h1', ev: 'submit', sid: 's1', utterance: 'קובייה ABCDA׳B׳C׳D׳', locale: 'he', source: 'parser', result: 'ok' },
+    { serverTs: '2026-07-08T09:02:00Z', iph: 'h1', ev: 'submit', sid: 's1', utterance: 'מנסרה נטויה', locale: 'he', source: 'parser', result: 'oblique-prism' },
+    { serverTs: '2026-07-08T09:03:00Z', iph: 'h1', ev: 'submit', sid: 's1', utterance: 'AM = u + v', locale: 'en', source: 'parser', result: 'claim-refuted' },
+    { serverTs: '2026-07-08T09:04:00Z', iph: 'h2', ev: 'submit', sid: 's2', utterance: 'weird solid', locale: 'en', source: 'llm', result: 'ok' },
+    { serverTs: '2026-07-08T09:05:00Z', iph: 'h2', ev: 'submit', sid: 's2', utterance: 'gibberish', locale: 'en', source: 'llm', result: 'not-understood' },
+  ];
+
+  it('classifies parsed / llm-built / refused / real-gap from the 3-D source+result', () => {
+    const by = Object.fromEntries(aggregate(sample3, PROFILE_3D).outcomes.map((o) => [o.key, o.count]));
+    expect(by.parsed).toBe(1);
+    expect(by.refused).toBe(2); // oblique-prism + claim-refuted — honest refusals, NOT gaps
+    expect(by['llm-built']).toBe(1);
+    expect(by['not-understood']).toBe(1); // the only real gap to implement
+  });
+
+  it('the two clickable cards are the real gaps and the reasoned refusals', () => {
+    const s = aggregate(sample3, PROFILE_3D);
+    expect(s.realGaps).toBe(1);
+    expect(s.outOfScope).toBe(2); // the secondary bucket = refusals for the 3-D profile
+    expect(s.gapUtterances.map((r) => r.utterance)).toEqual(['gibberish']);
+    expect(s.scopeUtterances.map((r) => r.utterance).sort()).toEqual(['AM = u + v', 'מנסרה נטויה']);
+  });
+
+  it('breaks refusals down by their code (each labelled)', () => {
+    const by = Object.fromEntries(aggregate(sample3, PROFILE_3D).scopeBreakdown.map((o) => [o.key, o.count]));
+    expect(by['oblique-prism']).toBe(1);
+    expect(by['claim-refuted']).toBe(1);
+  });
+
+  it('the dashboard renders the 3-D title with a valid cookie', async () => {
+    // seed the 3-D events file, then log in and fetch the dashboard against the 3-D profile
+    const dir = await mkdtemp(path.join(tmpdir(), 'geo-admin3-'));
+    const log3 = path.join(dir, 'events-3d.jsonl');
+    await writeFile(log3, sample3.map((e) => JSON.stringify(e)).join('\n') + '\n', 'utf8');
+    try {
+      const login = mockReq('POST', '/admin3/login', ['username=teacher&password=s3cret'], {
+        'content-type': 'application/x-www-form-urlencoded',
+      });
+      const loginRes = mockRes();
+      await handleAdmin(login as unknown as IncomingMessage, loginRes as unknown as ServerResponse, {
+        ...OPTS,
+        base: '/admin3',
+        logPath: log3,
+        profile: PROFILE_3D,
+      });
+      const cookie = cookieFrom(loginRes.headers['set-cookie']);
+      const dashReq = mockReq('GET', '/admin3', [], { cookie });
+      const dashRes = mockRes();
+      await handleAdmin(dashReq as unknown as IncomingMessage, dashRes as unknown as ServerResponse, {
+        ...OPTS,
+        base: '/admin3',
+        logPath: log3,
+        profile: PROFILE_3D,
+      });
+      expect(dashRes.statusCode).toBe(200);
+      expect(dashRes.body).toContain('3D Builder — דוח שימוש');
+      expect(dashRes.body).toContain('סירובים מנומקים'); // the 3-D secondary card label
+    } finally {
+      await rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
   });
 });
 

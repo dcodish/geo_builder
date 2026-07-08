@@ -79,6 +79,28 @@ describe('dataView — organize your data', () => {
     expect(en2?.decomp).toBe('−1/4·u + 1/2·v + 1/4·w');
   });
 
+  it('perpendicular declared vectors surface as u·v = 0 (operator, 2026-07-08)', () => {
+    // a cube's three edge-vectors from A are mutually perpendicular by construction
+    ['קובייה ABCD', "נסמן: AB = u, AD = v, AA' = w"].forEach(submit);
+    expect(useGeo3.getState().lastError).toBeNull();
+    const p = panel();
+    expect(p.relations).toContain('u·v = 0');
+    expect(p.relations).toContain('u·w = 0');
+    expect(p.relations).toContain('v·w = 0');
+  });
+
+  it('non-perpendicular declared vectors do NOT report a dot = 0', () => {
+    // a square-base pyramid: AS (height) ⊥ AD and ⊥ AB, but AD and AB are the base edges
+    // (perpendicular too) — a slanted lateral edge is the non-⊥ control
+    ['פירמידה ABCDS שבסיסה ריבוע', 'המקצוע AS הוא גובה בפירמידה', "נסמן: AD = u, AB = v, AS = w, SC = s"].forEach(submit);
+    expect(useGeo3.getState().lastError).toBeNull();
+    const p = panel();
+    expect(p.relations).toContain('u·w = 0'); // AD ⊥ AS (height)
+    expect(p.relations).toContain('v·w = 0'); // AB ⊥ AS (height)
+    // SC (a lateral edge direction) is perpendicular to none of the axis edges
+    expect(p.relations.some((r) => r.includes('s·') || r.includes('·s'))).toBe(false);
+  });
+
   it('a stated magnitude prints with its square; nothing prints for an unstated one', () => {
     submit('פירמידה ABCDS שבסיסה ריבוע');
     submit('AS = w');

@@ -87,7 +87,7 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
 const EXAMPLE_KEYS = ['ex1', 'ex2', 'ex3', 'ex4', 'ex5', 'ex6', 'ex7', 'ex8'] as const;
 
 export default function App3() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const facts = useGeo3((s) => s.facts);
   const seed = useGeo3((s) => s.seed);
   // the "organize your data" panel (ADR-3D-014): derived vector/point presentations,
@@ -226,7 +226,7 @@ export default function App3() {
     if (!text.trim() || busy) return;
     submit(text);
     let err = useGeo3.getState().lastError;
-    logDebug3({ kind: 'input', utterance: text, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
+    logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
     // out-of-grammar → escalate to the LLM proxy; the returned canonical lines re-parse deterministically
     if (err?.code === 'not-understood') {
       setBusy(true);
@@ -235,7 +235,7 @@ export default function App3() {
         const steps = await escalate3(text, ctx);
         if (steps) submitSteps(text, steps);
         err = useGeo3.getState().lastError;
-        logDebug3({ kind: 'input', utterance: text, source: 'llm', steps: steps ?? null, result: err ? err.code : 'ok' });
+        logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'llm', steps: steps ?? null, result: err ? err.code : 'ok' });
       } finally {
         setBusy(false);
       }
@@ -308,18 +308,22 @@ export default function App3() {
             </div>
           )}
 
-          <div className="flex flex-wrap gap-1.5">
-            {EXAMPLE_KEYS.map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setText(t(`examples.${k}`))}
-                className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-600 hover:border-sky-400 hover:text-sky-700"
-              >
-                {t(`examples.${k}`)}
-              </button>
-            ))}
-          </div>
+          {/* Examples folded into a dropdown so they don't crowd the panel (matches the 2-D app). */}
+          <details className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium text-slate-600">{t('examples.title')}</summary>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {EXAMPLE_KEYS.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setText(t(`examples.${k}`))}
+                  className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs text-slate-600 hover:border-sky-400 hover:text-sky-700"
+                >
+                  {t(`examples.${k}`)}
+                </button>
+              ))}
+            </div>
+          </details>
 
           <ul className="flex flex-col gap-1.5" data-testid="fact-list">
             {facts.length === 0 && <li className="py-2 text-sm text-slate-400">{t('facts.empty')}</li>}

@@ -15,7 +15,7 @@
  */
 
 import { resolve3 } from './evaluate';
-import { sub3, type Vec3 } from './vec3';
+import { dot3, sub3, type Vec3 } from './vec3';
 import type { Construction3, Id } from './types';
 
 export interface VecEntry {
@@ -274,6 +274,39 @@ export function dataView(c: Construction3, seed: number): DataPanel {
           stated === undefined && hasFrame && per.every((m) => Math.abs(m - per[0]) < 1e-6 * Math.max(1, per[0])) ? per[0] : undefined;
         const val = stated ?? derived;
         relations.push(cls.map((n) => `|${n}|`).join(' = ') + (val !== undefined ? ` = ${cleanNum(val)}` : ''));
+      }
+    }
+  }
+
+  // derived PERPENDICULARITY among the declared vectors: u·v = 0 (operator, 2026-07-08).
+  // The dot product's VALUE is gauge (scale varies per seed), but its being ZERO is a
+  // shape property — invariant across every sampled configuration; so a pair reads as
+  // perpendicular iff the normalised dot (the cosine) is ~0 in EVERY seed (the same
+  // multi-sample discipline the magnitude equalities use). ⊥ from construction (cube /
+  // pyramid-height edges) or from a stated ⟂ given both surface identically.
+  {
+    const dirs = vecNames.map(([name, d]) => ({
+      name,
+      per: positions.map((pos) => {
+        const p = pos.get(d.from);
+        const q = pos.get(d.to);
+        return p && q ? sub3(q, p) : null;
+      }),
+    }));
+    for (let i = 0; i < dirs.length; i++) {
+      for (let j = i + 1; j < dirs.length; j++) {
+        const a = dirs[i].per;
+        const b = dirs[j].per;
+        if (a.some((x) => !x) || b.some((x) => !x)) continue;
+        const perp = a.every((x, s) => {
+          const va = x!;
+          const vb = b[s]!;
+          const na = Math.hypot(va.x, va.y, va.z);
+          const nb = Math.hypot(vb.x, vb.y, vb.z);
+          if (na < EPS || nb < EPS) return false; // a degenerate (zero-length) vector isn't "perpendicular"
+          return Math.abs(dot3(va, vb)) / (na * nb) < 1e-4; // |cos θ| ≈ 0
+        });
+        if (perp) relations.push(`${dirs[i].name}·${dirs[j].name} = 0`);
       }
     }
   }

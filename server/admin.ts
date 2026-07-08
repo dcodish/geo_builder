@@ -37,6 +37,8 @@ export interface AdminOpts {
   base?: string; // default '/admin'; production sets '/geo-builder/admin'
   /** Override the events file (tests). */
   logPath?: string;
+  /** Which app's dashboard to render (title + outcome classifier + labels). Default: the 2-D profile. */
+  profile?: DashboardProfile;
 }
 
 // ── auth ────────────────────────────────────────────────────────────────────
@@ -103,7 +105,38 @@ export async function readEvents(file: string): Promise<UsageEvent[]> {
   return out;
 }
 
-const OUTCOME_LABELS: Record<string, string> = {
+/**
+ * A dashboard PROFILE — everything about how one app's raw events become the
+ * page's outcome buckets + labels. The 2-D app and its 3-D sibling
+ * (`src3d/`, `/3d-builder/`) share ONE dashboard renderer; only the profile
+ * differs. Keeping this a plain data+function bundle (not a subclass) means the
+ * whole aggregation/HTML pipeline stays generic and both apps stay byte-DRY.
+ */
+export interface DashboardProfile {
+  /** Page + header title. */
+  title: string;
+  /** Outcome-key → Hebrew label, in display order (the outcome-bars + recent-activity table read this). */
+  outcomeLabels: Record<string, string>;
+  /** Map one `submit` event to its outcome key. */
+  classify(e: UsageEvent): string;
+  /** The primary "real gaps to implement" bucket key (the first clickable drill card). */
+  gapKey: string;
+  gapCard: string;
+  /** The secondary clickable bucket key + card label (2-D: out-of-scope, 3-D: reasoned refusals). */
+  secondaryKey: string;
+  secondaryCard: string;
+  /** Drill-panel titles for the two clickable cards. */
+  gapDrillTitle: string;
+  secondaryDrillTitle: string;
+  /** Optional sub-breakdown of a bucket (2-D scope categories / 3-D refusal codes) → its own panel. */
+  subCategoryOf?(e: UsageEvent): string | null;
+  subLabels?: Record<string, string>;
+  subPanelTitle?: string;
+}
+
+// ── the 2-D profile (the original, unchanged behaviour) ──────────────────────
+
+const OUTCOME_LABELS_2D: Record<string, string> = {
   parsed: 'נותח (דקדוק)',
   deferred: 'נדחה (אילוץ)',
   weak: 'חלקי / נשמט',
@@ -115,15 +148,16 @@ const OUTCOME_LABELS: Record<string, string> = {
 };
 
 /** Hebrew labels for the out-of-scope sub-categories (the SPA's `scope:<category>` tag — see src/parser/scope.ts). */
-const SCOPE_LABELS: Record<string, string> = {
+const SCOPE_LABELS_2D: Record<string, string> = {
+  analytic: 'גאומטריה אנליטית (צירים / שיפוע)',
   'angle-relation': 'יחסי זוויות / משפטים',
   proof: 'בקשת הוכחה',
   compute: 'בקשת חישוב / פתרון',
   unrelated: 'לא קשור / טקסט חופשי',
 };
 
-/** Classify a `submit` event into an outcome bucket from its source + result. */
-function outcomeOf(e: UsageEvent): string {
+/** Classify a 2-D `submit` event into an outcome bucket from its source + result. */
+function outcomeOf2D(e: UsageEvent): string {
   const r = e.result ?? 'ok';
   // A deliberately out-of-scope input (angle relationship, proof/compute request, free text) the SPA
   // recognised after the LLM failed — kept SEPARATE from a genuine `not-understood` gap (operator request).
@@ -141,11 +175,108 @@ function outcomeOf(e: UsageEvent): string {
 }
 
 /** The out-of-scope sub-category of a `scope` event (`scope:<cat>` → `<cat>`), or null. */
-function scopeCategoryOf(e: UsageEvent): string | null {
+function scopeCategoryOf2D(e: UsageEvent): string | null {
   if (e.source !== 'scope') return null;
   const r = e.result ?? '';
   return r.startsWith('scope:') ? r.slice('scope:'.length) : 'unrelated';
 }
+
+export const PROFILE_2D: DashboardProfile = {
+  title: 'Geo Builder — דוח שימוש',
+  outcomeLabels: OUTCOME_LABELS_2D,
+  classify: outcomeOf2D,
+  gapKey: 'not-understood',
+  gapCard: 'פערים אמיתיים (לטיפול)',
+  secondaryKey: 'out-of-scope',
+  secondaryCard: 'מחוץ לתחום (לא נדרש)',
+  gapDrillTitle: 'פערים אמיתיים — משפטים שלא הובנו (לטיפול)',
+  secondaryDrillTitle: 'מחוץ לתחום — משפטים שזוהו כלא-נדרשים',
+  subCategoryOf: scopeCategoryOf2D,
+  subLabels: SCOPE_LABELS_2D,
+  subPanelTitle: 'מחוץ לתחום — לפי סוג (לא נדרש מימוש)',
+};
+
+// ── the 3-D profile (the space/vectors sibling app, `/3d-builder/`) ──────────
+
+const OUTCOME_LABELS_3D: Record<string, string> = {
+  parsed: 'נותח (דקדוק)',
+  'llm-built': 'נותח (LLM)',
+  refused: 'סירוב מנומק (מחוץ ליכולת / קלט לא-עקבי)',
+  'not-understood': 'לא הובן — פער אמיתי (לטיפול)',
+};
+
+/**
+ * Hebrew labels for the 3-D reasoned-refusal codes (an honest `err.code` the parser/engine
+ * returns instead of a wrong figure — e.g. an oblique prism, a two-parameter plane, a refuted
+ * claim). These are NOT gaps to implement — they are the tool correctly declining. The keys
+ * are the exact `code` strings the SPA logs as the submit `result`.
+ */
+const REFUSAL_LABELS_3D: Record<string, string> = {
+  'claim-refuted': 'טענה הופרכה (תשובת תלמיד שגויה)',
+  'symbolic-new-point': 'נקודה חדשה עם נעלמים',
+  'size-on-solid': 'מידה על גוף עם ממדים חופשיים',
+  'free-size-claim': 'טענת גודל על ממד חופשי',
+  'two-params': 'מישור עם שני פרמטרים',
+  'two-unknowns': 'שני נעלמים',
+  'no-roots': 'אין פתרון לפרמטר (סתירה)',
+  'no-solution': 'אין פתרון',
+  'no-such-solid': 'אין גוף כזה',
+  'not-coplanar': 'הנקודות אינן במישור אחד',
+  'not-on-line': 'הנקודה אינה על הישר',
+  'not-on-plane': 'הנקודה אינה על המישור',
+  'not-on-segment': 'הנקודה אינה על הקטע',
+  'line-misses-plane': 'הישר אינו חותך את המישור',
+  'wrong-side-of-plane': 'הנקודה בצד הלא-נכון של המישור',
+  'plane-side-undefined': 'צד המישור אינו מוגדר (מישור אנכי)',
+  'sign-unsatisfiable': 'סימן לא ניתן לסיפוק',
+  'injection-unsatisfiable': 'הזרקת קואורדינטות בלתי-אפשרית',
+  'oblique-prism': 'מנסרה נטויה',
+  'bad-ratio': 'יחס לא תקין',
+  'bad-solid': 'הגדרת גוף שגויה',
+  'bad-name': 'שם לא תקין',
+  'need-basis': 'חסר בסיס וקטורי',
+  'already-defined': 'כבר מוגדר',
+  'unknown-point': 'נקודה לא ידועה',
+  'unknown-line': 'ישר לא ידוע',
+  'unknown-plane': 'מישור לא ידוע',
+  'unknown-vector': 'וקטור לא ידוע',
+  'unknown-symbol': 'סמל לא ידוע',
+};
+
+/**
+ * Classify a 3-D `submit` event. The 3-D SPA logs only two sources: `parser` and `llm`
+ * (no scope/limit/edit lane). A parser event with a non-`ok` result is a reasoned refusal
+ * code (the intermediate `not-understood` step that escalates to the LLM is already dropped
+ * client-side by `analyticsSubmit3`, so it never reaches here).
+ */
+function outcomeOf3D(e: UsageEvent): string {
+  const r = e.result ?? 'ok';
+  if (e.source === 'llm') return r === 'ok' ? 'llm-built' : 'not-understood';
+  // parser (or any non-llm source)
+  if (r === 'ok') return 'parsed';
+  if (r === 'not-understood') return 'not-understood'; // defensive: should be intermediate-dropped
+  return 'refused';
+}
+
+/** The refusal-code sub-category of a 3-D refused event (the raw `result` code), or null. */
+function refusalCodeOf3D(e: UsageEvent): string | null {
+  return outcomeOf3D(e) === 'refused' ? (e.result ?? 'unknown') : null;
+}
+
+export const PROFILE_3D: DashboardProfile = {
+  title: '3D Builder — דוח שימוש',
+  outcomeLabels: OUTCOME_LABELS_3D,
+  classify: outcomeOf3D,
+  gapKey: 'not-understood',
+  gapCard: 'פערים אמיתיים (לטיפול)',
+  secondaryKey: 'refused',
+  secondaryCard: 'סירובים מנומקים',
+  gapDrillTitle: 'פערים אמיתיים — משפטים שלא הובנו (לטיפול)',
+  secondaryDrillTitle: 'סירובים מנומקים — משפטים שהכלי דחה במכוון',
+  subCategoryOf: refusalCodeOf3D,
+  subLabels: REFUSAL_LABELS_3D,
+  subPanelTitle: 'סירובים — לפי סוג (לא נדרש מימוש)',
+};
 
 export interface Stats {
   total: number;
@@ -183,8 +314,8 @@ function day(ts: string | undefined): string {
   return (ts ?? '').slice(0, 10);
 }
 
-/** Aggregate raw events into the dashboard's numbers. Pure + unit-tested. */
-export function aggregate(events: UsageEvent[]): Stats {
+/** Aggregate raw events into the dashboard's numbers. Pure + unit-tested. `profile` defaults to 2-D. */
+export function aggregate(events: UsageEvent[], profile: DashboardProfile = PROFILE_2D): Stats {
   const sessionIds = new Set<string>();
   const visitorIds = new Set<string>();
   const byDay = new Map<string, { sessions: Set<string>; submits: number }>();
@@ -215,9 +346,9 @@ export function aggregate(events: UsageEvent[]): Stats {
     if (e.ev === 'submit') {
       submits++;
       bucket.submits++;
-      const oc = outcomeOf(e);
+      const oc = profile.classify(e);
       outcomeCount.set(oc, (outcomeCount.get(oc) ?? 0) + 1);
-      const sc = scopeCategoryOf(e);
+      const sc = profile.subCategoryOf?.(e) ?? null;
       if (sc) scopeCount.set(sc, (scopeCount.get(sc) ?? 0) + 1);
       if (e.source === 'llm') llmFallbacks++;
       if (e.locale === 'he') langs.he++;
@@ -226,7 +357,7 @@ export function aggregate(events: UsageEvent[]): Stats {
       const u = (e.utterance ?? '').trim();
       if (u) uttCount.set(u, (uttCount.get(u) ?? 0) + 1);
       // Accumulate the per-utterance drill list for whichever card this falls under.
-      const drill = oc === 'not-understood' ? gapMap : oc === 'out-of-scope' ? scopeUttMap : null;
+      const drill = oc === profile.gapKey ? gapMap : oc === profile.secondaryKey ? scopeUttMap : null;
       if (drill && u) {
         const ts2 = e.serverTs ?? e.t ?? '';
         const g = drill.get(u) ?? { count: 0, locale: e.locale ?? '', lastSeen: '' };
@@ -247,13 +378,17 @@ export function aggregate(events: UsageEvent[]): Stats {
     .slice(-30)
     .map(([d, v]) => ({ day: d, sessions: v.sessions.size, submits: v.submits }));
 
-  const outcomes = Object.keys(OUTCOME_LABELS)
-    .map((key) => ({ key, label: OUTCOME_LABELS[key], count: outcomeCount.get(key) ?? 0 }))
+  const outcomes = Object.keys(profile.outcomeLabels)
+    .map((key) => ({ key, label: profile.outcomeLabels[key], count: outcomeCount.get(key) ?? 0 }))
     .filter((o) => o.count > 0);
 
-  const scopeBreakdown = Object.keys(SCOPE_LABELS)
-    .map((key) => ({ key, label: SCOPE_LABELS[key], count: scopeCount.get(key) ?? 0 }))
-    .filter((o) => o.count > 0);
+  const subLabels = profile.subLabels ?? {};
+  // A refusal/scope sub-category with no authored label still shows (keyed by its raw code) so a new
+  // refusal type can never be silently invisible.
+  const scopeBreakdown = [...new Set([...Object.keys(subLabels), ...scopeCount.keys()])]
+    .map((key) => ({ key, label: subLabels[key] ?? key, count: scopeCount.get(key) ?? 0 }))
+    .filter((o) => o.count > 0)
+    .sort((a, b) => b.count - a.count);
 
   // Drill lists: distinct utterances, most-frequent first then most-recent, capped so the page stays lean.
   const toDrill = (m: Map<string, { count: number; locale: string; lastSeen: string }>): DrillRow[] =>
@@ -280,8 +415,8 @@ export function aggregate(events: UsageEvent[]): Stats {
     visitors: visitorIds.size,
     submits,
     llmFallbacks,
-    realGaps: outcomeCount.get('not-understood') ?? 0,
-    outOfScope: outcomeCount.get('out-of-scope') ?? 0,
+    realGaps: outcomeCount.get(profile.gapKey) ?? 0,
+    outOfScope: outcomeCount.get(profile.secondaryKey) ?? 0,
     firstSeen,
     lastSeen,
     byDay: last30,
@@ -339,8 +474,8 @@ export function releasesOf(events: UsageEvent[]): string[] {
 const esc = (s: unknown): string =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-const PAGE_HEAD = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>Geo Builder — דוח שימוש</title>
+const pageHead = (title = 'Geo Builder — דוח שימוש') => `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>
 <style>
   :root{color-scheme:light}
   *{box-sizing:border-box}
@@ -382,9 +517,9 @@ const PAGE_HEAD = `<!doctype html><html lang="he" dir="rtl"><head><meta charset=
 </style></head><body><div class="wrap">`;
 const PAGE_FOOT = `</div></body></html>`;
 
-function loginPage(base: string, error: boolean): string {
+function loginPage(base: string, error: boolean, title?: string): string {
   return (
-    PAGE_HEAD +
+    pageHead(title) +
     `<form class="login" method="post" action="${esc(base)}/login">
       <h1>כניסת מנהל</h1>
       ${error ? '<div class="err">שם משתמש או סיסמה שגויים</div>' : ''}
@@ -471,14 +606,21 @@ function filterBar(base: string, releases: string[], cur: Filter, presets: { lab
     </form>`;
 }
 
-function dashboard(base: string, s: Stats, releases: string[], cur: Filter, presets: { label: string; since: string }[]): string {
+function dashboard(
+  base: string,
+  s: Stats,
+  releases: string[],
+  cur: Filter,
+  presets: { label: string; since: string }[],
+  profile: DashboardProfile,
+): string {
   const fmt = (ts: string | null) => (ts ? ts.replace('T', ' ').slice(0, 16) : '—');
   const range = s.firstSeen ? `${fmt(s.firstSeen)} — ${fmt(s.lastSeen)}` : 'אין נתונים';
   const filtered = !!(cur.since || (cur.rel && cur.rel !== 'all'));
   return (
-    PAGE_HEAD +
+    pageHead(profile.title) +
     `<div class="top">
-       <h1 style="flex:1">Geo Builder — דוח שימוש</h1>
+       <h1 style="flex:1">${esc(profile.title)}</h1>
        <a class="btn2" href="${API_COST_URL}" target="_blank" rel="noopener">💰 עלות API</a>
        <a class="btn" href="${esc(base)}/logout">יציאה</a>
      </div>
@@ -489,21 +631,21 @@ function dashboard(base: string, s: Stats, releases: string[], cur: Filter, pres
        ${card(s.sessions, 'כניסות (sessions)')}
        ${card(s.submits, 'פעולות / משפטים')}
        ${card(s.llmFallbacks, 'נפילה ל-LLM')}
-       ${cardLink(s.realGaps, 'פערים אמיתיים (לטיפול)', `${esc(base)}${queryString(cur, { view: cur.view === 'gaps' ? undefined : 'gaps' })}`, cur.view === 'gaps')}
-       ${cardLink(s.outOfScope, 'מחוץ לתחום (לא נדרש)', `${esc(base)}${queryString(cur, { view: cur.view === 'scope' ? undefined : 'scope' })}`, cur.view === 'scope')}
+       ${cardLink(s.realGaps, profile.gapCard, `${esc(base)}${queryString(cur, { view: cur.view === 'gaps' ? undefined : 'gaps' })}`, cur.view === 'gaps')}
+       ${cardLink(s.outOfScope, profile.secondaryCard, `${esc(base)}${queryString(cur, { view: cur.view === 'scope' ? undefined : 'scope' })}`, cur.view === 'scope')}
      </div>
      ${
        cur.view === 'gaps'
-         ? drillPanel('פערים אמיתיים — משפטים שלא הובנו (לטיפול)', s.gapUtterances, `${esc(base)}${queryString(cur, { view: undefined })}`, fmt)
+         ? drillPanel(profile.gapDrillTitle, s.gapUtterances, `${esc(base)}${queryString(cur, { view: undefined })}`, fmt)
          : cur.view === 'scope'
-           ? drillPanel('מחוץ לתחום — משפטים שזוהו כלא-נדרשים', s.scopeUtterances, `${esc(base)}${queryString(cur, { view: undefined })}`, fmt)
+           ? drillPanel(profile.secondaryDrillTitle, s.scopeUtterances, `${esc(base)}${queryString(cur, { view: undefined })}`, fmt)
            : ''
      }
      <div class="panel"><h2>פעילות יומית (30 ימים אחרונים)</h2>${dailyChart(s.byDay)}</div>
      <div class="panel"><h2>תוצאות ניתוח</h2>${outcomeBars(s.outcomes)}</div>
      ${
        s.scopeBreakdown.length
-         ? `<div class="panel"><h2>מחוץ לתחום — לפי סוג (לא נדרש מימוש)</h2>${outcomeBars(s.scopeBreakdown)}</div>`
+         ? `<div class="panel"><h2>${esc(profile.subPanelTitle ?? '')}</h2>${outcomeBars(s.scopeBreakdown)}</div>`
          : ''
      }
      <div class="panel"><h2>שפה</h2>
@@ -529,7 +671,7 @@ function dashboard(base: string, s: Stats, releases: string[], cur: Filter, pres
                    `<tr><td class="muted">${esc(fmt(e.serverTs ?? e.t ?? null))}</td>
                     <td>${esc(e.locale ?? '')}</td>
                     <td><code>${esc(e.utterance ?? '')}</code></td>
-                    <td class="muted">${esc(OUTCOME_LABELS[outcomeOf(e)] ?? e.result ?? '')}</td></tr>`,
+                    <td class="muted">${esc(profile.outcomeLabels[profile.classify(e)] ?? e.result ?? '')}</td></tr>`,
                )
                .join('')
            : '<tr><td class="muted">אין נתונים עדיין</td><td></td><td></td><td></td></tr>'
@@ -561,6 +703,7 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
   // never derives this secret from `ipSalt`/the committed default, so an empty `cookieSecret` genuinely
   // means "not configured" — a forged cookie under a guessed default can no longer reach the dashboard.
   const secure = opts.username.length > 0 && opts.password.length > 0 && opts.cookieSecret.length > 0;
+  const profile = opts.profile ?? PROFILE_2D; // which app's dashboard (title threads into the login page too)
 
   // logout
   if (path.endsWith('/logout')) {
@@ -573,7 +716,7 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
 
   // login POST
   if (path.endsWith('/login') && req.method === 'POST') {
-    if (loginLimited(clientIp(req))) return send(res, 429, loginPage(base, true)); // brute-force throttle (SEC-6)
+    if (loginLimited(clientIp(req))) return send(res, 429, loginPage(base, true, profile.title)); // brute-force throttle (SEC-6)
     let body = '';
     for await (const chunk of req) body += chunk;
     const params = new URLSearchParams(body);
@@ -583,7 +726,7 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
       secure &&
       safeEq(params.get('username') ?? '', opts.username) &&
       safeEq(params.get('password') ?? '', opts.password);
-    if (!ok) return send(res, 401, loginPage(base, true));
+    if (!ok) return send(res, 401, loginPage(base, true, profile.title));
     res.statusCode = 303;
     res.setHeader(
       'set-cookie',
@@ -597,7 +740,7 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
   // dashboard (auth required). `secure &&` fails closed: with no configured cookie secret, even a
   // well-formed cookie is rejected — a forged cookie under a guessed/default secret can't get in (SEC-3).
   const authed = secure && validCookie(readCookies(req)[COOKIE], opts.cookieSecret);
-  if (!authed) return send(res, 200, loginPage(base, false));
+  if (!authed) return send(res, 200, loginPage(base, false, profile.title));
 
   const all = await readEvents(opts.logPath ?? eventsLogPath());
   // Filter state from the query string (?since=YYYY-MM-DD&rel=<build>&view=gaps|scope) — empty = show everything.
@@ -617,5 +760,5 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
     { label: '7 ימים', since: dayMinus(7) },
     { label: '30 ימים', since: dayMinus(30) },
   ];
-  return send(res, 200, dashboard(base, aggregate(events), releases, cur, presets));
+  return send(res, 200, dashboard(base, aggregate(events, profile), releases, cur, presets, profile));
 }

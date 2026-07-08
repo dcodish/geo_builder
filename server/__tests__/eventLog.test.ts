@@ -172,4 +172,26 @@ describe('handleLog', () => {
     expect(stored.evil).toBeUndefined();
     expect(stored.commands).toBeUndefined();
   });
+
+  it("routes a tool:'3d' event to the 3-D file and a 2-D event to the 2-D file (never mixed)", async () => {
+    const log3Path = path.join(path.dirname(logPath), 'events-3d.jsonl');
+    const both = (req: ReturnType<typeof mockReq>, res: ReturnType<typeof mockRes>) =>
+      handleLog(req as unknown as IncomingMessage, res as unknown as ServerResponse, { ipSalt: 'salt', logPath, log3Path });
+
+    const r2 = mockRes();
+    await both(mockReq('POST', '10.0.0.8', [JSON.stringify({ ev: 'submit', utterance: 'square ABCD', source: 'parser' })]), r2);
+    const r3 = mockRes();
+    await both(mockReq('POST', '10.0.0.9', [JSON.stringify({ tool: '3d', ev: 'submit', utterance: 'קובייה ABCDA׳', source: 'parser' })]), r3);
+
+    expect([r2.statusCode, r3.statusCode]).toEqual([204, 204]);
+    const two = await readFile(logPath, 'utf8');
+    const three = await readFile(log3Path, 'utf8');
+    // Each utterance lands ONLY in its own app's file.
+    expect(two).toContain('square ABCD');
+    expect(two).not.toContain('קובייה');
+    expect(three).toContain('קובייה');
+    expect(three).not.toContain('square ABCD');
+    // The `tool` tag is the routing signal only — it is not duplicated into the stored lean line.
+    expect(JSON.parse(three.trim()).tool).toBeUndefined();
+  });
 });

@@ -31,6 +31,16 @@ export function eventsLogPath(): string {
   return process.env.EVENTS_LOG_PATH || path.resolve(process.cwd(), 'logs', 'events.jsonl');
 }
 
+/**
+ * Resolve the 3-D events-log path: `EVENTS_3D_LOG_PATH` env, else `./logs/events-3d.jsonl`.
+ * The 3-D sibling app (`src3d/`, `/3d-builder/`) tags each usage event `tool:'3d'` so it lands
+ * in its OWN file — 2-D and 3-D analytics never mix, exactly as their dev debug traces don't
+ * (`logs/debug-log.jsonl` vs `logs/debug-log-3d.jsonl`).
+ */
+export function events3LogPath(): string {
+  return process.env.EVENTS_3D_LOG_PATH || path.resolve(process.cwd(), 'logs', 'events-3d.jsonl');
+}
+
 /** Salted, truncated HMAC of the IP — stable per IP+salt, not reversible to the IP. */
 export function hashIp(ip: string, salt: string): string {
   return createHmac('sha256', salt).update(ip).digest('hex').slice(0, 16);
@@ -53,8 +63,10 @@ export interface UsageEvent {
 export interface LogHandlerOpts {
   /** Salt for the IP hash (root-only env). Absent → a constant fallback (still non-reversible-ish). */
   ipSalt: string;
-  /** Override the events file (tests). Defaults to `eventsLogPath()`. */
+  /** Override the 2-D events file (tests). Defaults to `eventsLogPath()`. */
   logPath?: string;
+  /** Override the 3-D events file (tests). Defaults to `events3LogPath()`. */
+  log3Path?: string;
 }
 
 /** Validate + normalise one client payload into a lean stored event (or null to drop). */
@@ -148,7 +160,7 @@ async function rotateIfLarge(file: string): Promise<void> {
 export async function handleLog(
   req: IncomingMessage,
   res: ServerResponse,
-  { ipSalt, logPath }: LogHandlerOpts,
+  { ipSalt, logPath, log3Path }: LogHandlerOpts,
 ): Promise<void> {
   const end = (code: number) => {
     res.statusCode = code;
@@ -171,7 +183,11 @@ export async function handleLog(
   const lean = normalise(payload);
   if (!lean) return end(400);
 
-  const file = logPath ?? eventsLogPath();
+  // Route the event to its app's OWN file by the client's `tool` tag (the 3-D sibling sends `tool:'3d'`,
+  // mirroring how the shared parse proxy selects the 3-D prompt). The stored event stays lean — the file
+  // choice IS the app tag, so `tool` is not duplicated into every line.
+  const is3d = (payload as { tool?: unknown } | null)?.tool === '3d';
+  const file = is3d ? (log3Path ?? events3LogPath()) : (logPath ?? eventsLogPath());
   const entry: UsageEvent = { serverTs: new Date().toISOString(), iph: hashIp(ip, ipSalt), ...lean };
   try {
     // One writer at a time (see `serialized`): the prune's read-modify-write and every append are

@@ -75,6 +75,7 @@
     "ambiguousVectorLength": "vector or length? write vector AB = vector CD (or AB⃗ = CD⃗), or |AB| = |CD|"
   },
   "examples": {
+    "title": "Examples",
     "ex1": "cube ABCD",
     "ex2": "right triangular prism ABC",
     "ex3": "M is the midpoint of BB'",
