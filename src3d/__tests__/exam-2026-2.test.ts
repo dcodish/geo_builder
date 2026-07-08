@@ -49,6 +49,11 @@ describe('GATE — 2026 מועד ב Q2 (square pyramid + |EN| abs-value given)',
       'הקודקוד D נמצא על החלק החיובי של ציר ה-x',
       'D על ציר x החיובי',
       'S on the positive part of the z axis',
+      // bare on-axis (no sign) — the axis membership alone is a given too
+      'D על ציר x',
+      'S על ציר z',
+      'הנקודה D על ציר y',
+      'D on the x axis',
     ];
     for (const form of forms) {
       reset();
