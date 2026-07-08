@@ -13,7 +13,7 @@
  */
 
 import { sample } from './rng';
-import { solvePivot } from './solve3';
+import { solvePivot, type PivotResult } from './solve3';
 import { decompose3 } from './vecExpr';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -580,42 +580,61 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   let pivot: Resolved3['pivot'] = null;
   if ((c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0) && c.solids.length > 0) {
     const dims0 = c.solids.flatMap((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed));
-    const evalCanonical = (dims: number[], cheap = true): Positions3 => {
+    const evalCanonical = (dims: number[], cheap = true, override?: Map<number, number>): Positions3 => {
       const p2: Positions3 = new Map<Id, Vec3>();
       for (const [id, def] of c.points) {
         if (def.kind === 'coord') p2.set(id, v3(def.x, def.y, def.z));
       }
-      evaluateSolidsAndPoints(c, seed, p2, planes, lines, dims, cheap);
+      evaluateSolidsAndPoints(c, seed, p2, planes, lines, dims, cheap, override);
       return p2;
     };
-    const solutions = solvePivot(c, evalCanonical, dims0, seed);
 
-    const satisfiesSigns = (sol: (typeof solutions)[number]): boolean => {
-      const p2 = evalCanonical(sol.dims, false);
-      return c.signGivens.every((g) => {
-        const q = p2.get(g.id);
-        if (!q) return false;
-        const val = sol.transform(q)[g.axis];
-        return g.positive ? val > 1e-9 : val < -1e-9;
-      });
-    };
-    const satisfying = solutions.filter(satisfiesSigns);
-    const pool = satisfying.length > 0 ? satisfying : solutions;
-    if (pool.length > 0) {
-      const chosen = pool[seed % pool.length];
-      const finalCanonical = evalCanonical(chosen.dims, false);
-      for (const [id, q] of finalCanonical) {
-        const def = c.points.get(id);
-        // an on-plane point rides the gauge iff its plane is a POINT-run plane (the run's
-        // points are gauge-frame); an equation plane is Lane-A absolute — no transform
-        const gauge =
-          def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
-        if (gauge) pos.set(id, chosen.transform(q));
-        else pos.set(id, q);
+    // V8-c: a symbol pinned ⟂/∥ a plane is a candidate to co-solve with a free dim.
+    const coupledPins = c.symbolPins.filter((p) => p.rel === 'perp' || p.rel === 'parallel');
+    const coupledDefs = [...new Set(coupledPins.map((p) => p.def))];
+    const overrideOf = (sol: PivotResult): Map<number, number> | undefined =>
+      sol.symbols ? new Map(coupledDefs.map((d, i) => [d, sol.symbols![i]])) : undefined;
+    const EC = (dims: number[], override?: Map<number, number>) => evalCanonical(dims, true, override);
+
+    const applySolutions = (solutions: PivotResult[]): void => {
+      const satisfiesSigns = (sol: PivotResult): boolean => {
+        const p2 = evalCanonical(sol.dims, false, overrideOf(sol));
+        return c.signGivens.every((g) => {
+          const q = p2.get(g.id);
+          if (!q) return false;
+          const val = sol.transform(q)[g.axis];
+          return g.positive ? val > 1e-9 : val < -1e-9;
+        });
+      };
+      const satisfying = solutions.filter(satisfiesSigns);
+      const pool = satisfying.length > 0 ? satisfying : solutions;
+      if (pool.length > 0) {
+        const chosen = pool[seed % pool.length];
+        const finalCanonical = evalCanonical(chosen.dims, false, overrideOf(chosen));
+        for (const [id, q] of finalCanonical) {
+          const def = c.points.get(id);
+          // an on-plane point rides the gauge iff its plane is a POINT-run plane (the run's
+          // points are gauge-frame); an equation plane is Lane-A absolute — no transform
+          const gauge = def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
+          if (gauge) pos.set(id, chosen.transform(q));
+          else pos.set(id, q);
+        }
+        pivot = { solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err };
+      } else {
+        pivot = { solutions: 0, chosen: -1, err: Infinity };
       }
-      pivot = { solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err };
-    } else {
-      pivot = { solutions: 0, chosen: -1, err: Infinity };
+    };
+
+    // 1) the normal solve — no symbol unknowns, so bit-identical to the pre-V8-c path.
+    applySolutions(solvePivot(c, EC, dims0, seed));
+
+    // 2) failure-path retry (V8-c): a ⟂/∥-pinned symbol whose point could NOT be placed
+    //    (no root-find value exists at the pivot's chosen dims) is COUPLED to a free dim —
+    //    re-solve the symbol and the dim JOINTLY (the D3 numeric-only path, no CAS).
+    const unplaced = coupledPins.some((p) => !pos.has(c.vecDefs[p.def].unknown));
+    if (unplaced && coupledDefs.length > 0 && dims0.length > 0) {
+      const retry = solvePivot(c, EC, dims0, seed, { defs: coupledDefs, pins: coupledPins });
+      if (retry.length > 0) applySolutions(retry);
     }
   }
 
@@ -689,6 +708,7 @@ function evaluateSolidsAndPoints(
   lines: Map<string, ResolvedLine>,
   dimOverride?: number[],
   cheapSymbols?: boolean,
+  symbolOverride?: Map<number, number>, // V8-c: def index → jointly-solved symbol value
 ): void {
   let dimCursor = 0;
   c.solids.forEach((solid, i) => {
@@ -767,7 +787,9 @@ function evaluateSolidsAndPoints(
       let k = 0;
       if (vd.symbol) {
         const pin = c.symbolPins.find((p) => p.def === def.def);
-        if (pin && pin.rel === 'value') {
+        if (symbolOverride?.has(def.def)) {
+          k = symbolOverride.get(def.def)!; // V8-c: the pivot solved this symbol jointly with a dim
+        } else if (pin && pin.rel === 'value') {
           k = pin.value; // direct assignment (k = ½) — free even during the cheap pass
         } else if (pin && cheapSymbols) {
           k = 0.35; // during the pivot's residual loop: pins never reference these points — skip the root-find

@@ -317,3 +317,15 @@ _(ADR numbers 016/017 were minted by a concurrent work-PC session — the usage 
 Parser: `relPlaneRule` (order-independent through/relation clauses, He+En, unnamed ⇒ π) + `planeCut` (four phrasings). A local non-capturing `PN` plane-name fragment avoids `PLANE_NAME`'s inner-group index shift.
 
 **Locked by** `v8b-plane-def.test.ts` (7: ⟂/∥ parse + the 1-through-point ∥ deferral; plane∩edge four phrasings; the 2009-ב build — plane ⟂ SC through F cuts SA→E=(1,½,1½), SB→D=(1.8,1.2,0), both verified on the plane; a ∥-plane crossing; the unknown-plane refusal). Catalog +3. **411 src3d tests green, `tsc -b` clean.**
+
+---
+
+## ADR-3D-020 — V8-c: a symbol COUPLED to a free dim is co-solved in the pivot (the D3 call) (2026-07-08)
+
+**Context (G7, the headline deferred exam).** 2022 חורף נבצרים Q2: a rhombus prism whose height `h` is a free dim, with `F` defined by `D'F = t·D'A + ¼·D'C` (symbol `t`) and `DF ⟂ plane ACD'`. The ⟂ condition couples `t` and `h`, but the engine solved `t` by a **post-pivot 1-DOF root-find** (`chooseParam`/`symbolPinResidual`) that runs AFTER the pivot has fixed the dims — so no `t` exists for the pivot's arbitrary `h`, the root-find returns ∅, `F` is left unplaced, and the step parked forever. **The operator's D3 ruling (2026-07-08): YES — a symbolic scalar may become an additional unknown INSIDE the numeric pivot solve when coupled to a dim. Still 100% numeric (LM / root-finding), no CAS.**
+
+**Decision — a FAILURE-PATH coupled retry (the happy path is bit-for-bit untouched).**
+- `solvePivot` gains an optional `coupled: { defs, pins }`: the coupled symbols are appended to the unknown vector AFTER the dims (`x = [gauge(7), …dims, …symbols]`), and each ⟂/∥-pinned condition becomes a residual (a `perp` adds 2, a `∥` adds 1) evaluated with the symbol **baked into the point** via a `symbolOverride` map threaded through `evaluateSolidsAndPoints`. `PivotResult.symbols` carries the joint solution; `nSym = 0` ⇒ every path is identical to before.
+- `resolve3` runs the **normal** solve first (`nSym = 0`). Only if a ⟂/∥-pinned symbol's point is then still **unplaced** (root-find failed) AND free dims exist does it re-solve with `coupled` set and re-apply. So determined figures where the root-find succeeds (2023-ב's `EF∥plane`, 2026-ב's `|EN|`) never enter the coupled path — verified bit-identical.
+
+Gate: 2022-נבצרים builds to the closed form (**t = ¼, |DD′| = 2**, DF ⟂ plane ACD′ verified). A parser robustness fix rode along: `vertexAngleClaim` now accepts the bare Hebrew `זווית ADC = 120` (the `ה` prefix was mandatory — the natural exam phrasing was silently dropped). *(The two-SYMBOL vec-rel form `AF = t·A'C + m·A'B` of 2013-קיץ-ב is a different mechanism — multiple free scalars in one relation — filed for V8-f.)* **Perf:** the coupled retry is a multi-start LM (~16 s for this figure) — acceptable, noted as a target (the ADR-229 precedent). Locked by `v8c-coupled-symbol.test.ts`. **413 src3d tests green, `tsc -b` clean.**

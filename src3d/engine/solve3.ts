@@ -140,6 +140,8 @@ export interface PivotResult {
   transform: (p: Vec3) => Vec3;
   mirror: boolean;
   dims: number[];
+  /** V8-c — the jointly-solved values of the coupled symbols (in `coupled.defs` order). */
+  symbols?: number[];
   err: number;
 }
 
@@ -150,26 +152,35 @@ export interface PivotResult {
  */
 export function solvePivot(
   c: Construction3,
-  evalCanonical: (dims: number[]) => Positions3,
+  evalCanonical: (dims: number[], symbolOverride?: Map<number, number>) => Positions3,
   dims0: number[],
   seed: number,
+  coupled?: { defs: number[]; pins: Construction3['symbolPins'] },
 ): PivotResult[] {
   const pointPins = c.pins;
   const vecPins = c.vectorPins;
   if (pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 && c.scalarPins.length === 0) return [];
+
+  // V8-c: a symbol coupled to a solid dim (`DF = t·… ⟂ plane` where the plane's height
+  // is a free dim) becomes an EXTRA pivot unknown, appended after the dims; its ⟂/∥
+  // condition is a residual — so t and the dim are solved JOINTLY (the D3 numeric-only
+  // path, no CAS). nSym = 0 ⇒ every code path below is bit-identical to before.
+  const nDims = dims0.length;
+  const nSym = coupled?.defs.length ?? 0;
 
   // When EVERY pin is similarity-INVARIANT (angles, ⟂/∥-to-plane — no coordinate,
   // length or dot given anywhere), the gauge is pure null-space: solving it invites
   // the scale→0 collapse basin (all normalized residuals vanish as the figure shrinks
   // onto a point). Freeze the gauge to identity and solve the shape dims ONLY.
   const invariantOnly =
-    pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 &&
+    nSym === 0 && pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 &&
     c.scalarPins.every((p) => p.kind === 'vangle' || p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane' || p.kind === 'length-rel');
 
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
     const g = { ...unpack(x), mirror };
-    const dims = x.slice(7);
-    const pos = evalCanonical(dims);
+    const dims = x.slice(7, 7 + nDims);
+    const override = coupled ? new Map(coupled.defs.map((d, i) => [d, x[7 + nDims + i]])) : undefined;
+    const pos = evalCanonical(dims, override);
     const out: number[] = [];
     for (const pin of pointPins) {
       const p = pos.get(pin.id);
@@ -261,6 +272,31 @@ export function solvePivot(
         }
       }
     }
+    // V8-c coupled symbol conditions: the vec-defined endpoint is baked into `pos` at the
+    // trial symbol value (via `override`), so its ⟂/∥-to-plane residual drives the symbol
+    // AND the free dim jointly (a perp adds 2 residuals, a parallel 1).
+    if (coupled) {
+      for (const pin of coupled.pins) {
+        if (pin.rel !== 'perp' && pin.rel !== 'parallel') continue; // only ⟂/∥-plane pins couple
+        const a = at(pin.a);
+        const b = at(pin.b);
+        const ring = pin.plane.map(at);
+        if (!a || !b || ring.some((p) => !p)) {
+          out.push(10);
+          if (pin.rel === 'perp') out.push(10);
+          continue;
+        }
+        const d = sub3(b, a);
+        const e1 = sub3(ring[1]!, ring[0]!);
+        const e2 = sub3(ring[2]!, ring[0]!);
+        if (pin.rel === 'perp') {
+          out.push(dot3(d, e1) / Math.max(norm3(d) * norm3(e1), 1e-12), dot3(d, e2) / Math.max(norm3(d) * norm3(e2), 1e-12));
+        } else {
+          const n = cross3(e1, e2);
+          out.push(dot3(d, n) / Math.max(norm3(d) * norm3(n), 1e-12));
+        }
+      }
+    }
     return out;
   };
 
@@ -305,7 +341,8 @@ export function solvePivot(
   ];
   for (let i = 0; i < 8; i++) {
     const k = (i + seed) % 8;
-    starts.push([0, 0, 0, axes[k].x * angles[k], axes[k].y * angles[k], axes[k].z * angles[k], 0, ...dims0]);
+    const symStart = Array.from({ length: nSym }, () => 0.2 + 0.2 * (k % 3)); // 0.2/0.4/0.6 spread
+    starts.push([0, 0, 0, axes[k].x * angles[k], axes[k].y * angles[k], axes[k].z * angles[k], 0, ...dims0, ...symStart]);
   }
 
   const results: PivotResult[] = [];
@@ -336,8 +373,9 @@ export function solvePivot(
           .join('|');
         if (!seen.has(sig)) {
           seen.add(sig);
-          const dims = r.x.slice(7);
-          results.push({ transform: (p) => applyGauge(p, g), mirror, dims, err: r.err });
+          const dims = r.x.slice(7, 7 + nDims);
+          const symbols = coupled ? r.x.slice(7 + nDims) : undefined;
+          results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, err: r.err });
         }
       }
       if (!best || r.err < best.err) best = r;
@@ -347,8 +385,9 @@ export function solvePivot(
     // Jacobian floor rises with mixed scalar residuals; 1e-16 was V4-era point-pins-only)
     if (!collectAll && best && best.err < 1e-12) {
       const g = { ...unpack(best.x), mirror };
-      const dims = best.x.slice(7);
-      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, err: best.err });
+      const dims = best.x.slice(7, 7 + nDims);
+      const symbols = coupled ? best.x.slice(7 + nDims) : undefined;
+      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, err: best.err });
     }
   }
   return results;

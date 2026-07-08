@@ -1122,7 +1122,7 @@ const onAxes: Rule = (s) => {
 const vertexAngleClaim: Rule = (s0) => {
   const s = stripProofPrefix(s0);
   const m = s.match(
-    new RegExp(`^(?:∠|הזווית\\s+|the angle\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*(?:היא|הוא|is|=)\\s*(${NUM})\\s*°?$`),
+    new RegExp(`^(?:∠|ה?זווית\\s+|the angle\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*(?:היא|הוא|is|=)\\s*(${NUM})\\s*°?$`),
   );
   if (!m) return null;
   const [, p, vertex, q, deg] = m;
