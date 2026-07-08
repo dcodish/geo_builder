@@ -989,28 +989,24 @@ const lateralAreaClaim: Rule = (s) => {
 const onAxes: Rule = (s) => {
   const origin = s.match(/^([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+|is\s+)?(?:בראשית הצירים|at the origin)$/);
   if (origin) return [{ type: 'point3', id: origin[1], x: 0, y: 0, z: 0 }];
-  const part = s.match(/^(?:הקודקוד\s+|הנקודה\s+)?([A-Z]\d*'?)\s+(?:נמצאת?\s+)?על\s+החלק\s+(החיובי|השלילי)\s+של\s+ציר\s+ה-?([xyz])$/);
-  if (part) {
-    const ax = part[3] as 'x' | 'y' | 'z';
+  const lower = (id: string, ax: 'x' | 'y' | 'z', signWord?: string): Command3[] => {
     const zero = { x: 0 as number | null, y: 0 as number | null, z: 0 as number | null };
-    zero[ax] = null;
-    return [
-      { type: 'point3', id: part[1], x: zero.x, y: zero.y, z: zero.z },
-      { type: 'sign-given', id: part[1], axis: ax, positive: part[2] === 'החיובי' },
-    ];
-  }
-  const axis = s.match(
-    /^([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?(?:על ציר ה-?([xyz])(?:\s+(החיובי|השלילי))?|on the (positive |negative )?([xyz])[- ]axis)$/,
-  );
-  if (!axis) return null;
-  const id = axis[1];
-  const ax = (axis[2] ?? axis[5]) as 'x' | 'y' | 'z';
-  const signWord = axis[3] ?? axis[4]?.trim();
-  const zero = { x: 0 as number | null, y: 0 as number | null, z: 0 as number | null };
-  zero[ax] = null; // the on-axis coordinate stays free
-  const cmds: Command3[] = [{ type: 'point3', id, x: zero.x, y: zero.y, z: zero.z }];
-  if (signWord) cmds.push({ type: 'sign-given', id, axis: ax, positive: signWord === 'החיובי' || signWord === 'positive' });
-  return cmds;
+    zero[ax] = null; // the on-axis coordinate stays free
+    const cmds: Command3[] = [{ type: 'point3', id, x: zero.x, y: zero.y, z: zero.z }];
+    if (signWord) cmds.push({ type: 'sign-given', id, axis: ax, positive: signWord === 'החיובי' || signWord === 'positive' });
+    return cmds;
+  };
+  // the "positive PART/SIDE of the axis" family — one shared axis fragment covers
+  // ציר ה-z / ציר ה z / ציר z; the container word covers על החלק / בחלק / בצד
+  const part =
+    s.match(/^(?:הקודקוד\s+|הנקודה\s+)?([A-Z]\d*'?)\s+(?:נמצאת?\s+)?(?:על\s+|ב)?ה?(?:חלק|צד)\s+(החיובי|השלילי)\s+של\s+ציר\s*ה?\s*[-־]?\s*([xyz])$/) ??
+    s.match(/^([A-Z]\d*'?)\s+(?:is\s+|lies\s+)?on\s+the\s+(positive|negative)\s+(?:part|side)\s+of\s+the\s+([xyz])[- ]axis$/i);
+  if (part) return lower(part[1], part[3] as 'x' | 'y' | 'z', part[2] === 'positive' || part[2] === 'החיובי' ? 'החיובי' : 'השלילי');
+  const he = s.match(/^(?:הקודקוד\s+|הנקודה\s+)?([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+)?על\s+ציר\s*ה?\s*[-־]?\s*([xyz])(?:\s+(החיובי|השלילי))?$/);
+  if (he) return lower(he[1], he[2] as 'x' | 'y' | 'z', he[3]);
+  const en = s.match(/^([A-Z]\d*'?)\s+(?:is\s+|lies\s+)?on\s+the\s+(positive\s+|negative\s+)?([xyz])[- ]axis$/i);
+  if (en) return lower(en[1], en[3] as 'x' | 'y' | 'z', en[2] && en[2].trim().toLowerCase() === 'positive' ? 'positive' : en[2] ? 'השלילי' : undefined);
+  return null;
 };
 
 /** `∠PC'C = 82.1` / `הזווית PC'C היא 90` — the vertex form lowers to the angle-between-segments claim. */

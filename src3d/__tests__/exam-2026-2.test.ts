@@ -40,6 +40,24 @@ const PLACE = [
 ];
 
 describe('GATE — 2026 מועד ב Q2 (square pyramid + |EN| abs-value given)', () => {
+  it("axis-placement phrasing variations all parse (the operator's ציר z form was the gap)", () => {
+    const forms = [
+      'S על החלק החיובי של ציר z',
+      'S נמצא על החלק החיובי של ציר ה-z',
+      'S בחלק החיובי של ציר ה z',
+      'S בצד השלילי של ציר x',
+      'הקודקוד D נמצא על החלק החיובי של ציר ה-x',
+      'D על ציר x החיובי',
+      'S on the positive part of the z axis',
+    ];
+    for (const form of forms) {
+      reset();
+      submit('פירמידה ABCDS שבסיסה ריבוע');
+      submit(form);
+      expect(state().lastError, form).toBeNull();
+    }
+  });
+
   beforeEach(reset);
 
   it('the full chain: |EN| pins k = ½ (touch root); N, E, the plane and the volumes verify', () => {
