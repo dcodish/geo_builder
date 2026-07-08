@@ -9,7 +9,7 @@
  */
 
 import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, Vec } from './types';
-import { add, reflectAcross, sub } from './geometry';
+import { add, dist, lineLineIntersect, reflectAcross, scale, sub } from './geometry';
 import { constraintRefs } from './solve';
 
 /**
@@ -432,6 +432,118 @@ function fitTemplate(template: BaseVertex[], pos: Map<Id, Vec>): (p: BaseVertex)
  * own definition stands — ADR-013). Derived vertices are added separately and
  * follow these by their rules.
  */
+/** The figure's extent around `c` (for scale-relative tolerances; floored at 1 for tiny/empty figures). */
+function spanAround(c: Vec, existing: Vec[]): number {
+  return Math.max(1, ...existing.map((v) => Math.max(Math.abs(v.x - c.x), Math.abs(v.y - c.y))));
+}
+
+/**
+ * Is any of `pts` in a DEGENERATE spot w.r.t. the existing points ([ADR-253](../../docs/06-decisions.md#adr-253)):
+ * within ~1.5% of the span of an existing point (the store's pointsDistinct "too close to draw" bar), or
+ * EXACTLY (1e-6·span — template arithmetic produces exact hits) on the infinite line through the anchor
+ * `c` and an existing point? Both are measure-zero relations the student never stated: they draw a false
+ * coincidence/collinearity (ADR-052) and hard-poison later solves at the one composition the apply gate
+ * judges.
+ */
+function degeneratePlacement(c: Vec, pts: Vec[], existing: Vec[], span: number): boolean {
+  const tolPt = 0.015 * span;
+  const tolLine = 1e-6 * span;
+  return pts.some((p) => {
+    const d = sub(p, c);
+    const len = Math.hypot(d.x, d.y);
+    return existing.some(
+      (q) =>
+        Math.hypot(p.x - q.x, p.y - q.y) < tolPt ||
+        (len > 1e-12 && Math.abs((q.x - c.x) * d.y - (q.y - c.y) * d.x) / len < tolLine),
+    );
+  });
+}
+
+/**
+ * Re-seat a GENUINELY LOOSE endpoint of a stated segment-meet so the two segments actually cross
+ * ([ADR-255](../../docs/06-decisions.md#adr-255)). "AM חותך את CO ב-K" asserts the crossing exists —
+ * that is information about where a free M belongs (M1/M4: defaults yield to statements). Fires only
+ * when the crossing currently lies OFF a segment (or the lines are parallel); moves only a non-pinned
+ * free point that no constraint references and no directive drives (a constrained endpoint — e.g. an
+ * ADR-166 equilateral apex — is owned by its own mechanism); prefers the endpoint with the FEWEST
+ * dependents (so a circle-defining point is moved only as a last resort); and the new spot must keep
+ * the point on the SAME SIDE of every resolvable circle (a stated "M מחוץ למעגל" survives, ADR-254)
+ * and in general position (ADR-253). The point stays a free DOF — this is a better default, not a pin.
+ */
+function reseatLooseMeetEndpoint(
+  objects: GeoObject[],
+  constraints: Constraint[],
+  pos: Map<Id, Vec>,
+  seg1: [Id, Id],
+  seg2: [Id, Id],
+): void {
+  const p = (id: Id) => pos.get(id);
+  const [a, b, c, d] = [p(seg1[0]), p(seg1[1]), p(seg2[0]), p(seg2[1])];
+  if (!a || !b || !c || !d) return;
+  const param = (s: Vec, e: Vec, x: Vec): number => {
+    const L = (e.x - s.x) ** 2 + (e.y - s.y) ** 2;
+    return L < 1e-18 ? 0.5 : ((x.x - s.x) * (e.x - s.x) + (x.y - s.y) * (e.y - s.y)) / L;
+  };
+  const off = (t: number) => t < -0.02 || t > 1.02;
+  const hit = lineLineIntersect(a, b, c, d);
+  const off1 = !hit || off(param(a, b, hit));
+  const off2 = !hit || off(param(c, d, hit));
+  if (!off1 && !off2) return; // the stated crossing already holds
+  const loose = (id: Id): boolean => {
+    const o = objects.find((x) => x.id === id);
+    return (
+      !!o &&
+      o.kind === 'free-point' &&
+      !o.pinned &&
+      !(o as { solve?: unknown }).solve &&
+      !constraints.some((k) => constraintRefs(k).includes(id))
+    );
+  };
+  const refsId = (o: GeoObject, id: Id): boolean =>
+    Object.entries(o).some(([k, v]) => k !== 'id' && (v === id || (Array.isArray(v) && (v as unknown[]).includes(id))));
+  const deps = (id: Id): number => objects.filter((o) => o.id !== id && refsId(o, id)).length;
+  type Cand = { id: Id; mate: Id; other: [Vec, Vec] };
+  const cands: Cand[] = [];
+  if (off1) cands.push({ id: seg1[0], mate: seg1[1], other: [c, d] }, { id: seg1[1], mate: seg1[0], other: [c, d] });
+  if (off2) cands.push({ id: seg2[0], mate: seg2[1], other: [a, b] }, { id: seg2[1], mate: seg2[0], other: [a, b] });
+  const picks = cands.filter((x) => loose(x.id)).sort((x, y) => deps(x.id) - deps(y.id));
+  const keepsCircleSides = (oldP: Vec, newP: Vec): boolean =>
+    objects.every((o) => {
+      if (o.kind !== 'circle') return true;
+      const ctr = pos.get(o.center);
+      if (!ctr) return true;
+      const r =
+        o.radius.via === 'through'
+          ? pos.get(o.radius.point)
+            ? dist(ctr, pos.get(o.radius.point)!)
+            : null
+          : 'value' in o.radius
+            ? o.radius.value
+            : null;
+      if (r == null) return true;
+      const so = dist(oldP, ctr) - r;
+      const sn = dist(newP, ctr) - r;
+      return Math.abs(so) < 1e-9 ? true : so > 0 === sn > 0;
+    });
+  for (const cand of picks) {
+    const S = pos.get(cand.mate)!;
+    const old = pos.get(cand.id)!;
+    const mid = { x: (cand.other[0].x + cand.other[1].x) / 2, y: (cand.other[0].y + cand.other[1].y) / 2 };
+    const dir = sub(mid, S);
+    if (dir.x * dir.x + dir.y * dir.y < 1e-12) continue; // the mate sits on the other segment's midpoint — aim elsewhere
+    const existing = [...pos.entries()].filter(([id]) => id !== cand.id && id !== cand.mate).map(([, v]) => v);
+    const span = spanAround(S, existing.length ? existing : [mid]);
+    for (const k of [1.7, 2.0, 2.4, 1.5, 2.9]) {
+      const F = add(S, scale(dir, k)); // beyond the other segment ⇒ the crossing lands inside both
+      if (degeneratePlacement(S, [F], existing, span)) continue;
+      if (!keepsCircleSides(old, F)) continue;
+      const i = objects.findIndex((o) => o.id === cand.id);
+      objects[i] = { ...(objects[i] as Extract<GeoObject, { kind: 'free-point' }>), x: F.x, y: F.y };
+      return;
+    }
+  }
+}
+
 function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Vec>, rigid = false): void {
   const fit = fitTemplate(template, pos);
   // A shape that shares NO point with the figure (0 anchors) would otherwise land on the
@@ -447,9 +559,41 @@ function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Ve
     const tMinX = Math.min(...template.map((t) => t.x));
     off = { x: maxX - tMinX + 4, y: 0 }; // a fixed gap past the existing figure's right edge
   }
+  // ── General position ([ADR-253](../../docs/06-decisions.md#adr-253)). With exactly ONE anchor the
+  // similarity fit's ROTATION is arbitrary (fitTemplate resolves it to a pure translation), so the naive
+  // default can land a NEW vertex in a measure-zero DEGENERATE spot: exactly ON an existing point ("AB
+  // קוטר" puts B at A+(5,0); a later bare "AM" then stacks M onto B), or exactly on the LINE through the
+  // anchor and an existing point (K = AM∩OC then collapses onto O, and a later constraint hard-fails at
+  // the only composition the apply gate ever judges — the seed is applied AFTER the fold, so no seed can
+  // rescue it). A default must also not silently DRAW a coincidence/collinearity the student never stated
+  // (ADR-052). So: spin the fitted template around the anchor by golden-angle steps until every new
+  // vertex is in general position. The identity is kept whenever it is already generic, so healthy
+  // figures are placed bit-identically.
+  let spin = (v: Vec): Vec => v;
+  const anchors = template.filter((t) => pos.get(t.id) !== undefined);
+  const news = template.filter((t) => !objects.some((o) => o.id === t.id));
+  if (anchors.length === 1 && news.length > 0) {
+    const c = pos.get(anchors[0].id)!;
+    const existing = [...pos.entries()].filter(([id]) => id !== anchors[0].id).map(([, v]) => v);
+    if (existing.length > 0) {
+      const span = spanAround(c, existing);
+      for (let k = 0; k <= 24; k++) {
+        const th = k * GOLDEN_ANGLE;
+        const cand = (v: Vec): Vec => {
+          const dx = v.x - c.x;
+          const dy = v.y - c.y;
+          return { x: c.x + Math.cos(th) * dx - Math.sin(th) * dy, y: c.y + Math.sin(th) * dx + Math.cos(th) * dy };
+        };
+        if (!degeneratePlacement(c, news.map((t) => cand(fit(t))), existing, span)) {
+          spin = cand;
+          break;
+        }
+      }
+    }
+  }
   for (const t of template) {
     if (objects.some((o) => o.id === t.id)) continue; // reuse existing
-    const v = fit(t);
+    const v = spin(fit(t));
     // `rigid` base vertices belong to a fully-committed regular shape (a square):
     // a constraint that contradicts the shape is a genuine over-constraint, so the
     // solver must NOT drive them (it would silently rescale/reshape) — ADR-030.
@@ -715,6 +859,18 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
 
     case 'line-line-intersection':
+      // A plain SEGMENT meet (`onSeg`) is a STATEMENT that the two segments actually cross — which is
+      // information about where an under-determined endpoint belongs (M1/M4: defaults yield to
+      // statements, [ADR-255](../../docs/06-decisions.md#adr-255)). When the current defaults put the
+      // crossing on a continuation and an endpoint is GENUINELY LOOSE (a non-pinned free point that no
+      // constraint references), re-seat its default so the segments really cross: aim it from its fixed
+      // mate through the midpoint of the other segment, keeping it on the SAME SIDE of every circle it
+      // was on (so a stated "M מחוץ למעגל" survives) and in general position (ADR-253). Without this the
+      // figure builds ✓ with the crossing off both segments, and no sampled config can rescue it — the
+      // seed jitter explores only a small neighbourhood of the default (session gaawv4fr). Endpoints
+      // that carry constraints (e.g. ADR-166's equilateral apexes) are left to their own mechanism
+      // (reflection DOFs); a meet with no loose endpoint keeps today's behaviour (verifier amber).
+      if (cmd.onSeg) reseatLooseMeetEndpoint(objects, constraints, pos, [cmd.a, cmd.b], [cmd.c, cmd.d]);
       addObj(objects, { kind: 'line-line-intersection', id: cmd.id, a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d, ...(cmd.onSeg ? { onSeg: true } : {}) });
       // A "המשך" operand is DIRECTIONAL — A must be BEYOND the named 2nd point (ADR-054). Emit a
       // `collinear-order` (A is already collinear via the crossing); when the current free DOFs put the
@@ -818,6 +974,60 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       addObj(objects, { kind: 'circumcenter', id: cmd.center, a: cmd.a, b: cmd.b, c: cmd.c });
       addObj(objects, { kind: 'circle', id: cmd.id, center: cmd.center, radius: { via: 'through', point: cmd.a }, autoCenter: true, ...(cmd.hidden ? { hidden: true } : {}) }); // circumcentre is auto, hidden unless used; `hidden` for a cyclic (בר-חסימה) figure
       break;
+
+    case 'point-circle-side': {
+      // "M מחוץ למעגל / בתוך המעגל" ([ADR-254](../../docs/06-decisions.md#adr-254)). The command itself
+      // is the side REQUIREMENT record — checkGivens re-derives it from the final coordinates
+      // (figure.v.circleSide) and meetsRequirements gates sampling/"show another" on it — so nothing is
+      // pushed to `constraints` here (an inequality has nothing to drive; the ADR-244 radius-order shape).
+      const circ = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle);
+      const centre = circ ? pos.get(circ.center) : undefined;
+      const rr = circ
+        ? circ.radius.via === 'through'
+          ? centre && pos.get(circ.radius.point)
+            ? dist(centre, pos.get(circ.radius.point)!)
+            : 5
+          : 'value' in circ.radius
+            ? circ.radius.value
+            : 5 // a tangent-inner radius is internal state with no length at apply time — the seed only needs a scale
+        : 5;
+      const seedSpot = (): Vec => {
+        // Seed on the stated side, in GENERAL POSITION around the centre: θ=0 (the textbook "external
+        // point to the right") usually sits exactly on a drawn diameter's line, so the golden spin
+        // walks off it (ADR-253). Structural probes (commandConflict / introducedPointIds) apply this
+        // on an EMPTY construction where the circle is absent — any spot stands in there.
+        const c = centre ?? { x: 0, y: 0 };
+        const rad = (cmd.side === 'outside' ? 1.7 : 0.45) * rr;
+        // The centre itself is the spin ANCHOR — it sits on every candidate line, so it must not count
+        // as an existing point to clear (placeBase excludes its anchor the same way).
+        const others = [...pos.entries()].filter(([id]) => id !== circ?.center).map(([, v]) => v);
+        const span = spanAround(c, others);
+        for (let k = 0; k <= 24; k++) {
+          const th = k * GOLDEN_ANGLE;
+          const p = { x: c.x + rad * Math.cos(th), y: c.y + rad * Math.sin(th) };
+          if (!degeneratePlacement(c, [p], others, span)) return p;
+        }
+        return { x: c.x + rad, y: c.y };
+      };
+      const existing = objects.find((o) => o.id === cmd.id);
+      if (!existing) {
+        const p = seedSpot();
+        objects.push({ kind: 'free-point', id: cmd.id, x: p.x, y: p.y }); // a real free DOF (ADR-052) — not pinned
+      } else if (existing.kind === 'free-point' && !existing.pinned && centre) {
+        // M1: a side statement about an EXISTING point is a statement about that point, never a
+        // re-creation. An under-determined (non-pinned) free point currently on the WRONG side gets its
+        // DEFAULT re-seated to the stated side — a better default, not a drive; it stays a free DOF. A
+        // pinned/derived/parametric point is left where its definition puts it (the verifier reports).
+        const d = dist({ x: existing.x, y: existing.y }, centre);
+        const wrong = cmd.side === 'outside' ? d <= rr : d >= rr;
+        if (wrong) {
+          const p = seedSpot();
+          const i = objects.findIndex((o) => o.id === cmd.id);
+          objects[i] = { ...existing, x: p.x, y: p.y };
+        }
+      }
+      break;
+    }
 
     case 'point-on-circle': {
       // Re-defining an EXISTING point as "on circle C" is a RELATION on that point, not a fresh

@@ -148,6 +148,88 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'stated-meet-relocates-loose-point',
+    title: 'AM חותך את CO בנקודה K with M loose: the stated meet re-seats M so the segments really cross (and M stays outside)',
+    guards:
+      'ADR-255: operator session gaawv4fr (2026-07-08) — with M seeded outside up-LEFT of the circle, segments AM and CO cannot cross; the figure built ✓ with K on the continuations, the amber was easy to miss, and NO sampled config could rescue it (findValidConfig null — seed jitter explores only a small neighbourhood of the free default). A stated segment-meet is information about where the loose endpoint belongs (M1/M4): apply now re-seats a non-pinned, constraint-free endpoint along the ray from its fixed mate through the other segment\'s midpoint, preserving its circle sides (the stated "M מחוץ למעגל" survives) and general position. Typos as typed: "על במעגל", "בנדוקה".',
+    steps: ['AB קוטר', 'C על במעגל', 'M מחוץ למעגל', 'AM חותך את CO בנדוקה K'],
+    check(fig) {
+      allStepsOk(fig);
+      const c = fig.circles.get('circle-O');
+      expect(c, 'circle O resolved').toBeTruthy();
+      if (!c) return;
+      // M is strictly outside — the ADR-254 side statement survived the re-seat.
+      expect(dist(at(fig, 'M'), c.center), 'M outside circle O').toBeGreaterThan(c.r);
+      // K lies WITHIN both stated segments (the meet is real, not on a continuation).
+      const within = (g: string, a: string, b: string) => {
+        const A = at(fig, a), B = at(fig, b), G = at(fig, g);
+        return ((G.x - A.x) * (B.x - A.x) + (G.y - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2);
+      };
+      expect(within('K', 'A', 'M'), 'K within AM').toBeGreaterThan(0.02);
+      expect(within('K', 'A', 'M'), 'K within AM').toBeLessThan(0.98);
+      expect(within('K', 'C', 'O'), 'K within CO').toBeGreaterThan(-0.02);
+      expect(within('K', 'C', 'O'), 'K within CO').toBeLessThan(1.02);
+    },
+  },
+  {
+    id: 'kite-EMKO-outside-point',
+    title: 'bagrut: AB קוטר, M מחוץ למעגל, AM חותך את CO ב-K, E על BO, דלתון EMKO (MK=ME, OK=OE)',
+    guards:
+      'ADR-254 + ADR-253: the operator typed this figure (session ad66x493, 2026-07-08) and hit BOTH bugs. (1) "M מחוץ למעגל" was unrepresentable (LLM → not-understood), so M entered as a bare endpoint of "AM" with no record it belongs outside; (2) that bare endpoint was default-placed at A+(5,0) — EXACTLY on B and collinear with A,O,B — so K = AM∩OC collapsed onto O and both kite givens (OK=OE, MK=ME) hard-failed at the only composition the apply gate judges, on every seed (the seed is applied after the fold). Now the side statement parses (a free point seeded outside, the side a verifier/meetsRequirements requirement) and defaults land in general position.',
+    steps: [
+      'AB קוטר במעגל O',
+      'C על המעגל',
+      'AC',
+      'M מחוץ למעגל',
+      'AM',
+      'OM',
+      { llm: ['K חיתוך AM ו-OC'] }, // the operator's typo "AM חותף את OC בנקודה K" escalated; the LLM's canonical line, from the log
+      'E על BO',
+      'OK=OE',
+      'MK=ME',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const c = fig.circles.get('circle-O');
+      expect(c, 'circle O resolved').toBeTruthy();
+      if (!c) return;
+      // M is strictly OUTSIDE the circle — the stated side survives the kite solve.
+      expect(dist(at(fig, 'M'), c.center), 'M outside circle O').toBeGreaterThan(c.r * 1.02);
+      // The kite EMKO: both stated equalities hold, and K did not degenerate onto O.
+      expect(dist(at(fig, 'O'), at(fig, 'K'))).toBeCloseTo(dist(at(fig, 'O'), at(fig, 'E')), 3);
+      expect(dist(at(fig, 'M'), at(fig, 'K'))).toBeCloseTo(dist(at(fig, 'M'), at(fig, 'E')), 3);
+      expect(dist(at(fig, 'K'), at(fig, 'O')), 'K distinct from O').toBeGreaterThan(0.05 * c.r);
+      // E lies within segment BO (not at an endpoint, not on the continuation).
+      const B = at(fig, 'B'), O = at(fig, 'O'), E = at(fig, 'E');
+      const t = ((E.x - B.x) * (O.x - B.x) + (E.y - B.y) * (O.y - B.y)) / ((O.x - B.x) ** 2 + (O.y - B.y) ** 2);
+      expect(t, 'E within BO').toBeGreaterThan(0.02);
+      expect(t, 'E within BO').toBeLessThan(0.98);
+    },
+  },
+  {
+    id: 'kite-EMKO-degenerate-default',
+    title: 'the same figure WITHOUT the side statement: a bare "AM" endpoint must not stack onto B (general position)',
+    guards:
+      'ADR-253: the fact list as it actually committed in session ad66x493 (the side statement was refused, so M was created by "AM" alone). placeBase\'s one-anchor fit is a pure translation, so M landed at A+(5,0) = B exactly — a measure-zero degenerate default that poisoned every later solve. Defaults must land in general position; with that, the kite constraints drive M/C/E to a valid figure on their own.',
+    steps: [
+      'AB קוטר במעגל O',
+      'C על המעגל',
+      'AC',
+      'AM',
+      'OM',
+      { llm: ['K חיתוך AM ו-OC'] },
+      'E על BO',
+      'OK=OE',
+      'MK=ME',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'O'), at(fig, 'K'))).toBeCloseTo(dist(at(fig, 'O'), at(fig, 'E')), 3);
+      expect(dist(at(fig, 'M'), at(fig, 'K'))).toBeCloseTo(dist(at(fig, 'M'), at(fig, 'E')), 3);
+      expect(dist(at(fig, 'M'), at(fig, 'B')), 'M did not stack onto B').toBeGreaterThan(0.5);
+    },
+  },
+  {
     id: 'incircle-inverted-passive-quad',
     title: 'במרובע ABCD חסום מעגל O — the inverted passive (container-first) reads as the INCIRCLE, not the converse',
     guards:
@@ -3922,6 +4004,44 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       expect(dist(at(fig, 'A'), at(fig, 'C'))).toBeCloseTo(10, 3); // the diagonals still hold
       expect(dist(at(fig, 'B'), at(fig, 'D'))).toBeCloseTo(10, 3);
     }
+    st.clear();
+  });
+
+  it('[ntzdgqn2-kite-detection-honours-requirements] the kite-EMKO figure: ∠AMO=∠EMO reported and △CAK~△OMK in the similar list (ADR-256)', async () => {
+    // Operator (2026-07-08, session ntzdgqn2): "when I ask to see equal angles … AMO which should be like
+    // OME is not shown; also the triangles OMK and CAK are similar and are not in the list." Both are
+    // FORCED by the givens (kite ⇒ MO bisects ∠KOE; radii ⇒ ∠OCA = ∠COB/2 = ∠KOM; vertical angles at K),
+    // but the detection sample pool included configs where K slid OFF segment CO (the stated meet), flipping
+    // ray O→K — so relations true in every VALID config read as not forced. The pool is now gated on the
+    // figure's stated configuration requirements (requirementSamples + extension margins), same bar as
+    // firstSatisfyingSeed.
+    const st = useGeoStore.getState();
+    st.clear();
+    for (const u of ['AB קוטר במעגל O', 'C על המעגל', 'M מחוץ למעגל', 'AM חותך את CO בנקודה K', 'E על BO', 'OK=OE', 'MK=ME', 'MO', 'AC', 'BC/EK=5/3']) {
+      const r = parse(u, ctxOf(useGeoStore.getState().facts));
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return;
+      for (const cmd of r.commands) st.execute(cmd, u, `g-${u}`);
+    }
+    useGeoStore.getState().viewRelations();
+    const rel = useGeoStore.getState().relations!.result;
+    // The wedge at M toward A/K (K lies on MA — one ray) equals the wedge toward E: one class holds both.
+    // Ray-merge may name the shared ray by either A or K, so accept either name.
+    const hasMWedgePair = rel.equalAngles.some((cls) => {
+      const names = cls.map((a) => [a.a, a.vertex, a.b].join(''));
+      const mSide = names.some((n) => n === 'AMO' || n === 'OMA' || n === 'KMO' || n === 'OMK');
+      const eSide = names.some((n) => n === 'EMO' || n === 'OME');
+      return mSide && eSide;
+    });
+    expect(hasMWedgePair, `∠AMO = ∠EMO reported (got: ${rel.equalAngles.map((c) => c.map((a) => `∠${a.a}${a.vertex}${a.b}`).join('=')).join(' | ')})`).toBe(true);
+    await useGeoStore.getState().detectShapes();
+    const similar = useGeoStore.getState().shapes!.result.similar;
+    const key = (t: Id[]) => [...t].sort().join('');
+    const hasPair = similar.some((cls) => {
+      const sets = cls.triangles.map(key);
+      return sets.includes('ACK') && sets.includes('KMO');
+    });
+    expect(hasPair, `△CAK ~ △OMK in the similar classes (got: ${similar.map((c) => c.triangles.map((t) => t.join('')).join('~')).join(' | ')})`).toBe(true);
     st.clear();
   });
 

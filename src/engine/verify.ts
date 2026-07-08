@@ -19,7 +19,7 @@ import { constraintRefs, describeConstraint, isSatisfied, residual } from './sol
 
 export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
-  relation: 'on-circle' | 'tangent' | 'radius-order' | Constraint['type'];
+  relation: 'on-circle' | 'tangent' | 'radius-order' | 'circle-side' | Constraint['type'];
   ids: Id[];
   /** English fallback, e.g. "E should lie on circle P (radius 3.60) but is 7.42 from its centre". */
   message: string;
@@ -200,6 +200,30 @@ export function checkGivens(
         message: `the inner circle (radius ${inner.r.toFixed(2)}) should be strictly inside the outer circle (radius ${outer.r.toFixed(2)})`,
         messageKey: 'figure.v.radiusOrder',
         params: { inner: circleName(cmd.inner), outer: circleName(cmd.outer), ri: inner.r.toFixed(2), ro: outer.r.toFixed(2) },
+      });
+    }
+  }
+
+  // A stated circle-SIDE ("M מחוץ למעגל" / "בתוך המעגל", ADR-254): the point must lie STRICTLY on its
+  // stated side of the circle. The point is a free DOF (ADR-052), so a sampled config can drift across —
+  // `meetsRequirements` gates on a clean verifier, so the sampler / "show another configuration" skips
+  // wrong-side configs; a genuinely contradicted side (the point pinned/derived onto the other side)
+  // surfaces amber here.
+  for (const cmd of commands) {
+    if (cmd.type !== 'point-circle-side') continue;
+    const c = circles.get(cmd.circle);
+    const p = positions.get(cmd.id);
+    if (!c || !p) continue;
+    const d = dist(p, c.center);
+    const tol = onCircleTol(c.r);
+    const ok = cmd.side === 'outside' ? d > c.r + tol : d < c.r - tol;
+    if (!ok) {
+      violations.push({
+        relation: 'circle-side',
+        ids: [cmd.id, cmd.circle],
+        message: `${cmd.id} should lie ${cmd.side} ${circleLabel(cmd.circle)} (radius ${c.r.toFixed(2)}) but is ${d.toFixed(2)} from its centre`,
+        messageKey: cmd.side === 'outside' ? 'figure.v.outsideCircle' : 'figure.v.insideCircle',
+        params: { point: cmd.id, circle: circleName(cmd.circle), radius: c.r.toFixed(2), dist: d.toFixed(2) },
       });
     }
   }

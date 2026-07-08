@@ -25,7 +25,7 @@ export type { StepResult, StepOk, StepErr } from './step';
 export { applySeed, freeDofs, freeDofCount, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, baseSeedOf, withReflectMask, REFLECT_MAX, REFLECT_STRIDE } from './sample';
 export { checkGivens } from './verify';
 export type { GivenViolation } from './verify';
-export { detectRelations, detectRelationsAcross, figureEdges, convergedSamples } from './relations';
+export { detectRelations, detectRelationsAcross, figureEdges, convergedSamples, requirementSamples } from './relations';
 export type { RelationsResult, SegmentRef, AngleRef, DefiniteAngle, DetectOptions } from './relations';
 export { detectShapes, detectShapesAcross, classifyShapesFromSamples } from './detectShapes';
 export type { ShapeType, DetectedShape, SimilarClass, ShapesResult, ShapeDetectOptions } from './detectShapes';

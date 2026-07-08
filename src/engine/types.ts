@@ -903,6 +903,12 @@ export type Command =
   | { type: 'circle-through'; id: Id; center: Id; through: Id; hidden?: boolean; autoCenter?: boolean }
   | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id; hidden?: boolean } // circle through a,b,c (centre = circumcentre); hidden for a cyclic (בר-חסימה) figure
   | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number; free?: boolean; between?: [Id, Id]; softPair?: boolean } // theta = a STARTING angle; free:true keeps it a samplable/drivable DOF even with a start angle (ADR-097); between = a free point on the arc from-to (ADR-042); softPair: a common-tangent macro's DEFAULT touch↔circle pairing — the store swaps the pair when a later explicit membership states the opposite assignment (ADR-239, the M4 shape)
+  // "M מחוץ למעגל / בתוך המעגל" (ADR-254): a NEW id is created as a FREE point (2 DOF) seeded on the
+  // stated side; an EXISTING id is a statement about that point (M1) — a non-pinned free point on the
+  // wrong side is re-seated to its stated side, anything else is left to the verifier. The side itself
+  // is a REQUIREMENT (like `set-radius-order`): the givens verifier flags a wrong-side config, so
+  // `meetsRequirements` (sampler / "show another") skips it — never a driven equality.
+  | { type: 'point-circle-side'; id: Id; circle: Id; side: 'inside' | 'outside' }
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
   | { type: 'arc'; id: Id; center: Id; from: Id; to: Id } // a drawn arc (CCW from→to): semicircle / quarter circle
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }

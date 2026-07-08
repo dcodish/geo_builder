@@ -244,6 +244,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle-circle-intersection",
     ],
   },
+  "M is outside circle O": {
+    "en": [
+      "circle",
+      "point-circle-side",
+    ],
+    "he": [
+      "circle",
+      "point-circle-side",
+    ],
+  },
   "M is the intersection of AC and BD": {
     "en": [
       "segment",

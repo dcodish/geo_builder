@@ -1053,6 +1053,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "M is outside circle O",
+    "winner": "pointVsCircle",
+  },
+  {
+    "lang": "he",
+    "text": "M מחוץ למעגל O",
+    "winner": "pointVsCircle",
+  },
+  {
+    "lang": "en",
     "text": "O is the centre of the circle",
     "winner": "nameCenter",
   },

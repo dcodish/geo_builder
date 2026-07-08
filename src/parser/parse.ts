@@ -2862,6 +2862,27 @@ const pointOnCircle: Rule = (s, ctx) => {
   return subjects.map((id) => ({ type: 'point-on-circle' as const, id, circle: circleId(center) }));
 };
 
+/** "M מחוץ למעגל [O]" / "הנקודה M נמצאת בתוך המעגל" / "M is outside circle O" / "point M lies inside
+ *  the circle" — a point's SIDE of a circle ([ADR-254](../../../docs/06-decisions.md#adr-254)). A NEW id
+ *  becomes a free point seeded on the stated side; an existing id gets the side as a statement (M1). The
+ *  subject may be a list ("M ו-N מחוץ למעגל", the ADR-076/240 convention). Deliberately a TIGHT full
+ *  match (anchored `$`): a compound like "מנקודה E מחוץ למעגל יוצאים שני משיקים…" has more after the
+ *  circle ref and belongs to the secant/tangent rules (which also run earlier). */
+const pointVsCircle: Rule = (s, ctx) => {
+  if (!/circle|מעגל/i.test(s)) return null;
+  const m = s.match(
+    /^\s*(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?((?:[A-Za-z]\d*)(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)[A-Za-z]\d*)*)\s+(?:נמצא(?:ת|ות|ים)?\s+|is\s+|are\s+|lies?\s+)?(מחוץ\s*ל|בתוך\s+|outside\s+|inside\s+)(?:of\s+|the\s+)?(?:ה?מעגל|circle)\s*([A-Za-z]\d*)?\s*\.?\s*$/i,
+  );
+  if (!m) return null;
+  const side = /מחוץ|outside/i.test(m[2]) ? ('outside' as const) : ('inside' as const);
+  const center = resolveCenter(s, ctx);
+  if (!center) return null; // no named circle and 0 or 2+ in the figure ⇒ ambiguous → defer/escalate
+  // UPPERCASE labels only (the ADR-076 list convention) — a lowercase run like "and" is a connective.
+  const subjects = (m[1].match(/[A-Z]\d*/g) ?? []).map(up);
+  if (subjects.length === 0 || new Set(subjects).size !== subjects.length) return null;
+  return subjects.map((id) => ({ type: 'point-circle-side' as const, id, circle: circleId(center), side }));
+};
+
 /**
  * TWO tangents to the circle, at two points ON it, meeting at a third point — "the tangent at A and the
  * tangent at C meet at D" / "המשיק [מ/ב]נקודה A והמשיק [מ/ב]נקודה C נפגשים בנקודה D" (the pole of chord
@@ -4414,6 +4435,7 @@ export const RULES: Rule[] = [
   foot, // before `pointOnSegment`
   pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)
   pointOnCircle, // "A on circle O" / the LIST "A ו C על המעגל" (every subject gets the membership) — before segment/pointOnSegment
+  pointVsCircle, // "M מחוץ למעגל / בתוך המעגל" — a point's SIDE of a circle (ADR-254); tight full-match, after the external-point compounds
   radiusSegment, // "OB רדיוס" — a drawn radius (rim point on the circle + centre→rim segment); after midpoint/setRadius/circle, before `segment` (so "OB" isn't grabbed as a bare segment)
   dividesInRatio, // "G מחלקת את DC ביחס 1:2" — a point on DC at a fixed t; keyword+`p:q` anchored, BEFORE `segment` (which would grab "הקטע DC" and drop the divider) and the numeric/ratio rules
   segment,
@@ -4480,6 +4502,7 @@ const normalizePointSubscript = (s: string): string => s.replace(/([A-Za-z])_\{?
 /** The circle a command CONSUMES (references but doesn't define), or null. */
 const consumedCircleId = (cmd: AnyCommand): Id | null =>
   cmd.type === 'point-on-circle' ||
+  cmd.type === 'point-circle-side' ||
   cmd.type === 'tangent' ||
   cmd.type === 'arc-midpoint' ||
   cmd.type === 'line-circle-intersection' ||

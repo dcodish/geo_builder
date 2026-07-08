@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
+import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
 import type { FigureFile } from './figureFile';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -1022,7 +1022,20 @@ function samplingJobs(facts: Fact[]) {
       if (r.ok) raw.push(r.positions);
     }),
   );
-  const finish = () => (sampleMemo = { facts, constructions, samples: convergedSamples(raw) });
+  // Ground truth = VALID configurations only ([ADR-256](docs/06-decisions.md#adr-256)): a sample that
+  // violates a stated configuration requirement — a segment-meet's crossing off its segments
+  // (`requirementSamples`), or a "המשך" extension not reaching its far side — is not a configuration of
+  // the FIGURE, and counting it suppresses relations forced in every valid config (△OMK ~ △CAK vanished
+  // because mirror samples put K past segment CO's end, flipping ∠KOM). Falls back to the unfiltered
+  // converged pool when fewer than 2 remain: a thin pool over-claims, the unfiltered one only under-claims.
+  const finish = () => {
+    const c0 = constructions[0];
+    const converged = convergedSamples(raw);
+    const valid = requirementSamples(c0, converged).filter((pos) =>
+      extensionsClear(facts, { construction: c0, positions: pos } as Derived),
+    );
+    return (sampleMemo = { facts, constructions, samples: valid.length >= 2 ? valid : converged });
+  };
   return { jobs, finish };
 }
 // Sample collection is budgeted like every other search loop (E2): a failing seed's solve costs ~10× a

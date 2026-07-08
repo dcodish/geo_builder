@@ -17,7 +17,7 @@
  * Pure and deterministic (seeds 0..N-1): a read-only consumer of the engine, no engine state is mutated.
  */
 
-import type { Construction, Id, LineSpec, Vec } from './types';
+import type { Construction, GeoObject, Id, LineSpec, Vec } from './types';
 import { isGeoPoint } from './types';
 import { evaluate } from './evaluate';
 import { applySeed } from './sample';
@@ -295,6 +295,34 @@ export function convergedSamples(samples: Map<Id, Vec>[]): Map<Id, Vec>[] {
 }
 
 /**
+ * Drop samples that violate the construction's own STATED configuration requirements
+ * ([ADR-256](docs/06-decisions.md#adr-256)): a plain segment-meet (`line-line-intersection` with
+ * `onSeg` — "AM חותך את CO ב-K", ADR-166) whose crossing sits OFF a segment in that sample. Such a
+ * sample is not a valid configuration of the FIGURE — counting it in the "holds in EVERY sample"
+ * ground-truth pool suppresses relations that ARE forced in every valid config (△OMK ~ △CAK vanished
+ * because mirror samples put K past segment CO's end, flipping the ray O→K and with it ∠KOM). Same
+ * shape as {@link convergedSamples}: never strips below 2 — a thin pool over-claims (coincidences of
+ * one drawing read as forced), while the unfiltered pool only under-claims, the safer failure.
+ */
+export function requirementSamples(c: Construction, samples: Map<Id, Vec>[]): Map<Id, Vec>[] {
+  const meets = c.objects.filter(
+    (o): o is Extract<GeoObject, { kind: 'line-line-intersection' }> => o.kind === 'line-line-intersection' && !!o.onSeg,
+  );
+  if (meets.length === 0 || samples.length < 3) return samples;
+  const MARGIN = 0.02; // the sampling bar (WITHIN_MARGIN); the verifier's amber check stays looser
+  const within = (pos: Map<Id, Vec>, s: Id, e: Id, x: Id): boolean => {
+    const ps = pos.get(s), pe = pos.get(e), px = pos.get(x);
+    if (!ps || !pe || !px) return true; // unplaced — a different failure mode, not a config violation
+    const L = (pe.x - ps.x) ** 2 + (pe.y - ps.y) ** 2;
+    if (L < 1e-12) return true;
+    const t = ((px.x - ps.x) * (pe.x - ps.x) + (px.y - ps.y) * (pe.y - ps.y)) / L;
+    return t >= MARGIN && t <= 1 - MARGIN;
+  };
+  const kept = samples.filter((pos) => meets.every((m) => within(pos, m.a, m.b, m.id) && within(pos, m.c, m.d, m.id)));
+  return kept.length >= 2 ? kept : samples;
+}
+
+/**
  * Detect the ground-truth equalities of `c`: which edges are equal and which vertex-angles are equal,
  * each true across every sampled configuration. `c` should be the figure's construction (e.g.
  * `replay(facts, 0).construction`); this samples it with its own seeds, never mutating it.
@@ -331,7 +359,10 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
       }
     }
   }
-  const samples = convergedSamples(opts.positions ?? rawSamples); // drop numerically-diverged solves (ADR-166 Am.)
+  // Sample hygiene: drop numerically-diverged solves (ADR-166 Am.) AND configuration-requirement
+  // violators (ADR-256) — the store's shared core is already filtered, but the direct engine path
+  // (tests/scenarios calling detectRelations on a construction) must apply the same ground-truth bar.
+  const samples = requirementSamples(c0, convergedSamples(opts.positions ?? rawSamples));
   if (samples.length === 0) return { equalSegments: [], equalAngles: [], definiteAngles: [], samplesUsed: 0 };
 
   // 2. The IMPLICIT edge universe — drawn segments + polygon edges + GEOMETRIC on-carrier splits +

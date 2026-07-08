@@ -19,7 +19,7 @@
 import type { Construction, Id, Vec, Polygon, Circle } from './types';
 import { evaluate } from './evaluate';
 import { applySeed } from './sample';
-import { figureEdges, collinearMerges, convergedSamples } from './relations';
+import { figureEdges, collinearMerges, convergedSamples, requirementSamples } from './relations';
 import { dist, sub, len } from './geometry';
 
 /** Every named shape the layer can detect; each maps to one geometry-book page (see shapeCatalog). */
@@ -104,7 +104,9 @@ function samplePositions(constructions: Construction[], N: number): Map<Id, Vec>
       if (r.ok) out.push(r.positions);
     }
   }
-  return convergedSamples(out); // drop numerically-diverged solves so a real forced shape isn't masked (ADR-166 Am.)
+  // Drop numerically-diverged solves (ADR-166 Am.) and stated-requirement violators (ADR-256 — a sample
+  // with a segment-meet's crossing off its segments is not a valid configuration of the figure).
+  return requirementSamples(constructions[0], convergedSamples(out));
 }
 
 /** Per-vertex coordinates of a polygon in one sample, or null if any vertex is missing/degenerate. */

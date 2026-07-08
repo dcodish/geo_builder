@@ -116,7 +116,9 @@
       "meetOnSegment": "{{id}} should be where segments {{seg1}} and {{seg2}} cross, but they meet on a continuation, not on the segments themselves.",
       "onSegment": "{{point}} should lie on segment {{seg}} but landed off it (outside its endpoints)",
       "trapezoidMorph": "{{quad}} was declared a trapezoid, but both pairs of opposite sides are now parallel — it is no longer a trapezoid. To change the shape, edit or delete the trapezoid step.",
-      "radiusOrder": "the inner circle (radius {{ri}}) should stay inside the outer circle (radius {{ro}})"
+      "radiusOrder": "the inner circle (radius {{ri}}) should stay inside the outer circle (radius {{ro}})",
+      "outsideCircle": "{{point}} should lie outside circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
+      "insideCircle": "{{point}} should lie inside circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre"
     }
   },
   "errors": {
