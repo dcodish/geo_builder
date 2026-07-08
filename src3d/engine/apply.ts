@@ -146,6 +146,25 @@ function missingPoint(c: Construction3, ids: Id[]): EngineError3 | null {
   return null;
 }
 
+/** Validate a VecAtom operand (V8-f): a named vector must be declared; a pair's points must exist. */
+function atomRefError(c: Construction3, atom: import('./types').VecAtom): EngineError3 | null {
+  if (atom.kind === 'named') return c.vectors.has(atom.name) ? null : { code: 'unknown-vector', id: atom.name };
+  return missingPoint(c, [atom.from, atom.to]);
+}
+
+const firstAtomError = (c: Construction3, atoms: import('./types').VecAtom[]): EngineError3 | null => {
+  for (const a of atoms) {
+    const e = atomRefError(c, a);
+    if (e) return e;
+  }
+  return null;
+};
+
+/** Auto-draw a VecAtom's pair (idempotent) — named vectors already draw their own segment. */
+function drawAtom(next: Construction3, atom: import('./types').VecAtom): void {
+  if (atom.kind === 'pair' && !hasSegment(next, atom.from, atom.to)) next.segments.push([atom.from, atom.to]);
+}
+
 /** Apply-time validation of a claim's references (order matters, like every fact). */
 function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
   switch (claim.type) {
@@ -179,6 +198,11 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return missingPoint(c, claim.ids);
     case 'angle-seg-eq':
       return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
+    case 'cos-angle-eq':
+      return firstAtomError(c, [claim.u, claim.v]);
+    case 'dot-eq':
+    case 'cos-eq':
+      return firstAtomError(c, [claim.a, claim.b, claim.c, claim.d]);
     case 'lines-rel':
       return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
     case 'length-ratio':
@@ -719,6 +743,64 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       if (missing) return { ok: false, error: missing };
       const next = clone(c);
       next.pairPins.push({ a: cmd.a, b: cmd.b, x: cmd.x, y: cmd.y, z: cmd.z });
+      return { ok: true, next };
+    }
+
+    // V8-f (G6): cos of the angle between two operands. M1 (the ADR-3D-010 shape): on a
+    // figure with FREE solid dims it is a driving GIVEN (a scalar pin); on a determined
+    // figure it is a verified CLAIM. Either way its pairs auto-draw.
+    case 'cos-angle': {
+      const err = firstAtomError(c, [cmd.u, cmd.v]);
+      if (err) return { ok: false, error: err };
+      const next = clone(c);
+      drawAtom(next, cmd.u);
+      drawAtom(next, cmd.v);
+      if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-angle', u: cmd.u, v: cmd.v, cos: cmd.cos });
+      else next.claims.push({ type: 'cos-angle-eq', u: cmd.u, v: cmd.v, cos: cmd.cos });
+      return { ok: true, next };
+    }
+
+    // V8-f (G9): a chain `u·v = v·w = u·w` — each consecutive equality is one relation.
+    case 'dot-eq-chain': {
+      if (cmd.ops.length < 2) return { ok: false, error: { code: 'unknown-vector', id: '·' } };
+      const err = firstAtomError(c, cmd.ops.flatMap(([a, b]) => [a, b]));
+      if (err) return { ok: false, error: err };
+      const next = clone(c);
+      for (const [a, b] of cmd.ops) {
+        drawAtom(next, a);
+        drawAtom(next, b);
+      }
+      const drive = freeDims(c) > 0 && c.solids.length > 0;
+      for (let i = 1; i < cmd.ops.length; i++) {
+        const [a, b] = cmd.ops[i - 1];
+        const [cc, d] = cmd.ops[i];
+        if (drive) next.scalarPins.push({ kind: 'dot-eq', a, b, c: cc, d });
+        else next.claims.push({ type: 'dot-eq', a, b, c: cc, d });
+      }
+      return { ok: true, next };
+    }
+
+    // V8-f (G10): `base` makes equal angles with `a` and `b` ⇒ ∠(base,a) = ∠(base,b).
+    case 'angle-eq': {
+      const err = firstAtomError(c, [cmd.base, cmd.a, cmd.b]);
+      if (err) return { ok: false, error: err };
+      const next = clone(c);
+      drawAtom(next, cmd.base);
+      drawAtom(next, cmd.a);
+      drawAtom(next, cmd.b);
+      if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
+      else next.claims.push({ type: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
+      return { ok: true, next };
+    }
+
+    // V8-f (G11): D on segment a–b, root-found so ray apex→D bisects ∠(a)(apex)(b).
+    case 'bisector-point': {
+      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      const missing = missingPoint(c, [cmd.a, cmd.b, cmd.apex]);
+      if (missing) return { ok: false, error: missing };
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'bisector-seg', a: cmd.a, b: cmd.b, apex: cmd.apex });
+      if (!hasSegment(next, cmd.apex, cmd.id)) next.segments.push([cmd.apex, cmd.id]); // draw OD
       return { ok: true, next };
     }
 

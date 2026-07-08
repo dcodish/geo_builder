@@ -17,7 +17,7 @@
  *    refuse rather than silently drop it.
  */
 
-import type { Command3, Id, LinExpr, SymTerm, VecExpr } from '../engine/types';
+import type { Command3, Id, LinExpr, SymTerm, VecAtom, VecExpr } from '../engine/types';
 
 export type ParseResult3 =
   | { ok: true; commands: Command3[] }
@@ -1149,6 +1149,97 @@ const vertexAngleClaim: Rule = (s0) => {
   ];
 };
 
+/** Build a VecAtom from a regex operand triple: a lowercase name, or a point pair. */
+const mkAtom = (named?: string, pa?: string, pb?: string): VecAtom | null =>
+  named ? { kind: 'named', name: named } : pa && pb ? { kind: 'pair', from: pa, to: pb } : null;
+
+/**
+ * V8-f (G6): the cosine of the angle between two operands = a value.
+ * Named vectors: `קוסינוס הזווית בין הוקטורים w ו-u הוא √35/10` / `the cosine of the angle
+ * between u and w is √35/10` / `cos(u,v) = 0.5`. Vertex form: `cos∠ACB = 3/4` / `קוסינוס
+ * הזווית ACB = 3/4` (rays from the middle vertex). The value may carry a radical (evalRadical).
+ */
+const cosAngleGiven: Rule = (s) => {
+  if (!/cos|קוסינוס/i.test(s)) return null;
+  let m =
+    s.match(/קוסינוס\s+(?:ה?זווית\s+)?בין\s+(?:ה?וקטורים\s+)?([a-w])\s+ו-?\s*([a-w])\s+(?:הוא|היא|שווה\s+ל-?|=)\s*(.+)$/) ??
+    s.match(/(?:the\s+)?cosine\s+of\s+the\s+angle\s+between\s+(?:the\s+vectors?\s+)?([a-w])\s+and\s+([a-w])\s+(?:is|equals?|=)\s*(.+)$/i) ??
+    s.match(/^cos\s*(?:∠|∡)?\s*\(\s*([a-w])\s*,\s*([a-w])\s*\)\s*=\s*(.+)$/i);
+  if (m) {
+    const v = evalRadical(m[3].trim());
+    return v === null ? null : [{ type: 'cos-angle', u: { kind: 'named', name: m[1] }, v: { kind: 'named', name: m[2] }, cos: v }];
+  }
+  // vertex form: cos∠ACB / cos ACB / קוסינוס הזווית ACB = value — rays CA, CB from the middle vertex
+  m = s.match(/(?:cos|קוסינוס(?:\s+ה?זווית)?)\s*(?:∠|∡)?\s*([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:הוא|היא|שווה\s+ל-?|is|=)\s*(.+)$/i);
+  if (m) {
+    const v = evalRadical(m[4].trim());
+    if (v === null) return null;
+    const [, p, vtx, q] = m;
+    return [
+      { type: 'segment3', a: vtx, b: p },
+      { type: 'segment3', a: vtx, b: q },
+      { type: 'cos-angle', u: { kind: 'pair', from: vtx, to: p }, v: { kind: 'pair', from: vtx, to: q }, cos: v },
+    ];
+  }
+  return null;
+};
+
+/** V8-f (G9): a CHAIN of equal dot products `u·v = v·w = u·w` (RHS a dot, not a number —
+ *  `u·v = 24` falls through to dotGiven). Named vectors; ≥ 2 dot terms. */
+const dotEqGiven: Rule = (s) => {
+  const norm = s.replace(/[×*]/g, '·');
+  if (!/·/.test(norm)) return null;
+  const parts = norm.split('=').map((x) => x.trim());
+  if (parts.length < 2) return null;
+  const ops: [VecAtom, VecAtom][] = [];
+  for (const part of parts) {
+    const mm = part.match(/^([a-w])\s*·\s*([a-w])$/);
+    if (!mm) return null; // any non-dot term (e.g. a number) ⇒ not this rule
+    ops.push([{ kind: 'named', name: mm[1] }, { kind: 'named', name: mm[2] }]);
+  }
+  return [{ type: 'dot-eq-chain', ops }];
+};
+
+/** V8-f (G10): `AE יוצר זוויות שוות עם AB ו-AD` / `AE makes equal angles with AB and AD`.
+ *  Operands may be named vectors or point pairs. */
+const equalAnglesGiven: Rule = (s) => {
+  if (!/יוצר|equal\s+angles/i.test(s)) return null;
+  const REF = String.raw`(?:([a-w])(?![a-z])|([A-Z]\d*'?)([A-Z]\d*'?))`;
+  const m =
+    s.match(new RegExp(`^${REF}\\s+יוצר(?:ת)?\\s+זוויות\\s+שוות\\s+עם\\s+(?:ה?וקטורים\\s+)?${REF}\\s+ו-?\\s*${REF}\\s*$`)) ??
+    s.match(new RegExp(`^${REF}\\s+(?:makes|creates|forms)\\s+equal\\s+angles\\s+with\\s+(?:the\\s+vectors?\\s+)?${REF}\\s+and\\s+${REF}\\s*$`, 'i'));
+  if (!m) return null;
+  const base = mkAtom(m[1], m[2], m[3]);
+  const a = mkAtom(m[4], m[5], m[6]);
+  const b = mkAtom(m[7], m[8], m[9]);
+  return base && a && b ? [{ type: 'angle-eq', base, a, b }] : null;
+};
+
+/** V8-f (G11): `D על AC כך ש-OD חוצה-זווית AOC` / `D on AC such that OD bisects angle AOC`.
+ *  D on segment a–b, ray apex→D bisects ∠(a)(apex)(b) — apex = OD's non-D endpoint. */
+const bisectorPoint: Rule = (s) => {
+  if (!/חוצ|bisect/i.test(s)) return null;
+  const L = String.raw`([A-Z]\d*'?)`;
+  const m =
+    s.match(
+      new RegExp(
+        `^(?:ה?נקודה\\s+)?${L}\\s+(?:נמצאת\\s+|נמצא\\s+)?על\\s+(?:ה?קטע\\s+|ה?צלע\\s+)?${L}${L}\\s+כך\\s+ש-?\\s*${L}${L}\\s+חוצ[הת]?\\s*-?\\s*(?:את\\s+)?(?:ה?זווית\\s+)?${L}${L}${L}\\s*$`,
+      ),
+    ) ??
+    s.match(
+      new RegExp(
+        `^(?:point\\s+)?${L}\\s+(?:is\\s+|lies\\s+)?on\\s+(?:the\\s+)?(?:segment\\s+|edge\\s+)?${L}${L}\\s+such\\s+that\\s+${L}${L}\\s+bisects\\s+(?:the\\s+)?(?:angle\\s+|∠)?${L}${L}${L}\\s*$`,
+        'i',
+      ),
+    );
+  if (!m) return null;
+  const [, d, a, b, o1, o2, an1, anV, an2] = m;
+  const apex = o1 === d ? o2 : o2 === d ? o1 : null; // OD's other endpoint is the apex
+  if (!apex || anV !== apex) return null; // the angle's vertex must be the apex
+  if ((an1 !== a && an1 !== b) || (an2 !== a && an2 !== b) || an1 === an2) return null; // rays = segment endpoints
+  return [{ type: 'bisector-point', id: d, a, b, apex }];
+};
+
 /** `NK ו-PL מצטלבים` / `NK and PL are skew` (+ מקבילים/parallel, נחתכים/intersect) — mutual-position claims. */
 const mutualPositionClaim: Rule = (s0) => {
   const s = stripProofPrefix(s0);
@@ -1257,7 +1348,10 @@ const RULES: Rule[] = [
   volumeEqPoly, // BEFORE volumePolyClaim: its RHS is a volume, not a number
   volumePolyClaim, // BEFORE rightPyramid: נפח הפירמידה ABCD must never build a pyramid
   rightPyramid,
+  dotEqGiven, // `u·v = v·w` (a dot RHS) — before dotGiven, which only matches a numeric RHS
   dotGiven,
+  cosAngleGiven, // V8-f (G6): cos∠ACB / cos(u,v) — before the plane-angle & vertex-angle rules
+  equalAnglesGiven, // V8-f (G10): AE makes equal angles with AB, AD
   revolutionSolid,
   volumeClaim,
   lateralAreaClaim,
@@ -1291,6 +1385,7 @@ const RULES: Rule[] = [
   nameVectors,
   centroidRule,
   diagIntersection, // `מפגש האלכסונים` — before onSegment/midpoint grab the tokens
+  bisectorPoint, // V8-f (G11): `D על AC כך ש-OD חוצה זווית AOC` — before onSegment grabs `D על AC`
   perpPlaneClaim,
   segParallelPlane,
   collinearClaim,

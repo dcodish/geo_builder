@@ -583,7 +583,7 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 }
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg']);
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number): Resolved3 {
@@ -898,6 +898,34 @@ function evaluateSolidsAndPoints(
       const from = pos.get(def.from);
       const line = lines.get(def.line);
       if (from && line) pos.set(id, footOnLine(from, line));
+    } else if (def.kind === 'bisector-seg') {
+      // V8-f (G11): D on segment a–b, its t root-found so ray apex→D bisects ∠(a)(apex)(b).
+      // f(t) = cos(apex→P(t), apex→a) − cos(apex→P(t), apex→b) is monotone on [0,1]
+      // (f(0)>0 at P=a, f(1)<0 at P=b) — one internal-bisector root, found by bisection.
+      const A = pos.get(def.a);
+      const B = pos.get(def.b);
+      const O = pos.get(def.apex);
+      if (!A || !B || !O) continue;
+      const d1 = normalize3(sub3(A, O));
+      const d2 = normalize3(sub3(B, O));
+      if (norm3(d1) < 1e-9 || norm3(d2) < 1e-9) continue; // apex coincides with a ray endpoint
+      const f = (t: number): number => {
+        const dp = sub3(lerp3(A, B, t), O);
+        const n = Math.max(norm3(dp), 1e-12);
+        return (dot3(dp, d1) - dot3(dp, d2)) / n;
+      };
+      let lo = 0;
+      let hi = 1;
+      if (f(lo) * f(hi) > 0) {
+        pos.set(id, lerp3(A, B, 0.5)); // no sign change (degenerate ∠) — fall back to the midpoint
+      } else {
+        for (let it = 0; it < 80; it++) {
+          const mid = (lo + hi) / 2;
+          if (f(lo) * f(mid) <= 0) hi = mid;
+          else lo = mid;
+        }
+        pos.set(id, lerp3(A, B, (lo + hi) / 2));
+      }
     } else if (def.kind === 'foot-face') {
       // V8-e (G5): the height's foot — ⟂ from `from` onto the plane through the face pts
       const from = pos.get(def.from);

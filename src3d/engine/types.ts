@@ -60,7 +60,13 @@ export type Claim3 =
   | { type: 'volume-eq'; solid: string; value: number } // נפח החרוט = 100π (value in world units³, π parsed)
   | { type: 'lateral-area-eq'; solid: string; value: number } // שטח המעטפת של החרוט = 65π
   | { type: 'lines-rel'; a1: Id; b1: Id; a2: Id; b2: Id; rel: 'skew' | 'parallel' | 'intersect' } // NK ו-PL מצטלבים (V7 T3)
-  | { type: 'volume-poly'; ids: Id[]; value: number }; // נפח הפירמידה ABCD = 64 (tetra: |triple|/6; V7 T2)
+  | { type: 'volume-poly'; ids: Id[]; value: number } // נפח הפירמידה ABCD = 64 (tetra: |triple|/6; V7 T2)
+  // V8-f (G6/G9/G10) — vector-relation givens VERIFIED on a determined figure. Each
+  // operand is a VecAtom (a declared vector or a point pair), so `cos∠ACB` (vertex →
+  // pairs) and `cos(u,v)` (named vectors) share one form.
+  | { type: 'cos-angle-eq'; u: VecAtom; v: VecAtom; cos: number } // cos∠ACB = 3/4 · cos(w,u) = √35/10
+  | { type: 'dot-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // u·v = v·w (a chained-equality link)
+  | { type: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom }; // ∠(a,b) = ∠(c,d) — AE makes equal angles with AB, AD
 
 /** V7 T2 — a SCALAR given that DRIVES the figure (a residual in the global solve). */
 export type ScalarPin =
@@ -69,7 +75,13 @@ export type ScalarPin =
   | { kind: 'vangle'; vertex: Id; p: Id; q: Id; deg: number } // ∠ADC = 120
   | { kind: 'dot'; v1: string; v2: string; value: number } // u·v = 24
   | { kind: 'seg-perp-plane'; a: Id; b: Id; plane: Id[] } // DC ניצב למישור ABC (a driving given)
-  | { kind: 'seg-par-plane'; a: Id; b: Id; plane: Id[] };
+  | { kind: 'seg-par-plane'; a: Id; b: Id; plane: Id[] }
+  // V8-f (G6/G9/G10) — vector-relation givens that DRIVE a free-dim figure. All three
+  // are similarity-INVARIANT (angle/cos, and an equality of dot products both scale as
+  // s²), so they join the gauge-frozen dims-only solve.
+  | { kind: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number } // cos∠ACB = 3/4 · cos(w,u) = √35/10 (G6)
+  | { kind: 'dot-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // u·v = v·w (G9 chain link)
+  | { kind: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom }; // ∠(a,b) = ∠(c,d) — equal angles (G10)
 
 // ---------------------------------------------------------------------------
 // The algebraic lane (V2 — docs/20 §6.3): coefficients may carry ONE symbolic
@@ -443,7 +455,17 @@ export type Command3 =
   | { type: 'inject-pair'; a: Id; b: Id; x: number; y: number; z: number } // BD = (-4,5,12) — a pair-vector injection (V7 T2)
   | { type: 'rel-plane'; name: string; rel: 'perp' | 'par'; through: Id[]; a: Id; b: Id } // V8-b (G1): plane ⟂/∥ edge a–b
   | { type: 'plane-cut'; id: Id; plane: string; a: Id; b: Id } // V8-b (G2): a point = plane ∩ segment a–b
-  | { type: 'height-to-face'; id: Id; from: Id; face: Id[] }; // V8-e (G5): `AF גובה … לפאה BDC` — F = foot of ⟂ from A onto plane BDC
+  | { type: 'height-to-face'; id: Id; from: Id; face: Id[] } // V8-e (G5): `AF גובה … לפאה BDC` — F = foot of ⟂ from A onto plane BDC
+  // V8-f (G6): cos of the angle between two operands = a value. `cos∠ACB = 3/4`
+  // (vertex ⇒ pairs) · `קוסינוס הזווית בין הוקטורים w ו-u הוא √35/10` (named vectors).
+  | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number }
+  // V8-f (G9): a CHAIN of dot products all equal — `u·v = v·w = u·w`. Apply lowers to
+  // pairwise dot-eq relations (drive on a free figure, else verify).
+  | { type: 'dot-eq-chain'; ops: [VecAtom, VecAtom][] }
+  // V8-f (G10): `base` makes EQUAL ANGLES with `a` and `b` — `AE יוצר זוויות שוות עם AB ו-AD`.
+  | { type: 'angle-eq'; base: VecAtom; a: VecAtom; b: VecAtom }
+  // V8-f (G11): `D על AC כך ש-OD חוצה-זווית AOC` — D on segment a–b, ray apex→D bisects ∠(a)(apex)(b).
+  | { type: 'bisector-point'; id: Id; a: Id; b: Id; apex: Id };
 
 // ---------------------------------------------------------------------------
 // Construction (what apply builds, what evaluate consumes)
@@ -471,6 +493,8 @@ export type PointDef =
   | { kind: 'line-plane'; line: string; plane: string }
   | { kind: 'plane-cut'; plane: string; a: Id; b: Id } // V8-b (G2): a plane ∩ segment a–b
   | { kind: 'foot-face'; from: Id; face: Id[] } // V8-e (G5): foot of ⟂ from a vertex onto a face's plane
+  // V8-f (G11): D on segment a–b, its t root-found so ray apex→D bisects ∠(a)(apex)(b)
+  | { kind: 'bisector-seg'; a: Id; b: Id; apex: Id }
   | { kind: 'rev-point'; rev: number; role: 'center' | 'apex' }
   | { kind: 'vec-defined'; def: number } // solved from construction.vecDefs[def]
   | { kind: 'vec-pair'; def1: number; def2: number }; // the cevian intersection (two symbol relations)

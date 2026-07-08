@@ -8,7 +8,7 @@
  */
 
 import { evaluate3, lineAtParam, planeAtParam } from './evaluate';
-import { evalExpr } from './vecExpr';
+import { atomVec, evalExpr } from './vecExpr';
 import { cross3, dot3, norm3, sub3, v3 } from './vec3';
 import type { Claim3, Construction3, Positions3 } from './types';
 
@@ -146,6 +146,31 @@ function holdsAt(claim: Claim3, c: Construction3, pos: Positions3): boolean {
       if (claim.rel === 'parallel') return parallel;
       if (claim.rel === 'intersect') return !parallel && coplanar;
       return !parallel && !coplanar; // skew (מצטלבים)
+    }
+    case 'cos-angle-eq': {
+      // V8-f (G6) on a determined figure: cos of the angle between two operands = value
+      const u = atomVec(claim.u, c, pos);
+      const v = atomVec(claim.v, c, pos);
+      if (!u || !v) return false;
+      const den = norm3(u) * norm3(v);
+      if (den < 1e-12) return false;
+      return Math.abs(dot3(u, v) / den - claim.cos) <= REL_TOL * Math.max(Math.abs(claim.cos), 1);
+    }
+    case 'dot-eq': {
+      // V8-f (G9): u·v = c·d (a chained-equality link), checked on the determined figure
+      const [a, b, cc, d] = [claim.a, claim.b, claim.c, claim.d].map((r) => atomVec(r, c, pos));
+      if (!a || !b || !cc || !d) return false;
+      const scale = Math.max(norm3(a) * norm3(b), norm3(cc) * norm3(d), 1e-12);
+      return Math.abs(dot3(a, b) - dot3(cc, d)) <= REL_TOL * scale;
+    }
+    case 'cos-eq': {
+      // V8-f (G10): ∠(a,b) = ∠(c,d) — equal angles ⟺ equal cosines
+      const [a, b, cc, d] = [claim.a, claim.b, claim.c, claim.d].map((r) => atomVec(r, c, pos));
+      if (!a || !b || !cc || !d) return false;
+      const den1 = norm3(a) * norm3(b);
+      const den2 = norm3(cc) * norm3(d);
+      if (den1 < 1e-12 || den2 < 1e-12) return false;
+      return Math.abs(dot3(a, b) / den1 - dot3(cc, d) / den2) <= REL_TOL;
     }
     case 'never-parallel': {
       // "ℓ ∦ π for EVERY parameter value" (2024-Q2 א): parallel ⟺ dir(m)·n(m) = 0,

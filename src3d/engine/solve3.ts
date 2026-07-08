@@ -174,7 +174,12 @@ export function solvePivot(
   // onto a point). Freeze the gauge to identity and solve the shape dims ONLY.
   const invariantOnly =
     nSym === 0 && pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 &&
-    c.scalarPins.every((p) => p.kind === 'vangle' || p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane' || p.kind === 'length-rel');
+    c.scalarPins.every(
+      (p) =>
+        p.kind === 'vangle' || p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane' || p.kind === 'length-rel' ||
+        // V8-f: cos/angle equalities and equal dot products are all similarity-INVARIANT
+        p.kind === 'cos-angle' || p.kind === 'dot-eq' || p.kind === 'cos-eq',
+    );
 
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
     const g = { ...unpack(x), mirror };
@@ -220,6 +225,20 @@ export function solvePivot(
       const p = pos.get(id);
       return p ? applyGauge(p, g) : null;
     };
+    // V8-f: a VecAtom operand → its (gauge-transformed) direction
+    const dirOf = (atom: import('./types').VecAtom): Vec3 | null => {
+      if (atom.kind === 'named') {
+        const d = c.vectors.get(atom.name);
+        if (!d) return null;
+        const a = at(d.from);
+        const b = at(d.to);
+        return a && b ? sub3(b, a) : null;
+      }
+      const a = at(atom.from);
+      const b = at(atom.to);
+      return a && b ? sub3(b, a) : null;
+    };
+    const cosOf = (u: Vec3, v: Vec3) => dot3(u, v) / Math.max(norm3(u) * norm3(v), 1e-12);
     for (const pin of c.scalarPins) {
       if (pin.kind === 'length') {
         const a = at(pin.a);
@@ -251,6 +270,24 @@ export function solvePivot(
         const a2 = at(pin.a2);
         const b2 = at(pin.b2);
         out.push(a1 && b1 && a2 && b2 ? norm3(sub3(b1, a1)) - pin.c * norm3(sub3(b2, a2)) : 10);
+      } else if (pin.kind === 'cos-angle') {
+        const u = dirOf(pin.u);
+        const v = dirOf(pin.v);
+        out.push(u && v ? cosOf(u, v) - pin.cos : 10); // G6: cos(u,v) = value (normalized ⇒ invariant)
+      } else if (pin.kind === 'dot-eq') {
+        const a = dirOf(pin.a);
+        const b = dirOf(pin.b);
+        const cc = dirOf(pin.c);
+        const d = dirOf(pin.d);
+        // G9: u·v = c·d, normalized by the operand norms so the residual is O(1) & scale-free
+        const scale = a && b && cc && d ? Math.max(norm3(a) * norm3(b), norm3(cc) * norm3(d), 1e-12) : 1;
+        out.push(a && b && cc && d ? (dot3(a, b) - dot3(cc, d)) / scale : 10);
+      } else if (pin.kind === 'cos-eq') {
+        const a = dirOf(pin.a);
+        const b = dirOf(pin.b);
+        const cc = dirOf(pin.c);
+        const d = dirOf(pin.d);
+        out.push(a && b && cc && d ? cosOf(a, b) - cosOf(cc, d) : 10); // G10: ∠(a,b) = ∠(c,d)
       } else {
         const a = at(pin.a);
         const b = at(pin.b);

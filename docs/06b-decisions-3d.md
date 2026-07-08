@@ -355,3 +355,19 @@ Gate: 2022-נבצרים builds to the closed form (**t = ¼, |DD′| = 2**, DF �
 **Deferred (documented, 2012-קיץ-ב, 1 exam):** the **dihedral angle between a lateral face and the base** (`70°`/`40°`) and the **in-face altitude** (`EL` of face EDC) — these need a face-as-plane reference + a dihedral-given machinery beyond this slice; filed as the G5 remainder.
 
 **Locked by** `v8e-height-to-face.test.ts` (He+En parse; the foot of A=(1,1,3) onto plane BCD=z-plane lands (1,1,0), AF ⟂ the face verified; the plain `AS גובה` base form unchanged). Catalog +1. **429 src3d tests green, `tsc -b` clean.**
+
+---
+
+## ADR-3D-023 — V8-f: vector-relation givens (cos-angle, chained dot products, equal angles, 3-D bisector) (2026-07-08)
+
+**Context (G6/G9/G10/G11).** The legacy corpus states several relations among NAMED vectors that the tool could not express: the **cosine of the angle** between two named vectors OR at a vertex (2013-חורף `cos(w,u)=√35/10`; 2014-קיץ-ב `cos∠ACB=¾`), a **chain of equal dot products** (2012-קיץ-ב `u·v=v·w=u·w`), a vector making **equal angles** with two vectors (2016-קיץ `AE יוצר זוויות שוות עם AB ו-AD`), and a **3-D angle bisector** defining a point (2015-קיץ `D על AC כך ש-OD חוצה-זווית AOC`). `vangle`/`dot-given` covered only a vertex angle in DEGREES and a dot product = a NUMBER.
+
+**Decisions.**
+- **All operands are `VecAtom`** (a declared vector OR a point pair — the existing symbolic-layer atom, reused, no new type), so `cos∠ACB` (vertex → pairs `CA`,`CB`) and `cos(u,v)` (named vectors) share one command. `evalRadical` parses the cos value (`√35/10`, `¾`, `0.5`).
+- **Three new `ScalarPin` kinds — `cos-angle`, `dot-eq`, `cos-eq` — and their `Claim3` twins.** APPLY decides drive-vs-verify by the M1 shape ([ADR-3D-010](#adr-3d-010)): on a figure with FREE solid dims a relation is a driving GIVEN (a scalar pin → the pivot residual); on a determined figure it is a verified CLAIM. All three residuals are **similarity-INVARIANT** — cos/angle equalities are normalized, and an equality of dot products scales as s² on both sides — so they join the gauge-frozen dims-only solve (`invariantOnly`); `dot-eq` is normalized by the operand-norm product to stay O(1). A chain `u·v=v·w=u·w` lowers to one `dot-eq-chain` command → n−1 pairwise relations; equal angles lowers to `cos-eq(base,a,base,b)`.
+- **`bisector-seg` point kind (G11)** `{a,b,apex}`: D rides segment a–b, its t **root-found by bisection** so `cos(apex→D, apex→a) = cos(apex→D, apex→b)` (monotone on [0,1] — one internal-bisector root; a degenerate angle falls back to the midpoint). Reuses the point loop, no solver/CAS — the D3 boundary holds. Added to `GAUGE_KINDS` (rides the pivot).
+- **Parser:** `cosAngleGiven`, `dotEqGiven` (before `dotGiven` — a numeric RHS stays a dot-given), `equalAnglesGiven`, `bisectorPoint` (before `onSegment`, or `D על AC` would be read as a free slider and drop the bisector condition). He+En.
+
+**Scope note (the 2-D lane is V8-g).** The pivot solver drives only figures that carry a SOLID; the pure-plane triangle builds of 2013-חורף/2014-קיץ-ב (free points, no solid) reproduce end-to-end only once the z=0 vector lane lands (V8-g). V8-f delivers the capability — parse + drive-on-a-solid + verify + the bisector point — gated on solid-bearing representatives of each gap (a tetra for G6, the apex-first pyramid SABC for G9, the square-base pyramid for G10, coordinate points for G11).
+
+**Locked by** `v8f-vector-relations.test.ts` (parse He+En for all four; cos(u,v)=½ reshapes a tetra to 60°; `u·v=v·w=u·w` equalises the three edge-dot products on SABC; equal angles gives cos(AE,AB)=cos(AE,AD); the bisector lands D on AC at the bisector-theorem ratio t=8/14 with equal angles to OA,OC; a determined-figure cos verifies as a claim). Catalog +5. **449 src3d tests green, `tsc -b` + `vite build:3d` clean.**
