@@ -148,6 +148,36 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'bisector-from-vertex-no-triple',
+    title: 'CD חוצה זוית (angle-bisector from a vertex, triple omitted) after triangle ABC + AB=AC — the two half-angles are equal',
+    guards:
+      'The operator typed "triangle ABC" → "AB=AC" → "CD חוצה זוית": a line was drawn but the half-angles were NOT equal (a prod user also errored on this phrasing). Root cause: the deterministic parser handled an angle bisector from a vertex only when the angle triple was spelled out ("CD חוצה זוית ACB"); with it omitted the input fell through to the LLM, which drew a bare line with no equal-angle constraint. Fix: `bisectorPlacesPoint` resolves the omitted angle from the vertex (the segment\'s first letter) + the figure\'s neighbours (the ADR-164 single-vertex resolution, gated to an explicit "angle"/"זוית" so a segment bisection never mis-fires), and the rule moved ahead of the shape rules so its "…במשולש ABC" form is not shadowed by `triangle`\'s SHAPE_LEFTOVER \'stop\'.',
+    steps: ['משולש ABC', 'AB=AC', 'CD חוצה זוית'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('D'), 'D was placed').toBe(true);
+      // D lies on segment AB (the opposite side).
+      const A = at(fig, 'A'), B = at(fig, 'B'), D = at(fig, 'D');
+      const t = ((D.x - A.x) * (B.x - A.x) + (D.y - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2);
+      expect(t, 'D within AB').toBeGreaterThan(0.02);
+      expect(t, 'D within AB').toBeLessThan(0.98);
+      // CD really bisects ∠ACB: the two half-angles are equal.
+      expect(angle(at(fig, 'A'), at(fig, 'C'), D), '∠ACD = ∠DCB').toBeCloseTo(angle(D, at(fig, 'C'), at(fig, 'B')), 4);
+    },
+  },
+  {
+    id: 'bisector-from-vertex-in-triangle',
+    title: 'BD חוצה זוית במשולש ABC — the "…במשולש ABC" bisector phrasing is not shadowed by the triangle rule',
+    guards:
+      'Sibling of bisector-from-vertex-no-triple (same construct, from the debug log): "BD חוצה זוית במשולש ABC" escalated to the LLM because the `triangle` rule matched the embedded "משולש ABC", found the "חוצה זוית" leftover, and returned \'stop\'. Fixed by ordering `bisectorPlacesPoint` before the shape rules (the same placement median/altitude/midsegment use).',
+    steps: ['משולש ABC', 'BD חוצה זוית במשולש ABC'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.positions.has('D'), 'D was placed').toBe(true);
+      expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'D')), '∠ABD = ∠DBC').toBeCloseTo(angle(at(fig, 'D'), at(fig, 'B'), at(fig, 'C')), 4);
+    },
+  },
+  {
     id: 'stated-meet-relocates-loose-point',
     title: 'AM חותך את CO בנקודה K with M loose: the stated meet re-seats M so the segments really cross (and M stays outside)',
     guards:

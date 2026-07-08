@@ -6,7 +6,57 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { classifyOutOfScope } from '../scope';
+import { classifyOutOfScope, looksCompound } from '../scope';
+
+describe('classifyOutOfScope — analytic / coordinate geometry (a different, planned tool)', () => {
+  for (const he of [
+    'ציר ה-x',
+    'ציר y',
+    'מערכת צירים',
+    'ראשית הצירים',
+    'השיפוע של AB הוא 2',
+    'משוואת הישר AB',
+    'הקואורדינטות של A',
+    'שיעורי הנקודה A',
+  ]) {
+    it(`Hebrew: ${he}`, () => expect(classifyOutOfScope(he)?.category).toBe('analytic'));
+  }
+  for (const en of [
+    'the y axis',
+    'x-axis',
+    'the coordinate system',
+    'slope of AB is 2',
+    'y = 2x + 3',
+    'y = -x',
+    'equation of the line AB',
+    'origin of the axes',
+    'cartesian plane',
+  ]) {
+    it(`English: ${en}`, () => expect(classifyOutOfScope(en)?.category).toBe('analytic'));
+  }
+  it('exposes the i18n message key', () =>
+    expect(classifyOutOfScope('the y axis')?.messageKey).toBe('input.scope.analytic'));
+});
+
+describe('looksCompound — several statements packed into one line (advise breaking up)', () => {
+  for (const c of [
+    'ריבוע Abcd, נקודה f נמצאת על צלע ab, זווית cfd 37 מעלות', // the operator example (shape + point + angle)
+    'משולש ABC ומעגל חוסם אותו', // triangle AND a circumscribing circle
+    'draw triangle ABC and a point D on AB and angle ABC = 40', // 3 En statements
+    'circle O, triangle ABC inscribed in it', // circle + inscribed triangle
+  ]) {
+    it(`compound: ${c}`, () => expect(looksCompound(c)).toBe(true));
+  }
+  for (const single of [
+    'triangle ABC', // one construction
+    'circle through A, B, C', // ONE construction with list-commas (only the first piece carries a keyword)
+    'F, G, H on AB, AC, CB', // a supported single construction (ADR-076) — bare-label pieces don't count
+    'משולש ABC ישר זווית', // one shape, no separator
+    'AB = 4, BC = 6', // a givens list — pieces are bare labels, not keyword statements
+  ]) {
+    it(`NOT compound: ${single}`, () => expect(looksCompound(single)).toBe(false));
+  }
+});
 
 describe('classifyOutOfScope — angle/theorem relationships', () => {
   it('Hebrew alternate angles (the operator example)', () =>
@@ -54,6 +104,13 @@ describe('classifyOutOfScope — does NOT steal a genuine construction gap', () 
     'E נקודת החיתוך של AO עם המעגל', // an intersection point
     '∠GEC=∠CHA', // angle equality (a real relation we support / should)
     'נקודה D על AB', // a plain point-on-segment
+    'A = (3, 5)', // coordinate free-point placement — SUPPORTED (freePoint grammar); must NOT read as analytic
+    'point B at (1, 2)',
+    'AB = 4', // a length given — the "= number" must not trip the line-equation pattern
+    'BC = 6, CA = 8',
+    'circle O radius 5',
+    'משולש ABC', // a bare triangle
+    'ריבוע ABCD', // a square (contains no analytic stem)
   ]) {
     it(`null for: ${real}`, () => expect(classifyOutOfScope(real)).toBeNull());
   }

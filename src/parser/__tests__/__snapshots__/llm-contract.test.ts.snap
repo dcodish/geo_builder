@@ -502,6 +502,14 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circumcircle",
     ],
   },
+  "circle with diameter 10": {
+    "en": [
+      "circle",
+    ],
+    "he": [
+      "circle",
+    ],
+  },
   "cyclic quadrilateral ABCD": {
     "en": [
       "circle",

@@ -1870,6 +1870,17 @@ const circleSizeRadius = (s: string): number | null => {
     if (!m) return null;
     return parseFloat(m[1]) * (m[2] ? Math.PI : 1);
   };
+  // A circle SIZED by its DIAMETER — "diameter 10" / "מעגל קוטר 10" / "מעגל בקוטר 10" (r = d/2). The value
+  // must follow the diameter word directly (optionally via a copula), with NO endpoint label between them —
+  // that keeps this DISTINCT from the diameter-CHORD "קוטר AB" (labelled, no size), which the diameter rule
+  // owns. A circle's size IS its radius, so this reduces to the same numeric-radius path as circumference/area.
+  const dm = s.match(
+    new RegExp(String.raw`(?:diameter|בקוטר|שקוטרו|קוטרו|קוטר)\s*(?:של|=|:|הוא|שווה|\bis\b|equals?)?\s*(${COEF})\s*[*·]?\s*(π|pi)?`, 'i'),
+  );
+  if (dm) {
+    const v = parseFloat(dm[1]) * (dm[2] ? Math.PI : 1);
+    if (v > 0) return v / 2;
+  }
   const cm = s.match(new RegExp(CIRCUMFERENCE_WORD, 'i'));
   if (cm) {
     const v = readVal(s.slice(cm.index! + cm[0].length));
@@ -4191,8 +4202,22 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
   const apex = up(seg[1]);
   const D = up(seg[2]);
   const after = s.slice(s.search(/bisects?|חוצ/i)).replace(/bisects?|חוצ\w*|angles?|the|את|הזוו?ית|זוו?ית|של/gi, ' ');
-  const tri = labelRun(after, 3);
-  if (!tri) return null;
+  let tri = labelRun(after, 3);
+  if (!tri) {
+    // No explicit angle triple ("CD חוצה זוית" / "CD bisects the angle"): resolve the angle from the
+    // figure. Gated to an explicit "angle"/"זוית" utterance so a SEGMENT bisection ("AB חוצה את הקטע CD")
+    // never mis-fires as an angle bisector. The bisecting ray runs FROM the segment's first letter, so
+    // THAT is the angle vertex; its two arms come from the figure (the same ADR-164 single-vertex
+    // resolution as `angle`). Well-defined only when the vertex has EXACTLY two edges (one possible angle)
+    // — e.g. a triangle's corner. A different edge count leaves the intended angle ambiguous, so ASK for
+    // the three letters rather than guessing or dropping it to the LLM (which drew a bare line with no
+    // equal-angle constraint — the reported bug).
+    if (!/angle|זוו?ית/i.test(s)) return null;
+    const nb = (ctx.neighbors ?? {})[apex] ?? [];
+    if (nb.length === 2) tri = [nb[0], apex, nb[1]];
+    else if ((ctx.points ?? []).includes(apex)) return { clarify: 'ambiguous-angle', vertex: apex };
+    else return null;
+  }
   const vertex = tri[1];
   if (vertex === apex) {
     // "AD bisects ∠BAC": the segment's FIRST letter is the angle vertex.
@@ -4364,6 +4389,7 @@ export const RULES: Rule[] = [
   altitude, // "height/altitude from A" / "perpendicular from A to BC"
   perpBisector, // "perpendicular bisector of AB"
   midsegment, // "midsegment to BC in triangle ABC" — a triangle construct ("במשולש"); before the shapes AND before segment/midpoint (its "קטע"/"אמצע" keywords)
+  bisectorPlacesPoint, // "AD bisects ∠BAC" / "CD חוצה זוית [במשולש ABC]" — places D on the opposite side. Before the shapes (its "במשולש ABC" form would otherwise make `triangle` 'stop'); safe before the bisector-∩ compounds because it DEFERS on intersect keywords.
   regularPolygon, // "regular pentagon ABCDE" / "מחומש משוכלל" — before square (it also routes "regular triangle/quadrilateral")
   square,
   parallelogram,
@@ -4380,7 +4406,6 @@ export const RULES: Rule[] = [
   triangle,
   bisectorIntersection, // two bisectors meet — before the one-bisector and generic intersections
   bisectorSegmentIntersection, // one bisector ∩ a segment
-  bisectorPlacesPoint, // "AD bisects ∠BAC" — places D on the opposite side (after the ∩ compounds)
   cornerTangentCircle, // "AB and AD tangent to circle O" — a circle tangent to two sides of a corner; before the tangent/line rules (the משיק keyword makes lineLineIntersection 'stop')
   twoTangentsMeet, // TWO tangents (at two on-circle points) meeting at a point — before tangent∩segment
   tangentLineIntersection, // tangent ∩ a segment
@@ -4795,7 +4820,11 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
   for (const c of commands) walk(c);
   const ok = (cands: number[]): boolean => cands.some((v) => Number.isFinite(v) && acc.has(q(v)));
   // stated numbers: blank labels FIRST (a subscript digit — O1, A2 — is part of a label, not a number)
-  const s = normalizeUtterance(utterance).replace(/[A-Za-z]\d*/g, ' ');
+  const raw = normalizeUtterance(utterance);
+  const s = raw.replace(/[A-Za-z]\d*/g, ' ');
+  // A DIAMETER given lowers to radius = d/2 (ADR-259). Checked on the UN-blanked text: blanking wipes the
+  // English keyword "diameter" (each Latin letter → space), so the number's radius half would look dropped.
+  const hasDiameter = /diameter|קוטר/i.test(raw);
   const dropped: number[] = [];
   const seen = new Set<string>();
   // a stated FRACTION lowers to one value (ratio 3/4 → r=0.75) — consume it whole
@@ -4817,6 +4846,7 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
     const cands = [n];
     if (/^\s*π/.test(rest)) cands.push(n / 2, Math.sqrt(n)); // nπ — circumference/area sizes lower to a radius
     if (/^\s*%/.test(rest)) cands.push(n / 100); // n% — lowers to a fraction
+    if (hasDiameter) cands.push(n / 2); // "diameter 10" / "קוטר 10" → radius d/2 (ADR-259)
     if (!ok(cands) && !seen.has(m[0])) {
       seen.add(m[0]);
       dropped.push(n);
@@ -4838,7 +4868,10 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
 export function normalizeUtterance(raw: string): string {
   // maqaf U+05BE → ASCII hyphen (so the ל-?/ב-?/מ-? suffix groups match); then strip invisible format
   // chars: ALM, ZWSP/ZWNJ/ZWJ/LRM/RLM, LRE…RLO, isolates LRI…PDI, BOM.
-  const orth = raw.replace(/־/g, '-').replace(/[؜​-‏‪-‮⁦-⁩﻿]/g, '');
+  // עיגול (disk) ≡ מעגל (circle): the everyday Hebrew synonym students use interchangeably. Normalising it
+  // to the canonical circle word HERE — at the one boundary every rule reads — means the whole circle
+  // vocabulary (creation, sizing, chord, tangent, inscribe…) accepts it without touching each rule.
+  const orth = raw.replace(/־/g, '-').replace(/[؜​-‏‪-‮⁦-⁩﻿]/g, '').replace(/עיגול/g, 'מעגל');
   return normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(orth.trim().replace(/\s+/g, ' '))));
 }
 

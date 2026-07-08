@@ -1043,6 +1043,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "circle with diameter 10",
+    "winner": "circle",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל בקוטר 10",
+    "winner": "circle",
+  },
+  {
+    "lang": "en",
     "text": "A is on circle O",
     "winner": "pointOnCircle",
   },

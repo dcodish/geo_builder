@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels, droppedGivenNumbers, classifyOutOfScope, buildParseCtx } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels, droppedGivenNumbers, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -471,6 +471,20 @@ export default function App() {
       setBusy(false);
       return;
     }
+    // Analytic / coordinate-geometry terminology (axes, coordinates, slope, line equations) — a DIFFERENT
+    // tool. This one builds synthetic constructions; a coordinate-geometry tool is planned separately.
+    // Refuse immediately with the pedagogical "wrong tool" message and tag it `scope:analytic` — never spend
+    // an LLM call on input that can never build. (Runs only on a failed grammar parse; a coordinate free-point
+    // like "A = (3,5)" parses via `freePoint` and never reaches here.)
+    if (!r.ok) {
+      const oos = classifyOutOfScope(utterance);
+      if (oos?.category === 'analytic') {
+        logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${oos.category}` });
+        setInputNote(t(oos.messageKey));
+        setBusy(false);
+        return;
+      }
+    }
     let weak: 'error' | 'empty' | 'dropped' | null = null;
     if (r.ok) {
       // A typo in a keyword (e.g. "מנוקדה" for "מנקודה") can make a rule match PARTIALLY, silently dropping
@@ -601,6 +615,16 @@ export default function App() {
       if (scope) {
         logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${scope.category}` });
         setInputNote(t(scope.messageKey));
+        setBusy(false);
+        return;
+      }
+      // A genuine gap — but if the input packed several statements into one line (a shape AND a point AND an
+      // angle…), the most actionable advice is to break it into smaller steps: each piece parses far more
+      // reliably alone, and the student can see which one is the problem. Tagged distinctly so the operator
+      // can measure how often it fires; still a real `not-understood` gap for the dashboard count.
+      if (looksCompound(utterance)) {
+        logDebug({ kind: 'input', utterance, locale, source: 'llm', result: 'not-understood-compound' });
+        setInputNote(t('input.tooManyParts'));
         setBusy(false);
         return;
       }

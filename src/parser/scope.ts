@@ -11,6 +11,9 @@
  *     don't let "alternate angles" inflate the real-gap count).
  *
  * Categories (all surfaced by the tool elsewhere or simply not its job):
+ *   - `analytic`       — analytic / coordinate geometry: axes, coordinates, slope, line equations, origin.
+ *     This tool builds SYNTHETIC constructions; a separate coordinate-geometry tool is planned. `App.submit`
+ *     short-circuits this category BEFORE the LLM call (it can never build — no reason to spend a call).
  *   - `angle-relation` — named angle relationships / theorem names (alternate/corresponding/co-interior
  *     angles, Pythagoras, Thales…). The tool DETECTS and surfaces these (Phase 6); they're never typed.
  *   - `proof`          — "prove / show that / הוכח". The tool draws figures, it doesn't write proofs.
@@ -21,7 +24,7 @@
  * they must NOT match a legitimate construction (a real gap must stay a real gap, not be mislabelled).
  */
 
-export type ScopeCategory = 'angle-relation' | 'proof' | 'compute' | 'unrelated';
+export type ScopeCategory = 'analytic' | 'angle-relation' | 'proof' | 'compute' | 'unrelated';
 
 export interface ScopeMatch {
   category: ScopeCategory;
@@ -35,6 +38,23 @@ interface ScopeRule {
 }
 
 const RULES: ScopeRule[] = [
+  {
+    // Analytic / coordinate geometry — a DIFFERENT tool. This one builds synthetic constructions on a
+    // free canvas (no axes); axes, coordinates, slopes and line equations belong to a coordinate-geometry
+    // tool that's planned separately. Placed FIRST so "the slope of AB" / "calculate the slope" surface the
+    // helpful "wrong tool" message rather than the generic compute refusal. Patterns are kept SPECIFIC so a
+    // real construction is never mislabelled: the Hebrew stems ("ציר"/"שיפוע"/"קואורדינ") and English words
+    // ("axis"/"slope"/"coordinate"/"origin"/"cartesian") appear in NO supported construct, and the numeric
+    // line-equation form requires BOTH `y =` and an `x` term (so a given like "AB = 4" can't trip it).
+    // NOTE: placing a free point AT coordinates ("A = (3,5)") stays supported — the `freePoint` grammar
+    // rule builds it, so it never reaches this classifier (which runs only on a FAILED parse).
+    category: 'analytic',
+    patterns: [
+      /מערכת\s*צירים|ראשית\s*הצירים|צירים|ציר\s+ה|ציר\s*[-]?\s*[xy]|שיפוע|קואורדינ|שיעורי\s+ה|שיעור\S*\s*ה?-?\s*[xy]|משוואת?\s+ה?(?:ישר|קו|פונקצי)|קרטזי/, // axes / origin / slope / coordinates ("שיעורי הנקודה" / "שיעור ה-x") / line-equation / cartesian
+      /\b[xy][-\s]?axis\b|\baxes\b|\baxis\b|\bslope\b|\bcoordinate(?:s)?\b|\bcartesian\b|\borigin\b|equation\s+of\s+(?:the\s+)?(?:line|curve|function)/i,
+      /(?:^|[^A-Za-z])[yY]\s*=\s*[-+\d.\s/*]*[xX](?![A-Za-z])/, // a line equation "y = 2x + 3" / "y = -x" (needs both y= and an x term)
+    ],
+  },
   {
     // Named angle relationships + theorem names — surfaced by the tool (Phase 6), never typed as input.
     // (Hebrew has no regex `\b`, so Hebrew stems are matched bare; theorem names are kept SPECIFIC —
@@ -71,7 +91,28 @@ const RULES: ScopeRule[] = [
 const GEO_SYMBOL = /[A-Z]\d*|\d|[∠°⊥⟂∥√△▲◯=<>]/;
 /** …or a geometry keyword in Hebrew or English (case-insensitive). Text with NONE of these is `unrelated`. */
 const GEO_KEYWORD =
-  /נקוד|זווי|ישר|קטע|מעגל|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקביל|אנך|מאונך|חוצה|תיכון|גובה|קוטר|מיתר|רדיוס|משיק|חותך|דלתון|מחומש|משושה|point|line|segment|circle|triangle|square|rectangle|quad|angle|tangent|chord|radius|diameter|perpendicular|parallel|bisect|median|midpoint|pentagon|hexagon/i;
+  /נקוד|זווי|ישר|קטע|מעגל|עיגול|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקביל|אנך|מאונך|חוצה|תיכון|גובה|קוטר|מיתר|רדיוס|משיק|חותך|דלתון|מחומש|משושה|צלע|point|line|segment|circle|triangle|square|rectangle|quad|angle|tangent|chord|radius|diameter|perpendicular|parallel|bisect|median|midpoint|pentagon|hexagon/i;
+
+/** Statement separators for the compound-input heuristic — list/clause punctuation plus the common He/En
+ *  conjunctions and sentence enders. Also the bare Hebrew ו glued to a following construct noun ("…ומעגל…"):
+ *  safe to split liberally here because the keyword-bearing-piece guard below rejects false positives (a ו
+ *  glued to a non-construct word yields a keyword-less piece that doesn't count). NOT a parser — a hint only. */
+const COMPOUND_SEP =
+  /\s*[,;.\n]\s*|\s+(?:וגם|ואז|\band\b|\bthen\b)\s+|\s+ו(?:-|\s+|(?=[A-Z]))\s*|\s+ו(?=מעגל|עיגול|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|נקוד|זווי|ישר|קטע|מחומש|משושה|דלתון)/gi;
+
+/**
+ * A FAILED utterance that packs several independent statements into one line — a shape AND a point-on-side
+ * AND an angle, say (the "ריבוע Abcd, נקודה f על צלע ab, זווית cfd 37" class). Splitting on the statement
+ * separators, ≥2 pieces each carry a geometry KEYWORD (a construct/relation word, NOT a bare label — so a
+ * single construction with list-commas like "circle through A, B, C" stays ONE statement and isn't flagged).
+ * `App.submit` consults it ONLY after both the grammar AND the LLM failed to build, to advise the student to
+ * break the input into smaller steps (each of which the tool is far likelier to read) — never on success.
+ */
+export function looksCompound(utterance: string): boolean {
+  const parts = utterance.split(COMPOUND_SEP).map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return false;
+  return parts.filter((p) => GEO_KEYWORD.test(p)).length >= 2;
+}
 
 /**
  * Classify a failed utterance as a deliberately out-of-scope concept, or `null` if it's a GENUINE

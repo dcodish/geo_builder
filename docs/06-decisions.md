@@ -3758,3 +3758,55 @@ The filter is silent and export-only: the step list UI, replay, and `.geo.json` 
 **Consequences.** `src/engine/detectShapes.ts` only; no UI change (the `congruent` row kind already renders). The kite figure now lists `similar: △ACK ~ △MOE ~ △MOK` AND `congruent: △EMO ≅ △KMO`. The square-two-diagonals flood-guard lock updated deliberately: its 8-triangle similar class now also reports its two true congruent sub-groups (the 4 quarter and 4 half triangles) — 3 rows, each a distinct true statement. Theorems/store/engine suites (1814) pass unchanged — no feed ripple.
 
 **Tests.** `detectShapes.test.ts` (the square-diagonals class + sub-groups; the rectangle congruent pair unchanged) + the `[ntzdgqn2-kite-detection-honours-requirements]` scenario extended to assert the congruent △EMO ≅ △KMO row.
+
+## ADR-258 — analytic / coordinate geometry is a deliberately out-of-scope class, refused pre-LLM
+
+**Context.** The operator observed students typing analytic-geometry terminology into the (synthetic-construction) tool — "the y axis" and the like. That input can never build here (this tool draws figures on a free canvas; there are no axes, slopes, or line equations), yet it fell through the grammar as a plain `not-handled`, spent an LLM call, and finally landed under the generic "couldn't read that" gap — inflating the real-gap count and giving the student no useful signal. The operator asked for a message saying this isn't that tool and that a separate coordinate-geometry tool is planned.
+
+**Class (design-rules §1).** *A whole family of input the tool deliberately does not accept must be recognised and refused with a pedagogical message + its own analytics tag — never mislabelled as a genuine construction gap, and never sent to the LLM when it provably can't build.* The existing `classifyOutOfScope` (ADR — the out-of-scope boundary: `angle-relation`/`proof`/`compute`/`unrelated`) is exactly this mechanism; analytic geometry is a new member of it.
+
+**Decision.** Add an `analytic` category to `src/parser/scope.ts` (bilingual patterns: axes `ציר`/axis, slope `שיפוע`/slope, coordinates `קואורדינ`/`שיעורי`/coordinate, origin/`ראשית הצירים`, `מערכת צירים`/coordinate-system, line equations `משוואת הישר`/`equation of the line` + the numeric `y = …x` form, cartesian). Patterns are kept SPECIFIC — the stems appear in no supported construct, and the equation form requires BOTH `y =` and an `x` term so a length given like `AB = 4` cannot trip it. Placing a free point AT coordinates (`A = (3,5)`) stays supported — the `freePoint` grammar rule builds it, so it never reaches the classifier (which runs only on a failed parse). `App.submit` short-circuits this category **before** the LLM call (unlike the other scope categories, which run post-LLM): analytic input is an unambiguous "wrong tool", so there's no reason to spend a call — it refuses instantly with `input.scope.analytic` and the `scope:analytic` analytics tag. The admin dashboard gets a Hebrew sub-category label.
+
+**Consequences.** `scope.ts` (new category + patterns), `App.tsx` (the pre-LLM guard), `he.json`/`en.json` (`input.scope.analytic`), `server/admin.ts` (`SCOPE_LABELS_2D.analytic`). No engine/parser-grammar change — `parse()` still returns `not-handled`; the classifier is a separate, read-only boundary. The dashboard now separates analytic requests from real construction gaps (the same operator ask that motivated the original scope classifier).
+
+**Tests.** `src/parser/__tests__/scope.test.ts` — an analytic block (He + En: axes, slope, coordinates, line equations, origin, cartesian) and regression cases asserting `null` for coordinate free-point placement (`A = (3,5)`), length givens (`AB = 4`), and bare shapes.
+
+## ADR-259 — a circle sized by its DIAMETER + the `עיגול` synonym
+
+**Context.** A prod-dashboard triage (the unrecognised-input list, 2026-07-08) surfaced one loud real gap: a student typed `מעגל קוטר 10` / `מעגל בקוטר 10` / `עיגול קוטר 10` / `עיגול קוטר 10 ס"מ` five times in an hour — clearly stuck. Two defects behind it: (1) a circle can be sized by radius / circumference / area (ADR-228) but NOT by its diameter; (2) `עיגול` (the everyday Hebrew word for a circle/disk) was not recognised as a circle at all — the `circle` rule matched only `circle`/`מעגל`.
+
+**Class (design-rules §1).** *A single magnitude-form gap (sizing by diameter) and a single vocabulary gap (a shape synonym) each belong at the ONE place their whole class is handled — the size helper and the normalization chokepoint — never as a per-rule patch.*
+
+**Decision.** (1) **Diameter sizing** — extend `circleSizeRadius` (the helper BOTH the `circle` creation rule and `circleSizeExisting` already call) with a diameter branch: a diameter word followed directly (optionally via a copula) by a number lowers to radius = d/2. The value must follow the keyword with NO endpoint label between them, keeping it DISTINCT from the diameter-CHORD `קוטר AB` (labelled, no size) which the diameter rule owns. A stated diameter is a real magnitude ⇒ the radius is numeric/fixed (ADR-052). (2) **`עיגול` synonym** — normalise `עיגול`→`מעגל` in `normalizeUtterance` (the single boundary every rule reads), so the entire circle vocabulary (creation, sizing, chord, tangent, inscribe, semicircle…) accepts it with one change. A trailing unit (`ס"מ`) is harmless — the size is read from the number and `isDef` short-circuits the leftover check.
+
+**Consequences.** `parse.ts` (`circleSizeRadius` diameter branch + the `עיגול` normalization + a `hasDiameter` candidate in `droppedGivenNumbers` so d/2 isn't seen as a dropped magnitude), a `catalog.ts` entry (`circle with diameter 10`). The diameter-chord form and all existing circle sizing are unchanged (snapshots additive only). Also feeds the scope keyword set (`עיגול` added to `GEO_KEYWORD`).
+
+**Tests.** `perimeter-circumference.test.ts` — a diameter/`עיגול` block (He + En, units, the chord form stays a chord, a bare `עיגול` is free-radius); catalog-coverage + shadow-matrix snapshots updated (additive).
+
+## ADR-260 — a failed COMPOUND utterance advises breaking it into smaller steps
+
+**Context.** Same triage: a student typed `ריבוע Abcd, נקודה f נמצאת על צלע ab, זווית cfd 37 מעלות` — three statements (shape + point-on-side + angle) in one line — which failed to build and got the flat "couldn't read that." The operator asked that long inputs packing 2–3 instructions be told to break them apart.
+
+**Class.** *When a failed input is structurally several statements, the most actionable message is "add them one at a time," not a generic miss* — the student both gets a smaller, far-more-parseable step AND can see which piece is the problem.
+
+**Decision.** Add `looksCompound(utterance)` to `src/parser/scope.ts`: split on statement separators (list/clause punctuation, He/En conjunctions incl. the bare `ו` glued to a construct noun), and flag when ≥2 pieces each carry a geometry KEYWORD (a construct/relation word, NOT a bare label — so a single construction with list-commas like `circle through A, B, C` or the supported `F, G, H on AB, AC, CB` stays ONE statement and is never flagged). `App.submit` consults it ONLY on the failure path (both grammar AND LLM failed to build), before the generic message, showing `input.tooManyParts` and logging `not-understood-compound` (still a real-gap count for the dashboard, but measurable). The keyword-bearing-piece guard is what makes liberal separator splitting safe.
+
+**Consequences.** `scope.ts` (`looksCompound` + `COMPOUND_SEP`), `parser/index.ts` (export), `App.tsx` (failure-path branch + import), `he.json`/`en.json` (`input.tooManyParts`). Read-only heuristic; never fires on a successful parse, so it can't block a working compound the grammar/LLM does handle.
+
+**Tests.** `scope.test.ts` — a `looksCompound` block: compound (the operator example; shape+circle; multi-clause En) TRUE, and single constructions with list-commas / givens-lists FALSE.
+
+---
+
+## ADR-261 — an angle bisector from a vertex resolves its angle from the figure when the triple is omitted
+
+**Status:** Accepted (2026-07-08)
+
+**Context.** The operator typed `משולש ABC` → `AB=AC` → `CD חוצה זוית` ("CD bisects the angle"): a line was drawn but the two half-angles at C were not equal, and a production user hit an error on the same phrasing. The deterministic parser's `bisectorPlacesPoint` resolved an angle bisector from a vertex only when the angle's three letters were spelled out (`CD חוצה זוית ACB`). With the triple omitted, the input fell through to the LLM, which drew a bare segment with no equal-angle constraint — a figure that violates its own given. A sibling from the debug log, `BD חוצה זוית במשולש ABC`, also escalated: the `triangle` rule matched the embedded `משולש ABC`, saw the `חוצה זוית` SHAPE_LEFTOVER, and returned `'stop'` (the same shadowing class median/altitude/midsegment already avoid by running before the shapes).
+
+**Class.** *A construct whose reference is fully determined by the figure must be resolved deterministically, not dropped to the LLM.* `XY חוצה זוית` names the bisecting ray `X→Y`, so `X` is the angle vertex; its two arms are the figure's edges at `X`. This is exactly the ADR-164 single-vertex angle resolution (`∠B = 90` → arms from `ctx.neighbors`), reused for the bisector.
+
+**Decision.** (1) `bisectorPlacesPoint` now, when no explicit triple is present, resolves the angle from `ctx.neighbors[apex]` — well-defined only when the vertex has exactly two edges (one angle); a different count returns the `ambiguous-angle` clarification (ask for the three letters) rather than guessing. Gated to an explicit "angle"/"זוית" utterance so a segment bisection (`AB חוצה את הקטע CD`) never mis-fires as an angle bisector. (2) The rule is moved ahead of the shape rules (joining median/altitude/perpBisector/midsegment) so its `…במשולש ABC` form is not shadowed by `triangle`'s `'stop'`; safe there because it defers on intersect keywords, so the bisector-∩ compounds (which require an intersect keyword) still win their inputs.
+
+**Consequences.** `parse.ts` (`bisectorPlacesPoint` neighbour resolution + RULES reorder). Deterministic — no LLM escalation for the common bisector-from-a-vertex phrasing. The placed point `D` sits geometrically on the bisector ⇒ the two half-angles are equal by construction (and a pre-existing `D` becomes a `set-angle-ratio k=1` equality, unchanged).
+
+**Tests.** Scenarios `bisector-from-vertex-no-triple` (∠ACD = ∠DCB after triangle+`AB=AC`) and `bisector-from-vertex-in-triangle` (the `…במשולש ABC` form) in `scenarios.test.ts`; full suite + build clean.

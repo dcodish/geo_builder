@@ -53,6 +53,24 @@ describe('circle sized by circumference / area (ADR-228 B)', () => {
   });
 });
 
+describe('circle sized by its DIAMETER + the עיגול synonym (ADR-259)', () => {
+  const r5 = [{ type: 'circle', id: 'circle-O', center: 'O', radius: 5, autoCenter: true }];
+  it('מעגל קוטר 10 ⇒ radius 5 (diameter/2)', () => expect(cmds('מעגל קוטר 10')).toEqual(r5));
+  it('מעגל בקוטר 10 (the ב prefix) ⇒ radius 5', () => expect(cmds('מעגל בקוטר 10')).toEqual(r5));
+  it('English "circle diameter 10" ⇒ radius 5', () => expect(cmds('circle diameter 10')).toEqual(r5));
+  it('עיגול (disk synonym) is a circle', () => expect(cmds('עיגול קוטר 10')).toEqual(r5));
+  it('a trailing unit ("ס\\"מ") is tolerated', () => expect(cmds('עיגול קוטר 10 ס"מ')).toEqual(r5));
+  it('the diameter-CHORD form "קוטר AB" (labels, no size) is NOT sized — stays a chord', () => {
+    const c = parse('AB קוטר במעגל O', { circles: ['O'], points: ['A', 'B'] });
+    // no `circle` re-creation with radius 5; the endpoints ride the circle (a diameter chord)
+    expect(c.ok && c.commands.some((k) => k.type === 'circle' && (k as { radius?: number }).radius === 5)).toBe(false);
+    expect(c.ok && c.commands.some((k) => k.type === 'point-on-circle')).toBe(true);
+  });
+  it('a bare עיגול (no size) is a free-radius circle (ADR-052 — no assumed size)', () => {
+    expect(cmds('עיגול')).toEqual([{ type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true, autoCenter: true }]);
+  });
+});
+
 describe('polygon perimeter (ADR-228 C)', () => {
   it('היקף המשולש ABC = 20 → set-perimeter', () => {
     expect(cmds('היקף המשולש ABC = 20')).toEqual([{ type: 'set-perimeter', ids: ['A', 'B', 'C'], value: 20 }]);
