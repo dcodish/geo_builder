@@ -14,8 +14,22 @@ import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
 import { Packer } from 'docx';
 import type { Fact } from '@/store/geoStore';
+import { replay } from '@/store/geoStore';
+import { buildParseCtx, parse } from '@/parser';
 import { questionLines } from '@/export/questionLines';
 import { buildQuestionDoc, pngDimensions, questionFileName } from '@/export/questionDoc';
+
+/** Real-pipeline fact builder: parse each utterance with the live figure context, exactly as the app does. */
+const factsFromUtterances = (utterances: string[]): Fact[] => {
+  const facts: Fact[] = [];
+  utterances.forEach((u, g) => {
+    const { construction, positions } = replay(facts);
+    const r = parse(u, buildParseCtx(construction, positions));
+    if (!r.ok) throw new Error(`did not parse: ${u}`);
+    for (const cmd of r.commands) facts.push({ id: `g${g}.${facts.length}`, utterance: u, group: `g${g}`, cmd, enabled: true });
+  });
+  return facts;
+};
 
 /** 2×1 RGB PNG (red, green) — non-square so aspect handling is exercised. */
 const PNG_2X1 = Uint8Array.from(
@@ -66,6 +80,79 @@ describe('questionLines', () => {
 
   it('empty facts → empty lines (button disabled)', () => {
     expect(questionLines([])).toEqual([]);
+  });
+
+  // ── ADR-252: scaffolding steps (pure ink / helper markers) are omitted ──
+  const square = (id: string, utterance = 'ריבוע ABCD'): Fact =>
+    fact({ id, utterance, cmd: { type: 'square', ids: ['A', 'B', 'C', 'D'] } });
+
+  it('a bare segment between existing points is pure ink — omitted', () => {
+    const facts: Fact[] = [
+      square('f1'),
+      fact({ id: 'f2', utterance: 'AC', cmd: { type: 'segment', a: 'A', b: 'C' } }),
+      fact({ id: 'f3', utterance: 'BD', cmd: { type: 'segment', a: 'B', b: 'D' } }),
+    ];
+    expect(questionLines(facts)).toEqual(['ריבוע ABCD']);
+  });
+
+  it('a free marker kept alive only by omitted ink cascades away with it', () => {
+    const facts: Fact[] = [
+      square('f1'),
+      fact({ id: 'f2', utterance: 'נקודה E על AB', cmd: { type: 'point-on-segment', id: 'E', a: 'A', b: 'B' } }),
+      fact({ id: 'f3', utterance: 'EC', cmd: { type: 'segment', a: 'E', b: 'C' } }),
+    ];
+    expect(questionLines(facts)).toEqual(['ריבוע ABCD']);
+  });
+
+  it('a marker referenced by a LATER real given is a definition the reader needs — kept', () => {
+    const facts: Fact[] = [
+      square('f1'),
+      fact({ id: 'f2', utterance: 'נקודה G על AD', cmd: { type: 'point-on-segment', id: 'G', a: 'A', b: 'D' } }),
+      fact({ id: 'f3', utterance: 'זווית GBA = 37', cmd: { type: 'set-angle', vertex: 'B', ray1: 'G', ray2: 'A', value: 37 } }),
+    ];
+    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'נקודה G על AD', 'זווית GBA = 37']);
+  });
+
+  it('a bare segment whose NEW endpoint a later given references is kept', () => {
+    const facts: Fact[] = [
+      square('f1'),
+      fact({ id: 'f2', utterance: 'BE', cmd: { type: 'segment', a: 'B', b: 'E' } }), // creates E
+      fact({ id: 'f3', utterance: 'זווית ABE = 30', cmd: { type: 'set-angle', vertex: 'B', ray1: 'A', ray2: 'E', value: 30 } }),
+    ];
+    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'BE', 'זווית ABE = 30']);
+  });
+
+  it('a membership statement about an EXISTING point is a given (M1), never scaffolding — and it keeps its carrier', () => {
+    const facts: Fact[] = [
+      fact({ id: 'f1', utterance: 'משולש ABC', cmd: { type: 'triangle', ids: ['A', 'B', 'C'] } }),
+      fact({ id: 'f2', utterance: 'DF', cmd: { type: 'segment', a: 'D', b: 'F' } }), // creates D, F
+      fact({ id: 'f3', utterance: 'C על DF', cmd: { type: 'point-on-segment', id: 'C', a: 'D', b: 'F' } }), // C exists ⇒ a constraint
+    ];
+    // f3 is kept (existing-id membership = a given); it references D,F so the DF step that defines them stays too.
+    expect(questionLines(facts)).toEqual(['משולש ABC', 'DF', 'C על DF']);
+  });
+
+  it('a stated ratio pins a marker — kept even when nothing later references it', () => {
+    const facts: Fact[] = [
+      square('f1'),
+      fact({ id: 'f2', utterance: 'נקודה G על AD ב-40%', cmd: { type: 'point-on-segment', id: 'G', a: 'A', b: 'D', t: 0.4 } }),
+    ];
+    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'נקודה G על AD ב-40%']);
+  });
+
+  it('a typed pinned point (coordinates stated, no free flag) is a given — kept', () => {
+    const facts: Fact[] = [fact({ id: 'f1', utterance: 'נקודה A ב-(1,2)', cmd: { type: 'free-point', id: 'A', x: 1, y: 2 } })];
+    expect(questionLines(facts)).toEqual(['נקודה A ב-(1,2)']);
+  });
+
+  it('operator pattern (session ufxrtyp2), real parser: centre-to-vertex helper segments are omitted', () => {
+    const facts = factsFromUtterances(['במרובע ABCD חסום מעגל O', 'OB', 'OD', 'OA', 'OC']);
+    expect(questionLines(facts)).toEqual(['במרובע ABCD חסום מעגל O']);
+  });
+
+  it('real parser: the canonical square figure keeps every line (marker referenced by the angle)', () => {
+    const facts = factsFromUtterances(['ריבוע ABCD', 'נקודה G על AD', 'זווית GBA = 37']);
+    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'נקודה G על AD', 'זווית GBA = 37']);
   });
 });
 

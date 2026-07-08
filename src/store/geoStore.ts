@@ -1092,9 +1092,10 @@ export function commandPointIds(cmd: AnyCommand): Id[] {
 
 /** Every OBJECT id a command mentions — points (`A`, `O1`) plus prefixed object ids (`circle-O`,
  *  `line-…`, `seg-…`, …) — the dependency set the HOIST pass needs to place a relation fact at the
- *  earliest position where everything it references exists. Structural scan like {@link commandPointIds};
+ *  earliest position where everything it references exists, and the reference set the question
+ *  export's scaffolding filter walks (ADR-252). Structural scan like {@link commandPointIds};
  *  the `type`/`expr` fields are skipped (a command type or a measure expression is never an object id). */
-function commandObjectIds(cmd: AnyCommand): Id[] {
+export function commandObjectIds(cmd: AnyCommand): Id[] {
   const out: Id[] = [];
   const take = (v: unknown) => {
     if (typeof v === 'string' && (/^[A-Z]\d*$/.test(v) || /^(circle|line|seg|bis|tan|poly)-/.test(v))) out.push(v);

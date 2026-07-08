@@ -44,6 +44,9 @@ export default defineConfig(({ command }) => ({
     // now lives outside Dropbox via a junction) — exclude its stray third-party tests from collection.
     // `**/*.tmp.*` — editors write atomic-save temp files (e.g. `foo.test.ts.tmp.28712.<hash>`) into the
     // tree; exclude them so a stray copy is never collected as a duplicate test (hardening plan A6).
-    exclude: ['**/node_modules/**', '**/_node_modules_dropbox_old/**', '**/dist/**', 'archive/**', '**/*.tmp.*'],
+    // dist-3d/ is the 3-D app's build output — not covered by the default `**/dist/**` — and
+    // .claude/ holds assistant worktrees (stale full repo copies); a Dropbox dehydrated
+    // placeholder inside either EPERMs vitest's crawl before a single test runs.
+    exclude: ['**/node_modules/**', '**/_node_modules_dropbox_old/**', '**/dist/**', 'dist-3d/**', '**/.claude/**', 'archive/**', '**/*.tmp.*'],
   },
 }));
