@@ -116,5 +116,14 @@ describe('dataView — organize your data', () => {
     expect(useGeo3.getState().lastError).toBeNull();
     const p = panel();
     expect(p.pointCoords.S).toEqual({ text: '(0, 0, +?)', kind: 'partial' });
+  it('axis given + length given determine S fully: (0, 0, +?) collapses to (0, 0, 12)', () => {
+    // the operator's chain: S on +z gives (0,0,+?); |AS|=|AD| (⇒ =|AB|=12) pins the +? to 12
+    ['פירמידה ABCDS שבסיסה ריבוע', 'AS גובה', '|AS|=|AD|', 'נתון: A(0,0,0), B(0,12,0)', 'S נמצא על החלק החיובי של ציר ה-z'].forEach(submit);
+    expect(useGeo3.getState().lastError).toBeNull();
+    const p = panel();
+    expect(p.pointCoords.S).toEqual({ text: '(0, 0, 12)', kind: 'fact' });
+    // S on the z-axis flattens the base, so D's z = 0 becomes a fact too — only its ± sign waits for the D placement
+    expect(p.pointCoords.D).toEqual({ text: '(?, 0, 0)', kind: 'partial' });
+  });
   });
 });
