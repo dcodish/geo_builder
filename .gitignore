@@ -21,3 +21,7 @@ logs/
 vite.config.ts.timestamp-*.mjs
 reports/
 dist-3d
+
+# Assistant worktrees (stale copies can hold unreadable Dropbox placeholders;
+# ignoring the dir also stops git status descending into it)
+.claude/worktrees/
