@@ -19,9 +19,9 @@ export interface Figure3Props {
   /** Reset-view button label (i18n-injected so this component stays translation-free). */
   resetLabel?: string;
   /** id → coordinate label drawn under the point letter (the organize-your-data
-   *  toggle). stable = a determined FACT (blue); otherwise this drawing's sampled
-   *  value (gray italic — it changes with "show another configuration"). */
-  coordLabels?: Record<string, { text: string; stable: boolean }>;
+   *  toggle). fact/partial = knowledge (blue; '?' marks a free component); sample =
+   *  this drawing's values (gray italic — changes with "show another configuration"). */
+  coordLabels?: Record<string, { text: string; kind: 'fact' | 'partial' | 'sample' }>;
 }
 
 /** Per-index plane patch colours (translucent — patches never occlude, docs/20 §11). */
@@ -261,8 +261,8 @@ export default function Figure3({ construction, resolved, width = 640, height = 
                 y={p.y + p.labelDy + 13}
                 fontSize={11}
                 fontFamily="ui-sans-serif, system-ui, sans-serif"
-                fill={coordLabels[p.id].stable ? '#0369a1' : '#94a3b8'}
-                fontStyle={coordLabels[p.id].stable ? 'normal' : 'italic'}
+                fill={coordLabels[p.id].kind === 'sample' ? '#94a3b8' : '#0369a1'}
+                fontStyle={coordLabels[p.id].kind === 'sample' ? 'italic' : 'normal'}
                 stroke="#ffffff"
                 strokeWidth={3}
                 paintOrder="stroke"

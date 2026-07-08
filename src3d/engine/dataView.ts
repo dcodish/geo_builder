@@ -36,10 +36,11 @@ export interface DataPanel {
   relations: string[];
   vectors: VecEntry[];
   points: string[]; // `N(6, 6, 6)` — stable coordinates only
-  /** id → canvas coordinate label for EVERY point (when a frame exists): a STABLE
-   *  coordinate is a fact; an unstable one is THIS DRAWING'S value (the canvas already
-   *  commits to one valid configuration) and renders visually distinct. */
-  pointCoords: Record<string, { text: string; stable: boolean }>;
+  /** id → canvas coordinate label for EVERY point (when a frame exists), judged
+   *  PER COMPONENT: 'fact' = fully determined; 'partial' = the known components print
+   *  and the free ones read '?' (S(?, 0, ?) — its y IS knowledge while the base still
+   *  tilts about AB); 'sample' = nothing determined, THIS DRAWING'S values shown. */
+  pointCoords: Record<string, { text: string; kind: 'fact' | 'partial' | 'sample' }>;
 }
 
 const EPS = 1e-6;
@@ -266,25 +267,40 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       }
       if (cls.length > 1) {
         const stated = cls.map((n) => lengths.get(pairKey(c.vectors.get(n)!.from, c.vectors.get(n)!.to))).find((v) => v !== undefined);
-        relations.push(cls.map((n) => `|${n}|`).join(' = ') + (stated !== undefined ? ` = ${cleanNum(stated)}` : ''));
+        // no stated number? a frame can still DERIVE one — append it when the class
+        // length is the same in every sampled configuration (scale is pinned)
+        const per = mags[i].per as number[];
+        const derived =
+          stated === undefined && hasFrame && per.every((m) => Math.abs(m - per[0]) < 1e-6 * Math.max(1, per[0])) ? per[0] : undefined;
+        const val = stated ?? derived;
+        relations.push(cls.map((n) => `|${n}|`).join(' = ') + (val !== undefined ? ` = ${cleanNum(val)}` : ''));
       }
     }
   }
 
   // points with STABLE coordinates (needs a frame; a pinned-only figure prints nothing sampled)
   const points: string[] = [];
-  const pointCoords: Record<string, { text: string; stable: boolean }> = {};
+  const pointCoords: Record<string, { text: string; kind: 'fact' | 'partial' | 'sample' }> = {};
   if (hasFrame) {
+    const axes = ['x', 'y', 'z'] as const;
     for (const id of positions[0].keys()) {
       const ps = positions.map((pos) => pos.get(id));
       if (ps.some((p) => !p)) continue;
-      const stable = sameVec(ps[0]!, ps[1]!) && sameVec(ps[0]!, ps[2]!);
-      // a stable coordinate is a FACT (the panel lists it); an unstable one is still
-      // shown on the canvas as THIS drawing's value — displayed distinct, and it
-      // visibly changes on "show another configuration"
-      const cs = coordStr(ps[0]!);
-      pointCoords[id] = { text: cs, stable };
-      if (stable) points.push(`${id}${cs}`);
+      const stableAx = axes.map((ax) => near(ps[0]![ax], ps[1]![ax]) && near(ps[0]![ax], ps[2]![ax]));
+      const nStable = stableAx.filter(Boolean).length;
+      if (nStable === 3) {
+        const cs = coordStr(ps[0]!);
+        pointCoords[id] = { text: cs, kind: 'fact' };
+        points.push(`${id}${cs}`);
+      } else if (nStable > 0) {
+        // PARTIALLY determined (S with only A,B injected: y = 0 is a fact while the
+        // base tilts about AB): known components print, free ones read '?'
+        const cs = `(${axes.map((ax, i) => (stableAx[i] ? cleanNum(ps[0]![ax]) : '?')).join(', ')})`;
+        pointCoords[id] = { text: cs, kind: 'partial' };
+        points.push(`${id}${cs}`);
+      } else {
+        pointCoords[id] = { text: coordStr(ps[0]!), kind: 'sample' };
+      }
     }
   }
   return { relations, vectors: entries, points, pointCoords };
