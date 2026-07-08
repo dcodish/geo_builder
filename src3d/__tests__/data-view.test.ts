@@ -110,4 +110,11 @@ describe('dataView — organize your data', () => {
     // and the equal-magnitudes row now carries the DERIVED length (scale pinned by A,B)
     expect(p.relations).toContain('|u| = |v| = |w| = 12');
   });
+  it('a sign given upgrades the free component: on the positive z-axis reads (0, 0, +?)', () => {
+    // WITHOUT |AS|=|AD| the height stays free — the axis placement pins x=0, y=0 and the SIGN
+    ['פירמידה ABCDS שבסיסה ריבוע', 'AS גובה', 'נתון: A(0,0,0), B(0,12,0)', 'S נמצא על החלק החיובי של ציר ה-z'].forEach(submit);
+    expect(useGeo3.getState().lastError).toBeNull();
+    const p = panel();
+    expect(p.pointCoords.S).toEqual({ text: '(0, 0, +?)', kind: 'partial' });
+  });
 });

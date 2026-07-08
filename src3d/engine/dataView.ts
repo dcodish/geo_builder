@@ -294,8 +294,14 @@ export function dataView(c: Construction3, seed: number): DataPanel {
         points.push(`${id}${cs}`);
       } else if (nStable > 0) {
         // PARTIALLY determined (S with only A,B injected: y = 0 is a fact while the
-        // base tilts about AB): known components print, free ones read '?'
-        const cs = `(${axes.map((ax, i) => (stableAx[i] ? cleanNum(ps[0]![ax]) : '?')).join(', ')})`;
+        // base tilts about AB): known components print, free ones read '?' — and a
+        // STATED sign given upgrades the '?' to '+?'/'−?' (the sign is knowledge too;
+        // never inferred from sample coincidence)
+        const free = (ax: 'x' | 'y' | 'z'): string => {
+          const sg = c.signGivens.find((g) => g.id === id && g.axis === ax);
+          return sg ? (sg.positive ? '+?' : '−?') : '?';
+        };
+        const cs = `(${axes.map((ax, i) => (stableAx[i] ? cleanNum(ps[0]![ax]) : free(ax))).join(', ')})`;
         pointCoords[id] = { text: cs, kind: 'partial' };
         points.push(`${id}${cs}`);
       } else {
