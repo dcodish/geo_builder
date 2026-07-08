@@ -51,6 +51,14 @@ export function solidDims(kind: SolidKind, key: string, seed: number): number[] 
       sample(seed, `${key}-aspect`, 0.6, 1.6),
       sample(seed, `${key}-ax`, 0.2, 0.8), sample(seed, `${key}-ay`, 0.2, 0.8), sample(seed, `${key}-az`, 0.8, 1.6),
     ];
+  // V8-d: equilateral-base prism/pyramid — the base is the similarity gauge, only the height is free
+  if (kind === 'prism3e' || kind === 'pyramid3e') return [sample(seed, `${key}-height`, 0.8, 1.6)];
+  // V8-d: free-apex parallelogram-base pyramid — the 2nd base edge (dx,dy) + the free apex
+  if (kind === 'pyramidPar')
+    return [
+      sample(seed, `${key}-dx`, -0.4, 0.4), sample(seed, `${key}-dy`, 0.5, 1.0),
+      sample(seed, `${key}-ax`, 0.2, 0.8), sample(seed, `${key}-ay`, 0.2, 0.8), sample(seed, `${key}-az`, 0.8, 1.6),
+    ];
   return [rad(sample(seed, `${key}-alpha`, 38, 72)), rad(sample(seed, `${key}-beta`, 38, 72)), sample(seed, `${key}-height`, 0.65, 1.5)];
 }
 
@@ -145,6 +153,30 @@ function solidPositions(kind: SolidKind, dims: number[], origin: Vec3): Vec3[] {
     const dy = Math.sin(theta);
     const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1 + dx, o.y + dy, o.z), v3(o.x + dx, o.y + dy, o.z)];
     return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
+  }
+  if (kind === 'pyramid3e') {
+    // equilateral-base right pyramid: apex above the base centroid (= circumcentre)
+    const [h] = dims;
+    const cy = Math.sqrt(3) / 2;
+    return [
+      v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 0.5, o.y + cy, o.z),
+      v3(o.x + 0.5, o.y + cy / 3, o.z + h),
+    ];
+  }
+  if (kind === 'prism3e') {
+    // equilateral-base right prism: base ABC equilateral (side 1 = gauge), tops straight up
+    const [h] = dims;
+    const cy = Math.sqrt(3) / 2;
+    const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 0.5, o.y + cy, o.z)];
+    return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
+  }
+  if (kind === 'pyramidPar') {
+    // free-apex parallelogram-base pyramid: base AB=(1,0), AD=(dx,dy); C = B + AD; apex free
+    const [dx, dy, ax, ay, az] = dims;
+    return [
+      v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1 + dx, o.y + dy, o.z), v3(o.x + dx, o.y + dy, o.z),
+      v3(o.x + ax, o.y + ay, o.z + az),
+    ];
   }
   // prism3 — right triangular prism: base ABC in the z=origin plane, tops straight up.
   const [alpha, beta, h] = dims;

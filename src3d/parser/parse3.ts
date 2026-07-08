@@ -87,15 +87,18 @@ const cubeOrBox: Rule = (s) => {
   return null;
 };
 
-/** Right triangular prism: `מנסרה ישרה (משולשת) ABCA'B'C'` — 6 vertices, or 3 auto-primed. */
+/** Right triangular prism: `מנסרה ישרה (משולשת) ABCA'B'C'` — 6 vertices, or 3 auto-primed.
+ *  V8-d: an equilateral base (`שווה צלעות` / `כל מקצועותיה שווים` / `equilateral`) → `prism3e`. */
 const rightPrism: Rule = (s) => {
   if (!/מנסרה/.test(s) && !/\bprism\b/i.test(s)) return null;
   if (!/ישרה/.test(s) && !/\bright\b/i.test(s)) return null; // oblique unsupported in V0 — honest refusal
-  const toks = labelTokens(s);
-  if (toks.length === 6) return [{ type: 'solid', kind: 'prism3', ids: toks }];
-  if (toks.length === 3 && toks.every(unprimed)) return [{ type: 'solid', kind: 'prism3', ids: [...toks, ...primeAll(toks)] }];
-  if (toks.length === 0 && (/משולש/.test(s) || /\btriangular\b/i.test(s)))
-    return [{ type: 'solid', kind: 'prism3', ids: ['A', 'B', 'C', ...primeAll(['A', 'B', 'C'])] }];
+  const equi = /שווה[\s-]?צלעות/.test(s) || /כל\s+מקצועותיה\s+שוו/.test(s) || /\bequilateral\b/i.test(s);
+  const kind = equi ? 'prism3e' : 'prism3';
+  const toks = firstLabelRun(s);
+  if (toks.length === 6) return [{ type: 'solid', kind, ids: toks }];
+  if (toks.length === 3 && toks.every(unprimed)) return [{ type: 'solid', kind, ids: [...toks, ...primeAll(toks)] }];
+  if (toks.length === 0 && (/משולש/.test(s) || /\btriangular\b/i.test(s) || equi))
+    return [{ type: 'solid', kind, ids: ['A', 'B', 'C', ...primeAll(['A', 'B', 'C'])] }];
   return null;
 };
 
@@ -134,32 +137,36 @@ function orientPyramid(s: string, toks: Id[]): Id[] {
   return toks;
 }
 
-/** Right pyramid: `פירמידה ישרה ABCDS` / `ABCS`. WITHOUT ישרה, 4 ids = a GENERAL tetrahedron (V7 T2). */
+/** Right pyramid: `פירמידה ישרה ABCDS` / `ABCS`. WITHOUT ישרה, 4 ids = a GENERAL tetrahedron (V7 T2).
+ *  V8-d: an equilateral triangular base → `pyramid3e`; a parallelogram base → `pyramidPar`. */
 const rightPyramid: Rule = (s) => {
   if (!/פירמידה/.test(s) && !/\bpyramid\b/i.test(s)) return null;
   const right = /ישרה/.test(s) || /\bright\b/i.test(s);
   const square = /ריבוע/.test(s) || /\bsquare\b/i.test(s);
-  const toks = orientPyramid(s, firstLabelRun(s));
-  if (toks.length === 0) {
+  const equi = /שווה[\s-]?צלעות/.test(s) || /\bequilateral\b/i.test(s);
+  const par = /מקבילית/.test(s) || /\bparallelogram\b/i.test(s);
+  // the triangular-base pyramid kind (equilateral only when right — a right equilateral pyramid)
+  const triKind = right ? (equi ? 'pyramid3e' : 'pyramid3') : 'tetra';
+  if (firstLabelRun(s).length === 0) {
     // label-less: a stated base word makes the shape determined — default lettering
-    // (base ring first, apex last), deterministic; bare 'פירמידה' stays ambiguous
     const rect = /מלבן/.test(s) || /\brectang/i.test(s);
-    const tri = /משולש/.test(s) || /\btriangular\b/i.test(s);
-    if (tri) return [{ type: 'solid', kind: right ? 'pyramid3' : 'tetra', ids: ['A', 'B', 'C', 'D'] }];
+    const tri = /משולש/.test(s) || /\btriangular\b/i.test(s) || equi;
+    if (par) return [{ type: 'solid', kind: 'pyramidPar', ids: ['A', 'B', 'C', 'D', 'S'] }];
+    if (tri) return [{ type: 'solid', kind: triKind, ids: ['A', 'B', 'C', 'D'] }];
     if (square || rect) {
       const kind = right ? (square ? 'pyramid4' : 'pyramid4r') : square ? ('pyramid4g' as const) : 'pyramid4gr';
       return [{ type: 'solid', kind, ids: ['A', 'B', 'C', 'D', 'S'] }];
     }
     return null;
   }
+  const toks = orientPyramid(s, firstLabelRun(s));
   if (toks.length === 5) {
-    // rightness and base shape are INDEPENDENT givens (ADR-052): a square base must be
-    // STATED (שבסיסה ריבוע / with a square base); unstated = free-aspect rectangle DOF
+    if (par) return [{ type: 'solid', kind: 'pyramidPar', ids: toks }];
+    // rightness and base shape are INDEPENDENT givens (ADR-052): a square base must be STATED
     const kind = right ? (square ? 'pyramid4' : 'pyramid4r') : square ? ('pyramid4g' as const) : 'pyramid4gr';
     return [{ type: 'solid', kind, ids: toks }];
   }
-  if (right && toks.length === 4) return [{ type: 'solid', kind: 'pyramid3', ids: toks }];
-  if (!right && toks.length === 4) return [{ type: 'solid', kind: 'tetra', ids: toks }]; // general — apex free
+  if (toks.length === 4) return [{ type: 'solid', kind: triKind, ids: toks }];
   return null;
 };
 

@@ -329,3 +329,17 @@ Parser: `relPlaneRule` (order-independent through/relation clauses, He+En, unnam
 - `resolve3` runs the **normal** solve first (`nSym = 0`). Only if a ⟂/∥-pinned symbol's point is then still **unplaced** (root-find failed) AND free dims exist does it re-solve with `coupled` set and re-apply. So determined figures where the root-find succeeds (2023-ב's `EF∥plane`, 2026-ב's `|EN|`) never enter the coupled path — verified bit-identical.
 
 Gate: 2022-נבצרים builds to the closed form (**t = ¼, |DD′| = 2**, DF ⟂ plane ACD′ verified). A parser robustness fix rode along: `vertexAngleClaim` now accepts the bare Hebrew `זווית ADC = 120` (the `ה` prefix was mandatory — the natural exam phrasing was silently dropped). *(The two-SYMBOL vec-rel form `AF = t·A'C + m·A'B` of 2013-קיץ-ב is a different mechanism — multiple free scalars in one relation — filed for V8-f.)* **Perf:** the coupled retry is a multi-start LM (~16 s for this figure) — acceptable, noted as a target (the ADR-229 precedent). Locked by `v8c-coupled-symbol.test.ts`. **413 src3d tests green, `tsc -b` clean.**
+
+---
+
+## ADR-3D-021 — V8-d: the legacy-572 solid family (equilateral bases + parallelogram-base pyramid) (2026-07-08)
+
+**Context (G4).** The legacy corpus wants solids the template set lacked: an **equilateral-triangle-base** right prism (2013-קיץ-ב, 2018-חורף) and pyramid (2014-קיץ, 2012-קיץ-ב), and a **parallelogram-base pyramid** (2012-חורף ABCDT, 2013-קיץ SABCD). The existing `prism3`/`pyramid3` carry a *free* triangular base (α,β sampled) and `pyramid4*` only square/rect bases.
+
+**Decision — three new `SolidKind`s, following the existing template pattern** (VERTEX_COUNT + DIM_COUNT + edge/face indices aliased to their triangular/quad siblings; `solidDims` + `solidPositions`):
+- **`prism3e` / `pyramid3e`** — an equilateral base is the similarity gauge (side 1, α=β=60° ⇒ C=(½,√3/2)), so the ONLY free dim is the height; the pyramid's apex sits above the base centroid (= circumcentre ⇒ equal lateral edges, a right pyramid). Parser: `rightPrism`/`rightPyramid` detect `שווה צלעות` / `equilateral` / `כל מקצועותיה שווים`.
+- **`pyramidPar`** — a free-apex parallelogram-base pyramid: base `AB=(1,0)`, `AD=(dx,dy)`, `C=B+AD` (5 dims: the 2nd base edge + the free apex). Parser: `מקבילית` / `parallelogram`, composing with V8-a apex-first naming (`SABCD` → `pyramidPar` with apex last).
+
+**Deferred (documented, low frequency — 1 exam each, expressible via coordinate injection today):** the **oblique parallelepiped** `מקבילון` (2011-חורף — a general non-right box) and the **orthoscheme** (2017-חורף `OBCD`, three mutually-⊥ edges at a corner). The **"all edges equal"** prism (2018-חורף) parses as `prism3e`; pinning height = side is left to a length-equality given.
+
+**Locked by** `v8d-solids.test.ts` (parse for all three He+En incl. apex-first `SABCD`→`pyramidPar` and the plain-vs-equilateral distinction; builds verifying the equilateral base + equal lateral edges, straight prism verticals, and the parallelogram opposite-sides-equal). Catalog +3. **424 src3d tests green, `tsc -b` clean.**

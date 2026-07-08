@@ -124,7 +124,10 @@ export type RelPlaneDef =
 /** The solid family. `cube`/`box`: 8 ids (base then primed tops); `prism3`: 6 ids (right triangular
  *  prism); `pyramid4`/`pyramid3`: base ring then the APEX LAST — a RIGHT pyramid (apex above the
  *  base's circumcentre, so the lateral edges are equal; stated `ישרה` required, ADR-052). */
-export type SolidKind = 'cube' | 'box' | 'prism3' | 'pyramid4' | 'pyramid3' | 'tetra' | 'prism4r' | 'pyramid4g' | 'pyramid4r' | 'pyramid4gr';
+export type SolidKind =
+  | 'cube' | 'box' | 'prism3' | 'pyramid4' | 'pyramid3' | 'tetra' | 'prism4r' | 'pyramid4g' | 'pyramid4r' | 'pyramid4gr'
+  // V8-d: equilateral-triangle-base right prism/pyramid, and a free-apex parallelogram-base pyramid
+  | 'prism3e' | 'pyramid3e' | 'pyramidPar';
 // The 4-base pyramid family: rightness (ישרה — apex above the base centre) and base shape
 // are INDEPENDENT stated givens (ADR-052). Square must be STATED (שבסיסה ריבוע); an
 // unstated base is a free-aspect rectangle DOF. pyramid4: right+square (dims [h]);

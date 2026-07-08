@@ -6,24 +6,24 @@
 import { exprPointIds, exprVectorNames } from './vecExpr';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, SolidCommand, SolidObj } from './types';
 
-const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5 };
+const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5 };
 
 /** Edge index pairs per solid kind (indices into `ids`). */
 function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
-  if (kind === 'prism3') {
+  if (kind === 'prism3' || kind === 'prism3e') {
     return [
       [0, 1], [1, 2], [2, 0], // base ring
       [3, 4], [4, 5], [5, 3], // top ring
       [0, 3], [1, 4], [2, 5], // verticals
     ];
   }
-  if (kind === 'pyramid4' || kind === 'pyramid4g' || kind === 'pyramid4r' || kind === 'pyramid4gr') {
+  if (kind === 'pyramid4' || kind === 'pyramid4g' || kind === 'pyramid4r' || kind === 'pyramid4gr' || kind === 'pyramidPar') {
     return [
       [0, 1], [1, 2], [2, 3], [3, 0], // base ring
       [0, 4], [1, 4], [2, 4], [3, 4], // lateral edges to the apex
     ];
   }
-  if (kind === 'pyramid3' || kind === 'tetra') {
+  if (kind === 'pyramid3' || kind === 'tetra' || kind === 'pyramid3e') {
     return [
       [0, 1], [1, 2], [2, 0], // base ring
       [0, 3], [1, 3], [2, 3], // lateral edges to the apex
@@ -46,20 +46,20 @@ function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
 
 /** Face index rings per solid kind. Orientation is irrelevant — the renderer re-orients outward numerically. */
 function faceIndices(kind: SolidCommand['kind']): number[][] {
-  if (kind === 'prism3') {
+  if (kind === 'prism3' || kind === 'prism3e') {
     return [
       [0, 1, 2], // base
       [3, 4, 5], // top
       [0, 1, 4, 3], [1, 2, 5, 4], [2, 0, 3, 5], // sides
     ];
   }
-  if (kind === 'pyramid4' || kind === 'pyramid4g' || kind === 'pyramid4r' || kind === 'pyramid4gr') {
+  if (kind === 'pyramid4' || kind === 'pyramid4g' || kind === 'pyramid4r' || kind === 'pyramid4gr' || kind === 'pyramidPar') {
     return [
       [0, 1, 2, 3], // base
       [0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4], // lateral triangles
     ];
   }
-  if (kind === 'pyramid3' || kind === 'tetra') {
+  if (kind === 'pyramid3' || kind === 'tetra' || kind === 'pyramid3e') {
     return [
       [0, 1, 2], // base
       [0, 1, 3], [1, 2, 3], [2, 0, 3], // lateral triangles
@@ -121,7 +121,7 @@ function relPointIds(c: Construction3, from: Id, to: Id, terms: { atom: import('
 }
 
 /** How many FREE dims the figure's solids carry (a scalar statement on such a figure is a GIVEN, not a check). */
-const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2, pyramid4g: 3, pyramid4r: 2, pyramid4gr: 4 };
+const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2, pyramid4g: 3, pyramid4r: 2, pyramid4gr: 4, prism3e: 1, pyramid3e: 1, pyramidPar: 5 };
 function freeDims(c: Construction3): number {
   let n = 0;
   for (const s of c.solids) n += DIM_COUNT[s.kind];
