@@ -371,3 +371,13 @@ Gate: 2022-נבצרים builds to the closed form (**t = ¼, |DD′| = 2**, DF �
 **Scope note (the 2-D lane is V8-g).** The pivot solver drives only figures that carry a SOLID; the pure-plane triangle builds of 2013-חורף/2014-קיץ-ב (free points, no solid) reproduce end-to-end only once the z=0 vector lane lands (V8-g). V8-f delivers the capability — parse + drive-on-a-solid + verify + the bisector point — gated on solid-bearing representatives of each gap (a tetra for G6, the apex-first pyramid SABC for G9, the square-base pyramid for G10, coordinate points for G11).
 
 **Locked by** `v8f-vector-relations.test.ts` (parse He+En for all four; cos(u,v)=½ reshapes a tetra to 60°; `u·v=v·w=u·w` equalises the three edge-dot products on SABC; equal angles gives cos(AE,AB)=cos(AE,AD); the bisector lands D on AC at the bisector-theorem ratio t=8/14 with equal angles to OA,OC; a determined-figure cos verifies as a claim). Catalog +5. **449 src3d tests green, `tsc -b` + `vite build:3d` clean.**
+
+## ADR-3D-024 — the `טטראדר`/`tetrahedron` keyword is a triangular pyramid that carries its own base (2026-07-08)
+
+**Context (operator request).** The tool models a general triangular pyramid (`tetra`, free apex, 5 dims) and its right variant (`pyramid3`), but the ONLY trigger word was `פירמידה`/`pyramid`; the transliteration `טטראדר` (and `tetrahedron`) fell through the deterministic grammar as `not-handled` and depended on the LLM fallback.
+
+**Decision.** Fold a `tetraWord` recogniser into the existing `rightPyramid` rule ([parse3.ts](../src3d/parser/parse3.ts)) — **no new engine construct**; it lowers onto the existing `tetra`/`pyramid3` kinds. Unlike bare `פירמידה` (base ambiguous → refused), a tetrahedron IS a triangular pyramid **by definition**, so the word carries its own base: `tetraWord` forces the `tri` branch, so the bare/label-less form parses deterministically to `tetra` (default labels A,B,C,D) instead of refusing. `טטראדר ישר`/`right tetrahedron` → `pyramid3`. A 5-label `טטראדר` is a **contradiction** (a tetra has exactly 4 vertices) → honest `not-handled` (the 5-token pyramid branch is gated `&& !tetraWord`).
+
+**Details.** The Hebrew stem is `טטרא`/`טטרה` (alef or hei) — `/טטר[אה]ה?דר(?:ון)?/` covers `טטראדר`/`טטראהדרון`/`טטרהדרון`; English `/\btetrahedr(?:on)?\b/i`. The `right` recogniser widened `/ישרה/`→`/ישרה?/` so the masculine `ישר` (agreeing with masculine `טטראדר`) also reads as right, the feminine `ישרה` (with `פירמידה`) unchanged.
+
+**Locked by** `tetrahedron.test.ts` (labelled/bare/right/5-label-refusal + end-to-end build, He+En, spelling variants) + a catalog entry (guard test asserts both locales parse). **456 src3d tests green, `tsc -b` + `vite build:3d` clean.**

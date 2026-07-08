@@ -140,8 +140,10 @@ function orientPyramid(s: string, toks: Id[]): Id[] {
 /** Right pyramid: `פירמידה ישרה ABCDS` / `ABCS`. WITHOUT ישרה, 4 ids = a GENERAL tetrahedron (V7 T2).
  *  V8-d: an equilateral triangular base → `pyramid3e`; a parallelogram base → `pyramidPar`. */
 const rightPyramid: Rule = (s) => {
-  if (!/פירמידה/.test(s) && !/\bpyramid\b/i.test(s)) return null;
-  const right = /ישרה/.test(s) || /\bright\b/i.test(s);
+  // `טטראדר`/`tetrahedron` IS a triangular pyramid by definition — it carries its own base
+  const tetraWord = /טטר[אה]ה?דר(?:ון)?/.test(s) || /\btetrahedr(?:on)?\b/i.test(s);
+  if (!/פירמידה/.test(s) && !/\bpyramid\b/i.test(s) && !tetraWord) return null;
+  const right = /ישרה?/.test(s) || /\bright\b/i.test(s); // ישרה (fem, פירמידה) or ישר (masc, טטראדר)
   const square = /ריבוע/.test(s) || /\bsquare\b/i.test(s);
   const equi = /שווה[\s-]?צלעות/.test(s) || /\bequilateral\b/i.test(s);
   const par = /מקבילית/.test(s) || /\bparallelogram\b/i.test(s);
@@ -150,7 +152,7 @@ const rightPyramid: Rule = (s) => {
   if (firstLabelRun(s).length === 0) {
     // label-less: a stated base word makes the shape determined — default lettering
     const rect = /מלבן/.test(s) || /\brectang/i.test(s);
-    const tri = /משולש/.test(s) || /\btriangular\b/i.test(s) || equi;
+    const tri = tetraWord || /משולש/.test(s) || /\btriangular\b/i.test(s) || equi;
     if (par) return [{ type: 'solid', kind: 'pyramidPar', ids: ['A', 'B', 'C', 'D', 'S'] }];
     if (tri) return [{ type: 'solid', kind: triKind, ids: ['A', 'B', 'C', 'D'] }];
     if (square || rect) {
@@ -160,7 +162,8 @@ const rightPyramid: Rule = (s) => {
     return null;
   }
   const toks = orientPyramid(s, firstLabelRun(s));
-  if (toks.length === 5) {
+  // a tetrahedron has exactly 4 vertices — a 5-label `טטראדר` is contradictory (refuse → honest)
+  if (toks.length === 5 && !tetraWord) {
     if (par) return [{ type: 'solid', kind: 'pyramidPar', ids: toks }];
     // rightness and base shape are INDEPENDENT givens (ADR-052): a square base must be STATED
     const kind = right ? (square ? 'pyramid4' : 'pyramid4r') : square ? ('pyramid4g' as const) : 'pyramid4gr';
