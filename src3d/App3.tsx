@@ -47,6 +47,12 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.noRoots');
     case 'not-on-plane':
       return t('err.notOnPlane', { id: err.id });
+    case 'not-coplanar':
+      return t('err.notCoplanar', { id: err.id });
+    case 'plane-side-undefined':
+      return t('err.planeSideUndefined', { id: err.id });
+    case 'wrong-side-of-plane':
+      return t('err.wrongSideOfPlane', { id: err.id });
     case 'not-on-line':
       return t('err.notOnLine', { id: err.id });
     case 'line-misses-plane':

@@ -362,8 +362,21 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'on-planes': {
-      if (!c.points.has(cmd.id)) return { ok: false, error: { code: 'unknown-point', id: cmd.id } };
-      if (cmd.plane !== 'any' && !c.planes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
+      if (cmd.plane !== 'any' && !c.planes.has(cmd.plane) && !c.pointPlanes.has(cmd.plane))
+        return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
+      if (!c.points.has(cmd.id)) {
+        // M1 dual (the 2-D ADR-236 shape): a NEW id stated onto — or above/below — a NAMED
+        // plane is CREATED as a free point riding it (2 DOF; 3 with a stated side)
+        if (cmd.plane === 'any') return { ok: false, error: { code: 'unknown-point', id: cmd.id } };
+        const next = clone(c);
+        next.points.set(
+          cmd.id,
+          cmd.side
+            ? { kind: 'on-plane', plane: cmd.plane, side: cmd.side === 'above' ? 1 : -1 }
+            : { kind: 'on-plane', plane: cmd.plane },
+        );
+        return { ok: true, next };
+      }
       const next = clone(c);
       next.memberships.push(cmd);
       return { ok: true, next };

@@ -689,6 +689,39 @@ const membership: Rule = (s) => {
   return null;
 };
 
+/** `E על המישור ABC` / `E מעל המישור ABCD` / `E מתחת למישור ABC` (En on/above/below) —
+ *  a point ON a plane, or on a stated SIDE of it (ADR-3D-015). A point-run plane is
+ *  materialised (idempotent plane-through), so referencing it also highlights it; apply
+ *  decides by id (M1): an EXISTING point is a verified given, a NEW id becomes a free
+ *  point riding the plane (2 DOF) or floating on the stated side (3 DOF). */
+const pointRelPlane: Rule = (s) => {
+  const RUN = `(?:[A-Z]\\d*'?){3,4}`;
+  const m =
+    s.match(
+      new RegExp(`^([A-Z]\\d*'?)\\s+(?:נמצאת\\s+|נמצא\\s+)?(מעל|מתחת|על)\\s+ל?ה?מישור\\s+(${RUN}|${PLANE_NAME.source})$`),
+    ) ??
+    s.match(
+      new RegExp(`^([A-Z]\\d*'?)\\s+(?:is\\s+|lies\\s+)?(on|above|below)\\s+(?:the\\s+)?plane\\s+(${RUN}|${PLANE_NAME.source})$`),
+    );
+  if (!m) return null;
+  const [, id, word, token] = m;
+  const side =
+    word === 'מעל' || word === 'above'
+      ? ('above' as const)
+      : word === 'מתחת' || word === 'below'
+        ? ('below' as const)
+        : undefined;
+  const ids = token.match(/[A-Z]\d*'?/g);
+  if (ids && ids.length >= 3) {
+    return [
+      { type: 'plane-through', name: token, ids },
+      side ? { type: 'on-planes', id, plane: token, side } : { type: 'on-planes', id, plane: token },
+    ];
+  }
+  if (!side) return null; // π-membership without a side is `membership`'s (one owner)
+  return [{ type: 'on-planes', id, plane: canonicalPlane(token), side }];
+};
+
 /** `הזווית בין המישורים π1 ו-π2 היא 45` / `the angle between planes π1 and π2 is 45`. */
 const angleBetweenPlanes: Rule = (s) => {
   const m = s.match(
@@ -883,6 +916,16 @@ const planeEqClaim: Rule = (s) => {
   if (!eq || eq.param) return null; // a claimed equation must be numeric
   const ids = m[1].match(/[A-Z]\d*'?/g)!;
   return [{ type: 'claim', claim: { type: 'plane-eq', ids, cx: eq.cx.k, cy: eq.cy.k, cz: eq.cz.k, d: eq.d.k } }];
+};
+
+/** `מישור ABC` / `המישור BC'D` / `plane ABCD` — a bare point-run plane declaration
+ *  (ADR-3D-015): HIGHLIGHTS the plane — the renderer draws its translucent patch, and
+ *  the patch always extends to cover the named points. Points must already exist. */
+const planeThroughBare: Rule = (s) => {
+  const RUN = `(?:[A-Z]\\d*'?){3,4}`;
+  const m = s.match(new RegExp(`^(?:ה?מישור|(?:the\\s+)?plane)\\s+(${RUN})$`));
+  if (!m) return null;
+  return [{ type: 'plane-through', name: m[1], ids: m[1].match(/[A-Z]\d*'?/g)! }];
 };
 
 // ---------------------------------------------------------------------------
@@ -1095,6 +1138,7 @@ const RULES: Rule[] = [
   parametricLine, // before planeByEquation: both carry `:`, but ℓ ≠ π so either order is safe — kept explicit
   planeByEquation,
   planeEqClaim, // plane named by POINTS + an equation — a claim, not a definition
+  planeThroughBare, // bare `מישור ABC` — after the `:`-carrying plane rules
   injectionList,
   signGiven,
   pointPlanesLine, // point-run planes before the π-name intersection rule
@@ -1103,6 +1147,7 @@ const RULES: Rule[] = [
   vectorInjection,
   onAxes, // `על ציר ה-x` before the generic membership/on-segment rules
   membership, // before onSegment: `על אחד המישורים` must never read as a point-on-segment
+  pointRelPlane, // on/above/below a point-run plane (+ above/below π) — likewise before onSegment
   onLineMembership, // likewise for `על הישר ℓ`
   angleBetweenPlanes,
   angleSegClaim,

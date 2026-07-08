@@ -309,8 +309,7 @@ export function buildScene3(
   for (const [name, pl] of resolved.planes) {
     const fr = frameOf(name, pl);
     const ext = { u1: -h, u2: h, v1: -h, v2: h };
-    for (const p of positions.values()) {
-      if (Math.abs(dot3(pl.n, p) + pl.d) > 1e-6 * (1 + norm3(pl.n))) continue; // only points ON the plane
+    const grow = (p: Vec3) => {
       const q = sub3(p, fr.center);
       const u = dot3(q, fr.e1);
       const v = dot3(q, fr.e2);
@@ -318,6 +317,17 @@ export function buildScene3(
       ext.u2 = Math.max(ext.u2, u + POINT_MARGIN);
       ext.v1 = Math.min(ext.v1, v - POINT_MARGIN);
       ext.v2 = Math.max(ext.v2, v + POINT_MARGIN);
+    };
+    for (const p of positions.values()) {
+      if (Math.abs(dot3(pl.n, p) + pl.d) > 1e-6 * (1 + norm3(pl.n))) continue; // only points ON the plane
+      grow(p);
+    }
+    // a point stated ABOVE/BELOW this plane floats off it — its ⟂ projection must still
+    // land INSIDE the patch (the patch is what the student reads the side against)
+    for (const [id, def] of c.points) {
+      if (def.kind !== 'on-plane' || def.plane !== name || !def.side) continue;
+      const p = positions.get(id);
+      if (p) grow(projectOntoPlane(p, pl));
     }
     patchExtent.set(name, ext);
     const at = (u: number, v: number) => add3(fr.center, add3(scale3(fr.e1, u), scale3(fr.e2, v)));

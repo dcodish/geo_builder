@@ -209,15 +209,51 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
         }
       } else if (cmd.type === 'on-planes') {
         const p = positions.get(cmd.id);
-        const names = cmd.plane === 'any' ? [...resolved.planes.keys()] : [cmd.plane];
+        if (cmd.side) {
+          // above/below (ADR-3D-015): the signed side of the +z-oriented plane — checked on
+          // FINAL coordinates, so it holds for a created point AND verifies a stated one
+          const pl = cmd.plane === 'any' ? undefined : resolved.planes.get(cmd.plane);
+          if (!p || !pl) {
+            status[f.id] = { code: 'not-on-plane', id: cmd.id };
+            break;
+          }
+          const nz = pl.n.z / norm3(pl.n);
+          if (Math.abs(nz) <= 1e-9) {
+            // a vertical plane has no "above"/"below" — refuse rather than guess a side
+            status[f.id] = { code: 'plane-side-undefined', id: cmd.plane };
+            break;
+          }
+          let signed = (dot3(pl.n, p) + pl.d) / norm3(pl.n);
+          if (nz < 0) signed = -signed;
+          if (signed * (cmd.side === 'above' ? 1 : -1) <= 1e-9) {
+            status[f.id] = { code: 'wrong-side-of-plane', id: cmd.id };
+            break;
+          }
+        } else {
+          const names = cmd.plane === 'any' ? [...resolved.planes.keys()] : [cmd.plane];
+          const holds =
+            p !== undefined &&
+            names.some((name) => {
+              const pl = resolved.planes.get(name);
+              return pl !== undefined && Math.abs(dot3(pl.n, p) + pl.d) <= 1e-7 * (1 + norm3(pl.n));
+            });
+          if (!holds) {
+            status[f.id] = { code: 'not-on-plane', id: cmd.id };
+            break;
+          }
+        }
+      } else if (cmd.type === 'plane-through') {
+        // a plane named by points must be a REAL plane: 4 named points must be coplanar,
+        // 3 must not be collinear — a best-fit patch through off-plane points would lie
+        const pl = resolved.planes.get(cmd.name);
         const holds =
-          p !== undefined &&
-          names.some((name) => {
-            const pl = resolved.planes.get(name);
-            return pl !== undefined && Math.abs(dot3(pl.n, p) + pl.d) <= 1e-7 * (1 + norm3(pl.n));
+          pl !== undefined &&
+          cmd.ids.every((q) => {
+            const p = positions.get(q);
+            return p !== undefined && Math.abs(dot3(pl.n, p) + pl.d) <= 1e-5 * norm3(pl.n) * (1 + norm3(p));
           });
         if (!holds) {
-          status[f.id] = { code: 'not-on-plane', id: cmd.id };
+          status[f.id] = { code: 'not-coplanar', id: cmd.name };
           break;
         }
       }

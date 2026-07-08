@@ -348,10 +348,12 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number): { va
   const explicit = [...c.planeAngles, ...c.linePerps].find((g) => g.branch !== undefined)?.branch;
   if (explicit !== undefined) return { value: roots[((explicit % roots.length) + roots.length) % roots.length], roots };
   for (const m of c.memberships) {
+    if (m.side) continue; // a side given never selects the parameter (verified downstream)
     const p = coordPos.get(m.id);
     if (!p) continue;
     for (const root of roots) {
-      const names = m.plane === 'any' ? [...c.planes.keys()] : [m.plane];
+      // only EQUATION planes depend on the parameter — point-run plane names are skipped
+      const names = (m.plane === 'any' ? [...c.planes.keys()] : [m.plane]).filter((name) => c.planes.has(name));
       if (names.some((name) => onPlane(p, planeAt(c, name, root)))) return { value: root, roots };
     }
   }
@@ -410,6 +412,7 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   let freeT = 0;
   for (const def of c.points.values()) {
     if (def.kind === 'on-segment' && def.t === undefined) freeT++;
+    if (def.kind === 'on-plane') freeT += def.side ? 3 : 2; // a plane rider slides in-plane; a side point also floats
   }
   const param = c.param && pinningGivens(c) === 0 ? 1 : 0;
   if (resolved.pivot && resolved.pivot.solutions > 0) {
@@ -506,6 +509,18 @@ function newellNormal(pts: Vec3[]): Vec3 {
   return n;
 }
 
+/** A point-run plane's numeric form from the CURRENT positions (Newell); null while
+ *  its defining points are unplaced or degenerate (collinear). */
+function planeFromPointRun(c: Construction3, name: string, pos: Positions3): ResolvedPlane | null {
+  const ids = c.pointPlanes.get(name);
+  if (!ids) return null;
+  const pts = ids.map((id) => pos.get(id)).filter((p): p is Vec3 => p !== undefined);
+  if (pts.length < 3) return null;
+  const n = newellNormal(pts);
+  if (norm3(n) < 1e-10) return null;
+  return { n, d: -dot3(n, pts[0]) };
+}
+
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
 const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair']);
 
@@ -562,7 +577,11 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       const finalCanonical = evalCanonical(chosen.dims, false);
       for (const [id, q] of finalCanonical) {
         const def = c.points.get(id);
-        if (def && GAUGE_KINDS.has(def.kind)) pos.set(id, chosen.transform(q));
+        // an on-plane point rides the gauge iff its plane is a POINT-run plane (the run's
+        // points are gauge-frame); an equation plane is Lane-A absolute — no transform
+        const gauge =
+          def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
+        if (gauge) pos.set(id, chosen.transform(q));
         else pos.set(id, q);
       }
       pivot = { solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err };
@@ -572,12 +591,9 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   }
 
   // ---- planes through points (resolved from FINAL positions, post-pivot)
-  for (const [name, ids] of c.pointPlanes) {
-    const pts = ids.map((id) => pos.get(id)).filter((p): p is Vec3 => p !== undefined);
-    if (pts.length < 3) continue;
-    const n = newellNormal(pts);
-    if (norm3(n) < 1e-10) continue; // degenerate (collinear) — no plane
-    planes.set(name, { n, d: -dot3(n, pts[0]) });
+  for (const [name] of c.pointPlanes) {
+    const pl = planeFromPointRun(c, name, pos);
+    if (pl) planes.set(name, pl);
   }
 
   // ---- lines THROUGH points (V5) — resolvable only from final positions
@@ -664,6 +680,35 @@ function evaluateSolidsAndPoints(
       if (!a || !b) continue; // unreachable if apply enforced parents; stay total anyway
       const t = def.t ?? sample(seed, `t-${id}-${def.a}-${def.b}`, 0.22, 0.78);
       pos.set(id, lerp3(a, b, t));
+    } else if (def.kind === 'on-plane') {
+      // a free point riding a named plane (ADR-3D-015): sampled u,v in an in-plane frame
+      // centred on the plane's own points (point-run) or the projected figure centroid
+      // (equation plane); a stated side adds a sampled offset along the +z-oriented normal.
+      // Only EARLIER points are read (insertion order), so adding later facts never moves it.
+      const pl = planes.get(def.plane) ?? planeFromPointRun(c, def.plane, pos);
+      if (!pl) continue; // degenerate/unplaced plane — flagged downstream (not-coplanar)
+      const runIds = c.pointPlanes.get(def.plane);
+      const anchors = runIds?.map((q) => pos.get(q)).filter((q): q is Vec3 => q !== undefined);
+      const placed = [...pos.values()];
+      const centre0 = anchors?.length ? centroid3(anchors) : placed.length ? centroid3(placed) : v3(0, 0, 0);
+      const t0 = (dot3(pl.n, centre0) + pl.d) / dot3(pl.n, pl.n);
+      const centre = sub3(centre0, scale3(pl.n, t0)); // ⟂ projection onto the plane
+      let spread = 1.2;
+      for (const q of placed) spread = Math.max(spread, dist3(q, centre));
+      const nn = normalize3(pl.n);
+      const axisSeed = Math.abs(nn.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
+      const e1 = normalize3(cross3(nn, axisSeed));
+      const e2 = cross3(nn, e1);
+      const u = sample(seed, `onplane-u-${id}`, -0.6, 0.6) * spread;
+      const v = sample(seed, `onplane-v-${id}`, -0.6, 0.6) * spread;
+      let p = add3(centre, add3(scale3(e1, u), scale3(e2, v)));
+      if (def.side) {
+        // "above" = the +z side; a vertical plane keeps its own orientation here and the
+        // derive-time check refuses the fact honestly (plane-side-undefined)
+        const up = nn.z < -1e-9 ? scale3(nn, -1) : nn;
+        p = add3(p, scale3(up, def.side * sample(seed, `onplane-h-${id}`, 0.45, 1.05) * spread));
+      }
+      pos.set(id, p);
     } else if (def.kind === 'centroid') {
       const ps = def.of.map((p) => pos.get(p));
       if (ps.some((p) => !p)) continue;

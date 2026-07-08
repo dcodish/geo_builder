@@ -304,11 +304,15 @@ export interface PlaneAngleCommand {
   branch?: number;
 }
 
-/** `A נמצאת על אחד המישורים` — membership given; with `'any'` it also SELECTS the branch (2022-Q2). */
+/** `A נמצאת על אחד המישורים` — membership given; with `'any'` it also SELECTS the branch (2022-Q2).
+ *  `side` states which side of a NAMED plane the point is on (`E מעל המישור ABC`); "above" is the
+ *  +z side, so a vertical plane refuses honestly. APPLY decides by id (M1): an EXISTING point is
+ *  a verified given; a NEW id is CREATED as a free point riding (or floating beside) the plane. */
 export interface OnPlanesCommand {
   type: 'on-planes';
   id: Id;
   plane: string | 'any';
+  side?: 'above' | 'below';
 }
 
 /** `מ-A מורידים אנך למישור π1 החותך אותו בנקודה B` — the ⟂ foot on a plane. */
@@ -428,6 +432,9 @@ export type PointDef =
   | { kind: 'centroid'; of: [Id, Id, Id] }
   | { kind: 'in-span'; a: Id; b: Id; vecFrom: Id; span: string[] }
   | { kind: 'coord'; x: number; y: number; z: number }
+  // a free point riding a named plane (2 sampled DOF), or floating on a stated SIDE of
+  // it (side ±1 = above/below the +z-oriented normal; 3 sampled DOF) — ADR-3D-015
+  | { kind: 'on-plane'; plane: string; side?: 1 | -1 }
   | { kind: 'foot-plane'; from: Id; plane: string }
   | { kind: 'foot-line'; from: Id; line: string }
   | { kind: 'line-plane'; line: string; plane: string }
@@ -530,6 +537,9 @@ export type EngineError3 =
   | { code: 'two-params' } // only ONE symbolic parameter per figure (V2 boundary)
   | { code: 'no-roots' } // no parameter value satisfies the stated angle — over-constrained, honestly
   | { code: 'not-on-plane'; id: Id } // a stated membership does not hold in any branch
+  | { code: 'not-coplanar'; id: string } // a plane's named points do not determine a single plane
+  | { code: 'plane-side-undefined'; id: string } // above/below a (near-)vertical plane is meaningless
+  | { code: 'wrong-side-of-plane'; id: Id } // a stated above/below does not hold for the point
   | { code: 'not-on-line'; id: Id } // a stated on-line membership does not hold
   | { code: 'line-misses-plane'; id: Id } // ℓ ∥ π at the chosen parameter — no crossing point
   | { code: 'symbolic-new-point'; id: Id } // a NEW point with symbolic components is under-determined
