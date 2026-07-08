@@ -19,6 +19,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: 'מנסרה ישרה משולשת ABC', en: 'right triangular prism ABC' },
   { category: 'solids', he: 'פירמידה ישרה ABCDS שבסיסה ריבוע', en: 'right pyramid ABCDS with a square base' },
   { category: 'solids', he: 'פירמידה ABCDS שבסיסה ריבוע', en: 'pyramid ABCDS with a square base' },
+  { category: 'solids', he: 'פירמידה SABCD שבסיסה ריבוע', en: 'pyramid SABCD with a square base' },
   { category: 'vectors', he: '|EN| = (√6/4)·|w|', en: '|EN| = (√6/4)·|w|' },
   { category: 'vectors', he: 'אורך AS שווה לאורך AB', en: '|AS| = |AB|' },
   { category: 'vectors', he: 'וקטור SE = 3/4 וקטור SD', en: 'vector SE = 3/4 vector SD' },
@@ -33,6 +34,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'points', he: "K על AA' כך ש-AK = 2KA'", en: "K on AA' such that AK = 2KA'" },
   { category: 'points', he: 'E על AC כך ש-AE:EC = 2:1', en: 'E on AC such that AE:EC = 2:1' },
   { category: 'points', he: "E מפגש התיכונים של משולש BC'D", en: "E is the centroid of triangle BC'D" },
+  { category: 'points', he: 'O מפגש האלכסונים של הפאה ABCD', en: 'O is the intersection of the diagonals of face ABCD' },
   { category: 'points', he: 'A(2,-2,6)', en: 'A(2,-2,6)' },
   { category: 'points', he: 'P על AM כך ש-KP = αu + βv', en: 'P on AM such that KP = αu + βv' },
   // --- vectors ---

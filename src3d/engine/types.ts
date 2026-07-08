@@ -165,6 +165,20 @@ export interface Centroid3Command {
 }
 
 /**
+ * `E מפגש האלכסונים של הפאה ABCD` / `E is the intersection of the diagonals of face
+ * ABCD` (V8-a) — the diagonal crossing of a parallelogram face/base = the midpoint of
+ * a diagonal (EXACT for the box/cube faces & square/rect/parallelogram bases this
+ * curriculum names; a general quad's crossing ≠ midpoint — filed). `face` = the 4
+ * cyclic vertices, or `[]` = the "the base" sentinel (resolved by apply to the single
+ * solid's base ring, the ADR-3D-011 chokepoint pattern).
+ */
+export interface DiagIntersectionCommand {
+  type: 'diag-intersection';
+  id: Id;
+  face: Id[];
+}
+
+/**
  * 2020-Q2's `P על AM כך ש-KP = αu + βv`: P rides segment a–b, its t DRIVEN so the
  * vector vecFrom→P lies in span{span} of the declared basis — closed-form (the
  * complement coefficient is affine in t), the V1 embodiment of "1-DOF root-find only".
@@ -390,6 +404,7 @@ export type Command3 =
   | NameVectorCommand
   | Segment3Command
   | Centroid3Command
+  | DiagIntersectionCommand
   | PointInSpanCommand
   | ClaimCommand
   | Point3Command

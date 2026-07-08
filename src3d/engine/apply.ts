@@ -260,6 +260,22 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    case 'diag-intersection': {
+      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      // face: [] is the "the base" sentinel — resolve HERE (one chokepoint) to the
+      // single solid's base ring (faces[0], base-first convention across every kind)
+      if (cmd.face.length === 0 && c.solids.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+      const face = cmd.face.length === 0 ? c.solids[0].faces[0] : cmd.face;
+      if (face.length !== 4) return { ok: false, error: { code: 'no-solution', id: cmd.id } }; // no diagonals without a quad
+      const missing = missingPoint(c, face);
+      if (missing) return { ok: false, error: missing };
+      // a parallelogram's diagonals bisect ⇒ the crossing = midpoint of a diagonal
+      // (1st & 3rd cyclic vertices); reuses the on-segment point kind (no eval change)
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'on-segment', a: face[0], b: face[2], t: 0.5 });
+      return { ok: true, next };
+    }
+
     case 'point-in-span': {
       if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
       const missing = missingPoint(c, [cmd.a, cmd.b, cmd.vecFrom]);

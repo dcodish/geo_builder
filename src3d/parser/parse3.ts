@@ -59,6 +59,13 @@ export function labelTokens(s: string): Id[] {
   return runs.flatMap((r) => r.match(TOKEN) ?? []);
 }
 
+/** The FIRST label run only (a solid's vertex glob), so a later `שבסיסה ABCD` clause
+ *  that re-names the base doesn't inflate the vertex count. */
+export function firstLabelRun(s: string): Id[] {
+  const first = s.match(RUN)?.[0];
+  return first ? (first.match(TOKEN) ?? []) : [];
+}
+
 const unprimed = (t: Id) => !t.includes("'");
 const primeAll = (ts: Id[]) => ts.map((t) => `${t}'`);
 
@@ -92,12 +99,47 @@ const rightPrism: Rule = (s) => {
   return null;
 };
 
+/** A maximal consecutive alphabetical run of single unprimed letters (e.g. A,B,C). */
+function isConsecutiveRun(toks: Id[]): boolean {
+  if (toks.length === 0 || !toks.every((t) => /^[A-Z]$/.test(t))) return false;
+  const codes = toks.map((t) => t.charCodeAt(0)).sort((a, b) => a - b);
+  return codes.every((code, i) => i === 0 || code === codes[i - 1] + 1);
+}
+
+/** The base run named by `שבסיסה ABCD` / `whose base ABCD` / `with base ABCD`, if present. */
+function namedBaseIds(s: string): Id[] | null {
+  const m = s.match(/(?:שבסיס[הו]|whose\s+base|with\s+(?:an?\s+)?base)\s+((?:[A-Z]\d*'?)+)/);
+  if (!m) return null;
+  const ids = m[1].match(TOKEN);
+  return ids && ids.length >= 3 ? ids : null;
+}
+
+/**
+ * Apex-first naming (V8-a, ADR-3D-018): the pyramid template treats the LAST id as the
+ * apex (base ring first). Legacy 572 exams routinely name the apex FIRST (`SABCD`,
+ * `EABCD`, `OBCD`). Reorder to [base ring…, apex]:
+ *  - an explicit named base (`שבסיסה ABCD`) fixes the base → apex = the remaining id;
+ *  - else apex-FIRST when removing the first token leaves a consecutive base run AND
+ *    removing the last does not (`SABC`→apex S; `ABCDS`/`ABCDT` keep their apex-last
+ *    reading — no regression). Ambiguous or already-last ⇒ unchanged.
+ */
+function orientPyramid(s: string, toks: Id[]): Id[] {
+  if (toks.length < 4 || toks.length > 5) return toks;
+  const nb = namedBaseIds(s);
+  if (nb && nb.length === toks.length - 1 && nb.every((t) => toks.includes(t))) {
+    const apex = toks.filter((t) => !nb.includes(t));
+    if (apex.length === 1) return [...nb, apex[0]];
+  }
+  if (isConsecutiveRun(toks.slice(1)) && !isConsecutiveRun(toks.slice(0, -1))) return [...toks.slice(1), toks[0]];
+  return toks;
+}
+
 /** Right pyramid: `פירמידה ישרה ABCDS` / `ABCS`. WITHOUT ישרה, 4 ids = a GENERAL tetrahedron (V7 T2). */
 const rightPyramid: Rule = (s) => {
   if (!/פירמידה/.test(s) && !/\bpyramid\b/i.test(s)) return null;
   const right = /ישרה/.test(s) || /\bright\b/i.test(s);
   const square = /ריבוע/.test(s) || /\bsquare\b/i.test(s);
-  const toks = labelTokens(s);
+  const toks = orientPyramid(s, firstLabelRun(s));
   if (toks.length === 0) {
     // label-less: a stated base word makes the shape determined — default lettering
     // (base ring first, apex last), deterministic; bare 'פירמידה' stays ambiguous
@@ -289,6 +331,30 @@ const centroidRule: Rule = (s) => {
     { type: 'segment3', a: c, b: a },
     { type: 'centroid3', id, of: [a, b, c] },
   ];
+};
+
+/**
+ * `E מפגש האלכסונים של הפאה ABCD` / `O נקודת חיתוך אלכסוני הבסיס` / `O = intersection
+ * of diagonal AC with diagonal BD` (V8-a, G3) — the diagonal crossing of a
+ * parallelogram face/base. Three forms: a NAMED quad (4 cyclic vertices → the crossing
+ * is the midpoint of the 1st & 3rd), TWO explicit diagonals (→ midpoint of the first),
+ * or the implicit `the base` (0 vertices → the base sentinel, resolved by apply).
+ */
+const diagIntersection: Rule = (s) => {
+  if (!/אלכסו[ןנ]|diagonal/i.test(s)) return null;
+  if (!/מפגש|חיתוך|נחתכים|intersection|meet/i.test(s)) return null;
+  const toks = labelTokens(s);
+  if (toks.length === 0) return null;
+  const [id, ...rest] = toks;
+  const twoDiag = (s.match(/אלכסו[ןנ]|diagonal/gi) ?? []).length >= 2;
+  if (rest.length === 4 && twoDiag) {
+    const [a, b] = rest; // two explicit diagonals — the crossing is on the first, a–b
+    if (id === a || id === b || a === b) return null;
+    return [{ type: 'point-on-segment3', id, a, b, t: 0.5 }];
+  }
+  if (rest.length === 4) return [{ type: 'diag-intersection', id, face: rest }]; // named quad, cyclic
+  if (rest.length === 0) return [{ type: 'diag-intersection', id, face: [] }]; // `the base` sentinel
+  return null;
 };
 
 /** `CA' מאונך למישור BC'D` / `CA' is perpendicular to plane BC'D` — a CLAIM; draws the segment + the plane triangle. */
@@ -1162,6 +1228,7 @@ const RULES: Rule[] = [
   dropPerpToLine,
   nameVectors,
   centroidRule,
+  diagIntersection, // `מפגש האלכסונים` — before onSegment/midpoint grab the tokens
   perpPlaneClaim,
   segParallelPlane,
   collinearClaim,

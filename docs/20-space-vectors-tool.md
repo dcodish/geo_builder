@@ -182,3 +182,26 @@ The operator fixes 2-D bugs in parallel sessions on this same repo/branch. The p
 ---
 
 **Summary:** a third sibling tool at its own URL; two lanes (geometric `u,v,w` vectors on solids + algebraic R³ lines/planes) joined by a first-class coordinate-injection pivot; three genuinely new cores (a bounded symbolic vector layer, a linear equation layer, an SVG projection renderer with textbook hidden-line style and orbit); everything else transplants from the proven chassis. Build order V0→V5 gated on reproducing the four corpus exams end-to-end (V6 solids-trig committed after). **D1–D5 resolved (§10) — next step: V0 (walking skeleton at `/3d-builder/`) on operator go.**
+
+---
+
+## 14. V8 — full legacy 572 coverage (planned 2026-07-08, operator: "promote the 3d builder … for each exam ensure engine support for the inputs")
+
+Trigger: a complete sweep of **every 572 exam 2009–2024** (~42 papers, `C:\Users\User\Dropbox\Math\בגרויות\572`) for INPUT (givens) coverage — not solving the questions. Full per-exam audit in **[21-572-coverage-audit.md](21-572-coverage-audit.md)**. Finding: the 2018–2024 modern era is essentially already wired (it was the build corpus); **nearly every gap lives in the 2009–2017 legacy exams**, and the gaps cluster into a small number of recurring themes. Operator scoped **everything in** (2D-vector lane via z=0, circles-in-R³, apex-first naming). Sequenced value-first; each slice a doc-09-style gate (tests green + `tsc -b`/`build:3d` clean + its gate exam(s) reproduce end-to-end, an ADR in `06b`, and every operator utterance sequence a scenario test).
+
+Also resolved en route: **D3 coupled-symbol call — YES** (operator, 2026-07-08). A symbolic scalar parameter may become an additional unknown INSIDE the numeric pivot solve when it is coupled to a solid dimension (still 100% numeric — LM/root-finding, no CAS); this unblocks the deferred 2022-נבצרים chain and the two-symbol vector combos. Scoped tightly to the coupling class; the single-symbol 1-DOF fast path stays untouched.
+
+| Slice | Scope (gap ids from doc 21) | Gate exam(s) |
+| --- | --- | --- |
+| **V8-a** Foundations | apex-first solid naming first-class (S3); "intersection of the diagonals" point `מפגש האלכסונים` (G3) | any legacy pyramid named apex-first; 2018-קיץ-ב, 2019-קיץ, 2021-חורף-א |
+| **V8-b** Plane-definition family | plane through P ⊥/∥ a line/edge (G1); plane cuts an edge → point on it (G2) | 2009-ב, 2011-חורף, 2013-חורף, 2015-קיץ, 2017-חורף |
+| **V8-c** Coupled symbols in pivot | the D3 work — symbol becomes a pivot unknown when coupled to a dim (G7) | 2022-נבצרים, 2013-קיץ-ב (`AF = t·A'C + m·A'B`) |
+| **V8-d** Solid family | parallelogram-base pyramid; oblique parallelepiped `מקבילון`; triangular/equilateral-base right pyramid; equilateral-base prism / all-edges-equal; 3-⊥-corner tetra (G4) | 2011-חורף, 2012-חורף, 2012-קיץ-ב, 2013-קיץ, 2014-קיץ, 2018-חורף, 2017-חורף |
+| **V8-e** Trig-in-space faces | face-as-plane refs; dihedral face↔base angle; height-to-a-named-face `גובה לפאה BDC`; altitude within a face (G5) | 2012-קיץ-ב, 2014-קיץ-ג |
+| **V8-f** Vector-relation givens | angle/cos between two named vectors (G6); chained equal dot products (G9); a vector making equal angles with two vectors (G10); 3D angle bisector (G11) | 2013-חורף, 2014-קיץ-ב, 2016-קיץ, 2012-קיץ-ב, 2015-קיץ |
+| **V8-g** 2D-vector lane (z=0) | plane vectors: quad/pentagon midpoints, triangle-altitude vectors, cevians (S1) | 2010-Q2, 2014-קיץ-ב, 2013-חורף(a) |
+| **V8-h** Lines | common perpendicular of two lines; projection of a line onto a plane `היטל` (G8) | 2010-Q3, 2012-חורף |
+| **V8-i** Circles in R³ | in-plane circle primitive; tangent-to-line; line∩plane membership (S2/G13) | 2016-קיץ-ב |
+| **V8-j** "Derived-solid-is-right" | a point positioned so `XABCD` becomes a right pyramid (G12) | 2019-חורף, 2019-קיץ-ב |
+
+Sequencing rationale: V8-a is cheap and removes friction across every legacy exam; V8-b is the highest-frequency real gap; V8-c is the already-greenlit solver-core change (best done early while the solver is in focus, and it clears the one deferred modern exam); the rest descend by frequency, circles (V8-i) and the niche constraint (V8-j) last. **RESUME: V8-a.**
