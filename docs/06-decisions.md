@@ -3746,3 +3746,15 @@ The filter is silent and export-only: the step list UI, replay, and `.geo.json` 
 **Consequences.** `src/engine/relations.ts` (+ index export), `src/engine/detectShapes.ts`, `src/store/geoStore.ts` (samplingJobs). On the operator's figure the pool drops 16 → 8 valid samples and detection now reports the merged four-way class **∠BAC = ∠ACK = ∠BOM = ∠COM**, the requested **∠CAK = ∠AMO = ∠EMO**, and the merged similar class **△ACK ~ △MOE ~ △MOK** (the previous congruent pair EMO ≅ KMO folded in; kind correctly degrades to `similar`). Emergent AC ∥ MO surfaces through ∠CAK = ∠AMO. All 77 engine/store/theorems test files (1814 tests incl. the B-corpus and the ADR-166/167 detection locks) pass unchanged.
 
 **Tests.** Store-driven scenario `[ntzdgqn2-kite-detection-honours-requirements]` (the operator's exact 10 utterances → viewRelations reports the M-wedge pair; detectShapes' similar classes contain {A,C,K}~{K,M,O}).
+
+## ADR-257 — a congruent SUB-GROUP inside a mixed similarity class is reported alongside it
+
+**Context.** Operator follow-up on the ADR-256 fix (same kite figure): "now it shows 3 similar triangles, but we also have OEM = OMK which is not shown." Before ADR-256 the list read `congruent: △EMO ≅ △KMO`; when △ACK joined them (correctly) into one class, `detectSimilarClasses`' class-wide kind degraded to `similar` — the design rule was "congruent only when EVERY member is congruent to the reference, else similar" — and the STRONGER statement between the two kite halves silently vanished from the display.
+
+**Class (design-rules §1).** *A relation class that carries a stronger sub-relation among some members reports only the class-wide weakest kind — merging drops information.* (The honesty invariant, detection-display edition: a true stronger statement must not disappear because a weaker cousin joined the class.)
+
+**Decision.** In `detectSimilarClasses`, after emitting a mixed (`similar`) class, partition its members into congruence sub-groups (union-find over pairwise congruence under the aligning correspondence — congruence is transitive within a similarity class) and emit each group of ≥2 as its own `congruent` class alongside the similar row. An all-congruent class stays one row (no duplication). The flood-guard scaling changes from "one row per class" to "one row per class + one per congruence sub-group" — still bounded by member count, never O(n²) pairs.
+
+**Consequences.** `src/engine/detectShapes.ts` only; no UI change (the `congruent` row kind already renders). The kite figure now lists `similar: △ACK ~ △MOE ~ △MOK` AND `congruent: △EMO ≅ △KMO`. The square-two-diagonals flood-guard lock updated deliberately: its 8-triangle similar class now also reports its two true congruent sub-groups (the 4 quarter and 4 half triangles) — 3 rows, each a distinct true statement. Theorems/store/engine suites (1814) pass unchanged — no feed ripple.
+
+**Tests.** `detectShapes.test.ts` (the square-diagonals class + sub-groups; the rectangle congruent pair unchanged) + the `[ntzdgqn2-kite-detection-honours-requirements]` scenario extended to assert the congruent △EMO ≅ △KMO row.

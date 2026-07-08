@@ -160,13 +160,18 @@ describe('similar / congruent triangle classes (ADR-224)', () => {
   const simSets = (c: ReturnType<typeof build>) =>
     detectShapes(c).similar.map((cls) => ({ kind: cls.kind, sets: cls.triangles.map((t) => [...t].sort().join('')).sort() }));
 
-  it("a square's two diagonals give ONE similar class of all 8 right-isosceles triangles (not O(n²) pairs)", () => {
+  it("a square's two diagonals give ONE similar class of all 8 right-isosceles triangles (not O(n²) pairs) + its congruent sub-groups", () => {
     const sim = simSets(buildCtx('ריבוע ABCD', 'AC', 'BD', 'E = חיתוך AC ו-BD'));
-    // Exactly one class (all 8 quarter/half triangles are 45-45-90, hence mutually similar) — the flood guard.
-    expect(sim.length, `one class, got ${JSON.stringify(sim)}`).toBe(1);
-    expect(sim[0].sets.length).toBe(8);
-    // Not all congruent (the 4 half-square triangles are bigger than the 4 quarter triangles) → 'similar'.
-    expect(sim[0].kind).toBe('similar');
+    // ONE class-wide row (all 8 quarter/half triangles are 45-45-90, hence mutually similar) — the flood
+    // guard: rows scale with congruence GROUPS, never O(n²) pairs. A congruent SUB-GROUP inside the mixed
+    // class is a STRONGER statement and is reported alongside it (ADR-257): the 4 quarter triangles are
+    // congruent, and so are the 4 half-square triangles — two extra 'congruent' rows, 3 rows total.
+    const similar = sim.filter((s) => s.kind === 'similar');
+    const congruent = sim.filter((s) => s.kind === 'congruent');
+    expect(similar.length, `one similar class, got ${JSON.stringify(sim)}`).toBe(1);
+    expect(similar[0].sets.length).toBe(8);
+    expect(congruent.length, `two congruent sub-groups, got ${JSON.stringify(sim)}`).toBe(2);
+    expect(congruent.map((c) => c.sets.length).sort()).toEqual([4, 4]);
   });
 
   it("a rectangle's diagonal splits it into two CONGRUENT triangles", () => {

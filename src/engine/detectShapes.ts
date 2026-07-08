@@ -430,6 +430,37 @@ function detectSimilarClasses(tris: TriSample[], angleTol: number, lengthTol: nu
     }
     if (triangles.length < 2) continue;
     classes.push({ kind: allCongruent ? 'congruent' : 'similar', triangles });
+    // A congruent SUB-GROUP inside a MIXED class is a STRONGER statement than the class-wide similarity
+    // and must not be silently dropped ([ADR-257](docs/06-decisions.md#adr-257)): when △ACK joined the
+    // kite's congruent pair △MOE ≅ △MOK, the merged class read "similar" and the congruence between the
+    // two kite halves vanished from the list (operator: "OEM=OMK is not shown"). Congruence is transitive
+    // within a similarity class, so partition the members into congruence groups (union-find over pairwise
+    // congruence under the aligning correspondence) and emit each group of ≥2 as its OWN 'congruent' class
+    // alongside the similar one.
+    if (!allCongruent) {
+      const sub = members.map((_, i) => i);
+      const subFind = (x: number): number => (sub[x] === x ? x : (sub[x] = subFind(sub[x])));
+      for (let i = 0; i < members.length; i++) {
+        for (let j = i + 1; j < members.length; j++) {
+          const p = corr(members[i], members[j]);
+          if (p && congruentTo(members[i], members[j], p)) sub[subFind(i)] = subFind(j);
+        }
+      }
+      const groups = new Map<number, number[]>();
+      for (let i = 0; i < members.length; i++) {
+        const r = subFind(i);
+        (groups.get(r) ?? groups.set(r, []).get(r)!).push(members[i]);
+      }
+      for (const g of groups.values()) {
+        if (g.length < 2) continue;
+        const gTriangles: Id[][] = [tris[g[0]].verts.slice()];
+        for (const m of g.slice(1)) {
+          const p = corr(g[0], m);
+          if (p) gTriangles.push(p.map((k) => tris[m].verts[k]));
+        }
+        if (gTriangles.length >= 2) classes.push({ kind: 'congruent', triangles: gTriangles });
+      }
+    }
   }
   classes.sort((a, b) => a.triangles[0].join('').localeCompare(b.triangles[0].join('')));
   return classes;

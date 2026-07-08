@@ -4042,6 +4042,13 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       return sets.includes('ACK') && sets.includes('KMO');
     });
     expect(hasPair, `△CAK ~ △OMK in the similar classes (got: ${similar.map((c) => c.triangles.map((t) => t.join('')).join('~')).join(' | ')})`).toBe(true);
+    // The kite halves' CONGRUENCE (△OEM ≅ △OMK) is a STRONGER statement than the merged class's
+    // similarity and must be reported alongside it (ADR-257 — operator: "OEM=OMK is not shown").
+    const hasCongruentPair = similar.some((cls) => {
+      const sets = cls.triangles.map(key);
+      return cls.kind === 'congruent' && sets.includes('EMO') && sets.includes('KMO');
+    });
+    expect(hasCongruentPair, `△OEM ≅ △OMK reported as a congruent class (got: ${similar.map((c) => `${c.kind}:${c.triangles.map((t) => t.join('')).join('~')}`).join(' | ')})`).toBe(true);
     st.clear();
   });
 
