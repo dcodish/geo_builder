@@ -343,3 +343,15 @@ Gate: 2022-נבצרים builds to the closed form (**t = ¼, |DD′| = 2**, DF �
 **Deferred (documented, low frequency — 1 exam each, expressible via coordinate injection today):** the **oblique parallelepiped** `מקבילון` (2011-חורף — a general non-right box) and the **orthoscheme** (2017-חורף `OBCD`, three mutually-⊥ edges at a corner). The **"all edges equal"** prism (2018-חורף) parses as `prism3e`; pinning height = side is left to a length-equality given.
 
 **Locked by** `v8d-solids.test.ts` (parse for all three He+En incl. apex-first `SABCD`→`pyramidPar` and the plain-vs-equilateral distinction; builds verifying the equilateral base + equal lateral edges, straight prism verticals, and the parallelogram opposite-sides-equal). Catalog +3. **424 src3d tests green, `tsc -b` clean.**
+
+---
+
+## ADR-3D-022 — V8-e: a pyramid's height to a NAMED FACE (2026-07-08)
+
+**Context (G5 core).** 2014-קיץ-ג: `AF גובה הפירמידה לפאה BDC` — the height from apex A drops ⟂ to the plane of face BDC, meeting it at the foot F. `heightOfSolid` (ADR-3D-012) only handled the height to the **base** (a `seg-plane-rel` with the base sentinel — a ⟂ relation, no foot point); a named lateral face + its foot had no representation. `foot-plane` exists but resolves only equation planes (a point-run/face plane isn't in the `planes` map during the point loop).
+
+**Decision — a `foot-face` point kind** `{from, face}`: the foot of the ⟂ from `from` onto the plane through the `face` vertices, resolved INLINE in the point loop from a Newell normal (the same pattern as V8-b's `plane-cut`/rel-plane — the face points are solid vertices placed first). Added to `GAUGE_KINDS` (rides the pivot); apply draws the height segment. `heightOfSolid` gains a `לפאה BDC` / `to face BDC` branch emitting `height-to-face` (the plain base form is untouched — a bare `AS גובה` still means ⟂-to-base).
+
+**Deferred (documented, 2012-קיץ-ב, 1 exam):** the **dihedral angle between a lateral face and the base** (`70°`/`40°`) and the **in-face altitude** (`EL` of face EDC) — these need a face-as-plane reference + a dihedral-given machinery beyond this slice; filed as the G5 remainder.
+
+**Locked by** `v8e-height-to-face.test.ts` (He+En parse; the foot of A=(1,1,3) onto plane BCD=z-plane lands (1,1,0), AF ⟂ the face verified; the plain `AS גובה` base form unchanged). Catalog +1. **429 src3d tests green, `tsc -b` clean.**

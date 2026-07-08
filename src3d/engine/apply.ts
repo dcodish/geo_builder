@@ -300,6 +300,17 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    case 'height-to-face': {
+      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      const missing = missingPoint(c, [cmd.from, ...cmd.face]);
+      if (missing) return { ok: false, error: missing };
+      if (cmd.face.length < 3) return { ok: false, error: { code: 'unknown-point', id: cmd.id } };
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'foot-face', from: cmd.from, face: [...cmd.face] });
+      if (!hasSegment(next, cmd.from, cmd.id)) next.segments.push([cmd.from, cmd.id]); // draw the height
+      return { ok: true, next };
+    }
+
     case 'point-in-span': {
       if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
       const missing = missingPoint(c, [cmd.a, cmd.b, cmd.vecFrom]);

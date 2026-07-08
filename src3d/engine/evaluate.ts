@@ -583,7 +583,7 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 }
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face']);
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number): Resolved3 {
@@ -898,6 +898,14 @@ function evaluateSolidsAndPoints(
       const from = pos.get(def.from);
       const line = lines.get(def.line);
       if (from && line) pos.set(id, footOnLine(from, line));
+    } else if (def.kind === 'foot-face') {
+      // V8-e (G5): the height's foot — ⟂ from `from` onto the plane through the face pts
+      const from = pos.get(def.from);
+      const pts = def.face.map((q) => pos.get(q)).filter((q): q is Vec3 => q !== undefined);
+      if (from && pts.length >= 3) {
+        const nn = newellNormal(pts);
+        if (norm3(nn) > 1e-10) pos.set(id, footOnPlane(from, { n: nn, d: -dot3(nn, pts[0]) }));
+      }
     } else if (def.kind === 'line-plane') {
       const line = lines.get(def.line);
       const pl = planes.get(def.plane);

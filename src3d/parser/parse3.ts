@@ -595,6 +595,15 @@ const segParallelPlane: Rule = (s) => {
 /** `AS גובה (הפירמידה)` / `AS אנך` / `AS is the height` — a solid's stated height: the
  *  segment is ⟂ the base (the base-sentinel plane: [], resolved by apply). */
 const heightOfSolid: Rule = (s) => {
+  // V8-e (G5): a height to a NAMED FACE → the foot of the ⟂ from the apex onto that face's plane
+  const faceM = s.match(/(?:לפאה|לפאת|to\s+(?:the\s+)?face)\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)/);
+  if (faceM) {
+    const seg =
+      s.match(/(?:המקצוע\s+|הצלע\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?(?:גובה|אנך)/) ??
+      s.match(/([A-Z]\d*'?)([A-Z]\d*'?)\s+is\s+the\s+(?:height|altitude)/i);
+    if (!seg) return null;
+    return [{ type: 'height-to-face', id: seg[2], from: seg[1], face: [faceM[1], faceM[2], faceM[3]] }];
+  }
   const m =
     s.match(/^(?:המקצוע\s+|הצלע\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:הוא\s+)?(?:גובה|אנך)(?:\s+(?:בפירמידה|במנסרה|הפירמידה|המנסרה|של\s+הפירמידה|של\s+המנסרה))?\s*$/) ??
     s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+is\s+the\s+(?:height|altitude)(?:\s+of\s+the\s+(?:pyramid|prism))?\s*$/i);

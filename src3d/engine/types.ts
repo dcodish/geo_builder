@@ -442,7 +442,8 @@ export type Command3 =
   | { type: 'dot-given'; v1: string; v2: string; value: number } // u·v = 24 (V7 T2)
   | { type: 'inject-pair'; a: Id; b: Id; x: number; y: number; z: number } // BD = (-4,5,12) — a pair-vector injection (V7 T2)
   | { type: 'rel-plane'; name: string; rel: 'perp' | 'par'; through: Id[]; a: Id; b: Id } // V8-b (G1): plane ⟂/∥ edge a–b
-  | { type: 'plane-cut'; id: Id; plane: string; a: Id; b: Id }; // V8-b (G2): a point = plane ∩ segment a–b
+  | { type: 'plane-cut'; id: Id; plane: string; a: Id; b: Id } // V8-b (G2): a point = plane ∩ segment a–b
+  | { type: 'height-to-face'; id: Id; from: Id; face: Id[] }; // V8-e (G5): `AF גובה … לפאה BDC` — F = foot of ⟂ from A onto plane BDC
 
 // ---------------------------------------------------------------------------
 // Construction (what apply builds, what evaluate consumes)
@@ -469,6 +470,7 @@ export type PointDef =
   | { kind: 'foot-line'; from: Id; line: string }
   | { kind: 'line-plane'; line: string; plane: string }
   | { kind: 'plane-cut'; plane: string; a: Id; b: Id } // V8-b (G2): a plane ∩ segment a–b
+  | { kind: 'foot-face'; from: Id; face: Id[] } // V8-e (G5): foot of ⟂ from a vertex onto a face's plane
   | { kind: 'rev-point'; rev: number; role: 'center' | 'apex' }
   | { kind: 'vec-defined'; def: number } // solved from construction.vecDefs[def]
   | { kind: 'vec-pair'; def1: number; def2: number }; // the cevian intersection (two symbol relations)
