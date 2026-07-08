@@ -36,8 +36,10 @@ export interface DataPanel {
   relations: string[];
   vectors: VecEntry[];
   points: string[]; // `N(6, 6, 6)` — stable coordinates only
-  /** id → `(6, 6, 6)` for the SAME stable set — the canvas coordinate labels. */
-  pointCoords: Record<string, string>;
+  /** id → canvas coordinate label for EVERY point (when a frame exists): a STABLE
+   *  coordinate is a fact; an unstable one is THIS DRAWING'S value (the canvas already
+   *  commits to one valid configuration) and renders visually distinct. */
+  pointCoords: Record<string, { text: string; stable: boolean }>;
 }
 
 const EPS = 1e-6;
@@ -271,16 +273,18 @@ export function dataView(c: Construction3, seed: number): DataPanel {
 
   // points with STABLE coordinates (needs a frame; a pinned-only figure prints nothing sampled)
   const points: string[] = [];
-  const pointCoords: Record<string, string> = {};
+  const pointCoords: Record<string, { text: string; stable: boolean }> = {};
   if (hasFrame) {
     for (const id of positions[0].keys()) {
       const ps = positions.map((pos) => pos.get(id));
       if (ps.some((p) => !p)) continue;
-      if (sameVec(ps[0]!, ps[1]!) && sameVec(ps[0]!, ps[2]!)) {
-        const cs = coordStr(ps[0]!);
-        points.push(`${id}${cs}`);
-        pointCoords[id] = cs;
-      }
+      const stable = sameVec(ps[0]!, ps[1]!) && sameVec(ps[0]!, ps[2]!);
+      // a stable coordinate is a FACT (the panel lists it); an unstable one is still
+      // shown on the canvas as THIS drawing's value — displayed distinct, and it
+      // visibly changes on "show another configuration"
+      const cs = coordStr(ps[0]!);
+      pointCoords[id] = { text: cs, stable };
+      if (stable) points.push(`${id}${cs}`);
     }
   }
   return { relations, vectors: entries, points, pointCoords };

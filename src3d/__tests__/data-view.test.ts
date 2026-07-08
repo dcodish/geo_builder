@@ -43,7 +43,7 @@ describe('dataView — organize your data', () => {
     expect(en!.decomp).toBe('−1/4·u + 1/2·v + 1/4·w');
     expect(en!.coords).toBe('(-3, 6, 3)');
     expect(p.points).toContain('N(6, 6, 6)');
-    expect(p.pointCoords.N).toBe('(6, 6, 6)'); // feeds the on-canvas labels
+    expect(p.pointCoords.N).toEqual({ text: '(6, 6, 6)', stable: true }); // feeds the on-canvas labels
     expect(p.points).toContain('E(9, 0, 3)');
     // the declared basis vectors print their coordinate form
     const w = p.vectors.find((v) => v.label === 'w');
@@ -97,5 +97,15 @@ describe('dataView — organize your data', () => {
     const p = panel();
     expect(p.points).toEqual([]);
     expect(p.vectors.every((v) => v.coords === null)).toBe(true);
+    expect(p.pointCoords).toEqual({}); // no frame → no canvas labels at all
+  });
+
+  it("a frame WITHOUT full determination: S shows as this drawing's value, marked unstable", () => {
+    ['פירמידה ABCDS שבסיסה ריבוע', 'AS גובה', '|AS|=|AD|', 'נתון: A(0,0,0), B(0,12,0)'].forEach(submit);
+    const p = panel();
+    expect(p.pointCoords.A).toEqual({ text: '(0, 0, 0)', stable: true });
+    // S still rotates about the AB axis — its coords are the DRAWING's, not a fact
+    expect(p.pointCoords.S?.stable).toBe(false);
+    expect(p.points.some((s) => s.startsWith('S('))).toBe(false); // the panel lists facts only
   });
 });
