@@ -618,6 +618,37 @@ const midsegment: Rule = (s, ctx) => {
   return out;
 };
 
+/**
+ * The DIAGONALS of a quad/polygon — plural `אלכסונים` / construct `אלכסוני הריבוע` / `diagonals`.
+ * Two forms: (A) two explicitly named diagonals joined by ו/and — `AC ו-BD אלכסוני הריבוע` → the
+ * two segments; (B) bare/quad — `אלכסונים` or `אלכסוני ABCD` → every non-adjacent vertex pair of the
+ * named quad (or the figure's single polygon). Singular `אלכסון AC` is a lone segment — left to `segment`.
+ */
+const diagonals: Rule = (s, ctx) => {
+  if (!/אלכסונים|אלכסוני|\bdiagonals?\b/i.test(s)) return null;
+  // (A) named diagonals: two label-pairs joined by ו/and/comma
+  const named = s.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:ו-?|,|and)\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  if (named && named.slice(1, 5).every(isUpperLabel)) {
+    return [
+      { type: 'segment', a: up(named[1]), b: up(named[2]) },
+      { type: 'segment', a: up(named[3]), b: up(named[4]) },
+    ];
+  }
+  // (B) the diagonals of a polygon — a named 4+ run, else the figure's single polygon
+  let poly =
+    labelRun(s.replace(/אלכסונ\S*|diagonals?|\bof\b|\bthe\b|ה?ריבוע|ה?מרובע|ה?מלבן|ה?מעוין|square|rectangle|quad\w*|polygon/gi, ' '), 4) ??
+    ((ctx.polygons ?? []).length === 1 ? (ctx.polygons![0].map(up) as Id[]) : null);
+  if (!poly || poly.length < 4) return null;
+  const out: AnyCommand[] = [];
+  const n = poly.length;
+  for (let i = 0; i < n; i++)
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue; // wrap-adjacent, not a diagonal
+      out.push({ type: 'segment', a: poly[i], b: poly[j] });
+    }
+  return out.length ? out : null;
+};
+
 /** "segment AC" / "diagonal AC" / "קטע AC" / "אלכסון AC" — connect two points. */
 const segment: Rule = (s) => {
   if (!/segment|diagonal|connect|קטע|אלכסון|חבר/i.test(s)) return null;
@@ -4062,13 +4093,24 @@ const median: Rule = (s, ctx) => {
     ];
   }
 
-  // Classic form "median from A in ABC" / "תיכון מ-A במשולש ABC" — auto-named midpoint.
-  const apexM = s.match(/(?:\bfrom\s+|מ-?)([A-Za-z]\d*)\b/i); // "from A" / "מ-A" (keyword required, not any letter)
+  // Classic form "median from A in ABC" / "תיכון מ-A במשולש ABC" / "מהנקודה C הורידו תיכון לצלע AB"
+  // — auto-named midpoint. The "from"/"מ" apex tolerates a point/vertex descriptor noun.
+  const apexM = s.match(/(?:\bfrom\s+(?:the\s+)?(?:point\s+|vertex\s+)?|מ-?\s*(?:ה?נקודה\s+|ה?קודקוד\s+)?)([A-Za-z]\d*)\b/i);
+  if (!apexM) return null;
+  const apex = up(apexM[1]);
+  // An explicit opposite side ("...to side AB") with a from-apex fully determines the median —
+  // the foot is that side's midpoint (no triangle to name/re-emit; the figure already has the points).
+  if (side && side[0] !== apex && side[1] !== apex) {
+    const foot = freeLabel([apex, ...side], ['M', 'N', 'P', 'Q']);
+    return [
+      { type: 'midpoint', id: foot, a: side[0], b: side[1] },
+      { type: 'segment', a: apex, b: foot },
+    ];
+  }
   // The triangle is named after "in"/"במשולש"; read it there so the apex letter isn't double-counted.
   const triPart = s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s;
   const tri = labelRun(triPart.replace(/triangle|the/gi, ' '), 3);
-  if (!apexM || !tri) return null;
-  const apex = up(apexM[1]);
+  if (!tri) return null;
   const others = tri.filter((x) => x !== apex);
   if (others.length !== 2) return null;
   const mid = freeLabel(tri, ['M', 'N', 'P', 'Q']);
@@ -4149,7 +4191,7 @@ const altitude: Rule = (s, ctx) => {
   // The classic UNNAMED form gives the apex via "from D" / "from point D" / "מD" / "מ-D" / "מנקודה D"
   // (the descriptor noun נקודה/point tolerated) and auto-names the foot. Detect it first so the
   // keyword-first named branch never misreads "גובה מ-A ל BC" — there the apex is given, not a name.
-  const apexM = s.match(/(?:\bfrom\s+(?:the\s+)?(?:point\s+)?|מ-?\s*(?:ה?נקודה\s+)?)([A-Za-z]\d*)\b/i);
+  const apexM = s.match(/(?:\bfrom\s+(?:the\s+)?(?:point\s+|vertex\s+)?|מ-?\s*(?:ה?נקודה\s+|ה?קודקוד\s+)?)([A-Za-z]\d*)\b/i);
   // The named segment, in either word order. The keyword-first form requires the two labels to sit
   // IMMEDIATELY after the keyword (whitespace only) so "גובה מ-A ל BC" / "altitude from A to BC" — where
   // a connector word/letter intervenes — can never be read as a name (and the !apexM guard backs that up).
@@ -4580,6 +4622,7 @@ export const RULES: Rule[] = [
   pointVsCircle, // "M מחוץ למעגל / בתוך המעגל" — a point's SIDE of a circle (ADR-254); tight full-match, after the external-point compounds
   radiusSegment, // "OB רדיוס" — a drawn radius (rim point on the circle + centre→rim segment); after midpoint/setRadius/circle, before `segment` (so "OB" isn't grabbed as a bare segment)
   dividesInRatio, // "G מחלקת את DC ביחס 1:2" — a point on DC at a fixed t; keyword+`p:q` anchored, BEFORE `segment` (which would grab "הקטע DC" and drop the divider) and the numeric/ratio rules
+  diagonals, // "אלכסונים" / "AC ו-BD אלכסוני הריבוע" — the quad's diagonals; before `segment` (which owns the singular "אלכסון AC")
   segment,
   pointsOnSegments, // "F, G, H on AB, AC, CB" — N points placed PAIRWISE on N segments, before the others
   pointsOnSegment, // "L and K are points on AC" — TWO points on a segment, before the single pointOnSegment
