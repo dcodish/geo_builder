@@ -105,6 +105,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'points', he: 'CD תיכון במשולש ABC', en: 'CD is the median in triangle ABC' },
   { category: 'points', he: 'DE גובה בטטראדר', en: 'DE is the altitude in the tetrahedron' },
   { category: 'planesLines', he: 'המישור x-y+z=1', en: 'plane x-y+z=1' },
+  { category: 'claims', he: "הזווית בין הישר AC' לבין המישור ABCD היא 30", en: "the angle between line AC' and plane ABCD is 30" },
   // --- drawing ---
   { category: 'drawing', he: "קטע CA'", en: "segment CA'" },
 ];

@@ -414,3 +414,18 @@ Parser: `planarPolygon` (bare `משולש`/`מרובע`/`מחומש` + En, guard
 5. **Plane-equation phrasings** — `planeByEquation` now accepts an UNNAMED plane (`המישור x-y+z=1` ⇒ π) and NO colon (`המישור π2 x-y+z=1`), gated by requiring `=` in the tail so a point-run plane (`מישור ABC`, no `=`) is never stolen (parseLinearEq strictly validates). `angleBetweenPlanes` accepts singular `מישור` (`ה?מישור(?:ים)?`) so `הזווית בין מישור π1 ו-π2 היא 45` parses.
 
 **Locked by** `triage-fixes.test.ts` (the exact prod utterances: parse + build — median D at mid-AB, tetra altitude DE⟂face ABC, bare sphere with a FREE radius; the half-read refusal; regressions on the colon plane-eq + point-run plane). Catalog +5. **488 src3d tests green, `tsc -b` + `vite build:3d` clean.** _(The line↔plane angle `זווית בין הישר AC' לבין המישור ABCD` is planned separately per the operator.)_
+
+---
+
+## ADR-3D-027 — the angle between a LINE and a PLANE (2026-07-09)
+
+**Context.** The one prod-triage item held for a plan (operator, 2026-07-09): `זווית בין הישר AC' לבין המישור ABCD` — the formula-sheet `sin β = |n·u| / (|n|·|u|)` (n = plane normal, u = line direction). The tool had angle-between-segments and angle-between-planes, but no line↔plane angle. Operator approved the plan.
+
+**Decision — a `line-plane-angle` measure, M1-routed like every other angle** ([ADR-3D-010](#adr-3d-010)):
+- On a figure with FREE solid dims it is a **driving GIVEN** — a similarity-INVARIANT scalar pin (`|n·u|/(|n||u|) − sin(deg)`, joins the gauge-frozen dims-only solve); on a determined figure it is a **verified CLAIM** (multi-sample, `|β − deg| ≤ 1e-3`).
+- The plane is a **point-run** (normal = two edges at the first vertex, computed inline in both claims.ts and solve3.ts to avoid an evaluate↔solve3 circular import); the line is `b − a`. The line segment auto-draws.
+- **The valueless form is a QUERY, not a construct.** `הזווית בין הישר AC' לבין המישור ABCD` (no value) is a "what is the angle" ask outside the reproduce-and-verify charter — the rule requires a value, so it stays `not-handled` (escalates) rather than getting a bespoke clarification (avoiding the App/i18n/store surface for a 1-user edge; never a silent build).
+
+Parser `linePlaneAngle` (He + En, before angleBetweenPlanes/angleSegClaim).
+
+**Locked by** `line-plane-angle.test.ts`: parse He+En + the valueless not-handled; **VERIFIES on a cube** (AC′↔base = asin(1/√3) ≈ 35.264°) and a **wrong value (30°) is refused** keep-prior; **DRIVES a free-dim box** so the angle becomes 30°. Catalog +1. **493 src3d tests green, `tsc -b` + `vite build:3d` clean.**

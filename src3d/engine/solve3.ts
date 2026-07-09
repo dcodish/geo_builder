@@ -178,7 +178,8 @@ export function solvePivot(
       (p) =>
         p.kind === 'vangle' || p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane' || p.kind === 'length-rel' ||
         // V8-f: cos/angle equalities and equal dot products are all similarity-INVARIANT
-        p.kind === 'cos-angle' || p.kind === 'dot-eq' || p.kind === 'cos-eq',
+        p.kind === 'cos-angle' || p.kind === 'dot-eq' || p.kind === 'cos-eq' ||
+        p.kind === 'line-plane-angle', // sin β is length-normalized → invariant
     );
 
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
@@ -288,6 +289,18 @@ export function solvePivot(
         const cc = dirOf(pin.c);
         const d = dirOf(pin.d);
         out.push(a && b && cc && d ? cosOf(a, b) - cosOf(cc, d) : 10); // G10: ∠(a,b) = ∠(c,d)
+      } else if (pin.kind === 'line-plane-angle') {
+        const a = at(pin.a);
+        const b = at(pin.b);
+        const ring = pin.plane.map(at);
+        if (!a || !b || ring.some((p) => !p)) {
+          out.push(10);
+        } else {
+          const u = sub3(b, a);
+          const n = cross3(sub3(ring[1]!, ring[0]!), sub3(ring[ring.length - 1]!, ring[0]!));
+          const den = Math.max(norm3(n) * norm3(u), 1e-12);
+          out.push(Math.abs(dot3(n, u)) / den - Math.sin((pin.deg * Math.PI) / 180)); // sin β − sin(given)
+        }
       } else {
         const a = at(pin.a);
         const b = at(pin.b);

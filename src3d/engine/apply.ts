@@ -218,6 +218,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
     case 'dot-eq':
     case 'cos-eq':
       return firstAtomError(c, [claim.a, claim.b, claim.c, claim.d]);
+    case 'line-plane-angle':
+      return missingPoint(c, [claim.a, claim.b, ...claim.plane]);
     case 'lines-rel':
       return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
     case 'length-ratio':
@@ -832,6 +834,20 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       const next = clone(c);
       next.points.set(cmd.id, { kind: 'foot-face', from: cmd.from, face });
       if (!hasSegment(next, cmd.from, cmd.id)) next.segments.push([cmd.from, cmd.id]); // draw the altitude
+      return { ok: true, next };
+    }
+
+    // triage 3-D: the angle between a line (a–b) and a plane (point-run). M1: on a free-dim solid
+    // it DRIVES (a similarity-invariant scalar pin), else it VERIFIES as a claim.
+    case 'line-plane-angle': {
+      if (cmd.plane.length < 3) return { ok: false, error: { code: 'not-coplanar', id: cmd.plane.join('') } };
+      const missing = missingPoint(c, [cmd.a, cmd.b, ...cmd.plane]);
+      if (missing) return { ok: false, error: missing };
+      const next = clone(c);
+      if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]); // draw the line
+      if (freeDims(c) > 0 && c.solids.length > 0)
+        next.scalarPins.push({ kind: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg: cmd.deg });
+      else next.claims.push({ type: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg: cmd.deg });
       return { ok: true, next };
     }
 

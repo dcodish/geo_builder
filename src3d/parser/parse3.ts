@@ -813,6 +813,22 @@ const pointRelPlane: Rule = (s) => {
 };
 
 /** `הזווית בין המישורים π1 ו-π2 היא 45` / `the angle between planes π1 and π2 is 45`. */
+/** triage 3-D: the angle between a LINE and a PLANE — `הזווית בין הישר AC' לבין המישור ABCD היא 30`
+ *  / `the angle between line AC' and plane ABCD is 30`. A VALUELESS form (a "what is" query) is
+ *  outside the reproduce-and-verify charter → not matched (escalates), never a silent build. */
+const linePlaneAngle: Rule = (s) => {
+  const m =
+    s.match(
+      new RegExp(`^ה?זווית\\s+בין\\s+ה?ישר\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+ל?בין\\s+ה?מישור\\s+((?:[A-Z]\\d*'?){3,4})\\s*(?:היא|הוא|=)\\s*(${NUM})\\s*°?$`),
+    ) ??
+    s.match(
+      new RegExp(`^the\\s+angle\\s+between\\s+(?:the\\s+)?line\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+and\\s+(?:the\\s+)?plane\\s+((?:[A-Z]\\d*'?){3,4})\\s*(?:is|=)\\s*(${NUM})\\s*°?$`, 'i'),
+    );
+  if (!m) return null;
+  const plane = m[3].match(/[A-Z]\d*'?/g)!;
+  return [{ type: 'line-plane-angle', a: m[1], b: m[2], plane, deg: +m[4] }];
+};
+
 const angleBetweenPlanes: Rule = (s) => {
   const m = s.match(
     new RegExp(
@@ -1462,6 +1478,7 @@ const RULES: Rule[] = [
   membership, // before onSegment: `על אחד המישורים` must never read as a point-on-segment
   pointRelPlane, // on/above/below a point-run plane (+ above/below π) — likewise before onSegment
   onLineMembership, // likewise for `על הישר ℓ`
+  linePlaneAngle, // `הזווית בין הישר AC' לבין המישור ABCD היא 30` — before angleBetweenPlanes/angleSegClaim
   angleBetweenPlanes,
   angleSegClaim,
   vertexAngleClaim,

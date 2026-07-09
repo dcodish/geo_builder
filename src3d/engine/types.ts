@@ -66,7 +66,9 @@ export type Claim3 =
   // pairs) and `cos(u,v)` (named vectors) share one form.
   | { type: 'cos-angle-eq'; u: VecAtom; v: VecAtom; cos: number } // cos∠ACB = 3/4 · cos(w,u) = √35/10
   | { type: 'dot-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // u·v = v·w (a chained-equality link)
-  | { type: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom }; // ∠(a,b) = ∠(c,d) — AE makes equal angles with AB, AD
+  | { type: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // ∠(a,b) = ∠(c,d) — AE makes equal angles with AB, AD
+  // triage 3-D: the angle between a LINE (a–b) and a PLANE (point-run) — `sin β = |n·u|/(|n||u|)`
+  | { type: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number };
 
 /** V7 T2 — a SCALAR given that DRIVES the figure (a residual in the global solve). */
 export type ScalarPin =
@@ -81,7 +83,9 @@ export type ScalarPin =
   // s²), so they join the gauge-frozen dims-only solve.
   | { kind: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number } // cos∠ACB = 3/4 · cos(w,u) = √35/10 (G6)
   | { kind: 'dot-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // u·v = v·w (G9 chain link)
-  | { kind: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom }; // ∠(a,b) = ∠(c,d) — equal angles (G10)
+  | { kind: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // ∠(a,b) = ∠(c,d) — equal angles (G10)
+  // triage 3-D: the angle between line a–b and plane (point-run) is `deg` — similarity-invariant
+  | { kind: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number };
 
 // ---------------------------------------------------------------------------
 // The algebraic lane (V2 — docs/20 §6.3): coefficients may carry ONE symbolic
@@ -471,6 +475,8 @@ export type Command3 =
   | { type: 'angle-eq'; base: VecAtom; a: VecAtom; b: VecAtom }
   // V8-f (G11): `D על AC כך ש-OD חוצה-זווית AOC` — D on segment a–b, ray apex→D bisects ∠(a)(apex)(b).
   | { type: 'bisector-point'; id: Id; a: Id; b: Id; apex: Id }
+  // triage 3-D: `הזווית בין הישר AC' לבין המישור ABCD היא 30` — the angle between a line and a plane
+  | { type: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number }
   // V8-g: `גובה המשולש לצלע AB הוא CD` — D = foot of the ⟂ from vertex `from` onto side a–b.
   | { type: 'altitude-foot'; id: Id; from: Id; a: Id; b: Id }
   // triage 3-D: `DE גובה בטטראדר` — altitude from vertex `from` to the OPPOSITE face of the

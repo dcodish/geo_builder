@@ -172,6 +172,19 @@ function holdsAt(claim: Claim3, c: Construction3, pos: Positions3): boolean {
       if (den1 < 1e-12 || den2 < 1e-12) return false;
       return Math.abs(dot3(a, b) / den1 - dot3(cc, d) / den2) <= REL_TOL;
     }
+    case 'line-plane-angle': {
+      // triage 3-D: sin β = |n·u| / (|n||u|) (formula sheet). n from two plane edges at pt[0].
+      const a = pos.get(claim.a);
+      const b = pos.get(claim.b);
+      const pts = claim.plane.map((id) => pos.get(id));
+      if (!a || !b || pts.some((p) => !p)) return false;
+      const u = sub3(b, a);
+      const n = cross3(sub3(pts[1]!, pts[0]!), sub3(pts[pts.length - 1]!, pts[0]!));
+      const den = norm3(n) * norm3(u);
+      if (den < 1e-12) return false;
+      const beta = (Math.asin(Math.min(1, Math.abs(dot3(n, u)) / den)) * 180) / Math.PI;
+      return Math.abs(beta - claim.deg) <= 1e-3;
+    }
     case 'never-parallel': {
       // "ℓ ∦ π for EVERY parameter value" (2024-Q2 א): parallel ⟺ dir(m)·n(m) = 0,
       // so the claim holds iff that residual has NO zero over the scanned range —
