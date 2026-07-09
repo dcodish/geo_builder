@@ -136,6 +136,24 @@ describe('relationMarks', () => {
     expect(m.angles).toEqual([]); // the equal-arc is suppressed (both shown as values)
   });
 
+  it('collapses two names of the SAME wedge in one class to ONE arc (inscribed shape at a shared vertex)', () => {
+    // At B: ∠ABC and ∠DBF are the SAME physical wedge — F lies on BA (both to the left) and D on BC (both up).
+    // The class {∠ABC, ∠DBF, ∠DEF} is the rhombus BDEF's ∠B = ∠E; B must draw ONE arc, not two stacked rings.
+    const rel: RelationsResult = {
+      equalSegments: [],
+      equalAngles: [[{ vertex: 'B', a: 'A', b: 'C' }, { vertex: 'B', a: 'D', b: 'F' }, { vertex: 'E', a: 'D', b: 'F' }]],
+      definiteAngles: [],
+      samplesUsed: 8,
+    };
+    // B at origin; A and F both to the left (same ray B→A ≈ B→F), C and D both up-left (same ray B→C ≈ B→D).
+    const p = pos([['B', [0, 0]], ['A', [-6, 0]], ['F', [-3, 0]], ['C', [-4, 4]], ['D', [-2, 2]], ['E', [-3, 3]]]);
+    const m = relationMarks(rel, p);
+    // Two arcs total (one at B, one at E) — NOT three (the duplicate B-wedge collapsed).
+    expect(m.angles).toHaveLength(2);
+    const atB = m.angles.filter((a) => a.vertex.x === 0 && a.vertex.y === 0);
+    expect(atB, 'exactly one arc at B').toHaveLength(1);
+  });
+
   it('equal angles that are NOT definite still get arcs (the only equality signal)', () => {
     const rel: RelationsResult = {
       equalSegments: [],

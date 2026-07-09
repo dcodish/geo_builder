@@ -227,6 +227,24 @@ export function Figure({
   const [menuNote, setMenuNote] = useState('');
   const drag = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  // The toolbar sits ABOVE the SVG in normal flow (never overlapping it — the "buttons hide the canvas"
+  // report), so the SVG area is the container height MINUS the (wrapping) toolbar row. Measure it and fit to
+  // THAT, falling back to the width/height props before the observer fires (and in the headless render tests,
+  // where ResizeObserver never runs).
+  const svgAreaRef = useRef<HTMLDivElement>(null);
+  const [svgSize, setSvgSize] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    const el = svgAreaRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((es) => {
+      const r = es[0]?.contentRect;
+      if (r) setSvgSize({ w: Math.max(1, Math.floor(r.width)), h: Math.max(1, Math.floor(r.height)) });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const vw = svgSize?.w ?? width;
+  const vh = svgSize?.h ?? height;
   // Fit hysteresis (F4/REN-5): the last adopted transform + the context it was computed under. A
   // viewport/orientation change invalidates it (a genuine re-frame); a positions change keeps it
   // while the figure still fits, so adding one far point doesn't shift every existing point.
@@ -295,7 +313,7 @@ export function Figure({
     const s = buildScene(construction, oriented, labels, angleMarks, { showCenters, circles });
     // View stability (F4): keep the previous fit while the figure still fits — refit only on
     // overflow / gross shrink, or when the viewport/orientation genuinely changed.
-    const vp = { width, height, padding };
+    const vp = { width: vw, height: vh, padding };
     const fitKey = `${width}x${height}x${padding}|${o.rot.toFixed(4)}|${o.flipX}|${o.flipY}`;
     const pts = scenePositions(s);
     const fresh = fitTransform(pts, vp);
@@ -319,7 +337,7 @@ export function Figure({
     const labelDirs = chooseLabelDirs(ptScreen, obstacles, circScreen, REF_OFF, REF_CLEAR);
 
     return { scene: s, transform: t, crossings: x, labelDirs, oriented };
-  }, [construction, positions, circles, labels, angleMarks, width, height, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, showCenters]);
+  }, [construction, positions, circles, labels, angleMarks, vw, vh, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, showCenters]);
 
   // "View relations" is now HOVER-DRIVEN to fight clutter (ADR-167 Am.): the resting figure is clean, and
   // pointing at a side/angle reveals ONLY its equality class. `hoverRel` is the class under the cursor;
@@ -393,8 +411,12 @@ export function Figure({
   function relationPickAt(clientX: number, clientY: number): RelationPick | null {
     if (!relations || !svgRef.current) return null;
     const rect = svgRef.current.getBoundingClientRect();
-    const sx = (clientX - rect.left) * (width / (rect.width || width));
-    const sy = (clientY - rect.top) * (height / (rect.height || height));
+    // Convert against the SVG's OWN view size (vw/vh) — NEVER the outer width/height props. The props include
+    // the toolbar row above the canvas, so scaling by them stretched every hover/tap coordinate by the ratio
+    // (error growing toward the bottom/right — at the bottom of the canvas the probe landed ~40px from the
+    // cursor, past every reach, so hovering an angle/side picked NOTHING). Latent while svg size === props;
+    // exposed the day the toolbar moved into flow. `clientToSvg` is the one shared conversion, unit-locked.
+    const { x: sx, y: sy } = clientToSvg(rect, vw, vh, clientX, clientY);
     const world = transform.toWorld({ x: (sx - view.panX) / view.zoom, y: (sy - view.panY) / view.zoom });
     const pxToWorld = 1 / (transform.scale * view.zoom);
     // Touch aims are coarser than a cursor — widen both reaches for a finger.
@@ -467,12 +489,16 @@ export function Figure({
   }
 
   return (
-    <div style={{ position: 'relative', width, height }}>
+    <div style={{ width, height, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* The SVG lives in its OWN area (visual order 2, below the toolbar) so the toolbar never covers the
+          figure. `flex:1` lets it take the height the wrapping toolbar leaves; the ResizeObserver above feeds
+          that measured size back as vw/vh. */}
+      <div ref={svgAreaRef} style={{ position: 'relative', order: 2, flex: 1, minHeight: 0, overflow: 'hidden' }}>
       <svg
         ref={svgRef}
-        width={width}
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
+        width={vw}
+        height={vh}
+        viewBox={`0 0 ${vw} ${vh}`}
         role="img"
         aria-label="geometry figure"
         style={{ touchAction: 'none', background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0' }}
@@ -934,8 +960,8 @@ export function Figure({
               // coordinate from the click, but under the Hebrew-default `dir=rtl` a logical inline-start
               // inset resolves to `right` — the menu opened MIRRORED, far from the clicked point. The
               // fixed toolbars keep their logical insets (they're layout, not click-anchored).
-              left: clamp(menu.x + 8, 0, width - 150),
-              top: clamp(menu.y + 8, 0, height - 80),
+              left: clamp(menu.x + 8, 0, vw - 150),
+              top: clamp(menu.y + 8, 0, vh - 80),
               background: '#fff',
               border: '1px solid #cbd5e1',
               borderRadius: 8,
@@ -1018,10 +1044,14 @@ export function Figure({
           </div>
         </>
       )}
+      </div>
 
+      {/* The toolbar row — in normal flow ABOVE the SVG (visual order 1), wrapping on narrow screens so no
+          button is ever hidden behind the canvas or collides with the other tray (the operator's report). */}
+      <div style={toolbarRow}>
       {/* Orientation controls — rotate / flip / align the whole figure (labels stay upright). These are
           secondary, so they're collapsed behind a single labeled toggle to keep the canvas uncluttered. */}
-      <div style={{ position: 'absolute', top: 8, insetInlineStart: 8, display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
         <div style={toolbarTray}>
           <button
             type="button"
@@ -1079,7 +1109,7 @@ export function Figure({
       {/* One toolbar TRAY (GUI overhaul): file pair | image pair | zoom trio, separated by thin
           dividers inside a single rounded container — reads as one toolbar instead of seven
           scattered buttons of three different shapes. */}
-      <div style={{ position: 'absolute', top: 8, insetInlineEnd: 8, ...toolbarTray, justifyContent: 'flex-end' }}>
+      <div style={{ ...toolbarTray, marginInlineStart: 'auto', justifyContent: 'flex-end' }}>
         {/* Save / load the construction as a .geo.json file (FR-HS-10) — grouped with the image exports
             because a student reaches for "save my work" in the same place. A slate variant marks them as
             the file pair, distinct from the blue image pair; the host owns the actual file I/O. */}
@@ -1139,6 +1169,7 @@ export function Figure({
           ↺
         </button>
       </div>
+      </div>
     </div>
   );
 }
@@ -1185,6 +1216,11 @@ async function svgToPng(svg: SVGSVGElement, scale = 2): Promise<Blob> {
   return await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png'));
 }
 
+// The toolbar ROW — sits ABOVE the SVG in normal flow (visual order 1, the SVG area is order 2), wrapping so
+// that on a narrow screen the trays drop to a second line instead of overlapping / disappearing behind the
+// canvas (the operator's report). The orientation tray sits at the start; the export tray is pushed to the
+// end with `marginInlineStart:auto`, and wraps below it when there isn't room.
+const toolbarRow: CSSProperties = { order: 1, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' };
 // The one toolbar tray container — both canvas clusters (transform at the start edge,
 // file/export/zoom at the end edge) share it so the controls read as toolbars, not
 // scattered buttons (GUI overhaul).
@@ -1211,8 +1247,14 @@ const ctrlBtn: CSSProperties = {
   background: '#f8fafc',
   cursor: 'pointer',
 };
-// The collapsible rotate/flip/align cluster.
+// The collapsible rotate/flip/align cluster. Overlays BELOW its toggle (absolute in the relative orientation
+// group) so opening it doesn't grow the toolbar row and shove the figure down.
 const orientPopover: CSSProperties = {
+  position: 'absolute',
+  top: '100%',
+  insetInlineStart: 0,
+  marginTop: 4,
+  zIndex: 6,
   display: 'flex',
   gap: 4,
   alignItems: 'center',
@@ -1254,6 +1296,26 @@ const unitVec = (v: Vec): Vec => {
   const l = Math.hypot(v.x, v.y);
   return l < 1e-9 ? { x: 0, y: 0 } : { x: v.x / l, y: v.y / l };
 };
+
+/**
+ * Client-space point → SVG viewBox coordinates. `viewW`/`viewH` MUST be the SVG element's own view size
+ * (its width/height attributes = the fitted viewBox), never an enclosing container's: scaling by an outer
+ * size stretches the coordinate by the ratio, an error that grows toward the far edge — the "hover picks
+ * nothing" class (the toolbar-row height crept into the ratio the day the toolbar moved into flow). The
+ * rect ratio itself handles genuine CSS scaling of the SVG (e.g. a max-width shrink).
+ */
+export function clientToSvg(
+  rect: { left: number; top: number; width: number; height: number },
+  viewW: number,
+  viewH: number,
+  clientX: number,
+  clientY: number,
+): Vec {
+  return {
+    x: (clientX - rect.left) * (viewW / (rect.width || viewW)),
+    y: (clientY - rect.top) * (viewH / (rect.height || viewH)),
+  };
+}
 
 /** Distance from point p to segment a→b (screen space). */
 function distToSeg(p: Vec, a: Vec, b: Vec): number {

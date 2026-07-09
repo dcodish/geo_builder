@@ -474,9 +474,20 @@ export function relationMarks(relations: RelationsResult, positions: Map<Id, Vec
   const angles: SceneEqualAngle[] = [];
   const perVertexArcs = new Map<Id, number>();
   let drawnClass = 0;
+  const sameWedge = (
+    p: { vertex: Id; a: Id; b: Id },
+    q: { vertex: Id; a: Id; b: Id },
+  ): boolean => {
+    const wp = wedgeOf(p.vertex, p.a, p.b), wq = wedgeOf(q.vertex, q.a, q.b);
+    return !!wp && !!wq && wp.v === wq.v && ((angNear(wp.d1, wq.d1) && angNear(wp.d2, wq.d2)) || (angNear(wp.d1, wq.d2) && angNear(wp.d2, wq.d1)));
+  };
   for (const cls of relations.equalAngles) {
-    const visible = cls.filter((r) => { const wk = wedgeOf(r.vertex, r.a, r.b); return !(wk && isShown(wk)); });
-    if (visible.length < 2) continue; // every (or all-but-one) member is already shown as a value
+    const notShown = cls.filter((r) => { const wk = wedgeOf(r.vertex, r.a, r.b); return !(wk && isShown(wk)); });
+    // Collapse members that are the SAME physical wedge under different point ids — e.g. ∠ABC and ∠DBF when F
+    // lies on BA and D on BC (an inscribed shape sharing the triangle's vertex): they are ONE angle and must
+    // draw ONE arc, not two stacked rings (the ADR-167 Am. wedge-dedup, extended from values to equal-marks).
+    const visible = notShown.filter((r, i) => notShown.every((s, j) => j >= i || !sameWedge(r, s)));
+    if (visible.length < 2) continue; // every (or all-but-one) member is already shown as a value / a duplicate wedge
     const count = ++drawnClass;
     for (const { vertex, a, b } of visible) {
       const pv = positions.get(vertex);

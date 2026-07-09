@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels, droppedGivenNumbers, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -496,7 +496,10 @@ export default function App() {
       // consumed only part of the utterance (usually a typo'd keyword mid-sentence) — escalate, never
       // commit the partial meaning (a "שטח… פי 2.25 משוטח…" typo used to commit as a bare triangle, ✓).
       const droppedNums = droppedGivenNumbers(utterance, r.commands);
-      if (dropped.length === 0 && droppedNums.length === 0) {
+      // The RELATION sibling (ADR-264): a stated `AB=CD`/`AB⊥CD`/`AB∥CD` between points that all already
+      // appear on the shape trips neither older gate — never commit a figure missing the student's given.
+      const droppedRels = droppedGivenRelations(utterance, r.commands);
+      if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0) {
         // A deterministic parse can "succeed" yet build NOTHING — apply with an error (kept-prior) or
         // change nothing at all. Dry-run before committing so a silent fail isn't shown as success
         // (operator request); a step that builds something commits immediately.
@@ -554,8 +557,8 @@ export default function App() {
         // become a second analytics `submit` (else the dashboard double-counts the utterance). See sessionLog.
         logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:${outcome.reason}`, detail: outcome.detail, commands: r.commands, intermediate: true });
       } else {
-        weak = 'dropped'; // a typo dropped a stated label/number → escalate rather than commit the partial parse
-        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums].join(',')}`, commands: r.commands, intermediate: true });
+        weak = 'dropped'; // a typo dropped a stated label/number/relation → escalate rather than commit the partial parse
+        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels].join(',')}`, commands: r.commands, intermediate: true });
       }
     }
     // out of grammar, OR a deterministic parse that built nothing → ask the LLM (a SECOND try),
@@ -646,6 +649,9 @@ export default function App() {
       // the numeric honesty gate holds on the second attempt too (ADR-250): a decomposition that loses a
       // stated magnitude must name it, never commit the partial figure
       ...droppedGivenNumbers(utterance, llmCmds),
+      // and the RELATION gate (ADR-264): a decomposition that loses a stated `AB=CD`/`⊥`/`∥` between
+      // existing points must name it — its labels all appear on the shape, so the older gates never fire
+      ...droppedGivenRelations(utterance, llmCmds),
     ];
     if (stillDropped.length > 0) {
       logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `dropped-labels:${stillDropped.join(',')}`, commands: llmCmds });

@@ -994,9 +994,16 @@ function addMeasureLabel(
  * that shape stepped to each OTHER variant (the others held at their current value). The relations layer
  * samples across these so the equal-pair of a kite/isosceles isn't reported as FORCED — it is the student's
  * free choice (ADR-052), not a ground truth. Bounded by the SUM of the variant counts, not their product.
+ *
+ * ONLY `shape-variant` participates — its variant encodes a RELATION choice (which sides are equal), so a
+ * relation true in only one variant must not be reported as forced. An `inscribe` variant is a PLACEMENT /
+ * mirror choice (which container side hosts a vertex; a rhombus's D↔F relabeling — ADR-262) — it does NOT
+ * change the shape's intrinsic relations, and sampling across it would wrongly DROP forced per-label relations
+ * when the mirror relabels the vertices (∠CDE at D is real but doesn't survive the D↔F swap). So inscribe is
+ * excluded here; it stays cyclable via the "show another configuration" button (`cycleVariant`).
  */
 function variantConfigs(facts: Fact[]): Fact[][] {
-  const variantFacts = facts.filter((f) => f.enabled && cyclableVariant(f.cmd));
+  const variantFacts = facts.filter((f) => f.enabled && f.cmd.type === 'shape-variant' && variantCountOf(f.cmd) > 1);
   if (variantFacts.length === 0) return [facts];
   const configs: Fact[][] = [facts];
   for (const vf of variantFacts) {

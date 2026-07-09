@@ -1604,6 +1604,48 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'isosceles-appositive-stated-pair-one-line',
+    title: '"משולש ABC הוא שווה שוקיים, כלומר AC=BC" — ONE line: the shape AND its stated pair both land (ADR-264)',
+    guards:
+      'the textbook appositive form (shape declaration + "כלומר <pair>" in one utterance) was never parsed deterministically: multiStatement requires every comma piece to carry a relation operator, the shape rule \'stop\'s on the leftover clause, and the whole line escalated to the LLM — whose decomposition could silently DROP the stated pair (its labels all already appear on the shape, so the new-label/number honesty gates never fire; the student saw success with their given missing). ADR-264: the clause fallback parses shape + givens all-or-nothing; the stated pair must win over the macro\'s soft default (ADR-114), never stack into an equilateral.',
+    steps: ['משולש ABC הוא שווה שוקיים, כלומר AC=BC'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(dist(A, C), 'the STATED pair |AC| = |BC| holds').toBeCloseTo(dist(B, C), 3);
+      expect(Math.abs(dist(A, B) - dist(A, C)), 'NOT equilateral — the soft default |AB|=|AC| yielded').toBeGreaterThan(0.3);
+    },
+  },
+  {
+    id: 'isosceles-bare-shape-with-pair-one-line',
+    title: '"משולש שווה שוקיים שבו AB=AC" — a LABEL-LESS shape + its pair draws a real TRIANGLE (ADR-264 Am. 1)',
+    guards:
+      'operator dev session zalwhvsh: this committed as segments AB, AC + set-equal with NO triangle — "AB is equal to AC but this is not a triangle". The label-less shape rule DEFERS (null, not \'stop\'), so `equalSegments` claimed the AB=AC clause anywhere in the string and silently dropped the shape declaration (the lax-relation-rule class: equality/distance/angle all do it). Fix: the dropped-shape-noun guard on the winning parse — never commit a shape-less half-parse — with the clause split as the deterministic rescue (bare "משולש שווה שוקיים" parses auto-named + the stated pair pins it).',
+    steps: ['משולש שווה שוקיים שבו AB=AC'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      expect(dist(A, B), 'the stated pair |AB| = |AC| holds').toBeCloseTo(dist(A, C), 3);
+      // the operator's complaint: it must be a real TRIANGLE — three vertices, non-degenerate area
+      const area2 = Math.abs((B.x - A.x) * (C.y - A.y) - (C.x - A.x) * (B.y - A.y));
+      expect(area2, 'A, B, C are not collinear — a real triangle').toBeGreaterThan(0.5);
+      expect(fig.construction.objects.some((o) => o.kind === 'polygon'), 'the triangle polygon is drawn').toBe(true);
+    },
+  },
+  {
+    id: 'kite-stated-pair-one-line',
+    title: '"דלתון ABCD, AB=AD" — ONE line: the kite AND the student\'s stated pair both land (ADR-264)',
+    guards:
+      'the comma sibling of the appositive form: "דלתון ABCD, AB=AD" escalated whole to the LLM, and a decomposition that returned only the kite committed silently (AB=AD\'s labels all appear on the kite → no gate fired). ADR-264: parses deterministically to the kite + the explicit set-equal, and the kite\'s defining pairs hold.',
+    steps: ['דלתון ABCD, AB=AD'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      expect(dist(A, B), 'the stated pair |AB| = |AD| holds').toBeCloseTo(dist(A, D), 3);
+      expect(dist(C, B), 'the kite\'s other pair |CB| = |CD| holds').toBeCloseTo(dist(C, D), 3);
+    },
+  },
+  {
     id: 'perpendicular-from-midpoint-flexes-rhombus',
     title: 'rhombus + E mid AB + G on the EXTENSION of BD + "GE⊥AB" — the rhombus angle flexes so G lands strictly beyond D',
     guards:
@@ -2405,17 +2447,20 @@ export const SCENARIOS: Scenario[] = [
     id: 'symbolic-2alpha-drives-shape-not-the-fixed-point',
     title: 'a "2α" relation drives the figure\'s FREE shape, not a point the student fixed (D on the extension)',
     guards:
-      "the operator's REAL α/2α bug (they used the α glyph): isosceles AB=AC in a circle, D placed on the extension of BC (t=1.3), ∠CAD=α, then a central angle ∠BOC=2α. It ERRORED 'cannot place D on segment BC so that ∠BOC = 2·∠CAD' — `driveOrCheck` drove D (the first on-segment ref) to satisfy the relation, but D is a GIVEN the student positioned, not a DOF, and a central angle can't be met by sliding D. Fix (ADR-064): only a FREE on-segment point (no stated ratio) is driveable; a stated-ratio/extension point is left put, so the relation drives the triangle's free shape instead and D stays at t=1.3.",
+      "the operator's REAL α/2α bug (they used the α glyph): isosceles AB=AC in a circle, D placed on the extension of BC (t=1.3), ∠CAD=α, then a central angle ∠BOC=2α. It ERRORED 'cannot place D on segment BC so that ∠BOC = 2·∠CAD' — `driveOrCheck` drove D (the first on-segment ref) to satisfy the relation, but D is a GIVEN the student positioned, not a DOF, and a central angle can't be met by sliding D. Fix (ADR-064): only a FREE on-segment point (no stated ratio) is driveable; a stated-ratio/extension point is left put, so the relation drives the triangle's free shape instead and D stays at t=1.3. GROUND-TRUTH CORRECTION (ADR-264 Am. 2): step 1 used to HALF-PARSE to a bare circumcircle — the isosceles and the stated AB=AC were silently dropped, and the t=1.3 expectation was calibrated on that wrong lopsided-triangle figure. With the full parse (isosceles + pinned pair + circumcircle), ∠BOC=2∠CAD ⟺ ∠BAC=∠CAD, which is UNSATISFIABLE at t=1.3 for every apex height (by symmetry ∠BAC subtends the whole base BC while ∠CAD subtends only the 0.3·BC stub), so the solver legitimately drives D's UNSTATED extension t (an ADR-052 free DOF — the seed-sweep exemption for this scenario says the same) while the isosceles holds. The check now asserts what the student actually stated: the pair, the ratio, and D beyond C.",
     steps: ['משולש שווה שוקיים ABC שבו AB=AC חוסם במעגל', 'נקודה D על המשך BC', 'BD', 'DA', '∠CAD=α', '∠BOC=2α'],
     check(fig) {
       allStepsOk(fig);
       const cad = angle(at(fig, 'C'), at(fig, 'A'), at(fig, 'D'));
       const boc = angle(at(fig, 'B'), at(fig, 'O'), at(fig, 'C'));
       expect(boc / cad, '∠BOC = 2·∠CAD').toBeCloseTo(2, 2);
-      // D stays where it was placed: t ≈ 1.3 along B→C
-      const B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      // the previously-dropped givens hold: the ISOSCELES pair (step 1's "שבו AB=AC") is enforced
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      expect(dist(A, B), 'isosceles |AB| = |AC| (was silently dropped pre-ADR-264 Am. 2)').toBeCloseTo(dist(A, C), 3);
+      // D stays ON the stated extension — BEYOND C (order B→C→D, ADR-054). Its exact t is an UNSTATED
+      // free DOF the relation legitimately drives (∠BAC=∠CAD has no solution at the seed t with AB=AC).
       const tD = ((D.x - B.x) * (C.x - B.x) + (D.y - B.y) * (C.y - B.y)) / ((C.x - B.x) ** 2 + (C.y - B.y) ** 2);
-      expect(tD, 'D not dragged off its stated extension position').toBeCloseTo(1.3, 2);
+      expect(tD, 'D beyond C on the extension of BC').toBeGreaterThan(1.05);
     },
   },
   {

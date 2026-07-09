@@ -29,9 +29,9 @@ describe('F4 — fit hysteresis (keepOrRefit)', () => {
 
   it('a small extension INSIDE the band keeps the previous transform (existing points do not move on screen)', () => {
     const prev = fitTransform(square, VP);
-    // one new point slightly outside the old bounds — still fits within the eaten padding
-    // (at the prev scale of ~50 px/unit, x=10.5 lands ~25 px into the 48 px padding — inside the band)
-    const grown = [...square, { x: 10.5, y: 5 }];
+    // one new point slightly outside the old bounds — still fits within the eaten padding, staying clear of the
+    // label-reserve margin (at the prev scale of ~50 px/unit, x=10.2 lands ~38 px from the edge — inside the band)
+    const grown = [...square, { x: 10.2, y: 5 }];
     const fresh = fitTransform(grown, VP);
     const kept = keepOrRefit(prev, fresh, grown, VP);
     expect(kept).toBe(prev); // the view did NOT jump
@@ -39,6 +39,16 @@ describe('F4 — fit hysteresis (keepOrRefit)', () => {
     for (const p of square) {
       expect(kept.toScreen(p)).toEqual(prev.toScreen(p));
     }
+  });
+
+  it('a vertex drifting within a LABEL width of the edge forces a refit (so its letter stays visible)', () => {
+    // The kept transform must not let a boundary vertex sit so close to the edge that its label clips — the
+    // "figure too large / top nodes not visible" report (ADR-262 follow-up). x=10.6 lands ~18 px from the edge,
+    // inside the reserved label margin (28 px) yet outside the old 8 px band, so keeping is wrong: refit.
+    const prev = fitTransform(square, VP);
+    const grown = [...square, { x: 10.6, y: 5 }];
+    const fresh = fitTransform(grown, VP);
+    expect(keepOrRefit(prev, fresh, grown, VP)).toBe(fresh); // refit, not kept
   });
 
   it('an extension far past the viewport forces a refit', () => {

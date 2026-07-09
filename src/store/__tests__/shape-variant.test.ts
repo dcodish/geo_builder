@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { replay, useGeoStore } from '../geoStore';
-import type { AnyCommand, Vec } from '@/engine';
+import type { AnyCommand, Id, Vec } from '@/engine';
 
 const s = () => useGeoStore.getState();
 const fig = () => replay(s().facts, s().seed);
@@ -107,6 +107,15 @@ describe('inscribed rhombus — drawn, detected, equal sides reported (ADR-262)'
     s().viewRelations();
     const cls = s().relations!.result.equalSegments;
     expect(cls.some((c) => c.length === 4)).toBe(true);
+    // (4) corresponding angle at a point ON a side: ∠B = ∠CDE (DE∥AB) must surface — an inscribe variant is a
+    // placement/mirror, so it must NOT gate relation detection (ADR-262 Am.: excluded from variantConfigs).
+    const eqA = s().relations!.result.equalAngles;
+    const sameRef = (r: { vertex: Id; a: Id; b: Id }, v: Id, a: Id, b: Id) =>
+      r.vertex === v && ((r.a === a && r.b === b) || (r.a === b && r.b === a));
+    expect(
+      eqA.some((c) => c.some((r) => sameRef(r, 'B', 'A', 'C')) && c.some((r) => sameRef(r, 'D', 'C', 'E'))),
+      '∠ABC and ∠CDE in one equal class',
+    ).toBe(true);
   });
 });
 

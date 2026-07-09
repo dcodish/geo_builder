@@ -207,7 +207,7 @@ const ESCALATES: string[] = [
   'square ABCD with AB = 6',
   'kite ABCD with AB = 6', // a named-shape macro + an extra constraint must not half-parse
   'regular pentagon ABCDE with AB = 6',
-  'parallelogram ABCD where AB = CD',
+  // ('parallelogram ABCD where AB = CD' moved to PARSES — the ADR-264 clause fallback parses it FULLY)
   'triangle ABC with angle BAC = 37',
   'משולש ABC עם זווית BAC = 37',
   // ── an intersection whose operands are themselves new constructs (diameter/chord) ──
@@ -215,7 +215,8 @@ const ESCALATES: string[] = [
   'diameter AB and chord DE meet at point C',
   'קוטר AB ומיתר DE נפגשים בנקודה C',
   // ── shape + a second construct ──
-  'square ABCD and segment AC',
+  // ('square ABCD and segment AC' moved to clause-split.test.ts — the ADR-264 fallback parses it FULLY;
+  //  the Hebrew sibling below still escalates: the ו is glued to a Hebrew noun, not a clause separator)
   'ריבוע ABCD וקטע AC',
   'square ABCD with point E on AB',
   'משולש ABC עם נקודה D על AB',

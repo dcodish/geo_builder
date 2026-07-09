@@ -142,7 +142,14 @@ export function keepOrRefit(prev: Transform | null, next: Transform, worldPts: V
   if (!prev) return next;
   const SHRINK = 1.6; // fresh fit would zoom in this much ⇒ the figure got small — refit
   if (next.scale > prev.scale * SHRINK) return next;
-  const m = Math.min(8, vp.padding * 0.2); // content may eat the padding down to this margin before a refit
+  // Content may eat INTO the padding before a refit (that's the hysteresis that keeps existing points from
+  // jumping) — but only down to a margin that still fits a point's LABEL. A vertex carries its letter ~12 px
+  // out (`REF_OFF` in Figure.tsx) plus the glyph (~16 px), so a vertex closer than ~`LABEL_MARGIN` to the edge
+  // clips its label. Reserving that room means a canvas SHRINK refits before the apex label disappears (the
+  // "figure too large / top nodes not visible" report) instead of keeping an oversized transform. Capped at
+  // the padding so a tiny viewport still behaves.
+  const LABEL_MARGIN = 28;
+  const m = Math.min(LABEL_MARGIN, vp.padding);
   for (const p of worldPts) {
     const s = prev.toScreen(p);
     if (s.x < m || s.x > vp.width - m || s.y < m || s.y > vp.height - m) return next; // overflow — refit

@@ -317,7 +317,13 @@ describe('parser — a NAMED altitude segment honours the foot the student gave'
     ]));
   // ADR-169: a trapezoid height. C's neighbours (B,D) are a DIAGONAL, so the triangle inference can't reach
   // the opposite side; ctx.parallels (AB ∥ DC) resolves it — the foot lands on the OPPOSITE base AB.
-  const trapCtx = { points: ['A', 'B', 'C', 'D'], parallels: [[['A', 'B'], ['D', 'C']]] as [[string, string], [string, string]][] };
+  // `polygons` mirrors the real buildParseCtx (a drawn trapezoid always supplies its polygon): the bare
+  // "בטרפז" noun is a definite REFERENCE to it, which the dropped-shape-noun guard (ADR-264 Am. 1) exempts.
+  const trapCtx = {
+    points: ['A', 'B', 'C', 'D'],
+    polygons: [['A', 'B', 'C', 'D']],
+    parallels: [[['A', 'B'], ['D', 'C']]] as [[string, string], [string, string]][],
+  };
   it('"CE גובה בטרפז" → foot E on the opposite parallel base AB (not the leg AD)', () =>
     expect(cmds('CE גובה בטרפז', trapCtx)).toEqual([
       { type: 'foot', id: 'E', from: 'C', a: 'A', b: 'B' },
@@ -386,9 +392,10 @@ describe('parser — a NAMED midsegment honours its endpoint labels', () => {
 describe('parser — misparse defense (out-of-grammar must not half-parse)', () => {
   for (const u of [
     // A shape carrying a constraint is a compound the LLM should decompose — the
-    // shape rule must not silently drop the "= 6".
+    // shape rule must not silently drop the "= 6". ("parallelogram ABCD where AB = CD" used to sit
+    // here as a must-escalate; the ADR-264 clause fallback now parses it FULLY — shape + set-equal,
+    // nothing dropped — so it moved to the positive coverage in clause-split.test.ts.)
     'square ABCD with AB = 6',
-    'parallelogram ABCD where AB = CD',
     // recognised intersection keyword but unreadable sentence → stop, not "segment"
     'the diagonals intersect somewhere',
   ]) {

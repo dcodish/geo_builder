@@ -5038,6 +5038,87 @@ export function normalizeUtterance(raw: string): string {
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
   const s = normalizeUtterance(raw);
   if (!s) return { ok: false, reason: 'not-handled' };
+  const whole = runRules(s, ctx);
+  // ADR-264 Am. 1: a winning parse (or a rule's clarification) that leaves a stated shape NOUN
+  // unmaterialized means a LAX relation rule claimed its clause out of a compound and silently dropped
+  // the declaration — "משולש שווה שוקיים שבו AB=AC" committed as just segments + set-equal (no
+  // triangle!), because the label-less shape rule DEFERS (null, not 'stop') and `equalSegments`/
+  // `distanceConstraint`/`angle` match their clause anywhere in the string. One guard here covers the
+  // whole lax family at once (never per-rule; §3 chokepoint discipline): never commit the shape-less
+  // half-parse — try the clause split (the deterministic rescue: "משולש שווה שוקיים" parses bare +
+  // the given pins it), else escalate the WHOLE line.
+  if (
+    (whole.ok && (droppedShapeNoun(s, whole.commands, ctx) || droppedCirclePredicate(s, whole.commands))) ||
+    (!whole.ok && whole.reason !== 'not-handled' && droppedShapeNoun(s, [], ctx))
+  ) {
+    return splitStatements(s, ctx) ?? { ok: false, reason: 'not-handled' };
+  }
+  // A clarification (ambiguous-angle / ambiguous-circle) is a rule's genuine question — propagate it,
+  // never second-guess it with a split. Only a flat not-handled falls through to the clause fallback.
+  if (whole.ok || whole.reason !== 'not-handled') return whole;
+  return splitStatements(s, ctx) ?? whole;
+}
+
+/**
+ * A stated POLYGON noun the parsed commands never materialize (ADR-264 Am. 1) — the shape-declaration
+ * sibling of `droppedGivenRelations`. True when the utterance names a polygon kind and (a) no command
+ * creates a polygon (every polygon creator — triangle/quad/…/shape-variant/inscribe — carries a ≥3-id
+ * `ids` run), and (b) the noun is not a REFERENCE: a noun followed (or preceded, "ABC משולש") by a
+ * label run whose letters the commands or the figure already know is naming an existing/derivable
+ * triangle ("קטע האמצעים PQ לצלע BC במשולש ABC" — P,Q ride A,B,C), and a bare noun with polygons
+ * already in the figure is a definite reference ("גובה מ A במשולש"). CIRCLE nouns are deliberately
+ * excluded: a circle word in a relation utterance is a carrier/membership marker owned by the
+ * `withCarrierMembership`/`withImplicitCircles` post-passes (ADR-119), not a dropped construction.
+ */
+const POLY_NOUN =
+  /משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|מקבילית|מחומש|משושה|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|kite|parallelogram|pentagon|hexagon/gi;
+function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseContext): boolean {
+  if (commands.some((c) => Array.isArray((c as { ids?: unknown }).ids) && ((c as { ids: unknown[] }).ids.length >= 3))) return false;
+  const known = new Set([
+    ...(ctx.points ?? []).map((p) => p.toUpperCase()),
+    ...(JSON.stringify(commands).match(/[A-Z]\d*/g) ?? []),
+  ]);
+  for (const m of s.matchAll(POLY_NOUN)) {
+    const after = s.slice(m.index! + m[0].length);
+    const before = s.slice(0, m.index!);
+    const run =
+      after.match(/^(?:ים|ות)?\s+ה?((?:[A-Z]\d*\s*){3,})/)?.[1] ?? before.match(/((?:[A-Z]\d*\s*){3,})\s*$/)?.[1];
+    if (!run) {
+      if ((ctx.polygons?.length ?? 0) > 0) continue; // a bare noun with a polygon on the figure = definite reference
+      return true; // a bare shape DECLARATION nothing materialized
+    }
+    const letters = run.match(/[A-Z]\d*/g) ?? [];
+    if (!letters.every((l) => known.has(l))) return true; // names a vertex nothing accounts for
+  }
+  return false;
+}
+
+/**
+ * A TRAILING inscribe predicate — "… חוסם במעגל" / "… חסום במעגל O" / "… inscribed in a circle" — the
+ * circle sibling of `droppedShapeNoun` (ADR-264 Am. 2). The lax relation rules (equality/distance/angle,
+ * all matching their clause mid-string) claim a compound like "AB=AC חוסם במעגל" and the inscribe clause
+ * vanishes; and the `circumcircle` rule itself has no leftover guard, so the WHOLE line
+ * "משולש שווה שוקיים ABC שבו AB=AC חוסם במעגל" used to commit as a bare circumcircle, silently dropping
+ * the shape AND the stated pair. The predicate is detected by verb+circle ADJACENCY at the END of the
+ * piece (a mid-string circle word stays owned by its rules / the ADR-119 carrier post-passes — this is
+ * deliberately narrower than a word test, §2.4). Inflections: masc/fem/plural, optional ש/ה prefix.
+ */
+const CIRCLE_PRED_TAIL =
+  /(?:^|\s+)((?:[שה])?(?:חסום|חסומה|חסומים|חסומות|חוסם|חוסמת|חוסמים|חוסמות)\s+במעגל(?:\s+[A-Z]\d*)?|(?:is\s+|are\s+)?inscribed\s+in\s+(?:a\s+|the\s+)?circle(?:\s+[A-Z]\d*)?)\s*$/i;
+function droppedCirclePredicate(s: string, commands: AnyCommand[]): boolean {
+  if (!CIRCLE_PRED_TAIL.test(s)) return false;
+  // Accounted when ANY command touches a circle (creates one, places a point on one, asserts
+  // concyclicity…) — the ADR-156 idempotent re-inscribe (which returns only the polygon because the
+  // vertices are ALREADY on the circle) is re-derived identically by the clause split, so a trip there
+  // is harmless (same commands, deterministic ids).
+  return !commands.some(
+    (c) => /circle|concyclic/i.test(c.type) || 'circle' in (c as object) || 'center' in (c as object),
+  );
+}
+
+/** The first-match-wins pass over `RULES` for ONE statement — the body `parse` always ran; extracted so
+ *  the clause fallback (ADR-264) can parse each piece without re-entering the fallback itself. */
+function runRules(s: string, ctx: ParseContext): ParseResult {
   for (const rule of RULES) {
     const res = rule(s, ctx);
     if (res === 'stop') break; // recognised but unreadable — escalate, don't half-parse
@@ -5054,6 +5135,106 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
     return { ok: false, reason: 'ambiguous-circle', center: res.center };
   }
   return { ok: false, reason: 'not-handled' };
+}
+
+/**
+ * LAST-RESORT clause fallback (ADR-264): a compound utterance mixing a CONSTRUCTION with its property
+ * givens — "דלתון ABCD, AB=AD", "משולש ABC הוא שווה שוקיים, כלומר AC=BC", "ABCD דלתון - AB=AD ו BC=DC" —
+ * the textbook's appositive form for DEFINING a named shape by its equal pair. `multiStatement` (an early
+ * rule) deliberately requires EVERY piece to carry a relation operator, so the shape piece falls through,
+ * the shape rule 'stop's on the leftover clause, and the whole line escalated to the LLM — whose
+ * decomposition could silently DROP the stated pair: its labels all already appear on the shape, so the
+ * new-label (ADR-089) and number (ADR-250) honesty gates never fire (`droppedGivenRelations` is the gate
+ * twin of this fix). Splits on the `multiStatement` separators PLUS the apposition connectives
+ * (כלומר/שבו/כאשר, a spaced dash, En "that is"/"i.e."/"where"/"in which"/"meaning"/"namely"), and parses
+ * each piece ALL-OR-NOTHING with the context AUGMENTED by what earlier pieces introduced (points,
+ * polygons, circle centres, segment neighbors) — so "מרובע ABCD, מעגל חסום במרובע" binds to THE quad and
+ * "משולש ABC, זווית B = 90" resolves the single-vertex angle. Clause semantics = the same statements
+ * typed on separate lines (the LLM-decomposition contract, now deterministic). Safety: it runs only after
+ * every whole-utterance rule failed (never shadows a rule that owns a comma/connective compound), any
+ * unreadable piece → null (the LLM keeps the case exactly as today), and a bare-label piece ("F, G, H on
+ * AB, AC, CB" list fragments) rejects the split outright.
+ */
+const APPOSITION_SEP = new RegExp(
+  String.raw`\s*[,;]\s*|\s+(?:וגם|\band\b)\s+|\s+ו(?:-|\s+|(?=[A-Z]))\s*|\s+(?:כלומר|שבו|כאשר|that\s+is|i\.e\.|in\s+which|meaning|namely|where)\s+|\s+[-–—]\s+`,
+  'gi',
+);
+/** A piece that is only labels (with an optional point-word) — a LIST fragment, never a statement. */
+const BARE_LABEL_PIECE = /^(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?[A-Z]\d*(?:\s+[A-Z]\d*)*$/;
+function splitStatements(s: string, ctx: ParseContext): ParseResult | null {
+  const parts = s.split(APPOSITION_SEP).map((p) => p.trim()).filter(Boolean);
+  // A single part is splittable only when it carries a detachable inscribe tail (ADR-264 Am. 2) —
+  // e.g. the whole-line "AB=AC חוסם במעגל" a lax rule would otherwise claim minus the inscribe.
+  if (parts.length < 2 && !CIRCLE_PRED_TAIL.test(s)) return null;
+  if (parts.some((p) => BARE_LABEL_PIECE.test(p))) return null; // a label-list construction — not clauses
+  let cur = ctx;
+  const all: AnyCommand[] = [];
+  // ONE clause, all-or-nothing: a clean rule win commits; a piece a lax rule half-claims (dropped shape
+  // noun — ADR-264 Am. 1 — or a dropped trailing inscribe predicate — Am. 2) gets ONE rescue: detach the
+  // inscribe tail, parse the head as its own clause, and give the subject-less predicate its subject —
+  // THE unique polygon the clause context knows (the ADR-245 definite-reference pattern, verb edition:
+  // "AB=AC חוסם במעגל" after "משולש שווה שוקיים ABC" ⇒ pair + "ABC חוסם במעגל" ⇒ the circumcircle).
+  // Ambiguity (zero or several polygons) → null → the whole line escalates honestly, never a guess.
+  const parseClause = (p: string, c0: ParseContext): AnyCommand[] | null => {
+    const r = runRules(p, c0);
+    if (r.ok && !droppedShapeNoun(p, r.commands, c0) && !droppedCirclePredicate(p, r.commands)) return r.commands;
+    const m = p.match(CIRCLE_PRED_TAIL);
+    if (!m) return null;
+    const head = p.slice(0, m.index).trim();
+    const out: AnyCommand[] = [];
+    let c1 = c0;
+    if (head) {
+      if (BARE_LABEL_PIECE.test(head)) return null; // a label list is no statement — nothing to inscribe
+      const rh = runRules(head, c1);
+      if (!rh.ok || droppedShapeNoun(head, rh.commands, c1) || droppedCirclePredicate(head, rh.commands)) return null;
+      out.push(...rh.commands);
+      c1 = augmentParseCtx(c1, rh.commands);
+    }
+    // Unique BY CONTENT — the head clause re-declaring the figure's own polygon (augmentParseCtx appends
+    // it again) is still ONE subject; two genuinely different polygons stay an honest refusal.
+    const polys = [...new Map((c1.polygons ?? []).map((v) => [v.join(''), v])).values()];
+    if (polys.length !== 1) return null; // no unique subject for the bare predicate — defer to the LLM
+    const rp = runRules(`${polys[0].join('')} ${m[1]}`, c1);
+    if (!rp.ok) return null;
+    out.push(...rp.commands);
+    return out;
+  };
+  for (const p of parts) {
+    const cmds = parseClause(p, cur);
+    // ALL-OR-NOTHING — any unreadable piece → whole line escalates (never half-parse).
+    if (!cmds) return null;
+    all.push(...cmds);
+    cur = augmentParseCtx(cur, cmds);
+  }
+  return { ok: true, commands: all };
+}
+
+/** Thread what earlier clauses INTRODUCED into the next clause's context (the clause-fallback sibling of
+ *  `buildParseCtx`, which reads a replayed figure the batch doesn't have yet): every label the commands
+ *  reference joins `points`; a ≥3-vertex ids run joins `polygons` + ring `neighbors`; a segment joins
+ *  `neighbors`; a `center` field joins `circles`. Copy-on-write — the caller's context is never mutated. */
+function augmentParseCtx(ctx: ParseContext, cmds: AnyCommand[]): ParseContext {
+  const points = new Set(ctx.points ?? []);
+  for (const l of JSON.stringify(cmds).match(/[A-Z]\d*/g) ?? []) points.add(l);
+  const polygons = [...(ctx.polygons ?? [])];
+  const circles = new Set(ctx.circles ?? []);
+  const neighbors: Record<string, string[]> = { ...(ctx.neighbors ?? {}) };
+  const link = (a: string, b: string) => {
+    neighbors[a] = [...(neighbors[a] ?? [])];
+    if (!neighbors[a].includes(b)) neighbors[a].push(b);
+    neighbors[b] = [...(neighbors[b] ?? [])];
+    if (!neighbors[b].includes(a)) neighbors[b].push(a);
+  };
+  for (const c of cmds as Array<Record<string, unknown>>) {
+    const ids = c.ids;
+    if (Array.isArray(ids) && ids.length >= 3 && ids.every((x) => typeof x === 'string')) {
+      polygons.push(ids as string[]);
+      for (let i = 0; i < ids.length; i++) link(ids[i] as string, ids[(i + 1) % ids.length] as string);
+    }
+    if (c.type === 'segment' && typeof c.a === 'string' && typeof c.b === 'string') link(c.a, c.b);
+    if (typeof c.center === 'string') circles.add(c.center);
+  }
+  return { ...ctx, points: [...points], polygons, circles: [...circles], neighbors };
 }
 
 /**
@@ -5079,6 +5260,43 @@ export function droppedNewLabels(utterance: string, commands: AnyCommand[], exis
   const s = normalizeUtterance(utterance).replace(/(?<![A-Za-z])S(?=(?:[A-Z]\d*){3,4}(?![A-Za-z\d]))/g, ' ');
   const inputLabels = [...new Set(s.match(/[A-Z]\d*/g) ?? [])];
   return inputLabels.filter((L) => !have.has(L) && !used.has(L));
+}
+
+/**
+ * Symbol-form RELATION givens (`AB=CD`, `AB⊥CD`, `AB∥CD` — exactly two labels each side) that the parsed
+ * commands do NOT carry — the third honesty gate, sibling of `droppedNewLabels` (ADR-089) and
+ * `droppedGivenNumbers` (ADR-250). The hole it closes (ADR-264): a stated equality between points that
+ * all ALREADY appear on the shape ("משולש ABC … כלומר AC=BC" where the LLM decomposition dropped the
+ * clause) trips NEITHER older gate — no new label, no number — so a figure missing the student's given
+ * committed silently as success. A relation is ACCOUNTED when (a) some single `set-*` constraint command
+ * references every label of the relation, or (b) one of the relation's labels is INTRODUCED by a
+ * point-definition command (`id` field) — the "K על המשך AB כך ש AB=BK" class, where the relation is
+ * baked into the point's definition (t = 2) and no separate constraint command exists. A bare shape
+ * command deliberately does NOT account (a kite enforces its default pair, but the student's *stated*
+ * pair must land as an explicit constraint — the ADR-234 pin). Conservative on purpose: word-form
+ * relations (מקביל/מאונך) belong to rule-owned compounds whose lowering is already leftover-guarded.
+ */
+export function droppedGivenRelations(utterance: string, commands: AnyCommand[]): string[] {
+  const s = normalizeUtterance(utterance);
+  const rel = /(?<![A-Za-z\d])([A-Z]\d*)([A-Z]\d*)\s*(=|⊥|⟂|∥)\s*([A-Z]\d*)([A-Z]\d*)(?![A-Za-z\d])/g;
+  const perCommand = commands.map((c) => ({
+    isConstraint: typeof (c as { type?: unknown }).type === 'string' && (c as { type: string }).type.startsWith('set-'),
+    labels: new Set(JSON.stringify(c).match(/[A-Z]\d*/g) ?? []),
+  }));
+  const introduced = new Set(
+    commands
+      .map((c) => (c as { id?: unknown }).id)
+      .filter((x): x is string => typeof x === 'string' && /^[A-Z]\d*$/.test(x)),
+  );
+  const dropped: string[] = [];
+  for (const m of s.matchAll(rel)) {
+    const labels = [...new Set([m[1], m[2], m[4], m[5]])];
+    const accounted =
+      labels.some((l) => introduced.has(l)) ||
+      perCommand.some((c) => c.isConstraint && labels.every((l) => c.labels.has(l)));
+    if (!accounted) dropped.push(m[0].replace(/\s+/g, ' ').trim());
+  }
+  return [...new Set(dropped)];
 }
 
 /**
