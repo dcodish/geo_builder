@@ -381,3 +381,22 @@ Gate: 2022-נבצרים builds to the closed form (**t = ¼, |DD′| = 2**, DF �
 **Details.** The Hebrew stem is `טטרא`/`טטרה` (alef or hei) — `/טטר[אה]ה?דר(?:ון)?/` covers `טטראדר`/`טטראהדרון`/`טטרהדרון`; English `/\btetrahedr(?:on)?\b/i`. The `right` recogniser widened `/ישרה/`→`/ישרה?/` so the masculine `ישר` (agreeing with masculine `טטראדר`) also reads as right, the feminine `ישרה` (with `פירמידה`) unchanged.
 
 **Locked by** `tetrahedron.test.ts` (labelled/bare/right/5-label-refusal + end-to-end build, He+En, spelling variants) + a catalog entry (guard test asserts both locales parse). **456 src3d tests green, `tsc -b` + `vite build:3d` clean.**
+
+---
+
+## ADR-3D-025 — V8-g: the 2-D vector lane (z=0) — flat free-point polygons (2026-07-08)
+
+**Context (S1).** Two 572 exams pose PURE PLANE-vector problems on free-point polygons the tool could not build (there was no construct below a solid): 2010-קיץ Q2 (a quadrilateral MKNL + a pentagon ABCDE whose sides' midpoints are MKNL; the identities `QP = ½(KM+LN)`, `QP ∥ EA`, `|QP| = ¼|EA|`) and 2014-קיץ-ב (a triangle with an altitude foot + a cevian, vectors expressed over a basis). Doc-21's scope decision S1: handle these as a **degenerate z=0 lane**.
+
+**Decision — a FLAT polygon is modelled as a "solid" whose dims are its free vertex coordinates.** New `SolidKind`s `polygon3`/`polygon4`/`polygon5` (triangle/quad/pentagon in the z=0 plane): `v0=(0,0,0)`, `v1=(1,0,0)` fix the gauge, the remaining vertices ride the free dims (`2(N−2)` of them: triangle 2, quad 4, pentagon 6 — exactly the shape DOF up to similarity), sampled in convex position. This **reuses every existing mechanism with zero new solver code**:
+- the FREE case (2010-Q2) — no givens → the dims sampler places a general polygon; the vector identities are pure AFFINE facts (I verified `QP = P−Q = ¼(A−E) = ¼·EA` for any pentagon) so they VERIFY multi-sample (`vec-eq`/`lines-rel`-parallel/`length-rel` claims — all already built); "show another configuration" varies the shape;
+- the DRIVEN case (2014-קיץ-ב SAS: `|CA|=1, |CB|=2, cos∠ACB=¾`) — the metric givens are the V8-f/T2 scalar pins, and the existing PIVOT solves the polygon's vertex-dims against them (a length pin anchors scale via the gauge; a cos pin is invariant). No special path.
+- **Double-sided faces** (the ring + its reverse) so that from any viewpoint one face is front-facing → a flat figure never renders fully dashed, while `faces[0]` still resolves `diag-intersection`'s "the base" sentinel.
+
+Also a **triangle-altitude foot** (`foot-seg` point + the `altitude-foot` command): `גובה המשולש לצלע AB הוא CD` / `CD is the altitude to AB` → D = foot of the ⟂ from the apex onto the side (reuses `footOnLine`; the command draws its own segment, so the parser emits NO premature `segment3` referencing the not-yet-created foot — the class bug the gate caught). Cevians ride the existing on-segment/ratio point.
+
+Parser: `planarPolygon` (bare `משולש`/`מרובע`/`מחומש` + En, guarded against the prism/pyramid words and placed AFTER the שטח/מפגש/area consumers of those nouns) + `altitudeFoot`. Catalog +4.
+
+**Deferred (documented):** a flat z=0 polygon renders in the horizontal plane, so at the ¾ home view it reads foreshortened (the camera frame degenerates at a true top-down pitch of ±90°); a **face-on default view for purely-planar figures** is a renderer follow-up (the engine + vector math are exact — the gate tests coordinates). The full 2014-קיץ-ב numeric chain (the specific value of t from the metric givens) rides the driven triangle; only its structural vector expressions are gated here.
+
+**Locked by** `v8g-planar-polygons.test.ts` (parse He+En incl. the no-steal guards; 2010-Q2 part א `QP=½(KM+LN)` on a free quad, part ב `QP∥EA` + `|QP|=¼|EA|` on the pentagon with an independent oracle `QP=¼·EA`; the altitude foot lands on AB with CD⟂AB; a cevian at CE:EB=3:5; and the SAS givens DRIVE the free triangle to `|CA|=1,|CB|=2,cos=¾`). **463 src3d tests green, `tsc -b` + `vite build:3d` clean.**

@@ -6,10 +6,17 @@
 import { exprPointIds, exprVectorNames } from './vecExpr';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, SolidCommand, SolidObj } from './types';
 
-const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5 };
+const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5 };
+
+/** The N vertex indices of a flat polygon kind, or null. */
+function polygonN(kind: SolidCommand['kind']): number | null {
+  return kind === 'polygon3' ? 3 : kind === 'polygon4' ? 4 : kind === 'polygon5' ? 5 : null;
+}
 
 /** Edge index pairs per solid kind (indices into `ids`). */
 function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
+  const pn = polygonN(kind);
+  if (pn) return Array.from({ length: pn }, (_, i) => [i, (i + 1) % pn] as [number, number]); // the boundary cycle
   if (kind === 'prism3' || kind === 'prism3e') {
     return [
       [0, 1], [1, 2], [2, 0], // base ring
@@ -46,6 +53,14 @@ function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
 
 /** Face index rings per solid kind. Orientation is irrelevant — the renderer re-orients outward numerically. */
 function faceIndices(kind: SolidCommand['kind']): number[][] {
+  const pn = polygonN(kind);
+  if (pn) {
+    // a flat polygon is DOUBLE-SIDED (the ring + its reverse) so that from any viewpoint one
+    // face is front-facing → its edges never dash (a 2-D figure is drawn fully solid); faces[0]
+    // is still the ring so `diag-intersection`'s "the base" sentinel resolves.
+    const ring = Array.from({ length: pn }, (_, i) => i);
+    return [ring, [...ring].reverse()];
+  }
   if (kind === 'prism3' || kind === 'prism3e') {
     return [
       [0, 1, 2], // base
@@ -121,7 +136,7 @@ function relPointIds(c: Construction3, from: Id, to: Id, terms: { atom: import('
 }
 
 /** How many FREE dims the figure's solids carry (a scalar statement on such a figure is a GIVEN, not a check). */
-const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2, pyramid4g: 3, pyramid4r: 2, pyramid4gr: 4, prism3e: 1, pyramid3e: 1, pyramidPar: 5 };
+const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2, pyramid4g: 3, pyramid4r: 2, pyramid4gr: 4, prism3e: 1, pyramid3e: 1, pyramidPar: 5, polygon3: 2, polygon4: 4, polygon5: 6 };
 function freeDims(c: Construction3): number {
   let n = 0;
   for (const s of c.solids) n += DIM_COUNT[s.kind];
@@ -801,6 +816,17 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       const next = clone(c);
       next.points.set(cmd.id, { kind: 'bisector-seg', a: cmd.a, b: cmd.b, apex: cmd.apex });
       if (!hasSegment(next, cmd.apex, cmd.id)) next.segments.push([cmd.apex, cmd.id]); // draw OD
+      return { ok: true, next };
+    }
+
+    // V8-g: the foot of a triangle altitude — D = foot of ⟂ from vertex `from` onto side a–b.
+    case 'altitude-foot': {
+      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      const missing = missingPoint(c, [cmd.from, cmd.a, cmd.b]);
+      if (missing) return { ok: false, error: missing };
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'foot-seg', from: cmd.from, a: cmd.a, b: cmd.b });
+      if (!hasSegment(next, cmd.from, cmd.id)) next.segments.push([cmd.from, cmd.id]); // draw the altitude
       return { ok: true, next };
     }
 

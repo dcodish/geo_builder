@@ -59,6 +59,20 @@ export function solidDims(kind: SolidKind, key: string, seed: number): number[] 
       sample(seed, `${key}-dx`, -0.4, 0.4), sample(seed, `${key}-dy`, 0.5, 1.0),
       sample(seed, `${key}-ax`, 0.2, 0.8), sample(seed, `${key}-ay`, 0.2, 0.8), sample(seed, `${key}-az`, 0.8, 1.6),
     ];
+  // V8-g: a FLAT polygon (z=0) — v0=(0,0), v1=(1,0) fix the gauge, the rest are free 2-D
+  // coords sampled in convex position (a general non-degenerate polygon that "show another" varies).
+  if (kind === 'polygon3') return [sample(seed, `${key}-x2`, 0.2, 0.8), sample(seed, `${key}-y2`, 0.6, 1.1)];
+  if (kind === 'polygon4')
+    return [
+      sample(seed, `${key}-x2`, 0.9, 1.35), sample(seed, `${key}-y2`, 0.5, 1.0),
+      sample(seed, `${key}-x3`, -0.35, 0.4), sample(seed, `${key}-y3`, 0.5, 1.0),
+    ];
+  if (kind === 'polygon5')
+    return [
+      sample(seed, `${key}-x2`, 1.0, 1.35), sample(seed, `${key}-y2`, 0.35, 0.8),
+      sample(seed, `${key}-x3`, 0.3, 0.7), sample(seed, `${key}-y3`, 0.95, 1.3),
+      sample(seed, `${key}-x4`, -0.35, 0.2), sample(seed, `${key}-y4`, 0.35, 0.8),
+    ];
   return [rad(sample(seed, `${key}-alpha`, 38, 72)), rad(sample(seed, `${key}-beta`, 38, 72)), sample(seed, `${key}-height`, 0.65, 1.5)];
 }
 
@@ -177,6 +191,12 @@ function solidPositions(kind: SolidKind, dims: number[], origin: Vec3): Vec3[] {
       v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1 + dx, o.y + dy, o.z), v3(o.x + dx, o.y + dy, o.z),
       v3(o.x + ax, o.y + ay, o.z + az),
     ];
+  }
+  if (kind === 'polygon3' || kind === 'polygon4' || kind === 'polygon5') {
+    // a FLAT polygon (z=0): v0=(0,0), v1=(1,0) fix the gauge, the rest ride the free dims
+    const pts = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z)];
+    for (let i = 0; i < dims.length; i += 2) pts.push(v3(o.x + dims[i], o.y + dims[i + 1], o.z));
+    return pts;
   }
   // prism3 — right triangular prism: base ABC in the z=origin plane, tops straight up.
   const [alpha, beta, h] = dims;
@@ -583,7 +603,7 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 }
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'foot-seg']);
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number): Resolved3 {
@@ -926,6 +946,12 @@ function evaluateSolidsAndPoints(
         }
         pos.set(id, lerp3(A, B, (lo + hi) / 2));
       }
+    } else if (def.kind === 'foot-seg') {
+      // V8-g: a triangle altitude's foot — ⟂ from `from` onto the line through a,b
+      const from = pos.get(def.from);
+      const A = pos.get(def.a);
+      const B = pos.get(def.b);
+      if (from && A && B) pos.set(id, footOnLine(from, { anchor: A, dir: sub3(B, A) }));
     } else if (def.kind === 'foot-face') {
       // V8-e (G5): the height's foot — ⟂ from `from` onto the plane through the face pts
       const from = pos.get(def.from);

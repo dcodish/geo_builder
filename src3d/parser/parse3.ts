@@ -1344,6 +1344,47 @@ const planeCut: Rule = (s) => {
   return null;
 };
 
+/**
+ * V8-g: a FLAT polygon of free points in the plane (the 2-D vector lane) — `משולש ABC`
+ * (triangle), `מרובע MKNL` (quadrilateral), `מחומש ABCDE` (pentagon). Excludes the 3-D
+ * solid words (a prism/pyramid rule owns those). Label-less ⇒ default lettering.
+ */
+const planarPolygon: Rule = (s) => {
+  if (/מנסרה|פירמידה|\bprism\b|\bpyramid\b/i.test(s)) return null;
+  const kind: 'polygon3' | 'polygon4' | 'polygon5' | null =
+    /משולש/.test(s) || /\btriangle\b/i.test(s) ? 'polygon3' :
+    /מרובע/.test(s) || /\b(quadrilateral|quad)\b/i.test(s) ? 'polygon4' :
+    /מחומש/.test(s) || /\bpentagon\b/i.test(s) ? 'polygon5' : null;
+  if (!kind) return null;
+  const n = kind === 'polygon3' ? 3 : kind === 'polygon4' ? 4 : 5;
+  const toks = firstLabelRun(s);
+  if (toks.length === n) return [{ type: 'solid', kind, ids: toks }];
+  if (toks.length === 0) return [{ type: 'solid', kind, ids: ['A', 'B', 'C', 'D', 'E'].slice(0, n) }];
+  return null;
+};
+
+/**
+ * V8-g: a triangle altitude — `גובה המשולש לצלע AB הוא CD` / `CD גובה לצלע AB` /
+ * `CD is the altitude to AB`. D = foot of the ⟂ from the apex (CD's first letter) onto side AB.
+ */
+const altitudeFoot: Rule = (s) => {
+  if (!/גובה|altitude/i.test(s)) return null;
+  if (/פירמידה|\bpyramid\b|פאה|\bface\b/i.test(s)) return null; // the 3-D height rule owns those
+  const L = String.raw`([A-Z]\d*'?)`;
+  const SIDE = String.raw`(?:ל|אל\s+)?(?:ה?צלע\s+)?`;
+  // the altitude-foot command creates the foot AND draws the segment — never emit a segment3
+  // first (it would reference the not-yet-created foot). apex = the altitude's first letter.
+  let m = s.match(new RegExp(`גובה\\s+(?:ה?משולש\\s+)?${SIDE}${L}${L}\\s+(?:הוא|היא)\\s+${L}${L}`)); // ...לצלע AB הוא CD
+  if (m) return [{ type: 'altitude-foot', id: m[4], from: m[3], a: m[1], b: m[2] }];
+  m = s.match(new RegExp(`${L}${L}\\s+(?:הוא\\s+|היא\\s+)?גובה\\s+(?:ה?משולש\\s+)?${SIDE}${L}${L}`)); // CD גובה לצלע AB
+  if (m) return [{ type: 'altitude-foot', id: m[2], from: m[1], a: m[3], b: m[4] }];
+  m = s.match(new RegExp(`${L}${L}\\s+is\\s+the\\s+altitude\\s+(?:to|onto)\\s+(?:side\\s+)?${L}${L}`, 'i')); // CD is the altitude to AB
+  if (m) return [{ type: 'altitude-foot', id: m[2], from: m[1], a: m[3], b: m[4] }];
+  m = s.match(new RegExp(`the\\s+altitude\\s+(?:to|onto)\\s+(?:side\\s+)?${L}${L}\\s+is\\s+${L}${L}`, 'i')); // the altitude to AB is CD
+  if (m) return [{ type: 'altitude-foot', id: m[4], from: m[3], a: m[1], b: m[2] }];
+  return null;
+};
+
 const RULES: Rule[] = [
   cubeOrBox,
   rhombusPrism,
@@ -1403,7 +1444,9 @@ const RULES: Rule[] = [
   lengthRatioClaim,
   areaClaim,
   lengthClaim,
+  altitudeFoot, // V8-g: `גובה ... לצלע AB הוא CD` — before heightOfSolid (which owns 3-D heights)
   heightOfSolid,
+  planarPolygon, // V8-g: bare `משולש/מרובע/מחומש` — after the שטח/מפגש/prism/pyramid consumers of those nouns
   bareSegment,
 ];
 

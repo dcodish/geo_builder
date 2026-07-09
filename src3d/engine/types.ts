@@ -139,7 +139,12 @@ export type RelPlaneDef =
 export type SolidKind =
   | 'cube' | 'box' | 'prism3' | 'pyramid4' | 'pyramid3' | 'tetra' | 'prism4r' | 'pyramid4g' | 'pyramid4r' | 'pyramid4gr'
   // V8-d: equilateral-triangle-base right prism/pyramid, and a free-apex parallelogram-base pyramid
-  | 'prism3e' | 'pyramid3e' | 'pyramidPar';
+  | 'prism3e' | 'pyramid3e' | 'pyramidPar'
+  // V8-g: a FLAT polygon of free points in the z=0 plane (the 2-D vector lane) — triangle /
+  // quadrilateral / pentagon. Modelled as a "solid" so it reuses the dims-sampler + the
+  // pivot (free case → sampled shape; metric givens → the pivot drives it); double-sided
+  // (two opposite faces) so a flat figure never renders fully hidden.
+  | 'polygon3' | 'polygon4' | 'polygon5';
 // The 4-base pyramid family: rightness (ישרה — apex above the base centre) and base shape
 // are INDEPENDENT stated givens (ADR-052). Square must be STATED (שבסיסה ריבוע); an
 // unstated base is a free-aspect rectangle DOF. pyramid4: right+square (dims [h]);
@@ -465,7 +470,9 @@ export type Command3 =
   // V8-f (G10): `base` makes EQUAL ANGLES with `a` and `b` — `AE יוצר זוויות שוות עם AB ו-AD`.
   | { type: 'angle-eq'; base: VecAtom; a: VecAtom; b: VecAtom }
   // V8-f (G11): `D על AC כך ש-OD חוצה-זווית AOC` — D on segment a–b, ray apex→D bisects ∠(a)(apex)(b).
-  | { type: 'bisector-point'; id: Id; a: Id; b: Id; apex: Id };
+  | { type: 'bisector-point'; id: Id; a: Id; b: Id; apex: Id }
+  // V8-g: `גובה המשולש לצלע AB הוא CD` — D = foot of the ⟂ from vertex `from` onto side a–b.
+  | { type: 'altitude-foot'; id: Id; from: Id; a: Id; b: Id };
 
 // ---------------------------------------------------------------------------
 // Construction (what apply builds, what evaluate consumes)
@@ -495,6 +502,8 @@ export type PointDef =
   | { kind: 'foot-face'; from: Id; face: Id[] } // V8-e (G5): foot of ⟂ from a vertex onto a face's plane
   // V8-f (G11): D on segment a–b, its t root-found so ray apex→D bisects ∠(a)(apex)(b)
   | { kind: 'bisector-seg'; a: Id; b: Id; apex: Id }
+  // V8-g: the foot of the ⟂ from `from` onto the line through a,b (a triangle altitude's foot)
+  | { kind: 'foot-seg'; from: Id; a: Id; b: Id }
   | { kind: 'rev-point'; rev: number; role: 'center' | 'apex' }
   | { kind: 'vec-defined'; def: number } // solved from construction.vecDefs[def]
   | { kind: 'vec-pair'; def1: number; def2: number }; // the cevian intersection (two symbol relations)
