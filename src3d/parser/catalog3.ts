@@ -108,6 +108,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'claims', he: "הזווית בין הישר AC' לבין המישור ABCD היא 30", en: "the angle between line AC' and plane ABCD is 30" },
   { category: 'planesLines', he: 'הישר d מאונך לישר AB ולישר CD', en: 'd is the common perpendicular of AB and CD' },
   { category: 'planesLines', he: 'BE היטל הישר TB על המישור ABCD', en: 'BE is the projection of line TB onto plane ABCD' },
+  { category: 'solids', he: 'מעגל A משיק לישר BC בנקודה F', en: 'circle A tangent to line BC at F' },
+  { category: 'points', he: 'D על המעגל', en: 'D is on the circle' },
   // --- drawing ---
   { category: 'drawing', he: "קטע CA'", en: "segment CA'" },
 ];

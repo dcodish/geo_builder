@@ -193,6 +193,19 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
           status[f.id] = { code: 'not-on-line', id: cmd.id };
           break;
         }
+      } else if (cmd.type === 'point-on-circle3') {
+        // V8-i: on the circle ⟺ |P−centre| = radius AND P lies in the circle's plane
+        const p = positions.get(cmd.point);
+        const k = cmd.circle === '' ? resolved.circles3[0] : resolved.circles3.find((x) => x.id === cmd.circle);
+        const holds =
+          p !== undefined &&
+          k !== undefined &&
+          Math.abs(norm3(sub3(p, k.center)) - k.radius) <= 1e-5 * Math.max(k.radius, 1) &&
+          Math.abs(dot3(sub3(p, k.center), k.normal)) <= 1e-5 * Math.max(k.radius, 1);
+        if (!holds) {
+          status[f.id] = { code: 'not-on-line', id: cmd.point };
+          break;
+        }
       } else if (cmd.type === 'inject-vector' || (cmd.type === 'point3' && c.pins.some((p) => p.id === cmd.id))) {
         // an injection with NO satisfying placement — the pivot found nothing (honest refusal)
         if (resolved.pivot && resolved.pivot.solutions === 0) {

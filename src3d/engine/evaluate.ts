@@ -232,6 +232,8 @@ export interface Resolved3 {
   pivot: { solutions: number; chosen: number; err: number } | null;
   /** V6 — resolved solids of revolution (world centre/apex + numeric radius/height) for the renderer. */
   revolutions: { kind: 'cylinder' | 'cone' | 'sphere'; center: Vec3; apex?: Vec3; r: number; h: number }[];
+  /** V8-i — resolved circles in R³ (world centre + unit normal + radius + in-plane basis) for the renderer + on-circle checks. */
+  circles3: { id: string; center: Vec3; normal: Vec3; radius: number; e1: Vec3; e2: Vec3 }[];
 }
 
 const linVal = (e: LinExpr, a: number): number => e.k + e.p * a;
@@ -766,6 +768,45 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     return { kind: rev.kind, center: (rev.center && pos.get(rev.center)) || origin, apex: rev.apex ? pos.get(rev.apex) : undefined, r, h };
   });
 
+  // ---- V8-i: circles in R³, resolved from the final positions/lines/planes. Also exposes each
+  // circle's PLANE (under its id) so a line can intersect it.
+  const circles3: Resolved3['circles3'] = [];
+  for (const k of c.circles3) {
+    const center = pos.get(k.def.center);
+    if (!center) continue;
+    let normal: Vec3, radius: number, e1: Vec3, e2: Vec3;
+    if (k.def.kind === 'tangent-line') {
+      const ln = lines.get(k.def.line);
+      if (!ln) continue;
+      const foot = footOnLine(center, ln); // the tangent point (radius ⟂ line)
+      const radial = sub3(foot, center);
+      radius = norm3(radial);
+      if (radius < 1e-9 || norm3(ln.dir) < 1e-9) continue; // centre on the line → degenerate
+      e1 = normalize3(radial);
+      e2 = normalize3(sub3(ln.dir, scale3(e1, dot3(ln.dir, e1)))); // tangent dir, orthonormalised
+      normal = normalize3(cross3(e1, e2));
+    } else {
+      const pl = planes.get(k.def.plane) ?? planeFromPointRun(c, k.def.plane, pos);
+      if (!pl) continue;
+      normal = normalize3(pl.n);
+      const seed0 = Math.abs(normal.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
+      e1 = normalize3(cross3(normal, seed0));
+      e2 = cross3(normal, e1);
+      radius = k.def.radius;
+    }
+    circles3.push({ id: k.id, center, normal, radius, e1, e2 });
+    planes.set(k.id, { n: normal, d: -dot3(normal, center) }); // the circle's plane, for line∩plane
+  }
+
+  // ---- a FINAL fill for foot-line points whose named line only resolved late (a through-line
+  // like a circle's tangent line) — the point loop ran before that line was in the `lines` map
+  for (const [id, def] of c.points) {
+    if (def.kind !== 'foot-line' || pos.has(id)) continue;
+    const from = pos.get(def.from);
+    const line = lines.get(def.line);
+    if (from && line) pos.set(id, footOnLine(from, line));
+  }
+
   return {
     positions: pos,
     planes,
@@ -773,6 +814,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     param: c.param && param ? { name: c.param, value: param.value, roots: param.roots } : null,
     pivot,
     revolutions,
+    circles3,
   };
 }
 

@@ -415,6 +415,8 @@ Parser: `planarPolygon` (bare `משולש`/`מרובע`/`מחומש` + En, guard
 
 **Locked by** `triage-fixes.test.ts` (the exact prod utterances: parse + build — median D at mid-AB, tetra altitude DE⟂face ABC, bare sphere with a FREE radius; the half-read refusal; regressions on the colon plane-eq + point-run plane). Catalog +5. **488 src3d tests green, `tsc -b` + `vite build:3d` clean.** _(The line↔plane angle `זווית בין הישר AC' לבין המישור ABCD` is planned separately per the operator.)_
 
+**Am. (2026-07-09, operator report — תיבה + `מישור A'B'C'D' הוא x-4y-8z-142=0` not recognized).** The plane-eq phrasing family (item 5) missed two forms, in BOTH plane-equation rules: the bare **`מישור`** (no definite ה — `planeThroughBare` already accepted `ה?מישור`, the equation rules didn't) and the copula **`הוא`/`is`** as the name↔equation separator. `planeEqClaim` (point-run planes) demanded exactly `המישור … : …`; `planeByEquation` (π-named) likewise lacked both. Fixed as a class in the two rules: prefix `ה?מישור`/`(the )plane`, separator `:` **or** `הוא`/`is` (still gated by the strict all-or-nothing `parseLinearEq`, so a point-run plane with no `=` is never stolen — verified: the loosened `planeByEquation` sees the utterance first, fails `parseLinearEq` on the point-run, and falls through to `planeEqClaim`). End-to-end on a תיבה: with injected coords the claim verifies (copula form), a wrong equation refuses `claim-refuted`; on a coordinate-FREE box it refuses `claim-refuted` (plane-eq is verify-only per ADR-3D-007 — whether it should also DRIVE as a given on an under-determined figure, the ADR-3D-027 M1 shape, is an open operator call). Locked by `parse3-v4.test.ts` (the exact reported utterance He+En) + `parse3-v2.test.ts` (copula on a π-name).
+
 ---
 
 ## ADR-3D-027 — the angle between a LINE and a PLANE (2026-07-09)
@@ -445,3 +447,19 @@ Parser `commonPerp` (`הישר d מאונך לישר AB ולישר CD` / `d is t
 **Deferred (documented):** the exact PARAMETRIC ℓ/ℓ' forms of 2010-Q3 (two named parametric lines) wait on a **multi-line-naming** rework — the current single-`ℓ` model (`LINE_NAME = /[ℓl]/`, 9 rules hard-code `name:'ℓ'`) can hold only one named parametric line. V8-h delivers the two constructs on through-line inputs (a cube's skew edges, a slanted edge's projection); the parametric reproduction is a bounded follow-up.
 
 **Locked by** `v8h-lines.test.ts` (parse He+En; on a cube: `d ⟂ AB` and `⟂ A'D'` to 1e-9; the projection of the space diagonal AC′ onto the base lies IN the base plane and is the base diagonal AC). Catalog +2. **501 src3d tests green, `tsc -b` + `vite build:3d` clean.**
+
+---
+
+## ADR-3D-029 — V8-i: a circle lying in a plane in R³, tangent to a line (2026-07-09)
+
+**Context (G13).** 2016-קיץ-ב Q2: a circle centred at O, lying in a plane π, **tangent to a line ℓ₁ at B**, with a second point A (= ℓ₂ ∩ π) lying on it. The tool had no circle in R³ — the biggest single V8 gap (a whole new primitive with its own rendering).
+
+**Decision — a first-class `Circle3` object (centre + plane-normal + radius), resolved from final positions/lines and rendered as a projected ellipse.**
+- **`Circle3Def`**: `tangent-line {center, line}` — centred at `center`, in the plane through the centre & the line, **tangent** to it: the touch point = the ⟂ **foot** of the centre onto the line (a `foot-line` point), the **radius** = the centre→line distance, the **normal** = `(foot−centre) × dir` (both in-plane and ⟂). Also `center-plane-radius {center, plane, radius}`. Resolved in a late pass (after lines/planes are placed) into `{center, normal, radius, e1, e2}`; the circle's PLANE is exposed in the `planes` map under its id so a line can intersect it.
+- **Rendering reuses `circlePts`** (the V6 revolution-circle sampler): one full outline sampled in the circle's own in-plane basis `e1,e2` — a tilted circle projects to an ellipse, no new renderer primitive.
+- **`point-on-circle3`** is a store-verified membership (like `on-line`, not a generic multi-seed claim — the check needs the *resolved* circle the store already holds): on the circle ⟺ `|P−centre| = radius` AND `P` in the plane. `''` = the single circle (ADR-029 implicit reference).
+- **A final `foot-line` fill** was added: a foot on a THROUGH-line (a circle's tangent line) resolves after the point loop, so unplaced foot-line points are re-resolved once every line is in the map.
+
+Parser `circleTangentLine` (`מעגל A משיק לישר BC בנקודה F` / En; id `circle-<centre>`, ADR-029; `במישור π` ignored — the plane is derived) + `onCircle3`. The tangent line is a **through-line** (point pair); the exact parametric-ℓ form of 2016-Q2 waits on the same multi-line-naming rework noted in ADR-3D-028.
+
+**Locked by** `v8i-circle.test.ts` (parse He+En; on a cube: circle centred at A tangent to edge BC → centre A, radius 1, plane z=0, touch F = the ⟂ foot with AF⟂BC; `D על המעגל` verifies, `C' על המעגל` refused). Catalog +2. **507 src3d tests green, `tsc -b` + `vite build:3d` clean.**

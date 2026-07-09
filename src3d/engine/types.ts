@@ -313,6 +313,30 @@ export interface LineThroughCommand {
   b: Id;
 }
 
+/**
+ * V8-i (G13): a CIRCLE lying in a plane in R³ — center + plane (normal) + radius. Definitions:
+ *  - `tangent-line`: centered at `center`, in the plane through the center & the line, TANGENT to it
+ *    (normal, radius = dist(center,line), and the touch point are all derived);
+ *  - `center-plane-radius`: centered, lying in a named plane, with a given radius.
+ */
+export type Circle3Def =
+  | { kind: 'tangent-line'; center: Id; line: string }
+  | { kind: 'center-plane-radius'; center: Id; plane: string; radius: number };
+
+/** `מעגל O במישור π משיק לישר ℓ בנקודה B` — a circle in R³ (id `circle-<centre>` unless named). */
+export interface Circle3Command {
+  type: 'circle3';
+  id: string;
+  def: Circle3Def;
+  /** For the tangent form: the touch point to create (a foot-line point). */
+  touch?: Id;
+}
+
+export interface Circle3Obj {
+  id: string;
+  def: Circle3Def;
+}
+
 // --- V6 (solids of revolution — the curriculum's spatial-trig block) ---
 
 export type RevolutionKind = 'cylinder' | 'cone' | 'sphere';
@@ -470,6 +494,9 @@ export type Command3 =
   | PlanePlaneLineCommand
   | LineCommonPerpCommand
   | LineProjectionCommand
+  | Circle3Command
+  // V8-i: `A נמצאת על המעגל` — verify a point lies on a circle in R³ (checked in the store vs the resolved circle)
+  | { type: 'point-on-circle3'; point: Id; circle: string }
   | FootOnLineCommand
   | Line3Command
   | LinePerpPlaneCommand
@@ -576,6 +603,8 @@ export interface Construction3 {
   relPlanes: Map<string, RelPlaneDef>;
   /** V6 — solids of revolution. */
   revolutions: RevolutionObj[];
+  /** V8-i — circles in R³ (centre + plane + radius), resolved from final positions/lines. */
+  circles3: Circle3Obj[];
   /** V7 — vector definitions: `X⃗Y = Σ terms`, solving `unknown` (affine; `symbol` = the free coefficient). */
   vecDefs: { from: Id; to: Id; terms: SymTerm[]; unknown: Id; symbol?: string }[];
   /** V7 — conditions that PIN a vec-def's symbol (∥/⟂ to a plane through points). */
@@ -612,6 +641,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   pointLines: new Map(),
   relPlanes: new Map(),
   revolutions: [],
+  circles3: [],
   vecDefs: [],
   symbolPins: [],
   claims: [],

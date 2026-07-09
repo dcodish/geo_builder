@@ -723,10 +723,11 @@ export function parseLinearEq(eq: string): { cx: LinExpr; cy: LinExpr; cz: LinEx
 
 /** `המישור π1: z - 3 = 0` / `plane π2: ay + z - 8 = 0`. */
 const planeByEquation: Rule = (s) => {
-  // name OPTIONAL (unnamed ⇒ π) and the `:` separator OPTIONAL (`המישור x-y+z=1`,
-  // `המישור π2 x-y+z=1`); the tail must contain `=` so a point-run plane (`מישור ABC`,
-  // no `=`) is never stolen, and parseLinearEq strictly validates it (all-or-nothing).
-  const m = s.match(new RegExp(`^(?:המישור\\s+|plane\\s+)?(${PLANE_NAME.source})?\\s*:?\\s*([^:]*=[^:]*)$`));
+  // name OPTIONAL (unnamed ⇒ π) and the separator OPTIONAL — `:` or the copula
+  // `הוא`/`is` (`המישור x-y+z=1`, `המישור π2 x-y+z=1`, `מישור π1 הוא z-3=0`); the tail
+  // must contain `=` so a point-run plane (`מישור ABC`, no `=`) is never stolen, and
+  // parseLinearEq strictly validates it (all-or-nothing).
+  const m = s.match(new RegExp(`^(?:ה?מישור\\s+|(?:the\\s+)?plane\\s+)?(${PLANE_NAME.source})?\\s*(?::|הוא\\s|is\\s)?\\s*([^:]*=[^:]*)$`));
   if (!m) return null;
   const eq = parseLinearEq(m[m.length - 1]);
   if (!eq) return null;
@@ -908,6 +909,49 @@ const lineProjection: Rule = (s) => {
   return cmds;
 };
 
+/**
+ * V8-i (G13): a CIRCLE in R³ tangent to a line — `מעגל שמרכזו O משיק לישר AB בנקודה B` /
+ * `circle centered at O tangent to line AB at B`. The circle's plane, radius (= dist O→line) and
+ * touch point are all derived; the id is `circle-<centre>` (ADR-029). The line is a through-line
+ * (point pair) or the single ℓ. (`במישור π` is redundant — the plane is derived — and is ignored.)
+ */
+const circleTangentLine: Rule = (s) => {
+  if (!/מעגל|\bcircle\b/i.test(s) || !/משיק|tangent/i.test(s)) return null;
+  const L = String.raw`([A-Z]\d*'?)`;
+  const centre =
+    s.match(/(?:שמרכזו|מרכזו|centered\s+at|cent(?:er|re)(?:ed)?\s+(?:at\s+)?)\s*([A-Z]\d*'?)/i)?.[1] ??
+    s.match(/^מעגל\s+([A-Z]\d*'?)\b/)?.[1] ??
+    s.match(/^circle\s+([A-Z]\d*'?)\b/i)?.[1];
+  if (!centre) return null;
+  // the tangent line: a point pair (AB, creating a through-line) or the single ℓ
+  const pair =
+    s.match(new RegExp(`(?:משיק\\s+)?ל(?:ה?ישר\\s+)?${L}${L}(?![A-Z0-9'])`)) ??
+    s.match(new RegExp(`tangent\\s+(?:to\\s+)?(?:the\\s+)?(?:line\\s+)?${L}${L}(?![A-Z0-9'])`, 'i'));
+  const lname =
+    s.match(new RegExp(`ל(?:ה?ישר\\s+)?(${LINE_NAME.source})(?![\\w'])`)) ??
+    s.match(new RegExp(`tangent\\s+(?:to\\s+)?(?:the\\s+)?line\\s+(${LINE_NAME.source})`, 'i'));
+  const touch = (s.match(/(?:בנקודה|at)\s+([A-Z]\d*'?)/i) ?? [])[1];
+  const id = `circle-${centre}`;
+  if (pair) {
+    const line = `${pair[1]}${pair[2]}`;
+    return [
+      { type: 'line-through', name: line, a: pair[1], b: pair[2] },
+      { type: 'circle3', id, def: { kind: 'tangent-line', center: centre, line }, touch },
+    ];
+  }
+  if (lname) return [{ type: 'circle3', id, def: { kind: 'tangent-line', center: centre, line: 'ℓ' }, touch }];
+  return null;
+};
+
+/** V8-i: `A נמצאת על המעגל` / `A על המעגל O` / `A is on the circle` — a verified membership. `''` = the single circle. */
+const onCircle3: Rule = (s) => {
+  const m =
+    s.match(/^(?:ה?נקודה\s+)?([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+)?על\s+ה?מעגל(?:\s+([A-Z]\d*'?))?$/) ??
+    s.match(/^(?:point\s+)?([A-Z]\d*'?)\s+(?:is\s+|lies\s+)?on\s+(?:the\s+)?circle(?:\s+([A-Z]\d*'?))?$/i);
+  if (!m) return null;
+  return [{ type: 'point-on-circle3', point: m[1], circle: m[2] ? `circle-${m[2]}` : '' }];
+};
+
 /** `ℓ ישר החיתוך בין המישורים π1 ו-π2` / `ℓ is the intersection line of π1 and π2`. */
 const intersectionLine: Rule = (s) => {
   const m = s.match(
@@ -1070,9 +1114,10 @@ const pointPlanesLine: Rule = (s) => {
   ];
 };
 
-/** `המישור KBC: x + 2y + 3z - 26 = 0` — a plane-EQUATION claim on a plane through points. */
+/** `המישור KBC: x + 2y + 3z - 26 = 0` / `מישור A'B'C'D' הוא x-4y-8z-142=0` — a
+ *  plane-EQUATION claim on a plane through points; separator `:` or the copula `הוא`/`is`. */
 const planeEqClaim: Rule = (s) => {
-  const m = s.match(/^(?:המישור\s+|plane\s+)((?:[A-Z]\d*'?){3,4})\s*:\s*(.+)$/);
+  const m = s.match(/^(?:ה?מישור\s+|(?:the\s+)?plane\s+)((?:[A-Z]\d*'?){3,4})\s*(?::|הוא\s|is\s)\s*(.+)$/);
   if (!m) return null;
   const eq = parseLinearEq(m[2]);
   if (!eq || eq.param) return null; // a claimed equation must be numeric
@@ -1532,6 +1577,7 @@ const RULES: Rule[] = [
   vectorInjection,
   onAxes, // `על ציר ה-x` before the generic membership/on-segment rules
   membership, // before onSegment: `על אחד המישורים` must never read as a point-on-segment
+  onCircle3, // V8-i: `A על המעגל` — before onSegment/membership
   pointRelPlane, // on/above/below a point-run plane (+ above/below π) — likewise before onSegment
   onLineMembership, // likewise for `על הישר ℓ`
   linePlaneAngle, // `הזווית בין הישר AC' לבין המישור ABCD היא 30` — before angleBetweenPlanes/angleSegClaim
@@ -1546,6 +1592,7 @@ const RULES: Rule[] = [
   dropPerpToPlane,
   commonPerp, // V8-h: common perpendicular of two lines — before the ⟂-to-a-line rules; tight two-line-target regex
   lineProjection, // V8-h: `היטל הישר TB על המישור ABCD`
+  circleTangentLine, // V8-i: `מעגל O משיק לישר AB בנקודה B`
   intersectionLine,
   dropPerpToLine,
   nameVectors,

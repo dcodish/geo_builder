@@ -114,6 +114,7 @@ function clone(c: Construction3): Construction3 {
     pointLines: new Map(c.pointLines),
     relPlanes: new Map(c.relPlanes),
     revolutions: [...c.revolutions],
+    circles3: [...c.circles3],
     vecDefs: [...c.vecDefs],
     symbolPins: [...c.symbolPins],
     claims: [...c.claims],
@@ -782,6 +783,37 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       const next = clone(c);
       next.pairPins.push({ a: cmd.a, b: cmd.b, x: cmd.x, y: cmd.y, z: cmd.z });
       return { ok: true, next };
+    }
+
+    // V8-i (G13): a circle in R³. `tangent-line`: centered at `center`, in the plane through the
+    // centre & the line, tangent to it — the touch point is the ⟂ foot of the centre onto the line.
+    case 'circle3': {
+      if (c.circles3.some((k) => k.id === cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      if (cmd.def.kind === 'tangent-line') {
+        if (!c.points.has(cmd.def.center)) return { ok: false, error: { code: 'unknown-point', id: cmd.def.center } };
+        if (!c.lines.has(cmd.def.line) && !c.pointLines.has(cmd.def.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.def.line } };
+      } else {
+        if (!c.points.has(cmd.def.center)) return { ok: false, error: { code: 'unknown-point', id: cmd.def.center } };
+        if (!c.planes.has(cmd.def.plane) && !c.pointPlanes.has(cmd.def.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.def.plane } };
+      }
+      if (cmd.touch && c.points.has(cmd.touch)) return { ok: false, error: { code: 'already-defined', id: cmd.touch } };
+      const next = clone(c);
+      next.circles3.push({ id: cmd.id, def: cmd.def });
+      if (cmd.touch && cmd.def.kind === 'tangent-line') {
+        next.points.set(cmd.touch, { kind: 'foot-line', from: cmd.def.center, line: cmd.def.line }); // the tangent point = foot ⟂ from centre
+      }
+      return { ok: true, next };
+    }
+
+    // V8-i: `A נמצאת על המעגל` — a verified membership (checked in the store vs the resolved circle).
+    case 'point-on-circle3': {
+      const missing = missingPoint(c, [cmd.point]);
+      if (missing) return { ok: false, error: missing };
+      // '' = the single circle (ADR-029 implicit-reference); a named id must exist
+      if (cmd.circle === '' ? c.circles3.length !== 1 : !c.circles3.some((k) => k.id === cmd.circle)) {
+        return { ok: false, error: { code: 'unknown-line', id: cmd.circle || 'circle' } };
+      }
+      return { ok: true, next: c };
     }
 
     // V8-f (G6): cos of the angle between two operands. M1 (the ADR-3D-010 shape): on a

@@ -452,6 +452,10 @@ export function buildScene3(
         wCurves.push({ pts: [rev.center, apex], hidden: true }); // the height
       }
     }
+    // V8-i: circles in R³ — one full outline each, sampled in its own in-plane basis (projects to an ellipse)
+    for (const k of resolved.circles3) {
+      wCurves.push({ pts: circlePts(k.center, k.radius, k.e1, k.e2, 0, 2 * Math.PI), hidden: false });
+    }
   }
 
   const wMarks: Vec3[][] = [];
