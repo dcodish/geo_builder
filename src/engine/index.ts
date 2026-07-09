@@ -35,3 +35,6 @@ export { lower, lowerOne, buildSymTab, measureLabelText, isMeasure } from './low
 export type { SymTab } from './lower';
 export { expandShapeVariant, eqMatchesPair, pinsSoftVariant, VARIANT_COUNT } from './shapeVariants';
 export type { VariantShape } from './shapeVariants';
+export { expandInscribe, inscribePlacements, inscribeVariantCount } from './inscribe';
+export type { InscribeShape, InscribeCmd } from './inscribe';
+export { variantCountOf, cyclableVariant, withVariant, variantVertices } from './variants';

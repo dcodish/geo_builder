@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, VARIANT_COUNT, withReflectMask } from '@/engine';
+import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, cyclableVariant, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
 import type { FigureFile } from './figureFile';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -310,6 +310,13 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
     .filter((f) => f.enabled && f.cmd.type !== 'shape-variant')
     .flatMap((f) => lowerOne(f.cmd, symtab))
     .filter((c): c is Extract<Command, { type: 'set-equal' }> => c.type === 'set-equal');
+  // Explicit `point-on-segment` givens (NOT an inscribe's own riders) — they PIN the matching variant of an
+  // `inscribe` command (which container side a vertex rides), the ADR-262 counterpart of `explicitEqs`.
+  const explicitOnSegs = facts
+    .filter((f) => f.enabled && f.cmd.type !== 'inscribe')
+    .flatMap((f) => lowerOne(f.cmd, symtab))
+    .filter((c): c is Extract<Command, { type: 'point-on-segment' }> => c.type === 'point-on-segment')
+    .map((c) => ({ id: c.id, a: c.a, b: c.b }));
   // Build the construction by folding the enabled facts. `forced` maps a fact id to a status string that
   // BLOCKS it (an atomic-group casualty — see the poisoning pass below): the fact is neither applied nor
   // measured, only its owned points are claimed so genuine dependents still cascade-fail. Runs at most twice
@@ -327,7 +334,10 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
       // ratio/distance/angle/[]; engine commands pass through; a `shape-variant` → base shape + the
       // variant-selected equal pairs, with an explicit equality pinning the variant — ADR-138).
       // 0 commands ⇒ a label-only / data-only fact (a free representative or `set-var`) — applied as a no-op.
-      let engineCmds = f.cmd.type === 'shape-variant' ? expandShapeVariant(f.cmd, explicitEqs) : lowerOne(f.cmd, symtab);
+      let engineCmds =
+        f.cmd.type === 'shape-variant' ? expandShapeVariant(f.cmd, explicitEqs)
+        : f.cmd.type === 'inscribe' ? expandInscribe(f.cmd, explicitOnSegs)
+        : lowerOne(f.cmd, symtab);
       // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see pre-scan).
       const reseat = rtReorder.get(f.id);
       if (reseat) engineCmds = engineCmds.map((ec) => (ec.type === 'right-triangle' ? { ...ec, ids: reseat } : ec));
@@ -986,15 +996,15 @@ function addMeasureLabel(
  * free choice (ADR-052), not a ground truth. Bounded by the SUM of the variant counts, not their product.
  */
 function variantConfigs(facts: Fact[]): Fact[][] {
-  const variantFacts = facts.filter((f) => f.enabled && f.cmd.type === 'shape-variant' && VARIANT_COUNT[f.cmd.shape] > 1);
+  const variantFacts = facts.filter((f) => f.enabled && cyclableVariant(f.cmd));
   if (variantFacts.length === 0) return [facts];
   const configs: Fact[][] = [facts];
   for (const vf of variantFacts) {
-    if (vf.cmd.type !== 'shape-variant') continue;
-    const count = VARIANT_COUNT[vf.cmd.shape];
+    const count = variantCountOf(vf.cmd);
+    const cur = (vf.cmd as { variant: number }).variant;
     for (let v = 0; v < count; v++) {
-      if (v === vf.cmd.variant) continue; // the current variant is already in `configs`
-      configs.push(facts.map((f) => (f === vf && f.cmd.type === 'shape-variant' ? { ...f, cmd: { ...f.cmd, variant: v } } : f)));
+      if (v === cur) continue; // the current variant is already in `configs`
+      configs.push(facts.map((f) => (f === vf ? { ...f, cmd: withVariant(f.cmd, v) } : f)));
     }
   }
   return configs;
@@ -1074,6 +1084,7 @@ export function introducedIds(cmd: AnyCommand): Id[] {
   if (cmd.type === 'measure-area') return cmd.ids; // highlight the polygon the area annotates
   if (cmd.type === 'set-var' || cmd.type === 'measure-order') return []; // a relation over variables — no object to highlight
   if (cmd.type === 'shape-variant') return cmd.ids; // the named shape's vertices (ADR-138)
+  if (cmd.type === 'inscribe') return variantVertices(cmd); // container + inscribed vertices (ADR-262)
   return applyCommand(emptyConstruction(), cmd).objects.map((o) => o.id);
 }
 
@@ -1637,13 +1648,15 @@ export const useGeoStore = create<GeoState>()(
 
       cycleVariant: () => {
         const facts = get().facts;
-        // Step the FIRST cyclable variant shape (kite: 2 axes; isosceles: 3 apexes). The variant lives in the
-        // fact's command (survives replay/undo — positions are never stored), so this is a pure fact rewrite,
-        // like cycleAlt's branch step. Not gated by `shapeDiffers`: a pair flip is always a genuine change.
-        const target = facts.find((f) => f.enabled && f.cmd.type === 'shape-variant' && VARIANT_COUNT[f.cmd.shape] > 1);
-        if (!target || target.cmd.type !== 'shape-variant') return false;
-        const count = VARIANT_COUNT[target.cmd.shape];
-        set({ facts: facts.map((f) => (f === target && f.cmd.type === 'shape-variant' ? { ...f, cmd: { ...f.cmd, variant: (f.cmd.variant + 1) % count } } : f)) });
+        // Step the FIRST cyclable variant fact (kite: 2 axes; isosceles: 3 apexes; inscribe: side/mirror
+        // placements). The variant lives in the fact's command (survives replay/undo — positions are never
+        // stored), so this is a pure fact rewrite, like cycleAlt's branch step. Not gated by `shapeDiffers`:
+        // a variant step is always a genuine change.
+        const target = facts.find((f) => f.enabled && cyclableVariant(f.cmd));
+        if (!target) return false;
+        const count = variantCountOf(target.cmd);
+        const cur = (target.cmd as { variant: number }).variant;
+        set({ facts: facts.map((f) => (f === target ? { ...f, cmd: withVariant(f.cmd, (cur + 1) % count) } : f)) });
         return true;
       },
 

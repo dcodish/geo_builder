@@ -328,8 +328,25 @@ describe('parser — a NAMED altitude segment honours the foot the student gave'
       { type: 'foot', id: 'F', from: 'A', a: 'D', b: 'C' },
       { type: 'segment', a: 'A', b: 'F' },
     ]));
-  it('a parallelogram (TWO parallel pairs) leaves the height AMBIGUOUS → not-handled (defers, ADR-052)', () =>
-    expect(parse('CE גובה', { points: ['A', 'B', 'C', 'D'], parallels: [[['A', 'B'], ['D', 'C']], [['B', 'C'], ['A', 'D']]] }).ok).toBe(false));
+  // A parallelogram height is ambiguous between TWO real opposite sides. With the polygon present the tool
+  // now DRAWS ONE real side rather than refusing (the operator's steer, superseding ADR-169's defer) — and
+  // crucially it must be a genuine SIDE, never a diagonal.
+  it('"CE גובה" in a parallelogram → foot E on a real opposite SIDE (draws one, never a diagonal)', () => {
+    const r = parse('CE גובה', {
+      points: ['A', 'B', 'C', 'D'],
+      polygons: [['A', 'B', 'C', 'D']],
+      parallels: [[['A', 'B'], ['D', 'C']], [['B', 'C'], ['A', 'D']]],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const foot = r.commands.find((c) => c.type === 'foot') as { a: string; b: string; from: string };
+    expect(foot.from).toBe('C');
+    // The base is a polygon EDGE not touching C (AB or AD) — NOT the diagonal AC or BD.
+    const edge = [foot.a, foot.b].sort().join('');
+    expect(['AB', 'AD']).toContain(edge);
+  });
+  it('without a polygon or resolvable side, the height still DEFERS (nothing to drop onto)', () =>
+    expect(parse('CE גובה', { points: ['A', 'B', 'C', 'D'] }).ok).toBe(false));
 });
 
 describe('parser — a NAMED midsegment honours its endpoint labels', () => {

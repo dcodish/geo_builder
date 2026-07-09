@@ -148,6 +148,70 @@ const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minGapDeg =
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'height-from-vertex-never-drops-onto-a-diagonal',
+    title: 'גובה מ A / גובה מ B in a quad with a diagonal — a height drops to a real SIDE, never the diagonal (ADR-263)',
+    guards:
+      'The operator hit a quadrilateral (parallelogram ABCD) with diagonal BD drawn: "גובה מ A" was understood but "גובה מ B" was refused, and a named height "BE גובה" drew onto the diagonal BD they never asked for. Root cause: the `altitude` rule\'s neighbour-adjacency fallback triangulated the quad ACROSS the drawn diagonal — from A it found the single triangle ABD and dropped the foot onto BD (a DIAGONAL, not a side); from B it found TWO such triangles (ABD, CBD) and refused as ambiguous. Fix (ADR-263): the opposite side of a height must be a real POLYGON EDGE not touching the apex (`oppositePolygonEdges`, which can never return a diagonal); a triangle has exactly one, a parallelogram/quad has several genuine heights → DRAW ONE deterministically rather than refuse (the operator\'s steer, superseding ADR-169\'s parallelogram-defers). A second altitude also no longer re-uses the foot label F (freeLabel now excludes every existing point).',
+    steps: ['מקבילית ABCD', 'BD', 'גובה מ A', 'גובה מ B', 'BE גובה'],
+    check(fig) {
+      allStepsOk(fig);
+      // Adjacent vertices of the parallelogram ABCD (a real side is one of these pairs; BD is the diagonal).
+      const isSide = (a: Id, b: Id) => {
+        const key = [a, b].sort().join('');
+        return ['AB', 'BC', 'CD', 'AD'].includes(key);
+      };
+      const feet = fig.construction.objects.filter((o) => o.kind === 'foot') as { id: Id; from: Id; a: Id; b: Id }[];
+      expect(feet.length, 'three heights → three feet').toBe(3);
+      const footIds = new Set(feet.map((f) => f.id));
+      expect(footIds.size, 'the feet have DISTINCT labels (no F/F collision)').toBe(3);
+      for (const f of feet) {
+        // The base is a genuine side of the quad — never the diagonal BD (the reported bug).
+        expect(isSide(f.a, f.b), `height from ${f.from} drops onto real side ${f.a}${f.b}, not a diagonal`).toBe(true);
+        expect([f.a, f.b].sort().join(''), `foot of ${f.from} is NOT on diagonal BD`).not.toBe('BD');
+        // …and the foot actually lands perpendicular on that side: |from−foot| ⟂ side.
+        const from = at(fig, f.from), foot = at(fig, f.id), A = at(fig, f.a), B = at(fig, f.b);
+        const side = { x: B.x - A.x, y: B.y - A.y };
+        const drop = { x: foot.x - from.x, y: foot.y - from.y };
+        const cos = (side.x * drop.x + side.y * drop.y) / (Math.hypot(side.x, side.y) * Math.hypot(drop.x, drop.y) || 1);
+        expect(Math.abs(cos), `${f.from}${f.id} ⟂ ${f.a}${f.b}`).toBeLessThan(1e-3);
+      }
+    },
+  },
+  {
+    id: 'rhombus-inscribed-in-triangle',
+    title: 'מעוין BDEF חסום במשולש ABC — a polygon inscribed in a polygon (ADR-262)',
+    guards:
+      'The operator hit the bagrut figure "מעוין חסום במשולש" (rhombus inscribed in a triangle) and had to build it point-by-point because the construct did not exist. Worse, "מעוין חסום במשולש ABC" SILENTLY MISPARSED to the triangle\'s incircle (a circle) — `isCircleInPolygon` only checked that the container was a polygon, never that the inscribed thing was a circle, so the `incircle` rule claimed it and the rhombus word was dropped (§6 honesty violation). Fix (ADR-262): a general polygon-in-polygon `inscribe` command — shared labels coincide with their container vertex, other vertices ride the sides as free on-segment points, and the shape\'s equal-side / right-angle constraints flex them into shape (the ADR-110 macro pattern, no new engine construct); the mirror/base-side choice is a cyclable variant (ADR-052/M4). `incircle` now requires a circle noun (semantic guard).',
+    steps: ['מעוין BDEF חסום במשולש ABC'],
+    check(fig) {
+      allStepsOk(fig);
+      // The container triangle and all four rhombus vertices exist.
+      for (const id of ['A', 'B', 'C', 'D', 'E', 'F']) expect(fig.positions.has(id), `${id} placed`).toBe(true);
+      // The rhombus BOUNDARY is actually DRAWN — a polygon object + its four side segments (the bug the
+      // operator hit: riders + equal-length constraints were emitted but no lines, so nothing rendered / was
+      // detected / was reportable as equal). `polygon` supplies both.
+      expect(fig.construction.objects.some((o) => o.kind === 'polygon' && o.id === 'poly-BDEF'), 'rhombus drawn').toBe(true);
+      const segIds = new Set(fig.construction.objects.filter((o) => o.kind === 'segment').map((o) => o.id));
+      for (const [a, b] of [['B', 'D'], ['D', 'E'], ['E', 'F'], ['F', 'B']])
+        expect(segIds.has(`seg-${a}${b}`) || segIds.has(`seg-${b}${a}`), `side ${a}${b} drawn`).toBe(true);
+      // It is a genuine rhombus: all four sides equal.
+      const s1 = dist(at(fig, 'B'), at(fig, 'D'));
+      for (const [x, y] of [['D', 'E'], ['E', 'F'], ['F', 'B']] as [Id, Id][])
+        expect(dist(at(fig, x), at(fig, y)), `|${x}${y}| = |BD|`).toBeCloseTo(s1, 3);
+      // D, E, F each lie ON a side of triangle ABC (inscribed). B is the shared vertex.
+      const sides: [Id, Id][] = [['A', 'B'], ['B', 'C'], ['C', 'A']];
+      const onSomeSide = (p: Id) =>
+        sides.some(([a, b]) => {
+          const A = at(fig, a), B = at(fig, b), P = at(fig, p);
+          const t = ((P.x - A.x) * (B.x - A.x) + (P.y - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2);
+          if (t < -0.02 || t > 1.02) return false;
+          const cx = A.x + t * (B.x - A.x), cy = A.y + t * (B.y - A.y);
+          return Math.hypot(P.x - cx, P.y - cy) < 1e-3;
+        });
+      for (const p of ['D', 'E', 'F'] as Id[]) expect(onSomeSide(p), `${p} on a triangle side`).toBe(true);
+    },
+  },
+  {
     id: 'bisector-from-vertex-no-triple',
     title: 'CD חוצה זוית (angle-bisector from a vertex, triple omitted) after triangle ABC + AB=AC — the two half-angles are equal',
     guards:

@@ -969,7 +969,19 @@ export type SymbolicCommand =
   // `replay` EXPANDS it to the base shape + the variant-selected commands; for kite/isosceles an explicit
   // `set-equal` on the shape's sides PINS the matching variant (and that pair is not re-emitted). `variant`
   // is the persisted, cyclable index ("show another configuration" steps it).
-  | { type: 'shape-variant'; shape: 'kite' | 'isosceles' | 'midsegment'; ids: Id[]; variant: number };
+  | { type: 'shape-variant'; shape: 'kite' | 'isosceles' | 'midsegment'; ids: Id[]; variant: number }
+  // A polygon INSCRIBED IN ANOTHER POLYGON ([ADR-262](docs/06-decisions.md#adr-262)) — "מעוין BDEF חסום
+  // במשולש ABC" / "rectangle inscribed in triangle ABC". The inscribed `shape` (rhombus/rectangle/square/
+  // parallelogram) has its vertices `ids` (cyclic order) riding the boundary of `container` (cyclic order):
+  // a vertex whose LABEL is shared with the container coincides with it; every other vertex becomes a free
+  // `point-on-segment` rider on a container side, plus the shape's defining constraints (equal sides /
+  // right angles), so the constraint solver flexes it into shape — no new engine construct (the ADR-110
+  // macro pattern). `replay` EXPANDS it to those commands per the cyclable `variant`; which side hosts an
+  // extra vertex and the mirror direction are genuinely unstated (ADR-052/M4) → the variant "show another
+  // configuration" cycles, and an explicit `point-on-segment` given on a shape vertex PINS the matching
+  // variant. `containerKind` tells the expansion whether to CREATE the container (labels not yet drawn) or
+  // reuse the existing one (M1).
+  | { type: 'inscribe'; shape: 'rhombus' | 'rectangle' | 'square' | 'parallelogram'; ids: Id[]; container: Id[]; containerKind: 'triangle' | 'quad'; variant: number };
 
 /** What the parser produces and a `Fact` stores: engine commands plus the symbolic layer. */
 export type AnyCommand = Command | SymbolicCommand;

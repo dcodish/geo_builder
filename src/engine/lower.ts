@@ -17,6 +17,7 @@
 
 import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from './types';
 import { expandShapeVariant } from './shapeVariants';
+import { expandInscribe } from './inscribe';
 
 type Binding = { kind: 'len' | 'ang' | 'area'; refs: Id[]; coef: number; pow?: number; affine?: boolean };
 export interface SymTab {
@@ -176,6 +177,11 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       // is the whole-list `lower()` / direct-caller path; `replay` calls `expandShapeVariant` itself with the
       // figure's explicit `set-equal`s so an explicit pair can PIN the variant.
       return expandShapeVariant(cmd, []);
+    case 'inscribe':
+      // Riders on the container's sides + the inscribed shape's defining constraints (ADR-262). Fallback path
+      // (no explicit on-segment pin); `replay` calls `expandInscribe` with the figure's `point-on-segment`
+      // givens so an explicit placement PINS the variant.
+      return expandInscribe(cmd, []);
     default:
       return [cmd as Command];
   }

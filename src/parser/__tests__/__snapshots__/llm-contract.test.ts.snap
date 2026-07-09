@@ -860,6 +860,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "rectangle",
     ],
   },
+  "rectangle DEFG inscribed in triangle ABC": {
+    "en": [
+      "triangle",
+      "inscribe",
+    ],
+    "he": [
+      "triangle",
+      "inscribe",
+    ],
+  },
   "regular pentagon ABCDE": {
     "en": [
       "circle",
@@ -886,6 +896,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     ],
     "he": [
       "rhombus",
+    ],
+  },
+  "rhombus BDEF inscribed in triangle ABC": {
+    "en": [
+      "triangle",
+      "inscribe",
+    ],
+    "he": [
+      "triangle",
+      "inscribe",
     ],
   },
   "right trapezoid ABCD": {
@@ -952,6 +972,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     ],
     "he": [
       "square",
+    ],
+  },
+  "square DEFG inscribed in triangle ABC": {
+    "en": [
+      "triangle",
+      "inscribe",
+    ],
+    "he": [
+      "triangle",
+      "inscribe",
     ],
   },
   "tangent to circle O at A": {

@@ -74,6 +74,42 @@ describe('B2 — viewRelations samples across variants', () => {
   });
 });
 
+describe('cycleVariant — inscribed rhombus (ADR-262: the variant is the mirror placement)', () => {
+  it('stays a rhombus across the cycle; the placement changes', () => {
+    s().execute({ type: 'triangle', ids: ['A', 'B', 'C'] } as AnyCommand, 'tri', 'g');
+    s().execute({ type: 'inscribe', shape: 'rhombus', ids: ['B', 'D', 'E', 'F'], container: ['A', 'B', 'C'], containerKind: 'triangle', variant: 0 } as AnyCommand, 'insc', 'g');
+    expect(fig().lastError).toBeNull();
+    const sidesEqual = () => {
+      const s0 = d(P('B'), P('D'));
+      return [d(P('D'), P('E')), d(P('E'), P('F')), d(P('F'), P('B'))].every((x) => Math.abs(x - s0) < 1e-3);
+    };
+    expect(sidesEqual(), 'rhombus at variant 0').toBe(true);
+    const d0 = { ...P('D') }, f0 = { ...P('F') };
+    expect(s().cycleVariant()).toBe(true); // → the mirror placement (D and F swap near-sides)
+    expect(fig().lastError).toBeNull();
+    expect(sidesEqual(), 'still a rhombus after the cycle').toBe(true);
+    // The mirror swaps D and F across B's near sides — a genuine change (D lands where F was).
+    expect(d(d0, P('D')), 'the placement changed').toBeGreaterThan(1e-6);
+    expect(d(f0, P('D')), 'D moved to F’s old side').toBeLessThan(1e-3);
+  });
+});
+
+describe('inscribed rhombus — drawn, detected, equal sides reported (ADR-262)', () => {
+  it('detect shapes finds the rhombus and equal-segments reports its four sides', async () => {
+    s().execute({ type: 'triangle', ids: ['A', 'B', 'C'] } as AnyCommand, 'tri', 'g');
+    s().execute({ type: 'inscribe', shape: 'rhombus', ids: ['B', 'D', 'E', 'F'], container: ['A', 'B', 'C'], containerKind: 'triangle', variant: 0 } as AnyCommand, 'insc', 'g');
+    // (1) drawn — the polygon object exists.
+    expect(fig().construction.objects.some((o) => o.kind === 'polygon' && o.id === 'poly-BDEF')).toBe(true);
+    // (2) detected.
+    await s().detectShapes();
+    expect(s().shapes!.result.shapes.some((sh) => sh.type === 'rhombus')).toBe(true);
+    // (3) equal segments — the four sides in one class.
+    s().viewRelations();
+    const cls = s().relations!.result.equalSegments;
+    expect(cls.some((c) => c.length === 4)).toBe(true);
+  });
+});
+
 describe('cycleVariant survives undo (the variant lives in the fact)', () => {
   it('undo reverts the variant flip', () => {
     s().execute({ type: 'shape-variant', shape: 'kite', ids: ['A', 'B', 'C', 'D'], variant: 0 } as AnyCommand, 'kite', 'g');

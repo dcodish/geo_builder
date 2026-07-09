@@ -603,6 +603,36 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "rhombus BDEF inscribed in triangle ABC",
+    "winner": "inscribedInPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "מעוין BDEF חסום במשולש ABC",
+    "winner": "inscribedInPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "rectangle DEFG inscribed in triangle ABC",
+    "winner": "inscribedInPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "מלבן DEFG חסום במשולש ABC",
+    "winner": "inscribedInPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "square DEFG inscribed in triangle ABC",
+    "winner": "inscribedInPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "ריבוע DEFG חסום במשולש ABC",
+    "winner": "inscribedInPolygon",
+  },
+  {
+    "lang": "en",
     "text": "point A at (0,0)",
     "winner": "freePoint",
   },

@@ -2317,6 +2317,85 @@ const inscribedPolygon: Rule = (s, ctx) => {
   return cmds;
 };
 
+/** The engine command that CREATES a container polygon of a given word (when its vertices aren't yet drawn). */
+const CONTAINER_CREATE: Record<string, (ids: Id[]) => Command> = {
+  triangle: (ids) => ({ type: 'triangle', ids: [ids[0], ids[1], ids[2]] }),
+  quad: (ids) => ({ type: 'quadrilateral', ids: [ids[0], ids[1], ids[2], ids[3]] }),
+  square: (ids) => ({ type: 'square', ids: [ids[0], ids[1], ids[2], ids[3]] }),
+  rectangle: (ids) => ({ type: 'rectangle', ids: [ids[0], ids[1], ids[2], ids[3]] }),
+  rhombus: (ids) => ({ type: 'rhombus', ids: [ids[0], ids[1], ids[2], ids[3]] }),
+  parallelogram: (ids) => ({ type: 'parallelogram', ids: [ids[0], ids[1], ids[2], ids[3]] }),
+  trapezoid: (ids) => ({ type: 'trapezoid', ids: [ids[0], ids[1], ids[2], ids[3]] }),
+};
+
+/** A polygon word → the generic container role: triangle (3 sides) vs quad (4 sides), plus the creation key. */
+const containerRole = (word: string): { kind: 'triangle' | 'quad'; create: string } | null => {
+  if (/triangle|משולש/i.test(word)) return { kind: 'triangle', create: 'triangle' };
+  if (/square|ריבוע/i.test(word)) return { kind: 'quad', create: 'square' };
+  if (/rectangle|מלבן/i.test(word)) return { kind: 'quad', create: 'rectangle' };
+  if (/rhombus|מעוין/i.test(word)) return { kind: 'quad', create: 'rhombus' };
+  if (/parallelogram|מקבילית/i.test(word)) return { kind: 'quad', create: 'parallelogram' };
+  if (/trapez|טרפז/i.test(word)) return { kind: 'quad', create: 'trapezoid' };
+  if (/quad|מרובע|kite|דלתון|עפיפון/i.test(word)) return { kind: 'quad', create: 'quad' };
+  return null;
+};
+
+/** The inscribed SHAPE the utterance names (the 4 constrained quads that make an inscription determinate).
+ *  Detected on `s` with the CONTAINER noun already stripped, so "rhombus inscribed in a square" reads the
+ *  rhombus as the inner shape. A generic/unsupported inner (bare quad, triangle) → null. */
+const innerShapeKind = (s: string): 'rhombus' | 'rectangle' | 'square' | 'parallelogram' | null =>
+  /square|ריבוע/i.test(s) ? 'square'
+  : /rectangle|מלבן/i.test(s) ? 'rectangle'
+  : /rhombus|מעוין/i.test(s) ? 'rhombus'
+  : /parallelogram|מקבילית/i.test(s) ? 'parallelogram'
+  : null;
+
+/**
+ * "מעוין BDEF חסום במשולש ABC" / "rectangle inscribed in triangle ABC" — a POLYGON INSCRIBED IN A POLYGON
+ * ([ADR-262](docs/06-decisions.md#adr-262)). Emits (optionally the container's own creation) + an `inscribe`
+ * command; `replay` expands the inscribe to on-segment riders + the shape's constraints (see engine/inscribe.ts).
+ * Runs BEFORE `incircle`/`inscribedPolygon` (both match "inscribed"/"חסום") and the base shape rules. The inner
+ * shape and its container are told apart by the ב/"in" preposition, never word order (the ADR-245 principle).
+ */
+const inscribedInPolygon: Rule = (s, ctx) => {
+  if (!/inscrib\w*|חסום/i.test(s)) return null;
+  if (/circle|מעגל|incircle/i.test(s)) return null; // a circle is involved → the circle-inscription rules own it
+  // The CONTAINER is the polygon carrying ב / "in [a/the]".
+  const contRe = new RegExp(
+    String.raw`(?:ב|בתוך\s+ה?)(${POLY_WORDS_HE})|\bin(?:side)?\s+(?:an?\s+|the\s+)?(${POLY_WORDS_HE}|${POLY_WORDS_EN})`,
+    'i',
+  );
+  const cm = contRe.exec(s);
+  if (!cm || cm.index === undefined) return null;
+  const contWord = cm[1] ?? cm[2];
+  const role = containerRole(contWord);
+  if (!role) return null;
+  // Container labels: the run of `contN` labels following the marker (works for both "…in triangle ABC" and
+  // the inverted "במשולש ABC חסום …").
+  const contN = role.kind === 'triangle' ? 3 : 4;
+  const afterCont = s.slice(cm.index + cm[0].length);
+  const contIds = labelRun(afterCont, contN) ?? existingPolygon(ctx, contN) ?? autoVertexLabels(contN, ctx.points ?? []);
+  // The inner shape: read from the utterance with the container noun + its labels removed, so a same-family
+  // container (rhombus in a rhombus) doesn't confuse the inner-shape detection.
+  let inner = s.replace(cm[0], ' ');
+  for (const id of contIds) inner = inner.replace(new RegExp(String.raw`\b${id}\b`, 'g'), ' ');
+  const shape = innerShapeKind(inner);
+  if (!shape) return 'stop'; // a polygon inscription we can't make determinate — escalate, never a plain-shape misparse
+  // Inner shape labels (always a quad, n=4): the run after the shape word, or auto-named avoiding existing +
+  // the container's labels (so an auto-named shape doesn't accidentally coincide with a container vertex).
+  const taken = [...(ctx.points ?? []), ...contIds];
+  const shapeWordRe = /square|ריבוע|rectangle|מלבן|rhombus|מעוין|parallelogram|מקבילית/i;
+  const wm = shapeWordRe.exec(inner);
+  const afterShape = wm ? inner.slice(wm.index + wm[0].length) : inner;
+  const ids = labelRun(afterShape, 4) ?? autoVertexLabels(4, taken);
+
+  const cmds: AnyCommand[] = [];
+  const allExist = contIds.every((c) => (ctx.points ?? []).includes(c));
+  if (!allExist) cmds.push(CONTAINER_CREATE[role.create](contIds)); // create the container unless it's already drawn (M1 reuse)
+  cmds.push({ type: 'inscribe', shape, ids, container: contIds, containerKind: role.kind, variant: 0 });
+  return cmds;
+};
+
 /** Polygon name → vertex count. "regular triangle/quadrilateral" route to equilateral/square. */
 const POLY_NAME_N: Record<string, number> = {
   triangle: 3, quadrilateral: 4,
@@ -2452,7 +2531,10 @@ const quarterCircle: Rule = (s) => {
 const incircle: Rule = (s, ctx) => {
   // The INCIRCLE of a polygon (triangle / quad / trapezoid / rhombus / square / rectangle / parallelogram):
   // EITHER "circle inscribed in <polygon>" (circle-in-polygon) …
-  const inscribed = /incircle|inscrib\w*|חסום/i.test(s) && isCircleInPolygon(s);
+  // An incircle statement is about a CIRCLE inscribed in a polygon — so a circle noun must be present. Without
+  // one ("מעוין חסום במשולש") it is a polygon-in-polygon inscription (ADR-262, owned by `inscribedInPolygon`),
+  // not an incircle — this is a semantic guard (what the statement is), not a keyword bow-out.
+  const inscribed = /incircle|inscrib\w*|חסום/i.test(s) && /incircle|circle|מעגל/i.test(s) && isCircleInPolygon(s);
   // … OR "<polygon> ABCD circumscribes the circle" — the polygon encloses the circle (same figure). Ordered
   // (polygon-labels … circumscribes … circle) so a CIRCLE-first "מעגל חוסם משולש" (a circumcircle) does NOT
   // match here — only the polygon-as-subject reading does.
@@ -4013,6 +4095,31 @@ const oppositeParallelBase = (apex: Id, parallels?: [[string, string], [string, 
   return cands.length === 1 ? cands[0] : null;
 };
 
+/** Real EDGES of a polygon the apex belongs to that do NOT touch the apex — the legitimate bases a height
+ *  from `apex` can drop onto. A DIAGONAL is never a polygon edge, so this can never return one: the fix for
+ *  the neighbour-triangle fallback that used to triangulate a quad ACROSS a drawn diagonal (e.g. "גובה מ A"
+ *  in a parallelogram whose diagonal BD is drawn dropped A onto BD — a diagonal, not a side; ADR-262+). A
+ *  triangle yields exactly one such edge; a parallelogram / general quad yields several genuine heights.
+ *  Deduped across every polygon the apex belongs to; the named foot (if any) is excluded as a base vertex. */
+const oppositePolygonEdges = (apex: Id, polygons?: string[][], exclude?: Id | null): [Id, Id][] => {
+  const out: [Id, Id][] = [];
+  const seen = new Set<string>();
+  for (const poly of polygons ?? []) {
+    const verts = poly.map(up);
+    if (!verts.includes(apex)) continue;
+    for (let i = 0; i < verts.length; i++) {
+      const a = verts[i], b = verts[(i + 1) % verts.length];
+      if (a === apex || b === apex) continue; // an edge touching the apex is adjacent, not opposite
+      if (a === exclude || b === exclude) continue;
+      const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push([a, b]);
+    }
+  }
+  return out;
+};
+
 /**
  * "height from A in ABC" / "altitude from A in ABC" / "גובה מ-A במשולש ABC", and
  * the bare-foot phrasing "perpendicular from A to BC" — the altitude from a vertex:
@@ -4090,14 +4197,21 @@ const altitude: Rule = (s, ctx) => {
       } else {
         tri = null; // no triangle stated — derive the side from context, and don't re-emit a triangle
         const pts = (ctx.points ?? []).filter((x) => x !== apex && x !== namedFoot);
-        if (pts.length === 2) {
+        // A height drops to a real polygon SIDE, never a diagonal. Prefer an EDGE of a polygon the apex
+        // belongs to that doesn't touch the apex. A triangle has exactly one such edge (unambiguous); a
+        // parallelogram / general quad has several genuine heights — the height is ambiguous but real, so
+        // DRAW ONE deterministically rather than refuse (the operator's steer, superseding ADR-169's
+        // parallelogram-defers). This also excludes any drawn diagonal by construction (it is not an edge).
+        const edges = oppositePolygonEdges(apex, ctx.polygons, namedFoot);
+        if (edges.length >= 1) {
+          [p, q] = edges[0];
+        } else if (pts.length === 2) {
           [p, q] = [pts[0], pts[1]];
         } else {
-          // More than two other points in the figure: the opposite side is unambiguous only if the apex
-          // belongs to exactly ONE triangle. Read it off the adjacency (ctx.neighbors) — two neighbours of the
-          // apex that are also joined to each other close a triangle apex–P–Q whose side opposite the apex is
-          // PQ. Exactly one such triangle → use it; zero or several → genuinely under-specified, so defer
-          // rather than guess a side (ADR-052, no assumptions). Handles "גובה מנקודה D" with extra points around.
+          // No polygon around the apex and more than two other points: last-ditch neighbour adjacency for a
+          // triangle drawn as LOOSE segments (no polygon object ⇒ no polygon diagonal, so a join between two
+          // of the apex's neighbours is a genuine edge). Exactly one such triangle → use it; zero or several
+          // → genuinely under-specified, so defer rather than guess a side (ADR-052, no assumptions).
           const nb = ctx.neighbors ?? {};
           const adj = (nb[apex] ?? []).filter((x) => x !== namedFoot);
           const sides: [Id, Id][] = [];
@@ -4109,7 +4223,9 @@ const altitude: Rule = (s, ctx) => {
       }
     }
   }
-  const f = namedFoot ?? freeLabel([apex, p, q], ['F', 'G', 'H', 'P']);
+  // Auto-name the foot avoiding EVERY existing figure point, not just the apex/base — otherwise a second
+  // altitude re-picks 'F' and silently REDEFINES the first altitude's foot (a §6-honesty collision).
+  const f = namedFoot ?? freeLabel([apex, p, q, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']);
   const cmds: Command[] = [];
   if (tri) cmds.push({ type: 'triangle', ids: [tri[0], tri[1], tri[2]] });
   cmds.push({ type: 'foot', id: f, from: apex, a: p, b: q });
@@ -4380,6 +4496,7 @@ export const RULES: Rule[] = [
   semicircle, // "חצי מעגל" / "semicircle" — before `circle` (contains "מעגל") and the shape rules
   quarterCircle, // "רבע מעגל" / "quarter circle" — same
   concentricCircles, // "שני מעגלים בעלי מרכז משותף O" — the CONCENTRIC PAIR (ADR-244); before `circle` (which would half-parse it to ONE circle) and the two-circle rules
+  inscribedInPolygon, // "מעוין BDEF חסום במשולש ABC" — a polygon inscribed in a polygon (ADR-262); before incircle/inscribedPolygon (all match "inscribed") AND the base shape rules
   incircle, // "circle inscribed in triangle ABC" — before inscribedPolygon (both match "inscribed")
   circumcircleMeetsSegment, // "the circle circumscribing ABC cuts CE at D" — before the shape rules (its "משולש ABC" would stop `triangle`)
   inscribedPolygon, // before the shape rules ("triangle ABC inscribed …" contains "triangle")

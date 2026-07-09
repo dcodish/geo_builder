@@ -188,6 +188,15 @@ const PARSES: [string, string][] = [
   ['BC מקביל ל-AD', 'set-parallel'],
   ['AB perpendicular to CD', 'set-perpendicular'],
   ['AB מאונך ל-CD', 'set-perpendicular'],
+  // ── polygon inscribed in a polygon (ADR-262): the container is created + an `inscribe` command ──
+  ['מעוין BDEF חסום במשולש ABC', 'inscribe'],
+  ['rhombus BDEF inscribed in triangle ABC', 'inscribe'],
+  ['מלבן DEFG חסום במשולש ABC', 'inscribe'],
+  ['rectangle DEFG inscribed in triangle ABC', 'inscribe'],
+  ['ריבוע DEFG חסום במשולש ABC', 'inscribe'],
+  ['square inscribed in triangle ABC', 'inscribe'], // unnamed inner → auto-named
+  ['במשולש ABC חסום מעוין BDEF', 'inscribe'], // inverted passive: container-first
+  ['rhombus inscribed in quadrilateral ABCD', 'inscribe'], // quad container
 ];
 
 /** Utterances that must escalate (not-handled) rather than half-parse or draw a wrong figure. */
@@ -211,6 +220,10 @@ const ESCALATES: string[] = [
   'square ABCD with point E on AB',
   'משולש ABC עם נקודה D על AB',
   'rectangle ABCD with diagonals',
+  // ── a polygon-in-polygon inscription we can't make determinate (generic quad / triangle inner) → escalate,
+  //    never a plain-shape misparse (ADR-262) ──
+  'quadrilateral DEFG inscribed in triangle ABC',
+  'triangle DEF inscribed in triangle ABC',
   // ── nothing to build ──
   'draw a circle somewhere',
   'hello there',
