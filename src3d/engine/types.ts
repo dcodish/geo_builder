@@ -472,7 +472,10 @@ export type Command3 =
   // V8-f (G11): `D על AC כך ש-OD חוצה-זווית AOC` — D on segment a–b, ray apex→D bisects ∠(a)(apex)(b).
   | { type: 'bisector-point'; id: Id; a: Id; b: Id; apex: Id }
   // V8-g: `גובה המשולש לצלע AB הוא CD` — D = foot of the ⟂ from vertex `from` onto side a–b.
-  | { type: 'altitude-foot'; id: Id; from: Id; a: Id; b: Id };
+  | { type: 'altitude-foot'; id: Id; from: Id; a: Id; b: Id }
+  // triage 3-D: `DE גובה בטטראדר` — altitude from vertex `from` to the OPPOSITE face of the
+  // single tetrahedron (apply resolves the face = the tetra's other 3 vertices → a foot-face point).
+  | { type: 'tetra-altitude'; id: Id; from: Id };
 
 // ---------------------------------------------------------------------------
 // Construction (what apply builds, what evaluate consumes)

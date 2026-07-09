@@ -141,7 +141,9 @@ function orientPyramid(s: string, toks: Id[]): Id[] {
  *  V8-d: an equilateral triangular base → `pyramid3e`; a parallelogram base → `pyramidPar`. */
 const rightPyramid: Rule = (s) => {
   // `טטראדר`/`tetrahedron` IS a triangular pyramid by definition — it carries its own base
-  const tetraWord = /טטר[אה]ה?דר(?:ון)?/.test(s) || /\btetrahedr(?:on)?\b/i.test(s);
+  // `טטראדר`/`טטרדר` (transliterations, the [אה] optional so a missing vowel-letter still reads),
+  // `ארבעון` (the Hebrew word), `tetrahedron` — all a triangular pyramid by definition
+  const tetraWord = /טטר[אה]?ה?דר(?:ון)?/.test(s) || /ארבעון/.test(s) || /\btetrahedr(?:on)?\b/i.test(s);
   if (!/פירמידה/.test(s) && !/\bpyramid\b/i.test(s) && !tetraWord) return null;
   const right = /ישרה?/.test(s) || /\bright\b/i.test(s); // ישרה (fem, פירמידה) or ישר (masc, טטראדר)
   const square = /ריבוע/.test(s) || /\bsquare\b/i.test(s);
@@ -721,14 +723,17 @@ export function parseLinearEq(eq: string): { cx: LinExpr; cy: LinExpr; cz: LinEx
 
 /** `המישור π1: z - 3 = 0` / `plane π2: ay + z - 8 = 0`. */
 const planeByEquation: Rule = (s) => {
-  const m = s.match(new RegExp(`^(?:המישור\\s+|plane\\s+)?(${PLANE_NAME.source})\\s*:\\s*(.+)$`));
+  // name OPTIONAL (unnamed ⇒ π) and the `:` separator OPTIONAL (`המישור x-y+z=1`,
+  // `המישור π2 x-y+z=1`); the tail must contain `=` so a point-run plane (`מישור ABC`,
+  // no `=`) is never stolen, and parseLinearEq strictly validates it (all-or-nothing).
+  const m = s.match(new RegExp(`^(?:המישור\\s+|plane\\s+)?(${PLANE_NAME.source})?\\s*:?\\s*([^:]*=[^:]*)$`));
   if (!m) return null;
   const eq = parseLinearEq(m[m.length - 1]);
   if (!eq) return null;
   return [
     {
       type: 'plane3',
-      name: canonicalPlane(m[1]),
+      name: m[1] ? canonicalPlane(m[1]) : 'π',
       plane: { cx: eq.cx, cy: eq.cy, cz: eq.cz, d: eq.d, src: m[m.length - 1].trim() },
       param: eq.param,
     },
@@ -811,7 +816,7 @@ const pointRelPlane: Rule = (s) => {
 const angleBetweenPlanes: Rule = (s) => {
   const m = s.match(
     new RegExp(
-      `^(?:הזווית בין המישורים|the angle between (?:the )?planes)\\s+(${PLANE_NAME.source})\\s*(?:ל|ו|and)-?\\s*(${PLANE_NAME.source})\\s*(?:היא|הוא|is|=)?\\s*(${NUM})\\s*°?$`,
+      `^(?:הזווית בין ה?מישור(?:ים)?|the angle between (?:the )?planes)\\s+(${PLANE_NAME.source})\\s*(?:ל|ו|and)-?\\s*(${PLANE_NAME.source})\\s*(?:היא|הוא|is|=)?\\s*(${NUM})\\s*°?$`,
     ),
   );
   if (!m) return null;
@@ -1070,8 +1075,9 @@ const revolutionSolid: Rule = (s) => {
   const center = s.match(/(?:שמרכזו|מרכזו|מרכז\s+ה?בסיסו?|(?:base\s+)?cent(?:er|re)(?:\s+is)?(?:\s+at)?)\s+([A-Z]\d*'?)/)?.[1];
   const radius = s.match(new RegExp(`(?:שרדיוסו|רדיוסו?|רדיוס\\s+ה?בסיסו?|radius(?:\\s+is)?)\\s*(?:הוא\\s*)?(${NUM})`))?.[1];
   const height = s.match(new RegExp(`(?:שגובהו|גובהו?|height(?:\\s+is)?)\\s*(?:הוא\\s*)?(${NUM})`))?.[1];
-  // an utterance that names the solid but binds NOTHING legible refuses (never a half-read)
-  if (!apex && !center && radius === undefined && height === undefined) return null;
+  // a BARE solid noun (no name/size bound) is a free-size solid (ADR-052 — unstated radius/
+  // height are free DOFs), UNLESS it carries a number we failed to bind (a half-read → refuse).
+  if (!apex && !center && radius === undefined && height === undefined && /\d/.test(s)) return null;
   if (kind !== 'cone' && apex) return null; // only a cone has an apex
   return [
     {
@@ -1385,6 +1391,47 @@ const altitudeFoot: Rule = (s) => {
   return null;
 };
 
+/**
+ * triage 3-D: a triangle MEDIAN — `CD תיכון במשולש ABC` / `CD is the median in triangle ABC`
+ * / `CD תיכון לצלע AB`. The foot (CD's 2nd letter) = the MIDPOINT of the opposite side (the
+ * triangle's other two vertices, or the stated side). No new engine construct — a midpoint + segment.
+ */
+const medianFoot: Rule = (s) => {
+  if (!/תיכון|\bmedian\b/i.test(s)) return null;
+  const L = String.raw`([A-Z]\d*'?)`;
+  // vertex form: infer the opposite side from the named triangle
+  let m =
+    s.match(new RegExp(`^${L}${L}\\s+(?:הוא\\s+|היא\\s+)?תיכון\\s+(?:ב|ל?)?(?:ה?משולש\\s+)${L}${L}${L}`)) ??
+    s.match(new RegExp(`^${L}${L}\\s+is\\s+(?:the\\s+)?median\\s+(?:in|of)\\s+(?:triangle\\s+)?${L}${L}${L}`, 'i'));
+  if (m) {
+    const [, from, foot, a, b, c] = m;
+    const tri = [a, b, c];
+    if (!tri.includes(from) || new Set(tri).size !== 3) return null;
+    const opp = tri.filter((x) => x !== from);
+    return [{ type: 'point-on-segment3', id: foot, a: opp[0], b: opp[1], t: 0.5 }, { type: 'segment3', a: from, b: foot }];
+  }
+  // explicit-side form: `CD תיכון לצלע AB`
+  m =
+    s.match(new RegExp(`^${L}${L}\\s+(?:הוא\\s+|היא\\s+)?תיכון\\s+(?:ל|אל\\s+)(?:ה?צלע\\s+)?${L}${L}`)) ??
+    s.match(new RegExp(`^${L}${L}\\s+is\\s+(?:the\\s+)?median\\s+to\\s+(?:side\\s+)?${L}${L}`, 'i'));
+  if (m) {
+    const [, from, foot, a, b] = m;
+    return [{ type: 'point-on-segment3', id: foot, a, b, t: 0.5 }, { type: 'segment3', a: from, b: foot }];
+  }
+  return null;
+};
+
+/** triage 3-D: `DE גובה בטטראדר` / `DE גובה בארבעון` / `DE altitude in the tetrahedron` — the
+ *  altitude from vertex `from` to the opposite face of THE tetra (face resolved at apply). */
+const tetraAltitude: Rule = (s) => {
+  if (!/גובה|altitude/i.test(s)) return null;
+  const L = String.raw`([A-Z]\d*'?)`;
+  const m =
+    s.match(new RegExp(`^${L}${L}\\s+(?:הוא\\s+|היא\\s+)?גובה\\s+(?:ב|של\\s+ה?)(?:טטר[אה]?ה?דר(?:ון)?|ארבעון)`)) ??
+    s.match(new RegExp(`^${L}${L}\\s+is\\s+(?:the\\s+)?(?:altitude|height)\\s+(?:in|of)\\s+(?:the\\s+)?tetrahedr(?:on)?`, 'i'));
+  return m ? [{ type: 'tetra-altitude', id: m[2], from: m[1] }] : null;
+};
+
 const RULES: Rule[] = [
   cubeOrBox,
   rhombusPrism,
@@ -1444,6 +1491,8 @@ const RULES: Rule[] = [
   lengthRatioClaim,
   areaClaim,
   lengthClaim,
+  tetraAltitude, // `DE גובה בטטראדר` — before altitudeFoot/heightOfSolid (more specific)
+  medianFoot, // `CD תיכון במשולש ABC`
   altitudeFoot, // V8-g: `גובה ... לצלע AB הוא CD` — before heightOfSolid (which owns 3-D heights)
   heightOfSolid,
   planarPolygon, // V8-g: bare `משולש/מרובע/מחומש` — after the שטח/מפגש/prism/pyramid consumers of those nouns

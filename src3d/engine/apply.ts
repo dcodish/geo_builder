@@ -819,6 +819,22 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    // triage 3-D: altitude from a vertex to the opposite face of THE tetrahedron. The face
+    // is resolved here (the ADR-3D-011 sentinel pattern) = the tetra's other 3 vertices → foot-face.
+    case 'tetra-altitude': {
+      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      const tetras = c.solids.filter((s) => s.kind === 'tetra' || s.kind === 'pyramid3' || s.kind === 'pyramid3e');
+      if (tetras.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: cmd.id } }; // 0 or many → ambiguous
+      const t = tetras[0];
+      if (!t.ids.includes(cmd.from)) return { ok: false, error: { code: 'unknown-point', id: cmd.from } };
+      const face = t.ids.filter((v) => v !== cmd.from);
+      if (face.length !== 3) return { ok: false, error: { code: 'unknown-point', id: cmd.id } };
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'foot-face', from: cmd.from, face });
+      if (!hasSegment(next, cmd.from, cmd.id)) next.segments.push([cmd.from, cmd.id]); // draw the altitude
+      return { ok: true, next };
+    }
+
     // V8-g: the foot of a triangle altitude — D = foot of ⟂ from vertex `from` onto side a–b.
     case 'altitude-foot': {
       if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };

@@ -99,6 +99,12 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: 'מרובע MKNL', en: 'quadrilateral MKNL' },
   { category: 'solids', he: 'מחומש ABCDE', en: 'pentagon ABCDE' },
   { category: 'points', he: 'גובה המשולש לצלע AB הוא CD', en: 'CD is the altitude to AB' },
+  // --- triage 3-D (ADR-3D-026): prod-log gaps ---
+  { category: 'solids', he: 'כדור', en: 'sphere' },
+  { category: 'solids', he: 'ABCD ארבעון', en: 'tetrahedron ABCD' },
+  { category: 'points', he: 'CD תיכון במשולש ABC', en: 'CD is the median in triangle ABC' },
+  { category: 'points', he: 'DE גובה בטטראדר', en: 'DE is the altitude in the tetrahedron' },
+  { category: 'planesLines', he: 'המישור x-y+z=1', en: 'plane x-y+z=1' },
   // --- drawing ---
   { category: 'drawing', he: "קטע CA'", en: "segment CA'" },
 ];

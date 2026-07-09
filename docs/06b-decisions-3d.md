@@ -400,3 +400,17 @@ Parser: `planarPolygon` (bare `משולש`/`מרובע`/`מחומש` + En, guard
 **Deferred (documented):** a flat z=0 polygon renders in the horizontal plane, so at the ¾ home view it reads foreshortened (the camera frame degenerates at a true top-down pitch of ±90°); a **face-on default view for purely-planar figures** is a renderer follow-up (the engine + vector math are exact — the gate tests coordinates). The full 2014-קיץ-ב numeric chain (the specific value of t from the metric givens) rides the driven triangle; only its structural vector expressions are gated here.
 
 **Locked by** `v8g-planar-polygons.test.ts` (parse He+En incl. the no-steal guards; 2010-Q2 part א `QP=½(KM+LN)` on a free quad, part ב `QP∥EA` + `|QP|=¼|EA|` on the pentagon with an independent oracle `QP=¼·EA`; the altitude foot lands on AB with CD⟂AB; a cevian at CE:EB=3:5; and the SAS givens DRIVE the free triangle to `|CA|=1,|CB|=2,cos=¾`). **463 src3d tests green, `tsc -b` + `vite build:3d` clean.**
+
+---
+
+## ADR-3D-026 — prod-log triage fixes: bare revolution solids, `ארבעון`, median, tetra altitude, plane-eq phrasings (2026-07-09)
+
+**Context.** The new `/log-triage` tool (`.claude/skills/log-triage/`, `.claude/agents/log-triage.md`) pulled the 3-D prod log, re-ran every failed utterance against HEAD, and surfaced the genuine LIVE gaps (already-fixed ones auto-dropped — e.g. `טטראדר`, which shipped in ADR-3D-024; those users had a stale cached bundle). Operator approved fixing all but the line↔plane angle (planned separately). All are **root-cause parser/vocabulary fixes, no new solver**:
+
+1. **Bare revolution solids** `כדור`/`חרוט`/`גליל` (no params) now build with FREE sizes (ADR-052). The `revolutionSolid` "binds nothing → refuse" guard was too aggressive; it now refuses only when the noun carries a NUMBER we couldn't bind (a genuine half-read like `חרוט 5` — which dim?), so a truly bare noun is a free-size solid while `חרוט גובה 5` still binds height 5.
+2. **`ארבעון`** (the actual Hebrew word for tetrahedron — ADR-3D-024 added only the transliteration `טטראדר`) and **`טטרדר`** (a missing vowel-letter) join the `tetraWord` set (`טטר[אה]?ה?דר` makes the alef/hei optional; `|ארבעון`).
+3. **Median in a triangle** `CD תיכון במשולש ABC` (+ `CD תיכון לצלע AB`, En) — no new construct: the foot = the MIDPOINT of the opposite side (the triangle's other two vertices, or the stated side) + a drawn segment (`medianFoot` rule).
+4. **Tetra altitude** `DE גובה בטטראדר`/`בארבעון` — a `tetra-altitude` command; apply resolves THE tetra (the ADR-3D-011 sentinel pattern), takes the face opposite `from` (its other 3 vertices), and reuses the V8-e `foot-face` point + draws the altitude.
+5. **Plane-equation phrasings** — `planeByEquation` now accepts an UNNAMED plane (`המישור x-y+z=1` ⇒ π) and NO colon (`המישור π2 x-y+z=1`), gated by requiring `=` in the tail so a point-run plane (`מישור ABC`, no `=`) is never stolen (parseLinearEq strictly validates). `angleBetweenPlanes` accepts singular `מישור` (`ה?מישור(?:ים)?`) so `הזווית בין מישור π1 ו-π2 היא 45` parses.
+
+**Locked by** `triage-fixes.test.ts` (the exact prod utterances: parse + build — median D at mid-AB, tetra altitude DE⟂face ABC, bare sphere with a FREE radius; the half-read refusal; regressions on the colon plane-eq + point-run plane). Catalog +5. **488 src3d tests green, `tsc -b` + `vite build:3d` clean.** _(The line↔plane angle `זווית בין הישר AC' לבין המישור ABCD` is planned separately per the operator.)_
