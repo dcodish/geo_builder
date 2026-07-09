@@ -852,6 +852,62 @@ const dropPerpToPlane: Rule = (s) => {
   return [{ type: 'foot-on-plane', id: foot, from, plane: canonicalPlane(plane) }];
 };
 
+/**
+ * V8-h (G8): the COMMON PERPENDICULAR of two lines — `הישר d מאונך לישר AB ולישר CD` /
+ * `d is the common perpendicular of AB and CD` / `אנך משותף ל-AB ו-CD`. The two source lines
+ * are through-lines (point pairs), created as needed. (The parametric ℓ/ℓ' form of 2010-Q3 waits
+ * on multi-line naming — the single-`ℓ` model can't hold two named parametric lines yet.)
+ */
+const commonPerp: Rule = (s) => {
+  if (!/מאונך|ניצב|מאונ[כך]|common\s+perpendicular|אנך\s+משותף/i.test(s)) return null;
+  const P2 = String.raw`([A-Z]\d*'?)([A-Z]\d*'?)`;
+  const NAME = String.raw`(ℓ\d*'?|[a-z]'?)`;
+  // He: a named line ⟂ to two through-lines (two explicit "לישר" targets — distinctive enough not to
+  // collide with the ⟂-constraint / ⟂-plane rules), or the "אנך משותף" phrasing
+  let m =
+    s.match(new RegExp(`^ה?ישר\\s+${NAME}\\s+(?:מאונך|ניצב|מאונ[כך])\\s+ל(?:ה?ישר\\s+)?${P2}\\s+ול(?:ה?ישר\\s+)?${P2}$`)) ??
+    s.match(new RegExp(`^(?:ה?ישר\\s+${NAME}\\s+)?אנך\\s+משותף\\s+ל(?:ה?ישרים\\s+)?${P2}\\s+ו-?(?:ל(?:ה?ישר\\s+)?)?${P2}$`));
+  let name: string, a1: string, a2: string, b1: string, b2: string;
+  if (m) [, name, a1, a2, b1, b2] = m as [string, string, string, string, string, string];
+  else {
+    m = s.match(new RegExp(`^(?:(?:ה?ישר\\s+|line\\s+)?${NAME}\\s+is\\s+)?the\\s+common\\s+perpendicular\\s+of\\s+(?:lines?\\s+)?${P2}\\s+and\\s+${P2}$`, 'i'));
+    if (!m) return null;
+    [, name, a1, a2, b1, b2] = m as [string, string, string, string, string, string];
+  }
+  const nm = name ?? 'd';
+  return [
+    { type: 'line-through', name: `${a1}${a2}`, a: a1, b: a2 },
+    { type: 'line-through', name: `${b1}${b2}`, a: b1, b: b2 },
+    { type: 'line-common-perp', name: nm, line1: `${a1}${a2}`, line2: `${b1}${b2}` },
+  ];
+};
+
+/**
+ * V8-h (G8): the PROJECTION (`היטל`) of a line onto a plane — `BE היטל הישר TB על המישור ABCD` /
+ * `BE is the projection of line TB onto plane ABCD`. Source line = a through-line (point pair);
+ * plane = a point-run (or a π-name); the result is a named line.
+ */
+const lineProjection: Rule = (s) => {
+  if (!/היטל|projection/i.test(s)) return null;
+  const P2 = String.raw`([A-Z]\d*'?)([A-Z]\d*'?)`;
+  const PL = String.raw`((?:[A-Z]\d*'?){3,4}|${PLANE_NAME.source})`;
+  const m =
+    s.match(new RegExp(`^${P2}\\s+(?:הוא\\s+)?(?:ה?היטל)\\s+(?:של\\s+)?(?:ה?ישר\\s+)?${P2}\\s+על\\s+(?:ה?מישור\\s+)?${PL}$`)) ??
+    s.match(new RegExp(`^${P2}\\s+is\\s+the\\s+projection\\s+of\\s+(?:line\\s+)?${P2}\\s+onto\\s+(?:the\\s+)?(?:plane\\s+)?${PL}$`, 'i'));
+  if (!m) return null;
+  const [, r1, r2, l1, l2, planeRaw] = m;
+  const cmds: Command3[] = [{ type: 'line-through', name: `${l1}${l2}`, a: l1, b: l2 }];
+  let planeName: string;
+  if (/^(?:π|pi)/i.test(planeRaw)) planeName = canonicalPlane(planeRaw);
+  else {
+    const ids = planeRaw.match(/[A-Z]\d*'?/g)!;
+    planeName = `plane-${ids.join('')}`;
+    cmds.push({ type: 'plane-through', name: planeName, ids });
+  }
+  cmds.push({ type: 'line-projection', name: `${r1}${r2}`, line: `${l1}${l2}`, plane: planeName });
+  return cmds;
+};
+
 /** `ℓ ישר החיתוך בין המישורים π1 ו-π2` / `ℓ is the intersection line of π1 and π2`. */
 const intersectionLine: Rule = (s) => {
   const m = s.match(
@@ -1488,6 +1544,8 @@ const RULES: Rule[] = [
   neverParallelClaim,
   lineCutsPlane,
   dropPerpToPlane,
+  commonPerp, // V8-h: common perpendicular of two lines — before the ⟂-to-a-line rules; tight two-line-target regex
+  lineProjection, // V8-h: `היטל הישר TB על המישור ABCD`
   intersectionLine,
   dropPerpToLine,
   nameVectors,

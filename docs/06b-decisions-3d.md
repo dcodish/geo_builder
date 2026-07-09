@@ -429,3 +429,19 @@ Parser: `planarPolygon` (bare `משולש`/`מרובע`/`מחומש` + En, guard
 Parser `linePlaneAngle` (He + En, before angleBetweenPlanes/angleSegClaim).
 
 **Locked by** `line-plane-angle.test.ts`: parse He+En + the valueless not-handled; **VERIFIES on a cube** (AC′↔base = asin(1/√3) ≈ 35.264°) and a **wrong value (30°) is refused** keep-prior; **DRIVES a free-dim box** so the angle becomes 30°. Catalog +1. **493 src3d tests green, `tsc -b` + `vite build:3d` clean.**
+
+---
+
+## ADR-3D-028 — V8-h: the common perpendicular of two lines + the projection of a line onto a plane (2026-07-09)
+
+**Context (G8).** 2010-Q3: a line `d ⟂ ℓ and ⟂ ℓ'` (the common perpendicular). 2012-חורף Q3: `BE = היטל הישר TB על המישור ABCD` — the projection of a line onto a plane. Two derived-line constructs the tool lacked.
+
+**Decision — two new `Line3Def` kinds, resolved in a LATE pass** (after the base lines + planes are placed, reading the resolved `lines`/`planes` maps — the pattern of the pointLines / plane∩plane second passes):
+- **`common-perp` `{line1, line2}`** — dir = `dir(line1) × dir(line2)` (the cross is internal-only, never displayed — the curriculum has no cross product); anchor = the foot on line1 of the shortest connecting segment (closest-points-between-two-lines, closed form). Parallel lines (cross ≈ 0) yield no unique common perpendicular → skipped.
+- **`line-projection` `{line, plane}`** — dir = the in-plane component `dir − (dir·n̂)n̂`; anchor = `footOnPlane(line.anchor, plane)`. A line ⟂ the plane projects to a point → skipped.
+
+Parser `commonPerp` (`הישר d מאונך לישר AB ולישר CD` / `d is the common perpendicular of AB and CD` / `אנך משותף`; a tight two-line-target regex so it never collides with the ⟂-constraint / ⟂-to-plane rules) and `lineProjection` (`BE היטל הישר TB על המישור ABCD` / En). Both **source their lines from through-lines (point pairs)** and the plane from a point-run (or a π-name), created as needed.
+
+**Deferred (documented):** the exact PARAMETRIC ℓ/ℓ' forms of 2010-Q3 (two named parametric lines) wait on a **multi-line-naming** rework — the current single-`ℓ` model (`LINE_NAME = /[ℓl]/`, 9 rules hard-code `name:'ℓ'`) can hold only one named parametric line. V8-h delivers the two constructs on through-line inputs (a cube's skew edges, a slanted edge's projection); the parametric reproduction is a bounded follow-up.
+
+**Locked by** `v8h-lines.test.ts` (parse He+En; on a cube: `d ⟂ AB` and `⟂ A'D'` to 1e-9; the projection of the space diagonal AC′ onto the base lies IN the base plane and is the base diagonal AC). Catalog +2. **501 src3d tests green, `tsc -b` + `vite build:3d` clean.**

@@ -255,7 +255,8 @@ export function lineAtParam(c: Construction3, name: string, a: number): Resolved
       dir: v3(linVal(def.dir[0], a), linVal(def.dir[1], a), linVal(def.dir[2], a)),
     };
   }
-  if (def.kind === 'through') return null; // resolved later, from final positions
+  // through / common-perp / line-projection all depend on other resolved lines/planes → resolved later
+  if (def.kind === 'through' || def.kind === 'common-perp' || def.kind === 'line-projection') return null;
   if (!c.planes.has(def.p1) || !c.planes.has(def.p2)) return null;
   return planePlaneLine(planeAt(c, def.p1, a), planeAt(c, def.p2, a));
 }
@@ -716,6 +717,34 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     if (def.kind === 'plane-plane' && planes.has(def.p1) && planes.has(def.p2)) {
       const line = planePlaneLine(planes.get(def.p1)!, planes.get(def.p2)!);
       if (line) lines.set(name, line);
+    }
+  }
+
+  // ---- V8-h (G8): DERIVED lines from other lines/planes — the common perpendicular of two lines,
+  // and the projection of a line onto a plane. Resolved after the base lines + planes are placed.
+  for (const [name, def] of c.lines) {
+    if (lines.has(name)) continue;
+    if (def.kind === 'common-perp') {
+      const l1 = lines.get(def.line1);
+      const l2 = lines.get(def.line2);
+      if (!l1 || !l2) continue;
+      const d = cross3(l1.dir, l2.dir); // ⟂ both (cross is internal-only, never displayed)
+      if (norm3(d) < 1e-9) continue; // parallel lines have no unique common perpendicular
+      // anchor = the foot on l1 of the shortest connecting segment (closest points between two lines)
+      const r = sub3(l1.anchor, l2.anchor);
+      const a11 = dot3(l1.dir, l1.dir), a12 = -dot3(l1.dir, l2.dir), a22 = dot3(l2.dir, l2.dir);
+      const b1 = -dot3(l1.dir, r), b2 = dot3(l2.dir, r);
+      const detm = a11 * a22 - a12 * a12;
+      const anchor = Math.abs(detm) < 1e-12 ? l1.anchor : add3(l1.anchor, scale3(l1.dir, (b1 * a22 - a12 * b2) / detm));
+      lines.set(name, { anchor, dir: d });
+    } else if (def.kind === 'line-projection') {
+      const l = lines.get(def.line);
+      const pl = planes.get(def.plane);
+      if (!l || !pl) continue;
+      const nn = normalize3(pl.n);
+      const dir = sub3(l.dir, scale3(nn, dot3(l.dir, nn))); // in-plane component of the direction
+      if (norm3(dir) < 1e-9) continue; // the line is ⟂ the plane → the projection is a single point
+      lines.set(name, { anchor: footOnPlane(l.anchor, pl), dir });
     }
   }
 

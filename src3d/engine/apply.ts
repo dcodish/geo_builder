@@ -494,6 +494,27 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    // V8-h (G8): the common perpendicular of two lines — resolved from the two (already-named) lines.
+    case 'line-common-perp': {
+      if (c.lines.has(cmd.name) || c.pointLines.has(cmd.name)) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
+      for (const ln of [cmd.line1, cmd.line2]) {
+        if (!c.lines.has(ln) && !c.pointLines.has(ln)) return { ok: false, error: { code: 'unknown-line', id: ln } };
+      }
+      const next = clone(c);
+      next.lines.set(cmd.name, { kind: 'common-perp', line1: cmd.line1, line2: cmd.line2 });
+      return { ok: true, next };
+    }
+
+    // V8-h (G8): the projection of a line onto a plane.
+    case 'line-projection': {
+      if (c.lines.has(cmd.name) || c.pointLines.has(cmd.name)) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
+      if (!c.lines.has(cmd.line) && !c.pointLines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
+      if (!c.planes.has(cmd.plane) && !c.pointPlanes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
+      const next = clone(c);
+      next.lines.set(cmd.name, { kind: 'line-projection', line: cmd.line, plane: cmd.plane });
+      return { ok: true, next };
+    }
+
     case 'foot-on-line': {
       if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
       if (!c.points.has(cmd.from)) return { ok: false, error: { code: 'unknown-point', id: cmd.from } };

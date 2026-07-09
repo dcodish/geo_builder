@@ -121,7 +121,12 @@ export type Line3Def =
       kind: 'through';
       a: Id;
       b: Id;
-    };
+    }
+  // V8-h (G8): the COMMON PERPENDICULAR of two lines — dir = dir(line1) × dir(line2) (cross is
+  // internal-only, never displayed), anchor = the foot on line1 of the shortest connecting segment.
+  | { kind: 'common-perp'; line1: string; line2: string }
+  // V8-h (G8): the PROJECTION (`היטל`) of a line onto a plane — each point's ⟂ foot on the plane.
+  | { kind: 'line-projection'; line: string; plane: string };
 
 /**
  * V8-b (G1): a plane defined by a ⊥/∥ RELATION to a segment/edge (not by points or an
@@ -379,6 +384,22 @@ export interface PlanePlaneLineCommand {
   p2: string;
 }
 
+/** V8-h (G8): `הישר d מאונך לישר ℓ ולישר ℓ'` — the common perpendicular of two lines. */
+export interface LineCommonPerpCommand {
+  type: 'line-common-perp';
+  name: string;
+  line1: string;
+  line2: string;
+}
+
+/** V8-h (G8): `היטל הישר TB על המישור ABCD` — the projection of a line onto a plane. */
+export interface LineProjectionCommand {
+  type: 'line-projection';
+  name: string;
+  line: string;
+  plane: string;
+}
+
 /** `מ-B מעבירים אנך לישר ℓ החותך אותו ב-C` — the ⟂ foot on a line. */
 export interface FootOnLineCommand {
   type: 'foot-on-line';
@@ -447,6 +468,8 @@ export type Command3 =
   | OnPlanesCommand
   | FootOnPlaneCommand
   | PlanePlaneLineCommand
+  | LineCommonPerpCommand
+  | LineProjectionCommand
   | FootOnLineCommand
   | Line3Command
   | LinePerpPlaneCommand
