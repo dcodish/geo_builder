@@ -2,8 +2,26 @@ name: CI
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'reports/**'
+      - 'deploy/**'
+      - '.claude/**'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'reports/**'
+      - 'deploy/**'
+      - '.claude/**'
+
+# A newer push to the same branch/PR cancels the still-running older run —
+# only the latest state matters, and each run costs ~13 free-tier minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
