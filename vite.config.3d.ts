@@ -25,11 +25,9 @@ export default defineConfig({
   base: '/3d-builder/',
   define: { __BUILD__: JSON.stringify(BUILD_ID) },
   plugins: [react(), tailwindcss()],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
+  // Deliberately NO `@` alias here: `@/*` maps to src/ (the 2-D app), and the
+  // isolation rule (docs/20 §12, ADR-266) forbids src3d importing 2-D code —
+  // without the alias such an import fails the 3-D build instead of silently working.
   build: {
     outDir: 'dist-3d',
     rollupOptions: { input: path.resolve(__dirname, '3d.html') },

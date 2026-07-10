@@ -62,7 +62,7 @@ Applies to feature requests **and** bug reports reclassified as capability gaps.
 
 ## 6. One-time GitHub setup (done at adoption)
 
-Labels: `P1` (red) `P2` (orange) `P3` (yellow) · `bug` `feature` `debt` · `2d` `3d` `server` · `needs-operator`. CI already runs on every push and PR (`.github/workflows/ci.yml`). Branch protection on `main` is optional (solo repo; CI is the real gate) — revisit if collaborators join.
+Labels: `P1` (red) `P2` (orange) `P3` (yellow) · `bug` `feature` `debt` · `2d` `3d` `server` · `needs-operator`. The app-label set **grows with the workspace** — each new product (§9) gets its own label at creation (planned: `analytic`, `complex`); `server` doubles as the label for shared-infra / CI / workspace items. CI runs per-product lanes on every push and PR (`.github/workflows/ci.yml`, ADR-266). Branch protection on `main` is optional (solo repo; CI is the real gate) — revisit if collaborators join.
 
 ## 7. Concurrency rules (the Dropbox reality)
 
@@ -85,3 +85,39 @@ The repo's `.git` syncs between two PCs via Dropbox, and parallel Claude session
 | Deploy | tag `prod/…` + [DEPLOY-LOG.md](DEPLOY-LOG.md) entry, per [RUNBOOK.md](RUNBOOK.md) |
 | Session narrative | [PROJECT-MEMORY.md](PROJECT-MEMORY.md) session log (unchanged) |
 | Status / resume pointer | [09-implementation-plan.md](09-implementation-plan.md) + CLAUDE.md (unchanged) |
+
+## 9. The multi-product workspace (product registry — ADR-266)
+
+This repo is **one workspace hosting several sibling products**. Every artifact in §8 is **per-product**: a request names (or implies) a product, and its issue label, ADR log, status section, CI lane, and deploy target all follow from that. When a session can't tell which product a request relates to, it asks — it never guesses across products.
+
+### Registry
+
+| | 2-D Geo Builder | 3-D Space Builder | Shared server |
+| --- | --- | --- | --- |
+| **Source** | `src/` | `src3d/` | `server/` |
+| **Entry / build** | `index.html` · `npm run build` → `dist/` | `3d.html` · `npm run build:3d` → `dist-3d/` | `npm run build:proxy` → `dist-server/` |
+| **Prod path** | `/geo-builder/` | `/3d-builder/` | proxy service `:8788` |
+| **ADR log** | [06-decisions.md](06-decisions.md) (`ADR-NNN`) | [06b-decisions-3d.md](06b-decisions-3d.md) (`ADR-3D-NNN`) | in 06 (repo-wide/infra ADRs also live here) |
+| **Plan / status** | [09-implementation-plan.md](09-implementation-plan.md) + CLAUDE.md current-state | [20-space-vectors-tool.md](20-space-vectors-tool.md) + CLAUDE.md 3-D section | RUNBOOK.md |
+| **Issue label** | `2d` | `3d` | `server` |
+| **Tests (local)** | `npm run test:2d` (= `vitest src/ server/`) | `npm run test:3d` (= `vitest src3d/ server/`) | runs in **every** lane |
+| **CI lane** | `test-2d` | `test-3d` | both |
+| **Fixtures** | `src/__tests__/fixtures/` | `fixtures3/` | — |
+
+Planned products (recommendation accepted 2026-07-10): **analytic geometry** — the 471 (4-pt) + 572 (5-pt) analytic-geometry questions as ONE engine with curriculum-level profiles (`src-analytic/`, ADR log `06c-decisions-analytic.md`, ids `ADR-AG-NNN`, label `analytic`); **complex numbers** (`src-complex/`, ADR log `06d-decisions-complex.md`, ids `ADR-CX-NNN`, label `complex`).
+
+### Isolation rules (operator authority — generalizes docs/20 §12)
+
+- A product's source tree **never imports another product's tree** — patterns are **COPIED**, not shared. Enforced mechanically by `server/__tests__/isolation.test.ts` (extend it when a product is added). Exception: *within* one product family (e.g. the analytic tool's 471/572 levels) sharing is free — they are one product with profiles.
+- The **shared server is the one deliberate sharing point** — parameterized by a `tool:` field (`server/parseHandler`, `handleLog`, admin `DashboardProfile`), never forked per product.
+- The 2-D locale files, ADR logs, and status text of one product are never touched by another product's work.
+- Full-suite runs (`npm run test:run`) remain the bar **before any deploy** and for changes to the shared surface; the per-product lanes are for the edit-push loop.
+
+### Adding product N+1 (the sibling-app recipe)
+
+1. Plan doc first (the docs/20 pattern: corpus audit → scope → decisions doc `06X-decisions-<tool>.md` with id prefix `ADR-<TOOL>-NNN`).
+2. `src-<tool>/` + `<tool>.html` + `vite.config.<tool>.ts` (own `base`, own `dist-<tool>/`, **no `@` alias** — it maps to `src/`) + `npm run build:<tool>`.
+3. GitHub label `<tool>`; a status section in CLAUDE.md (own section, like the 3-D one).
+4. CI: add the product's exclusive paths to the `changes` classifier in `.github/workflows/ci.yml` + a `test-<tool>` lane (`vitest src-<tool>/ server/`); add `test:<tool>` npm scripts. **Until the classifier knows the new paths they fall in the uncategorized bucket and run all lanes — safe by default.**
+5. Server: a `tool:` value + log sink + `DashboardProfile` in the shared proxy; Apache directives per RUNBOOK/deploy docs.
+6. Extend `server/__tests__/isolation.test.ts` with the new tree.
