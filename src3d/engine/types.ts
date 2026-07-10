@@ -542,6 +542,8 @@ export type Command3 =
   | { type: 'bisector-point'; id: Id; a: Id; b: Id; apex: Id }
   // triage 3-D: `הזווית בין הישר AC' לבין המישור ABCD היא 30` — the angle between a line and a plane
   | { type: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number }
+  // V8-j (G12): `T על SC כך ש-TABCD פירמידה ישרה` — T on segment a–b so pyramid(base, apex=T) is right.
+  | { type: 'right-pyramid-point'; id: Id; a: Id; b: Id; base: Id[] }
   // V8-g: `גובה המשולש לצלע AB הוא CD` — D = foot of the ⟂ from vertex `from` onto side a–b.
   | { type: 'altitude-foot'; id: Id; from: Id; a: Id; b: Id }
   // triage 3-D: `DE גובה בטטראדר` — altitude from vertex `from` to the OPPOSITE face of the
@@ -585,6 +587,9 @@ export type PointDef =
   | { kind: 'bisector-seg'; a: Id; b: Id; apex: Id }
   // V8-g: the foot of the ⟂ from `from` onto the line through a,b (a triangle altitude's foot)
   | { kind: 'foot-seg'; from: Id; a: Id; b: Id }
+  // V8-j (G12): the apex on segment a–b positioned so pyramid (base, apex) is RIGHT — i.e. the
+  // point on a–b that sits directly above the base's centroid (closed-form t; no CAS)
+  | { kind: 'right-pyramid-apex'; a: Id; b: Id; base: Id[] }
   | { kind: 'rev-point'; rev: number; role: 'center' | 'apex' }
   | { kind: 'vec-defined'; def: number } // solved from construction.vecDefs[def]
   | { kind: 'vec-pair'; def1: number; def2: number }; // the cevian intersection (two symbol relations)

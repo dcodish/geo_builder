@@ -137,6 +137,27 @@ function orientPyramid(s: string, toks: Id[]): Id[] {
   return toks;
 }
 
+/**
+ * V8-j (G12): a point on a segment positioned so a DERIVED pyramid is RIGHT — `T נמצאת על הקטע SC
+ * כך ש-TABCD היא פירמידה ישרה` / `T on SC such that TABCD is a right pyramid` (2019-קיץ-ב, 2019-חורף).
+ * The apex = the on-segment point (anywhere in the 5-letter name); the base = the other 4 vertices.
+ * MUST run before `rightPyramid` (which would otherwise build a pyramid solid from `TABCD`).
+ */
+const rightPyramidPoint: Rule = (s) => {
+  if ((!/פירמידה\s+ישרה/.test(s) && !/right\s+pyramid/i.test(s)) || (!/כך\s+ש/.test(s) && !/such\s+that/i.test(s))) return null;
+  const L = String.raw`([A-Z]\d*'?)`;
+  const m =
+    s.match(new RegExp(`^(?:ה?נקודה\\s+)?${L}\\s+(?:נמצאת\\s+|נמצא\\s+)?על\\s+(?:ה?קטע\\s+|ה?מקצוע\\s+|ה?צלע\\s+)?${L}${L}\\s+כך\\s+ש-?\\s*((?:[A-Z]\\d*'?){5})\\s+(?:היא\\s+)?פירמידה\\s+ישרה`)) ??
+    s.match(new RegExp(`^(?:point\\s+)?${L}\\s+(?:is\\s+)?on\\s+(?:the\\s+)?(?:segment\\s+|edge\\s+)?${L}${L}\\s+such\\s+that\\s+((?:[A-Z]\\d*'?){5})\\s+is\\s+a\\s+right\\s+pyramid`, 'i'));
+  if (!m) return null;
+  const [, pt, a, b, pyr] = m;
+  const verts = pyr.match(/[A-Z]\d*'?/g)!;
+  if (verts.length !== 5 || !verts.includes(pt)) return null;
+  const base = verts.filter((v) => v !== pt);
+  if (base.length !== 4) return null;
+  return [{ type: 'right-pyramid-point', id: pt, a, b, base }];
+};
+
 /** Right pyramid: `פירמידה ישרה ABCDS` / `ABCS`. WITHOUT ישרה, 4 ids = a GENERAL tetrahedron (V7 T2).
  *  V8-d: an equilateral triangular base → `pyramid3e`; a parallelogram base → `pyramidPar`. */
 const rightPyramid: Rule = (s) => {
@@ -1618,6 +1639,7 @@ const RULES: Rule[] = [
   rightPrism,
   volumeEqPoly, // BEFORE volumePolyClaim: its RHS is a volume, not a number
   volumePolyClaim, // BEFORE rightPyramid: נפח הפירמידה ABCD must never build a pyramid
+  rightPyramidPoint, // V8-j: `T על SC כך ש-TABCD פירמידה ישרה` — before rightPyramid (which would build a solid)
   rightPyramid,
   dotEqGiven, // `u·v = v·w` (a dot RHS) — before dotGiven, which only matches a numeric RHS
   dotGiven,

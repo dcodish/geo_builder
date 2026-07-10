@@ -989,6 +989,22 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    // V8-j (G12): the apex on segment a–b positioned so pyramid(base, apex) is RIGHT.
+    case 'right-pyramid-point': {
+      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      if (cmd.base.length !== 4) return { ok: false, error: { code: 'unknown-point', id: cmd.id } };
+      const missing = missingPoint(c, [cmd.a, cmd.b, ...cmd.base]);
+      if (missing) return { ok: false, error: missing };
+      const next = clone(c);
+      next.points.set(cmd.id, { kind: 'right-pyramid-apex', a: cmd.a, b: cmd.b, base: [...cmd.base] });
+      for (const v of cmd.base) if (!hasSegment(next, cmd.id, v)) next.segments.push([cmd.id, v]); // lateral edges
+      for (let j = 0; j < 4; j++) {
+        const [p, q] = [cmd.base[j], cmd.base[(j + 1) % 4]];
+        if (!hasSegment(next, p, q)) next.segments.push([p, q]); // base ring
+      }
+      return { ok: true, next };
+    }
+
     // V8-g: the foot of a triangle altitude — D = foot of ⟂ from vertex `from` onto side a–b.
     case 'altitude-foot': {
       if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };

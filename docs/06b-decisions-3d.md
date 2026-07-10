@@ -550,3 +550,17 @@ Not done (still the documented ADR-3D-028 deferral): rules that *operate on* a n
 **Semantics on the operator's case:** the full session now builds end-to-end — the membership drives the depth to |AD| = 40√3/9 with k = 2√15, A = (0,−3,1), the top face still exactly on its plane, and "show another configuration" keeps M on the face at every seed (a requirement, not a sample). `B על מישור DCC'D'` (satisfiable only by a collapsed box) still refuses `not-on-plane`, and the cube's rigid `A על המישור BC'D` refusal is byte-identical.
 
 **Locked by** `member-drive.test.ts` — the operator's exact sequence (+ the closed-form depth), resample-holds, entry-order permutation (membership typed BEFORE the pinning givens), the no-param coord-point class member, the equation-plane class member, the degenerate-only refusal, the rigid-cube refusal, and the transactional sibling-given guard. **550 src3d tests green, `tsc -b` + `vite build:3d` clean.**
+
+---
+
+## ADR-3D-034 — V8-j: a point positioned so a DERIVED solid becomes a right pyramid (2026-07-10)
+
+**Context (G12) — the LAST legacy-572 slice (V8 complete).** 2019-קיץ-ב Q2: `T נמצאת על הקטע SC כך ש-TABCD היא פירמידה ישרה` (T on SC so TABCD is right); 2019-חורף Q2: `K על EC כך ש-KOBCD פירמידה ישרה`. A point on a segment positioned so the derived pyramid (base = the other 4 vertices, apex = the point) is a RIGHT pyramid — apex directly above the base centre.
+
+**Decision — a driven on-segment point with a CLOSED-FORM t (no CAS, the ADR-3D bisector/span pattern).** A new `right-pyramid-apex` PointDef `{a, b, base}`: the point on segment a–b whose **in-plane offset from the base centroid is 0** (the apex sits directly above the centre). Resolved in the point loop: `centroid = mean(base)`, `n̂ = newellNormal(base)`, `inplane(v) = v − (v·n̂)n̂`; along `P(t) = a + t(b−a)` the offset `o(t) = inplane(a−centroid) + t·inplane(b−a)` is affine → minimise `|o(t)|²` closed-form `t* = −(a₀·d₀)/(d₀·d₀)`, and **place only if the residual ≈ 0** (else the segment never projects through the centroid → the point is left unplaced and the store reports `no-solution`, honest — no fake right pyramid). Added to `GAUGE_KINDS`; apply draws the pyramid's lateral edges + base ring.
+
+Parser `rightPyramidPoint` (He + En; the apex = the on-segment point wherever it sits in the 5-letter name, base = the other 4 — so `TABCD`/`KOBCD` apex-first and an apex-last name both read; runs BEFORE `rightPyramid` so `TABCD … פירמידה ישרה` isn't built as a pyramid solid).
+
+**Locked by** `v8j-right-pyramid.test.ts` (parse He+En incl. `KOBCD`; a square base with S above A → T lands at (2,2,3) directly above O=(2,2,0), TABCD right; an apex off to the side → honest `no-solution` kept-prior). Catalog +1. **555 src3d tests green, `tsc -b` + `vite build:3d` clean.**
+
+**V8 (full legacy-572 coverage) is COMPLETE** — every 2009–2024 exam's space/vectors INPUT is now expressible (documented deferrals: the exact parametric ℓ/ℓ' forms of V8-h/V8-i wait on the multi-line-naming rework; oblique parallelepiped + orthoscheme + the dihedral face↔base angle remain low-frequency coord-expressible items).
