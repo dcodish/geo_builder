@@ -36,11 +36,16 @@ export interface DataPanel {
   relations: string[];
   vectors: VecEntry[];
   points: string[]; // `N(6, 6, 6)` — stable coordinates only
-  /** id → canvas coordinate label for EVERY point (when a frame exists), judged
-   *  PER COMPONENT: 'fact' = fully determined; 'partial' = the known components print
-   *  and the free ones read '?' (S(?, 0, ?) — its y IS knowledge while the base still
-   *  tilts about AB); 'sample' = nothing determined, THIS DRAWING'S values shown. */
-  pointCoords: Record<string, { text: string; kind: 'fact' | 'partial' | 'sample' }>;
+  /** Named planes whose equation is FORCED (identical up to scale in every sampled
+   *  configuration): the standard form `ABB'A': 20x - y + 2z - 5 = 0` the exam asks
+   *  for, plus a parametric form when the run's anchor/edges are stable (ADR-3D-032). */
+  planes: string[];
+  /** id → canvas coordinate label (when a frame exists), judged PER COMPONENT across
+   *  every sampled configuration: 'fact' = fully determined; 'partial' = the known
+   *  components print and the free ones read '?' (S(?, 0, ?) — its y IS knowledge
+   *  while the base still tilts about AB). A point with NO stable component gets no
+   *  label — a sample coordinate is not knowledge (operator rule, 2026-07-09). */
+  pointCoords: Record<string, { text: string; kind: 'fact' | 'partial' }>;
 }
 
 const EPS = 1e-6;
@@ -61,6 +66,33 @@ export function cleanNum(x: number, tol = 1e-5): string {
 const cleanCoef = (x: number): string => cleanNum(x, 2e-3);
 
 const coordStr = (v: Vec3): string => `(${cleanNum(v.x)}, ${cleanNum(v.y)}, ${cleanNum(v.z)})`;
+
+/** Render a UNIT-normalized plane (lead coefficient positive) as `20x - y + 2z - 5 = 0`:
+ *  find the smallest integer scaling (the book form); fall back to the 2-decimal unit form. */
+export function planeEqStr(u: { x: number; y: number; z: number; d: number }): string {
+  const vals = [u.x, u.y, u.z, u.d];
+  const minAbs = Math.min(...vals.filter((v) => Math.abs(v) > 1e-6).map(Math.abs));
+  let ints: number[] | null = null;
+  for (let m = 1; m <= 60 && !ints; m++) {
+    const scaled = vals.map((v) => (v * m) / minAbs);
+    // tolerance sized for the pivot's numeric floor propagated through the normal
+    if (scaled.every((v) => Math.abs(v - Math.round(v)) < 2e-3 * Math.max(1, Math.abs(v))) && scaled.every((v) => Math.abs(v) < 1000)) {
+      ints = scaled.map(Math.round);
+    }
+  }
+  const co = ints ?? vals;
+  const num = (v: number) => (ints ? String(Math.abs(v)) : cleanNum(Math.abs(v)));
+  const parts: string[] = [];
+  (['x', 'y', 'z'] as const).forEach((ax, i) => {
+    const v = co[i];
+    if (Math.abs(v) < 1e-9) return;
+    const coef = Math.abs(Math.abs(v) - 1) < 1e-9 ? '' : num(v);
+    const term = `${coef}${ax}`;
+    parts.push(parts.length === 0 ? (v < 0 ? `-${term}` : term) : `${v < 0 ? '-' : '+'} ${term}`);
+  });
+  if (Math.abs(co[3]) > 1e-9) parts.push(`${co[3] < 0 ? '-' : '+'} ${num(co[3])}`);
+  return `${parts.join(' ')} = 0`;
+}
 
 /** Solve M·x = t for 3×3 M given by columns u,v,w; null when singular. */
 function solve3x3(u: Vec3, v: Vec3, w: Vec3, t: Vec3): [number, number, number] | null {
@@ -157,7 +189,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
 
   // an absolute frame exists only when something was injected — otherwise every
   // coordinate is gauge, and gauge must never print as data
-  const hasFrame = c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0;
+  const hasFrame = c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
 
   const vecNames = [...c.vectors.entries()];
   const basis = vecNames.slice(0, 3);
@@ -226,13 +258,26 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     const coefs = isBasisVec ? null : decompose(a, b);
     const symDecomp = !isBasisVec && !coefs ? decomposeSym(a, b) : null;
     const d = stablePair(a, b);
-    const stated = lengths.get(k);
+    // a magnitude is knowledge when STATED — or when the frame DERIVES it: identical
+    // in every sampled configuration (the |u|=|v| class-value gate; operator 2026-07-09:
+    // |BB'| = 18 is forced by the plane given + B, the student never has to type it)
+    let mag = lengths.get(k);
+    if (mag === undefined && hasFrame) {
+      const per = positions.map((pos) => {
+        const p = pos.get(a);
+        const q = pos.get(b);
+        return p && q ? Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z) : null;
+      });
+      if (per.every((m): m is number => m !== null) && per.every((m) => Math.abs(m! - per[0]!) < 1e-6 * Math.max(1, per[0]!))) {
+        mag = per[0]!;
+      }
+    }
     const entry: VecEntry = {
       label,
       decomp: coefs ? decompStr(coefs, basisNames) : symDecomp,
       coords: hasFrame && d ? coordStr(d) : null,
-      mag: stated !== undefined ? `|${label}| = ${cleanNum(stated)}` : null,
-      sq: stated !== undefined ? `${label}² = ${cleanNum(stated * stated)}` : null,
+      mag: mag !== undefined ? `|${label}| = ${cleanNum(mag)}` : null,
+      sq: mag !== undefined ? `${label}² = ${cleanNum(mag * mag)}` : null,
     };
     if (entry.decomp || entry.coords || entry.mag) entries.push(entry);
   };
@@ -311,9 +356,12 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     }
   }
 
-  // points with STABLE coordinates (needs a frame; a pinned-only figure prints nothing sampled)
+  // points with STABLE coordinates (needs a frame; a pinned-only figure prints nothing sampled).
+  // A coordinate is KNOWLEDGE only when it is identical in EVERY sampled configuration —
+  // an unstable (seed-varying) coordinate never prints at all (operator rule, 2026-07-09:
+  // a number on a node is read as known; one drawing's sample is not knowledge).
   const points: string[] = [];
-  const pointCoords: Record<string, { text: string; kind: 'fact' | 'partial' | 'sample' }> = {};
+  const pointCoords: Record<string, { text: string; kind: 'fact' | 'partial' }> = {};
   if (hasFrame) {
     const axes = ['x', 'y', 'z'] as const;
     for (const id of positions[0].keys()) {
@@ -337,10 +385,44 @@ export function dataView(c: Construction3, seed: number): DataPanel {
         const cs = `(${axes.map((ax, i) => (stableAx[i] ? cleanNum(ps[0]![ax]) : free(ax))).join(', ')})`;
         pointCoords[id] = { text: cs, kind: 'partial' };
         points.push(`${id}${cs}`);
-      } else {
-        pointCoords[id] = { text: coordStr(ps[0]!), kind: 'sample' };
+      }
+      // no stable axis at all → no label (a sample coordinate is not knowledge)
+    }
+  }
+
+  // named planes (point-run / rel-plane) whose EQUATION is forced — identical up to
+  // scale in EVERY sampled configuration (the same multi-sample gate; operator request
+  // 2026-07-09: `מישור ABB'A'` should surface its equation, the exam's מצאו את משוואת
+  // המישור). An equation-plane was GIVEN by equation — nothing to derive.
+  const planes: string[] = [];
+  if (hasFrame) {
+    for (const name of [...c.pointPlanes.keys(), ...c.relPlanes.keys()]) {
+      const per = resolved.map((r) => r.planes.get(name));
+      if (per.some((p) => !p)) continue;
+      const canon = per.map((p) => {
+        const n = Math.hypot(p!.n.x, p!.n.y, p!.n.z);
+        if (n < EPS) return null;
+        const u = { x: p!.n.x / n, y: p!.n.y / n, z: p!.n.z / n, d: p!.d / n };
+        const lead = [u.x, u.y, u.z].find((v) => Math.abs(v) > 1e-6) ?? 1;
+        return lead < 0 ? { x: -u.x, y: -u.y, z: -u.z, d: -u.d } : u;
+      });
+      if (canon.some((v) => !v)) continue;
+      const keys = ['x', 'y', 'z', 'd'] as const;
+      if (!canon.every((v) => keys.every((k) => Math.abs(v![k] - canon[0]![k]) < 1e-4))) continue;
+      planes.push(`${name}: ${planeEqStr(canon[0]!)}`);
+      // the parametric form rides when the run's anchor point and spanning edges are stable
+      const run = c.pointPlanes.get(name);
+      if (run && run.length >= 3) {
+        const p0s = positions.map((pos) => pos.get(run[0]));
+        const anchorStable = p0s.every((p): p is Vec3 => !!p) && sameVec(p0s[0]!, p0s[1]!) && sameVec(p0s[0]!, p0s[2]!);
+        const e1 = stablePair(run[0], run[1]);
+        const e2 = stablePair(run[0], run[run.length - 1]);
+        if (anchorStable && e1 && e2) {
+          planes.push(`${name}: x = ${coordStr(p0s[0]!)} + t·${coordStr(e1)} + s·${coordStr(e2)}`);
+        }
       }
     }
   }
-  return { relations, vectors: entries, points, pointCoords };
+
+  return { relations, vectors: entries, points, pointCoords, planes };
 }

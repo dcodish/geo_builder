@@ -51,6 +51,37 @@ describe('Figure3 (static, DOM-free)', () => {
     expect((group.match(/#0d9488/g) ?? []).length).toBeGreaterThanOrEqual(5); // everything in the vector colour
   });
 
+  it('canvas MATH labels are bidi-ISOLATED so an RTL document cannot reorder them (ADR-3D-031 Am.)', () => {
+    // operator report: B(0, 7, 6) rendered as (6 ,7 ,0) on the RTL canvas — the coordinate
+    // string must be wrapped LRI…PDI (U+2066/U+2069); same for the line-equation echo.
+    let c = emptyConstruction3();
+    const cmds: Command3[] = [
+      { type: 'solid', kind: 'cube', ids: ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"] },
+      {
+        type: 'line3',
+        name: 'ℓ',
+        anchor: [{ k: 0, p: 0 }, { k: 7, p: 0 }, { k: 6, p: 0 }],
+        dir: [{ k: 0, p: 0 }, { k: 2, p: 0 }, { k: 1, p: 0 }],
+        src: 'x = (0,7,6) + t·(0,2,1)',
+      },
+    ];
+    for (const cmd of cmds) {
+      const r = applyCommand3(c, cmd);
+      if (!r.ok) throw new Error('apply failed');
+      c = r.next;
+    }
+    const html = renderToStaticMarkup(
+      <Figure3
+        construction={c}
+        resolved={resolve3(c, 0)}
+        resetLabel="reset"
+        coordLabels={{ B: { text: '(0, 7, 6)', kind: 'fact' } }}
+      />,
+    );
+    expect(html).toContain('⁦(0, 7, 6)⁩'); // the coordinate label, isolated
+    expect(html).toContain('⁦ℓ: x ='); // the line-equation echo, isolated
+  });
+
   it('renders an empty construction without crashing', () => {
     const empty = emptyConstruction3();
     const html = renderToStaticMarkup(

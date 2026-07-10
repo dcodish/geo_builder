@@ -4,7 +4,8 @@
  */
 
 import { exprPointIds, exprVectorNames } from './vecExpr';
-import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, SolidCommand, SolidObj } from './types';
+import { cross3, dot3, normalize3, v3 } from './vec3';
+import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, SolidCommand, SolidObj } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5 };
 
@@ -120,6 +121,9 @@ function clone(c: Construction3): Construction3 {
     claims: [...c.claims],
     scalarPins: [...c.scalarPins],
     pairPins: [...c.pairPins],
+    planePins: [...c.planePins],
+    paramGivens: [...c.paramGivens],
+    paramSigns: [...c.paramSigns],
   };
 }
 
@@ -288,7 +292,10 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       const missing = missingPoint(c, [cmd.a, cmd.b]);
       if (missing) return { ok: false, error: missing };
       if (cmd.a === cmd.b) return { ok: false, error: { code: 'unknown-point', id: cmd.b } };
-      if (hasSegment(c, cmd.a, cmd.b)) return { ok: true, next: c }; // idempotent — the 2-D convention
+      if (c.segments.some((s) => samePair(s, cmd.a, cmd.b))) return { ok: true, next: c }; // idempotent — the 2-D convention
+      // a pair that IS a solid edge is still RECORDED (ADR-3D-030 Am. 2): the student
+      // naming `BB'` is a deliberate act — the data panel organizes that pair's
+      // knowledge (derived |BB'|); the scene draws the ink ONCE (the solid edge wins)
       const next = clone(c);
       next.segments.push([cmd.a, cmd.b]);
       return { ok: true, next };
@@ -371,6 +378,19 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       const err = claimRefsError(c, cmd.claim);
       if (err) return { ok: false, error: err };
       const next = clone(c);
+      // ADR-3D-032: a given referencing a coord-sym point PINS the figure parameter —
+      // it must NOT enter the pivot (M rides a provisional sampled k there); it is
+      // root-found post-pivot over final positions (1-DOF, the D3 boundary). Recorded
+      // as a claim too — the final verification stays the arbiter.
+      const refsCoordSym = (ids: Id[]): boolean => ids.some((id) => c.points.get(id)?.kind === 'coord-sym');
+      if (
+        (cmd.claim.type === 'length-eq' && refsCoordSym([cmd.claim.a, cmd.claim.b])) ||
+        (cmd.claim.type === 'angle-seg-eq' && refsCoordSym([cmd.claim.a1, cmd.claim.b1, cmd.claim.a2, cmd.claim.b2]))
+      ) {
+        next.paramGivens.push(cmd.claim);
+        next.claims.push(cmd.claim);
+        return { ok: true, next };
+      }
       // M1 (V7 T2): a scalar statement on a figure with FREE dims is a GIVEN — it
       // drives the solve instead of being "checked" against an arbitrary sample.
       if (freeDims(c) > 0) {
@@ -382,6 +402,16 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
           next.scalarPins.push({ kind: 'vangle', vertex: cmd.claim.a1, p: cmd.claim.b1, q: cmd.claim.b2, deg: cmd.claim.deg });
           return { ok: true, next };
         }
+      }
+      // M1 (ADR-3D-030): a plane-EQUATION statement on a SOLID-bearing figure is ALSO a
+      // GIVEN — it pins the pivot (each named point satisfies n·P + d = 0), driving the
+      // free gauge/dims exactly like a coordinate injection; contradictory ⇒
+      // `injection-unsatisfiable`. The claim record is KEPT (fall through): points the
+      // pivot cannot place (symbol-defined, resolved post-pivot) skip the residual, so
+      // the final claim verification is what guarantees EVERY named point. A coord-only
+      // figure (no solid, nothing to drive) is the plain verified claim.
+      if (cmd.claim.type === 'plane-eq' && c.solids.length > 0) {
+        next.planePins.push({ ids: [...cmd.claim.ids], cx: cmd.claim.cx, cy: cmd.claim.cy, cz: cmd.claim.cz, d: cmd.claim.d });
       }
       next.claims.push(cmd.claim); // recorded — derive3 verifies EVERY recorded claim (fact-attributed)
       return { ok: true, next };
@@ -398,10 +428,37 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
         return { ok: true, next };
       }
       if (cmd.x === null || cmd.y === null || cmd.z === null) {
+        // ADR-3D-032: a NEW point whose symbolic components all carry ONE letter is a
+        // coord-sym point — the letter becomes the figure's single parameter (a sampled
+        // free DOF until a recorded given pins it, ADR-052). Distinct letters stay the
+        // honest under-determination refusal.
+        const letters = [...new Set((cmd.syms ?? []).flatMap((s) => (s !== null ? [s] : [])))];
+        if (letters.length === 1) {
+          const sym = letters[0];
+          if (c.param && c.param !== sym) return { ok: false, error: { code: 'two-params' } };
+          const comp = (v: number | null, s: string | null): { k: number; p: number } =>
+            v !== null ? { k: v, p: 0 } : s ? { k: 0, p: 1 } : { k: 0, p: 0 };
+          const next = clone(c);
+          next.points.set(cmd.id, {
+            kind: 'coord-sym',
+            x: comp(cmd.x, cmd.syms![0]),
+            y: comp(cmd.y, cmd.syms![1]),
+            z: comp(cmd.z, cmd.syms![2]),
+          });
+          next.param = sym;
+          return { ok: true, next };
+        }
         return { ok: false, error: { code: 'symbolic-new-point', id: cmd.id } }; // a NEW point needs numbers
       }
       const next = clone(c);
       next.points.set(cmd.id, { kind: 'coord', x: cmd.x, y: cmd.y, z: cmd.z });
+      return { ok: true, next };
+    }
+
+    case 'param-sign': {
+      if (c.param !== cmd.sym) return { ok: false, error: { code: 'unknown-symbol', id: cmd.sym } };
+      const next = clone(c);
+      next.paramSigns.push(cmd);
       return { ok: true, next };
     }
 
@@ -555,9 +612,37 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'on-line': {
-      if (!c.points.has(cmd.id)) return { ok: false, error: { code: 'unknown-point', id: cmd.id } };
       if (!c.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
+      if (!c.points.has(cmd.id)) {
+        // M1 dual (ADR-3D-031, the on-planes shape): a NEW id stated onto a named line is
+        // CREATED as a free rider (1 sampled DOF); the store's status pass still checks
+        // membership on final coordinates, so nothing escapes verification
+        const next = clone(c);
+        next.points.set(cmd.id, { kind: 'on-line', line: cmd.line });
+        return { ok: true, next };
+      }
       const next = clone(c);
+      // M1 (ADR-3D-031 Am., the ADR-3D-030 shape): an EXISTING point stated onto a NUMERIC
+      // typed line on a SOLID-bearing figure is ALSO a GIVEN — a point on a line is a point
+      // on TWO planes through it, so the statement lowers to two plane pins and the whole
+      // plane-drive machinery (normal-solve exclusion, unmet check, failure-path retry,
+      // Stage-A placement, degeneracy filter) absorbs it with no new solver code. The
+      // onLines record is KEPT (below) — the store's not-on-line check on final
+      // coordinates is the arbiter either way.
+      const lineDef = c.lines.get(cmd.line)!;
+      if (lineDef.kind === 'parametric' && c.solids.length > 0) {
+        const num = (e: LinExpr): number | null => (e.p === 0 ? e.k : null);
+        const a = lineDef.anchor.map(num);
+        const d = lineDef.dir.map(num);
+        if (a.every((x) => x !== null) && d.every((x) => x !== null)) {
+          const anchor = v3(a[0]!, a[1]!, a[2]!);
+          const u = normalize3(v3(d[0]!, d[1]!, d[2]!));
+          const axisSeed = Math.abs(u.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
+          const e1 = normalize3(cross3(u, axisSeed));
+          const e2 = cross3(u, e1);
+          for (const n of [e1, e2]) next.planePins.push({ ids: [cmd.id], cx: n.x, cy: n.y, cz: n.z, d: -dot3(n, anchor) });
+        }
+      }
       next.onLines.push(cmd);
       return { ok: true, next };
     }

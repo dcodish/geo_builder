@@ -40,6 +40,12 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'points', he: "E מפגש התיכונים של משולש BC'D", en: "E is the centroid of triangle BC'D" },
   { category: 'points', he: 'O מפגש האלכסונים של הפאה ABCD', en: 'O is the intersection of the diagonals of face ABCD' },
   { category: 'points', he: 'A(2,-2,6)', en: 'A(2,-2,6)' },
+  {
+    // ADR-3D-032: one symbolic coordinate = the figure parameter (a later given pins it)
+    category: 'points',
+    he: 'נתונה נקודה M(k,1,3), k הוא פרמטר חיובי',
+    en: 'point M(k,1,3), k is a positive parameter',
+  },
   { category: 'points', he: 'P על AM כך ש-KP = αu + βv', en: 'P on AM such that KP = αu + βv' },
   // --- vectors ---
   { category: 'vectors', he: "נסמן: AB = u, AD = v, AA' = w", en: "denote AB = u, AD = v, AA' = w" },
@@ -47,6 +53,12 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // --- planes & lines ---
   { category: 'planesLines', he: 'המישור π1: z - 3 = 0', en: 'plane π1: z - 3 = 0' },
   { category: 'planesLines', he: 'הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)', en: 'line ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)' },
+  {
+    // ADR-3D-031: a pair-named parametric line also puts A,B ON the line (riders / verified givens)
+    category: 'planesLines',
+    he: 'הצגה פרמטרית של הישר AB היא x = (0,7,6) + t(0,2,1)',
+    en: 'a parametric representation of line AB is x = (0,7,6) + t(0,2,1)',
+  },
   { category: 'planesLines', he: 'הזווית בין המישורים π1 ו-π2 היא 45', en: 'the angle between planes π1 and π2 is 45' },
   { category: 'planesLines', he: 'הישר ℓ ניצב למישור π1', en: 'line ℓ is perpendicular to plane π1' },
   { category: 'planesLines', he: 'מ-A מורידים אנך למישור π1 החותך אותו בנקודה B', en: 'from A drop a perpendicular to plane π1, it cuts it at B' },

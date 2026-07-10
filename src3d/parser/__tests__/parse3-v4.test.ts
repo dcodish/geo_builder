@@ -30,8 +30,8 @@ describe('the נתון injection list', () => {
 });
 
 describe('symbolic point components', () => {
-  it('A(3,n,p) — letters become null (only numerics constrain)', () => {
-    expect(cmds('A(3,n,p)')).toEqual([{ type: 'point3', id: 'A', x: 3, y: null, z: null }]);
+  it('A(3,n,p) — letters become null (only numerics constrain); ADR-3D-032 keeps the letters for apply', () => {
+    expect(cmds('A(3,n,p)')).toEqual([{ type: 'point3', id: 'A', x: 3, y: null, z: null, syms: [null, 'n', 'p'] }]);
   });
 });
 
@@ -40,6 +40,15 @@ describe('the sign given', () => {
     expect(cmds("שיעור ה-z של C' חיובי")).toEqual([{ type: 'sign-given', id: "C'", axis: 'z', positive: true }]);
     expect(cmds("the z-coordinate of C' is positive")).toEqual([{ type: 'sign-given', id: "C'", axis: 'z', positive: true }]);
     expect(cmds('שיעור ה-y של B שלילי')).toEqual([{ type: 'sign-given', id: 'B', axis: 'y', positive: false }]);
+  });
+  it('spaced article + copula (operator report 2026-07-09)', () => {
+    const neg = [{ type: 'sign-given', id: 'A', axis: 'y', positive: false }];
+    expect(cmds('שיעור ה y של A הוא שלילי')).toEqual(neg); // the exact reported phrasing
+    expect(cmds('שיעור ה y של A שלילי')).toEqual(neg); // spaced article alone
+    expect(cmds('שיעור ה-y של A הוא שלילי')).toEqual(neg); // copula alone
+    expect(cmds('שיעור הy של A היא שלילי')).toEqual(neg); // glued article + feminine copula
+    expect(cmds("שיעור ה z של C' הוא חיובי")).toEqual([{ type: 'sign-given', id: "C'", axis: 'z', positive: true }]);
+    expect(cmds('y coordinate of A is negative')).toEqual(neg); // En mirror: optional "the"
   });
 });
 
@@ -60,6 +69,12 @@ describe('the plane-equation claim', () => {
       { type: 'claim', claim: { type: 'plane-eq', ids: ['K', 'B', 'C'], cx: 1, cy: 2, cz: 3, d: -26 } },
     ]);
     expect(cmds('plane KBC: x + 2y + 3z - 26 = 0')).toHaveLength(1);
+  });
+  it("מישור A'B'C'D' הוא x-4y-8z-142=0 — bare מישור, the copula הוא, a primed run (operator report 2026-07-09)", () => {
+    expect(cmds("מישור A'B'C'D' הוא x-4y-8z-142=0")).toEqual([
+      { type: 'claim', claim: { type: 'plane-eq', ids: ["A'", "B'", "C'", "D'"], cx: 1, cy: -4, cz: -8, d: -142 } },
+    ]);
+    expect(cmds("plane A'B'C'D' is x-4y-8z-142=0")).toHaveLength(1);
   });
   it('a claimed plane equation with a parameter is refused', () => {
     expect(parse3('המישור KBC: mx + 2y = 0')).toEqual({ ok: false, reason: 'not-handled' });

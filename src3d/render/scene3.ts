@@ -375,6 +375,44 @@ export function buildScene3(
     wAngles.push({ pts, label, text: `${g.deg}°` });
   }
 
+  // A STATED angle between two segments from a shared vertex (ADR-3D-032 Am.) gets an
+  // arc + its value at the vertex — marked only because the student said it (the 2-D
+  // stated-angle rule). Sources: vangle scalar pins (driving givens) and recorded
+  // shared-apex angle claims (incl. paramGivens — they live in claims too).
+  {
+    const stated = [
+      ...c.scalarPins.flatMap((sp) => (sp.kind === 'vangle' ? [{ vertex: sp.vertex, p: sp.p, q: sp.q, deg: sp.deg }] : [])),
+      ...c.claims.flatMap((cl) =>
+        cl.type === 'angle-seg-eq' && cl.a1 === cl.a2 ? [{ vertex: cl.a1, p: cl.b1, q: cl.b2, deg: cl.deg }] : [],
+      ),
+    ];
+    const seen = new Set<string>();
+    for (const g of stated) {
+      const key = `${g.vertex}|${[g.p, g.q].sort().join('|')}|${g.deg}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const v = positions.get(g.vertex);
+      const p = positions.get(g.p);
+      const q = positions.get(g.q);
+      if (!v || !p || !q) continue;
+      const d1 = dist3(p, v);
+      const d2 = dist3(q, v);
+      if (d1 < 1e-9 || d2 < 1e-9) continue;
+      const u1 = normalize3(sub3(p, v));
+      const u2 = normalize3(sub3(q, v));
+      const r = Math.min(d1, d2) * 0.3;
+      const pts: Vec3[] = [];
+      for (let s = 0; s <= 12; s++) {
+        const m = add3(scale3(u1, 1 - s / 12), scale3(u2, s / 12));
+        if (norm3(m) < 1e-9) continue;
+        pts.push(add3(v, scale3(normalize3(m), r)));
+      }
+      const bis = add3(u1, u2);
+      const label = add3(v, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : u1, r * 1.6));
+      wAngles.push({ pts, label, text: `${g.deg}°` });
+    }
+  }
+
   const wLines: { name: string; a: Vec3; b: Vec3; form: string }[] = [];
   for (const [name, ln] of resolved.lines) {
     const mid = projectOntoLine(center, ln);
@@ -534,7 +572,9 @@ export function buildScene3(
       edges.push({ id: `edge-${edgeKey(a, b)}`, a, b, x1: pa.x, y1: pa.y, x2: pb.x, y2: pb.y, hidden: hidden.has(edgeKey(a, b)) });
     }
   }
+  const solidEdgeKeys = new Set(c.solids.flatMap((s) => s.edges.map(([a, b]) => edgeKey(a, b))));
   for (const [a, b] of c.segments) {
+    if (solidEdgeKeys.has(edgeKey(a, b))) continue; // a recorded pair on a solid edge — the edge already draws this ink
     const pa = screen.get(a);
     const pb = screen.get(b);
     if (!pa || !pb) continue;
@@ -559,6 +599,7 @@ export function buildScene3(
     }
   }
   for (const [a, b] of c.segments) {
+    if (solidEdgeKeys.has(edgeKey(a, b))) continue; // the solid-edge pass above already counted this direction
     if (!screen.has(a) || !screen.has(b)) continue;
     addIncident(a, b);
     addIncident(b, a);

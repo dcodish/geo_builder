@@ -251,6 +251,18 @@ export interface Point3Command {
   x: number | null;
   y: number | null;
   z: number | null;
+  /** ADR-3D-032: the symbol letter behind each null component (`M(k,1,3)` → ['k',null,null]).
+   *  On a NEW id with ONE distinct letter the point becomes `coord-sym` (the letter is the
+   *  figure's single parameter); an EXISTING id keeps the V4 partial-pin semantics. */
+  syms?: [string | null, string | null, string | null];
+}
+
+/** ADR-3D-032: `k הוא פרמטר חיובי` — a sign given on the figure's symbolic parameter
+ *  (selects among the root branches, the point sign-given's sibling). */
+export interface ParamSignCommand {
+  type: 'param-sign';
+  sym: string;
+  positive: boolean;
 }
 
 /** `נתון: v = (10,-5,0)` — inject a numeric value for a DECLARED vector (the V4 pivot). */
@@ -461,7 +473,9 @@ export interface LinePlanePointCommand {
   plane: string;
 }
 
-/** `B על הישר ℓ` — a membership GIVEN on a line (verified; 2024-Q2 ד's investigation). */
+/** `B על הישר ℓ` — a membership statement on a line. APPLY decides by id (M1, the
+ *  on-planes shape): an EXISTING point is a verified given (2024-Q2 ד's investigation);
+ *  a NEW id is CREATED as a free rider on the line (ADR-3D-031). */
 export interface OnLineCommand {
   type: 'on-line';
   id: Id;
@@ -487,6 +501,7 @@ export type Command3 =
   | PointInSpanCommand
   | ClaimCommand
   | Point3Command
+  | ParamSignCommand
   | Plane3Command
   | PlaneAngleCommand
   | OnPlanesCommand
@@ -554,6 +569,13 @@ export type PointDef =
   // a free point riding a named plane (2 sampled DOF), or floating on a stated SIDE of
   // it (side ±1 = above/below the +z-oriented normal; 3 sampled DOF) — ADR-3D-015
   | { kind: 'on-plane'; plane: string; side?: 1 | -1 }
+  // a free point riding a named line (1 sampled DOF) — the on-plane rider, line edition
+  // (ADR-3D-031: `משוואת הישר AB היא (0,7,6)+t(0,2,1)` creates A,B as riders on the line)
+  | { kind: 'on-line'; line: string }
+  // ADR-3D-032: `M(k,1,3)` — typed coordinates carrying the figure's SINGLE symbolic
+  // parameter (LinExpr components; absolute, never gauge). Unpinned k = a sampled free
+  // DOF; a recorded given referencing the point (paramGivens) root-finds it post-pivot.
+  | { kind: 'coord-sym'; x: LinExpr; y: LinExpr; z: LinExpr }
   | { kind: 'foot-plane'; from: Id; plane: string }
   | { kind: 'foot-line'; from: Id; line: string }
   | { kind: 'line-plane'; line: string; plane: string }
@@ -621,6 +643,17 @@ export interface Construction3 {
   scalarPins: ScalarPin[];
   /** V7 T2 — pair-vector injections (`BD = (-4,5,12)`), residuals like vectorPins. */
   pairPins: { a: Id; b: Id; x: number; y: number; z: number }[];
+  /** ADR-3D-030 (M1) — a stated plane EQUATION on a solid-bearing figure is a GIVEN:
+   *  each named point must satisfy cx·x + cy·y + cz·z + d = 0 (pivot residuals, like
+   *  coordinate injections — it drives the free gauge/dims, verifies when determined). */
+  planePins: { ids: Id[]; cx: number; cy: number; cz: number; d: number }[];
+  /** ADR-3D-032 — recorded givens (angle/length claims) that reference a `coord-sym`
+   *  point: they PIN the figure parameter by a post-pivot 1-DOF root-find (roots =
+   *  branches; the D3 numeric-only boundary). */
+  paramGivens: Claim3[];
+  /** ADR-3D-032 — sign givens on the figure parameter (`k הוא פרמטר חיובי`): select
+   *  among the root branches. */
+  paramSigns: ParamSignCommand[];
 }
 
 export const emptyConstruction3 = (): Construction3 => ({
@@ -647,6 +680,9 @@ export const emptyConstruction3 = (): Construction3 => ({
   claims: [],
   scalarPins: [],
   pairPins: [],
+  planePins: [],
+  paramGivens: [],
+  paramSigns: [],
 });
 
 // ---------------------------------------------------------------------------

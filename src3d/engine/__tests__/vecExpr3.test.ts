@@ -139,13 +139,16 @@ describe('apply validation (V1 commands)', () => {
     expect(applyCommand3(named1, { type: 'name-vector', name: 'u', from: 'B', to: 'C' })).toMatchObject({ ok: false, error: { code: 'already-defined', id: 'u' } });
   });
 
-  it('segment3 is idempotent and never duplicates a solid edge', () => {
+  it('segment3 is idempotent; naming a solid edge RECORDS the pair (the scene dedupes the ink)', () => {
     const c = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }, { type: 'segment3', a: 'C', b: "A'" });
     expect(c.segments).toEqual([['C', "A'"]]);
     const again = applyCommand3(c, { type: 'segment3', a: "A'", b: 'C' });
     expect(again.ok && again.next.segments.length).toBe(1);
-    const edge = applyCommand3(c, { type: 'segment3', a: 'A', b: 'B' }); // a cube edge — no aux duplicate
-    expect(edge.ok && edge.next.segments.length).toBe(1);
+    // a cube edge — RECORDED (ADR-3D-030 Am.): the student's naming feeds the data
+    // panel (e.g. a derived |BB'|); scene3 skips solid-edge duplicates so the ink
+    // still draws exactly once (locked in scene3.test.ts)
+    const edge = applyCommand3(c, { type: 'segment3', a: 'A', b: 'B' });
+    expect(edge.ok && edge.next.segments.length).toBe(2);
   });
 
   it('a claim referencing an undeclared vector is refused at apply time', () => {

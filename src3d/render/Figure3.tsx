@@ -19,9 +19,9 @@ export interface Figure3Props {
   /** Reset-view button label (i18n-injected so this component stays translation-free). */
   resetLabel?: string;
   /** id → coordinate label drawn under the point letter (the organize-your-data
-   *  toggle). fact/partial = knowledge (blue; '?' marks a free component); sample =
-   *  this drawing's values (gray italic — changes with "show another configuration"). */
-  coordLabels?: Record<string, { text: string; kind: 'fact' | 'partial' | 'sample' }>;
+   *  toggle). Knowledge only — a value identical in every sampled configuration;
+   *  '?' marks a free component. Undetermined points carry no label (ADR-3D-030 Am.). */
+  coordLabels?: Record<string, { text: string; kind: 'fact' | 'partial' }>;
 }
 
 /** Per-index plane patch colours (translucent — patches never occlude, docs/20 §11). */
@@ -31,6 +31,10 @@ const ORBIT_SPEED = 0.011; // radians per px
 
 /** Named vectors draw in their own colour (ADR-3D-003 Am.) so tail/head read instantly. */
 const VECTOR_COLOR = '#0d9488';
+
+/** Bidi-isolate a MATH string (coordinates, equations) so the RTL document can't visually
+ *  reorder it — `(0, 7, 6)` used to render as `(6 ,7 ,0)` on the canvas (LRI…PDI). */
+const ltr = (s: string) => `⁦${s}⁩`;
 
 export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels }: Figure3Props) {
   const [cam, setCam] = useState<Camera3>(HOME_CAMERA);
@@ -169,7 +173,7 @@ export default function Figure3({ construction, resolved, width = 640, height = 
               textAnchor="middle"
               dominantBaseline="middle"
             >
-              {l.form}
+              {ltr(l.form)}
             </text>
           </g>
         ))}
@@ -261,15 +265,14 @@ export default function Figure3({ construction, resolved, width = 640, height = 
                 y={p.y + p.labelDy + 13}
                 fontSize={11}
                 fontFamily="ui-sans-serif, system-ui, sans-serif"
-                fill={coordLabels[p.id].kind === 'sample' ? '#94a3b8' : '#0369a1'}
-                fontStyle={coordLabels[p.id].kind === 'sample' ? 'italic' : 'normal'}
+                fill="#0369a1"
                 stroke="#ffffff"
                 strokeWidth={3}
                 paintOrder="stroke"
                 textAnchor="middle"
                 dominantBaseline="middle"
               >
-                {coordLabels[p.id].text}
+                {ltr(coordLabels[p.id].text)}
               </text>
             )}
           </g>

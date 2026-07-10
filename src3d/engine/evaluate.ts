@@ -397,7 +397,11 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number): { va
   if (!c.param) return null;
   const roots = paramRoots(c);
   if (pinningGivens(c) === 0) {
-    return { value: sample(seed, `param-${c.param}`, -3, 3), roots: [] };
+    // an UNPINNED parameter is a free sampled DOF — a stated sign (ADR-3D-032,
+    // `k הוא פרמטר חיובי`) constrains the sample's half-line, never flags it
+    const sign = c.paramSigns.find(() => true);
+    const range: [number, number] = sign ? (sign.positive ? [0.3, 3] : [-3, -0.3]) : [-3, 3];
+    return { value: sample(seed, `param-${c.param}`, range[0], range[1]), roots: [] };
   }
   if (roots.length === 0) return { value: NaN, roots }; // no-roots — surfaced as an honest error
   const explicit = [...c.planeAngles, ...c.linePerps].find((g) => g.branch !== undefined)?.branch;
@@ -468,8 +472,9 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   for (const def of c.points.values()) {
     if (def.kind === 'on-segment' && def.t === undefined) freeT++;
     if (def.kind === 'on-plane') freeT += def.side ? 3 : 2; // a plane rider slides in-plane; a side point also floats
+    if (def.kind === 'on-line') freeT += 1; // a line rider slides along its line (ADR-3D-031)
   }
-  const param = c.param && pinningGivens(c) === 0 ? 1 : 0;
+  const param = c.param && pinningGivens(c) === 0 && c.paramGivens.length === 0 ? 1 : 0;
   if (resolved.pivot && resolved.pivot.solutions > 0) {
     let pinCount = c.vectorPins.length * 3;
     for (const p of c.pins) pinCount += (p.x !== null ? 1 : 0) + (p.y !== null ? 1 : 0) + (p.z !== null ? 1 : 0);
@@ -620,6 +625,12 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   const param = c.param ? chooseParam(c, pos, seed) : null;
   const a = param && Number.isFinite(param.value) ? param.value : 0;
 
+  // ADR-3D-032: coord-sym points (`M(k,1,3)`) are absolute like coord points, at the
+  // (provisional) parameter value — re-placed post-pivot when a paramGiven pins k.
+  for (const [id, def] of c.points) {
+    if (def.kind === 'coord-sym') pos.set(id, v3(linVal(def.x, a), linVal(def.y, a), linVal(def.z, a)));
+  }
+
   const planes = new Map<string, ResolvedPlane>();
   for (const name of c.planes.keys()) planes.set(name, planeAt(c, name, a));
 
@@ -633,7 +644,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
 
   // ---- the V4 pivot: injected coordinates pin the gauge (ADR-3D-007)
   let pivot: Resolved3['pivot'] = null;
-  if ((c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0) && c.solids.length > 0) {
+  if ((c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0 || c.planePins.length > 0) && c.solids.length > 0) {
     const dims0 = c.solids.flatMap((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed));
     const evalCanonical = (dims: number[], cheap = true, override?: Map<number, number>): Positions3 => {
       const p2: Positions3 = new Map<Id, Vec3>();
@@ -680,16 +691,90 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       }
     };
 
+    // ADR-3D-030: the normal solve EXCLUDES plane-equation pins — on a figure the other
+    // pins already place, an extra plane residual only spawns junk basins (one named
+    // point dragged onto the plane, the rest of the figure off it); membership is
+    // checked below, and the recorded claim is the final arbiter either way.
+    const cNoPlanes = c.planePins.length > 0 ? { ...c, planePins: [] } : c;
+    const hasOtherPins = c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0;
+
     // 1) the normal solve — no symbol unknowns, so bit-identical to the pre-V8-c path.
-    applySolutions(solvePivot(c, EC, dims0, seed));
+    if (hasOtherPins) applySolutions(solvePivot(cNoPlanes, EC, dims0, seed));
 
     // 2) failure-path retry (V8-c): a ⟂/∥-pinned symbol whose point could NOT be placed
     //    (no root-find value exists at the pivot's chosen dims) is COUPLED to a free dim —
     //    re-solve the symbol and the dim JOINTLY (the D3 numeric-only path, no CAS).
     const unplaced = coupledPins.some((p) => !pos.has(c.vecDefs[p.def].unknown));
     if (unplaced && coupledDefs.length > 0 && dims0.length > 0) {
-      const retry = solvePivot(c, EC, dims0, seed, { defs: coupledDefs, pins: coupledPins });
+      const retry = solvePivot(cNoPlanes, EC, dims0, seed, { defs: coupledDefs, pins: coupledPins });
       if (retry.length > 0) applySolutions(retry);
+    }
+
+    // 3) plane-equation DRIVE (ADR-3D-030, failure path): when nothing else pins the
+    //    figure, or the pinned solve leaves a stated plane membership unmet, re-solve
+    //    WITH the plane pins so the equation drives the free gauge/dims. If the joint
+    //    solve finds nothing, the pinned figure stands and the recorded claim refutes
+    //    the equation (the student-answer semantics, `claim-refuted`).
+    if (c.planePins.length > 0) {
+      const unmet = c.planePins.some((pin) => {
+        const nn = Math.max(Math.hypot(pin.cx, pin.cy, pin.cz), 1e-12);
+        return pin.ids.some((id) => {
+          const p = pos.get(id);
+          return p ? Math.abs(p.x * pin.cx + p.y * pin.cy + p.z * pin.cz + pin.d) / nn > 1e-4 * Math.max(norm3(p), 1) : false;
+        });
+      });
+      if (!hasOtherPins || unmet) {
+        const retry = solvePivot(c, EC, dims0, seed);
+        if (retry.length > 0) applySolutions(retry);
+        else if (!hasOtherPins) pivot = { solutions: 0, chosen: -1, err: Infinity };
+      }
+    }
+  }
+
+  // ---- ADR-3D-032: a given referencing a coord-sym point pins the parameter — a
+  // post-pivot 1-DOF root-find over FINAL positions (roots = branches, the ADR-3D-006
+  // semantics: a param sign given selects, otherwise the seed cycles; no root = the
+  // honest no-roots refusal). Runs after the pivot because the residuals read the
+  // pivot-placed points (A, B), never before.
+  let paramOut: { value: number; roots: number[] } | null = param;
+  if (c.param && c.paramGivens.length > 0) {
+    const symAt = (id: Id, t: number): Vec3 | undefined => {
+      const d = c.points.get(id);
+      return d?.kind === 'coord-sym' ? v3(linVal(d.x, t), linVal(d.y, t), linVal(d.z, t)) : pos.get(id);
+    };
+    const residual = (cl: (typeof c.paramGivens)[number]) => (t: number): number => {
+      if (cl.type === 'length-eq') {
+        const p = symAt(cl.a, t);
+        const q = symAt(cl.b, t);
+        return p && q ? dist3(p, q) - cl.value : NaN;
+      }
+      if (cl.type === 'angle-seg-eq') {
+        const p1 = symAt(cl.a1, t);
+        const q1 = symAt(cl.b1, t);
+        const p2 = symAt(cl.a2, t);
+        const q2 = symAt(cl.b2, t);
+        if (!p1 || !q1 || !p2 || !q2) return NaN;
+        const u = sub3(q1, p1);
+        const w = sub3(q2, p2);
+        const den = norm3(u) * norm3(w);
+        return den < 1e-12 ? NaN : Math.abs(dot3(u, w)) / den - Math.cos((cl.deg * Math.PI) / 180);
+      }
+      return NaN;
+    };
+    const fns = c.paramGivens.map(residual);
+    // sign-change roots catch crossings; touch-zero catches double roots (deg-90 |cos|)
+    const candidates = fns.flatMap((f) => [...signChangeRoots(f), ...touchZeroRoots((t) => Math.abs(f(t)))]);
+    const roots = snapAndDedupe(candidates.filter((t) => fns.every((f) => Math.abs(f(t)) < 1e-5)));
+    const pool0 = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
+    const pool = pool0.length > 0 ? pool0 : roots;
+    if (pool.length > 0) {
+      const value = pool[seed % pool.length];
+      for (const [id, d] of c.points) {
+        if (d.kind === 'coord-sym') pos.set(id, v3(linVal(d.x, value), linVal(d.y, value), linVal(d.z, value)));
+      }
+      paramOut = { value, roots };
+    } else {
+      paramOut = { value: NaN, roots: [] };
     }
   }
 
@@ -811,7 +896,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     positions: pos,
     planes,
     lines,
-    param: c.param && param ? { name: c.param, value: param.value, roots: param.roots } : null,
+    param: c.param && paramOut ? { name: c.param, value: paramOut.value, roots: paramOut.roots } : null,
     pivot,
     revolutions,
     circles3,
@@ -887,6 +972,20 @@ function evaluateSolidsAndPoints(
         p = add3(p, scale3(up, def.side * sample(seed, `onplane-h-${id}`, 0.45, 1.05) * spread));
       }
       pos.set(id, p);
+    } else if (def.kind === 'on-line') {
+      // a free point riding a named line (ADR-3D-031, the on-plane rider's line edition):
+      // sampled t along the unit direction around the figure centroid's ⟂ projection onto
+      // the line, spread-scaled; distinct ids sample distinct t (general position).
+      const ln = lines.get(def.line);
+      if (!ln || norm3(ln.dir) < 1e-12) continue; // unresolved/degenerate line — flagged downstream
+      const placed = [...pos.values()];
+      const centre0 = placed.length ? centroid3(placed) : ln.anchor;
+      const u = normalize3(ln.dir);
+      const centre = add3(ln.anchor, scale3(u, dot3(sub3(centre0, ln.anchor), u)));
+      let spread = 1.2;
+      for (const q of placed) spread = Math.max(spread, dist3(q, centre));
+      const t = sample(seed, `online-t-${id}`, -0.85, 0.85) * spread;
+      pos.set(id, add3(centre, scale3(u, t)));
     } else if (def.kind === 'plane-cut') {
       // V8-b (G2): the point where a plane crosses segment a–b (the plane may be an
       // equation, a point-run, or a ⊥/∥ rel-plane — resolved from current positions)

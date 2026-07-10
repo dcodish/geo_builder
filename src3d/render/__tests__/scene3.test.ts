@@ -90,6 +90,16 @@ describe('buildScene3', () => {
     }
   });
 
+  it('a recorded segment on a SOLID EDGE draws no duplicate ink (ADR-3D-030 Am.)', () => {
+    // apply RECORDS the pair (the student's naming feeds the data panel); the scene
+    // must still draw that edge exactly once — the solid edge wins
+    const c = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS }, { type: 'segment3', a: 'A', b: 'B' });
+    expect(c.segments).toEqual([['A', 'B']]);
+    const scene = buildScene3(c, resolve3(c, 0), HOME_CAMERA, viewport);
+    expect(scene.edges).toHaveLength(12); // the cube's own edges only — no 13th
+    expect(scene.edges.filter((e) => (e.a === 'A' && e.b === 'B') || (e.a === 'B' && e.b === 'A'))).toHaveLength(1);
+  });
+
   it('dashed edges are emitted FIRST so solid edges paint over them at crossings', () => {
     const c = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS });
     const scene = buildScene3(c, resolve3(c, 0), HOME_CAMERA, viewport);

@@ -77,7 +77,7 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     }
     let st: FactStatus3 = 'ok';
     const claimsBefore = c.claims.length;
-    const pinsBefore = c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length;
+    const pinsBefore = c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length + c.planePins.length;
     for (const cmd of f.cmds) {
       const r = applyCommand3(c, cmd);
       if (!r.ok) {
@@ -91,7 +91,7 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     if (c.claims.length > claimsBefore) claimOwners.push({ factId: f.id, from: claimsBefore, to: c.claims.length });
     // pin ownership (same count-delta discipline): a fact that contributed ANY pivot
     // pin must not read ok when the pivot finds no placement (honesty — no silent seed figure)
-    if (c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length > pinsBefore) pinOwnerIds.add(f.id);
+    if (c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length + c.planePins.length > pinsBefore) pinOwnerIds.add(f.id);
     status[f.id] = st;
   }
 
@@ -103,9 +103,16 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     if (status[owner.factId] !== 'ok') continue;
     for (let i = owner.from; i < owner.to; i++) {
       const claim = c.claims[i];
+      // ADR-3D-032: a claim that PINS the figure parameter (references a coord-sym
+      // point) is a given, not a size statement — no root = the honest no-roots.
+      const pinsParam = c.paramGivens.includes(claim);
+      if (pinsParam && resolved.param && resolved.param.roots.length === 0) {
+        status[owner.factId] = { code: 'no-roots' };
+        break;
+      }
       // V2 honest boundary: a numeric size on a free-dim solid figure is a SCALE
       // statement, not a check — refuse with a clear message rather than "refute" it.
-      if ((claim.type === 'length-eq' || claim.type === 'area-eq') && c.solids.length > 0) {
+      if (!pinsParam && (claim.type === 'length-eq' || claim.type === 'area-eq') && c.solids.length > 0) {
         status[owner.factId] = { code: 'size-on-solid' };
         break;
       }
@@ -138,6 +145,13 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
         // the stated relation admits NO parameter value — over-constrained, honestly
         if (resolved.param && resolved.param.roots.length === 0) {
           status[f.id] = { code: 'no-roots' };
+          break;
+        }
+      } else if (cmd.type === 'param-sign') {
+        // ADR-3D-032: the chosen parameter value must honour the stated sign
+        const v = resolved.param?.value;
+        if (v === undefined || !Number.isFinite(v) || (cmd.positive ? v <= 1e-9 : v >= -1e-9)) {
+          status[f.id] = { code: 'sign-unsatisfiable', id: cmd.sym };
           break;
         }
       } else if (cmd.type === 'vec-rel' || cmd.type === 'seg-plane-rel' || cmd.type === 'length-rel') {

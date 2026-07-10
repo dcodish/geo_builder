@@ -509,7 +509,9 @@ const lengthRel: Rule = (s) => {
     const val = evalRadical(vm[2]);
     return val === null ? null : [{ type: 'vec-mag', name: vm[1], value: val }];
   }
-  const lhs = s.match(new RegExp(`^(?:\\|${P}\\||(?:אורך|length)\\s+(?:המקצוע\\s+|הצלע\\s+|צלע\\s+)?${P})\\s*(?:=|שווה\\s+ל)\\s*(.+)$`));
+  // the copula `הוא`/`is` joins the separators (the exam's `אורך המקצוע AB הוא 5√5` —
+  // the ADR-3D-026 phrasing class)
+  const lhs = s.match(new RegExp(`^(?:\\|${P}\\||(?:אורך|length)\\s+(?:המקצוע\\s+|הצלע\\s+|צלע\\s+)?${P})\\s*(?:=|שווה\\s+ל|הוא\\s|is\\s)\\s*(.+)$`));
   if (!lhs) return null; // bare `AS = AB` is AMBIGUOUS — parse3 surfaces the clarification, never a guess
   const a1 = lhs[1] ?? lhs[3];
   const b1 = lhs[2] ?? lhs[4];
@@ -747,15 +749,32 @@ const NUM = String.raw`-?\d+(?:\.\d+)?`;
 const COMP = `(?:${NUM}|[a-w])`;
 const compVal = (t: string): number | null => (/^[a-w]$/.test(t) ? null : +t);
 
-/** `A(2,-2,6)` / `A(3,n,p)` (+ optional membership tail: `נמצאת על אחד המישורים` / `על המישור π2` / `על הישר ℓ`). */
+/** `A(2,-2,6)` / `A(3,n,p)` / `נתונה נקודה M(k,1,3), k הוא פרמטר חיובי` (+ optional
+ *  membership tail: `נמצאת על אחד המישורים` / `על המישור π2` / `על הישר ℓ`). */
 const coordPoint: Rule = (s) => {
   const m = s.match(
-    new RegExp(`^(?:הנקודה\\s+|point\\s+)?([A-Z]\\d*'?)\\s*\\(\\s*(${COMP})\\s*,\\s*(${COMP})\\s*,\\s*(${COMP})\\s*\\)\\s*(.*)$`),
+    new RegExp(`^(?:נתונה\\s+)?(?:ה?נקודה\\s+|point\\s+)?([A-Z]\\d*'?)\\s*\\(\\s*(${COMP})\\s*,\\s*(${COMP})\\s*,\\s*(${COMP})\\s*\\)\\s*(.*)$`),
   );
   if (!m) return null;
   const [, id, x, y, z, restRaw] = m;
-  const cmds: Command3[] = [{ type: 'point3', id, x: compVal(x), y: compVal(y), z: compVal(z) }];
-  const rest = restRaw.trim();
+  const syms = [x, y, z].map((t) => (/^[a-w]$/.test(t) ? t : null)) as [string | null, string | null, string | null];
+  const cmds: Command3[] = [
+    syms.some((t) => t !== null)
+      ? { type: 'point3', id, x: compVal(x), y: compVal(y), z: compVal(z), syms }
+      : { type: 'point3', id, x: compVal(x), y: compVal(y), z: compVal(z) },
+  ];
+  let rest = restRaw.trim();
+  // ADR-3D-032: the exam's appositive sign clause — `M(k,1,3), k הוא פרמטר חיובי` /
+  // bare `, k חיובי` / `, k > 0` / En mirrors (the same family as the standalone rule)
+  const signTail = rest.match(
+    /^,?\s*([a-w])\s+(?:הוא\s+)?(?:פרמטר\s+)?(חיובי|שלילי)$|^,?\s*(?:where\s+)?([a-w])\s+is\s+(?:a\s+)?(positive|negative)(?:\s+parameter)?$|^,?\s*([a-w])\s*([<>])\s*0$/,
+  );
+  if (signTail) {
+    const sym = signTail[1] ?? signTail[3] ?? signTail[5];
+    const word = signTail[2] ?? signTail[4] ?? signTail[6];
+    cmds.push({ type: 'param-sign', sym, positive: word === 'חיובי' || word === 'positive' || word === '>' });
+    rest = '';
+  }
   if (rest) {
     const onLine = rest.match(new RegExp(`^(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על הישר|on (?:the )?line)\\s+(${LINE_NAME.source})$`));
     if (/^(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?(?:על אחד המישורים|on one of the planes)$/.test(rest)) {
@@ -820,7 +839,7 @@ const pointRelPlane: Rule = (s) => {
 const linePlaneAngle: Rule = (s) => {
   const m =
     s.match(
-      new RegExp(`^ה?זווית\\s+בין\\s+ה?ישר\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+ל?בין\\s+ה?מישור\\s+((?:[A-Z]\\d*'?){3,4})\\s*(?:היא|הוא|=)\\s*(${NUM})\\s*°?$`),
+      new RegExp(`^ה?זו?וית\\s+בין\\s+ה?ישר\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+ל?בין\\s+ה?מישור\\s+((?:[A-Z]\\d*'?){3,4})\\s*(?:היא|הוא|=)\\s*(${NUM})\\s*°?$`),
     ) ??
     s.match(
       new RegExp(`^the\\s+angle\\s+between\\s+(?:the\\s+)?line\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+and\\s+(?:the\\s+)?plane\\s+((?:[A-Z]\\d*'?){3,4})\\s*(?:is|=)\\s*(${NUM})\\s*°?$`, 'i'),
@@ -833,7 +852,7 @@ const linePlaneAngle: Rule = (s) => {
 const angleBetweenPlanes: Rule = (s) => {
   const m = s.match(
     new RegExp(
-      `^(?:הזווית בין ה?מישור(?:ים)?|the angle between (?:the )?planes)\\s+(${PLANE_NAME.source})\\s*(?:ל|ו|and)-?\\s*(${PLANE_NAME.source})\\s*(?:היא|הוא|is|=)?\\s*(${NUM})\\s*°?$`,
+      `^(?:הזו?וית בין ה?מישור(?:ים)?|the angle between (?:the )?planes)\\s+(${PLANE_NAME.source})\\s*(?:ל|ו|and)-?\\s*(${PLANE_NAME.source})\\s*(?:היא|הוא|is|=)?\\s*(${NUM})\\s*°?$`,
     ),
   );
   if (!m) return null;
@@ -980,26 +999,47 @@ const dropPerpToLine: Rule = (s) => {
 // V3 — parameters in lines (docs/20 §8 V3, ADR-3D-006; gate 2024-Q2)
 // ---------------------------------------------------------------------------
 
-/** `הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)` — a typed parametric line (components may carry the parameter). */
+/** `הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)` — a typed parametric line (components may carry
+ *  the parameter). ADR-3D-031: the name may also be a POINT PAIR (`משוואת הישר AB היא
+ *  (0,7,6)+t(0,2,1)` / `the equation of line AB is …` / the textbook `הצגה פרמטרית של הישר AB
+ *  היא x = …`), which ALSO puts the named points ON the line — new ids become free riders
+ *  (1 sampled DOF each, ADR-052), existing ids become verified membership givens (M1). */
 const parametricLine: Rule = (s) => {
-  const m = s.match(new RegExp(`^(?:הישר\\s+|line\\s+)?(${LINE_NAME.source})\\s*:\\s*x\\s*=\\s*\\(([^()]*)\\)\\s*\\+\\s*t\\s*[·×*]?\\s*\\(([^()]*)\\)$`));
+  const NAME = `(${LINE_NAME.source}|[A-Z]\\d*'?[A-Z]\\d*'?)`;
+  const head =
+    s.match(new RegExp(`^(?:הישר\\s+|line\\s+)?${NAME}\\s*:\\s*(.+)$`)) ??
+    s.match(
+      new RegExp(
+        `^(?:נתון\\s+(?:כי\\s+|ש))?(?:משוואת|ה?משוואה\\s+של|ה?הצגה\\s+ה?פרמטרית\\s+של)\\s+(?:ה?ישר\\s+)?${NAME}\\s+(?:היא|הוא)\\s*:?\\s*(.+)$`,
+      ),
+    ) ??
+    s.match(
+      new RegExp(
+        `^(?:given\\s+that\\s+)?(?:the\\s+|a\\s+)?(?:equation|parametric\\s+(?:representation|form|equation))\\s+of\\s+(?:the\\s+)?(?:line\\s+)?${NAME}\\s+is\\s*:?\\s*(.+)$`,
+      ),
+    );
+  if (!head) return null;
+  const m = head[2].match(/^(?:x\s*=\s*)?\(([^()]*)\)\s*\+\s*t\s*[·×*]?\s*\(([^()]*)\)$/);
   if (!m) return null;
   const triple = (str: string) => str.split(',').map((p) => parseParamExpr(p));
-  const anchor = triple(m[2]);
-  const dir = triple(m[3]);
+  const anchor = triple(m[1]);
+  const dir = triple(m[2]);
   if (anchor.length !== 3 || dir.length !== 3 || [...anchor, ...dir].some((x) => !x)) return null;
   const params = new Set([...anchor, ...dir].flatMap((x) => (x!.param ? [x!.param] : [])));
   if (params.size > 1) return null;
-  return [
+  const name = LINE_NAME.test(head[1]) && head[1].length === 1 ? 'ℓ' : head[1];
+  const cmds: Command3[] = [
     {
       type: 'line3',
-      name: 'ℓ',
+      name,
       anchor: [anchor[0]!.expr, anchor[1]!.expr, anchor[2]!.expr],
       dir: [dir[0]!.expr, dir[1]!.expr, dir[2]!.expr],
-      src: `x = (${m[2].trim()}) + t·(${m[3].trim()})`,
+      src: `x = (${m[1].trim()}) + t·(${m[2].trim()})`,
       param: [...params][0],
     },
   ];
+  if (name !== 'ℓ') for (const id of name.match(/[A-Z]\d*'?/g)!) cmds.push({ type: 'on-line', id, line: name });
+  return cmds;
 };
 
 /** `הישר ℓ ניצב למישור π` — a GIVEN that pins the parameter (line ⟂ plane). */
@@ -1075,6 +1115,18 @@ const injectionList: Rule = (s) => {
   return cmds.length > 0 ? cmds : null;
 };
 
+/** ADR-3D-032: `k הוא פרמטר חיובי` / `k חיובי` / `k > 0` / `k is (a) positive (parameter)` —
+ *  a sign given on the figure's symbolic parameter (selects among the root branches).
+ *  A letter the figure doesn't carry as its parameter refuses at apply (unknown-symbol). */
+const paramSign: Rule = (s) => {
+  const m =
+    s.match(/^([a-w])\s+(?:הוא\s+)?(?:פרמטר\s+)?(חיובי|שלילי)$/) ??
+    s.match(/^([a-w])\s+is\s+(?:a\s+)?(positive|negative)(?:\s+parameter)?$/) ??
+    s.match(/^([a-w])\s*([<>])\s*0$/);
+  if (!m) return null;
+  return [{ type: 'param-sign', sym: m[1], positive: m[2] === 'חיובי' || m[2] === 'positive' || m[2] === '>' }];
+};
+
 /** Standalone `v = (10,-5,0)` — a single vector injection. */
 const vectorInjection: Rule = (s) => {
   const m = s.match(new RegExp(`^([a-w])\\s*=\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)$`));
@@ -1082,11 +1134,13 @@ const vectorInjection: Rule = (s) => {
   return [{ type: 'inject-vector', name: m[1], x: +m[2], y: +m[3], z: +m[4] }];
 };
 
-/** `שיעור ה-z של C' חיובי` / `the z-coordinate of C' is positive` — a sign branch given. */
+/** `שיעור ה-z של C' חיובי` / `the z-coordinate of C' is positive` — a sign branch given.
+ *  Article spaced or hyphenated (`ה z`/`ה-z`/`הz`, the on-axes idiom) and the copula
+ *  (`הוא`/`היא`/`is`) optional — the ADR-3D-026 phrasing class. */
 const signGiven: Rule = (s) => {
   const m =
-    s.match(/^שיעור\s+ה-?([xyz])\s+של\s+([A-Z]\d*'?)\s+(חיובי|שלילי)$/) ??
-    s.match(/^the\s+([xyz])(?:-coordinate|\s+coordinate)\s+of\s+([A-Z]\d*'?)\s+is\s+(positive|negative)$/);
+    s.match(/^שיעור\s+ה\s*[-־]?\s*([xyz])\s+של\s+(?:הקודקוד\s+|הנקודה\s+)?([A-Z]\d*'?)\s+(?:הוא\s+|היא\s+)?(חיובי|שלילי)$/) ??
+    s.match(/^(?:the\s+)?([xyz])(?:-coordinate|\s+coordinate)\s+of\s+(?:vertex\s+|point\s+)?([A-Z]\d*'?)\s+is\s+(positive|negative)$/);
   if (!m) return null;
   return [{ type: 'sign-given', id: m[2], axis: m[1] as 'x' | 'y' | 'z', positive: m[3] === 'חיובי' || m[3] === 'positive' }];
 };
@@ -1155,12 +1209,21 @@ const segLineCutsPointPlane: Rule = (s) => {
   ];
 };
 
-/** `הזווית בין A'C לבין BC' היא 90` — the angle between two SEGMENT-lines (≤90°), a claim. */
+/** `הזווית בין A'C לבין BC' היא 90` / the exam's `גודל הזווית שבין הישר AB ובין הישר AM
+ *  הוא 60` — the angle between two SEGMENT-lines (≤90°), a claim. */
 const angleSegClaim: Rule = (s0) => {
   const s = stripProofPrefix(s0);
   const m =
-    s.match(new RegExp(`^הזווית\\s+בין\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+(?:לבין|ל)-?\\s*([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+(?:היא|הוא)\\s+(${NUM})\\s*°?$`)) ??
-    s.match(new RegExp(`^the\\s+angle\\s+between\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+and\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+is\\s+(${NUM})\\s*°?$`));
+    s.match(
+      new RegExp(
+        `^(?:גודל\\s+)?ה?זו?וית\\s+ש?בין\\s+(?:ה?ישר\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+(?:לבין|ובין|ל|ו)-?\\s*(?:ה?ישר\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+(?:היא|הוא)\\s+(${NUM})\\s*°?$`,
+      ),
+    ) ??
+    s.match(
+      new RegExp(
+        `^the\\s+angle\\s+between\\s+(?:line\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+and\\s+(?:line\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+is\\s+(${NUM})\\s*°?$`,
+      ),
+    );
   if (!m) return null;
   const [, a1, b1, a2, b2, deg] = m;
   return [
@@ -1264,7 +1327,7 @@ const onAxes: Rule = (s) => {
 const vertexAngleClaim: Rule = (s0) => {
   const s = stripProofPrefix(s0);
   const m = s.match(
-    new RegExp(`^(?:∠|ה?זווית\\s+|the angle\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*(?:היא|הוא|is|=)\\s*(${NUM})\\s*°?$`),
+    new RegExp(`^(?:∠|ה?זו?וית\\s+|the angle\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*(?:היא|הוא|is|=)\\s*(${NUM})\\s*°?$`),
   );
   if (!m) return null;
   const [, p, vertex, q, deg] = m;
@@ -1288,7 +1351,7 @@ const mkAtom = (named?: string, pa?: string, pb?: string): VecAtom | null =>
 const cosAngleGiven: Rule = (s) => {
   if (!/cos|קוסינוס/i.test(s)) return null;
   let m =
-    s.match(/קוסינוס\s+(?:ה?זווית\s+)?בין\s+(?:ה?וקטורים\s+)?([a-w])\s+ו-?\s*([a-w])\s+(?:הוא|היא|שווה\s+ל-?|=)\s*(.+)$/) ??
+    s.match(/קוסינוס\s+(?:ה?זו?וית\s+)?בין\s+(?:ה?וקטורים\s+)?([a-w])\s+ו-?\s*([a-w])\s+(?:הוא|היא|שווה\s+ל-?|=)\s*(.+)$/) ??
     s.match(/(?:the\s+)?cosine\s+of\s+the\s+angle\s+between\s+(?:the\s+vectors?\s+)?([a-w])\s+and\s+([a-w])\s+(?:is|equals?|=)\s*(.+)$/i) ??
     s.match(/^cos\s*(?:∠|∡)?\s*\(\s*([a-w])\s*,\s*([a-w])\s*\)\s*=\s*(.+)$/i);
   if (m) {
@@ -1296,7 +1359,7 @@ const cosAngleGiven: Rule = (s) => {
     return v === null ? null : [{ type: 'cos-angle', u: { kind: 'named', name: m[1] }, v: { kind: 'named', name: m[2] }, cos: v }];
   }
   // vertex form: cos∠ACB / cos ACB / קוסינוס הזווית ACB = value — rays CA, CB from the middle vertex
-  m = s.match(/(?:cos|קוסינוס(?:\s+ה?זווית)?)\s*(?:∠|∡)?\s*([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:הוא|היא|שווה\s+ל-?|is|=)\s*(.+)$/i);
+  m = s.match(/(?:cos|קוסינוס(?:\s+ה?זו?וית)?)\s*(?:∠|∡)?\s*([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:הוא|היא|שווה\s+ל-?|is|=)\s*(.+)$/i);
   if (m) {
     const v = evalRadical(m[4].trim());
     if (v === null) return null;
@@ -1349,7 +1412,7 @@ const bisectorPoint: Rule = (s) => {
   const m =
     s.match(
       new RegExp(
-        `^(?:ה?נקודה\\s+)?${L}\\s+(?:נמצאת\\s+|נמצא\\s+)?על\\s+(?:ה?קטע\\s+|ה?צלע\\s+)?${L}${L}\\s+כך\\s+ש-?\\s*${L}${L}\\s+חוצ[הת]?\\s*-?\\s*(?:את\\s+)?(?:ה?זווית\\s+)?${L}${L}${L}\\s*$`,
+        `^(?:ה?נקודה\\s+)?${L}\\s+(?:נמצאת\\s+|נמצא\\s+)?על\\s+(?:ה?קטע\\s+|ה?צלע\\s+)?${L}${L}\\s+כך\\s+ש-?\\s*${L}${L}\\s+חוצ[הת]?\\s*-?\\s*(?:את\\s+)?(?:ה?זו?וית\\s+)?${L}${L}${L}\\s*$`,
       ),
     ) ??
     s.match(
@@ -1574,6 +1637,7 @@ const RULES: Rule[] = [
   pointPlanesLine, // point-run planes before the π-name intersection rule
   segLineCutsPointPlane, // `הישר A'C חותך את המישור BC'D בנקודה K` — before the ℓ-name cut rule
   coordPoint,
+  paramSign, // ADR-3D-032: `k הוא פרמטר חיובי` — before generic rules can misread the letter
   vectorInjection,
   onAxes, // `על ציר ה-x` before the generic membership/on-segment rules
   membership, // before onSegment: `על אחד המישורים` must never read as a point-on-segment

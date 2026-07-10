@@ -446,7 +446,7 @@ export default function App3() {
           </label>
           {showData && dataPanel && (
             <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
-              {dataPanel.vectors.length === 0 && dataPanel.points.length === 0 ? (
+              {dataPanel.vectors.length === 0 && dataPanel.points.length === 0 && dataPanel.planes.length === 0 ? (
                 <p className="text-slate-400">{t('dataPanel.empty')}</p>
               ) : (
                 <ul className="flex flex-col gap-1" dir="ltr">
@@ -476,6 +476,11 @@ export default function App3() {
                   ))}
                   {dataPanel.points.map((p) => (
                     <li key={p}>{p}</li>
+                  ))}
+                  {dataPanel.planes.map((p) => (
+                    <li key={p} className="border-t border-slate-100 pt-1">
+                      {p}
+                    </li>
                   ))}
                 </ul>
               )}

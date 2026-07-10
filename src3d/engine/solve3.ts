@@ -159,7 +159,7 @@ export function solvePivot(
 ): PivotResult[] {
   const pointPins = c.pins;
   const vecPins = c.vectorPins;
-  if (pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 && c.scalarPins.length === 0) return [];
+  if (pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 && c.scalarPins.length === 0 && c.planePins.length === 0) return [];
 
   // V8-c: a symbol coupled to a solid dim (`DF = t·… ⟂ plane` where the plane's height
   // is a free dim) becomes an EXTRA pivot unknown, appended after the dims; its ⟂/∥
@@ -174,6 +174,7 @@ export function solvePivot(
   // onto a point). Freeze the gauge to identity and solve the shape dims ONLY.
   const invariantOnly =
     nSym === 0 && pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 &&
+    c.planePins.length === 0 && // a plane EQUATION is absolute-coordinates — it pins the gauge
     c.scalarPins.every(
       (p) =>
         p.kind === 'vangle' || p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane' || p.kind === 'length-rel' ||
@@ -181,6 +182,10 @@ export function solvePivot(
         p.kind === 'cos-angle' || p.kind === 'dot-eq' || p.kind === 'cos-eq' ||
         p.kind === 'line-plane-angle', // sin β is length-normalized → invariant
     );
+
+  // ADR-3D-030: ids whose in-solve placement is provisional (symbol-defined points —
+  // their symbol is root-found post-pivot); plane-pin residuals skip them.
+  const symbolTainted = new Set(c.vecDefs.filter((vd) => vd.symbol).map((vd) => vd.unknown));
 
   const residualsFor = (mirror: boolean) => (x: number[]): number[] => {
     const g = { ...unpack(x), mirror };
@@ -220,6 +225,25 @@ export function solvePivot(
       }
       const w = sub3(applyGauge(b, g), applyGauge(a, g));
       out.push(w.x - pin.x, w.y - pin.y, w.z - pin.z);
+    }
+    // plane-equation givens (ADR-3D-030): each named point lies on cx·x+cy·y+cz·z+d = 0,
+    // normalized by |n| so the residual is O(1) in coordinate units. A point the pivot
+    // cannot TRUST is SKIPPED: unplaced ids, and symbol-defined points — they sit at a
+    // PROVISIONAL symbol value during the solve (the root-find runs post-pivot), so
+    // their residual would poison it. The recorded claim verifies every named point on
+    // the final figure, so nothing escapes checking (worst case is a failed drive,
+    // never a silently wrong figure). A point that is ABSOLUTE (typed coords / an
+    // equation-plane rider) does not ride the gauge — the final placement pass's rule.
+    for (const pin of c.planePins) {
+      const nn = Math.max(Math.hypot(pin.cx, pin.cy, pin.cz), 1e-12);
+      for (const id of pin.ids) {
+        const p = pos.get(id);
+        if (!p || symbolTainted.has(id)) continue;
+        const def = c.points.get(id);
+        const absolute = def?.kind === 'coord' || (def?.kind === 'on-plane' && !c.pointPlanes.has(def.plane));
+        const q = absolute ? p : applyGauge(p, g);
+        out.push((q.x * pin.cx + q.y * pin.cy + q.z * pin.cz + pin.d) / nn);
+      }
     }
     // scalar givens (V7 T2): lengths / vertex angles / dot products / seg-⟂/∥-plane
     const at = (id: string): Vec3 | null => {
@@ -396,6 +420,42 @@ export function solvePivot(
   }
 
   const results: PivotResult[] = [];
+  // ADR-3D-030: plane-equation pins reach solvePivot ONLY on the drive path (the normal
+  // solve strips them). Plane residuals have a DEGENERATE attractor — collapsing the
+  // solid (whole-scale, or a single dim, e.g. B'≡C') zeroes them "for free" — so a
+  // plane-carrying solve is (a) anchored (dims + log-scale pulled gently to the seed's
+  // sample, the invariantOnly REG pattern), (b) judged on its PRIMARY residuals so
+  // exact solutions are never rejected for carrying the anchor's pull, and (c) filtered:
+  // a candidate whose solid has two coincident vertices is not a figure at all.
+  const planeDrive = c.planePins.length > 0;
+  // ...and when NOTHING pins an absolute length (no point/vector/pair injection, no
+  // length/dot scalar), placement alone can satisfy the equations — Stage A below.
+  const scaleFree =
+    nSym === 0 && planeDrive && pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 &&
+    c.scalarPins.every((p) => p.kind !== 'length' && p.kind !== 'dot');
+  const REG_SF = 1e-4;
+  const ACCEPT = planeDrive ? 1e-10 : 1e-12; // reg equilibrium floors primary at ~(REG·pull)²
+  /** A candidate whose solid carries two coincident vertices is DEGENERATE — never a figure. */
+  const degenerate = (x: number[]): boolean => {
+    if (!planeDrive) return false;
+    const dims = x.slice(7, 7 + nDims);
+    const override = coupled ? new Map(coupled.defs.map((d, i) => [d, x[7 + nDims + i]])) : undefined;
+    const pos = evalCanonical(dims, override);
+    for (const solid of c.solids) {
+      const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
+      let maxD = 0;
+      let minD = Infinity;
+      for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+          const d = norm3(sub3(pts[j], pts[i]));
+          if (d > maxD) maxD = d;
+          if (d < minD) minD = d;
+        }
+      }
+      if (pts.length >= 2 && minD <= 1e-4 * Math.max(maxD, 1e-12)) return true;
+    }
+    return false;
+  };
   // Sign givens select among DISCRETE placement branches — and those are not only the
   // two mirrors: within one mirror, different rotation BASINS are exact solutions too
   // (D on +x with S on −z vs D on −x with S on +z). With sign givens present, keep
@@ -403,19 +463,53 @@ export function solvePivot(
   // them, the fast best-per-mirror path stands.
   const collectAll = c.signGivens.length > 0;
   for (const mirror of [false, true]) {
-    const f = residualsFor(mirror);
+    const fPrimary = residualsFor(mirror);
+    if (scaleFree) {
+      // Stage A (ADR-3D-030): a plane equation is a PLACEMENT statement — try pure
+      // gauge placement first (translate + rotate ONLY; scale frozen, dims at the
+      // seed's sample), so the degenerate shrink-onto-the-plane basin does not exist
+      // at all. Only when placement alone cannot satisfy the pins (e.g. two plane
+      // equations jointly pinning a dim) does the anchored full solve below open
+      // scale + dims.
+      const fA = (y: number[]) => fPrimary([y[0], y[1], y[2], y[3], y[4], y[5], 0, ...dims0]);
+      let bestA: { x: number[]; err: number } | null = null;
+      for (const x0 of starts) {
+        let r = leastSquares(fA, x0.slice(0, 6));
+        for (let polish = 0; polish < 3 && r.err > 1e-24 && r.err < 1e-4; polish++) {
+          const r2 = leastSquares(fA, r.x);
+          if (r2.err >= r.err * 0.99) break;
+          r = r2;
+        }
+        if (!bestA || r.err < bestA.err) bestA = r;
+        if (bestA.err < 1e-22) break;
+      }
+      if (bestA && bestA.err < ACCEPT) {
+        const g = { ...unpack([...bestA.x, 0]), mirror };
+        results.push({ transform: (p) => applyGauge(p, g), mirror, dims: dims0, err: bestA.err });
+        continue; // this mirror solved by placement alone
+      }
+    }
+    const f = planeDrive
+      ? (x: number[]) => [...fPrimary(x), REG_SF * x[6], ...x.slice(7, 7 + nDims).map((v, i) => REG_SF * (v - dims0[i]))]
+      : fPrimary;
+    // best-selection stays on the FULL error (the anchor's pull punishes the collapse
+    // basin); ACCEPTANCE is on the primary residuals so exact solutions always pass.
+    const primaryErr = (x: number[]): number =>
+      planeDrive ? fPrimary(x).reduce((s, v) => s + v * v, 0) : NaN;
     let best: { x: number[]; err: number } | null = null;
     const seen = new Set<string>();
     for (const x0 of starts) {
-      let r = leastSquares(f, x0);
+      let r0 = leastSquares(f, x0);
       // polish: restart LM (fresh damping) from the found point until it stops improving
-      for (let polish = 0; polish < 3 && r.err > 1e-24 && r.err < 1e-4; polish++) {
-        const r2 = leastSquares(f, r.x);
-        if (r2.err >= r.err * 0.99) break;
-        r = r2;
+      for (let polish = 0; polish < 3 && r0.err > 1e-24 && r0.err < 1e-4; polish++) {
+        const r2 = leastSquares(f, r0.x);
+        if (r2.err >= r0.err * 0.99) break;
+        r0 = r2;
       }
-      if (collectAll && r.err < 1e-12) {
-        const g = { ...unpack(r.x), mirror };
+      if (degenerate(r0.x)) continue; // a collapsed solid is not a figure (general position)
+      const rAccept = planeDrive ? primaryErr(r0.x) : r0.err;
+      if (collectAll && rAccept < ACCEPT) {
+        const g = { ...unpack(r0.x), mirror };
         // dedupe by the transform's ACTION (probe frame), not its parameters (axis-angle wraps)
         const sig = [v3(0, 0, 0), v3(1, 0, 0), v3(0, 1, 0), v3(0, 0, 1)]
           .map((p) => applyGauge(p, g))
@@ -423,21 +517,22 @@ export function solvePivot(
           .join('|');
         if (!seen.has(sig)) {
           seen.add(sig);
-          const dims = r.x.slice(7, 7 + nDims);
-          const symbols = coupled ? r.x.slice(7 + nDims) : undefined;
-          results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, err: r.err });
+          const dims = r0.x.slice(7, 7 + nDims);
+          const symbols = coupled ? r0.x.slice(7 + nDims) : undefined;
+          results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, err: rAccept });
         }
       }
-      if (!best || r.err < best.err) best = r;
+      if (!best || r0.err < best.err) best = r0; // FULL err — the anchor punishes collapse
       if (!collectAll && best.err < 1e-22) break;
     }
     // acceptance: per-residual ~1e-6 — far under the 2e-5 claim tolerance (the numeric-
     // Jacobian floor rises with mixed scalar residuals; 1e-16 was V4-era point-pins-only)
-    if (!collectAll && best && best.err < 1e-12) {
+    const bestAccept = best ? (planeDrive ? primaryErr(best.x) : best.err) : Infinity;
+    if (!collectAll && best && bestAccept < ACCEPT) {
       const g = { ...unpack(best.x), mirror };
       const dims = best.x.slice(7, 7 + nDims);
       const symbols = coupled ? best.x.slice(7 + nDims) : undefined;
-      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, err: best.err });
+      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, err: bestAccept });
     }
   }
   return results;

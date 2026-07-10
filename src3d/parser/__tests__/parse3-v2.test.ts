@@ -46,6 +46,11 @@ describe('planes and points', () => {
     expect(cmds('plane pi2: ay + z - 8 = 0')[0]).toMatchObject({ type: 'plane3', name: 'π2', param: 'a' });
   });
 
+  it('plane by equation — bare מישור + the copula הוא/is as separator', () => {
+    expect(cmds('מישור π1 הוא z - 3 = 0')[0]).toMatchObject({ type: 'plane3', name: 'π1' });
+    expect(cmds('the plane π1 is z - 3 = 0')[0]).toMatchObject({ type: 'plane3', name: 'π1' });
+  });
+
   it('coordinate point, bare and with the membership tails', () => {
     expect(cmds('A(2,-2,6)')).toEqual([{ type: 'point3', id: 'A', x: 2, y: -2, z: 6 }]);
     expect(cmds('A(2,-2,6) נמצאת על אחד המישורים')).toEqual([
