@@ -81,6 +81,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // --- claims (the student's answers, verified) ---
   { category: 'claims', he: 'AM = 1/2u + 1/2v + 5/3w', en: 'AM = 1/2u + 1/2v + 5/3w' },
   { category: 'claims', he: "CA' מאונך למישור BC'D", en: "CA' is perpendicular to plane BC'D" },
+  { category: 'claims', he: 'SM מאונך ל-DB', en: 'SM is perpendicular to DB' },
+  { category: 'claims', he: 'u ⊥ v', en: 'u ⊥ v' },
   { category: 'claims', he: "E, C, A' על ישר אחד", en: "E, C, A' are collinear" },
   { category: 'claims', he: 'AB = 3', en: 'AB = 3' },
   { category: 'claims', he: 'שטח המשולש ABC = 4.5', en: 'the area of triangle ABC = 4.5' },
