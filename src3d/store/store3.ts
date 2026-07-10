@@ -24,7 +24,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { applyCommand3 } from '../engine/apply';
-import { checkInSpan, resolve3, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, memberHolds3, resolve3, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
 import { cross3, dot3, norm3, sub3 } from '../engine/vec3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
@@ -258,11 +258,13 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
           }
         } else {
           const names = cmd.plane === 'any' ? [...resolved.planes.keys()] : [cmd.plane];
+          // memberHolds3 (ADR-3D-033): the same predicate the membership DRIVE triggers
+          // on, so a driven landing always verifies (no drive/verify tolerance gap)
           const holds =
             p !== undefined &&
             names.some((name) => {
               const pl = resolved.planes.get(name);
-              return pl !== undefined && Math.abs(dot3(pl.n, p) + pl.d) <= 1e-7 * (1 + norm3(pl.n));
+              return pl !== undefined && memberHolds3(p, pl);
             });
           if (!holds) {
             status[f.id] = { code: 'not-on-plane', id: cmd.id };

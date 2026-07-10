@@ -16,8 +16,8 @@
  * (`שיעור ה-z של C' חיובי`) select among the surviving solutions, else the seed.
  */
 
-import type { Construction3, Positions3 } from './types';
-import { add3, cross3, dot3, norm3, scale3, sub3, v3, type Vec3 } from './vec3';
+import type { Construction3, Id, Positions3 } from './types';
+import { add3, cross3, dist3, dot3, newellNormal, norm3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 export interface GaugeParams {
   /** [tx, ty, tz, rx, ry, rz (axis-angle), logScale, ...dims] */
@@ -135,6 +135,22 @@ function solveLinear(A: number[][], b: number[]): number[] | null {
   return x;
 }
 
+/**
+ * A stated MEMBERSHIP given (ADR-3D-033, M1): `X על מישור Y` about an EXISTING point
+ * is a residual the pivot can DRIVE, not only a post-hoc check. The carrier is either
+ * a fixed numeric equation plane (`plane`) or a POINT-RUN re-derived from the candidate
+ * positions each evaluation (`run`) — a face plane rides the figure's free dims.
+ * `frozen` carries the member's FINAL absolute position when it does not ride the
+ * gauge (typed coords / a coord-sym point at its PINNED parameter value), so the
+ * drive never reads a provisional symbol placement (the ADR-3D-030 poison).
+ */
+export interface MemberPin {
+  id: Id;
+  frozen?: Vec3;
+  plane?: { n: Vec3; d: number };
+  run?: Id[];
+}
+
 export interface PivotResult {
   /** Canonical → absolute transform to apply to every position. */
   transform: (p: Vec3) => Vec3;
@@ -143,6 +159,10 @@ export interface PivotResult {
   /** V8-c — the jointly-solved values of the coupled symbols (in `coupled.defs` order). */
   symbols?: number[];
   err: number;
+  /** The solved parameter vector [t, w, logScale, dims…] — the warm-start vehicle: a
+   *  later DRIVE (ADR-3D-033) perturbs the pinned figure from here, so it lands in the
+   *  same basin (branch choices preserved) instead of gambling on the rotation starts. */
+  x: number[];
 }
 
 /**
@@ -156,10 +176,17 @@ export function solvePivot(
   dims0: number[],
   seed: number,
   coupled?: { defs: number[]; pins: Construction3['symbolPins'] },
+  members?: MemberPin[],
+  warmStart?: number[],
 ): PivotResult[] {
   const pointPins = c.pins;
   const vecPins = c.vectorPins;
-  if (pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 && c.scalarPins.length === 0 && c.planePins.length === 0) return [];
+  const memberPins = members ?? [];
+  if (
+    pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 && c.scalarPins.length === 0 &&
+    c.planePins.length === 0 && memberPins.length === 0
+  )
+    return [];
 
   // V8-c: a symbol coupled to a solid dim (`DF = t·… ⟂ plane` where the plane's height
   // is a free dim) becomes an EXTRA pivot unknown, appended after the dims; its ⟂/∥
@@ -175,6 +202,9 @@ export function solvePivot(
   const invariantOnly =
     nSym === 0 && pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 &&
     c.planePins.length === 0 && // a plane EQUATION is absolute-coordinates — it pins the gauge
+    // an all-gauge run-carrier membership is similarity-invariant (extent-normalized);
+    // a frozen member or a fixed equation plane pins the gauge instead
+    memberPins.every((m) => !m.frozen && !m.plane) &&
     c.scalarPins.every(
       (p) =>
         p.kind === 'vangle' || p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane' || p.kind === 'length-rel' ||
@@ -371,6 +401,33 @@ export function solvePivot(
         }
       }
     }
+    // membership givens (ADR-3D-033): distance of the member from its carrier plane.
+    // A run carrier is re-derived from the CANDIDATE positions (Newell) and the
+    // residual is normalized by the run's own extent, so it is similarity-invariant —
+    // shrinking the solid (scale OR a dim) can never zero it "for free" (the
+    // collapse-basin class the planePins guards exist for). A fixed equation plane
+    // keeps the raw planePins scale (it legitimately pins absolute placement).
+    for (const m of memberPins) {
+      const q = m.frozen ?? at(m.id);
+      if (!q) {
+        out.push(10);
+        continue;
+      }
+      if (m.plane) {
+        out.push((dot3(m.plane.n, q) + m.plane.d) / Math.max(norm3(m.plane.n), 1e-12));
+        continue;
+      }
+      const pts = (m.run ?? []).map(at);
+      if (pts.length < 3 || pts.some((p) => !p)) {
+        out.push(10);
+        continue;
+      }
+      const ring = pts as Vec3[];
+      const n = newellNormal(ring);
+      let extent = 0;
+      for (let i = 1; i < ring.length; i++) extent = Math.max(extent, dist3(ring[i], ring[0]));
+      out.push((dot3(n, q) - dot3(n, ring[0])) / (Math.max(norm3(n), 1e-12) * Math.max(extent, 1e-9)));
+    }
     return out;
   };
 
@@ -378,6 +435,7 @@ export function solvePivot(
     if (dims0.length === 0) return []; // nothing to flex — the condition either holds or is refused downstream
     const f = residualsFor(false); // mirror is also invariant here
     const fd = (d: number[]) => f([0, 0, 0, 0, 0, 0, 0, ...d]);
+    const warmDims = warmStart && warmStart.length >= 7 + nDims ? warmStart.slice(7, 7 + nDims) : null;
     // regularised-nearest: the invariant residuals are ANGLE-like (length-normalized),
     // so an unconstrained dim can drift to extremes that also shrink them (a ⟂ apex
     // ran its free height to ~55× the base — a needle). A tiny pull toward the seed's
@@ -386,6 +444,7 @@ export function solvePivot(
     const fr = (d: number[]) => [...fd(d), ...d.map((v, i) => REG * (v - dims0[i]))];
     // dims-only multi-start: deterministic jitters around the seed's sample
     const dimStarts = [dims0, dims0.map((v) => v * 0.75), dims0.map((v) => v * 1.3), dims0.map((v, i) => (i % 2 ? v * 0.6 : v * 1.2))];
+    if (warmDims) dimStarts.unshift(warmDims);
     let best: { x: number[]; err: number } | null = null;
     for (const d0 of dimStarts) {
       let r = leastSquares(fr, d0);
@@ -402,7 +461,7 @@ export function solvePivot(
     // acceptance: the regulariser's pull stops LM at a primary floor of ~(REG·dims)² —
     // 1e-10 sits above that equilibrium and far under the 2e-5 claim tolerance
     if (primary >= 1e-10) return [];
-    return [{ transform: (p) => p, mirror: false, dims: best.x, err: primary }];
+    return [{ transform: (p) => p, mirror: false, dims: best.x, err: primary, x: [0, 0, 0, 0, 0, 0, 0, ...best.x] }];
   }
 
   // deterministic multi-start: several initial rotations, seed-rotated so "show
@@ -418,6 +477,9 @@ export function solvePivot(
     const symStart = Array.from({ length: nSym }, () => 0.2 + 0.2 * (k % 3)); // 0.2/0.4/0.6 spread
     starts.push([0, 0, 0, axes[k].x * angles[k], axes[k].y * angles[k], axes[k].z * angles[k], 0, ...dims0, ...symStart]);
   }
+  // the warm start (a prior solve's exact solution) goes FIRST so a drive perturbs the
+  // pinned figure's own basin before gambling on the rotation spread (ADR-3D-033)
+  if (warmStart && warmStart.length === 7 + nDims + nSym) starts.unshift([...warmStart]);
 
   const results: PivotResult[] = [];
   // ADR-3D-030: plane-equation pins reach solvePivot ONLY on the drive path (the normal
@@ -427,7 +489,7 @@ export function solvePivot(
   // sample, the invariantOnly REG pattern), (b) judged on its PRIMARY residuals so
   // exact solutions are never rejected for carrying the anchor's pull, and (c) filtered:
   // a candidate whose solid has two coincident vertices is not a figure at all.
-  const planeDrive = c.planePins.length > 0;
+  const planeDrive = c.planePins.length > 0 || memberPins.length > 0;
   // ...and when NOTHING pins an absolute length (no point/vector/pair injection, no
   // length/dot scalar), placement alone can satisfy the equations — Stage A below.
   const scaleFree =
@@ -485,7 +547,7 @@ export function solvePivot(
       }
       if (bestA && bestA.err < ACCEPT) {
         const g = { ...unpack([...bestA.x, 0]), mirror };
-        results.push({ transform: (p) => applyGauge(p, g), mirror, dims: dims0, err: bestA.err });
+        results.push({ transform: (p) => applyGauge(p, g), mirror, dims: dims0, err: bestA.err, x: [...bestA.x, 0, ...dims0] });
         continue; // this mirror solved by placement alone
       }
     }
@@ -519,7 +581,7 @@ export function solvePivot(
           seen.add(sig);
           const dims = r0.x.slice(7, 7 + nDims);
           const symbols = coupled ? r0.x.slice(7 + nDims) : undefined;
-          results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, err: rAccept });
+          results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, err: rAccept, x: [...r0.x] });
         }
       }
       if (!best || r0.err < best.err) best = r0; // FULL err — the anchor punishes collapse
@@ -532,7 +594,7 @@ export function solvePivot(
       const g = { ...unpack(best.x), mirror };
       const dims = best.x.slice(7, 7 + nDims);
       const symbols = coupled ? best.x.slice(7 + nDims) : undefined;
-      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, err: bestAccept });
+      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, err: bestAccept, x: [...best.x] });
     }
   }
   return results;

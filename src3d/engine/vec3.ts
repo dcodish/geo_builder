@@ -39,3 +39,14 @@ export function centroid3(ps: Vec3[]): Vec3 {
   const s = ps.reduce(add3, v3(0, 0, 0));
   return scale3(s, 1 / ps.length);
 }
+
+/** Newell's method — a polygon's normal from its vertex ring (internal device). */
+export function newellNormal(pts: Vec3[]): Vec3 {
+  let n = v3(0, 0, 0);
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % pts.length];
+    n = v3(n.x + (p.y - q.y) * (p.z + q.z), n.y + (p.z - q.z) * (p.x + q.x), n.z + (p.x - q.x) * (p.y + q.y));
+  }
+  return n;
+}

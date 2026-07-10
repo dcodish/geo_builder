@@ -13,10 +13,10 @@
  */
 
 import { sample } from './rng';
-import { solvePivot, type PivotResult } from './solve3';
+import { solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { decompose3 } from './vecExpr';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
-import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
+import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 /** Deg → rad. */
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -386,6 +386,13 @@ export function paramRoots(c: Construction3): number[] {
 
 const onPlane = (p: Vec3, pl: ResolvedPlane): boolean => Math.abs(dot3(pl.n, p) + pl.d) <= 1e-7 * (1 + norm3(pl.n));
 
+/** A stated membership's arbiter (ADR-3D-033): the point lies on the plane to within the
+ *  DRIVE's numeric floor (the LM + regulariser equilibrium, ~1e-5 of the figure scale) —
+ *  still orders of magnitude below any genuinely off-plane statement. Shared by the
+ *  stage-4 unmet trigger and the store's verify pass so no drive/verify gap can exist. */
+export const memberHolds3 = (p: Vec3, pl: ResolvedPlane): boolean =>
+  Math.abs(dot3(pl.n, p) + pl.d) / Math.max(norm3(pl.n), 1e-12) <= 1e-4 * Math.max(1, norm3(p));
+
 /**
  * Pick the parameter's value for this seed: an explicit `branch` on a plane-angle
  * wins; otherwise a membership given (`on one of the planes`) SELECTS the root
@@ -558,17 +565,6 @@ function symbolPinResidual(
   return pin.rel === 'parallel' ? dot3(d, n) / den : norm3(cross3(d, n)) / den;
 }
 
-/** Newell's method — a polygon's normal from its vertex ring (internal device). */
-function newellNormal(pts: Vec3[]): Vec3 {
-  let n = v3(0, 0, 0);
-  for (let i = 0; i < pts.length; i++) {
-    const p = pts[i];
-    const q = pts[(i + 1) % pts.length];
-    n = v3(n.x + (p.y - q.y) * (p.z + q.z), n.y + (p.z - q.z) * (p.x + q.x), n.z + (p.x - q.x) * (p.y + q.y));
-  }
-  return n;
-}
-
 /** A point-run plane's numeric form from the CURRENT positions (Newell); null while
  *  its defining points are unplaced or degenerate (collinear). */
 function planeFromPointRun(c: Construction3, name: string, pos: Positions3): ResolvedPlane | null {
@@ -642,9 +638,84 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
 
   evaluateSolidsAndPoints(c, seed, pos, planes, lines);
 
+  // ---- ADR-3D-032: a given referencing a coord-sym point pins the parameter — a
+  // post-pivot 1-DOF root-find over FINAL positions (roots = branches, the ADR-3D-006
+  // semantics: a param sign given selects, otherwise the seed cycles; no root = the
+  // honest no-roots refusal). A closure (deterministic, so idempotent) because the
+  // ADR-3D-033 membership drive re-runs it after moving the figure.
+  let paramOut: { value: number; roots: number[] } | null = param;
+  const pinParam = (): void => {
+    if (!c.param || c.paramGivens.length === 0) return;
+    const symAt = (id: Id, t: number): Vec3 | undefined => {
+      const d = c.points.get(id);
+      return d?.kind === 'coord-sym' ? v3(linVal(d.x, t), linVal(d.y, t), linVal(d.z, t)) : pos.get(id);
+    };
+    const residual = (cl: (typeof c.paramGivens)[number]) => (t: number): number => {
+      if (cl.type === 'length-eq') {
+        const p = symAt(cl.a, t);
+        const q = symAt(cl.b, t);
+        return p && q ? dist3(p, q) - cl.value : NaN;
+      }
+      if (cl.type === 'angle-seg-eq') {
+        const p1 = symAt(cl.a1, t);
+        const q1 = symAt(cl.b1, t);
+        const p2 = symAt(cl.a2, t);
+        const q2 = symAt(cl.b2, t);
+        if (!p1 || !q1 || !p2 || !q2) return NaN;
+        const u = sub3(q1, p1);
+        const w = sub3(q2, p2);
+        const den = norm3(u) * norm3(w);
+        return den < 1e-12 ? NaN : Math.abs(dot3(u, w)) / den - Math.cos((cl.deg * Math.PI) / 180);
+      }
+      return NaN;
+    };
+    const fns = c.paramGivens.map(residual);
+    // sign-change roots catch crossings; touch-zero catches double roots (deg-90 |cos|)
+    const candidates = fns.flatMap((f) => [...signChangeRoots(f), ...touchZeroRoots((t) => Math.abs(f(t)))]);
+    const roots = snapAndDedupe(candidates.filter((t) => fns.every((f) => Math.abs(f(t)) < 1e-5)));
+    const pool0 = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
+    const pool = pool0.length > 0 ? pool0 : roots;
+    if (pool.length > 0) {
+      const value = pool[seed % pool.length];
+      for (const [id, d] of c.points) {
+        if (d.kind === 'coord-sym') pos.set(id, v3(linVal(d.x, value), linVal(d.y, value), linVal(d.z, value)));
+      }
+      paramOut = { value, roots };
+    } else {
+      paramOut = { value: NaN, roots: [] };
+    }
+  };
+
+  // ---- planes through points + rel-planes resolve only from final positions; a closure
+  // because the ADR-3D-033 membership drive needs them mid-flight (before its unmet check
+  // and again after moving the figure). Idempotent overwrites of the `planes` map.
+  const resolveLatePlanes = (): void => {
+    for (const [name] of c.pointPlanes) {
+      const pl = planeFromPointRun(c, name, pos);
+      if (pl) planes.set(name, pl);
+    }
+    for (const [name] of c.relPlanes) {
+      const pl = relPlaneFromPositions(c, name, pos);
+      if (pl) planes.set(name, pl);
+    }
+  };
+
+  // ADR-3D-033 (M1): a side-less membership statement about a NAMED plane is a GIVEN the
+  // figure's free DOFs must satisfy — drivable when the carrier is a point-run plane
+  // (it rides the figure) or a numeric equation plane. `'any'` keeps its branch-SELECTION
+  // semantics (chooseParam); a side statement is an inequality (sampled + verified).
+  const drivableMemberships = c.memberships.filter(
+    (m) => !m.side && m.plane !== 'any' && (c.pointPlanes.has(m.plane) || c.planes.has(m.plane)),
+  );
+
   // ---- the V4 pivot: injected coordinates pin the gauge (ADR-3D-007)
   let pivot: Resolved3['pivot'] = null;
-  if ((c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0 || c.planePins.length > 0) && c.solids.length > 0) {
+  const warm: { x?: number[] } = {}; // the applied solution's vector — the drive's warm start (ADR-3D-033)
+  if (
+    (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0 ||
+      c.planePins.length > 0 || drivableMemberships.length > 0) &&
+    c.solids.length > 0
+  ) {
     const dims0 = c.solids.flatMap((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed));
     const evalCanonical = (dims: number[], cheap = true, override?: Map<number, number>): Positions3 => {
       const p2: Positions3 = new Map<Id, Vec3>();
@@ -676,6 +747,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       const pool = satisfying.length > 0 ? satisfying : solutions;
       if (pool.length > 0) {
         const chosen = pool[seed % pool.length];
+        warm.x = [...chosen.x];
         const finalCanonical = evalCanonical(chosen.dims, false, overrideOf(chosen));
         for (const [id, q] of finalCanonical) {
           const def = c.points.get(id);
@@ -729,66 +801,100 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
         else if (!hasOtherPins) pivot = { solutions: 0, chosen: -1, err: Infinity };
       }
     }
-  }
 
-  // ---- ADR-3D-032: a given referencing a coord-sym point pins the parameter — a
-  // post-pivot 1-DOF root-find over FINAL positions (roots = branches, the ADR-3D-006
-  // semantics: a param sign given selects, otherwise the seed cycles; no root = the
-  // honest no-roots refusal). Runs after the pivot because the residuals read the
-  // pivot-placed points (A, B), never before.
-  let paramOut: { value: number; roots: number[] } | null = param;
-  if (c.param && c.paramGivens.length > 0) {
-    const symAt = (id: Id, t: number): Vec3 | undefined => {
-      const d = c.points.get(id);
-      return d?.kind === 'coord-sym' ? v3(linVal(d.x, t), linVal(d.y, t), linVal(d.z, t)) : pos.get(id);
-    };
-    const residual = (cl: (typeof c.paramGivens)[number]) => (t: number): number => {
-      if (cl.type === 'length-eq') {
-        const p = symAt(cl.a, t);
-        const q = symAt(cl.b, t);
-        return p && q ? dist3(p, q) - cl.value : NaN;
+    // 4) MEMBERSHIP drive (ADR-3D-033, M1 — the operator's "fit the diagram to match
+    //    input"): a stated `X on plane Y` about an EXISTING point that the pinned
+    //    figure leaves UNMET re-solves the free DOFs (gauge + dims) WITH a membership
+    //    residual whose carrier is re-derived from the candidate positions each
+    //    evaluation (a face plane rides the free dims — the exam's depth). Failure
+    //    path only: a figure whose memberships already hold never enters, so it is
+    //    bit-identical. Runs AFTER the parameter root-find so a coord-sym member
+    //    drives at its PINNED value, never a provisional one (the ADR-3D-030 poison),
+    //    and re-pins the parameter afterwards. If the joint solve finds nothing the
+    //    pinned figure stands and the verify pass refuses honestly (`not-on-plane`).
+    if (drivableMemberships.length > 0) {
+      pinParam();
+      resolveLatePlanes();
+      const unmetMembership = drivableMemberships.some((m) => {
+        const p = pos.get(m.id);
+        const pl = planes.get(m.plane);
+        return !p || !pl || !memberHolds3(p, pl);
+      });
+      if (unmetMembership) {
+        const members: MemberPin[] = [];
+        for (const m of drivableMemberships) {
+          const def = c.points.get(m.id);
+          // mirror applySolutions' lane rule: a gauge-frame member is evaluated inside
+          // the solve; an absolute-lane member (typed coords / coord-sym at the pinned
+          // parameter / an equation-plane rider) is FROZEN at its final position
+          const gauge = def && (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane)));
+          const fin = pos.get(m.id);
+          if (!gauge && !(fin && Number.isFinite(fin.x) && Number.isFinite(fin.y) && Number.isFinite(fin.z))) continue;
+          const frozen = gauge ? undefined : fin;
+          if (c.pointPlanes.has(m.plane)) {
+            members.push({ id: m.id, frozen, run: c.pointPlanes.get(m.plane)! });
+          } else {
+            const pd = c.planes.get(m.plane)!;
+            // a symbolic-parameter equation plane stays selection/verify-only (chooseParam)
+            if ([pd.cx, pd.cy, pd.cz, pd.d].every((e) => e.p === 0))
+              members.push({ id: m.id, frozen, plane: { n: v3(pd.cx.k, pd.cy.k, pd.cz.k), d: pd.d.k } });
+          }
+        }
+        if (members.length > 0) {
+          // transactional (M2): the drive is an EXPERIMENT — snapshot what it may
+          // mutate, and roll back if it broke anything that held before (a discrete
+          // branch flip can kill a sibling given, e.g. the param root-find or a sign)
+          const posBefore = new Map(pos);
+          const paramBefore = paramOut;
+          const pivotBefore = pivot;
+          const signsHold = (): boolean =>
+            c.signGivens.every((g) => {
+              const q = pos.get(g.id);
+              return !!q && (g.positive ? q[g.axis] > 1e-9 : q[g.axis] < -1e-9);
+            });
+          const signsBefore = signsHold();
+          // warm-started from the pinned figure's own solution so the drive PERTURBS it
+          // (branch choices preserved, minimal movement) instead of re-rolling the basins
+          const retry = solvePivot(c, EC, dims0, seed, undefined, members, warm.x);
+          // several basins converge (mirrors, rotations) and not every one satisfies the
+          // membership on FINAL positions — validate each candidate and keep the first
+          // fully-good one (membership + signs + the param root-find), never seed-modulo
+          let accepted = false;
+          for (const sol of retry) {
+            applySolutions([sol]);
+            pinParam();
+            resolveLatePlanes();
+            const stillUnmet = drivableMemberships.some((m) => {
+              const p = pos.get(m.id);
+              const pl = planes.get(m.plane);
+              return !p || !pl || !memberHolds3(p, pl);
+            });
+            const paramBroke =
+              paramBefore !== null && Number.isFinite(paramBefore.value) && !(paramOut !== null && Number.isFinite(paramOut.value));
+            if (!stillUnmet && !paramBroke && (!signsBefore || signsHold())) {
+              accepted = true;
+              break;
+            }
+          }
+          if (!accepted && retry.length > 0) {
+            pos.clear();
+            for (const [id, q] of posBefore) pos.set(id, q);
+            paramOut = paramBefore;
+            pivot = pivotBefore;
+            resolveLatePlanes();
+          }
+        }
       }
-      if (cl.type === 'angle-seg-eq') {
-        const p1 = symAt(cl.a1, t);
-        const q1 = symAt(cl.b1, t);
-        const p2 = symAt(cl.a2, t);
-        const q2 = symAt(cl.b2, t);
-        if (!p1 || !q1 || !p2 || !q2) return NaN;
-        const u = sub3(q1, p1);
-        const w = sub3(q2, p2);
-        const den = norm3(u) * norm3(w);
-        return den < 1e-12 ? NaN : Math.abs(dot3(u, w)) / den - Math.cos((cl.deg * Math.PI) / 180);
-      }
-      return NaN;
-    };
-    const fns = c.paramGivens.map(residual);
-    // sign-change roots catch crossings; touch-zero catches double roots (deg-90 |cos|)
-    const candidates = fns.flatMap((f) => [...signChangeRoots(f), ...touchZeroRoots((t) => Math.abs(f(t)))]);
-    const roots = snapAndDedupe(candidates.filter((t) => fns.every((f) => Math.abs(f(t)) < 1e-5)));
-    const pool0 = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
-    const pool = pool0.length > 0 ? pool0 : roots;
-    if (pool.length > 0) {
-      const value = pool[seed % pool.length];
-      for (const [id, d] of c.points) {
-        if (d.kind === 'coord-sym') pos.set(id, v3(linVal(d.x, value), linVal(d.y, value), linVal(d.z, value)));
-      }
-      paramOut = { value, roots };
-    } else {
-      paramOut = { value: NaN, roots: [] };
     }
   }
 
-  // ---- planes through points (resolved from FINAL positions, post-pivot)
-  for (const [name] of c.pointPlanes) {
-    const pl = planeFromPointRun(c, name, pos);
-    if (pl) planes.set(name, pl);
-  }
+  // ---- ADR-3D-032: the parameter root-find (defined pre-pivot as `pinParam`) runs
+  // after the pivot because the residuals read the pivot-placed points (A, B), never
+  // before. Idempotent — a stage-4 membership drive may have run it already.
+  pinParam();
 
-  // ---- rel-planes (⟂/∥ an edge), likewise resolved from final positions (V8-b)
-  for (const [name] of c.relPlanes) {
-    const pl = relPlaneFromPositions(c, name, pos);
-    if (pl) planes.set(name, pl);
-  }
+  // ---- planes through points + rel-planes (resolved from FINAL positions, post-pivot)
+  resolveLatePlanes();
 
   // ---- lines THROUGH points (V5) — resolvable only from final positions
   for (const [name, def] of c.pointLines) {
