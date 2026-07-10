@@ -607,7 +607,7 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 }
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'foot-seg']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex']);
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number): Resolved3 {
@@ -1228,6 +1228,28 @@ function evaluateSolidsAndPoints(
       const A = pos.get(def.a);
       const B = pos.get(def.b);
       if (from && A && B) pos.set(id, footOnLine(from, { anchor: A, dir: sub3(B, A) }));
+    } else if (def.kind === 'right-pyramid-apex') {
+      // V8-j: the point on segment a–b whose in-plane offset from the base centroid is 0 (apex
+      // directly above the centre ⇒ a right pyramid). Closed-form t*; unplaced if no such point.
+      const A = pos.get(def.a);
+      const B = pos.get(def.b);
+      const bp = def.base.map((q) => pos.get(q)).filter((q): q is Vec3 => q !== undefined);
+      if (A && B && bp.length === def.base.length) {
+        const centroid = centroid3(bp);
+        const nn = newellNormal(bp);
+        if (norm3(nn) > 1e-10) {
+          const n = normalize3(nn);
+          const inplane = (v: Vec3) => sub3(v, scale3(n, dot3(v, n)));
+          const a0 = inplane(sub3(A, centroid));
+          const d0 = inplane(sub3(B, A));
+          const dd = dot3(d0, d0);
+          if (dd > 1e-12) {
+            const t = -dot3(a0, d0) / dd;
+            const resid = norm3(add3(a0, scale3(d0, t)));
+            if (resid < 1e-6 * Math.max(norm3(sub3(B, A)), 1e-9)) pos.set(id, lerp3(A, B, t)); // else no right pyramid — left unplaced (honest)
+          }
+        }
+      }
     } else if (def.kind === 'foot-face') {
       // V8-e (G5): the height's foot — ⟂ from `from` onto the plane through the face pts
       const from = pos.get(def.from);
