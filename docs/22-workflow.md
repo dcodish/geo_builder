@@ -22,6 +22,8 @@ Every operator report and feature request becomes a **GitHub issue** on `dcodish
 
 **"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. (The historical backlog in [14-backlog.md](14-backlog.md) and ADR prose was partially migrated at adoption; sweep opportunistically.)
 
+**Prod-log triage findings follow the same taxonomy:** the log-triage agent/skill classifies each cluster `bug` vs `feature` with a proposed priority, **files the `bug` clusters as issues immediately** (deduped against open issues), and holds `feature` clusters as recommendations — those are filed as issues only once the operator approves them for building (then built via the feature route, §4).
+
 ## 2. Priority rubric
 
 - **P1 — production correctness / honesty.** A figure that renders wrong while looking right, a silently dropped given, a crash, data loss, prod down. **Drop everything**; fix before any other work; hotfix may land directly on `main` (gates still apply); deploy promptly.

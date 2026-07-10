@@ -44,11 +44,15 @@ For each cluster, check what already exists so the recommendation is precise and
 - 3-D: `docs/21-572-coverage-audit.md`, `docs/20-space-vectors-tool.md` §14, `docs/06b-decisions-3d.md`. 2-D: `docs/06-decisions.md`, `docs/09-implementation-plan.md`.
 - Say whether a gap is a planned slice, a documented deferral, or genuinely new, and which existing rule/pattern a fix would mirror.
 
-## Step 4 — ranked recommendation, then STOP for approval
+## Step 4 — classify, file bugs, ranked recommendation, then STOP for approval
 
-Summarize the top recommendations inline (and they're already persisted in the report file). For each: cluster name + verbatim examples + distinct-user count + proposed root-cause action (rule/construct + where) + rough effort + priority (users × value ÷ effort), most-impactful first. Keep garbage / UI-requests / out-of-scope in a short "no action" note so nothing is silently dropped.
+**Classify every cluster per [docs/22-workflow.md](../../../docs/22-workflow.md) (ADR-265):** type **`bug`** (the tool did the WRONG thing — wrong/partial figure with ✓, silently dropped given, half-parse, misleading refusal, crash) vs **`feature`** (an honest refusal/escalation on a missing capability — most LIVE grammar gaps), plus a proposed **P1/P2/P3** (P1 = a student can see a wrong-but-plausible figure or lose a given silently; P2 = real demand; P3 = tail).
 
-**Do not start building** until the operator approves which items to pursue. When approved, each build follows the normal slice discipline: root-cause fix, a scenario/gate test replaying the exact prod utterance, `tsc -b`/tests green, an ADR, commit + deploy.
+**File the `bug` clusters as GitHub issues NOW** (they are reports, not build decisions): dedupe against `gh issue list --state open` first, then `gh issue create` with labels `bug` + priority + app, body per docs/22 §1. **`feature` clusters are recommendations** — include ready-to-file issue text in the report; file them only after operator approval.
+
+Summarize the top recommendations inline (and they're already persisted in the report file). For each: cluster name + type + proposed priority + verbatim examples + distinct-user count + proposed root-cause action (rule/construct + where) + rough effort, most-impactful first. Keep garbage / UI-requests / out-of-scope in a short "no action" note so nothing is silently dropped.
+
+**Do not start building** until the operator approves which items to pursue. When approved: file the approved feature issues (labels `feature` + priority + app), then each build follows the docs/22 feature route (a `feat/<issue#>-slug` PR) + the normal slice discipline: root-cause fix, a scenario/gate test replaying the exact prod utterance, `tsc -b`/tests green, an ADR, merge + deploy.
 
 ## Rules
 - **Never fire a live Anthropic/LLM call** to test the fallback (operator policy) — reason as the oracle yourself.
