@@ -30,6 +30,8 @@ import { isGeoPoint, freeDofs, freeDofCount, applySeed, firstCyclableBranch, eva
 import type { AnyCommand, Id, Vec } from '@/engine';
 import { humanizeError } from '@/i18n/humanizeError';
 import { detectTheorems } from '@/theorems';
+import { relationAt } from '@/render/scene';
+import { fitTransform } from '@/render/transform';
 
 export type Step =
   | string
@@ -3911,6 +3913,167 @@ export const SCENARIOS: Scenario[] = [
       expect(cosA(at(fig, 'P'), at(fig, 'B'), C), 'PB ⟂ CB (CB tangent to P at B)').toBeLessThan(0.02);
     },
   },
+  {
+    id: 'extension-cuts-bare-segment-keeps-on-segment-default',
+    title: '"המשך FO חותך את AC בנקודה E" keeps E ON segment AC (the bare operand\'s on-segment default survives the other operand\'s המשך)',
+    guards:
+      'operator prod test 2026-07-10, saved figure `figure-2026-07-10.geo (6).json` (issue #22, P1): on the tangent-quad-in-right-triangle figure, "המשך FO חותך את AC בנקודה E" placed E on the CONTINUATION of AC (t = 1.139, beyond C) with every row ✓ and zero violations — the stated given ("חותך את AC", a bare segment reference = the segment, ADR-077) silently violated. Root cause (class): per-operand reference semantics (bare pair = SEGMENT; המשך = directional extension; הישר = infinite line) were computed UTTERANCE-GLOBALLY in lineLineIntersection — `extend` tested the whole string, so המשך on the FIRST operand stripped the on-segment default from the SECOND, bare operand (`onSeg = !extend && !infinite`). Fix: per-operand classification in all three phrasing forms (cut-form by verb side; conjunction forms by pre-operand spans, with a leading המשך distributing over the conjoined pair) → the bare operand emits onSeg1/onSeg2, lowered in the engine to a collinear-order [X,E,Y] (the ADR-077/ADR-127 within mechanism) that flexes the figure to bring the crossing onto the segment; the joint both-bare case keeps the sampled ADR-166 onSeg requirement byte-identical. The bare operand also draws WHOLE (A–C), no longer an overshooting A–E stub.',
+    steps: [
+      'ABC משולש ישר זווית',
+      'F על AB',
+      'G על AC',
+      'H על CB',
+      'GCHF מרובע',
+      'הGCHF חסום במעגל',
+      'AB משיק למעגל בנקודה F',
+      'AB מקביל ל GH',
+      'CF',
+      'המשך FO חותך את AC בנקודה E',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), C = at(fig, 'C'), E = at(fig, 'E'), F = at(fig, 'F'), O = at(fig, 'O');
+      // E is ON segment AC (the bare operand's default), not on its continuation.
+      const ac = { x: C.x - A.x, y: C.y - A.y };
+      const ae = { x: E.x - A.x, y: E.y - A.y };
+      const offLine = Math.abs(ae.x * ac.y - ae.y * ac.x) / Math.hypot(ac.x, ac.y);
+      expect(offLine, 'E collinear with A,C').toBeLessThan(1e-3);
+      const t = (ae.x * ac.x + ae.y * ac.y) / (ac.x * ac.x + ac.y * ac.y);
+      expect(t, 'E within segment AC').toBeGreaterThan(0);
+      expect(t, 'E within segment AC').toBeLessThan(1);
+      // The המשך operand stays directional: E beyond O on the ray F→O (F-O-E order, ADR-054).
+      const fo = { x: O.x - F.x, y: O.y - F.y };
+      const fe = { x: E.x - F.x, y: E.y - F.y };
+      const u = (fe.x * fo.x + fe.y * fo.y) / (fo.x * fo.x + fo.y * fo.y);
+      expect(u, 'E beyond O (F-O-E)').toBeGreaterThan(1);
+    },
+  },
+  {
+    id: 'bare-diameter-from-point',
+    title: '"קוטר מנקודה F" draws the diameter from the tangency point (auto-named antipode), then "המשך FO חותך את AC בנקודה E" lands E on AC',
+    guards:
+      'operator prod test 2026-07-10 (issue #21): on the tangent-quad-in-right-triangle figure the operator wanted the diameter of circle O from the tangency point F, but every bare form ("קוטר מנקודה F" / "diameter from F") was not-handled → LLM escalation; they had to fall back to the cut-compound workaround. Fix: a `diameterFromPoint` rule — diameter word + a from-marker + exactly ONE label + no cut verb → resolve the circle (named or implicit, ADR-029), assert F\'s membership idempotently (M1), auto-name the antipode as a fresh label (the ADR-263 auto-foot precedent) and emit the existing `diameter` command. No theft: the cut compound stays with diameterCutsSegment (INTERSECT_KW defer), the two-label "FD קוטר" stays with `diameter`. This scenario is the operator\'s exact saved sequence with the workaround replaced by the bare form + the follow-up cut.',
+    steps: [
+      'ABC משולש ישר זווית',
+      'F על AB',
+      'G על AC',
+      'H על CB',
+      'GCHF מרובע',
+      'הGCHF חסום במעגל',
+      'AB משיק למעגל בנקודה F',
+      'AB מקביל ל GH',
+      'CF',
+      'קוטר מנקודה F',
+      'המשך FO חותך את AC בנקודה E',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), C = at(fig, 'C'), E = at(fig, 'E'), F = at(fig, 'F'), O = at(fig, 'O'), D = at(fig, 'D');
+      // D is the auto-named antipode of F: on the circle (|OD| = |OF|) and F–O–D collinear.
+      const rF = Math.hypot(F.x - O.x, F.y - O.y);
+      expect(Math.hypot(D.x - O.x, D.y - O.y), '|OD| = |OF| (D on circle O)').toBeCloseTo(rF, 3);
+      const cross = (F.x - O.x) * (D.y - O.y) - (F.y - O.y) * (D.x - O.x);
+      expect(Math.abs(cross) / (rF * rF), 'F, O, D collinear (a diameter)').toBeLessThan(1e-3);
+      // The follow-up cut still lands E ON segment AC (the issue-#22 fix, on this exact figure).
+      const ac = { x: C.x - A.x, y: C.y - A.y };
+      const t = ((E.x - A.x) * ac.x + (E.y - A.y) * ac.y) / (ac.x * ac.x + ac.y * ac.y);
+      expect(t, 'E within segment AC').toBeGreaterThan(0);
+      expect(t, 'E within segment AC').toBeLessThan(1);
+    },
+  },
+  {
+    id: 'adr-124-contradictory-extension-refused-honestly',
+    title: 'ADR-124 unparked (issue #6): "המשך CA חותך את מעגל P בנקודה D" onto the EXISTING tangent-chord endpoint D is refused over-constrained, never silently violated',
+    guards:
+      'operator session v7veg7sc (ADR-124) + the issue-#6 operator ruling (2026-07-11): in the booklet-571 p.78 Q4 figure, "AD tangent to O at A" IS a construction GIVEN (not the conclusion). With both tangencies given, tangent-chord algebra (and a 15k-sample engine-free sweep) prove C, A, D can never be collinear non-degenerately — so the operator\'s exact sequence, which re-used the chord endpoint D as the extension target (the book\'s figure uses a NEW point E there; that correct form is locked by scenario shared-endpoint-extension-either-side-default, ADR-267), is genuinely contradictory. Before ADR-124 the tool HID the conflict (a clean-looking figure quietly violating C-A-D, collinear residual 0.38); the correct behaviour — now locked here end-to-end — is the honest over-constrained refusal with the prior figure kept (both stated tangencies still holding). The scenario was parked in ADR-124 pending the operator\'s check of the bagrut source; the ruling makes (a) — keep the honest error — final.',
+    steps: [
+      'שני מעגלים נחתכים בנקודות A ו-B',
+      'המיתר AD במעגל P משיק למעגל O בנקודה A',
+      'CB מיתר במעגל O משיק למעגל P בנקודה B',
+      'המשך CA חותך את מעגל P בנקודה D',
+    ],
+    expectViolations: true, // the last step is REFUSED — the figure keeps the prior (valid) state
+    check(fig) {
+      // The contradictory step is refused honestly — an over-constraint naming the relation, never a
+      // silent build with C-A-D violated.
+      expect(fig.lastError, 'the contradictory extension is refused').not.toBeNull();
+      // The prior figure survives: both stated tangencies genuinely hold on the kept figure.
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), O = at(fig, 'O'), P = at(fig, 'P');
+      const cosA = (p: Vec, v: Vec, q: Vec) => Math.abs(Math.cos((angle(p, v, q) * Math.PI) / 180));
+      expect(cosA(O, A, D), 'OA ⟂ AD (AD tangent to O at A)').toBeLessThan(0.02);
+      expect(cosA(P, B, C), 'PB ⟂ CB (CB tangent to P at B)').toBeLessThan(0.02);
+    },
+  },
+  {
+    id: 'b13-extension-equality-no-vacuous-collapse',
+    title: 'B13: "GA = AC" on an extension point must not be "satisfied" by collapsing A onto C (vacuous 0 = 0)',
+    guards:
+      'issue #7 (the ADR-243 B13 corpus ENGINE FINDING): triangle ABC inscribed in circle O, BC a diameter, G on the extension of CA, then "GA = AC". driveOrCheck skipped G (an extension t is deliberately "recruitable not eager", ADR-073) and eagerly drove the free on-circle vertex A — whose only zero-residual configuration is A ≡ C, where |GA| = |AC| holds VACUOUSLY (0 = 0; the relative-residual cost reads 0/max(0,1e-9) = 0 as perfect, and isSatisfied agrees). The collapse was admitted by the failure-path accepts (plain `evaluate(recruited).ok`), the figure looked green, and the NEXT step ("line GB meets circle O at D") exploded with "over-constrained: |GA| = |AC| cannot hold" — the corpus knownBuildIssue. Class: a new constraint admitted as vacuously-satisfied-by-collapse of its own referenced points. Fix: `newConstraintsNonVacuous` — one gate at every applyStep accept (primary, reinterpret, recruiter, scale-rescue), mirroring solutionAccepted\'s non-degeneracy rule scoped per-constraint; ADR-123\'s forced coincidence (driven point ≡ a point the constraint does NOT reference) is untouched. The recruiter then finds the real configuration: G\'s extension t driven to 2 (A the midpoint of GC).',
+    steps: [
+      'triangle ABC inscribed in circle O',
+      'diameter BC in circle O',
+      'G on the extension of CA',
+      'GA = AC',
+      'line GB meets circle O at D',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), C = at(fig, 'C'), G = at(fig, 'G'), D = at(fig, 'D'), O = at(fig, 'O');
+      // A did NOT collapse onto C (the vacuous root), and the equality holds genuinely.
+      expect(Math.hypot(A.x - C.x, A.y - C.y), 'A and C are distinct points').toBeGreaterThan(1);
+      expect(Math.hypot(G.x - A.x, G.y - A.y), '|GA| = |AC| genuinely').toBeCloseTo(Math.hypot(A.x - C.x, A.y - C.y), 3);
+      // G is on the extension of CA beyond A (order C → A → G), i.e. A is the midpoint of GC.
+      const ca = { x: A.x - C.x, y: A.y - C.y };
+      const t = ((G.x - C.x) * ca.x + (G.y - C.y) * ca.y) / (ca.x * ca.x + ca.y * ca.y);
+      expect(t, 'G beyond A on ray C→A').toBeGreaterThan(1.5);
+      // D built (the step that used to explode) and is on circle O.
+      const r = Math.hypot(C.x - O.x, C.y - O.y);
+      expect(Math.hypot(D.x - O.x, D.y - O.y), 'D on circle O').toBeCloseTo(r, 3);
+    },
+  },
+  {
+    id: 'q4-chord-cuts-radius-textbook-nouns',
+    title: 'bagrut Q4 circle figure in textbook wording: "המיתר CK חותך את הרדיוס AO בנקודה E" + "המשך הקטע KO חותך את המיתר CB בנקודה P" build with memberships',
+    guards:
+      'operator prod session wtgzh6v2 (2026-07-10, issue #17): the bagrut פרק-שני Q4 figure (AB diameter in circle O; chord CK cuts radius AO at E; ∠EKO=∠ABK; extension of KO cuts chord CB at P; PO=4, r=4.8) did not build — the two textbook-worded cut steps failed the deterministic parse (not-handled → LLM, which dropped the chord and was correctly refused by droppedNewLabels). Root cause (class): the shared cut/meet compounds accepted only BARE point-pair operands — a shape-noun marker (המיתר/הרדיוס/הקטע) on either operand made every rule in the family miss (the ADR-119 class one seam earlier: withCarrierMembership never ran because the parse failed upstream). Fix: lineLineIntersection no longer stops on chord/radius nouns (only diameter/tangent, which ARE constructs other rules own); withCarrierMembership restores the noun\'s memberships for the operand pairs (its centre-ref bail scoped to diameter-flavoured utterances; scaffolding segments to the NEW crossing excluded so P is never forced onto the circle); the ⊥/∥ LINE_CUT filler tolerates the same nouns.',
+    steps: [
+      'AB קוטר במעגל O',
+      'המיתר CK חותך את הרדיוס AO בנקודה E',
+      'זווית EKO = זווית ABK',
+      'המשך הקטע KO חותך את המיתר CB בנקודה P',
+      'PO = 4',
+      'רדיוס המעגל הוא 4.8',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), K = at(fig, 'K'), O = at(fig, 'O'), E = at(fig, 'E'), P = at(fig, 'P');
+      const within = (p: Vec, q: Vec, x: Vec, label: string) => {
+        const d = { x: q.x - p.x, y: q.y - p.y };
+        const v = { x: x.x - p.x, y: x.y - p.y };
+        const t = (v.x * d.x + v.y * d.y) / (d.x * d.x + d.y * d.y);
+        expect(t, `${label} within`).toBeGreaterThan(0);
+        expect(t, `${label} within`).toBeLessThan(1);
+        return t;
+      };
+      // E ON the radius AO and ON the chord CK; P ON the chord CB — the nouns' segment semantics.
+      within(A, O, E, 'E on radius AO');
+      within(C, K, E, 'E on chord CK');
+      within(C, B, P, 'P on chord CB');
+      // P beyond O in the K→O→P direction (המשך הקטע KO).
+      const ko = { x: O.x - K.x, y: O.y - K.y };
+      const kp = { x: P.x - K.x, y: P.y - K.y };
+      expect((kp.x * ko.x + kp.y * ko.y) / (ko.x * ko.x + ko.y * ko.y), 'P beyond O (K-O-P)').toBeGreaterThan(1);
+      // The chord/radius memberships the nouns assert: C, K, A (and B via the diameter) on circle O.
+      const r = Math.hypot(A.x - O.x, A.y - O.y);
+      expect(r, 'radius 4.8').toBeCloseTo(4.8, 1);
+      for (const [id, p] of [['C', C], ['K', K], ['B', B]] as const) {
+        expect(Math.hypot(p.x - O.x, p.y - O.y), `${id} on circle O`).toBeCloseTo(r, 1);
+      }
+      // The stated relations hold: ∠EKO = ∠ABK and |PO| = 4.
+      expect(Math.abs(angle(E, K, O) - angle(A, B, K)), '∠EKO = ∠ABK').toBeLessThan(0.5);
+      expect(Math.hypot(P.x - O.x, P.y - O.y), '|PO| = 4').toBeCloseTo(4, 1);
+    },
+  },
 ];
 
 describe('reported scenarios — end-to-end replay of real bug reports', () => {
@@ -4167,6 +4330,58 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
     const fig = replay(useGeoStore.getState().facts, useGeoStore.getState().seed);
     expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| = |AC| holds').toBeCloseTo(dist(at(fig, 'A'), at(fig, 'C')), 3);
     st.clear();
+  });
+});
+
+/**
+ * Hover-pick regression (issue #18): the "show equal sides & angles" layer is HOVER-only (ADR-167 Am. 2),
+ * and inside a narrow wedge the raw closer-wins disambiguation let an arm segment steal every possible
+ * cursor position — a stated equal-angle class was detected but structurally undisplayable.
+ */
+describe('reported scenarios — narrow equal-angle classes are hoverable (issue #18)', () => {
+  it('[narrow-angle-class-pickable] wtgzh6v2: the stated ∠EKO=∠ABK class is detected AND pickable at the K wedge', () => {
+    // The operator's exact bagrut-Q4 figure (session wtgzh6v2, the #17 figure): the input states
+    // ∠EKO=∠ABK, the figure builds ✓ — but hovering could never reveal the equal angles: ∠EKO is 16.8°,
+    // its arms are radii/chords (always in an equal-length class), and inside a wedge ≲26° every probe
+    // within the 44px vertex reach is under the 10px segment reach of the nearest arm. relationAt now
+    // excludes an ACTIVE wedge's own arms from the segment candidates (pointing into a wedge is
+    // unambiguous angle intent); genuinely separate segments still compete closer-wins.
+    const facts = factsOf([
+      'AB קוטר במעגל O',
+      'המיתר CK חותך את הרדיוס AO בנקודה E',
+      'זווית EKO = זווית ABK',
+      'המשך הקטע KO חותך את המיתר CB בנקודה P',
+      'PO = 4',
+      'רדיוס המעגל הוא 4.8',
+    ]);
+    const fig = replay(facts, firstSatisfyingSeed(facts));
+    expect(fig.lastError).toBeNull();
+    // Detection finds the stated equality — a class holding BOTH a K-vertex angle and ∠ABK (the stated
+    // ∠EKO appears under its alias ∠CKO: ray K→E ≡ ray K→C since E lies on chord CK).
+    const rel = detectRelations(fig.construction);
+    const cls = rel.equalAngles.find(
+      (c) => c.some((m) => m.vertex === 'K') && c.some((m) => m.vertex === 'B'),
+    );
+    expect(cls, `the ∠EKO=∠ABK class is detected (got ${JSON.stringify(rel.equalAngles)})`).toBeDefined();
+    const clsIndex = rel.equalAngles.indexOf(cls!);
+    // The K wedge whose rays run toward {C/E} and O — the angle the operator stated.
+    const kMember = cls!.find((m) => m.vertex === 'K' && [m.a, m.b].includes('O'))!;
+    expect(kMember, 'the class has a K-vertex member with an O ray').toBeDefined();
+    const pos = fig.positions;
+    const K = pos.get('K')!, Pa = pos.get(kMember.a)!, Pb = pos.get(kMember.b)!;
+    // App-faithful reaches (Figure.relationPickAt): segReach 10px, vertReach 44px, converted to world
+    // units through the isotropic fit of the figure into the canvas.
+    const t = fitTransform([...pos.values()].filter((v) => Number.isFinite(v.x) && Number.isFinite(v.y)), { width: 800, height: 600, padding: 24 });
+    const segReach = 10 / t.scale, vertReach = 44 / t.scale;
+    // Probe ON THE WEDGE BISECTOR at 60% of the vertex reach — the natural place a student points.
+    const angA = Math.atan2(Pa.y - K.y, Pa.x - K.x);
+    let angB = Math.atan2(Pb.y - K.y, Pb.x - K.x);
+    while (angB - angA > Math.PI) angB -= 2 * Math.PI;
+    while (angB - angA < -Math.PI) angB += 2 * Math.PI;
+    const mid = (angA + angB) / 2;
+    const probe = { x: K.x + 0.6 * vertReach * Math.cos(mid), y: K.y + 0.6 * vertReach * Math.sin(mid) };
+    const pick = relationAt(rel, pos, probe, segReach, vertReach);
+    expect(pick, 'pointing into the stated narrow wedge picks its ANGLE class').toEqual({ kind: 'angle', classIndex: clsIndex });
   });
 });
 

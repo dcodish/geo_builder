@@ -546,7 +546,14 @@ function inWedge(p: Vec, v: Vec, a: Vec, b: Vec): boolean {
  * The equality class nearest to `world` (an oriented-space math point), or null if nothing is within reach.
  * A SEGMENT is picked by perpendicular distance to any of its members (≤ `segReach`); an ANGLE by pointing
  * INTO its wedge near the vertex (≤ `vertReach` from the vertex). When both are candidates the closer wins,
- * so hovering ON a line selects the length class and hovering in an open corner selects the angle class.
+ * so hovering ON a line selects the length class and hovering in an open corner selects the angle class —
+ * EXCEPT that a wedge's own ARM segments never steal the pick from that wedge (issue #18): inside a wedge
+ * of full angle 2θ every probe at distance d from the vertex is d·sinθ from the nearest arm, so with raw
+ * closer-wins any wedge ≲2·asin(segReach/vertReach) whose arm belongs to an equal-length class was
+ * structurally unhoverable — and in circle figures stated angles' arms are typically radii, which are
+ * ALWAYS an equality class. Pointing into a wedge is unambiguous angle intent; the arm's own body is
+ * precisely the boundary of that intent region. A genuinely separate segment (one not sharing the wedge's
+ * vertex and ray) still competes closer-wins, and the arm stays pickable outside the wedge's vertex reach.
  */
 export function relationAt(
   relations: RelationsResult,
@@ -560,18 +567,37 @@ export function relationAt(
   const consider = (d: number, reach: number, pick: RelationPick) => {
     if (d <= reach && d < bestD) { bestD = d; bestPick = pick; }
   };
-  relations.equalSegments.forEach((cls, i) => {
-    for (const [a, b] of cls) {
-      const pa = positions.get(a), pb = positions.get(b);
-      if (pa && pb) consider(distToSegment(world, pa, pb), segReach, { kind: 'segment', classIndex: i });
-    }
-  });
+  // Angle candidates first — collecting each ACTIVE wedge (probe inside it, within vertex reach) so the
+  // segment pass below can exclude that wedge's arms.
+  const activeWedges: { vId: Id; v: Vec; a: Vec; b: Vec }[] = [];
   relations.equalAngles.forEach((cls, j) => {
     for (const { vertex, a, b } of cls) {
       const pv = positions.get(vertex), pa = positions.get(a), pb = positions.get(b);
       if (!pv || !pa || !pb) continue;
       if (!inWedge(world, pv, pa, pb)) continue;
-      consider(Math.hypot(world.x - pv.x, world.y - pv.y), vertReach, { kind: 'angle', classIndex: j });
+      const d = Math.hypot(world.x - pv.x, world.y - pv.y);
+      if (d <= vertReach) activeWedges.push({ vId: vertex, v: pv, a: pa, b: pb });
+      consider(d, vertReach, { kind: 'angle', classIndex: j });
+    }
+  });
+  // Same direction from `v` (within ~1.8°): the segment lies ALONG the wedge ray — an arm, not a crossing.
+  const alongRay = (v: Vec, p: Vec, q: Vec): boolean => {
+    const ux = p.x - v.x, uy = p.y - v.y, wx = q.x - v.x, wy = q.y - v.y;
+    const lu = Math.hypot(ux, uy), lw = Math.hypot(wx, wy);
+    if (lu < 1e-9 || lw < 1e-9) return false;
+    return (ux * wx + uy * wy) / (lu * lw) > 0.9995;
+  };
+  const isArmOfActiveWedge = (x: Id, y: Id, px: Vec, py: Vec): boolean =>
+    activeWedges.some((w) => {
+      const other = x === w.vId ? py : y === w.vId ? px : null; // an arm shares the wedge's vertex
+      return other !== null && (alongRay(w.v, other, w.a) || alongRay(w.v, other, w.b));
+    });
+  relations.equalSegments.forEach((cls, i) => {
+    for (const [a, b] of cls) {
+      const pa = positions.get(a), pb = positions.get(b);
+      if (!pa || !pb) continue;
+      if (isArmOfActiveWedge(a, b, pa, pb)) continue;
+      consider(distToSegment(world, pa, pb), segReach, { kind: 'segment', classIndex: i });
     }
   });
   return bestPick;

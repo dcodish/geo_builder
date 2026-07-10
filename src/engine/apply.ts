@@ -871,13 +871,22 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // that carry constraints (e.g. ADR-166's equilateral apexes) are left to their own mechanism
       // (reflection DOFs); a meet with no loose endpoint keeps today's behaviour (verifier amber).
       if (cmd.onSeg) reseatLooseMeetEndpoint(objects, constraints, pos, [cmd.a, cmd.b], [cmd.c, cmd.d]);
-      addObj(objects, { kind: 'line-line-intersection', id: cmd.id, a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d, ...(cmd.onSeg ? { onSeg: true } : {}) });
+      addObj(objects, { kind: 'line-line-intersection', id: cmd.id, a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d, ...(cmd.onSeg ? { onSeg: true } : {}), ...(cmd.onSeg1 ? { onSeg1: true } : {}), ...(cmd.onSeg2 ? { onSeg2: true } : {}) });
       // A "המשך" operand is DIRECTIONAL — A must be BEYOND the named 2nd point (ADR-054). Emit a
       // `collinear-order` (A is already collinear via the crossing); when the current free DOFs put the
       // crossing on the wrong side, recruitFreeDofs DRIVES them (e.g. pulls a free apex closer) so the
       // extensions reach A. The free DOF is solved by the engine — the student never moves a point.
       if (cmd.dir1) constraints.push({ type: 'collinear-order', points: [cmd.a, cmd.b, cmd.id] });
       if (cmd.dir2) constraints.push({ type: 'collinear-order', points: [cmd.c, cmd.d, cmd.id] });
+      // A single BARE operand (the other carries "המשך"/"הישר" — issue #22): the crossing must land
+      // WITHIN that segment. The within-order twin of dir1/dir2, expressed as `collinear-order [X,id,Y]`
+      // (the ADR-077/ADR-127 mechanism — the crossing is already collinear by construction, so ONLY the
+      // order is asserted; addCollinearOrder drives a free parametric carrier, else the recruiter flexes
+      // the figure). The joint both-bare case stays the sampled ADR-166 `onSeg` requirement above —
+      // whether two whole segments cross at all is a DISCRETE configuration choice (apex reflection),
+      // not a continuously drivable one.
+      if (cmd.onSeg1) addCollinearOrder(objects, constraints, [cmd.a, cmd.id, cmd.b]);
+      if (cmd.onSeg2) addCollinearOrder(objects, constraints, [cmd.c, cmd.id, cmd.d]);
       break;
 
     case 'segment':

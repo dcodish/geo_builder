@@ -26,6 +26,7 @@
     "another": "Show another configuration",
     "resetView": "Reset view",
     "save": "Save to file",
+    "saveNamePrompt": "File name (a -vectors suffix is added automatically; leave empty for today's date):",
     "load": "Load from file",
     "saveImage": "Save image"
   },

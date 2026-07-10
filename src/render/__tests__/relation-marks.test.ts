@@ -198,6 +198,40 @@ describe('relationAt / relationsForPick — hover-to-focus picking (ADR-167 Am.)
     expect(relationAt(angleOnly, q, { x: -0.3, y: -0.3 }, 0.05, 2)).toBeNull(); // opposite quadrant → not the wedge
   });
 
+  it('a NARROW wedge whose arms are in a segment class is still pickable on its bisector (issue #18)', () => {
+    // ∠AVB = 18° at V, arms V–A and V–B both members of an equal-length class (the radii case).
+    const deg = (d: number) => (d * Math.PI) / 180;
+    const narrow = pos([
+      ['V', [0, 0]],
+      ['A', [10 * Math.cos(deg(0)), 10 * Math.sin(deg(0))]],
+      ['B', [10 * Math.cos(deg(18)), 10 * Math.sin(deg(18))]],
+    ]);
+    const relNarrow: RelationsResult = {
+      equalSegments: [[['V', 'A'], ['V', 'B']]],
+      equalAngles: [[{ vertex: 'V', a: 'A', b: 'B' }]],
+      definiteAngles: [],
+      samplesUsed: 8,
+    };
+    // Probe on the wedge BISECTOR at 60% of the vertex reach: inside the wedge, so with raw closer-wins
+    // the arm (dist = 3·sin9° ≈ 0.47 < segReach 1) always stole the pick — the wedge was unhoverable.
+    const probe = { x: 3 * Math.cos(deg(9)), y: 3 * Math.sin(deg(9)) };
+    expect(relationAt(relNarrow, narrow, probe, 1, 5)).toEqual({ kind: 'angle', classIndex: 0 });
+    // The arm is still pickable ALONG ITS FAR BODY (outside the wedge's vertex reach)…
+    expect(relationAt(relNarrow, narrow, { x: 8, y: -0.3 }, 1, 5)).toEqual({ kind: 'segment', classIndex: 0 });
+    // …and OUTSIDE the wedge (below the +x arm, near the vertex).
+    expect(relationAt(relNarrow, narrow, { x: 3, y: -0.5 }, 1, 5)).toEqual({ kind: 'segment', classIndex: 0 });
+    // A genuinely SEPARATE segment (not sharing the wedge's vertex) crossing near the probe still
+    // competes closer-wins inside the wedge.
+    const withCrosser: RelationsResult = {
+      ...relNarrow,
+      equalSegments: [...relNarrow.equalSegments, [['P', 'Q']]],
+    };
+    const crossPos = new Map(narrow);
+    crossPos.set('P', { x: 3.05, y: -2 });
+    crossPos.set('Q', { x: 3.05, y: 2 }); // a vertical segment through the wedge, right at the probe
+    expect(relationAt(withCrosser, crossPos, { x: 3.05, y: 0.55 }, 1, 5)).toEqual({ kind: 'segment', classIndex: 1 });
+  });
+
   it('relationsForPick narrows to just the hovered class (values kept for an angle pick)', () => {
     const seg = relationsForPick(rel, { kind: 'segment', classIndex: 1 });
     expect(seg.equalSegments).toEqual([[['E', 'F']]]);

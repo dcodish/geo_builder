@@ -313,7 +313,7 @@ export function checkGivens(
   // the apex to fix it; if no valid config is found, flag it amber here. Tolerance is LOOSE (a crossing just
   // past an endpoint isn't flagged — only one genuinely off the segment), mirroring the extension check.
   for (const cmd of commands) {
-    if (cmd.type !== 'line-line-intersection' || !cmd.onSeg) continue;
+    if (cmd.type !== 'line-line-intersection' || !(cmd.onSeg || cmd.onSeg1 || cmd.onSeg2)) continue;
     const g = positions.get(cmd.id);
     const param = (a: Id, b: Id): number | null => {
       const pa = positions.get(a), pb = positions.get(b);
@@ -321,7 +321,9 @@ export function checkGivens(
       const abx = pb.x - pa.x, aby = pb.y - pa.y, L = abx * abx + aby * aby;
       return L < 1e-12 ? null : ((g.x - pa.x) * abx + (g.y - pa.y) * aby) / L;
     };
-    const t1 = param(cmd.a, cmd.b), t2 = param(cmd.c, cmd.d);
+    // Per-operand (issue #22): only a BARE operand asserts "within" — joint `onSeg` asserts both.
+    const t1 = cmd.onSeg || cmd.onSeg1 ? param(cmd.a, cmd.b) : null;
+    const t2 = cmd.onSeg || cmd.onSeg2 ? param(cmd.c, cmd.d) : null;
     const off = (t: number | null) => t !== null && (t < -0.02 || t > 1.02);
     const seg = off(t1) ? `${cmd.a}${cmd.b}` : off(t2) ? `${cmd.c}${cmd.d}` : null;
     if (seg) {

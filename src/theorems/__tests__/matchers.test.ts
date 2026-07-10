@@ -638,8 +638,12 @@ describe('theorem matchers (real pipeline)', () => {
 
   describe('ADR-244 evidence paths (Stage-1 worklist)', () => {
     it('a tangency stated at an EXISTING on-circle point fires the tangent family (the B9 form)', () => {
-      const ids = surfaced('circle O', 'chord AD in circle O', 'AD is tangent to circle O at A');
-      // A is ON circle O, so this lowers to the radius-⟂ constraint (ADR-075) — path 3.
+      // A is ON circle O and AD exists with a FREE far end, so the tangency lowers to the radius-⟂
+      // constraint (ADR-075) — path 3 — and D swings onto the tangent line. (The fixture used to make
+      // AD a CHORD of the same circle — a chord tangent at its own endpoint is satisfiable only by the
+      // degenerate D ≡ A, which the ADR-272 vacuous-collapse gate now honestly refuses; the real B9 is
+      // a chord of the OTHER circle, and this evidence path only needs the constraint form.)
+      const ids = surfaced('circle O', 'chord AB in circle O', 'AD', 'AD is tangent to circle O at A');
       expect(ids).toEqual(expect.arrayContaining([105, 107]));
     });
     it('two constraint-form tangencies from one point fire the two-tangents pair (108/109)', () => {

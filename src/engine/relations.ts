@@ -306,7 +306,7 @@ export function convergedSamples(samples: Map<Id, Vec>[]): Map<Id, Vec>[] {
  */
 export function requirementSamples(c: Construction, samples: Map<Id, Vec>[]): Map<Id, Vec>[] {
   const meets = c.objects.filter(
-    (o): o is Extract<GeoObject, { kind: 'line-line-intersection' }> => o.kind === 'line-line-intersection' && !!o.onSeg,
+    (o): o is Extract<GeoObject, { kind: 'line-line-intersection' }> => o.kind === 'line-line-intersection' && !!(o.onSeg || o.onSeg1 || o.onSeg2),
   );
   if (meets.length === 0 || samples.length < 3) return samples;
   const MARGIN = 0.02; // the sampling bar (WITHIN_MARGIN); the verifier's amber check stays looser
@@ -318,7 +318,13 @@ export function requirementSamples(c: Construction, samples: Map<Id, Vec>[]): Ma
     const t = ((px.x - ps.x) * (pe.x - ps.x) + (px.y - ps.y) * (pe.y - ps.y)) / L;
     return t >= MARGIN && t <= 1 - MARGIN;
   };
-  const kept = samples.filter((pos) => meets.every((m) => within(pos, m.a, m.b, m.id) && within(pos, m.c, m.d, m.id)));
+  const kept = samples.filter((pos) =>
+    meets.every(
+      (m) =>
+        (!(m.onSeg || m.onSeg1) || within(pos, m.a, m.b, m.id)) &&
+        (!(m.onSeg || m.onSeg2) || within(pos, m.c, m.d, m.id)),
+    ),
+  );
   return kept.length >= 2 ? kept : samples;
 }
 

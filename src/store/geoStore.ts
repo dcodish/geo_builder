@@ -755,11 +755,12 @@ function segParam(fig: Derived, a: Id, b: Id, p: Id): number | null {
  */
 export function intersectionsWithinSegments(fig: Derived, margin = WITHIN_MARGIN): boolean {
   for (const o of fig.construction.objects) {
-    if (o.kind !== 'line-line-intersection' || !o.onSeg) continue;
-    const t1 = segParam(fig, o.a, o.b, o.id);
-    const t2 = segParam(fig, o.c, o.d, o.id);
-    if (t1 === null || t2 === null) continue;
-    if (t1 < margin || t1 > 1 - margin || t2 < margin || t2 > 1 - margin) return false;
+    if (o.kind !== 'line-line-intersection' || !(o.onSeg || o.onSeg1 || o.onSeg2)) continue;
+    // Per-operand (issue #22): a single-sided bare operand (`onSeg1`/`onSeg2`) gates only its own segment.
+    const t1 = o.onSeg || o.onSeg1 ? segParam(fig, o.a, o.b, o.id) : null;
+    const t2 = o.onSeg || o.onSeg2 ? segParam(fig, o.c, o.d, o.id) : null;
+    if (t1 !== null && (t1 < margin || t1 > 1 - margin)) return false;
+    if (t2 !== null && (t2 < margin || t2 > 1 - margin)) return false;
   }
   return true;
 }
@@ -771,9 +772,9 @@ function reflectMaskForFailing(fig: Derived): number {
   if (pts.length === 0) return 0;
   const culprits = new Set<Id>();
   for (const o of fig.construction.objects) {
-    if (o.kind !== 'line-line-intersection' || !o.onSeg) continue;
-    const t1 = segParam(fig, o.a, o.b, o.id);
-    const t2 = segParam(fig, o.c, o.d, o.id);
+    if (o.kind !== 'line-line-intersection' || !(o.onSeg || o.onSeg1 || o.onSeg2)) continue;
+    const t1 = o.onSeg || o.onSeg1 ? segParam(fig, o.a, o.b, o.id) : null;
+    const t2 = o.onSeg || o.onSeg2 ? segParam(fig, o.c, o.d, o.id) : null;
     if (t1 !== null && (t1 < WITHIN_MARGIN || t1 > 1 - WITHIN_MARGIN)) { culprits.add(o.a); culprits.add(o.b); }
     if (t2 !== null && (t2 < WITHIN_MARGIN || t2 > 1 - WITHIN_MARGIN)) { culprits.add(o.c); culprits.add(o.d); }
   }
@@ -808,7 +809,7 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   const hasExt = extensionTriples(facts).length > 0;
   const base0 = replay(facts, from);
   const reflectable = reflectableFreePoints(base0.construction);
-  const hasOnSeg = base0.construction.objects.some((o) => o.kind === 'line-line-intersection' && o.onSeg);
+  const hasOnSeg = base0.construction.objects.some((o) => o.kind === 'line-line-intersection' && (o.onSeg || o.onSeg1 || o.onSeg2));
   if (!hasExt && !hasOnSeg) return from; // nothing to satisfy → keep the seed
   const ok = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig) && intersectionsWithinSegments(fig);
   // The ADR-142 acceptance bar: a SHARED-ENDPOINT extension counts on EITHER side (see extensionsClear).

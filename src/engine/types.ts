@@ -147,6 +147,12 @@ export interface LineLineIntersection {
    *  the sampler reflects free apexes / re-seeds to bring it onto the segments). Absent for an explicit
    *  extension or infinite-line meet, whose crossing is allowed off the drawn segments. */
   onSeg?: boolean;
+  /** PER-OPERAND within-segment requirement (issue #22): only THIS operand is a bare segment reference —
+   *  the other carries "המשך"/"הישר", so the joint `onSeg` (which asserts both, ADR-166) doesn't apply.
+   *  The crossing must land within a–b (`onSeg1`) / c–d (`onSeg2`); a `collinear-order [X,id,Y]` drives
+   *  the figure onto it (the ADR-077/ADR-127 mechanism), and verifier + sampler gate it per side. */
+  onSeg1?: boolean;
+  onSeg2?: boolean;
 }
 
 /** 0 DOF — `anchor` offset perpendicular to from→to by `dist` (rectangle corners). `flip` negates the offset. */
@@ -858,7 +864,7 @@ export type Command =
   | { type: 'free-point'; id: Id; x: number; y: number; free?: boolean; ifAbsent?: boolean } // free: an AUTO-placed default (a construct's apex) — a free DOF, NOT pinned (ADR-052); a student-typed "A at (x,y)" omits it and pins. ifAbsent: a parser-injected ensure-exists (a NEW point named onto a line, ADR-236) — skipped entirely when the id already exists as ANYTHING (never moves, never conflicts)
   | { type: 'point-on-segment'; id: Id; a: Id; b: Id; t?: number; branch?: number; extension?: boolean } // branch: which root, once a constraint drives it (ADR-043); extension: an unstated t>1 default, recruitable not eager (ADR-073)
   | { type: 'point-by-distances'; id: Id; from1: Id; dist1: number; from2: Id; dist2: number; branch?: number }
-  | { type: 'line-line-intersection'; id: Id; a: Id; b: Id; c: Id; d: Id; dir1?: boolean; dir2?: boolean; onSeg?: boolean } // dir1/dir2: a "המשך" operand — A must be BEYOND the 2nd point (ADR-054). onSeg: a plain SEGMENT meet — the crossing must land WITHIN both segments (ADR-166)
+  | { type: 'line-line-intersection'; id: Id; a: Id; b: Id; c: Id; d: Id; dir1?: boolean; dir2?: boolean; onSeg?: boolean; onSeg1?: boolean; onSeg2?: boolean } // dir1/dir2: a "המשך" operand — A must be BEYOND the 2nd point (ADR-054). onSeg: a plain SEGMENT meet — the crossing must land WITHIN both segments (ADR-166). onSeg1/onSeg2: only THAT operand is bare — within that segment alone, driven by collinear-order (issue #22)
   | { type: 'segment'; a: Id; b: Id }
   | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number }
   | { type: 'set-distance'; a: Id; b: Id; value: number }

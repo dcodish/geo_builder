@@ -1333,6 +1333,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "diameter from F in circle O",
+    "winner": "diameterFromPoint",
+  },
+  {
+    "lang": "he",
+    "text": "קוטר מנקודה F במעגל O",
+    "winner": "diameterFromPoint",
+  },
+  {
+    "lang": "en",
     "text": "M is the midpoint of arc BC in circle O",
     "winner": "arcMidpoint",
   },

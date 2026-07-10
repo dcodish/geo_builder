@@ -1795,6 +1795,8 @@ The decomposition is sound and over-constraint-free (a general quad has 4 free v
 
 **Parked (pending operator review of the bagrut source).** Whether the operator's *exact* (contradictory) sequence should (a) keep the honest over-constrained error or (b) be modelled with the tangency dropped is a problem-statement question the operator is checking ("let me look first"). The end-to-end regression scenario in `scenarios.test.ts` is **held** until that is decided; the engine behaviour itself is already locked by the `extend-onto-circle.test.ts` unit test above. *General principle reaffirmed: a derived/extension point that already exists is **re-constrained, not re-created** — the same lesson as `point-on-line`'s ADR-036 loose-point upgrade.*
 
+**UNPARKED (2026-07-11, issue #6 — operator ruling: "we agreed that it was given and not the question").** "AD tangent to O at A" **is a construction given** in the bagrut source. With both tangencies given, the over-determinacy proof stands — the operator's exact sequence (re-using the chord endpoint **D** as the extension target, i.e. asserting C-A-D collinear) is genuinely contradictory, and option **(a) — the honest over-constrained refusal — is final.** The book's actual figure names a NEW point for that crossing (C-A-**E**), which builds clean and is locked by scenario `shared-endpoint-extension-either-side-default` (ADR-267/issue #19). The held scenario is now added as `adr-124-contradictory-extension-refused-honestly`: the exact 4-step sequence, asserting the last step is refused with the prior figure kept and both stated tangencies genuinely holding.
+
 ## ADR-125 — A subject-named incentre ("M is the centre of the incircle") is honoured, not dropped
 
 **Status.** Accepted (2026-06-25). Operator-reported, diagnosed from the debug log (session `djvbb7`): `M מרכז המעגל החסום במשולש BDC` ("M is the centre of the circle inscribed in triangle BDC") drew the centre at **O**, not M, and the tangency point on side BD showed as **G** and flipped to **F** when hidden. *Single file: `src/parser/parse.ts`.*
@@ -3956,3 +3958,85 @@ Operator's live prod test of the inscribed rhombus surfaced three issues, all fi
 **Sibling audit.** All `extensionsClear`/`meetsRequirements` call sites reviewed: the two commit-path trigger gates (append/edit) only TRIGGER the search (either bar failing at the current seed does that correctly); the givens-verifier already had the ADR-142 relaxation (both consumers of ADR-142 now agree); `resample` and the sample filter gained the ladder (above). Remaining members of the test/prod budget-divergence class: the other budgeted loops (`resample`, sample collection) are single-pass — no second-pass fallback to starve; the new rule (a fallback bar rides the same loop) guards future searches.
 
 **Tests.** Scenario `shared-endpoint-extension-either-side-default` (the operator's exact 5-utterance sequence, the LLM step as its corrected canonical line): E collinear with C,A and beyond A, both tangencies genuinely ⟂, zero violations. **Companion production-budget lock**: `findValidConfig(facts, 0, 2500)` on cold (structuredClone) facts returns a config meeting the acceptance bar with E beyond A — the suite otherwise runs at Infinity budget and would re-mask a reintroduced starvation. The ADR-098 scenarios (`free-point-on-circle-both-extensions-reach-far-side`, `free-on-circle-extensions-auto-advance`) and the seed-sweep oracle lock the strict preference; ADR-142's scenario (`extension-onto-circle-side-inferred-from-circle`, the same bagrut question typed with reversed letters) locks the acceptance tier.
+
+## ADR-268
+
+### ADR-268 — Per-operand reference semantics in line∩line: a bare pair keeps its on-segment default even when the OTHER operand carries "המשך"/"הישר"
+
+**Status:** Accepted (2026-07-11, dedicated fix session; issue #22, P1). Operator prod test 2026-07-10, saved figure `figure-2026-07-10.geo (6).json`. *Files: `src/engine/types.ts`, `src/engine/apply.ts`, `src/engine/verify.ts`, `src/engine/relations.ts`, `src/store/geoStore.ts`, `src/parser/parse.ts`, tests.*
+
+**Context.** On the tangent-quad-in-right-triangle figure, `המשך FO חותך את AC בנקודה E` placed E on the CONTINUATION of AC (t = 1.139, beyond C) with every row ✓ and zero violations — the stated given ("חותך את **AC**", a bare segment reference = the segment, ADR-077) silently violated. The rule's drawing also produced an overshooting A–E stub for the bare operand.
+
+**Class (docs/17 §1).** Per-operand reference semantics (bare pair = the SEGMENT; `המשך` = the directional extension; `הישר` = the infinite line) were computed **utterance-globally** in `lineLineIntersection` (`extend`/`infinite` tested the whole string, `onSeg = !extend && !infinite`), so a reference word on ONE operand stripped the semantics of the OTHER. The documented generalization gap: ADR-077's principle was implemented per-operand only in the diameter rule (CLAUDE.md recorded it verbatim as "general, currently only in the diameter rule").
+
+**Decision.** (1) **Engine:** `line-line-intersection` gains per-operand `onSeg1`/`onSeg2` — the *within* twin of the existing *beyond* `dir1`/`dir2` — lowered to `collinear-order [X,id,Y]` via `addCollinearOrder` (the ADR-077/ADR-127 mechanism: the crossing is already collinear by construction, so ONLY the order is asserted and the figure flexes a free DOF to bring it onto the segment). The joint both-bare `onSeg` stays byte-identical (ADR-166's sampled requirement + apex reflection — whether two whole segments cross at all is a DISCRETE configuration choice, not continuously drivable). The verifier (`meetOnSegment`), the sampler gates (`intersectionsWithinSegments`, `reflectMaskForFailing`, `firstSatisfyingSeed`'s trigger) and the ADR-256 sample filter all honour the per-operand flags. (2) **Parser:** all three phrasing forms classify each operand — the cut-form by verb side (the ADR-054 split, now carrying bare/ext/line, not just direction), the conjunction forms by pre-operand spans with a **leading המשך distributing over the conjoined pair** (Hebrew construct state: "המשך BE ו-AD" = the extensions of BE and of AD — required by the parallelogram corpus figure where F lies beyond D). Drawing is per-operand too: an extension operand draws base→crossing, a bare operand draws WHOLE.
+
+**Sibling audit.** `extensionMeetsExistingPoint`, `extendOntoCircle`: single pair operand + line/circle target — no cross-operand contamination (no fix). The ⊥/∥ `LINE_CUT` compounds: the cut target's reference words were swallowed by `CUT_FILLER` entirely — now classified from the matched cut span (`cutTargetOrder`: bare → within-order, המשך → beyond-order, הישר → free). `tangentLineIntersection`: evaluated and deliberately NOT given the bare-within default — when the pair is a chord of the tangent's own circle (the corpus case) the tangent meets line AB strictly OUTSIDE the segment (a tangent∩secant crossing lies outside the circle), so a within default would be infeasible by construction; recorded in a code note.
+
+**Tests.** Scenario `extension-cuts-bare-segment-keeps-on-segment-default` (the operator's exact 10-step sequence: E within AC, E beyond O, verifier clean). Class tests in `phase4.test.ts`: mirrored slots (`dir1+onSeg2` / `dir2+onSeg1`), the English mirror, the הישר opt-out, and the conjunction-distribution pair.
+
+## ADR-269
+
+### ADR-269 — Noun-flavoured cut/meet operands (המיתר/הרדיוס/הקטע) parse as segment meets and KEEP the noun's circle membership
+
+**Status:** Accepted (2026-07-11, dedicated fix session; issue #17, P2 feature). Operator prod session `wtgzh6v2` (bagrut פרק-שני Q4). *Files: `src/parser/parse.ts`, `src/__tests__/scenarios.test.ts`.*
+
+**Context.** The bagrut Q4 circle figure did not build: `המיתר CK חותך את הרדיוס AO בנקודה E` and `המשך הקטע KO חותך את המיתר CB בנקודה P` both failed the deterministic parse (not-handled → LLM, which dropped the chord and was correctly refused by `droppedNewLabels`) — while the noun-stripped phrasings parsed but LOST the chord membership (C,K as free points, not on the circle).
+
+**Class.** The shared cut/meet compounds accepted only BARE point-pair operands: a shape-noun marker on either operand made every rule in the family miss — the ADR-119 class one seam earlier (`withCarrierMembership` never ran because the parse failed upstream).
+
+**Decision.** (1) `lineLineIntersection` no longer `stop`s on chord/radius nouns — only on diameter/tangent, which ARE constructs other rules own (a chord/radius operand is just a segment reference whose membership the post-pass restores). (2) `withCarrierMembership` refined at two points: its centre-ref bail is scoped to DIAMETER-flavoured utterances (a radius operand legitimately touches the centre — the meet command references O, yet the memberships are exactly what must be restored; the pair logic is already centre-safe), and segments touching a point the rule CREATED as an intersection are excluded as SCAFFOLDING (the K→P extension leg — P is never forced onto the circle). (3) `CUT_FILLER` tolerates the same nouns so the ⊥/∥ compounds bind them too. The ADR-268 per-operand semantics compose: the second utterance lowers to `dir1` (P beyond O) + `onSeg2` (P within chord CB) + memberships C,B — exactly the textbook figure.
+
+**Tests.** Scenario `q4-chord-cuts-radius-textbook-nouns` — the full 6-step textbook-worded Q4 (E on radius AO and on chord CK; P on chord CB beyond O; ∠EKO=∠ABK; |PO|=4; r=4.8; memberships).
+
+## ADR-270
+
+### ADR-270 — "קוטר מנקודה F" / "diameter from F": the bare one-label diameter with an auto-named antipode
+
+**Status:** Accepted (2026-07-11, dedicated fix session; issue #21, P2 feature). Operator prod test 2026-07-10. *Files: `src/parser/parse.ts`, `src/parser/catalog.ts`, tests.*
+
+**Decision.** A `diameterFromPoint` rule: diameter word + a from-marker (`מ-`/`מנקודה`/`היוצא מ`/`from`) + exactly ONE label + **no** cut verb → resolve the circle (named or implicit, ADR-029), assert F's membership idempotently when it exists off the circle (M1 — the statement makes it a given), auto-name the antipode as a fresh label (the ADR-263 auto-foot precedent) and emit the existing `diameter` command. No new engine construct. No theft either way: the cut compound stays with `diameterCutsSegment` (INTERSECT_KW defer), the two-label `FD קוטר` stays with `diameter` (this rule requires exactly ONE label).
+
+**Tests.** `diameter-from-point.test.ts` (He/En forms, M1 membership, implicit circle, honest refusal with no circle, both no-theft locks) + scenario `bare-diameter-from-point` (the operator's exact saved sequence with the workaround replaced by the bare form + the follow-up cut) + catalog entry under the coverage guard.
+
+## ADR-271
+
+### ADR-271 — Hover picking: a wedge's own ARM segments never steal the pick from the wedge
+
+**Status:** Accepted (2026-07-11, dedicated fix session; issue #18, P2). Operator prod session `wtgzh6v2`. *Files: `src/render/scene.ts`, tests.*
+
+**Context.** "Show equal sides & angles" is hover-only (ADR-167 Am. 2). The input stated `∠EKO=∠ABK`; detection found the class (∠ABK=∠ACE=∠BKO=∠CKO — the stated angle under its alias ∠CKO) — but hovering could NEVER reveal it: `relationAt` disambiguates by raw closer-wins, and inside a wedge of full angle 2θ every probe at distance d from the vertex is d·sinθ from the nearest arm — with segReach 10px / vertReach 44px, any wedge ≲2·asin(10/44) ≈ 26° whose arm belongs to an equal-length class was structurally unhoverable. In circle figures stated angles' arms are typically radii/diameters — ALWAYS an equality class — so the theft was the common case (∠EKO here is 16.8°).
+
+**Decision.** In `relationAt`, angle candidates collect first; a segment that is an ARM of an ACTIVE wedge candidate (shares the wedge's vertex and runs along one of its rays, within ~1.8°) is excluded from the segment pass. Pointing into a wedge is unambiguous angle intent — the arm's own body is precisely the boundary of that intent region. Genuinely separate segments (not sharing the vertex+ray) still compete closer-wins; the arm stays pickable outside the wedge's vertex reach and outside the wedge.
+
+**Tests.** `relation-marks.test.ts` — an 18° wedge with both arms in a segment class: angle pickable on the bisector, arm pickable along its far body and outside the wedge, a separate crossing segment still wins. Scenario `narrow-angle-class-pickable` — the operator's exact Q4 sequence, app-faithful reaches (10px/44px through the real `fitTransform`), the stated class detected AND picked at the K wedge. Detection needed no change.
+
+## ADR-272
+
+### ADR-272 — A new constraint is never admitted as VACUOUSLY satisfied by collapsing its own referenced points (the step-accept non-degeneracy gate)
+
+**Status:** Accepted (2026-07-11, dedicated fix session; issue #7, P2 — the ADR-243 B13 corpus ENGINE FINDING). *Files: `src/engine/step.ts`, `src/theorems/__tests__/b-corpus.test.ts`, `src/__tests__/scenarios.test.ts`.*
+
+**Context.** B13: triangle ABC inscribed in circle O, BC a diameter, G on the extension of CA, then `GA = AC`. `driveOrCheck` skipped G (an extension t is deliberately "recruitable not eager", ADR-073) and eagerly drove the free on-circle vertex A — whose only zero-residual configuration is **A ≡ C**, where |GA| = |AC| holds VACUOUSLY (0 = 0). The relative-residual cost reads 0/max(0,1e-9) = 0 as perfect ("un-gameable by shrinking" fails exactly at literal zero), `isSatisfied` agrees, and ADR-123 made coincidences non-erroring — so the collapse was admitted by the failure-path accepts (plain `evaluate(recruited).ok`), the figure looked green, and the NEXT step ("line GB meets circle O at D") exploded with `over-constrained: |GA| = |AC| cannot hold` (the corpus `knownBuildIssue`).
+
+**Class.** The non-degeneracy rule existed only INSIDE the driven solvers (`solutionAccepted`; the closed-form `solvedOnSegmentCandidates` discard) — the step-boundary accepts (recruiter experiments, reinterpret-as-constraint, scale rescue, and the primary evaluate) had none, so ANY solve path that ended in a vacuous config was admitted.
+
+**Decision.** `newConstraintsNonVacuous` — one gate at every applyStep accept: each new non-`coincide` constraint's OWN refs must be pairwise distinct (the same 1e-3·extent threshold as `solutionAccepted`), pairs a declared `coincide` merges exempt. Scoped **per-constraint**, so ADR-123's allowed forced coincidence — a driven point landing on a point the driving constraint does NOT reference (N ≡ O) — is untouched. A primary solve that passed only vacuously routes into the same failure path as a genuine over-constraint (the recruiter then finds the real configuration — here G's extension t driven to 2, A the midpoint of GC); if nothing real exists, the step reports the honest `over-constrained` immediately (previously the contradiction surfaced one step LATE, blamed on the wrong statement).
+
+**Result.** B13 builds end-to-end; D exists; the 4-member concyclic evidence reaches theorem 87 (b-corpus: gaps→expect, `knownBuildIssue` removed). Locked by the b-corpus flip + scenario `b13-extension-equality-no-vacuous-collapse`.
+
+## ADR-273
+
+### ADR-273 — Word magnitudes (רבע/חצי/half) join the droppedGivenNumbers honesty gate
+
+**Status:** Accepted (2026-07-11, dedicated fix session; issue #2, P2 — ADR-250's named open item). *Files: `src/parser/parse.ts`, `src/parser/__tests__/adr-250.test.ts`.*
+
+**Decision.** A stated fraction written as a WORD with no digit never reached the digit extraction, so a rule that claimed the utterance without lowering the word committed a silently-wrong relation ("AB שווה לחצי BC" as plain equality — the half gone, the row ✓). `droppedGivenNumbers` now scans the UN-blanked text (blanking wipes English words) for חצי/מחצית/רבע/שליש/half/quarter — only when the utterance states a RELATION (a bare word is a construct/noun context), with the shape nouns `חצי מעגל`/`רבע מעגל` (semicircle/quarter-circle) exempt via lookahead — and accounts generously as the value OR its inverse (rules lower "רבע מ-X" as k=4 on the mirrored side). The catalog-wide zero-false-positive sweep holds.
+
+## ADR-274
+
+### ADR-274 — User-named save files with the automatic per-product suffix (-geo / -vectors)
+
+**Status:** Accepted (2026-07-11; issue #20, P3 feature, operator-selected). *Files: `src/store/figureFile.ts`, `src/App.tsx`, `src3d/store/figureFile3.ts`, `src3d/App3.tsx`, all four locale files, `docs/22-workflow.md` §9. 3-D twin recorded as ADR-3D-036 in docs/06b.*
+
+**Decision.** On Save, each app prompts for a file name (`window.prompt`, bilingual label); `namedFigureFileName`/`namedFigureFileName3` sanitize illegal filename characters, strip a typed extension, append the per-product suffix unless already present (`2026summer` → `2026summer-geo.json` in the 2-D app, `2026summer-vectors.json` in the 3-D app), and fall back to the date-stamped default for an empty/cancelled input (the prior behaviour, preserved). The suffix is a per-product constant COPIED into each product tree (the isolation rule — `SAVE_SUFFIX = 'geo'` in `src/`, `SAVE_SUFFIX_3D = 'vectors'` in `src3d/`), registered in the docs/22 §9 product registry; future products define their own on start. Load stays content-based (the `app` marker + `schemaVersion`), so old and new names both load; the fixtures nets are untouched. The interpreted form is `<name>-geo.json` (a normal `.json` extension — a bare `-geo` "extension" would lose the OS file-type association); flagged in the issue for operator feedback.

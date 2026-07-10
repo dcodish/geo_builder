@@ -214,8 +214,22 @@ describe('parser — cut-form intersection (verb BETWEEN the two segments)', () 
   // operand (which side of the cut verb the word falls on), so a one-sided extension only flags its side.
   it('"המשך BD חותך את המשך OC" → both directional (dir1 + dir2)', () =>
     has('המשך BD חותך את המשך OC בנקודה A', { ...a, dir1: true, dir2: true }));
-  it('"המשך BD חותך את OC" → only the first is directional (dir1)', () =>
-    has('המשך BD חותך את OC בנקודה A', { ...a, dir1: true }));
+  it('"המשך BD חותך את OC" → the first is directional (dir1), the bare OC keeps its on-segment default (onSeg2, issue #22)', () =>
+    has('המשך BD חותך את OC בנקודה A', { ...a, dir1: true, onSeg2: true }));
+  it('mirrored slot: "BD חותך את המשך OC" → dir2 + the bare BD keeps its default (onSeg1)', () =>
+    has('BD חותך את המשך OC בנקודה A', { ...a, dir2: true, onSeg1: true }));
+  it('english mirror: "the extension of BD cuts OC at A" → dir1 + onSeg2', () =>
+    has('the extension of BD cuts OC at A', { ...a, dir1: true, onSeg2: true }));
+  it('an explicit "הישר" operand is the infinite line — free, no within-default', () =>
+    has('המשך BD חותך את הישר OC בנקודה A', { ...a, dir1: true }));
+  // Conjunction forms: a leading המשך governs the conjoined pair (construct state — "the extensions
+  // of BE and AD"), so it DISTRIBUTES to an unmarked second operand; a second operand with its own
+  // marker keeps it, and a bare first operand before a marked second stays bare (onSeg1).
+  const f: Command = { type: 'line-line-intersection', id: 'F', a: 'B', b: 'E', c: 'A', d: 'D' };
+  it('"המשך BE ו AD נפגשים בנקודה F" → the leading המשך distributes (dir1 + dir2)', () =>
+    has('המשך BE ו AD נפגשים בנקודה F', { ...f, dir1: true, dir2: true }));
+  it('"BE והמשך AD נפגשים בנקודה F" → bare BE keeps its default, AD directional (onSeg1 + dir2)', () =>
+    has('BE והמשך AD נפגשים בנקודה F', { ...f, onSeg1: true, dir2: true }));
   it('still routes "… cuts circle P …" to the circle rule, not line∩line', () => {
     const r = parse('AC חותך מעגל P בנקודה E', { circles: ['P'] });
     expect(r.ok).toBe(true);

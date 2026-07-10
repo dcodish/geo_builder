@@ -26,7 +26,7 @@ import { Modal } from '@/ui/Modal';
 import { btn, card as themeCard, color as pal, foldToggle, fs, pill, sectionTitle } from '@/ui/theme';
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
-import { deserializeFigure, figureFileName, serializeFigure } from '@/store/figureFile';
+import { deserializeFigure, namedFigureFileName, serializeFigure } from '@/store/figureFile';
 import { questionLines } from '@/export/questionLines';
 import { auditLoadedFigure } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
@@ -308,7 +308,9 @@ export default function App() {
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = figureFileName(new Date());
+    // The user names the file; the per-product -geo suffix is appended automatically (issue #20).
+    // Empty/cancelled → the date-stamped default, the pre-#20 behaviour.
+    a.download = namedFigureFileName(window.prompt(t('file.saveNamePrompt')), new Date());
     a.click();
     URL.revokeObjectURL(url);
   };

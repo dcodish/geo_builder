@@ -175,3 +175,26 @@ describe('store.loadFigure — replaces the session, one undo restores it', () =
     expect(fig().positions.has('K')).toBe(true);
   });
 });
+
+/** Issue #20 — user-named save files with the automatic per-product suffix. */
+import { namedFigureFileName } from '../figureFile';
+
+describe('namedFigureFileName (issue #20)', () => {
+  const now = new Date('2026-07-11T10:00:00Z');
+  it('appends the -geo suffix to a user name', () => {
+    expect(namedFigureFileName('2026summer', now)).toBe('2026summer-geo.json');
+  });
+  it('never doubles the suffix', () => {
+    expect(namedFigureFileName('2026summer-geo', now)).toBe('2026summer-geo.json');
+    expect(namedFigureFileName('2026summer-GEO', now)).toBe('2026summer-GEO.json');
+  });
+  it('strips a typed extension and illegal filename characters', () => {
+    expect(namedFigureFileName('my:fig?.json', now)).toBe('myfig-geo.json');
+    expect(namedFigureFileName('old-save.geo.json', now)).toBe('old-save-geo.json');
+  });
+  it('empty / cancelled / reduced-to-nothing → the date-stamped default (pre-#20 behaviour)', () => {
+    expect(namedFigureFileName('', now)).toBe('figure-2026-07-11.geo.json');
+    expect(namedFigureFileName(null, now)).toBe('figure-2026-07-11.geo.json');
+    expect(namedFigureFileName('  ??  ', now)).toBe('figure-2026-07-11.geo.json');
+  });
+});

@@ -577,3 +577,9 @@ Parser `rightPyramidPoint` (He + En; the apex = the on-segment point wherever it
 - **Recorded trap (Hebrew final forms):** the rule's keyword gate `/מאונך/` (final ך) silently rejected the plural `מאונכים` (REGULAR כ) before the regex ever ran — the gate is now `מאונ[ךכ]` (the same class `commonPerp` already guarded with `מאונ[כך]`). Keyword gates over Hebrew stems must always admit both kaf forms.
 
 **Locked by** `perp-seg.test.ts` — the exact prod sequences (the pyramid figure with the drive asserted at 3 seeds + the |AB|=|AD| closed form; the cube sibling both without O — honest `unknown-point` — and with O defined — verifies), all parse forms He+En, verify-true/verify-false-keep-prior on a determined figure, and no-theft regressions for the existing ⟂ rules. Catalog +2 (`SM מאונך ל-DB`, `u ⊥ v`). **568 src3d tests green; full suite 3601 green, `tsc -b` + `vite build:3d` clean.**
+
+## ADR-3D-036 — User-named save files with the automatic -vectors suffix (issue #20; the 2-D twin is ADR-274)
+
+**Status:** Accepted (2026-07-11). *Files: `src3d/store/figureFile3.ts`, `src3d/App3.tsx`, `src3d/i18n/locales/*.json`.*
+
+**Decision.** On Save, the app prompts for a file name (bilingual `actions.saveNamePrompt`); `namedFigureFileName3` sanitizes illegal filename characters, strips a typed extension, appends `-vectors` unless already present (`2026summer` → `2026summer-vectors.json`), and falls back to the date-stamped `figure-3d-YYYY-MM-DD.geo3.json` default for an empty/cancelled input. `SAVE_SUFFIX_3D = 'vectors'` is this product's copy of the per-product constant (docs/22 §9 registry — never imported across `src/` ↔ `src3d/`). Load stays content-based (`app` marker + `schemaVersion`), so old `.geo3.json` files keep loading; the `fixtures3/` net is untouched. Locked by the name-builder tests in `figure-file3.test.ts`.

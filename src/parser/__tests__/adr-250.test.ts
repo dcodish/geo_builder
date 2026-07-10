@@ -78,6 +78,21 @@ describe('ADR-250/1 — droppedGivenNumbers (no stated magnitude is silently dro
     expect(droppedGivenNumbers('AB = 7 בערך', [{ type: 'segment', a: 'A', b: 'B' }])).toEqual([7]);
   });
 
+  it('WORD magnitudes (issue #2): a stated רבע/חצי/half with no digit is flagged when dropped', () => {
+    // "AB שווה לחצי BC" claimed as a plain equality drops the HALF — a silently wrong relation.
+    expect(droppedGivenNumbers('AB שווה לחצי BC', [{ type: 'set-equal', a: 'A', b: 'B', c: 'B', d: 'C' } as unknown as AnyCommand])).toEqual([0.5]);
+    expect(droppedGivenNumbers('שטח NCE שווה לרבע שטח ACD', [{ type: 'segment', a: 'N', b: 'C' }])).toEqual([0.25]);
+    expect(droppedGivenNumbers('AB equals half BC', [{ type: 'set-equal', a: 'A', b: 'B', c: 'B', d: 'C' } as unknown as AnyCommand])).toEqual([0.5]);
+    // …and accounted when the rule lowered it — as the value OR its inverse (the mirrored side's k).
+    expect(droppedGivenNumbers('שטח NCE שווה לרבע שטח ACD', [{ type: 'area-ratio', ids1: ['A', 'C', 'D'], ids2: ['N', 'C', 'E'], k: 4 } as unknown as AnyCommand])).toEqual([]);
+    expect(droppedGivenNumbers('AB שווה לחצי BC', [{ type: 'set-ratio', a: 'A', b: 'B', c: 'B', d: 'C', k: 0.5 } as unknown as AnyCommand])).toEqual([]);
+    // The construct nouns are shapes, not magnitudes — never flagged (they also state no relation).
+    expect(droppedGivenNumbers('חצי מעגל שקוטרו AB', [{ type: 'segment', a: 'A', b: 'B' }])).toEqual([]);
+    expect(droppedGivenNumbers('רבע מעגל', [{ type: 'segment', a: 'A', b: 'B' }])).toEqual([]);
+    // A relationless word context (a bisector "חוצה", bare nouns) is not a magnitude statement.
+    expect(droppedGivenNumbers('CD חוצה זווית ACB', [{ type: 'segment', a: 'C', b: 'D' }])).toEqual([]);
+  });
+
   it('catalog-wide zero false positives: every supported example that parses accounts all its numbers', () => {
     for (const c of COMMAND_CATALOG) {
       if (!c.supported) continue;

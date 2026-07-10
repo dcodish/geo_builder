@@ -118,6 +118,7 @@ This repo is **one workspace hosting several sibling products**. Every artifact 
 | **Tests (local)** | `npm run test:2d` (= `vitest src/ server/`) | `npm run test:3d` (= `vitest src3d/ server/`) | runs in **every** lane |
 | **CI lane** | `test-2d` | `test-3d` | both |
 | **Fixtures** | `src/__tests__/fixtures/` | `fixtures3/` | — |
+| **Save-file suffix** | `-geo` (`<name>-geo.json`, ADR-274) | `-vectors` (`<name>-vectors.json`, ADR-3D-036) | — |
 
 Planned products (recommendation accepted 2026-07-10): **analytic geometry** — the 471 (4-pt) + 572 (5-pt) analytic-geometry questions as ONE engine with curriculum-level profiles (`src-analytic/`, ADR log `06c-decisions-analytic.md`, ids `ADR-AG-NNN`, label `analytic`); **complex numbers** (`src-complex/`, ADR log `06d-decisions-complex.md`, ids `ADR-CX-NNN`, label `complex`).
 

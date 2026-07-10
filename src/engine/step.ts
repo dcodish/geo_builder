@@ -15,7 +15,7 @@ import { evaluate, resolveDriven } from './evaluate';
 import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist, sub } from './geometry';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
-import { constraintRefs, solvedOnSegmentCandidates } from './solve';
+import { constraintRefs, describeConstraint, solvedOnSegmentCandidates } from './solve';
 
 export interface StepOk {
   ok: true;
@@ -174,6 +174,40 @@ function degenerateConstraintError(cmd: Command): string | null {
   }
 }
 
+/**
+ * VACUOUS-SATISFACTION gate at the step-accept boundary (issue #7, the B13 corpus finding): a solve
+ * result in which two DISTINCT points referenced by one of THIS step's new constraints coincide has
+ * satisfied that constraint by COLLAPSE (0 = 0), not by geometry — B13's "GA = AC" (G the extension
+ * point of CA at its default t) was "satisfied" by driving the free on-circle vertex A exactly onto C,
+ * zeroing both lengths; `isSatisfied` and the relative residual (0 / max(scale,1e-9)) both read that as
+ * perfect. The driven solvers already refuse such roots inside their own accept (`solutionAccepted`,
+ * and the closed-form `solvedOnSegmentCandidates` discard), but the FAILURE-PATH accepts — the
+ * recruiter's experiments, reinterpret-as-constraint, scale rescue — admitted whatever plain `evaluate`
+ * passed. One shared gate at every applyStep accept closes the class. Scoped per-constraint (each new
+ * non-`coincide` constraint's OWN refs must be pairwise distinct, at the same 1e-3·extent threshold as
+ * `solutionAccepted`), so ADR-123's allowed forced coincidence — a driven point landing on a point the
+ * driving constraint does NOT reference (N ≡ O) — is untouched; pairs a declared `coincide` merges are
+ * exempt.
+ */
+function newConstraintsNonVacuous(c: Construction, positions: Map<Id, Vec>, newCons: Constraint[]): boolean {
+  const merged = new Set(c.constraints.filter((k) => k.type === 'coincide').map((k) => [k.p, k.q].sort().join('|')));
+  for (const con of newCons) {
+    if (con.type === 'coincide') continue;
+    const refs = [...new Set(constraintRefs(con))];
+    const pts = refs.map((id) => positions.get(id));
+    let ext = 1;
+    for (const p of pts) if (p) ext = Math.max(ext, Math.abs(p.x), Math.abs(p.y));
+    const eps = 1e-3 * ext;
+    for (let i = 0; i < refs.length; i++)
+      for (let j = i + 1; j < refs.length; j++) {
+        if (merged.has([refs[i], refs[j]].sort().join('|'))) continue;
+        const p = pts[i], q = pts[j];
+        if (p && q && Math.hypot(p.x - q.x, p.y - q.y) < eps) return false;
+      }
+  }
+  return true;
+}
+
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
   const prevEval = evaluate(prev);
@@ -204,21 +238,23 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
       replaceCyclicForDiameter(prev, ncmd) ??
       reinterpretDiameter(prev, ncmd);
     if (constrained) {
+      const newCons = constrained.constraints.slice(prev.constraints.length);
       const r = evaluate(constrained);
-      if (r.ok) return { ok: true, construction: constrained, positions: r.positions };
+      if (r.ok && newConstraintsNonVacuous(constrained, r.positions, newCons)) return { ok: true, construction: constrained, positions: r.positions };
       // The reinterpreted statement is a CONSTRAINT whose direct carrier alone couldn't satisfy it —
       // give it the SAME failure path a typed constraint gets (recruit the figure's other free DOFs,
       // ADR-028 extended) before giving up. One statement, one semantics, one solve path (M1/ADR-231).
-      const newCons = constrained.constraints.slice(prev.constraints.length);
       const recruited = recruitFreeDofs(constrained, newCons);
       if (recruited) {
         const r2 = evaluate(recruited);
-        if (r2.ok) return { ok: true, construction: recruited, positions: r2.positions };
+        if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions };
       }
       // Surface the constraint's honest failure (over-constrained / unsatisfiable), never "already
       // defined" — the second statement about an existing object was a constraint, not a redefinition,
-      // so the error must describe the RELATION that can't hold (M1/ADR-231).
-      return { ok: false, error: r.error, construction: prev, positions: prevPositions };
+      // so the error must describe the RELATION that can't hold (M1/ADR-231). A solve that "passed"
+      // only vacuously (the non-vacuous gate refused it) reports the same over-constraint shape.
+      const vacuousErr = newCons.length ? `over-constrained: ${describeConstraint(newCons[0])} cannot hold` : 'over-constrained';
+      return { ok: false, error: r.ok ? vacuousErr : r.error, construction: prev, positions: prevPositions };
     }
     return { ok: false, error: conflict, construction: prev, positions: prevPositions };
   }
@@ -245,12 +281,17 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     if (stack) return { ok: false, error: `${stack[0][0]} and ${stack[0][1]} would be at the same point`, construction: prev, positions: prevPositions };
   }
 
-  if (!res.ok) {
+  // A primary solve that "passed" only VACUOUSLY (a new constraint's own referenced points collapsed —
+  // 0 = 0) is not a success: route it through the same failure path as a genuine over-constraint so the
+  // recruiter searches for a real configuration (issue #7, the B13 finding).
+  const newConsMain = next.constraints.slice(prev.constraints.length);
+  const mainVacuous = res.ok && !newConstraintsNonVacuous(next, res.positions, newConsMain);
+  if (!res.ok || mainVacuous) {
     // A constraint its direct carrier alone can't satisfy ("cannot place F on AB
     // so |DE|=|DF|" — F is stuck on the segment) may still hold if the figure's
     // OTHER free DOFs move too. Recruit them and solve jointly before giving up
     // (ADR-028, extended): "find a possible configuration and use it".
-    const newCons = next.constraints.slice(prev.constraints.length);
+    const newCons = newConsMain;
     // OWNERSHIP RE-HOME (M2/ADR-231): a `coincide` is a placement obligation the engine always creates
     // WITH an owner; a size given that pins the radius that drove it (applyRadiusGiven drops the stale
     // directive; keepTangencyDriven's free-centre handoff can come up empty when every centre is already
@@ -267,7 +308,7 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     const recruited = recruitFreeDofs(next, [...newCons, ...orphans]);
     if (recruited) {
       const r2 = evaluate(recruited);
-      if (r2.ok) return { ok: true, construction: recruited, positions: r2.positions };
+      if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions };
     }
     // LAST RESORT — SCALE RESCUE (ADR-237): a figure with no absolute given yet is determined only up
     // to SIMILARITY (the ADR-101 gauge), so its FIRST size given is a statement about SCALE —
@@ -282,9 +323,10 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     const scaled = scaleRescue(next, newCons, prevPositions);
     if (scaled) {
       const rs = evaluate(scaled);
-      if (rs.ok) return { ok: true, construction: scaled, positions: rs.positions };
+      if (rs.ok && newConstraintsNonVacuous(scaled, rs.positions, newCons)) return { ok: true, construction: scaled, positions: rs.positions };
     }
-    return { ok: false, error: res.error, construction: prev, positions: prevPositions };
+    const vacuousMainErr = newCons.length ? `over-constrained: ${describeConstraint(newCons[0])} cannot hold` : 'over-constrained';
+    return { ok: false, error: res.ok ? vacuousMainErr : res.error, construction: prev, positions: prevPositions };
   }
   return { ok: true, construction: next, positions: res.positions };
 }

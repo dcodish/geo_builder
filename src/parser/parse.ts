@@ -690,12 +690,14 @@ const bareSegment: Rule = (s) => {
 const INTERSECT_KW = /intersect|∩|חיתוך|נחתך|נחתכ|נפגש|פוגש|פגש|חות[כך]|\bcuts?\b|\bmeets?\b/i; // incl. "חותך" (cuts), active "פוגש"/"פגש" (meets), "cuts"
 const lineLineIntersection: Rule = (s) => {
   if (!INTERSECT_KW.test(s)) return null;
-  // The operands of a plain line∩line must be point-pairs the figure already has.
-  // If they're introduced here AS constructs this rule can't build (a diameter, a
-  // chord, a radius/tangent), don't half-parse "diameter AB and chord DE meet at C"
-  // into a bare intersection that drops the diameter & chord — escalate so the
-  // operands get created (ADR-024; the LLM has the circle as context).
-  if (/\bdiameter\b|\bchord\b|\bradius\b|\btangent\b|קוטר|מיתר|רדיוס|משיק/i.test(s)) return 'stop';
+  // A DIAMETER or TANGENT operand is a construct this rule can't build (an antipode / a touch-point
+  // geometry) — don't half-parse "diameter AB and chord DE meet at C" into a bare intersection that
+  // drops it: escalate so the operand gets created (ADR-024; the LLM has the circle as context, and
+  // the tangent/diameter compounds run earlier). A CHORD or RADIUS operand, by contrast, is just a
+  // segment reference whose circle membership the `withCarrierMembership` post-pass restores (ADR-119)
+  // — "המיתר CK חותך את הרדיוס AO בנקודה E" is a plain segment meet + memberships (issue #17), so those
+  // nouns no longer abort the parse.
+  if (/\bdiameter\b|\btangent\b|קוטר|משיק/i.test(s)) return 'stop';
   // A PERPENDICULAR/PARALLEL operand ("the perpendicular to AD") is NOT a line through two labelled
   // points — reading "האנך ל-AD" as "line AD" silently drops the ⟂ and (when AD shares an endpoint with
   // the other line) collapses the crossing onto that point (operator: "המשך DB והאנך לישר AD נפגשים ב-G"
@@ -707,39 +709,78 @@ const lineLineIntersection: Rule = (s) => {
   const pointFirst = t.match(
     /\b([A-Za-z]\d*)\b.*?(?:intersection|∩|חיתוך|נחתך).*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
   );
-  // Draw the two segments we reference (idempotent if they're already edges) — the
-  // student should see the lines whose crossing is the point, not just the point.
-  // When the lines are EXTENDED to meet at a named point ("המשך CA ו-BD נפגשים בנקודה G"), draw each
-  // line from its base THROUGH to the meeting point G, so the student sees the lines reaching G — not
-  // stubs that stop at the inner points (the operator drew BG/CG by hand otherwise). Without an
-  // extension it draws the operand segments as-is: diagonals crossing BETWEEN their endpoints must stay
-  // whole (drawing only to the crossing would hide half of each diagonal).
-  const extend = /המשך|extension|extended/i.test(s);
-  // A plain SEGMENT meet — the student named no extension ("המשך") and no infinite line ("הישר"/"line"/
-  // "ray") — must land its crossing WITHIN both segments, not on their continuation (ADR-166, the operator's
-  // rule: "two segments meet ON the segments, not the continuation"). When EITHER an extension or an
-  // infinite-line word is present the crossing is allowed off the drawn segments, so `onSeg` is dropped.
-  const infinite = /\bline\b|הישר|הקו|\bray\b|קרן/i.test(s);
-  const onSeg = !extend && !infinite;
-  const cross = (id: string, a: string, b: string, c: string, d: string, dir1?: boolean, dir2?: boolean): Command[] => {
-    const inter: Command = { type: 'line-line-intersection', id: up(id), a: up(a), b: up(b), c: up(c), d: up(d), ...(dir1 ? { dir1: true } : {}), ...(dir2 ? { dir2: true } : {}), ...(onSeg ? { onSeg: true } : {}) };
-    // Extension case: DEFINE G (the intersection) first, THEN draw each line's base → G. Order matters —
-    // a segment to G before G exists would create G as a stray free point and conflict with the
-    // intersection ("'G' is already defined"). Plain case: draw the operand segments, then the crossing.
-    return extend
-      ? [inter, { type: 'segment', a: up(a), b: up(id) }, { type: 'segment', a: up(c), b: up(id) }]
-      : [{ type: 'segment', a: up(a), b: up(b) }, { type: 'segment', a: up(c), b: up(d) }, inter];
+  // PER-OPERAND reference semantics (issue #22, the ADR-077 principle generalized): each pair operand is,
+  // independently, a bare SEGMENT reference (crossing must land WITHIN it), a "המשך"/extension (directional
+  // — the crossing lies BEYOND the 2nd letter, ADR-054), or a "הישר"/infinite line (unconstrained). The old
+  // code computed extension/line words UTTERANCE-GLOBALLY, so "המשך FO חותך את AC בנקודה E" stripped the
+  // on-segment default from the BARE operand AC too — E landed past C, silently green.
+  const EXT_RE = /המשך|extension|extended/i;
+  const LINE_RE = /\bline\b|הישר|הקו|\bray\b|קרן/i;
+  const semOf = (span: string): 'bare' | 'ext' | 'line' =>
+    EXT_RE.test(span) ? 'ext' : LINE_RE.test(span) ? 'line' : 'bare';
+  // The text immediately BEFORE each operand pair (where its reference words live), located by walking the
+  // matched pair texts in order. Falls back to whole-string spans when a pair can't be re-located.
+  const operandSpans = (str: string, p1: [string, string], p2: [string, string], from = 0): [string, string] => {
+    const find = (l: [string, string], start: number) => {
+      const re = new RegExp(`\\b${l[0]}\\s*${l[1]}\\b`, 'g');
+      re.lastIndex = start;
+      const m = re.exec(str);
+      return m ? { start: m.index, end: m.index + m[0].length } : null;
+    };
+    const f1 = find(p1, from);
+    const f2 = f1 ? find(p2, f1.end) : null;
+    if (!f1 || !f2) return [str, str];
+    return [str.slice(from, f1.start), str.slice(f1.end, f2.start)];
   };
+  // Draw the two operands (idempotent if they're already edges) — the student should see the lines whose
+  // crossing is the point, not just the point. A bare/infinite-line operand draws WHOLE (a diagonal crossing
+  // between its endpoints must not be cut at the crossing); an extension operand draws base → the meeting
+  // point, so the student sees the line reaching it (the operator drew BG/CG by hand otherwise). Order
+  // matters: a segment to the point before it exists would create it as a stray free point and conflict
+  // with the intersection ("'G' is already defined") — so extension segments come AFTER the intersection.
+  const cross = (id: string, a: string, b: string, c: string, d: string, sem1: 'bare' | 'ext' | 'line' = 'bare', sem2: 'bare' | 'ext' | 'line' = 'bare'): Command[] => {
+    // Both bare = the joint ADR-166 `onSeg` (sampled requirement + apex reflection — whether two whole
+    // segments cross at all is discrete). A single bare operand = per-operand `onSeg1`/`onSeg2`, driven
+    // continuously by a collinear-order in the engine (issue #22).
+    const bothBare = sem1 === 'bare' && sem2 === 'bare';
+    const inter: Command = {
+      type: 'line-line-intersection', id: up(id), a: up(a), b: up(b), c: up(c), d: up(d),
+      ...(sem1 === 'ext' ? { dir1: true } : {}), ...(sem2 === 'ext' ? { dir2: true } : {}),
+      ...(bothBare ? { onSeg: true } : {}),
+      ...(!bothBare && sem1 === 'bare' ? { onSeg1: true } : {}),
+      ...(!bothBare && sem2 === 'bare' ? { onSeg2: true } : {}),
+    };
+    const pre: Command[] = [];
+    const post: Command[] = [];
+    if (sem1 === 'ext') post.push({ type: 'segment', a: up(a), b: up(id) });
+    else pre.push({ type: 'segment', a: up(a), b: up(b) });
+    if (sem2 === 'ext') post.push({ type: 'segment', a: up(c), b: up(id) });
+    else pre.push({ type: 'segment', a: up(c), b: up(d) });
+    return [...pre, inter, ...post];
+  };
+  // In the CONJUNCTION forms ("המשך BE ו-AD נפגשים ב-F", "the extensions of AC and BD meet at E") a
+  // reference word before the FIRST operand governs the whole conjoined pair (Hebrew construct state:
+  // "המשך X ו-Y" = the extensions of X and of Y) — so it DISTRIBUTES to an unmarked second operand.
+  // The CUT form keeps strict per-side attribution: its operands play different roles (subject cuts
+  // object), so "המשך FO חותך את AC" extends only FO and AC stays the bare segment (issue #22).
+  const distribute = (s1: 'bare' | 'ext' | 'line', s2: 'bare' | 'ext' | 'line') =>
+    s2 === 'bare' ? s1 : s2;
   if (pointFirst) {
     const m = pointFirst;
-    return cross(m[1], m[2], m[3], m[4], m[5]);
+    const kw = t.match(/intersection|∩|חיתוך|נחתך/i);
+    const from = kw ? (kw.index ?? 0) + kw[0].length : 0;
+    const [s1, s2] = operandSpans(t, [m[2], m[3]], [m[4], m[5]], from);
+    const sem1 = semOf(s1);
+    return cross(m[1], m[2], m[3], m[4], m[5], sem1, distribute(sem1, semOf(s2)));
   }
   const linesFirst = t.match(
     /\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?(?:intersect\w*|∩|חיתוך|נחתך|נחתכ|נפגש|meets?).*?\b([A-Za-z]\d*)\b/i,
   );
   if (linesFirst) {
     const m = linesFirst;
-    return cross(m[5], m[1], m[2], m[3], m[4]);
+    const [s1, s2] = operandSpans(t, [m[1], m[2]], [m[3], m[4]]);
+    const sem1 = semOf(s1);
+    return cross(m[5], m[1], m[2], m[3], m[4], sem1, distribute(sem1, semOf(s2)));
   }
   // cut-form: seg1, the CUT verb, seg2, then the point — "BD חותך את OC בנקודה A" / "BD cuts OC at A".
   // (The verb between the segments is what the lines-first form, which needs it AFTER both, misses.)
@@ -748,13 +789,12 @@ const lineLineIntersection: Rule = (s) => {
   );
   if (cutForm) {
     const m = cutForm;
-    // A "המשך"/extension operand is DIRECTIONAL — A must be beyond its 2nd point (ADR-054). Detect it
-    // per operand by which side of the cut verb the word falls on (seg1 before, seg2 after).
+    // Reference words attribute per operand by which side of the cut verb they fall on (seg1 before,
+    // seg2 after — ADR-054's split, now carrying bare/extension/line, not just the direction).
     const kw = s.match(/חות[כך]|נחתכ?\w*|נפגש\w*|פוגש\w*|cuts?|crosses?|intersects?|meets?/i);
     const before = kw ? s.slice(0, kw.index) : s;
     const after = kw ? s.slice((kw.index ?? 0) + kw[0].length) : '';
-    const ext = /המשך|extension|extended/i;
-    return cross(m[5], m[1], m[2], m[3], m[4], ext.test(before), ext.test(after));
+    return cross(m[5], m[1], m[2], m[3], m[4], semOf(before), semOf(after));
   }
   return 'stop';
 };
@@ -2936,6 +2976,40 @@ const diameter: Rule = (s, ctx) => {
 };
 
 /**
+ * "קוטר מנקודה F" / "הקוטר היוצא מנקודה F" / "קוטר מ-F" / "diameter from F" — the diameter drawn FROM an
+ * on-circle point, with NO cut clause and NO named far endpoint (issue #21). The engine's `diameter`
+ * command needs both endpoints, so the far end (the antipode) is AUTO-NAMED as a fresh label (the
+ * ADR-263 auto-foot precedent — every existing letter excluded). An EXISTING F not yet known on the
+ * circle gets its membership asserted (M1 — the statement makes it a given; idempotent for a member);
+ * a NEW F is created on-circle by the `diameter` command itself. No theft either way: the compound
+ * "קוטר מנקודה F חותך את AC בנקודה E" carries a cut verb and stays owned by `diameterCutsSegment`
+ * (this rule defers on INTERSECT_KW), and a named far endpoint ("FD קוטר") stays with `diameter`
+ * (this rule requires exactly ONE label).
+ */
+const diameterFromPoint: Rule = (s, ctx) => {
+  if (!/diameter|קוטר/i.test(s)) return null;
+  if (INTERSECT_KW.test(s)) return null; // a cut compound → diameterCutsSegment
+  if (POINT_ON_CARRIER.test(s)) return null; // "E על הקוטר…" is a point ON the diameter
+  const fromM = s.match(/(?:from(?:\s+(?:the\s+)?point)?|מ-?נקודה|מהנקודה|היוצא\s+מ-?|מ-)\s*([A-Za-z]\d*)/i);
+  if (!fromM) return null; // no from-marker → the two-label `diameter` rule
+  const center = resolveCenter(s, ctx);
+  if (!center) return null;
+  const F = up(fromM[1]);
+  if (up(center) === F) return null; // "from the centre" is not an on-circle point
+  // Exactly ONE label besides the circle name — a second label is a named far endpoint (→ `diameter`).
+  const rest = dropCircleRef(s).replace(/diameter|קוטר|היוצא|מ-?נקודה|מהנקודה|\bfrom\b|\bpoint\b|\bthe\b/gi, ' ');
+  const labels = [...rest.matchAll(/\b[A-Za-z]\d*\b/g)].map((mm) => up(mm[0]));
+  if (labels.some((l) => l !== F)) return null;
+  const far = freeLabel([F, up(center), ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['D', 'E', 'G', 'H', 'K', 'L']);
+  const members = membersOfCenter(ctx, center);
+  const exists = (ctx.points ?? []).some((q) => up(q) === F);
+  return [
+    ...(exists && !members.has(F) ? [{ type: 'point-on-circle' as const, id: F, circle: circleId(center) }] : []),
+    { type: 'diameter' as const, id1: F, id2: far, circle: circleId(center) },
+  ];
+};
+
+/**
  * Arc constructs on a circle:
  *   - "M is the midpoint of arc BC" / "M אמצע הקשת BC" → the FIXED arc midpoint (`arc-midpoint`).
  *   - "F is ON arc BC" / "F על קשת BC" → a FREE point on the arc (`point-on-circle` with `between`,
@@ -3072,6 +3146,11 @@ const tangentLineIntersection: Rule = (s, ctx) => {
   // the crossing's `order` so the figure flexes to put E on AB's extension (not the wrong side); without it
   // the tangent ∩ the infinite line can land beyond a. (ADR-127's order mechanism; folds into the solver.)
   const directional = /extension|המשך/i.test(s);
+  // NOTE (issue #22 sibling audit): a BARE pair here deliberately does NOT get the within-segment
+  // default — when A,B are a chord of the tangent's own circle (the corpus case), the tangent meets
+  // line AB strictly OUTSIDE the segment (a tangent∩secant crossing lies outside the circle), so a
+  // "within" default would be infeasible by construction. Single pair operand → no cross-operand
+  // contamination, so this rule was never in the #22 defect class; unconstrained stays correct.
   return [
     // Draw what we reference, not just the point: the tangent (trimmed to D–E by the
     // renderer) and the line AB drawn all the way to E (E is on AB's extension).
@@ -3883,8 +3962,17 @@ const THROUGH_PT = String.raw`(?:through|\bat\b|דרך|בנקודה)\s+([A-Za-z]
  * the EXISTING point D as an on-line marker (a silently wrong figure; T1 wiring finding, ADR-236).
  */
 const CUT_VERB = String.raw`(?:חות[כך]|נחת\w*|פוגש\w*|פגש|\bcuts?\b|\bcrosses?\b|\bmeets?\b|\bintersects?\b)`;
-const CUT_FILLER = String.raw`(?:את\s+|the\s+|line\s+|ray\s+|segment\s+|extension\s+(?:of\s+)?|extended\s+|ה?קו\s+|ה?ישר\s+|ה?משך\s+|ה?קטע\s+)*`;
+const CUT_FILLER = String.raw`(?:את\s+|the\s+|line\s+|ray\s+|segment\s+|extension\s+(?:of\s+)?|extended\s+|chord\s+|radius\s+|side\s+|diagonal\s+|ה?קו\s+|ה?ישר\s+|ה?משך\s+|ה?קטע\s+|ה?מיתר\s+|ה?רדיוס\s+|ה?צלע\s+|ה?אלכסון\s+)*`;
 const LINE_CUT = new RegExp(String.raw`${CUT_VERB}\s*${CUT_FILLER}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?(?:בנקודה|\bat\b|ב-)\s*([A-Za-z]\d*)`, 'i');
+/** Reference semantics of a LINE_CUT target (the issue-#22 class, per operand): a bare pair (or "הקטע"/
+ *  "segment") means the SEGMENT — the crossing lands WITHIN it (order [c1,e,c2], ADR-077); "המשך"/
+ *  extension is DIRECTIONAL — beyond the 2nd letter (order [c1,c2,e], ADR-054); "הישר"/line/ray is the
+ *  infinite line — unconstrained. Classified on the matched cut span (`cut[0]`), where the target's own
+ *  reference words live (never the whole utterance — that's the utterance-global defect this fixes). */
+const cutTargetOrder = (cutText: string, c1: Id, c2: Id, e: Id): Id[] | undefined =>
+  /המשך|extension|extended/i.test(cutText) ? [c1, c2, e]
+  : /\bline\b|הישר|הקו|\bray\b|קרן/i.test(cutText) ? undefined
+  : [c1, e, c2];
 /** A cut verb aimed at a NAMED segment (two labels) — if this is present but {@link LINE_CUT} didn't
  *  bind, the utterance is a cut compound we can't fully read → escalate, never half-parse. A cut verb
  *  with a PRONOUN target ("וחותך אותו בנקודה E" — cuts IT, i.e. the reference segment) is NOT this:
@@ -3915,9 +4003,10 @@ const perpendicularLine: Rule = (s, ctx) => {
   if (cut) {
     const [c1, c2, e] = [up(cut[1]), up(cut[2]), up(cut[3])];
     const abId = `line-${c1}${c2}`;
+    const ord = cutTargetOrder(cut[0], c1, c2, e); // bare = within, המשך = beyond, הישר = free (issue #22)
     out.push({ type: 'perpendicular-line', id: lineId, through: P, a, b, visible: false }); // scaffolding for the ∩
     out.push({ type: 'line-through', id: abId, a: c1, b: c2 }); // the segment it cuts, as a line
-    out.push({ type: 'line-intersection', id: e, line1: lineId, line2: abId }); // E = perpendicular ∩ CD
+    out.push({ type: 'line-intersection', id: e, line1: lineId, line2: abId, ...(ord ? { order: ord } : {}) }); // E = perpendicular ∩ CD
     out.push({ type: 'segment', a: e, b: P }); // draw the perpendicular segment E–P (e.g. EK)
     return out;
   }
@@ -3956,10 +4045,11 @@ const parallelLine: Rule = (s, ctx) => {
   if (cut) {
     const [c1, c2, e] = [up(cut[1]), up(cut[2]), up(cut[3])];
     const abId = `line-${c1}${c2}`;
+    const ord = cutTargetOrder(cut[0], c1, c2, e); // bare = within, המשך = beyond, הישר = free (issue #22)
     return [
       { type: 'parallel-line', id: lineIdCut, through: P, a, b, visible: false }, // scaffolding for the ∩
       { type: 'line-through', id: abId, a: c1, b: c2 },
-      { type: 'line-intersection', id: e, line1: lineIdCut, line2: abId },
+      { type: 'line-intersection', id: e, line1: lineIdCut, line2: abId, ...(ord ? { order: ord } : {}) },
       { type: 'segment', a: e, b: P },
     ];
   }
@@ -4610,6 +4700,7 @@ export const RULES: Rule[] = [
   midpoint, // "C אמצע מיתר AB" — a NAMED midpoint, before `chord` grabs "מיתר AB" and drops C (after arcMidpoint)
   circleOnDiameter, // "circle with diameter AB" / "AB קוטר של מעגל" — a circle DEFINED by its diameter (centre = midpoint AB); before `diameter` (add-to-existing) and `circle`
   inscribedAngleOnDiameter, // "זווית היקפית נשענת על הקוטר" (Thales) — before `diameter` (owns "קוטר") and the angle rules
+  diameterFromPoint, // "קוטר מנקודה F" — ONE on-circle label, no cut clause: auto-named antipode (issue #21); before `diameter`
   diameter,
   chord,
   circumcircle, // "circle through A B C" — before the centre-based `circle`
@@ -4853,23 +4944,37 @@ function withCarrierMembership(commands: AnyCommand[], s: string, ctx: ParseCont
   // ANCHORS to the circle — references its centre (`diameterCutsSegment`'s F–O line, the `diameter` rule's
   // A·O·B collinearity). A meet of two chords ("chords AC and BD meet at E") emits the same command KINDS
   // but never touches the circle — bailing on the kind alone dropped all four memberships (review
-  // 2026-07-03, P5). So bail per-command on the centre reference, not per-kind.
+  // 2026-07-03, P5). So bail per-command on the centre reference, not per-kind — and only for a
+  // DIAMETER-flavoured utterance: a RADIUS operand legitimately touches the centre ("המיתר CK חותך את
+  // הרדיוס AO בנקודה E", issue #17 — its intersection command references O, yet the chord/rim
+  // memberships are exactly what this pass must restore; the pair logic below is already centre-safe).
   const LINE_CONSTRUCT: ReadonlySet<string> = new Set(['set-collinear', 'set-line', 'line-line-intersection', 'line-intersection']);
   const refsCentre = (c: AnyCommand): boolean =>
     Object.entries(c).some(([k, v]) => k !== 'type' && (v === up(center) || (Array.isArray(v) && v.includes(up(center)))));
-  if (commands.some((c) => LINE_CONSTRUCT.has(c.type) && refsCentre(c))) return commands;
+  if (isDiameter && commands.some((c) => LINE_CONSTRUCT.has(c.type) && refsCentre(c))) return commands;
   const centers = new Set([center, ...(ctx.circles ?? [])].map(up));
   const already = new Set(
     commands.flatMap((c) => (c.type === 'point-on-circle' && c.circle === circ ? [up(c.id)] : [])),
   );
   // Ordered endpoint PAIRS drawn by the winning rule — a `segment` or a `point-on-segment` carrier (the
   // on-segment RIDER `id` is NOT an endpoint, so "C אמצע מיתר AB" puts A,B — not C — on the circle). A pair
-  // touching the circle's CENTRE is a radius, not a chord — excluded (so "radius OE" keeps O off).
+  // touching the circle's CENTRE is a radius, not a chord — excluded (so "radius OE" keeps O off). A
+  // segment touching a point the rule CREATED as an intersection is SCAFFOLDING it drew (an extension leg
+  // to the new crossing, e.g. K→P in "המשך הקטע KO חותך את המיתר CB בנקודה P"), never a stated chord —
+  // excluded, so the crossing itself is not forced onto the circle (issue #17).
+  const newMeets = new Set(
+    commands.flatMap((c) =>
+      c.type === 'line-line-intersection' || c.type === 'line-intersection' || c.type === 'line-circle-intersection'
+        ? [up(c.id)]
+        : [],
+    ),
+  );
   const pairs: Id[][] = []; // chord/diameter: an endpoint pair NOT touching the centre
   const rims: Id[] = []; // radius: the non-centre end of a centre→rim carrier ("D on radius OB" → B)
   for (const c of commands) {
     if (c.type !== 'segment' && c.type !== 'point-on-segment') continue;
     const ab = [up(c.a), up(c.b)];
+    if (ab.some((id) => newMeets.has(id))) continue; // scaffolding to a new crossing, not a stated carrier
     const centreEnds = ab.filter((id) => centers.has(id));
     if (centreEnds.length === 0) pairs.push(ab);
     else if (isRadius && centreEnds.length === 1) rims.push(ab.find((id) => !centers.has(id))!);
@@ -5010,6 +5115,31 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
     if (!ok(cands) && !seen.has(m[0])) {
       seen.add(m[0]);
       dropped.push(n);
+    }
+  }
+  // WORD magnitudes (issue #2, ADR-250's named follow-up): a stated fraction written as a WORD with no
+  // digit ("רבע", "חצי", "half") never reaches the digit extraction above, so a rule that claimed the
+  // utterance without lowering the word committed a silently-wrong relation ("AB שווה לחצי BC" as plain
+  // equality). Scanned on the UN-blanked text (blanking wipes English words), only when the utterance
+  // states a RELATION (a bare word is a construct/noun context) — and the shape nouns "חצי מעגל" /
+  // "רבע מעגל" (semicircle / quarter-circle) are exempt via a lookahead. Accounted generously as the
+  // value OR its inverse (rules lower "רבע מ-X" as k=4 on the mirrored side).
+  const REL_MARKER = /[=<>≥≤]|שווה|גדול|קטן|\bפי\b|equals?|larger|greater|smaller|less|twice/i;
+  if (REL_MARKER.test(raw)) {
+    const WORD_MAGNITUDES: [RegExp, number][] = [
+      [/(?<![א-ת])(?:[ולבמכ]-?)?מחצית(?![א-ת])/, 0.5],
+      [/(?<![א-ת])(?:[ולבמכ]-?)?חצי(?!\s*(?:ה?מעגל|ה?עיגול))(?![א-ת])/, 0.5],
+      [/(?<![א-ת])(?:[ולבמכ]-?)?רבע(?!\s*(?:ה?מעגל|ה?עיגול))(?![א-ת])/, 0.25],
+      [/(?<![א-ת])(?:[ולבמכ]-?)?שליש(?![א-ת])/, 1 / 3],
+      [/\bhalf\b(?!\s*(?:a\s+|of\s+a\s+)?circle)/i, 0.5],
+      [/\bquarter\b(?!\s*(?:of\s+a\s+)?circle)/i, 0.25],
+    ];
+    for (const [re, v] of WORD_MAGNITUDES) {
+      const m = raw.match(re);
+      if (m && !ok([v, 1 / v]) && !seen.has(m[0])) {
+        seen.add(m[0]);
+        dropped.push(q(v));
+      }
     }
   }
   return dropped;

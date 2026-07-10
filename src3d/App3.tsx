@@ -13,7 +13,7 @@ import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
 import { escalate3 } from './parser/llm3';
 import Figure3 from './render/Figure3';
-import { deserializeFigure3, serializeFigure3 } from './store/figureFile3';
+import { deserializeFigure3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
 import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
 
 function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: StoreError3): string | null {
@@ -185,7 +185,9 @@ export default function App3() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `figure-3d-${new Date().toISOString().slice(0, 10)}.geo3.json`;
+    // The user names the file; the per-product -vectors suffix is appended automatically (issue #20).
+    // Empty/cancelled → the date-stamped default, the pre-#20 behaviour.
+    a.download = namedFigureFileName3(window.prompt(t('actions.saveNamePrompt')), new Date());
     a.click();
     URL.revokeObjectURL(url);
   };

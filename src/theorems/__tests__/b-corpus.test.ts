@@ -286,15 +286,14 @@ const CORPUS: BQuestion[] = [
       // solve costs ~30 s (the ADR-123 over-recruit note) — omitted from the CI wiring.
       'the tangent at C meets the extension of BA at E',
     ],
-    expect: [103, 105, 107, 84, 10, 22, 1],
-    gaps: [87],
+    // 87 fires since the issue-#7 fix: "GA = AC" used to be "satisfied" by collapsing the free
+    // on-circle vertex A onto C (a VACUOUS 0 = 0 the recruiter's plain-evaluate accept admitted), so
+    // the D-crossing group then failed honestly and the circle had only 3 members (the ADR-243
+    // ENGINE FINDING). The step-accept boundary now refuses a result in which a new constraint's own
+    // referenced points coincide (`newConstraintsNonVacuous`), the recruiter finds the real
+    // configuration (A the midpoint of GC), D builds, and the 4-member concyclic evidence reaches 87.
+    expect: [103, 105, 107, 84, 10, 22, 1, 87],
     never: [69, 18],
-    // ENGINE FINDING (ADR-243): the D-crossing group fails although the figure is constructible —
-    // G on the extension of CA with |GA| = |AC| (A the midpoint of GC) is fine on its own, but
-    // adding "line GB meets circle O at D" re-solves and reports the equality violated. D never
-    // builds, so the circle has only 3 members and 87 correctly stays a gap here (a BUILD gap, not
-    // a matcher gap). Solver-routing class (ADR-229/230 family) — filed, not fixed in T2.
-    knownBuildIssue: '|GA| = |AC| cannot hold',
   },
   {
     id: 'B14',

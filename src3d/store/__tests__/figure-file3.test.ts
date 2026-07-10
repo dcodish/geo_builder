@@ -69,3 +69,21 @@ describe('figure file (.geo3.json)', () => {
     expect(useGeo3.getState().facts.map((f) => f.utterance)).toEqual(preLoad);
   });
 });
+
+/** Issue #20 — user-named save files with the automatic per-product suffix (3-D twin). */
+import { namedFigureFileName3 } from '../figureFile3';
+
+describe('namedFigureFileName3 (issue #20)', () => {
+  const now = new Date('2026-07-11T10:00:00Z');
+  it('appends the -vectors suffix to a user name', () => {
+    expect(namedFigureFileName3('2026summer', now)).toBe('2026summer-vectors.json');
+  });
+  it('never doubles the suffix and strips a typed extension', () => {
+    expect(namedFigureFileName3('2026summer-vectors', now)).toBe('2026summer-vectors.json');
+    expect(namedFigureFileName3('old.geo3.json', now)).toBe('old-vectors.json');
+  });
+  it('empty / cancelled → the date-stamped default (pre-#20 behaviour)', () => {
+    expect(namedFigureFileName3('', now)).toBe('figure-3d-2026-07-11.geo3.json');
+    expect(namedFigureFileName3(null, now)).toBe('figure-3d-2026-07-11.geo3.json');
+  });
+});

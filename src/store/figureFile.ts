@@ -170,3 +170,26 @@ export function deserializeFigure(text: string): FigureLoadResult {
 export function figureFileName(now: Date): string {
   return `figure-${now.toISOString().slice(0, 10)}.geo.json`;
 }
+
+/** This product's save-file suffix (issue #20; registry: docs/22-workflow.md §9). COPIED per product
+ *  tree, never imported across src/ ↔ src3d/ (the isolation rule) — the 3-D sibling carries `vectors`. */
+export const SAVE_SUFFIX = 'geo';
+
+/**
+ * A user-chosen save name → the download filename (issue #20): strip characters illegal in filenames,
+ * drop a typed extension, append the per-product suffix unless the name already ends with it, and fall
+ * back to the date-stamped default when nothing usable remains (empty / cancelled prompt).
+ * "2026summer" → "2026summer-geo.json"; "2026summer-geo" stays single-suffixed. Load is content-based
+ * (the `app` marker + schemaVersion), so any name loads — old `.geo.json` files included.
+ */
+export function namedFigureFileName(name: string | null | undefined, now: Date): string {
+  const clean = (name ?? '')
+    .replace(/[/\\:*?"<>|]/g, '')
+    .trim()
+    .replace(/\.json$/i, '')
+    .replace(/\.geo$/i, '')
+    .trim();
+  if (!clean) return figureFileName(now);
+  const stem = new RegExp(`-${SAVE_SUFFIX}$`, 'i').test(clean) ? clean : `${clean}-${SAVE_SUFFIX}`;
+  return `${stem}.json`;
+}
