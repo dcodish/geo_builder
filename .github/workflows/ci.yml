@@ -1,5 +1,12 @@
 name: CI
 
+# Per-product CI lanes (ADR-266, issue #13): a `changes` job classifies the diff and
+# only the affected product lanes run. Anything on the SHARED surface (server/,
+# package.json, tsconfig, vite.config.ts, .github/, or any uncategorized new path)
+# runs every lane — unknown-by-default is "run everything", never "skip".
+# Each lane still runs `tsc -b` (tsconfig includes src + src3d), so every lane
+# typechecks the whole repo — the cross-product safety net stays.
+
 on:
   push:
     branches: [main]
@@ -18,13 +25,60 @@ on:
       - '.claude/**'
 
 # A newer push to the same branch/PR cancels the still-running older run —
-# only the latest state matters, and each run costs ~13 free-tier minutes.
+# only the latest state matters, and each run costs free-tier minutes.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run2d: ${{ steps.classify.outputs.run2d }}
+      run3d: ${{ steps.classify.outputs.run3d }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed paths per product
+        id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          # New branch / force push / unknown base → cannot diff → run everything.
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
+            echo "no usable diff base ($BASE) - running all lanes"
+            echo "run2d=true" >> "$GITHUB_OUTPUT"
+            echo "run3d=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          app2d=false; app3d=false; shared=false
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              docs/*|reports/*|deploy/*|.claude/*|*.md) ;;                # docs-only: no lane
+              src3d/*|3d.html|fixtures3/*|vite.config.3d.ts) app3d=true ;;
+              src/*|index.html) app2d=true ;;
+              *) shared=true ;;   # server/, package*.json, tsconfig*, vite.config.ts, .github/, anything new
+            esac
+          done < <(git diff --name-only "$BASE" "$GITHUB_SHA")
+          run2d=false; run3d=false
+          { [ "$shared" = true ] || [ "$app2d" = true ]; } && run2d=true
+          { [ "$shared" = true ] || [ "$app3d" = true ]; } && run3d=true
+          echo "classified: app2d=$app2d app3d=$app3d shared=$shared -> run2d=$run2d run3d=$run3d"
+          echo "run2d=$run2d" >> "$GITHUB_OUTPUT"
+          echo "run3d=$run3d" >> "$GITHUB_OUTPUT"
+
+  test-2d:
+    name: 2-D Geo Builder (src/ + server/)
+    needs: changes
+    if: needs.changes.outputs.run2d == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -38,8 +92,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build (tsc + vite)
+      - name: Build (tsc + vite, 2-D bundle)
         run: npm run build
 
-      - name: Test
-        run: npm run test:run
+      - name: Test (2-D + shared server)
+        run: npx vitest run src/ server/
+
+  test-3d:
+    name: 3-D Space Builder (src3d/ + server/)
+    needs: changes
+    if: needs.changes.outputs.run3d == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (tsc + vite, 3-D bundle)
+        run: npm run build:3d
+
+      - name: Test (3-D + shared server)
+        run: npx vitest run src3d/ server/

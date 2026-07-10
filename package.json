@@ -10,7 +10,11 @@
     "build:proxy": "node server/build.mjs",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:2d": "vitest src/ server/",
+    "test:3d": "vitest src3d/ server/",
+    "test:run:2d": "vitest run src/ server/",
+    "test:run:3d": "vitest run src3d/ server/"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
