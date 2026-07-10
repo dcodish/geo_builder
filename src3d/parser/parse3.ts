@@ -390,11 +390,13 @@ const diagIntersection: Rule = (s) => {
   return null;
 };
 
-/** `CA' מאונך למישור BC'D` / `CA' is perpendicular to plane BC'D` — a CLAIM; draws the segment + the plane triangle. */
+/** `CA' מאונך למישור BC'D` / `CA' is perpendicular to plane BC'D` — a CLAIM; draws the segment + the plane triangle.
+ *  The plane keyword is optional when the target run is 3–4 points (`MO ⊥ABCD`, issue #14) —
+ *  a run of ≥3 points can only be a plane (a segment is exactly 2), so the symbol form is unambiguous. */
 const perpPlaneClaim: Rule = (s0) => {
   const s = stripProofPrefix(s0);
   const m = s.match(
-    /^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:מאונך|ניצב|אנך|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור|plane)\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)?\s*$/,
+    /^([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:מאונך|ניצב|אנך|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור|plane)?\s*([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)?\s*$/,
   );
   if (!m) {
     // "AS ניצב לבסיס / למישור הבסיס" / "AS is perpendicular to the base" — the base
@@ -412,6 +414,37 @@ const perpPlaneClaim: Rule = (s0) => {
     { type: 'segment3', a: p3, b: p1 },
     { type: 'seg-plane-rel', rel: 'perp', a: s1, b: s2, plane: [p1, p2, p3] },
   ];
+};
+
+/** A ⟂-operand: a point PAIR (`SM`) or a named vector (`u`). Strict case — a single
+ *  uppercase letter is a point, never a vector name, so it yields no atom. */
+const perpOperand = (tok: string): VecAtom | null => {
+  const pm = tok.match(/^([A-Z]\d*'?)([A-Z]\d*'?)$/);
+  if (pm) return pm[1] === pm[2] ? null : { kind: 'pair', from: pm[1], to: pm[2] };
+  return /^[a-w]$/.test(tok) ? { kind: 'named', name: tok } : null;
+};
+
+/**
+ * Issue #14: a stated ⟂ between two SEGMENTS / named VECTORS — `SM ⊥ DB` / `SM מאונך ל-DB` /
+ * `SM is perpendicular to DB` / `u ⊥ v` / plural `SM ו-DB מאונכים זה לזה`. Lowers to the
+ * V8-f `cos-angle` with cos = 0 (no new engine construct) — M1 at apply: a driving scalar
+ * pin on a free-dim solid, a verified claim on a determined figure; both operands auto-draw.
+ * A target run of 3–4 points is a PLANE and stays with perpPlaneClaim (which runs first).
+ */
+const perpSegGiven: Rule = (s0) => {
+  const s = stripProofPrefix(s0);
+  if (!/⊥|מאונ[ךכ]|ניצב|אנך|perpendicular/i.test(s)) return null; // מאונ[ךכ]: the plural מאונכים has a REGULAR kaf
+  const TOK = String.raw`([A-Z]\d*'?[A-Z]\d*'?|[a-w])`;
+  const NOUN = String.raw`(?:ה?קטע\s+|ה?מקצוע\s+|ה?ישר\s+|ה?ו?וקטור\s+|(?:the\s+)?(?:segment|edge|line|vector)\s+)?`;
+  const NOUNS = String.raw`(?:ה?קטעים\s+|ה?ישרים\s+|ה?מקצועות\s+|ה?ו?וקטורים\s+|(?:the\s+)?(?:segments|edges|lines|vectors)\s+)?`;
+  const m =
+    s.match(new RegExp(`^${NOUN}${TOK}\\s*(?:⊥|מאונך|ניצב|אנך|(?:is\\s+)?perpendicular)\\s*(?:ל|to\\s+(?:the\\s+)?)?-?\\s*${NOUN}${TOK}\\s*$`, 'i')) ??
+    s.match(new RegExp(`^${NOUNS}${TOK}\\s+(?:ו-?|and\\s+)\\s*${TOK}\\s+(?:מאונכים|ניצבים|are\\s+perpendicular)(?:\\s+זה\\s+לזה)?\\s*$`, 'i'));
+  if (!m) return null;
+  const u = perpOperand(m[1]);
+  const v = perpOperand(m[2]);
+  if (!u || !v) return null;
+  return [{ type: 'cos-angle', u, v, cos: 0 }];
 };
 
 /** `E, C, A' על ישר אחד` / `E, C, A' are collinear` — a CLAIM. */
@@ -1686,6 +1719,7 @@ const RULES: Rule[] = [
   diagIntersection, // `מפגש האלכסונים` — before onSegment/midpoint grab the tokens
   bisectorPoint, // V8-f (G11): `D על AC כך ש-OD חוצה זווית AOC` — before onSegment grabs `D על AC`
   perpPlaneClaim,
+  perpSegGiven, // issue #14: `SM ⊥ DB` / `u ⊥ v` — after perpPlaneClaim (3–4-point targets are planes)
   segParallelPlane,
   collinearClaim,
   midpoint,
