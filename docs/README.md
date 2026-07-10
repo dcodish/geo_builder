@@ -1,6 +1,6 @@
 # Geo Builder — Documentation
 
-Living project documentation. Status: **design phase** (last updated 2026-06-10). The system described here is the **target design**; the engine, parser, and UI are not yet implemented. For the current state of the repository, see the repo-root [`CLAUDE.md`](../CLAUDE.md).
+Living project documentation (last updated 2026-07-10). Both apps are **built and in production** (themathbible.com/geo-builder/ + /3d-builder/); for current state and the resume pointer see the repo-root [`CLAUDE.md`](../CLAUDE.md) and [09-implementation-plan.md](09-implementation-plan.md). Day-to-day process lives in [22-workflow.md](22-workflow.md) (issues → PRs → main → deploy) and [RUNBOOK.md](RUNBOOK.md).
 
 ## Contents
 
@@ -27,6 +27,9 @@ Living project documentation. Status: **design phase** (last updated 2026-06-10)
 | 18 | [Theorem Discovery v2 — Relevance Replan](18-theorem-relevance-plan.md) | **ACCEPTED, decision-complete (2026-07-06); T1 next.** The 6b+ replan after the operator's dissatisfaction review: coverage disposition map (66/109 ids absent today), evidence-predicate library, explainable rank bands + subsumption, the observed (L2/L3) lane, the principles lane (teacher tips + intent hints); all §8 decisions resolved |
 | 19 | [Analytic-geometry tool (sibling app)](19-analytic-geometry-tool.md) | **PROPOSED — one decision open (2026-07-06).** A second tool at its own URL for bagrut analytic geometry: corpus reading (Q1 is a *locus* problem), the shared-chassis / new-core split, the locus↔free-DOF bridge, and vectors/3-D parked as a third track |
 | 20 | [Space/vectors tool (3-D)](20-space-vectors-tool.md) | **ACCEPTED, decision-complete (2026-07-06); V0 next.** The detailed plan for the third tool at **`/3d-builder/`** (bagrut Q2, vectors geometric + algebraic): corpus reading of four 572 exams, the two lanes + the coordinate-injection pivot, three new cores (bounded symbolic vector layer — **NO CAS**, linear equation layer, SVG projection renderer with textbook hidden-line style), phased V0–V6 build gated on the corpus |
+| 22 | [Project Workflow](22-workflow.md) | **The standard operating route (ADR-265):** GitHub issues for every report, priority rubric P1–P3, bug vs feature routes, PRs to `main`, deploy tagging |
+| — | [RUNBOOK](RUNBOOK.md) | Ops: deploy procedures for both apps + the proxy, verification, troubleshooting index, rollback, logs |
+| — | [DEPLOY-LOG](DEPLOY-LOG.md) | Append-only record of what is live in production (paired with `prod/*` git tags) |
 | — | [Project Memory](PROJECT-MEMORY.md) | Travelling memory: where memory lives, operational notes, resume pointer (read at session start) |
 | — | [Paper & Theory](paper/README.md) | Academic writing + the theory/algorithmic lineage behind the implementation (method↔citation mapping, paper outline, dated discussion logs) |
 

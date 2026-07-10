@@ -1,0 +1,89 @@
+# RUNBOOK — operating & deploying Geo Builder (2-D + 3-D) on themathbible.com
+
+The single ops entry point. Deep 2-D proxy detail (one-time setup, env file, security notes) lives in [deploy/README.md](../deploy/README.md) — this file is the day-to-day procedure + troubleshooting index for **both** apps.
+
+## The moving parts
+
+| Artifact | Built by | Lives on the server at | Served as |
+| --- | --- | --- | --- |
+| 2-D static app (`dist/`) | `npm run build` | `/var/www/vhosts/themathbible.com/httpdocs/geo-builder/` | `https://themathbible.com/geo-builder/` (Apache static) |
+| 3-D static app (`dist-3d/`) | `npm run build:3d` | `…/httpdocs/3d-builder/` (**rename `3d.html` → `index.html`**) | `https://themathbible.com/3d-builder/` (Apache static) |
+| Shared Node proxy (`dist-server/proxy.mjs`) | `npm run build:proxy` | `/var/www/geo-proxy/proxy.mjs` | `geo-proxy.service` on loopback **:8788**, reverse-proxied by Apache |
+| Proxy env (key, admin creds, log paths) | — (hand-edited) | `/var/www/geo-proxy/geo-proxy.env` (mode 600) | read by the service |
+
+- **Server:** `ssh root@themathbible.com` (74.208.61.39). Plesk on Ubuntu 22.04. **Apache serves everything; nginx is OFF** — never touch `vhost_nginx.conf`.
+- **One proxy serves both apps** (`server/parseHandler.ts` binds them): LLM fallback (`/api/parse`, body `tool:'3d'` selects the 3-D prompt), usage-event sinks (`events.jsonl` + `events-3d.jsonl` via `EVENTS_3D_LOG_PATH`), and the two admin dashboards.
+- **Admin dashboards:** `https://themathbible.com/geo-builder/admin` and `…/3d-builder/admin` (→ proxy path `/admin3`, `ADMIN_3D_BASE`). Same credentials (in the env file).
+- **Apache directives** (reverse-proxy lines): sources in [deploy/apache-geo-builder.conf](../deploy/apache-geo-builder.conf) + [deploy/apache-3d-builder.conf](../deploy/apache-3d-builder.conf). **Store them in Plesk's GUI field** (*Domains → themathbible.com → Apache & nginx Settings → Additional directives for HTTPS*) so a Plesk regeneration doesn't drop them; direct edits to `vhost_ssl.conf` do NOT survive regeneration.
+
+## Standard deploy
+
+Deploy **only committed state on `main`** ([docs/22 §5](22-workflow.md)). Decision rule first: **did `server/` change?**
+- **No** → static-only deploy; **do not restart the proxy.**
+- **Yes** → also rebuild + push + restart the proxy (step 4).
+
+```sh
+# 0. Gates on the exact tree being deployed
+npx vitest run           # full suite green
+npm run build            # 2-D (tsc -b + vite)   — skip if 2-D unchanged
+npm run build:3d         # 3-D                    — skip if 3-D unchanged
+npm run build:proxy      # only if server/ changed
+
+# 1. 2-D static
+scp -r dist/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/geo-builder/
+
+# 2. 3-D static (note the rename)
+scp -r dist-3d/* root@themathbible.com:/var/www/vhosts/themathbible.com/httpdocs/3d-builder/
+ssh root@themathbible.com 'cd /var/www/vhosts/themathbible.com/httpdocs/3d-builder && mv -f 3d.html index.html'
+
+# 3. perms (static files should be 644 root:root — scp usually preserves this; verify)
+ssh root@themathbible.com 'chmod -R a+rX /var/www/vhosts/themathbible.com/httpdocs/geo-builder /var/www/vhosts/themathbible.com/httpdocs/3d-builder'
+
+# 4. proxy — ONLY when server/ changed
+scp dist-server/proxy.mjs root@themathbible.com:/var/www/geo-proxy/
+ssh root@themathbible.com 'systemctl restart geo-proxy'
+```
+
+## Verify (every deploy)
+
+- `ssh root@themathbible.com 'curl -s http://127.0.0.1:8788/healthz'` → `ok`
+- Both pages load over HTTPS; `index.html` references the **new** bundle hash and the bundle returns 200.
+- A quick in-grammar utterance builds (no proxy call); if the proxy changed, an out-of-grammar utterance builds too (and shows in the Anthropic Console usage).
+- Admin dashboards log in and show the visit.
+
+## Record it (every deploy — non-optional)
+
+```sh
+git tag prod/YYYY-MM-DD        # -2, -3 … for same-day redeploys
+git push origin --tags
+```
+…and append the entry to **[DEPLOY-LOG.md](DEPLOY-LOG.md)** (date, tag, commit, app(s), bundle hash(es), one line of what changed).
+
+## Troubleshooting index
+
+| Symptom | Likely cause → fix |
+| --- | --- |
+| Proxied routes (`/api/parse`, admin) 404, static fine, service `active` | **Plesk regenerated `vhost_ssl.conf`** and dropped hand-appended directives → re-add (via the Plesk GUI field this time), `apache2ctl -t && systemctl reload apache2` |
+| App renders with old behaviour after a deploy | **Browser cache kept the old `index.html`** → hard-refresh; long-term the `<Directory>` cache block in `apache-geo-builder.conf` (no-cache HTML, immutable assets) |
+| LLM fallback answers "service busy" | `LLM_DAILY_MAX` hit (usually a bot) → `journalctl -u geo-proxy | grep 'daily limit'`; tune in `geo-proxy.env` + restart |
+| Dev machine: a "fixed" bug still reproduces | **Stale dev server** (predates the fix) → restart `npm run dev` (the ADR-115 lesson) |
+| Dev machine: tests hang / ESM loads take seconds | Dropbox cloud-filter on `node_modules` → the junction fix; **`npm ci` clobbers the junction**, use `npm install` (PROJECT-MEMORY operational notes) |
+| Local git weirdness (phantom modified files, fsck errors) | Dropbox corrupting `.git` → `git fetch` from GitHub to backfill; GitHub is the source of truth |
+
+## Rollback
+
+Old hashed bundles are never deleted by `scp`, so the fastest rollback is redeploying the previous good commit's build:
+
+```sh
+git checkout prod/<previous-tag>   # in a worktree, not the shared tree
+npm install && npx vitest run && npm run build   # (and/or build:3d / build:proxy)
+# then the standard deploy steps for the affected artifact(s)
+```
+
+Tag the rollback deploy too (`prod/YYYY-MM-DD-rollback`) and log it.
+
+## Logs & data
+
+- **Proxy service:** `journalctl -u geo-proxy -f`
+- **Prod usage events:** `/var/www/geo-proxy/events.jsonl` (2-D) + `events-3d.jsonl` (3-D) — hashed IPs only, self-rotating, retention per `EVENTS_RETENTION_DAYS`. Triaged by the `/log-triage` skill.
+- **Dev debug log:** `logs/debug-log.jsonl` (dev-only, gitignored) — the session-reconstruction source for bug reports; keep `logs/` out of personal cloud sync.
