@@ -700,7 +700,15 @@ function extensionsClear(facts: Fact[], fig: Derived, relax = false): boolean {
   const margin = 0.05 * figureSpan(fig);
   const triples = extensionTriples(facts);
   if (triples.length === 0) return true;
-  // Only the RELAXED pass needs the shared-endpoint test (ADR-142); the strict pass is pure direction.
+  // Two bars, both real (ADR-098 vs ADR-142, reconciled by ADR-267): STRICT is the PREFERENCE — the letter
+  // order is honoured whenever some configuration achieves it (on a free-DOF figure "המשך CA → D" genuinely
+  // SELECTS the placement, ADR-098). RELAXED is the ACCEPTANCE bar for a SHARED-ENDPOINT extension (an
+  // endpoint already on the target circle ⇒ the second crossing is UNIQUE): when NO configuration achieves
+  // the letter-order side (booklet-571 p.78 Q4: CB tangent to circle P pins C outside P, so E can never land
+  // beyond C) the order carries no information and EITHER extension counts — a point genuinely BETWEEN the
+  // endpoints still fails. Every consumer that needs "is this config valid at all" passes relax=true;
+  // "strict first, relaxed only if strict is unachievable" is the SEARCH's job (`firstSatisfyingSeed`
+  // interleaves both bars in ONE budgeted sweep — never a second full pass, issue #19).
   const members = relax ? circleMembers(fig.construction) : [];
   for (const { a, b, id, circle } of triples) {
     const pa = fig.positions.get(a), pb = fig.positions.get(b), pid = fig.positions.get(id);
@@ -709,11 +717,6 @@ function extensionsClear(facts: Fact[], fig: Derived, relax = false): boolean {
     const abl = Math.hypot(abx, aby);
     if (abl < 1e-9) return false;
     const beyondB = ((pid.x - pb.x) * abx + (pid.y - pb.y) * aby) / abl; // signed distance of id past b along a→b
-    // STRICT (the primary bar): the new point must reach beyond the named 2nd endpoint b — so a free DOF is
-    // SAMPLED so "המשך" reaches the FAR side when that is achievable (ADR-098). The RELAXED fallback only
-    // applies for a SHARED-ENDPOINT extension (a line endpoint already on the circle ⇒ the other crossing is
-    // UNIQUE, so the side is forced by the geometry, not the BD/DB letter order): then the new point on EITHER
-    // extension counts (ADR-142). Used by firstSatisfyingSeed's second pass when NO seed satisfies strict.
     let reach = beyondB;
     if (relax) {
       // Entries are per circle id (ADR-244), so match the extension's target circle exactly.
@@ -797,7 +800,8 @@ const SEARCH_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSIT
  * another circle, and an apex whose side decides whether two segments cross, are both placements only a
  * subset of configurations satisfies — we SAMPLE one rather than drive across a degeneracy. Used to auto-pick
  * the default configuration after a step and to gate "show another configuration". Bounded by `budgetMs`
- * of wall-clock (E2): past the deadline it returns `from` (keep the current view, amber if short).
+ * of wall-clock (E2): past the deadline it returns the best seed seen so far (the relaxed fallback if one
+ * was recorded, else `from` — keep the current view, amber if short).
  */
 export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budgetMs = SEARCH_BUDGET_MS): number {
   const deadline = Date.now() + budgetMs;
@@ -807,6 +811,8 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   const hasOnSeg = base0.construction.objects.some((o) => o.kind === 'line-line-intersection' && o.onSeg);
   if (!hasExt && !hasOnSeg) return from; // nothing to satisfy → keep the seed
   const ok = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig) && intersectionsWithinSegments(fig);
+  // The ADR-142 acceptance bar: a SHARED-ENDPOINT extension counts on EITHER side (see extensionsClear).
+  const okRelaxed = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig, true) && intersectionsWithinSegments(fig);
   if (ok(base0)) return from; // the current view already satisfies every requirement
   // Candidate seeds in priority order. When a segment-meet is off its segment the cause is almost always an
   // apex pointing the wrong way, which plain re-seeding rarely fixes — so try the REFLECTION seeds first
@@ -821,19 +827,20 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
     for (const m of masks) for (let s = 0; s < 24; s++) seeds.push(withReflectMask(m, s));
   }
   for (let s = from; s < from + budget; s++) seeds.push(s);
+  // ONE interleaved sweep, both bars per seed (issue #19 / ADR-267): STRICT wins the moment it's found (the
+  // letter order is honoured whenever achievable, ADR-098); the first RELAXED-only seed is remembered as the
+  // fallback and returned when the sweep ends — or the DEADLINE hits — without a strict hit (ADR-142: no
+  // configuration achieves the letter-order side, so the order carries no information). The old shape — a
+  // full strict pass, THEN a full relaxed pass — burned the entire wall budget on a provably futile strict
+  // sweep for the ADR-142 class, so the live app (2500ms) never reached the fallback its tests (∞) always did.
+  let fallback = okRelaxed(base0) ? from : -1;
   for (const s of seeds) {
-    if (Date.now() > deadline) return from; // out of budget — keep the current view (amber if short)
-    if (ok(replay(facts, s))) return s;
-  }
-  // RELAXED FALLBACK ([ADR-142](docs/06-decisions.md#adr-142)): no seed satisfies the strict extension
-  // direction, so accept a shared-endpoint extension on EITHER side (the strict pass above ran first, so this
-  // never weakens an achievable figure). Still requires plain segment-meets to land within.
-  for (let s = from; s < from + budget; s++) {
-    if (Date.now() > deadline) return from;
+    if (Date.now() > deadline) break; // out of budget — settle for the best seen so far
     const fig = replay(facts, s);
-    if (fig.lastError === null && extensionsClear(facts, fig, true) && intersectionsWithinSegments(fig)) return s;
+    if (ok(fig)) return s;
+    if (fallback < 0 && okRelaxed(fig)) fallback = s;
   }
-  return from;
+  return fallback >= 0 ? fallback : from;
 }
 
 /** Branchable derived-point command types — the discrete "alternatives" a figure can have (which of two
@@ -847,12 +854,15 @@ const BRANCHABLE = new Set<AnyCommand['type']>(['point-by-distances', 'arc-midpo
  * genuinely under-determined PENDING figure also passes (its unsatisfied constraint is not a violation —
  * it's waiting for more givens, ADR-104 — so there is nothing to search for).
  */
-export function meetsRequirements(facts: Fact[], seed = 0): boolean {
+export function meetsRequirements(facts: Fact[], seed = 0, relaxExtensions = false): boolean {
   const fig = replay(facts, seed);
   return (
     fig.lastError === null &&
     fig.violations.length === 0 &&
-    extensionsClear(facts, fig) &&
+    // relaxExtensions: the ADR-142 acceptance bar for a config `firstSatisfyingSeed` returned as its
+    // shared-endpoint FALLBACK — the letter-order side is unachievable, so either extension counts
+    // (issue #19: `findValidConfig` used to strictly reject the very seed the fallback found).
+    extensionsClear(facts, fig, relaxExtensions) &&
     intersectionsWithinSegments(fig) &&
     pointsDistinct(fig.construction, fig.positions, fig.coincidences) &&
     polygonsConvex(facts, fig.positions)
@@ -875,6 +885,14 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
   // apex points the wrong way is brought onto the segments in a handful of tries instead of by luck.
   const s0 = firstSatisfyingSeed(facts, fromSeed, 120, timeLeft());
   if (meetsRequirements(facts, s0)) return { facts, seed: s0 };
+  // ADR-142 acceptance (issue #19 / ADR-267): `firstSatisfyingSeed` may have returned its shared-endpoint
+  // FALLBACK — every seed it examined failed the strict extension direction, so the RELAXED bar is the right
+  // validity test for s0. Checked BEFORE the strict sweep/branch tiers: when s0 is a fallback those tiers are
+  // provably futile on the extension bar (the sweep re-covers seeds firstSatisfyingSeed already rejected),
+  // and their cold replays would burn the remaining budget and bail to null past the very config in hand —
+  // the exact starvation this ADR removes. When s0 simply failed OTHER requirement dimensions (violations,
+  // convexity, distinctness), the relaxed check fails identically and the tiers below run as before.
+  if (meetsRequirements(facts, s0, true)) return { facts, seed: s0 };
   for (let s = fromSeed; s < fromSeed + 40; s++) {
     if (Date.now() > deadline) return null; // out of budget — caller keeps the current figure, amber
     if (meetsRequirements(facts, s)) return { facts, seed: s };
@@ -1048,10 +1066,14 @@ function samplingJobs(facts: Fact[]) {
   const finish = () => {
     const c0 = constructions[0];
     const converged = convergedSamples(raw);
-    const valid = requirementSamples(c0, converged).filter((pos) =>
-      extensionsClear(facts, { construction: c0, positions: pos } as Derived),
-    );
-    return (sampleMemo = { facts, constructions, samples: valid.length >= 2 ? valid : converged });
+    const within = requirementSamples(c0, converged);
+    const strict = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived));
+    if (strict.length >= 2) return (sampleMemo = { facts, constructions, samples: strict });
+    // The ADR-267 preference ladder: when the letter-order side is unachievable (no strict samples), the
+    // RELAXED shared-endpoint bar (ADR-142) is the figure's real validity — filter by it before giving up
+    // to the unfiltered converged pool (which would count wrong-side samples as configurations).
+    const relaxed = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived, true));
+    return (sampleMemo = { facts, constructions, samples: relaxed.length >= 2 ? relaxed : converged });
   };
   return { jobs, finish };
 }
@@ -1678,6 +1700,13 @@ export const useGeoStore = create<GeoState>()(
         // the tab for tens of seconds. Same E2 convention as the other searches: past the deadline, return
         // what we have (no change, button reads "no other configuration"). Tests run deadline-free.
         const deadline = Date.now() + SEARCH_BUDGET_MS;
+        // The same preference ladder as the config search (ADR-267): a STRICT-valid view wins outright; a
+        // RELAXED-valid view (the ADR-142 shared-endpoint either-side bar) is remembered as a fallback and
+        // offered only when the CURRENT view itself is not strict-valid — i.e. the figure lives on the
+        // fallback tier already (its letter-order side is unachievable), so "show another" must cycle within
+        // that tier instead of refusing ("determined") on a figure with visibly free DOFs.
+        const curStrict = meetsRequirements(facts, get().seed);
+        let fallback = -1;
         for (let k = 0; k < 24 && Date.now() <= deadline; k++) {
           s += 1;
           const r = replay(facts, s);
@@ -1689,10 +1718,16 @@ export const useGeoStore = create<GeoState>()(
           // class where "show another" offered configs the initial view would never display — e.g. two right
           // triangles sharing a hypotenuse whose legs meet at E: a seed where C,D fall on opposite sides
           // leaves E off its segments, so E can't be where instructed and that view must not be offered (Q8).
-          if (meetsRequirements(facts, s) && shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions))) {
+          if (!shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions))) continue;
+          if (meetsRequirements(facts, s)) {
             set({ seed: s, radiusOverrides: {} }); // a fresh view clears any dialed radii (scratchpad reset)
             return true;
           }
+          if (!curStrict && fallback < 0 && meetsRequirements(facts, s, true)) fallback = s;
+        }
+        if (fallback >= 0) {
+          set({ seed: fallback, radiusOverrides: {} });
+          return true;
         }
         return false; // searched but found no shape-different drawing — the figure is determined up to size/placement
       },

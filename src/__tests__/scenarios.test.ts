@@ -24,7 +24,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { parse, droppedNewLabels, droppedGivenNumbers, buildParseCtx } from '@/parser';
-import { replay, polygonsConvex, useGeoStore, firstSatisfyingSeed, dryRunOutcome, hasDeferrableConstraint, meetsRequirements } from '@/store/geoStore';
+import { replay, polygonsConvex, useGeoStore, firstSatisfyingSeed, findValidConfig, dryRunOutcome, hasDeferrableConstraint, meetsRequirements } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { isGeoPoint, freeDofs, freeDofCount, applySeed, firstCyclableBranch, evaluate, detectRelations, detectShapes } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
@@ -3882,6 +3882,35 @@ export const SCENARIOS: Scenario[] = [
       expect(dist(D, M), 'D is a marker off the touch too').toBeGreaterThan(0.05);
     },
   },
+  {
+    id: 'shared-endpoint-extension-either-side-default',
+    title: 'booklet-571 p.78 Q4: "המשך AC חותך את מעגל P בנקודה E" on the two-tangent-chords figure lands E beyond A (C-A-E)',
+    guards:
+      "operator session eew5ezi5 (2026-07-10, the ADR-124/#6 source question re-typed correctly with the NEW point E): two circles meet at A,B; chord AD in P tangent to O at A; chord CB in O tangent to P at B; 'המשך AC חותך את מעגל P בנקודה E' (the operator typed חותר — a typo the LLM corrected). Every step showed ✓ but E landed BETWEEN C and A (t = 0.64), amber-flagged orderBeyond — 'fails to create the C-A-E sequence'. Root cause (issue #19): ADR-142's shared-endpoint either-side semantics lived ONLY behind extensionsClear's `relax` flag, set solely by firstSatisfyingSeed's fallback pass — so (a) the strict primary sweep demanded E beyond C, which is geometrically impossible here at EVERY seed (CB tangent to circle P pins C outside P), burning the app's 2500ms wall budget before the fallback ever ran, and (b) meetsRequirements/`findValidConfig` used the STRICT form, rejecting the very seed the fallback found — the consumers disagreed. Fix (ADR-267): a PREFERENCE LADDER — strict letter order wherever achievable (the ADR-098 free-DOF family, where the order genuinely SELECTS the config), the ADR-142 either-side bar as the ACCEPTANCE tier, searched in ONE interleaved budget-safe sweep (a fallback bar rides the same loop, never a second pass); meetsRequirements/findValidConfig/resample/the ADR-256 sample filter all honour the ladder.",
+    steps: [
+      'שני מעגלים נחתכים בנקודות A ו-B',
+      'AD מיתר במעגל P משיק למעגל O בנקודה A',
+      'CB מיתר במעגל O משיק למעגל P בנקודה B',
+      { llm: ['המשך AC חותך את מעגל P בנקודה E'] }, // the operator's חותר typo, as the LLM's corrected canonical line
+      'CE',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const C = at(fig, 'C'), A = at(fig, 'A'), E = at(fig, 'E');
+      // E is ON line CA…
+      const ca = { x: A.x - C.x, y: A.y - C.y };
+      const ce = { x: E.x - C.x, y: E.y - C.y };
+      const offLine = Math.abs(ce.x * ca.y - ce.y * ca.x) / Math.hypot(ca.x, ca.y);
+      expect(offLine, 'E collinear with C,A').toBeLessThan(1e-3);
+      // …beyond A (the book's C-A-E order; t=1 at A), never between C and A.
+      const t = (ce.x * ca.x + ce.y * ca.y) / (ca.x * ca.x + ca.y * ca.y);
+      expect(t, 'E beyond A (C-A-E)').toBeGreaterThan(1);
+      // Both stated tangencies genuinely hold (radius ⟂ chord at the touch).
+      const cosA = (p: Vec, v: Vec, q: Vec) => Math.abs(Math.cos((angle(p, v, q) * Math.PI) / 180));
+      expect(cosA(at(fig, 'O'), A, at(fig, 'D')), 'OA ⟂ AD (AD tangent to O at A)').toBeLessThan(0.02);
+      expect(cosA(at(fig, 'P'), at(fig, 'B'), C), 'PB ⟂ CB (CB tangent to P at B)').toBeLessThan(0.02);
+    },
+  },
 ];
 
 describe('reported scenarios — end-to-end replay of real bug reports', () => {
@@ -3896,6 +3925,30 @@ describe('reported scenarios — end-to-end replay of real bug reports', () => {
       }
     });
   }
+});
+
+/**
+ * Production-budget lock (issue #19): the suite runs with SEARCH_BUDGET_MS = Infinity, so a config search
+ * that only succeeds after a long futile sweep looks green here while the LIVE app (2500ms wall budget)
+ * gives up and keeps a violating seed — exactly how session eew5ezi5 shipped E between C and A with every
+ * test passing. This test calls `findValidConfig` with the app's REAL budget, so a reintroduced
+ * strict-then-fallback search order (or any other budget starvation on this figure class) fails the suite.
+ */
+describe('reported scenarios — config search succeeds under the app PRODUCTION budget (issue #19)', () => {
+  it('[shared-endpoint-extension-either-side-default] findValidConfig resolves the eew5ezi5 figure within 2500ms', () => {
+    const sc = SCENARIOS.find((s) => s.id === 'shared-endpoint-extension-either-side-default')!;
+    // structuredClone defeats the replay purity memo, so the search pays COLD replays like a live session.
+    const facts = structuredClone(factsOf(sc.steps)) as Fact[];
+    const found = findValidConfig(facts, 0, 2500);
+    expect(found, 'the app-budgeted config search finds a valid configuration').not.toBeNull();
+    // The letter-order side is unachievable on this figure, so the found config lives on the RELAXED
+    // (shared-endpoint either-side, ADR-142) tier — and E genuinely lands beyond A (the book's C-A-E).
+    expect(meetsRequirements(found!.facts, found!.seed, true), 'the found config meets the acceptance bar').toBe(true);
+    const fig = replay(found!.facts, found!.seed);
+    const C = at(fig, 'C'), A = at(fig, 'A'), E = at(fig, 'E');
+    const t = ((E.x - C.x) * (A.x - C.x) + (E.y - C.y) * (A.y - C.y)) / ((A.x - C.x) ** 2 + (A.y - C.y) ** 2);
+    expect(t, 'E beyond A (C-A-E)').toBeGreaterThan(1);
+  });
 });
 
 /**
