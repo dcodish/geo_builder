@@ -32,7 +32,22 @@ Every operator report and feature request becomes a **GitHub issue** on `dcodish
 
 Honesty violations outrank capability gaps: a wrong figure teaches a student something false; a refusal only inconveniences them.
 
+## 2b. Triage-first: a reported issue is QUEUED, never auto-fixed (operator directive, 2026-07-10 — ADR-265 Am. 1)
+
+The operator raises issues **while testing**, often several per pass. If the reporting session starts fixing immediately, the operator is forced to feed one issue at a time and parallel fixes overwrite each other in the shared tree. So the reporting session's job is **triage, not repair**:
+
+1. **File the issue** (§1) with type + priority + app labels.
+2. **Diagnose to the class level** (per [docs/17](17-design-rules.md)): reproduce from the logs, find the root cause, classify `bug` vs `feature`, set the priority.
+3. **Write the analysis into the issue** (a comment or the body): root cause, the class it belongs to, a concrete fix plan (mechanism, files, tests, blast radius), open questions for the operator.
+4. **STOP — do not implement.** No branch, no code, no "it's a one-liner" exceptions. Reply to the operator with the classification + plan and move to the next report.
+
+Fixing happens in **dedicated fix sessions**: the operator opens one and picks issues off the queue by priority (`gh issue list` sorted P1→P3). Only then do the bug route (§3 steps 4–6) / feature route (§4 steps 3–7) run.
+
+**Exceptions:** (a) the operator explicitly says to fix/build it *now* in this session; (b) a **P1 prod-down / honesty emergency** — drop-everything still applies, but say so before starting.
+
 ## 3. The bug route (operator reports something broken)
+
+Steps 1–3 run in the reporting session; steps 4–6 run **only in a dedicated fix session or on an explicit "fix now"** (§2b).
 
 1. **File the issue** (§1) — before or in parallel with diagnosis, never "after, if I remember."
 2. **Diagnose per [docs/17](17-design-rules.md)** — reproduce from `logs/debug-log.jsonl` / prod events through the real `parse → replay` path; identify the *class*, not the instance.
@@ -43,7 +58,7 @@ Honesty violations outrank capability gaps: a wrong figure teaches a student som
 
 ## 4. The feature route (new capability — always a PR)
 
-Applies to feature requests **and** bug reports reclassified as capability gaps.
+Applies to feature requests **and** bug reports reclassified as capability gaps. Steps 1–2 run in the reporting session; building (steps 3–7) starts **only in a dedicated session on operator go** (§2b).
 
 1. **File the issue** labeled `feature` + priority.
 2. **Scope with the operator** before building anything non-trivial (the ADR-262 pattern — AskUserQuestion rounds; big things get a plan doc first, like docs/18/20).

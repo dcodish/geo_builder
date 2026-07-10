@@ -3918,6 +3918,8 @@ Operator's live prod test of the inscribed rhombus surfaced three issues, all fi
 
 **Consequences.** "What's known-broken / queued / live?" each have one queryable answer (issues; the P-labels; the deploy log + tags). The uncommitted-tree deploy habit ends — every prod bundle is reconstructable. Costs accepted: filing overhead per report (mitigated: the assistant files via `gh` during triage), and PR latency on features (wanted — it *is* the operator gate). Seeded at adoption: labels, ~7 issues migrated from ADR "filed, not fixed" prose, tag `prod/2026-07-10` retroactively on `6168d0c`.
 
+**Am. 1 — triage-first: a reported issue is QUEUED, never auto-fixed (2026-07-10, operator).** The first run of the route (issue #14 → PR #16) exposed a gap: the assistant filed, classified, *and immediately built* the fix. The operator's correction: while testing they raise **several** issues per pass; if the reporting session fixes immediately, they are forced to feed one issue at a time and parallel fixes overwrite each other. **The reporting session does the full triage — file, diagnose to root cause/class per docs/17, classify bug-vs-feature + priority, write a concrete fix plan into the issue — and STOPS; no implementation.** Fixing happens in dedicated fix sessions where the operator picks issues off the queue by priority. Exceptions: an explicit "fix this now", or a P1 prod-honesty emergency (announced first). Codified as [docs/22-workflow.md §2b](22-workflow.md); §3/§4 step ownership annotated accordingly.
+
 ## ADR-266
 
 ### ADR-266 — The multi-product workspace: product registry, per-product CI lanes, mechanical isolation
