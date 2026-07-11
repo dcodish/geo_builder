@@ -583,3 +583,9 @@ Parser `rightPyramidPoint` (He + En; the apex = the on-segment point wherever it
 **Status:** Accepted (2026-07-11). *Files: `src3d/store/figureFile3.ts`, `src3d/App3.tsx`, `src3d/i18n/locales/*.json`.*
 
 **Decision.** On Save, the app prompts for a file name (bilingual `actions.saveNamePrompt`); `namedFigureFileName3` sanitizes illegal filename characters, strips a typed extension, appends `-vectors` unless already present (`2026summer` → `2026summer-vectors.json`), and falls back to the date-stamped `figure-3d-YYYY-MM-DD.geo3.json` default for an empty/cancelled input. `SAVE_SUFFIX_3D = 'vectors'` is this product's copy of the per-product constant (docs/22 §9 registry — never imported across `src/` ↔ `src3d/`). Load stays content-based (`app` marker + `schemaVersion`), so old `.geo3.json` files keep loading; the `fixtures3/` net is untouched. Locked by the name-builder tests in `figure-file3.test.ts`.
+
+## ADR-3D-037 — A persistent figure NAME (issue #42, the 2-D ADR-286 twin, COPIED per docs/20 §12)
+
+**Status:** Accepted (2026-07-11; issue #42). *Files: `src3d/store/store3.ts` (`figureName`/`setFigureName` — outside the undo slice, reset by `clear`), `src3d/store/figureFile3.ts` (`figureNameFromFileName3` — the `namedFigureFileName3` inverse dropping `.json`/`.geo3` + the `-vectors` suffix; a provenance-only `name` field in the file), `src3d/App3.tsx` (header inline-editable title input `dir="auto"`; save uses the set name — no prompt — and adopts a prompted one; load names the figure from the FILENAME per the operator ruling), locales `actions.namePlaceholder`.*
+
+Same decision shape as [ADR-286](06-decisions.md#adr-286) — one control is both the field and the visible title; the filename wins on load; the embedded `name` is never read back. No docx leg (the 3-D app has no question export). Locked by `figure-name3.test.ts`.

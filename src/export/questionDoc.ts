@@ -35,6 +35,8 @@ import {
 } from 'docx';
 
 export interface QuestionDocInput {
+  /** The figure's name (issue #42) — an optional document title above the givens. */
+  title?: string;
   /** Localized list heading — "נתון:" / "Given:". */
   heading: string;
   /** The verbatim givens, one per list item (from questionLines). */
@@ -90,6 +92,15 @@ export function buildQuestionDoc(input: QuestionDocInput): Document {
     margins: { top: 100, bottom: 100, left: 150, right: 150 },
     width: { size: TEXT_COL_DXA, type: WidthType.DXA },
     children: [
+      ...(input.title
+        ? [
+            new Paragraph({
+              bidirectional: rtl,
+              spacing: { after: 160 },
+              children: [new TextRun({ text: input.title, bold: true, size: 32, rightToLeft: rtl })],
+            }),
+          ]
+        : []),
       new Paragraph({
         bidirectional: rtl,
         spacing: { after: 120 },

@@ -26,7 +26,7 @@ import { Modal } from '@/ui/Modal';
 import { btn, card as themeCard, color as pal, foldToggle, fs, pill, sectionTitle } from '@/ui/theme';
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
-import { deserializeFigure, namedFigureFileName, serializeFigure } from '@/store/figureFile';
+import { deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
 import { questionLines } from '@/export/questionLines';
 import { auditLoadedFigure } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
@@ -65,6 +65,8 @@ export default function App() {
   const resample = useGeoStore((s) => s.resample);
   const autoResolve = useGeoStore((s) => s.autoResolve);
   const radiusOverrides = useGeoStore((s) => s.radiusOverrides);
+  const figureName = useGeoStore((s) => s.figureName);
+  const setFigureName = useGeoStore((s) => s.setFigureName);
   const setRadius = useGeoStore((s) => s.setRadius);
   const seed = useGeoStore((s) => s.seed);
   const showMeasures = useGeoStore((s) => s.showMeasures);
@@ -290,6 +292,13 @@ export default function App() {
   // no positions (the figure is re-derived on load). See src/store/figureFile.ts.
   const saveFigure = () => {
     const st = useGeoStore.getState();
+    // A set figure name (issue #42) IS the save name — no prompt. Unset -> today's prompt, and a
+    // name typed there is adopted as the figure's name (the field + page title pick it up).
+    let name = st.figureName.trim();
+    if (!name) {
+      name = (window.prompt(t('file.saveNamePrompt')) ?? '').trim();
+      if (name) setFigureName(name);
+    }
     const json = serializeFigure(
       {
         facts: st.facts,
@@ -303,14 +312,14 @@ export default function App() {
           showCenters: st.showCenters,
         },
       },
-      { locale: i18n.language, savedAt: new Date().toISOString() },
+      { locale: i18n.language, savedAt: new Date().toISOString(), ...(name ? { name } : {}) },
     );
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
     const a = document.createElement('a');
     a.href = url;
-    // The user names the file; the per-product -geo suffix is appended automatically (issue #20).
-    // Empty/cancelled → the date-stamped default, the pre-#20 behaviour.
-    a.download = namedFigureFileName(window.prompt(t('file.saveNamePrompt')), new Date());
+    // The name (field or prompt) becomes the filename; the per-product -geo suffix is appended
+    // automatically (issue #20). Empty/cancelled -> the date-stamped default, the pre-#20 behaviour.
+    a.download = namedFigureFileName(name, new Date());
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -326,6 +335,7 @@ export default function App() {
     const lines = questionLines(useGeoStore.getState().facts);
     const data = new Uint8Array(await png.arrayBuffer());
     const blob = await questionDocxBlob({
+      title: useGeoStore.getState().figureName.trim() || undefined,
       heading: t('questionDoc.given'),
       lines,
       png: { data, ...pngDimensions(data) },
@@ -359,6 +369,7 @@ export default function App() {
       return;
     }
     loadFigure(r.file); // one undo restores the session that was open before
+    setFigureName(figureNameFromFileName(f.name)); // the FILENAME names the figure (issue #42)
     setFileNote('');
     // Honesty audit (ADR-242): the file replays its SAVED lowering (deterministic restore, ADR-232), so
     // a step whose stored commands dropped a stated label, or whose utterance the current parser reads
@@ -925,6 +936,15 @@ export default function App() {
           <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{t('app.title')}</h1>
           <p style={{ color: '#64748b', margin: '4px 0 0', fontSize: 13 }}>{t('app.subtitle')}</p>
         </div>
+        <input
+          type="text"
+          value={figureName}
+          onChange={(e) => setFigureName(e.target.value)}
+          placeholder={t('file.namePlaceholder')}
+          dir="auto"
+          aria-label={t('file.namePlaceholder')}
+          style={figureNameInput}
+        />
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" style={ghost} onClick={() => { setHelpTab('guide'); setHelpOpen(true); }}>
             {t('header.help')}
@@ -1715,7 +1735,23 @@ const page: React.CSSProperties = {
   flexDirection: 'column',
   gap: 14,
 };
-const headerRow: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' };
+const headerRow: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 };
+/** The figure's name (issue #42): an inline-editable title — one control is both the field and the
+ *  visible name. Transparent until hovered/filled so an unnamed session stays clean. */
+const figureNameInput: React.CSSProperties = {
+  flex: '1 1 220px',
+  minWidth: 140,
+  maxWidth: 420,
+  alignSelf: 'center',
+  fontSize: 17,
+  fontWeight: 600,
+  color: '#1e293b',
+  textAlign: 'center',
+  padding: '6px 10px',
+  border: '1px dashed #cbd5e1',
+  borderRadius: 8,
+  background: 'transparent',
+};
 const main: React.CSSProperties = { display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' };
 const footerRow: React.CSSProperties = {
   display: 'flex',

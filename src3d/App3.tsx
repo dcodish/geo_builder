@@ -13,7 +13,7 @@ import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
 import { escalate3 } from './parser/llm3';
 import Figure3 from './render/Figure3';
-import { deserializeFigure3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
+import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
 import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
 
 function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: StoreError3): string | null {
@@ -90,6 +90,8 @@ export default function App3() {
   const { t, i18n } = useTranslation();
   const facts = useGeo3((s) => s.facts);
   const seed = useGeo3((s) => s.seed);
+  const figureName = useGeo3((s) => s.figureName);
+  const setFigureName = useGeo3((s) => s.setFigureName);
   // the "organize your data" panel (ADR-3D-014): derived vector/point presentations,
   // OPT-IN by checkbox — it shows derived results, so the student chooses to peek
   const [showData, setShowData] = useState(false);
@@ -181,13 +183,20 @@ export default function App3() {
   };
 
   const onSaveFile = () => {
-    const blob = new Blob([serializeFigure3(facts, seed)], { type: 'application/json' });
+    // A set figure name (issue #42) IS the save name - no prompt. Unset -> today's prompt, and a
+    // name typed there is adopted as the figure's name (the field + page title pick it up).
+    let name = figureName.trim();
+    if (!name) {
+      name = (window.prompt(t('actions.saveNamePrompt')) ?? '').trim();
+      if (name) setFigureName(name);
+    }
+    const blob = new Blob([serializeFigure3(facts, seed, name || undefined)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     // The user names the file; the per-product -vectors suffix is appended automatically (issue #20).
     // Empty/cancelled → the date-stamped default, the pre-#20 behaviour.
-    a.download = namedFigureFileName3(window.prompt(t('actions.saveNamePrompt')), new Date());
+    a.download = namedFigureFileName3(name, new Date());
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -197,8 +206,10 @@ export default function App3() {
     e.target.value = ''; // allow re-loading the same file
     if (!f) return;
     const r = deserializeFigure3(await f.text());
-    if (r.ok) loadFigure(r.facts, r.seed);
-    else reportLoadError(r.reason);
+    if (r.ok) {
+      loadFigure(r.facts, r.seed);
+      setFigureName(figureNameFromFileName3(f.name)); // the FILENAME names the figure (issue #42)
+    } else reportLoadError(r.reason);
   };
 
   // Debug log (dev only): snapshot the fact list + statuses whenever the figure
@@ -253,10 +264,21 @@ export default function App3() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-200 bg-white px-5 py-3">
+      <header className="flex items-center gap-4 border-b border-slate-200 bg-white px-5 py-3">
         <h1 className="text-xl font-bold">
           {t('title')} <span className="ms-2 align-middle text-xs font-normal text-slate-400">{t('tagline')}</span>
         </h1>
+        {/* The figure's name (issue #42): an inline-editable title - one control is both the field and
+            the visible name. */}
+        <input
+          type="text"
+          value={figureName}
+          onChange={(e) => setFigureName(e.target.value)}
+          placeholder={t('actions.namePlaceholder')}
+          dir="auto"
+          aria-label={t('actions.namePlaceholder')}
+          className="min-w-0 max-w-md flex-1 rounded-lg border border-dashed border-slate-300 bg-transparent px-3 py-1.5 text-center text-base font-semibold text-slate-800 focus:border-sky-500 focus:outline-none"
+        />
       </header>
 
       <main className="mx-auto flex max-w-screen-2xl flex-col gap-5 p-5 md:flex-row">

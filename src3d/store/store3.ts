@@ -308,6 +308,11 @@ export interface Geo3State {
   toggle: (factId: string) => void;
   remove: (factId: string) => void;
   clear: () => void;
+  /** The figure's NAME (issue #42) - shown on the page, used as the save filename, derived from the
+   *  loaded file's name. Session metadata: NOT in the undo history (partialize is facts+seed only);
+   *  reset by `clear`. */
+  figureName: string;
+  setFigureName: (name: string) => void;
   resample: () => void;
   dismissError: () => void;
   /** Load a deserialised figure — ONE undoable set (never destructive: undo restores the prior session). */
@@ -321,6 +326,7 @@ export const useGeo3 = create<Geo3State>()(
     (set, get) => ({
       facts: [],
       seed: 0,
+      figureName: '',
       lastError: null,
 
       submit: (utterance) => {
@@ -370,7 +376,9 @@ export const useGeo3 = create<Geo3State>()(
 
       remove: (factId) => set({ facts: get().facts.filter((f) => f.id !== factId), lastError: null }),
 
-      clear: () => set({ facts: [], lastError: null }),
+      clear: () => set({ facts: [], figureName: '', lastError: null }),
+
+      setFigureName: (name) => set({ figureName: name }),
 
       resample: () => set({ seed: get().seed + 1 }),
 

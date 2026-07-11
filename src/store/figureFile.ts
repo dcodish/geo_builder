@@ -48,6 +48,9 @@ export interface FigureFile {
   locale?: string;
   /** Informational only (ISO timestamp supplied by the caller). */
   savedAt?: string;
+  /** The figure's name at save time (issue #42) — PROVENANCE only: on load the FILENAME wins
+   *  (operator ruling), so this field is never read back into the session. */
+  name?: string;
   seed: number;
   radiusOverrides: Record<Id, number>;
   facts: Fact[];
@@ -60,13 +63,14 @@ export type FigureLoadResult = { ok: true; file: FigureFile } | { ok: false; rea
 /** Serialize the session to pretty-printed JSON (human-diffable — the point of a text format). */
 export function serializeFigure(
   state: { facts: Fact[]; seed: number; radiusOverrides: Record<Id, number>; display?: FigureFileDisplay },
-  meta: { locale?: string; savedAt?: string } = {},
+  meta: { locale?: string; savedAt?: string; name?: string } = {},
 ): string {
   const file: FigureFile = {
     app: APP_MARKER,
     schemaVersion: FIGURE_FILE_VERSION,
     ...(meta.locale ? { locale: meta.locale } : {}),
     ...(meta.savedAt ? { savedAt: meta.savedAt } : {}),
+    ...(meta.name ? { name: meta.name } : {}),
     seed: state.seed,
     radiusOverrides: state.radiusOverrides,
     facts: state.facts.map(sanitizeFactOut),
@@ -158,6 +162,7 @@ export function deserializeFigure(text: string): FigureLoadResult {
       schemaVersion: raw.schemaVersion,
       ...(typeof raw.locale === 'string' ? { locale: raw.locale } : {}),
       ...(typeof raw.savedAt === 'string' ? { savedAt: raw.savedAt } : {}),
+      ...(typeof raw.name === 'string' ? { name: raw.name } : {}),
       seed: typeof raw.seed === 'number' && Number.isFinite(raw.seed) ? raw.seed : 0,
       radiusOverrides,
       facts,
@@ -192,4 +197,19 @@ export function namedFigureFileName(name: string | null | undefined, now: Date):
   if (!clean) return figureFileName(now);
   const stem = new RegExp(`-${SAVE_SUFFIX}$`, 'i').test(clean) ? clean : `${clean}-${SAVE_SUFFIX}`;
   return `${stem}.json`;
+}
+
+/**
+ * The inverse of {@link namedFigureFileName} (issue #42): a loaded file's NAME gives the figure its
+ * on-screen name — drop the `.json`/`.geo` extensions and the per-product `-geo` save suffix.
+ * "2026summer-geo.json" → "2026summer". The FILENAME wins on load (operator ruling — any `name`
+ * embedded in the file is provenance only). A date-stamped default save ("geo-figure-2026-07-11…")
+ * is a real name too — the student sees what they loaded.
+ */
+export function figureNameFromFileName(fileName: string): string {
+  return fileName
+    .replace(/\.json$/i, '')
+    .replace(/\.geo$/i, '')
+    .replace(new RegExp(`-${SAVE_SUFFIX}$`, 'i'), '')
+    .trim();
 }
