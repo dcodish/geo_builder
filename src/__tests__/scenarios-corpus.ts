@@ -158,6 +158,82 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'hosem-slip-container-marker-wins',
+    title: 'משולש ABC חוסם במעגל + BC קוטר — the ב container marker wins over the חוסם verb letter (issues #31/#38, ADR-283)',
+    guards:
+      "Operator prod session `jsptarcl` (2026-07-11): the first step «משולש ABC חוסם במעגל» (חוסם — the classic one-letter slip for חסום; the ב on the circle says the CIRCLE is the container) was claimed by `incircle`'s circumscribes branch by the VERB alone and silently built the INCIRCLE DUAL (bisectors, incentre O, auto-named feet) with every row ✓; «BC קוטר» then over-constrained (a triangle side can't be an incircle diameter) and every later step inherited the wrong figure. Fix (ADR-283): `normalizeInscriptionSlip` in `normalizeUtterance` — an active חוסם-family verb directly governing a ב-marked container noun rewrites to the passive (the ADR-245 marker is authoritative; direct-object «חוסם את המעגל» untouched), so every rule resolves the direction the same way.",
+    steps: ['משולש ABC חוסם במעגל', 'BC קוטר'],
+    check(fig) {
+      allStepsOk(fig);
+      // The build is the INSCRIBED reading: one circle with A, B, C all ON it (the circumcircle).
+      const circ = fig.construction.objects.find((o) => o.kind === 'circle') as { id: Id; center: Id } | undefined;
+      expect(circ, 'a circle exists').toBeTruthy();
+      const O = at(fig, circ!.center);
+      const r = dist(at(fig, 'A'), O);
+      for (const v of ['B', 'C'] as Id[]) expect(dist(at(fig, v), O), `${v} on the circumcircle`).toBeCloseTo(r, 5);
+      // BC is a genuine diameter: B, centre, C collinear.
+      const B = at(fig, 'B'), C = at(fig, 'C');
+      expect(Math.abs((C.x - B.x) * (O.y - B.y) - (C.y - B.y) * (O.x - B.x)), 'B–centre–C collinear').toBeLessThan(1e-5);
+      // No incircle scaffolding was minted (the bug's fingerprint: bisector lines + auto feet).
+      expect(
+        fig.construction.objects.some((o) => o.kind === 'line' && (o as { spec?: { via?: string } }).spec?.via === 'bisector'),
+        'no bisector scaffold',
+      ).toBe(false);
+    },
+  },
+  {
+    id: 'semicircle-on-existing-square-side',
+    title: 'ריבוע → על צלע CD יש חצי מעגל → CD קוטר — a semicircle on an existing side attaches EXACTLY, square unmoved (issue #28, ADR-284)',
+    guards:
+      "Operator prod sessions `p3du4l9p`/`z57b5nd0`/`fxp24nna`: the semicircle rule predated M1 + free-radius — it re-declared the square's existing C,D as NEW on-circle points with PINNED θ on a hidden radius-5 circle, which never reached the side (every row ✓, figure verifier-amber: 'C should lie on circle P … but is 8.81 from its centre'), and the follow-up «CD קוטר» could not resolve the circle implicitly (zero satisfied members) — the student got stuck. Fix (ADR-284): with both endpoints EXISTING the semicircle is CLOSED-FORM — centre = midpoint of CD (a derived point), radius through C — zero solve, so the square cannot move (stability by construction); «CD קוטר» then resolves implicitly and passes as a check.",
+    steps: ['ריבוע', 'על צלע CD יש חצי מעגל', 'CD קוטר'],
+    check(fig) {
+      allStepsOk(fig);
+      const C = at(fig, 'C'), D = at(fig, 'D');
+      const circ = fig.construction.objects.find((o) => o.kind === 'circle') as { id: Id; center: Id } | undefined;
+      expect(circ, 'the hidden semicircle circle exists').toBeTruthy();
+      const O = at(fig, circ!.center);
+      // Centre exactly at the midpoint of CD; C and D antipodal at r = |CD|/2.
+      expect(O.x).toBeCloseTo((C.x + D.x) / 2, 9);
+      expect(O.y).toBeCloseTo((C.y + D.y) / 2, 9);
+      const r = dist(C, O);
+      expect(dist(D, O), 'D at the same radius').toBeCloseTo(r, 9);
+      expect(r, 'r = |CD|/2').toBeCloseTo(dist(C, D) / 2, 9);
+      // The square is intact (all four sides still equal — nothing shrank/rotated to "reach" the circle).
+      const side = dist(at(fig, 'A'), at(fig, 'B'));
+      for (const [x, y] of [['B', 'C'], ['C', 'D'], ['D', 'A']] as [Id, Id][])
+        expect(dist(at(fig, x), at(fig, y)), `|${x}${y}| = |AB|`).toBeCloseTo(side, 6);
+    },
+  },
+  {
+    id: 'semicircle-diameter-phrasing-on-existing-side',
+    title: 'ריבוע → חצי מעגל שהקוטר שלו CD — the possessive diameter phrasing lands on the side too (issue #28, ADR-284)',
+    guards:
+      "The same prod sessions' second phrasing: «חצי מעגל שהקוטר שלו CD» (a semicircle whose diameter is CD) hit the same pinned-θ re-declaration and left the arc floating off the square. Locks the closed-form lowering for the possessive form.",
+    steps: ['ריבוע', 'חצי מעגל שהקוטר שלו CD'],
+    check(fig) {
+      allStepsOk(fig);
+      const C = at(fig, 'C'), D = at(fig, 'D');
+      const circ = fig.construction.objects.find((o) => o.kind === 'circle') as { id: Id; center: Id } | undefined;
+      const O = at(fig, circ!.center);
+      expect(dist(C, O)).toBeCloseTo(dist(C, D) / 2, 9);
+      expect(dist(D, O)).toBeCloseTo(dist(C, D) / 2, 9);
+    },
+  },
+  {
+    id: 'ratio-radical-coefficient',
+    title: 'AB=√2*OD — a radical coefficient × segment proportion parses deterministically (issue #52, ADR-285)',
+    guards:
+      "Operator prod report (2026-07-11): `AB=√2*OD` (OD a radius of circle O — the natural textbook form) was not recognized (escalated to the LLM, which failed in prod) while `AB=√2*R` and `AB/OD = √2` worked: `ratioConstraint`'s coefficient atom was plain-decimal while its `/`-form sibling already read √-aware values. Fix (ADR-285): the shared radical-aware coefficient atom on both `=` sides, the trailing divisor, and the Hebrew פי form.",
+    steps: ['מעגל O', 'D על המעגל', 'AB', 'AB=√2*OD'],
+    check(fig) {
+      allStepsOk(fig);
+      const ab = dist(at(fig, 'A'), at(fig, 'B'));
+      const od = dist(at(fig, 'O'), at(fig, 'D'));
+      expect(ab, '|AB| = √2·|OD|').toBeCloseTo(Math.SQRT2 * od, 4);
+    },
+  },
+  {
     id: 'height-from-vertex-never-drops-onto-a-diagonal',
     title: 'גובה מ A / גובה מ B in a quad with a diagonal — a height drops to a real SIDE, never the diagonal (ADR-263)',
     guards:

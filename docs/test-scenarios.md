@@ -22,6 +22,22 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `hosem-slip-container-marker-wins` — משולש ABC חוסם במעגל: the ב container marker wins over the verb letter (issues #31/#38, ADR-283)
+**Steps**: `משולש ABC חוסם במעגל` · `BC קוטר`
+**Guards against:** operator prod session `jsptarcl` (2026-07-11): the חוסם/חסום one-letter slip was read by the VERB alone, so the utterance silently built the INCIRCLE DUAL (bisectors, incentre, auto-named feet) with every row ✓, and `BC קוטר` then over-constrained (a triangle side can't be an incircle diameter). Fix (ADR-283): `normalizeInscriptionSlip` at the `normalizeUtterance` boundary — an active חוסם-family verb directly governing a ב-marked container noun rewrites to the passive (the ADR-245 container marker is authoritative); direct-object `חוסם את המעגל` and bare `חוסם מעגל` untouched. **Asserts:** all steps ok; one circle with A,B,C all ON it (the circumcircle); B–centre–C collinear (BC a genuine diameter); no bisector scaffolding minted.
+
+### `semicircle-on-existing-square-side` — ריבוע → על צלע CD יש חצי מעגל → CD קוטר (issue #28, ADR-284)
+**Steps**: `ריבוע` · `על צלע CD יש חצי מעגל` · `CD קוטר`
+**Guards against:** operator prod sessions `p3du4l9p`/`z57b5nd0`/`fxp24nna`: the semicircle rule predated M1 + free-radius — it re-declared the square's existing C,D with PINNED θ on a hidden radius-5 circle that never reached the side (rows ✓, figure verifier-amber), and `CD קוטר` couldn't resolve the circle implicitly. Fix (ADR-284): both-endpoints-existing lowers CLOSED-FORM — centre = midpoint of CD, radius through C — zero solve, so the prior square cannot move. **Asserts:** all steps ok, no violations; centre exactly the midpoint; |centre·C| = |centre·D| = |CD|/2; the square's four sides still equal.
+
+### `semicircle-diameter-phrasing-on-existing-side` — ריבוע → חצי מעגל שהקוטר שלו CD (issue #28, ADR-284)
+**Steps**: `ריבוע` · `חצי מעגל שהקוטר שלו CD`
+**Guards against:** the same sessions' possessive phrasing hit the same pinned-θ re-declaration and left the arc floating off the square. **Asserts:** all steps ok; C and D both at radius |CD|/2 from the centre.
+
+### `ratio-radical-coefficient` — AB=√2*OD parses deterministically (issue #52, ADR-285)
+**Steps**: `מעגל O` · `D על המעגל` · `AB` · `AB=√2*OD`
+**Guards against:** operator prod report (2026-07-11): the radical-coefficient proportion `AB=√2*OD` was not recognized (escalated to the LLM, which failed in prod) while `AB=√2*R` and `AB/OD = √2` worked — `ratioConstraint`'s coefficient atom was plain-decimal while its `/`-form sibling was already √-aware. Fix (ADR-285): the shared radical-aware coefficient atom (RCOEF) on both `=` sides, the trailing divisor, and the Hebrew פי form. **Asserts:** all steps ok; |AB| = √2·|OD| in the built figure.
+
 ### `height-from-vertex-never-drops-onto-a-diagonal` — גובה מ A / גובה מ B in a quad with a diagonal (ADR-263)
 **Steps**: `מקבילית ABCD` · `BD` · `גובה מ A` · `גובה מ B` · `BE גובה`
 **Guards against:** operator report (2026-07-09): a parallelogram with the diagonal BD drawn — `גובה מ A` was understood but `גובה מ B` was refused, and `BE גובה` drew onto the diagonal BD. Root cause: the `altitude` rule's neighbour-adjacency fallback triangulated the quad ACROSS the drawn diagonal (from A → the single triangle ABD → foot on the DIAGONAL BD; from B → two triangles ABD, CBD → refused as ambiguous). Fix (ADR-263): the opposite side must be a real POLYGON EDGE not touching the apex (`oppositePolygonEdges`, which can never return a diagonal); a parallelogram/quad's several genuine heights → DRAW ONE deterministically rather than refuse (superseding ADR-169's parallelogram-defers); the auto-named foot also excludes every existing point (no F/F redefinition). **Asserts:** all steps ok; three feet with distinct labels; every foot's base is a real side of ABCD (never BD) and the height is ⟂ that side.

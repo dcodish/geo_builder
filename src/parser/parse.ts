@@ -1222,28 +1222,56 @@ const pointByDistances: Rule = (s) => {
 };
 
 /**
- * "AB = 2 AD" / "2 AB = 3 CD" / "AB = 2·AD" / "AB = 2AD" / "AB = CD/2" / "AB פי 2 מ-AD" — a
- * proportion |AB| = k·|CD|. At least one numeric coefficient must be present — a LEADING one
- * (`= 2·CD`) or a TRAILING divisor (`= CD/2`, so |AB| = |CD|/2); the coefficient-free "AB = CD"
- * is the `equalSegments` case, k = 1. The trailing `/d` form is what the LLM emits for a stated
- * segment ratio ("DF:FC = 1:2" → "DF = FC/2"); without it, `equalSegments` grabs "DF = FC" and
- * SILENTLY DROPS the divisor (the ADR-024/026 half-parse class). Runs before `distanceConstraint`,
- * which would otherwise half-parse "AB = 2 AD" into "AB = 2".
+ * "AB = 2 AD" / "2 AB = 3 CD" / "AB = 2·AD" / "AB = 2AD" / "AB = CD/2" / "AB = √2·OD" /
+ * "AB = (√2/2)CD" / "AB פי 2 מ-AD" — a proportion |AB| = k·|CD|. At least one coefficient must be
+ * present — a LEADING one (`= 2·CD`) or a TRAILING divisor (`= CD/2`, so |AB| = |CD|/2); the
+ * coefficient-free "AB = CD" is the `equalSegments` case, k = 1. The trailing `/d` form is what the
+ * LLM emits for a stated segment ratio ("DF:FC = 1:2" → "DF = FC/2"); without it, `equalSegments`
+ * grabs "DF = FC" and SILENTLY DROPS the divisor (the ADR-024/026 half-parse class). Runs before
+ * `distanceConstraint`, which would otherwise half-parse "AB = 2 AD" into "AB = 2".
+ *
+ * The coefficient atom is RADICAL-AWARE (issue #52, ADR-285): a number or fraction, each part
+ * optionally under √, optionally parenthesised — the SAME value vocabulary as `segmentRatio`'s
+ * RATVAL, so the textbook `AB=√2*OD` no longer parses in the `/`-form and fails in the `= k·seg`
+ * form. No theft: the rule still requires TWO labels on each side of `=`, so "AB = √2R" (the
+ * reserved radius symbol) stays with `measureSqrt` and "AB = √2" stays a concrete length.
  */
 const COEF = String.raw`\d+(?:\.\d+)?`;
+/** A radical-aware coefficient: named groups `<p>s` (√ on the numerator), `<p>n` (numerator),
+ *  `<p>ts` (√ on the denominator), `<p>tn` (denominator) — "2", "√2", "√2/2", "(√2/2)". */
+const RCOEF = (p: string) =>
+  String.raw`\(?\s*(?<${p}s>√)?\s*(?<${p}n>${COEF})(?:\s*\/\s*(?<${p}ts>√)?\s*(?<${p}tn>${COEF}))?\s*\)?`;
+const rcoefVal = (g: Record<string, string | undefined>, p: string): number | null => {
+  const n = g[`${p}n`];
+  if (n === undefined) return null;
+  const num = g[`${p}s`] ? Math.sqrt(parseFloat(n)) : parseFloat(n);
+  const den = g[`${p}tn`] !== undefined ? (g[`${p}ts`] ? Math.sqrt(parseFloat(g[`${p}tn`]!)) : parseFloat(g[`${p}tn`]!)) : 1;
+  return num / den;
+};
 const ratioConstraint: Rule = (s) => {
   const en = s.match(
-    new RegExp(String.raw`\b(${COEF})?\s*[*·]?\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*(${COEF})?\s*[*·]?\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:\/\s*(${COEF}))?`),
+    new RegExp(
+      String.raw`(?<![A-Za-z\d])(?:${RCOEF('m')}\s*[*·]?\s*)?(?<la>[A-Za-z]\d*)\s*(?<lb>[A-Za-z]\d*)\b\s*=\s*(?:${RCOEF('n')}\s*[*·]?\s*)?(?<lc>[A-Za-z]\d*)\s*(?<ld>[A-Za-z]\d*)\b\s*(?:\/\s*${RCOEF('q')})?`,
+    ),
   );
-  if (en && (en[1] || en[4] || en[7])) {
-    const m = en[1] ? parseFloat(en[1]) : 1; // |m·AB| = |n·CD / d| ⇒ |AB| = (n/(m·d))·|CD|
-    const n = en[4] ? parseFloat(en[4]) : 1;
-    const d = en[7] ? parseFloat(en[7]) : 1; // trailing divisor ("CD/2")
-    return [{ type: 'set-ratio', a: up(en[2]), b: up(en[3]), c: up(en[5]), d: up(en[6]), k: n / (m * d) }];
+  const g = en?.groups ?? {};
+  if (en && (g.mn || g.nn || g.qn)) {
+    const m = rcoefVal(g, 'm') ?? 1; // |m·AB| = |n·CD / d| ⇒ |AB| = (n/(m·d))·|CD|
+    const n = rcoefVal(g, 'n') ?? 1;
+    const d = rcoefVal(g, 'q') ?? 1; // trailing divisor ("CD/2", "CD/√2")
+    return [{ type: 'set-ratio', a: up(g.la!), b: up(g.lb!), c: up(g.lc!), d: up(g.ld!), k: n / (m * d) }];
   }
-  // Hebrew "AB פי 2 מ-AD" — |AB| is 2× |AD|.
-  const he = s.match(new RegExp(String.raw`([A-Za-z]\d*)\s*([A-Za-z]\d*)\b[^=]*?פי\s*(${COEF})\s*מ-?\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`));
-  if (he) return [{ type: 'set-ratio', a: up(he[1]), b: up(he[2]), c: up(he[4]), d: up(he[5]), k: parseFloat(he[3]) }];
+  // Hebrew "AB פי 2 מ-AD" / "AB פי √2 מ-OD" — |AB| is k× |AD|.
+  const he = s.match(
+    new RegExp(
+      String.raw`(?<ha>[A-Za-z]\d*)\s*(?<hb>[A-Za-z]\d*)\b[^=]*?פי\s*${RCOEF('k')}\s*מ-?\s*(?<hc>[A-Za-z]\d*)\s*(?<hd>[A-Za-z]\d*)\b`,
+    ),
+  );
+  if (he) {
+    const hg = he.groups ?? {};
+    const k = rcoefVal(hg, 'k');
+    if (k !== null) return [{ type: 'set-ratio', a: up(hg.ha!), b: up(hg.hb!), c: up(hg.hc!), d: up(hg.hd!), k }];
+  }
   return null;
 };
 
@@ -2577,26 +2605,73 @@ const regularPolygon: Rule = (s, ctx) => {
  * "semicircle with diameter AB" / "חצי מעגל שקוטרו AB" / "half circle on AB" (or bare
  * "semicircle"/"חצי מעגל"). A 180° arc on a diameter: a HIDDEN circle keeps the two ends
  * antipodal (so the figure is a clean half-circle, not a full one), the arc draws the upper
- * half, and the diameter AB is drawn. The centre point is shown. Optional "radius r".
+ * half, and the diameter AB is drawn. Optional "radius r".
+ *
+ * M1 + free-radius migration (issue #28, ADR-284): a semicircle ON EXISTING endpoints — «ריבוע» then
+ * «על צלע CD יש חצי מעגל» — is a STATEMENT about C,D (M1, ADR-231), never a re-creation with pinned θ:
+ * each existing endpoint gets idempotent circle MEMBERSHIP and the through-centre collinearity makes it
+ * a diameter (the `diameter` rule's ADR-137 lowering), so the free centre+radius are DRIVEN to the side
+ * (centre = the side's midpoint, r = half the side). The pinned θ stayed only for NEW endpoints, where
+ * it is pure gauge. And an unstated radius is a FREE DOF (ADR-051/052 — `freeRadius` unless a number
+ * was stated), the unnamed auto-picked centre carries `autoCenter` (FR-RN-8), same as `circle`.
  */
 const semicircle: Rule = (s, ctx) => {
   if (!/semicircle|half[\s-]?circle|חצי[\s-]?מעגל|חצי[\s-]?עיגול/i.test(s)) return null;
   const r = parseRadius(s);
+  const namedC = circleCenter(s); // "חצי מעגל P שקוטרו CD" names the hidden circle's centre P
+  // A SIDE reference is this rule's own vocabulary — «על צלע CD יש חצי מעגל» states the side IS the
+  // diameter, so צלע/side is consumed here before the leftover test (the ADR-280 discipline: each rule
+  // strips its OWN words; the quantified «על כל צלע של ריבוע…» still stops on the surviving כל/ריבוע).
   const stripped = dropCircleRef(s).replace(
-    /semicircle|half[\s-]?circle|חצי[\s-]?מעגל|חצי[\s-]?עיגול|diameter|קוטר|שקוטרו|על|\bon\b|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
+    /semicircle|half[\s-]?circle|חצי[\s-]?מעגל|חצי[\s-]?עיגול|diameter|קוטר|שקוטרו|צלע\S*|\bsides?\b|(?<![א-ת])יש(?![א-ת])|על|\bon\b|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
     ' ',
   );
-  const dia = labelRun(stripped, 2);
+  const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
+  const dia = labelRun(restNoC, 2);
   const [a, b] = dia ?? ['A', 'B'];
-  const leftover = [a, b].reduce((acc, id) => acc.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '), stripped);
+  const leftover = [a, b].reduce((acc, id) => acc.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '), restNoC);
   if (SHAPE_LEFTOVER.test(leftover)) return 'stop'; // a compound ("semicircle … with AC=5") → escalate, don't half-parse
-  const center = ['O', 'P', 'Q', 'M', 'N', 'S'].find((c) => c !== a && c !== b && !(ctx.points ?? []).includes(c)) ?? 'O';
+  const center =
+    (namedC && up(namedC) !== up(a) && up(namedC) !== up(b) ? up(namedC) : null) ??
+    (['O', 'P', 'Q', 'M', 'N', 'S'].find((c) => c !== a && c !== b && !(ctx.points ?? []).includes(c)) ?? 'O');
   const circ = circleId(center);
-  const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, hidden: true }];
+  const exists = (p: string) => (ctx.points ?? []).some((q) => up(q) === up(p));
+  // BOTH endpoints EXIST and no numeric radius contradicts: the semicircle is CLOSED-FORM — centre =
+  // the midpoint of the stated diameter, radius through an endpoint. Zero solve, so the prior figure
+  // cannot move (the stability principle by construction); the other endpoint's membership lands as a
+  // passing check (|centre·b| ≡ |centre·a| at the midpoint), recorded for the verifier + implicit-
+  // circle resolution («CD קוטר» next resolves to this circle once members are satisfied).
+  if (exists(a) && exists(b) && !r.numeric && !exists(center)) {
+    const cmds: AnyCommand[] = [
+      { type: 'midpoint', id: up(center), a: up(a), b: up(b) },
+      { type: 'circle-through', id: circ, center: up(center), through: up(a), hidden: true, ...(namedC ? {} : { autoCenter: true }) },
+    ];
+    if (r.varCmd) cmds.push(r.varCmd);
+    cmds.push(
+      { type: 'point-on-circle', id: up(b), circle: circ }, // the tautological membership — a recorded, passing check
+      { type: 'arc', id: `arc-${up(b)}${up(a)}`, center: up(center), from: up(b), to: up(a) }, // CCW B→A = the upper half
+      { type: 'segment', a: up(a), b: up(b) }, // the diameter
+    );
+    return cmds;
+  }
+  const cmds: AnyCommand[] = [
+    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(namedC ? {} : { autoCenter: true }) },
+  ];
   if (r.varCmd) cmds.push(r.varCmd);
+  const members = membersOfCenter(ctx, center);
+  const anyExisting = exists(a) || exists(b);
+  // Endpoints: an EXISTING one is asserted a MEMBER (idempotent, M1); a NEW one is created with pinned θ (gauge).
+  for (const [p, theta] of [[a, Math.PI], [b, 0]] as const) {
+    if (exists(p)) {
+      if (!members.has(up(p))) cmds.push({ type: 'point-on-circle', id: up(p), circle: circ });
+    } else {
+      cmds.push({ type: 'point-on-circle', id: up(p), circle: circ, theta });
+    }
+  }
+  // The diameter property: NEW antipodal θs carry it by construction; with any EXISTING endpoint the
+  // through-centre collinearity DRIVES the free centre/radius to the stated side (the ADR-137 lowering).
+  if (anyExisting) cmds.push({ type: 'set-collinear', a: up(a), b: up(center), c: up(b) });
   cmds.push(
-    { type: 'point-on-circle', id: up(a), circle: circ, theta: Math.PI }, // left end of the diameter
-    { type: 'point-on-circle', id: up(b), circle: circ, theta: 0 }, // right end
     { type: 'arc', id: `arc-${up(b)}${up(a)}`, center: up(center), from: up(b), to: up(a) }, // CCW B→A = the upper half
     { type: 'segment', a: up(a), b: up(b) }, // the diameter
   );
@@ -2606,8 +2681,10 @@ const semicircle: Rule = (s, ctx) => {
 /**
  * "quarter circle" / "רבע מעגל" (optionally "quarter circle OAB" naming centre + the two ends).
  * A 90° arc with its two bounding radii drawn; a HIDDEN circle keeps the ends on it. Optional "radius r".
+ * Same M1 + free-radius migration as `semicircle` (issue #28, ADR-284): EXISTING ends/centre are
+ * statements — membership + a 90° central angle DRIVE the free circle; pinned θ only for NEW ends.
  */
-const quarterCircle: Rule = (s) => {
+const quarterCircle: Rule = (s, ctx) => {
   if (!/quarter[\s-]?circle|רבע[\s-]?מעגל|רבע[\s-]?עיגול/i.test(s)) return null;
   const r = parseRadius(s);
   const stripped = dropCircleRef(s).replace(
@@ -2617,11 +2694,24 @@ const quarterCircle: Rule = (s) => {
   const named = labelRun(stripped, 3); // "OAB" ⇒ centre O + ends A,B; else default
   const [center, a, b] = named ?? ['O', 'A', 'B'];
   const circ = circleId(center);
-  const cmds: AnyCommand[] = [{ type: 'circle', id: circ, center: up(center), radius: r.radius, hidden: true }];
+  const cmds: AnyCommand[] = [
+    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(named ? {} : { autoCenter: true }) },
+  ];
   if (r.varCmd) cmds.push(r.varCmd);
+  const exists = (p: string) => (ctx.points ?? []).some((q) => up(q) === up(p));
+  const members = membersOfCenter(ctx, center);
+  const anyExisting = exists(a) || exists(b);
+  for (const [p, theta] of [[a, 0], [b, Math.PI / 2]] as const) {
+    if (exists(p)) {
+      if (!members.has(up(p))) cmds.push({ type: 'point-on-circle', id: up(p), circle: circ });
+    } else {
+      cmds.push({ type: 'point-on-circle', id: up(p), circle: circ, theta });
+    }
+  }
+  // NEW ends carry the quarter (90° apart) by their pinned θs; an EXISTING end makes it a CONSTRAINT
+  // on the driven circle — the central angle at the centre is 90°.
+  if (anyExisting) cmds.push({ type: 'set-angle', vertex: up(center), ray1: up(a), ray2: up(b), value: 90 });
   cmds.push(
-    { type: 'point-on-circle', id: up(a), circle: circ, theta: 0 },
-    { type: 'point-on-circle', id: up(b), circle: circ, theta: Math.PI / 2 },
     { type: 'arc', id: `arc-${up(a)}${up(b)}`, center: up(center), from: up(a), to: up(b) }, // CCW 0°→90°
     { type: 'segment', a: up(center), b: up(a) }, // a bounding radius
     { type: 'segment', a: up(center), b: up(b) }, // the other bounding radius
@@ -5225,8 +5315,30 @@ export function normalizeUtterance(raw: string): string {
   // to the canonical circle word HERE — at the one boundary every rule reads — means the whole circle
   // vocabulary (creation, sizing, chord, tangent, inscribe…) accepts it without touching each rule.
   const orth = raw.replace(/־/g, '-').replace(/[؜​-‏‪-‮⁦-⁩﻿]/g, '').replace(/עיגול/g, 'מעגל');
-  return normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(orth.trim().replace(/\s+/g, ' '))));
+  return normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(orth.trim().replace(/\s+/g, ' ')))));
 }
+
+/**
+ * The חוסם/חסום slip (issues #31/#38, ADR-283): an ACTIVE circumscribes verb directly governing a
+ * ב-marked container noun — «משולש ABC חוסם במעגל» — is self-contradictory as written (the verb says
+ * the polygon contains the circle, the ב says the circle contains the polygon). Per [ADR-245] the
+ * CONTAINER MARKER is authoritative, and grammatically "circumscribes" takes a direct object
+ * (חוסם **את** המעגל) — the ב-form only ever occurs as the one-letter slip for the passive חסום.
+ * Rewriting active→passive HERE, at the one boundary every rule reads, means the incircle rule,
+ * the inscribe tail-gate, the clause split, and every future consumer resolve the direction the
+ * same way — the marker wins, never the verb letter. Direct-object (חוסם את המעגל) and bare
+ * (חוסם מעגל) circumscribes statements carry no conflicting marker and are untouched; the En
+ * twin "circumscribed in a circle" gets the same treatment.
+ */
+const CONTAINER_NOUNS_HE = 'מעגל|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|עפיפון|מקבילית';
+const HOSEM_TO_PASSIVE: Record<string, string> = { 'חוסם': 'חסום', 'חוסמת': 'חסומה', 'חוסמים': 'חסומים', 'חוסמות': 'חסומות' };
+const normalizeInscriptionSlip = (s: string): string =>
+  s
+    .replace(
+      new RegExp(String.raw`(חוסם|חוסמת|חוסמים|חוסמות)(?=\s+ב-?ה?(?:${CONTAINER_NOUNS_HE}))`, 'g'),
+      (m) => HOSEM_TO_PASSIVE[m] ?? m,
+    )
+    .replace(/circumscrib\w+(?=\s+in\s+(?:a\s+|the\s+|another\s+)?(?:circle|triangle|square|rectangle|rhombus|kite|trapezoid|parallelogram|quadrilateral))/gi, 'inscribed');
 
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
   const s = normalizeUtterance(raw);

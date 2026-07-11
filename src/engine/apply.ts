@@ -1091,6 +1091,24 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
           objects[i] = { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: nextTheta(objects, cmd.circle), free: true, ...(solve ? { solve } : {}) };
           break;
         }
+        // (c3) The point is DETERMINED ((c2) didn't take it — a derived/pinned vertex, e.g. a square
+        // corner) and the circle's radius is a FREE DOF with no other job: the membership makes the
+        // radius THROUGH the point — the circle passes through it by construction (r = |centre·P|),
+        // its centre still free. A SECOND such membership then lands in (c) and drives the free centre
+        // (|centre·Q| = |centre·P|), so a semicircle declared on an existing square side CD is DRIVEN
+        // to the side — centre at the midpoint, r = |CD|/2 (issue #28 / ADR-284; the free-radius twin
+        // of (c)). A radius BUSY driving another constraint (ADR-230 tangency) is left alone → (d).
+        if (circ && circ.radius.via === 'free' && cmd.id !== circ.center && (circ as { solve?: unknown }).solve === undefined) {
+          const ci = objects.findIndex((o) => o.id === cmd.circle);
+          objects[ci] = { ...circ, radius: { via: 'through', point: cmd.id } };
+          break;
+        }
+        // (c4) A STATED numeric radius must hold instead: the membership is |centre·P| = value — push
+        // the distance so the machinery drives the free centre (honest over-constraint when it can't).
+        if (circ && circ.radius.via === 'length' && cmd.id !== circ.center) {
+          driveOrCheck(objects, constraints, { type: 'distance', a: circ.center, b: cmd.id, value: circ.radius.value });
+          break;
+        }
         // (d) Can't reconcile structurally here — do NOT silently drop it; the post-evaluate
         // verifier reports that "E on circle C" doesn't hold, so it can never read as a clean green.
         break;
