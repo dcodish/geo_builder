@@ -4229,6 +4229,20 @@ Operator's live prod test of the inscribed rhombus surfaced three issues, all fi
 
 **Composition.** With a real crossing available, the ADR-255 re-seat lands the stated meet's point WITHIN both segments — the first-utterance compound now builds green end-to-end.
 
+## ADR-288 — The #71 phrasing batch: six context-verified prod gaps widened inside their owning rules (baseline log-triage)
+
+**Status:** Accepted (2026-07-11; issue #71 — operator-approved batch). *Files: `src/parser/parse.ts` (six owning-rule widenings, one new distributive rule), `src/parser/__tests__/issue71-phrasing.test.ts`.*
+
+Each item is a widening of the rule that already OWNS the construct — never a new engine construct, never a special case (docs/17):
+
+1. **`M נקודה מחוץ למעגל`** — the ADR-254 circle-side rule's subject admits the noun AFTER the label (it only allowed `הנקודה M`, not `M נקודה`).
+2. **`E נקודת החיתוך של המעגל עם AD`** — `leadingNamedPoint` gains the appositive no-copula NOUN form (+ the En `E is the intersection point of…`), and `lineMeetsCircle`'s body strip removes the leading noun phrase; everything downstream (the ADR-277 within-segment default, both-halves drawing) is inherited.
+3. **`חוצה זוית C וחוצה זוית B נפגשים בנקודה O`** — `bisectorIntersection` gains a VERTEX form: each single-letter angle resolves from `ctx.neighbors` (the ADR-164/261 single-vertex pattern; ≠2 edges → the `ambiguous-angle` clarification, never a guess). The triple form is byte-unchanged.
+4. **`AD BE ו-CF הם גבהים במשולש`** — a new `pluralSpecialLines` rule distributes a plural heights/medians declaration into the singular statements and parses each through its OWNING rule (`altitude`/`median`), ALL-OR-NOTHING (the ADR-264 bar — a partial distribution never commits). Deliberately NO `/i` flag: under it the pair atom would swallow lowercase connectives ("and" reads as pairs).
+5. **`הוסף תיכון לצלע AB`** — `median` gains the VERTEX-LESS side form: the apex is the unique third vertex of a figure triangle carrying the named side (`ctx.polygons`); several candidates or none → defer (ADR-052). The auto-named foot excludes every existing point (the ADR-263 lesson).
+6. **`EF קטע אמצעים במשולש DCB`** (both letters fresh) — `midsegmentBaseless` gains the named-triangle branch: E rides the FIRST named side (the student's own vertex order — a discrete labeling read) as a `point-on-segment` rider, and the ADR-199 `shape-variant` channel cycles F's side on "show another configuration". Anchored forms byte-unchanged.
+
+**Deferred out of the batch (recorded on #71):** the compound `מנקודה E מחוץ למעגל יוצאים חותך ABC ומשיק AD` — the 3-letter secant run's semantics are ambiguous (which letters are the crossings?) and per ADR-052 we never guess; and `זוית מרכזית נשענת על קשת CD` — a value-less angle MARK register, which belongs to the #43/#73 guidance work (or a future bare-angle-mark feature), not a parse widening.
 ## ADR-289 — The guidance register: non-constructive input families answer with "what to do instead" (issue #43)
 
 **Status:** Accepted (2026-07-11; issue #43 — the baseline log-triage's largest cluster, ~15 distinct prod users; operator-approved). *Files: `src/parser/scope.ts` (5 new categories), `src/i18n/locales/he.json`/`en.json` (`input.scope.<category>`), `src/App.tsx` (the pre-LLM short-circuit widened), `src/parser/__tests__/scope.test.ts`.*

@@ -530,6 +530,8 @@ export type Command3 =
   | { type: 'rel-plane'; name: string; rel: 'perp' | 'par'; through: Id[]; a: Id; b: Id } // V8-b (G1): plane ⟂/∥ edge a–b
   | { type: 'plane-cut'; id: Id; plane: string; a: Id; b: Id } // V8-b (G2): a point = plane ∩ segment a–b
   | { type: 'height-to-face'; id: Id; from: Id; face: Id[] } // V8-e (G5): `AF גובה … לפאה BDC` — F = foot of ⟂ from A onto plane BDC
+  | { type: 'draw-arrow'; from: Id; to: Id } // #72: `חץ A'C` — an UNNAMED ink arrow (draws the segment too)
+  | { type: 'perp-to-base'; from: Id } // #72: `אנך יורד מ-M לבסיס` — foot auto-minted at apply (parse3 is context-free)
   // V8-f (G6): cos of the angle between two operands = a value. `cos∠ACB = 3/4`
   // (vertex ⇒ pairs) · `קוסינוס הזווית בין הוקטורים w ו-u הוא √35/10` (named vectors).
   | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number }
@@ -600,6 +602,8 @@ export interface Construction3 {
   points: Map<Id, PointDef>;
   /** Declared vector names → their ordered pair. */
   vectors: Map<string, { from: Id; to: Id }>;
+  /** #72: UNNAMED ink arrows (`חץ A'C`) — rendered like a named vector, no label, never a basis member. */
+  arrows: [Id, Id][];
   /** Auxiliary drawn segments (beyond the solids' own edges). */
   segments: [Id, Id][];
   /** V2 — planes by equation, name → def (insertion-ordered). */
@@ -665,6 +669,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   solids: [],
   points: new Map(),
   vectors: new Map(),
+  arrows: [],
   segments: [],
   planes: new Map(),
   lines: new Map(),
