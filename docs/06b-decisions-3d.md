@@ -606,3 +606,11 @@ Same decision shape as [ADR-286](06-decisions.md#adr-286) — one control is bot
 5. **Boundaries locked, not changed:** a second line carrying a DIFFERENT symbol letter still refuses `two-params` (the docs/20 D3 single-parameter boundary — the existing apply guard, now locked across two lines); a duplicate line name refuses `already-defined` keep-prior.
 
 **Gate.** `multi-line.test.ts` (10): the 2010-Q3-shaped figure — two typed parametric lines + common perpendicular d, ⟂ both and anchored at the closest-points foot, He+En; name-binding proofs (a rider lands ON ℓ2 not ℓ1; a foot lands ON ℓ1; line∩plane crosses via ℓ2 while the parallel ℓ1 honestly refuses); projection of a named line; the two-params + already-defined refusals; V8-h pair-form regressions byte-equivalent. *The verbatim 2010-Q3 exam text is not in the repo — the gate reproduces its documented shape (docs/21 G8); replaying the exact wording when the operator supplies it is a follow-up.*
+
+## ADR-3D-040 — The 3-D guidance register: non-constructive input answers with "what to do instead" (issue #73, the 2-D ADR-289 twin)
+
+**Status:** Accepted (2026-07-11; issue #73 — baseline log-triage, operator-approved). *Files: `src3d/parser/scope3.ts` (COPIED pattern per docs/20 §12 — never shared), `src3d/App3.tsx` (guidance short-circuit BEFORE the LLM escalation + a sky-toned note distinct from the amber error), `src3d/i18n/locales` (`scope.<category>`), `src3d/__tests__/scope3.test.ts`.*
+
+Families, each from verbatim prod utterances: **`valueless-query`** («הזווית בין הישר AC' לבין המישור ABCD», «∠DEF=?», «מצא את הזווית» — the ADR-3D-027 reproduce-verify charter made student-facing: state the value and it is enforced/verified); **`cross-app`** (bare «מעגל»/«מלבן»/«מעוין»/«חסום במעגל» → the 2-D Geo Builder; the message also shows the SUPPORTED in-space circle form); **`bare-solid`** (bare «פירמידה»/«מנסרה» — the deliberate ADR-3D-008 refusal upgraded to say WHAT to add); **`ui-command`** («סימון זווית ישרה D» → state the given «זווית D = 90»).
+
+Analytics: `source:'scope'`, `result:'scope:<category>'` — the PROFILE_3D dashboard already classifies reasoned refusals separately, so guidance events never inflate the real-gap count. **No-theft locked:** every supported catalog3 example (both locales) classifies null; the valued angle forms stay null (they parse).
