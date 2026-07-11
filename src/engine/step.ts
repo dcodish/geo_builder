@@ -208,6 +208,82 @@ function newConstraintsNonVacuous(c: Construction, positions: Map<Id, Vec>, newC
   return true;
 }
 
+/**
+ * Blame honesty (issue #37): an over-constrained refusal names the STUDENT'S new statement, not a
+ * collateral casualty. The primary joint solve's violated set can be an EARLIER given the compromise
+ * basin broke while satisfying the new one ("ישר BAE" refused as "|GA| = |AC| cannot hold") — the
+ * student's last input is the statement being refused, so the message must describe IT. Substituted
+ * only for the over-constrained shape (an unknown-point / dependency error stays verbatim) and only
+ * when the failure step actually added constraints.
+ */
+function blameNewStatement(error: string, newCons: Constraint[]): string {
+  if (!newCons.length || !error.startsWith('over-constrained')) return error;
+  return `over-constrained: ${describeConstraint(newCons[0])} cannot hold`;
+}
+
+/**
+ * STAGE-0 of the failure path (M2 minimal-first on the PRIMARY seam — ADR-276, issue #37): before
+ * recruiting more DOFs, try satisfying the NEW statement's own carriers over the PRIOR figure's solved
+ * values FROZEN in place.
+ *
+ * Why: `evaluate` re-solves EVERY standing directive jointly on each call, so a new constraint whose own
+ * carrier could satisfy it alone (E's on-line offset sliding to the tangent∩line crossing) instead
+ * re-opens the whole coupled system (a 5-carrier |GA|=|AC| + area-ratio soup) from its seeds — the joint
+ * descent lands in a compromise basin, an EARLIER given reads violated, and the step is refused with the
+ * blame on the collateral casualty. The committed prior figure was already a valid solution: freeze it
+ * (the ADR-229 bake — params written, directives cleared), attach only the new command's directives
+ * (seeded from the frozen values), and solve. Succeeds ⇒ the figure moves minimally (the stability
+ * principle: existing points don't jump) and the recruiter rampage never runs.
+ *
+ * Restore law (ADR-229/F2, ADR-231): the freeze is for the experiment, never a permanent ownership
+ * strip — after a successful frozen solve, the standing directives are re-attached on top of the solved
+ * params (the joint system warm-starts AT a solution and lands back on it), so later givens still find
+ * their carriers. Only when the restored form fails does the frozen form commit (never worse than the
+ * refusal it replaces).
+ */
+function settleOnFrozenPrior(
+  prev: Construction,
+  next: Construction,
+  newCons: Constraint[],
+): { construction: Construction; positions: Map<Id, Vec> } | null {
+  const prevRes = evaluate(prev);
+  if (!prevRes.ok) return null; // no valid prior solution to freeze
+  const baked = resolveDriven(prev); // prior solved params written, directives cleared
+  const bakedById = new Map(baked.objects.map((o) => [o.id, o] as const));
+  const prevById = new Map(prev.objects.map((o) => [o.id, o] as const));
+  const strip = (o: GeoObject) => JSON.stringify({ ...o, solve: undefined });
+  let anyFrozen = false;
+  const trialObjects = next.objects.map((o) => {
+    const po = prevById.get(o.id);
+    const b = bakedById.get(o.id);
+    if (!po || !b) return o; // brand-new object — keep as the command built it
+    if (o !== po && strip(o) !== strip(po)) return o; // the command REWROTE it (M1 lowering etc.) — not frozen
+    const oSolve = (o as { solve?: SolveDirective }).solve;
+    const pSolve = (po as { solve?: SolveDirective }).solve;
+    if (pSolve !== undefined) anyFrozen = true;
+    const solveSame = oSolve === pSolve || JSON.stringify(oSolve ?? null) === JSON.stringify(pSolve ?? null);
+    if (solveSame) return b; // frozen at the prior solved value
+    return { ...b, solve: oSolve } as GeoObject; // the NEW directive, seeded from the prior solved value
+  });
+  if (!anyFrozen) return null; // nothing was jointly driven before — the primary attempt already was minimal
+  const trial: Construction = { ...next, objects: trialObjects };
+  const r = evaluate(trial);
+  if (!r.ok || !newConstraintsNonVacuous(trial, r.positions, newCons)) return null;
+  // Re-attach the standing directives on top of the SOLVED params (ownership restore).
+  const solvedTrial = resolveDriven(trial);
+  const stById = new Map(solvedTrial.objects.map((o) => [o.id, o] as const));
+  const restoredObjects = next.objects.map((o) => {
+    const st = stById.get(o.id);
+    if (!st) return o;
+    const oSolve = (o as { solve?: SolveDirective }).solve;
+    return (oSolve ? { ...st, solve: oSolve } : st) as GeoObject;
+  });
+  const restored: Construction = { ...next, objects: restoredObjects };
+  const r3 = evaluate(restored);
+  if (r3.ok && newConstraintsNonVacuous(restored, r3.positions, newCons)) return { construction: restored, positions: r3.positions };
+  return { construction: trial, positions: r.positions };
+}
+
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
   const prevEval = evaluate(prev);
@@ -241,6 +317,10 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
       const newCons = constrained.constraints.slice(prev.constraints.length);
       const r = evaluate(constrained);
       if (r.ok && newConstraintsNonVacuous(constrained, r.positions, newCons)) return { ok: true, construction: constrained, positions: r.positions };
+      // STAGE-0 (ADR-276): the new statement's own carriers over the FROZEN prior solution — minimal
+      // movement, before any joint re-solve or recruiting.
+      const settled = settleOnFrozenPrior(prev, constrained, newCons);
+      if (settled) return { ok: true, construction: settled.construction, positions: settled.positions };
       // The reinterpreted statement is a CONSTRAINT whose direct carrier alone couldn't satisfy it —
       // give it the SAME failure path a typed constraint gets (recruit the figure's other free DOFs,
       // ADR-028 extended) before giving up. One statement, one semantics, one solve path (M1/ADR-231).
@@ -254,7 +334,7 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
       // so the error must describe the RELATION that can't hold (M1/ADR-231). A solve that "passed"
       // only vacuously (the non-vacuous gate refused it) reports the same over-constraint shape.
       const vacuousErr = newCons.length ? `over-constrained: ${describeConstraint(newCons[0])} cannot hold` : 'over-constrained';
-      return { ok: false, error: r.ok ? vacuousErr : r.error, construction: prev, positions: prevPositions };
+      return { ok: false, error: r.ok ? vacuousErr : blameNewStatement(r.error, newCons), construction: prev, positions: prevPositions };
     }
     return { ok: false, error: conflict, construction: prev, positions: prevPositions };
   }
@@ -305,6 +385,13 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
       if (sv) { owned.add(sv.constraint); for (const k of sv.also ?? []) owned.add(k); }
     }
     const orphans = next.constraints.filter((k) => k.type === 'coincide' && !owned.has(k) && !newCons.includes(k));
+    // STAGE-0 (ADR-276, issue #37): before recruiting, try the new statement's own carriers over the
+    // FROZEN prior solution — a satisfiable-by-its-own-carrier statement must not re-open (and land in a
+    // compromise basin of) the whole already-valid coupled system.
+    if (!orphans.length) {
+      const settled = settleOnFrozenPrior(prev, next, newCons);
+      if (settled) return { ok: true, construction: settled.construction, positions: settled.positions };
+    }
     const recruited = recruitFreeDofs(next, [...newCons, ...orphans]);
     if (recruited) {
       const r2 = evaluate(recruited);
@@ -326,7 +413,7 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
       if (rs.ok && newConstraintsNonVacuous(scaled, rs.positions, newCons)) return { ok: true, construction: scaled, positions: rs.positions };
     }
     const vacuousMainErr = newCons.length ? `over-constrained: ${describeConstraint(newCons[0])} cannot hold` : 'over-constrained';
-    return { ok: false, error: res.ok ? vacuousMainErr : res.error, construction: prev, positions: prevPositions };
+    return { ok: false, error: res.ok ? vacuousMainErr : blameNewStatement(res.error, newCons), construction: prev, positions: prevPositions };
   }
   return { ok: true, construction: next, positions: res.positions };
 }

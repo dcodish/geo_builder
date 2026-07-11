@@ -277,6 +277,32 @@ export function isSatisfied(con: Constraint, get: (id: Id) => Vec): boolean {
   return Math.abs(residual(con, get)) <= residualTolerance(con, constraintScale(con, get));
 }
 
+/**
+ * A constraint's SQUARED contribution to a JOINT driven-solve cost — the relative-residual
+ * convention (ADR-033 Am.1 / ADR-045 R5), shared by `resolveFreeDriven` and `resolveMixedCarriers`.
+ *
+ * For the one-sided ORDER family (angle/length/collinear-order, acuteness) the residual is hinged at
+ * the AIM margin (`ORDER_*_MARGIN`), but everything inside the ACCEPTANCE tolerance is a drawn-clarity
+ * PREFERENCE, not a violation — so here it costs ZERO (ADR-276, issue #37). Before this, a *satisfied*
+ * order's margin gradient competed at full weight with a hard equality's residual and dragged the joint
+ * minimum off the equality's root (the "ישר BAE" figure: the collinear root leaves E only ~7% of |BA|
+ * beyond A — inside the 12% aim margin — so the order term shifted the optimum just past collinear's
+ * 1e-6 tolerance and `solutionAccepted` rejected every candidate; the step then read over-constrained).
+ * Beyond the tolerance the order costs fully, so a genuinely wrong-side configuration is still pulled
+ * back in. The aim margin keeps steering where it belongs: the 1-D driven path's root ORDERING (which
+ * picks among discrete roots) — there is no competing equality inside a root choice.
+ */
+export function jointCostTerm(con: Constraint, get: (id: Id) => Vec): number {
+  const sc = Math.max(constraintScale(con, get), 1e-9);
+  const v = residual(con, get) / sc;
+  if (con.type === 'angle-order' || con.type === 'length-order' || con.type === 'collinear-order' || con.type === 'angle-acuteness') {
+    const tolN = residualTolerance(con, sc) / sc;
+    const over = Math.max(0, Math.abs(v) - tolN);
+    return over * over;
+  }
+  return v * v;
+}
+
 /** Human-readable form of a constraint, for error messages. */
 export function describeConstraint(con: Constraint): string {
   switch (con.type) {

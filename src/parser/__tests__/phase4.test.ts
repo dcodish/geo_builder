@@ -271,6 +271,91 @@ describe('parser — implicit circle reference (the figure has one circle)', () 
   });
 });
 
+describe('parser — tangent∩line touch/cut roles are bound by circle MEMBERSHIP (issue #36)', () => {
+  // The figure knows A,B,C are on circle O (an inscribed triangle) — the touch is the MEMBER label,
+  // wherever it sits in the sentence; the new label is the crossing.
+  const ctx = { circles: ['O'], circleMembers: [{ id: 'circle-O', center: 'O', points: ['A', 'B', 'C'] }] };
+  const expectTouchC = (u: string) => {
+    const r = parse(u, ctx);
+    expect(r.ok, `"${u}" should parse`).toBe(true);
+    if (!r.ok) return;
+    const tan = r.commands.find((c) => c.type === 'tangent') as { at: string };
+    const cross = r.commands.find((c) => c.type === 'line-intersection') as { id: string; order?: string[] };
+    expect(tan.at, 'the touch is the circle member C').toBe('C');
+    expect(cross.id, 'the crossing is the new label E').toBe('E');
+    expect(cross.order, 'המשך BA is directional: B→A→E').toEqual(['B', 'A', 'E']);
+  };
+  it('the touch named BEFORE the keyword (the jsptarcl book wording, He)', () =>
+    expectTouchC('דרך הנקודה C העבירו משיק למעגל שחותך את המשך הקטע BA בנקודה E'));
+  it('the touch named BEFORE the keyword (En mirror)', () =>
+    expectTouchC('through point C a tangent to the circle cuts the extension of BA at E'));
+  it('the touch named AFTER the keyword still binds to the member (order-independence of the class fix)', () =>
+    expectTouchC('המשיק למעגל בנקודה C חותך את המשך הקטע BA בנקודה E'));
+  it('both labels NEW + a through-carrier → the carrier names the touch (positional tiebreak overridden)', () => {
+    const r = parse('דרך הנקודה D העבירו משיק למעגל שחותך את המשך הקטע BA בנקודה E', {
+      circles: ['O'],
+      circleMembers: [{ id: 'circle-O', center: 'O', points: ['A', 'B'] }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect((r.commands.find((c) => c.type === 'tangent') as { at: string }).at).toBe('D');
+    expect((r.commands.find((c) => c.type === 'line-intersection') as { id: string }).id).toBe('E');
+  });
+  it('bare "GB חותך את המעגל בנקודה D" carries the within-segment order [G,D,B] (issue #30, ADR-277)', () => {
+    const r = parse('GB חותך את המעגל בנקודה D', { circles: ['O'], circleMembers: [{ id: 'circle-O', center: 'O', points: ['B'] }] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const x = r.commands.find((c) => c.type === 'line-circle-intersection') as { order?: string[] };
+    expect(x.order).toEqual(['G', 'D', 'B']);
+  });
+  it('"הישר GB חותך את המעגל בנקודה D" / "line GB meets circle O at D" stay infinite-line (no order — the B13 opt-out)', () => {
+    for (const u of ['הישר GB חותך את המעגל בנקודה D', 'line GB meets circle O at D']) {
+      const r = parse(u, { circles: ['O'], circleMembers: [{ id: 'circle-O', center: 'O', points: ['B'] }] });
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) continue;
+      const x = r.commands.find((c) => c.type === 'line-circle-intersection') as { order?: string[] };
+      expect(x.order, u).toBeUndefined();
+    }
+  });
+  it('bare "AB חותך את המעגל בנקודות C ו-D" puts BOTH crossings within AB; הישר opts out (sibling sweep)', () => {
+    const bare = parse('AB חותך את המעגל בנקודות C ו-D', { circles: ['O'] });
+    expect(bare.ok).toBe(true);
+    if (bare.ok) {
+      const xs = bare.commands.filter((c) => c.type === 'line-circle-intersection') as { id: string; order?: string[] }[];
+      expect(xs.map((x) => x.order)).toEqual([['A', 'C', 'B'], ['A', 'D', 'B']]);
+    }
+    const line = parse('הישר AB חותך את המעגל בנקודות C ו-D', { circles: ['O'] });
+    expect(line.ok).toBe(true);
+    if (line.ok) {
+      const xs = line.commands.filter((c) => c.type === 'line-circle-intersection') as { order?: string[] }[];
+      expect(xs.every((x) => x.order === undefined)).toBe(true);
+    }
+  });
+  it('a bare pair ENDING AT THE CENTRE ("AO חותך את המעגל בנקודות C ו-D") reads as the LINE — a segment to the centre can hold at most one crossing', () => {
+    const r = parse('AO חותך את המעגל בנקודות C ו-D', { circles: ['O'] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const xs = r.commands.filter((c) => c.type === 'line-circle-intersection') as { order?: string[] }[];
+    expect(xs.every((x) => x.order === undefined)).toBe(true);
+  });
+  it('one-crossing centre-pair ("AO חותך את המעגל בנקודה E" on a radius) also reads as the line — no within order', () => {
+    const r = parse('AO חותך את המעגל בנקודה E', { circles: ['O'], circleMembers: [{ id: 'circle-O', center: 'O', points: ['A'] }] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const x = r.commands.find((c) => c.type === 'line-circle-intersection') as { order?: string[] };
+    expect(x.order).toBeUndefined();
+  });
+  it('two tangents "meeting" AT a known circle member is a mis-read → defers, never builds (sibling audit)', () => {
+    // Two tangents at distinct points meet strictly OUTSIDE the circle — a member as the meet label is impossible.
+    const r = parse('המשיק בנקודה A והמשיק בנקודה B נפגשים בנקודה C', ctx);
+    if (r.ok) {
+      const tans = r.commands.filter((c) => c.type === 'tangent') as { at: string }[];
+      expect(tans.map((t) => t.at)).not.toContain('C');
+      expect(r.commands.some((c) => c.type === 'line-intersection' && (c as { id: string }).id === 'C')).toBe(false);
+    }
+  });
+});
+
 describe('parser — filler words are not labels', () => {
   it('"connect A to B" reads A,B — not T,O', () =>
     one('connect A to B', { type: 'segment', a: 'A', b: 'B' }));

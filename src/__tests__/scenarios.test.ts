@@ -4074,6 +4074,92 @@ export const SCENARIOS: Scenario[] = [
       expect(Math.hypot(P.x - O.x, P.y - O.y), '|PO| = 4').toBeCloseTo(4, 1);
     },
   },
+  {
+    id: 'tangent-through-on-circle-point-binds-touch-by-membership',
+    title: 'book wording "דרך הנקודה C העבירו משיק למעגל שחותך את המשך הקטע BA בנקודה E" — the touch is the circle MEMBER (C), the crossing the new label (E)',
+    guards:
+      'operator prod session jsptarcl (2026-07-11, issue #36): tangentLineIntersection bound the tangency point by POSITION ("the first בנקודה-label after the משיק keyword"), so in the "דרך הנקודה C העבירו משיק" phrasing — where the touch is named BEFORE the keyword and the only post-keyword בנקודה is the CUT point — the roles swapped: the parse emitted `tangent at E` + `crossing id C`, the existing on-circle C was dragged toward the bogus crossing, and the step refused over-constrained. The student could not enter the question as printed. Fix (the ADR-233 proxy-vs-semantic class): the touch/cut pair is oriented by CIRCLE MEMBERSHIP (the known member is the touch, wherever it sits in the sentence); the positional read survives only as the both-labels-new tiebreak, with the explicit through-carrier ("דרך הנקודה X") breaking that tie.',
+    steps: [
+      'משולש ABC חסום במעגל',
+      'BC קוטר',
+      'דרך הנקודה C העבירו משיק למעגל שחותך את המשך הקטע BA בנקודה E',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), O = at(fig, 'O'), E = at(fig, 'E');
+      // C stays ON the circle (it is the touch) — before the fix it was re-bound as the crossing.
+      const r = Math.hypot(A.x - O.x, A.y - O.y);
+      expect(Math.hypot(C.x - O.x, C.y - O.y), 'C on circle O (the touch)').toBeCloseTo(r, 5);
+      // E is the tangent∩line(BA) crossing: EC ⟂ OC (tangent ⟂ radius at the touch).
+      const dot = (E.x - C.x) * (C.x - O.x) + (E.y - C.y) * (C.y - O.y);
+      expect(Math.abs(dot) / (Math.hypot(E.x - C.x, E.y - C.y) * r), 'EC ⟂ OC').toBeLessThan(1e-6);
+      // E lies on line BA, beyond A (המשך הקטע BA is directional: B→A→E).
+      const ba = { x: A.x - B.x, y: A.y - B.y };
+      const be = { x: E.x - B.x, y: E.y - B.y };
+      expect(Math.abs(be.x * ba.y - be.y * ba.x) / Math.hypot(ba.x, ba.y), 'E on line BA').toBeLessThan(1e-6);
+      expect((be.x * ba.x + be.y * ba.y) / (ba.x * ba.x + ba.y * ba.y), 'E beyond A (B-A-E)').toBeGreaterThan(1);
+    },
+  },
+  {
+    id: 'tangent-rider-collinear-solves-own-offset',
+    title: '"ישר BAE" on a tangent-riding E — the crossing solves E\'s own offset; the earlier givens do not move and are not blamed (issue #37, ADR-276)',
+    guards:
+      'operator prod session jsptarcl (2026-07-11): the full B13 figure + a tangent at C with E a ±offset rider on it; then "ישר BAE" — refused "over-constrained: |GA| = |AC| cannot hold" after a ~24s replay, though E rides the tangent with exactly 1 free DOF and set-line [B,A,E] is satisfied at the tangent∩line(BA) crossing. TWO root causes (ADR-276): (1) a SATISFIED one-sided collinear-order\'s aim-margin residual competed at full weight in the joint cost — the crossing leaves E only ~7% of |BA| beyond A, inside the 12% visible-gap margin, so the order term dragged the joint minimum just past collinear\'s 1e-6 tolerance and solutionAccepted rejected every candidate (jointCostTerm now zeroes a satisfied order in joint costs); (2) the failure path went straight to the recruiter rampage — settleOnFrozenPrior (stage-0) now first tries the new statement\'s own carriers over the FROZEN prior solution, so a satisfiable-alone statement never re-opens (or gets blamed on) the already-valid coupled system. Also locks the blame-honesty change: a final over-constrained refusal names the student\'s NEW statement, never a collateral casualty.',
+    steps: [
+      'משולש ABC חסום במעגל',
+      'BC קוטר',
+      'G על המשך CA',
+      'GA=AC',
+      'D על קשת AB',
+      'ישר GDB',
+      'S_{DBCA}/S_{GAD}=15',
+      'AD',
+      'מנקודה E יוצא משיק למעגל בנקודה C',
+      'ישר BAE',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), G = at(fig, 'G'), O = at(fig, 'O'), E = at(fig, 'E');
+      // The stated equality genuinely holds — the fix must not "solve" the new line by breaking it.
+      expect(Math.abs(Math.hypot(G.x - A.x, G.y - A.y) - Math.hypot(A.x - C.x, A.y - C.y)), '|GA| = |AC|').toBeLessThan(0.01);
+      // E on the tangent at C: EC ⟂ OC.
+      const r = Math.hypot(C.x - O.x, C.y - O.y);
+      const dot = (E.x - C.x) * (C.x - O.x) + (E.y - C.y) * (C.y - O.y);
+      expect(Math.abs(dot) / (Math.hypot(E.x - C.x, E.y - C.y) * r), 'EC ⟂ OC').toBeLessThan(1e-4);
+      // E collinear with B,A and beyond A (ישר BAE names the order B→A→E).
+      const ba = { x: A.x - B.x, y: A.y - B.y };
+      const be = { x: E.x - B.x, y: E.y - B.y };
+      expect(Math.abs(be.x * ba.y - be.y * ba.x) / (Math.hypot(ba.x, ba.y) * Math.hypot(be.x, be.y)), 'E on line BA').toBeLessThan(1e-3);
+      expect((be.x * ba.x + be.y * ba.y) / (ba.x * ba.x + ba.y * ba.y), 'E beyond A (B-A-E)').toBeGreaterThan(1);
+    },
+  },
+  {
+    id: 'bare-segment-cuts-circle-keeps-on-segment-default',
+    title: '"GB חותך את המעגל בנקודה D" lands D WITHIN segment GB — the bare-pair segment default, line∩circle edition (issue #30, ADR-277)',
+    guards:
+      'operator prod session jsptarcl (2026-07-11): "the point D was not on GB — rather on the continuation of GB, which I didn\'t write." A bare pair means the SEGMENT (ADR-077/268), but lineMeetsCircle emitted the crossing with an `avoid` and NO order, so the default seed put D beyond B (t≈1.27) with every row ✓ and violations [] — a stated given silently violated. Fix: a bare pair now carries the ADR-127 `order: [a, D, b]` (→ collinear-order, solver-driven); הישר/line keeps the infinite-line semantics (the B13 corpus phrasing "line GB meets circle O at D" is asserted unchanged by the b13 scenario), המשך stays extendOntoCircle\'s. Sibling swept: lineCutsCircleTwice (both crossings within a bare pair). The verbatim jsptarcl sequence starts with the #31 חוסם misparse — that composite scenario lands with the #31 fix; this locks the intended clean figure.',
+    steps: [
+      'משולש ABC חסום במעגל',
+      'BC קוטר',
+      'G על המשך CA',
+      'GB חותך את המעגל בנקודה D',
+      'GA=AC',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), G = at(fig, 'G'), D = at(fig, 'D'), O = at(fig, 'O');
+      // D WITHIN segment GB — the stated bare-segment semantics (the reported defect: t was 1.27).
+      const gb = { x: B.x - G.x, y: B.y - G.y };
+      const gd = { x: D.x - G.x, y: D.y - G.y };
+      const t = (gd.x * gb.x + gd.y * gb.y) / (gb.x * gb.x + gb.y * gb.y);
+      expect(t, 'D within GB').toBeGreaterThan(0);
+      expect(t, 'D within GB').toBeLessThan(1);
+      // D genuinely on circle O, and the later given |GA| = |AC| holds.
+      const r = Math.hypot(B.x - O.x, B.y - O.y);
+      expect(Math.hypot(D.x - O.x, D.y - O.y), 'D on circle O').toBeCloseTo(r, 4);
+      expect(Math.abs(Math.hypot(G.x - A.x, G.y - A.y) - Math.hypot(A.x - C.x, A.y - C.y)), '|GA| = |AC|').toBeLessThan(0.01);
+    },
+  },
 ];
 
 describe('reported scenarios — end-to-end replay of real bug reports', () => {

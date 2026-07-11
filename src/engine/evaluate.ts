@@ -23,7 +23,7 @@ import {
   sub,
   unit,
 } from './geometry';
-import { constraintRefs, constraintScale, describeConstraint, isSatisfied, residual, residualTolerance, solvedOnSegmentCandidates } from './solve';
+import { constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates } from './solve';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
 export interface ResolvedLine {
@@ -327,8 +327,9 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
       // driven solvers (matches resolveMixedCarriers), un-gameable by shrinking a segment toward 0
       // (ADR-033 Am.1 / ADR-045 R5). The zero set is unchanged, so a single constraint lands in the
       // same place; it only rebalances multi-constraint joint solves and the seed tie-breaker.
-      const v = residual(con, get) / Math.max(constraintScale(con, get), 1e-9);
-      s += v * v;
+      // A SATISFIED one-sided order costs 0 (jointCostTerm, ADR-276) — a preference never outweighs
+      // a hard constraint's root.
+      s += jointCostTerm(con, get);
     }
     return { s, pos: r.positions };
   };
@@ -635,8 +636,9 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
       for (const con of cons) {
         for (const id of constraintRefs(con)) if (!r.positions.has(id)) return { s: Infinity, pos: null };
         const get = (id: Id) => r.positions.get(id)!;
-        const v = residual(con, get) / Math.max(constraintScale(con, get), 1e-9);
-        s += v * v;
+        // A SATISFIED one-sided order costs 0 (jointCostTerm, ADR-276) — a preference never outweighs
+        // a hard constraint's root.
+        s += jointCostTerm(con, get);
       }
       return { s, pos: r.positions };
     };

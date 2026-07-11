@@ -91,6 +91,23 @@ const membersOfCenter = (ctx: ParseContext, center: string): Set<string> => {
 };
 const NO_CONTEXT: ParseContext = {};
 
+/** Orient a tangent rule's (touch, cut) label pair by CIRCLE MEMBERSHIP — the touch is the label the
+ *  figure already knows is ON the circle, wherever it sits in the sentence; the positional read ("the
+ *  label after the tangent keyword's בנקודה/at") is only the tiebreak when membership says nothing.
+ *  The ADR-233 proxy-vs-semantic lesson, intersection edition (issue #36): in "דרך הנקודה C העבירו
+ *  משיק … שחותך … בנקודה E" the touch C is named BEFORE the keyword and the only post-keyword label is
+ *  the CUT point — a positional bind swaps the roles and re-creates the on-circle C as a crossing.
+ *  When NEITHER label is a known member, an explicit through-carrier ("דרך הנקודה X"/"through point X")
+ *  names the touch — a tangent drawn through an on-circle X touches at X. */
+const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: string, cut: string): [string, string] => {
+  const members = membersOfCenter(ctx, center);
+  if (members.has(touch)) return [touch, cut];
+  if (members.has(cut)) return [cut, touch];
+  const thr = s.match(/(?:דרך\s+ה?נקודה|through\s+(?:the\s+)?point)\s+([A-Za-z]\d*)/i);
+  if (thr && up(thr[1]) === cut) return [cut, touch];
+  return [touch, cut];
+};
+
 /**
  * 'stop' = the rule recognised its keyword but could not read the sentence:
  * abort the whole parse (→ not-handled, the fallback boundary) instead of
@@ -3102,6 +3119,10 @@ const twoTangentsMeet: Rule = (s, ctx) => {
   const [A, C] = [pts[0], pts[1]];
   const D = up(meetM[1]);
   if (new Set([A, C, D]).size !== 3) return null;
+  // Semantic impossibility guard (the #36 sibling audit): two tangents at distinct points meet strictly
+  // OUTSIDE the circle — a known circle MEMBER captured as the meet label means the positional read
+  // mis-bound the roles. Defer (→ escalation) rather than build a wrong figure.
+  if (membersOfCenter(ctx, center).has(D)) return null;
   const circ = circleId(center);
   return [
     { type: 'tangent', id: `tan-${A}`, circle: circ, at: A, visible: true },
@@ -3131,16 +3152,20 @@ const tangentLineIntersection: Rule = (s, ctx) => {
   const rest = dropCircleRef(s)
     .replace(/tangent|משיק/gi, ' ')
     .replace(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-?)\s*${at}\b`, 'i'), ' ')
-    .replace(/extension|המשך|intersection|חיתוך|נפגש\w*|מפגש|\bmeets?\b|\bpoint\b|בנקודה|נקודה/gi, ' ')
+    .replace(/extension|המשך|intersection|חיתוך|נפגש\w*|מפגש|\bmeets?\b|\bcuts?\b|crosses|\bthrough\b|\bpoint\b|בנקודה|נקודה/gi, ' ')
     .replace(FILLER, ' ');
-  const pairM = rest.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
+  // Labels are UPPERCASE (the repo convention, `isUpperLabel`) — a leftover lowercase word or the
+  // article "a" must not be read as a point pair ("through point C **a** tangent…" → pair C,A).
+  const pairM = rest.match(/\b([A-Z]\d*)\s*([A-Z]\d*)\b/);
   if (!pairM) return null;
   const a = up(pairM[1]);
   const b = up(pairM[2]);
-  const resM = rest.replace(/\b[A-Za-z]\d*\s*[A-Za-z]\d*\b/, ' ').match(/\b([A-Za-z]\d*)\b/); // remove the pair, take the lone letter
+  const resM = rest.replace(/\b[A-Z]\d*\s*[A-Z]\d*\b/, ' ').match(/\b([A-Z]\d*)\b/); // remove the pair, take the lone letter
   if (!resM) return null;
-  const e = up(resM[1]);
-  const tanId = `tan-${at}`;
+  // Bind touch vs crossing SEMANTICALLY (circle membership; positional only as the both-new tiebreak) —
+  // the post-keyword read alone swaps the roles in the "דרך הנקודה C העבירו משיק … בנקודה E" phrasing (#36).
+  const [touch, e] = orientTouchCut(s, ctx, center, at, up(resM[1]));
+  const tanId = `tan-${touch}`;
   const abId = `line-${a}${b}`;
   // "המשך AB" / "extension of AB" is DIRECTIONAL — E is beyond the SECOND letter (order a→b→e). Carry that as
   // the crossing's `order` so the figure flexes to put E on AB's extension (not the wrong side); without it
@@ -3154,7 +3179,7 @@ const tangentLineIntersection: Rule = (s, ctx) => {
   return [
     // Draw what we reference, not just the point: the tangent (trimmed to D–E by the
     // renderer) and the line AB drawn all the way to E (E is on AB's extension).
-    { type: 'tangent', id: tanId, circle: circleId(center), at, visible: true },
+    { type: 'tangent', id: tanId, circle: circleId(center), at: touch, visible: true },
     { type: 'line-through', id: abId, a, b }, // scaffolding for the crossing
     { type: 'line-intersection', id: e, line1: tanId, line2: abId, ...(directional ? { order: [a, b, e] } : {}) },
     { type: 'segment', a: e, b: a },
@@ -3391,10 +3416,19 @@ const lineCutsCircleTwice: Rule = (s, ctx) => {
   const [a, b] = pr;
   const circ = circleId(center);
   const lineId = `sec-${a}${b}`;
+  // A BARE pair means the SEGMENT (the #30 class, sibling sweep): BOTH stated crossings must land
+  // within a–b; `הישר`/`line` (the catalog's own example) keeps the infinite-line semantics. A pair
+  // endpoint that IS the circle's CENTRE also reads as the line: the centre is inside the circle, so a
+  // segment ending there can contain at most ONE crossing — a stated TWO-crossing cut through the
+  // centre ("AO חותך את המעגל בנקודות C ו-D", the 2026-06-20 operator figure) necessarily means the
+  // secant LINE, never an unsatisfiable segment.
+  const infinite =
+    /\bline\b|\bray\b|הישר|הקו|קרן|המשך|extension|extended/i.test(s) || a === up(center) || b === up(center);
+  const within = (id: Id) => (infinite ? {} : { order: [a, id, b] as Id[] });
   return [
     { type: 'line-through', id: lineId, a, b },
-    { type: 'line-circle-intersection', id: C, line: lineId, circle: circ, branch: 0 },
-    { type: 'line-circle-intersection', id: D, line: lineId, circle: circ, branch: 1 },
+    { type: 'line-circle-intersection', id: C, line: lineId, circle: circ, branch: 0, ...within(C) },
+    { type: 'line-circle-intersection', id: D, line: lineId, circle: circ, branch: 1, ...within(D) },
     { type: 'segment', a, b: C },
     { type: 'segment', a, b: D }, // the visible secant: external end → each crossing (collinear, spans the line)
   ];
@@ -3452,9 +3486,18 @@ const lineMeetsCircle: Rule = (s, ctx) => {
   const onCircle = circleContaining(ctx, [a], center) ? a : circleContaining(ctx, [b], center) ? b : a;
   const other = onCircle === a ? b : a;
   const lineId = `chord-${a}${b}`;
+  // A BARE pair means the SEGMENT (ADR-077 / ADR-268, the line∩circle member — issue #30): the stated
+  // crossing must land WITHIN a–b, carried as the ADR-127 `order` (→ a `collinear-order` the solver
+  // flexes free DOFs to satisfy). Opt-outs keep their own semantics: `הישר`/`line` = the infinite line
+  // (the B13 corpus phrasing), `המשך` = the extension (owned by extendOntoCircle, which runs earlier).
+  // A pair endpoint that IS the circle's CENTRE also reads as the line: a segment ending at the centre
+  // has no second crossing strictly within it ("E היא מפגש של AO עם המעגל" on a radius AO = the
+  // antipode, beyond O by definition), so the within-default would be unsatisfiable by construction.
+  const infinite =
+    /\bline\b|\bray\b|הישר|הקו|קרן|המשך|extension|extended/i.test(s) || a === up(center) || b === up(center);
   return [
     { type: 'line-through', id: lineId, a, b },
-    { type: 'line-circle-intersection', id: R, line: lineId, circle: circ, avoid: onCircle },
+    { type: 'line-circle-intersection', id: R, line: lineId, circle: circ, avoid: onCircle, ...(infinite ? {} : { order: [a, R, b] as Id[] }) },
     // BOTH halves of the stated line are drawn (ADR-250, honesty §6): "AD חותך את המעגל ב-E" must show
     // A—E—D whole, not just D–E — the on-circle half was silently missing and the student re-typed it
     // (session m68n76e7). Split at the crossing, so no overlapping collinear strokes.
