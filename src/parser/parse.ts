@@ -2095,6 +2095,24 @@ const circle: Rule = (s, ctx) => {
 };
 
 /**
+ * A SIZE statement (set a circle's radius / circumference / area) owns only its size vocabulary. When a
+ * CONSTRUCTION-significant word survives after that vocabulary, the labels, and the value are stripped,
+ * the utterance is a construction statement that merely CARRIES a size clause — "משולש ADO חסום במעגל
+ * שרדיוסו 5" is an inscription, and claiming it as a size statement resizes a BYSTANDER circle (the
+ * vertex letter O resolved as a known centre) while silently dropping the stated inscription (issue #53's
+ * numeric sibling; the ADR-024 leftover-guard discipline, never a keyword bow-out). The size rules defer,
+ * so the construction rules — and the honesty gates behind them — own the utterance.
+ */
+const sizeStatementLeftover = (s: string): boolean =>
+  SHAPE_LEFTOVER.test(
+    s
+      .replace(/radius|radii|רדיוס\S*|circles?|מעגל\w*|circumference|perimeter|area|שהיקפו|היקפו|היקף|ששטחו|שטחו|שטח|נתון|הוא|=/gi, ' ')
+      .replace(/[A-Z]\d*/g, ' ')
+      .replace(/\d+(?:\.\d+)?|π/g, ' ')
+      .replace(FILLER, ' '),
+  );
+
+/**
  * "the radius of circle P is 4" / "רדיוס מעגל P הוא 4" / "radius of P = 4" — set an EXISTING circle's radius
  * to a value, with NO segment drawn and NO point invented (ADR-087). Distinct from circle CREATION
  * ("circle O radius 5"): fires only when the named circle ALREADY EXISTS — otherwise it falls through to
@@ -2103,6 +2121,7 @@ const circle: Rule = (s, ctx) => {
  */
 const setRadius: Rule = (s, ctx) => {
   if (!/radius|רדיוס/i.test(s)) return null;
+  if (sizeStatementLeftover(s)) return null; // a construction carrying a size clause — not a size statement
   const valM = s.replace(/[A-Z]\d*/g, ' ').match(new RegExp(num)); // value with circle labels (e.g. P1) stripped first
   if (!valM) return null; // a magnitude must be given
   let center = circleCenter(s);
@@ -2126,6 +2145,7 @@ const setRadius: Rule = (s, ctx) => {
 const circleSizeExisting: Rule = (s, ctx) => {
   const r = circleSizeRadius(s);
   if (r === null) return null; // no circumference/area value present
+  if (sizeStatementLeftover(s)) return null; // a construction carrying a size clause — not a size statement
   // Resolve the target circle: "מעגל X", else a bare label that is a KNOWN circle — so "שטח O2 הוא 81π"
   // (the area of circle O2, no "מעגל" word) also sets its radius, not just "שטח מעגל O2 …" (mirrors how
   // `setRadius` resolves a bare circle label). A polygon area ("שטח ABC", 3–4 vertices) is claimed earlier
@@ -5221,7 +5241,10 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
   // half-parse — try the clause split (the deterministic rescue: "משולש שווה שוקיים" parses bare +
   // the given pins it), else escalate the WHOLE line.
   if (
-    (whole.ok && (droppedShapeNoun(s, whole.commands, ctx) || droppedCirclePredicate(s, whole.commands))) ||
+    (whole.ok &&
+      (droppedShapeNoun(s, whole.commands, ctx) ||
+        droppedCirclePredicate(s, whole.commands) ||
+        droppedRadiusSymbol(s, whole.commands).length > 0)) ||
     (!whole.ok && whole.reason !== 'not-handled' && droppedShapeNoun(s, [], ctx))
   ) {
     return splitStatements(s, ctx) ?? { ok: false, reason: 'not-handled' };
@@ -5275,9 +5298,12 @@ function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseContext):
  * the shape AND the stated pair. The predicate is detected by verb+circle ADJACENCY at the END of the
  * piece (a mid-string circle word stays owned by its rules / the ADR-119 carrier post-passes — this is
  * deliberately narrower than a word test, §2.4). Inflections: masc/fem/plural, optional ש/ה prefix.
+ * The predicate may CARRY its circle's qualifier + size clause ("במעגל אחר, שרדיוסו r" / "in another
+ * circle whose radius is r" — issue #53): the end-anchor must not be defeated by a trailing modifier of
+ * the predicate's own circle, or the gate goes blind exactly when a rule branch drops the whole clause.
  */
 const CIRCLE_PRED_TAIL =
-  /(?:^|\s+)((?:[שה])?(?:חסום|חסומה|חסומים|חסומות|חוסם|חוסמת|חוסמים|חוסמות)\s+במעגל(?:\s+[A-Z]\d*)?|(?:is\s+|are\s+)?inscribed\s+in\s+(?:a\s+|the\s+)?circle(?:\s+[A-Z]\d*)?)\s*$/i;
+  /(?:^|\s+)((?:[שה])?(?:חסום|חסומה|חסומים|חסומות|חוסם|חוסמת|חוסמים|חוסמות)\s+במעגל(?:\s+אחר)?(?:\s+[A-Z]\d*)?(?:,?\s*(?:ש|ו)?רדיוסו\s+\S+)?|(?:is\s+|are\s+)?inscribed\s+in\s+(?:a\s+|the\s+|another\s+)?circle(?:\s+[A-Z]\d*)?(?:,?\s+(?:whose\s+radius\s+is|with\s+radius|of\s+radius)\s+\S+)?)\s*$/i;
 function droppedCirclePredicate(s: string, commands: AnyCommand[]): boolean {
   if (!CIRCLE_PRED_TAIL.test(s)) return false;
   // Accounted when ANY command touches a circle (creates one, places a point on one, asserts
@@ -5287,6 +5313,35 @@ function droppedCirclePredicate(s: string, commands: AnyCommand[]): boolean {
   return !commands.some(
     (c) => /circle|concyclic/i.test(c.type) || 'circle' in (c as object) || 'center' in (c as object),
   );
+}
+
+/**
+ * A stated RADIUS SYMBOL — "שרדיוסו r" / "ורדיוסו R" / "whose radius is r" / "radius = T" — that the
+ * parsed commands leave with NOTHING to denote (issue #53): the MEASURE-SYMBOL lane of the dropped-given
+ * honesty family (labels ADR-089, numbers ADR-250, relations ADR-264). A single-letter measure name is
+ * invisible to all three older gates (lowercase `r` is no point label, no digit, no relation operator),
+ * so a rule branch that consumed the construction but dropped its trailing size clause committed
+ * silently — the ADR-156 idempotent re-inscribe returned a BARE `triangle` for
+ * "משולש ADO חסום במעגל שרדיוסו r", every row ✓ (the docs/17 §6 honesty class).
+ *
+ * Detected by radius-word + single-letter ADJACENCY (the `parseRadius` symbolic shape, any letter — #54's
+ * named radii included), never by word presence alone: "רדיוס OB" (a radius SEGMENT, two glued labels) and
+ * "radius of P" (multi-letter word follows) don't fire. "Accounted" is deliberately GENEROUS (the family
+ * doctrine): ANY circle-touching command — the symbol then denotes that circle's radius (the ADR-071
+ * machinery; per-circle BINDING quality is issue #54's feature). The gate guarantees only that the circle
+ * the clause describes exists in the parse — it fires exactly on the silent-wrong-figure case.
+ */
+export function droppedRadiusSymbol(utterance: string, commands: AnyCommand[]): string[] {
+  const s = normalizeUtterance(utterance);
+  const syms: string[] = [];
+  for (const m of s.matchAll(new RegExp(String.raw`${RADIUS_WORD}\s*(?:is\s+|הוא\s+)?(?:=\s*)?([A-Za-z])(?![A-Za-z\d])`, 'g'))) {
+    syms.push(m[1]);
+  }
+  if (syms.length === 0) return [];
+  const accounted = commands.some(
+    (c) => /circle|concyclic/i.test(c.type) || 'circle' in (c as object) || 'center' in (c as object),
+  );
+  return accounted ? [] : [...new Set(syms)];
 }
 
 /** The first-match-wins pass over `RULES` for ONE statement — the body `parse` always ran; extracted so
@@ -5350,7 +5405,13 @@ function splitStatements(s: string, ctx: ParseContext): ParseResult | null {
   // Ambiguity (zero or several polygons) → null → the whole line escalates honestly, never a guess.
   const parseClause = (p: string, c0: ParseContext): AnyCommand[] | null => {
     const r = runRules(p, c0);
-    if (r.ok && !droppedShapeNoun(p, r.commands, c0) && !droppedCirclePredicate(p, r.commands)) return r.commands;
+    if (
+      r.ok &&
+      !droppedShapeNoun(p, r.commands, c0) &&
+      !droppedCirclePredicate(p, r.commands) &&
+      droppedRadiusSymbol(p, r.commands).length === 0
+    )
+      return r.commands;
     const m = p.match(CIRCLE_PRED_TAIL);
     if (!m) return null;
     const head = p.slice(0, m.index).trim();
@@ -5369,6 +5430,11 @@ function splitStatements(s: string, ctx: ParseContext): ParseResult | null {
     if (polys.length !== 1) return null; // no unique subject for the bare predicate — defer to the LLM
     const rp = runRules(`${polys[0].join('')} ${m[1]}`, c1);
     if (!rp.ok) return null;
+    // The rebuilt predicate must not drop a RADIUS SYMBOL its clause carries — the ADR-156 idempotent
+    // re-inscribe returns a bare polygon HERE too (issue #53), and the rescue must not become the leak it
+    // plugs. The bare no-op re-inscribe itself stays a legitimate lowering (ADR-156: "already drawn");
+    // a dropped NUMERIC size keeps its existing lane (droppedGivenNumbers at the commit boundary).
+    if (droppedRadiusSymbol(m[1], rp.commands).length > 0) return null;
     out.push(...rp.commands);
     return out;
   };

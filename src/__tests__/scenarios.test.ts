@@ -4160,6 +4160,30 @@ export const SCENARIOS: Scenario[] = [
       expect(Math.abs(Math.hypot(G.x - A.x, G.y - A.y) - Math.hypot(A.x - C.x, A.y - C.y)), '|GA| = |AC|').toBeLessThan(0.01);
     },
   },
+  {
+    id: 'inscribe-existing-triangle-with-radius-symbol',
+    title: '"משולש ADO חסום במעגל אחר, שרדיוסו r" on existing points builds the SECOND circle through them (issue #53, ADR-279)',
+    guards:
+      'operator prod report (2026-07-11, the booklet tangent-secant question part ג, same figure as #36/#37): "I\'m trying to say that a different circle has a radius of r (not R) — not supported." The trailing radius-symbol clause שרדיוסו r defeated the end-anchored droppedCirclePredicate gate, and once the circumcircle existed the ADR-156 idempotent re-inscribe branch returned a BARE `triangle ADO` — the stated inscription AND the r vanished with every row ✓ (the docs/17 §6 silent-wrong-figure class). Fix (ADR-279): the measure-symbol honesty lane `droppedRadiusSymbol` + the widened CIRCLE_PRED_TAIL (a predicate may carry its circle\'s qualifier/size clause). This scenario locks the HONEST half that builds: the first entry of the part-ג utterance creates the second circle through A, D, O (r stays unbound — its per-circle binding is issue #54); the refusal half (a re-type must never commit a bare triangle) is locked in src/parser/__tests__/issue-53.test.ts.',
+    steps: [
+      'משולש ABC חסום במעגל',
+      'BC קוטר',
+      'G על המשך CA',
+      'GA=AC',
+      'D על קשת AB',
+      'ישר GDB',
+      'משולש ADO חסום במעגל אחר, שרדיוסו r',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), D = at(fig, 'D'), O = at(fig, 'O'), P = at(fig, 'P');
+      // The SECOND circle exists and passes through all three named points (the circumcircle of ADO).
+      const r = Math.hypot(A.x - P.x, A.y - P.y);
+      expect(r, 'circle P is non-degenerate').toBeGreaterThan(1e-6);
+      expect(Math.hypot(D.x - P.x, D.y - P.y), 'D on circle P').toBeCloseTo(r, 4);
+      expect(Math.hypot(O.x - P.x, O.y - P.y), 'O on circle P').toBeCloseTo(r, 4);
+    },
+  },
 ];
 
 describe('reported scenarios — end-to-end replay of real bug reports', () => {
