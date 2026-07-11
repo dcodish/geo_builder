@@ -688,8 +688,17 @@ const bareSegment: Rule = (s) => {
 /** Plane names: π1 / pi1 / a bare π → canonical `π<digits?>`. */
 const PLANE_NAME = /(?:π|pi|Pi|PI)\s?(\d*)/;
 const canonicalPlane = (s: string): string => `π${s.match(/\d+/)?.[0] ?? ''}`;
-/** Line names: ℓ or l → canonical `ℓ`. */
-const LINE_NAME = /[ℓl]/;
+/** Line names (#69, multi-line): ℓ/l + an optional digit index (`ℓ1`, `l2`, subscript `ℓ₂`)
+ *  → canonical `ℓ<digits?>`. Digit-indexed by operator ruling — prime forms (ℓ') are NOT in
+ *  the vocabulary. NOTE: ℓ is not a `\w` character — never `\b` after a line name, use an
+ *  explicit lookahead. */
+const LINE_NAME = /[ℓl][\d₀-₉]*/;
+const LINE_NAME_ONLY = new RegExp(`^(?:${LINE_NAME.source})$`);
+const canonicalLine = (s: string): string =>
+  `ℓ${[...s]
+    .filter((ch) => /[\d₀-₉]/.test(ch))
+    .map((ch) => (/\d/.test(ch) ? ch : String.fromCharCode(ch.charCodeAt(0) - 0x2080 + 48)))
+    .join('')}`;
 
 /** Parse `m-1` / `5-m` / `-2` / `2m` → a LinExpr (k + p·param). Null on anything else. */
 export function parseParamExpr(src: string): { expr: LinExpr; param?: string } | null {
@@ -834,7 +843,7 @@ const coordPoint: Rule = (s) => {
     if (/^(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?(?:על אחד המישורים|on one of the planes)$/.test(rest)) {
       cmds.push({ type: 'on-planes', id, plane: 'any' });
     } else if (onLine) {
-      cmds.push({ type: 'on-line', id, line: 'ℓ' });
+      cmds.push({ type: 'on-line', id, line: canonicalLine(onLine[1]) });
     } else {
       const named = rest.match(new RegExp(`^(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על המישור|on plane)\\s+(${PLANE_NAME.source})$`));
       if (!named) return null; // trailing text we don't understand — refuse the whole utterance
@@ -928,49 +937,63 @@ const dropPerpToPlane: Rule = (s) => {
 
 /**
  * V8-h (G8): the COMMON PERPENDICULAR of two lines — `הישר d מאונך לישר AB ולישר CD` /
- * `d is the common perpendicular of AB and CD` / `אנך משותף ל-AB ו-CD`. The two source lines
- * are through-lines (point pairs), created as needed. (The parametric ℓ/ℓ' form of 2010-Q3 waits
- * on multi-line naming — the single-`ℓ` model can't hold two named parametric lines yet.)
+ * `d is the common perpendicular of AB and CD` / `אנך משותף ל-AB ו-CD`. A source line is a
+ * through-line (point pair, created as needed) or — #69, the 2010-Q3 form — an already-NAMED
+ * line (`הישר d מאונך לישר ℓ1 ולישר ℓ2`; the named lines must exist, apply refuses
+ * `unknown-line` otherwise).
  */
 const commonPerp: Rule = (s) => {
   if (!/מאונך|ניצב|מאונ[כך]|common\s+perpendicular|אנך\s+משותף/i.test(s)) return null;
-  const P2 = String.raw`([A-Z]\d*'?)([A-Z]\d*'?)`;
-  const NAME = String.raw`(ℓ\d*'?|[a-z]'?)`;
-  // He: a named line ⟂ to two through-lines (two explicit "לישר" targets — distinctive enough not to
+  // an operand: a point PAIR (through-line) or a NAMED line (#69)
+  const OP = String.raw`((?:[A-Z]\d*'?){2}|${LINE_NAME.source})`;
+  const NAME = String.raw`(${LINE_NAME.source}|ℓ\d*'?|[a-z]'?)`;
+  // He: a named line ⟂ to two line targets (two explicit "לישר" targets — distinctive enough not to
   // collide with the ⟂-constraint / ⟂-plane rules), or the "אנך משותף" phrasing
   let m =
-    s.match(new RegExp(`^ה?ישר\\s+${NAME}\\s+(?:מאונך|ניצב|מאונ[כך])\\s+ל(?:ה?ישר\\s+)?${P2}\\s+ול(?:ה?ישר\\s+)?${P2}$`)) ??
-    s.match(new RegExp(`^(?:ה?ישר\\s+${NAME}\\s+)?אנך\\s+משותף\\s+ל(?:ה?ישרים\\s+)?${P2}\\s+ו-?(?:ל(?:ה?ישר\\s+)?)?${P2}$`));
-  let name: string, a1: string, a2: string, b1: string, b2: string;
-  if (m) [, name, a1, a2, b1, b2] = m as [string, string, string, string, string, string];
-  else {
-    m = s.match(new RegExp(`^(?:(?:ה?ישר\\s+|line\\s+)?${NAME}\\s+is\\s+)?the\\s+common\\s+perpendicular\\s+of\\s+(?:lines?\\s+)?${P2}\\s+and\\s+${P2}$`, 'i'));
-    if (!m) return null;
-    [, name, a1, a2, b1, b2] = m as [string, string, string, string, string, string];
-  }
-  const nm = name ?? 'd';
-  return [
-    { type: 'line-through', name: `${a1}${a2}`, a: a1, b: a2 },
-    { type: 'line-through', name: `${b1}${b2}`, a: b1, b: b2 },
-    { type: 'line-common-perp', name: nm, line1: `${a1}${a2}`, line2: `${b1}${b2}` },
-  ];
+    s.match(new RegExp(`^ה?ישר\\s+${NAME}\\s+(?:מאונך|ניצב|מאונ[כך])\\s+ל(?:ה?ישר\\s+)?${OP}\\s+ול(?:ה?ישר\\s+)?${OP}$`)) ??
+    s.match(new RegExp(`^(?:ה?ישר\\s+${NAME}\\s+)?אנך\\s+משותף\\s+ל(?:ה?ישרים\\s+)?${OP}\\s+ו-?(?:ל(?:ה?ישר\\s+)?)?${OP}$`)) ??
+    s.match(new RegExp(`^(?:(?:ה?ישר\\s+|line\\s+)?${NAME}\\s+is\\s+)?the\\s+common\\s+perpendicular\\s+of\\s+(?:lines?\\s+)?${OP}\\s+and\\s+${OP}$`, 'i'));
+  if (!m) return null;
+  const [, name, opA, opB] = m;
+  const nm = name ? (LINE_NAME_ONLY.test(name) ? canonicalLine(name) : name) : 'd';
+  const cmds: Command3[] = [];
+  const lineOf = (op: string): string => {
+    if (LINE_NAME_ONLY.test(op)) return canonicalLine(op);
+    const [a, b] = op.match(/[A-Z]\d*'?/g)!;
+    cmds.push({ type: 'line-through', name: `${a}${b}`, a, b });
+    return `${a}${b}`;
+  };
+  const line1 = lineOf(opA);
+  const line2 = lineOf(opB);
+  cmds.push({ type: 'line-common-perp', name: nm, line1, line2 });
+  return cmds;
 };
 
 /**
  * V8-h (G8): the PROJECTION (`היטל`) of a line onto a plane — `BE היטל הישר TB על המישור ABCD` /
- * `BE is the projection of line TB onto plane ABCD`. Source line = a through-line (point pair);
- * plane = a point-run (or a π-name); the result is a named line.
+ * `BE is the projection of line TB onto plane ABCD`. Each line operand is a through-line
+ * (point pair, created as needed) or — #69 — a NAMED line (`הישר ℓ2 הוא היטל הישר ℓ1 על
+ * המישור π1`); plane = a point-run (or a π-name).
  */
 const lineProjection: Rule = (s) => {
   if (!/היטל|projection/i.test(s)) return null;
-  const P2 = String.raw`([A-Z]\d*'?)([A-Z]\d*'?)`;
+  const OP = String.raw`((?:[A-Z]\d*'?){2}|${LINE_NAME.source})`;
   const PL = String.raw`((?:[A-Z]\d*'?){3,4}|${PLANE_NAME.source})`;
   const m =
-    s.match(new RegExp(`^${P2}\\s+(?:הוא\\s+)?(?:ה?היטל)\\s+(?:של\\s+)?(?:ה?ישר\\s+)?${P2}\\s+על\\s+(?:ה?מישור\\s+)?${PL}$`)) ??
-    s.match(new RegExp(`^${P2}\\s+is\\s+the\\s+projection\\s+of\\s+(?:line\\s+)?${P2}\\s+onto\\s+(?:the\\s+)?(?:plane\\s+)?${PL}$`, 'i'));
+    s.match(new RegExp(`^(?:ה?ישר\\s+)?${OP}\\s+(?:הוא\\s+)?(?:ה?היטל)\\s+(?:של\\s+)?(?:ה?ישר\\s+)?${OP}\\s+על\\s+(?:ה?מישור\\s+)?${PL}$`)) ??
+    s.match(new RegExp(`^(?:line\\s+)?${OP}\\s+is\\s+the\\s+projection\\s+of\\s+(?:line\\s+)?${OP}\\s+onto\\s+(?:the\\s+)?(?:plane\\s+)?${PL}$`, 'i'));
   if (!m) return null;
-  const [, r1, r2, l1, l2, planeRaw] = m;
-  const cmds: Command3[] = [{ type: 'line-through', name: `${l1}${l2}`, a: l1, b: l2 }];
+  const [, resOp, srcOp, planeRaw] = m;
+  const cmds: Command3[] = [];
+  const lineOf = (op: string): string => {
+    if (LINE_NAME_ONLY.test(op)) return canonicalLine(op);
+    const [a, b] = op.match(/[A-Z]\d*'?/g)!;
+    cmds.push({ type: 'line-through', name: `${a}${b}`, a, b });
+    return `${a}${b}`;
+  };
+  const srcLine = lineOf(srcOp);
+  // the RESULT is only a NAME (nothing to create) — a pair keeps its pair name, a ℓ-name canonicalizes
+  const resName = LINE_NAME_ONLY.test(resOp) ? canonicalLine(resOp) : resOp;
   let planeName: string;
   if (/^(?:π|pi)/i.test(planeRaw)) planeName = canonicalPlane(planeRaw);
   else {
@@ -978,7 +1001,7 @@ const lineProjection: Rule = (s) => {
     planeName = `plane-${ids.join('')}`;
     cmds.push({ type: 'plane-through', name: planeName, ids });
   }
-  cmds.push({ type: 'line-projection', name: `${r1}${r2}`, line: `${l1}${l2}`, plane: planeName });
+  cmds.push({ type: 'line-projection', name: resName, line: srcLine, plane: planeName });
   return cmds;
 };
 
@@ -1012,7 +1035,7 @@ const circleTangentLine: Rule = (s) => {
       { type: 'circle3', id, def: { kind: 'tangent-line', center: centre, line }, touch },
     ];
   }
-  if (lname) return [{ type: 'circle3', id, def: { kind: 'tangent-line', center: centre, line: 'ℓ' }, touch }];
+  if (lname) return [{ type: 'circle3', id, def: { kind: 'tangent-line', center: centre, line: canonicalLine(lname[1]) }, touch }];
   return null;
 };
 
@@ -1033,7 +1056,7 @@ const intersectionLine: Rule = (s) => {
     ),
   );
   if (!m) return null;
-  return [{ type: 'plane-plane-line', name: 'ℓ', p1: canonicalPlane(m[2]), p2: canonicalPlane(m[4]) }];
+  return [{ type: 'plane-plane-line', name: canonicalLine(m[1]), p1: canonicalPlane(m[2]), p2: canonicalPlane(m[4]) }];
 };
 
 /** `מ-B מעבירים אנך לישר ℓ החותך אותו בנקודה C` / `from B drop a perpendicular to line ℓ, it cuts it at C`. */
@@ -1045,8 +1068,8 @@ const dropPerpToLine: Rule = (s) => {
   const en =
     he ?? s.match(new RegExp(`^from ([A-Z]\\d*'?) drop a perpendicular to (?:the )?line (${LINE_NAME.source})(?=[\\s,.]|$).*? at ([A-Z]\\d*'?)$`));
   if (!en) return null;
-  const [, from, , foot] = en;
-  return [{ type: 'foot-on-line', id: foot, from, line: 'ℓ' }];
+  const [, from, line, foot] = en;
+  return [{ type: 'foot-on-line', id: foot, from, line: canonicalLine(line) }];
 };
 
 // ---------------------------------------------------------------------------
@@ -1081,7 +1104,8 @@ const parametricLine: Rule = (s) => {
   if (anchor.length !== 3 || dir.length !== 3 || [...anchor, ...dir].some((x) => !x)) return null;
   const params = new Set([...anchor, ...dir].flatMap((x) => (x!.param ? [x!.param] : [])));
   if (params.size > 1) return null;
-  const name = LINE_NAME.test(head[1]) && head[1].length === 1 ? 'ℓ' : head[1];
+  const isLineName = LINE_NAME_ONLY.test(head[1]);
+  const name = isLineName ? canonicalLine(head[1]) : head[1];
   const cmds: Command3[] = [
     {
       type: 'line3',
@@ -1092,7 +1116,7 @@ const parametricLine: Rule = (s) => {
       param: [...params][0],
     },
   ];
-  if (name !== 'ℓ') for (const id of name.match(/[A-Z]\d*'?/g)!) cmds.push({ type: 'on-line', id, line: name });
+  if (!isLineName) for (const id of name.match(/[A-Z]\d*'?/g)!) cmds.push({ type: 'on-line', id, line: name });
   return cmds;
 };
 
@@ -1102,7 +1126,7 @@ const linePerpPlane: Rule = (s) => {
     s.match(new RegExp(`^(?:הישר\\s+)?(${LINE_NAME.source})\\s+(?:ניצב|מאונך)\\s+למישור\\s+(${PLANE_NAME.source})$`)) ??
     s.match(new RegExp(`^(?:line\\s+)?(${LINE_NAME.source})\\s+is\\s+perpendicular\\s+to\\s+(?:the\\s+)?plane\\s+(${PLANE_NAME.source})$`));
   if (!m) return null;
-  return [{ type: 'line-perp-plane', line: 'ℓ', plane: canonicalPlane(m[2]) }];
+  return [{ type: 'line-perp-plane', line: canonicalLine(m[1]), plane: canonicalPlane(m[2]) }];
 };
 
 /** `ℓ חותך את π בנקודה A` / `ℓ cuts plane π at A` — the line∩plane point. */
@@ -1113,7 +1137,7 @@ const lineCutsPlane: Rule = (s) => {
     ) ??
     s.match(new RegExp(`^(?:line\\s+)?(${LINE_NAME.source})\\s+cuts\\s+(?:the\\s+)?plane\\s+(${PLANE_NAME.source})\\s+at\\s+([A-Z]\\d*'?)$`));
   if (!m) return null;
-  return [{ type: 'line-plane-point', id: m[m.length - 1], line: 'ℓ', plane: canonicalPlane(m[2]) }];
+  return [{ type: 'line-plane-point', id: m[m.length - 1], line: canonicalLine(m[1]), plane: canonicalPlane(m[2]) }];
 };
 
 /** `ℓ אינו מקביל ל-π לכל m` / `ℓ is not parallel to plane π for every m` — the 2024-א probe, a CLAIM. */
@@ -1128,7 +1152,7 @@ const neverParallelClaim: Rule = (s) => {
       ),
     );
   if (!m) return null;
-  return [{ type: 'claim', claim: { type: 'never-parallel', line: 'ℓ', plane: canonicalPlane(m[2]) } }];
+  return [{ type: 'claim', claim: { type: 'never-parallel', line: canonicalLine(m[1]), plane: canonicalPlane(m[2]) } }];
 };
 
 /** Standalone `B על הישר ℓ` / `B is on line ℓ` — an on-line membership GIVEN (verified). */
@@ -1137,7 +1161,7 @@ const onLineMembership: Rule = (s) => {
     new RegExp(`^([A-Z]\\d*'?)\\s+(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על הישר|on (?:the )?line)\\s+(${LINE_NAME.source})$`),
   );
   if (!m) return null;
-  return [{ type: 'on-line', id: m[1], line: 'ℓ' }];
+  return [{ type: 'on-line', id: m[1], line: canonicalLine(m[2]) }];
 };
 
 // ---------------------------------------------------------------------------
@@ -1218,7 +1242,7 @@ const pointPlanesLine: Rule = (s) => {
   return [
     { type: 'plane-through', name: m[2], ids: idsOf(m[2]) },
     { type: 'plane-through', name: m[3], ids: idsOf(m[3]) },
-    { type: 'plane-plane-line', name: 'ℓ', p1: m[2], p2: m[3] },
+    { type: 'plane-plane-line', name: canonicalLine(m[1]), p1: m[2], p2: m[3] },
   ];
 };
 
