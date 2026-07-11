@@ -4243,3 +4243,18 @@ Each item is a widening of the rule that already OWNS the construct — never a 
 6. **`EF קטע אמצעים במשולש DCB`** (both letters fresh) — `midsegmentBaseless` gains the named-triangle branch: E rides the FIRST named side (the student's own vertex order — a discrete labeling read) as a `point-on-segment` rider, and the ADR-199 `shape-variant` channel cycles F's side on "show another configuration". Anchored forms byte-unchanged.
 
 **Deferred out of the batch (recorded on #71):** the compound `מנקודה E מחוץ למעגל יוצאים חותך ABC ומשיק AD` — the 3-letter secant run's semantics are ambiguous (which letters are the crossings?) and per ADR-052 we never guess; and `זוית מרכזית נשענת על קשת CD` — a value-less angle MARK register, which belongs to the #43/#73 guidance work (or a future bare-angle-mark feature), not a parse widening.
+## ADR-289 — The guidance register: non-constructive input families answer with "what to do instead" (issue #43)
+
+**Status:** Accepted (2026-07-11; issue #43 — the baseline log-triage's largest cluster, ~15 distinct prod users; operator-approved). *Files: `src/parser/scope.ts` (5 new categories), `src/i18n/locales/he.json`/`en.json` (`input.scope.<category>`), `src/App.tsx` (the pre-LLM short-circuit widened), `src/parser/__tests__/scope.test.ts`.*
+
+**Context.** Real students constantly type NON-CONSTRUCTIVE input — a lone point label, canvas-orientation wishes, UI/mark commands, value-less angle queries, 3-D solids — and got the dead-end "not understood" (often after a wasted LLM call). The ADR-254-era `scope.ts` classifier + `input.scope.*` message channel already existed (analytic/proof/compute/…); this extends it with the GUIDANCE families, each with a specific pedagogical redirect:
+
+- **`cross-app`** — `תיבה`/`קובייה`/`pyramid` in the 2-D tool → point to themathbible.com/3d-builder.
+- **`ui-command`** — `תוסיף זוויות`, `תסמן זוית ישרה`, `להוסיף את מרכז המעגל` → marks derive from GIVENS; state the given itself ("זווית B = 90").
+- **`valueless-query`** — `∠DEF=?` → the tool enforces/verifies stated values, it doesn't solve (the reproduce-verify charter, student-facing).
+- **`orientation`** — `BD אופקי`, `AB בסיס למטה`, `תזיז את הקוטר` → layout is the tool's choice (ADR-052: an unstated orientation is not a given); "show another configuration" varies it.
+- **`bare-point`** — `נקודה A`, `C`, `קו ועליו נקודה A` → say WHERE the point sits (runs LAST, the most generic pattern).
+
+**The whole register short-circuits BEFORE the LLM** (the analytic precedent — none of these can ever build, so an LLM call is pure cost); post-LLM classification is inherited unchanged. **No-theft is a locked invariant:** every supported catalog example (both locales) must classify `null` — a real construction may never get a guidance brush-off (`scope.test.ts` sweeps the catalog).
+
+The 3-D twin is #73 (`scope3.ts`, COPIED per docs/20 §12 — never shared).
