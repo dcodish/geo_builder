@@ -1,0 +1,267 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-07-11T06:01:29.298Z",
+  "seed": 0,
+  "radiusOverrides": {},
+  "facts": [
+    {
+      "id": "_xWfFzciRf0TurJHE0Tdk",
+      "utterance": "נתון מעגל שרדיוסו R ומרכזו O",
+      "cmd": {
+        "type": "circle",
+        "id": "circle-O",
+        "center": "O",
+        "radius": 5,
+        "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "kJ3IQUCQqfrGEsA9WXzLk",
+      "utterance": "מנקודה A הוציאו משיק למעגל בנקודה B",
+      "group": "_ohUT2Ps8iGKmYbtUtiQx",
+      "cmd": {
+        "type": "free-point",
+        "id": "A",
+        "x": 12,
+        "y": 0,
+        "free": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "gLOx40FtDHtwXs2sRcTDC",
+      "utterance": "מנקודה A הוציאו משיק למעגל בנקודה B",
+      "group": "_ohUT2Ps8iGKmYbtUtiQx",
+      "cmd": {
+        "type": "midpoint",
+        "id": "~tanmid-OA",
+        "a": "O",
+        "b": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "zIX8DD0iiqDjwwmhfDs_t",
+      "utterance": "מנקודה A הוציאו משיק למעגל בנקודה B",
+      "group": "_ohUT2Ps8iGKmYbtUtiQx",
+      "cmd": {
+        "type": "circle-through",
+        "id": "tanaux-OA",
+        "center": "~tanmid-OA",
+        "through": "O",
+        "hidden": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "z5E1DkH-ac1DJfvEHzj_X",
+      "utterance": "מנקודה A הוציאו משיק למעגל בנקודה B",
+      "group": "_ohUT2Ps8iGKmYbtUtiQx",
+      "cmd": {
+        "type": "circle-circle-intersection",
+        "id": "B",
+        "circle1": "circle-O",
+        "circle2": "tanaux-OA",
+        "branch": 0
+      },
+      "enabled": true
+    },
+    {
+      "id": "6dxGfi35rPuhK1mj3guyk",
+      "utterance": "מנקודה A הוציאו משיק למעגל בנקודה B",
+      "group": "_ohUT2Ps8iGKmYbtUtiQx",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "5nz0maoPkGOZp9TKXTmy3",
+      "utterance": "המשך AO חותך את המעגל בנקודה D",
+      "cmd": {
+        "type": "extend-onto-circle",
+        "id": "D",
+        "a": "A",
+        "b": "O",
+        "circle": "circle-O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "fBOn1s_hgm8MYDEhbnbhR",
+      "utterance": "AO חותך את המעגל בנקודה C",
+      "group": "v4ozfrCQIO9XRZ1EtBM4k",
+      "cmd": {
+        "type": "line-through",
+        "id": "chord-AO",
+        "a": "A",
+        "b": "O"
+      },
+      "enabled": true
+    },
+    {
+      "id": "Q5vKO0X1IIFP6MdOwj_aO",
+      "utterance": "AO חותך את המעגל בנקודה C",
+      "group": "v4ozfrCQIO9XRZ1EtBM4k",
+      "cmd": {
+        "type": "line-circle-intersection",
+        "id": "C",
+        "line": "chord-AO",
+        "circle": "circle-O",
+        "avoid": "A"
+      },
+      "enabled": true
+    },
+    {
+      "id": "EN1uYjtzxiefpmvL2DyXL",
+      "utterance": "AO חותך את המעגל בנקודה C",
+      "group": "v4ozfrCQIO9XRZ1EtBM4k",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "Nkey3z3RKybSeZtSupDl4",
+      "utterance": "AO חותך את המעגל בנקודה C",
+      "group": "v4ozfrCQIO9XRZ1EtBM4k",
+      "cmd": {
+        "type": "segment",
+        "a": "O",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "W0ublR9jJpZCpgjhKqrXr",
+      "utterance": "G נמצאת על המשך DB",
+      "group": "0gZK5LR560EBIsg0aYt_U",
+      "cmd": {
+        "type": "segment",
+        "a": "D",
+        "b": "B"
+      },
+      "enabled": true
+    },
+    {
+      "id": "mbR_xsI_SV8RFTaAxaKW5",
+      "utterance": "G נמצאת על המשך DB",
+      "group": "0gZK5LR560EBIsg0aYt_U",
+      "cmd": {
+        "type": "point-on-segment",
+        "id": "G",
+        "a": "D",
+        "b": "B",
+        "t": 1.3,
+        "extension": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "yuZk73Oi6fnC1eznLqltQ",
+      "utterance": "G נמצאת על המשך DB",
+      "group": "0gZK5LR560EBIsg0aYt_U",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "G"
+      },
+      "enabled": true
+    },
+    {
+      "id": "7ypA5pMDgTqa2FlfK5mOs",
+      "utterance": "AG מאונך ל AD",
+      "group": "9HZKOkuRLopgf7bvLWDPt",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "G"
+      },
+      "enabled": true
+    },
+    {
+      "id": "LuXC7LLj3ObPYRcgQxgZs",
+      "utterance": "AG מאונך ל AD",
+      "group": "9HZKOkuRLopgf7bvLWDPt",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "OFAzYn7e_gaQ53RQxBqZc",
+      "utterance": "AG מאונך ל AD",
+      "group": "9HZKOkuRLopgf7bvLWDPt",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "A",
+        "b": "G",
+        "c": "A",
+        "d": "D"
+      },
+      "enabled": true
+    },
+    {
+      "id": "-S1H07iEDtD-yyPABGTvT",
+      "utterance": "BC",
+      "cmd": {
+        "type": "segment",
+        "a": "B",
+        "b": "C"
+      },
+      "enabled": true
+    },
+    {
+      "id": "seg-AG-issue59",
+      "utterance": "AG=8",
+      "group": "FmZ2X-jLp2Tip41lYv5F8",
+      "cmd": {
+        "type": "segment",
+        "a": "A",
+        "b": "G"
+      },
+      "enabled": true
+    },
+    {
+      "id": "aDwE_rsD4cZoCe3VdR6FS",
+      "utterance": "AG=8",
+      "group": "FmZ2X-jLp2Tip41lYv5F8",
+      "cmd": {
+        "type": "set-distance",
+        "a": "A",
+        "b": "G",
+        "value": 8
+      },
+      "enabled": true
+    },
+    {
+      "id": "5hxLsQ3HA96O-lzW5w8TM",
+      "utterance": "AC=0.5DC",
+      "cmd": {
+        "type": "set-ratio",
+        "a": "A",
+        "b": "C",
+        "c": "D",
+        "d": "C",
+        "k": 0.5
+      },
+      "enabled": true
+    }
+  ],
+  "display": {
+    "hidden": [],
+    "segStyle": {},
+    "hiddenCircles": [],
+    "showMeasures": true,
+    "showCenters": false
+  }
+}
