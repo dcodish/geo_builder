@@ -201,8 +201,8 @@ export default function Figure3({ construction, resolved, width = 640, height = 
             strokeLinecap="round"
           />
         ))}
-        {scene.vectors.map((v) => (
-          <g key={v.name} data-testid={`vec-${v.name}`}>
+        {scene.vectors.map((v, vi) => (
+          <g key={v.name || `arrow-${vi}`} data-testid={`vec-${v.name || `arrow-${vi}`}`}>
             {/* the vector itself, in its own colour: tail→head overlay, ARROWHEAD AT THE HEAD (`to`) */}
             <line
               x1={v.x1}
@@ -219,27 +219,30 @@ export default function Figure3({ construction, resolved, width = 640, height = 
               transform={`translate(${v.x2} ${v.y2}) rotate(${v.angleDeg})`}
               fill={VECTOR_COLOR}
             />
-            {/* the name in textbook vector notation: arrow above + underline (ADR-3D-003) */}
-            <g transform={`translate(${v.labelX} ${v.labelY})`}>
-              <text
-                x={0}
-                y={0}
-                fontSize={15}
-                fontStyle="italic"
-                fontFamily="ui-sans-serif, system-ui, sans-serif"
-                fill={VECTOR_COLOR}
-                stroke="#ffffff"
-                strokeWidth={3.5}
-                paintOrder="stroke"
-                textAnchor="middle"
-                dominantBaseline="middle"
-              >
-                {v.name}
-              </text>
-              <line x1={-6} y1={-11} x2={6.5} y2={-11} stroke={VECTOR_COLOR} strokeWidth={1.2} />
-              <path d="M 6.5 -11 l -3.5 -2.3 M 6.5 -11 l -3.5 2.3" stroke={VECTOR_COLOR} strokeWidth={1.2} fill="none" strokeLinecap="round" />
-              <line x1={-6} y1={9} x2={6} y2={9} stroke={VECTOR_COLOR} strokeWidth={1.2} />
-            </g>
+            {/* the name in textbook vector notation: arrow above + underline (ADR-3D-003) —
+                an UNNAMED ink arrow (#72 `חץ A'C`) draws no label */}
+            {v.name && (
+              <g transform={`translate(${v.labelX} ${v.labelY})`}>
+                <text
+                  x={0}
+                  y={0}
+                  fontSize={15}
+                  fontStyle="italic"
+                  fontFamily="ui-sans-serif, system-ui, sans-serif"
+                  fill={VECTOR_COLOR}
+                  stroke="#ffffff"
+                  strokeWidth={3.5}
+                  paintOrder="stroke"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                >
+                  {v.name}
+                </text>
+                <line x1={-6} y1={-11} x2={6.5} y2={-11} stroke={VECTOR_COLOR} strokeWidth={1.2} />
+                <path d="M 6.5 -11 l -3.5 -2.3 M 6.5 -11 l -3.5 2.3" stroke={VECTOR_COLOR} strokeWidth={1.2} fill="none" strokeLinecap="round" />
+                <line x1={-6} y1={9} x2={6} y2={9} stroke={VECTOR_COLOR} strokeWidth={1.2} />
+              </g>
+            )}
           </g>
         ))}
         {scene.points.map((p) => (

@@ -100,6 +100,7 @@ function clone(c: Construction3): Construction3 {
     solids: [...c.solids],
     points: new Map(c.points),
     vectors: new Map(c.vectors),
+    arrows: c.arrows.map(([f, t]) => [f, t] as [Id, Id]),
     segments: [...c.segments],
     planes: new Map(c.planes),
     lines: new Map(c.lines),
@@ -358,6 +359,35 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       next.points.set(cmd.id, { kind: 'foot-face', from: cmd.from, face: [...cmd.face] });
       if (!hasSegment(next, cmd.from, cmd.id)) next.segments.push([cmd.from, cmd.id]); // draw the height
       return { ok: true, next };
+    }
+
+    case 'draw-arrow': {
+      // #72: `חץ A'C` — pure ink: record the unnamed arrow + draw its carrier segment.
+      const missing = missingPoint(c, [cmd.from, cmd.to]);
+      if (missing) return { ok: false, error: missing };
+      const next = clone(c);
+      if (!next.arrows.some(([f, t]) => f === cmd.from && t === cmd.to)) next.arrows.push([cmd.from, cmd.to]);
+      if (!hasSegment(next, cmd.from, cmd.to)) next.segments.push([cmd.from, cmd.to]);
+      return { ok: true, next };
+    }
+
+    case 'perp-to-base': {
+      // #72: `אנך יורד מ-M לבסיס` — the ⟂ from a point onto the solid's BASE plane. The foot
+      // carries no stated name (parse3 is context-free), so the first unused label is minted
+      // HERE and the command delegates to the height-to-face foot machinery (V8-e).
+      const missing = missingPoint(c, [cmd.from]);
+      if (missing) return { ok: false, error: missing };
+      if (c.solids.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+      const face = c.solids[0].ids.slice(0, 3);
+      let foot: Id | null = null;
+      for (const ch of 'EFGHKLMNPQRSTUVWXYZABCD') {
+        if (!c.points.has(ch)) {
+          foot = ch;
+          break;
+        }
+      }
+      if (!foot) return { ok: false, error: { code: 'already-defined', id: 'foot' } };
+      return applyCommand3(c, { type: 'height-to-face', id: foot, from: cmd.from, face });
     }
 
     case 'point-in-span': {

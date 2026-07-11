@@ -115,3 +115,67 @@ describe('classifyOutOfScope — does NOT steal a genuine construction gap', () 
     it(`null for: ${real}`, () => expect(classifyOutOfScope(real)).toBeNull());
   }
 });
+
+// ---------------------------------------------------------------------------
+// #43 (ADR-289) — the GUIDANCE register from the baseline log-triage: every family answers with a
+// specific "what to do instead"; each case below is a VERBATIM prod utterance.
+// ---------------------------------------------------------------------------
+
+describe('#43 — cross-app: a 3-D solid typed into the 2-D tool', () => {
+  for (const u of ['תיבה', "תיבה ABCDA'B'C'D'", 'קובייה', 'pyramid SABCD']) {
+    it(u, () => expect(classifyOutOfScope(u)?.category).toBe('cross-app'));
+  }
+});
+
+describe('#43 — ui-command: marks derive from givens', () => {
+  for (const u of [
+    'תוסיף זוויות',
+    'תסמן זוית ישרה',
+    'הראו זוויות ישרות',
+    'להוסיף את מרכז המעגל',
+    'E זוית ישרה הוסף סימון',
+    'זוויות',
+    'זוויות°',
+    'angles',
+    'angle°',
+    'show the right angles',
+  ]) {
+    it(u, () => expect(classifyOutOfScope(u)?.category).toBe('ui-command'));
+  }
+});
+
+describe('#43 — valueless-query: a measure reference with no value', () => {
+  for (const u of ['∠DEF', '∠DEF=', '∠DEF=?']) {
+    it(u, () => expect(classifyOutOfScope(u)?.category).toBe('valueless-query'));
+  }
+});
+
+describe('#43 — orientation: canvas layout is not a given', () => {
+  for (const u of ['BD אופקי', 'קו AB אופקי', 'AB בסיס למטה', 'A הוא הקודקוד העליון', 'תזיז את הקוטר ב40 מעלות', 'A מימין לקו', 'BD is horizontal']) {
+    it(u, () => expect(classifyOutOfScope(u)?.category).toBe('orientation'));
+  }
+});
+
+describe('#43 — bare-point: a lone label', () => {
+  for (const u of ['נקודה A', 'נקודה P', 'C', 'point G', 'קו ועליו נקודה A', 'קו עם נקודה A']) {
+    it(u, () => expect(classifyOutOfScope(u)?.category).toBe('bare-point'));
+  }
+});
+
+describe('#43 — NO THEFT: every supported catalog example stays unclassified (a real construction must never get a guidance brush-off)', () => {
+  it('the whole catalog classifies null in both locales', async () => {
+    const { COMMAND_CATALOG } = await import('../catalog');
+    for (const entry of COMMAND_CATALOG) {
+      if (!entry.supported) continue;
+      for (const u of [entry.he, entry.en]) {
+        expect(classifyOutOfScope(u), `catalog example must stay null: ${u}`).toBeNull();
+      }
+    }
+  });
+  it('constructive imperatives that PARSE are out of reach anyway, and near-misses stay real gaps', () => {
+    // a failed CONSTRUCT imperative must not be brushed off as ui-command
+    expect(classifyOutOfScope('הוסף חוצה זווית מ-A')?.category).not.toBe('ui-command');
+    // a valued angle is a given, not a query
+    expect(classifyOutOfScope('∠DEF = 60')).toBeNull();
+  });
+});

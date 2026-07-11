@@ -607,6 +607,16 @@ Same decision shape as [ADR-286](06-decisions.md#adr-286) — one control is bot
 
 **Gate.** `multi-line.test.ts` (10): the 2010-Q3-shaped figure — two typed parametric lines + common perpendicular d, ⟂ both and anchored at the closest-points foot, He+En; name-binding proofs (a rider lands ON ℓ2 not ℓ1; a foot lands ON ℓ1; line∩plane crosses via ℓ2 while the parallel ℓ1 honestly refuses); projection of a named line; the two-params + already-defined refusals; V8-h pair-form regressions byte-equivalent. *The verbatim 2010-Q3 exam text is not in the repo — the gate reproduces its documented shape (docs/21 G8); replaying the exact wording when the operator supplies it is a follow-up.*
 
+## ADR-3D-039 — The #72 phrasing batch: connect-imperative, diagonal noun, ink arrow, the אורך disambiguator, ⟂-to-the-base (baseline log-triage)
+
+**Status:** Accepted (2026-07-11; issue #72 — five context-verified prod gaps, operator-approved batch). *Files: `src3d/parser/parse3.ts` (`bareSegment` prefixes, `drawArrow`, `perpToBase`, `lengthRel` bare-pair RHS), `src3d/engine/types.ts` (+`arrows`, +2 commands), `src3d/engine/apply.ts` (`draw-arrow`, `perp-to-base`), `src3d/render/scene3.ts` + `Figure3.tsx` (unnamed-arrow overlay), `catalog3.ts` (+5), `issue72-phrasing.test.ts`.*
+
+1. **`נחבר את D'F` / `אלכסון BD'`** — the connect-imperative and the diagonal noun join `bareSegment`'s prefix set (a diagonal IS a segment — pure ink, no construct; the final-ם slip `אלכסום` admitted per the ADR-3D-035 `מאונ[כך]` precedent).
+2. **`חץ A'C`** — a new `draw-arrow` command records an UNNAMED ink arrow in `Construction3.arrows` (a sibling of `segments`, rendered on the ADR-3D-003 vector overlay with the label suppressed) — it never joins the declared basis, so `need-basis` counting is untouched. The vector WORD (`וקטור AB`) deliberately keeps its established normalize3-stripped segment reading.
+3. **`אורך AB=BC`** — a bare-pair RHS is accepted in `lengthRel` ONLY behind the explicit length marker (the marker disambiguates the whole utterance); bare `AB=BC` stays the honest `ambiguous-vector-length` clarification — which used to be unanswerable in this compact form.
+4. **`אנך יורד מMלבסיס`** (the prod form, fully glued) — a new `perp-to-base {from}` command: apply resolves the base by the seg-plane-rel sentinel rule (single solid, ids first ring), MINTS the first unused label for the foot (parse3 is context-free — the mint must live at apply, deterministic per prefix), and delegates to the V8-e `height-to-face` foot machinery. No solid → honest `unknown-plane: base` refusal.
+
+Locked by `issue72-phrasing.test.ts` (exact prod utterances, parse + build: the box drive, the pyramid foot ⟂-on-base, the no-solid refusal, the basis-untouched arrow).
 ## ADR-3D-040 — The 3-D guidance register: non-constructive input answers with "what to do instead" (issue #73, the 2-D ADR-289 twin)
 
 **Status:** Accepted (2026-07-11; issue #73 — baseline log-triage, operator-approved). *Files: `src3d/parser/scope3.ts` (COPIED pattern per docs/20 §12 — never shared), `src3d/App3.tsx` (guidance short-circuit BEFORE the LLM escalation + a sky-toned note distinct from the amber error), `src3d/i18n/locales` (`scope.<category>`), `src3d/__tests__/scope3.test.ts`.*

@@ -24,7 +24,19 @@
  * they must NOT match a legitimate construction (a real gap must stay a real gap, not be mislabelled).
  */
 
-export type ScopeCategory = 'analytic' | 'angle-relation' | 'proof' | 'compute' | 'unrelated';
+export type ScopeCategory =
+  | 'analytic'
+  | 'angle-relation'
+  | 'proof'
+  | 'compute'
+  | 'unrelated'
+  // #43 (ADR-289, baseline log-triage): the GUIDANCE register — non-constructive input families that can
+  // never build, each answered with a specific "what to do instead" (never a bare not-understood).
+  | 'cross-app' // a 3-D solid typed into the 2-D tool → point to the 3-D Space Builder
+  | 'ui-command' // "add/mark/show …" — marks derive from GIVENS; say the given itself
+  | 'valueless-query' // "∠DEF = ?" — the tool enforces/verifies stated values, it doesn't solve
+  | 'orientation' // canvas layout words (horizontal / upper / rotate…) — not geometry givens
+  | 'bare-point'; // a lone point label — say WHERE it sits
 
 export interface ScopeMatch {
   category: ScopeCategory;
@@ -38,6 +50,40 @@ interface ScopeRule {
 }
 
 const RULES: ScopeRule[] = [
+  {
+    // #43: a 3-D SOLID typed into the 2-D tool — the sibling app exists; point the student there.
+    category: 'cross-app',
+    patterns: [/תיבה|קוביי?ה|פירמידה|מנסרה|טטרא?דר|ארבעון/, /\bbox\b|\bcube\b|pyramid|prism|tetrahedron/i],
+  },
+  {
+    // #43: UI/mark commands — "תוסיף זוויות", "תסמן זוית ישרה", "להוסיף את מרכז המעגל", "E זוית ישרה
+    // הוסף סימון", bare "זוויות"/"angles". Marks derive from GIVENS; the message says to state the
+    // given itself ("זווית B = 90"). Kept SPECIFIC: an imperative that names a real CONSTRUCT
+    // ("הוסף תיכון לצלע AB") parses via its own rule and never reaches this classifier.
+    category: 'ui-command',
+    patterns: [
+      /(?:תוסיף|הוסף|הוסיפו|להוסיף|תסמן|סמנו?|תמחק|מחקו?|הצג|תציג|הראה?|הראו)\s+(?:את\s+)?(?:ה?זוו?יות|ה?סימו(?:ן|נים)|זו?וית\s+ישרה|מרכז)/,
+      /זו?וית\s+ישרה\s*(?:הוסף|תסמן|סמן|תוסיף)|סימון\s+זו?וית/,
+      /^(?:זוו?יות|angles?)\s*[°α]?\s*$/i,
+      /\b(?:mark|show|add|display)\b.*\b(?:right\s+angles?|angles?|marks?|cent(?:er|re))\b/i,
+    ],
+  },
+  {
+    // #43: a VALUE-LESS angle query — "∠DEF", "∠DEF=", "∠DEF=?". The tool enforces/verifies STATED
+    // values (reproduce-verify); it doesn't solve. (A valued "∠DEF = 60" parses and never reaches here.)
+    category: 'valueless-query',
+    patterns: [/^\s*∠\s*[A-Za-z]{1,3}\d*\s*=?\s*\??\s*$/, /^\s*(?:זו?וית\s+)?[A-Za-z]{3}\s*=\s*\??\s*$/],
+  },
+  {
+    // #43: ORIENTATION / canvas-layout words — "BD אופקי", "AB בסיס למטה", "A הקודקוד העליון",
+    // "תזיז את הקוטר ב40 מעלות", "נקודה מימין לקו". Layout is the tool's choice (ADR-052 — an
+    // unstated orientation is not a given); "show another configuration" explores it.
+    category: 'orientation',
+    patterns: [
+      /אופקית?|אנכית?(?![א-ת])|בסיס\s+למטה|למעלה|למטה|ה?עליו(?:ן|נה)|ה?תחתו(?:ן|נה)|מימין\s+ל|משמאל\s+ל|תזיז|הזז|סובב|תסובב/,
+      /\bhorizontal\b|\bvertical\b|\bupper\b|\blower\b|\bleftmost\b|\brightmost\b|\brotate\b|\bmove\s+(?:the|it)\b/i,
+    ],
+  },
   {
     // Analytic / coordinate geometry — a DIFFERENT tool. This one builds synthetic constructions on a
     // free canvas (no axes); axes, coordinates, slopes and line equations belong to a coordinate-geometry
@@ -81,6 +127,12 @@ const RULES: ScopeRule[] = [
       /מצא(?:ו|י)?\s+את\s+ה?(?:שטח|אורך|זווית|ערך|גודל|היקף|רדיוס|נפח)/, // "find the area/length/angle/value/…" (NOT "find point/intersection" — those are constructions)
       /\bcalculate\b|\bcompute\b|solve\s+for\b|find\s+(?:the\s+)?(?:value|area|length|measure|perimeter|radius)\b|what\s+is\s+the\s+(?:value|area|measure|length|perimeter)\b/i,
     ],
+  },
+  {
+    // #43: a LONE point label — "נקודה A", "C", "קו ועליו נקודה A". A point with no relation builds
+    // nothing; the message says to state WHERE it sits. LAST (the most generic pattern).
+    category: 'bare-point',
+    patterns: [/^\s*(?:ה?נקודה\s+|point\s+)?[A-Za-z]\d*\s*\.?\s*$/, /^קו\s+(?:עם|ועליו)\s+(?:ה?נקודה\s+)?[A-Za-z]\d*\s*$/],
   },
 ];
 

@@ -491,7 +491,10 @@ export default function App() {
     // like "A = (3,5)" parses via `freePoint` and never reaches here.)
     if (!r.ok) {
       const oos = classifyOutOfScope(utterance);
-      if (oos?.category === 'analytic') {
+      // #43 (ADR-289): the whole GUIDANCE register short-circuits BEFORE the LLM — none of these
+      // families can ever build, so an LLM call on them is pure cost (the analytic precedent).
+      const PRE_LLM = new Set(['analytic', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point']);
+      if (oos && PRE_LLM.has(oos.category)) {
         logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${oos.category}` });
         setInputNote(t(oos.messageKey));
         setBusy(false);
