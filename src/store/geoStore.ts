@@ -1496,6 +1496,11 @@ export interface GeoState {
   replaceGroup: (key: string, cmds: AnyCommand[], utterance?: string) => void;
   /** Select a fact for inspection (or clear, if it was already selected). */
   select: (id: string | null) => void;
+  /** The figure's NAME (issue #42) — shown on the page, used as the save filename, derived from the
+   *  loaded file's name. UI-level session metadata: NOT in the undo history (renaming the diagram is
+   *  not a construction step — the partialize slice is facts+seed only); reset by `clear`. */
+  figureName: string;
+  setFigureName: (name: string) => void;
   /** Compute the ground-truth relations of the current figure and turn the layer ON (ADR-134). Synchronous
    *  (samples the figure); the caller paints a busy state first. A no-op-safe re-press recomputes. */
   viewRelations: () => void;
@@ -1698,6 +1703,7 @@ export const useGeoStore = create<GeoState>()(
     (set, get) => ({
       facts: [],
       selectedId: null,
+      figureName: '',
       seed: 0,
       showMeasures: true,
       showCenters: false,
@@ -1789,6 +1795,10 @@ export const useGeoStore = create<GeoState>()(
 
       select: (id) => {
         set({ selectedId: get().selectedId === id ? null : id });
+      },
+
+      setFigureName: (name) => {
+        set({ figureName: name });
       },
 
       viewRelations: () => {
@@ -2024,7 +2034,7 @@ export const useGeoStore = create<GeoState>()(
       },
 
       clear: () => {
-        set({ facts: [], selectedId: null, seed: 0, radiusOverrides: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, shapes: null });
+        set({ facts: [], selectedId: null, figureName: '', seed: 0, radiusOverrides: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, shapes: null });
         useGeoStore.temporal.getState().clear();
       },
 

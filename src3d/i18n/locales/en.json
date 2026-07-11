@@ -27,6 +27,7 @@
     "another": "Show another configuration",
     "resetView": "Reset view",
     "save": "Save to file",
+    "namePlaceholder": "Figure name (optional)",
     "saveNamePrompt": "Name the file — exam date, page and book, or anything else",
     "load": "Load from file",
     "saveImage": "Save image"

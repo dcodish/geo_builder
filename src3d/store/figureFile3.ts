@@ -20,6 +20,8 @@ export interface FigureFile3 {
   schemaVersion: number;
   app: '3d-builder';
   savedAt?: string;
+  /** The figure's name at save time (issue #42) - PROVENANCE only: on load the FILENAME wins. */
+  name?: string;
   seed: number;
   facts: { utterance: string; cmds: Command3[]; enabled?: boolean }[];
 }
@@ -54,11 +56,12 @@ const COMMAND_TYPES = new Set<Command3['type']>([
   'symbol-value',
 ]);
 
-export function serializeFigure3(facts: Fact3[], seed: number): string {
+export function serializeFigure3(facts: Fact3[], seed: number, name?: string): string {
   const file: FigureFile3 = {
     schemaVersion: SCHEMA_VERSION_3D,
     app: '3d-builder',
     savedAt: new Date().toISOString(),
+    ...(name ? { name } : {}),
     seed,
     facts: facts.map((f) => ({ utterance: f.utterance, cmds: f.cmds, ...(f.enabled ? {} : { enabled: false }) })),
   };
@@ -124,4 +127,18 @@ export function namedFigureFileName3(name: string | null | undefined, now: Date)
   if (!clean) return figureFileName3(now);
   const stem = new RegExp(`-${SAVE_SUFFIX_3D}$`, 'i').test(clean) ? clean : `${clean}-${SAVE_SUFFIX_3D}`;
   return `${stem}.json`;
+}
+
+/**
+ * The inverse of {@link namedFigureFileName3} (issue #42): a loaded file's NAME gives the figure its
+ * on-screen name - drop the `.json`/`.geo3` extensions and the per-product `-vectors` save suffix.
+ * "2026summer-vectors.json" -> "2026summer". The FILENAME wins on load (operator ruling - any `name`
+ * embedded in the file is provenance only).
+ */
+export function figureNameFromFileName3(fileName: string): string {
+  return fileName
+    .replace(/\.json$/i, '')
+    .replace(/\.geo3$/i, '')
+    .replace(new RegExp(`-${SAVE_SUFFIX_3D}$`, 'i'), '')
+    .trim();
 }

@@ -4203,3 +4203,18 @@ Operator's live prod test of the inscribed rhombus surfaced three issues, all fi
 **Decision.** A shared radical-aware coefficient atom `RCOEF` (optional `√` on a number or fraction, optionally parenthesised — the RATVAL vocabulary) replaces plain `COEF` in `ratioConstraint` on BOTH sides of `=`, on the trailing divisor (`CD/√2`), and in the Hebrew `פי` form (`AB פי √2 מ-OD`); named groups keep the rule readable. **No theft by construction:** the rule still requires TWO labels on each side, so `AB = √2R` (single-letter reserved radius symbol) stays with `measureSqrt`, `AB = √2` stays a concrete length, `AB = CD` stays `equalSegments`, and `EB/AE=√2/2` stays with `segmentRatio` (which runs first). Display text: the fact list keeps the student's original text (a `set-ratio` display-text field remains out of scope, recorded in the issue).
 
 **Locked by** `issue-52.test.ts` (the radical forms He+En, plain forms byte-unchanged, the no-theft table) + scenario `ratio-radical-coefficient` (|AB| = √2·|OD| holds in the built figure).
+
+## ADR-286 — A persistent figure NAME: inline-editable title, save uses it, load derives it from the filename (issue #42)
+
+**Status:** Accepted (2026-07-11; issue #42, P2 feature — operator request, built on "build now and deploy"; PR per docs/22 §4, play-and-approve waived by the operator). *Files: `src/store/geoStore.ts` (`figureName`/`setFigureName`), `src/store/figureFile.ts` (`figureNameFromFileName`, the `name` provenance field), `src/App.tsx` (header title-input, save/load wiring, docx title), `src/export/questionDoc.ts` (optional `title`), locales; 3-D twin (COPIED per the isolation rule): `src3d/store/store3.ts`, `src3d/store/figureFile3.ts` (`figureNameFromFileName3`), `src3d/App3.tsx`, locales — recorded as ADR-3D-037 in 06b.*
+
+**Context.** Operator request (2026-07-11): "A user can name the diagram even before saving. It should be somewhere with the save/load buttons. When a figure has a name, the name should appear somewhere visible on the page. A loaded figure gets the name of the file (without the extensions)." Issue #20 (ADR-274) gave saves a user-chosen FILENAME, but the name lived only in that prompt — nothing on screen, nothing recovered on load.
+
+**Decision.**
+1. **One control is both the field and the visible title:** an inline-editable input in the page header (styled as a title, dashed border, `dir="auto"` for RTL) — filled it IS the prominent figure name; empty it shows a short placeholder. No separate display element to keep in sync.
+2. **Store semantics:** `figureName` lives in the session store but OUTSIDE the undo history — renaming the diagram is not a construction step (the zundo `partialize` slice stays facts+seed, so exclusion holds by construction); `clear` resets it.
+3. **Save:** a set name skips the prompt and feeds `namedFigureFileName` directly; unset keeps today's prompt, and a name typed there is ADOPTED as the figure's name. The name is also embedded in the `.geo.json` (`name` field) as **provenance only**.
+4. **Load: the FILENAME wins** (operator ruling) — `figureNameFromFileName` is the inverse of `namedFigureFileName` (drop `.json`/`.geo`, drop the per-product `-geo` suffix; 3-D `-vectors`); the embedded `name` is never read back into the session.
+5. **Question export:** the figure name titles the FR-HS-11 `.docx` (optional `title` on `QuestionDocInput`), bold above the "נתון:" heading, bidi-safe.
+
+**Locked by** `figure-name.test.ts` + `figure-name3.test.ts` (filename ⇄ name round-trips incl. Hebrew, undo-exclusion, clear-reset, provenance embed/pass-through, name-less files unchanged).
