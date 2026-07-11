@@ -1,6 +1,7 @@
 {
   "title": "Space Builder",
-  "tagline": "Build in 3-D space — solids, points, vectors (dev preview V0)",
+  "tagline": "Build in 3-D space — solids, points, vectors",
+  "privacy": "Privacy: no sign-up and no personal details are collected; typed instructions (math text only) are kept for a few days with an anonymous visitor id — your IP address is never stored.",
   "input": {
     "placeholder": "Type a given, e.g.: cube ABCD",
     "add": "Add",

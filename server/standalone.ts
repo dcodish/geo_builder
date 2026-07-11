@@ -16,7 +16,8 @@
  *   ANTHROPIC_API_KEY  (required for live parsing; absent -> 503 from the handler)
  *   PORT   (default 8788)
  *   HOST   (default 127.0.0.1 — bind to loopback; only the reverse proxy reaches it)
- *   IP_HASH_SALT   (salt for the hashed visitor id on /api/log; absent -> a default)
+ *   IP_HASH_SALT   (salt for the hashed visitor id on /api/log; absent -> a RANDOM per-boot salt,
+ *                   so visitor ids reset on every restart — set a stable secret for continuity)
  *   EVENTS_LOG_PATH (2-D usage-event JSONL; default ./logs/events.jsonl)
  *   EVENTS_3D_LOG_PATH (3-D usage-event JSONL; default ./logs/events-3d.jsonl)
  *   ADMIN_USERNAME / ADMIN_PASSWORD   (the dashboard login — shared by both /admin and /admin3)
@@ -29,6 +30,7 @@
  */
 
 import { createServer } from 'node:http';
+import { randomBytes } from 'node:crypto';
 import { handleParse } from './parseHandler';
 import { handleLog, events3LogPath } from './eventLog';
 import { handleAdmin, PROFILE_3D } from './admin';
@@ -36,8 +38,16 @@ import { handleAdmin, PROFILE_3D } from './admin';
 const PORT = Number(process.env.PORT ?? 8788);
 const HOST = process.env.HOST ?? '127.0.0.1';
 const apiKey = process.env.ANTHROPIC_API_KEY;
+// The historical committed fallback — kept ONLY so both secrets below can REFUSE it; never used as a salt.
 const DEFAULT_SALT = 'geo-builder-default-salt';
-const ipSalt = process.env.IP_HASH_SALT || DEFAULT_SALT;
+// SEC-7 (issue #57): IPs must never be hashed under a committed constant — with a known salt the 16-hex
+// visitor id is brute-forcible back to an IPv4. Unset (or set to the legacy default) ⇒ a random per-boot
+// salt: hashes stay non-reversible and the service stays up; visitor identity merely resets on restart
+// (the same effect as the documented salt rotation).
+const ipSalt =
+  process.env.IP_HASH_SALT && process.env.IP_HASH_SALT !== DEFAULT_SALT
+    ? process.env.IP_HASH_SALT
+    : randomBytes(16).toString('hex');
 const adminUsername = process.env.ADMIN_USERNAME || 'admin';
 const adminPassword = process.env.ADMIN_PASSWORD || '';
 // The admin cookie secret must be its OWN dedicated env — NEVER derived from `ipSalt` or the committed
@@ -53,6 +63,11 @@ const admin3Base = process.env.ADMIN_3D_BASE || '/3d-builder/admin';
 
 if (!apiKey) {
   console.error('[geo-proxy] WARNING: ANTHROPIC_API_KEY is not set — /api/parse will return 503.');
+}
+if (!process.env.IP_HASH_SALT || process.env.IP_HASH_SALT === DEFAULT_SALT) {
+  console.error(
+    '[geo-proxy] WARNING: IP_HASH_SALT is not set (or is the legacy committed default) — using a random per-boot salt; visitor ids reset on every restart. Set a stable secret salt in the environment.',
+  );
 }
 if (!adminPassword || !adminCookieSecret) {
   console.error(

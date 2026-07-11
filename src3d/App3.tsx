@@ -490,6 +490,8 @@ export default function App3() {
           )}
         </section>
       </main>
+      {/* The in-app privacy note (NFR-SE-3 / ADR-278) — this app has no about modal, so it lives in a footer. */}
+      <footer className="px-5 pb-4 text-center text-xs text-slate-400">{t('privacy')}</footer>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 # 03 — Non-Functional Requirements
 
-_Last updated: 2026-06-10._
+_Last updated: 2026-07-11._
 
 Quality attributes and constraints. IDs are stable references (`NFR-<area>-<n>`). Each is phrased to be checkable.
 
@@ -9,7 +9,7 @@ Quality attributes and constraints. IDs are stable references (`NFR-<area>-<n>`)
 - **NFR-US-1** — Usable by a high-school student with **no training or documentation**. Core actions (add a fact, cycle alternative, undo, clear) are discoverable on first use.
 - **NFR-US-2** — Hebrew, right-to-left, is the default and a first-class experience (not a translation afterthought). Layout, input, and labels all respect RTL.
 - **NFR-US-3** — Errors and contradictions are explained in plain student language, never as stack traces or jargon.
-- **NFR-US-4** — Works on a typical school desktop/laptop browser; **should** be usable on a tablet/phone (mobile-friendly layout).
+- **NFR-US-4** — Works on a typical school desktop/laptop browser and is usable on a **tablet** (touch: pinch-zoom, tap-to-focus, +/− buttons — hardening F2, [ADR-207](06-decisions.md#adr-207)). **Phones are explicitly out of scope for this phase** (operator ruling 2026-07-03, reaffirmed 2026-07-11: "I don't want to support mobile phones at this phase, but tablets should be").
 
 ## Stability (a hard requirement, not a nice-to-have)
 
@@ -52,7 +52,7 @@ For capabilities that are expensive (extra LLM spend) or commercial (premium/pai
 
 - **NFR-SE-1** — The Claude API key is **never shipped to the browser**; all API calls go through a server-side proxy that holds the key.
 - **NFR-SE-2** — The proxy is gated (e.g. a per-class access code) and rate-limited per client, so an exposed endpoint cannot be abused to run up cost.
-- **NFR-SE-3** — No student personal data is collected or stored server-side. Any persistence (FR-HS-4) is local to the browser.
+- **NFR-SE-3** — No accounts, no names, no student personal identifiers. The server keeps a **minimal usage-event log** for product improvement ([ADR-179](06-decisions.md#adr-179), [ADR-278](06-decisions.md#adr-278)): the typed utterance (math text only), locale/outcome, and a salted-HMAC **visitor hash — never the raw IP**. Retention is **finite by default** (`EVENTS_RETENTION_DAYS`; default 7 days, operator ladder 7→~30 with real traffic) and the salt never falls back to a committed constant (unset ⇒ random per-boot). A short privacy note is shown **in-app** (2-D About modal, 3-D footer). Figure persistence (FR-HS-4) is local to the browser; verbose debug logs (figure snapshots) are dev-only, never written in production.
 
 ## Accessibility
 

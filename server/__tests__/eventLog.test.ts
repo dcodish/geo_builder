@@ -11,7 +11,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readFile, rm, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { handleLog, hashIp, pruneOldEvents } from '../eventLog';
+import { handleLog, hashIp, pruneOldEvents, retentionDays } from '../eventLog';
 
 function mockRes() {
   return {
@@ -75,6 +75,32 @@ describe('pruneOldEvents — age-based retention (SEC-7)', () => {
   it('an all-old log prunes to empty (no stray blank line)', () => {
     const text = line('2020-01-01T00:00:00Z', 'x') + '\n';
     expect(pruneOldEvents(text, Date.parse('2026-01-01T00:00:00Z'))).toBe('');
+  });
+});
+
+describe('retentionDays — finite BY DEFAULT (issue #57, ADR-278)', () => {
+  // Retention must fail toward privacy: an unset/garbage env means the finite default,
+  // never keep-forever. Only an EXPLICIT 0 (or negative) disables pruning.
+  afterEach(() => {
+    delete process.env.EVENTS_RETENTION_DAYS;
+  });
+  it('defaults to 7 days when the env is unset', () => {
+    delete process.env.EVENTS_RETENTION_DAYS;
+    expect(retentionDays()).toBe(7);
+  });
+  it('honours an explicit positive window', () => {
+    process.env.EVENTS_RETENTION_DAYS = '30';
+    expect(retentionDays()).toBe(30);
+  });
+  it('an explicit 0 is the documented keep-forever escape hatch', () => {
+    process.env.EVENTS_RETENTION_DAYS = '0';
+    expect(retentionDays()).toBe(0);
+  });
+  it('garbage falls back to the default, never to keep-forever', () => {
+    process.env.EVENTS_RETENTION_DAYS = 'forever';
+    expect(retentionDays()).toBe(7);
+    process.env.EVENTS_RETENTION_DAYS = '  ';
+    expect(retentionDays()).toBe(7);
   });
 });
 

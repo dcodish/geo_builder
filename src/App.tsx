@@ -1659,6 +1659,8 @@ export default function App() {
             </li>
           ))}
         </ol>
+        {/* The in-app privacy note (NFR-SE-3 / ADR-278) — the deploy README alone is not user-facing. */}
+        <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12, color: pal.muted }}>{t('about.privacy')}</p>
       </Modal>
 
       {/* "עזרה" — a short guide + the full command reference, in two tabs. */}

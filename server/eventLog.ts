@@ -93,7 +93,7 @@ function normalise(raw: unknown): Omit<UsageEvent, 'serverTs' | 'iph'> | null {
  * Drop events older than the cutoff (SEC-7 privacy retention). Pure: keeps lines whose `serverTs` is on or
  * after `cutoffMs`; a blank line is dropped, an UNPARSEABLE line is KEPT (never lose data on one bad line).
  * A minors'-data tool shouldn't retain student utterances + IP hashes forever; `EVENTS_RETENTION_DAYS`
- * bounds the age, and this is applied at most once per day so it's cheap.
+ * bounds the age (finite BY DEFAULT — see `retentionDays`), applied at most once per day so it's cheap.
  */
 export function pruneOldEvents(text: string, cutoffMs: number): string {
   const kept = text
@@ -124,11 +124,26 @@ function serialized<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
+const DEFAULT_RETENTION_DAYS = 7; // operator 2026-07-11 (ADR-278): keep little at this stage; raise to ~30 with real traffic
+
+/**
+ * Effective retention window in days. `EVENTS_RETENTION_DAYS` unset/blank/garbage → the finite DEFAULT
+ * (retention must fail toward privacy, never toward keep-forever — issue #57); an EXPLICIT `0` (or a
+ * negative) is the documented keep-forever escape hatch; a positive number is honoured as-is.
+ */
+export function retentionDays(): number {
+  const raw = process.env.EVENTS_RETENTION_DAYS;
+  if (raw === undefined || raw.trim() === '') return DEFAULT_RETENTION_DAYS;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return DEFAULT_RETENTION_DAYS;
+  return n > 0 ? n : 0;
+}
+
 let lastPruneDay = '';
-/** Once per UTC day, rewrite the log without events older than `EVENTS_RETENTION_DAYS` (unset → keep all). */
+/** Once per UTC day, rewrite the log without events older than `retentionDays()` (0 → keep all). */
 async function pruneByRetention(file: string): Promise<void> {
-  const days = Number(process.env.EVENTS_RETENTION_DAYS);
-  if (!days || !Number.isFinite(days) || days <= 0) return; // retention disabled → keep everything (no change)
+  const days = retentionDays();
+  if (!days) return; // retention explicitly disabled → keep everything (no change)
   const today = new Date().toISOString().slice(0, 10);
   if (today === lastPruneDay) return; // already pruned today
   lastPruneDay = today;

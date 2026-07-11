@@ -46,7 +46,7 @@ aggregates.
    LLM_DAILY_MAX=500           # hard cap on Haiku calls/day (cost backstop, SEC-2, ~$1.25/day worst-case); tune to taste
    IP_HASH_SALT=<long-random-string>
    EVENTS_LOG_PATH=/var/www/geo-proxy/events.jsonl
-   EVENTS_RETENTION_DAYS=90    # drop usage events older than this (privacy, SEC-7); unset = keep forever
+   EVENTS_RETENTION_DAYS=7     # drop usage events older than this (privacy, SEC-7); unset = 7 (default-on, ADR-278); an explicit 0 = keep forever
    ADMIN_USERNAME=<pick-a-name>
    ADMIN_PASSWORD=<pick-a-strong-password>
    ADMIN_COOKIE_SECRET=<long-random-string>
@@ -127,8 +127,11 @@ ssh root@themathbible.com 'systemctl restart geo-proxy'
 - **Data & privacy (SEC-7) — a tool for minors.** Production stores only lean events:
   a salted **hash** of the IP (never the raw address) plus the student's utterance text
   and outcome — no snapshots, no names. `EVENTS_RETENTION_DAYS` (above) drops events past
-  that age (applied at most once/day); leave it unset only if you truly want to keep them
-  forever. The verbose **debug log** (`logs/debug-log.jsonl`, full figure snapshots) is
+  that age (applied at most once/day); **unset means the 7-day default** (retention fails
+  toward privacy, ADR-278 — the operator's ladder is 7 d now, ~30 d once there is real
+  traffic); only an explicit `0` keeps events forever. `IP_HASH_SALT` never falls back to a
+  committed constant — unset means a random per-boot salt (visitor ids reset each restart),
+  so always set a stable secret. The verbose **debug log** (`logs/debug-log.jsonl`, full figure snapshots) is
   **dev-only** — it is written by the Vite dev plugin, NOT by this production server, so no
   student snapshots are stored in production. **Operator action:** on any dev machine, keep
   the project's `logs/` folder OUT of a personal cloud (Dropbox selective-sync / ignore) so
