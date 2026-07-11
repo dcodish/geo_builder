@@ -14,6 +14,7 @@ import { lower } from './lower';
 import { evaluate, resolveDriven } from './evaluate';
 import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist, sub } from './geometry';
+import { budgetExceeded } from './solveBudget';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 import { constraintRefs, describeConstraint, solvedOnSegmentCandidates } from './solve';
 
@@ -772,6 +773,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
   // `C`, a rhombus's `rotated` angle behind C). The joint solver moves only the ones that matter
   // (the regulariser keeps the rest near their seed).
   for (const K of newCons) {
+    if (budgetExceeded()) break; // armed only around view searches — see engine/solveBudget.ts
     // Once the system already evaluates VALID (an earlier K's recruit fixed the step), STOP: the remaining
     // new constraints are satisfied in that solution too, and the exploratory cases below MUTATE the carrier
     // assignment even when their own verification fails (case (C) documents its steal persisting) — running
@@ -792,8 +794,28 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
     const refs = [...new Set(constraintRefs(K))].sort((p, q) => objIdx(q) - objIdx(p)); // newest first
     const minimal = refs.length > 0 ? freeDrivableAncestors(objects, refs[0]).filter((id) => !isSolving(objects, id)) : [];
     const full = [...new Set(refs.flatMap((ref) => freeDrivableAncestors(objects, ref)))].filter((id) => !isSolving(objects, id));
-    const stages = minimal.length > 0 && minimal.length < full.length ? [minimal, full] : full.length > 0 ? [full] : [];
+    // ONE-DOF-AT-A-TIME first ([ADR-281](docs/06-decisions.md#adr-281), issue #51 — the M2 "least
+    // ownership" law): a recruit stage COMMITS carrier ownership, and the minimal rung is "the newest
+    // ref's ancestor LIST" — on a chained figure that is the whole chain (the measured AG=8 claimed G +
+    // the circle's radius + its centre for ONE scalar equation), so the next given (AC=0.5·DC) found
+    // every DOF busy (minimal/full EMPTY) and burned the steal/lend/co-drive ladder into a false
+    // over-constraint (issue #51) — or, when the HOIST re-fold happened to rescue it, into the 80 s
+    // replay of issue #59. Try each candidate DOF ALONE (deterministic base order), then the minimal
+    // set, then the full union; every rung is self-verified (accepted only when the WHOLE system
+    // evaluates valid), so a singleton that satisfies commits the least ownership and later givens keep
+    // their carriers.
+    // …EXCEPT for a REGION/ORDER constraint (collinear-order, angle/length-order, acuteness): it removes
+    // 0 DOF and its carriers stay free/samplable (ADR-136 Am. 2), so "least ownership" is vacuous for it —
+    // and a lone carrier re-solved from a perturbed seed can satisfy an order by DEGENERACY (E collapsing
+    // onto A zeroes the collinear-order residual) where the multi-carrier regularised solve stays healthy.
+    // Region constraints keep the original minimal→full stages.
+    const isRegionK = K.type === 'angle-order' || K.type === 'length-order' || K.type === 'collinear-order' || K.type === 'angle-acuteness';
+    const base = minimal.length > 0 ? minimal : full;
+    const stages: Id[][] = isRegionK ? [] : base.map((id) => [id]);
+    if (base.length > 1 || (isRegionK && base.length > 0)) stages.push(base);
+    if (full.length > base.length) stages.push(full);
     for (const cand of stages) {
+      if (budgetExceeded()) break;
       const trial = objects.map((o) => (cand.includes(o.id) ? markDriven(o, K) : o));
       if (evaluate({ objects: trial, constraints: [...c.constraints, ...added] }).ok) {
         objects = trial;
@@ -865,7 +887,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
       const sv = (o as { solve?: { constraint: Constraint } }).solve;
       return reach.has(o.id) && sv && (carrierCount.get(sv.constraint) ?? 0) >= 2;
     });
-    if (steal) {
+    if (steal && !budgetExceeded()) {
       changed = true;
       objects = objects.map((o) => (o.id === steal.id ? markDriven(o, K) : o)); // K already in c.constraints (pushed as a check)
       // VERIFY, as for case (B)/(D) above ([ADR-139](docs/06-decisions.md#adr-139)): a steal that doesn't
@@ -891,6 +913,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
       })
       .sort((a, b) => b.i - a.i); // try the most-recently-added carrier first (keeps base geometry stable)
     for (const { o } of lendable) {
+      if (budgetExceeded()) break;
       const trial = objects.map((x) => (x.id === o.id ? markDriven(x, K) : x));
       const r = evaluate({ objects: trial, constraints: [...c.constraints, ...added] });
       if (r.ok) { objects = trial; changed = true; break; }
@@ -936,6 +959,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
           hostSeeds.push([bakedHost.x + r * Math.cos(a), bakedHost.y + r * Math.sin(a)]);
         }
         for (const [sx, sy] of hostSeeds) {
+          if (budgetExceeded()) break;
           const trial = baked.objects.map((o) => {
             if (!kept.includes(o.id)) return o; // frozen at its solved position (directive cleared by the bake)
             const sv = claimed.get(o.id)!;

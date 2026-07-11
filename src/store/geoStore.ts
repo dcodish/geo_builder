@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, cyclableVariant, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, cyclableVariant, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
 import type { FigureFile } from './figureFile';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -217,8 +217,98 @@ export function replay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
  * the apex free points (ADR-166); seed < REFLECT_STRIDE ⇒ mask 0 ⇒ no reflection.
  * (Callers use the memoized {@link replay} wrapper above; this is the real build.)
  */
-function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}, hoistDepth = 0): Derived {
-  let lastError: string | null = null;
+/**
+ * The seed-INDEPENDENT half of a replay ([ADR-280](docs/06-decisions.md#adr-280), issue #59): everything
+ * derived from the fact list alone — the symbol table, the default-yield pre-scans, the apply fold
+ * (`runBuild`, including the failure-path recruiter), the ADR-104 deferral retries, the atomic-group
+ * poisoning, and the ADR-231 HOIST rescue. The seed and radius overrides enter only in {@link runTail},
+ * which perturbs the finished construction and evaluates once. Statuses and the rtReorder map are stored
+ * BY FACT INDEX (not id) so a dry-run trial array and the committed array — same content, different fact
+ * ids — share one fold. A HOIST rescue is kept as a `rescue` candidate (build-clean and not pending);
+ * the seed-level acceptance the old recursive replay applied (the rescued replay must evaluate clean at
+ * the CURRENT seed, else the original fold's error stands) is preserved by {@link tailChoice}, which
+ * tries the rescue chain first and falls back per seed.
+ */
+interface FoldNode {
+  cur: Construction;
+  statusByIndex: FactStatus[];
+  applied: Command[];
+  pending: boolean;
+  buildError: string | null;
+  rtReorderByIndex: [number, [Id, Id, Id]][];
+  lens: [string, MeasureLabels['lengths'][number]][];
+  angs: [string, MeasureLabels['angles'][number]][];
+  areas: [string, MeasureLabels['areas'][number]][];
+  /** Tail iteration order over the facts (original indices) — a rescue iterates in ITS (hoisted) order,
+   *  so duplicate-keyed angle marks dedupe exactly as the old recursive replay did. */
+  iterOrder: number[];
+  rescue: FoldNode | null;
+}
+
+/**
+ * Fold memo, keyed by fact-list CONTENT ([ADR-280](docs/06-decisions.md#adr-280)): enabled flag +
+ * group PARTITION (first-occurrence numbering — the atomic-group and softPair semantics depend on which
+ * facts share a group, never on the group id's spelling) + the command JSON, order-sensitive. The fold
+ * was measured at ~75 s on a hard figure (issue #59) and is identical for every seed, every dry-run
+ * trial array, and every sweep candidate — this cache is what turns an 80 s-per-candidate seed search
+ * into one fold + a ~1 s tail per candidate.
+ */
+const foldCache = new Map<string, FoldNode>();
+const FOLD_CACHE_MAX = 8;
+export const foldStats = { computes: 0 };
+function foldKey(facts: Fact[]): string {
+  const groupIdx = new Map<string, number>();
+  const parts: string[] = [];
+  for (const f of facts) {
+    const g = groupKey(f);
+    if (!groupIdx.has(g)) groupIdx.set(g, groupIdx.size);
+    parts.push(`${f.enabled ? 1 : 0}|${groupIdx.get(g)}|${JSON.stringify(f.cmd)}`);
+  }
+  return parts.join('\n');
+}
+
+/** Re-index a (hoisted) fold node from its permuted fact order back to the caller's original indices. */
+function translateFold(node: FoldNode, permToOrig: number[]): FoldNode {
+  const statusByIndex: FactStatus[] = [];
+  node.statusByIndex.forEach((s, permIdx) => { statusByIndex[permToOrig[permIdx]] = s; });
+  return {
+    ...node,
+    statusByIndex,
+    rtReorderByIndex: node.rtReorderByIndex.map(([permIdx, ids]) => [permToOrig[permIdx], ids] as [number, [Id, Id, Id]]),
+    iterOrder: node.iterOrder.map((permIdx) => permToOrig[permIdx]),
+    rescue: node.rescue ? translateFold(node.rescue, permToOrig) : null,
+  };
+}
+
+function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}): Derived {
+  const key = foldKey(facts);
+  let fold = foldCache.get(key);
+  if (!fold) {
+    const abortsBefore = solveBudget.aborts;
+    fold = computeFold(facts);
+    foldStats.computes++;
+    // A fold whose recruit ladder was cut short by the view-search budget is NOT the fold for this
+    // content — memoizing it would pin the degraded figure for every later, unbudgeted replay.
+    if (solveBudget.aborts === abortsBefore) {
+      if (foldCache.size >= FOLD_CACHE_MAX) foldCache.delete(foldCache.keys().next().value as string);
+      foldCache.set(key, fold);
+    }
+  }
+  return tailChoice(fold, facts, seed, radiusOverrides);
+}
+
+/** Per-seed candidate choice: try the HOIST rescue chain first; a rescue whose tail evaluates clean at
+ *  THIS seed wins (exactly the old recursive acceptance `rescued.lastError === null && !rescued.pending`),
+ *  else fall back to the fold that failed — its honest error stands. */
+function tailChoice(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: Record<Id, number>): Derived {
+  if (fold.rescue) {
+    const r = tailChoice(fold.rescue, facts, seed, radiusOverrides);
+    if (r.lastError === null && !r.pending) return r;
+  }
+  return runTail(fold, facts, seed, radiusOverrides);
+}
+
+function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
   // Symbol table over the ENABLED facts, so a value given later (`x = 4`) resolves an
   // earlier `AB = 3x`, and two segments sharing a variable become a proportion (ADR-031).
   const symtab = buildSymTab(facts.filter((f) => f.enabled).map((f) => f.cmd));
@@ -326,6 +416,13 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
     const status: Record<string, FactStatus> = {};
     const owned = new Set<Id>();
     const applied: Command[] = [];
+    // The construction (by REFERENCE) a fact last failed against. `applyStep` is pure, so retrying the
+    // same fact against the identical construction re-runs the identical (expensive — the failure-path
+    // recruiter) search to the identical failure. The ADR-104 deferral retry below skips a fact whose
+    // input hasn't changed since it failed — measured at ~22 s of pure waste per replay on the issue-#59
+    // figure, where the failing constraint is the LAST fact so the "now-complete figure" IS the one it
+    // already failed against ([ADR-280](docs/06-decisions.md#adr-280)).
+    const failedWith = new Map<string, Construction>();
     lenByKey.clear();
     angByKey.clear();
     areaByKey.clear();
@@ -388,6 +485,7 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
         else {
           status[f.id] = r.error; // dependencies gone, contradiction, etc. — keep prior figure
           ok = false;
+          failedWith.set(f.id, cur);
           break;
         }
       }
@@ -415,6 +513,9 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
       let progressed = false;
       for (const f of facts) {
         if (!deferrable(f)) continue;
+        // Purity skip (ADR-280): the figure hasn't changed since this fact failed against it, so the
+        // retry would re-run the identical expensive search to the identical failure.
+        if (failedWith.get(f.id) === cur) continue;
         const engineCmds = lowerOne(f.cmd, symtab);
         let trial = cur;
         let ok = true;
@@ -428,7 +529,7 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
           status[f.id] = 'ok';
           applied.push(...(engineCmds as Command[]));
           progressed = true;
-        }
+        } else failedWith.set(f.id, cur);
       }
       if (!progressed) break;
     }
@@ -498,6 +599,7 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   // here and only the ENTRY ORDER starved the carriers, the hoisted fold builds fully clean — proof the
   // figure was never waiting. Acceptance stays strict (clean AND not pending), so a genuinely
   // under-determined figure keeps its pending cue unchanged.
+  let rescue: FoldNode | null = null;
   if (failedFacts.length && hoistDepth < 2) {
     const hoistable = failedFacts.filter((f) => {
       if (!f.enabled) return false;
@@ -522,12 +624,54 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
       }
       permuted.push(...waiting); // refs never all appear → keep at the end (unchanged from the failed fold)
       if (permuted.some((f, i) => f !== facts[i])) {
-        const rescued = computeReplay(permuted, seed, radiusOverrides, hoistDepth + 1);
-        if (rescued.lastError === null && !rescued.pending) return rescued;
+        // Recurse on the FOLD only (ADR-280): build-clean and not-pending is the fold-level pre-filter
+        // the old recursion applied regardless of seed; whether the rescue is ACCEPTED at a given seed
+        // (its tail must evaluate clean, else the original fold's honest error stands) is decided per
+        // seed by {@link tailChoice} — exactly the old `rescued.lastError === null && !rescued.pending`.
+        const rescuedFold = computeFold(permuted, hoistDepth + 1);
+        // CHAIN-aware pre-filter: a depth-2 double-hoist figure (ADR-238's sizes-last class) is clean
+        // only in the recursed fold's OWN rescue — the old recursion returned that accepted rescue as
+        // its whole result, so the outer saw "clean". Accept when ANY node on the chain is build-clean
+        // and not pending; the per-seed tail acceptance (tailChoice) walks the same chain.
+        const chainClean = (n: FoldNode | null): boolean => !!n && ((n.buildError === null && !n.pending) || chainClean(n.rescue));
+        if (chainClean(rescuedFold)) {
+          const permToOrig = permuted.map((f) => facts.indexOf(f));
+          rescue = translateFold(rescuedFold, permToOrig);
+        }
       }
     }
   }
-  lastError = !pending && failedFacts.length ? status[failedFacts[failedFacts.length - 1].id] : null;
+  const buildError = !pending && failedFacts.length ? (status[failedFacts[failedFacts.length - 1].id] as string) : null;
+  return {
+    cur,
+    statusByIndex: facts.map((f) => status[f.id]),
+    applied,
+    pending,
+    buildError,
+    rtReorderByIndex: [...rtReorder].map(([fid, ids]) => [facts.findIndex((f) => f.id === fid), ids] as [number, [Id, Id, Id]]),
+    lens: [...lenByKey],
+    angs: [...angByKey],
+    areas: [...areaByKey],
+    iterOrder: facts.map((_, i) => i),
+    rescue,
+  };
+}
+
+/**
+ * The seed-DEPENDENT tail of a replay (ADR-280): reflections + the ADR-018 sample + radius overrides on
+ * the fold's finished construction, ONE evaluate, then the per-seed presentation (labels, asserted angle
+ * marks, the givens verifier, radius sliders, coincidences). This is all a new seed — a sweep candidate,
+ * a "show another configuration" probe, a detection sample — ever pays.
+ */
+function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: Record<Id, number>): Derived {
+  const { cur, applied, pending } = fold;
+  const status: Record<string, FactStatus> = {};
+  facts.forEach((f, i) => { status[f.id] = fold.statusByIndex[i]; });
+  const rtReorder = new Map(fold.rtReorderByIndex.map(([i, ids]) => [facts[i].id, ids]));
+  const lenByKey = new Map(fold.lens);
+  const angByKey = new Map(fold.angs);
+  const areaByKey = new Map(fold.areas);
+  let lastError = fold.buildError;
   // The seed's high bits select a reflection of certain free points (ADR-166); the low bits are the
   // continuous sample. The reflection is split around the sample by the kind of point being flipped:
   //  • APEX points (equidistant / shared-vertex right angle) reflect BEFORE the sample — their mirror is a
@@ -576,7 +720,8 @@ function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, numb
   // a right-angle square or an angle arc. Deduped by vertex + ray pair.
   const angleMarks: AngleMark[] = [];
   const amSeen = new Set<string>();
-  for (const f of facts) {
+  for (const fi of fold.iterOrder) {
+    const f = facts[fi];
     if (status[f.id] !== 'ok') continue;
     // Mark from the RESEATED right-triangle (ADR-163), so the right-angle knee is drawn at the vertex the
     // figure actually built the right angle at — not the original last id. Without this the knee sits on a
@@ -835,13 +980,18 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   // full strict pass, THEN a full relaxed pass — burned the entire wall budget on a provably futile strict
   // sweep for the ADR-142 class, so the live app (2500ms) never reached the fallback its tests (∞) always did.
   let fallback = okRelaxed(base0) ? from : -1;
-  for (const s of seeds) {
-    if (Date.now() > deadline) break; // out of budget — settle for the best seen so far
-    const fig = replay(facts, s);
-    if (ok(fig)) return s;
-    if (fallback < 0 && okRelaxed(fig)) fallback = s;
-  }
-  return fallback >= 0 ? fallback : from;
+  // The same deadline is ARMED inside the solve ladder (engine/solveBudget.ts): the between-replay check
+  // below caps the sweep, and the in-ladder consult caps a single pathological candidate (issue #59 —
+  // one replay used to blow through 32 budgets before this line ever ran again).
+  return withSolveBudget(deadline, () => {
+    for (const s of seeds) {
+      if (Date.now() > deadline) break; // out of budget — settle for the best seen so far
+      const fig = replay(facts, s);
+      if (ok(fig)) return s;
+      if (fallback < 0 && okRelaxed(fig)) fallback = s;
+    }
+    return fallback >= 0 ? fallback : from;
+  });
 }
 
 /** Branchable derived-point command types — the discrete "alternatives" a figure can have (which of two
@@ -894,31 +1044,36 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
   // the exact starvation this ADR removes. When s0 simply failed OTHER requirement dimensions (violations,
   // convexity, distinctness), the relaxed check fails identically and the tiers below run as before.
   if (meetsRequirements(facts, s0, true)) return { facts, seed: s0 };
-  for (let s = fromSeed; s < fromSeed + 40; s++) {
-    if (Date.now() > deadline) return null; // out of budget — caller keeps the current figure, amber
-    if (meetsRequirements(facts, s)) return { facts, seed: s };
-  }
-  // Discrete branch alternatives — vary which intersection/side each branchable point takes.
-  const base = replay(facts).construction;
-  const branchy = facts
-    .map((f, i) => ({ f, i }))
-    .filter(({ f }) => f.enabled && BRANCHABLE.has(f.cmd.type) && 'id' in f.cmd)
-    .map(({ f, i }) => ({ i, count: Math.max(1, branchCount(base, (f.cmd as { id: Id }).id)) }))
-    .filter((x) => x.count > 1)
-    .slice(0, 4); // bound the combinatorics — vary the first few branchable points
-  if (branchy.length === 0) return null;
-  let combos: number[][] = [[]];
-  for (const { count } of branchy) combos = combos.flatMap((c) => Array.from({ length: count }, (_, b) => [...c, b]));
-  for (const combo of combos.slice(0, 16)) {
-    if (Date.now() > deadline) return null;
-    // skip the current assignment (already swept above)
-    const fc = facts.map((f, idx) => {
-      const k = branchy.findIndex((x) => x.i === idx);
-      return k >= 0 ? ({ ...f, cmd: { ...f.cmd, branch: combo[k] } } as Fact) : f;
-    });
-    for (let s = 0; s < 6; s++) if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
-  }
-  return null;
+  // The deadline is also ARMED inside the solve ladder (engine/solveBudget.ts, issue #59): the branch
+  // tier below builds NEW fact content (branch rewrites), whose folds can hit the expensive recruit
+  // ladder — the between-replay checks alone couldn't stop a single 30 s candidate.
+  return withSolveBudget(deadline, () => {
+    for (let s = fromSeed; s < fromSeed + 40; s++) {
+      if (Date.now() > deadline) return null; // out of budget — caller keeps the current figure, amber
+      if (meetsRequirements(facts, s)) return { facts, seed: s };
+    }
+    // Discrete branch alternatives — vary which intersection/side each branchable point takes.
+    const base = replay(facts).construction;
+    const branchy = facts
+      .map((f, i) => ({ f, i }))
+      .filter(({ f }) => f.enabled && BRANCHABLE.has(f.cmd.type) && 'id' in f.cmd)
+      .map(({ f, i }) => ({ i, count: Math.max(1, branchCount(base, (f.cmd as { id: Id }).id)) }))
+      .filter((x) => x.count > 1)
+      .slice(0, 4); // bound the combinatorics — vary the first few branchable points
+    if (branchy.length === 0) return null;
+    let combos: number[][] = [[]];
+    for (const { count } of branchy) combos = combos.flatMap((c) => Array.from({ length: count }, (_, b) => [...c, b]));
+    for (const combo of combos.slice(0, 16)) {
+      if (Date.now() > deadline) return null;
+      // skip the current assignment (already swept above)
+      const fc = facts.map((f, idx) => {
+        const k = branchy.findIndex((x) => x.i === idx);
+        return k >= 0 ? ({ ...f, cmd: { ...f.cmd, branch: combo[k] } } as Fact) : f;
+      });
+      for (let s = 0; s < 6; s++) if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
+    }
+    return null;
+  });
 }
 
 /** Outcome of dry-running a parsed step on top of the current facts (see {@link dryRunOutcome}). */
@@ -1088,11 +1243,15 @@ function sharedSamples(facts: Fact[]): { constructions: Construction[]; samples:
   if (sampleMemo?.facts === facts) return sampleMemo;
   const { jobs, finish } = samplingJobs(facts);
   const deadline = Date.now() + SAMPLE_BUDGET_MS;
-  for (let i = 0; i < jobs.length; i++) {
-    if (i > 0 && Date.now() > deadline) break;
-    jobs[i]();
-  }
-  return finish();
+  // Armed inside the solve ladder too (engine/solveBudget.ts, issue #59): a variant job builds NEW fact
+  // content whose fold can hit the recruit ladder — the between-job check alone couldn't stop it.
+  return withSolveBudget(deadline, () => {
+    for (let i = 0; i < jobs.length; i++) {
+      if (i > 0 && Date.now() > deadline) break;
+      jobs[i]();
+    }
+    return finish();
+  });
 }
 async function sharedSamplesAsync(facts: Fact[]): Promise<{ constructions: Construction[]; samples: Map<Id, Vec>[] }> {
   if (sampleMemo?.facts === facts) return sampleMemo;
@@ -1100,7 +1259,9 @@ async function sharedSamplesAsync(facts: Fact[]): Promise<{ constructions: Const
   const deadline = Date.now() + SAMPLE_BUDGET_MS;
   for (let i = 0; i < jobs.length; i++) {
     if (i > 0 && Date.now() > deadline) break;
-    jobs[i]();
+    // Each job runs under the ladder budget individually (the await below must run OUTSIDE the arm —
+    // withSolveBudget's restore is synchronous, and the yield is where other work interleaves).
+    withSolveBudget(deadline, jobs[i]);
     if ((i & 3) === 3) await new Promise<void>((res) => setTimeout(res, 0)); // yield every 4 samples
   }
   return finish();
@@ -1708,9 +1869,11 @@ export const useGeoStore = create<GeoState>()(
         // that tier instead of refusing ("determined") on a figure with visibly free DOFs.
         const curStrict = meetsRequirements(facts, get().seed);
         let fallback = -1;
+        // The deadline is also armed inside the solve ladder (engine/solveBudget.ts, issue #59) so a
+        // single pathological candidate can't blow through the between-candidate check below.
         for (let k = 0; k < 24 && Date.now() <= deadline; k++) {
           s += 1;
-          const r = replay(facts, s);
+          const r = withSolveBudget(deadline, () => replay(facts, s));
           // Accept an alternative view only if it MEETS EVERY REQUIREMENT — the SAME bar the initial display
           // uses (`meetsRequirements`: builds, verifier-clean, every "המשך" reaches its far side, every
           // on-segment crossing lands WITHIN its segments, points distinct, declared polygons convex) — AND

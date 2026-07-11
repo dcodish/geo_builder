@@ -3,7 +3,7 @@
 A human-readable index of the **real figures** the operator has built while testing, each
 captured the moment a bug was found. Every entry is replayed automatically, end-to-end
 (parse-with-context → fact list → replay, exactly as the app does), by
-[`src/__tests__/scenarios.test.ts`](../src/__tests__/scenarios.test.ts) — so "what used to
+[`src/__tests__/scenarios-corpus.ts`](../src/__tests__/scenarios-corpus.ts) (run by the sharded `scenarios-e2e-*.test.ts` slices — ADR-280 / issue #60) — so "what used to
 work still does" is checked on every change, at the level you actually use the app.
 
 This complements the per-fix unit tests: those assert at the parser/engine level; these
@@ -788,7 +788,7 @@ over all four (ADR-041).
 
 ---
 
-> **Backfilled 2026-07-02 (hardening plan A6 / ADR-174):** the scenarios below were already live regression tests in [`scenarios.test.ts`](../src/__tests__/scenarios.test.ts) but had not been indexed here (the index had drifted behind the code). Each entry is generated from the scenario's own `title` / `steps` / `guards`. A parity test now fails CI if any scenario id is missing from this file, so the index can no longer drift.
+> **Backfilled 2026-07-02 (hardening plan A6 / ADR-174):** the scenarios below were already live regression tests in the scenario corpus (now `scenarios-corpus.ts`, ADR-280) but had not been indexed here (the index had drifted behind the code). Each entry is generated from the scenario's own `title` / `steps` / `guards`. A parity test now fails CI if any scenario id is missing from this file, so the index can no longer drift.
 
 ### `name-existing-circle-centre` — "O מרכז המעגל" reveals the centre of an EXISTING inscribed circle (ADR-148 #2), without clobbering it
 **Steps**: `מרובע ABCD חסום במעגל` · `O מרכז המעגל`
