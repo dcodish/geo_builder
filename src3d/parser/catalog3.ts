@@ -77,6 +77,9 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: "הישר A'C חותך את המישור BC'D בנקודה K", en: "line A'C cuts plane BC'D at K" },
   { category: 'planesLines', he: 'A נמצאת על אחד המישורים', en: 'A is on one of the planes' },
   { category: 'planesLines', he: 'B על הישר ℓ', en: 'B is on line ℓ' },
+  // #69 (ADR-3D-038): digit-indexed line names ℓ1/ℓ2 — several parametric lines coexist
+  { category: 'planesLines', he: 'הישר ℓ1: x = (0,0,0) + t(1,0,0)', en: 'line ℓ1: x = (0,0,0) + t(1,0,0)' },
+  { category: 'planesLines', he: 'הישר d מאונך לישר ℓ1 ולישר ℓ2', en: 'd is the common perpendicular of ℓ1 and ℓ2' },
   { category: 'planesLines', he: "שיעור ה-z של C' חיובי", en: "the z-coordinate of C' is positive" },
   // --- claims (the student's answers, verified) ---
   { category: 'claims', he: 'AM = 1/2u + 1/2v + 5/3w', en: 'AM = 1/2u + 1/2v + 5/3w' },
