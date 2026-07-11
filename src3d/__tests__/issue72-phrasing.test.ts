@@ -72,7 +72,7 @@ describe('#72 — build', () => {
     const d = derived();
     expect(d.construction.arrows).toEqual([["A'", 'C']]);
     expect(d.construction.vectors.size).toBe(0); // not a named vector — the basis is untouched
-    const scene = buildScene3(d.construction, d.resolved, 520, 420, { yaw: 0.6, pitch: 0.42 });
+    const scene = buildScene3(d.construction, d.resolved, { yaw: 0.6, pitch: 0.42 }, { width: 520, height: 420 });
     const arrow = scene.vectors.find((v) => v.name === '');
     expect(arrow, 'the arrow rides the vector overlay').toBeTruthy();
   });
