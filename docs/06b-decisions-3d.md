@@ -617,3 +617,10 @@ Same decision shape as [ADR-286](06-decisions.md#adr-286) — one control is bot
 4. **`אנך יורד מMלבסיס`** (the prod form, fully glued) — a new `perp-to-base {from}` command: apply resolves the base by the seg-plane-rel sentinel rule (single solid, ids first ring), MINTS the first unused label for the foot (parse3 is context-free — the mint must live at apply, deterministic per prefix), and delegates to the V8-e `height-to-face` foot machinery. No solid → honest `unknown-plane: base` refusal.
 
 Locked by `issue72-phrasing.test.ts` (exact prod utterances, parse + build: the box drive, the pyramid foot ⟂-on-base, the no-solid refusal, the basis-untouched arrow).
+## ADR-3D-040 — The 3-D guidance register: non-constructive input answers with "what to do instead" (issue #73, the 2-D ADR-289 twin)
+
+**Status:** Accepted (2026-07-11; issue #73 — baseline log-triage, operator-approved). *Files: `src3d/parser/scope3.ts` (COPIED pattern per docs/20 §12 — never shared), `src3d/App3.tsx` (guidance short-circuit BEFORE the LLM escalation + a sky-toned note distinct from the amber error), `src3d/i18n/locales` (`scope.<category>`), `src3d/__tests__/scope3.test.ts`.*
+
+Families, each from verbatim prod utterances: **`valueless-query`** («הזווית בין הישר AC' לבין המישור ABCD», «∠DEF=?», «מצא את הזווית» — the ADR-3D-027 reproduce-verify charter made student-facing: state the value and it is enforced/verified); **`cross-app`** (bare «מעגל»/«מלבן»/«מעוין»/«חסום במעגל» → the 2-D Geo Builder; the message also shows the SUPPORTED in-space circle form); **`bare-solid`** (bare «פירמידה»/«מנסרה» — the deliberate ADR-3D-008 refusal upgraded to say WHAT to add); **`ui-command`** («סימון זווית ישרה D» → state the given «זווית D = 90»).
+
+Analytics: `source:'scope'`, `result:'scope:<category>'` — the PROFILE_3D dashboard already classifies reasoned refusals separately, so guidance events never inflate the real-gap count. **No-theft locked:** every supported catalog3 example (both locales) classifies null; the valued angle forms stay null (they parse).

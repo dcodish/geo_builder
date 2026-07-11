@@ -12,6 +12,7 @@ import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
 import { escalate3 } from './parser/llm3';
+import { classifyGuidance3 } from './parser/scope3';
 import Figure3 from './render/Figure3';
 import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
 import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
@@ -136,6 +137,8 @@ export default function App3() {
     });
   };
   const [busy, setBusy] = useState(false);
+  // #73 (ADR-3D-040): the guidance register's what-to-do-instead note (shown in place of an error)
+  const [guidanceNote, setGuidanceNote] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const canvasBox = useRef<HTMLDivElement>(null);
   const [canvasW, setCanvasW] = useState(640);
@@ -237,11 +240,21 @@ export default function App3() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!text.trim() || busy) return;
+    setGuidanceNote(null); // a fresh submit clears the previous guidance
     submit(text);
     let err = useGeo3.getState().lastError;
     logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
     // out-of-grammar → escalate to the LLM proxy; the returned canonical lines re-parse deterministically
     if (err?.code === 'not-understood') {
+      // #73 (ADR-3D-040): the GUIDANCE register short-circuits BEFORE the LLM — a non-constructive
+      // family can never build, so an LLM call on it is pure cost (the 2-D ADR-289 twin, copied).
+      const g = classifyGuidance3(text);
+      if (g) {
+        logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'scope', result: `scope:${g.category}` });
+        setGuidanceNote(t(g.messageKey));
+        useGeo3.setState({ lastError: null });
+        return;
+      }
       setBusy(true);
       try {
         const ctx = `Existing points: ${[...derived.construction.points.keys()].join(', ') || '(none)'}.`;
@@ -253,7 +266,10 @@ export default function App3() {
         setBusy(false);
       }
     }
-    if (!err) setText('');
+    if (!err) {
+      setText('');
+      setGuidanceNote(null);
+    }
   };
 
   const statusDot = (st: FactStatus3 | undefined) => {
@@ -326,6 +342,11 @@ export default function App3() {
             ))}
           </div>
 
+          {guidanceNote && !lastError && !busy && (
+            <div role="note" className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+              {guidanceNote}
+            </div>
+          )}
           {lastError && !busy && (
             <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
               {errorText(t, lastError)}
