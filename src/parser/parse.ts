@@ -212,7 +212,10 @@ const crossingAfterCircle = (s: string): string | null => {
 const leadingNamedPoint = (s: string): string | null => {
   const m =
     s.match(/(?:^|\s)(?:ה?נקוד[הת]|point)\s+([A-Za-z]\d*)\b/i) ??
-    s.match(/^\s*([A-Za-z]\d*)\s*(?:\bis\b|היא|הוא|=)/i);
+    s.match(/^\s*([A-Za-z]\d*)\s*(?:\bis\b|היא|הוא|=)/i) ??
+    // #71 (log-triage): the appositive NOUN form, no copula — "E נקודת החיתוך של המעגל עם AD"
+    s.match(/^\s*([A-Za-z]\d*)\s+נקודת\s+ה?(?:חיתוך|מפגש)/) ??
+    s.match(/^\s*([A-Za-z]\d*)\s+(?:is\s+)?the\s+(?:intersection|meeting)\s+point\b/i);
   return m ? up(m[1]) : null;
 };
 
@@ -503,7 +506,31 @@ function midsegmentBaseless(s: string, ctx: ParseContext): AnyCommand[] | null {
     if (shared.length !== 1 || shared[0] === gLbl) return null; // unique third vertex R, and G is fresh
     return [{ type: 'shape-variant', shape: 'midsegment', ids: [p, q, shared[0], eLbl, gLbl], variant: 0 }];
   };
-  return tryOrder(pair[0], pair[1]) ?? tryOrder(pair[1], pair[0]);
+  const anchored = tryOrder(pair[0], pair[1]) ?? tryOrder(pair[1], pair[0]);
+  if (anchored) return anchored;
+  // #71 (log-triage): BOTH letters fresh + an explicitly NAMED triangle — "EF קטע אמצעים במשולש
+  // DCB". E rides the FIRST named side (the student's own vertex order signals the base — a
+  // discrete labeling read, not an invented magnitude) and F cycles between the other two sides
+  // via the shape-variant channel, so "show another configuration" explores the unstated side.
+  const triM = s.match(/(?:במשולש|בתוך\s+משולש|in\s+(?:the\s+)?triangle)\s*\b([A-Za-z])([A-Za-z])([A-Za-z])\b/i);
+  if (triM && [1, 2, 3].every((i) => isUpperLabel(triM[i]))) {
+    const tri = [up(triM[1]), up(triM[2]), up(triM[3])];
+    const have = new Set(ctx.points ?? []);
+    if (
+      new Set(tri).size === 3 &&
+      !have.has(pair[0]) &&
+      !have.has(pair[1]) &&
+      !tri.includes(pair[0]) &&
+      !tri.includes(pair[1])
+    )
+      return [
+        { type: 'triangle', ids: [tri[0], tri[1], tri[2]] },
+        // E must EXIST as a rider on its side before the variant's set-equal pins it to the midpoint
+        { type: 'point-on-segment', id: pair[0], a: tri[0], b: tri[1] },
+        { type: 'shape-variant', shape: 'midsegment', ids: [tri[0], tri[1], tri[2], pair[0], pair[1]], variant: 0 },
+      ];
+  }
+  return null;
 }
 
 /**
@@ -886,16 +913,43 @@ const BISECTOR_KW = /bisector|חוצ/i; // English "bisector"; Hebrew חוצה /
  * bisector lines (each vertex is the triple's middle letter) and the point where
  * they cross. The bisector lines are scaffolding — only the point is named/drawn.
  */
-const bisectorIntersection: Rule = (s) => {
+const bisectorIntersection: Rule = (s, ctx) => {
   if (!BISECTOR_KW.test(s)) return null;
   const meet = INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s);
+  if (!meet) return null;
+  // #71 (log-triage): the VERTEX form — "חוצה זוית C וחוצה זוית B נפגשים בנקודה O" / "the
+  // bisectors of angle C and angle B meet at O". Each single-letter vertex resolves its angle
+  // from the figure (the ADR-164/261 single-vertex pattern): exactly 2 edges → the one possible
+  // angle; anything else → the ambiguous-angle clarification ("name all three letters").
+  const vform =
+    s.match(
+      /^חוצ[הת]\s+זוו?ית\s+([A-Za-z])\s+ו-?חוצ[הת]\s+זוו?ית\s+([A-Za-z])\s+נפגש(?:ים|ות)\s+בנקודה\s+([A-Za-z]\d*)\s*\.?\s*$/,
+    ) ??
+    s.match(
+      /^the\s+bisectors?\s+of\s+angles?\s+([A-Za-z])\s+and\s+(?:of\s+)?(?:angle\s+)?([A-Za-z])\s+meet\s+at\s+(?:point\s+)?([A-Za-z]\d*)\s*\.?\s*$/i,
+    );
+  if (vform) {
+    const triples: string[] = [];
+    for (const raw of [vform[1], vform[2]]) {
+      const v = up(raw);
+      const nb = (ctx.neighbors ?? {})[v] ?? [];
+      if (nb.length !== 2) return { clarify: 'ambiguous-angle', vertex: v };
+      triples.push(`${nb[0]}${v}${nb[1]}`);
+    }
+    const [t1, t2] = triples;
+    return [
+      { type: 'bisector', id: `bis-${t1}`, vertex: t1[1], p: t1[0], q: t1[2] },
+      { type: 'bisector', id: `bis-${t2}`, vertex: t2[1], p: t2[0], q: t2[2] },
+      { type: 'line-intersection', id: up(vform[3]), line1: `bis-${t1}`, line2: `bis-${t2}` },
+    ];
+  }
   // Strip every keyword word so only the point label + the two angle triples remain.
   const kw =
     /bisectors?|angles?|intersection|intersect\w*|meets?|points?|of|the|is|are|and|זוו?ית|הזוו?יות|חוצי|חוצה|חוצ|חיתוך|נחתכים|נקודת|המפגש|מפגש|נפגשים|של|הם|בנקודה/gi;
   const labels = s.replace(kw, ' ').replace(/-/g, ' ').match(/\b[A-Za-z]{1,3}\b/g) ?? [];
   const point = labels.find((l) => l.length === 1);
   const triples = labels.filter((l) => l.length === 3).map((l) => l.toUpperCase());
-  if (!meet || !point || triples.length < 2) return null;
+  if (!point || triples.length < 2) return null;
   const [t1, t2] = triples;
   return [
     { type: 'bisector', id: `bis-${t1}`, vertex: t1[1], p: t1[0], q: t1[2] },
@@ -3203,7 +3257,8 @@ const pointOnCircle: Rule = (s, ctx) => {
 const pointVsCircle: Rule = (s, ctx) => {
   if (!/circle|מעגל/i.test(s)) return null;
   const m = s.match(
-    /^\s*(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?((?:[A-Za-z]\d*)(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)[A-Za-z]\d*)*)\s+(?:נמצא(?:ת|ות|ים)?\s+|is\s+|are\s+|lies?\s+)?(מחוץ\s*ל|בתוך\s+|outside\s+|inside\s+)(?:of\s+|the\s+)?(?:ה?מעגל|circle)\s*([A-Za-z]\d*)?\s*\.?\s*$/i,
+    // the noun may also FOLLOW the label — "M נקודה מחוץ למעגל" (#71, log-triage)
+    /^\s*(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?((?:[A-Za-z]\d*)(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)[A-Za-z]\d*)*)\s+(?:נקודה\s+|נקודות\s+|(?:is\s+|are\s+)?(?:a\s+)?points?\s+)?(?:נמצא(?:ת|ות|ים)?\s+|is\s+|are\s+|lies?\s+)?(מחוץ\s*ל|בתוך\s+|outside\s+|inside\s+)(?:of\s+|the\s+)?(?:ה?מעגל|circle)\s*([A-Za-z]\d*)?\s*\.?\s*$/i,
   );
   if (!m) return null;
   const side = /מחוץ|outside/i.test(m[2]) ? ('outside' as const) : ('inside' as const);
@@ -3594,6 +3649,9 @@ const lineMeetsCircle: Rule = (s, ctx) => {
     .replace(/(?:\bat\b|בנקודה|ב-)\s*[A-Za-z]\d*\b/gi, ' ')
     .replace(/(?:^|\s)(?:ה?נקוד[הת]|point)\s+[A-Za-z]\d*\b/gi, ' ')
     .replace(new RegExp(String.raw`^\s*${R}\s*(?:\bis\b|היא|הוא|=)`, 'i'), ' ')
+    // #71: the appositive noun form — strip the leading "E נקודת החיתוך" / "E is the intersection point"
+    .replace(new RegExp(String.raw`^\s*${R}\s+נקודת\s+ה?(?:חיתוך|מפגש)(?:\s+של)?`, 'i'), ' ')
+    .replace(new RegExp(String.raw`^\s*${R}\s+(?:is\s+)?the\s+(?:intersection|meeting)\s+point(?:\s+of)?`, 'i'), ' ')
     .replace(/extension|extended|\bline\b|המשך|הישר|הקו|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?/gi, ' ');
   const pr = labelRun(body, 2);
   if (!pr || pr.includes(R)) return null;
@@ -4346,7 +4404,22 @@ const median: Rule = (s, ctx) => {
   // Classic form "median from A in ABC" / "תיכון מ-A במשולש ABC" / "מהנקודה C הורידו תיכון לצלע AB"
   // — auto-named midpoint. The "from"/"מ" apex tolerates a point/vertex descriptor noun.
   const apexM = s.match(/(?:\bfrom\s+(?:the\s+)?(?:point\s+|vertex\s+)?|מ-?\s*(?:ה?נקודה\s+|ה?קודקוד\s+)?)([A-Za-z]\d*)\b/i);
-  if (!apexM) return null;
+  if (!apexM) {
+    // #71 (log-triage): the VERTEX-LESS side form — "הוסף תיכון לצלע AB" / "add the median to
+    // side AB". The apex is the unique third vertex of a figure triangle carrying side AB
+    // (several candidate triangles or none → defer, never guess — ADR-052).
+    if (!side) return null;
+    const tris = (ctx.polygons ?? [])
+      .map((p) => p.map(up))
+      .filter((p) => p.length === 3 && p.includes(side[0]) && p.includes(side[1]));
+    const apexes = [...new Set(tris.map((t) => t.find((x) => x !== side[0] && x !== side[1])!))];
+    if (apexes.length !== 1) return null;
+    const foot = freeLabel([apexes[0], ...side, ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']);
+    return [
+      { type: 'midpoint', id: foot, a: side[0], b: side[1] },
+      { type: 'segment', a: apexes[0], b: foot },
+    ];
+  }
   const apex = up(apexM[1]);
   // An explicit opposite side ("...to side AB") with a from-apex fully determines the median —
   // the foot is that side's midpoint (no triangle to name/re-emit; the figure already has the points).
@@ -4523,6 +4596,33 @@ const altitude: Rule = (s, ctx) => {
   cmds.push({ type: 'foot', id: f, from: apex, a: p, b: q });
   cmds.push({ type: 'segment', a: apex, b: f });
   return cmds;
+};
+
+/**
+ * #71 (log-triage): a PLURAL special-line declaration — "AD BE ו-CF הם גבהים במשולש [ABC]" /
+ * "AD BE and CF are heights/medians in triangle ABC" distributes into the singular statements
+ * (the ADR-076 list convention) and parses each through the OWNING rule — all-or-nothing (the
+ * ADR-264 honesty bar: a partial distribution never commits).
+ */
+const pluralSpecialLines: Rule = (s, ctx) => {
+  // NO /i — under it the pair atom [A-Z] would also swallow lowercase connectives ("and" reads
+  // as the pairs "an"+"d"); En keywords carry explicit case alternatives instead.
+  const m = s.match(
+    /^((?:[A-Z]\d*){2}(?:(?:\s*,\s*|\s+ו-?\s*|\s+[aA]nd\s+|\s+)(?:[A-Z]\d*){2})+)\s+(?:הם\s+|[aA]re\s+)?(גבהים|[hH]eights|[aA]ltitudes|תיכונים|[mM]edians)(?:\s+(?:במשולש|[iI]n\s+(?:the\s+)?triangle)(\s+(?:[A-Z]\d*){3})?)?\s*\.?\s*$/,
+  );
+  if (!m) return null;
+  const labels = m[1].match(/[A-Z]\d*/g) ?? [];
+  if (labels.length < 4 || labels.length % 2 !== 0) return null;
+  const kind = /גבהים|heights|altitudes/i.test(m[2]) ? 'גובה' : 'תיכון';
+  const tail = m[3] ? ` במשולש${m[3]}` : '';
+  const out: AnyCommand[] = [];
+  for (let i = 0; i < labels.length; i += 2) {
+    const single = `${up(labels[i])}${up(labels[i + 1])} ${kind}${tail}`;
+    const r = kind === 'גובה' ? altitude(single, ctx) : median(single, ctx);
+    if (!r || !Array.isArray(r)) return null; // all-or-nothing — never a partial figure
+    out.push(...r);
+  }
+  return out;
 };
 
 /**
@@ -4795,6 +4895,7 @@ export const RULES: Rule[] = [
   // Special-line constructs whose Hebrew names a triangle ("…במשולש ABC") must
   // run before the shape rules, or `triangle` grabs the embedded משולש and stops.
   median,
+  pluralSpecialLines, // #71: "AD BE ו-CF הם גבהים במשולש" distributes into the singulars, all-or-nothing
   altitude, // "height/altitude from A" / "perpendicular from A to BC"
   perpBisector, // "perpendicular bisector of AB"
   midsegment, // "midsegment to BC in triangle ABC" — a triangle construct ("במשולש"); before the shapes AND before segment/midpoint (its "קטע"/"אמצע" keywords)
