@@ -307,9 +307,16 @@ function shapeLabels(bare: string, n: number, ctx: ParseContext, hasLeftover: bo
  * to the LLM (ADR-002/023). Latin terms are word-bounded so they don't match
  * inside "rectangle"/"triangle"; the shape's own keyword is removed before the
  * test, so e.g. "triangle"/"angle" there is fine.
+ *
+ * SIDE references, the EVERY/EACH quantifier, and the POLYGON nouns joined the vocabulary with issue #27
+ * (ADR-282): «על כל צלע של ריבוע יש חצי מעגל» left `כל צלע של ריבוע` unconsumed and the semicircle rule
+ * DEFAULTED its diameter to A,B — one semicircle, quantifier and side reference silently dropped, all
+ * rows ✓. Every user of this guard strips its OWN vocabulary first, so a polygon noun/side word that
+ * survives always means a compound the rule cannot express — escalate, never half-parse. (The compound
+ * shape phrases שווה־צלעות / שווה־שוקיים are stripped as UNITS by their owners before the test.)
  */
 const SHAPE_LEFTOVER =
-  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?)\b|[=⊥⟂∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונ[כך]|אנ[כך]|מקביל|חוצ|אמצע|תיכון|גובה|המשך|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ/i;
+  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?|sides?|every|each|triangles?|squares?|rectangles?|rhombus(?:es)?|trapezoids?|kites?|parallelograms?|quadrilaterals?)\b|[=⊥⟂∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונ[כך]|אנ[כך]|מקביל|חוצ|אמצע|תיכון|גובה|המשך|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ|צלע|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|עפיפון|מקבילית|(?<![א-ת])[ובשלמכ]?כל(?![א-ת])/i;
 
 /** True if, after removing the shape keyword, geometry the shape can't express remains. */
 const shapeHasLeftover = (s: string, re: RegExp): boolean => SHAPE_LEFTOVER.test(s.replace(re, ' '));

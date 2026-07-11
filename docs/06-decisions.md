@@ -4151,6 +4151,23 @@ Operator's live prod test of the inscribed rhombus surfaced three issues, all fi
 
 **Measured.** `AG=8` now claims only G (singleton verifies in ~30 ms); `AC=0.5DC` finds the radius/centre free (its in-order singleton still fails on the genuinely-coupled basin — the ⟂ must rotate A while R shrinks — and the existing HOIST re-fold resolves it, now cheaply); the one-time fold 56 s to 28 s, and #51's direct-apply refusal path no longer triggers on this figure through the deferral+HOIST route. Locked by the ADR-280 fixture (builds + verifies |AO| = 2R via the ratio) + the full corpus (the ADR-095/ADR-103 over-recruit locks, the M2 entry-order scenarios `q11-sizes-last-order-independence`, `shared-touch-tangents-sizes-last`, `existing-point-statements-lower-to-constraints` — all green).
 
+## ADR-282 — The leftover-guard vocabulary gains side references, the every/each quantifier, and the polygon nouns (issue #27)
+
+**Status:** Accepted (2026-07-11; issue #27, P1). *Files: `src/parser/parse.ts` (SHAPE_LEFTOVER), `src/parser/__tests__/issue-27.test.ts`, shadow-matrix snapshot.*
+
+**Context (prod).** Sessions `p3du4l9p` / `z57b5nd0` / `fxp24nna`: after `ריבוע`, the utterance «על כל צלע של ריבוע יש חצי מעגל» ("on every side of the square there is a semicircle") built ONE semicircle whose diameter DEFAULTED to A,B — the quantifier **כל** and the side-of-the-square reference silently dropped, every row ✓ (the docs/17 §6 silent-wrong-figure class).
+
+**Root cause (class).** *A rule that recognised its own keyword invents DEFAULT operands although unconsumed words that change the figure's meaning remain.* The guard that exists exactly for this — `SHAPE_LEFTOVER`, the ADR-024 leftover mechanism every shape rule shares — had **no vocabulary** for side references (`צלע`/`sides`), the every/each quantifier (`כל`/`every`/`each`), or the polygon nouns; `droppedShapeNoun` didn't fire either (the existing square is a legitimate reference-exemption). Same family as ADR-024/026 (half-parse) and ADR-273 (word magnitudes): a word that changes the meaning was consumed by silence.
+
+**Decision.** Fix at the MECHANISM (the shared vocabulary), never a rule-local carve-out: `SHAPE_LEFTOVER` gains `צלע` (substring — covers צלעות/הצלע/לצלע), the quantifier `כל` (standalone, one optional prefix letter, Hebrew-letter-bounded), En `sides?|every|each`, and the polygon nouns (He substrings משולש/מרובע/ריבוע/מלבן/מעוין/טרפז/דלתון/עפיפון/מקבילית; En word-bounded plurals). This is sound for EVERY user of the guard because each strips its OWN vocabulary before the test — a polygon noun/side word that survives always means a compound the rule cannot express (the compound shape phrases שווה־צלעות/שווה־שוקיים are stripped as UNITS by their owners). The quantified phrasing now `stop`s → escalates to the LLM instead of half-parsing; the per-side semicircle CAPABILITY is issue #29 (feature, separate).
+
+**Sibling closed unreported.** The shadow-matrix snapshot recorded «משולש שווה צלעות ABC» as a latent divergent later-claimer — the plain `triangle` rule would have claimed it as a BARE triangle had the equilateral macro not run first. With `צלע` in the vocabulary the triangle rule now stops on that leftover; the latent shadow is gone (snapshot updated deliberately — one entry REMOVED, none added).
+
+**Honesty boundary.** Until #29 lands, the quantified input honestly refuses ("couldn't read that"); a scenario for the exact prod sequence lands WITH the feature (docs/22) — until then `issue-27.test.ts` asserts the exact utterances never half-parse and the legitimate semicircle/quarter-circle forms are byte-unchanged. The on-EXISTING-endpoints semicircle defect from the same session is issue #28 (distinct root, unchanged here).
+
+
+*(Numbering note: this ADR was drafted concurrently with the ADR-280/281 perf session as "ADR-280" and renumbered 282 on integration — the code/test comments reference ADR-282.)*
+
 ## ADR-283 — The ב container marker governs over the חוסם/חסום verb letter: the inscription-slip normalization at the utterance boundary (issues #31 + #38)
 
 **Status:** Accepted (2026-07-11; issues #31/#38, P2 — operator prod session `jsptarcl`). *Files: `src/parser/parse.ts` (`normalizeInscriptionSlip` in `normalizeUtterance`), `src/parser/__tests__/issue-31-38.test.ts`, scenario `hosem-slip-container-marker-wins`.*

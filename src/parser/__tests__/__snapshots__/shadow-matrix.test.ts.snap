@@ -35,14 +35,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "winner": "(anon)",
   },
   {
-    "lang": "he",
-    "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "משולש שווה צלעות ABC",
-    "winner": "(anon)",
-  },
-  {
     "lang": "en",
     "shadowedBy": [
       "(anon)",
