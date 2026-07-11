@@ -130,4 +130,10 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'points', he: 'T על הקטע SC כך ש-TABCD היא פירמידה ישרה', en: 'T on SC such that TABCD is a right pyramid' },
   // --- drawing ---
   { category: 'drawing', he: "קטע CA'", en: "segment CA'" },
+  // #72 (ADR-3D-039): the baseline log-triage phrasing batch
+  { category: 'drawing', he: "נחבר את D'F", en: "connect D'F" },
+  { category: 'drawing', he: "אלכסון BD'", en: "the diagonal BD'" },
+  { category: 'drawing', he: "חץ A'C", en: "arrow A'C" },
+  { category: 'drawing', he: 'אורך AB=BC', en: 'length AB = BC' },
+  { category: 'drawing', he: 'אנך יורד מ-M לבסיס', en: 'drop a perpendicular from M to the base' },
 ];

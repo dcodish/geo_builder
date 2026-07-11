@@ -599,6 +599,11 @@ const lengthRel: Rule = (s) => {
   // `שווה לאורך צלע הריבוע ABCD` — any side of the named square; its first edge stands in
   const sq = r.match(/^(?:אורך\s+)?(?:ה?צלע\s+)?(?:של\s+)?הריבוע\s+([A-Z]\d*'?)([A-Z]\d*'?)(?:[A-Z]\d*'?)*\s*$/) ?? r.match(/^(?:אורך\s+)?צלע\s+([A-Z]\d*'?)([A-Z]\d*'?)(?:[A-Z]\d*'?)*\s*$/);
   if (sq) return [{ type: 'segment3', a: a1, b: b1 }, { type: 'length-rel', a1, b1, rhs: { pair: [sq[1], sq[2]] }, c: 1 }];
+  // #72: a BARE pair RHS (`אורך AB=BC`) — the explicit length marker on the LHS already
+  // disambiguated the whole utterance to LENGTH (bare `AB=BC` alone stays the
+  // ambiguous-vector-length clarification — this rule is only reached through the marked lhs).
+  const bare = r.match(new RegExp(`^${P}$`));
+  if (bare) return [{ type: 'segment3', a: a1, b: b1 }, { type: 'length-rel', a1, b1, rhs: { pair: [bare[1], bare[2]] }, c: 1 }];
   return null;
 };
 
@@ -672,9 +677,35 @@ const heightOfSolid: Rule = (s) => {
   return [{ type: 'seg-plane-rel', rel: 'perp', a: m[1], b: m[2], plane: [] }];
 };
 
-/** A bare auxiliary segment: `AM` / `קטע AM` / `segment CA'`. Last rule — everything else wins first. */
+/** #72: `חץ A'C` / `arrow A'C` — draw the pair as an UNNAMED ink arrow (the named-basis lane
+ *  stays `נסמן: AB = u`; an unnamed arrow never joins the basis). The vector WORD (`וקטור AB`)
+ *  is normalize3-stripped decoration and deliberately keeps its established segment reading. */
+const drawArrow: Rule = (s) => {
+  const m = s.match(/^(?:ה?חץ|(?:the\s+)?arrow)\s+([A-Z]\d*'?)([A-Z]\d*'?)\s*$/);
+  if (!m || m[1] === m[2]) return null;
+  return [{ type: 'draw-arrow', from: m[1], to: m[2] }];
+};
+
+/** #72: `אנך יורד מ-M לבסיס` (the prod form was fully GLUED: `מMלבסיס`) / `מ-M מורידים אנך
+ *  לבסיס` / `drop a perpendicular from M to the base` — the ⟂ from a point onto the solid's
+ *  base; the foot is auto-minted at apply (parse3 is context-free). */
+const perpToBase: Rule = (s) => {
+  const m =
+    s.match(/^ה?אנך\s+(?:ה?יורד\s+)?מ-?\s*([A-Z]\d*'?)\s*ל-?\s*ה?בסיס\s*$/) ??
+    s.match(/^מ-?\s*([A-Z]\d*'?)\s+(?:מורידים|הורידו|מעבירים|העבירו)\s+אנך\s+ל-?\s*ה?בסיס\s*$/) ??
+    s.match(/^(?:drop\s+)?(?:a\s+|the\s+)?perpendicular\s+from\s+([A-Z]\d*'?)\s+to\s+(?:the\s+)?base\s*$/i);
+  if (!m) return null;
+  return [{ type: 'perp-to-base', from: m[1] }];
+};
+
+/** A bare auxiliary segment: `AM` / `קטע AM` / `segment CA'` — plus the #72 prod forms: the
+ *  connect-imperative (`נחבר את D'F`) and the diagonal noun (`אלכסון BD'` — a diagonal IS a
+ *  segment, pure ink; the final-ם slip `אלכסום` admitted per the ADR-3D-035 מאונ[כך] precedent).
+ *  Last rule — everything else wins first. */
 const bareSegment: Rule = (s) => {
-  const m = s.match(/^(?:קטע\s+|העבירו\s+(?:את\s+)?|segment\s+|draw\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s*$/);
+  const m = s.match(
+    /^(?:קטע\s+|העבירו\s+(?:את\s+)?|נ?חבר\s+(?:את\s+)?|ה?אלכסו[ןם]\s+|segment\s+|draw\s+|connect\s+|join\s+|(?:the\s+)?diagonal\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s*$/,
+  );
   if (!m) return null;
   const [, a, b] = m;
   if (a === b) return null;
@@ -1761,6 +1792,8 @@ const RULES: Rule[] = [
   medianFoot, // `CD תיכון במשולש ABC`
   altitudeFoot, // V8-g: `גובה ... לצלע AB הוא CD` — before heightOfSolid (which owns 3-D heights)
   heightOfSolid,
+  drawArrow, // #72: an unnamed ink arrow — before bareSegment (the noun must not read as a label)
+  perpToBase, // #72: the base-directed ⟂ from a point (auto-minted foot)
   planarPolygon, // V8-g: bare `משולש/מרובע/מחומש` — after the שטח/מפגש/prism/pyramid consumers of those nouns
   bareSegment,
 ];

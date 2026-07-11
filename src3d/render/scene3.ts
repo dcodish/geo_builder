@@ -631,7 +631,12 @@ export function buildScene3(
   // the name label sits beside the midpoint on the side facing AWAY from the
   // figure centre (the figure is fit-centred, so the viewport centre stands in).
   const vectors: SceneVector3[] = [];
-  for (const [name, def] of c.vectors) {
+  // #72: UNNAMED ink arrows (`חץ A'C`) ride the same overlay with an empty label.
+  const vectorEntries: [string, { from: Id; to: Id }][] = [
+    ...c.vectors,
+    ...c.arrows.map(([from, to]) => ['', { from, to }] as [string, { from: Id; to: Id }]),
+  ];
+  for (const [name, def] of vectorEntries) {
     const a = screen.get(def.from);
     const b = screen.get(def.to);
     if (!a || !b) continue;
