@@ -73,3 +73,47 @@ describe('general-position default placement (ADR-253)', () => {
     expect(positions.get('B')).toEqual({ x: 5, y: 0 });
   });
 });
+
+describe('direction general position (#34, ADR-287)', () => {
+  /** |cross| of the two segment directions, normalized — 0 means exactly parallel. */
+  const sinBetween = (p1: Vec, q1: Vec, p2: Vec, q2: Vec) => {
+    const d1 = { x: q1.x - p1.x, y: q1.y - p1.y };
+    const d2 = { x: q2.x - p2.x, y: q2.y - p2.y };
+    return Math.abs(d1.x * d2.y - d1.y * d2.x) / (Math.hypot(d1.x, d1.y) * Math.hypot(d2.x, d2.y));
+  };
+
+  it('two DISJOINT default segments do not land parallel (the #34 class)', () => {
+    const { positions } = build([
+      { type: 'segment', a: 'C', b: 'K' },
+      { type: 'segment', a: 'A', b: 'O' },
+    ] as AnyCommand[]);
+    expect(sinBetween(positions.get('C')!, positions.get('K')!, positions.get('A')!, positions.get('O')!)).toBeGreaterThan(0.01);
+  });
+
+  it('a 1-anchor default segment is oblique to the existing edges ("square ABCD" + "AE" ∦ every side)', () => {
+    const { positions } = build([
+      { type: 'square', ids: ['A', 'B', 'C', 'D'] },
+      { type: 'segment', a: 'A', b: 'E' },
+    ] as AnyCommand[]);
+    const A = positions.get('A')!;
+    const E = positions.get('E')!;
+    for (const [p, q] of [['A', 'B'], ['B', 'C'], ['C', 'D'], ['D', 'A']] as const) {
+      expect(sinBetween(A, E, positions.get(p)!, positions.get(q)!), `AE should not parallel ${p}${q}`).toBeGreaterThan(1e-4);
+    }
+  });
+
+  it('the FIRST segment keeps its template default (no edges to be parallel to)', () => {
+    const { positions } = build([{ type: 'segment', a: 'A', b: 'B' }] as AnyCommand[]);
+    expect(positions.get('A')).toEqual({ x: 0, y: 0 });
+    expect(positions.get('B')).toEqual({ x: 5, y: 0 });
+  });
+
+  it('named shapes are untouched: two disjoint congruence triangles keep the same canonical orientation', () => {
+    const { positions } = build([
+      { type: 'triangle', ids: ['A', 'B', 'C'] },
+      { type: 'triangle', ids: ['D', 'E', 'F'] },
+    ] as AnyCommand[]);
+    // base AB and base DE both horizontal — the direction bar deliberately does NOT reorient shapes
+    expect(sinBetween(positions.get('A')!, positions.get('B')!, positions.get('D')!, positions.get('E')!)).toBeLessThan(1e-9);
+  });
+});

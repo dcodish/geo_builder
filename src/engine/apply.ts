@@ -544,8 +544,25 @@ function reseatLooseMeetEndpoint(
   }
 }
 
-function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Vec>, rigid = false): void {
+function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Vec>, rigid = false, obliqueToEdges = false): void {
   const fit = fitTemplate(template, pos);
+  // ── Direction general position (#34, [ADR-287](../../docs/06-decisions.md#adr-287)). A DEFAULT bare
+  // segment must additionally not land exactly PARALLEL to an existing drawn edge: segment templates are
+  // horizontal and the 0-anchor branch is a pure translation, so two disjoint defaults are exactly
+  // parallel — a later stated meet then has no crossing at the only composition the apply gate judges
+  // (the ADR-253 sibling, direction edition; an unstated exact parallelism is itself a silently-drawn
+  // relation, ADR-052). Scoped to bare SEGMENT templates — named shapes keep their canonical orientation.
+  const drawnDirs: Vec[] = obliqueToEdges
+    ? objects.flatMap((o) => {
+        if (o.kind !== 'segment') return [];
+        const p = pos.get(o.a);
+        const q = pos.get(o.b);
+        return p && q && dist(p, q) > 1e-9 ? [sub(q, p)] : [];
+      })
+    : [];
+  const parallelToDrawn = (d: Vec): boolean =>
+    drawnDirs.some((e) => Math.abs(d.x * e.y - d.y * e.x) < 1e-6 * Math.hypot(d.x, d.y) * Math.hypot(e.x, e.y));
+  const needDir = obliqueToEdges && template.length === 2 && drawnDirs.length > 0;
   // A shape that shares NO point with the figure (0 anchors) would otherwise land on the
   // raw template coords — exactly where a prior disjoint shape sits, so they'd collide
   // (the ADR-017 coincidence guard then rejects it). Offset such a shape to the right of
@@ -572,6 +589,8 @@ function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Ve
   let spin = (v: Vec): Vec => v;
   const anchors = template.filter((t) => pos.get(t.id) !== undefined);
   const news = template.filter((t) => !objects.some((o) => o.id === t.id));
+  const dirOk = (cand: (v: Vec) => Vec): boolean =>
+    !needDir || !parallelToDrawn(sub(cand(fit(template[1])), cand(fit(template[0]))));
   if (anchors.length === 1 && news.length > 0) {
     const c = pos.get(anchors[0].id)!;
     const existing = [...pos.entries()].filter(([id]) => id !== anchors[0].id).map(([, v]) => v);
@@ -584,10 +603,31 @@ function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Ve
           const dy = v.y - c.y;
           return { x: c.x + Math.cos(th) * dx - Math.sin(th) * dy, y: c.y + Math.sin(th) * dx + Math.cos(th) * dy };
         };
-        if (!degeneratePlacement(c, news.map((t) => cand(fit(t))), existing, span)) {
+        if (dirOk(cand) && !degeneratePlacement(c, news.map((t) => cand(fit(t))), existing, span)) {
           spin = cand;
           break;
         }
+      }
+    }
+  } else if (anchors.length === 0 && needDir && news.length > 0) {
+    // ADR-287 — the DISJOINT default segment (#34's exact class): the offset is a pure translation, so
+    // it keeps the template's horizontal orientation exactly. Spin around the segment's own first
+    // vertex until the direction is oblique to every drawn edge (and the placement stays generic).
+    const c = fit(template[0]);
+    const cFinal = add(c, off);
+    const existing = [...pos.values()];
+    const span = spanAround(cFinal, existing.length ? existing : [cFinal]);
+    for (let k = 0; k <= 24; k++) {
+      const th = k * GOLDEN_ANGLE;
+      const cand = (v: Vec): Vec => {
+        const dx = v.x - c.x;
+        const dy = v.y - c.y;
+        return { x: c.x + Math.cos(th) * dx - Math.sin(th) * dy, y: c.y + Math.sin(th) * dx + Math.cos(th) * dy };
+      };
+      const posOk = existing.length === 0 || !degeneratePlacement(cFinal, news.map((t) => add(cand(fit(t)), off)), existing, span);
+      if (dirOk(cand) && posOk) {
+        spin = cand;
+        break;
       }
     }
   }
@@ -895,7 +935,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // to the prior figure like a shape's base vertices (ADR-013). Without this
       // a bare "segment AB" would add an unresolvable segment that silently
       // doesn't draw.
-      placeBase(objects, [{ id: cmd.a, x: 0, y: 0 }, { id: cmd.b, x: 5, y: 0 }], pos);
+      placeBase(objects, [{ id: cmd.a, x: 0, y: 0 }, { id: cmd.b, x: 5, y: 0 }], pos, false, /* obliqueToEdges (ADR-287) */ true);
       addObj(objects, segment(cmd.a, cmd.b));
       break;
 

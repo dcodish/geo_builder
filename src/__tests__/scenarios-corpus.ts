@@ -352,6 +352,25 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'first-utterance-meet-of-default-segments',
+    title: 'מיתר CK חותך את AO בנקודה E as the FIRST utterance — two default segments must not land parallel (#34, ADR-287)',
+    guards:
+      'Issue #34 (log-triage 2026-07-11, three distinct prod users hit the class): as a first utterance the compound refused "cannot construct E: lines CK and AO are parallel". Root cause: the ADR-253 general-position spin ran only for 1-anchor templates, so two DISJOINT default segments (both laid horizontally by placeBase, the second merely offset right — a pure translation) were EXACTLY parallel, and the meet had no crossing at the only composition the apply gate judges. ADR-287: direction joins the general-position bar for bare SEGMENT templates — a new default segment spins (golden-angle) until oblique to every drawn edge (0-anchor and 1-anchor alike; named shapes keep their canonical orientation). With a real crossing available, the ADR-255 re-seat then lands E within both segments.',
+    steps: ['מיתר CK חותך את AO בנקודה E'],
+    check(fig) {
+      allStepsOk(fig);
+      const within = (g: string, a: string, b: string) => {
+        const A = at(fig, a), B = at(fig, b), G = at(fig, g);
+        return ((G.x - A.x) * (B.x - A.x) + (G.y - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2);
+      };
+      expect(fig.positions.has('E'), 'E was placed').toBe(true);
+      expect(within('E', 'C', 'K'), 'E within CK').toBeGreaterThan(-0.02);
+      expect(within('E', 'C', 'K'), 'E within CK').toBeLessThan(1.02);
+      expect(within('E', 'A', 'O'), 'E within AO').toBeGreaterThan(-0.02);
+      expect(within('E', 'A', 'O'), 'E within AO').toBeLessThan(1.02);
+    },
+  },
+  {
     id: 'kite-EMKO-outside-point',
     title: 'bagrut: AB קוטר, M מחוץ למעגל, AM חותך את CO ב-K, E על BO, דלתון EMKO (MK=ME, OK=OE)',
     guards:
