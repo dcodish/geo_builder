@@ -242,7 +242,7 @@
   },
   "file": {
     "save": "Save to file",
-    "saveNamePrompt": "File name (a -geo suffix is added automatically; leave empty for today's date):",
+    "saveNamePrompt": "Name the file — exam date, page and book, or anything else",
     "saveHint": "Download the construction as a .geo.json file — open it again on any computer",
     "load": "Load from file",
     "loadHint": "Open a saved figure file (replaces the current construction — undo restores it)",
