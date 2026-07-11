@@ -4228,3 +4228,19 @@ Operator's live prod test of the inscribed rhombus surfaced three issues, all fi
 **Decision.** Direction-degeneracy joins the ADR-253 general-position bar, **scoped to bare SEGMENT templates** (the `segment` case passes `obliqueToEdges`): a newly placed default segment spins (golden-angle steps, identity kept when already generic) until its direction is oblique to EVERY existing drawn edge — in both the 1-anchor spin (its accept predicate gains the direction check) and a NEW 0-anchor spin around the segment's own first vertex (the offset branch was a pure translation and had no genericity pass at all). Exact default parallelism is itself a silently-drawn relation the student never stated (ADR-052) — the same sin ADR-253 fixed for coincidence/collinearity, direction edition. **Named shapes deliberately keep their canonical orientation** (two congruence triangles still draw same-way-up; a shape's edges being parallel to a sibling shape's is an accepted default visual, and reorienting shapes would churn every snapshot for no student value) — locked by a test.
 
 **Composition.** With a real crossing available, the ADR-255 re-seat lands the stated meet's point WITHIN both segments — the first-utterance compound now builds green end-to-end.
+
+## ADR-289 — The guidance register: non-constructive input families answer with "what to do instead" (issue #43)
+
+**Status:** Accepted (2026-07-11; issue #43 — the baseline log-triage's largest cluster, ~15 distinct prod users; operator-approved). *Files: `src/parser/scope.ts` (5 new categories), `src/i18n/locales/he.json`/`en.json` (`input.scope.<category>`), `src/App.tsx` (the pre-LLM short-circuit widened), `src/parser/__tests__/scope.test.ts`.*
+
+**Context.** Real students constantly type NON-CONSTRUCTIVE input — a lone point label, canvas-orientation wishes, UI/mark commands, value-less angle queries, 3-D solids — and got the dead-end "not understood" (often after a wasted LLM call). The ADR-254-era `scope.ts` classifier + `input.scope.*` message channel already existed (analytic/proof/compute/…); this extends it with the GUIDANCE families, each with a specific pedagogical redirect:
+
+- **`cross-app`** — `תיבה`/`קובייה`/`pyramid` in the 2-D tool → point to themathbible.com/3d-builder.
+- **`ui-command`** — `תוסיף זוויות`, `תסמן זוית ישרה`, `להוסיף את מרכז המעגל` → marks derive from GIVENS; state the given itself ("זווית B = 90").
+- **`valueless-query`** — `∠DEF=?` → the tool enforces/verifies stated values, it doesn't solve (the reproduce-verify charter, student-facing).
+- **`orientation`** — `BD אופקי`, `AB בסיס למטה`, `תזיז את הקוטר` → layout is the tool's choice (ADR-052: an unstated orientation is not a given); "show another configuration" varies it.
+- **`bare-point`** — `נקודה A`, `C`, `קו ועליו נקודה A` → say WHERE the point sits (runs LAST, the most generic pattern).
+
+**The whole register short-circuits BEFORE the LLM** (the analytic precedent — none of these can ever build, so an LLM call is pure cost); post-LLM classification is inherited unchanged. **No-theft is a locked invariant:** every supported catalog example (both locales) must classify `null` — a real construction may never get a guidance brush-off (`scope.test.ts` sweeps the catalog).
+
+The 3-D twin is #73 (`scope3.ts`, COPIED per docs/20 §12 — never shared).
