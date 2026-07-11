@@ -95,6 +95,12 @@ jobs:
       - name: Build (tsc + vite, 2-D bundle)
         run: npm run build
 
+      # The proxy esbuild bundle is part of the release surface (RUNBOOK step 4) but no lane
+      # built it, so a server/ change that broke the BUNDLING step passed CI green and failed
+      # only at deploy time (issue #56). esbuild takes seconds — run it in every lane.
+      - name: Build proxy (shared server bundle)
+        run: npm run build:proxy
+
       - name: Test (2-D + shared server)
         run: npx vitest run src/ server/
 
@@ -117,6 +123,11 @@ jobs:
 
       - name: Build (tsc + vite, 3-D bundle)
         run: npm run build:3d
+
+      # Same rationale as the 2-D lane (issue #56): the proxy bundle must not be able to
+      # break without CI noticing, whichever lane a server/shared change lands in.
+      - name: Build proxy (shared server bundle)
+        run: npm run build:proxy
 
       - name: Test (3-D + shared server)
         run: npx vitest run src3d/ server/
