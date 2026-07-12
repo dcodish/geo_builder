@@ -1093,3 +1093,7 @@ over all four (ADR-041).
 ### `right-angle-word-and-glyph-forms` — ∡ glyph + ⁰ superscript right-angle (#45, ADR-299)
 
 **Guards against:** right-angle input variants (∡/∢ glyphs, ⁰ superscript, Cyrillic homoglyph labels, the «ישרה»/«right angle» word, a lowercase vertex) failing. **Asserts:** «∡ABC=90⁰» on a triangle builds ∠ABC = 90 (the ∡→∠ + ⁰→° normalization). The word / Cyrillic / lowercase-vertex forms are locked in `right-angle-forms.test.ts`.
+
+### `q4-external-secant-and-on-circle-parallel` — Q4 construction: מ-B secant + D על המעגל (#96/#97, ADR-300/301)
+
+**Guards against:** the abbreviated «מ-B» external-point cue being not-handled (#96) and «D על המעגל כך ש-…» dropping the on-circle membership so D floats free (#97). **Asserts:** the bagrut 2023-קיץ-א Q4 construction builds — E, A land on circle O (secant from the abbreviated «מ-B»), D is on circle O (membership kept), and CD ∥ EA holds.

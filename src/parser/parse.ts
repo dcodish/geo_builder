@@ -3525,7 +3525,7 @@ const bisectorSegmentIntersection: Rule = (s) => {
  */
 const secantFromExternal: Rule = (s, ctx) => {
   if (!/חות[כך]|\bcuts?\b|\bsecant\b|\bmeets?\b|crosses|נחת/i.test(s)) return null; // a secant cut
-  const eM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?|מנקודה|מהנקודה|מ\s*נקודה)\s+([A-Za-z]\d*)/i); // the (external) point
+  const eM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)([A-Za-z]\d*)(?![A-Za-z])/i); // the (external) point — spelled out "מנקודה B" OR the abbreviated "מ-B" (#96); `(?![A-Za-z])` keeps it a single label (not "מ-AB")
   if (!eM) return null;
   // "the circle" is usually unnamed; guard against `circleCenter` reading an English article
   // ("the circle **a** line" → "a"): a real centre label is uppercase, an article is lowercase.
@@ -4083,7 +4083,7 @@ function lineNameLabels(s: string, exclude: Id[]): Id[] {
 const tangentsFromExternal: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   if (!/\btwo\b|tangents|שני|שתי|משיקים/i.test(s)) return null; // TWO tangents from a point, not a single tangent-at-a-point
-  const eM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?|מנקודה|מהנקודה|מ\s*נקודה)\s+([A-Za-z]\d*)/i);
+  const eM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)([A-Za-z]\d*)(?![A-Za-z])/i); // "מנקודה E" OR abbreviated "מ-E" (#96)
   if (!eM) return null;
   const named = circleCenter(s);
   const center = named && /^[A-Z]/.test(named) ? named : ctx.circles?.length === 1 ? ctx.circles[0] : null;
@@ -5438,6 +5438,33 @@ function withCarrierMembership(commands: AnyCommand[], s: string, ctx: ParseCont
 }
 
 /**
+ * ON-CIRCLE membership post-pass ([ADR-119](docs/06-decisions.md#adr-119) family / issue #97): a point the
+ * student explicitly states is ON THE CIRCLE — "D על המעגל כך ש-CD מקביל ל-EA" / "D on the circle such that
+ * …" — whose membership a relation rule (parallel/⟂/distance/…) DROPPED when it claimed the rest of the
+ * clause. Without it D floats free (a green row, a silently-wrong figure — the §6 honesty class). Assert
+ * `point-on-circle` for every label the utterance says is `על המעגל` / `on the circle`, when a circle
+ * resolves; idempotent (a point a circle-construct already placed is skipped). PREPENDED so the point is
+ * created ON the circle before the relation drives its remaining DOF.
+ */
+function withOnCircleMembership(commands: AnyCommand[], s: string, ctx: ParseContext): AnyCommand[] {
+  if (!/על\s+ה?מעגל|on\s+the\s+circle/i.test(s)) return commands;
+  const center = resolveMentionedCircle(s, ctx);
+  if (!center) return commands; // no single/named circle to anchor on
+  const circ = circleId(center);
+  const already = new Set(commands.flatMap((c) => (c.type === 'point-on-circle' && c.circle === circ ? [up(c.id)] : [])));
+  const add: AnyCommand[] = [];
+  // The label must be a STANDALONE token immediately before "on the circle" (`(?<![A-Za-z])` so the last
+  // letter of a word — "are ON the circle" → not "e" — is never captured, PAR-2/ADR-240 regression).
+  for (const m of s.matchAll(/(?<![A-Za-z])([A-Za-z]\d*)\s*(?:על\s+ה?מעגל|on\s+the\s+circle)/gi)) {
+    const id = up(m[1]);
+    if (id === up(center) || already.has(id)) continue; // the centre isn't ON its circle; don't double-add
+    add.push({ type: 'point-on-circle', id, circle: circ });
+    already.add(id);
+  }
+  return add.length ? [...add, ...commands] : commands;
+}
+
+/**
  * CARRIER auto-draw post-pass (ADR-250): a stated on-segment point implies its carrier SEGMENT is part
  * of the figure — "G on AD" draws AD; "D on the continuation of BC" draws BC AND the extension leg C→D.
  * Honesty (design-rules §6): everything the student stated must be visible. Enforced here at the parse
@@ -5775,7 +5802,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
     if (Array.isArray(res)) {
       // Concentric resolution runs LAST (ADR-244): the other post-passes mint the pair's OUTER id
       // (`circleId(centre)`), and this one redirects/confirms per qualifier or asks to clarify.
-      const resolved = withConcentricResolution(withImplicitCircles(withCarrierMembership(withCarrierSegments(res), s, ctx), ctx), s, ctx);
+      const resolved = withConcentricResolution(withImplicitCircles(withOnCircleMembership(withCarrierMembership(withCarrierSegments(res), s, ctx), s, ctx), ctx), s, ctx);
       if (Array.isArray(resolved)) return { ok: true, commands: resolved };
       return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
     }

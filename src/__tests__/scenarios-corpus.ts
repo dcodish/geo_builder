@@ -4463,6 +4463,31 @@ export const SCENARIOS: Scenario[] = [
       expect(deg, '∠ABC = 90 (∡ glyph + ⁰ superscript read as ∠…=90)').toBeCloseTo(90, 3);
     },
   },
+  {
+    id: 'q4-external-secant-and-on-circle-parallel',
+    title: 'bagrut 2023-קיץ-א Q4 construction: מ-B secant + D על המעגל keep working (#96, #97)',
+    guards:
+      'Operator building the real Q4 (tangent from external B at C; a line from B cuts the circle at E and A; D on the circle with CD∥EA). Two gaps blocked it: (#96/ADR-300) the abbreviated «מ-B» external-point cue was not-handled (only «מנקודה B» worked), and (#97/ADR-301) «D על המעגל כך ש-CD מקביל ל-EA» DROPPED the «D על המעגל» membership so D floated free. This replays the construction with the abbreviated forms and asserts E, A land on the circle (secant) and D is ON the circle while CD∥EA holds.',
+    steps: [
+      'מעגל O',
+      'C על המעגל',
+      'מנקודה B מחוץ למעגל מעבירים משיק למעגל בנקודה C',
+      'מ-B יוצא ישר החותך את המעגל בנקודות E ו A',
+      'D על המעגל כך ש-CD מקביל ל-EA',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // C, E, A, D all lie on circle O — geometric check (equidistant from the centre), robust to point kind.
+      const O = at(fig, 'O');
+      const r = dist(O, at(fig, 'C'));
+      for (const id of ['E', 'A', 'D']) expect(dist(O, at(fig, id)), `${id} is on circle O`).toBeCloseTo(r, 3);
+      // CD ∥ EA actually holds in the built figure (#97 kept the membership AND the parallel)
+      const C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E'), A = at(fig, 'A');
+      const cross = (D.x - C.x) * (A.y - E.y) - (D.y - C.y) * (A.x - E.x);
+      const scale = Math.hypot(D.x - C.x, D.y - C.y) * Math.hypot(A.x - E.x, A.y - E.y);
+      expect(Math.abs(cross) / (scale || 1), 'CD ∥ EA').toBeLessThan(1e-3);
+    },
+  },
 ];
 
 /**

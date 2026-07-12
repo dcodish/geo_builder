@@ -4377,3 +4377,15 @@ Applied in this PR to the **incircle** (fresh feet + the ADR-115 existing-circle
 **Sibling audit.** The normalization is at the ONE boundary every rule reads (the ADR-121/228/283 chokepoint), so the ∡/° fix and the Cyrillic fix help every future angle/label rule, not just the reported ones. No-theft verified: `∠ABC = 37`, `זווית B = 90`, and a multi-angle givens list are byte-unchanged; the `נתון`-prefix path was already working. The En "right angle" phrase's double-`angle` count is neutralised only for the right-angle word (a real two-angle list still splits).
 
 **Tests / lock.** `right-angle-forms.test.ts` (13: glyph ∡/∢/⁰, Cyrillic diameter, `ישרה`/`right angle` word in every position, lowercase vertex, + no-regression on the numeric and multi-angle forms); scenario `right-angle-word-and-glyph-forms` (the headline «∡ABC=90⁰» builds ∠ABC = 90 end-to-end).
+
+## ADR-300 — "from an external point" accepts the abbreviated `מ-X`, not only the spelled-out `מנקודה X` (issue #96)
+
+**Status:** Accepted (2026-07-12). *Files: `src/parser/parse.ts` (`secantFromExternal`, `tangentsFromExternal` external-point cue); `src/parser/__tests__/from-external-and-oncircle.test.ts`.*
+
+Operator building bagrut 2023-קיץ-א Q4 ("a line from B cuts the circle at E and A"): `secantFromExternal`'s external-point cue matched `from`/`מנקודה`/`מהנקודה`/`מ נקודה` but NOT the very common abbreviation **`מ-B`** (from-B), so the natural utterance was not-handled and the operator built a wrong reconstruction (arc-midpoint substituting the secant). Fix: the cue gains the `מ-\s*` alternative (the diameter rules ADR-270 already had it) with a `(?![A-Za-z])` single-label guard so `מ-AB` (a segment) never misfires as "from A"; applied to `secantFromExternal` AND `tangentsFromExternal` (same cue, same class).
+
+## ADR-301 — A point stated `על המעגל` keeps its membership through a relation clause (issue #97)
+
+**Status:** Accepted (2026-07-12). *Files: `src/parser/parse.ts` (`withOnCircleMembership` post-pass + chain); `src/parser/__tests__/from-external-and-oncircle.test.ts`.*
+
+`D על המעגל כך ש-CD מקביל ל-EA` ("D on the circle such that CD ∥ EA") lowered to `segment CD / segment EA / set-parallel` — the leading **`D על המעגל`** membership was DROPPED (the parallel rule claimed the clause), so D floated free (a green row, a silently-wrong figure — the §6 honesty class, the ADR-119 chord-membership family, "such-that" edition). Fix: a `withOnCircleMembership` post-pass (sibling of `withCarrierMembership`, but keyed on the explicit `על המעגל`/`on the circle` phrase, not a chord/diameter/radius noun) asserts `point-on-circle` for every label the utterance says is on the circle, when a circle resolves; idempotent (a point a circle-construct already placed is skipped) and PREPENDED so the point is created on the circle before the relation drives its remaining DOF. A `(?<![A-Za-z])` label guard keeps a word's last letter ("...are ON the circle") from being read as a phantom point (ADR-240 regression averted).
