@@ -42,6 +42,12 @@ export interface FigureProps {
   onPickIntersection?: (crossing: Crossing) => void;
   /** Tooltip for the crossing dots (host supplies the localized string). */
   intersectionLabel?: string;
+  /** Promote an ANONYMOUS constructed point (`@`-prefixed, #32 / ADR-297 — a decomposition touch/tangency
+   *  point the student didn't name, drawn as a clickable dot). Clicking calls this with the point's id so
+   *  the host can name it (the store's `promote`). Omit to draw the dots non-interactive. */
+  onPromotePoint?: (id: Id) => void;
+  /** Tooltip for the anonymous promotable dots (host supplies the localized string). */
+  promoteLabel?: string;
   /** Measure labels to print on the figure (ADR-031) — lengths along segments, angles at vertices. */
   labels?: MeasureLabels;
   /** Angle marks the student asserted — right-angle squares / angle arcs. */
@@ -166,6 +172,8 @@ export function Figure({
   highlightEdges,
   onPickIntersection,
   intersectionLabel,
+  onPromotePoint,
+  promoteLabel,
   labels,
   angleMarks,
   relations,
@@ -218,6 +226,7 @@ export function Figure({
   const circEditable = !!onToggleCircleHidden; // ditto for circles
   const [view, setView] = useState<View>(IDENTITY);
   const [hotCross, setHotCross] = useState<number | null>(null);
+  const [hotPromote, setHotPromote] = useState<Id | null>(null); // hovered anonymous promotable dot (#32)
   const [exportFlash, setExportFlash] = useState<'' | 'ok' | 'err'>('');
   const [showOrient, setShowOrient] = useState(false); // the rotate/flip/align cluster — collapsed by default (declutter)
   // The on-canvas edit menu: a point (rename / hide) or a segment (hide / dashed), where (container px),
@@ -708,6 +717,33 @@ export function Figure({
 
           {scene.points.map((pt) => {
             const s = transform.toScreen(pt.pos);
+            // An ANONYMOUS promotable point (#32 / ADR-297): a hollow dot, brighter on hover, with NO label;
+            // clicking names it (the same affordance as an unmarked crossing). Drawn non-interactive (a plain
+            // faint dot) when the host wires no `onPromotePoint` (e.g. the static/export render).
+            if (pt.promotable) {
+              const hot = hotPromote === pt.id;
+              return (
+                <circle
+                  key={pt.id}
+                  data-id={pt.id}
+                  data-promotable="1"
+                  data-noexport="1"
+                  cx={s.x}
+                  cy={s.y}
+                  r={hot ? pointR * 1.9 : pointR * 1.4}
+                  fill="#fff"
+                  stroke={hot ? '#2563eb' : '#93c5fd'}
+                  strokeWidth={hot ? stroke * 1.5 : stroke}
+                  style={{ cursor: onPromotePoint ? 'pointer' : 'default' }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseEnter={() => onPromotePoint && setHotPromote(pt.id)}
+                  onMouseLeave={() => setHotPromote((h) => (h === pt.id ? null : h))}
+                  onClick={(e) => { if (onPromotePoint) { e.stopPropagation(); onPromotePoint(pt.id); } }}
+                >
+                  {onPromotePoint && promoteLabel && <title>{promoteLabel}</title>}
+                </circle>
+              );
+            }
             const hide = isHidden(pt.id);
             // The label direction is chosen (zoom-independent) to clear the figure's
             // lines; fall back to the seed outward dir (Y-flipped to screen) if absent.

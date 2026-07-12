@@ -238,6 +238,7 @@
     "confirmEdit": "Confirm",
     "cancelEdit": "Cancel",
     "markIntersection": "Create intersection point",
+    "promotePoint": "Click to name this point",
     "showMeasures": "Show measures",
     "viewRelations": "Show equal sides & angles",
     "hideRelations": "Hide equal sides & angles",

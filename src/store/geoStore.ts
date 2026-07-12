@@ -1625,6 +1625,11 @@ export interface GeoState {
   toggleCircleHidden: (id: Id) => void;
   /** Relabel a point everywhere (e.g. E → G) — rewrites every fact, one undo entry. */
   rename: (from: Id, to: Id) => RenameResult;
+  /** PROMOTE an anonymous constructed point (`@`-prefixed, #32 / [ADR-297](docs/06-decisions.md#adr-297) —
+   *  a decomposition touch/tangency point the student didn't name, shown as a clickable dot) to a real
+   *  named point: assign the next free capital letter and rewrite the `@`-id → that letter everywhere. One
+   *  undo entry. Returns the assigned letter, or null if the id isn't a promotable anon point / A–Z is full. */
+  promote: (auxId: Id) => Id | null;
   /** Exchange two existing labels (A ↔ B) everywhere — what rename can't do (taken target). One undo entry. */
   swap: (a: Id, b: Id) => SwapResult;
   /** Fold one point into another (e.g. F → E, both already present) — drops F's definition,
@@ -2019,6 +2024,31 @@ export const useGeoStore = create<GeoState>()(
           selectedId: null,
         });
         return { ok: true };
+      },
+
+      /**
+       * PROMOTE an anonymous constructed point (#32 / ADR-297). The decomposition minted it with a
+       * `@`-prefixed id (e.g. `@f-AB`, an incircle touch point) so it never occupied a student letter and
+       * rendered as a clickable dot; when the student clicks it, it becomes a real named point at the next
+       * free capital letter. Mechanically it's a rename `@f-AB → F` across every command (via the same
+       * `renameInCommand` id-remap; the `@`-id is a literal, not a letter token, so only its exact
+       * occurrences are rewritten). The utterance carries no `@`-id, so the step row text is untouched.
+       */
+      promote: (auxId) => {
+        if (!auxId.startsWith('@')) return null; // only an anon point is promotable
+        const facts = get().facts;
+        const used = new Set(facts.flatMap((f) => commandPointIds(f.cmd))); // student letters in use (never `@`-ids)
+        let to = '';
+        for (let k = 0; k < 26; k++) {
+          const ch = String.fromCharCode(65 + k);
+          if (!used.has(ch)) { to = ch; break; }
+        }
+        if (!to) return null; // A–Z all taken (won't happen in practice)
+        set({
+          facts: facts.map((f) => ({ ...f, cmd: renameInCommand(f.cmd, auxId, to) })),
+          selectedId: null,
+        });
+        return to;
       },
 
       /**

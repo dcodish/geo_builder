@@ -277,6 +277,17 @@ function freeLabel(used: string[], prefer: string[] = []): Id {
   return (pool.find((c) => !taken.has(c.toUpperCase())) ?? 'M').toUpperCase();
 }
 
+/**
+ * An ANONYMOUS constructed point ([ADR-297](docs/06-decisions.md#adr-297) / issue #32): a point a
+ * decomposition NEEDS to build a figure (an incircle touch point, a tangency foot) but which the STUDENT
+ * did not name. `@`-prefixed so it can never occupy a student letter — the namespace-hijack class where an
+ * auto-minted `F`/`G`/`H` stole a letter the student then reached for (`G על המשך CA` bound to the invisible
+ * incircle foot). It renders as a clickable DOT the student promotes to a real letter when the book labels
+ * it (students copy from books where these touch points are often unlabeled). Deterministic from its
+ * defining parts (like `seg-AB`), so re-issuing the command is idempotent. Excluded from the parse context
+ * ({@link buildParseCtx}) and from detection ({@link isScaffoldId}) until promoted. */
+const anonId = (...parts: string[]): Id => `@${parts.join('-')}`;
+
 /** The first `n` vertex labels — A, B, C, D, … in order, skipping any already in `used` — for a polygon
  *  the student drew WITHOUT naming its vertices ("מרובע חסום במעגל" / "square"). The convention is to name
  *  vertices alphabetically; this just supplies that default so a bare shape is deterministic, not an LLM
@@ -2864,8 +2875,9 @@ const incircle: Rule = (s, ctx) => {
   if (n === 3 && namedCenter && (ctx.circles ?? []).some((c) => up(c) === up(namedCenter))) {
     const O = up(namedCenter);
     const circ = circleId(O);
-    const touch: Id[] = []; // three fresh, distinct touch-point labels, each dodging the figure + prior touches
-    for (let i = 0; i < 3; i++) touch.push(freeLabel([...ids, O, ...taken, ...touch], ['P', 'Q', 'S', 'T', 'U', 'V']));
+    // The three tangency touch points are SCAFFOLDING the student didn't name (#32) — anonymous promotable
+    // dots (`@t-O0…`), deterministic per (circle, index), so they never occupy a student letter.
+    const touch: Id[] = [anonId('t', O, '0'), anonId('t', O, '1'), anonId('t', O, '2')];
     const verts: [Id, Id, Id] = [A, B, C]; // the student's named vertices = pairwise tangent intersections
     return [
       ...touch.map((t, i): AnyCommand => ({ type: 'point-on-circle', id: t, circle: circ, free: true, theta: 0.4 + (i * 2 * Math.PI) / 3 })),
@@ -2925,7 +2937,10 @@ const incircle: Rule = (s, ctx) => {
   ];
   const feet: Id[] = [];
   for (let e = 0; e < n; e++) {
-    const f = freeLabel([...ids, I, ...feet, ...taken], ['F', 'G', 'H', 'K', 'L', 'N', 'P', 'Q', 'S', 'T']);
+    // The tangency foot on edge e is SCAFFOLDING the student didn't name (#32): an anonymous promotable
+    // point (`@f-AB`), deterministic per side, so it never occupies a student letter and shows as a
+    // clickable dot instead of hijacking F/G/H. The student promotes it to a letter if the book labels it.
+    const f = anonId('f', `${v[e]}${v[(e + 1) % n]}`);
     feet.push(f);
     cmds.push({ type: 'foot', id: f, from: I, a: v[e], b: v[(e + 1) % n] }); // touch point on edge e
     if (e === 0) {

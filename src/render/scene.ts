@@ -25,6 +25,10 @@ export interface ScenePoint {
    * label never sits on an edge and lands on the outer side of the figure.
    */
   labelDir: Vec;
+  /** An ANONYMOUS constructed point ([ADR-297](docs/06-decisions.md#adr-297) / #32 — a `@`-prefixed
+   *  decomposition touch/tangency point the student didn't name). Rendered as a clickable dot with NO
+   *  label; clicking PROMOTES it to a real named point. */
+  promotable?: boolean;
 }
 export interface SceneSegment {
   id: Id;
@@ -232,6 +236,13 @@ export function buildScene(
       if (o.id.startsWith('~')) continue; // hidden helper (a coincidence target, ADR-028) — not drawn
       if (autoCenters.has(o.id) && !incident.has(o.id) && !showCenters) continue; // an unused auto-centre — hidden unless "show centres" is on
       const pos = positions.get(o.id);
+      // An ANONYMOUS promotable point (`@`-prefixed, #32 / ADR-297): drawn as a clickable dot with NO label
+      // (the student promotes it to a letter). Unlike `~` scaffolding it IS drawn — the student can see and
+      // name it, matching a book where a touch point is often unlabeled.
+      if (o.id.startsWith('@')) {
+        if (pos) points.push({ id: o.id, pos, label: '', promotable: true, labelDir: outwardDir(incident.get(o.id)) });
+        continue;
+      }
       if (pos) points.push({ id: o.id, pos, label: o.id, labelDir: outwardDir(incident.get(o.id)) });
       continue;
     }
