@@ -4437,6 +4437,18 @@ export const SCENARIOS: Scenario[] = [
       expect(G!.kind, 'G is the student’s on-segment extension point, not the incircle foot').toBe('on-segment');
     },
   },
+  {
+    id: 'radical-fraction-length-value',
+    title: 'נתון: BC = 35/√32 — a radical-fraction length builds and keeps its verbatim form (#77)',
+    guards:
+      'Issue #77 (operator 2026-07-11): the textbook given «נתון: BC = 35/√32» could not be entered (the workaround was converting to a decimal by hand). No stated-VALUE position had a QUOTIENT grammar — each carried its own partial regex (bare number / coef·√ / …). Fix (ADR-298): the shared `NUMEXPR` concrete-value atom (the ADR-285 coefficient vocabulary one seam over) lowers a quotient value in the length / area / perimeter / radius positions, emitting a `measure-length` with the computed value AND the VERBATIM radical-fraction text — so the figure shows «35/√32», never «6.19», and the droppedGivenNumbers honesty gate stays green off the verbatim text. This replays the operator’s exact utterance and asserts |BC| = 35/√32 with the label text kept.',
+    steps: ['משולש ABC', 'נתון: BC = 35/√32'],
+    check(fig) {
+      allStepsOk(fig);
+      // The value drives the length; the verbatim-text preservation is unit-tested (radical-fraction-values).
+      expect(dist(at(fig, 'B'), at(fig, 'C')), '|BC| = 35/√32').toBeCloseTo(35 / Math.sqrt(32), 4);
+    },
+  },
 ];
 
 /**

@@ -1085,3 +1085,7 @@ over all four (ADR-041).
 ### `incircle-feet-are-anonymous-not-namespace-hijack` — incircle feet are anonymous @-ids (#32, ADR-297)
 
 **Guards against:** an auto-minted decomposition point occupying a student letter, so a later student statement binds to the invisible scaffolding. **Asserts:** the incircle's three tangency feet are ANONYMOUS promotable points (`@f-<side>` — never F/G/H), so «G על המשך CA» after the incircle creates a FRESH on-segment point on CA's extension, not a constraint on the incircle foot. The feet render as clickable dots (no label) the student promotes to a letter (locked in `promote.test.ts`).
+
+### `radical-fraction-length-value` — נתון: BC = 35/√32 builds (#77, ADR-298)
+
+**Guards against:** a stated radical/fraction VALUE (`35/√32`, `35/2`, `√32/5`, `5√2/3`) being unparseable, forcing a hand-computed decimal. **Asserts:** the operator's exact «נתון: BC = 35/√32» builds with |BC| = 35/√32; the shared `NUMEXPR` value atom lowers a quotient in the length/area/perimeter/radius positions and keeps the verbatim radical-fraction text (unit-tested in `radical-fraction-values.test.ts`, incl. no-theft of `12√2`/`AB=CD/2`/`√2R` and the radius/area positions + the honesty gate).
