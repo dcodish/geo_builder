@@ -2479,12 +2479,12 @@ export const SCENARIOS: Scenario[] = [
     steps: ['משולש DEF חוסם את המעגל'],
     check(fig) {
       allStepsOk(fig);
-      // the incircle is centred at the incentre O (a circle centre defaults to O), tangent to side DE at its foot G
-      const I = at(fig, 'O'), D = at(fig, 'D'), E = at(fig, 'E'), G = at(fig, 'G');
+      // The incircle is centred at the incentre O; its tangency feet are ANONYMOUS promotable points
+      // (`@f-DE`… — #32/ADR-297: scaffolding the student didn't name), one per side.
+      const I = at(fig, 'O'), D = at(fig, 'D'), E = at(fig, 'E'), F = at(fig, 'F'), G = at(fig, '@f-DE');
       const off = Math.abs((G.x - D.x) * (E.y - D.y) - (G.y - D.y) * (E.x - D.x)) / dist(D, E);
-      expect(off, 'tangency point G lies on side DE').toBeLessThan(1e-4);
+      expect(off, 'tangency foot @f-DE lies on side DE').toBeLessThan(1e-4);
       // I is equidistant from all three sides (the inradius) — check vs side DF too
-      const F = at(fig, 'F');
       const distToLine = (p: Vec, a: Vec, b: Vec) => Math.abs((p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)) / dist(a, b);
       expect(distToLine(I, D, F), 'inradius to DF = inradius to DE').toBeCloseTo(dist(I, G), 3);
     },
@@ -2499,16 +2499,19 @@ export const SCENARIOS: Scenario[] = [
       allStepsOk(fig);
       const I = at(fig, 'O'); // incentre = circle centre (defaults to O)
       const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
-      const F = at(fig, 'F'), G = at(fig, 'G'), H = at(fig, 'H'); // three tangency feet
+      // The three tangency feet are ANONYMOUS promotable points (`@f-<side>` — #32/ADR-297), one per side,
+      // never occupying the student letters F/G/H.
+      expect(fig.construction.objects.filter((o) => isGeoPoint(o) && o.id.startsWith('@')).length, 'three anonymous feet').toBe(3);
+      const F = at(fig, '@f-AB'), G = at(fig, '@f-BC'), H = at(fig, '@f-CA');
       const distToLine = (p: Vec, a: Vec, b: Vec) => Math.abs((p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)) / dist(a, b);
       // each foot lies on its side
-      expect(distToLine(F, A, B), 'F on side AB').toBeLessThan(1e-4);
-      expect(distToLine(G, B, C), 'G on side BC').toBeLessThan(1e-4);
-      expect(distToLine(H, C, A), 'H on side CA').toBeLessThan(1e-4);
+      expect(distToLine(F, A, B), '@f-AB on side AB').toBeLessThan(1e-4);
+      expect(distToLine(G, B, C), '@f-BC on side BC').toBeLessThan(1e-4);
+      expect(distToLine(H, C, A), '@f-CA on side CA').toBeLessThan(1e-4);
       // all three are the same distance from the incentre (they lie on the circle)
       const r = dist(I, F);
-      expect(dist(I, G), 'G on the circle (same inradius)').toBeCloseTo(r, 4);
-      expect(dist(I, H), 'H on the circle (same inradius)').toBeCloseTo(r, 4);
+      expect(dist(I, G), '@f-BC on the circle (same inradius)').toBeCloseTo(r, 4);
+      expect(dist(I, H), '@f-CA on the circle (same inradius)').toBeCloseTo(r, 4);
     },
   },
   {
@@ -4411,6 +4414,27 @@ export const SCENARIOS: Scenario[] = [
       const has = (t: string[]) => (cls: { triangles: Id[][] }) => cls.triangles.some((tri) => [...tri].sort().join('') === [...t].sort().join(''));
       const abdAcb = similar.some((cls) => has(['A', 'B', 'D'])(cls) && has(['A', 'C', 'B'])(cls));
       expect(abdAcb, `△ABD ~ △ACB detected (got: ${similar.map((c) => c.triangles.map((t) => t.join('')).join(c.kind === 'congruent' ? '≅' : '~')).join(' | ') || 'none'})`).toBe(true);
+    },
+  },
+  {
+    id: 'incircle-feet-are-anonymous-not-namespace-hijack',
+    title: 'the incircle’s touch feet are anonymous (@-ids), so a later student point reuses no hijacked letter (#32)',
+    guards:
+      'Issue #32 (prod session jsptarcl): the incircle decomposition auto-named its three tangency feet F, G, H — points the student never asked for — so when the student then typed «G על המשך CA» to make a NEW point on the extension of CA, the M1 existing-point machinery correctly found G EXISTING and constrained the invisible incircle foot instead of creating the student’s point. Root fix (ADR-297): a decomposition’s touch/tangency points are ANONYMOUS promotable points (`@f-AB`… — `@`-prefixed, never a student letter, drawn as clickable dots the student promotes to a letter), so no letter is silently occupied. This replays the incircle + the student’s extension point: the feet are `@`-ids and G is a FRESH point on CA’s extension, not the incircle foot.',
+    steps: ['מעגל חסום במשולש ABC', 'G על המשך CA'],
+    check(fig) {
+      allStepsOk(fig);
+      const pts = fig.construction.objects.filter((o) => isGeoPoint(o));
+      const ptIds = pts.map((o) => o.id);
+      // the three tangency feet are anonymous `@`-ids — F/G/H are NOT consumed by scaffolding
+      const anon = ptIds.filter((id) => id.startsWith('@'));
+      expect(anon.length, `three anonymous incircle feet (got ${ptIds.join(',')})`).toBe(3);
+      expect(anon.every((id) => id.startsWith('@f-')), 'feet are @f-<side> ids').toBe(true);
+      // the student's G is a FRESH point of their own — an on-segment point on CA's extension, NOT a `foot`
+      // dangling off the incentre (the hijack that emitted `set-line [C,A,G]` onto the invisible foot).
+      const G = fig.construction.objects.find((o) => o.id === 'G');
+      expect(G, 'G exists').toBeTruthy();
+      expect(G!.kind, 'G is the student’s on-segment extension point, not the incircle foot').toBe('on-segment');
     },
   },
 ];

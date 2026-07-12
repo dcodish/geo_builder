@@ -1042,6 +1042,8 @@ export default function App() {
             highlightEdges={theoremHighlight ? undefined : shapeHighlightEdges}
             onPickIntersection={markIntersection}
             intersectionLabel={t('actions.markIntersection')}
+            onPromotePoint={(id) => useGeoStore.getState().promote(id)}
+            promoteLabel={t('actions.promotePoint')}
             labels={labels}
             angleMarks={angleMarks}
             relations={relationsLayer}
