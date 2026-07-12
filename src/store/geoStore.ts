@@ -1132,6 +1132,15 @@ export function searchResample(facts: Fact[], seed: number, onProgress?: (k: num
   return fallback >= 0 ? fallback : null;
 }
 
+/** #85 ([ADR-293](docs/06-decisions.md#adr-293)) — is this derived state DRAWABLE? Positions exist and
+ *  every coordinate is finite (a NaN reaches the isotropic fit as a NaN viewBox = a blank canvas with
+ *  green statuses). The App keeps the last usable view when this is false (the never-blank principle). */
+export function viewUsable(d: Derived): boolean {
+  if (d.positions.size === 0) return false;
+  for (const p of d.positions.values()) if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return false;
+  return true;
+}
+
 export type StepOutcome = { produced: true } | { produced: false; reason: 'error' | 'empty'; detail?: string };
 
 /**
@@ -1168,7 +1177,7 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, o
   const dataOnly = commands.length > 0 && commands.every((c) => c.type === 'set-var');
   // `name-center` REVEALS an existing circle's hidden centre — a visible change that adds no object/point
   // and moves nothing, so the geometry checks above miss it. It still "produced" (the centre now shows).
-  const reveals = commands.some((c) => c.type === 'name-center');
+  const reveals = commands.some((c) => c.type === 'name-center' || c.type === 'show-circle');
   if (grew || dataOnly || reveals) return { produced: true };
   // No geometric change — but a `set-equal` NAMING an enabled shape-variant's (kite/isosceles) equal-pair
   // that no explicit equality already asserts is the student CHOOSING which sides are equal: it PINS a

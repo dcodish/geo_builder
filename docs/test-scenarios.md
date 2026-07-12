@@ -1057,3 +1057,19 @@ over all four (ADR-041).
 ### `first-utterance-meet-of-default-segments` — מיתר CK חותך את AO בנקודה E as the FIRST utterance (#34, ADR-287)
 
 **Guards against:** issue #34 (baseline log-triage 2026-07-11; three distinct prod users): the first-utterance compound refused "cannot construct E: lines CK and AO are parallel". Root cause: the ADR-253 general-position spin covered only 1-anchor templates — two DISJOINT default segments (both horizontal, the second a pure translation offset) were exactly parallel, so the meet had no crossing at the only composition the apply gate judges, and the ADR-255 re-seat had nothing to aim at. ADR-287 adds direction to the general-position bar for bare segment templates (0-anchor spin added; 1-anchor predicate extended; shapes keep canonical orientation). **Asserts:** all steps ok; E within segment CK and within segment AO.
+
+### `plural-hemshekhei-extensions-meet` — המשכי CF ו DE נפגשים בנקודה G (#79, ADR-294)
+
+**Guards against:** the plural המשכי parsing to the OPPOSITE constraint (a bare onSeg meet) because every regex keyed on the literal המשך misses the medial-kaf inflections — the recorded ADR-3D-035 kaf-class trap. **Asserts:** the operator's exact 6-step two-circles sequence builds with F between C–G and E between D–G (G really on both extensions).
+
+### `tangent-to-circumscribing-circle` — הישר ℓ משיק בנקודה C למעגל החוסם את המשולש ABC (#82 P1, ADR-291/292)
+
+**Guards against:** the silent tangent drop — the circumcircle rule claiming the compound, minting a duplicate circle and losing the tangent with a green row. **Asserts:** exactly one circle; the tangent `tan-C` exists; all steps ok.
+
+### `restated-circumscription-resolves` — המעגל חוסם את CEFO after בר חסימה (#83, ADR-291)
+
+**Guards against:** the M1 re-create class — a second coincident circle + duplicate constraint, and the guess-the-hidden-name problem. **Asserts:** one circle, now VISIBLE, zero coincidence pairs.
+
+### `circumscribing-circle-cuts-side` — המעגל החוסם את CEFO חותך את הצלע AC בנקודה D (#81, ADR-291)
+
+**Guards against:** the book phrasing being not-understood (3-label-only run) and the workaround minting duplicates. **Asserts:** one circle (the existing one referenced), D strictly within segment AC.

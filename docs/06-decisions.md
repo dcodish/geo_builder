@@ -4272,3 +4272,29 @@ The 3-D twin is #73 (`scope3.ts`, COPIED per docs/20 §12 — never shared).
 4. **Tests keep the sync world.** Environments without `Worker` (vitest, the scenario harness) fall back to the SAME functions synchronously — store semantics byte-equivalent (`resample` now applies `searchResample`'s result; behavior locked by an equivalence test).
 
 **Residuals (recorded, not hidden):** a branch/variant flip (`cycleAlt`/`cycleVariant`) changes fact content and still folds on the main thread (usually cheap; the worker prefold pattern extends to it if demand shows); the ✎ edit path (`replaceGroup`) keeps its sync cost.
+
+## ADR-291 — "המעגל החוסם את …" is a circle REFERENCE, resolved before creation (issues #82/#81/#83, the CEFO cluster)
+
+**Status:** Accepted (2026-07-12; prod session `vaotw0tq` — the CEFO book problem). *Files: `src/parser/parse.ts` (`circumscribingRef` + the `resolveCenter`/`resolveMentionedCircle` chokepoint wiring + the `dropCircleRef` phrase strip; resolution-first guards in `circumcircle` and `circumcircleMeetsSegment`; the 4-label creation run), `src/engine/types.ts`/`apply.ts` (`show-circle`), `src/store/geoStore.ts` (dry-run `reveals`).*
+
+**Context.** Three sibling failures on one book figure: the tangent sentence half-parsed into a DUPLICATE circumcircle with the tangent silently dropped (#82, P1); the book's circumcircle-cut phrasing was not-understood and its workaround minted duplicates (#81); re-stating the circumscription minted a second coincident circle (#83). One root: the circumscribing-circle PHRASE was only ever a CREATION cue — nothing could *refer* to an existing circle by it (the M1 class: a statement about an existing object resolves, never re-creates).
+
+**Decision.** `circumscribingRef` resolves "ה?מעגל ה?חוסם את [המשולש|המרובע] <3–4 labels>" (+ En) to the EXISTING circle through the named points (`circleContaining` over `ctx.circleMembers`), wired into BOTH resolver chokepoints — so every circle-consuming rule (tangent, line∩circle, chord…) gains the phrasing at once (the ADR-119 pattern) — and `dropCircleRef` strips the whole phrase so its labels never pollute a rule's label run. The creation rules keep owning the no-such-circle case, each behind its own resolution-first guard: `circumcircle` lowers a re-statement to the new **`show-circle`** command (reveal the auto-hidden concyclic circle — it becomes visible and referenceable, killing the guess-the-hidden-name problem; `dryRunOutcome` counts it as `reveals`), and `circumcircleMeetsSegment` references the existing circle for its crossing (and accepts a 4-label QUAD run on the creation path, mirroring `circumcircle`'s four-branch — the #81 feature half).
+
+Locked by scenarios `tangent-to-circumscribing-circle`, `restated-circumscription-resolves`, `circumscribing-circle-cuts-side` (the exact prod/book utterances).
+
+## ADR-292 — The VERB honesty gate: a stated tangency/bisection/… verb absent from the lowering never commits (issue #82, P1)
+
+**Status:** Accepted (2026-07-12). *Files: `src/parser/parse.ts` (`droppedGivenVerbs`), `src/App.tsx` (both commit paths), `src/parser/__tests__/verb-gate.test.ts`.*
+
+The fourth honesty sibling — labels (ADR-089), numbers (ADR-250), symbol relations (ADR-264), and now VERBS: `משיק`/tangent, `חוצה`/bisect, `מקביל`/parallel, `מאונך`/perpendicular. A gate fires when the verb appears in the utterance but NO command family that can carry its meaning appears in the lowering; the satisfied-sets are deliberately GENEROUS (tangency also satisfied by `set-perpendicular` — the ADR-115 radius-⟂ lowering; parallel also by the `parallelogram` noun) so a legitimate alternative lowering never false-blocks. Grammar path: escalate instead of committing; LLM path: refuse naming the verb. This is the gate that makes the #82 class — a rule claiming a compound and silently dropping the verb given, with a green row — structurally impossible to commit.
+
+## ADR-293 — View-level keep-prior: the canvas is NEVER blank (issue #85)
+
+**Status:** Accepted (2026-07-12; operator: "the image was gone — nothing was shown"). *Files: `src/store/geoStore.ts` (`viewUsable`), `src/App.tsx` (the display split + the stale notice), locales (`view.stale`).*
+
+The engine keeps-prior at APPLY time, but the VIEW had no equivalent: a current state that evaluates to nothing (empty positions) or to non-finite coordinates (a NaN viewBox) rendered an EMPTY canvas under the error banner. Now the App splits the derived: GEOMETRY renders from the last `viewUsable` state (positions exist, every coordinate finite) — dimmed, with a stale notice ("undo or fix the last step") — while STATUS/ERROR always tell the truth about the current state. A CLEAN empty state (fresh session / clear / all facts deselected: no error, no positions) resets the fallback so a ghost figure never outlives its facts. The entry path that produced the prod blank remains unlogged (#84) — this is the unconditional safety net either way.
+
+## ADR-294 — המשך joins the kaf-inflection keyword class (issue #79)
+
+**Status:** Accepted (2026-07-12). *File: `src/parser/parse.ts` (18 regex sites).* The recorded ADR-3D-035 trap, המשך edition: the singular ends in final kaf (ך) but every inflected form — המשכי (construct plural), המשכים, המשכיהם/ן — uses medial kaf (כ), so all ~18 regexes keyed on the literal `המשך` missed them; the plural didn't merely fail — it parsed to the OPPOSITE constraint (a bare `onSeg` meet), stranding the point at the backward crossing with an amber the student read as a bug. Every site now carries the stem `המש(?:ך|כי(?:ם|הם|הן)?)` (the sweep skipped comments; test gates and strip-lists both). Locked by scenario `plural-hemshekhei-extensions-meet` (the operator's exact 6-step sequence).

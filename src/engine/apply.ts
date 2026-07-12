@@ -989,6 +989,14 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       });
       break;
 
+    case 'show-circle': {
+      // #83 (ADR-291): the student RE-STATED an existing circumscription — draw the (auto-hidden)
+      // circle. Membership/constraints already exist (that's how the parser resolved it); only the
+      // visibility flips. Idempotent; no-op when the circle is already visible.
+      for (const o of objects) if (o.kind === 'circle' && o.id === cmd.id && o.hidden) delete o.hidden;
+      break;
+    }
+
     case 'name-center': {
       // "O is the centre of the circle" — the student NAMED an existing circle's auto-hidden centre, so
       // reveal it (FR-RN-8: a named centre always shows). Flip `autoCenter` off on the circle(s) centred at

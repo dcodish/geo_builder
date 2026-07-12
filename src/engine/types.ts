@@ -873,6 +873,7 @@ export type Command =
   // driven constraint — the radii stay free DOFs (ADR-052); the givens verifier flags an order-violating
   // config, so `meetsRequirements` (sampler / "show another") skips it and a real contradiction reads amber.
   | { type: 'set-radius-order'; outer: Id; inner: Id }
+  | { type: 'show-circle'; id: Id } // #83 (ADR-291): reveal an EXISTING hidden circle — a circumscription stated about points already riding a circle RESOLVES it (never a coincident duplicate)
   | { type: 'name-center'; center: Id } // reveal/name an EXISTING circle's auto-hidden centre (FR-RN-8): the student said "O is the centre of the circle" — flips the circle's autoCenter off so its centre shows, WITHOUT touching the radius
   | { type: 'set-area'; ids: Id[]; value: number } // area of polygon `ids` = value (ADR-118)
   | { type: 'set-area-ratio'; ids1: Id[]; ids2: Id[]; k: number } // area(ids1) = k·area(ids2)

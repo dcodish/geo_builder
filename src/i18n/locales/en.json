@@ -336,5 +336,8 @@
       "30-60-90-triangle": "A right triangle whose acute angles are 30° and 60°; the leg opposite the 30° angle is half the hypotenuse.",
       "circle": "The set of points in the plane at a fixed distance from a centre."
     }
+  },
+  "view": {
+    "stale": "The current state cannot be drawn — showing the last good configuration. Undo or fix the last step."
   }
 }

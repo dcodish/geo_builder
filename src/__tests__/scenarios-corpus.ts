@@ -4287,6 +4287,77 @@ export const SCENARIOS: Scenario[] = [
       expect(Math.hypot(O.x - P.x, O.y - P.y), 'O on circle P').toBeCloseTo(r, 4);
     },
   },
+  {
+    id: 'plural-hemshekhei-extensions-meet',
+    title: 'המשכי CF ו DE נפגשים בנקודה G — the PLURAL extension form carries the extension semantics (#79)',
+    guards:
+      'Issue #79 (operator screenshot session, 2026-07-11, the two-intersecting-circles figure): the plural המשכי parsed to the OPPOSITE constraint — a bare meet with the ADR-166 onSeg requirement — so the verifier went amber and G stranded at the backward crossing; the singular המשך worked. Root cause: the recorded ADR-3D-035 kaf-class trap — המשך ends in final kaf, its inflections (המשכי/המשכים) use medial kaf, and every regex keyed on the literal המשך missed them. Fixed by the stem sweep המש(?:ך|כי(?:ם|הם|הן)?) across every parse.ts regex site.',
+    steps: [
+      'שני מעגלים נחתכים בנקודות A ו-B',
+      'C על מעגל P',
+      'המשך CA חותך את מעגל O בנקודה D',
+      'המשך CB חותך את המעגל O בנקודה E',
+      'F על הקשת BC',
+      'המשכי CF ו DE נפגשים בנקודה G',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const between = (m: string, a: string, b: string) => {
+        const A = at(fig, a), B = at(fig, b), M = at(fig, m);
+        const t = ((M.x - A.x) * (B.x - A.x) + (M.y - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2);
+        return t > 0 && t < 1;
+      };
+      // G lies on the EXTENSIONS: F between C and G, E between D and G (order C→F→G, D→E→G).
+      expect(between('F', 'C', 'G'), 'F between C and G (extension of CF)').toBe(true);
+      expect(between('E', 'D', 'G'), 'E between D and G (extension of DE)').toBe(true);
+    },
+  },
+  {
+    id: 'tangent-to-circumscribing-circle',
+    title: 'הישר ℓ משיק בנקודה C למעגל החוסם את המשולש ABC — the P1 silent tangent drop (#82)',
+    guards:
+      'Issue #82 (P1, triage probe on prod session vaotw0tq, the CEFO book problem part ג): the sentence half-parsed — the circumcircle rule claimed the whole utterance, minted a DUPLICATE circle (A,B,C already ride circle O) and silently dropped the tangent, with a green row (the docs/17 §6 silent-wrong-figure class). Fixed by ADR-291 (the circumscribing-circle REFERENCE resolves to the existing circle at the resolveCenter/resolveMentionedCircle chokepoint + dropCircleRef strips the phrase, so tangentLine reads it as a plain tangent-at-C) and guarded by ADR-292 (the droppedGivenVerbs honesty gate — a stated משיק absent from the lowering can never commit again).',
+    steps: ['משולש ABC חסום במעגל O', 'הישר ℓ משיק בנקודה C למעגל החוסם את המשולש ABC'],
+    check(fig) {
+      allStepsOk(fig);
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles.length, 'exactly ONE circle — no duplicate was minted').toBe(1);
+      expect(
+        fig.construction.objects.some((o) => o.id === 'tan-C'),
+        'the tangent at C exists — the verb was not dropped',
+      ).toBe(true);
+    },
+  },
+  {
+    id: 'restated-circumscription-resolves',
+    title: 'מרובע CEFO בר חסימה במעגל then המעגל חוסם את CEFO — resolves/unhides, never a coincident duplicate (#83)',
+    guards:
+      'Issue #83 (prod session vaotw0tq): re-stating the circumscription minted a SECOND coincident circle (duplicate object + duplicate set-concyclic) and the student still had to guess the hidden circle auto-name to reference it. ADR-291: the circumcircle rule resolves an existing circle through the named points first — lowering to show-circle (the circle becomes visible and referenceable), minting nothing.',
+    steps: ['מרובע CEFO בר חסימה במעגל', 'המעגל חוסם את CEFO'],
+    check(fig) {
+      allStepsOk(fig);
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles.length, 'exactly ONE circle').toBe(1);
+      expect((circles[0] as { hidden?: boolean }).hidden, 'the circle is now VISIBLE').toBeUndefined();
+      expect(fig.coincidences.length, 'no forced coincidence pair (no duplicate centre)').toBe(0);
+    },
+  },
+  {
+    id: 'circumscribing-circle-cuts-side',
+    title: 'המעגל החוסם את CEFO חותך את הצלע AC בנקודה D — the book phrasing resolves the EXISTING circle and lands D within AC (#81)',
+    guards:
+      'Issue #81 (prod session vaotw0tq, the CEFO book problem): the exact book wording was not-understood — circumcircleMeetsSegment read only a 3-label run, and even that path MINTED a fresh circle instead of resolving the hidden concyclic one, so the operator needed a 2-step workaround plus guessing the auto-name. ADR-291: resolution-before-creation inside circumcircleMeetsSegment (an existing circle through the named vertices is referenced + shown) + the 4-label run accepted on the creation path.',
+    steps: ['מרובע CEFO בר חסימה במעגל', 'AC', 'המעגל החוסם את CEFO חותך את הצלע AC בנקודה D'],
+    check(fig) {
+      allStepsOk(fig);
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles.length, 'exactly ONE circle — the existing one was referenced').toBe(1);
+      const A = at(fig, 'A'), C = at(fig, 'C'), D = at(fig, 'D');
+      const t = ((D.x - A.x) * (C.x - A.x) + (D.y - A.y) * (C.y - A.y)) / ((C.x - A.x) ** 2 + (C.y - A.y) ** 2);
+      expect(t, 'D within segment AC').toBeGreaterThan(0.02);
+      expect(t, 'D within segment AC').toBeLessThan(0.98);
+    },
+  },
 ];
 
 /**

@@ -1,6 +1,6 @@
 /** Public surface of the grammar parser (Phase 4). The `utterance → command[]` boundary. */
 
-export { parse, parseRename, parseMerge, parseSwap, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedRadiusSymbol, normalizeUtterance } from './parse';
+export { parse, parseRename, parseMerge, parseSwap, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs, droppedRadiusSymbol, normalizeUtterance } from './parse';
 export type { ParseResult, ParseContext } from './parse';
 export { buildParseCtx } from './context';
 export { classifyOutOfScope, looksCompound } from './scope';

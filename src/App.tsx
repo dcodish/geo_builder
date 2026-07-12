@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedRadiusSymbol, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs, droppedRadiusSymbol, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -24,7 +24,7 @@ import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { btn, card as themeCard, color as pal, foldToggle, fs, pill, sectionTitle } from '@/ui/theme';
-import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, primeFoldFor, replay, trialFacts, useGeoStore } from '@/store/geoStore';
+import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, primeFoldFor, replay, trialFacts, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
@@ -536,7 +536,10 @@ export default function App() {
       // The RELATION sibling (ADR-264): a stated `AB=CD`/`AB⊥CD`/`AB∥CD` between points that all already
       // appear on the shape trips neither older gate — never commit a figure missing the student's given.
       const droppedRels = droppedGivenRelations(utterance, r.commands);
-      if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0) {
+      // The VERB sibling (ADR-292, the #82 P1): a stated tangency/bisection/… verb entirely absent
+      // from the lowering means a rule claimed a compound and dropped a given — never commit it.
+      const droppedVerbs = droppedGivenVerbs(utterance, r.commands);
+      if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0 && droppedVerbs.length === 0) {
         // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
         // the commit, and every later replay of this content then run at TAIL speed on the main thread
         // (the one unbudgeted cold fold, measured ~26 s on the #59 figure, used to block the tab here).
@@ -604,8 +607,8 @@ export default function App() {
         // become a second analytics `submit` (else the dashboard double-counts the utterance). See sessionLog.
         logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:${outcome.reason}`, detail: outcome.detail, commands: r.commands, intermediate: true });
       } else {
-        weak = 'dropped'; // a typo dropped a stated label/number/relation → escalate rather than commit the partial parse
-        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels].join(',')}`, commands: r.commands, intermediate: true });
+        weak = 'dropped'; // a typo dropped a stated label/number/relation/verb → escalate rather than commit the partial parse
+        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs].join(',')}`, commands: r.commands, intermediate: true });
       }
     }
     // out of grammar, OR a deterministic parse that built nothing → ask the LLM (a SECOND try),
@@ -709,6 +712,9 @@ export default function App() {
       // and the RELATION gate (ADR-264): a decomposition that loses a stated `AB=CD`/`⊥`/`∥` between
       // existing points must name it — its labels all appear on the shape, so the older gates never fire
       ...droppedGivenRelations(utterance, llmCmds),
+      // and the VERB gate (ADR-292, the #82 P1): a decomposition that loses a stated tangency/
+      // bisection/… verb must name it — never a silent drop on the second attempt either
+      ...droppedGivenVerbs(utterance, llmCmds),
       // and the MEASURE-SYMBOL gate (issue #53): a decomposition that loses a stated radius symbol
       // ("שרדיוסו r") must name it — a lowercase measure letter trips none of the older gates
       ...droppedRadiusSymbol(utterance, llmCmds),
@@ -732,10 +738,23 @@ export default function App() {
   }
 
   // Figure + per-fact status are derived from the fact list.
-  const { construction, positions, circles, status, lastError, pending, labels, angleMarks, violations, radiusDofs, coincidences } = useMemo(
-    () => replay(facts, seed, radiusOverrides),
-    [facts, seed, radiusOverrides],
-  );
+  const derivedRaw = useMemo(() => replay(facts, seed, radiusOverrides), [facts, seed, radiusOverrides]);
+  // #85 ([ADR-293](docs/06-decisions.md#adr-293)) — view-level keep-prior, the NEVER-BLANK principle: when
+  // the current (facts, seed, overrides) state evaluates to NOTHING (positions empty) or to non-finite
+  // coordinates (a NaN viewBox renders an empty canvas with every status green), the canvas keeps drawing
+  // the LAST GOOD configuration — dimmed, with a stale notice — instead of going blank under the error
+  // banner. A CLEAN empty state (fresh session / clear / all facts deselected: no error, no positions) is
+  // legitimately empty and resets the fallback, so a ghost figure never outlives its facts.
+  const lastGoodViewRef = useRef<ReturnType<typeof replay> | null>(null);
+  const usable = viewUsable(derivedRaw);
+  if (usable) lastGoodViewRef.current = derivedRaw;
+  else if (derivedRaw.positions.size === 0 && derivedRaw.lastError === null) lastGoodViewRef.current = null;
+  const viewStale = !usable && lastGoodViewRef.current !== null;
+  const display = viewStale ? lastGoodViewRef.current! : derivedRaw;
+  // GEOMETRY from the displayable state; STATUS/ERROR from the real current state (the step list and the
+  // error banner must tell the truth about what just happened).
+  const { construction, positions, circles, labels, angleMarks, violations, radiusDofs, coincidences } = display;
+  const { status, lastError, pending } = derivedRaw;
 
   // The "view relations" layer is shown only while its cached result still matches the CURRENT facts —
   // any fact change makes a new `facts` array (≠ the cached ref), so the layer auto-clears (ADR-134). Ground
@@ -1004,7 +1023,15 @@ export default function App() {
       </header>
 
       <div style={main}>
-        <div ref={canvasRef} style={canvasWrap}>
+        <div ref={canvasRef} style={{ ...canvasWrap, ...(viewStale ? { opacity: 0.55 } : {}) }}>
+          {viewStale && (
+            <div
+              role="note"
+              style={{ position: 'absolute', top: 8, insetInlineStart: 8, zIndex: 5, background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, padding: '4px 10px', fontSize: 12, color: '#92400e' }}
+            >
+              {t('view.stale')}
+            </div>
+          )}
           <Figure
             construction={construction}
             positions={positions}

@@ -180,8 +180,24 @@ const incenterLabel = (s: string): string | null => {
  * figure has exactly ONE circle — that circle's centre (implicit "the circle"). With
  * 0 or 2+ unnamed circles it stays null (ambiguous → the rule defers/escalates).
  */
+/**
+ * #82/#81/#83 ([ADR-291](docs/06-decisions.md#adr-291)): "המעגל החוסם את [המשולש|המרובע] ABC[D]" /
+ * "the circle circumscribing …" as a circle REFERENCE — resolved to the EXISTING circle through the
+ * named points (M1: resolution before creation; the ADR-119 circle-reference chokepoint, so EVERY
+ * circle-consuming rule gains the phrasing at once). Null when no such circle exists yet — the
+ * creation rules (`circumcircle`/`circumcircleMeetsSegment`) keep owning that case.
+ */
+const CIRCUM_REF_SRC = String.raw`(?:ה?מעגל\s+ה?חוסם\s+(?:את\s+)?(?:ה?משולש\s+|ה?מרובע\s+)?|(?:the\s+)?circle\s+circumscribing\s+(?:the\s+)?(?:triangle\s+|quad(?:rilateral)?\s+)?)((?:[A-Za-z]\d*\s*){3,4})`;
+const circumscribingRef = (s: string, ctx: ParseContext): string | null => {
+  const m = s.match(new RegExp(CIRCUM_REF_SRC, 'i'));
+  if (!m) return null;
+  const run = (m[1].match(/[A-Za-z]\d*/g) ?? []).map(up);
+  if (run.length < 3) return null;
+  return circleContaining(ctx, run);
+};
+
 const resolveCenter = (s: string, ctx: ParseContext): string | null =>
-  circleCenter(s) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
+  circleCenter(s) ?? circumscribingRef(s, ctx) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
 
 /** True when the utterance explicitly refers to a circle — named ("circle O") or definite ("the circle" / "המעגל"). */
 const mentionsCircle = (s: string): boolean => /circle|מעגל/i.test(s);
@@ -194,7 +210,7 @@ const mentionsCircle = (s: string): boolean => /circle|מעגל/i.test(s);
  * circle intersection. (Operator principle: with one circle in the diagram you needn't name it.)
  */
 const resolveMentionedCircle = (s: string, ctx: ParseContext): string | null =>
-  circleCenter(s) ?? (mentionsCircle(s) && ctx.circles?.length === 1 ? ctx.circles[0] : null);
+  circleCenter(s) ?? circumscribingRef(s, ctx) ?? (mentionsCircle(s) && ctx.circles?.length === 1 ? ctx.circles[0] : null);
 
 /** The crossing point named AFTER the circle word ("… circle [O] at R" / "… [ה]מעגל [O] בנקודה R"),
  *  with the circle's NAME optional so "the circle" / "המעגל" anchors too (operator: one circle → no name). */
@@ -220,7 +236,10 @@ const leadingNamedPoint = (s: string): string | null => {
 };
 
 /** Remove a "circle X" / "מעגל X" mention so its centre letter isn't read as a figure label. */
-const dropCircleRef = (s: string): string => s.replace(/(?:circle|מעגל)\s+[A-Za-z]\d*\b/gi, ' ');
+const dropCircleRef = (s: string): string =>
+  s
+    .replace(new RegExp(CIRCUM_REF_SRC, 'gi'), ' ') // the ADR-291 circumscribing REFERENCE, labels and all
+    .replace(/(?:circle|מעגל)\s+[A-Za-z]\d*\b/gi, ' ');
 
 /**
  * English filler words, lowercase only — typed fillers are lowercase, while
@@ -319,7 +338,7 @@ function shapeLabels(bare: string, n: number, ctx: ParseContext, hasLeftover: bo
  * shape phrases שווה־צלעות / שווה־שוקיים are stripped as UNITS by their owners before the test.)
  */
 const SHAPE_LEFTOVER =
-  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?|sides?|every|each|triangles?|squares?|rectangles?|rhombus(?:es)?|trapezoids?|kites?|parallelograms?|quadrilaterals?)\b|[=⊥⟂∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונ[כך]|אנ[כך]|מקביל|חוצ|אמצע|תיכון|גובה|המשך|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ|צלע|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|עפיפון|מקבילית|(?<![א-ת])[ובשלמכ]?כל(?![א-ת])/i;
+  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?|sides?|every|each|triangles?|squares?|rectangles?|rhombus(?:es)?|trapezoids?|kites?|parallelograms?|quadrilaterals?)\b|[=⊥⟂∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונ[כך]|אנ[כך]|מקביל|חוצ|אמצע|תיכון|גובה|המש(?:ך|כי(?:ם|הם|הן)?)|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ|צלע|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|עפיפון|מקבילית|(?<![א-ת])[ובשלמכ]?כל(?![א-ת])/i;
 
 /** True if, after removing the shape keyword, geometry the shape can't express remains. */
 const shapeHasLeftover = (s: string, re: RegExp): boolean => SHAPE_LEFTOVER.test(s.replace(re, ' '));
@@ -765,7 +784,7 @@ const lineLineIntersection: Rule = (s) => {
   // — the crossing lies BEYOND the 2nd letter, ADR-054), or a "הישר"/infinite line (unconstrained). The old
   // code computed extension/line words UTTERANCE-GLOBALLY, so "המשך FO חותך את AC בנקודה E" stripped the
   // on-segment default from the BARE operand AC too — E landed past C, silently green.
-  const EXT_RE = /המשך|extension|extended/i;
+  const EXT_RE = /המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i;
   const LINE_RE = /\bline\b|הישר|הקו|\bray\b|קרן/i;
   const semOf = (span: string): 'bare' | 'ext' | 'line' =>
     EXT_RE.test(span) ? 'ext' : LINE_RE.test(span) ? 'line' : 'bare';
@@ -885,7 +904,7 @@ const diameterCutsSegment: Rule = (s, ctx) => {
   // A bare "AC" (like "the side AC") is the SEGMENT between X and Y — keep E ON it by default (operator
   // principle, 2026-06-21). Two opt-outs: "המשך AC" / "the EXTENSION of AC" puts E BEYOND the segment
   // (order [X,Y,E] via dir2), and "הישר AC" / "the LINE AC" leaves E free anywhere on the infinite line.
-  const isExtension = /המשך|extension|extended/i.test(after);
+  const isExtension = /המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(after);
   const isLine = /\bline\b|הישר|הקו/i.test(after);
   const out: AnyCommand[] = [
     { type: 'line-line-intersection', id: E, a: F, b: up(center), c: X, d: Y, dir1: true, ...(isExtension ? { dir2: true } : {}) },
@@ -991,10 +1010,10 @@ const midpoint: Rule = (s, ctx) => {
   return out;
 };
 
-/** "F on the extension of AD" / "F על המשך AD" — a point on the ray beyond the far end (t > 1). */
+/** "F on the extension of AD" / "F על המש(?:ך|כי(?:ם|הם|הן)?) AD" — a point on the ray beyond the far end (t > 1). */
 const pointOnExtension: Rule = (s, ctx) => {
-  if (!/extension|המשך/i.test(s)) return null;
-  const m = s.match(/(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\b.*?(?:extension|המשך)\s*(.*)/i);
+  if (!/extension|המש(?:ך|כי(?:ם|הם|הן)?)/i.test(s)) return null;
+  const m = s.match(/(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\b.*?(?:extension|המש(?:ך|כי(?:ם|הם|הן)?))\s*(.*)/i);
   if (!m) return null;
   // strip filler ("of"!) so "of AD" reads AD, not the labels O,F of "of".
   const seg = labelRun(m[2].replace(FILLER, ' '), 2);
@@ -3324,7 +3343,7 @@ const tangentLineIntersection: Rule = (s, ctx) => {
   const rest = dropCircleRef(s)
     .replace(/tangent|משיק/gi, ' ')
     .replace(new RegExp(String.raw`(?:\bat\b|בנקודה|ב-?)\s*${at}\b`, 'i'), ' ')
-    .replace(/extension|המשך|intersection|חיתוך|נפגש\w*|מפגש|\bmeets?\b|\bcuts?\b|crosses|\bthrough\b|\bpoint\b|בנקודה|נקודה/gi, ' ')
+    .replace(/extension|המש(?:ך|כי(?:ם|הם|הן)?)|intersection|חיתוך|נפגש\w*|מפגש|\bmeets?\b|\bcuts?\b|crosses|\bthrough\b|\bpoint\b|בנקודה|נקודה/gi, ' ')
     .replace(FILLER, ' ');
   // Labels are UPPERCASE (the repo convention, `isUpperLabel`) — a leftover lowercase word or the
   // article "a" must not be read as a point pair ("through point C **a** tangent…" → pair C,A).
@@ -3342,7 +3361,7 @@ const tangentLineIntersection: Rule = (s, ctx) => {
   // "המשך AB" / "extension of AB" is DIRECTIONAL — E is beyond the SECOND letter (order a→b→e). Carry that as
   // the crossing's `order` so the figure flexes to put E on AB's extension (not the wrong side); without it
   // the tangent ∩ the infinite line can land beyond a. (ADR-127's order mechanism; folds into the solver.)
-  const directional = /extension|המשך/i.test(s);
+  const directional = /extension|המש(?:ך|כי(?:ם|הם|הן)?)/i.test(s);
   // NOTE (issue #22 sibling audit): a BARE pair here deliberately does NOT get the within-segment
   // default — when A,B are a chord of the tangent's own circle (the corpus case), the tangent meets
   // line AB strictly OUTSIDE the segment (a tangent∩secant crossing lies outside the circle), so a
@@ -3544,7 +3563,7 @@ const circleCircleIntersection: Rule = (s) => {
  * and after the tangent/external-secant compounds (guarded out by "tangent"/"משיק"/"from"/"מנקודה").
  */
 const extendOntoCircle: Rule = (s, ctx) => {
-  if (!/המשך|extension|extended/i.test(s)) return null; // directional only — a plain chord stays lineMeetsCircle
+  if (!/המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(s)) return null; // directional only — a plain chord stays lineMeetsCircle
   if (!INTERSECT_KW.test(s)) return null;
   if (/tangent|משיק/i.test(s)) return null; // tangent compound → tangentMeetsOtherCircle / tangentLine
   if (/\bfrom\b|מנקודה|מהנקודה/i.test(s)) return null; // "from <point>" → the external-point secant
@@ -3556,7 +3575,7 @@ const extendOntoCircle: Rule = (s, ctx) => {
   // the line's two points (document order: a then b; D lands beyond b — the 2nd letter)
   const body = dropCircleRef(s)
     .replace(/(?:\bat\b|בנקודה|ב-)\s*[A-Za-z]\d*\b/gi, ' ')
-    .replace(/extension|extended|\bline\b|המשך|הישר|הקו|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?/gi, ' ');
+    .replace(/extension|extended|\bline\b|המש(?:ך|כי(?:ם|הם|הן)?)|הישר|הקו|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?/gi, ' ');
   const pr = labelRun(body, 2);
   if (!pr || pr.includes(R)) return null;
   const [a, b] = pr;
@@ -3582,7 +3601,7 @@ const lineCutsCircleTwice: Rule = (s, ctx) => {
   // the line's two points: strip the circle ref + the two-crossing clause + connectives → the 2-label run
   const body = dropCircleRef(s)
     .replace(/(?:\bat\b|בנקודות?|ב-)\s*[A-Za-z]\d*\s*(?:\band\b|ו-?|,)\s*[A-Za-z]\d*\b/gi, ' ')
-    .replace(/\bline\b|הישר|הקו|ישר|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?|המשך|extension|extended/gi, ' ');
+    .replace(/\bline\b|הישר|הקו|ישר|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?|המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/gi, ' ');
   const pr = labelRun(body, 2);
   if (!pr || pr.includes(C) || pr.includes(D)) return null; // the line's points must differ from the crossings
   const [a, b] = pr;
@@ -3595,7 +3614,7 @@ const lineCutsCircleTwice: Rule = (s, ctx) => {
   // centre ("AO חותך את המעגל בנקודות C ו-D", the 2026-06-20 operator figure) necessarily means the
   // secant LINE, never an unsatisfiable segment.
   const infinite =
-    /\bline\b|\bray\b|הישר|הקו|קרן|המשך|extension|extended/i.test(s) || a === up(center) || b === up(center);
+    /\bline\b|\bray\b|הישר|הקו|קרן|המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(s) || a === up(center) || b === up(center);
   const within = (id: Id) => (infinite ? {} : { order: [a, id, b] as Id[] });
   return [
     { type: 'line-through', id: lineId, a, b },
@@ -3616,7 +3635,7 @@ const lineCutsCircleTwice: Rule = (s, ctx) => {
  * extendOntoCircle / lineMeetsCircle). A NEW crossing point is left to the intersection constructs.
  */
 const extensionMeetsExistingPoint: Rule = (s, ctx) => {
-  if (!/המשך|extension|extended/i.test(s)) return null;
+  if (!/המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(s)) return null;
   if (mentionsCircle(s)) return null; // a circle target → extendOntoCircle / lineMeetsCircle
   if (!/tangent|משיק|\bline\b|הישר|הקו/i.test(s)) return null; // the object D lives on (not a 2nd segment → line∩line)
   if (!INTERSECT_KW.test(s)) return null; // a "meets/cuts" phrasing
@@ -3624,7 +3643,7 @@ const extensionMeetsExistingPoint: Rule = (s, ctx) => {
   if (!atM) return null;
   const D = up(atM[1]);
   if (!(ctx.points ?? []).includes(D)) return null; // only CONSTRAIN an existing point (a new crossing is the intersection construct)
-  const segM = s.match(/(?:המשך|extension(?:\s+of)?|extended)\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  const segM = s.match(/(?:המש(?:ך|כי(?:ם|הם|הן)?)|extension(?:\s+of)?|extended)\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
   if (!segM) return null;
   const [X, Y] = [up(segM[1]), up(segM[2])];
   if (X === D || Y === D) return null;
@@ -3652,7 +3671,7 @@ const lineMeetsCircle: Rule = (s, ctx) => {
     // #71: the appositive noun form — strip the leading "E נקודת החיתוך" / "E is the intersection point"
     .replace(new RegExp(String.raw`^\s*${R}\s+נקודת\s+ה?(?:חיתוך|מפגש)(?:\s+של)?`, 'i'), ' ')
     .replace(new RegExp(String.raw`^\s*${R}\s+(?:is\s+)?the\s+(?:intersection|meeting)\s+point(?:\s+of)?`, 'i'), ' ')
-    .replace(/extension|extended|\bline\b|המשך|הישר|הקו|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?/gi, ' ');
+    .replace(/extension|extended|\bline\b|המש(?:ך|כי(?:ם|הם|הן)?)|הישר|הקו|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?/gi, ' ');
   const pr = labelRun(body, 2);
   if (!pr || pr.includes(R)) return null;
   const [a, b] = pr;
@@ -3669,7 +3688,7 @@ const lineMeetsCircle: Rule = (s, ctx) => {
   // has no second crossing strictly within it ("E היא מפגש של AO עם המעגל" on a radius AO = the
   // antipode, beyond O by definition), so the within-default would be unsatisfiable by construction.
   const infinite =
-    /\bline\b|\bray\b|הישר|הקו|קרן|המשך|extension|extended/i.test(s) || a === up(center) || b === up(center);
+    /\bline\b|\bray\b|הישר|הקו|קרן|המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(s) || a === up(center) || b === up(center);
   return [
     { type: 'line-through', id: lineId, a, b },
     { type: 'line-circle-intersection', id: R, line: lineId, circle: circ, avoid: onCircle, ...(infinite ? {} : { order: [a, R, b] as Id[] }) },
@@ -4188,7 +4207,7 @@ const LINE_CUT = new RegExp(String.raw`${CUT_VERB}\s*${CUT_FILLER}([A-Za-z]\d*)\
  *  infinite line — unconstrained. Classified on the matched cut span (`cut[0]`), where the target's own
  *  reference words live (never the whole utterance — that's the utterance-global defect this fixes). */
 const cutTargetOrder = (cutText: string, c1: Id, c2: Id, e: Id): Id[] | undefined =>
-  /המשך|extension|extended/i.test(cutText) ? [c1, c2, e]
+  /המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(cutText) ? [c1, c2, e]
   : /\bline\b|הישר|הקו|\bray\b|קרן/i.test(cutText) ? undefined
   : [c1, e, c2];
 /** A cut verb aimed at a NAMED segment (two labels) — if this is present but {@link LINE_CUT} didn't
@@ -4312,21 +4331,37 @@ const circumcircleMeetsSegment: Rule = (s, ctx) => {
   const at = s.match(/(?:\bat\b|בנקודה|ב-)\s*([A-Za-z]\d*)\b/i);
   if (!cue || !cut || !at || cut.index! < cue.index!) return null;
   const D = up(at[1]);
-  // the triangle's 3 vertices: the labels between the cue and the cut verb ("…circumscribing [triangle] ABC cuts…").
-  const tri = labelRun(s.slice(cue.index! + cue[0].length, cut.index).replace(/triangle|משולש|את|\bof\b|\bthe\b/gi, ' '), 3);
+  // the shape's vertices: the labels between the cue and the cut verb ("…circumscribing [triangle] ABC
+  // cuts…"). #81: a 4-label QUAD run is accepted too — circumcircle of three + the 4th concyclic
+  // (mirroring `circumcircle`'s four-branch). When the circle already EXISTS, the ADR-291 reference
+  // resolution lets `lineMeetsCircle` claim the utterance first — this rule owns only CREATION.
+  const between = s.slice(cue.index! + cue[0].length, cut.index).replace(/triangle|משולש|מרובע|quad\w*|את|\bof\b|\bthe\b/gi, ' ');
+  const tri = labelRun(between, 4) ?? labelRun(between, 3);
   if (!tri) return null;
   const [a, b, c] = tri;
   // the cut segment: the 2 labels between the cut verb and "at".
-  const seg = labelRun(s.slice(cut.index! + cut[0].length, at.index).replace(/את|\bthe\b|\bline\b|הישר|הקו|המשך/gi, ' '), 2);
+  const seg = labelRun(s.slice(cut.index! + cut[0].length, at.index).replace(/את|\bthe\b|\bline\b|הישר|הקו|המש(?:ך|כי(?:ם|הם|הן)?)/gi, ' '), 2);
   if (!seg || seg.includes(D)) return null;
   const [p, q] = seg;
   const shared = [p, q].find((x) => [a, b, c].includes(x)) ?? p; // the endpoint already on the circumcircle
   const other = shared === p ? q : p; // the segment's OTHER endpoint
+  const lineId = `line-${p}${q}`;
+  // #81 (ADR-291, M1 resolution-before-creation): when a circle through the named vertices ALREADY
+  // exists (e.g. the hidden concyclic circle from "בר חסימה"), reference it — never mint a coincident
+  // duplicate. This rule runs before lineMeetsCircle, so the guard must live here, not on rule order.
+  const existing = circleContaining(ctx, tri);
+  if (existing) {
+    return [
+      { type: 'show-circle', id: circleId(existing) }, // the student is clearly USING it — draw it
+      { type: 'line-through', id: lineId, a: p, b: q },
+      { type: 'line-circle-intersection', id: D, line: lineId, circle: circleId(existing), avoid: shared, order: [shared, D, other] },
+    ];
+  }
   const center = freeLabel([a, b, c, p, q, D, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
   const circId = circleId(center);
-  const lineId = `line-${p}${q}`;
   return [
     { type: 'circumcircle', id: circId, center, a, b, c },
+    ...(tri.length === 4 ? [{ type: 'set-concyclic', points: tri } as AnyCommand] : []),
     { type: 'line-through', id: lineId, a: p, b: q },
     // D = the OTHER crossing (avoid the shared vertex), constrained to lie ON segment CE (order C→D→E),
     // not on the line's extension — the circle "cuts CE" at an interior point (segment-reference principle,
@@ -4340,6 +4375,15 @@ const circumcircle: Rule = (s, ctx) => {
   if (!/through|circumscrib|חוסם|דרך/i.test(s)) return null; // the 3-point cue (חוסם circumscribes ≠ חסום inscribed)
   if (circleCenter(s)) return null; // a named centre ⇒ it's a centre-based circle, not a circumcircle
   const rest = s.replace(/circles?|מעגל|circumscrib\w*|through|דרך|חוסם|את|of|the|around|triangle|משולש|מרובע/gi, ' ');
+  // #83 ([ADR-291](docs/06-decisions.md#adr-291), M1): a circumscription stated about points that ALREADY
+  // ride a circle RESOLVES it — reveal the existing (auto-hidden) circle, never mint a coincident
+  // duplicate + duplicate constraint (the ADR-099/ADR-115 family, circumscribes-edition). This also
+  // removes the guess-the-hidden-name problem: the circle becomes visible and referenceable.
+  const stated = labelRun(rest, 4) ?? labelRun(rest, 3);
+  if (stated) {
+    const existing = circleContaining(ctx, stated);
+    if (existing) return [{ type: 'show-circle', id: circleId(existing) }];
+  }
   // "circle through A B C D" — FOUR existing points: a unique circle can't pass through four arbitrary
   // points, so draw the circumcircle of three and make the fourth concyclic by driving a free DOF
   // (ADR-041). Only when all four already exist (else it's a fresh on-circle placement, not this rule).
@@ -5735,6 +5779,29 @@ export function droppedNewLabels(utterance: string, commands: AnyCommand[], exis
  * pair must land as an explicit constraint — the ADR-234 pin). Conservative on purpose: word-form
  * relations (מקביל/מאונך) belong to rule-owned compounds whose lowering is already leftover-guarded.
  */
+/**
+ * #82 ([ADR-292](docs/06-decisions.md#adr-292)) — the VERB honesty gate, the fourth sibling of
+ * droppedNewLabels (ADR-089) / droppedGivenNumbers (ADR-250) / droppedGivenRelations (ADR-264):
+ * a statement VERB present in the utterance whose meaning is entirely ABSENT from the winning
+ * parse's lowering means a rule claimed a compound and silently dropped a given (the P1 class —
+ * "הישר ℓ משיק … למעגל החוסם את המשולש ABC" lowered to a bare circumcircle, the tangent gone,
+ * green row). Never commit such a parse — escalate (grammar path) or refuse (LLM path).
+ * The satisfied-sets are deliberately GENEROUS (any command family that can carry the verb's
+ * meaning, incl. the ADR-115 tangency-as-⟂ lowering) so a legitimate alternative lowering never
+ * false-blocks; the gate aims at the verb being entirely unrepresented.
+ */
+const VERB_GATES: { verb: string; present: RegExp; satisfied: RegExp }[] = [
+  { verb: 'משיק/tangent', present: /משיק|tangent/i, satisfied: /tangent|circles-tangent|set-perpendicular/ },
+  { verb: 'חוצה/bisect', present: /חוצ[הי]|bisect/i, satisfied: /bisector|midpoint|set-angle-ratio|set-equal|arc-midpoint|set-line/ },
+  { verb: 'מקביל/parallel', present: /מקביל|parallel/i, satisfied: /parallel/ },
+  { verb: 'מאונך/perpendicular', present: /מאונ[כך]|perpendicular/i, satisfied: /perpendicular|foot|right-triangle|altitude/ },
+];
+export function droppedGivenVerbs(utterance: string, commands: AnyCommand[]): string[] {
+  const s = normalizeUtterance(utterance);
+  const json = JSON.stringify(commands);
+  return VERB_GATES.filter((g) => g.present.test(s) && !g.satisfied.test(json)).map((g) => g.verb);
+}
+
 export function droppedGivenRelations(utterance: string, commands: AnyCommand[]): string[] {
   const s = normalizeUtterance(utterance);
   const rel = /(?<![A-Za-z\d])([A-Z]\d*)([A-Z]\d*)\s*(=|⊥|⟂|∥)\s*([A-Z]\d*)([A-Z]\d*)(?![A-Za-z\d])/g;
