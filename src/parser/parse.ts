@@ -91,6 +91,17 @@ const membersOfCenter = (ctx: ParseContext, center: string): Set<string> => {
 };
 const NO_CONTEXT: ParseContext = {};
 
+/** The label of a "דרך [ה]נקודה X" / "through [the] point X" / bare "דרך X" carrier clause, or null.
+ *  Shared by the tangent rules: a tangent drawn THROUGH a point names that point as a carrier — and when
+ *  the point is a known circle MEMBER, it IS the touch (issue #100; the ADR-233 membership-over-position
+ *  principle). The bare "דרך X" form is read only where a tangent keyword already gates the rule. */
+const throughPointLabel = (s: string): string | null => {
+  const m =
+    s.match(/(?:דרך\s+ה?נקודה|through\s+(?:the\s+)?point)\s+([A-Za-z]\d*)/i) ??
+    s.match(/(?:דרך|\bthrough\b)\s+([A-Za-z]\d*)(?![A-Za-z])/i);
+  return m ? up(m[1]) : null;
+};
+
 /** Orient a tangent rule's (touch, cut) label pair by CIRCLE MEMBERSHIP — the touch is the label the
  *  figure already knows is ON the circle, wherever it sits in the sentence; the positional read ("the
  *  label after the tangent keyword's בנקודה/at") is only the tiebreak when membership says nothing.
@@ -103,8 +114,8 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
   const members = membersOfCenter(ctx, center);
   if (members.has(touch)) return [touch, cut];
   if (members.has(cut)) return [cut, touch];
-  const thr = s.match(/(?:דרך\s+ה?נקודה|through\s+(?:the\s+)?point)\s+([A-Za-z]\d*)/i);
-  if (thr && up(thr[1]) === cut) return [cut, touch];
+  const thr = throughPointLabel(s);
+  if (thr && thr === cut) return [cut, touch];
   return [touch, cut];
 };
 
@@ -139,8 +150,11 @@ const circleId = (center: string): Id => `circle-${center.toUpperCase()}`;
  * circle centre.
  */
 const circleCenter = (s: string): string | null => {
+  // An optional "בנקודה"/"at point" may sit between the centre word and its label — "מעגל שמרכזו בנקודה O"
+  // (the 2025-exam wording; issue #100 ride-along). Without it the stated centre was silently DROPPED and
+  // an auto-named sibling minted (P) — luck-dependent honesty (§6).
   const m =
-    s.match(/(?:cent\w*\s+(?:at\s+)?|around\s+|שמרכזו\s*|מרכזו\s*|סביב\s+)([A-Za-z]\d*)\b/i) ??
+    s.match(/(?:cent\w*\s+(?:at\s+)?(?:point\s+)?|around\s+|שמרכזו\s+(?:ב?נקודה\s+)?|שמרכזו|מרכזו\s+(?:ב?נקודה\s+)?|מרכזו|סביב\s+)([A-Za-z]\d*)\b/i) ??
     s.match(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/i) ??
     orderlessCenter(s);
   return m ? m[1] : null;
@@ -245,7 +259,10 @@ const dropCircleRef = (s: string): string =>
  * English filler words, lowercase only — typed fillers are lowercase, while
  * uppercase pairs like "ON" must stay readable as point labels (O, N).
  */
-const FILLER = /\b(?:to|the|and|of|is|are|at|on|in|with|from|that|so|such)\b/g;
+// Lowercase-only (no /i): the ARTICLES "a"/"an" are filler exactly like "the", but an UPPERCASE "A" is a
+// point label and must survive — "through point A a tangent is drawn" read the article as a second label
+// A, producing a degenerate pair (issue #100 En mirror).
+const FILLER = /\b(?:a|an|to|the|and|of|is|are|at|on|in|with|from|that|so|such)\b/g;
 
 /**
  * Find a run of `n` point labels, as a contiguous token ("ABCD", "O1O2") or `n`
@@ -3843,6 +3860,39 @@ const tangentMeetsOtherCircle: Rule = (s) => {
 };
 
 /**
+ * "המשיק חותך את מעגל P בנקודה K" / "the tangent cuts circle P at K" — a DEFINITE back-reference to
+ * the tangent line already drawn in the figure, intersected with a circle in a SEPARATE statement
+ * (issue #100; the ADR-029 implicit-reference pattern, tangent-line edition). The textbook two-clause
+ * form: "דרך הנקודה A העבירו משיק למעגל הקטן. המשיק חותך את המעגל הגדול בנקודה K." Deliberately TIGHT:
+ * the subject must be exactly the bare definite tangent noun followed by the cut verb — a subject that
+ * declares its own tangency ("המשיק למעגל O בנקודה A חותך…") carries a circle ref before the verb and
+ * belongs to `tangentMeetsOtherCircle` (which runs first); a two-tangent meet ("המשיק בנקודה A והמשיק
+ * בנקודה B נפגשים") doesn't match the anchor. Resolves to THE tangent line when the figure has exactly
+ * one — 0 or 2+ is genuinely ambiguous → defer (escalate), never guess. The crossing avoids the touch
+ * point when the touch is a member of the target circle (the intersecting-circles case: the tangent
+ * meets the other circle at the shared point AND at K — K is the crossing away from it).
+ */
+const theTangentMeetsCircle: Rule = (s, ctx) => {
+  // No `\b` after the Hebrew verb — Hebrew letters are not `\w`, so \b never matches there (the recorded ℓ trap).
+  const subj = s.match(/^\s*(?:המשיק|the\s+tangent)\s+(?:חות(?:ך|כת)|פוגש\w*|נפגש\w*|cuts?|meets?|crosses|intersects?)(?![A-Za-z])/i);
+  if (!subj) return null;
+  const tans = (ctx.lines ?? []).filter((l) => l.startsWith('tan-'));
+  if (tans.length !== 1) return null; // no tangent to refer to, or ambiguous which — escalate, never guess
+  const tanId = tans[0];
+  const touch = up(tanId.slice('tan-'.length));
+  const center = resolveMentionedCircle(s, ctx);
+  if (!center) return null; // must name/refer to a circle (else it's a line∩line statement)
+  const K = crossingAfterCircle(s);
+  if (!K || K === touch || K === up(center)) return null;
+  if ((ctx.points ?? []).includes(K)) return null; // an EXISTING crossing target is an M1 statement — escalate rather than silently no-op
+  const avoid = membersOfCenter(ctx, center).has(touch);
+  return [
+    { type: 'line-circle-intersection', id: K, line: tanId, circle: circleId(center), ...(avoid ? { avoid: touch } : { branch: 0 }) },
+    { type: 'segment', a: touch, b: K }, // draw the chord the tangent cuts (touch → K), like lineMeetsCircle's drawn halves
+  ];
+};
+
+/**
  * "circle O and circle P are tangent to each other at M" /
  * "מעגל O ומעגל P משיקים זה לזה בנקודה M" — two circles touching at one point. TWO
  * circles named + a tangent keyword (a single-circle "tangent to circle X" is the
@@ -4214,6 +4264,10 @@ const tangentLine: Rule = (s, ctx) => {
   const named = dropCircleRef(s)
     .replace(/(?:\bat\b|בנקודה|ב-?)\s*[A-Za-z]\d*\b/gi, ' ')
     .replace(/tangent|משיק\S*|\bline\b|הישר|הקו|למעגל|מעגל/gi, ' ');
+  // NOTE: a degenerate pair ("BB") is deliberately NOT filtered here — it flows to the existing-segment
+  // branch whose set-perpendicular the ADR-202 apply gate rejects with a clear message (the ONE chokepoint
+  // for zero-length operands, whatever their source). The article-as-label misread ("through point A a
+  // tangent…" → pair A,A) is fixed at ITS root instead: "a"/"an" joined FILLER (lowercase-only).
   const pts = labelRun(named, 2);
 
   // The touch point T. Usually named explicitly ("… at K" / "בנקודה K"). But a student commonly OMITS it
@@ -4230,6 +4284,15 @@ const tangentLine: Rule = (s, ctx) => {
   if (!T && pts) {
     const onCircle = pts.filter((p) => members.has(p));
     if (onCircle.length === 1) T = onCircle[0];
+  }
+  // Third source (issue #100): a tangent drawn THROUGH a point that is ON the circle touches there —
+  // "דרך הנקודה A העבירו משיק למעגל" / "through point A a tangent is drawn to the circle" (the textbook
+  // form when A is a circle∩circle intersection). Membership-gated (ADR-233: role by membership, never
+  // by phrasing luck) — a through-point OFF the circle is an external apex and belongs to
+  // `tangentFromExternal`, which runs earlier and reads the from/מנקודה forms.
+  if (!T) {
+    const thr = throughPointLabel(s);
+    if (thr && members.has(thr)) T = thr;
   }
   if (!T) return null;
   const lineId = `tan-${T}`;
@@ -5081,6 +5144,7 @@ export const RULES: Rule[] = [
   commonTangent, // a COMMON tangent of two circles ("משיק משותף") — before circlesTangent (which would misread it as mutual tangency of new circles)
   tangentChord, // a CHORD of one circle tangent to the OTHER at its endpoint — before circlesTangent/chord (which drop the tangency or the chord)
   tangentMeetsOtherCircle, // tangent LINE to one circle meets the OTHER circle — before circlesTangent (which would misread it as mutual tangency)
+  theTangentMeetsCircle, // "המשיק חותך את מעגל P בנקודה K" — definite back-reference to THE drawn tangent (#100); after tangentMeetsOtherCircle (whose self-declaring subject also starts "המשיק"), before lineLineIntersection (which 'stop's on משיק)
   circlesTangent, // two circles tangent to each other — before tangentLine (which would grab the משיק)
   secantFromExternal, // "from external point E a line cuts the circle at A,B" — before the generic intersections
   twoCirclesMeet, // "two circles intersect at A and B" — create both circles + both intersection points

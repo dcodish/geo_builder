@@ -1097,3 +1097,7 @@ over all four (ADR-041).
 ### `q4-external-secant-and-on-circle-parallel` — Q4 construction: מ-B secant + D על המעגל (#96/#97, ADR-300/301)
 
 **Guards against:** the abbreviated «מ-B» external-point cue being not-handled (#96) and «D על המעגל כך ש-…» dropping the on-circle membership so D floats free (#97). **Asserts:** the bagrut 2023-קיץ-א Q4 construction builds — E, A land on circle O (secant from the abbreviated «מ-B»), D is on circle O (membership kept), and CD ∥ EA holds.
+
+### `tangent-through-oncircle-point-then-back-reference` — 2025 bagrut: משיק דרך נקודת החיתוך A + «המשיק חותך את המעגל ב-K» (#100)
+
+**Guards against:** the two-clause textbook tangent form failing on both clauses: «דרך הנקודה A העבירו משיק למעגל» had no touch-inference lane for a through-point that is a circle MEMBER (the touch), and the definite back-reference «המשיק חותך את מעגל P בנקודה K» had no rule at all (`lineLineIntersection` 'stop's on משיק → not-handled). **Asserts:** the operator's exact 6-step sequence (two intersecting circles, O on the big one, A = circle∩circle) builds — the tangent touches at A, K lands on the big circle away from A, and OA ⟂ AK. He/En + defer/no-theft edges locked in `issue-100.test.ts`.

@@ -4488,6 +4488,30 @@ export const SCENARIOS: Scenario[] = [
       expect(Math.abs(cross) / (scale || 1), 'CD ∥ EA').toBeLessThan(1e-3);
     },
   },
+  {
+    id: 'tangent-through-oncircle-point-then-back-reference',
+    title: 'bagrut 2025 two-circle figure: tangent THROUGH the intersection point A, then "המשיק חותך את המעגל ב-K" (#100)',
+    guards:
+      'Operator prod report 2026-07-12 (the 2025 bagrut, two intersecting circles): «דרך הנקודה A העבירו משיק למעגל» fell through every tangent rule (the through-point clause named no touch: tangentLine read the touch only from an at-clause or a named segment, while tangentFromExternal correctly DEFERRED on the on-circle apex — the designed ADR-233 handoff had no receiving lane), and the follow-up «המשיק חותך את מעגל P בנקודה K» — a DEFINITE back-reference to the drawn tangent — had no rule at all (lineLineIntersection then \'stop\'s on משיק → not-handled). Fix (#100): tangentLine gains the membership-gated through-point touch source, and theTangentMeetsCircle resolves THE unique tan-* line from context and lowers to line∩circle avoiding the touch. This replays the operator\'s construction; K must land on the big circle and the tangency (OA ⟂ AK) must hold.',
+    steps: [
+      'מעגל O',
+      'מעגל P',
+      'O נמצאת על מעגל P',
+      'A היא אחת מנקודות החיתוך של מעגל O ומעגל P',
+      'דרך הנקודה A העבירו משיק למעגל O',
+      'המשיק חותך את מעגל P בנקודה K',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), K = at(fig, 'K'), P = at(fig, 'P');
+      // K lies on the big circle (its radius is |P·O| — O rides it), away from the shared point A
+      expect(dist(P, K), 'K on the big circle').toBeCloseTo(dist(P, O), 5);
+      expect(dist(K, A)).toBeGreaterThan(0.1);
+      // the drawn line is TANGENT to the small circle at A: radius OA ⟂ the chord AK
+      const dot = (O.x - A.x) * (K.x - A.x) + (O.y - A.y) * (K.y - A.y);
+      expect(Math.abs(dot), 'OA ⟂ AK (tangency at A)').toBeLessThan(1e-6);
+    },
+  },
 ];
 
 /**
