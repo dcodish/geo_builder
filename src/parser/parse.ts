@@ -1056,17 +1056,21 @@ const pointOnExtension: Rule = (s, ctx) => {
  */
 const angle: Rule = (s, ctx) => {
   if (!/(?:angle|∠|זוו?ית)/i.test(s)) return null;
+  // The right-angle WORD form (#45 / ADR-299): "זוית B ישרה" / "זוית ABC ישרה" / "angle ABC is a right
+  // angle" ≡ "= 90". Detected on the raw utterance; the "right angle" phrase is NOT a second angle
+  // reference (the multi-angle guard below counts on a copy with the phrase removed).
+  const rightWord = /ישרה|right[\s-]?angle/i.test(s);
   // TWO+ angle REFERENCES in one line ("זווית ABC = 40, זווית DEF = 60") is a multi-angle GIVENS list —
   // the `multiStatement` splitter owns it. If it reaches here unsplit, bail rather than silently claim
   // only the first triple (PAR-2, defence in depth); the whole then escalates instead of half-parsing.
   // Count REFERENCES, not raw keyword tokens: the word immediately followed by the glyph ("זווית ∠ABC",
   // a student typing the word then pressing the ∠ toolbar button) is ONE angle — counting it as two
   // regressed that form to an LLM escalation (review 2026-07-03, P2).
-  if (((s.match(/(?:angle|זוו?ית)(?:\s*∠)?|∠/gi) ?? []).length) > 1) return null;
-  const stripped = s.replace(/angle|∠|זוו?ית/gi, ' ');
+  if (((s.replace(/right[\s-]?angle/gi, ' ').match(/(?:angle|זוו?ית)(?:\s*∠)?|∠/gi) ?? []).length) > 1) return null;
+  const stripped = s.replace(/angle|∠|זוו?ית|ישרה|right/gi, ' ');
   const valM = stripped.match(new RegExp(num));
-  if (!valM) return null; // no degree value → not this rule (an equality/ratio is handled upstream)
-  const value = parseFloat(valM[1]);
+  if (!valM && !rightWord) return null; // no degree value AND not a right-angle word → not this rule
+  const value = valM ? parseFloat(valM[1]) : 90;
   const ids = labelRun(stripped, 3);
   if (ids) {
     const [r1, v, r2] = ids;
@@ -1081,8 +1085,15 @@ const angle: Rule = (s, ctx) => {
   // of edges (more = several angles to choose between; fewer = no arms to use) the intended angle is
   // ambiguous, so ASK the student to name all three letters rather than guessing or escalating to the LLM.
   // Gated to a CLEAN single-label utterance (exactly one label besides the value) so compounds fall through.
-  const one = labelRun(stripped, 1);
-  const labelCount = (stripped.match(/[A-Z]\d*/g) ?? []).length;
+  const one = labelRun(stripped, 1); // labelRun already uppercases a lone lowercase label (`d` → `D`)
+  const upperCount = (stripped.match(/[A-Z]\d*/g) ?? []).length;
+  // A LOWERCASE vertex (#45 / ADR-299): "נתון זווית d=90" — a student typed a lowercase point label.
+  // `labelRun` resolves it, but the compound-guard count was UPPERCASE-only and so read zero labels and
+  // bailed. Count a LONE lowercase Latin letter too — but only when there is NO uppercase label (so a
+  // lowercase FILLER word's letters, e.g. "is a", are never counted: those cases always have uppercase
+  // vertices and take the count-3 path). So a bare lowercase vertex reads as exactly one label.
+  const lowerLoners = upperCount === 0 ? (stripped.match(/(?<![A-Za-z])[a-z](?![A-Za-z])/g) ?? []).length : 0;
+  const labelCount = upperCount + lowerLoners;
   if (!one || labelCount !== 1) return null;
   const v = one[0];
   const nb = (ctx.neighbors ?? {})[v] ?? [];
@@ -5482,13 +5493,29 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
  * He/Latin text — both silently break `\s*`/optional-`-` adjacency, so e.g. "נקודה E על AC ב־40%" dropped
  * the ratio. Fixing it here, at the boundary, kills the whole class in one place instead of per-rule.
  */
+/** Uppercase Cyrillic letters that are visual twins of Latin uppercase (#45 / ADR-299) — mapped to Latin so
+ *  a label pasted with a homoglyph is read as the letter it looks like. Only the unambiguous look-alikes. */
+const CYRILLIC_TO_LATIN: Record<string, string> = { 'А': 'A', 'В': 'B', 'С': 'C', 'Е': 'E', 'Н': 'H', 'К': 'K', 'М': 'M', 'О': 'O', 'Р': 'P', 'Т': 'T', 'Х': 'X' };
+
 export function normalizeUtterance(raw: string): string {
   // maqaf U+05BE → ASCII hyphen (so the ל-?/ב-?/מ-? suffix groups match); then strip invisible format
   // chars: ALM, ZWSP/ZWNJ/ZWJ/LRM/RLM, LRE…RLO, isolates LRI…PDI, BOM.
   // עיגול (disk) ≡ מעגל (circle): the everyday Hebrew synonym students use interchangeably. Normalising it
   // to the canonical circle word HERE — at the one boundary every rule reads — means the whole circle
   // vocabulary (creation, sizing, chord, tangent, inscribe…) accepts it without touching each rule.
-  const orth = raw.replace(/־/g, '-').replace(/[؜​-‏‪-‮⁦-⁩﻿]/g, '').replace(/עיגול/g, 'מעגל');
+  const orth = raw
+    .replace(/־/g, '-')
+    .replace(/[؜​-‏‪-‮⁦-⁩﻿]/g, '')
+    .replace(/עיגול/g, 'מעגל')
+    // Angle/degree GLYPH variants (#45 / ADR-299): the ∡ MEASURED-ANGLE (U+2221) and ∢ SPHERICAL-ANGLE
+    // (U+2222) glyphs are the same student intent as ∠ (U+2220); the SUPERSCRIPT ZERO ⁰ (U+2070), typed for
+    // degrees ("90⁰"), is the ° sign. Normalising here means every angle rule reads the canonical glyphs.
+    .replace(/[∡∢]/g, '∠')
+    .replace(/⁰/g, '°')
+    // Uppercase CYRILLIC homoglyphs → Latin (#45): a label pasted with a Cyrillic look-alike (А/В/С/… are
+    // NOT [A-Za-z]) silently fails every label rule. Map the visual twins to their Latin letter at the one
+    // boundary every rule reads, so "מעגל עם קוטר АВ" reads AB.
+    .replace(/[АВСЕНКМОРТХ]/g, (ch) => CYRILLIC_TO_LATIN[ch]);
   return normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(orth.trim().replace(/\s+/g, ' ')))));
 }
 

@@ -1085,3 +1085,8 @@ over all four (ADR-041).
 ### `incircle-feet-are-anonymous-not-namespace-hijack` — incircle feet are anonymous @-ids (#32, ADR-297)
 
 **Guards against:** an auto-minted decomposition point occupying a student letter, so a later student statement binds to the invisible scaffolding. **Asserts:** the incircle's three tangency feet are ANONYMOUS promotable points (`@f-<side>` — never F/G/H), so «G על המשך CA» after the incircle creates a FRESH on-segment point on CA's extension, not a constraint on the incircle foot. The feet render as clickable dots (no label) the student promotes to a letter (locked in `promote.test.ts`).
+
+
+### `right-angle-word-and-glyph-forms` — ∡ glyph + ⁰ superscript right-angle (#45, ADR-299)
+
+**Guards against:** right-angle input variants (∡/∢ glyphs, ⁰ superscript, Cyrillic homoglyph labels, the «ישרה»/«right angle» word, a lowercase vertex) failing. **Asserts:** «∡ABC=90⁰» on a triangle builds ∠ABC = 90 (the ∡→∠ + ⁰→° normalization). The word / Cyrillic / lowercase-vertex forms are locked in `right-angle-forms.test.ts`.
