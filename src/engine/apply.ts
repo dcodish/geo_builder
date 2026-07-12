@@ -1207,7 +1207,17 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
           // the whole `point-on-circle` fact is rolled back — the point can never reach the circle. Carried
           // over, D still drives `AB=AD`, now via its on-circle θ (it slides on the circle to keep |AD|=|AB|).
           const solve = (existing as { solve?: SolveDirective }).solve;
-          objects[i] = { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: nextTheta(objects, cmd.circle), free: true, ...(solve ? { solve } : {}) };
+          // Convert AT THE POINT'S OWN BEARING from the centre, not an arbitrary slot angle (M1: a
+          // membership statement about an existing point keeps it near where it was — the stability
+          // principle). This also preserves an earlier REGION statement's seeding by default: an E
+          // seeded inside a triangle converts to the on-circle spot NEAREST that seat, instead of
+          // jumping to nextTheta on the far side (play-test session yla2d4xo — "E בתוך משולש" then
+          // "E על מעגל O" landed E outside the stated region).
+          const eSpot = pos.get(cmd.id);
+          const cSpot = pos.get(circ.center);
+          const bearing =
+            eSpot && cSpot && dist(eSpot, cSpot) > 1e-9 ? Math.atan2(eSpot.y - cSpot.y, eSpot.x - cSpot.x) : nextTheta(objects, cmd.circle);
+          objects[i] = { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: bearing, free: true, ...(solve ? { solve } : {}) };
           break;
         }
         // (c3) The point is DETERMINED ((c2) didn't take it — a derived/pinned vertex, e.g. a square

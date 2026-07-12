@@ -10,7 +10,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { parse, buildParseCtx } from '@/parser';
-import { replay, firstSatisfyingSeed } from '@/store/geoStore';
+import { replay, firstSatisfyingSeed, dryRunOutcome } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand, Vec } from '@/engine';
 import { pointInPolygon } from '@/engine/geometry';
@@ -114,6 +114,41 @@ describe('issue #99 — point-polygon-side (region requirement)', () => {
     ];
     const fig = replay(contradiction);
     expect(fig.violations.some((v) => v.messageKey === 'figure.v.insideRegion')).toBe(true);
+  });
+
+  it('membership stated AFTER the region converts E at its OWN bearing — E stays on the circle AND inside (session yla2d4xo)', () => {
+    // The operator's exact second-session order: region first (free E seeded inside), THEN "E על מעגל O".
+    // The (c2) free→on-circle conversion used to jump E to an arbitrary slot angle, ignoring both its
+    // seat and its region requirement. (The triangle must genuinely admit an on-circle interior point —
+    // here K is on the BIG circle via the one-sentence tangent compound, so circle O's arc crosses △AKO.)
+    const facts = runLines([
+      'שני מעגלים נחתכים',
+      'דרך A עובר משיק למעגל O שחותך את מעגל P בנקודה K',
+      'O על מעגל P',
+      'משולש AKO',
+      'נקודה E בתוך משולש AKO',
+      'E על מעגל O',
+    ]);
+    const fig = replay(facts, firstSatisfyingSeed(facts));
+    expect(fig.lastError).toBeNull();
+    const O = at(fig, 'O'), E = at(fig, 'E'), A = at(fig, 'A'), K = at(fig, 'K');
+    const r = Math.hypot(A.x - O.x, A.y - O.y);
+    expect(Math.hypot(E.x - O.x, E.y - O.y), 'E on circle O').toBeCloseTo(r, 5);
+    expect(pointInPolygon(E, [A, K, O]), 'E inside the region').toBe(true);
+  });
+
+  it('re-stating an EXISTING region requirement is a truthful no-op; a FRESH one commits (dryRunOutcome)', () => {
+    const facts = runLines(['משולש ABC', 'נקודה E בתוך משולש ABC']);
+    const r = parse('נקודה E בתוך משולש ABC', ctxOf(facts));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // exact duplicate of an enabled fact → 'empty' (noop-exists is honest)
+    expect(dryRunOutcome(facts, r.commands, 0, {}).produced).toBe(false);
+    // but a DIFFERENT region statement about the same existing point commits (zero coordinate delta)
+    const facts3 = runLines(['משולש ABC', 'משולש ABD'.replace('ABD', 'ABD'), 'נקודה E בתוך משולש ABC']);
+    const r3 = parse('נקודה E בתוך משולש ABD', ctxOf(facts3));
+    expect(r3.ok).toBe(true);
+    if (r3.ok) expect(dryRunOutcome(facts3, r3.commands, 0, {}).produced).toBe(true);
   });
 
   it('no-theft: inscription phrasings are untouched', () => {

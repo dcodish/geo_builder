@@ -124,6 +124,22 @@ describe('issue #100 — tangent through an on-circle point + המשיק back-re
     expect(r.ok).toBe(false);
   });
 
+  it('the ONE-SENTENCE compound with a through-point touch — "דרך A עובר משיק למעגל O שחותך את מעגל P בנקודה K"', () => {
+    // Play-test session yla2d4xo (second round): the operator's natural one-liner. The touch is named by
+    // the THROUGH-clause, not an at-clause, so tangentMeetsOtherCircle's two-pair match missed it and a
+    // weaker rule claimed a bare re-statement of A (caught by the gates → dead-LLM dead end).
+    const facts = runLines(PREFIX_HE);
+    const r = parse('דרך A עובר משיק למעגל O שחותך את מעגל P בנקודה K', ctxOf(facts));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.commands.map((c) => c.type)).toEqual(['tangent', 'line-circle-intersection', 'segment']);
+    expect(r.commands[0]).toMatchObject({ type: 'tangent', circle: 'circle-O', at: 'A' });
+    expect(r.commands[1]).toMatchObject({ id: 'K', circle: 'circle-P', avoid: 'A' });
+    // membership gate: an off-circle through-point still defers to the external-tangent rules
+    const off = runLines(['מעגל O', 'מעגל P', 'E מחוץ למעגל O']);
+    expect(parse('דרך E עובר משיק למעגל O שחותך את מעגל P בנקודה K', ctxOf(off)).ok).toBe(false);
+  });
+
   it('no-theft: the single-utterance tangentMeetsOtherCircle form is untouched', () => {
     const facts = runLines(PREFIX_HE);
     const r = parse('המשיק למעגל O בנקודה A חותך את מעגל P בנקודה D', ctxOf(facts));

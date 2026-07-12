@@ -3727,6 +3727,12 @@ const twoCirclesMeet: Rule = (s, ctx) => {
 const circleCircleIntersection: Rule = (s) => {
   if (!/circle|מעגל/i.test(s)) return null;
   if (!(INTERSECT_KW.test(s) || /מפגש|נפגש/.test(s))) return null;
+  // A tangent-LINE compound that names two circles ("דרך E עובר משיק למעגל O שחותך את מעגל P בנקודה K")
+  // is owned by the tangent rules — the same defer its siblings carry (lineMeetsCircle bows out on משיק,
+  // lineLineIntersection 'stop's on it). Without it this rule claimed the compound as a bare
+  // circle∩circle of the through-point, silently dropping the tangent AND the crossing (play-test
+  // session yla2d4xo — the gates caught it, but a not-handled escalates honestly instead).
+  if (/tangent|משיק/i.test(s)) return null;
   const centers = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => m[1]);
   if (centers.length < 2) return null;
   const resM = dropCircleRef(s).match(/\b([A-Za-z]\d*)\b/);
@@ -3912,7 +3918,7 @@ const lineMeetsCircle: Rule = (s, ctx) => {
  * mutual-tangency point. Must run BEFORE `circlesTangent`, which would otherwise read the
  * משיק + two circle names + the first "at" as mutual tangency (the misparse this fixes).
  */
-const tangentMeetsOtherCircle: Rule = (s) => {
+const tangentMeetsOtherCircle: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   if (!INTERSECT_KW.test(s)) return null; // a meeting EVENT (cuts/meets/חותך/פוגש), not a state
   if (/each\s+other|זה\s+לזה/i.test(s)) return null; // mutual tangency → circlesTangent
@@ -3920,9 +3926,21 @@ const tangentMeetsOtherCircle: Rule = (s) => {
   // target circle + the new crossing. The adjacency (no "and"/verb between circle and "at")
   // is what separates this from `circlesTangent`'s "circle O and circle P … at M".
   const pairs = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b\s*(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/gi)];
-  if (pairs.length < 2) return null;
-  const c1 = up(pairs[0][1]), p1 = up(pairs[0][2]);
-  const c2 = up(pairs[1][1]), p2 = up(pairs[1][2]);
+  let c1: string, p1: string, c2: string, p2: string;
+  if (pairs.length >= 2) {
+    [c1, p1, c2, p2] = [up(pairs[0][1]), up(pairs[0][2]), up(pairs[1][1]), up(pairs[1][2])];
+  } else if (pairs.length === 1) {
+    // ONE pair + a THROUGH-point touch — «דרך A עובר משיק למעגל O שחותך את מעגל P בנקודה K» (the
+    // operator's one-sentence form, play-test session yla2d4xo): the tangent's touch is named by the
+    // through-clause, not an at-clause. Membership-gated (ADR-233): the through-point must be a known
+    // member of the tangent's own circle — the one named with the tangent preposition («משיק למעגל O» /
+    // "tangent to circle O"), which the single pair must not be.
+    const thr = throughPointLabel(s);
+    const tanCircM = s.match(/(?:משיק\s+למעגל|tangent\s+to\s+(?:the\s+)?circle)\s+([A-Za-z]\d*)\b/i);
+    if (!thr || !tanCircM) return null;
+    [c1, p1, c2, p2] = [up(tanCircM[1]), thr, up(pairs[0][1]), up(pairs[0][2])];
+    if (!membersOfCenter(ctx, c1).has(p1)) return null; // an off-circle through-point is an external apex — other rules own it
+  } else return null;
   if (c1 === c2) return null; // two DIFFERENT circles
   if (new Set([c1, p1, c2, p2]).size !== 4) return null; // four distinct labels
   const lineId = `tan-${p1}`;

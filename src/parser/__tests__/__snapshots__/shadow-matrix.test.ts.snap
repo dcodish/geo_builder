@@ -351,7 +351,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
-      "circleCircleIntersection",
       "tangentLine",
     ],
     "text": "the tangent to circle O at A meets circle P at D",
@@ -360,7 +359,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "he",
     "shadowedBy": [
-      "circleCircleIntersection",
       "tangentLine",
     ],
     "text": "המשיק למעגל O בנקודה A חותך את מעגל P בנקודה D",
