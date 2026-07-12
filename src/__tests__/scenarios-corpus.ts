@@ -4449,6 +4449,20 @@ export const SCENARIOS: Scenario[] = [
       expect(dist(at(fig, 'B'), at(fig, 'C')), '|BC| = 35/√32').toBeCloseTo(35 / Math.sqrt(32), 4);
     },
   },
+  {
+    id: 'right-angle-word-and-glyph-forms',
+    title: 'the ∡ glyph + ⁰ superscript right-angle form builds ∠ABC = 90 (#45)',
+    guards:
+      'Issue #45 (log-triage 2026-07-11, ~4 prod users): four right-angle input families failed on HEAD — the ∡ (U+2221) / ∢ (U+2222) angle glyphs and the ⁰ (U+2070) superscript degree; uppercase Cyrillic homoglyph labels; the WORD form «זוית B ישרה» / «angle ABC is a right angle»; and a lowercase vertex «נתון זווית d=90». Fix (ADR-299): a symbol-normalization pass at the parse-entry chokepoint (∡/∢→∠, ⁰→°, Cyrillic→Latin — every rule inherits at once) + the `angle` rule reads the «ישרה»/«right angle» word as 90 and adopts a lone lowercase vertex (the `נתון` prefix already worked — the real cause was the lowercase `d`). This replays the headline glyph+superscript form end-to-end; the word / Cyrillic / lowercase forms are locked in `right-angle-forms.test.ts`.',
+    steps: ['משולש ABC', '∡ABC=90⁰'],
+    check(fig) {
+      allStepsOk(fig);
+      const pv = at(fig, 'B'), pa = at(fig, 'A'), pc = at(fig, 'C');
+      const u = { x: pa.x - pv.x, y: pa.y - pv.y }, w = { x: pc.x - pv.x, y: pc.y - pv.y };
+      const deg = (Math.acos(Math.max(-1, Math.min(1, (u.x * w.x + u.y * w.y) / (Math.hypot(u.x, u.y) * Math.hypot(w.x, w.y))))) * 180) / Math.PI;
+      expect(deg, '∠ABC = 90 (∡ glyph + ⁰ superscript read as ∠…=90)').toBeCloseTo(90, 3);
+    },
+  },
 ];
 
 /**

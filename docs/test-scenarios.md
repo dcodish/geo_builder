@@ -1089,3 +1089,7 @@ over all four (ADR-041).
 ### `radical-fraction-length-value` — נתון: BC = 35/√32 builds (#77, ADR-298)
 
 **Guards against:** a stated radical/fraction VALUE (`35/√32`, `35/2`, `√32/5`, `5√2/3`) being unparseable, forcing a hand-computed decimal. **Asserts:** the operator's exact «נתון: BC = 35/√32» builds with |BC| = 35/√32; the shared `NUMEXPR` value atom lowers a quotient in the length/area/perimeter/radius positions and keeps the verbatim radical-fraction text (unit-tested in `radical-fraction-values.test.ts`, incl. no-theft of `12√2`/`AB=CD/2`/`√2R` and the radius/area positions + the honesty gate).
+
+### `right-angle-word-and-glyph-forms` — ∡ glyph + ⁰ superscript right-angle (#45, ADR-299)
+
+**Guards against:** right-angle input variants (∡/∢ glyphs, ⁰ superscript, Cyrillic homoglyph labels, the «ישרה»/«right angle» word, a lowercase vertex) failing. **Asserts:** «∡ABC=90⁰» on a triangle builds ∠ABC = 90 (the ∡→∠ + ⁰→° normalization). The word / Cyrillic / lowercase-vertex forms are locked in `right-angle-forms.test.ts`.
