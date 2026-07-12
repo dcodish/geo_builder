@@ -28,6 +28,14 @@ describe('#77 — quotient LENGTH values (measure-length with verbatim text)', (
     ['BC = 35/2', 17.5, '35/2'],
     ['BC = 5√2/3', (5 * Math.sqrt(2)) / 3, '5√2/3'],
     ['BC = 3/4', 0.75, '3/4'],
+    // EXPLICIT √() grouping (ADR-298 Am. — the √ button's form), which DISAMBIGUATES the radicand:
+    ['BC = √(2/3)', Math.sqrt(2 / 3), '√(2/3)'], // root of the whole fraction
+    ['BC = √2/3', Math.sqrt(2) / 3, '√2/3'], // ≠ above: (√2)/3 (bare √ binds only to 2, textbook convention)
+    ['BC = 5√(2/3)', 5 * Math.sqrt(2 / 3), '5√(2/3)'],
+    ['BC = 5√(2)/3', (5 * Math.sqrt(2)) / 3, '5√(2)/3'],
+    ['BC = (5√2)/3', (5 * Math.sqrt(2)) / 3, '(5√2)/3'], // outer-paren grouping
+    ['BC = √(32)', Math.sqrt(32), '√(32)'],
+    ['BC = 35/√(32)', 35 / Math.sqrt(32), '35/√(32)'],
   ];
   for (const [u, val, text] of cases) {
     it(u, () => {

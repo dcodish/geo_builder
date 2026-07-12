@@ -18,6 +18,7 @@ import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
 import type { Crossing } from '@/render';
+import { MathText, hasMath } from '@/render/mathText';
 import type { DetectedShape, Id, SimilarClass } from '@/engine';
 import { bookUrl } from '@/shapes/shapeCatalog';
 import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES_VISIBLE } from '@/theorems';
@@ -220,7 +221,7 @@ export default function App() {
   // Math symbols. `label` is shown on the button; `insert` is what lands in the box
   // (x²/xⁿ show their meaning but insert just the operator so the caret sits after it).
   const SYMBOLS: { label: string; insert: string; caret?: number }[] = [
-    { label: '√', insert: '√' }, // AD = 12√x
+    { label: '√()', insert: '√()', caret: 2 }, // AD = √(2/3) — inserts the EXPLICIT radicand group, caret between the parens (#77 Am.: √() disambiguates √(2/3) from √2/3)
     { label: 'x²', insert: '²' }, // AB = x²
     { label: 'xⁿ', insert: '^' }, // AB = x^3
     { label: 'π', insert: 'π' }, // AB = 2π
@@ -1162,6 +1163,14 @@ export default function App() {
                 {thinking ? t('input.loading') : t('input.send')}
               </button>
             </div>
+            {/* Live math preview (#77 Am. / #40): render the current input's fractions/radicals/subscripts as
+                real formatted math, so the interpretation is visible while typing — `√(2/3)` shows a radical
+                OVER the fraction, `√2/3` shows `(√2)/3`, disambiguating what the parser will do. */}
+            {hasMath(text) && (
+              <div dir="ltr" style={{ marginTop: 4, padding: '4px 8px', fontSize: 18, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, overflowX: 'auto' }}>
+                <MathText text={text} />
+              </div>
+            )}
             {/* Greek + math-symbol inserts — advanced (only for symbolic lengths / angle variables /
                 relation glyphs), so collapsed behind a toggle to keep the input area clean. */}
             <button type="button" onClick={() => setShowSymbols((v) => !v)} style={symbolsToggle}>
@@ -1329,7 +1338,7 @@ export default function App() {
                         <>
                           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                             <button type="button" style={factLabel(state)} onClick={() => select(g.key)} dir={textDir(label)} title={state === 'broken' ? errText : undefined}>
-                              {label}
+                              {hasMath(label) ? <MathText text={label} /> : label}
                             </button>
                             {/* The broken-step REASON, inline (F6): it lived only in a `title` tooltip —
                                 invisible on touch and to screen readers. Shown when the row is selected

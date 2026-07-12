@@ -1397,19 +1397,35 @@ const segmentRatio: Rule = (s) => {
  * `<p>dn`. The whole match is captured as `<p>all` (the verbatim text). A caller requiring a QUOTIENT (the
  * NEW forms only, leaving bare `35` / `12√2` to their existing owners) tests `groups.<p>dn !== undefined`.
  */
-// A TERM is `[coef ·] √ number` (a radical, coefficient optional) OR a plain `number`. The coefficient is
-// tied to the √ — WITHOUT a radical a bare number carries no coefficient, so "35" is one number 35, never
-// "3 × 5" (the digit-stealing trap). Groups (prefix `t`): `<t>c` coef, `<t>s` √-flag + `<t>n` radicand (the
-// radical alt), or `<t>pn` (the plain-number alt).
+// A TERM is `[coef ·] √ radicand` (a radical, coefficient optional) OR a plain `number`, each optionally
+// wrapped in parentheses. The radicand is EITHER a PARENTHESISED value `(n)` / `(n/d)` — the EXPLICIT
+// grouping the √ toolbar button produces (#77 Am. / ADR-298), which disambiguates `√(2/3)` (root of the
+// fraction) from `√2/3` (`(√2)/3`) — OR a BARE number (`√32`), whose radicand is JUST that number so the
+// textbook convention holds and any following `/d` divides the whole term. The coefficient is tied to the √
+// (a bare number carries none — "35" is one number, never "3 × 5", the digit-stealing trap). Groups (prefix
+// `t`): `<t>c` coef, `<t>s` √-flag, `<t>prn`/`<t>prd` parenthesised radicand num/den, `<t>brn` bare
+// radicand, `<t>pn` the plain-number alt.
 const NUMTERM = (t: string) =>
-  String.raw`(?:(?:(?<${t}c>${COEF})\s*[*·]?\s*)?(?<${t}s>√)\s*(?<${t}n>${COEF})|(?<${t}pn>${COEF}))`;
+  String.raw`\(?\s*(?:(?:(?<${t}c>${COEF})\s*[*·]?\s*)?(?<${t}s>√)\s*(?:\(\s*(?<${t}prn>${COEF})(?:\s*\/\s*(?<${t}prd>${COEF}))?\s*\)|(?<${t}brn>${COEF}))|(?<${t}pn>${COEF}))\s*\)?`;
+const termMatched = (g: Record<string, string | undefined>, t: string): boolean =>
+  g[`${t}pn`] !== undefined || g[`${t}brn`] !== undefined || g[`${t}prn`] !== undefined;
 const numTermVal = (g: Record<string, string | undefined>, t: string): number | null => {
-  if (g[`${t}s`] !== undefined) return (g[`${t}c`] !== undefined ? parseFloat(g[`${t}c`]!) : 1) * Math.sqrt(parseFloat(g[`${t}n`]!));
+  if (g[`${t}s`] !== undefined) {
+    const rn = g[`${t}prn`] ?? g[`${t}brn`];
+    if (rn === undefined) return null;
+    const radicand = g[`${t}prd`] !== undefined ? parseFloat(rn) / parseFloat(g[`${t}prd`]!) : parseFloat(rn);
+    return (g[`${t}c`] !== undefined ? parseFloat(g[`${t}c`]!) : 1) * Math.sqrt(radicand);
+  }
   if (g[`${t}pn`] !== undefined) return parseFloat(g[`${t}pn`]!);
   return null;
 };
 const NUMEXPR = (p: string) => String.raw`(?<${p}all>${NUMTERM(`${p}A`)}(?:\s*\/\s*${NUMTERM(`${p}B`)})?)`;
-const hasDivisor = (g: Record<string, string | undefined>, p: string): boolean => g[`${p}Bn`] !== undefined || g[`${p}Bpn`] !== undefined;
+const hasDivisor = (g: Record<string, string | undefined>, p: string): boolean => termMatched(g, `${p}B`);
+/** Is this a value form OWNED by the shared atom rather than the existing bare-number / `coef√` rules — a
+ *  QUOTIENT (`35/√32`) OR a PARENTHESISED radicand (`√(2/3)`, `5√(2/3)` — which `measureSqrt` can't parse)?
+ *  Bare `35` and `12√2` return false and stay with `distanceConstraint`/`measureSqrt`. */
+const isNewValueForm = (g: Record<string, string | undefined>, p: string): boolean =>
+  hasDivisor(g, p) || g[`${p}Aprn`] !== undefined || g[`${p}Bprn`] !== undefined;
 const numexprVal = (g: Record<string, string | undefined>, p: string): { value: number; text: string } | null => {
   const numer = numTermVal(g, `${p}A`);
   if (numer === null) return null;
@@ -1642,7 +1658,7 @@ function parseAreaExpr(rhs: string): MeasureExpr | null {
   // (before the √/number branches, which would half-read the numerator and drop the divisor) but only when
   // a divisor is present, so a plain "25√3" / "13" still flows to its existing branch below.
   const q = t.match(new RegExp(String.raw`^${NUMEXPR('a')}$`));
-  if (q && hasDivisor(q.groups!, 'a')) { const v = numexprVal(q.groups!, 'a'); if (v) return v; }
+  if (q && isNewValueForm(q.groups!, 'a')) { const v = numexprVal(q.groups!, 'a'); if (v) return v; }
   let m = t.match(new RegExp(String.raw`^(${COEF})?\s*√\s*(${COEF})$`)); // 25√3 / √3
   if (m) {
     const c = m[1] ? parseFloat(m[1]) : 1;
@@ -1792,7 +1808,7 @@ const SQRT_FN = String.raw`(?:√|\\sqrt|sqrt)\s*[\{(]?\s*(${VAR}|${COEF})\s*[\}
 const measureFraction: Rule = (s) => {
   if (SEG_RATIO_LHS.test(s)) return null;
   const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${NUMEXPR('v')}\s*$`));
-  if (!m || !hasDivisor(m.groups!, 'v')) return null; // no divisor ⇒ not this rule (leave bare/√ to their owners)
+  if (!m || !isNewValueForm(m.groups!, 'v')) return null; // bare `35` / `12√2` → their owners; a quotient or a √(…) group is ours
   const val = numexprVal(m.groups!, 'v');
   if (!val) return null;
   return [{ type: 'measure-length', a: up(m[1]), b: up(m[2]), expr: val }];
@@ -2100,7 +2116,7 @@ const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: b
   // A QUOTIENT radius — "רדיוס 35/√32", "שרדיוסו √32/5" (#77, the shared NUMEXPR atom). Checked BEFORE the
   // bare-number form, which would otherwise read "רדיוס 35" and silently drop the "/√32".
   const rFrac = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*(?:=|:|הוא|שווה|\bis\b)?\s*${NUMEXPR('r')}`, 'i'));
-  if (rFrac && hasDivisor(rFrac.groups!, 'r')) {
+  if (rFrac && isNewValueForm(rFrac.groups!, 'r')) {
     const v = numexprVal(rFrac.groups!, 'r');
     if (v && v.value > 0) return { radius: v.value, numeric: true, symbolic: false };
   }
@@ -5489,19 +5505,37 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
   // quotient term may sit under a √ ("35/√32", "√32/5", "5√2/3"); the √ breaks a plain digit/digit span, so
   // each side is captured whole and evaluated (`[coef ·] √ n` or a plain number) — the value the parser
   // lowered to (a length's expr.value, a fraction radius) is what must be accounted, not the raw digits.
-  const TERM = String.raw`(?:(?:\d+(?:\.\d+)?\s*[*·]?\s*)?√\s*\d+(?:\.\d+)?|\d+(?:\.\d+)?)`;
-  const evalTerm = (t: string): number => {
-    const r = t.match(/^(?:(\d+(?:\.\d+)?)\s*[*·]?\s*)?√\s*(\d+(?:\.\d+)?)$/);
-    return r ? (r[1] ? parseFloat(r[1]) : 1) * Math.sqrt(parseFloat(r[2])) : parseFloat(t);
+  // A radical's radicand may be a BARE number (`√32`) or a PARENTHESISED value (`√(2/3)`, `√(2)` — the ADR-298
+  // Am. explicit grouping the √ button produces); `evalTerm` computes both, and the standalone pass below
+  // accounts a radical that isn't part of a top-level fraction (`√(2/3)`, whose only division is inside the root).
+  const RAD = String.raw`√\s*(?:\(\s*\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?\s*\)|\d+(?:\.\d+)?)`;
+  // a TERM tolerates an OUTER paren pair `(5√2)` (the ADR-298 Am. explicit grouping) around the `[coef]√rad`
+  // or plain number.
+  const TERM = String.raw`\(?\s*(?:(?:\d+(?:\.\d+)?\s*[*·]?\s*)?${RAD}|\d+(?:\.\d+)?)\s*\)?`;
+  const evalTerm = (raw: string): number => {
+    const t = raw.trim().replace(/^\(([\s\S]*)\)$/, '$1'); // strip an outer paren pair, keep an inner √(…)
+    const r = t.match(/^(?:(\d+(?:\.\d+)?)\s*[*·]?\s*)?√\s*(?:\(\s*(\d+(?:\.\d+)?)(?:\s*\/\s*(\d+(?:\.\d+)?))?\s*\)|(\d+(?:\.\d+)?))$/);
+    if (!r) return parseFloat(t);
+    const rn = r[2] ?? r[4];
+    const radicand = r[3] !== undefined ? parseFloat(rn!) / parseFloat(r[3]) : parseFloat(rn!);
+    return (r[1] ? parseFloat(r[1]) : 1) * Math.sqrt(radicand);
   };
+  // One pass over each VALUE expression `TERM [ / TERM ]` (longest match wins, so `35/√(32)` and `√(2/3)` are
+  // each consumed WHOLE — never re-read as an inner `2/3`). Only a match that actually carries a √ or a top-
+  // level `/` is accounted here; a lone plain number falls through to the digit loop below, which owns the
+  // π / percent / diameter lowerings.
   const spans: [number, number][] = [];
-  for (const m of s.matchAll(new RegExp(String.raw`(${TERM})\s*\/\s*(${TERM})`, 'g'))) {
-    spans.push([m.index!, m.index! + m[0].length]);
+  for (const m of s.matchAll(new RegExp(String.raw`(${TERM})(?:\s*\/\s*(${TERM}))?`, 'g'))) {
+    if (!/√|\//.test(m[0])) continue; // a bare number → the single-number loop (with its π/%/diameter candidates)
+    const i = m.index!;
+    if (spans.some(([x, y]) => i >= x && i < y)) continue;
+    spans.push([i, i + m[0].length]);
     const numV = evalTerm(m[1]);
-    const denV = evalTerm(m[2]);
-    if (!ok([denV !== 0 ? numV / denV : NaN, numV, denV]) && !seen.has(m[0])) {
+    const denV = m[2] !== undefined ? evalTerm(m[2]) : 1;
+    const val = denV !== 0 ? numV / denV : numV;
+    if (!ok([val, numV, denV]) && !seen.has(m[0])) {
       seen.add(m[0]);
-      dropped.push(denV !== 0 ? numV / denV : numV);
+      dropped.push(val);
     }
   }
   for (const m of s.matchAll(/\d+(?:\.\d+)?/g)) {
