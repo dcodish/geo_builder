@@ -24,7 +24,8 @@ import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { btn, card as themeCard, color as pal, foldToggle, fs, pill, sectionTitle } from '@/ui/theme';
-import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, replay, useGeoStore } from '@/store/geoStore';
+import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, primeFoldFor, replay, trialFacts, useGeoStore } from '@/store/geoStore';
+import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
 import { questionLines } from '@/export/questionLines';
@@ -62,8 +63,6 @@ export default function App() {
   const select = useGeoStore((s) => s.select);
   const cycleAlt = useGeoStore((s) => s.cycleAlt);
   const cycleVariant = useGeoStore((s) => s.cycleVariant);
-  const resample = useGeoStore((s) => s.resample);
-  const autoResolve = useGeoStore((s) => s.autoResolve);
   const radiusOverrides = useGeoStore((s) => s.radiusOverrides);
   const figureName = useGeoStore((s) => s.figureName);
   const setFigureName = useGeoStore((s) => s.setFigureName);
@@ -113,7 +112,8 @@ export default function App() {
     busyRef.current = b;
     setThinking(b);
   };
-  const [resampling, setResampling] = useState(false); // "show another configuration" search in flight (synchronous; we paint a busy state first)
+  const [resampling, setResampling] = useState(false);
+  const [altProgress, setAltProgress] = useState(''); // "show another configuration" search in flight (synchronous; we paint a busy state first)
   const [analysing, setAnalysing] = useState(false); // "view relations" detection in flight (synchronous; paint a busy state first)
   const [detecting, setDetecting] = useState(false); // "detect shapes" detection in flight (synchronous; paint a busy state first)
   const [openShape, setOpenShape] = useState<DetectedShape | null>(null); // the shape badge whose inline book-link card is open
@@ -360,13 +360,30 @@ export default function App() {
       noteFileProblem(r.reason === 'newer-version' ? 'file.newerVersion' : 'file.badFile');
       return;
     }
+    // #41 (ADR-290, + the #67 core): a saved heavy figure's ENTIRE load cost is one cold fold (27 s
+    // measured on the #59 file) — compute it in the geometry WORKER behind the busy cue and transplant
+    // it, so the smoke-replay below and the post-load render both run at tail speed on the main thread.
+    setBusy(true);
+    try {
+      const fold = await geoWork.prefold(r.file.facts, r.file.seed);
+      if (fold) primeFoldFor(r.file.facts, fold);
+    } catch (err) {
+      if (!isCancelled(err)) {
+        setBusy(false);
+        noteFileProblem('file.badFile'); // the worker replay threw — same refusal as the smoke-replay
+        return;
+      }
+    }
     // Smoke-replay before committing: a file that makes the derivation THROW (not merely flag a fact)
     // must never become the session — refuse it instead of a white screen on the next render.
     try {
       replay(r.file.facts, r.file.seed, r.file.radiusOverrides);
     } catch {
+      setBusy(false);
       noteFileProblem('file.badFile');
       return;
+    } finally {
+      setBusy(false);
     }
     loadFigure(r.file); // one undo restores the session that was open before
     setFigureName(figureNameFromFileName(f.name)); // the FILENAME names the figure (issue #42)
@@ -391,33 +408,37 @@ export default function App() {
   // slow on a heavy figure, so it runs behind a "thinking" state painted first (double rAF). Only fires
   // when the figure is actually short of its requirements — a clean (or under-determined PENDING) figure
   // pays nothing.
-  const resolveAfterCommit = () => {
+  const resolveAfterCommit = async () => {
     const st = useGeoStore.getState();
     // `submit` has already painted the spinner; if the figure already meets its requirements there's no
-    // search to run, so just clear it (the commit itself was the answer).
+    // search to run, so just clear it (the commit itself was the answer). (The fold for the committed
+    // content is warm — the commit path just computed or worker-primed it — so this check is cheap.)
     if (meetsRequirements(st.facts, st.seed)) {
       setBusy(false);
       return;
     }
     setBusy(true);
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
+    try {
+      // #41 (ADR-290): the config search runs in the geometry WORKER — the main thread stays free, so
+      // the tab can never hit the page-unresponsive dialog here (was a synchronous findValidConfig).
+      const r = await geoWork.autoResolve(st.facts, st.seed);
+      if (r && r !== 'ok') {
+        if (r.fold) primeFoldFor(r.facts, r.fold); // transplant the worker's fold — main replays at tail speed
+        // the branch/seed rewrite belongs to the SAME user action as the commit it follows — pause
+        // history so it merges into that entry (E4/STO-4; one undo removes the whole action).
+        const temporal = useGeoStore.temporal.getState();
+        temporal.pause();
         try {
-          // autoResolve's branch/seed rewrite belongs to the SAME user action as the commit it follows —
-          // pause history so it merges into that entry instead of adding an invisible extra undo step
-          // (E4/STO-4; one undo now removes the whole action, auto-resolution included).
-          const temporal = useGeoStore.temporal.getState();
-          temporal.pause();
-          try {
-            autoResolve();
-          } finally {
-            temporal.resume();
-          }
+          useGeoStore.getState().applyView({ facts: r.facts, seed: r.seed });
         } finally {
-          setBusy(false);
+          temporal.resume();
         }
-      }),
-    );
+      }
+    } catch (err) {
+      if (!isCancelled(err)) throw err;
+    } finally {
+      setBusy(false);
+    }
   };
 
   async function submit(utterance: string) {
@@ -516,6 +537,16 @@ export default function App() {
       // appear on the shape trips neither older gate — never commit a figure missing the student's given.
       const droppedRels = droppedGivenRelations(utterance, r.commands);
       if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0) {
+        // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
+        // the commit, and every later replay of this content then run at TAIL speed on the main thread
+        // (the one unbudgeted cold fold, measured ~26 s on the #59 figure, used to block the tab here).
+        try {
+          const trial = trialFacts(facts, r.commands);
+          const fold = await geoWork.prefold(trial, seed);
+          if (fold) primeFoldFor(trial, fold);
+        } catch (err) {
+          if (!isCancelled(err)) throw err; // cancelled prefold: fall through — the sync path still works
+        }
         // A deterministic parse can "succeed" yet build NOTHING — apply with an error (kept-prior) or
         // change nothing at all. Dry-run before committing so a silent fail isn't shown as success
         // (operator request); a step that builds something commits immediately.
@@ -621,6 +652,16 @@ export default function App() {
     // The LLM only counts if its decomposition actually BUILDS something — else it's another silent
     // fail. Dry-run the combined commands; if neither grammar nor LLM built anything, say so plainly.
     const llmCmds = out ? out.built.flatMap((g) => g.commands) : [];
+    // #41 (ADR-290): same worker prefold for the LLM decomposition's content before ITS dry-run.
+    if (out !== null && out.built.length > 0) {
+      try {
+        const trial = trialFacts(cur.facts, llmCmds);
+        const fold = await geoWork.prefold(trial, cur.seed);
+        if (fold) primeFoldFor(trial, fold);
+      } catch (err) {
+        if (!isCancelled(err)) throw err;
+      }
+    }
     const llmBuilds =
       out !== null && out.built.length > 0 && dryRunOutcome(cur.facts, llmCmds, cur.seed, cur.radiusOverrides).produced;
     if (!llmBuilds) {
@@ -1322,37 +1363,53 @@ export default function App() {
               // one. Previously this did branch-cycling EXCLUSIVELY whenever any branch existed, so a
               // figure with both (e.g. a circle∩circle point + free secant ends) only flipped between
               // 2 branch options and never varied its free DOFs.
-              onClick={() => {
+              onClick={async () => {
                 if (resampling) return;
-                // The search is SYNCHRONOUS and can take a moment on a heavy figure (it replays + verifies
-                // many candidate seeds), which would freeze the UI with no feedback. Paint a "working" state
-                // FIRST (double rAF = after the next paint), then run the blocking search (operator: "no sign
-                // of the system thinking").
+                // #41 (ADR-290): the seed search runs in the geometry WORKER — the main thread stays free
+                // (no page-unresponsive dialog possible), the cue shows live progress, and the ✕ beside it
+                // cancels (worker termination — real preemption). The store applies the found seed as one
+                // undo-tracked step; its fold is already warm here (same facts), so the re-render is a tail.
                 setResampling(true);
-                requestAnimationFrame(() =>
-                  requestAnimationFrame(() => {
-                    try {
-                      const changed = resample(); // true if it found a genuinely different drawing
-                      if (branchId) cycleAlt(branchId); // a discrete branch flip is always a real change
-                      const flipped = cycleVariant(); // also cycle the equal-pair of a kite/isosceles (ADR-138)
-                      if (changed || branchId || flipped) setAltNote('');
-                      else {
-                        // searched and found nothing different — tell the student something DID happen (the
-                        // figure is determined), so "show another" doesn't look like a dead button (operator).
-                        setAltNote(t('actions.onlyConfig'));
-                        window.setTimeout(() => setAltNote(''), 4000);
-                      }
-                    } finally {
-                      setResampling(false);
-                    }
-                  }),
-                );
+                try {
+                  const st = useGeoStore.getState();
+                  const found = await geoWork.resample(st.facts, st.seed, (k, n) => setAltProgress(`${k}/${n}`));
+                  const changed = found !== null;
+                  if (changed) useGeoStore.getState().applyView({ seed: found! });
+                  if (branchId) cycleAlt(branchId); // a discrete branch flip is always a real change
+                  const flipped = cycleVariant(); // also cycle the equal-pair of a kite/isosceles (ADR-138)
+                  if (changed || branchId || flipped) setAltNote('');
+                  else {
+                    // searched and found nothing different — tell the student something DID happen (the
+                    // figure is determined), so "show another" doesn't look like a dead button (operator).
+                    setAltNote(t('actions.onlyConfig'));
+                    window.setTimeout(() => setAltNote(''), 4000);
+                  }
+                } catch (err) {
+                  if (!isCancelled(err)) throw err; // cancelled: quiet — the student chose to stop
+                } finally {
+                  setResampling(false);
+                  setAltProgress('');
+                }
               }}
             >
               {resampling ? t('input.loading') : t('actions.another')}
             </button>
           )}
-          {resampling && <span style={{ fontSize: 12, color: '#2563eb' }}>{t('input.loading')}</span>}
+          {resampling && (
+            <span style={{ fontSize: 12, color: '#2563eb', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              {t('input.loading')}
+              {altProgress && <span>({altProgress})</span>}
+              {/* #41: real preemption — terminate the worker; the in-flight promise rejects {cancelled} */}
+              <button
+                type="button"
+                onClick={() => cancelGeoWork()}
+                title={t('actions.cancelSearch')}
+                style={{ border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 11, lineHeight: '16px', padding: '0 6px' }}
+              >
+                ✕
+              </button>
+            </span>
+          )}
           {altNote && <span style={{ fontSize: 12, color: '#64748b' }}>{altNote}</span>}
 
           {/* The two analysis layers side by side — quiet outline toggles (secondary to "show

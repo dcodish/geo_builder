@@ -280,6 +280,28 @@ function translateFold(node: FoldNode, permToOrig: number[]): FoldNode {
   };
 }
 
+/**
+ * #41 ([ADR-290](docs/06-decisions.md#adr-290)) — the Web-Worker seam. The FOLD is seed-independent pure
+ * DATA (structured-clone-safe) and the fold cache is keyed by fact-list CONTENT, so a fold computed in a
+ * geometry WORKER can be transplanted into this thread's cache: `getFoldFor` reads the node after a worker
+ * replay warmed it, `primeFoldFor` inserts a (cloned) node here — after which every main-thread replay of
+ * that content runs at TAIL speed and the tab never pays the cold fold.
+ */
+export type { FoldNode };
+export function getFoldFor(facts: Fact[]): FoldNode | null {
+  return foldCache.get(foldKey(facts)) ?? null;
+}
+export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
+  if (foldCache.size >= FOLD_CACHE_MAX) foldCache.delete(foldCache.keys().next().value as string);
+  foldCache.set(foldKey(facts), fold);
+}
+
+/** The dry-run trial fact list for a candidate step — the FIRST content the submit path folds, shared
+ *  here so a worker prefold warms exactly the content `dryRunOutcome` (and usually the commit) will use. */
+export function trialFacts(facts: Fact[], commands: AnyCommand[]): Fact[] {
+  return [...facts, ...commands.map((c, i) => ({ id: `~try.${i}`, group: '~try', enabled: true, cmd: c }))];
+}
+
 function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}): Derived {
   const key = foldKey(facts);
   let fold = foldCache.get(key);
@@ -1077,6 +1099,39 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
 }
 
 /** Outcome of dry-running a parsed step on top of the current facts (see {@link dryRunOutcome}). */
+/**
+ * The "show another configuration" SEARCH, extracted PURE (#41 / [ADR-290](docs/06-decisions.md#adr-290))
+ * so a geometry worker can run it off the main thread; the store's `resample` action applies its result.
+ * Semantics unchanged: a wall-clock budget (2026-07-06 review hotspot #3 — past the deadline, return what
+ * we have; tests run deadline-free), the ADR-267 preference ladder (a STRICT-valid view wins outright; a
+ * RELAXED-valid one — the ADR-142 shared-endpoint either-side bar — is a fallback offered only when the
+ * CURRENT view itself is not strict-valid), the shared `meetsRequirements` acceptance bar, and the
+ * similarity-invariant fingerprint (a same-shape-resized view is not "another configuration"). The
+ * deadline is also armed inside the solve ladder (engine/solveBudget.ts, issue #59) so a single
+ * pathological candidate can't blow through the between-candidate checks. `onProgress` reports the
+ * candidate index (the worker forwards it to the UI's "still searching…" cue).
+ */
+export function searchResample(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void): number | null {
+  const cur = replay(facts, seed);
+  if (freeDofs(cur.construction).length === 0) return null; // fully determined — nothing to vary
+  const curFp = shapeFingerprint(cur.construction, cur.positions);
+  let s = seed;
+  const deadline = Date.now() + SEARCH_BUDGET_MS;
+  const curStrict = meetsRequirements(facts, seed);
+  let fallback = -1;
+  for (let k = 0; k < 24 && Date.now() <= deadline; k++) {
+    onProgress?.(k + 1, 24);
+    s += 1;
+    const r = withSolveBudget(deadline, () => replay(facts, s));
+    // Accept only a view that MEETS EVERY REQUIREMENT — the SAME bar the initial display uses — AND is a
+    // genuinely DIFFERENT drawing (see the class notes above; the Q8 two-right-triangles lock).
+    if (!shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions))) continue;
+    if (meetsRequirements(facts, s)) return s;
+    if (!curStrict && fallback < 0 && meetsRequirements(facts, s, true)) fallback = s;
+  }
+  return fallback >= 0 ? fallback : null;
+}
+
 export type StepOutcome = { produced: true } | { produced: false; reason: 'error' | 'empty'; detail?: string };
 
 /**
@@ -1090,8 +1145,9 @@ export type StepOutcome = { produced: true } | { produced: false; reason: 'error
 export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, overrides: Record<Id, number> = {}): StepOutcome {
   const labelCount = (l: MeasureLabels) => l.lengths.length + l.angles.length;
   const before = replay(facts, seed, overrides);
-  const trial: Fact[] = commands.map((c, i) => ({ id: `~try.${i}`, group: '~try', enabled: true, cmd: c }));
-  const after = replay([...facts, ...trial], seed, overrides);
+  const all = trialFacts(facts, commands);
+  const trial = all.slice(facts.length);
+  const after = replay(all, seed, overrides);
   const errored = trial.find((f) => after.status[f.id] !== 'ok');
   if (errored) return { produced: false, reason: 'error', detail: after.status[errored.id] };
   // "Built something" = added a shape/constraint/label, OR RESHAPED the figure — a step like "diameter AB"
@@ -1524,6 +1580,10 @@ export interface GeoState {
    *  (seeds + branches) for one that does and apply it ([ADR-106](docs/06-decisions.md#adr-106)).
    *  Returns `true` if the figure now meets every requirement, `false` if none was found (kept as-is). */
   autoResolve: () => boolean;
+  /** #41 (ADR-290): apply a view decided OFF-thread (a worker resample / auto-resolve outcome) as ONE
+   *  undo-tracked transition — the async twin of `resample`/`autoResolve`'s own `set` (clears dialed radii
+   *  like every fresh view). */
+  applyView: (patch: { facts?: Fact[]; seed: number }) => void;
   /** Dial a free circle's radius directly (a DOF slider). Cleared on resample. */
   setRadius: (circle: Id, value: number) => void;
   /** Show/hide measure labels on the figure (ADR-031). */
@@ -1862,48 +1922,14 @@ export const useGeoStore = create<GeoState>()(
       },
 
       resample: () => {
-        const facts = get().facts;
-        const cur = replay(facts, get().seed);
-        if (freeDofs(cur.construction).length === 0) return false; // fully determined — nothing to vary
-        const curFp = shapeFingerprint(cur.construction, cur.positions);
-        let s = get().seed;
-        // Wall-clock budget (2026-07-06 review hotspot #3): this was the ONE seed loop without a deadline —
-        // on a pathologically slow figure (~4–9 s per perturbed-seed replay was measured) 24 candidates froze
-        // the tab for tens of seconds. Same E2 convention as the other searches: past the deadline, return
-        // what we have (no change, button reads "no other configuration"). Tests run deadline-free.
-        const deadline = Date.now() + SEARCH_BUDGET_MS;
-        // The same preference ladder as the config search (ADR-267): a STRICT-valid view wins outright; a
-        // RELAXED-valid view (the ADR-142 shared-endpoint either-side bar) is remembered as a fallback and
-        // offered only when the CURRENT view itself is not strict-valid — i.e. the figure lives on the
-        // fallback tier already (its letter-order side is unachievable), so "show another" must cycle within
-        // that tier instead of refusing ("determined") on a figure with visibly free DOFs.
-        const curStrict = meetsRequirements(facts, get().seed);
-        let fallback = -1;
-        // The deadline is also armed inside the solve ladder (engine/solveBudget.ts, issue #59) so a
-        // single pathological candidate can't blow through the between-candidate check below.
-        for (let k = 0; k < 24 && Date.now() <= deadline; k++) {
-          s += 1;
-          const r = withSolveBudget(deadline, () => replay(facts, s));
-          // Accept an alternative view only if it MEETS EVERY REQUIREMENT — the SAME bar the initial display
-          // uses (`meetsRequirements`: builds, verifier-clean, every "המשך" reaches its far side, every
-          // on-segment crossing lands WITHIN its segments, points distinct, declared polygons convex) — AND
-          // is a genuinely DIFFERENT drawing (not the same shape at another size/rotation, else "show another"
-          // shows no change; fingerprint is similarity-invariant). Using the shared gate is the fix for the
-          // class where "show another" offered configs the initial view would never display — e.g. two right
-          // triangles sharing a hypotenuse whose legs meet at E: a seed where C,D fall on opposite sides
-          // leaves E off its segments, so E can't be where instructed and that view must not be offered (Q8).
-          if (!shapeDiffers(curFp, shapeFingerprint(r.construction, r.positions))) continue;
-          if (meetsRequirements(facts, s)) {
-            set({ seed: s, radiusOverrides: {} }); // a fresh view clears any dialed radii (scratchpad reset)
-            return true;
-          }
-          if (!curStrict && fallback < 0 && meetsRequirements(facts, s, true)) fallback = s;
-        }
-        if (fallback >= 0) {
-          set({ seed: fallback, radiusOverrides: {} });
-          return true;
-        }
-        return false; // searched but found no shape-different drawing — the figure is determined up to size/placement
+        const found = searchResample(get().facts, get().seed);
+        if (found === null) return false; // determined (or nothing shape-different in budget)
+        set({ seed: found, radiusOverrides: {} }); // a fresh view clears any dialed radii (scratchpad reset)
+        return true;
+      },
+
+      applyView: (patch) => {
+        set({ ...(patch.facts ? { facts: patch.facts } : {}), seed: patch.seed, radiusOverrides: {} });
       },
 
       autoResolve: () => {

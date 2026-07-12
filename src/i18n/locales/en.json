@@ -228,6 +228,7 @@
     "flip": "Flip",
     "another": "Show another configuration",
     "anotherHint": "Same shape — drawn differently",
+    "cancelSearch": "Stop the search",
     "onlyConfig": "No other configuration — the shape is determined (only size/position can change)",
     "dof": "Degrees of freedom: {{count}}",
     "determined": "✓ Fully determined",
