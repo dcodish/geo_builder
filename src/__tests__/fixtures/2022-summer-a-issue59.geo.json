@@ -9,12 +9,24 @@
     {
       "id": "_xWfFzciRf0TurJHE0Tdk",
       "utterance": "נתון מעגל שרדיוסו R ומרכזו O",
+      "group": "g-circle-R-bind",
       "cmd": {
         "type": "circle",
         "id": "circle-O",
         "center": "O",
         "radius": 5,
         "freeRadius": true
+      },
+      "enabled": true
+    },
+    {
+      "id": "_xWfFzciRf0TurJHE0Tdk2",
+      "utterance": "נתון מעגל שרדיוסו R ומרכזו O",
+      "group": "g-circle-R-bind",
+      "cmd": {
+        "type": "radius-symbol",
+        "circle": "circle-O",
+        "name": "R"
       },
       "enabled": true
     },

@@ -1186,8 +1186,12 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, o
     after.construction.objects.length > before.construction.objects.length ||
     after.construction.constraints.length > before.construction.constraints.length ||
     labelCount(after.labels) > labelCount(before.labels);
-  // A bare variable binding ("x = 4") legitimately draws nothing — it's data, not a silent fail.
-  const dataOnly = commands.length > 0 && commands.every((c) => c.type === 'set-var');
+  // A bare variable binding ("x = 4") legitimately draws nothing — it's data, not a silent fail. So are
+  // a radius-symbol NAMING ("רדיוס מעגל O הוא R" stamps the letter, no geometry moves — issue #54) and a
+  // standalone radius ORDER ("R > r" — a REQUIREMENT the verifier/sampler enforce, not a drawn object;
+  // pre-#54 it only ever rode the concentric-pair macro whose circles made the step "grow").
+  const dataOnly =
+    commands.length > 0 && commands.every((c) => c.type === 'set-var' || c.type === 'radius-symbol' || c.type === 'set-radius-order');
   // `name-center` REVEALS an existing circle's hidden centre — a visible change that adds no object/point
   // and moves nothing, so the geometry checks above miss it. It still "produced" (the centre now shows).
   const reveals = commands.some((c) => c.type === 'name-center' || c.type === 'show-circle');

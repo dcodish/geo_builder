@@ -126,7 +126,10 @@
       "trapezoidMorph": "{{quad}} was declared a trapezoid, but both pairs of opposite sides are now parallel — it is no longer a trapezoid. To change the shape, edit or delete the trapezoid step.",
       "radiusOrder": "the inner circle (radius {{ri}}) should stay inside the outer circle (radius {{ro}})",
       "outsideCircle": "{{point}} should lie outside circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
-      "insideCircle": "{{point}} should lie inside circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre"
+      "insideCircle": "{{point}} should lie inside circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
+      "outsideRegion": "{{point}} should lie outside {{poly}}",
+      "insideRegion": "{{point}} should lie inside {{poly}}",
+      "radiusRatio": "radius of circle {{c1}} ({{r1}}) should be {{k}} × radius of circle {{c2}} ({{r2}})"
     }
   },
   "errors": {

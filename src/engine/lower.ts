@@ -15,7 +15,7 @@
  * finer-grained pieces so it can attach a status/label to each originating fact.
  */
 
-import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from './types';
+import type { AnyCommand, Command, Id, MeasureExpr, SymbolicCommand } from './types';
 import { expandShapeVariant } from './shapeVariants';
 import { expandInscribe } from './inscribe';
 
@@ -26,6 +26,12 @@ export interface SymTab {
    *  (|center→witness| = R). Set only when R has no fixed value — it lets an "AB = √2R" measure
    *  lower to a {@link LengthRadiusConstraint} that couples the length to the free radius DOF (ADR-071). */
   radiusCircle?: { id: Id; center: Id; witness: Id };
+  /** PER-CIRCLE radius symbols (issue #54 — the ADR-034 auto-bind generalized): each explicitly-bound
+   *  letter ("מעגל שרדיוסו r" / "רדיוס מעגל O הוא R" → `radius-symbol`) maps to ITS circle, with a
+   *  witness point when one is known (a measure using the symbol couples to THAT circle's radius DOF;
+   *  a missing witness is minted at lowering). Explicit bindings win over the legacy single-circle
+   *  {@link radiusCircle} fallback, which stays for the unbound reserved R/r. */
+  radiusOf: Map<string, { id: Id; center: Id; witness?: Id }>;
 }
 
 /** A point id known to lie on circle `circleId` (so its distance to the centre IS the radius), or null. */
@@ -34,6 +40,9 @@ function pointOnCircle(cmds: AnyCommand[], circleId: Id): Id | null {
     if (c.type === 'point-on-circle' && c.circle === circleId) return c.id;
     if (c.type === 'arc-midpoint' && c.circle === circleId) return c.id;
     if (c.type === 'line-circle-intersection' && c.circle === circleId) return c.id;
+    if (c.type === 'circle-circle-intersection' && (c.circle1 === circleId || c.circle2 === circleId)) return c.id;
+    if (c.type === 'diameter' && c.circle === circleId) return c.id1;
+    if (c.type === 'extend-onto-circle' && c.circle === circleId) return c.id;
   }
   return null;
 }
@@ -62,14 +71,28 @@ export function buildSymTab(cmds: AnyCommand[]): SymTab {
   // free and lower "AB = √2R" to a FIXED distance that fights the free radius (seed-fragile
   // over-constraint). Left unvalued, R-measures couple through the ratio machinery instead
   // (|BO| = (1/√2)|AB| for "AB=√2R" + "BO=R"), keeping the figure scalable.
-  const rad = vars.get(RADIUS_VAR);
+  // PER-CIRCLE radius symbols (issue #54): every explicit `radius-symbol` binding maps its letter to
+  // its circle (+ a witness point on it when the figure has one — the lowering mints one otherwise).
+  // Explicit bindings WIN over the legacy reserved-R fallback below.
+  const radiusOf: SymTab['radiusOf'] = new Map();
+  for (const c of cmds) {
+    if (c.type !== 'radius-symbol') continue;
+    const circ = cmds.find((x) => (x.type === 'circle' || x.type === 'circle-through' || x.type === 'circumcircle') && x.id === c.circle) as
+      | { id: Id; center: Id }
+      | undefined;
+    if (circ) radiusOf.set(c.name, { id: circ.id, center: circ.center, witness: pointOnCircle(cmds, circ.id) ?? undefined });
+  }
+  // Legacy reserved-R fallback (ADR-034/071) — now per SPELLING (R and r are the same reserved symbol
+  // only while UNBOUND; an explicit per-circle binding above removes the spelling from this fallback).
   let radiusCircle: SymTab['radiusCircle'];
-  if (rad && rad.value === undefined) {
+  for (const name of ['R', 'r']) {
+    const rad = vars.get(name);
+    if (!rad || rad.value !== undefined || radiusOf.has(name)) continue;
     const circ = cmds.find(
       (c) => c.type === 'circle' && typeof (c as { radius?: unknown }).radius === 'number' && !(c as { freeRadius?: boolean }).freeRadius,
     ) as { radius: number } | undefined;
     if (circ) rad.value = circ.radius;
-    else {
+    else if (!radiusCircle) {
       // No fixed-radius circle, but R is used → it denotes a FREE-radius circle. Record it (+ a point on
       // it that witnesses the radius) so R-measures couple to the radius DOF rather than freezing it (ADR-071).
       const free = cmds.find((c) => c.type === 'circle' && (c as { freeRadius?: boolean }).freeRadius) as
@@ -81,7 +104,7 @@ export function buildSymTab(cmds: AnyCommand[]): SymTab {
       }
     }
   }
-  return { vars, radiusCircle };
+  return { vars, radiusCircle, radiusOf };
 }
 
 /** Lower one command to the engine command(s) it produces (0+). Engine commands pass through unchanged. */
@@ -95,9 +118,14 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
       const konst = e.const ?? 0;
       // |XY| = k·R against a FREE-radius circle (ADR-071): couple the length to the radius DOF. Only the
       // LINEAR case (pow 1) is a radius multiple; a √/² power of the radius falls through to the var path.
-      if (e.var === RADIUS_VAR && tab.radiusCircle && (e.pow ?? 1) === 1) {
-        const { id, center, witness } = tab.radiusCircle;
-        return [{ type: 'set-length-radius', a: cmd.a, b: cmd.b, circle: id, center, witness, k: e.coef, ...(konst ? { add: konst } : {}) }];
+      // Resolution (issue #54): an EXPLICIT per-circle binding wins ("שרדיוסו r" → THAT circle); an
+      // unbound reserved R/r falls back to the legacy single-circle bind. A bound circle with no known
+      // on-circle witness gets a hidden pinned `~radw-*` rider minted here (idempotent at apply).
+      const rc = tab.radiusOf.get(e.var) ?? (/^[Rr]$/.test(e.var) && tab.vars.get(e.var)?.value === undefined ? tab.radiusCircle : undefined);
+      if (rc && (e.pow ?? 1) === 1) {
+        const witness = rc.witness ?? `~radw-${rc.id}`;
+        const mint: Command[] = rc.witness ? [] : [{ type: 'point-on-circle', id: witness, circle: rc.id, theta: 0.9 }];
+        return [...mint, { type: 'set-length-radius', a: cmd.a, b: cmd.b, circle: rc.id, center: rc.center, witness, k: e.coef, ...(konst ? { add: konst } : {}) }];
       }
       const info = tab.vars.get(e.var);
       if (info?.value !== undefined) {
@@ -220,8 +248,9 @@ export function measureLabelText(cmd: Extract<SymbolicCommand, { type: 'measure-
   // A concrete value: show its faithful text ("12√2", "2π") if the parser kept one, else the number.
   if ('value' in e) return e.text ?? fmtNum(e.value) + (isAngle ? '°' : '');
   // The radius symbol stays symbolic on the figure ("1.6R") even when its value is known (ADR-034) —
-  // it's a size relative to the radius, not a number the student picked.
-  if (e.var === RADIUS_VAR) return e.text ?? (e.coef === 1 ? '' : fmtNum(e.coef)) + powVar(e.var, e.pow);
+  // it's a size relative to the radius, not a number the student picked. Applies to the reserved R/r
+  // AND to any explicitly-bound per-circle radius symbol (issue #54).
+  if (/^[Rr]$/.test(e.var) || tab.radiusOf.has(e.var)) return e.text ?? (e.coef === 1 ? '' : fmtNum(e.coef)) + powVar(e.var, e.pow);
   const info = tab.vars.get(e.var);
   // Resolved (the variable has a value): always the computed number — the symbolic text no longer applies.
   if (info?.value !== undefined) return fmtNum(e.coef * Math.pow(info.value, e.pow ?? 1) + (e.const ?? 0)) + (isAngle ? '°' : '');

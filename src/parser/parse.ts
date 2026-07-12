@@ -73,6 +73,11 @@ export interface ParseContext {
    *  ("במרובע חסום מעגל" typed after מרובע ABCD exists) bind to THE existing polygon instead of minting
    *  a fresh auto-named one (the ADR-029 implicit-reference pattern, polygon edition). */
   polygons?: string[][];
+  /** Radius symbols already bound in the figure (issue #54) — "מעגל שרדיוסו R" / "רדיוס מעגל P הוא r"
+   *  stamp the letter on the circle; relations between the letters ("R = 1.5r", "R > r") resolve each
+   *  to its circle here. Keyed by the letter, CASE-SENSITIVE (bagrut convention: R vs r are different
+   *  radii). */
+  radiusSymbols?: { name: string; circle: string; center: string }[];
 }
 
 /** The centre of a circle that contains EVERY point in `pts` (preferring `prefer` if it qualifies), else null. */
@@ -1587,7 +1592,11 @@ const VAR = String.raw`[a-zα-ω]`;
 // A length's RHS variable also admits the reserved radius symbol R/r ("AC = 1.6R") — ADR-034.
 // (Only as a size: the `(?![a-zA-Z])` guard keeps "AB = RS"/"AB = AR" reading R as a vertex.)
 const LVAR = String.raw`[a-zα-ωR]`;
-const normVar = (v: string): string => (/^[Rr]$/.test(v) ? RADIUS_VAR : v);
+// R and r are DISTINCT variables (issue #54 — the bagrut convention names two circles' radii R vs r);
+// the old fold `r → R` merged them into one reserved symbol, which is wrong the moment a second circle
+// binds its own letter. An UNBOUND R/r still both denote "the" circle's radius via the symbol table's
+// legacy fallback (buildSymTab), so single-circle figures behave as before.
+const normVar = (v: string): string => v;
 
 /**
  * "AB = 3x" / "AB = x" / "AB = 1.5y" — a segment's length as `coef·var` (a symbolic
@@ -2140,7 +2149,7 @@ const RADIUS_WORD = String.raw`(?:radius|רדיוס\S*)`;
  * radius symbol — ADR-034). A symbol pins the variable R to the concrete default radius via
  * a `set-var`, so a later "AC = 1.6R" resolves to |AC| = 1.6·radius while still labelling "1.6R".
  */
-const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: boolean; varCmd?: SymbolicCommand } => {
+const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: boolean; sym?: string; varCmd?: SymbolicCommand } => {
   // A QUOTIENT radius — "רדיוס 35/√32", "שרדיוסו √32/5" (#77, the shared NUMEXPR atom). Checked BEFORE the
   // bare-number form, which would otherwise read "רדיוס 35" and silently drop the "/√32".
   const rFrac = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*(?:=|:|הוא|שווה|\bis\b)?\s*${NUMEXPR('r')}`, 'i'));
@@ -2150,8 +2159,11 @@ const parseRadius = (s: string): { radius: number; numeric: boolean; symbolic: b
   }
   const rNum = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*${num}`, 'i'));
   if (rNum) return { radius: parseFloat(rNum[1]), numeric: true, symbolic: false };
-  const rVar = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*[Rr]\b`));
-  if (rVar) return { radius: RADIUS_DEFAULT, numeric: false, symbolic: true, varCmd: { type: 'set-var', name: RADIUS_VAR, value: RADIUS_DEFAULT } };
+  // A SYMBOLIC radius — any single letter, not only the reserved R/r (issue #54: "שרדיוסו T" names the
+  // radius T). The letter (case kept — R vs r are different radii) is returned so the binding post-pass
+  // can attach it to the circle the utterance creates/references; the radius stays a free DOF.
+  const rVar = s.match(new RegExp(String.raw`${RADIUS_WORD}\s*(?:is\s+|הוא\s+)?(?:=\s*)?([A-Za-z])(?![A-Za-z\d])`));
+  if (rVar) return { radius: RADIUS_DEFAULT, numeric: false, symbolic: true, sym: rVar[1], varCmd: { type: 'set-var', name: RADIUS_VAR, value: RADIUS_DEFAULT } };
   const sized = circleSizeRadius(s);
   if (sized !== null) return { radius: sized, numeric: true, symbolic: false };
   return { radius: RADIUS_DEFAULT, numeric: false, symbolic: false };
@@ -2362,6 +2374,68 @@ const setRadius: Rule = (s, ctx) => {
 };
 
 /**
+ * "רדיוס מעגל O הוא R" / "radius of circle P is r" — NAME an EXISTING circle's radius with a letter
+ * (issue #54; the operator's requested after-the-fact binding form). Pure data (`radius-symbol` stamps
+ * the circle object): the radius stays a free DOF; the letter becomes referenceable in relations
+ * ("R = 1.5r", "R > r") and measures ("AB = √2R" couples to THIS circle). Distinct from `setRadius`
+ * (numeric value, which runs first) — here the RHS is a bare single letter. The circle is named, or
+ * the single circle in context. Only the radius-of-circle reference may precede the copula — anything
+ * else is a compound (defer).
+ */
+const radiusSymbolStatement: Rule = (s, ctx) => {
+  if (!/radius|רדיוס/i.test(s)) return null;
+  if (sizeStatementLeftover(s)) return null; // a construction carrying a size clause — not a naming statement
+  const m = s.match(/(?:הוא|היא|=|\bis\b)\s*([A-Za-z])\s*\.?\s*$/);
+  if (!m || m.index === undefined) return null;
+  const head = s.slice(0, m.index);
+  const center = circleCenter(head) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
+  if (!center) return null;
+  if (!(ctx.circles ?? []).some((c) => up(c) === up(center))) return null; // EXISTING circle only
+  const leftover = head
+    .replace(/radius|רדיוס\S*|circles?|ה?מעגל\w*|של/gi, ' ')
+    .replace(new RegExp(String.raw`\b${center}\b`, 'gi'), ' ')
+    .replace(FILLER, ' ')
+    .trim();
+  if (leftover) return null;
+  return [{ type: 'radius-symbol', circle: circleId(center), name: m[1] }];
+};
+
+/**
+ * A RELATION between two bound radius symbols (issue #54): "R > r" (order — the ADR-244 requirement,
+ * independent-circles edition), "R = 1.5r" (ratio, product form; k may carry the ADR-298 √ arithmetic),
+ * "R/r = 2√7/5" (ratio, quotient form). Both letters must already be BOUND radius symbols in the
+ * figure (case-sensitive — the bagrut's R vs r), else the rule defers: a comparison of unbound letters
+ * is not a radius statement. Runs before `measureOrder` (which would silently no-op unbound
+ * lowercase-only pairs) — though its uppercase-R forms never matched there anyway.
+ */
+const radiusRelation: Rule = (s, ctx) => {
+  const syms = new Map((ctx.radiusSymbols ?? []).map((r) => [r.name, r]));
+  if (syms.size === 0) return null;
+  const order = s.match(/^\s*([A-Za-z])\s*(>=|<=|>|<|≥|≤)\s*([A-Za-z])\s*$/);
+  if (order) {
+    const a = syms.get(order[1]);
+    const b = syms.get(order[3]);
+    if (!a || !b || a.circle === b.circle) return null;
+    const bigLeft = order[2] === '>' || order[2] === '≥' || order[2] === '>=';
+    return [{ type: 'set-radius-order', outer: (bigLeft ? a : b).circle, inner: (bigLeft ? b : a).circle }];
+  }
+  // Both forms state the SAME relation — radius(lhs) = k · radius(rhs): "R = k·r" directly, "R/r = k"
+  // by multiplying through.
+  const bind = (lhs: string | undefined, rhs: string | undefined, g: Record<string, string | undefined>): AnyCommand[] | null => {
+    const a = lhs ? syms.get(lhs) : undefined;
+    const b = rhs ? syms.get(rhs) : undefined;
+    const v = numexprVal(g, 'k');
+    if (!a || !b || a.circle === b.circle || !v || v.value <= 0) return null;
+    return [{ type: 'set-radius-ratio', c1: a.circle, c2: b.circle, k: v.value }];
+  };
+  const prod = s.match(new RegExp(String.raw`^\s*(?<lhs>[A-Za-z])\s*=\s*${NUMEXPR('k')}\s*[·*]?\s*(?<rhs>[A-Za-z])\s*$`));
+  if (prod) return bind(prod.groups!.lhs, prod.groups!.rhs, prod.groups!);
+  const quot = s.match(new RegExp(String.raw`^\s*(?<lhs>[A-Za-z])\s*\/\s*(?<rhs>[A-Za-z])\s*=\s*${NUMEXPR('k')}\s*$`));
+  if (quot) return bind(quot.groups!.lhs, quot.groups!.rhs, quot.groups!);
+  return null;
+};
+
+/**
  * A circumference or area given on an EXISTING circle (ADR-228 Am.): "היקף מעגל O1 הוא 6π" / "the area of
  * circle O is 9π" SETS that circle's radius (r = C/2π or √(A/π)) via `set-radius` — flexing the circle in
  * place. Mirrors `setRadius` (which does the same for a numeric "radius = 4"), and reuses the same
@@ -2531,7 +2605,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
     ' ',
   );
   if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
-  if (r.symbolic) rest = rest.replace(/\b[Rr]\b/g, ' '); // the radius symbol is not a vertex (ADR-034)
+  if (r.symbolic) rest = rest.replace(new RegExp(String.raw`\b[Rr]\b${r.sym && !/^[Rr]$/.test(r.sym) ? String.raw`|\b${r.sym}\b` : ''}`, 'g'), ' '); // the radius symbol is not a vertex (ADR-034; #54 — any bound letter)
   // The vertices the student named, or — when the shape word is explicit but UNLABELED ("מרובע חסום
   // במעגל" / "triangle inscribed in a circle") — auto-named A,B,C(,D), avoiding existing points and the
   // named centre. A PARTIAL label run (some letters but not n) stays a defer/escalate (a typo / compound).
@@ -5102,6 +5176,8 @@ export const RULES: Rule[] = [
   compoundSuchThat, // "<place a point> such that <condition>" — split + parse each half, before all else
   multiStatement, // "AB = 4, BC = 6" — split comma/and-joined GIVENS, parse each all-or-nothing (PAR-2)
   setRadius, // "radius of circle P is 4" — set an EXISTING circle's radius; before `circle` (creation) and the shape rules (which 'stop' on רדיוס)
+  radiusSymbolStatement, // "רדיוס מעגל O הוא R" — NAME an existing circle's radius with a letter (#54); after setRadius (numeric wins), before the shape rules
+  radiusRelation, // "R > r" / "R = 1.5r" / "R/r = 2√7/5" between BOUND radius symbols (#54); before measureOrder (unbound-pair no-op) and the value rules
   congruence, // "ABC ≅ DEF" — before the shape rules ("triangle ABC ≅ …" contains "triangle")
   similarity, // "ABC ~ DEF"
   area, // "שטח המשולש ABC = 13" / "SABC/SDEF = 3/4" (ADR-118) — BEFORE the shape rules, which would otherwise build the named shape and drop the area
@@ -5756,15 +5832,92 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
     (whole.ok &&
       (droppedShapeNoun(s, whole.commands, ctx) ||
         droppedCirclePredicate(s, whole.commands) ||
-        droppedRadiusSymbol(s, whole.commands).length > 0)) ||
+        droppedRadiusSymbol(s, whole.commands).length > 0 ||
+        droppedRegionSubject(s, whole.commands))) ||
     (!whole.ok && whole.reason !== 'not-handled' && droppedShapeNoun(s, [], ctx))
   ) {
-    return splitStatements(s, ctx) ?? { ok: false, reason: 'not-handled' };
+    return splitStatements(s, ctx) ?? regionSideFallback(s, ctx) ?? { ok: false, reason: 'not-handled' };
   }
   // A clarification (ambiguous-angle / ambiguous-circle) is a rule's genuine question — propagate it,
   // never second-guess it with a split. Only a flat not-handled falls through to the clause fallback.
   if (whole.ok || whole.reason !== 'not-handled') return whole;
-  return splitStatements(s, ctx) ?? whole;
+  return splitStatements(s, ctx) ?? regionSideFallback(s, ctx) ?? whole;
+}
+
+/**
+ * Trailing POLYGON-REGION clause fallback (issue #99 — the ADR-254 circle-side family, polygon edition):
+ * "הנקודה E נמצאת על מעגל O בתוך המשולש KAO" / "E is on circle O inside triangle KAO" — a point-defining
+ * (or point-referencing) statement carrying a REGION disambiguator that selects which part of its carrier
+ * the point occupies. No rule owns the compound, so the whole line used to escalate → not-understood and
+ * the statement VANISHED. A LAST-RESORT fallback (runs only after runRules + splitStatements both fail, so
+ * inscriptions — which parse fully — are untouched): strip the trailing region clause, parse the HEAD
+ * normally, and attach a `point-polygon-side` requirement to the point the head introduces. A bare head
+ * ("הנקודה E בתוך המשולש KAO") attaches to that point directly — a NEW id becomes a free point seeded on
+ * the stated side (apply), an EXISTING id is an M1 statement. Region vertices must already be known points
+ * (a region reference, never a construction); an ambiguous subject (0 or 2+ introduced points) defers.
+ */
+const REGION_TAIL = new RegExp(
+  String.raw`[,\s]+(?:ש?נמצאת\s+|ש?נמצא\s+|is\s+|lies\s+|and\s+)*(בתוך|מחוץ\s*ל-?|inside(?:\s+of)?|outside(?:\s+of)?)\s*(?:the\s+)?(?:ה?(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|מקבילית)|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|kite|parallelogram)\s+((?:[A-Z]\d*\s*){3,4})\s*\.?\s*$`,
+);
+/**
+ * A REGION-clause utterance whose SUBJECT the winning parse dropped (issue #99) — the region lane of
+ * the dropped-given honesty family (labels ADR-089, numbers ADR-250, relations ADR-264, radius #53):
+ * a bare "M בתוך המשולש ABC" is claimed by the `triangle` rule ("משולש ABC" matches; a lone label is
+ * not SHAPE_LEFTOVER), silently dropping M and the stated region. When the trailing region clause is
+ * present, no command carries a region, and a head label went unreferenced — rescue via
+ * {@link regionSideFallback}, never commit the subject-less half-parse.
+ */
+function droppedRegionSubject(s: string, commands: AnyCommand[]): boolean {
+  const m = s.match(REGION_TAIL);
+  if (!m) return false;
+  if (commands.some((c) => c.type === 'point-polygon-side')) return false;
+  const used = new Set(JSON.stringify(commands).match(/[A-Z]\d*/g) ?? []);
+  return (s.slice(0, m.index).match(/[A-Z]\d*/g) ?? []).some((l) => !used.has(l));
+}
+
+function regionSideFallback(s: string, ctx: ParseContext): ParseResult | null {
+  const m = s.match(REGION_TAIL);
+  if (!m) return null;
+  const side: 'inside' | 'outside' = /בתוך|inside/i.test(m[1]) ? 'inside' : 'outside';
+  const poly = (m[2].match(/[A-Z]\d*/g) ?? []).map(up);
+  if (poly.length < 3) return null;
+  const have = new Set((ctx.points ?? []).map(up));
+  // The region is normally a REFERENCE to drawn vertices. An all-NEW TRIANGLE is the one implicit
+  // creation allowed ("E inside triangle KAO" states the triangle exists — the withImplicitCircles
+  // pattern, triangle edition); a partially-known vertex set is ambiguous (a typo'd reference?) and a
+  // non-triangle noun stays reference-only — both escalate.
+  const allKnown = poly.every((p) => have.has(p));
+  const allNew = poly.every((p) => !have.has(p));
+  const isTriangle = poly.length === 3 && /משולש|triangle/i.test(m[0]);
+  if (!allKnown && !(allNew && isTriangle)) return null;
+  const prefix: AnyCommand[] = allKnown ? [] : [{ type: 'triangle', ids: [poly[0], poly[1], poly[2]] }];
+  const head = s.slice(0, m.index).trim();
+  if (!head) return null;
+  // (a) the head is a full statement of its own ("הנקודה E נמצאת על מעגל O") — parse it and attach the
+  // region to the ONE point it introduces; 0 or 2+ introduced points is ambiguous → defer to the LLM.
+  const r = runRules(head, ctx);
+  if (r.ok) {
+    const introduced = [
+      ...new Set(
+        r.commands
+          .map((c) => (c as { id?: unknown }).id)
+          .filter((x): x is string => typeof x === 'string' && /^[A-Z]\d*$/.test(x) && !have.has(up(x))),
+      ),
+    ];
+    if (introduced.length === 1 && !poly.includes(up(introduced[0]))) {
+      return { ok: true, commands: [...prefix, ...r.commands, { type: 'point-polygon-side', id: up(introduced[0]), poly, side }] };
+    }
+    return null;
+  }
+  // (b) a bare point reference head — "הנקודה E" / "point E" / "E"
+  const one = head
+    .replace(/ה?נקודה|ה?נקודות|points?/gi, ' ')
+    .trim()
+    .match(/^([A-Z]\d*)$/);
+  if (!one) return null;
+  const id = up(one[1]);
+  if (poly.includes(id)) return null;
+  return { ok: true, commands: [...prefix, { type: 'point-polygon-side', id, poly, side }] };
 }
 
 /**
@@ -5843,17 +5996,52 @@ function droppedCirclePredicate(s: string, commands: AnyCommand[]): boolean {
  * machinery; per-circle BINDING quality is issue #54's feature). The gate guarantees only that the circle
  * the clause describes exists in the parse — it fires exactly on the silent-wrong-figure case.
  */
-export function droppedRadiusSymbol(utterance: string, commands: AnyCommand[]): string[] {
-  const s = normalizeUtterance(utterance);
+/** Every radius SYMBOL the utterance states ("שרדיוסו r", "radius = T") in order of appearance — the
+ *  `parseRadius` symbolic shape, shared by the honesty gate below and the binding post-pass (#54). */
+function statedRadiusSymbols(s: string): string[] {
   const syms: string[] = [];
   for (const m of s.matchAll(new RegExp(String.raw`${RADIUS_WORD}\s*(?:is\s+|הוא\s+)?(?:=\s*)?([A-Za-z])(?![A-Za-z\d])`, 'g'))) {
     syms.push(m[1]);
   }
+  return syms;
+}
+
+export function droppedRadiusSymbol(utterance: string, commands: AnyCommand[]): string[] {
+  const syms = statedRadiusSymbols(normalizeUtterance(utterance));
   if (syms.length === 0) return [];
   const accounted = commands.some(
     (c) => /circle|concyclic/i.test(c.type) || 'circle' in (c as object) || 'center' in (c as object),
   );
   return accounted ? [] : [...new Set(syms)];
+}
+
+/**
+ * Radius-symbol BINDING post-pass (issue #54 — the ADR-119 chokepoint pattern, so EVERY circle rule
+ * gains the "שרדיוסו r" binding at once instead of each rule learning the clause): a stated symbolic
+ * radius attaches a `radius-symbol` command to the circle its clause describes. Pairing is by ORDER —
+ * n stated symbols ↔ n circles the utterance CREATES (each creation clause carries its own שרדיוסו);
+ * a single symbol may instead bind the single circle the commands reference. Unpairable counts leave
+ * the commands untouched (the #53 honesty gate stays the net). Idempotent against the figure's
+ * existing bindings; a rule that already emitted an explicit `radius-symbol` is left alone.
+ */
+function withRadiusSymbolBinding(commands: AnyCommand[], s: string, ctx: ParseContext): AnyCommand[] {
+  const syms = statedRadiusSymbols(s);
+  if (syms.length === 0) return commands;
+  if (commands.some((c) => c.type === 'radius-symbol')) return commands;
+  const created = commands.map(definedCircleId).filter((x): x is Id => x !== null);
+  const referenced = [...new Set(commands.map(consumedCircleId).filter((x): x is Id => x !== null))];
+  let targets: Id[] | null = null;
+  if (created.length === syms.length) targets = created;
+  else if (syms.length === 1 && created.length >= 1) targets = [created[0]];
+  else if (syms.length === 1 && referenced.length === 1) targets = referenced;
+  if (!targets) return commands;
+  const bound = new Map((ctx.radiusSymbols ?? []).map((r) => [r.name, r.circle]));
+  const out = [...commands];
+  for (let i = 0; i < syms.length; i++) {
+    if (bound.get(syms[i]) === targets[i]) continue; // already bound to this circle — idempotent
+    out.push({ type: 'radius-symbol', circle: targets[i], name: syms[i] });
+  }
+  return out;
 }
 
 /** The first-match-wins pass over `RULES` for ONE statement — the body `parse` always ran; extracted so
@@ -5867,7 +6055,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
       // Concentric resolution runs LAST (ADR-244): the other post-passes mint the pair's OUTER id
       // (`circleId(centre)`), and this one redirects/confirms per qualifier or asks to clarify.
       const resolved = withConcentricResolution(withImplicitCircles(withOnCircleMembership(withCarrierMembership(withCarrierSegments(res), s, ctx), s, ctx), ctx), s, ctx);
-      if (Array.isArray(resolved)) return { ok: true, commands: resolved };
+      if (Array.isArray(resolved)) return { ok: true, commands: withRadiusSymbolBinding(resolved, s, ctx) };
       return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
     }
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).

@@ -695,6 +695,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "point E lies inside triangle KAO",
+    "winner": "(escalate)",
+  },
+  {
+    "lang": "he",
+    "text": "הנקודה E נמצאת בתוך המשולש KAO",
+    "winner": "(escalate)",
+  },
+  {
+    "lang": "en",
     "text": "segment AC",
     "winner": "segment",
   },
@@ -1071,6 +1081,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   {
     "lang": "he",
     "text": "מעגל בקוטר 10",
+    "winner": "circle",
+  },
+  {
+    "lang": "en",
+    "text": "circle O with radius R",
+    "winner": "circle",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל O שרדיוסו R",
     "winner": "circle",
   },
   {

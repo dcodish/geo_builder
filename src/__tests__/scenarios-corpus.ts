@@ -4512,6 +4512,57 @@ export const SCENARIOS: Scenario[] = [
       expect(Math.abs(dot), 'OA ⟂ AK (tangency at A)').toBeLessThan(1e-6);
     },
   },
+  {
+    id: 'bagrut-2025-two-circles-full-figure',
+    title: 'the FULL 2025-bagrut two-circle figure: radius symbols R/r + R>r + region-inside E + the tangent clauses + R=1.5r (#54, #99, #100)',
+    guards:
+      'Operator prod report 2026-07-12 — the whole question could not be built: «we are missing the ability to say רדיוס מעגל O הוא R» (+ R>r untried, #54), «E is inside a triangle — this is tricky» (#99), and the tangent had to be worked around (#100). This is the complete figure typed as a student would: two circles with SYMBOLIC radii R (big, P) and r (small, O), the R>r order, O on the big circle, A a circle∩circle crossing, the tangent to the small circle THROUGH A cutting the big circle at K, triangle KAO, E on the small circle INSIDE the triangle, the part-ב continuation (המשך AE cuts OK at M — M must land WITHIN segment OK), and the part-ד size relation R = 1.5r. Asserts the printed figure’s geometry: the ratio holds exactly, E is on circle O and inside △KAO, OA ⟂ AK (tangency), K on the big circle, M within OK.',
+    steps: [
+      'מעגל P שרדיוסו R',
+      'מעגל O שרדיוסו r',
+      'R > r',
+      'הנקודה O נמצאת על מעגל P',
+      'A היא אחת מנקודות החיתוך של מעגל O ומעגל P',
+      'דרך הנקודה A העבירו משיק למעגל O',
+      'המשיק חותך את מעגל P בנקודה K',
+      'משולש KAO',
+      'הנקודה E נמצאת על מעגל O בתוך המשולש KAO',
+      'המשך הקטע AE חותך את הקטע OK בנקודה M',
+      'R = 1.5r',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), K = at(fig, 'K'), P = at(fig, 'P'), E = at(fig, 'E'), M = at(fig, 'M');
+      // R = 1.5r — the stated ratio holds exactly between the two resolved radii
+      const rBig = fig.circles.get('circle-P')!.r;
+      const rSmall = fig.circles.get('circle-O')!.r;
+      expect(rBig / rSmall, 'R = 1.5r').toBeCloseTo(1.5, 5);
+      expect(rBig, 'R > r').toBeGreaterThan(rSmall);
+      // O on the big circle; A on both circles
+      expect(dist(P, O)).toBeCloseTo(rBig, 5);
+      expect(dist(P, A)).toBeCloseTo(rBig, 5);
+      expect(dist(O, A)).toBeCloseTo(rSmall, 5);
+      // the tangent at A: OA ⟂ AK, K on the big circle, away from A
+      expect(dist(P, K), 'K on the big circle').toBeCloseTo(rBig, 5);
+      expect(dist(K, A)).toBeGreaterThan(0.1);
+      const dot = (O.x - A.x) * (K.x - A.x) + (O.y - A.y) * (K.y - A.y);
+      expect(Math.abs(dot), 'OA ⟂ AK').toBeLessThan(1e-6);
+      // E on the small circle AND inside triangle KAO (the #99 region requirement)
+      expect(dist(O, E), 'E on the small circle').toBeCloseTo(rSmall, 5);
+      const insideKAO = (() => {
+        // same-side test vs each edge (KAO is a triangle)
+        const sgn = (p: { x: number; y: number }, a: { x: number; y: number }, b: { x: number; y: number }) =>
+          Math.sign((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x));
+        const s1 = sgn(E, K, A), s2 = sgn(E, A, O), s3 = sgn(E, O, K);
+        return s1 === s2 && s2 === s3;
+      })();
+      expect(insideKAO, 'E inside triangle KAO').toBe(true);
+      // part ב: M = the continuation of AE crossing OK, WITHIN segment OK (and beyond E on ray A→E)
+      const tOK = ((M.x - O.x) * (K.x - O.x) + (M.y - O.y) * (K.y - O.y)) / dist(O, K) ** 2;
+      expect(tOK, 'M within segment OK').toBeGreaterThan(0.02);
+      expect(tOK, 'M within segment OK').toBeLessThan(0.98);
+    },
+  },
 ];
 
 /**

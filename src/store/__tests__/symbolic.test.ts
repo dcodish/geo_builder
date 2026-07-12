@@ -330,14 +330,17 @@ describe('reserved radius symbol R/r (ADR-034)', () => {
     const r = parse('circle O radius R');
     // A symbolic radius is an unknown magnitude → a free DOF that R denotes; R is left UNVALUED (no
     // set-var) so a later "AB = √2R" couples to the free radius rather than freezing it (ADR-071).
+    // Since #54 (ADR-304) the letter is also BOUND to the circle via a `radius-symbol` data command
+    // (per-circle symbols) — the radius itself stays free.
     expect(r.ok && r.commands).toEqual([
       { type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true },
+      { type: 'radius-symbol', circle: 'circle-O', name: 'R' },
     ]);
   });
 
-  it('"מעגל סביב O רדיוס R" (Hebrew) does the same (free radius, no set-var)', () => {
+  it('"מעגל סביב O רדיוס R" (Hebrew) does the same (free radius + binding, no set-var)', () => {
     const r = parse('מעגל סביב O רדיוס R');
-    expect(r.ok && r.commands.map((c) => c.type)).toEqual(['circle']);
+    expect(r.ok && r.commands.map((c) => c.type)).toEqual(['circle', 'radius-symbol']);
     expect(r.ok && r.commands[0]).toMatchObject({ type: 'circle', freeRadius: true });
   });
 
@@ -346,9 +349,15 @@ describe('reserved radius symbol R/r (ADR-034)', () => {
     expect(r.ok && r.commands[0]).toEqual({ type: 'measure-length', a: 'A', b: 'C', expr: { coef: 1.6, var: 'R' } });
   });
 
-  it('lowercase "AC = 2r" normalises to the same radius symbol R', () => {
+  it('lowercase "AC = 2r" keeps its OWN spelling (r ≠ R since #54); an UNBOUND r still couples to the one circle', () => {
+    // R and r are distinct variables (the bagrut names two radii R vs r — ADR-304); the old fold r→R
+    // merged them. The reserved-symbol BEHAVIOR is preserved by the symbol table's legacy fallback:
+    // an unbound r couples to the single circle exactly as R does (asserted behaviorally below).
     const r = parse('AC = 2r');
-    expect(r.ok && r.commands[0]).toEqual({ type: 'measure-length', a: 'A', b: 'C', expr: { coef: 2, var: 'R' } });
+    expect(r.ok && r.commands[0]).toEqual({ type: 'measure-length', a: 'A', b: 'C', expr: { coef: 2, var: 'r' } });
+    const d = replay(facts('circle O radius 5', 'triangle ABC inscribed in circle O', 'AC = 2r'));
+    expect(d.lastError).toBeNull();
+    expect(len(d.positions, 'A', 'C')).toBeCloseTo(10, 2); // 2 × the fixed radius — same as "AC = 2R"
   });
 
   it('R stays a vertex inside a letter-run ("PQRS", "AB = RS", "AB = AR")', () => {

@@ -49,6 +49,36 @@ export function rotate(v: Vec, deg: number): Vec {
 export const cross = (o: Vec, a: Vec, b: Vec): number =>
   (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 
+/**
+ * Is `p` strictly inside the polygon `verts` (any simple polygon, convex or not — ray cast)?
+ * `margin` > 0 demands clearance from every edge (a strict-inside test for the verifier: a point
+ * sitting ON the boundary is not "inside" a region a question states it occupies); `margin` < 0
+ * would loosen, unused. Used by the `point-polygon-side` region requirement (issue #99, the
+ * ADR-254 circle-side family, polygon edition).
+ */
+export function pointInPolygon(p: Vec, verts: Vec[], margin = 0): boolean {
+  const n = verts.length;
+  if (n < 3) return false;
+  let inside = false;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const a = verts[i], b = verts[j];
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  if (!inside) return false;
+  if (margin > 0) {
+    // clearance: distance from p to every edge segment must exceed the margin
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const a = verts[i], b = verts[j];
+      const d = sub(b, a);
+      const dd = d.x * d.x + d.y * d.y;
+      const t = dd < 1e-18 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * d.x + (p.y - a.y) * d.y) / dd));
+      const foot = { x: a.x + t * d.x, y: a.y + t * d.y };
+      if (dist(p, foot) < margin) return false;
+    }
+  }
+  return true;
+}
+
 /** Reflect point p across the line through a and b (a degenerate a≈b returns p). */
 export function reflectAcross(p: Vec, a: Vec, b: Vec): Vec {
   const d = sub(b, a);

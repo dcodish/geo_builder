@@ -1605,7 +1605,12 @@ export default function App() {
                 // A concentric pair (ADR-244) shares a centre letter — label its sliders outer/inner.
                 const paired = radiusDofs.some((o) => o.circle !== d.circle && o.center === d.center);
                 const isInner = construction.objects.some((o) => o.kind === 'circle' && o.id === d.circle && o.innerOf);
-                const label = paired ? t(isInner ? 'dof.radiusInner' : 'dof.radiusOuter', { center: d.center }) : t('dof.radius', { center: d.center });
+                // A bound radius SYMBOL (issue #54 — "מעגל שרדיוסו R") names the slider, so the student
+                // sees the letter they typed pointing at the DOF it denotes (§6 visibility).
+                const circObj = construction.objects.find((o) => o.kind === 'circle' && o.id === d.circle);
+                const sym = circObj && circObj.kind === 'circle' ? circObj.radiusSymbol : undefined;
+                const base = paired ? t(isInner ? 'dof.radiusInner' : 'dof.radiusOuter', { center: d.center }) : t('dof.radius', { center: d.center });
+                const label = sym ? `${base} (${sym})` : base;
                 return (
                   <div key={d.circle} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <span style={{ fontSize: 12, minWidth: 96 }}>{label}</span>

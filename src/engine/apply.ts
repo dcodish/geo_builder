@@ -9,7 +9,7 @@
  */
 
 import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, Vec } from './types';
-import { add, dist, lineLineIntersect, reflectAcross, scale, sub } from './geometry';
+import { add, dist, lineLineIntersect, pointInPolygon, reflectAcross, scale, sub } from './geometry';
 import { constraintRefs } from './solve';
 
 /**
@@ -1086,6 +1086,77 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
     }
 
+    case 'point-polygon-side': {
+      // "E … בתוך המשולש KAO" / "inside triangle KAO" (issue #99) — the ADR-254 circle-side shape,
+      // polygon edition. The command is the side REQUIREMENT record — checkGivens re-derives it from the
+      // final coordinates (figure.v.insideRegion/outsideRegion) and meetsRequirements gates sampling /
+      // "show another" on it — so nothing is pushed to `constraints` (an inequality has nothing to drive).
+      // Here we only improve the DEFAULT: seed a NEW id on the stated side; re-seat an EXISTING free
+      // point (or a free on-circle rider's starting θ) that sits on the wrong side.
+      const verts = cmd.poly.map((v) => pos.get(v)).filter((v): v is Vec => v !== undefined);
+      const known = verts.length === cmd.poly.length && verts.length >= 3; // structural probes run on an empty construction — any spot stands in there
+      const cx = known ? verts.reduce((s, v) => s + v.x, 0) / verts.length : 0;
+      const cy = known ? verts.reduce((s, v) => s + v.y, 0) / verts.length : 0;
+      const rspan = known ? Math.max(...verts.map((v) => dist(v, { x: cx, y: cy }))) : 5;
+      const onSide = (p: Vec): boolean =>
+        !known || (cmd.side === 'inside' ? pointInPolygon(p, verts, rspan * 0.06) : !pointInPolygon(p, verts));
+      const seedSpot = (): Vec => {
+        const others = [...pos.values()];
+        // golden-angle spins at a few radius tiers around the centroid — the stated side + general position
+        for (const f of cmd.side === 'inside' ? [0.45, 0.25, 0.6, 0.12] : [1.8, 2.4, 1.4]) {
+          for (let k = 0; k <= 24; k++) {
+            const th = k * GOLDEN_ANGLE;
+            const p = { x: cx + f * rspan * Math.cos(th), y: cy + f * rspan * Math.sin(th) };
+            if (!onSide(p)) continue;
+            if (others.some((q) => dist(p, q) < rspan * 0.05)) continue; // off existing points
+            return p;
+          }
+        }
+        return { x: cx, y: cy };
+      };
+      const existing = objects.find((o) => o.id === cmd.id);
+      if (!existing) {
+        const p = seedSpot();
+        objects.push({ kind: 'free-point', id: cmd.id, x: p.x, y: p.y }); // a real free DOF (ADR-052) — not pinned
+      } else if (existing.kind === 'free-point' && !existing.pinned && known) {
+        // M1: a side statement about an EXISTING point is a statement about that point. A non-pinned free
+        // point on the WRONG side gets its DEFAULT re-seated — a better default, not a drive.
+        if (!onSide({ x: existing.x, y: existing.y })) {
+          const p = seedSpot();
+          const i = objects.findIndex((o) => o.id === cmd.id);
+          objects[i] = { ...existing, x: p.x, y: p.y };
+        }
+      } else if (existing.kind === 'on-circle' && existing.free && !existing.solve && known) {
+        // The 2025-bagrut case: E is a FREE rider on a circle, stated inside a triangle — re-seat its
+        // STARTING θ to an on-circle spot inside the region (the requirement gate keeps it there across
+        // sampling; a driven/fixed rider is left to the verifier).
+        const circ = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === existing.circle);
+        const centre = circ ? pos.get(circ.center) : undefined;
+        if (circ && centre) {
+          const rr =
+            circ.radius.via === 'through'
+              ? pos.get(circ.radius.point)
+                ? dist(centre, pos.get(circ.radius.point)!)
+                : 5
+              : 'value' in circ.radius
+                ? circ.radius.value
+                : 5;
+          const at = (th: number): Vec => ({ x: centre.x + rr * Math.cos(th), y: centre.y + rr * Math.sin(th) });
+          if (!onSide(at(existing.theta))) {
+            for (let k = 1; k <= 36; k++) {
+              const th = existing.theta + (k * Math.PI * 2) / 36;
+              if (onSide(at(th))) {
+                const i = objects.findIndex((o) => o.id === cmd.id);
+                objects[i] = { ...existing, theta: th };
+                break;
+              }
+            }
+          }
+        }
+      }
+      break;
+    }
+
     case 'point-on-circle': {
       // Re-defining an EXISTING point as "on circle C" is a RELATION on that point, not a fresh
       // vertex — and `addObj` would silently no-op it (the "green but E isn't on the circle" bug).
@@ -1434,8 +1505,52 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // qualifier references ("המעגל הפנימי"). A REQUIREMENT, not a driven constraint — the radii stay free
       // DOFs; the givens verifier checks inner < outer against the final radii, and `meetsRequirements`
       // (which gates the sampler and "show another configuration") skips any order-violating config.
+      // The `innerOf` CONCENTRIC-pair marker is stamped only when the circles share a centre — an
+      // independent-circle order ("R > r" between two intersecting circles, issue #54) must not make the
+      // pair read as concentric (the qualifier-resolution post-pass redirects references by it).
       const idx = objects.findIndex((o) => o.kind === 'circle' && o.id === cmd.inner);
-      if (idx >= 0) objects[idx] = { ...objects[idx], innerOf: cmd.outer } as GeoObject;
+      const outer = objects.find((o) => o.kind === 'circle' && o.id === cmd.outer);
+      if (idx >= 0 && outer && outer.kind === 'circle' && (objects[idx] as Extract<GeoObject, { kind: 'circle' }>).center === outer.center) {
+        objects[idx] = { ...objects[idx], innerOf: cmd.outer } as GeoObject;
+      }
+      break;
+    }
+
+    case 'radius-symbol': {
+      // Bind a letter as a circle's radius symbol (issue #54) — pure data on the circle object: the
+      // parser context, the symbolic-measure lowering, and the slider labels read it back. The radius
+      // itself stays whatever it is (a free DOF unless a value pinned it) — a name, not a size.
+      const idx = objects.findIndex((o) => o.kind === 'circle' && o.id === cmd.circle);
+      if (idx >= 0) objects[idx] = { ...objects[idx], radiusSymbol: cmd.name } as GeoObject;
+      break;
+    }
+
+    case 'set-radius-ratio': {
+      // radius(c1) = k · radius(c2) — lowered to an ordinary `ratio` over (centre, on-circle WITNESS)
+      // pairs: |centre₁·w₁| IS radius₁ (w₁ rides circle 1), so the existing ratio machinery — incl. the
+      // ADR-103 free-radius recruitment behind a parametric ref — drives it with no new solver code. A
+      // witness is any point already ON the circle; with none, a hidden PINNED `~radw-*` rider is minted
+      // (θ fixed ⇒ 0 sampled DOF; `~` ⇒ never rendered, excluded from detection per ADR-295).
+      const witness = (circleId: Id): Id | null => {
+        const circ = objects.find((o) => o.kind === 'circle' && o.id === circleId);
+        if (!circ) return null;
+        for (const o of objects) {
+          if (o.kind === 'on-circle' && o.circle === circleId) return o.id;
+          if (o.kind === 'line-circle' && o.circle === circleId) return o.id;
+          if (o.kind === 'circle-circle' && (o.circle1 === circleId || o.circle2 === circleId)) return o.id;
+          if (o.kind === 'antipode' && o.circle === circleId) return o.id;
+          if (o.kind === 'arc-midpoint' && o.circle === circleId) return o.id;
+        }
+        const id = `~radw-${circleId}`;
+        objects.push({ kind: 'on-circle', id, circle: circleId, theta: 0.9 }); // pinned θ — a pure radius witness, not a DOF
+        return id;
+      };
+      const c1 = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.c1);
+      const c2 = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.c2);
+      if (!c1 || !c2) break; // a missing circle is a dangling ref — the verifier/pending machinery reports
+      const w1 = witness(cmd.c1);
+      const w2 = witness(cmd.c2);
+      if (w1 && w2) driveOrCheck(objects, constraints, { type: 'ratio', a: c1.center, b: w1, c: c2.center, d: w2, k: cmd.k });
       break;
     }
 
