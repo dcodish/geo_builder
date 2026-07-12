@@ -529,7 +529,7 @@ export default function App() {
       // a NEW label it introduced ("from D …") — committing a wrong/partial figure. When the parse leaves a
       // new input label unused, escalate to the LLM (whose job is freeform/typo input) instead of committing
       // the partial parse (ADR-089). An EXISTING label a command doesn't re-name is fine (context).
-      const dropped = droppedNewLabels(utterance, r.commands, pctx.points ?? []);
+      const dropped = droppedNewLabels(utterance, r.commands, pctx.points ?? [], (pctx.radiusSymbols ?? []).map((x) => x.name));
       // The NUMERIC sibling (ADR-250): a stated magnitude the commands don't account for means the rule
       // consumed only part of the utterance (usually a typo'd keyword mid-sentence) — escalate, never
       // commit the partial meaning (a "שטח… פי 2.25 משוטח…" typo used to commit as a bare triangle, ✓).
@@ -705,8 +705,14 @@ export default function App() {
     // canonical line is re-parsed by the SAME grammar that just dropped the label, so the round-trip can
     // return the identical partial lowering ("A ו C נמצאות על המעגל" committed as A alone — the
     // operator's saved-figure C floating off its circle). Name the lost label and keep the text to edit.
+    const llmFig = replay(cur.facts).construction;
     const stillDropped: (string | number)[] = [
-      ...droppedNewLabels(utterance, llmCmds, replay(cur.facts).construction.objects.filter(isGeoPoint).map((o) => o.id)),
+      ...droppedNewLabels(
+        utterance,
+        llmCmds,
+        llmFig.objects.filter(isGeoPoint).map((o) => o.id),
+        llmFig.objects.flatMap((o) => (o.kind === 'circle' && o.radiusSymbol ? [o.radiusSymbol] : [])), // bound radius letters are measure names, not points (#54)
+      ),
       // the numeric honesty gate holds on the second attempt too (ADR-250): a decomposition that loses a
       // stated magnitude must name it, never commit the partial figure
       ...droppedGivenNumbers(utterance, llmCmds),

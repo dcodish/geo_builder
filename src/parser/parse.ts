@@ -3947,12 +3947,18 @@ const tangentMeetsOtherCircle: Rule = (s) => {
  * meets the other circle at the shared point AND at K — K is the crossing away from it).
  */
 const theTangentMeetsCircle: Rule = (s, ctx) => {
+  // The subject may NAME its touch — "המשיק בנקודה A חותך…" / "the tangent at A cuts…" (the operator's
+  // retry phrasing) — which SELECTS the tangent line tan-A (and disambiguates when several exist).
   // No `\b` after the Hebrew verb — Hebrew letters are not `\w`, so \b never matches there (the recorded ℓ trap).
-  const subj = s.match(/^\s*(?:המשיק|the\s+tangent)\s+(?:חות(?:ך|כת)|פוגש\w*|נפגש\w*|cuts?|meets?|crosses|intersects?)(?![A-Za-z])/i);
+  const subj = s.match(
+    /^\s*(?:המשיק|the\s+tangent)\s+(?:(?:בנקודה|at)\s*([A-Za-z]\d*)\s+)?(?:חות(?:ך|כת)|פוגש\w*|נפגש\w*|cuts?|meets?|crosses|intersects?)(?![A-Za-z])/i,
+  );
   if (!subj) return null;
   const tans = (ctx.lines ?? []).filter((l) => l.startsWith('tan-'));
-  if (tans.length !== 1) return null; // no tangent to refer to, or ambiguous which — escalate, never guess
-  const tanId = tans[0];
+  const named = subj[1] ? `tan-${up(subj[1])}` : null;
+  if (named && !tans.includes(named)) return null; // names a tangent the figure doesn't have — escalate
+  if (!named && tans.length !== 1) return null; // no tangent to refer to, or ambiguous which — escalate, never guess
+  const tanId = named ?? tans[0];
   const touch = up(tanId.slice('tan-'.length));
   const center = resolveMentionedCircle(s, ctx);
   if (!center) return null; // must name/refer to a circle (else it's a line∩line statement)
@@ -6185,8 +6191,14 @@ function augmentParseCtx(ctx: ParseContext, cmds: AnyCommand[]): ParseContext {
  * freeform/typo input) instead of committing. A label that ALREADY EXISTS but a command doesn't re-name
  * is NOT dropped (it's context, e.g. a tangent at an existing point) — only genuinely NEW labels count.
  */
-export function droppedNewLabels(utterance: string, commands: AnyCommand[], existingPoints: Id[] = []): Id[] {
+export function droppedNewLabels(utterance: string, commands: AnyCommand[], existingPoints: Id[] = [], measureSymbols: string[] = []): Id[] {
   const have = new Set(existingPoints.map((p) => p.toUpperCase()));
+  // BOUND measure symbols (issue #54): an uppercase radius letter ("R" in "R > r" / "R = 1.5r") is a
+  // MEASURE name, not a point label — its lowered command references circles, never the letter, so
+  // without the mask a correctly-parsed radius relation read as a dropped point and escalated for
+  // nothing (the operator's play-test: `weak:dropped:R` → LLM → not-understood). The caller passes the
+  // figure's bound symbol names (ctx.radiusSymbols) — semantic, never a guess from utterance shape.
+  for (const m of measureSymbols) have.add(m.toUpperCase());
   const used = new Set(JSON.stringify(commands).match(/[A-Z]\d*/g) ?? []); // every label the commands reference (incl. inside ids like circle-P / tan-B)
   // Extract labels from the SAME text the rules parsed (subscripts glued, maqaf/bidi fixed — PAR-7 /
   // ADR-228: the raw "O_1" reads as label "O" while the commands carry "O1", a guaranteed false drop),
@@ -6227,7 +6239,7 @@ export function droppedNewLabels(utterance: string, commands: AnyCommand[], exis
  * false-blocks; the gate aims at the verb being entirely unrepresented.
  */
 const VERB_GATES: { verb: string; present: RegExp; satisfied: RegExp }[] = [
-  { verb: 'משיק/tangent', present: /משיק|tangent/i, satisfied: /tangent|circles-tangent|set-perpendicular/ },
+  { verb: 'משיק/tangent', present: /משיק|tangent/i, satisfied: /tangent|circles-tangent|set-perpendicular|"tan-/ }, // "tan- : a REFERENCE to a drawn tangent line ("המשיק חותך…" → line:"tan-A") carries the verb's meaning (#100/#54 play-test)
   { verb: 'חוצה/bisect', present: /חוצ[הי]|bisect/i, satisfied: /bisector|midpoint|set-angle-ratio|set-equal|arc-midpoint|set-line/ },
   { verb: 'מקביל/parallel', present: /מקביל|parallel/i, satisfied: /parallel/ },
   { verb: 'מאונך/perpendicular', present: /מאונ[כך]|perpendicular/i, satisfied: /perpendicular|foot|right-triangle|altitude/ },

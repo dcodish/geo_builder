@@ -21,7 +21,7 @@
  * mirror read the article as a point label A, degenerating the pair).
  */
 import { describe, expect, it } from 'vitest';
-import { parse, buildParseCtx } from '@/parser';
+import { parse, buildParseCtx, droppedGivenVerbs } from '@/parser';
 import { replay, firstSatisfyingSeed } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand, Vec } from '@/engine';
@@ -90,6 +90,32 @@ describe('issue #100 — tangent through an on-circle point + המשיק back-re
     const facts = runLines(['מעגל O', 'המשיק בנקודה A והמשיק בנקודה B נפגשים בנקודה E', 'מעגל P']);
     const r = parse('המשיק חותך את מעגל P בנקודה K', ctxOf(facts));
     expect(r.ok).toBe(false);
+  });
+
+  it('a NAMED touch selects the tangent — "המשיק בנקודה A חותך…" (and disambiguates the 2+ case)', () => {
+    // the operator's retry phrasing from the play-test log (session yla2d4xo)
+    const facts = runLines([...PREFIX_HE, 'דרך הנקודה A העבירו משיק למעגל O']);
+    const r = parse('המשיק בנקודה A חותך את מעגל P בנקודה K', ctxOf(facts));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.commands[0]).toMatchObject({ type: 'line-circle-intersection', id: 'K', line: 'tan-A', circle: 'circle-P' });
+    // two tangents + a named touch: no longer ambiguous
+    const two = runLines(['מעגל O', 'המשיק בנקודה A והמשיק בנקודה B נפגשים בנקודה E', 'מעגל P']);
+    const rB = parse('המשיק בנקודה B חותך את מעגל P בנקודה K', ctxOf(two));
+    expect(rB.ok).toBe(true);
+    if (rB.ok) expect(rB.commands[0]).toMatchObject({ type: 'line-circle-intersection', line: 'tan-B' });
+    // a touch the figure doesn't have still defers
+    expect(parse('המשיק בנקודה Q חותך את מעגל P בנקודה K', ctxOf(two)).ok).toBe(false);
+  });
+
+  it('the play-test gate regression: the back-reference and the radius relations pass EVERY submit gate', () => {
+    // the operator's session hit `weak:dropped:R` / `weak:dropped:משיק` — parse succeeded but the
+    // honesty gates false-positived and the steps leaked to the LLM (→ not-understood).
+    const facts = runLines([...PREFIX_HE, 'דרך הנקודה A העבירו משיק למעגל O']);
+    const ctx = ctxOf(facts);
+    const rTan = parse('המשיק חותך את מעגל P בנקודה K', ctx);
+    expect(rTan.ok).toBe(true);
+    if (rTan.ok) expect(droppedGivenVerbs('המשיק חותך את מעגל P בנקודה K', rTan.commands)).toEqual([]);
   });
 
   it('defers the back-reference when the crossing label already EXISTS (an M1 statement, not a creation)', () => {
