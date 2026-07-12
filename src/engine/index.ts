@@ -26,7 +26,7 @@ export { applySeed, freeDofs, freeDofCount, reflectableFreePoints, directionHelp
 export { checkGivens } from './verify';
 export { solveBudget, budgetExceeded, withSolveBudget } from './solveBudget';
 export type { GivenViolation } from './verify';
-export { detectRelations, detectRelationsAcross, figureEdges, convergedSamples, requirementSamples } from './relations';
+export { detectRelations, detectRelationsAcross, figureEdges, convergedSamples, requirementSamples, distinctSamples, isScaffoldId } from './relations';
 export type { RelationsResult, SegmentRef, AngleRef, DefiniteAngle, DetectOptions } from './relations';
 export { detectShapes, detectShapesAcross, classifyShapesFromSamples } from './detectShapes';
 export type { ShapeType, DetectedShape, SimilarClass, ShapesResult, ShapeDetectOptions } from './detectShapes';

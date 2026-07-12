@@ -1073,3 +1073,7 @@ over all four (ADR-041).
 ### `circumscribing-circle-cuts-side` — המעגל החוסם את CEFO חותך את הצלע AC בנקודה D (#81, ADR-291)
 
 **Guards against:** the book phrasing being not-understood (3-label-only run) and the workaround minting duplicates. **Asserts:** one circle (the existing one referenced), D strictly within segment AC.
+
+### `tangent-secant-detection-honours-valid-configs` — tangent/secant figure detection hygiene (#49/#50/#88, ADR-295)
+
+**Guards against:** the detection layers reading a false ground truth from invalid configs or scaffold objects. **Asserts (one figure, three members of the ADR-295 class):** no `~`-scaffold point in any equality class (the AO Thales midpoint split is gone, #49) while the real radii equality CO=DO and AB=AG survive; △ABD~△ACB surfaces in the similar/congruent classes once the C≡D collapse samples are dropped (#50); and the genuinely-forced ∠CAG=90° still prints on the healthy (~13-sample) pool (#88 over-suppression guard — the pool-size floor suppresses only STARVED pools, locked at the engine level in `relations.test.ts`).

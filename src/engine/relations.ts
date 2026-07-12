@@ -20,9 +20,15 @@
 import type { Construction, GeoObject, Id, LineSpec, Vec } from './types';
 import { isGeoPoint } from './types';
 import { evaluate } from './evaluate';
-import { applySeed } from './sample';
+import { applySeed, freeDofCount } from './sample';
 import { pointNeighbors } from './step';
 import { dist, sub, len } from './geometry';
+
+/** Internal SCAFFOLDING ids are `~`-prefixed (the Thales auxiliary midpoint `~tanmid-…`, touch witnesses,
+ *  incircle-dual points). They are never rendered, so they must never appear in a detected relation, split,
+ *  angle, or shape — the detection universe is "what the student sees" (FR-RV-6). One predicate, used
+ *  wherever the universe is built ([ADR-295](docs/06-decisions.md#adr-295)). */
+export const isScaffoldId = (id: Id): boolean => id.startsWith('~');
 
 /**
  * GEOMETRIC segment splitting — every point that lies ON a drawn carrier, connected to the carrier's other
@@ -194,6 +200,10 @@ export function figureEdges(c: Construction, samples: Map<Id, Vec>[]): [Id, Id][
   const out: [Id, Id][] = [];
   const add = (x: Id, y: Id) => {
     if (x === y) return;
+    // Internal scaffolding (`~tanmid-…` and its kin) never enters the universe: the diameter midpoint minted
+    // by the tangent Thales construction would otherwise SPLIT AO into two "equal radii" the student sees no
+    // point between (ADR-295 / issue #49). One guard here covers segments, splits, and visible-line edges.
+    if (isScaffoldId(x) || isScaffoldId(y)) return;
     const [lo, hi] = x < y ? [x, y] : [y, x];
     const key = `${lo}|${hi}`;
     if (seen.has(key)) return;
@@ -329,6 +339,52 @@ export function requirementSamples(c: Construction, samples: Map<Id, Vec>[]): Ma
 }
 
 /**
+ * Drop samples that are DEGENERATE by an unforced point collapse ([ADR-295](docs/06-decisions.md#adr-295),
+ * the [ADR-256](docs/06-decisions.md#adr-256) sibling). Two independently-defined points landing on top of
+ * each other is a valid drawing ONLY when the givens FORCE it (a derived intersection that provably lands on
+ * a centre, the ADR-123 allowed coincidence) — and a forced coincidence shows up in EVERY sample. A collapse
+ * that happens in only SOME samples is a degenerate branch (e.g. `C`, the line∩circle crossing, flipping onto
+ * `D`'s far root in 3/16 seeds), NOT a configuration of the figure — yet counting it as ground truth poisons
+ * the "holds under one consistent correspondence in every sample" test, so a genuinely-forced similarity
+ * (△ABD ~ △ACB) never forms (issue #50). Forced coincidences (present in all samples) are KEPT, so the
+ * ADR-123 "converge and allow" figures are untouched. Same fallback discipline as its siblings: never strips
+ * below 2 — a thin pool over-claims, the unfiltered pool only under-claims.
+ */
+export function distinctSamples(c: Construction, samples: Map<Id, Vec>[]): Map<Id, Vec>[] {
+  if (samples.length < 3) return samples;
+  const pts = c.objects.filter((o) => isGeoPoint(o) && !isScaffoldId(o.id)).map((o) => o.id);
+  if (pts.length < 2) return samples;
+  const coincident = (pos: Map<Id, Vec>): Set<string> => {
+    const placed = pts.map((id) => [id, pos.get(id)] as const).filter((x): x is [Id, Vec] => !!x[1]);
+    let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+    for (const [, p] of placed) { minx = Math.min(minx, p.x); miny = Math.min(miny, p.y); maxx = Math.max(maxx, p.x); maxy = Math.max(maxy, p.y); }
+    const eps = 1e-3 * Math.max(1e-9, maxx - minx, maxy - miny); // relative to span — figures float in scale
+    const set = new Set<string>();
+    for (let i = 0; i < placed.length; i++) for (let j = i + 1; j < placed.length; j++) {
+      if (Math.hypot(placed[i][1].x - placed[j][1].x, placed[i][1].y - placed[j][1].y) < eps) {
+        const [a, b] = placed[i][0] < placed[j][0] ? [placed[i][0], placed[j][0]] : [placed[j][0], placed[i][0]];
+        set.add(`${a}|${b}`);
+      }
+    }
+    return set;
+  };
+  const perSample = samples.map(coincident);
+  // A pair coincident in EVERY sample is a FORCED coincidence (allowed, ADR-123); one coincident in only some
+  // is a degenerate branch. Keep a sample iff it has no coincidence beyond the forced set.
+  const forced = new Set<string>([...perSample[0]].filter((k) => perSample.every((s) => s.has(k))));
+  const kept = samples.filter((_, i) => [...perSample[i]].every((k) => forced.has(k)));
+  return kept.length >= 2 ? kept : samples;
+}
+
+/** How many valid samples a DEFINITE VALUE (an angle/length number) needs before it is trusted as forced by
+ *  the givens, when the figure still has free shape DOF. Below it — a pool STARVED by the requirement/
+ *  distinct filters down to 1–3 samples — "the same in every sample" is vacuous (a handful of samples agree
+ *  with themselves), so a configuration-dependent value would print as if fixed (issue #88). Equality
+ *  classes/ticks keep the ≥2 discipline; a printed NUMBER may not. A DETERMINED figure (0 shape DOF) is
+ *  seed-invariant, so its single configuration IS the figure and the floor does not apply. */
+const MIN_DEFINITE_POOL = 4;
+
+/**
  * Detect the ground-truth equalities of `c`: which edges are equal and which vertex-angles are equal,
  * each true across every sampled configuration. `c` should be the figure's construction (e.g.
  * `replay(facts, 0).construction`); this samples it with its own seeds, never mutating it.
@@ -368,7 +424,7 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
   // Sample hygiene: drop numerically-diverged solves (ADR-166 Am.) AND configuration-requirement
   // violators (ADR-256) — the store's shared core is already filtered, but the direct engine path
   // (tests/scenarios calling detectRelations on a construction) must apply the same ground-truth bar.
-  const samples = requirementSamples(c0, convergedSamples(opts.positions ?? rawSamples));
+  const samples = requirementSamples(c0, distinctSamples(c0, convergedSamples(opts.positions ?? rawSamples)));
   if (samples.length === 0) return { equalSegments: [], equalAngles: [], definiteAngles: [], samplesUsed: 0 };
 
   // 2. The IMPLICIT edge universe — drawn segments + polygon edges + GEOMETRIC on-carrier splits +
@@ -467,8 +523,14 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
 
   // 4. DEFINITIVE angle values — an angle whose measure is the same (within tolerance) across every sample
   //    is forced by the givens, so its value is a ground truth. Skip a straight/degenerate angle.
+  //    A printed NUMBER demands a non-starved pool (issue #88): on a figure that still has free shape DOF,
+  //    "same in every sample" is only meaningful over enough valid samples — below the floor the pool has
+  //    starved (most seeds failed the requirement/distinct filters) and a handful of survivors agreeing with
+  //    themselves is vacuous, so a configuration-dependent value would print as if fixed. A DETERMINED figure
+  //    (0 shape DOF) is seed-invariant, so its lone configuration IS the figure and prints regardless.
   const definiteAngles: DefiniteAngle[] = [];
-  for (let i = 0; i < angles.length; i++) {
+  const trustDefinite = freeDofCount(c0) === 0 || samples.length >= MIN_DEFINITE_POOL;
+  for (let i = 0; trustDefinite && i < angles.length; i++) {
     if (!angUsable[i]) continue;
     const vals = angVal[i];
     if (Math.max(...vals) - Math.min(...vals) > angleTol) continue; // it flexes ⇒ not definitive

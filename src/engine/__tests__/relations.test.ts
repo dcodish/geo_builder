@@ -9,8 +9,8 @@
 import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
 import { replay, type Fact } from '@/store/geoStore';
-import { detectRelations, detectRelationsAcross, freeDofs, freeDofCount, isGeoPoint, circleMembers, pointNeighbors } from '@/engine';
-import type { AnyCommand, SegmentRef, AngleRef } from '@/engine';
+import { detectRelations, detectRelationsAcross, distinctSamples, freeDofs, freeDofCount, isGeoPoint, circleMembers, pointNeighbors, applySeed, evaluate } from '@/engine';
+import type { AnyCommand, SegmentRef, AngleRef, Construction, Id, Vec } from '@/engine';
 
 let n = 0;
 function build(...utterances: string[]) {
@@ -135,6 +135,76 @@ describe('no false positives when the figure is genuinely free (the sampler must
     for (const v of ['A', 'D', 'B']) expect(fd.has(v), `vertex ${v} samplable despite the order solve`).toBe(true);
     const r = detectRelations(c);
     expect(r.definiteAngles, 'no angle is forced in an under-determined figure').toEqual([]);
+  });
+});
+
+describe('ADR-295 — detection ground truth = valid configs of the REAL objects only', () => {
+  // The operator's tangent/secant figure (issues #49/#50/#88): tangent from A at B; the secant A-O-C-D
+  // through the centre; G on the extension of DB; AG ⟂ AD; BC. Under-determined (free radius), and its
+  // Thales tangent construction mints the scaffold midpoint `~tanmid-OA`.
+  const tangentSecant = (): Construction =>
+    buildCtx(
+      'נתון מעגל שרדיוסו R ומרכזו O',
+      'מנקודה A יוצא משיק למעגל בנקודה B',
+      'המשך AO חותך את המעגל בנקודה D',
+      'AO חותך את המעגל בנקודה C',
+      'G נמצאת על המשך DB',
+      'AG אנך ל AD',
+      'BC',
+    );
+  const pool = (c: Construction, seeds: number[]): Map<Id, Vec>[] => {
+    const out: Map<Id, Vec>[] = [];
+    for (const s of seeds) { const r = evaluate(applySeed(c, s)); if (r.ok) out.push(r.positions); }
+    return out;
+  };
+
+  it('#49 — no `~`-scaffold point appears in any equality class (the AO midpoint is not a subdivision)', () => {
+    const rel = detectRelations(tangentSecant());
+    const leak = rel.equalSegments.flat().some(([a, b]) => a.startsWith('~') || b.startsWith('~'));
+    expect(leak, `no scaffold segment equalities (got ${JSON.stringify(rel.equalSegments)})`).toBe(false);
+    // the REAL radii equalities survive
+    expect(rel.equalSegments.map(segClassKeys)).toContainEqual(['CO', 'DO']);
+  });
+
+  it('#50 — distinctSamples drops an unforced point-collapse sample, keeps a forced one', () => {
+    const c = tangentSecant();
+    // Two independently-defined points landing together in ONLY SOME samples ⇒ that sample is dropped; a pair
+    // together in EVERY sample (a forced coincidence) is kept. Simulate by injecting a collapse into one seed.
+    const good = pool(c, [0, 1, 2, 3]);
+    expect(good.length, 'baseline pool').toBeGreaterThanOrEqual(3);
+    const collapsed = good.map((m) => new Map(m));
+    // collapse C onto D in exactly ONE sample (an unforced degeneracy)
+    collapsed[0].set('C', collapsed[0].get('D')!);
+    const kept = distinctSamples(c, collapsed);
+    expect(kept.length, 'the single collapsed sample is dropped').toBe(collapsed.length - 1);
+    // a coincidence present in EVERY sample is forced ⇒ nothing dropped
+    const allCollapsed = good.map((m) => { const n = new Map(m); n.set('C', n.get('D')!); return n; });
+    expect(distinctSamples(c, allCollapsed).length, 'a forced coincidence is allowed').toBe(allCollapsed.length);
+  });
+
+  it('#88 — a definite VALUE needs a non-starved pool when the figure has free shape DOF', () => {
+    const c = tangentSecant();
+    expect(freeDofCount(c), 'the figure is under-determined').toBeGreaterThan(0);
+    // Healthy internal pool ⇒ the forced right angles print.
+    const healthy = detectRelations(c);
+    expect(healthy.samplesUsed).toBeGreaterThanOrEqual(4);
+    expect(healthy.definiteAngles.length, 'forced 90° angles print on a healthy pool').toBeGreaterThan(0);
+    // A pool STARVED to 3 self-agreeing samples ⇒ NO definite value (vacuously "same in every sample").
+    const starved = detectRelationsAcross([c], { positions: pool(c, [0, 1, 2]) });
+    expect(starved.samplesUsed).toBe(3);
+    expect(starved.definiteAngles, 'starved pool prints no definite value').toEqual([]);
+    // At the floor (4) it prints again.
+    const four = detectRelationsAcross([c], { positions: pool(c, [0, 1, 2, 3]) });
+    expect(four.samplesUsed).toBe(4);
+    expect(four.definiteAngles.length, 'the floor lets the forced value print').toBeGreaterThan(0);
+  });
+
+  it('#88 — a DETERMINED figure (0 shape DOF) prints definite values even on a thin pool', () => {
+    const c = build('equilateral triangle ABC');
+    expect(freeDofCount(c)).toBe(0);
+    const thin = detectRelationsAcross([c], { positions: pool(c, [0, 1]) });
+    expect(thin.definiteAngles.length, 'the three 60° corners print').toBe(3);
+    for (const a of thin.definiteAngles) expect(a.valueDeg).toBeCloseTo(60, 3);
   });
 });
 

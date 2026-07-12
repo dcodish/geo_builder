@@ -4358,6 +4358,43 @@ export const SCENARIOS: Scenario[] = [
       expect(t, 'D within segment AC').toBeLessThan(0.98);
     },
   },
+  {
+    id: 'tangent-secant-detection-honours-valid-configs',
+    title: 'tangent/secant figure: no scaffold-point equalities (#49), △ABD~△ACB surfaces (#50), forced 90° still prints (#88)',
+    guards:
+      'Operator manual session 2026-07-11 (#49/#50) + the CEFO figure 2026-07-12 (#88): the detection layers drew ground truth from a pool/universe that admitted INVALID configs and INTERNAL scaffolding. THREE members of one class ("detection ground truth = valid configurations of the REAL objects only", ADR-295): (#49) the tangent Thales midpoint `~tanmid-OA` split AO into two "equal radii" the student sees no point between — scaffold `~` points now excluded from the detection universe at the figureEdges chokepoint; (#50) in ~3/16 seeds the secant crossing C flips onto D`s far root (C≡D), an unforced collapse that poisoned the similarity correspondence so △ABD~△ACB never formed — `distinctSamples` drops samples with a coincidence not forced in every sample (ADR-256 sibling); (#88) a definite ANGLE value printed off a pool STARVED by those filters to 1-3 self-agreeing samples — a printed NUMBER now needs a non-starved pool (≥4 valid samples) when the figure has free shape DOF, while a determined figure (0 DOF) and a healthy pool still print. This exact 7-step sequence exercises all three: the AO scaffold split must be gone, the forced similarity present, and the genuinely-forced ∠CAG=90° (healthy 13-sample pool) must STILL print (the over-suppression guard).',
+    steps: [
+      'נתון מעגל שרדיוסו R ומרכזו O',
+      'מנקודה A יוצא משיק למעגל בנקודה B',
+      'המשך AO חותך את המעגל בנקודה D',
+      'AO חותך את המעגל בנקודה C',
+      'G נמצאת על המשך DB',
+      'AG אנך ל AD',
+      'BC',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const rel = detectRelations(fig.construction);
+      // #49: NO scaffold (`~`-prefixed) id may appear in any equality class — the AO Thales midpoint is gone.
+      const scaffoldLeak = rel.equalSegments.flat().some(([a, b]) => a.startsWith('~') || b.startsWith('~'));
+      expect(scaffoldLeak, `no ~scaffold segment equalities (got ${JSON.stringify(rel.equalSegments)})`).toBe(false);
+      // …while the legitimate classes survive: AB=AG (the ⟂-from-A leg) and CO=DO (radii to the secant hits).
+      const segCls = rel.equalSegments.map((cls) => cls.map(([a, b]) => [a, b].sort().join('')).sort());
+      expect(segCls, 'AB=AG survives').toContainEqual(['AB', 'AG']);
+      expect(segCls, 'CO=DO survives').toContainEqual(['CO', 'DO']);
+      // #88 over-suppression guard: the healthy pool (~13 valid samples) must STILL print the forced right
+      // angle ∠CAG=90 (AG ⟂ AD, C on AD). The pool-size gate suppresses only STARVED pools, never this.
+      expect(rel.samplesUsed, 'the pool is healthy, not starved').toBeGreaterThanOrEqual(4);
+      const cag = rel.definiteAngles.find((a) => a.vertex === 'A' && [a.a, a.b].sort().join('') === 'CG');
+      expect(cag && Math.abs(cag.valueDeg - 90) < 0.5, `forced ∠CAG=90 still printed (got ${JSON.stringify(rel.definiteAngles.map((a) => `${a.a}${a.vertex}${a.b}=${a.valueDeg.toFixed(0)}`))})`).toBe(true);
+      // #50: △ABD ~ △ACB (tangent-chord ∠ABС=∠ADB + shared ∠A ⟹ AA) is forced — it must surface in the
+      // similar/congruent classes now that the C≡D collapse samples no longer break the correspondence.
+      const { similar } = detectShapes(fig.construction);
+      const has = (t: string[]) => (cls: { triangles: Id[][] }) => cls.triangles.some((tri) => [...tri].sort().join('') === [...t].sort().join(''));
+      const abdAcb = similar.some((cls) => has(['A', 'B', 'D'])(cls) && has(['A', 'C', 'B'])(cls));
+      expect(abdAcb, `△ABD ~ △ACB detected (got: ${similar.map((c) => c.triangles.map((t) => t.join('')).join(c.kind === 'congruent' ? '≅' : '~')).join(' | ') || 'none'})`).toBe(true);
+    },
+  },
 ];
 
 /**
@@ -4393,6 +4430,7 @@ export const SEED_SWEEP_EXEMPT: Record<string, string> = {
   'point-on-arc-no-midpoint-word': 'a FREE point on the arc — its position varies by design (ADR-042); no fixed arc coordinate is an invariant',
   'perp-constraint-keeps-quad-convex': 'the convex-gap threshold (15°) is stricter than the app’s displayable-convexity gate; a valid ~12° corner appears at some seeds',
   'tangent-chord-bisector': 'same convex-gap threshold vs the displayable gate — a valid tight corner at one seed',
+  'tangent-secant-detection-honours-valid-configs': 'the check runs detectRelations/detectShapes, which sample the figure internally across their own seeds — the ground-truth relations it asserts are seed-invariant by construction, so a per-display-seed re-run only repeats the same internal detection',
 };
 
 /**

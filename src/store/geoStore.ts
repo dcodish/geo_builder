@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, cyclableVariant, deepEqual, detectRelationsAcross, emptyConstruction, evaluate, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, cyclableVariant, deepEqual, detectRelationsAcross, distinctSamples, emptyConstruction, evaluate, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
 import type { FigureFile } from './figureFile';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -1287,7 +1287,10 @@ function samplingJobs(facts: Fact[]) {
   const finish = () => {
     const c0 = constructions[0];
     const converged = convergedSamples(raw);
-    const within = requirementSamples(c0, converged);
+    // Drop unforced point-collapse degeneracies before the requirement filter (ADR-295 / issue #50): a seed
+    // where two independent points coincide only sometimes is not a configuration of the figure, and would
+    // otherwise poison the ground-truth pool the relations/shapes layers share.
+    const within = requirementSamples(c0, distinctSamples(c0, converged));
     const strict = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived));
     if (strict.length >= 2) return (sampleMemo = { facts, constructions, samples: strict });
     // The ADR-267 preference ladder: when the letter-order side is unachievable (no strict samples), the
