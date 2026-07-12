@@ -4346,12 +4346,30 @@ export const SCENARIOS: Scenario[] = [
     id: 'circumscribing-circle-cuts-side',
     title: 'המעגל החוסם את CEFO חותך את הצלע AC בנקודה D — the book phrasing resolves the EXISTING circle and lands D within AC (#81)',
     guards:
-      'Issue #81 (prod session vaotw0tq, the CEFO book problem): the exact book wording was not-understood — circumcircleMeetsSegment read only a 3-label run, and even that path MINTED a fresh circle instead of resolving the hidden concyclic one, so the operator needed a 2-step workaround plus guessing the auto-name. ADR-291: resolution-before-creation inside circumcircleMeetsSegment (an existing circle through the named vertices is referenced + shown) + the 4-label run accepted on the creation path.',
+      'Issue #81 (prod session vaotw0tq, the CEFO book problem): the exact book wording was not-understood — circumcircleMeetsSegment read only a 3-label run, and even that path MINTED a fresh circle instead of resolving the hidden concyclic one, so the operator needed a 2-step workaround plus guessing the auto-name. ADR-291: resolution-before-creation inside circumcircleMeetsSegment (an existing circle through the named vertices is referenced) + the 4-label run accepted on the creation path. ADR-291 Am. (#86): the resolution path references the circle WITHOUT `show-circle` — in the cut sentence the circumscribing circle is scaffolding (its role is locating D), so it stays HIDDEN.',
     steps: ['מרובע CEFO בר חסימה במעגל', 'AC', 'המעגל החוסם את CEFO חותך את הצלע AC בנקודה D'],
     check(fig) {
       allStepsOk(fig);
       const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
       expect(circles.length, 'exactly ONE circle — the existing one was referenced').toBe(1);
+      expect((circles[0] as { hidden?: boolean }).hidden, 'the circle stays HIDDEN (scaffolding, #86)').toBe(true);
+      const A = at(fig, 'A'), C = at(fig, 'C'), D = at(fig, 'D');
+      const t = ((D.x - A.x) * (C.x - A.x) + (D.y - A.y) * (C.y - A.y)) / ((C.x - A.x) ** 2 + (C.y - A.y) ** 2);
+      expect(t, 'D within segment AC').toBeGreaterThan(0.02);
+      expect(t, 'D within segment AC').toBeLessThan(0.98);
+    },
+  },
+  {
+    id: 'circumscribing-circle-cut-creation-path-hidden',
+    title: 'the cut sentence with NO prior בר חסימה CREATES the circumscribing circle hidden (#86)',
+    guards:
+      'Issue #86 (prod re-test 2026-07-12, the CEFO figure): «המעגל החוסם את מרובע CEFO חותך את AC בנקודה D» with no prior «בר חסימה» hit circumcircleMeetsSegment`s CREATION path, which minted a VISIBLE circumcircle — but the operator ruled the circumscribing circle in a CUT sentence is scaffolding (its only role is locating D), so it must be created hidden (the same semantics as בר חסימה). Fix (ADR-291 Am.): the creation path emits the `circumcircle` command with `hidden: true`. Here CEFO is a general (non-concyclic) quad, so the circle does not yet exist and the creation branch fires; D still lands within AC.',
+    steps: ['מרובע CEFO', 'AC', 'המעגל החוסם את מרובע CEFO חותך את AC בנקודה D'],
+    check(fig) {
+      allStepsOk(fig);
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles.length, 'one circle was created').toBe(1);
+      expect((circles[0] as { hidden?: boolean }).hidden, 'the created circle is HIDDEN (scaffolding, #86)').toBe(true);
       const A = at(fig, 'A'), C = at(fig, 'C'), D = at(fig, 'D');
       const t = ((D.x - A.x) * (C.x - A.x) + (D.y - A.y) * (C.y - A.y)) / ((C.x - A.x) ** 2 + (C.y - A.y) ** 2);
       expect(t, 'D within segment AC').toBeGreaterThan(0.02);

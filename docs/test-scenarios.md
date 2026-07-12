@@ -1072,7 +1072,11 @@ over all four (ADR-041).
 
 ### `circumscribing-circle-cuts-side` — המעגל החוסם את CEFO חותך את הצלע AC בנקודה D (#81, ADR-291)
 
-**Guards against:** the book phrasing being not-understood (3-label-only run) and the workaround minting duplicates. **Asserts:** one circle (the existing one referenced), D strictly within segment AC.
+**Guards against:** the book phrasing being not-understood (3-label-only run) and the workaround minting duplicates. **Asserts:** one circle (the existing one referenced) that stays HIDDEN (#86 — scaffolding), D strictly within segment AC.
+
+### `circumscribing-circle-cut-creation-path-hidden` — cut sentence with no prior בר חסימה creates the circle hidden (#86, ADR-291 Am.)
+
+**Guards against:** the cut sentence's CREATION path minting a VISIBLE circumscribing circle. **Asserts:** `circumcircleMeetsSegment` creates the circle `hidden: true` (scaffolding — its role is only locating D), one circle, D within AC. The explicit «המעגל חוסם את CEFO» statement (`circumcircle` rule) still reveals its circle via `show-circle`.
 
 ### `tangent-secant-detection-honours-valid-configs` — tangent/secant figure detection hygiene (#49/#50/#88, ADR-295)
 

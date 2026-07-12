@@ -4351,8 +4351,12 @@ const circumcircleMeetsSegment: Rule = (s, ctx) => {
   // duplicate. This rule runs before lineMeetsCircle, so the guard must live here, not on rule order.
   const existing = circleContaining(ctx, tri);
   if (existing) {
+    // The circumscribing circle here is SCAFFOLDING — its only role is locating D; it is NOT materialised
+    // ([ADR-291](docs/06-decisions.md#adr-291) Am. / issue #86, operator ruling). So the resolution path
+    // references the existing (auto-hidden) circle WITHOUT a `show-circle` — revealing stays correct only
+    // for the EXPLICIT "the circle circumscribes CEFO" statement (`circumcircle`, the #83 case) where
+    // materialising the circle IS the point.
     return [
-      { type: 'show-circle', id: circleId(existing) }, // the student is clearly USING it — draw it
       { type: 'line-through', id: lineId, a: p, b: q },
       { type: 'line-circle-intersection', id: D, line: lineId, circle: circleId(existing), avoid: shared, order: [shared, D, other] },
     ];
@@ -4360,7 +4364,10 @@ const circumcircleMeetsSegment: Rule = (s, ctx) => {
   const center = freeLabel([a, b, c, p, q, D, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T']);
   const circId = circleId(center);
   return [
-    { type: 'circumcircle', id: circId, center, a, b, c },
+    // Created HIDDEN (issue #86): the cut sentence uses the circle only to place D — the same scaffolding
+    // semantics as `בר חסימה`. An explicit later "the circle circumscribing CEFO" (the `circumcircle` rule)
+    // reveals it via `show-circle`; the cut sentence alone never draws it.
+    { type: 'circumcircle', id: circId, center, a, b, c, hidden: true },
     ...(tri.length === 4 ? [{ type: 'set-concyclic', points: tri } as AnyCommand] : []),
     { type: 'line-through', id: lineId, a: p, b: q },
     // D = the OTHER crossing (avoid the shared vertex), constrained to lie ON segment CE (order C→D→E),

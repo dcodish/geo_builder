@@ -961,6 +961,19 @@ function reflectMaskForFailing(fig: Derived): number {
 const SEARCH_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 2500;
 
 /**
+ * The budget for a config search that runs OFF the main thread in the geometry worker (issue #87 /
+ * [ADR-296](docs/06-decisions.md#adr-296)). `SEARCH_BUDGET_MS` (2500) was sized to protect the MAIN
+ * THREAD from the page-unresponsive dialog (E2); since ADR-290 the searches (`resample` / `autoResolve` →
+ * `findValidConfig`) run in the worker, where the tab never blocks and the UI already shows a "thinking"
+ * state (resample also has progress + a ✕ cancel). So the worker gets a generous budget — a findable
+ * configuration on a heavy figure (the CEFO figure's `findValidConfig` returned null cold at ~2743 ms,
+ * one bad seed past 2500) is now found on the FIRST submit instead of only after an idempotent re-submit
+ * warmed the worker's caches. Finite (not ∞) so the same value is meaningful when a test passes it
+ * explicitly; the worker is never instantiated under vitest (no `Worker`/`document`), so the main-thread
+ * sync fallback keeps `SEARCH_BUDGET_MS`. */
+export const WORKER_SEARCH_BUDGET_MS = 12_000;
+
+/**
  * The first seed whose replay BUILDS and satisfies the configuration requirements — every "המשך" extension
  * reaches its far side cleanly (ADR-098) AND every plain segment-meet lands WITHIN its segments (ADR-166) —
  * else `from`. Two unstated DOFs are searched: the continuous sample (seeds) and the discrete apex
@@ -1111,12 +1124,12 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
  * pathological candidate can't blow through the between-candidate checks. `onProgress` reports the
  * candidate index (the worker forwards it to the UI's "still searching…" cue).
  */
-export function searchResample(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void): number | null {
+export function searchResample(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void, budgetMs = SEARCH_BUDGET_MS): number | null {
   const cur = replay(facts, seed);
   if (freeDofs(cur.construction).length === 0) return null; // fully determined — nothing to vary
   const curFp = shapeFingerprint(cur.construction, cur.positions);
   let s = seed;
-  const deadline = Date.now() + SEARCH_BUDGET_MS;
+  const deadline = Date.now() + budgetMs;
   const curStrict = meetsRequirements(facts, seed);
   let fallback = -1;
   for (let k = 0; k < 24 && Date.now() <= deadline; k++) {

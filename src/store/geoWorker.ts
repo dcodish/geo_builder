@@ -12,7 +12,7 @@
  * Cancellation is by TERMINATION (the client kills + respawns the worker): a JS worker can't be
  * interrupted mid-computation any other way, and a fresh worker only costs re-warming its caches.
  */
-import { searchResample, findValidConfig, meetsRequirements, replay, getFoldFor, type Fact, type FoldNode } from './geoStore';
+import { searchResample, findValidConfig, meetsRequirements, replay, getFoldFor, WORKER_SEARCH_BUDGET_MS, type Fact, type FoldNode } from './geoStore';
 
 export type GeoWorkRequest =
   | { id: number; op: 'resample'; facts: Fact[]; seed: number }
@@ -36,14 +36,18 @@ self.onmessage = (e: MessageEvent<GeoWorkRequest>) => {
   const req = e.data;
   try {
     if (req.op === 'resample') {
-      const seed = searchResample(req.facts, req.seed, (k, n) => post({ id: req.id, progress: { k, n } }));
+      // Off the main thread ⇒ the generous budget (issue #87): the tab can't freeze here, and the UI shows
+      // progress + a ✕ cancel, so a findable "another configuration" isn't lost to the 2500ms freeze cap.
+      const seed = searchResample(req.facts, req.seed, (k, n) => post({ id: req.id, progress: { k, n } }), WORKER_SEARCH_BUDGET_MS);
       post({ id: req.id, done: { op: 'resample', seed } });
     } else if (req.op === 'autoResolve') {
       if (meetsRequirements(req.facts, req.seed)) {
         post({ id: req.id, done: { op: 'autoResolve', ok: true } });
         return;
       }
-      const found = findValidConfig(req.facts, 0);
+      // The post-commit search, off-thread with the generous budget — a valid config one bad seed past the
+      // 2500ms cap (the CEFO figure, ~2743ms cold) is found on the first submit, not only on a warm retry.
+      const found = findValidConfig(req.facts, 0, WORKER_SEARCH_BUDGET_MS);
       if (!found) {
         post({ id: req.id, done: { op: 'autoResolve', found: null } });
         return;
