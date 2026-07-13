@@ -4615,6 +4615,39 @@ export const SCENARIOS: Scenario[] = [
       expect(dist(A, P)).toBeCloseTo(fig.circles.get('circle-P')!.r, 3);
     },
   },
+  {
+    id: 'extension-crossing-then-midpoint-given',
+    title: 'the 2025-bagrut part-ב given «M אמצע OK» on the AE-extension∩OK crossing flexes E so M bisects OK (#110)',
+    guards:
+      'Operator report 2026-07-13: the book given «נתון כי M אמצע OK» could not be drawn — M (=AE-extended ∩ OK) restated as the midpoint of OK reported over-constrained, though a valid E exists (closed-form). Root cause (ADR-308): the soft `collinear-order` from the "המשך AE חותך OK" step (onSeg2) had over-recruited O and the radii as its carriers, so (1) `freeCarrierAncestor` skipped the upstream free E as "already solving" and (2) the generic 2-D `coincide(M, midpoint)` can`t be zeroed by a 1-D driven carrier. Fix: a collinear midpoint lowers to the 1-D equidistance |OM|=|MK|, driven by E (reachable past soft-order carriers), freeing the soft orders that ride the optimizer. This replays the FULL exam + the midpoint given and asserts M bisects OK while every other relation holds.',
+    steps: [
+      'מעגל קטן שמרכזו בנקודה O ורדיוסו r',
+      'מעגל גדול שרדיוסו R',
+      'הנקודה O נמצאת על המעגל הגדול',
+      'A היא אחת מנקודות החיתוך של המעגל הגדול והמעגל הקטן',
+      'דרך הנקודה A העבירו משיק למעגל הקטן',
+      'המשיק חותך את המעגל הגדול בנקודה K',
+      'משולש KAO',
+      'הנקודה E נמצאת על המעגל הקטן בתוך המשולש KAO',
+      'המשך הקטע AE חותך את הקטע OK בנקודה M',
+      'M אמצע OK',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), K = at(fig, 'K'), P = at(fig, 'P'), E = at(fig, 'E'), M = at(fig, 'M');
+      // the part-ב given: M is the midpoint of OK
+      expect(dist(O, M), 'M bisects OK: |OM| = |MK|').toBeCloseTo(dist(M, K), 3);
+      // …reached by flexing E, with every earlier relation intact
+      const rSmall = fig.circles.get('circle-O')!.r, rBig = fig.circles.get('circle-P')!.r;
+      expect(dist(O, E), 'E still on the small circle').toBeCloseTo(rSmall, 3);
+      expect(dist(P, K), 'K still on the big circle').toBeCloseTo(rBig, 3);
+      const dot = (O.x - A.x) * (K.x - A.x) + (O.y - A.y) * (K.y - A.y);
+      expect(Math.abs(dot), 'OA ⟂ AK still holds (tangency)').toBeLessThan(1e-4);
+      // A, E, M stay collinear (M is on the AE extension)
+      const cr = (E.x - A.x) * (M.y - A.y) - (E.y - A.y) * (M.x - A.x);
+      expect(Math.abs(cr) / (dist(A, E) * dist(A, M) || 1), 'A, E, M collinear').toBeLessThan(1e-3);
+    },
+  },
 ];
 
 /**

@@ -584,7 +584,7 @@ function reinterpretDiameter(prev: Construction, cmd: Command): Construction | n
  * `param` mode stops at a free carrier; `drivable` mode records a free on-segment carrier but keeps
  * walking PAST it to the shape DOFs behind its segment (ADR-113). A SOLVING carrier is walked through.
  */
-function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', includeStart = true, includeSolving = false): Id[] {
+function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', includeStart = true, includeSolving: boolean | 'soft-order' = false): Id[] {
   const byId = new Map(objects.map((o) => [o.id, o] as const));
   const seen = new Set<Id>();
   const result: Id[] = [];
@@ -593,9 +593,19 @@ function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', 
     ? [start]
     : pointParents(startObj && isGeoPoint(startObj) ? startObj : ({ kind: 'free-point', id: start, x: 0, y: 0 } as GeoObject));
   if (!includeStart) seen.add(start);
-  // `includeSolving` also surfaces carriers a constraint ALREADY drives (their `solve` is set) — used by
-  // the R7 joint re-bind to find a CLAIMED-but-shareable DOF when no free one is reachable (ADR-045).
-  const avail = (o: GeoObject) => (o as { solve?: unknown }).solve === undefined || includeSolving;
+  // `includeSolving` also surfaces carriers a constraint ALREADY drives (their `solve` is set) — `true`
+  // surfaces ALL (the R7 joint re-bind, ADR-045); `'soft-order'` surfaces only those driven by a SOFT
+  // ORDER (collinear-order / angle-order / length-order / angle-acuteness — issue #110), which ride the
+  // optimizer and own no dedicated DOF, so a HARD constraint may claim them (the claimer frees the order).
+  const avail = (o: GeoObject) => {
+    const sv = (o as { solve?: SolveDirective }).solve;
+    if (sv === undefined || includeSolving === true) return true;
+    if (includeSolving === 'soft-order') {
+      const t = sv.constraint.type;
+      return t === 'collinear-order' || t === 'angle-order' || t === 'length-order' || t === 'angle-acuteness';
+    }
+    return false;
+  };
   while (queue.length) {
     const id = queue.shift()!;
     if (seen.has(id)) continue;
@@ -1029,8 +1039,8 @@ function pointParents(o: GeoObject): Id[] {
  * (drive an ANCESTOR). Now via the one `ancestors` walker (R7(1)); unlike the old bespoke walk it skips
  * an already-SOLVING carrier (which couldn't be re-driven anyway) and finds a free one past it.
  */
-function freeCarrierAncestor(objects: GeoObject[], start: Id): Id | null {
-  const cands = ancestors(objects, start, 'param', false);
+function freeCarrierAncestor(objects: GeoObject[], start: Id, includeSolving: boolean | 'soft-order' = false): Id | null {
+  const cands = ancestors(objects, start, 'param', false, includeSolving);
   if (!cands.length) return null;
   const idx = (id: Id) => objects.findIndex((x) => x.id === id);
   return cands.reduce((best, id) => (idx(id) > idx(best) ? id : best), cands[0]);
@@ -1074,9 +1084,57 @@ function reinterpretAsConstraint(prev: Construction, cmd: Command): Construction
   // (a hidden free twin would satisfy the coincidence trivially and swallow a real contradiction), so it
   // keeps the ADR-011 semantics (free→free is a move upstream; derived→free is a genuine conflict).
   if (!carrier && cmd.type === 'free-point') return null;
+  // "M (existing) is the MIDPOINT of a–b" where M is already COLLINEAR with a,b (its own definition puts
+  // it on line ab — the "extension of AE meets OK at M, then M is the midpoint of OK" class, issue #110):
+  // the midpoint reduces to the well-conditioned 1-D EQUIDISTANCE |aM| = |Mb|. The generic 2-D
+  // `coincide(M, midpoint)` below cannot be zeroed by a 1-D driven carrier (the drivenRoots solver finds
+  // no root), so this class over-constrained though a valid config exists. Drive the upstream free carrier
+  // toward the equidistance instead — `driveHardOn` also frees competing SOFT-ORDER carriers (a
+  // collinear-order that over-recruited O/radii rides the optimizer and must not hold the hard carrier
+  // hostage). Falls through to the generic coincide when M is NOT structurally on line ab.
+  if (cmd.type === 'midpoint' && collinearByConstruction(prev.objects, cmd.id, cmd.a, cmd.b)) {
+    // The carrier may itself be currently driven by a SOFT ORDER (a collinear-order that over-recruited
+    // it — issue #110): that's fine, `driveHardOn` frees the order. So look past soft-order-solving
+    // carriers when the free walk finds none.
+    const midCarrier = carrier ?? freeCarrierAncestor(prev.objects, P, 'soft-order');
+    if (midCarrier) {
+      const eq: Constraint = { type: 'equal', a: cmd.a, b: cmd.id, c: cmd.id, d: cmd.b };
+      return driveHardOn(prev.objects, prev.constraints, midCarrier, eq);
+    }
+  }
   const withHelper = applyCommand(prev, { ...(cmd as object), id: H } as Command); // the new def under the hidden id
   if (carrier) return driveCoincideOn(withHelper.objects, withHelper.constraints, P, H, carrier);
   return { objects: withHelper.objects, constraints: [...withHelper.constraints, { type: 'coincide', p: P, q: H }] };
+}
+
+/** Is `p` collinear with `a`,`b` BY CONSTRUCTION — its definition puts it on line ab (an intersection or
+ *  on-line/on-segment point whose line is exactly {a,b})? Lets "M is the midpoint of ab" drop to the 1-D
+ *  equidistance when M is already on ab (issue #110), without evaluating coordinates. */
+function collinearByConstruction(objects: GeoObject[], p: Id, a: Id, b: Id): boolean {
+  const o = objects.find((x) => x.id === p);
+  if (!o) return false;
+  const onLinePair = (x: Id, y: Id) => (x === a && y === b) || (x === b && y === a);
+  if (o.kind === 'line-line-intersection') return onLinePair(o.a, o.b) || onLinePair(o.c, o.d);
+  if (o.kind === 'on-segment' || o.kind === 'on-segment-solved') return onLinePair(o.a, o.b);
+  return false;
+}
+
+/** Drive a free `carrier` toward a HARD constraint (`con`), FREEING every competing SOFT-ORDER carrier
+ *  (collinear-order / angle-order / length-order / angle-acuteness) — those ride the optimizer (they own
+ *  no dedicated DOF by design) and must not compete with the hard constraint's single driven carrier
+ *  (issue #110: a collinear-order had over-recruited O + the radii, turning a solvable 1-DOF drive into a
+ *  divergent multi-carrier joint solve). The freed orders stay in `constraints` as checks. */
+function driveHardOn(objects: GeoObject[], priorConstraints: Constraint[], carrier: Id, con: Constraint): Construction {
+  const isSoftOrder = (k: Constraint | undefined) =>
+    !!k && (k.type === 'collinear-order' || k.type === 'angle-order' || k.type === 'length-order' || k.type === 'angle-acuteness');
+  const objs = objects.map((o) => {
+    const sv = (o as { solve?: SolveDirective }).solve;
+    if (sv && isSoftOrder(sv.constraint) && o.id !== carrier) return { ...o, solve: undefined } as GeoObject;
+    if (o.id === carrier && (o.kind === 'on-circle' || o.kind === 'on-segment' || o.kind === 'free-point'))
+      return { ...o, solve: { constraint: con, branch: 0 } } as GeoObject;
+    return o;
+  });
+  return { objects: objs, constraints: [...priorConstraints, con] };
 }
 
 /**

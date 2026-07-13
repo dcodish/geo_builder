@@ -1113,3 +1113,7 @@ over all four (ADR-041).
 ### `intersection-of-the-circles-binds-existing` — «נקודת החיתוך של המעגלים» binds the two drawn circles (#111, ADR-307)
 
 **Guards against:** a definite plural circle reference inventing a third circle (the single-"the circle" implicit-reference existed; the two-circle plural didn't). **Asserts:** with circle O and circle P drawn, «A היא נקודת החיתוך של המעגלים» yields EXACTLY those two circles with A on both — no circle-Q. Unit coverage: `definite-two-circles.test.ts` (7).
+
+### `extension-crossing-then-midpoint-given` — «M אמצע OK» on the AE-extension∩OK crossing (#110, ADR-308)
+
+**Guards against:** the 2025-bagrut part-ב given «נתון כי M אמצע OK» reporting over-constrained though satisfiable — a soft `collinear-order` had over-recruited the upstream free DOF (E) and the radii, so the reinterpret couldn't reach E and the 2-D coincide couldn't be solved by a 1-D carrier. **Asserts:** the full exam + the midpoint given builds — M bisects OK (|OM|=|MK|), reached by flexing E, with E still on the small circle, K on the big circle, OA ⟂ AK, and A-E-M collinear. Unit coverage: `midpoint-of-crossing.test.ts`.
