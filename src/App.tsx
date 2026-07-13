@@ -1634,21 +1634,20 @@ export default function App() {
                 const sym = circObj && circObj.kind === 'circle' ? circObj.radiusSymbol : undefined;
                 const base = paired ? t(isInner ? 'dof.radiusInner' : 'dof.radiusOuter', { center: d.center }) : t('dof.radius', { center: d.center });
                 const label = sym ? `${base} (${sym})` : base;
-                // Clamp the slider RANGE to a stated RADIUS ORDER (R>r, ADR-305/244) so it is mechanically
-                // impossible to drag the small circle past the big one (issue #113 — the value guard in
-                // setRadius rejected such a drag, but the free range still let the thumb travel there and
-                // snap back, which reads as "it violates the order"). The inner circle's max is the outer's
-                // current radius minus the verifier's gap; the outer's min is the inner's current radius
-                // plus that gap — matching `checkGivens`' radius-order tolerance, so slider and verifier agree.
-                const curR = (id: Id) => radiusOverrides[id] ?? circles.get(id)?.r;
-                const gap = (r: number) => Math.max(0.05, r * 0.02);
-                const orderedBelow = circObj && circObj.kind === 'circle' ? circObj.orderedBelow : undefined; // d is INNER: must stay < this circle
-                const outerOfMe = construction.objects.find((o) => o.kind === 'circle' && o.orderedBelow === d.circle); // d is OUTER: must stay > this circle
-                let min = Math.max(0.2, d.base * 0.3);
-                let max = d.base * 2.2;
-                if (orderedBelow) { const oR = curR(orderedBelow); if (oR) max = Math.min(max, oR - gap(oR)); }
-                if (outerOfMe) { const iR = curR(outerOfMe.id); if (iR) min = Math.max(min, iR + gap(iR)); }
-                if (min >= max) min = Math.max(0.1, max * 0.9); // degenerate guard (the paired radius left no room)
+                // Two circles under a stated RADIUS ORDER (R>r, ADR-305/244) share ONE common slider scale,
+                // so the order is VISIBLE — R's thumb always sits to the right of r's on the same axis
+                // (issue #113 follow-up: with per-slider ranges the small circle's thumb could sit further
+                // right than the big one's, so the order was enforced but not shown). The order itself is
+                // still guaranteed by `setRadius` (rejects a value that violates radius-order/ratio); the
+                // shared scale makes it legible. A circle not in an order keeps its own range.
+                const orderPartner =
+                  circObj && circObj.kind === 'circle' && circObj.orderedBelow
+                    ? circObj.orderedBelow // d is inner → its outer
+                    : construction.objects.find((o) => o.kind === 'circle' && o.orderedBelow === d.circle)?.id; // d is outer → its inner
+                const partnerDof = orderPartner ? radiusDofs.find((x) => x.circle === orderPartner) : undefined;
+                const bases = partnerDof ? [d.base, partnerDof.base] : [d.base];
+                const min = Math.max(0.2, Math.min(...bases) * 0.3);
+                const max = Math.max(...bases) * 2.2;
                 return (
                   <div key={d.circle} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <span style={{ fontSize: 12, minWidth: 96 }} dir={textDir(label)}>{label}</span>
