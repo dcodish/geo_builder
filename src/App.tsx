@@ -1634,15 +1634,30 @@ export default function App() {
                 const sym = circObj && circObj.kind === 'circle' ? circObj.radiusSymbol : undefined;
                 const base = paired ? t(isInner ? 'dof.radiusInner' : 'dof.radiusOuter', { center: d.center }) : t('dof.radius', { center: d.center });
                 const label = sym ? `${base} (${sym})` : base;
+                // Clamp the slider RANGE to a stated RADIUS ORDER (R>r, ADR-305/244) so it is mechanically
+                // impossible to drag the small circle past the big one (issue #113 — the value guard in
+                // setRadius rejected such a drag, but the free range still let the thumb travel there and
+                // snap back, which reads as "it violates the order"). The inner circle's max is the outer's
+                // current radius minus the verifier's gap; the outer's min is the inner's current radius
+                // plus that gap — matching `checkGivens`' radius-order tolerance, so slider and verifier agree.
+                const curR = (id: Id) => radiusOverrides[id] ?? circles.get(id)?.r;
+                const gap = (r: number) => Math.max(0.05, r * 0.02);
+                const orderedBelow = circObj && circObj.kind === 'circle' ? circObj.orderedBelow : undefined; // d is INNER: must stay < this circle
+                const outerOfMe = construction.objects.find((o) => o.kind === 'circle' && o.orderedBelow === d.circle); // d is OUTER: must stay > this circle
+                let min = Math.max(0.2, d.base * 0.3);
+                let max = d.base * 2.2;
+                if (orderedBelow) { const oR = curR(orderedBelow); if (oR) max = Math.min(max, oR - gap(oR)); }
+                if (outerOfMe) { const iR = curR(outerOfMe.id); if (iR) min = Math.max(min, iR + gap(iR)); }
+                if (min >= max) min = Math.max(0.1, max * 0.9); // degenerate guard (the paired radius left no room)
                 return (
                   <div key={d.circle} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <span style={{ fontSize: 12, minWidth: 96 }} dir={textDir(label)}>{label}</span>
                     <input
                       type="range"
-                      min={Math.max(0.2, d.base * 0.3)}
-                      max={d.base * 2.2}
+                      min={min}
+                      max={max}
                       step={d.base * 0.02}
-                      value={value}
+                      value={Math.min(max, Math.max(min, value))}
                       onChange={(e) => setRadius(d.circle, Number(e.target.value))}
                       style={{ flex: 1 }}
                     />
