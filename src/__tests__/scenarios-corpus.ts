@@ -4563,6 +4563,42 @@ export const SCENARIOS: Scenario[] = [
       expect(tOK, 'M within segment OK').toBeLessThan(0.98);
     },
   },
+  {
+    id: 'bagrut-2025-verbatim-unnamed-circles',
+    title: 'the 2025 bagrut in its VERBATIM wording — unnamed circles referenced as «המעגל הגדול/הקטן» (#102)',
+    guards:
+      'Operator ruling 2026-07-13: «when we say המעגל הגדול או הקטן we should translate it to a R>r like constraint». The exam never names its circles — it says «מעגל גדול שרדיוסו R», «מעגל קטן שמרכזו בנקודה O ורדיוסו r», then refers to them as «המעגל הגדול/הקטן» throughout; before #102 those references dead-ended (rules see no named centre and 2 circles → defer → LLM). Now `resolveSizeQualifier` rewrites each definite qualifier to the concrete circle (recorded roles first, else assigned from the drawn sizes — the creation adjectives seed the split) and the FIRST assigning use appends the locking `set-radius-order`, so sampling can never swap which circle is the big one. This is the exam question in its published wording, end-to-end.',
+    steps: [
+      'מעגל קטן שמרכזו בנקודה O ורדיוסו r',
+      'מעגל גדול שרדיוסו R',
+      'הנקודה O נמצאת על המעגל הגדול',
+      'A היא אחת מנקודות החיתוך של המעגל הגדול והמעגל הקטן',
+      'דרך הנקודה A העבירו משיק למעגל הקטן',
+      'המשיק חותך את המעגל הגדול בנקודה K',
+      'משולש KAO',
+      'הנקודה E נמצאת על המעגל הקטן בתוך המשולש KAO',
+      'המשך הקטע AE חותך את הקטע OK בנקודה M',
+      'R = 1.5r',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), K = at(fig, 'K'), P = at(fig, 'P'), E = at(fig, 'E'), M = at(fig, 'M');
+      const rBig = fig.circles.get('circle-P')!.r;
+      const rSmall = fig.circles.get('circle-O')!.r;
+      expect(rBig / rSmall, 'R = 1.5r').toBeCloseTo(1.5, 5);
+      expect(rBig, 'R > r (the qualifier-assigned order)').toBeGreaterThan(rSmall);
+      expect(dist(P, O), 'O on the big circle').toBeCloseTo(rBig, 5);
+      expect(dist(O, A), 'A on the small circle').toBeCloseTo(rSmall, 5);
+      expect(dist(P, K), 'K on the big circle').toBeCloseTo(rBig, 5);
+      const dot = (O.x - A.x) * (K.x - A.x) + (O.y - A.y) * (K.y - A.y);
+      expect(Math.abs(dot), 'OA ⟂ AK (tangency at A)').toBeLessThan(1e-6);
+      expect(dist(O, E), 'E on the small circle').toBeCloseTo(rSmall, 5);
+      const sgn = (p: Vec, a: Vec, b: Vec) => Math.sign((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x));
+      expect(sgn(E, K, A) === sgn(E, A, O) && sgn(E, A, O) === sgn(E, O, K), 'E inside triangle KAO').toBe(true);
+      const tOK = ((M.x - O.x) * (K.x - O.x) + (M.y - O.y) * (K.y - O.y)) / dist(O, K) ** 2;
+      expect(tOK > 0.02 && tOK < 0.98, 'M within segment OK').toBe(true);
+    },
+  },
 ];
 
 /**

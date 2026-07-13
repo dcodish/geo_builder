@@ -1520,8 +1520,12 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // pair read as concentric (the qualifier-resolution post-pass redirects references by it).
       const idx = objects.findIndex((o) => o.kind === 'circle' && o.id === cmd.inner);
       const outer = objects.find((o) => o.kind === 'circle' && o.id === cmd.outer);
-      if (idx >= 0 && outer && outer.kind === 'circle' && (objects[idx] as Extract<GeoObject, { kind: 'circle' }>).center === outer.center) {
-        objects[idx] = { ...objects[idx], innerOf: cmd.outer } as GeoObject;
+      if (idx >= 0 && outer && outer.kind === 'circle') {
+        // The pure SIZE role (`orderedBelow`) is stamped for ANY pair (issue #102 — «המעגל הגדול/הקטן»
+        // resolves through it); the CONCENTRIC-pair marker (`innerOf`, qualifier-redirect semantics)
+        // only when the circles share a centre (ADR-304).
+        const concentric = (objects[idx] as Extract<GeoObject, { kind: 'circle' }>).center === outer.center;
+        objects[idx] = { ...objects[idx], orderedBelow: cmd.outer, ...(concentric ? { innerOf: cmd.outer } : {}) } as GeoObject;
       }
       break;
     }
