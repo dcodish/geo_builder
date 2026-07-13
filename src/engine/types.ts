@@ -487,6 +487,13 @@ export interface Circle {
    *  ([ADR-244](../../docs/06-decisions.md#adr-244)): set by `set-radius-order`, read by the parser
    *  context so qualifier references ("המעגל הפנימי" / "the inner circle") resolve to this circle. */
   innerOf?: Id;
+  /** The letter the student named this circle's radius with — "מעגל שרדיוסו R" / "רדיוס מעגל P הוא r"
+   *  (issue #54; the ADR-034 reserved-R auto-bind generalized to per-circle named symbols, bagrut
+   *  convention R vs r). Set by `radius-symbol`; read by the parser context (so "R = 1.5r" / "R > r"
+   *  resolve each letter to its circle), the symbolic-measure lowering (an "AB = √2R" couples to THIS
+   *  circle's radius DOF), and the radius-slider labels. The radius itself stays a free DOF (ADR-052)
+   *  until a value/ratio pins it — the symbol is a NAME, not a size. */
+  radiusSymbol?: string;
   /** Drive a `via:'free'` radius so a constraint holds — the circle analogue of a shape scalar's
    *  `solve` ([ADR-051](docs/06-decisions.md#adr-051)). Set by `driveOrCheck`/`recruitFreeDofs` when a
    *  constraint on the circle's points can only be met by resizing it; the solver sizes the radius. */
@@ -873,6 +880,16 @@ export type Command =
   // driven constraint — the radii stay free DOFs (ADR-052); the givens verifier flags an order-violating
   // config, so `meetsRequirements` (sampler / "show another") skips it and a real contradiction reads amber.
   | { type: 'set-radius-order'; outer: Id; inner: Id }
+  // Bind a LETTER as a circle's radius symbol — "מעגל שרדיוסו R" / "רדיוס מעגל P הוא r" (issue #54, the
+  // ADR-034 auto-bind generalized per circle). Pure data: stamps `radiusSymbol` on the circle object; the
+  // radius stays a free DOF. Read back by the parser context (relations "R = 1.5r" / "R > r"), the
+  // symbolic-measure lowering ("AB = √2R" couples to THIS circle), and the radius-slider labels.
+  | { type: 'radius-symbol'; circle: Id; name: string }
+  // radius(c1) = k · radius(c2) — a RATIO between two circles' radii ("R = 1.5r", "R/r = 2√7/5"). Lowered
+  // at apply to an ordinary `ratio` constraint over (centre, on-circle witness) pairs — a witness point on
+  // each circle is resolved from the figure or minted as a hidden pinned `~radw-*` rider — so the existing
+  // solver machinery (incl. the ADR-103 free-radius recruitment) drives it; no new solver code.
+  | { type: 'set-radius-ratio'; c1: Id; c2: Id; k: number }
   | { type: 'show-circle'; id: Id } // #83 (ADR-291): reveal an EXISTING hidden circle — a circumscription stated about points already riding a circle RESOLVES it (never a coincident duplicate)
   | { type: 'name-center'; center: Id } // reveal/name an EXISTING circle's auto-hidden centre (FR-RN-8): the student said "O is the centre of the circle" — flips the circle's autoCenter off so its centre shows, WITHOUT touching the radius
   | { type: 'set-area'; ids: Id[]; value: number } // area of polygon `ids` = value (ADR-118)
@@ -916,6 +933,14 @@ export type Command =
   // is a REQUIREMENT (like `set-radius-order`): the givens verifier flags a wrong-side config, so
   // `meetsRequirements` (sampler / "show another") skips it — never a driven equality.
   | { type: 'point-circle-side'; id: Id; circle: Id; side: 'inside' | 'outside' }
+  // "E … בתוך המשולש KAO" / "inside triangle KAO" (issue #99) — a point's side of a POLYGON region: the
+  // ADR-254 circle-side family, polygon edition. `poly` = the region's vertex ids (≥3, cyclic). Same
+  // M1 shape: a NEW id becomes a FREE point seeded on the stated side; an EXISTING free point on the
+  // wrong side is re-seated (a better default, never a drive) — incl. a free ON-CIRCLE point, whose
+  // starting θ is re-seated into the region (the 2025-bagrut "E on the small circle inside △KAO"). The
+  // side is a REQUIREMENT: the verifier flags a wrong-side config (figure.v.insideRegion/outsideRegion),
+  // so `meetsRequirements` (sampler / "show another") skips it — never a driven equality.
+  | { type: 'point-polygon-side'; id: Id; poly: Id[]; side: 'inside' | 'outside' }
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
   | { type: 'arc'; id: Id; center: Id; from: Id; to: Id } // a drawn arc (CCW from→to): semicircle / quarter circle
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }

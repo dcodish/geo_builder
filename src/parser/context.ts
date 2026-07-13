@@ -39,5 +39,8 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     parallels: parallelEdgePairs(construction, positions), // "height from C" drops to a trapezoid's opposite base (ADR-169)
     lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // idempotent construct reuse
     polygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])), // definite "the quad" binds to the existing one
+    radiusSymbols: construction.objects.flatMap((o) =>
+      o.kind === 'circle' && o.radiusSymbol ? [{ name: o.radiusSymbol, circle: o.id, center: o.center }] : [],
+    ), // "R = 1.5r" / "R > r" resolve each letter to its circle (issue #54)
   };
 }

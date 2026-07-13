@@ -412,6 +412,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle",
     ],
   },
+  "circle O with radius R": {
+    "en": [
+      "circle",
+      "radius-symbol",
+    ],
+    "he": [
+      "circle",
+      "radius-symbol",
+    ],
+  },
   "circle centered at O radius 5": {
     "en": [
       "circle",
@@ -794,6 +804,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     ],
     "he": [
       "free-point",
+    ],
+  },
+  "point E lies inside triangle KAO": {
+    "en": [
+      "triangle",
+      "point-polygon-side",
+    ],
+    "he": [
+      "triangle",
+      "point-polygon-side",
     ],
   },
   "point E on AC at 40%": {

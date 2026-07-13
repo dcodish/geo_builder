@@ -14,12 +14,12 @@
 
 import type { Command, Constraint, Id, Vec } from './types';
 import type { ResolvedCircle } from './evaluate';
-import { dist } from './geometry';
+import { dist, pointInPolygon } from './geometry';
 import { constraintRefs, describeConstraint, isSatisfied, residual } from './solve';
 
 export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
-  relation: 'on-circle' | 'tangent' | 'radius-order' | 'circle-side' | Constraint['type'];
+  relation: 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | Constraint['type'];
   ids: Id[];
   /** English fallback, e.g. "E should lie on circle P (radius 3.60) but is 7.42 from its centre". */
   message: string;
@@ -224,6 +224,53 @@ export function checkGivens(
         message: `${cmd.id} should lie ${cmd.side} ${circleLabel(cmd.circle)} (radius ${c.r.toFixed(2)}) but is ${d.toFixed(2)} from its centre`,
         messageKey: cmd.side === 'outside' ? 'figure.v.outsideCircle' : 'figure.v.insideCircle',
         params: { point: cmd.id, circle: circleName(cmd.circle), radius: c.r.toFixed(2), dist: d.toFixed(2) },
+      });
+    }
+  }
+
+  // A stated RADIUS RATIO between two circles ("R = 1.5r" / "R/r = 2√7/5", issue #54): checked directly
+  // against the RESOLVED radii (the witnesses the apply lowering used are an implementation detail this
+  // re-derivation must not depend on — the ADR-053 independence principle).
+  for (const cmd of commands) {
+    if (cmd.type !== 'set-radius-ratio') continue;
+    const a = circles.get(cmd.c1);
+    const b = circles.get(cmd.c2);
+    if (!a || !b) continue;
+    const want = cmd.k * b.r;
+    if (Math.abs(a.r - want) > Math.max(0.02, 0.02 * Math.max(a.r, want))) {
+      violations.push({
+        relation: 'radius-ratio',
+        ids: [cmd.c1, cmd.c2],
+        message: `radius of ${circleLabel(cmd.c1)} (${a.r.toFixed(2)}) should be ${cmd.k} × radius of ${circleLabel(cmd.c2)} (${b.r.toFixed(2)})`,
+        messageKey: 'figure.v.radiusRatio',
+        params: { c1: circleName(cmd.c1), c2: circleName(cmd.c2), k: String(cmd.k), r1: a.r.toFixed(2), r2: b.r.toFixed(2) },
+      });
+    }
+  }
+
+  // A stated POLYGON-region side ("E … בתוך המשולש KAO", issue #99 — the ADR-254 circle-side family,
+  // polygon edition): the point must lie strictly on its stated side of the region in every shown config.
+  // Same requirement discipline: `meetsRequirements` gates on a clean verifier, so the sampler /
+  // "show another configuration" skips wrong-side configs; a genuinely contradicted side (the point
+  // pinned/derived onto the other side) surfaces amber here.
+  for (const cmd of commands) {
+    if (cmd.type !== 'point-polygon-side') continue;
+    const p = positions.get(cmd.id);
+    const verts = cmd.poly.map((v) => positions.get(v));
+    if (!p || verts.some((v) => v === undefined)) continue; // a ref isn't placed — a different failure mode
+    const vs = verts as Vec[];
+    const cx = vs.reduce((s, v) => s + v.x, 0) / vs.length;
+    const cy = vs.reduce((s, v) => s + v.y, 0) / vs.length;
+    const rspan = Math.max(...vs.map((v) => dist(v, { x: cx, y: cy })));
+    const ok = cmd.side === 'inside' ? pointInPolygon(p, vs, rspan * 0.01) : !pointInPolygon(p, vs);
+    if (!ok) {
+      const polyName = cmd.poly.join('');
+      violations.push({
+        relation: 'region-side',
+        ids: [cmd.id, ...cmd.poly],
+        message: `${cmd.id} should lie ${cmd.side} ${polyName}`,
+        messageKey: cmd.side === 'outside' ? 'figure.v.outsideRegion' : 'figure.v.insideRegion',
+        params: { point: cmd.id, poly: polyName },
       });
     }
   }

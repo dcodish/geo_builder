@@ -351,7 +351,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
-      "circleCircleIntersection",
       "tangentLine",
     ],
     "text": "the tangent to circle O at A meets circle P at D",
@@ -360,7 +359,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "he",
     "shadowedBy": [
-      "circleCircleIntersection",
       "tangentLine",
     ],
     "text": "המשיק למעגל O בנקודה A חותך את מעגל P בנקודה D",
@@ -692,6 +690,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "lang": "he",
     "text": "נקודה F על המשך AD",
     "winner": "pointOnExtension",
+  },
+  {
+    "lang": "en",
+    "text": "point E lies inside triangle KAO",
+    "winner": "(escalate)",
+  },
+  {
+    "lang": "he",
+    "text": "הנקודה E נמצאת בתוך המשולש KAO",
+    "winner": "(escalate)",
   },
   {
     "lang": "en",
@@ -1071,6 +1079,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   {
     "lang": "he",
     "text": "מעגל בקוטר 10",
+    "winner": "circle",
+  },
+  {
+    "lang": "en",
+    "text": "circle O with radius R",
+    "winner": "circle",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל O שרדיוסו R",
     "winner": "circle",
   },
   {

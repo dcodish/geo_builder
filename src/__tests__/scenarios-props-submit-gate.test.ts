@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parse, droppedNewLabels, droppedGivenNumbers } from '@/parser';
+import { parse, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs } from '@/parser';
 import { replay, useGeoStore, dryRunOutcome, hasDeferrableConstraint } from '@/store/geoStore';
 import { humanizeError } from '@/i18n/humanizeError';
 import { ctxOf, at, dist } from './scenarios-corpus';
@@ -221,6 +221,107 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
     expect(useGeoStore.getState().relations!.result.equalSegments.length, 'AB=AC now reported as forced equal').toBeGreaterThan(0);
     const fig = replay(useGeoStore.getState().facts, useGeoStore.getState().seed);
     expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| = |AC| holds').toBeCloseTo(dist(at(fig, 'A'), at(fig, 'C')), 3);
+    st.clear();
+  });
+});
+
+/**
+ * The 2025-bagrut two-circle figure through the FULL App.submit gate set (#54/#99/#100 play-test,
+ * ADR-302/303/304 amendment). The scenario corpus replays parse→replay, which skips the honesty gates —
+ * and the operator's play-test found exactly there what the tests missed: `droppedNewLabels` read the
+ * bound radius letter R in "R > r" as a dropped point ("weak:dropped:R" → needless LLM → not-understood),
+ * and `droppedGivenVerbs` read the definite tangent back-reference ("המשיק חותך…", whose lowering
+ * REFERENCES line tan-A but contains no `tangent` command) as a dropped משיק verb. This mirrors
+ * App.submit's gate order EXACTLY — labels (with the figure's bound measure symbols), numbers,
+ * relations, verbs, then dry-run — so every step of the exam figure must COMMIT deterministically,
+ * with no step leaking to the LLM.
+ */
+describe('reported scenarios — the 2025-bagrut figure passes the FULL submit gate set (#54/#99/#100)', () => {
+  it('[bagrut-2025-submit-gates] all 11 utterances commit deterministically through every honesty gate', () => {
+    const st = useGeoStore.getState();
+    st.clear();
+    const submit = (utterance: string) => {
+      const facts = useGeoStore.getState().facts;
+      const ctx = ctxOf(facts);
+      const r = parse(utterance, ctx);
+      expect(r.ok, `parses: ${utterance} (${!r.ok ? r.reason : ''})`).toBe(true);
+      if (!r.ok) return;
+      // the four honesty gates, in App.submit's order — all must stay silent on a correct lowering
+      const symbols = (ctx.radiusSymbols ?? []).map((x) => x.name);
+      expect(droppedNewLabels(utterance, r.commands, ctx.points ?? [], symbols), `labels gate: ${utterance}`).toEqual([]);
+      expect(droppedGivenNumbers(utterance, r.commands), `numbers gate: ${utterance}`).toEqual([]);
+      expect(droppedGivenRelations(utterance, r.commands), `relations gate: ${utterance}`).toEqual([]);
+      expect(droppedGivenVerbs(utterance, r.commands), `verbs gate: ${utterance}`).toEqual([]);
+      const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
+      const commits = outcome.produced || (outcome.reason === 'error' && hasDeferrableConstraint(r.commands));
+      expect(commits, `dry-run commits: ${utterance} (${!outcome.produced ? outcome.reason : ''})`).toBe(true);
+      r.commands.forEach((c) => useGeoStore.getState().execute(c, utterance, 'g-' + utterance));
+    };
+    for (const u of [
+      'מעגל P שרדיוסו R',
+      'מעגל O שרדיוסו r',
+      'R > r',
+      'הנקודה O נמצאת על מעגל P',
+      'A היא אחת מנקודות החיתוך של מעגל O ומעגל P',
+      'דרך הנקודה A העבירו משיק למעגל O',
+      'המשיק חותך את מעגל P בנקודה K',
+      'משולש KAO',
+      'הנקודה E נמצאת על מעגל O בתוך המשולש KAO',
+      'המשך הקטע AE חותך את הקטע OK בנקודה M',
+      'R=1.5r', // the operator's exact glued form
+    ]) {
+      submit(u);
+    }
+    const state = useGeoStore.getState();
+    const fig = replay(state.facts, state.seed);
+    expect(fig.lastError).toBeNull();
+    // the ratio holds and E is on the small circle (the geometric spine; the corpus scenario asserts the rest)
+    expect(fig.circles.get('circle-P')!.r / fig.circles.get('circle-O')!.r).toBeCloseTo(1.5, 4);
+    st.clear();
+  });
+
+  it('[bagrut-2025-second-session] the operator’s SECOND play-test flow commits end-to-end (session yla2d4xo round 2)', () => {
+    // The natural flow they actually used: two intersecting circles + after-the-fact radius naming +
+    // the ONE-SENTENCE tangent compound + region-then-membership in the OPPOSITE order. Every step
+    // must clear all four gates and commit; the true-duplicate re-statement stays a friendly no-op.
+    const st = useGeoStore.getState();
+    st.clear();
+    const gateAndClassify = (utterance: string) => {
+      const facts = useGeoStore.getState().facts;
+      const ctx = ctxOf(facts);
+      const r = parse(utterance, ctx);
+      expect(r.ok, `parses: ${utterance} (${!r.ok ? r.reason : ''})`).toBe(true);
+      if (!r.ok) return null;
+      const symbols = (ctx.radiusSymbols ?? []).map((x) => x.name);
+      expect(droppedNewLabels(utterance, r.commands, ctx.points ?? [], symbols), `labels gate: ${utterance}`).toEqual([]);
+      expect(droppedGivenNumbers(utterance, r.commands), `numbers gate: ${utterance}`).toEqual([]);
+      expect(droppedGivenRelations(utterance, r.commands), `relations gate: ${utterance}`).toEqual([]);
+      expect(droppedGivenVerbs(utterance, r.commands), `verbs gate: ${utterance}`).toEqual([]);
+      return { commands: r.commands, outcome: dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {}) };
+    };
+    const submit = (utterance: string) => {
+      const res = gateAndClassify(utterance)!;
+      expect(res.outcome.produced, `commits: ${utterance} (${!res.outcome.produced ? res.outcome.reason : ''})`).toBe(true);
+      res.commands.forEach((c) => useGeoStore.getState().execute(c, utterance, 'g-' + utterance));
+    };
+    submit('שני מעגלים נחתכים');
+    submit('רדיוס מעגל O הוא r');
+    submit('רדיוס מעגל P הוא R');
+    submit('R>r');
+    submit('דרך A עובר משיק למעגל O שחותך את מעגל P בנקודה K'); // the one-sentence compound (was a gate-caught misparse)
+    submit('O על מעגל P');
+    submit('משולש AKO');
+    submit('נקודה E בתוך משולש AKO'); // region FIRST — E a free point seeded inside
+    submit('E על מעגל O'); // THEN membership — converts E at its own bearing (c2)
+    // the exact duplicate is a truthful no-op, never a commit and never an escalation
+    const dup = gateAndClassify('נקודה E בתוך משולש AKO')!;
+    expect(dup.outcome.produced).toBe(false);
+    expect(!dup.outcome.produced && dup.outcome.reason).toBe('empty');
+    const state = useGeoStore.getState();
+    const fig = replay(state.facts, state.seed);
+    expect(fig.lastError).toBeNull();
+    const O = at(fig, 'O'), E = at(fig, 'E'), A = at(fig, 'A');
+    expect(dist(O, E), 'E on circle O').toBeCloseTo(dist(O, A), 5);
     st.clear();
   });
 });

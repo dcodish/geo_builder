@@ -1186,8 +1186,20 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, o
     after.construction.objects.length > before.construction.objects.length ||
     after.construction.constraints.length > before.construction.constraints.length ||
     labelCount(after.labels) > labelCount(before.labels);
-  // A bare variable binding ("x = 4") legitimately draws nothing — it's data, not a silent fail.
-  const dataOnly = commands.length > 0 && commands.every((c) => c.type === 'set-var');
+  // A bare variable binding ("x = 4") legitimately draws nothing — it's data, not a silent fail. So is a
+  // pure REQUIREMENT/DATA statement (issue #54/#99 play-test): a radius-symbol naming ("רדיוס מעגל O הוא
+  // R"), a radius order ("R > r"), and a region/circle SIDE about an EXISTING point that already sits on
+  // the stated side ("נקודה E בתוך משולש AKO" re-stated after E exists — zero coordinate delta, but the
+  // record gates all future sampling; refusing it as "nothing to add" swallowed the student's statement,
+  // the ADR-234 class). An EXACT duplicate of an enabled fact stays a friendly no-op — the statement
+  // genuinely IS already on the figure.
+  const REQUIREMENT_DATA = new Set(['radius-symbol', 'set-radius-order', 'point-polygon-side', 'point-circle-side']);
+  const enabledCmdList = facts.filter((f) => f.enabled).map((f) => f.cmd);
+  const dataOnly =
+    commands.length > 0 &&
+    commands.every(
+      (c) => c.type === 'set-var' || (REQUIREMENT_DATA.has(c.type) && !enabledCmdList.some((e) => deepEqual(e, c))),
+    );
   // `name-center` REVEALS an existing circle's hidden centre — a visible change that adds no object/point
   // and moves nothing, so the geometry checks above miss it. It still "produced" (the centre now shows).
   const reveals = commands.some((c) => c.type === 'name-center' || c.type === 'show-circle');

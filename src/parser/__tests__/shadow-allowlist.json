@@ -32,7 +32,6 @@
     "semicircle → diameter",
     "setRadius → circle",
     "tangentLineIntersection → tangentLine",
-    "tangentMeetsOtherCircle → circleCircleIntersection",
     "tangentMeetsOtherCircle → tangentLine",
     "tangentsFromExternal → tangentLine",
     "twoTangentsMeet → tangentLine"

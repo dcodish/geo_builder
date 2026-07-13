@@ -22,10 +22,12 @@ describe('circle on diameter AB (ADR-090)', () => {
       'מעגל שבו AB קוטר',
       'circle with diameter AB',
       'AB is the diameter of circle O',
-      'AB קוטר במעגל שמרכזו O ורדיוסו R', // a circle being DEFINED by centre+radius (ADR-091): "במעגל" but "שמרכזו…ורדיוסו" = define
     ]) {
       expect(types(u), u).toEqual(['segment', 'midpoint', 'circle-through']);
     }
+    // a circle being DEFINED by centre+radius (ADR-091): "במעגל" but "שמרכזו…ורדיוסו" = define. The stated
+    // radius SYMBOL R also binds to the circle since #54 (ADR-304) — the binding post-pass appends the data command.
+    expect(types('AB קוטר במעגל שמרכזו O ורדיוסו R')).toEqual(['segment', 'midpoint', 'circle-through', 'radius-symbol']);
   });
 
   it('a GIVEN diameter (A,B already exist, no circle yet) defines the circle even without a define-marker', () => {
