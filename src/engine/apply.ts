@@ -688,16 +688,38 @@ function nextTheta(objects: GeoObject[], circle: Id): number {
 }
 
 /**
- * Seed `t` for a NEW free point on segment a→b that doesn't collide with free points already on it
- * (two "point on AC" both defaulting to 0.5 → "would be at the same point"). Place it in the middle of
- * the largest open gap between the existing parameters (normalised to a→b), so points spread out; the
- * first lands at 0.5. The "show another configuration" sampler still slides each independently.
+ * Seed `t` for a NEW free point on segment a→b that doesn't collide with points already on it. Two
+ * sources of collision are dodged: (1) other free on-segment riders on this same segment (two "point on
+ * AC" both defaulting to 0.5 → "would be at the same point"); (2) ANY existing point whose CURRENT
+ * position lies ON the segment — a midpoint, an intersection, a foot — so the free rider never defaults
+ * onto a point the student never said it coincides with (ADR-253 general position, rider edition, issue
+ * #115). The new t is the middle of the largest open gap between all such parameters (normalised to
+ * a→b); the first free rider on a clear segment still lands at 0.5. "Show another configuration" slides
+ * each rider independently, and a later constraint that FORCES a coincidence still wins (it drives t).
  */
-function freeSegT(objects: GeoObject[], a: Id, b: Id): number {
+function freeSegT(objects: GeoObject[], a: Id, b: Id, pos?: Map<Id, Vec>): number {
   const taken = objects
     .filter((o): o is Extract<GeoObject, { kind: 'on-segment' }> => o.kind === 'on-segment' && ((o.a === a && o.b === b) || (o.a === b && o.b === a)))
     .map((o) => (o.a === a ? o.t : 1 - o.t)) // normalise every parameter to the a→b orientation
     .filter((t) => t > 0 && t < 1);
+  // (2) Existing positioned points lying ON the a→b segment (ADR-253). A point off the line doesn't count.
+  const A = pos?.get(a), B = pos?.get(b);
+  if (A && B) {
+    const L2 = (B.x - A.x) ** 2 + (B.y - A.y) ** 2;
+    const span = Math.sqrt(L2);
+    if (L2 > 1e-12) {
+      for (const o of objects) {
+        const id = (o as { id?: Id }).id;
+        if (!id || id === a || id === b) continue;
+        const p = pos!.get(id);
+        if (!p) continue; // non-point objects (segments/circles/polygons) aren't in `pos`
+        const t = ((p.x - A.x) * (B.x - A.x) + (p.y - A.y) * (B.y - A.y)) / L2;
+        if (t <= 0.02 || t >= 0.98) continue; // near/beyond an endpoint — not a rider collision
+        const perp = Math.abs((p.x - A.x) * (B.y - A.y) - (p.y - A.y) * (B.x - A.x)) / span;
+        if (perp < 0.015 * span) taken.push(t); // ON the segment (the ADR-253 "too close to draw" bar)
+      }
+    }
+  }
   if (taken.length === 0) return 0.5;
   const xs = [0, ...taken.sort((p, q) => p - q), 1];
   let best = 0.5;
@@ -891,7 +913,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         id: cmd.id,
         a: cmd.a,
         b: cmd.b,
-        t: cmd.t ?? freeSegT(objects, cmd.a, cmd.b),
+        t: cmd.t ?? freeSegT(objects, cmd.a, cmd.b, pos),
         ...(cmd.t === undefined ? { free: true } : {}),
         ...(cmd.extension ? { extension: true } : {}),
         ...(cmd.branch !== undefined ? { solveBranch: cmd.branch } : {}),

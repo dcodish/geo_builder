@@ -81,9 +81,10 @@ describe('segment ratio with a √ value — Q3', () => {
     expect(ratio('AE/ED=2').k).toBe(2);
   });
 
-  it('an RHS the ratio rule cannot read FAILS cleanly — no fragment misparse to a length', () => {
-    const r = parse('EB/AE=(√2)/2');
-    expect(r.ok, 'escalates to the LLM rather than silently parsing "AE=√2"').toBe(false);
+  it('"EB/AE=(√2)/2" ⇒ k = √2/2 (the parenthesised √ value now reads via NUMEXPR — issue #114/ADR-310)', () => {
+    // Previously RATVAL couldn't read the leading paren, so this escalated; the shared NUMEXPR atom reads it
+    // (no fragment misparse to "AE=√2" — the whole value is captured).
+    expect(ratio('EB/AE=(√2)/2').k).toBeCloseTo(Math.SQRT1_2, 6);
   });
 
   it('a plain length with a √ (no ratio LHS) is untouched', () => {

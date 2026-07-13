@@ -158,6 +158,36 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'q5-isosceles-incircle-sqrt3-ratio-and-area',
+    title: 'bagrut Q5: isosceles + incircle, «AC=√(3)CO» (the √() toolbar ratio) + «S_{CKE}=6» — builds green, area solves (issues #114/#115, ADR-310/311)',
+    guards:
+      "Operator prod session `qderonm3` (2026-07-13): the √3 ratio typed with the √() palette form failed deterministically (`AC=√(3)CO`, `AC גדול פי √(3) מ CO`) and escalated to the LLM, which produced a malformed figure — so `E על CB` defaulted onto the auto-created free point K and `S_{CKE}=6` reported «cannot place E so area=6». Two root fixes: #114 (the ratio rules now use the shared NUMEXPR atom, so `√(3)` parses deterministically — no LLM detour) and #115 (a free on-segment rider defaults into general position, off existing points). With both, the exact sequence builds green and the area solves.",
+    steps: [
+      'משולש שווה שוקיים ABC',
+      'AB=AC',
+      'במשולש חסום מעגל',
+      'OA',
+      'OB',
+      'OC',
+      'AC=√(3)CO',
+      'CK=√(63)',
+      'OK',
+      'E על CB',
+      'S_{CKE}=6',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // |CK| = √63 (the stated length holds).
+      expect(dist(at(fig, 'C'), at(fig, 'K'))).toBeCloseTo(Math.sqrt(63), 4);
+      // area(CKE) = 6 (the area given is actually satisfied — the prod failure).
+      const C = at(fig, 'C'), K = at(fig, 'K'), E = at(fig, 'E');
+      const area = Math.abs((K.x - C.x) * (E.y - C.y) - (K.y - C.y) * (E.x - C.x)) / 2;
+      expect(area).toBeCloseTo(6, 3);
+      // E did not default onto K (general position, #115).
+      expect(dist(E, K)).toBeGreaterThan(1);
+    },
+  },
+  {
     id: 'hosem-slip-container-marker-wins',
     title: 'משולש ABC חוסם במעגל + BC קוטר — the ב container marker wins over the חוסם verb letter (issues #31/#38, ADR-283)',
     guards:

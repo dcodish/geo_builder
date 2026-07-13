@@ -1363,47 +1363,37 @@ const pointByDistances: Rule = (s) => {
  * grabs "DF = FC" and SILENTLY DROPS the divisor (the ADR-024/026 half-parse class). Runs before
  * `distanceConstraint`, which would otherwise half-parse "AB = 2 AD" into "AB = 2".
  *
- * The coefficient atom is RADICAL-AWARE (issue #52, ADR-285): a number or fraction, each part
- * optionally under √, optionally parenthesised — the SAME value vocabulary as `segmentRatio`'s
- * RATVAL, so the textbook `AB=√2*OD` no longer parses in the `/`-form and fails in the `= k·seg`
- * form. No theft: the rule still requires TWO labels on each side of `=`, so "AB = √2R" (the
- * reserved radius symbol) stays with `measureSqrt` and "AB = √2" stays a concrete length.
+ * The coefficient atom is the shared radical-aware {@link NUMEXPR} (ADR-298 / issues #52/#114): a number or
+ * fraction, each part optionally under √, optionally parenthesised INCLUDING the `√(3)` / `√(2/3)` form the
+ * √() toolbar button emits — the SAME value vocabulary the length/area/radius rules use, so the textbook
+ * `AB=√2*OD` and `AC=√(3)CO` both parse. No theft: the rule still requires TWO labels on each side of `=`, so
+ * "AB = √2R" (the reserved radius symbol) stays with `measureSqrt` and "AB = √2" stays a concrete length.
  */
 const COEF = String.raw`\d+(?:\.\d+)?`;
-/** A radical-aware coefficient: named groups `<p>s` (√ on the numerator), `<p>n` (numerator),
- *  `<p>ts` (√ on the denominator), `<p>tn` (denominator) — "2", "√2", "√2/2", "(√2/2)". */
-const RCOEF = (p: string) =>
-  String.raw`\(?\s*(?<${p}s>√)?\s*(?<${p}n>${COEF})(?:\s*\/\s*(?<${p}ts>√)?\s*(?<${p}tn>${COEF}))?\s*\)?`;
-const rcoefVal = (g: Record<string, string | undefined>, p: string): number | null => {
-  const n = g[`${p}n`];
-  if (n === undefined) return null;
-  const num = g[`${p}s`] ? Math.sqrt(parseFloat(n)) : parseFloat(n);
-  const den = g[`${p}tn`] !== undefined ? (g[`${p}ts`] ? Math.sqrt(parseFloat(g[`${p}tn`]!)) : parseFloat(g[`${p}tn`]!)) : 1;
-  return num / den;
-};
 const ratioConstraint: Rule = (s) => {
   const en = s.match(
     new RegExp(
-      String.raw`(?<![A-Za-z\d])(?:${RCOEF('m')}\s*[*·]?\s*)?(?<la>[A-Za-z]\d*)\s*(?<lb>[A-Za-z]\d*)\b\s*=\s*(?:${RCOEF('n')}\s*[*·]?\s*)?(?<lc>[A-Za-z]\d*)\s*(?<ld>[A-Za-z]\d*)\b\s*(?:\/\s*${RCOEF('q')})?`,
+      String.raw`(?<![A-Za-z\d])(?:${NUMEXPR('m')}\s*[*·]?\s*)?(?<la>[A-Za-z]\d*)\s*(?<lb>[A-Za-z]\d*)\b\s*=\s*(?:${NUMEXPR('n')}\s*[*·]?\s*)?(?<lc>[A-Za-z]\d*)\s*(?<ld>[A-Za-z]\d*)\b\s*(?:\/\s*${NUMEXPR('q')})?`,
     ),
   );
   const g = en?.groups ?? {};
-  if (en && (g.mn || g.nn || g.qn)) {
-    const m = rcoefVal(g, 'm') ?? 1; // |m·AB| = |n·CD / d| ⇒ |AB| = (n/(m·d))·|CD|
-    const n = rcoefVal(g, 'n') ?? 1;
-    const d = rcoefVal(g, 'q') ?? 1; // trailing divisor ("CD/2", "CD/√2")
+  const mV = numexprVal(g, 'm'), nV = numexprVal(g, 'n'), qV = numexprVal(g, 'q');
+  if (en && (mV || nV || qV)) {
+    const m = mV?.value ?? 1; // |m·AB| = |n·CD / d| ⇒ |AB| = (n/(m·d))·|CD|
+    const n = nV?.value ?? 1;
+    const d = qV?.value ?? 1; // trailing divisor ("CD/2", "CD/√2")
     return [{ type: 'set-ratio', a: up(g.la!), b: up(g.lb!), c: up(g.lc!), d: up(g.ld!), k: n / (m * d) }];
   }
-  // Hebrew "AB פי 2 מ-AD" / "AB פי √2 מ-OD" — |AB| is k× |AD|.
+  // Hebrew "AB פי 2 מ-AD" / "AB פי √2 מ-OD" / "AC פי √(3) מ-CO" — |AB| is k× |AD|.
   const he = s.match(
     new RegExp(
-      String.raw`(?<ha>[A-Za-z]\d*)\s*(?<hb>[A-Za-z]\d*)\b[^=]*?פי\s*${RCOEF('k')}\s*מ-?\s*(?<hc>[A-Za-z]\d*)\s*(?<hd>[A-Za-z]\d*)\b`,
+      String.raw`(?<ha>[A-Za-z]\d*)\s*(?<hb>[A-Za-z]\d*)\b[^=]*?פי\s*${NUMEXPR('k')}\s*מ-?\s*(?<hc>[A-Za-z]\d*)\s*(?<hd>[A-Za-z]\d*)\b`,
     ),
   );
   if (he) {
     const hg = he.groups ?? {};
-    const k = rcoefVal(hg, 'k');
-    if (k !== null) return [{ type: 'set-ratio', a: up(hg.ha!), b: up(hg.hb!), c: up(hg.hc!), d: up(hg.hd!), k }];
+    const k = numexprVal(hg, 'k');
+    if (k !== null) return [{ type: 'set-ratio', a: up(hg.ha!), b: up(hg.hb!), c: up(hg.hc!), d: up(hg.hd!), k: k.value }];
   }
   return null;
 };
@@ -1414,14 +1404,14 @@ const ratioConstraint: Rule = (s) => {
  * would otherwise half-parse the "ED=2" in the middle and drop the rest (the bug that
  * left a point unplaced). Drives a sliding point on either segment.
  */
-// A ratio VALUE: a number or fraction, each part optionally under a √ — "2/3", "√2/2", "1/√3", "√2".
-const RATVAL = String.raw`(√)?\s*(${COEF})\s*(?:\/\s*(√)?\s*(${COEF}))?`;
 const segmentRatio: Rule = (s) => {
-  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*\/\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${RATVAL}`));
+  // RHS value uses the shared NUMEXPR atom (ADR-298) so "√(2)", "√(2/3)" (the √() toolbar form) and quotient
+  // radicals parse, not only the RATVAL "√2/2" shapes (issue #114).
+  const m = s.match(new RegExp(String.raw`\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*\/\s*\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*=\s*${NUMEXPR('v')}`));
   if (!m) return null;
-  const num = m[5] ? Math.sqrt(parseFloat(m[6])) : parseFloat(m[6]); // m5 = √ on numerator
-  const den = m[8] !== undefined ? (m[7] ? Math.sqrt(parseFloat(m[8])) : parseFloat(m[8])) : 1; // m7 = √ on denominator
-  return [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: num / den }];
+  const v = numexprVal(m.groups!, 'v');
+  if (!v) return null;
+  return [{ type: 'set-ratio', a: up(m[1]), b: up(m[2]), c: up(m[3]), d: up(m[4]), k: v.value }];
 };
 
 /**
@@ -1669,13 +1659,6 @@ function areaReferences(s: string): { ids: Id[]; at: number }[] {
   return refs.sort((a, b) => a.at - b.at);
 }
 
-/** Numerator/denominator under optional √, computed from a {@link RATVAL} match starting at group `g`. */
-const ratvalAt = (m: RegExpMatchArray, g: number): number => {
-  const numr = m[g] ? Math.sqrt(parseFloat(m[g + 1])) : parseFloat(m[g + 1]);
-  const den = m[g + 3] !== undefined ? (m[g + 2] ? Math.sqrt(parseFloat(m[g + 3])) : parseFloat(m[g + 3])) : 1;
-  return numr / den;
-};
-
 /**
  * The ratio coefficient k for "measure(P1) = k·measure(P2)" from the connective between two refs — shared by
  * area (ADR-118) and perimeter (ADR-228). `kwAlt` is the measure keyword alternation (e.g. `S[A-Z]|שטח|area`)
@@ -1687,10 +1670,12 @@ function measureRatioK(s: string, kwAlt: string): number {
   if (/רבע/.test(s) || /\bquarter\b/i.test(s)) return 1 / 4;
   if (/שליש/.test(s) || /\bthird\b/i.test(s)) return 1 / 3;
   if (/חצי|מחצית/.test(s) || /\bhalf\b/i.test(s)) return 1 / 2;
-  const pi = s.match(new RegExp(String.raw`(?:פי|times)\s*(${COEF})`, 'i')); // "גדול פי 2 מ" / "2 times"
-  if (pi) return parseFloat(pi[1]);
-  const eq = s.match(new RegExp(String.raw`(?:=|הוא|\bis\b)\s*${RATVAL}`, 'i')); // "= 3/4" / "הוא 1.8"
-  if (eq) return ratvalAt(eq, 1);
+  // "גדול פי 2 מ" / "2 times" / "פי √(3)" and "= 3/4" / "הוא 1.8" — the shared NUMEXPR atom (ADR-298) so a
+  // radical factor / the √() toolbar form parses here too (issue #114, the segment-ratio sibling).
+  const pi = s.match(new RegExp(String.raw`(?:פי|times)\s*${NUMEXPR('pi')}`, 'i'));
+  if (pi) { const v = numexprVal(pi.groups!, 'pi'); if (v) return v.value; }
+  const eq = s.match(new RegExp(String.raw`(?:=|הוא|\bis\b)\s*${NUMEXPR('eq')}`, 'i'));
+  if (eq) { const v = numexprVal(eq.groups!, 'eq'); if (v) return v.value; }
   const coef = s.match(new RegExp(String.raw`=\s*(${COEF})\s*(?:${kwAlt})`, 'i')); // "= 2 SDEF" / "= 2 area DEF"
   if (coef) return parseFloat(coef[1]);
   return 1; // equal measures
