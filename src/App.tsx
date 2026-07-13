@@ -1184,9 +1184,12 @@ export default function App() {
             </div>
             {/* Live math preview (#77 Am. / #40): render the current input's fractions/radicals/subscripts as
                 real formatted math, so the interpretation is visible while typing — `√(2/3)` shows a radical
-                OVER the fraction, `√2/3` shows `(√2)/3`, disambiguating what the parser will do. */}
+                OVER the fraction, `√2/3` shows `(√2)/3`, disambiguating what the parser will do. The container
+                follows the INPUT's direction (#118 / ADR-312): forcing `dir="ltr"` reversed a Hebrew sentence
+                that merely contained a radical («אורך AC גדול פי √(3) מהקטע CO» → scrambled). A pure math value
+                (`35/√32`) is LTR; a Hebrew sentence is RTL with the MathML atoms as LTR islands in place. */}
             {hasMath(text) && (
-              <div dir="ltr" style={{ marginTop: 4, padding: '4px 8px', fontSize: 18, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, overflowX: 'auto' }}>
+              <div dir={textDir(text)} style={{ marginTop: 4, padding: '4px 8px', fontSize: 18, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, overflowX: 'auto' }}>
                 <MathText text={text} />
               </div>
             )}
