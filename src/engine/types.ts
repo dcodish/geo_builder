@@ -487,6 +487,11 @@ export interface Circle {
    *  ([ADR-244](../../docs/06-decisions.md#adr-244)): set by `set-radius-order`, read by the parser
    *  context so qualifier references ("המעגל הפנימי" / "the inner circle") resolve to this circle. */
   innerOf?: Id;
+  /** This circle's radius is ordered STRICTLY BELOW the referenced circle's (`set-radius-order`,
+   *  concentric or not — issue #102). Unlike {@link innerOf} (concentric-pair semantics: qualifier
+   *  redirects, shared centre), this is the pure SIZE role — read back by the parser context so
+   *  «המעגל הגדול/הקטן» between two independent circles resolves consistently once assigned. */
+  orderedBelow?: Id;
   /** The letter the student named this circle's radius with — "מעגל שרדיוסו R" / "רדיוס מעגל P הוא r"
    *  (issue #54; the ADR-034 reserved-R auto-bind generalized to per-circle named symbols, bagrut
    *  convention R vs r). Set by `radius-symbol`; read by the parser context (so "R = 1.5r" / "R > r"

@@ -1105,3 +1105,7 @@ over all four (ADR-041).
 ### `bagrut-2025-two-circles-full-figure` — the FULL 2025 bagrut two-circle question (#54, #99, #100)
 
 **Guards against:** the three gaps that made the question unbuildable in prod (operator report 2026-07-12): no way to name a radius with a letter or relate two radii (#54 — «רדיוס מעגל O הוא R», «R > r», «R = 1.5r»), no region disambiguator (#99 — «הנקודה E נמצאת על מעגל O בתוך המשולש KAO»), and the two-clause tangent form (#100). **Asserts:** all 11 exam utterances parse deterministically and the built figure matches the printed one — R/r ratio exactly 1.5, R>r, O and A on their circles, OA ⟂ AK with K on the big circle, E on the small circle strictly inside △KAO, and M (המשך AE ∩ OK) strictly within segment OK. Unit coverage: `radius-symbols.test.ts` (14), `region-side.test.ts` (10), `issue-100.test.ts` (9, on main).
+
+### `bagrut-2025-verbatim-unnamed-circles` — the 2025 bagrut in its PUBLISHED wording (#102, ADR-305)
+
+**Guards against:** the exam's unnamed-circle references «המעגל הגדול/הקטן» dead-ending (only concentric pairs resolved size qualifiers). **Asserts:** all 10 verbatim utterances parse deterministically — the first qualifier use assigns the roles from the drawn sizes AND appends the locking `set-radius-order` (the operator's "translate it to a R>r like constraint" ruling) — and the built figure matches the print: R/r = 1.5 exactly, R>r, O and A on their circles, OA ⟂ AK with K on the big circle, E on the small circle inside △KAO, M within OK. Unit coverage: `size-qualifier.test.ts` (8).

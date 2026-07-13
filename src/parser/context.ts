@@ -42,5 +42,24 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     radiusSymbols: construction.objects.flatMap((o) =>
       o.kind === 'circle' && o.radiusSymbol ? [{ name: o.radiusSymbol, circle: o.id, center: o.center }] : [],
     ), // "R = 1.5r" / "R > r" resolve each letter to its circle (issue #54)
+    radiusOrder: construction.objects.flatMap((o) =>
+      o.kind === 'circle' && o.orderedBelow ? [{ outer: o.orderedBelow, inner: o.id }] : [],
+    ), // recorded size roles — «המעגל הגדול/הקטן» resolves consistently once assigned (issue #102)
+    circleSizes: construction.objects.flatMap((o) => {
+      if (o.kind !== 'circle') return [];
+      // the circle's CURRENT drawn size (seed base for a free radius; |centre·through| when derivable) —
+      // the M4 soft default a first «המעגל הגדול» assignment reads (what the student is looking at)
+      const r =
+        o.radius.via === 'free' || o.radius.via === 'length'
+          ? o.radius.value
+          : o.radius.via === 'through'
+            ? (() => {
+                const c = positions.get(o.center);
+                const t = positions.get(o.radius.point);
+                return c && t ? Math.hypot(t.x - c.x, t.y - c.y) : null;
+              })()
+            : null;
+      return r !== null && r !== undefined ? [{ id: o.id, center: o.center, r }] : [];
+    }),
   };
 }

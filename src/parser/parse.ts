@@ -78,6 +78,12 @@ export interface ParseContext {
    *  to its circle here. Keyed by the letter, CASE-SENSITIVE (bagrut convention: R vs r are different
    *  radii). */
   radiusSymbols?: { name: string; circle: string; center: string }[];
+  /** Recorded SIZE roles between circles (`set-radius-order`, concentric or not — issue #102): lets
+   *  «המעגל הגדול/הקטן» resolve consistently once assigned. */
+  radiusOrder?: { outer: string; inner: string }[];
+  /** Each circle's CURRENT drawn size — the M4 soft default a first «המעגל הגדול» assignment reads
+   *  (what the student is looking at); the emitted `set-radius-order` then locks the roles. */
+  circleSizes?: { id: string; center: string; r: number }[];
 }
 
 /** The centre of a circle that contains EVERY point in `pts` (preferring `prefer` if it qualifies), else null. */
@@ -2331,7 +2337,12 @@ const circle: Rule = (s, ctx) => {
   // so a later "AB = √2R" couples to the free-radius DOF via the radius-circle machinery (ADR-071)
   // instead of freezing it to the default. Only a NUMERIC radius ("radius 5") is fixed.
   const freeRadius = !r.numeric;
-  return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius, ...(freeRadius ? { freeRadius: true } : {}), ...(auto ? { autoCenter: true } : {}) }];
+  // A size ADJECTIVE at creation («מעגל קטן…» / "a small circle") shapes the STARTING radius only —
+  // small draws smaller (the twoCirclesMeet 0.72 seed split), so the default view matches the words and
+  // a later definite «המעגל הקטן» assignment (issue #102) reads the intended circle. Sizes stay free
+  // DOFs (ADR-052); a numeric radius wins.
+  const adj = !r.numeric ? (/מעגל\s+קטן|\bsmall(?:er)?\s+circle/i.test(s) ? 0.72 : 1) : 1;
+  return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius * adj, ...(freeRadius ? { freeRadius: true } : {}), ...(auto ? { autoCenter: true } : {}) }];
 };
 
 /**
@@ -5843,6 +5854,57 @@ const normalizeInscriptionSlip = (s: string): string =>
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
   const s = normalizeUtterance(raw);
   if (!s) return { ok: false, reason: 'not-handled' };
+  // «המעגל הגדול/הקטן» between two INDEPENDENT circles (issue #102, operator ruling): the size
+  // qualifier both REFERS and ASSERTS — resolve the reference to a concrete circle (recorded roles
+  // first, else assign by the drawn sizes) and, on a first ASSIGNING use, append the R>r-like
+  // `set-radius-order` requirement so sampling can never swap which circle is the big one. A
+  // ctx-aware REWRITE at the one parse boundary (the ADR-119/244 chokepoint), so every
+  // circle-consuming rule gains the reference at once. Concentric pairs keep their ADR-244 path.
+  const q = resolveSizeQualifier(s, ctx);
+  if (q) {
+    const r = parseResolved(q.s, ctx);
+    if (r.ok && q.assert) return { ok: true, commands: [...r.commands, { type: 'set-radius-order', outer: q.assert.outer, inner: q.assert.inner }] };
+    return r;
+  }
+  return parseResolved(s, ctx);
+}
+
+/** The size-qualifier resolution (issue #102): rewrite each «[ל/ב/…]המעגל הגדול/הקטן» / "the big/small
+ *  circle" to the concrete `מעגל <centre>` it denotes. Roles come from a recorded `set-radius-order`
+ *  (consistent forever after); an unrecorded first use ASSIGNS them from the currently-drawn sizes (the
+ *  M4 soft default — what the student is looking at) and returns `assert` so the caller appends the
+ *  locking `set-radius-order`. Exactly TWO visible circles (a concentric pair keeps ADR-244; 0/1/3+ —
+ *  existing behavior / escalate). The INDEFINITE creation adjective («מעגל גדול שרדיוסו R» — no ה on
+ *  the adjective) is deliberately not matched: that is a creation, whose adjective shapes the seed. */
+function resolveSizeQualifier(s: string, ctx: ParseContext): { s: string; assert?: { outer: Id; inner: Id } } | null {
+  if ((ctx.concentric ?? []).length > 0) return null; // ADR-244 owns concentric qualifiers
+  const HE = String.raw`([לבמשו]?)(ה?)מעגל\s+ה(גדול|קטן)`;
+  const EN = String.raw`\bthe\s+(big(?:ger|gest)?|larg(?:er|est)?|small(?:er|est)?|little)\s+circle\b`;
+  if (!new RegExp(HE).test(s) && !new RegExp(EN, 'i').test(s)) return null;
+  const sizes = ctx.circleSizes ?? [];
+  if (sizes.length !== 2) return null;
+  const rec = (ctx.radiusOrder ?? []).find((o) => sizes.some((x) => x.id === o.outer) && sizes.some((x) => x.id === o.inner));
+  let outerId: string, innerId: string;
+  let assert: { outer: Id; inner: Id } | undefined;
+  if (rec) {
+    outerId = rec.outer;
+    innerId = rec.inner;
+  } else {
+    const [a, b] = sizes;
+    const big = a.r >= b.r ? a : b;
+    const small = big === a ? b : a;
+    outerId = big.id;
+    innerId = small.id;
+    assert = { outer: big.id, inner: small.id };
+  }
+  const centreOf = (id: string) => sizes.find((x) => x.id === id)!.center;
+  let out = s.replace(new RegExp(HE, 'g'), (_m, pre: string, _ha: string, adj: string) => `${pre}מעגל ${centreOf(adj === 'גדול' ? outerId : innerId)}`);
+  out = out.replace(new RegExp(EN, 'gi'), (_m, adj: string) => `circle ${centreOf(/^(small|little)/i.test(adj) ? innerId : outerId)}`);
+  return { s: out, ...(assert ? { assert } : {}) };
+}
+
+/** The parse body AFTER normalization + size-qualifier resolution (the pre-#102 `parse`). */
+function parseResolved(s: string, ctx: ParseContext): ParseResult {
   const whole = runRules(s, ctx);
   // ADR-264 Am. 1: a winning parse (or a rule's clarification) that leaves a stated shape NOUN
   // unmaterialized means a LAX relation rule claimed its clause out of a compound and silently dropped
