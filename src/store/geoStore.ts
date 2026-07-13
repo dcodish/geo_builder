@@ -1992,10 +1992,16 @@ export const useGeoStore = create<GeoState>()(
       setRadius: (circle, value) => {
         const { facts, seed, radiusOverrides } = get();
         const candidate = { ...radiusOverrides, [circle]: value };
-        // A playable DOF must not be draggable into an IMPOSSIBLE figure (operator requirement): only
-        // accept a value that still builds (replay has no error). Rejected values leave the override
-        // unchanged, so the slider effectively STOPS at the boundary of the constructible range.
-        if (replay(facts, seed, candidate).lastError === null) set({ radiusOverrides: candidate });
+        // A playable DOF must not be draggable into an IMPOSSIBLE figure (operator requirement): accept a
+        // value only if the figure still BUILDS (no error) AND still honours its stated RADIUS RELATIONS —
+        // a `set-radius-order` (R>r) / `set-radius-ratio` given is a REQUIREMENT the verifier flags but that
+        // leaves `lastError` null, so an order-only check let the slider drag the small circle past the big
+        // one (operator report 2026-07-13). Reject a candidate that introduces a radius-order/ratio
+        // violation, so the slider STOPS at the R>r boundary. Other (pre-existing) violations don't freeze
+        // the slider — only radius-relation ones, which dialing this radius directly controls.
+        const fig = replay(facts, seed, candidate);
+        const radiusViolated = fig.violations.some((v) => v.relation === 'radius-order' || v.relation === 'radius-ratio');
+        if (fig.lastError === null && !radiusViolated) set({ radiusOverrides: candidate });
       },
 
       setShowMeasures: (show) => set({ showMeasures: show }),

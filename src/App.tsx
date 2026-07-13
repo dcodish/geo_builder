@@ -1600,7 +1600,11 @@ export default function App() {
                   <button
                     key={`sim-${i}`}
                     type="button"
-                    style={active ? shapeBadgeOn : shapeBadge}
+                    // LTR math notation ("△MOA ~ △OEA"): force LTR so the leading △ glyph and the ~/≅
+                    // separators don't reorder under the RTL document (the #26/#89 garble). `unicodeBidi:
+                    // isolate` keeps this run from disturbing surrounding RTL.
+                    dir="ltr"
+                    style={{ ...(active ? shapeBadgeOn : shapeBadge), unicodeBidi: 'isolate' }}
                     onMouseEnter={() => setHoverSimilar(cls)}
                     onMouseLeave={() => setHoverSimilar(null)}
                     onClick={() => setOpenSimilar(active ? null : cls)}
@@ -1632,7 +1636,7 @@ export default function App() {
                 const label = sym ? `${base} (${sym})` : base;
                 return (
                   <div key={d.circle} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, minWidth: 96 }}>{label}</span>
+                    <span style={{ fontSize: 12, minWidth: 96 }} dir={textDir(label)}>{label}</span>
                     <input
                       type="range"
                       min={Math.max(0.2, d.base * 0.3)}

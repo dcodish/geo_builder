@@ -4,7 +4,7 @@
  * (resample) clears the scratchpad. See ADR-048 (a dialed value is a viewing aid, not a fixed given).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { parse } from '@/parser';
+import { parse, buildParseCtx } from '@/parser';
 import { replay, useGeoStore } from '@/store/geoStore';
 import { circleMembers, isGeoPoint, freeDofCount } from '@/engine';
 
@@ -145,6 +145,45 @@ describe('radius DOF sliders', () => {
     });
     it('a square is rigid up to similarity → 0 (unaffected by the fix)', () => {
       expect(dof('ריבוע ABCD')).toBe(0);
+    });
+  });
+
+  // Issue #113 (2026-07-13): the radius slider must respect a stated RADIUS ORDER (R>r) — dialing a
+  // radius past the order boundary is an IMPOSSIBLE figure (a verifier violation, not a hard error), so
+  // `setRadius` must reject it and the slider STOPS there, instead of letting the small circle grow bigger
+  // than the big one.
+  describe('the slider respects a stated radius order (R>r)', () => {
+    const ctxFull = (u: string) => {
+      const { construction, positions } = replay(s().facts);
+      const r = parse(u, buildParseCtx(construction, positions));
+      if (!r.ok) throw new Error(`parse failed: ${u} (${r.reason})`);
+      for (const cmd of r.commands) s().execute(cmd, u, `g-${u}`);
+    };
+    beforeEach(() => s().clear());
+
+    it('rejects dialing the SMALL circle above the big one, accepts a valid smaller value', () => {
+      for (const u of ['מעגל O שרדיוסו R', 'מעגל P שרדיוסו r', 'R > r']) ctxFull(u);
+      const dofs = replay(s().facts, s().seed, s().radiusOverrides).radiusDofs;
+      // circle-O carries R (outer), circle-P carries r (inner)
+      const small = dofs.find((d) => d.circle === 'circle-P')!;
+      const bigR = replay(s().facts, s().seed, s().radiusOverrides).circles.get('circle-O')!.r;
+
+      // drag the small radius WAY above the big one — must be REJECTED (override unchanged)
+      s().setRadius(small.circle, bigR + 5);
+      expect(s().radiusOverrides['circle-P'], 'order-violating value rejected').toBeUndefined();
+
+      // drag it to a valid small value — accepted, and no radius-order violation
+      s().setRadius(small.circle, Math.max(0.5, bigR - 2));
+      expect(s().radiusOverrides['circle-P'], 'valid value applied').toBeCloseTo(Math.max(0.5, bigR - 2), 3);
+      const fig = replay(s().facts, s().seed, s().radiusOverrides);
+      expect(fig.violations.some((v) => v.relation === 'radius-order')).toBe(false);
+    });
+
+    it('rejects dialing the BIG circle below the small one', () => {
+      for (const u of ['מעגל O שרדיוסו R', 'מעגל P שרדיוסו r', 'R > r']) ctxFull(u);
+      const smallR = replay(s().facts, s().seed, s().radiusOverrides).circles.get('circle-P')!.r;
+      s().setRadius('circle-O', Math.max(0.3, smallR - 1)); // big below small → reject
+      expect(s().radiusOverrides['circle-O']).toBeUndefined();
     });
   });
 });
