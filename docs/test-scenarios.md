@@ -1109,3 +1109,7 @@ over all four (ADR-041).
 ### `bagrut-2025-verbatim-unnamed-circles` — the 2025 bagrut in its PUBLISHED wording (#102, ADR-305)
 
 **Guards against:** the exam's unnamed-circle references «המעגל הגדול/הקטן» dead-ending (only concentric pairs resolved size qualifiers). **Asserts:** all 10 verbatim utterances parse deterministically — the first qualifier use assigns the roles from the drawn sizes AND appends the locking `set-radius-order` (the operator's "translate it to a R>r like constraint" ruling) — and the built figure matches the print: R/r = 1.5 exactly, R>r, O and A on their circles, OA ⟂ AK with K on the big circle, E on the small circle inside △KAO, M within OK. Unit coverage: `size-qualifier.test.ts` (8).
+
+### `intersection-of-the-circles-binds-existing` — «נקודת החיתוך של המעגלים» binds the two drawn circles (#111, ADR-307)
+
+**Guards against:** a definite plural circle reference inventing a third circle (the single-"the circle" implicit-reference existed; the two-circle plural didn't). **Asserts:** with circle O and circle P drawn, «A היא נקודת החיתוך של המעגלים» yields EXACTLY those two circles with A on both — no circle-Q. Unit coverage: `definite-two-circles.test.ts` (7).

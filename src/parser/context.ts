@@ -23,6 +23,9 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     // an unnamed chord still resolves to it, and the concentric post-pass (qualifier / membership /
     // clarify) decides WHICH of the pair. Two distinct centres stay two entries, as before.
     circles: [...new Set(construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [o.center] : [])))],
+    // Centre letters that were AUTO-assigned (unnamed circle → hidden centre): «מרכז המעגל הוא P» renames
+    // one of these to the student's letter instead of minting a second circle (issue #112).
+    autoCenters: construction.objects.flatMap((o) => (o.kind === 'circle' && o.autoCenter && !o.center.startsWith('~') ? [o.center] : [])),
     // Concentric pairs (ADR-244): the bound roles, read off the inner circle's `innerOf` marker.
     concentric: construction.objects.flatMap((o) =>
       o.kind === 'circle' && o.innerOf ? [{ center: o.center, outer: o.innerOf, inner: o.id }] : [],

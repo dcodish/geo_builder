@@ -4599,6 +4599,22 @@ export const SCENARIOS: Scenario[] = [
       expect(tOK > 0.02 && tOK < 0.98, 'M within segment OK').toBe(true);
     },
   },
+  {
+    id: 'intersection-of-the-circles-binds-existing',
+    title: 'a definite plural «נקודת החיתוך של המעגלים» binds the two existing circles, no third invented (#111)',
+    guards:
+      'Operator report 2026-07-13: with circle O and circle P drawn, «A נקודות חיתוך בין המעגלים» invented a third circle-Q and intersected O with it, ignoring P. `definiteTwoCircles` (ADR-307) binds the two existing circles when the reference is a definite plural with no letters. This replays the operator sequence and asserts the figure has EXACTLY the two circles it drew, with A on both.',
+    steps: ['מעגל O', 'מעגל P', 'A היא נקודת החיתוך של המעגלים'],
+    check(fig) {
+      allStepsOk(fig);
+      const circleIds = fig.construction.objects.filter((o) => o.kind === 'circle').map((o) => o.id).sort();
+      expect(circleIds, 'exactly the two drawn circles — no third invented').toEqual(['circle-O', 'circle-P']);
+      // A lies on both circles (equidistant from each centre at its radius)
+      const A = at(fig, 'A'), O = at(fig, 'O'), P = at(fig, 'P');
+      expect(dist(A, O)).toBeCloseTo(fig.circles.get('circle-O')!.r, 3);
+      expect(dist(A, P)).toBeCloseTo(fig.circles.get('circle-P')!.r, 3);
+    },
+  },
 ];
 
 /**

@@ -73,6 +73,9 @@ export interface ParseContext {
    *  ("במרובע חסום מעגל" typed after מרובע ABCD exists) bind to THE existing polygon instead of minting
    *  a fresh auto-named one (the ADR-029 implicit-reference pattern, polygon edition). */
   polygons?: string[][];
+  /** Centre letters that were AUTO-assigned to an unnamed circle (hidden until named) — «מרכז המעגל
+   *  הוא P» renames one of these to P and reveals it, instead of creating a second circle (issue #112). */
+  autoCenters?: string[];
   /** Radius symbols already bound in the figure (issue #54) — "מעגל שרדיוסו R" / "רדיוס מעגל P הוא r"
    *  stamp the letter on the circle; relations between the letters ("R = 1.5r", "R > r") resolve each
    *  to its circle here. Keyed by the letter, CASE-SENSITIVE (bagrut convention: R vs r are different
@@ -3702,9 +3705,35 @@ const parallelCircleIntersection: Rule = (s, ctx) => {
  * The single-point `circleCircleIntersection` below needs the two circles to already exist and yields
  * one point; this is the "draw two intersecting circles" opener.
  */
+/**
+ * The two EXISTING circles a DEFINITE-PLURAL reference names — «(שני) המעגלים» / «the (two) circles» with
+ * NO circle letters — when the figure holds exactly TWO circles (issue #111, the ADR-029 implicit-reference
+ * pattern, plural edition). Returns their ids, or null (named, or ≠2 circles). Lets «A נקודת החיתוך של
+ * המעגלים» / «חיתוך בין המעגלים» bind the two circles already drawn instead of inventing a third.
+ */
+const definiteTwoCircles = (s: string, ctx: ParseContext): [Id, Id] | null => {
+  const circs = (ctx.circles ?? []).filter((c) => !c.startsWith('~'));
+  if (circs.length !== 2) return null;
+  if (/(?:circle|מעגל)\s+[A-Za-z]\d*/i.test(s)) return null; // a NAMED circle → circleCircleIntersection owns it
+  if (!/ה?מעגלים|\bcircles\b/i.test(s)) return null; // must be the definite plural «המעגלים» / «the circles»
+  return [circleId(circs[0]), circleId(circs[1])];
+};
+
 const twoCirclesMeet: Rule = (s, ctx) => {
   if (!/\bcircles\b|שני\s+מעגל|מעגלים/i.test(s)) return null; // two circles being introduced (plural)
   if (!(INTERSECT_KW.test(s) || /נחתכ|נפגש|מפגש|\bmeets?\b/i.test(s))) return null;
+  // A definite reference to the TWO circles ALREADY in the figure — «A חיתוך בין המעגלים» / «A נקודת
+  // החיתוך של המעגלים» — binds THOSE circles (issue #111), never invents new ones. Emit only the
+  // crossing point(s) the student named: one → branch 0; two → the other crossing (avoid the first).
+  const existing = definiteTwoCircles(s, ctx);
+  if (existing) {
+    const [id1, id2] = existing;
+    const labels = [...new Set((dropCircleRef(s).match(/\b[A-Z]\d*\b/g) ?? []).map(up))];
+    if (labels.length === 0) return null; // no crossing named — leave to another rule / escalate
+    const out: AnyCommand[] = [{ type: 'circle-circle-intersection', id: labels[0], circle1: id1, circle2: id2, branch: 0 }];
+    if (labels[1]) out.push({ type: 'circle-circle-intersection', id: labels[1], circle1: id1, circle2: id2, branch: 1, avoid: labels[0] });
+    return out;
+  }
   const named = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
   const c1 = named[0] ?? 'O';
   const c2 = named[1] ?? freeLabel([c1, ...(ctx.points ?? [])], ['P', 'Q', 'K', 'S']);
@@ -6361,6 +6390,45 @@ export function droppedGivenRelations(utterance: string, commands: AnyCommand[])
  * Returns the uppercased point letters, or null when the utterance isn't a rename.
  * Connectors are optional and varied: to/as/into/with/with-arrow, ל-/ב-/עם.
  */
+/**
+ * NAME an auto-assigned circle centre after the fact (issue #112): a student drew an unnamed circle (the
+ * system hid an auto-picked centre O) and now says «מרכז המעגל הוא P» / "the centre of the circle is P" /
+ * "P is the centre of the circle" to name it P. This is a store-level RENAME of the hidden centre O→P
+ * (rewrite it across every fact) PLUS a REVEAL — NOT a second circle. The App intercepts it before the
+ * parser (like {@link parseRename}). Fires only when the naming letter is FRESH and exactly ONE circle in
+ * the figure has an auto-named centre (the one they just drew); the reveal-with-the-same-existing-letter
+ * case stays with the `nameCenter` parser rule (`name-center`), and a circle whose centre is already
+ * NAMED is left to a plain rename. A rename of a NAMED centre to a fresh letter is also accepted (the
+ * student re-letters the centre) — its source is the sole named centre.
+ */
+export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { from: Id; to: Id } | null {
+  const s = normalizeUtterance(raw); // orthography boundary (PAR-7) — runs before parse()
+  if (!/cent(?:er|re)|מרכז/i.test(s) || !mentionsCircle(s)) return null;
+  // Not a creation / other construct carrying a centre word (a circle WITH a radius/through/inscribe/on…).
+  if (/inscrib\w*|חסום|חוסם|through|העובר|דרך|radius|רדיוס|\bon\b|על(?=\s|$)|משיק|tangent/i.test(s)) return null;
+  const x = circleCenter(s);
+  if (!x) return null;
+  const X = up(x);
+  if ((ctx.points ?? []).map(up).includes(X)) return null; // the naming letter must be FRESH (a taken letter would merge)
+  // Just "the centre [of the circle] is X" — nothing geometric remains after the centre/circle words,
+  // the label, copulas, and filler (the nameCenter-rule leftover check).
+  const leftover = s
+    .replace(/cent(?:er|re)|ה?מרכז/gi, ' ')
+    .replace(/circles?|ה?מעגל\w*/gi, ' ')
+    .replace(new RegExp(String.raw`\b${X}\b`, 'gi'), ' ')
+    .replace(/\bpoint\b|הוא|היא|הינו|ה?נקוד[הת]|של/gi, ' ')
+    .replace(FILLER, ' ')
+    .trim();
+  if (leftover) return null;
+  const autos = (ctx.autoCenters ?? []).map(up);
+  const named = (ctx.circles ?? []).map(up).filter((c) => !autos.includes(c));
+  // The centre to rename: the sole AUTO-named centre (the reported case), else — if none is auto — the sole
+  // already-NAMED centre being re-lettered. Ambiguous (0 or ≥2 candidates) → defer to the parser.
+  const from = autos.length === 1 ? autos[0] : autos.length === 0 && named.length === 1 ? named[0] : null;
+  if (!from || from === X) return null;
+  return { from, to: X };
+}
+
 export function parseRename(raw: string): { from: Id; to: Id } | null {
   // Same orthography boundary as parse() (PAR-7): a pasted maqaf ("שנה שם E ל־G") or an invisible bidi
   // control must not break the ל-?/ב-? connector groups — these entry points run BEFORE parse(), so they

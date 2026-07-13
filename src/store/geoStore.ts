@@ -1637,6 +1637,10 @@ export interface GeoState {
   toggleCircleHidden: (id: Id) => void;
   /** Relabel a point everywhere (e.g. E → G) — rewrites every fact, one undo entry. */
   rename: (from: Id, to: Id) => RenameResult;
+  /** NAME an auto-assigned circle centre (issue #112): rename the hidden centre `from`→`to` across every
+   *  fact AND reveal it (a named centre always shows, FR-RN-8). One undo entry — «מרכז המעגל הוא P» on a
+   *  circle the student drew unnamed, instead of a second circle. */
+  nameCentre: (from: Id, to: Id) => RenameResult;
   /** PROMOTE an anonymous constructed point (`@`-prefixed, #32 / [ADR-297](docs/06-decisions.md#adr-297) —
    *  a decomposition touch/tangency point the student didn't name, shown as a clickable dot) to a real
    *  named point: assign the next free capital letter and rewrite the `@`-id → that letter everywhere. One
@@ -2032,6 +2036,43 @@ export const useGeoStore = create<GeoState>()(
           hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)), // a hidden circle tracks its renamed centre
           // a dialed radius (keyed `circle-X`) tracks its renamed centre too — else the override orphans
           // and the circle silently snaps back to its seed radius (review 2026-07-03, S2)
+          radiusOverrides: Object.fromEntries(Object.entries(get().radiusOverrides).map(([k, v]) => [relabelId(k, F, T), v])),
+          selectedId: null,
+        });
+        return { ok: true };
+      },
+
+      /**
+       * NAME an auto-assigned circle centre (issue #112) — the student drew an unnamed circle (hidden
+       * auto-centre `from`) and now names it `to`. Mechanically a rename (`from`→`to` across every fact,
+       * via the same `renameInCommand` id-remap — which rewrites `circle-O`→`circle-P` and `center:O`→P)
+       * PLUS a REVEAL: the just-named centre's circle drops its `autoCenter` flag so the point shows
+       * (FR-RN-8). One `set` → one undo entry. Never mints a second circle.
+       */
+      nameCentre: (from, to) => {
+        const F = from.toUpperCase();
+        const T = to.toUpperCase();
+        if (F === T) return { ok: false, reason: 'same' };
+        const facts = get().facts;
+        const all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
+        if (!all.has(F)) return { ok: false, reason: 'no-source' };
+        if (all.has(T)) return { ok: false, reason: 'target-taken' };
+        set({
+          facts: facts.map((f) => {
+            const cmd = renameInCommand(f.cmd, F, T);
+            // reveal the renamed circle's centre: the `circle` command whose centre is now T drops autoCenter
+            const revealed =
+              cmd.type === 'circle' && (cmd as { center?: string }).center === T && (cmd as { autoCenter?: boolean }).autoCenter
+                ? (() => {
+                    const { autoCenter: _drop, ...rest } = cmd as Record<string, unknown>;
+                    return rest as AnyCommand;
+                  })()
+                : cmd;
+            return { ...f, cmd: revealed, utterance: relabelUtterance(f.utterance, F, T) };
+          }),
+          hidden: get().hidden.map((h) => (h === F ? T : h)),
+          segStyle: renameSegStyle(get().segStyle, F, T),
+          hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)),
           radiusOverrides: Object.fromEntries(Object.entries(get().radiusOverrides).map(([k, v]) => [relabelId(k, F, T), v])),
           selectedId: null,
         });

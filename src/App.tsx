@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs, droppedRadiusSymbol, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, parseNameCenter, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs, droppedRadiusSymbol, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -74,6 +74,7 @@ export default function App() {
   const showCenters = useGeoStore((s) => s.showCenters);
   const setShowCenters = useGeoStore((s) => s.setShowCenters);
   const rename = useGeoStore((s) => s.rename);
+  const nameCentre = useGeoStore((s) => s.nameCentre);
   const swap = useGeoStore((s) => s.swap);
   const merge = useGeoStore((s) => s.merge);
   const hidden = useGeoStore((s) => s.hidden);
@@ -457,6 +458,18 @@ export default function App() {
       logDebug({ kind: 'input', utterance, locale, source: 'swap', rename: { from: swp.a, to: swp.b }, result: res.ok ? 'ok' : res.reason });
       if (res.ok) setText('');
       else setRenameNote(t(`input.swap_${res.reason}`, { from: swp.a, to: swp.b }));
+      return;
+    }
+    // NAME an auto-assigned circle centre ("מרכז המעגל הוא P" / "the centre of the circle is P") — the
+    // student drew an unnamed circle (hidden auto-centre) and now names it. A store-level RENAME of the
+    // hidden centre + a reveal, NOT a second circle (issue #112). Before the parser (whose `circle` rule
+    // would otherwise mint circle-P) and before rename (parseNameCenter resolves the hidden source letter).
+    const nc = parseNameCenter(utterance, parseCtx());
+    if (nc) {
+      const res = nameCentre(nc.from, nc.to);
+      logDebug({ kind: 'input', utterance, locale, source: 'name-center', rename: nc, result: res.ok ? 'ok' : res.reason });
+      if (res.ok) setText('');
+      else setRenameNote(t(`input.rename_${res.reason}`, { from: nc.from, to: nc.to }));
       return;
     }
     // A relabel ("rename E to G" / "שנה שם E ל-G") is a store operation, not a
