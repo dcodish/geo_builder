@@ -200,6 +200,27 @@ export function namedFigureFileName(name: string | null | undefined, now: Date):
 }
 
 /**
+ * Decide the save name for a figure that ALREADY has a name (issue #121): ask overwrite-vs-copy instead
+ * of silently re-saving under the same name. Pure + lazily evaluated (the copy prompt fires ONLY when the
+ * user declines to overwrite), so the caller supplies the two dialogs as thunks and this stays testable:
+ *   - overwrite → keep the current name (`adopt: false` — the on-screen name is unchanged);
+ *   - save a copy → the typed name (`adopt: true` — the caller updates the figure's name to it);
+ *   - a blank/cancelled copy prompt → `null` (abort the save).
+ * An UNNAMED figure returns `null` too — the caller runs its own "name this figure" prompt for that case.
+ */
+export function chooseSaveName(
+  currentName: string,
+  confirmOverwrite: () => boolean,
+  promptCopyName: () => string | null,
+): { name: string; adopt: boolean } | null {
+  const name = currentName.trim();
+  if (!name) return null; // unnamed — the caller prompts for a first name
+  if (confirmOverwrite()) return { name, adopt: false };
+  const copy = (promptCopyName() ?? '').trim();
+  return copy ? { name: copy, adopt: true } : null; // blank/cancelled copy → abort
+}
+
+/**
  * The inverse of {@link namedFigureFileName} (issue #42): a loaded file's NAME gives the figure its
  * on-screen name — drop the `.json`/`.geo` extensions and the per-product `-geo` save suffix.
  * "2026summer-geo.json" → "2026summer". The FILENAME wins on load (operator ruling — any `name`
