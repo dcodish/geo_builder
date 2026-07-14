@@ -356,6 +356,24 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     }
   }
 
+  // #94 — named-angle MARKERS (`∠SDB` / `∠SDB = α`): the measure, printed ONLY when it agrees across every
+  // sampled seed (a determined angle — the same knowledge gate as |u|=|v| and forced plane equations). An
+  // under-determined marker draws its arc but shows no value. Labelled `α = 35.26°` when named, else `∠SDB`.
+  for (const mk of c.angleMarks) {
+    const degs = positions.map((pos) => {
+      const v = pos.get(mk.vertex), p = pos.get(mk.p), q = pos.get(mk.q);
+      if (!v || !p || !q) return null;
+      const u1 = sub3(p, v), u2 = sub3(q, v);
+      const n1 = Math.sqrt(dot3(u1, u1)), n2 = Math.sqrt(dot3(u2, u2));
+      if (n1 < EPS || n2 < EPS) return null;
+      return (Math.acos(Math.max(-1, Math.min(1, dot3(u1, u2) / (n1 * n2)))) * 180) / Math.PI;
+    });
+    if (degs.some((d) => d === null)) continue;
+    const [g0, g1, g2] = degs as number[];
+    if (Math.abs(g0 - g1) > 0.05 || Math.abs(g0 - g2) > 0.05) continue; // seed-varying → not knowledge, no value
+    relations.push(`${mk.label ?? `∠${mk.p}${mk.vertex}${mk.q}`} = ${cleanNum(g0)}°`);
+  }
+
   // points with STABLE coordinates (needs a frame; a pinned-only figure prints nothing sampled).
   // A coordinate is KNOWLEDGE only when it is identical in EVERY sampled configuration —
   // an unstable (seed-varying) coordinate never prints at all (operator rule, 2026-07-09:

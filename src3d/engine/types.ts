@@ -196,6 +196,18 @@ export interface Segment3Command {
   b: Id;
 }
 
+/** A named-angle MARKER (#94): `∠SDB` / `∠SDB = α` — a pedagogical highlight, NOT a driver. Draws the arc
+ *  at `vertex` between rays vertex→p and vertex→q (and the two arms); consumes no DOF, verifies nothing.
+ *  `label` (a Greek/letter name from `∠SDB = α`) is drawn on the arc; the numeric measure is a seed-invariant
+ *  panel derivation (never a single-seed number on the arc — ADR-3D-030). */
+export interface AngleMark3Command {
+  type: 'angle-mark';
+  vertex: Id;
+  p: Id;
+  q: Id;
+  label?: string;
+}
+
 /** `E מפגש התיכונים של משולש BC'D` — the centroid of three existing points. */
 export interface Centroid3Command {
   type: 'centroid3';
@@ -493,6 +505,7 @@ export type Command3 =
   // הציבו k = ½ — assign the named parameter directly (replaces any prior pin on it)
   | { type: 'symbol-value'; symbol: string; value: number }
   | SolidCommand
+  | AngleMark3Command
   | PointOnSegment3Command
   | NameVectorCommand
   | Segment3Command
@@ -606,6 +619,8 @@ export interface Construction3 {
   arrows: [Id, Id][];
   /** Auxiliary drawn segments (beyond the solids' own edges). */
   segments: [Id, Id][];
+  /** #94 — named-angle MARKERS (`∠SDB` / `∠SDB = α`): pedagogical arc highlights, no DOF, no verification. */
+  angleMarks: { vertex: Id; p: Id; q: Id; label?: string }[];
   /** V2 — planes by equation, name → def (insertion-ordered). */
   planes: Map<string, PlaneDef>;
   /** V2 — named lines (plane∩plane), name → def. */
@@ -671,6 +686,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   vectors: new Map(),
   arrows: [],
   segments: [],
+  angleMarks: [],
   planes: new Map(),
   lines: new Map(),
   planeAngles: [],

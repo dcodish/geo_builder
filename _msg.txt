@@ -1,0 +1,25 @@
+feat(3d): a named angle is a highlightable MARKER, not a valueless-query refusal (#94)
+
+Root cause: on a right square pyramid the student typed `∠SDB` (x3) and `∠SDB=α`
+to SEE/NAME the angle; scope3 classified bare `∠XYZ` as a valueless-query and the
+tool did nothing. Naming an angle is a pedagogy act — it should draw the angle.
+
+Fix (ADR-3D-043): a new `angle-mark` command — a pure marker (no DOF, no driver,
+no verification). apply records it in Construction3.angleMarks (idempotent; a later
+`∠SDB=α` upgrades the label). Parser `angleMarker` lowers bare `∠XYZ` → marker and
+`∠XYZ = <letter>` → labelled marker; a NUMERIC RHS stays the driving vertexAngleClaim,
+a `?`/bare-`=` stays a scope question. scope3's valueless-query now matches only the
+genuine question forms, so `∠DEF`/`∠DEF=α` build. scene3 draws the arc with the label
+(α) but NEVER a single-seed value (ADR-3D-030 knowledge rule); dataView derives the
+measure and prints `∠SDB = 35.26°` / `α = 35.26°` only when seed-invariant (determined).
+
+Settled the issue's open questions: the marker is a real undoable fact; α is a display
+name, never a driving parameter (no conflict — `∠XYZ=α` previously just escalated).
+
+angle-marker.test.ts (routing, determined cube→value, under-determined pyramid→arc-only)
++ scenario replaying session 23mxaquw. Catalog3 +2. Full 3-D lane green (719), tsc +
+build:3d clean.
+
+Closes #94
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>

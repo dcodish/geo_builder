@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { freeDofCount3 } from '../engine/evaluate';
 import { dist3 } from '../engine/vec3';
 import { derive3, useGeo3 } from '../store/store3';
+import { dataView } from '../engine/dataView';
 
 function reset() {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
@@ -523,5 +524,25 @@ describe("#116 (ADR-3D-042) — a right-triangle qualifier on a prism base (prod
     submit('משולש DEF ישר זווית');
     expectAllOk();
     expect(angleAt('E', 'D', 'F')).toBeCloseTo(90, 0);
+  });
+});
+
+// #94 — prod session 23mxaquw (right square pyramid ABCDS): the student typed ∠SDB three times + ∠SDB=α
+// trying to SEE/NAME the angle; the tool refused it as a valueless query. Now a bare ∠XYZ is a pedagogical
+// MARKER — it draws the arc and (if determined) surfaces its measure — never a refusal.
+describe('#94 — a named angle is a highlightable marker (session 23mxaquw)', () => {
+  beforeEach(reset);
+  it('∠SDB on the right square pyramid builds the arc (repeatable, idempotent); ∠SDB=α labels it', () => {
+    submit('פירמידה ABCDS שבסיסה ריבוע');
+    submit('∠SDB');
+    submit('∠SDB'); // typed again — idempotent, still one marker
+    expect(state().lastError).toBeNull();
+    const marks = derived().construction.angleMarks;
+    expect(marks).toHaveLength(1);
+    expect(marks[0]).toMatchObject({ vertex: 'D', p: 'S', q: 'B' });
+    // under-determined (free height) → the arc shows, but no seed-varying value is printed
+    expect(dataView(derived().construction, state().seed).relations.some((r) => r.startsWith('∠SDB'))).toBe(false);
+    submit('∠SDB = α'); // naming it α upgrades the marker's label
+    expect(derived().construction.angleMarks.find((m) => m.vertex === 'D')?.label).toBe('α');
   });
 });
