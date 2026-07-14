@@ -1085,6 +1085,47 @@ const pointOnExtension: Rule = (s, ctx) => {
  * even on a standalone configuration; `segment` is idempotent, so on an existing corner where the
  * arms are already edges these are no-ops (mirrors the ∥/⟂ draw-its-segments convenience, FR-IN-7).
  */
+/**
+ * #106: a CENTRAL angle — the angle at a circle's CENTRE subtending two on-circle points (or an arc).
+ *  - "זוית מרכזית COD" / "central angle COD" — O (the MIDDLE letter) is the centre, arms OC, OD.
+ *  - "זוית מרכזית נשענת על קשת CD" / "central angle subtending arc CD" — the centre is resolved from the
+ *    circle the arc endpoints ride (ADR-029 implicit circle); arms centre-C, centre-D.
+ * A VALUE ("= 80" / "היא 80" / "is 80") makes it an angle GIVEN (`set-angle` — drives a free-DOF figure via
+ * the ADR-116 arc↔central-angle identity, checks a determined one); valueless is a highlightable stated-angle
+ * MARK (`mark-angle`, FR-RN-7 style — no value asserted). Either way the two radii are drawn, so the centre
+ * becomes a used point and shows (FR-RN-8). Runs before every generic angle rule (its `מרכזית`/`central`
+ * keyword is specific). The arc-subtended form defers when the circle can't be resolved (→ LLM), never guesses.
+ */
+const centralAngle: Rule = (s, ctx) => {
+  if (!/מרכזית|central\s+angle/i.test(s)) return null;
+  const valM = s.match(new RegExp(String.raw`(?:=|היא|הוא|is)\s*${num}\s*°?`, 'i'));
+  const value = valM ? parseFloat(valM[1]) : undefined;
+  const body = s.replace(new RegExp(String.raw`(?:=|היא|הוא|is)\s*${num}\s*°?`, 'i'), ' ');
+  let centre: string | null;
+  let a: string;
+  let b: string;
+  const arcM = body.match(/(?:קשת|arc|⌢|⏜)\s*([A-Z]\d*)\s*([A-Z]\d*)/i); // "… (על) קשת CD" / "arc CD"
+  if (arcM) {
+    a = up(arcM[1]);
+    b = up(arcM[2]);
+    centre = circleContaining(ctx, [a, b]);
+    if (!centre) return null; // can't resolve the circle → defer honestly (never guess a centre)
+  } else {
+    // three-letter form "COD": the MIDDLE letter is the centre
+    const cleaned = body.replace(/מרכזית|central|angle|∠|זוו?ית|נשענת|subtend\w*|על|the/gi, ' ');
+    const ids = labelRun(cleaned, 3);
+    if (!ids) return null;
+    [a, centre, b] = ids;
+  }
+  const arms: Command[] = [
+    { type: 'segment', a: centre, b: a },
+    { type: 'segment', a: centre, b: b },
+  ];
+  return value !== undefined
+    ? [...arms, { type: 'set-angle', vertex: centre, ray1: a, ray2: b, value }]
+    : [...arms, { type: 'mark-angle', vertex: centre, ray1: a, ray2: b }];
+};
+
 const angle: Rule = (s, ctx) => {
   if (!/(?:angle|∠|זוו?ית)/i.test(s)) return null;
   // The right-angle WORD form (#45 / ADR-299): "זוית B ישרה" / "זוית ABC ישרה" / "angle ABC is a right
@@ -5324,6 +5365,7 @@ export const RULES: Rule[] = [
   collinearConstraint,
   diameterCutsSegment, // "קוטר … מנקודה F חותך את הצלע AC בנקודה E" — before lineLineIntersection (which stops on "קוטר") and `diameter`
   lineLineIntersection,
+  centralAngle, // #106: "זוית מרכזית COD" / "…נשענת על קשת CD" — before every generic angle rule
   angleAcuteness, // "∠ABC קהה/חדה" (obtuse/acute) — before the value-based angle rules
   arcEquality, // "⌢DE = 2⌢CE" / "קשת DE = 2 קשת CE" (arc-measure ratio → central-angle ratio) — own keyword, before angleEquality
   angleEquality, // "∠ABC = ∠DEF" (two angles equal) — before measureAngle/angle, which expect a value RHS

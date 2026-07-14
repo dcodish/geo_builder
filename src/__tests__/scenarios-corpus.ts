@@ -4747,6 +4747,28 @@ export const SCENARIOS: Scenario[] = [
       expect(Math.abs(cr) / (dist(A, E) * dist(A, M) || 1), 'A, E, M collinear').toBeLessThan(1e-3);
     },
   },
+  {
+    id: 'central-angle-valueless-and-valued',
+    title: 'issue #106 (central angle): «זוית מרכזית COD» marks the angle at centre O; a value drives it',
+    guards:
+      'prod log-triage 2026-07-13 (~2 users): «זוית מרכזית COD» / «זוית מרכזית נשענת על קשת CD» / «זוית COD» all returned not-handled — there was no central-angle construct. Fix (ADR-323): a `centralAngle` rule resolves the centre (the middle letter, or implicitly from the arc endpoints\' circle, ADR-029), draws the two radii (so the centre shows, FR-RN-8), and either sets the angle (a value → `set-angle`, drives on-circle points) or marks it (valueless → `mark-angle`, FR-RN-7).',
+    steps: ['מעגל O', 'C על המעגל', 'D על המעגל', 'זוית מרכזית COD = 80'],
+    check: (fig) => {
+      allStepsOk(fig);
+      // the central angle at O between OC and OD is driven to 80°
+      const O = at(fig, 'O'), C = at(fig, 'C'), D = at(fig, 'D');
+      const u = { x: C.x - O.x, y: C.y - O.y }, w = { x: D.x - O.x, y: D.y - O.y };
+      const deg = (Math.acos(Math.max(-1, Math.min(1, (u.x * w.x + u.y * w.y) / (Math.hypot(u.x, u.y) * Math.hypot(w.x, w.y)))))) * 180 / Math.PI;
+      expect(deg, '∠COD driven to 80°').toBeCloseTo(80, 1);
+      // C, D still on the circle (radii OC, OD are true radii)
+      const r = fig.circles.get('circle-O')!.r;
+      expect(dist(O, C), 'C on circle O').toBeCloseTo(r, 3);
+      expect(dist(O, D), 'D on circle O').toBeCloseTo(r, 3);
+      // the angle is marked at O and labelled 80°
+      expect(fig.angleMarks.some((m) => m.vertex === 'O'), 'angle mark at the centre O').toBe(true);
+      expect(fig.labels.angles.some((a) => a.vertex === 'O' && a.text.includes('80')), '80° label at O').toBe(true);
+    },
+  },
 ];
 
 /**

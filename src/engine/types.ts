@@ -1006,6 +1006,10 @@ export const RADIUS_VAR = 'R';
 export type SymbolicCommand =
   | { type: 'measure-length'; a: Id; b: Id; expr: MeasureExpr }
   | { type: 'measure-angle'; vertex: Id; ray1: Id; ray2: Id; expr: MeasureExpr }
+  // A VALUELESS stated-angle MARK ([issue #106], FR-RN-7): draw an angle arc at `vertex` between the rays to
+  // `ray1`/`ray2` WITHOUT asserting any value — a highlightable marker (e.g. a valueless central angle). It
+  // adds no geometry (the arms are drawn as their own `segment`s) and lowers to nothing for the engine.
+  | { type: 'mark-angle'; vertex: Id; ray1: Id; ray2: Id }
   // The (possibly symbolic) AREA of a named polygon ([ADR-118](docs/06-decisions.md#adr-118)). Lowered like
   // `measure-length`: a value → `set-area`; a shared variable → `set-area-ratio` against the representative.
   | { type: 'measure-area'; ids: Id[]; expr: MeasureExpr }

@@ -1132,3 +1132,7 @@ over all four (ADR-041).
 ### `extension-crossing-then-midpoint-given` — «M אמצע OK» on the AE-extension∩OK crossing (#110, ADR-308)
 
 **Guards against:** the 2025-bagrut part-ב given «נתון כי M אמצע OK» reporting over-constrained though satisfiable — a soft `collinear-order` had over-recruited the upstream free DOF (E) and the radii, so the reinterpret couldn't reach E and the 2-D coincide couldn't be solved by a 1-D carrier. **Asserts:** the full exam + the midpoint given builds — M bisects OK (|OM|=|MK|), reached by flexing E, with E still on the small circle, K on the big circle, OA ⟂ AK, and A-E-M collinear. Unit coverage: `midpoint-of-crossing.test.ts`.
+
+### `central-angle-valueless-and-valued` — «זוית מרכזית COD» marks/drives the angle at centre O (#106, ADR-323)
+
+**Guards against:** the central-angle phrasings returning `not-handled` (→ LLM) — there was no central-angle construct. **Asserts:** on «מעגל O» + on-circle C, D, the utterance «זוית מרכזית COD = 80» drives ∠COD to 80° (C, D staying on the circle), draws the two radii (so the centre shows), and marks + labels the angle at O. Unit coverage: `central-angle.test.ts` (valueless → `mark-angle`; the arc-subtended form resolves the centre from `circleMembers`, defers when it can't; both locales).
