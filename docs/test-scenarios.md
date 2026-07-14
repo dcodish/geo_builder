@@ -22,6 +22,12 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `diagonals-meet-noun-form` — «G נקודת מפגש האלכסונים» — the diagonal crossing by noun (issue #44, ADR-329)
+Prod (~5-6 users): naming the diagonal crossing by NOUN was not-handled; only the lettered form parsed. Now resolves the context quad → two diagonals + their crossing (ADR-110 macro).
+
+### `medians-meet-centroid-noun-form` — «M מפגש התיכונים» — the triangle centroid by noun (issue #44, ADR-329)
+Operator: generalize to the four triangle centres. «M מפגש התיכונים» builds the centroid = (A+B+C)/3 (two medians + crossing); the same macro covers angle-bisectors/altitudes/⊥-bisectors.
+
 ### `q5-isosceles-incircle-sqrt3-ratio-and-area` — bagrut Q5: «AC=√(3)CO» (√() toolbar ratio) + «S_{CKE}=6» build green (issues #114/#115, ADR-310/311)
 Operator prod session `qderonm3` (2026-07-13). The √3 ratio typed with the √() palette form (`AC=√(3)CO`, `AC גדול פי √(3) מ CO`) had failed deterministically and escalated to the LLM, which produced a malformed figure — so `E על CB` defaulted onto the auto-created free point K and `S_{CKE}=6` reported "cannot place E so area=6". Fixed at two roots: #114 (ratio rules use the shared `NUMEXPR` atom, so `√(3)` parses deterministically — no LLM detour) and #115 (a free on-segment rider defaults into general position, off existing points). The exact sequence now builds green; |CK|=√63 and area(CKE)=6 both hold.
 

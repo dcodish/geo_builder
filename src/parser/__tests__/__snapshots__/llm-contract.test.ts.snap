@@ -244,6 +244,34 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle-circle-intersection",
     ],
   },
+  "G is the intersection of the diagonals of quadrilateral ABCD": {
+    "en": [
+      "segment",
+      "segment",
+      "line-line-intersection",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "line-line-intersection",
+    ],
+  },
+  "H is the intersection of the altitudes of triangle ABC": {
+    "en": [
+      "foot",
+      "foot",
+      "segment",
+      "segment",
+      "line-line-intersection",
+    ],
+    "he": [
+      "foot",
+      "foot",
+      "segment",
+      "segment",
+      "line-line-intersection",
+    ],
+  },
   "M is outside circle O": {
     "en": [
       "circle",
@@ -261,6 +289,22 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "line-line-intersection",
     ],
     "he": [
+      "segment",
+      "segment",
+      "line-line-intersection",
+    ],
+  },
+  "M is the intersection of the medians of triangle ABC": {
+    "en": [
+      "midpoint",
+      "midpoint",
+      "segment",
+      "segment",
+      "line-line-intersection",
+    ],
+    "he": [
+      "midpoint",
+      "midpoint",
       "segment",
       "segment",
       "line-line-intersection",
@@ -292,6 +336,34 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     ],
     "he": [
       "circle",
+    ],
+  },
+  "O is the intersection of the angle bisectors of triangle ABC": {
+    "en": [
+      "bisector",
+      "bisector",
+      "line-intersection",
+    ],
+    "he": [
+      "bisector",
+      "bisector",
+      "line-intersection",
+    ],
+  },
+  "P is the intersection of the perpendicular bisectors of triangle ABC": {
+    "en": [
+      "midpoint",
+      "perpendicular-line",
+      "midpoint",
+      "perpendicular-line",
+      "line-intersection",
+    ],
+    "he": [
+      "midpoint",
+      "perpendicular-line",
+      "midpoint",
+      "perpendicular-line",
+      "line-intersection",
     ],
   },
   "S_{ABC} = 13": {

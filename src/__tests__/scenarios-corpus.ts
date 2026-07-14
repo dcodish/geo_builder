@@ -158,6 +158,33 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'diagonals-meet-noun-form',
+    title: '«G נקודת מפגש האלכסונים» — the diagonal crossing by noun (issue #44, ADR-329)',
+    guards:
+      'Prod (~5-6 users): naming the diagonal crossing by NOUN («מפגש האלכסונים», no letters) was not-handled — only the explicitly-lettered form («E חיתוך AC ו-BD») parsed. The noun form now resolves the context quad and lowers to the two diagonals + their crossing (ADR-110 macro).',
+    steps: ['ריבוע ABCD', 'G נקודת מפגש האלכסונים'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), G = at(fig, 'G');
+      // the diagonals of a square cross at its centre = the average of all four vertices
+      expect(G.x).toBeCloseTo((A.x + B.x + C.x + D.x) / 4, 3);
+      expect(G.y).toBeCloseTo((A.y + B.y + C.y + D.y) / 4, 3);
+    },
+  },
+  {
+    id: 'medians-meet-centroid-noun-form',
+    title: '«M מפגש התיכונים» — the triangle centroid by noun (issue #44, ADR-329)',
+    guards:
+      'Operator: generalize the diagonal-meet noun form to the four triangle centres. «M מפגש התיכונים» (the medians meet) now builds the centroid = (A+B+C)/3 as two medians + their crossing (ADR-110 macro, no new engine construct).',
+    steps: ['משולש ABC', 'M מפגש התיכונים'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), M = at(fig, 'M');
+      expect(M.x).toBeCloseTo((A.x + B.x + C.x) / 3, 3);
+      expect(M.y).toBeCloseTo((A.y + B.y + C.y) / 3, 3);
+    },
+  },
+  {
     id: 'verbose-relational-ratio-builds',
     title: '«אורך AC גדול פי 2 מהקטע AB» drives the ratio (verbose/relational size-given, issue #105, ADR-318)',
     guards:

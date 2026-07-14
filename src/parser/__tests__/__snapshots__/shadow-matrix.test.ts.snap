@@ -79,6 +79,55 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
+      "diagonals",
+    ],
+    "text": "G is the intersection of the diagonals of quadrilateral ABCD",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "(anon)",
+      "diagonals",
+    ],
+    "text": "G מפגש האלכסונים במרובע ABCD",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "M מפגש התיכונים במשולש ABC",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "bisectorIntersection",
+    ],
+    "text": "O is the intersection of the angle bisectors of triangle ABC",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "(anon)",
+    ],
+    "text": "H מפגש הגבהים במשולש ABC",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "bisectorIntersection",
+    ],
+    "text": "P is the intersection of the perpendicular bisectors of triangle ABC",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
       "(anon)",
       "segment",
     ],
@@ -670,6 +719,56 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "lang": "he",
     "text": "M חיתוך AC ו-BD",
     "winner": "lineLineIntersection",
+  },
+  {
+    "lang": "en",
+    "text": "G is the intersection of the diagonals of quadrilateral ABCD",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "he",
+    "text": "G מפגש האלכסונים במרובע ABCD",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "en",
+    "text": "M is the intersection of the medians of triangle ABC",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "he",
+    "text": "M מפגש התיכונים במשולש ABC",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "en",
+    "text": "O is the intersection of the angle bisectors of triangle ABC",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "he",
+    "text": "O מפגש חוצי הזוויות במשולש ABC",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "en",
+    "text": "H is the intersection of the altitudes of triangle ABC",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "he",
+    "text": "H מפגש הגבהים במשולש ABC",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "en",
+    "text": "P is the intersection of the perpendicular bisectors of triangle ABC",
+    "winner": "specialPointMeet",
+  },
+  {
+    "lang": "he",
+    "text": "P מפגש האנכים האמצעיים במשולש ABC",
+    "winner": "specialPointMeet",
   },
   {
     "lang": "en",
