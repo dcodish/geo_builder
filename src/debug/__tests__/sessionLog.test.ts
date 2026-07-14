@@ -45,3 +45,32 @@ describe('analyticsSubmit — one submit per submission', () => {
     expect(submits[0]).toMatchObject({ source: 'llm', result: 'ok' });
   });
 });
+
+describe('analyticsSubmit — issue #84: LLM commands + action events', () => {
+  it('includes the LLM committed COMMANDS on an llm submit (so a session reconstructs)', () => {
+    const cmds = [{ type: 'triangle', ids: ['A', 'B', 'C'] }];
+    const s = analyticsSubmit({ kind: 'input', utterance: 'משהו חופשי', source: 'llm', commands: cmds });
+    expect(s).toMatchObject({ ev: 'submit', source: 'llm' });
+    expect(typeof s!.commands).toBe('string');
+    expect(s!.commands).toContain('triangle');
+  });
+
+  it('does NOT attach commands on a PARSER submit (only the opaque llm path needs them)', () => {
+    const s = analyticsSubmit({ kind: 'input', utterance: 'ריבוע ABCD', source: 'parser', commands: [{ type: 'square' }] });
+    expect(s!.commands).toBeUndefined();
+  });
+
+  it('shapes a store ACTION event (edit / slider / show-another / delete)', () => {
+    expect(analyticsSubmit({ kind: 'action', action: 'edit', detail: 'g3 → CK=√63' })).toEqual({
+      ev: 'action',
+      action: 'edit',
+      detail: 'g3 → CK=√63',
+    });
+    expect(analyticsSubmit({ kind: 'action', action: 'show-another', detail: 'seed=4', result: 'changed' })).toEqual({
+      ev: 'action',
+      action: 'show-another',
+      detail: 'seed=4',
+      result: 'changed',
+    });
+  });
+});

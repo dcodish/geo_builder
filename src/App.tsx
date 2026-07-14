@@ -275,6 +275,7 @@ export default function App() {
       return;
     }
     replaceGroup(key, r.commands, editText.trim());
+    logDebug({ kind: 'action', action: 'edit', detail: `${key} → ${editText.trim()}` }); // #84: so a reported session replays edits
     cancelEdit();
   }
 
@@ -770,7 +771,9 @@ export default function App() {
     // like a deterministic multi-command parse, so editing the row re-runs the original wording. The
     // canonical decomposition + any unbuildable steps stay in the debug log / `dropped` report.
     executeMany(llmCmds, utterance); // one batch → one step row AND one undo entry (E4)
-    logDebug({ kind: 'input', utterance, locale, source: 'llm', built: out!.built.map((g) => g.step), dropped: out!.dropped });
+    // `commands` carries the LLM's committed canonical commands into the PROD analytics event too (issue
+    // #84) — a `source:llm, result:ok` submit is otherwise opaque and a reported session can't reconstruct.
+    logDebug({ kind: 'input', utterance, locale, source: 'llm', built: out!.built.map((g) => g.step), dropped: out!.dropped, commands: llmCmds });
     setLlmDropped(out!.dropped);
     setText('');
     resolveAfterCommit();
@@ -1396,7 +1399,7 @@ export default function App() {
                           <button type="button" style={iconBtn('#64748b')} title={t('actions.edit')} onClick={() => startEdit(g.key, g.facts[0].utterance)}>
                             ✎
                           </button>
-                          <button type="button" style={del} title={t('actions.delete')} onClick={() => removeGroup(g.key)}>
+                          <button type="button" style={del} title={t('actions.delete')} onClick={() => { logDebug({ kind: 'action', action: 'delete', detail: g.key }); removeGroup(g.key); }}>
                             ×
                           </button>
                         </>
@@ -1456,6 +1459,7 @@ export default function App() {
                   if (changed) useGeoStore.getState().applyView({ seed: found! });
                   if (branchId) cycleAlt(branchId); // a discrete branch flip is always a real change
                   const flipped = cycleVariant(); // also cycle the equal-pair of a kite/isosceles (ADR-138)
+                  logDebug({ kind: 'action', action: 'show-another', detail: `seed=${changed ? found : st.seed}`, result: changed || branchId || flipped ? 'changed' : 'only-config' }); // #84
                   if (changed || branchId || flipped) setAltNote('');
                   else {
                     // searched and found nothing different — tell the student something DID happen (the
@@ -1680,6 +1684,8 @@ export default function App() {
                       step={d.base * 0.02}
                       value={Math.min(max, Math.max(min, value))}
                       onChange={(e) => setRadius(d.circle, Number(e.target.value))}
+                      // #84: log the FINAL dialed value on release (not every drag tick) so a session replays.
+                      onPointerUp={(e) => logDebug({ kind: 'action', action: 'slider', detail: `${d.circle}=${Number((e.target as HTMLInputElement).value).toFixed(2)}` })}
                       style={{ flex: 1 }}
                     />
                     <span style={{ fontSize: 12, minWidth: 34, textAlign: 'end', color: '#64748b' }}>{value.toFixed(1)}</span>

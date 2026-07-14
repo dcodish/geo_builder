@@ -50,7 +50,7 @@ export function hashIp(ip: string, salt: string): string {
 export interface UsageEvent {
   serverTs: string;
   iph: string;
-  ev: 'session' | 'submit';
+  ev: 'session' | 'submit' | 'action';
   sid?: string;
   t?: string;
   rel?: string; // the build release (git short-hash · date) this event came from — for the dashboard's release filter
@@ -58,6 +58,9 @@ export interface UsageEvent {
   locale?: string;
   source?: string;
   result?: string;
+  commands?: string; // submit: the LLM's committed canonical commands (issue #84) — so a session reconstructs
+  action?: string; // action: edit / slider / show-another / delete (issue #84)
+  detail?: string; // action: the reconstruction data (a step key, circle+value, seed)
 }
 
 export interface LogHandlerOpts {
@@ -74,7 +77,7 @@ function normalise(raw: unknown): Omit<UsageEvent, 'serverTs' | 'iph'> | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
   const ev = o.ev;
-  if (ev !== 'session' && ev !== 'submit') return null;
+  if (ev !== 'session' && ev !== 'submit' && ev !== 'action') return null;
   const str = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : undefined);
   const out: Omit<UsageEvent, 'serverTs' | 'iph'> = { ev };
   out.sid = str(o.sid, 16);
@@ -84,6 +87,12 @@ function normalise(raw: unknown): Omit<UsageEvent, 'serverTs' | 'iph'> | null {
     out.utterance = str(o.utterance, MAX_UTTERANCE);
     out.locale = str(o.locale, 8);
     out.source = str(o.source, 24);
+    out.result = str(o.result, 64);
+    out.commands = str(o.commands, 1000); // the LLM's committed canonical commands (issue #84)
+  } else if (ev === 'action') {
+    // A store interaction (issue #84): edit / slider / show-another / delete — lean reconstruction data.
+    out.action = str(o.action, 24);
+    out.detail = str(o.detail, 200);
     out.result = str(o.result, 64);
   }
   return out;

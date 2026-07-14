@@ -59,14 +59,31 @@ function post(body: Record<string, unknown>): void {
  *     real LLM outcome. Pure so the "one submit per submission" rule is unit-tested.
  */
 export function analyticsSubmit(event: Record<string, unknown>): Record<string, unknown> | null {
+  // A store INTERACTION (edit / slider / show-another / delete) — one lean `action` line so a reported
+  // session replays end-to-end, not just the submits (issue #84). `detail` carries only the reconstruction
+  // data (a step key, a circle+value, a seed), never a figure snapshot.
+  if (event.kind === 'action') {
+    return {
+      ev: 'action',
+      action: event.action,
+      ...(event.detail !== undefined ? { detail: event.detail } : {}),
+      ...(event.result !== undefined ? { result: event.result } : {}),
+    };
+  }
   if (event.kind !== 'input') return null;
   if (event.intermediate) return null;
+  // On the LLM path, the committed canonical COMMANDS (what actually landed on the figure) — a
+  // `source:llm, result:ok` submit is otherwise opaque, so a reported session can't be reconstructed
+  // (issue #84). Short text, same privacy class as the utterance; capped so the sink stays lean.
+  const commands =
+    event.source === 'llm' && event.commands !== undefined ? JSON.stringify(event.commands).slice(0, 900) : undefined;
   return {
     ev: 'submit',
     utterance: event.utterance,
     locale: event.locale,
     source: event.source,
     result: event.result ?? 'ok', // the happy parser path logs no `result` → treat as ok
+    ...(commands ? { commands } : {}),
   };
 }
 
