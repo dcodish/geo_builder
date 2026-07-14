@@ -68,7 +68,21 @@ git push origin --tags
 | LLM fallback answers "service busy" | `LLM_DAILY_MAX` hit (usually a bot) → `journalctl -u geo-proxy | grep 'daily limit'`; tune in `geo-proxy.env` + restart |
 | Dev machine: a "fixed" bug still reproduces | **Stale dev server** (predates the fix) → restart `npm run dev` (the ADR-115 lesson) |
 | Dev machine: tests hang / ESM loads take seconds | Dropbox cloud-filter on `node_modules` → the junction fix; **`npm ci` clobbers the junction**, use `npm install` (PROJECT-MEMORY operational notes) |
+| Serving a WORKTREE branch: `vite dev` fails `Cannot find package '@babel/core'` | A feature **worktree's `node_modules` is a junction** to the main tree's; the dev server's React/Babel plugin can't resolve `@babel/core` across it (`build` uses esbuild, so it works). → **Don't `vite dev` a worktree; use `build` + `vite preview`** (recipe below). |
+| Local feature server: BLANK page, `#root` empty, JS request returns `Content-Type: text/html` | **Base-path mismatch.** `vite build` bakes `base:'/geo-builder/'` into `index.html`, but `vite preview` serves at `/` (`command==='serve'`), so the browser fetches `/geo-builder/assets/*.js` → SPA-fallback `index.html`. HTTP is 200 (misleading) — **check the JS `Content-Type`, not the status.** → rebuild with `--base=/`. |
+| A `/`-leading CLI arg becomes `/Program Files/Git/...` | **git-bash MSYS path conversion** mangles `--base=/`. → run it from **PowerShell** (or `MSYS_NO_PATHCONV=1`, or `--base=./`). |
 | Local git weirdness (phantom modified files, fsck errors) | Dropbox corrupting `.git` → `git fetch` from GitHub to backfill; GitHub is the source of truth |
+
+## Serving a feature-branch worktree locally (for operator play-testing)
+
+A git worktree's `node_modules` is a junction, so `vite dev` breaks (Babel, above) — serve a production **preview** instead. From the worktree, **via PowerShell** (so `--base=/` isn't mangled):
+
+```powershell
+node node_modules/vite/bin/vite.js build --base=/          # base=/ so preview (served at /) matches
+node node_modules/vite/bin/vite.js preview --port 5180 --strictPort
+```
+
+Then open **`http://localhost:5180/`** (root — NOT `/geo-builder/`). VERIFY before handing over: the JS the page references must return `Content-Type: text/javascript` (`curl -sD - http://localhost:5180/assets/<hash>.js -o /dev/null`), not `text/html`. It's a static build (no HMR) — rebuild + refresh for changes. `--host` exposes it on the LAN.
 
 ## Rollback
 
