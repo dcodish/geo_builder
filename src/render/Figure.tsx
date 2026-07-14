@@ -16,6 +16,7 @@ import type { MeasureLabels, RelationPick } from './scene';
 import type { RelationsResult, ResolvedCircle } from '@/engine';
 import { findSegmentCrossings } from './intersections';
 import type { Crossing } from './intersections';
+import { MathSvg } from './mathSvg';
 import { alignRotation, fitTransform, keepOrRefit, orient } from './transform';
 import type { Transform } from './transform';
 
@@ -822,28 +823,18 @@ export function Figure({
               // bit LARGER than a length, so it's clear WHICH angle it labels and легible (operator request).
               // An AREA label sits AT the polygon's centroid (no offset).
               const off = m.kind === 'area' ? 0 : m.kind === 'angle' ? r * 4.2 + fontSize * 0.7 : r * 1.4 + fontSize * 0.55;
+              // A measure is a math expression (12√2, 7k/5, 2α, 37°). `MathSvg` lays out a radical (√ + a real
+              // vinculum) or a fraction as pure SVG so it EXPORTS (#98 — MathML/foreignObject rasterizes blank);
+              // a plain label stays the single haloed <text> it always was. LTR is forced inside so the RTL page
+              // doesn't reorder `12√2` → `2√12`.
               return (
-                <text
+                <MathSvg
                   key={`m-${i}`}
-                  x={s.x + sd.x * off}
-                  y={s.y + sd.y * off}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
+                  text={m.text}
+                  cx={s.x + sd.x * off}
+                  cy={s.y + sd.y * off}
                   fontSize={fontSize * (m.kind === 'angle' ? 1.05 : 0.85)}
-                  fontFamily="system-ui, sans-serif"
-                  fontWeight={500}
-                  fill="#1d4ed8"
-                  stroke="#fff"
-                  strokeWidth={fontSize * 0.2}
-                  strokeLinejoin="round"
-                  // A measure is a math expression (12√2, 7k/5, 2α) — force LTR so the RTL (Hebrew)
-                  // page context doesn't bidi-reorder its runs (12√2 was rendering as "2√12").
-                  direction="ltr"
-                  // A white halo (paint-order: stroke) keeps it legible over a line it sits on.
-                  style={{ pointerEvents: 'none', direction: 'ltr', unicodeBidi: 'bidi-override', paintOrder: 'stroke' }}
-                >
-                  {m.text}
-                </text>
+                />
               );
             })}
 
