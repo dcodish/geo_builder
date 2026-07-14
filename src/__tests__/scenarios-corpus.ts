@@ -158,6 +158,18 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'semicircle-on-every-side-of-square',
+    title: '«ריבוע» then «על כל צלע של ריבוע יש חצי מעגל» — a semicircle on each side (issue #29, ADR-330)',
+    guards:
+      'Prod session p3du4l9p: the classic composite (a polygon with a semicircle erected on each side) was not-handled — only the single-side form parsed. The quantified «על כל צלע … יש חצי מעגל» now resolves the context polygon and builds one closed-form semicircle per side (ADR-110 macro, no new engine construct).',
+    steps: ['ריבוע ABCD', 'על כל צלע של ריבוע יש חצי מעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const arcs = fig.construction.objects.filter((o) => o.kind === 'arc');
+      expect(arcs).toHaveLength(4); // one semicircle arc per side of the square
+    },
+  },
+  {
     id: 'verbose-relational-ratio-builds',
     title: '«אורך AC גדול פי 2 מהקטע AB» drives the ratio (verbose/relational size-given, issue #105, ADR-318)',
     guards:

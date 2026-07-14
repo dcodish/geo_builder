@@ -1273,6 +1273,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "a semicircle on each side of square ABCD",
+    "winner": "semicirclesOnEverySide",
+  },
+  {
+    "lang": "he",
+    "text": "על כל צלע של ריבוע ABCD יש חצי מעגל",
+    "winner": "semicirclesOnEverySide",
+  },
+  {
+    "lang": "en",
     "text": "quarter circle",
     "winner": "quarterCircle",
   },

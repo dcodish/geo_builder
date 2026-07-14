@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `semicircle-on-every-side-of-square` — «על כל צלע של ריבוע יש חצי מעגל» (issue #29, ADR-330)
+Prod session p3du4l9p: the classic composite (a polygon with a semicircle on each side) was not-handled; only the single-side form parsed. The quantified form now resolves the context polygon and builds one closed-form semicircle per side (ADR-110 macro). Outward-vs-inward bulge is a documented follow-up (winding is unknown at parse time).
+
 ### `q5-isosceles-incircle-sqrt3-ratio-and-area` — bagrut Q5: «AC=√(3)CO» (√() toolbar ratio) + «S_{CKE}=6» build green (issues #114/#115, ADR-310/311)
 Operator prod session `qderonm3` (2026-07-13). The √3 ratio typed with the √() palette form (`AC=√(3)CO`, `AC גדול פי √(3) מ CO`) had failed deterministically and escalated to the LLM, which produced a malformed figure — so `E על CB` defaulted onto the auto-created free point K and `S_{CKE}=6` reported "cannot place E so area=6". Fixed at two roots: #114 (ratio rules use the shared `NUMEXPR` atom, so `√(3)` parses deterministically — no LLM detour) and #115 (a free on-segment rider defaults into general position, off existing points). The exact sequence now builds green; |CK|=√63 and area(CKE)=6 both hold.
 
