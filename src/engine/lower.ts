@@ -112,6 +112,8 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
   switch (cmd.type) {
     case 'set-var':
       return []; // pure data — only its referenced measures produce constraints
+    case 'mark-angle':
+      return []; // pure display (issue #106) — a valueless angle mark; the arms are their own `segment`s
     case 'measure-length': {
       const e = cmd.expr;
       if ('value' in e) return [{ type: 'set-distance', a: cmd.a, b: cmd.b, value: e.value }];

@@ -62,6 +62,8 @@ function angleMarkFor(cmd: AnyCommand): AngleMark | null {
   switch (cmd.type) {
     case 'measure-angle':
       return { vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, right: false };
+    case 'mark-angle': // #106: a valueless stated-angle mark (a central angle with no value) — an arc, never a knee
+      return { vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, right: false };
     case 'set-angle':
       return { vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, right: Math.abs(cmd.value - 90) < 1e-6 };
     case 'right-triangle':
@@ -1372,7 +1374,7 @@ async function sharedSamplesAsync(facts: Fact[]): Promise<{ constructions: Const
 export function introducedIds(cmd: AnyCommand): Id[] {
   // A symbolic measure introduces no objects; highlight the points it annotates instead.
   if (cmd.type === 'measure-length') return [cmd.a, cmd.b];
-  if (cmd.type === 'measure-angle') return [cmd.vertex, cmd.ray1, cmd.ray2];
+  if (cmd.type === 'measure-angle' || cmd.type === 'mark-angle') return [cmd.vertex, cmd.ray1, cmd.ray2];
   if (cmd.type === 'measure-area') return cmd.ids; // highlight the polygon the area annotates
   if (cmd.type === 'set-var' || cmd.type === 'measure-order') return []; // a relation over variables — no object to highlight
   if (cmd.type === 'shape-variant') return cmd.ids; // the named shape's vertices (ADR-138)

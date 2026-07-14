@@ -366,6 +366,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "bisector",
     ],
   },
+  "central angle COD": {
+    "en": [
+      "segment",
+      "segment",
+      "mark-angle",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "mark-angle",
+    ],
+  },
   "chord AB in circle O": {
     "en": [
       "circle",
