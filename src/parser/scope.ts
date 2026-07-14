@@ -36,7 +36,8 @@ export type ScopeCategory =
   | 'ui-command' // "add/mark/show …" — marks derive from GIVENS; say the given itself
   | 'valueless-query' // "∠DEF = ?" — the tool enforces/verifies stated values, it doesn't solve
   | 'orientation' // canvas layout words (horizontal / upper / rotate…) — not geometry givens
-  | 'bare-point'; // a lone point label — say WHERE it sits
+  | 'bare-point' // a lone point label — say WHERE it sits
+  | 'unnamed-sides'; // "one side 10, other side 5" — name the sides (AB=10, BC=5) — #105
 
 export interface ScopeMatch {
   category: ScopeCategory;
@@ -126,6 +127,16 @@ const RULES: ScopeRule[] = [
       /חשב(?:ו|י|תי?)?\s+את|מהו\s+הערך|כמה\s+(?:שווה|הוא|זה)/, // חשב/חשבו/לחשב את… / מהו הערך / כמה שווה
       /מצא(?:ו|י)?\s+את\s+ה?(?:שטח|אורך|זווית|ערך|גודל|היקף|רדיוס|נפח)/, // "find the area/length/angle/value/…" (NOT "find point/intersection" — those are constructions)
       /\bcalculate\b|\bcompute\b|solve\s+for\b|find\s+(?:the\s+)?(?:value|area|length|measure|perimeter|radius)\b|what\s+is\s+the\s+(?:value|area|measure|length|perimeter)\b/i,
+    ],
+  },
+  {
+    // #105: the UNNAMED-SIDES form — "צלע אחת 10 צלע שניה 5" / "one side 10 the other 5". The magnitudes
+    // are stated but not tied to labelled sides, so nothing can build; the message says to name the sides
+    // (AB=10, BC=5). Kept SPECIFIC — requires "side/צלע" + a number TWICE — so a labelled given never trips it.
+    category: 'unnamed-sides',
+    patterns: [
+      /צלע\s+אחת\s+\S*\d.*?צלע\s+(?:שניי?ה|אחרת|נוספת)\s+\S*\d/s,
+      /one\s+side\s+\S*\d.*?(?:other|another|second)\s+side\s+\S*\d/is,
     ],
   },
   {

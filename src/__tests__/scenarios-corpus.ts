@@ -158,6 +158,17 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'verbose-relational-ratio-builds',
+    title: '«אורך AC גדול פי 2 מהקטע AB» drives the ratio (verbose/relational size-given, issue #105, ADR-318)',
+    guards:
+      "Operator (bagrut Q5) typed `אורך AC גדול פי √(3) מהקטע CO` and it escalated → not-understood: the `אורך`/`הקטע` noun prefixes + the `מהקטע` (from-segment) RHS defeated the ratio rule (its `קטע` was grabbed by the loose `segment` rule, dropping the factor). Fixed by the ratio noun-skip + running `ratioConstraint` before `segment`.",
+    steps: ['משולש ABC', 'אורך AC גדול פי 2 מהקטע AB'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'A'), at(fig, 'C'))).toBeCloseTo(2 * dist(at(fig, 'A'), at(fig, 'B')), 3);
+    },
+  },
+  {
     id: 'point-between-builds-on-segment',
     title: '«E בין A ל-B» builds a free point on segment AB (issue #95, ADR-317)',
     guards:

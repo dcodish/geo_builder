@@ -25,6 +25,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 ### `q5-isosceles-incircle-sqrt3-ratio-and-area` — bagrut Q5: «AC=√(3)CO» (√() toolbar ratio) + «S_{CKE}=6» build green (issues #114/#115, ADR-310/311)
 Operator prod session `qderonm3` (2026-07-13). The √3 ratio typed with the √() palette form (`AC=√(3)CO`, `AC גדול פי √(3) מ CO`) had failed deterministically and escalated to the LLM, which produced a malformed figure — so `E על CB` defaulted onto the auto-created free point K and `S_{CKE}=6` reported "cannot place E so area=6". Fixed at two roots: #114 (ratio rules use the shared `NUMEXPR` atom, so `√(3)` parses deterministically — no LLM detour) and #115 (a free on-segment rider defaults into general position, off existing points). The exact sequence now builds green; |CK|=√63 and area(CKE)=6 both hold.
 
+### `verbose-relational-ratio-builds` — «אורך AC גדול פי k מהקטע AB» drives the ratio (issue #105, ADR-318)
+Operator (bagrut Q5): the verbose relational ratio with `אורך`/`הקטע` noun prefixes escalated because the loose `segment` rule grabbed the `קטע` in `מהקטע` and dropped the factor. Fixed by the ratio RHS noun-skip + running `ratioConstraint` before `segment`; `שורש N → √N` + a verbose-length frame (`אורך X הוא √N`) added in `normalizeUtterance`; the vague unnamed-sides form gets a guided message.
+
 ### `point-between-builds-on-segment` — «E בין A ל-B» builds a free point on segment AB (issue #95, ADR-317)
 Prod session `lrbdnp5v`: the BETWEEN phrasing built nothing (escalated → built-nothing). It is exactly `E על AB` — a free point-on-segment; `pointOnSegment` now recognises it (guarded against the ratio/angle/swap/area-ratio rules that also use `בין`).
 

@@ -47,7 +47,8 @@
       "ui-command": "Marks on the figure (right angles, equal ticks, the circle centre) appear automatically from the givens — instead of asking for a mark, state the given itself: e.g. \"angle B = 90\" or \"AB = AC\".",
       "valueless-query": "To act on an angle or a length the tool needs a stated value: write e.g. \"angle DEF = 60\" and it will be enforced and verified. This tool draws and verifies givens — it does not solve the question.",
       "orientation": "Direction and placement on the screen (horizontal, upper, to the right…) are not geometric givens — the tool picks a layout itself, and \"show another configuration\" varies it. The shape is determined only by the givens you type.",
-      "bare-point": "A lone point does not build anything yet — say where it sits: e.g. \"point D on AB\", \"M outside the circle\", or start from a shape (\"triangle ABC\")."
+      "bare-point": "A lone point does not build anything yet — say where it sits: e.g. \"point D on AB\", \"M outside the circle\", or start from a shape (\"triangle ABC\").",
+      "unnamed-sides": "To set lengths, name the sides: type e.g. \"AB = 10\" and \"BC = 5\" (or start with \"triangle ABC\", then the lengths), instead of \"one side… the other side…\"."
     },
     "producedNothing": "I understood that but it didn't build anything on the figure — I tried rephrasing it too. Check the names/relations, or word it differently.",
     "alreadyDrawn": "That's already on the figure — nothing to add.",
