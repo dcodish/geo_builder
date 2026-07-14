@@ -2191,6 +2191,23 @@ const freePoint: Rule = (s) => {
   return [{ type: 'free-point', id: up(m[1]), x: parseFloat(m[2]), y: parseFloat(m[3]) }];
 };
 
+/**
+ * "נקודה A" / "הוסף נקודה A" / "point A" / "add point A" — a BARE free point (2 DOF, ADR-052), NO
+ * coordinates: placed in general position and positioned by the NEXT statement (issue #104). This was a
+ * core primitive of the original model that the rebuild never re-exposed. Anchored end-to-end (`$`) so a
+ * trailing relation ("נקודה A על AB", "point A on the circle") is claimed by the relational rules first,
+ * and the נקודה/point keyword is REQUIRED so a lone letter ("C") stays escalation. Idempotent via
+ * `ifAbsent` — re-declaring is a no-op, and naming an existing point is a no-op statement (M1), never a
+ * redefinition. `free: true` hands the DOFs to the sampler, so "show another configuration" moves it and a
+ * later constraint (`AB=5`, `∠…`) recruits it. Runs after the coordinate `freePoint` (which owns the
+ * `נקודה A ב-(0,0)` form) so an explicit placement is never swallowed as a bare point.
+ */
+const bareFreePoint: Rule = (s) => {
+  const m = s.match(/^\s*(?:הוסף\s+|add\s+)?(?:ה?נקודה|point)\s+([A-Za-z]\d*)\s*$/i);
+  if (!m) return null;
+  return [{ type: 'free-point', id: up(m[1]), x: 3, y: 2, free: true, ifAbsent: true }];
+};
+
 // ── Phase 5c — circles ──────────────────────────────────────────────────────
 
 // The default concrete radius a circle takes when none is given numerically (incl. a symbolic "radius R").
@@ -5421,6 +5438,7 @@ export const RULES: Rule[] = [
   distanceConstraint, // "AB = 6"
   pointByDistances,
   freePoint,
+  bareFreePoint, // "נקודה A" / "point A" — a bare 2-DOF free point (no coords), after freePoint owns the coord form (#104)
   bareSegment, // LAST catch-all: a bare "AB" / "line AB" → draw the segment (after every keyword/structured rule)
 ];
 
@@ -6084,7 +6102,21 @@ function regionSideFallback(s: string, ctx: ParseContext): ParseResult | null {
   const prefix: AnyCommand[] = allKnown ? [] : [{ type: 'triangle', ids: [poly[0], poly[1], poly[2]] }];
   const head = s.slice(0, m.index).trim();
   if (!head) return null;
-  // (a) the head is a full statement of its own ("הנקודה E נמצאת על מעגל O") — parse it and attach the
+  // (a) a BARE point-reference head — "הנקודה E" / "נקודה E" / "point E" / "E" — merely NAMES the region's
+  // subject. Checked FIRST: since #104 a bare "נקודה E" parses to a standalone free-point on its own, but
+  // here it is just the subject label, so point-polygon-side creates E (a free point seeded on the side) —
+  // an extra free-point command would double-declare it. A genuine full-statement head (more than a bare
+  // label after stripping the נקודה/point word) falls through to (b).
+  const one = head
+    .replace(/ה?נקודה|ה?נקודות|points?/gi, ' ')
+    .trim()
+    .match(/^([A-Z]\d*)$/);
+  if (one) {
+    const id = up(one[1]);
+    if (poly.includes(id)) return null;
+    return { ok: true, commands: [...prefix, { type: 'point-polygon-side', id, poly, side }] };
+  }
+  // (b) the head is a full statement of its own ("הנקודה E נמצאת על מעגל O") — parse it and attach the
   // region to the ONE point it introduces; 0 or 2+ introduced points is ambiguous → defer to the LLM.
   const r = runRules(head, ctx);
   if (r.ok) {
@@ -6100,15 +6132,7 @@ function regionSideFallback(s: string, ctx: ParseContext): ParseResult | null {
     }
     return null;
   }
-  // (b) a bare point reference head — "הנקודה E" / "point E" / "E"
-  const one = head
-    .replace(/ה?נקודה|ה?נקודות|points?/gi, ' ')
-    .trim()
-    .match(/^([A-Z]\d*)$/);
-  if (!one) return null;
-  const id = up(one[1]);
-  if (poly.includes(id)) return null;
-  return { ok: true, commands: [...prefix, { type: 'point-polygon-side', id, poly, side }] };
+  return null;
 }
 
 /**

@@ -60,6 +60,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'shapes', supported: true, en: 'square DEFG inscribed in triangle ABC', he: 'ריבוע DEFG חסום במשולש ABC', descEn: 'A square inscribed in a triangle (base on a side). "Show another configuration" cycles the base side.', descHe: 'ריבוע חסום במשולש (בסיס על צלע). "הצג תצורה אחרת" מחליף את צלע הבסיס.' },
 
   // ── Points ──────────────────────────────────────────────────────────────
+  { category: 'points', supported: true, en: 'point A', he: 'נקודה A', descEn: 'A bare free point (2 DOF), placed in general position and positioned by the next statement.', descHe: 'נקודה חופשית (2 דרגות חופש), ממוקמת לפי המשפט הבא.' },
   { category: 'points', supported: true, en: 'point A at (0,0)', he: 'נקודה A ב-(0,0)', descEn: 'A free point at coordinates.', descHe: 'נקודה חופשית בקואורדינטות.' },
   { category: 'points', supported: true, en: 'point E on AC at 40%', he: 'נקודה E על AC ב-40%', descEn: 'A point on a segment (ratio optional).', descHe: 'נקודה על קטע (יחס לא חובה).' },
   { category: 'points', supported: true, en: 'points F, G, H on AB, AC, CB', he: 'נקודות F, G, H על AB, AC, CB', descEn: 'Several points, each on its own side/line (paired in order).', descHe: 'כמה נקודות, כל אחת על הצלע/הישר שלה (בהתאמה לפי הסדר).' },

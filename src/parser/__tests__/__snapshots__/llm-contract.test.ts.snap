@@ -810,6 +810,14 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "perpendicular-line",
     ],
   },
+  "point A": {
+    "en": [
+      "free-point",
+    ],
+    "he": [
+      "free-point",
+    ],
+  },
   "point A at (0,0)": {
     "en": [
       "free-point",

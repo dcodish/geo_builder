@@ -158,6 +158,17 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'bare-free-point-positioned-by-next-statement',
+    title: '«נקודה A» + «נקודה B» + «AB=5» — bare free points recruited by a later given (issue #104, ADR-328)',
+    guards:
+      'Prod log-triage 2026-07-13 (~4 users): a bare free-point declaration «נקודה A»/«point A» was not-handled — the rebuild never re-exposed the original model\'s "free point (2 DOF)" primitive; every point arrived via a relation. Now «נקודה A» builds a free 2-DOF point (ADR-052 sampled, ifAbsent-idempotent) that a later constraint recruits.',
+    steps: ['נקודה A', 'נקודה B', 'AB = 5'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'A'), at(fig, 'B'))).toBeCloseTo(5, 3); // the distance recruited both free points
+    },
+  },
+  {
     id: 'verbose-relational-ratio-builds',
     title: '«אורך AC גדול פי 2 מהקטע AB» drives the ratio (verbose/relational size-given, issue #105, ADR-318)',
     guards:
