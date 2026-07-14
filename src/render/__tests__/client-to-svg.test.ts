@@ -45,6 +45,7 @@ describe('clientToSvg', () => {
       equalSegments: [],
       equalAngles: [[{ vertex: 'B', a: 'A', b: 'C' }, { vertex: 'E', a: 'D', b: 'F' }]],
       definiteAngles: [],
+      definiteLengths: [],
       samplesUsed: 8,
     };
     const pos = new Map<Id, Vec>([

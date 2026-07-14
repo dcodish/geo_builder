@@ -27,7 +27,7 @@ export { checkGivens } from './verify';
 export { solveBudget, budgetExceeded, withSolveBudget } from './solveBudget';
 export type { GivenViolation } from './verify';
 export { detectRelations, detectRelationsAcross, figureEdges, convergedSamples, requirementSamples, distinctSamples, isScaffoldId } from './relations';
-export type { RelationsResult, SegmentRef, AngleRef, DefiniteAngle, DetectOptions } from './relations';
+export type { RelationsResult, SegmentRef, AngleRef, DefiniteAngle, DefiniteLength, DetectOptions } from './relations';
 export { detectShapes, detectShapesAcross, classifyShapesFromSamples } from './detectShapes';
 export type { ShapeType, DetectedShape, SimilarClass, ShapesResult, ShapeDetectOptions } from './detectShapes';
 export { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';

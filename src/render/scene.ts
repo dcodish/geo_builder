@@ -12,7 +12,7 @@
 import type { Construction, Id, Circle, Vec } from '@/engine/types';
 import { isGeoPoint } from '@/engine/types';
 import { len, rot90, sub, unit } from '@/engine/geometry';
-import { resolveCircle, resolveLine, type DefiniteAngle, type RelationsResult, type ResolvedCircle } from '@/engine';
+import { resolveCircle, resolveLine, type DefiniteAngle, type DefiniteLength, type RelationsResult, type ResolvedCircle } from '@/engine';
 
 export interface ScenePoint {
   id: Id;
@@ -133,6 +133,9 @@ export interface RelationMarks {
   /** Forced RIGHT angles (≈90°): drawn as a right-angle SQUARE (the "knee" symbol), the textbook notation,
    *  instead of a "90°" value label (operator request). Reuses the stated-mark square renderer. */
   rightAngles: SceneAngleMark[];
+  /** Forced segment LENGTHS (issue #126): a length label at the segment's midpoint, shown on hover so a
+   *  student can read a determined side's length off the drawing. Uses the same measure-label renderer. */
+  lengths: SceneMeasure[];
 }
 
 export interface Scene {
@@ -511,13 +514,38 @@ export function relationMarks(relations: RelationsResult, positions: Map<Id, Vec
       }
     }
   }
-  return { ticks, angles, values, rightAngles };
+  // Forced segment LENGTHS (issue #126) — a length label at the midpoint, nudged perpendicular to the OUTSIDE
+  // (away from the figure centroid), the same treatment as a stated length measure. Shown only for the
+  // definite lengths in the (hover-narrowed) relations, so a determined side reads its length on hover.
+  const lengths: SceneMeasure[] = [];
+  if (relations.definiteLengths.length > 0) {
+    const all = [...positions.values()];
+    const cen = all.length
+      ? { x: all.reduce((s, p) => s + p.x, 0) / all.length, y: all.reduce((s, p) => s + p.y, 0) / all.length }
+      : { x: 0, y: 0 };
+    for (const { a, b, value } of relations.definiteLengths) {
+      const pa = positions.get(a);
+      const pb = positions.get(b);
+      if (!pa || !pb || len(sub(pb, pa)) < 1e-9) continue;
+      const mid = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
+      let perp = unit(rot90(sub(pb, pa)));
+      if ((mid.x - cen.x) * perp.x + (mid.y - cen.y) * perp.y < 0) perp = { x: -perp.x, y: -perp.y };
+      lengths.push({ kind: 'length', pos: mid, dir: perp, text: formatLen(value) });
+    }
+  }
+  return { ticks, angles, values, rightAngles, lengths };
 }
 
 /** A definitive angle value for display: an integer when it's within 0.1° of one (60°), else one decimal. */
 function formatDeg(v: number): string {
   const rounded = Math.round(v);
   return `${Math.abs(v - rounded) < 0.1 ? rounded : v.toFixed(1)}°`;
+}
+
+/** A definitive length value for display: an integer when it's within 0.05 of one, else one decimal. */
+function formatLen(v: number): string {
+  const rounded = Math.round(v);
+  return Math.abs(v - rounded) < 0.05 ? String(rounded) : v.toFixed(1);
 }
 
 // ── Hover-to-focus picking (the "explore equals on the diagram" interaction, ADR-167 Am.) ──────────────
@@ -527,7 +555,9 @@ function formatDeg(v: number): string {
 
 /** Which relation the student is pointing at: one equality CLASS (its index into equalSegments/equalAngles). */
 export interface RelationPick {
-  kind: 'segment' | 'angle';
+  /** An equality CLASS (`segment`/`angle`, `classIndex` into equalSegments/equalAngles), OR a single forced
+   *  VALUE (`valueAngle`/`valueLength`, `classIndex` into definiteAngles/definiteLengths — issue #126). */
+  kind: 'segment' | 'angle' | 'valueAngle' | 'valueLength';
   classIndex: number;
 }
 
@@ -591,6 +621,17 @@ export function relationAt(
       consider(d, vertReach, { kind: 'angle', classIndex: j });
     }
   });
+  // Forced-VALUE angles (issue #126): a definite angle that's not part of any equal class is still hoverable —
+  // pointing into its wedge reveals its measure (a right angle shows its knee). Same in-wedge + vertex-reach
+  // test; also registers as an active wedge so the segment pass excludes its arms.
+  relations.definiteAngles.forEach(({ vertex, a, b }, k) => {
+    const pv = positions.get(vertex), pa = positions.get(a), pb = positions.get(b);
+    if (!pv || !pa || !pb) return;
+    if (!inWedge(world, pv, pa, pb)) return;
+    const d = Math.hypot(world.x - pv.x, world.y - pv.y);
+    if (d <= vertReach) activeWedges.push({ vId: vertex, v: pv, a: pa, b: pb });
+    consider(d, vertReach, { kind: 'valueAngle', classIndex: k });
+  });
   // Same direction from `v` (within ~1.8°): the segment lies ALONG the wedge ray — an arm, not a crossing.
   const alongRay = (v: Vec, p: Vec, q: Vec): boolean => {
     const ux = p.x - v.x, uy = p.y - v.y, wx = q.x - v.x, wy = q.y - v.y;
@@ -611,6 +652,14 @@ export function relationAt(
       consider(distToSegment(world, pa, pb), segReach, { kind: 'segment', classIndex: i });
     }
   });
+  // Forced-VALUE lengths (issue #126): a determined segment (its length the same in every sample) is hoverable
+  // to read its length — same perpendicular-distance test + arm-exclusion as the equal-length segments.
+  relations.definiteLengths.forEach(({ a, b }, k) => {
+    const pa = positions.get(a), pb = positions.get(b);
+    if (!pa || !pb) return;
+    if (isArmOfActiveWedge(a, b, pa, pb)) return;
+    consider(distToSegment(world, pa, pb), segReach, { kind: 'valueLength', classIndex: k });
+  });
   return bestPick;
 }
 
@@ -618,12 +667,24 @@ export function relationAt(
  *  draws ONLY that class's marks (the hover-focus render). Definitive angle VALUES are kept (they're facts,
  *  not clutter) so a hovered angle can still show its measure. */
 export function relationsForPick(relations: RelationsResult, pick: RelationPick): RelationsResult {
+  const empty = { equalSegments: [], equalAngles: [], definiteAngles: [], definiteLengths: [], samplesUsed: relations.samplesUsed };
+  const sameSeg = (p: DefiniteLength, a: Id, b: Id) => (p.a === a && p.b === b) || (p.a === b && p.b === a);
+  if (pick.kind === 'valueAngle') {
+    const d = relations.definiteAngles[pick.classIndex];
+    return { ...empty, definiteAngles: d ? [d] : [] };
+  }
+  if (pick.kind === 'valueLength') {
+    const d = relations.definiteLengths[pick.classIndex];
+    return { ...empty, definiteLengths: d ? [d] : [] };
+  }
   if (pick.kind === 'segment') {
     const cls = relations.equalSegments[pick.classIndex];
-    return { equalSegments: cls ? [cls] : [], equalAngles: [], definiteAngles: [], samplesUsed: relations.samplesUsed };
+    // Show the class ticks AND each member's forced length (so a determined equal-length pair reads its value).
+    const lengths = cls ? relations.definiteLengths.filter((d) => cls.some(([a, b]) => sameSeg(d, a, b))) : [];
+    return { ...empty, equalSegments: cls ? [cls] : [], definiteLengths: lengths };
   }
   const cls = relations.equalAngles[pick.classIndex];
-  return { equalSegments: [], equalAngles: cls ? [cls] : [], definiteAngles: relations.definiteAngles, samplesUsed: relations.samplesUsed };
+  return { ...empty, equalAngles: cls ? [cls] : [], definiteAngles: relations.definiteAngles };
 }
 
 /**

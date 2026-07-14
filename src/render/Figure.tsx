@@ -970,6 +970,31 @@ export function Figure({
                 const c3 = `${V.x + u2.x * s},${V.y + u2.y * s}`;
                 return <polyline key={`rr-${i}`} points={`${c1} ${c2} ${c3}`} fill="none" stroke={REL} strokeWidth={stroke} style={{ pointerEvents: 'none' }} />;
               })}
+              {/* Forced segment LENGTHS (issue #126): a length number at the midpoint, revealed on hover so a
+                  determined side reads its length. Relations colour + white halo; LTR (it's a number). */}
+              {relMarks.lengths.map((m, i) => {
+                const s = transform.toScreen(m.pos);
+                const sd = unitVec({ x: m.dir.x, y: -m.dir.y });
+                const off = r * 1.4 + fontSize * 0.55;
+                return (
+                  <text
+                    key={`rl-${i}`}
+                    x={s.x + sd.x * off}
+                    y={s.y + sd.y * off}
+                    fontSize={fontSize * 0.78}
+                    fill={REL}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    stroke="#fff"
+                    strokeWidth={stroke * 2.2}
+                    paintOrder="stroke"
+                    direction="ltr"
+                    style={{ pointerEvents: 'none', fontWeight: 600, direction: 'ltr', unicodeBidi: 'bidi-override' }}
+                  >
+                    {m.text}
+                  </text>
+                );
+              })}
             </g>
           )}
         </g>
