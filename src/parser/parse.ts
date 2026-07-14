@@ -1088,8 +1088,9 @@ const pointOnExtension: Rule = (s, ctx) => {
 /**
  * #106: a CENTRAL angle — the angle at a circle's CENTRE subtending two on-circle points (or an arc).
  *  - "זוית מרכזית COD" / "central angle COD" — O (the MIDDLE letter) is the centre, arms OC, OD.
- *  - "זוית מרכזית נשענת על קשת CD" / "central angle subtending arc CD" — the centre is resolved from the
- *    circle the arc endpoints ride (ADR-029 implicit circle); arms centre-C, centre-D.
+ *  - "זוית מרכזית נשענת על קשת CD" / "…נשענת על CD" / "central angle subtending arc CD" — the SUBTENDS verb
+ *    (`נשענת`/`subtend`/`rests on`) or the `קשת`/`arc` noun signals the two endpoints (the `קשת` word is
+ *    optional after the verb); the centre is resolved from the circle they ride (ADR-029 implicit circle).
  * A VALUE ("= 80" / "היא 80" / "is 80") makes it an angle GIVEN (`set-angle` — drives a free-DOF figure via
  * the ADR-116 arc↔central-angle identity, checks a determined one); valueless is a highlightable stated-angle
  * MARK (`mark-angle`, FR-RN-7 style — no value asserted). Either way the two radii are drawn, so the centre
@@ -1104,7 +1105,12 @@ const centralAngle: Rule = (s, ctx) => {
   let centre: string | null;
   let a: string;
   let b: string;
-  const arcM = body.match(/(?:קשת|arc|⌢|⏜)\s*([A-Z]\d*)\s*([A-Z]\d*)/i); // "… (על) קשת CD" / "arc CD"
+  // The arc-subtended form: the `קשת`/`arc`/glyph noun OR the SUBTENDS verb (`נשענת`/`subtend`/`rests on`)
+  // signals that the two named points are the ARC ENDPOINTS (the `קשת` word after the verb is optional —
+  // "…נשענת על CB"). With a signal present the endpoints are the trailing letter PAIR (a central-angle
+  // utterance names exactly those two labels). The centre is then resolved from the circle they ride.
+  const arcSignal = /קשת|\barc\b|⌢|⏜|נשע|subtend|rest\w*\s+on/i.test(body);
+  const arcM = arcSignal ? body.match(/([A-Z]\d*)\s*([A-Z]\d*)\s*$/) : null;
   if (arcM) {
     a = up(arcM[1]);
     b = up(arcM[2]);

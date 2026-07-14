@@ -32,9 +32,16 @@ describe('central angle (issue #106)', () => {
 
   it('the arc-subtended form resolves the centre from the circle the arc endpoints ride', () => {
     const ctx: ParseContext = { circleMembers: [{ id: 'circle-O', center: 'O', points: ['C', 'D'] }] };
-    const c = cmds('זוית מרכזית נשענת על קשת CD', ctx);
-    expect(c).toContainEqual({ type: 'mark-angle', vertex: 'O', ray1: 'C', ray2: 'D' });
-    expect(cmds('central angle subtending arc CD', ctx)).toContainEqual({ type: 'mark-angle', vertex: 'O', ray1: 'C', ray2: 'D' });
+    // the SUBTENDS verb or the קשת/arc noun signals the endpoints; the קשת word is OPTIONAL after the verb.
+    for (const u of [
+      'זוית מרכזית נשענת על קשת CD',
+      'זוית מרכזית הנשענת על CD', // no קשת word — the נשענת verb alone signals the endpoints (operator play-test)
+      'central angle subtending arc CD',
+      'central angle subtending CD',
+      'central angle resting on CD',
+    ]) {
+      expect(cmds(u, ctx), u).toContainEqual({ type: 'mark-angle', vertex: 'O', ray1: 'C', ray2: 'D' });
+    }
   });
 
   it('the arc form DEFERS (never guesses a centre) when the circle cannot be resolved', () => {
