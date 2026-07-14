@@ -196,7 +196,26 @@ describe('handleLog', () => {
     await run(mockReq('POST', '10.0.0.7', [JSON.stringify(ev)]), res, logPath);
     const stored = JSON.parse((await readFile(logPath, 'utf8')).trim());
     expect(stored.evil).toBeUndefined();
-    expect(stored.commands).toBeUndefined();
+    expect(stored.commands).toBeUndefined(); // a non-STRING commands (array) is dropped
+  });
+
+  it('issue #84: keeps the LLM commands string on a submit', async () => {
+    const res = mockRes();
+    const ev = { ev: 'submit', utterance: 'משהו', source: 'llm', commands: '[{"type":"triangle","ids":["A","B","C"]}]' };
+    await run(mockReq('POST', '10.0.0.71', [JSON.stringify(ev)]), res, logPath);
+    const stored = JSON.parse((await readFile(logPath, 'utf8')).trim());
+    expect(stored.commands).toContain('triangle');
+  });
+
+  it("issue #84: accepts an `action` event (edit/slider/show-another/delete) and stores its lean fields", async () => {
+    const res = mockRes();
+    const ev = { ev: 'action', sid: 's1', action: 'edit', detail: 'g3 → CK=√63', evil: 'x' };
+    await run(mockReq('POST', '10.0.0.72', [JSON.stringify(ev)]), res, logPath);
+    expect(res.statusCode).toBe(204);
+    const stored = JSON.parse((await readFile(logPath, 'utf8')).trim());
+    expect(stored).toMatchObject({ ev: 'action', action: 'edit', detail: 'g3 → CK=√63' });
+    expect(stored.evil).toBeUndefined();
+    expect(stored.utterance).toBeUndefined(); // an action carries no utterance
   });
 
   it("routes a tool:'3d' event to the 3-D file and a 2-D event to the 2-D file (never mixed)", async () => {
