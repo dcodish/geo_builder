@@ -20,6 +20,7 @@ describe('relationMarks', () => {
       ],
       equalAngles: [],
       definiteAngles: [],
+      definiteLengths: [],
       samplesUsed: 4,
     };
     const p = pos([['A', [0, 0]], ['B', [2, 0]], ['C', [0, 1]], ['D', [2, 1]], ['E', [0, 2]], ['F', [2, 2]]]);
@@ -35,6 +36,7 @@ describe('relationMarks', () => {
       equalSegments: [],
       equalAngles: [[{ vertex: 'B', a: 'A', b: 'C' }, { vertex: 'D', a: 'C', b: 'E' }]],
       definiteAngles: [],
+      definiteLengths: [],
       samplesUsed: 4,
     };
     const p = pos([['A', [1, 0]], ['B', [0, 0]], ['C', [0, 1]], ['D', [2, 0]], ['E', [3, 0]]]);
@@ -48,6 +50,7 @@ describe('relationMarks', () => {
       equalSegments: [],
       equalAngles: [],
       definiteAngles: [{ vertex: 'B', a: 'A', b: 'C', valueDeg: 60.0000001 }],
+      definiteLengths: [],
       samplesUsed: 8,
     };
     const p = pos([['A', [1, 0]], ['B', [0, 0]], ['C', [0, 1]]]);
@@ -61,6 +64,7 @@ describe('relationMarks', () => {
       equalSegments: [],
       equalAngles: [],
       definiteAngles: [{ vertex: 'B', a: 'A', b: 'C', valueDeg: 90.00001 }],
+      definiteLengths: [],
       samplesUsed: 8,
     };
     const p = pos([['A', [1, 0]], ['B', [0, 0]], ['C', [0, 1]]]);
@@ -81,6 +85,7 @@ describe('relationMarks', () => {
         { vertex: 'B', a: 'C', b: 'D', valueDeg: 45 },
         { vertex: 'B', a: 'A', b: 'D', valueDeg: 67.5 }, // = 22.5 + 45 → redundant
       ],
+      definiteLengths: [],
       samplesUsed: 8,
     };
     const p = pos([['A', [1, 0]], ['B', [0, 0]], ['C', [1, 1]], ['D', [0, 1]]]);
@@ -99,6 +104,7 @@ describe('relationMarks', () => {
         { vertex: 'F', a: 'A', b: 'D', valueDeg: 60 }, // rays F→A (0°) and F→D (60°)
         { vertex: 'F', a: 'G', b: 'H', valueDeg: 60 }, // F→G (=60°, G on FD) and F→H (=0°, H on FA) — same wedge
       ],
+      definiteLengths: [],
       samplesUsed: 8,
     };
     const p = pos([['F', [0, 0]], ['A', [1, 0]], ['H', [2, 0]], ['D', [0.5, 0.8660254]], ['G', [1, 1.7320508]]]);
@@ -111,6 +117,7 @@ describe('relationMarks', () => {
       equalSegments: [[['A', 'B'], ['C', 'D']]],
       equalAngles: [],
       definiteAngles: [],
+      definiteLengths: [],
       samplesUsed: 1,
     };
     const p = pos([['A', [0, 0]], ['B', [0, 0]] /* coincident → degenerate */, ['C', [0, 0]] /* D missing */]);
@@ -128,6 +135,7 @@ describe('relationMarks', () => {
         { vertex: 'B', a: 'A', b: 'X', valueDeg: 30 },
         { vertex: 'B', a: 'C', b: 'Y', valueDeg: 30 },
       ],
+      definiteLengths: [],
       samplesUsed: 8,
     };
     const p = pos([['A', [1, 0]], ['X', [1, 1]], ['C', [-1, 0]], ['Y', [-1, 1]], ['B', [0, 0]]]);
@@ -143,6 +151,7 @@ describe('relationMarks', () => {
       equalSegments: [],
       equalAngles: [[{ vertex: 'B', a: 'A', b: 'C' }, { vertex: 'B', a: 'D', b: 'F' }, { vertex: 'E', a: 'D', b: 'F' }]],
       definiteAngles: [],
+      definiteLengths: [],
       samplesUsed: 8,
     };
     // B at origin; A and F both to the left (same ray B→A ≈ B→F), C and D both up-left (same ray B→C ≈ B→D).
@@ -159,6 +168,7 @@ describe('relationMarks', () => {
       equalSegments: [],
       equalAngles: [[{ vertex: 'B', a: 'A', b: 'X' }, { vertex: 'D', a: 'C', b: 'Y' }]],
       definiteAngles: [], // they float (e.g. isosceles base angles) → arcs are the only way to show equality
+      definiteLengths: [],
       samplesUsed: 8,
     };
     const p = pos([['A', [1, 0]], ['X', [1, 1]], ['B', [0, 0]], ['C', [3, 0]], ['Y', [3, 1]], ['D', [2, 0]]]);
@@ -176,6 +186,7 @@ describe('relationAt / relationsForPick — hover-to-focus picking (ADR-167 Am.)
     ],
     equalAngles: [[{ vertex: 'B', a: 'A', b: 'C' }]], // class 0: the +x→+y wedge at B
     definiteAngles: [],
+    definiteLengths: [],
     samplesUsed: 8,
   };
   const p = pos([
@@ -210,6 +221,7 @@ describe('relationAt / relationsForPick — hover-to-focus picking (ADR-167 Am.)
       equalSegments: [[['V', 'A'], ['V', 'B']]],
       equalAngles: [[{ vertex: 'V', a: 'A', b: 'B' }]],
       definiteAngles: [],
+      definiteLengths: [],
       samplesUsed: 8,
     };
     // Probe on the wedge BISECTOR at 60% of the vertex reach: inside the wedge, so with raw closer-wins

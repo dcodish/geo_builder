@@ -19,6 +19,7 @@ import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
 import type { Crossing } from '@/render';
 import { MathText, hasMath } from '@/render/mathText';
+import { readoutForGroup } from '@/render/computedValue';
 import type { DetectedShape, Id, SimilarClass } from '@/engine';
 import { bookUrl } from '@/shapes/shapeCatalog';
 import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES_VISIBLE } from '@/theorems';
@@ -933,6 +934,16 @@ export default function App() {
     return inGroup.length ? new Set(inGroup.flatMap((x) => introducedIds(x.cmd))) : undefined;
   }, [facts, selectedId]);
 
+  // #39: the COMPUTED VALUE of the selected step's size/ratio given, measured on the current drawing — so
+  // the student can SEE that `S(DBCA)/S(GAD)=15` was actually enforced (a green figure already means it holds;
+  // this shows the numbers). Read-only over the coordinates; null for steps that carry no measurable given.
+  const selectedReadout = useMemo(() => {
+    if (!selectedId) return null;
+    const groupCmds = facts.filter((x) => groupKey(x) === selectedId).map((x) => x.cmd);
+    const allEnabled = facts.filter((x) => x.enabled).map((x) => x.cmd);
+    return readoutForGroup(groupCmds, allEnabled, positions);
+  }, [facts, selectedId, positions]);
+
   const hiddenSet = useMemo(() => new Set(hidden), [hidden]);
   const hiddenCircleSet = useMemo(() => new Set(hiddenCircles), [hiddenCircles]);
 
@@ -1430,6 +1441,22 @@ export default function App() {
                             {state === 'broken' && errText && g.key === selectedId && (
                               <span style={{ fontSize: 11, color: '#dc2626', paddingInlineStart: 6 }} dir={textDir(errText)}>
                                 {errText}
+                              </span>
+                            )}
+                            {/* #39: the computed value of a size/ratio given, measured on the drawing —
+                                shown when the step is selected. The ratio (verdict) is the seed-invariant
+                                knowledge (green ✓ / red ✗ vs the stated given); the absolute areas/lengths
+                                are per-drawing context. Forced LTR (it's math). */}
+                            {state === 'ok' && g.key === selectedId && selectedReadout && (
+                              <span style={{ fontSize: 11, paddingInlineStart: 6, direction: 'ltr', unicodeBidi: 'isolate' }}>
+                                {selectedReadout.measured.length > 0 && (
+                                  <span style={{ color: '#64748b' }}>
+                                    {selectedReadout.measured.map((m) => `${m.label} = ${m.value}`).join(' · ')} →{' '}
+                                  </span>
+                                )}
+                                <strong style={{ color: selectedReadout.verdict.ok ? '#16a34a' : '#dc2626' }}>
+                                  {selectedReadout.verdict.label} = {selectedReadout.verdict.value} {selectedReadout.verdict.ok ? '✓' : '✗'}
+                                </strong>
                               </span>
                             )}
                           </div>

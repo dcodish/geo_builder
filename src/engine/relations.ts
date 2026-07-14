@@ -232,6 +232,16 @@ export interface DefiniteAngle extends AngleRef {
   valueDeg: number;
 }
 
+/** A segment whose LENGTH is forced (the same in every sample) — a definitive value (issue #126). Unlike a
+ *  definite angle this is NOT scale-invariant: a free-scale figure's lengths vary across sampled seeds (the
+ *  sampler moves the gauge), so a length is definite ONLY once a size given pins the scale — exactly when it
+ *  is meaningful to read off. `value` is in the figure's world units (= the units of the pinning given). */
+export interface DefiniteLength {
+  a: Id;
+  b: Id;
+  value: number;
+}
+
 export interface RelationsResult {
   /** Each inner array is one equality CLASS of segments that are equal in every sample (size ≥ 2). */
   equalSegments: SegmentRef[][];
@@ -241,6 +251,9 @@ export interface RelationsResult {
    *  Scale-invariant, so these appear even when the figure floats in size (a 60° equilateral corner, a forced
    *  90°). A straight (~180°) / degenerate (~0°) angle is excluded. */
   definiteAngles: DefiniteAngle[];
+  /** Segments whose LENGTH is the SAME in every sample — forced (a size given pins the scale). Empty on a
+   *  free-scale figure (lengths float). See {@link DefiniteLength}. */
+  definiteLengths: DefiniteLength[];
   /** How many valid configurations were actually sampled (a determined figure yields identical samples). */
   samplesUsed: number;
 }
@@ -428,7 +441,7 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
   // violators (ADR-256) — the store's shared core is already filtered, but the direct engine path
   // (tests/scenarios calling detectRelations on a construction) must apply the same ground-truth bar.
   const samples = requirementSamples(c0, distinctSamples(c0, convergedSamples(opts.positions ?? rawSamples)));
-  if (samples.length === 0) return { equalSegments: [], equalAngles: [], definiteAngles: [], samplesUsed: 0 };
+  if (samples.length === 0) return { equalSegments: [], equalAngles: [], definiteAngles: [], definiteLengths: [], samplesUsed: 0 };
 
   // 2. The IMPLICIT edge universe — drawn segments + polygon edges + GEOMETRIC on-carrier splits +
   //    visible-line edges, the same universe the angle pass uses. The geometric splits (`collinearSplits`
@@ -543,7 +556,22 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
   }
   definiteAngles.sort(cmpAngle);
 
-  return { equalSegments, equalAngles, definiteAngles, samplesUsed: samples.length };
+  // 5. DEFINITIVE segment LENGTHS (issue #126) — a segment whose length is the same across every sample is
+  //    forced by the givens. NOT scale-invariant (unlike an angle): a free-scale figure's `segLen` rows vary
+  //    across seeds (the sampler moves the gauge, verified — `triangle ABC`'s |AB| spans 5.09…7.26), so this
+  //    is empty until a size given pins the scale — exactly when reading a length off the drawing is
+  //    meaningful. Same non-starved-pool gate as the angles.
+  const definiteLengths: DefiniteLength[] = [];
+  for (let i = 0; trustDefinite && i < segs.length; i++) {
+    if (!segUsable[i]) continue;
+    const vals = segLen[i];
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+    if (Math.max(...vals) - Math.min(...vals) > lengthTol * Math.max(mean, EPS)) continue; // it flexes ⇒ not definite
+    definiteLengths.push({ a: segs[i][0], b: segs[i][1], value: mean });
+  }
+  definiteLengths.sort((x, y) => cmpSeg([x.a, x.b], [y.a, y.b]));
+
+  return { equalSegments, equalAngles, definiteAngles, definiteLengths, samplesUsed: samples.length };
 }
 
 const cmpSeg = (x: SegmentRef, y: SegmentRef): number => x[0].localeCompare(y[0]) || x[1].localeCompare(y[1]);

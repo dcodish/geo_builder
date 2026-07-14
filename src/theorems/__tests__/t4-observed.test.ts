@@ -32,7 +32,7 @@ function feedWith(utterances: string[], observed?: ObservedInputs): TheoremFeedE
   const { construction } = replay(facts);
   return detectTheorems({ facts, construction, observed });
 }
-const REL_EMPTY = { equalSegments: [], equalAngles: [], definiteAngles: [], samplesUsed: 4 };
+const REL_EMPTY = { equalSegments: [], equalAngles: [], definiteAngles: [], definiteLengths: [], samplesUsed: 4 };
 
 describe('T4 observed lane (ADR-247)', () => {
   it('an observed SIMILAR class fires 69 at L3 amber; without observed it stays silent', () => {

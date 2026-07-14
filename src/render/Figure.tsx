@@ -16,6 +16,7 @@ import type { MeasureLabels, RelationPick } from './scene';
 import type { RelationsResult, ResolvedCircle } from '@/engine';
 import { findSegmentCrossings } from './intersections';
 import type { Crossing } from './intersections';
+import { MathSvg } from './mathSvg';
 import { alignRotation, fitTransform, keepOrRefit, orient } from './transform';
 import type { Transform } from './transform';
 
@@ -822,28 +823,18 @@ export function Figure({
               // bit LARGER than a length, so it's clear WHICH angle it labels and легible (operator request).
               // An AREA label sits AT the polygon's centroid (no offset).
               const off = m.kind === 'area' ? 0 : m.kind === 'angle' ? r * 4.2 + fontSize * 0.7 : r * 1.4 + fontSize * 0.55;
+              // A measure is a math expression (12√2, 7k/5, 2α, 37°). `MathSvg` lays out a radical (√ + a real
+              // vinculum) or a fraction as pure SVG so it EXPORTS (#98 — MathML/foreignObject rasterizes blank);
+              // a plain label stays the single haloed <text> it always was. LTR is forced inside so the RTL page
+              // doesn't reorder `12√2` → `2√12`.
               return (
-                <text
+                <MathSvg
                   key={`m-${i}`}
-                  x={s.x + sd.x * off}
-                  y={s.y + sd.y * off}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
+                  text={m.text}
+                  cx={s.x + sd.x * off}
+                  cy={s.y + sd.y * off}
                   fontSize={fontSize * (m.kind === 'angle' ? 1.05 : 0.85)}
-                  fontFamily="system-ui, sans-serif"
-                  fontWeight={500}
-                  fill="#1d4ed8"
-                  stroke="#fff"
-                  strokeWidth={fontSize * 0.2}
-                  strokeLinejoin="round"
-                  // A measure is a math expression (12√2, 7k/5, 2α) — force LTR so the RTL (Hebrew)
-                  // page context doesn't bidi-reorder its runs (12√2 was rendering as "2√12").
-                  direction="ltr"
-                  // A white halo (paint-order: stroke) keeps it legible over a line it sits on.
-                  style={{ pointerEvents: 'none', direction: 'ltr', unicodeBidi: 'bidi-override', paintOrder: 'stroke' }}
-                >
-                  {m.text}
-                </text>
+                />
               );
             })}
 
@@ -978,6 +969,31 @@ export function Figure({
                 const c2 = `${V.x + (u1.x + u2.x) * s},${V.y + (u1.y + u2.y) * s}`;
                 const c3 = `${V.x + u2.x * s},${V.y + u2.y * s}`;
                 return <polyline key={`rr-${i}`} points={`${c1} ${c2} ${c3}`} fill="none" stroke={REL} strokeWidth={stroke} style={{ pointerEvents: 'none' }} />;
+              })}
+              {/* Forced segment LENGTHS (issue #126): a length number at the midpoint, revealed on hover so a
+                  determined side reads its length. Relations colour + white halo; LTR (it's a number). */}
+              {relMarks.lengths.map((m, i) => {
+                const s = transform.toScreen(m.pos);
+                const sd = unitVec({ x: m.dir.x, y: -m.dir.y });
+                const off = r * 1.4 + fontSize * 0.55;
+                return (
+                  <text
+                    key={`rl-${i}`}
+                    x={s.x + sd.x * off}
+                    y={s.y + sd.y * off}
+                    fontSize={fontSize * 0.78}
+                    fill={REL}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    stroke="#fff"
+                    strokeWidth={stroke * 2.2}
+                    paintOrder="stroke"
+                    direction="ltr"
+                    style={{ pointerEvents: 'none', fontWeight: 600, direction: 'ltr', unicodeBidi: 'bidi-override' }}
+                  >
+                    {m.text}
+                  </text>
+                );
               })}
             </g>
           )}
