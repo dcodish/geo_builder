@@ -487,3 +487,41 @@ describe('GATE — V6 solids-trig (cone / cylinder / sphere with stated sizes; f
     expect(freeDofCount3(d2.construction, d2.resolved)).toBe(0);
   });
 });
+
+describe("#116 (ADR-3D-042) — a right-triangle qualifier on a prism base (prod session 38t9c7lv)", () => {
+  beforeEach(reset);
+
+  const angleAt = (V: string, P: string, Q: string) => {
+    const pos = derived().resolved.positions;
+    const v = pos.get(V)!, p = pos.get(P)!, q = pos.get(Q)!;
+    const a = { x: p.x - v.x, y: p.y - v.y, z: p.z - v.z };
+    const b = { x: q.x - v.x, y: q.y - v.y, z: q.z - v.z };
+    const d = a.x * b.x + a.y * b.y + a.z * b.z;
+    return (Math.acos(Math.max(-1, Math.min(1, d / (Math.hypot(a.x, a.y, a.z) * Math.hypot(b.x, b.y, b.z))))) * 180) / Math.PI;
+  };
+
+  it("the exact prod sequence: right prism, then AOB is a right triangle — no already-defined, ∠ at the middle vertex drives to 90", () => {
+    submit("מנסרה ישרה AOBA'O'B'");
+    submit('AOB משולש ישר זוית');
+    expectAllOk(); // the qualifier is NOT dropped and NOT an already-defined re-build (M1 idempotency)
+    expect(angleAt('O', 'A', 'B')).toBeCloseTo(90, 0); // default = middle vertex O
+  });
+
+  it('an explicit ∠OAB = 90 overrides the soft middle-vertex default (M4 defaults-yield)', () => {
+    submit("מנסרה ישרה AOBA'O'B'");
+    submit('AOB משולש ישר זוית');
+    submit('∠OAB = 90');
+    expectAllOk(); // one right angle, not two (the soft O-default was dropped) → never over-constrained
+    expect(angleAt('A', 'O', 'B')).toBeCloseTo(90, 0);
+  });
+
+  it('a fresh "right triangle ABC" (new points, both locales) builds a right-angled triangle', () => {
+    submit('right triangle ABC');
+    expectAllOk();
+    expect(angleAt('B', 'A', 'C')).toBeCloseTo(90, 0); // middle vertex B
+    reset();
+    submit('משולש DEF ישר זווית');
+    expectAllOk();
+    expect(angleAt('E', 'D', 'F')).toBeCloseTo(90, 0);
+  });
+});

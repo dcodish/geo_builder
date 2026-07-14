@@ -253,6 +253,13 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       if (cmd.ids.length !== n || new Set(cmd.ids).size !== n) {
         return { ok: false, error: { code: 'bad-solid', kind: cmd.kind } };
       }
+      // M1 (issue #116): a FLAT polygon whose ids ALL already exist is a statement ABOUT those points, not a
+      // re-creation — reference them idempotently instead of erroring `already-defined`. This lets a
+      // right-triangle / bare-polygon statement land on an existing prism/pyramid base (its vertices are
+      // `solid-vertex` points) so the accompanying constraint (e.g. the ∠=90) applies. A polygon that adds
+      // NEW points still builds; a genuine SOLID (cube/prism/…) re-declaration keeps the conflict error.
+      const flat = polygonN(cmd.kind) !== null;
+      if (flat && cmd.ids.every((id) => c.points.has(id))) return { ok: true, next: c };
       const taken = cmd.ids.find((id) => c.points.has(id));
       if (taken !== undefined) return { ok: false, error: { code: 'already-defined', id: taken } };
 

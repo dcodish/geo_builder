@@ -1649,6 +1649,29 @@ const planeCut: Rule = (s) => {
  * (triangle), `מרובע MKNL` (quadrilateral), `מחומש ABCDE` (pentagon). Excludes the 3-D
  * solid words (a prism/pyramid rule owns those). Label-less ⇒ default lettering.
  */
+/**
+ * #116 (ADR-3D-042): a RIGHT triangle — `AOB משולש ישר זווית` / `right(-angled) triangle ABC` (both
+ * `זוית`/`זווית`, single/double vav — the ADR-3D-032 `זו?וית` class). The 3-D counterpart of the 2-D
+ * ADR-163/164 class. Emits the triangle (`polygon3`) PLUS a right angle at the MIDDLE-named vertex as a
+ * SOFT default (operator ruling, issue #116): "right triangle" states SOME vertex is 90° — which is the
+ * student's to say (ADR-052) — so the default yields (dropped in derive3) to an explicit later `∠XYZ = 90`
+ * on the same triangle. The right angle lowers to the existing V7-T3 `cos-angle` (cos = 0) — M1 at apply:
+ * DRIVES a free-dim solid (the reported prism base flexes so ∠AOB = 90) or VERIFIES a determined figure;
+ * no new engine construct. The polygon `solid` is idempotent on EXISTING ids (M1, apply.ts), so re-stating
+ * the prism base as `AOB משולש …` references it instead of erroring `already-defined`.
+ */
+const rightTriangle: Rule = (s) => {
+  if (!/(?:משולש.*ישר\s*[-\s]?\s*זו?וית|ישר\s*[-\s]?\s*זו?וית.*משולש|right[-\s]?(?:angled\s+)?triangle)/i.test(s)) return null;
+  const toks = firstLabelRun(s);
+  const ids = toks.length === 3 ? toks : toks.length === 0 ? ['A', 'B', 'C'] : null;
+  if (!ids) return null;
+  const [a, mid, b] = ids;
+  return [
+    { type: 'solid', kind: 'polygon3', ids },
+    { type: 'cos-angle', u: { kind: 'pair', from: mid, to: a }, v: { kind: 'pair', from: mid, to: b }, cos: 0, soft: true },
+  ];
+};
+
 const planarPolygon: Rule = (s) => {
   if (/מנסרה|פירמידה|\bprism\b|\bpyramid\b/i.test(s)) return null;
   const kind: 'polygon3' | 'polygon4' | 'polygon5' | null =
@@ -1799,6 +1822,7 @@ const RULES: Rule[] = [
   heightOfSolid,
   drawArrow, // #72: an unnamed ink arrow — before bareSegment (the noun must not read as a label)
   perpToBase, // #72: the base-directed ⟂ from a point (auto-minted foot)
+  rightTriangle, // #116: `משולש … ישר זווית` — BEFORE planarPolygon (which would swallow bare `משולש`)
   planarPolygon, // V8-g: bare `משולש/מרובע/מחומש` — after the שטח/מפגש/prism/pyramid consumers of those nouns
   bareSegment,
 ];

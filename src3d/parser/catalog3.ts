@@ -113,6 +113,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'points', he: 'D על AC כך ש-OD חוצה-זווית AOC', en: 'D on AC such that OD bisects angle AOC' },
   // --- V8-g: the 2-D vector lane (flat polygons in the plane) ---
   { category: 'solids', he: 'משולש ABC', en: 'triangle ABC' },
+  { category: 'solids', he: 'משולש ABC ישר זווית', en: 'right triangle ABC' },
   { category: 'solids', he: 'מרובע MKNL', en: 'quadrilateral MKNL' },
   { category: 'solids', he: 'מחומש ABCDE', en: 'pentagon ABCDE' },
   { category: 'points', he: 'גובה המשולש לצלע AB הוא CD', en: 'CD is the altitude to AB' },

@@ -70,6 +70,23 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
   const status: Record<string, FactStatus3> = {};
   const claimOwners: { factId: string; from: number; to: number }[] = [];
   const pinOwnerIds = new Set<string>();
+  // #116 (M4 defaults-yield): a right-triangle's SOFT default right angle (a `cos-angle` cos:0 at the
+  // middle vertex) is dropped when an EXPLICIT ∠=90 on the SAME three vertices is stated — the student's
+  // choice of right-angle vertex wins over the soft guess (ADR-052/163). Scanned once before the fold.
+  const key3 = (labels: string[]) => [...labels].sort().join('');
+  const explicitRightAngles = new Set<string>();
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    for (const cmd of f.cmds) {
+      if (cmd.type === 'cos-angle' && !cmd.soft && Math.abs(cmd.cos) < 1e-9 && cmd.u.kind === 'pair' && cmd.v.kind === 'pair' && cmd.u.from === cmd.v.from)
+        explicitRightAngles.add(key3([cmd.u.from, cmd.u.to, cmd.v.to]));
+      if (cmd.type === 'claim' && cmd.claim.type === 'angle-seg-eq' && Math.abs(cmd.claim.deg - 90) < 1e-9 && cmd.claim.a1 === cmd.claim.a2)
+        explicitRightAngles.add(key3([cmd.claim.a1, cmd.claim.b1, cmd.claim.b2]));
+    }
+  }
+  const droppedSoft = (cmd: Command3): boolean =>
+    cmd.type === 'cos-angle' && !!cmd.soft && cmd.u.kind === 'pair' && cmd.v.kind === 'pair' &&
+    explicitRightAngles.has(key3([cmd.u.from, cmd.u.to, cmd.v.to]));
   for (const f of facts) {
     if (!f.enabled) {
       status[f.id] = 'disabled';
@@ -79,6 +96,7 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     const claimsBefore = c.claims.length;
     const pinsBefore = c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length + c.planePins.length;
     for (const cmd of f.cmds) {
+      if (droppedSoft(cmd)) continue; // an explicit ∠=90 on this triangle superseded the soft default
       const r = applyCommand3(c, cmd);
       if (!r.ok) {
         st = r.error;

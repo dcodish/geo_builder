@@ -534,7 +534,7 @@ export type Command3 =
   | { type: 'perp-to-base'; from: Id } // #72: `אנך יורד מ-M לבסיס` — foot auto-minted at apply (parse3 is context-free)
   // V8-f (G6): cos of the angle between two operands = a value. `cos∠ACB = 3/4`
   // (vertex ⇒ pairs) · `קוסינוס הזווית בין הוקטורים w ו-u הוא √35/10` (named vectors).
-  | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number }
+  | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number; soft?: boolean } // `soft` (issue #116): a right-triangle's DEFAULT right-angle vertex, dropped in derive3 when an explicit ∠=90 on the same triangle is stated (M4 defaults-yield)
   // V8-f (G9): a CHAIN of dot products all equal — `u·v = v·w = u·w`. Apply lowers to
   // pairwise dot-eq relations (drive on a free figure, else verify).
   | { type: 'dot-eq-chain'; ops: [VecAtom, VecAtom][] }
