@@ -238,3 +238,29 @@ describe('droppedGivenRelations — the third honesty gate (ADR-264)', () => {
     }
   });
 });
+
+describe('a run-on given-list is never committed as a cross-clause compound (issue #33)', () => {
+  // Two prod users typed the whole bagrut given-list as ONE unpunctuated submission. A permissive circle
+  // compound rule claimed the whole string first (first-match-wins, ADR-119 class) and lowered it to
+  // garbage — «במעגל D» grabbed the next clause's D as the circle name, «מקביל» bound to the WRONG operands
+  // → set-parallel(A,B, O,B), and «ED=EC» was dropped. `parse` returned that as ok:true; only the App-level
+  // honesty gates stood between it and a committed wrong figure. The winning-parse chokepoint now refuses a
+  // parse that silently drops a stated RELATION (droppedGivenRelations joins the shape/circle/radius/region
+  // family) → the run-on escalates honestly instead of committing set-parallel(AB, OB).
+  const RUNON = 'AB קוטר במעגל D אמצע הרדיוס OB AC מיתר E על המיתר AC DE מקביל ל BC ED=EC F על AB EF אנך ל AB';
+
+  it('the whole run-on is refused (not-handled), never the garbage set-parallel(A,B,O,B)', () => {
+    const r = parse(RUNON, {} as ParseContext);
+    expect('ok' in r && r.ok).toBe(false);
+    if (r.ok) {
+      const json = JSON.stringify(r.commands);
+      expect(json).not.toContain('"set-parallel"');
+    }
+  });
+
+  it('the individual relation clauses still parse correctly on their own (fix does not harm them)', () => {
+    // The fix must not harm the clause-by-clause path the students should use.
+    expect(types('DE מקביל ל BC')).toContain('set-parallel');
+    expect(cmds('ED=EC')).toContainEqual({ type: 'set-equal', a: 'E', b: 'D', c: 'E', d: 'C' });
+  });
+});

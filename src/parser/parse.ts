@@ -5959,19 +5959,23 @@ function resolveSizeQualifier(s: string, ctx: ParseContext): { s: string; assert
 /** The parse body AFTER normalization + size-qualifier resolution (the pre-#102 `parse`). */
 function parseResolved(s: string, ctx: ParseContext): ParseResult {
   const whole = runRules(s, ctx);
-  // ADR-264 Am. 1: a winning parse (or a rule's clarification) that leaves a stated shape NOUN
-  // unmaterialized means a LAX relation rule claimed its clause out of a compound and silently dropped
-  // the declaration — "משולש שווה שוקיים שבו AB=AC" committed as just segments + set-equal (no
-  // triangle!), because the label-less shape rule DEFERS (null, not 'stop') and `equalSegments`/
-  // `distanceConstraint`/`angle` match their clause anywhere in the string. One guard here covers the
-  // whole lax family at once (never per-rule; §3 chokepoint discipline): never commit the shape-less
-  // half-parse — try the clause split (the deterministic rescue: "משולש שווה שוקיים" parses bare +
-  // the given pins it), else escalate the WHOLE line.
+  // ADR-264 Am. 1 / issue #33: a winning parse (or a rule's clarification) that silently DROPPED something
+  // the student stated — a shape NOUN left unmaterialized, a circle predicate, a radius symbol, a REGION
+  // subject, or a symbol-form RELATION (`ED=EC`) — means a LAX rule claimed a clause out of a compound and
+  // dropped the rest. "משולש שווה שוקיים שבו AB=AC" committed as just segments + set-equal (no triangle!);
+  // an unpunctuated run-on given-list ("AB קוטר במעגל D אמצע הרדיוס OB … DE מקביל ל BC ED=EC …") let a
+  // permissive circle compound grab the whole string and lower it to garbage (במעגל D swallowed the next
+  // clause's D; מקביל bound the wrong operands; ED=EC vanished). One guard here covers the whole lax family
+  // at once (never per-rule; §3 chokepoint discipline): never commit the drop — try the clause split (the
+  // deterministic rescue when there ARE separators: "משולש שווה שוקיים" parses bare + the given pins it),
+  // else escalate the WHOLE line honestly. `droppedGivenRelations` is the App-level commit gate too, so a
+  // legitimate single-rule parse (the relation lands in a `set-*` or introduces a label) is never blocked.
   if (
     (whole.ok &&
       (droppedShapeNoun(s, whole.commands, ctx) ||
         droppedCirclePredicate(s, whole.commands) ||
         droppedRadiusSymbol(s, whole.commands).length > 0 ||
+        droppedGivenRelations(s, whole.commands).length > 0 ||
         droppedRegionSubject(s, whole.commands))) ||
     (!whole.ok && whole.reason !== 'not-handled' && droppedShapeNoun(s, [], ctx))
   ) {
