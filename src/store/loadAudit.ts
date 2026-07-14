@@ -31,6 +31,12 @@ export interface LoadAuditFinding {
   kind: 'dropped' | 'drift';
   /** The uncovered labels (`dropped` only; empty for `drift`). */
   labels: string[];
+  /** The group key of the audited step — a stable handle so the note's lifetime can be tied to the row it
+   *  flags (the row survives deletion/undo/re-lower by group, not by index). See {@link liveAuditFindings}. */
+  group: string;
+  /** The commands the step held WHEN audited — the note drops once the row's commands change (a ✎ re-lower,
+   *  which is exactly the re-read the note asked for). Compared by value against the row's current commands. */
+  cmds: AnyCommand[];
 }
 
 /** Consecutive facts sharing a group = one user step (one utterance → possibly many commands). */
@@ -116,14 +122,36 @@ export function auditLoadedFigure(facts: Fact[], budgetMs = 3000): { findings: L
     const prefix = facts.slice(0, step.start);
     const { construction, positions } = replay(prefix);
     const ctx = buildParseCtx(construction, positions);
+    const group = groupKey(facts[step.start]);
     const dropped = droppedNewLabels(step.utterance, step.cmds, ctx.points ?? []);
     if (dropped.length > 0) {
-      findings.push({ step: i + 1, utterance: step.utterance, kind: 'dropped', labels: dropped });
+      findings.push({ step: i + 1, utterance: step.utterance, kind: 'dropped', labels: dropped, group, cmds: step.cmds });
       continue; // `dropped` subsumes `drift` for the step — one finding per row
     }
     const p = parse(step.utterance, ctx);
     if (p.ok && JSON.stringify(p.commands) !== JSON.stringify(step.cmds))
-      findings.push({ step: i + 1, utterance: step.utterance, kind: 'drift', labels: [] });
+      findings.push({ step: i + 1, utterance: step.utterance, kind: 'drift', labels: [], group, cmds: step.cmds });
   }
   return { findings, complete: true };
+}
+
+/**
+ * The subset of audit findings that STILL apply to the current fact list (issue #24). The ADR-242 load-audit
+ * note names suspect rows; it must disappear the moment the condition it describes is gone. Rather than a
+ * one-shot string with no exit path, the App keeps the findings and derives the visible note from these live
+ * ones — a finding drops when the row it flags is DELETED / cleared / undone past the load (its group no
+ * longer exists), TOGGLED OFF (the student excluded it), or RE-READ via ✎ (its commands changed — exactly
+ * the re-lower the note asked for). No re-audit: a cheap group-existence + commands-equality check per render.
+ */
+export function liveAuditFindings(facts: Fact[], findings: LoadAuditFinding[]): LoadAuditFinding[] {
+  if (findings.length === 0) return findings;
+  const steps = stepsOf(facts);
+  const byGroup = new Map(steps.map((s) => [groupKey(facts[s.start]), { start: s.start, cmds: s.cmds }]));
+  const same = (a: AnyCommand[], b: AnyCommand[]) => JSON.stringify(a) === JSON.stringify(b);
+  return findings.filter((f) => {
+    const step = byGroup.get(f.group);
+    if (!step) return false; // row deleted / cleared / undone past the load
+    if (!facts[step.start].enabled) return false; // row toggled off (excluded from the figure)
+    return same(step.cmds, f.cmds); // unchanged since the audit → still suspect; a ✎ re-lower changed them
+  });
 }

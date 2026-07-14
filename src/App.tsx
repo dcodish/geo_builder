@@ -30,7 +30,8 @@ import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
 import { questionLines } from '@/export/questionLines';
-import { auditLoadedFigure, refreshLoadedFigure } from '@/store/loadAudit';
+import { auditLoadedFigure, liveAuditFindings, refreshLoadedFigure } from '@/store/loadAudit';
+import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { humanizeError } from '@/i18n/humanizeError';
 /**
@@ -127,6 +128,11 @@ export default function App() {
   const [renameNote, setRenameNote] = useState(''); // why a relabel was a no-op (target taken / no such point)
   const [altNote, setAltNote] = useState(''); // transient: "show another configuration" found no different drawing
   const [fileNote, setFileNote] = useState(''); // transient: why a figure file couldn't be loaded (FR-HS-10)
+  // Persistent ADR-242 load-audit findings (issue #24). Unlike `fileNote` (a one-shot string), the audit note
+  // must live exactly as long as the rows it flags: it is DERIVED from these findings against the current
+  // facts (a finding drops when its row is deleted / toggled off / ✎ re-lowered), so it self-clears without a
+  // timer. `×` dismisses this load's note outright; a fresh load re-audits.
+  const [fileAudit, setFileAudit] = useState<LoadAuditFinding[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null); // the hidden <input type=file> behind "load figure"
   const [helpOpen, setHelpOpen] = useState(false); // the help modal ("עזרה") — guide + command reference
   const [helpTab, setHelpTab] = useState<'guide' | 'commands'>('guide');
@@ -142,6 +148,18 @@ export default function App() {
   const [theoremSel, setTheoremSel] = useState<TheoremId | null>(null); // the theorem row whose premise is highlighted on the canvas
   const [bgOpen, setBgOpen] = useState(false); // the collapsed "background theorems" family fold is expanded
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // The ADR-242 load-audit note, DERIVED from the persistent findings against the current facts (issue #24):
+  // a finding drops the moment its row is deleted / toggled off / ✎ re-lowered, so the note self-clears — no
+  // timer, no orphaned banner. Empty ⇒ nothing shown.
+  const auditNote = useMemo(() => {
+    const live = liveAuditFindings(facts, fileAudit);
+    if (live.length === 0) return '';
+    const rows = live
+      .map((f) => `${f.step}. "${f.utterance}"${f.labels.length ? ` (${f.labels.join(', ')})` : ''}`)
+      .join(' · ');
+    return t('file.loadAudit', { steps: rows });
+  }, [facts, fileAudit, t]);
 
   // Responsive canvas: the figure fills the space beside the sidebar (use the whole screen) instead
   // of a fixed box. A ResizeObserver feeds the measured size to <Figure>, which fits isotropically.
@@ -407,6 +425,7 @@ export default function App() {
     loadFigure(r.file); // one undo restores the session that was open before
     setFigureName(figureNameFromFileName(f.name)); // the FILENAME names the figure (issue #42)
     setFileNote('');
+    setFileAudit([]); // drop the prior load's audit before the new one (issue #24)
     // Honesty audit (ADR-242): the file replays its SAVED lowering (deterministic restore, ADR-232), so
     // a step whose stored commands dropped a stated label, or whose utterance the current parser reads
     // differently (a fix landed since the save), silently shows an outdated figure. Load still opens
@@ -415,10 +434,7 @@ export default function App() {
     // problem, not a file-handling hiccup.
     const audit = auditLoadedFigure(r.file.facts);
     if (audit.findings.length > 0) {
-      const rows = audit.findings
-        .map((f) => `${f.step}. "${f.utterance}"${f.labels.length ? ` (${f.labels.join(', ')})` : ''}`)
-        .join(' · ');
-      setFileNote(t('file.loadAudit', { steps: rows }));
+      setFileAudit(audit.findings); // note is DERIVED from these against live facts (issue #24) — self-clears
     } else if (refreshed.length > 0) {
       // The save was from an older version and some steps were re-lowered to the current one (issue #120).
       setFileNote(t('file.loadRefreshed', { count: refreshed.length }));
@@ -1154,9 +1170,11 @@ export default function App() {
               </div>
             </div>
           )}
-          {/* Why a figure file couldn't be loaded (FR-HS-10) — shown right under the toolbar's
-              "load from file" button, where the action was taken. Transient (clears on next parse). */}
-          {fileNote && (
+          {/* Why a figure file couldn't be loaded (FR-HS-10) — shown right under the toolbar's "load from
+              file" button. `fileNote` is a transient problem/refreshed message; `auditNote` is the ADR-242
+              honesty audit DERIVED from live facts (issue #24), so it self-clears when its rows are fixed
+              and carries a × to dismiss this load's note outright. */}
+          {(fileNote || auditNote) && (
             <div
               style={{
                 position: 'absolute',
@@ -1170,9 +1188,31 @@ export default function App() {
                 color: '#991b1b',
                 fontSize: 12,
                 zIndex: 5,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 6,
               }}
             >
-              {fileNote}
+              <span style={{ flex: 1 }}>{fileNote || auditNote}</span>
+              {!fileNote && auditNote && (
+                <button
+                  type="button"
+                  onClick={() => setFileAudit([])}
+                  aria-label={t('file.dismissAudit')}
+                  title={t('file.dismissAudit')}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#991b1b',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                >
+                  ×
+                </button>
+              )}
             </div>
           )}
         </div>

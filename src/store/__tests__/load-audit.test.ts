@@ -11,7 +11,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { deserializeFigure } from '@/store/figureFile';
-import { auditLoadedFigure } from '@/store/loadAudit';
+import { auditLoadedFigure, liveAuditFindings } from '@/store/loadAudit';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
 
@@ -41,7 +41,9 @@ describe('load-time figure-file audit (ADR-242)', () => {
     if (!r.ok) return;
     const { findings, complete } = auditLoadedFigure(r.file.facts);
     expect(complete).toBe(true);
-    expect(findings).toEqual([{ step: 2, utterance: 'A ו C נמצאות על המעגל', kind: 'dropped', labels: ['C'] }]);
+    expect(findings).toMatchObject([{ step: 2, utterance: 'A ו C נמצאות על המעגל', kind: 'dropped', labels: ['C'] }]);
+    expect(findings[0].group).toBeTypeOf('string'); // carries a stable row handle (issue #24)
+    expect(findings[0].cmds.length).toBeGreaterThan(0);
   });
 
   it('flags a stale lowering as drift: the pre-ADR-241 "AC קוטר" set-collinear snapshot', () => {
@@ -68,5 +70,53 @@ describe('load-time figure-file audit (ADR-242)', () => {
     const { findings, complete } = auditLoadedFigure(facts);
     expect(complete).toBe(true);
     expect(findings).toEqual([]);
+  });
+});
+
+describe('liveAuditFindings — the note self-clears when its rows are fixed (issue #24)', () => {
+  const loaded = (): Fact[] => {
+    const r = deserializeFigure(OPERATOR_FILE);
+    if (!r.ok) throw new Error('deserialize failed');
+    return r.file.facts;
+  };
+
+  it('keeps the finding while the flagged row is unchanged and enabled', () => {
+    const facts = loaded();
+    const { findings } = auditLoadedFigure(facts);
+    expect(findings.length).toBe(1);
+    expect(liveAuditFindings(facts, findings)).toHaveLength(1);
+  });
+
+  it('drops the finding when the flagged row is DELETED (group gone)', () => {
+    const facts = loaded();
+    const { findings } = auditLoadedFigure(facts);
+    const flagged = findings[0].group;
+    const without = facts.filter((f) => (f.group ?? f.id) !== flagged);
+    expect(liveAuditFindings(without, findings)).toHaveLength(0);
+  });
+
+  it('drops the finding when the flagged row is TOGGLED OFF', () => {
+    const facts = loaded();
+    const { findings } = auditLoadedFigure(facts);
+    const flagged = findings[0].group;
+    const off = facts.map((f) => ((f.group ?? f.id) === flagged ? { ...f, enabled: false } : f));
+    expect(liveAuditFindings(off, findings)).toHaveLength(0);
+  });
+
+  it('drops the finding when the flagged row is ✎ RE-LOWERED (commands change)', () => {
+    const facts = loaded();
+    const { findings } = auditLoadedFigure(facts);
+    const flagged = findings[0].group;
+    // Simulate replaceGroup covering C too — the re-read the note asked for.
+    const relowered = facts.map((f) =>
+      (f.group ?? f.id) === flagged
+        ? { ...f, cmd: { type: 'point-on-circle', id: 'C', circle: 'circle-O' } as AnyCommand }
+        : f,
+    );
+    expect(liveAuditFindings(relowered, findings)).toHaveLength(0);
+  });
+
+  it('empty findings stay empty (a clean load shows no note)', () => {
+    expect(liveAuditFindings(loaded(), [])).toHaveLength(0);
   });
 });

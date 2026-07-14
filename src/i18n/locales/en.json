@@ -263,6 +263,7 @@
     "newerVersion": "This file was saved by a newer version of the site — refresh the page and try again",
     "loadAudit": "Note: this file was saved by an older version of the tool — the figure may not match the text at step(s): {{steps}}. Click ✎ on the step to re-read it.",
     "loadRefreshed": "This file was saved by an older version — {{count}} step(s) were updated to the current one.",
+    "dismissAudit": "Dismiss this note",
     "overwriteOrCopy": "Re-save \"{{name}}\"? Click OK to overwrite the file, or Cancel to save a new copy.",
     "copyNamePrompt": "Name for the new copy"
   },
