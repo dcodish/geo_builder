@@ -1393,10 +1393,12 @@ const ratioConstraint: Rule = (s) => {
     const d = qV?.value ?? 1; // trailing divisor ("CD/2", "CD/√2")
     return [{ type: 'set-ratio', a: up(g.la!), b: up(g.lb!), c: up(g.lc!), d: up(g.ld!), k: n / (m * d) }];
   }
-  // Hebrew "AB פי 2 מ-AD" / "AB פי √2 מ-OD" / "AC פי √(3) מ-CO" — |AB| is k× |AD|.
+  // Hebrew "AB פי 2 מ-AD" / "AB פי √2 מ-OD" / "AC פי √(3) מ-CO" — |AB| is k× |AD|. The RHS "מ" may be glued
+  // to a segment-noun ("מהקטע CO" / "מהצלע CD" / "מאורך CO") — the verbose relational form (issue #105) — so
+  // skip an optional noun after מ; the LHS noun prefix ("אורך AC" / "הצלע BC") is absorbed by the `[^=]*?`.
   const he = s.match(
     new RegExp(
-      String.raw`(?<ha>[A-Za-z]\d*)\s*(?<hb>[A-Za-z]\d*)\b[^=]*?פי\s*${NUMEXPR('k')}\s*מ-?\s*(?<hc>[A-Za-z]\d*)\s*(?<hd>[A-Za-z]\d*)\b`,
+      String.raw`(?<ha>[A-Za-z]\d*)\s*(?<hb>[A-Za-z]\d*)\b[^=]*?פי\s*${NUMEXPR('k')}\s*מ-?\s*(?:(?:ה?קטע|ה?צלע|אורך|ה?ישר)\s+)?(?<hc>[A-Za-z]\d*)\s*(?<hd>[A-Za-z]\d*)\b`,
     ),
   );
   if (he) {
@@ -5352,6 +5354,7 @@ export const RULES: Rule[] = [
   radiusSegment, // "OB רדיוס" — a drawn radius (rim point on the circle + centre→rim segment); after midpoint/setRadius/circle, before `segment` (so "OB" isn't grabbed as a bare segment)
   dividesInRatio, // "G מחלקת את DC ביחס 1:2" — a point on DC at a fixed t; keyword+`p:q` anchored, BEFORE `segment` (which would grab "הקטע DC" and drop the divider) and the numeric/ratio rules
   diagonals, // "אלכסונים" / "AC ו-BD אלכסוני הריבוע" — the quad's diagonals; before `segment` (which owns the singular "אלכסון AC")
+  ratioConstraint, // "AB = 2 AD" / "אורך AC גדול פי √3 מהקטע CO" — BEFORE `segment` (its "מהקטע"/"קטע" would else half-parse the relational ratio into a bare segment, dropping the factor — the dividesInRatio class, #105) and before equal/distance
   segment,
   pointsOnSegments, // "F, G, H on AB, AC, CB" — N points placed PAIRWISE on N segments, before the others
   pointsOnSegment, // "L and K are points on AC" — TWO points on a segment, before the single pointOnSegment
@@ -5366,7 +5369,6 @@ export const RULES: Rule[] = [
   measurePower, // "AB = x²" / "3x^2" — before measureLength so the exponent isn't dropped
   measurePi, // "AB = 2π" — before measureLength so π isn't read as a free variable
   measureLength, // "AB = 3x" (symbolic) — before ratio/equal/distance
-  ratioConstraint, // "AB = 2 AD" — before equal/distance (it would half-parse "AB = 2")
   equalSegments, // "AB = CD" — before distance (numeric RHS) and freePoint (coord RHS)
   distanceConstraint, // "AB = 6"
   pointByDistances,
@@ -5869,7 +5871,14 @@ export function normalizeUtterance(raw: string): string {
     // Uppercase CYRILLIC homoglyphs → Latin (#45): a label pasted with a Cyrillic look-alike (А/В/С/… are
     // NOT [A-Za-z]) silently fails every label rule. Map the visual twins to their Latin letter at the one
     // boundary every rule reads, so "מעגל עם קוטר АВ" reads AB.
-    .replace(/[АВСЕНКМОРТХ]/g, (ch) => CYRILLIC_TO_LATIN[ch]);
+    .replace(/[АВСЕНКМОРТХ]/g, (ch) => CYRILLIC_TO_LATIN[ch])
+    // The Hebrew word "שורש N" (square root) ≡ the √ glyph (issue #105) — normalise it HERE so every
+    // length/ratio/radius value path inherits it. Only before a number or "(" (so "שורש של" etc. is untouched).
+    .replace(/שורש\s*(?=[\d(])/g, '√')
+    // Verbose length frame "אורך/הצלע/הקטע <seg> הוא/היא/שווה <value>" → "<seg> = <value>" (issue #105), so
+    // the existing length rules handle the wordy phrasing. Requires a VALUE (√/digit/"(") after the copula,
+    // so the ratio form "הצלע BC גדולה פי 2 …" (no copula, a comparative) is left to `ratioConstraint`.
+    .replace(/(?:אורך|הצלע|הקטע)\s+([A-Za-z]\d*\s*[A-Za-z]\d*)\s+(?:הוא|היא|שווה(?:\s*ל-?)?)\s+(?=[√\d(])/g, '$1 = ');
   return normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(orth.trim().replace(/\s+/g, ' ')))));
 }
 

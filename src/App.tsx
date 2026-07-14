@@ -548,7 +548,7 @@ export default function App() {
       const oos = classifyOutOfScope(utterance);
       // #43 (ADR-289): the whole GUIDANCE register short-circuits BEFORE the LLM — none of these
       // families can ever build, so an LLM call on them is pure cost (the analytic precedent).
-      const PRE_LLM = new Set(['analytic', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point']);
+      const PRE_LLM = new Set(['analytic', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point', 'unnamed-sides']);
       if (oos && PRE_LLM.has(oos.category)) {
         logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${oos.category}` });
         setInputNote(t(oos.messageKey));
