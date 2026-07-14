@@ -296,7 +296,7 @@ const FRACTION_GLYPHS: Record<string, number> = {
   '⅕': 1 / 5, '⅖': 2 / 5, '⅗': 3 / 5, '⅘': 4 / 5, '⅙': 1 / 6, '⅚': 5 / 6, '⅛': 1 / 8,
 };
 
-/** `5/3`, `0.5`, `2`, `½`… — absent ⇒ 1. Null on malformed. */
+/** `5/3`, `0.5`, `2`, `½`, `√2`, `2√3`, `√6/4`… — absent ⇒ 1. Null on malformed. */
 function parseCoeff(s: string | undefined): number | null {
   if (s === undefined || s === '') return 1;
   if (FRACTION_GLYPHS[s] !== undefined) return FRACTION_GLYPHS[s];
@@ -305,6 +305,9 @@ function parseCoeff(s: string | undefined): number | null {
     const den = parseInt(frac[2], 10);
     return den === 0 ? null : parseInt(frac[1], 10) / den;
   }
+  if (/√/.test(s)) return evalRadical(s); // #55 gap (a): a RADICAL coefficient (`√2·OD`) makes `AB = √2·OD`
+  // a vec-rel exactly like `A'K = 4/5 DN` (the neutral vector lane — coefficient pair=pair is NOT the bare
+  // c=1 ambiguity), instead of falling through to not-handled → the LLM.
   const v = parseFloat(s);
   return Number.isFinite(v) ? v : null;
 }
@@ -479,7 +482,7 @@ const spanPoint: Rule = (s) => {
  * `2k·u`, `t·BE`, plus every numeric form. Null on anything else.
  */
 const SYM_TERM =
-  /^([+-])?\s*(?:\(([^()]+)\)\s*[·×*]?\s*)?((?:\d+(?:\.\d+)?)(?:\s*\/\s*\d+(?:\.\d+)?)?|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛])?\s*[·×*]?\s*([a-w])?\s*[·×*]?\s*(?:([A-Z]\d*'?)([A-Z]\d*'?)|([a-z]))\s*(?:\/\s*(\d+(?:\.\d+)?))?$/;
+  /^([+-])?\s*(?:\(([^()]+)\)\s*[·×*]?\s*)?((?:\d+(?:\.\d+)?)?\s*(?:√\s*\d+(?:\.\d+)?)?(?:\s*\/\s*\d+(?:\.\d+)?)?|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛])?\s*[·×*]?\s*([a-w])?\s*[·×*]?\s*(?:([A-Z]\d*'?)([A-Z]\d*'?)|([a-z]))\s*(?:\/\s*(\d+(?:\.\d+)?))?$/;
 
 export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string } | null {
   const parts = src
@@ -599,11 +602,13 @@ const lengthRel: Rule = (s) => {
   // `שווה לאורך צלע הריבוע ABCD` — any side of the named square; its first edge stands in
   const sq = r.match(/^(?:אורך\s+)?(?:ה?צלע\s+)?(?:של\s+)?הריבוע\s+([A-Z]\d*'?)([A-Z]\d*'?)(?:[A-Z]\d*'?)*\s*$/) ?? r.match(/^(?:אורך\s+)?צלע\s+([A-Z]\d*'?)([A-Z]\d*'?)(?:[A-Z]\d*'?)*\s*$/);
   if (sq) return [{ type: 'segment3', a: a1, b: b1 }, { type: 'length-rel', a1, b1, rhs: { pair: [sq[1], sq[2]] }, c: 1 }];
-  // #72: a BARE pair RHS (`אורך AB=BC`) — the explicit length marker on the LHS already
-  // disambiguated the whole utterance to LENGTH (bare `AB=BC` alone stays the
-  // ambiguous-vector-length clarification — this rule is only reached through the marked lhs).
-  const bare = r.match(new RegExp(`^${P}$`));
-  if (bare) return [{ type: 'segment3', a: a1, b: b1 }, { type: 'length-rel', a1, b1, rhs: { pair: [bare[1], bare[2]] }, c: 1 }];
+  // #72 / #55 gap (b): a BARE pair RHS, with or without a radical coefficient (`אורך AB=BC`,
+  // `|AB| = √2·OD`, `|AB| = OD`) — the explicit length marker on the LHS already disambiguated the whole
+  // utterance to LENGTH, so the bare pair reads as |ZW| (bare `AB=BC` with NO length marker stays the
+  // ambiguous-vector-length clarification — this rule is only reached through the marked lhs). `tail(P)`
+  // carries the coefficient (before OR after the pair), so `√2·OD` lands c=√2 and plain `OD` lands c=1.
+  t = tail(P);
+  if (t) return [{ type: 'segment3', a: a1, b: b1 }, { type: 'length-rel', a1, b1, rhs: { pair: [t.g[0], t.g[1]] }, c: t.c }];
   return null;
 };
 

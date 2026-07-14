@@ -119,3 +119,39 @@ describe('#72 — build', () => {
     expect(state().facts).toHaveLength(before);
   });
 });
+
+describe('#55 (ADR-3D-040): the coefficient form of the length/vector ambiguity', () => {
+  const val = (u: string) => {
+    const c = cmd(u).find((x) => x.type === 'length-rel') as { c: number } | undefined;
+    return c?.c;
+  };
+
+  it("gap (a): a bare pair = <radical-coef>·pair is a vec-rel (like A'K = 4/5 DN), not not-handled", () => {
+    // The coefficient form resolves to the NEUTRAL vector lane (ADR-3D-010) exactly like `A'K = 4/5 DN` —
+    // routing it to the ambiguity clarification would regress that established behaviour. Only the BARE
+    // c=1 pair=pair stays the length/vector ambiguity. `√2` just needs to parse like `4/5`.
+    for (const u of ['AB=√2*OD', 'AB = √2·OD', 'A\'K = 4/5 DN']) {
+      const r = parse3(u);
+      expect(r.ok, u).toBe(true);
+      if (r.ok) expect(r.commands.some((c) => c.type === 'vec-rel')).toBe(true);
+    }
+    // the no-coefficient bare pair is still the length/vector ambiguity (unchanged)
+    const bare = parse3('AS = AB');
+    expect(bare.ok).toBe(false);
+    if (!bare.ok) expect(bare.reason).toBe('ambiguous-vector-length');
+  });
+
+  it("gap (b): a LENGTH-marked LHS accepts a bare pair RHS with a coefficient", () => {
+    expect(val('|AB| = √2 OD')).toBeCloseTo(Math.SQRT2, 6); // pipes disambiguate → length
+    expect(val('|AB| = √2·OD')).toBeCloseTo(Math.SQRT2, 6);
+    expect(val('|AB| = OD')).toBeCloseTo(1, 6);
+  });
+
+  it('no-theft: an ARROWED pair stays a vector relation; markers/numerics unchanged', () => {
+    expect(parse3('AB⃗ = 2·OD⃗').ok).toBe(true); // vector lane
+    expect(cmd('AB⃗ = 2·OD⃗').some((c) => c.type === 'vec-rel')).toBe(true);
+    expect(val('|AB| = √2·|OD|')).toBeCloseTo(Math.SQRT2, 6); // pipes-both, unchanged
+    expect(cmd('|w| = 2').some((c) => c.type === 'vec-mag')).toBe(true); // named-vector magnitude
+    expect(cmd('AS = 12').some((c) => c.type === 'claim')).toBe(true); // numeric length given, not ambiguous
+  });
+});
