@@ -71,4 +71,21 @@ describe('dryRunOutcome — did the step actually build something?', () => {
     // pin any variant isn't rescued by this path — guarded by the other cases; here we assert the pin path
     // is scoped to variant shapes: an equality naming a NON-variant triangle's existing sides is unaffected.
   });
+
+  it('RE-TYPING an equality that is already a committed fact is a friendly no-op, not a phantom move (issue #1)', () => {
+    // ADR-234 class: the commit's `foldFact` dedups an EXACT enabled-duplicate, so the figure never moves —
+    // but the dry-run's trial used to append the duplicate un-deduped, and two identical `set-equal`s perturb
+    // the solver ~0.75, falsely reading as "produced". The dry-run must model the commit's dedup: an exact
+    // enabled-duplicate contributes nothing → the step is "already drawn" (empty), not a phantom build.
+    const iso = facts([{ type: 'shape-variant', shape: 'isosceles', ids: ['A', 'B', 'C'], variant: 0 } as AnyCommand]);
+    const withPair = [...iso, ...facts(cmdsOf('AB=AC')).map((f, i) => ({ ...f, id: `eq${i}` }))];
+    const o = dryRunOutcome(withPair, cmdsOf('AB=AC'));
+    expect(o.produced, 'a duplicate of an already-committed equality builds nothing new').toBe(false);
+    if (!o.produced) expect(o.reason).toBe('empty');
+    // Class breadth: the same holds for a plain construct's constraint (not just the variant-pin path).
+    const sq = facts(cmdsOf('square ABCD'));
+    const withLen = [...sq, ...facts(cmdsOf('AB = 6')).map((f, i) => ({ ...f, id: `len${i}` }))];
+    const o2 = dryRunOutcome(withLen, cmdsOf('AB = 6'));
+    expect(o2.produced, 're-typing an existing distance given is already-drawn').toBe(false);
+  });
 });

@@ -297,9 +297,17 @@ export function primeFoldFor(facts: Fact[], fold: FoldNode): void {
 }
 
 /** The dry-run trial fact list for a candidate step — the FIRST content the submit path folds, shared
- *  here so a worker prefold warms exactly the content `dryRunOutcome` (and usually the commit) will use. */
+ *  here so a worker prefold warms exactly the content `dryRunOutcome` (and usually the commit) will use.
+ *  It models what `foldFact` will actually commit: a command that exactly duplicates an ENABLED fact is a
+ *  friendly idempotent no-op (FR-EN-9) and is dropped, so the trial's net content matches the committed
+ *  figure. Without this a re-stated constraint (re-typing `AB=AC`, or a compound step like an altitude that
+ *  re-emits its base `triangle ABC`) would append a redundant copy — two identical `set-equal`s perturb the
+ *  solver ~0.75 and read as a phantom "produced" (issue #1 / ADR-234) though the real figure never moves. A
+ *  DISABLED twin is kept (the commit re-enables it — a genuine change; the disabled copy is inert in replay). */
 export function trialFacts(facts: Fact[], commands: AnyCommand[]): Fact[] {
-  return [...facts, ...commands.map((c, i) => ({ id: `~try.${i}`, group: '~try', enabled: true, cmd: c }))];
+  const enabled = facts.filter((f) => f.enabled).map((f) => f.cmd);
+  const eff = commands.filter((c) => !enabled.some((e) => deepEqual(e, c)));
+  return [...facts, ...eff.map((c, i) => ({ id: `~try.${i}`, group: '~try', enabled: true, cmd: c }))];
 }
 
 function computeReplay(facts: Fact[], seed = 0, radiusOverrides: Record<Id, number> = {}): Derived {
