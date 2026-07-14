@@ -1,0 +1,28 @@
+feat(3d): right prisms over more bases + the parallelepiped (#117)
+
+Operator: support מנסרה ישרה over parallelogram / general-quad / square / regular
+n-gon bases, and מקבילון (the oblique parallelepiped bagrut uses). All slot into the
+existing dims-sampler + pivot with NO new solver code — a prism is a base polygon
+translated straight up (right) or by a free lateral vector (parallelepiped).
+
+Fix (ADR-3D-044): six new fixed-vertex SolidKinds — prism4 (parallelogram),
+prism4g (general quad), prism4sq (square), prismReg5/prismReg6 (regular pentagon/
+hexagon), parallelepiped (parallelogram base + free lateral vector w). Topology is
+ONE generic helper prismRing(n) (base ring + top ring + n verticals + n lateral
+faces), keyed by prismBaseN(kind) — no per-kind edge/face cases. The parser's
+rightPrism becomes a base-noun dispatcher (He+En; rhombus stays with rhombusPrism,
+rectangle routes to the existing box); a bare מנסרה ישרה with no base/labels keeps
+the honest ADR-052 refusal. מקבילון is a first-class rule (a named oblique solid
+carrying its own free DOF asserts no unstated "right" given).
+
+Scope: regular prisms are pentagon+hexagon (fixed kinds fit the per-kind-Record
+architecture); arbitrary-n is a documented follow-up.
+
+prism-bases.test.ts (dispatch He/En; square base geometry; parallelogram parallel
+edges; parallelepiped single lateral vector; triangle/rhombus regressions) +
+scenarios (build-clean + DOF cue per base; size given on an edge verifies).
+Catalog3 +6. Full 3-D lane green (729), tsc + build:3d clean.
+
+Closes #117
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>

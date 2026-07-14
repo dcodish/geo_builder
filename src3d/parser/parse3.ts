@@ -17,7 +17,7 @@
  *    refuse rather than silently drop it.
  */
 
-import type { Command3, Id, LinExpr, SymTerm, VecAtom, VecExpr } from '../engine/types';
+import type { Command3, Id, LinExpr, SolidKind, SymTerm, VecAtom, VecExpr } from '../engine/types';
 
 export type ParseResult3 =
   | { ok: true; commands: Command3[] }
@@ -87,18 +87,41 @@ const cubeOrBox: Rule = (s) => {
   return null;
 };
 
-/** Right triangular prism: `מנסרה ישרה (משולשת) ABCA'B'C'` — 6 vertices, or 3 auto-primed.
- *  V8-d: an equilateral base (`שווה צלעות` / `כל מקצועותיה שווים` / `equilateral`) → `prism3e`. */
+/** Right prism, dispatched by its BASE shape (#117): `מנסרה ישרה [שבסיסה <shape>] <labels>`.
+ *  triangle→prism3, equilateral→prism3e, parallelogram→prism4, general quad→prism4g, square→prism4sq,
+ *  rectangle→box, pentagon→prismReg5, hexagon→prismReg6. (Rhombus is left to `rhombusPrism`.) Labels: the
+ *  2n primed run, or n unprimed auto-primed, or a base noun with no labels → the default A,B,C(,D…) base.
+ *  A bare `מנסרה ישרה` with NO base noun and no labels stays the honest ADR-052 refusal. */
 const rightPrism: Rule = (s) => {
   if (!/מנסרה/.test(s) && !/\bprism\b/i.test(s)) return null;
-  if (!/ישרה/.test(s) && !/\bright\b/i.test(s)) return null; // oblique unsupported in V0 — honest refusal
+  if (!/ישרה/.test(s) && !/\bright\b/i.test(s)) return null; // oblique unsupported — honest refusal
+  if (/מעוין/.test(s) || /\brhombus\b/i.test(s)) return null; // rhombus base → rhombusPrism
   const equi = /שווה[\s-]?צלעות/.test(s) || /כל\s+מקצועותיה\s+שוו/.test(s) || /\bequilateral\b/i.test(s);
-  const kind = equi ? 'prism3e' : 'prism3';
+  let kind: SolidKind, bn: number, namedBase: boolean;
+  if (/מקבילית/.test(s) || /\bparallelogram\b/i.test(s)) { kind = 'prism4'; bn = 4; namedBase = true; }
+  else if (/מלבן/.test(s) || /\brectangle\b/i.test(s)) { kind = 'box'; bn = 4; namedBase = true; }
+  else if (/ריבוע/.test(s) || /\bsquare\b/i.test(s)) { kind = 'prism4sq'; bn = 4; namedBase = true; }
+  else if (/מרובע/.test(s) || /\bquadrilateral\b/i.test(s) || /\bquad\b/i.test(s)) { kind = 'prism4g'; bn = 4; namedBase = true; }
+  else if (/מחומש/.test(s) || /\bpentagon\b/i.test(s)) { kind = 'prismReg5'; bn = 5; namedBase = true; }
+  else if (/משושה/.test(s) || /\bhexagon\b/i.test(s)) { kind = 'prismReg6'; bn = 6; namedBase = true; }
+  else { kind = equi ? 'prism3e' : 'prism3'; bn = 3; namedBase = /משולש/.test(s) || /\btriangular\b/i.test(s) || equi; }
+  const base = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, bn);
   const toks = firstLabelRun(s);
-  if (toks.length === 6) return [{ type: 'solid', kind, ids: toks }];
-  if (toks.length === 3 && toks.every(unprimed)) return [{ type: 'solid', kind, ids: [...toks, ...primeAll(toks)] }];
-  if (toks.length === 0 && (/משולש/.test(s) || /\btriangular\b/i.test(s) || equi))
-    return [{ type: 'solid', kind, ids: ['A', 'B', 'C', ...primeAll(['A', 'B', 'C'])] }];
+  if (toks.length === 2 * bn) return [{ type: 'solid', kind, ids: toks }];
+  if (toks.length === bn && toks.every(unprimed)) return [{ type: 'solid', kind, ids: [...toks, ...primeAll(toks)] }];
+  if (toks.length === 0 && namedBase) return [{ type: 'solid', kind, ids: [...base, ...primeAll(base)] }];
+  return null;
+};
+
+/** The oblique parallelepiped `מקבילון` / `parallelepiped` (#117): a parallelogram base translated by a
+ *  FREE lateral vector — 8 labels, or 4 auto-primed, or the default ABCD base. Allowed despite being
+ *  oblique: it is a NAMED oblique solid carrying its own free DOF, so it asserts no unstated "right" given. */
+const parallelepiped: Rule = (s) => {
+  if (!/מקבילון/.test(s) && !/\bparallelepiped\b/i.test(s)) return null;
+  const toks = firstLabelRun(s);
+  if (toks.length === 8) return [{ type: 'solid', kind: 'parallelepiped', ids: toks }];
+  if (toks.length === 4 && toks.every(unprimed)) return [{ type: 'solid', kind: 'parallelepiped', ids: [...toks, ...primeAll(toks)] }];
+  if (toks.length === 0) return [{ type: 'solid', kind: 'parallelepiped', ids: ['A', 'B', 'C', 'D', ...primeAll(['A', 'B', 'C', 'D'])] }];
   return null;
 };
 
@@ -1753,6 +1776,7 @@ const RULES: Rule[] = [
   cubeOrBox,
   rhombusPrism,
   rightPrism,
+  parallelepiped, // מקבילון / parallelepiped — an oblique named solid (#117)
   volumeEqPoly, // BEFORE volumePolyClaim: its RHS is a volume, not a number
   volumePolyClaim, // BEFORE rightPyramid: נפח הפירמידה ABCD must never build a pyramid
   rightPyramidPoint, // V8-j: `T על SC כך ש-TABCD פירמידה ישרה` — before rightPyramid (which would build a solid)

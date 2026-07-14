@@ -153,7 +153,10 @@ export type SolidKind =
   // quadrilateral / pentagon. Modelled as a "solid" so it reuses the dims-sampler + the
   // pivot (free case → sampled shape; metric givens → the pivot drives it); double-sided
   // (two opposite faces) so a flat figure never renders fully hidden.
-  | 'polygon3' | 'polygon4' | 'polygon5';
+  | 'polygon3' | 'polygon4' | 'polygon5'
+  // #117: right prisms over more bases — parallelogram / general quad / square / regular pentagon+hexagon —
+  // and the oblique parallelepiped (מקבילון: a parallelogram base translated by a FREE lateral vector w).
+  | 'prism4' | 'prism4g' | 'prism4sq' | 'prismReg5' | 'prismReg6' | 'parallelepiped';
 // The 4-base pyramid family: rightness (ישרה — apex above the base centre) and base shape
 // are INDEPENDENT stated givens (ADR-052). Square must be STATED (שבסיסה ריבוע); an
 // unstated base is a free-aspect rectangle DOF. pyramid4: right+square (dims [h]);

@@ -525,3 +525,34 @@ describe("#116 (ADR-3D-042) — a right-triangle qualifier on a prism base (prod
     expect(angleAt('E', 'D', 'F')).toBeCloseTo(90, 0);
   });
 });
+
+// #117 — right prisms over more bases (parallelogram / square / regular n-gon) + the oblique parallelepiped
+// (מקבילון). Each slots into the dims-sampler + pivot with no new solver code; the DOF cue reads the base's
+// free shape dims (modulo the similarity gauge).
+describe('#117 — generalized prism bases + parallelepiped', () => {
+  beforeEach(reset);
+  const dof = () => freeDofCount3(derived().construction, derived().resolved);
+
+  it('a parallelogram-base right prism builds (3 shape DOF)', () => {
+    submit("מנסרה ישרה שבסיסה מקבילית ABCDA'B'C'D'");
+    expect(state().lastError).toBeNull();
+    expect(dof()).toBe(3); // dx, dy, height
+  });
+  it('a square-base right prism builds (1 shape DOF — only the height)', () => {
+    submit("מנסרה ישרה שבסיסה ריבוע ABCDA'B'C'D'");
+    expect(state().lastError).toBeNull();
+    expect(dof()).toBe(1);
+  });
+  it('a regular pentagon prism builds (1 shape DOF)', () => {
+    submit('מנסרה ישרה שבסיסה מחומש');
+    expect(state().lastError).toBeNull();
+    expect(dof()).toBe(1);
+  });
+  it('a מקבילון (oblique) builds (5 shape DOF) and a size given on an edge verifies', () => {
+    submit("מקבילון ABCDA'B'C'D'");
+    expect(state().lastError).toBeNull();
+    expect(dof()).toBe(5); // dx, dy + the free lateral vector w=(wx,wy,wz)
+    submit('|AB| = 3');
+    expect(state().lastError).toBeNull(); // the size is accepted (verifies), never refused
+  });
+});
