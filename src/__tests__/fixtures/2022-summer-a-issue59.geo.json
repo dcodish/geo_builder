@@ -125,7 +125,11 @@
         "id": "C",
         "line": "chord-AO",
         "circle": "circle-O",
-        "avoid": "A"
+        "avoid": "A",
+        "onSegment": [
+          "A",
+          "O"
+        ]
       },
       "enabled": true
     },

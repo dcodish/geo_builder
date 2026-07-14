@@ -188,6 +188,32 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'q5-circle-cuts-BO-K-stays-on-segment',
+    title: 'bagrut Q5: «המעגל חותך את BO בנקודה K» then «CK=√63» — K stays ON segment BO, does not flip beyond the centre (issue #119, ADR-313)',
+    guards:
+      "Operator dev session `disb4ebn` (2026-07-13): `המעגל חותך את BO בנקודה K` (O the incircle centre, B an external vertex) placed K between B and O, then the size given `CK=√(63)` flipped K to the intersection beyond O (off segment BO), silently green. Fixed by a stable within-segment SELECTION (ADR-313): `line-circle-intersection` gains `onSegment:[B,O]` — pick the root with parameter in (0,1), scale-invariant so it can't flip. A pure pick (no `collinear-order` constraint), so unlike a driving `order` it never over-constrains a sibling crossing on the same line (the tangent/secant #3 regression).",
+    steps: [
+      'במשולש שווה שוקיים חסום מעגל O',
+      'AC=AB',
+      { llm: ['AC=√3 CO'] }, // the operator's wordy «אורך…גדול פי √(3) מהקטע…» escalated (#105); canonical set-ratio
+      'CO',
+      'OB',
+      'OA',
+      'המעגל חותך את BO בנקודה K',
+      'CK',
+      'CK=√(63)',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const B = at(fig, 'B'), O = at(fig, 'O'), K = at(fig, 'K'), C = at(fig, 'C');
+      const L2 = (O.x - B.x) ** 2 + (O.y - B.y) ** 2;
+      const t = ((K.x - B.x) * (O.x - B.x) + (K.y - B.y) * (O.y - B.y)) / L2;
+      expect(t, 'K strictly between B and O on the segment').toBeGreaterThan(0.02);
+      expect(t, 'K not beyond O').toBeLessThan(0.98);
+      expect(dist(C, K), '|CK| = √63').toBeCloseTo(Math.sqrt(63), 3);
+    },
+  },
+  {
     id: 'hosem-slip-container-marker-wins',
     title: 'משולש ABC חוסם במעגל + BC קוטר — the ב container marker wins over the חוסם verb letter (issues #31/#38, ADR-283)',
     guards:

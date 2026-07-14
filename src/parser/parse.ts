@@ -3910,17 +3910,28 @@ const lineMeetsCircle: Rule = (s, ctx) => {
   const other = onCircle === a ? b : a;
   const lineId = `chord-${a}${b}`;
   // A BARE pair means the SEGMENT (ADR-077 / ADR-268, the line∩circle member — issue #30): the stated
-  // crossing must land WITHIN a–b, carried as the ADR-127 `order` (→ a `collinear-order` the solver
-  // flexes free DOFs to satisfy). Opt-outs keep their own semantics: `הישר`/`line` = the infinite line
-  // (the B13 corpus phrasing), `המשך` = the extension (owned by extendOntoCircle, which runs earlier).
-  // A pair endpoint that IS the circle's CENTRE also reads as the line: a segment ending at the centre
-  // has no second crossing strictly within it ("E היא מפגש של AO עם המעגל" on a radius AO = the
-  // antipode, beyond O by definition), so the within-default would be unsatisfiable by construction.
-  const infinite =
-    /\bline\b|\bray\b|הישר|הקו|קרן|המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(s) || a === up(center) || b === up(center);
+  // crossing must land WITHIN a–b. Two ways to keep it there:
+  //   • `order` (ADR-127, a driving `collinear-order`) — the general bare-pair case, where the figure may
+  //     have to FLEX free DOFs to bring the crossing onto the segment.
+  //   • `onSegment` (ADR-313/#119, a stable SELECTION, no constraint) — when one endpoint is INSIDE the
+  //     circle (the extreme case: the CENTRE), so exactly ONE root is within the segment. A pick suffices
+  //     (no driving needed) and adds no constraint, so it can't contend with a sibling crossing on the same
+  //     line (the tangent-secant `AO חותך C` + `המשך AO חותך D`, where a driving `order` over-constrained).
+  // Opt-outs keep their own semantics: `הישר`/`line` = the infinite line (the B13 corpus phrasing), `המשך` =
+  // the extension (owned by extendOntoCircle). A segment ending at the centre whose OTHER endpoint is ON the
+  // circle is a RADIUS — its only crossing beyond that endpoint is the antipode (beyond the centre), so it
+  // reads as the infinite line (no within crossing).
+  const wordInfinite = /\bline\b|\bray\b|הישר|הקו|קרן|המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(s);
+  const aCentre = a === up(center), bCentre = b === up(center);
+  const centreRadius = (aCentre && !!circleContaining(ctx, [b], center)) || (bCentre && !!circleContaining(ctx, [a], center));
+  const centreSelect = (aCentre || bCentre) && !centreRadius; // centre endpoint, other not on the circle → within selection
+  const infinite = wordInfinite || centreRadius;
   return [
     { type: 'line-through', id: lineId, a, b },
-    { type: 'line-circle-intersection', id: R, line: lineId, circle: circ, avoid: onCircle, ...(infinite ? {} : { order: [a, R, b] as Id[] }) },
+    {
+      type: 'line-circle-intersection', id: R, line: lineId, circle: circ, avoid: onCircle,
+      ...(centreSelect ? { onSegment: [a, b] as [Id, Id] } : infinite ? {} : { order: [a, R, b] as Id[] }),
+    },
     // BOTH halves of the stated line are drawn (ADR-250, honesty §6): "AD חותך את המעגל ב-E" must show
     // A—E—D whole, not just D–E — the on-circle half was silently missing and the student re-typed it
     // (session m68n76e7). Split at the crossing, so no overlapping collinear strokes.

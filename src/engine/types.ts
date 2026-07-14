@@ -298,6 +298,13 @@ export interface ArcMidpointPoint {
  * the solution FARTHEST from it is chosen instead of `branch` — so "the OTHER crossing"
  * is deterministic and stays put under resampling (the two roots' index order flips with
  * the line's direction, so a fixed branch would intermittently collapse onto the known point).
+ *
+ * `onSegment` (a pair of point ids [a,b]) makes the crossing WITHIN the a–b segment a stable
+ * SELECTION — the root whose parameter lies in (0,1) along a→b (ADR-313/issue #119). Used when one
+ * endpoint is INSIDE the circle (the extreme case: the centre) so exactly one crossing is within the
+ * segment and no driving is needed: a pure pick, never a `collinear-order` CONSTRAINT (so it adds no
+ * DOF the recruiter must satisfy — the `order` field is for the flex-the-figure cases). Stable under
+ * rescale because "within (0,1)" is scale-invariant, so the crossing can't flip to the far root.
  */
 export interface LineCirclePoint {
   kind: 'line-circle';
@@ -306,6 +313,7 @@ export interface LineCirclePoint {
   circle: Id;
   branch: number;
   avoid?: Id;
+  onSegment?: [Id, Id];
 }
 
 /**
@@ -952,7 +960,10 @@ export type Command =
   // `order` (e.g. [C, id, E]) keeps the crossing ON the segment between two of the line's points (the
   // circle "cuts CE at D" ⇒ D between C and E), via a `collinear-order` constraint — D is already
   // collinear (it's on the line), so only the side/order is constrained ([ADR-127]).
-  | { type: 'line-circle-intersection'; id: Id; line: Id; circle: Id; branch?: number; avoid?: Id; order?: Id[] }
+  // `onSegment` [a,b] (ADR-313/#119): pick the crossing WITHIN the a–b segment as a stable SELECTION (no
+  // constraint), for the case where one endpoint is inside the circle (e.g. the centre) so exactly one root
+  // is within — a pick, not the flex-the-figure `order`. Distinct from `order` (a driving collinear-order).
+  | { type: 'line-circle-intersection'; id: Id; line: Id; circle: Id; branch?: number; avoid?: Id; order?: Id[]; onSegment?: [Id, Id] }
   // "המשך AC חותך מעגל P בנקודה D" — directional extension onto a circle (ADR-054): the NEW point
   // `id` is collinear with `a`,`b` AND beyond `b` (order a→b→id); a free-radius circle adapts so the
   // extension actually reaches it. Distinct from `line-circle-intersection` (order-agnostic chord).

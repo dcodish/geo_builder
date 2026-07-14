@@ -1374,6 +1374,36 @@ function tryEval(
       if (!l || !c) return 'pending';
       const sols = lineCircleIntersect(l.anchor, l.dir, c.center, c.r);
       if (sols.length === 0) return `cannot construct ${p.id}: line ${p.line} does not meet circle ${p.circle}`;
+      // `onSegment` [a,b] (ADR-313 / issue #119): pick the crossing WITHIN the a–b segment as a stable
+      // SELECTION — the root whose parameter is in (0,1) along a→b. Used when one endpoint is inside the
+      // circle (the extreme case: the centre) so exactly one root is within; being scale-invariant, the pick
+      // can't flip to the far root when a later size given rescales the figure. A pure pick — no constraint,
+      // so it never contends with a sibling crossing on the same line (unlike the driving `order`).
+      if (p.onSegment) {
+        const a = pos.get(p.onSegment[0]);
+        const b = pos.get(p.onSegment[1]);
+        if (a && b) {
+          const d = sub(b, a);
+          const L2 = d.x * d.x + d.y * d.y;
+          if (L2 > 1e-18) {
+            const within = sols.filter((s) => {
+              const t = ((s.x - a.x) * d.x + (s.y - a.y) * d.y) / L2;
+              return t > 1e-6 && t < 1 - 1e-6;
+            });
+            if (within.length === 1) return within[0];
+            if (within.length >= 2) {
+              // Two crossings both within the segment (a through-secant): tiebreak by `avoid`, else a stable side.
+              if (p.avoid) {
+                const kept = otherCrossing(within, [...pos.values()], pos.get(p.avoid), p.branch);
+                if (kept) return kept;
+              }
+              return bySide(within, l.anchor, l.dir)[p.branch % within.length];
+            }
+            // No root strictly within at this config — fall through to avoid/branch (safety; shouldn't
+            // happen for a centre-endpoint segment where a within crossing always exists).
+          }
+        }
+      }
       // "The OTHER crossing" (`avoid` set): the secant runs through a KNOWN on-circle point (a line
       // endpoint), so one root is that point — keep the genuinely new one (see {@link otherCrossing}).
       if (p.avoid) {
