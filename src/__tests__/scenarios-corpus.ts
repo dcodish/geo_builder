@@ -158,6 +158,19 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'semicircle-outside-a-triangle-side',
+    title: '«חצי מעגל על צלע AB מחוץ למשולש» builds (bulge outward), not an escalation (issue #134, ADR-331)',
+    guards:
+      'Operator play-test 2026-07-14: a semicircle on side AB "מחוץ למשולש" (outside the triangle) errored — the semicircle rule had no side vocabulary, so `מחוץ למשולש` tripped the SHAPE_LEFTOVER escalation. Now the bulge clause is consumed and resolved to a render-time orientation (the arc gets bulgeRef = the opposite vertex); the exact sequence builds clean.',
+    steps: ['משולש ABC', 'חצי מעגל על צלע AB מחוץ למשולש'],
+    check(fig) {
+      allStepsOk(fig);
+      // the semicircle's hidden circle + its arc were built (the orientation is a render concern, tested in
+      // semicircle-bulge.test.tsx); the point is that the "מחוץ למשולש" utterance no longer escalates/errors.
+      expect(fig.construction.objects.some((o) => o.kind === 'arc')).toBe(true);
+    },
+  },
+  {
     id: 'verbose-relational-ratio-builds',
     title: '«אורך AC גדול פי 2 מהקטע AB» drives the ratio (verbose/relational size-given, issue #105, ADR-318)',
     guards:

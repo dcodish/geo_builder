@@ -2946,6 +2946,34 @@ const regularPolygon: Rule = (s, ctx) => {
  * it is pure gauge. And an unstated radius is a FREE DOF (ADR-051/052 — `freeRadius` unless a number
  * was stated), the unnamed auto-picked centre carries `autoCenter` (FR-RN-8), same as `circle`.
  */
+// "outside/inside the <shape>" — a semicircle on a polygon SIDE, bulging away from (outside, default) or
+// toward (inside) the shape. Matches the whole clause so it can be stripped before the leftover/diameter
+// read; the shape noun + up to 4 labels are consumed with it.
+const BULGE_CLAUSE =
+  /(?:מחוץ\s*ל|בתוך\s*ה?|\boutside(?:\s+of)?\b|\binside(?:\s+of)?\b)\s*(?:the\s+)?(?:ה?(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע)|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite|polygon)?\s*(?:[A-Z]\d*\s*){0,4}/gi;
+
+/** Resolve a semicircle's bulge orientation (#outward): "outside/inside the <shape>" → the reference vertex
+ *  (a vertex of the shape NOT on the diameter side) + `bulgeToward` for inside. The shape is a named run,
+ *  else the figure's single polygon whose edge is the diameter. No qualifier / unresolvable → no control. */
+function semicircleBulge(s: string, ctx: ParseContext, a: Id, b: Id): { bulgeRef?: Id; bulgeToward?: boolean } {
+  const outside = /מחוץ\s*ל|\boutside\b/i.test(s);
+  const inside = /בתוך|\binside\b/i.test(s);
+  if (!outside && !inside) return {};
+  const A = up(a), B = up(b);
+  let poly: Id[] | null = null;
+  const shapeM = s.match(
+    /(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite)\s+((?:[A-Z]\d*\s*){3,4})/i,
+  );
+  if (shapeM) { const run = (shapeM[1].match(/[A-Z]\d*/g) ?? []).map(up); if (run.length >= 3) poly = run; }
+  if (!poly) {
+    const edge = (ctx.polygons ?? []).find((v) => { const u = v.map(up); return u.includes(A) && u.includes(B); });
+    if (edge) poly = edge.map(up);
+  }
+  const ref = poly?.find((v) => v !== A && v !== B); // a vertex on the interior side of the diameter
+  if (!ref) return {}; // couldn't resolve a reference → leave the arc unoriented
+  return { bulgeRef: ref, ...(inside ? { bulgeToward: true } : {}) };
+}
+
 const semicircle: Rule = (s, ctx) => {
   if (!/semicircle|half[\s-]?circle|חצי[\s-]?מעגל|חצי[\s-]?עיגול/i.test(s)) return null;
   const r = parseRadius(s);
@@ -2953,13 +2981,16 @@ const semicircle: Rule = (s, ctx) => {
   // A SIDE reference is this rule's own vocabulary — «על צלע CD יש חצי מעגל» states the side IS the
   // diameter, so צלע/side is consumed here before the leftover test (the ADR-280 discipline: each rule
   // strips its OWN words; the quantified «על כל צלע של ריבוע…» still stops on the surviving כל/ריבוע).
-  const stripped = dropCircleRef(s).replace(
+  // The "outside/inside the <shape>" bulge clause is stripped too (its shape+labels must not be read as
+  // the diameter or trip the leftover guard); it's resolved to a bulge reference below.
+  const stripped = dropCircleRef(s).replace(BULGE_CLAUSE, ' ').replace(
     /semicircle|half[\s-]?circle|חצי[\s-]?מעגל|חצי[\s-]?עיגול|diameter|קוטר|שקוטרו|צלע\S*|\bsides?\b|(?<![א-ת])יש(?![א-ת])|על|\bon\b|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
     ' ',
   );
   const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
   const dia = labelRun(restNoC, 2);
   const [a, b] = dia ?? ['A', 'B'];
+  const bulge = semicircleBulge(s, ctx, up(a), up(b));
   const leftover = [a, b].reduce((acc, id) => acc.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '), restNoC);
   if (SHAPE_LEFTOVER.test(leftover)) return 'stop'; // a compound ("semicircle … with AC=5") → escalate, don't half-parse
   const center =
@@ -2980,7 +3011,7 @@ const semicircle: Rule = (s, ctx) => {
     if (r.varCmd) cmds.push(r.varCmd);
     cmds.push(
       { type: 'point-on-circle', id: up(b), circle: circ }, // the tautological membership — a recorded, passing check
-      { type: 'arc', id: `arc-${up(b)}${up(a)}`, center: up(center), from: up(b), to: up(a) }, // CCW B→A = the upper half
+      { type: 'arc', id: `arc-${up(b)}${up(a)}`, center: up(center), from: up(b), to: up(a), ...bulge }, // CCW B→A = the upper half (bulge = outside/inside the shape)
       { type: 'segment', a: up(a), b: up(b) }, // the diameter
     );
     return cmds;
@@ -3003,7 +3034,7 @@ const semicircle: Rule = (s, ctx) => {
   // through-centre collinearity DRIVES the free centre/radius to the stated side (the ADR-137 lowering).
   if (anyExisting) cmds.push({ type: 'set-collinear', a: up(a), b: up(center), c: up(b) });
   cmds.push(
-    { type: 'arc', id: `arc-${up(b)}${up(a)}`, center: up(center), from: up(b), to: up(a) }, // CCW B→A = the upper half
+    { type: 'arc', id: `arc-${up(b)}${up(a)}`, center: up(center), from: up(b), to: up(a), ...bulge }, // CCW B→A (bulge = outside/inside)
     { type: 'segment', a: up(a), b: up(b) }, // the diameter
   );
   return cmds;

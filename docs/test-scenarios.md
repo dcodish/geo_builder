@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `semicircle-outside-a-triangle-side` — «חצי מעגל על צלע AB מחוץ למשולש» orients the bulge outward (issue #134, ADR-331)
+Operator play-test: a semicircle "outside the triangle" errored (the `משולש` leftover tripped SHAPE_LEFTOVER). Now the bulge clause is consumed and resolved to a render-time orientation (arc `bulgeRef` = the opposite vertex; renderer flips the arc so the apex is on the far side of the diameter). `בתוך` bulges inward. Also a follow-up path for #29’s every-side outward orientation.
+
 ### `q5-isosceles-incircle-sqrt3-ratio-and-area` — bagrut Q5: «AC=√(3)CO» (√() toolbar ratio) + «S_{CKE}=6» build green (issues #114/#115, ADR-310/311)
 Operator prod session `qderonm3` (2026-07-13). The √3 ratio typed with the √() palette form (`AC=√(3)CO`, `AC גדול פי √(3) מ CO`) had failed deterministically and escalated to the LLM, which produced a malformed figure — so `E על CB` defaulted onto the auto-created free point K and `S_{CKE}=6` reported "cannot place E so area=6". Fixed at two roots: #114 (ratio rules use the shared `NUMEXPR` atom, so `√(3)` parses deterministically — no LLM detour) and #115 (a free on-segment rider defaults into general position, off existing points). The exact sequence now builds green; |CK|=√63 and area(CKE)=6 both hold.
 

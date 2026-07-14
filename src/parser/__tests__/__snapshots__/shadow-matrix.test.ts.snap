@@ -286,6 +286,14 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
+      "pointOnSegment",
+    ],
+    "text": "semicircle on side AB outside triangle ABC",
+    "winner": "semicircle",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
       "lineMeetsCircle",
       "lineLineIntersection",
     ],
@@ -1269,6 +1277,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   {
     "lang": "he",
     "text": "חצי מעגל שקוטרו AB",
+    "winner": "semicircle",
+  },
+  {
+    "lang": "en",
+    "text": "semicircle on side AB outside triangle ABC",
+    "winner": "semicircle",
+  },
+  {
+    "lang": "he",
+    "text": "חצי מעגל על צלע AB מחוץ למשולש ABC",
     "winner": "semicircle",
   },
   {

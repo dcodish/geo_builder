@@ -1029,7 +1029,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     }
 
     case 'arc':
-      addObj(objects, { kind: 'arc', id: cmd.id, center: cmd.center, from: cmd.from, to: cmd.to });
+      addObj(objects, { kind: 'arc', id: cmd.id, center: cmd.center, from: cmd.from, to: cmd.to, ...(cmd.bulgeRef ? { bulgeRef: cmd.bulgeRef } : {}), ...(cmd.bulgeToward ? { bulgeToward: cmd.bulgeToward } : {}) });
       break;
 
     case 'circle-through':

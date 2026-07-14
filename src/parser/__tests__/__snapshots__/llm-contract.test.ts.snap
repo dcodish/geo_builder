@@ -992,6 +992,22 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "segment",
     ],
   },
+  "semicircle on side AB outside triangle ABC": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "arc",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "arc",
+      "segment",
+    ],
+  },
   "semicircle with diameter AB": {
     "en": [
       "circle",
