@@ -4561,3 +4561,19 @@ Operator building bagrut 2023-קיץ-א Q4 ("a line from B cuts the circle at E 
 **Status:** Accepted (2026-07-13; issue #121, PR). *Files: `src/store/figureFile.ts` (`chooseSaveName`); `src/App.tsx` (`saveFigure`); i18n `file.overwriteOrCopy` / `file.copyNamePrompt`; `src/store/__tests__/load-refresh.test.ts`.*
 
 **Problem.** `saveFigure` re-downloaded a NAMED figure (loaded, or previously named — issue #42) under the same name with no prompt, so a student refining a loaded exam silently produced same-name files. **Fix:** a named figure now asks overwrite-vs-copy (`window.confirm`: OK = overwrite under the current name; Cancel = a copy — prompt for a new name, adopt it via `setFigureName`; blank/cancelled copy = abort). An unnamed figure keeps its first-name prompt. The decision is a pure, lazily-evaluated helper `chooseSaveName(currentName, confirmOverwrite, promptCopyName)` (the copy prompt fires only when overwrite is declined), unit-tested for all four outcomes; the low-tech `window.*` dialogs match the existing file UX (a nicer modal is later polish).
+
+## ADR-316 — Minor/major arc qualifier «הקשת הקטנה/הגדולה» is tolerated + selects the arc (issue #90)
+
+**Status:** Accepted (2026-07-13; issue #90). *Files: `src/parser/parse.ts` (`arcMidpoint`); `src/engine/types.ts` + `evaluate.ts` + `apply.ts` (`on-circle` `major`); `src/parser/__tests__/arc-qualifier.test.ts`; scenario `arc-minor-midpoint-on-arc-not-chord`.*
+
+**Class.** *An arc rule demands its endpoint labels immediately after the arc keyword, so an arc-magnitude qualifier makes it fall through — for `arc-midpoint` into the generic `midpoint` rule, a SILENT wrong figure.* Operator: `D אמצע הקשת הקטנה AB` placed D on the CHORD midpoint (the qualifier `הקטנה` sits between `הקשת` and `AB`, so the label-immediately-after match failed).
+
+**Fix.** `arcMidpoint` tolerates an optional arc-magnitude qualifier — Hebrew FOLLOWS the noun (`הקשת הקטנה/הגדולה`), English PRECEDES it (`minor/major arc`) — and reads whether it selects the MAJOR arc. The engine already computes BOTH arc midpoints (the `u1+u2` bisector and its antipodal `branch 1`), so `major ⇒ branch 1`. For a free point-on-arc (`F על הקשת הגדולה BC`) the engine's `between` resolution only did the minor arc; it gains a `major` flag (dir = −bis, span = the reflex complement π−minorHalf) so the far arc is expressible. `arcEquality` is left untouched — a qualified arc-measure equality (whose major measure is the reflex angle) escalates honestly rather than lowering to the wrong (minor) measure. Locked by `arc-qualifier.test.ts` (minor = default; major = branch 1 / `major`; English forms; unqualified unchanged; placements on the circle & antipodal) + the scenario.
+
+## ADR-317 — The BETWEEN phrasing is a free point on a segment (issue #95)
+
+**Status:** Accepted (2026-07-13; issue #95). *Files: `src/parser/parse.ts` (`pointOnSegment`); `src/parser/__tests__/point-between.test.ts`; scenario `point-between-builds-on-segment`.*
+
+**Class.** *A phrasing alias for an existing construct is missing, so a common input escalates and builds nothing.* Prod session `lrbdnp5v`: `E בין A ל-B` (E between A and B) built nothing — it is exactly `E על AB`, a free `point-on-segment`, but `pointOnSegment` knew only the on/על form.
+
+**Fix.** `pointOnSegment` gains the BETWEEN alternative (`E בין A ל/ו-B`, `E between A and B`, optional `point`/`נקודה` prefix). No theft: `בין`/`between` are load-bearing in the ratio (`היחס בין`), angle-between (`הזווית בין`), swap (`החלף בין`), and area-ratio rules — but those all lead with a Hebrew word, so anchoring the SUBJECT to a Latin label at the START already excludes them, and a keyword bow-out (`יחס|ratio|זווית|angle|החלף|swap|שטח|area`) covers the rest. Locked by `point-between.test.ts` (six He/En between forms → point-on-segment; the five collision rules are NOT stolen) + the scenario.

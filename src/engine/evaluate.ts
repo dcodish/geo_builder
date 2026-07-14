@@ -1338,8 +1338,12 @@ function tryEval(
         const u2 = unit(sub(to, c.center));
         let bis = add(u1, u2); // points to the midpoint of the minor arc from→to
         if (len(bis) < 1e-9) bis = rot90(u1); // antipodal endpoints → arc midpoint is perpendicular
-        const baseAng = Math.atan2(bis.y, bis.x);
-        const half = Math.acos(Math.max(-1, Math.min(1, u1.x * u2.x + u1.y * u2.y))) / 2; // half the arc
+        // The MAJOR arc (#90): its midpoint is the antipodal direction (−bis) and its half-span is the
+        // reflex complement (π − minorHalf), so F rides the far side of from→to.
+        const minorHalf = Math.acos(Math.max(-1, Math.min(1, u1.x * u2.x + u1.y * u2.y))) / 2;
+        const dir = p.major ? { x: -bis.x, y: -bis.y } : bis;
+        const half = p.major ? Math.PI - minorHalf : minorHalf;
+        const baseAng = Math.atan2(dir.y, dir.x);
         const frac = Math.max(-1, Math.min(1, p.theta));
         const ang = baseAng + frac * 0.92 * half; // 0.92 keeps F strictly inside (never onto from/to)
         return add(c.center, { x: c.r * Math.cos(ang), y: c.r * Math.sin(ang) });

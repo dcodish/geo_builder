@@ -158,6 +158,38 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'point-between-builds-on-segment',
+    title: '«E בין A ל-B» builds a free point on segment AB (issue #95, ADR-317)',
+    guards:
+      "Prod session `lrbdnp5v`: `E בין A ל-B` (E between A and B) built nothing (escalated → built-nothing). It is exactly `E על AB` — a free point-on-segment. Fixed by teaching `pointOnSegment` the BETWEEN phrasing (guarded against the ratio/angle/swap/area-ratio rules that also use בין).",
+    steps: ['משולש ABC', 'E בין A ל-B'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), E = at(fig, 'E');
+      // E is ON segment AB: collinear and within.
+      const cross = (B.x - A.x) * (E.y - A.y) - (B.y - A.y) * (E.x - A.x);
+      expect(Math.abs(cross), 'E collinear with A,B').toBeLessThan(1e-6);
+      const t = ((E.x - A.x) * (B.x - A.x) + (E.y - A.y) * (B.y - A.y)) / ((B.x - A.x) ** 2 + (B.y - A.y) ** 2);
+      expect(t).toBeGreaterThan(0.02);
+      expect(t).toBeLessThan(0.98);
+    },
+  },
+  {
+    id: 'arc-minor-midpoint-on-arc-not-chord',
+    title: '«D אמצע הקשת הקטנה AB» lands D on the (minor) ARC, not the chord midpoint (issue #90, ADR-316)',
+    guards:
+      "Operator report: `D אמצע הקשת הקטנה AB` silently placed D on the CHORD midpoint — the arc-magnitude qualifier `הקטנה` between `הקשת` and the labels made `arcMidpoint` return null, so it fell through to the generic `midpoint` rule. Fixed by tolerating the qualifier; MAJOR selects the far arc (branch 1 / the `major` flag).",
+    steps: ['מעגל שמרכזו O', 'A על המעגל', 'B על המעגל', 'D אמצע הקשת הקטנה AB', 'E אמצע הקשת הגדולה AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), D = at(fig, 'D'), E = at(fig, 'E');
+      const r = dist(A, O);
+      expect(dist(D, O), 'D on the circle (arc), not the chord').toBeCloseTo(r, 5);
+      expect(dist(E, O), 'E on the circle').toBeCloseTo(r, 5);
+      expect(dist(D, E), 'minor & major midpoints antipodal').toBeCloseTo(2 * r, 5);
+    },
+  },
+  {
     id: 'q5-isosceles-incircle-sqrt3-ratio-and-area',
     title: 'bagrut Q5: isosceles + incircle, «AC=√(3)CO» (the √() toolbar ratio) + «S_{CKE}=6» — builds green, area solves (issues #114/#115, ADR-310/311)',
     guards:

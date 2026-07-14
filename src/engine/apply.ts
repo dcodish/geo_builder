@@ -1272,7 +1272,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       addObj(
         objects,
         cmd.between
-          ? { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: 0, free: true, between: cmd.between }
+          ? { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: 0, free: true, between: cmd.between, ...(cmd.major ? { major: true } : {}) }
           : { kind: 'on-circle', id: cmd.id, circle: cmd.circle, theta: cmd.theta ?? nextTheta(objects, cmd.circle), free: cmd.free ?? cmd.theta === undefined },
       );
       break;

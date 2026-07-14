@@ -1260,14 +1260,23 @@ const pointOnSegment: Rule = (s) => {
       'i',
     ),
   );
-  if (!m) return null;
-  const id = up(m[1]);
-  const a = up(m[2]);
-  const b = up(m[3]);
-  if (m[4] === undefined) return [{ type: 'point-on-segment', id, a, b }];
-  const raw = parseFloat(m[4]);
-  const t = m[5] ? raw / 100 : raw; // "%" → fraction; bare number is taken as a fraction
-  return [{ type: 'point-on-segment', id, a, b, t }];
+  if (m) {
+    const id = up(m[1]), a = up(m[2]), b = up(m[3]);
+    if (m[4] === undefined) return [{ type: 'point-on-segment', id, a, b }];
+    const raw = parseFloat(m[4]);
+    const t = m[5] ? raw / 100 : raw; // "%" → fraction; bare number is taken as a fraction
+    return [{ type: 'point-on-segment', id, a, b, t }];
+  }
+  // "E בין A ל-B" / "E בין A ו-B" / "E between A and B" — the BETWEEN phrasing for a free point on segment
+  // AB (issue #95: it is exactly "E על AB"). `בין`/`between` are load-bearing elsewhere (ratio `היחס בין`,
+  // angle `הזווית בין`, swap `החלף בין`, area-ratio) — but those lead with a Hebrew word, so anchoring the
+  // SUBJECT to a Latin label at the START already excludes them; a keyword bow-out guards the rest.
+  const bw = s.match(
+    new RegExp(String.raw`^\s*(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\s+(?:is\s+)?(?:בין|between)\s+([A-Za-z]\d*)\s+(?:and|ל-?|ו-?)\s*([A-Za-z]\d*)\b`, 'i'),
+  );
+  if (bw && !/יחס|ratio|זוו?ית|\bangle\b|החלף|\bswap\b|שטח|\barea\b/i.test(s))
+    return [{ type: 'point-on-segment', id: up(bw[1]), a: up(bw[2]), b: up(bw[3]) }];
+  return null;
 };
 
 /**
@@ -3422,17 +3431,27 @@ const diameterFromPoint: Rule = (s, ctx) => {
  */
 const arcMidpoint: Rule = (s, ctx) => {
   if (!/arc|קשת/i.test(s)) return null;
-  const m = dropCircleRef(s).match(/([A-Za-z]\d*)\b.*?(midpoint|אמצע|\bon\b|על)\s*.*?(?:arc|הקשת|קשת)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+  // An optional arc-magnitude qualifier may sit between the arc keyword and the labels — Hebrew
+  // FOLLOWS the noun ("הקשת הקטנה AB"), English PRECEDES it ("minor arc AB") — issue #90. Tolerate it
+  // (skip over it) so the labels are still captured, and read whether it selects the MAJOR (far) arc;
+  // without it, the labels demanded a position immediately after the keyword and the whole utterance
+  // fell through to the generic `midpoint` rule → D on the CHORD, a silent wrong figure.
+  const m = dropCircleRef(s).match(
+    /([A-Za-z]\d*)\b.*?(midpoint|אמצע|\bon\b|על)\s*.*?(?:(minor|major)\s+)?(?:arc|הקשת|קשת)\s*(?:(ה?(?:קטנה|גדולה))\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+  );
   if (!m) return null;
-  const id = up(m[1]), from = up(m[3]), to = up(m[4]);
+  const id = up(m[1]), from = up(m[5]), to = up(m[6]);
+  const major = /major/i.test(m[3] ?? '') || /גדולה/.test(m[4] ?? '');
   // The arc BC lives on the circle that actually contains BOTH endpoints — prefer it over a named
   // circle that doesn't (a wrong LLM "in circle O" when C is only on circle P), and use it to
   // disambiguate when two circles exist. Fall back to the named / single circle otherwise.
   const center = circleContaining(ctx, [from, to], circleCenter(s)) ?? resolveCenter(s, ctx);
   if (!center) return null;
+  // arc-midpoint: minor = branch 0 (the u1+u2 bisector), major = branch 1 (the antipodal midpoint — the
+  // engine already flips on odd branch). point-on-arc (a FREE point): `major` picks the far/reflex arc.
   return /midpoint|אמצע/i.test(m[2])
-    ? [{ type: 'arc-midpoint', id, circle: circleId(center), from, to }]
-    : [{ type: 'point-on-circle', id, circle: circleId(center), between: [from, to] }];
+    ? [{ type: 'arc-midpoint', id, circle: circleId(center), from, to, ...(major ? { branch: 1 } : {}) }]
+    : [{ type: 'point-on-circle', id, circle: circleId(center), between: [from, to], ...(major ? { major: true } : {}) }];
 };
 
 /** "A is on circle O" / "A על מעגל O" — inscribed point(s). The subject may be a LIST — "A ו C נמצאות

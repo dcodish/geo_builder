@@ -272,6 +272,9 @@ export interface OnCirclePoint {
    * can drive it. "F is on arc BC" with F free, vs `arc-midpoint` which is the fixed midpoint.
    */
   between?: [Id, Id];
+  /** With `between`, place F on the MAJOR arc from→to (the far side, reflex span) instead of the minor
+   *  arc — "F על הקשת הגדולה BC" / "F on the major arc BC" (issue #90). Ignored without `between`. */
+  major?: boolean;
 }
 
 /** 0 DOF — the antipode of `of` on `circle` (a diameter's far end): 2·centre − of. */
@@ -939,7 +942,7 @@ export type Command =
   | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean; autoCenter?: boolean; freeRadius?: boolean; ifAbsent?: boolean } // freeRadius: radius is a DOF (ADR-051); ifAbsent: a parser-injected implicit circle — skip if it already exists (don't clobber a real one)
   | { type: 'circle-through'; id: Id; center: Id; through: Id; hidden?: boolean; autoCenter?: boolean }
   | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id; hidden?: boolean } // circle through a,b,c (centre = circumcentre); hidden for a cyclic (בר-חסימה) figure
-  | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number; free?: boolean; between?: [Id, Id]; softPair?: boolean } // theta = a STARTING angle; free:true keeps it a samplable/drivable DOF even with a start angle (ADR-097); between = a free point on the arc from-to (ADR-042); softPair: a common-tangent macro's DEFAULT touch↔circle pairing — the store swaps the pair when a later explicit membership states the opposite assignment (ADR-239, the M4 shape)
+  | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number; free?: boolean; between?: [Id, Id]; major?: boolean; softPair?: boolean } // theta = a STARTING angle; free:true keeps it a samplable/drivable DOF even with a start angle (ADR-097); between = a free point on the arc from-to (ADR-042), major = the far/reflex arc (#90); softPair: a common-tangent macro's DEFAULT touch↔circle pairing — the store swaps the pair when a later explicit membership states the opposite assignment (ADR-239, the M4 shape)
   // "M מחוץ למעגל / בתוך המעגל" (ADR-254): a NEW id is created as a FREE point (2 DOF) seeded on the
   // stated side; an EXISTING id is a statement about that point (M1) — a non-pinned free point on the
   // wrong side is re-seated to its stated side, anything else is left to the verifier. The side itself
