@@ -246,13 +246,9 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "G is the intersection of the diagonals of quadrilateral ABCD": {
     "en": [
-      "segment",
-      "segment",
       "line-line-intersection",
     ],
     "he": [
-      "segment",
-      "segment",
       "line-line-intersection",
     ],
   },
@@ -260,15 +256,11 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     "en": [
       "foot",
       "foot",
-      "segment",
-      "segment",
       "line-line-intersection",
     ],
     "he": [
       "foot",
       "foot",
-      "segment",
-      "segment",
       "line-line-intersection",
     ],
   },
@@ -298,15 +290,11 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     "en": [
       "midpoint",
       "midpoint",
-      "segment",
-      "segment",
       "line-line-intersection",
     ],
     "he": [
       "midpoint",
       "midpoint",
-      "segment",
-      "segment",
       "line-line-intersection",
     ],
   },

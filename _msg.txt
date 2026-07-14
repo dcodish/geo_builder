@@ -1,29 +1,16 @@
-feat(parser): named special-point meets — the NOUN form of a centre (#44)
+fix(#44): special-point meets draw ONLY the centre point, not the construction
 
-Root cause: naming a concurrency point by its NOUN («X מפגש האלכסונים»/«התיכונים»
-/«חוצי הזוויות»/«הגבהים»/«האנכים האמצעיים») was not-handled — only the explicitly-
-lettered form («E חיתוך AC ו-BD») parsed. ~5-6 prod users named the diagonal
-crossing this way; the operator asked to include it AND generalize to the four
-triangle centres.
+Operator play-test feedback: "M מפגש התיכונים" should draw just the centroid,
+not the median segments — same for the other centres.
 
-Fix (ADR-329, ADR-110 macro — no new engine construct): a `specialPointMeet` rule
-over five CENTER_FAMILIES. Fires only on a meet cue (מפגש/נפגש/נחתכ/חיתוך/
-intersection of/meet) AND a plural centre-noun stem, so the lettered forms stay
-with their own rules. Shape resolves from a «במשולש ABC»/«במרובע ABCD» qualifier
-else the figure's single polygon of the right size; ambiguity DEFERS (ADR-052).
-Each lowers to two special lines + their existing intersection:
-- diagonals → 2 segments + line-line-intersection (quad crossing)
-- medians   → 2 midpoints + median segments + line-line-intersection (centroid)
-- altitudes → 2 feet + segments + line-line-intersection (orthocentre)
-- angle bisectors → 2 bisector lines + line-intersection (incentre)
-- ⊥-bisectors → 2 midpoints + perpendicular-lines + line-intersection (circumcentre)
-Runs before the shapes + diagonals; He noun patterns are stems (construct form too).
-Catalog +5 (all He/En); snapshots + shadow allowlist updated.
+The construction (diagonals / medians / altitudes / ⊥-bisectors and their helper
+feet/midpoints) is now invisible scaffolding: no `segment` commands are emitted,
+helper points are `~`-prefixed (unrendered per scene.ts:239, and excluded from
+detection by ADR-295), and the ⊥-bisector `perpendicular-line`s are visible:false.
+Only the intersection point (centroid / incentre / orthocentre / circumcentre /
+diagonal crossing) is drawn. Geometry is unchanged (centroid = (A+B+C)/3, etc.).
 
-special-point-meet.test.ts (5 families He/En, defer, no-theft) + scenarios
-diagonals-meet-noun-form (crossing = centre) and medians-meet-centroid-noun-form
-(M = (A+B+C)/3). Full 2-D lane green (3451), tsc + build clean.
-
-Closes #44
+special-point-meet.test.ts updated (command types + `~`-hidden helper assertion);
+llm-contract snapshot updated. Full 2-D lane green, tsc clean.
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>

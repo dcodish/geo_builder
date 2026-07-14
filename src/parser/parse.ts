@@ -778,53 +778,47 @@ const specialPointMeet: Rule = (s, ctx) => {
   }
   if (!poly) return null; // ambiguous / unknown shape → defer (ADR-052)
   const [A, B, C, D] = poly; // D undefined for a triangle
+  // Only the CENTRE point is drawn — every construction line/point (diagonals, medians, altitudes, ⊥-bisectors
+  // and their feet/midpoints) is SCAFFOLDING (operator, 2026-07-14): a `~`-prefixed helper point is not
+  // rendered (and is excluded from detection, ADR-295), a `bisector`/`perpendicular-line` Line object is drawn
+  // only when `visible`, and `line-line-intersection` computes its crossing without drawing the operand lines.
   if (fam.key === 'diag') {
-    // quad ABCD: the two diagonals AC, BD and their crossing.
-    return [
-      { type: 'segment', a: A, b: C },
-      { type: 'segment', a: B, b: D },
-      { type: 'line-line-intersection', id: X, a: A, b: C, c: B, d: D },
-    ];
+    // quad ABCD: the crossing of the two diagonals (the diagonals themselves are not drawn).
+    return [{ type: 'line-line-intersection', id: X, a: A, b: C, c: B, d: D }];
   }
   if (fam.key === 'median') {
-    const ma = freeLabel([...poly, X], ['M', 'N', 'P', 'Q', 'R']);
-    const mb = freeLabel([...poly, X, ma], ['N', 'P', 'Q', 'R', 'S']);
+    const ma = `~med-${B}${C}`, mb = `~med-${A}${C}`; // hidden side-midpoints (median 1: A→mid BC, median 2: B→mid AC)
     return [
-      { type: 'midpoint', id: ma, a: B, b: C }, // median from A → midpoint of BC
-      { type: 'midpoint', id: mb, a: A, b: C }, // median from B → midpoint of AC
-      { type: 'segment', a: A, b: ma },
-      { type: 'segment', a: B, b: mb },
+      { type: 'midpoint', id: ma, a: B, b: C },
+      { type: 'midpoint', id: mb, a: A, b: C },
       { type: 'line-line-intersection', id: X, a: A, b: ma, c: B, d: mb }, // the centroid
     ];
   }
   if (fam.key === 'altitude') {
-    const fa = freeLabel([...poly, X], ['F', 'G', 'H', 'K']);
-    const fb = freeLabel([...poly, X, fa], ['G', 'H', 'K', 'L']);
+    const fa = `~alt-${A}`, fb = `~alt-${B}`; // hidden altitude feet (from A onto BC, from B onto AC)
     return [
-      { type: 'foot', id: fa, from: A, a: B, b: C }, // altitude from A onto BC
-      { type: 'foot', id: fb, from: B, a: A, b: C }, // altitude from B onto AC
-      { type: 'segment', a: A, b: fa },
-      { type: 'segment', a: B, b: fb },
+      { type: 'foot', id: fa, from: A, a: B, b: C },
+      { type: 'foot', id: fb, from: B, a: A, b: C },
       { type: 'line-line-intersection', id: X, a: A, b: fa, c: B, d: fb }, // the orthocentre
     ];
   }
   if (fam.key === 'bisector') {
-    const b1 = `bis-${A}${B}${C}`, b2 = `bis-${B}${A}${C}`;
+    const b1 = `bis-${A}${B}${C}`, b2 = `bis-${B}${A}${C}`; // bisector Lines (scaffolding — not visible)
     return [
       { type: 'bisector', id: b1, vertex: A, p: B, q: C },
       { type: 'bisector', id: b2, vertex: B, p: A, q: C },
       { type: 'line-intersection', id: X, line1: b1, line2: b2 }, // the incentre
     ];
   }
-  // perpbis: two ⊥-bisector lines (of AB, of BC) → the circumcentre.
-  const mab = freeLabel([...poly, X], ['M', 'N', 'P', 'Q']);
-  const mbc = freeLabel([...poly, X, mab], ['N', 'P', 'Q', 'R']);
+  // perpbis: two ⊥-bisector lines (of AB, of BC) → the circumcentre. Both the ⟂-bisector lines and their
+  // side-midpoints are scaffolding (invisible line + `~`-hidden midpoints); only the circumcentre is drawn.
+  const mab = `~pb-${A}${B}`, mbc = `~pb-${B}${C}`;
   const l1 = `perp-${mab}-${A}${B}`, l2 = `perp-${mbc}-${B}${C}`;
   return [
     { type: 'midpoint', id: mab, a: A, b: B },
-    { type: 'perpendicular-line', id: l1, through: mab, a: A, b: B, visible: true },
+    { type: 'perpendicular-line', id: l1, through: mab, a: A, b: B, visible: false },
     { type: 'midpoint', id: mbc, a: B, b: C },
-    { type: 'perpendicular-line', id: l2, through: mbc, a: B, b: C, visible: true },
+    { type: 'perpendicular-line', id: l2, through: mbc, a: B, b: C, visible: false },
     { type: 'line-intersection', id: X, line1: l1, line2: l2 },
   ];
 };
