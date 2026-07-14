@@ -158,6 +158,18 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'parallel-line-from-a-point',
+    title: '«מנקודה A ישר מקביל ל-DO» draws a parallel line through A (the "from a point" anchor, issue #127, ADR-327)',
+    guards:
+      'Prod log-triage 2026-07-14: `מנקודה A ישר מקביל ל-DO` ("from point A a line parallel to DO") escalated to the paid LLM — the drawn `parallel-line` construct existed but its through-point anchor THROUGH_PT only accepted through/דרך/בנקודה, not the "from a point" origin (מנקודה/מ-/from point) students actually write. Fixed by a FROM_PT anchor on the parallel-line rule (the perpendicular "from a point" is already handled by the foot rule, so it is deliberately NOT added there).',
+    steps: ['משולש ADO', 'מנקודה A ישר מקביל ל-DO'],
+    check(fig) {
+      allStepsOk(fig);
+      // The parallel line through A ∥ DO built as a real construct (id par-<through>-<a><b>), not escalated.
+      expect(fig.construction.objects.some((o) => o.id === 'par-A-DO')).toBe(true);
+    },
+  },
+  {
     id: 'verbose-relational-ratio-builds',
     title: '«אורך AC גדול פי 2 מהקטע AB» drives the ratio (verbose/relational size-given, issue #105, ADR-318)',
     guards:

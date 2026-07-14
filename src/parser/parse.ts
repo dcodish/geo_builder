@@ -4562,6 +4562,13 @@ const bisectorLine: Rule = (s) => {
 // "at"/"בנקודה" lets "DE ⟂ AB at C" / "DE אנך ל-AB בנקודה C" name the foot as the through-point.
 const THROUGH_PT = String.raw`(?:through|\bat\b|דרך|בנקודה)\s+([A-Za-z]\d*)\b`;
 
+// The "from a point" origin students write for a drawn PARALLEL line — "from point A" / "from A" /
+// "מנקודה A" / "מ-A" (issue #127). Used ONLY by the parallel-line rule: the perpendicular "from a point"
+// is already read (better) by the foot rule, and adding a "from" anchor to the SHARED perpendicular path
+// would make it grab foot phrasings ("the foot of the perpendicular from C to AD" carries both אנך AND a
+// "from C" source). Mirrors the מ-/מנקודה idiom the tangent/secant/diameter rules use (e.g. :3455).
+const FROM_PT = String.raw`(?:from\s+(?:(?:a|the)\s+)?point|\bfrom\b|מהנקודה|מ-?נקודה|מ-)\s*([A-Za-z]\d*)\b`;
+
 /**
  * "… cuts/meets <the line/the extension of> CD at E" — the cut-clause a drawn ⊥/∥ line compound ends
  * with. Shared by {@link perpendicularLine} and {@link parallelLine}. The filler group must swallow
@@ -4640,11 +4647,14 @@ const perpendicularLine: Rule = (s, ctx) => {
 /** "line through P parallel to AB" / "ישר דרך P מקביל ל-AB" / "DE מקביל ל-AB בנקודה C" — a *drawn* parallel line through a point. */
 const parallelLine: Rule = (s, ctx) => {
   if (!/parallel|∥|מקביל/i.test(s)) return null;
-  const thr = s.match(new RegExp(THROUGH_PT, 'i'));
+  // Anchor the line at its through-point — "through P" / "דרך P", OR the "from a point" origin (#127).
+  // Within a `מקביל`/parallel utterance a "from X" is unambiguously the origin (the parallel-TO segment
+  // uses `מקביל ל-`, never a bare `מ-`/`from`), so FROM_PT is safe here where it would not be on the ⟂ rule.
+  const thr = s.match(new RegExp(THROUGH_PT, 'i')) ?? s.match(new RegExp(FROM_PT, 'i'));
   if (!thr) return null; // no through-point ⇒ it's the ∥ constraint, not a drawn line
   const seg = s
-    .replace(new RegExp(THROUGH_PT, 'gi'), ' ')
-    .match(/(?:parallel\s*to|∥|מקביל\s*ל-?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i);
+    .replace(thr[0], ' ') // drop the anchor clause so its point isn't read as the parallel-to segment
+    .match(/(?:parallel\s*to|∥|מקביל\s*ל[-=]?)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // ל[-=] tolerates the ל=AB typo (#127)
   if (!seg) return null;
   const [P, a, b] = [up(thr[1]), up(seg[1]), up(seg[2])];
   const lineIdCut = `par-${P}-${a}${b}`;
