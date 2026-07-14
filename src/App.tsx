@@ -28,9 +28,9 @@ import { btn, card as themeCard, color as pal, foldToggle, fs, pill, sectionTitl
 import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, primeFoldFor, replay, trialFacts, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
-import { deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
+import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
 import { questionLines } from '@/export/questionLines';
-import { auditLoadedFigure } from '@/store/loadAudit';
+import { auditLoadedFigure, refreshLoadedFigure } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { humanizeError } from '@/i18n/humanizeError';
 /**
@@ -294,10 +294,20 @@ export default function App() {
   // no positions (the figure is re-derived on load). See src/store/figureFile.ts.
   const saveFigure = () => {
     const st = useGeoStore.getState();
-    // A set figure name (issue #42) IS the save name — no prompt. Unset -> today's prompt, and a
-    // name typed there is adopted as the figure's name (the field + page title pick it up).
+    // A NAMED figure (issue #42) asks overwrite-vs-copy (issue #121) instead of silently re-saving the
+    // same name; an UNNAMED one prompts for a first name. A name typed in either dialog is adopted as the
+    // figure's name (the field + page title pick it up).
     let name = st.figureName.trim();
-    if (!name) {
+    if (name) {
+      const choice = chooseSaveName(
+        name,
+        () => window.confirm(t('file.overwriteOrCopy', { name })),
+        () => window.prompt(t('file.copyNamePrompt'), name),
+      );
+      if (!choice) return; // overwrite declined + copy cancelled → abort the save
+      name = choice.name;
+      if (choice.adopt) setFigureName(choice.name);
+    } else {
       name = (window.prompt(t('file.saveNamePrompt')) ?? '').trim();
       if (name) setFigureName(name);
     }
@@ -362,6 +372,12 @@ export default function App() {
       noteFileProblem(r.reason === 'newer-version' ? 'file.newerVersion' : 'file.badFile');
       return;
     }
+    // Auto-re-lower the DETERMINISTIC steps against the current parser (ADR-232 Am. / issue #120): an old
+    // save replays its saved lowering, so a parser/engine fix that landed since would otherwise never
+    // reach it (the #119 K stayed misplaced on a pre-fix save). LLM steps stay byte-for-byte (no
+    // re-escalation). Do it BEFORE the fold/replay so the refreshed facts are what loads.
+    const { facts: refreshedFacts, refreshed } = refreshLoadedFigure(r.file.facts);
+    r.file.facts = refreshedFacts;
     // #41 (ADR-290, + the #67 core): a saved heavy figure's ENTIRE load cost is one cold fold (27 s
     // measured on the #59 file) — compute it in the geometry WORKER behind the busy cue and transplant
     // it, so the smoke-replay below and the post-load render both run at tail speed on the main thread.
@@ -402,6 +418,9 @@ export default function App() {
         .map((f) => `${f.step}. "${f.utterance}"${f.labels.length ? ` (${f.labels.join(', ')})` : ''}`)
         .join(' · ');
       setFileNote(t('file.loadAudit', { steps: rows }));
+    } else if (refreshed.length > 0) {
+      // The save was from an older version and some steps were re-lowered to the current one (issue #120).
+      setFileNote(t('file.loadRefreshed', { count: refreshed.length }));
     }
   };
 

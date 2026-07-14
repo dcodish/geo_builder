@@ -51,6 +51,60 @@ function stepsOf(facts: Fact[]): { utterance?: string; cmds: AnyCommand[]; start
  * utterance no longer parses is an LLM-escalated step stored as canonical commands — only the
  * `dropped` differential applies to it.
  */
+/**
+ * Auto-re-lower a loaded fact list against the CURRENT parser (ADR-232 Am. / issue #120). Load replays
+ * SAVED commands (ADR-232), so an old file faithfully shows the reading from the version that saved it —
+ * a parser/engine fix that landed since never reaches it (the operator's #119 K stayed misplaced on a
+ * pre-fix save). This adopts the fresh lowering for the DETERMINISTIC steps, so an old save picks up
+ * fixes on load, while preserving ADR-232's guarantee for LLM steps:
+ *
+ *   - A step whose utterance RE-PARSES deterministically (`parse(...).ok`, offline — no LLM) AND whose
+ *     result DIFFERS from the saved commands → replace the saved commands with the fresh parse. A
+ *     deterministic re-parse involves no LLM, so ADR-232's real concern (never re-escalate on load) holds.
+ *   - A step whose utterance does NOT re-parse = an LLM-escalated step stored as canonical commands →
+ *     keep it byte-for-byte (no re-escalation).
+ *   - A step with no utterance (a direct command) → kept as-is.
+ *
+ * Re-parsing threads the ALREADY-refreshed prefix (a later step sees earlier refreshes). Budgeted like
+ * {@link auditLoadedFigure}; on budget exhaustion the remaining steps are kept as saved (never partially
+ * corrupt). Returns the (possibly rebuilt) fact list + the 1-based indices of the steps that changed.
+ */
+export function refreshLoadedFigure(facts: Fact[], budgetMs = 4000): { facts: Fact[]; refreshed: number[] } {
+  const t0 = Date.now();
+  const steps = stepsOf(facts);
+  const out: Fact[] = [];
+  const refreshed: number[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    const end = steps[i + 1]?.start ?? facts.length;
+    const groupFacts = facts.slice(step.start, end);
+    if (!step.utterance || Date.now() - t0 > budgetMs) {
+      out.push(...groupFacts);
+      continue;
+    }
+    // Re-parse against the prefix built from the ALREADY-refreshed earlier steps (`out`).
+    const { construction, positions } = replay(out);
+    const p = parse(step.utterance, buildParseCtx(construction, positions));
+    if (p.ok && JSON.stringify(p.commands) !== JSON.stringify(step.cmds)) {
+      const group = groupFacts[0].group;
+      const enabled = groupFacts[0].enabled; // a step toggles enabled as a unit
+      refreshed.push(i + 1);
+      p.commands.forEach((cmd, j) => {
+        out.push({
+          id: groupFacts[j]?.id ?? `${step.start}r${j}`,
+          utterance: step.utterance,
+          ...(group !== undefined ? { group } : {}),
+          cmd,
+          enabled,
+        });
+      });
+    } else {
+      out.push(...groupFacts);
+    }
+  }
+  return { facts: out, refreshed };
+}
+
 export function auditLoadedFigure(facts: Fact[], budgetMs = 3000): { findings: LoadAuditFinding[]; complete: boolean } {
   const t0 = Date.now();
   const findings: LoadAuditFinding[] = [];
