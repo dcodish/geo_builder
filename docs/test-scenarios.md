@@ -24,6 +24,8 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ### `secant-apex-far-point-named-near` — «AD חותך למעגל בנקודה B» — apex + far crossing D, near B (issue #136, ADR-332)
 Operator 2026-07-15: the secant «AD חותך למעגל» (apex A external, only the FAR crossing D named) was not-handled, and «…בנקודה B» was mis-grabbed by `lineMeetsCircle` and built NOTHING (a `line-through chord-AD` to a never-created D). The new `secantFarPoint` rule (before `lineMeetsCircle`) creates D as a free-θ on-circle far crossing and the named near crossing B via line∩circle with a one-sided order A→B→D keeping D on the far side.
+### `secant-from-point-far-crossing` — «מנקודה A יוצא חותך למעגל בנקודה D» — the from-point secant phrasing (issue #136, ADR-332)
+Operator 2026-07-15 (play-testing PR #137): the from-point phrasing (A the external apex from «מנקודה A», D the FAR crossing from «בנקודה D») fell through to lineLineIntersection → LLM. `secantFarPoint` gained a from-point branch, gated to a cut OF THE CIRCLE and guarded off the diameter family (so it never steals «קוטר … חותך את הצלע AC»).
 ### `secant-apex-far-point-bare-anon-near` — «AD חותך למעגל» bare — D far, near an anonymous @-dot (issue #136, ADR-332)
 Operator 2026-07-15: bare «AD חותך למעגל» escalated to the LLM. Now D is a free-θ far crossing, the unnamed near crossing an anonymous promotable @-dot (#32/ADR-297), the secant's rotation about the external apex A a free DOF (ADR-052); A is created via `point-circle-side` outside.
 ### `parallel-line-from-a-point` — «מנקודה A ישר מקביל ל-DO» draws a parallel line through A (issue #127, ADR-327)

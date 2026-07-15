@@ -161,4 +161,39 @@ describe('secantFarPoint (#136) — apex + far point only', () => {
     expect(built).not.toBeNull();
     if (built) expect(built.construction.objects.some((o) => isGeoPoint(o) && o.id.startsWith('@'))).toBe(true);
   });
+
+  describe('the FROM-POINT form «מנקודה A יוצא חותך למעגל בנקודה D» (בנקודה = the FAR crossing)', () => {
+    it('«מנקודה A יוצא חותך למעגל בנקודה D»: A the apex, D the far crossing, near anonymous', () => {
+      const { ctx } = ctxWith();
+      const r = parse('מנקודה A יוצא חותך למעגל בנקודה D', ctx);
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(types(r.commands)).toEqual(['point-circle-side', 'point-on-circle', 'line-through', 'line-circle-intersection', 'segment']);
+      expect((r.commands.find((c) => c.type === 'point-on-circle') as any).id).toBe('D'); // D = far crossing on the circle
+      const near = r.commands.find((c) => c.type === 'line-circle-intersection') as any;
+      expect(near.id).toBe('@near-A-D'); // near = anonymous dot
+      expect(near.order).toEqual(['A', '@near-A-D', 'D']);
+    });
+
+    it('English «from point A a secant cuts the circle at D» + bare «מנקודה A חותך למעגל בנקודה D»', () => {
+      const { ctx } = ctxWith([externalA]);
+      for (const u of ['from point A a secant cuts the circle at D', 'מנקודה A חותך למעגל בנקודה D']) {
+        const r = parse(u, ctx);
+        expect(r.ok, u).toBe(true);
+        if (r.ok) expect((r.commands.find((c) => c.type === 'point-on-circle') as any)?.id, u).toBe('D');
+      }
+    });
+
+    it('DEFERS a DIAMETER-cuts-a-SEGMENT compound (never an apex secant)', () => {
+      // «קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E» — a diameter from F cutting SEGMENT AC at E
+      // (diameterCutsSegment). The `מנקודה F` must NOT trigger the from-point secant: no circle far-crossing.
+      const { ctx } = ctxWith([externalA]);
+      const r = parse('קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E', ctx);
+      // Whatever owns it, it must NOT be our secant (no point-circle-side apex / on-circle E from this rule).
+      if (r.ok) {
+        expect(r.commands.some((c) => c.type === 'point-circle-side')).toBe(false);
+        expect(r.commands.some((c) => c.type === 'point-on-circle' && (c as any).id === 'E')).toBe(false);
+      }
+    });
+  });
 });

@@ -4174,18 +4174,55 @@ const extensionMeetsExistingPoint: Rule = (s, ctx) => {
  * crossings named), the tangent rules, `parallelCircleIntersection` (parallel), and to `lineMeetsCircle`
  * itself when the pair's far label ALREADY EXISTS (a real chord/line through two existing points).
  */
+/** The shared apex+far secant construct ([ADR-332](../../../docs/06-decisions.md#adr-332)): A the external
+ *  apex, D a free-θ far crossing on the circle, `nearId` the near crossing (anonymous @-dot or a named
+ *  point) kept between A and D by the one-sided `order`, `thr` (optional) pinning the direction A–P–D. */
+function secantFarCommands(A: Id, D: Id, nearId: Id, circ: Id, ctx: ParseContext, thr: string | null): AnyCommand[] {
+  const lineId = `sec-${A}${D}`;
+  const aNew = !(ctx.points ?? []).includes(A);
+  const pNew = thr ? !(ctx.points ?? []).includes(thr) : false;
+  return [
+    ...(aNew ? [{ type: 'point-circle-side' as const, id: A, circle: circ, side: 'outside' as const }] : []), // NEW A → external apex
+    { type: 'point-on-circle', id: D, circle: circ }, // D = far crossing (free θ = the free direction)
+    { type: 'line-through', id: lineId, a: A, b: D },
+    { type: 'line-circle-intersection', id: nearId, line: lineId, circle: circ, avoid: D, order: [A, nearId, D] }, // near crossing; D far
+    ...(pNew ? [{ type: 'free-point' as const, id: thr!, x: 0, y: 0, free: true }] : []),
+    ...(thr ? [{ type: 'set-line' as const, points: [A, thr, D] }] : []), // "דרך P" pins the direction
+    { type: 'segment', a: A, b: D }, // the drawn secant A–D (passes through the near crossing)
+  ];
+}
+
 const secantFarPoint: Rule = (s, ctx) => {
   if (!/חות[כך]|\bsecant\b|\bcuts?\b|\bmeets?\b|crosses/i.test(s)) return null; // the secant cut keyword
   if (/tangent|משיק/i.test(s)) return null; // tangent → the tangent rules
   if (/parallel|מקביל|perpendicular|מאונ[ךכ]/i.test(s)) return null; // parallel/⟂ line ∩ circle → its own rule
-  if (/\bfrom\b|מנקודה|מהנקודה|מ-\s*[A-Za-z]/i.test(s)) return null; // "from <point>" → secantFromExternal
   if (/המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(s)) return null; // המשך → extendOntoCircle
   if (/\bline\b|\bray\b|הישר|הקו|קרן/i.test(s)) return null; // an EXPLICIT line/ray ("the line GB…") is a defined line, crossing named separately → lineMeetsCircle/lineCutsCircleTwice (the B13 opt-out)
+  if (/קוטר|diameter/i.test(s)) return null; // a diameter compound ("קוטר מעגל O … חותך את הצלע AC") → the diameter rules, never an apex secant
   const center = resolveMentionedCircle(s, ctx); // a named circle, or "the circle" when there's exactly one
   if (!center) return null; // must REFER to a circle
-  // TWO crossings named ("at C and D" / "בנקודות C ו-D") → lineCutsCircleTwice, never this apex+far rule.
+  const circ = circleId(center);
+  // TWO crossings named ("at C and D" / "בנקודות C ו-D") → lineCutsCircleTwice / secantFromExternal, never this rule.
   if (/(?:\bat\b|בנקודות?|ב-)\s*[A-Za-z]\d*\s*(?:\band\b|ו-?|,)\s*[A-Za-z]\d*/i.test(s)) return null;
 
+  // FROM-POINT form: "מנקודה A [יוצא] חותך למעגל בנקודה D" / "from point A a secant cuts the circle at D" —
+  // A the external apex (named by "from point A"), D the FAR crossing (named after the circle; the ONLY
+  // crossing given, so there's no leading pair to supply it). secantFromExternal (earlier) owns the
+  // two-crossings / "outside"+two-crossings forms; a single far crossing falls through to here.
+  const fromM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)([A-Za-z]\d*)(?![A-Za-z])/i);
+  // The cut must be OF THE CIRCLE directly ("חותך למעגל" / "cuts the circle"), not of a segment named after a
+  // circle mention ("חותך את הצלע AC" — that's diameterCutsSegment / lineLineIntersection, guarded above too).
+  const cutsCircle = /(?:חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|\bsecant\b|crosses|meets?)\s+(?:ל|את\s+ה|to\s+the\s+|the\s+)?(?:מעגל|circle)/i.test(s);
+  if (fromM && cutsCircle) {
+    const A = up(fromM[1]);
+    const D = crossingAfterCircle(s); // the single named crossing = the FAR point
+    if (!D || D === A) return null;
+    if (membersOfCenter(ctx, center).has(A)) return null; // apex not on the circle (A-on-circle: a later follow-up)
+    if ((ctx.points ?? []).includes(D) || membersOfCenter(ctx, center).has(D)) return null; // D is a NEW far crossing
+    return secantFarCommands(A, D, anonId('near', A, D), circ, ctx, null);
+  }
+
+  // PAIR form: "AD חותך למעגל [בנקודה B]" — apex+far from a leading label pair, בנקודה = the NEAR crossing.
   // Optional NEAR-crossing label ("בנקודה B" / "at B") and THROUGH-point ("דרך P" / "through P").
   const thr = /(?:דרך|עובר\s+דרך|\bthrough\b|passing\s+through)/i.test(s) ? throughPointLabel(s) : null;
   const atM = s.match(/(?:בנקודה|בנק'|\bat\b)\s*([A-Za-z]\d*)\b/i);
@@ -4207,20 +4244,8 @@ const secantFarPoint: Rule = (s, ctx) => {
   // A is the EXTERNAL apex. If A is already ON the circle, that's the A-on-circle follow-up (not this issue).
   if (membersOfCenter(ctx, center).has(A)) return null;
 
-  const circ = circleId(center);
   const nearId = near ?? anonId('near', A, D); // named crossing, else an anonymous promotable dot
-  const lineId = `sec-${A}${D}`;
-  const aNew = !(ctx.points ?? []).includes(A);
-  const pNew = thr ? !(ctx.points ?? []).includes(thr) : false;
-  return [
-    ...(aNew ? [{ type: 'point-circle-side', id: A, circle: circ, side: 'outside' } as const] : []), // NEW A → external apex
-    { type: 'point-on-circle', id: D, circle: circ }, // D = far crossing (free θ = the free direction)
-    { type: 'line-through', id: lineId, a: A, b: D },
-    { type: 'line-circle-intersection', id: nearId, line: lineId, circle: circ, avoid: D, order: [A, nearId, D] }, // near crossing; D far
-    ...(pNew ? [{ type: 'free-point' as const, id: thr!, x: 0, y: 0, free: true }] : []),
-    ...(thr ? [{ type: 'set-line' as const, points: [A, thr, D] }] : []), // "דרך P" pins the direction
-    { type: 'segment', a: A, b: D }, // the drawn secant A–D (passes through the near crossing)
-  ];
+  return secantFarCommands(A, D, nearId, circ, ctx, thr);
 };
 
 const lineMeetsCircle: Rule = (s, ctx) => {

@@ -192,6 +192,23 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'secant-from-point-far-crossing',
+    title: '«מנקודה A יוצא חותך למעגל בנקודה D» — the from-point secant phrasing (issue #136, ADR-332)',
+    guards:
+      'Operator 2026-07-15 (play-testing PR #137): the from-point phrasing «מנקודה A יוצא חותך למעגל בנקודה D» (A the external apex, D the FAR crossing named after the circle) fell through to lineLineIntersection → not-handled → LLM (dropped D). The #136 rule handled only the «AD חותך» pair form. Widened `secantFarPoint` with a FROM-POINT branch (A from «מנקודה A», D from «בנקודה D» = far, near anonymous), gated to a cut OF THE CIRCLE and guarded off the diameter family so it never steals «קוטר … חותך את הצלע AC».',
+    steps: ['מעגל שמרכזו O', 'מנקודה A יוצא חותך למעגל בנקודה D'],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), D = at(fig, 'D');
+      const r = dist(O, D); // D on the circle → radius
+      expect(dist(A, O), 'A external apex').toBeGreaterThan(r);
+      const anon = fig.construction.objects.filter((o) => isGeoPoint(o) && o.id.startsWith('@'));
+      expect(anon.length, 'an anonymous near-crossing dot').toBe(1);
+      const N = at(fig, anon[0].id);
+      expect(dist(A, N), 'the @-dot is the NEAR crossing, D the FAR').toBeLessThan(dist(A, D));
+    },
+  },
+  {
     id: 'parallel-line-from-a-point',
     title: '«מנקודה A ישר מקביל ל-DO» draws a parallel line through A (the "from a point" anchor, issue #127, ADR-327)',
     guards:
