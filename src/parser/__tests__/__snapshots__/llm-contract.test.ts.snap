@@ -138,6 +138,24 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "segment",
     ],
   },
+  "AD cuts circle O at B": {
+    "en": [
+      "circle",
+      "point-circle-side",
+      "point-on-circle",
+      "line-through",
+      "line-circle-intersection",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "point-circle-side",
+      "point-on-circle",
+      "line-through",
+      "line-circle-intersection",
+      "segment",
+    ],
+  },
   "AD median to BC": {
     "en": [
       "midpoint",

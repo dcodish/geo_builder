@@ -4157,6 +4157,101 @@ const extensionMeetsExistingPoint: Rule = (s, ctx) => {
   return [{ type: 'set-line', points: [X, Y, D] }]; // D on the extension of XY, in order X→Y→D
 };
 
+/**
+ * "AD חותך למעגל" / "AD cuts the circle" — a SECANT from an EXTERNAL apex A with only the FAR crossing D
+ * named ([ADR-332](../../../docs/06-decisions.md#adr-332), issue #136). A is outside the circle, D is the
+ * far-side crossing (a NEW point ON the circle), the near crossing is not named. Under-specified ⇒ BUILD
+ * with the secant's rotation about A a free DOF ([ADR-052](../../../docs/06-decisions.md#adr-052)); extra
+ * info pins/labels it:
+ *   - bare — D = `point-on-circle` (free θ = the free direction); the near crossing is an ANONYMOUS
+ *     promotable `@`-dot (#32/ADR-297), a `line-circle-intersection` whose one-sided `order` [A, near, D]
+ *     keeps D on the FAR side (the ADR-098/267 requirement — sampling / "show another" stay far-side, a
+ *     contradiction reads amber; never a silent near/far flip). Segment A–D is the drawn secant.
+ *   - "בנקודה B" / "at B" — the near crossing is NAMED B (a derived point), order A→B→D by construction.
+ *   - "דרך P" / "through P" — collinearity A–P–D pins the direction (P created free if new).
+ * A NEW A becomes an external free point (`point-circle-side` outside — mirrors ADR-254); an existing A is
+ * used as-is.
+ *
+ * Runs BEFORE `lineMeetsCircle`, which would otherwise grab it, assume BOTH pair endpoints exist, and emit
+ * a `line-through` to a never-created D — the #136 latent `chord-AD` failure (parses ok, builds nothing).
+ * Defers to `secantFromExternal` (from-point cue), `extendOntoCircle` (המשך), `lineCutsCircleTwice` (two
+ * crossings named), the tangent rules, `parallelCircleIntersection` (parallel), and to `lineMeetsCircle`
+ * itself when the pair's far label ALREADY EXISTS (a real chord/line through two existing points).
+ */
+/** The shared apex+far secant construct ([ADR-332](../../../docs/06-decisions.md#adr-332)): A the external
+ *  apex, D a free-θ far crossing on the circle, `nearId` the near crossing (anonymous @-dot or a named
+ *  point) kept between A and D by the one-sided `order`, `thr` (optional) pinning the direction A–P–D. */
+function secantFarCommands(A: Id, D: Id, nearId: Id, circ: Id, ctx: ParseContext, thr: string | null): AnyCommand[] {
+  const lineId = `sec-${A}${D}`;
+  const aNew = !(ctx.points ?? []).includes(A);
+  const pNew = thr ? !(ctx.points ?? []).includes(thr) : false;
+  return [
+    ...(aNew ? [{ type: 'point-circle-side' as const, id: A, circle: circ, side: 'outside' as const }] : []), // NEW A → external apex
+    { type: 'point-on-circle', id: D, circle: circ }, // D = far crossing (free θ = the free direction)
+    { type: 'line-through', id: lineId, a: A, b: D },
+    { type: 'line-circle-intersection', id: nearId, line: lineId, circle: circ, avoid: D, order: [A, nearId, D] }, // near crossing; D far
+    ...(pNew ? [{ type: 'free-point' as const, id: thr!, x: 0, y: 0, free: true }] : []),
+    ...(thr ? [{ type: 'set-line' as const, points: [A, thr, D] }] : []), // "דרך P" pins the direction
+    { type: 'segment', a: A, b: D }, // the drawn secant A–D (passes through the near crossing)
+  ];
+}
+
+const secantFarPoint: Rule = (s, ctx) => {
+  if (!/חות[כך]|\bsecant\b|\bcuts?\b|\bmeets?\b|crosses/i.test(s)) return null; // the secant cut keyword
+  if (/tangent|משיק/i.test(s)) return null; // tangent → the tangent rules
+  if (/parallel|מקביל|perpendicular|מאונ[ךכ]/i.test(s)) return null; // parallel/⟂ line ∩ circle → its own rule
+  if (/המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(s)) return null; // המשך → extendOntoCircle
+  if (/\bline\b|\bray\b|הישר|הקו|קרן/i.test(s)) return null; // an EXPLICIT line/ray ("the line GB…") is a defined line, crossing named separately → lineMeetsCircle/lineCutsCircleTwice (the B13 opt-out)
+  if (/קוטר|diameter/i.test(s)) return null; // a diameter compound ("קוטר מעגל O … חותך את הצלע AC") → the diameter rules, never an apex secant
+  const center = resolveMentionedCircle(s, ctx); // a named circle, or "the circle" when there's exactly one
+  if (!center) return null; // must REFER to a circle
+  const circ = circleId(center);
+  // TWO crossings named ("at C and D" / "בנקודות C ו-D") → lineCutsCircleTwice / secantFromExternal, never this rule.
+  if (/(?:\bat\b|בנקודות?|ב-)\s*[A-Za-z]\d*\s*(?:\band\b|ו-?|,)\s*[A-Za-z]\d*/i.test(s)) return null;
+
+  // FROM-POINT form: "מנקודה A [יוצא] חותך למעגל בנקודה D" / "from point A a secant cuts the circle at D" —
+  // A the external apex (named by "from point A"), D the FAR crossing (named after the circle; the ONLY
+  // crossing given, so there's no leading pair to supply it). secantFromExternal (earlier) owns the
+  // two-crossings / "outside"+two-crossings forms; a single far crossing falls through to here.
+  const fromM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)([A-Za-z]\d*)(?![A-Za-z])/i);
+  // The cut must be OF THE CIRCLE directly ("חותך למעגל" / "cuts the circle"), not of a segment named after a
+  // circle mention ("חותך את הצלע AC" — that's diameterCutsSegment / lineLineIntersection, guarded above too).
+  const cutsCircle = /(?:חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|\bsecant\b|crosses|meets?)\s+(?:ל|את\s+ה|to\s+the\s+|the\s+)?(?:מעגל|circle)/i.test(s);
+  if (fromM && cutsCircle) {
+    const A = up(fromM[1]);
+    const D = crossingAfterCircle(s); // the single named crossing = the FAR point
+    if (!D || D === A) return null;
+    if (membersOfCenter(ctx, center).has(A)) return null; // apex not on the circle (A-on-circle: a later follow-up)
+    if ((ctx.points ?? []).includes(D) || membersOfCenter(ctx, center).has(D)) return null; // D is a NEW far crossing
+    return secantFarCommands(A, D, anonId('near', A, D), circ, ctx, null);
+  }
+
+  // PAIR form: "AD חותך למעגל [בנקודה B]" — apex+far from a leading label pair, בנקודה = the NEAR crossing.
+  // Optional NEAR-crossing label ("בנקודה B" / "at B") and THROUGH-point ("דרך P" / "through P").
+  const thr = /(?:דרך|עובר\s+דרך|\bthrough\b|passing\s+through)/i.test(s) ? throughPointLabel(s) : null;
+  const atM = s.match(/(?:בנקודה|בנק'|\bat\b)\s*([A-Za-z]\d*)\b/i);
+  const near = atM && up(atM[1]) !== thr ? up(atM[1]) : null; // the "at/בנקודה" label is the near crossing
+
+  // The leading label pair A (apex) + D (far) — strip the circle ref, the at/through clauses, and keywords.
+  const body = dropCircleRef(s)
+    .replace(/(?:בנקודה|בנק'|\bat\b)\s*[A-Za-z]\d*\b/gi, ' ')
+    .replace(/(?:דרך|עובר\s+דרך|\bthrough\b|passing\s+through)\s+(?:ה?נקודה\s+)?[A-Za-z]\d*\b/gi, ' ')
+    .replace(/חות[כך]|נחתכ?\w*|פוגש\w*|\bsecant\b|cuts?|meets?|crosses|\bline\b|הישר|הקו|ועובר|עובר/gi, ' ');
+  const pr = labelRun(body, 2);
+  if (!pr) return null;
+  const [A, D] = pr;
+  if (new Set([A, D, near, thr].filter(Boolean)).size !== [A, D, near, thr].filter(Boolean).length) return null; // labels distinct
+  // D is the FAR crossing = a BRAND-NEW point (created on the circle). If D already exists as a point OR is
+  // already ON this circle, it's a line ENDPOINT, not a new far crossing — a line through two placed points
+  // whose crossing is named separately (בנקודה) → lineMeetsCircle / lineCutsCircleTwice owns it.
+  if ((ctx.points ?? []).includes(D) || membersOfCenter(ctx, center).has(D)) return null;
+  // A is the EXTERNAL apex. If A is already ON the circle, that's the A-on-circle follow-up (not this issue).
+  if (membersOfCenter(ctx, center).has(A)) return null;
+
+  const nearId = near ?? anonId('near', A, D); // named crossing, else an anonymous promotable dot
+  return secantFarCommands(A, D, nearId, circ, ctx, thr);
+};
+
 const lineMeetsCircle: Rule = (s, ctx) => {
   // verb form ("AB cuts/meets the circle") OR noun/definitional form ("E is the מפגש/meeting/intersection of AB with the circle")
   if (!INTERSECT_KW.test(s) && !/מפגש|\bmeeting\b/i.test(s)) return null;
@@ -5581,6 +5676,7 @@ export const RULES: Rule[] = [
   circleCircleIntersection, // two circles cross — before the generic line∩line intersection
   extendOntoCircle, // "המשך AC חותך מעגל P בנקודה D" — DIRECTIONAL extension onto a circle (D beyond the 2nd letter), before the order-agnostic lineMeetsCircle
   lineCutsCircleTwice, // "AO cuts the circle at C and D" — a named line crossing the circle at BOTH roots; before lineMeetsCircle (one crossing)
+  secantFarPoint, // "AD חותך למעגל [בנקודה B]" — apex A external + FAR crossing D only (near unnamed); before lineMeetsCircle, which would mis-grab a never-created D (#136)
   lineMeetsCircle, // "line AC meets circle P at E" — an order-agnostic chord/line meeting a circle, before collinearity & line∩line
   extensionMeetsExistingPoint, // "המשך CA נפגש עם המשיק בנקודה D" — drive an EXISTING D (a tangent's apex marker) onto the extension of CA; before line∩line ("חותך"/"נפגש" would otherwise 'stop' it)
   // A drawn perpendicular/parallel line that "cuts" another at a point must be claimed BEFORE the
