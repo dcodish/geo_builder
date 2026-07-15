@@ -199,6 +199,15 @@ export const SCENARIOS: Scenario[] = [
       const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), M = at(fig, 'M');
       expect(M.x).toBeCloseTo((A.x + B.x + C.x) / 3, 3);
       expect(M.y).toBeCloseTo((A.y + B.y + C.y) / 3, 3);
+    id: 'semicircle-on-every-side-of-square',
+    title: '«ריבוע» then «על כל צלע של ריבוע יש חצי מעגל» — a semicircle on each side (issue #29, ADR-330)',
+    guards:
+      'Prod session p3du4l9p: the classic composite (a polygon with a semicircle erected on each side) was not-handled — only the single-side form parsed. The quantified «על כל צלע … יש חצי מעגל» now resolves the context polygon and builds one closed-form semicircle per side (ADR-110 macro, no new engine construct).',
+    steps: ['ריבוע ABCD', 'על כל צלע של ריבוע יש חצי מעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const arcs = fig.construction.objects.filter((o) => o.kind === 'arc');
+      expect(arcs).toHaveLength(4); // one semicircle arc per side of the square
     },
   },
   {

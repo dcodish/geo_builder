@@ -10,8 +10,9 @@
  * shares) had no tokens for SIDE references (צלע/sides), the EVERY/EACH quantifier, or the polygon
  * nouns — so a rule that recognised its own keyword could invent default operands although words that
  * change the figure's meaning remained unconsumed. Fix at the mechanism: the vocabulary, not a
- * rule-local carve-out. The per-side semicircle CAPABILITY is issue #29 (feature); until it lands the
- * honest behaviour is escalation, and this test asserts the exact prod sequence never half-parses.
+ * rule-local carve-out. The per-side semicircle CAPABILITY has since landed (issue #29 / ADR-330): the
+ * exact prod sequence now BUILDS one semicircle per side — the honest outcome — instead of a default-A,B
+ * half-parse. This test asserts that (and that a non-quantified compound still escalates).
  */
 import { describe, it, expect } from 'vitest';
 import { parse, buildParseCtx } from '@/parser';
@@ -31,16 +32,17 @@ function squareCtx() {
 }
 
 describe('issue #27 — quantified per-side semicircle never half-parses to a default-A,B figure', () => {
-  it('the exact prod utterances refuse (escalate) instead of committing one default semicircle', () => {
-    const ctx = squareCtx();
+  it('the exact prod utterances now BUILD one semicircle per side (issue #29) — never a default-A,B half-parse', () => {
+    const ctx = squareCtx(); // a square with 4 vertices in context
     for (const u of [
       'על כל צלע של ריבוע יש חצי מעגל', // the exact prod utterance (session p3du4l9p)
-      'יש חצי מעגל על כל צלע', // phrasing sibling — quantifier without the polygon noun
+      'יש חצי מעגל על כל צלע', // phrasing sibling — quantifier without the polygon noun (resolves the context polygon)
       'on every side of the square there is a semicircle', // En mirror
       'on each side of the square draw a semicircle',
     ]) {
       const r = parse(u, ctx);
-      expect(r.ok, `must refuse (escalate), never default the diameter: ${u}`).toBe(false);
+      expect(r.ok, `must build the per-side figure: ${u}`).toBe(true);
+      if (r.ok) expect(r.commands.filter((c) => c.type === 'arc').length, `one semicircle per side: ${u}`).toBe(4);
     }
   });
 

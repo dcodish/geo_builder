@@ -3056,6 +3056,72 @@ const regularPolygon: Rule = (s, ctx) => {
  * it is pure gauge. And an unstated radius is a FREE DOF (ADR-051/052 — `freeRadius` unless a number
  * was stated), the unnamed auto-picked centre carries `autoCenter` (FR-RN-8), same as `circle`.
  */
+/**
+ * The QUANTIFIED semicircle figure (#29): «על כל צלע של ריבוע יש חצי מעגל» / «a semicircle on each side of
+ * the square» — the classic bagrut composite (a polygon with a 180° arc erected on every side). An ADR-110
+ * MACRO: resolve the polygon (a named «ריבוע ABCD» label run whose vertices exist, else the figure's SINGLE
+ * polygon — the ADR-245 definite reference), then emit ONE closed-form semicircle per side (the exact shape
+ * the single-side rule produces: midpoint centre + hidden circle-through + the antipode membership + the
+ * arc + the diameter). No new engine construct. Runs BEFORE `semicircle` so the quantifier isn't lost.
+ * The vertices must already exist (build the polygon first — the prod flow); otherwise it defers. The
+ * bulge SIDE (outward vs inward) is winding-dependent and cannot be known at parse time (no coordinates) —
+ * v1 uses the single-rule's consistent arc convention; a per-side outward orientation is a follow-up.
+ */
+const SEMI_NEW_SHAPE: Record<string, 'square' | 'rectangle' | 'rhombus' | 'quadrilateral' | 'triangle'> = {
+  ריבוע: 'square', square: 'square', מלבן: 'rectangle', rectangle: 'rectangle',
+  מעוין: 'rhombus', rhombus: 'rhombus', מרובע: 'quadrilateral', quadrilateral: 'quadrilateral', quad: 'quadrilateral',
+  משולש: 'triangle', triangle: 'triangle',
+};
+const semicirclesOnEverySide: Rule = (s, ctx) => {
+  if (!/semicircle|half[\s-]?circle|חצי[\s-]?מעגל|חצי[\s-]?עיגול/i.test(s)) return null;
+  if (!/כל\s+צלע|(?:every|each)\s+side/i.test(s)) return null; // the "on EVERY side" quantifier
+  const shapeM = s.match(
+    /(משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע|triangle|quadrilateral|quad|square|rectangle|rhombus|trapezoid|parallelogram|kite|polygon)\s+((?:[A-Za-z]\d*\s*){3,})/i,
+  );
+  let poly: Id[] | null = null;
+  if (shapeM) {
+    const ids = (shapeM[2].match(/[A-Z]\d*/g) ?? []).map(up); // UPPERCASE labels only — never lowercase prose ("square THERE is …")
+    if (ids.length >= 3) poly = ids;
+  }
+  if (!poly) {
+    const cands = ctx.polygons ?? [];
+    if (cands.length === 1) poly = cands[0].map(up);
+  }
+  if (!poly || poly.length < 3) return null;
+  const known = new Set((ctx.points ?? []).map(up));
+  const prefix: AnyCommand[] = [];
+  // The semicircle's closed form is centred on each side's MIDPOINT, so the vertices must be defined. When
+  // they already exist (the prod flow — build the polygon, then the semicircles) we use them; when a NAMED
+  // polygon's vertices are all NEW we build the shape INLINE first (the self-contained «…על כל צלע של ריבוע
+  // ABCD…»), but only for a shape we can create outright. Anything else (partial / uncreatable) defers.
+  if (!poly.every((p) => known.has(p))) {
+    const noun = shapeM ? shapeM[1].toLowerCase() : null;
+    const t = noun ? SEMI_NEW_SHAPE[noun] : undefined;
+    if (!poly.every((p) => !known.has(p)) || !t) return null; // partial set, or a shape we can't build inline
+    if (t === 'triangle') { if (poly.length !== 3) return null; prefix.push({ type: 'triangle', ids: [poly[0], poly[1], poly[2]] }); }
+    else { if (poly.length !== 4) return null; prefix.push({ type: t, ids: [poly[0], poly[1], poly[2], poly[3]] }); }
+  }
+  const rr = parseRadius(s);
+  const out: AnyCommand[] = [...prefix];
+  const used = new Set<string>([...(ctx.points ?? []).map(up), ...poly]);
+  const CENTRES = ['O', 'P', 'Q', 'S', 'T', 'U', 'V', 'W', 'M', 'N'];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i], b = poly[(i + 1) % poly.length];
+    const center = freeLabel([...used], CENTRES);
+    used.add(center);
+    const circ = circleId(center);
+    out.push(
+      { type: 'midpoint', id: center, a, b },
+      { type: 'circle-through', id: circ, center, through: a, hidden: true, autoCenter: true },
+      { type: 'point-on-circle', id: b, circle: circ }, // the antipode membership (a passing check)
+      { type: 'arc', id: `arc-${b}${a}`, center, from: b, to: a }, // CCW b→a = the half-circle
+      { type: 'segment', a, b }, // the side (diameter)
+    );
+  }
+  if (rr.varCmd) out.push(rr.varCmd);
+  return out;
+};
+
 const semicircle: Rule = (s, ctx) => {
   if (!/semicircle|half[\s-]?circle|חצי[\s-]?מעגל|חצי[\s-]?עיגול/i.test(s)) return null;
   const r = parseRadius(s);
@@ -5430,6 +5496,7 @@ export const RULES: Rule[] = [
   similarity, // "ABC ~ DEF"
   area, // "שטח המשולש ABC = 13" / "SABC/SDEF = 3/4" (ADR-118) — BEFORE the shape rules, which would otherwise build the named shape and drop the area
   perimeter, // "היקף ABC = 20" / "perimeter of ABCD is 20" (ADR-228) — BEFORE the shape rules, same reason (a circle's circumference → the `circle` rule)
+  semicirclesOnEverySide, // "על כל צלע … יש חצי מעגל" — a semicircle on EVERY side; before `semicircle` (#29)
   semicircle, // "חצי מעגל" / "semicircle" — before `circle` (contains "מעגל") and the shape rules
   quarterCircle, // "רבע מעגל" / "quarter circle" — same
   concentricCircles, // "שני מעגלים בעלי מרכז משותף O" — the CONCENTRIC PAIR (ADR-244); before `circle` (which would half-parse it to ONE circle) and the two-circle rules
