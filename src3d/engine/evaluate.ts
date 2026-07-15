@@ -73,6 +73,22 @@ export function solidDims(kind: SolidKind, key: string, seed: number): number[] 
       sample(seed, `${key}-x3`, 0.3, 0.7), sample(seed, `${key}-y3`, 0.95, 1.3),
       sample(seed, `${key}-x4`, -0.35, 0.2), sample(seed, `${key}-y4`, 0.35, 0.8),
     ];
+  // #117: right prisms over more bases. The base's 1st edge AB=(1,0) is the similarity gauge; the height is
+  // straight up (ז), the base shape is the free DOF(s). A parallelepiped adds a FREE lateral vector w.
+  if (kind === 'prism4') // parallelogram base: 2nd edge AD=(dx,dy)
+    return [sample(seed, `${key}-dx`, -0.4, 0.5), sample(seed, `${key}-dy`, 0.6, 1.2), sample(seed, `${key}-height`, 0.7, 1.5)];
+  if (kind === 'prism4g') // general quad base: C=(cx,cy), D=(dx,dy) free (A,B gauge)
+    return [
+      sample(seed, `${key}-cx`, 0.9, 1.5), sample(seed, `${key}-cy`, 0.6, 1.2),
+      sample(seed, `${key}-dx`, -0.3, 0.4), sample(seed, `${key}-dy`, 0.6, 1.2), sample(seed, `${key}-height`, 0.7, 1.5),
+    ];
+  if (kind === 'prism4sq' || kind === 'prismReg5' || kind === 'prismReg6') // fixed base shape (gauge) — only the height is free
+    return [sample(seed, `${key}-height`, 0.7, 1.5)];
+  if (kind === 'parallelepiped') // oblique: parallelogram base + a free lateral vector w
+    return [
+      sample(seed, `${key}-dx`, -0.4, 0.5), sample(seed, `${key}-dy`, 0.6, 1.2),
+      sample(seed, `${key}-wx`, -0.35, 0.35), sample(seed, `${key}-wy`, -0.35, 0.35), sample(seed, `${key}-wz`, 0.7, 1.5),
+    ];
   return [rad(sample(seed, `${key}-alpha`, 38, 72)), rad(sample(seed, `${key}-beta`, 38, 72)), sample(seed, `${key}-height`, 0.65, 1.5)];
 }
 
@@ -197,6 +213,36 @@ function solidPositions(kind: SolidKind, dims: number[], origin: Vec3): Vec3[] {
     const pts = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z)];
     for (let i = 0; i < dims.length; i += 2) pts.push(v3(o.x + dims[i], o.y + dims[i + 1], o.z));
     return pts;
+  }
+  // #117: right prisms over more bases — base ring in the z=origin plane, tops straight up by `h`.
+  if (kind === 'prism4') {
+    const [dx, dy, h] = dims; // parallelogram base AB=(1,0), AD=(dx,dy), C=B+AD
+    const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1 + dx, o.y + dy, o.z), v3(o.x + dx, o.y + dy, o.z)];
+    return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
+  }
+  if (kind === 'prism4g') {
+    const [cx, cy, dx, dy, h] = dims; // general quad base: A,B gauge; C,D free
+    const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + cx, o.y + cy, o.z), v3(o.x + dx, o.y + dy, o.z)];
+    return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
+  }
+  if (kind === 'prism4sq') {
+    const [h] = dims; // unit square base (gauge)
+    const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1, o.y + 1, o.z), v3(o.x, o.y + 1, o.z)];
+    return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
+  }
+  if (kind === 'prismReg5' || kind === 'prismReg6') {
+    const [h] = dims; // regular n-gon base on a unit-circumradius circle (gauge)
+    const n = kind === 'prismReg5' ? 5 : 6;
+    const base = Array.from({ length: n }, (_, i) => {
+      const a = (2 * Math.PI * i) / n;
+      return v3(o.x + Math.cos(a), o.y + Math.sin(a), o.z);
+    });
+    return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
+  }
+  if (kind === 'parallelepiped') {
+    const [dx, dy, wx, wy, wz] = dims; // parallelogram base translated by the FREE lateral vector w (oblique)
+    const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1 + dx, o.y + dy, o.z), v3(o.x + dx, o.y + dy, o.z)];
+    return [...base, ...base.map((p) => v3(p.x + wx, p.y + wy, p.z + wz))];
   }
   // prism3 — right triangular prism: base ABC in the z=origin plane, tops straight up.
   const [alpha, beta, h] = dims;

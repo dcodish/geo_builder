@@ -7,7 +7,31 @@ import { exprPointIds, exprVectorNames } from './vecExpr';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, SolidCommand, SolidObj } from './types';
 
-const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5 };
+const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8 };
+
+/** The base-polygon vertex count of a 2n-vertex prism/parallelepiped (#117), or null for other solids. */
+function prismBaseN(kind: SolidCommand['kind']): number | null {
+  switch (kind) {
+    case 'prism4': case 'prism4g': case 'prism4sq': case 'parallelepiped': return 4;
+    case 'prismReg5': return 5;
+    case 'prismReg6': return 6;
+    default: return null;
+  }
+}
+/** Generic prism topology for a base ring [0..n-1] + top ring [n..2n-1] + n verticals. */
+function prismRing(n: number): { edges: [number, number][]; faces: number[][] } {
+  const edges: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    edges.push([i, (i + 1) % n]); // base ring
+    edges.push([i + n, ((i + 1) % n) + n]); // top ring
+    edges.push([i, i + n]); // vertical
+  }
+  const base = Array.from({ length: n }, (_, i) => i);
+  const top = Array.from({ length: n }, (_, i) => i + n);
+  const faces: number[][] = [base, top];
+  for (let i = 0; i < n; i++) faces.push([i, (i + 1) % n, ((i + 1) % n) + n, i + n]); // rectangular laterals
+  return { edges, faces };
+}
 
 /** The N vertex indices of a flat polygon kind, or null. */
 function polygonN(kind: SolidCommand['kind']): number | null {
@@ -16,6 +40,8 @@ function polygonN(kind: SolidCommand['kind']): number | null {
 
 /** Edge index pairs per solid kind (indices into `ids`). */
 function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
+  const bn = prismBaseN(kind);
+  if (bn) return prismRing(bn).edges; // #117: parallelogram/quad/square/regular prism + parallelepiped
   const pn = polygonN(kind);
   if (pn) return Array.from({ length: pn }, (_, i) => [i, (i + 1) % pn] as [number, number]); // the boundary cycle
   if (kind === 'prism3' || kind === 'prism3e') {
@@ -54,6 +80,8 @@ function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
 
 /** Face index rings per solid kind. Orientation is irrelevant — the renderer re-orients outward numerically. */
 function faceIndices(kind: SolidCommand['kind']): number[][] {
+  const bn = prismBaseN(kind);
+  if (bn) return prismRing(bn).faces; // #117
   const pn = polygonN(kind);
   if (pn) {
     // a flat polygon is DOUBLE-SIDED (the ring + its reverse) so that from any viewpoint one
@@ -143,7 +171,7 @@ function relPointIds(c: Construction3, from: Id, to: Id, terms: { atom: import('
 }
 
 /** How many FREE dims the figure's solids carry (a scalar statement on such a figure is a GIVEN, not a check). */
-const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2, pyramid4g: 3, pyramid4r: 2, pyramid4gr: 4, prism3e: 1, pyramid3e: 1, pyramidPar: 5, polygon3: 2, polygon4: 4, polygon5: 6 };
+const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2, pyramid4g: 3, pyramid4r: 2, pyramid4gr: 4, prism3e: 1, pyramid3e: 1, pyramidPar: 5, polygon3: 2, polygon4: 4, polygon5: 6, prism4: 3, prism4g: 5, prism4sq: 1, prismReg5: 1, prismReg6: 1, parallelepiped: 5 };
 function freeDims(c: Construction3): number {
   let n = 0;
   for (const s of c.solids) n += DIM_COUNT[s.kind];
