@@ -22,6 +22,8 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `two-tangents-from-point-distinct` — the two tangents from a point are DISTINCT (issue #142, ADR-333)
+Operator 2026-07-15 (dev play-test): two separate «tangent from A» statements landed on the SAME touch point («B ו-C נפלו על אותה נקודה») — `tangentFromExternal` always emitted branch 0. Fixed: a SECOND single tangent from the same apex (its `tanaux-` circle already exists, via `ctx.tangentAuxes`) takes branch 1 = the other touch.
 ### `single-external-tangent-builds` — «מנקודה A יוצא משיק למעגל בנקודה B» builds (prod regression, issue #138)
 Prod regression: the singular external tangent parsed OK in prod on 2026-07-11 (source:parser) but broke by 2026-07-15 (weak:dropped:משיק/tangent → LLM → built-nothing) — the ADR-292 משיק verb gate (deployed prod/2026-07-12-2) didn't recognise `tangentFromExternal`'s Thales aux-circle construction (`tanaux-`/`~tanmid-`, no literal `tangent` object). Fixed by adding `tanaux-`/`tanmid-` to the gate's satisfied set (ADR-292 Am.). This scenario locks the parse+build; the gate itself is locked by `verb-gate.test.ts`.
 ### `parallel-line-from-a-point` — «מנקודה A ישר מקביל ל-DO» draws a parallel line through A (issue #127, ADR-327)
