@@ -28,6 +28,19 @@ describe('bare-segment shorthand', () => {
     seg('הישר CD', 'C', 'D');
   });
 
+  // issue #46: the bare colloquial "קו XY" (no article) — ~3 prod users — lowers exactly like "ישר XY".
+  it('"קו XY" (bare, no article) → the same segment as "ישר XY"', () => {
+    seg('קו AB', 'A', 'B');
+    seg('קו BD', 'B', 'D');
+    seg('הקו AC', 'A', 'C'); // the articled form still works
+  });
+  // The orientation/style adjective forms must NOT be claimed as segments (both operands must be Latin
+  // labels) — they escape to the guidance-message classes (#43) instead of a wrong segment.
+  it('"קו <adjective>" is not a segment', () => {
+    expect(types('קו אופקי')).toEqual(['NOT-HANDLED']); // "horizontal line"
+    expect(types('קו מקווקו')).toEqual(['NOT-HANDLED']); // "dashed line"
+  });
+
   // The catch-all must never steal a structured form.
   it('does NOT shadow keyword/structured forms', () => {
     expect(types('AB = 6')).toContain('set-distance'); // distance (auto-draws its own segment)

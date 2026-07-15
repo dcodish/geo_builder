@@ -381,9 +381,28 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const noteFileProblem = (key: string) => {
-    setFileNote(t(key));
+  const noteFileProblem = (key: string, vals?: Record<string, unknown>) => {
+    setFileNote(t(key, vals));
     window.setTimeout(() => setFileNote(''), 6000);
+  };
+
+  // "Clear the session" spans two owners — the store (facts/figure) and this component's local UI state —
+  // and the button used to invoke only the store half (issue #146), leaving the typed input text and every
+  // transient note (input/file/rename/alt/LLM notes + any in-progress inline edit) behind, misrepresenting a
+  // cleared session. clearAll resets BOTH: the store figure plus every session-scoped local field. Display /
+  // help / fold PREFERENCES are deliberately left untouched — those are not session data.
+  const clearAll = () => {
+    clear();
+    setText('');
+    setInputNote('');
+    setFileNote('');
+    setFileAudit([]);
+    setRenameNote('');
+    setAltNote('');
+    setLlmDropped([]);
+    setEditingId(null);
+    setEditText('');
+    setEditError(false);
   };
 
   const loadFigureFile = async (f: File) => {
@@ -438,7 +457,10 @@ export default function App() {
       setFileAudit(audit.findings); // note is DERIVED from these against live facts (issue #24) — self-clears
     } else if (refreshed.length > 0) {
       // The save was from an older version and some steps were re-lowered to the current one (issue #120).
-      setFileNote(t('file.loadRefreshed', { count: refreshed.length }));
+      // Route it through the auto-clearing lane (issue #147): a "refreshed" note is a transient
+      // informational hiccup like the file refusals, not a persistent truth-audit — it inherits the
+      // 6 s auto-clear instead of hanging forever with no dismissal path.
+      noteFileProblem('file.loadRefreshed', { count: refreshed.length });
     }
   };
 
@@ -1370,7 +1392,7 @@ export default function App() {
                 <span style={{ display: 'flex', gap: 4 }}>
                   <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => undo()}>{t('actions.undo')}</button>
                   <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => redo()}>{t('actions.redo')}</button>
-                  <button type="button" style={{ ...subtleBtn, color: pal.danger }} onClick={clear}>{t('actions.clear')}</button>
+                  <button type="button" style={{ ...subtleBtn, color: pal.danger }} onClick={clearAll}>{t('actions.clear')}</button>
                 </span>
               )}
             </div>

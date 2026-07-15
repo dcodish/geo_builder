@@ -1536,6 +1536,34 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'altitude-to-named-side',
+    title: '"משולש ABC" → "גובה לצלע AB" — the altitude TO a named side drops from the opposite vertex (issue #107)',
+    guards:
+      'log-triage 2026-07-13 (operator-approved): "גובה לצלע AB" (altitude TO a side) was not-handled, while the mirror forms work — "גובה מ A" (altitude FROM a vertex, ADR-263) and "הוסף תיכון לצלע AB" (median TO a side, #71). The `altitude` rule resolved its apex only from a "from/מ" phrase or a named segment, so the vertex-less "to a named side" phrasing fell through to `return null`. Fix (#107): mirror the median\'s vertex-less side form — resolve the apex as the unique third vertex of a figure triangle carrying side AB, then reuse the foot+segment lowering. Several candidate triangles or none → defer (ADR-052), never guess.',
+    steps: [
+      'משולש ABC', // triangle ABC
+      'גובה לצלע AB', // altitude to side AB → drops from the opposite vertex C, foot on AB
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // The apex is C (the vertex not on AB); the foot is the auto-named point on AB.
+      const foot = fig.construction.objects
+        .filter(isGeoPoint)
+        .map((o) => o.id)
+        .find((id) => !['A', 'B', 'C'].includes(id));
+      expect(foot, 'a foot point was created').toBeTruthy();
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), F = at(fig, foot!);
+      // F on line AB, and CF ⟂ AB (the altitude from C).
+      const onAB = Math.abs((F.x - A.x) * (B.y - A.y) - (F.y - A.y) * (B.x - A.x)) / Math.max(dist(A, B), 1) ** 2;
+      expect(onAB, 'the foot is on line AB').toBeLessThan(1e-3);
+      const cf = { x: F.x - C.x, y: F.y - C.y }, ab = { x: B.x - A.x, y: B.y - A.y };
+      expect(
+        Math.abs(cf.x * ab.x + cf.y * ab.y) / (Math.hypot(cf.x, cf.y) * Math.hypot(ab.x, ab.y) + 1e-9),
+        'the altitude CF ⟂ AB',
+      ).toBeLessThan(1e-3);
+    },
+  },
+  {
     id: 'named-midsegment-keeps-its-endpoint-names',
     title: '"PQ קטע אמצעים לצלע BC במשולש ABC" — the named midsegment keeps endpoints P,Q (was auto-renamed M,N)',
     guards:

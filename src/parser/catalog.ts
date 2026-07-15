@@ -76,7 +76,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'points', supported: true, en: 'point E lies inside triangle KAO', he: 'הנקודה E נמצאת בתוך המשולש KAO', descEn: 'A point kept inside (or outside) a polygon region. Combines with a carrier: "E is on circle O inside triangle KAO" keeps E on the circle AND inside the triangle.', descHe: 'נקודה שנשארת בתוך (או מחוץ ל) צורה. משתלב עם נשא: "הנקודה E נמצאת על מעגל O בתוך המשולש KAO" — גם על המעגל וגם בתוך המשולש.' },
 
   // ── Lines & perpendiculars ──────────────────────────────────────────────
-  { category: 'lines', supported: true, en: 'segment AC', he: 'קטע AC', descEn: 'Connect two points — or just type "AC" / "line AC".', descHe: 'חיבור שתי נקודות — או פשוט "AC" / "ישר AC".' },
+  { category: 'lines', supported: true, en: 'segment AC', he: 'קטע AC', descEn: 'Connect two points — or just type "AC" / "line AC" / "קו AC".', descHe: 'חיבור שתי נקודות — או פשוט "AC" / "ישר AC" / "קו AC".' },
   { category: 'lines', supported: true, en: 'BC parallel to AD', he: 'BC מקביל ל-AD', descEn: 'Make two segments parallel (drives a sliding point, else checks).', descHe: 'הקבלת שני קטעים (מזיז נקודה שיכולה לזוז, אחרת נבדק).' },
   { category: 'lines', supported: true, en: 'F is the foot of the perpendicular from C to AD', he: 'F רגל האנך מ-C ל-AD', descEn: 'The foot of a perpendicular dropped onto a line.', descHe: 'רגל אנך המורד אל ישר.' },
   { category: 'lines', supported: true, en: 'E is where the bisectors of BAC and BCA meet', he: 'E חיתוך חוצי הזוויות BAC ו-BCA', descEn: 'The point where two angle bisectors cross.', descHe: 'הנקודה שבה נחתכים שני חוצי זווית.' },
