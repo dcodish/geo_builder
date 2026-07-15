@@ -167,6 +167,9 @@ export const SCENARIOS: Scenario[] = [
       allStepsOk(fig);
       // The parallel line through A ∥ DO built as a real construct (id par-<through>-<a><b>), not escalated.
       expect(fig.construction.objects.some((o) => o.id === 'par-A-DO')).toBe(true);
+    },
+  },
+  {
     id: 'bare-free-point-positioned-by-next-statement',
     title: '«נקודה A» + «נקודה B» + «AB=5» — bare free points recruited by a later given (issue #104, ADR-328)',
     guards:
@@ -175,6 +178,9 @@ export const SCENARIOS: Scenario[] = [
     check(fig) {
       allStepsOk(fig);
       expect(dist(at(fig, 'A'), at(fig, 'B'))).toBeCloseTo(5, 3); // the distance recruited both free points
+    },
+  },
+  {
     id: 'diagonals-meet-noun-form',
     title: '«G נקודת מפגש האלכסונים» — the diagonal crossing by noun (issue #44, ADR-329)',
     guards:
@@ -199,6 +205,9 @@ export const SCENARIOS: Scenario[] = [
       const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), M = at(fig, 'M');
       expect(M.x).toBeCloseTo((A.x + B.x + C.x) / 3, 3);
       expect(M.y).toBeCloseTo((A.y + B.y + C.y) / 3, 3);
+    },
+  },
+  {
     id: 'semicircle-on-every-side-of-square',
     title: '«ריבוע» then «על כל צלע של ריבוע יש חצי מעגל» — a semicircle on each side (issue #29, ADR-330)',
     guards:
@@ -208,6 +217,9 @@ export const SCENARIOS: Scenario[] = [
       allStepsOk(fig);
       const arcs = fig.construction.objects.filter((o) => o.kind === 'arc');
       expect(arcs).toHaveLength(4); // one semicircle arc per side of the square
+    },
+  },
+  {
     id: 'semicircle-outside-a-triangle-side',
     title: '«חצי מעגל על צלע AB מחוץ למשולש» builds (bulge outward), not an escalation (issue #134, ADR-331)',
     guards:

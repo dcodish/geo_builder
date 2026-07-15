@@ -544,6 +544,9 @@ describe('#94 — a named angle is a highlightable marker (session 23mxaquw)', (
     expect(dataView(derived().construction, state().seed).relations.some((r) => r.startsWith('∠SDB'))).toBe(false);
     submit('∠SDB = α'); // naming it α upgrades the marker's label
     expect(derived().construction.angleMarks.find((m) => m.vertex === 'D')?.label).toBe('α');
+  });
+});
+
 // #117 — right prisms over more bases (parallelogram / square / regular n-gon) + the oblique parallelepiped
 // (מקבילון). Each slots into the dims-sampler + pivot with no new solver code; the DOF cue reads the base's
 // free shape dims (modulo the similarity gauge).
