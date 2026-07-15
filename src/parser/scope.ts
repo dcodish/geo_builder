@@ -140,10 +140,12 @@ const RULES: ScopeRule[] = [
     ],
   },
   {
-    // #43: a LONE point label — "נקודה A", "C", "קו ועליו נקודה A". A point with no relation builds
-    // nothing; the message says to state WHERE it sits. LAST (the most generic pattern).
+    // A LONE point label with NO keyword — "C", "A." — builds nothing; the message says to state WHERE it
+    // sits. The KEYWORD forms ("נקודה A" / "point A") now BUILD a bare free point (#104, ADR-328), so they
+    // are deliberately NOT matched here — they fall through to the `bareFreePoint` rule. "קו ועליו נקודה A"
+    // (a line carrying an unrelated point) stays guidance. LAST (the most generic pattern).
     category: 'bare-point',
-    patterns: [/^\s*(?:ה?נקודה\s+|point\s+)?[A-Za-z]\d*\s*\.?\s*$/, /^קו\s+(?:עם|ועליו)\s+(?:ה?נקודה\s+)?[A-Za-z]\d*\s*$/],
+    patterns: [/^\s*[A-Za-z]\d*\s*\.?\s*$/, /^קו\s+(?:עם|ועליו)\s+(?:ה?נקודה\s+)?[A-Za-z]\d*\s*$/],
   },
 ];
 
