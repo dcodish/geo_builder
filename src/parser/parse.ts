@@ -249,7 +249,10 @@ const resolveMentionedCircle = (s: string, ctx: ParseContext): string | null =>
 const crossingAfterCircle = (s: string): string | null => {
   const ci = s.search(/(?:circle|מעגל)(?:\s+[A-Za-z]\d*)?/i);
   if (ci < 0) return null;
-  const m = s.slice(ci).match(/(?:\bat\b|בנקודה|ב-)\s*([A-Za-z]\d*)\b/i);
+  // The crossing marker may be a full "בנקודה F", a hyphenated "ב-F", OR a bare "ב F" (spaced bet — a
+  // real prod form, issue #47): "ב-?" tolerates the missing hyphen. Safe: the marker is anchored to a
+  // Latin label, so a Hebrew ב-prefix (always followed by Hebrew) can never false-match.
+  const m = s.slice(ci).match(/(?:\bat\b|בנקודה|ב-?)\s*([A-Za-z]\d*)\b/i);
   return m ? up(m[1]) : null;
 };
 
@@ -868,15 +871,19 @@ const segment: Rule = (s) => {
 
 /**
  * A bare two-label token — "AB", "ED", "O1O2" — or a "line"-prefixed pair — "line AB" / "ישר AB" /
- * "הישר AB" / "הקו AB" — is the student's shorthand for *draw the segment* through those two points
- * (the app draws segments, not infinite lines). The single biggest source of needless LLM escalation
- * (debug-log analysis 2026-06-18). Anchored to the WHOLE input (just the two labels, nothing else), so
- * it never shadows a keyword form: "AB = 6" (distance), "AB ⟂ CD" (perpendicular), "line ABE" (ordered
- * line, ≥3 labels), "line CE passes through A" (collinear) all still reach their own rules first. Runs
- * LATE (just before `freePoint`) as a catch-all, so anything with structure is claimed ahead of it.
+ * "הישר AB" / "הקו AB" / "קו AB" — is the student's shorthand for *draw the segment* through those two
+ * points (the app draws segments, not infinite lines). The single biggest source of needless LLM
+ * escalation (debug-log analysis 2026-06-18). The bare colloquial "קו XY" (~3 prod users, log-triage
+ * 2026-07-11, issue #46) lowers exactly like "ישר XY" — a drawn segment with bare-reference semantics
+ * (ADR-077). Anchored to the WHOLE input (just the two labels, nothing else), so it never shadows a
+ * keyword form: "AB = 6" (distance), "AB ⟂ CD" (perpendicular), "line ABE" (ordered line, ≥3 labels),
+ * "line CE passes through A" (collinear) all still reach their own rules first — and an orientation/style
+ * adjective ("קו אופקי", "קו מקווקו") never matches (the two operands must be Latin labels), so it
+ * escapes to the guidance-message classes (#43) instead of being mis-claimed as a segment. Runs LATE
+ * (just before `freePoint`) as a catch-all, so anything with structure is claimed ahead of it.
  */
 const bareSegment: Rule = (s) => {
-  const m = s.trim().match(/^(?:line\s+|ישר\s+|הישר\s+|הקו\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)$/);
+  const m = s.trim().match(/^(?:line\s+|ישר\s+|הישר\s+|ה?קו\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)$/);
   if (!m) return null;
   const a = up(m[1]), b = up(m[2]);
   if (a === b) return null; // "AA" is not a segment
@@ -1149,15 +1156,30 @@ const midpoint: Rule = (s, ctx) => {
   return out;
 };
 
-/** "F on the extension of AD" / "F על המש(?:ך|כי(?:ם|הם|הן)?) AD" — a point on the ray beyond the far end (t > 1). */
+/** "F on the extension of AD" / "F על המש(?:ך|כי(?:ם|הם|הן)?) AD" — a point on the ray beyond the far end (t > 1).
+ *  Also the COPULA form (issue #47) — "the extension of CD is point A" / "המשך CD היא [נקודה] A" — which names
+ *  the extension point AFTER the segment (extension word first, point last), the mirror phrasing. Same
+ *  semantics either way. */
 const pointOnExtension: Rule = (s, ctx) => {
   if (!/extension|המש(?:ך|כי(?:ם|הם|הן)?)/i.test(s)) return null;
-  const m = s.match(/(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\b.*?(?:extension|המש(?:ך|כי(?:ם|הם|הן)?))\s*(.*)/i);
-  if (!m) return null;
-  // strip filler ("of"!) so "of AD" reads AD, not the labels O,F of "of".
-  const seg = labelRun(m[2].replace(FILLER, ' '), 2);
+  let seg: string[] | null = null;
+  let id: string;
+  // Copula form first: "המשך CD היא נקודה A" / "the extension of CD is point A" — the segment's two labels
+  // sit right after the extension word, the named point after the copula (היא/הוא/is).
+  const cop = s.match(
+    /(?:extension\s+of|המש(?:ך|כי(?:ם|הם|הן)?))\s+([A-Za-z]\d*)\s*([A-Za-z]\d*)\b[\s\S]*?(?:\bis\b|היא|הוא)\s*(?:the\s+point\s+|נקודה\s+|point\s+)?([A-Za-z]\d*)\b/i,
+  );
+  if (cop) {
+    seg = [up(cop[1]), up(cop[2])];
+    id = up(cop[3]);
+  } else {
+    const m = s.match(/(?:point\s+|נקודה\s+)?([A-Za-z]\d*)\b.*?(?:extension|המש(?:ך|כי(?:ם|הם|הן)?))\s*(.*)/i);
+    if (!m) return null;
+    // strip filler ("of"!) so "of AD" reads AD, not the labels O,F of "of".
+    seg = labelRun(m[2].replace(FILLER, ' '), 2);
+    id = up(m[1]);
+  }
   if (!seg) return null;
-  const id = up(m[1]);
   // "C on the extension of DA" beyond A → order D→A→C. If C ALREADY EXISTS (e.g. an inscribed vertex still
   // on the circle), creating it afresh as an off-object on-segment point would keep it pinned to its prior
   // carrier and the apply path picks the WRONG (near) intersection, losing the order. Emit an ORDERED
@@ -4081,7 +4103,7 @@ const extendOntoCircle: Rule = (s, ctx) => {
   if (!R) return null;
   // the line's two points (document order: a then b; D lands beyond b — the 2nd letter)
   const body = dropCircleRef(s)
-    .replace(/(?:\bat\b|בנקודה|ב-)\s*[A-Za-z]\d*\b/gi, ' ')
+    .replace(/(?:\bat\b|בנקודה|ב-?)\s*[A-Za-z]\d*\b/gi, ' ') // strip the crossing marker (incl. the spaced "ב F", issue #47)
     .replace(/extension|extended|\bline\b|המש(?:ך|כי(?:ם|הם|הן)?)|הישר|הקו|חות[כך]|נחתכ?\w*|פוגש\w*|cuts?|meets?|crosses|intersects?/gi, ' ');
   const pr = labelRun(body, 2);
   if (!pr || pr.includes(R)) return null;
@@ -5271,9 +5293,31 @@ const altitude: Rule = (s, ctx) => {
   if (named) {
     apex = up(named[1]);
     namedFoot = up(named[2]);
-  } else {
-    if (!apexM) return null;
+  } else if (apexM) {
     apex = up(apexM[1]);
+  } else {
+    // #107: the VERTEX-LESS "to a named side" form — "גובה לצלע AB" / "altitude to side AB" — the mirror of
+    // the median's vertex-less side form (#71). No apex, no name: the apex is the unique third vertex of a
+    // figure triangle carrying side AB, then reuse the foot+segment lowering. Several candidate triangles or
+    // none → defer, never guess (ADR-052). Only for the HEIGHT keyword (a bare "perpendicular to AB" has no
+    // determinate apex).
+    if (!isHeight) return null;
+    const sideOnly = s.match(
+      /(?:\bto\s+(?:the\s+)?(?:side\s+)?|אל\s*(?:ה?צלע\s+)?|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+    );
+    if (!sideOnly) return null;
+    const sd: [Id, Id] = [up(sideOnly[1]), up(sideOnly[2])];
+    const tris = (ctx.polygons ?? [])
+      .map((p) => p.map(up))
+      .filter((p) => p.length === 3 && p.includes(sd[0]) && p.includes(sd[1]));
+    const apexes = [...new Set(tris.map((t) => t.find((x) => x !== sd[0] && x !== sd[1])!))];
+    if (apexes.length !== 1) return null;
+    const apx = apexes[0];
+    const foot2 = freeLabel([apx, ...sd, ...(ctx.points ?? [])], ['F', 'G', 'H', 'P']);
+    return [
+      { type: 'foot', id: foot2, from: apx, a: sd[0], b: sd[1] },
+      { type: 'segment', a: apx, b: foot2 },
+    ];
   }
   // Opposite side: "to BC" / "to side BC" / "ל BC" / "ל-BC" / "לצלע BC" / "לקטע BC" (descriptor noun tolerated).
   const sideM = s.match(/(?:\bto\s+(?:the\s+)?(?:side\s+)?|אל\s*(?:ה?צלע\s+)?|ל-?\s*(?:ה?צלע\s+|ה?קטע\s+)?)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i); // explicit opposite side "to BC"

@@ -109,6 +109,32 @@ describe('#71 — vertex-less median to a side', () => {
   });
 });
 
+describe('#107 — vertex-less altitude to a side (sibling of the #71 median-to-a-side)', () => {
+  it('גובה לצלע AB drops the altitude from the unique third vertex', () => {
+    const r = run('משולש ABC', 'גובה לצלע AB');
+    allOk(r);
+    const at = (i: string) => r.replayed.positions.get(i)!;
+    const F = at('F'); // the auto-named foot (F first in the free-label order)
+    expect(F).toBeTruthy();
+    // F on line AB, and the altitude CF ⟂ AB.
+    const [A, B, C] = ['A', 'B', 'C'].map(at);
+    const onAB = Math.abs((F.x - A.x) * (B.y - A.y) - (F.y - A.y) * (B.x - A.x)) / Math.max(Math.hypot(B.x - A.x, B.y - A.y), 1) ** 2;
+    expect(onAB, 'foot on AB').toBeLessThan(1e-3);
+    const cf = { x: F.x - C.x, y: F.y - C.y }, ab = { x: B.x - A.x, y: B.y - A.y };
+    expect(Math.abs(cf.x * ab.x + cf.y * ab.y) / (Math.hypot(cf.x, cf.y) * Math.hypot(ab.x, ab.y) + 1e-9), 'CF ⟂ AB').toBeLessThan(1e-3);
+  });
+  it('the English mirror "altitude to side AB" parses', () => {
+    const r = run('triangle ABC', 'altitude to side AB');
+    allOk(r);
+    expect(r.replayed.positions.has('F')).toBe(true);
+  });
+  it('with no figure triangle the rule defers (never guesses an apex)', () => {
+    const { construction, positions } = replay([]);
+    const r = parse('גובה לצלע AB', buildParseCtx(construction, positions));
+    expect(r.ok).toBe(false); // escalates — no triangle to resolve the apex from
+  });
+});
+
 describe('#71 — letter-named midsegment, both letters fresh', () => {
   it('EF קטע אמצעים במשולש DCB rides the named triangle (E mid the first side, F cyclable)', () => {
     const r = run('משולש DCB', 'EF קטע אמצעים במשולש DCB');
