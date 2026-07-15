@@ -6649,7 +6649,8 @@ export function droppedNewLabels(utterance: string, commands: AnyCommand[], exis
  * false-blocks; the gate aims at the verb being entirely unrepresented.
  */
 const VERB_GATES: { verb: string; present: RegExp; satisfied: RegExp }[] = [
-  { verb: 'משיק/tangent', present: /משיק|tangent/i, satisfied: /tangent|circles-tangent|set-perpendicular|"tan-/ }, // "tan- : a REFERENCE to a drawn tangent line ("המשיק חותך…" → line:"tan-A") carries the verb's meaning (#100/#54 play-test)
+  { verb: 'משיק/tangent', present: /משיק|tangent/i, satisfied: /tangent|circles-tangent|set-perpendicular|"tan-|tanaux-|tanmid-/ }, // "tan- : a REFERENCE to a drawn tangent line ("המשיק חותך…" → line:"tan-A"); tanaux-/tanmid- : the Thales AUX-CIRCLE construction of an external tangent (tangentFromExternal / tangentsFromExternal, which emit no literal `tangent` object) — issue #138, ADR-292 regressed the singular form
+
   { verb: 'חוצה/bisect', present: /חוצ[הי]|bisect/i, satisfied: /bisector|midpoint|set-angle-ratio|set-equal|arc-midpoint|set-line/ },
   { verb: 'מקביל/parallel', present: /מקביל|parallel/i, satisfied: /parallel/ },
   { verb: 'מאונך/perpendicular', present: /מאונ[כך]|perpendicular/i, satisfied: /perpendicular|foot|right-triangle|altitude/ },

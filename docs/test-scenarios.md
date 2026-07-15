@@ -22,6 +22,8 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `single-external-tangent-builds` — «מנקודה A יוצא משיק למעגל בנקודה B» builds (prod regression, issue #138)
+Prod regression: the singular external tangent parsed OK in prod on 2026-07-11 (source:parser) but broke by 2026-07-15 (weak:dropped:משיק/tangent → LLM → built-nothing) — the ADR-292 משיק verb gate (deployed prod/2026-07-12-2) didn't recognise `tangentFromExternal`'s Thales aux-circle construction (`tanaux-`/`~tanmid-`, no literal `tangent` object). Fixed by adding `tanaux-`/`tanmid-` to the gate's satisfied set (ADR-292 Am.). This scenario locks the parse+build; the gate itself is locked by `verb-gate.test.ts`.
 ### `parallel-line-from-a-point` — «מנקודה A ישר מקביל ל-DO» draws a parallel line through A (issue #127, ADR-327)
 Prod log-triage 2026-07-14: the "from a point" origin (`מנקודה A` / `מ-A` / `from point A`) wasn't in the drawn-line through-point anchor `THROUGH_PT`, so `מנקודה A ישר מקביל ל-DO` escalated to the paid LLM though the `parallel-line` construct already existed. Fixed by a `FROM_PT` anchor on the parallel-line rule; the `ל=` typo for `ל-` is tolerated. The perpendicular "from a point" is deliberately left to the foot rule (a shared anchor would make the ⟂ rule shadow foot phrasings).
 ### `bare-free-point-positioned-by-next-statement` — «נקודה A» + «AB=5» recruit a bare 2-DOF free point (issue #104, ADR-328)

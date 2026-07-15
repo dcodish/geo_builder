@@ -38,6 +38,8 @@ describe('#82 — the gate BLOCKS a lowering that lost the verb', () => {
 describe('#82 — NO THEFT: legitimate lowerings pass', () => {
   const cases: [string, string[]][] = [
     ['ישר משיק למעגל O בנקודה C', ['מעגל שמרכזו O', 'C על המעגל']],
+    ['מנקודה A יוצא משיק למעגל בנקודה B', ['מעגל שמרכזו O']], // issue #138: the SINGULAR external tangent (tangentFromExternal) — a Thales `tanaux-` construction, no literal `tangent` object; ADR-292 regressed it
+    ['מנקודה B יוצאים שני משיקים למעגל', ['מעגל שמרכזו O']], // the PLURAL two-tangents (tangentsFromExternal) — same Thales `tanaux-` construction
     ['AB ו AD משיקים למעגל O', ['מעגל שמרכזו O', 'דלתון ABCD חוסם את המעגל']], // the ADR-115 tangency-as-⟂ lowering
     ['חוצה זווית ABC', ['משולש ABC']],
     ['CD חוצה זוית', ['משולש ABC', 'AB=AC']], // ADR-261 vertex bisector
