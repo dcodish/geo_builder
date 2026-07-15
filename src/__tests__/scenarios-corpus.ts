@@ -208,6 +208,16 @@ export const SCENARIOS: Scenario[] = [
       allStepsOk(fig);
       const arcs = fig.construction.objects.filter((o) => o.kind === 'arc');
       expect(arcs).toHaveLength(4); // one semicircle arc per side of the square
+    id: 'semicircle-outside-a-triangle-side',
+    title: '«חצי מעגל על צלע AB מחוץ למשולש» builds (bulge outward), not an escalation (issue #134, ADR-331)',
+    guards:
+      'Operator play-test 2026-07-14: a semicircle on side AB "מחוץ למשולש" (outside the triangle) errored — the semicircle rule had no side vocabulary, so `מחוץ למשולש` tripped the SHAPE_LEFTOVER escalation. Now the bulge clause is consumed and resolved to a render-time orientation (the arc gets bulgeRef = the opposite vertex); the exact sequence builds clean.',
+    steps: ['משולש ABC', 'חצי מעגל על צלע AB מחוץ למשולש'],
+    check(fig) {
+      allStepsOk(fig);
+      // the semicircle's hidden circle + its arc were built (the orientation is a render concern, tested in
+      // semicircle-bulge.test.tsx); the point is that the "מחוץ למשולש" utterance no longer escalates/errors.
+      expect(fig.construction.objects.some((o) => o.kind === 'arc')).toBe(true);
     },
   },
   {

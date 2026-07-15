@@ -529,6 +529,11 @@ export interface Arc {
   center: Id;
   from: Id;
   to: Id;
+  /** Optional bulge orientation (a semicircle "outside"/"inside" a shape): the renderer flips from↔to so
+   *  the arc's apex is on the far side of the diameter from `bulgeRef` (outward, default) or the same side
+   *  (`bulgeToward`, inward). Resolved at render time because the side needs coordinates. */
+  bulgeRef?: Id;
+  bulgeToward?: boolean;
 }
 
 export type GeoObject = GeoPoint | Segment | Polygon | Line | Circle | Arc;
@@ -958,7 +963,7 @@ export type Command =
   // so `meetsRequirements` (sampler / "show another") skips it — never a driven equality.
   | { type: 'point-polygon-side'; id: Id; poly: Id[]; side: 'inside' | 'outside' }
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
-  | { type: 'arc'; id: Id; center: Id; from: Id; to: Id } // a drawn arc (CCW from→to): semicircle / quarter circle
+  | { type: 'arc'; id: Id; center: Id; from: Id; to: Id; bulgeRef?: Id; bulgeToward?: boolean } // a drawn arc (CCW from→to): semicircle / quarter circle. bulgeRef+bulgeToward orient a semicircle outside/inside a shape (render-time)
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }
   // `order` (e.g. [C, id, E]) keeps the crossing ON the segment between two of the line's points (the
   // circle "cuts CE at D" ⇒ D between C and E), via a `collinear-order` constraint — D is already

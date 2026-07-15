@@ -33,6 +33,7 @@
     "rightTriangle → (anon)",
     "semicircle → circleOnDiameter",
     "semicircle → diameter",
+    "semicircle → pointOnSegment",
     "setRadius → circle",
     "tangentLineIntersection → tangentLine",
     "tangentMeetsOtherCircle → tangentLine",

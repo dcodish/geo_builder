@@ -269,9 +269,23 @@ export function buildScene(
     }
     if (o.kind === 'arc') {
       const center = positions.get(o.center);
-      const from = positions.get(o.from);
-      const to = positions.get(o.to);
+      let from = positions.get(o.from);
+      let to = positions.get(o.to);
       if (center && from && to) {
+        // A semicircle "outside"/"inside" a shape: flip from↔to so the arc's apex sits on the far side of
+        // the diameter from `bulgeRef` (outward, default) or the same side (`bulgeToward`, inward). The
+        // apex of the CCW arc from `from` is 90° CCW around the centre; `side()` is the signed half-plane
+        // of a point relative to the diameter line (through the centre, along to−from).
+        const ref = o.bulgeRef ? positions.get(o.bulgeRef) : undefined;
+        if (ref) {
+          const r = len(sub(from, center));
+          const u = unit(sub(from, center));
+          const apex = { x: center.x - u.y * r, y: center.y + u.x * r }; // centre + r·rot90CCW(u)
+          const dia = sub(to, from);
+          const side = (p: Vec) => (p.x - center.x) * dia.y - (p.y - center.y) * dia.x;
+          const sameSide = side(apex) * side(ref) > 0;
+          if (sameSide !== !!o.bulgeToward) [from, to] = [to, from]; // wrong side → the other semicircle
+        }
         const a = arcGeometry(center, from, to, o.id);
         if (a) arcs.push(a);
       }
