@@ -731,6 +731,99 @@ const midsegment: Rule = (s, ctx) => {
 };
 
 /**
+ * A named CENTRE meet — the NOUN form of a triangle/quad concurrency point (#44):
+ *   «X מפגש האלכסונים» · «X נקודת מפגש התיכונים» · «ה<noun> נפגשים/נחתכים בנקודה X» ·
+ *   En «X is the intersection of the diagonals/medians/angle bisectors/altitudes/perpendicular bisectors».
+ * The five families: diagonals (quad), medians / angle-bisectors / altitudes / ⊥-bisectors (triangle).
+ * Each resolves its shape from context — a named «במשולש ABC»/«במרובע ABCD»/«triangle ABC» qualifier, else
+ * the figure's SINGLE polygon of the right vertex count; anything ambiguous (0 or 2+ candidates) DEFERS
+ * (ADR-052), never a guess. Then lowers to two special lines + their existing intersection — an ADR-110
+ * MACRO, no new engine construct (the solver already computes each crossing). Runs before the shape rules
+ * (so a «במרובע ABCD» qualifier isn't grabbed by `quadrilateral`) and before `diagonals`. The explicitly-
+ * LETTERED forms (`E חיתוך AC ו-BD`, the two-angle bisector meet) stay owned by their existing rules —
+ * this needs BOTH a meet cue AND a plural centre-noun, which those forms lack.
+ */
+// He noun STEMS (so the construct form matches too: אלכסוני הטרפז, not only אלכסונים). Order matters — the
+// ⊥-bisector (אנכים אמצעיים) is checked before the angle-bisector (חוצי זווית) so neither shadows the other.
+const CENTER_FAMILIES = [
+  { key: 'perpbis', n: 3, he: /ה?אנכים\s*ה?אמצעי/, en: /perpendicular\s+bisectors?/i },
+  { key: 'bisector', n: 3, he: /חוצ[יה]\s*ה?זוו/, en: /angle\s+bisectors?|bisectors?\s+of\s+(?:the\s+)?angles?/i },
+  { key: 'median', n: 3, he: /ה?תיכונ/, en: /medians?/i },
+  { key: 'altitude', n: 3, he: /ה?גבהי/, en: /altitudes?|heights?/i },
+  { key: 'diag', n: 4, he: /ה?אלכסונ/, en: /diagonals?/i },
+] as const;
+
+const specialPointMeet: Rule = (s, ctx) => {
+  if (!/מפגש|נפגש|נחתכ|חיתוך|concurren|intersection\s+of|\bmeet\b/i.test(s)) return null; // a MEETING statement
+  const fam = CENTER_FAMILIES.find((f) => f.he.test(s) || f.en.test(s));
+  if (!fam) return null;
+  // Result label: "… בנקודה X" / "… at X" (after the meet), or "הנקודה X היא …"/"X מפגש …"/"X is the
+  // intersection …" (before). Precise so a shape vertex is never mistaken for the result point.
+  const after = s.match(/(?:בנקודה|\bat\b(?:\s+point)?)\s+([A-Za-z]\d*)\b/i);
+  const before = s.match(/^\s*([A-Za-z]\d*)\s+(?:היא\s+|הוא\s+|is\s+)?(?:ה?נקודת\s+)?(?:מפגש|the\s+(?:intersection|meeting|concurrency)\b)/i);
+  const X = after ? up(after[1]) : leadingNamedPoint(s) ?? (before ? up(before[1]) : null);
+  if (!X) return null;
+  // Resolve the shape: a named qualifier's label run of the right size, else the figure's single polygon.
+  const shapeM = s.match(
+    /(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite)\s+((?:[A-Za-z]\d*\s*){3,4})/i,
+  );
+  let poly: Id[] | null = null;
+  if (shapeM) {
+    const ids = (shapeM[1].match(/[A-Za-z]\d*/g) ?? []).map(up);
+    if (ids.length === fam.n) poly = ids;
+  }
+  if (!poly) {
+    const cands = (ctx.polygons ?? []).filter((v) => v.length === fam.n);
+    if (cands.length === 1) poly = cands[0].map(up);
+  }
+  if (!poly) return null; // ambiguous / unknown shape → defer (ADR-052)
+  const [A, B, C, D] = poly; // D undefined for a triangle
+  // Only the CENTRE point is drawn — every construction line/point (diagonals, medians, altitudes, ⊥-bisectors
+  // and their feet/midpoints) is SCAFFOLDING (operator, 2026-07-14): a `~`-prefixed helper point is not
+  // rendered (and is excluded from detection, ADR-295), a `bisector`/`perpendicular-line` Line object is drawn
+  // only when `visible`, and `line-line-intersection` computes its crossing without drawing the operand lines.
+  if (fam.key === 'diag') {
+    // quad ABCD: the crossing of the two diagonals (the diagonals themselves are not drawn).
+    return [{ type: 'line-line-intersection', id: X, a: A, b: C, c: B, d: D }];
+  }
+  if (fam.key === 'median') {
+    const ma = `~med-${B}${C}`, mb = `~med-${A}${C}`; // hidden side-midpoints (median 1: A→mid BC, median 2: B→mid AC)
+    return [
+      { type: 'midpoint', id: ma, a: B, b: C },
+      { type: 'midpoint', id: mb, a: A, b: C },
+      { type: 'line-line-intersection', id: X, a: A, b: ma, c: B, d: mb }, // the centroid
+    ];
+  }
+  if (fam.key === 'altitude') {
+    const fa = `~alt-${A}`, fb = `~alt-${B}`; // hidden altitude feet (from A onto BC, from B onto AC)
+    return [
+      { type: 'foot', id: fa, from: A, a: B, b: C },
+      { type: 'foot', id: fb, from: B, a: A, b: C },
+      { type: 'line-line-intersection', id: X, a: A, b: fa, c: B, d: fb }, // the orthocentre
+    ];
+  }
+  if (fam.key === 'bisector') {
+    const b1 = `bis-${A}${B}${C}`, b2 = `bis-${B}${A}${C}`; // bisector Lines (scaffolding — not visible)
+    return [
+      { type: 'bisector', id: b1, vertex: A, p: B, q: C },
+      { type: 'bisector', id: b2, vertex: B, p: A, q: C },
+      { type: 'line-intersection', id: X, line1: b1, line2: b2 }, // the incentre
+    ];
+  }
+  // perpbis: two ⊥-bisector lines (of AB, of BC) → the circumcentre. Both the ⟂-bisector lines and their
+  // side-midpoints are scaffolding (invisible line + `~`-hidden midpoints); only the circumcentre is drawn.
+  const mab = `~pb-${A}${B}`, mbc = `~pb-${B}${C}`;
+  const l1 = `perp-${mab}-${A}${B}`, l2 = `perp-${mbc}-${B}${C}`;
+  return [
+    { type: 'midpoint', id: mab, a: A, b: B },
+    { type: 'perpendicular-line', id: l1, through: mab, a: A, b: B, visible: false },
+    { type: 'midpoint', id: mbc, a: B, b: C },
+    { type: 'perpendicular-line', id: l2, through: mbc, a: B, b: C, visible: false },
+    { type: 'line-intersection', id: X, line1: l1, line2: l2 },
+  ];
+};
+
+/**
  * The DIAGONALS of a quad/polygon — plural `אלכסונים` / construct `אלכסוני הריבוע` / `diagonals`.
  * Two forms: (A) two explicitly named diagonals joined by ו/and — `AC ו-BD אלכסוני הריבוע` → the
  * two segments; (B) bare/quad — `אלכסונים` or `אלכסוני ABCD` → every non-adjacent vertex pair of the
@@ -5349,6 +5442,7 @@ export const RULES: Rule[] = [
   median,
   pluralSpecialLines, // #71: "AD BE ו-CF הם גבהים במשולש" distributes into the singulars, all-or-nothing
   altitude, // "height/altitude from A" / "perpendicular from A to BC"
+  specialPointMeet, // "X מפגש האלכסונים/התיכונים/…" — a named centre meet (noun form); before the shapes + diagonals (#44)
   perpBisector, // "perpendicular bisector of AB"
   midsegment, // "midsegment to BC in triangle ABC" — a triangle construct ("במשולש"); before the shapes AND before segment/midpoint (its "קטע"/"אמצע" keywords)
   bisectorPlacesPoint, // "AD bisects ∠BAC" / "CD חוצה זוית [במשולש ABC]" — places D on the opposite side. Before the shapes (its "במשולש ABC" form would otherwise make `triangle` 'stop'); safe before the bisector-∩ compounds because it DEFERS on intersect keywords.
