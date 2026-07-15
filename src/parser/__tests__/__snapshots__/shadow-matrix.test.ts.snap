@@ -1450,6 +1450,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "AD cuts circle O at B",
+    "winner": "lineMeetsCircle",
+  },
+  {
+    "lang": "he",
+    "text": "AD חותך את מעגל O בנקודה B",
+    "winner": "lineMeetsCircle",
+  },
+  {
+    "lang": "en",
     "text": "from point E outside circle O two tangents touch the circle at A and B",
     "winner": "tangentsFromExternal",
   },

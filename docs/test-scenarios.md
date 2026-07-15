@@ -22,6 +22,10 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `secant-apex-far-point-named-near` — «AD חותך למעגל בנקודה B» — apex + far crossing D, near B (issue #136, ADR-332)
+Operator 2026-07-15: the secant «AD חותך למעגל» (apex A external, only the FAR crossing D named) was not-handled, and «…בנקודה B» was mis-grabbed by `lineMeetsCircle` and built NOTHING (a `line-through chord-AD` to a never-created D). The new `secantFarPoint` rule (before `lineMeetsCircle`) creates D as a free-θ on-circle far crossing and the named near crossing B via line∩circle with a one-sided order A→B→D keeping D on the far side.
+### `secant-apex-far-point-bare-anon-near` — «AD חותך למעגל» bare — D far, near an anonymous @-dot (issue #136, ADR-332)
+Operator 2026-07-15: bare «AD חותך למעגל» escalated to the LLM. Now D is a free-θ far crossing, the unnamed near crossing an anonymous promotable @-dot (#32/ADR-297), the secant's rotation about the external apex A a free DOF (ADR-052); A is created via `point-circle-side` outside.
 ### `parallel-line-from-a-point` — «מנקודה A ישר מקביל ל-DO» draws a parallel line through A (issue #127, ADR-327)
 Prod log-triage 2026-07-14: the "from a point" origin (`מנקודה A` / `מ-A` / `from point A`) wasn't in the drawn-line through-point anchor `THROUGH_PT`, so `מנקודה A ישר מקביל ל-DO` escalated to the paid LLM though the `parallel-line` construct already existed. Fixed by a `FROM_PT` anchor on the parallel-line rule; the `ל=` typo for `ל-` is tolerated. The perpendicular "from a point" is deliberately left to the foot rule (a shared anchor would make the ⟂ rule shadow foot phrasings).
 ### `bare-free-point-positioned-by-next-statement` — «נקודה A» + «AB=5» recruit a bare 2-DOF free point (issue #104, ADR-328)

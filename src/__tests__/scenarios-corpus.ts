@@ -158,6 +158,40 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'secant-apex-far-point-named-near',
+    title: '«AD חותך למעגל בנקודה B» — apex A external, D the far crossing, B the near (issue #136, ADR-332)',
+    guards:
+      'Operator 2026-07-15: the secant «AD חותך למעגל» (apex A + FAR point D only) was not-handled, and «…בנקודה B» was GRABBED by lineMeetsCircle which built nothing — a `line-through chord-AD` to a never-created D (the latent chord-AD failure). The new `secantFarPoint` rule (before lineMeetsCircle) creates D as a free-θ on-circle far crossing, the near crossing B (named) via line∩circle with a one-sided order A→B→D keeping D far.',
+    steps: ['מעגל O שרדיוסו R', 'AD חותך למעגל בנקודה B'],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), D = at(fig, 'D'), B = at(fig, 'B');
+      const r = dist(O, D); // D on the circle → radius
+      expect(Math.abs(dist(O, B) - r), 'B (near crossing) on the circle').toBeLessThan(1e-2);
+      expect(dist(A, O), 'A external apex').toBeGreaterThan(r);
+      expect(dist(A, B), 'B is the NEAR crossing, D the FAR').toBeLessThan(dist(A, D));
+    },
+  },
+  {
+    id: 'secant-apex-far-point-bare-anon-near',
+    title: '«AD חותך למעגל» bare — D far, the near crossing an anonymous @-dot, rotation a free DOF (issue #136, ADR-332)',
+    guards:
+      'Operator 2026-07-15: bare «AD חותך למעגל» escalated to the LLM. Now it builds: D a free-θ far crossing on the circle, the unnamed near crossing an anonymous promotable @-dot (#32/ADR-297), the secant’s rotation about A a free DOF (ADR-052). A is created as an external apex (point-circle-side outside).',
+    steps: ['מעגל O שרדיוסו R', 'AD חותך למעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), D = at(fig, 'D');
+      const r = dist(O, D);
+      expect(dist(A, O), 'A external apex').toBeGreaterThan(r);
+      // the near crossing is an anonymous promotable point, ON the circle, between A and D
+      const anon = fig.construction.objects.filter((o) => isGeoPoint(o) && o.id.startsWith('@'));
+      expect(anon.length, 'an anonymous near-crossing dot').toBe(1);
+      const N = at(fig, anon[0].id);
+      expect(Math.abs(dist(O, N) - r), 'the @-dot lies on the circle').toBeLessThan(1e-2);
+      expect(dist(A, N), 'the @-dot is the NEAR crossing').toBeLessThan(dist(A, D));
+    },
+  },
+  {
     id: 'parallel-line-from-a-point',
     title: '«מנקודה A ישר מקביל ל-DO» draws a parallel line through A (the "from a point" anchor, issue #127, ADR-327)',
     guards:
