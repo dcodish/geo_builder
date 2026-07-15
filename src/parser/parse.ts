@@ -69,6 +69,10 @@ export interface ParseContext {
    *  ALREADY built (its deterministic scaffolding lines exist) and REUSE rather than mint a duplicate
    *  auto-named copy (the idempotency root-cause fix). */
   lines?: string[];
+  /** Ids of Thales tangent-aux circles already in the figure (`tanaux-<centre><apex>`) — lets a SECOND
+   *  single tangent from the SAME external apex take the OTHER branch of the circle∩aux intersection, so
+   *  the two tangents from a point don't collapse onto one touch ([issue #142](https://github.com/dcodish/geo_builder/issues/142)). */
+  tangentAuxes?: string[];
   /** Vertex lists of polygons already in the figure — lets a DEFINITE unnamed shape reference
    *  ("במרובע חסום מעגל" typed after מרובע ABCD exists) bind to THE existing polygon instead of minting
    *  a fresh auto-named one (the ADR-029 implicit-reference pattern, polygon edition). */
@@ -4745,12 +4749,16 @@ const tangentFromExternal: Rule = (s, ctx) => {
   const circ = circleId(center);
   const mid = `~tanmid-${center}${apex}`; // hidden centre of the Thales circle on O-apex (scaffolding; "~" → not drawn)
   const aux = `tanaux-${center}${apex}`;
+  // A SECOND single tangent from the SAME apex (its Thales aux circle already exists) is the OTHER tangent —
+  // take branch 1, else both statements pick branch 0 and the two touch points coincide (issue #142). The
+  // midpoint + aux circle re-emit idempotently (same ids); branch 1 = the other circle∩aux intersection.
+  const branch = (ctx.tangentAuxes ?? []).includes(aux) ? 1 : 0;
   const out: AnyCommand[] = [];
   if (placeApex) out.push({ type: 'free-point', id: apex, x: 12, y: 0, free: true }); // the external apex, if new — a FREE DOF (ADR-052): its distance from O is unstated, so a later given (∠ADB = α, |AG| = …) can flex it
   out.push(
     { type: 'midpoint', id: mid, a: center, b: apex }, // centre of the Thales circle on O-apex
     { type: 'circle-through', id: aux, center: mid, through: center, hidden: true },
-    { type: 'circle-circle-intersection', id: touch, circle1: circ, circle2: aux, branch: 0 }, // the touch point
+    { type: 'circle-circle-intersection', id: touch, circle1: circ, circle2: aux, branch }, // the touch point (branch 1 = the 2nd tangent from this apex)
     { type: 'segment', a: apex, b: touch }, // the tangent
   );
   return out;

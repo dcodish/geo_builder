@@ -209,6 +209,24 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'two-tangents-from-point-distinct',
+    title: '«מנקודה A יוצא משיק … B» then «… C» — the two tangents from a point are DISTINCT (issue #142, ADR-333)',
+    guards:
+      'Operator 2026-07-15 (dev play-test): two separate «tangent from A» statements landed on the SAME tangent point («B ו-C נפלו על אותה נקודה») — `tangentFromExternal` always emitted branch 0, so both took the same circle∩(Thales-aux) intersection. Fixed: a SECOND single tangent from the same apex (its `tanaux-` circle already exists, surfaced via `ctx.tangentAuxes`) takes branch 1 = the OTHER touch. The two tangents are now the two distinct touch points, symmetric about OA.',
+    steps: ['מעגל O ברדיוס 5', 'מנקודה A יוצא משיק למעגל בנקודה B', 'מנקודה A יוצא משיק למעגל בנקודה C'],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      const rB = dist(O, B);
+      expect(dist(B, C), 'B and C are DISTINCT tangent points').toBeGreaterThan(1e-2);
+      expect(Math.abs(dist(O, C) - rB), 'both on the circle').toBeLessThan(1e-2);
+      // both are genuine tangents: AB ⟂ OB and AC ⟂ OC
+      const perp = (P: typeof B) => Math.abs((A.x - P.x) * (O.x - P.x) + (A.y - P.y) * (O.y - P.y)) / (dist(A, P) * rB);
+      expect(perp(B), 'AB ⟂ OB').toBeLessThan(1e-2);
+      expect(perp(C), 'AC ⟂ OC').toBeLessThan(1e-2);
+    },
+  },
+  {
     id: 'single-external-tangent-builds',
     title: '«מנקודה A יוצא משיק למעגל בנקודה B» — a single external tangent builds (prod regression, issue #138)',
     guards:
