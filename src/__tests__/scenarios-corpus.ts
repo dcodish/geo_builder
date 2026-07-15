@@ -158,6 +158,22 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'single-external-tangent-builds',
+    title: '«מנקודה A יוצא משיק למעגל בנקודה B» — a single external tangent builds (prod regression, issue #138)',
+    guards:
+      'PROD regression (session e43ezom5 + prod events.jsonl): «מנקודה A יוצא משיק למעגל בנקודה B» parsed OK in prod on 2026-07-11 (source:parser) but broke by 2026-07-15 (weak:dropped:משיק/tangent → LLM → built-nothing). Cause: the ADR-292 משיק verb gate (deployed prod/2026-07-12-2) did not recognise tangentFromExternal\'s Thales AUX-CIRCLE construction (ids tanaux-/~tanmid-, no literal `tangent` object), so it flagged the CORRECT parse as dropping משיק. Fix (ADR-292 Am.): tanaux-/tanmid- added to the gate\'s satisfied set. This scenario locks the parse+build; the gate itself is locked by verb-gate.test.ts.',
+    steps: ['מעגל שמרכזו O', 'מנקודה A יוצא משיק למעגל בנקודה B'],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), A = at(fig, 'A'), B = at(fig, 'B');
+      const r = dist(O, B); // B is on the circle → radius
+      expect(dist(A, O), 'A external apex').toBeGreaterThan(r);
+      // tangent: AB ⟂ OB  ⇒  (A−B)·(O−B) ≈ 0
+      const dot = (A.x - B.x) * (O.x - B.x) + (A.y - B.y) * (O.y - B.y);
+      expect(Math.abs(dot) / (dist(A, B) * r), 'AB ⟂ OB (B is the tangent point)').toBeLessThan(1e-2);
+    },
+  },
+  {
     id: 'parallel-line-from-a-point',
     title: '«מנקודה A ישר מקביל ל-DO» draws a parallel line through A (the "from a point" anchor, issue #127, ADR-327)',
     guards:
