@@ -40,7 +40,7 @@ const RULES3: ScopeRule3[] = [
   {
     category: 'valueless-query',
     patterns: [
-      /^\s*∠\s*[A-Za-z]{1,3}\d*'?\s*=?\s*\??\s*$/, // ∠DEF · ∠DEF= · ∠DEF=?
+      /^\s*∠\s*[A-Za-z]{1,3}\d*'?\s*(?:=\s*\??|\?)\s*$/, // a QUERY only: ∠DEF? · ∠DEF= · ∠DEF=? — NOT bare ∠DEF or ∠DEF=α (those BUILD a marker, #94)
       // "the angle between …" with NO stated value (a valued form has =/היא/is/a digit and PARSES)
       /^ה?זו?וית\s+בין(?![\s\S]*(?:=|היא|הוא|\bis\b|\d))/,
       /^the\s+angle\s+between(?![\s\S]*(?:=|\bis\b|\d))/i,

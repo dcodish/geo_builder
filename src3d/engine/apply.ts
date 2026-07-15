@@ -102,6 +102,7 @@ function clone(c: Construction3): Construction3 {
     vectors: new Map(c.vectors),
     arrows: c.arrows.map(([f, t]) => [f, t] as [Id, Id]),
     segments: [...c.segments],
+    angleMarks: [...c.angleMarks],
     planes: new Map(c.planes),
     lines: new Map(c.lines),
     param: c.param,
@@ -306,6 +307,27 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       // knowledge (derived |BB'|); the scene draws the ink ONCE (the solid edge wins)
       const next = clone(c);
       next.segments.push([cmd.a, cmd.b]);
+      return { ok: true, next };
+    }
+
+    case 'angle-mark': {
+      // #94 — a pedagogical angle highlight: draw the arc + its two arms, drive nothing. All three points
+      // must exist (a marker references the figure, never invents it); the two arms are distinct.
+      const missing = missingPoint(c, [cmd.vertex, cmd.p, cmd.q]);
+      if (missing) return { ok: false, error: missing };
+      if (cmd.p === cmd.vertex || cmd.q === cmd.vertex || cmd.p === cmd.q) return { ok: false, error: { code: 'unknown-point', id: cmd.vertex } };
+      const next = clone(c);
+      const same = (m: { vertex: Id; p: Id; q: Id }) =>
+        m.vertex === cmd.vertex && ((m.p === cmd.p && m.q === cmd.q) || (m.p === cmd.q && m.q === cmd.p));
+      const existing = next.angleMarks.find(same);
+      if (!existing) {
+        next.angleMarks.push({ vertex: cmd.vertex, p: cmd.p, q: cmd.q, ...(cmd.label ? { label: cmd.label } : {}) });
+      } else if (cmd.label && existing.label !== cmd.label) {
+        // «∠SDB» then «∠SDB = α» — naming an already-marked angle UPGRADES its display label (new object, no
+        // prior-construction mutation since clone shares the refs).
+        next.angleMarks = next.angleMarks.map((m) => (m === existing ? { ...m, label: cmd.label } : m));
+      }
+      for (const arm of [cmd.p, cmd.q]) if (!next.segments.some((s) => samePair(s, cmd.vertex, arm))) next.segments.push([cmd.vertex, arm]);
       return { ok: true, next };
     }
 

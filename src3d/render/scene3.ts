@@ -413,6 +413,27 @@ export function buildScene3(
     }
   }
 
+  // #94 — named-angle MARKERS (`∠SDB` / `∠SDB = α`): a pedagogical arc at the vertex, drawing NO numeric
+  // value on the canvas (a single-seed number would violate the ADR-3D-030 knowledge rule — the measure is
+  // a seed-invariant panel derivation). The arc carries the display LABEL (α) when one was named, else blank.
+  for (const mk of c.angleMarks) {
+    const v = positions.get(mk.vertex), p = positions.get(mk.p), q = positions.get(mk.q);
+    if (!v || !p || !q) continue;
+    const d1 = dist3(p, v), d2 = dist3(q, v);
+    if (d1 < 1e-9 || d2 < 1e-9) continue;
+    const u1 = normalize3(sub3(p, v)), u2 = normalize3(sub3(q, v));
+    const r = Math.min(d1, d2) * 0.3;
+    const pts: Vec3[] = [];
+    for (let sIdx = 0; sIdx <= 12; sIdx++) {
+      const mid = add3(scale3(u1, 1 - sIdx / 12), scale3(u2, sIdx / 12));
+      if (norm3(mid) < 1e-9) continue;
+      pts.push(add3(v, scale3(normalize3(mid), r)));
+    }
+    const bis = add3(u1, u2);
+    const label = add3(v, scale3(norm3(bis) > 1e-9 ? normalize3(bis) : u1, r * 1.6));
+    wAngles.push({ pts, label, text: mk.label ?? '' });
+  }
+
   const wLines: { name: string; a: Vec3; b: Vec3; form: string }[] = [];
   for (const [name, ln] of resolved.lines) {
     const mid = projectOntoLine(center, ln);

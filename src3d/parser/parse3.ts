@@ -1452,6 +1452,19 @@ const vertexAngleClaim: Rule = (s0) => {
   ];
 };
 
+/** `∠SDB` / `∠SDB = α` — a named-angle MARKER (#94): draw the arc at the middle vertex, no value drives.
+ *  A NUMERIC RHS (`∠SDB = 82`) is a claim (owned by `vertexAngleClaim`, before this); a `?`/bare `=` is a
+ *  query (owned by scope3). A single-LETTER RHS (`= α`, Greek or Latin) is a display NAME for the angle. */
+const angleMarker: Rule = (s0) => {
+  const s = stripProofPrefix(s0).trim();
+  const m = s.match(
+    new RegExp(`^(?:∠|ה?זו?וית\\s+|the angle\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*(?:(?:=|היא|הוא|is)\\s*([A-Za-zα-ωΑ-Ω]))?\\s*$`),
+  );
+  if (!m) return null;
+  const [, p, vertex, q, label] = m;
+  return [{ type: 'angle-mark', vertex, p, q, ...(label ? { label } : {}) }];
+};
+
 /** Build a VecAtom from a regex operand triple: a lowercase name, or a point pair. */
 const mkAtom = (named?: string, pa?: string, pb?: string): VecAtom | null =>
   named ? { kind: 'named', name: named } : pa && pb ? { kind: 'pair', from: pa, to: pb } : null;
@@ -1786,6 +1799,7 @@ const RULES: Rule[] = [
   angleBetweenPlanes,
   angleSegClaim,
   vertexAngleClaim,
+  angleMarker, // `∠SDB` / `∠SDB = α` — a named-angle marker (no driver); after vertexAngleClaim (numeric = claim), #94
   mutualPositionClaim,
   rectComplete,
   linePerpPlane,

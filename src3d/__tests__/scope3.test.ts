@@ -7,7 +7,9 @@ import { classifyGuidance3 } from '../parser/scope3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
 
 describe('#73 — valueless-query (the reproduce-verify charter, student-facing)', () => {
-  for (const u of ["הזווית בין הישר AC' לבין המישור ABCD", 'הזווית בין המישורים', "מצא את הזווית D'FD", '∠DEF', '∠DEF=', '∠DEF=?']) {
+  // NB: bare `∠DEF` (and `∠DEF = α`) now BUILD a pedagogical marker (#94) — they are NOT valueless queries.
+  // Only the genuine QUESTION forms (`∠DEF=`, `∠DEF?`, `∠DEF=?`, `מצא…`, `the angle between …`) stay guidance.
+  for (const u of ["הזווית בין הישר AC' לבין המישור ABCD", 'הזווית בין המישורים', "מצא את הזווית D'FD", '∠DEF=', '∠DEF?', '∠DEF=?']) {
     it(u, () => expect(classifyGuidance3(u)?.category).toBe('valueless-query'));
   }
   it('a VALUED angle stays null (it parses; and must never be brushed off)', () => {
