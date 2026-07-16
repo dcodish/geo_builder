@@ -100,7 +100,9 @@ describe('arcValue — an ABSOLUTE arc measure «קשת AB = 40» (operator play
   it('lowers to set-angle at the centre — He / En / glyph / braced / degree-glyph forms', () => {
     for (const u of ['קשת AB = 40', 'arc AB = 40', '⌢AB=40', '⌢{AB} = 40', 'קשת AB = 40°', 'arc AB in circle O = 40']) {
       const cs = cmdsOf(u);
-      expect(cs, u).toEqual([{ type: 'set-angle', vertex: 'O', ray1: 'A', ray2: 'B', value: 40 }]);
+      // arcOf tags the value as an ARC measure: same constraint, but the display shows it ON the arc,
+      // never a wedge at the (hidden) centre (the operator's rule; the set-perpendicular `implicit` discipline)
+      expect(cs, u).toEqual([{ type: 'set-angle', vertex: 'O', ray1: 'A', ray2: 'B', value: 40, arcOf: 'circle-O' }]);
     }
   });
 

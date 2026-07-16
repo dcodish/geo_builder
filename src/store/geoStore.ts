@@ -43,6 +43,7 @@ export interface MeasureLabels {
   lengths: { a: Id; b: Id; text: string }[];
   angles: { vertex: Id; ray1: Id; ray2: Id; text: string }[];
   areas: { ids: Id[]; text: string }[]; // a polygon's area label, printed at its centroid (ADR-118)
+  arcs: { circle: Id; a: Id; b: Id; text: string }[]; // an ARC measure's value, printed ON the arc (ADR-335)
 }
 
 /**
@@ -65,6 +66,7 @@ function angleMarkFor(cmd: AnyCommand): AngleMark | null {
     case 'mark-angle': // #106: a valueless stated-angle mark (a central angle with no value) — an arc, never a knee
       return { vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, right: false };
     case 'set-angle':
+      if (cmd.arcOf) return null; // an ARC measure — the value prints ON the arc, never a wedge at the (hidden) centre (ADR-335)
       return { vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, right: Math.abs(cmd.value - 90) < 1e-6 };
     case 'right-triangle':
       return { vertex: cmd.ids[2], ray1: cmd.ids[0], ray2: cmd.ids[1], right: true }; // right angle at the last id
@@ -703,6 +705,7 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
   const lenByKey = new Map(fold.lens);
   const angByKey = new Map(fold.angs);
   const areaByKey = new Map(fold.areas);
+  const arcByKey = new Map<string, MeasureLabels['arcs'][number]>(); // ARC measures (ADR-335) — per-seed constraint values, nothing fold-carried
   let lastError = fold.buildError;
   // The seed's high bits select a reflection of certain free points (ADR-166); the low bits are the
   // continuous sample. The reflection is split around the sample by the kind of point being flipped:
@@ -744,10 +747,14 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
   // key a symbolic fact didn't already own (FR-RN-2).
   for (const con of figure.constraints) {
     if (con.type === 'distance') addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-length', a: con.a, b: con.b }, fmtMeasure(con.value), true);
-    else if (con.type === 'angle') addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: con.vertex, ray1: con.ray1, ray2: con.ray2 }, `${fmtMeasure(con.value)}°`, true);
+    else if (con.type === 'angle') {
+      // An ARC measure (ADR-335): the value prints ON the arc — never at the (often hidden) centre vertex.
+      if (con.arcOf) arcByKey.set(`${con.arcOf}:${[con.ray1, con.ray2].sort().join('')}`, { circle: con.arcOf, a: con.ray1, b: con.ray2, text: `${fmtMeasure(con.value)}°` });
+      else addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: con.vertex, ray1: con.ray1, ray2: con.ray2 }, `${fmtMeasure(con.value)}°`, true);
+    }
     else if (con.type === 'area') addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-area', ids: con.ids }, fmtMeasure(con.value), true);
   }
-  const labels: MeasureLabels = { lengths: [...lenByKey.values()], angles: [...angByKey.values()], areas: [...areaByKey.values()] };
+  const labels: MeasureLabels = { lengths: [...lenByKey.values()], angles: [...angByKey.values()], areas: [...areaByKey.values()], arcs: [...arcByKey.values()] };
   // Angle marks the student ASSERTED (only from facts that applied, and whose points all exist) —
   // a right-angle square or an angle arc. Deduped by vertex + ray pair.
   const angleMarks: AngleMark[] = [];

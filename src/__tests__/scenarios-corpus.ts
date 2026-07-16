@@ -169,6 +169,10 @@ export const SCENARIOS: Scenario[] = [
       expect(Math.abs(aob - 40), '∠AOB = 40 (the arc measure)').toBeLessThan(0.1);
       // …and the chord is NOT 40 long (the old wrong lowering would have forced |AB| = 40 on a radius-5 circle — impossible)
       expect(dist(at(fig, 'A'), at(fig, 'B'))).toBeLessThan(11);
+      // DISPLAY (operator rule): an arc given draws NO angle wedge/value at the (hidden) centre — the
+      // value prints ON the arc. Only an explicit «∠AOB = 40» earns the centre mark.
+      expect(fig.angleMarks, 'no wedge mark at the centre for an arc given').toHaveLength(0);
+      expect(fig.labels.arcs, 'the value prints on the arc').toEqual([{ circle: 'circle-O', a: 'A', b: 'B', text: '40°' }]);
     },
   },
   {

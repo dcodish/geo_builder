@@ -1540,7 +1540,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
 
     case 'set-angle':
-      driveOrCheck(objects, constraints, { type: 'angle', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, value: cmd.value });
+      driveOrCheck(objects, constraints, { type: 'angle', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, value: cmd.value, ...(cmd.arcOf ? { arcOf: cmd.arcOf } : {}) });
       break;
 
     case 'set-distance': {

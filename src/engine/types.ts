@@ -636,6 +636,10 @@ export interface AngleConstraint {
   ray1: Id;
   ray2: Id;
   value: number;
+  /** Set when this angle IS an ARC measure (arc ray1-ray2 on this circle; vertex = its centre, ADR-116):
+   *  same constraint semantics, but the DISPLAY differs — no wedge mark/value at the (often hidden)
+   *  centre; the value prints ON the arc (the set-perpendicular `implicit` discipline, display-only). */
+  arcOf?: Id;
 }
 
 /** |a→b| = value. */
@@ -932,7 +936,7 @@ export type Command =
   | { type: 'point-by-distances'; id: Id; from1: Id; dist1: number; from2: Id; dist2: number; branch?: number }
   | { type: 'line-line-intersection'; id: Id; a: Id; b: Id; c: Id; d: Id; dir1?: boolean; dir2?: boolean; onSeg?: boolean; onSeg1?: boolean; onSeg2?: boolean } // dir1/dir2: a "המשך" operand — A must be BEYOND the 2nd point (ADR-054). onSeg: a plain SEGMENT meet — the crossing must land WITHIN both segments (ADR-166). onSeg1/onSeg2: only THAT operand is bare — within that segment alone, driven by collinear-order (issue #22)
   | { type: 'segment'; a: Id; b: Id }
-  | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number }
+  | { type: 'set-angle'; vertex: Id; ray1: Id; ray2: Id; value: number; arcOf?: Id } // arcOf: the value is an ARC measure on that circle (vertex = centre) — constraint identical, display on the arc, no centre wedge (ADR-116/335)
   | { type: 'set-distance'; a: Id; b: Id; value: number }
   | { type: 'set-radius'; circle: Id; value: number } // a circle's radius = value (no segment drawn — ADR-087)
   // Bind a CONCENTRIC pair's roles: `inner` stays strictly inside `outer` (ADR-244). A REQUIREMENT, never a

@@ -72,7 +72,7 @@ export interface SceneLine {
 
 /** A measure label to print on the figure (ADR-031): a length along a segment, an angle at a vertex. */
 export interface SceneMeasure {
-  kind: 'length' | 'angle' | 'area';
+  kind: 'length' | 'angle' | 'area' | 'arc';
   /** World anchor (y-up): a segment's midpoint, an angle's vertex, or a polygon's centroid (area). */
   pos: Vec;
   /** Unit direction (y-up) to offset the text along — outward for a length, into the angle for an angle, none for area. */
@@ -85,6 +85,9 @@ export interface MeasureLabels {
   lengths: { a: Id; b: Id; text: string }[];
   angles: { vertex: Id; ray1: Id; ray2: Id; text: string }[];
   areas?: { ids: Id[]; text: string }[]; // a polygon's area label at its centroid (ADR-118); optional for back-compat
+  /** An ARC measure («קשת AB = 40», ADR-335): the value prints ON the arc — at the minor-arc midpoint of
+   *  a–b on `circle`, nudged toward the centre — never a wedge at the (often hidden) centre. */
+  arcs?: { circle: Id; a: Id; b: Id; text: string }[];
 }
 
 /** A user-asserted angle mark to draw: a right-angle square (`right`) or an angle arc, at `vertex`. */
@@ -364,6 +367,21 @@ export function buildScene(
       if (verts.length < 3) continue;
       const c = { x: verts.reduce((s, p) => s + p.x, 0) / verts.length, y: verts.reduce((s, p) => s + p.y, 0) / verts.length };
       measures.push({ kind: 'area', pos: c, dir: { x: 0, y: 0 }, text: Ar.text });
+    }
+    // An ARC measure sits ON the arc (ADR-335, operator rule: never a wedge at the hidden centre): at the
+    // MINOR-arc midpoint of a–b (the bisector of the two radius directions — matching the constraint's
+    // minor central-angle semantics), offset INWARD so the text hugs the arc without crossing the stroke.
+    for (const A of labels.arcs ?? []) {
+      const circ = resolvedCircles.get(A.circle);
+      const pa = positions.get(A.a);
+      const pb = positions.get(A.b);
+      if (!circ || !pa || !pb) continue;
+      const da = unit(sub(pa, circ.center));
+      const db = unit(sub(pb, circ.center));
+      let bis = { x: da.x + db.x, y: da.y + db.y };
+      bis = len(bis) < 1e-9 ? rot90(da) : unit(bis); // antipodal endpoints — either mid works
+      const on = { x: circ.center.x + bis.x * circ.r, y: circ.center.y + bis.y * circ.r };
+      measures.push({ kind: 'arc', pos: on, dir: { x: -bis.x, y: -bis.y }, text: A.text });
     }
   }
 

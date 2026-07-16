@@ -1412,7 +1412,7 @@ const arcValue: Rule = (s, ctx) => {
   if (!center) return 'stop'; // an arc measure with no circle — never let the length rules claim the number
   const value = parseFloat(m[2]);
   if (!(value > 0 && value < 360)) return 'stop'; // an arc measure is a positive angle
-  return [{ type: 'set-angle', vertex: up(center), ray1: pair[0], ray2: pair[1], value }];
+  return [{ type: 'set-angle', vertex: up(center), ray1: pair[0], ray2: pair[1], value, arcOf: circleId(center) }];
 };
 
 /**
