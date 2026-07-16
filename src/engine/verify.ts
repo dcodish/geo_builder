@@ -59,6 +59,8 @@ function assertedRelations(commands: Command[]): Constraint[] {
       case 'set-area-ratio': out.push({ type: 'area-ratio', ids1: c.ids1, ids2: c.ids2, k: c.k }); break;
       case 'set-perimeter': out.push({ type: 'perimeter', ids: c.ids, value: c.value }); break;
       case 'set-perimeter-ratio': out.push({ type: 'perimeter-ratio', ids1: c.ids1, ids2: c.ids2, k: c.k }); break;
+      case 'set-measure-sum': out.push({ type: 'measure-sum', unit: c.unit, coefs: c.coefs, points: c.points, target: c.target }); break;
+      case 'set-length-product': out.push({ type: 'length-product', k: c.k, lhs: c.lhs, rhs: c.rhs }); break;
     }
   }
   return out;

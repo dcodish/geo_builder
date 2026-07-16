@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, parseNameCenter, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs, droppedRadiusSymbol, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, parseNameCenter, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedCompoundRelation, droppedGivenVerbs, droppedRadiusSymbol, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -587,7 +587,7 @@ export default function App() {
       const oos = classifyOutOfScope(utterance);
       // #43 (ADR-289): the whole GUIDANCE register short-circuits BEFORE the LLM — none of these
       // families can ever build, so an LLM call on them is pure cost (the analytic precedent).
-      const PRE_LLM = new Set(['analytic', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point', 'unnamed-sides']);
+      const PRE_LLM = new Set(['analytic', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point', 'unnamed-sides', 'compound-relation']);
       if (oos && PRE_LLM.has(oos.category)) {
         logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${oos.category}` });
         setInputNote(t(oos.messageKey));
@@ -612,7 +612,11 @@ export default function App() {
       // The VERB sibling (ADR-292, the #82 P1): a stated tangency/bisection/… verb entirely absent
       // from the lowering means a rule claimed a compound and dropped a given — never commit it.
       const droppedVerbs = droppedGivenVerbs(utterance, r.commands);
-      if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0 && droppedVerbs.length === 0) {
+      // The STRUCTURAL sibling (#153/#145): a compound measure relation («X + Y = Z + W», «DM·ME=BM·DR»)
+      // whose lowering doesn't carry the FULL term list was truncated to a different, wrong constraint —
+      // the labels all land, so the older gates never fire. Never commit it.
+      const droppedCompound = droppedCompoundRelation(utterance, r.commands);
+      if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0 && droppedVerbs.length === 0 && droppedCompound.length === 0) {
         // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
         // the commit, and every later replay of this content then run at TAIL speed on the main thread
         // (the one unbudgeted cold fold, measured ~26 s on the #59 figure, used to block the tab here).
@@ -680,8 +684,8 @@ export default function App() {
         // become a second analytics `submit` (else the dashboard double-counts the utterance). See sessionLog.
         logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:${outcome.reason}`, detail: outcome.detail, commands: r.commands, intermediate: true });
       } else {
-        weak = 'dropped'; // a typo dropped a stated label/number/relation/verb → escalate rather than commit the partial parse
-        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs].join(',')}`, commands: r.commands, intermediate: true });
+        weak = 'dropped'; // a typo dropped a stated label/number/relation/verb/compound-structure → escalate rather than commit the partial parse
+        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound].join(',')}`, commands: r.commands, intermediate: true });
       }
     }
     // out of grammar, OR a deterministic parse that built nothing → ask the LLM (a SECOND try),
@@ -794,6 +798,9 @@ export default function App() {
       // and the VERB gate (ADR-292, the #82 P1): a decomposition that loses a stated tangency/
       // bisection/… verb must name it — never a silent drop on the second attempt either
       ...droppedGivenVerbs(utterance, llmCmds),
+      // and the STRUCTURAL gate (#153/#145): the LLM must not re-introduce a truncated lowering of a
+      // compound measure relation — the whole term list lands in one structured constraint, or refuse
+      ...droppedCompoundRelation(utterance, llmCmds),
       // and the MEASURE-SYMBOL gate (issue #53): a decomposition that loses a stated radius symbol
       // ("שרדיוסו r") must name it — a lowercase measure letter trips none of the older gates
       ...droppedRadiusSymbol(utterance, llmCmds),

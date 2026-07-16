@@ -37,7 +37,8 @@ export type ScopeCategory =
   | 'valueless-query' // "∠DEF = ?" — the tool enforces/verifies stated values, it doesn't solve
   | 'orientation' // canvas layout words (horizontal / upper / rotate…) — not geometry givens
   | 'bare-point' // a lone point label — say WHERE it sits
-  | 'unnamed-sides'; // "one side 10, other side 5" — name the sides (AB=10, BC=5) — #105
+  | 'unnamed-sides' // "one side 10, other side 5" — name the sides (AB=10, BC=5) — #105
+  | 'compound-relation'; // a compound measure relation the vocabulary doesn't cover (mixed units, unequal-degree product) — #153/#154/#144
 
 export interface ScopeMatch {
   category: ScopeCategory;
@@ -137,6 +138,21 @@ const RULES: ScopeRule[] = [
     patterns: [
       /צלע\s+אחת\s+\S*\d.*?צלע\s+(?:שניי?ה|אחרת|נוספת)\s+\S*\d/s,
       /one\s+side\s+\S*\d.*?(?:other|another|second)\s+side\s+\S*\d/is,
+    ],
+  },
+  {
+    // #153/#154/#144: a MIXED-UNIT measure sum — a bare segment PAIR joined by +/− to an arc/angle term
+    // («AB + ∠ABC = 90»). Dimensionally invalid, so it can NEVER parse (measureSum enforces unit
+    // homogeneity and no other rule reads a term list) — which is what qualifies it for this classifier
+    // (the scope invariant: a pattern must never match a supported catalog example). The SUPPORTED
+    // compounds (same-unit sums, equal-degree products — ADR-335) parse and never reach here; the other
+    // refused variants (an unequal-degree product like «4·DM/ME=BM·DM») carry no never-parseable lexical
+    // signature, so they take the ordinary honesty lane (the structural gate refuses the truncated parse
+    // AND the LLM's re-lowering → the labelsDropped message). The negative lookbehind keeps an ARC/ANGLE
+    // term's own label pair («arc AC + arc BE») from reading as a bare segment pair.
+    category: 'compound-relation',
+    patterns: [
+      /(?<!(?:arcs?|הקשת|קשת|⌢|⏜|∠|∢|angle|הזוו?ית|זוו?ית)\s*)(?<![A-Za-z\d])[A-Z]\d*[A-Z]\d*(?![A-Za-z\d])\s*[+−]\s*(?:arcs?|קשת|⌢|⏜|∠|∢|angle|זוו?ית)/u,
     ],
   },
   {

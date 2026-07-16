@@ -455,7 +455,18 @@ function similarityGauge(c: Construction, cons: Set<Constraint>): number {
   const hasCircle = c.objects.some((o) => o.kind === 'circle');
   const scaleFixed =
     pinned >= 2 ||
-    [...cons].some((k) => k.type === 'distance' || k.type === 'area' || k.type === 'perimeter') || // a numeric length, area, OR perimeter pins the scale (already in `removed`; ADR-118/ADR-228)
+    [...cons].some(
+      (k) =>
+        k.type === 'distance' ||
+        k.type === 'area' ||
+        k.type === 'perimeter' ||
+        // An ABSOLUTE length sum («AB + CD = 20») pins the scale like a perimeter; a relative Σ=Σ or an
+        // angle sum is similarity-invariant and must NOT (#154). Defensive: a degree-unbalanced length
+        // product would pin scale too — the parser refuses those today, but if one ever lowers the DOF
+        // count must stay honest rather than silently drift by 1.
+        (k.type === 'measure-sum' && k.unit === 'length' && k.target !== 0) ||
+        (k.type === 'length-product' && k.lhs.length !== k.rhs.length),
+    ) ||
     c.objects.some((o) => o.kind === 'circle' && o.radius.via === 'length'); // a numeric radius
   const t = pinned === 0 ? 2 : 0;
   const r = npts >= 2 && pinned <= 1 ? 1 : 0;

@@ -170,6 +170,28 @@ function degenerateConstraintError(cmd: Command): string | null {
       const dup = cmd.points.find((p, i) => cmd.points.indexOf(p) !== i);
       return dup !== undefined ? `collinear points must be distinct — "${dup}" is named twice` : null;
     }
+    // A measure-sum's ANGLE term with vertex === ray is a zero ray (NaN, the set-angle case); a
+    // repeated-id LENGTH pair "AA" is honestly 0 there, but in a length-PRODUCT a zero factor makes
+    // the LOG residual NaN at every configuration — the exact churn class this guard exists for.
+    case 'set-measure-sum': {
+      if (cmd.unit === 'length') {
+        for (let i = 0; i + 1 < cmd.points.length; i += 2)
+          if (cmd.points[i] === cmd.points[i + 1])
+            return `a length needs two distinct points — "${cmd.points[i]}${cmd.points[i + 1]}" is a single point, not a segment`;
+        return null;
+      }
+      for (let i = 0; i + 2 < cmd.points.length; i += 3)
+        if (cmd.points[i + 1] === cmd.points[i] || cmd.points[i + 1] === cmd.points[i + 2])
+          return `an angle needs three distinct points — "∠${cmd.points[i]}${cmd.points[i + 1]}${cmd.points[i + 2]}" repeats its vertex`;
+      return null;
+    }
+    case 'set-length-product': {
+      for (const side of [cmd.lhs, cmd.rhs])
+        for (let i = 0; i + 1 < side.length; i += 2)
+          if (side[i] === side[i + 1])
+            return `a length needs two distinct points — "${side[i]}${side[i + 1]}" is a single point, not a segment`;
+      return null;
+    }
     default:
       return null;
   }

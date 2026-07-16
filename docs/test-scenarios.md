@@ -22,6 +22,16 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `q22-arc-sum-enforced-not-truncated` — «קשת AC + קשת BE = קשת AD + קשת BC» enforced whole (#153 P1 / #154)
+Operator 2026-07-15 (session `qx5a19co`, bagrut Q22): the arc-SUM given parsed green but `arcEquality` truncated it to the first arc of each side — the figure was constrained by ∠AOC = ∠AOD, a DIFFERENT given, every honesty gate silent. Now `measureSum` lowers the whole term list to ONE `set-measure-sum` over the central angles; the exact operator sequence builds, the SUM holds on the coordinates (and the truncated equality provably does NOT), and the exam's ∠CFG = ∠CGH composes on top. The HG⊥AB exam conclusion is the operator's play-gate (the log session never got past the failing arc-sum).
+### `q22-arc-sum-typed-early-order-independence` — the arc-sum typed EARLY still builds (M2/ADR-104)
+The compound sum entered straight after the chords (before H/HG) defers/drives the same free DOF — entry-order independence for the new constraint kind.
+### `power-of-point-median-product-builds` — «4*DM*DM=BM*ME» builds the true product (#145 P1 / #144)
+Operator 2026-07-15 (prod session `o90uiwwh` seq 18–35): the medians figure + 4·DM² = BM·ME. `equalSegments`' unanchored regex slid to the interior «DM=BM» and committed a WRONG `set-equal` (the coefficient-less quotient forms committed silently). Now `lengthProduct` lowers it to ONE `set-length-product` (log-domain residual) driving the free M; the relation holds exactly. («CF תיכון» after a prior median is a separate parser gap, filed.)
+### `segment-sum-drives-endpoint` — «AB + CD = EF» drives a free endpoint (#154)
+The additive length family: one `set-measure-sum` (coefs [1,1,−1]), never a truncated `set-equal(C,D,E,F)` dropping AB (the unreported sibling the class probe surfaced).
+### `angle-sum-180-forces-parallel` — «זווית A + זווית B = 180» (single-vertex arms) forces AD ∥ BC (#154)
+The additive angle family with a numeric target + ADR-164 single-vertex arm resolution; co-interior angles at 180 force AD ∥ BC on the final coordinates.
 ### `secant-apex-far-point-named-near` — «AD חותך למעגל בנקודה B» — apex + far crossing D, near B (issue #136, ADR-332)
 Operator 2026-07-15: the secant «AD חותך למעגל» (apex A external, only the FAR crossing D named) was not-handled, and «…בנקודה B» was mis-grabbed by `lineMeetsCircle` and built NOTHING (a `line-through chord-AD` to a never-created D). The new `secantFarPoint` rule (before `lineMeetsCircle`) creates D as a free-θ on-circle far crossing and the named near crossing B via line∩circle with a one-sided order A→B→D keeping D on the far side.
 ### `secant-from-point-far-crossing` — «מנקודה A יוצא חותך למעגל בנקודה D» — the from-point secant phrasing (issue #136, ADR-332)

@@ -721,6 +721,42 @@ export interface PerimeterRatioConstraint {
   k: number;
 }
 
+/**
+ * A SIGNED LINEAR COMBINATION of same-unit measures: Σ coefs[i]·m_i = target (issues #153/#154).
+ * Each term's measure is read from `points` at a fixed stride — 2 ids per term for `unit:'length'`
+ * (|points[2i]·points[2i+1]|), 3 ids per term for `unit:'angle'` (∠ at points[3i+1], i.e. vertex in
+ * the MIDDLE, matching ∠ABC reading order). RHS terms arrive NEGATED in `coefs` (the parser moves
+ * everything left), so «AB + CD = EF» is coefs [1, 1, −1], target 0, and «∠A + ∠B = 180» is
+ * coefs [1, 1], target 180. Arc terms never reach the engine — the parser lowers each arc to its
+ * central angle (arc XY on circle O ≡ ∠XOY, the ADR-116 precedent), so an arc-sum is an angle sum.
+ * `points` is a FLAT id array on purpose: `renameInCommand`/`commandPointIds`/`commandObjectIds`
+ * rewrite/scan only flat string arrays — a nested `{a,b,coef}[]` shape would silently break
+ * rename/swap/merge and the HOIST placement.
+ */
+export interface MeasureSumConstraint {
+  type: 'measure-sum';
+  unit: 'length' | 'angle';
+  coefs: number[];
+  points: Id[];
+  target: number;
+}
+
+/**
+ * A MONOMIAL equality between segment-length products: k·∏|lhs pairs| = ∏|rhs pairs| (issues
+ * #145/#144 — the power-of-a-point / similar-triangle proportion givens: «DM·ME = BM·DR»,
+ * «DM/ME = BM/DM» cross-multiplied at parse to DM·DM = ME·BM, «4·DM² = BM·ME» as a repeated
+ * pair). `lhs`/`rhs` are FLAT id arrays, 2 ids per factor (see {@link MeasureSumConstraint} on
+ * why flat). The residual lives in LOG space (log k + Σlog|lhsᵢ| − Σlog|rhsⱼ|): signed,
+ * sign-changing through the root, naturally scale-free when the factor DEGREES match — which the
+ * parser guarantees (unequal-degree forms would pin the figure's scale and are refused for now).
+ */
+export interface LengthProductConstraint {
+  type: 'length-product';
+  k: number;
+  lhs: Id[];
+  rhs: Id[];
+}
+
 /** a→b ∥ c→d. */
 export interface ParallelConstraint {
   type: 'parallel';
@@ -871,7 +907,9 @@ export type Constraint =
   | AreaConstraint
   | AreaRatioConstraint
   | PerimeterConstraint
-  | PerimeterRatioConstraint;
+  | PerimeterRatioConstraint
+  | MeasureSumConstraint
+  | LengthProductConstraint;
 
 export interface Construction {
   objects: GeoObject[];
@@ -917,6 +955,13 @@ export type Command =
   | { type: 'set-area-ratio'; ids1: Id[]; ids2: Id[]; k: number } // area(ids1) = k·area(ids2)
   | { type: 'set-perimeter'; ids: Id[]; value: number } // perimeter of polygon `ids` = value (ADR-228)
   | { type: 'set-perimeter-ratio'; ids1: Id[]; ids2: Id[]; k: number } // perimeter(ids1) = k·perimeter(ids2)
+  // Σ coefs[i]·m_i = target over same-unit measures (#153/#154): stride-2 length pairs or stride-3
+  // angles (vertex in the middle) in the FLAT `points`; RHS terms arrive negated; arcs are lowered by
+  // the parser to central angles first. See {@link MeasureSumConstraint}.
+  | { type: 'set-measure-sum'; unit: 'length' | 'angle'; coefs: number[]; points: Id[]; target: number }
+  // k·∏|lhs pairs| = ∏|rhs pairs| (#145/#144, power-of-a-point/proportion): flat 2-id factors,
+  // quotients cross-multiplied at parse, squares = repeated pair. See {@link LengthProductConstraint}.
+  | { type: 'set-length-product'; k: number; lhs: Id[]; rhs: Id[] }
   | { type: 'set-equal'; a: Id; b: Id; c: Id; d: Id; soft?: boolean } // soft: a DEFAULT equal-pair a named-shape macro picks when the student didn't say which sides are equal (e.g. isosceles |AB|=|AC|); the store drops it if an explicit equality on the same triangle is stated (ADR-114). The engine treats it as an ordinary equality.
   | { type: 'set-ratio'; a: Id; b: Id; c: Id; d: Id; k: number; add?: number } // |ab| = k·|cd| + add
   | { type: 'set-length-radius'; a: Id; b: Id; circle: Id; center: Id; witness: Id; k: number; add?: number } // |ab| = k·R (ADR-071)
