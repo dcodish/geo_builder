@@ -35,7 +35,7 @@
 
 import { expect } from 'vitest';
 import { parse, buildParseCtx } from '@/parser';
-import { replay, firstSatisfyingSeed } from '@/store/geoStore';
+import { replay, firstSatisfyingSeed, settleVariantDefaults } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { isGeoPoint, freeDofs, freeDofCount, applySeed, evaluate, detectRelations, detectShapes } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
@@ -72,10 +72,16 @@ export function ctxOf(facts: Fact[]) {
  *  `run`, the seed-sweep oracle, and the E7 round-trip properties (all in THIS file — importing a .test.ts
  *  from another test would double-register every scenario), so all drive the exact pipeline the app does. */
 export function factsOf(steps: Step[]): Fact[] {
-  const facts: Fact[] = [];
+  let facts: Fact[] = [];
   let g = 0;
   const push = (group: string, utterance: string, cmd: AnyCommand) =>
     facts.push({ id: `${group}.${facts.length}`, utterance, group, cmd, enabled: true });
+  // Mirror the app's per-step commit: a newly-appended cyclable variant's DEFAULT settles to the first
+  // cleanly-building configuration (ADR-339) — exactly as `commitCommands`/`replaceGroup` do, so scenarios
+  // can't drift from production (the same mirroring `run()` already does for the ADR-098 seed advance).
+  const settle = (group: string) => {
+    facts = settleVariantDefaults(facts, (f) => f.group === group, 0);
+  };
   for (const step of steps) {
     if (typeof step === 'object' && 'edit' in step) {
       // The app's ✎ path (ADR-241): parse against the PREFIX (facts before the edited group — the
@@ -95,6 +101,7 @@ export function factsOf(steps: Step[]): Fact[] {
         enabled: true,
       }));
       facts.splice(start, end - start, ...replacement);
+      settle(key);
       continue;
     }
     const group = `g${g++}`;
@@ -113,6 +120,7 @@ export function factsOf(steps: Step[]): Fact[] {
     } else {
       for (const cmd of step.llm as AnyCommand[]) push(group, '(llm step)', cmd);
     }
+    settle(group);
   }
   return facts;
 }
@@ -171,13 +179,14 @@ export const SCENARIOS: Scenario[] = [
       expect(Math.max(...sides) - Math.min(...sides), 'all four sides equal').toBeLessThan(1e-3);
       for (const [p, v, q] of [[g, d, e], [d, e, f], [e, f, g], [f, g, d]] as const)
         expect(Math.abs(angle(p, v, q) - 90), 'right angle at each corner').toBeLessThan(0.01);
-      // The CORNER square: D sits exactly on A (the forced coincidence, reported as such).
-      expect(dist(d, at(fig, 'A')), 'D ≡ A — the corner square').toBeLessThan(1e-6);
-      expect(fig.coincidences, 'the forced coincidence is surfaced, not silent').toContainEqual(['A', 'D']);
-      // …and the side matches the INDEPENDENT closed-form oracle: s = 1/(1/b + 1/c) over the two legs.
-      const b = dist(at(fig, 'A'), at(fig, 'B'));
-      const c = dist(at(fig, 'A'), at(fig, 'C'));
-      expect(Math.abs(sides[0] - 1 / (1 / b + 1 / c)), 'side = the closed-form corner-square side').toBeLessThan(1e-3);
+      // …in GENERAL POSITION (ADR-339, the operator's play-test follow-up): the DEFAULT drawing puts all
+      // four vertices genuinely on the sides — never the degenerate corner square (D≡A), which stays
+      // reachable by cycling with its ADR-123 notice. The corner square's closed-form oracle lock lives in
+      // `inscribe-joint-solve.test.ts` at the PINNED corner variant.
+      expect(fig.coincidences, 'no coincidence in the default drawing').toEqual([]);
+      for (const s of [d, e, f, g])
+        for (const c of ['A', 'B', 'C'])
+          expect(dist(s, at(fig, c)), 'every square vertex clear of every container vertex').toBeGreaterThan(0.5);
     },
   },
   {
@@ -208,7 +217,8 @@ export const SCENARIOS: Scenario[] = [
       const [d, e, f, g] = ['D', 'E', 'F', 'G'].map((id) => at(fig, id));
       const sides = [dist(d, e), dist(e, f), dist(f, g), dist(g, d)];
       expect(Math.max(...sides) - Math.min(...sides), 'a genuine square').toBeLessThan(1e-3);
-      expect(dist(d, at(fig, 'A')), 'D ≡ A — the corner square').toBeLessThan(1e-6);
+      // The DEFAULT drawing is the general-position square (ADR-339), never the corner degenerate.
+      expect(fig.coincidences, 'no coincidence in the default drawing').toEqual([]);
     },
   },
   {

@@ -1803,6 +1803,60 @@ function shapeDiffers(a: number[], b: number[]): boolean {
 }
 
 /**
+ * Settle a NEW cyclable-variant fact's DEFAULT configuration ([ADR-339](docs/06-decisions.md#adr-339),
+ * issue #176 — the variant sibling of the ADR-098 seed auto-advance).
+ *
+ * The parser emits `variant: 0` blindly, but a variant is an UNSTATED configuration choice (ADR-052/M4) and
+ * the default must land in general position (ADR-253): a coincidence that variant 0 forces but a SIBLING
+ * variant avoids is a DEFAULT collision (ADR-123: avoided), not a given-forced one (allowed + notice) — the
+ * "forced" classification's proper scope is the variant FAMILY, not the chosen member. The reported case: a
+ * square inscribed in a right triangle at A — variant 0 (base on a leg) forces the corner square D≡A, while
+ * the hypotenuse variants put all four vertices genuinely on the sides.
+ *
+ * Walked from the parsed variant, first candidate on the best achievable tier:
+ *   builds + no NEW coincidence among the command's own vertices + fewest verifier violations
+ *   ≻ builds + no new coincidence  ≻ builds  ≻ keep the parsed variant (its honest error stands).
+ *
+ * Settling happens ONCE, at commit — the parser is the only producer of the default, a student can only
+ * CYCLE afterwards — so the persisted variant is authoritative from then on, "show another configuration"
+ * cycles verbatim from it, and the corner square stays REACHABLE (with its notice), never the default.
+ * Returns the SAME array when nothing changed (undo/memo hygiene). Budgeted like the seed search.
+ */
+export function settleVariantDefaults(facts: Fact[], isNew: (f: Fact) => boolean, seed: number, budgetMs = SEARCH_BUDGET_MS): Fact[] {
+  const deadline = Date.now() + budgetMs;
+  let out = facts;
+  for (let idx = 0; idx < out.length; idx++) {
+    const f = out[idx];
+    if (!isNew(f) || !cyclableVariant(f.cmd)) continue;
+    const n = variantCountOf(f.cmd);
+    const v0 = (f.cmd as { variant: number }).variant;
+    // A coincidence is NEW iff it touches the command's own vertices and wasn't already in the prefix
+    // figure (an inherited coincidence between container vertices must not disqualify every variant).
+    const verts = new Set(variantVertices(f.cmd));
+    const canon = ([a, b]: [Id, Id]) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+    const prior = new Set(replay(out.slice(0, idx), seed).coincidences.map(canon));
+    const score = (fig: Derived): [number, number, number] => [
+      fig.status[f.id] === 'ok' ? 0 : 1,
+      fig.coincidences.some((p) => verts.has(p[0]) && verts.has(p[1]) && !prior.has(canon(p))) ? 1 : 0,
+      fig.violations.length,
+    ];
+    const candidate = (v: number) => out.map((x, i) => (i === idx ? { ...x, cmd: withVariant(x.cmd, v) } : x));
+    let best = { v: v0, s: score(replay(out, seed)) };
+    if (best.s[0] === 0 && best.s[1] === 0 && best.s[2] === 0) continue; // the parsed default is already clean
+    for (let dv = 1; dv < n && Date.now() < deadline; dv++) {
+      const v = (v0 + dv) % n;
+      const s = score(replay(candidate(v), seed));
+      // Strictly better lexicographically wins; ties keep the earlier (most-canonical) variant.
+      if (s[0] < best.s[0] || (s[0] === best.s[0] && (s[1] < best.s[1] || (s[1] === best.s[1] && s[2] < best.s[2]))))
+        best = { v, s };
+      if (s[0] === 0 && s[1] === 0 && s[2] === 0) break; // can't do better than clean
+    }
+    if (best.v !== v0) out = candidate(best.v);
+  }
+  return out;
+}
+
+/**
  * Fold ONE command into the fact list per the execute policy: idempotent duplicate (FR-EN-9 — re-issuing
  * re-enables a deselected twin, never stacks), a free-point move updates its fact in place (ADR-011), and
  * re-stating a STANDALONE circle resizes it in place (a circle inside a bigger step falls through to an
@@ -1840,6 +1894,12 @@ function commitCommands(
   let next = facts;
   for (const cmd of cmds) next = foldFact(next, cmd, utterance, group);
   if (next === facts) return; // every command was an idempotent duplicate — nothing to record
+  // Settle a NEWLY-appended cyclable variant's default configuration (ADR-339) before the seed search,
+  // in the same transaction — one undo restores the pre-step state whole.
+  if (next.length > facts.length) {
+    const known = new Set(facts.map((f) => f.id));
+    next = settleVariantDefaults(next, (f) => !known.has(f.id), get().seed);
+  }
   const patch: Partial<GeoState> = { facts: next };
   // The seed auto-advance applies only when the batch APPENDED a step (matching the old per-command
   // behaviour: a free-point move / circle resize never re-seeds), and only when the current view is
@@ -1933,7 +1993,11 @@ export const useGeoStore = create<GeoState>()(
         while (end < facts.length && groupKey(facts[end]) === key) end++;
         const group = cmds.length > 1 ? nanoid() : undefined; // multi-command edits stay one step
         const replacement: Fact[] = cmds.map((cmd) => ({ id: nanoid(), cmd, utterance, group, enabled: true }));
-        const next = [...facts.slice(0, start), ...replacement, ...facts.slice(end)];
+        let next = [...facts.slice(0, start), ...replacement, ...facts.slice(end)];
+        // Edit-path parity: an edited step re-lowers with the parser's default variant — settle it like a
+        // newly-typed one (ADR-339).
+        const replaced = new Set(replacement.map((f) => f.id));
+        next = settleVariantDefaults(next, (f) => replaced.has(f.id), get().seed);
         const patch: Partial<GeoState> = {
           facts: next,
           selectedId: get().selectedId === key ? null : get().selectedId,

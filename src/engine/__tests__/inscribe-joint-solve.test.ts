@@ -87,6 +87,21 @@ describe('a macro\'s defining constraints are solved as one coupled system (ADR-
     }
   }
 
+  it('the PINNED corner variant reaches the t=0 boundary and matches the closed-form oracle (ADR-338)', () => {
+    // Variant 0 with the right angle at A forces D exactly onto A — the corner square of side
+    // 1/(1/b + 1/c) over the legs (proved by an oracle importing nothing from the engine). This pins the
+    // joint solve's boundary reachability + the ADR-123 forced-coincidence surfacing. The DEFAULT no longer
+    // draws this configuration (ADR-339 settles it to general position); it stays reachable by cycling —
+    // this test replays the pinned variant directly, the persisted-variant path cycling uses.
+    const fig = replay(withVariant(['משולש ABC', 'זוית A ישרה'], 'square', 0), 0);
+    for (const [, s] of Object.entries(fig.status)) expect(s).toBe('ok');
+    const [a, b, c, d] = ['A', 'B', 'C', 'D'].map((id) => fig.positions.get(id)!);
+    expect(dist(d, a), 'D ≡ A — the forced corner').toBeLessThan(1e-6);
+    expect(fig.coincidences, 'the forced coincidence is surfaced, not silent').toContainEqual(['A', 'D']);
+    const side = dist(d, fig.positions.get('E')!);
+    expect(Math.abs(side - 1 / (1 / dist(a, b) + 1 / dist(a, c))), 'side = the closed-form corner-square side').toBeLessThan(1e-3);
+  });
+
   it('the plain-triangle baseline stays green (both shapes, default variant)', () => {
     for (const shape of ['square', 'rectangle'] as const) {
       const fig = replay(factsOf(['משולש ABC', `${shape === 'square' ? 'ריבוע' : 'מלבן'} DEFG חסום במשולש ABC`]), 0);
