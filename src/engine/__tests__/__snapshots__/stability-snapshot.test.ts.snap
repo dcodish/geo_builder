@@ -213,20 +213,20 @@ exports[`driven-solver stability snapshot (Wave-2/3 gate) > trapezoid (scaled-of
 exports[`driven-solver stability snapshot (Wave-2/3 gate) > triangle + E on AC at 0.4 (on-segment parametric) 1`] = `
 {
   "A": [
-    0,
-    0,
+    2,
+    3.6,
   ],
   "B": [
     6,
     0,
   ],
   "C": [
-    2,
-    4,
+    0,
+    0,
   ],
   "E": [
-    0.8,
-    1.6,
+    1.2,
+    2.16,
   ],
 }
 `;

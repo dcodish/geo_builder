@@ -891,8 +891,14 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     }
 
     case 'triangle': {
+      // Textbook orientation (#161, ADR-335): first vertex at the apex, the other two on a
+      // horizontal base (2nd bottom-right, 3rd bottom-left). Deliberately scalene — a generic
+      // triangle must not read as isosceles (ADR-052/ADR-085) — and the apex is TUNED, not
+      // arbitrary: driving any stated equal pair (isosceles macros) from this seed must stay
+      // clearly non-equilateral at every sampled config (the ADR-114/ADR-264 scenarios' 0.3
+      // bar; this apex measures ≥0.55 across seeds 0-4 — see ADR-335 before "rounding" it).
       const [a, b, c] = cmd.ids;
-      placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 2, y: 4 }], pos);
+      placeBase(objects, [{ id: a, x: 2, y: 3.6 }, { id: b, x: 6, y: 0 }, { id: c, x: 0, y: 0 }], pos);
       triEdges(objects, a, b, c);
       break;
     }
