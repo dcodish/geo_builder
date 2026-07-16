@@ -33,6 +33,15 @@ describe('mathHtml — MathML for the math tokens, verbatim text otherwise', () 
   it('x² → a superscript', () => {
     expect(mathHtml('AB = x²')).toBe('AB = <math><msup><mi>x</mi><mn>2</mn></msup></math>');
   });
+  it('an arc measure renders as the textbook OVER-ARC — glyph and word forms (#155 / ADR-335)', () => {
+    const arc = (pair: string) => `<math><mover accent="true"><mi>${pair}</mi><mo stretchy="true">⏜</mo></mover></math>`;
+    expect(mathHtml('⌢AC')).toBe(arc('AC'));
+    expect(mathHtml('קשת AC + קשת BE = קשת AD + קשת BC')).toBe(`${arc('AC')} + ${arc('BE')} = ${arc('AD')} + ${arc('BC')}`);
+    expect(mathHtml('arc DE = 2 arc CE')).toBe(`${arc('DE')} = 2 ${arc('CE')}`);
+  });
+  it('a QUALIFIED arc reference (not a measure) stays plain text', () => {
+    expect(mathHtml('D אמצע הקשת הקטנה AB')).toBe('D אמצע הקשת הקטנה AB'); // no pair right after the word
+  });
   it('leaves non-math text (Hebrew, labels, symbols) verbatim', () => {
     expect(mathHtml('משולש ABC')).toBe('משולש ABC');
     expect(mathHtml('AB ⊥ CD')).toBe('AB ⊥ CD');

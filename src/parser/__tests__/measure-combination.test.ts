@@ -51,6 +51,12 @@ describe('measureSum — sums of arcs / segments / angles (#153/#154)', () => {
     expect(c.coefs).toEqual([1, 1, -1, -1]);
   });
 
+  it('the ⌢ glyph form (the #155 toolbar button inserts it)', () => {
+    const c = only('⌢AC + ⌢BE = ⌢AD + ⌢BC', 'set-measure-sum');
+    expect(c.coefs).toEqual([1, 1, -1, -1]);
+    expect(c.points).toEqual(['A', 'O', 'C', 'B', 'O', 'E', 'A', 'O', 'D', 'B', 'O', 'C']);
+  });
+
   it('segment sums: «AB + CD = EF + GH», «AB + CD = EF»', () => {
     expect(only('AB + CD = EF + GH', 'set-measure-sum')).toMatchObject({ unit: 'length', coefs: [1, 1, -1, -1], target: 0 });
     expect(only('AB + CD = EF', 'set-measure-sum')).toMatchObject({ unit: 'length', coefs: [1, 1, -1], points: ['A', 'B', 'C', 'D', 'E', 'F'] });

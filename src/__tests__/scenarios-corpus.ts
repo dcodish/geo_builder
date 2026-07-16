@@ -159,18 +159,24 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 export const SCENARIOS: Scenario[] = [
   {
     id: 'q22-arc-sum-enforced-not-truncated',
-    title: '«קשת AC + קשת BE = קשת AD + קשת BC» — the arc SUM is enforced whole, never truncated to arc AC = arc AD (#153 P1, #154)',
+    title: '«קשת AC + קשת BE = קשת AD + קשת BC» + «S_{CFG}=S_{CGH}» — the full bagrut Q22: the arc SUM enforced whole forces HG ⊥ AB (#153 P1, #154)',
     guards:
-      'Operator 2026-07-15 (session qx5a19co, bagrut Q22): the arc-sum given parsed green but arcEquality had TRUNCATED it to the first arc of each side (labelRun grabs the first run) — the figure was constrained by ∠AOC = ∠AOD, a DIFFERENT given, with every honesty gate silent. Now measureSum lowers the whole term list to ONE set-measure-sum over the central angles, the solver drives a free chord endpoint until the SUM holds, and the exam’s second given (∠CFG = ∠CGH) composes on top. (The exam’s HG⊥AB conclusion is checked at operator play — the log session never reached past the failing arc-sum, so the H-side/labeling ground truth is the operator’s.)',
+      'Operator 2026-07-15/16 (sessions qx5a19co + wn3axiea, bagrut Q22 — exam text supplied 2026-07-16): the arc-sum given parsed green but arcEquality had TRUNCATED it to the first arc of each side (labelRun grabs the first run) — the figure was constrained by ∠AOC = ∠AOD, a DIFFERENT given, every honesty gate silent. Now measureSum lowers the whole term list to ONE set-measure-sum over the central angles, and with the exam’s REAL second given — the AREA equality S_{CFG}=S_{CGH} (the issue text had mis-transcribed it as an angle equality) — the exam theorem is FORCED on the drawing: the arc condition ⇒ CF = CG, the area equality over the collinear bases (D-F-C-H one line) ⇒ CF = CH, so CG = ½·FH ⇒ Thales converse ⇒ HG ⊥ AB. Both chords carry the מיתר noun (the wn3axiea session showed a bare «CD חותך…» leaves D OFF the circle — ADR-052-honest, but then «קשת AD» is meaningless).',
     steps: [
-      'מעגל O ברדיוס 5',
+      // The operator's wn3axiea sequence with the מיתר noun restored on the CD step (their bare
+      // «CD חותך…» left D off the circle). NOTE the chord ORDER (CD before CE) matters for the
+      // THEOREM assertion: the engine's central angles are minor-arc [0,180°], so a different
+      // entry order can settle a valid configuration whose minor-arc sum holds without the exam's
+      // arc arrangement — the sum given is honoured either way (see the order-independence
+      // scenario), but the ⊥ conclusion is a property of the exam's configuration.
+      'מעגל',
       'AB מיתר',
-      'CE מיתר שחותך את AB בנקודה G',
-      'CD מיתר שחותך את AB בנקודה F',
+      'מיתר CD חותך את AB בנקודה F',
+      'מיתר CE חותך את AB בנקודה G',
       'H על המשך DC',
-      'קשת AC + קשת BE= קשת AD + קשת BC',
+      'קשת AC +קשת BE = קשת AD + קשת BC',
       'HG',
-      'זווית CFG = זווית CGH',
+      'S_{CFG}=S_{CGH}',
     ],
     check(fig) {
       allStepsOk(fig);
@@ -179,10 +185,13 @@ export const SCENARIOS: Scenario[] = [
       // The STATED sum holds on the final coordinates — not the truncated arc AC = arc AD.
       expect(Math.abs(arc('A', 'C') + arc('B', 'E') - (arc('A', 'D') + arc('B', 'C'))), 'arc AC + arc BE = arc AD + arc BC').toBeLessThan(0.1);
       expect(Math.abs(arc('A', 'C') - arc('A', 'D')), 'NOT the truncated arc AC = arc AD').toBeGreaterThan(1);
-      // The second exam given composes with the sum (both hold simultaneously).
-      const cfg = angle(at(fig, 'C'), at(fig, 'F'), at(fig, 'G'));
-      const cgh = angle(at(fig, 'C'), at(fig, 'G'), at(fig, 'H'));
-      expect(Math.abs(cfg - cgh), '∠CFG = ∠CGH').toBeLessThan(0.1);
+      // The theorem chain the two givens force: CF = CG (arc condition) = CH (area equality, collinear bases).
+      const C = at(fig, 'C'), F = at(fig, 'F'), G = at(fig, 'G'), H = at(fig, 'H'), A = at(fig, 'A'), B = at(fig, 'B');
+      expect(Math.abs(dist(C, F) - dist(C, G)), 'CF = CG').toBeLessThan(0.05);
+      expect(Math.abs(dist(C, F) - dist(C, H)), 'CF = CH').toBeLessThan(0.05);
+      // …and the exam conclusion: HG ⊥ AB (Thales converse — G sees FH under a right angle).
+      const cos = ((H.x - G.x) * (B.x - A.x) + (H.y - G.y) * (B.y - A.y)) / (dist(H, G) * dist(A, B));
+      expect(Math.abs(cos), 'HG ⊥ AB').toBeLessThan(0.01);
     },
   },
   {

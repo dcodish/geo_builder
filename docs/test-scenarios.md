@@ -22,8 +22,8 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
-### `q22-arc-sum-enforced-not-truncated` — «קשת AC + קשת BE = קשת AD + קשת BC» enforced whole (#153 P1 / #154)
-Operator 2026-07-15 (session `qx5a19co`, bagrut Q22): the arc-SUM given parsed green but `arcEquality` truncated it to the first arc of each side — the figure was constrained by ∠AOC = ∠AOD, a DIFFERENT given, every honesty gate silent. Now `measureSum` lowers the whole term list to ONE `set-measure-sum` over the central angles; the exact operator sequence builds, the SUM holds on the coordinates (and the truncated equality provably does NOT), and the exam's ∠CFG = ∠CGH composes on top. The HG⊥AB exam conclusion is the operator's play-gate (the log session never got past the failing arc-sum).
+### `q22-arc-sum-enforced-not-truncated` — the FULL bagrut Q22: arc-sum + `S_{CFG}=S_{CGH}` force HG ⊥ AB (#153 P1 / #154)
+Operator 2026-07-15/16 (sessions `qx5a19co` + `wn3axiea`; exam text supplied 2026-07-16): the arc-SUM given parsed green but `arcEquality` truncated it to the first arc of each side — the figure was constrained by ∠AOC = ∠AOD, a DIFFERENT given, every honesty gate silent. Now `measureSum` lowers the whole term list to ONE `set-measure-sum` over the central angles, and with the exam's REAL second given — the AREA equality `S_{CFG}=S_{CGH}` (the issue text had mis-transcribed it as an angle equality) — the exam theorem is FORCED: arc condition ⇒ CF=CG; area equality over collinear bases (D-F-C-H) ⇒ CF=CH; Thales converse ⇒ **HG ⊥ AB** (cos = 0.0000 measured). Both chords must carry the מיתר noun (a bare «CD חותך…» leaves D off the circle — honest per ADR-052, but «קשת AD» is then meaningless).
 ### `q22-arc-sum-typed-early-order-independence` — the arc-sum typed EARLY still builds (M2/ADR-104)
 The compound sum entered straight after the chords (before H/HG) defers/drives the same free DOF — entry-order independence for the new constraint kind.
 ### `power-of-point-median-product-builds` — «4*DM*DM=BM*ME» builds the true product (#145 P1 / #144)
