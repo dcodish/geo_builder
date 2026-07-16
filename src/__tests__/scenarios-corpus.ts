@@ -158,6 +158,55 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'inscribe-square-failure-leaves-no-trace',
+    title: '«ריבוע DEFG חסום במשולש ABC» in a RIGHT triangle — a failed macro leaves ZERO trace and the prior figure is untouched (#167 P1, ADR-337)',
+    guards:
+      'Operator 2026-07-16 (session tos0z5cf; triaged out of #166 and filed as #167). The inscribe is ONE fact lowering to NINE engine commands (4 riders + the polygon + 4 defining constraints). The fold committed each command’s success into the shared construction as the loop ran, so when the final ⟂ constraint failed the earlier commands SURVIVED: D/E/F/G rendered as a RHOMBUS (all sides 2.000, ∠(GD,DE)=79°) from a step the app showed RED, the triangle silently MOVED (CA 5.000 → 3.929 — the successful prefix recruited it), and because the failing constraint never reached `applied` the verifier reported violations: [] on a figure violating the step’s own stated relations. The student saw a shape they never asked for, drawn next to a red error, with a clean verifier. Now a fact’s lowering is transactional (build into a trial, commit only if EVERY command succeeds).',
+    steps: ['right-triangle ABC', 'זוית A ישרה', 'ריבוע DEFG חסום במשולש ABC'],
+    check(fig) {
+      // The step is honestly RED and surfaces as an error (it used to leave lastError null: the leaked
+      // riders made the failing constraint still look "pending", so the banner was suppressed too).
+      expect(Object.values(fig.status).some((s) => s !== 'ok'), 'the inscribe step reports its failure').toBe(true);
+      expect(fig.lastError, 'the failure surfaces (not a silent red row)').not.toBeNull();
+      // ZERO TRACE: none of the four riders the failed step would introduce exist.
+      for (const id of ['D', 'E', 'F', 'G'])
+        expect(fig.positions.has(id), `${id} must not exist — the step introducing it failed`).toBe(false);
+      // KEEP-PRIOR: the triangle is bit-identical to its pre-step shape.
+      const prior = run(['right-triangle ABC', 'זוית A ישרה']);
+      for (const id of ['A', 'B', 'C'])
+        expect(dist(at(fig, id), at(prior, id)), `${id} moved — the failed step must not touch the prior figure`).toBeLessThan(1e-9);
+    },
+  },
+  {
+    id: 'inscribe-rectangle-failure-leaves-no-trace',
+    title: '«מלבן DEFG חסום במשולש ABC» in a RIGHT triangle — the same zero-trace guarantee for the RECTANGLE macro (#167, ADR-337)',
+    guards:
+      'Operator 2026-07-16 ("ensure we cover not only ריבוע but also מלבן חסום"). The rectangle inscribe is the SAME fold chokepoint with a different expansion (three right angles instead of rhombus+one), and it leaked identically: it fails «cannot place G on segment CA so that GD ⟂ DE» yet drew D/E/F/G with violations: []. Locks the class fix across the shape, not just the one reported figure. (That this figure FAILS at all is #166 — the coupled defining constraints are solved greedily one-at-a-time; an inscribed rectangle is under-determined and should build. This scenario asserts only that the failure is HONEST; when #166 lands it flips to a build and this scenario is re-pointed.)',
+    steps: ['right-triangle ABC', 'זוית A ישרה', 'מלבן DEFG חסום במשולש ABC'],
+    check(fig) {
+      expect(Object.values(fig.status).some((s) => s !== 'ok'), 'the inscribe step reports its failure').toBe(true);
+      for (const id of ['D', 'E', 'F', 'G'])
+        expect(fig.positions.has(id), `${id} must not exist — the step introducing it failed`).toBe(false);
+      const prior = run(['right-triangle ABC', 'זוית A ישרה']);
+      for (const id of ['A', 'B', 'C'])
+        expect(dist(at(fig, id), at(prior, id)), `${id} moved — the failed step must not touch the prior figure`).toBeLessThan(1e-9);
+    },
+  },
+  {
+    id: 'inscribe-rectangle-builds-in-plain-triangle',
+    title: '«מלבן DEFG חסום במשולש ABC» in a plain triangle — the SUCCESS branch of the transactional fold still commits (ADR-337 guard)',
+    guards:
+      'The other half of ADR-337: making the fold all-or-nothing must not stop a macro that legitimately succeeds from committing. A working 6-command expansion (4 riders + polygon + 3 right angles) still lands, and the result is a genuine rectangle. Guards the "trial never gets promoted to cur" regression.',
+    steps: ['משולש ABC', 'מלבן DEFG חסום במשולש ABC'],
+    check(fig) {
+      allStepsOk(fig);
+      for (const id of ['D', 'E', 'F', 'G']) expect(fig.positions.has(id), `${id} exists`).toBe(true);
+      // …and it really is a rectangle: three right angles ⇒ the fourth.
+      for (const [p, v, q] of [['D', 'E', 'F'], ['E', 'F', 'G'], ['F', 'G', 'D']] as const)
+        expect(Math.abs(angle(at(fig, p), at(fig, v), at(fig, q)) - 90), `right angle at ${v}`).toBeLessThan(0.5);
+    },
+  },
+  {
     id: 'arc-value-drives-central-angle',
     title: '«קשת AB = 40» — an absolute arc measure drives the central angle, never a chord length (ADR-335 play-gate request)',
     guards:

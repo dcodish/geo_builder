@@ -22,6 +22,15 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `inscribe-square-failure-leaves-no-trace` — «ריבוע DEFG חסום במשולש ABC» in a right triangle: a failed macro leaves ZERO trace (#167 P1, ADR-337)
+Operator 2026-07-16 (session `tos0z5cf`, triaged out of #166). The inscribe is ONE fact lowering to NINE commands; the fold committed each command's success as it ran, so the failing final ⟂ left the earlier ones behind: D/E/F/G drawn as a **rhombus** from a RED step, the triangle silently moved (CA 5.000 → 3.929), and `violations: []` because the failed constraint never reached `applied`. Now the lowering is transactional — a red step draws nothing, the prior figure is bit-identical, and the error actually surfaces (`lastError` was `null` before).
+
+### `inscribe-rectangle-failure-leaves-no-trace` — «מלבן DEFG חסום במשולש ABC»: the same zero-trace guarantee for the RECTANGLE macro (#167, ADR-337)
+Operator 2026-07-16 ("ensure we cover not only ריבוע but also מלבן חסום"). Same fold chokepoint, different expansion (three right angles vs rhombus+one) — and it leaked identically. Locks the class across the shape, not just the reported figure. (That this figure fails at all is **#166**; when that lands, this scenario flips to a build.)
+
+### `inscribe-rectangle-builds-in-plain-triangle` — the SUCCESS branch of the transactional fold still commits (ADR-337 guard)
+The dual regression: making the fold all-or-nothing must not stop a legitimately-succeeding macro from committing. A working 6-command expansion still lands, and the result is a genuine rectangle (three right angles).
+
 ### `arc-value-drives-central-angle` — «קשת AB = 40»: an absolute arc measure drives the central angle (ADR-335 play-gate)
 Operator 2026-07-16: «arc AB = 40» as a given. Before `arcValue` this fell through to `distanceConstraint` — the arc's DEGREES committed as a chord LENGTH, the word קשת dropped, all gates quiet (the #153 family). Now: `set-angle` at the centre (arc ≡ central angle, ADR-116); no circle resolvable → 'stop' (escalate), never a length fall-through.
 ### `q22-arc-sum-enforced-not-truncated` — the FULL bagrut Q22: arc-sum + `S_{CFG}=S_{CGH}` force HG ⊥ AB (#153 P1 / #154)

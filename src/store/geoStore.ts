@@ -512,18 +512,29 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
         claim();
         continue;
       }
+      // TRANSACTIONAL — a fact's lowering is ALL-OR-NOTHING ([ADR-337](docs/06-decisions.md#adr-337)).
+      // ONE fact can lower to MANY engine commands (every macro: `inscribe` ADR-262, `shape-variant`
+      // ADR-138, the named shapes ADR-110, regular polygon ADR-111, common tangent ADR-239, the concentric
+      // pair ADR-244, any multi-command `lowerOne`). Committing each command into `cur` as it succeeds left
+      // a HALF-BUILT expansion behind when a LATER command of the SAME fact failed: the riders rendered and
+      // the figure moved although the step is red, and — because the failing constraint never reached
+      // `applied` — the verifier read CLEAN on a figure violating the step's own stated relations (docs/17
+      // §6 honesty). So build into a `trial` and commit only if EVERY command succeeded; this mirrors the
+      // pattern the ADR-104 deferral retry below already uses.
+      let trial = cur;
       let ok = true;
       for (const ec of engineCmds) {
-        const r = applyStep(cur, ec);
-        if (r.ok) cur = r.construction;
+        const r = applyStep(trial, ec);
+        if (r.ok) trial = r.construction;
         else {
           status[f.id] = r.error; // dependencies gone, contradiction, etc. — keep prior figure
           ok = false;
-          failedWith.set(f.id, cur);
+          failedWith.set(f.id, cur); // the PRE-fact figure — what the retry must compare against (ADR-280 purity skip)
           break;
         }
       }
       if (ok) {
+        cur = trial;
         status[f.id] = 'ok';
         applied.push(...(engineCmds as Command[]));
       }
