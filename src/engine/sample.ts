@@ -270,7 +270,26 @@ export function applySeed(c: Construction, seed: number): Construction {
     }
     if (o.kind === 'scaled-offset' && notConsumed(o)) {
       const jr = mulberry32((seed ^ hashId(o.id)) >>> 0);
-      return { ...o, k: 0.3 + jr() * 0.55 }; // a trapezoid's top:base ratio ∈ [0.3, 0.85]
+      // WHICH side is the LONG base is an unstated DISCRETE choice ([ADR-341](docs/06-decisions.md#adr-341),
+      // issue #173 — the ADR-052 conformance smell named in CLAUDE.md): the old range [0.3, 0.85] was
+      // hard-capped below 1, so "show another configuration" could never show the k-scaled side as the
+      // long one — a fixed default masquerading as free. Now a seed bit picks the branch and the magnitude
+      // mirrors across it (k ∈ [0.35, 0.85] or its reciprocal [1.18, 2.86]), deliberately EXCLUDING a
+      // neighbourhood of k = 1 — that is a parallelogram, not a trapezoid (the honest boundary). A stated
+      // length-order over the two parallel sides PINS the branch (the choice is no longer unstated), so
+      // sampling never fights the order back to the k≈1 boundary.
+      const mag = 0.35 + jr() * 0.5;
+      const flip = jr() < 0.5;
+      const same = (x1: Id, y1: Id, x2: Id, y2: Id) => (x1 === x2 && y1 === y2) || (x1 === y2 && y1 === x2);
+      const order = c.constraints.find(
+        (k): k is Extract<Constraint, { type: 'length-order' }> =>
+          k.type === 'length-order' &&
+          ((same(k.a, k.b, o.from, o.to) && same(k.c, k.d, o.anchor, o.id)) ||
+            (same(k.a, k.b, o.anchor, o.id) && same(k.c, k.d, o.from, o.to))),
+      );
+      // (anchor,id) is the k-SCALED side: shorter ⇒ k < 1. Stated order pins; else the seed bit chooses.
+      const scaledShorter = order ? same(order.a, order.b, o.anchor, o.id) : flip;
+      return { ...o, k: scaledShorter ? mag : 1 / mag };
     }
     // Free-radius circle (ADR-051): vary the size so "show another configuration" reaches a figure with
     // differently-sized circles (including the OTHER one larger). A wide jitter (0.45×–1.6×) so the two

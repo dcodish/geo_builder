@@ -64,8 +64,6 @@ export default function App() {
   const removeGroup = useGeoStore((s) => s.removeGroup);
   const replaceGroup = useGeoStore((s) => s.replaceGroup);
   const select = useGeoStore((s) => s.select);
-  const cycleAlt = useGeoStore((s) => s.cycleAlt);
-  const cycleVariant = useGeoStore((s) => s.cycleVariant);
   const radiusOverrides = useGeoStore((s) => s.radiusOverrides);
   const figureName = useGeoStore((s) => s.figureName);
   const setFigureName = useGeoStore((s) => s.setFigureName);
@@ -1551,13 +1549,16 @@ export default function App() {
                 setResampling(true);
                 try {
                   const st = useGeoStore.getState();
+                  // ADR-340 (#175): the search returns the whole COMPOSITE view — facts (possibly carrying a
+                  // branch/variant step) + seed — already validated by `meetsRequirements`. It is applied as
+                  // ONE undo-tracked transition; no post-hoc `cycleAlt`/`cycleVariant` exists to invalidate
+                  // it (the old path validated the seed alone, then mutated the facts unchecked — a green
+                  // figure could silently start violating its own givens).
                   const found = await geoWork.resample(st.facts, st.seed, (k, n) => setAltProgress(`${k}/${n}`));
                   const changed = found !== null;
-                  if (changed) useGeoStore.getState().applyView({ seed: found! });
-                  if (branchId) cycleAlt(branchId); // a discrete branch flip is always a real change
-                  const flipped = cycleVariant(); // also cycle the equal-pair of a kite/isosceles (ADR-138)
-                  logDebug({ kind: 'action', action: 'show-another', detail: `seed=${changed ? found : st.seed}`, result: changed || branchId || flipped ? 'changed' : 'only-config' }); // #84
-                  if (changed || branchId || flipped) setAltNote('');
+                  if (changed) useGeoStore.getState().applyView(found!);
+                  logDebug({ kind: 'action', action: 'show-another', detail: `seed=${changed ? found!.seed : st.seed}`, result: changed ? 'changed' : 'only-config' }); // #84
+                  if (changed) setAltNote('');
                   else {
                     // searched and found nothing different — tell the student something DID happen (the
                     // figure is determined), so "show another" doesn't look like a dead button (operator).

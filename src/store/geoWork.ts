@@ -10,7 +10,7 @@
  * scenario harness keep driving the store exactly as before.
  */
 import {
-  searchResample,
+  searchAnotherView,
   findValidConfig,
   meetsRequirements,
   replay,
@@ -80,7 +80,7 @@ function call(
   if (!hasWorker) {
     // synchronous fallback — the same functions, same semantics, main thread (tests / no-Worker envs)
     try {
-      if (op === 'resample') return Promise.resolve({ op, seed: searchResample(facts, seed, onProgress) });
+      if (op === 'resample') return Promise.resolve({ op, found: searchAnotherView(facts, seed, onProgress) });
       if (op === 'autoResolve') {
         if (meetsRequirements(facts, seed)) return Promise.resolve({ op, ok: true } as AutoResolveDone);
         const found = findValidConfig(facts, 0);
@@ -100,10 +100,11 @@ function call(
 }
 
 export const geoWork = {
-  /** The "show another configuration" search, off-thread. Resolves the found seed or null. */
-  async resample(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void): Promise<number | null> {
+  /** The "show another configuration" search, off-thread. Resolves the validated COMPOSITE view —
+   *  facts (possibly carrying a branch/variant step) + seed — or null (ADR-340, #175). */
+  async resample(facts: Fact[], seed: number, onProgress?: (k: number, n: number) => void): Promise<{ facts: Fact[]; seed: number } | null> {
     const done = (await call('resample', facts, seed, onProgress)) as ResampleDone;
-    return done.seed;
+    return done.found;
   },
   /** The post-commit config search. `'ok'` = already valid; `null` = nothing found in budget. */
   async autoResolve(

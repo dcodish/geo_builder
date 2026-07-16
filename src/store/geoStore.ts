@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, cyclableVariant, deepEqual, detectRelationsAcross, distinctSamples, emptyConstruction, evaluate, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, cyclableVariant, deepEqual, detectRelationsAcross, distinctSamples, emptyConstruction, evaluate, expandInscribe, expandShapeVariant, firstCyclableBranch, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
 import type { FigureFile } from './figureFile';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -390,6 +390,27 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       rtReorder.set(f.id, [a, b, v]); // the right-angle vertex LAST (the structural ∠ position)
     }
   }
+  // A trapezoid's LONG BASE is an unstated default that yields to an explicit length-order
+  // ([ADR-341](docs/06-decisions.md#adr-341), issue #173 — the ADR-163 pre-scan shape, M4). The template
+  // draws |DC| = 0.6·|AB| (AB the long base); a stated «AB < CD» — an order over the trapezoid's PARALLEL
+  // sides contradicting that default — used to be "repaired" by grinding k just past 1, a boundary-
+  // degenerate near-parallelogram. Rotating the ids by two ([C,D,A,B]) names the SAME quad (same edges,
+  // same legs — so the iso-trapezoid macro's equal legs stay legs) with the template's long base landing
+  // on the stated-long pair: the order then holds AT THE TEMPLATE, with the default's own comfortable
+  // margin. Position-independent (typed before or after the shape).
+  const lengthOrders = facts
+    .filter((f) => f.enabled)
+    .flatMap((f) => lowerOne(f.cmd, symtab))
+    .filter((c): c is Extract<Command, { type: 'set-length-order' }> => c.type === 'set-length-order');
+  const trapRotate = new Map<string, [Id, Id, Id, Id]>();
+  for (const f of facts) {
+    if (!f.enabled || f.cmd.type !== 'trapezoid') continue;
+    const [a, b, c, d] = f.cmd.ids;
+    const samePair = (x1: Id, y1: Id, x2: Id, y2: Id) => (x1 === x2 && y1 === y2) || (x1 === y2 && y1 === x2);
+    // `set-length-order {a,b,c,d}` asserts |ab| < |cd| — a conflict names the template-LONG base (a,b) as
+    // the shorter side and the template-short top (c,d) as the longer.
+    if (lengthOrders.some((o) => samePair(o.a, o.b, a, b) && samePair(o.c, o.d, c, d))) trapRotate.set(f.id, [c, d, a, b]);
+  }
   // A common-tangent macro's touch↔circle PAIRING is a soft default (`softPair`, ADR-239): "AB משיק
   // משותף" states only that AB touches both circles, never WHICH touch rides WHICH circle — the macro
   // pairs them in stated order. When an explicit membership elsewhere (an untagged point-on-circle of
@@ -472,6 +493,9 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see pre-scan).
       const reseat = rtReorder.get(f.id);
       if (reseat) engineCmds = engineCmds.map((ec) => (ec.type === 'right-triangle' ? { ...ec, ids: reseat } : ec));
+      // Rotate a trapezoid whose stated base order contradicts the template's long-base default (ADR-341).
+      const trot = trapRotate.get(f.id);
+      if (trot) engineCmds = engineCmds.map((ec) => (ec.type === 'trapezoid' ? { ...ec, ids: trot } : ec));
       // Swap a common-tangent group's soft touch↔circle pairing to the explicitly-stated one (ADR-239 pre-scan).
       const pairSwap = pairSwapByGroup.get(groupKey(f));
       if (pairSwap) {
@@ -1197,6 +1221,84 @@ export function searchResample(facts: Fact[], seed: number, onProgress?: (k: num
     if (!curStrict && fallback < 0 && meetsRequirements(facts, s, true)) fallback = s;
   }
   return fallback >= 0 ? fallback : null;
+}
+
+/** The command types whose `branch` a student can cycle — shared by `cycleAlt` and the composite
+ *  view search so the two can never drift (the ADR-043 list-drift class). */
+const BRANCH_CYCLE_KINDS = new Set(['point-by-distances', 'arc-midpoint', 'line-circle-intersection', 'circle-circle-intersection', 'point-on-segment']);
+
+/**
+ * The "show another configuration" search over the COMPOSITE view — facts × seed × branch × variant —
+ * validated as a WHOLE ([ADR-340](docs/06-decisions.md#adr-340), issue #175).
+ *
+ * The App used to validate only the SEED (via `searchResample`) and then apply `cycleAlt`/`cycleVariant`
+ * on top unvalidated — so a figure that was green and satisfied its givens could be silently turned into
+ * one that contradicts them by the very button whose contract is "show me another VALID drawing" (ADR-018).
+ * Here every candidate IS the final view: a discrete branch/variant step composed with a seed, accepted
+ * only when `meetsRequirements` holds on the resulting facts + seed. The caller applies the returned
+ * composite via ONE `applyView` — no post-hoc mutation exists to invalidate it.
+ *
+ * Candidate order preserves the button's intent ("explore the WHOLE configuration space"): the
+ * everything-advances composite first (branch+1 & variant+1 & fresh seed — what the old path always
+ * applied), then single discrete steps (walking further around a cycle so an invalid neighbour never
+ * strands the rest of the family), then the plain seed resample (`searchResample`, shape-diff gated).
+ * A discrete step is inherently a different drawing, so it needs no fingerprint check. The ADR-267
+ * ladder is kept: strict-valid wins; a relaxed-valid composite is a fallback offered only when the
+ * CURRENT view itself is not strict-valid. Returns null when nothing in budget qualifies — the caller
+ * keeps the current view ("only configuration"), never applies an unvalidated one.
+ */
+export function searchAnotherView(
+  facts: Fact[],
+  seed: number,
+  onProgress?: (k: number, n: number) => void,
+  budgetMs = SEARCH_BUDGET_MS,
+): { facts: Fact[]; seed: number } | null {
+  const deadline = Date.now() + budgetMs;
+  const cur = replay(facts, seed);
+  const branchId = firstCyclableBranch(cur.construction);
+  const nBranch = branchId ? Math.max(1, branchCount(cur.construction, branchId)) : 1;
+  const variantFact = facts.find((f) => f.enabled && cyclableVariant(f.cmd));
+  const nVariant = variantFact ? variantCountOf(variantFact.cmd) : 1;
+  const hasDofs = freeDofs(cur.construction).length > 0;
+  const curStrict = meetsRequirements(facts, seed);
+
+  // A candidate's fact rewrite — the SAME steps `cycleAlt`/`cycleVariant` would apply.
+  const stepped = (b: number, v: number): Fact[] =>
+    facts.map((f) => {
+      let cmd = f.cmd;
+      if (b && f.enabled && branchId && BRANCH_CYCLE_KINDS.has(cmd.type) && 'id' in cmd && (cmd as { id?: Id }).id === branchId)
+        cmd = { ...cmd, branch: ((((cmd as { branch?: number }).branch ?? 0) + b) % nBranch) } as AnyCommand;
+      if (v && variantFact && f === variantFact) cmd = withVariant(cmd, ((((cmd as { variant: number }).variant ?? 0) + v) % nVariant));
+      return cmd === f.cmd ? f : { ...f, cmd };
+    });
+
+  // Discrete combos: everything-advances first (the legacy intent), then each family walked fully.
+  const combos: [number, number][] = [];
+  if (nBranch > 1 && nVariant > 1) combos.push([1, 1]);
+  for (let b = 1; b < nBranch; b++) combos.push([b, 0]);
+  for (let v = 1; v < nVariant; v++) combos.push([0, v]);
+
+  let fallback: { facts: Fact[]; seed: number } | null = null;
+  let k = 0;
+  const total = combos.length * (hasDofs ? 4 : 1) + (hasDofs ? 24 : 0);
+  for (const [b, v] of combos) {
+    if (Date.now() > deadline) break;
+    const fc = stepped(b, v);
+    // Fresh seeds first (the legacy press resampled AND flipped), the current seed as the in-combo fallback.
+    const seeds = hasDofs ? [seed + 1, seed + 2, seed + 3, seed] : [seed];
+    for (const s of seeds) {
+      if (Date.now() > deadline) break;
+      onProgress?.(++k, total);
+      if (withSolveBudget(deadline, () => meetsRequirements(fc, s))) return { facts: fc, seed: s };
+      if (!curStrict && !fallback && withSolveBudget(deadline, () => meetsRequirements(fc, s, true))) fallback = { facts: fc, seed: s };
+    }
+  }
+  // The plain seed resample (no discrete step) — shape-diff gated, existing semantics.
+  if (hasDofs && Date.now() <= deadline) {
+    const s = searchResample(facts, seed, (kk, n) => onProgress?.(Math.min(k + kk, total), Math.max(total, k + n)), Math.max(0, deadline - Date.now()));
+    if (s !== null) return { facts, seed: s };
+  }
+  return fallback;
 }
 
 /** #85 ([ADR-293](docs/06-decisions.md#adr-293)) — is this derived state DRAWABLE? Positions exist and
@@ -2057,22 +2159,34 @@ export const useGeoStore = create<GeoState>()(
       clearShapes: () => set({ shapes: null }),
 
       cycleAlt: (pointId) => {
-        const facts = get().facts;
-        const { construction } = replay(facts);
+        const { facts, seed } = get();
+        const { construction } = replay(facts, seed);
         const n = branchCount(construction, pointId) || 1;
-        // The commands that carry a `branch` index the student can cycle.
-        const branchable = new Set(['point-by-distances', 'arc-midpoint', 'line-circle-intersection', 'circle-circle-intersection', 'point-on-segment']);
-        set({
-          facts: facts.map((f) =>
-            f.enabled && branchable.has(f.cmd.type) && 'id' in f.cmd && f.cmd.id === pointId
-              ? { ...f, cmd: { ...f.cmd, branch: (((f.cmd as { branch?: number }).branch ?? 0) + 1) % n } }
+        const flip = (by: number): Fact[] =>
+          facts.map((f) =>
+            f.enabled && BRANCH_CYCLE_KINDS.has(f.cmd.type) && 'id' in f.cmd && f.cmd.id === pointId
+              ? { ...f, cmd: { ...f.cmd, branch: (((f.cmd as { branch?: number }).branch ?? 0) + by) % n } }
               : f,
-          ),
-        });
+          );
+        // ADR-340 gate: a branch step must never turn a requirement-SATISFYING view into a violating one
+        // (#175 — the two-tangent-circles figure where flipping D collapsed it onto B and broke the stated
+        // tangency). Walk to the NEXT branch that keeps the view valid; with none, keep the view. An
+        // already-amber view cycles ungated (it can't be made worse, and exploration stays free).
+        if (meetsRequirements(facts, seed)) {
+          for (let by = 1; by < n; by++) {
+            const fc = flip(by);
+            if (meetsRequirements(fc, seed)) {
+              set({ facts: fc });
+              return;
+            }
+          }
+          return; // every alternative branch breaks a currently-valid figure — no-op
+        }
+        set({ facts: flip(1) });
       },
 
       cycleVariant: () => {
-        const facts = get().facts;
+        const { facts, seed } = get();
         // Step the FIRST cyclable variant fact (kite: 2 axes; isosceles: 3 apexes; inscribe: side/mirror
         // placements). The variant lives in the fact's command (survives replay/undo — positions are never
         // stored), so this is a pure fact rewrite, like cycleAlt's branch step. Not gated by `shapeDiffers`:
@@ -2081,14 +2195,30 @@ export const useGeoStore = create<GeoState>()(
         if (!target) return false;
         const count = variantCountOf(target.cmd);
         const cur = (target.cmd as { variant: number }).variant;
-        set({ facts: facts.map((f) => (f === target ? { ...f, cmd: withVariant(f.cmd, (cur + 1) % count) } : f)) });
+        const at = (v: number): Fact[] => facts.map((f) => (f === target ? { ...f, cmd: withVariant(f.cmd, v) } : f));
+        // ADR-340 gate — the variant twin of cycleAlt's: from a valid view, step to the next variant that
+        // keeps the figure requirement-satisfying (a forced ADR-123 coincidence passes — `pointsDistinct`
+        // allows it — so e.g. the corner square stays reachable); skip variants that would violate.
+        if (meetsRequirements(facts, seed)) {
+          for (let by = 1; by < count; by++) {
+            const fc = at((cur + by) % count);
+            if (meetsRequirements(fc, seed)) {
+              set({ facts: fc });
+              return true;
+            }
+          }
+          return false; // every other variant breaks a currently-valid figure
+        }
+        set({ facts: at((cur + 1) % count) });
         return true;
       },
 
       resample: () => {
-        const found = searchResample(get().facts, get().seed);
-        if (found === null) return false; // determined (or nothing shape-different in budget)
-        set({ seed: found, radiusOverrides: {} }); // a fresh view clears any dialed radii (scratchpad reset)
+        // The composite search (ADR-340): branch/variant steps are part of the SEARCHED candidate, never a
+        // post-hoc mutation — the applied view is always validated as a whole.
+        const found = searchAnotherView(get().facts, get().seed);
+        if (found === null) return false; // determined (or nothing valid/shape-different in budget)
+        set({ ...(found.facts !== get().facts ? { facts: found.facts } : {}), seed: found.seed, radiusOverrides: {} });
         return true;
       },
 

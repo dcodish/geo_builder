@@ -12,7 +12,7 @@
  * Cancellation is by TERMINATION (the client kills + respawns the worker): a JS worker can't be
  * interrupted mid-computation any other way, and a fresh worker only costs re-warming its caches.
  */
-import { searchResample, findValidConfig, meetsRequirements, replay, getFoldFor, WORKER_SEARCH_BUDGET_MS, type Fact, type FoldNode } from './geoStore';
+import { searchAnotherView, findValidConfig, meetsRequirements, replay, getFoldFor, WORKER_SEARCH_BUDGET_MS, type Fact, type FoldNode } from './geoStore';
 
 export type GeoWorkRequest =
   | { id: number; op: 'resample'; facts: Fact[]; seed: number }
@@ -24,7 +24,9 @@ export type GeoWorkResponse =
   | { id: number; done: ResampleDone | AutoResolveDone | PrefoldDone }
   | { id: number; error: string };
 
-export type ResampleDone = { op: 'resample'; seed: number | null };
+// ADR-340 (#175): the search returns the whole validated COMPOSITE (facts may carry a branch/variant
+// step), never a bare seed for the caller to mutate on top of.
+export type ResampleDone = { op: 'resample'; found: { facts: Fact[]; seed: number } | null };
 export type AutoResolveDone =
   | { op: 'autoResolve'; ok: true }
   | { op: 'autoResolve'; found: { facts: Fact[]; seed: number; fold: FoldNode | null } | null };
@@ -38,8 +40,9 @@ self.onmessage = (e: MessageEvent<GeoWorkRequest>) => {
     if (req.op === 'resample') {
       // Off the main thread ⇒ the generous budget (issue #87): the tab can't freeze here, and the UI shows
       // progress + a ✕ cancel, so a findable "another configuration" isn't lost to the 2500ms freeze cap.
-      const seed = searchResample(req.facts, req.seed, (k, n) => post({ id: req.id, progress: { k, n } }), WORKER_SEARCH_BUDGET_MS);
-      post({ id: req.id, done: { op: 'resample', seed } });
+      // The COMPOSITE search (ADR-340): branch/variant steps live inside the validated candidate.
+      const found = searchAnotherView(req.facts, req.seed, (k, n) => post({ id: req.id, progress: { k, n } }), WORKER_SEARCH_BUDGET_MS);
+      post({ id: req.id, done: { op: 'resample', found } });
     } else if (req.op === 'autoResolve') {
       if (meetsRequirements(req.facts, req.seed)) {
         post({ id: req.id, done: { op: 'autoResolve', ok: true } });

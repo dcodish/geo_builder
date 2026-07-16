@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { parse } from '@/parser';
-import { replay, polygonsConvex, useGeoStore } from '@/store/geoStore';
+import { replay, polygonsConvex, meetsRequirements, useGeoStore } from '@/store/geoStore';
 import { freeDofs, firstCyclableBranch, evaluate } from '@/engine';
 import { ctxOf, at, dist } from './scenarios-corpus';
 import type { Derived, Fact } from '@/store/geoStore';
-import type { Id, Vec } from '@/engine';
+import type { AnyCommand, Id, Vec } from '@/engine';
 
 /**
  * Resampling regressions — these exercise "show another configuration" (seed > 0), which the
@@ -241,6 +241,73 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
         expect(dist(at(fig, p), at(fig, 'A')), `view ${press}: ${p}≠A`).toBeGreaterThan(0.1);
         expect(dist(at(fig, p), at(fig, 'B')), `view ${press}: ${p}≠B`).toBeGreaterThan(0.1);
       }
+    }
+    st.clear();
+  });
+
+  it('[gxccyt2n-show-another-composite-validated] the two-tangent-circles figure: EVERY "show another" view satisfies the givens (#175 P1, ADR-340)', () => {
+    // Operator, prod session gxccyt2n (2026-07-16): "I built this shape and it was good. When I asked for
+    // another configuration I got several errors and the diagram is broken." Root cause: the button
+    // validated only the SEED (searchResample → meetsRequirements(facts, seed)) and then applied
+    // cycleAlt/cycleVariant on the FACTS unchecked — flipping D's branch sent the tangency touch onto B
+    // («B ו-D נפלו על אותה נקודה») and broke the figure's HEADLINE given (the circles' internal tangency,
+    // violation "centres 1.04 apart but they are 1.44 apart"). Now the search space IS the composite
+    // (facts × seed × branch × variant), each candidate validated whole by meetsRequirements, applied as
+    // ONE transition. Steps 2/4/6 carry the LLM commands the prod log recorded (the issue's triage).
+    const st = useGeoStore.getState();
+    st.clear();
+    const llm = (cmds: AnyCommand[], u: string) => st.executeMany(cmds, u);
+    const typed = (u: string) => {
+      const r = parse(u, ctxOf(useGeoStore.getState().facts));
+      expect(r.ok, u).toBe(true);
+      if (r.ok) st.executeMany(r.commands, u);
+    };
+    typed('שני מעגלים משיקים מבפנים');
+    llm(
+      [
+        { type: 'tangent', id: 'tan-B', circle: 'circle-O', at: 'B', visible: true },
+        { type: 'point-on-line', id: 'A', line: 'tan-B', offset: 5 },
+      ] as AnyCommand[],
+      'מנקודה A מעבירים משיק למעגל בנקודה B',
+    );
+    typed('מנקודה A מעבירים משיק למעגל הקטן בנקודה D');
+    llm([{ type: 'extend-onto-circle', id: 'E', a: 'A', b: 'D', circle: 'circle-O' }] as AnyCommand[], 'המשך AD חותך את המעגל הגדול בנקודה E');
+    typed('S_{ABD}=S_{BDE}');
+    llm(
+      [
+        { type: 'line-through', id: 'chord-AD', a: 'A', b: 'D' },
+        { type: 'line-circle-intersection', id: 'C', line: 'chord-AD', circle: 'circle-O', avoid: 'D' },
+        { type: 'segment', a: 'A', b: 'C' },
+        { type: 'segment', a: 'C', b: 'D' },
+      ] as AnyCommand[],
+      'AD חותך את המעגל הגדול בנקודה C',
+    );
+    typed('BD');
+    typed('BE');
+    // The built figure satisfies its givens…
+    const facts0 = useGeoStore.getState().facts;
+    expect(meetsRequirements(facts0, useGeoStore.getState().seed), 'initial view valid').toBe(true);
+    // THE DETERMINISTIC BREAKING PAIR (measured, the issue's own numbers): seed 2 is plain-VALID but
+    // flipping D's branch on it VIOLATES the tangency given — exactly the composite the old pipeline
+    // applied (searchResample found seed 2, then cycleAlt(D) unchecked). The gated cycleAlt must keep
+    // the view requirement-satisfying (here: no other valid branch exists at seed 2 → a no-op); the
+    // ungated one flips into the violation and FAILS this assert.
+    st.applyView({ seed: 2 });
+    expect(meetsRequirements(useGeoStore.getState().facts, 2), 'seed 2 is a valid view').toBe(true);
+    st.cycleAlt('D');
+    {
+      const { facts, seed } = useGeoStore.getState();
+      expect(meetsRequirements(facts, seed), 'cycleAlt never turns a valid view violating (kept or no-opped)').toBe(true);
+    }
+    // …and EVERY view "show another" applies keeps satisfying the givens — no reachable output violates.
+    st.applyView({ facts: facts0, seed: 0 });
+    for (let press = 1; press <= 3; press++) {
+      st.resample();
+      const { facts, seed } = useGeoStore.getState();
+      const fig = replay(facts, seed);
+      expect(fig.lastError, `press ${press} (seed ${seed}) builds`).toBeNull();
+      expect(fig.violations.map((v) => v.message), `press ${press} (seed ${seed}) honours the givens`).toEqual([]);
+      expect(meetsRequirements(facts, seed), `press ${press} (seed ${seed}) meets every requirement`).toBe(true);
     }
     st.clear();
   });

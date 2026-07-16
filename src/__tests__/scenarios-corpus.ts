@@ -166,6 +166,25 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'trapezoid-stated-long-base-first-draw',
+    title: '«טרפז ABCD» + «AB < CD» — the stated order flips the TEMPLATE to a basic CD-long trapezoid, never a k≈1.08 boundary grind (#173 P1, ADR-341)',
+    guards:
+      'Operator 2026-07-16: "when i draw a trapezoid, the default is AB>CD. when I write AB<CD i get something that is a trapezoid but not nice. what I really want is a basic trapezoid with CD as the large base." Root cause, one class: which parallel side is the LONG base is an unstated DISCRETE choice hard-baked twice — the template seeds k=0.6 and the sampler drew k ∈ [0.3,0.85] (capped below 1, the ADR-052 smell named in CLAUDE.md), so the stated order was "repaired" by grinding k to 1.079, a skewed near-parallelogram on the region boundary. Now the pre-scan (the ADR-163 M4 shape, order-independent of typing position) rotates the trapezoid ids by two — the SAME quad, same edges and legs — so the template long base lands on the stated-long pair with the default’s own margin, and the sampler both straddles 1 when unstated and stays in the stated branch.',
+    steps: ['טרפז ABCD', 'AB < CD'],
+    check(fig) {
+      allStepsOk(fig);
+      const [a, b, c, d] = ['A', 'B', 'C', 'D'].map((id) => at(fig, id));
+      const k = dist(d, c) / dist(a, b);
+      // A comfortable CD-long trapezoid — never the boundary grind (1.079). Seed 0 draws the mirror
+      // default k = 1/0.6; sampled seeds stay in the stated branch (≥ ~1.2) — the bar admits both.
+      expect(k, 'CD is the long base with margin').toBeGreaterThan(1.15);
+      // Still a genuine trapezoid: AB ∥ DC (the defining parallelism).
+      const cross = (b.x - a.x) * (c.y - d.y) - (b.y - a.y) * (c.x - d.x);
+      const scale = dist(a, b) * dist(d, c);
+      expect(Math.abs(cross) / scale, 'AB ∥ DC').toBeLessThan(1e-4);
+    },
+  },
+  {
     id: 'inscribe-square-in-right-triangle',
     title: '«ריבוע DEFG חסום במשולש ABC» in a RIGHT triangle — the CORNER square builds, matching the closed-form oracle (#166, ADR-338)',
     guards:

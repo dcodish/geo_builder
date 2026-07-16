@@ -14,9 +14,10 @@ import {
   dryRunOutcome,
   foldStats,
   getFoldFor,
+  meetsRequirements,
   primeFoldFor,
   replay,
-  searchResample,
+  searchAnotherView,
   trialFacts,
   useGeoStore,
   type Fact,
@@ -36,31 +37,33 @@ function factsOf(...utterances: string[]): Fact[] {
   return facts;
 }
 
-describe('searchResample (the pure extraction)', () => {
-  it('finds a shape-different seed on a figure with free DOFs', () => {
+describe('searchAnotherView (the pure extraction — ADR-340 composite)', () => {
+  it('finds a shape-different view on a figure with free DOFs (no discrete step here → same facts, new seed)', () => {
     const facts = factsOf('מעגל שמרכזו O', 'A על המעגל', 'B על המעגל');
-    const s = searchResample(facts, 0);
-    expect(s).not.toBeNull();
-    expect(s).toBeGreaterThan(0);
+    const found = searchAnotherView(facts, 0);
+    expect(found).not.toBeNull();
+    expect(found!.seed).toBeGreaterThan(0);
+    expect(found!.facts).toBe(facts); // no cyclable branch/variant — the composite is a pure reseed
+    expect(meetsRequirements(found!.facts, found!.seed)).toBe(true); // the contract: only validated views
   });
   it('returns null on a fully-determined figure', () => {
     const facts = factsOf('ריבוע ABCD');
-    expect(searchResample(facts, 0)).toBeNull();
+    expect(searchAnotherView(facts, 0)).toBeNull();
   });
   it('reports progress', () => {
     const facts = factsOf('מעגל שמרכזו O', 'A על המעגל', 'B על המעגל');
     const ticks: number[] = [];
-    searchResample(facts, 0, (k) => ticks.push(k));
+    searchAnotherView(facts, 0, (k) => ticks.push(k));
     expect(ticks.length).toBeGreaterThan(0);
     expect(ticks[0]).toBe(1);
   });
-  it('the store action applies exactly the searched seed', () => {
+  it('the store action applies exactly the searched composite', () => {
     useGeoStore.setState({ facts: factsOf('מעגל שמרכזו O', 'A על המעגל', 'B על המעגל'), seed: 0, radiusOverrides: { 'circle-O': 3 } });
-    const expected = searchResample(useGeoStore.getState().facts, 0);
+    const expected = searchAnotherView(useGeoStore.getState().facts, 0);
     const changed = useGeoStore.getState().resample();
     expect(changed).toBe(expected !== null);
     if (expected !== null) {
-      expect(useGeoStore.getState().seed).toBe(expected);
+      expect(useGeoStore.getState().seed).toBe(expected.seed);
       expect(useGeoStore.getState().radiusOverrides).toEqual({}); // a fresh view clears dialed radii
     }
   });
@@ -102,11 +105,14 @@ describe('geoWork — the no-Worker fallback (vitest env)', () => {
   beforeEach(() => {
     useGeoStore.setState({ facts: [], seed: 0, radiusOverrides: {} });
   });
-  it('resample resolves the same seed the sync search finds', async () => {
+  it('resample resolves the same COMPOSITE the sync search finds (ADR-340: validated facts + seed, never a bare seed)', async () => {
     const facts = factsOf('מעגל שמרכזו O', 'A על המעגל', 'B על המעגל');
-    const sync = searchResample(facts, 0);
+    const sync = searchAnotherView(facts, 0);
     const viaWork = await geoWork.resample(facts, 0);
-    expect(viaWork).toBe(sync);
+    expect(viaWork).toEqual(sync);
+    expect(viaWork, 'this figure has another configuration').not.toBeNull();
+    // The contract: whatever is returned is a WHOLE view the caller applies verbatim — and it is valid.
+    expect(meetsRequirements(viaWork!.facts, viaWork!.seed)).toBe(true);
   });
   it('autoResolve resolves ok on a requirement-clean figure', async () => {
     const facts = factsOf('ריבוע ABCD');
