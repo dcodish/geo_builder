@@ -21,11 +21,12 @@ const RTERM = String.raw`(?:${NUM}\s*[*·]?\s*)?√\s*(?:${RADICAND})|${NUM}`;
 const VALUE = String.raw`(?:${RTERM})(?:\s*\/\s*(?:${RTERM}))?`;
 const SUB = String.raw`[A-Za-z]_\{[A-Za-z0-9]+\}`;
 const SUP = String.raw`[A-Za-z0-9](?:²|\^\d+)`;
-// An ARC measure — the ⌢/⏜ glyph or the word (קשת/arc) followed immediately by a 2-letter point pair —
-// rendered as the textbook over-arc (⌢ OVER the letters, like the exam's ⌢AC + ⌢BE notation; issue #155).
-// The word form requires the pair RIGHT AFTER it, so «הקשת הקטנה AB» (a qualified arc reference, not a
-// measure) stays plain text.
-const ARC = String.raw`(?:⌢|⏜|ה?קשת|(?<![A-Za-z])arc)\s*([A-Z]\d*[A-Z]\d*)(?![A-Za-z\d])`;
+// An ARC measure — the ⌢/⏜ glyph or the word (קשת/arc) followed immediately by a 2-letter point pair,
+// bare or in the ⌢{} toolbar template's braces («⌢{AC}», the √()/S_{} discipline) — rendered as the
+// textbook over-arc (⌢ OVER the letters, like the exam's ⌢AC + ⌢BE notation; issue #155). The word form
+// requires the pair RIGHT AFTER it, so «הקשת הקטנה AB» (a qualified arc reference, not a measure) stays
+// plain text.
+const ARC = String.raw`(?:⌢|⏜|ה?קשת|(?<![A-Za-z])arc)\s*(?:\{\s*([A-Z]\d*[A-Z]\d*)\s*\}|([A-Z]\d*[A-Z]\d*)(?![A-Za-z\d]))`;
 // One tokenizer over the line: an arc, a subscript, a superscript, or a value expression (post-filtered
 // to those that actually carry a √ or a `/`, so a lone number stays plain text).
 const TOKEN = new RegExp(`(${ARC})|(${SUB})|(${SUP})|(${VALUE})`, 'gu');
@@ -81,7 +82,7 @@ function arcML(pair: string): string {
 
 /** True when the text carries math notation worth formatting (a radical, a fraction, a subscript, a power, an arc). */
 export function hasMath(text: string): boolean {
-  return /√|_\{|²|\^\d|\d\s*\/\s*[\d√]|⌢|⏜|(?:ה?קשת|(?<![A-Za-z])arc)\s*[A-Z]\d*[A-Z]/u.test(text);
+  return /√|_\{|²|\^\d|\d\s*\/\s*[\d√]|⌢|⏜|(?:ה?קשת|(?<![A-Za-z])arc)\s*\{?[A-Z]\d*[A-Z]/u.test(text);
 }
 
 /** Render `text` to an HTML string: MathML for the math tokens, escaped verbatim text for the rest. */
@@ -91,10 +92,10 @@ export function mathHtml(text: string): string {
   for (const m of text.matchAll(TOKEN)) {
     const i = m.index!;
     out += esc(text.slice(last, i));
-    if (m[1]) out += arcML(m[2]); // m[2] = the arc's point pair (the word/glyph is replaced by the over-arc)
-    else if (m[3]) out += subML(m[3]);
-    else if (m[4]) out += supML(m[4]);
-    else if (m[5] && /√|\//.test(m[5])) out += valueML(m[5]);
+    if (m[1]) out += arcML(m[2] ?? m[3]); // m[2] = braced pair (⌢{AC}), m[3] = bare pair — either way the over-arc replaces the token
+    else if (m[4]) out += subML(m[4]);
+    else if (m[5]) out += supML(m[5]);
+    else if (m[6] && /√|\//.test(m[6])) out += valueML(m[6]);
     else out += esc(m[0]); // a lone number matched by VALUE — keep as plain text
     last = i + m[0].length;
   }

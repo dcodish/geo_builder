@@ -246,7 +246,7 @@ export default function App() {
     { label: 'xⁿ', insert: '^' }, // AB = x^3
     { label: 'π', insert: 'π' }, // AB = 2π
     { label: '∠', insert: '∠' }, // ∠ABC = 37°
-    { label: '⌢', insert: '⌢' }, // arc: ⌢AC + ⌢BE = ⌢AD + ⌢BC (issue #155; rendered as an over-arc by MathText)
+    { label: '⌢{}', insert: '⌢{}', caret: 2 }, // arc template (issue #155, the √()/S_{} discipline): ⌢{AC} + ⌢{BE} = … — caret lands between the braces; rendered as an over-arc by MathText (bare ⌢AC and קשת AC parse too)
     { label: '°', insert: '°' },
     { label: '⊥', insert: '⊥' }, // AB ⊥ CD
     { label: '∥', insert: '∥' }, // AB ∥ CD

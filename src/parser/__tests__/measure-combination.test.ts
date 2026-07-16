@@ -51,10 +51,14 @@ describe('measureSum — sums of arcs / segments / angles (#153/#154)', () => {
     expect(c.coefs).toEqual([1, 1, -1, -1]);
   });
 
-  it('the ⌢ glyph form (the #155 toolbar button inserts it)', () => {
+  it('the ⌢ glyph form and the ⌢{} toolbar template (#155)', () => {
     const c = only('⌢AC + ⌢BE = ⌢AD + ⌢BC', 'set-measure-sum');
     expect(c.coefs).toEqual([1, 1, -1, -1]);
     expect(c.points).toEqual(['A', 'O', 'C', 'B', 'O', 'E', 'A', 'O', 'D', 'B', 'O', 'C']);
+    // the braced template the button inserts — same lowering (labelRun reads through the braces)
+    expect(only('⌢{AC} + ⌢{BE} = ⌢{AD} + ⌢{BC}', 'set-measure-sum')).toMatchObject({ coefs: [1, 1, -1, -1] });
+    // the single-arc ratio keeps its lane in the braced form too
+    expect(only('⌢{DE} = 2 ⌢{CE}', 'set-angle-ratio')).toMatchObject({ k: 2 });
   });
 
   it('segment sums: «AB + CD = EF + GH», «AB + CD = EF»', () => {
