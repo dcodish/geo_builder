@@ -1,10 +1,10 @@
 # 09 — Implementation Plan
 
-_Last updated: 2026-07-16._
+_Last updated: 2026-07-16 (evening)._
 
 > **Status (2026-07-16).** The full v1 pipeline is shipped and live in prod (engine, renderer, store, parser, LLM fallback, save/load, PNG + `.docx` exports; latest deploy tag `prod/2026-07-16`). Work is now **issue-queue-driven** ([ADR-265](06-decisions.md#adr-265); workflow: [22-workflow.md](22-workflow.md)) — day-to-day priorities are the open GitHub issues on `dcodish/geo_builder`, not this plan. Authoritative *current-state* sources: the **ADR log** ([06-decisions.md](06-decisions.md)), **[DEPLOY-LOG.md](DEPLOY-LOG.md)** (what is live), and **[PROJECT-MEMORY.md](PROJECT-MEMORY.md)** (session log).
 >
-> **Resume pointer.** The two P1 honesty bugs are FIXED at the class ([ADR-335](06-decisions.md#adr-335), the compound-measure-relations PR): **#153** (arc-sum truncation) and **#145** (multiplicative truncation) now build correctly via `set-measure-sum`/`set-length-product`, with the structural `droppedCompoundRelation` gate as the permanent net — closing #154 and #144 too. DEPLOYED `prod/2026-07-16` (Q22 verified end-to-end — HG⊥AB forced with the real exam given). Next: **#167 (P1 — non-transactional multi-command lowering)**, then the P2/P3 queue. (**#141** closed 2026-07-16 — resolved by #142's fix, operator-verified.)
+> **Resume pointer.** The **inscribe triple is FIXED and DEPLOYED** (`prod/2026-07-16-3`, operator play-tested): **#167 P1** ([ADR-337](06-decisions.md#adr-337) — a fact's multi-command lowering is transactional, a failed macro leaves zero trace), **#166** ([ADR-338](06-decisions.md#adr-338) — a macro's defining constraints solve as ONE coupled system; square/rectangle inscribed in a right triangle builds, corner square matches the closed-form oracle), and **#176** ([ADR-339](06-decisions.md#adr-339) — a cyclable variant's DEFAULT settles at commit to general position; the degenerate corner square stays reachable by cycling). Filed **#174** (P3 — 1-of-18 marginal NM convergence). Next: the two open P1s — **#175** (show-another applies unvalidated mutations) and **#173** (trapezoid long-base fixed assumption) — then the P2/P3 queue.
 >
 > **Active milestone:** Phase 6 theorems — 6a is live; 6b (relevance) T1–T5 are built per [18-theorem-relevance-plan.md](18-theorem-relevance-plan.md); remaining operator gates = play-and-judge the ranking, author ≥3 principles, the 6c ship pass. **Parked threads:** the area constraint, the production proxy deploy, the coordinate-validation campaign.
 >
