@@ -8,6 +8,7 @@ export { evaluate, resolveLine, resolveCircle, otherCrossing, bySide } from './e
 export type { EvalResult, EvalOk, EvalErr, ResolvedLine, ResolvedCircle } from './evaluate';
 export {
   applyStep,
+  applyCoupledStep,
   build,
   branchCount,
   circleMembers,

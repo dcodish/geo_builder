@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, cyclableVariant, deepEqual, detectRelationsAcross, distinctSamples, emptyConstruction, evaluate, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, cyclableVariant, deepEqual, detectRelationsAcross, distinctSamples, emptyConstruction, evaluate, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
 import type { FigureFile } from './figureFile';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -523,8 +523,8 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       // pattern the ADR-104 deferral retry below already uses.
       let trial = cur;
       let ok = true;
-      for (const ec of engineCmds) {
-        const r = applyStep(trial, ec);
+      for (const unit of applyUnits(engineCmds as Command[])) {
+        const r = unit.length > 1 ? applyCoupledStep(trial, unit) : applyStep(trial, unit[0]);
         if (r.ok) trial = r.construction;
         else {
           status[f.id] = r.error; // dependencies gone, contradiction, etc. — keep prior figure
@@ -833,6 +833,32 @@ function extensionTriples(facts: Fact[]): { a: Id; b: Id; id: Id; circle: Id }[]
  *  class again). `set-var` is excluded — it's symbol-table data, resolved position-independently anyway. */
 const isRelationCommand = (c: AnyCommand): boolean =>
   c.type.startsWith('set-') && c.type !== 'set-var' && introducedPointIds(c as Command).length === 0;
+
+/**
+ * Partition ONE fact's lowered commands into APPLY UNITS ([ADR-338](docs/06-decisions.md#adr-338), #166):
+ * a maximal run of consecutive RELATION commands is ONE coupled unit, everything else applies alone.
+ *
+ * A macro's defining constraints are one figure, not N independent statements (`inscribe`'s square is
+ * `|DE|=|EF| ∧ |EF|=|FG| ∧ |FG|=|GD| ∧ GD⟂DE`), and applying them one at a time evaluates — i.e. MOVES the
+ * figure — between each, so the last is asked to hold from a basin the earlier ones already committed to.
+ * Grouped, they reach `evaluate` together and are solved jointly (`applyCoupledStep`).
+ *
+ * The RUN rule is structural and conservative, not an inscribe special case: it uses the same
+ * `isRelationCommand` predicate as the ADR-104 deferral, degenerates to today's behaviour everywhere a fact
+ * carries at most one constraint (a plain given, «AB ⟂ CD» → segment+segment+⟂, every single-command fact),
+ * and needs no marker threaded through the Command union. Interleaved creations naturally split runs, so a
+ * macro that creates between constraints still applies those constraints separately — correct, since a
+ * creation in between means they aren't a simultaneous system.
+ */
+function applyUnits(cmds: Command[]): Command[][] {
+  const out: Command[][] = [];
+  for (const c of cmds) {
+    const last = out[out.length - 1];
+    if (isRelationCommand(c) && last && isRelationCommand(last[last.length - 1])) last.push(c);
+    else out.push([c]);
+  }
+  return out;
+}
 
 /**
  * Does this parsed step carry a constraint the engine can DEFER? If so, the input layer should COMMIT it

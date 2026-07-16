@@ -3,24 +3,21 @@
  *
  * ONE fact can lower to MANY engine commands (every macro: `inscribe` ADR-262, `shape-variant` ADR-138, the
  * named shapes ADR-110, regular polygon ADR-111, common tangent ADR-239, the concentric pair ADR-244). The
- * build fold used to commit each command's success into the shared construction as it ran, so a failure on a
- * LATER command of the same fact left the earlier ones on the figure: objects from a red step rendered, the
- * prior figure moved, and the failing constraint never reached `applied` so the verifier read clean on a
+ * build fold used to commit each apply unit's success into the shared construction as it ran, so a failure
+ * on a LATER unit of the same fact left the earlier ones on the figure: objects from a red step rendered,
+ * the prior figure moved, and the failing constraint never reached `applied` so the verifier read clean on a
  * violated figure.
  *
- * The invariant, stated once and asserted per macro family: **a fact whose status is not 'ok' contributes
- * NOTHING — none of the ids it would introduce exist, and every pre-existing point is bit-identical to the
- * figure built from the prefix alone.**
+ * The invariant: **a fact whose status is not 'ok' contributes NOTHING** — none of the ids it would
+ * introduce exist, and every pre-existing point is bit-identical to the figure built from the prefix alone.
  *
- * SCOPE NOTE (honest): the failure position reachable through the real macros is always at or after the
- * expansion's constraint block — a macro's leading commands are point/shape CREATIONS, which don't fail
- * (a creation on an existing id is idempotent M1 reuse, and a broken dependency is caught by the `broken`
- * pre-check before the fold runs). So "fails on its FIRST command" is not a reachable state through the
- * public surface, and a mock-injected one would assert the mock, not the engine. What IS varied here is the
- * expansion SHAPE and the failing command's index within it: a 9-command inscribe (square: 4 riders +
- * polygon + 4 constraints), a 6-command inscribe (rectangle: 4 riders + polygon + 3 constraints), and a
- * 2-command shape-variant (isosceles: triangle + one equality) — i.e. the failure lands at index 8, 5 and 1
- * of three differently-shaped expansions.
+ * WITNESS NOTE. ADR-337's original witnesses (a square/rectangle inscribed in a right triangle) now BUILD —
+ * [ADR-338](docs/06-decisions.md#adr-338)/#166 made the macro's defining constraints solve jointly, which is
+ * the point of that fix. They moved to the scenario corpus as success cases. The witness kept here is one
+ * that still genuinely fails while CREATING its riders: a square sharing the container's vertex A
+ * (`ריבוע ADEF` — D,E,F ride the sides) inscribed in a triangle whose three sides are all PINNED (3-4-5), so
+ * the figure has no freedom left to satisfy the square and the coupled solve refuses honestly. Verified to
+ * leak D,E,F onto the figure when the trial split is reverted — i.e. this test still fails without ADR-337.
  */
 import { describe, it, expect } from 'vitest';
 import { replay } from '@/store/geoStore';
@@ -43,33 +40,14 @@ function expectZeroTrace(full: Derived, prior: Derived, introduced: string[], ke
   }
 }
 
-describe('a fact\'s lowering is transactional (ADR-337 / #167)', () => {
-  const cases: { name: string; prefix: string[]; failing: string; introduced: string[]; keep: string[] }[] = [
-    {
-      // 9-command expansion; fails in the constraint block (index 8): "over-constrained: |DE| = |EF| …"
-      name: 'inscribe SQUARE (9 commands — 4 riders + polygon + 4 constraints)',
-      prefix: ['right-triangle ABC', 'זוית A ישרה'],
-      failing: 'ריבוע DEFG חסום במשולש ABC',
-      introduced: ['D', 'E', 'F', 'G'],
-      keep: ['A', 'B', 'C'],
-    },
-    {
-      // 6-command expansion; fails placing a rider against a constraint (index 5).
-      name: 'inscribe RECTANGLE (6 commands — 4 riders + polygon + 3 constraints)',
-      prefix: ['right-triangle ABC', 'זוית A ישרה'],
-      failing: 'מלבן DEFG חסום במשולש ABC',
-      introduced: ['D', 'E', 'F', 'G'],
-      keep: ['A', 'B', 'C'],
-    },
-  ];
+describe("a fact's lowering is transactional (ADR-337 / #167)", () => {
+  const PINNED = ['משולש ABC', 'AB=3', 'BC=4', 'AC=5'];
 
-  for (const c of cases) {
-    it(`${c.name}: a red step leaves zero trace and keeps the prior figure`, () => {
-      const prior = replay(factsOf(c.prefix), 0);
-      const full = replay(factsOf([...c.prefix, c.failing]), 0);
-      expectZeroTrace(full, prior, c.introduced, c.keep);
-    });
-  }
+  it('a failing macro leaves zero trace and keeps the prior figure', () => {
+    const prior = replay(factsOf(PINNED), 0);
+    const full = replay(factsOf([...PINNED, 'ריבוע ADEF חסום במשולש ABC']), 0);
+    expectZeroTrace(full, prior, ['D', 'E', 'F'], ['A', 'B', 'C']);
+  });
 
   it('the SUCCESS branch still commits — a legitimate multi-command macro lands whole', () => {
     const fig = replay(factsOf(['משולש ABC', 'מלבן DEFG חסום במשולש ABC']), 0);

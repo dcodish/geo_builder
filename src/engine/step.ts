@@ -442,6 +442,60 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
 }
 
 /**
+ * Apply N CONSTRAINTS as ONE COUPLED SYSTEM ([ADR-338](docs/06-decisions.md#adr-338), issue #166).
+ *
+ * A macro's defining constraints are not N independent statements — they are one figure. A square inscribed
+ * in a triangle is the coupled system `|DE|=|EF| ∧ |EF|=|FG| ∧ |FG|=|GD| ∧ GD⟂DE`; solving them one at a
+ * time reaches the solution only from benign basins, because each `applyStep` EVALUATES (i.e. moves the
+ * figure) before the next constraint is even attached, so the last constraint is asked to hold from a basin
+ * the earlier ones already committed to. On the operator's right triangle that lands the nearest RHOMBUS
+ * (sides 2.000, ∠(GD,DE)=79°) and then reports the ⟂ unsatisfiable; on the hypotenuse variants it goes
+ * green on a figure that is not a square.
+ *
+ * The fix needs NO new numerics. `applyCommand`'s `driveOrCheck` only RECORDS a solve directive — it never
+ * solves — and `evaluate`/`resolveMixedCarriers` already minimises `Σ jointCostTerm` over EVERY constraint
+ * attached to EVERY carrier (nothing there is arity-limited). So attaching all N first and evaluating ONCE
+ * *is* the joint solve, started from the pre-macro basin instead of a greedily-perturbed one. The failure
+ * path likewise runs once over the UNION of the N constraints, so the recruiter's own `evaluate` gate can
+ * no longer short-circuit on "constraint 1 is satisfied" while 2..N are not.
+ *
+ * Constraint-only by construction (the caller partitions on the structural `set-*` predicate), so the
+ * creation-specific machinery `applyStep` runs — `normalizeShapeComposition`, `commandConflict`/reinterpret,
+ * `mirrorComposition` — is deliberately absent: a `set-*` produces no objects, so `commandConflict` (which
+ * derives conflicts structurally from apply's produced objects) is a guaranteed no-op on it, and there is no
+ * composition to mirror. A run of ONE is just `applyStep`, so nothing outside a multi-constraint macro moves.
+ */
+export function applyCoupledStep(prev: Construction, cmds: Command[]): StepResult {
+  const prevEval = evaluate(prev);
+  const prevPositions = prevEval.ok ? prevEval.positions : new Map<Id, Vec>();
+  for (const cmd of cmds) {
+    const degenErr = degenerateConstraintError(cmd);
+    if (degenErr) return { ok: false, error: degenErr, construction: prev, positions: prevPositions };
+  }
+  // ATTACH every constraint before solving once (see above — this is the whole mechanism).
+  let next = prev;
+  for (const cmd of cmds) next = applyCommand(next, cmd, prevPositions);
+  const newCons = next.constraints.slice(prev.constraints.length);
+  const res = evaluate(next);
+  if (res.ok && newConstraintsNonVacuous(next, res.positions, newCons)) return { ok: true, construction: next, positions: res.positions };
+  // The same failure ladder as applyStep, once, over the UNION of the coupled constraints.
+  const settled = settleOnFrozenPrior(prev, next, newCons);
+  if (settled) return { ok: true, construction: settled.construction, positions: settled.positions };
+  const recruited = recruitFreeDofs(next, newCons);
+  if (recruited) {
+    const r2 = evaluate(recruited);
+    if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions };
+  }
+  const scaled = scaleRescue(next, newCons, prevPositions);
+  if (scaled) {
+    const rs = evaluate(scaled);
+    if (rs.ok && newConstraintsNonVacuous(scaled, rs.positions, newCons)) return { ok: true, construction: scaled, positions: rs.positions };
+  }
+  const vacuousErr = newCons.length ? `over-constrained: ${describeConstraint(newCons[0])} cannot hold` : 'over-constrained';
+  return { ok: false, error: res.ok ? vacuousErr : blameNewStatement(res.error, newCons), construction: prev, positions: prevPositions };
+}
+
+/**
  * SCALE RESCUE (ADR-237) — satisfy a failing SIZE given by scaling the whole figure.
  *
  * A figure with no absolute given yet is determined only up to similarity (the ADR-101 gauge): every

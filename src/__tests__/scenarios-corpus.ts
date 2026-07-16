@@ -158,50 +158,68 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
-    id: 'inscribe-square-failure-leaves-no-trace',
-    title: '«ריבוע DEFG חסום במשולש ABC» in a RIGHT triangle — a failed macro leaves ZERO trace and the prior figure is untouched (#167 P1, ADR-337)',
+    id: 'inscribe-square-in-right-triangle',
+    title: '«ריבוע DEFG חסום במשולש ABC» in a RIGHT triangle — the CORNER square builds, matching the closed-form oracle (#166, ADR-338)',
     guards:
-      'Operator 2026-07-16 (session tos0z5cf; triaged out of #166 and filed as #167). The inscribe is ONE fact lowering to NINE engine commands (4 riders + the polygon + 4 defining constraints). The fold committed each command’s success into the shared construction as the loop ran, so when the final ⟂ constraint failed the earlier commands SURVIVED: D/E/F/G rendered as a RHOMBUS (all sides 2.000, ∠(GD,DE)=79°) from a step the app showed RED, the triangle silently MOVED (CA 5.000 → 3.929 — the successful prefix recruited it), and because the failing constraint never reached `applied` the verifier reported violations: [] on a figure violating the step’s own stated relations. The student saw a shape they never asked for, drawn next to a red error, with a clean verifier. Now a fact’s lowering is transactional (build into a trial, commit only if EVERY command succeeds).',
+      'Operator 2026-07-16 (session tos0z5cf), THE reported sequence. It used to fail «over-constrained: |DE| = |EF| and |EF| = |FG| and |FG| = |GD| and GD ⟂ DE cannot hold»: the inscribe’s four defining constraints were applied as independent commands, and each applyStep EVALUATES — i.e. moves the figure — before the next is attached, so the last was asked to hold from a basin the earlier ones had already committed to (the solver landed the nearest RHOMBUS and then reported the ⟂ unsatisfiable). With the right angle at A the geometry forces D exactly onto A: the unique square is the CORNER square of side 1/(1/|AB|+1/|AC|) — legitimate and textbook, just unreachable one constraint at a time. Now the macro’s constraints reach `evaluate` together (applyCoupledStep) and are solved jointly from the pre-macro basin, landing the exact corner square; the D≡A boundary is admitted as an ADR-123 forced coincidence (which the issue recorded as coincidences: []).',
     steps: ['right-triangle ABC', 'זוית A ישרה', 'ריבוע DEFG חסום במשולש ABC'],
     check(fig) {
-      // The step is honestly RED and surfaces as an error (it used to leave lastError null: the leaked
-      // riders made the failing constraint still look "pending", so the banner was suppressed too).
-      expect(Object.values(fig.status).some((s) => s !== 'ok'), 'the inscribe step reports its failure').toBe(true);
-      expect(fig.lastError, 'the failure surfaces (not a silent red row)').not.toBeNull();
-      // ZERO TRACE: none of the four riders the failed step would introduce exist.
-      for (const id of ['D', 'E', 'F', 'G'])
-        expect(fig.positions.has(id), `${id} must not exist — the step introducing it failed`).toBe(false);
-      // KEEP-PRIOR: the triangle is bit-identical to its pre-step shape.
-      const prior = run(['right-triangle ABC', 'זוית A ישרה']);
-      for (const id of ['A', 'B', 'C'])
-        expect(dist(at(fig, id), at(prior, id)), `${id} moved — the failed step must not touch the prior figure`).toBeLessThan(1e-9);
+      allStepsOk(fig);
+      const [d, e, f, g] = ['D', 'E', 'F', 'G'].map((id) => at(fig, id));
+      // A genuine SQUARE: four equal sides, four right angles.
+      const sides = [dist(d, e), dist(e, f), dist(f, g), dist(g, d)];
+      expect(Math.max(...sides) - Math.min(...sides), 'all four sides equal').toBeLessThan(1e-3);
+      for (const [p, v, q] of [[g, d, e], [d, e, f], [e, f, g], [f, g, d]] as const)
+        expect(Math.abs(angle(p, v, q) - 90), 'right angle at each corner').toBeLessThan(0.01);
+      // The CORNER square: D sits exactly on A (the forced coincidence, reported as such).
+      expect(dist(d, at(fig, 'A')), 'D ≡ A — the corner square').toBeLessThan(1e-6);
+      expect(fig.coincidences, 'the forced coincidence is surfaced, not silent').toContainEqual(['A', 'D']);
+      // …and the side matches the INDEPENDENT closed-form oracle: s = 1/(1/b + 1/c) over the two legs.
+      const b = dist(at(fig, 'A'), at(fig, 'B'));
+      const c = dist(at(fig, 'A'), at(fig, 'C'));
+      expect(Math.abs(sides[0] - 1 / (1 / b + 1 / c)), 'side = the closed-form corner-square side').toBeLessThan(1e-3);
     },
   },
   {
-    id: 'inscribe-rectangle-failure-leaves-no-trace',
-    title: '«מלבן DEFG חסום במשולש ABC» in a RIGHT triangle — the same zero-trace guarantee for the RECTANGLE macro (#167, ADR-337)',
+    id: 'inscribe-rectangle-in-right-triangle',
+    title: '«מלבן DEFG חסום במשולש ABC» in a RIGHT triangle — the RECTANGLE macro builds too (#166, operator: "not only ריבוע but also מלבן")',
     guards:
-      'Operator 2026-07-16 ("ensure we cover not only ריבוע but also מלבן חסום"). The rectangle inscribe is the SAME fold chokepoint with a different expansion (three right angles instead of rhombus+one), and it leaked identically: it fails «cannot place G on segment CA so that GD ⟂ DE» yet drew D/E/F/G with violations: []. Locks the class fix across the shape, not just the one reported figure. (That this figure FAILS at all is #166 — the coupled defining constraints are solved greedily one-at-a-time; an inscribed rectangle is under-determined and should build. This scenario asserts only that the failure is HONEST; when #166 lands it flips to a build and this scenario is re-pointed.)',
+      'Operator 2026-07-16 ("ensure we cover not only ריבוע but also מלבן חסום"). Same greedy-solve class, different expansion (three right angles instead of rhombus+one): it used to fail «cannot place G on segment CA so that GD ⟂ DE» — and an inscribed rectangle is UNDER-determined (a free aspect ratio), so failing at all was the clearest proof the defect was the solve order, not the geometry. Locks the class fix across the shape, not just the one reported figure.',
     steps: ['right-triangle ABC', 'זוית A ישרה', 'מלבן DEFG חסום במשולש ABC'],
     check(fig) {
-      expect(Object.values(fig.status).some((s) => s !== 'ok'), 'the inscribe step reports its failure').toBe(true);
-      for (const id of ['D', 'E', 'F', 'G'])
-        expect(fig.positions.has(id), `${id} must not exist — the step introducing it failed`).toBe(false);
-      const prior = run(['right-triangle ABC', 'זוית A ישרה']);
-      for (const id of ['A', 'B', 'C'])
-        expect(dist(at(fig, id), at(prior, id)), `${id} moved — the failed step must not touch the prior figure`).toBeLessThan(1e-9);
+      allStepsOk(fig);
+      const [d, e, f, g] = ['D', 'E', 'F', 'G'].map((id) => at(fig, id));
+      for (const [p, v, q] of [[g, d, e], [d, e, f], [e, f, g], [f, g, d]] as const)
+        expect(Math.abs(angle(p, v, q) - 90), 'right angle at each corner').toBeLessThan(0.01);
+      expect(Math.abs(dist(d, e) - dist(f, g)), 'opposite sides equal').toBeLessThan(1e-3);
+      expect(Math.abs(dist(e, f) - dist(g, d)), 'opposite sides equal').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'inscribe-square-in-plain-triangle-with-right-angle',
+    title: '«משולש ABC» + «זוית A ישרה» + «ריבוע DEFG חסום» — the inscribe no longer BREAKS the earlier right angle (#166, ADR-338)',
+    guards:
+      'The third row of #166’s reproduction table, and the worst of the three: this sequence used to fail «∠BAC = 90° cannot hold» — the greedy solve broke the student’s OWN earlier given and then blamed it (a docs/17 §6 breach: an error must name the conflicting NEW statement, not an established one). Jointly solved, the corner square lands AND ∠BAC = 90° still holds.',
+    steps: ['משולש ABC', 'זוית A ישרה', 'ריבוע DEFG חסום במשולש ABC'],
+    check(fig) {
+      allStepsOk(fig);
+      // The student's earlier given SURVIVES the inscribe.
+      expect(Math.abs(angle(at(fig, 'B'), at(fig, 'A'), at(fig, 'C')) - 90), '∠BAC = 90 still holds').toBeLessThan(0.01);
+      const [d, e, f, g] = ['D', 'E', 'F', 'G'].map((id) => at(fig, id));
+      const sides = [dist(d, e), dist(e, f), dist(f, g), dist(g, d)];
+      expect(Math.max(...sides) - Math.min(...sides), 'a genuine square').toBeLessThan(1e-3);
+      expect(dist(d, at(fig, 'A')), 'D ≡ A — the corner square').toBeLessThan(1e-6);
     },
   },
   {
     id: 'inscribe-rectangle-builds-in-plain-triangle',
-    title: '«מלבן DEFG חסום במשולש ABC» in a plain triangle — the SUCCESS branch of the transactional fold still commits (ADR-337 guard)',
+    title: '«מלבן DEFG חסום במשולש ABC» in a plain triangle — the baseline that must STAY green (ADR-337/338 guard)',
     guards:
-      'The other half of ADR-337: making the fold all-or-nothing must not stop a macro that legitimately succeeds from committing. A working 6-command expansion (4 riders + polygon + 3 right angles) still lands, and the result is a genuine rectangle. Guards the "trial never gets promoted to cur" regression.',
+      'The success branch both fixes must preserve: ADR-337 (a legitimately-succeeding macro must still be promoted from its trial to the figure) and ADR-338 (coupling the constraints must not break a case the greedy path already solved). A working 6-command expansion still lands, and the result is a genuine rectangle.',
     steps: ['משולש ABC', 'מלבן DEFG חסום במשולש ABC'],
     check(fig) {
       allStepsOk(fig);
       for (const id of ['D', 'E', 'F', 'G']) expect(fig.positions.has(id), `${id} exists`).toBe(true);
-      // …and it really is a rectangle: three right angles ⇒ the fourth.
       for (const [p, v, q] of [['D', 'E', 'F'], ['E', 'F', 'G'], ['F', 'G', 'D']] as const)
         expect(Math.abs(angle(at(fig, p), at(fig, v), at(fig, q)) - 90), `right angle at ${v}`).toBeLessThan(0.5);
     },
