@@ -60,7 +60,18 @@ export function constraintRefs(con: Constraint): Id[] {
     case 'area-ratio':
     case 'perimeter-ratio':
       return [...con.ids1, ...con.ids2];
+    case 'measure-sum':
+      return con.points;
+    case 'length-product':
+      return [...con.lhs, ...con.rhs];
   }
+}
+
+/** One measure-sum term's value at these positions: |pair| (stride 2) or ∠ at the middle id (stride 3). */
+function measureSumTerm(con: { unit: 'length' | 'angle'; points: Id[] }, i: number, get: (id: Id) => Vec): number {
+  return con.unit === 'length'
+    ? dist(get(con.points[2 * i]), get(con.points[2 * i + 1]))
+    : angleDeg(get(con.points[3 * i + 1]), get(con.points[3 * i]), get(con.points[3 * i + 2]));
 }
 
 /**
@@ -181,6 +192,33 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
       return polygonPerimeter(con.ids.map(get)) - con.value;
     case 'perimeter-ratio':
       return polygonPerimeter(con.ids1.map(get)) - con.k * polygonPerimeter(con.ids2.map(get));
+    case 'measure-sum': {
+      // signed: Σ coefᵢ·mᵢ − target (length units or degrees). Sign-changes through the target as a
+      // DOF varies. An angle term propagates angleDeg's NaN on a collapsed ray (solver skips — the
+      // `parallel` discipline); a length term of a collapsed pair is honestly 0 (a real length).
+      let s = -con.target;
+      for (let i = 0; i < con.coefs.length; i++) s += con.coefs[i] * measureSumTerm(con, i, get);
+      return s;
+    }
+    case 'length-product': {
+      // LOG-domain monomial residual: log k + Σlog|lhsᵢ| − Σlog|rhsⱼ| — signed, sign-changing
+      // through the root, scale-free when factor degrees match (the parser guarantees they do), and
+      // relative-error-sized in `jointCostTerm` beside the equal/ratio terms. A near-zero factor
+      // returns NaN (never ±∞) so `solveParam`/the optimizer skip the sample — the collapsed-ray
+      // discipline (see `parallel`): a degenerate collapse must never read as "satisfied".
+      let r = Math.log(con.k);
+      for (let i = 0; i + 1 < con.lhs.length; i += 2) {
+        const d = dist(get(con.lhs[i]), get(con.lhs[i + 1]));
+        if (d < 1e-9) return NaN;
+        r += Math.log(d);
+      }
+      for (let i = 0; i + 1 < con.rhs.length; i += 2) {
+        const d = dist(get(con.rhs[i]), get(con.rhs[i + 1]));
+        if (d < 1e-9) return NaN;
+        r -= Math.log(d);
+      }
+      return r;
+    }
   }
 }
 
@@ -228,6 +266,18 @@ export function constraintScale(con: Constraint, get: (id: Id) => Vec): number {
       return Math.max(Math.abs(con.value), 1e-9); // length units — relative to the target perimeter
     case 'perimeter-ratio':
       return Math.max(con.k * polygonPerimeter(con.ids2.map(get)), 1e-9); // relative to the (scaled) reference perimeter
+    case 'measure-sum': {
+      if (con.unit === 'angle') return 1; // degrees are scale-free (the angle/angle-ratio convention)
+      // Length units: an ABSOLUTE sum scales to its target (the perimeter precedent); a RELATIVE
+      // Σ=Σ (target 0) scales to its LARGEST term measured at the positions — a max, not a mean, so
+      // the solver can't "game" a relative tolerance by shrinking one side (the ADR-033 discipline).
+      if (con.target !== 0) return Math.max(Math.abs(con.target), 1e-9);
+      let m = 1e-9;
+      for (let i = 0; i < con.coefs.length; i++) m = Math.max(m, Math.abs(con.coefs[i]) * measureSumTerm(con, i, get));
+      return m;
+    }
+    case 'length-product':
+      return 1; // the LOG residual is dimensionless (relative error per factor) — scale-free by construction
     default:
       return 1; // angle / angle-ratio / parallel / perpendicular / coincide are scale-free (or fixed)
   }
@@ -247,6 +297,14 @@ export function residualTolerance(con: Constraint, scale = 1): number {
     case 'perimeter':
     case 'perimeter-ratio':
       return Math.max(1e-6, 2e-4 * scale);
+    case 'measure-sum':
+      // angle unit: scale is 1 (constraintScale) so this is the ANGLE_EPS discipline in degrees;
+      // length unit: the relative length-group tolerance against the sum's own scale.
+      return con.unit === 'angle' ? ANGLE_EPS : Math.max(1e-6, 2e-4 * scale);
+    case 'length-product':
+      // log-space: a per-factor relative-error budget of 2e-4 (the length-group discipline), summed
+      // over the factor count — Σ|Δlog| ≈ Σ relative errors.
+      return Math.max(1e-6, ((con.lhs.length + con.rhs.length) / 2) * 2e-4);
     case 'parallel':
     case 'perpendicular':
     case 'collinear':
@@ -351,6 +409,31 @@ export function describeConstraint(con: Constraint): string {
       return `perimeter(${con.ids.join('')}) = ${con.value}`;
     case 'perimeter-ratio':
       return `perimeter(${con.ids1.join('')}) = ${con.k}·perimeter(${con.ids2.join('')})`;
+    case 'measure-sum': {
+      // Reassemble the student's equation: positive-coef terms on the left, negated (RHS) terms back
+      // on the right, the numeric target joining whichever side keeps everything positive.
+      const term = (i: number): string => {
+        const m =
+          con.unit === 'length'
+            ? `|${con.points[2 * i]}${con.points[2 * i + 1]}|`
+            : `∠${con.points[3 * i]}${con.points[3 * i + 1]}${con.points[3 * i + 2]}`;
+        const c = Math.abs(con.coefs[i]);
+        return c === 1 ? m : `${c}·${m}`;
+      };
+      const lhs: string[] = [];
+      const rhs: string[] = [];
+      for (let i = 0; i < con.coefs.length; i++) (con.coefs[i] >= 0 ? lhs : rhs).push(term(i));
+      if (con.target !== 0) rhs.push(`${con.target}${con.unit === 'angle' ? '°' : ''}`);
+      return `${lhs.join(' + ') || '0'} = ${rhs.join(' + ') || '0'}`;
+    }
+    case 'length-product': {
+      const side = (ids: Id[]): string => {
+        const parts: string[] = [];
+        for (let i = 0; i + 1 < ids.length; i += 2) parts.push(`|${ids[i]}${ids[i + 1]}|`);
+        return parts.join('·') || '1';
+      };
+      return `${con.k === 1 ? '' : `${con.k}·`}${side(con.lhs)} = ${side(con.rhs)}`;
+    }
   }
 }
 

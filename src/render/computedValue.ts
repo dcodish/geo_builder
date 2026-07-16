@@ -15,7 +15,7 @@
  */
 import type { AnyCommand, Command, Id, Vec } from '@/engine';
 import { buildSymTab, lowerOne } from '@/engine';
-import { dist, polygonArea, polygonPerimeter } from '@/engine/geometry';
+import { angleDeg, dist, polygonArea, polygonPerimeter } from '@/engine/geometry';
 
 /** One measured line in a readout. `strong` marks the seed-invariant verdict (a ratio, or the pinned value). */
 export interface ReadoutItem {
@@ -107,6 +107,55 @@ export function readoutForCommand(con: Command, pos: Map<Id, Vec>): Readout | nu
         ],
         verdict: { label: `|${con.a}${con.b}|/|${con.c}${con.d}|`, value: fmt(r), ok: matches(r, expected) },
       };
+    }
+    case 'set-measure-sum': {
+      // Σ coefᵢ·mᵢ = target (#154): each term measured as context; the verdict is the LHS sum against the
+      // target (absolute form, «∠A + ∠B = 180») or the LHS/RHS sum RATIO (Σ=Σ form — a ratio is the
+      // seed-invariant knowledge under the similarity gauge, matching the area/perimeter-ratio discipline).
+      const stride = con.unit === 'length' ? 2 : 3;
+      const measured: ReadoutItem[] = [];
+      let sumL = 0; // positive-coef terms (the utterance's left side)
+      let sumR = 0; // negated (right-side) terms, restored to positive
+      for (let i = 0; i < con.coefs.length; i++) {
+        const ids = con.points.slice(i * stride, (i + 1) * stride);
+        const m =
+          con.unit === 'length'
+            ? lenOf(ids[0], ids[1], pos)
+            : pos.get(ids[0]) && pos.get(ids[1]) && pos.get(ids[2])
+              ? angleDeg(pos.get(ids[1])!, pos.get(ids[0])!, pos.get(ids[2])!)
+              : null;
+        if (m === null || !Number.isFinite(m)) return null;
+        measured.push({ label: con.unit === 'length' ? `|${ids[0]}${ids[1]}|` : `∠${ids.join('')}`, value: fmt(m) });
+        if (con.coefs[i] >= 0) sumL += con.coefs[i] * m;
+        else sumR += -con.coefs[i] * m;
+      }
+      const lbl = con.unit === 'angle' ? 'Σ∠' : 'Σ';
+      if (con.target !== 0 || sumR < 1e-9) {
+        const total = sumL - sumR;
+        return { measured, verdict: { label: lbl, value: fmt(total), ok: matches(total, con.target) } };
+      }
+      const ratio = sumL / sumR;
+      return { measured, verdict: { label: `${lbl}/${lbl}`, value: fmt(ratio), ok: matches(ratio, 1) } };
+    }
+    case 'set-length-product': {
+      // k·∏|lhs| = ∏|rhs| (#144): each factor measured as context, the two products' RATIO as the verdict
+      // (a ratio is the seed-invariant knowledge under the similarity gauge — products are per-drawing).
+      const measured: ReadoutItem[] = [];
+      const prod = (ids: Id[]): number | null => {
+        let p = 1;
+        for (let i = 0; i + 1 < ids.length; i += 2) {
+          const d = lenOf(ids[i], ids[i + 1], pos);
+          if (d === null) return null;
+          measured.push({ label: `|${ids[i]}${ids[i + 1]}|`, value: fmt(d) });
+          p *= d;
+        }
+        return p;
+      };
+      const l = prod(con.lhs);
+      const r = prod(con.rhs);
+      if (l === null || r === null || Math.abs(r) < 1e-12) return null;
+      const ratio = (con.k * l) / r;
+      return { measured, verdict: { label: con.k === 1 ? '∏/∏' : `${fmt(con.k)}·∏/∏`, value: fmt(ratio), ok: matches(ratio, 1) } };
     }
     default:
       return null;

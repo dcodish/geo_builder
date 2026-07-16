@@ -158,6 +158,136 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'arc-value-drives-central-angle',
+    title: '«קשת AB = 40» — an absolute arc measure drives the central angle, never a chord length (ADR-335 play-gate request)',
+    guards:
+      'Operator 2026-07-16 (the ADR-335 play-gate): «arc AB = 40» as a given. Before the arcValue rule this fell through to distanceConstraint, committing the arc’s DEGREES as a chord LENGTH (set-distance |AB| = 40) with the word קשת silently dropped and every gate quiet — the same green-but-wrong family as #153. Now it lowers to set-angle at the centre (arc ≡ central angle, ADR-116) and drives a free on-circle endpoint until ∠AOB = 40.',
+    steps: ['מעגל O ברדיוס 5', 'AB מיתר', 'קשת AB = 40'],
+    check(fig) {
+      allStepsOk(fig);
+      const aob = angle(at(fig, 'A'), at(fig, 'O'), at(fig, 'B'));
+      expect(Math.abs(aob - 40), '∠AOB = 40 (the arc measure)').toBeLessThan(0.1);
+      // …and the chord is NOT 40 long (the old wrong lowering would have forced |AB| = 40 on a radius-5 circle — impossible)
+      expect(dist(at(fig, 'A'), at(fig, 'B'))).toBeLessThan(11);
+      // DISPLAY (operator rule): an arc given draws NO angle wedge/value at the (hidden) centre — the
+      // value prints ON the arc. Only an explicit «∠AOB = 40» earns the centre mark.
+      expect(fig.angleMarks, 'no wedge mark at the centre for an arc given').toHaveLength(0);
+      expect(fig.labels.arcs, 'the value prints on the arc').toEqual([{ circle: 'circle-O', a: 'A', b: 'B', text: '40°' }]);
+    },
+  },
+  {
+    id: 'q22-arc-sum-enforced-not-truncated',
+    title: '«קשת AC + קשת BE = קשת AD + קשת BC» + «S_{CFG}=S_{CGH}» — the full bagrut Q22: the arc SUM enforced whole forces HG ⊥ AB (#153 P1, #154)',
+    guards:
+      'Operator 2026-07-15/16 (sessions qx5a19co + wn3axiea, bagrut Q22 — exam text supplied 2026-07-16): the arc-sum given parsed green but arcEquality had TRUNCATED it to the first arc of each side (labelRun grabs the first run) — the figure was constrained by ∠AOC = ∠AOD, a DIFFERENT given, every honesty gate silent. Now measureSum lowers the whole term list to ONE set-measure-sum over the central angles, and with the exam’s REAL second given — the AREA equality S_{CFG}=S_{CGH} (the issue text had mis-transcribed it as an angle equality) — the exam theorem is FORCED on the drawing: the arc condition ⇒ CF = CG, the area equality over the collinear bases (D-F-C-H one line) ⇒ CF = CH, so CG = ½·FH ⇒ Thales converse ⇒ HG ⊥ AB. Both chords carry the מיתר noun (the wn3axiea session showed a bare «CD חותך…» leaves D OFF the circle — ADR-052-honest, but then «קשת AD» is meaningless).',
+    steps: [
+      // The operator's wn3axiea sequence with the מיתר noun restored on the CD step (their bare
+      // «CD חותך…» left D off the circle). NOTE the chord ORDER (CD before CE) matters for the
+      // THEOREM assertion: the engine's central angles are minor-arc [0,180°], so a different
+      // entry order can settle a valid configuration whose minor-arc sum holds without the exam's
+      // arc arrangement — the sum given is honoured either way (see the order-independence
+      // scenario), but the ⊥ conclusion is a property of the exam's configuration.
+      'מעגל',
+      'AB מיתר',
+      'מיתר CD חותך את AB בנקודה F',
+      'מיתר CE חותך את AB בנקודה G',
+      'H על המשך DC',
+      'קשת AC +קשת BE = קשת AD + קשת BC',
+      'HG',
+      'S_{CFG}=S_{CGH}',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O');
+      const arc = (x: Id, y: Id) => angle(at(fig, x), O, at(fig, y));
+      // The STATED sum holds on the final coordinates — not the truncated arc AC = arc AD.
+      expect(Math.abs(arc('A', 'C') + arc('B', 'E') - (arc('A', 'D') + arc('B', 'C'))), 'arc AC + arc BE = arc AD + arc BC').toBeLessThan(0.1);
+      expect(Math.abs(arc('A', 'C') - arc('A', 'D')), 'NOT the truncated arc AC = arc AD').toBeGreaterThan(1);
+      // The theorem chain the two givens force: CF = CG (arc condition) = CH (area equality, collinear bases).
+      const C = at(fig, 'C'), F = at(fig, 'F'), G = at(fig, 'G'), H = at(fig, 'H'), A = at(fig, 'A'), B = at(fig, 'B');
+      expect(Math.abs(dist(C, F) - dist(C, G)), 'CF = CG').toBeLessThan(0.05);
+      expect(Math.abs(dist(C, F) - dist(C, H)), 'CF = CH').toBeLessThan(0.05);
+      // …and the exam conclusion: HG ⊥ AB (Thales converse — G sees FH under a right angle).
+      const cos = ((H.x - G.x) * (B.x - A.x) + (H.y - G.y) * (B.y - A.y)) / (dist(H, G) * dist(A, B));
+      expect(Math.abs(cos), 'HG ⊥ AB').toBeLessThan(0.01);
+    },
+  },
+  {
+    id: 'q22-arc-sum-typed-early-order-independence',
+    title: 'the Q22 arc-sum typed EARLY (before H/HG) still builds — entry-order independence (M2/ADR-104)',
+    guards:
+      'The compound sum must not depend on being typed last: entered straight after the chords it defers/drives the same free chord endpoint and the later steps compose on top (the ADR-104/M2 discipline for the new constraint kind).',
+    steps: [
+      'מעגל O ברדיוס 5',
+      'AB מיתר',
+      'CE מיתר שחותך את AB בנקודה G',
+      'CD מיתר שחותך את AB בנקודה F',
+      'קשת AC + קשת BE= קשת AD + קשת BC',
+      'H על המשך DC',
+      'HG',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O');
+      const arc = (x: Id, y: Id) => angle(at(fig, x), O, at(fig, y));
+      expect(Math.abs(arc('A', 'C') + arc('B', 'E') - (arc('A', 'D') + arc('B', 'C'))), 'the sum holds').toBeLessThan(0.1);
+    },
+  },
+  {
+    id: 'power-of-point-median-product-builds',
+    title: '«4*DM*DM=BM*ME» on the medians figure builds the true product, never a wrong set-equal (#145 P1, #144)',
+    guards:
+      'Operator 2026-07-15 (prod session o90uiwwh, seq 18–35): the medians figure + the exam relation 4·DM² = BM·ME. equalSegments’ unanchored regex used to slide to the interior «DM=BM» and commit set-equal(D,M,B,M) — a WRONG constraint, saved from silence only by the accidental droppedGivenNumbers hit on the 4 (the coefficient-less quotient forms committed silently). Now lengthProduct lowers it to ONE set-length-product (k=4, DM twice) whose log-domain residual drives the free M; the relation holds exactly on the final coordinates. (The CF/AD median steps are pre-parsed commands from the log — «CF תיכון» after a prior median is a SEPARATE parser gap, filed.)',
+    steps: [
+      'משולש ABC',
+      'BE תיכון',
+      { llm: [{ type: 'midpoint', id: 'F', a: 'A', b: 'B' } as unknown as AnyCommand, { type: 'segment', a: 'C', b: 'F' } as unknown as AnyCommand] },
+      { llm: [{ type: 'midpoint', id: 'D', a: 'B', b: 'C' } as unknown as AnyCommand, { type: 'segment', a: 'A', b: 'D' } as unknown as AnyCommand] },
+      'BF=FM',
+      '4*DM*DM=BM*ME',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const D = at(fig, 'D'), M = at(fig, 'M'), B = at(fig, 'B'), E = at(fig, 'E'), F = at(fig, 'F');
+      const lhs = 4 * dist(D, M) ** 2;
+      const rhs = dist(B, M) * dist(M, E);
+      expect(Math.abs(lhs - rhs) / Math.max(rhs, 1e-9), '4·DM² = BM·ME (relative)').toBeLessThan(0.01);
+      expect(Math.abs(dist(B, F) - dist(F, M)), 'the earlier BF = FM still holds').toBeLessThan(0.05);
+    },
+  },
+  {
+    id: 'segment-sum-drives-endpoint',
+    title: '«AB + CD = EF» — a segment SUM drives a free endpoint until the sum holds (#154)',
+    guards:
+      'The additive length family: a sum of segment lengths is ONE set-measure-sum (coefs [1,1,−1]) driving a free DOF — not a truncated set-equal(C,D,E,F) silently dropping AB (the unreported sibling the #153 class probe surfaced).',
+    steps: ['מרובע ABCD', 'EF', 'AB + CD = EF'],
+    check(fig) {
+      allStepsOk(fig);
+      const s = dist(at(fig, 'A'), at(fig, 'B')) + dist(at(fig, 'C'), at(fig, 'D'));
+      const ef = dist(at(fig, 'E'), at(fig, 'F'));
+      expect(Math.abs(s - ef) / Math.max(ef, 1e-9), '|AB| + |CD| = |EF|').toBeLessThan(0.01);
+    },
+  },
+  {
+    id: 'angle-sum-180-forces-parallel',
+    title: '«זווית A + זווית B = 180» — single-vertex angle SUM (arms from the figure) reshapes the quad; AD ∥ BC follows (#154)',
+    guards:
+      'The additive angle family with a numeric target and ADR-164 single-vertex arms: ∠A + ∠B = 180 on a quadrilateral is ONE set-measure-sum (target 180) driving a shape DOF — not a truncated set-angle dropping the second term. Co-interior angles at 180 force AD ∥ BC, which must hold on the final coordinates.',
+    steps: ['מרובע ABCD', 'זווית A + זווית B = 180'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D');
+      const a1 = angle(B, A, D);
+      const a2 = angle(A, B, C);
+      expect(Math.abs(a1 + a2 - 180), '∠A + ∠B = 180').toBeLessThan(0.1);
+      // co-interior angles ⇒ AD ∥ BC: |sin| of the angle between the directions ≈ 0
+      const u = { x: D.x - A.x, y: D.y - A.y };
+      const v = { x: C.x - B.x, y: C.y - B.y };
+      const sin = Math.abs(u.x * v.y - u.y * v.x) / (Math.hypot(u.x, u.y) * Math.hypot(v.x, v.y));
+      expect(sin, 'AD ∥ BC follows').toBeLessThan(0.01);
+    },
+  },
+  {
     id: 'secant-apex-far-point-named-near',
     title: '«AD חותך למעגל בנקודה B» — apex A external, D the far crossing, B the near (issue #136, ADR-332)',
     guards:

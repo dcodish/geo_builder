@@ -22,6 +22,36 @@ import { constraintRefs } from './solve';
  * detection in `evaluate`). Generic over the constraint type — new constraints
  * add a residual case in solve.ts, not logic here.
  */
+/**
+ * A measure combination whose terms cancel IDENTICALLY — «AB + CD = CD + AB» (same term keys, coefs
+ * summing to 0, target 0) or «DM·ME = ME·DM» (same factor multisets, k = 1). Its residual is 0 as a
+ * FUNCTION, so it must be pushed as a check, never drive a carrier (see the equal/ratio guard).
+ */
+function isTautologicalMeasure(con: Extract<Constraint, { type: 'measure-sum' | 'length-product' }>): boolean {
+  if (con.type === 'measure-sum') {
+    if (con.target !== 0) return false;
+    const stride = con.unit === 'length' ? 2 : 3;
+    const acc = new Map<string, number>();
+    for (let i = 0; i < con.coefs.length; i++) {
+      const ids = con.points.slice(i * stride, (i + 1) * stride);
+      // |AB| ≡ |BA|; ∠ABC ≡ ∠CBA (vertex fixed, rays order-free).
+      const key = con.unit === 'length' ? [...ids].sort().join('|') : `${ids[1]}|${[ids[0], ids[2]].sort().join('|')}`;
+      acc.set(key, (acc.get(key) ?? 0) + con.coefs[i]);
+    }
+    return [...acc.values()].every((v) => Math.abs(v) < 1e-12);
+  }
+  if (con.k !== 1) return false;
+  const count = new Map<string, number>();
+  const tally = (ids: Id[], sign: number): void => {
+    for (let i = 0; i + 1 < ids.length; i += 2) {
+      const key = [ids[i], ids[i + 1]].sort().join('|');
+      count.set(key, (count.get(key) ?? 0) + sign);
+    }
+  };
+  tally(con.lhs, 1);
+  tally(con.rhs, -1);
+  return [...count.values()].every((v) => v === 0);
+}
 function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Constraint): void {
   // A trivially-true equal/ratio — the SAME segment on both sides ("DF = DF") —
   // constrains nothing, so it must NOT drive a carrier (which would slide it to a
@@ -31,6 +61,14 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
     (con.type === 'equal' || con.type === 'ratio') &&
     ((con.a === con.c && con.b === con.d) || (con.a === con.d && con.b === con.c))
   ) {
+    constraints.push(con);
+    return;
+  }
+  // The measure-combination sibling of that guard (#153/#154/#144): terms that cancel IDENTICALLY
+  // («AB + CD = CD + AB», «DM·ME = ME·DM») make the residual 0 at EVERY configuration — driving a
+  // carrier with it would root at every grid sample and land on a degenerate placement. Push as a
+  // check (residual 0 ⇒ passes; a k≠1 same-sides product correctly fails instead).
+  if ((con.type === 'measure-sum' || con.type === 'length-product') && isTautologicalMeasure(con)) {
     constraints.push(con);
     return;
   }
@@ -1502,7 +1540,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
 
     case 'set-angle':
-      driveOrCheck(objects, constraints, { type: 'angle', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, value: cmd.value });
+      driveOrCheck(objects, constraints, { type: 'angle', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, value: cmd.value, ...(cmd.arcOf ? { arcOf: cmd.arcOf } : {}) });
       break;
 
     case 'set-distance': {
@@ -1612,6 +1650,14 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
 
     case 'set-perimeter-ratio':
       driveOrCheck(objects, constraints, { type: 'perimeter-ratio', ids1: cmd.ids1, ids2: cmd.ids2, k: cmd.k });
+      break;
+
+    case 'set-measure-sum':
+      driveOrCheck(objects, constraints, { type: 'measure-sum', unit: cmd.unit, coefs: cmd.coefs, points: cmd.points, target: cmd.target });
+      break;
+
+    case 'set-length-product':
+      driveOrCheck(objects, constraints, { type: 'length-product', k: cmd.k, lhs: cmd.lhs, rhs: cmd.rhs });
       break;
 
     case 'set-length-radius':

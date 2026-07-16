@@ -22,6 +22,18 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `arc-value-drives-central-angle` — «קשת AB = 40»: an absolute arc measure drives the central angle (ADR-335 play-gate)
+Operator 2026-07-16: «arc AB = 40» as a given. Before `arcValue` this fell through to `distanceConstraint` — the arc's DEGREES committed as a chord LENGTH, the word קשת dropped, all gates quiet (the #153 family). Now: `set-angle` at the centre (arc ≡ central angle, ADR-116); no circle resolvable → 'stop' (escalate), never a length fall-through.
+### `q22-arc-sum-enforced-not-truncated` — the FULL bagrut Q22: arc-sum + `S_{CFG}=S_{CGH}` force HG ⊥ AB (#153 P1 / #154)
+Operator 2026-07-15/16 (sessions `qx5a19co` + `wn3axiea`; exam text supplied 2026-07-16): the arc-SUM given parsed green but `arcEquality` truncated it to the first arc of each side — the figure was constrained by ∠AOC = ∠AOD, a DIFFERENT given, every honesty gate silent. Now `measureSum` lowers the whole term list to ONE `set-measure-sum` over the central angles, and with the exam's REAL second given — the AREA equality `S_{CFG}=S_{CGH}` (the issue text had mis-transcribed it as an angle equality) — the exam theorem is FORCED: arc condition ⇒ CF=CG; area equality over collinear bases (D-F-C-H) ⇒ CF=CH; Thales converse ⇒ **HG ⊥ AB** (cos = 0.0000 measured). Both chords must carry the מיתר noun (a bare «CD חותך…» leaves D off the circle — honest per ADR-052, but «קשת AD» is then meaningless).
+### `q22-arc-sum-typed-early-order-independence` — the arc-sum typed EARLY still builds (M2/ADR-104)
+The compound sum entered straight after the chords (before H/HG) defers/drives the same free DOF — entry-order independence for the new constraint kind.
+### `power-of-point-median-product-builds` — «4*DM*DM=BM*ME» builds the true product (#145 P1 / #144)
+Operator 2026-07-15 (prod session `o90uiwwh` seq 18–35): the medians figure + 4·DM² = BM·ME. `equalSegments`' unanchored regex slid to the interior «DM=BM» and committed a WRONG `set-equal` (the coefficient-less quotient forms committed silently). Now `lengthProduct` lowers it to ONE `set-length-product` (log-domain residual) driving the free M; the relation holds exactly. («CF תיכון» after a prior median is a separate parser gap, filed.)
+### `segment-sum-drives-endpoint` — «AB + CD = EF» drives a free endpoint (#154)
+The additive length family: one `set-measure-sum` (coefs [1,1,−1]), never a truncated `set-equal(C,D,E,F)` dropping AB (the unreported sibling the class probe surfaced).
+### `angle-sum-180-forces-parallel` — «זווית A + זווית B = 180» (single-vertex arms) forces AD ∥ BC (#154)
+The additive angle family with a numeric target + ADR-164 single-vertex arm resolution; co-interior angles at 180 force AD ∥ BC on the final coordinates.
 ### `secant-apex-far-point-named-near` — «AD חותך למעגל בנקודה B» — apex + far crossing D, near B (issue #136, ADR-332)
 Operator 2026-07-15: the secant «AD חותך למעגל» (apex A external, only the FAR crossing D named) was not-handled, and «…בנקודה B» was mis-grabbed by `lineMeetsCircle` and built NOTHING (a `line-through chord-AD` to a never-created D). The new `secantFarPoint` rule (before `lineMeetsCircle`) creates D as a free-θ on-circle far crossing and the named near crossing B via line∩circle with a one-sided order A→B→D keeping D on the far side.
 ### `secant-from-point-far-crossing` — «מנקודה A יוצא חותך למעגל בנקודה D» — the from-point secant phrasing (issue #136, ADR-332)

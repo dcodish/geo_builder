@@ -204,6 +204,22 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-on-line",
     ],
   },
+  "DM*ME = BM*DR": {
+    "en": [
+      "segment",
+      "segment",
+      "segment",
+      "segment",
+      "set-length-product",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "segment",
+      "segment",
+      "set-length-product",
+    ],
+  },
   "E is the intersection of the tangent to circle O at A and BC": {
     "en": [
       "circle",
@@ -474,6 +490,22 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "segment",
       "segment",
       "set-angle",
+    ],
+  },
+  "arc AB = 40 in circle O": {
+    "en": [
+      "set-angle",
+    ],
+    "he": [
+      "set-angle",
+    ],
+  },
+  "arc AC + arc BE = arc AD + arc BC in circle O": {
+    "en": [
+      "set-measure-sum",
+    ],
+    "he": [
+      "set-measure-sum",
     ],
   },
   "arc DE = 2 arc CE in circle O": {

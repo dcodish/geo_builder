@@ -48,7 +48,8 @@
       "valueless-query": "To act on an angle or a length the tool needs a stated value: write e.g. \"angle DEF = 60\" and it will be enforced and verified. This tool draws and verifies givens — it does not solve the question.",
       "orientation": "Direction and placement on the screen (horizontal, upper, to the right…) are not geometric givens — the tool picks a layout itself, and \"show another configuration\" varies it. The shape is determined only by the givens you type.",
       "bare-point": "A lone point does not build anything yet — say where it sits: e.g. \"point D on AB\", \"M outside the circle\", or start from a shape (\"triangle ABC\").",
-      "unnamed-sides": "To set lengths, name the sides: type e.g. \"AB = 10\" and \"BC = 5\" (or start with \"triangle ABC\", then the lengths), instead of \"one side… the other side…\"."
+      "unnamed-sides": "To set lengths, name the sides: type e.g. \"AB = 10\" and \"BC = 5\" (or start with \"triangle ABC\", then the lengths), instead of \"one side… the other side…\".",
+      "compound-relation": "Part of this compound relation isn’t supported yet. Supported: same-unit sums like \"arc AC + arc BE = arc AD + arc BC\", \"AB + CD = EF\", \"∠A + ∠B = 180\", and length products/proportions like \"DM·ME = BM·DR\" or \"DM/ME = BM/DM\". A sum can’t mix lengths with angles, and a product needs the same number of segments on each side — restate the given in one of these forms."
     },
     "producedNothing": "I understood that but it didn't build anything on the figure — I tried rephrasing it too. Check the names/relations, or word it differently.",
     "alreadyDrawn": "That's already on the figure — nothing to add.",

@@ -1389,6 +1389,33 @@ const arcEquality: Rule = (s, ctx) => {
 };
 
 /**
+ * "קשת AB = 40" / "arc AB = 40°" / "⌢{AB} = 40" — an ABSOLUTE arc-measure given (operator request at the
+ * ADR-335 play-gate). An arc's measure IS its central angle (ADR-116), so this lowers to `set-angle` at
+ * the circle's centre — the exact centralAngle (#106/ADR-323) lowering, minus the radii (an arc lives on
+ * the circle boundary; no radii are drawn, matching arcEquality's discipline). The circle resolves like
+ * every arc rule (named / circumscribing / the one implicit circle, ADR-029). HONESTY: before this rule
+ * the utterance fell through to `distanceConstraint`, which committed the arc's DEGREES as a chord
+ * LENGTH (`set-distance |AB| = 40`) with the word קשת silently dropped and every gate quiet — the same
+ * green-but-wrong family as #153. So an arc-flavoured value with NO resolvable circle returns 'stop'
+ * (recognized but unreadable → escalate), never a fall-through to the length rules.
+ */
+const arcValue: Rule = (s, ctx) => {
+  if (!/arc|קשת|⌢|⏜/i.test(s)) return null;
+  if (/midpoint|אמצע/i.test(s)) return null; // "midpoint of arc …" → arcMidpoint
+  // the circle reference may trail the VALUE («arc AB = 40 in circle O») — tolerate it after the number
+  const m = s.match(/^(.*?)=\s*(-?\d+(?:\.\d+)?)\s*°?\s*(?:(?:ב-?)?(?:ה?מעגל|in\s+circle|circle)\s+[A-Za-z]\d*\s*)?$/is);
+  if (!m) return null; // no numeric RHS — the ratio/equality forms belong to arcEquality/measureSum
+  const stripped = dropCircleRef(m[1]).replace(/arcs?|הקשת|קשת|⌢|⏜|[{}]|\bin\b|\bof\b|של|ב-?/gi, ' ');
+  const pair = labelRun(stripped, 2);
+  if (!pair || (stripped.match(/[A-Z]\d*/g) ?? []).length !== 2) return null; // not a single-arc value shape
+  const center = resolveCenter(s, ctx);
+  if (!center) return 'stop'; // an arc measure with no circle — never let the length rules claim the number
+  const value = parseFloat(m[2]);
+  if (!(value > 0 && value < 360)) return 'stop'; // an arc measure is a positive angle
+  return [{ type: 'set-angle', vertex: up(center), ray1: pair[0], ray2: pair[1], value, arcOf: circleId(center) }];
+};
+
+/**
  * The descriptor nouns that can NAME the carrier a point rides on — chord/side/segment/diagonal, and
  * (PAR-5) a circle's diameter/radius, in both languages. A point ON a diameter/radius is a point on the
  * chord/centre→rim SEGMENT (the diameter IS segment AB; the radius IS segment OB), so the point-on rules
@@ -1641,6 +1668,260 @@ const numexprVal = (g: Record<string, string | undefined>, p: string): { value: 
   const denom = hasDivisor(g, p) ? numTermVal(g, `${p}B`) : 1;
   if (denom === null || denom === 0) return null;
   return { value: numer / denom, text: (g[`${p}all`] ?? '').replace(/\s+/g, '') };
+};
+
+// ── Compound measure relations (#153/#145/#154/#144) ─────────────────────────────────────────────
+// A relation whose side is a TERM LIST — «קשת AC + קשת BE = קשת AD + קשת BC», «AB + CD = EF»,
+// «∠A + ∠B = 180», «DM·ME = BM·DR», «DM/ME = BM/DM». Before these rules the first-match-wins
+// relation rules TRUNCATED such input to the first bare two-operand sub-relation (labelRun grabs the
+// first run; equalSegments' unanchored regex slides to an interior «ME=BM») and committed a WRONG
+// constraint with every honesty gate silent — the #153/#145 P1 class. The rules here are
+// ALL-OR-NOTHING: a side with any unreadable chunk returns null (never a partial claim), and the
+// `droppedCompoundRelation` gate (the structural sibling of `droppedGivenRelations`) refuses any
+// OTHER rule's lowering of an utterance with this shape, on both commit paths.
+
+/** One parsed additive term: a coefficient times a measure (a segment length or an angle). */
+type MeasureTerm = { coef: number; kind: 'length' | 'angle'; ids: Id[] }; // ids: [a,b] | [a,vertex,b]
+type MeasureSide = { terms: MeasureTerm[]; constant: number };
+
+const ARC_KW = /arcs?|הקשת|קשת|⌢|⏜/i;
+const ANGLE_KW = /angle|∠|∢|הזוו?ית|זוו?ית/i;
+/**
+ * The additive joiner between measure terms: `+` and the true minus `−` unconditionally; the ASCII
+ * HYPHEN only when flanked by measure-ish material — a Hebrew conjunction/preposition hyphen
+ * («ו-CL», «ב-F», «ל-D») must NEVER read as subtraction (it broke «D = חיתוך AK ו-CL»).
+ */
+const ADDITIVE_JOIN = String.raw`\+|−|(?<=[A-Z\d°²)\s])-(?=[\sA-Z\d√(])`;
+/** Split a relation side into its additive chunks (separators dropped) — shared by rule + gate. */
+const splitAdditive = (side: string): string[] =>
+  side.replace(/\|/g, ' ').split(new RegExp(`(?:${ADDITIVE_JOIN})`, 'u')).map((c) => c.trim()).filter((c) => c !== '');
+/** Leading NUMEXPR coefficient of a chunk (radicals/quotients ride along — «√(3)·קשת AC», «2·AB»). */
+const CHUNK_COEF = new RegExp(String.raw`^\s*${NUMEXPR('mc')}\s*[*·]?\s*`, 'iu');
+/** A whole chunk that is a pure numeric value (an additive constant — «180», «20°»). */
+const CHUNK_NUM = new RegExp(String.raw`^\s*${NUMEXPR('mn')}\s*°?\s*$`, 'iu');
+
+/**
+ * Parse one side of a compound relation into coef·measure terms + a numeric constant — ALL-OR-NOTHING
+ * (any unreadable chunk fails the whole side, so a partial reading can never be committed). Chunks are
+ * split on top-level `+`/`−`; each is `[coef ·] (arc PAIR | angle TRIPLE-or-VERTEX | PAIR | PAIR/n |
+ * number)`. Arc terms lower to their CENTRAL angle (arc XY on the circle at O ≡ ∠XOY, ADR-116) via the
+ * side-invariant `center`; a single-vertex angle resolves its arms from ctx.neighbors (ADR-164) or
+ * reports the ambiguity. Returns null (unreadable) | Clarify (ambiguous single-vertex angle) | side.
+ */
+function parseMeasureSide(raw: string, ctx: ParseContext, center: string | null): MeasureSide | Clarify | null {
+  const side: MeasureSide = { terms: [], constant: 0 };
+  // Drop |·| absolute-value pipes, then split into signed chunks on the guarded additive joiner
+  // (a Hebrew conjunction hyphen «ו-CL» is NOT a minus — see ADDITIVE_JOIN).
+  const cleaned = raw.replace(/\|/g, ' ');
+  const pieces = cleaned.split(new RegExp(`(${ADDITIVE_JOIN})`, 'u')).map((p) => (p === '−' ? '-' : p.trim()));
+  let sign = 1;
+  for (let i = 0; i < pieces.length; i++) {
+    const p = pieces[i];
+    if (p === '') continue;
+    if (p === '+') { sign = 1; continue; }
+    if (p === '-') { sign = -1; continue; }
+    let chunk = p;
+    // 1) a pure numeric constant chunk («180», «20°», «√(3)»)
+    const asNum = chunk.match(CHUNK_NUM);
+    if (asNum?.groups) {
+      const v = numexprVal(asNum.groups, 'mn');
+      if (v === null) return null;
+      side.constant += sign * v.value;
+      sign = 1;
+      continue;
+    }
+    // 2) optional leading coefficient
+    let coef = 1;
+    const cm = chunk.match(CHUNK_COEF);
+    if (cm?.groups && termMatched(cm.groups, 'mcA')) {
+      const v = numexprVal(cm.groups, 'mc');
+      if (v === null) return null;
+      coef = v.value;
+      chunk = chunk.slice(cm[0].length);
+    }
+    const labels = chunk.match(/[A-Z]\d*/g) ?? [];
+    // 3) an ARC term → its central angle (needs the resolved circle centre). The label count runs on
+    // the STRIPPED text so a trailing circle reference («arc BC in circle O») isn't read as a 3rd label.
+    if (ARC_KW.test(chunk)) {
+      const stripped = dropCircleRef(chunk).replace(new RegExp(ARC_KW.source, 'gi'), ' ').replace(/\bin\b|\bof\b|של|ב-?/gi, ' ');
+      const pair = labelRun(stripped, 2);
+      if (!pair || !center || (stripped.match(/[A-Z]\d*/g) ?? []).length !== 2) return null;
+      side.terms.push({ coef: sign * coef, kind: 'angle', ids: [pair[0], up(center), pair[1]] });
+      sign = 1;
+      continue;
+    }
+    // 4) an ANGLE term — 3 letters (vertex middle) or a single vertex resolved from the figure
+    if (ANGLE_KW.test(chunk)) {
+      const stripped = chunk.replace(new RegExp(ANGLE_KW.source, 'gi'), ' ');
+      if (labels.length === 3) {
+        const tri = labelRun(stripped, 3);
+        if (!tri) return null;
+        side.terms.push({ coef: sign * coef, kind: 'angle', ids: [tri[0], tri[1], tri[2]] });
+        sign = 1;
+        continue;
+      }
+      const one = labelRun(stripped, 1);
+      if (!one || labels.length > 1) return null;
+      const nb = (ctx.neighbors ?? {})[one[0]] ?? [];
+      if (nb.length !== 2) return { clarify: 'ambiguous-angle', vertex: one[0] };
+      side.terms.push({ coef: sign * coef, kind: 'angle', ids: [nb[0], one[0], nb[1]] });
+      sign = 1;
+      continue;
+    }
+    // 5) a bare segment PAIR («AB»), optionally over a numeric divisor («AB/2»)
+    const pm = chunk.match(/^([A-Z]\d*)\s*([A-Z]\d*)\s*(?:\/\s*(\d+(?:\.\d+)?))?$/);
+    if (pm && labels.length === 2) {
+      const div = pm[3] !== undefined ? parseFloat(pm[3]) : 1;
+      if (div === 0) return null;
+      side.terms.push({ coef: (sign * coef) / div, kind: 'length', ids: [pm[1], pm[2]] });
+      sign = 1;
+      continue;
+    }
+    return null; // an unreadable chunk fails the WHOLE side — never a partial claim
+  }
+  return side;
+}
+
+/**
+ * «קשת AC + קשת BE = קשת AD + קשת BC» / «AB + CD = EF» / «∠ABC + ∠DEF = ∠GHI» / «∠A + ∠B = 180» —
+ * a SIGNED LINEAR COMBINATION of same-unit measures (#153/#154). Lowers to ONE `set-measure-sum`
+ * (Σ coefᵢ·mᵢ = target; RHS terms negated, constants folded into the target) + idempotent segment
+ * draws for the named arms/pairs (arcs draw nothing — they live on the circle boundary, ADR-116).
+ * Claims ONLY a true compound (some side carries ≥2 chunks and ≥2 measure terms overall), so the
+ * bare forms — «AB=CD», «∠ABC=∠DEF», «קשת DE = 2 קשת CE», «AB/CD=2/3» — fall through byte-unchanged
+ * to their existing rules. Mixed length+angle sums are dimensionally invalid → null (the gate
+ * escalates them honestly).
+ */
+const measureSum: Rule = (s, ctx) => {
+  if (/[:]/.test(s)) return null; // colon ratios (segmentRatioColon / dividesInRatio)
+  if (/(?<![A-Za-z])S\s*[_{]|שטח|area|היקף|perimeter/i.test(s)) return null; // the area/perimeter lanes (ADR-118/121/228)
+  const parts = s.split('=');
+  if (parts.length !== 2) return null; // chains «∠1=∠2=∠3» → chainedEquality
+  if (/=\s*\(/.test(s)) return null; // coordinates «A=(3,5)»
+  // Cheap precondition before any real parsing: a top-level additive joiner must exist.
+  if (!new RegExp(ADDITIVE_JOIN, 'u').test(s)) return null;
+  const center = ARC_KW.test(s) ? resolveCenter(s, ctx) : null;
+  const L = parseMeasureSide(parts[0], ctx, center);
+  if (L === null) return null;
+  if ('clarify' in L) return L;
+  const R = parseMeasureSide(parts[1], ctx, center);
+  if (R === null) return null;
+  if ('clarify' in R) return R;
+  const terms = [...L.terms, ...R.terms.map((t) => ({ ...t, coef: -t.coef }))];
+  if (terms.length < 2) return null; // a single measure is the existing rules' territory
+  if (splitAdditive(parts[0]).length < 2 && splitAdditive(parts[1]).length < 2) return null; // no side is a real term list
+  const unit = terms[0].kind;
+  if (terms.some((t) => t.kind !== unit)) return null; // dimensionally mixed — refuse, never guess
+  const target = R.constant - L.constant;
+  const draws: AnyCommand[] = [];
+  const seen = new Set<string>();
+  const draw = (a: Id, b: Id) => {
+    const key = [a, b].sort().join('|');
+    if (a === b || seen.has(key)) return;
+    seen.add(key);
+    draws.push({ type: 'segment', a, b });
+  };
+  for (const t of L.terms.concat(R.terms)) {
+    if (t.kind === 'length') draw(t.ids[0], t.ids[1]);
+    else if (!center || t.ids[1] !== up(center)) {
+      // an angle term draws its arms (the angleEquality pattern); a CENTRAL angle from an arc draws none
+      draw(t.ids[1], t.ids[0]);
+      draw(t.ids[1], t.ids[2]);
+    }
+  }
+  return [
+    ...draws,
+    {
+      type: 'set-measure-sum',
+      unit,
+      coefs: terms.map((t) => t.coef),
+      points: terms.flatMap((t) => t.ids),
+      target,
+    },
+  ];
+};
+
+/** One side of a multiplicative relation: scalar k times a list of 2-id segment factors. */
+function parseProductSide(raw: string): { k: number; factors: [Id, Id][] } | null {
+  // Split into ·/* chunks at the top level; a `/`-quotient is handled by the CALLER (numerator and
+  // denominator arrive here separately). Each chunk: a number (folds into k) or a PAIR[²].
+  const out = { k: 1, factors: [] as [Id, Id][] };
+  for (const piece of raw.replace(/\|/g, ' ').split(/[*·]/)) {
+    let chunk = piece.trim();
+    if (chunk === '') continue;
+    const asNum = chunk.match(CHUNK_NUM);
+    if (asNum?.groups) {
+      const v = numexprVal(asNum.groups, 'mn');
+      if (v === null) return null;
+      out.k *= v.value;
+      continue;
+    }
+    // an optionally-GLUED coefficient before the pair («4DM²»)
+    const cm = chunk.match(CHUNK_COEF);
+    if (cm?.groups && termMatched(cm.groups, 'mcA')) {
+      const v = numexprVal(cm.groups, 'mc');
+      if (v === null) return null;
+      out.k *= v.value;
+      chunk = chunk.slice(cm[0].length);
+    }
+    const pm = chunk.match(/^([A-Z]\d*)\s*([A-Z]\d*)\s*(²|\^2)?$/);
+    if (!pm || (chunk.match(/[A-Z]\d*/g) ?? []).length !== 2) return null;
+    out.factors.push([pm[1], pm[2]]);
+    if (pm[3] !== undefined) out.factors.push([pm[1], pm[2]]); // ² = the factor twice
+  }
+  return out;
+}
+
+/**
+ * «DM·ME = BM·DR» / «DM/ME = BM/DM» / «4·DM² = BM·ME» — a MULTIPLICATIVE relation between segment
+ * lengths (#145/#144, the power-of-a-point / similar-triangle proportion givens; operator ruling
+ * 2026-07-16: accepted as a GIVEN that drives/verifies). Quotients are cross-multiplied here
+ * (DM/ME = BM/DM → DM·DM = ME·BM), squares repeat their factor, numeric coefficients fold into k;
+ * lowers to ONE `set-length-product` (k·∏|lhs| = ∏|rhs|, log-domain residual) + segment draws.
+ * Claims only a true product shape (≥3 factors total, ≥1 per side), so «AB=CD» (equalSegments),
+ * «AB = 2·CD» (ratioConstraint) and «AB/CD = 2/3» (segmentRatio, numeric RHS) fall through
+ * byte-unchanged. UNEQUAL factor degrees (after cross-multiplying) would pin the figure's absolute
+ * scale — refused (null → the gate escalates honestly) rather than built wrong.
+ */
+const lengthProduct: Rule = (s) => {
+  if (/[:]/.test(s) || /=\s*\(/.test(s)) return null;
+  if (/(?<![A-Za-z])S\s*[_{]|שטח|area|היקף|perimeter|קשת|arc|⌢|∠|∢|זוו?ית|angle/i.test(s)) return null;
+  const parts = s.split('=');
+  if (parts.length !== 2) return null;
+  if (/[+−]/.test(s)) return null; // additive shapes are measureSum's
+  const sides: { k: number; factors: [Id, Id][] }[] = [];
+  for (const part of parts) {
+    const [numer, ...dens] = part.split('/');
+    const n = parseProductSide(numer);
+    if (!n) return null;
+    const den = { k: 1, factors: [] as [Id, Id][] };
+    for (const d of dens) {
+      const pd = parseProductSide(d);
+      if (!pd) return null;
+      den.k *= pd.k;
+      den.factors.push(...pd.factors);
+    }
+    if (den.k === 0) return null;
+    sides.push({ k: n.k / den.k, factors: n.factors }, den);
+  }
+  // sides = [Lnum, Lden, Rnum, Rden]; cross-multiply: kL·∏Lnum·∏Rden = kR·∏Rnum·∏Lden
+  const [Ln, Ld, Rn, Rd] = sides;
+  const lhs = [...Ln.factors, ...Rd.factors];
+  const rhs = [...Rn.factors, ...Ld.factors];
+  if (lhs.length === 0 || rhs.length === 0) return null; // «AB/CD = 2/3» — a pair-less side is segmentRatio's
+  if (lhs.length + rhs.length < 3) return null; // «AB = 2CD» — the binary ratio lane
+  if (lhs.length !== rhs.length) return null; // unequal degree pins scale — refused honestly, never built wrong
+  const k = Ln.k / Rn.k;
+  if (!Number.isFinite(k) || k <= 0) return null;
+  const draws: AnyCommand[] = [];
+  const seen = new Set<string>();
+  for (const [a, b] of [...lhs, ...rhs]) {
+    const key = [a, b].sort().join('|');
+    if (a === b || seen.has(key)) continue;
+    seen.add(key);
+    draws.push({ type: 'segment', a, b });
+  }
+  return [...draws, { type: 'set-length-product', k, lhs: lhs.flat(), rhs: rhs.flat() }];
 };
 
 /**
@@ -5739,7 +6020,14 @@ export const RULES: Rule[] = [
   lineLineIntersection,
   centralAngle, // #106: "זוית מרכזית COD" / "…נשענת על קשת CD" — before every generic angle rule
   angleAcuteness, // "∠ABC קהה/חדה" (obtuse/acute) — before the value-based angle rules
+  // Compound measure relations (#153/#145/#154/#144) — MUST precede every truncating relation rule
+  // (arcEquality, angleEquality, chainedEquality, ratioConstraint, segmentRatio, equalSegments): each
+  // of those matches the FIRST bare sub-relation of a «X + Y = Z + W» / «DM·ME = BM·DR» term list and
+  // silently drops the rest. Both claim only true compounds, so the bare forms fall through unchanged.
+  measureSum, // «קשת AC + קשת BE = קשת AD + קשת BC», «AB + CD = EF», «∠A + ∠B = 180» → set-measure-sum
+  lengthProduct, // «DM·ME = BM·DR», «DM/ME = BM/DM», «4·DM² = BM·ME» → set-length-product (cross-multiplied)
   arcEquality, // "⌢DE = 2⌢CE" / "קשת DE = 2 קשת CE" (arc-measure ratio → central-angle ratio) — own keyword, before angleEquality
+  arcValue, // "קשת AB = 40" / "⌢{AB} = 40°" (absolute arc measure → set-angle at the centre) — MUST precede the length-value rules, which used to claim the degrees as a chord LENGTH
   angleEquality, // "∠ABC = ∠DEF" (two angles equal) — before measureAngle/angle, which expect a value RHS
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,
@@ -6391,6 +6679,7 @@ function parseResolved(s: string, ctx: ParseContext): ParseResult {
         droppedCirclePredicate(s, whole.commands) ||
         droppedRadiusSymbol(s, whole.commands).length > 0 ||
         droppedGivenRelations(s, whole.commands).length > 0 ||
+        droppedCompoundRelation(s, whole.commands).length > 0 ||
         droppedRegionSubject(s, whole.commands))) ||
     (!whole.ok && whole.reason !== 'not-handled' && droppedShapeNoun(s, [], ctx))
   ) {
@@ -6830,6 +7119,113 @@ export function droppedGivenRelations(utterance: string, commands: AnyCommand[])
     if (!accounted) dropped.push(m[0].replace(/\s+/g, ' ').trim());
   }
   return [...new Set(dropped)];
+}
+
+/**
+ * The STRUCTURAL honesty gate (#153/#145) — the fifth sibling of droppedNewLabels (ADR-089) /
+ * droppedGivenNumbers (ADR-250) / droppedGivenRelations (ADR-264) / droppedGivenVerbs (ADR-292).
+ *
+ * The class it closes: a relation whose operand is a COMPOUND expression over ≥2 measure terms
+ * («קשת AC + קשת BE = קשת AD + קשת BC», «AB + CD = EF», «DM/ME = BM/DM», «AB + ∠ABC = 90») used to be
+ * TRUNCATED by the first-match-wins relation rules to its first bare sub-relation and committed as a
+ * DIFFERENT, wrong constraint — and every token-presence gate stayed silent, because the wrong
+ * `set-equal` does reference the matched sub-relation's labels. This gate validates STRUCTURE:
+ * a compound-shaped relation is accounted only by a single command that carries every operand label
+ * AND at least as many term/factor SLOTS as the utterance states (the slot COUNT is load-bearing —
+ * a truncated binary constraint can contain every distinct letter of a quotient form like
+ * «DM/ME=BM/DM», so label containment alone would false-negate).
+ *
+ * With the measureSum/lengthProduct rules the supported compounds lower correctly and pass; the gate
+ * remains the permanent net for the forms the capability does NOT cover (a mixed length+angle sum, an
+ * unequal-degree product) and for any regression/LLM lowering that re-truncates. Detection is
+ * deliberately conservative — the exclusions (colon ratios, coordinates, the area/perimeter keyword
+ * lanes, chains, lowercase symbol algebra) each map to a supported non-compound lane.
+ */
+export function droppedCompoundRelation(utterance: string, commands: AnyCommand[]): string[] {
+  const s = normalizeUtterance(utterance);
+  if (/[:]/.test(s) || /=\s*\(/.test(s)) return []; // colon ratios / coordinates
+  if (/(?<![A-Za-z])S\s*[_{]|שטח|area|היקף|perimeter/i.test(s)) return []; // the area/perimeter lanes
+  const parts = s.split('=');
+  if (parts.length !== 2) return []; // chains → chainedEquality; non-relations
+  const arcKw = /arcs?|הקשת|קשת|⌢|⏜/i;
+  const angleKw = /angle|∠|∢|הזוו?ית|זוו?ית/i;
+  // Classify one additive chunk (coef already irrelevant — only the measure ATOM matters here).
+  const atomLabels = (chunkRaw: string): Id[] | null => {
+    const chunk = chunkRaw.replace(/[*·]/g, ' ').trim();
+    const labels = chunk.match(/[A-Z]\d*/g) ?? [];
+    if (arcKw.test(chunk)) {
+      const sl = dropCircleRef(chunk).match(/[A-Z]\d*/g) ?? []; // «arc BC in circle O» — O isn't an arc endpoint
+      return sl.length === 2 ? sl : null;
+    }
+    if (angleKw.test(chunk)) return labels.length === 3 || labels.length === 1 ? labels : null;
+    // a bare pair, possibly with a numeric coefficient/divisor/square glued around it
+    if (labels.length === 2 && /(?<![A-Za-z\d])[A-Z]\d*\s*[A-Z]\d*(?![A-Za-z\d])/.test(chunk)) return labels;
+    return null;
+  };
+  // ── detect the compound structure ──────────────────────────────────────────
+  let stated: Id[] = [];
+  let termCount = 0;
+  let compound = false;
+  // additive: some side splits into ≥2 chunks of which ≥1 is a measure atom, with ≥2 atoms overall
+  {
+    let atoms = 0;
+    let sideWithList = false;
+    for (const part of parts) {
+      const chunks = splitAdditive(part); // the guarded joiner — a «ו-CL» conjunction hyphen is not a minus
+      let sideAtoms = 0;
+      for (const c of chunks) {
+        const ids = atomLabels(c);
+        if (ids) {
+          sideAtoms++;
+          stated.push(...ids);
+        }
+      }
+      atoms += sideAtoms;
+      if (chunks.length >= 2 && sideAtoms >= 1) sideWithList = true;
+    }
+    if (sideWithList && atoms >= 2) {
+      compound = true;
+      termCount = atoms;
+    }
+  }
+  // multiplicative: a pair joined to a pair by */·, a squared pair, or a pair/pair quotient with a
+  // pair on the OTHER side of the '=' too (a numeric other side is the supported set-ratio lane)
+  if (!compound) {
+    stated = [];
+    const pair = String.raw`[A-Z]\d*\s*[A-Z]\d*`;
+    const pairProd = new RegExp(String.raw`(?<![A-Za-z\d])${pair}\s*(?:²|\^2|[*·/]\s*(?:\d+(?:\.\d+)?\s*[*·]?\s*)?${pair}(?![A-Za-z\d]))`);
+    const hasPair = (p: string) => /(?<![A-Za-z\d])[A-Z]\d*\s*[A-Z]\d*(?![A-Za-z\d])/.test(p);
+    const lProd = pairProd.test(parts[0]);
+    const rProd = pairProd.test(parts[1]);
+    if ((lProd || rProd) && hasPair(parts[0]) && hasPair(parts[1])) {
+      compound = true;
+      for (const part of parts) {
+        for (const m of part.matchAll(/(?<![A-Za-z\d])([A-Z]\d*)\s*([A-Z]\d*)(?![A-Za-z\d])/g)) {
+          stated.push(m[1], m[2]);
+          termCount++;
+          if (/²|\^2/.test(part.slice(m.index! + m[0].length, m.index! + m[0].length + 3))) termCount++; // a square is TWO factor slots
+        }
+      }
+    }
+  }
+  if (!compound) return [];
+  // ── accounting: a single structured command must carry every label AND enough slots ────────────
+  const statedSet = [...new Set(stated)];
+  const accounted = commands.some((c) => {
+    const t = (c as { type?: unknown }).type;
+    if (t !== 'set-measure-sum' && t !== 'set-length-product' && t !== 'set-perimeter') return false;
+    const labels = new Set(JSON.stringify(c).match(/[A-Z]\d*/g) ?? []);
+    if (!statedSet.every((l) => labels.has(l))) return false;
+    const cc = c as { coefs?: unknown[]; lhs?: unknown[]; rhs?: unknown[]; ids?: unknown[] };
+    const slots =
+      t === 'set-measure-sum'
+        ? (cc.coefs?.length ?? 0)
+        : t === 'set-length-product'
+          ? ((cc.lhs?.length ?? 0) + (cc.rhs?.length ?? 0)) / 2
+          : (cc.ids?.length ?? 0); // perimeter: one slot per side
+    return slots >= termCount;
+  });
+  return accounted ? [] : [s.replace(/\s+/g, ' ').trim()];
 }
 
 /**
