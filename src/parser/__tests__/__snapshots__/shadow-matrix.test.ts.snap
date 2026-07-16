@@ -153,6 +153,14 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
+      "ratioConstraint",
+    ],
+    "text": "arc AB = 40 in circle O",
+    "winner": "arcValue",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
       "arcEquality",
     ],
     "text": "arc AC + arc BE = arc AD + arc BC in circle O",
@@ -1029,6 +1037,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "lang": "he",
     "text": "קשת DE = 2 קשת CE במעגל O",
     "winner": "arcEquality",
+  },
+  {
+    "lang": "en",
+    "text": "arc AB = 40 in circle O",
+    "winner": "arcValue",
+  },
+  {
+    "lang": "he",
+    "text": "קשת AB = 40 במעגל O",
+    "winner": "arcValue",
   },
   {
     "lang": "en",

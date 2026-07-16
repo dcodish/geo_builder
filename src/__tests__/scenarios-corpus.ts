@@ -158,6 +158,20 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'arc-value-drives-central-angle',
+    title: '«קשת AB = 40» — an absolute arc measure drives the central angle, never a chord length (ADR-335 play-gate request)',
+    guards:
+      'Operator 2026-07-16 (the ADR-335 play-gate): «arc AB = 40» as a given. Before the arcValue rule this fell through to distanceConstraint, committing the arc’s DEGREES as a chord LENGTH (set-distance |AB| = 40) with the word קשת silently dropped and every gate quiet — the same green-but-wrong family as #153. Now it lowers to set-angle at the centre (arc ≡ central angle, ADR-116) and drives a free on-circle endpoint until ∠AOB = 40.',
+    steps: ['מעגל O ברדיוס 5', 'AB מיתר', 'קשת AB = 40'],
+    check(fig) {
+      allStepsOk(fig);
+      const aob = angle(at(fig, 'A'), at(fig, 'O'), at(fig, 'B'));
+      expect(Math.abs(aob - 40), '∠AOB = 40 (the arc measure)').toBeLessThan(0.1);
+      // …and the chord is NOT 40 long (the old wrong lowering would have forced |AB| = 40 on a radius-5 circle — impossible)
+      expect(dist(at(fig, 'A'), at(fig, 'B'))).toBeLessThan(11);
+    },
+  },
+  {
     id: 'q22-arc-sum-enforced-not-truncated',
     title: '«קשת AC + קשת BE = קשת AD + קשת BC» + «S_{CFG}=S_{CGH}» — the full bagrut Q22: the arc SUM enforced whole forces HG ⊥ AB (#153 P1, #154)',
     guards:

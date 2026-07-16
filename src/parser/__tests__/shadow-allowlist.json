@@ -3,6 +3,7 @@
   "shadowPairs": [
     "(anon) → (anon)",
     "arcMidpoint → midpoint",
+    "arcValue → ratioConstraint",
     "area → (anon)",
     "circleSizeExisting → circle",
     "circlesTangent → tangentLine",

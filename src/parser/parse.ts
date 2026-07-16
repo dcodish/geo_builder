@@ -1389,6 +1389,33 @@ const arcEquality: Rule = (s, ctx) => {
 };
 
 /**
+ * "קשת AB = 40" / "arc AB = 40°" / "⌢{AB} = 40" — an ABSOLUTE arc-measure given (operator request at the
+ * ADR-335 play-gate). An arc's measure IS its central angle (ADR-116), so this lowers to `set-angle` at
+ * the circle's centre — the exact centralAngle (#106/ADR-323) lowering, minus the radii (an arc lives on
+ * the circle boundary; no radii are drawn, matching arcEquality's discipline). The circle resolves like
+ * every arc rule (named / circumscribing / the one implicit circle, ADR-029). HONESTY: before this rule
+ * the utterance fell through to `distanceConstraint`, which committed the arc's DEGREES as a chord
+ * LENGTH (`set-distance |AB| = 40`) with the word קשת silently dropped and every gate quiet — the same
+ * green-but-wrong family as #153. So an arc-flavoured value with NO resolvable circle returns 'stop'
+ * (recognized but unreadable → escalate), never a fall-through to the length rules.
+ */
+const arcValue: Rule = (s, ctx) => {
+  if (!/arc|קשת|⌢|⏜/i.test(s)) return null;
+  if (/midpoint|אמצע/i.test(s)) return null; // "midpoint of arc …" → arcMidpoint
+  // the circle reference may trail the VALUE («arc AB = 40 in circle O») — tolerate it after the number
+  const m = s.match(/^(.*?)=\s*(-?\d+(?:\.\d+)?)\s*°?\s*(?:(?:ב-?)?(?:ה?מעגל|in\s+circle|circle)\s+[A-Za-z]\d*\s*)?$/is);
+  if (!m) return null; // no numeric RHS — the ratio/equality forms belong to arcEquality/measureSum
+  const stripped = dropCircleRef(m[1]).replace(/arcs?|הקשת|קשת|⌢|⏜|[{}]|\bin\b|\bof\b|של|ב-?/gi, ' ');
+  const pair = labelRun(stripped, 2);
+  if (!pair || (stripped.match(/[A-Z]\d*/g) ?? []).length !== 2) return null; // not a single-arc value shape
+  const center = resolveCenter(s, ctx);
+  if (!center) return 'stop'; // an arc measure with no circle — never let the length rules claim the number
+  const value = parseFloat(m[2]);
+  if (!(value > 0 && value < 360)) return 'stop'; // an arc measure is a positive angle
+  return [{ type: 'set-angle', vertex: up(center), ray1: pair[0], ray2: pair[1], value }];
+};
+
+/**
  * The descriptor nouns that can NAME the carrier a point rides on — chord/side/segment/diagonal, and
  * (PAR-5) a circle's diameter/radius, in both languages. A point ON a diameter/radius is a point on the
  * chord/centre→rim SEGMENT (the diameter IS segment AB; the radius IS segment OB), so the point-on rules
@@ -6000,6 +6027,7 @@ export const RULES: Rule[] = [
   measureSum, // «קשת AC + קשת BE = קשת AD + קשת BC», «AB + CD = EF», «∠A + ∠B = 180» → set-measure-sum
   lengthProduct, // «DM·ME = BM·DR», «DM/ME = BM/DM», «4·DM² = BM·ME» → set-length-product (cross-multiplied)
   arcEquality, // "⌢DE = 2⌢CE" / "קשת DE = 2 קשת CE" (arc-measure ratio → central-angle ratio) — own keyword, before angleEquality
+  arcValue, // "קשת AB = 40" / "⌢{AB} = 40°" (absolute arc measure → set-angle at the centre) — MUST precede the length-value rules, which used to claim the degrees as a chord LENGTH
   angleEquality, // "∠ABC = ∠DEF" (two angles equal) — before measureAngle/angle, which expect a value RHS
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,

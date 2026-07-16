@@ -96,6 +96,33 @@ describe('measureSum — sums of arcs / segments / angles (#153/#154)', () => {
   });
 });
 
+describe('arcValue — an ABSOLUTE arc measure «קשת AB = 40» (operator play-gate request)', () => {
+  it('lowers to set-angle at the centre — He / En / glyph / braced / degree-glyph forms', () => {
+    for (const u of ['קשת AB = 40', 'arc AB = 40', '⌢AB=40', '⌢{AB} = 40', 'קשת AB = 40°', 'arc AB in circle O = 40']) {
+      const cs = cmdsOf(u);
+      expect(cs, u).toEqual([{ type: 'set-angle', vertex: 'O', ray1: 'A', ray2: 'B', value: 40 }]);
+    }
+  });
+
+  it('HONESTY: the arc degrees are never again committed as a chord LENGTH', () => {
+    for (const u of ['קשת AB = 40', '⌢AB=40']) {
+      expect(cmdsOf(u).some((c) => c.type === 'set-distance'), u).toBe(false);
+    }
+  });
+
+  it('no resolvable circle → recognized-but-unreadable (escalates), never a length fall-through', () => {
+    const bare = parse('קשת AB = 40', {});
+    expect(bare.ok).toBe(false);
+    if (bare.ok) return;
+    expect(bare.reason).toBe('not-handled');
+  });
+
+  it('no theft: a plain length «AB = 40» keeps its set-distance; the ratio form keeps arcEquality', () => {
+    expect(cmdsOf('AB = 40').some((c) => c.type === 'set-distance')).toBe(true);
+    expect(cmdsOf('קשת DE = 2 קשת CE').some((c) => c.type === 'set-angle-ratio')).toBe(true);
+  });
+});
+
 // ── the multiplicative family parses to ONE set-length-product ──────────────
 
 describe('lengthProduct — products / proportions of lengths (#145/#144)', () => {

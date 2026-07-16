@@ -22,6 +22,8 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `arc-value-drives-central-angle` — «קשת AB = 40»: an absolute arc measure drives the central angle (ADR-335 play-gate)
+Operator 2026-07-16: «arc AB = 40» as a given. Before `arcValue` this fell through to `distanceConstraint` — the arc's DEGREES committed as a chord LENGTH, the word קשת dropped, all gates quiet (the #153 family). Now: `set-angle` at the centre (arc ≡ central angle, ADR-116); no circle resolvable → 'stop' (escalate), never a length fall-through.
 ### `q22-arc-sum-enforced-not-truncated` — the FULL bagrut Q22: arc-sum + `S_{CFG}=S_{CGH}` force HG ⊥ AB (#153 P1 / #154)
 Operator 2026-07-15/16 (sessions `qx5a19co` + `wn3axiea`; exam text supplied 2026-07-16): the arc-SUM given parsed green but `arcEquality` truncated it to the first arc of each side — the figure was constrained by ∠AOC = ∠AOD, a DIFFERENT given, every honesty gate silent. Now `measureSum` lowers the whole term list to ONE `set-measure-sum` over the central angles, and with the exam's REAL second given — the AREA equality `S_{CFG}=S_{CGH}` (the issue text had mis-transcribed it as an angle equality) — the exam theorem is FORCED: arc condition ⇒ CF=CG; area equality over collinear bases (D-F-C-H) ⇒ CF=CH; Thales converse ⇒ **HG ⊥ AB** (cos = 0.0000 measured). Both chords must carry the מיתר noun (a bare «CD חותך…» leaves D off the circle — honest per ADR-052, but «קשת AD» is then meaningless).
 ### `q22-arc-sum-typed-early-order-independence` — the arc-sum typed EARLY still builds (M2/ADR-104)

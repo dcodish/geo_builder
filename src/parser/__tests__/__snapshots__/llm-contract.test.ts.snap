@@ -492,6 +492,14 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "set-angle",
     ],
   },
+  "arc AB = 40 in circle O": {
+    "en": [
+      "set-angle",
+    ],
+    "he": [
+      "set-angle",
+    ],
+  },
   "arc AC + arc BE = arc AD + arc BC in circle O": {
     "en": [
       "set-measure-sum",
