@@ -55,7 +55,7 @@
     "alreadyDrawn": "That's already on the figure — nothing to add.",
     "ambiguousAngle": "There's more than one angle at {{vertex}}, so I can't tell which one you mean. Name all three letters of the angle — e.g. \"∠A{{vertex}}C = 90\".",
     "ambiguousCircle": "There are two circles around {{center}}, so I can't tell which one you mean. Say \"the outer circle\" or \"the inner circle\".",
-    "unknownCircle": "There is no circle named {{center}}. More than one unnamed circle is drawn — name one first, e.g.: the centre of the big circle is {{center}}.",
+    "unknownCircle": "There is no circle named {{center}}. More than one unnamed circle is drawn — name one first, e.g.: the centre of the right circle is {{center}}.",
     "partial": "Couldn't draw this part",
     "labelsDropped": "I only partly understood — I couldn't place {{labels}}. Rephrase the step (e.g. split it in two).",
     "rename_no-source": "There's no point {{from}} to rename.",

@@ -1210,3 +1210,7 @@ over all four (ADR-041).
 ### `unknown-circle-name-binds-unnamed-circle` — «מעגל O1»/«מעגל O2» bind the two unnamed circles (#186, ADR-347)
 
 **Guards against:** prod session `hqxbjh0x` — a circle referenced by a name that matches no circle was silently INVENTED as a new circle (wrong figure, green) or left a dangling reference surfacing the raw «unresolved dependencies for: E». **Asserts:** after «שני מעגלים נחתכים» + the LLM chord placing D,F on the second circle, «D ו F על מעגל O1» binds that circle by the membership signal and «E ו C על מעגל O2» binds the sole remaining unnamed one; exactly two circles remain (`circle-O1`, `circle-O2`), all four memberships hold geometrically, and no auto centre stays hidden. Unit coverage: `circle-name-binding.test.ts`, `dangling-circle.test.ts`.
+
+### `chord-in-the-right-circle` — «מיתר DF במעגל הימני» resolves deterministically (#188, ADR-349)
+
+**Guards against:** a directional circle reference («המעגל הימני/השמאלי» / right|left) escalating to the LLM — the prod session hqxbjh0x utterance. **Asserts:** on two unnamed intersecting circles, the chord lands on the circle whose centre is drawn further right; every step green. Unit coverage: `directional-circle.test.ts`.

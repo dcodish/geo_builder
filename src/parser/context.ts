@@ -60,6 +60,14 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     radiusOrder: construction.objects.flatMap((o) =>
       o.kind === 'circle' && o.orderedBelow ? [{ outer: o.orderedBelow, inner: o.id }] : [],
     ), // recorded size roles — «המעגל הגדול/הקטן» resolves consistently once assigned (issue #102)
+    circleXs: construction.objects.flatMap((o) => {
+      // each referenceable centre's drawn x — «המעגל הימני/השמאלי» (the right/left circle, #188) resolves
+      // a POINTING gesture against what the student is looking at; dedupe follows `circles` (a concentric
+      // pair is ONE referenceable centre).
+      if (o.kind !== 'circle' || o.center.startsWith('~')) return [];
+      const c = positions.get(o.center);
+      return c ? [{ center: ctrToken(o.center), x: c.x }] : [];
+    }),
     circleSizes: construction.objects.flatMap((o) => {
       if (o.kind !== 'circle') return [];
       // the circle's CURRENT drawn size (seed base for a free radius; |centre·through| when derivable) —
