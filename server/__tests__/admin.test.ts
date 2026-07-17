@@ -10,7 +10,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { writeFile, rm, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { handleAdmin, aggregate, filterEvents, releasesOf, PROFILE_3D, type Stats } from '../admin';
+import { handleAdmin, aggregate, filterEvents, releasesOf, readVerdicts, PROFILE_3D, type Stats } from '../admin';
 import type { UsageEvent } from '../eventLog';
 
 const OPTS = { username: 'teacher', password: 's3cret', cookieSecret: 'sign-me', base: '/admin' };
@@ -431,5 +431,76 @@ describe('drill-down into the real-gap / out-of-scope cards', () => {
   it('ignores an unknown view value', async () => {
     const res = await dash('/admin?view=bogus');
     expect(res.body).not.toContain('משפטים שלא הובנו');
+  });
+});
+
+describe('#183 — the gap card re-verifies against the triage verdict map', () => {
+  const evs: UsageEvent[] = [
+    { serverTs: '2026-07-01T09:00:00Z', iph: 'h1', ev: 'session', sid: 's1' },
+    { serverTs: '2026-07-01T09:01:00Z', iph: 'h1', ev: 'submit', sid: 's1', utterance: 'גובה מ B', locale: 'he', source: 'llm', result: 'not-understood' },
+    { serverTs: '2026-07-02T09:01:00Z', iph: 'h2', ev: 'submit', sid: 's2', utterance: 'גובה מ B', locale: 'he', source: 'llm', result: 'not-understood' },
+    { serverTs: '2026-07-03T09:01:00Z', iph: 'h3', ev: 'submit', sid: 's3', utterance: 'משהו שעדיין נכשל', locale: 'he', source: 'llm', result: 'not-understood' },
+  ];
+
+  async function dashWith(verdicts: object | string | null, url = '/admin?view=gaps') {
+    await writeFile(logPath, evs.map((e) => JSON.stringify(e)).join('\n'), 'utf8');
+    if (verdicts !== null) {
+      const body = typeof verdicts === 'string' ? verdicts : JSON.stringify(verdicts);
+      await writeFile(path.join(path.dirname(logPath), 'verdicts-2d.json'), body, 'utf8');
+    }
+    const login = mockRes();
+    await run(mockReq('POST', '/admin/login', ['username=teacher&password=s3cret']), login, logPath);
+    const cookie = cookieFrom(login.headers['set-cookie']);
+    const res = mockRes();
+    await run(mockReq('GET', url, [], { cookie }), res, logPath);
+    return res;
+  }
+
+  it('readVerdicts: absent → null, torn → null, valid → parsed', async () => {
+    expect(await readVerdicts(path.join(path.dirname(logPath), 'nope.json'))).toBeNull();
+    const torn = path.join(path.dirname(logPath), 'torn.json');
+    await writeFile(torn, '{"rev": "abc", "verd', 'utf8');
+    expect(await readVerdicts(torn)).toBeNull();
+    const good = path.join(path.dirname(logPath), 'good.json');
+    await writeFile(good, JSON.stringify({ rev: 'abc1234', generatedAt: '2026-07-17T10:00:00Z', verdicts: { 'x': 'built' } }), 'utf8');
+    expect((await readVerdicts(good))?.rev).toBe('abc1234');
+  });
+
+  it('with NO verdict file the drill says plainly that nothing was re-verified', async () => {
+    const res = await dashWith(null);
+    expect(res.body).toContain('אין נתוני אימות');
+    expect(res.body).toContain('גובה מ B'); // both rows still listed as-is
+    expect(res.body).toContain('משהו שעדיין נכשל');
+  });
+
+  it('a verified-BUILT row moves out of the worklist into «תוקן מאז», the rest carry their verdict', async () => {
+    const res = await dashWith({
+      rev: 'abc1234',
+      generatedAt: '2026-07-17T10:00:00Z',
+      verdicts: { 'גובה מ B': 'built', 'משהו שעדיין נכשל': 'not-handled' },
+    });
+    expect(res.body).toContain('נבדק מחדש מול הקוד הנוכחי');
+    expect(res.body).toContain('abc1234'); // the revision is visible, so staleness is judgeable
+    expect(res.body).toContain('תוקן מאז — נבנה בקוד הנוכחי (1)');
+    expect(res.body).toContain('✗ עדיין פער'); // the open row's current verdict
+    // the fixed section lists the fixed utterance AFTER the open table (moved, not annotated in place)
+    expect(res.body.indexOf('משהו שעדיין נכשל')).toBeLessThan(res.body.indexOf('גובה מ B'));
+  });
+
+  it('the gap CARD shows the still-open count (prod events minus verified-built ones)', async () => {
+    const res = await dashWith(
+      { rev: 'abc1234', generatedAt: '2026-07-17T10:00:00Z', verdicts: { 'גובה מ B': 'built' } },
+      '/admin',
+    );
+    // 3 gap events total, 2 of them the fixed utterance → the card reads 1 with the fixed note
+    expect(res.body).toContain('תוקנו מאז: 2');
+    expect(res.body).toMatch(/<div class="n">1<\/div><div class="l">פערים אמיתיים/);
+  });
+
+  it('an unknown verdict for a listed row renders as unknown (—), never as fixed', async () => {
+    const res = await dashWith({ rev: 'abc1234', generatedAt: '2026-07-17T10:00:00Z', verdicts: {} });
+    expect(res.body).toContain('נבדק מחדש מול הקוד הנוכחי');
+    expect(res.body).not.toContain('תוקן מאז');
+    expect(res.body).toContain('גובה מ B');
   });
 });

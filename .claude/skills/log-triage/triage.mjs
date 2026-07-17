@@ -515,7 +515,20 @@ function reportFor(a) {
   s += `\n## ◇ Parses but builds nothing — context / re-declaration (M1), not a grammar gap\n${context.length ? tbl(context, 'cmds') : '_none_'}\n`;
   s += `\n## ⚠ Reasoned refusals / clarify (review)\n${review.length ? tbl(review, 'code') : '_none_'}\n`;
   s += `\n## ? UNVERIFIED — only ever seen after a step we couldn't replay (an LLM step with no logged commands — pre-#84, or 3-D per #182 — or a store action), or over budget. NOT evidence either way\n${unverified.length ? tbl(unverified, 'why') : '_none_'}\n`;
-  return { md: s, live };
+
+  // #183: distill each candidate's CURRENT verdict for the admin dashboard's gap card — the same
+  // bucket rule as the report above (a degraded-prefix failure is 'unverified', never a claim), so the
+  // card and this report can never disagree. Keyed by the normalized utterance.
+  const verdictMap = {};
+  for (const c of cands) {
+    if (c.u === '(empty)' || noVerify) continue;
+    const v = c.verify;
+    verdictMap[c.u] =
+      (v.degraded && (v.now === 'not-handled' || v.now === 'refused' || v.now === 'error')) || v.now === 'unverified'
+        ? 'unverified'
+        : v.now;
+  }
+  return { md: s, live, verdictMap };
 }
 
 // ---- run -----------------------------------------------------------------
@@ -525,7 +538,31 @@ out += `> **▶ LIVE is the worklist.** Every utterance is re-run through the Ap
 out += `> \`parse\` WITH the session's figure as context → clarify → the pre-LLM out-of-scope register → the honesty\n`;
 out += `> gates → replay (ADR-346, issue #35). So already-fixed, guided-refusal, would-escalate and\n`;
 out += `> unreplayable-prefix items are separated out and are NOT gaps. Cluster the LIVE rows by intent and recommend.\n`;
-for (const a of APPS) out += reportFor(a).md;
+const verdictMaps = {};
+for (const a of APPS) {
+  const r = reportFor(a);
+  out += r.md;
+  verdictMaps[a] = r.verdictMap ?? {};
+}
 const file = path.join(reportsDir, `log-triage-${APPS.join('+')}-${new Date().toISOString().slice(0, 10)}.md`);
 writeFileSync(file, out);
+// #183: publish the distilled verdict map next to the prod events file (the same SSH channel as the
+// pull, reverse direction), so the admin dashboard's «פערים אמיתיים» card can annotate its rows with
+// what the CURRENT code does instead of presenting already-fixed input as work to do. Best-effort:
+// an offline run still writes the local file and the report; the dashboard states data age itself.
+if (!noVerify) {
+  for (const a of APPS) {
+    const payload = { app: a, rev: headRev, generatedAt: new Date().toISOString(), verdicts: verdictMaps[a] };
+    const vfile = path.join(cacheDir, `triage-verdicts-${a}.json`);
+    writeFileSync(vfile, JSON.stringify(payload));
+    if (!noFetch) {
+      try {
+        execFileSync('scp', ['-q', vfile, `${server}:${remoteDir}/verdicts-${a}.json`], { stdio: ['ignore', 'ignore', 'inherit'] });
+        process.stderr.write(`verdicts uploaded: ${remoteDir}/verdicts-${a}.json (@ ${headRev})\n`);
+      } catch {
+        process.stderr.write(`verdicts upload FAILED for ${a} — the dashboard will show its last-known verdict age\n`);
+      }
+    }
+  }
+}
 process.stdout.write(out + `\n\nwritten: ${path.relative(repoRoot, file)}\n`);
