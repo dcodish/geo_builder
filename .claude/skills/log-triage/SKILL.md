@@ -24,14 +24,21 @@ npx vite-node .claude/skills/log-triage/triage.mjs --app 3d --no-fetch # reuse l
 Run it with **vite-node** (it imports the real TS parsers/builders). It:
 1. SSH-pulls the log to `logs/prod-events-*.jsonl` (gitignored).
 2. Classifies every submit; dedups the interesting buckets by **distinct users** (so one power-user can't skew priorities).
-3. **Re-runs each distinct utterance through the CURRENT code** — `parse`+`replay` (2-D) / `parse3`+`derive3` (3-D) — and sorts it by its outcome TODAY:
-   - **▶ LIVE grammar gaps** — still `not-handled` on HEAD → *the worklist*.
-   - **✓ Already fixed — AUTO-REMOVED** — builds now (the user hit a stale cached bundle, or we fixed it after they logged it). This is the "remove what we already fixed" step, automatic.
-   - **◇ Parses but builds nothing standalone** — context / re-declaration (the M1 class), not a grammar gap.
-   - **⚠ Reasoned refusals / needs prior context** — real `err.code`s or utterances that need an earlier fact (e.g. a plane referenced before it's defined).
+3. **Re-runs every utterance through the App's REAL submit path** ([ADR-346](../../../docs/06-decisions.md#adr-346)) — each session's (`sid`) submits replayed **in order**, so a construct sees the figure the student actually had. Per utterance: store ops → `parse(u, buildParseCtx(figure))` → clarify → the pre-LLM out-of-scope register → the five honesty gates → `replay`. An utterance is judged by its **best outcome across occurrences**. Buckets:
+   - **▶ LIVE grammar gaps** — still `not-handled` in a real session context → *the worklist* (the App would escalate these to the LLM).
+   - **✓ Already fixed — AUTO-REMOVED** — builds now, in context.
+   - **⇗ Would ESCALATE** — parses, but an honesty gate drops a stated given, so the App sends it to the LLM rather than committing. A *partial-parse* signal, not a grammar gap.
+   - **⊘ Guided out-of-scope** — the App answers these on purpose, pre-LLM (ADR-289: `analytic`, `orientation`, `ui-command`, `cross-app`, …). **Not gaps.**
+   - **◇ Parses but builds nothing** — context / re-declaration (the M1 class).
+   - **⚠ Reasoned refusals / clarify** — real `err.code`s and `ambiguous-*` clarifications.
+   - **? UNVERIFIED** — seen only after a step we cannot replay, or over the session budget. **Not evidence either way** (see below).
 4. Writes the report to `reports/log-triage-*.md` (gitignored) and prints it.
 
-You reason over the **▶ LIVE** section — the already-fixed items are gone, so nothing you recommend is a duplicate of what already ships.
+You reason over the **▶ LIVE** section — already-fixed, guided, would-escalate and unverified rows are separated out, so nothing you recommend is a duplicate of what already ships or of what the tool answers deliberately.
+
+> **The one blind spot — don't paper over it.** The event log stores utterances, never the LLM's returned commands. So after an `llm-built` step our replayed prefix is genuinely missing objects, and any later failure in that session may be *our artifact*. Those verdicts are marked `degraded`, never become LIVE rows, and land in **? UNVERIFIED**. If a `?` row matters to a recommendation, re-check it by hand (build the prefix yourself) — never promote it to a gap on the strength of the report alone.
+
+> **Keeping the mirror honest ([ADR-346](../../../docs/06-decisions.md#adr-346)).** This harness's verify path mirrors `App.tsx#submit`, and that mirror has drifted **three times**, each time silently converting the instrument into confident false signal (issue #35). `src/parser/__tests__/triage-mirror.test.ts` fails when the App's `PRE_LLM` set or its gate call-list changes without this file following — but it is a *text* guard and cannot prove semantic equivalence. **When the App's submit path changes, update `triage.mjs` in the same commit.** A missing gate is a false gap; a skipped gate silently marks a real gap "already fixed."
 
 ## Step 2 — cluster the LIVE gaps by intent
 
@@ -59,4 +66,5 @@ Summarize the top recommendations inline (and they're already persisted in the r
 - Prioritize by **distinct users**, not raw submit count.
 - Raw pulled logs (`logs/prod-events-*.jsonl`) and reports (`reports/…`) are gitignored — local only; only approved work gets committed as code + ADRs.
 - Utterances are math constructions, not PII; IPs arrive already hashed. Safe to analyze.
-- Keep the classifier + build paths in `triage.mjs` in sync with `server/admin.ts` and the store APIs if they change.
+- Keep the classifier + build paths in `triage.mjs` in sync with `server/admin.ts`, `App.tsx#submit`, and the store APIs if they change — `src/parser/__tests__/triage-mirror.test.ts` guards the submit mirror (ADR-346), nothing guards the `admin.ts` bucket mirror.
+- A **`⊘ guided`** or **`⇗ would-escalate`** row is not a gap. If you want to change what the tool does there, that's a product decision (the scope register / a gate) — raise it as such, don't file it as missing grammar.
