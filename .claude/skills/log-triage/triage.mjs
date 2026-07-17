@@ -42,9 +42,22 @@
  * gaps — that is the same false-signal class this file exists to kill. An utterance is judged by its BEST
  * outcome over all its occurrences: if it builds in any real context, it is not a gap.
  *
+ * INCREMENTAL (operator ruling 2026-07-17, [ADR-346](../../../docs/06-decisions.md#adr-346) Am. 2) — two
+ * separate problems, deliberately solved differently:
+ *   COST. Session verdicts are cached in `logs/triage-state-<app>.json` (gitignored: raw utterances stay out
+ *     of git per this skill's privacy posture, and a fresh machine simply does one full run). A later run
+ *     replays only sessions that are NEW, that grew, or that hold a STILL-OPEN row (the set whose verdict can
+ *     actually improve). Sessions where everything already builds are trusted from cache — a regression there
+ *     is the test suite's job, not triage's. `--reverify` forces the full sweep.
+ *   NOISE. Counts stay ALL-TIME — a naive "only new events" watermark would reset distinct-user counts each
+ *     window, so a slow-burning cluster (3 users over 3 months) would read as 1 user and rank low, breaking
+ *     the skill's core prioritization rule. Instead the LIVE worklist SPLITS: rows never reported before are
+ *     ▶ NEW; rows surfaced in an earlier run collapse into ↩ carried-over with their first-seen date.
+ *
  * Options: --server root@themathbible.com  --remote-dir /var/www/geo-proxy
  *          --days N (0=all)  --release <substr>  --top 80  --no-fetch  --no-verify
  *          --session-budget-ms N (default 60000; overrun → honest `unverified`, never a silent drop)
+ *          --reverify (ignore the session cache)  --no-state (don't read or write the state file)
  */
 
 import { execFileSync } from 'node:child_process';
@@ -70,6 +83,8 @@ const top = Number(opt('--top', '80'));
 const release = opt('--release', '');
 const noFetch = has('--no-fetch');
 const noVerify = has('--no-verify');
+const reverify = has('--reverify');
+const noState = has('--no-state');
 const sessionBudgetMs = Number(opt('--session-budget-ms', '60000'));
 
 const repoRoot = path.resolve(process.cwd());
@@ -133,6 +148,30 @@ function load(a) {
   }
   return { events, submits: events.filter((e) => e.ev === 'submit'), sessions: sessions.size, visitors: visitors.size };
 }
+
+// ---- incremental state (ADR-346 Am. 2) -----------------------------------
+// Gitignored, per-machine: raw utterances stay out of git (this skill's privacy posture), and a fresh
+// machine just does one full run. Deliberately minimal — it holds ONLY what cannot be re-derived from the
+// log: per-session verdicts (the COST half) and a `reportedAt` stamp per utterance (the NOISE half —
+// "have we already put this in front of the operator?"). First-seen is NOT stored: it comes from the
+// events, so it is stable across runs and machines and honest on a first run over an all-time log.
+const STATE = (a) => path.join(cacheDir, `triage-state-${a}.json`);
+const loadState = (a) => {
+  if (noState) return { version: 1, lastRun: null, sessions: {}, utterances: {} };
+  try {
+    const s = JSON.parse(readFileSync(STATE(a), 'utf8'));
+    if (s.version === 1) return s;
+  } catch { /* first run / unreadable / stale schema → start clean */ }
+  return { version: 1, lastRun: null, sessions: {}, utterances: {} };
+};
+const saveState = (a, s) => { if (!noState && !noVerify) writeFileSync(STATE(a), JSON.stringify(s)); };
+const headRev = (() => {
+  try { return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim(); } catch { return '?'; }
+})();
+/** Verdicts whose answer can still IMPROVE as code lands — their sessions are always re-replayed. The rest
+ *  (built / store-op / guided / built-nothing / clarify / skip) are trusted from cache until `--reverify`:
+ *  a REGRESSION in already-working input is what the test suite is for, not what triage is for. */
+const OPEN = new Set(['not-handled', 'would-escalate', 'refused', 'error', 'unverified']);
 
 // ---- verify: replay each SESSION through the App's submit path ------------
 // The categories App.tsx#submit refuses with a GUIDED message BEFORE ever paying for an LLM call
@@ -262,8 +301,9 @@ function session3d(evs) {
   return out;
 }
 
-/** Replay every session of an app; return normalized-utterance → the outcomes it got across sessions. */
-function verifyAll(a, events) {
+/** Replay every session of an app; return normalized-utterance → the outcomes it got across sessions.
+ *  Sessions are re-replayed only when NEW, GROWN, or holding a still-open row (ADR-346 Am. 2). */
+function verifyAll(a, events, state) {
   const bySid = new Map();
   for (const e of events) {
     const sid = e.sid ?? '(nosid)';
@@ -271,18 +311,25 @@ function verifyAll(a, events) {
     bySid.get(sid).push(e);
   }
   const byUtterance = new Map();
-  let n = 0;
-  for (const [, evs] of bySid) {
-    const outs = (a === '2d' ? session2d : session3d)(evs);
+  let done = 0, replayed = 0, cached = 0;
+  for (const [sid, evs] of bySid) {
+    const prior = state.sessions[sid];
+    // Trust the cache only for a session that is unchanged AND fully settled. Any open row ⇒ re-replay:
+    // that is exactly the "did we fix it since?" question this tool exists to answer.
+    const reusable = !reverify && prior && prior.n === evs.length && !prior.outs.some((o) => OPEN.has(o.now));
+    let outs;
+    if (reusable) { outs = prior.outs; cached++; }
+    else { outs = (a === '2d' ? session2d : session3d)(evs); replayed++; }
+    state.sessions[sid] = { n: evs.length, rev: reusable ? prior.rev : headRev, at: reusable ? prior.at : new Date().toISOString(), outs };
     outs.forEach((o, i) => {
       if (evs[i].ev !== 'submit') return; // `action` rows exist only to degrade the prefix, never to be judged
       const key = norm(evs[i].utterance) || '(empty)';
       if (!byUtterance.has(key)) byUtterance.set(key, []);
       byUtterance.get(key).push(o);
     });
-    if (++n % 10 === 0) process.stderr.write(`  verified ${n}/${bySid.size} ${a} sessions\n`);
+    if (++done % 10 === 0) process.stderr.write(`  ${a}: ${done}/${bySid.size} sessions (${replayed} replayed, ${cached} cached)\n`);
   }
-  return byUtterance;
+  return { byUtterance, replayed, cached };
 }
 
 // Best-outcome rank: if an utterance works in ANY real session context, it is not a gap.
@@ -313,17 +360,32 @@ function reportFor(a) {
     const map = new Map();
     for (const e of arr) {
       const key = norm(e.utterance) || '(empty)';
-      const rec = map.get(key) ?? { count: 0, iphs: new Set(), codes: new Set(), locales: new Set() };
+      const rec = map.get(key) ?? { count: 0, iphs: new Set(), codes: new Set(), locales: new Set(), first: null };
       rec.count++; if (e.iph) rec.iphs.add(e.iph);
       if (e.result && e.result !== 'ok') rec.codes.add(e.result); if (e.locale) rec.locales.add(e.locale);
+      // First-seen comes from the LOG, not from when we happened to run: authoritative, stable across runs
+      // and machines, and honest on a first run over an all-time log (stamping "today" would claim a row
+      // months old was seen this morning). Nothing to persist — it is re-derived every time.
+      const ts = (e.serverTs ?? '').slice(0, 10);
+      if (ts && (!rec.first || ts < rec.first)) rec.first = ts;
       map.set(key, rec);
     }
-    for (const [u, r] of map) cands.push({ u, bucket, count: r.count, users: r.iphs.size, codes: [...r.codes], locales: [...r.locales] });
+    for (const [u, r] of map) cands.push({ u, bucket, count: r.count, users: r.iphs.size, codes: [...r.codes], locales: [...r.locales], firstSeen: r.first });
   }
   // Verify by replaying every session in order (the App's submit path, in context), then judge each
   // distinct utterance by its BEST outcome across occurrences (ADR-346).
-  const verified = noVerify ? new Map() : verifyAll(a, events);
-  for (const c of cands) c.verify = noVerify ? { now: '?', detail: '' } : bestOutcome(verified.get(c.u));
+  const state = loadState(a);
+  const prevRun = state.lastRun;
+  const { byUtterance, replayed, cached } = noVerify
+    ? { byUtterance: new Map(), replayed: 0, cached: 0 }
+    : verifyAll(a, events, state);
+  // `firstSeen` is already derived from the log above. The ONLY thing that needs persisting is whether we
+  // have put this row in front of the operator before — "carried over" means *we already reported it*, not
+  // merely that it existed in the log.
+  for (const c of cands) {
+    c.verify = noVerify ? { now: '?', detail: '' } : bestOutcome(byUtterance.get(c.u));
+    c.reportedAt = state.utterances[c.u]?.reportedAt ?? null;
+  }
 
   // sort each candidate into a REPORT bucket by its CURRENT (post-fix) outcome
   const live = [], fixed = [], context = [], review = [], guided = [], escalate = [], unverified = [];
@@ -344,15 +406,33 @@ function reportFor(a) {
   const byUsers = (x, y) => y.users - x.users || y.count - x.count;
   for (const arr of [live, fixed, context, review, guided, escalate, unverified]) arr.sort(byUsers);
 
+  // The worklist splits NEW vs carried-over (counts above stay ALL-TIME, so ranking is unaffected — the
+  // operator ruling: a watermark that reset distinct-user counts would bury slow-burning clusters).
+  const liveNew = live.filter((c) => !c.reportedAt);
+  const liveOld = live.filter((c) => c.reportedAt);
+  const today = new Date().toISOString().slice(0, 10);
+  for (const c of live) (state.utterances[c.u] ??= {}).reportedAt ??= today; // stamp AFTER the split
+  state.lastRun = new Date().toISOString();
+  saveState(a, state);
+
   const NAME = a === '2d' ? 'Geo Builder (2-D)' : 'Space Builder (3-D)';
   const row = (c, i) => `| ${i + 1} | ${c.users} | ${c.count} | \`${norm(c.u).replace(/\|/g, '\\|').slice(0, 120)}\` | ${c.bucket} | ${c.verify.detail || ''} | ${c.locales.join('/')} |`;
   const tbl = (arr, cols) => [`| # | users | subs | utterance | logged | ${cols} | loc |`, `|--:|--:|--:|---|---|---|---|`, ...arr.slice(0, top).map(row)].join('\n') + (arr.length > top ? `\n_(+${arr.length - top} more)_` : '');
+  // The carried-over table earns one extra column: how long this has been sitting there unactioned.
+  const rowSeen = (c, i) => `${row(c, i)}`.replace(/\|$/, `| ${c.firstSeen ?? '?'} |`);
+  const tblSeen = (arr) => [`| # | users | subs | utterance | logged | now | loc | 1st seen |`, `|--:|--:|--:|---|---|---|---|---|`, ...arr.slice(0, top).map(rowSeen)].join('\n') + (arr.length > top ? `\n_(+${arr.length - top} more)_` : '');
 
   let s = `\n# ${NAME} — usage triage\n`;
   s += `window: ${days > 0 ? `last ${days}d` : 'all time'}${release ? ` · rel~"${release}"` : ''} · submits ${total} · sessions ${sessions} · visitors ${visitors}\n`;
   s += `buckets: ` + Object.entries(counts).sort((x, y) => y[1] - x[1]).map(([b, n]) => `${b} ${n} (${((100 * n) / total || 0).toFixed(0)}%)`).join(' · ') + '\n';
-  s += `verify: session-context replay of the App submit path (ADR-346)${noVerify ? ' — SKIPPED (--no-verify)' : ''}\n`;
-  s += `\n## ▶ LIVE grammar gaps — still not-handled in a REAL session context (the worklist)\n${live.length ? tbl(live, 'now') : '_none_'}\n`;
+  s += `verify: session-context replay of the App submit path (ADR-346)${noVerify ? ' — SKIPPED (--no-verify)' : ` · ${replayed} sessions replayed, ${cached} from cache @ ${headRev}${reverify ? ' (--reverify: full sweep)' : cached ? ' (--reverify for a full sweep)' : ''}`}\n`;
+  s += prevRun ? `previous triage: ${prevRun.slice(0, 10)} — counts below are ALL-TIME; the worklist splits new vs carried-over\n` : `previous triage: none (first run — every row is new)\n`;
+  s += `\n## ▶ LIVE grammar gaps — NEW since the last triage (the worklist)\n${liveNew.length ? tbl(liveNew, 'now') : '_none — no new gaps since the last run_'}\n`;
+  if (liveOld.length) {
+    // Collapsed on purpose: already put in front of the operator once. Still counted, still ranked, not re-argued.
+    s += `\n## ↩ LIVE — carried over (surfaced in an earlier run, still not handled)\n`;
+    s += `<details><summary>${liveOld.length} row(s) — expand</summary>\n\n${tblSeen(liveOld)}\n</details>\n`;
+  }
   s += `\n## ✓ Already fixed since logged — AUTO-REMOVED (builds now, in context)\n${fixed.length ? tbl(fixed, 'builds') : '_none_'}\n`;
   s += `\n## ⇗ Would ESCALATE — parses, but an honesty gate drops a stated given (the App sends these to the LLM)\n${escalate.length ? tbl(escalate, 'gate') : '_none_'}\n`;
   s += `\n## ⊘ Guided out-of-scope — the App answers these on purpose, pre-LLM (ADR-289). NOT gaps\n${guided.length ? tbl(guided, 'scope') : '_none_'}\n`;

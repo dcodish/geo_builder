@@ -71,4 +71,25 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
     // A degraded prefix must never be promoted to a gap (the false-signal class this ADR removes).
     expect(triageSrc).toContain('degraded');
   });
+
+  it('the session cache can never serve a stale verdict for a still-open row (ADR-346 Am. 2)', () => {
+    // The incremental cache trades away regression-detection on ALREADY-BUILDING input (that's the test
+    // suite's job) — but it must NEVER cache away the "did we fix it since?" question, which is the entire
+    // point of the tool. Any OPEN verdict forces a re-replay; `--reverify` forces everything.
+    const open = setLiteral(triageSrc, 'OPEN');
+    for (const v of ['not-handled', 'would-escalate', 'refused', 'error', 'unverified']) {
+      expect(open, `'${v}' must force a re-replay — caching it would hide a fix (or a real gap) forever`).toContain(v);
+    }
+    // The reuse predicate must consult OPEN and the event count; losing either silently freezes verdicts.
+    expect(triageSrc).toMatch(/reusable\s*=\s*!reverify\s*&&\s*prior\s*&&\s*prior\.n === evs\.length\s*&&\s*!prior\.outs\.some\(\(o\) => OPEN\.has\(o\.now\)\)/);
+  });
+
+  it('all-time counts survive the incremental split (the ranking rule the operator kept)', () => {
+    // The rejected design was a watermark that only counted new events — it would reset distinct-user
+    // counts each window and bury a cluster hit by 3 users over 3 months. Stats/candidates must stay over
+    // the FULL `submits` list; only the worklist may split new vs carried-over.
+    expect(triageSrc).toContain('const total = submits.length');
+    expect(triageSrc).toMatch(/for \(const e of submits\) \(byBucket\[classify\(a, e\)\]/);
+    expect(triageSrc).toMatch(/liveNew|liveOld/);
+  });
 });
