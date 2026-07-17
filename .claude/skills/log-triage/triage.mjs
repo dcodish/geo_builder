@@ -192,10 +192,11 @@ function droppedBy(u, cmds, pctx) {
   return hits.map(String);
 }
 
-/** The canonical commands the LLM actually committed, logged since issue #84 (a JSON string). Lets the
- *  replay follow a step our grammar can't reproduce, keeping the PREFIX faithful — the difference between
- *  "the rest of this session is unverifiable" and real evidence. Absent on pre-2026-07-14 events, and on
- *  3-D entirely (#84 was 2-D only; #182), which is exactly when `degraded` still fires. */
+/** The canonical commands the LLM actually committed, logged since issue #84 (a JSON string): 2-D carries
+ *  engine COMMAND OBJECTS (since 2026-07-14), 3-D the canonical LINES submitSteps re-parsed (#182, since
+ *  2026-07-17). Lets the replay follow a step our grammar can't reproduce, keeping the PREFIX faithful —
+ *  the difference between "the rest of this session is unverifiable" and real evidence. Absent on older
+ *  events, which is exactly when `degraded` still fires. */
 const loggedCommands = (e) => {
   if (e.source !== 'llm' || e.result !== 'ok' || !e.commands) return null;
   try {
@@ -308,13 +309,33 @@ function session2d(evs) {
 }
 
 /** One 3-D session. `parse3` is context-free BY DESIGN (it takes no ParseContext — App3 mirrors that), so
- *  only the BUILD needs the session prefix: the `unknown-point` refusals are prefix artifacts, not gaps. */
+ *  only the BUILD needs the session prefix: the `unknown-point` refusals are prefix artifacts, not gaps.
+ *  Since #182 the 3-D sink logs `action` lines + the LLM's committed canonical LINES (`commands`), so this
+ *  replay FOLLOWS clear/undo/redo and llm-built steps exactly like `session2d` — degradation is reserved
+ *  for what we genuinely cannot reproduce (delete / show-another / load, pre-#182 llm steps). */
 function session3d(evs) {
   const out = [];
   let facts = [];
   let degraded = false;
+  const history = [];
+  let future = [];
+  const advance = (next) => { history.push(facts); future = []; facts = next; };
   const t0 = Date.now();
   for (const e of evs) {
+    if (e.ev === 'action') {
+      if (e.action === 'clear') { advance([]); out.push({ now: 'skip', detail: 'action:clear', degraded }); continue; }
+      if (e.action === 'undo') {
+        if (history.length) { future.push(facts); facts = history.pop(); out.push({ now: 'skip', detail: 'action:undo', degraded }); }
+        else { degraded = true; out.push({ now: 'skip', detail: 'action:undo (past tracked history)', degraded }); }
+        continue;
+      }
+      if (e.action === 'redo') {
+        if (future.length) { history.push(facts); facts = future.pop(); out.push({ now: 'skip', detail: 'action:redo', degraded }); }
+        else { degraded = true; out.push({ now: 'skip', detail: 'action:redo (past tracked history)', degraded }); }
+        continue;
+      }
+      degraded = true; out.push({ now: 'skip', detail: `action:${e.action}`, degraded }); continue;
+    }
     const u = norm(e.utterance);
     if (!u) { out.push({ now: 'skip', detail: '', degraded }); continue; }
     if (Date.now() - t0 > sessionBudgetMs) { out.push({ now: 'unverified', detail: 'session budget', degraded: true }); continue; }
@@ -329,11 +350,29 @@ function session3d(evs) {
         const st = d.status[id];
         if (st && st !== 'ok' && st !== 'disabled') res = { now: 'refused', detail: (typeof st === 'string' ? st : st.code ?? JSON.stringify(st)).slice(0, 60) };
         else if (d.positions.size === 0) res = { now: 'built-nothing', detail: r.commands.map((c) => c.type).join(',') };
-        else { res = { now: 'built', detail: r.commands.map((c) => c.type).join(',') }; facts = next; }
+        else { res = { now: 'built', detail: r.commands.map((c) => c.type).join(',') }; advance(next); }
       }
     } catch (err) { res = { now: 'error', detail: String(err?.message ?? err).slice(0, 70) }; }
     out.push({ ...res, degraded });
-    if (res.now !== 'built' && res.now !== 'skip') degraded = true;
+    if (res.now === 'built' || res.now === 'skip') continue;
+    // Our grammar didn't land this step — follow what the LLM actually committed (#182: the canonical
+    // LINES, re-parsed through parse3 so parser drift is caught, the scenarios' mocked-LLM form). The
+    // verdict above still reports OUR coverage honestly; only the prefix stays faithful.
+    const lines = loggedCommands(e);
+    if (!lines || !lines.every((l) => typeof l === 'string')) { degraded = true; continue; }
+    try {
+      let next = facts;
+      let ok = true;
+      for (const line of lines) {
+        const lr = parse3(norm(line));
+        if (!lr.ok) { ok = false; break; }
+        next = [...next, { id: `L${next.length}`, utterance: line, cmds: lr.commands, enabled: true }];
+      }
+      const d = ok ? derive3(next, 0) : null;
+      const bad = d && Object.entries(d.status).find(([, v]) => v !== 'ok' && v !== 'disabled');
+      if (!ok || bad) degraded = true; // the logged lines don't replay cleanly here — don't pretend they did
+      else advance(next);
+    } catch { degraded = true; }
   }
   return out;
 }
@@ -476,7 +515,20 @@ function reportFor(a) {
   s += `\n## ◇ Parses but builds nothing — context / re-declaration (M1), not a grammar gap\n${context.length ? tbl(context, 'cmds') : '_none_'}\n`;
   s += `\n## ⚠ Reasoned refusals / clarify (review)\n${review.length ? tbl(review, 'code') : '_none_'}\n`;
   s += `\n## ? UNVERIFIED — only ever seen after a step we couldn't replay (an LLM step with no logged commands — pre-#84, or 3-D per #182 — or a store action), or over budget. NOT evidence either way\n${unverified.length ? tbl(unverified, 'why') : '_none_'}\n`;
-  return { md: s, live };
+
+  // #183: distill each candidate's CURRENT verdict for the admin dashboard's gap card — the same
+  // bucket rule as the report above (a degraded-prefix failure is 'unverified', never a claim), so the
+  // card and this report can never disagree. Keyed by the normalized utterance.
+  const verdictMap = {};
+  for (const c of cands) {
+    if (c.u === '(empty)' || noVerify) continue;
+    const v = c.verify;
+    verdictMap[c.u] =
+      (v.degraded && (v.now === 'not-handled' || v.now === 'refused' || v.now === 'error')) || v.now === 'unverified'
+        ? 'unverified'
+        : v.now;
+  }
+  return { md: s, live, verdictMap };
 }
 
 // ---- run -----------------------------------------------------------------
@@ -486,7 +538,31 @@ out += `> **▶ LIVE is the worklist.** Every utterance is re-run through the Ap
 out += `> \`parse\` WITH the session's figure as context → clarify → the pre-LLM out-of-scope register → the honesty\n`;
 out += `> gates → replay (ADR-346, issue #35). So already-fixed, guided-refusal, would-escalate and\n`;
 out += `> unreplayable-prefix items are separated out and are NOT gaps. Cluster the LIVE rows by intent and recommend.\n`;
-for (const a of APPS) out += reportFor(a).md;
+const verdictMaps = {};
+for (const a of APPS) {
+  const r = reportFor(a);
+  out += r.md;
+  verdictMaps[a] = r.verdictMap ?? {};
+}
 const file = path.join(reportsDir, `log-triage-${APPS.join('+')}-${new Date().toISOString().slice(0, 10)}.md`);
 writeFileSync(file, out);
+// #183: publish the distilled verdict map next to the prod events file (the same SSH channel as the
+// pull, reverse direction), so the admin dashboard's «פערים אמיתיים» card can annotate its rows with
+// what the CURRENT code does instead of presenting already-fixed input as work to do. Best-effort:
+// an offline run still writes the local file and the report; the dashboard states data age itself.
+if (!noVerify) {
+  for (const a of APPS) {
+    const payload = { app: a, rev: headRev, generatedAt: new Date().toISOString(), verdicts: verdictMaps[a] };
+    const vfile = path.join(cacheDir, `triage-verdicts-${a}.json`);
+    writeFileSync(vfile, JSON.stringify(payload));
+    if (!noFetch) {
+      try {
+        execFileSync('scp', ['-q', vfile, `${server}:${remoteDir}/verdicts-${a}.json`], { stdio: ['ignore', 'ignore', 'inherit'] });
+        process.stderr.write(`verdicts uploaded: ${remoteDir}/verdicts-${a}.json (@ ${headRev})\n`);
+      } catch {
+        process.stderr.write(`verdicts upload FAILED for ${a} — the dashboard will show its last-known verdict age\n`);
+      }
+    }
+  }
+}
 process.stdout.write(out + `\n\nwritten: ${path.relative(repoRoot, file)}\n`);

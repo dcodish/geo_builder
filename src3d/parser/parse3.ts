@@ -32,21 +32,43 @@ const NOT_HANDLED: ParseResult3 = { ok: false, reason: 'not-handled' };
 // Tokenisation
 // ---------------------------------------------------------------------------
 
-/** Normalise an utterance: unify primes to `'`, strip vector arrows (AB→ ≡ AB),
- *  unify minus/maqaf to `-`, collapse whitespace. */
-export function normalize3(s: string): string {
+/**
+ * Lowercase point labels in LABEL POSITION → uppercase (#181, the 2-D `up()` discipline copied per
+ * docs/20 §12 — never imported). 3-D has CASE-SIGNIFICANT tokens 2-D lacks (axes x/y/z, parameters
+ * k/m/t, vector names u/v/w, R vs r, ℓ), so a blanket `/i` is impossible; instead a lowercase run is
+ * uplifted only where an ANCHOR proves it is a label — after the angle glyph/word («∠sdb», «זווית sdb»)
+ * or after an explicit point/vertex noun («הקודקוד c», «הנקודות a ו-b»). The lone axis letters x/y/z
+ * are never uplifted (a student's «נקודה x» stays theirs to disambiguate), and after an ENGLISH anchor
+ * a run is uplifted only when it isn't an English function word ("angle of …", "point of intersection").
+ * New label-demanding anchors join HERE — the one chokepoint — never per-rule.
+ */
+const EN_STOP = new Set(['of', 'at', 'in', 'on', 'is', 'to', 'the', 'and', 'are', 'for', 'its', 'was', 'has', 'be', 'by', 'a', 'an', 'no', 'not', 'it', 'all', 'any', 'one', 'two']);
+function upliftLowercaseLabels(s: string): string {
+  const LIST = String.raw`[A-Za-z][A-Za-z0-9']{0,5}(?:\s*(?:,|ו-?|\band\b)\s*[A-Za-z][A-Za-z0-9']{0,5})*(?![A-Za-z])`;
+  const upTokens = (list: string, en: boolean) =>
+    list.replace(/\b[a-z][a-z0-9']*/g, (t) => (/^[xyz]$/.test(t) || (en && EN_STOP.has(t)) ? t : t.toUpperCase()));
   return s
-    .replace(/[′’‘`]/g, "'")
-    .replace(/[→⃗⟶]/g, '')
-    .replace(/[−־]/g, '-')
-    .replace(/(?:^|(?<=[\s:,]))(?:ה?ו?וקטור|vectors?)\s+/gi, '') // the vector WORD marks vector meaning (recorded before normalize), then reads as decoration
-    .replace(/½/g, '1/2')
-    .replace(/¼/g, '1/4')
-    .replace(/¾/g, '3/4')
-    .replace(/⅓/g, '1/3')
-    .replace(/⅔/g, '2/3')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(new RegExp(String.raw`((?:[∠∡∢]|זו?וית|ה?קודקוד(?:ים)?|ה?נקוד(?:ה|ות))\s*)(${LIST})`, 'g'), (_m, pre: string, list: string) => `${pre}${upTokens(list, false)}`)
+    .replace(new RegExp(String.raw`(\b(?:angle|points?|vert(?:ex|ices))\s+)(${LIST})`, 'gi'), (_m, pre: string, list: string) => `${pre}${upTokens(list, true)}`);
+}
+
+/** Normalise an utterance: unify primes to `'`, strip vector arrows (AB→ ≡ AB),
+ *  unify minus/maqaf to `-`, collapse whitespace, uplift anchored lowercase labels (#181). */
+export function normalize3(s: string): string {
+  return upliftLowercaseLabels(
+    s
+      .replace(/[′’‘`]/g, "'")
+      .replace(/[→⃗⟶]/g, '')
+      .replace(/[−־]/g, '-')
+      .replace(/(?:^|(?<=[\s:,]))(?:ה?ו?וקטור|vectors?)\s+/gi, '') // the vector WORD marks vector meaning (recorded before normalize), then reads as decoration
+      .replace(/½/g, '1/2')
+      .replace(/¼/g, '1/4')
+      .replace(/¾/g, '3/4')
+      .replace(/⅓/g, '1/3')
+      .replace(/⅔/g, '2/3')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  );
 }
 
 const TOKEN = /[A-Z]\d*'?/g;

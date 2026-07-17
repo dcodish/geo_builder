@@ -16,6 +16,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { eventsLogPath, type UsageEvent } from './eventLog';
 import { clientIp, makeRateLimiter } from './http';
 
@@ -37,6 +38,8 @@ export interface AdminOpts {
   base?: string; // default '/admin'; production sets '/geo-builder/admin'
   /** Override the events file (tests). */
   logPath?: string;
+  /** Override the triage verdict-map file (#183; tests). Default: `<events dir>/<profile.verdictsFile>`. */
+  verdictsPath?: string;
   /** Which app's dashboard to render (title + outcome classifier + labels). Default: the 2-D profile. */
   profile?: DashboardProfile;
 }
@@ -106,6 +109,52 @@ export async function readEvents(file: string): Promise<UsageEvent[]> {
 }
 
 /**
+ * The distilled triage VERDICT MAP (#183) — what the CURRENT code does with each utterance the prod log
+ * recorded as a gap, uploaded by the log-triage harness (`triage.mjs`) next to the events file. The gap
+ * card renders from prod-TIME outcomes, which never expire: an utterance that failed once and was fixed
+ * the next day sat in «פערים אמיתיים (לטיפול)» forever (~4/5 of the card was noise, ranked freshest-fix
+ * first). Re-verifying server-side is a non-starter (the engine doesn't run on the prod box; a sweep is
+ * ~10 min), so the dashboard CONSUMES the verdicts the triage run already computed — and states their
+ * age, so "no verdict data" reads as UNKNOWN, never as verification that didn't happen.
+ */
+export interface VerdictMap {
+  rev: string;
+  generatedAt: string;
+  /** normalized utterance → its current outcome (`built` / `not-handled` / `guided` / `would-escalate` / …). */
+  verdicts: Record<string, string>;
+}
+
+export async function readVerdicts(file: string): Promise<VerdictMap | null> {
+  try {
+    const v = JSON.parse(await readFile(file, 'utf8')) as VerdictMap;
+    return v && typeof v === 'object' && v.verdicts && typeof v.verdicts === 'object' ? v : null;
+  } catch {
+    return null; // absent / torn → the dashboard says so instead of implying verification
+  }
+}
+
+/** A drill row's current verdict — triage normalizes whitespace, the event log only trims. */
+export const verdictOf = (vm: VerdictMap | null, utterance: string): string | null =>
+  vm?.verdicts[utterance.replace(/\s+/g, ' ').trim()] ?? null;
+
+/** Verdicts that mean "this input WORKS on the current code" — moved out of the gap list. */
+export const VERDICT_FIXED = new Set(['built', 'store-op']);
+
+/** Hebrew labels for the verdict states (raw code shown for an unlisted future state — never invisible). */
+const VERDICT_LABELS: Record<string, string> = {
+  built: '✓ נבנה כיום',
+  'store-op': '✓ פעולת עריכה — נתמך',
+  guided: 'מנותב להנחיה (לא פער)',
+  'would-escalate': 'מנותח חלקית — מוסלם',
+  'built-nothing': 'מנותח — לא מוסיף (תלוי הקשר)',
+  clarify: 'שאלת הבהרה',
+  'not-handled': '✗ עדיין פער',
+  refused: 'סירוב מנומק',
+  error: 'שגיאה',
+  unverified: '? לא ניתן לאימות',
+};
+
+/**
  * A dashboard PROFILE — everything about how one app's raw events become the
  * page's outcome buckets + labels. The 2-D app and its 3-D sibling
  * (`src3d/`, `/3d-builder/`) share ONE dashboard renderer; only the profile
@@ -132,6 +181,8 @@ export interface DashboardProfile {
   subCategoryOf?(e: UsageEvent): string | null;
   subLabels?: Record<string, string>;
   subPanelTitle?: string;
+  /** The triage verdict-map filename beside the events file (#183) — `verdicts-2d.json` / `verdicts-3d.json`. */
+  verdictsFile?: string;
 }
 
 // ── the 2-D profile (the original, unchanged behaviour) ──────────────────────
@@ -194,6 +245,7 @@ export const PROFILE_2D: DashboardProfile = {
   subCategoryOf: scopeCategoryOf2D,
   subLabels: SCOPE_LABELS_2D,
   subPanelTitle: 'מחוץ לתחום — לפי סוג (לא נדרש מימוש)',
+  verdictsFile: 'verdicts-2d.json',
 };
 
 // ── the 3-D profile (the space/vectors sibling app, `/3d-builder/`) ──────────
@@ -276,6 +328,7 @@ export const PROFILE_3D: DashboardProfile = {
   subCategoryOf: refusalCodeOf3D,
   subLabels: REFUSAL_LABELS_3D,
   subPanelTitle: 'סירובים — לפי סוג (לא נדרש מימוש)',
+  verdictsFile: 'verdicts-3d.json',
 };
 
 export interface Stats {
@@ -556,6 +609,39 @@ function drillPanel(title: string, rows: DrillRow[], closeHref: string, fmt: (ts
     ${trs}</table></div>`;
 }
 
+/**
+ * The GAP card's drill panel (#183) — the one list the operator opens to decide what to build. Rendered
+ * from prod-TIME outcomes but re-verified against the CURRENT code via the triage verdict map when one
+ * is present: rows the current code BUILDS move out of the worklist into a «תוקן מאז» section, every
+ * remaining row carries its current verdict, and the header states which revision the verdicts were
+ * computed against (and when). Without a map, the header says plainly that nothing was re-verified.
+ */
+function gapDrillPanel(title: string, rows: DrillRow[], closeHref: string, fmt: (ts: string | null) => string, vm: VerdictMap | null): string {
+  const head = `<div class="top" style="margin-bottom:8px"><h2 style="flex:1;margin:0">${esc(title)}</h2><a class="chip" href="${esc(closeHref)}">סגירה ✕</a></div>`;
+  const vNote = vm
+    ? `<div class="muted" style="margin-bottom:8px">נבדק מחדש מול הקוד הנוכחי: גרסה <b>${esc(vm.rev)}</b> · ${esc(fmt(vm.generatedAt || null))} (ריצת triage אחרונה)</div>`
+    : `<div class="muted" style="margin-bottom:8px">⚠ אין נתוני אימות — הרשימה משקפת את התוצאה <b>בזמן ההקלדה</b> בלבד; ייתכן שחלקה כבר תוקן (הרץ log-triage לעדכון)</div>`;
+  if (!rows.length) return `<div class="panel">${head}${vNote}<div class="muted">אין פריטים בטווח/הסינון הנוכחי 🎉</div></div>`;
+  const open = vm ? rows.filter((r) => !VERDICT_FIXED.has(verdictOf(vm, r.utterance) ?? '')) : rows;
+  const fixed = vm ? rows.filter((r) => VERDICT_FIXED.has(verdictOf(vm, r.utterance) ?? '')) : [];
+  const tr = (r: DrillRow, withVerdict: boolean) => {
+    const v = withVerdict ? verdictOf(vm, r.utterance) : null;
+    const vCell = withVerdict ? `<td class="muted">${v ? esc(VERDICT_LABELS[v] ?? v) : '—'}</td>` : '';
+    return `<tr><td><code>${esc(r.utterance)}</code></td><td>${r.count}</td>
+       <td class="muted">${esc(r.locale)}</td><td class="muted">${esc(fmt(r.lastSeen || null))}</td>${vCell}</tr>`;
+  };
+  const headRow = (withVerdict: boolean) =>
+    `<tr><th>משפט</th><th style="width:60px">פעמים</th><th style="width:50px">שפה</th><th style="width:130px">נראה לאחרונה</th>${withVerdict ? '<th style="width:170px">מצב כיום</th>' : ''}</tr>`;
+  const openTbl = open.length
+    ? `<table>${headRow(!!vm)}${open.map((r) => tr(r, !!vm)).join('')}</table>`
+    : `<div class="muted">אין פערים פתוחים בטווח 🎉</div>`;
+  const fixedTbl = fixed.length
+    ? `<h3 style="margin:14px 0 6px">✓ תוקן מאז — נבנה בקוד הנוכחי (${fixed.length})</h3>
+       <table>${headRow(false)}${fixed.map((r) => tr(r, false)).join('')}</table>`
+    : '';
+  return `<div class="panel">${head}${vNote}${openTbl}${fixedTbl}</div>`;
+}
+
 function dailyChart(byDay: Stats['byDay']): string {
   if (!byDay.length) return '<div class="muted">אין נתונים עדיין</div>';
   const max = Math.max(1, ...byDay.map((d) => d.submits));
@@ -613,10 +699,16 @@ function dashboard(
   cur: Filter,
   presets: { label: string; since: string }[],
   profile: DashboardProfile,
+  vm: VerdictMap | null = null,
 ): string {
   const fmt = (ts: string | null) => (ts ? ts.replace('T', ' ').slice(0, 16) : '—');
   const range = s.firstSeen ? `${fmt(s.firstSeen)} — ${fmt(s.lastSeen)}` : 'אין נתונים';
   const filtered = !!(cur.since || (cur.rel && cur.rel !== 'all'));
+  // #183: the gap CARD counts prod-time events forever; with a verdict map, show the still-OPEN share
+  // (events whose utterance the current code does NOT build) so the number stops overstating the work.
+  const fixedEvents = vm ? s.gapUtterances.filter((r) => VERDICT_FIXED.has(verdictOf(vm, r.utterance) ?? '')).reduce((n, r) => n + r.count, 0) : 0;
+  const gapCount = s.realGaps - fixedEvents;
+  const gapLabel = vm && fixedEvents > 0 ? `${profile.gapCard} · תוקנו מאז: ${fixedEvents}` : profile.gapCard;
   return (
     pageHead(profile.title) +
     `<div class="top">
@@ -631,12 +723,12 @@ function dashboard(
        ${card(s.sessions, 'כניסות (sessions)')}
        ${card(s.submits, 'פעולות / משפטים')}
        ${card(s.llmFallbacks, 'נפילה ל-LLM')}
-       ${cardLink(s.realGaps, profile.gapCard, `${esc(base)}${queryString(cur, { view: cur.view === 'gaps' ? undefined : 'gaps' })}`, cur.view === 'gaps')}
+       ${cardLink(gapCount, gapLabel, `${esc(base)}${queryString(cur, { view: cur.view === 'gaps' ? undefined : 'gaps' })}`, cur.view === 'gaps')}
        ${cardLink(s.outOfScope, profile.secondaryCard, `${esc(base)}${queryString(cur, { view: cur.view === 'scope' ? undefined : 'scope' })}`, cur.view === 'scope')}
      </div>
      ${
        cur.view === 'gaps'
-         ? drillPanel(profile.gapDrillTitle, s.gapUtterances, `${esc(base)}${queryString(cur, { view: undefined })}`, fmt)
+         ? gapDrillPanel(profile.gapDrillTitle, s.gapUtterances, `${esc(base)}${queryString(cur, { view: undefined })}`, fmt, vm)
          : cur.view === 'scope'
            ? drillPanel(profile.secondaryDrillTitle, s.scopeUtterances, `${esc(base)}${queryString(cur, { view: undefined })}`, fmt)
            : ''
@@ -742,7 +834,11 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
   const authed = secure && validCookie(readCookies(req)[COOKIE], opts.cookieSecret);
   if (!authed) return send(res, 200, loginPage(base, false, profile.title));
 
-  const all = await readEvents(opts.logPath ?? eventsLogPath());
+  const logPath = opts.logPath ?? eventsLogPath();
+  const all = await readEvents(logPath);
+  // #183: the triage verdict map, uploaded beside the events file (`triage.mjs`). Absent → the gap
+  // drill states plainly that nothing was re-verified, never implying verification that didn't happen.
+  const vm = await readVerdicts(opts.verdictsPath ?? join(dirname(logPath), profile.verdictsFile ?? 'verdicts.json'));
   // Filter state from the query string (?since=YYYY-MM-DD&rel=<build>&view=gaps|scope) — empty = show everything.
   const q = new URLSearchParams((req.url ?? '').split('?')[1] ?? '');
   const view = q.get('view');
@@ -760,5 +856,5 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
     { label: '7 ימים', since: dayMinus(7) },
     { label: '30 ימים', since: dayMinus(30) },
   ];
-  return send(res, 200, dashboard(base, aggregate(events, profile), releases, cur, presets, profile));
+  return send(res, 200, dashboard(base, aggregate(events, profile), releases, cur, presets, profile, vm));
 }
