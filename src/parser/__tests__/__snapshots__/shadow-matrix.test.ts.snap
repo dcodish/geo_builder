@@ -1500,6 +1500,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "AB and CD are chords in circle O",
+    "winner": "chord",
+  },
+  {
+    "lang": "he",
+    "text": "AB ו-CD מיתרים במעגל O",
+    "winner": "chord",
+  },
+  {
+    "lang": "en",
     "text": "from a point E outside circle O a line cuts the circle at A and B",
     "winner": "secantFromExternal",
   },

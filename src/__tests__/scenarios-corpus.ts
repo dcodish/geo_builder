@@ -181,6 +181,57 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'chained-value-marks-every-member',
+    title: '«AB=BC=8» — the chained value lands on EVERY member: |AB|=8 AND |BC|=8, both labelled (#163, ADR-343)',
+    guards:
+      'Operator dev test 2026-07-16: "I entered AB=BC=8. AB is equal to BC and BC is marked on canvas as 8 but AB was not marked as 8." chainedEquality split the chain into adjacent pairwise clauses only, so the numeric set-distance landed on the LAST member (BC) and AB was tied to 8 only transitively via set-equal — geometrically correct but a display-honesty gap (docs/17 §6: everything the student stated must be visible). Operator ruling 2026-07-17: «AB=BC=8 means AB=8 and BC=8». Now the chain distributes its tail VALUE to every member (lengths, angles, symbolic — one owner, chainedEquality); the set-equal link is kept (ADR-234 pinsSoftVariant reads it; redundancy measured green through replay).',
+    steps: ['AB=BC=8'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| = 8').toBeCloseTo(8, 3);
+      expect(dist(at(fig, 'B'), at(fig, 'C')), '|BC| = 8').toBeCloseTo(8, 3);
+      // BOTH segments carry the stated value on the figure — the reported gap.
+      const labelled = fig.labels.lengths.map((l) => [l.a, l.b].sort().join('') + '=' + l.text).sort();
+      expect(labelled, 'both members labelled 8').toEqual(['AB=8', 'BC=8']);
+    },
+  },
+  {
+    id: 'qx5a19co-plural-chords-conjunction',
+    title: '«AB ו DC מיתרים» — BOTH chords land: all four endpoints on the circle + both segments (#151, ADR-344)',
+    guards:
+      'Operator session qx5a19co ("commands I had to work around"): the natural both-chords-at-once declaration was read by the chord rule as ONE label run (A,B on the circle + segment AB), D,C dropped → weak:dropped:D,C → LLM → not-understood — the statement was lost and the operator fell back to one chord per line. The plural carrier-membership class (ADR-076/240/pluralSpecialLines family): the label list now pairs sequentially, each pair one chord — all memberships + all segments, mirrored for plural diameters; an intersect compound never pair-reads.',
+    steps: ['מעגל O', 'AB ו DC מיתרים'],
+    check(fig) {
+      allStepsOk(fig);
+      const circle = fig.circles.get('circle-O')!;
+      expect(circle, 'circle O resolved').toBeTruthy();
+      for (const id of ['A', 'B', 'D', 'C'])
+        expect(dist(at(fig, id), circle.center), `${id} on the circle`).toBeCloseTo(circle.r, 4);
+      const segs = fig.construction.objects.filter((o) => o.kind === 'segment').map((o) => o.id);
+      expect(segs, 'both chords drawn').toContain('seg-AB');
+      expect(segs, 'both chords drawn').toContain('seg-CD');
+    },
+  },
+  {
+    id: 'pxeb2ng8-count-digit-two-tangents',
+    title: '«מנקודה A יוצאים 2 משיקים למעגל» — the DIGIT spelling builds like the word spelling, no LLM (#160, ADR-345)',
+    guards:
+      'Operator dev session pxeb2ng8 (2026-07-16): the שני spelling built the two-tangents Thales construction; the 2 spelling produced the IDENTICAL correct parse and droppedGivenNumbers threw it away (weak:dropped:2 → LLM → not-understood) — the same statement passed or failed on spelling alone, because the gate reads every digit as a magnitude and a COUNT quantifier is consumed by the rule\'s structure, not a payload. The gate now blanks count slots (a bare integer before a plural countable noun — the digit twin of the already-invisible count words); ratio/size digits (פי 2, רדיוס 5, "2 times", פעמים) stay gated. This scenario locks parse+build; the gate itself is locked in adr-250.test.ts (command-identity with the שני spelling + the anti-regression set).',
+    steps: ['מעגל O ברדיוס 5', 'מנקודה A יוצאים 2 משיקים למעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const circle = fig.circles.get('circle-O')!;
+      expect(circle.r, 'stated radius').toBeCloseTo(5, 4);
+      // The two touch points ride the circle and each tangent is ⟂ its radius (a genuine tangent pair).
+      const touches = ['T', 'S'].filter((id) => fig.positions.has(id));
+      expect(touches.length, 'two touch points').toBe(2);
+      for (const id of touches) {
+        expect(dist(at(fig, id), circle.center), `${id} on the circle`).toBeCloseTo(circle.r, 3);
+        expect(Math.abs(angle(circle.center, at(fig, id), at(fig, 'A')) - 90), `radius ⟂ tangent at ${id}`).toBeLessThan(0.1);
+      }
+    },
+  },
+  {
     id: 'gxccyt2n-hidden-centre-never-squats-letter',
     title: '«שני מעגלים נחתכים» → «P על המשך BA» — the invisible auto centre never squats P; the student gets THEIR new point (#177 P1, ADR-342)',
     guards:

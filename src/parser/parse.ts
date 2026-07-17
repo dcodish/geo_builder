@@ -2458,15 +2458,37 @@ const measureAngle: Rule = (s) => {
  * effect (the bug: a substring rule grabbed just one clause — "AC = 3x" — and the AB = AC
  * equality was silently dropped). Fires only on ≥2 '=' and bails (→ null) unless every
  * clause parses, so non-chain inputs fall through untouched.
+ *
+ * A chain whose TAIL is a VALUE distributes that value to EVERY member (issue #163, operator
+ * ruling 2026-07-17: «AB=BC=8 means AB=8 and BC=8») — the pairwise split alone attached the 8
+ * only to the LAST member, so every earlier member lost its stated value on the figure (BC
+ * marked 8, AB bare — a display-honesty gap; lengths, angles, and symbolic sizes all affected).
+ * When the final clause carries a value command (a numeric `value` or symbolic `expr` payload —
+ * a semantic test on what the clause LOWERED TO, never on the tail's spelling), each earlier
+ * member is re-parsed against the same tail and its value commands appended. The pairwise
+ * `set-equal` links are KEPT although now entailed: ADR-234's `pinsSoftVariant` reads them, and
+ * the redundant group measured green through the real replay (the ADR-272 gate tests point
+ * collapse, not informational redundancy). A member whose value clause happens not to parse
+ * keeps today's transitive-equality semantics — never a whole-chain regression to the LLM.
  */
 const chainedEquality: Rule = (s, ctx) => {
   const parts = s.split('=').map((p) => p.trim());
   if (parts.length < 3 || parts.some((p) => p === '')) return null;
   const out: AnyCommand[] = [];
+  let tailClause: AnyCommand[] = [];
   for (let i = 0; i < parts.length - 1; i++) {
     const clause = parse(`${parts[i]} = ${parts[i + 1]}`, ctx);
     if (!clause.ok) return null;
     out.push(...clause.commands);
+    if (i === parts.length - 2) tailClause = clause.commands;
+  }
+  const carriesValue = (cmds: AnyCommand[]): boolean => cmds.some((c) => 'value' in c || 'expr' in c);
+  if (carriesValue(tailClause)) {
+    const tail = parts[parts.length - 1];
+    for (let i = 0; i < parts.length - 2; i++) {
+      const clause = parse(`${parts[i]} = ${tail}`, ctx);
+      if (clause.ok && carriesValue(clause.commands)) out.push(...clause.commands);
+    }
   }
   return out;
 };
@@ -3907,13 +3929,32 @@ const chord: Rule = (s, ctx) => {
   if (CARRIER_RELATION_TAIL.test(s)) return null;
   const center = resolveCenter(s, ctx);
   if (!center) return null;
-  const ids = labelRun(dropCircleRef(s).replace(/chord|מיתר/gi, ' '), 2);
-  if (!ids) return null;
+  const body = dropCircleRef(s).replace(/chords?|מיתרים|מיתר/gi, ' ');
+  // A plural declaration names SEVERAL chords at once — "AB ו DC מיתרים" / "AB and DC are chords"
+  // (issue #151): the single labelRun read asserted only the FIRST pair, silently dropping the
+  // rest (the honesty gate escalated, the LLM failed, the statement was lost). Distribute over the
+  // conjunction: collect every UPPERCASE label token in order (the ADR-076 list convention —
+  // lowercase connectives "and"/"are" are never tokens; glued "AB" and spaced "A B" both read) and
+  // pair them sequentially, each pair one chord. An odd token count is not a pair list — fall back
+  // to the single labelRun read (whose honesty gates flag any leftover), byte-identical to before.
+  const toks = (body.match(/\b(?:[A-Z]\d*){1,2}\b/g) ?? []).flatMap((u) => u.match(/[A-Z]\d*/g) ?? []);
+  let chordPairs: Id[][];
+  // The distribution is for BARE declarations only — an intersect compound that fell through to this
+  // rule must not pair-read its cut operands as chords (the leftover stays with the honesty gates).
+  if (!INTERSECT_KW.test(s) && toks.length >= 2 && toks.length % 2 === 0) {
+    chordPairs = Array.from({ length: toks.length / 2 }, (_, i) => [up(toks[2 * i]), up(toks[2 * i + 1])]);
+  } else {
+    const ids = labelRun(body, 2);
+    if (!ids) return null;
+    chordPairs = [ids];
+  }
+  if (chordPairs.some(([a, b]) => a === b)) return null; // a degenerate "AA" pair is not a chord list
   const circ = circleId(center);
+  const members: Id[] = [];
+  for (const [a, b] of chordPairs) for (const id of [a, b]) if (!members.includes(id)) members.push(id);
   return [
-    { type: 'point-on-circle', id: ids[0], circle: circ },
-    { type: 'point-on-circle', id: ids[1], circle: circ },
-    { type: 'segment', a: ids[0], b: ids[1] },
+    ...members.map((id) => ({ type: 'point-on-circle' as const, id, circle: circ })),
+    ...chordPairs.map(([a, b]) => ({ type: 'segment' as const, a, b })),
   ];
 };
 
@@ -4020,25 +4061,43 @@ const diameter: Rule = (s, ctx) => {
   if (CARRIER_RELATION_TAIL.test(s)) return null;
   const center = resolveCenter(s, ctx);
   if (!center) return null;
-  const ids = labelRun(dropCircleRef(s).replace(/diameter|קוטר/gi, ' '), 2);
-  if (!ids) return null;
-  const exists = (p: string) => (ctx.points ?? []).some((q) => up(q) === up(p));
-  if (exists(ids[0]) && exists(ids[1])) {
-    // "XY is a diameter" entails BOTH endpoints ON the circle AND the through-centre collinearity.
-    // Existence is not membership (the ADR-233 proxy-vs-semantic lesson): an existing endpoint NOT yet
-    // on the circle (e.g. a free point some ⊥/segment given created) must be put ON it, or the
-    // constraint form silently under-asserts — the bare collinearity let "AC קוטר" verify green with
-    // A,C floating off the circle (ADR-241). Membership is idempotent for endpoints already on it
-    // (the ADR-099 lowering), so assert it for any endpoint not known to be a member.
-    const members = membersOfCenter(ctx, center);
-    return [
-      ...ids
-        .filter((p) => !members.has(up(p)))
-        .map((p) => ({ type: 'point-on-circle' as const, id: up(p), circle: circleId(center) })),
-      { type: 'set-collinear' as const, a: up(ids[0]), b: centrePt(ctx, up(center)), c: up(ids[1]) },
-    ];
+  const body = dropCircleRef(s).replace(/diameters?|קוטרים|קוטר/gi, ' ');
+  // A plural declaration names SEVERAL diameters at once — "AB ו CD קוטרים" / "AB and CD are
+  // diameters" (issue #151's diameter mirror): sequential UPPERCASE pair extraction, the same
+  // conjunction distribution as `chord`; an odd token count falls back to the single labelRun read.
+  const toks = (body.match(/\b(?:[A-Z]\d*){1,2}\b/g) ?? []).flatMap((u) => u.match(/[A-Z]\d*/g) ?? []);
+  let diaPairs: Id[][];
+  // Bare declarations only — an intersect compound's operands are never pair-read (as in `chord`).
+  if (!INTERSECT_KW.test(s) && toks.length >= 2 && toks.length % 2 === 0) {
+    diaPairs = Array.from({ length: toks.length / 2 }, (_, i) => [up(toks[2 * i]), up(toks[2 * i + 1])]);
+  } else {
+    const ids = labelRun(body, 2);
+    if (!ids) return null;
+    diaPairs = [ids];
   }
-  return [{ type: 'diameter', id1: ids[0], id2: ids[1], circle: circleId(center) }];
+  if (diaPairs.some(([a, b]) => a === b)) return null; // a degenerate "AA" pair is not a diameter list
+  const exists = (p: string) => (ctx.points ?? []).some((q) => up(q) === up(p));
+  const members = membersOfCenter(ctx, center);
+  const out: AnyCommand[] = [];
+  for (const [a, b] of diaPairs) {
+    if (exists(a) && exists(b)) {
+      // "XY is a diameter" entails BOTH endpoints ON the circle AND the through-centre collinearity.
+      // Existence is not membership (the ADR-233 proxy-vs-semantic lesson): an existing endpoint NOT yet
+      // on the circle (e.g. a free point some ⊥/segment given created) must be put ON it, or the
+      // constraint form silently under-asserts — the bare collinearity let "AC קוטר" verify green with
+      // A,C floating off the circle (ADR-241). Membership is idempotent for endpoints already on it
+      // (the ADR-099 lowering), so assert it for any endpoint not known to be a member.
+      out.push(
+        ...[a, b]
+          .filter((p) => !members.has(p))
+          .map((p) => ({ type: 'point-on-circle' as const, id: p, circle: circleId(center) })),
+        { type: 'set-collinear' as const, a, b: centrePt(ctx, up(center)), c: b },
+      );
+    } else {
+      out.push({ type: 'diameter', id1: a, id2: b, circle: circleId(center) });
+    }
+  }
+  return out;
 };
 
 /**
@@ -6557,7 +6616,22 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
   const ok = (cands: number[]): boolean => cands.some((v) => Number.isFinite(v) && acc.has(q(v)));
   // stated numbers: blank labels FIRST (a subscript digit — O1, A2 — is part of a label, not a number)
   const raw = normalizeUtterance(utterance);
-  const s = raw.replace(/[A-Za-z]\d*/g, ' ');
+  // A COUNT is not a MAGNITUDE (issue #160): a bare integer QUANTIFYING a plural countable noun
+  // ("2 משיקים", "3 circles") is consumed by the rule's STRUCTURE (it emits that many objects), never
+  // by a numeric payload — the digit twin of the count words (שני/שתי/two) this gate is already blind
+  // to, so the same statement passed or failed on SPELLING alone (the correct Thales construction for
+  // "מנקודה A יוצאים 2 משיקים למעגל" was thrown away and lost to a failed LLM round-trip). Blank the
+  // digit in count slots before extraction (the label-subscript blanking precedent below): a count
+  // slot is a bare integer immediately followed by a Hebrew plural (…ים/…ות) or an English plural
+  // (…s, lowercase tail — a label pair "AS" is not a plural). Real magnitudes never sit in that slot
+  // ("רדיוס 5", "AB = 6", "פי 2" — and a ratio's "פי"-prefixed digit is excluded outright); the
+  // regular-N-gon `ids.length` account is the same count-by-structure idea, un-generalized.
+  // Deliberately generous per this gate's doctrine — a false account only suppresses a warning, while
+  // the false DROP broke a working input.
+  // "פעמים"/"times" end in a plural suffix but head a RATIO ("גדול 2 פעמים", "2 times CD") — excluded,
+  // that digit is a magnitude.
+  const counted = raw.replace(/(?<![\d.,])(?<!פי\s)\d+\s+(?=(?!פעמים)[א-ת]+(?:ים|ות)(?![א-ת])|(?!times\b)[A-Za-z][a-z]+s(?![A-Za-z]))/g, ' ');
+  const s = counted.replace(/[A-Za-z]\d*/g, ' ');
   // A DIAMETER given lowers to radius = d/2 (ADR-259). Checked on the UN-blanked text: blanking wipes the
   // English keyword "diameter" (each Latin letter → space), so the number's radius half would look dropped.
   const hasDiameter = /diameter|קוטר/i.test(raw);

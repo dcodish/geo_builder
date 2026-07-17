@@ -93,6 +93,38 @@ describe('ADR-250/1 — droppedGivenNumbers (no stated magnitude is silently dro
     expect(droppedGivenNumbers('CD חוצה זווית ACB', [{ type: 'segment', a: 'C', b: 'D' }])).toEqual([]);
   });
 
+  it('a COUNT digit is not a magnitude (issue #160): "2 משיקים" ≡ "שני משיקים" — never spelling-gated', () => {
+    // The operator's exact pxeb2ng8 sequence: the digit spelling produced the complete, correct Thales
+    // construction and the gate threw it away as dropped:[2] — while the word spelling passed. A bare
+    // integer quantifying a plural countable noun is consumed by the rule's STRUCTURE, not a payload.
+    const pre = ['מעגל O ברדיוס 5'];
+    const digitHe = parseSteps([...pre, 'מנקודה A יוצאים 2 משיקים למעגל']);
+    const wordHe = parseSteps([...pre, 'מנקודה A יוצאים שני משיקים למעגל']);
+    expect(digitHe.last.ok && wordHe.last.ok).toBe(true);
+    if (digitHe.last.ok && wordHe.last.ok) {
+      // command-identical: the two spellings of one word must agree
+      expect(digitHe.last.commands).toEqual(wordHe.last.commands);
+      expect(droppedGivenNumbers('מנקודה A יוצאים 2 משיקים למעגל', digitHe.last.commands)).toEqual([]);
+    }
+    const digitEn = parseSteps([['circle O with radius 5'], '2 tangents from A to the circle'].flat());
+    expect(digitEn.last.ok).toBe(true);
+    if (digitEn.last.ok) expect(droppedGivenNumbers('2 tangents from A to the circle', digitEn.last.commands)).toEqual([]);
+    // sibling count slots in both languages — the class, not the instance
+    expect(droppedGivenNumbers('2 מעגלים נחתכים בנקודות A ו B', [{ type: 'segment', a: 'A', b: 'B' }])).toEqual([]);
+    expect(droppedGivenNumbers('החותכים אותו ב 3 נקודות', [{ type: 'segment', a: 'A', b: 'B' }])).toEqual([]);
+    expect(droppedGivenNumbers('2 circles intersect at A and B', [{ type: 'segment', a: 'A', b: 'B' }])).toEqual([]);
+  });
+
+  it('count exemption never reaches real magnitudes: ratio/size/times digits stay gated (issue #160 anti-regression)', () => {
+    expect(droppedGivenNumbers('רדיוס 5', [])).toEqual([5]);
+    expect(droppedGivenNumbers('שטח AEB גדול פי 2 משיקים', [])).toEqual([2]); // פי-prefixed digit is a ratio
+    expect(droppedGivenNumbers('AB = 2 times CD', [])).toEqual([2]); // "times" heads a ratio, not a countable
+    expect(droppedGivenNumbers('AB גדול 2 פעמים מ CD', [])).toEqual([2]); // פעמים likewise
+    expect(droppedGivenNumbers('AB = 6', [{ type: 'segment', a: 'A', b: 'B' }])).toEqual([6]);
+    // a decimal is never a count ("2.5 tangents" is not a quantifier)
+    expect(droppedGivenNumbers('2.5 tangents', [])).toEqual([2.5]);
+  });
+
   it('catalog-wide zero false positives: every supported example that parses accounts all its numbers', () => {
     for (const c of COMMAND_CATALOG) {
       if (!c.supported) continue;

@@ -300,14 +300,17 @@ describe('symbolic angle relations (Greek variables)', () => {
 });
 
 describe('chained equality "AB = AC = 3x"', () => {
-  it('splits a symbolic chain into the equality AND the measure (the dropped-clause bug)', () => {
+  it('splits a symbolic chain into the equality AND the measure ON EVERY MEMBER (#163)', () => {
     const r = parse('AB = AC = 3x');
     // The "AB = AC" clause also draws both equal segments (FR-IN-7) before the set-equal/measure.
+    // The chain's tail value distributes to EVERY member (issue #163, operator ruling: «AB=BC=8
+    // means AB=8 and BC=8» — same for a symbolic tail), so AB carries the 3x too, not only AC.
     expect(r.ok && r.commands).toEqual([
       { type: 'segment', a: 'A', b: 'B' },
       { type: 'segment', a: 'A', b: 'C' },
       { type: 'set-equal', a: 'A', b: 'B', c: 'A', d: 'C' },
       { type: 'measure-length', a: 'A', b: 'C', expr: { coef: 3, var: 'x' } },
+      { type: 'measure-length', a: 'A', b: 'B', expr: { coef: 3, var: 'x' } },
     ]);
   });
 

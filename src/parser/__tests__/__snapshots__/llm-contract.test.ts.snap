@@ -74,6 +74,26 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle-through",
     ],
   },
+  "AB and CD are chords in circle O": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "segment",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "segment",
+      "segment",
+    ],
+  },
   "AB is a common tangent to circles O and P": {
     "en": [
       "circle",
