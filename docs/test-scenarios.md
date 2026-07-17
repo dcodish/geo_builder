@@ -22,6 +22,21 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### The #185 nine-parser-gap batch (prod log-triage 2026-07-17, operator-approved ALL NINE — ADR-350/ADR-351)
+Eleven scenarios, one per approved row (row 2 and row 7 carry two forms each), all verbatim prod utterances:
+
+- `polygon-noun-binds-existing-quad` — «מרובע ABCD» → «המצולע חסום במעגל»: the GENERIC polygon noun is a definite reference; the unique existing polygon supplies arity + ids (the ADR-245 pattern extended into `inscribedPolygon`'s kind ladder).
+- `point-on-the-definite-line` — «קטע AB» → «נקודה G על הקו»: the ADR-029 implicit-reference pattern, line edition — with exactly one drawn segment, «הקו» is it.
+- `line-with-point-creates-the-line` — «קו ועליו נקודה A» as the FIRST utterance: no segment yet → the rule creates one (auto-named endpoints, the inscribe auto-label precedent) with A riding it.
+- `parallel-to-the-bases` — «EL מקביל לבסיסים» on a trapezoid: the definite BASES resolve via the ADR-169 `parallels` hint; ∥-to-one-base ≡ ∥-to-both (the bases are mutually parallel); a parallelogram defers.
+- `centres-segment` — «קטע מרכזים» / «מרכז מעגלים» with two circles: the segment joining the two centre points (an anonymous ADR-342 centre becomes visible by use, FR-RN-8).
+- `angle-word-number-degrees` — «זווית C שווה לשלושים מעלות»: Hebrew/English cardinals before a degree word normalise to digits at the parse boundary (compounds sum: «ארבעים וחמש» → 45); a counting word with no degree suffix («צלע אחת») is never rewritten.
+- `isosceles-paren-appositive` — «ABC משולש שווה שוקיים (AB=AC)»: a parenthesized RELATION is a clause separator for the ADR-264 split; the stated pair pins the soft default (ADR-114/234); √(…) value groups never split.
+- `square-with-side-in-one-line` — «ריבוע ABCD שצלעו הוא 1»: rewritten at the boundary to the appositive «ריבוע ABCD, AB = 1»; scoped to equilateral-sided shapes (a rectangle's «שצלעו» would be an unstated pick, ADR-052).
+- `rectangle-two-sides-values` — «מלבן ABCD» → «צלע אחת 10 צלע שניה 5»: two ADJACENT ring edges of THE unique polygon get the values.
+- `chained-angle-word-equality` — «זוית AEB שווה לזווית BEC שווה 60 מעלות»: «שווה ל» before an angle/arc reference or a degree value normalises to `=`; the ADR-343 chain distributes the value to every member. Operator ruling 2026-07-17 narrowing ADR-119: angles/arcs actionable, general segment word-equality stays out.
+- `arc-word-equality` — «הקשת AE שווה לקשת DC»: the word operator feeds ADR-116's arcEquality → equal central angles.
+
 ### `chained-value-marks-every-member` — «AB=BC=8»: the chained value lands on EVERY member, both labelled 8 (#163, ADR-343)
 Operator dev test 2026-07-16: "BC is marked on canvas as 8 but AB was not marked as 8." `chainedEquality` split a chain into adjacent pairwise clauses only, so the value landed on the LAST member; every earlier member lost its stated value on the figure (a docs/17 §6 display-honesty gap — the geometry itself was correct). Operator ruling 2026-07-17: «AB=BC=8 means AB=8 and BC=8». The chain's one owner now distributes a value tail to every member (lengths, angles, symbolic all inherit); the entailed `set-equal` is KEPT (ADR-234 `pinsSoftVariant` reads it; redundancy measured green through replay). Class test `chained-value.test.ts` (all four flavour rows, both locales, the pure member chain unchanged); `symbolic.test.ts` re-derived (it had enshrined the defect).
 

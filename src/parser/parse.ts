@@ -2578,12 +2578,31 @@ const lengthOrder: Rule = (s) => {
  * relation also DRAWS them (segment is idempotent — a no-op if already on the
  * figure), so "AB ∥ CD" puts both lines on the canvas without a separate request.
  */
-const parallelConstraint: Rule = (s) => {
+const parallelConstraint: Rule = (s, ctx) => {
   if (!/parallel|∥|מקביל/i.test(s)) return null;
   // strip the keyword AND filler words (so "to"/"of" aren't read as 2-letter labels)
   const t = s.replace(/parallel(?:\s*to)?|∥|מקביל(?:\s*ל-?)?/gi, ' ').replace(FILLER, ' ');
   const m = t.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b.*?\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
-  if (!m) return null;
+  if (!m) {
+    // «EL מקביל לבסיסים» / "EL parallel to the bases" (#185 row 3): the definite BASES resolve via the
+    // figure's vertex-disjoint parallel edge-pair (the ADR-169 `parallels` hint). One base suffices as
+    // the ∥ target — the bases are mutually parallel by the trapezoid's own constraint, so ∥-to-one is
+    // exactly ∥-to-both (no redundant second constraint). Two pairs (a parallelogram) → ambiguous →
+    // defer; zero → not a trapezoid figure → defer.
+    if (/בסיסים|בסיסי\b|the\s+bases/i.test(s)) {
+      const one = t.match(/\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/);
+      const pairs = ctx.parallels ?? [];
+      if (one && pairs.length === 1) {
+        const [a, b] = [up(one[1]), up(one[2])];
+        const [base] = pairs[0];
+        return [
+          { type: 'segment', a, b },
+          { type: 'set-parallel', a, b, c: up(base[0]), d: up(base[1]) },
+        ];
+      }
+    }
+    return null;
+  }
   const [a, b, c, d] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])];
   return [
     { type: 'segment', a, b },
@@ -2664,6 +2683,87 @@ const dashCollinear: Rule = (s) => {
   return [
     { type: 'segment', a: pts[0], b: pts[pts.length - 1] },
     { type: 'set-line', points: pts },
+  ];
+};
+
+/**
+ * The definite UNNAMED line (#185 row 2 — the ADR-029 implicit-reference pattern, line edition):
+ * «נקודה G על הקו» / "point G on the line" resolves THE single drawn segment and puts the named
+ * point(s) on it; «קו ועליו נקודה A» / «קו עם נקודה A» / "a line with point A" with NO segment yet
+ * CREATES the line first (auto-named endpoints — the inscribe auto-label precedent, shown on canvas so
+ * later references work), so a student can open a figure with "a line and on it a point". Several drawn
+ * segments — or any drawn `line` object — make "the line" ambiguous → defer (LLM keeps the case).
+ */
+const pointOnTheLine: Rule = (s, ctx) => {
+  const LABELS = String.raw`((?:[A-Za-z]\d*)(?:\s*,?\s*(?:ו-?\s*|and\s+)?[A-Za-z]\d*)*)`;
+  const m =
+    s.match(new RegExp(String.raw`^\s*(?:ה?נקוד(?:ה|ות)\s+)?${LABELS}\s+(?:נמצא(?:ת|ות|ים)?\s+)?על\s+ה(?:קו|ישר)\s*$`)) ??
+    s.match(new RegExp(String.raw`^\s*points?\s+${LABELS}\s+(?:lies?\s+|is\s+|are\s+)?on\s+the\s+line\s*$`, 'i')) ??
+    s.match(new RegExp(String.raw`^\s*ה?(?:קו|ישר)\s+(?:ועליו|שעליו|עם)\s+ה?נקוד(?:ה|ות)\s+${LABELS}\s*$`)) ??
+    s.match(new RegExp(String.raw`^\s*(?:a\s+)?line\s+(?:with|and\s+on\s+it)\s+points?\s+${LABELS}(?:\s+on\s+it)?\s*$`, 'i'));
+  if (!m) return null;
+  const labels = (m[1].match(/[A-Za-z]\d*/g) ?? []).map(up);
+  if (!labels.length) return null;
+  if ((ctx.lines ?? []).length) return null; // a drawn line OBJECT exists — "the line" is ambiguous with it
+  // THE line = the figure's single drawn segment/edge; none → create; several → ambiguous.
+  const seen = new Set<string>();
+  const edges: [Id, Id][] = [];
+  for (const [a, nbs] of Object.entries(ctx.neighbors ?? {}))
+    for (const b of nbs) {
+      const k = a < b ? `${a}|${b}` : `${b}|${a}`;
+      if (!seen.has(k)) {
+        seen.add(k);
+        edges.push(a < b ? [a, b] : [b, a]);
+      }
+    }
+  if (edges.length > 1) return null;
+  const out: AnyCommand[] = [];
+  let [a, b] = edges[0] ?? ['', ''];
+  if (!edges.length) {
+    [a, b] = autoVertexLabels(2, [...(ctx.points ?? []), ...labels]);
+    out.push({ type: 'segment', a, b });
+  }
+  for (const L of labels) out.push({ type: 'point-on-segment', id: L, a, b });
+  return out;
+};
+
+/**
+ * «קטע מרכזים» / «מרכזי המעגלים» / "the segment of centres" (#185 row 4): the segment joining THE two
+ * circle centres. Label-free full-match; needs exactly two referenceable circles (with one — or three —
+ * "the centres" has no unique pair → defer). Drawing the segment "uses" both centres, so an anonymous
+ * (ADR-342) centre becomes visible per FR-RN-8 without ever occupying a letter.
+ */
+const centresSegment: Rule = (s, ctx) => {
+  const HE = String.raw`ה?(?:קטע|קו|ישר)\s+(?:ה?מרכזים|מרכזי?\s+ה?מעגלים)|מרכזי?\s+ה?מעגלים`;
+  const EN = String.raw`(?:the\s+)?(?:segment|line)\s+of\s+(?:the\s+)?cent(?:er|re)s|(?:the\s+)?cent(?:er|re)s\s+(?:segment|line)`;
+  if (!new RegExp(String.raw`^\s*(?:${HE}|${EN})\s*$`, 'i').test(s)) return null;
+  const cs = ctx.circles ?? [];
+  if (cs.length !== 2) return null;
+  return [{ type: 'segment', a: centrePt(ctx, up(cs[0])), b: centrePt(ctx, up(cs[1])) }];
+};
+
+/**
+ * «צלע אחת 10 צלע שניה 5» / "one side 10, the other side 5" (#185 row 7): two ADJACENT sides of THE
+ * unique polygon get the stated lengths (the ADR-245 definite-reference pattern — the statement's
+ * subject is the figure's one polygon). Adjacency (first two ring edges) is what "one side… the second
+ * side…" means on a rectangle (length/width); a square with two different values refuses honestly
+ * downstream (over-constrained), never silently.
+ */
+const twoSidesValues: Rule = (s, ctx) => {
+  const m =
+    s.match(
+      /^\s*ה?צלע\s+(?:אחת|אחד|ראשונה)\s*(?:הוא|היא|=|שווה(?:\s+ל-?)?)?\s*(-?\d+(?:\.\d+)?)\s*,?\s*(?:ו-?\s*)?ה?צלע\s+(?:שניי?ה|אחרת)\s*(?:הוא|היא|=|שווה(?:\s+ל-?)?)?\s*(-?\d+(?:\.\d+)?)\s*$/,
+    ) ??
+    s.match(
+      /^\s*one\s+side\s*(?:is|=)?\s*(-?\d+(?:\.\d+)?)\s*,?\s*(?:and\s+)?(?:the\s+)?(?:second|other)\s+side\s*(?:is|=)?\s*(-?\d+(?:\.\d+)?)\s*$/i,
+    );
+  if (!m) return null;
+  const polys = [...new Map((ctx.polygons ?? []).map((v) => [v.map(up).join(''), v.map(up)])).values()];
+  if (polys.length !== 1) return null;
+  const [v0, v1, v2] = polys[0];
+  return [
+    { type: 'set-distance', a: v0, b: v1, value: parseFloat(m[1]) },
+    { type: 'set-distance', a: v1, b: v2, value: parseFloat(m[2]) },
   ];
 };
 
@@ -3185,6 +3285,15 @@ const inscribedPolygon: Rule = (s, ctx) => {
     : /trapez|טרפז/i.test(s) ? 'trapezoid'
     : /quad|מרובע/i.test(s) ? 'quad'
     : null;
+  // «המצולע חסום במעגל» / "the polygon is inscribed in a circle" (#185 row 1): the GENERIC polygon noun
+  // is a DEFINITE reference — bind THE unique existing polygon (the ADR-245 pattern); its arity picks the
+  // triangle/quad branch and `existingPolygon` below supplies the ids. Zero or several polygons (or a
+  // 5+-gon, which this rule can't lower) → defer honestly, never a guess.
+  if (!kind && /polygon|מצולע/i.test(s)) {
+    const uniq = [...new Map((ctx.polygons ?? []).map((v) => [v.map(up).join(''), v.map(up)])).values()];
+    if (uniq.length !== 1 || (uniq[0].length !== 3 && uniq[0].length !== 4)) return null;
+    kind = uniq[0].length === 3 ? 'triangle' : 'quad';
+  }
   if (!kind) {
     // No explicit shape word ("ABCD חסום במעגל" / "ABCD בר חסימה") — infer from a bare label
     // run: 4 letters ⇒ quadrilateral, 3 ⇒ triangle. Keeps the inscribed-vs-cyclic distinction
@@ -3213,7 +3322,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   const named = circleCenter(s); // may be null — "inscribed in a circle" need not name the centre
   const r = parseRadius(s);
   let rest = dropCircleRef(s).replace(
-    /equilateral|שווה[\s-]?צלעות|isosceles|שווה[\s-]?שוקיים|right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|kite|דלתון|עפיפון|trapez\w*|טרפז|quad\w*|מרובע|inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
+    /equilateral|שווה[\s-]?צלעות|isosceles|שווה[\s-]?שוקיים|right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|kite|דלתון|עפיפון|trapez\w*|טרפז|quad\w*|מרובע|polygon|מצולע|inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
     ' ',
   );
   if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
@@ -6188,6 +6297,7 @@ export const RULES: Rule[] = [
   parallelLine, // a *drawn* parallel line through a point (before the ∥ constraint & line∩line)
   dashCollinear, // "A-O1-O2-B" — a dash-separated ordered collinear list (before segment/collinear rules)
   lineThroughCenters, // "AB עובר דרך מרכזי המעגלים" / "…דרך O1 ו O2" — the line through two on-circle points crosses both centres
+  centresSegment, // "קטע מרכזים" / "מרכזי המעגלים" — the segment joining THE two circle centres (#185); label-free full-match, before the label-based line/segment rules
   // Collinearity ("E on line AC" / "line CE passes through A" / "A B C collinear") — before the
   // generic line∩line and before pointOnSegment (whose "P on QR" would misread "P on line QR").
   collinearConstraint,
@@ -6228,9 +6338,11 @@ export const RULES: Rule[] = [
   pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)
   pointOnCircle, // "A on circle O" / the LIST "A ו C על המעגל" (every subject gets the membership) — before segment/pointOnSegment
   pointVsCircle, // "M מחוץ למעגל / בתוך המעגל" — a point's SIDE of a circle (ADR-254); tight full-match, after the external-point compounds
+  pointOnTheLine, // "נקודה G על הקו" / "קו ועליו נקודה A" — THE definite unnamed line (#185); tight full-match, before the label-based point rules
   radiusSegment, // "OB רדיוס" — a drawn radius (rim point on the circle + centre→rim segment); after midpoint/setRadius/circle, before `segment` (so "OB" isn't grabbed as a bare segment)
   dividesInRatio, // "G מחלקת את DC ביחס 1:2" — a point on DC at a fixed t; keyword+`p:q` anchored, BEFORE `segment` (which would grab "הקטע DC" and drop the divider) and the numeric/ratio rules
   diagonals, // "אלכסונים" / "AC ו-BD אלכסוני הריבוע" — the quad's diagonals; before `segment` (which owns the singular "אלכסון AC")
+  twoSidesValues, // "צלע אחת 10 צלע שניה 5" — two adjacent sides of THE unique polygon (#185); full-match, before the generic value rules
   ratioConstraint, // "AB = 2 AD" / "אורך AC גדול פי √3 מהקטע CO" — BEFORE `segment` (its "מהקטע"/"קטע" would else half-parse the relational ratio into a bare segment, dropping the factor — the dividesInRatio class, #105) and before equal/distance
   segment,
   pointsOnSegments, // "F, G, H on AB, AC, CB" — N points placed PAIRWISE on N segments, before the others
@@ -6796,6 +6908,135 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
  *  a label pasted with a homoglyph is read as the letter it looks like. Only the unambiguous look-alikes. */
 const CYRILLIC_TO_LATIN: Record<string, string> = { 'А': 'A', 'В': 'B', 'С': 'C', 'Е': 'E', 'Н': 'H', 'К': 'K', 'М': 'M', 'О': 'O', 'Р': 'P', 'Т': 'T', 'Х': 'X' };
 
+/**
+ * Cardinal NUMBER WORDS before a degree word — «שלושים מעלות», «ארבעים וחמש מעלות», "thirty degrees",
+ * "forty-five degrees" — rewritten to digits at the one boundary every rule reads (#185 row 5, the
+ * ADR-273 word-magnitude family, cardinal edition). Scoped to the degree suffix on purpose: a counting
+ * word elsewhere («צלע אחת 10» — "one side") is a determiner, not a value, and must never be rewritten.
+ * A glued Hebrew prefix on the number word is preserved («לשלושים» → «ל-30»).
+ */
+const HE_NUM_UNITS: Record<string, number> = {
+  'אחת': 1, 'אחד': 1, 'שתיים': 2, 'שניים': 2, 'שתי': 2, 'שני': 2, 'שלוש': 3, 'שלושה': 3, 'ארבע': 4, 'ארבעה': 4,
+  'חמש': 5, 'חמישה': 5, 'שש': 6, 'שישה': 6, 'שבע': 7, 'שבעה': 7, 'שמונה': 8, 'תשע': 9, 'תשעה': 9,
+};
+const HE_NUM_TENS: Record<string, number> = {
+  'עשר': 10, 'עשרה': 10, 'עשרים': 20, 'שלושים': 30, 'ארבעים': 40, 'חמישים': 50, 'שישים': 60, 'ששים': 60,
+  'שבעים': 70, 'שמונים': 80, 'תשעים': 90,
+};
+const EN_NUM_WORDS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17,
+  eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70,
+  eighty: 80, ninety: 90,
+};
+
+/** Evaluate a Hebrew cardinal phrase (tokens in order, later tokens may carry a ו conjunction):
+ *  «שלושים» → 30, «ארבעים וחמש» → 45, «מאה ועשרים» → 120, «שלוש עשרה» → 13. Null when not a number. */
+function heWordNumber(tokens: string[]): number | null {
+  if (tokens.length === 2 && HE_NUM_UNITS[tokens[0]] !== undefined && /^עשרה?$/.test(tokens[1]))
+    return 10 + HE_NUM_UNITS[tokens[0]]; // the teen form: unit + עשרה
+  let total = 0;
+  let rank = Infinity; // strictly descending magnitude: מאה → tens → unit (rejects «חמש שלושים»)
+  for (let i = 0; i < tokens.length; i++) {
+    const t = i > 0 ? tokens[i].replace(/^ו/, '') : tokens[i];
+    const v = t === 'מאה' ? 100 : (HE_NUM_TENS[t] ?? HE_NUM_UNITS[t]);
+    if (v === undefined || v >= rank) return null;
+    total += v;
+    rank = v;
+  }
+  return total > 0 ? total : null;
+}
+
+/** The Hebrew phrase with an optional glued prefix on its FIRST word («לשלושים», «בארבעים וחמש»). */
+function heNumPhrase(words: string[]): { pre: string; value: number } | null {
+  const direct = heWordNumber(words);
+  if (direct !== null) return { pre: '', value: direct };
+  const m = words[0].match(/^([ולבמכש])([א-ת]{2,})$/); // strip one prefix letter and retry
+  if (m) {
+    const v = heWordNumber([m[2], ...words.slice(1)]);
+    if (v !== null) return { pre: m[1], value: v };
+  }
+  return null;
+}
+
+function enWordNumber(tokens: string[]): number | null {
+  let total = 0;
+  let rank = Infinity;
+  for (const t of tokens) {
+    if (t === 'and') continue;
+    if (t === 'hundred') {
+      if (total === 0) return null; // "hundred degrees" alone is not a cardinal phrase
+      total *= 100;
+      rank = 99;
+      continue;
+    }
+    const v = EN_NUM_WORDS[t];
+    if (v === undefined || v >= rank) return null;
+    total += v;
+    rank = v;
+  }
+  return total > 0 ? total : null;
+}
+
+function normalizeWordDegrees(s: string): string {
+  // Hebrew: the run of words directly before «מעלות», trimmed from the LEFT until a valid cardinal
+  // remains — «שווה לשלושים מעלות» keeps «שווה» and rewrites «לשלושים» → «ל-30».
+  let out = s.replace(/((?:[א-ת]+\s+){1,3})(?=מעלות(?![א-ת]))/g, (m, phrase: string) => {
+    const words = phrase.trim().split(/\s+/);
+    for (let i = 0; i < words.length; i++) {
+      const hit = heNumPhrase(words.slice(i));
+      if (hit) return `${words.slice(0, i).join(' ')}${i ? ' ' : ''}${hit.pre ? `${hit.pre}-` : ''}${hit.value} `;
+    }
+    return m;
+  });
+  out = out.replace(/((?:[A-Za-z]+[-\s]+){1,4})(?=degrees?\b)/gi, (m, phrase: string) => {
+    const words = phrase.trim().split(/[-\s]+/);
+    for (let i = 0; i < words.length; i++) {
+      const v = enWordNumber(words.slice(i).map((w) => w.toLowerCase()));
+      if (v !== null) return `${words.slice(0, i).join(' ')}${i ? ' ' : ''}${v} `;
+    }
+    return m;
+  });
+  return out;
+}
+
+/**
+ * WORD equality between ANGLES/ARCS → the `=` the relation rules read (#185 rows 8+9, operator ruling
+ * 2026-07-17): «זוית AEB שווה לזווית BEC שווה 60 מעלות» and «הקשת AE שווה לקשת DC» are actionable, so the
+ * word operator is rewritten to `=` when it joins an angle/arc reference or a DEGREE value — and ONLY
+ * then. This deliberately narrows [ADR-119]'s word-equality ruling to arcs/angles: general word-equality
+ * between segments («AB שווה ל CD», «X ו Y שווים») stays out — students spell those with `=` — which is
+ * why the value lookahead requires the degree suffix rather than any number.
+ */
+const normalizeWordEquality = (s: string): string =>
+  s
+    .replace(/שוו(?:ה|ות)\s+ל-?(?=\s*(?:ה?זוו?ית|∠|ה?קשת|⌢))/g, '= ')
+    .replace(/שוו(?:ה|ות)\s+(?:ל-?\s*)?(?=-?\d+(?:\.\d+)?\s*(?:°|מעלות))/g, '= ')
+    .replace(/\b(?:equals|is\s+equal\s+to)\s+(?=(?:the\s+)?(?:angle|∠|arcs?|⌢))/gi, '= ')
+    .replace(/\b(?:equals|is\s+equal\s+to)\s+(?=-?\d+(?:\.\d+)?\s*(?:°|degrees?))/gi, '= ');
+
+/**
+ * An equilateral-sided shape declared WITH its side length in one utterance — «ריבוע ABCD שצלעו הוא 1» /
+ * "square ABCD whose side is 1" (#185 row 7, the ADR-228 size-given seam) — rewritten to the appositive
+ * `<shape> <ids>, <first-edge> = <value>` the ADR-264 clause split already reads. Scoped to shapes whose
+ * sides are all equal by definition (square / rhombus / equilateral triangle): on those "its side" is
+ * unambiguous; a rectangle's «שצלעו» stays out (WHICH side would be an unstated pick, ADR-052).
+ */
+const SIDE_CLAUSE = String.raw`\s*(?:שצלעו|שאורך\s+צלעו|שכל\s+צלע\s+שלו|whose\s+side(?:\s+length)?|with\s+side(?:\s+length)?)\s*(?:הוא|היא|שווה(?:\s+ל-?)?|is|=)?\s*(?=[√\d(])`;
+const SIDE_SHAPES = String.raw`ריבוע|מעוין|square|rhombus|(?:משולש\s+)?שווה[\s-]?צלעות|equilateral(?:\s+triangle)?`;
+const sideRewrite = (head: string, run: string, fallback: string): string => {
+  const [l1, l2] = run.match(/[A-Za-z]\d*/g) ?? [];
+  return l1 && l2 ? `${head.trim()}, ${up(l1)}${up(l2)} = ` : fallback;
+};
+const normalizeShapeSide = (s: string): string =>
+  s
+    .replace(new RegExp(String.raw`((?:${SIDE_SHAPES})\s+((?:[A-Za-z]\d*\s*){3,4}?))${SIDE_CLAUSE}`, 'gi'), (m, head: string, run: string) =>
+      sideRewrite(head, run, m),
+    )
+    .replace(new RegExp(String.raw`(((?:[A-Za-z]\d*\s*){3,4}?)\s*(?:${SIDE_SHAPES}))${SIDE_CLAUSE}`, 'gi'), (m, head: string, run: string) =>
+      sideRewrite(head, run, m),
+    );
+
 export function normalizeUtterance(raw: string): string {
   // maqaf U+05BE → ASCII hyphen (so the ל-?/ב-?/מ-? suffix groups match); then strip invisible format
   // chars: ALM, ZWSP/ZWNJ/ZWJ/LRM/RLM, LRE…RLO, isolates LRI…PDI, BOM.
@@ -6822,7 +7063,11 @@ export function normalizeUtterance(raw: string): string {
     // the existing length rules handle the wordy phrasing. Requires a VALUE (√/digit/"(") after the copula,
     // so the ratio form "הצלע BC גדולה פי 2 …" (no copula, a comparative) is left to `ratioConstraint`.
     .replace(/(?:אורך|הצלע|הקטע)\s+([A-Za-z]\d*\s*[A-Za-z]\d*)\s+(?:הוא|היא|שווה(?:\s*ל-?)?)\s+(?=[√\d(])/g, '$1 = ');
-  return normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(orth.trim().replace(/\s+/g, ' ')))));
+  // #185: number words before a degree word → digits, THEN the angle/arc word-equality → `=` (its value
+  // lookahead needs the digits), THEN the shape-with-side appositive rewrite. All three are scoped (a
+  // degree suffix / an angle-arc operand / an equilateral-sided shape), so nothing else is touched.
+  const words = normalizeShapeSide(normalizeWordEquality(normalizeWordDegrees(orth)));
+  return normalizeAreaSubscript(normalizePointSubscript(normalizeGreek(normalizeInscriptionSlip(words.trim().replace(/\s+/g, ' ')))));
 }
 
 /**
@@ -7187,7 +7432,12 @@ const APPOSITION_SEP = new RegExp(
 );
 /** A piece that is only labels (with an optional point-word) — a LIST fragment, never a statement. */
 const BARE_LABEL_PIECE = /^(?:ה?נקודות\s+|ה?נקודה\s+|points?\s+)?[A-Z]\d*(?:\s+[A-Z]\d*)*$/;
-function splitStatements(s: string, ctx: ParseContext): ParseResult | null {
+function splitStatements(s0: string, ctx: ParseContext): ParseResult | null {
+  // A PARENTHESIZED relation is the textbook appositive — «ABC משולש שווה שוקיים (AB=AC)» (#185 row 6):
+  // rewrite the parens to a clause separator so the ADR-264 split reads it. Only a group carrying a
+  // RELATION operator is a clause; a √(…) value group is not (the lookbehind), nor is any other
+  // parenthesized value — those stay with their statement.
+  const s = s0.replace(/(?<!√)\(\s*([^()]*(?:[=<>≤≥⊥⟂∥≅~∼∽])[^()]*)\s*\)/g, ', $1');
   const parts = s.split(APPOSITION_SEP).map((p) => p.trim()).filter(Boolean);
   // A single part is splittable only when it carries a detachable inscribe tail (ADR-264 Am. 2) —
   // e.g. the whole-line "AB=AC חוסם במעגל" a lax rule would otherwise claim minus the inscribe.

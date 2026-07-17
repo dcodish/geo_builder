@@ -202,6 +202,143 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'polygon-noun-binds-existing-quad',
+    title: '«המצולע חסום במעגל» — the GENERIC polygon noun binds THE existing polygon (#185 row 1)',
+    guards:
+      'Prod log-triage 2026-07-17: «חסום במעגל» with a shape word works, but the generic «המצולע» fell out of the inscribedPolygon kind ladder → not-handled → LLM. The noun is a DEFINITE reference (the ADR-245 pattern): the unique existing polygon supplies both arity and ids; zero/several polygons still defer.',
+    steps: ['מרובע ABCD', 'המצולע חסום במעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const circle = [...fig.circles.values()][0];
+      expect(circle, 'a circumscribing circle drawn').toBeTruthy();
+      for (const id of ['A', 'B', 'C', 'D'])
+        expect(dist(at(fig, id), circle.center), `${id} on the circle`).toBeCloseTo(circle.r, 3);
+    },
+  },
+  {
+    id: 'point-on-the-definite-line',
+    title: '«קטע AB» → «נקודה G על הקו» — THE definite unnamed line resolves to the single drawn segment (#185 row 2)',
+    guards:
+      'Prod log-triage 2026-07-17: «נקודה G על הקו» was not-handled — the ADR-029 implicit-reference pattern ("the circle") had no line edition. With exactly one drawn segment, "הקו" is it; G rides it as an on-segment point.',
+    steps: ['קטע AB', 'נקודה G על הקו'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, G] = [at(fig, 'A'), at(fig, 'B'), at(fig, 'G')];
+      const cross = (B.x - A.x) * (G.y - A.y) - (B.y - A.y) * (G.x - A.x);
+      expect(Math.abs(cross) / dist(A, B), 'G on line AB').toBeLessThan(1e-3);
+      expect((G.x - A.x) * (B.x - A.x) + (G.y - A.y) * (B.y - A.y), 'G on the A-side of the span').toBeGreaterThanOrEqual(0);
+      expect((G.x - B.x) * (A.x - B.x) + (G.y - B.y) * (A.y - B.y), 'G on the B-side of the span').toBeGreaterThanOrEqual(0);
+    },
+  },
+  {
+    id: 'line-with-point-creates-the-line',
+    title: '«קו ועליו נקודה A» — a first-utterance line with a named rider CREATES the line (#185 row 2)',
+    guards:
+      'Prod log-triage 2026-07-17: «קו ועליו נקודה A» / «קו עם נקודה A» were not-handled, so a student could not OPEN a figure with "a line and on it a point". With no drawn segment the rule creates one (auto-named endpoints, the inscribe auto-label precedent) and puts A on it.',
+    steps: ['קו ועליו נקודה A'],
+    check(fig) {
+      allStepsOk(fig);
+      const [B, C, A] = [at(fig, 'B'), at(fig, 'C'), at(fig, 'A')];
+      const cross = (C.x - B.x) * (A.y - B.y) - (C.y - B.y) * (A.x - B.x);
+      expect(Math.abs(cross) / dist(B, C), 'A rides the created line BC').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'parallel-to-the-bases',
+    title: '«EL מקביל לבסיסים» — the definite BASES resolve via the trapezoid\'s parallel edge-pair (#185 row 3)',
+    guards:
+      'Prod log-triage 2026-07-17: «EL מקביל לבסיסים» was not-handled — the ∥ rule needed two label pairs. The bases resolve from the ADR-169 `parallels` ctx hint (the unique vertex-disjoint parallel edge-pair); one base is exactly ∥-to-both since the bases are mutually parallel; a parallelogram (two pairs) still defers.',
+    steps: ['טרפז ABCD', 'E אמצע AD', 'L אמצע BC', 'EL מקביל לבסיסים'],
+    check(fig) {
+      allStepsOk(fig);
+      const [E, L, A, B] = [at(fig, 'E'), at(fig, 'L'), at(fig, 'A'), at(fig, 'B')];
+      const cross = (L.x - E.x) * (B.y - A.y) - (L.y - E.y) * (B.x - A.x);
+      expect(Math.abs(cross) / (dist(E, L) * dist(A, B)), 'EL ∥ AB').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'centres-segment',
+    title: '«קטע מרכזים» / «מרכז מעגלים» — the segment joining THE two circle centres (#185 row 4)',
+    guards:
+      'Prod log-triage 2026-07-17: both phrasings were not-handled. Label-free full-match; with exactly two referenceable circles the segment joins their centre points (an anonymous ADR-342 centre becomes visible by use, FR-RN-8).',
+    steps: ['מעגל שמרכזו O', 'מעגל שמרכזו P', 'קטע מרכזים'],
+    check(fig) {
+      allStepsOk(fig);
+      const segs = fig.construction.objects.filter((o) => o.kind === 'segment').map((o) => `${o.a}|${o.b}`);
+      expect(segs.some((s) => s === 'O|P' || s === 'P|O'), 'segment O–P drawn').toBe(true);
+    },
+  },
+  {
+    id: 'angle-word-number-degrees',
+    title: '«זווית C שווה לשלושים מעלות» — Hebrew cardinal words before מעלות read as the value (#185 row 5)',
+    guards:
+      'Prod log-triage 2026-07-17: the word spelling of a degree value was not-handled (the ADR-273 word-magnitude family covered only fractions). Cardinals before a degree word normalise to digits at the parse boundary — compounds sum («ארבעים וחמש» → 45) — and the ADR-164 single-vertex angle then fires as usual; a counting word with no degree suffix («צלע אחת») is never rewritten.',
+    steps: ['משולש ABC', 'זווית C שווה לשלושים מעלות'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'B'), at(fig, 'C'), at(fig, 'A')), '∠C = 30').toBeCloseTo(30, 1);
+    },
+  },
+  {
+    id: 'isosceles-paren-appositive',
+    title: '«ABC משולש שווה שוקיים (AB=AC)» — a PARENTHESIZED relation is the appositive clause (#185 row 6)',
+    guards:
+      'Prod log-triage 2026-07-17: the parenthesized pair made the whole line not-handled (ADR-264\'s split knew only comma/connective separators). A (…) group carrying a relation operator now reads as a clause — the stated pair PINS the isosceles soft default (ADR-114/234); a √(…) value group is never split.',
+    steps: ['ABC משולש שווה שוקיים (AB=AC)'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| = |AC|').toBeCloseTo(dist(at(fig, 'A'), at(fig, 'C')), 3);
+    },
+  },
+  {
+    id: 'square-with-side-in-one-line',
+    title: '«ריבוע ABCD שצלעו הוא 1» — a shape declared WITH its side length in one utterance (#185 row 7)',
+    guards:
+      'Prod log-triage 2026-07-17: the relative size clause made the line not-handled. The parse boundary rewrites it to the appositive «ריבוע ABCD, AB = 1» (the ADR-228 size-given seam + the ADR-264 clause split); scoped to equilateral-sided shapes (square/rhombus/equilateral), where "its side" is unambiguous — a rectangle\'s «שצלעו» would be an unstated pick (ADR-052) and stays out.',
+    steps: ['ריבוע ABCD שצלעו הוא 1'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| = 1').toBeCloseTo(1, 3);
+      expect(dist(at(fig, 'B'), at(fig, 'C')), 'a square — |BC| = 1 too').toBeCloseTo(1, 3);
+    },
+  },
+  {
+    id: 'rectangle-two-sides-values',
+    title: '«מלבן ABCD» → «צלע אחת 10 צלע שניה 5» — two adjacent sides of THE polygon get the stated lengths (#185 row 7)',
+    guards:
+      'Prod log-triage 2026-07-17: the "one side… second side…" follow-up was not-handled. The subject is THE unique polygon (the ADR-245 definite-reference pattern); the values land on two ADJACENT ring edges — a rectangle\'s length and width.',
+    steps: ['מלבן ABCD', 'צלע אחת 10 צלע שניה 5'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| = 10').toBeCloseTo(10, 3);
+      expect(dist(at(fig, 'B'), at(fig, 'C')), '|BC| = 5').toBeCloseTo(5, 3);
+    },
+  },
+  {
+    id: 'chained-angle-word-equality',
+    title: '«זוית AEB שווה לזווית BEC שווה 60 מעלות» — a WORD-chained angle equality with a value tail (#185 row 8)',
+    guards:
+      'Prod log-triage 2026-07-17: the word operator between angles was not-handled (angleEquality/chainedEquality split on `=` only). «שווה ל» before an angle/arc reference or a degree value now normalises to `=` at the parse boundary (operator ruling 2026-07-17, narrowing ADR-119: angles/arcs are actionable, general segment word-equality stays out), so the existing chain machinery (ADR-343) distributes the value to every member.',
+    steps: ['זוית AEB שווה לזווית BEC שווה 60 מעלות'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(angle(at(fig, 'A'), at(fig, 'E'), at(fig, 'B')), '∠AEB = 60').toBeCloseTo(60, 1);
+      expect(angle(at(fig, 'B'), at(fig, 'E'), at(fig, 'C')), '∠BEC = 60').toBeCloseTo(60, 1);
+    },
+  },
+  {
+    id: 'arc-word-equality',
+    title: '«הקשת AE שווה לקשת DC» — arc word-equality lowers to the central-angle ratio (#185 row 9)',
+    guards:
+      'Prod log-triage 2026-07-17, operator-approved (narrowing ADR-119): «שווה ל» between two ARCS is actionable. The word operator normalises to `=` and ADR-116\'s arcEquality lowers arc AE = arc DC to ∠AOE = ∠DOC, driving the free on-circle points.',
+    steps: ['מעגל O', 'A, E, D, C על המעגל', 'הקשת AE שווה לקשת DC'],
+    check(fig) {
+      allStepsOk(fig);
+      const O = fig.circles.get('circle-O')!.center;
+      expect(angle(at(fig, 'A'), O, at(fig, 'E')), '∠AOE = ∠DOC (equal arcs)').toBeCloseTo(angle(at(fig, 'D'), O, at(fig, 'C')), 1);
+    },
+  },
+  {
     id: 'chained-value-marks-every-member',
     title: '«AB=BC=8» — the chained value lands on EVERY member: |AB|=8 AND |BC|=8, both labelled (#163, ADR-343)',
     guards:

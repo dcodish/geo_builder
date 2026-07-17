@@ -157,12 +157,13 @@ describe('#43 — orientation: canvas layout is not a given', () => {
 });
 
 describe('#43 — bare-point: a lone label still gets guidance', () => {
-  // A lone letter with NO keyword, and a line carrying an unrelated point, still say "state WHERE it sits".
-  for (const u of ['C', 'A.', 'קו ועליו נקודה A', 'קו עם נקודה A']) {
+  // A lone letter with NO keyword still says "state WHERE it sits".
+  for (const u of ['C', 'A.']) {
     it(u, () => expect(classifyOutOfScope(u)?.category).toBe('bare-point'));
   }
-  // But the KEYWORD forms now BUILD a bare free point (#104) — they must NOT be brushed off as guidance.
-  for (const u of ['נקודה A', 'נקודה P', 'point G', 'הוסף נקודה P']) {
+  // But the KEYWORD forms now BUILD a bare free point (#104) — they must NOT be brushed off as guidance —
+  // and the line-with-rider forms BUILD the line + its on-line point since #185 (`pointOnTheLine`).
+  for (const u of ['נקודה A', 'נקודה P', 'point G', 'הוסף נקודה P', 'קו ועליו נקודה A', 'קו עם נקודה A']) {
     it(`${u} builds — not guidance`, () => expect(classifyOutOfScope(u)).toBeNull());
   }
 });
