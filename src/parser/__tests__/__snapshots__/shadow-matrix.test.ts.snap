@@ -650,6 +650,26 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "isosceles triangle ABC (AB=AC)",
+    "winner": "(escalate)",
+  },
+  {
+    "lang": "he",
+    "text": "ABC משולש שווה שוקיים (AB=AC)",
+    "winner": "(escalate)",
+  },
+  {
+    "lang": "en",
+    "text": "square ABCD whose side is 1",
+    "winner": "(escalate)",
+  },
+  {
+    "lang": "he",
+    "text": "ריבוע ABCD שצלעו הוא 1",
+    "winner": "(escalate)",
+  },
+  {
+    "lang": "en",
     "text": "equilateral triangle ABC",
     "winner": "(anon)",
   },
@@ -870,6 +890,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "a line with point A",
+    "winner": "pointOnTheLine",
+  },
+  {
+    "lang": "he",
+    "text": "קו ועליו נקודה A",
+    "winner": "pointOnTheLine",
+  },
+  {
+    "lang": "en",
     "text": "BC parallel to AD",
     "winner": "parallelConstraint",
   },
@@ -1027,6 +1057,26 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "lang": "he",
     "text": "זווית GBA = 37",
     "winner": "angle",
+  },
+  {
+    "lang": "en",
+    "text": "angle ABC equals thirty degrees",
+    "winner": "angle",
+  },
+  {
+    "lang": "he",
+    "text": "זווית ABC שווה לשלושים מעלות",
+    "winner": "angle",
+  },
+  {
+    "lang": "en",
+    "text": "angle AEB equals angle BEC equals 60 degrees",
+    "winner": "chainedEquality",
+  },
+  {
+    "lang": "he",
+    "text": "זוית AEB שווה לזווית BEC שווה 60 מעלות",
+    "winner": "chainedEquality",
   },
   {
     "lang": "en",

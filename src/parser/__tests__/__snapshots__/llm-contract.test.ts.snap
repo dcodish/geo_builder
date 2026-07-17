@@ -432,6 +432,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "set-area-ratio",
     ],
   },
+  "a line with point A": {
+    "en": [
+      "segment",
+      "point-on-segment",
+    ],
+    "he": [
+      "segment",
+      "point-on-segment",
+    ],
+  },
   "a semicircle on each side of square ABCD": {
     "en": [
       "square",
@@ -488,6 +498,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "measure-angle",
     ],
   },
+  "angle ABC equals thirty degrees": {
+    "en": [
+      "segment",
+      "segment",
+      "set-angle",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "set-angle",
+    ],
+  },
   "angle ABC is obtuse": {
     "en": [
       "segment",
@@ -498,6 +520,34 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "segment",
       "segment",
       "set-angle-acuteness",
+    ],
+  },
+  "angle AEB equals angle BEC equals 60 degrees": {
+    "en": [
+      "segment",
+      "segment",
+      "segment",
+      "segment",
+      "set-angle-ratio",
+      "segment",
+      "segment",
+      "set-angle",
+      "segment",
+      "segment",
+      "set-angle",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "segment",
+      "segment",
+      "set-angle-ratio",
+      "segment",
+      "segment",
+      "set-angle",
+      "segment",
+      "segment",
+      "set-angle",
     ],
   },
   "angle GBA = 37": {
@@ -870,6 +920,20 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "shape-variant",
     ],
   },
+  "isosceles triangle ABC (AB=AC)": {
+    "en": [
+      "shape-variant",
+      "segment",
+      "segment",
+      "set-equal",
+    ],
+    "he": [
+      "shape-variant",
+      "segment",
+      "segment",
+      "set-equal",
+    ],
+  },
   "kite ABCD": {
     "en": [
       "shape-variant",
@@ -1216,6 +1280,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     ],
     "he": [
       "square",
+    ],
+  },
+  "square ABCD whose side is 1": {
+    "en": [
+      "square",
+      "segment",
+      "set-distance",
+    ],
+    "he": [
+      "square",
+      "segment",
+      "set-distance",
     ],
   },
   "square DEFG inscribed in triangle ABC": {
