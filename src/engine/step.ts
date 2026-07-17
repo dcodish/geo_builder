@@ -307,6 +307,33 @@ function settleOnFrozenPrior(
   return { construction: trial, positions: r.positions };
 }
 
+/**
+ * #186 belt-and-braces: a command that would CREATE A NEW POINT riding a circle id that exists nowhere
+ * — not in the prior figure and not defined by the command itself — can only produce a dangling object
+ * that the topological evaluator reports as the cryptic internal "unresolved dependencies for: X".
+ * The parser's `withImplicitCircles` auto-creates every consumed circle, so this fires only for broken
+ * external sources (a raw LLM commit, a hand-edited figure file, a direct engine call) — refuse
+ * HONESTLY, naming the missing circle, before anything is applied. Scope deliberately narrow: a
+ * statement about an EXISTING point keeps its M1 ladder semantics (apply's point-on-circle (a)–(d)
+ * reconciliation — incl. the tolerated same-batch creation-after-use order some rules emit, e.g.
+ * «נקודות B C D על מעגל שמרכזו O» whose circle command follows its memberships), and line references
+ * keep their own lenient design (ADR-236's pending constraints).
+ */
+function danglingCircleError(prev: Construction, cmd: Command): string | null {
+  const own = cmd.type === 'circle' || cmd.type === 'circle-through' || cmd.type === 'circumcircle' ? cmd.id : null;
+  const id = (cmd as { id?: Id }).id;
+  if (id !== undefined && prev.objects.some((o) => o.id === id)) return null; // an EXISTING-id statement → the M1 ladder owns it
+  for (const k of ['circle', 'circle1', 'circle2'] as const) {
+    const v = (cmd as Record<string, unknown>)[k];
+    if (typeof v !== 'string' || v === own) continue;
+    if (!prev.objects.some((o) => o.kind === 'circle' && o.id === v)) {
+      const letter = v.startsWith('circle-') ? v.slice('circle-'.length) : v;
+      return `circle '${letter}' is not defined`;
+    }
+  }
+  return null;
+}
+
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
   const prevEval = evaluate(prev);
@@ -319,6 +346,11 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   // has a NaN residual: reject it here, before the solver churns on it (a freeze in the config search).
   const degenErr = degenerateConstraintError(cmd);
   if (degenErr) return { ok: false, error: degenErr, construction: prev, positions: prevPositions };
+
+  // #186: a reference to a circle that doesn't exist refuses with the circle's NAME, never the
+  // topological evaluator's internal "unresolved dependencies" (the student-facing honesty guard).
+  const danglingErr = danglingCircleError(prev, cmd);
+  if (danglingErr) return { ok: false, error: danglingErr, construction: prev, positions: prevPositions };
 
   // Rotate a shape's vertices so an existing edge lands on its free base slots —
   // lets a shape build on an existing edge wherever that edge sits in the name

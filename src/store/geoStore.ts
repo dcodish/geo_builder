@@ -1671,6 +1671,71 @@ const relabelUtterance = (utt: string | undefined, from: Id, to: Id): string | u
 /** Outcome of a relabel request, so the UI can explain a no-op. */
 export type RenameResult = { ok: true } | { ok: false; reason: 'same' | 'no-source' | 'target-taken' };
 
+/**
+ * The PURE fact-list core of the `nameCentre` store action (ADR-342 / #186): resolve the centre token
+ * `from` (a letter, or a raw '@ctr-…' id) to the owning circle's real centre and rename it — plus the
+ * circle's reference id letter-half and the auto-centre reveal — to `to`, across every fact. Extracted
+ * so the log-triage verifier can mirror the App's #186 name-binding step on its plain fact arrays with
+ * THE SAME implementation (a re-implementation is the ADR-346 drift class this repo keeps paying for).
+ */
+export function nameCentreFacts(
+  facts: Fact[],
+  from: Id,
+  to: Id,
+): { ok: true; facts: Fact[]; source: string; letter: string; anon: boolean } | { ok: false; reason: 'same' | 'no-source' | 'target-taken' } {
+  const F = from.startsWith('@') ? from : from.toUpperCase();
+  const T = to.toUpperCase();
+  let source: string | null = null;
+  let letter: string | null = null; // the circle-id letter half (`circle-<letter>`)
+  for (const f of facts) {
+    const c = f.cmd as { type?: string; center?: string };
+    if ((c.type !== 'circle' && c.type !== 'circle-through') || !c.center) continue;
+    const tok = c.center.startsWith('@ctr-') ? c.center.slice(5) : c.center;
+    if (tok === F || c.center === F) {
+      source = c.center;
+      letter = tok;
+      break;
+    }
+  }
+  const all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
+  if (!source) {
+    // legacy: renaming a centre letter that IS a plain point (a named centre being re-lettered)
+    if (!all.has(F)) return { ok: false, reason: 'no-source' };
+    source = F;
+    letter = F;
+  }
+  if (source === T) return { ok: false, reason: 'same' }; // promoting a token to its OWN letter ('@ctr-O'→'O') is a real change
+  if (all.has(T)) return { ok: false, reason: 'target-taken' };
+  const anon = source.startsWith('@');
+  // The circle-id follow must match the WHOLE id (or its `-`-suffixed concentric inner), never a
+  // substring: `renameInCommand`'s literal fallback turned `circle-O1` into `circle-O21` when the
+  // renamed circle was `circle-O` → `circle-O2` (the ADR-122 split/join corruption class, latent here
+  // until #186 made same-letter-prefixed circle names routine).
+  const followCircleId = (cmd: AnyCommand, fromId: string, toId: string): AnyCommand => {
+    const map = (v: unknown): unknown =>
+      typeof v === 'string' ? (v === fromId ? toId : v.startsWith(`${fromId}-`) ? toId + v.slice(fromId.length) : v) : Array.isArray(v) ? v.map(map) : v;
+    return Object.fromEntries(Object.entries(cmd).map(([k, v]) => [k, k === 'expr' ? v : map(v)])) as AnyCommand;
+  };
+  const mapped = facts.map((f) => {
+    let cmd = renameInCommand(f.cmd, source!, T);
+    // An anonymous centre's rename only touched the point id — the circle's REFERENCE id keeps the
+    // letter half, so «מעגל T» must resolve after naming: rename `circle-<letter>` → `circle-<T>`
+    // too (whole-id exact, so a student's own point <letter> and a sibling `circle-<letter>1` are
+    // untouched; the concentric inner `circle-<letter>-2` follows by prefix).
+    if (anon && letter && letter !== T) cmd = followCircleId(cmd, `circle-${letter}`, `circle-${T}`);
+    // reveal the renamed circle's centre: the circle command whose centre is now T drops autoCenter
+    const revealed =
+      (cmd.type === 'circle' || cmd.type === 'circle-through') && (cmd as { center?: string }).center === T && (cmd as { autoCenter?: boolean }).autoCenter
+        ? (() => {
+            const { autoCenter: _drop, ...rest } = cmd as Record<string, unknown>;
+            return rest as AnyCommand;
+          })()
+        : cmd;
+    return { ...f, cmd: revealed, utterance: anon ? f.utterance : relabelUtterance(f.utterance, source!, T) };
+  });
+  return { ok: true, facts: mapped, source, letter: letter!, anon };
+}
+
 /** Outcome of a swap request (exchange two existing labels), so the UI can explain a no-op. */
 export type SwapResult = { ok: true } | { ok: false; reason: 'same' | 'no-source' };
 
@@ -2329,56 +2394,22 @@ export const useGeoStore = create<GeoState>()(
        * (FR-RN-8). One `set` → one undo entry. Never mints a second circle.
        */
       nameCentre: (from, to) => {
-        // `from` is the centre TOKEN (the letter parseNameCenter resolved) or a raw '@ctr-…' id (the
-        // promote path). Resolve it to the REAL centre point id via the owning circle command (ADR-342):
-        // an unnamed circle's centre is anonymous ('@ctr-O') while its token stays the letter.
-        const F = from.startsWith('@') ? from : from.toUpperCase();
+        const r = nameCentreFacts(get().facts, from, to);
+        if (!r.ok) return { ok: false, reason: r.reason };
+        const { source, letter, anon } = r;
         const T = to.toUpperCase();
-        const facts = get().facts;
-        let source: string | null = null;
-        let letter: string | null = null; // the circle-id letter half (`circle-<letter>`)
-        for (const f of facts) {
-          const c = f.cmd as { type?: string; center?: string };
-          if ((c.type !== 'circle' && c.type !== 'circle-through') || !c.center) continue;
-          const tok = c.center.startsWith('@ctr-') ? c.center.slice(5) : c.center;
-          if (tok === F || c.center === F) {
-            source = c.center;
-            letter = tok;
-            break;
-          }
-        }
-        const all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
-        if (!source) {
-          // legacy: renaming a centre letter that IS a plain point (a named centre being re-lettered)
-          if (!all.has(F)) return { ok: false, reason: 'no-source' };
-          source = F;
-          letter = F;
-        }
-        if (source === T) return { ok: false, reason: 'same' }; // promoting a token to its OWN letter ('@ctr-O'→'O') is a real change
-        if (all.has(T)) return { ok: false, reason: 'target-taken' };
-        const anon = source.startsWith('@');
         set({
-          facts: facts.map((f) => {
-            let cmd = renameInCommand(f.cmd, source!, T);
-            // An anonymous centre's rename only touched the point id — the circle's REFERENCE id keeps the
-            // letter half, so «מעגל T» must resolve after naming: rename `circle-<letter>` → `circle-<T>`
-            // too (literal-exact, so a student's own point <letter> is untouched; the concentric inner
-            // `circle-<letter>-2` follows by prefix).
-            if (anon && letter && letter !== T) cmd = renameInCommand(cmd, `circle-${letter}`, `circle-${T}`);
-            // reveal the renamed circle's centre: the circle command whose centre is now T drops autoCenter
-            const revealed =
-              (cmd.type === 'circle' || cmd.type === 'circle-through') && (cmd as { center?: string }).center === T && (cmd as { autoCenter?: boolean }).autoCenter
-                ? (() => {
-                    const { autoCenter: _drop, ...rest } = cmd as Record<string, unknown>;
-                    return rest as AnyCommand;
-                  })()
-                : cmd;
-            return { ...f, cmd: revealed, utterance: anon ? f.utterance : relabelUtterance(f.utterance, source!, T) };
-          }),
+          facts: r.facts,
           hidden: get().hidden.map((h) => (h === source ? T : h)),
           segStyle: renameSegStyle(get().segStyle, source, T),
           hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${letter}` ? `circle-${T}` : c)),
-          radiusOverrides: Object.fromEntries(Object.entries(get().radiusOverrides).map(([k, v]) => [anon ? k.split(`circle-${letter}`).join(`circle-${T}`) : relabelId(k, source!, T), v])),
+          radiusOverrides: Object.fromEntries(
+            Object.entries(get().radiusOverrides).map(([k, v]) => [
+              // whole-id (or concentric `-`-suffix) mapping — never substring (the ADR-122 class, see nameCentreFacts)
+              anon ? (k === `circle-${letter}` ? `circle-${T}` : k.startsWith(`circle-${letter}-`) ? `circle-${T}` + k.slice(`circle-${letter}`.length) : k) : relabelId(k, source, T),
+              v,
+            ]),
+          ),
           selectedId: null,
         });
         return { ok: true };

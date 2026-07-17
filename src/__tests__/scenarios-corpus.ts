@@ -34,8 +34,8 @@
  */
 
 import { expect } from 'vitest';
-import { parse, buildParseCtx } from '@/parser';
-import { replay, firstSatisfyingSeed, settleVariantDefaults } from '@/store/geoStore';
+import { parse, buildParseCtx, impliedCircleBinding } from '@/parser';
+import { replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { isGeoPoint, freeDofs, freeDofCount, applySeed, evaluate, detectRelations, detectShapes } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
@@ -91,7 +91,18 @@ export function factsOf(steps: Step[]): Fact[] {
       if (start < 0) throw new Error(`edit step: no step group ${key} to edit`);
       let end = start;
       while (end < facts.length && facts[end].group === key) end++;
-      const r = parse(step.edit.to, ctxOf(facts.slice(0, start)));
+      let er = parse(step.edit.to, ctxOf(facts.slice(0, start)));
+      // #186 mirror (the App's commitEdit auto-bind): a fresh circle name in an edit binds an unnamed
+      // circle via the shared decision helper + fact core, then re-parses against the renamed prefix.
+      for (let guard = 0; er.ok && guard < 3; guard++) {
+        const bind = impliedCircleBinding(er.commands, ctxOf(facts.slice(0, start)));
+        if (!bind || 'clarify' in bind) break;
+        const nc = nameCentreFacts(facts, bind.from, bind.to);
+        if (!nc.ok) break;
+        facts = nc.facts;
+        er = parse(step.edit.to, ctxOf(facts.slice(0, start)));
+      }
+      const r = er;
       if (!r.ok) throw new Error(`edited step did not parse: ${JSON.stringify(step.edit.to)}`);
       const replacement: Fact[] = r.commands.map((cmd, i) => ({
         id: `${key}e.${i}`,
@@ -106,7 +117,17 @@ export function factsOf(steps: Step[]): Fact[] {
     }
     const group = `g${g++}`;
     if (typeof step === 'string') {
-      const r = parse(step, ctxOf(facts));
+      let r = parse(step, ctxOf(facts));
+      // #186 mirror (App.submit's auto-bind): a circle named by a fresh name, with unnamed circles in
+      // the figure, binds one of them (shared decision helper + fact core) and re-parses.
+      for (let guard = 0; r.ok && guard < 3; guard++) {
+        const bind = impliedCircleBinding(r.commands, ctxOf(facts));
+        if (!bind || 'clarify' in bind) break;
+        const nc = nameCentreFacts(facts, bind.from, bind.to);
+        if (!nc.ok) break;
+        facts = nc.facts;
+        r = parse(step, ctxOf(facts));
+      }
       if (!r.ok) throw new Error(`scenario step did not parse (would escalate to the LLM): ${JSON.stringify(step)}`);
       for (const cmd of r.commands) push(group, step, cmd);
     } else if (step.llm.length && typeof step.llm[0] === 'string') {
@@ -5264,6 +5285,38 @@ export const SCENARIOS: Scenario[] = [
       // the angle is marked at O and labelled 80°
       expect(fig.angleMarks.some((m) => m.vertex === 'O'), 'angle mark at the centre O').toBe(true);
       expect(fig.labels.angles.some((a) => a.vertex === 'O' && a.text.includes('80')), '80° label at O').toBe(true);
+    },
+  },
+  {
+    id: 'unknown-circle-name-binds-unnamed-circle',
+    title: 'issue #186 (hqxbjh0x): «מעגל O1» / «מעגל O2» BIND the two unnamed intersecting circles — naming-by-use, never an invented circle',
+    guards:
+      'prod session hqxbjh0x (2026-07-17): after «שני מעגלים נחתכים» (auto centres HIDDEN, FR-RN-8 — the student cannot know the internal names O/P) the student referred to the circles as O1 and O2. The parser accepted the names purely textually and INVENTED new circles (`withImplicitCircles`) — a wrong figure shown green — and in the session\'s state the E-statement surfaced the raw internal «unresolved dependencies for: E». Now (ADR-347) a fresh circle name binds an UNNAMED circle: a stated-membership signal first (D,F already ride the right circle → it becomes O1), then the sole remaining unnamed circle (→ O2); the binding is the #112 nameCentre rename, so the centres reveal under the student\'s own names and later references resolve deterministically.',
+    steps: [
+      'שני מעגלים נחתכים',
+      // the prod LLM step («מיתר DF במעגל הימני»): D,F onto the second circle by its internal token
+      { llm: [
+        { type: 'point-on-circle', id: 'D', circle: 'circle-P' },
+        { type: 'point-on-circle', id: 'F', circle: 'circle-P' },
+        { type: 'segment', a: 'D', b: 'F' },
+      ] as AnyCommand[] },
+      'D ו F על מעגל O1', // membership signal: D,F already ride circle-P → P is bound as O1
+      'E ו C על מעגל O2', // one unnamed circle left → it is bound as O2; E,C become riders
+    ],
+    check: (fig) => {
+      allStepsOk(fig); // never the raw "unresolved dependencies" refusal
+      // exactly the two original circles, now carrying the student's names — no invented third/fourth
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles.map((c) => c.id).sort(), 'the two circles ARE the student-named ones').toEqual(['circle-O1', 'circle-O2']);
+      // the memberships the student stated hold geometrically
+      const on = (p: Id, cid: Id) => {
+        const c = fig.circles.get(cid)!;
+        return Math.abs(dist(at(fig, p), c.center) - c.r);
+      };
+      for (const p of ['D', 'F'] as Id[]) expect(on(p, 'circle-O1'), `${p} on circle O1`).toBeLessThan(1e-6);
+      for (const p of ['E', 'C'] as Id[]) expect(on(p, 'circle-O2'), `${p} on circle O2`).toBeLessThan(1e-6);
+      // the bound centres are REVEALED under the student's names (naming-by-use = a real naming)
+      expect(circles.some((c) => (c as { autoCenter?: boolean }).autoCenter), 'no hidden auto centre remains').toBe(false);
     },
   },
 ];

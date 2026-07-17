@@ -38,6 +38,9 @@ interface Pattern {
 // Order matters only where one pattern's text is a prefix of another's; each regex below is
 // anchored and specific enough that the first match is the right one.
 const PATTERNS: Pattern[] = [
+  // step.ts danglingCircleError (#186) — `circle 'O2' is not defined`
+  { re: /^circle '(.+)' is not defined$/, key: 'errors.unknownCircle', params: (m) => ({ center: m[1] }) },
+
   // evaluate.ts:851 — `unresolved dependencies for: A, B, circle-O`
   { re: /^unresolved dependencies for: (.+)$/, key: 'errors.unresolvedDeps', params: (m) => ({ ids: m[1] }) },
 

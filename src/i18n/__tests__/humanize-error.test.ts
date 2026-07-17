@@ -14,6 +14,8 @@ const hasHebrew = (s: string) => /[֐-׿]/.test(s);
  * site is added to the engine, add its raw shape here so coverage stays complete.
  */
 const CASES: { raw: string; contains: string[] }[] = [
+  // step.ts danglingCircleError (#186) — a reference to a circle that doesn't exist
+  { raw: "circle 'O2' is not defined", contains: ['O2'] },
   { raw: 'unresolved dependencies for: A, B, circle-O', contains: ['A, B, circle-O'] },
   { raw: 'non-finite position computed', contains: [] },
   { raw: '|AB| = |AD| references an unknown point', contains: ['|AB| = |AD|'] },

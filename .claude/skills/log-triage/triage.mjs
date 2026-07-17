@@ -36,8 +36,9 @@
  * keep-prior). Our grammar failing a step does NOT by itself break the prefix: when the log carries what the
  * LLM committed (`commands`, issue #84), that is replayed instead, so the verdict reports OUR coverage
  * honestly while the rest of the session stays real evidence. Where we genuinely cannot follow — an LLM step
- * with no logged commands (pre-2026-07-14 events; all of 3-D until #182) or a store `action` (edit/delete/
- * show-another) — the rest of the session is marked DEGRADED: our figure is missing objects the student had,
+ * with no logged commands (pre-2026-07-14 events; all of 3-D until #182) or a store `action` this replay
+ * cannot reproduce (edit/delete/show-another/slider; clear/undo/redo ARE followed since #189) — the rest
+ * of the session is marked DEGRADED: our figure is missing objects the student had,
  * so a downstream failure may be OUR artifact. Degraded failures are reported separately and NEVER claimed as
  * gaps — that is the same false-signal class this file exists to kill. An utterance is judged by its BEST
  * outcome over all its occurrences: if it builds in any real context, it is not a gap.
@@ -64,10 +65,10 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  parse, parseRename, parseMerge, parseSwap, parseNameCenter, buildParseCtx, classifyOutOfScope,
+  parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, buildParseCtx, classifyOutOfScope,
   droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs, droppedCompoundRelation,
 } from '../../../src/parser/index.ts';
-import { replay } from '../../../src/store/geoStore.ts';
+import { replay, nameCentreFacts } from '../../../src/store/geoStore.ts';
 import { parse3 } from '../../../src3d/parser/parse3.ts';
 import { derive3 } from '../../../src3d/store/store3.ts';
 
@@ -210,11 +211,31 @@ function session2d(evs) {
   let fig;
   try { fig = replay([], 0); } catch { fig = { construction: { objects: [], points: new Map() }, positions: new Map(), status: {} }; }
   let degraded = false; // our prefix ≠ the user's figure ⇒ nothing downstream is evidence
+  // #189: a zundo-like history so logged clear/undo/redo actions are FOLLOWED, not degraded — one
+  // entry per fact-list mutation, mirroring the store's per-set() undo granularity.
+  const history = [];
+  let future = [];
+  const advance = (next, d) => { history.push(facts); future = []; facts = next; if (d) fig = d; };
   const t0 = Date.now();
   for (const e of evs) {
-    // A store action (edit / delete / show-another, #84) reshapes the figure in ways this replay does not
-    // reproduce — from here on our prefix is a guess. Honest `degraded`, not a silent divergence.
-    if (e.ev === 'action') { degraded = true; out.push({ now: 'skip', detail: `action:${e.action}`, degraded }); continue; }
+    if (e.ev === 'action') {
+      // #189: clear / undo / redo are logged since prod/2026-07-17-3 and this replay FOLLOWS them, so
+      // the prefix stays faithful. An undo/redo reaching past what this session tracked (or any other
+      // action — edit / delete / show-another / slider, whose reshaping we can't reproduce) still
+      // degrades honestly.
+      if (e.action === 'clear') { advance([], replay([], 0)); out.push({ now: 'skip', detail: 'action:clear', degraded }); continue; }
+      if (e.action === 'undo') {
+        if (history.length) { future.push(facts); facts = history.pop(); fig = replay(facts, 0); out.push({ now: 'skip', detail: 'action:undo', degraded }); }
+        else { degraded = true; out.push({ now: 'skip', detail: 'action:undo (past tracked history)', degraded }); }
+        continue;
+      }
+      if (e.action === 'redo') {
+        if (future.length) { history.push(facts); facts = future.pop(); fig = replay(facts, 0); out.push({ now: 'skip', detail: 'action:redo', degraded }); }
+        else { degraded = true; out.push({ now: 'skip', detail: 'action:redo (past tracked history)', degraded }); }
+        continue;
+      }
+      degraded = true; out.push({ now: 'skip', detail: `action:${e.action}`, degraded }); continue;
+    }
     const u = norm(e.utterance);
     if (!u) { out.push({ now: 'skip', detail: '', degraded }); continue; }
     if (Date.now() - t0 > sessionBudgetMs) { out.push({ now: 'unverified', detail: 'session budget', degraded: true }); continue; }
@@ -227,8 +248,24 @@ function session2d(evs) {
       if (parseNameCenter(u, pctx) || parseRename(u) || parseMerge(u) || parseSwap(u)) {
         res = { now: 'store-op', detail: 'rename/merge/swap/name-centre' };
       } else {
-        const r = parse(u, pctx);
-        if (!r.ok && (r.reason === 'ambiguous-angle' || r.reason === 'ambiguous-circle')) {
+        let r = parse(u, pctx);
+        // #186 mirror: a circle referenced by a name that matches no circle, with UNNAMED circles in the
+        // figure, BINDS the fresh name to one of them (App.submit's auto-bind: `impliedCircleBinding` →
+        // `nameCentreFacts` → re-parse); ambiguous → the same clarify the App shows.
+        let bindClarify = null;
+        for (let guard = 0; r.ok && guard < 3; guard++) {
+          const bind = impliedCircleBinding(r.commands, pctx);
+          if (!bind) break;
+          if (bind.clarify) { bindClarify = bind.center; break; }
+          const nc = nameCentreFacts(facts, bind.from, bind.to);
+          if (!nc.ok) break;
+          advance(nc.facts, replay(nc.facts, 0)); // #189: its own history entry (the store's nameCentre set())
+          pctx = buildParseCtx(fig.construction, fig.positions);
+          r = parse(u, pctx);
+        }
+        if (bindClarify) {
+          res = { now: 'clarify', detail: `unknown-circle:${bindClarify}` };
+        } else if (!r.ok && (r.reason === 'ambiguous-angle' || r.reason === 'ambiguous-circle')) {
           res = { now: 'clarify', detail: r.reason };
         } else if (!r.ok) {
           const oos = classifyOutOfScope(u);
@@ -245,7 +282,7 @@ function session2d(evs) {
             const bad = Object.entries(d.status).find(([, v]) => v !== 'ok' && v !== 'disabled');
             if (bad) res = { now: 'refused', detail: String(typeof bad[1] === 'string' ? bad[1] : bad[1]?.code ?? 'err').slice(0, 60) };
             else if (d.positions.size === 0) res = { now: 'built-nothing', detail: r.commands.map((c) => c.type).join(',') };
-            else { res = { now: 'built', detail: r.commands.map((c) => c.type).join(',') }; facts = next; fig = d; } // advance only on success (keep-prior)
+            else { res = { now: 'built', detail: r.commands.map((c) => c.type).join(',') }; advance(next, d); } // advance only on success (keep-prior)
           }
         }
       }
@@ -264,7 +301,7 @@ function session2d(evs) {
       const d = replay(next, 0);
       const bad = Object.entries(d.status).find(([, v]) => v !== 'ok' && v !== 'disabled');
       if (bad) degraded = true; // the logged commands don't replay cleanly here — don't pretend they did
-      else { facts = next; fig = d; }
+      else advance(next, d);
     } catch { degraded = true; }
   }
   return out;

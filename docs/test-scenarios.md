@@ -1206,3 +1206,7 @@ over all four (ADR-041).
 ### `central-angle-valueless-and-valued` — «זוית מרכזית COD» marks/drives the angle at centre O (#106, ADR-323)
 
 **Guards against:** the central-angle phrasings returning `not-handled` (→ LLM) — there was no central-angle construct. **Asserts:** on «מעגל O» + on-circle C, D, the utterance «זוית מרכזית COD = 80» drives ∠COD to 80° (C, D staying on the circle), draws the two radii (so the centre shows), and marks + labels the angle at O. Unit coverage: `central-angle.test.ts` (valueless → `mark-angle`; the arc-subtended form resolves the centre from `circleMembers`, defers when it can't; both locales).
+
+### `unknown-circle-name-binds-unnamed-circle` — «מעגל O1»/«מעגל O2» bind the two unnamed circles (#186, ADR-347)
+
+**Guards against:** prod session `hqxbjh0x` — a circle referenced by a name that matches no circle was silently INVENTED as a new circle (wrong figure, green) or left a dangling reference surfacing the raw «unresolved dependencies for: E». **Asserts:** after «שני מעגלים נחתכים» + the LLM chord placing D,F on the second circle, «D ו F על מעגל O1» binds that circle by the membership signal and «E ו C על מעגל O2» binds the sole remaining unnamed one; exactly two circles remain (`circle-O1`, `circle-O2`), all four memberships hold geometrically, and no auto centre stays hidden. Unit coverage: `circle-name-binding.test.ts`, `dangling-circle.test.ts`.

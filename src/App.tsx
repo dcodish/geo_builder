@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, parseNameCenter, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedCompoundRelation, droppedGivenVerbs, droppedRadiusSymbol, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedCompoundRelation, droppedGivenVerbs, droppedRadiusSymbol, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -283,11 +283,30 @@ export default function App() {
     // step), so context-sensitive lowering (M1 existing-id → constraint) chose a constraint form that is
     // wrong at the replay position — editing "AB קוטר"→"AC קוטר" saw the ⊥-step's C "existing" and
     // lowered to a bare collinearity, silently dropping the diameter's circle membership (ADR-241).
-    const facts = useGeoStore.getState().facts;
-    const start = facts.findIndex((f) => groupKey(f) === key);
-    const prefix = start >= 0 ? facts.slice(0, start) : facts;
-    const before = replay(prefix);
-    const r = parse(editText, buildParseCtx(before.construction, before.positions));
+    const prefixCtx = () => {
+      const facts = useGeoStore.getState().facts;
+      const start = facts.findIndex((f) => groupKey(f) === key);
+      const prefix = start >= 0 ? facts.slice(0, start) : facts;
+      const before = replay(prefix);
+      return buildParseCtx(before.construction, before.positions);
+    };
+    let ectx = prefixCtx();
+    let r = parse(editText, ectx);
+    // #186: an edit referencing a circle by a name that matches no circle binds an UNNAMED circle the
+    // same way submit does (the prod session's «מעגל O!» → «מעגל O1» edit) — clarify when ambiguous.
+    for (let guard = 0; r.ok && guard < 3; guard++) {
+      const bind = impliedCircleBinding(r.commands, ectx);
+      if (!bind) break;
+      if ('clarify' in bind) {
+        setInputNote(t('input.unknownCircle', { center: bind.center }));
+        setEditError(true);
+        return;
+      }
+      const res = nameCentre(bind.from, bind.to);
+      if (!res.ok) break;
+      ectx = prefixCtx();
+      r = parse(editText, ectx);
+    }
     if (!r.ok || r.commands.length === 0) {
       setEditError(true);
       return;
@@ -391,6 +410,7 @@ export default function App() {
   // cleared session. clearAll resets BOTH: the store figure plus every session-scoped local field. Display /
   // help / fold PREFERENCES are deliberately left untouched — those are not session data.
   const clearAll = () => {
+    logDebug({ kind: 'action', action: 'clear' }); // #189: so a reported session's replay can follow the wipe
     clear();
     setText('');
     setInputNote('');
@@ -561,8 +581,34 @@ export default function App() {
     // commit paths hand off to `resolveAfterCommit`, which owns the spinner through any auto-resolve.
     setBusy(true);
     await nextPaint();
-    const pctx = parseCtx();
-    const r = parse(utterance, pctx);
+    let pctx = parseCtx();
+    let r = parse(utterance, pctx);
+    // #186: a circle referenced BY NAME that matches no existing circle, while UNNAMED (auto-centre)
+    // circles are on canvas, is naming-by-use of one of THEM — the student cannot know the internal
+    // names (hidden centres, FR-RN-8) and refers to a drawn circle by a name of their own («D ו F על
+    // מעגל O1» after «שני מעגלים נחתכים», prod session hqxbjh0x). Committing the parser's invented
+    // circle would silently build a WRONG figure (a third circle). Bind the fresh name to the
+    // resolvable unnamed circle (the #112 `nameCentre` machinery) and re-parse; genuinely ambiguous →
+    // ask which circle is meant (never a silent pick, never an LLM guess).
+    let boundName = false; // a #186 auto-bind happened — the submission already changed the figure (a naming)
+    for (let guard = 0; r.ok && guard < 3; guard++) {
+      const bind = impliedCircleBinding(r.commands, pctx);
+      if (!bind) break;
+      if ('clarify' in bind) {
+        logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `unknown-circle:${bind.center}` });
+        setInputNote(t('input.unknownCircle', { center: bind.center }));
+        setBusy(false);
+        return;
+      }
+      const res = nameCentre(bind.from, bind.to);
+      if (!res.ok) break; // can't bind (e.g. letter taken) — the implicit creation stands, as before
+      boundName = true;
+      logDebug({ kind: 'input', utterance, locale, source: 'name-center', rename: bind, result: 'auto-bind', intermediate: true });
+      const st = useGeoStore.getState();
+      const d = replay(st.facts, st.seed, st.radiusOverrides);
+      pctx = buildParseCtx(d.construction, d.positions);
+      r = parse(utterance, pctx);
+    }
     // A single-vertex angle ("∠B = 90") the parser flagged as ambiguous (the vertex has ≠2 edges, so WHICH
     // angle is meant is unclear) — ask the student to name all three letters instead of escalating to the LLM
     // (which would only guess). Keep the text so they can edit it into the three-letter form.
@@ -670,6 +716,15 @@ export default function App() {
         // nothing, NOT an error, and the utterance introduces no new label (every label it names already
         // exists). (ADR-156 follow-up — the friendly no-op message.)
         if (outcome.reason === 'empty') {
+          // A #186 auto-bind ALREADY changed the figure (an unnamed circle took the student's name and
+          // its centre revealed) — geometrically-idempotent leftovers ("D,F on circle O1" when D,F
+          // already ride it) are then a SUCCESS, not "already drawn" and never an LLM escalation.
+          if (boundName) {
+            logDebug({ kind: 'input', utterance, locale, source: 'parser', result: 'bound-circle-name', commands: r.commands });
+            setText('');
+            setBusy(false);
+            return;
+          }
           const existing = new Set((pctx.points ?? []).map((p) => p.toUpperCase()));
           const newLabels = [...new Set(utterance.match(/[A-Z]\d*/g) ?? [])].filter((l) => !existing.has(l));
           if (newLabels.length === 0) {
@@ -1399,8 +1454,8 @@ export default function App() {
               )}
               {(facts.length > 0 || canUndo || canRedo) && (
                 <span style={{ display: 'flex', gap: 4 }}>
-                  <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => undo()}>{t('actions.undo')}</button>
-                  <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => redo()}>{t('actions.redo')}</button>
+                  <button type="button" style={canUndo ? subtleBtn : subtleBtnOff} disabled={!canUndo} onClick={() => { logDebug({ kind: 'action', action: 'undo' }); undo(); }}>{t('actions.undo')}</button>
+                  <button type="button" style={canRedo ? subtleBtn : subtleBtnOff} disabled={!canRedo} onClick={() => { logDebug({ kind: 'action', action: 'redo' }); redo(); }}>{t('actions.redo')}</button>
                   <button type="button" style={{ ...subtleBtn, color: pal.danger }} onClick={clearAll}>{t('actions.clear')}</button>
                 </span>
               )}

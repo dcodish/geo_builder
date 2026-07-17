@@ -6305,10 +6305,51 @@ function withImplicitCircles(commands: AnyCommand[], ctx: ParseContext): AnyComm
     if (!cid || !cid.startsWith('circle-') || definedHere.has(cid) || created.has(cid)) continue;
     const center = cid.slice('circle-'.length).toUpperCase();
     if (!center || have.has(center)) continue;
-    prefix.push({ type: 'circle', id: cid, center, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true });
+    prefix.push({ type: 'circle', id: cid, center, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, implied: true });
     created.add(cid);
   }
   return prefix.length ? [...prefix, ...commands] : commands;
+}
+
+/**
+ * #186 — the BINDING decision for a NAMED circle reference that matched NO existing circle («D ו F על
+ * מעגל O1» after «שני מעגלים נחתכים»: the two circles exist but are UNNAMED — auto centres hidden per
+ * FR-RN-8 — so the student cannot know their internal names and refers to them by a name of their own).
+ * `withImplicitCircles` marks the circle it had to invent (`implied`); when the figure holds unnamed
+ * (auto-centre) circles, that invention is almost surely a REFERENCE to one of them — naming-by-use —
+ * and committing the invented circle silently builds a WRONG figure (a third circle through the
+ * student's points, prod session hqxbjh0x).
+ *
+ * Pure decision (shared by App.submit, the edit path, and the log-triage mirror — one implementation,
+ * no drift): returns the unnamed circle to bind (`nameCentre(from, to)` + re-parse), a clarification
+ * when the reference is genuinely ambiguous (never a silent pick, never an LLM guess — the ADR-244
+ * shape), or null when there is nothing to bind (no implied circle / no unnamed circles — the LLM
+ * decomposition seam keeps its implicit creation / the name is an existing POINT, i.e. a legitimate
+ * "circle centred X" creation). Resolution order: a stated-membership signal (an EXISTING subject point
+ * already riding exactly ONE unnamed circle picks it) → the sole unnamed circle → clarify. One binding
+ * per call — the caller re-parses (the figure changed) and loops.
+ */
+export function impliedCircleBinding(
+  commands: AnyCommand[],
+  ctx: ParseContext,
+): { from: string; to: string } | { clarify: 'unknown-circle'; center: string } | null {
+  const implied = commands.find(
+    (c): c is Extract<AnyCommand, { type: 'circle' }> => c.type === 'circle' && (c as { implied?: boolean }).implied === true,
+  );
+  if (!implied) return null;
+  const autos = ctx.autoCenters ?? [];
+  if (autos.length === 0) return null; // no unnamed circle to bind — the implicit creation stands
+  const X = up(implied.center); // the letter the student used IS the implied centre
+  if ((ctx.points ?? []).map(up).includes(X)) return null; // X is a real point → "circle centred X" is a creation
+  const members = new Map((ctx.circleMembers ?? []).map((e) => [e.id ?? circleId(e.center), new Set(e.points.map(up))]));
+  const points = new Set((ctx.points ?? []).map(up));
+  const subjects = commands.flatMap((c) =>
+    consumedCircleId(c) === implied.id && 'id' in c && typeof (c as { id?: unknown }).id === 'string' ? [up((c as { id: string }).id)] : [],
+  );
+  const signal = new Set(subjects.filter((p) => points.has(p)).flatMap((p) => autos.filter((tok) => members.get(circleId(tok))?.has(p))));
+  if (signal.size === 1) return { from: [...signal][0], to: X };
+  if (autos.length === 1) return { from: autos[0], to: X };
+  return { clarify: 'unknown-circle', center: X };
 }
 
 /**

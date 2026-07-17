@@ -56,6 +56,23 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
     for (const g of GATES) expect(triageSrc, `triage.mjs must mirror the App's ${g} gate (ADR-346)`).toContain(`${g}(`);
   });
 
+  it('the #186 circle-name auto-bind runs in both (the shared decision helper + the shared fact core)', () => {
+    // App.submit binds a fresh circle name to an UNNAMED circle (impliedCircleBinding → nameCentre →
+    // re-parse). A harness that skips the bind reports every such utterance as refused/clarify —
+    // false gaps for input the App resolves silently.
+    for (const src of [appSrc, triageSrc]) expect(src).toContain('impliedCircleBinding(');
+    expect(triageSrc).toContain('nameCentreFacts(');
+  });
+
+  it('the #189 followable actions are followed, and the App logs them', () => {
+    // clear/undo/redo are logged so a session replay can follow them instead of degrading. If the App
+    // stops logging one (or the harness stops following), reported sessions silently lose their tail.
+    for (const a of ['clear', 'undo', 'redo']) {
+      expect(appSrc, `App.tsx must log the '${a}' action (#189)`).toContain(`action: '${a}'`);
+      expect(triageSrc, `triage.mjs must follow the '${a}' action (#189)`).toContain(`e.action === '${a}'`);
+    }
+  });
+
   it('the harness derives its parse context from the shared builder, never a local copy', () => {
     // The ADR-169 instance: the harness had its OWN ctx builder, missing `parallels`, so every
     // trapezoid-altitude utterance read as a gap. `context.ts` was centralized to end that class —
