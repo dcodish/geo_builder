@@ -33,11 +33,14 @@
  * Session context: each session's (`sid`) submits are replayed IN ORDER, threading ONE figure forward (one
  * `replay` per step, reused for both the context and the `before` figure — the naive prefix-replay-per-step
  * is O(n²) and never finished a full sweep). A step that doesn't build leaves the figure untouched (the App's
- * keep-prior), and marks the rest of that session DEGRADED: the log stores no LLM output, so after an
- * `llm-built` step our prefix is genuinely missing objects and a downstream failure may be OUR artifact, not
- * a gap. Degraded failures are reported separately and NEVER claimed as gaps — that is the same false-signal
- * class this fix exists to kill. An utterance is judged by its BEST outcome over all its occurrences: if it
- * builds in any real context, it is not a gap.
+ * keep-prior). Our grammar failing a step does NOT by itself break the prefix: when the log carries what the
+ * LLM committed (`commands`, issue #84), that is replayed instead, so the verdict reports OUR coverage
+ * honestly while the rest of the session stays real evidence. Where we genuinely cannot follow — an LLM step
+ * with no logged commands (pre-2026-07-14 events; all of 3-D until #182) or a store `action` (edit/delete/
+ * show-another) — the rest of the session is marked DEGRADED: our figure is missing objects the student had,
+ * so a downstream failure may be OUR artifact. Degraded failures are reported separately and NEVER claimed as
+ * gaps — that is the same false-signal class this file exists to kill. An utterance is judged by its BEST
+ * outcome over all its occurrences: if it builds in any real context, it is not a gap.
  *
  * Options: --server root@themathbible.com  --remote-dir /var/www/geo-proxy
  *          --days N (0=all)  --release <substr>  --top 80  --no-fetch  --no-verify
@@ -119,12 +122,16 @@ function load(a) {
     if (cutoff && e.serverTs && Date.parse(e.serverTs) < cutoff) continue;
     if (release && !(e.rel ?? '').includes(release)) continue;
     if (e.ev === 'session') { if (e.iph) visitors.add(e.iph); continue; }
-    if (e.ev !== 'submit') continue;
+    // `action` events (issue #84: edit / delete / show-another) are NOT submits — they never enter the
+    // stats or the candidate list — but they DO move the student's figure, so the session replay must see
+    // them to know when its prefix stops being faithful. Kept in `events`, filtered out of the counts.
+    if (e.ev !== 'submit' && e.ev !== 'action') continue;
+    if (e.ev === 'action') { events.push(e); continue; }
     if (e.sid) sessions.add(e.sid);
     if (e.iph) visitors.add(e.iph);
     events.push(e);
   }
-  return { events, sessions: sessions.size, visitors: visitors.size };
+  return { events, submits: events.filter((e) => e.ev === 'submit'), sessions: sessions.size, visitors: visitors.size };
 }
 
 // ---- verify: replay each SESSION through the App's submit path ------------
@@ -145,15 +152,30 @@ function droppedBy(u, cmds, pctx) {
   return hits.map(String);
 }
 
-/** One 2-D session, in order, threading ONE figure forward. Returns an outcome per submit index. */
+/** The canonical commands the LLM actually committed, logged since issue #84 (a JSON string). Lets the
+ *  replay follow a step our grammar can't reproduce, keeping the PREFIX faithful — the difference between
+ *  "the rest of this session is unverifiable" and real evidence. Absent on pre-2026-07-14 events, and on
+ *  3-D entirely (#84 was 2-D only; #182), which is exactly when `degraded` still fires. */
+const loggedCommands = (e) => {
+  if (e.source !== 'llm' || e.result !== 'ok' || !e.commands) return null;
+  try {
+    const c = typeof e.commands === 'string' ? JSON.parse(e.commands) : e.commands;
+    return Array.isArray(c) && c.length ? c : null;
+  } catch { return null; }
+};
+
+/** One 2-D session, in order, threading ONE figure forward. Returns an outcome per event index. */
 function session2d(evs) {
   const out = [];
   let facts = [];
   let fig;
   try { fig = replay([], 0); } catch { fig = { construction: { objects: [], points: new Map() }, positions: new Map(), status: {} }; }
-  let degraded = false; // a prior step didn't build here ⇒ our prefix ≠ the user's figure
+  let degraded = false; // our prefix ≠ the user's figure ⇒ nothing downstream is evidence
   const t0 = Date.now();
   for (const e of evs) {
+    // A store action (edit / delete / show-another, #84) reshapes the figure in ways this replay does not
+    // reproduce — from here on our prefix is a guess. Honest `degraded`, not a silent divergence.
+    if (e.ev === 'action') { degraded = true; out.push({ now: 'skip', detail: `action:${e.action}`, degraded }); continue; }
     const u = norm(e.utterance);
     if (!u) { out.push({ now: 'skip', detail: '', degraded }); continue; }
     if (Date.now() - t0 > sessionBudgetMs) { out.push({ now: 'unverified', detail: 'session budget', degraded: true }); continue; }
@@ -190,9 +212,21 @@ function session2d(evs) {
       }
     } catch (err) { res = { now: 'error', detail: String(err?.message ?? err).slice(0, 70) }; }
     out.push({ ...res, degraded });
-    // The log stores no LLM commands, so once a step doesn't land here our prefix diverges from what the
-    // student actually saw — every later verdict in this session is suspect, and must not become a "gap".
-    if (res.now !== 'built' && res.now !== 'store-op' && res.now !== 'skip') degraded = true;
+    if (res.now === 'built' || res.now === 'store-op' || res.now === 'skip') continue; // prefix stays faithful
+    // Our grammar didn't land this step — but the student's figure DID advance (the LLM built it). If the
+    // log carries what the LLM committed (#84), replay THAT so the prefix keeps matching what they saw:
+    // the verdict above still reports our own coverage honestly (an `llm-built` row our grammar misses is
+    // still a LIVE gap), while the rest of the session stays real evidence instead of collapsing to
+    // `degraded`. Without the logged commands — pre-#84 events, and all of 3-D (#182) — we cannot follow.
+    const cmds = loggedCommands(e);
+    if (!cmds) { degraded = true; continue; }
+    try {
+      const next = [...facts, ...cmds.map((cmd, k) => ({ id: `L${facts.length}-${k}`, group: `lg${out.length}`, cmd, enabled: true }))];
+      const d = replay(next, 0);
+      const bad = Object.entries(d.status).find(([, v]) => v !== 'ok' && v !== 'disabled');
+      if (bad) degraded = true; // the logged commands don't replay cleanly here — don't pretend they did
+      else { facts = next; fig = d; }
+    } catch { degraded = true; }
   }
   return out;
 }
@@ -241,6 +275,7 @@ function verifyAll(a, events) {
   for (const [, evs] of bySid) {
     const outs = (a === '2d' ? session2d : session3d)(evs);
     outs.forEach((o, i) => {
+      if (evs[i].ev !== 'submit') return; // `action` rows exist only to degrade the prefix, never to be judged
       const key = norm(evs[i].utterance) || '(empty)';
       if (!byUtterance.has(key)) byUtterance.set(key, []);
       byUtterance.get(key).push(o);
@@ -263,10 +298,12 @@ function bestOutcome(outs) {
 
 // ---- per-app report ------------------------------------------------------
 function reportFor(a) {
-  const { events, sessions, visitors } = load(a);
+  // `events` carries submits AND the store `action` rows (needed by the session replay); every STAT and
+  // candidate below is over `submits` only, so the counts stay comparable to server/admin.ts.
+  const { events, submits, sessions, visitors } = load(a);
   const byBucket = {};
-  for (const e of events) (byBucket[classify(a, e)] ??= []).push(e);
-  const total = events.length;
+  for (const e of submits) (byBucket[classify(a, e)] ??= []).push(e);
+  const total = submits.length;
   const counts = Object.fromEntries(Object.entries(byBucket).map(([b, arr]) => [b, arr.length]));
 
   // dedup the interesting buckets, then verify each distinct utterance against HEAD
@@ -321,7 +358,7 @@ function reportFor(a) {
   s += `\n## ⊘ Guided out-of-scope — the App answers these on purpose, pre-LLM (ADR-289). NOT gaps\n${guided.length ? tbl(guided, 'scope') : '_none_'}\n`;
   s += `\n## ◇ Parses but builds nothing — context / re-declaration (M1), not a grammar gap\n${context.length ? tbl(context, 'cmds') : '_none_'}\n`;
   s += `\n## ⚠ Reasoned refusals / clarify (review)\n${review.length ? tbl(review, 'code') : '_none_'}\n`;
-  s += `\n## ? UNVERIFIED — only ever seen after a step we can't replay (the log stores no LLM output), or over budget. NOT evidence either way\n${unverified.length ? tbl(unverified, 'why') : '_none_'}\n`;
+  s += `\n## ? UNVERIFIED — only ever seen after a step we couldn't replay (an LLM step with no logged commands — pre-#84, or 3-D per #182 — or a store action), or over budget. NOT evidence either way\n${unverified.length ? tbl(unverified, 'why') : '_none_'}\n`;
   return { md: s, live };
 }
 
