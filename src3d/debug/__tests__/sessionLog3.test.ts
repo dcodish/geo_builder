@@ -52,3 +52,27 @@ describe('analyticsSubmit3 — one submit per submission', () => {
     expect(submits[0]).toMatchObject({ source: 'llm', result: 'ok' });
   });
 });
+
+describe('#182 — the sink carries what a session replay needs (the 2-D #84/#189 mirror)', () => {
+  it('an LLM submit carries the committed canonical LINES as `commands` (capped JSON)', () => {
+    const s = analyticsSubmit3({ kind: 'input', utterance: 'freeform', locale: 'he', source: 'llm', commands: ['קוביה ABCDA\'B\'C\'D\'', 'M אמצע AB'] });
+    expect(s).toMatchObject({ ev: 'submit', source: 'llm', result: 'ok' });
+    expect(JSON.parse((s as { commands: string }).commands)).toEqual(['קוביה ABCDA\'B\'C\'D\'', 'M אמצע AB']);
+  });
+
+  it('a parser submit never carries `commands` (grammar steps replay from the utterance itself)', () => {
+    const s = analyticsSubmit3({ kind: 'input', utterance: 'קוביה', locale: 'he', source: 'parser', commands: ['x'] });
+    expect(s && 'commands' in s).toBe(false);
+  });
+
+  it('an LLM submit with NO steps (null) carries no `commands` field', () => {
+    const s = analyticsSubmit3({ kind: 'input', utterance: 'freeform', locale: 'he', source: 'llm', commands: null, result: 'not-understood' });
+    expect(s && 'commands' in s).toBe(false);
+  });
+
+  it('a store interaction emits one lean `action` line', () => {
+    expect(analyticsSubmit3({ kind: 'action', action: 'delete', detail: 'f3' })).toEqual({ ev: 'action', action: 'delete', detail: 'f3' });
+    expect(analyticsSubmit3({ kind: 'action', action: 'show-another' })).toEqual({ ev: 'action', action: 'show-another' });
+    for (const action of ['undo', 'redo', 'clear', 'load']) expect(analyticsSubmit3({ kind: 'action', action })).toEqual({ ev: 'action', action });
+  });
+});

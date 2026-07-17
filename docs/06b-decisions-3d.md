@@ -669,3 +669,18 @@ Analytics: `source:'scope'`, `result:'scope:<category>'` — the PROFILE_3D dash
 **Fix (the copied 2-D pattern, per docs/20 §12 — never an import).** `normalize3` gains ONE chokepoint pass, `upliftLowercaseLabels`: a lowercase run (with digits/primes, lists joined by ,/ו/and) is uppercased only where an ANCHOR proves label position — the angle glyph `∠∡∢` or the angle word «זו?וית», or an explicit point/vertex noun («ה?קודקוד», «ה?נקודה/נקודות», En point/vertex). The lone axis letters x/y/z never uplift even in label position (a student's «נקודה x» stays theirs to disambiguate), and after an ENGLISH anchor a run must not be an English function word ("angle of…", "point of intersection"). Everything outside an anchor is byte-unchanged — vector naming (`נסמן: AB=u`), sign givens (`שיעור ה-z`), `k הוא פרמטר`, `M(k,1,3)`, plane equations. New label-demanding anchors join the chokepoint, never per-rule.
 
 **Locks:** `lowercase-labels.test.ts` — the two exact prod utterances ≡ their uppercase twins (the axis `x` in the same sentence survives), list + prime forms, En mirrors, and the no-theft set over every case-significant lane.
+
+## ADR-3D-046 — The 3-D prod sink logs the LLM's committed lines + store actions; the triage replay follows them (issue #182)
+
+**Status:** Accepted (2026-07-17; ADR-346 follow-up — the #84/#189 mirror, 3-D edition). *Files: `src3d/debug/sessionLog3.ts` (`analyticsSubmit3` gains the `action` branch + the llm `commands` field); `src3d/App3.tsx` (log sites); `.claude/skills/log-triage/triage.mjs` (`session3d` follows actions + logged lines); `src3d/debug/__tests__/sessionLog3.test.ts`; `src/parser/__tests__/triage-mirror.test.ts` (the 3-D textual guard).*
+
+**Class.** #84 gave the 2-D sink what a session replay needs (the LLM's committed commands + `action` lines) and stopped at the app boundary — so a 3-D `source:llm, result:ok` row said *that* the LLM built something, never *what*, and every later step of that session was unreplayable. Measured: 15/54 3-D sessions (28%) held an llm-built step; 44 submits (20%) sat downstream of one, permanently `? UNVERIFIED`.
+
+**Fix (parameterize the shared thing, never fork it — the ADR-3D-016 discipline, and docs/20 §12 copying for the app code).**
+1. **`commands` on the llm submit:** App3's LLM log site adds `commands: steps` — the canonical LINES `submitSteps` re-parsed onto the figure (3-D's faithful "what committed"; 2-D logs engine command objects — `loggedCommands` in the harness documents both shapes). Same privacy class as the utterance, capped at 900 chars in the lean sink.
+2. **`action` lines:** delete / show-another / undo / redo / clear / **load** (a file load replaces the figure — the replay must know) each log one lean line; `analyticsSubmit3` forwards them exactly like the 2-D sink.
+3. **`session3d` follows:** clear/undo/redo ride a zundo-like history (the #189 pattern); an llm step our grammar misses replays its logged canonical lines through `parse3` (parser drift caught — the scenarios' mocked-LLM form) while the verdict still reports OUR coverage honestly; delete/show-another/load and pre-#182 llm steps keep degrading honestly.
+
+**Gate (from the issue):** a post-fix 3-D session with an llm-built step replays without `degraded` — the `? UNVERIFIED` bucket empties for new traffic. **Locks:** `sessionLog3.test.ts` (#182 block: commands on llm only, null-steps carry nothing, every action forwarded) + the `triage-mirror.test.ts` 3-D textual guard (App3 must log each action + the commands field; session3d must follow them — the ADR-346 anti-drift discipline).
+
+**Deploy note:** takes effect on the next `dist-3d/` deploy; the harness half is live immediately (it reads whatever fields exist).

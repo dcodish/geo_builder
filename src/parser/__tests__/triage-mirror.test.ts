@@ -101,6 +101,24 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
     expect(triageSrc).toMatch(/reusable\s*=\s*!reverify\s*&&\s*prior\s*&&\s*prior\.n === evs\.length\s*&&\s*!prior\.outs\.some\(\(o\) => OPEN\.has\(o\.now\)\)/);
   });
 
+  it('#182 — the 3-D sink logs what the 3-D session replay follows (the #84/#189 mirror, 3-D edition)', () => {
+    // The 3-D app must log the LLM's committed canonical lines (`commands`) and its store actions, and
+    // session3d must FOLLOW them — else 3-D permanently stays the weaker instrument (28% of its sessions
+    // held an unfollowable llm-built step before #182). Same textual-guard discipline as the 2-D checks.
+    const app3Src = readFileSync(path.join(root, 'src3d/App3.tsx'), 'utf8');
+    const sink3Src = readFileSync(path.join(root, 'src3d/debug/sessionLog3.ts'), 'utf8');
+    expect(app3Src, 'App3 must log the LLM canonical lines as `commands` (#182)').toMatch(/source: 'llm'[^}]*commands: steps/s);
+    for (const a of ['delete', 'show-another', 'undo', 'redo', 'clear', 'load']) {
+      expect(app3Src, `App3 must log the '${a}' action (#182)`).toContain(`action: '${a}'`);
+    }
+    expect(sink3Src, 'the lean 3-D sink must forward `action` events').toContain("event.kind === 'action'");
+    expect(sink3Src, 'the lean 3-D sink must forward llm `commands`').toContain("event.source === 'llm' && event.commands");
+    // session3d follows: clear/undo/redo via the history, llm steps via loggedCommands re-parsed with parse3.
+    const s3 = triageSrc.slice(triageSrc.indexOf('function session3d'));
+    for (const a of ['clear', 'undo', 'redo']) expect(s3, `session3d must follow '${a}'`).toContain(`e.action === '${a}'`);
+    expect(s3, 'session3d must follow the logged canonical lines').toContain('loggedCommands(e)');
+  });
+
   it('all-time counts survive the incremental split (the ranking rule the operator kept)', () => {
     // The rejected design was a watermark that only counted new events — it would reset distinct-user
     // counts each window and bury a cluster hit by 3 users over 3 months. Stats/candidates must stay over

@@ -210,6 +210,7 @@ export default function App3() {
     if (!f) return;
     const r = deserializeFigure3(await f.text());
     if (r.ok) {
+      logDebug3({ kind: 'action', action: 'load', detail: `${r.facts.length} facts` }); // #182: a load replaces the figure — the replay must know
       loadFigure(r.facts, r.seed);
       setFigureName(figureNameFromFileName3(f.name)); // the FILENAME names the figure (issue #42)
     } else reportLoadError(r.reason);
@@ -261,7 +262,10 @@ export default function App3() {
         const steps = await escalate3(text, ctx);
         if (steps) submitSteps(text, steps);
         err = useGeo3.getState().lastError;
-        logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'llm', steps: steps ?? null, result: err ? err.code : 'ok' });
+        // `commands` = the canonical lines that re-parsed onto the figure (#182): without them a prod
+        // `llm, ok` submit is opaque and every later step of the session is unreplayable (`steps` stays
+        // for the dev trace; the lean sink reads `commands`, mirroring the 2-D #84 field).
+        logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'llm', steps: steps ?? null, commands: steps ?? undefined, result: err ? err.code : 'ok' });
       } finally {
         setBusy(false);
       }
@@ -395,7 +399,7 @@ export default function App3() {
                   type="button"
                   aria-label={t('facts.delete')}
                   title={t('facts.delete')}
-                  onClick={() => remove(f.id)}
+                  onClick={() => { logDebug3({ kind: 'action', action: 'delete', detail: f.id }); remove(f.id); }} // #182: so a reported session replays deletions
                   className="text-slate-400 hover:text-rose-600"
                 >
                   ×
@@ -444,16 +448,18 @@ export default function App3() {
           )}
           <p className="text-xs text-slate-400">{t('hint.orbit')}</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={resample} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
+            {/* #182: each store interaction logs one lean `action` line so a reported prod session
+                replays end-to-end (the 2-D #84/#189 mirror — delete logs at its own button above). */}
+            <button type="button" onClick={() => { logDebug3({ kind: 'action', action: 'show-another' }); resample(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
               {t('actions.another')}
             </button>
-            <button type="button" onClick={undo3} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
+            <button type="button" onClick={() => { logDebug3({ kind: 'action', action: 'undo' }); undo3(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
               {t('actions.undo')}
             </button>
-            <button type="button" onClick={redo3} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
+            <button type="button" onClick={() => { logDebug3({ kind: 'action', action: 'redo' }); redo3(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
               {t('actions.redo')}
             </button>
-            <button type="button" onClick={clear} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50">
+            <button type="button" onClick={() => { logDebug3({ kind: 'action', action: 'clear' }); clear(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50">
               {t('actions.clear')}
             </button>
             <span className="mx-1 self-center text-slate-300">|</span>
