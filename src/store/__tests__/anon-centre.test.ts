@@ -119,10 +119,20 @@ describe('anonymous auto-centres (ADR-342 / #177)', () => {
     // the SMALL circle is the second one (seeded 3.6 vs 5) — its token is P
     expect(nc!.from).toBe('P');
     expect(nc!.to).toBe('O1');
-    expect(nc!.assert, 'a first assigning use locks the roles (the #102 ruling)').toEqual({ outer: 'circle-O', inner: 'circle-P' });
+    // POST-rename ids (#179): the lock must reference the circle's id AFTER naming (circle-P → circle-O1),
+    // else it lands on a ghost, orderedBelow stamps on neither circle, and the sliders ignore the order.
+    expect(nc!.assert, 'a first assigning use locks the roles (the #102 ruling), post-rename ids').toEqual({ outer: 'circle-O', inner: 'circle-O1' });
     expect(st.nameCentre(nc!.from, nc!.to).ok).toBe(true);
+    st.execute({ type: 'set-radius-order', outer: nc!.assert!.outer, inner: nc!.assert!.inner }, 'מרכז מעגל קטן הוא O1');
     const after = replay(useGeoStore.getState().facts, 0);
     expect(after.positions.has('O1'), 'O1 is the real centre of the small circle').toBe(true);
+    const inner = after.construction.objects.find((o) => o.id === 'circle-O1')! as { orderedBelow?: string };
+    expect(inner.orderedBelow, 'the order lock LANDED (orderedBelow stamped)').toBe('circle-O');
+    // …and the ADR-309 slider machinery keys off it: the small circle can never be dragged past the big.
+    st.setRadius('circle-O1', 20);
+    expect(useGeoStore.getState().radiusOverrides['circle-O1'], 'an order-violating dial is rejected').toBeUndefined();
+    st.setRadius('circle-O1', 2);
+    expect(useGeoStore.getState().radiusOverrides['circle-O1'], 'a legal dial is accepted').toBe(2);
     // the En mirror + the big qualifier, on a fresh figure
     st.clear();
     st.executeMany(r0.commands, 'שני מעגלים נחתכים');

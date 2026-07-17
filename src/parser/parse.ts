@@ -7397,7 +7397,12 @@ export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { 
     const pick = sizes.find((c) => c.id === pickId)!;
     const from = pick.center.startsWith('@ctr-') ? pick.center.slice(5) : pick.center; // nameCentre is token-driven
     if (from === X) return null;
-    return { from, to: X, ...(rec ? {} : { assert: { outer: outerId, inner: innerId } }) };
+    // The assert carries POST-RENAME ids: `nameCentre` renames the picked circle `circle-<from>` →
+    // `circle-<to>`, so a lock built on the pre-rename id would reference a GHOST — it applied vacuously
+    // green, `orderedBelow` was stamped on neither circle, and the radius sliders ignored the just-stated
+    // big/small order (issue #179, the operator's follow-up play-test).
+    const mapId = (id: Id): Id => (id === `circle-${from}` ? `circle-${X}` : id);
+    return { from, to: X, ...(rec ? {} : { assert: { outer: mapId(outerId), inner: mapId(innerId) } }) };
   }
   // The centre to rename: the sole AUTO-named centre (the reported case), else — if none is auto — the sole
   // already-NAMED centre being re-lettered. Ambiguous (0 or ≥2 candidates) → defer to the parser.
