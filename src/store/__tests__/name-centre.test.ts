@@ -66,7 +66,7 @@ describe('issue #112 — name an auto-assigned circle centre', () => {
     submit('מרכז המעגל הוא P');
     s().undo();
     // after undo, the circle is back to its auto-named state (centre P gone)
-    expect(replay(s().facts).construction.objects.filter((o) => o.kind === 'circle')[0].center).toBe('O');
+    expect(replay(s().facts).construction.objects.filter((o) => o.kind === 'circle')[0].center).toBe('@ctr-O'); // the auto centre is anonymous (ADR-342)
     expect(s().facts.length).toBe(before);
     s().clear();
   });

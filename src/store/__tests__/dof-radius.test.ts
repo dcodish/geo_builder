@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { parse, buildParseCtx } from '@/parser';
 import { replay, useGeoStore } from '@/store/geoStore';
-import { circleMembers, isGeoPoint, freeDofCount } from '@/engine';
+import { freeDofCount } from '@/engine';
 
 const s = () => useGeoStore.getState();
 const run = (u: string) => {
@@ -14,15 +14,12 @@ const run = (u: string) => {
   if (!r.ok) throw new Error(`parse failed: ${u}`);
   for (const cmd of r.commands) s().execute(cmd, u);
 };
-/** Run an utterance with the live figure threaded as parse context (as the app does). */
+/** Run an utterance with the live figure threaded as parse context (as the app does) — via the SHARED
+ *  builder, so the test can't drift from production (the hand-rolled copy fed raw '@ctr-O' ids as circle
+ *  tokens after ADR-342 — the exact drift class buildParseCtx exists to prevent). */
 const ctxRun = (u: string) => {
-  const { construction } = replay(s().facts);
-  const ctx = {
-    circles: construction.objects.flatMap((o) => (o.kind === 'circle' ? [o.center] : [])),
-    points: construction.objects.filter(isGeoPoint).map((o) => o.id),
-    circleMembers: circleMembers(construction),
-  };
-  const r = parse(u, ctx);
+  const { construction, positions } = replay(s().facts);
+  const r = parse(u, buildParseCtx(construction, positions));
   if (!r.ok) throw new Error(`parse failed: ${u}`);
   for (const cmd of r.commands) s().execute(cmd, u);
 };
@@ -34,9 +31,9 @@ describe('radius DOF sliders', () => {
     run('שני מעגלים נחתכים בנקודות A ו B'); // two free-radius circles O, P
 
     const d0 = replay(s().facts, s().seed, s().radiusOverrides);
-    expect(d0.radiusDofs.map((x) => x.center).sort()).toEqual(['O', 'P']);
+    expect(d0.radiusDofs.map((x) => x.center).sort()).toEqual(['@ctr-O', '@ctr-P']);
 
-    const o = d0.radiusDofs.find((x) => x.center === 'O')!;
+    const o = d0.radiusDofs.find((x) => x.center === '@ctr-O')!;
     const dialed = o.base * 1.15;
     s().setRadius(o.circle, dialed);
 
@@ -96,7 +93,7 @@ describe('radius DOF sliders', () => {
     const fig = replay(s().facts, s().seed, s().radiusOverrides);
     const circO = fig.construction.objects.find((o) => o.id === 'circle-O' && o.kind === 'circle') as { radius: { via: string } };
     expect(circO.radius.via, 'unstated inscribed radius is FREE').toBe('free');
-    expect(fig.radiusDofs.map((d) => d.center), 'and it shows a slider').toEqual(['O']);
+    expect(fig.radiusDofs.map((d) => d.center), 'and it shows a slider').toEqual(['O']); // NAMED circle — the centre is the real letter
   });
 
   it('keeps the radius slider when a constraint can be met by ANOTHER free DOF (the apex), not the radius', () => {
@@ -106,7 +103,7 @@ describe('radius DOF sliders', () => {
     ctxRun('מנקודה A יוצאים שני משיקים למעגל בנקודות B ו C');
     ctxRun('∠CAB=90');
     const dofs = replay(s().facts, s().seed, s().radiusOverrides).radiusDofs;
-    expect(dofs.map((d) => d.center), 'the free radius is still a slider (apex absorbs the angle, not R)').toEqual(['O']);
+    expect(dofs.map((d) => d.center), 'the free radius is still a slider (apex absorbs the angle, not R)').toEqual(['@ctr-O']);
 
     const ang = (a: { x: number; y: number }, v: { x: number; y: number }, b: { x: number; y: number }) => {
       const u = { x: a.x - v.x, y: a.y - v.y }, w = { x: b.x - v.x, y: b.y - v.y };

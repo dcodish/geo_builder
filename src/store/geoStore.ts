@@ -398,6 +398,29 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
   // same legs — so the iso-trapezoid macro's equal legs stay legs) with the template's long base landing
   // on the stated-long pair: the order then holds AT THE TEMPLATE, with the default's own comfortable
   // margin. Position-independent (typed before or after the shape).
+  // SEMANTIC CENTRE-USE promotes an anonymous auto centre to its letter ([ADR-342](docs/06-decisions.md#adr-342),
+  // issue #177 ruling (b)): a statement whose WORDS name the centre («רדיוס OB» — the word radius itself
+  // asserts O is the centre) carries a `name-center` command with the LETTER; this pre-scan renames the
+  // matching anonymous centre id ('@ctr-O' → 'O') across every fact's lowering, so the letter becomes the
+  // real, visible centre point — order-independent (typed before or after the circle), pure replay (the
+  // corpus and save/load ride it with no store op). Positional/definitional statements never emit the
+  // marker, so the reported hijack class ('P על המשך BA') stays closed.
+  const centrePromotions = new Map<string, string>(); // '@ctr-O' → 'O'
+  for (const f of facts) {
+    if (!f.enabled) continue;
+    for (const c of lowerOne(f.cmd, symtab)) {
+      if (c.type !== 'name-center' || c.center.startsWith('@') || c.center.startsWith('~')) continue;
+      centrePromotions.set(`@ctr-${c.center}`, c.center);
+    }
+  }
+  const promoteCentres = (cmds: Command[]): Command[] => {
+    if (centrePromotions.size === 0) return cmds;
+    return cmds.map((c) => {
+      let s = JSON.stringify(c);
+      for (const [from, to] of centrePromotions) s = s.split(JSON.stringify(from)).join(JSON.stringify(to));
+      return JSON.parse(s) as Command;
+    });
+  };
   const lengthOrders = facts
     .filter((f) => f.enabled)
     .flatMap((f) => lowerOne(f.cmd, symtab))
@@ -496,6 +519,8 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       // Rotate a trapezoid whose stated base order contradicts the template's long-base default (ADR-341).
       const trot = trapRotate.get(f.id);
       if (trot) engineCmds = engineCmds.map((ec) => (ec.type === 'trapezoid' ? { ...ec, ids: trot } : ec));
+      // Promote anonymous centres a semantic centre-use named (ADR-342, '@ctr-O' → 'O').
+      engineCmds = promoteCentres(engineCmds as Command[]);
       // Swap a common-tangent group's soft touch↔circle pairing to the explicitly-stated one (ADR-239 pre-scan).
       const pairSwap = pairSwapByGroup.get(groupKey(f));
       if (pairSwap) {
@@ -2304,30 +2329,56 @@ export const useGeoStore = create<GeoState>()(
        * (FR-RN-8). One `set` → one undo entry. Never mints a second circle.
        */
       nameCentre: (from, to) => {
-        const F = from.toUpperCase();
+        // `from` is the centre TOKEN (the letter parseNameCenter resolved) or a raw '@ctr-…' id (the
+        // promote path). Resolve it to the REAL centre point id via the owning circle command (ADR-342):
+        // an unnamed circle's centre is anonymous ('@ctr-O') while its token stays the letter.
+        const F = from.startsWith('@') ? from : from.toUpperCase();
         const T = to.toUpperCase();
-        if (F === T) return { ok: false, reason: 'same' };
         const facts = get().facts;
+        let source: string | null = null;
+        let letter: string | null = null; // the circle-id letter half (`circle-<letter>`)
+        for (const f of facts) {
+          const c = f.cmd as { type?: string; center?: string };
+          if ((c.type !== 'circle' && c.type !== 'circle-through') || !c.center) continue;
+          const tok = c.center.startsWith('@ctr-') ? c.center.slice(5) : c.center;
+          if (tok === F || c.center === F) {
+            source = c.center;
+            letter = tok;
+            break;
+          }
+        }
         const all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
-        if (!all.has(F)) return { ok: false, reason: 'no-source' };
+        if (!source) {
+          // legacy: renaming a centre letter that IS a plain point (a named centre being re-lettered)
+          if (!all.has(F)) return { ok: false, reason: 'no-source' };
+          source = F;
+          letter = F;
+        }
+        if (source === T) return { ok: false, reason: 'same' }; // promoting a token to its OWN letter ('@ctr-O'→'O') is a real change
         if (all.has(T)) return { ok: false, reason: 'target-taken' };
+        const anon = source.startsWith('@');
         set({
           facts: facts.map((f) => {
-            const cmd = renameInCommand(f.cmd, F, T);
-            // reveal the renamed circle's centre: the `circle` command whose centre is now T drops autoCenter
+            let cmd = renameInCommand(f.cmd, source!, T);
+            // An anonymous centre's rename only touched the point id — the circle's REFERENCE id keeps the
+            // letter half, so «מעגל T» must resolve after naming: rename `circle-<letter>` → `circle-<T>`
+            // too (literal-exact, so a student's own point <letter> is untouched; the concentric inner
+            // `circle-<letter>-2` follows by prefix).
+            if (anon && letter && letter !== T) cmd = renameInCommand(cmd, `circle-${letter}`, `circle-${T}`);
+            // reveal the renamed circle's centre: the circle command whose centre is now T drops autoCenter
             const revealed =
-              cmd.type === 'circle' && (cmd as { center?: string }).center === T && (cmd as { autoCenter?: boolean }).autoCenter
+              (cmd.type === 'circle' || cmd.type === 'circle-through') && (cmd as { center?: string }).center === T && (cmd as { autoCenter?: boolean }).autoCenter
                 ? (() => {
                     const { autoCenter: _drop, ...rest } = cmd as Record<string, unknown>;
                     return rest as AnyCommand;
                   })()
                 : cmd;
-            return { ...f, cmd: revealed, utterance: relabelUtterance(f.utterance, F, T) };
+            return { ...f, cmd: revealed, utterance: anon ? f.utterance : relabelUtterance(f.utterance, source!, T) };
           }),
-          hidden: get().hidden.map((h) => (h === F ? T : h)),
-          segStyle: renameSegStyle(get().segStyle, F, T),
-          hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)),
-          radiusOverrides: Object.fromEntries(Object.entries(get().radiusOverrides).map(([k, v]) => [relabelId(k, F, T), v])),
+          hidden: get().hidden.map((h) => (h === source ? T : h)),
+          segStyle: renameSegStyle(get().segStyle, source, T),
+          hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${letter}` ? `circle-${T}` : c)),
+          radiusOverrides: Object.fromEntries(Object.entries(get().radiusOverrides).map(([k, v]) => [anon ? k.split(`circle-${letter}`).join(`circle-${T}`) : relabelId(k, source!, T), v])),
           selectedId: null,
         });
         return { ok: true };
@@ -2351,6 +2402,12 @@ export const useGeoStore = create<GeoState>()(
           if (!used.has(ch)) { to = ch; break; }
         }
         if (!to) return null; // A–Z all taken (won't happen in practice)
+        // An anonymous CIRCLE CENTRE ('@ctr-…', ADR-342) promotes through the naming flow — the same
+        // rename + circle-id follow + autoCenter reveal «מרכז המעגל הוא X» does.
+        if (auxId.startsWith('@ctr-')) {
+          const res = get().nameCentre(auxId, to);
+          return res.ok ? to : null;
+        }
         set({
           facts: facts.map((f) => ({ ...f, cmd: renameInCommand(f.cmd, auxId, to) })),
           selectedId: null,

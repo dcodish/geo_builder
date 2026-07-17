@@ -23,7 +23,7 @@ describe('anonymous promotable incircle feet (#32)', () => {
   it('the incircle mints anonymous @-feet — no F/G/H letter is consumed', () => {
     submit('מעגל חסום במשולש ABC');
     const ids = pointIds();
-    const anon = ids.filter((id) => id.startsWith('@'));
+    const anon = ids.filter((id) => id.startsWith('@f-'));
     expect(anon.length, `three anonymous feet (got ${ids.join(',')})`).toBe(3);
     // the student's namespace is intact: F, G, H are all free
     for (const letter of ['F', 'G', 'H']) expect(ids.includes(letter), `${letter} not consumed`).toBe(false);
@@ -42,22 +42,22 @@ describe('anonymous promotable incircle feet (#32)', () => {
 
   it('promote() assigns the next free letter and rewrites the @-id everywhere', () => {
     submit('מעגל חסום במשולש ABC');
-    const anonId = pointIds().find((id) => id.startsWith('@'))!;
+    const anonId = pointIds().find((id) => id.startsWith('@f-'))!; // a FOOT (the centre is anonymous too now — ADR-342)
     const letter = s().promote(anonId);
     expect(letter, 'the next free letter (A,B,C,O taken ⇒ D)').toBe('D');
     const after = pointIds();
     expect(after.includes('D'), 'the promoted point exists as D').toBe(true);
     expect(after.includes(anonId), 'the @-id is gone').toBe(false);
-    expect(after.filter((id) => id.startsWith('@')).length, 'the other two feet stay anonymous').toBe(2);
+    expect(after.filter((id) => id.startsWith('@f-')).length, 'the other two feet stay anonymous').toBe(2);
   });
 
   it('promote is ONE undoable step', () => {
     submit('מעגל חסום במשולש ABC');
-    const anonId = pointIds().find((id) => id.startsWith('@'))!;
+    const anonId = pointIds().find((id) => id.startsWith('@f-'))!; // a FOOT (the centre is anonymous too now — ADR-342)
     s().promote(anonId);
-    expect(pointIds().filter((id) => id.startsWith('@')).length).toBe(2);
+    expect(pointIds().filter((id) => id.startsWith('@f-')).length).toBe(2);
     useGeoStore.temporal.getState().undo();
-    expect(pointIds().filter((id) => id.startsWith('@')).length, 'undo restores all three anonymous feet').toBe(3);
+    expect(pointIds().filter((id) => id.startsWith('@f-')).length, 'undo restores all three anonymous feet').toBe(3);
   });
 
   it('promote is a no-op on a non-anonymous id', () => {

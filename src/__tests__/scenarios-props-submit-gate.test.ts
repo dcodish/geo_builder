@@ -309,6 +309,9 @@ describe('reported scenarios — the 2025-bagrut figure passes the FULL submit g
     submit('רדיוס מעגל P הוא R');
     submit('R>r');
     submit('דרך A עובר משיק למעגל O שחותך את מעגל P בנקודה K'); // the one-sentence compound (was a gate-caught misparse)
+    // ADR-342: a bare positional «O על מעגל P» now creates a FRESH O — the session's intent (the CENTRE
+    // rides circle P) is expressed by promoting the centre first via the semantic carve-out.
+    submit('רדיוס OA');
     submit('O על מעגל P');
     submit('משולש AKO');
     submit('נקודה E בתוך משולש AKO'); // region FIRST — E a free point seeded inside

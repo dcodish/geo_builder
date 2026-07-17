@@ -4,10 +4,10 @@
  * freeze: a kite whose area-ratio given drives N exactly onto the centre O).
  */
 import { describe, it, expect } from 'vitest';
-import { parse } from '@/parser';
+import { parse, buildParseCtx } from '@/parser';
 import { replay, meetsRequirements, pointsDistinct } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
-import { isGeoPoint, circleMembers, pointNeighbors } from '@/engine';
+
 import type { AnyCommand, Construction, Vec } from '@/engine';
 
 describe('pointsDistinct respects allowed (forced) coincidences', () => {
@@ -26,8 +26,9 @@ describe('pointsDistinct respects allowed (forced) coincidences', () => {
 
 describe('the operator freeze: meetsRequirements must be TRUE for the forced-coincidence figure', () => {
   function ctxOf(facts: Fact[]) {
-    const { construction } = replay(facts);
-    return { circles: construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [o.center] : [])), points: construction.objects.filter(isGeoPoint).map((o) => o.id), circleMembers: circleMembers(construction), neighbors: pointNeighbors(construction) };
+    // the SHARED context builder — a hand-rolled copy fed raw '@ctr-O' ids as circle tokens after ADR-342
+    const { construction, positions } = replay(facts);
+    return buildParseCtx(construction, positions);
   }
   const STEPS = ['ABCD דלתון חסום במעגל', 'AB=AD', 'CB=CD', 'E על DC', 'BE⊥DC', 'AC', 'N = חיתוך BE ו-AC', 'שטח משולש NCE= רבע שטח משולש ACD'];
   it('builds and meets requirements (so autoResolve does NOT loop)', () => {
@@ -35,7 +36,7 @@ describe('the operator freeze: meetsRequirements must be TRUE for the forced-coi
     for (const s of STEPS) { const r = parse(s, ctxOf(facts)); if (!r.ok) throw new Error('parse ' + s); const grp = `g${g++}`; for (const cmd of r.commands as AnyCommand[]) facts.push({ id: `${grp}.${facts.length}`, utterance: s, group: grp, cmd, enabled: true }); }
     const fig = replay(facts, 0);
     expect(fig.lastError).toBeNull();
-    expect(fig.coincidences.some(([a, b]) => (a === 'N' && b === 'O') || (a === 'O' && b === 'N'))).toBe(true);
+    expect(fig.coincidences.some(([a, b]) => (a === 'N' && (b === 'O' || b === '@ctr-O')) || ((a === 'O' || a === '@ctr-O') && b === 'N'))).toBe(true); // anon centre (ADR-342)
     expect(meetsRequirements(facts, 0), 'a forced coincidence still meets requirements (no futile auto-resolve search)').toBe(true);
   });
 });

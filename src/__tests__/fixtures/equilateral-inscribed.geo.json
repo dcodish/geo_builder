@@ -26,7 +26,7 @@
       "cmd": {
         "type": "circle",
         "id": "circle-P",
-        "center": "P",
+        "center": "@ctr-P",
         "radius": 5,
         "freeRadius": true,
         "autoCenter": true

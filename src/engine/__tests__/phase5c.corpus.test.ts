@@ -60,7 +60,7 @@ describe('inscribed cyclic polygons (square / rectangle / isosceles trapezoid)',
 
   it('inscribed square: 4 equal sides, all on the circle', () => {
     const { positions } = reproduce(['square ABCD inscribed in a circle'], 'sq');
-    const O = positions.get('O')!;
+    const O = (positions.get('O') ?? positions.get('@ctr-O'))!;
     const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => positions.get(id)!);
     for (const p of [A, B, C, D]) expect(dist(O, p)).toBeCloseTo(5, 6);
     expect(dist(A, B)).toBeCloseTo(dist(B, C), 6);
@@ -69,7 +69,7 @@ describe('inscribed cyclic polygons (square / rectangle / isosceles trapezoid)',
 
   it('inscribed isosceles trapezoid: AB ∥ DC, equal legs, all on the circle', () => {
     const { positions } = reproduce(['טרפז ABCD חסום במעגל'], 'trap');
-    const O = positions.get('O')!;
+    const O = (positions.get('O') ?? positions.get('@ctr-O'))!;
     const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => positions.get(id)!);
     for (const p of [A, B, C, D]) expect(dist(O, p)).toBeCloseTo(5, 6);
     expect(para(A, B, D, C)).toBe(true); // one pair of parallel sides
@@ -81,7 +81,7 @@ describe('inscribed cyclic polygons (square / rectangle / isosceles trapezoid)',
 describe('constructible cases that used to escalate (right-tri inscribed, circumcircle, special lines)', () => {
   it('right triangle inscribed: vertices on the circle, right angle at C (Thales)', () => {
     const { positions } = reproduce(['right triangle ABC inscribed in a circle'], 'rt');
-    const O = positions.get('O')!;
+    const O = (positions.get('O') ?? positions.get('@ctr-O'))!;
     const [A, B, C] = ['A', 'B', 'C'].map((id) => positions.get(id)!);
     for (const p of [A, B, C]) expect(dist(O, p)).toBeCloseTo(5, 6);
     expect(angleDeg(C, A, B)).toBeCloseTo(90, 6); // right angle at C
@@ -91,7 +91,7 @@ describe('constructible cases that used to escalate (right-tri inscribed, circum
 
   it('circle through A B C: the circle is the circumcircle (equidistant from all three)', () => {
     const { positions } = reproduce(['circle through A B C'], 'cc');
-    const O = positions.get('O')!;
+    const O = (positions.get('O') ?? positions.get('@ctr-O'))!;
     const [A, B, C] = ['A', 'B', 'C'].map((id) => positions.get(id)!);
     expect(dist(O, A)).toBeCloseTo(dist(O, B), 6);
     expect(dist(O, B)).toBeCloseTo(dist(O, C), 6);
@@ -121,7 +121,7 @@ describe('constructible cases that used to escalate (right-tri inscribed, circum
   it('circle inscribed in a triangle: the incircle is tangent to all three sides', () => {
     // distinct from "triangle inscribed in a circle" — the circle is INSIDE the triangle
     const { positions } = reproduce(['triangle ABC', 'circle inscribed in triangle ABC'], 'incircle');
-    const [A, B, C, I] = ['A', 'B', 'C', 'O'].map((id) => positions.get(id)!); // centre defaults to O
+    const [A, B, C, I] = ['A', 'B', 'C', 'O'].map((id) => (positions.get(id) ?? positions.get(`@ctr-${id}`))!); // centre defaults to O (anonymous, ADR-342)
     const distToSide = (p: Vec, q: Vec) => dist(I, footOnLine(I, p, q));
     // the incenter is equidistant from all three sides ⇒ one circle is tangent to each
     expect(distToSide(A, B)).toBeCloseTo(distToSide(B, C), 6);
@@ -158,7 +158,7 @@ describe('re-referencing a drawn line in a later compound (tangent at D, then �
       ],
       'tangent∩',
     );
-    const A = positions.get('A')!, B = positions.get('B')!, D = positions.get('D')!, O = positions.get('O')!, E = positions.get('E')!;
+    const A = positions.get('A')!, B = positions.get('B')!, D = positions.get('D')!, O = (positions.get('O') ?? positions.get('@ctr-O'))!, E = positions.get('E')!;
     expect(E).toBeDefined(); // the point is named E, not T
     expect(collinear(A, B, E)).toBe(true); // E lies on AB
     expect(dot(sub(E, D), sub(D, O))).toBeCloseTo(0, 5); // E is on the tangent (tangent ⟂ radius OD)
@@ -187,7 +187,7 @@ describe('corpus Q5 — triangle inscribed in a circle + arc midpoint', () => {
   for (const [lang, utterances] of [['en', EN], ['he', HE]] as const) {
     it(`reproduces Q5 (${lang})`, () => {
       const { construction, positions } = reproduce(utterances, `Q5-${lang}`);
-      const O = positions.get('O')!;
+      const O = (positions.get('O') ?? positions.get('@ctr-O'))!;
       const A = positions.get('A')!, B = positions.get('B')!, C = positions.get('C')!, D = positions.get('D')!, E = positions.get('E')!;
 
       // A, B, C, D all lie on the circle of radius 5
@@ -223,7 +223,7 @@ describe('corpus Q6 — chord & diameter crossing, plus a parallel line ∩ circ
   for (const [lang, utterances] of [['en', EN], ['he', HE]] as const) {
     it(`reproduces Q6 (${lang})`, () => {
       const { construction, positions } = reproduce(utterances, `Q6-${lang}`);
-      const O = positions.get('O')!;
+      const O = (positions.get('O') ?? positions.get('@ctr-O'))!;
       const A = positions.get('A')!, B = positions.get('B')!, D = positions.get('D')!, EE = positions.get('E')!, C = positions.get('C')!, G = positions.get('G')!;
 
       // A, B (chord) and D, E (diameter) are on the circle of radius 4
@@ -264,7 +264,7 @@ describe('corpus Q7 — inscribed triangle, tangent at a vertex, angle bisector'
   for (const [lang, utterances] of [['en', EN], ['he', HE]] as const) {
     it(`reproduces Q7 (${lang})`, () => {
       const { construction, positions } = reproduce(utterances, `Q7-${lang}`);
-      const O = positions.get('O')!;
+      const O = (positions.get('O') ?? positions.get('@ctr-O'))!;
       const A = positions.get('A')!, B = positions.get('B')!, D = positions.get('D')!, E = positions.get('E')!, F = positions.get('F')!;
 
       // A, B, D are on the circle

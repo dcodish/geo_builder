@@ -15,6 +15,12 @@ import type { Construction, Id, Vec } from '@/engine';
 import { isGeoPoint, circleMembers, pointNeighbors, parallelEdgePairs } from '@/engine';
 import type { ParseContext } from './parse';
 
+/** A circle centre's reference TOKEN ([ADR-342](../../docs/06-decisions.md#adr-342)): an anonymous auto
+ *  centre ('@ctr-O') is referenced by its letter ('O' — the circle's name, «מעגל O», `circle-O`), while a
+ *  student-named centre IS its letter. Keeps every ctx consumer letter-based; the `centrePoint` map below
+ *  carries the translation back to the real point id for rules that use a centre AS A POINT. */
+const ctrToken = (centerId: string): string => (centerId.startsWith('@ctr-') ? centerId.slice(5) : centerId);
+
 export function buildParseCtx(construction: Construction, positions: Map<Id, Vec>): ParseContext {
   return {
     // Exclude pure SCAFFOLDING circles (a tangent's Thales aux), marked by a `~`-prefixed centre — the
@@ -22,10 +28,15 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     // DEDUPED per centre letter (ADR-244): a concentric pair is ONE referenceable centre — "the circle" /
     // an unnamed chord still resolves to it, and the concentric post-pass (qualifier / membership /
     // clarify) decides WHICH of the pair. Two distinct centres stay two entries, as before.
-    circles: [...new Set(construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [o.center] : [])))],
+    circles: [...new Set(construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [ctrToken(o.center)] : [])))],
+    // Centre TOKEN → the centre's real POINT id (ADR-342): identity for named centres, '@ctr-…' for
+    // anonymous auto centres — the translation rules use when a centre serves AS A POINT.
+    centrePoint: Object.fromEntries(
+      construction.objects.flatMap((o) => (o.kind === 'circle' && !o.center.startsWith('~') ? [[ctrToken(o.center), o.center] as [Id, Id]] : [])),
+    ),
     // Centre letters that were AUTO-assigned (unnamed circle → hidden centre): «מרכז המעגל הוא P» renames
     // one of these to the student's letter instead of minting a second circle (issue #112).
-    autoCenters: construction.objects.flatMap((o) => (o.kind === 'circle' && o.autoCenter && !o.center.startsWith('~') ? [o.center] : [])),
+    autoCenters: construction.objects.flatMap((o) => (o.kind === 'circle' && o.autoCenter && !o.center.startsWith('~') ? [ctrToken(o.center)] : [])),
     // Concentric pairs (ADR-244): the bound roles, read off the inner circle's `innerOf` marker.
     concentric: construction.objects.flatMap((o) =>
       o.kind === 'circle' && o.innerOf ? [{ center: o.center, outer: o.innerOf, inner: o.id }] : [],

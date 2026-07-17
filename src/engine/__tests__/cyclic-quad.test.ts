@@ -38,7 +38,7 @@ describe('cyclic quadrilateral (בר חסימה) — concyclic, circle not drawn
 
       // The four vertices are concyclic: equidistant from the (hidden) centre.
       const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => positions.get(id)!);
-      const O = positions.get('O')!; // auto-named centre
+      const O = (positions.get('O') ?? positions.get('@ctr-O'))!; // auto-named centre
       const radii = [A, B, C, D].map((p) => dist(O, p));
       for (const ri of radii) expect(ri).toBeCloseTo(radii[0], 6);
 
@@ -109,7 +109,7 @@ describe('concyclic constraint on PRE-EXISTING points (ADR-041) — drives a DOF
       { type: 'set-concyclic', points: ['A', 'B', 'D', 'E'] },
     ];
     const { positions } = build(cmds);
-    const O = positions.get('O')!, R = Math.hypot(O.x - positions.get('A')!.x, O.y - positions.get('A')!.y);
+    const O = (positions.get('O') ?? positions.get('@ctr-O'))!, R = Math.hypot(O.x - positions.get('A')!.x, O.y - positions.get('A')!.y);
     for (const id of ['A', 'B', 'D', 'E']) {
       const p = positions.get(id)!;
       expect(Math.hypot(O.x - p.x, O.y - p.y)).toBeCloseTo(R, 4);
@@ -124,7 +124,7 @@ describe('a diameter stated on a cyclic quad reshapes the whole quad (stays conv
     const circle = r.commands.find((c) => c.type === 'circle') as { id: string };
     // Apply the diameter on two vertices of the cyclic quad (the bug: it shoved A onto B).
     const { construction, positions } = build([...r.commands, { type: 'diameter', id1: 'A', id2: 'D', circle: circle.id }]);
-    const O = positions.get('O')!;
+    const O = (positions.get('O') ?? positions.get('@ctr-O'))!;
     const pts = ['A', 'B', 'C', 'D'].map((id) => positions.get(id)!);
     const ang = (p: { x: number; y: number }) => Math.atan2(p.y - O.y, p.x - O.x);
 
@@ -162,7 +162,7 @@ describe('a diameter stated on a cyclic quad reshapes the whole quad (stays conv
       { type: 'set-perpendicular', a: 'F', b: 'B', c: 'F', d: 'A' },
       { type: 'set-angle', vertex: 'D', ray1: 'B', ray2: 'A', value: 24 },
     ]);
-    const [A, B, C, D, F, O] = ['A', 'B', 'C', 'D', 'F', 'O'].map((id) => positions.get(id)!);
+    const [A, B, C, D, F, O] = ['A', 'B', 'C', 'D', 'F', 'O'].map((id) => (positions.get(id) ?? positions.get(`@ctr-${id}`))!); // anon centre fallback (ADR-342)
 
     // AD is STILL a diameter after the angle step (A, D antipodal about O).
     expect(O.x).toBeCloseTo((A.x + D.x) / 2, 6);
@@ -209,7 +209,7 @@ describe('a segment that BISECTS an angle (all points exist) is a coupled constr
       { type: 'set-equal', a: 'A', b: 'B', c: 'C', d: 'B' }, // AB = CB
       { type: 'set-angle-ratio', v1: 'C', a1: 'E', b1: 'A', v2: 'C', a2: 'A', b2: 'D', k: 1 }, // AC bisects ∠ECD
     ]);
-    const [A, B, C, D, E, O] = ['A', 'B', 'C', 'D', 'E', 'O'].map((id) => positions.get(id)!);
+    const [A, B, C, D, E, O] = ['A', 'B', 'C', 'D', 'E', 'O'].map((id) => (positions.get(id) ?? positions.get(`@ctr-${id}`))!); // anon centre fallback (ADR-342)
 
     // Both givens hold simultaneously.
     expect(dist(A, B)).toBeCloseTo(dist(C, B), 4); // AB = CB

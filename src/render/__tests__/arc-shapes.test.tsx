@@ -25,7 +25,7 @@ describe('semicircle (חצי מעגל / semicircle)', () => {
       const { construction, positions } = buildFrom(u);
       const A = positions.get('A')!;
       const B = positions.get('B')!;
-      const O = positions.get('O')!; // the (shown) centre
+      const O = (positions.get('O') ?? positions.get('@ctr-O'))!; // the (shown) centre
 
       // O is the midpoint of AB; A,B are antipodal on the (hidden) circle of radius |OA|.
       expect(O.x).toBeCloseTo((A.x + B.x) / 2, 6);
@@ -52,7 +52,7 @@ describe('quarter circle (רבע מעגל / quarter circle)', () => {
   for (const u of ['quarter circle', 'רבע מעגל']) {
     it(`"${u}" → a 90° arc with two bounding radii, no full circle`, () => {
       const { construction, positions } = buildFrom(u);
-      const O = positions.get('O')!;
+      const O = (positions.get('O') ?? positions.get('@ctr-O'))!;
       const A = positions.get('A')!;
       const B = positions.get('B')!;
 

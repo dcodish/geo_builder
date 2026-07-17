@@ -1756,7 +1756,10 @@ export default function App() {
                 // sees the letter they typed pointing at the DOF it denotes (§6 visibility).
                 const circObj = construction.objects.find((o) => o.kind === 'circle' && o.id === d.circle);
                 const sym = circObj && circObj.kind === 'circle' ? circObj.radiusSymbol : undefined;
-                const base = paired ? t(isInner ? 'dof.radiusInner' : 'dof.radiusOuter', { center: d.center }) : t('dof.radius', { center: d.center });
+                // An anonymous centre ('@ctr-O', ADR-342) is displayed by its reference token — the letter
+                // the student uses for the circle («מעגל O»), never the internal id.
+                const ctrTok = d.center.startsWith('@ctr-') ? d.center.slice(5) : d.center;
+                const base = paired ? t(isInner ? 'dof.radiusInner' : 'dof.radiusOuter', { center: ctrTok }) : t('dof.radius', { center: ctrTok });
                 const label = sym ? `${base} (${sym})` : base;
                 // Two circles under a stated RADIUS ORDER (R>r, ADR-305/244) share ONE common slider scale,
                 // so the order is VISIBLE — R's thumb always sits to the right of r's on the same axis

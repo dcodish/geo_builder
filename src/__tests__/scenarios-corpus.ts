@@ -137,11 +137,26 @@ export function run(steps: Step[]): Derived {
 
 // ── check helpers ──────────────────────────────────────────────────────────
 export const at = (fig: Derived, id: Id): Vec => {
-  const v = fig.positions.get(id);
+  // An UNNAMED circle's centre is anonymous under ADR-342 ('@ctr-O') — checks written before that may
+  // reference it by its token letter; resolve the fallback so geometric asserts keep reading naturally.
+  // (The PROMOTION semantics — when the letter becomes a real point — are locked strictly in
+  // anon-centre.test.ts, so this fallback can't mask a promotion regression.)
+  const v = fig.positions.get(id) ?? fig.positions.get(`@ctr-${id}`);
   if (!v) throw new Error(`no position for "${id}"`);
   return v;
 };
 export const dist = (a: Vec, b: Vec) => Math.hypot(a.x - b.x, a.y - b.y);
+/** The CENTRE POINT id of a circle — by its reference letter, or the sole circle when omitted. Under
+ *  ADR-342 an UNNAMED circle's centre is anonymous ('@ctr-O'), so a check must resolve it from the
+ *  construction instead of assuming the literal letter. */
+export const centreOf = (fig: Derived, letter?: string): Id => {
+  const circles = fig.construction.objects.filter((o): o is Extract<typeof o, { kind: 'circle' }> => o.kind === 'circle' && !(o as { center: string }).center.startsWith('~'));
+  const hit = letter
+    ? circles.find((c) => (c as { center: string }).center === letter || (c as { center: string }).center === `@ctr-${letter}` || c.id === `circle-${letter}`)
+    : circles[0];
+  if (!hit) throw new Error(`no circle${letter ? ` for "${letter}"` : ''} in the figure`);
+  return (hit as { center: Id }).center;
+};
 export const angle = (a: Vec, b: Vec, c: Vec) => {
   const u = { x: a.x - b.x, y: a.y - b.y };
   const v = { x: c.x - b.x, y: c.y - b.y };
@@ -165,6 +180,24 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
+  {
+    id: 'gxccyt2n-hidden-centre-never-squats-letter',
+    title: '«שני מעגלים נחתכים» → «P על המשך BA» — the invisible auto centre never squats P; the student gets THEIR new point (#177 P1, ADR-342)',
+    guards:
+      'Operator prod session gxccyt2n (2026-07-16, 15:57): after «שני מעגלים נחתכים» (auto-centres O and P, hidden per FR-RN-8 — the student cannot know P exists), «P על המשך BA» was M1-bound to the INVISIBLE second centre → set-line [B,A,P] on a point equidistant from A,B → honestly impossible → parked deferred forever, with the canvas drawing A→P into the centre (a claim the student never made). The ADR-297 namespace-hijack class, centre edition. Now an unnamed circle\'s centre POINT is anonymous (@ctr-P) while the LETTER stays the circle\'s reference token («מעגל P» still works), so the statement creates the student\'s own P beyond A on ray B→A. Ruling (b): semantic centre-use («רדיוס OB») binds-and-promotes; positional statements like this one always treat the letter as fresh (locked in anon-centre.test.ts).',
+    steps: ['שני מעגלים נחתכים', 'P על המשך BA'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.pending, 'never the parked deferred-constraint the operator saw').toBe(false);
+      const P = at(fig, 'P');
+      const A = at(fig, 'A');
+      const B = at(fig, 'B');
+      expect((P.x - A.x) * (A.x - B.x) + (P.y - A.y) * (A.y - B.y), 'P beyond A on ray B→A').toBeGreaterThan(0);
+      // both circles intact, their centres anonymous — the letters stay the student's
+      expect(fig.construction.objects.filter((o) => o.kind === 'circle').length).toBe(2);
+      expect(fig.positions.has('@ctr-O') && fig.positions.has('@ctr-P'), 'anonymous centres').toBe(true);
+    },
+  },
   {
     id: 'trapezoid-stated-long-base-first-draw',
     title: '«טרפז ABCD» + «AB < CD» — the stated order flips the TEMPLATE to a basic CD-long trapezoid, never a k≈1.08 boundary grind (#173 P1, ADR-341)',
@@ -1330,7 +1363,7 @@ export const SCENARIOS: Scenario[] = [
       // The degenerate tangent is rejected with a clear message (NOT a silent freeze / bogus over-constraint).
       expect(fig.lastError).toMatch(/distinct points|single point/);
       // The prior figure is kept: every earlier point still has a position (no clobber, no wipe).
-      for (const id of ['O', 'P', 'A', 'B', 'C', 'D']) expect(fig.positions.has(id), `position for ${id}`).toBe(true);
+      for (const id of ['@ctr-O', '@ctr-P', 'A', 'B', 'C', 'D']) expect(fig.positions.has(id), `position for ${id}`).toBe(true); // centres anonymous (ADR-342)
       // The valid earlier tangent (OA ⟂ CA) is unaffected — its constraint still holds in the kept figure.
       const O = at(fig, 'O'), A = at(fig, 'A'), C = at(fig, 'C');
       const dot = (O.x - A.x) * (C.x - A.x) + (O.y - A.y) * (C.y - A.y);
@@ -1968,7 +2001,7 @@ export const SCENARIOS: Scenario[] = [
       { llm: [
         { type: 'point-on-circle', id: 'C', circle: 'circle-O' },
         { type: 'point-on-circle', id: 'B', circle: 'circle-P' },
-        { type: 'set-perpendicular', a: 'P', b: 'B', c: 'C', d: 'B', implicit: true },
+        { type: 'set-perpendicular', a: '@ctr-P', b: 'B', c: 'C', d: 'B', implicit: true }, // the centre point id (ADR-342 — the letter is the circle's token, not a point)
         { type: 'segment', a: 'C', b: 'B' },
       ] },
       'CB',
@@ -1998,7 +2031,7 @@ export const SCENARIOS: Scenario[] = [
         const e = evaluate(applySeed(fig.construction, s));
         expect(e.ok, `seed ${s} evaluates`).toBe(true);
         if (!e.ok) continue;
-        const A = e.positions.get('A')!, B = e.positions.get('B')!, C = e.positions.get('C')!, O = e.positions.get('O')!;
+        const A = e.positions.get('A')!, B = e.positions.get('B')!, C = e.positions.get('C')!, O = (e.positions.get('O') ?? e.positions.get('@ctr-O'))!; // the unnamed circle's centre is anonymous (ADR-342)
         expect(angle(A, C, B), `seed ${s}: ∠ACB = 90 (AB is a diameter)`).toBeCloseTo(90, 0);
         const ab = { x: B.x - A.x, y: B.y - A.y };
         const off = Math.abs((O.x - A.x) * ab.y - (O.y - A.y) * ab.x) / Math.hypot(ab.x, ab.y);
@@ -2158,7 +2191,7 @@ export const SCENARIOS: Scenario[] = [
       const area = (ids: Id[]) => { let s = 0; for (let i = 0; i < ids.length; i++) { const a = at(fig, ids[i]), b = at(fig, ids[(i + 1) % ids.length]); s += a.x * b.y - b.x * a.y; } return Math.abs(s) / 2; };
       expect(area(['N', 'C', 'E']) / area(['A', 'C', 'D']), 'area(NCE) = ¼ area(ACD)').toBeCloseTo(0.25, 2);
       expect(dist(at(fig, 'N'), at(fig, 'O')), 'N converged onto the centre O').toBeLessThan(1e-3);
-      expect(fig.coincidences.some(([a, b]) => (a === 'N' && b === 'O') || (a === 'O' && b === 'N')), 'the N=O coincidence is surfaced as a notice').toBe(true);
+      expect(fig.coincidences.some(([a, b]) => (a === 'N' && (b === 'O' || b === '@ctr-O')) || ((a === 'O' || a === '@ctr-O') && b === 'N')), 'the N=O coincidence is surfaced as a notice').toBe(true); // the unnamed centre is anonymous (ADR-342)
     },
   },
   {
@@ -2546,7 +2579,7 @@ export const SCENARIOS: Scenario[] = [
     steps: ['B אמצע AC', 'AB קוטר', 'מנקודה E מעבירים משיק למעגל בנקודה D', 'נקודה C נמצאת על המשך הצלע ED', 'EA משיק למעגל בנקודה A'],
     check: (fig) => {
       allStepsOk(fig);
-      const O = at(fig, 'O'), A = at(fig, 'A'), E = at(fig, 'E');
+      const O = at(fig, centreOf(fig)), A = at(fig, 'A'), E = at(fig, 'E'); // the unnamed circle's centre is anonymous (ADR-342)
       const dot = (A.x - O.x) * (E.x - A.x) + (A.y - O.y) * (E.y - A.y);
       expect(Math.abs(dot), 'OA ⟂ EA (tangent at A)').toBeLessThan(1e-3);
     },
@@ -3014,7 +3047,7 @@ export const SCENARIOS: Scenario[] = [
       const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
       // The three tangency feet are ANONYMOUS promotable points (`@f-<side>` — #32/ADR-297), one per side,
       // never occupying the student letters F/G/H.
-      expect(fig.construction.objects.filter((o) => isGeoPoint(o) && o.id.startsWith('@')).length, 'three anonymous feet').toBe(3);
+      expect(fig.construction.objects.filter((o) => isGeoPoint(o) && o.id.startsWith('@f-')).length, 'three anonymous feet').toBe(3); // the centre is anonymous too now ('@ctr-', ADR-342) — count only the feet
       const F = at(fig, '@f-AB'), G = at(fig, '@f-BC'), H = at(fig, '@f-CA');
       const distToLine = (p: Vec, a: Vec, b: Vec) => Math.abs((p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)) / dist(a, b);
       // each foot lies on its side
@@ -3808,7 +3841,7 @@ export const SCENARIOS: Scenario[] = [
       allStepsOk(fig);
       expect(fig.positions.has('D'), 'D placed (the step did not drop)').toBe(true);
       // D is the OTHER crossing of line A–C with the left circle O ⇒ D is ON circle O.
-      const O = fig.construction.objects.find((o) => o.kind === 'circle' && (o as { center: Id }).center === 'O') as { radius: { value: number } };
+      const O = fig.construction.objects.find((o) => o.kind === 'circle' && ['O', '@ctr-O'].includes((o as { center: Id }).center)) as { radius: { value: number } }; // anon centre (ADR-342)
       expect(dist(at(fig, 'O'), at(fig, 'D'))).toBeCloseTo(O.radius.value, 2);
     },
   },
@@ -4172,7 +4205,7 @@ export const SCENARIOS: Scenario[] = [
       // all three sides equal (equilateral) and the vertices lie on a circle.
       expect(dist(A, B)).toBeCloseTo(dist(B, C), 3);
       expect(dist(B, C)).toBeCloseTo(dist(C, A), 3);
-      expect([...fig.positions.keys()]).toContain('O'); // the circumscribing circle's centre exists
+      expect([...fig.positions.keys()]).toContain('@ctr-O'); // the circumscribing circle's centre exists (anonymous, ADR-342)
     },
   },
   {
@@ -4940,9 +4973,8 @@ export const SCENARIOS: Scenario[] = [
       const pts = fig.construction.objects.filter((o) => isGeoPoint(o));
       const ptIds = pts.map((o) => o.id);
       // the three tangency feet are anonymous `@`-ids — F/G/H are NOT consumed by scaffolding
-      const anon = ptIds.filter((id) => id.startsWith('@'));
+      const anon = ptIds.filter((id) => id.startsWith('@f-')); // the incircle CENTRE is anonymous too now ('@ctr-', ADR-342) — count only the feet
       expect(anon.length, `three anonymous incircle feet (got ${ptIds.join(',')})`).toBe(3);
-      expect(anon.every((id) => id.startsWith('@f-')), 'feet are @f-<side> ids').toBe(true);
       // the student's G is a FRESH point of their own — an on-segment point on CA's extension, NOT a `foot`
       // dangling off the incentre (the hijack that emitted `set-line [C,A,G]` onto the invisible foot).
       const G = fig.construction.objects.find((o) => o.id === 'G');

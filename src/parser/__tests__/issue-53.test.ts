@@ -14,7 +14,7 @@
  * the second circle) is locked by scenario `inscribe-existing-triangle-with-radius-symbol`.
  */
 import { describe, it, expect } from 'vitest';
-import { parse, buildParseCtx, droppedRadiusSymbol } from '@/parser';
+import { parse, buildParseCtx, droppedRadiusSymbol, droppedGivenNumbers } from '@/parser';
 import { replay } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
@@ -58,7 +58,18 @@ describe('issue #53 — a dropped radius-symbol clause blocks the parse (never a
       'משולש ADO חסום במעגל שרדיוסו 5', // the NUMERIC sibling: the widened tail catches it at parse level too
     ]) {
       const r = parse(u, ctx);
-      expect(r.ok, `must refuse (escalate), never half-parse: ${u}`).toBe(false);
+      // ADR-342 updated this outcome: with A,D,O all real points (O is a REAL vertex now — the first
+      // inscription created it as a fresh letter, since an unnamed circle's centre no longer squats O),
+      // the re-type lowers to their CIRCUMCIRCLE with the radius symbol BOUND — the r clause is CONSUMED,
+      // not dropped, so the honest outcome is a parse, no longer a refusal. The refusal contract this
+      // test locks — never commit while silently dropping the radius clause — is asserted directly.
+      if (r.ok) {
+        // consumed in the parse — or (the numeric sibling on a circumcircle, whose radius is DERIVED from
+        // its three points) caught by the number honesty gate at the commit seam. Either way: never silent.
+        const consumed = r.commands.some((c) => c.type === 'radius-symbol' || c.type === 'set-radius');
+        const flagged = droppedGivenNumbers(u, r.commands).length > 0;
+        expect(consumed || flagged, `the radius clause must be CONSUMED or FLAGGED, never silently dropped: ${u}`).toBe(true);
+      }
     }
   });
 

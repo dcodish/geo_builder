@@ -124,6 +124,11 @@ describe('issue #99 — point-polygon-side (region requirement)', () => {
     const facts = runLines([
       'שני מעגלים נחתכים',
       'דרך A עובר משיק למעגל O שחותך את מעגל P בנקודה K',
+      // ADR-342 (#177 ruling (b)): a bare positional «O על מעגל P» now creates a FRESH point O (the
+      // unnamed circle's centre no longer squats the letter). The session's intent — the CENTRE rides
+      // circle P — is expressed by first naming the centre through the semantic carve-out («רדיוס OA»
+      // promotes the anonymous centre to O), after which the membership binds the real centre (M1).
+      'רדיוס OA',
       'O על מעגל P',
       'משולש AKO',
       'נקודה E בתוך משולש AKO',

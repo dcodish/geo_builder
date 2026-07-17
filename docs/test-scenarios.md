@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `gxccyt2n-hidden-centre-never-squats-letter` — «שני מעגלים נחתכים» → «P על המשך BA»: the invisible auto centre never squats P (#177 P1, ADR-342)
+Operator prod session `gxccyt2n` (2026-07-16): the auto-named hidden centre P was M1-bound by the student's «P על המשך BA» → an impossible collinearity parked "deferred" forever, the canvas asserting a claim the student never made. The ADR-297 namespace-hijack class, centre edition. Now an unnamed circle's centre POINT is anonymous (`@ctr-P`) while the LETTER stays the circle's reference token («מעגל P» unchanged); the boundary is PLACING vs REFERENCING (amended ruling): metric givens («OP=4», «OA=5») and bare segments («OP», «PA») bind-and-promote the token; placing statements create the student's fresh point. Class test `anon-centre.test.ts` (emitters, promotion strict, naming flow + converse, dot-promote, the positional negative).
+
 ### `trapezoid-stated-long-base-first-draw` — «טרפז ABCD» + «AB < CD»: the stated order flips the TEMPLATE, never a k≈1.08 boundary grind (#173 P1, ADR-341)
 Operator 2026-07-16: "when I write AB<CD i get something that is a trapezoid but not nice. what I really want is a basic trapezoid with CD as the large base." One class, two symptoms: the long-base side is an unstated DISCRETE choice hard-baked twice — template k=0.6 + sampler capped below 1 (the ADR-052 smell CLAUDE.md names verbatim), so the stated order was "repaired" to the region boundary (k=1.079, a skewed near-parallelogram). Now: a pre-scan (ADR-163 M4 shape) rotates the ids by two so the template long base lands on the stated-long pair (first draw k=1/0.6≈1.667 — the mirror default), and the sampler straddles 1 when unstated / stays in the stated branch when pinned. Class test `trapezoid-long-base.test.ts` (defaults, smell gate, branch pinning, iso-trapezoid legs) — 4/6 verified red on the pre-fix tree.
 

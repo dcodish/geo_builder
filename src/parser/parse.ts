@@ -41,6 +41,12 @@ export type ParseResult =
 export interface ParseContext {
   /** Centre letters of circles already in the figure (e.g. ['O']). */
   circles?: string[];
+  /** Centre TOKEN → the centre's real POINT id ([ADR-342](docs/06-decisions.md#adr-342), issue #177).
+   *  For a student-NAMED circle the two coincide ('O' → 'O'); for an UNNAMED circle the token is the
+   *  circle's reference letter while the centre point is ANONYMOUS ('O' → '@ctr-O') so the letter never
+   *  occupies the student's namespace. A rule that uses a resolved centre AS A POINT (a central angle, a
+   *  diameter's collinearity, a tangency ⟂) must translate through {@link centrePt}. */
+  centrePoint?: Record<string, string>;
   /** Point ids already in the figure — so inscribing an EXISTING triangle becomes its circumcircle. */
   points?: string[];
   /** For each circle (one entry per circle OBJECT), the points known to lie on it — lets "arc BC" resolve
@@ -97,14 +103,21 @@ export interface ParseContext {
 const circleContaining = (ctx: ParseContext, pts: string[], prefer?: string | null): string | null => {
   const has = (center: string) => membersOfCenter(ctx, center).size > 0 && pts.every((p) => membersOfCenter(ctx, center).has(p.toUpperCase()));
   if (prefer && has(prefer)) return prefer;
-  return ctx.circleMembers?.find((e) => pts.every((p) => e.points.includes(p)))?.center ?? null;
+  const hit = ctx.circleMembers?.find((e) => pts.every((p) => e.points.includes(p)))?.center ?? null;
+  // Return the reference TOKEN — an anonymous centre ('@ctr-O', ADR-342) is referenced by its letter, and
+  // every consumer derives the circle id via `circleId(<token>)`.
+  return hit && hit.startsWith('@ctr-') ? hit.slice(5) : hit;
 };
 /** ALL points known on any circle at this CENTRE — the union across a concentric pair's two entries
  *  (ADR-244: `circleMembers` is per circle id, so a per-centre "already a member?" guard must union). */
 const membersOfCenter = (ctx: ParseContext, center: string): Set<string> => {
   const out = new Set<string>();
+  // Match by the centre's reference TOKEN as well as its real id — an UNNAMED circle's centre is anonymous
+  // ('@ctr-O', ADR-342) while the rules resolve it by its letter.
+  const tok = (c: string): string => (c.startsWith('@ctr-') ? c.slice(5) : c);
   for (const e of ctx.circleMembers ?? [])
-    if (e.center.toUpperCase() === center.toUpperCase()) for (const p of e.points) out.add(p.toUpperCase());
+    if (e.center.toUpperCase() === center.toUpperCase() || tok(e.center).toUpperCase() === center.toUpperCase())
+      for (const p of e.points) out.add(p.toUpperCase());
   return out;
 };
 const NO_CONTEXT: ParseContext = {};
@@ -325,6 +338,82 @@ function freeLabel(used: string[], prefer: string[] = []): Id {
  * defining parts (like `seg-AB`), so re-issuing the command is idempotent. Excluded from the parse context
  * ({@link buildParseCtx}) and from detection ({@link isScaffoldId}) until promoted. */
 const anonId = (...parts: string[]): Id => `@${parts.join('-')}`;
+
+/**
+ * An UNNAMED circle's centre-point id ([ADR-342](docs/06-decisions.md#adr-342), issue #177 — the ADR-297
+ * namespace-hijack class, centre edition): the reference LETTER stays the circle's token (`circle-O`,
+ * «מעגל O», implicit resolution — all byte-unchanged), but the centre POINT is anonymous so the letter
+ * never occupies the student's namespace («P על המשך BA» after «שני מעגלים נחתכים» used to bind P to the
+ * INVISIBLE second centre). Promoted to a real letter only by naming («מרכז המעגל הוא P») or dot-click.
+ */
+const ctrAnonId = (letter: string): Id => anonId('ctr', letter);
+/** Translate a resolved centre TOKEN to the centre's real POINT id (identity when unmapped/named). */
+const centrePt = (ctx: ParseContext, letter: string): Id => ctx.centrePoint?.[letter] ?? letter;
+
+/**
+ * SEMANTIC centre-use ([ADR-342](docs/06-decisions.md#adr-342), issue #177 ruling (b)): the utterance's own
+ * WORDS named `letter` as a centre («רדיוס OB», «זוית מרכזית AOB» — the vocabulary asserts the letter IS the
+ * centre, so binding it is resolution, not hijack). Returns a `name-center` promotion for an UNNAMED auto
+ * centre (the replay pre-scan renames '@ctr-L' → 'L' across the figure, making the letter the real visible
+ * centre); a named centre — or a letter the student separately owns as a point — needs/gets nothing.
+ * Positional/definitional statements («P על המשך BA») must NOT call this — the letter stays fresh there.
+ */
+const promoteCentreUse = (ctx: ParseContext, letter: string): AnyCommand[] =>
+  (ctx.autoCenters ?? []).map(up).includes(up(letter)) && !(ctx.points ?? []).includes(up(letter))
+    ? [{ type: 'name-center', center: up(letter) }]
+    : [];
+
+/** Command kinds a PURE METRIC statement may lower to — a measure/relation plus its auto-drawn segments. */
+const METRIC_KINDS = new Set([
+  'segment', 'set-distance', 'set-ratio', 'set-equal', 'set-length-radius', 'set-angle', 'set-angle-ratio',
+  'set-measure-sum', 'set-length-product', 'set-area', 'set-area-ratio', 'set-perimeter', 'set-perimeter-ratio',
+  'measure-length', 'measure-angle', 'measure-area', 'mark-angle',
+]);
+
+/**
+ * METRIC givens bind hidden-centre tokens ([ADR-342](docs/06-decisions.md#adr-342), issue #177 — the
+ * operator's amended ruling): «OP=4» / «OM=4» / «OA=5» beside unnamed circles carry the textbook meaning
+ * (O, P are THE centres), so a statement that is PURELY metric — only measure/relation commands and their
+ * auto-drawn segments, nothing positional/definitional — promotes every auto-centre token it names.
+ * «P על המשך BA» (the reported hijack) lowers to a `set-line`, which is NOT in the whitelist, so
+ * PLACING statements keep treating the letter as fresh. The boundary is placing-vs-REFERENCING: a bare
+ * segment «OP»/«PA» beside unnamed circles REFERENCES the centres (the operator's kite flow draws the
+ * radii and the centre line by their tokens), so segment-only statements bind too — a segment never
+ * (re)positions the letter, while every placing kind (on-*, extension, intersection) is outside the list.
+ */
+function withMetricCentreBinding(commands: AnyCommand[], ctx: ParseContext): AnyCommand[] {
+  if (!(ctx.autoCenters ?? []).length) return commands;
+  if (commands.length === 0 || !commands.every((c) => METRIC_KINDS.has(c.type))) return commands;
+  const letters = new Set<string>();
+  for (const c of commands)
+    for (const [k, v] of Object.entries(c)) {
+      if (k === 'type' || k === 'expr') continue;
+      if (typeof v === 'string' && /^[A-Z]\d*$/.test(v)) letters.add(v);
+      if (Array.isArray(v)) for (const e of v) if (typeof e === 'string' && /^[A-Z]\d*$/.test(e)) letters.add(e);
+    }
+  const promos = [...letters].flatMap((l) => promoteCentreUse(ctx, l));
+  return promos.length ? [...promos, ...commands] : commands;
+}
+
+/**
+ * The ADR-342 post-pass (the ADR-119 chokepoint pattern): every command in a winning parse that CREATES an
+ * `autoCenter` circle gets its centre point anonymized — and every sibling command's exact references to
+ * that letter-as-a-point follow (a JSON exact-string remap: only whole id values match, so composite ids
+ * like `circle-O` are untouched — the LETTER keeps naming the circle). Running at the chokepoint means a
+ * future rule that mints an auto centre can never regress the class.
+ */
+function withAnonymousAutoCentres(commands: AnyCommand[]): AnyCommand[] {
+  const minted = new Map<string, Id>();
+  for (const c of commands)
+    if ((c.type === 'circle' || c.type === 'circle-through') && c.autoCenter && !c.center.startsWith('@') && !c.center.startsWith('~'))
+      minted.set(c.center, ctrAnonId(c.center));
+  if (minted.size === 0) return commands;
+  return commands.map((c) => {
+    let s = JSON.stringify(c);
+    for (const [from, to] of minted) s = s.split(JSON.stringify(from)).join(JSON.stringify(to));
+    return JSON.parse(s) as AnyCommand;
+  });
+}
 
 /** The first `n` vertex labels — A, B, C, D, … in order, skipping any already in `used` — for a polygon
  *  the student drew WITHOUT naming its vertices ("מרובע חסום במעגל" / "square"). The convention is to name
@@ -1053,7 +1142,7 @@ const diameterCutsSegment: Rule = (s, ctx) => {
   const isExtension = /המש(?:ך|כי(?:ם|הם|הן)?)|extension|extended/i.test(after);
   const isLine = /\bline\b|הישר|הקו/i.test(after);
   const out: AnyCommand[] = [
-    { type: 'line-line-intersection', id: E, a: F, b: up(center), c: X, d: Y, dir1: true, ...(isExtension ? { dir2: true } : {}) },
+    { type: 'line-line-intersection', id: E, a: F, b: centrePt(ctx, up(center)), c: X, d: Y, dir1: true, ...(isExtension ? { dir2: true } : {}) },
   ];
   if (!isExtension && !isLine) out.push({ type: 'set-line', points: [X, E, Y] }); // default: E between X and Y (on the segment)
   out.push({ type: 'segment', a: F, b: E }); // draw the diameter chord
@@ -1412,7 +1501,7 @@ const arcValue: Rule = (s, ctx) => {
   if (!center) return 'stop'; // an arc measure with no circle — never let the length rules claim the number
   const value = parseFloat(m[2]);
   if (!(value > 0 && value < 360)) return 'stop'; // an arc measure is a positive angle
-  return [{ type: 'set-angle', vertex: up(center), ray1: pair[0], ray2: pair[1], value, arcOf: circleId(center) }];
+  return [{ type: 'set-angle', vertex: centrePt(ctx, up(center)), ray1: pair[0], ray2: pair[1], value, arcOf: circleId(center) }];
 };
 
 /**
@@ -1746,7 +1835,7 @@ function parseMeasureSide(raw: string, ctx: ParseContext, center: string | null)
       const stripped = dropCircleRef(chunk).replace(new RegExp(ARC_KW.source, 'gi'), ' ').replace(/\bin\b|\bof\b|של|ב-?/gi, ' ');
       const pair = labelRun(stripped, 2);
       if (!pair || !center || (stripped.match(/[A-Z]\d*/g) ?? []).length !== 2) return null;
-      side.terms.push({ coef: sign * coef, kind: 'angle', ids: [pair[0], up(center), pair[1]] });
+      side.terms.push({ coef: sign * coef, kind: 'angle', ids: [pair[0], centrePt(ctx, up(center)), pair[1]] });
       sign = 1;
       continue;
     }
@@ -2751,7 +2840,7 @@ const concentricCircles: Rule = (s, ctx) => {
   // "common center O" — `cent\w*` covers it). Unnamed → auto-assigned and hidden until used (FR-RN-8).
   const m = s.match(/(?:משותף|קונצנטריים)\s+([A-Za-z]\d*)(?![A-Za-z])/);
   const named = m ? m[1] : circleCenter(s);
-  const center = named ?? freeLabel(ctx.points ?? [], ['O', 'P', 'Q', 'K']);
+  const center = named ?? freeLabel([...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K']);
   const outer = circleId(center);
   const inner = `${outer}-2`;
   const auto = named ? {} : { autoCenter: true as const };
@@ -2791,7 +2880,7 @@ const circle: Rule = (s, ctx) => {
     if (leftover) return null;
   }
   // An UNNAMED centre is auto-assigned and HIDDEN unless used (FR-RN-8); a named centre is shown.
-  const center = named ?? freeLabel(ctx.points ?? [], ['O', 'P', 'Q', 'K']);
+  const center = named ?? freeLabel([...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K']);
   const auto = !named;
   if (thrM && !r.numeric && !r.symbolic) return [{ type: 'circle-through', id: circleId(center), center: up(center), through: up(thrM[1]), ...(auto ? { autoCenter: true } : {}) }];
   // No NUMERIC size was stated ⇒ the radius is a free DOF seeded at the default, not a fixed value
@@ -2959,6 +3048,8 @@ const radiusSegment: Rule = (s, ctx) => {
   if (!centre || x === y) return null;
   const rim = centre === x ? y : x;
   return [
+    // «רדיוס OB» names O as the centre in so many words — promote an unnamed auto centre to it (ADR-342 (b)).
+    ...promoteCentreUse(ctx, centre),
     { type: 'point-on-circle', id: rim, circle: circleId(centre) },
     { type: 'segment', a: centre, b: rim },
   ];
@@ -3414,7 +3505,7 @@ const semicirclesOnEverySide: Rule = (s, ctx) => {
   const CENTRES = ['O', 'P', 'Q', 'S', 'T', 'U', 'V', 'W', 'M', 'N'];
   for (let i = 0; i < poly.length; i++) {
     const a = poly[i], b = poly[(i + 1) % poly.length];
-    const center = freeLabel([...used], CENTRES);
+    const center = freeLabel([...used, ...(ctx.circles ?? [])], CENTRES);
     used.add(center);
     const circ = circleId(center);
     out.push(
@@ -3646,7 +3737,7 @@ const incircle: Rule = (s, ctx) => {
     if (incLabel && !ids.includes(up(incLabel))) return up(incLabel);
     return null;
   })();
-  const I = namedInc ?? freeLabel([...ids, ...taken], ['O', 'P', 'Q', 'I']); // a circle centre defaults to O
+  const I = namedInc ?? freeLabel([...ids, ...taken, ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'I']); // a circle centre defaults to O (never an existing circle's token — ADR-342)
 
   // The polygon's defining command (carries its constraints: trapezoid AB∥CD, rhombus equal sides, …), so the
   // shape stays the named shape while the tangential flex below adjusts it to admit an incircle.
@@ -3763,7 +3854,7 @@ const cornerTangentCircle: Rule = (s, ctx) => {
     for (const [arm, T] of [[arm1, tips[0]], [arm2, tips[1]]] as const) {
       cmds.push({ type: 'segment', a: vertex, b: arm }); // draw the tangent side (idempotent if already an edge)
       if (!members.has(T)) cmds.push({ type: 'point-on-circle', id: T, circle: circleId(O) }); // the TANGENT POINT lies on the circle
-      cmds.push({ type: 'set-perpendicular', a: O, b: T, c: vertex, d: arm, implicit: true }); // radius O–T ⟂ the side ⇒ tangent at T (structural, no mark)
+      cmds.push({ type: 'set-perpendicular', a: centrePt(ctx, O), b: T, c: vertex, d: arm, implicit: true }); // radius O–T ⟂ the side ⇒ tangent at T (structural, no mark)
       if (T !== arm && T !== vertex) cmds.push({ type: 'set-collinear', a: T, b: vertex, c: arm }); // T lies ON the side (line vertex–arm), the arm endpoint untouched
     }
     return cmds;
@@ -3771,7 +3862,7 @@ const cornerTangentCircle: Rule = (s, ctx) => {
   // The circle's centre: the named one ("circle O"), else a fresh auto-name — the corner circle is a
   // NEW object, so "AB ו-AD משיקים למעגל" (no name) is built deterministically rather than escalating
   // (the centre is dodged against the figure's labels, like the incircle's incenter).
-  const center = circleCenter(s) ?? freeLabel([vertex, arm1, arm2, ...(ctx.points ?? [])], ['O', 'P', 'Q', 'M']);
+  const center = circleCenter(s) ?? freeLabel([vertex, arm1, arm2, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'M']);
   // optional named tangency points: "at E and K" / "בנקודות E ו-K"
   const tp = s.match(/(?:\bat\b|בנקוד(?:ות|ה|ים)?)\s+([A-Za-z]\d*)\s*(?:and|ו-?|,)\s*([A-Za-z]\d*)/i); // בנקוד\w* fails — \w excludes Hebrew, so the suffix must be spelled out
   const taken = [vertex, arm1, arm2, center, ...(ctx.points ?? [])];
@@ -3944,7 +4035,7 @@ const diameter: Rule = (s, ctx) => {
       ...ids
         .filter((p) => !members.has(up(p)))
         .map((p) => ({ type: 'point-on-circle' as const, id: up(p), circle: circleId(center) })),
-      { type: 'set-collinear' as const, a: up(ids[0]), b: up(center), c: up(ids[1]) },
+      { type: 'set-collinear' as const, a: up(ids[0]), b: centrePt(ctx, up(center)), c: up(ids[1]) },
     ];
   }
   return [{ type: 'diameter', id1: ids[0], id2: ids[1], circle: circleId(center) }];
@@ -4302,7 +4393,7 @@ const twoCirclesMeet: Rule = (s, ctx) => {
   }
   const named = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
   const c1 = named[0] ?? 'O';
-  const c2 = named[1] ?? freeLabel([c1, ...(ctx.points ?? [])], ['P', 'Q', 'K', 'S']);
+  const c2 = named[1] ?? freeLabel([c1, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
   // The two intersection points: the pair after "at"/"בנקודות", or a bare "X and Y" that ISN'T the
   // named centres — else AUTO-name them A,B (the student drew "two intersecting circles" without naming the
   // crossings; ADR-132). Avoid the centres and any existing points.
@@ -4742,7 +4833,7 @@ const circlesTangent: Rule = (s, ctx) => {
   if (named.length < 2 && !plural) return null; // a single circle ⇒ the tangent-line rule
   if (named.length >= 2 && named[0] === named[1]) return null;
   const c1 = named[0] ?? 'O';
-  const c2 = named[1] ?? freeLabel([c1, ...(ctx.points ?? [])], ['P', 'Q', 'K', 'S']);
+  const c2 = named[1] ?? freeLabel([c1, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
   if (c1 === c2) return null;
   const internal = /\binternal\w*\b|\bfrom\s+inside\b|\binside\b|פנימ|מבפנים/i.test(s);
   // Touch point: a named "at M"/"בנקודה M", else AUTO-name it (the student drew "two tangent circles"
@@ -4842,8 +4933,8 @@ const commonTangent: Rule = (s, ctx) => {
     ...mk,
     { type: 'point-on-circle', id: A, circle: id1, softPair: true },
     { type: 'point-on-circle', id: B, circle: id2, softPair: true },
-    { type: 'set-perpendicular', a: c1, b: A, c: A, d: B, implicit: true }, // radius c1→A ⟂ the tangent
-    { type: 'set-perpendicular', a: c2, b: B, c: A, d: B, implicit: true }, // radius c2→B ⟂ the tangent
+    { type: 'set-perpendicular', a: centrePt(ctx, c1), b: A, c: A, d: B, implicit: true }, // radius c1→A ⟂ the tangent
+    { type: 'set-perpendicular', a: centrePt(ctx, c2), b: B, c: A, d: B, implicit: true }, // radius c2→B ⟂ the tangent
     { type: 'segment', a: A, b: B },
   ];
 };
@@ -4864,7 +4955,7 @@ const commonTangent: Rule = (s, ctx) => {
  * itself, and asserting a tangency that contradicts "the circles intersect" (operator session
  * vk346px4). Must run BEFORE `circlesTangent` (and `chord`, which would drop the tangency).
  */
-const tangentChord: Rule = (s) => {
+const tangentChord: Rule = (s, ctx) => {
   if (!/chord|מיתר/i.test(s)) return null;
   if (!/tangent|משיק/i.test(s)) return null;
   if (INTERSECT_KW.test(s)) return null; // a CUTTING event ("חותך"/"meets") → tangentMeetsOtherCircle owns it
@@ -4885,7 +4976,7 @@ const tangentChord: Rule = (s) => {
     { type: 'point-on-circle', id: ends[0], circle: hostCirc }, // both endpoints lie on the HOST circle (a chord)
     { type: 'point-on-circle', id: ends[1], circle: hostCirc },
     { type: 'point-on-circle', id: Z, circle: circleId(target) }, // the touch point lies on the TARGET circle (idempotent at a shared intersection)
-    { type: 'set-perpendicular', a: up(target), b: Z, c: ends[0], d: ends[1], implicit: true }, // radius(target→Z) ⟂ the chord ⇒ tangent at Z
+    { type: 'set-perpendicular', a: centrePt(ctx, up(target)), b: Z, c: ends[0], d: ends[1], implicit: true }, // radius(target→Z) ⟂ the chord ⇒ tangent at Z
     { type: 'segment', a: ends[0], b: ends[1] }, // draw the chord
   ];
 };
@@ -4979,7 +5070,7 @@ const tangentsFromExternal: Rule = (s, ctx) => {
     for (const P of [A, B]) {
       out.push(
         { type: 'point-on-circle', id: P, circle: circ }, // idempotent if P already on the circle (ADR-093); creates it (free θ) if new
-        { type: 'set-perpendicular', a: up(center), b: P, c: E, d: P, implicit: true }, // EP ⟂ OP — tangent at P (structural, no right-angle mark)
+        { type: 'set-perpendicular', a: centrePt(ctx, up(center)), b: P, c: E, d: P, implicit: true }, // EP ⟂ OP — tangent at P (structural, no right-angle mark)
         { type: 'segment', a: E, b: P },
       );
     }
@@ -4991,8 +5082,8 @@ const tangentsFromExternal: Rule = (s, ctx) => {
   const mid = `~tanmid-${center}${E}`; // hidden centre of the Thales circle on O-E (scaffolding; "~" → not drawn)
   const aux = `tanaux-${center}${E}`;
   out.push(
-    { type: 'midpoint', id: mid, a: center, b: E },
-    { type: 'circle-through', id: aux, center: mid, through: center, hidden: true }, // circle on diameter OE (hidden)
+    { type: 'midpoint', id: mid, a: centrePt(ctx, center), b: E },
+    { type: 'circle-through', id: aux, center: mid, through: centrePt(ctx, center), hidden: true }, // circle on diameter OE (hidden)
     { type: 'circle-circle-intersection', id: A, circle1: circ, circle2: aux, branch: 0 }, // touch point 1
     { type: 'circle-circle-intersection', id: B, circle1: circ, circle2: aux, branch: 1 }, // touch point 2
     { type: 'segment', a: E, b: A }, // tangent 1
@@ -5059,8 +5150,8 @@ const tangentFromExternal: Rule = (s, ctx) => {
   const out: AnyCommand[] = [];
   if (placeApex) out.push({ type: 'free-point', id: apex, x: 12, y: 0, free: true }); // the external apex, if new — a FREE DOF (ADR-052): its distance from O is unstated, so a later given (∠ADB = α, |AG| = …) can flex it
   out.push(
-    { type: 'midpoint', id: mid, a: center, b: apex }, // centre of the Thales circle on O-apex
-    { type: 'circle-through', id: aux, center: mid, through: center, hidden: true },
+    { type: 'midpoint', id: mid, a: centrePt(ctx, center), b: apex }, // centre of the Thales circle on O-apex
+    { type: 'circle-through', id: aux, center: mid, through: centrePt(ctx, center), hidden: true },
     { type: 'circle-circle-intersection', id: touch, circle1: circ, circle2: aux, branch }, // the touch point (branch 1 = the 2nd tangent from this apex)
     { type: 'segment', a: apex, b: touch }, // the tangent
   );
@@ -5122,7 +5213,7 @@ const tangentLine: Rule = (s, ctx) => {
   // Scope: assumes T is already on the circle (true for the marked-touch-point case); a tangency
   // point not yet on the circle is a follow-up.
   if (naming && have.has(naming[0]) && have.has(naming[1]) && have.has(T)) {
-    return [{ type: 'set-perpendicular', a: up(center), b: T, c: naming[0], d: naming[1], implicit: true }];
+    return [{ type: 'set-perpendicular', a: centrePt(ctx, up(center)), b: T, c: naming[0], d: naming[1], implicit: true }];
   }
 
   // An EXISTING segment tangent at its OWN ENDPOINT — "KB משיק … בנקודה K", where the named line's two
@@ -5133,7 +5224,7 @@ const tangentLine: Rule = (s, ctx) => {
   if (pts && have.has(pts[0]) && have.has(pts[1]) && (pts[0] === T || pts[1] === T)) {
     return [
       { type: 'point-on-circle', id: T, circle: circleId(center) }, // the touch point lies on the circle
-      { type: 'set-perpendicular', a: up(center), b: T, c: pts[0], d: pts[1], implicit: true }, // radius O–T ⟂ the tangent segment (structural, no right-angle mark)
+      { type: 'set-perpendicular', a: centrePt(ctx, up(center)), b: T, c: pts[0], d: pts[1], implicit: true }, // radius O–T ⟂ the tangent segment (structural, no right-angle mark)
     ];
   }
 
@@ -6315,6 +6406,7 @@ function withCarrierMembership(commands: AnyCommand[], s: string, ctx: ParseCont
   );
   const pairs: Id[][] = []; // chord/diameter: an endpoint pair NOT touching the centre
   const rims: Id[] = []; // radius: the non-centre end of a centre→rim carrier ("D on radius OB" → B)
+  const typedCentres = new Set<Id>(); // centre letters the student typed as carrier ends (semantic use, ADR-342)
   for (const c of commands) {
     if (c.type !== 'segment' && c.type !== 'point-on-segment') continue;
     const ab = [up(c.a), up(c.b)];
@@ -6322,6 +6414,10 @@ function withCarrierMembership(commands: AnyCommand[], s: string, ctx: ParseCont
     const centreEnds = ab.filter((id) => centers.has(id));
     if (centreEnds.length === 0) pairs.push(ab);
     else if (isRadius && centreEnds.length === 1) rims.push(ab.find((id) => !centers.has(id))!);
+    // The student TYPED a centre letter as a carrier endpoint («הרדיוס OB», «המשך הקטע KO») — this pass
+    // already commits to reading that end AS the centre, so it is semantic centre-use: promote an unnamed
+    // auto centre to the letter (ADR-342 ruling (b)).
+    for (const t of centreEnds) typedCentres.add(t);
   }
   if (!pairs.length && !rims.length) return commands;
   // WHICH pair is the diameter? Never "the first segment the winner drew" — that is utterance order, so
@@ -6356,7 +6452,11 @@ function withCarrierMembership(commands: AnyCommand[], s: string, ctx: ParseCont
   // A DIAMETER passes through the centre — add the collinearity so the RESOLVED pair is a DIAMETER, not
   // just a chord. (A winner that modelled the diameter itself — the `diameter` rule's kinds, or a
   // centre-anchored collinearity — already bailed above, so no double-add here.)
-  if (diaPair) extra.push({ type: 'set-collinear', a: diaPair[0], b: up(center), c: diaPair[1] });
+  // The collinearity references the centre AS A POINT internally (the student never typed it here) —
+  // route through the real centre id (ADR-342 flavor (b)); when a semantic use promoted the letter, the
+  // replay pre-scan renames the anon id back to it, so both paths converge.
+  if (diaPair) extra.push({ type: 'set-collinear', a: diaPair[0], b: centrePt(ctx, up(center)), c: diaPair[1] });
+  for (const t of typedCentres) extra.unshift(...promoteCentreUse(ctx, t));
   if (!extra.length) return commands;
   return [...extra, ...commands];
 }
@@ -6653,7 +6753,12 @@ function resolveSizeQualifier(s: string, ctx: ParseContext): { s: string; assert
     innerId = small.id;
     assert = { outer: big.id, inner: small.id };
   }
-  const centreOf = (id: string) => sizes.find((x) => x.id === id)!.center;
+  // The rewrite feeds the PARSER, which speaks reference TOKENS — an anonymous centre ('@ctr-P', ADR-342)
+  // is referenced by its letter.
+  const centreOf = (id: string) => {
+    const c = sizes.find((x) => x.id === id)!.center;
+    return c.startsWith('@ctr-') ? c.slice(5) : c;
+  };
   let out = s.replace(new RegExp(HE, 'g'), (_m, pre: string, _ha: string, adj: string) => `${pre}מעגל ${centreOf(adj === 'גדול' ? outerId : innerId)}`);
   out = out.replace(new RegExp(EN, 'gi'), (_m, adj: string) => `circle ${centreOf(/^(small|little)/i.test(adj) ? innerId : outerId)}`);
   return { s: out, ...(assert ? { assert } : {}) };
@@ -6908,7 +7013,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
       // Concentric resolution runs LAST (ADR-244): the other post-passes mint the pair's OUTER id
       // (`circleId(centre)`), and this one redirects/confirms per qualifier or asks to clarify.
       const resolved = withConcentricResolution(withImplicitCircles(withOnCircleMembership(withCarrierMembership(withCarrierSegments(res), s, ctx), s, ctx), ctx), s, ctx);
-      if (Array.isArray(resolved)) return { ok: true, commands: withRadiusSymbolBinding(resolved, s, ctx) };
+      if (Array.isArray(resolved)) return { ok: true, commands: withAnonymousAutoCentres(withMetricCentreBinding(withRadiusSymbolBinding(resolved, s, ctx), ctx)) };
       return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
     }
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).

@@ -225,7 +225,7 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       for (const cmd of r.commands) st.execute(cmd, u);
     }
     const radius = (fig: Derived, center: Id) =>
-      (fig.construction.objects.find((o) => o.kind === 'circle' && (o as { center: Id }).center === center) as { radius: { value: number } }).radius.value;
+      (fig.construction.objects.find((o) => o.kind === 'circle' && [(center as string), `@ctr-${center}`].includes((o as { center: Id }).center)) as { radius: { value: number } }).radius.value; // anon centre (ADR-342)
 
     // Canonical view + 8 resampled "other views" all stay structurally correct.
     for (let press = 0; press <= 8; press++) {

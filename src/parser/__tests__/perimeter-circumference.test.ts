@@ -54,7 +54,7 @@ describe('circle sized by circumference / area (ADR-228 B)', () => {
 });
 
 describe('circle sized by its DIAMETER + the עיגול synonym (ADR-259)', () => {
-  const r5 = [{ type: 'circle', id: 'circle-O', center: 'O', radius: 5, autoCenter: true }];
+  const r5 = [{ type: 'circle', id: 'circle-O', center: '@ctr-O', radius: 5, autoCenter: true }]; // an unnamed circle's centre is anonymous (ADR-342)
   it('מעגל קוטר 10 ⇒ radius 5 (diameter/2)', () => expect(cmds('מעגל קוטר 10')).toEqual(r5));
   it('מעגל בקוטר 10 (the ב prefix) ⇒ radius 5', () => expect(cmds('מעגל בקוטר 10')).toEqual(r5));
   it('English "circle diameter 10" ⇒ radius 5', () => expect(cmds('circle diameter 10')).toEqual(r5));
@@ -67,7 +67,7 @@ describe('circle sized by its DIAMETER + the עיגול synonym (ADR-259)', () =
     expect(c.ok && c.commands.some((k) => k.type === 'point-on-circle')).toBe(true);
   });
   it('a bare עיגול (no size) is a free-radius circle (ADR-052 — no assumed size)', () => {
-    expect(cmds('עיגול')).toEqual([{ type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true, autoCenter: true }]);
+    expect(cmds('עיגול')).toEqual([{ type: 'circle', id: 'circle-O', center: '@ctr-O', radius: 5, freeRadius: true, autoCenter: true }]); // ADR-342
   });
 });
 
