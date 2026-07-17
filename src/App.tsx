@@ -525,6 +525,9 @@ export default function App() {
     const nc = parseNameCenter(utterance, parseCtx());
     if (nc) {
       const res = nameCentre(nc.from, nc.to);
+      // A size-qualified naming («מרכז המעגל הקטן הוא O1», #178) also LOCKS which circle is the small/big
+      // one (the #102 ruling: a qualifier both refers and asserts), so sampling can never swap the name.
+      if (res.ok && nc.assert) useGeoStore.getState().execute({ type: 'set-radius-order', outer: nc.assert.outer, inner: nc.assert.inner }, utterance);
       logDebug({ kind: 'input', utterance, locale, source: 'name-center', rename: nc, result: res.ok ? 'ok' : res.reason });
       if (res.ok) setText('');
       else setRenameNote(t(`input.rename_${res.reason}`, { from: nc.from, to: nc.to }));

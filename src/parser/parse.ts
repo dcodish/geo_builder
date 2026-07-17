@@ -7352,20 +7352,30 @@ export function droppedCompoundRelation(utterance: string, commands: AnyCommand[
  * NAMED is left to a plain rename. A rename of a NAMED centre to a fresh letter is also accepted (the
  * student re-letters the centre) — its source is the sole named centre.
  */
-export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { from: Id; to: Id } | null {
+export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { from: Id; to: Id; assert?: { outer: Id; inner: Id } } | null {
   const s = normalizeUtterance(raw); // orthography boundary (PAR-7) — runs before parse()
   if (!/cent(?:er|re)|מרכז/i.test(s) || !mentionsCircle(s)) return null;
   // Not a creation / other construct carrying a centre word (a circle WITH a radius/through/inscribe/on…).
   if (/inscrib\w*|חסום|חוסם|through|העובר|דרך|radius|רדיוס|\bon\b|על(?=\s|$)|משיק|tangent/i.test(s)) return null;
-  const x = circleCenter(s);
+  // A SIZE QUALIFIER picks WHICH circle's centre is being named ([ADR-342](docs/06-decisions.md#adr-342)
+  // Am. / issue #178 — «מרכז מעגל קטן הוא O1» with TWO unnamed circles escalated to the LLM, which invented
+  // an arbitrary free point). Articles optional — the operator typed the bare «מעגל קטן»; the naming word
+  // מרכז/centre is what marks this a REFERENCE, so the #102 indefinite-creation concern doesn't apply here.
+  const heQ = s.match(/ה?מעגל\s+ה?(גדול|קטן)/);
+  const enQ = s.match(/\bthe\s+(big(?:ger|gest)?|larg(?:er|est)?|small(?:er|est)?|little)\s+circle\b/i);
+  const qualM = heQ ?? enQ;
+  const qual = qualM ? (/גדול|big|larg/i.test(qualM[1]) ? 'outer' : 'inner') : null;
+  // strip the qualifier for the letter extraction, keeping the circle NOUN in the matched language
+  const x = circleCenter(qualM ? s.replace(qualM[0], heQ ? ' מעגל ' : ' the circle ') : s);
   if (!x) return null;
   const X = up(x);
   if ((ctx.points ?? []).map(up).includes(X)) return null; // the naming letter must be FRESH (a taken letter would merge)
   // Just "the centre [of the circle] is X" — nothing geometric remains after the centre/circle words,
-  // the label, copulas, and filler (the nameCenter-rule leftover check).
+  // the label, copulas, the size qualifier, and filler (the nameCenter-rule leftover check).
   const leftover = s
     .replace(/cent(?:er|re)|ה?מרכז/gi, ' ')
     .replace(/circles?|ה?מעגל\w*/gi, ' ')
+    .replace(/ה?(גדול|קטן)(?=\s|$)|\b(big(?:ger|gest)?|larg(?:er|est)?|small(?:er|est)?|little)\b/gi, ' ') // (?=\s|$), never \b — Hebrew letters are not \w (the recorded trap)
     .replace(new RegExp(String.raw`\b${X}\b`, 'gi'), ' ')
     .replace(/\bpoint\b|הוא|היא|הינו|ה?נקוד[הת]|של/gi, ' ')
     .replace(FILLER, ' ')
@@ -7373,6 +7383,22 @@ export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { 
   if (leftover) return null;
   const autos = (ctx.autoCenters ?? []).map(up);
   const named = (ctx.circles ?? []).map(up).filter((c) => !autos.includes(c));
+  // A qualifier over exactly TWO circles resolves via the #102 core: recorded roles first (consistent
+  // forever after), else the drawn sizes — and a first ASSIGNING use returns the locking order (the
+  // operator's #102 ruling: a size qualifier both refers AND asserts), which the App commits as a fact so
+  // sampling can never swap which circle carries the student's name.
+  if (qual && (ctx.circleSizes ?? []).length === 2 && (ctx.concentric ?? []).length === 0) {
+    const sizes = ctx.circleSizes!;
+    const rec = (ctx.radiusOrder ?? []).find((o) => sizes.some((c) => c.id === o.outer) && sizes.some((c) => c.id === o.inner));
+    const [a, b] = sizes;
+    const outerId = rec ? rec.outer : (a.r >= b.r ? a : b).id;
+    const innerId = rec ? rec.inner : (a.r >= b.r ? b : a).id;
+    const pickId = qual === 'outer' ? outerId : innerId;
+    const pick = sizes.find((c) => c.id === pickId)!;
+    const from = pick.center.startsWith('@ctr-') ? pick.center.slice(5) : pick.center; // nameCentre is token-driven
+    if (from === X) return null;
+    return { from, to: X, ...(rec ? {} : { assert: { outer: outerId, inner: innerId } }) };
+  }
   // The centre to rename: the sole AUTO-named centre (the reported case), else — if none is auto — the sole
   // already-NAMED centre being re-lettered. Ambiguous (0 or ≥2 candidates) → defer to the parser.
   const from = autos.length === 1 ? autos[0] : autos.length === 0 && named.length === 1 ? named[0] : null;

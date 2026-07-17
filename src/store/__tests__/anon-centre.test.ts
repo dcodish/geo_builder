@@ -104,6 +104,36 @@ describe('anonymous auto-centres (ADR-342 / #177)', () => {
     if (r1.ok) expect(r1.commands.some((c) => JSON.stringify(c).includes('"P"'))).toBe(true);
   });
 
+  it('naming with TWO circles + a size qualifier resolves the right centre — never an arbitrary LLM point (#178)', () => {
+    // The operator's exact dev sequence (2026-07-17): «שני מעגלים נחתכים» → «מרכז מעגל קטן הוא O1»
+    // escalated to the LLM, which invented {free-point O1 at (3,2)}. parseNameCenter now reads the size
+    // qualifier (articles optional) and resolves via the #102 core.
+    const st = useGeoStore.getState();
+    const r0 = parse('שני מעגלים נחתכים', buildParseCtx(replay([], 0).construction, new Map()));
+    if (!r0.ok) throw new Error('did not parse');
+    st.executeMany(r0.commands, 'שני מעגלים נחתכים');
+    const figA = replay(useGeoStore.getState().facts, 0);
+    const ctxA = buildParseCtx(figA.construction, figA.positions);
+    const nc = parseNameCenter('מרכז מעגל קטן הוא O1', ctxA);
+    expect(nc, 'the qualifier resolves — no LLM escalation').toBeTruthy();
+    // the SMALL circle is the second one (seeded 3.6 vs 5) — its token is P
+    expect(nc!.from).toBe('P');
+    expect(nc!.to).toBe('O1');
+    expect(nc!.assert, 'a first assigning use locks the roles (the #102 ruling)').toEqual({ outer: 'circle-O', inner: 'circle-P' });
+    expect(st.nameCentre(nc!.from, nc!.to).ok).toBe(true);
+    const after = replay(useGeoStore.getState().facts, 0);
+    expect(after.positions.has('O1'), 'O1 is the real centre of the small circle').toBe(true);
+    // the En mirror + the big qualifier, on a fresh figure
+    st.clear();
+    st.executeMany(r0.commands, 'שני מעגלים נחתכים');
+    const figB = replay(useGeoStore.getState().facts, 0);
+    const ncBig = parseNameCenter('the centre of the big circle is Q', buildParseCtx(figB.construction, figB.positions));
+    expect(ncBig?.from).toBe('O');
+    expect(ncBig?.to).toBe('Q');
+    // NO qualifier with two circles → still honestly deferred (ambiguous)
+    expect(parseNameCenter('מרכז המעגל הוא Q', buildParseCtx(figB.construction, figB.positions))).toBeNull();
+  });
+
   it('dot-click promote routes a centre through the naming flow (reveal + circle-id follow)', () => {
     const st = useGeoStore.getState();
     const r0 = parse('מעגל', buildParseCtx(replay([], 0).construction, new Map()));
