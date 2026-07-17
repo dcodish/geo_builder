@@ -97,6 +97,9 @@ export interface ParseContext {
   /** Each circle's CURRENT drawn size — the M4 soft default a first «המעגל הגדול» assignment reads
    *  (what the student is looking at); the emitted `set-radius-order` then locks the roles. */
   circleSizes?: { id: string; center: string; r: number }[];
+  /** Each referenceable centre's drawn x-position — «המעגל הימני/השמאלי» (right/left) resolves a
+   *  POINTING gesture against the drawing the student sees (#188 / ADR-349). */
+  circleXs?: { center: string; x: number }[];
 }
 
 /** The centre of a circle that contains EVERY point in `pts` (preferring `prefer` if it qualifies), else null. */
@@ -241,8 +244,30 @@ const circumscribingRef = (s: string, ctx: ParseContext): string | null => {
   return circleContaining(ctx, run);
 };
 
+/**
+ * «המעגל הימני/השמאלי» / "the right/left circle" (#188 / ADR-349) — a DIRECTIONAL reference to one of
+ * the drawn circles, resolved by the centres' drawn x-positions (a POINTING gesture at the current
+ * drawing, resolved at utterance time — deliberately NOT a standing left/right constraint, which would
+ * forbid legitimate mirrored configurations; once a membership/naming lands on the picked circle, THAT
+ * binding is what persists). Needs ≥2 referenceable centres — with one circle the definite «המעגל»
+ * already resolves. Adjacency to the circle noun per the ADR-244 qualifier discipline («נקודה ימנית»
+ * must never read as a circle qualifier).
+ */
+const directionalCircleRef = (s: string, ctx: ParseContext): string | null => {
+  const he = s.match(/ה?מעגל\s+ה?(ימני|שמאלי)/);
+  const en = s.match(/\bthe\s+(right|left)(?:-hand)?\s+circle\b/i);
+  const dir = he ? (he[1] === 'ימני' ? 'right' : 'left') : en ? (en[1].toLowerCase() as 'right' | 'left') : null;
+  if (!dir) return null;
+  const byTok = new Map<string, number>();
+  for (const c of ctx.circleXs ?? []) if (!byTok.has(c.center)) byTok.set(c.center, c.x);
+  if (byTok.size < 2) return null;
+  let best: { tok: string; x: number } | null = null;
+  for (const [tok, x] of byTok) if (!best || (dir === 'right' ? x > best.x : x < best.x)) best = { tok, x };
+  return best ? best.tok : null;
+};
+
 const resolveCenter = (s: string, ctx: ParseContext): string | null =>
-  circleCenter(s) ?? circumscribingRef(s, ctx) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
+  circleCenter(s) ?? circumscribingRef(s, ctx) ?? directionalCircleRef(s, ctx) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
 
 /** True when the utterance explicitly refers to a circle — named ("circle O") or definite ("the circle" / "המעגל"). */
 const mentionsCircle = (s: string): boolean => /circle|מעגל/i.test(s);
@@ -255,7 +280,7 @@ const mentionsCircle = (s: string): boolean => /circle|מעגל/i.test(s);
  * circle intersection. (Operator principle: with one circle in the diagram you needn't name it.)
  */
 const resolveMentionedCircle = (s: string, ctx: ParseContext): string | null =>
-  circleCenter(s) ?? circumscribingRef(s, ctx) ?? (mentionsCircle(s) && ctx.circles?.length === 1 ? ctx.circles[0] : null);
+  circleCenter(s) ?? circumscribingRef(s, ctx) ?? directionalCircleRef(s, ctx) ?? (mentionsCircle(s) && ctx.circles?.length === 1 ? ctx.circles[0] : null);
 
 /** The crossing point named AFTER the circle word ("… circle [O] at R" / "… [ה]מעגל [O] בנקודה R"),
  *  with the circle's NAME optional so "the circle" / "המעגל" anchors too (operator: one circle → no name). */
@@ -7476,10 +7501,11 @@ export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { 
   // Am. / issue #178 — «מרכז מעגל קטן הוא O1» with TWO unnamed circles escalated to the LLM, which invented
   // an arbitrary free point). Articles optional — the operator typed the bare «מעגל קטן»; the naming word
   // מרכז/centre is what marks this a REFERENCE, so the #102 indefinite-creation concern doesn't apply here.
-  const heQ = s.match(/ה?מעגל\s+ה?(גדול|קטן)/);
-  const enQ = s.match(/\bthe\s+(big(?:ger|gest)?|larg(?:er|est)?|small(?:er|est)?|little)\s+circle\b/i);
+  const heQ = s.match(/ה?מעגל\s+ה?(גדול|קטן|ימני|שמאלי)/);
+  const enQ = s.match(/\bthe\s+(big(?:ger|gest)?|larg(?:er|est)?|small(?:er|est)?|little|right|left)\s+circle\b/i);
   const qualM = heQ ?? enQ;
-  const qual = qualM ? (/גדול|big|larg/i.test(qualM[1]) ? 'outer' : 'inner') : null;
+  const dirQ = qualM && /ימני|שמאלי|^(?:right|left)$/i.test(qualM[1]) ? (/ימני|right/i.test(qualM[1]) ? ('right' as const) : ('left' as const)) : null;
+  const qual = qualM && !dirQ ? (/גדול|big|larg/i.test(qualM[1]) ? 'outer' : 'inner') : null;
   // strip the qualifier for the letter extraction, keeping the circle NOUN in the matched language
   const x = circleCenter(qualM ? s.replace(qualM[0], heQ ? ' מעגל ' : ' the circle ') : s);
   if (!x) return null;
@@ -7490,7 +7516,7 @@ export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { 
   const leftover = s
     .replace(/cent(?:er|re)|ה?מרכז/gi, ' ')
     .replace(/circles?|ה?מעגל\w*/gi, ' ')
-    .replace(/ה?(גדול|קטן)(?=\s|$)|\b(big(?:ger|gest)?|larg(?:er|est)?|small(?:er|est)?|little)\b/gi, ' ') // (?=\s|$), never \b — Hebrew letters are not \w (the recorded trap)
+    .replace(/ה?(גדול|קטן|ימני|שמאלי)(?=\s|$)|\b(big(?:ger|gest)?|larg(?:er|est)?|small(?:er|est)?|little|right|left)\b/gi, ' ') // (?=\s|$), never \b — Hebrew letters are not \w (the recorded trap)
     .replace(new RegExp(String.raw`\b${X}\b`, 'gi'), ' ')
     .replace(/\bpoint\b|הוא|היא|הינו|ה?נקוד[הת]|של/gi, ' ')
     .replace(FILLER, ' ')
@@ -7498,6 +7524,20 @@ export function parseNameCenter(raw: string, ctx: ParseContext = NO_CONTEXT): { 
   if (leftover) return null;
   const autos = (ctx.autoCenters ?? []).map(up);
   const named = (ctx.circles ?? []).map(up).filter((c) => !autos.includes(c));
+  // A DIRECTIONAL qualifier (#188 / ADR-349) — «מרכז המעגל הימני הוא O1» — picks the circle by its
+  // drawn centre x-position (a pointing gesture at the current drawing). No standing lock is asserted:
+  // the RENAME ITSELF is the permanent binding (once the circle carries the student's name, sampling
+  // cannot un-name it), unlike a size qualifier, whose big/small claim needs the radius-order record.
+  if (dirQ && (ctx.circleXs ?? []).length >= 2 && (ctx.concentric ?? []).length === 0) {
+    const byTok = new Map<string, number>();
+    for (const c of ctx.circleXs!) if (!byTok.has(c.center)) byTok.set(c.center, c.x);
+    if (byTok.size >= 2) {
+      let best: { tok: string; x: number } | null = null;
+      for (const [tok, x] of byTok) if (!best || (dirQ === 'right' ? x > best.x : x < best.x)) best = { tok, x };
+      if (best && best.tok !== X) return { from: best.tok, to: X };
+    }
+    return null; // degenerate (shared token) — defer rather than guess
+  }
   // A qualifier over exactly TWO circles resolves via the #102 core: recorded roles first (consistent
   // forever after), else the drawn sizes — and a first ASSIGNING use returns the locking order (the
   // operator's #102 ruling: a size qualifier both refers AND asserts), which the App commits as a fact so

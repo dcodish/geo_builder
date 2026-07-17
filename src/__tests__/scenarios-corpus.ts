@@ -5319,6 +5319,24 @@ export const SCENARIOS: Scenario[] = [
       expect(circles.some((c) => (c as { autoCenter?: boolean }).autoCenter), 'no hidden auto centre remains').toBe(false);
     },
   },
+  {
+    id: 'chord-in-the-right-circle',
+    title: 'issue #188 (hqxbjh0x): «מיתר DF במעגל הימני» resolves the RIGHT circle deterministically — a pointing gesture, no LLM',
+    guards:
+      'prod session hqxbjh0x: with two unnamed intersecting circles the student’s first instinct — «מיתר DF במעגל הימני» — had no deterministic rule (directional qualifiers were missing from the ADR-244 family), so it burned a paid LLM call that resolved the circle by prompt luck. ADR-349: «המעגל הימני/השמאלי» / right|left resolve by the circles’ drawn centre x-positions at the resolveCenter/resolveMentionedCircle chokepoints (every circle-consuming rule at once), deliberately as a POINTING gesture (no standing side constraint — the landed membership is what persists).',
+    steps: ['שני מעגלים נחתכים', 'מיתר DF במעגל הימני'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const circles = [...fig.circles.entries()].filter(([id]) => !id.startsWith('~'));
+      expect(circles.length).toBe(2);
+      // D,F were bound at UTTERANCE time to the then-rightmost circle (that pick is locked at the
+      // command level in directional-circle.test.ts). Across every DISPLAYED config they stay with
+      // THAT circle — the pointing-gesture semantics: no standing side lock, so a resampled seed may
+      // legitimately swap which circle is drawn further right (ADR-349).
+      const carrier = circles.find(([, c]) => (['D', 'F'] as Id[]).every((p) => Math.abs(dist(at(fig, p), c.center) - c.r) < 1e-6));
+      expect(carrier, 'D and F ride one common circle in every config').toBeDefined();
+    },
+  },
 ];
 
 /**
