@@ -1727,6 +1727,24 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       let rb = seedRadiusOf(cb, pos);
       const d = dist(pa, pb);
       const otherPts = (self: Id) => [...pos.entries()].filter(([id]) => id !== self).map(([, v]) => v);
+      if (cmd.relation === 'any') {
+        // The UNSTATED mutual position (#196 Am., bare «שני מעגלים»): seat the DEFAULT per the cyclable
+        // VARIANT — 0 intersecting / 1 disjoint / 2 contained — so "show another configuration" steps
+        // through the cases (ADR-052/M4). No requirement is recorded: nothing was stated, every case is
+        // a valid drawing. Deterministic per variant (stable replays).
+        const v = ((cmd.variant ?? 0) % 3 + 3) % 3;
+        const mv = movable(cb) ? cb : movable(ca) ? ca : null;
+        if (!mv) break;
+        if (v === 2 && cb.radius.via === 'free' && rb >= ra * 0.8) {
+          const ib = objects.findIndex((o) => o.id === cb.id);
+          rb = ra * 0.45;
+          objects[ib] = { ...cb, radius: { via: 'free', value: rb } };
+        }
+        const around = mv === cb ? pa : pb;
+        const gapT = v === 0 ? (ra + rb) * 0.62 : v === 1 ? (ra + rb) * 1.45 : Math.max(0.1, ra - rb) * 0.4;
+        moveCentre(mv, seedSpotAround(around, gapT, otherPts(mv.center)));
+        break;
+      }
       if (cmd.relation === 'disjoint') {
         if (d > (ra + rb) * 1.05) break; // already clearly apart — keep the drawing still (stability)
         const mv = movable(cb) ? cb : movable(ca) ? ca : null;
@@ -1762,7 +1780,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // that no `avoid` tangent occupies, so the default config lands right without a search (the solver
       // then polishes via the radius-⟂-tangent constraints). A kind-less first tangent (no avoid) is left
       // to the solver exactly as before — byte-identical behaviour for the existing ADR-239 form.
-      if (!cmd.kind && !(cmd.avoid && cmd.avoid.length > 0)) break;
+      // (#197 Am.) ALWAYS seat — a kind-less tangent's basin is the cyclable VARIANT (all 4).
       const c1 = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle1);
       const c2 = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle2);
       const p1 = c1 && pos.get(c1.center);
@@ -1797,7 +1815,8 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       const free = candidates.filter(
         (c) => !taken.some((t) => dist(t, c.t1) < Math.max(0.25 * r1, 0.3) || dist(t, c.t2) < Math.max(0.25 * r2, 0.3)),
       );
-      const pick = free[0] ?? candidates[0];
+      const v = ((cmd.variant ?? 0) % 4 + 4) % 4;
+      const pick = free.length ? free[v % free.length] : candidates.length ? candidates[v % candidates.length] : undefined;
       if (!pick) break;
       const seatTheta = (rider: Id, centre: Vec, touch: Vec): void => {
         const i = objects.findIndex((o) => o.id === rider && o.kind === 'on-circle');

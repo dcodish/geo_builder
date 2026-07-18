@@ -103,6 +103,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "set-perpendicular",
       "set-perpendicular",
       "segment",
+      "common-tangent",
     ],
     "he": [
       "circle",
@@ -112,6 +113,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "set-perpendicular",
       "set-perpendicular",
       "segment",
+      "common-tangent",
     ],
   },
   "AB is an external common tangent of the two circles": {
@@ -1534,6 +1536,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle-through",
       "foot",
       "foot",
+    ],
+  },
+  "two circles": {
+    "en": [
+      "circle",
+      "circle",
+      "set-circle-position",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "set-circle-position",
     ],
   },
   "two circles intersect at A and B": {

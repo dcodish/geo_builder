@@ -1046,7 +1046,10 @@ export type Command =
   // nothing to drive: the givens verifier flags a violating config (figure.v.circlesDisjoint /
   // figure.v.circleContained), so `meetsRequirements` (sampler / "show another") skips it; apply only
   // improves the DEFAULT (re-seats a free centre / free radius seed onto the stated side).
-  | { type: 'set-circle-position'; relation: 'disjoint' | 'contained'; a: Id; b: Id }
+  | { type: 'set-circle-position'; relation: 'disjoint' | 'contained' | 'any'; a: Id; b: Id; variant?: number }
+  // relation 'any' (bare «שני מעגלים», #196 Am.): the mutual position is UNSTATED — a cyclable VARIANT
+  // (0 intersecting / 1 disjoint / 2 contained) "show another configuration" steps through (ADR-052/M4);
+  // no requirement is recorded, apply only seats the default per variant.
   // A COMMON tangent's configuration record (#197): the tangent touching `circle1` at `a` and `circle2`
   // at `b`. `kind` (when the student said «חיצוני»/«פנימי» / external/internal) is a REQUIREMENT — the
   // two centres must lie on the SAME side of line a-b (external) or OPPOSITE sides (internal); unstated ⇒
@@ -1054,7 +1057,7 @@ export type Command =
   // common tangents of the same pair (the #142 repetition pattern: a repeated «משיק משותף חיצוני» takes
   // the OTHER tangent) — the new touches must stay distinct from each avoided one, and apply seeds the
   // touch riders' θ into an untaken analytic tangent basin so the default lands right.
-  | { type: 'common-tangent'; a: Id; b: Id; circle1: Id; circle2: Id; kind?: 'external' | 'internal'; avoid?: Id[] };
+  | { type: 'common-tangent'; a: Id; b: Id; circle1: Id; circle2: Id; kind?: 'external' | 'internal'; avoid?: Id[]; variant?: number }; // variant: WHICH tangent basin — kind-less cycles all 4, kind-stated cycles the 2 of its kind (ADR-052/M4)
 
 /**
  * A measure's value: either a literal number, or `coef · var` where `var` is a

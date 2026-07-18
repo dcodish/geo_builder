@@ -4760,6 +4760,29 @@ const twoCirclesPosition: Rule = (s, ctx) => {
   return cmds;
 };
 
+/**
+ * BARE «שני מעגלים» / "two circles" (#196 Am.): the mutual position is UNSTATED — two circles whose
+ * configuration is a cyclable VARIANT (intersecting / disjoint / contained) that "show another
+ * configuration" steps through (ADR-052: an unstated discrete choice is an explorable DOF, never a
+ * frozen default). Registered AFTER the family rules; the leftover guard defers anything non-bare
+ * («שני מעגלים נחתכים/זרים/משיקים…») to its owner.
+ */
+const twoCirclesBare: Rule = (s, ctx) => {
+  if (!/שני\s+מעגלים|\btwo\s+circles\b/i.test(s)) return null;
+  const leftover = s
+    .replace(/שני\s+מעגלים|\btwo\s+circles\b|נתונים|נתון|יש/gi, ' ')
+    .replace(FILLER, ' ')
+    .trim();
+  if (leftover) return null;
+  const c1 = 'O';
+  const c2 = freeLabel([c1, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
+  return [
+    { type: 'circle', id: circleId(c1), center: c1, radius: RADIUS_DEFAULT, freeRadius: true, autoCenter: true, ifAbsent: true },
+    { type: 'circle', id: circleId(c2), center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, autoCenter: true, ifAbsent: true },
+    { type: 'set-circle-position', relation: 'any', a: circleId(c1), b: circleId(c2), variant: 0 },
+  ];
+};
+
 const twoCirclesMeet: Rule = (s, ctx) => {
   if (!/\bcircles\b|שני\s+מעגל|מעגלים/i.test(s)) return null; // two circles being introduced (plural)
   if (!(INTERSECT_KW.test(s) || /נחתכ|נפגש|מפגש|\bmeets?\b/i.test(s))) return null;
@@ -5381,10 +5404,10 @@ const commonTangent: Rule = (s, ctx) => {
       { type: 'set-perpendicular', a: centrePt(ctx, c1), b: A, c: A, d: B, implicit: true }, // radius c1→A ⟂ the tangent
       { type: 'set-perpendicular', a: centrePt(ctx, c2), b: B, c: A, d: B, implicit: true }, // radius c2→B ⟂ the tangent
       { type: 'segment', a: A, b: B },
-      // The configuration record (#197): apply seeds the touches into an analytic tangent basin of the
-      // stated kind that no avoided tangent occupies; the verifier + meetsRequirements gate the rest.
-      // A kind-less single tangent with no avoid emits nothing extra — byte-identical to ADR-239.
-      ...(kind || avoid.length ? [{ type: 'common-tangent', a: A, b: B, circle1: id1, circle2: id2, ...(kind ? { kind } : {}), ...(avoid.length ? { avoid } : {}) } as AnyCommand] : []),
+      // The configuration record (#197): apply seeds the touches into an analytic tangent basin —
+      // WHICH basin is the cyclable VARIANT (#197 Am.: a kind-less tangent cycles all 4, a stated kind
+      // its 2 — "show another" steps them); the verifier + meetsRequirements gate kind/distinctness.
+      { type: 'common-tangent', a: A, b: B, circle1: id1, circle2: id2, variant: 0, ...(kind ? { kind } : {}), ...(avoid.length ? { avoid } : {}) } as AnyCommand,
     );
     prevTouches = [A, B];
   }
@@ -6543,6 +6566,7 @@ export const RULES: Rule[] = [
   secantFromExternal, // "from external point E a line cuts the circle at A,B" — before the generic intersections
   twoCirclesPosition, // #196: two disjoint / contained circles — a set-circle-position requirement
   twoCirclesMeet, // "two circles intersect at A and B" — create both circles + both intersection points
+  twoCirclesBare, // #196 Am.: bare «שני מעגלים» — the mutual position is a cyclable variant
   circleCircleIntersection, // two circles cross — before the generic line∩line intersection
   extendOntoCircle, // "המשך AC חותך מעגל P בנקודה D" — DIRECTIONAL extension onto a circle (D beyond the 2nd letter), before the order-agnostic lineMeetsCircle
   lineCutsCircleTwice, // "AO cuts the circle at C and D" — a named line crossing the circle at BOTH roots; before lineMeetsCircle (one crossing)

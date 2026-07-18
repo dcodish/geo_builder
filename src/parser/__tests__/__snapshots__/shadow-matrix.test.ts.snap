@@ -1334,6 +1334,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "two circles",
+    "winner": "twoCirclesBare",
+  },
+  {
+    "lang": "he",
+    "text": "שני מעגלים",
+    "winner": "twoCirclesBare",
+  },
+  {
+    "lang": "en",
     "text": "two disjoint circles",
     "winner": "twoCirclesPosition",
   },

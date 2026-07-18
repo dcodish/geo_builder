@@ -237,6 +237,7 @@ export function checkGivens(
   // circles pinned/sized so the relation cannot hold) surfaces amber here.
   for (const cmd of commands) {
     if (cmd.type !== 'set-circle-position') continue;
+    if (cmd.relation === 'any') continue; // bare «שני מעגלים» — nothing stated, every case valid (#196 Am.)
     const a = circles.get(cmd.a);
     const b = circles.get(cmd.b);
     if (!a || !b) continue;

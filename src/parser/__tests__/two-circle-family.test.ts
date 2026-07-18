@@ -12,6 +12,7 @@ import { parse, buildParseCtx, droppedWordRelations } from '@/parser';
 import { replay } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
 import type { AnyCommand } from '@/engine';
+import { withVariant, variantCountOf } from '@/engine/variants';
 
 function buildFacts(steps: string[]): Fact[] {
   const facts: Fact[] = [];
@@ -89,6 +90,52 @@ describe('ADR-358 (#196) — two circles: mutual position', () => {
     expect(Object.values(fig.status).every((s) => s === 'ok')).toBe(true);
     const A = fig.positions.get('A')!;
     for (const c of fig.circles.values()) expect(d(A, c.center), 'A on the circle').toBeCloseTo(c.r, 3);
+  });
+});
+
+describe('#196 Am. — bare «שני מעגלים»: the mutual position is a cyclable VARIANT', () => {
+  const classify = (fig: ReturnType<typeof replay>): string => {
+    const [a, b] = [...fig.circles.values()];
+    const gap = d(a.center, b.center);
+    if (gap > a.r + b.r) return 'disjoint';
+    if (gap + Math.min(a.r, b.r) < Math.max(a.r, b.r)) return 'contained';
+    return 'intersecting';
+  };
+  for (const u of ['שני מעגלים', 'two circles']) {
+    it(`bare «${u}» builds two circles and "show another" TOGGLES the cases`, () => {
+      const facts = buildFacts([u]);
+      const fig = replay(facts);
+      expect(Object.values(fig.status).every((s) => s === 'ok')).toBe(true);
+      expect(fig.violations).toEqual([]);
+      expect([...fig.circles.values()]).toHaveLength(2);
+      // Cycle the variant (what searchAnotherView's composite step applies) — the position class changes.
+      const seen = new Set<string>();
+      for (const v of [0, 1, 2]) {
+        const stepped = facts.map((f) => (f.cmd.type === 'set-circle-position' ? { ...f, cmd: withVariant(f.cmd, v) } : f));
+        seen.add(classify(replay(stepped)));
+      }
+      expect(seen, 'the three mutual-position cases are all reachable').toEqual(new Set(['intersecting', 'disjoint', 'contained']));
+    });
+  }
+});
+
+describe('#197 Am. — a kind-less common tangent TOGGLES its basin', () => {
+  it('variant cycling flips the tangent between external and internal sides', () => {
+    const facts = buildFacts(['שני מעגלים זרים', 'AB משיק משותף לשני המעגלים']);
+    const ct = facts.find((f) => f.cmd.type === 'common-tangent');
+    expect(ct, 'the kind-less tangent now carries the cyclable record').toBeTruthy();
+    expect(variantCountOf(ct!.cmd)).toBe(4);
+    const sideProduct = (v: number): number => {
+      const stepped = facts.map((f) => (f.cmd.type === 'common-tangent' ? { ...f, cmd: withVariant(f.cmd, v) } : f));
+      const fig = replay(stepped);
+      const A = fig.positions.get('A')!, B = fig.positions.get('B')!;
+      const [c1, c2] = [...fig.circles.values()];
+      const side = (p: { x: number; y: number }) => (B.x - A.x) * (p.y - A.y) - (B.y - A.y) * (p.x - A.x);
+      return side(c1.center) * side(c2.center);
+    };
+    const signs = new Set([0, 1, 2, 3].map((v) => Math.sign(sideProduct(v))));
+    expect(signs.has(1), 'an external basin (same side) is reachable').toBe(true);
+    expect(signs.has(-1), 'an internal basin (opposite sides) is reachable').toBe(true);
   });
 });
 
