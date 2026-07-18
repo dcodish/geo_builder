@@ -630,7 +630,7 @@ export default function App() {
     // exist; say so plainly instead of escalating or grinding an impossible solve.
     if (!r.ok && r.reason === 'tangents-exhausted') {
       logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `tangents-exhausted:${r.kind}` });
-      setInputNote(t(r.kind === 'external' ? 'input.tangentsExhaustedExternal' : r.kind === 'internal' ? 'input.tangentsExhaustedInternal' : 'input.tangentsExhaustedAny'));
+      setInputNote(t(r.hint === 'at-touch' ? 'input.tangentsExhaustedTouch' : r.kind === 'external' ? 'input.tangentsExhaustedExternal' : r.kind === 'internal' ? 'input.tangentsExhaustedInternal' : 'input.tangentsExhaustedAny'));
       setBusy(false);
       return;
     }

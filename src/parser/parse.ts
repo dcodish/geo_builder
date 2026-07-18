@@ -34,7 +34,7 @@ export type ParseResult =
   | { ok: false; reason: 'ambiguous-circle'; center: string }
   // Every common tangent of the requested kind is already drawn (two of a kind / four in all) — a
   // further one does not exist; refuse deterministically, never a solver grind (#197 Am. 3).
-  | { ok: false; reason: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any' };
+  | { ok: false; reason: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch' };
 
 /**
  * Figure context the parser may consult to resolve implicit references — chiefly
@@ -98,6 +98,9 @@ export interface ParseContext {
    *  (`circle-O|circle-P`), recognised from the paired radius-⟂-tangent constraints — a repeated
    *  «משיק משותף» passes them as `avoid` so it takes an untaken tangent. */
   commonTangents?: Record<string, { pair: [string, string]; kind?: 'external' | 'internal' }[]>;
+  /** Every circle pair's mutual position (drawn seed, tangency tol-based) — the two-touch tangent
+   *  capacity follows it (#197 Am. 4). */
+  circlePairPositions?: Record<string, 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained'>;
   /** Recorded SIZE roles between circles (`set-radius-order`, concentric or not — issue #102): lets
    *  «המעגל הגדול/הקטן» resolve consistently once assigned. */
   radiusOrder?: { outer: string; inner: string }[];
@@ -169,7 +172,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any' };
+type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch' };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -5397,8 +5400,18 @@ const commonTangent: Rule = (s, ctx) => {
   // an impossible ⟂ system into a cryptic over-constraint (the operator's "crash": a 5th tangent after
   // all four were drawn burned the recruiter and blamed an unrelated old constraint).
   const priorOfKind = kind ? priorEntries.filter((e) => e.kind === kind).length : priorEntries.length;
-  const capacity = kind ? 2 : 4;
-  if (priorOfKind + wantPairs > capacity) return { clarify: 'tangents-exhausted', kind: kind ?? 'any' };
+  // CAPACITY follows the pair's mutual position (#197 Am. 4 — the operator's tangent-circles session):
+  // disjoint circles have 4 two-touch tangents (2 per kind); externally tangent or intersecting circles
+  // have only the 2 externals (the remaining common tangent passes THROUGH the touch point — the
+  // at-form «המשיק המשותף בנקודה M» — never a two-touch construction); internally tangent/contained: 0.
+  const position = ctx.circlePairPositions?.[priorKey];
+  const extCap = position === 'int-tangent' || position === 'contained' ? 0 : 2;
+  const intCap = position === undefined || position === 'disjoint' ? 2 : 0;
+  const capacity = kind === 'external' ? extCap : kind === 'internal' ? intCap : extCap + intCap;
+  if (priorOfKind + wantPairs > capacity) {
+    const touchy = position === 'ext-tangent' || position === 'int-tangent';
+    return { clarify: 'tangents-exhausted', kind: kind ?? 'any', ...(touchy ? { hint: 'at-touch' as const } : {}) };
+  }
   const prior = priorEntries.flatMap((e) => e.pair);
   const out: AnyCommand[] = [...mk];
   let prevTouches: string[] = [];
@@ -5412,13 +5425,15 @@ const commonTangent: Rule = (s, ctx) => {
     out.push(
       { type: 'point-on-circle', id: A, circle: id1, softPair: true },
       { type: 'point-on-circle', id: B, circle: id2, softPair: true },
+      // The configuration record (#197) comes BEFORE the ⟂ constraints (#197 Am. 4, measured): apply
+      // seats the touches into an analytic tangent basin — WHICH basin is the cyclable VARIANT — so the
+      // driven ⟂ solves below start at residual ≈ 0 and verify instantly. Emitted AFTER them, the ⟂s'
+      // joint solve ground the recruiter from default θs for 15–30 s on tangency-coupled circles (the
+      // operator's slow second tangent). The verifier + meetsRequirements gate kind/distinctness.
+      { type: 'common-tangent', a: A, b: B, circle1: id1, circle2: id2, variant: 0, ...(kind ? { kind } : {}), ...(avoid.length ? { avoid } : {}) } as AnyCommand,
       { type: 'set-perpendicular', a: centrePt(ctx, c1), b: A, c: A, d: B, implicit: true }, // radius c1→A ⟂ the tangent
       { type: 'set-perpendicular', a: centrePt(ctx, c2), b: B, c: A, d: B, implicit: true }, // radius c2→B ⟂ the tangent
       { type: 'segment', a: A, b: B },
-      // The configuration record (#197): apply seeds the touches into an analytic tangent basin —
-      // WHICH basin is the cyclable VARIANT (#197 Am.: a kind-less tangent cycles all 4, a stated kind
-      // its 2 — "show another" steps them); the verifier + meetsRequirements gate kind/distinctness.
-      { type: 'common-tangent', a: A, b: B, circle1: id1, circle2: id2, variant: 0, ...(kind ? { kind } : {}), ...(avoid.length ? { avoid } : {}) } as AnyCommand,
     );
     prevTouches = [A, B];
   }
@@ -7711,7 +7726,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
     }
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).
     if (res.clarify === 'ambiguous-angle') return { ok: false, reason: 'ambiguous-angle', vertex: res.vertex };
-    if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind };
+    if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}) };
     return { ok: false, reason: 'ambiguous-circle', center: res.center };
   }
   return { ok: false, reason: 'not-handled' };

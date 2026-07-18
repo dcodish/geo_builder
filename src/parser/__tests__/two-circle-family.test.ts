@@ -176,6 +176,43 @@ describe('#197 Am. 3 — מבחוץ/מבפנים synonyms + tangent EXHAUSTION r
   });
 });
 
+describe('#197 Am. 4 — TANGENT circles: capacity follows the mutual position', () => {
+  it("the operator's sequence: on «שני מעגלים משיקים מבחוץ», two «משיק משותף» build and the THIRD refuses fast with the at-touch hint", () => {
+    // Externally tangent circles have only TWO separate two-touch common tangents — the third common
+    // tangent passes THROUGH the touch point (the at-form). Session 2026-07-18 18:52: the third
+    // request ground the solver instead.
+    const facts = buildFacts(['שני מעגלים משיקים מבחוץ', 'משיק משותף', 'משיק משותף']);
+    const fig = replay(facts);
+    expect(Object.values(fig.status).every((s) => s === 'ok'), 'two tangents build').toBe(true);
+    const t0 = Date.now();
+    const r = parse('משיק משותף', buildParseCtx(fig.construction, fig.positions));
+    expect(Date.now() - t0).toBeLessThan(500);
+    expect(!r.ok && r.reason === 'tangents-exhausted' && r.hint === 'at-touch').toBe(true);
+  });
+
+  it('perf lock (#197 Am. 4): the second tangent on tangent circles builds within budget (was 38 s)', () => {
+    // The record precedes the ⟂ constraints, so the driven solves start at the analytic basin
+    // (residual ≈ 0). Regression guard: a cold fold of the full sequence stays well under a second.
+    const t0 = Date.now();
+    const fig = replay(buildFacts(['שני מעגלים משיקים מבחוץ', 'משיק משותף', 'משיק משותף']));
+    expect(Object.values(fig.status).every((s) => s === 'ok')).toBe(true);
+    expect(Date.now() - t0, 'cold fold budget').toBeLessThan(3000);
+  });
+
+  it('INTERSECTING circles: the two externals build, an internal or a third refuses', () => {
+    const facts = buildFacts(['שני מעגלים נחתכים']);
+    const fig = replay(facts);
+    const ctx = buildParseCtx(fig.construction, fig.positions);
+    const rInt = parse('משיק משותף פנימי', ctx);
+    expect(!rInt.ok && rInt.reason === 'tangents-exhausted', 'no internal tangents exist for intersecting circles').toBe(true);
+    const facts2 = buildFacts(['שני מעגלים נחתכים', 'משיק משותף', 'משיק משותף']);
+    const fig2 = replay(facts2);
+    expect(Object.values(fig2.status).every((s) => s === 'ok'), 'the two externals build').toBe(true);
+    const r3 = parse('משיק משותף', buildParseCtx(fig2.construction, fig2.positions));
+    expect(!r3.ok && r3.reason === 'tangents-exhausted').toBe(true);
+  });
+});
+
 describe('ADR-360 (#210) — the WORD-relation honesty gate', () => {
   it('a stated זרים not encoded in the commands is reported dropped', () => {
     const bare: AnyCommand[] = [

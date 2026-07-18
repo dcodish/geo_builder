@@ -54,6 +54,39 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // idempotent construct reuse
     tangentAuxes: construction.objects.flatMap((o) => (o.kind === 'circle' && o.id.startsWith('tanaux-') ? [o.id] : [])), // existing Thales tangent-aux circles — a 2nd single tangent from the SAME apex takes the OTHER branch (issue #142)
     polygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])), // definite "the quad" binds to the existing one
+    // Every circle pair's MUTUAL POSITION (from the drawn seed, tangency tol-based) — the two-touch
+    // common-tangent CAPACITY depends on it (#197 Am. 4): disjoint 4, externally tangent / intersecting
+    // 2 (the remaining tangents pass through the touch / don't exist), internally tangent or contained 0.
+    circlePairPositions: (() => {
+      const cs = construction.objects.filter((o): o is Extract<typeof o, { kind: 'circle' }> => o.kind === 'circle' && !o.center.startsWith('~'));
+      const out: Record<string, 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained'> = {};
+      const radiusOf = (c: (typeof cs)[number]): number | null => {
+        if (c.radius.via === 'through') {
+          const a = positions.get(c.center);
+          const t = positions.get(c.radius.point);
+          return a && t ? Math.hypot(a.x - t.x, a.y - t.y) : null;
+        }
+        return 'value' in c.radius ? c.radius.value : null;
+      };
+      for (let i = 0; i < cs.length; i++)
+        for (let j = i + 1; j < cs.length; j++) {
+          const p1 = positions.get(cs[i].center);
+          const p2 = positions.get(cs[j].center);
+          const r1 = radiusOf(cs[i]);
+          const r2 = radiusOf(cs[j]);
+          if (!p1 || !p2 || r1 === null || r2 === null) continue;
+          const d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+          const tol = 0.03 * (r1 + r2);
+          const key = [cs[i].id, cs[j].id].sort().join('|');
+          out[key] =
+            Math.abs(d - (r1 + r2)) <= tol ? 'ext-tangent'
+            : d > r1 + r2 ? 'disjoint'
+            : Math.abs(d - Math.abs(r1 - r2)) <= tol ? 'int-tangent'
+            : d > Math.abs(r1 - r2) ? 'intersecting'
+            : 'contained';
+        }
+      return out;
+    })(),
     // Existing COMMON tangents per circle pair (#197): touch pairs (A on c1, B on c2) recognised by the
     // paired radius-⟂-tangent constraints the common-tangent lowering emits — a REPEATED «משיק משותף»
     // must take an untaken tangent, so the rule passes these as its `avoid` list.
