@@ -11,7 +11,14 @@ import type { ParseContext } from '../parse';
 const ctx: ParseContext = { circles: ['O'], points: ['A', 'B', 'C', 'F', 'O'], circleMembers: [{ id: 'circle-O', center: 'O', points: ['F'] }] };
 
 describe('parser — diameter from a point (bare, no cut clause)', () => {
-  for (const u of ['קוטר מנקודה F', 'הקוטר מנקודה F', 'קוטר מ-F', 'הקוטר היוצא מנקודה F', 'diameter from F']) {
+  // The THROUGH family (#201, operator ruling 2026-07-18: «קוטר ב/מנקודה A» = the diameter THROUGH the
+  // point): «[ה]עובר בנקודה», the bare locative «בנקודה», the stacked-prefix slip «במנקודה», «דרך»,
+  // a leading imperative («הוסף»/"add"/"draw"), and the En "through" mirrors — all the same construct.
+  for (const u of [
+    'קוטר מנקודה F', 'הקוטר מנקודה F', 'קוטר מ-F', 'הקוטר היוצא מנקודה F', 'diameter from F',
+    'קוטר העובר בנקודה F', 'הוסף קוטר העובר בנקודה F', 'קוטר בנקודה F', 'קוטר במנקודה F',
+    'קוטר דרך F', 'קוטר דרך נקודה F', 'diameter through F', 'add a diameter through the point F',
+  ]) {
     it(`"${u}" parses to a diameter with an auto-named far endpoint`, () => {
       const r = parse(u, ctx);
       expect(r.ok, `"${u}" should parse`).toBe(true);

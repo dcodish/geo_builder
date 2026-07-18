@@ -202,6 +202,29 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'diameter-through-point-imperative',
+    title: '«הוסף קוטר העובר בנקודה A» — the THROUGH phrasing + a leading imperative reach the ADR-270 diameter (#201)',
+    guards:
+      'Prod log-triage 2026-07-17 (LIVE row): the construct existed («קוטר מנקודה F», ADR-270) but the THROUGH wording «העובר בנקודה» + the «הוסף» imperative fell to the LLM → not-handled. Operator ruling 2026-07-18: «קוטר ב/מנקודה A» means the diameter THROUGH A — one construct, more phrasings, widened at the rule\'s own from-marker (the ADR-3D-026 phrasing-class discipline).',
+    steps: ['מעגל O', 'A על המעגל', 'הוסף קוטר העובר בנקודה A'],
+    check(fig) {
+      allStepsOk(fig);
+      const O = fig.circles.get('circle-O')!;
+      const A = at(fig, 'A');
+      expect(dist(A, O.center), 'A on the circle').toBeCloseTo(O.r, 3);
+      // The antipode is a fresh auto-named point, diametrically opposite A — find the drawn diameter
+      // segment (the full-width segment with A as an endpoint; the `diameter` command lowers to it).
+      const dia = fig.construction.objects.find(
+        (o) => o.kind === 'segment' && (o.a === 'A' || o.b === 'A') && dist(at(fig, o.a), at(fig, o.b)) > 1.9 * O.r,
+      );
+      expect(dia, 'a diameter through A drawn').toBeTruthy();
+      if (!dia || dia.kind !== 'segment') return;
+      const far = dia.a === 'A' ? dia.b : dia.a;
+      expect(dist(at(fig, far), O.center), 'the far end on the circle').toBeCloseTo(O.r, 3);
+      expect(dist(A, at(fig, far)), 'a full diameter').toBeCloseTo(2 * O.r, 3);
+    },
+  },
+  {
     id: 'polygon-noun-binds-existing-quad',
     title: '«המצולע חסום במעגל» — the GENERIC polygon noun binds THE existing polygon (#185 row 1)',
     guards:

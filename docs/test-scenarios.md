@@ -22,6 +22,10 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `diameter-through-point-imperative` — «הוסף קוטר העובר בנקודה A»: the THROUGH phrasing + a leading imperative reach the ADR-270 diameter (#201, ADR-353)
+Prod log-triage 2026-07-17 (LIVE, 1 user): the construct existed («קוטר מנקודה F», ADR-270) but the THROUGH wording fell to the LLM → not-handled. Operator ruling 2026-07-18: «קוטר ב/מנקודה A» means the diameter THROUGH A — one construct, more phrasings, widened at the rule's own from-marker (the ADR-3D-026 phrasing-class discipline): «[ה]עובר בנקודה», the bare locative «בנקודה», the stacked-prefix slip «במנקודה», «דרך [נקודה]», En "through [the point]", and a tolerated leading imperative («הוסף», "add/draw"). Class test `diameter-from-point.test.ts` (13 forms + the no-theft set); catalog +1.
+
+
 ### The #185 nine-parser-gap batch (prod log-triage 2026-07-17, operator-approved ALL NINE — ADR-350/ADR-351)
 Eleven scenarios, one per approved row (row 2 and row 7 carry two forms each), all verbatim prod utterances:
 

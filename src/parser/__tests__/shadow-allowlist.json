@@ -17,6 +17,7 @@
     "concentricCircles → circle",
     "cornerTangentCircle → tangentLine",
     "diameterCutsSegment → diameter",
+    "diameterFromPoint → circle",
     "extendOntoCircle → lineMeetsCircle",
     "incircle → circumcircle",
     "inscribedPolygon → (anon)",
