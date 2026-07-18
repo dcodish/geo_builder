@@ -34,7 +34,7 @@ export type ParseResult =
   | { ok: false; reason: 'ambiguous-circle'; center: string }
   // Every common tangent of the requested kind is already drawn (two of a kind / four in all) — a
   // further one does not exist; refuse deterministically, never a solver grind (#197 Am. 3).
-  | { ok: false; reason: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch' };
+  | { ok: false; reason: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' };
 
 /**
  * Figure context the parser may consult to resolve implicit references — chiefly
@@ -174,7 +174,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch' };
+type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -5490,10 +5490,14 @@ const commonTangent: Rule = (s, ctx) => {
     // refusal is only for a request beyond THAT too (or an explicit חיצוני beyond the two externals).
     const touch = touchy ? ctx.circlePairTouches?.[[id1, id2].sort().join('|')] : undefined;
     const touchFree = touch && !(ctx.lines ?? []).includes(`tan-${up(touch)}`);
-    if (touchFree && kind !== 'external' && wantPairs === 1) {
+    // The touch tangent's KIND by geometry: externally tangent pair → centres on opposite sides of it
+    // (internal); internally tangent pair → same side (external). A kind-less request or one matching
+    // the touch kind BUILDS it directly.
+    const touchKind = position === 'ext-tangent' ? 'internal' : 'external';
+    if (touchFree && wantPairs === 1 && (kind === undefined || kind === touchKind)) {
       return [...mk, { type: 'tangent', id: `tan-${up(touch)}`, circle: id1, at: up(touch), visible: true }];
     }
-    return { clarify: 'tangents-exhausted', kind: kind ?? 'any', ...(touchy && touchFree ? { hint: 'at-touch' as const } : {}) };
+    return { clarify: 'tangents-exhausted', kind: kind ?? 'any', ...(touchy && touchFree ? { hint: 'at-touch' as const } : {}), ...(position ? { position } : {}) };
   }
   const prior = priorEntries.flatMap((e) => e.pair);
   const out: AnyCommand[] = [...mk];
@@ -7810,7 +7814,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
     }
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).
     if (res.clarify === 'ambiguous-angle') return { ok: false, reason: 'ambiguous-angle', vertex: res.vertex };
-    if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}) };
+    if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };
     return { ok: false, reason: 'ambiguous-circle', center: res.center };
   }
   return { ok: false, reason: 'not-handled' };

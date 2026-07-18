@@ -74,7 +74,13 @@
     "tangentsExhaustedExternal": "Both external common tangents are already drawn — two circles have no third external tangent.",
     "tangentsExhaustedInternal": "Both internal common tangents are already drawn — two circles have no third internal tangent.",
     "tangentsExhaustedAny": "All four common tangents are already drawn — two circles have no fifth common tangent.",
-    "tangentsExhaustedTouch": "The separate common tangents are already drawn — for tangent circles the only remaining common tangent passes through the touch point. Type: \"common tangent at the touch point\"."
+    "tangentsExhaustedTouch": "The separate common tangents are already drawn — for tangent circles the only remaining common tangent passes through the touch point. Type: \"common tangent at the touch point\".",
+    "tangentsExhaustedContained": "A circle contained inside another has no common tangent at all.",
+    "tangentsExhaustedIntersecting": "Both common tangents are already drawn — intersecting circles have exactly two (external).",
+    "tangentsExhaustedNoInternal": "Circles in this configuration have no internal common tangent.",
+    "tangentsExhaustedExtTangent": "All three common tangents are already drawn — externally tangent circles have exactly three: two separate and one at the touch point.",
+    "tangentsExhaustedTouchTaken": "The only internal tangent — the one at the touch point — is already drawn.",
+    "tangentsExhaustedIntTangent": "The single common tangent is already drawn — internally tangent circles have exactly one, at the touch point."
   },
   "explore": {
     "title": "Explore the figure"

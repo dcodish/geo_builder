@@ -288,6 +288,41 @@ describe('#197 Am. 7 — the naming DOT at a drawn-line × segment crossing', ()
   });
 });
 
+describe('#197 Am. 8 — position-accurate refusals (not everything is "4 tangents")', () => {
+  const exhausted = (r: ReturnType<typeof parse>) => (!r.ok && r.reason === 'tangents-exhausted' ? r : null);
+
+  it('CONTAINED circles: any tangent request refuses with position=contained (0 exist)', () => {
+    const facts = buildFacts(['מעגל P מוכל בתוך מעגל O']);
+    const fig = replay(facts);
+    const r = exhausted(parse('משיק משותף', buildParseCtx(fig.construction, fig.positions)));
+    expect(r?.position).toBe('contained');
+  });
+
+  it('INTERNALLY tangent circles: the first request BUILDS the single tangent; the second refuses with position=int-tangent (1 exists)', () => {
+    const facts = buildFacts(['שני מעגלים משיקים מבפנים', 'משיק משותף']);
+    const fig = replay(facts);
+    expect(Object.values(fig.status).every((s) => s === 'ok'), 'the single touch tangent builds').toBe(true);
+    expect(fig.construction.objects.some((o) => o.kind === 'line' && o.id.startsWith('tan-'))).toBe(true);
+    const r = exhausted(parse('משיק משותף', buildParseCtx(fig.construction, fig.positions)));
+    expect(r?.position).toBe('int-tangent');
+  });
+
+  it('INTERSECTING circles: position lands on the refusal (2 exist)', () => {
+    const facts = buildFacts(['שני מעגלים נחתכים']);
+    const fig = replay(facts);
+    const r = exhausted(parse('משיק משותף פנימי', buildParseCtx(fig.construction, fig.positions)));
+    expect(r?.position).toBe('intersecting');
+    expect(r?.kind).toBe('internal');
+  });
+
+  it('EXTERNALLY tangent circles: the post-touch refusal carries position=ext-tangent (3 exist)', () => {
+    const facts = buildFacts(['שני מעגלים משיקים מבחוץ', 'משיק משותף', 'משיק משותף', 'משיק משותף']);
+    const fig = replay(facts);
+    const r = exhausted(parse('משיק משותף', buildParseCtx(fig.construction, fig.positions)));
+    expect(r?.position).toBe('ext-tangent');
+  });
+});
+
 describe('ADR-360 (#210) — the WORD-relation honesty gate', () => {
   it('a stated זרים not encoded in the commands is reported dropped', () => {
     const bare: AnyCommand[] = [

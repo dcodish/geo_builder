@@ -630,7 +630,18 @@ export default function App() {
     // exist; say so plainly instead of escalating or grinding an impossible solve.
     if (!r.ok && r.reason === 'tangents-exhausted') {
       logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `tangents-exhausted:${r.kind}` });
-      setInputNote(t(r.hint === 'at-touch' ? 'input.tangentsExhaustedTouch' : r.kind === 'external' ? 'input.tangentsExhaustedExternal' : r.kind === 'internal' ? 'input.tangentsExhaustedInternal' : 'input.tangentsExhaustedAny'));
+      // Position-accurate refusal (#197 Am. 8): the true tangent count depends on the pair's mutual
+      // position — disjoint 4, externally tangent 3, intersecting 2, internally tangent 1, contained 0.
+      const msgKey =
+        r.hint === 'at-touch' ? 'input.tangentsExhaustedTouch'
+        : r.position === 'contained' ? 'input.tangentsExhaustedContained'
+        : r.position === 'int-tangent' ? (r.kind === 'internal' ? 'input.tangentsExhaustedNoInternal' : 'input.tangentsExhaustedIntTangent')
+        : r.position === 'intersecting' ? (r.kind === 'internal' ? 'input.tangentsExhaustedNoInternal' : 'input.tangentsExhaustedIntersecting')
+        : r.position === 'ext-tangent' ? (r.kind === 'external' ? 'input.tangentsExhaustedExternal' : r.kind === 'internal' ? 'input.tangentsExhaustedTouchTaken' : 'input.tangentsExhaustedExtTangent')
+        : r.kind === 'external' ? 'input.tangentsExhaustedExternal'
+        : r.kind === 'internal' ? 'input.tangentsExhaustedInternal'
+        : 'input.tangentsExhaustedAny';
+      setInputNote(t(msgKey));
       setBusy(false);
       return;
     }
