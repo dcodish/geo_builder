@@ -199,6 +199,24 @@ describe('#197 Am. 4 — TANGENT circles: capacity follows the mutual position',
     expect(Date.now() - t0, 'cold fold budget').toBeLessThan(3000);
   });
 
+  it("«משיק משותף בנקודת ההשקה» — the touch referenced by ROLE resolves to the circles' common point (the operator's follow-up)", () => {
+    // Session 2026-07-18 19:15: following the at-touch hint, the operator typed the ROLE form — and it
+    // silently built a SECOND external tangent (wrong figure, all green). Now it takes the at-variant.
+    const facts = buildFacts(['שני מעגלים משיקים מבחוץ', 'משיק משותף', 'משיק משותף בנקודת ההשקה']);
+    const roleCmds = facts.filter((f) => f.utterance === 'משיק משותף בנקודת ההשקה').map((f) => f.cmd);
+    expect(roleCmds.some((c) => c.type === 'tangent'), 'the drawn tangent AT the touch').toBe(true);
+    expect(roleCmds.some((c) => c.type === 'common-tangent'), 'NOT a two-touch pair').toBe(false);
+    const fig = replay(facts);
+    expect(Object.values(fig.status).every((s) => s === 'ok')).toBe(true);
+    // The tangent line anchors at the actual touch point — the common member of both circles.
+    const tangent = roleCmds.find((c): c is Extract<AnyCommand, { type: 'tangent' }> => c.type === 'tangent')!;
+    const touch = fig.positions.get(tangent.at)!;
+    for (const c of fig.circles.values()) expect(d(touch, c.center), 'the touch on the circle').toBeCloseTo(c.r, 2);
+    // And a further two-touch tangent still builds (the second external — capacity 2, one taken).
+    const more = parse('משיק משותף', buildParseCtx(fig.construction, fig.positions));
+    expect(more.ok, 'the second external is still available').toBe(true);
+  });
+
   it('INTERSECTING circles: the two externals build, an internal or a third refuses', () => {
     const facts = buildFacts(['שני מעגלים נחתכים']);
     const fig = replay(facts);

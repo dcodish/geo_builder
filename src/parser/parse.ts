@@ -101,6 +101,8 @@ export interface ParseContext {
   /** Every circle pair's mutual position (drawn seed, tangency tol-based) — the two-touch tangent
    *  capacity follows it (#197 Am. 4). */
   circlePairPositions?: Record<string, 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained'>;
+  /** A tangent circle pair's TOUCH point, resolved positionally — the referent of «בנקודת ההשקה» (#197 Am. 5). */
+  circlePairTouches?: Record<string, string>;
   /** Recorded SIZE roles between circles (`set-radius-order`, concentric or not — issue #102): lets
    *  «המעגל הגדול/הקטן» resolve consistently once assigned. */
   radiusOrder?: { outer: string; inner: string }[];
@@ -5346,12 +5348,28 @@ const commonTangent: Rule = (s, ctx) => {
   );
   const [c1, c2] = centres;
   const id1 = circleId(c1), id2 = circleId(c2);
-  // NAMED circles that don't exist yet are created (free radius per ADR-052, `ifAbsent` keeps a stated one).
+  // NAMED circles that don't yet exist are created (free radius per ADR-052, `ifAbsent` keeps a stated one).
   const haveCircles = new Set((ctx.circles ?? []).map((x) => x.toUpperCase()));
   const mk: AnyCommand[] = [];
   if (!haveCircles.has(c1)) mk.push({ type: 'circle', id: id1, center: c1, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true });
   if (!haveCircles.has(c2)) mk.push({ type: 'circle', id: id2, center: c2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ifAbsent: true });
-  if (at) {
+  // The touch point referenced by ROLE — «בנקודת ההשקה»/«בנקודת המגע» / "at the touch/tangency point"
+  // (#197 Am. 5, the operator's exact follow-up to the at-touch hint): resolve THE common member of the
+  // two circles. Without this the role phrase silently fell through to the label-less path and built a
+  // SECOND external tangent — a wrong figure, all green. No common member (the circles aren't tangent
+  // there) → escalate whole, never a silent mis-build.
+  let atResolved = at;
+  if (!atResolved && /בנקודת\s+ה?השקה|בנקודת\s+ה?מגע|at\s+the\s+touch(?:\s*point)?|at\s+the\s+tangency(?:\s*point)?/i.test(s)) {
+    const touch = ctx.circlePairTouches?.[[id1, id2].sort().join('|')];
+    if (!touch) return 'stop'; // the circles aren't tangent (no shared point) — escalate, never mis-build
+    // The role phrase REFERENCES the existing tangency (that's how the touch was resolved) — it asserts
+    // nothing new, so the lowering is ONLY the drawn tangent line at the touch. Re-asserting the
+    // memberships/collinearity (the at-variant's creation path) coupled into the existing tangency's
+    // joint solve and ground it for ~55 s.
+    return [...mk, { type: 'tangent', id: `tan-${up(touch)}`, circle: id1, at: up(touch), visible: true }];
+  }
+  if (atResolved) {
+    const at = atResolved;
     // Variant 2 — the common tangent AT the shared touch point M ("tangent at the intersection").
     const cmds: AnyCommand[] = [...mk];
     if (have.has(at)) {

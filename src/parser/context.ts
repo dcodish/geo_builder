@@ -87,6 +87,42 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
         }
       return out;
     })(),
+    // The TOUCH POINT of each tangent circle pair, resolved POSITIONALLY (#197 Am. 5): the point lying
+    // on both circles (within tol) — the referent of the ROLE phrase «בנקודת ההשקה» / "at the touch
+    // point". Membership lists can't answer this (the coincide-driven construction registers the touch
+    // on ONE circle; the tangency drives the other side), so the drawn coordinates are the truth.
+    circlePairTouches: (() => {
+      const cs = construction.objects.filter((o): o is Extract<typeof o, { kind: 'circle' }> => o.kind === 'circle' && !o.center.startsWith('~'));
+      const out: Record<string, Id> = {};
+      const radiusOf = (c: (typeof cs)[number]): number | null => {
+        if (c.radius.via === 'through') {
+          const a = positions.get(c.center);
+          const t = positions.get(c.radius.point);
+          return a && t ? Math.hypot(a.x - t.x, a.y - t.y) : null;
+        }
+        return 'value' in c.radius ? c.radius.value : null;
+      };
+      const pts = construction.objects.filter(isGeoPoint);
+      for (let i = 0; i < cs.length; i++)
+        for (let j = i + 1; j < cs.length; j++) {
+          const p1 = positions.get(cs[i].center);
+          const p2 = positions.get(cs[j].center);
+          const r1 = radiusOf(cs[i]);
+          const r2 = radiusOf(cs[j]);
+          if (!p1 || !p2 || r1 === null || r2 === null) continue;
+          const tol = 0.05 * (r1 + r2);
+          for (const pt of pts) {
+            if (pt.id === cs[i].center || pt.id === cs[j].center) continue;
+            const v = positions.get(pt.id);
+            if (!v) continue;
+            if (Math.abs(Math.hypot(v.x - p1.x, v.y - p1.y) - r1) <= tol && Math.abs(Math.hypot(v.x - p2.x, v.y - p2.y) - r2) <= tol) {
+              out[[cs[i].id, cs[j].id].sort().join('|')] = pt.id;
+              break;
+            }
+          }
+        }
+      return out;
+    })(),
     // Existing COMMON tangents per circle pair (#197): touch pairs (A on c1, B on c2) recognised by the
     // paired radius-⟂-tangent constraints the common-tangent lowering emits — a REPEATED «משיק משותף»
     // must take an untaken tangent, so the rule passes these as its `avoid` list.

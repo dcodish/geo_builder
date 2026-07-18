@@ -74,7 +74,7 @@
     "tangentsExhaustedExternal": "Both external common tangents are already drawn — two circles have no third external tangent.",
     "tangentsExhaustedInternal": "Both internal common tangents are already drawn — two circles have no third internal tangent.",
     "tangentsExhaustedAny": "All four common tangents are already drawn — two circles have no fifth common tangent.",
-    "tangentsExhaustedTouch": "The separate common tangents are already drawn — for tangent circles the only remaining common tangent passes through the touch point. Try \"the common tangent at M\" (with the touch point’s name)."
+    "tangentsExhaustedTouch": "The separate common tangents are already drawn — for tangent circles the only remaining common tangent passes through the touch point. Type: \"common tangent at the touch point\"."
   },
   "explore": {
     "title": "Explore the figure"
