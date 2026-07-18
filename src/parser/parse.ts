@@ -5301,15 +5301,20 @@ const commonTangent: Rule = (s, ctx) => {
   const centres = named.length >= 2 ? named.slice(0, 2) : (ctx.circles ?? []).length === 2 ? [ctx.circles![0], ctx.circles![1]].map(up) : null;
   if (!centres || centres[0] === centres[1]) return null; // no two distinct circles to be common to → LLM
   const have = new Set(ctx.points ?? []);
+  // An ACTIVE cut verb («משיק משותף חותך את …» / "…cuts…") makes this a COMPOUND the rule can't
+  // express — defer whole (never a bare tangent that drops the cut; the ADR-024 discipline). The
+  // participle description «מעגלים נחתכים» (the circles being intersecting) stays legal.
+  if (/חות(?:ך|כת|כים)|\bcuts?\b|\bcrosses\b/i.test(s)) return null;
   const atM = s.match(/(?:\bat\b|בנקודה)\s*([A-Za-z]\d*)\b/i);
   const at = atM ? up(atM[1]) : null;
   // The 1–2 labels NAMING the tangent ("AB משיק משותף…"), excluding the touch and the centres.
-  const naming = labelRun(
-    dropCircleRef(s)
-      .replace(/(?:\bat\b|בנקודה)\s*[A-Za-z]\d*\b/gi, ' ')
-      .replace(/tangent|משיק\S*|\bcommon\b|משותף|משותפת|\bline\b|הישר|הקו|למעגלים|מעגלים|לשני|המעגלים/gi, ' '),
-    2,
-  )?.filter((p) => p !== at && p !== centres[0] && p !== centres[1]);
+  // ALL touch labels, not one 2-run — «AB ו-CD משיקים משותפים» names two tangents as two separate runs.
+  const namingText = dropCircleRef(s)
+    .replace(/(?:\bat\b|בנקודה)\s*[A-Za-z]\d*\b/gi, ' ')
+    .replace(/tangent|משיק\S*|\bcommon\b|משותף|משותפת|\bline\b|הישר|הקו|למעגלים|מעגלים|לשני|המעגלים/gi, ' ');
+  const naming = [...new Set((namingText.match(/\b[A-Z]\d*(?:[A-Z]\d*)?\b/g) ?? []).flatMap((run) => run.match(/[A-Z]\d*/g) ?? []).map(up))].filter(
+    (p) => p !== at && p !== centres[0] && p !== centres[1],
+  );
   const [c1, c2] = centres;
   const id1 = circleId(c1), id2 = circleId(c2);
   // NAMED circles that don't exist yet are created (free radius per ADR-052, `ifAbsent` keeps a stated one).
@@ -5339,34 +5344,51 @@ const commonTangent: Rule = (s, ctx) => {
     if (fresh.length) cmds.push(...lineMarkers(`tan-${at}`, fresh));
     return cmds;
   }
-  if (!naming || naming.length < 2) return null; // no touch labels and no touch point → LLM
-  const [A, B] = naming;
   // The stated KIND (#197, ADR-359): «חיצוני»/external ⇔ both centres on the same side of the tangent,
-  // «פנימי»/internal ⇔ opposite sides — a REQUIREMENT (verifier figure.v.tangentExternal/Internal +
+  // «פנימי»/«אלכסוני»/internal ⇔ opposite sides (the "diagonal" tangent crossing between the circles —
+  // a textbook synonym) — a REQUIREMENT (verifier figure.v.tangentExternal/Internal +
   // meetsRequirements), superseding ADR-239's "a configuration show-another explores". Unstated ⇒ no
   // requirement (any of the 4 tangents, ADR-052).
-  const kind = /חיצוני|\bexternal\b/i.test(s) ? ('external' as const) : /פנימי|\binternal\b/i.test(s) ? ('internal' as const) : undefined;
+  const kind = /חיצוני|\bexternal\b/i.test(s) ? ('external' as const) : /פנימי|אלכסוני|\binternal\b|\bdiagonal\b/i.test(s) ? ('internal' as const) : undefined;
+  // The touch labels: 2 (one tangent, «AB משיק משותף»), 4 («AB ו-CD משיקים משותפים» — two tangents),
+  // or NONE — a label-less «משיק משותף [חיצוני]» auto-names fresh touches instead of escalating (the
+  // #184 pattern; the student asked for the tangent, not for a naming exercise). The PLURAL
+  // («שני המשיקים המשותפים החיצוניים» — the classic figure) builds TWO tangents at once, the second
+  // avoiding the first, so both externals (or one of each, kind unstated) land distinct.
+  const plural = /שני\s+ה?משיקים|משיקים\s+משותפ/i.test(s);
+  const wantPairs = plural || (naming?.length ?? 0) >= 4 ? 2 : 1;
+  let names = naming ?? [];
+  if (names.length < wantPairs * 2)
+    names = [...names, ...autoVertexLabels(wantPairs * 2 - names.length, [...names, c1, c2, ...(ctx.points ?? [])])];
+  if (names.length < wantPairs * 2) return null; // alphabet exhausted — not a real figure
   // Already-drawn common tangents of THIS pair (from the ctx hint): a REPEATED «משיק משותף» must take
   // an untaken tangent (#142 pattern) — their touches become `avoid` (never the current naming labels:
   // re-typing the SAME tangent is idempotent, not a demand for another one).
   const priorKey = [id1, id2].sort().join('|');
-  const avoid = (ctx.commonTangents?.[priorKey] ?? []).flat().filter((t) => t !== A && t !== B);
-  // Variant 1 — a common tangent touching circle 1 at A and circle 2 at B. The student stated only
-  // "AB touches both", never WHICH touch rides WHICH circle — the pairing is a soft default (`softPair`,
-  // stated/figure order) that the store SWAPS when a later explicit membership names the opposite
-  // assignment (M4: defaults yield to statements; ADR-239).
-  return [
-    ...mk,
-    { type: 'point-on-circle', id: A, circle: id1, softPair: true },
-    { type: 'point-on-circle', id: B, circle: id2, softPair: true },
-    { type: 'set-perpendicular', a: centrePt(ctx, c1), b: A, c: A, d: B, implicit: true }, // radius c1→A ⟂ the tangent
-    { type: 'set-perpendicular', a: centrePt(ctx, c2), b: B, c: A, d: B, implicit: true }, // radius c2→B ⟂ the tangent
-    { type: 'segment', a: A, b: B },
-    // The configuration record (#197): apply seeds the touches into an analytic tangent basin of the
-    // stated kind that no avoided tangent occupies; the verifier + meetsRequirements gate the rest.
-    // Kind-less first tangents (no avoid) emit nothing extra — byte-identical to ADR-239.
-    ...(kind || avoid.length ? [{ type: 'common-tangent', a: A, b: B, circle1: id1, circle2: id2, ...(kind ? { kind } : {}), ...(avoid.length ? { avoid } : {}) } as AnyCommand] : []),
-  ];
+  const prior = (ctx.commonTangents?.[priorKey] ?? []).flat();
+  const out: AnyCommand[] = [...mk];
+  let prevTouches: string[] = [];
+  for (let p = 0; p < wantPairs; p++) {
+    const [A, B] = [names[p * 2], names[p * 2 + 1]];
+    const avoid = [...prior.filter((t) => t !== A && t !== B), ...prevTouches];
+    // A common tangent touching circle 1 at A and circle 2 at B. The student stated only "AB touches
+    // both", never WHICH touch rides WHICH circle — the pairing is a soft default (`softPair`,
+    // stated/figure order) that the store SWAPS when a later explicit membership names the opposite
+    // assignment (M4: defaults yield to statements; ADR-239).
+    out.push(
+      { type: 'point-on-circle', id: A, circle: id1, softPair: true },
+      { type: 'point-on-circle', id: B, circle: id2, softPair: true },
+      { type: 'set-perpendicular', a: centrePt(ctx, c1), b: A, c: A, d: B, implicit: true }, // radius c1→A ⟂ the tangent
+      { type: 'set-perpendicular', a: centrePt(ctx, c2), b: B, c: A, d: B, implicit: true }, // radius c2→B ⟂ the tangent
+      { type: 'segment', a: A, b: B },
+      // The configuration record (#197): apply seeds the touches into an analytic tangent basin of the
+      // stated kind that no avoided tangent occupies; the verifier + meetsRequirements gate the rest.
+      // A kind-less single tangent with no avoid emits nothing extra — byte-identical to ADR-239.
+      ...(kind || avoid.length ? [{ type: 'common-tangent', a: A, b: B, circle1: id1, circle2: id2, ...(kind ? { kind } : {}), ...(avoid.length ? { avoid } : {}) } as AnyCommand] : []),
+    );
+    prevTouches = [A, B];
+  }
+  return out;
 };
 
 /**

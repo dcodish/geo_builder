@@ -133,6 +133,43 @@ describe('ADR-359 (#197) — common tangent KIND + repetition', () => {
     expect(side(c1.center) * side(c2.center)).toBeLessThan(0);
   });
 
+  it('label-less «משיק משותף חיצוני» auto-names the touches and builds (the #184 pattern)', () => {
+    const fig = replay(buildFacts(['שני מעגלים זרים', 'משיק משותף חיצוני']));
+    expect(Object.values(fig.status).every((s) => s === 'ok')).toBe(true);
+    expect(fig.violations).toEqual([]);
+    const touches = fig.construction.objects.filter((o) => o.kind === 'on-circle');
+    expect(touches.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('«אלכסוני» is the INTERNAL tangent (centres on opposite sides)', () => {
+    const facts = buildFacts(['שני מעגלים זרים', 'AB משיק משותף אלכסוני לשני המעגלים']);
+    const ct = facts.find((f) => f.cmd.type === 'common-tangent')!.cmd as Extract<AnyCommand, { type: 'common-tangent' }>;
+    expect(ct.kind).toBe('internal');
+    const fig = replay(facts);
+    expect(fig.violations).toEqual([]);
+    const A = fig.positions.get('A')!, B = fig.positions.get('B')!;
+    const [c1, c2] = [...fig.circles.values()];
+    const side = (p: { x: number; y: number }) => (B.x - A.x) * (p.y - A.y) - (B.y - A.y) * (p.x - A.x);
+    expect(side(c1.center) * side(c2.center)).toBeLessThan(0);
+  });
+
+  it('the PLURAL «שני המשיקים המשותפים החיצוניים» builds TWO distinct external tangents at once', () => {
+    const fig = replay(buildFacts(['שני מעגלים זרים', 'שני המשיקים המשותפים החיצוניים']));
+    expect(Object.values(fig.status).every((s) => s === 'ok')).toBe(true);
+    expect(fig.violations).toEqual([]);
+    const cts = fig.construction.objects.filter((o) => o.kind === 'on-circle');
+    expect(cts.length).toBeGreaterThanOrEqual(4); // four auto-named touches
+    const segs = fig.construction.objects.filter((o) => o.kind === 'segment');
+    expect(segs.length).toBeGreaterThanOrEqual(2); // two tangent segments
+  });
+
+  it('a label-less CUT compound still defers (never a bare tangent dropping the cut)', () => {
+    const facts = buildFacts(['שני מעגלים זרים']);
+    const { construction, positions } = replay(facts);
+    const r = parse('משיק משותף חותך את הקטע בנקודה E', buildParseCtx(construction, positions));
+    expect(r.ok).toBe(false);
+  });
+
   it('a REPEATED external tangent takes the OTHER tangent (avoid, parse-level + end-to-end distinct)', () => {
     const steps = ['שני מעגלים זרים', 'AB משיק משותף חיצוני לשני המעגלים', 'CD משיק משותף חיצוני לשני המעגלים'];
     const facts = buildFacts(steps);
