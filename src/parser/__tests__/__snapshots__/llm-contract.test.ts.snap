@@ -100,6 +100,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle",
       "point-on-circle",
       "point-on-circle",
+      "common-tangent",
       "set-perpendicular",
       "set-perpendicular",
       "segment",
@@ -109,9 +110,22 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle",
       "point-on-circle",
       "point-on-circle",
+      "common-tangent",
       "set-perpendicular",
       "set-perpendicular",
       "segment",
+    ],
+  },
+  "AB is an external common tangent of the two circles": {
+    "en": [
+      "circle",
+      "circle",
+      "circles-tangent",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "circles-tangent",
     ],
   },
   "AB perpendicular to CD": {
@@ -432,6 +446,28 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "set-area-ratio",
     ],
   },
+  "a line cuts the two circles at points C, D, E and F": {
+    "en": [
+      "circle",
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "set-line",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "point-on-circle",
+      "set-line",
+      "segment",
+    ],
+  },
   "a line with point A": {
     "en": [
       "segment",
@@ -660,6 +696,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     "he": [
       "circle",
       "radius-symbol",
+    ],
+  },
+  "circle P contained in circle O": {
+    "en": [
+      "circle",
+      "circle",
+      "set-circle-position",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "set-circle-position",
     ],
   },
   "circle centered at O radius 5": {
@@ -1490,6 +1538,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "foot",
     ],
   },
+  "two circles": {
+    "en": [
+      "circle",
+      "circle",
+      "set-circle-position",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "set-circle-position",
+    ],
+  },
   "two circles intersect at A and B": {
     "en": [
       "circle",
@@ -1514,6 +1574,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle",
       "circle",
       "set-radius-order",
+    ],
+  },
+  "two disjoint circles": {
+    "en": [
+      "circle",
+      "circle",
+      "set-circle-position",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "set-circle-position",
     ],
   },
   "α < β": {

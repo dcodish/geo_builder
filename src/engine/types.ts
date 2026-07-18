@@ -1003,7 +1003,7 @@ export type Command =
   | { type: 'foot'; id: Id; from: Id; a: Id; b: Id }
   | { type: 'midpoint'; id: Id; a: Id; b: Id }
   // Phase 5c — circles and the points they produce.
-  | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean; autoCenter?: boolean; freeRadius?: boolean; ifAbsent?: boolean; implied?: boolean } // freeRadius: radius is a DOF (ADR-051); ifAbsent: a parser-injected implicit circle — skip if it already exists (don't clobber a real one); implied: minted by withImplicitCircles for a NAMED reference that matched no circle (#186 — the App may BIND that name to an unnamed circle instead of committing this creation)
+  | { type: 'circle'; id: Id; center: Id; radius: number; hidden?: boolean; autoCenter?: boolean; freeRadius?: boolean; ifAbsent?: boolean; implied?: boolean; apart?: boolean } // freeRadius: radius is a DOF (ADR-051); ifAbsent: a parser-injected implicit circle — skip if it already exists (don't clobber a real one); implied: minted by withImplicitCircles for a NAMED reference that matched no circle (#186 — the App may BIND that name to an unnamed circle instead of committing this creation); apart: a STANDALONE bare circle («מעגל O2» alone) seeds its NEW centre clear of every existing circle (#196 — an overlapping default silently draws intersections the student never stated; ADR-253 general position, circle edition). Placement only — the centre stays a free sampled DOF, no requirement is recorded.
   | { type: 'circle-through'; id: Id; center: Id; through: Id; hidden?: boolean; autoCenter?: boolean }
   | { type: 'circumcircle'; id: Id; center: Id; a: Id; b: Id; c: Id; hidden?: boolean } // circle through a,b,c (centre = circumcentre); hidden for a cyclic (בר-חסימה) figure
   | { type: 'point-on-circle'; id: Id; circle: Id; theta?: number; free?: boolean; between?: [Id, Id]; major?: boolean; softPair?: boolean } // theta = a STARTING angle; free:true keeps it a samplable/drivable DOF even with a start angle (ADR-097); between = a free point on the arc from-to (ADR-042), major = the far/reflex arc (#90); softPair: a common-tangent macro's DEFAULT touch↔circle pairing — the store swaps the pair when a later explicit membership states the opposite assignment (ADR-239, the M4 shape)
@@ -1038,7 +1038,26 @@ export type Command =
   | { type: 'circle-circle-intersection'; id: Id; circle1: Id; circle2: Id; branch?: number; avoid?: Id }
   | { type: 'tangent'; id: Id; circle: Id; at: Id; visible?: boolean }
   | { type: 'point-on-line'; id: Id; line: Id; offset: number } // a fixed marker on a drawn line (names it by a point)
-  | { type: 'circles-tangent'; circle1: Id; circle2: Id; at: Id; external: boolean }; // two circles touch at one point `at`
+  | { type: 'circles-tangent'; circle1: Id; circle2: Id; at: Id; external: boolean } // two circles touch at one point `at`
+  // Two circles' MUTUAL POSITION as a stated INEQUALITY (#196 — «שני מעגלים זרים» / «מעגל O2 מוכל בתוך
+  // מעגל O1»): 'disjoint' = each outside the other (|c1c2| > r1+r2), 'contained' = `b` strictly inside `a`
+  // (|c1c2| + r_b < r_a). A REQUIREMENT in the ADR-244 radius-order shape — the equality members of the
+  // two-circle family (tangent/intersecting/concentric) are constructs, the strict-inequality members have
+  // nothing to drive: the givens verifier flags a violating config (figure.v.circlesDisjoint /
+  // figure.v.circleContained), so `meetsRequirements` (sampler / "show another") skips it; apply only
+  // improves the DEFAULT (re-seats a free centre / free radius seed onto the stated side).
+  | { type: 'set-circle-position'; relation: 'disjoint' | 'contained' | 'any'; a: Id; b: Id; variant?: number }
+  // relation 'any' (bare «שני מעגלים», #196 Am.): the mutual position is UNSTATED — a cyclable VARIANT
+  // (0 intersecting / 1 disjoint / 2 contained) "show another configuration" steps through (ADR-052/M4);
+  // no requirement is recorded, apply only seats the default per variant.
+  // A COMMON tangent's configuration record (#197): the tangent touching `circle1` at `a` and `circle2`
+  // at `b`. `kind` (when the student said «חיצוני»/«פנימי» / external/internal) is a REQUIREMENT — the
+  // two centres must lie on the SAME side of line a-b (external) or OPPOSITE sides (internal); unstated ⇒
+  // no requirement, any of the 4 tangents (ADR-052). `avoid` lists the touch points of ALREADY-drawn
+  // common tangents of the same pair (the #142 repetition pattern: a repeated «משיק משותף חיצוני» takes
+  // the OTHER tangent) — the new touches must stay distinct from each avoided one, and apply seeds the
+  // touch riders' θ into an untaken analytic tangent basin so the default lands right.
+  | { type: 'common-tangent'; a: Id; b: Id; circle1: Id; circle2: Id; kind?: 'external' | 'internal'; avoid?: Id[]; variant?: number }; // variant: WHICH tangent basin — kind-less cycles all 4, kind-stated cycles the 2 of its kind (ADR-052/M4)
 
 /**
  * A measure's value: either a literal number, or `coef · var` where `var` is a

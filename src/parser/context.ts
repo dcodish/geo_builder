@@ -54,6 +54,113 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // idempotent construct reuse
     tangentAuxes: construction.objects.flatMap((o) => (o.kind === 'circle' && o.id.startsWith('tanaux-') ? [o.id] : [])), // existing Thales tangent-aux circles — a 2nd single tangent from the SAME apex takes the OTHER branch (issue #142)
     polygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])), // definite "the quad" binds to the existing one
+    // Every circle pair's MUTUAL POSITION (from the drawn seed, tangency tol-based) — the two-touch
+    // common-tangent CAPACITY depends on it (#197 Am. 4): disjoint 4, externally tangent / intersecting
+    // 2 (the remaining tangents pass through the touch / don't exist), internally tangent or contained 0.
+    circlePairPositions: (() => {
+      const cs = construction.objects.filter((o): o is Extract<typeof o, { kind: 'circle' }> => o.kind === 'circle' && !o.center.startsWith('~'));
+      const out: Record<string, 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained'> = {};
+      const radiusOf = (c: (typeof cs)[number]): number | null => {
+        if (c.radius.via === 'through') {
+          const a = positions.get(c.center);
+          const t = positions.get(c.radius.point);
+          return a && t ? Math.hypot(a.x - t.x, a.y - t.y) : null;
+        }
+        return 'value' in c.radius ? c.radius.value : null;
+      };
+      for (let i = 0; i < cs.length; i++)
+        for (let j = i + 1; j < cs.length; j++) {
+          const p1 = positions.get(cs[i].center);
+          const p2 = positions.get(cs[j].center);
+          const r1 = radiusOf(cs[i]);
+          const r2 = radiusOf(cs[j]);
+          if (!p1 || !p2 || r1 === null || r2 === null) continue;
+          const d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+          const tol = 0.03 * (r1 + r2);
+          const key = [cs[i].id, cs[j].id].sort().join('|');
+          out[key] =
+            Math.abs(d - (r1 + r2)) <= tol ? 'ext-tangent'
+            : d > r1 + r2 ? 'disjoint'
+            : Math.abs(d - Math.abs(r1 - r2)) <= tol ? 'int-tangent'
+            : d > Math.abs(r1 - r2) ? 'intersecting'
+            : 'contained';
+        }
+      return out;
+    })(),
+    // The TOUCH POINT of each tangent circle pair, resolved POSITIONALLY (#197 Am. 5): the point lying
+    // on both circles (within tol) — the referent of the ROLE phrase «בנקודת ההשקה» / "at the touch
+    // point". Membership lists can't answer this (the coincide-driven construction registers the touch
+    // on ONE circle; the tangency drives the other side), so the drawn coordinates are the truth.
+    circlePairTouches: (() => {
+      const cs = construction.objects.filter((o): o is Extract<typeof o, { kind: 'circle' }> => o.kind === 'circle' && !o.center.startsWith('~'));
+      const out: Record<string, Id> = {};
+      const radiusOf = (c: (typeof cs)[number]): number | null => {
+        if (c.radius.via === 'through') {
+          const a = positions.get(c.center);
+          const t = positions.get(c.radius.point);
+          return a && t ? Math.hypot(a.x - t.x, a.y - t.y) : null;
+        }
+        return 'value' in c.radius ? c.radius.value : null;
+      };
+      const pts = construction.objects.filter(isGeoPoint);
+      for (let i = 0; i < cs.length; i++)
+        for (let j = i + 1; j < cs.length; j++) {
+          const p1 = positions.get(cs[i].center);
+          const p2 = positions.get(cs[j].center);
+          const r1 = radiusOf(cs[i]);
+          const r2 = radiusOf(cs[j]);
+          if (!p1 || !p2 || r1 === null || r2 === null) continue;
+          const tol = 0.05 * (r1 + r2);
+          for (const pt of pts) {
+            if (pt.id === cs[i].center || pt.id === cs[j].center) continue;
+            const v = positions.get(pt.id);
+            if (!v) continue;
+            if (Math.abs(Math.hypot(v.x - p1.x, v.y - p1.y) - r1) <= tol && Math.abs(Math.hypot(v.x - p2.x, v.y - p2.y) - r2) <= tol) {
+              out[[cs[i].id, cs[j].id].sort().join('|')] = pt.id;
+              break;
+            }
+          }
+        }
+      return out;
+    })(),
+    // Existing COMMON tangents per circle pair (#197): touch pairs (A on c1, B on c2) recognised by the
+    // paired radius-⟂-tangent constraints the common-tangent lowering emits — a REPEATED «משיק משותף»
+    // must take an untaken tangent, so the rule passes these as its `avoid` list.
+    commonTangents: (() => {
+      const centreOf = new Map(construction.objects.flatMap((o) => (o.kind === 'circle' ? [[o.center, o.id] as [Id, Id]] : [])));
+      const out: Record<string, { pair: [Id, Id]; kind?: 'external' | 'internal' }[]> = {};
+      const perps = construction.constraints.filter((c) => c.type === 'perpendicular');
+      for (const c of perps) {
+        if (c.type !== 'perpendicular') continue;
+        // The tangent-side pattern: radius (centre→touch) ⟂ (touch→other touch), i.e. b === c and
+        // `a` is a circle centre. Pair two such constraints sharing the same segment {c,d}.
+        if (c.b !== c.c || !centreOf.has(c.a)) continue; // this ⟂: radius to the touch at the segment's C end
+        // The mate: the OTHER end's radius-⟂ on the same segment (b === d there).
+        const mate = perps.find(
+          (m) => m !== c && m.type === 'perpendicular' && centreOf.has(m.a) && m.c === c.c && m.d === c.d && m.b === m.d,
+        );
+        if (!mate || mate.type !== 'perpendicular') continue;
+        const id1 = centreOf.get(c.a)!;
+        const id2 = centreOf.get(mate.a)!;
+        if (id1 === id2) continue;
+        const key = [id1, id2].sort().join('|');
+        const pair: [Id, Id] = id1 <= id2 ? [c.b, mate.b] : [mate.b, c.b];
+        // The tangent's KIND, read off the drawn positions (external = centres on the same side of the
+        // tangent line) — lets the rule refuse a third external/internal deterministically (#197 Am. 3).
+        const A = positions.get(c.b);
+        const B = positions.get(mate.b);
+        const p1 = positions.get(c.a);
+        const p2 = positions.get(mate.a);
+        let kind: 'external' | 'internal' | undefined;
+        if (A && B && p1 && p2) {
+          const side = (q: Vec) => (B.x - A.x) * (q.y - A.y) - (B.y - A.y) * (q.x - A.x);
+          const s = side(p1) * side(p2);
+          if (Math.abs(s) > 1e-12) kind = s > 0 ? 'external' : 'internal';
+        }
+        (out[key] ??= []).push({ pair, kind });
+      }
+      return out;
+    })(),
     radiusSymbols: construction.objects.flatMap((o) =>
       o.kind === 'circle' && o.radiusSymbol ? [{ name: o.radiusSymbol, circle: o.id, center: o.center }] : [],
     ), // "R = 1.5r" / "R > r" resolve each letter to its circle (issue #54)

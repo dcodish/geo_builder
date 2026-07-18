@@ -19,7 +19,7 @@ import { constraintRefs, describeConstraint, isSatisfied, residual } from './sol
 
 export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
-  relation: 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | Constraint['type'];
+  relation: 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | Constraint['type'];
   ids: Id[];
   /** English fallback, e.g. "E should lie on circle P (radius 3.60) but is 7.42 from its centre". */
   message: string;
@@ -227,6 +227,87 @@ export function checkGivens(
         messageKey: cmd.side === 'outside' ? 'figure.v.outsideCircle' : 'figure.v.insideCircle',
         params: { point: cmd.id, circle: circleName(cmd.circle), radius: c.r.toFixed(2), dist: d.toFixed(2) },
       });
+    }
+  }
+
+  // Two circles' stated MUTUAL POSITION (#196 — «שני מעגלים זרים» disjoint / «מעגל O2 מוכל בתוך מעגל O1»
+  // contained): a strict-inequality REQUIREMENT in the ADR-244 radius-order shape. The centres and radii
+  // are free DOFs, so a sampled config can violate it — `meetsRequirements` gates on a clean verifier, so
+  // the sampler / "show another configuration" skips such configs; a genuinely contradicted position (the
+  // circles pinned/sized so the relation cannot hold) surfaces amber here.
+  for (const cmd of commands) {
+    if (cmd.type !== 'set-circle-position') continue;
+    if (cmd.relation === 'any') continue; // bare «שני מעגלים» — nothing stated, every case valid (#196 Am.)
+    const a = circles.get(cmd.a);
+    const b = circles.get(cmd.b);
+    if (!a || !b) continue;
+    const d = dist(a.center, b.center);
+    const tol = Math.max(0.05, 0.02 * (a.r + b.r));
+    if (cmd.relation === 'disjoint') {
+      if (d <= a.r + b.r + tol) {
+        violations.push({
+          relation: 'circles-disjoint',
+          ids: [cmd.a, cmd.b],
+          message: `${circleLabel(cmd.a)} and ${circleLabel(cmd.b)} should be disjoint (centre gap ${d.toFixed(2)} ≤ r₁+r₂ = ${(a.r + b.r).toFixed(2)})`,
+          messageKey: 'figure.v.circlesDisjoint',
+          params: { c1: circleName(cmd.a), c2: circleName(cmd.b), d: d.toFixed(2), sum: (a.r + b.r).toFixed(2) },
+        });
+      }
+    } else if (d + b.r >= a.r - tol) {
+      violations.push({
+        relation: 'circle-contained',
+        ids: [cmd.a, cmd.b],
+        message: `${circleLabel(cmd.b)} should lie strictly inside ${circleLabel(cmd.a)} (centre gap ${d.toFixed(2)} + r = ${(d + b.r).toFixed(2)} ≥ R = ${a.r.toFixed(2)})`,
+        messageKey: 'figure.v.circleContained',
+        params: { inner: circleName(cmd.b), outer: circleName(cmd.a), reach: (d + b.r).toFixed(2), ro: a.r.toFixed(2) },
+      });
+    }
+  }
+
+  // A COMMON tangent's stated KIND (#197 — «משיק משותף חיצוני/פנימי»): external ⇔ both centres on the
+  // SAME side of the tangent line, internal ⇔ opposite sides — and the repetition distinctness (a second
+  // «משיק משותף חיצוני» must be the OTHER tangent, never the first one again, the #142 pattern). Both are
+  // requirements: the touch riders are driven DOFs whose basin a sampled seed picks, so meetsRequirements
+  // gates which basins may be shown; a genuinely stuck configuration surfaces amber here.
+  for (const cmd of commands) {
+    if (cmd.type !== 'common-tangent') continue;
+    const a = positions.get(cmd.a);
+    const b = positions.get(cmd.b);
+    const c1 = circles.get(cmd.circle1);
+    const c2 = circles.get(cmd.circle2);
+    if (!a || !b || !c1 || !c2) continue;
+    if (cmd.kind) {
+      const len = dist(a, b);
+      if (len < 1e-9) continue; // collapsed tangent — pointsDistinct / the avoid check owns this
+      const side = (p: Vec): number => ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) / len;
+      const s1 = side(c1.center);
+      const s2 = side(c2.center);
+      const tol = 0.02 * Math.max(c1.r, c2.r);
+      const ok = cmd.kind === 'external' ? s1 * s2 > 0 && Math.abs(s1) > tol && Math.abs(s2) > tol : s1 * s2 < 0 && Math.abs(s1) > tol && Math.abs(s2) > tol;
+      if (!ok) {
+        violations.push({
+          relation: 'tangent-kind',
+          ids: [cmd.a, cmd.b, cmd.circle1, cmd.circle2],
+          message: `the common tangent ${cmd.a}${cmd.b} should be ${cmd.kind} (centres on ${cmd.kind === 'external' ? 'the same side' : 'opposite sides'} of it)`,
+          messageKey: cmd.kind === 'external' ? 'figure.v.tangentExternal' : 'figure.v.tangentInternal',
+          params: { a: cmd.a, b: cmd.b, c1: circleName(cmd.circle1), c2: circleName(cmd.circle2) },
+        });
+      }
+    }
+    for (const avoidId of cmd.avoid ?? []) {
+      const q = positions.get(avoidId);
+      if (!q) continue;
+      const tol = Math.max(0.15, 0.1 * Math.max(c1.r, c2.r));
+      if (dist(a, q) < tol || dist(b, q) < tol) {
+        violations.push({
+          relation: 'tangent-distinct',
+          ids: [cmd.a, cmd.b, avoidId],
+          message: `the repeated common tangent ${cmd.a}${cmd.b} coincides with the one already drawn at ${avoidId}`,
+          messageKey: 'figure.v.tangentDistinct',
+          params: { a: cmd.a, b: cmd.b, prior: avoidId },
+        });
+        break;
+      }
     }
   }
 

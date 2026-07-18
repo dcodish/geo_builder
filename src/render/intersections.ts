@@ -19,12 +19,16 @@ import { add, dist, scale, sub } from '@/engine/geometry';
 export interface Crossing {
   /** World position of the crossing. */
   pos: Vec;
-  /** First segment's endpoints. */
-  a: Id;
-  b: Id;
+  /** First segment's endpoints (absent when the first operand is a drawn LINE — `line1`). */
+  a?: Id;
+  b?: Id;
   /** Second segment's endpoints. */
-  c: Id;
-  d: Id;
+  c?: Id;
+  d?: Id;
+  /** A drawn LINE object (a tangent / bisector / perpendicular) as the first operand (#197 Am. 7 —
+   *  the touch tangent visibly crosses the two-touch tangent segments; those crossings must offer the
+   *  naming dot like any segment crossing). */
+  line1?: Id;
 }
 
 /** Crossing of segments a→b and c→d strictly interior to both, else null. */
@@ -41,8 +45,10 @@ function properCross(a: Vec, b: Vec, c: Vec, d: Vec): Vec | null {
   return add(a, scale(r, t));
 }
 
-/** All interior crossings of the construction's segments, deduped, excluding existing points. */
-export function findSegmentCrossings(c: Construction, positions: Map<Id, Vec>): Crossing[] {
+/** All interior crossings of the construction's segments, deduped, excluding existing points.
+ *  `lines` (optional): the scene's resolved DRAWN lines — their crossings with segment interiors are
+ *  offered too (#197 Am. 7: the touch tangent visibly crossing the two-touch tangent segments). */
+export function findSegmentCrossings(c: Construction, positions: Map<Id, Vec>, lines: { id: Id; anchor: Vec; dir: Vec }[] = []): Crossing[] {
   const segs = c.objects
     .filter((o): o is Extract<typeof o, { kind: 'segment' }> => o.kind === 'segment')
     .map((s) => ({ a: s.a, b: s.b, pa: positions.get(s.a), pb: positions.get(s.b) }))
@@ -76,6 +82,25 @@ export function findSegmentCrossings(c: Construction, positions: Map<Id, Vec>): 
       if (named.some((p) => dist(p, x) < eps)) continue; // already a named point here
       if (out.some((o) => dist(o.pos, x) < eps)) continue; // concurrent lines → one dot
       out.push({ pos: x, a: s1.a, b: s1.b, c: s2.a, d: s2.b });
+    }
+  }
+  // Drawn LINES × segment interiors (#197 Am. 7): a tangent/bisector line crossing a segment strictly
+  // inside it is a visible crossing the student expects to name — same dot, same dedupe discipline.
+  const near = Math.max(1e-9, 2e-2 * span); // a line skimming an endpoint isn't an interior crossing
+  for (const ln of lines) {
+    for (const s of segs) {
+      const r = sub(s.pb, s.pa);
+      const denom = ln.dir.x * r.y - ln.dir.y * r.x;
+      if (Math.abs(denom) < 1e-12) continue; // parallel
+      const ac = sub(s.pa, ln.anchor);
+      // Solve anchor + t·dir = pa + u·r for the SEGMENT param u: cross both sides with dir.
+      const u2 = (ac.x * ln.dir.y - ac.y * ln.dir.x) / denom;
+      const E = 1e-6;
+      if (u2 <= E || u2 >= 1 - E) continue; // must land strictly inside the drawn segment
+      const x = add(s.pa, scale(r, u2));
+      if (named.some((p) => dist(p, x) < near)) continue;
+      if (out.some((o) => dist(o.pos, x) < eps)) continue;
+      out.push({ pos: x, line1: ln.id, c: s.a, d: s.b });
     }
   }
   return out;

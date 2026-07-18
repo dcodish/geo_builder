@@ -1334,6 +1334,56 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "two circles",
+    "winner": "twoCirclesBare",
+  },
+  {
+    "lang": "he",
+    "text": "שני מעגלים",
+    "winner": "twoCirclesBare",
+  },
+  {
+    "lang": "en",
+    "text": "two disjoint circles",
+    "winner": "twoCirclesPosition",
+  },
+  {
+    "lang": "he",
+    "text": "שני מעגלים זרים",
+    "winner": "twoCirclesPosition",
+  },
+  {
+    "lang": "en",
+    "text": "circle P contained in circle O",
+    "winner": "twoCirclesPosition",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל P מוכל בתוך מעגל O",
+    "winner": "twoCirclesPosition",
+  },
+  {
+    "lang": "en",
+    "text": "AB is an external common tangent of the two circles",
+    "winner": "circlesTangent",
+  },
+  {
+    "lang": "he",
+    "text": "AB משיק משותף חיצוני לשני המעגלים",
+    "winner": "circlesTangent",
+  },
+  {
+    "lang": "en",
+    "text": "a line cuts the two circles at points C, D, E and F",
+    "winner": "twoCirclesMeet",
+  },
+  {
+    "lang": "he",
+    "text": "ישר חותך את שני המעגלים בנקודות C, D, E ו-F",
+    "winner": "twoCirclesMeet",
+  },
+  {
+    "lang": "en",
     "text": "circle O with circumference 6π",
     "winner": "circleSizeExisting",
   },
