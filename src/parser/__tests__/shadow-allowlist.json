@@ -32,6 +32,7 @@
     "pointsOnSegments → pointOnSegment",
     "pointsOnSegments → pointsOnSegment",
     "rightTriangle → (anon)",
+    "sector → angle",
     "semicircle → circleOnDiameter",
     "semicircle → diameter",
     "semicircle → pointOnSegment",

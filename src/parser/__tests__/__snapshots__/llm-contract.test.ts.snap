@@ -1244,6 +1244,26 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "triangle",
     ],
   },
+  "sector AOB with angle 80": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "set-angle",
+      "arc",
+      "segment",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "set-angle",
+      "arc",
+      "segment",
+      "segment",
+    ],
+  },
   "segment AC": {
     "en": [
       "segment",

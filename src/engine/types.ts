@@ -540,6 +540,10 @@ export interface Arc {
    *  mirrored SOLVE (an unsigned central-angle constraint's other branch) can flip the drawing to the
    *  complement (ADR-356, issue #170). Absent → the legacy model-CCW from→to identity. */
   spanDeg?: number;
+  /** No stated span but the textbook-default identity: the MINOR (≤180°) traversal — a sector declared
+   *  on existing points whose angle the figure itself determines (ADR-357). A render default, never a
+   *  constraint. */
+  minor?: boolean;
 }
 
 export type GeoObject = GeoPoint | Segment | Polygon | Line | Circle | Arc;
@@ -1018,7 +1022,7 @@ export type Command =
   // so `meetsRequirements` (sampler / "show another") skips it — never a driven equality.
   | { type: 'point-polygon-side'; id: Id; poly: Id[]; side: 'inside' | 'outside' }
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
-  | { type: 'arc'; id: Id; center: Id; from: Id; to: Id; bulgeRef?: Id; bulgeToward?: boolean; spanDeg?: number } // a drawn arc: semicircle / quarter / sector. spanDeg = the INTENDED central angle (arc identity, ADR-356); bulgeRef+bulgeToward orient a semicircle outside/inside a shape (render-time)
+  | { type: 'arc'; id: Id; center: Id; from: Id; to: Id; bulgeRef?: Id; bulgeToward?: boolean; spanDeg?: number; minor?: boolean } // a drawn arc: semicircle / quarter / sector. spanDeg = the INTENDED central angle (arc identity, ADR-356); bulgeRef+bulgeToward orient a semicircle outside/inside a shape (render-time)
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }
   // `order` (e.g. [C, id, E]) keeps the crossing ON the segment between two of the line's points (the
   // circle "cuts CE at D" ⇒ D between C and E), via a `collinear-order` constraint — D is already

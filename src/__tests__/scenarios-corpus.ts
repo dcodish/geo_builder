@@ -202,6 +202,43 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'sector-ODC-value-word-form',
+    title: '«גזרה ODC שווה 90» — the שווה value form + the O-family centre letter (#171, ADR-357 Am.)',
+    guards:
+      "Play-test session 9blvgg2o (2026-07-18): «גזרה ODC שווה 90» parsed as a FREE-angle sector (שווה was not a value marker — the 90 landed nowhere), the number-honesty gate refused, and the LLM died. The value-marker family (שווה/=/מעלות/equals) now parses, and the O-family letter is the centre wherever it sits.",
+    steps: ['משולש ABC ישר זוית', 'O על AC', 'D על AB', 'גזרה ODC שווה 90'],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), C = at(fig, 'C'), D = at(fig, 'D');
+      expect(dist(O, C), '|OC| = |OD| (the sector radii)').toBeCloseTo(dist(O, D), 3);
+      const dot = (C.x - O.x) * (D.x - O.x) + (C.y - O.y) * (D.y - O.y);
+      expect(Math.abs(dot), 'the 90° central angle').toBeLessThan(1e-2);
+      const arc = fig.construction.objects.find((o) => o.kind === 'arc');
+      expect(arc && arc.kind === 'arc' && arc.center === 'O' && arc.spanDeg === 90, 'the 90° arc at centre O').toBe(true);
+    },
+  },
+  {
+    id: 'sector-DCE-angle-style-in-right-triangle',
+    title: '«גזרה DCE» on existing connected points — the sector construct, centre read angle-style (#171, ADR-357)',
+    guards:
+      "Prod session cm4ak2yo (2026-07-17): «גזרה DCE» escalated to the LLM and came back not-understood — the sector construct did not exist. The operator's keystroke names the centre in the MIDDLE (like ∠DCE); the rule reads it angle-style because all three letters exist and the middle is connected to both others (D on CB, E on AC).",
+    steps: ['משולש ABC ישר זוית', 'D על BC', 'E על AC', 'גזרה DCE'],
+    check(fig) {
+      allStepsOk(fig);
+      const C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E');
+      // Centre C: both stated points become the sector's equal-radius ends.
+      expect(dist(C, D), '|CD| = |CE| (the sector radii)').toBeCloseTo(dist(C, E), 3);
+      const arc = fig.construction.objects.find((o) => o.kind === 'arc');
+      expect(arc, 'the sector arc drawn').toBeTruthy();
+      if (arc && arc.kind === 'arc') expect(arc.center).toBe('C');
+      // Both bounding radii drawn from C.
+      const radii = fig.construction.objects.filter(
+        (o) => o.kind === 'segment' && [o.a, o.b].includes('C') && (['D', 'E'] as string[]).some((x) => [o.a, o.b].includes(x)),
+      );
+      expect(radii.length, 'the two bounding radii').toBeGreaterThanOrEqual(2);
+    },
+  },
+  {
     id: 'quarter-circle-in-right-triangle-any-end-order',
     title: '«OCD רבע מעגל» in the right-triangle bagrut figure — membership on a vertex the circle depends on lowers to SIZE, never a cycle (#202)',
     guards:

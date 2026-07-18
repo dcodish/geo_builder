@@ -1237,3 +1237,11 @@ over all four (ADR-041).
 ### `quarter-circle-in-right-triangle-any-end-order` — «OCD רבע מעגל» builds regardless of end-letter order (#202, ADR-354)
 
 **Guards against:** prod sessions `cm4ak2yo`/`3yrpvz14` — the quarter circle centred at O (on AC) with ends C and D (on AB) refused `unresolved dependencies` in the OCD end order while ODC built: the C-membership converted the free vertex C into a rider of a circle whose centre rides segment AC (the ADR-093 inverted-dependency cycle). **Asserts:** the full bagrut sequence (`ABC משולש ישר זוית`, AC=15, BC=10, O על AC, D על AB, `OCD רבע מעגל`) builds all-green to the closed form |OC| = |OD| = 6 with OC ⟂ OD and D on AB. Unit coverage: `membership-cycle.test.ts`, `adr-355.test.ts`, the ADR-356 block in `arc-shapes.test.tsx`.
+
+### `sector-DCE-angle-style-in-right-triangle` — «גזרה DCE» builds the sector, centre read angle-style (#171, ADR-357)
+
+**Guards against:** the sector construct not existing (prod `cm4ak2yo`: «גזרה DCE» → LLM → not-understood) and the naming convention regressing. **Asserts:** on the right triangle with D on CB and E on AC, «גזרה DCE» reads the MIDDLE letter as the centre (the letters bind angle-style), sizes |CD| = |CE|, and draws the arc + both bounding radii from C. Unit coverage: `sector.test.ts` (free-angle DOF, stated 80°, reflex 200° major arc, centre-first on a bare canvas, fresh-label defaults, leftover stop).
+
+### `sector-ODC-value-word-form` — «גזרה ODC שווה 90» parses the value word-form + O-family centre (#171, ADR-357 Am.)
+
+**Guards against:** play-test session `9blvgg2o` — «שווה 90» was not a value marker (the stated 90 landed nowhere → honesty refusal → LLM dead end), and the centre-first run reading misread the operator's letters. **Asserts:** the right-triangle figure + «גזרה ODC שווה 90» builds with centre O, |OC| = |OD|, a 90° central angle, and the 90° arc. Unit coverage: the value-form / naming-convention / central-angle blocks in `sector.test.ts`.

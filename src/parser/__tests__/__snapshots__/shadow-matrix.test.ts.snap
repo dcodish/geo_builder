@@ -383,6 +383,22 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
+      "angle",
+    ],
+    "text": "sector AOB with angle 80",
+    "winner": "sector",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "angle",
+    ],
+    "text": "גזרה AOB בזווית 80",
+    "winner": "sector",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
       "lineMeetsCircle",
       "lineLineIntersection",
     ],
@@ -1545,6 +1561,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "lang": "he",
     "text": "רבע מעגל",
     "winner": "quarterCircle",
+  },
+  {
+    "lang": "en",
+    "text": "sector AOB with angle 80",
+    "winner": "sector",
+  },
+  {
+    "lang": "he",
+    "text": "גזרה AOB בזווית 80",
+    "winner": "sector",
   },
   {
     "lang": "en",

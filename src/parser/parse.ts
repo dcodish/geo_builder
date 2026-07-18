@@ -188,7 +188,7 @@ const circleCenter = (s: string): string | null => {
   // (the 2025-exam wording; issue #100 ride-along). Without it the stated centre was silently DROPPED and
   // an auto-named sibling minted (P) — luck-dependent honesty (§6).
   const m =
-    s.match(/(?:cent\w*\s+(?:at\s+)?(?:point\s+)?|around\s+|שמרכזו\s+(?:ב?נקודה\s+)?|שמרכזו|מרכזו\s+(?:ב?נקודה\s+)?|מרכזו|סביב\s+)([A-Za-z]\d*)\b/i) ??
+    s.match(/(?:cent\w*\s+(?:at\s+)?(?:point\s+)?|around\s+|שמרכז[וה]\s+(?:ב?נקודה\s+)?|שמרכז[וה]|מרכז[וה]\s+(?:ב?נקודה\s+)?|מרכז[וה]|סביב\s+)([A-Za-z]\d*)\b/i) ??
     s.match(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/i) ??
     orderlessCenter(s);
   return m ? m[1] : null;
@@ -1355,6 +1355,17 @@ const centralAngle: Rule = (s, ctx) => {
     const ids = labelRun(cleaned, 3);
     if (!ids) return null;
     [a, centre, b] = ids;
+    // A central angle's vertex IS the circle's centre: when exactly one run letter is a known circle
+    // centre (or the O-family convention) and it is NOT the middle, it wins wherever it sits —
+    // session 9blvgg2o: «זוית מרכזית ODC = 90» read vertex D and the operator had to retype «DOC»
+    // (ADR-357 Am.). The plain middle convention stays when no unique centre letter disambiguates.
+    const isCentre = (p: string) => (ctx.circles ?? []).some((c) => up(c) === up(p)) || /^[OPQ]\d*$/.test(up(p));
+    const centres = ids.filter(isCentre);
+    if (centres.length === 1 && centres[0] !== centre) {
+      const c = centres[0];
+      const rays = ids.filter((x) => x !== c);
+      [a, centre, b] = [rays[0], c, rays[1]];
+    }
   }
   const arms: Command[] = [
     { type: 'segment', a: centre, b: a },
@@ -3838,6 +3849,95 @@ const quarterCircle: Rule = (s, ctx) => {
 };
 
 /**
+ * «גזרה» / "sector" — the GENERAL sector (ADR-357, issue #171): a quarter/semicircle whose central
+ * angle is an unstated magnitude, hence a FREE sampled/drivable DOF (ADR-052); «גזרה בזווית 80» pins
+ * it (reflex >180° in scope — the wedge constraint takes 360−deg, the drawn arc carries the stated
+ * span per ADR-356). Naming: a 3-run is CENTRE-FIRST («גזרה OAB», the operator's #171 table), EXCEPT
+ * the angle-style reading (∠XYZ — centre in the MIDDLE) when the letters bind that way in the
+ * existing figure: all three exist and the middle is connected to both others (a drawn-segment
+ * neighbor, or the other rides a segment ending at it) — the operator's own «גזרה DCE» keystroke.
+ * Fresh-label defaults + SHAPE_LEFTOVER 'stop' per ADR-355.
+ */
+const sector: Rule = (s, ctx) => {
+  if (!/(?<![א-ת])ה?גי?זרה|\bsectors?\b/i.test(s)) return null;
+  const r = parseRadius(s);
+  // The value-marker family (session 9blvgg2o: «גזרה ODC שווה 90», «גזרה AOB =80» fell to the LLM and
+  // died — the stated angle must parse in every natural spelling): בזוית / שווה [ל] / = / with angle /
+  // equals, or a degree-suffixed number (90° / 90 מעלות / 90 degrees).
+  const angM =
+    s.match(/(?:בזוו?ית|שווה(?:\s*ל-?)?|with\s+angle|at\s+angle|equals?|=)\s*(\d+(?:\.\d+)?)\s*°?/i) ??
+    s.match(/(\d+(?:\.\d+)?)\s*(?:°|מעלות|degrees?)/i);
+  const angleDeg = angM ? Number(angM[1]) : null;
+  if (angleDeg !== null && !(angleDeg > 0 && angleDeg < 360)) return 'stop'; // not a central angle — escalate
+  // circleCenter with the sector word collapsed to a circle noun, so «גזרה O» reads like «מעגל O».
+  const namedC = circleCenter(s.replace(/(?<![א-ת])ה?גי?זרה|\bsectors?\b/gi, 'מעגל'));
+  const stripped = dropCircleRef(s).replace(
+    /(?<![א-ת])ה?גי?זרה|\bsectors?\b|בזוו?ית|שווה(?:\s*ל-?)?|with\s+angle|at\s+angle|equals?|\bangle\b|מעלות|degrees?|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*|\d+(?:\.\d+)?|[°=]/gi,
+    ' ',
+  );
+  const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
+  const run = labelRun(restNoC, 3);
+  const endsRun = !run && namedC ? labelRun(restNoC, 2) : null;
+  const leftover = [...(run ?? []), ...(endsRun ?? [])].reduce(
+    (acc, id) => acc.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
+    restNoC,
+  );
+  if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
+  const taken = ctx.points ?? [];
+  const exists = (p: string) => taken.some((q) => up(q) === up(p));
+  let center: string, a: string, b: string;
+  if (run) {
+    const [X, Y, Z] = run;
+    // The student's convention is the ANGLE notation — centre in the MIDDLE (∠AOB): every observed
+    // operator keystroke reads that way (sessions cm4ak2yo + 9blvgg2o: «גזרה DCE», «גזרה AOB» ×2,
+    // «גזרה DOC»). A unique O-family centre letter overrides wherever it sits, so the #171 table's
+    // centre-first «גזרה OAB» also lands on centre O (ADR-357 Am.).
+    const oFam = (p: string) => /^[OPQ]\d*$/.test(up(p));
+    [center, a, b] = oFam(X) && !oFam(Y) ? [X, Y, Z] : [Y, X, Z];
+  } else {
+    center = namedC ? up(namedC) : (['O', 'P', 'Q', 'M', 'N', 'S'].find((c) => !exists(c)) ?? 'O');
+    const fresh = autoVertexLabels(2, [...taken, center]);
+    [a, b] = endsRun ?? (fresh.length === 2 ? (fresh as [string, string]) : ['A', 'B']);
+  }
+  const circ = circleId(center);
+  const cmds: AnyCommand[] = [
+    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(run || namedC ? {} : { autoCenter: true }) },
+  ];
+  if (r.varCmd) cmds.push(r.varCmd);
+  const members = membersOfCenter(ctx, center);
+  const anyExisting = exists(a) || exists(b);
+  // End a: gauge θ when new. End b: a FREE θ — the unstated central angle is a sampled/drivable DOF
+  // (ADR-052) — unless the angle was stated (θ seeded at it, held by the set-angle below).
+  const seedB = ((angleDeg !== null ? Math.min(angleDeg, 359) : 70) * Math.PI) / 180;
+  for (const [p, theta, free] of [[a, 0, false], [b, seedB, angleDeg === null]] as const) {
+    if (exists(p)) {
+      if (!members.has(up(p))) cmds.push({ type: 'point-on-circle', id: up(p), circle: circ });
+    } else {
+      cmds.push({ type: 'point-on-circle', id: up(p), circle: circ, theta, ...(free ? { free: true } : {}) });
+    }
+  }
+  // A stated angle: the wedge between the rays (set-angle measures the unsigned ≤180° angle); the
+  // ARC's identity carries the full stated span — a reflex sector draws the major arc (ADR-356).
+  if (angleDeg !== null) {
+    cmds.push({ type: 'set-angle', vertex: up(center), ray1: up(a), ray2: up(b), value: angleDeg > 180 ? 360 - angleDeg : angleDeg });
+  }
+  cmds.push(
+    {
+      type: 'arc',
+      id: `arc-${up(a)}${up(b)}`,
+      center: up(center),
+      from: up(a),
+      to: up(b),
+      ...(angleDeg !== null ? { spanDeg: angleDeg } : {}),
+      ...(angleDeg === null && anyExisting ? { minor: true } : {}), // the textbook wedge for figure-determined ends
+    },
+    { type: 'segment', a: up(center), b: up(a) }, // a bounding radius
+    { type: 'segment', a: up(center), b: up(b) }, // the other bounding radius
+  );
+  return cmds;
+};
+
+/**
  * "circle inscribed in triangle ABC" / "incircle of triangle ABC" / "מעגל חסום במשולש ABC", OR the
  * triangle-first phrasing "triangle DEF circumscribes the circle" / "משולש DEF חוסם את המעגל" — the
  * INCIRCLE: centred at the incenter (where two angle bisectors meet), tangent to the sides. Built from
@@ -6278,6 +6378,7 @@ export const RULES: Rule[] = [
   semicirclesOnEverySide, // "על כל צלע … יש חצי מעגל" — a semicircle on EVERY side; before `semicircle` (#29)
   semicircle, // "חצי מעגל" / "semicircle" — before `circle` (contains "מעגל") and the shape rules
   quarterCircle, // "רבע מעגל" / "quarter circle" — same
+  sector, // «גזרה» / "sector" — the general central-angle construct (ADR-357)
   concentricCircles, // "שני מעגלים בעלי מרכז משותף O" — the CONCENTRIC PAIR (ADR-244); before `circle` (which would half-parse it to ONE circle) and the two-circle rules
   inscribedInPolygon, // "מעוין BDEF חסום במשולש ABC" — a polygon inscribed in a polygon (ADR-262); before incircle/inscribedPolygon (all match "inscribed") AND the base shape rules
   incircle, // "circle inscribed in triangle ABC" — before inscribedPolygon (both match "inscribed")
