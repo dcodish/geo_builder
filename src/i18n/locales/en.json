@@ -132,7 +132,12 @@
       "insideCircle": "{{point}} should lie inside circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
       "outsideRegion": "{{point}} should lie outside {{poly}}",
       "insideRegion": "{{point}} should lie inside {{poly}}",
-      "radiusRatio": "radius of circle {{c1}} ({{r1}}) should be {{k}} × radius of circle {{c2}} ({{r2}})"
+      "radiusRatio": "radius of circle {{c1}} ({{r1}}) should be {{k}} × radius of circle {{c2}} ({{r2}})",
+      "circlesDisjoint": "circles {{c1}} and {{c2}} should be disjoint (centre gap {{d}} is not larger than the radii sum {{sum}})",
+      "circleContained": "circle {{inner}} should lie strictly inside circle {{outer}} (centre gap + radius = {{reach}} is not below {{ro}})",
+      "tangentExternal": "the common tangent {{a}}{{b}} should be external — both centres on the same side of it",
+      "tangentInternal": "the common tangent {{a}}{{b}} should be internal — the centres on opposite sides of it",
+      "tangentDistinct": "the repeated common tangent {{a}}{{b}} coincides with the tangent already drawn ({{prior}})"
     }
   },
   "errors": {

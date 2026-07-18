@@ -822,6 +822,31 @@ function polyEdges(objects: GeoObject[], ids: Id[]): void {
   addObj(objects, { kind: 'polygon', id: `poly-${ids.join('')}`, vertices: [...ids] });
 }
 
+/** A circle's current SEED radius — the drawn size before any solve: spec value ('free'/'length'),
+ *  |centre·through| when both are placed, else the default scale. Placement decisions (#196) only need
+ *  the seed — the solved radius is downstream. */
+function seedRadiusOf(circ: Extract<GeoObject, { kind: 'circle' }>, pos: Map<Id, Vec>): number {
+  if (circ.radius.via === 'through') {
+    const c = pos.get(circ.center);
+    const t = pos.get(circ.radius.point);
+    return c && t ? dist(c, t) : 5;
+  }
+  return 'value' in circ.radius ? circ.radius.value : 5;
+}
+
+/** A general-position spot at distance `rad` around `centre` — golden-angle spins, off existing points and
+ *  off lines through the centre and an existing point (the ADR-253/ADR-254 seeding discipline), with an
+ *  extra per-candidate acceptance test. Returns the first passing spot, or the θ=0 fallback. */
+function seedSpotAround(centre: Vec, rad: number, others: Vec[], accept: (p: Vec) => boolean = () => true): Vec {
+  const span = spanAround(centre, others.length ? others : [{ x: centre.x + rad, y: centre.y }]);
+  for (let k = 0; k <= 24; k++) {
+    const th = k * GOLDEN_ANGLE;
+    const p = { x: centre.x + rad * Math.cos(th), y: centre.y + rad * Math.sin(th) };
+    if (accept(p) && !degeneratePlacement(centre, [p], others, span)) return p;
+  }
+  return { x: centre.x + rad, y: centre.y };
+}
+
 export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec> = new Map()): Construction {
   const objects = [...prev.objects];
   const constraints = [...prev.constraints];
@@ -1069,7 +1094,27 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // real one with the default free radius (e.g. when a later "chord … in circle O" is parsed without
       // the circle in context). When truly absent, fall through and create it.
       if (cmd.ifAbsent && objects.some((o) => o.kind === 'circle' && o.id === cmd.id)) break;
-      placeBase(objects, [{ id: cmd.center, x: 0, y: 0 }], pos); // create the centre if new
+      // `apart` (#196): a STANDALONE bare circle seeds its NEW centre CLEAR of every existing circle —
+      // the default 0-anchor placement (a fixed +4 gap) lands a second «מעגל O2» overlapping the first,
+      // visually asserting two intersection points the student never stated (the ADR-052/253 smell,
+      // circle edition). Placement only: the centre stays a free sampled DOF, no requirement recorded —
+      // a later stated relation (נחתכים / משיקים / זרים / מוכל) settles the mutual position.
+      if (cmd.apart && !objects.some((o) => o.id === cmd.center)) {
+        const circs = objects.filter((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && !o.center.startsWith('~'));
+        const anchor = circs.length > 0 ? pos.get(circs[circs.length - 1].center) : undefined;
+        if (anchor) {
+          const clearOfAll = (p: Vec): boolean =>
+            circs.every((c) => {
+              const cc = pos.get(c.center);
+              return !cc || dist(p, cc) > (seedRadiusOf(c, pos) + cmd.radius) * 1.12;
+            });
+          const rNear = seedRadiusOf(circs[circs.length - 1], pos);
+          const others = [...pos.values()];
+          const p = seedSpotAround(anchor, (rNear + cmd.radius) * 1.45, others, clearOfAll);
+          if (clearOfAll(p)) objects.push({ kind: 'free-point', id: cmd.center, x: p.x, y: p.y });
+        }
+      }
+      placeBase(objects, [{ id: cmd.center, x: 0, y: 0 }], pos); // create the centre if new (no-op when `apart` placed it)
       upsertCircle(objects, {
         kind: 'circle',
         id: cmd.id,
@@ -1623,6 +1668,116 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         const concentric = (objects[idx] as Extract<GeoObject, { kind: 'circle' }>).center === outer.center;
         objects[idx] = { ...objects[idx], orderedBelow: cmd.outer, ...(concentric ? { innerOf: cmd.outer } : {}) } as GeoObject;
       }
+      break;
+    }
+
+    case 'set-circle-position': {
+      // Two circles' stated MUTUAL POSITION (#196 — «זרים» disjoint / «מוכל בתוך» contained): a
+      // REQUIREMENT in the ADR-244 radius-order shape. checkGivens re-derives it from the final resolved
+      // circles (figure.v.circlesDisjoint / figure.v.circleContained) and `meetsRequirements` gates
+      // sampling / "show another" on it — nothing is pushed to `constraints` (a strict inequality has
+      // nothing to drive). Here we only improve the DEFAULT so the stated position holds at the seed:
+      // re-seat a movable free centre / re-seed a free radius (the ADR-254 pattern — a better default,
+      // never a drive; everything stays a free sampled DOF).
+      const ca = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.a);
+      const cb = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.b);
+      if (!ca || !cb) break; // structural probes run on an empty construction — the verifier owns the rest
+      const pa = pos.get(ca.center);
+      const pb = pos.get(cb.center);
+      const centreObj = (c: Extract<GeoObject, { kind: 'circle' }>) => objects.find((o) => o.id === c.center);
+      const movable = (c: Extract<GeoObject, { kind: 'circle' }>): boolean => {
+        const o = centreObj(c);
+        return !!o && o.kind === 'free-point' && !o.pinned;
+      };
+      const moveCentre = (c: Extract<GeoObject, { kind: 'circle' }>, p: Vec): void => {
+        const i = objects.findIndex((o) => o.id === c.center);
+        objects[i] = { ...(objects[i] as Extract<GeoObject, { kind: 'free-point' }>), x: p.x, y: p.y };
+      };
+      if (!pa || !pb) break;
+      const ra = seedRadiusOf(ca, pos);
+      let rb = seedRadiusOf(cb, pos);
+      const d = dist(pa, pb);
+      const otherPts = (self: Id) => [...pos.entries()].filter(([id]) => id !== self).map(([, v]) => v);
+      if (cmd.relation === 'disjoint') {
+        if (d > (ra + rb) * 1.05) break; // already clearly apart — keep the drawing still (stability)
+        const mv = movable(cb) ? cb : movable(ca) ? ca : null;
+        if (!mv) break; // both centres pinned/derived — the verifier reports the contradiction
+        const around = mv === cb ? pa : pb;
+        moveCentre(mv, seedSpotAround(around, (ra + rb) * 1.45, otherPts(mv.center)));
+      } else {
+        // contained: b strictly inside a — b needs a smaller radius seed AND a centre near a's.
+        if (d + rb < ra * 0.98) break; // already inside — keep the drawing still
+        if (rb >= ra * 0.8) {
+          // Free radius SEEDS may be re-seeded (the concentric pair's 0.55 split, ADR-244) — still free DOFs.
+          const ib = objects.findIndex((o) => o.id === cb.id);
+          const ia = objects.findIndex((o) => o.id === ca.id);
+          if (cb.radius.via === 'free') {
+            rb = ra * 0.45;
+            objects[ib] = { ...cb, radius: { via: 'free', value: rb } };
+          } else if (ca.radius.via === 'free') {
+            objects[ia] = { ...ca, radius: { via: 'free', value: Math.max(ra, rb / 0.45) } };
+          }
+        }
+        const raNow = seedRadiusOf(objects.find((o) => o.id === ca.id) as Extract<GeoObject, { kind: 'circle' }>, pos);
+        const gap = Math.max(0.1, raNow - rb);
+        if (movable(cb)) moveCentre(cb, seedSpotAround(pa, gap * 0.4, otherPts(cb.center)));
+        else if (movable(ca)) moveCentre(ca, seedSpotAround(pb, gap * 0.4, otherPts(ca.center)));
+      }
+      break;
+    }
+
+    case 'common-tangent': {
+      // A common tangent's configuration record (#197). The KIND («חיצוני»/«פנימי») and the distinctness
+      // from already-drawn tangents (`avoid`) are REQUIREMENTS — checkGivens flags them, meetsRequirements
+      // gates sampling. Here we seed the touch riders' θ into an analytic tangent basin of the stated kind
+      // that no `avoid` tangent occupies, so the default config lands right without a search (the solver
+      // then polishes via the radius-⟂-tangent constraints). A kind-less first tangent (no avoid) is left
+      // to the solver exactly as before — byte-identical behaviour for the existing ADR-239 form.
+      if (!cmd.kind && !(cmd.avoid && cmd.avoid.length > 0)) break;
+      const c1 = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle1);
+      const c2 = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle2);
+      const p1 = c1 && pos.get(c1.center);
+      const p2 = c2 && pos.get(c2.center);
+      if (!c1 || !c2 || !p1 || !p2) break;
+      const r1 = seedRadiusOf(c1, pos);
+      const r2 = seedRadiusOf(c2, pos);
+      const d = dist(p1, p2);
+      if (d < 1e-9) break;
+      const u = scale(sub(p2, p1), 1 / d);
+      const uPerp = { x: -u.y, y: u.x };
+      // Candidate tangents as (touch1, touch2) pairs — line normal n with n·u = s, n = s·u ± √(1−s²)·u⊥;
+      // external: both centres on the same side (s = (r2−r1)/d), touches c−r·n on each;
+      // internal: opposite sides (s = −(r1+r2)/d), touch2 = c2 + r2·n. Skip a kind whose |s| > 1
+      // (external needs d > |r1−r2|, internal needs d > r1+r2 — not yet true at this seed).
+      const candidates: { kind: 'external' | 'internal'; t1: Vec; t2: Vec }[] = [];
+      for (const kind of cmd.kind ? [cmd.kind] : (['external', 'internal'] as const)) {
+        const s = kind === 'external' ? (r2 - r1) / d : -(r1 + r2) / d;
+        if (Math.abs(s) >= 1) continue;
+        const q = Math.sqrt(1 - s * s);
+        for (const sign of [1, -1]) {
+          const n = { x: s * u.x + sign * q * uPerp.x, y: s * u.y + sign * q * uPerp.y };
+          candidates.push({
+            kind,
+            t1: { x: p1.x - r1 * n.x, y: p1.y - r1 * n.y },
+            t2: kind === 'external' ? { x: p2.x - r2 * n.x, y: p2.y - r2 * n.y } : { x: p2.x + r2 * n.x, y: p2.y + r2 * n.y },
+          });
+        }
+      }
+      // Drop basins an existing tangent occupies — an avoided touch (either end) near a candidate touch.
+      const taken = (cmd.avoid ?? []).map((id) => pos.get(id)).filter((v): v is Vec => v !== undefined);
+      const free = candidates.filter(
+        (c) => !taken.some((t) => dist(t, c.t1) < Math.max(0.25 * r1, 0.3) || dist(t, c.t2) < Math.max(0.25 * r2, 0.3)),
+      );
+      const pick = free[0] ?? candidates[0];
+      if (!pick) break;
+      const seatTheta = (rider: Id, circle: Id, centre: Vec, touch: Vec): void => {
+        const i = objects.findIndex((o) => o.id === rider && o.kind === 'on-circle');
+        if (i < 0) return;
+        const th = Math.atan2(touch.y - centre.y, touch.x - centre.x);
+        objects[i] = { ...(objects[i] as Extract<GeoObject, { kind: 'on-circle' }>), theta: th, free: true };
+      };
+      seatTheta(cmd.a, cmd.circle1, p1, pick.t1);
+      seatTheta(cmd.b, cmd.circle2, p2, pick.t2);
       break;
     }
 

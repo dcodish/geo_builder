@@ -1374,7 +1374,7 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, o
   // record gates all future sampling; refusing it as "nothing to add" swallowed the student's statement,
   // the ADR-234 class). An EXACT duplicate of an enabled fact stays a friendly no-op — the statement
   // genuinely IS already on the figure.
-  const REQUIREMENT_DATA = new Set(['radius-symbol', 'set-radius-order', 'point-polygon-side', 'point-circle-side']);
+  const REQUIREMENT_DATA = new Set(['radius-symbol', 'set-radius-order', 'point-polygon-side', 'point-circle-side', 'set-circle-position']);
   const enabledCmdList = facts.filter((f) => f.enabled).map((f) => f.cmd);
   const dataOnly =
     commands.length > 0 &&
@@ -2338,7 +2338,9 @@ export const useGeoStore = create<GeoState>()(
         // violation, so the slider STOPS at the R>r boundary. Other (pre-existing) violations don't freeze
         // the slider — only radius-relation ones, which dialing this radius directly controls.
         const fig = replay(facts, seed, candidate);
-        const radiusViolated = fig.violations.some((v) => v.relation === 'radius-order' || v.relation === 'radius-ratio');
+        const radiusViolated = fig.violations.some(
+          (v) => v.relation === 'radius-order' || v.relation === 'radius-ratio' || v.relation === 'circles-disjoint' || v.relation === 'circle-contained',
+        );
         if (fig.lastError === null && !radiusViolated) set({ radiusOverrides: candidate });
       },
 
