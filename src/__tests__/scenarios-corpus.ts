@@ -212,12 +212,16 @@ export const SCENARIOS: Scenario[] = [
       const O = fig.circles.get('circle-O')!;
       const A = at(fig, 'A');
       expect(dist(A, O.center), 'A on the circle').toBeCloseTo(O.r, 3);
-      // The antipode is a fresh auto-named point, diametrically opposite A.
-      const dia = fig.construction.objects.find((o) => o.kind === 'diameter' || (o.kind === 'segment' && o.id.startsWith('seg-') && dist(at(fig, o.a), at(fig, o.b)) > 1.9 * O.r && [o.a, o.b].includes('A')));
+      // The antipode is a fresh auto-named point, diametrically opposite A — find the drawn diameter
+      // segment (the full-width segment with A as an endpoint; the `diameter` command lowers to it).
+      const dia = fig.construction.objects.find(
+        (o) => o.kind === 'segment' && (o.a === 'A' || o.b === 'A') && dist(at(fig, o.a), at(fig, o.b)) > 1.9 * O.r,
+      );
       expect(dia, 'a diameter through A drawn').toBeTruthy();
-      const far = dia && 'a' in dia ? (dia.a === 'A' ? dia.b : dia.a) : undefined;
-      expect(far && dist(at(fig, far), O.center), 'the far end on the circle').toBeCloseTo(O.r, 3);
-      if (far) expect(dist(A, at(fig, far)), 'a full diameter').toBeCloseTo(2 * O.r, 3);
+      if (!dia || dia.kind !== 'segment') return;
+      const far = dia.a === 'A' ? dia.b : dia.a;
+      expect(dist(at(fig, far), O.center), 'the far end on the circle').toBeCloseTo(O.r, 3);
+      expect(dist(A, at(fig, far)), 'a full diameter').toBeCloseTo(2 * O.r, 3);
     },
   },
   {
