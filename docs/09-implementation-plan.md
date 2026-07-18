@@ -2,7 +2,7 @@
 
 _Last updated: 2026-07-17._
 
-> **Status (2026-07-18).** The quarter-circle bundle is on main (ADR-354/355/356 — #202 membership-cycle guard, #205 quarter/semicircle naming honesty, #170 span-aware arc identity; the P1 is closed); the sector construct (#171) is on the PR route. Previous status follows.
+> **Status (2026-07-18, deployed `prod/2026-07-18-2`).** The quarter-circle bundle (ADR-354/355/356 — #202/#205/#170, the P1 closed) AND the sector «גזרה» (ADR-357 + Am., #171 via PR #209 — free/pinned/reflex central angle, the value-form family, middle-centre naming with the O-family override) are on main and LIVE. Previous status follows.
 >
 > **Status (2026-07-17).** The full v1 pipeline is shipped and live in prod (engine, renderer, store, parser, LLM fallback, save/load, PNG + `.docx` exports; latest deploy tag `prod/2026-07-17` — #177/ADR-342 + both amendments are LIVE). Work is now **issue-queue-driven** ([ADR-265](06-decisions.md#adr-265); workflow: [22-workflow.md](22-workflow.md)) — day-to-day priorities are the open GitHub issues on `dcodish/geo_builder`, not this plan. Authoritative *current-state* sources: the **ADR log** ([06-decisions.md](06-decisions.md)), **[DEPLOY-LOG.md](DEPLOY-LOG.md)** (what is live), and **[PROJECT-MEMORY.md](PROJECT-MEMORY.md)** (session log).
 >
