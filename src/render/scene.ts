@@ -167,7 +167,7 @@ export interface Scene {
  * central-angle constraint lets the SOLVE itself land the mirrored configuration. Without `spanDeg`
  * the identity stays the legacy model-frame CCW from→to (parity-corrected under a mirrored view).
  */
-function arcGeometry(center: Vec, from: Vec, to: Vec, id: Id, opts?: { spanDeg?: number; mirrored?: boolean }): SceneArc | null {
+function arcGeometry(center: Vec, from: Vec, to: Vec, id: Id, opts?: { spanDeg?: number; minor?: boolean; mirrored?: boolean }): SceneArc | null {
   const r = len(sub(from, center));
   if (r < 1e-9) return null;
   const TAU = 2 * Math.PI;
@@ -175,7 +175,10 @@ function arcGeometry(center: Vec, from: Vec, to: Vec, id: Id, opts?: { spanDeg?:
   const angB = Math.atan2(to.y - center.y, to.x - center.x);
   let ccw = (angB - angA) % TAU; // CCW span from `from` to `to` in the RECEIVED frame
   if (ccw <= 1e-9) ccw += TAU;
-  const intended = opts?.spanDeg !== undefined ? (opts.spanDeg * Math.PI) / 180 : opts?.mirrored ? TAU - ccw : ccw;
+  const intended =
+    opts?.spanDeg !== undefined ? (opts.spanDeg * Math.PI) / 180
+    : opts?.minor ? Math.min(ccw, TAU - ccw) // the textbook wedge (ADR-357) — parity-invariant
+    : opts?.mirrored ? TAU - ccw : ccw;
   // Traverse whichever way realises the intended span (tie — a semicircle — keeps CCW; the bulge
   // mechanism has already oriented a semicircle's from/to in this frame).
   const goCcw = Math.abs(ccw - intended) <= Math.abs(TAU - ccw - intended);
@@ -309,7 +312,7 @@ export function buildScene(
           const sameSide = side(apex) * side(ref) > 0;
           if (sameSide !== !!o.bulgeToward) [from, to] = [to, from]; // wrong side → the other semicircle
         }
-        const a = arcGeometry(center, from, to, o.id, { spanDeg: o.spanDeg, mirrored: opts?.mirrored });
+        const a = arcGeometry(center, from, to, o.id, { spanDeg: o.spanDeg, minor: o.minor, mirrored: opts?.mirrored });
         if (a) arcs.push(a);
       }
     }
