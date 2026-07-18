@@ -52,7 +52,9 @@ export interface SceneCircle {
 }
 
 /** A drawn arc (world, y-up): from `from` to `to` around `center`, radius `r`. The
- *  `largeArc`/`sweep` are SVG arc flags computed for the CCW(world)→CW(screen) arc. */
+ *  `largeArc`/`sweep` are SVG arc flags for the RESOLVED traversal; `startAng`/`sweepAng`
+ *  (radians, sweep signed — negative = clockwise in the received frame) publish that same
+ *  traversal so consumers (the fit extent) never re-derive the arc's identity (ADR-356). */
 export interface SceneArc {
   id: Id;
   center: Vec;
@@ -61,6 +63,8 @@ export interface SceneArc {
   r: number;
   largeArc: 0 | 1;
   sweep: 0 | 1;
+  startAng: number;
+  sweepAng: number;
 }
 
 /** A visible (infinite) line: a point on it and a unit direction. The renderer clips it to the view. */
@@ -152,17 +156,33 @@ export interface Scene {
   angleMarks: SceneAngleMark[];
 }
 
-/** Resolve an {@link Arc} object to a drawable {@link SceneArc}, or null if a referenced point is missing/degenerate. */
-function arcGeometry(center: Vec, from: Vec, to: Vec, id: Id): SceneArc | null {
+/**
+ * Resolve an {@link Arc} object to a drawable {@link SceneArc}, or null if a referenced point is
+ * missing/degenerate.
+ *
+ * The arc's IDENTITY — which of the two arcs between `from` and `to` — is "the arc of the intended
+ * central angle" (`spanDeg`, e.g. a quarter's 90°), never "the CCW sweep in whatever frame we were
+ * handed" (ADR-356, issue #170): the received positions may be a MIRRORED view frame (`Figure`
+ * pre-orients world positions; one flip reverses handedness — `mirrored`), and an unsigned
+ * central-angle constraint lets the SOLVE itself land the mirrored configuration. Without `spanDeg`
+ * the identity stays the legacy model-frame CCW from→to (parity-corrected under a mirrored view).
+ */
+function arcGeometry(center: Vec, from: Vec, to: Vec, id: Id, opts?: { spanDeg?: number; mirrored?: boolean }): SceneArc | null {
   const r = len(sub(from, center));
   if (r < 1e-9) return null;
+  const TAU = 2 * Math.PI;
   const angA = Math.atan2(from.y - center.y, from.x - center.x);
   const angB = Math.atan2(to.y - center.y, to.x - center.x);
-  let span = (angB - angA) % (2 * Math.PI); // CCW span from `from` to `to` (world, y-up)
-  if (span <= 1e-9) span += 2 * Math.PI;
-  // The renderer flips Y to screen (y-down), where SVG sweep-flag 1 is *clockwise*. A
-  // world-CCW arc traverses right→top→left (visually counter-clockwise on screen) ⇒ sweep 0.
-  return { id, center, from, to, r, largeArc: span > Math.PI ? 1 : 0, sweep: 0 };
+  let ccw = (angB - angA) % TAU; // CCW span from `from` to `to` in the RECEIVED frame
+  if (ccw <= 1e-9) ccw += TAU;
+  const intended = opts?.spanDeg !== undefined ? (opts.spanDeg * Math.PI) / 180 : opts?.mirrored ? TAU - ccw : ccw;
+  // Traverse whichever way realises the intended span (tie — a semicircle — keeps CCW; the bulge
+  // mechanism has already oriented a semicircle's from/to in this frame).
+  const goCcw = Math.abs(ccw - intended) <= Math.abs(TAU - ccw - intended);
+  const extent = goCcw ? ccw : TAU - ccw;
+  // The renderer flips Y to screen (y-down), where SVG sweep-flag 1 is *clockwise*. A received-frame
+  // CCW arc traverses right→top→left (visually counter-clockwise on screen) ⇒ sweep 0; CW ⇒ sweep 1.
+  return { id, center, from, to, r, largeArc: extent > Math.PI ? 1 : 0, sweep: goCcw ? 0 : 1, startAng: angA, sweepAng: goCcw ? extent : -extent };
 }
 
 /** Resolve a construction + computed positions into drawable primitives. */
@@ -171,7 +191,7 @@ export function buildScene(
   positions: Map<Id, Vec>,
   labels?: MeasureLabels,
   angleMarkSpecs?: { vertex: Id; ray1: Id; ray2: Id; right: boolean }[],
-  opts?: { showCenters?: boolean; circles?: Map<Id, ResolvedCircle> },
+  opts?: { showCenters?: boolean; circles?: Map<Id, ResolvedCircle>; mirrored?: boolean },
 ): Scene {
   // "Show circle centres": reveal every circle's centre with its label (O, P, …), even an AUTO one
   // that nothing is drawn from — so the student can tell two unnamed circles apart and address each
@@ -289,7 +309,7 @@ export function buildScene(
           const sameSide = side(apex) * side(ref) > 0;
           if (sameSide !== !!o.bulgeToward) [from, to] = [to, from]; // wrong side → the other semicircle
         }
-        const a = arcGeometry(center, from, to, o.id);
+        const a = arcGeometry(center, from, to, o.id, { spanDeg: o.spanDeg, mirrored: opts?.mirrored });
         if (a) arcs.push(a);
       }
     }
@@ -432,15 +452,16 @@ export function scenePositions(scene: Scene): Vec[] {
     ps.push({ x: c.center.x - c.r, y: c.center.y }, { x: c.center.x + c.r, y: c.center.y });
     ps.push({ x: c.center.x, y: c.center.y - c.r }, { x: c.center.x, y: c.center.y + c.r });
   }
-  // An arc's extent: its endpoints plus any axis-extreme (0/90/180/270°) the arc actually sweeps.
+  // An arc's extent: its endpoints plus any axis-extreme (0/90/180/270°) the arc actually sweeps —
+  // read from the RESOLVED traversal the scene builder published (startAng + signed sweepAng), never
+  // re-derived from a CCW convention (the duplicated-identity smell ADR-356 removed).
   for (const a of scene.arcs) {
     ps.push(a.from, a.to);
-    const angA = Math.atan2(a.from.y - a.center.y, a.from.x - a.center.x);
-    let span = (Math.atan2(a.to.y - a.center.y, a.to.x - a.center.x) - angA) % (2 * Math.PI);
-    if (span <= 1e-9) span += 2 * Math.PI;
+    const start = a.sweepAng >= 0 ? a.startAng : a.startAng + a.sweepAng; // the CCW-low end of the swept interval
+    const span = Math.abs(a.sweepAng);
     for (let k = 0; k < 4; k++) {
       const ca = (k * Math.PI) / 2;
-      let d = (ca - angA) % (2 * Math.PI);
+      let d = (ca - start) % (2 * Math.PI);
       if (d < 0) d += 2 * Math.PI;
       if (d <= span + 1e-9) ps.push({ x: a.center.x + a.r * Math.cos(ca), y: a.center.y + a.r * Math.sin(ca) });
     }

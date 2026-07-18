@@ -2,6 +2,8 @@
 
 _Last updated: 2026-07-17._
 
+> **Status (2026-07-18).** The quarter-circle bundle is on main (ADR-354/355/356 — #202 membership-cycle guard, #205 quarter/semicircle naming honesty, #170 span-aware arc identity; the P1 is closed); the sector construct (#171) is on the PR route. Previous status follows.
+>
 > **Status (2026-07-17).** The full v1 pipeline is shipped and live in prod (engine, renderer, store, parser, LLM fallback, save/load, PNG + `.docx` exports; latest deploy tag `prod/2026-07-17` — #177/ADR-342 + both amendments are LIVE). Work is now **issue-queue-driven** ([ADR-265](06-decisions.md#adr-265); workflow: [22-workflow.md](22-workflow.md)) — day-to-day priorities are the open GitHub issues on `dcodish/geo_builder`, not this plan. Authoritative *current-state* sources: the **ADR log** ([06-decisions.md](06-decisions.md)), **[DEPLOY-LOG.md](DEPLOY-LOG.md)** (what is live), and **[PROJECT-MEMORY.md](PROJECT-MEMORY.md)** (session log).
 >
 > **Resume pointer.** The P1 queue is EMPTY (all 2026-07-16 P1s fixed AND deployed). **2026-07-17 fix session (operator "go ahead"): the parser-distribution P2 package is FIXED on main** — #163 ([ADR-343](06-decisions.md#adr-343), a chained value distributes to EVERY member per the operator ruling «AB=BC=8 means AB=8 and BC=8»), #151 ([ADR-344](06-decisions.md#adr-344), plural chord/diameter declarations distribute over the conjunction), #160 ([ADR-345](06-decisions.md#adr-345), a count digit is a quantifier — the honesty gate no longer rejects a correct parse on spelling); awaiting deploy. Next: the remaining P2 queue (#150/#152/#156/#157/#158-needs-operator/#159/#162/#164/#168/#170/#171) + the standing operator gates (theorem-ranking play-and-judge, ≥3 principles, the 6c ship pass).

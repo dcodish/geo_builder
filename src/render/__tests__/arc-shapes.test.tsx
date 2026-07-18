@@ -48,6 +48,49 @@ describe('semicircle (חצי מעגל / semicircle)', () => {
   });
 });
 
+describe('ADR-356 (#170) — an arc\'s identity survives a MIRRORED frame', () => {
+  const mirrorX = (positions: Map<string, { x: number; y: number }>) =>
+    new Map([...positions].map(([id, p]) => [id, { x: -p.x, y: p.y }]));
+  const arcSpanDeg = (a: { sweepAng: number }) => (Math.abs(a.sweepAng) * 180) / Math.PI;
+
+  it('quarter: a mirrored VIEW frame still draws the 90° arc (never the 270° complement)', () => {
+    const { construction, positions } = buildFrom('רבע מעגל');
+    // The Figure pre-orients world positions; one flip reverses handedness. Simulate exactly that:
+    // mirrored positions + the parity flag the Figure now passes.
+    const scene = buildScene(construction, mirrorX(positions), undefined, undefined, { mirrored: true });
+    expect(scene.arcs).toHaveLength(1);
+    expect(scene.arcs[0].largeArc).toBe(0);
+    expect(arcSpanDeg(scene.arcs[0])).toBeCloseTo(90, 4);
+  });
+
+  it('quarter: a mirrored SOLVE (world-mirrored config, identity view) still draws the 90° arc — spanDeg is the identity', () => {
+    const { construction, positions } = buildFrom('רבע מעגל');
+    // No parity flag here — the WORLD positions themselves are the mirror configuration (the unsigned
+    // central-angle constraint's other branch). The stated 90° span must still win.
+    const scene = buildScene(construction, mirrorX(positions));
+    expect(scene.arcs).toHaveLength(1);
+    expect(scene.arcs[0].largeArc).toBe(0);
+    expect(arcSpanDeg(scene.arcs[0])).toBeCloseTo(90, 4);
+  });
+
+  it('semicircle: mirrored view still draws the 180° arc and keeps its bulge orientation machinery', () => {
+    const { construction, positions } = buildFrom('semicircle with diameter AB');
+    const scene = buildScene(construction, mirrorX(positions), undefined, undefined, { mirrored: true });
+    expect(scene.arcs).toHaveLength(1);
+    expect(arcSpanDeg(scene.arcs[0])).toBeCloseTo(180, 4);
+  });
+
+  it('identity frame stays byte-stable: unmirrored quarter/semicircle flags unchanged', () => {
+    for (const [u, span] of [['רבע מעגל', 90], ['semicircle with diameter AB', 180]] as const) {
+      const { construction, positions } = buildFrom(u);
+      const scene = buildScene(construction, positions);
+      expect(scene.arcs[0].largeArc, u).toBe(0);
+      expect(scene.arcs[0].sweep, u).toBe(0);
+      expect(arcSpanDeg(scene.arcs[0])).toBeCloseTo(span, 4);
+    }
+  });
+});
+
 describe('quarter circle (רבע מעגל / quarter circle)', () => {
   for (const u of ['quarter circle', 'רבע מעגל']) {
     it(`"${u}" → a 90° arc with two bounding radii, no full circle`, () => {

@@ -9,6 +9,7 @@
  */
 
 import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, Vec } from './types';
+import { objectParents } from './types';
 import { add, dist, lineLineIntersect, pointInPolygon, reflectAcross, scale, sub } from './geometry';
 import { constraintRefs } from './solve';
 
@@ -685,6 +686,31 @@ function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Ve
  * pattern: a collinearity whose driven point is on a circle, with the line through another point that
  * is ALSO on that circle, is really a line∩circle crossing — see the `set-collinear` handler.
  */
+/**
+ * Would rewriting object `x` to reference `refs` invert the dependency graph? True when any ref
+ * transitively depends on `x` (BFS over the exhaustive `objectParents`). Every conversion at the
+ * membership chokepoints (a free vertex → on-circle rider, an on-segment point → line∩circle, a free
+ * radius → through-point) must pass this gate: a circle whose centre rides a segment ending at C
+ * ("O על AC" then "C על מעגל O") transitively depends on C, so converting C to ride that circle
+ * would create the cycle C → circle → O → C — the ADR-093 inverted-dependency class, refused by
+ * `evaluate` as "unresolved dependencies". The membership must then fall through to the
+ * constraint/size lowerings instead (ADR-354).
+ */
+function wouldInvertDependency(objects: GeoObject[], x: Id, refs: Id[]): boolean {
+  const byId = new Map(objects.map((o) => [o.id, o] as const));
+  const seen = new Set<Id>();
+  const queue = [...refs];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (id === x) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const o = byId.get(id);
+    if (o) queue.push(...objectParents(o));
+  }
+  return false;
+}
+
 function pointOnCircle(objects: GeoObject[], id: Id, circleId: Id): boolean {
   const circ = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === circleId);
   const center = circ?.center;
@@ -1073,7 +1099,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     }
 
     case 'arc':
-      addObj(objects, { kind: 'arc', id: cmd.id, center: cmd.center, from: cmd.from, to: cmd.to, ...(cmd.bulgeRef ? { bulgeRef: cmd.bulgeRef } : {}), ...(cmd.bulgeToward ? { bulgeToward: cmd.bulgeToward } : {}) });
+      addObj(objects, { kind: 'arc', id: cmd.id, center: cmd.center, from: cmd.from, to: cmd.to, ...(cmd.bulgeRef ? { bulgeRef: cmd.bulgeRef } : {}), ...(cmd.bulgeToward ? { bulgeToward: cmd.bulgeToward } : {}), ...(cmd.spanDeg !== undefined ? { spanDeg: cmd.spanDeg } : {}) });
       break;
 
     case 'circle-through':
@@ -1234,7 +1260,7 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         // crossing of that line with C: become a line∩circle avoiding the shared end (the same
         // reinterpretation as `addCollinear`). E.g. "E on extension AC" + "E on circle P", A on P
         // ⇒ E = line(A,C) ∩ P, avoiding A. Drives E onto the circle instead of dropping the fact.
-        if (existing.kind === 'on-segment' || existing.kind === 'on-segment-solved') {
+        if ((existing.kind === 'on-segment' || existing.kind === 'on-segment-solved') && !wouldInvertDependency(objects, cmd.id, [cmd.circle])) {
           const ends = [existing.a, existing.b];
           const shared = ends.find((id) => pointOnCircle(objects, id, cmd.circle));
           if (shared) {
@@ -1265,7 +1291,10 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         // constraints. This is the "shapes carry their true DOF" model: declaring a quad's C,D "on circle O"
         // makes CD a real chord instead of leaving the corners adrift (the verifier's "C is not on circle O").
         // A through-radius circle (handled by (c)) is excluded — there the CIRCLE grows to the fixed vertex.
-        if (circ && existing.kind === 'free-point' && !(existing as Extract<GeoObject, { kind: 'free-point' }>).pinned) {
+        // (cycle gate, ADR-354): the conversion is only sound when the circle does not transitively
+        // depend on this very point (via its centre/through-point); else fall through to (c3)/(c4) —
+        // the membership SIZES the circle to the point instead of moving the point onto the circle.
+        if (circ && existing.kind === 'free-point' && !(existing as Extract<GeoObject, { kind: 'free-point' }>).pinned && !wouldInvertDependency(objects, cmd.id, [cmd.circle])) {
           const i = objects.findIndex((o) => o.id === cmd.id);
           // PRESERVE a `solve` the free vertex already carries ([ADR-140](docs/06-decisions.md#adr-140)): a
           // kite/shape vertex may already DRIVE an equality (e.g. D drives `AB=AD`). Dropping its carrier role
@@ -1293,7 +1322,8 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
         // (|centre·Q| = |centre·P|), so a semicircle declared on an existing square side CD is DRIVEN
         // to the side — centre at the midpoint, r = |CD|/2 (issue #28 / ADR-284; the free-radius twin
         // of (c)). A radius BUSY driving another constraint (ADR-230 tangency) is left alone → (d).
-        if (circ && circ.radius.via === 'free' && cmd.id !== circ.center && (circ as { solve?: unknown }).solve === undefined) {
+        if (circ && circ.radius.via === 'free' && cmd.id !== circ.center && (circ as { solve?: unknown }).solve === undefined
+            && !wouldInvertDependency(objects, cmd.circle, [cmd.id])) {
           const ci = objects.findIndex((o) => o.id === cmd.circle);
           objects[ci] = { ...circ, radius: { via: 'through', point: cmd.id } };
           break;
@@ -1781,7 +1811,7 @@ function addCollinear(objects: GeoObject[], constraints: Constraint[], a: Id, b:
   const shared = dObj && dObj.kind === 'on-circle' && others.length === 2
     ? others.find((id) => pointOnCircle(objects, id, dObj.circle))
     : undefined;
-  if (dObj && dObj.kind === 'on-circle' && shared) {
+  if (dObj && dObj.kind === 'on-circle' && shared && !wouldInvertDependency(objects, driven!, others)) {
     const lineId = `line-${others[0]}${others[1]}`;
     addLine(objects, { kind: 'line', id: lineId, spec: { via: 'through', a: others[0], b: others[1] } });
     const i = objects.findIndex((x) => x.id === driven);

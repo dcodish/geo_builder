@@ -202,6 +202,25 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'quarter-circle-in-right-triangle-any-end-order',
+    title: '«OCD רבע מעגל» in the right-triangle bagrut figure — membership on a vertex the circle depends on lowers to SIZE, never a cycle (#202)',
+    guards:
+      'Prod sessions cm4ak2yo/3yrpvz14 (2026-07-17/18): the quarter circle centred at O (on AC) with ends C and D (on AB) was refused «unresolved dependencies» in the OCD end order while ODC built — the C-membership arrived first and branch (c2) converted the free vertex C into a rider of circle-O, whose centre O rides segment AC → the cycle C → circle-O → O → C (the ADR-093 inverted-dependency class). ADR-354: every conversion at the membership chokepoint passes a wouldInvertDependency gate and falls through to the constraint/size lowering, so end-letter order cannot change build success (M2).',
+    steps: ['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'O על AC', 'D על AB', 'OCD רבע מעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const O = at(fig, 'O'), C = at(fig, 'C'), D = at(fig, 'D'), A = at(fig, 'A'), B = at(fig, 'B');
+      // The closed form: |OC| = |OD| = r = 6 (similar triangles AOD ~ ACB with AC=15, BC=10).
+      expect(dist(O, C), 'radius |OC|').toBeCloseTo(6, 2);
+      expect(dist(O, D), 'radius |OD|').toBeCloseTo(6, 2);
+      // The 90° quarter at the centre, and D genuinely on the hypotenuse.
+      const dot = (C.x - O.x) * (D.x - O.x) + (C.y - O.y) * (D.y - O.y);
+      expect(Math.abs(dot), 'OC ⟂ OD').toBeLessThan(1e-2);
+      const cross = (B.x - A.x) * (D.y - A.y) - (B.y - A.y) * (D.x - A.x);
+      expect(Math.abs(cross) / dist(A, B), 'D on line AB').toBeLessThan(1e-3);
+    },
+  },
+  {
     id: 'diameter-through-point-imperative',
     title: '«הוסף קוטר העובר בנקודה A» — the THROUGH phrasing + a leading imperative reach the ADR-270 diameter (#201)',
     guards:

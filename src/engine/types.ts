@@ -534,6 +534,12 @@ export interface Arc {
    *  (`bulgeToward`, inward). Resolved at render time because the side needs coordinates. */
   bulgeRef?: Id;
   bulgeToward?: boolean;
+  /** The arc's INTENDED central angle in degrees (90 for a quarter, 180 for a semicircle, a sector's
+   *  stated angle). The arc's identity is "the arc of this span between its endpoints" — the renderer
+   *  picks whichever traversal direction realises it, so neither a mirrored VIEW (flipX/flipY) nor a
+   *  mirrored SOLVE (an unsigned central-angle constraint's other branch) can flip the drawing to the
+   *  complement (ADR-356, issue #170). Absent → the legacy model-CCW from→to identity. */
+  spanDeg?: number;
 }
 
 export type GeoObject = GeoPoint | Segment | Polygon | Line | Circle | Arc;
@@ -1012,7 +1018,7 @@ export type Command =
   // so `meetsRequirements` (sampler / "show another") skips it — never a driven equality.
   | { type: 'point-polygon-side'; id: Id; poly: Id[]; side: 'inside' | 'outside' }
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
-  | { type: 'arc'; id: Id; center: Id; from: Id; to: Id; bulgeRef?: Id; bulgeToward?: boolean } // a drawn arc (CCW from→to): semicircle / quarter circle. bulgeRef+bulgeToward orient a semicircle outside/inside a shape (render-time)
+  | { type: 'arc'; id: Id; center: Id; from: Id; to: Id; bulgeRef?: Id; bulgeToward?: boolean; spanDeg?: number } // a drawn arc: semicircle / quarter / sector. spanDeg = the INTENDED central angle (arc identity, ADR-356); bulgeRef+bulgeToward orient a semicircle outside/inside a shape (render-time)
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }
   // `order` (e.g. [C, id, E]) keeps the crossing ON the segment between two of the line's points (the
   // circle "cuts CE at D" ⇒ D between C and E), via a `collinear-order` constraint — D is already

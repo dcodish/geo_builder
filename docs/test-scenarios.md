@@ -1233,3 +1233,7 @@ over all four (ADR-041).
 ### `chord-in-the-right-circle` — «מיתר DF במעגל הימני» resolves deterministically (#188, ADR-349)
 
 **Guards against:** a directional circle reference («המעגל הימני/השמאלי» / right|left) escalating to the LLM — the prod session hqxbjh0x utterance. **Asserts:** on two unnamed intersecting circles, the chord lands on the circle whose centre is drawn further right; every step green. Unit coverage: `directional-circle.test.ts`.
+
+### `quarter-circle-in-right-triangle-any-end-order` — «OCD רבע מעגל» builds regardless of end-letter order (#202, ADR-354)
+
+**Guards against:** prod sessions `cm4ak2yo`/`3yrpvz14` — the quarter circle centred at O (on AC) with ends C and D (on AB) refused `unresolved dependencies` in the OCD end order while ODC built: the C-membership converted the free vertex C into a rider of a circle whose centre rides segment AC (the ADR-093 inverted-dependency cycle). **Asserts:** the full bagrut sequence (`ABC משולש ישר זוית`, AC=15, BC=10, O על AC, D על AB, `OCD רבע מעגל`) builds all-green to the closed form |OC| = |OD| = 6 with OC ⟂ OD and D on AB. Unit coverage: `membership-cycle.test.ts`, `adr-355.test.ts`, the ADR-356 block in `arc-shapes.test.tsx`.

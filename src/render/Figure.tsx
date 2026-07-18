@@ -320,7 +320,10 @@ export function Figure({
       o.rot === 0 && !o.flipX && !o.flipY
         ? positions
         : new Map<Id, Vec>([...positions].map(([id, v]) => [id, orient(v, o)]));
-    const s = buildScene(construction, oriented, labels, angleMarks, { showCenters, circles });
+    // A single flip is an odd isometry — it reverses the CCW sense of the pre-oriented positions the
+    // scene is built from, so the arc resolver must know the parity or every arc draws as its
+    // complement (ADR-356, issue #170 — «רבע מעגל» flipped drew the 270° arc).
+    const s = buildScene(construction, oriented, labels, angleMarks, { showCenters, circles, mirrored: o.flipX !== o.flipY });
     // View stability (F4): keep the previous fit while the figure still fits — refit only on
     // overflow / gross shrink, or when the viewport/orientation genuinely changed.
     const vp = { width: vw, height: vh, padding };

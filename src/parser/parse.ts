@@ -3668,7 +3668,7 @@ const semicirclesOnEverySide: Rule = (s, ctx) => {
       { type: 'midpoint', id: center, a, b },
       { type: 'circle-through', id: circ, center, through: a, hidden: true, autoCenter: true },
       { type: 'point-on-circle', id: b, circle: circ }, // the antipode membership (a passing check)
-      { type: 'arc', id: `arc-${b}${a}`, center, from: b, to: a }, // CCW b→a = the half-circle
+      { type: 'arc', id: `arc-${b}${a}`, center, from: b, to: a, spanDeg: 180 }, // the 180° half-circle
       { type: 'segment', a, b }, // the side (diameter)
     );
   }
@@ -3704,7 +3704,7 @@ function semicircleBulge(s: string, ctx: ParseContext, a: Id, b: Id): { bulgeRef
 }
 
 const semicircle: Rule = (s, ctx) => {
-  if (!/semicircle|half[\s-]?circle|חצי[\s-]?מעגל|חצי[\s-]?עיגול/i.test(s)) return null;
+  if (!/semicircle|half[\s-]?circle|חצי[\s-]?ה?מעגל|חצי[\s-]?ה?עיגול/i.test(s)) return null;
   const r = parseRadius(s);
   const namedC = circleCenter(s); // "חצי מעגל P שקוטרו CD" names the hidden circle's centre P
   // A SIDE reference is this rule's own vocabulary — «על צלע CD יש חצי מעגל» states the side IS the
@@ -3713,12 +3713,16 @@ const semicircle: Rule = (s, ctx) => {
   // The "outside/inside the <shape>" bulge clause is stripped too (its shape+labels must not be read as
   // the diameter or trip the leftover guard); it's resolved to a bulge reference below.
   const stripped = dropCircleRef(s).replace(BULGE_CLAUSE, ' ').replace(
-    /semicircle|half[\s-]?circle|חצי[\s-]?מעגל|חצי[\s-]?עיגול|diameter|קוטר|שקוטרו|צלע\S*|\bsides?\b|(?<![א-ת])יש(?![א-ת])|על|\bon\b|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
+    /semicircle|half[\s-]?circle|חצי[\s-]?ה?מעגל|חצי[\s-]?ה?עיגול|diameter|קוטר|שקוטרו|צלע\S*|\bsides?\b|(?<![א-ת])יש(?![א-ת])|על|\bon\b|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
     ' ',
   );
   const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
   const dia = labelRun(restNoC, 2);
-  const [a, b] = dia ?? ['A', 'B'];
+  // Unnamed diameter defaults pick FRESH labels — a bare «חצי מעגל» beside an existing triangle must
+  // never bind its A,B as the diameter (the ADR-116/263 label-hijack class, ADR-355). Alphabet
+  // exhausted → the legacy A,B rather than a crash.
+  const freshDia = autoVertexLabels(2, ctx.points ?? []);
+  const [a, b] = dia ?? (freshDia.length === 2 ? freshDia : ['A', 'B']);
   const bulge = semicircleBulge(s, ctx, up(a), up(b));
   const leftover = [a, b].reduce((acc, id) => acc.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '), restNoC);
   if (SHAPE_LEFTOVER.test(leftover)) return 'stop'; // a compound ("semicircle … with AC=5") → escalate, don't half-parse
@@ -3740,7 +3744,7 @@ const semicircle: Rule = (s, ctx) => {
     if (r.varCmd) cmds.push(r.varCmd);
     cmds.push(
       { type: 'point-on-circle', id: up(b), circle: circ }, // the tautological membership — a recorded, passing check
-      { type: 'arc', id: `arc-${up(b)}${up(a)}`, center: up(center), from: up(b), to: up(a), ...bulge }, // CCW B→A = the upper half (bulge = outside/inside the shape)
+      { type: 'arc', id: `arc-${up(b)}${up(a)}`, center: up(center), from: up(b), to: up(a), spanDeg: 180, ...bulge }, // the 180° half (bulge = outside/inside the shape)
       { type: 'segment', a: up(a), b: up(b) }, // the diameter
     );
     return cmds;
@@ -3763,7 +3767,7 @@ const semicircle: Rule = (s, ctx) => {
   // through-centre collinearity DRIVES the free centre/radius to the stated side (the ADR-137 lowering).
   if (anyExisting) cmds.push({ type: 'set-collinear', a: up(a), b: up(center), c: up(b) });
   cmds.push(
-    { type: 'arc', id: `arc-${up(b)}${up(a)}`, center: up(center), from: up(b), to: up(a), ...bulge }, // CCW B→A (bulge = outside/inside)
+    { type: 'arc', id: `arc-${up(b)}${up(a)}`, center: up(center), from: up(b), to: up(a), spanDeg: 180, ...bulge }, // the 180° half (bulge = outside/inside)
     { type: 'segment', a: up(a), b: up(b) }, // the diameter
   );
   return cmds;
@@ -3776,17 +3780,40 @@ const semicircle: Rule = (s, ctx) => {
  * statements — membership + a 90° central angle DRIVE the free circle; pinned θ only for NEW ends.
  */
 const quarterCircle: Rule = (s, ctx) => {
-  if (!/quarter[\s-]?circle|רבע[\s-]?מעגל|רבע[\s-]?עיגול/i.test(s)) return null;
+  // The definite form «רבע המעגל» is the natural NAMING phrasing ("C מרכז רבע המעגל") — ה-tolerant.
+  if (!/quarter[\s-]?circle|רבע[\s-]?ה?מעגל|רבע[\s-]?ה?עיגול/i.test(s)) return null;
   const r = parseRadius(s);
+  // A named CENTRE ("C מרכז רבע המעגל", "רבע מעגל שמרכזו C") — resolved with the quarter word
+  // collapsed so circleCenter's circle-noun forms see a plain «מעגל» (ADR-355; the semicircle
+  // rule's own namedC discipline).
+  const namedC = circleCenter(s.replace(/רבע[\s-]?|quarter[\s-]?/gi, ''));
   const stripped = dropCircleRef(s).replace(
-    /quarter[\s-]?circle|רבע[\s-]?מעגל|רבע[\s-]?עיגול|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
+    /quarter[\s-]?circle|רבע[\s-]?ה?מעגל|רבע[\s-]?ה?עיגול|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
     ' ',
   );
-  const named = labelRun(stripped, 3); // "OAB" ⇒ centre O + ends A,B; else default
-  const [center, a, b] = named ?? ['O', 'A', 'B'];
+  const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
+  const named = labelRun(restNoC, 3); // "OAB" ⇒ centre O + ends A,B
+  const endsRun = !named && namedC ? labelRun(restNoC, 2) : null; // centre named separately + "…AB" ends
+  // Anything geometry-significant surviving the rule's own words + labels («החסום במשולש», a cut
+  // compound) is meaning this rule cannot express — escalate, never half-build (ADR-355; the
+  // semicircle rule's SHAPE_LEFTOVER discipline).
+  const leftover = [...(named ?? []), ...(endsRun ?? [])].reduce(
+    (acc, id) => acc.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
+    restNoC,
+  );
+  if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
+  // Defaults NEVER bind existing points the utterance didn't name (the ADR-116/263 label-hijack
+  // class): an unnamed centre picks a free centre letter, unnamed ends pick fresh vertex letters.
+  const taken = ctx.points ?? [];
+  const center =
+    named?.[0] ??
+    (namedC ? up(namedC) : (['O', 'P', 'Q', 'M', 'N', 'S'].find((c) => !taken.some((p) => up(p) === c)) ?? 'O'));
+  const fresh = autoVertexLabels(2, [...taken, center]);
+  // Alphabet exhausted (26 points taken) → the legacy A,B defaults rather than a crash; not a real figure.
+  const [a, b] = named ? [named[1], named[2]] : (endsRun ?? (fresh.length === 2 ? fresh : ['A', 'B']));
   const circ = circleId(center);
   const cmds: AnyCommand[] = [
-    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(named ? {} : { autoCenter: true }) },
+    { type: 'circle', id: circ, center: up(center), radius: r.radius, ...(r.numeric ? {} : { freeRadius: true }), hidden: true, ...(named || namedC ? {} : { autoCenter: true }) },
   ];
   if (r.varCmd) cmds.push(r.varCmd);
   const exists = (p: string) => (ctx.points ?? []).some((q) => up(q) === up(p));
@@ -3803,7 +3830,7 @@ const quarterCircle: Rule = (s, ctx) => {
   // on the driven circle — the central angle at the centre is 90°.
   if (anyExisting) cmds.push({ type: 'set-angle', vertex: up(center), ray1: up(a), ray2: up(b), value: 90 });
   cmds.push(
-    { type: 'arc', id: `arc-${up(a)}${up(b)}`, center: up(center), from: up(a), to: up(b) }, // CCW 0°→90°
+    { type: 'arc', id: `arc-${up(a)}${up(b)}`, center: up(center), from: up(a), to: up(b), spanDeg: 90 }, // the 90° quarter
     { type: 'segment', a: up(center), b: up(a) }, // a bounding radius
     { type: 'segment', a: up(center), b: up(b) }, // the other bounding radius
   );
