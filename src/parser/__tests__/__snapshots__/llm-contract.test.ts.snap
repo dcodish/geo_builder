@@ -1244,7 +1244,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "triangle",
     ],
   },
-  "sector OAB with angle 80": {
+  "sector AOB with angle 80": {
     "en": [
       "circle",
       "point-on-circle",

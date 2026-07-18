@@ -385,7 +385,7 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "shadowedBy": [
       "angle",
     ],
-    "text": "sector OAB with angle 80",
+    "text": "sector AOB with angle 80",
     "winner": "sector",
   },
   {
@@ -393,7 +393,7 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "shadowedBy": [
       "angle",
     ],
-    "text": "גזרה OAB בזווית 80",
+    "text": "גזרה AOB בזווית 80",
     "winner": "sector",
   },
   {
@@ -1564,12 +1564,12 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
-    "text": "sector OAB with angle 80",
+    "text": "sector AOB with angle 80",
     "winner": "sector",
   },
   {
     "lang": "he",
-    "text": "גזרה OAB בזווית 80",
+    "text": "גזרה AOB בזווית 80",
     "winner": "sector",
   },
   {

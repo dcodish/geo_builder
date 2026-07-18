@@ -84,12 +84,59 @@ describe('ADR-357 — sector', () => {
     expect(segs.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('centre-first «גזרה OAB» on a bare canvas: O is the centre', () => {
-    const r = parse('גזרה OAB', {});
+  it('the naming convention (ADR-357 Am.): middle-centre by default, an O-family letter wins wherever it sits', () => {
+    // Every observed operator keystroke is the ANGLE notation (centre in the middle); the O-family
+    // override keeps the #171 table's centre-first «גזרה OAB» working too.
+    for (const [u, want] of [
+      ['גזרה OAB', 'O'], // O-family first → centre O (the #171 table form)
+      ['גזרה AOB', 'O'], // O-family middle → centre O (the operator's keystroke, session 9blvgg2o)
+      ['גזרה DCE', 'C'], // no O-family → middle-centre (the angle notation)
+    ] as const) {
+      const r = parse(u, {});
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) continue;
+      const circle = r.commands.find((c): c is Extract<AnyCommand, { type: 'circle' }> => c.type === 'circle')!;
+      expect(circle.center, u).toBe(want);
+    }
+  });
+
+  for (const [u, deg] of [
+    ['גזרה AOB שווה 80', 80],
+    ['גזרה AOB = 80', 80],
+    ['גזרה AOB =80', 80],
+    ['sector AOB equals 80', 80],
+    ['גזרה AOB 60°', 60],
+    ['גזרה AOB 60 מעלות', 60],
+  ] as const) {
+    it(`value form «${u}» pins the central angle (the session-9blvgg2o family)`, () => {
+      const r = parse(u, {});
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return;
+      const angle = r.commands.find((c): c is Extract<AnyCommand, { type: 'set-angle' }> => c.type === 'set-angle')!;
+      expect(angle.vertex, u).toBe('O'); // middle-centre / O-family
+      expect(angle.value, u).toBe(deg);
+      const arc = r.commands.find((c): c is Extract<AnyCommand, { type: 'arc' }> => c.type === 'arc')!;
+      expect(arc.spanDeg, u).toBe(deg);
+    });
+  }
+
+  it('«זוית מרכזית ODC = 90» — the central-angle word resolves the vertex to the CENTRE letter', () => {
+    const facts = buildFacts(['משולש ABC ישר זוית', 'O על AC', 'D על AB']);
+    const { construction, positions } = replay(facts);
+    const r = parse('זוית מרכזית ODC = 90', buildParseCtx(construction, positions));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    const circle = r.commands.find((c): c is Extract<AnyCommand, { type: 'circle' }> => c.type === 'circle')!;
-    expect(circle.center).toBe('O');
+    const angle = r.commands.find((c): c is Extract<AnyCommand, { type: 'set-angle' }> => c.type === 'set-angle')!;
+    expect(angle.vertex).toBe('O'); // the centre, not the middle letter D
+    expect([angle.ray1, angle.ray2].sort()).toEqual(['C', 'D']);
+  });
+
+  it('plain «זוית ODC = 90» (no central word) keeps the middle-vertex convention', () => {
+    const r = parse('זוית ODC = 90', {});
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const angle = r.commands.find((c): c is Extract<AnyCommand, { type: 'set-angle' }> => c.type === 'set-angle')!;
+    expect(angle.vertex).toBe('D');
   });
 
   it('fresh-label defaults beside a triangle (ADR-355 discipline): no hijack of A,B,C', () => {

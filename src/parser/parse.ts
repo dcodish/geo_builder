@@ -1355,6 +1355,17 @@ const centralAngle: Rule = (s, ctx) => {
     const ids = labelRun(cleaned, 3);
     if (!ids) return null;
     [a, centre, b] = ids;
+    // A central angle's vertex IS the circle's centre: when exactly one run letter is a known circle
+    // centre (or the O-family convention) and it is NOT the middle, it wins wherever it sits —
+    // session 9blvgg2o: «זוית מרכזית ODC = 90» read vertex D and the operator had to retype «DOC»
+    // (ADR-357 Am.). The plain middle convention stays when no unique centre letter disambiguates.
+    const isCentre = (p: string) => (ctx.circles ?? []).some((c) => up(c) === up(p)) || /^[OPQ]\d*$/.test(up(p));
+    const centres = ids.filter(isCentre);
+    if (centres.length === 1 && centres[0] !== centre) {
+      const c = centres[0];
+      const rays = ids.filter((x) => x !== c);
+      [a, centre, b] = [rays[0], c, rays[1]];
+    }
   }
   const arms: Command[] = [
     { type: 'segment', a: centre, b: a },
@@ -3850,14 +3861,18 @@ const quarterCircle: Rule = (s, ctx) => {
 const sector: Rule = (s, ctx) => {
   if (!/(?<![א-ת])ה?גי?זרה|\bsectors?\b/i.test(s)) return null;
   const r = parseRadius(s);
+  // The value-marker family (session 9blvgg2o: «גזרה ODC שווה 90», «גזרה AOB =80» fell to the LLM and
+  // died — the stated angle must parse in every natural spelling): בזוית / שווה [ל] / = / with angle /
+  // equals, or a degree-suffixed number (90° / 90 מעלות / 90 degrees).
   const angM =
-    s.match(/(?:בזוו?ית|with\s+angle|at\s+angle)\s+(\d+(?:\.\d+)?)\s*°?/i) ?? s.match(/(\d+(?:\.\d+)?)\s*°/);
+    s.match(/(?:בזוו?ית|שווה(?:\s*ל-?)?|with\s+angle|at\s+angle|equals?|=)\s*(\d+(?:\.\d+)?)\s*°?/i) ??
+    s.match(/(\d+(?:\.\d+)?)\s*(?:°|מעלות|degrees?)/i);
   const angleDeg = angM ? Number(angM[1]) : null;
   if (angleDeg !== null && !(angleDeg > 0 && angleDeg < 360)) return 'stop'; // not a central angle — escalate
   // circleCenter with the sector word collapsed to a circle noun, so «גזרה O» reads like «מעגל O».
   const namedC = circleCenter(s.replace(/(?<![א-ת])ה?גי?זרה|\bsectors?\b/gi, 'מעגל'));
   const stripped = dropCircleRef(s).replace(
-    /(?<![א-ת])ה?גי?זרה|\bsectors?\b|בזוו?ית|with\s+angle|at\s+angle|\bangle\b|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*|\d+(?:\.\d+)?|°/gi,
+    /(?<![א-ת])ה?גי?זרה|\bsectors?\b|בזוו?ית|שווה(?:\s*ל-?)?|with\s+angle|at\s+angle|equals?|\bangle\b|מעלות|degrees?|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*|\d+(?:\.\d+)?|[°=]/gi,
     ' ',
   );
   const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
@@ -3870,13 +3885,15 @@ const sector: Rule = (s, ctx) => {
   if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
   const taken = ctx.points ?? [];
   const exists = (p: string) => taken.some((q) => up(q) === up(p));
-  const connected = (m: string, x: string) =>
-    (ctx.neighbors?.[up(m)] ?? []).map(up).includes(up(x)) || (ctx.onSegment?.[up(x)] ?? []).map(up).includes(up(m));
   let center: string, a: string, b: string;
   if (run) {
     const [X, Y, Z] = run;
-    const angleStyle = exists(X) && exists(Y) && exists(Z) && connected(Y, X) && connected(Y, Z);
-    [center, a, b] = angleStyle ? [Y, X, Z] : [X, Y, Z];
+    // The student's convention is the ANGLE notation — centre in the MIDDLE (∠AOB): every observed
+    // operator keystroke reads that way (sessions cm4ak2yo + 9blvgg2o: «גזרה DCE», «גזרה AOB» ×2,
+    // «גזרה DOC»). A unique O-family centre letter overrides wherever it sits, so the #171 table's
+    // centre-first «גזרה OAB» also lands on centre O (ADR-357 Am.).
+    const oFam = (p: string) => /^[OPQ]\d*$/.test(up(p));
+    [center, a, b] = oFam(X) && !oFam(Y) ? [X, Y, Z] : [Y, X, Z];
   } else {
     center = namedC ? up(namedC) : (['O', 'P', 'Q', 'M', 'N', 'S'].find((c) => !exists(c)) ?? 'O');
     const fresh = autoVertexLabels(2, [...taken, center]);
