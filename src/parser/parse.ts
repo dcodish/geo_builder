@@ -4249,14 +4249,24 @@ const diameterFromPoint: Rule = (s, ctx) => {
   if (!/diameter|קוטר/i.test(s)) return null;
   if (INTERSECT_KW.test(s)) return null; // a cut compound → diameterCutsSegment
   if (POINT_ON_CARRIER.test(s)) return null; // "E על הקוטר…" is a point ON the diameter
-  const fromM = s.match(/(?:from(?:\s+(?:the\s+)?point)?|מ-?נקודה|מהנקודה|היוצא\s+מ-?|מ-)\s*([A-Za-z]\d*)/i);
-  if (!fromM) return null; // no from-marker → the two-label `diameter` rule
+  // The from/THROUGH marker (#201, operator ruling 2026-07-18: «קוטר ב/מנקודה A» means the diameter
+  // THROUGH A — the same ADR-270 construct): the original from-forms, plus «[ה]עובר בנקודה A» /
+  // «בנקודה A» (incl. the stacked-prefix slip «במנקודה») / «דרך [ה]נקודה A» / En "through [the point] A".
+  // A leading imperative («הוסף קוטר…», "add/draw a diameter…") needs no handling of its own — the rule
+  // is unanchored and the strip below keeps the En filler words out of the label count.
+  const fromM = s.match(
+    /(?:from(?:\s+(?:the\s+)?point)?|through(?:\s+(?:the\s+)?point)?|מ-?נקודה|מהנקודה|היוצא\s+מ-?|מ-|(?:ה?עובר\s+)?(?:ב|במ)-?נקודה|דרך(?:\s+ה?נקודה)?)\s*([A-Za-z]\d*)/i,
+  );
+  if (!fromM) return null; // no from/through-marker → the two-label `diameter` rule
   const center = resolveCenter(s, ctx);
   if (!center) return null;
   const F = up(fromM[1]);
   if (up(center) === F) return null; // "from the centre" is not an on-circle point
   // Exactly ONE label besides the circle name — a second label is a named far endpoint (→ `diameter`).
-  const rest = dropCircleRef(s).replace(/diameter|קוטר|היוצא|מ-?נקודה|מהנקודה|\bfrom\b|\bpoint\b|\bthe\b/gi, ' ');
+  const rest = dropCircleRef(s).replace(
+    /diameter|קוטר|היוצא|העובר|עובר|מ-?נקודה|מהנקודה|(?:ב|במ)-?נקודה|דרך|\bfrom\b|\bthrough\b|\bpoint\b|\bthe\b|\badd\b|\bdraw\b|\ban?\b/gi,
+    ' ',
+  );
   const labels = [...rest.matchAll(/\b[A-Za-z]\d*\b/g)].map((mm) => up(mm[0]));
   if (labels.some((l) => l !== F)) return null;
   const far = freeLabel([F, up(center), ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['D', 'E', 'G', 'H', 'K', 'L']);

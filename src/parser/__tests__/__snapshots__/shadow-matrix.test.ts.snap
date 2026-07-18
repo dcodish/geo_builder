@@ -416,6 +416,14 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
+      "circle",
+    ],
+    "text": "diameter through A in circle O",
+    "winner": "diameterFromPoint",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
       "midpoint",
     ],
     "text": "M is the midpoint of arc BC in circle O",
@@ -1636,6 +1644,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   {
     "lang": "he",
     "text": "קוטר מנקודה F במעגל O",
+    "winner": "diameterFromPoint",
+  },
+  {
+    "lang": "en",
+    "text": "diameter through A in circle O",
+    "winner": "diameterFromPoint",
+  },
+  {
+    "lang": "he",
+    "text": "קוטר העובר בנקודה A במעגל O",
     "winner": "diameterFromPoint",
   },
   {

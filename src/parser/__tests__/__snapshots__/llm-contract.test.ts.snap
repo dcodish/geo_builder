@@ -798,6 +798,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "diameter",
     ],
   },
+  "diameter through A in circle O": {
+    "en": [
+      "circle",
+      "diameter",
+    ],
+    "he": [
+      "circle",
+      "diameter",
+    ],
+  },
   "equilateral triangle ABC": {
     "en": [
       "triangle",

@@ -4939,3 +4939,11 @@ if (ok) { cur = trial; status[f.id] = 'ok'; applied.push(...engineCmds); }
 3. **The honest limit, stated in the UI:** the map is only as fresh as the last triage run. **No map → the header says plainly that nothing was re-verified** («⚠ אין נתוני אימות — הרשימה משקפת את התוצאה בזמן ההקלדה בלבד») — "no verdict data" reads as UNKNOWN, never as verification that didn't happen.
 
 **Locks:** `admin.test.ts` #183 block — reader tolerance, the no-map honesty note, built-row move + verdict column + revision header, the card's open count, unknown-verdict-is-never-fixed. SKILL.md step 5 documents the upload. **Deploy note:** `proxy.mjs` must be redeployed for the dashboard half; the first verdict file appears on the next triage run.
+
+### ADR-353 — diameter-THROUGH-a-point phrasings reach the ADR-270 construct (issue #201)
+
+**Context.** Prod log-triage 2026-07-17 (LIVE, 1 user): «הוסף קוטר העובר בנקודה A» → not-handled → paid LLM → not-handled — although the construct has existed since ADR-270 («קוטר מנקודה F»: the on-circle point, an auto-named antipode). **Operator ruling 2026-07-18: «קוטר ב/מנקודה A» means the diameter THROUGH A** — a phrasing gap on an existing construct, never a new one.
+
+**Decision (the ADR-3D-026 phrasing-class discipline — widen at the rule's own seam, one place).** `diameterFromPoint`'s from-marker gains the THROUGH family: «[ה]עובר בנקודה A», the bare locative «בנקודה A», the stacked-prefix slip «במנקודה A», «דרך [ה?נקודה] A», En "through [the point] A"; the label-count strip gains the new marker words + the En filler («add», «draw», articles) so a leading imperative never reads as labels — the rule is unanchored, so «הוסף קוטר…» needs no imperative machinery of its own. Everything else is byte-unchanged: the INTERSECT_KW defer keeps cut compounds with `diameterCutsSegment`, POINT_ON_CARRIER keeps «E על הקוטר», two labels keep the named-antipode `diameter`, and the M1 membership assert / fresh-antipode naming are the ADR-270 lowering untouched.
+
+**Locks:** `diameter-from-point.test.ts` widened to 13 accepted forms + the standing no-theft set; scenario `diameter-through-point-imperative` (the verbatim prod utterance end-to-end); catalog +1 («קוטר העובר בנקודה A במעגל O» / "diameter through A in circle O").
