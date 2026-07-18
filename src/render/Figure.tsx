@@ -332,7 +332,7 @@ export function Figure({
     const fresh = fitTransform(pts, vp);
     const t = lastFit.current?.key === fitKey ? keepOrRefit(lastFit.current.t, fresh, pts, vp) : fresh;
     lastFit.current = { t, key: fitKey };
-    const x = onPickIntersection ? findSegmentCrossings(construction, oriented) : [];
+    const x = onPickIntersection ? findSegmentCrossings(construction, oriented, s.lines) : [];
 
     // Nudge each label off the lines, in screen space at a reference scale (zoom
     // is applied later by the pan/zoom <g>, so this stays stable across zooming).

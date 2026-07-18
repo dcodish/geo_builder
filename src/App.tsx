@@ -1022,10 +1022,24 @@ export default function App() {
       }
     }
     if (!id) return; // A–Z all taken (won't happen in practice)
+    // A drawn-LINE operand (#197 Am. 7 — e.g. the touch tangent crossing a tangent segment): the
+    // crossing is line∩line of the drawn line and the segment's carrier line (created idempotently).
+    if (x.line1) {
+      const segLine = `line-${x.c}${x.d}`;
+      const utterance = he ? `${id} = חיתוך ${x.line1} ו-${x.c}${x.d}` : `${id} = intersection of ${x.line1} and ${x.c}${x.d}`;
+      executeMany(
+        [
+          { type: 'line-through', id: segLine, a: x.c!, b: x.d! },
+          { type: 'line-intersection', id, line1: x.line1, line2: segLine },
+        ],
+        utterance,
+      );
+      return;
+    }
     const utterance = he
       ? `${id} = חיתוך ${x.a}${x.b} ו-${x.c}${x.d}`
       : `${id} = intersection of ${x.a}${x.b} and ${x.c}${x.d}`;
-    execute({ type: 'line-line-intersection', id, a: x.a, b: x.b, c: x.c, d: x.d }, utterance);
+    execute({ type: 'line-line-intersection', id, a: x.a!, b: x.b!, c: x.c!, d: x.d! }, utterance);
   }
 
   // Highlight every object introduced by the selected step (all its commands).

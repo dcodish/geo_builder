@@ -1030,6 +1030,62 @@ const bareSegment: Rule = (s) => {
  * silently dropping the intersection point.
  */
 const INTERSECT_KW = /intersect|∩|חיתוך|נחתך|נחתכ|נפגש|פוגש|פגש|חות[כך]|\bcuts?\b|\bmeets?\b/i; // incl. "חותך" (cuts), active "פוגש"/"פגש" (meets), "cuts"
+/**
+ * TWO TANGENTS' MEET (#197 Am. 6): «המשיקים [המשותפים] נפגשים בנקודה K» / "the [common] tangents meet
+ * at K" — the classic construction (the tangents extended to their crossing, the homothety centre) —
+ * and the LABELED form «AB ו-CD נפגשים בנקודה K» when BOTH pairs are recognised common tangents of the
+ * same circle pair (the ctx hint). Tangents meet BEYOND their touches, so the generic bare-pair meet's
+ * within-segment requirement (ADR-166) would wrongly refuse — this rule emits the LINE crossing (no
+ * onSeg) + extension ink from each touch to the meet. Runs BEFORE the generic line∩line rules.
+ */
+const tangentsMeet: Rule = (s, ctx) => {
+  if (!/נפגש|נחתכ|מפגש|חיתוך|\bmeet\b|\bmeets\b|\bintersect\w*/i.test(s)) return null;
+  // The LABELED form needs no tangent noun — recognition is SEMANTIC (both stated pairs are known
+  // common tangents); only the definite «המשיקים» form requires the word.
+  const tangentWord = /משיק|tangent/i.test(s);
+  const pairsByKey = ctx.commonTangents ?? {};
+  const keys = Object.keys(pairsByKey);
+  // The named meet point: «בנקודה K» or the one label the utterance names.
+  const atM = s.match(/(?:\bat\b|בנקודה)\s*([A-Za-z]\d*)\b/i);
+  // Letter RUNS split into labels («AB ו-CD» → A,B,C,D — the shared toks pattern).
+  const labels = [...new Set((dropCircleRef(s).match(/\b(?:[A-Z]\d*){1,2}\b/g) ?? []).flatMap((t) => t.match(/[A-Z]\d*/g) ?? []).map(up))];
+  const K = atM ? up(atM[1]) : null;
+  // Labeled form: two stated pairs, both recognised tangents of ONE circle pair.
+  const runs = labels.filter((l) => l !== K);
+  let t1: [string, string] | null = null;
+  let t2: [string, string] | null = null;
+  if (runs.length === 4) {
+    for (const key of keys) {
+      const ps = pairsByKey[key].map((e) => new Set(e.pair));
+      const p1 = ps.find((p) => p.has(runs[0]) && p.has(runs[1]));
+      const p2 = ps.find((p) => p.has(runs[2]) && p.has(runs[3]));
+      if (p1 && p2 && p1 !== p2) {
+        t1 = [runs[0], runs[1]];
+        t2 = [runs[2], runs[3]];
+        break;
+      }
+    }
+    if (!t1) return null; // stated pairs that aren't a known tangent pair — the generic meet rules own it
+  } else if (runs.length === 0) {
+    if (!tangentWord) return null; // the definite form needs the tangent noun («המשיקים»)
+    // The definite «המשיקים»: exactly one circle pair with exactly two drawn tangents resolves.
+    const key = keys.find((k) => pairsByKey[k].length === 2);
+    if (!key || keys.filter((k) => pairsByKey[k].length >= 2).length !== 1) return null;
+    [t1, t2] = pairsByKey[key].map((e) => e.pair) as [[string, string], [string, string]];
+  } else return null;
+  if (!K) return null; // a meet with no named point — nothing to name; the generic rules/LLM own it
+  const [A, B] = t1!;
+  const [C, D] = t2!;
+  return [
+    { type: 'line-line-intersection', id: K, a: A, b: B, c: C, d: D }, // the LINE crossing — beyond the touches by nature
+    // Extension ink: K to both touches of each tangent covers the reach whichever side K lands on.
+    { type: 'segment', a: A, b: K },
+    { type: 'segment', a: B, b: K },
+    { type: 'segment', a: C, b: K },
+    { type: 'segment', a: D, b: K },
+  ];
+};
+
 const lineLineIntersection: Rule = (s) => {
   if (!INTERSECT_KW.test(s)) return null;
   // A DIAMETER or TANGENT operand is a construct this rule can't build (an antipode / a touch-point
@@ -5428,7 +5484,16 @@ const commonTangent: Rule = (s, ctx) => {
   const capacity = kind === 'external' ? extCap : kind === 'internal' ? intCap : extCap + intCap;
   if (priorOfKind + wantPairs > capacity) {
     const touchy = position === 'ext-tangent' || position === 'int-tangent';
-    return { clarify: 'tangents-exhausted', kind: kind ?? 'any', ...(touchy ? { hint: 'at-touch' as const } : {}) };
+    // On a TANGENT pair, the remaining common tangent EXISTS — it is the one AT the touch point. A
+    // kind-less (or internal — its degenerate limit) request with the touch not yet drawn BUILDS it
+    // directly (operator: "when there is an ability to do the 3rd one, it told me it cannot"); the
+    // refusal is only for a request beyond THAT too (or an explicit חיצוני beyond the two externals).
+    const touch = touchy ? ctx.circlePairTouches?.[[id1, id2].sort().join('|')] : undefined;
+    const touchFree = touch && !(ctx.lines ?? []).includes(`tan-${up(touch)}`);
+    if (touchFree && kind !== 'external' && wantPairs === 1) {
+      return [...mk, { type: 'tangent', id: `tan-${up(touch)}`, circle: id1, at: up(touch), visible: true }];
+    }
+    return { clarify: 'tangents-exhausted', kind: kind ?? 'any', ...(touchy && touchFree ? { hint: 'at-touch' as const } : {}) };
   }
   const prior = priorEntries.flatMap((e) => e.pair);
   const out: AnyCommand[] = [...mk];
@@ -6631,6 +6696,7 @@ export const RULES: Rule[] = [
   // generic line∩line and before pointOnSegment (whose "P on QR" would misread "P on line QR").
   collinearConstraint,
   diameterCutsSegment, // "קוטר … מנקודה F חותך את הצלע AC בנקודה E" — before lineLineIntersection (which stops on "קוטר") and `diameter`
+  tangentsMeet, // #197 Am. 6: «המשיקים נפגשים בנקודה K» — the tangents' crossing, named
   lineLineIntersection,
   centralAngle, // #106: "זוית מרכזית COD" / "…נשענת על קשת CD" — before every generic angle rule
   angleAcuteness, // "∠ABC קהה/חדה" (obtuse/acute) — before the value-based angle rules

@@ -177,17 +177,25 @@ describe('#197 Am. 3 — מבחוץ/מבפנים synonyms + tangent EXHAUSTION r
 });
 
 describe('#197 Am. 4 — TANGENT circles: capacity follows the mutual position', () => {
-  it("the operator's sequence: on «שני מעגלים משיקים מבחוץ», two «משיק משותף» build and the THIRD refuses fast with the at-touch hint", () => {
-    // Externally tangent circles have only TWO separate two-touch common tangents — the third common
-    // tangent passes THROUGH the touch point (the at-form). Session 2026-07-18 18:52: the third
-    // request ground the solver instead.
-    const facts = buildFacts(['שני מעגלים משיקים מבחוץ', 'משיק משותף', 'משיק משותף']);
+  it("the operator's sequence: on «שני מעגלים משיקים מבחוץ», the THIRD «משיק משותף» BUILDS the touch tangent; a FOURTH refuses", () => {
+    // Externally tangent circles have two separate two-touch tangents + ONE through the touch point.
+    // The third kind-less request builds that remaining tangent directly (operator: "when there is an
+    // ability to do the 3rd one, it told me it cannot"); only a fourth is a genuine refusal.
+    const facts = buildFacts(['שני מעגלים משיקים מבחוץ', 'משיק משותף', 'משיק משותף', 'משיק משותף']);
     const fig = replay(facts);
-    expect(Object.values(fig.status).every((s) => s === 'ok'), 'two tangents build').toBe(true);
+    expect(Object.values(fig.status).every((s) => s === 'ok'), 'all three tangents build').toBe(true);
+    // The third is the tangent LINE at the true touch point (on both circles).
+    const tangents = fig.construction.objects.filter((o) => o.kind === 'line' && o.id.startsWith('tan-'));
+    expect(tangents.length).toBeGreaterThanOrEqual(1);
+    const touchId = tangents[0].id.slice(4);
+    const touch = fig.positions.get(touchId)!;
+    for (const c of fig.circles.values()) expect(d(touch, c.center), 'the touch on the circle').toBeCloseTo(c.r, 2);
+    // The FOURTH refuses fast — nothing remains (the touch tangent is taken, no hint).
     const t0 = Date.now();
     const r = parse('משיק משותף', buildParseCtx(fig.construction, fig.positions));
     expect(Date.now() - t0).toBeLessThan(500);
-    expect(!r.ok && r.reason === 'tangents-exhausted' && r.hint === 'at-touch').toBe(true);
+    expect(!r.ok && r.reason === 'tangents-exhausted').toBe(true);
+    if (!r.ok && r.reason === 'tangents-exhausted') expect(r.hint).toBeUndefined();
   });
 
   it('perf lock (#197 Am. 4): the second tangent on tangent circles builds within budget (was 38 s)', () => {
@@ -228,6 +236,55 @@ describe('#197 Am. 4 — TANGENT circles: capacity follows the mutual position',
     expect(Object.values(fig2.status).every((s) => s === 'ok'), 'the two externals build').toBe(true);
     const r3 = parse('משיק משותף', buildParseCtx(fig2.construction, fig2.positions));
     expect(!r3.ok && r3.reason === 'tangents-exhausted').toBe(true);
+  });
+});
+
+describe('#197 Am. 6 — naming the tangents’ MEET', () => {
+  const collinear = (P: { x: number; y: number }, Q: { x: number; y: number }, R: { x: number; y: number }) =>
+    Math.abs((Q.x - P.x) * (R.y - P.y) - (Q.y - P.y) * (R.x - P.x)) / Math.max(1e-9, d(P, Q));
+
+  it('the definite «המשיקים נפגשים בנקודה K» resolves THE two drawn tangents and names their crossing', () => {
+    const facts = buildFacts(['שני מעגלים זרים', 'משיק משותף חיצוני', 'משיק משותף חיצוני', 'המשיקים נפגשים בנקודה K']);
+    const fig = replay(facts);
+    expect(Object.values(fig.status).every((s) => s === 'ok')).toBe(true);
+    const K = fig.positions.get('K')!;
+    expect(K, 'K exists').toBeTruthy();
+    // K is collinear with each tangent's touch pair (the crossing of the two tangent LINES).
+    const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => fig.positions.get(id)!);
+    expect(collinear(A, B, K), 'K on line AB').toBeLessThan(0.05);
+    expect(collinear(C, D, K), 'K on line CD').toBeLessThan(0.05);
+  });
+
+  it('the labeled form «AB ו-CD נפגשים בנקודה K» on recognised tangents drops the within-segment requirement', () => {
+    const facts = buildFacts([
+      'שני מעגלים זרים',
+      'AB משיק משותף חיצוני לשני המעגלים',
+      'CD משיק משותף חיצוני לשני המעגלים',
+      'AB ו-CD נפגשים בנקודה K',
+    ]);
+    const fig = replay(facts);
+    expect(Object.values(fig.status).every((s) => s === 'ok')).toBe(true);
+    expect(fig.violations).toEqual([]); // no within-segment amber — tangents meet BEYOND their touches
+    const K = fig.positions.get('K')!;
+    const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => fig.positions.get(id)!);
+    expect(collinear(A, B, K)).toBeLessThan(0.05);
+    expect(collinear(C, D, K)).toBeLessThan(0.05);
+  });
+});
+
+describe('#197 Am. 7 — the naming DOT at a drawn-line × segment crossing', () => {
+  it("the touch tangent's visible crossings with the two-touch tangents offer pick dots (the operator's red marks)", async () => {
+    const { buildScene } = await import('@/render/scene');
+    const { findSegmentCrossings } = await import('@/render/intersections');
+    // The operator's exact figure: tangent circles, both two-touch tangents, then the touch tangent.
+    const facts = buildFacts(['שני מעגלים משיקים מבחוץ', 'משיק משותף', 'משיק משותף', 'משיק משותף']);
+    const fig = replay(facts);
+    const scene = buildScene(fig.construction, fig.positions, undefined, undefined, { circles: fig.circles });
+    expect(scene.lines.length, 'the touch tangent is a drawn line').toBeGreaterThanOrEqual(1);
+    const crossings = findSegmentCrossings(fig.construction, fig.positions, scene.lines);
+    const lineDots = crossings.filter((x) => x.line1);
+    // The vertical touch tangent crosses BOTH tangent segments strictly inside them — two dots.
+    expect(lineDots.length, 'both visible crossings offer dots').toBeGreaterThanOrEqual(2);
   });
 });
 
