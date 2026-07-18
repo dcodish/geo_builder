@@ -59,7 +59,7 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     // must take an untaken tangent, so the rule passes these as its `avoid` list.
     commonTangents: (() => {
       const centreOf = new Map(construction.objects.flatMap((o) => (o.kind === 'circle' ? [[o.center, o.id] as [Id, Id]] : [])));
-      const out: Record<string, [Id, Id][]> = {};
+      const out: Record<string, { pair: [Id, Id]; kind?: 'external' | 'internal' }[]> = {};
       const perps = construction.constraints.filter((c) => c.type === 'perpendicular');
       for (const c of perps) {
         if (c.type !== 'perpendicular') continue;
@@ -76,7 +76,19 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
         if (id1 === id2) continue;
         const key = [id1, id2].sort().join('|');
         const pair: [Id, Id] = id1 <= id2 ? [c.b, mate.b] : [mate.b, c.b];
-        (out[key] ??= []).push(pair);
+        // The tangent's KIND, read off the drawn positions (external = centres on the same side of the
+        // tangent line) — lets the rule refuse a third external/internal deterministically (#197 Am. 3).
+        const A = positions.get(c.b);
+        const B = positions.get(mate.b);
+        const p1 = positions.get(c.a);
+        const p2 = positions.get(mate.a);
+        let kind: 'external' | 'internal' | undefined;
+        if (A && B && p1 && p2) {
+          const side = (q: Vec) => (B.x - A.x) * (q.y - A.y) - (B.y - A.y) * (q.x - A.x);
+          const s = side(p1) * side(p2);
+          if (Math.abs(s) > 1e-12) kind = s > 0 ? 'external' : 'internal';
+        }
+        (out[key] ??= []).push({ pair, kind });
       }
       return out;
     })(),

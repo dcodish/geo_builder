@@ -31,7 +31,10 @@ export type ParseResult =
   // The utterance references a circle at a centre that carries a CONCENTRIC PAIR (ADR-244) with no
   // outer/inner qualifier and no disambiguating stated membership — WHICH circle is meant is the
   // student's to say ("המעגל החיצוני"/"the inner circle"), never a silent pick or an LLM guess.
-  | { ok: false; reason: 'ambiguous-circle'; center: string };
+  | { ok: false; reason: 'ambiguous-circle'; center: string }
+  // Every common tangent of the requested kind is already drawn (two of a kind / four in all) — a
+  // further one does not exist; refuse deterministically, never a solver grind (#197 Am. 3).
+  | { ok: false; reason: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any' };
 
 /**
  * Figure context the parser may consult to resolve implicit references — chiefly
@@ -94,7 +97,7 @@ export interface ParseContext {
   /** Existing COMMON tangents per circle pair (#197): touch pairs keyed by the sorted circle-id pair
    *  (`circle-O|circle-P`), recognised from the paired radius-⟂-tangent constraints — a repeated
    *  «משיק משותף» passes them as `avoid` so it takes an untaken tangent. */
-  commonTangents?: Record<string, [string, string][]>;
+  commonTangents?: Record<string, { pair: [string, string]; kind?: 'external' | 'internal' }[]>;
   /** Recorded SIZE roles between circles (`set-radius-order`, concentric or not — issue #102): lets
    *  «המעגל הגדול/הקטן» resolve consistently once assigned. */
   radiusOrder?: { outer: string; inner: string }[];
@@ -166,7 +169,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string };
+type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any' };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -5372,7 +5375,7 @@ const commonTangent: Rule = (s, ctx) => {
   // a textbook synonym) — a REQUIREMENT (verifier figure.v.tangentExternal/Internal +
   // meetsRequirements), superseding ADR-239's "a configuration show-another explores". Unstated ⇒ no
   // requirement (any of the 4 tangents, ADR-052).
-  const kind = /חיצוני|\bexternal\b/i.test(s) ? ('external' as const) : /פנימי|אלכסוני|\binternal\b|\bdiagonal\b/i.test(s) ? ('internal' as const) : undefined;
+  const kind = /חיצוני|מבחוץ|\bexternal\b/i.test(s) ? ('external' as const) : /פנימי|מבפנים|אלכסוני|\binternal\b|\bdiagonal\b/i.test(s) ? ('internal' as const) : undefined;
   // The touch labels: 2 (one tangent, «AB משיק משותף»), 4 («AB ו-CD משיקים משותפים» — two tangents),
   // or NONE — a label-less «משיק משותף [חיצוני]» auto-names fresh touches instead of escalating (the
   // #184 pattern; the student asked for the tangent, not for a naming exercise). The PLURAL
@@ -5388,7 +5391,15 @@ const commonTangent: Rule = (s, ctx) => {
   // an untaken tangent (#142 pattern) — their touches become `avoid` (never the current naming labels:
   // re-typing the SAME tangent is idempotent, not a demand for another one).
   const priorKey = [id1, id2].sort().join('|');
-  const prior = (ctx.commonTangents?.[priorKey] ?? []).flat();
+  const priorEntries = ctx.commonTangents?.[priorKey] ?? [];
+  // EXHAUSTION (#197 Am. 3): two circles have exactly two tangents of each kind, four in all. Asking
+  // for more than remain is a deterministic REFUSAL with a clear message — never the solver grinding
+  // an impossible ⟂ system into a cryptic over-constraint (the operator's "crash": a 5th tangent after
+  // all four were drawn burned the recruiter and blamed an unrelated old constraint).
+  const priorOfKind = kind ? priorEntries.filter((e) => e.kind === kind).length : priorEntries.length;
+  const capacity = kind ? 2 : 4;
+  if (priorOfKind + wantPairs > capacity) return { clarify: 'tangents-exhausted', kind: kind ?? 'any' };
+  const prior = priorEntries.flatMap((e) => e.pair);
   const out: AnyCommand[] = [...mk];
   let prevTouches: string[] = [];
   for (let p = 0; p < wantPairs; p++) {
@@ -7700,6 +7711,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
     }
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).
     if (res.clarify === 'ambiguous-angle') return { ok: false, reason: 'ambiguous-angle', vertex: res.vertex };
+    if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind };
     return { ok: false, reason: 'ambiguous-circle', center: res.center };
   }
   return { ok: false, reason: 'not-handled' };

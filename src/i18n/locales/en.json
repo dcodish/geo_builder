@@ -70,7 +70,10 @@
     "greek": "Greek letters",
     "insertGreek": "Insert a Greek letter (an angle variable, e.g. 2α)",
     "symbols": "Symbols",
-    "insertSymbol": "Insert a symbol (root/power for a symbolic length, or ∠ ° ⊥ ∥)"
+    "insertSymbol": "Insert a symbol (root/power for a symbolic length, or ∠ ° ⊥ ∥)",
+    "tangentsExhaustedExternal": "Both external common tangents are already drawn — two circles have no third external tangent.",
+    "tangentsExhaustedInternal": "Both internal common tangents are already drawn — two circles have no third internal tangent.",
+    "tangentsExhaustedAny": "All four common tangents are already drawn — two circles have no fifth common tangent."
   },
   "explore": {
     "title": "Explore the figure"
@@ -207,7 +210,10 @@
       "l3hint": "+ what the diagram reveals"
     }
   },
-  "principles": { "title": "Principles", "more": "{{count}} more principles" },
+  "principles": {
+    "title": "Principles",
+    "more": "{{count}} more principles"
+  },
   "concepts": {
     "title": "Guiding principles"
   },

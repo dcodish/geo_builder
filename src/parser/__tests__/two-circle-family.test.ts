@@ -139,6 +139,43 @@ describe('#197 Am. — a kind-less common tangent TOGGLES its basin', () => {
   });
 });
 
+describe('#197 Am. 3 — מבחוץ/מבפנים synonyms + tangent EXHAUSTION refuses fast', () => {
+  for (const [u, want] of [
+    ['AB משיק משותף מבחוץ לשני המעגלים', 'external'],
+    ['CD משיק משותף מבפנים לשני המעגלים', 'internal'],
+  ] as const) {
+    it(`«${u}» reads kind ${want}`, () => {
+      const facts = buildFacts(['שני מעגלים זרים', u]);
+      const ct = facts.find((f) => f.cmd.type === 'common-tangent')!.cmd as Extract<AnyCommand, { type: 'common-tangent' }>;
+      expect(ct.kind).toBe(want);
+    });
+  }
+
+  it("the operator's crash sequence: a THIRD external tangent refuses deterministically (never a solver grind)", () => {
+    // All four tangents drawn (2 external + 2 internal), then a fifth request — the exact play-test
+    // figure that burned the recruiter and blamed an unrelated old constraint.
+    const facts = buildFacts([
+      'שני מעגלים זרים',
+      'משיק משותף חיצוני',
+      'משיק משותף פנימי',
+      'משיק משותף פנימי',
+      'משיק משותף חיצוני',
+    ]);
+    const { construction, positions } = replay(facts);
+    const t0 = Date.now();
+    const r = parse('משיק משותף חיצוני', buildParseCtx(construction, positions));
+    expect(Date.now() - t0, 'a deterministic refusal, not a solve').toBeLessThan(500);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.reason).toBe('tangents-exhausted');
+      if (r.reason === 'tangents-exhausted') expect(r.kind).toBe('external');
+    }
+    // And the kind-less fifth is refused too (all four taken).
+    const r2 = parse('משיק משותף', buildParseCtx(construction, positions));
+    expect(!r2.ok && r2.reason === 'tangents-exhausted').toBe(true);
+  });
+});
+
 describe('ADR-360 (#210) — the WORD-relation honesty gate', () => {
   it('a stated זרים not encoded in the commands is reported dropped', () => {
     const bare: AnyCommand[] = [

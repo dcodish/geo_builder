@@ -626,6 +626,14 @@ export default function App() {
       setBusy(false);
       return;
     }
+    // Every common tangent of the requested kind is already drawn (#197 Am. 3) — a further one does not
+    // exist; say so plainly instead of escalating or grinding an impossible solve.
+    if (!r.ok && r.reason === 'tangents-exhausted') {
+      logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `tangents-exhausted:${r.kind}` });
+      setInputNote(t(r.kind === 'external' ? 'input.tangentsExhaustedExternal' : r.kind === 'internal' ? 'input.tangentsExhaustedInternal' : 'input.tangentsExhaustedAny'));
+      setBusy(false);
+      return;
+    }
     // Analytic / coordinate-geometry terminology (axes, coordinates, slope, line equations) — a DIFFERENT
     // tool. This one builds synthetic constructions; a coordinate-geometry tool is planned separately.
     // Refuse immediately with the pedagogical "wrong tool" message and tag it `scope:analytic` — never spend
