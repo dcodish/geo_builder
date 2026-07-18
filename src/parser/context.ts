@@ -54,6 +54,32 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     lines: construction.objects.flatMap((o) => (o.kind === 'line' ? [o.id] : [])), // idempotent construct reuse
     tangentAuxes: construction.objects.flatMap((o) => (o.kind === 'circle' && o.id.startsWith('tanaux-') ? [o.id] : [])), // existing Thales tangent-aux circles — a 2nd single tangent from the SAME apex takes the OTHER branch (issue #142)
     polygons: construction.objects.flatMap((o) => (o.kind === 'polygon' ? [o.vertices] : [])), // definite "the quad" binds to the existing one
+    // Existing COMMON tangents per circle pair (#197): touch pairs (A on c1, B on c2) recognised by the
+    // paired radius-⟂-tangent constraints the common-tangent lowering emits — a REPEATED «משיק משותף»
+    // must take an untaken tangent, so the rule passes these as its `avoid` list.
+    commonTangents: (() => {
+      const centreOf = new Map(construction.objects.flatMap((o) => (o.kind === 'circle' ? [[o.center, o.id] as [Id, Id]] : [])));
+      const out: Record<string, [Id, Id][]> = {};
+      const perps = construction.constraints.filter((c) => c.type === 'perpendicular');
+      for (const c of perps) {
+        if (c.type !== 'perpendicular') continue;
+        // The tangent-side pattern: radius (centre→touch) ⟂ (touch→other touch), i.e. b === c and
+        // `a` is a circle centre. Pair two such constraints sharing the same segment {c,d}.
+        if (c.b !== c.c || !centreOf.has(c.a)) continue; // this ⟂: radius to the touch at the segment's C end
+        // The mate: the OTHER end's radius-⟂ on the same segment (b === d there).
+        const mate = perps.find(
+          (m) => m !== c && m.type === 'perpendicular' && centreOf.has(m.a) && m.c === c.c && m.d === c.d && m.b === m.d,
+        );
+        if (!mate || mate.type !== 'perpendicular') continue;
+        const id1 = centreOf.get(c.a)!;
+        const id2 = centreOf.get(mate.a)!;
+        if (id1 === id2) continue;
+        const key = [id1, id2].sort().join('|');
+        const pair: [Id, Id] = id1 <= id2 ? [c.b, mate.b] : [mate.b, c.b];
+        (out[key] ??= []).push(pair);
+      }
+      return out;
+    })(),
     radiusSymbols: construction.objects.flatMap((o) =>
       o.kind === 'circle' && o.radiusSymbol ? [{ name: o.radiusSymbol, circle: o.id, center: o.center }] : [],
     ), // "R = 1.5r" / "R > r" resolve each letter to its circle (issue #54)

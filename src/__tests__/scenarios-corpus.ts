@@ -202,6 +202,35 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'two-circles-disjoint-operator',
+    title: '«שני מעגלים זרים» draws two genuinely DISJOINT circles (#196, ADR-358)',
+    guards:
+      'Prod sessions cm4ak2yo/jwbimfsf (2026-07-18): the utterance escalated to the LLM, which emitted two unrelated fixed-radius circles — drawn INTERSECTING, all rows green (the stated disjointness silently dropped). Now a deterministic construct: circles + a set-circle-position requirement the verifier and meetsRequirements keep.',
+    steps: ['שני מעגלים זרים'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const cs = [...fig.circles.values()];
+      expect(cs).toHaveLength(2);
+      expect(dist(cs[0].center, cs[1].center), 'disjoint: gap beyond the radii sum').toBeGreaterThan(cs[0].r + cs[1].r);
+    },
+  },
+  {
+    id: 'two-circles-contained-operator',
+    title: '«שני מעגלים מוכלים» draws one circle strictly INSIDE the other (#196, ADR-358)',
+    guards:
+      "Prod session jwbimfsf (2026-07-18): the LLM emitted circle O + a set-radius on that SAME circle — the second circle never existed (the operator's \"gives me one circle\"). Now deterministic: two circles + the contained requirement.",
+    steps: ['שני מעגלים מוכלים'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const cs = [...fig.circles.values()];
+      expect(cs).toHaveLength(2);
+      const [big, small] = cs[0].r >= cs[1].r ? [cs[0], cs[1]] : [cs[1], cs[0]];
+      expect(dist(big.center, small.center) + small.r, 'inner strictly inside outer').toBeLessThan(big.r);
+    },
+  },
+  {
     id: 'sector-ODC-value-word-form',
     title: '«גזרה ODC שווה 90» — the שווה value form + the O-family centre letter (#171, ADR-357 Am.)',
     guards:

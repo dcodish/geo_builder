@@ -91,6 +91,10 @@ export interface ParseContext {
    *  to its circle here. Keyed by the letter, CASE-SENSITIVE (bagrut convention: R vs r are different
    *  radii). */
   radiusSymbols?: { name: string; circle: string; center: string }[];
+  /** Existing COMMON tangents per circle pair (#197): touch pairs keyed by the sorted circle-id pair
+   *  (`circle-O|circle-P`), recognised from the paired radius-⟂-tangent constraints — a repeated
+   *  «משיק משותף» passes them as `avoid` so it takes an untaken tangent. */
+  commonTangents?: Record<string, [string, string][]>;
   /** Recorded SIZE roles between circles (`set-radius-order`, concentric or not — issue #102): lets
    *  «המעגל הגדול/הקטן» resolve consistently once assigned. */
   radiusOrder?: { outer: string; inner: string }[];
@@ -3052,7 +3056,11 @@ const circle: Rule = (s, ctx) => {
   // a later definite «המעגל הקטן» assignment (issue #102) reads the intended circle. Sizes stay free
   // DOFs (ADR-052); a numeric radius wins.
   const adj = !r.numeric ? (/מעגל\s+קטן|\bsmall(?:er)?\s+circle/i.test(s) ? 0.72 : 1) : 1;
-  return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius * adj, ...(freeRadius ? { freeRadius: true } : {}), ...(auto ? { autoCenter: true } : {}) }];
+  // A NEW standalone circle beside existing ones seats its centre CLEAR of them (#196 — the fixed
+  // +4-gap default drew a second bare circle overlapping the first, visually asserting intersections
+  // the student never stated). Placement only; the centre stays a free sampled DOF.
+  const apart = (ctx.circles ?? []).length > 0;
+  return [{ type: 'circle', id: circleId(center), center: up(center), radius: r.radius * adj, ...(freeRadius ? { freeRadius: true } : {}), ...(auto ? { autoCenter: true } : {}), ...(apart ? { apart: true } : {}) }];
 };
 
 /**
@@ -4706,9 +4714,87 @@ const definiteTwoCircles = (s: string, ctx: ParseContext): [Id, Id] | null => {
   return [circleId(circs[0]), circleId(circs[1])];
 };
 
+/**
+ * Two circles' MUTUAL POSITION (#196, ADR-358): «שני מעגלים זרים» / "two disjoint circles" (disjoint)
+ * and «שני מעגלים מוכלים» / «מעגל O2 מוכל בתוך מעגל O1» / "circle P contained in circle O" (contained).
+ * The equality members of the family (נחתכים / משיקים / concentric) are constructs; these
+ * strict-inequality members lower to the circles + a `set-circle-position` REQUIREMENT — the verifier
+ * re-derives it (figure.v.circlesDisjoint / circleContained), `meetsRequirements` gates sampling /
+ * "show another" on it, and apply only improves the DEFAULT seat (ADR-254 pattern). On EXISTING
+ * circles it is the M1 statement alone. Guard: the words are TWO-circle relations — a point-side
+ * «M בתוך המעגל» (one circle noun, no plural) is never claimed.
+ */
+const twoCirclesPosition: Rule = (s, ctx) => {
+  const disjoint = /זרים|\bdisjoint\b/i.test(s);
+  const contained = /מוכל(?:ים|ת)?(?![א-ת])|\bcontained\b/i.test(s);
+  if (!disjoint && !contained) return null;
+  if (disjoint && contained) return 'stop'; // contradictory words — escalate whole
+  const circleNouns = (s.match(/circle|מעגל/gi) ?? []).length;
+  const plural = /שני\s+ה?מעגלים|מעגלים|\bcircles\b/i.test(s);
+  if (!plural && circleNouns < 2) return null; // not a two-circle relation statement
+  const relation = disjoint ? ('disjoint' as const) : ('contained' as const);
+  const named = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
+  const haveCircles = new Set((ctx.circles ?? []).map(up));
+  // Resolve the pair: both named → those; the definite plural on THE two existing circles; else a
+  // fresh pair (the twoCirclesMeet naming discipline — auto centres, hidden unless used).
+  const definite = definiteTwoCircles(s, ctx);
+  const pair: [string, string] | null =
+    named.length >= 2 ? [named[0], named[1]] : definite ? [definite[0].replace(/^circle-/, ''), definite[1].replace(/^circle-/, '')] : null;
+  const c1 = pair?.[0] ?? 'O';
+  const c2 = pair?.[1] ?? freeLabel([c1, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
+  if (up(c1) === up(c2)) return null;
+  const id1 = circleId(c1), id2 = circleId(c2);
+  const cmds: AnyCommand[] = [];
+  if (!haveCircles.has(up(c1)))
+    cmds.push({ type: 'circle', id: id1, center: up(c1), radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, ...(named[0] ? {} : { autoCenter: true }) });
+  if (!haveCircles.has(up(c2)))
+    cmds.push({ type: 'circle', id: id2, center: up(c2), radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ifAbsent: true, ...(named[1] ? {} : { autoCenter: true }) });
+  // Contained: a NAMED first circle is the stated INNER («מעגל O2 מוכל בתוך מעגל O1» — the subject of
+  // מוכל); the bare/definite plural defaults the SECOND as inner (creation order — an M4 soft default
+  // the student can restate). The command's shape is {a: outer, b: inner} (b strictly inside a).
+  cmds.push(
+    relation === 'disjoint'
+      ? { type: 'set-circle-position', relation, a: id1, b: id2 }
+      : { type: 'set-circle-position', relation, a: named.length >= 2 ? id2 : id1, b: named.length >= 2 ? id1 : id2 },
+  );
+  return cmds;
+};
+
 const twoCirclesMeet: Rule = (s, ctx) => {
   if (!/\bcircles\b|שני\s+מעגל|מעגלים/i.test(s)) return null; // two circles being introduced (plural)
   if (!(INTERSECT_KW.test(s) || /נחתכ|נפגש|מפגש|\bmeets?\b/i.test(s))) return null;
+  // «ישר חותך את שני המעגלים בנקודות C, D, E ו-F» (#191, ADR-361): a LINE cutting BOTH circles at
+  // FOUR stated points — the first two ride the first circle, the last two the second (stated order;
+  // `swap` exists), all four collinear in that order, the secant drawn. Without this the definite
+  // branch below read C,D as the circles' MUTUAL crossings and silently dropped E,F (then a paid LLM
+  // escalation). Existing circles (the definite plural) get riders; a fresh pair is created first.
+  if (/הישר|ישר|\bline\b|(?<![א-ת])קו(?![א-ת])/i.test(s)) {
+    const namedCentres = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
+    const labels = [...new Set((dropCircleRef(s).match(/\b[A-Z]\d*\b/g) ?? []).map(up))].filter((l) => !namedCentres.includes(l));
+    if (labels.length === 4) {
+      const pairIds = definiteTwoCircles(s, ctx);
+      const cc1 = namedCentres[0] ?? 'O';
+      const cc2 = namedCentres[1] ?? freeLabel([cc1, ...labels, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
+      const sid1 = pairIds?.[0] ?? circleId(cc1);
+      const sid2 = pairIds?.[1] ?? circleId(cc2);
+      const creates: AnyCommand[] = pairIds
+        ? []
+        : [
+            { type: 'circle', id: sid1, center: cc1, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, ...(namedCentres[0] ? {} : { autoCenter: true }) },
+            { type: 'circle', id: sid2, center: cc2, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ifAbsent: true, ...(namedCentres[1] ? {} : { autoCenter: true }) },
+          ];
+      const [P1, P2, P3, P4] = labels;
+      return [
+        ...creates,
+        { type: 'point-on-circle', id: P1, circle: sid1, free: true },
+        { type: 'point-on-circle', id: P2, circle: sid1, free: true },
+        { type: 'point-on-circle', id: P3, circle: sid2, free: true },
+        { type: 'point-on-circle', id: P4, circle: sid2, free: true },
+        { type: 'set-line', points: [P1, P2, P3, P4] },
+        { type: 'segment', a: P1, b: P4 },
+      ];
+    }
+  }
   // A definite reference to the TWO circles ALREADY in the figure — «A חיתוך בין המעגלים» / «A נקודת
   // החיתוך של המעגלים» — binds THOSE circles (issue #111), never invents new ones. Emit only the
   // crossing point(s) the student named: one → branch 0; two → the other crossing (avoid the first).
@@ -5255,6 +5341,16 @@ const commonTangent: Rule = (s, ctx) => {
   }
   if (!naming || naming.length < 2) return null; // no touch labels and no touch point → LLM
   const [A, B] = naming;
+  // The stated KIND (#197, ADR-359): «חיצוני»/external ⇔ both centres on the same side of the tangent,
+  // «פנימי»/internal ⇔ opposite sides — a REQUIREMENT (verifier figure.v.tangentExternal/Internal +
+  // meetsRequirements), superseding ADR-239's "a configuration show-another explores". Unstated ⇒ no
+  // requirement (any of the 4 tangents, ADR-052).
+  const kind = /חיצוני|\bexternal\b/i.test(s) ? ('external' as const) : /פנימי|\binternal\b/i.test(s) ? ('internal' as const) : undefined;
+  // Already-drawn common tangents of THIS pair (from the ctx hint): a REPEATED «משיק משותף» must take
+  // an untaken tangent (#142 pattern) — their touches become `avoid` (never the current naming labels:
+  // re-typing the SAME tangent is idempotent, not a demand for another one).
+  const priorKey = [id1, id2].sort().join('|');
+  const avoid = (ctx.commonTangents?.[priorKey] ?? []).flat().filter((t) => t !== A && t !== B);
   // Variant 1 — a common tangent touching circle 1 at A and circle 2 at B. The student stated only
   // "AB touches both", never WHICH touch rides WHICH circle — the pairing is a soft default (`softPair`,
   // stated/figure order) that the store SWAPS when a later explicit membership names the opposite
@@ -5266,6 +5362,10 @@ const commonTangent: Rule = (s, ctx) => {
     { type: 'set-perpendicular', a: centrePt(ctx, c1), b: A, c: A, d: B, implicit: true }, // radius c1→A ⟂ the tangent
     { type: 'set-perpendicular', a: centrePt(ctx, c2), b: B, c: A, d: B, implicit: true }, // radius c2→B ⟂ the tangent
     { type: 'segment', a: A, b: B },
+    // The configuration record (#197): apply seeds the touches into an analytic tangent basin of the
+    // stated kind that no avoided tangent occupies; the verifier + meetsRequirements gate the rest.
+    // Kind-less first tangents (no avoid) emit nothing extra — byte-identical to ADR-239.
+    ...(kind || avoid.length ? [{ type: 'common-tangent', a: A, b: B, circle1: id1, circle2: id2, ...(kind ? { kind } : {}), ...(avoid.length ? { avoid } : {}) } as AnyCommand] : []),
   ];
 };
 
@@ -6419,6 +6519,7 @@ export const RULES: Rule[] = [
   theTangentMeetsCircle, // "המשיק חותך את מעגל P בנקודה K" — definite back-reference to THE drawn tangent (#100); after tangentMeetsOtherCircle (whose self-declaring subject also starts "המשיק"), before lineLineIntersection (which 'stop's on משיק)
   circlesTangent, // two circles tangent to each other — before tangentLine (which would grab the משיק)
   secantFromExternal, // "from external point E a line cuts the circle at A,B" — before the generic intersections
+  twoCirclesPosition, // #196: two disjoint / contained circles — a set-circle-position requirement
   twoCirclesMeet, // "two circles intersect at A and B" — create both circles + both intersection points
   circleCircleIntersection, // two circles cross — before the generic line∩line intersection
   extendOntoCircle, // "המשך AC חותך מעגל P בנקודה D" — DIRECTIONAL extension onto a circle (D beyond the 2nd letter), before the order-agnostic lineMeetsCircle
@@ -7245,6 +7346,18 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
     if (r.ok && q.assert) return { ok: true, commands: [...r.commands, { type: 'set-radius-order', outer: q.assert.outer, inner: q.assert.inner }] };
     return r;
   }
+  // The ORDINAL circle reference (#192, ADR-362) — the sibling REWRITE at the same chokepoint (the #102
+  // size-qualifier pattern): «המעגל השלישי» / "the third circle" resolves by CREATION order to the
+  // concrete «מעגל <centre>», so every circle-consuming rule gains it at once. A pointing gesture, not
+  // a constraint (ADR-349). An ordinal the figure can't satisfy (fewer circles) DEFERS — never the
+  // single-circle fallback guess.
+  const ordM = s.match(/ה?מעגל\s+ה(ראשון|שני|שלישי|רביעי)(?![א-ת])|(?:the\s+)?(first|second|third|fourth)\s+circle/i);
+  if (ordM) {
+    const idx = ordM[1] ? ['ראשון', 'שני', 'שלישי', 'רביעי'].indexOf(ordM[1]) : ['first', 'second', 'third', 'fourth'].indexOf(ordM[2].toLowerCase());
+    const target = idx >= 0 && (ctx.circles?.length ?? 0) > idx ? ctx.circles![idx] : null;
+    if (!target) return { ok: false, reason: 'not-handled' };
+    return parseResolved(s.replace(ordM[0], ordM[1] ? `מעגל ${target}` : `circle ${target}`), ctx);
+  }
   return parseResolved(s, ctx);
 }
 
@@ -7725,6 +7838,26 @@ const VERB_GATES: { verb: string; present: RegExp; satisfied: RegExp }[] = [
   { verb: 'מקביל/parallel', present: /מקביל|parallel/i, satisfied: /parallel/ },
   { verb: 'מאונך/perpendicular', present: /מאונ[כך]|perpendicular/i, satisfied: /perpendicular|foot|right-triangle|altitude/ },
 ];
+/**
+ * WORD-form RELATION givens (#210, ADR-360) — the fourth dropped-given sibling: a relation stated as a
+ * WORD between CIRCLE nouns that the parsed commands do not encode. The symbol gate (ADR-264) sees
+ * `AB=CD`-form pairs, the verb gate (ADR-292) sees action verbs; a bare plural adjective («שני מעגלים
+ * זרים») trips neither — the LLM's decomposition dropped it and two unrelated circles committed green,
+ * drawn INTERSECTING (prod 2026-07-18, sessions cm4ak2yo/jwbimfsf). Lexicon v1 = the mutual-position
+ * words the deterministic rules now own (#196); extend per the ADR-273 word-lexicon pattern — a listed
+ * word must land in an encoding command, or the commit refuses/escalates honestly.
+ */
+export function droppedWordRelations(utterance: string, commands: AnyCommand[]): string[] {
+  const s = normalizeUtterance(utterance);
+  // Two-circle context only: >=2 circle nouns or the plural — a point-side «M בתוך המעגל» never trips.
+  const circleNouns = (s.match(/circle|מעגל/gi) ?? []).length;
+  if (!(circleNouns >= 2 || /מעגלים|circles/i.test(s))) return [];
+  const out: string[] = [];
+  if (/זרים|disjoint/i.test(s) && !commands.some((c) => c.type === 'set-circle-position' && c.relation === 'disjoint')) out.push('זרים');
+  if (/מוכל(?:ים|ת)?(?![א-ת])|contained/i.test(s) && !commands.some((c) => c.type === 'set-circle-position' && c.relation === 'contained')) out.push('מוכל');
+  return out;
+}
+
 export function droppedGivenVerbs(utterance: string, commands: AnyCommand[]): string[] {
   const s = normalizeUtterance(utterance);
   const json = JSON.stringify(commands);

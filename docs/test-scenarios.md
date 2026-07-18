@@ -1245,3 +1245,11 @@ over all four (ADR-041).
 ### `sector-ODC-value-word-form` — «גזרה ODC שווה 90» parses the value word-form + O-family centre (#171, ADR-357 Am.)
 
 **Guards against:** play-test session `9blvgg2o` — «שווה 90» was not a value marker (the stated 90 landed nowhere → honesty refusal → LLM dead end), and the centre-first run reading misread the operator's letters. **Asserts:** the right-triangle figure + «גזרה ODC שווה 90» builds with centre O, |OC| = |OD|, a 90° central angle, and the 90° arc. Unit coverage: the value-form / naming-convention / central-angle blocks in `sector.test.ts`.
+
+### `two-circles-disjoint-operator` — «שני מעגלים זרים» draws genuinely disjoint circles (#196, ADR-358)
+
+**Guards against:** the LLM emitting two unrelated circles drawn intersecting, all rows green (prod 2026-07-18). **Asserts:** two circles, verifier clean, centre gap > radii sum. Unit coverage: `two-circle-family.test.ts`.
+
+### `two-circles-contained-operator` — «שני מעגלים מוכלים» draws one circle inside the other (#196, ADR-358)
+
+**Guards against:** the LLM resizing ONE circle (the second never created — "gives me one circle"). **Asserts:** two circles, verifier clean, inner strictly inside outer. Unit coverage: `two-circle-family.test.ts`.

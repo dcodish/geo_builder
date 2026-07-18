@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedCompoundRelation, droppedGivenVerbs, droppedRadiusSymbol, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedWordRelations, droppedCompoundRelation, droppedGivenVerbs, droppedRadiusSymbol, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -664,7 +664,10 @@ export default function App() {
       // whose lowering doesn't carry the FULL term list was truncated to a different, wrong constraint —
       // the labels all land, so the older gates never fire. Never commit it.
       const droppedCompound = droppedCompoundRelation(utterance, r.commands);
-      if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0 && droppedVerbs.length === 0 && droppedCompound.length === 0) {
+      // The WORD sibling (ADR-360, #210): a relation stated as a word between circle nouns («שני
+      // מעגלים זרים») that the lowering doesn't encode — never commit the unrelated pair.
+      const droppedWordRels = droppedWordRelations(utterance, r.commands);
+      if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0 && droppedVerbs.length === 0 && droppedCompound.length === 0 && droppedWordRels.length === 0) {
         // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
         // the commit, and every later replay of this content then run at TAIL speed on the main thread
         // (the one unbudgeted cold fold, measured ~26 s on the #59 figure, used to block the tab here).
@@ -855,6 +858,9 @@ export default function App() {
       // and the VERB gate (ADR-292, the #82 P1): a decomposition that loses a stated tangency/
       // bisection/… verb must name it — never a silent drop on the second attempt either
       ...droppedGivenVerbs(utterance, llmCmds),
+      // and the WORD gate (ADR-360, #210): a decomposition that loses a word-stated circle relation
+      // (זרים/מוכל) must name it — the exact prod class where two unrelated circles committed green
+      ...droppedWordRelations(utterance, llmCmds),
       // and the STRUCTURAL gate (#153/#145): the LLM must not re-introduce a truncated lowering of a
       // compound measure relation — the whole term list lands in one structured constraint, or refuse
       ...droppedCompoundRelation(utterance, llmCmds),

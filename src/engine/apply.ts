@@ -1477,9 +1477,38 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
     }
 
-    case 'circle-circle-intersection':
+    case 'circle-circle-intersection': {
+      // A STATED crossing is information about the circles' mutual position (the ADR-255 stated-meet
+      // pattern, circle edition — ADR-358): with the #196 `apart` seat, two bare circles default
+      // DISJOINT, so «נקודת החיתוך של המעגלים» must pull them back together — re-seat a movable free
+      // centre so the seed configs genuinely intersect (a better default, never a drive; the centres
+      // stay free sampled DOFs). Already-intersecting pairs are untouched (stability).
+      const ca = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle1);
+      const cb = objects.find((o): o is Extract<GeoObject, { kind: 'circle' }> => o.kind === 'circle' && o.id === cmd.circle2);
+      const pa = ca && pos.get(ca.center);
+      const pb = cb && pos.get(cb.center);
+      if (ca && cb && pa && pb) {
+        const ra = seedRadiusOf(ca, pos);
+        const rb = seedRadiusOf(cb, pos);
+        const gap = dist(pa, pb);
+        if (gap > (ra + rb) * 0.95 || gap < Math.abs(ra - rb) * 1.05) {
+          const mv = [cb, ca].find((c) => {
+            const o = objects.find((x) => x.id === c.center);
+            return !!o && o.kind === 'free-point' && !o.pinned;
+          });
+          if (mv) {
+            const around = mv === cb ? pa : pb;
+            const target = (ra + rb) * 0.62; // an overlapping gap: |r1−r2| < d < r1+r2
+            const others = [...pos.entries()].filter(([id]) => id !== mv.center).map(([, v]) => v);
+            const spot = seedSpotAround(around, target, others);
+            const i = objects.findIndex((o) => o.id === mv.center);
+            objects[i] = { ...(objects[i] as Extract<GeoObject, { kind: 'free-point' }>), x: spot.x, y: spot.y };
+          }
+        }
+      }
       addObj(objects, { kind: 'circle-circle', id: cmd.id, circle1: cmd.circle1, circle2: cmd.circle2, branch: cmd.branch ?? 0, ...(cmd.avoid ? { avoid: cmd.avoid } : {}) });
       break;
+    }
 
     case 'tangent':
       // The point of tangency lies on the circle — create it there if it doesn't
@@ -1770,14 +1799,14 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       );
       const pick = free[0] ?? candidates[0];
       if (!pick) break;
-      const seatTheta = (rider: Id, circle: Id, centre: Vec, touch: Vec): void => {
+      const seatTheta = (rider: Id, centre: Vec, touch: Vec): void => {
         const i = objects.findIndex((o) => o.id === rider && o.kind === 'on-circle');
         if (i < 0) return;
         const th = Math.atan2(touch.y - centre.y, touch.x - centre.x);
         objects[i] = { ...(objects[i] as Extract<GeoObject, { kind: 'on-circle' }>), theta: th, free: true };
       };
-      seatTheta(cmd.a, cmd.circle1, p1, pick.t1);
-      seatTheta(cmd.b, cmd.circle2, p2, pick.t2);
+      seatTheta(cmd.a, p1, pick.t1);
+      seatTheta(cmd.b, p2, pick.t2);
       break;
     }
 
