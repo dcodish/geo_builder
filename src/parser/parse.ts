@@ -3850,8 +3850,8 @@ const semicirclesOnEverySide: Rule = (s, ctx) => {
   // per-side arcs carried no bulge control, so a stated given became an unasserted default drawing
   // (#213 ride-along). Thread it per side exactly as the single-semicircle rule does: the reference is
   // any polygon vertex NOT on that side, `bulgeToward` for inside.
-  const bulgeOut = /מחוץ\s*ל|\boutside\b/i.test(s);
-  const bulgeIn = /בתוך|\binside\b/i.test(s);
+  const bulgeOut = /מחוץ\s*ל|מבחוץ|(?<![א-ת])בחוץ(?![א-ת])|\boutside\b/i.test(s);
+  const bulgeIn = /בתוך|מבפנים|\binside\b/i.test(s);
   for (let i = 0; i < poly.length; i++) {
     const a = poly[i], b = poly[(i + 1) % poly.length];
     const center = freeLabel([...used, ...(ctx.circles ?? [])], CENTRES);
@@ -3874,14 +3874,17 @@ const semicirclesOnEverySide: Rule = (s, ctx) => {
 // toward (inside) the shape. Matches the whole clause so it can be stripped before the leftover/diameter
 // read; the shape noun + up to 4 labels are consumed with it.
 const BULGE_CLAUSE =
-  /(?:מחוץ\s*ל|בתוך\s*ה?|\boutside(?:\s+of)?\b|\binside(?:\s+of)?\b)\s*(?:the\s+)?(?:ה?(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע)|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite|polygon)?\s*(?:[A-Z]\d*\s*){0,4}/gi;
+  /(?:מחוץ\s*ל|בתוך\s*ה?|מבחוץ|מבפנים|(?<![א-ת])בחוץ(?![א-ת])|\boutside(?:\s+of)?\b|\binside(?:\s+of)?\b)\s*(?:the\s+)?(?:ה?(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע)|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite|polygon)?\s*(?:[A-Z]\d*\s*){0,4}/gi;
 
 /** Resolve a semicircle's bulge orientation (#outward): "outside/inside the <shape>" → the reference vertex
  *  (a vertex of the shape NOT on the diameter side) + `bulgeToward` for inside. The shape is a named run,
  *  else the figure's single polygon whose edge is the diameter. No qualifier / unresolvable → no control. */
 function semicircleBulge(s: string, ctx: ParseContext, a: Id, b: Id): { bulgeRef?: Id; bulgeToward?: boolean } {
-  const outside = /מחוץ\s*ל|\boutside\b/i.test(s);
-  const inside = /בתוך|\binside\b/i.test(s);
+  // The bare ADVERB forms «מבחוץ»/«בחוץ» ("on the outside") bind like the object form «מחוץ ל<shape>»
+  // (#222 — they were silently dropped; the two-circle family already treats מבחוץ/מבפנים as synonyms,
+  // ADR-359 Am. 3). The shape resolves from ctx.polygons by the diameter edge, as for an object-less use.
+  const outside = /מחוץ\s*ל|מבחוץ|(?<![א-ת])בחוץ(?![א-ת])|\boutside\b/i.test(s);
+  const inside = /בתוך|מבפנים|\binside\b/i.test(s);
   if (!outside && !inside) return {};
   const A = up(a), B = up(b);
   let poly: Id[] | null = null;

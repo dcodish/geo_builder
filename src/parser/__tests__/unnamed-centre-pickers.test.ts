@@ -58,6 +58,26 @@ describe('#213 — unnamed-centre pickers consult ctx.circles', () => {
     expect(new Set(ids).size, `distinct circle ids: ${ids.join(', ')}`).toBe(2);
   });
 
+  it.each([['מבחוץ', 'BC קוטר חצי מעגל מבחוץ'], ['בחוץ', 'BC קוטר חצי מעגל בחוץ']])(
+    '#222: the bare ADVERB side word (%s) binds the bulge like «מחוץ לריבוע» — never silently dropped',
+    (_t, u) => {
+      const facts = runLines(['ריבוע']);
+      const r = parse(u, ctxOf(facts));
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return;
+      const arc = r.commands.find((c) => c.type === 'arc') as { bulgeRef?: string; bulgeToward?: boolean } | undefined;
+      expect(arc?.bulgeRef, 'the outward reference bound').toBeTruthy();
+      expect(arc?.bulgeToward, 'outside ⇒ away from the reference vertex').toBeUndefined();
+    },
+  );
+
+  it('#222: the quantified bare adverb «על כל צלע של הריבוע יש חצי מעגל מבחוץ» carries the bulge per side', () => {
+    const facts = runLines(['ריבוע ABCD', 'על כל צלע של הריבוע יש חצי מעגל מבחוץ']);
+    const arcs = replay(facts).construction.objects.filter((o) => o.kind === 'arc');
+    expect(arcs).toHaveLength(4);
+    for (const arc of arcs) expect((arc as { bulgeRef?: string }).bulgeRef, 'each side arc bound outward').toBeTruthy();
+  });
+
   it('ride-along: the quantified «על כל צלע של הריבוע יש חצי מעגל מחוץ לריבוע» carries the bulge per side', () => {
     const facts = runLines(['ריבוע ABCD', 'על כל צלע של הריבוע יש חצי מעגל מחוץ לריבוע']);
     const arcs = replay(facts).construction.objects.filter((o) => o.kind === 'arc');
