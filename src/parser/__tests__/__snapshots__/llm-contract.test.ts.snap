@@ -246,6 +246,24 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-by-distances",
     ],
   },
+  "CD is a common tangent to circles O and P at M": {
+    "en": [
+      "circle",
+      "circle",
+      "circles-tangent",
+      "tangent",
+      "point-on-line",
+      "point-on-line",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "circles-tangent",
+      "tangent",
+      "point-on-line",
+      "point-on-line",
+    ],
+  },
   "DM*ME = BM*DR": {
     "en": [
       "segment",
