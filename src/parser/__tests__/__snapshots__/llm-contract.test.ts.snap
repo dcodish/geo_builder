@@ -456,6 +456,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "set-area-ratio",
     ],
   },
+  "a diameter": {
+    "en": [
+      "circle",
+      "diameter",
+    ],
+    "he": [
+      "circle",
+      "diameter",
+    ],
+  },
   "a line cuts the two circles at points C, D, E and F": {
     "en": [
       "circle",
@@ -475,6 +485,20 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-on-circle",
       "point-on-circle",
       "set-line",
+      "segment",
+    ],
+  },
+  "a line cutting the circle at two points": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
+      "segment",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "point-on-circle",
       "segment",
     ],
   },
@@ -534,6 +558,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-on-circle",
       "arc",
       "segment",
+    ],
+  },
+  "a tangent to the circle": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "tangent",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "tangent",
     ],
   },
   "angle ABC = 2α": {
@@ -810,6 +846,14 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circumcircle",
     ],
   },
+  "circle with center O": {
+    "en": [
+      "circle",
+    ],
+    "he": [
+      "circle",
+    ],
+  },
   "circle with diameter 10": {
     "en": [
       "circle",
@@ -934,6 +978,14 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "circle-circle-intersection",
       "segment",
       "segment",
+    ],
+  },
+  "given a circle": {
+    "en": [
+      "circle",
+    ],
+    "he": [
+      "circle",
     ],
   },
   "height from A in ABC": {
@@ -1068,6 +1120,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "triangle",
       "midpoint",
       "segment",
+    ],
+  },
+  "midpoint of AB": {
+    "en": [
+      "segment",
+      "midpoint",
+    ],
+    "he": [
+      "segment",
+      "midpoint",
     ],
   },
   "midsegment of trapezoid ABCD": {
@@ -1404,6 +1466,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     "he": [
       "circle",
       "tangent",
+    ],
+  },
+  "the centre of the circle": {
+    "en": [
+      "circle",
+      "name-center",
+    ],
+    "he": [
+      "circle",
+      "name-center",
     ],
   },
   "the circle through A B C cuts CE at D": {

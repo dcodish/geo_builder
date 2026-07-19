@@ -217,6 +217,41 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'unnamed-construct-chain',
+    title: '«נתון מעגל» → «קוטר» → «משיק למעגל» → «מרכז המעגל» — the student who names nothing (#184, ADR-368)',
+    guards:
+      'Prod log-triage 2026-07-17 (~6 distinct users, operator-approved): midpoint/diameter/tangent/centre required a student-supplied name while median/altitude auto-named — same sentence shape, arbitrary split. The unnamed forms now build with auto-chosen labels (freeLabel, every existing label excluded) as strict last-resort rules.',
+    steps: ['נתון מעגל', 'קוטר', 'משיק למעגל', 'מרכז המעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.construction.objects.some((o) => o.kind === 'circle')).toBe(true);
+      expect(fig.construction.objects.filter((o) => o.kind === 'segment').length, 'the diameter drawn').toBeGreaterThanOrEqual(1);
+      expect(fig.construction.objects.some((o) => o.kind === 'line'), 'the tangent line drawn').toBe(true);
+    },
+  },
+  {
+    id: 'unnamed-midpoint-auto-label',
+    title: '«הוסף אמצע צלע AB» auto-names the midpoint — no leading letter required (#184, ADR-368)',
+    guards:
+      'Prod log-triage 2026-07-17: «הוסף אמצע צלע AB» / «אמצע AB» were not-handled while «M אמצע AB» worked — the arbitrary naming split. The unnamed form now auto-names via freeLabel (never hijacking an existing label, the ADR-263 discipline).',
+    steps: ['משולש ABC', 'הוסף אמצע צלע AB'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const mid = fig.construction.objects.find((o) => o.kind === 'midpoint');
+      expect(mid).toBeTruthy();
+      if (mid && mid.kind === 'midpoint') {
+        expect([mid.a, mid.b].sort()).toEqual(['A', 'B']);
+        expect(['A', 'B', 'C']).not.toContain(mid.id);
+        const M = at(fig, mid.id);
+        const A = at(fig, 'A');
+        const B = at(fig, 'B');
+        expect(dist(M, A), 'a true midpoint').toBeCloseTo(dist(M, B), 4);
+      }
+    },
+  },
+  {
     id: 'tangents-to-unbuilt-circle',
     title: '«מנקודה A יוצאים שני משיקים למעגל» as the FIRST utterance introduces the circle deterministically (#159, ADR-367)',
     guards:
