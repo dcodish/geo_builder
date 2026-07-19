@@ -233,6 +233,25 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'cross-circle-diameter-new-circle',
+    title: '«CD קוטר» with C,D on two DIFFERENT circles builds the NEW circle on CD (#221, ADR-366 Am.)',
+    guards:
+      "Operator play session id8j4di1 (2026-07-19): «ED קוטר» with the endpoints riding two different circles built NOTHING (the implicit circle never resolves at ≥2 circles; no routing recognised the pair as un-attachable); the «במעגל O3» workaround worked but surfaced a visible named centre. Cross-membership now routes to circleOnDiameter with an auto (hidden) centre; membership resolves the host when both endpoints share ONE circle.",
+    steps: ['מעגל O', 'מעגל P', 'C על מעגל O', 'D על מעגל P', 'CD קוטר'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles, 'the two drawn circles + the new one on CD').toHaveLength(3);
+      const fresh = circles.find((c) => c.id !== 'circle-O' && c.id !== 'circle-P')!;
+      const cPos = fig.positions.get((fresh as { center: string }).center)!;
+      const C = at(fig, 'C');
+      const D = at(fig, 'D');
+      expect(dist(cPos, C), 'centre equidistant from C and D').toBeCloseTo(dist(cPos, D), 4);
+      expect(dist(cPos, C) + dist(cPos, D), 'centre ON segment CD (its midpoint)').toBeCloseTo(dist(C, D), 4);
+    },
+  },
+  {
     id: 'q27-eo-diameter-new-circle',
     title: '«EO קוטר» after two chords meeting at E builds the NEW Thales circle on EO (#152, ADR-366)',
     guards:

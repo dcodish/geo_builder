@@ -4319,6 +4319,21 @@ const cornerTangentCircle: Rule = (s, ctx) => {
 const CARRIER_RELATION_TAIL =
   /[=<>]|שווה(?!\s*(?:שוקיים|צלעות))|equals?\b|(?<!מעגל(?:ים)?\s+ה)(?:גדול|קטן)|ארו[כך]|קצר|(?:longer|shorter|larger|smaller|greater)(?!\s+circles?\b)/i;
 
+/**
+ * The circle BOTH endpoints of a pair are members of (#221 — the ADR-366 class, membership edition):
+ * the semantic resolver for an unnamed chord/diameter beside SEVERAL circles, where the ADR-029
+ * single-circle rule can't fire. Exactly one common host → its centre token; none or several (e.g.
+ * the two shared intersection points of two circles — a chord of either, genuinely ambiguous) → null.
+ */
+const commonHostCentre = (ctx: ParseContext, a: Id, b: Id): string | null => {
+  const tok = (c: string): string => (c.startsWith('@ctr-') ? c.slice(5) : c);
+  const hosts = (ctx.circleMembers ?? []).filter((e) => {
+    const pts = e.points.map(up);
+    return pts.includes(up(a)) && pts.includes(up(b));
+  });
+  return hosts.length === 1 ? tok(hosts[0].center) : null;
+};
+
 const chord: Rule = (s, ctx) => {
   if (!/chord|מיתר/i.test(s)) return null;
   // "E על מיתר AC" is a POINT ON a chord, not a chord DEFINITION — let pointOnSegment handle it (and
@@ -4331,8 +4346,7 @@ const chord: Rule = (s, ctx) => {
   // draws (PAR-1). Without this the relation was silently dropped. (⟂/∥ chords need no guard here —
   // those constraint rules already run before `chord`.)
   if (CARRIER_RELATION_TAIL.test(s)) return null;
-  const center = resolveCenter(s, ctx);
-  if (!center) return null;
+  let center = resolveCenter(s, ctx);
   const body = dropCircleRef(s).replace(/chords?|מיתרים|מיתר/gi, ' ');
   // A plural declaration names SEVERAL chords at once — "AB ו DC מיתרים" / "AB and DC are chords"
   // (issue #151): the single labelRun read asserted only the FIRST pair, silently dropping the
@@ -4353,6 +4367,9 @@ const chord: Rule = (s, ctx) => {
     chordPairs = [ids];
   }
   if (chordPairs.some(([a, b]) => a === b)) return null; // a degenerate "AA" pair is not a chord list
+  // #221: unnamed beside SEVERAL circles — resolve by the endpoints' MEMBERSHIP (the one common host).
+  if (!center && chordPairs.length === 1) center = commonHostCentre(ctx, chordPairs[0][0], chordPairs[0][1]);
+  if (!center) return null;
   // #152 (the diameter rule's sibling): a chord endpoint that IS this circle's own CENTRE is
   // impossible — «OB מיתר» is not a chord of circle O. Defer; never emit the impossible membership.
   if (!centrePt(ctx, up(center)).startsWith('@') && chordPairs.some(([a, b]) => up(a) === up(center) || up(b) === up(center))) return null;
@@ -4408,7 +4425,22 @@ const circleOnDiameter: Rule = (s, ctx) => {
   const hostIsEndpoint =
     implicitHost !== null && !centrePt(ctx, up(implicitHost)).startsWith('@') && ids.some((p) => up(p) === up(implicitHost));
   const explicitNew = /מעגל\s+חדש|\bnew\s+circle\b/i.test(s);
-  const referencedCircleMissing = named ? true : circles.length === 0 || hostIsEndpoint || explicitNew; // (a named-and-existing circle already returned above)
+  // #221 (the #152 class, membership edition): the endpoints are members of DIFFERENT circles with NO
+  // common host — «ED קוטר» where E rides one circle and D the other. The pair cannot be a diameter of
+  // any existing circle without moving a stated membership, so the statement introduces the NEW circle
+  // on ED (the operator's expectation; the named workaround «…במעגל O3» surfaced an unwanted visible
+  // centre — the unnamed form creates an auto/hidden one). Shared members (two circles' intersection
+  // points — a chord of EITHER, ambiguous) don't qualify: commonHostCentre finds a host there.
+  const memberOfAny = (p: string) => (ctx.circleMembers ?? []).some((e) => e.points.map(up).includes(up(p)));
+  const crossMembers =
+    ids.every((p) => (ctx.points ?? []).some((q) => up(q) === up(p))) &&
+    memberOfAny(ids[0]) &&
+    memberOfAny(ids[1]) &&
+    !(ctx.circleMembers ?? []).some((e) => {
+      const pts = e.points.map(up);
+      return pts.includes(up(ids[0])) && pts.includes(up(ids[1]));
+    });
+  const referencedCircleMissing = named ? true : circles.length === 0 || hostIsEndpoint || explicitNew || crossMembers; // (a named-and-existing circle already returned above)
   // DEFINE-from-new signal (vs the ADD phrasing "diameter DE in circle O"): the diameter LABELS come
   // BEFORE the keyword ("AB קוטר") — the student says "AB is a/the diameter" — OR the circle is referred
   // to WITHOUT a name ("קוטר במעגל AB" / "AB קוטר במעגל"). The ADD phrasing is keyword-first AND names the
@@ -4476,8 +4508,7 @@ const diameter: Rule = (s, ctx) => {
   // rule claims the length; `withCarrierMembership` then re-asserts A,B on the circle AND collinear-through-
   // centre so it stays a DIAMETER (PAR-1/PAR-4). Without this the "= 10" was silently dropped.
   if (CARRIER_RELATION_TAIL.test(s)) return null;
-  const center = resolveCenter(s, ctx);
-  if (!center) return null;
+  let center = resolveCenter(s, ctx);
   const body = dropCircleRef(s).replace(/diameters?|קוטרים|קוטר/gi, ' ');
   // A plural declaration names SEVERAL diameters at once — "AB ו CD קוטרים" / "AB and CD are
   // diameters" (issue #151's diameter mirror): sequential UPPERCASE pair extraction, the same
@@ -4493,6 +4524,9 @@ const diameter: Rule = (s, ctx) => {
     diaPairs = [ids];
   }
   if (diaPairs.some(([a, b]) => a === b)) return null; // a degenerate "AA" pair is not a diameter list
+  // #221: unnamed beside SEVERAL circles — resolve by the endpoints' MEMBERSHIP (the one common host).
+  if (!center && diaPairs.length === 1) center = commonHostCentre(ctx, diaPairs[0][0], diaPairs[0][1]);
+  if (!center) return null;
   // #152: an endpoint that IS this circle's own CENTRE (a real point — an anonymous '@ctr-' centre's
   // letter is free) can never lie ON the circle, so the statement is not a diameter OF this circle —
   // defer («EO קוטר» is the NEW Thales circle on EO; `circleOnDiameter`, which runs first, claims it).

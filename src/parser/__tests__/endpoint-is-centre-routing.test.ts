@@ -77,6 +77,36 @@ describe('#152 — endpoint-is-centre routes to circle creation', () => {
     }
   });
 
+  it.each([['He', 'CD קוטר'], ['En', 'CD is a diameter']])(
+    '#221 cross-membership (%s): endpoints on two DIFFERENT circles → a NEW circle on that diameter, auto (hidden) centre',
+    (_t, u) => {
+      const facts = runLines(['מעגל O', 'מעגל P', 'C על מעגל O', 'D על מעגל P']);
+      const r = parse(u, ctxOf(facts));
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return;
+      expect(r.commands.some((c) => c.type === 'midpoint'), 'centre = midpoint of CD').toBe(true);
+      const ct = r.commands.find((c) => c.type === 'circle-through') as { autoCenter?: boolean } | undefined;
+      expect(ct, 'a NEW circle through C').toBeTruthy();
+      expect(ct!.autoCenter, 'unnamed → auto (hidden) centre, no invented letter').toBe(true);
+    },
+  );
+
+  it('#221 membership resolution: «CE קוטר» with BOTH endpoints on ONE of several circles attaches to THAT circle', () => {
+    const facts = runLines(['מעגל O', 'מעגל P', 'C על מעגל O', 'E על מעגל O']);
+    const r = parse('CE קוטר', ctxOf(facts));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.commands.some((c) => c.type === 'set-collinear'), 'the ADR-137 diameter constraint on the host').toBe(true);
+    expect(r.commands.some((c) => c.type === 'circle-through'), 'no new circle').toBe(false);
+  });
+
+  it('#221 ambiguity: the SHARED members of two intersecting circles stay deferred (a chord of either)', () => {
+    const facts = runLines(['שני מעגלים נחתכים בנקודות A ו-B']);
+    const r = parse('AB קוטר', ctxOf(facts));
+    // Two common hosts — never guessed, never a spurious third circle.
+    if (r.ok) expect(r.commands.some((c) => c.type === 'circle-through')).toBe(false);
+  });
+
   it('the full Q27 flow: «EO קוטר» then the small circle is referenceable by its auto name', () => {
     const facts = runLines([...Q27_PREFIX, 'EO קוטר']);
     const fig = replay(facts);
