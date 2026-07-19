@@ -5953,6 +5953,43 @@ const tangentLine: Rule = (s, ctx) => {
     const thr = throughPointLabel(s);
     if (thr && members.has(thr)) T = thr;
   }
+  // The NO-TOUCH member of the tangency-constraint family (#203, ADR-369): «AB משיק למעגל [C]» /
+  // "AB tangent to circle C" with BOTH endpoints existing and OFF the circle, no touch named. The
+  // statement is a tangency CONSTRAINT on the existing circle (never a rebuilt one, ADR-115):
+  // materialise the touch as the FOOT of the perpendicular from the centre onto line AB — an ADR-297
+  // anonymous dot (the student named no touch; promotable when the book labels it) — and assert its
+  // MEMBERSHIP, i.e. dist(centre, AB) = r, driving the free radius/centre exactly like the corner-
+  // tangent guard's per-arm ⟂. A bare pair means the SEGMENT (ADR-077): the touch must land WITHIN
+  // AB (`set-line [A,F,B]`, drive-or-check); an explicit «הישר»/line keeps the infinite-line reading.
+  // tangentFromExternal (earlier) defers on a both-existing pair, so nothing richer is stolen.
+  if (!T && pts && pts[0] !== pts[1] && have.has(pts[0]) && have.has(pts[1]) && !members.has(pts[0]) && !members.has(pts[1])) {
+    const [a, b] = pts;
+    if (a === up(center) || b === up(center)) return null; // a segment FROM the centre can never be tangent — defer honestly
+    const F = anonId('tang', up(center), a, b);
+    const infinite = /\bline\b|\bray\b|הישר|הקו|קרן/i.test(s);
+    return [
+      { type: 'segment', a, b }, // the tangent segment drawn (idempotent)
+      { type: 'foot', id: F, from: centrePt(ctx, up(center)), a, b }, // the touch = the ⟂ foot from the centre
+      { type: 'point-on-circle', id: F, circle: circleId(center) }, // membership ⟺ dist(centre, AB) = r — the tangency
+      ...(infinite ? [] : [{ type: 'set-line', points: [a, F, b] } as AnyCommand]), // the touch WITHIN the bare segment (ADR-077)
+    ];
+  }
+  // The OPENER twin (#203): «AB משיק למעגל C» with both endpoints NEW — a drawn tangent named by A,B
+  // (±offset markers, ADR-036) at an ANONYMOUS free touch (ADR-297 — the student named the line, not
+  // the touch), the circle created if absent (the ADR-367 seam). One EXISTING endpoint is the
+  // external-apex form and belongs to tangentFromExternal, which runs earlier.
+  if (!T && pts && pts[0] !== pts[1] && !have.has(pts[0]) && !have.has(pts[1]) && pts[0] !== up(center) && pts[1] !== up(center)) {
+    const resolved = resolveOrIntroduceCircle(s, ctx);
+    if (resolved) {
+      const F = anonId('touch', up(resolved.center));
+      return [
+        ...resolved.prepend,
+        { type: 'point-on-circle', id: F, circle: circleId(resolved.center), free: true }, // the free touch
+        { type: 'tangent', id: `tan-${F}`, circle: circleId(resolved.center), at: F, visible: true },
+        ...lineMarkers(`tan-${F}`, pts), // A, B as ±offset markers along the tangent — referenceable
+      ];
+    }
+  }
   if (!T) return null;
   const lineId = `tan-${T}`;
   const naming = pts && pts[0] !== T && pts[1] !== T && pts[0] !== up(center) && pts[1] !== up(center) ? pts : null;

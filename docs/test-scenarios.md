@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `hypotenuse-tangent-to-quarter-circle` — «AB משיק למעגל C» with no touch named constrains the existing circle (#203, ADR-369)
+Prod session `cm4ak2yo`: both «AB משיק למעגל C» and «AB משיק למעגל» fell to the LLM → not-understood — the both-endpoints-existing / unnamed-touch member of the tangency family was missing (it blocks the quarter-circle-in-a-right-triangle bagrut figure). Now a tangency CONSTRAINT: the touch = the ⟂ foot from the centre (anonymous dot), membership drives the free radius, `set-line` keeps it within the bare segment («הישר» opts out); the opener twin (new endpoints) draws a tangent with A,B as markers. Unit locks in `segment-tangency-no-touch.test.ts`.
+
 ### `tangents-to-unbuilt-circle` — «מנקודה A יוצאים שני משיקים למעגל» as the first utterance introduces the circle deterministically (#159, ADR-367)
 Operator report 2026-07-16: with no circle in the figure the two-tangents rule required one to already exist, so both the «שני» and «2» phrasings fell to the LLM (whose rescue pinned an unstated radius 5 — ADR-052 violation; the perceived word-vs-digit difference was LLM luck). `resolveOrIntroduceCircle` now resolves an existing circle, creates a named-but-absent one, or introduces an auto-centred free-radius circle on an empty figure; routed through the tangent + secant rules. Unit locks (`resolve-or-introduce.test.ts`) cover the named/unnamed × present/absent matrix + digit/En mirrors.
 

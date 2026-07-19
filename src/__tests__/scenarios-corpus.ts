@@ -217,6 +217,28 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'hypotenuse-tangent-to-quarter-circle',
+    title: '«AB משיק למעגל C» with no touch named — the hypotenuse tangent to the arc at the right-angle vertex (#203, ADR-369)',
+    guards:
+      "Prod session cm4ak2yo (2026-07-17): «AB משיק למעגל C» and «AB משיק למעגל» both fell through every tangent rule to the LLM → not-understood — the single-segment / both-endpoints-existing / unnamed-touch member of the tangency family was missing, blocking the classic quarter-circle-in-a-right-triangle bagrut figure. Now a tangency CONSTRAINT: the touch is the ⟂ foot from the centre (an anonymous dot), its membership drives the free radius, and it stays WITHIN AB.",
+    steps: ['משולש ABC ישר זוית', 'D על BC', 'E על AC', 'מעגל C', 'DC רדיוס', 'CD=CE', 'AB משיק למעגל C'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const A = at(fig, 'A');
+      const B = at(fig, 'B');
+      const C = at(fig, 'C');
+      const D = at(fig, 'D');
+      const len = dist(A, B);
+      const dC = Math.abs((B.x - A.x) * (A.y - C.y) - (A.x - C.x) * (B.y - A.y)) / len;
+      expect(dC, 'tangency: dist(C, line AB) = r = |CD|').toBeCloseTo(dist(C, D), 2);
+      // the touch lands WITHIN the hypotenuse (the bare-segment principle, ADR-077)
+      const t = ((C.x - A.x) * (B.x - A.x) + (C.y - A.y) * (B.y - A.y)) / (len * len);
+      expect(t).toBeGreaterThan(0);
+      expect(t).toBeLessThan(1);
+    },
+  },
+  {
     id: 'tangents-to-unbuilt-circle',
     title: '«מנקודה A יוצאים שני משיקים למעגל» as the FIRST utterance introduces the circle deterministically (#159, ADR-367)',
     guards:

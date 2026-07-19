@@ -242,6 +242,7 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "lang": "en",
     "shadowedBy": [
       "circlesTangent",
+      "tangentLine",
     ],
     "text": "AB is an external common tangent of the two circles",
     "winner": "commonTangent",
@@ -250,6 +251,7 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "lang": "he",
     "shadowedBy": [
       "circlesTangent",
+      "tangentLine",
     ],
     "text": "AB משיק משותף חיצוני לשני המעגלים",
     "winner": "commonTangent",
@@ -351,6 +353,14 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
       "tangentLine",
     ],
     "text": "AB and AD are tangent to circle O at E and K",
+    "winner": "cornerTangentCircle",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "tangentLine",
+    ],
+    "text": "AB ו-AD משיקים למעגל O בנקודות E ו-K",
     "winner": "cornerTangentCircle",
   },
   {
@@ -544,6 +554,7 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "lang": "en",
     "shadowedBy": [
       "circlesTangent",
+      "tangentLine",
     ],
     "text": "AB is a common tangent to circles O and P",
     "winner": "commonTangent",
@@ -552,26 +563,9 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "lang": "he",
     "shadowedBy": [
       "circlesTangent",
+      "tangentLine",
     ],
     "text": "AB משיק משותף למעגלים O ו-P",
-    "winner": "commonTangent",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
-      "circlesTangent",
-      "tangentLine",
-    ],
-    "text": "CD is a common tangent to circles O and P at M",
-    "winner": "commonTangent",
-  },
-  {
-    "lang": "he",
-    "shadowedBy": [
-      "circlesTangent",
-      "tangentLine",
-    ],
-    "text": "CD משיק משותף למעגלים O ו-P בנקודה M",
     "winner": "commonTangent",
   },
 ]
@@ -1851,13 +1845,13 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
-    "text": "CD is a common tangent to circles O and P at M",
-    "winner": "commonTangent",
+    "text": "AB tangent to circle C",
+    "winner": "tangentLine",
   },
   {
     "lang": "he",
-    "text": "CD משיק משותף למעגלים O ו-P בנקודה M",
-    "winner": "commonTangent",
+    "text": "AB משיק למעגל C",
+    "winner": "tangentLine",
   },
 ]
 `;
