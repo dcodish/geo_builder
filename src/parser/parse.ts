@@ -3176,8 +3176,14 @@ const circle: Rule = (s, ctx) => {
   // A size ADJECTIVE at creation («מעגל קטן…» / "a small circle") shapes the STARTING radius only —
   // small draws smaller (the twoCirclesMeet 0.72 seed split), so the default view matches the words and
   // a later definite «המעגל הקטן» assignment (issue #102) reads the intended circle. Sizes stay free
-  // DOFs (ADR-052); a numeric radius wins.
-  const adj = !r.numeric ? (/מעגל\s+קטן|\bsmall(?:er)?\s+circle/i.test(s) ? 0.72 : 1) : 1;
+  // DOFs (ADR-052); a numeric radius wins. A SECOND (third, …) standalone free circle also splits its
+  // DEFAULT radius by the pair-macro 0.72 convention (the ADR-253 general-position principle, radius
+  // edition — PR #220 play-test): the fold applies at the DEFAULTS (the seed comes after, ADR-253),
+  // and two equal-by-default radii are a degenerate configuration for downstream constructs — the two
+  // external common tangents of equal circles are exactly parallel, so a derived tangent-crossing
+  // apex failed at APPLY where no seed sweep can rescue it. The radius stays a free sampled DOF.
+  const distinct = !r.numeric && !r.symbolic ? Math.pow(0.72, (ctx.circles ?? []).filter((c) => !c.startsWith('~')).length) : 1;
+  const adj = !r.numeric ? (/מעגל\s+קטן|\bsmall(?:er)?\s+circle/i.test(s) ? 0.72 : 1) * distinct : 1;
   // A NEW standalone circle beside existing ones seats its centre CLEAR of them (#196 — the fixed
   // +4-gap default drew a second bare circle overlapping the first, visually asserting intersections
   // the student never stated). Placement only; the centre stays a free sampled DOF.
@@ -5637,7 +5643,9 @@ const commonTangent: Rule = (s, ctx) => {
   // #184 pattern; the student asked for the tangent, not for a naming exercise). The PLURAL
   // («שני המשיקים המשותפים החיצוניים» — the classic figure) builds TWO tangents at once, the second
   // avoiding the first, so both externals (or one of each, kind unstated) land distinct.
-  const plural = /שני\s+ה?משיקים|משיקים\s+משותפ/i.test(s);
+  // In the APEX form a bare PLURAL tangent noun means the pair — «מנקודה A יוצאים משיקים לשני
+  // המעגלים» drew ONE tangent and the operator had to retype with «שני» (play-test finding, PR #220).
+  const plural = /שני\s+ה?משיקים|משיקים\s+משותפ/i.test(s) || (apexForm && /משיקים|\btangents\b/i.test(s));
   const wantPairs = plural || (naming?.length ?? 0) >= 4 ? 2 : 1;
   let names = naming ?? [];
   if (names.length < wantPairs * 2)
@@ -5680,11 +5688,18 @@ const commonTangent: Rule = (s, ctx) => {
   }
   const prior = priorEntries.flatMap((e) => e.pair);
   const out: AnyCommand[] = [...mk];
-  // A NEW apex is a FREE point (2 DOF, ADR-052 — its distance from the circles is unstated); the
-  // through-apex set-line couplings below drive it onto the tangent line(s) — with TWO tangents it
-  // lands at their crossing (the homothety centre emerges from the solve, never asserted). An
-  // EXISTING apex is the M1 statement alone: the figure flexes so the tangent(s) pass through it.
-  if (apex && !have.has(apex)) out.push({ type: 'free-point', id: apex, x: 12, y: 0, free: true });
+  // The apex's REALISATION (play-test fix, PR #220): a NEW apex with TWO tangents is DERIVED — the
+  // crossing of the two seated tangent lines (`line-through` scaffolding + `line-intersection`), so
+  // the solve never recruits the circles' free radii/centres to satisfy a coupling (the operator's
+  // «שני מעגלים זרים» figure was drawn OVERLAPPING: the free-apex set-lines were satisfied by
+  // shrinking the gap — every hard constraint green, the disjoint REQUIREMENT amber, while the valid
+  // untouched-circles configuration existed). The homothety centre still EMERGES (it is where the
+  // seated tangents cross), never asserted. A NEW apex with ONE tangent stays a free point + the
+  // set-line coupling (1 constraint on 2 DOF — the apex itself absorbs it); an EXISTING apex is the
+  // M1 statement alone: set-line couplings flex the figure through it.
+  const newApex = apex !== null && !have.has(apex);
+  if (apex && newApex && wantPairs === 1) out.push({ type: 'free-point', id: apex, x: 12, y: 0, free: true });
+  const apexInk: AnyCommand[] = []; // segments from the apex — pushed AFTER the apex exists (a `segment` would otherwise pre-create it)
   let prevTouches: string[] = [];
   for (let p = 0; p < wantPairs; p++) {
     const [A, B] = [names[p * 2], names[p * 2 + 1]];
@@ -5706,18 +5721,20 @@ const commonTangent: Rule = (s, ctx) => {
       { type: 'set-perpendicular', a: centrePt(ctx, c2), b: B, c: A, d: B, implicit: true }, // radius c2→B ⟂ the tangent
       { type: 'segment', a: A, b: B },
     );
-    // The through-apex coupling (#214): the apex lies ON this tangent's line, strictly beyond both
-    // touches (order apex→A→B — the nearer-circle-first pairing is the softPair default; a later
-    // explicit membership swaps per M4), and the external part apex–A is drawn. With two tangents the
-    // two couplings pin the free apex at their crossing.
+    // The through-apex coupling (#214): with a DERIVED apex the tangent's line is scaffolding for the
+    // crossing; otherwise the set-line coupling (apex strictly beyond both touches — order
+    // apex→A→B; the nearer-circle-first pairing is the softPair default, M4-swappable) drives the
+    // existing/free apex. The external part apex–A is drawn either way.
     if (apex) {
-      out.push(
-        { type: 'set-line', points: [apex, A, B] },
-        { type: 'segment', a: apex, b: A },
-      );
+      if (newApex && wantPairs === 2) out.push({ type: 'line-through', id: `tanline-${A}${B}`, a: A, b: B });
+      else out.push({ type: 'set-line', points: [apex, A, B] });
+      apexInk.push({ type: 'segment', a: apex, b: A });
     }
     prevTouches = [A, B];
   }
+  if (apex && newApex && wantPairs === 2)
+    out.push({ type: 'line-intersection', id: apex, line1: `tanline-${names[0]}${names[1]}`, line2: `tanline-${names[2]}${names[3]}` });
+  out.push(...apexInk);
   return out;
 };
 
