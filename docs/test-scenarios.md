@@ -22,6 +22,12 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `four-unnamed-semicircles-on-square` — a square with an unnamed semicircle outside on each of the 4 sides (#213, ADR-365)
+Operator prod repro 2026-07-19 (+ session `agwxxo9k`): the second UNNAMED semicircle re-picked the letter O — the picker consulted `ctx.points` only, blind to the ADR-342 anonymous centre `@ctr-O` living in `ctx.circles` — re-emitted the first's ids and refused «coincides with its constructed target». All three hand-rolled pickers (semicircle/quarter/sector) now use the shared `freeLabel([points, circles], …)` discipline; the quantified one-liner also stops dropping «מחוץ לריבוע» (bulge threads per side). Unit locks in `unnamed-centre-pickers.test.ts`.
+
+### `definite-circles-tangent-binds-pair` — «המעגלים משיקים זה לזה» binds THE two drawn circles, never an invented third (#215 P1, ADR-363)
+Operator repro 2026-07-19 (found triaging #214): with «מעגל O» + «מעגל P» drawn, the definite plural emitted an INVENTED circle-Q + `circles-tangent O↔Q` — P silently dropped, three circles rendered, all rows green. `circlesTangent` (and the whole two-circle family) now resolves its pair at the shared `resolveCirclePair` chokepoint: bind at exactly 2 existing, complete the pair at 1 (letter-independent), introduce at 0, DEFER at 3+ / half-named; a from-marker («מנקודה») is never read as a touch. Class tests in `circle-pair-binding.test.ts`.
+
 ### `diameter-through-point-imperative` — «הוסף קוטר העובר בנקודה A»: the THROUGH phrasing + a leading imperative reach the ADR-270 diameter (#201, ADR-353)
 Prod log-triage 2026-07-17 (LIVE, 1 user): the construct existed («קוטר מנקודה F», ADR-270) but the THROUGH wording fell to the LLM → not-handled. Operator ruling 2026-07-18: «קוטר ב/מנקודה A» means the diameter THROUGH A — one construct, more phrasings, widened at the rule's own from-marker (the ADR-3D-026 phrasing-class discipline): «[ה]עובר בנקודה», the bare locative «בנקודה», the stacked-prefix slip «במנקודה», «דרך [נקודה]», En "through [the point]", and a tolerated leading imperative («הוסף», "add/draw"). Class test `diameter-from-point.test.ts` (13 forms + the no-theft set); catalog +1.
 

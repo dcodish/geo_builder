@@ -202,6 +202,37 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'definite-circles-tangent-binds-pair',
+    title: '«המעגלים משיקים זה לזה» binds THE two drawn circles — never an invented third (#215, ADR-363)',
+    guards:
+      'Operator repro 2026-07-19 (found triaging #214): with «מעגל O» + «מעגל P» drawn, the definite «המעגלים משיקים זה לזה» emitted an INVENTED circle-Q + circles-tangent O↔Q — P silently dropped from the statement, THREE circles rendered, all rows green. circlesTangent now resolves the pair at the shared resolveCirclePair chokepoint (bind 2 / complete 1 / introduce 0 / defer 3+).',
+    steps: ['מעגל O', 'מעגל P', 'המעגלים משיקים זה לזה'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const cs = [...fig.circles.values()];
+      expect(cs, 'exactly the two circles the student drew').toHaveLength(2);
+      const [a, b] = cs;
+      expect(dist(a.center, b.center), 'the tangency holds between THE drawn pair: centre gap = r1 + r2').toBeCloseTo(a.r + b.r, 1);
+    },
+  },
+  {
+    id: 'four-unnamed-semicircles-on-square',
+    title: 'A square with an unnamed semicircle OUTSIDE on each side — every unnamed centre picks a fresh letter (#213, ADR-365)',
+    guards:
+      "Operator prod repro 2026-07-19 (+ session agwxxo9k same day): the SECOND unnamed semicircle re-picked the letter O — its picker consulted ctx.points only, blind to the ADR-342 anonymous centre @ctr-O that lives in ctx.circles — re-emitted the first's ids and refused «@ctr-O coincides with its constructed target». All three hand-rolled pickers (semicircle/quarterCircle/sector) now use the shared freeLabel([points, circles], …) discipline.",
+    steps: ['ריבוע', 'BC קוטר חצי מעגל מחוץ לריבוע', 'DC קוטר חצי מעגל O2', 'AD קוטר חצי מעגל מחוץ לריבוע', 'AB קוטר חצי מעגל מחוץ לריבוע'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(new Set(circles.map((c) => c.id)).size, 'four distinct semicircle carriers').toBe(4);
+      const arcs = fig.construction.objects.filter((o) => o.kind === 'arc');
+      expect(arcs, 'a 180° arc per side').toHaveLength(4);
+      for (const a of arcs) if (a.kind === 'arc') expect(a.spanDeg).toBe(180);
+    },
+  },
+  {
     id: 'two-circles-disjoint-operator',
     title: '«שני מעגלים זרים» draws two genuinely DISJOINT circles (#196, ADR-358)',
     guards:

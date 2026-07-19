@@ -241,6 +241,22 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
+      "circlesTangent",
+    ],
+    "text": "AB is an external common tangent of the two circles",
+    "winner": "commonTangent",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "circlesTangent",
+    ],
+    "text": "AB משיק משותף חיצוני לשני המעגלים",
+    "winner": "commonTangent",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
       "circle",
     ],
     "text": "circle O with circumference 6π",
@@ -284,7 +300,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
       "lineMeetsCircle",
       "lineLineIntersection",
       "circumcircle",
-      "circle",
     ],
     "text": "the circle through A B C cuts CE at D",
     "winner": "circumcircleMeetsSegment",
@@ -428,14 +443,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     ],
     "text": "קוטר מעגל O היוצא מנקודה F חותך את הצלע AC בנקודה E",
     "winner": "diameterCutsSegment",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
-      "circle",
-    ],
-    "text": "diameter through A in circle O",
-    "winner": "diameterFromPoint",
   },
   {
     "lang": "en",
@@ -1365,12 +1372,12 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   {
     "lang": "en",
     "text": "AB is an external common tangent of the two circles",
-    "winner": "circlesTangent",
+    "winner": "commonTangent",
   },
   {
     "lang": "he",
     "text": "AB משיק משותף חיצוני לשני המעגלים",
-    "winner": "circlesTangent",
+    "winner": "commonTangent",
   },
   {
     "lang": "en",
