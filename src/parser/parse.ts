@@ -314,7 +314,7 @@ const resolveMentionedCircle = (s: string, ctx: ParseContext): string | null =>
  * Callers PREPEND the returned commands. Rules that must NOT introduce (a plain line∩line reading a
  * stray circle word — `resolveMentionedCircle`'s contract) keep the resolve-only helpers.
  */
-const resolveOrIntroduceCircle = (s: string, ctx: ParseContext): { center: string; prepend: AnyCommand[] } | null => {
+const resolveOrIntroduceCircle = (s: string, ctx: ParseContext, opts?: { implied?: boolean }): { center: string; prepend: AnyCommand[] } | null => {
   const namedRaw = circleCenter(s);
   // A real centre label is uppercase — guard against an English article read as a label ("the circle a line" → "a").
   const named = namedRaw && /^[A-Z]/.test(namedRaw) ? up(namedRaw) : null;
@@ -327,7 +327,9 @@ const resolveOrIntroduceCircle = (s: string, ctx: ParseContext): { center: strin
     };
   }
   if (circles.length === 1) return { center: circles[0], prepend: [] };
-  if (circles.length === 0 && mentionsCircle(s)) {
+  // `implied` (#184): a construct noun that presupposes its circle — a bare «קוטר»/"a diameter",
+  // «משיק»/"a tangent" — introduces one even without the circle word.
+  if (circles.length === 0 && (mentionsCircle(s) || opts?.implied)) {
     const c = freeLabel([...(ctx.points ?? [])], ['O', 'P', 'Q', 'K']);
     return {
       center: c,
@@ -377,6 +379,17 @@ const dropCircleRef = (s: string): string =>
 // point label and must survive — "through point A a tangent is drawn" read the article as a second label
 // A, producing a degenerate pair (issue #100 En mirror).
 const FILLER = /\b(?:a|an|to|the|and|of|is|are|at|on|in|with|from|that|so|such)\b/g;
+
+/**
+ * Leading REQUEST words (#184) — imperatives («הוסף/להוסיף/צייר/העבר», "add/draw") and the given-marker
+ * («נתון/יש», "given") a student wraps a bare construct request in, plus the Hebrew object marker «את».
+ * Stripped by the unnamed-construct rules (bare midpoint/tangent/diameter/centre/circle) before their
+ * "nothing else remains" guards, so «הוסף אמצע צלע AB» reads like «אמצע AB». Lowercase-only English
+ * (FILLER's discipline). NOT global filler — only rules whose semantics are "draw me the construct"
+ * may consume a request verb.
+ */
+const REQUEST_WORDS =
+  /הוסיפי|להוסיף|תוסיפי|תוסיף|הוסיף|הוסף|ציירי|צייר|העבירו|העבר|נתונים|נתון|(?<![א-ת])יש(?![א-ת])|(?<![א-ת])את(?![א-ת])|\b(?:add|draw|given|please)\b/g;
 
 /**
  * Find a run of `n` point labels, as a contiguous token ("ABCD", "O1O2") or `n`
@@ -1366,18 +1379,39 @@ const midpoint: Rule = (s, ctx) => {
   if (!/midpoint|אמצע/i.test(s)) return null;
   // Leading \b so "point M is the midpoint …" reads M, not the "t" of "poin**t**".
   const m = s.match(/\b([A-Za-z]\d*)\b.*?(?:midpoint|אמצע)\s*(.*)/i);
-  if (!m) return null;
-  // strip filler ("of"!) and segment/radius words so they aren't read as labels.
-  const rest = m[2].replace(FILLER, ' ').replace(/radius|רדיוס\S*|segment|קטע/gi, ' ');
+  let id = m ? up(m[1]) : null;
+  let tail = m ? m[2] : null;
+  if (!m) {
+    // The UNNAMED form (#184): «[הוסף] אמצע [צלע] AB» / "midpoint of AB" — the student didn't name the
+    // midpoint. AUTO-name it (the altitude/median freeLabel discipline — every existing label excluded),
+    // provided only request words precede the keyword (anything else is a richer phrasing for another
+    // rule; arc forms are already owned by arcMidpoint, which runs first).
+    const un = s.match(/(?:midpoint|אמצע)\s*(.*)/i);
+    if (!un || un.index === undefined) return null;
+    const before = s.slice(0, un.index).replace(REQUEST_WORDS, ' ').replace(FILLER, ' ').trim();
+    if (before) return null;
+    tail = un[1];
+  }
+  // strip filler ("of"!) and segment/radius/side words so they aren't read as labels.
+  const rest = tail!.replace(FILLER, ' ').replace(/radius|רדיוס\S*|segment|קטע|צלע\S*|\bside\b/gi, ' ');
   const seg = labelRun(rest, 2);
   if (!seg) return null;
+  if (!id) {
+    // Nothing but the one segment may remain in the unnamed tail — extra labels or words mean a
+    // compound (escalate). Label runs are GLUED ("AB"), so count tokens and strip whole runs.
+    const toks = rest.match(/[A-Z]\d*/g) ?? [];
+    if (toks.length !== 2) return null;
+    const leftover = rest.replace(/\b(?:[A-Z]\d*)+\b/g, ' ').replace(REQUEST_WORDS, ' ').trim();
+    if (leftover) return null;
+    id = freeLabel([...(ctx.points ?? []), ...(ctx.circles ?? [])], ['M', 'N', 'K', 'L']);
+  }
   // "B is the midpoint of segment AC" implies the segment AC. If an endpoint is NEW, draw the segment first
   // (idempotent; it also CREATES the endpoints, which `midpoint` needs — else "unresolved dependencies"
   // when A,C don't exist yet, ADR-091). When both already exist, emit just the midpoint (no extra segment).
   const have = new Set(ctx.points ?? []);
   const out: AnyCommand[] = [];
   if (!have.has(seg[0]) || !have.has(seg[1])) out.push({ type: 'segment', a: seg[0], b: seg[1] });
-  out.push({ type: 'midpoint', id: up(m[1]), a: seg[0], b: seg[1] });
+  out.push({ type: 'midpoint', id, a: seg[0], b: seg[1] });
   return out;
 };
 
@@ -3131,7 +3165,11 @@ const circle: Rule = (s, ctx) => {
   const r = parseRadius(s);
   const thrM = s.match(/(?:through|העובר\s*דרך|דרך)\s+([A-Za-z]\d*)\b/i);
   const centered = /cent(?:er|re)d?|around|מרכז\w*|סביב/i.test(s);
-  const named = circleCenter(s); // the centre the student named ("circle O" / "centered at O"), or null
+  // The centre the student named ("circle O" / "centered at O"), or null. «מעגל עם מרכז O» / "circle
+  // with centre O" (#184 — a verbatim prod form circleCenter doesn't read) is added LOCALLY: widening
+  // circleCenter itself would touch every consumer (e.g. nameCenter's «מרכז המעגל הוא P»).
+  const withCentreM = s.match(/(?:עם\s+מרכז|with\s+cent(?:er|re))\s+([A-Za-z]\d*)\b/i);
+  const named = circleCenter(s) ?? (withCentreM ? withCentreM[1] : null);
   // «דרך X» / "through X" is a circle DEFINITION only when no OTHER construct owns the through (#180):
   // «דרך A עובר משיק למעגל» is a TANGENT through A, and claiming it here minted a phantom circle
   // through A while silently dropping the stated tangent — the same "a reference is not a definition"
@@ -3153,12 +3191,14 @@ const circle: Rule = (s, ctx) => {
   const isDef = r.numeric || r.symbolic || !!thrM || (centered && !!named);
   if (!isDef) {
     // No radius/centre/through given. A STANDALONE "circle" / "מעגל" / "circle O" is a circle request →
-    // draw a default one. But "A on circle O" (another label remains) or "draw a circle somewhere"
-    // (words remain) is not standalone → defer to the right rule / escalate. Strip the circle word, the
-    // named centre, and filler; if anything meaningful is left, it's not a standalone circle.
+    // draw a default one — including the request-wrapped «נתון מעגל» / "given a circle" (#184). But
+    // "A on circle O" (another label remains) or "draw a circle somewhere" (words remain) is not
+    // standalone → defer to the right rule / escalate. Strip the circle word, the named centre,
+    // request words, and filler; if anything meaningful is left, it's not a standalone circle.
     const leftover = s
       .replace(/circles?|מעגל\w*/gi, ' ')
       .replace(named ? new RegExp(String.raw`\b${named}\b`, 'gi') : /,^/, ' ')
+      .replace(REQUEST_WORDS, ' ')
       .replace(FILLER, ' ')
       .trim();
     if (leftover) return null;
@@ -6819,6 +6859,125 @@ const multiStatement: Rule = (s, ctx) => {
 // Order matters: the most specific keyword-anchored rules run first; the
 // coordinate rule (freePoint) is last because it's the loosest.
 //
+// ── #184: the unnamed-construct family (auto-name the derived point) ────────────────────────────
+// The engine already auto-names for median/altitude/foot; midpoint/diameter/tangent/centre/secant
+// still required the student to supply a name — same student, same sentence shape, arbitrary split
+// (verbatim prod misses, ~6 users). One shared discipline: a LAST-RESORT rule per family that fires
+// only when nothing beyond the construct noun + a circle reference + request words remains, resolves
+// the circle per ADR-029, and auto-names via freeLabel (every existing label + centre excluded, the
+// ADR-263 foot-naming rule). Registered AFTER every richer sibling, so no theft is possible.
+
+/** «[להוסיף] משיק למעגל [O]» / "a tangent to the circle" — a tangent at an auto-named FREE touch.
+ *  On an empty figure the circle is INTRODUCED (the #159 seam — a tangent implies its circle). */
+const bareTangent: Rule = (s, ctx) => {
+  if (!/tangent|משיק/i.test(s)) return null;
+  const resolved = resolveOrIntroduceCircle(s, ctx, { implied: true });
+  if (!resolved) return null;
+  const center = resolved.center;
+  // Nothing but the tangent noun + the circle reference + request words may remain — labels, at/from
+  // markers, cut verbs etc. all mean a richer phrasing another rule (or the LLM) owns.
+  const leftover = dropCircleRef(s)
+    .replace(REQUEST_WORDS, ' ') // request verbs FIRST — the bare-ל strip below would maul «להוסיף»
+    .replace(/tangent|משיק\S*|circles?|ה?מעגל\w*|(?<![א-ת])ל-?/gi, ' ')
+    .replace(new RegExp(String.raw`\b${up(center)}\b`, 'gi'), ' ')
+    .replace(FILLER, ' ')
+    .trim();
+  if (leftover) return null;
+  const T = freeLabel([up(center), ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['T', 'S', 'K', 'N']);
+  return [
+    ...resolved.prepend,
+    { type: 'point-on-circle', id: T, circle: circleId(center), free: true }, // the touch — a free on-circle DOF
+    { type: 'tangent', id: `tan-${T}`, circle: circleId(center), at: T, visible: true },
+  ];
+};
+
+/** «[הוסף] קוטר» / "a diameter" — a diameter of THE circle with both endpoints auto-named.
+ *  On an empty figure the circle is INTRODUCED (the #159 seam — a diameter implies its circle). */
+const bareDiameter: Rule = (s, ctx) => {
+  if (!/diameter|קוטר/i.test(s)) return null;
+  const resolved = resolveOrIntroduceCircle(s, ctx, { implied: true });
+  if (!resolved) return null;
+  const center = resolved.center;
+  const leftover = dropCircleRef(s)
+    .replace(REQUEST_WORDS, ' ')
+    .replace(/diameters?|קוטר\S*|circles?|ה?מעגל\w*|(?<![א-ת])ב-?/gi, ' ')
+    .replace(new RegExp(String.raw`\b${up(center)}\b`, 'gi'), ' ')
+    .replace(FILLER, ' ')
+    .trim();
+  if (leftover) return null;
+  const taken = [up(center), ...(ctx.points ?? []), ...(ctx.circles ?? [])];
+  const A = freeLabel(taken, ['A', 'B', 'C', 'D', 'E', 'F']);
+  const B = freeLabel([...taken, A], ['B', 'C', 'D', 'E', 'F', 'G']);
+  return [...resolved.prepend, { type: 'diameter', id1: A, id2: B, circle: circleId(center) }];
+};
+
+/**
+ * «ישר החותך את המעגל בשתי נקודות» / "a line cutting the circle at two points" — the unnamed secant:
+ * two crossings on THE circle, auto-named, the secant chord drawn. The crossings-named twin («ישר
+ * החותך את המעגל בנקודות C ו-D» — the LINE itself unnamed) rides the same rule with the stated names.
+ * Registered after every named-line cut rule (lineCutsCircleTwice needs the line's OWN labels; this
+ * fires only when the line has none).
+ */
+const unnamedSecant: Rule = (s, ctx) => {
+  // The participle forms ("a line CUTTING the circle") fall outside INTERSECT_KW's word-bounded verbs —
+  // widened locally (this last-resort rule only; the global keyword set keeps its precedence semantics).
+  if (!INTERSECT_KW.test(s) && !/\bcut(?:ting)?\b|\bcrossing\b|\bintersecting\b|\bmeeting\b/i.test(s)) return null;
+  if (!/הישר|(?<![א-ת])ישר(?![א-ת])|\bline\b|(?<![א-ת])קו(?![א-ת])/i.test(s)) return null;
+  if (/tangent|משיק|קוטר|diameter|מיתר|chord|המש(?:ך|כי(?:ם|הם|הן)?)|extension/i.test(s)) return null; // richer nouns own those
+  const resolved = resolveOrIntroduceCircle(s, ctx);
+  if (!resolved) return null;
+  const center = resolved.center;
+  // The stated crossing names, if any («בנקודות C ו-D» / "at C and D"); else the two-points COUNT form.
+  const namedM = s.match(/(?:\bat\b|בנקודות?)\s*([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i);
+  const countForm = /בשתי\s+נקודות|ב-?2\s+נקודות|at\s+two\s+points|\btwo\s+points\b/i.test(s);
+  if (!namedM && !countForm) return null;
+  // Beyond the line noun + cut verb + circle ref + the crossing clause, nothing may remain (no line
+  // labels — those belong to lineCutsCircleTwice/lineMeetsCircle, which run first).
+  const leftover = dropCircleRef(s)
+    .replace(REQUEST_WORDS, ' ')
+    .replace(/(?:\bat\b|בנקודות?)\s*[A-Za-z]\d*\s*(?:\band\b|ו-?|,)\s*[A-Za-z]\d*\b/gi, ' ')
+    .replace(/בשתי\s+נקודות|ב-?2\s+נקודות|at\s+two\s+points|\btwo\s+points\b/gi, ' ')
+    .replace(/\bline\b|הישר|הקו|(?<![א-ת])ישר(?![א-ת])|(?<![א-ת])קו(?![א-ת])|ה?חות(?:ך|כת|כים)|נחת\w*|פוגש\w*|cut(?:s|ting)?|meet(?:s|ing)?|cross(?:es|ing)?|intersect(?:s|ing)?|circles?|ה?מעגל\w*/gi, ' ')
+    .replace(new RegExp(String.raw`\b${up(center)}\b`, 'gi'), ' ')
+    .replace(FILLER, ' ')
+    .trim();
+  if (leftover) return null;
+  const taken = [up(center), ...(ctx.points ?? []), ...(ctx.circles ?? [])];
+  const C = namedM ? up(namedM[1]) : freeLabel(taken, ['C', 'D', 'E', 'F']);
+  let D = namedM ? up(namedM[2]) : freeLabel([...taken, C], ['D', 'E', 'F', 'G']);
+  // Alphabet exhausted → both freeLabel fallbacks collapse to 'M'; diverge the second (the
+  // quarterCircle legacy-default precedent — not a real figure, but never a silent escalation).
+  if (!namedM && D === C) D = C === 'M' ? 'N' : 'M';
+  if (C === D) return null;
+  // STATED existing crossings are an M1 statement about those points, not this opener — defer. (An
+  // auto pick collides only on alphabet exhaustion — proceed with the fallback, the quarterCircle
+  // precedent: not a real figure.)
+  if (namedM && ((ctx.points ?? []).includes(C) || (ctx.points ?? []).includes(D))) return null;
+  return [
+    ...resolved.prepend,
+    { type: 'point-on-circle', id: C, circle: circleId(center), free: true },
+    { type: 'point-on-circle', id: D, circle: circleId(center), free: true },
+    { type: 'segment', a: C, b: D }, // the drawn secant chord
+  ];
+};
+
+/** «[להוסיף את] מרכז המעגל» / "the centre of the circle" — REVEAL the single circle's hidden centre. */
+const showCenter: Rule = (s, ctx) => {
+  if (!/cent(?:er|re)|מרכז/i.test(s) || !mentionsCircle(s)) return null;
+  if (circleCenter(s)) return null; // a named centre → nameCenter/circle own it
+  const resolved = resolveOrIntroduceCircle(s, ctx);
+  if (!resolved) return null;
+  const leftover = s
+    .replace(/cent(?:er|re)|ה?מרכז/gi, ' ')
+    .replace(/circles?|ה?מעגל\w*|של/gi, ' ')
+    .replace(REQUEST_WORDS, ' ')
+    .replace(FILLER, ' ')
+    .trim();
+  if (leftover) return null;
+  // Reveal by its own token letter — deterministic; idempotent when already visible.
+  return [...resolved.prepend, { type: 'name-center', center: up(resolved.center) }];
+};
+
 // EXPORTED for the shadow-matrix guard test only ([docs/15-hardening-plan.md](../../docs/15-hardening-plan.md)
 // A1 / PAR-11): the test runs EVERY rule against a corpus (not stopping at the first match) to detect a
 // later, more-specific rule whose output diverges from the earlier winner's — the first-match-wins
@@ -6885,6 +7044,7 @@ export const RULES: Rule[] = [
   lineCutsCircleTwice, // "AO cuts the circle at C and D" — a named line crossing the circle at BOTH roots; before lineMeetsCircle (one crossing)
   secantFarPoint, // "AD חותך למעגל [בנקודה B]" — apex A external + FAR crossing D only (near unnamed); before lineMeetsCircle, which would mis-grab a never-created D (#136)
   lineMeetsCircle, // "line AC meets circle P at E" — an order-agnostic chord/line meeting a circle, before collinearity & line∩line
+  unnamedSecant, // #184: «ישר החותך את המעגל בשתי נקודות» / crossings-only names — the LINE itself label-less; after every named-line cut rule
   extensionMeetsExistingPoint, // "המשך CA נפגש עם המשיק בנקודה D" — drive an EXISTING D (a tangent's apex marker) onto the extension of CA; before line∩line ("חותך"/"נפגש" would otherwise 'stop' it)
   // A drawn perpendicular/parallel line that "cuts" another at a point must be claimed BEFORE the
   // generic line∩line rule: the "cuts"/"חותך" keyword otherwise makes lineLineIntersection 'stop'
@@ -6918,6 +7078,7 @@ export const RULES: Rule[] = [
   tangentsFromExternal, // TWO tangents from an external point — before the single tangentLine
   tangentFromExternal, // ONE tangent from an external point — before tangentLine (tangent AT a point)
   tangentLine, // a *drawn* tangent (after the tangent∩line compound)
+  bareTangent, // #184: «משיק למעגל» with NOTHING else — auto-named free touch; after every richer tangent rule
   bisectorLine, // a *drawn* bisector (after the bisector compounds)
   parallelConstraint, // ∥ / ⟂ constraints (keyword-anchored) — before the loose "XY = …" rules
   perpendicularConstraint,
@@ -6928,9 +7089,11 @@ export const RULES: Rule[] = [
   inscribedAngleOnDiameter, // "זווית היקפית נשענת על הקוטר" (Thales) — before `diameter` (owns "קוטר") and the angle rules
   diameterFromPoint, // "קוטר מנקודה F" — ONE on-circle label, no cut clause: auto-named antipode (issue #21); before `diameter`
   diameter,
+  bareDiameter, // #184: a label-less «קוטר» / "a diameter" — both endpoints auto-named; after `diameter`
   chord,
   circumcircle, // "circle through A B C" — before the centre-based `circle`
   nameCenter, // "O מרכז המעגל" — reveal an EXISTING circle's hidden centre; before `circle` (which would CREATE one)
+  showCenter, // #184: the UNNAMED «מרכז המעגל» — reveal the single circle's hidden centre by its own token
   circleSizeExisting, // "היקף מעגל O1 הוא 6π" on an EXISTING circle → set-radius; before `circle` (which would re-create + drop the size)
   circle,
   foot, // before `pointOnSegment`
