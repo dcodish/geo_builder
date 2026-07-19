@@ -233,6 +233,23 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'semicircle-bare-adverb-outside',
+    title: '«BC קוטר חצי מעגל מבחוץ» — the bare adverb binds the OUTSIDE like «מחוץ לריבוע» (#222, ADR-365 Am.)',
+    guards:
+      "Operator validation pass 2026-07-20 (right after #213): the object form «מחוץ לריבוע» bound the bulge, but the bare adverb «מבחוץ»/«בחוץ» parsed and silently DROPPED the stated side — the ADR-365 ride-along class, word-form edition. The adverbs now bind (the shape resolved from ctx.polygons by the diameter edge), matching the two-circle family's מבחוץ/מבפנים synonyms (ADR-359 Am. 3).",
+    steps: ['ריבוע', 'BC קוטר חצי מעגל מבחוץ'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const arc = fig.construction.objects.find((o) => o.kind === 'arc');
+      expect(arc).toBeTruthy();
+      if (arc && arc.kind === 'arc') {
+        expect((arc as { bulgeRef?: string }).bulgeRef, 'the stated OUTSIDE bound, never dropped').toBeTruthy();
+        expect((arc as { bulgeToward?: boolean }).bulgeToward).toBeUndefined();
+      }
+    },
+  },
+  {
     id: 'cross-circle-diameter-new-circle',
     title: '«CD קוטר» with C,D on two DIFFERENT circles builds the NEW circle on CD (#221, ADR-366 Am.)',
     guards:
