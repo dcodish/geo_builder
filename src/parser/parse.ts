@@ -4310,6 +4310,9 @@ const chord: Rule = (s, ctx) => {
     chordPairs = [ids];
   }
   if (chordPairs.some(([a, b]) => a === b)) return null; // a degenerate "AA" pair is not a chord list
+  // #152 (the diameter rule's sibling): a chord endpoint that IS this circle's own CENTRE is
+  // impossible — «OB מיתר» is not a chord of circle O. Defer; never emit the impossible membership.
+  if (!centrePt(ctx, up(center)).startsWith('@') && chordPairs.some(([a, b]) => up(a) === up(center) || up(b) === up(center))) return null;
   const circ = circleId(center);
   const members: Id[] = [];
   for (const [a, b] of chordPairs) for (const id of [a, b]) if (!members.includes(id)) members.push(id);
@@ -4352,7 +4355,17 @@ const circleOnDiameter: Rule = (s, ctx) => {
   // and present, or the single unnamed one) → `diameter` adds the diameter to it.
   const DEFINE = /של\s*ה?מעגל|שקוטר|מעגל\s+שבו|שמרכז|רדיוסו|circle\s+with\b|with\s+(?:a\s+|the\s+)?diameter|diameter\s+of|is\s+(?:a\s+|the\s+)?diameter|cent(?:er|re)d|radius/i;
   const endpointsExist = ids.every((p) => (ctx.points ?? []).some((q) => up(q) === up(p)));
-  const referencedCircleMissing = named ? true : circles.length === 0; // (a named-and-existing circle already returned above)
+  // #152: an endpoint that IS the would-be host circle's own CENTRE can never lie ON that circle, so
+  // «EO קוטר» beside circle O (O = its centre, a real named point — an ADR-342 anonymous centre's
+  // letter is NOT a point and never trips this) is a NEW circle on diameter EO (the Thales-circle
+  // opener of bagrut Q27), not a diameter of the existing circle. That impossibility is the
+  // disambiguator the routing was missing; an explicit «במעגל חדש» / "in a new circle" is a create
+  // signal outright (it used to no-op).
+  const implicitHost = !named ? resolveCenter(s, ctx) : null;
+  const hostIsEndpoint =
+    implicitHost !== null && !centrePt(ctx, up(implicitHost)).startsWith('@') && ids.some((p) => up(p) === up(implicitHost));
+  const explicitNew = /מעגל\s+חדש|\bnew\s+circle\b/i.test(s);
+  const referencedCircleMissing = named ? true : circles.length === 0 || hostIsEndpoint || explicitNew; // (a named-and-existing circle already returned above)
   // DEFINE-from-new signal (vs the ADD phrasing "diameter DE in circle O"): the diameter LABELS come
   // BEFORE the keyword ("AB קוטר") — the student says "AB is a/the diameter" — OR the circle is referred
   // to WITHOUT a name ("קוטר במעגל AB" / "AB קוטר במעגל"). The ADD phrasing is keyword-first AND names the
@@ -4437,6 +4450,10 @@ const diameter: Rule = (s, ctx) => {
     diaPairs = [ids];
   }
   if (diaPairs.some(([a, b]) => a === b)) return null; // a degenerate "AA" pair is not a diameter list
+  // #152: an endpoint that IS this circle's own CENTRE (a real point — an anonymous '@ctr-' centre's
+  // letter is free) can never lie ON the circle, so the statement is not a diameter OF this circle —
+  // defer («EO קוטר» is the NEW Thales circle on EO; `circleOnDiameter`, which runs first, claims it).
+  if (!centrePt(ctx, up(center)).startsWith('@') && diaPairs.some(([a, b]) => up(a) === up(center) || up(b) === up(center))) return null;
   const exists = (p: string) => (ctx.points ?? []).some((q) => up(q) === up(p));
   const members = membersOfCenter(ctx, center);
   const out: AnyCommand[] = [];

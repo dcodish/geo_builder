@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `q27-eo-diameter-new-circle` — «EO קוטר» builds the NEW Thales circle on EO, not an impossible diameter of circle O (#152, ADR-366)
+Operator session `qx5a19co` (bagrut Q27): «EO קוטר» — where O is circle O's own centre — was attached to circle O (`point-on-circle O`, impossible) and deferred; «EO קוטר במעגל חדש» no-op'ed. The endpoint-is-centre impossibility now routes the statement to `circleOnDiameter` (new circle, centre = auto-named midpoint of EO); «במעגל חדש» is an explicit create signal; ordinary diameter/chord attachments byte-unchanged. Unit locks in `endpoint-is-centre-routing.test.ts`.
+
 ### `four-unnamed-semicircles-on-square` — a square with an unnamed semicircle outside on each of the 4 sides (#213, ADR-365)
 Operator prod repro 2026-07-19 (+ session `agwxxo9k`): the second UNNAMED semicircle re-picked the letter O — the picker consulted `ctx.points` only, blind to the ADR-342 anonymous centre `@ctr-O` living in `ctx.circles` — re-emitted the first's ids and refused «coincides with its constructed target». All three hand-rolled pickers (semicircle/quarter/sector) now use the shared `freeLabel([points, circles], …)` discipline; the quantified one-liner also stops dropping «מחוץ לריבוע» (bulge threads per side). Unit locks in `unnamed-centre-pickers.test.ts`.
 

@@ -217,6 +217,25 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'q27-eo-diameter-new-circle',
+    title: '«EO קוטר» after two chords meeting at E builds the NEW Thales circle on EO (#152, ADR-366)',
+    guards:
+      "Operator session qx5a19co (bagrut Q27): «EO קוטר» was claimed by the `diameter` rule (attach to the EXISTING circle O), which emitted the impossible `point-on-circle O` on circle-O — the whole step deferred with unresolved deps; «EO קוטר במעגל חדש» no-op'ed. The endpoint-is-centre impossibility now routes the statement to `circleOnDiameter` (a new circle, centre = midpoint of EO), which the operator had to reach by a 2-step workaround.",
+    steps: ['מעגל O', 'AB מיתר', 'CD מיתר', 'AB ו CD נחתכים בנקודה E', 'EO קוטר'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles, 'circle O + the new Thales circle on EO').toHaveLength(2);
+      const small = circles.find((c) => c.id !== 'circle-O')!;
+      const cPos = fig.positions.get((small as { center: string }).center)!;
+      const E = at(fig, 'E');
+      const O = at(fig, 'O');
+      expect(dist(cPos, E), 'centre equidistant from E and O').toBeCloseTo(dist(cPos, O), 4);
+      expect(dist(cPos, E) + dist(cPos, O), 'centre ON segment EO (its midpoint)').toBeCloseTo(dist(E, O), 4);
+    },
+  },
+  {
     id: 'four-unnamed-semicircles-on-square',
     title: 'A square with an unnamed semicircle OUTSIDE on each side — every unnamed centre picks a fresh letter (#213, ADR-365)',
     guards:
