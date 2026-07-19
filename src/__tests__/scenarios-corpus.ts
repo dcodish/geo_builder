@@ -217,6 +217,36 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'two-tangents-from-apex-to-both-circles',
+    title: '«מנקודה A יוצאים שני משיקים לשני המעגלים» — the classic two-circle figure through an external apex (#214, ADR-370)',
+    guards:
+      "Operator report 2026-07-19: the construct was missing — «מנקודה A יוצא משיק לשני המעגלים» was silently mis-parsed (an invented third circle with A as a mutual-tangency touch — the #215 P1), and even with «משותף» the rule had no apex concept (A was swept into the touch labels and placed ON circle O). The from-marker now binds the APEX role; per tangent the ADR-239 two-touch bundle + line-through scaffolding; a new A is DERIVED at the two tangents' crossing (the play-test amendment — the circles are never recruited).",
+    steps: ['מעגל O', 'מעגל P', 'מנקודה A יוצאים שני משיקים לשני המעגלים'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const A = at(fig, 'A');
+      // the two external parts drawn from A, each to a touch that rides one of the circles: for each
+      // A-segment, the far end is at radius distance from one centre and the segment is ⟂ that radius
+      const segs = fig.construction.objects.filter((o) => o.kind === 'segment' && (o.a === 'A' || o.b === 'A'));
+      expect(segs.length, 'the external parts drawn from A').toBeGreaterThanOrEqual(2);
+      const circles = [...fig.circles.values()];
+      expect(circles).toHaveLength(2);
+      for (const seg of segs) {
+        if (seg.kind !== 'segment') continue;
+        const T = fig.positions.get(seg.a === 'A' ? seg.b : seg.a)!;
+        const onSome = circles.some((c) => Math.abs(dist(c.center, T) - c.r) < 0.05 * c.r);
+        expect(onSome, 'each tangent touch rides a circle').toBe(true);
+        // tangency: the radius to the touch ⟂ the line A–T
+        const c = circles.find((cc) => Math.abs(dist(cc.center, T) - cc.r) < 0.05 * cc.r)!;
+        const rx = T.x - c.center.x, ry = T.y - c.center.y;
+        const vx = A.x - T.x, vy = A.y - T.y;
+        const cos = Math.abs(rx * vx + ry * vy) / (Math.hypot(rx, ry) * Math.hypot(vx, vy));
+        expect(cos, 'radius ⟂ tangent at the touch').toBeLessThan(0.05);
+      }
+    },
+  },
+  {
     id: 'unnamed-construct-chain',
     title: '«נתון מעגל» → «קוטר» → «משיק למעגל» → «מרכז המעגל» — the student who names nothing (#184, ADR-368)',
     guards:

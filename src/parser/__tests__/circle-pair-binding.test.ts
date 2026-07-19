@@ -82,7 +82,10 @@ describe('#215 — definite plural tangency binds THE existing pair', () => {
     expect(parse('the two circles are tangent to each other', ctxOf(three)).ok).toBe(false);
   });
 
-  it('a FROM-marker is never a touch marker: «מנקודה A …» defers to the #214 owner family', () => {
+  it('a FROM-marker is never a touch marker: «מנקודה A …» is owned by the #214 apex family (A never placed ON a circle)', () => {
+    // When #215 landed, the apex owner did not exist yet and these deferred to the LLM; the ADR-370
+    // apex form now claims them. The INVARIANT this locks is unchanged: A is the apex, never a touch —
+    // circlesTangent must not consume the from-marked point as a mutual-tangency touch.
     const facts = runLines(TWO);
     for (const u of [
       'מנקודה A יוצא משיק לשני המעגלים',
@@ -90,7 +93,10 @@ describe('#215 — definite plural tangency binds THE existing pair', () => {
       'from point A a tangent to both circles',
     ]) {
       const r = parse(u, ctxOf(facts));
-      expect(r.ok, `${u} must not be claimed (apex ≠ touch)`).toBe(false);
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) continue;
+      expect(r.commands.some((c) => c.type === 'point-on-circle' && (c as { id: string }).id === 'A'), `${u}: A must never be a touch`).toBe(false);
+      expect(r.commands.some((c) => c.type === 'circles-tangent'), `${u}: never mutual tangency`).toBe(false);
     }
   });
 

@@ -574,14 +574,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     "text": "CD משיק משותף למעגלים O ו-P בנקודה M",
     "winner": "commonTangent",
   },
-  {
-    "lang": "en",
-    "shadowedBy": [
-      "circle",
-    ],
-    "text": "circle with center O",
-    "winner": "nameCenter",
-  },
 ]
 `;
 
@@ -1869,73 +1861,13 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
-    "text": "midpoint of AB",
-    "winner": "midpoint",
+    "text": "from point A two tangents to both circles",
+    "winner": "tangentsFromExternal",
   },
   {
     "lang": "he",
-    "text": "אמצע AB",
-    "winner": "midpoint",
-  },
-  {
-    "lang": "en",
-    "text": "a tangent to the circle",
-    "winner": "bareTangent",
-  },
-  {
-    "lang": "he",
-    "text": "משיק למעגל",
-    "winner": "bareTangent",
-  },
-  {
-    "lang": "en",
-    "text": "a diameter",
-    "winner": "bareDiameter",
-  },
-  {
-    "lang": "he",
-    "text": "קוטר",
-    "winner": "bareDiameter",
-  },
-  {
-    "lang": "en",
-    "text": "a line cutting the circle at two points",
-    "winner": "unnamedSecant",
-  },
-  {
-    "lang": "he",
-    "text": "ישר החותך את המעגל בשתי נקודות",
-    "winner": "unnamedSecant",
-  },
-  {
-    "lang": "en",
-    "text": "given a circle",
-    "winner": "circle",
-  },
-  {
-    "lang": "he",
-    "text": "נתון מעגל",
-    "winner": "circle",
-  },
-  {
-    "lang": "en",
-    "text": "circle with center O",
-    "winner": "nameCenter",
-  },
-  {
-    "lang": "he",
-    "text": "מעגל עם מרכז O",
-    "winner": "circle",
-  },
-  {
-    "lang": "en",
-    "text": "the centre of the circle",
-    "winner": "showCenter",
-  },
-  {
-    "lang": "he",
-    "text": "מרכז המעגל",
-    "winner": "showCenter",
+    "text": "מנקודה A יוצאים שני משיקים לשני המעגלים",
+    "winner": "tangentsFromExternal",
   },
 ]
 `;
