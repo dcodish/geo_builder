@@ -520,7 +520,13 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
           return pv && pa && pb ? angleAt(pv, pa, pb) ?? NaN : NaN;
         });
         if (vals.some((x) => !Number.isFinite(x))) continue;
-        if (vals.some((x) => x < degenTol || x > Math.PI - degenTol)) continue; // degenerate ⇒ no information
+        // A wedge is STRUCTURALLY degenerate — and rightly excluded — only when it is ~0°/180° in
+        // EVERY sample (a permanent straight angle along a set-line). The old ANY-sample kill (#193)
+        // applied the per-sample "no information" reasoning at the universe level: one squashed-but-
+        // valid configuration in the pool (Q9's thin-lens seeds put A within ~2° of the secant) erased
+        // an equality that holds in every sample — the book's own ∠ACE = ∠ABE vanished. Same
+        // quantifier discipline as `distinctSamples`/`sameRay`: structural = forced in ALL samples.
+        if (vals.every((x) => x < degenTol || x > Math.PI - degenTol)) continue; // degenerate in EVERY sample ⇒ no information
         angles.push({ vertex: v, a, b });
         angVal.push(vals);
       }

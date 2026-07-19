@@ -1346,7 +1346,10 @@ export type StepOutcome = { produced: true } | { produced: false; reason: 'error
  * "produced nothing" — the amber "may not match" cue already flags that, and the figure is still shown.
  */
 export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, overrides: Record<Id, number> = {}): StepOutcome {
-  const labelCount = (l: MeasureLabels) => l.lengths.length + l.angles.length;
+  // ALL THREE label kinds (#162): the gate predates ADR-118's `areas`, so a lone symbolic area label
+  // («שטח משולש AFO הוא 9b» — correctly no constraint, ADR-031/118) counted as nothing and the
+  // student's statement was swallowed as "already drawn". A diff, so an exact re-statement still nets 0.
+  const labelCount = (l: MeasureLabels) => l.lengths.length + l.angles.length + l.areas.length;
   const before = replay(facts, seed, overrides);
   const all = trialFacts(facts, commands);
   const trial = all.slice(facts.length);
@@ -1384,7 +1387,15 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, o
   // `name-center` REVEALS an existing circle's hidden centre — a visible change that adds no object/point
   // and moves nothing, so the geometry checks above miss it. It still "produced" (the centre now shows).
   const reveals = commands.some((c) => c.type === 'name-center' || c.type === 'show-circle');
-  if (grew || dataOnly || reveals) return { produced: true };
+  // A step that REDUCES the figure's free-DOF count took effect even with ZERO coordinate delta (#156 —
+  // the ADR-234/272/273 honesty class, driven-parametric edition): «∠EOF=90» on square-side midpoints
+  // seeded at t=0.5 already held at the seed (nothing moved) and drives via the carriers' `solve`
+  // fields (no constraint object grew), so the given was swallowed as "already set" — and "show
+  // another configuration" then resampled E,F independently and broke the angle. `freeDofCount`
+  // already folds solve-directive DOF removals, so the before/after delta is the exact general
+  // signal; a truly-vacuous re-statement removes no DOF (delta 0) and stays a friendly no-op.
+  const dofReduced = freeDofCount(after.construction) < freeDofCount(before.construction);
+  if (grew || dofReduced || dataOnly || reveals) return { produced: true };
   // No geometric change — but a `set-equal` NAMING an enabled shape-variant's (kite/isosceles) equal-pair
   // that no explicit equality already asserts is the student CHOOSING which sides are equal: it PINS a
   // previously-SOFT default (ADR-138 / design-rules M4), flipping the relation from "not forced" to

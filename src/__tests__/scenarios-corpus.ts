@@ -202,6 +202,33 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'symbolic-area-label-not-swallowed',
+    title: '«שטח משולש AFO הוא 9b» is committed and labelled — never "already on the figure" (#162, ADR-118 Am.)',
+    guards:
+      "Operator dev session pxeb2ng8 (2026-07-16): the lone symbolic area statement was silently discarded with «already on the figure» — dryRunOutcome's labelCount predated ADR-118's areas lane, so the (correctly constraint-free) area LABEL counted as nothing. All three label kinds now count; the numeric sibling and the shared-variable ratio lane are unchanged.",
+    steps: ['משולש ABC', 'AE תיכון', 'F ו D על צלע AB', 'CD ו AE נחתכים בנקודה O', 'BE∥FO', 'שטח משולש AFO הוא 9b', 'שטח מרובע BEOF הוא 16'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.labels.areas.length, 'both area statements visible on the figure').toBeGreaterThanOrEqual(2);
+      expect(fig.labels.areas.some((a) => a.text.includes('9b')), 'the symbolic 9b label present').toBe(true);
+    },
+  },
+  {
+    id: 'seed-coincident-angle-not-swallowed',
+    title: '«∠EOF=90» true at the default seeds is still COMMITTED and pinned (#156, ADR-371)',
+    guards:
+      'Operator dev session qx5a19co: E,F seeded at the square-side midpoints subtend exactly 90° at the centre, so the driving set-angle moved nothing and grew no constraint object — dryRunOutcome read «empty», told the student «already set», and "show another" then broke the angle. A step that reduces the free-DOF count is now produced; after commit the angle is pinned in every displayed configuration (the seed-sweep oracle enforces this check per seed).',
+    steps: ['ריבוע ABCD', 'אלכסונים נחתכים בנקודה O', 'AC', 'DB', 'E על AB', 'F על AD', 'משולש OEF', '∠EOF=90'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const E = at(fig, 'E');
+      const O = at(fig, 'O');
+      const F = at(fig, 'F');
+      expect(angle(E, O, F), 'the committed angle holds (and must keep holding at every seed)').toBeCloseTo(90, 1);
+    },
+  },
+  {
     id: 'definite-circles-tangent-binds-pair',
     title: '«המעגלים משיקים זה לזה» binds THE two drawn circles — never an invented third (#215, ADR-363)',
     guards:
@@ -872,12 +899,12 @@ export const SCENARIOS: Scenario[] = [
     id: 'power-of-point-median-product-builds',
     title: '«4*DM*DM=BM*ME» on the medians figure builds the true product, never a wrong set-equal (#145 P1, #144)',
     guards:
-      'Operator 2026-07-15 (prod session o90uiwwh, seq 18–35): the medians figure + the exam relation 4·DM² = BM·ME. equalSegments’ unanchored regex used to slide to the interior «DM=BM» and commit set-equal(D,M,B,M) — a WRONG constraint, saved from silence only by the accidental droppedGivenNumbers hit on the 4 (the coefficient-less quotient forms committed silently). Now lengthProduct lowers it to ONE set-length-product (k=4, DM twice) whose log-domain residual drives the free M; the relation holds exactly on the final coordinates. (The CF/AD median steps are pre-parsed commands from the log — «CF תיכון» after a prior median is a SEPARATE parser gap, filed.)',
+      'Operator 2026-07-15 (prod session o90iwwh/o90uiwwh, seq 18–35): the medians figure + the exam relation 4·DM² = BM·ME. equalSegments’ unanchored regex used to slide to the interior «DM=BM» and commit set-equal(D,M,B,M) — a WRONG constraint, saved from silence only by the accidental droppedGivenNumbers hit on the 4 (the coefficient-less quotient forms committed silently). Now lengthProduct lowers it to ONE set-length-product (k=4, DM twice) whose log-domain residual drives the free M; the relation holds exactly on the final coordinates. The CF/AD median steps are the BARE typed strings again (#168 fixed: the second median resolves its opposite side from the apex’s polygon — the ADR-263 mechanism — instead of a raw point count the first median’s rider broke).',
     steps: [
       'משולש ABC',
       'BE תיכון',
-      { llm: [{ type: 'midpoint', id: 'F', a: 'A', b: 'B' } as unknown as AnyCommand, { type: 'segment', a: 'C', b: 'F' } as unknown as AnyCommand] },
-      { llm: [{ type: 'midpoint', id: 'D', a: 'B', b: 'C' } as unknown as AnyCommand, { type: 'segment', a: 'A', b: 'D' } as unknown as AnyCommand] },
+      'CF תיכון',
+      'AD תיכון',
       'BF=FM',
       '4*DM*DM=BM*ME',
     ],

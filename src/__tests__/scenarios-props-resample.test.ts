@@ -80,6 +80,56 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
     st.clear();
   });
 
+  it('[q9-degenerate-wedge-quantifier] the Q9 two-circle figure reports the part-א classes ∠ACE=∠ABE and ∠AFD=∠ABD (#193)', () => {
+    // Operator (booklet Q9, the #191/#192 build): "when I try to see similar angles, they are not shown
+    // as equal. For instance ACE and ABE." Both pairs are FORCED (inscribed angles on one arc) and hold
+    // EXACTLY in every converged sample — but the angle-universe gate killed any wedge that is within 2°
+    // of 0/180 in ANY single sample, and the thin-lens seeds (A almost on the secant) squashed ∠ACE/∠AFD
+    // somewhere in the pool. The exclusion is now ALL-samples (structural degeneracy only — the same
+    // quantifier discipline as distinctSamples/sameRay).
+    const st = useGeoStore.getState();
+    st.clear();
+    const steps = [
+      'שני מעגלים נחתכים בנקודות A ו-B',
+      'מיתר CE במעגל השמאלי',
+      'מיתר DF במעגל הימני',
+      'ישר CDEF',
+      'משולש ACF',
+      'AB',
+      'BC',
+      'BD',
+      'BE',
+      'BF',
+      'מעגל חוסם את המשולש ACF',
+      'G על הקשת הגדולה CF',
+      'GC',
+      'GF',
+      'נסמן ב-O את החיתוך של AB ו-CF',
+    ];
+    for (const u of steps) {
+      const r = parse(u, ctxOf(useGeoStore.getState().facts));
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return;
+      for (const cmd of r.commands) st.execute(cmd, u, `g-${u}`);
+    }
+    useGeoStore.getState().viewRelations();
+    const rel = useGeoStore.getState().relations!.result;
+    // Ray-merge may rename an arm lying on the secant (C,D,E,F collinear) to the class representative,
+    // so accept any collinear stand-in for the merged arm.
+    const wedge = (cls: { vertex: Id; a: Id; b: Id }[], vertex: Id, arm1: Id[], arm2: Id[]) =>
+      cls.some(
+        (x) =>
+          x.vertex === vertex &&
+          ((arm1.includes(x.a) && arm2.includes(x.b)) || (arm1.includes(x.b) && arm2.includes(x.a))),
+      );
+    const fmt = rel.equalAngles.map((c) => c.map((a) => `∠${a.a}${a.vertex}${a.b}`).join('=')).join(' | ');
+    const class1 = rel.equalAngles.some((cls) => wedge(cls, 'C', ['A'], ['D', 'E', 'F']) && wedge(cls, 'B', ['A', 'H'], ['E']));
+    expect(class1, `∠ACE = ∠ABE surfaced (got: ${fmt})`).toBe(true);
+    const class2 = rel.equalAngles.some((cls) => wedge(cls, 'F', ['A'], ['C', 'D', 'E']) && wedge(cls, 'B', ['A', 'H'], ['D']));
+    expect(class2, `∠AFD = ∠ABD surfaced (got: ${fmt})`).toBe(true);
+    st.clear();
+  });
+
   it('[constrained-inscribed-quad-resample] the constrained cyclic quad offers DIFFERENT convex drawings', () => {
     // Same figure as the seed-0 scenario. The operator saw "5 DOF" but "show another configuration"
     // said impossible — because the quad's vertices were pinned, leaving only similarity DOF. With the

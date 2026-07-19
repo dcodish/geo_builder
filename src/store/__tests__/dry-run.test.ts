@@ -5,8 +5,9 @@
  * success. A *givens violation* is deliberately NOT "produced nothing" (the amber cue already flags it).
  */
 import { describe, it, expect } from 'vitest';
-import { dryRunOutcome, type Fact } from '@/store/geoStore';
-import { parse } from '@/parser';
+import { dryRunOutcome, replay, type Fact } from '@/store/geoStore';
+import { parse, buildParseCtx } from '@/parser';
+import { freeDofCount } from '@/engine';
 import type { AnyCommand } from '@/engine';
 
 const facts = (cmds: AnyCommand[]): Fact[] => cmds.map((cmd, i) => ({ id: `f${i}`, group: `g${i}`, enabled: true, cmd }));
@@ -87,5 +88,69 @@ describe('dryRunOutcome — did the step actually build something?', () => {
     const withLen = [...sq, ...facts(cmdsOf('AB = 6')).map((f, i) => ({ ...f, id: `len${i}` }))];
     const o2 = dryRunOutcome(withLen, cmdsOf('AB = 6'));
     expect(o2.produced, 're-typing an existing distance given is already-drawn').toBe(false);
+  });
+});
+
+// ── #162 + #156 — the two dryRunOutcome swallow classes (same function, different mechanisms) ──
+const ctxOf = (fs: Fact[]) => {
+  const fig = replay(fs);
+  return buildParseCtx(fig.construction, fig.positions);
+};
+const buildSeq = (lines: string[]): Fact[] => {
+  const out: Fact[] = [];
+  let g = 0;
+  for (const line of lines) {
+    const r = parse(line, ctxOf(out));
+    if (!r.ok) throw new Error(`prefix step did not parse: ${line} (${r.reason})`);
+    const group = `g${g++}`;
+    for (const cmd of r.commands) out.push({ id: `${group}.${out.length}`, utterance: line, group, cmd, enabled: true });
+  }
+  return out;
+};
+const ctxCmds = (fs: Fact[], u: string): AnyCommand[] => {
+  const r = parse(u, ctxOf(fs));
+  if (!r.ok) throw new Error(`did not parse: ${u} (${r.reason})`);
+  return r.commands;
+};
+
+describe('#162 — a lone symbolic AREA label is produced, never "already drawn"', () => {
+  const PREFIX = ['משולש ABC', 'AE תיכון', 'F ו D על צלע AB', 'CD ו AE נחתכים בנקודה O', 'BE∥FO'];
+
+  it('the operator\'s exact step «שטח משולש AFO הוא 9b» is produced (labels.areas now counted)', () => {
+    const base = buildSeq(PREFIX);
+    const o = dryRunOutcome(base, ctxCmds(base, 'שטח משולש AFO הוא 9b'));
+    expect(o.produced, 'a first/lone symbolic area label is genuine new information').toBe(true);
+  });
+
+  it('re-stating the IDENTICAL area label stays a friendly no-op (the gate is a diff)', () => {
+    const base = buildSeq([...PREFIX, 'שטח משולש AFO הוא 9b']);
+    const o = dryRunOutcome(base, ctxCmds(base, 'שטח משולש AFO הוא 9b'));
+    expect(o.produced).toBe(false);
+    if (!o.produced) expect(o.reason).toBe('empty');
+  });
+
+  it('the numeric sibling («הוא 9») was and stays produced (the set-area constraint)', () => {
+    const base = buildSeq(PREFIX);
+    expect(dryRunOutcome(base, ctxCmds(base, 'שטח משולש AFO הוא 9')).produced).toBe(true);
+  });
+});
+
+describe('#156 — a driving constraint coincidentally satisfied at the seed is produced (DOF reduction)', () => {
+  const PREFIX = ['ריבוע ABCD', 'אלכסונים נחתכים בנקודה O', 'AC', 'DB', 'E על AB', 'F על AD', 'משולש OEF'];
+
+  it('the operator\'s «∠EOF=90» — true at the t=0.5 seeds, zero delta — is PRODUCED (2 DOF → 1)', () => {
+    const base = buildSeq(PREFIX);
+    const cmds = ctxCmds(base, '∠EOF=90');
+    const before = freeDofCount(replay(base).construction);
+    const o = dryRunOutcome(base, cmds);
+    expect(o.produced, 'the given genuinely removes a DOF — never "already set"').toBe(true);
+    const after = freeDofCount(replay([...base, ...cmds.map((cmd, i) => ({ id: `t${i}`, group: 'gt', enabled: true, cmd }))].map((f) => f)).construction);
+    expect(after, 'the DOF count actually drops').toBeLessThan(before);
+  });
+
+  it('a truly-vacuous re-statement (the same angle re-typed after commit) still reads empty', () => {
+    const base = buildSeq([...PREFIX, '∠EOF=90']);
+    const o = dryRunOutcome(base, ctxCmds(base, '∠EOF=90'));
+    expect(o.produced, 'no DOF removed the second time — a friendly no-op, not a swallow').toBe(false);
   });
 });

@@ -22,6 +22,15 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `symbolic-area-label-not-swallowed` — «שטח משולש AFO הוא 9b» is committed and labelled (#162, ADR-118 Am.)
+Operator dev session `pxeb2ng8`: the lone symbolic area statement was silently discarded («already on the figure») — `dryRunOutcome`'s `labelCount` predated ADR-118's `areas` lane. All three label kinds now count (still a diff, so an exact re-statement stays a no-op). Unit locks in `dry-run.test.ts` (#162 block).
+
+### `seed-coincident-angle-not-swallowed` — «∠EOF=90» true at the default seeds is committed and PINNED (#156, ADR-371)
+Operator dev session `qx5a19co`: E,F at the square-side midpoints already subtend 90° at the centre, so the driving set-angle moved nothing and grew no constraint object → «already set», and "show another" then broke the angle. A free-DOF-count reduction is now the `produced` signal; the scenario's 90° check runs under the seed-sweep oracle so every displayed config keeps it. Unit locks in `dry-run.test.ts` (#156 block).
+
+### `[q9-degenerate-wedge-quantifier]` (store-driven, in `scenarios-props-resample.test.ts`) — Q9's part-א classes ∠ACE=∠ABE, ∠AFD=∠ABD surface (#193, ADR-373)
+Operator (booklet Q9, the #191 build): both pairs are forced and held in every sample, yet 'view relations' showed nothing — the angle universe killed any wedge within 2° of 0/180 in ANY one sample, and the thin-lens seeds squashed those wedges somewhere in the pool. The exclusion is now ALL-samples (structural degeneracy only). The ADR-335 median scenario also regained its bare «CF תיכון»/«AD תיכון» strings (#168, ADR-372 — the second median resolves from the apex's polygon, not a raw point count).
+
 ### `unnamed-construct-chain` + `unnamed-midpoint-auto-label` — the student who names nothing (#184, FR-IN-11, ADR-368)
 Prod log-triage 2026-07-17 (~6 users, operator-approved): «נתון מעגל» / «קוטר» / «משיק למעגל» / «מרכז המעגל» / «הוסף אמצע צלע AB» were all not-handled while their named twins worked. Strict last-resort rules + a REQUEST_WORDS strip + freeLabel auto-naming (existing labels excluded); the circle resolves per ADR-029 or is introduced on an empty figure (ADR-367 `implied`). Unit locks in `auto-name-constructs.test.ts` (19).
 ### `hypotenuse-tangent-to-quarter-circle` — «AB משיק למעגל C» with no touch named constrains the existing circle (#203, ADR-369)

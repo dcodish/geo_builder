@@ -6442,9 +6442,15 @@ const median: Rule = (s, ctx) => {
       if (tri && tri.includes(apex)) {
         opp = tri.filter((x) => x !== apex) as [Id, Id];
       } else {
-        const pts = (ctx.points ?? []).filter((x) => x !== apex);
-        if (pts.length !== 2) return null;
-        opp = [pts[0], pts[1]];
+        // The figure-derived fallback used to resolve by RAW POINT COUNT ("apex + exactly two other
+        // points"), so the FIRST median's midpoint rider broke every later one — «BE תיכון» then
+        // «CF תיכון» escalated to the LLM (#168). The semantic fact is the POLYGON the apex belongs
+        // to (the ADR-263 altitude mechanism): the median's side is the edge NOT touching the apex —
+        // exactly one for a triangle no matter how many auxiliary points exist. Several (a quad) or
+        // none → defer, never guess (ADR-052).
+        const edges = oppositePolygonEdges(apex, ctx.polygons, foot);
+        if (edges.length !== 1) return null;
+        opp = edges[0];
       }
     }
     if (opp[0] === apex || opp[1] === apex) return null;
@@ -6486,7 +6492,17 @@ const median: Rule = (s, ctx) => {
   // The triangle is named after "in"/"במשולש"; read it there so the apex letter isn't double-counted.
   const triPart = s.split(/\bin\b|במשולש|משולש/i).slice(1).join(' ') || s;
   const tri = labelRun(triPart.replace(/triangle|the/gi, ' '), 3);
-  if (!tri) return null;
+  if (!tri) {
+    // No triangle named («תיכון מ-C» alone) — the #168 sibling: resolve the opposite side from the
+    // polygon the apex belongs to (exactly one non-touching edge = a triangle; else defer).
+    const edges = oppositePolygonEdges(apex, ctx.polygons, null);
+    if (edges.length !== 1) return null;
+    const mid = freeLabel([apex, ...edges[0], ...(ctx.points ?? [])], ['M', 'N', 'P', 'Q']);
+    return [
+      { type: 'midpoint', id: mid, a: edges[0][0], b: edges[0][1] },
+      { type: 'segment', a: apex, b: mid },
+    ];
+  }
   const others = tri.filter((x) => x !== apex);
   if (others.length !== 2) return null;
   const mid = freeLabel(tri, ['M', 'N', 'P', 'Q']);

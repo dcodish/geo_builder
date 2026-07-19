@@ -296,9 +296,11 @@ describe('named median "AD תיכון" honors the named foot D and the stated/co
     });
   }
 
-  // Bare form on an existing triangle: the opposite side comes from figure context.
+  // Bare form on an existing triangle: the opposite side comes from the apex's POLYGON (#168 — the
+  // real buildParseCtx always carries a drawn triangle's polygon; the old point-count fallback broke
+  // the moment an auxiliary point existed, so a SECOND median escalated). Stub matches the app.
   it('"AD תיכון" with triangle ABC in context → D = midpoint of BC', () => {
-    const r = parse('AD תיכון', { points: ['A', 'B', 'C'] });
+    const r = parse('AD תיכון', { points: ['A', 'B', 'C'], polygons: [['A', 'B', 'C']] });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const mid = r.commands.find((c) => c.type === 'midpoint') as { id: string; a: string; b: string };
@@ -306,9 +308,18 @@ describe('named median "AD תיכון" honors the named foot D and the stated/co
     expect([mid.a, mid.b].sort()).toEqual(['B', 'C']);
   });
 
-  // Ambiguous bare form (no side, no single-triangle context) must escalate, never guess.
+  // #168: auxiliary points (a prior median's rider) no longer break the resolution — the polygon does it.
+  it('"AD תיכון" with triangle ABC + auxiliary points still resolves (the second-median case)', () => {
+    const r = parse('AD תיכון', { points: ['A', 'B', 'C', 'E', 'F'], polygons: [['A', 'B', 'C']] });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const mid = r.commands.find((c) => c.type === 'midpoint') as { id: string; a: string; b: string };
+    expect([mid.a, mid.b].sort()).toEqual(['B', 'C']);
+  });
+
+  // Genuinely ambiguous (the apex belongs to TWO triangles) must escalate, never guess.
   it('"AD תיכון" with no resolvable side escalates', () => {
-    expect(parse('AD תיכון', { points: ['A', 'B', 'C', 'E', 'F'] }).ok).toBe(false);
+    expect(parse('AD תיכון', { points: ['A', 'B', 'C', 'E', 'F'], polygons: [['A', 'B', 'C'], ['A', 'E', 'F']] }).ok).toBe(false);
   });
 
   // The classic auto-named form is unchanged.
