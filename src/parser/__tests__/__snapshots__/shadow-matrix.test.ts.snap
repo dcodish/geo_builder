@@ -1859,5 +1859,15 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "text": "CD משיק משותף למעגלים O ו-P בנקודה M",
     "winner": "commonTangent",
   },
+  {
+    "lang": "en",
+    "text": "from point A two tangents to both circles",
+    "winner": "tangentsFromExternal",
+  },
+  {
+    "lang": "he",
+    "text": "מנקודה A יוצאים שני משיקים לשני המעגלים",
+    "winner": "tangentsFromExternal",
+  },
 ]
 `;

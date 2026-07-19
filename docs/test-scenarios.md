@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `two-tangents-from-apex-to-both-circles` — «מנקודה A יוצאים שני משיקים לשני המעגלים», the classic external-apex figure (#214, ADR-370)
+Operator report 2026-07-19: the construct was missing — the from + two-circles form was mis-parsed (#215's invented-circle P1) or, with «משותף», A was swept into the touch labels and placed ON circle O. The from-marker now binds the APEX role; each tangent gets the ADR-239 two-touch bundle + a through-apex `set-line` (A strictly beyond both touches) + the drawn external part; a new A is a free point pinned at the tangents' crossing. Unit locks in `common-tangent-apex.test.ts` (8).
+
 ### `tangents-to-unbuilt-circle` — «מנקודה A יוצאים שני משיקים למעגל» as the first utterance introduces the circle deterministically (#159, ADR-367)
 Operator report 2026-07-16: with no circle in the figure the two-tangents rule required one to already exist, so both the «שני» and «2» phrasings fell to the LLM (whose rescue pinned an unstated radius 5 — ADR-052 violation; the perceived word-vs-digit difference was LLM luck). `resolveOrIntroduceCircle` now resolves an existing circle, creates a named-but-absent one, or introduces an auto-centred free-radius circle on an empty figure; routed through the tangent + secant rules. Unit locks (`resolve-or-introduce.test.ts`) cover the named/unnamed × present/absent matrix + digit/En mirrors.
 
