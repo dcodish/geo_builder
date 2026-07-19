@@ -5377,7 +5377,16 @@ const circlesTangent: Rule = (s, ctx) => {
  */
 const commonTangent: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
-  if (!/common|משותף|משותפ/i.test(s)) return null;
+  // The stated KIND (hoisted — it doubles as a TRIGGER, #212): a kind adjective on a SINGULAR tangent
+  // noun is a common-tangent request with «משותף» implied — a single circle's tangent is never
+  // «פנימי», so «AB משיק פנימי» has no other reading. Without this it fell to the LLM, which
+  // REPOSITIONED the stated disjoint circles into mutual tangency (wrong figure, all green — prod
+  // sessions hozzokz1/gnh7kejp). The plural participle («שני מעגלים משיקים מבחוץ» — the CIRCLES
+  // touching each other) keeps falling through to `circlesTangent`.
+  const kind = /חיצוני|מבחוץ|\bexternal\b/i.test(s) ? ('external' as const) : /פנימי|מבפנים|אלכסוני|\binternal\b|\bdiagonal\b/i.test(s) ? ('internal' as const) : undefined;
+  const circlesForm = /מעגלים\s+ה?משיקים|משיקים\s+זה\s+לזה|circles\s+(?:are\s+)?tangent/i.test(s);
+  const singularTangent = /(?<![א-ת])ה?משיק(?!ים)(?![א-ת])|\btangent\b(?!s)/i.test(s);
+  if (!(/common|משותף|משותפ/i.test(s) || (kind !== undefined && singularTangent && !circlesForm))) return null;
   // The two circles: named per-circle ("למעגלים O1 ו O2" / "circles O and P"), else THE two circles
   // when the figure has exactly two ("לשני המעגלים" — the definite form of the operator's session).
   let named = [...s.matchAll(/(?:circle|מעגל)\s+([A-Za-z]\d*)\b/gi)].map((m) => up(m[1]));
@@ -5447,12 +5456,9 @@ const commonTangent: Rule = (s, ctx) => {
     if (fresh.length) cmds.push(...lineMarkers(`tan-${at}`, fresh));
     return cmds;
   }
-  // The stated KIND (#197, ADR-359): «חיצוני»/external ⇔ both centres on the same side of the tangent,
-  // «פנימי»/«אלכסוני»/internal ⇔ opposite sides (the "diagonal" tangent crossing between the circles —
-  // a textbook synonym) — a REQUIREMENT (verifier figure.v.tangentExternal/Internal +
-  // meetsRequirements), superseding ADR-239's "a configuration show-another explores". Unstated ⇒ no
-  // requirement (any of the 4 tangents, ADR-052).
-  const kind = /חיצוני|מבחוץ|\bexternal\b/i.test(s) ? ('external' as const) : /פנימי|מבפנים|אלכסוני|\binternal\b|\bdiagonal\b/i.test(s) ? ('internal' as const) : undefined;
+  // (`kind` is hoisted to the trigger above, #212: «חיצוני»/«מבחוץ» external ⇔ centres on the same
+  // side of the tangent; «פנימי»/«מבפנים»/«אלכסוני» internal ⇔ opposite sides — a REQUIREMENT
+  // (figure.v.tangentExternal/Internal + meetsRequirements); unstated ⇒ any of the 4, ADR-052.)
   // The touch labels: 2 (one tangent, «AB משיק משותף»), 4 («AB ו-CD משיקים משותפים» — two tangents),
   // or NONE — a label-less «משיק משותף [חיצוני]» auto-names fresh touches instead of escalating (the
   // #184 pattern; the student asked for the tangent, not for a naming exercise). The PLURAL
@@ -8016,6 +8022,15 @@ export function droppedWordRelations(utterance: string, commands: AnyCommand[]):
   const out: string[] = [];
   if (/זרים|disjoint/i.test(s) && !commands.some((c) => c.type === 'set-circle-position' && c.relation === 'disjoint')) out.push('זרים');
   if (/מוכל(?:ים|ת)?(?![א-ת])|contained/i.test(s) && !commands.some((c) => c.type === 'set-circle-position' && c.relation === 'contained')) out.push('מוכל');
+  // The tangent-KIND member (#212): a kind adjective on a SINGULAR tangent noun in a two-circle
+  // context must land in a common-tangent / drawn-tangent lowering (the LLM's guess repositioned the
+  // stated disjoint circles into mutual tangency, all rows green).
+  if (
+    /חיצוני|מבחוץ|פנימי|מבפנים|אלכסוני|external|internal/i.test(s) &&
+    /(?<![א-ת])ה?משיק(?!ים)(?![א-ת])|tangent(?!s)/i.test(s) &&
+    !commands.some((c) => c.type === 'common-tangent' || c.type === 'tangent')
+  )
+    out.push('משיק');
   return out;
 }
 

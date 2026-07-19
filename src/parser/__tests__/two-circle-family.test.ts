@@ -323,6 +323,45 @@ describe('#197 Am. 8 — position-accurate refusals (not everything is "4 tangen
   });
 });
 
+describe('#212 — a KIND adjective without «משותף» is a common-tangent request', () => {
+  for (const [u, want] of [
+    ['AB משיק פנימי', 'internal'],
+    ['משיק אלכסוני', 'internal'],
+    ['משיק חיצוני', 'external'],
+    ['CD משיק מבחוץ', 'external'],
+  ] as const) {
+    it(`«${u}» on two disjoint circles builds the ${want} common tangent — never the LLM`, () => {
+      const facts = buildFacts(['שני מעגלים זרים', u]);
+      const ct = facts.find((f) => f.cmd.type === 'common-tangent')!.cmd as Extract<AnyCommand, { type: 'common-tangent' }>;
+      expect(ct.kind).toBe(want);
+      const fig = replay(facts);
+      expect(Object.values(fig.status).every((s) => s === 'ok')).toBe(true);
+      expect(fig.violations).toEqual([]);
+      // The stated disjointness SURVIVES (the prod bug repositioned the circles into tangency).
+      const [c1, c2] = [...fig.circles.values()];
+      expect(d(c1.center, c2.center), 'the circles stay disjoint').toBeGreaterThan(c1.r + c2.r);
+    });
+  }
+
+  it('the plural participle «שני מעגלים משיקים מבחוץ» is still the CIRCLES-tangent state (no theft)', () => {
+    const r = parse('שני מעגלים משיקים מבחוץ', {});
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.commands.some((c) => c.type === 'circles-tangent')).toBe(true);
+    expect(r.commands.some((c) => c.type === 'common-tangent')).toBe(false);
+  });
+
+  it('the gate reports a kind-tangent request the lowering dropped', () => {
+    const bare: AnyCommand[] = [
+      { type: 'circle', id: 'circle-O', center: 'O', radius: 5 },
+      { type: 'circle', id: 'circle-P', center: 'P', radius: 5 },
+    ];
+    expect(droppedWordRelations('AB משיק פנימי במעגלים', bare)).toContain('משיק');
+    const ok: AnyCommand[] = [{ type: 'common-tangent', a: 'A', b: 'B', circle1: 'circle-O', circle2: 'circle-P', kind: 'internal' }];
+    expect(droppedWordRelations('AB משיק פנימי במעגלים', ok)).toEqual([]);
+  });
+});
+
 describe('ADR-360 (#210) — the WORD-relation honesty gate', () => {
   it('a stated זרים not encoded in the commands is reported dropped', () => {
     const bare: AnyCommand[] = [
