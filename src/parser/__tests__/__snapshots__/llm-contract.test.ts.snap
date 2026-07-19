@@ -150,6 +150,22 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "set-perpendicular",
     ],
   },
+  "AB tangent to circle C": {
+    "en": [
+      "circle",
+      "point-on-circle",
+      "tangent",
+      "point-on-line",
+      "point-on-line",
+    ],
+    "he": [
+      "circle",
+      "point-on-circle",
+      "tangent",
+      "point-on-line",
+      "point-on-line",
+    ],
+  },
   "AC extended meets circle P at E": {
     "en": [
       "circle",
@@ -228,24 +244,6 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     ],
     "he": [
       "point-by-distances",
-    ],
-  },
-  "CD is a common tangent to circles O and P at M": {
-    "en": [
-      "circle",
-      "circle",
-      "circles-tangent",
-      "tangent",
-      "point-on-line",
-      "point-on-line",
-    ],
-    "he": [
-      "circle",
-      "circle",
-      "circles-tangent",
-      "tangent",
-      "point-on-line",
-      "point-on-line",
     ],
   },
   "DM*ME = BM*DR": {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Command catalog (Phase 4/5) — the user-facing command reference *and* the
  * coverage map of the engine's vocabulary.
  *
@@ -185,4 +185,5 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'circles', supported: true, en: 'given a circle', he: 'נתון מעגל', descEn: 'A bare circle request wrapped in a given-marker.', descHe: 'בקשת מעגל עם מילת נתון.' },
   { category: 'circles', supported: true, en: 'circle with center O', he: 'מעגל עם מרכז O', descEn: 'A circle by its named centre — the «עם מרכז» phrasing.', descHe: 'מעגל לפי מרכז בשמו — הניסוח «עם מרכז».' },
   { category: 'circles', supported: true, en: 'the centre of the circle', he: 'מרכז המעגל', descEn: 'Reveal the circle’s hidden centre (auto-named by its own letter).', descHe: 'חשיפת מרכז המעגל החבוי (בשמו האוטומטי).' },
+  { category: 'circles', supported: true, en: 'AB tangent to circle C', he: 'AB משיק למעגל C', descEn: 'A segment tangent to a circle with NO touch point named: on existing A,B it constrains the circle (the touch is the ⟂ foot from the centre, kept within AB); on new A,B it draws the tangent with A,B as markers.', descHe: 'קטע משיק למעגל בלי לנקוב בנקודת ההשקה: על A,B קיימות זהו אילוץ על המעגל (ההשקה היא רגל האנך מהמרכז, בתוך AB); על A,B חדשות מצויר המשיק ו-A,B סימונים עליו.' },
 ];
