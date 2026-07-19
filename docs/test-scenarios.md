@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `tangents-to-unbuilt-circle` — «מנקודה A יוצאים שני משיקים למעגל» as the first utterance introduces the circle deterministically (#159, ADR-367)
+Operator report 2026-07-16: with no circle in the figure the two-tangents rule required one to already exist, so both the «שני» and «2» phrasings fell to the LLM (whose rescue pinned an unstated radius 5 — ADR-052 violation; the perceived word-vs-digit difference was LLM luck). `resolveOrIntroduceCircle` now resolves an existing circle, creates a named-but-absent one, or introduces an auto-centred free-radius circle on an empty figure; routed through the tangent + secant rules. Unit locks (`resolve-or-introduce.test.ts`) cover the named/unnamed × present/absent matrix + digit/En mirrors.
+
 ### `q27-eo-diameter-new-circle` — «EO קוטר» builds the NEW Thales circle on EO, not an impossible diameter of circle O (#152, ADR-366)
 Operator session `qx5a19co` (bagrut Q27): «EO קוטר» — where O is circle O's own centre — was attached to circle O (`point-on-circle O`, impossible) and deferred; «EO קוטר במעגל חדש» no-op'ed. The endpoint-is-centre impossibility now routes the statement to `circleOnDiameter` (new circle, centre = auto-named midpoint of EO); «במעגל חדש» is an explicit create signal; ordinary diameter/chord attachments byte-unchanged. Unit locks in `endpoint-is-centre-routing.test.ts`.
 

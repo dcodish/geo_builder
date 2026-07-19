@@ -294,6 +294,49 @@ const mentionsCircle = (s: string): boolean => /circle|מעגל/i.test(s);
 const resolveMentionedCircle = (s: string, ctx: ParseContext): string | null =>
   circleCenter(s) ?? circumscribingRef(s, ctx) ?? directionalCircleRef(s, ctx) ?? (mentionsCircle(s) && ctx.circles?.length === 1 ? ctx.circles[0] : null);
 
+/**
+ * Resolve the circle a construct rule acts on, INTRODUCING it when the reference has no referent yet —
+ * the unbuilt half of the ADR-029 implicit reference (#159). ADR-029 taught the rules to RESOLVE "the
+ * circle" when exactly one exists, but never to introduce one when none does, so the opener «מנקודה A
+ * יוצאים שני משיקים למעגל» fell off the deterministic path to the LLM (whose rescue pinned an unstated
+ * radius — an ADR-052 violation), and the named-but-absent «…למעגל O» emitted dangling refs against a
+ * `circle-O` that was never created.
+ *
+ *  - EXISTING circle (named, or the single unnamed one) → `{ center, prepend: [] }` — byte-identical
+ *    to the old `named ?? single` shape;
+ *  - NAMED + ABSENT → create it (visible named centre; free radius per ADR-052; `ifAbsent` keeps a
+ *    concurrently-stated one);
+ *  - UNNAMED + the figure has NO circle + the utterance mentions the circle noun → introduce an
+ *    auto-centred one (FR-RN-8 hidden-until-used; free radius) — the `ifAbsent`+`autoCenter`+
+ *    `freeRadius` prepend pattern of `twoCircles`;
+ *  - otherwise null (an unnamed reference beside ≥2 circles is ambiguous — defer).
+ *
+ * Callers PREPEND the returned commands. Rules that must NOT introduce (a plain line∩line reading a
+ * stray circle word — `resolveMentionedCircle`'s contract) keep the resolve-only helpers.
+ */
+const resolveOrIntroduceCircle = (s: string, ctx: ParseContext): { center: string; prepend: AnyCommand[] } | null => {
+  const namedRaw = circleCenter(s);
+  // A real centre label is uppercase — guard against an English article read as a label ("the circle a line" → "a").
+  const named = namedRaw && /^[A-Z]/.test(namedRaw) ? up(namedRaw) : null;
+  const circles = (ctx.circles ?? []).filter((c) => !c.startsWith('~'));
+  if (named) {
+    if (circles.some((c) => up(c) === named)) return { center: named, prepend: [] };
+    return {
+      center: named,
+      prepend: [{ type: 'circle', id: circleId(named), center: named, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true }],
+    };
+  }
+  if (circles.length === 1) return { center: circles[0], prepend: [] };
+  if (circles.length === 0 && mentionsCircle(s)) {
+    const c = freeLabel([...(ctx.points ?? [])], ['O', 'P', 'Q', 'K']);
+    return {
+      center: c,
+      prepend: [{ type: 'circle', id: circleId(c), center: c, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, autoCenter: true }],
+    };
+  }
+  return null;
+};
+
 /** The crossing point named AFTER the circle word ("… circle [O] at R" / "… [ה]מעגל [O] בנקודה R"),
  *  with the circle's NAME optional so "the circle" / "המעגל" anchors too (operator: one circle → no name). */
 const crossingAfterCircle = (s: string): string | null => {
@@ -4736,11 +4779,11 @@ const secantFromExternal: Rule = (s, ctx) => {
   if (!/חות[כך]|\bcuts?\b|\bsecant\b|\bmeets?\b|crosses|נחת/i.test(s)) return null; // a secant cut
   const eM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)([A-Za-z]\d*)(?![A-Za-z])/i); // the (external) point — spelled out "מנקודה B" OR the abbreviated "מ-B" (#96); `(?![A-Za-z])` keeps it a single label (not "מ-AB")
   if (!eM) return null;
-  // "the circle" is usually unnamed; guard against `circleCenter` reading an English article
-  // ("the circle **a** line" → "a"): a real centre label is uppercase, an article is lowercase.
-  const named = circleCenter(s);
-  const center = named && /^[A-Z]/.test(named) ? named : ctx.circles?.length === 1 ? ctx.circles[0] : null;
-  if (!center) return null;
+  // Resolve-or-INTRODUCE (#159, the tangent rules' secant sibling): the opener "from E outside the
+  // circle a line cuts it at A,B" introduces its own circle (free radius); named-but-absent creates.
+  const resolved = resolveOrIntroduceCircle(s, ctx);
+  if (!resolved) return null;
+  const center = resolved.center;
   const abM = s.match(/\b([A-Za-z]\d*)\s*(?:\band\b|ו-?|,)\s*([A-Za-z]\d*)\b/i); // the two intersections "A and B" / "A ו-B"
   if (!abM) return null;
   const E = up(eM[1]), A = up(abM[1]), B = up(abM[2]);
@@ -4758,6 +4801,7 @@ const secantFromExternal: Rule = (s, ctx) => {
     // near on-circle end and B is the crossing away from A.
     const aExists = ctx.points?.includes(A);
     return [
+      ...resolved.prepend,
       ...(aExists ? [] : [{ type: 'point-on-circle', id: A, circle: circ } as const]),
       { type: 'line-through', id: lineId, a: E, b: A },
       { type: 'line-circle-intersection', id: B, line: lineId, circle: circ, avoid: aExists ? E : A },
@@ -4768,6 +4812,7 @@ const secantFromExternal: Rule = (s, ctx) => {
   // (X not yet placed) doesn't misfire. A,B a chord; E outside on the extension.
   if (!/מחוץ|outside|external/i.test(s)) return null;
   return [
+    ...resolved.prepend,
     { type: 'point-on-circle', id: A, circle: circ },
     { type: 'point-on-circle', id: B, circle: circ },
     { type: 'segment', a: A, b: B }, // the chord
@@ -5741,9 +5786,11 @@ const tangentsFromExternal: Rule = (s, ctx) => {
   if (!/\btwo\b|tangents|שני|שתי|משיקים/i.test(s)) return null; // TWO tangents from a point, not a single tangent-at-a-point
   const eM = s.match(/(?:from(?:\s+(?:a|the))?(?:\s+point)?\s+|(?:מנקודה|מהנקודה|מ\s*נקודה)\s+|מ-\s*)([A-Za-z]\d*)(?![A-Za-z])/i); // "מנקודה E" OR abbreviated "מ-E" (#96)
   if (!eM) return null;
-  const named = circleCenter(s);
-  const center = named && /^[A-Z]/.test(named) ? named : ctx.circles?.length === 1 ? ctx.circles[0] : null;
-  if (!center) return null;
+  // Resolve-or-INTRODUCE (#159): the circle this sentence itself introduces («…שני משיקים למעגל» as an
+  // opener) is created here with a FREE radius — it used to fall to the LLM, whose rescue pinned 5.
+  const resolved = resolveOrIntroduceCircle(s, ctx);
+  if (!resolved) return null;
+  const center = resolved.center;
   const E = up(eM[1]);
   const circ = circleId(center);
   // The two touch points: named explicitly ("…at A and B" / "…בנקודות A ו-B"), else AUTO-named — the
@@ -5760,7 +5807,7 @@ const tangentsFromExternal: Rule = (s, ctx) => {
     A = freeLabel(taken0, ['T', 'S', 'U', 'V', 'W', 'G', 'H']);
     B = freeLabel([...taken0, A], ['S', 'U', 'V', 'W', 'G', 'H', 'T']);
   }
-  const out: AnyCommand[] = [];
+  const out: AnyCommand[] = [...resolved.prepend];
   // The external apex, if new. Seeded CLOSE to the default circle (~1.2× its radius, like a textbook
   // tangent sketch) rather than far out: a far apex puts directional follow-ups like "המשך BD חותך את
   // המשך OC" in the wrong basin (the extensions then cross on the far side), and a close apex also gives
@@ -5807,9 +5854,11 @@ const tangentsFromExternal: Rule = (s, ctx) => {
 const tangentFromExternal: Rule = (s, ctx) => {
   if (!/tangent|משיק/i.test(s)) return null;
   if (/\btwo\b|שני|שתי|משיקים/i.test(s)) return null; // plural → the two-tangent rule
-  const named = circleCenter(s);
-  const center = named && /^[A-Z]/.test(named) ? named : ctx.circles?.length === 1 ? ctx.circles[0] : null;
-  if (!center) return null;
+  // Resolve-or-INTRODUCE (#159): a named-but-absent «…למעגל O» is created (it used to emit dangling
+  // refs against a circle-O that never existed); an unnamed opener's circle is introduced free-radius.
+  const resolved = resolveOrIntroduceCircle(s, ctx);
+  if (!resolved) return null;
+  const center = resolved.center;
   const have = new Set(ctx.points ?? []);
   const members = membersOfCenter(ctx, center); // labels already ON this circle
   const labels = (s.match(/[A-Z]\d*/g) ?? []).filter((l) => l !== center); // uppercase tokens = point labels
@@ -5852,7 +5901,7 @@ const tangentFromExternal: Rule = (s, ctx) => {
   // take branch 1, else both statements pick branch 0 and the two touch points coincide (issue #142). The
   // midpoint + aux circle re-emit idempotently (same ids); branch 1 = the other circle∩aux intersection.
   const branch = (ctx.tangentAuxes ?? []).includes(aux) ? 1 : 0;
-  const out: AnyCommand[] = [];
+  const out: AnyCommand[] = [...resolved.prepend];
   if (placeApex) out.push({ type: 'free-point', id: apex, x: 12, y: 0, free: true }); // the external apex, if new — a FREE DOF (ADR-052): its distance from O is unstated, so a later given (∠ADB = α, |AG| = …) can flex it
   out.push(
     { type: 'midpoint', id: mid, a: centrePt(ctx, center), b: apex }, // centre of the Thales circle on O-apex

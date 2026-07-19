@@ -898,6 +898,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "from point E a tangent touches circle O at D": {
     "en": [
+      "circle",
       "free-point",
       "midpoint",
       "circle-through",
@@ -905,6 +906,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "segment",
     ],
     "he": [
+      "circle",
       "free-point",
       "midpoint",
       "circle-through",
@@ -914,6 +916,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
   },
   "from point E outside circle O two tangents touch the circle at A and B": {
     "en": [
+      "circle",
       "free-point",
       "midpoint",
       "circle-through",
@@ -923,6 +926,7 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "segment",
     ],
     "he": [
+      "circle",
       "free-point",
       "midpoint",
       "circle-through",

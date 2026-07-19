@@ -217,6 +217,22 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'tangents-to-unbuilt-circle',
+    title: '«מנקודה A יוצאים שני משיקים למעגל» as the FIRST utterance introduces the circle deterministically (#159, ADR-367)',
+    guards:
+      'Operator report 2026-07-16 ("שני works, 2 doesn\'t — we need both at engine level"): the difference was pure LLM luck — with no circle in the figure the rule required one to ALREADY exist and both phrasings fell to the LLM, whose rescue pinned an unstated radius 5 (ADR-052 violation). resolveOrIntroduceCircle now introduces the circle (free radius, auto centre) at the deterministic layer.',
+    steps: ['מנקודה A יוצאים שני משיקים למעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle' && !o.id.startsWith('tanaux'));
+      expect(circles, 'the introduced circle').toHaveLength(1);
+      const tangents = fig.construction.objects.filter((o) => o.kind === 'segment' && [o.a, o.b].includes('A'));
+      expect(tangents.length, 'both tangents from A drawn').toBeGreaterThanOrEqual(2);
+      expect(freeDofs(fig.construction).includes(circles[0].id), 'the radius stays a FREE DOF (never the LLM-pinned 5)').toBe(true);
+    },
+  },
+  {
     id: 'q27-eo-diameter-new-circle',
     title: '«EO קוטר» after two chords meeting at E builds the NEW Thales circle on EO (#152, ADR-366)',
     guards:
