@@ -1438,8 +1438,22 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
           driveOrCheck(objects, constraints, { type: 'distance', a: circ.center, b: cmd.id, value: circ.radius.value });
           break;
         }
-        // (d) Can't reconcile structurally here — do NOT silently drop it; the post-evaluate
-        // verifier reports that "E on circle C" doesn't hold, so it can never read as a clean green.
+        // (d) Can't reconcile structurally (every branch above cycle-gated or inapplicable — e.g. the
+        // touch E of a declared tangency whose circle already carries a rider that depends back on E's
+        // hosts, #233): push the membership as a RESIDUAL — |centre·P| = R measured through a WITNESS
+        // member — so driveOrCheck/the recruiter DRIVE the free radius/centre/carriers to satisfy it
+        // (#230: a membership statement about an existing point is a constraint in every case, M1;
+        // amber-only was a report, not an enforcement). Witness = any point already riding the circle;
+        // reaching here with NO member and a free radius cannot happen ((c3) owns that), so the bare
+        // `break` below is the genuine can't-say residue, still verifier-reported.
+        const witness =
+          objects.find((o) => o.kind === 'on-circle' && (o as Extract<GeoObject, { kind: 'on-circle' }>).circle === cmd.circle && o.id !== cmd.id)?.id ??
+          (circ && circ.radius.via === 'through' && circ.radius.point !== cmd.id ? circ.radius.point : undefined);
+        if (circ && witness) {
+          driveOrCheck(objects, constraints, { type: 'length-radius', a: circ.center, b: cmd.id, circle: cmd.circle, center: circ.center, witness, k: 1 });
+          break;
+        }
+        // truly nothing to couple to — the post-evaluate verifier reports the unmet membership
         break;
       }
       // `between` ⇒ a free point ON THE ARC between two points (theta is a fraction of the half-arc,

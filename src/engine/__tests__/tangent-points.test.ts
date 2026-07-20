@@ -44,11 +44,15 @@ describe('parse — a tangent named by two points', () => {
  * cycle (A → tan-F → circle → … → A) and error "unresolved dependencies". ADR-075.
  */
 describe('parse — an EXISTING line declared tangent is a constraint, not a drawn tangent', () => {
-  it('emits set-perpendicular(O, F, A, B) when A, B, F all pre-exist', () => {
+  it('emits the FULL tangency conjunction when A, B, F all pre-exist (#233: membership + ⟂ + on-line — the ⟂ alone was satisfiable with AB far from the circle)', () => {
     const r = parse('AB משיק למעגל בנקודה F', { circles: ['O'], points: ['A', 'B', 'F', 'O'] });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.commands).toEqual([{ type: 'set-perpendicular', a: 'O', b: 'F', c: 'A', d: 'B', implicit: true }]);
+    expect(r.commands).toEqual([
+      { type: 'point-on-circle', id: 'F', circle: 'circle-O' }, // the touch ON the circle (idempotent for a member)
+      { type: 'set-perpendicular', a: 'O', b: 'F', c: 'A', d: 'B', implicit: true },
+      { type: 'set-line', points: ['A', 'F', 'B'] }, // F on the named line (a loose F in this bare ctx)
+    ]);
     // crucially, NO point-on-line that would redefine the existing A/B (the dependency cycle)
     expect(r.commands.some((c) => c.type === 'point-on-line')).toBe(false);
   });
@@ -57,7 +61,8 @@ describe('parse — an EXISTING line declared tangent is a constraint, not a dra
     const r = parse('AB is tangent to circle O at F', { circles: ['O'], points: ['A', 'B', 'F', 'O'] });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.commands).toEqual([{ type: 'set-perpendicular', a: 'O', b: 'F', c: 'A', d: 'B', implicit: true }]);
+    expect(r.commands[0]).toEqual({ type: 'point-on-circle', id: 'F', circle: 'circle-O' });
+    expect(r.commands[1]).toEqual({ type: 'set-perpendicular', a: 'O', b: 'F', c: 'A', d: 'B', implicit: true });
   });
 
   it('but a tangent named by NEW points still draws the tangent + markers (unchanged)', () => {

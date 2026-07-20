@@ -6128,15 +6128,25 @@ const tangentLine: Rule = (s, ctx) => {
 
   // An EXISTING line declared tangent ("AB משיק … בנקודה F", with A, B and the touch point F
   // all already placed): this is a tangency CONSTRAINT on the existing segment — NOT a freshly
-  // drawn tangent. Adapt the circle so its radius O–T is ⟂ to the existing line (T is already on
-  // the circle, here via the inscribed-quad's concyclic given). We must NEVER re-create A, B as
-  // markers on a new tangent line: A is an ancestor of the circle (O = circumcentre of points on
-  // A's sides), so a `point-on-line A → tan-F → circle-O → … → A` edge closes a dependency cycle
-  // and the step fails with "unresolved dependencies" instead of flexing the figure (ADR-075).
-  // Scope: assumes T is already on the circle (true for the marked-touch-point case); a tangency
-  // point not yet on the circle is a follow-up.
+  // drawn tangent. We must NEVER re-create A, B as markers on a new tangent line: A is an
+  // ancestor of the circle (O = circumcentre of points on A's sides), so a `point-on-line A →
+  // tan-F → circle-O → … → A` edge closes a dependency cycle and the step fails with "unresolved
+  // dependencies" instead of flexing the figure (ADR-075).
+  // The lowering states the FULL tangency conjunction (#233 — the ADR-374 class, third member):
+  // T ∈ circle ∧ T ∈ line ∧ radius ⟂ line. The original ADR-075 branch asserted the ⟂ ALONE
+  // ("assumes T is already on the circle") — a ⟂-only "tangency" is trivially satisfiable with
+  // the line arbitrarily far from the circle (T slides to the ⟂ foot), so «AD משיק למעגל בנקודה
+  // E» after «E על AD» committed GREEN with no tangency (prod screenshot 2026-07-20). The
+  // membership is idempotent when T is already a member (the marked-touch case is unchanged);
+  // the on-line conjunct is structural when T already rides the named segment, stated otherwise.
   if (naming && have.has(naming[0]) && have.has(naming[1]) && have.has(T)) {
-    return [{ type: 'set-perpendicular', a: centrePt(ctx, up(center)), b: T, c: naming[0], d: naming[1], implicit: true }];
+    const host = ctx.onSegment?.[T];
+    const ridesNamed = !!host && ((host[0] === naming[0] && host[1] === naming[1]) || (host[0] === naming[1] && host[1] === naming[0]));
+    return [
+      { type: 'point-on-circle', id: T, circle: circleId(center) },
+      { type: 'set-perpendicular', a: centrePt(ctx, up(center)), b: T, c: naming[0], d: naming[1], implicit: true },
+      ...(ridesNamed || members.has(T) ? [] : [{ type: 'set-line', points: [naming[0], T, naming[1]] } as AnyCommand]),
+    ];
   }
 
   // An EXISTING segment tangent at its OWN ENDPOINT — "KB משיק … בנקודה K", where the named line's two

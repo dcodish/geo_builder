@@ -22,6 +22,12 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `tangent-at-existing-touch-carries-membership` — «AD משיק למעגל בנקודה E» with E already on AD is a REAL tangency (#233, ADR-377)
+Operator screenshot (dev 2026-07-20): rectangle + circle + «B על המעגל» + «E על AD» + the tangency — all green while AD sat nowhere near the circle. The ADR-075 existing-touch branch asserted the radius-⟂ alone; the lowering now states the full conjunction (membership + ⟂ + on-line-when-loose) and the apply `(d)` fall-through pushes an unreconcilable membership as a `length-radius` residual, so the circle is driven to the segment. Unit locks in `tangent-existing-touch.test.ts` (both entry orders, loose-point touch, member-touch idempotence).
+
+### `chord-endpoints-on-derived-corners-driven` — «BC מיתר במעגל» over a rectangle puts BOTH endpoints on the circle (#230, ADR-377)
+Operator (dev 2026-07-20): «I cannot get BC to be a chord» — the rectangle's derived corner C had every structural membership reinterpretation cycle-gated and stayed off the circle (amber; retype swallowed as noop-exists). The `(d)` residual now drives the free radius/centre; BC is a real chord. Unit locks in `membership-residual.test.ts` (+ the impossible-membership honest refusal).
+
 ### `rectangle-named-over-existing-riders` — «FEDG מלבן» over four existing riders asserts the rectangle and flexes them into shape (#223, ADR-375)
 Prod session `0yqufnuv` 09:41–09:43 (2026-07-20): naming a polygon over EXISTING points refused «'D' is already defined» — the shape commands' derived corners hit the redefine guard (the 2-D sibling of #199). Under M1 the shape command lowers to its defining constraints (the `shapeConstraints` authority shared with the ADR-262 inscribe expansion) over the existing points; the riders' own t-DOFs are driven, the figure flexes into a genuine inscribed rectangle, and the triangle frame stays put. Class locks in `shape-over-existing.test.ts` (driven/satisfied/idempotent/partial/no-detour).
 
