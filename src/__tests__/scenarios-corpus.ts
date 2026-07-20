@@ -202,6 +202,22 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'circle-contained-in-definite-circle',
+    title: '«מעגל מוכל בתוך המעגל הגדול» creates a NEW circle contained in THE drawn circle (#224, ADR-376)',
+    guards:
+      "Prod 0yqufnuv 09:23 (2026-07-20): the definite-container containment had no owner — the parser deferred, the LLM dropped the «מוכל» given (dropped-labels) and the bare «מעגל מוכל» came back not-understood. The #196 seam now resolves an INDEFINITE subject + a definite/named/implicit container (the #102 size-qualifier rewrite widened to a single-circle figure), emits the new inner circle + the contained requirement, and the sampler keeps it.",
+    steps: ['AB קוטר', 'מעגל מוכל בתוך המעגל הגדול'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const cs = [...fig.circles.values()];
+      expect(cs, 'the drawn circle + the new contained one').toHaveLength(2);
+      const outer = cs[0].r >= cs[1].r ? cs[0] : cs[1];
+      const inner = outer === cs[0] ? cs[1] : cs[0];
+      expect(dist(outer.center, inner.center) + inner.r, 'strict containment holds on the drawn seed').toBeLessThan(outer.r);
+    },
+  },
+  {
     id: 'rectangle-named-over-existing-riders',
     title: '«FEDG מלבן» over four existing on-segment riders ASSERTS the rectangle and flexes them into shape (#223, ADR-375)',
     guards:

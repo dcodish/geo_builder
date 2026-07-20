@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `circle-contained-in-definite-circle` — «מעגל מוכל בתוך המעגל הגדול» creates a new circle contained in THE drawn circle (#224, ADR-376)
+Prod session `0yqufnuv` 09:23 (2026-07-20): the definite-container containment had no owner — the parser deferred, the LLM dropped the «מוכל» given, bare «מעגל מוכל» came back not-understood. The #196 seam gains the indefinite-subject lane (`containedNewInExisting`): the container resolves named / THE single circle / the #102 size-qualifier rewrite (widened to a single-circle figure — ADR-029); the subject is a new auto-centred free-radius circle; the `contained` requirement seats it. Unit locks in `definite-containment.test.ts`.
+
 ### `rectangle-named-over-existing-riders` — «FEDG מלבן» over four existing riders asserts the rectangle and flexes them into shape (#223, ADR-375)
 Prod session `0yqufnuv` 09:41–09:43 (2026-07-20): naming a polygon over EXISTING points refused «'D' is already defined» — the shape commands' derived corners hit the redefine guard (the 2-D sibling of #199). Under M1 the shape command lowers to its defining constraints (the `shapeConstraints` authority shared with the ADR-262 inscribe expansion) over the existing points; the riders' own t-DOFs are driven, the figure flexes into a genuine inscribed rectangle, and the triangle frame stays put. Class locks in `shape-over-existing.test.ts` (driven/satisfied/idempotent/partial/no-detour).
 

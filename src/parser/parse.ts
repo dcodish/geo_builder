@@ -5007,11 +5007,71 @@ const definiteTwoCircles = (s: string, ctx: ParseContext): [Id, Id] | null => {
  * circles it is the M1 statement alone. Guard: the words are TWO-circle relations — a point-side
  * «M בתוך המעגל» (one circle noun, no plural) is never claimed.
  */
+/**
+ * The DEFINITE-CONTAINER containment form (#224 / ADR-376): an INDEFINITE subject circle («מעגל
+ * מוכל…» / "a circle contained…" — no ה, no letter on the subject noun) contained in a container
+ * resolved from the reference, never guessed:
+ *  - «בתוך מעגל O» / "in circle O" — the named circle (created `ifAbsent` when absent);
+ *  - «בתוך המעגל» / "in the circle" — THE single drawn circle (ADR-029); 0 or 2+ → defer;
+ *  - bare «מעגל מוכל» (no object clause) — the single drawn circle; NO circles → introduce the
+ *    container too (the containment presupposes it — the ADR-367 `implied` discipline); 2+ → defer.
+ * The subject is always a NEW auto-centred circle (hidden centre, free radius — ADR-052); the
+ * `set-circle-position contained` REQUIREMENT then seats it (verifier + `meetsRequirements`, #196).
+ * Named subjects («מעגל O2 מוכל…») and plural forms («שני מעגלים מוכלים») keep their existing owners.
+ */
+const containedNewInExisting = (s: string, ctx: ParseContext): AnyCommand[] | null => {
+  // an INDEFINITE subject: the circle noun right before מוכל carries no definite ה and no letter
+  // (one optional Hebrew adjective tolerated: «מעגל קטן מוכל…»); En "a circle … contained"
+  const subj =
+    /(?:^|[^א-תA-Za-z])מעגל(?:\s+(?!מוכל)[א-ת]+)?\s+מוכל/.test(s) || /\ba\s+circle\b(?:\s+\w+){0,2}?\s+(?:is\s+)?contained\b/i.test(s);
+  if (!subj) return null;
+  const circs = (ctx.circles ?? []).filter((c) => !c.startsWith('~')).map(up);
+  const objM = s.match(/(?:בתוך|\binside\b|\bin\b)\s+(?:ה?מעגל|(?:the\s+)?circle)(?:\s+([A-Za-z]\d*))?/i);
+  let outer: string;
+  let outerNew = false;
+  let outerNamed = false;
+  if (objM && objM[1]) {
+    outer = up(objM[1]);
+    outerNew = !circs.includes(outer);
+    outerNamed = true;
+  } else if (objM) {
+    if (circs.length === 1) outer = circs[0];
+    else if (circs.length === 0) {
+      outer = 'O'; // «בתוך המעגל [הגדול]» on an empty figure — the referenced container is introduced
+      outerNew = true;
+    } else return null; // 2+ circles — ambiguous container, defer
+  } else if (circs.length === 1) {
+    outer = circs[0]; // bare «מעגל מוכל» — the one drawn circle is the implicit container
+  } else if (circs.length === 0) {
+    outer = 'O'; // the containment presupposes its container — introduce it (ADR-367 `implied`)
+    outerNew = true;
+  } else {
+    return null; // 2+ circles, no reference — ambiguous container, defer
+  }
+  const inner = freeLabel([outer, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
+  const cmds: AnyCommand[] = [];
+  if (outerNew)
+    cmds.push({ type: 'circle', id: circleId(outer), center: outer, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, ...(outerNamed ? {} : { autoCenter: true }) });
+  cmds.push({ type: 'circle', id: circleId(inner), center: inner, radius: RADIUS_DEFAULT * 0.72, freeRadius: true, ifAbsent: true, autoCenter: true });
+  cmds.push({ type: 'set-circle-position', relation: 'contained', a: circleId(outer), b: circleId(inner) });
+  return cmds;
+};
+
 const twoCirclesPosition: Rule = (s, ctx) => {
   const disjoint = /זרים|\bdisjoint\b/i.test(s);
   const contained = /מוכל(?:ים|ת)?(?![א-ת])|\bcontained\b/i.test(s);
   if (!disjoint && !contained) return null;
   if (disjoint && contained) return 'stop'; // contradictory words — escalate whole
+  // #224 (ADR-376): an INDEFINITE subject circle contained in a resolvable container — «מעגל מוכל
+  // בתוך מעגל O» (which the #102 qualifier rewrite also feeds from «…בתוך המעגל הגדול»), and the
+  // bare «מעגל מוכל» whose implicit container is the single drawn circle (ADR-029). The generic
+  // pair-resolver can't bind these (a half-named / sub-plural reference), but the containment's
+  // object marker carries the roles, so nothing is guessed. Runs before the noun-count guard —
+  // the bare form has ONE circle noun.
+  if (contained) {
+    const out = containedNewInExisting(s, ctx);
+    if (out) return out;
+  }
   const circleNouns = (s.match(/circle|מעגל/gi) ?? []).length;
   const plural = /שני\s+ה?מעגלים|מעגלים|\bcircles\b/i.test(s);
   if (!plural && circleNouns < 2) return null; // not a two-circle relation statement
@@ -8008,6 +8068,16 @@ function resolveSizeQualifier(s: string, ctx: ParseContext): { s: string; assert
   const EN = String.raw`\bthe\s+(big(?:ger|gest)?|larg(?:er|est)?|small(?:er|est)?|little)\s+circle\b`;
   if (!new RegExp(HE).test(s) && !new RegExp(EN, 'i').test(s)) return null;
   const sizes = ctx.circleSizes ?? [];
+  // ONE circle (#224 / ADR-376): a definite size-qualified reference beside a SINGLE circle resolves to
+  // THE circle (ADR-029 — with one circle you needn't name it; the adjective is the student's
+  // forward-looking role: «מעגל מוכל בתוך המעגל הגדול» is about to introduce the smaller one). No role
+  // assert — a radius order needs a pair; the containment/order the sentence states carries the roles.
+  if (sizes.length === 1) {
+    const c = sizes[0].center.startsWith('@ctr-') ? sizes[0].center.slice(5) : sizes[0].center;
+    let out1 = s.replace(new RegExp(HE, 'g'), (_m, pre: string) => `${pre}מעגל ${c}`);
+    out1 = out1.replace(new RegExp(EN, 'gi'), () => `circle ${c}`);
+    return { s: out1 };
+  }
   if (sizes.length !== 2) return null;
   const rec = (ctx.radiusOrder ?? []).find((o) => sizes.some((x) => x.id === o.outer) && sizes.some((x) => x.id === o.inner));
   let outerId: string, innerId: string;
