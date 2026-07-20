@@ -2110,7 +2110,14 @@ function commitCommands(
   if (next.length > facts.length) {
     const seed = get().seed;
     const fig = replay(next, seed);
-    if (fig.lastError === null && (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig))) {
+    // The trigger covers DISTINCTNESS too (#232 / ADR-378): a default collision at the current seed
+    // (a bare «נקודה D» stacked on A — the ADR-378 collector now honestly refuses to certify it) must
+    // start the same search the extension/meet breaks do; before, the gate never asked, so the stack
+    // was drawn even though seeds that separate the pair exist.
+    if (
+      fig.lastError === null &&
+      (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig) || !pointsDistinct(fig.construction, fig.positions, fig.coincidences))
+    ) {
       const s = firstSatisfyingSeed(next, seed);
       if (s !== seed) {
         patch.seed = s;
@@ -2206,11 +2213,15 @@ export const useGeoStore = create<GeoState>()(
           selectedId: get().selectedId === key ? null : get().selectedId,
         };
         // Edit-path parity with the submit path (commitCommands): an edited command can break an
-        // extension's directional order or a segment-meet at the current seed just like an appended one —
-        // search upward for a satisfying view in the SAME transition (one undo restores both, ADR-241).
+        // extension's directional order, a segment-meet, or point DISTINCTNESS (#232/ADR-378) at the
+        // current seed just like an appended one — search upward for a satisfying view in the SAME
+        // transition (one undo restores both, ADR-241).
         const seed = get().seed;
         const fig = replay(next, seed);
-        if (fig.lastError === null && (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig))) {
+        if (
+          fig.lastError === null &&
+          (!extensionsClear(next, fig) || !intersectionsWithinSegments(fig) || !pointsDistinct(fig.construction, fig.positions, fig.coincidences))
+        ) {
           const s = firstSatisfyingSeed(next, seed);
           if (s !== seed) {
             patch.seed = s;

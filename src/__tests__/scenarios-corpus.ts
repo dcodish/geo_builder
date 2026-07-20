@@ -202,6 +202,40 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'second-bare-point-never-stacks',
+    title: 'A second bare «נקודה X» lands in general position — never drawn exactly on an existing point (#232, ADR-378)',
+    guards:
+      "Prod eshsc843 (2026-07-20): every bare free point hard-coded the SAME (3,2), so «נקודה d» after «נקודה a» drew D exactly ON A — and the coincidence collector certified the stack (the ⓘ converge notice asserted a coincidence the student never stated, disarming the whole avoid machinery). Three fixes: the free-point apply chokepoint probes auto-placed coords to general position (ADR-253, identity when generic); the collector's forcedness split refuses to certify a BOTH-free default stack; the submit/edit auto-advance gates also fire on a distinctness break.",
+    steps: ['Bc', 'Mו n על bc', 'נקודה a', 'Ab', 'Am', 'An', 'נקודה d'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A');
+      const D = at(fig, 'D');
+      expect(dist(A, D), 'D clearly OFF A').toBeGreaterThan(0.3);
+      expect(
+        (fig.coincidences ?? []).some(([a, b]) => (a === 'A' && b === 'D') || (a === 'D' && b === 'A')),
+        'no false A–D coincidence certified',
+      ).toBe(false);
+    },
+  },
+  {
+    id: 'bare-point-then-angle-ratio-stays-off-existing',
+    title: '«נקודה d» + «Dc» + an angle ratio — D never sits visually on A (#232, ADR-378, prod quvq3txq)',
+    guards:
+      'Prod quvq3txq (2026-07-20): the same (3,2) stack; the final «זוית abc שווה לזוית dcb» recruit nudged D to |AD| ≈ 0.41 on a ~8-unit span — still visually on A, with the converge notice shown. With the general-position probe D starts clearly separated and the driven solve keeps it so.',
+    steps: ['קטע mn', 'B על המשך nm', 'Cעל המשך mn', 'נקודה a', 'Ab', 'נקודה d', 'Dc', 'זוית abc שווה לזוית dcb'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A');
+      const D = at(fig, 'D');
+      expect(dist(A, D), 'D clearly OFF A').toBeGreaterThan(0.3);
+      expect(
+        (fig.coincidences ?? []).some(([a, b]) => (a === 'A' && b === 'D') || (a === 'D' && b === 'A')),
+        'no false A–D coincidence certified',
+      ).toBe(false);
+    },
+  },
+  {
     id: 'tangent-at-existing-touch-carries-membership',
     title: '«AD משיק למעגל בנקודה E» with E already on AD — a REAL tangency, never a ⟂-only green (#233, ADR-377)',
     guards:

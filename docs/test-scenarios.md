@@ -22,6 +22,12 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `second-bare-point-never-stacks` — a second bare «נקודה X» lands in general position (#232, ADR-378)
+Prod `eshsc843` (2026-07-20): every bare free point hard-coded the same (3,2), so «נקודה d» drew D exactly ON A — and the coincidence collector certified the stack (a ⓘ converge notice asserting an unstated given, the avoid machinery disarmed). Three fixes at three chokepoints: the free-point apply case probes auto-placed coords to general position (ADR-253 discipline — identity when generic, pinned placements verbatim); the collector's forcedness split refuses a BOTH-free default stack (the zero-cost structural case of ADR-295's forced-in-every-sample standard — a web-forced pair like ADR-123's kite stays recorded); the submit/edit auto-advance gates also fire on a distinctness break. Unit locks in `general-position.test.ts` (#232 block).
+
+### `bare-point-then-angle-ratio-stays-off-existing` — the quvq3txq twin: D stays clearly off A through a driven angle ratio (#232, ADR-378)
+Prod `quvq3txq` (2026-07-20): the same stack, then «זוית abc שווה לזוית dcb» nudged D to |AD| ≈ 0.41 on a ~8-unit span — still visually on A. With the probe D starts separated and the driven solve keeps it so.
+
 ### `tangent-at-existing-touch-carries-membership` — «AD משיק למעגל בנקודה E» with E already on AD is a REAL tangency (#233, ADR-377)
 Operator screenshot (dev 2026-07-20): rectangle + circle + «B על המעגל» + «E על AD» + the tangency — all green while AD sat nowhere near the circle. The ADR-075 existing-touch branch asserted the radius-⟂ alone; the lowering now states the full conjunction (membership + ⟂ + on-line-when-loose) and the apply `(d)` fall-through pushes an unreconcilable membership as a `length-radius` residual, so the circle is driven to the segment. Unit locks in `tangent-existing-touch.test.ts` (both entry orders, loose-point touch, member-touch idempotence).
 

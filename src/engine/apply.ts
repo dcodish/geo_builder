@@ -916,13 +916,31 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       // existence the parse context may not know — ADR-236): if the id already exists as ANY object,
       // skip entirely — never move it, never conflict (mirrors the circle command's `ifAbsent`).
       if (cmd.ifAbsent && objects.some((o) => o.id === cmd.id)) break;
+      // An AUTO-placed (`free`) point's coords are a SUGGESTION, not a statement (#232 / ADR-378):
+      // every parser site hands a canned spot (the bare «נקודה X» rule hands the SAME (3,2) to every
+      // point), so a second bare point used to land EXACTLY on the first — a drawn coincidence the
+      // student never stated (ADR-052), certified by the converge notice. Probe to general position
+      // at this ONE chokepoint (the ADR-253 discipline — identity when the suggestion is already
+      // generic, so healthy figures stay bit-identical); a student's explicit placement (pinned)
+      // stays verbatim — what they typed is a given.
+      let spot: Vec = { x: cmd.x, y: cmd.y };
+      if (cmd.free) {
+        const others = objects
+          .filter((o) => isGeoPoint(o) && o.id !== cmd.id)
+          .map((o) => pos.get(o.id))
+          .filter((p): p is Vec => !!p);
+        if (others.length) {
+          const span = spanAround(spot, others);
+          if (degeneratePlacement(spot, [spot], others, span)) spot = seedSpotAround(spot, Math.max(1.5, 0.25 * span), others);
+        }
+      }
       // A free point may be (re)placed: if it already exists as a free point,
       // update its coordinates — a *move* (ADR-011). Conflicts with non-free
       // points of the same id are caught upstream by commandConflict. A student's
       // explicit placement is *pinned* — the sampler never moves it (ADR-018); but a
       // construct's AUTO-placed default (`free`) is a real free DOF the sampler and
       // constraints may move (ADR-052), so the seed coords are just a starting point.
-      const fp: GeoObject = { kind: 'free-point', id: cmd.id, x: cmd.x, y: cmd.y, ...(cmd.free ? {} : { pinned: true }) };
+      const fp: GeoObject = { kind: 'free-point', id: cmd.id, x: spot.x, y: spot.y, ...(cmd.free ? {} : { pinned: true }) };
       const i = objects.findIndex((o) => o.id === cmd.id);
       if (i === -1) objects.push(fp);
       else if (objects[i].kind === 'free-point') objects[i] = fp;
