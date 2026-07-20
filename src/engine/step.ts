@@ -9,7 +9,7 @@
 
 import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, SolveDirective, Vec } from './types';
 import { LEN_EPS, isGeoPoint } from './types';
-import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition } from './apply';
+import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeLowersToConstraints } from './apply';
 import { lower } from './lower';
 import { evaluate, resolveDriven } from './evaluate';
 import type { EvalResult } from './evaluate';
@@ -46,6 +46,11 @@ export function deepEqual(a: unknown, b: unknown): boolean {
   if (ka.length !== kb.length) return false;
   return ka.every((k) => deepEqual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
 }
+
+/** The kinds a shape command's DERIVED corners are built as (audit 2026-07-20: produced ONLY by
+ *  square/rectangle/rhombus/parallelogram/trapezoid/right-triangle) — the M1 reinterpretation key
+ *  in {@link commandConflict} (#223 / ADR-375). */
+const SHAPE_CORNER_KINDS = new Set(['derived', 'perp-offset', 'parallelogram-vertex', 'rotated', 'scaled-offset']);
 
 /**
  * A command may introduce new objects, but it must not *redefine* an existing
@@ -92,11 +97,18 @@ export function commandConflict(prev: Construction, cmd: Command): string | null
     // then intersect "the tangent at D" with AB) is the SAME line — its id is its
     // spec — so reuse it instead of conflicting (visibility is kept/merged in apply).
     if (o.kind === 'line' && existing.kind === 'line') continue;
-    // A right-triangle's derived leg vertex (perp-offset, from the empty-construction probe above)
-    // may land on an existing point when the hypotenuse pre-exists (two right triangles sharing AB).
-    // apply reinterprets that as a right-angle CONSTRAINT on the new vertex rather than rebuilding
-    // the leg endpoint, so it is not a redefinition conflict (Q8, ADR-223; right angle at the last id).
+    // A right-triangle's derived leg vertex (perp-offset) landing on an existing point: apply's own
+    // case reinterprets it as a right-angle CONSTRAINT (Q8, ADR-223 — semantic vertex order, so it
+    // is not in the quad-family DERIVED_SLOTS rotation/lowering machinery).
     if (cmd.type === 'right-triangle' && o.kind === 'perp-offset' && isGeoPoint(existing)) continue;
+    // A QUAD-family shape's derived corner (perp-offset / parallelogram-vertex / rotated /
+    // scaled-offset / derived, from the empty-construction probe above) landing on an existing point
+    // is NOT a redefinition when apply will LOWER the shape to its defining constraints over the
+    // existing points (M1 — «FEDG מלבן» over four on-segment riders asserts the rectangle relations
+    // and flexes the figure; #223 / ADR-375). The shared predicate excludes a vertex cycle already
+    // DECLARED as a shape — ADR-157 immutability: re-declaring a trapezoid's cycle as a square stays
+    // THIS refusal, never a silent morph.
+    if (SHAPE_CORNER_KINDS.has(o.kind) && isGeoPoint(existing) && shapeLowersToConstraints(prev, cmd)) continue;
     return `'${o.id}' is already defined — it can't be redefined as something different`;
   }
   return null;

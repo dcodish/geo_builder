@@ -35,6 +35,51 @@ describe('#82 — the gate BLOCKS a lowering that lost the verb', () => {
   });
 });
 
+describe('#226 — OPERAND accounting: a family token bound to the WRONG operands is a dropped given', () => {
+  it('the exact P1 (prod 0yqufnuv 11:39): «AD משיק למעגל» lowered to a tangent line at endpoint A only', () => {
+    const llm: AnyCommand[] = [{ type: 'tangent', id: 'tan-A', circle: 'circle-O', at: 'A', visible: true } as AnyCommand];
+    expect(droppedGivenVerbs('AD משיק למעגל', llm)).toEqual(['משיק/tangent']);
+    expect(droppedGivenVerbs('AD tangent to the circle', llm)).toEqual(['משיק/tangent']);
+  });
+  it('the class, parallel/perpendicular/bisect editions: evidence bound to OTHER labels does not account', () => {
+    const wrongPar: AnyCommand[] = [{ type: 'set-parallel', a: 'X', b: 'Y', c: 'B', d: 'C' } as AnyCommand];
+    expect(droppedGivenVerbs('FG מקביל ל BC', wrongPar)).toEqual(['מקביל/parallel']);
+    const wrongPerp: AnyCommand[] = [{ type: 'set-perpendicular', a: 'X', b: 'Y', c: 'C', d: 'B' } as AnyCommand];
+    expect(droppedGivenVerbs('DE מאונך ל CB', wrongPerp)).toEqual(['מאונך/perpendicular']);
+    const wrongBis: AnyCommand[] = [{ type: 'bisector', id: 'bis-XYZ', vertex: 'Y', p: 'X', q: 'Z', visible: true } as AnyCommand];
+    expect(droppedGivenVerbs('CD חוצה זוית', wrongBis)).toEqual(['חוצה/bisect']);
+  });
+  it('the #203 tangency lowering (foot-from-centre + membership, no tangent token) IS evidence — the false-block that pushed prod to the LLM', () => {
+    const det: AnyCommand[] = [
+      { type: 'segment', a: 'A', b: 'D' },
+      { type: 'foot', id: '@tang-O-A-D', from: '@ctr-O', a: 'A', b: 'D' },
+      { type: 'point-on-circle', id: '@tang-O-A-D', circle: 'circle-O' },
+      { type: 'set-line', points: ['A', '@tang-O-A-D', 'D'] },
+    ] as AnyCommand[];
+    expect(droppedGivenVerbs('AD משיק למעגל', det)).toEqual([]);
+    // an altitude foot that happens to ride a circle is NOT tangency evidence (foot.from ≠ the centre)
+    const altFoot: AnyCommand[] = [
+      { type: 'foot', id: 'H', from: 'C', a: 'A', b: 'D' },
+      { type: 'point-on-circle', id: 'H', circle: 'circle-O' },
+    ] as AnyCommand[];
+    expect(droppedGivenVerbs('AD משיק למעגל', altFoot)).toEqual(['משיק/tangent']);
+  });
+  it('«AD משיק למעגל בנקודה E» lowers to a tangency constraint ON segment AD with the NAMED touch (the deterministic-rule member, prod 0yqufnuv 11:36)', () => {
+    const ctx = ctxOf('מעגל', 'B ו C על המעגל', 'ABCD מלבן');
+    for (const u of ['AD משיק למעגל בנקודה E', 'AD tangent to the circle at E']) {
+      const r = parse(u, ctx);
+      if (!r.ok) throw new Error(`parse failed: ${u}`);
+      const foot = r.commands.find((c: AnyCommand) => c.type === 'foot') as { id?: string; a?: string; b?: string } | undefined;
+      expect(foot, `${u}: the touch is the ⟂ foot from the centre on AD`).toBeTruthy();
+      expect(foot!.id, `${u}: the touch carries the student's label`).toBe('E');
+      expect([foot!.a, foot!.b].sort()).toEqual(['A', 'D']);
+      expect(r.commands.some((c: AnyCommand) => c.type === 'point-on-circle' && (c as { id?: string }).id === 'E'), `${u}: E on the circle`).toBe(true);
+      expect(r.commands.some((c: AnyCommand) => c.type === 'set-line'), `${u}: the touch lands WITHIN the bare segment (ADR-077)`).toBe(true);
+      expect(droppedGivenVerbs(u, r.commands)).toEqual([]);
+    }
+  });
+});
+
 describe('#82 — NO THEFT: legitimate lowerings pass', () => {
   const cases: [string, string[]][] = [
     ['ישר משיק למעגל O בנקודה C', ['מעגל שמרכזו O', 'C על המעגל']],

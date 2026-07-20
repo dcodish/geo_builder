@@ -83,9 +83,11 @@ describe('shapes compose on existing points (ADR-013)', () => {
     for (const id of ['P', 'Q', 'R']) expect(r.positions.get(id)).toBeTruthy();
   });
 
-  it('still rejects when no vertex order avoids redefining an existing point', () => {
-    // Re-declaring all four of the square's vertices as a parallelogram forces the
-    // parallelogram's derived 4th corner onto an existing point — no rotation helps.
+  it('a DECLARED cycle stays immutable — re-declaring the square as a parallelogram still refuses (ADR-157; the ADR-375 lowering covers only UNDECLARED point sets)', () => {
+    // ABCD is a DECLARED shape (its polygon object exists), so ADR-157's immutability owns it:
+    // a different shape word over the same cycle is a contradiction → refuse with the clear
+    // message (never a silent morph). The ADR-375 M1 lowering applies only to a vertex set with
+    // NO shape declared over it (riders, free points — see shape-over-existing.test.ts).
     const base = build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }]);
     const r = applyStep(base.construction, { type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] });
     expect(r.ok).toBe(false);

@@ -187,12 +187,22 @@ describe('shape composition — the shared edge need not be named first (ADR-013
     }
   });
 
-  it('still rejects when the two existing vertices are a diagonal (no edge to build on)', () => {
-    // A square ABCD, then "square AXCY" reusing the diagonal pair A,C — no cyclic
-    // rotation puts a *diagonal* on the adjacent base slots, so it stays a conflict.
+  it('a diagonal pair (no edge to build on) — lowered to constraints, X,Y flex into a square on diagonal AC (M1, #223/ADR-375)', () => {
+    // A square ABCD, then "square AXCY" reusing the diagonal pair A,C — no cyclic rotation puts a
+    // *diagonal* on the adjacent base slots, so this used to refuse. Under the M1 lowering the fresh
+    // X,Y are created and the square's defining constraints place them: AXCY is a genuine square whose
+    // diagonal is AC. (Known nuance, filed: the true solution puts X,Y exactly ON B,D — a forced
+    // coincidence the dodging machinery steers off, so the prior square may resize slightly.)
     const sq = build([{ type: 'square', ids: ['A', 'B', 'C', 'D'] }]);
     const r = applyStep(sq.construction, { type: 'square', ids: ['A', 'X', 'C', 'Y'] });
-    expect(r.ok).toBe(false);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const p = (id: Id) => r.positions.get(id)!;
+    const side = (a: Id, b: Id) => len(sub(p(a), p(b)));
+    const sides = [side('A', 'X'), side('X', 'C'), side('C', 'Y'), side('Y', 'A')];
+    for (const s of sides) expect(s).toBeCloseTo(sides[0], 1); // all four sides equal
+    const dot = (sub(p('A'), p('X')).x * sub(p('C'), p('X')).x) + (sub(p('A'), p('X')).y * sub(p('C'), p('X')).y);
+    expect(Math.abs(dot)).toBeLessThan(0.05); // right angle at X — a genuine square
   });
 });
 

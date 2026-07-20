@@ -9,7 +9,8 @@
  */
 
 import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, Vec } from './types';
-import { objectParents } from './types';
+import { isGeoPoint, objectParents } from './types';
+import { shapeConstraints } from './inscribe';
 import { add, dist, lineLineIntersect, pointInPolygon, reflectAcross, scale, sub } from './geometry';
 import { constraintRefs } from './solve';
 
@@ -338,6 +339,40 @@ const DERIVED_SLOTS: Partial<Record<Command['type'], number[]>> = {
   // interchangeable hypotenuse endpoints so a fresh one becomes the derived perp-offset, and when the
   // whole hypotenuse pre-exists it asserts the right angle as a CONSTRAINT on the new vertex.
 };
+
+/**
+ * Does this quad-family shape command REINTERPRET as constraints over existing points
+ * (M1, #223 / [ADR-375](../../docs/06-decisions.md#adr-375))? True when a derived-slot id already
+ * exists as a point — the rotation could not absorb the reuse, so the statement is ABOUT the
+ * existing points — EXCEPT:
+ *  - an identical re-issue of the same shape (the probe-compare below): the idempotent no-op, FR-EN-9;
+ *  - a vertex cycle already DECLARED as a polygon ([ADR-157](../../docs/06-decisions.md#adr-157)):
+ *    a named shape is immutable — re-declaring its cycle as a different shape is a contradiction,
+ *    refused upstream by `commandConflict`, never silently morphed. (An UNDECLARED point set — riders,
+ *    free points, a different cycle through shared vertices — is exactly the #223 class and lowers.)
+ * Shared by `applyCommand` (which performs the lowering) and `commandConflict` (which must not refuse
+ * what apply will reinterpret) so the two can never drift.
+ */
+export function shapeLowersToConstraints(prev: Construction, cmd: Command): boolean {
+  const slots = DERIVED_SLOTS[cmd.type];
+  if (!slots || !('ids' in cmd)) return false;
+  const ids = cmd.ids as Id[];
+  const set = new Set(ids);
+  const declared = prev.objects.some(
+    (o) => o.kind === 'polygon' && o.vertices.length === ids.length && o.vertices.every((v) => set.has(v)),
+  );
+  if (declared) return false; // ADR-157 — the declared cycle stays immutable
+  if (!slots.some((sIdx) => prev.objects.some((x) => x.id === ids[sIdx]))) return false;
+  // A derived-slot id counts as a CLASH only when it exists as a point that is NOT this command's own
+  // identical corner. Both objects come off the same construction path, so serialized equality is exact.
+  const probe = applyCommand({ objects: [], constraints: [] }, cmd).objects;
+  return slots.some((sIdx) => {
+    const ex = prev.objects.find((x) => x.id === ids[sIdx]);
+    if (!ex || !isGeoPoint(ex)) return false;
+    const pr = probe.find((p) => p.id === ids[sIdx]);
+    return !pr || JSON.stringify(ex) !== JSON.stringify(pr);
+  });
+}
 
 /**
  * Pick the cyclic rotation of a shape's vertex list that puts existing points on
@@ -850,6 +885,30 @@ function seedSpotAround(centre: Vec, rad: number, others: Vec[], accept: (p: Vec
 export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec> = new Map()): Construction {
   const objects = [...prev.objects];
   const constraints = [...prev.constraints];
+
+  // ── M1: a shape command whose DERIVED corner lands on an EXISTING point lowers to the shape's
+  // defining CONSTRAINTS over the existing points (#223 / ADR-375) ─────────────────────────────
+  // `normalizeShapeComposition` (which ran upstream in applyStep) rotates the vertex cycle so existing
+  // points take the free base slots; when that cannot absorb them all (3–4 of the vertices pre-exist —
+  // «FEDG מלבן» over four on-segment riders), the statement is ABOUT the existing points: draw the
+  // polygon and assert the shape's defining relations (the ONE authority `shapeConstraints`, shared
+  // with the ADR-262 inscribe expansion), letting the solver flex the riders into shape — never a
+  // rebuild, never an «already defined» refusal. The right-triangle case below does the same for its
+  // semantic (non-rotatable) vertex order; triangle/quadrilateral have no derived corners and always
+  // composed. A missing vertex (3-of-4) is created by the normal `placeBase` reuse-or-create fit.
+  // A vertex cycle already DECLARED as a shape is NOT lowered — ADR-157 keeps it immutable
+  // (`shapeLowersToConstraints` returns false there and commandConflict refuses upstream).
+  if (shapeLowersToConstraints(prev, cmd) && 'ids' in cmd) {
+    const ids = cmd.ids as Id[];
+    const [a, b, c, d] = ids;
+    // any not-yet-existing vertex is created (reuse-or-create), fitted to the existing anchors;
+    // the template is a generic quad seed — the shape's own constraints drive the final form
+    placeBase(objects, [{ id: a, x: 0, y: 0 }, { id: b, x: 6, y: 0 }, { id: c, x: 6, y: 4 }, { id: d, x: 0, y: 4 }], pos);
+    quadEdges(objects, a, b, c, d);
+    let acc: Construction = { ...prev, objects, constraints };
+    for (const sub of shapeConstraints(cmd.type as Parameters<typeof shapeConstraints>[0], ids)) acc = applyCommand(acc, sub, pos);
+    return acc;
+  }
 
   switch (cmd.type) {
     case 'free-point': {

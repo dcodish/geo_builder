@@ -22,6 +22,12 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `rectangle-named-over-existing-riders` — «FEDG מלבן» over four existing riders asserts the rectangle and flexes them into shape (#223, ADR-375)
+Prod session `0yqufnuv` 09:41–09:43 (2026-07-20): naming a polygon over EXISTING points refused «'D' is already defined» — the shape commands' derived corners hit the redefine guard (the 2-D sibling of #199). Under M1 the shape command lowers to its defining constraints (the `shapeConstraints` authority shared with the ADR-262 inscribe expansion) over the existing points; the riders' own t-DOFs are driven, the figure flexes into a genuine inscribed rectangle, and the triangle frame stays put. Class locks in `shape-over-existing.test.ts` (driven/satisfied/idempotent/partial/no-detour).
+
+### `segment-tangent-binds-named-segment` — «AD משיק למעגל» constrains SEGMENT AD tangent, never a green chord + stray tangent (#226, ADR-374)
+P1 prod session `0yqufnuv` 11:38–11:39 (2026-07-20): the verb honesty gate accounted a stated tangency by family-token presence, not operand binding — it false-blocked the correct deterministic #203 lowering (anonymous foot `@tang-…`, no tangent token → escalated to the LLM) and then false-passed the LLM's `tangent at:A` (family token present, segment AD never bound) — AD committed GREEN drawn as a chord. The gate is now operand-aware (a stated subject pair must be bound by the verb's own evidence commands, derived-chain closure included), the #203 foot-from-centre+membership lowering counts as tangency evidence, and a NAMED new touch («…בנקודה E», the 11:36 sibling) rides the named segment instead of spawning a stray free tangent. Unit locks in `verb-gate.test.ts` (#226 block).
+
 ### `symbolic-area-label-not-swallowed` — «שטח משולש AFO הוא 9b» is committed and labelled (#162, ADR-118 Am.)
 Operator dev session `pxeb2ng8`: the lone symbolic area statement was silently discarded («already on the figure») — `dryRunOutcome`'s `labelCount` predated ADR-118's `areas` lane. All three label kinds now count (still a diff, so an exact re-statement stays a no-op). Unit locks in `dry-run.test.ts` (#162 block).
 

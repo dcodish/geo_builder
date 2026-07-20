@@ -202,6 +202,60 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'rectangle-named-over-existing-riders',
+    title: '«FEDG מלבן» over four existing on-segment riders ASSERTS the rectangle and flexes them into shape (#223, ADR-375)',
+    guards:
+      "Prod 0yqufnuv 09:41-09:43 (2026-07-20): naming a polygon over EXISTING points refused «'D' is already defined» — the shape commands' derived corners hit the redefine guard, so the construction path dead-ended (the 2-D sibling of #199). Under M1 the shape command now lowers to its defining constraints (the shared `shapeConstraints` authority) over the existing points; the riders' own t-DOFs are driven and the figure flexes into a genuine inscribed rectangle.",
+    steps: ['משולש ABC', 'E ו F על BC', 'D על AC', 'G על AB', 'FEDG מלבן'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const [F, E, D, G] = ['F', 'E', 'D', 'G'].map((id) => at(fig, id));
+      expect(angle(G, F, E), '∠GFE').toBeCloseTo(90, 1);
+      expect(angle(F, E, D), '∠FED').toBeCloseTo(90, 1);
+      expect(angle(E, D, G), '∠EDG').toBeCloseTo(90, 1);
+      // each rider stayed ON its host segment (never re-created off it)
+      const onHost = (p: Vec, a: Vec, b: Vec, label: string) => {
+        const vx = b.x - a.x;
+        const vy = b.y - a.y;
+        const t = ((p.x - a.x) * vx + (p.y - a.y) * vy) / (vx * vx + vy * vy);
+        expect(Math.hypot(p.x - (a.x + t * vx), p.y - (a.y + t * vy)), `${label} on its host`).toBeLessThan(1e-6);
+        expect(t, `${label} within its host`).toBeGreaterThan(0);
+        expect(t, `${label} within its host`).toBeLessThan(1);
+      };
+      const [A, B, C] = ['A', 'B', 'C'].map((id) => at(fig, id));
+      onHost(E, B, C, 'E');
+      onHost(F, B, C, 'F');
+      onHost(D, A, C, 'D');
+      onHost(G, A, B, 'G');
+    },
+  },
+  {
+    id: 'segment-tangent-binds-named-segment',
+    title: '«AD משיק למעגל» constrains SEGMENT AD tangent — never a green figure with AD a chord and a stray tangent line (#226, ADR-374)',
+    guards:
+      "P1 prod 0yqufnuv 11:38-11:39 (2026-07-20): the verb honesty gate accounted a stated tangency by FAMILY TOKEN PRESENCE, not operand binding — so it (a) false-blocked the correct deterministic #203 lowering (its anonymous foot id is `@tang-…`, no tangent token) and escalated to the LLM, then (b) false-passed the LLM's `tangent at:A`, which binds only endpoint A — AD committed GREEN drawn as a chord. The gate is now operand-aware (a stated subject pair must be bound by the verb's own evidence commands, with a derived-chain closure), so the deterministic parse commits directly and a wrong-operand lowering refuses.",
+    steps: ['מעגל', 'B ו C על המעגל', 'ABCD מלבן', 'AD משיק למעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const A = at(fig, 'A');
+      const D = at(fig, 'D');
+      const c = [...fig.circles.values()][0];
+      // segment AD is genuinely tangent: the ⟂ distance from the centre to line AD equals r…
+      const vx = D.x - A.x;
+      const vy = D.y - A.y;
+      const t = ((c.center.x - A.x) * vx + (c.center.y - A.y) * vy) / (vx * vx + vy * vy);
+      const gap = Math.hypot(c.center.x - (A.x + t * vx), c.center.y - (A.y + t * vy));
+      expect(Math.abs(gap - c.r), 'dist(centre, line AD) = r — AD tangent, not a chord').toBeLessThan(0.1);
+      // …and the touch lands WITHIN the named segment (ADR-077: a bare pair means the segment)
+      expect(t, 'the touch within AD').toBeGreaterThan(0);
+      expect(t, 'the touch within AD').toBeLessThan(1);
+      // no stray drawn tangent line was invented for the mis-bound reading
+      expect(fig.construction.objects.some((o) => o.kind === 'line' && o.id.startsWith('tan-')), 'no stray tangent line').toBe(false);
+    },
+  },
+  {
     id: 'symbolic-area-label-not-swallowed',
     title: '«שטח משולש AFO הוא 9b» is committed and labelled — never "already on the figure" (#162, ADR-118 Am.)',
     guards:

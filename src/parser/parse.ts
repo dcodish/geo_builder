@@ -6088,10 +6088,16 @@ const tangentLine: Rule = (s, ctx) => {
   // tangent guard's per-arm ⟂. A bare pair means the SEGMENT (ADR-077): the touch must land WITHIN
   // AB (`set-line [A,F,B]`, drive-or-check); an explicit «הישר»/line keeps the infinite-line reading.
   // tangentFromExternal (earlier) defers on a both-existing pair, so nothing richer is stolen.
-  if (!T && pts && pts[0] !== pts[1] && have.has(pts[0]) && have.has(pts[1]) && !members.has(pts[0]) && !members.has(pts[1])) {
+  // A NAMED NEW touch («AD משיק למעגל בנקודה E», #226) is the SAME statement with the student labelling
+  // the touch: the foot takes the stated id instead of the ADR-297 anonymous one. Before this, the
+  // named-touch form fell through to the drawn-tangent fallback, which emitted a stray free tangent
+  // line `tan-E` NOWHERE NEAR the named segment — the segment's tangency silently dropped (the
+  // deterministic-rule member of the #226 operand-binding class; prod 0yqufnuv 11:36).
+  const namedNewTouch = T && pts && !have.has(T) && T !== pts[0] && T !== pts[1] && T !== up(center) ? T : null;
+  if ((!T || namedNewTouch) && pts && pts[0] !== pts[1] && have.has(pts[0]) && have.has(pts[1]) && !members.has(pts[0]) && !members.has(pts[1])) {
     const [a, b] = pts;
     if (a === up(center) || b === up(center)) return null; // a segment FROM the centre can never be tangent — defer honestly
-    const F = anonId('tang', up(center), a, b);
+    const F = namedNewTouch ?? anonId('tang', up(center), a, b);
     const infinite = /\bline\b|\bray\b|הישר|הקו|קרן/i.test(s);
     return [
       { type: 'segment', a, b }, // the tangent segment drawn (idempotent)
@@ -8496,10 +8502,91 @@ export function droppedWordRelations(utterance: string, commands: AnyCommand[]):
   return out;
 }
 
+/** The commands that are EVIDENCE for a verb gate — the per-command form of the `satisfied` family test
+ *  (equivalent for token presence: a family token never spans two commands' JSON), PLUS the structural
+ *  tangency encoding the token regex cannot see (#226): a `foot` dropped FROM THE CENTRE onto a segment
+ *  whose foot-point is also asserted ON that centre's circle encodes dist(centre, seg) = r — the #203
+ *  no-touch/named-touch lowering, which carries no `tangent` token anywhere (its anon id is `@tang-…`,
+ *  not `tan-…`). Without this the gate FALSE-BLOCKED the correct deterministic parse of «AD משיק למעגל»
+ *  and escalated it to the LLM (prod 0yqufnuv 11:39 — the P1's first half). */
+function verbEvidence(g: (typeof VERB_GATES)[number], commands: AnyCommand[]): AnyCommand[] {
+  const ev = commands.filter((c) => g.satisfied.test(JSON.stringify(c)));
+  if (g.present.source.includes('משיק')) {
+    const feet = new Map(
+      commands.filter((c): c is Extract<AnyCommand, { type: 'foot' }> => c.type === 'foot').map((c) => [c.id, c]),
+    );
+    for (const c of commands) {
+      if (c.type !== 'point-on-circle' || !feet.has(c.id)) continue;
+      const foot = feet.get(c.id)!;
+      // strict: the foot's source must be THIS circle's centre (token or its ADR-342 anonymous form) —
+      // an altitude foot that happens to ride a circle is not tangency evidence.
+      const tok = typeof foot.from === 'string' ? foot.from.replace(/^@ctr-/, '') : '';
+      if (c.circle === `circle-${tok}`) ev.push(foot, c);
+    }
+  }
+  // CLOSURE: a command that references an evidence object's id participates in the verb's encoding —
+  // «CD חוצה זוית» binds D as `line-intersection D ON bis-BCA` (the ADR-261 lowering), and a marker
+  // `point-on-line D on tan-A` binds D onto a drawn tangent. Without the closure the operand check
+  // (#226) would false-block those constructions (the operand IS bound, through the derived chain).
+  const ids = new Set(ev.map((c) => (c as { id?: string }).id).filter((x): x is string => typeof x === 'string'));
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const c of commands) {
+      if (ev.includes(c)) continue;
+      const j = JSON.stringify(c);
+      if (![...ids].some((id) => j.includes(`"${id}"`))) continue;
+      ev.push(c);
+      const cid = (c as { id?: string }).id;
+      if (typeof cid === 'string' && !ids.has(cid)) ids.add(cid);
+      grew = true;
+    }
+  }
+  return ev;
+}
+
+/** The uppercase pairs the utterance states as the verb's own OPERANDS — the SUBJECT segment(s)
+ *  immediately before the verb (a ו/and/comma chain of glued pairs, an optional copula between) and the
+ *  OBJECT pair immediately after it (past an את/ל/to particle). Deliberately adjacency-only: prose
+ *  between a pair and the verb yields nothing, so a clause like «המשך CA נפגש עם המשיק» extracts no
+ *  operand and keeps the family-presence fallback (never a false block). */
+function statedVerbOperands(s: string, verbAt: number, verbLen: number): Id[] {
+  const PAIR = String.raw`(?<![A-Za-z\d])[A-Z]\d*[A-Z]\d*(?![A-Za-z\d])`;
+  const out: Id[] = [];
+  const before = s.slice(0, verbAt);
+  const subj = before.match(
+    new RegExp(String.raw`(${PAIR}(?:\s*(?:,|ו-?|\band\b)\s*${PAIR})*)\s*(?:\b(?:is|are)\b\s+|הוא\s+|היא\s+|הם\s+)?$`),
+  );
+  if (subj) out.push(...(subj[1].match(/[A-Z]\d*/g) ?? []));
+  const after = s.slice(verbAt + verbLen);
+  const obj = after.match(new RegExp(String.raw`^[א-ת]*\s*(?:את\s+|ל-?\s*|\bto\b\s+(?:the\s+)?)?(${PAIR})`));
+  if (obj) out.push(...(obj[1].match(/[A-Z]\d*/g) ?? []));
+  return [...new Set(out)];
+}
+
 export function droppedGivenVerbs(utterance: string, commands: AnyCommand[]): string[] {
   const s = normalizeUtterance(utterance);
-  const json = JSON.stringify(commands);
-  return VERB_GATES.filter((g) => g.present.test(s) && !g.satisfied.test(json)).map((g) => g.verb);
+  const out: string[] = [];
+  for (const g of VERB_GATES) {
+    const m = g.present.exec(s);
+    if (!m) continue;
+    const evidence = verbEvidence(g, commands);
+    if (evidence.length === 0) {
+      out.push(g.verb); // the verb's meaning is entirely absent from the lowering (the original #82 class)
+      continue;
+    }
+    // #226 — OPERAND accounting, the second half of the class: family-token presence is not enough when
+    // the utterance NAMES the verb's operands. A lowering that carries a tangent/parallel/… command
+    // bound to DIFFERENT operands (the LLM's `tangent at:A` for «AD משיק למעגל» — AD drawn as a chord,
+    // row green) must read as dropped: the verb's own evidence commands must collectively reference
+    // every stated operand label. Same accounting as droppedGivenRelations' symbol form (ADR-264),
+    // extended to the word/verb form.
+    const stated = statedVerbOperands(s, m.index, m[0].length);
+    if (stated.length === 0) continue;
+    const bound = new Set<string>();
+    for (const c of evidence) for (const L of JSON.stringify(c).match(/[A-Z]\d*/g) ?? []) bound.add(L);
+    if (!stated.every((L) => bound.has(L))) out.push(g.verb);
+  }
+  return out;
 }
 
 export function droppedGivenRelations(utterance: string, commands: AnyCommand[]): string[] {

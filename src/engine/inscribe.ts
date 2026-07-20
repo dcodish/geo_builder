@@ -143,8 +143,12 @@ export function inscribeVariantCount(cmd: InscribeCmd): number {
   return Math.max(1, inscribePlacements(cmd.ids, cmd.container).length);
 }
 
-/** The shape's defining constraints on its placed vertices (cyclic order `ids`). */
-function shapeConstraints(shape: InscribeShape, ids: Id[]): Command[] {
+/** The shape's defining constraints on its placed vertices (cyclic order `ids`).
+ *  EXPORTED as the one authority for "what does this shape word assert" (M1, #223/ADR-375): the inscribe
+ *  expansion and the apply-boundary lowering of a shape command over EXISTING points both read it, so the
+ *  two can never drift. `trapezoid` exists for the M1 lowering only (not an inscribe shape — inscribing a
+ *  trapezoid is under-determined); its single assertion is the one parallel pair (ADR-052: no more). */
+export function shapeConstraints(shape: InscribeShape | 'trapezoid', ids: Id[]): Command[] {
   const n = ids.length;
   const side = (i: number): [Id, Id] => [ids[i % n], ids[(i + 1) % n]];
   const equalAdjacent: Command[] = Array.from({ length: n - 1 }, (_, i) => {
@@ -170,6 +174,10 @@ function shapeConstraints(shape: InscribeShape, ids: Id[]): Command[] {
       return [rightAt(0), rightAt(1), rightAt(2)]; // three right angles ⇒ the fourth too
     case 'parallelogram':
       return oppositeEqual;
+    case 'trapezoid':
+      // AB ∥ DC (side 0 ∥ side 2) — the ONE relation the word asserts (ADR-052: leg lengths, the other
+      // pair's non-parallelism, and all sizes stay unstated).
+      return [{ type: 'set-parallel', a: side(0)[0], b: side(0)[1], c: side(2)[0], d: side(2)[1] } as Command];
   }
 }
 
