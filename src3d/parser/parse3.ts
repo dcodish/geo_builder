@@ -215,29 +215,42 @@ const rightPyramid: Rule = (s) => {
   const square = /ריבוע/.test(s) || /\bsquare\b/i.test(s);
   const equi = /שווה[\s-]?צלעות/.test(s) || /\bequilateral\b/i.test(s);
   const par = /מקבילית/.test(s) || /\bparallelogram\b/i.test(s);
+  // #199 (ADR-3D-047): «שווה מקצועות» on a TETRA is a macro (the ADR-110 pattern) — the solid plus
+  // five equal-edge `length-rel` constraints, M1 at apply (drives a free tetra into the regular one,
+  // verifies a pinned one). On any other kind the qualifier has no lowering — DEFER (escalate),
+  // never the silent drop it used to be.
+  const eqEdges = /שווה[\s-]?מקצועות/.test(s) || /כל\s+מקצועותיו\s+שוו/.test(s) || /\bequal[\s-]edges?\b/i.test(s) || /\bregular\s+tetrahedr(?:on)?\b/i.test(s);
+  const withEqEdges = (cmds: Command3[]): Command3[] | null => {
+    if (!eqEdges) return cmds;
+    const solid = cmds[0];
+    if (cmds.length !== 1 || solid.type !== 'solid' || solid.kind !== 'tetra') return null;
+    const [a, b, c3, d] = solid.ids;
+    const rel = (a1: Id, b1: Id): Command3 => ({ type: 'length-rel', a1, b1, rhs: { pair: [a, b] }, c: 1 });
+    return [solid, rel(a, c3), rel(a, d), rel(b, c3), rel(b, d), rel(c3, d)];
+  };
   // the triangular-base pyramid kind (equilateral only when right — a right equilateral pyramid)
   const triKind = right ? (equi ? 'pyramid3e' : 'pyramid3') : 'tetra';
   if (firstLabelRun(s).length === 0) {
     // label-less: a stated base word makes the shape determined — default lettering
     const rect = /מלבן/.test(s) || /\brectang/i.test(s);
     const tri = tetraWord || /משולש/.test(s) || /\btriangular\b/i.test(s) || equi;
-    if (par) return [{ type: 'solid', kind: 'pyramidPar', ids: ['A', 'B', 'C', 'D', 'S'] }];
-    if (tri) return [{ type: 'solid', kind: triKind, ids: ['A', 'B', 'C', 'D'] }];
+    if (par) return withEqEdges([{ type: 'solid', kind: 'pyramidPar', ids: ['A', 'B', 'C', 'D', 'S'] }]);
+    if (tri) return withEqEdges([{ type: 'solid', kind: triKind, ids: ['A', 'B', 'C', 'D'] }]);
     if (square || rect) {
       const kind = right ? (square ? 'pyramid4' : 'pyramid4r') : square ? ('pyramid4g' as const) : 'pyramid4gr';
-      return [{ type: 'solid', kind, ids: ['A', 'B', 'C', 'D', 'S'] }];
+      return withEqEdges([{ type: 'solid', kind, ids: ['A', 'B', 'C', 'D', 'S'] }]);
     }
     return null;
   }
   const toks = orientPyramid(s, firstLabelRun(s));
   // a tetrahedron has exactly 4 vertices — a 5-label `טטראדר` is contradictory (refuse → honest)
   if (toks.length === 5 && !tetraWord) {
-    if (par) return [{ type: 'solid', kind: 'pyramidPar', ids: toks }];
+    if (par) return withEqEdges([{ type: 'solid', kind: 'pyramidPar', ids: toks }]);
     // rightness and base shape are INDEPENDENT givens (ADR-052): a square base must be STATED
     const kind = right ? (square ? 'pyramid4' : 'pyramid4r') : square ? ('pyramid4g' as const) : 'pyramid4gr';
-    return [{ type: 'solid', kind, ids: toks }];
+    return withEqEdges([{ type: 'solid', kind, ids: toks }]);
   }
-  if (toks.length === 4) return [{ type: 'solid', kind: triKind, ids: toks }];
+  if (toks.length === 4) return withEqEdges([{ type: 'solid', kind: triKind, ids: toks }]);
   return null;
 };
 

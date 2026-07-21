@@ -289,6 +289,13 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       // NEW points still builds; a genuine SOLID (cube/prism/…) re-declaration keeps the conflict error.
       const flat = polygonN(cmd.kind) !== null;
       if (flat && cmd.ids.every((id) => c.points.has(id))) return { ok: true, next: c };
+      // #199 M1 (ADR-3D-047): re-DECLARING an existing solid (same kind, same ids) is a statement
+      // about the figure, not a re-creation — idempotent no-op (the solid-shaped sibling of the
+      // #116 flat-polygon path above and the segment3 convention below). A different kind or a
+      // partial id overlap keeps the honest conflict error.
+      if (c.solids.some((sld) => sld.kind === cmd.kind && sld.ids.length === cmd.ids.length && sld.ids.every((id, i) => id === cmd.ids[i]))) {
+        return { ok: true, next: c };
+      }
       const taken = cmd.ids.find((id) => c.points.has(id));
       if (taken !== undefined) return { ok: false, error: { code: 'already-defined', id: taken } };
 
@@ -307,7 +314,25 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'point-on-segment3': {
-      if (c.points.has(cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
+      if (c.points.has(cmd.id)) {
+        // #199 M1 (ADR-3D-047): placing an EXISTING point on a segment is a GIVEN about it, never a
+        // re-creation. A numeric t (median foot, stated ratio) lowers to the vec-rel dual —
+        // A→id = t·(A→B), all endpoints known ⇒ a multi-seed verified claim (a false statement now
+        // refuses `claim-refuted`, naming the actual conflict instead of `already-defined`). A free
+        // t (bare membership) lowers to the collinear3 claim (the ADR-3D-031 on-line M1 shape;
+        // betweenness is deliberately not asserted without a stated t).
+        const missingSeg = missingPoint(c, [cmd.a, cmd.b]);
+        if (missingSeg) return { ok: false, error: missingSeg };
+        if (cmd.t !== undefined) {
+          return applyCommand3(c, {
+            type: 'vec-rel',
+            from: cmd.a,
+            to: cmd.id,
+            terms: [{ coeff: { k: cmd.t, p: 0 }, atom: { kind: 'pair', from: cmd.a, to: cmd.b } }],
+          });
+        }
+        return applyCommand3(c, { type: 'claim', claim: { type: 'collinear3', ids: [cmd.a, cmd.id, cmd.b] } });
+      }
       const missing = missingPoint(c, [cmd.a, cmd.b]);
       if (missing) return { ok: false, error: missing };
       const next = clone(c);

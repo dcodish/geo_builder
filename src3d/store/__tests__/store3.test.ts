@@ -36,7 +36,9 @@ describe('store3', () => {
 
   it('keep-prior on error: a conflicting fact is NOT added and the error surfaces', () => {
     useGeo3.getState().submit('קובייה ABCD');
-    useGeo3.getState().submit('קובייה ABCD');
+    // #199 (ADR-3D-047): a same-solid re-declare is now an idempotent ok — the conflict here is a
+    // DIFFERENT solid claiming the taken ids
+    useGeo3.getState().submit('טטראדר ABCD');
     expect(useGeo3.getState().facts).toHaveLength(1);
     expect(useGeo3.getState().lastError).toEqual({ code: 'already-defined', id: 'A' });
   });

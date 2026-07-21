@@ -51,11 +51,16 @@ describe('apply — solids', () => {
     expect(c.solids[0].faces).toHaveLength(5);
   });
 
-  it('re-using a taken id is refused (already-defined)', () => {
+  it('re-declaring the SAME solid no-ops; a DIFFERENT solid on taken ids still refuses (#199, ADR-3D-047)', () => {
     const c = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS });
-    const r = applyCommand3(c, { type: 'solid', kind: 'cube', ids: CUBE_IDS });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toEqual({ code: 'already-defined', id: 'A' });
+    // same kind + same ids = a re-statement of the figure (M1) — idempotent, never a dead-end
+    const same = applyCommand3(c, { type: 'solid', kind: 'cube', ids: CUBE_IDS });
+    expect(same.ok).toBe(true);
+    if (same.ok) expect(same.next.solids).toHaveLength(1);
+    // a conflicting overlap keeps the honest refusal
+    const clash = applyCommand3(c, { type: 'solid', kind: 'tetra', ids: ['A', 'B', 'C', 'D'] });
+    expect(clash.ok).toBe(false);
+    if (!clash.ok) expect(clash.error).toEqual({ code: 'already-defined', id: 'A' });
   });
 
   it('wrong vertex count is refused (bad-solid)', () => {
@@ -64,14 +69,15 @@ describe('apply — solids', () => {
     if (!r.ok) expect(r.error.code).toBe('bad-solid');
   });
 
-  it('on-segment needs existing parents and a fresh id', () => {
+  it('on-segment needs existing parents; an EXISTING id lowers to the M1 claim (#199, ADR-3D-047)', () => {
     const c = build({ type: 'solid', kind: 'cube', ids: CUBE_IDS });
     const missing = applyCommand3(c, { type: 'point-on-segment3', id: 'M', a: 'X', b: 'B' });
     expect(missing.ok).toBe(false);
     if (!missing.ok) expect(missing.error).toEqual({ code: 'unknown-point', id: 'X' });
-    const taken = applyCommand3(c, { type: 'point-on-segment3', id: 'A', a: 'B', b: 'C' });
-    expect(taken.ok).toBe(false);
-    if (!taken.ok) expect(taken.error).toEqual({ code: 'already-defined', id: 'A' });
+    // a taken id is a STATEMENT about the existing point — recorded as a claim, judged at derive
+    const taken = applyCommand3(c, { type: 'point-on-segment3', id: 'A', a: 'B', b: 'C', t: 0.5 });
+    expect(taken.ok).toBe(true);
+    if (taken.ok) expect(taken.next.claims.length).toBeGreaterThan(c.claims.length);
   });
 });
 
