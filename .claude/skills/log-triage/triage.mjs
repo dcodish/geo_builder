@@ -70,6 +70,7 @@ import {
 } from '../../../src/parser/index.ts';
 import { replay, nameCentreFacts } from '../../../src/store/geoStore.ts';
 import { parse3 } from '../../../src3d/parser/parse3.ts';
+import { classifyGuidance3 } from '../../../src3d/parser/scope3.ts';
 import { derive3 } from '../../../src3d/store/store3.ts';
 
 // ---- args ----------------------------------------------------------------
@@ -342,8 +343,12 @@ function session3d(evs) {
     let res;
     try {
       const r = parse3(u);
-      if (!r.ok) res = { now: 'not-handled', detail: r.reason };
-      else {
+      if (!r.ok) {
+        // #243 mirror: App3 consults the ADR-3D-040 guidance register BEFORE the LLM escalation
+        // (App3.tsx#onSubmit) — a guided family is a deliberate answer, never a grammar gap.
+        const g = classifyGuidance3(u);
+        res = g ? { now: 'guided', detail: `scope:${g.category}` } : { now: 'not-handled', detail: r.reason };
+      } else {
         const id = `f${facts.length}`;
         const next = [...facts, { id, utterance: u, cmds: r.commands, enabled: true }];
         const d = derive3(next, 0);

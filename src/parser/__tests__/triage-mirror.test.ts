@@ -119,6 +119,17 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
     expect(s3, 'session3d must follow the logged canonical lines').toContain('loggedCommands(e)');
   });
 
+  it('#243 — session3d mirrors App3\'s pre-LLM guidance register (ADR-3D-040, the 3-D twin of the PRE_LLM check)', () => {
+    // The 4th drift instance: commit 7280754 gave App3 a pre-LLM guidance register (classifyGuidance3)
+    // and the harness didn't follow — 8 of 15 carried-over 3-D "LIVE gaps" in the 2026-07-21 run were
+    // families the App answers on purpose. A register consulted by only one side is false signal.
+    const app3Src = readFileSync(path.join(root, 'src3d/App3.tsx'), 'utf8');
+    expect(app3Src, 'App3 must consult the guidance register before the LLM (#73)').toContain('classifyGuidance3(');
+    const s3 = triageSrc.slice(triageSrc.indexOf('function session3d'));
+    expect(s3, 'session3d must consult the guidance register on a failed parse (#243)').toContain('classifyGuidance3(');
+    expect(s3, "a guidance match must land in the 'guided' bucket, never 'not-handled'").toContain("now: 'guided'");
+  });
+
   it('all-time counts survive the incremental split (the ranking rule the operator kept)', () => {
     // The rejected design was a watermark that only counted new events — it would reset distinct-user
     // counts each window and bury a cluster hit by 3 users over 3 months. Stats/candidates must stay over
