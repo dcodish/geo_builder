@@ -14,8 +14,8 @@ import type { Construction, Id, Vec } from '@/engine/types';
 import { buildScene, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
 import type { MeasureLabels, RelationPick } from './scene';
 import type { RelationsResult, ResolvedCircle } from '@/engine';
-import { findSegmentCrossings } from './intersections';
-import type { Crossing } from './intersections';
+import { findInkCrossings, drawnPointIds, resolveDrawnLines } from '@/engine';
+import type { Crossing } from '@/engine';
 import { MathSvg } from './mathSvg';
 import { alignRotation, fitTransform, keepOrRefit, orient } from './transform';
 import type { Transform } from './transform';
@@ -41,6 +41,14 @@ export interface FigureProps {
    * create a named intersection point. Omit to disable the affordance.
    */
   onPickIntersection?: (crossing: Crossing) => void;
+  /**
+   * The FORCED crossings' operand-pair keys ([ADR-380](docs/06-decisions.md#adr-380), issue #228) — the
+   * store's verdict on which crossings hold in EVERY valid configuration. A candidate whose key is absent
+   * gets NO dot: it exists only in the drawing on screen, so naming it would strand the letter the moment
+   * the student presses "show another configuration". Undefined (not yet computed) offers nothing, which is
+   * the same conservative direction.
+   */
+  forcedCrossings?: Set<string>;
   /** Tooltip for the crossing dots (host supplies the localized string). */
   intersectionLabel?: string;
   /** Promote an ANONYMOUS constructed point (`@`-prefixed, #32 / ADR-297 — a decomposition touch/tangency
@@ -172,6 +180,7 @@ export function Figure({
   highlight,
   highlightEdges,
   onPickIntersection,
+  forcedCrossings,
   intersectionLabel,
   onPromotePoint,
   promoteLabel,
@@ -332,7 +341,17 @@ export function Figure({
     const fresh = fitTransform(pts, vp);
     const t = lastFit.current?.key === fitKey ? keepOrRefit(lastFit.current.t, fresh, pts, vp) : fresh;
     lastFit.current = { t, key: fitKey };
-    const x = onPickIntersection ? findSegmentCrossings(construction, oriented, s.lines) : [];
+    // Candidates from THIS drawing, over the whole drawn-ink universe (segments, drawn lines — infinite or
+    // trimmed — and drawn circles), then gated to the ones the store proved forced.
+    let x: Crossing[] = [];
+    if (onPickIntersection && forcedCrossings?.size) {
+      const oc = new Map<Id, ResolvedCircle>(s.circles.map((cc) => [cc.id, { center: cc.center, r: cc.r }]));
+      const drawnIds = drawnPointIds(construction, oriented, { showCenters });
+      const { infinite, trimmed } = resolveDrawnLines(construction, oriented, oc, drawnIds);
+      x = findInkCrossings(construction, oriented, { lines: infinite, trimmed, circles: s.circles }).filter((k) =>
+        forcedCrossings.has(k.key),
+      );
+    }
 
     // Nudge each label off the lines, in screen space at a reference scale (zoom
     // is applied later by the pan/zoom <g>, so this stays stable across zooming).
@@ -350,7 +369,7 @@ export function Figure({
     const labelDirs = chooseLabelDirs(ptScreen, obstacles, circScreen, REF_OFF, REF_CLEAR);
 
     return { scene: s, transform: t, crossings: x, labelDirs, oriented };
-  }, [construction, positions, circles, labels, angleMarks, vw, vh, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, showCenters]);
+  }, [construction, positions, circles, labels, angleMarks, vw, vh, padding, onPickIntersection, view.rot, view.flipX, view.flipY, view.alignSeg, showCenters, forcedCrossings]);
 
   // "View relations" is now HOVER-DRIVEN to fight clutter (ADR-167 Am.): the resting figure is clean, and
   // pointing at a side/angle reveals ONLY its equality class. `hoverRel` is the class under the cursor;

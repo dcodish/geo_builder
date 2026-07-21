@@ -16,8 +16,9 @@ import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT 
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedWordRelations, droppedCompoundRelation, droppedGivenVerbs, droppedRadiusSymbol, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
-import { Figure, crossingCommands } from '@/render';
-import type { Crossing } from '@/render';
+import { Figure } from '@/render';
+import { crossingCommands } from '@/engine';
+import type { Crossing } from '@/engine';
 import { MathText, hasMath } from '@/render/mathText';
 import { readoutForGroup } from '@/render/computedValue';
 import type { DetectedShape, Id, SimilarClass } from '@/engine';
@@ -87,6 +88,7 @@ export default function App() {
   const viewRelations = useGeoStore((s) => s.viewRelations);
   const clearRelations = useGeoStore((s) => s.clearRelations);
   const shapes = useGeoStore((s) => s.shapes);
+  const crossings = useGeoStore((s) => s.crossings);
   const detectShapes = useGeoStore((s) => s.detectShapes);
   const clearShapes = useGeoStore((s) => s.clearShapes);
   const clear = useGeoStore((s) => s.clear);
@@ -1070,6 +1072,14 @@ export default function App() {
     return out;
   }, [facts]);
 
+  // The crossing-dot affordance is always on, so its forcedness verdict (#228) recomputes after EVERY fact
+  // change rather than behind a toggle. Async by design (ADR-380): the figure paints at once and the dots
+  // resolve a beat later, off the main thread's critical path — the alternative, sampling synchronously on
+  // submit, is exactly the freeze issue #157 is about.
+  useEffect(() => {
+    void useGeoStore.getState().detectCrossings();
+  }, [facts]);
+
   useEffect(() => {
     document.documentElement.dir = i18n.dir();
     document.documentElement.lang = i18n.language;
@@ -1220,6 +1230,7 @@ export default function App() {
             highlight={theoremHighlight ?? shapeHighlight ?? highlight}
             highlightEdges={theoremHighlight ? undefined : shapeHighlightEdges}
             onPickIntersection={markIntersection}
+            forcedCrossings={crossings?.facts === facts ? crossings.forced : undefined}
             intersectionLabel={t('actions.markIntersection')}
             onPromotePoint={(id) => useGeoStore.getState().promote(id)}
             promoteLabel={t('actions.promotePoint')}

@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, constraintRefs, convergedSamples, cyclableVariant, deepEqual, detectRelationsAcross, distinctSamples, emptyConstruction, evaluate, expandInscribe, expandShapeVariant, firstCyclableBranch, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, circleMembers, classifyShapesFromSamples, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintRefs, convergedSamples, cyclableVariant, deepEqual, detectRelationsAcross, distinctSamples, emptyConstruction, evaluate, expandInscribe, expandShapeVariant, firstCyclableBranch, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
 import type { FigureFile } from './figureFile';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -1485,6 +1485,13 @@ function variantConfigs(facts: Fact[]): Fact[][] {
  * like the relations/shapes layer caches.
  */
 let sampleMemo: { facts: Fact[]; constructions: Construction[]; samples: Map<Id, Vec>[] } | null = null;
+/**
+ * Each sample's resolved circles, keyed by its OWN positions map (issue #228). A side table rather than a
+ * parallel array on purpose: the pool then passes through `convergedSamples` → `distinctSamples` →
+ * `requirementSamples` → the extension filters — each of which returns a SUBSET — without any alignment to
+ * maintain. A positions map is a unique object, so the lookup survives every filter unchanged.
+ */
+const circlesOfSample = new WeakMap<Map<Id, Vec>, Map<Id, ResolvedCircle>>();
 function samplingJobs(facts: Fact[]) {
   const constructions = variantConfigs(facts).map((vf) => replay(vf, firstSatisfyingSeed(vf)).construction);
   const N = constructions.length === 1 && freeDofCount(constructions[0]) === 0 ? 1 : 16;
@@ -1492,7 +1499,10 @@ function samplingJobs(facts: Fact[]) {
   const jobs = constructions.flatMap((c) =>
     Array.from({ length: N }, (_, s) => () => {
       const r = evaluate(applySeed(c, s));
-      if (r.ok) raw.push(r.positions);
+      if (r.ok) {
+        raw.push(r.positions);
+        circlesOfSample.set(r.positions, r.circles);
+      }
     }),
   );
   // Ground truth = VALID configurations only ([ADR-256](docs/06-decisions.md#adr-256)): a sample that
@@ -1518,6 +1528,46 @@ function samplingJobs(facts: Fact[]) {
   };
   return { jobs, finish };
 }
+/**
+ * Which crossings of the drawn ink are FORCED — present in EVERY valid configuration of the figure
+ * ([ADR-380](docs/06-decisions.md#adr-380), issue #228; operator ruling 2026-07-21).
+ *
+ * "A dot is offered only if that intersection exists for sure." The renderer proposes candidates from the
+ * ONE drawing on screen; this decides which of them are properties of the FIGURE rather than accidents of
+ * the current seed. Without it, widening the pair-type universe would make the reported failure — a dot,
+ * and the letter given to it, vanishing on "show another configuration" — strictly more frequent.
+ *
+ * The verdict is per OPERAND PAIR, by crossing COUNT: a pair is forced when it contributes the same
+ * non-zero number of crossings in every sample. Matching individual roots across samples would be
+ * unreliable — root labelling is not stable as a figure flexes — whereas the count is exactly the question
+ * being asked ("do these two things still cross?"). A secant contributing 2 everywhere offers both dots; a
+ * pair that is secant in one configuration and tangent or clear in another offers none.
+ *
+ * A STARVED pool withholds every dot (the operator's confirmed conservative call, following ADR-295's
+ * printed-number rule): on an under-determined figure fewer than 4 valid samples cannot establish "in every
+ * configuration", and offering a dot that later vanishes is precisely the harm. A determined figure
+ * (`freeDofCount === 0`) has ONE configuration, so its single sample IS every configuration.
+ */
+export function forcedCrossingKeys(samples: { constructions: Construction[]; samples: Map<Id, Vec>[] }): Set<string> {
+  const { constructions, samples: pool } = samples;
+  const c0 = constructions[0];
+  if (!c0 || !pool.length) return new Set();
+  if (freeDofCount(c0) !== 0 && pool.length < 4) return new Set(); // starved → withhold (conservative)
+
+  const perSample = pool.map((pos) => {
+    const circles = circlesOfSample.get(pos) ?? new Map<Id, ResolvedCircle>();
+    const drawn = drawnPointIds(c0, pos);
+    const { infinite, trimmed } = resolveDrawnLines(c0, pos, circles, drawn);
+    return crossingCounts(findInkCrossings(c0, pos, { lines: infinite, trimmed, circles: drawnCircles(c0, circles) }));
+  });
+
+  const forced = new Set<string>();
+  for (const [key, n] of perSample[0]) {
+    if (n > 0 && perSample.every((m) => m.get(key) === n)) forced.add(key);
+  }
+  return forced;
+}
+
 // Sample collection is budgeted like every other search loop (E2): a failing seed's solve costs ~10× a
 // converging one (all restarts run to exhaustion) and is then DROPPED by convergedSamples anyway — on the
 // ADR-123 heavy figure the unbudgeted loop was ~50 s of mostly-discarded work. Past the deadline, detection
@@ -1820,6 +1870,11 @@ export interface GeoState {
    *  were computed from — same caching/auto-clear contract as `relations` (a selector checking
    *  `shapes.facts === facts` drops it on any fact change; it survives "show another configuration"). */
   shapes: { result: ShapesResult; facts: Fact[] } | null;
+  /** The crossing-dot forcedness verdict (#228): the operand-pair keys whose crossing holds in EVERY valid
+   *  configuration, plus the facts they were computed from (same staleness contract as `shapes`). Until it
+   *  is computed for the current facts the renderer offers NO dots — an unverified candidate is exactly the
+   *  one that vanishes on "show another configuration". */
+  crossings: { forced: Set<string>; facts: Fact[] } | null;
 
   /** Append a fact (enabled). Commands sharing a `group` display as one step row. */
   execute: (cmd: AnyCommand, utterance?: string, group?: string) => void;
@@ -1861,6 +1916,9 @@ export interface GeoState {
   detectShapes: () => Promise<void>;
   /** Turn the shape-badges layer off. */
   clearShapes: () => void;
+  /** Recompute which crossings of the drawn ink are FORCED (#228). Always-on affordance, so the App calls
+   *  this after every fact change; async + shared-pool so it never blocks the figure's paint. */
+  detectCrossings: () => Promise<void>;
   /** Advance an intersection point to its next configuration (stored in the fact's command). */
   cycleAlt: (pointId: Id) => void;
   /** Step the equal-pair VARIANT of a kite/isosceles shape ([ADR-138](docs/06-decisions.md#adr-138)) — so
@@ -2143,6 +2201,7 @@ export const useGeoStore = create<GeoState>()(
       hiddenCircles: [],
       relations: null,
       shapes: null,
+      crossings: null,
 
       execute: (cmd, utterance, group) => {
         commitCommands(get, set, [cmd], utterance, group);
@@ -2269,6 +2328,20 @@ export const useGeoStore = create<GeoState>()(
       },
 
       clearShapes: () => set({ shapes: null }),
+
+      detectCrossings: async () => {
+        // The crossing-dot affordance is ALWAYS on, so unlike the relations/shapes layers this runs after
+        // every step rather than behind a toggle — hence the async, shared-pool path (issue #228, option A):
+        // the figure draws immediately and the dots resolve a beat later, off the main thread's critical
+        // path. Nothing extra is paid when the student also presses relations/shapes — the sample pool is
+        // the same facts-keyed memo. Until it resolves, the previous step's verdict is still displayed and
+        // stale-guarded below, so a dot never flashes onto a figure it was not computed for.
+        const facts = get().facts;
+        if (get().crossings?.facts === facts) return;
+        const shared = await sharedSamplesAsync(facts);
+        if (get().facts !== facts) return; // a step/undo raced us — never overwrite with a stale layer
+        set({ crossings: { forced: forcedCrossingKeys(shared), facts } });
+      },
 
       cycleAlt: (pointId) => {
         const { facts, seed } = get();

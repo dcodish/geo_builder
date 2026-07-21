@@ -38,7 +38,7 @@ import { parse, buildParseCtx, impliedCircleBinding } from '@/parser';
 import { replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { isGeoPoint, freeDofs, freeDofCount, applySeed, evaluate, detectRelations, detectShapes } from '@/engine';
-import { crossingCommands } from '@/render';
+import { crossingCommands } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 import { detectTheorems } from '@/theorems';
 

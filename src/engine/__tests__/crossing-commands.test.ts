@@ -11,7 +11,7 @@ import { applySeed, build, evaluate } from '@/engine';
 import { parse } from '@/parser';
 import { factsOf } from '@/__tests__/scenarios-corpus';
 import { firstSatisfyingSeed, meetsRequirements, replay } from '@/store/geoStore';
-import { crossingCommands, findSegmentCrossings } from '../intersections';
+import { crossingCommands, findInkCrossings } from '../inkCrossings';
 
 describe('findSegmentCrossings', () => {
   it('offers the diagonal crossing of a parallelogram + the BD diagonal (the reported figure)', () => {
@@ -23,7 +23,7 @@ describe('findSegmentCrossings', () => {
       { type: 'segment', a: 'B', b: 'D' }, // diagonal BD
     ];
     const { construction, positions } = build(cmds);
-    const crossings = findSegmentCrossings(construction, positions);
+    const crossings = findInkCrossings(construction, positions);
 
     expect(crossings).toHaveLength(1);
     const x = crossings[0];
@@ -40,7 +40,7 @@ describe('findSegmentCrossings', () => {
   it('does not offer a crossing at a shared vertex (adjacent segments)', () => {
     // A triangle's three sides only meet at vertices — no interior crossings.
     const { construction, positions } = build([{ type: 'triangle', ids: ['A', 'B', 'C'] }]);
-    expect(findSegmentCrossings(construction, positions)).toHaveLength(0);
+    expect(findInkCrossings(construction, positions)).toHaveLength(0);
   });
 
   it('stops offering a crossing once it has been named', () => {
@@ -50,17 +50,17 @@ describe('findSegmentCrossings', () => {
       { type: 'segment', a: 'B', b: 'D' },
     ];
     const before = build(cmds);
-    expect(findSegmentCrossings(before.construction, before.positions)).toHaveLength(1);
+    expect(findInkCrossings(before.construction, before.positions)).toHaveLength(1);
 
     // Name the crossing → the dot must disappear (an existing point sits there now).
     const after = build([...cmds, { type: 'line-line-intersection', id: 'M', a: 'A', b: 'C', c: 'B', d: 'D' }]);
-    expect(findSegmentCrossings(after.construction, after.positions)).toHaveLength(0);
+    expect(findInkCrossings(after.construction, after.positions)).toHaveLength(0);
   });
 
   it('offers nothing when segments are parallel (no crossing)', () => {
     // The two parallel sides of a parallelogram never cross.
     const { construction, positions } = build([{ type: 'parallelogram', ids: ['A', 'B', 'C', 'D'] }]);
-    expect(findSegmentCrossings(construction, positions)).toHaveLength(0);
+    expect(findInkCrossings(construction, positions)).toHaveLength(0);
   });
 });
 
