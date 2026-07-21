@@ -34,6 +34,8 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.unknownPoint', { id: err.id });
     case 'unknown-symbol':
       return t('err.unknownSymbol', { id: err.id });
+    case 'ambiguous-angle':
+      return t('err.ambiguousAngle', { id: err.id });
     case 'unknown-vector':
       return t('err.unknownVector', { id: err.id });
     case 'unknown-plane':
