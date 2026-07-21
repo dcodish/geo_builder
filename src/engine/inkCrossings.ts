@@ -26,6 +26,7 @@ import type { Command, Construction, Id, Vec } from './types';
 import { isGeoPoint } from './types';
 import { add, dist, lineCircleIntersect, circleCircleIntersect, scale, sub } from './geometry';
 import { isScaffoldId } from './relations';
+import { resolveLine } from './evaluate';
 import type { ResolvedCircle } from './evaluate';
 
 /** A drawn line as the scene resolves it: an anchor point and a direction. */
@@ -51,6 +52,91 @@ export interface DrawnCircleRef {
  * the same rule `buildScene` applies), a `~`/`@`-prefixed scaffolding construction (ADR-295), and a
  * degenerate radius.
  */
+/** A visible line TRIMMED to the extreme named points lying on it — bounded ink, not an infinite line. */
+export interface TrimmedLineRef {
+  id: Id;
+  /** The extreme on-line points the trim runs between (so a within requirement can name them). */
+  a: Id;
+  b: Id;
+  pa: Vec;
+  pb: Vec;
+}
+
+/**
+ * The points that are DRAWN — the scene's own rule, lifted here so the renderer and the affordance's
+ * forcedness gate share one definition (issue #228). A `~`-prefixed helper is scaffolding; an AUTO-assigned
+ * circle centre is drawn only when something is drawn FROM it (a radius, an angle arm) or "show centres" is
+ * on; an `@`-prefixed anonymous dot IS drawn (the student can see and promote it).
+ */
+export function drawnPointIds(c: Construction, positions: Map<Id, Vec>, opts?: { showCenters?: boolean }): Set<Id> {
+  const autoCenters = new Set<Id>();
+  for (const o of c.objects) if (o.kind === 'circle' && o.autoCenter) autoCenters.add(o.center);
+  const incident = new Set<Id>();
+  for (const o of c.objects) {
+    if (o.kind !== 'segment') continue;
+    if (positions.get(o.a) && positions.get(o.b)) { incident.add(o.a); incident.add(o.b); }
+  }
+  const out = new Set<Id>();
+  for (const o of c.objects) {
+    if (!isGeoPoint(o) || !positions.get(o.id)) continue;
+    if (o.id.startsWith('~')) continue;
+    if (autoCenters.has(o.id) && !incident.has(o.id) && !opts?.showCenters) continue;
+    out.add(o.id);
+  }
+  return out;
+}
+
+/**
+ * Resolve every VISIBLE line to the ink it actually becomes: a line carrying two or more drawn points is
+ * TRIMMED to the extreme ones (a tangent from its touch point to where it meets a chord, a bisector from
+ * its vertex to the side it hits); with 0–1 points it stays an infinite, clipped line.
+ *
+ * This is `buildScene`'s rule, lifted so the affordance sees the same ink the student does — a crossing
+ * beyond a trimmed line's visible end is not on the drawing and must never earn a dot.
+ */
+export function resolveDrawnLines(
+  c: Construction,
+  positions: Map<Id, Vec>,
+  circles: Map<Id, ResolvedCircle>,
+  drawn: Set<Id>,
+): { infinite: ResolvedLineRef[]; trimmed: TrimmedLineRef[] } {
+  // Span-relative incidence epsilon (F7/REN-8) — the same normalization the scene uses.
+  const pts = [...drawn].map((id) => ({ id, pos: positions.get(id)! }));
+  const spanDiag = (() => {
+    if (!pts.length) return 1;
+    let nx = Infinity, ny = Infinity, xx = -Infinity, xy = -Infinity;
+    for (const p of pts) {
+      nx = Math.min(nx, p.pos.x); ny = Math.min(ny, p.pos.y);
+      xx = Math.max(xx, p.pos.x); xy = Math.max(xy, p.pos.y);
+    }
+    return Math.hypot(xx - nx, xy - ny) || 1;
+  })();
+  const onLineEps = Math.max(1e-9, 1e-6 * spanDiag);
+
+  const infinite: ResolvedLineRef[] = [];
+  const trimmed: TrimmedLineRef[] = [];
+  for (const o of c.objects) {
+    if (o.kind !== 'line' || !o.visible) continue;
+    const rl = resolveLine(o, positions, circles);
+    if (rl === 'pending' || typeof rl === 'string') continue;
+    const on: { t: number; id: Id; p: Vec }[] = [];
+    for (const pt of pts) {
+      const w = sub(pt.pos, rl.anchor);
+      const perp = w.x * rl.dir.y - w.y * rl.dir.x;
+      if (Math.abs(perp) < onLineEps) on.push({ t: w.x * rl.dir.x + w.y * rl.dir.y, id: pt.id, p: pt.pos });
+    }
+    if (on.length >= 2) {
+      on.sort((p, q) => p.t - q.t);
+      const lo = on[0];
+      const hi = on[on.length - 1];
+      trimmed.push({ id: o.id, a: lo.id, b: hi.id, pa: lo.p, pb: hi.p });
+    } else {
+      infinite.push({ id: o.id, anchor: rl.anchor, dir: rl.dir });
+    }
+  }
+  return { infinite, trimmed };
+}
+
 export function drawnCircles(c: Construction, resolved: Map<Id, ResolvedCircle>): DrawnCircleRef[] {
   const out: DrawnCircleRef[] = [];
   for (const o of c.objects) {
@@ -73,6 +159,11 @@ export interface Crossing {
   /** An operand that is a drawn LINE (a tangent / bisector / perpendicular / parallel). */
   line1?: Id;
   line2?: Id;
+  /** Present when that line operand is drawn TRIMMED to two points — the extreme points it runs between,
+   *  so the lowering can state the within-the-visible-ink requirement (issue #228, the "drawn line isn't
+   *  one thing" wrinkle: `buildScene` trims a line carrying 2+ drawn points to a segment). */
+  trim1?: [Id, Id];
+  trim2?: [Id, Id];
   /** An operand that is a drawn CIRCLE. */
   circle1?: Id;
   circle2?: Id;
@@ -89,17 +180,19 @@ export interface Crossing {
 type Ink =
   | { kind: 'segment'; a: Id; b: Id; pa: Vec; pb: Vec }
   | { kind: 'line'; id: Id; anchor: Vec; dir: Vec }
+  /** A visible line trimmed to its extreme on-line points: a LINE by identity, BOUNDED like a segment. */
+  | { kind: 'trimmed'; id: Id; a: Id; b: Id; pa: Vec; pb: Vec }
   | { kind: 'circle'; id: Id; center: Vec; r: number };
 
 /** Slot order within a crossing: the circle is always operand 1, a segment always last. */
 function kindRank(k: Ink): number {
-  return k.kind === 'circle' ? 0 : k.kind === 'line' ? 1 : 2;
+  return k.kind === 'circle' ? 0 : k.kind === 'line' || k.kind === 'trimmed' ? 1 : 2;
 }
 
 /** Canonical token for one operand — the halves of a {@link Crossing.key}. */
 function token(k: Ink): string {
   if (k.kind === 'segment') return `s:${[k.a, k.b].sort().join('-')}`;
-  return `${k.kind === 'line' ? 'l' : 'c'}:${k.id}`;
+  return `${k.kind === 'circle' ? 'c' : 'l'}:${k.id}`;
 }
 
 /** Stable, order-independent identity of an operand PAIR. */
@@ -117,7 +210,7 @@ function paramOn(p: Vec, a: Vec, b: Vec): number {
 /** Does `p` lie strictly inside the drawn extent of `k`? A LINE and a CIRCLE are unbounded/closed —
  *  every point of them is drawn — so only a SEGMENT constrains where its crossings may be offered. */
 function withinInk(k: Ink, p: Vec, e: number): boolean {
-  if (k.kind !== 'segment') return true;
+  if (k.kind !== 'segment' && k.kind !== 'trimmed') return true;
   const t = paramOn(p, k.pa, k.pb);
   return t > e && t < 1 - e;
 }
@@ -128,7 +221,9 @@ function withinInk(k: Ink, p: Vec, e: number): boolean {
  *  configuration later. */
 function intersect(x: Ink, y: Ink, eps: number): Vec[] {
   const asLine = (k: Ink): { anchor: Vec; dir: Vec } =>
-    k.kind === 'segment' ? { anchor: k.pa, dir: sub(k.pb, k.pa) } : { anchor: (k as { anchor: Vec }).anchor, dir: (k as { dir: Vec }).dir };
+    k.kind === 'segment' || k.kind === 'trimmed'
+      ? { anchor: k.pa, dir: sub(k.pb, k.pa) }
+      : { anchor: (k as { anchor: Vec }).anchor, dir: (k as { dir: Vec }).dir };
 
   if (x.kind === 'circle' && y.kind === 'circle') {
     const sols = circleCircleIntersect(x.center, x.r, y.center, y.r);
@@ -154,8 +249,11 @@ function intersect(x: Ink, y: Ink, eps: number): Vec[] {
 /** Fill the operand fields of a {@link Crossing} for one ink, as operand 1 or operand 2. */
 function operandFields(k: Ink, slot: 1 | 2): Partial<Crossing> {
   if (k.kind === 'segment') return slot === 1 ? { a: k.a, b: k.b } : { c: k.a, d: k.b };
-  if (k.kind === 'line') return slot === 1 ? { line1: k.id } : { line2: k.id };
-  return slot === 1 ? { circle1: k.id } : { circle2: k.id };
+  if (k.kind === 'circle') return slot === 1 ? { circle1: k.id } : { circle2: k.id };
+  // A line — infinite or trimmed. A trimmed one also publishes the points it is bounded BY, so the
+  // lowering can state the within requirement the visible ink carries.
+  const trim = k.kind === 'trimmed' ? (slot === 1 ? { trim1: [k.a, k.b] as [Id, Id] } : { trim2: [k.a, k.b] as [Id, Id] }) : {};
+  return { ...(slot === 1 ? { line1: k.id } : { line2: k.id }), ...trim };
 }
 
 /**
@@ -169,7 +267,7 @@ function operandFields(k: Ink, slot: 1 | 2): Partial<Crossing> {
 export function findInkCrossings(
   c: Construction,
   positions: Map<Id, Vec>,
-  opts: { lines?: ResolvedLineRef[]; circles?: DrawnCircleRef[] } = {},
+  opts: { lines?: ResolvedLineRef[]; trimmed?: TrimmedLineRef[]; circles?: DrawnCircleRef[] } = {},
 ): Crossing[] {
   const inks: Ink[] = [];
   for (const o of c.objects) {
@@ -179,6 +277,8 @@ export function findInkCrossings(
     if (pa && pb) inks.push({ kind: 'segment', a: o.a, b: o.b, pa, pb });
   }
   for (const l of opts.lines ?? []) inks.push({ kind: 'line', id: l.id, anchor: l.anchor, dir: l.dir });
+  // A line the scene draws TRIMMED is bounded ink: a crossing past its visible end is not on the drawing.
+  for (const l of opts.trimmed ?? []) inks.push({ kind: 'trimmed', id: l.id, a: l.a, b: l.b, pa: l.pa, pb: l.pb });
   // Circles arrive already filtered to DRAWN ink by `drawnCircles` — the shared definition, so the
   // renderer's candidates and the store's forcedness verdict are computed over the same universe.
   for (const c2 of opts.circles ?? []) inks.push({ kind: 'circle', id: c2.id, center: c2.center, r: c2.r });
@@ -257,6 +357,11 @@ export function crossingCounts(xs: Crossing[]): Map<string, number> {
 export function crossingCommands(x: Crossing, id: Id): Command[] {
   const segLine = (p: Id, q: Id) => `line-${p}${q}`;
   const carrier = (p: Id, q: Id): Command => ({ type: 'line-through', id: segLine(p, q), a: p, b: q });
+  /** A TRIMMED line operand is bounded by the two points it visibly runs between — state that too. */
+  const trimBounds = (): Command[] =>
+    [x.trim1, x.trim2]
+      .filter((t): t is [Id, Id] => !!t)
+      .map((t) => ({ type: 'set-line', points: [t[0], id, t[1]] }) as Command);
 
   // ── circle × circle ────────────────────────────────────────────────────────────────────────────────
   if (x.circle1 && x.circle2) {
@@ -268,7 +373,10 @@ export function crossingCommands(x: Crossing, id: Id): Command[] {
     // A drawn LINE operand is infinite — the crossing is wherever it is (no order requirement). A SEGMENT
     // operand bounds it: the ADR-277 `order` twin, exactly what a bare-pair secant lowers to.
     if (x.line1 || x.line2) {
-      return [{ type: 'line-circle-intersection', id, line: (x.line1 ?? x.line2)!, circle: x.circle1, branch: x.branch ?? 0 }];
+      return [
+        { type: 'line-circle-intersection', id, line: (x.line1 ?? x.line2)!, circle: x.circle1, branch: x.branch ?? 0 },
+        ...trimBounds(),
+      ];
     }
     const [p, q] = [x.c!, x.d!];
     return [
@@ -277,9 +385,9 @@ export function crossingCommands(x: Crossing, id: Id): Command[] {
     ];
   }
 
-  // ── line × line (both drawn, both infinite — nothing to bound) ─────────────────────────────────────
+  // ── line × line (each bounds the crossing only if IT is drawn trimmed) ─────────────────────────────
   if (x.line1 && x.line2) {
-    return [{ type: 'line-intersection', id, line1: x.line1, line2: x.line2 }];
+    return [{ type: 'line-intersection', id, line1: x.line1, line2: x.line2 }, ...trimBounds()];
   }
 
   // ── line × segment (#197 Am. 7) ────────────────────────────────────────────────────────────────────
@@ -287,10 +395,11 @@ export function crossingCommands(x: Crossing, id: Id): Command[] {
     return [
       carrier(x.c!, x.d!),
       { type: 'line-intersection', id, line1: x.line1, line2: segLine(x.c!, x.d!) },
-      // Only the SEGMENT operand bounds the crossing — the per-operand within twin (the ADR-268 `onSeg2`
+      // The SEGMENT operand always bounds the crossing — the per-operand within twin (the ADR-268 `onSeg2`
       // shape) as an order constraint, since `line-intersection` has no such field. `set-line`'s own
-      // segment(c,d) is idempotent: that segment is already drawn.
+      // segment(c,d) is idempotent: that segment is already drawn. A TRIMMED line operand adds its own.
       { type: 'set-line', points: [x.c!, id, x.d!] },
+      ...trimBounds(),
     ];
   }
 

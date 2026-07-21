@@ -6,28 +6,25 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { AnyCommand, Id, Vec } from '../types';
-import { build, evaluate, resolveLine } from '..';
-import { drawnCircles, findInkCrossings, crossingCounts, type ResolvedLineRef } from '../inkCrossings';
+import type { AnyCommand } from '../types';
+import { build, evaluate } from '..';
+import { drawnCircles, drawnPointIds, findInkCrossings, crossingCounts, resolveDrawnLines } from '../inkCrossings';
 
-/** Resolve a figure to the DRAWN ink the affordance sees. */
+/** Resolve a figure to the DRAWN ink the affordance sees — the same shared definition the scene uses. */
 function inkOf(cmds: AnyCommand[]) {
   const { construction } = build(cmds);
   const e = evaluate(construction);
   if (!e.ok) throw new Error(e.error);
-  const lines: ResolvedLineRef[] = [];
-  for (const o of construction.objects) {
-    if (o.kind !== 'line' || !o.visible) continue;
-    const rl = resolveLine(o, e.positions, e.circles);
-    if (rl === 'pending' || typeof rl === 'string') continue;
-    lines.push({ id: o.id, anchor: rl.anchor, dir: rl.dir });
-  }
+  const drawn = drawnPointIds(construction, e.positions);
+  const { infinite, trimmed } = resolveDrawnLines(construction, e.positions, e.circles, drawn);
+  const circles = drawnCircles(construction, e.circles);
   return {
     construction,
     positions: e.positions,
-    circles: drawnCircles(construction, e.circles),
-    lines,
-    crossings: findInkCrossings(construction, e.positions, { lines, circles: drawnCircles(construction, e.circles) }),
+    circles,
+    lines: infinite,
+    trimmed,
+    crossings: findInkCrossings(construction, e.positions, { lines: infinite, trimmed, circles }),
   };
 }
 

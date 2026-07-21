@@ -12,7 +12,7 @@
 import type { Construction, Id, Circle, Vec } from '@/engine/types';
 import { isGeoPoint } from '@/engine/types';
 import { len, rot90, sub, unit } from '@/engine/geometry';
-import { resolveCircle, resolveLine, type DefiniteAngle, type DefiniteLength, type RelationsResult, type ResolvedCircle } from '@/engine';
+import { resolveCircle, resolveDrawnLines, type DefiniteAngle, type DefiniteLength, type RelationsResult, type ResolvedCircle } from '@/engine';
 
 export interface ScenePoint {
   id: Id;
@@ -324,37 +324,15 @@ export function buildScene(
   // infinite line to its useful extent — a tangent from its touch point to where it meets a chord,
   // a bisector from its vertex to the side it hits); with 0–1 points it stays an infinite (clipped)
   // line, since it has no natural endpoints.
-  // Span-relative incidence epsilon (F7/REN-8): the old absolute 1e-5 was scale-dependent — a figure whose
-  // free radius grew to hundreds of units stopped recognising its own on-line points, while a tiny figure
-  // could trim through near-misses. Normalize by the figure's diagonal.
-  const spanDiag = (() => {
-    if (!points.length) return 1;
-    let nx = Infinity, ny = Infinity, xx = -Infinity, xy = -Infinity;
-    for (const p of points) {
-      nx = Math.min(nx, p.pos.x); ny = Math.min(ny, p.pos.y);
-      xx = Math.max(xx, p.pos.x); xy = Math.max(xy, p.pos.y);
-    }
-    return Math.hypot(xx - nx, xy - ny) || 1;
-  })();
-  const onLineEps = Math.max(1e-9, 1e-6 * spanDiag);
-  for (const o of c.objects) {
-    if (o.kind !== 'line' || !o.visible) continue;
-    const rl = resolveLine(o, positions, resolvedCircles);
-    if (rl === 'pending' || typeof rl === 'string') continue;
-    const sl: SceneLine = { id: o.id, anchor: rl.anchor, dir: rl.dir };
-    const on: { t: number; p: Vec }[] = [];
-    for (const pt of points) {
-      const w = sub(pt.pos, sl.anchor);
-      const perp = w.x * sl.dir.y - w.y * sl.dir.x; // signed distance from the line
-      if (Math.abs(perp) < onLineEps) on.push({ t: w.x * sl.dir.x + w.y * sl.dir.y, p: pt.pos });
-    }
-    if (on.length >= 2) {
-      on.sort((p, q) => p.t - q.t);
-      segments.push({ id: sl.id, a: on[0].p, b: on[on.length - 1].p }); // trimmed to the extreme points on it
-    } else {
-      lines.push(sl); // unbounded → an infinite clipped line
-    }
-  }
+  // (The span-relative incidence epsilon — F7/REN-8, normalized by the figure's diagonal — moved into the
+  // engine helper along with the rule it belongs to.)
+  // The trim rule itself lives in the engine (`resolveDrawnLines`, ADR-380 / issue #228) so the renderer and
+  // the crossing affordance's forcedness gate resolve "what line ink is actually drawn" from ONE definition —
+  // a crossing beyond a trimmed line's visible end is not on the drawing and must not earn a dot.
+  const drawnIds = new Set(points.map((p) => p.id));
+  const drawnLines = resolveDrawnLines(c, positions, resolvedCircles, drawnIds);
+  for (const t of drawnLines.trimmed) segments.push({ id: t.id, a: t.pa, b: t.pb });
+  for (const l of drawnLines.infinite) lines.push({ id: l.id, anchor: l.anchor, dir: l.dir });
 
   // Measure labels (ADR-031): a length sits at its segment's midpoint, nudged
   // perpendicular to the OUTSIDE (away from the figure's centroid); an angle sits
