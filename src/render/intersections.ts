@@ -12,7 +12,7 @@
  * former isn't an intersection to mark, the latter is already on the canvas.
  */
 
-import type { Construction, Id, Vec } from '@/engine/types';
+import type { Command, Construction, Id, Vec } from '@/engine/types';
 import { isGeoPoint } from '@/engine/types';
 import { add, dist, scale, sub } from '@/engine/geometry';
 
@@ -104,4 +104,35 @@ export function findSegmentCrossings(c: Construction, positions: Map<Id, Vec>, l
     }
   }
   return out;
+}
+
+/**
+ * The commands a clicked crossing lowers to ([ADR-379](docs/06-decisions.md#adr-379), issue #234) — the ONE
+ * place the dot gesture becomes engine commands, so App and the tests can never drift apart (the ADR-346
+ * shared-seam discipline).
+ *
+ * The gesture is a STATEMENT, not a coordinate: a dot is only ever offered where the ink crosses *interior*
+ * to its operands, so clicking it asserts "these two drawn things cross HERE" — the same thing the typed
+ * «AM ו-DN נפגשים בנקודה O» asserts. The bare `line-line-intersection` this used to emit is the INFINITE-line
+ * crossing, which carries no such requirement: after "show another configuration" the operands could cross
+ * outside the drawn segments, so O silently left the visible figure while still holding its letter (the
+ * operator's prod session `ne810woo`). Each operand now contributes its own within requirement — an infinite
+ * drawn LINE has none, a drawn SEGMENT gets one.
+ */
+export function crossingCommands(x: Crossing, id: Id): Command[] {
+  if (x.line1) {
+    const segLine = `line-${x.c}${x.d}`;
+    return [
+      { type: 'line-through', id: segLine, a: x.c!, b: x.d! },
+      { type: 'line-intersection', id, line1: x.line1, line2: segLine },
+      // Only the SEGMENT operand bounds the crossing (the drawn line runs on forever) — the per-operand
+      // within twin (the ADR-268 `onSeg2` shape) expressed as the order constraint, since `line-intersection`
+      // has no such field. `set-line`'s own segment(c,d) is idempotent: that segment is already drawn.
+      { type: 'set-line', points: [x.c!, id, x.d!] },
+    ];
+  }
+  // Both operands are drawn segments → the joint ADR-166 `onSeg` requirement (sampled + reflection-explored,
+  // gated by `meetsRequirements`, checked by the verifier's `meetOnSegment`) — byte-identical to what the
+  // typed meet form lowers to.
+  return [{ type: 'line-line-intersection', id, a: x.a!, b: x.b!, c: x.c!, d: x.d!, onSeg: true }];
 }

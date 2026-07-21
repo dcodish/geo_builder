@@ -38,6 +38,7 @@ import { parse, buildParseCtx, impliedCircleBinding } from '@/parser';
 import { replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { isGeoPoint, freeDofs, freeDofCount, applySeed, evaluate, detectRelations, detectShapes } from '@/engine';
+import { crossingCommands } from '@/render';
 import type { AnyCommand, Id, Vec } from '@/engine';
 import { detectTheorems } from '@/theorems';
 
@@ -201,6 +202,37 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
+  {
+    id: 'clicked-crossing-stays-within-its-segments',
+    title: 'A dot-named crossing keeps its within-the-segments meaning across configurations (#234, ADR-379)',
+    guards:
+      "Prod session `ne810woo` (2026-07-20, the book figure — M,N on BC, apexes A,D, the four cevians): the operator clicked the crossing of two cevians and named it O, then changed configuration; O left the drawn segments and the letter read as taken with no reclaim path. The dot is only ever OFFERED at a crossing interior to both operands, so the gesture states a within-the-ink meet — but `markIntersection` lowered it to the bare INFINITE-line crossing, which carries no such requirement (7 of the 15 displayable seeds put O outside both cevians). It now lowers through `crossingCommands` to the same `onSeg` requirement the typed «AN ו-DM נפגשים בנקודה O» produces, so `meetsRequirements` never shows a configuration where O has left the figure. The seed-sweep oracle runs this check at EVERY displayable seed — that is the lock.",
+    steps: [
+      'קטע BC',
+      'M ו N על BC',
+      'נקודה A',
+      'נקודה D',
+      'AM',
+      'AN',
+      'DM',
+      'DN',
+      // The dot click itself — through the real gesture seam, so a drift in the lowering fails here too.
+      { llm: crossingCommands({ pos: { x: 0, y: 0 }, a: 'A', b: 'N', c: 'D', d: 'M' }, 'O') },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const param = (p: Vec, a: Vec, b: Vec) =>
+        ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / ((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+      const O = at(fig, 'O');
+      const t1 = param(O, at(fig, 'A'), at(fig, 'N'));
+      const t2 = param(O, at(fig, 'D'), at(fig, 'M'));
+      expect(t1, 'O strictly within cevian AN').toBeGreaterThan(0);
+      expect(t1, 'O strictly within cevian AN').toBeLessThan(1);
+      expect(t2, 'O strictly within cevian DM').toBeGreaterThan(0);
+      expect(t2, 'O strictly within cevian DM').toBeLessThan(1);
+    },
+  },
   {
     id: 'circle-contained-in-definite-circle',
     title: '«מעגל מוכל בתוך המעגל הגדול» creates a NEW circle contained in THE drawn circle (#224, ADR-376)',

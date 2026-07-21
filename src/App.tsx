@@ -16,7 +16,7 @@ import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT 
 import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedWordRelations, droppedCompoundRelation, droppedGivenVerbs, droppedRadiusSymbol, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
-import { Figure } from '@/render';
+import { Figure, crossingCommands } from '@/render';
 import type { Crossing } from '@/render';
 import { MathText, hasMath } from '@/render/mathText';
 import { readoutForGroup } from '@/render/computedValue';
@@ -59,7 +59,6 @@ export default function App() {
   };
   const facts = useGeoStore((s) => s.facts);
   const selectedId = useGeoStore((s) => s.selectedId);
-  const execute = useGeoStore((s) => s.execute);
   const setGroupEnabled = useGeoStore((s) => s.setGroupEnabled);
   const removeGroup = useGeoStore((s) => s.removeGroup);
   const replaceGroup = useGeoStore((s) => s.replaceGroup);
@@ -1033,24 +1032,10 @@ export default function App() {
       }
     }
     if (!id) return; // A–Z all taken (won't happen in practice)
-    // A drawn-LINE operand (#197 Am. 7 — e.g. the touch tangent crossing a tangent segment): the
-    // crossing is line∩line of the drawn line and the segment's carrier line (created idempotently).
-    if (x.line1) {
-      const segLine = `line-${x.c}${x.d}`;
-      const utterance = he ? `${id} = חיתוך ${x.line1} ו-${x.c}${x.d}` : `${id} = intersection of ${x.line1} and ${x.c}${x.d}`;
-      executeMany(
-        [
-          { type: 'line-through', id: segLine, a: x.c!, b: x.d! },
-          { type: 'line-intersection', id, line1: x.line1, line2: segLine },
-        ],
-        utterance,
-      );
-      return;
-    }
-    const utterance = he
-      ? `${id} = חיתוך ${x.a}${x.b} ו-${x.c}${x.d}`
-      : `${id} = intersection of ${x.a}${x.b} and ${x.c}${x.d}`;
-    execute({ type: 'line-line-intersection', id, a: x.a!, b: x.b!, c: x.c!, d: x.d! }, utterance);
+    // The lowering itself lives in `crossingCommands` (ADR-379) — one seam, shared with the tests.
+    const operands = x.line1 ? `${x.line1} ${he ? 'ו-' : 'and '}${x.c}${x.d}` : `${x.a}${x.b} ${he ? 'ו-' : 'and '}${x.c}${x.d}`;
+    const utterance = he ? `${id} = חיתוך ${operands}` : `${id} = intersection of ${operands}`;
+    executeMany(crossingCommands(x, id), utterance);
   }
 
   // Highlight every object introduced by the selected step (all its commands).
