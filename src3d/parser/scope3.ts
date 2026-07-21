@@ -50,17 +50,20 @@ const RULES3: ScopeRule3[] = [
   {
     // a BARE 2-D noun — plane-geometry work belongs in the 2-D Geo Builder. Single-word / inscribed
     // forms only, so the SUPPORTED in-space circle («מעגל שמרכזו O משיק לישר AB») is never touched.
+    // #247: a leading «נתון/נתונה(:)» is tolerated (the noun stays bare — «נתון מעויין», prod piyrx56a)
+    // and the double-yod spelling «מעויין» joins the noun list.
     category: 'cross-app',
     patterns: [
-      /^\s*(?:ה?מעגל|מעגל|עיגול|מלבן|מעוין|טרפז|דלתון|מקבילית)\s*\.?\s*$/,
+      /^\s*(?:נתו(?:ן|נה)\s*:?\s+)?(?:ה?מעגל|מעגל|עיגול|מלבן|מעויי?ן|טרפז|דלתון|מקבילית)\s*\.?\s*$/,
       /חסום\s+במעגל|inscribed\s+in\s+(?:a\s+|the\s+)?circle/i,
-      /^\s*(?:circle|rectangle|rhombus|trapezoid|kite|parallelogram)\s*\.?\s*$/i,
+      /^\s*(?:given\s+a\s+)?(?:circle|rectangle|rhombus|trapezoid|kite|parallelogram)\s*\.?\s*$/i,
     ],
   },
   {
     // a bare solid noun whose BASE is deliberately required (ADR-3D-008) — say what to add.
+    // #247: «פרמידה» (missing-yod spelling) + the same «נתון» prefix tolerance.
     category: 'bare-solid',
-    patterns: [/^\s*(?:ה?פירמידה|פירמידה|מנסרה)\s*\.?\s*$/, /^\s*(?:pyramid|prism)\s*\.?\s*$/i],
+    patterns: [/^\s*(?:נתו(?:ן|נה)\s*:?\s+)?(?:ה?פי?רמידה|מנסרה)\s*\.?\s*$/, /^\s*(?:given\s+a\s+)?(?:pyramid|prism)\s*\.?\s*$/i],
   },
 ];
 
