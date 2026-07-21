@@ -1074,13 +1074,34 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
     idA.startsWith('~') ||
     idB.startsWith('~') ||
     c.constraints.some((k) => k.type === 'coincide' && ((k.p === idA && k.q === idB) || (k.p === idB && k.q === idA)));
+  // FORCEDNESS split (#232 / ADR-378 — ADR-123's own design, made testable): a recorded coincidence
+  // certifies the stack — `pointsDistinct` treats it as ALLOWED, `meetsRequirements` passes, the whole
+  // avoid machinery (`firstSatisfyingSeed`/`findValidConfig`/`resample`) is disarmed, and the ⓘ
+  // converge notice asserts an unstated given. That is only right for a FORCED coincidence (a pair the
+  // constraint web genuinely lands together — the ADR-123 kite's N=O). A pair in which BOTH points
+  // still OWN unclaimed sampled DOFs (bare free points, free riders without a solve directive) is
+  // separable BY CONSTRUCTION — a DEFAULT collision (the second «נקודה D» drawn exactly on A), which
+  // must FAIL distinctness so the sampler/search separates it: the zero-cost structural specialisation
+  // of ADR-295's forced-in-every-sample standard. Deliberately BOTH-sided: a pair with one determined
+  // side may be web-forced through the free side's constraints (the kite centre), so it stays recorded
+  // — the one-free-side default collision is owned by the creation-time probe (apply's free-point
+  // general position), which prevents it from ever forming.
+  const separable = (id: Id): boolean => {
+    const o = c.objects.find((x) => x.id === id);
+    if (!o) return false;
+    if (o.kind === 'free-point') return !o.pinned && (o as { solve?: unknown }).solve === undefined;
+    if (o.kind === 'on-segment' || o.kind === 'on-circle' || o.kind === 'on-line')
+      return (o as { free?: boolean }).free === true && (o as { solve?: unknown }).solve === undefined;
+    return false;
+  };
   const coincidences: [Id, Id][] = [];
   const placed = [...pos.entries()];
   for (let i = 0; i < placed.length; i++) {
     for (let j = i + 1; j < placed.length; j++) {
       const [idA, a] = placed[i];
       const [idB, b] = placed[j];
-      if (Math.hypot(a.x - b.x, a.y - b.y) < LEN_EPS && !intended(idA, idB)) coincidences.push([idA, idB]);
+      if (Math.hypot(a.x - b.x, a.y - b.y) < LEN_EPS && !intended(idA, idB) && !(separable(idA) && separable(idB)))
+        coincidences.push([idA, idB]);
     }
   }
 

@@ -218,6 +218,91 @@ export const SCENARIOS: Scenario[] = [
     },
   },
   {
+    id: 'second-bare-point-never-stacks',
+    title: 'A second bare «נקודה X» lands in general position — never drawn exactly on an existing point (#232, ADR-378)',
+    guards:
+      "Prod eshsc843 (2026-07-20): every bare free point hard-coded the SAME (3,2), so «נקודה d» after «נקודה a» drew D exactly ON A — and the coincidence collector certified the stack (the ⓘ converge notice asserted a coincidence the student never stated, disarming the whole avoid machinery). Three fixes: the free-point apply chokepoint probes auto-placed coords to general position (ADR-253, identity when generic); the collector's forcedness split refuses to certify a BOTH-free default stack; the submit/edit auto-advance gates also fire on a distinctness break.",
+    steps: ['Bc', 'Mו n על bc', 'נקודה a', 'Ab', 'Am', 'An', 'נקודה d'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A');
+      const D = at(fig, 'D');
+      expect(dist(A, D), 'D clearly OFF A').toBeGreaterThan(0.3);
+      expect(
+        (fig.coincidences ?? []).some(([a, b]) => (a === 'A' && b === 'D') || (a === 'D' && b === 'A')),
+        'no false A–D coincidence certified',
+      ).toBe(false);
+    },
+  },
+  {
+    id: 'bare-point-then-angle-ratio-stays-off-existing',
+    title: '«נקודה d» + «Dc» + an angle ratio — D never sits visually on A (#232, ADR-378, prod quvq3txq)',
+    guards:
+      'Prod quvq3txq (2026-07-20): the same (3,2) stack; the final «זוית abc שווה לזוית dcb» recruit nudged D to |AD| ≈ 0.41 on a ~8-unit span — still visually on A, with the converge notice shown. With the general-position probe D starts clearly separated and the driven solve keeps it so.',
+    steps: ['קטע mn', 'B על המשך nm', 'Cעל המשך mn', 'נקודה a', 'Ab', 'נקודה d', 'Dc', 'זוית abc שווה לזוית dcb'],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A');
+      const D = at(fig, 'D');
+      expect(dist(A, D), 'D clearly OFF A').toBeGreaterThan(0.3);
+      expect(
+        (fig.coincidences ?? []).some(([a, b]) => (a === 'A' && b === 'D') || (a === 'D' && b === 'A')),
+        'no false A–D coincidence certified',
+      ).toBe(false);
+    },
+  },
+  {
+    id: 'tangent-at-existing-touch-carries-membership',
+    title: '«AD משיק למעגל בנקודה E» with E already on AD — a REAL tangency, never a ⟂-only green (#233, ADR-377)',
+    guards:
+      "Operator screenshot (dev 2026-07-20): rectangle + circle + «B על המעגל» + «E על AD» + «AD משיק למעגל בנקודה E» — every row green while AD sat nowhere near the circle. The ADR-075 existing-touch branch asserted the radius-⟂ ALONE ('assumes T is already on the circle'); E just slid to the ⟂ foot. The lowering now states the full tangency conjunction (membership + ⟂ + on-line-when-loose) and the apply (d) fall-through pushes an unreconcilable membership as a length-radius RESIDUAL so the solver drives the circle to the segment.",
+    steps: ['מלבן ABCD', 'מעגל', 'B על המעגל', 'E על AD', 'AD משיק למעגל בנקודה E'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const c = [...fig.circles.values()][0];
+      const A = at(fig, 'A');
+      const D = at(fig, 'D');
+      const E = at(fig, 'E');
+      const B = at(fig, 'B');
+      const vx = D.x - A.x;
+      const vy = D.y - A.y;
+      const t = ((c.center.x - A.x) * vx + (c.center.y - A.y) * vy) / (vx * vx + vy * vy);
+      const gap = Math.hypot(c.center.x - (A.x + t * vx), c.center.y - (A.y + t * vy));
+      expect(Math.abs(gap - c.r), 'AD genuinely tangent: dist(centre, line AD) = r').toBeLessThan(0.05);
+      expect(Math.abs(dist(E, c.center) - c.r), 'E is the touch — ON the circle').toBeLessThan(0.05);
+      expect(Math.abs(dist(B, c.center) - c.r), 'B stays on the circle').toBeLessThan(0.05);
+      const tE = ((E.x - A.x) * vx + (E.y - A.y) * vy) / (vx * vx + vy * vy);
+      expect(tE, 'the touch within AD').toBeGreaterThan(0);
+      expect(tE, 'the touch within AD').toBeLessThan(1);
+    },
+  },
+  {
+    id: 'chord-endpoints-on-derived-corners-driven',
+    title: '«BC מיתר במעגל» over a rectangle — BOTH endpoints land on the circle, the derived corner too (#230, ADR-377)',
+    guards:
+      "Operator (dev 2026-07-20): «I cannot get BC to be a chord» — B (free) converted to a rider but C (the rectangle's derived perp-offset corner) had every structural reinterpretation cycle-gated and stayed off the circle (verifier amber, retype swallowed as noop-exists). The point-on-circle (d) fall-through now pushes the membership as a length-radius residual through a witness member, so the solver drives the free radius/centre and BC is a real chord.",
+    steps: [
+      'מלבן ABCD',
+      {
+        llm: [
+          { type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true, ifAbsent: true, implied: true },
+          { type: 'point-on-circle', id: 'B', circle: 'circle-O' },
+          { type: 'point-on-circle', id: 'C', circle: 'circle-O' },
+          { type: 'segment', a: 'B', b: 'C' },
+        ] as AnyCommand[],
+      },
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const c = [...fig.circles.values()][0];
+      for (const id of ['B', 'C'] as const) {
+        expect(Math.abs(dist(at(fig, id), c.center) - c.r), `${id} exactly on the circle`).toBeLessThan(0.05);
+      }
+    },
+  },
+  {
     id: 'rectangle-named-over-existing-riders',
     title: '«FEDG מלבן» over four existing on-segment riders ASSERTS the rectangle and flexes them into shape (#223, ADR-375)',
     guards:

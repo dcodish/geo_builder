@@ -117,3 +117,43 @@ describe('direction general position (#34, ADR-287)', () => {
     expect(sinBetween(positions.get('A')!, positions.get('B')!, positions.get('D')!, positions.get('E')!)).toBeLessThan(1e-9);
   });
 });
+
+describe('#232 (ADR-378) — bare free points land in general position; default stacks are never certified', () => {
+  it('a second bare point never stacks on the first (every parser site hands the same canned spot)', () => {
+    const { positions } = build([
+      { type: 'free-point', id: 'A', x: 3, y: 2, free: true },
+      { type: 'free-point', id: 'D', x: 3, y: 2, free: true },
+    ] as AnyCommand[]);
+    expect(d(positions.get('A')!, positions.get('D')!), 'D probed off A').toBeGreaterThan(0.5);
+  });
+
+  it("a student's explicit (pinned) placement stays verbatim — what they typed is a given", () => {
+    const { positions } = build([
+      { type: 'free-point', id: 'A', x: 3, y: 2, free: true },
+      { type: 'free-point', id: 'D', x: 3, y: 2 }, // explicit «נקודה D ב-(3,2)» — pinned
+    ] as AnyCommand[]);
+    expect(positions.get('D')).toEqual({ x: 3, y: 2 });
+  });
+
+  it('identity when the suggestion is already generic (healthy figures bit-identical)', () => {
+    const { positions } = build([
+      { type: 'free-point', id: 'A', x: 3, y: 2, free: true },
+      { type: 'free-point', id: 'D', x: 8, y: 6, free: true },
+    ] as AnyCommand[]);
+    expect(positions.get('D')).toEqual({ x: 8, y: 6 });
+  });
+
+  it('the collector never certifies a BOTH-free default stack as a coincidence (the forcedness split)', async () => {
+    const { evaluate } = await import('@/engine');
+    const ev = evaluate({
+      objects: [
+        { kind: 'free-point', id: 'A', x: 1, y: 1 },
+        { kind: 'free-point', id: 'D', x: 1, y: 1 },
+      ],
+      constraints: [],
+    });
+    expect(ev.ok).toBe(true);
+    if (!ev.ok) return;
+    expect((ev as { coincidences?: [string, string][] }).coincidences ?? [], 'a separable pair is a DEFAULT collision, not a forced coincidence').toEqual([]);
+  });
+});
