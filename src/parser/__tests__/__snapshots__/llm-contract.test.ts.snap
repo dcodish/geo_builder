@@ -472,6 +472,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "set-area-ratio",
     ],
   },
+  "a circle contained inside the circle": {
+    "en": [
+      "circle",
+      "circle",
+      "set-circle-position",
+    ],
+    "he": [
+      "circle",
+      "circle",
+      "set-circle-position",
+    ],
+  },
   "a diameter": {
     "en": [
       "circle",

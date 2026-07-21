@@ -22,6 +22,8 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `circle-contained-in-definite-circle` — «מעגל מוכל בתוך המעגל הגדול» creates a new circle contained in THE drawn circle (#224, ADR-376)
+Prod session `0yqufnuv` 09:23 (2026-07-20): the definite-container containment had no owner — the parser deferred, the LLM dropped the «מוכל» given, bare «מעגל מוכל» came back not-understood. The #196 seam gains the indefinite-subject lane (`containedNewInExisting`): the container resolves named / THE single circle / the #102 size-qualifier rewrite (widened to a single-circle figure — ADR-029); the subject is a new auto-centred free-radius circle; the `contained` requirement seats it. Unit locks in `definite-containment.test.ts`.
 ### `second-bare-point-never-stacks` — a second bare «נקודה X» lands in general position (#232, ADR-378)
 Prod `eshsc843` (2026-07-20): every bare free point hard-coded the same (3,2), so «נקודה d» drew D exactly ON A — and the coincidence collector certified the stack (a ⓘ converge notice asserting an unstated given, the avoid machinery disarmed). Three fixes at three chokepoints: the free-point apply case probes auto-placed coords to general position (ADR-253 discipline — identity when generic, pinned placements verbatim); the collector's forcedness split refuses a BOTH-free default stack (the zero-cost structural case of ADR-295's forced-in-every-sample standard — a web-forced pair like ADR-123's kite stays recorded); the submit/edit auto-advance gates also fire on a distinctness break. Unit locks in `general-position.test.ts` (#232 block).
 

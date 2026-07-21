@@ -1391,6 +1391,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "a circle contained inside the circle",
+    "winner": "twoCirclesPosition",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל מוכל בתוך המעגל הגדול",
+    "winner": "twoCirclesPosition",
+  },
+  {
+    "lang": "en",
     "text": "AB is an external common tangent of the two circles",
     "winner": "commonTangent",
   },
