@@ -340,6 +340,18 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    case 'midpoint-auto': {
+      // #225 (ADR-3D-048): the un-named `אמצע BB'` — pick the first free letter HERE (apply knows the
+      // taken ids; parse3 is context-free) and delegate to the ordinary on-segment midpoint. The 2-D
+      // freeLabel pattern, copied per docs/20 §12 (M first — the letter students use for midpoints).
+      const missingMid = missingPoint(c, [cmd.a, cmd.b]);
+      if (missingMid) return { ok: false, error: missingMid };
+      const pool = [...'MNKLPQRSTUVWXYZGHIJ'];
+      const label = pool.find((l) => !c.points.has(l));
+      if (!label) return { ok: false, error: { code: 'already-defined', id: 'M' } }; // 19 letters taken — practically unreachable
+      return applyCommand3(c, { type: 'point-on-segment3', id: label, a: cmd.a, b: cmd.b, t: 0.5 });
+    }
+
     case 'name-vector': {
       if (!/^[a-z]$/.test(cmd.name)) return { ok: false, error: { code: 'bad-name', id: cmd.name } };
       if (c.vectors.has(cmd.name)) return { ok: false, error: { code: 'already-defined', id: cmd.name } };

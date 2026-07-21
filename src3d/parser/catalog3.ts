@@ -40,6 +40,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: 'כדור שמרכזו O ורדיוסו 3', en: 'sphere with center O radius 3' },
   // --- points ---
   { category: 'points', he: "M אמצע BB'", en: "M is the midpoint of BB'" },
+  { category: 'points', he: "אמצע BB'", en: "midpoint of BB'" },
   { category: 'points', he: "K על AA' כך ש-AK = 2KA'", en: "K on AA' such that AK = 2KA'" },
   { category: 'points', he: 'E על AC כך ש-AE:EC = 2:1', en: 'E on AC such that AE:EC = 2:1' },
   { category: 'points', he: "E מפגש התיכונים של משולש BC'D", en: "E is the centroid of triangle BC'D" },
