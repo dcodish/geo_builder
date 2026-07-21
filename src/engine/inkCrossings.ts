@@ -177,6 +177,10 @@ export interface Crossing {
   key: string;
 }
 
+/** What the lowering actually reads: a crossing's OPERANDS. The forcedness `key` and the drawn `pos` are
+ *  the gate's and the renderer's business, so a caller (or a test) may hand over operands alone. */
+export type CrossingRef = Omit<Crossing, 'key' | 'pos'> & { pos?: Vec };
+
 type Ink =
   | { kind: 'segment'; a: Id; b: Id; pa: Vec; pb: Vec }
   | { kind: 'line'; id: Id; anchor: Vec; dir: Vec }
@@ -354,7 +358,7 @@ export function crossingCounts(xs: Crossing[]): Map<string, number> {
  * LINE and a closed CIRCLE bound nothing, a drawn SEGMENT bounds its crossing. Every lowering mirrors what
  * the equivalent TYPED utterance produces, so the two input routes can never mean different things.
  */
-export function crossingCommands(x: Crossing, id: Id): Command[] {
+export function crossingCommands(x: CrossingRef, id: Id): Command[] {
   const segLine = (p: Id, q: Id) => `line-${p}${q}`;
   const carrier = (p: Id, q: Id): Command => ({ type: 'line-through', id: segLine(p, q), a: p, b: q });
   /** A TRIMMED line operand is bounded by the two points it visibly runs between — state that too. */

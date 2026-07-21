@@ -275,13 +275,13 @@ describe('#197 Am. 6 — naming the tangents’ MEET', () => {
 describe('#197 Am. 7 — the naming DOT at a drawn-line × segment crossing', () => {
   it("the touch tangent's visible crossings with the two-touch tangents offer pick dots (the operator's red marks)", async () => {
     const { buildScene } = await import('@/render/scene');
-    const { findSegmentCrossings } = await import('@/render/intersections');
+    const { findInkCrossings } = await import('@/engine');
     // The operator's exact figure: tangent circles, both two-touch tangents, then the touch tangent.
     const facts = buildFacts(['שני מעגלים משיקים מבחוץ', 'משיק משותף', 'משיק משותף', 'משיק משותף']);
     const fig = replay(facts);
     const scene = buildScene(fig.construction, fig.positions, undefined, undefined, { circles: fig.circles });
     expect(scene.lines.length, 'the touch tangent is a drawn line').toBeGreaterThanOrEqual(1);
-    const crossings = findSegmentCrossings(fig.construction, fig.positions, scene.lines);
+    const crossings = findInkCrossings(fig.construction, fig.positions, { lines: scene.lines });
     const lineDots = crossings.filter((x) => x.line1);
     // The vertical touch tangent crosses BOTH tangent segments strictly inside them — two dots.
     expect(lineDots.length, 'both visible crossings offer dots').toBeGreaterThanOrEqual(2);
