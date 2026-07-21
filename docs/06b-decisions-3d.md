@@ -699,3 +699,13 @@ Analytics: `source:'scope'`, `result:'scope:<category>'` — the PROFILE_3D dash
 **Documented rungs not taken (extend on demand, same recipe):** the flat-polygon→solid UPGRADE (`AOB מנסרה ישרה` over an existing triangle AOB — 1 unverified prod row; would need in-place solid replacement) and the remaining derived-point creators (`centroid3`, `diag-intersection`, feet) whose existing-id form should lower to a coincidence claim — no scaffold-point support in 3-D yet, and no verified prod demand. A DRIVE (vs verify) for a free existing point named onto a segment waits on the same re-home mechanism as ADR-3D-033's members. A duplicate re-declare currently records a second (no-op) fact row — cosmetic, the 2-D `dryRunOutcome` dedupe is not copied.
 
 **Locks:** `m1-redeclare.test.ts` — the exact prod sequences (re-typed qualified tetra drives all 6 edges equal; the apex-median refuses `claim-refuted` keep-prior and the student's `CE` recovery builds the true midpoint; pyramidPar re-type no-ops; kind-clash still refuses) + the fresh-figure macro (qualifier never dropped).
+
+## ADR-3D-048 — The un-named `אמצע BB'` builds an auto-labeled midpoint (issue #225)
+
+**Status:** Accepted (2026-07-21; prod session `t0n3ktkt`; feature PR). *Files: `src3d/engine/types.ts` (`MidpointAutoCommand`); `src3d/engine/apply.ts` (`midpoint-auto` case); `src3d/parser/parse3.ts` (the `midpoint` rule's 2-token branch); `src3d/store/figureFile3.ts` (schema whitelist); `src3d/parser/catalog3.ts` (+1); `src3d/__tests__/auto-midpoint.test.ts`.*
+
+**Class.** The named `M אמצע BB'` parsed since V0; the un-named `אמצע BB'` (prod: a cube edge midpoint with no student-given letter) fell through to the paid LLM. The 2-D app closed this in #184 via `freeLabel` at parse time — but `parse3` is deliberately CONTEXT-FREE (App3 mirrors that), so the 3-D twin cannot pick a letter at parse.
+
+**Fix.** A tiny `midpoint-auto {a,b}` command: the parser's existing `midpoint` rule gains a 2-token branch (He `אמצע XY`, En `midpoint/middle of XY`; primes tolerated), and APPLY — which knows the taken ids — picks the first free letter (M preferred, the students' midpoint convention; the 2-D `freeLabel` pattern copied per docs/20 §12) and delegates to the ordinary `point-on-segment3` t=½. Deterministic under replay (the pick depends only on the fact prefix), serializable (schema whitelist +1), no renderer/DOF change (the construction only ever holds the delegated on-segment point).
+
+**Locks:** `auto-midpoint.test.ts` — the exact prod sequence (cube → `אמצע BB'` → M at the true midpoint), M-taken fallback to N, the named form byte-unchanged, unknown endpoints refuse, He+En parse; the catalog guard covers the new entry both locales.

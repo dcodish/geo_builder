@@ -184,6 +184,17 @@ export interface PointOnSegment3Command {
   t?: number;
 }
 
+/**
+ * #225 (ADR-3D-048): `אמצע BB'` with NO student-given name — the midpoint of segment a–b,
+ * auto-labeled at APPLY (parse3 is context-free, so the free-letter pick must happen where the
+ * taken ids are known). Lowers to `point-on-segment3` t=½ under the picked label.
+ */
+export interface MidpointAutoCommand {
+  type: 'midpoint-auto';
+  a: Id;
+  b: Id;
+}
+
 /** `נסמן: AB = u` — bind a lowercase name to the ordered pair from→to. */
 export interface NameVectorCommand {
   type: 'name-vector';
@@ -510,6 +521,7 @@ export type Command3 =
   | SolidCommand
   | AngleMark3Command
   | PointOnSegment3Command
+  | MidpointAutoCommand
   | NameVectorCommand
   | Segment3Command
   | Centroid3Command

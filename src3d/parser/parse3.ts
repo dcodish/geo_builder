@@ -288,10 +288,17 @@ const volumePolyClaim: Rule = (s) => {
   return [{ type: 'claim', claim: { type: 'volume-poly', ids: m[1].match(/[A-Z]\d*'?/g)!, value: +m[2] } }];
 };
 
-/** `M אמצע BC` / `M is the midpoint of BC` → on-segment t = ½. */
+/** `M אמצע BC` / `M is the midpoint of BC` → on-segment t = ½.
+ *  #225 (ADR-3D-048): the UN-named `אמצע BB'` / `midpoint of BB'` (2 tokens) lowers to
+ *  `midpoint-auto` — the label is picked at APPLY, where the taken ids are known. */
 const midpoint: Rule = (s) => {
   if (!/אמצע/.test(s) && !/\b(midpoint|middle)\b/i.test(s)) return null;
   const toks = labelTokens(s);
+  if (toks.length === 2) {
+    const [a, b] = toks;
+    if (a === b) return null;
+    return [{ type: 'midpoint-auto', a, b }];
+  }
   if (toks.length !== 3) return null;
   const [id, a, b] = toks;
   if (id === a || id === b || a === b) return null;
