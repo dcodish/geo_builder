@@ -185,6 +185,18 @@ export interface PointOnSegment3Command {
 }
 
 /**
+ * #251 (ADR-3D-049): `זוית O ישרה` / `זווית O = 90` — a stated angle named by its VERTEX alone.
+ * The two arms are resolved at APPLY from the figure's edges at the vertex (parse3 is
+ * context-free); exactly two distinct neighbors ⇒ the ordinary angle-seg-eq lowering,
+ * otherwise the honest `ambiguous-angle` refusal (the 2-D ADR-164 pattern, apply-time edition).
+ */
+export interface VertexAngleCommand {
+  type: 'vertex-angle';
+  vertex: Id;
+  deg: number;
+}
+
+/**
  * #225 (ADR-3D-048): `אמצע BB'` with NO student-given name — the midpoint of segment a–b,
  * auto-labeled at APPLY (parse3 is context-free, so the free-letter pick must happen where the
  * taken ids are known). Lowers to `point-on-segment3` t=½ under the picked label.
@@ -522,6 +534,7 @@ export type Command3 =
   | AngleMark3Command
   | PointOnSegment3Command
   | MidpointAutoCommand
+  | VertexAngleCommand
   | NameVectorCommand
   | Segment3Command
   | Centroid3Command
@@ -758,6 +771,7 @@ export type EngineError3 =
   | { code: 'two-unknowns'; id: Id } // a vector relation with more than one undefined point
   | { code: 'size-on-solid' } // a numeric size on a free-dim solid figure — not supported yet (honest boundary)
   | { code: 'unknown-symbol'; id: string } // a value was assigned to a parameter no relation defines
+  | { code: 'ambiguous-angle'; id: Id } // #251: a single-vertex angle whose arms cannot be resolved (≠2 edges at the vertex)
   | { code: 'claim-refuted' }; // the stated answer does not hold in the figure
 
 export type ApplyResult3 = { ok: true; next: Construction3 } | { ok: false; error: EngineError3 };

@@ -75,6 +75,7 @@
     "badFile": "This is not a valid Space Builder figure file",
     "newerSchema": "The file was saved by a newer version of the tool — refresh the page and try again",
     "unknownSymbol": "the parameter {{id}} isn't defined in the figure",
+    "ambiguousAngle": "identifying the angle at {{id}} needs exactly two edges in the figure — name all three letters (e.g. ∠AOB = 90)",
     "ambiguousVectorLength": "vector or length? write vector AB = vector CD (or AB⃗ = CD⃗), or |AB| = |CD|"
   },
   "examples": {

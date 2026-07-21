@@ -340,6 +340,22 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    case 'vertex-angle': {
+      // #251 (ADR-3D-049): the arms of a vertex-named angle are resolved HERE, where the figure is
+      // known. Exactly two distinct edges at the vertex ⇒ delegate to the ordinary ∠PVQ lowering;
+      // anything else is honestly ambiguous — the student names all three letters.
+      if (!c.points.has(cmd.vertex)) return { ok: false, error: { code: 'unknown-point', id: cmd.vertex } };
+      const nbrs = new Set<Id>();
+      for (const sld of c.solids) for (const [ea, eb] of sld.edges) { if (ea === cmd.vertex) nbrs.add(eb); else if (eb === cmd.vertex) nbrs.add(ea); }
+      for (const [sa, sb] of c.segments) { if (sa === cmd.vertex) nbrs.add(sb); else if (sb === cmd.vertex) nbrs.add(sa); }
+      if (nbrs.size !== 2) return { ok: false, error: { code: 'ambiguous-angle', id: cmd.vertex } };
+      const [p, q] = [...nbrs];
+      let r = applyCommand3(c, { type: 'segment3', a: cmd.vertex, b: p });
+      if (r.ok) r = applyCommand3(r.next, { type: 'segment3', a: cmd.vertex, b: q });
+      if (r.ok) r = applyCommand3(r.next, { type: 'claim', claim: { type: 'angle-seg-eq', a1: cmd.vertex, b1: p, a2: cmd.vertex, b2: q, deg: cmd.deg } });
+      return r;
+    }
+
     case 'midpoint-auto': {
       // #225 (ADR-3D-048): the un-named `אמצע BB'` — pick the first free letter HERE (apply knows the
       // taken ids; parse3 is context-free) and delegate to the ordinary on-segment midpoint. The 2-D

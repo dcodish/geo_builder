@@ -55,6 +55,7 @@ const COMMAND_TYPES = new Set<Command3['type']>([
   'length-rel',
   'symbol-value',
   'midpoint-auto',
+  'vertex-angle',
 ]);
 
 export function serializeFigure3(facts: Fact3[], seed: number, name?: string): string {

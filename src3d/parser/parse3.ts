@@ -1502,19 +1502,30 @@ const onAxes: Rule = (s) => {
   return null;
 };
 
-/** `∠PC'C = 82.1` / `הזווית PC'C היא 90` — the vertex form lowers to the angle-between-segments claim. */
+/** `∠PC'C = 82.1` / `הזווית PC'C היא 90` — the vertex form lowers to the angle-between-segments claim.
+ *  #251 (ADR-3D-049): also the `ישרה`/`is right` word-form (deg 90), and the SINGLE-VERTEX form
+ *  (`זוית O ישרה`, `זווית O = 90`, `angle at O is right`) → `vertex-angle`, arms resolved at APPLY. */
 const vertexAngleClaim: Rule = (s0) => {
   const s = stripProofPrefix(s0);
-  const m = s.match(
-    new RegExp(`^(?:∠|ה?זו?וית\\s+|the angle\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*(?:היא|הוא|is|=)\\s*(${NUM})\\s*°?$`),
-  );
-  if (!m) return null;
-  const [, p, vertex, q, deg] = m;
-  return [
-    { type: 'segment3', a: vertex, b: p },
-    { type: 'segment3', a: vertex, b: q },
-    { type: 'claim', claim: { type: 'angle-seg-eq', a1: vertex, b1: p, a2: vertex, b2: q, deg: +deg } },
-  ];
+  const L = String.raw`([A-Z]\d*'?)`;
+  const PRE = String.raw`(?:∠|ה?זו?וית\s+|the angle\s+(?:at\s+)?|angle\s+(?:at\s+)?)`;
+  const RIGHT = String.raw`(?:היא\s+|הוא\s+)?ישרה|is\s+(?:a\s+)?right(?:\s+angle)?`;
+  const m =
+    s.match(new RegExp(`^${PRE}${L}${L}${L}\\s*(?:היא|הוא|is|=)\\s*(${NUM})\\s*°?$`)) ??
+    s.match(new RegExp(`^${PRE}${L}${L}${L}\\s+(?:${RIGHT})$`));
+  if (m) {
+    const [, p, vertex, q, deg] = m;
+    return [
+      { type: 'segment3', a: vertex, b: p },
+      { type: 'segment3', a: vertex, b: q },
+      { type: 'claim', claim: { type: 'angle-seg-eq', a1: vertex, b1: p, a2: vertex, b2: q, deg: deg !== undefined ? +deg : 90 } },
+    ];
+  }
+  const sv =
+    s.match(new RegExp(`^${PRE}${L}\\s*(?:היא|הוא|is|=)\\s*(${NUM})\\s*°?$`)) ??
+    s.match(new RegExp(`^${PRE}${L}\\s+(?:${RIGHT})$`));
+  if (sv) return [{ type: 'vertex-angle', vertex: sv[1], deg: sv[2] !== undefined ? +sv[2] : 90 }];
+  return null;
 };
 
 /** `∠SDB` / `∠SDB = α` — a named-angle MARKER (#94): draw the arc at the middle vertex, no value drives.
