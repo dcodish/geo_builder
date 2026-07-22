@@ -6157,6 +6157,49 @@ export const SCENARIOS: Scenario[] = [
       expect(carrier, 'D and F ride one common circle in every config').toBeDefined();
     },
   },
+  {
+    id: 'angle-bound-is-a-region-not-an-equality',
+    title: 'issue #277 (P1): «∠ABC > 40» BOUNDS the angle — it never commits «∠ABC = 40»',
+    guards:
+      'the operator asked whether «40 < α < 60» works; probing it found worse — a ONE-SIDED bound on a spelled-out angle silently committed the EQUALITY at the bound. `angle` (parse.ts) strips the angle keyword and takes the first number in whatever remains, with no regard for the operator between, so «∠ABC > 40» lowered to set-angle 40: the strongest reading of a bound, asserted as a given the student never gave, row green and verifier happy. No older honesty gate could see it — every label lands, the single number lands, no relation symbol is present; only the OPERATOR was lost. ADR-390: acuteness (an angle bounded against the constant 90, ADR-108) generalizes to a stated bound, `measureBound` owns every comparison form, `angle` refuses a comparison outright, and `droppedComparison` closes the class at the commit boundary.',
+    steps: ['משולש ABC', '∠ABC > 40'],
+    check: (fig) => {
+      allStepsOk(fig);
+      // the bound HOLDS — and, being a region, it leaves the angle free rather than pinning it to 40
+      const a = angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C'));
+      expect(a, 'the angle respects its lower bound').toBeGreaterThan(40);
+      // the P1 itself: what reached the ENGINE is a region, never the equality at the bound
+      const cons = fig.construction.constraints;
+      expect(cons.some((c) => c.type === 'angle'), 'a bound must never become an angle EQUALITY').toBe(false);
+      expect(cons.some((c) => c.type === 'angle-bound'), 'the bound is what got recorded').toBe(true);
+    },
+  },
+  {
+    id: 'angle-range-keeps-the-angle-inside',
+    title: 'issue #277 / ADR-390: «40 < ∠ABC < 60» is a RANGE — every configuration shown stays inside it',
+    guards:
+      'the range form is the one the operator actually asked for. A range determines nothing (ADR-052): the angle stays a free, sampled DOF, so the risk is the opposite of the P1 — the figure drifting OUT of the stated window on a reseed, or the panel claiming a value for an angle that is only bounded. Modelled as ONE constraint carrying both ends (not two independent ones, whose 8° aim margins would fight inside a narrow window).',
+    steps: ['משולש ABC', '40 < ∠ABC < 60'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const a = angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C'));
+      expect(a, 'inside the stated range (lower)').toBeGreaterThan(40);
+      expect(a, 'inside the stated range (upper)').toBeLessThan(60);
+    },
+  },
+  {
+    id: 'named-measure-bound-reshapes',
+    title: 'issue #277 / ADR-390: «∠ABC = α» then «60 < α < 90» bounds whatever the symbol names',
+    guards:
+      'the operator’s literal request — label an angle α, then constrain α. The named form resolves through the SAME symbol table `α < β` (ADR-039) uses, so the bound lands on the measure the letter was bound to rather than needing its own machinery.',
+    steps: ['משולש ABC', '∠ABC = α', '60 < α < 90'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const a = angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'C'));
+      expect(a, 'α respects its lower bound').toBeGreaterThan(60);
+      expect(a, 'α respects its upper bound').toBeLessThan(90);
+    },
+  },
 ];
 
 /**

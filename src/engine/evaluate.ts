@@ -6,7 +6,7 @@
  */
 
 import type { Circle, Constraint, Construction, GeoObject, GeoPoint, Id, Line, Vec } from './types';
-import { LEN_EPS, isGeoPoint, objectParents } from './types';
+import { LEN_EPS, isGeoPoint, isOrderConstraint, objectParents } from './types';
 import { isShapeCarrier } from './carriers';
 import {
   add,
@@ -75,7 +75,7 @@ export type EvalResult = EvalOk | EvalErr;
 function withOrderCons(cons: Constraint[], c: Construction): Constraint[] {
   const seen = new Set(cons.map((k) => JSON.stringify(k)));
   for (const k of c.constraints) {
-    if (k.type !== 'angle-order' && k.type !== 'length-order' && k.type !== 'collinear-order' && k.type !== 'angle-acuteness') continue;
+    if (!isOrderConstraint(k)) continue;
     const key = JSON.stringify(k);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -201,11 +201,7 @@ export function resolveDriven(c: Construction): Construction {
     // (the FAR crossing) over the near one. This picks the right side at the CURRENT size, so a free
     // radius is grown (by recruitFreeDofs) only when NO root satisfies the order, never to collapse the
     // circle onto a near crossing. branch then cycles the order-sorted roots ("show another config").
-    const orderCons = c.constraints.filter(
-      (k) =>
-        (k.type === 'collinear-order' || k.type === 'angle-order' || k.type === 'length-order' || k.type === 'angle-acuteness') &&
-        constraintRefs(k).includes(carrier.id),
-    );
+    const orderCons = c.constraints.filter((k) => isOrderConstraint(k) && constraintRefs(k).includes(carrier.id));
     let ordered = roots;
     if (orderCons.length) {
       const orderResid = (v: number): number => {

@@ -202,6 +202,19 @@ export function lowerOne(cmd: AnyCommand, tab: SymTab): Command[] {
         return [{ type: 'set-angle-order', v1: small.refs[0], a1: small.refs[1], b1: small.refs[2], v2: large.refs[0], a2: large.refs[1], b2: large.refs[2] }];
       return [{ type: 'set-length-order', a: small.refs[0], b: small.refs[1], c: large.refs[0], d: large.refs[1] }];
     }
+    case 'measure-bound': {
+      // "α > 40" / "60 < α < 90" (ADR-390) — the NUMERIC twin of `measure-order`, resolved through the
+      // same first-binding lookup: whichever measure the variable names gets the bound. A variable that
+      // names nothing yet, or a non-bare binding (2α, x², affine), is left alone — the same discipline
+      // `measure-order` applies, since a coefficient makes the inequality mean something else.
+      const B = tab.vars.get(cmd.name)?.bindings[0];
+      if (!B) return [];
+      if (B.coef !== 1 || (B.pow ?? 1) !== 1 || B.affine) return [];
+      const { min, max } = cmd;
+      if (B.kind === 'ang') return [{ type: 'set-angle-bound', vertex: B.refs[0], ray1: B.refs[1], ray2: B.refs[2], min, max }];
+      if (B.kind === 'len') return [{ type: 'set-length-bound', a: B.refs[0], b: B.refs[1], min, max }];
+      return []; // an area binding has no bound constraint yet
+    }
     case 'shape-variant':
       // The base shape + the variant-selected equal pairs (ADR-138). This fallback (no explicit equalities)
       // is the whole-list `lower()` / direct-caller path; `replay` calls `expandShapeVariant` itself with the
