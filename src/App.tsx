@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedWordRelations, droppedCompoundRelation, droppedGivenVerbs, droppedRadiusSymbol, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedWordRelations, droppedCompoundRelation, droppedGivenVerbs, droppedRadiusSymbol, droppedRegionSubject, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -898,6 +898,10 @@ export default function App() {
       // and the MEASURE-SYMBOL gate (issue #53): a decomposition that loses a stated radius symbol
       // ("שרדיוסו r") must name it — a lowercase measure letter trips none of the older gates
       ...droppedRadiusSymbol(utterance, llmCmds),
+      // and the REGION-SUBJECT gate (ADR-303; wired here by #266/ADR-387): a decomposition of a
+      // region-clause utterance («M בתוך המשולש ABC») that references the subject label nowhere
+      // dropped the student's statement about it — the grammar path already held this line
+      ...(droppedRegionSubject(utterance, llmCmds) ? ['בתוך/מחוץ'] : []),
     ];
     if (stillDropped.length > 0) {
       logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `dropped-labels:${stillDropped.join(',')}`, commands: llmCmds });

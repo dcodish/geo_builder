@@ -8240,7 +8240,7 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
   // concrete «מעגל <centre>», so every circle-consuming rule gains it at once. A pointing gesture, not
   // a constraint (ADR-349). An ordinal the figure can't satisfy (fewer circles) DEFERS — never the
   // single-circle fallback guess.
-  const ordM = s.match(/ה?מעגל\s+ה(ראשון|שני|שלישי|רביעי)(?![א-ת])|(?:the\s+)?(first|second|third|fourth)\s+circle/i);
+  const ordM = s.match(/ה?מעגל\s+ה(ראשון|שני|שלישי|רביעי)(?![א-ת])|\b(?:the\s+)?(first|second|third|fourth)\s+circle\b/i);
   if (ordM) {
     const idx = ordM[1] ? ['ראשון', 'שני', 'שלישי', 'רביעי'].indexOf(ordM[1]) : ['first', 'second', 'third', 'fourth'].indexOf(ordM[2].toLowerCase());
     const target = idx >= 0 && (ctx.circles?.length ?? 0) > idx ? ctx.circles![idx] : null;
@@ -8354,7 +8354,10 @@ const REGION_TAIL = new RegExp(
  * present, no command carries a region, and a head label went unreferenced — rescue via
  * {@link regionSideFallback}, never commit the subject-less half-parse.
  */
-function droppedRegionSubject(s: string, commands: AnyCommand[]): boolean {
+export function droppedRegionSubject(utterance: string, commands: AnyCommand[]): boolean {
+  // Normalizes internally (idempotent) so the App's LLM commit path (#266/ADR-387 — the second
+  // attempt must hold the same line, the ADR-240 discipline) can pass the raw utterance.
+  const s = normalizeUtterance(utterance);
   const m = s.match(REGION_TAIL);
   if (!m) return false;
   if (commands.some((c) => c.type === 'point-polygon-side')) return false;
@@ -8746,16 +8749,30 @@ const VERB_GATES: { verb: string; present: RegExp; satisfied: RegExp }[] = [
  * זרים») trips neither — the LLM's decomposition dropped it and two unrelated circles committed green,
  * drawn INTERSECTING (prod 2026-07-18, sessions cm4ak2yo/jwbimfsf). Lexicon v1 = the mutual-position
  * words the deterministic rules now own (#196); extend per the ADR-273 word-lexicon pattern — a listed
- * word must land in an encoding command, or the commit refuses/escalates honestly.
+ * word must land in an encoding command, or the commit refuses/escalates honestly. #266 (ADR-387)
+ * widened the lexicon beyond circle nouns: the side-pair phrases are carrier-agnostic.
  */
 export function droppedWordRelations(utterance: string, commands: AnyCommand[]): string[] {
   const s = normalizeUtterance(utterance);
-  // Two-circle context only: >=2 circle nouns or the plural — a point-side «M בתוך המעגל» never trips.
-  const circleNouns = (s.match(/circle|מעגל/gi) ?? []).length;
-  if (!(circleNouns >= 2 || /מעגלים|circles/i.test(s))) return [];
   const out: string[] = [];
-  if (/זרים|disjoint/i.test(s) && !commands.some((c) => c.type === 'set-circle-position' && c.relation === 'disjoint')) out.push('זרים');
-  if (/מוכל(?:ים|ת)?(?![א-ת])|contained/i.test(s) && !commands.some((c) => c.type === 'set-circle-position' && c.relation === 'contained')) out.push('מוכל');
+  // The SIDE-PAIR member (#266, ADR-387) — a spatial side relation stated as a PHRASE («C ו-D נמצאות
+  // בצדדים שונים של AB», "on different/opposite sides", «באותו צד» / "the same side") about ANY
+  // carrier. Its labels all land as points, no number, no symbol relation, no action verb, no
+  // polygon-region tail — every older gate was structurally blind, and the LLM's decomposition
+  // committed two bare free points GREEN on the same side (prod 2026-07-22, session m01ophid).
+  // The satisfied set is the side/region command family (generous per the gate discipline;
+  // `points-line-side` is #265's deterministic owner).
+  if (
+    /בצדדים\s+(?:שונים|נגדיים)|מצדדים\s+שונים|משני\s+(?:ה?צדדים|צי?די)|באותו\s+ה?צד(?![א-ת])|מאותו\s+ה?צד(?![א-ת])|\b(?:different|opposite)\s+sides?\b|\bsame\s+side\b/i.test(s) &&
+    !commands.some((c) => (c.type as string) === 'points-line-side' || c.type === 'point-circle-side' || c.type === 'point-polygon-side')
+  )
+    out.push('צדדים');
+  // Two-circle context for the mutual-position members: >=2 circle nouns or the plural — a point-side
+  // «M בתוך המעגל» never trips.
+  const circleNouns = (s.match(/circle|מעגל/gi) ?? []).length;
+  if (!(circleNouns >= 2 || /מעגלים|\bcircles\b/i.test(s))) return out;
+  if (/זרים|\bdisjoint\b/i.test(s) && !commands.some((c) => c.type === 'set-circle-position' && c.relation === 'disjoint')) out.push('זרים');
+  if (/מוכל(?:ים|ת)?(?![א-ת])|\bcontained\b/i.test(s) && !commands.some((c) => c.type === 'set-circle-position' && c.relation === 'contained')) out.push('מוכל');
   // The tangent-KIND member (#212): a kind adjective on a SINGULAR tangent noun in a two-circle
   // context must land in a common-tangent / drawn-tangent lowering (the LLM's guess repositioned the
   // stated disjoint circles into mutual tangency, all rows green).
