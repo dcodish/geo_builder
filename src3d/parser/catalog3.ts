@@ -60,6 +60,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // --- planes & lines ---
   { category: 'planesLines', he: 'המישור π1: z - 3 = 0', en: 'plane π1: z - 3 = 0' },
   { category: 'planesLines', he: 'הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)', en: 'line ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)' },
+  // ADR-3D-050 (#275): the bare textbook form — no name — binds the canonical ℓ
+  { category: 'planesLines', he: 'x = (0,2,0) + t(2,-2,0)', en: 'x = (0,2,0) + t(2,-2,0)' },
   {
     // ADR-3D-031: a pair-named parametric line also puts A,B ON the line (riders / verified givens)
     category: 'planesLines',

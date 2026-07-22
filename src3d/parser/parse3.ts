@@ -1196,8 +1196,15 @@ const parametricLine: Rule = (s) => {
         `^(?:given\\s+that\\s+)?(?:the\\s+|a\\s+)?(?:equation|parametric\\s+(?:representation|form|equation))\\s+of\\s+(?:the\\s+)?(?:line\\s+)?${NAME}\\s+is\\s*:?\\s*(.+)$`,
       ),
     );
-  if (!head) return null;
-  const m = head[2].match(/^(?:x\s*=\s*)?\(([^()]*)\)\s*\+\s*t\s*[·×*]?\s*\(([^()]*)\)$/);
+  // #275 (ADR-3D-050): the textbook's BARE parametric form — «x=(0,2,0)+t(2,-2,0)» with no
+  // «הישר ℓ:» prefix (prod 18z741vq burned a paid LLM call on the exam's exact notation) —
+  // binds the canonical ℓ. The leading `x =` is MANDATORY here (in the named lanes it is
+  // optional) so nothing else can be mistaken for a line; a SECOND bare line hits apply's
+  // `already-defined` refusal — naming lines (ℓ1/ℓ2, ADR-3D-038) stays the student's move.
+  const bare = !head && /^x\s*=\s*\(/.test(s);
+  if (!head && !bare) return null;
+  const body = head ? head[2] : s;
+  const m = body.match(/^(?:x\s*=\s*)?\(([^()]*)\)\s*\+\s*t\s*[·×*]?\s*\(([^()]*)\)$/);
   if (!m) return null;
   const triple = (str: string) => str.split(',').map((p) => parseParamExpr(p));
   const anchor = triple(m[1]);
@@ -1205,8 +1212,8 @@ const parametricLine: Rule = (s) => {
   if (anchor.length !== 3 || dir.length !== 3 || [...anchor, ...dir].some((x) => !x)) return null;
   const params = new Set([...anchor, ...dir].flatMap((x) => (x!.param ? [x!.param] : [])));
   if (params.size > 1) return null;
-  const isLineName = LINE_NAME_ONLY.test(head[1]);
-  const name = isLineName ? canonicalLine(head[1]) : head[1];
+  const isLineName = head ? LINE_NAME_ONLY.test(head[1]) : true;
+  const name = head ? (isLineName ? canonicalLine(head[1]) : head[1]) : 'ℓ';
   const cmds: Command3[] = [
     {
       type: 'line3',
