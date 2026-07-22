@@ -142,6 +142,8 @@
       "radiusOrder": "the inner circle (radius {{ri}}) should stay inside the outer circle (radius {{ro}})",
       "outsideCircle": "{{point}} should lie outside circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
       "insideCircle": "{{point}} should lie inside circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
+      "lineSideDifferent": "{{points}} should lie on different sides of {{seg}}, but they don't in this drawing",
+      "lineSideSame": "{{points}} should lie on the same side of {{seg}}, but they don't in this drawing",
       "outsideRegion": "{{point}} should lie outside {{poly}}",
       "insideRegion": "{{point}} should lie inside {{poly}}",
       "radiusRatio": "radius of circle {{c1}} ({{r1}}) should be {{k}} × radius of circle {{c2}} ({{r2}})",

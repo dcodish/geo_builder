@@ -205,6 +205,21 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'points-on-different-sides-of-line',
+    title: 'issue #265 (m01ophid): «נקודת C ו D נמצאות בצדדים שונים של AB» builds deterministically — C and D strictly on opposite sides in every shown config (ADR-389)',
+    guards:
+      'prod session m01ophid (2026-07-22): the side-of-a-LINE statement had no owner rule — it escalated to the LLM, whose decomposition was two bare free points (the relation dropped, both on the SAME side, committed green — the #266/ADR-387 honesty half). ADR-389: the pointsVsLine rule lowers it to the carrier segment + a relational points-line-side REQUIREMENT (the ADR-244 shape — verifier figure.v.lineSideDifferent/lineSideSame + meetsRequirements gate), apply seeds NEW subjects on their assigned sides in general position (phase-decorrelated so no unstated CD ⟂ AB shows), and an existing wrong-side free default is re-seated (M1).',
+    steps: ['AB', 'נקודת C ו D נמצאות בצדדים שונים של AB'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const A = at(fig, 'A');
+      const B = at(fig, 'B');
+      const side = (p: Id) => Math.sign((B.x - A.x) * (at(fig, p).y - A.y) - (B.y - A.y) * (at(fig, p).x - A.x));
+      expect(side('C') * side('D'), 'C and D strictly on opposite sides of AB').toBe(-1);
+    },
+  },
+  {
     id: 'apex-common-tangents-single-ink-run',
     title: 'issue #264 (m01ophid): each common tangent from apex A is ONE ownable ink run — hide/dash act on the whole line (ADR-388)',
     guards:

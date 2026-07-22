@@ -1371,6 +1371,87 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
     }
 
+    case 'points-line-side': {
+      // «C ו-D בצדדים שונים של AB» / "C and D on different (the same) sides of AB" (issue #265,
+      // ADR-389) — the ADR-254 circle-side shape, LINE edition. The command is the RELATIONAL side
+      // REQUIREMENT record — checkGivens re-derives it from the final coordinates
+      // (figure.v.lineSideDifferent/lineSideSame) and `meetsRequirements` gates sampling / "show
+      // another" on it — so nothing is pushed to `constraints` (an inequality has nothing to drive).
+      // Here we only improve the DEFAULT: assign each subject a target side ('different' alternates,
+      // an EXISTING definitely-sided subject anchors the assignment), seed a NEW id on its side in
+      // general position, and re-seat an EXISTING non-pinned free point sitting on the wrong side.
+      const pa = pos.get(cmd.a);
+      const pb = pos.get(cmd.b);
+      const L0 = pa && pb ? dist(pa, pb) : 0;
+      const known = !!pa && !!pb && L0 > 1e-9; // structural probes run on an empty construction — any spot stands in there
+      const base = known ? pa! : { x: 0, y: 0 };
+      const L = known ? L0 : 5;
+      const u = known ? { x: (pb!.x - pa!.x) / L0, y: (pb!.y - pa!.y) / L0 } : { x: 1, y: 0 };
+      const nrm = { x: -u.y, y: u.x };
+      const sideOf = (p: Vec): number => {
+        const off = (p.x - base.x) * nrm.x + (p.y - base.y) * nrm.y;
+        return Math.abs(off) < 1e-9 * Math.max(1, L) ? 0 : Math.sign(off);
+      };
+      // Target signs: 'different' = [+1, −1], 'same' = all +1 — flipped as a block so an existing
+      // subject with a definite side keeps its side (M1: the statement adapts to the figure, the
+      // figure never jumps under a pure statement).
+      let signs: number[] = cmd.rel === 'different' ? [1, -1] : cmd.subjects.map(() => 1);
+      if (known) {
+        for (let i = 0; i < cmd.subjects.length; i++) {
+          const p = pos.get(cmd.subjects[i]);
+          const s = p ? sideOf(p) : 0;
+          if (s !== 0) {
+            if (s !== signs[i]) signs = signs.map((x) => -x);
+            break;
+          }
+        }
+      }
+      // `pos` predates this batch, so same-command siblings are invisible to it (the ADR-378 lesson) —
+      // track what this command placed and avoid it too. The per-subject PHASE decorrelates the golden
+      // walks: without it two mirror-side subjects take the same along-t and the default drawing shows
+      // an unstated CD ⟂ AB through the midpoint (the ADR-253 special-position smell).
+      const placedNow: Vec[] = [];
+      const seedSpot = (sign: number, phase: number): Vec => {
+        // The carrier's `a` endpoint is the spin ANCHOR — it must not count as an existing point to
+        // clear (degeneratePlacement's through-the-anchor line test degenerates at q ≡ anchor; the
+        // point-circle-side case excludes its centre for exactly this reason).
+        const others = [...[...pos.entries()].filter(([id]) => id !== cmd.a).map(([, v]) => v), ...placedNow];
+        const span = spanAround(base, others);
+        // golden-angle walks along the carrier at a few offset tiers — the stated side + general position
+        for (const f of [0.45, 0.7, 0.28, 1.0]) {
+          for (let k = 0; k <= 24; k++) {
+            const t = 0.5 + 0.38 * Math.sin((k + 1 + phase * 5) * GOLDEN_ANGLE);
+            const p = { x: base.x + u.x * t * L + nrm.x * sign * f * L, y: base.y + u.y * t * L + nrm.y * sign * f * L };
+            if (degeneratePlacement(base, [p], others, span)) continue; // off existing points + off anchor lines (ADR-253)
+            return p;
+          }
+        }
+        return { x: base.x + u.x * 0.5 * L + nrm.x * sign * 0.45 * L, y: base.y + u.y * 0.5 * L + nrm.y * sign * 0.45 * L };
+      };
+      for (let i = 0; i < cmd.subjects.length; i++) {
+        const id = cmd.subjects[i];
+        const existing = objects.find((o) => o.id === id);
+        if (!existing) {
+          const p = seedSpot(signs[i], i);
+          placedNow.push(p);
+          objects.push({ kind: 'free-point', id, x: p.x, y: p.y }); // a real free DOF (ADR-052) — not pinned
+        } else if (existing.kind === 'free-point' && !existing.pinned && known && sideOf({ x: existing.x, y: existing.y }) !== signs[i]) {
+          // M1: a side statement about an EXISTING point is a statement about that point. A non-pinned
+          // free point on the WRONG side gets its DEFAULT re-seated — a better default, not a drive.
+          const p = seedSpot(signs[i], i);
+          placedNow.push(p);
+          const j = objects.findIndex((o) => o.id === id);
+          objects[j] = { ...existing, x: p.x, y: p.y };
+        } else {
+          // kept where it is (right side already, or pinned/derived — the verifier reports the latter);
+          // later siblings still avoid its spot
+          const p = pos.get(id) ?? (existing.kind === 'free-point' ? { x: existing.x, y: existing.y } : undefined);
+          if (p) placedNow.push(p);
+        }
+      }
+      break;
+    }
+
     case 'segments-cross':
       // «CD חותך את AB» with no point named (issue #241, ADR-383) — the point-free crossing REQUIREMENT.
       // The command itself is the record: the givens verifier re-derives it from the final coordinates

@@ -1447,7 +1447,7 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, o
   // record gates all future sampling; refusing it as "nothing to add" swallowed the student's statement,
   // the ADR-234 class). An EXACT duplicate of an enabled fact stays a friendly no-op — the statement
   // genuinely IS already on the figure.
-  const REQUIREMENT_DATA = new Set(['radius-symbol', 'set-radius-order', 'point-polygon-side', 'point-circle-side', 'set-circle-position', 'segments-cross']);
+  const REQUIREMENT_DATA = new Set(['radius-symbol', 'set-radius-order', 'point-polygon-side', 'point-circle-side', 'points-line-side', 'set-circle-position', 'segments-cross']);
   const enabledCmdList = facts.filter((f) => f.enabled).map((f) => f.cmd);
   const dataOnly =
     commands.length > 0 &&

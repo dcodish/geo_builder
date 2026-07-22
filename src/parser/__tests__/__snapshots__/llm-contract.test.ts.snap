@@ -238,6 +238,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "set-parallel",
     ],
   },
+  "C and D are on different sides of AB": {
+    "en": [
+      "segment",
+      "points-line-side",
+    ],
+    "he": [
+      "segment",
+      "points-line-side",
+    ],
+  },
   "C is 5 from A and 5 from B": {
     "en": [
       "point-by-distances",
