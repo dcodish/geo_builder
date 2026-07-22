@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `points-on-different-sides-of-line` — «נקודת C ו D נמצאות בצדדים שונים של AB» builds deterministically (#265, ADR-389)
+Prod session `m01ophid` (2026-07-22): the side-of-a-LINE statement had no owner rule — it escalated to the LLM, whose decomposition was two bare free points (the relation dropped, both on the SAME side, committed green — the #266/ADR-387 honesty half). Now `pointsVsLine` lowers it to the carrier segment + a relational `points-line-side` requirement (verifier + `meetsRequirements` gate — every shown config keeps the stated sides), new subjects seed on their sides in general position, and a wrong-side existing free default is re-seated (M1). Same-side dual, En mirrors, contradiction-ambers, and sampling locks in `points-line-side.test.ts`.
+
 ### `apex-common-tangents-single-ink-run` — each common tangent from apex A is ONE ownable ink run (#264, ADR-388)
 Prod session `m01ophid` (2026-07-22): «שני מעגלים משיקים מבחוץ» + «מנקודה A יוצאים שני משיקים משותפים לשני המעגלים» draws, per tangent, both the touch–touch segment and the spanning apex segment on one line (the derived apex lands beyond the smaller second circle, so «apex–T1» contains «T1–T2»). Hiding the spanning segment left the contained stretch drawn beneath ("it only hid AC") and its wide hit-line occluded the contained segment's menu ("cannot hide the BC part"). ADR-388: the scene marks a collinearly-contained segment `covered` — no base ink, no hit-target; the maximal container owns the run, so hide/dash act on the whole visible line, computed per configuration. Unit locks in `ink-dedup.test.ts`.
 

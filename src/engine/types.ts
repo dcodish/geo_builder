@@ -1045,6 +1045,16 @@ export type Command =
   // side is a REQUIREMENT: the verifier flags a wrong-side config (figure.v.insideRegion/outsideRegion),
   // so `meetsRequirements` (sampler / "show another") skips it — never a driven equality.
   | { type: 'point-polygon-side'; id: Id; poly: Id[]; side: 'inside' | 'outside' }
+  // «C ו-D בצדדים שונים של AB» / "C and D on different (the same) sides of AB" (issue #265, ADR-389) —
+  // points' RELATIVE side of a LINE through two points: the ADR-254 circle-side family, line edition.
+  // The two sides of a bare line have no canonical names, so the statement is RELATIONAL (`rel`):
+  // 'different' couples exactly two subjects across the line, 'same' couples ≥2 on one side. Same M1
+  // shape: a NEW subject becomes a FREE point seeded on its assigned side (an existing subject anchors
+  // the assignment); an EXISTING free point on the wrong side is re-seated (a better default, never a
+  // drive). The relation is a REQUIREMENT: the verifier flags a violating config
+  // (figure.v.lineSideDifferent/lineSideSame), so `meetsRequirements` (sampler / "show another") skips
+  // it — never a driven equality.
+  | { type: 'points-line-side'; a: Id; b: Id; subjects: Id[]; rel: 'different' | 'same' }
   // «CD חותך את AB» with NO crossing point named (issue #241, ADR-383): the two segments CROSS, stated as
   // a point-free REQUIREMENT — the ADR-166 within-both-segments meaning without minting a node (reading
   // (a): typing STATES the crossing; the ADR-380 forced-crossing dot then OFFERS the naming). The ADR-244

@@ -19,7 +19,7 @@ import { constraintRefs, describeConstraint, isSatisfied, residual } from './sol
 
 export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
-  relation: 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | Constraint['type'];
+  relation: 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'line-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | Constraint['type'];
   ids: Id[];
   /** English fallback, e.g. "E should lie on circle P (radius 3.60) but is 7.42 from its centre". */
   message: string;
@@ -381,6 +381,46 @@ export function checkGivens(
         message: `${cmd.id} should lie ${cmd.side} ${polyName}`,
         messageKey: cmd.side === 'outside' ? 'figure.v.outsideRegion' : 'figure.v.insideRegion',
         params: { point: cmd.id, poly: polyName },
+      });
+    }
+  }
+
+  // A stated points-vs-LINE side relation («C ו-D בצדדים שונים של AB», issue #265 — the ADR-254 side
+  // family, line edition): the subjects must lie STRICTLY off the line a–b, on different (resp. the
+  // same) sides, in every shown config. Same requirement discipline: `meetsRequirements` gates on a
+  // clean verifier, so the sampler / "show another configuration" skips violating configs; a genuinely
+  // contradicted relation (a subject pinned/derived onto the line or the wrong side) surfaces amber here.
+  for (const cmd of commands) {
+    if (cmd.type !== 'points-line-side') continue;
+    const pa = positions.get(cmd.a);
+    const pb = positions.get(cmd.b);
+    if (!pa || !pb) continue; // a ref isn't placed — a different failure mode
+    const L = dist(pa, pb);
+    if (L < 1e-9) continue; // degenerate carrier — not a measurable side
+    const offs: number[] = [];
+    let missing = false;
+    for (const id of cmd.subjects) {
+      const p = positions.get(id);
+      if (!p) {
+        missing = true;
+        break;
+      }
+      offs.push(((p.x - pa.x) * (pb.y - pa.y) - (p.y - pa.y) * (pb.x - pa.x)) / L);
+    }
+    if (missing) continue;
+    const tol = 1e-3 * Math.max(1, L); // strictly off the line — above solver noise, below anything visible
+    const strict = offs.every((o) => Math.abs(o) > tol);
+    const ok =
+      strict &&
+      (cmd.rel === 'different' ? offs.length === 2 && offs[0] * offs[1] < 0 : offs.every((o) => o * offs[0] > 0));
+    if (!ok) {
+      const seg = `${cmd.a}${cmd.b}`;
+      violations.push({
+        relation: 'line-side',
+        ids: [...cmd.subjects, cmd.a, cmd.b],
+        message: `${cmd.subjects.join(', ')} should lie on ${cmd.rel === 'different' ? 'different sides' : 'the same side'} of ${seg}`,
+        messageKey: cmd.rel === 'different' ? 'figure.v.lineSideDifferent' : 'figure.v.lineSideSame',
+        params: { points: cmd.subjects.join(', '), seg },
       });
     }
   }

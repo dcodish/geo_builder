@@ -4844,6 +4844,34 @@ const pointVsCircle: Rule = (s, ctx) => {
   return subjects.map((id) => ({ type: 'point-circle-side' as const, id, circle: circleId(center), side }));
 };
 
+/** «נקודת C ו D נמצאות בצדדים שונים של AB» / «C ו-D באותו צד של הישר AB» / "C and D are on different
+ *  (opposite) sides of AB" / "… the same side of AB" — points' RELATIVE side of a LINE (issue #265,
+ *  [ADR-389](../../../docs/06-decisions.md#adr-389) — the ADR-254/303 side family, line edition; the
+ *  utterance the #266 side-pair honesty gate refuses to let the LLM drop). Lowering: the carrier drawn
+ *  (idempotent `segment` — creates its endpoints if missing) + ONE relational `points-line-side`
+ *  requirement; apply seeds NEW subjects on their sides / re-seats a wrong-side free default (M1).
+ *  'different' takes exactly TWO subjects (a bare line has two sides); 'same' takes ≥2. A carrier
+ *  endpoint as a subject is meaningless (its own line) → defer. Tight full match (anchored), the
+ *  pointVsCircle shape. */
+const pointsVsLine: Rule = (s) => {
+  const m = s.match(
+    /^\s*(?:ה?נקודות\s+|ה?נקודה\s+|נקודת\s+|points?\s+)?((?:[A-Za-z]\d*)(?:(?:\s*,\s*|\s+ו-?\s*|\s+and\s+)[A-Za-z]\d*)*)\s+(?:נקודות\s+|נקודה\s+|(?:is\s+|are\s+)?(?:a\s+)?points?\s+)?(?:נמצא(?:ת|ות|ים)?\s+|is\s+|are\s+|lies?\s+|lie\s+)?(?:on\s+)?(בצדדים\s+(?:שונים|נגדיים)|מצדדים\s+שונים|משני\s+(?:ה?צדדים|צי?די)|באותו\s+ה?צד|מאותו\s+ה?צד|(?:different|opposite)\s+sides?|(?:the\s+)?same\s+side)\s+(?:של\s+)?(?:of\s+)?(?:ה?ישר\s+|ה?קטע\s+|the\s+line\s+|the\s+segment\s+|line\s+|segment\s+)?((?:[A-Z]\d*\s*){2})\s*\.?\s*$/i,
+  );
+  if (!m) return null;
+  const rel = /שונים|נגדיים|different|opposite|משני/i.test(m[2]) ? ('different' as const) : ('same' as const);
+  const pair = (m[3].match(/[A-Z]\d*/g) ?? []).map(up);
+  if (pair.length !== 2 || pair[0] === pair[1]) return null;
+  // UPPERCASE labels only (the ADR-076 list convention) — a lowercase run like "and" is a connective.
+  const subjects = (m[1].match(/[A-Z]\d*/g) ?? []).map(up);
+  if (new Set(subjects).size !== subjects.length) return null;
+  if (subjects.some((x) => pair.includes(x))) return null; // a carrier endpoint has no side of its own line
+  if (rel === 'different' ? subjects.length !== 2 : subjects.length < 2) return null;
+  return [
+    { type: 'segment' as const, a: pair[0], b: pair[1] }, // the carrier drawn (idempotent; creates its endpoints if missing)
+    { type: 'points-line-side' as const, a: pair[0], b: pair[1], subjects, rel },
+  ];
+};
+
 /**
  * TWO tangents to the circle, at two points ON it, meeting at a third point — "the tangent at A and the
  * tangent at C meet at D" / "המשיק [מ/ב]נקודה A והמשיק [מ/ב]נקודה C נפגשים בנקודה D" (the pole of chord
@@ -7445,6 +7473,7 @@ export const RULES: Rule[] = [
   pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)
   pointOnCircle, // "A on circle O" / the LIST "A ו C על המעגל" (every subject gets the membership) — before segment/pointOnSegment
   pointVsCircle, // "M מחוץ למעגל / בתוך המעגל" — a point's SIDE of a circle (ADR-254); tight full-match, after the external-point compounds
+  pointsVsLine, // «C ו-D בצדדים שונים של AB» — points' relative side of a LINE (#265, ADR-389); tight full-match, the pointVsCircle sibling
   pointOnTheLine, // "נקודה G על הקו" / "קו ועליו נקודה A" — THE definite unnamed line (#185); tight full-match, before the label-based point rules
   radiusSegment, // "OB רדיוס" — a drawn radius (rim point on the circle + centre→rim segment); after midpoint/setRadius/circle, before `segment` (so "OB" isn't grabbed as a bare segment)
   dividesInRatio, // "G מחלקת את DC ביחס 1:2" — a point on DC at a fixed t; keyword+`p:q` anchored, BEFORE `segment` (which would grab "הקטע DC" and drop the divider) and the numeric/ratio rules
@@ -8764,7 +8793,7 @@ export function droppedWordRelations(utterance: string, commands: AnyCommand[]):
   // `points-line-side` is #265's deterministic owner).
   if (
     /בצדדים\s+(?:שונים|נגדיים)|מצדדים\s+שונים|משני\s+(?:ה?צדדים|צי?די)|באותו\s+ה?צד(?![א-ת])|מאותו\s+ה?צד(?![א-ת])|\b(?:different|opposite)\s+sides?\b|\bsame\s+side\b/i.test(s) &&
-    !commands.some((c) => (c.type as string) === 'points-line-side' || c.type === 'point-circle-side' || c.type === 'point-polygon-side')
+    !commands.some((c) => c.type === 'points-line-side' || c.type === 'point-circle-side' || c.type === 'point-polygon-side')
   )
     out.push('צדדים');
   // Two-circle context for the mutual-position members: >=2 circle nouns or the plural — a point-side

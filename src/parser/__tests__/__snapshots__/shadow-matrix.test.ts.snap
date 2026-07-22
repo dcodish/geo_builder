@@ -947,6 +947,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "C and D are on different sides of AB",
+    "winner": "pointsVsLine",
+  },
+  {
+    "lang": "he",
+    "text": "C ו-D בצדדים שונים של AB",
+    "winner": "pointsVsLine",
+  },
+  {
+    "lang": "en",
     "text": "segment AC",
     "winner": "segment",
   },

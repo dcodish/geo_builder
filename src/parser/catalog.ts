@@ -76,6 +76,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'points', supported: true, en: 'M is the midpoint of AB', he: 'M אמצע AB', descEn: 'The midpoint of a segment.', descHe: 'אמצע הקטע.' },
   { category: 'points', supported: true, en: 'point F on the extension of AD', he: 'נקודה F על המשך AD', descEn: 'A point beyond a segment, on its ray.', descHe: 'נקודה על המשך הקטע (מעבר לקצה).' },
   { category: 'points', supported: true, en: 'point E lies inside triangle KAO', he: 'הנקודה E נמצאת בתוך המשולש KAO', descEn: 'A point kept inside (or outside) a polygon region. Combines with a carrier: "E is on circle O inside triangle KAO" keeps E on the circle AND inside the triangle.', descHe: 'נקודה שנשארת בתוך (או מחוץ ל) צורה. משתלב עם נשא: "הנקודה E נמצאת על מעגל O בתוך המשולש KAO" — גם על המעגל וגם בתוך המשולש.' },
+  { category: 'points', supported: true, en: 'C and D are on different sides of AB', he: 'C ו-D בצדדים שונים של AB', descEn: 'Two points kept on opposite sides of a line ("the same side" works too). New points are placed on their sides; the drawings keep the stated sides.', descHe: 'שתי נקודות שנשארות משני צידי ישר ("באותו צד" עובד גם). נקודות חדשות מוצבות בצד המתאים, והסרטוטים שומרים על הצדדים שנאמרו.' },
 
   // ── Lines & perpendiculars ──────────────────────────────────────────────
   { category: 'lines', supported: true, en: 'segment AC', he: 'קטע AC', descEn: 'Connect two points — or just type "AC" / "line AC" / "קו AC".', descHe: 'חיבור שתי נקודות — או פשוט "AC" / "ישר AC" / "קו AC".' },
