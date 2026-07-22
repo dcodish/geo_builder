@@ -34,7 +34,11 @@ export type ParseResult =
   | { ok: false; reason: 'ambiguous-circle'; center: string }
   // Every common tangent of the requested kind is already drawn (two of a kind / four in all) — a
   // further one does not exist; refuse deterministically, never a solver grind (#197 Am. 3).
-  | { ok: false; reason: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' };
+  | { ok: false; reason: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' }
+  // «נסמן זוית BAM כ-A1» whose NAME is already taken (an existing point, or an alias bound to a
+  // DIFFERENT angle) — the collision is the student's to resolve (pick another name), never a silent
+  // rebind and never an LLM guess (issue #235, ADR-386).
+  | { ok: false; reason: 'alias-taken'; name: string };
 
 /**
  * Figure context the parser may consult to resolve implicit references — chiefly
@@ -94,6 +98,10 @@ export interface ParseContext {
    *  to its circle here. Keyed by the letter, CASE-SENSITIVE (bagrut convention: R vs r are different
    *  radii). */
   radiusSymbols?: { name: string; circle: string; center: string }[];
+  /** ANGLE ALIASES bound by «נסמן זוית BAM כ-A1» (issue #235, ADR-386): name → the angle identity. The
+   *  parse seam rewrites «זוית A1»/«∠A1» to the aliased triple before the rules run, so every
+   *  angle-consuming rule (value, equality/ratio, acuteness, chains) gains the book notation at once. */
+  angleAliases?: { name: string; vertex: string; ray1: string; ray2: string }[];
   /** Existing COMMON tangents per circle pair (#197): touch pairs keyed by the sorted circle-id pair
    *  (`circle-O|circle-P`), recognised from the paired radius-⟂-tangent constraints — a repeated
    *  «משיק משותף» passes them as `avoid` so it takes an untaken tangent. */
@@ -174,7 +182,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' };
+type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -1652,14 +1660,31 @@ const angleAcuteness: Rule = (s, ctx) => {
  * angle are drawn (idempotent) so the stated angles are visible. A single angle with a numeric or
  * symbolic VALUE is handled by `angle` / `measureAngle`; this fires only when BOTH sides are angles.
  */
-const angleEquality: Rule = (s) => {
+const angleEquality: Rule = (s, ctx) => {
   if (!/(?:angle|∠|∢|זוו?ית)/i.test(s)) return null;
   const parts = s.split('=');
   if (parts.length !== 2) return null; // a single '=' (a chain "∠1=∠2=∠3" is handled by chainedEquality)
   const strip = (p: string) => p.replace(/angle|∠|∢|זוו?ית/gi, ' ');
-  const left = labelRun(strip(parts[0]), 3);
-  const right = labelRun(strip(parts[1]), 3); // null for a numeric/symbolic RHS ("= 37°", "= 2α") → defer to angle/measureAngle
+  // A side is a full 3-letter triple, or — the book's «∠B=∠C» (issue #235, the ADR-164 pattern) — a
+  // SINGLE vertex carrying its OWN angle keyword, resolved from the figure when the vertex has exactly
+  // two edges (one possible angle). ≠2 edges is the honest ambiguity — the clarification now also
+  // points at the «נסמן זוית … כ-B1» alias syntax, which is exactly what the book's subscripts solve.
+  const sideTriple = (p: string): [Id, Id, Id] | null | { clarify: 'ambiguous-angle'; vertex: string } => {
+    const t = labelRun(strip(p), 3);
+    if (t) return t as [Id, Id, Id];
+    if (!/(?:angle|∠|∢|זוו?ית)/i.test(p)) return null; // a single-vertex side must carry its own keyword
+    const one = labelRun(strip(p), 1);
+    if (!one) return null; // numeric/symbolic side ("= 37°", "= 2α") → defer to angle/measureAngle
+    const v = one[0];
+    const nb = (ctx.neighbors ?? {})[v] ?? [];
+    if (nb.length === 2) return [nb[0], v, nb[1]];
+    return { clarify: 'ambiguous-angle', vertex: v };
+  };
+  const left = sideTriple(parts[0]);
+  const right = sideTriple(parts[1]);
   if (!left || !right) return null;
+  if (!Array.isArray(left)) return left;
+  if (!Array.isArray(right)) return right;
   const coefM = parts[1].match(new RegExp(String.raw`(${COEF})\s*[*·]?\s*(?:angle|∠|∢|זוו?ית)`, 'i')); // "= 2∠DEF"
   const k = coefM ? parseFloat(coefM[1]) : 1;
   const [a1, v1, b1] = left;
@@ -1670,6 +1695,36 @@ const angleEquality: Rule = (s) => {
     { type: 'segment', a: v2, b: a2 },
     { type: 'segment', a: v2, b: b2 },
     { type: 'set-angle-ratio', v1, a1, b1, v2, a2, b2, k },
+  ];
+};
+
+/**
+ * «נסמן [את] [ה]זוית BAM כ-A1» / "denote angle BAM as A1" (issue #235, ADR-386) — bind an ANGLE ALIAS:
+ * the book's subscript notation for angles at a shared vertex. Explicit-נסמן only (operator scoping,
+ * 2026-07-22): no auto-numbering — an alias exists only when the student states it. The name is an
+ * uppercase letter + digits (the A1/B2 book style; a bare Greek letter stays the ADR-031 measure-var
+ * lane). Lowering: the two arm segments (idempotent ink, like a stated angle) + the data-only
+ * `angle-alias` record; the arc + the "A1" label ride the FR-RN-7 mark/measure-label streams. A taken
+ * name (an existing point, or an alias bound to a DIFFERENT angle) is the student's to resolve —
+ * `alias-taken`, never a silent rebind; re-stating the SAME binding is an idempotent no-op.
+ */
+const angleAliasRule: Rule = (s, ctx) => {
+  if (!/נסמן|denote|נסמנה/i.test(s)) return null;
+  if (!/(?:angle|∠|∢|זוו?ית)/i.test(s)) return null;
+  const m = s.match(
+    /(?:angle|∠|∢|ה?זוו?ית)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b[^A-Za-z]*?(?:כ-?\s*|ב-?\s*|\bas\s+|\bby\s+)([A-Z]\d+)(?![A-Za-z\d])/,
+  );
+  if (!m) return null;
+  const [r1, v, r2, name] = [up(m[1]), up(m[2]), up(m[3]), m[4]];
+  if (new Set([r1, v, r2]).size !== 3) return null;
+  const same = (ctx.angleAliases ?? []).find((al) => al.name === name);
+  if (same && !(same.vertex === v && ((same.ray1 === r1 && same.ray2 === r2) || (same.ray1 === r2 && same.ray2 === r1))))
+    return { clarify: 'alias-taken', name };
+  if (!same && (ctx.points ?? []).some((p) => up(p) === name)) return { clarify: 'alias-taken', name };
+  return [
+    { type: 'segment', a: v, b: r1 },
+    { type: 'segment', a: v, b: r2 },
+    { type: 'angle-alias', name, vertex: v, ray1: r1, ray2: r2 },
   ];
 };
 
@@ -3036,9 +3091,12 @@ const freePoint: Rule = (s) => {
  * later constraint (`AB=5`, `∠…`) recruits it. Runs after the coordinate `freePoint` (which owns the
  * `נקודה A ב-(0,0)` form) so an explicit placement is never swallowed as a bare point.
  */
-const bareFreePoint: Rule = (s) => {
+const bareFreePoint: Rule = (s, ctx) => {
   const m = s.match(/^\s*(?:הוסף\s+|add\s+)?(?:ה?נקודה|point)\s+([A-Za-z]\d*)\s*$/i);
   if (!m) return null;
+  // A name bound as an ANGLE ALIAS (#235) is not a point — an `ifAbsent` free point would silently
+  // no-op against the alias record (a point the student never got). The collision is theirs to resolve.
+  if ((ctx.angleAliases ?? []).some((al) => al.name === up(m[1]))) return { clarify: 'alias-taken', name: up(m[1]) };
   return [{ type: 'free-point', id: up(m[1]), x: 3, y: 2, free: true, ifAbsent: true }];
 };
 
@@ -7345,7 +7403,8 @@ export const RULES: Rule[] = [
   lengthProduct, // «DM·ME = BM·DR», «DM/ME = BM/DM», «4·DM² = BM·ME» → set-length-product (cross-multiplied)
   arcEquality, // "⌢DE = 2⌢CE" / "קשת DE = 2 קשת CE" (arc-measure ratio → central-angle ratio) — own keyword, before angleEquality
   arcValue, // "קשת AB = 40" / "⌢{AB} = 40°" (absolute arc measure → set-angle at the centre) — MUST precede the length-value rules, which used to claim the degrees as a chord LENGTH
-  angleEquality, // "∠ABC = ∠DEF" (two angles equal) — before measureAngle/angle, which expect a value RHS
+  angleAliasRule, // «נסמן זוית BAM כ-A1» — bind an ANGLE ALIAS (#235); before the value/equality rules (its utterance carries no '=' so no theft either way)
+  angleEquality, // "∠ABC = ∠DEF" (two angles equal, incl. single-vertex «∠B=∠C» via ctx.neighbors — #235) — before measureAngle/angle, which expect a value RHS
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,
   tangentsFromExternal, // TWO tangents from an external point — before the single tangentLine
@@ -8139,8 +8198,18 @@ const normalizeInscriptionSlip = (s: string): string =>
     .replace(/circumscrib\w+(?=\s+in\s+(?:a\s+|the\s+|another\s+)?(?:circle|triangle|square|rectangle|rhombus|kite|trapezoid|parallelogram|quadrilateral))/gi, 'inscribed');
 
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
-  const s = normalizeUtterance(raw);
+  let s = normalizeUtterance(raw);
   if (!s) return { ok: false, reason: 'not-handled' };
+  // ANGLE-ALIAS resolution (issue #235, ADR-386) — the sibling ctx-aware REWRITE at the same chokepoint
+  // as the size-qualifier/ordinal rewrites below: each bound alias name («נסמן זוית BAM כ-A1») rewrites
+  // «זוית A1»/«∠A1» to the aliased triple («זוית BAM»), so EVERY angle-consuming rule — value,
+  // equality/ratio, acuteness, chains — gains the book notation at once. Only an ANGLE-position
+  // reference rewrites (the name right after an angle keyword): a bare `A1` stays a point token (the
+  // ADR-228 subscript convention), and the naming statement's own «כ-A1» is untouched.
+  for (const al of ctx.angleAliases ?? []) {
+    const re = new RegExp(String.raw`((?:angle|∠|∢|ה?זוו?ית)\s*)${al.name}(?![A-Za-z\d])`, 'gi');
+    s = s.replace(re, `$1${al.ray1}${al.vertex}${al.ray2}`);
+  }
   // «המעגל הגדול/הקטן» between two INDEPENDENT circles (issue #102, operator ruling): the size
   // qualifier both REFERS and ASSERTS — resolve the reference to a concrete circle (recorded roles
   // first, else assign by the drawn sizes) and, on a first ASSIGNING use, append the R>r-like
@@ -8472,6 +8541,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).
     if (res.clarify === 'ambiguous-angle') return { ok: false, reason: 'ambiguous-angle', vertex: res.vertex };
     if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };
+    if (res.clarify === 'alias-taken') return { ok: false, reason: 'alias-taken', name: res.name };
     return { ok: false, reason: 'ambiguous-circle', center: res.center };
   }
   return { ok: false, reason: 'not-handled' };

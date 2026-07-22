@@ -164,6 +164,9 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     radiusSymbols: construction.objects.flatMap((o) =>
       o.kind === 'circle' && o.radiusSymbol ? [{ name: o.radiusSymbol, circle: o.id, center: o.center }] : [],
     ), // "R = 1.5r" / "R > r" resolve each letter to its circle (issue #54)
+    angleAliases: construction.objects.flatMap((o) =>
+      o.kind === 'angle-alias' ? [{ name: o.id, vertex: o.vertex, ray1: o.ray1, ray2: o.ray2 }] : [],
+    ), // «נסמן זוית BAM כ-A1» — «זוית A1» resolves through the alias at the parse seam (issue #235)
     radiusOrder: construction.objects.flatMap((o) =>
       o.kind === 'circle' && o.orderedBelow ? [{ outer: o.orderedBelow, inner: o.id }] : [],
     ), // recorded size roles — «המעגל הגדול/הקטן» resolves consistently once assigned (issue #102)

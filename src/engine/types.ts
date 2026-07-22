@@ -546,7 +546,25 @@ export interface Arc {
   minor?: boolean;
 }
 
-export type GeoObject = GeoPoint | Segment | Polygon | Line | Circle | Arc;
+/**
+ * A named ANGLE IDENTITY — the book's «נסמן זוית BAM כ-A1» (issue #235, ADR-386): `id` is the alias
+ * name (A1), bound to the wedge ∠(ray1, vertex, ray2). A pure DATA record in the object list (angles
+ * are not otherwise objects): `evaluate` never visits it (its sweeps filter points/lines/circles), the
+ * renderer never draws it (the arc + the "A1" text ride the FR-RN-7 mark + measure-label streams), and
+ * detection never sees it (not a point kind). Living in `objects` gives the name id-registry
+ * visibility for free: a later «נקודה A1» hits the ordinary conflict path, `commandPointIds` counts
+ * the name as taken for rename/swap, and `buildParseCtx` reads the map back as `ctx.angleAliases` so
+ * «זוית A1» resolves at the parse seam — the radius-symbol (#54) shape, angle edition.
+ */
+export interface AngleAlias {
+  kind: 'angle-alias';
+  id: Id;
+  vertex: Id;
+  ray1: Id;
+  ray2: Id;
+}
+
+export type GeoObject = GeoPoint | Segment | Polygon | Line | Circle | Arc | AngleAlias;
 
 /** The object ids a {@link LineSpec} references (the points/circle that define the line). */
 function lineSpecRefs(spec: LineSpec): Id[] {
@@ -630,6 +648,8 @@ export function objectParents(o: GeoObject): Id[] {
       ];
     case 'arc':
       return [o.center, o.from, o.to];
+    case 'angle-alias':
+      return [o.vertex, o.ray1, o.ray2]; // the alias depends on its wedge's points (delete/deselect cascade)
   }
   const _exhaustive: never = o;
   return _exhaustive;
@@ -958,6 +978,10 @@ export type Command =
   // radius stays a free DOF. Read back by the parser context (relations "R = 1.5r" / "R > r"), the
   // symbolic-measure lowering ("AB = √2R" couples to THIS circle), and the radius-slider labels.
   | { type: 'radius-symbol'; circle: Id; name: string }
+  // «נסמן זוית BAM כ-A1» (issue #235, ADR-386): bind the alias NAME to the angle identity ∠(ray1,
+  // vertex, ray2). Stored as the data-only `angle-alias` object (id = name, so the id registry and the
+  // conflict path see it); the parse seam then rewrites «זוית A1» to the triple for every angle rule.
+  | { type: 'angle-alias'; name: Id; vertex: Id; ray1: Id; ray2: Id }
   // radius(c1) = k · radius(c2) — a RATIO between two circles' radii ("R = 1.5r", "R/r = 2√7/5"). Lowered
   // at apply to an ordinary `ratio` constraint over (centre, on-circle witness) pairs — a witness point on
   // each circle is resolved from the figure or minted as a hidden pinned `~radw-*` rider — so the existing

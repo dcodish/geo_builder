@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `angle-alias-book-notation` — the book-74 figure through «נסמן זוית ACB כ-C1» + «זוית C1 = זוית E1» (#235, ADR-386)
+Prod session `ne810woo` (2026-07-20): «∠C=∠BED» died not-understood — C carries three edges, so the single-vertex resolution is honestly ambiguous, which is what the book's subscripts exist to solve; the tool had no way to state them. Now «נסמן זוית BAM כ-A1» binds an angle ALIAS (a data-only `angle-alias` object — id-registry visible, arc + name label on the wedge), «זוית A1» rewrites to the triple at the parse seam so every angle rule gains the notation, «∠B=∠C» resolves bare 2-edge vertices (ambiguous → the clarification now suggests נסמן), and the collision lanes refuse honestly (`alias-taken`, both directions). The scenario keeps the operator's equality-first order so ADR-384 composes. Unit locks in `angle-alias.test.ts`.
+
 ### `infeasible-quarter-circle-refuses-honestly` — a structurally impossible quarter circle is a red refusal, never a parked deferral (#207, ADR-385)
 Prod session `3yrpvz14` (2026-07-18): «רבע מעגל ODC» with D on the LEG (∠OCD=90° ⇒ |OD|>|OC| always) parked as `deferred-constraint` («add the remaining givens») — asserting missing givens that could never help. The submit route consulted only half the classifier's gate; `deferralWorthwhile` (= `hasDeferrableConstraint` + `constraintIsPending`) is now the ONE shared gate for App.submit, the submit-gate props harness, and `classify`. Gate locks (refusal + the ADR-104 early-⟂ control + the feasible D-on-AB twin r=6) in `deferral-gate.test.ts`; this scenario locks the committed-form honesty (specific error, never pending, prior figure intact). Perf residual (the ~30s concluded-infeasibility ladder) filed as #259.
 

@@ -203,6 +203,38 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'angle-alias-book-notation',
+    title: 'The book-74 figure through the A1/D1 subscript notation: «נסמן זוית ACB כ-C1» + «זוית C1 = זוית E1» (#235, ADR-386)',
+    guards:
+      "Prod session `ne810woo` (2026-07-20, book exercise 74): «∠C=∠BED» and «זוית C שווה לזוית BED» died not-understood — C carries three edges there, so even the ADR-164 single-vertex resolution is honestly ambiguous, which is exactly what the book's A1/B1 subscripts exist to solve, and the tool had no way to state them. Now: «נסמן זוית ACB כ-C1» binds the alias (arc + the C1 label on the wedge), «זוית C1 = זוית E1» resolves both names at the parse seam to the same set-angle-ratio the spelled-out triples produce, and the figure closes to the book values. Steps deliberately keep the operator's equality-before-membership order, so this scenario also re-locks the ADR-384 conversion composing with the alias flow.",
+    steps: [
+      'AB אנך ל CD',
+      'B על CD',
+      'BC=BE',
+      'E על AB',
+      'ED',
+      'AC',
+      'נסמן זוית ACB כ-C1',
+      'נסמן זוית BED כ-E1',
+      'זוית C1 = זוית E1',
+      'CD=14',
+      'BD=8',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const [B, C, D, E] = ['B', 'C', 'D', 'E'].map((id) => at(fig, id));
+      expect(dist(C, D)).toBeCloseTo(14, 1);
+      expect(dist(B, D)).toBeCloseTo(8, 1);
+      expect(dist(B, C)).toBeCloseTo(6, 1);
+      expect(dist(B, E)).toBeCloseTo(6, 1);
+      // The wedges carry their bound names.
+      const texts = fig.labels.angles.map((a) => a.text);
+      expect(texts).toContain('C1');
+      expect(texts).toContain('E1');
+    },
+  },
+  {
     id: 'infeasible-quarter-circle-refuses-honestly',
     title: 'The quarter circle whose |OC|=|OD| is structurally impossible stays an HONEST red error, never a parked deferral (#207, ADR-385)',
     guards:
