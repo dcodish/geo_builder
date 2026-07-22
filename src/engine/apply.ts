@@ -1371,6 +1371,16 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
     }
 
+    case 'segments-cross':
+      // «CD חותך את AB» with no point named (issue #241, ADR-383) — the point-free crossing REQUIREMENT.
+      // The command itself is the record: the givens verifier re-derives it from the final coordinates
+      // (figure.v.segmentsCross) and `meetsRequirements` / the shared sample core gate sampling and
+      // "show another" on it — nothing is pushed to `constraints` (the ADR-244 radius-order shape).
+      // Here we only improve the DEFAULT, exactly as a NAMED `onSeg` meet does: a genuinely loose
+      // endpoint is re-seated so the stated crossing exists at the starting placement (ADR-255).
+      reseatLooseMeetEndpoint(objects, constraints, pos, [cmd.a, cmd.b], [cmd.c, cmd.d]);
+      break;
+
     case 'point-on-circle': {
       // Re-defining an EXISTING point as "on circle C" is a RELATION on that point, not a fresh
       // vertex — and `addObj` would silently no-op it (the "green but E isn't on the circle" bug).

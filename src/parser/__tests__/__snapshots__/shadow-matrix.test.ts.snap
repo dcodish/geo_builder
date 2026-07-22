@@ -961,6 +961,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "CD bisects AB",
+    "winner": "bisectsSegment",
+  },
+  {
+    "lang": "he",
+    "text": "CD חוצה את AB",
+    "winner": "bisectsSegment",
+  },
+  {
+    "lang": "en",
     "text": "F is the foot of the perpendicular from C to AD",
     "winner": "foot",
   },
@@ -1098,6 +1108,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "lang": "he",
     "text": "AD חוצה את הזווית BAC",
     "winner": "bisectorPlacesPoint",
+  },
+  {
+    "lang": "en",
+    "text": "CD cuts AB",
+    "winner": "lineLineIntersection",
+  },
+  {
+    "lang": "he",
+    "text": "CD חותך את AB",
+    "winner": "lineLineIntersection",
   },
   {
     "lang": "en",

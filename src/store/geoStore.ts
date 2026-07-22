@@ -1035,9 +1035,40 @@ export function intersectionsWithinSegments(fig: Derived, margin = WITHIN_MARGIN
   return true;
 }
 
+/** The infinite-line crossing params of segments a–b and c–d over a positions map (t1 along a–b, t2 along
+ *  c–d), or null when the lines are parallel or an endpoint is unplaced. */
+function crossParamsAt(posn: Map<Id, Vec>, a: Id, b: Id, c: Id, d: Id): { t1: number; t2: number } | null {
+  const pa = posn.get(a), pb = posn.get(b), pc = posn.get(c), pd = posn.get(d);
+  if (!pa || !pb || !pc || !pd) return null;
+  const den = (pb.x - pa.x) * (pd.y - pc.y) - (pb.y - pa.y) * (pd.x - pc.x);
+  if (Math.abs(den) < 1e-12) return null;
+  return {
+    t1: ((pc.x - pa.x) * (pd.y - pc.y) - (pc.y - pa.y) * (pd.x - pc.x)) / den,
+    t2: ((pc.x - pa.x) * (pb.y - pa.y) - (pc.y - pa.y) * (pb.x - pa.x)) / den,
+  };
+}
+
+/**
+ * Does every point-free CROSSING statement («CD חותך את AB» with no point named — `segments-cross`,
+ * issue #241 / [ADR-383](docs/06-decisions.md#adr-383)) hold — the two segments cross WITHIN both spans?
+ * The ADR-166 bar without a named point: the same strict margin as {@link intersectionsWithinSegments},
+ * computed from the operands' own endpoints since there is no crossing point to read. A still-unplaced
+ * operand (pending figure) is a different failure mode, skipped here.
+ */
+export function segmentsCrossWithin(facts: Fact[], posn: Map<Id, Vec>, margin = WITHIN_MARGIN): boolean {
+  for (const f of facts) {
+    const cmd = f.cmd;
+    if (!f.enabled || cmd.type !== 'segments-cross') continue;
+    if (![cmd.a, cmd.b, cmd.c, cmd.d].every((id) => posn.has(id))) continue; // pending — skip
+    const t = crossParamsAt(posn, cmd.a, cmd.b, cmd.c, cmd.d);
+    if (!t || t.t1 < margin || t.t1 > 1 - margin || t.t2 < margin || t.t2 > 1 - margin) return false;
+  }
+  return true;
+}
+
 /** The reflection mask (over {@link reflectableFreePoints}) that mirrors exactly the apex free points whose
  *  on-segment meet currently lands off the segment — the targeted first guess for the reflection search. */
-function reflectMaskForFailing(fig: Derived): number {
+function reflectMaskForFailing(fig: Derived, facts: Fact[] = []): number {
   const pts = reflectableFreePoints(fig.construction);
   if (pts.length === 0) return 0;
   const culprits = new Set<Id>();
@@ -1047,6 +1078,13 @@ function reflectMaskForFailing(fig: Derived): number {
     const t2 = o.onSeg || o.onSeg2 ? segParam(fig, o.c, o.d, o.id) : null;
     if (t1 !== null && (t1 < WITHIN_MARGIN || t1 > 1 - WITHIN_MARGIN)) { culprits.add(o.a); culprits.add(o.b); }
     if (t2 !== null && (t2 < WITHIN_MARGIN || t2 > 1 - WITHIN_MARGIN)) { culprits.add(o.c); culprits.add(o.d); }
+  }
+  // The point-free crossing statement (`segments-cross`, ADR-383) has the same discrete apex DOF —
+  // a currently-failing one blames its own operand endpoints, exactly like a named `onSeg` meet.
+  for (const f of facts) {
+    const cmd = f.cmd;
+    if (!f.enabled || cmd.type !== 'segments-cross') continue;
+    if (!segmentsCrossWithin([f], fig.positions)) for (const id of [cmd.a, cmd.b, cmd.c, cmd.d]) culprits.add(id);
   }
   let mask = 0;
   pts.forEach((id, i) => { if (culprits.has(id)) mask |= 1 << i; });
@@ -1093,10 +1131,13 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   const base0 = replay(facts, from);
   const reflectable = reflectableFreePoints(base0.construction);
   const hasOnSeg = base0.construction.objects.some((o) => o.kind === 'line-line-intersection' && (o.onSeg || o.onSeg1 || o.onSeg2));
-  if (!hasExt && !hasOnSeg) return from; // nothing to satisfy → keep the seed
-  const ok = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig) && intersectionsWithinSegments(fig);
+  // The point-free crossing statement (`segments-cross`, issue #241 / ADR-383) is the same discrete
+  // requirement as a named `onSeg` meet — it joins every bar and the reflection search below.
+  const hasCross = facts.some((f) => f.enabled && f.cmd.type === 'segments-cross');
+  if (!hasExt && !hasOnSeg && !hasCross) return from; // nothing to satisfy → keep the seed
+  const ok = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig) && intersectionsWithinSegments(fig) && segmentsCrossWithin(facts, fig.positions);
   // The ADR-142 acceptance bar: a SHARED-ENDPOINT extension counts on EITHER side (see extensionsClear).
-  const okRelaxed = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig, true) && intersectionsWithinSegments(fig);
+  const okRelaxed = (fig: Derived) => fig.lastError === null && extensionsClear(facts, fig, true) && intersectionsWithinSegments(fig) && segmentsCrossWithin(facts, fig.positions);
   if (ok(base0)) return from; // the current view already satisfies every requirement
   // Candidate seeds in priority order. When a segment-meet is off its segment the cause is almost always an
   // apex pointing the wrong way, which plain re-seeding rarely fixes — so try the REFLECTION seeds first
@@ -1104,8 +1145,8 @@ export function firstSatisfyingSeed(facts: Fact[], from = 0, budget = 120, budge
   // band of continuous seeds (the apex flips inward, the seed varies the rest of the shape so the crossing
   // lands cleanly inside). Then the plain seeds (extensions; also an on-seg figure fixable by re-seed alone).
   const seeds: number[] = [];
-  if (hasOnSeg && reflectable.length > 0) {
-    const targeted = reflectMaskForFailing(base0);
+  if ((hasOnSeg || hasCross) && reflectable.length > 0) {
+    const targeted = reflectMaskForFailing(base0, facts);
     const subsets = Array.from({ length: (1 << reflectable.length) - 1 }, (_, i) => i + 1);
     const masks = [targeted, ...subsets].filter((m, i, a) => m > 0 && a.indexOf(m) === i);
     for (const m of masks) for (let s = 0; s < 24; s++) seeds.push(withReflectMask(m, s));
@@ -1153,6 +1194,7 @@ export function meetsRequirements(facts: Fact[], seed = 0, relaxExtensions = fal
     // (issue #19: `findValidConfig` used to strictly reject the very seed the fallback found).
     extensionsClear(facts, fig, relaxExtensions) &&
     intersectionsWithinSegments(fig) &&
+    segmentsCrossWithin(facts, fig.positions) &&
     pointsDistinct(fig.construction, fig.positions, fig.coincidences) &&
     polygonsConvex(facts, fig.positions)
   );
@@ -1377,7 +1419,7 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, o
   // record gates all future sampling; refusing it as "nothing to add" swallowed the student's statement,
   // the ADR-234 class). An EXACT duplicate of an enabled fact stays a friendly no-op — the statement
   // genuinely IS already on the figure.
-  const REQUIREMENT_DATA = new Set(['radius-symbol', 'set-radius-order', 'point-polygon-side', 'point-circle-side', 'set-circle-position']);
+  const REQUIREMENT_DATA = new Set(['radius-symbol', 'set-radius-order', 'point-polygon-side', 'point-circle-side', 'set-circle-position', 'segments-cross']);
   const enabledCmdList = facts.filter((f) => f.enabled).map((f) => f.cmd);
   const dataOnly =
     commands.length > 0 &&
@@ -1517,7 +1559,9 @@ function samplingJobs(facts: Fact[]) {
     // Drop unforced point-collapse degeneracies before the requirement filter (ADR-295 / issue #50): a seed
     // where two independent points coincide only sometimes is not a configuration of the figure, and would
     // otherwise poison the ground-truth pool the relations/shapes layers share.
-    const within = requirementSamples(c0, distinctSamples(c0, converged));
+    // A point-free crossing statement (`segments-cross`, ADR-383) is fact-level like the extensions, so
+    // its sample filter lives HERE (the store core), not in the object-level `requirementSamples`.
+    const within = requirementSamples(c0, distinctSamples(c0, converged)).filter((pos) => segmentsCrossWithin(facts, pos));
     const strict = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived));
     if (strict.length >= 2) return (sampleMemo = { facts, constructions, samples: strict });
     // The ADR-267 preference ladder: when the letter-order side is unachievable (no strict samples), the

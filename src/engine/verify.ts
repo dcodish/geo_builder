@@ -19,7 +19,7 @@ import { constraintRefs, describeConstraint, isSatisfied, residual } from './sol
 
 export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
-  relation: 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | Constraint['type'];
+  relation: 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | Constraint['type'];
   ids: Id[];
   /** English fallback, e.g. "E should lie on circle P (radius 3.60) but is 7.42 from its centre". */
   message: string;
@@ -226,6 +226,33 @@ export function checkGivens(
         message: `${cmd.id} should lie ${cmd.side} ${circleLabel(cmd.circle)} (radius ${c.r.toFixed(2)}) but is ${d.toFixed(2)} from its centre`,
         messageKey: cmd.side === 'outside' ? 'figure.v.outsideCircle' : 'figure.v.insideCircle',
         params: { point: cmd.id, circle: circleName(cmd.circle), radius: c.r.toFixed(2), dist: d.toFixed(2) },
+      });
+    }
+  }
+
+  // A stated bare CROSSING with no point named («CD חותך את AB», issue #241 / ADR-383): the two
+  // segments must cross WITHIN both spans — the ADR-166 meaning, point-free. The endpoints are free
+  // DOFs (ADR-052), so a sampled config can pull them apart — `meetsRequirements` gates on a clean
+  // verifier, so the sampler / "show another configuration" skips non-crossing configs; a genuinely
+  // contradicted crossing (the segments pinned apart) surfaces amber here.
+  for (const cmd of commands) {
+    if (cmd.type !== 'segments-cross') continue;
+    const pa = positions.get(cmd.a);
+    const pb = positions.get(cmd.b);
+    const pc = positions.get(cmd.c);
+    const pd = positions.get(cmd.d);
+    if (!pa || !pb || !pc || !pd) continue; // pending / not placed — a different failure mode
+    const den = (pb.x - pa.x) * (pd.y - pc.y) - (pb.y - pa.y) * (pd.x - pc.x);
+    const t1 = Math.abs(den) < 1e-12 ? null : ((pc.x - pa.x) * (pd.y - pc.y) - (pc.y - pa.y) * (pd.x - pc.x)) / den;
+    const t2 = Math.abs(den) < 1e-12 ? null : ((pc.x - pa.x) * (pb.y - pa.y) - (pc.y - pa.y) * (pb.x - pa.x)) / den;
+    const off = (t: number | null) => t === null || t < -0.02 || t > 1.02;
+    if (off(t1) || off(t2)) {
+      violations.push({
+        relation: 'segments-cross',
+        ids: [cmd.a, cmd.b, cmd.c, cmd.d],
+        message: `${cmd.a}${cmd.b} and ${cmd.c}${cmd.d} were stated to cross, but they don't in this drawing`,
+        messageKey: 'figure.v.segmentsCross',
+        params: { s1: `${cmd.a}${cmd.b}`, s2: `${cmd.c}${cmd.d}` },
       });
     }
   }
