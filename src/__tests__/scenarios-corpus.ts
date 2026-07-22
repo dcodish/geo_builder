@@ -203,6 +203,24 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'equality-before-membership-order-independence',
+    title: '«BC=BE» typed before «E על AB» builds the book figure — membership CONVERTS the busy free point (#236, ADR-384)',
+    guards:
+      "Prod session `ne810woo` (2026-07-20, book exercise 74 — AB⊥CD, B on CD, E on AB, BC=BE, ∠ACB=∠BED, CD=14, BD=8): the operator's typed order failed over-constrained on the angle and BD=8 (|BC| drew 1.61 instead of the book's 6) while the SAME set with «E על AB» first built perfectly. Root cause (M2 law (i)): «E על AB» about the existing busy free E lowered to a generic collinear that claimed ANOTHER free point (B!) as its carrier, leaving E a phantom 2-DOF — ownership spread across unrelated points until the later givens found every carrier busy. `reinterpretAsCollinear` now CONVERTS a free, non-pinned P into the on-segment rider the statement declares (t at P's projection, the ADR-140 directive carried whole) — the on-segment edition of apply's on-circle (c2). The four entry orders are locked in membership-conversion.test.ts; the sizes-early residual (an amber-settled driven constraint never re-enters the order-independence machinery) is #258.",
+    steps: ['AB אנך ל CD', 'B על CD', 'BC=BE', 'E על AB', 'ED', 'AC', '∠ACB=∠BED', 'CD=14', 'BD=8'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const [A, B, C, D, E] = ['A', 'B', 'C', 'D', 'E'].map((id) => at(fig, id));
+      expect(dist(C, D)).toBeCloseTo(14, 1);
+      expect(dist(B, D)).toBeCloseTo(8, 1);
+      expect(dist(B, C)).toBeCloseTo(6, 1);
+      expect(dist(B, E)).toBeCloseTo(6, 1);
+      const dot = (E.x - A.x) * (D.x - C.x) + (E.y - A.y) * (D.y - C.y);
+      expect(Math.abs(dot) / (dist(A, E) * dist(C, D)), 'AB ⊥ CD holds').toBeLessThan(0.02);
+    },
+  },
+  {
     id: 'bare-crossing-statement-states-no-label',
     title: '«CD חותך את AB» with no point named STATES the crossing and invents no label (#241, ADR-383)',
     guards:

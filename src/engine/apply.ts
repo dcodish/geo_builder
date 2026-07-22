@@ -731,7 +731,7 @@ function placeBase(objects: GeoObject[], template: BaseVertex[], pos: Map<Id, Ve
  * `evaluate` as "unresolved dependencies". The membership must then fall through to the
  * constraint/size lowerings instead (ADR-354).
  */
-function wouldInvertDependency(objects: GeoObject[], x: Id, refs: Id[]): boolean {
+export function wouldInvertDependency(objects: GeoObject[], x: Id, refs: Id[]): boolean {
   const byId = new Map(objects.map((o) => [o.id, o] as const));
   const seen = new Set<Id>();
   const queue = [...refs];

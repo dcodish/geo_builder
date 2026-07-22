@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `equality-before-membership-order-independence` — «BC=BE» before «E על AB» builds the book figure (#236, ADR-384)
+Prod session `ne810woo` (2026-07-20, book exercise 74): the typed order failed over-constrained (|BC| drew 1.61 for the book's 6) while the membership-first order built — M2 law (i) violated. Root cause: a membership statement about an existing busy FREE point lowered to a generic collinear claiming ANOTHER free point as carrier (ownership spread; the phantom 2-DOF stayed). `reinterpretAsCollinear` now CONVERTS a free non-pinned P to the declared on-segment rider (projection-seeded t, the ADR-140 directive carried whole) — the on-segment edition of the on-circle (c2) conversion. Book values asserted (14/8/6/6 + the ⊥). Class locks (all four entry orders + the conversion fences) in `membership-conversion.test.ts`; residual #258 (amber-settled constraints vs order-independence) and #260 (two-host rider membership) filed.
+
 ### `bare-crossing-statement-states-no-label` — «CD חותך את AB» with no point named states the crossing, invents no label (#241, ADR-383)
 Operator session `i1mt2us8` (2026-07-21): the unnamed crossing statement escalated to the LLM and died not-understood — and the same sentence later returned a figure with an invented point M («AB חותך את CD» → `M חיתוך AB ו-CD`), a coin flip in what the figure contains. Reading (a): the sentence now lowers deterministically to the point-free `segments-cross` requirement (within both spans, the ADR-166 meaning, the ADR-244 requirement shape) — no label is created, apply improves the default via the ADR-255 reseat, the verifier (`figure.v.segmentsCross`) + `meetsRequirements` + the shared sample core keep every shown configuration crossing, and the ADR-380 forced-crossing dot then offers the naming. Unit locks in `segments-cross.test.ts`.
 

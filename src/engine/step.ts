@@ -9,7 +9,7 @@
 
 import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, SolveDirective, Vec } from './types';
 import { LEN_EPS, isGeoPoint } from './types';
-import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeLowersToConstraints } from './apply';
+import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeLowersToConstraints, wouldInvertDependency } from './apply';
 import { lower } from './lower';
 import { evaluate, resolveDriven } from './evaluate';
 import type { EvalResult } from './evaluate';
@@ -377,7 +377,7 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   if (conflict) {
     const constrained =
       reinterpretAsConstraint(prev, ncmd) ??
-      reinterpretAsCollinear(prev, ncmd) ??
+      reinterpretAsCollinear(prev, ncmd, prevPositions) ??
       replaceCyclicForDiameter(prev, ncmd) ??
       reinterpretDiameter(prev, ncmd);
     if (constrained) {
@@ -1258,22 +1258,51 @@ function driveHardOn(objects: GeoObject[], priorConstraints: Constraint[], carri
 }
 
 /**
- * Reinterpret a redefining "P on segment a→b" (incl. the "on the extension of" form) as a
- * COLLINEARITY + ORDER constraint on the EXISTING P: instead of erroring "P is already defined",
- * keep P and constrain it onto the stated stretch of the line (ADR-050, generalized by M1/ADR-231).
- * This is the on-line analogue of {@link reinterpretAsConstraint} (which handles a fixed second
- * *placement* via a coincidence). ANY existing point kind qualifies — a free/derived/busy P simply
- * makes the constraint fall to applyStep's normal solve path (own carrier → driven; otherwise the
- * failure path recruits the figure's drivable DOFs; genuinely unsatisfiable → an honest
- * over-constraint, never a redefinition conflict). The statement's DIRECTION is kept, per the
- * bare-segment principle (ADR-077) and directional המשך (ADR-054): "P on a–b" means BETWEEN
+ * Reinterpret a redefining "P on segment a→b" (incl. the "on the extension of" form) on the EXISTING P
+ * (ADR-050, generalized by M1/ADR-231) — instead of erroring "P is already defined":
+ *
+ * **Conversion first (issue #236, ADR-384 — M2 law (i), the on-segment edition of apply's on-circle
+ * (c2)/ADR-140).** A membership statement about a FREE, non-pinned P says P has ONE fewer DOF — so
+ * CONVERT it to the parametric rider the statement declares (`on-segment`, t seeded at the projection
+ * of where P currently stands — M1 stability), carrying a `solve` directive P already owns onto the
+ * rider whole (incl. ADR-229 `also` — the rider's t becomes the directive's carrier, exactly what the
+ * membership-first entry order produces). The old lowering kept a phantom 2-DOF P PLUS a generic
+ * collinear that claimed some OTHER free point as its carrier, so ownership spread to unrelated points
+ * and satisfiability depended on entry order — «BC=BE» then «E על AB» wedged where the reverse order
+ * built (the #236 book figure). Betweenness is structural on the rider (t ∈ (0,1)); no order
+ * constraint is needed.
+ *
+ * **Constraint fallback** for everything the conversion can't own: a non-free/pinned/rigid P, a P the
+ * segment's endpoints depend on (dependency inversion), and the EXTENSION form (an extension rider's
+ * t is not a `free`-sampled DOF — ADR-064/ADR-074 — so the beyond-order constraint remains the honest
+ * encoding): keep P and constrain it onto the stated stretch. The statement's DIRECTION is kept, per
+ * the bare-segment principle (ADR-077) and directional המשך (ADR-054): "P on a–b" means BETWEEN
  * (order a,P,b); "P on the extension of a–b" means BEYOND b (order a,b,P).
  */
-function reinterpretAsCollinear(prev: Construction, cmd: Command): Construction | null {
+function reinterpretAsCollinear(prev: Construction, cmd: Command, prevPos?: Map<Id, Vec>): Construction | null {
   if (cmd.type !== 'point-on-segment') return null;
   if (cmd.id === cmd.a || cmd.id === cmd.b) return null; // "A on AB" is malformed → the plain conflict
   const existing = prev.objects.find((o) => o.id === cmd.id);
   if (!existing || !isGeoPoint(existing)) return null; // only a *re*definition of an existing point
+  if (
+    !cmd.extension &&
+    existing.kind === 'free-point' &&
+    !existing.pinned &&
+    !(existing as { rigid?: boolean }).rigid &&
+    !wouldInvertDependency(prev.objects, cmd.id, [cmd.a, cmd.b])
+  ) {
+    const solve = (existing as { solve?: SolveDirective }).solve;
+    const P = prevPos?.get(cmd.id);
+    const A = prevPos?.get(cmd.a);
+    const B = prevPos?.get(cmd.b);
+    const L = A && B ? (B.x - A.x) ** 2 + (B.y - A.y) ** 2 : 0;
+    const proj = P && A && B && L > 1e-12 ? ((P.x - A.x) * (B.x - A.x) + (P.y - A.y) * (B.y - A.y)) / L : 0.5;
+    const t = Math.min(0.88, Math.max(0.12, proj)); // within the span, clear of the endpoints
+    const objects = prev.objects.map((o) =>
+      o.id === cmd.id ? ({ kind: 'on-segment', id: cmd.id, a: cmd.a, b: cmd.b, t, free: true, ...(solve ? { solve } : {}) } as GeoObject) : o,
+    );
+    return { objects, constraints: [...prev.constraints] };
+  }
   const next = applyCommand(prev, { type: 'set-collinear', a: cmd.id, b: cmd.a, c: cmd.b });
   const objects = [...next.objects];
   const constraints = [...next.constraints];
