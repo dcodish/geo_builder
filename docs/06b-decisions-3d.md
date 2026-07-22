@@ -719,3 +719,33 @@ Analytics: `source:'scope'`, `result:'scope:<category>'` — the PROFILE_3D dash
 **Fix.** `vertexAngleClaim` gains (a) the `ישרה`/`is right` word-form on the triple (≡ `= 90`, same `angle-seg-eq` lowering — already M1-routed per ADR-3D-023: drives free dims, verifies pinned ones) and (b) a single-vertex branch (`זוית O ישרה`, `זווית O = 60`, `angle at O is right`) lowering to a new `vertex-angle {vertex, deg}` command. APPLY collects the vertex's distinct neighbors over solid edges + drawn segments: exactly two ⇒ delegate to the ordinary ∠PVQ lowering (segments idempotent, the claim drives-or-verifies); anything else ⇒ the new honest `ambiguous-angle` refusal («name all three letters» — a cube corner's 3 edges never gets a guessed angle). No-theft: the #94 marker forms (`∠SDB`, `∠SDB = α`) and the scope3 query guidance are byte-unchanged (a Greek RHS is not a NUM).
 
 **Locks:** `vertex-angle.test.ts` — the prod utterance drives a free triangle to ∠AOB=90 across seeds; a cube vertex refuses `ambiguous-angle` keep-prior; unknown vertex refuses; re-statement verifies; parse forms He+En; marker no-theft. Catalog +1 (`זווית O ישרה`).
+
+## ADR-3D-054 — A derived MAGNITUDE needs the scale pinned, not a coordinate frame (issue #268)
+
+**Operator report (prod, 2026-07-22).** On a right triangular prism — ∠CAB = 90, `AB=u`, `AC=v`, `AA'=w`, `BE = 0.2BC'`, `|u| = 3`, `|v| = 4`, `B'E ⊥ C'E` — «I think that |w| can be calculated yet it is not shown on the side. I entered AA' just to maybe make the tool calc it.»
+
+**It was calculated.** Replayed through the real path, the engine solves the height exactly and identically at every seed (2.500000 at seeds 0/1013/2027/7/99). The panel simply withheld it.
+
+**Root cause.** `dataView` gated the derived-magnitude path on `hasFrame`:
+
+```ts
+const hasFrame = c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
+if (mag === undefined && hasFrame) { /* … multi-sample agreement → derived magnitude */ }
+```
+
+`hasFrame` asks *"was a COORDINATE injected?"* — the right question for **coordinates**, since a coordinate without a frame is pure gauge. It is the wrong question for **magnitudes**: a length is gauge only when the figure's SCALE is free, and `|u| = 3` pins the scale absolutely with no coordinate frame anywhere. The figure carried four `scalarPins` and zero coordinate pins, so the branch never ran.
+
+**Why the multi-sample check cannot simply replace it** (checked, and the reason the obvious fix is wrong): the first dim of every solid is the frozen similarity gauge, so a *bare* solid reports a constant length across all seeds —
+
+```
+bare cube  |AB| = 1.000000 | 1.000000 | 1.000000     ← gauge, NOT knowledge
+bare box   |AD| = 1.326722 | 0.959239 | 0.990628     ← a free dim, correctly varying
+```
+
+Dropping the gate outright would print `|AB| = 1` on a bare cube: an invented given, the ADR-052 cardinal sin. A second gate is genuinely needed; it was simply the wrong one.
+
+**Decision.** Extract the classification the solver already maintains — `solvePivot`'s `invariantOnly` enumerates every similarity-INVARIANT pin kind precisely to know when the gauge is null-space — into one exported `scalePinned(c)`, and gate the two MAGNITUDE sites on it (the per-vector derived `mag`, and the class value on `|u| = |v| = |w|`). Coordinates, `pointCoords`, `points` and `planes` keep `hasFrame` — they genuinely need a frame. `solvePivot` consumes the same predicate, so a future pin kind that carries units cannot make the two drift apart (the ADR-167 chokepoint discipline).
+
+Measured after the fix: the operator's prism prints `|w| = 5/2` plus the other forced lengths; a bare cube and invariant-only givens (⟂, a ratio) print nothing; `|u| = 3` alone prints `|u|` only, leaving the still-free `|v|`/`|w|` unprinted.
+
+Locked by `derived-magnitudes.test.ts` (both directions: the forced value prints, the gauge never does).

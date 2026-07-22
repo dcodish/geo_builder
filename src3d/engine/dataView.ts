@@ -15,6 +15,7 @@
  */
 
 import { resolve3 } from './evaluate';
+import { scalePinned } from './solve3';
 import { dot3, sub3, type Vec3 } from './vec3';
 import type { Construction3, Id } from './types';
 
@@ -190,6 +191,16 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // an absolute frame exists only when something was injected — otherwise every
   // coordinate is gauge, and gauge must never print as data
   const hasFrame = c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
+  // ADR-3D-054 (#268) — a LENGTH needs less than a coordinate does. A coordinate without a frame is
+  // pure gauge, but a length is gauge only when the SCALE is free, and an absolute size given ("|u| = 3")
+  // pins the scale with no coordinate frame anywhere. Gating magnitudes on `hasFrame` therefore withheld
+  // values the engine had already solved exactly: the operator's prism reported |u| and |v| (stated) but
+  // never |w| = 2.5, though it is forced by the givens and identical in every sampled configuration.
+  // The second gate is still needed — the first dim of every solid is the frozen similarity gauge, so a
+  // bare cube reports |AB| = 1.000000 at every seed and dropping the check outright would print that as
+  // data (the ADR-052 cardinal sin). `scalePinned` is the right question, and lives with the solver that
+  // asks it too, so the two can't drift.
+  const hasScale = scalePinned(c);
 
   const vecNames = [...c.vectors.entries()];
   const basis = vecNames.slice(0, 3);
@@ -262,7 +273,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     // in every sampled configuration (the |u|=|v| class-value gate; operator 2026-07-09:
     // |BB'| = 18 is forced by the plane given + B, the student never has to type it)
     let mag = lengths.get(k);
-    if (mag === undefined && hasFrame) {
+    if (mag === undefined && hasScale) {
       const per = positions.map((pos) => {
         const p = pos.get(a);
         const q = pos.get(b);
@@ -316,7 +327,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
         // length is the same in every sampled configuration (scale is pinned)
         const per = mags[i].per as number[];
         const derived =
-          stated === undefined && hasFrame && per.every((m) => Math.abs(m - per[0]) < 1e-6 * Math.max(1, per[0])) ? per[0] : undefined;
+          stated === undefined && hasScale && per.every((m) => Math.abs(m - per[0]) < 1e-6 * Math.max(1, per[0])) ? per[0] : undefined;
         const val = stated ?? derived;
         relations.push(cls.map((n) => `|${n}|`).join(' = ') + (val !== undefined ? ` = ${cleanNum(val)}` : ''));
       }
