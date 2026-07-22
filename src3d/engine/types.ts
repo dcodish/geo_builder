@@ -671,6 +671,11 @@ export type PointDef =
   | { kind: 'centroid'; of: [Id, Id, Id] }
   | { kind: 'in-span'; a: Id; b: Id; vecFrom: Id; span: string[] }
   | { kind: 'coord'; x: number; y: number; z: number }
+  // ADR-3D-094 (#276): a NEW point stated with PARTIALLY-known numeric coordinates and no
+  // symbols («הקודקוד D על החלק החיובי של ציר ה-x» → y=z=0, x free): each null component is
+  // a free sampled DOF (ADR-052), Lane-A absolute like `coord`. A sign-given on a null axis
+  // SELECTS the sample's sign, so the stated side holds in every seed by construction.
+  | { kind: 'partial'; x: number | null; y: number | null; z: number | null }
   // a free point riding a named plane (2 sampled DOF), or floating on a stated SIDE of
   // it (side ±1 = above/below the +z-oriented normal; 3 sampled DOF) — ADR-3D-015
   | { kind: 'on-plane'; plane: string; side?: 1 | -1 }

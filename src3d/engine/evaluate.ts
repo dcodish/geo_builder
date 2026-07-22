@@ -598,6 +598,7 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     if (def.kind === 'on-segment' && def.t === undefined) freeT++;
     if (def.kind === 'on-plane') freeT += def.side ? 3 : 2; // a plane rider slides in-plane; a side point also floats
     if (def.kind === 'on-line') freeT += 1; // a line rider slides along its line (ADR-3D-031)
+    if (def.kind === 'partial') freeT += [def.x, def.y, def.z].filter((v) => v === null).length; // each unstated component is a free DOF (ADR-3D-094)
   }
   const param = c.param && pinningGivens(c) === 0 && c.paramGivens.length === 0 ? 1 : 0;
   if (resolved.pivot && resolved.pivot.solutions > 0) {
@@ -943,6 +944,10 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
         });
         if (!symsOk) return false;
         return c.signGivens.every((g) => {
+          // ADR-3D-094: a `partial` point's sign is honored at SAMPLE time and the point is
+          // Lane-A absolute — the gauge transform below doesn't apply to it, so judging it
+          // here would spuriously reject pivot branches. Skip; the sampler is the guarantee.
+          if (c.points.get(g.id)?.kind === 'partial') return true;
           const q = p2.get(g.id);
           if (!q) return false;
           const val = sol.transform(q)[g.axis];
@@ -1308,6 +1313,24 @@ function evaluateSolidsAndPoints(
         p = add3(p, scale3(up, def.side * sample(seed, `onplane-h-${id}`, 0.45, 1.05) * spread));
       }
       pos.set(id, p);
+    } else if (def.kind === 'partial') {
+      // ADR-3D-094 (#276): a NEW point with PARTIALLY-known numeric coordinates — each null
+      // component is a free sampled DOF (Lane-A absolute, like `coord`). A stated sign-given
+      // on a null axis SELECTS the sample's sign, so the requirement holds in every seed by
+      // construction (the on-plane `side` pattern); magnitudes are spread-scaled off zero for
+      // general position, and an unsigned null axis varies its side across seeds.
+      const placed = [...pos.values()];
+      let spread = 1.2;
+      for (const q of placed) spread = Math.max(spread, Math.abs(q.x), Math.abs(q.y), Math.abs(q.z));
+      const comp = (ax: 'x' | 'y' | 'z'): number => {
+        const fixed = def[ax];
+        if (fixed !== null) return fixed;
+        const sg = c.signGivens.find((g) => g.id === id && g.axis === ax);
+        const mag = sample(seed, `partial-${ax}-${id}`, 0.3, 1.05) * spread;
+        const sgn = sg ? (sg.positive ? 1 : -1) : sample(seed, `partialsgn-${ax}-${id}`, -1, 1) >= 0 ? 1 : -1;
+        return sgn * mag;
+      };
+      pos.set(id, v3(comp('x'), comp('y'), comp('z')));
     } else if (def.kind === 'on-line') {
       // a free point riding a named line (ADR-3D-031, the on-plane rider's line edition):
       // sampled t along the unit direction around the figure centroid's ⟂ projection onto
