@@ -640,6 +640,26 @@ export function Figure({
             const b = transform.toScreen(seg.b);
             const st = segOf(seg.id);
             const dash = st.dashed ? `${6 / view.zoom} ${5 / view.zoom}` : undefined;
+            // #264 (ADR-388): a COVERED segment (collinearly contained in another drawn segment) owns
+            // no ink and no hit-target — the containing run carries both, so hide/dash act on the whole
+            // visible line and no menu is occluded. It still echoes fact-selection (the accent overlay).
+            if (seg.covered) {
+              return lit(seg.id) ? (
+                <line
+                  key={seg.id}
+                  data-id={seg.id}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke={ACCENT}
+                  strokeWidth={stroke * 2}
+                  strokeLinecap="round"
+                  data-export-stroke="#334155"
+                  data-export-width={stroke}
+                />
+              ) : null;
+            }
             return (
               <g key={seg.id} data-id={seg.id}>
                 {st.hidden ? (

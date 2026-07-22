@@ -38,6 +38,8 @@ import { parse, buildParseCtx, impliedCircleBinding } from '@/parser';
 import { replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { isGeoPoint, freeDofs, freeDofCount, applySeed, evaluate, detectRelations, detectShapes } from '@/engine';
+import { buildScene } from '@/render/scene';
+import type { SceneSegment } from '@/render/scene';
 import { crossingCommands } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 import { detectTheorems } from '@/theorems';
@@ -202,6 +204,39 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
+  {
+    id: 'apex-common-tangents-single-ink-run',
+    title: 'issue #264 (m01ophid): each common tangent from apex A is ONE ownable ink run — hide/dash act on the whole line (ADR-388)',
+    guards:
+      'prod session m01ophid (2026-07-22): the apex common-tangent lowering draws BOTH the touch–touch segment and the spanning apex segment on one line (the derived apex lands beyond the SMALLER second circle, so «apex–T1» contains «T1–T2»). Hiding the spanning segment left the contained stretch drawn beneath ("it only hid AC") and its wide hit-line occluded the contained segment’s menu ("cannot hide the BC part"). ADR-388: the scene marks a collinearly-contained segment `covered` (no base ink, no hit-target — the maximal container owns the run), computed per configuration, so no static id choice at the lowering can double-ink again.',
+    steps: ['שני מעגלים משיקים מבחוץ', 'מנקודה A יוצאים שני משיקים משותפים לשני המעגלים'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const scene = buildScene(fig.construction, fig.positions);
+      const contained = (T: SceneSegment, S: SceneSegment): boolean => {
+        const len = Math.hypot(S.b.x - S.a.x, S.b.y - S.a.y);
+        if (len < 1e-9) return false;
+        const u = { x: (S.b.x - S.a.x) / len, y: (S.b.y - S.a.y) / len };
+        const tol = 1e-6 * Math.max(1, len);
+        const within = (p: { x: number; y: number }): boolean => {
+          const dx = p.x - S.a.x;
+          const dy = p.y - S.a.y;
+          const along = dx * u.x + dy * u.y;
+          return Math.abs(dx * u.y - dy * u.x) <= tol && along >= -tol && along <= len + tol;
+        };
+        return within(T.a) && within(T.b);
+      };
+      const live = scene.segments.filter((s) => !s.covered);
+      for (const T of live)
+        for (const S of live) {
+          if (T !== S) expect(contained(T, S), `${T.id} double-inked under ${S.id}`).toBe(false);
+        }
+      // each tangent’s touch–touch stretch rides UNDER the spanning apex segment — the carrier the
+      // student’s hide click acts on covers the whole tangent
+      expect(scene.segments.filter((s) => s.covered).length).toBe(2);
+    },
+  },
   {
     id: 'angle-alias-bare-digit-sign',
     title: '«נסמן זוית CAD כ 1» binds the vertex-letter alias and draws the digit sign — never a silent ∠CAD=1° (#262 P1 + #263, ADR-386 Am.)',

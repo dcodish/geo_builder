@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `apex-common-tangents-single-ink-run` — each common tangent from apex A is ONE ownable ink run (#264, ADR-388)
+Prod session `m01ophid` (2026-07-22): «שני מעגלים משיקים מבחוץ» + «מנקודה A יוצאים שני משיקים משותפים לשני המעגלים» draws, per tangent, both the touch–touch segment and the spanning apex segment on one line (the derived apex lands beyond the smaller second circle, so «apex–T1» contains «T1–T2»). Hiding the spanning segment left the contained stretch drawn beneath ("it only hid AC") and its wide hit-line occluded the contained segment's menu ("cannot hide the BC part"). ADR-388: the scene marks a collinearly-contained segment `covered` — no base ink, no hit-target; the maximal container owns the run, so hide/dash act on the whole visible line, computed per configuration. Unit locks in `ink-dedup.test.ts`.
+
 ### `angle-alias-bare-digit-sign` — «נסמן זוית CAD כ 1» binds A1 and draws the digit sign, never ∠CAD=1° (#262 P1 + #263, ADR-386 Am.)
 Operator prod play-test of #235 (2026-07-22): the naming-shaped utterance fell through to the value rule — «כ 1» silently set ∠CAD=1° (green row), «כ-1» gave −1°, and the verb variants סימון/לסמן with «A1» read the digit the same way. The alias rule is now ALL-OR-NOTHING for naming-shaped utterances (the ADR-024 leftover guard) with the widened verbs (נסמן/נסמנה/סימון/לסמן/מסמנים · denote/mark/label), connectors (כ/ב/בתור · as/by), and «כזוית»/∠ decor; a bare digit binds the canonical vertex-letter name (CAD כ 1 ⇒ A1); the wedge sign renders the digit alone (the vertex label already shows the letter — the screenshot collision, #263). Probe-table + display locks in `angle-alias.test.ts`.
 

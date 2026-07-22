@@ -38,6 +38,11 @@ export interface SceneSegment {
    *  so the segment menu can offer "swap endpoints" (ADR-122). */
   aId?: Id;
   bId?: Id;
+  /** #264 (ADR-388): this segment's span is collinearly CONTAINED in another drawn segment (its
+   *  carrier), so it contributes NO base ink and NO hit-target — the carrier owns the visible run
+   *  (hide/dash/click act on the whole line, and double ink can't mask a style change). It stays in
+   *  the scene so fact-selection can still highlight it (the lit overlay renders regardless). */
+  covered?: boolean;
 }
 export interface ScenePolygon {
   id: Id;
@@ -188,6 +193,40 @@ function arcGeometry(center: Vec, from: Vec, to: Vec, id: Id, opts?: { spanDeg?:
   return { id, center, from, to, r, largeArc: extent > Math.PI ? 1 : 0, sweep: goCcw ? 0 : 1, startAng: angA, sweepAng: goCcw ? extent : -extent };
 }
 
+/**
+ * #264 (ADR-388): flag every segment whose span is collinearly contained in a longer, uncovered
+ * segment. Longest-first so the MAXIMAL run is always the carrier (a chain S ⊃ T ⊃ U marks T and U
+ * against S); an exact-duplicate pair tie-breaks toward the named segment (aId present) so the menu
+ * keeps its swap capability. Tolerance is relative to the carrier's span — generous against solver
+ * residuals (~1e-9), far below anything visible.
+ */
+export function markCoveredSegments(segments: SceneSegment[]): void {
+  const info = segments.map((s, i) => ({ i, len: len(sub(s.b, s.a)) }));
+  info.sort((x, y) => y.len - x.len || (segments[x.i].aId ? -1 : 1) - (segments[y.i].aId ? -1 : 1));
+  for (let k = 0; k < info.length; k++) {
+    const t = info[k];
+    const T = segments[t.i];
+    for (let j = 0; j < k; j++) {
+      const s = info[j];
+      const S = segments[s.i];
+      if (S.covered || s.len < 1e-9) continue;
+      const u = { x: (S.b.x - S.a.x) / s.len, y: (S.b.y - S.a.y) / s.len };
+      const tol = 1e-6 * Math.max(1, s.len);
+      const within = (p: Vec): boolean => {
+        const dx = p.x - S.a.x;
+        const dy = p.y - S.a.y;
+        const along = dx * u.x + dy * u.y;
+        const off = Math.abs(dx * u.y - dy * u.x);
+        return off <= tol && along >= -tol && along <= s.len + tol;
+      };
+      if (within(T.a) && within(T.b)) {
+        T.covered = true;
+        break;
+      }
+    }
+  }
+}
+
 /** Resolve a construction + computed positions into drawable primitives. */
 export function buildScene(
   c: Construction,
@@ -333,6 +372,18 @@ export function buildScene(
   const drawnLines = resolveDrawnLines(c, positions, resolvedCircles, drawnIds);
   for (const t of drawnLines.trimmed) segments.push({ id: t.id, a: t.pa, b: t.pb });
   for (const l of drawnLines.infinite) lines.push({ id: l.id, anchor: l.anchor, dir: l.dir });
+
+  // #264 (ADR-388) — collinear-containment ink DEDUP, the 2-D sibling of scene3's solid-edge dedup:
+  // a lowering may draw two segments on ONE line where one contains the other (the apex common
+  // tangent: `apex–T1` spans the whole tangent while `T1–T2` re-inks the touch–touch stretch; a
+  // drawn tangent LINE trimmed over its touch chord is the line-derived member). Double ink is
+  // invisible until a per-object style change: hiding/dashing the container leaves the contained
+  // stretch drawn beneath (the operator's "it only hid AC"), and the container's wide hit-line
+  // occludes the contained segment's menu ("cannot hide the BC part"). Ruling: ONE visible run =
+  // ONE ink owner — the maximal container keeps ink + hit-target; a contained segment is `covered`
+  // (no ink, no hit; still highlightable). Computed per configuration from positions, so it is
+  // robust to branch/DOF changes no static id choice at the lowering could be.
+  markCoveredSegments(segments);
 
   // Measure labels (ADR-031): a length sits at its segment's midpoint, nudged
   // perpendicular to the OUTSIDE (away from the figure's centroid); an angle sits
