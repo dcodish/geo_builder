@@ -1433,3 +1433,39 @@ export function checkInSpan(
   if (norm3(ab) < 1e-12 || t < -1e-9 || t > 1 + 1e-9) return 'not-on-segment';
   return 'ok';
 }
+
+/**
+ * ADR-3D-053 (#273) — does a resolved configuration satisfy every stated REQUIREMENT?
+ *
+ * The 3-D sibling of the 2-D `meetsRequirements` (ADR-106/244/254). A requirement is an inequality:
+ * it determines nothing, so no solver residual can reach it and no claim can verify it — instead it
+ * gates WHICH sampled configuration may be shown. The measure keeps its DOF, and "show another
+ * configuration" varies it inside the bound (see {@link firstSatisfyingSeed3}).
+ */
+export function meetsRequirements3(c: Construction3, seed: number): boolean {
+  if (c.requirements.length === 0) return true;
+  const r = resolve3(c, seed);
+  return c.requirements.every((req) => {
+    const v = r.positions.get(req.vertex);
+    const p = r.positions.get(req.p);
+    const q = r.positions.get(req.q);
+    if (!v || !p || !q) return false;
+    const u1 = sub3(p, v);
+    const u2 = sub3(q, v);
+    const n1 = norm3(u1);
+    const n2 = norm3(u2);
+    if (n1 < 1e-12 || n2 < 1e-12) return false;
+    const deg = (Math.acos(Math.max(-1, Math.min(1, dot3(u1, u2) / (n1 * n2)))) * 180) / Math.PI;
+    return (req.min === undefined || deg > req.min) && (req.max === undefined || deg < req.max);
+  });
+}
+
+/** The first seed from `from` whose configuration meets every requirement, or null within `budget`
+ *  tries. Deterministic — the same figure always lands on the same drawing (ADR-3D-053). */
+export function firstSatisfyingSeed3(c: Construction3, from = 0, budget = 200): number | null {
+  for (let i = 0; i < budget; i++) {
+    const seed = from + i;
+    if (meetsRequirements3(c, seed)) return seed;
+  }
+  return null;
+}

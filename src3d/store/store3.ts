@@ -24,7 +24,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { applyCommand3 } from '../engine/apply';
-import { checkInSpan, memberHolds3, resolve3, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, firstSatisfyingSeed3, memberHolds3, resolve3, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
 import { cross3, dot3, norm3, sub3 } from '../engine/vec3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
@@ -65,6 +65,15 @@ export type StoreError3 =
  * `status` — and `submit` refuses it (keep-prior), so a wrong answer or an
  * unsatisfiable condition can never silently sit on the figure.
  */
+/** The first seed at/after `from` whose figure meets every stated requirement, or null when none does
+ *  within budget (ADR-3D-053). Requirement-free figures return `from` immediately — the search costs
+ *  nothing for the figures that state no inequality. */
+function seedForRequirements(facts: Fact3[], from: number): number | null {
+  const { construction } = derive3(facts, from);
+  if (construction.requirements.length === 0) return from;
+  return firstSatisfyingSeed3(construction, from);
+}
+
 export function derive3(facts: Fact3[], seed: number): Derived3 {
   let c: Construction3 = emptyConstruction3();
   const status: Record<string, FactStatus3> = {};
@@ -361,7 +370,15 @@ export const useGeo3 = create<Geo3State>()(
           set({ lastError: st }); // keep-prior: the bad fact is not added
           return;
         }
-        set({ facts: candidate, lastError: null });
+        // ADR-3D-053 (#273): a stated inequality determines nothing, so it can only be honoured by
+        // CHOOSING a configuration that satisfies it. Land on one before drawing; if none exists within
+        // budget, refuse and keep the prior figure rather than draw a figure that contradicts the given.
+        const found = seedForRequirements(candidate, seed);
+        if (found === null) {
+          set({ lastError: { code: 'bound-unsatisfiable', id: '' } });
+          return;
+        }
+        set({ facts: candidate, seed: found, lastError: null });
       },
 
       submitSteps: (utterance, steps) => {
@@ -398,7 +415,15 @@ export const useGeo3 = create<Geo3State>()(
 
       setFigureName: (name) => set({ figureName: name }),
 
-      resample: () => set({ seed: get().seed + 1 }),
+      // "show another configuration": the next seed whose configuration still satisfies every stated
+      // requirement (ADR-3D-053). Was a blind `seed + 1`, which could show a drawing contradicting a
+      // stated bound; with no requirements the search accepts the very next seed, so behaviour is
+      // unchanged for every figure that states none.
+      resample: () => {
+        const { facts, seed } = get();
+        const next = seedForRequirements(facts, seed + 1);
+        set({ seed: next ?? seed + 1 });
+      },
 
       dismissError: () => set({ lastError: null }),
 

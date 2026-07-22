@@ -778,3 +778,51 @@ Locked by `v8a-apex-diagonals.test.ts` (+3: the operator's exact «נפגשים 
 **Two fix-plan items from #286 not needed after (1):** because the symbol is driven, the ⊥ now holds at every seed, so there is nothing to flag amber (honesty backstop) and the config search never has to skip a ⊥-violating seed. They stay filed as defence-in-depth if a future un-drivable ⊥ appears.
 
 Locked by `perp-drives-symbol.test.ts` (EO⊥AS = 90° across a seed sweep, E on the AS foot, He + En, the stripped no-regression case, and a determined-segment ⊥ still a claim).
+## ADR-3D-052 — An angle EQUALITY is statable, and a reused label MEANS it (issue #271, the M4 defaults/statement class)
+
+**Operator report (prod, 2026-07-22).** «when I tried saying that angle SAB = angle SAD it failed. I wanted to tell it that angle SAB = angle SAD = alpha (using the symbol).»
+
+**Two symptoms, one class: there was no way to state that two angles are equal.**
+
+```
+∠SAB = ∠SAD · זווית SAB = זווית SAD · angle SAB = angle SAD · ∠ABC = ∠SAD   → all not-handled
+∠SAB = α  then  ∠SAD = α                                                    → two cosmetic stickers, NOTHING asserted
+```
+
+The implicit form is the worse half, because it is **silent**: labelling two angles with the same letter is how a student says "these are equal", and the tool recorded a second display marker, raised no error, and drew `α` on two angles the figure does not make equal. A stated given dropped *and* a drawing contradicting it — the class the 2-D honesty gates (ADR-264/089/250) exist to prevent.
+
+**Root cause.** The relation was already in the engine — `cos-eq` (V8-f/G10), with the M1 dual (drives a free-dim solid, verifies a determined one) — but reachable through exactly ONE phrasing, `AS יוצר זוויות שוות עם AB ו-AD`, because the rule was authored as a *construction* ("X makes equal angles with Y and Z") rather than as the equality a textbook states. And an angle label was a pure display string with no identity to relate.
+
+**Decision.**
+- A new command `angle-pair-eq` carrying FOUR independent `VecAtom`s, so a shared vertex/arm is a special case rather than a requirement (`∠ABC = ∠SAD` works). Its apply is the `angle-eq` twin — same M1 routing, zero new solver code. The existing `angle-eq` stays for the construction phrasing.
+- Parser `angleEquality3`, both languages, symbol/word forms, plus the chained `∠SAB = ∠SAD = α` which names both. Ordered BEFORE `angleMarker`, which would otherwise claim the left angle and drop the right-hand side.
+- **A label BINDS to its angle.** A second `angle-mark` carrying a label another angle already wears asserts the equality (same M1 routing). One binding still just names — no self-equality.
+- **A value for a name** (issue #272): `symbol-value` — the existing "give this symbol a value" command — resolves at APPLY against whatever the letter denotes (a vector-def parameter, or now a labelled angle), delegating to the ordinary angle claim so `α = 70` drives or verifies like any stated angle. Every angle wearing the label is pinned; that is what sharing a name means. A letter naming nothing is refused `unknown-symbol`, never invented. This is 2-D's `buildSymTab` insight (ADR-031) in the shape `src3d` already had: resolution happens where the figure is known, because `parse3` is context-free (the ADR-3D-048 pattern).
+- Greek letters (α β γ δ θ) and `<` join the 3-D symbol palette — `∠SAB = α` is unusable when the letter cannot be typed.
+
+Locked by `angle-measures.test.ts`; catalog3 +2.
+
+## ADR-3D-053 — A stated INEQUALITY is a REQUIREMENT: the 3-D bound + the configuration-search layer (issue #273)
+
+**Operator (prod, 2026-07-22).** «I wanted to say that 60 < alpha < 90 but I'm not sure if that would have worked.» It did not — `60 < α < 90`, `α > 60` and every spelled-out form were not-handled.
+
+**Why this needed a new layer rather than a new command.** A bound is not an equation: it determines nothing, so it can be neither a `ScalarPin` (no target to reach) nor a `Claim3` (a whole REGION satisfies it). The 2-D app enforces exactly this idea through `meetsRequirements` + a seed search (ADR-106/244/254) — and **`src3d` had no such layer at all**:
+
+| | 2-D | 3-D (before) |
+| --- | --- | --- |
+| region/inequality constraint | 4 kinds (ADR-039/108) | none |
+| valid-configuration search | `firstSatisfyingSeed` / `meetsRequirements` / `findValidConfig` | none |
+| "show another configuration" | searches for a config meeting every requirement | `set({ seed: seed + 1 })` — a blind bump |
+
+The one inequality-flavoured thing that existed — a stated plane SIDE (ADR-3D-015) — is enforced *constructively*: an on-plane point is BORN on the stated side (its sampled offset is multiplied by the side's sign), so it can never leave. Elegant, and it does not generalize: the angle in `60 < α < 90` is a nonlinear function of several free solid dims, not a coordinate whose sign can be fixed at birth.
+
+**Decision — build the missing layer, with bounds as its first client.**
+- `Construction3.requirements: Requirement3[]` (first kind `angle-bound`), and `meetsRequirements3(c, seed)` — the 3-D sibling of the 2-D predicate. Patterns are COPIED from `src/`, never imported (docs/20 §12).
+- `firstSatisfyingSeed3` + `seedForRequirements`: **submit lands on a configuration that satisfies the stated bounds**, and `resample` searches forward for the next one — `store3.ts`'s blind `seed + 1` is gone. A requirement-free figure returns immediately, so every existing figure is unchanged and pays nothing.
+- **The measure keeps its DOF.** A bound restricts which configuration may be shown; it never determines a value. So the angle still varies across configurations (locked by a test), and no value is ever reported for it — the ADR-052 discipline.
+- No configuration within budget ⇒ the honest `bound-unsatisfiable` refusal with keep-prior, never a drawing that contradicts the given.
+- Parser `angleBound3` mirrors the 2-D `measureBound` grammar (ADR-390): one/two-sided, glyph and word forms, both languages, spelled-out angle or a label (resolved at apply, like every other name). An empty window (`70 < ∠SAB < 60`) defers.
+
+**Recorded trap, twice in one night.** A Hebrew keyword gate must admit BOTH nun spellings — `קטן` (m) / `קטנה` (f). The 2-D fix (ADR-390) had to correct exactly this in `CMP_SMALL`, and the guard at the top of *this* rule then reintroduced it: the regex matched fine while a `קטן`-only early-out rejected the utterance before it ran. Write `קט[ןנ]`, as ADR-3D-035 wrote `מאונ[ךכ]`.
+
+Locked by `angle-measures.test.ts`; catalog3 +2.

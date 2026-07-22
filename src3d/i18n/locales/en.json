@@ -71,6 +71,7 @@
     "twoUnknowns": "A vector relation may define only one unknown point ('{{id}}' is a second)",
     "lineMissesPlane": "The line is parallel to the plane at the chosen parameter value — no crossing point '{{id}}'",
     "sizeOnSolid": "A numeric size on a free-dimension solid isn't supported here yet",
+    "boundUnsatisfiable": "No configuration of the figure puts the angle at {{id}} inside the stated bound",
     "claimRefuted": "The claim doesn't hold in the figure — check the computation",
     "badFile": "This is not a valid Space Builder figure file",
     "newerSchema": "The file was saved by a newer version of the tool — refresh the page and try again",

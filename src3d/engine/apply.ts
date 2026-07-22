@@ -5,7 +5,7 @@
 
 import { exprPointIds, exprVectorNames } from './vecExpr';
 import { cross3, dot3, normalize3, v3 } from './vec3';
-import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, SolidCommand, SolidObj } from './types';
+import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, SolidCommand, SolidObj, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8 };
 
@@ -130,6 +130,7 @@ function clone(c: Construction3): Construction3 {
     vectors: new Map(c.vectors),
     arrows: c.arrows.map(([f, t]) => [f, t] as [Id, Id]),
     segments: [...c.segments],
+    requirements: [...c.requirements],
     angleMarks: [...c.angleMarks],
     planes: new Map(c.planes),
     lines: new Map(c.lines),
@@ -426,6 +427,19 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
         next.angleMarks = next.angleMarks.map((m) => (m === existing ? { ...m, label: cmd.label } : m));
       }
       for (const arm of [cmd.p, cmd.q]) if (!next.segments.some((s) => samePair(s, cmd.vertex, arm))) next.segments.push([cmd.vertex, arm]);
+      // ADR-3D-052 (#271) — REUSING a label is how a student says "these two angles are equal". It used
+      // to record a second cosmetic sticker and assert nothing, so the canvas drew α on two angles the
+      // figure did not make equal: a stated given silently dropped. A label BINDS to its angle, and a
+      // second binding of the same letter is the equality (M1-routed exactly like the explicit form).
+      if (cmd.label) {
+        const prior = c.angleMarks.find((m) => m.label === cmd.label && !same(m));
+        if (prior) {
+          const pair = (v: Id, x: Id): VecAtom => ({ kind: 'pair', from: v, to: x });
+          const [a, b, cc, d] = [pair(prior.vertex, prior.p), pair(prior.vertex, prior.q), pair(cmd.vertex, cmd.p), pair(cmd.vertex, cmd.q)];
+          if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a, b, c: cc, d });
+          else next.claims.push({ type: 'cos-eq', a, b, c: cc, d });
+        }
+      }
       return { ok: true, next };
     }
 
@@ -966,7 +980,22 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       // הציבו k = ½: pin the named parameter directly — replaces any prior pin on it
       // (the student substituting the value the earlier relation produced)
       const idx = c.vecDefs.findIndex((vd) => vd.symbol === cmd.symbol);
-      if (idx < 0) return { ok: false, error: { code: 'unknown-symbol', id: cmd.symbol } };
+      if (idx < 0) {
+        // ADR-3D-052 (#272) — the letter may instead name an ANGLE («∠SAB = α» then «α = 70»). Resolved
+        // HERE, where the figure is known (parse3 is context-free), and delegated to the ordinary angle
+        // claim so the value DRIVES a free-dim solid and VERIFIES a determined one (M1) like any other
+        // stated angle. Every angle wearing the label is pinned — that is what sharing a name means.
+        const marks = c.angleMarks.filter((m) => m.label === cmd.symbol);
+        if (marks.length > 0) {
+          let r: ApplyResult3 = { ok: true, next: c };
+          for (const mk of marks) {
+            if (!r.ok) return r;
+            r = applyCommand3(r.next, { type: 'claim', claim: { type: 'angle-seg-eq', a1: mk.vertex, b1: mk.p, a2: mk.vertex, b2: mk.q, deg: cmd.value } });
+          }
+          return r;
+        }
+        return { ok: false, error: { code: 'unknown-symbol', id: cmd.symbol } };
+      }
       const next = clone(c);
       next.symbolPins = next.symbolPins.filter((p) => p.def !== idx);
       next.symbolPins.push({ rel: 'value', value: cmd.value, def: idx });
@@ -1120,6 +1149,45 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       drawAtom(next, cmd.b);
       if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
       else next.claims.push({ type: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
+      return { ok: true, next };
+    }
+
+    // ADR-3D-053 (#273) — a stated numeric BOUND on an angle. NOT an equation: it determines nothing,
+    // so it becomes a REQUIREMENT (which sampled configuration may be shown) rather than a pin or a
+    // claim. The angle keeps its DOF; "show another configuration" varies it inside the bound.
+    case 'angle-bound3': {
+      let vertex = cmd.vertex, p = cmd.p, q = cmd.q;
+      if (cmd.label !== undefined) {
+        // the letter names the angle («∠SAB = α» then «60 < α < 90») — resolved HERE, where the marks
+        // are known (parse3 is context-free). Sharing a name means sharing the bound.
+        const marks = c.angleMarks.filter((m) => m.label === cmd.label);
+        if (marks.length === 0) return { ok: false, error: { code: 'unknown-symbol', id: cmd.label } };
+        let r: ApplyResult3 = { ok: true, next: c };
+        for (const mk of marks) {
+          if (!r.ok) return r;
+          r = applyCommand3(r.next, { type: 'angle-bound3', vertex: mk.vertex, p: mk.p, q: mk.q, min: cmd.min, max: cmd.max });
+        }
+        return r;
+      }
+      if (vertex === undefined || p === undefined || q === undefined) return { ok: false, error: { code: 'ambiguous-angle', id: vertex ?? '?' } };
+      const missing = missingPoint(c, [vertex, p, q]);
+      if (missing) return { ok: false, error: missing };
+      if (cmd.min !== undefined && cmd.max !== undefined && cmd.min >= cmd.max) return { ok: false, error: { code: 'bound-unsatisfiable', id: vertex } };
+      const next = clone(c);
+      for (const arm of [p, q]) if (!hasSegment(next, vertex, arm)) next.segments.push([vertex, arm]);
+      next.requirements.push({ kind: 'angle-bound', vertex, p, q, min: cmd.min, max: cmd.max });
+      return { ok: true, next };
+    }
+
+    // ADR-3D-052 (#271) — a general angle equality between two independently-named angles. Same M1
+    // routing as `angle-eq`: a free-dim solid is DRIVEN into shape, a determined figure is VERIFIED.
+    case 'angle-pair-eq': {
+      const err = firstAtomError(c, [cmd.a, cmd.b, cmd.c, cmd.d]);
+      if (err) return { ok: false, error: err };
+      const next = clone(c);
+      for (const at of [cmd.a, cmd.b, cmd.c, cmd.d]) drawAtom(next, at);
+      if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      else next.claims.push({ type: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
       return { ok: true, next };
     }
 

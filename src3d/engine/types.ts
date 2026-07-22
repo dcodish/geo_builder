@@ -581,6 +581,15 @@ export type Command3 =
   | { type: 'dot-eq-chain'; ops: [VecAtom, VecAtom][] }
   // V8-f (G10): `base` makes EQUAL ANGLES with `a` and `b` — `AE יוצר זוויות שוות עם AB ו-AD`.
   | { type: 'angle-eq'; base: VecAtom; a: VecAtom; b: VecAtom }
+  // A general angle EQUALITY between two independently-named angles — "∠SAB = ∠SAD", "זווית ABC =
+  // זווית DEF" (ADR-3D-052, issue #271). The four atoms are independent, so a shared vertex/arm is a
+  // special case rather than a requirement; `angle-eq` above stays for the "X makes equal angles with
+  // Y and Z" CONSTRUCTION phrasing. M1-routed like every other relation: it drives a free-dim solid
+  // and verifies a determined figure. Also what a REUSED angle label means (α on two angles).
+  | { type: 'angle-pair-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom }
+  // A stated numeric BOUND on an angle — "∠SAB > 60", "60 < α < 90" (ADR-3D-053, issue #273). A `label`
+  // names the angle instead of spelling its three letters; it is resolved at APPLY (parse3 is context-free).
+  | { type: 'angle-bound3'; vertex?: Id; p?: Id; q?: Id; label?: string; min?: number; max?: number }
   // V8-f (G11): `D על AC כך ש-OD חוצה-זווית AOC` — D on segment a–b, ray apex→D bisects ∠(a)(apex)(b).
   | { type: 'bisector-point'; id: Id; a: Id; b: Id; apex: Id }
   // triage 3-D: `הזווית בין הישר AC' לבין המישור ABCD היא 30` — the angle between a line and a plane
@@ -649,6 +658,8 @@ export interface Construction3 {
   segments: [Id, Id][];
   /** #94 — named-angle MARKERS (`∠SDB` / `∠SDB = α`): pedagogical arc highlights, no DOF, no verification. */
   angleMarks: { vertex: Id; p: Id; q: Id; label?: string }[];
+  /** Stated inequalities the DISPLAYED configuration must satisfy (ADR-3D-053) — see {@link Requirement3}. */
+  requirements: Requirement3[];
   /** V2 — planes by equation, name → def (insertion-ordered). */
   planes: Map<string, PlaneDef>;
   /** V2 — named lines (plane∩plane), name → def. */
@@ -720,6 +731,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   arrows: [],
   segments: [],
   angleMarks: [],
+  requirements: [],
   planes: new Map(),
   lines: new Map(),
   planeAngles: [],
@@ -749,6 +761,19 @@ export const emptyConstruction3 = (): Construction3 => ({
 // ---------------------------------------------------------------------------
 
 /** Structured engine errors — humanised by the app layer through i18n. */
+/**
+ * A REQUIREMENT — a stated INEQUALITY the drawn configuration must satisfy ([ADR-3D-053](docs/06b-decisions-3d.md),
+ * issue #273). Unlike every other 3-D given it is not an equation: it determines nothing, so it can neither
+ * be a `ScalarPin` residual (there is no target to reach) nor a `Claim3` (a whole REGION satisfies it).
+ * It restricts WHICH sampled configuration may be shown — the ADR-052 discipline: the measure stays a free
+ * DOF, "show another configuration" varies it INSIDE the bound, and no value is ever reported for it.
+ *
+ * The 2-D app enforces the same idea through `meetsRequirements` + a seed search (ADR-106/244/254);
+ * `src3d` had no such layer at all (its `resample` was a blind `seed + 1`), so this is that layer, with
+ * angle bounds as its first client. Patterns are COPIED from `src/`, never imported (docs/20 §12).
+ */
+export type Requirement3 = { kind: 'angle-bound'; vertex: Id; p: Id; q: Id; min?: number; max?: number };
+
 export type EngineError3 =
   | { code: 'already-defined'; id: Id }
   | { code: 'unknown-point'; id: Id }
@@ -777,7 +802,8 @@ export type EngineError3 =
   | { code: 'size-on-solid' } // a numeric size on a free-dim solid figure — not supported yet (honest boundary)
   | { code: 'unknown-symbol'; id: string } // a value was assigned to a parameter no relation defines
   | { code: 'ambiguous-angle'; id: Id } // #251: a single-vertex angle whose arms cannot be resolved (≠2 edges at the vertex)
-  | { code: 'claim-refuted' }; // the stated answer does not hold in the figure
+  | { code: 'claim-refuted' } // the stated answer does not hold in the figure
+  | { code: 'bound-unsatisfiable'; id: Id }; // #273: no sampled configuration puts the measure inside the stated bound
 
 export type ApplyResult3 = { ok: true; next: Construction3 } | { ok: false; error: EngineError3 };
 

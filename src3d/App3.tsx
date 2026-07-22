@@ -20,6 +20,8 @@ import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } fr
 function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: StoreError3): string | null {
   if (!err) return null;
   switch (err.code) {
+    case 'bound-unsatisfiable':
+      return t('err.boundUnsatisfiable', { id: err.id });
     case 'ambiguous-vector-length':
       return t('err.ambiguousVectorLength');
     case 'not-understood':
@@ -323,6 +325,14 @@ export default function App3() {
           <div className="flex flex-wrap gap-1" dir="ltr">
             {(
               [
+                // Greek letters for angle names (#272): 2-D has had these since ADR-039 — «∠SAB = α»
+                // is unusable when the letter can't be typed.
+                ['α', 'α', 0],
+                ['β', 'β', 0],
+                ['γ', 'γ', 0],
+                ['δ', 'δ', 0],
+                ['θ', 'θ', 0],
+                ['<', '<', 0], // a bound / ordering between measures
                 ['⃗', '⃗', 0],
                 ['|·|', '||', 1],
                 ['√', '√', 0],
