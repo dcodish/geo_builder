@@ -27,7 +27,7 @@ import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { btn, card as themeCard, color as pal, foldToggle, fs, pill, sectionTitle } from '@/ui/theme';
-import { dryRunOutcome, groupKey, hasDeferrableConstraint, introducedIds, meetsRequirements, primeFoldFor, replay, trialFacts, useGeoStore, viewUsable } from '@/store/geoStore';
+import { deferralWorthwhile, dryRunOutcome, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, trialFacts, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
@@ -715,7 +715,10 @@ export default function App() {
         // DE=18") is NOT an LLM problem: the LLM would re-emit the same command, or drop it. Commit it so
         // `replay`'s deferral retries it once the later givens pin the figure (ADR-104) — order-independence.
         // A genuine contradiction then surfaces honestly as a failing step instead of "couldn't read that".
-        if (outcome.reason === 'error' && hasDeferrableConstraint(r.commands)) {
+        // The gate is the SAME one `classify` applies after replay (issue #207 / ADR-385): a CONCLUDED
+        // contradiction — a relation whose residual is invariant or provably one-signed across the free
+        // configurations — must take the honest-refusal route below, never park as «waiting for givens».
+        if (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands)) {
           executeMany(r.commands, utterance);
           logDebug({ kind: 'input', utterance, locale, source: 'parser', result: 'deferred-constraint', detail: outcome.detail, commands: r.commands });
           setText('');

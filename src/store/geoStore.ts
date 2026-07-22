@@ -948,6 +948,22 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   });
 }
 
+/**
+ * Should a cleanly-parsed statement that FAILED against the current figure be COMMITTED as a deferred
+ * constraint (the ADR-104 bet: later givens will pin the figure and the retry will satisfy it) — or
+ * refused honestly right now? This is the SAME gate `classify` applies after replay
+ * (`hasDeferrableConstraint` + `constraintIsPending`), exported so the App's submit route and the
+ * classifier can never diverge (issue #207 / ADR-385 — the route used to consult only the first half,
+ * committing a CONCLUDED contradiction as «waiting for givens»: the quarter-circle whose |OC|=|OD| is
+ * structurally impossible landed as a parked deferred-constraint instead of the honest refusal).
+ */
+export function deferralWorthwhile(facts: Fact[], commands: AnyCommand[]): boolean {
+  if (!hasDeferrableConstraint(commands)) return false;
+  const symtab = buildSymTab([...facts.filter((f) => f.enabled).map((f) => f.cmd), ...commands]);
+  const lowered = commands.flatMap((c) => lowerOne(c, symtab)) as Command[];
+  return constraintIsPending(replay(facts).construction, lowered);
+}
+
 /** The figure's overall scale (bounding-box diagonal of all placed points) — the yardstick a clearance
  *  margin is measured against, so it's robust whether the extension's base segment is long or short. */
 function figureSpan(fig: Derived): number {

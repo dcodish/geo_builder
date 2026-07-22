@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parse, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs } from '@/parser';
-import { replay, useGeoStore, dryRunOutcome, hasDeferrableConstraint } from '@/store/geoStore';
+import { replay, useGeoStore, dryRunOutcome, deferralWorthwhile } from '@/store/geoStore';
 import { humanizeError } from '@/i18n/humanizeError';
 import { ctxOf, at, dist } from './scenarios-corpus';
 import type { Fact } from '@/store/geoStore';
@@ -25,7 +25,7 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
       let commands: AnyCommand[] | null = null;
       if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0 && droppedGivenNumbers(utterance, r.commands).length === 0) {
         const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
-        if (outcome.produced || (outcome.reason === 'error' && hasDeferrableConstraint(r.commands))) commands = r.commands;
+        if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands))) commands = r.commands;
       }
       if (!commands) commands = llm ?? null; // LLM second attempt (mocked: pass the canonical commands)
       expect(commands, `step did not commit: ${utterance}`).not.toBeNull();
@@ -64,7 +64,7 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
       const r = parse(utterance, ctx);
       if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0 && droppedGivenNumbers(utterance, r.commands).length === 0) {
         const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
-        if (outcome.produced || (outcome.reason === 'error' && hasDeferrableConstraint(r.commands))) return { kind: 'commit', commands: r.commands };
+        if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands))) return { kind: 'commit', commands: r.commands };
         if (outcome.reason === 'empty') {
           const existing = new Set((ctx.points ?? []).map((p) => p.toUpperCase()));
           const newLabels = [...new Set(utterance.match(/[A-Z]\d*/g) ?? [])].filter((l) => !existing.has(l));
@@ -106,7 +106,7 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
         const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
         // refused as a contradiction — NOT produced (no silent morph), and a deferrable constraint must not sneak it in
         expect(outcome.produced, `${target} must NOT reshape the trapezoid`).toBe(false);
-        if (!outcome.produced) expect(outcome.reason === 'error' && !hasDeferrableConstraint(r.commands), `${target} is a hard conflict`).toBe(true);
+        if (!outcome.produced) expect(outcome.reason === 'error' && !deferralWorthwhile(facts, r.commands), `${target} is a hard conflict`).toBe(true);
       }
     }
     st.clear();
@@ -123,7 +123,7 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
       const r = parse(utterance, ctx);
       if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0 && droppedGivenNumbers(utterance, r.commands).length === 0) {
         const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
-        if (outcome.produced || (outcome.reason === 'error' && hasDeferrableConstraint(r.commands))) return { kind: 'commit' };
+        if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands))) return { kind: 'commit' };
         if (outcome.reason === 'error') return { kind: 'conflict', detail: outcome.detail };
         if (outcome.reason === 'empty') return { kind: 'noop' };
       }
@@ -195,7 +195,7 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
       const r = parse(utterance, ctx);
       if (r.ok && droppedNewLabels(utterance, r.commands, ctx.points ?? []).length === 0 && droppedGivenNumbers(utterance, r.commands).length === 0) {
         const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
-        if (outcome.produced || (outcome.reason === 'error' && hasDeferrableConstraint(r.commands))) return { kind: 'commit', commands: r.commands };
+        if (outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands))) return { kind: 'commit', commands: r.commands };
         if (outcome.reason === 'empty') {
           const existing = new Set((ctx.points ?? []).map((p) => p.toUpperCase()));
           const newLabels = [...new Set(utterance.match(/[A-Z]\d*/g) ?? [])].filter((l) => !existing.has(l));
@@ -253,7 +253,7 @@ describe('reported scenarios — the 2025-bagrut figure passes the FULL submit g
       expect(droppedGivenRelations(utterance, r.commands), `relations gate: ${utterance}`).toEqual([]);
       expect(droppedGivenVerbs(utterance, r.commands), `verbs gate: ${utterance}`).toEqual([]);
       const outcome = dryRunOutcome(facts, r.commands, useGeoStore.getState().seed, {});
-      const commits = outcome.produced || (outcome.reason === 'error' && hasDeferrableConstraint(r.commands));
+      const commits = outcome.produced || (outcome.reason === 'error' && deferralWorthwhile(facts, r.commands));
       expect(commits, `dry-run commits: ${utterance} (${!outcome.produced ? outcome.reason : ''})`).toBe(true);
       r.commands.forEach((c) => useGeoStore.getState().execute(c, utterance, 'g-' + utterance));
     };

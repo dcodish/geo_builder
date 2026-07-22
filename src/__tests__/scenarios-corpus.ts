@@ -203,6 +203,23 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'infeasible-quarter-circle-refuses-honestly',
+    title: 'The quarter circle whose |OC|=|OD| is structurally impossible stays an HONEST red error, never a parked deferral (#207, ADR-385)',
+    guards:
+      "Prod session `3yrpvz14` (2026-07-18, the quarter-circle bagrut figure with D typed onto the LEG): with D on CB, ∠OCD = 90° forces |OD| > |OC| at every configuration, so «רבע מעגל ODC» can never hold — yet prod parked it as `deferred-constraint` («add the remaining givens»), asserting missing givens that could never help. The submit route used to consult only HALF the classifier's gate (`hasDeferrableConstraint` without `constraintIsPending`); `deferralWorthwhile` is now the ONE shared gate (App route + `classify`, the ADR-346 seam discipline), so this statement takes the honest-refusal route at submit — locked in deferral-gate.test.ts along with the ADR-104 early-⟂ control that must STAY deferral-worthy and the feasible D-on-AB twin (r=6). This scenario locks the committed-form honesty: replayed as facts, the figure reports the specific relation that cannot hold, and is NEVER classified pending.",
+    steps: ['ABC משולש ישר זוית', 'AC=15', 'BC=10', 'O על AC', 'D על CB', 'רבע מעגל ODC'],
+    expectViolations: true,
+    check(fig) {
+      // The honest end state: the impossible relation is named, and the figure is NOT «waiting for givens».
+      expect(fig.lastError, 'the specific refusal').toContain('cannot place O');
+      expect(fig.pending, 'never the parked deferred-constraint info state').toBe(false);
+      // The prior figure survives intact — the triangle and its sizes are untouched by the failed step.
+      const [A, B, C] = ['A', 'B', 'C'].map((id) => at(fig, id));
+      expect(dist(A, C)).toBeCloseTo(15, 1);
+      expect(dist(B, C)).toBeCloseTo(10, 1);
+    },
+  },
+  {
     id: 'equality-before-membership-order-independence',
     title: '«BC=BE» typed before «E על AB» builds the book figure — membership CONVERTS the busy free point (#236, ADR-384)',
     guards:
