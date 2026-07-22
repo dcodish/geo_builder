@@ -2126,7 +2126,21 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     // figure (recruitFreeDofs drives a free DOF) until the angle is on the requested side. Its arms are drawn
     // by the parser (segment commands), as for `set-angle`.
     case 'set-angle-acuteness':
-      constraints.push({ type: 'angle-acuteness', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, obtuse: cmd.obtuse });
+      // Acuteness IS a numeric bound at 90 (ADR-390): obtuse ⇒ min 90, acute ⇒ max 90. The COMMAND keeps
+      // its own name — saved figures (ADR-232) carry it — but there is one constraint behind both it and
+      // a student's own "∠ABC > 40".
+      constraints.push({ type: 'angle-bound', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, ...(cmd.obtuse ? { min: 90 } : { max: 90 }) });
+      break;
+
+    // A student's own numeric bound on a measure (ADR-390) — a REGION, not an equality: it restricts
+    // which configurations are valid and leaves the measure's DOF free (so "show another" varies it
+    // WITHIN the bound and no value is ever reported for it).
+    case 'set-angle-bound':
+      constraints.push({ type: 'angle-bound', vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, min: cmd.min, max: cmd.max });
+      break;
+
+    case 'set-length-bound':
+      constraints.push({ type: 'length-bound', a: cmd.a, b: cmd.b, min: cmd.min, max: cmd.max });
       break;
 
     // The points are concyclic (ADR-041) — drive a free DOF among them (an on-segment slide, a free

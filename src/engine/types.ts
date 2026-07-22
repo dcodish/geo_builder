@@ -908,18 +908,36 @@ export interface CollinearOrderConstraint {
 }
 
 /**
- * The ACUTENESS of an angle — ∠(ray1,vertex,ray2) must be OBTUSE (> 90°) or ACUTE (< 90°). Like the other
- * order/inequality constraints ([ADR-039](docs/06-decisions.md#adr-039)) it is satisfied by a whole region
- * (one side of 90°), so it has no sign change — it rides the optimizer as a one-sided residual and actively
- * reshapes the figure (drives a free DOF) so the angle falls on the requested side. "זווית קהה" = obtuse,
- * "זווית חדה" = acute. ([ADR-108](docs/06-decisions.md#adr-108).)
+ * An angle BOUNDED against numbers — ∠(ray1,vertex,ray2) must lie above `min`, below `max`, or strictly
+ * between the two. Like the other order/inequality constraints ([ADR-039](docs/06-decisions.md#adr-039))
+ * it is satisfied by a whole region, so it has no sign change — it rides the optimizer as a one-sided
+ * residual and actively reshapes the figure (drives a free DOF) until the angle lands in the region.
+ *
+ * ACUTENESS is this constraint at 90 ([ADR-108](docs/06-decisions.md#adr-108)): "זווית קהה"/obtuse is
+ * `{min: 90}`, "זווית חדה"/acute is `{max: 90}` — the `set-angle-acuteness` COMMAND is unchanged (saved
+ * figures carry it) and lowers to this. A student's own bound ("∠ABC > 40", "60 < α < 90") is the same
+ * constraint with the numbers they gave ([ADR-390](docs/06-decisions.md#adr-390)).
+ *
+ * A two-sided range is ONE constraint, not two: the aim margin is clamped to the window
+ * (see `boundAim`), so a narrow range can't set two independent margins fighting each other.
  */
-export interface AngleAcutenessConstraint {
-  type: 'angle-acuteness';
+export interface AngleBoundConstraint {
+  type: 'angle-bound';
   vertex: Id;
   ray1: Id;
   ray2: Id;
-  obtuse: boolean; // true = obtuse (>90°); false = acute (<90°)
+  min?: number; // degrees — the angle must exceed this
+  max?: number; // degrees — the angle must fall below this
+}
+
+/** A length BOUNDED against numbers — |ab| above `min` / below `max` / between. The length twin of
+ *  {@link AngleBoundConstraint} (ADR-390); margins are FRACTIONS of the bound, like `length-order`. */
+export interface LengthBoundConstraint {
+  type: 'length-bound';
+  a: Id;
+  b: Id;
+  min?: number;
+  max?: number;
 }
 
 export type Constraint =
@@ -936,7 +954,8 @@ export type Constraint =
   | ConcyclicConstraint
   | CollinearConstraint
   | CollinearOrderConstraint
-  | AngleAcutenessConstraint
+  | AngleBoundConstraint
+  | LengthBoundConstraint
   | LengthRadiusConstraint
   | AreaConstraint
   | AreaRatioConstraint
@@ -1006,7 +1025,12 @@ export type Command =
   | { type: 'set-angle-ratio'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id; k: number } // ∠1 = k·∠2
   | { type: 'set-angle-order'; v1: Id; a1: Id; b1: Id; v2: Id; a2: Id; b2: Id } // ∠1 < ∠2 (∠1 is the smaller)
   | { type: 'set-length-order'; a: Id; b: Id; c: Id; d: Id } // |ab| < |cd| (ab is the shorter)
-  | { type: 'set-angle-acuteness'; vertex: Id; ray1: Id; ray2: Id; obtuse: boolean } // ∠ obtuse (>90°) / acute (<90°) — "זווית קהה/חדה"
+  | { type: 'set-angle-acuteness'; vertex: Id; ray1: Id; ray2: Id; obtuse: boolean } // ∠ obtuse (>90°) / acute (<90°) — "זווית קהה/חדה"; lowers to `angle-bound` at 90 (kept: saved figures carry this command)
+  // A student's own NUMERIC bound on a measure (ADR-390): "∠ABC > 40" / "40 < ∠ABC < 60" / "α > 40",
+  // "|AB| > 5". At least one of min/max is present; both ⇒ a range. NOT an equality — it restricts
+  // which configurations are valid without determining one, so the measure keeps its DOF.
+  | { type: 'set-angle-bound'; vertex: Id; ray1: Id; ray2: Id; min?: number; max?: number }
+  | { type: 'set-length-bound'; a: Id; b: Id; min?: number; max?: number }
   | { type: 'set-parallel'; a: Id; b: Id; c: Id; d: Id }
   // `implicit` ⇒ the perpendicularity is structurally implied (a radius ⟂ a tangent line), NOT a
   // right angle the student stated; it constrains the figure but draws no right-angle mark (a
@@ -1141,6 +1165,11 @@ export type SymbolicCommand =
   // An ordering between two named measures — "α < β" / "x > y" (ADR-039). Lowered (lower.ts) to a
   // `set-angle-order`/`set-length-order` once the symbol table says which measure each variable names.
   | { type: 'measure-order'; left: string; op: '<' | '>' | '<=' | '>='; right: string }
+  // A NUMERIC bound on a named measure — "α > 40" / "60 < α < 90" (ADR-390). The symbolic twin of
+  // `measure-order`: lowered once the symbol table says which measure `name` binds to, to a
+  // `set-angle-bound`/`set-length-bound`. The spelled-out form ("∠ABC > 40") skips this and emits
+  // the set-* command directly, since no symbol needs resolving.
+  | { type: 'measure-bound'; name: string; min?: number; max?: number }
   // A named shape whose CONFIGURATION is an ambiguous, cyclable VARIANT ([ADR-138](docs/06-decisions.md#adr-138)):
   // a kite (which diagonal is the axis of symmetry — 2 variants), an isosceles triangle (which vertex is the
   // apex — 3), or a base-less midsegment whose second endpoint rides one of two other sides ([ADR-199](docs/06-decisions.md#adr-199),
@@ -1182,3 +1211,35 @@ export const ORDER_ANGLE_MARGIN_DEG = 8; // degrees — the visible gap the solv
 export const ORDER_ANGLE_MIN_GAP_DEG = 1; // degrees — accept any config at least this much in order
 export const ORDER_LEN_MARGIN_FRAC = 0.12; // fraction of the longer length — visible target gap
 export const ORDER_LEN_MIN_FRAC = 0.02; // fraction — acceptance threshold
+
+/**
+ * The ORDER/REGION constraint family ([ADR-039](docs/06-decisions.md#adr-039)) — an inequality satisfied
+ * by a whole REGION rather than a point. The single source of truth for the family, because membership
+ * decides behaviour at seven places that each used to spell the list out inline (`residual`'s optimizer-only
+ * routing, `jointCostTerm`'s over-tolerance cost, `dofRemoved` = 0, `isOrderOnlySolve`, `withOrderCons`,
+ * the root-ordering pick, and `step`'s soft-order carrier release). Missing ONE of them makes a region
+ * constraint behave like a hard equality — it would consume a DOF and freeze its carrier out of sampling,
+ * the ADR-052 smell. Add a new region kind HERE and the compiler carries it to every consumer
+ * ([ADR-390](docs/06-decisions.md#adr-390); the ADR-167 chokepoint discipline).
+ */
+export const ORDER_CONSTRAINT_TYPES = ['angle-order', 'length-order', 'collinear-order', 'angle-bound', 'length-bound'] as const;
+
+export type OrderConstraint = Extract<Constraint, { type: (typeof ORDER_CONSTRAINT_TYPES)[number] }>;
+
+/** Whether a constraint is an ORDER/REGION one — see {@link ORDER_CONSTRAINT_TYPES}. */
+export function isOrderConstraint(con: Constraint | undefined): con is OrderConstraint {
+  return !!con && (ORDER_CONSTRAINT_TYPES as readonly string[]).includes(con.type);
+}
+
+/**
+ * The target the optimizer aims for inside a numeric bound, and the accept threshold — the {@link
+ * ORDER_ANGLE_MARGIN_DEG} pair generalized to a stated window. A ONE-sided bound aims a full margin
+ * past it; a TWO-sided one clamps to a third of the window so a narrow range ("60 < α < 65") sets a
+ * reachable target instead of two margins fighting from both ends.
+ */
+export function boundAim(min: number | undefined, max: number | undefined, margin: number, minGap: number): { margin: number; minGap: number } {
+  if (min === undefined || max === undefined) return { margin, minGap };
+  const width = max - min;
+  const m = Math.min(margin, width / 3);
+  return { margin: m, minGap: Math.min(minGap, m / 2) };
+}

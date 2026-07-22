@@ -1335,3 +1335,15 @@ over all four (ADR-041).
 ### `two-circles-contained-operator` — «שני מעגלים מוכלים» draws one circle inside the other (#196, ADR-358)
 
 **Guards against:** the LLM resizing ONE circle (the second never created — "gives me one circle"). **Asserts:** two circles, verifier clean, inner strictly inside outer. Unit coverage: `two-circle-family.test.ts`.
+
+### `angle-bound-is-a-region-not-an-equality` — «∠ABC > 40» bounds the angle, never commits «= 40» (#277 P1, ADR-390)
+
+**Guards against:** the silent misparse — the `angle` rule strips its keyword and takes the first number left in the line regardless of the operator between, so a one-sided bound committed as the EQUALITY at the bound, row green, verifier happy. Every older honesty gate was blind (labels land, the number lands, no relation symbol present); only the OPERATOR was lost. **Asserts:** the angle exceeds 40, the engine carries an `angle-bound` constraint, and NO `angle` equality constraint exists. Unit coverage: `measure-bound.test.ts`.
+
+### `angle-range-keeps-the-angle-inside` — «40 < ∠ABC < 60» is a range every configuration respects (#277, ADR-390)
+
+**Guards against:** a range drifting outside its window (it determines nothing, so the angle stays a sampled free DOF) and against modelling a range as two independent bounds, whose 8° aim margins fight inside a narrow window. **Asserts:** the built angle lies strictly between 40 and 60. Unit coverage: `measure-bound.test.ts`.
+
+### `named-measure-bound-reshapes` — «∠ABC = α» then «60 < α < 90» bounds what the symbol names (#277, ADR-390)
+
+**Guards against:** the named form needing its own machinery instead of resolving through the same symbol table `α < β` (ADR-039) uses. **Asserts:** the angle labelled α lies strictly between 60 and 90. Unit coverage: `measure-bound.test.ts`.
