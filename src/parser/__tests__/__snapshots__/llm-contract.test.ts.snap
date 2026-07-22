@@ -246,6 +246,34 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-by-distances",
     ],
   },
+  "CD bisects AB": {
+    "en": [
+      "segment",
+      "segment",
+      "midpoint",
+      "segments-cross",
+      "set-line",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "midpoint",
+      "segments-cross",
+      "set-line",
+    ],
+  },
+  "CD cuts AB": {
+    "en": [
+      "segment",
+      "segment",
+      "segments-cross",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "segments-cross",
+    ],
+  },
   "CD is a common tangent to circles O and P at M": {
     "en": [
       "circle",

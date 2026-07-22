@@ -1142,7 +1142,7 @@ const tangentsMeet: Rule = (s, ctx) => {
   ];
 };
 
-const lineLineIntersection: Rule = (s) => {
+const lineLineIntersection: Rule = (s, ctx) => {
   if (!INTERSECT_KW.test(s)) return null;
   // A DIAMETER or TANGENT operand is a construct this rule can't build (an antipode / a touch-point
   // geometry) — don't half-parse "diameter AB and chord DE meet at C" into a bare intersection that
@@ -1249,6 +1249,48 @@ const lineLineIntersection: Rule = (s) => {
     const before = kw ? s.slice(0, kw.index) : s;
     const after = kw ? s.slice((kw.index ?? 0) + kw[0].length) : '';
     return cross(m[5], m[1], m[2], m[3], m[4], semOf(before), semOf(after));
+  }
+  // UNNAMED forms (issue #241, ADR-383): a bare crossing STATEMENT with no point named — the cut form
+  // «CD חותך את AB» / "CD cuts AB" and the conjunction meet «AB ו-CD נפגשים» / "AB and CD intersect".
+  // Reading (a), evidence-backed: typing STATES the crossing (a point-free `segments-cross` requirement,
+  // within both spans — the ADR-166 meaning), and NO label is invented — the ADR-380 forced-crossing dot
+  // then OFFERS the naming, so "gesture = observe, typing = state" holds. Only the both-BARE form is
+  // deterministic here: a "המשך"/"הישר"/ray operand changes where the crossing may lie and there is no
+  // named point to hang the per-operand order on — those still escalate. Two recognised COMMON TANGENTS
+  // also defer: they meet BEYOND their touches, so the within requirement would assert the wrong thing
+  // (`tangentsMeet` owns the named form).
+  if (!EXT_RE.test(s) && !LINE_RE.test(s)) {
+    const unnamedCut = t.match(
+      /^\s*(?:ה?קטע\s+|ה?צלע\s+|ה?אלכסון\s+|ה?מיתר\s+|ה?רדיוס\s+|segment\s+|side\s+|diagonal\s+|chord\s+|radius\s+)*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:חות[כך]|נחתכ[א-ת]*|נפגש[א-ת]*|פוגש[א-ת]*|cuts?|crosses?|intersects?|meets?)\s*(?:את\s+)?(?:ה?קטע\s+|ה?צלע\s+|ה?אלכסון\s+|ה?מיתר\s+|ה?רדיוס\s+|segment\s+|side\s+|diagonal\s+|chord\s+|radius\s+)*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*[.!]?\s*$/i,
+    );
+    const unnamedMeet =
+      unnamedCut ??
+      t.match(
+        /^\s*(?:ה?קטעים\s+|ה?אלכסונים\s+|segments\s+|diagonals\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:ו-?\s*|and\s+)([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:נפגש[א-ת]*|נחתכ[א-ת]*|מצטלב[א-ת]*|intersect\w*|meets?|cross(?:es)?)\s*(?:זה\s+(?:את|עם)\s+זה)?\s*[.!]?\s*$/i,
+      );
+    if (unnamedMeet) {
+      const [a, b, c, d] = [up(unnamedMeet[1]), up(unnamedMeet[2]), up(unnamedMeet[3]), up(unnamedMeet[4])];
+      if (new Set([a, b, c, d]).size === 4) {
+        const isTangentPair = (p: [string, string], q: [string, string]): boolean =>
+          Object.values(ctx.commonTangents ?? {}).some((entries) => {
+            const sets = entries.map((e) => new Set(e.pair));
+            const h1 = sets.find((x) => x.has(p[0]) && x.has(p[1]));
+            const h2 = sets.find((x) => x.has(q[0]) && x.has(q[1]));
+            return !!h1 && !!h2 && h1 !== h2;
+          });
+        if (isTangentPair([a, b], [c, d])) return 'stop';
+        const have = new Set(ctx.points ?? []);
+        const nb = ctx.neighbors ?? {};
+        const drawn = (x: string, y: string) => (nb[x] ?? []).includes(y);
+        const out: Command[] = [];
+        // Operand ink only where missing, so re-stating the crossing on a drawn figure is a pure
+        // requirement step (REQUIREMENT_DATA — the ADR-234 zero-delta class), never "nothing to add".
+        if (!have.has(a) || !have.has(b) || !drawn(a, b)) out.push({ type: 'segment', a, b });
+        if (!have.has(c) || !have.has(d) || !drawn(c, d)) out.push({ type: 'segment', a: c, b: d });
+        out.push({ type: 'segments-cross', a, b, c, d });
+        return out;
+      }
+    }
   }
   return 'stop';
 };
@@ -6928,6 +6970,55 @@ const bisectorPlacesPoint: Rule = (s, ctx) => {
 };
 
 /**
+ * SEGMENT bisection — «CD חוצה את AB [בנקודה M]» / "CD bisects AB [at M]" (issue #240, ADR-382).
+ * The subject segment passes through the OBJECT segment's midpoint: an ADR-110 macro over existing
+ * constructs, NO new engine construct — `midpoint` of A,B + `set-line [C,M,D]` (collinearity +
+ * betweenness, so the bisector crosses WITHIN CD per the ADR-077 bare-segment default; set-line also
+ * draws C–D). The midpoint label: an explicit «בנקודה M» pins it; an existing midpoint of A,B is
+ * REUSED (M1 — never a coincident twin); else auto-named per the ADR-263 `freeLabel` discipline.
+ * The ANGLE sense of חוצה (ADR-261, `bisectorPlacesPoint`) owns any utterance with an angle/arc
+ * keyword; the ⊥-bisector (אנך אמצעי / a stated ⟂) and the intersection verbs keep their own rules.
+ * A non-bare subject («המשך CD חוצה…» / «הישר CD חוצה…») changes where the crossing may lie, so it
+ * DEFERS (escalates) rather than silently asserting the within-CD order.
+ */
+const bisectsSegment: Rule = (s, ctx) => {
+  if (!/bisects?|חוצה/i.test(s)) return null;
+  if (/angle|arc|זוו?ית|קשת|[∠∡∢⌢]/i.test(s)) return null; // the ANGLE/ARC sense (ADR-261 / arc-midpoint) owns those
+  if (/perpendicular|מאונ[כך]|אנ[כך]|[⊥⟂]/i.test(s)) return null; // אנך אמצעי / a stated ⟂ is the perpBisector family
+  if (INTERSECT_KW.test(s) || /מפגש/.test(s)) return null; // the intersection rules own cut/meet phrasing
+  if (/המש(?:ך|כי)|extension|extended|הישר|הקו|קרן|\bline\b|\bray\b/i.test(s)) return null; // non-bare subject → defer
+  const m = s.match(
+    /\b([A-Za-z]\d*)\s*([A-Za-z]\d*)\b\s*(?:bisects?|חוצה)\s+(?:את\s+)?(?:הקטע\s+|הצלע\s+|האלכסון\s+|the\s+)?(?:segment\s+|side\s+|diagonal\s+)?([A-Za-z]\d*)\s*([A-Za-z]\d*)\b/i,
+  );
+  if (!m) return null;
+  const [s1, s2, o1, o2] = [up(m[1]), up(m[2]), up(m[3]), up(m[4])]; // s1s2 bisects o1o2
+  if (new Set([s1, s2, o1, o2]).size !== 4) return null; // a shared endpoint is not a bisection of a disjoint segment
+  const named = s.slice((m.index ?? 0) + m[0].length).match(/(?:בנקודה|\bat(?:\s+point)?)\s+([A-Za-z]\d*)\b/i);
+  // Reuse an existing midpoint of the object segment (either orientation) rather than minting a coincident twin.
+  const existingMid = Object.entries(ctx.midpointOf ?? {}).find(
+    ([, [x, y]]) => (x === o1 && y === o2) || (x === o2 && y === o1),
+  )?.[0];
+  const M = named ? up(named[1]) : existingMid ?? freeLabel([...(ctx.points ?? []), ...(ctx.circles ?? []), s1, s2, o1, o2], ['M', 'N', 'K', 'L']);
+  const have = new Set(ctx.points ?? []);
+  const nb = ctx.neighbors ?? {};
+  const drawn = (x: Id, y: Id) => (nb[x] ?? []).includes(y);
+  const out: AnyCommand[] = [];
+  // Operand ink, only where missing (an idempotent re-statement on a drawn figure stays a pure
+  // constraint step — the ADR-234 zero-delta class): the bisected segment always shows; the
+  // subject's ink comes from `set-line` itself.
+  if (!have.has(o1) || !have.has(o2) || !drawn(o1, o2)) out.push({ type: 'segment', a: o1, b: o2 });
+  if (!have.has(s1) || !have.has(s2)) out.push({ type: 'segment', a: s1, b: s2 });
+  if (M !== existingMid) out.push({ type: 'midpoint', id: M, a: o1, b: o2 });
+  // Bisection IS a crossing statement plus "the crossing is the midpoint" — the ADR-383 requirement
+  // brings the reseat + verifier + sampling gates along, so the default drawing reads as a CROSSING
+  // and a degenerate all-collinear solve (a valid solution of the bare collinearity, the issue-#240
+  // design note) is repaired at apply and excluded from the shown configurations.
+  out.push({ type: 'segments-cross', a: s1, b: s2, c: o1, d: o2 });
+  out.push({ type: 'set-line', points: [s1, M, s2] });
+  return out;
+};
+
+/**
  * The two triangles named in a relation utterance — handles "ABC ≅ DEF" (labels either
  * side of the symbol) and the Hebrew "המשולשים ABC ו-DEF חופפים" (both before the verb).
  * Strips the shape/relation words, then takes the first two runs of three labels.
@@ -7191,6 +7282,7 @@ export const RULES: Rule[] = [
   perpBisector, // "perpendicular bisector of AB"
   midsegment, // "midsegment to BC in triangle ABC" — a triangle construct ("במשולש"); before the shapes AND before segment/midpoint (its "קטע"/"אמצע" keywords)
   bisectorPlacesPoint, // "AD bisects ∠BAC" / "CD חוצה זוית [במשולש ABC]" — places D on the opposite side. Before the shapes (its "במשולש ABC" form would otherwise make `triangle` 'stop'); safe before the bisector-∩ compounds because it DEFERS on intersect keywords.
+  bisectsSegment, // "CD חוצה את AB" / "CD bisects AB" — SEGMENT bisection (#240, ADR-382): midpoint + set-line macro. After the angle sense (which owns any angle-keyword utterance); before `chord`/`segment` (whose "הקטע AB" would half-parse the object and drop the bisection).
   regularPolygon, // "regular pentagon ABCDE" / "מחומש משוכלל" — before square (it also routes "regular triangle/quadrilateral")
   square,
   parallelogram,
@@ -7994,6 +8086,17 @@ export function normalizeUtterance(raw: string): string {
     // (U+2222) glyphs are the same student intent as ∠ (U+2220); the SUPERSCRIPT ZERO ⁰ (U+2070), typed for
     // degrees ("90⁰"), is the ° sign. Normalising here means every angle rule reads the canonical glyphs.
     .replace(/[∡∢]/g, '∠')
+    // Keyboard-natural PREFIX `<` ≡ ∠ (issue #237, ADR-381): students approximate the book's angle glyph
+    // with `<` («<ACB = 40», «<ACB=<BED») because ∠ isn't on a keyboard. Disambiguated from the INFIX
+    // less-than by both sides: it must be FOLLOWED by an uppercase label run (1–3 labels, not part of a
+    // longer letter run) and NOT PRECEDED (ignoring whitespace) by an operand — a label/measure letter,
+    // digit, or closing bracket. So `AB < CD` (lengthOrder, ADR-158), `α<β` (measureOrder), `R<r`
+    // (radius order, #54) and `k < 0` stay comparisons, locked in angle-bracket.test.ts.
+    .replace(/</g, (m, off: number, str: string) => {
+      if (!/^\s*(?:[A-Z]\d*){1,3}(?![A-Za-z])/.test(str.slice(off + 1))) return m;
+      const before = str.slice(0, off).replace(/\s+$/, '');
+      return /[A-Za-z0-9α-ωΑ-Ω)\]}|]$/.test(before) ? m : '∠';
+    })
     .replace(/⁰/g, '°')
     // Uppercase CYRILLIC homoglyphs → Latin (#45): a label pasted with a Cyrillic look-alike (А/В/С/… are
     // NOT [A-Za-z]) silently fails every label rule. Map the visual twins to their Latin letter at the one

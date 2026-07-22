@@ -203,6 +203,46 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'bare-crossing-statement-states-no-label',
+    title: '«CD חותך את AB» with no point named STATES the crossing and invents no label (#241, ADR-383)',
+    guards:
+      "Operator session `i1mt2us8` (2026-07-21): the unnamed crossing statement escalated to the LLM and died not-understood — and the SAME sentence later returned a figure with an invented point M («AB חותך את CD» → `M חיתוך AB ו-CD`), a coin flip in what the figure contains. Reading (a), evidence-backed: the sentence lowers deterministically to the point-free `segments-cross` requirement (within both spans, the ADR-166 meaning) — NO label is created, the verifier + meetsRequirements keep every shown configuration crossing, and the ADR-380 forced-crossing dot then offers the naming.",
+    steps: ['AB', 'CD חותך את AB'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      // reading (a): exactly the four stated points — nothing minted
+      expect([...fig.positions.keys()].sort()).toEqual(['A', 'B', 'C', 'D']);
+      const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => at(fig, id));
+      const den = (D.x - C.x) * (B.y - A.y) - (D.y - C.y) * (B.x - A.x);
+      expect(Math.abs(den), 'the segments are not parallel/collinear').toBeGreaterThan(1e-9);
+      const t1 = ((A.x - C.x) * (B.y - A.y) - (A.y - C.y) * (B.x - A.x)) / den; // along C–D
+      const t2 = ((A.x - C.x) * (D.y - C.y) - (A.y - C.y) * (D.x - C.x)) / den; // along A–B
+      expect(t1, 'crossing within CD').toBeGreaterThan(0.02);
+      expect(t1, 'crossing within CD').toBeLessThan(0.98);
+      expect(t2, 'crossing within AB').toBeGreaterThan(0.02);
+      expect(t2, 'crossing within AB').toBeLessThan(0.98);
+    },
+  },
+  {
+    id: 'segment-bisection-statement',
+    title: '«CD חוצה את AB» — a segment BISECTED by another segment builds the midpoint + through-line (#240, ADR-382)',
+    guards:
+      "Operator session `i1mt2us8` (2026-07-21): «CD חוצה את AB» (and the mirrored «AB חוצה את CD») died not-understood on EVERY attempt — חוצה was wired only for the ANGLE sense (ADR-261), whose own comment names segment bisection as the deliberately-excluded case, and nothing downstream picked it up. Now an ADR-110 macro: auto-named midpoint of the object segment (ADR-263 freeLabel) + `set-line` through the subject (collinear + between) + the ADR-383 crossing requirement — so the default drawing reads as a genuine crossing, never the degenerate all-five-collinear solution of the bare collinearity (the issue's design note).",
+    steps: ['AB', 'CD', 'CD חוצה את AB'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      const [A, B, C, D, M] = ['A', 'B', 'C', 'D', 'M'].map((id) => at(fig, id));
+      expect(dist(M, { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 }), 'M is the midpoint of AB').toBeLessThan(1e-6);
+      const t = ((M.x - C.x) * (D.x - C.x) + (M.y - C.y) * (D.y - C.y)) / ((D.x - C.x) ** 2 + (D.y - C.y) ** 2);
+      expect(t, 'M within CD').toBeGreaterThan(0.02);
+      expect(t, 'M within CD').toBeLessThan(0.98);
+      const perp = (p: Vec) => Math.abs((B.x - A.x) * (p.y - A.y) - (B.y - A.y) * (p.x - A.x)) / Math.hypot(B.x - A.x, B.y - A.y);
+      expect(Math.max(perp(C), perp(D)), 'CD is a transversal, not collinear with AB').toBeGreaterThan(0.3);
+    },
+  },
+  {
     id: 'clicked-crossing-stays-within-its-segments',
     title: 'A dot-named crossing keeps its within-the-segments meaning across configurations (#234, ADR-379)',
     guards:

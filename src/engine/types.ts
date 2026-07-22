@@ -1021,6 +1021,13 @@ export type Command =
   // side is a REQUIREMENT: the verifier flags a wrong-side config (figure.v.insideRegion/outsideRegion),
   // so `meetsRequirements` (sampler / "show another") skips it — never a driven equality.
   | { type: 'point-polygon-side'; id: Id; poly: Id[]; side: 'inside' | 'outside' }
+  // «CD חותך את AB» with NO crossing point named (issue #241, ADR-383): the two segments CROSS, stated as
+  // a point-free REQUIREMENT — the ADR-166 within-both-segments meaning without minting a node (reading
+  // (a): typing STATES the crossing; the ADR-380 forced-crossing dot then OFFERS the naming). The ADR-244
+  // radius-order shape: apply only improves the DEFAULT (the ADR-255 loose-endpoint reseat); the givens
+  // verifier flags a non-crossing config (figure.v.segmentsCross), `meetsRequirements` + the shared sample
+  // core gate on it, so the sampler / "show another" keep the segments crossing — never a driven equality.
+  | { type: 'segments-cross'; a: Id; b: Id; c: Id; d: Id }
   | { type: 'diameter'; id1: Id; id2: Id; circle: Id; theta?: number }
   | { type: 'arc'; id: Id; center: Id; from: Id; to: Id; bulgeRef?: Id; bulgeToward?: boolean; spanDeg?: number; minor?: boolean } // a drawn arc: semicircle / quarter / sector. spanDeg = the INTENDED central angle (arc identity, ADR-356); bulgeRef+bulgeToward orient a semicircle outside/inside a shape (render-time)
   | { type: 'arc-midpoint'; id: Id; circle: Id; from: Id; to: Id; branch?: number }
