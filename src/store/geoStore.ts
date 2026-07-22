@@ -65,6 +65,8 @@ function angleMarkFor(cmd: AnyCommand): AngleMark | null {
       return { vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, right: false };
     case 'mark-angle': // #106: a valueless stated-angle mark (a central angle with no value) — an arc, never a knee
       return { vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, right: false };
+    case 'angle-alias': // «נסמן זוית BAM כ-A1» (#235) — the named wedge gets its arc; the "A1" text rides the measure-label stream
+      return { vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, right: false };
     case 'set-angle':
       if (cmd.arcOf) return null; // an ARC measure — the value prints ON the arc, never a wedge at the (hidden) centre (ADR-335)
       return { vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2, right: Math.abs(cmd.value - 90) < 1e-6 };
@@ -553,6 +555,10 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       }
       // A measure annotates the figure regardless of whether it adds a constraint.
       if (isMeasure(f.cmd)) addMeasureLabel(lenByKey, angByKey, areaByKey, f.cmd, measureLabelText(f.cmd, symtab));
+      // An angle ALIAS annotates its wedge with the bound name (#235) — a name, not a value, so it
+      // rides the same label stream as a symbolic measure (the arc comes from angleMarkFor).
+      if (f.cmd.type === 'angle-alias')
+        addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: f.cmd.vertex, ray1: f.cmd.ray1, ray2: f.cmd.ray2 }, f.cmd.name);
       // A point a lowered command would (re)create that an earlier fact owns but which
       // isn't in the figure now ⇒ its definition is gone, so this fact can't build either.
       const broken = intro.filter((id) => owned.has(id) && !cur.objects.some((o) => o.id === id));

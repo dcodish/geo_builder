@@ -619,6 +619,14 @@ export default function App() {
       setBusy(false);
       return;
     }
+    // An angle-alias name that is already taken (an existing point, or an alias bound to a different
+    // angle) — the student picks another name (#235, ADR-386); never a silent rebind or an LLM guess.
+    if (!r.ok && r.reason === 'alias-taken') {
+      logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `alias-taken:${r.name}` });
+      setInputNote(t('input.aliasTaken', { name: r.name }));
+      setBusy(false);
+      return;
+    }
     // A reference to a centre carrying a CONCENTRIC PAIR with no outer/inner qualifier (ADR-244) — ask
     // WHICH circle is meant instead of picking silently or escalating to the LLM (which would only guess).
     if (!r.ok && r.reason === 'ambiguous-circle') {

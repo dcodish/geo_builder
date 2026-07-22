@@ -153,6 +153,22 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
+      "angle",
+    ],
+    "text": "denote angle BAM as A1",
+    "winner": "angleAliasRule",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "angle",
+    ],
+    "text": "נסמן זוית BAM כ-A1",
+    "winner": "angleAliasRule",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
       "ratioConstraint",
     ],
     "text": "arc AB = 40 in circle O",
@@ -1118,6 +1134,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
     "lang": "he",
     "text": "CD חותך את AB",
     "winner": "lineLineIntersection",
+  },
+  {
+    "lang": "en",
+    "text": "denote angle BAM as A1",
+    "winner": "angleAliasRule",
+  },
+  {
+    "lang": "he",
+    "text": "נסמן זוית BAM כ-A1",
+    "winner": "angleAliasRule",
   },
   {
     "lang": "en",

@@ -936,6 +936,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "quadrilateral",
     ],
   },
+  "denote angle BAM as A1": {
+    "en": [
+      "segment",
+      "segment",
+      "angle-alias",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "angle-alias",
+    ],
+  },
   "diameter AB in circle O": {
     "en": [
       "circle",

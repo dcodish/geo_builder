@@ -1939,6 +1939,13 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
     }
 
+    case 'angle-alias':
+      // «נסמן זוית BAM כ-A1» (issue #235, ADR-386) — bind the alias NAME to the angle identity. A pure
+      // DATA object (id = the name, so the id registry/conflict path own collisions; `evaluate` never
+      // visits it); the wedge itself constrains nothing — a name, not a value. Idempotent via addObj.
+      addObj(objects, { kind: 'angle-alias', id: cmd.name, vertex: cmd.vertex, ray1: cmd.ray1, ray2: cmd.ray2 });
+      break;
+
     case 'set-radius-ratio': {
       // radius(c1) = k · radius(c2) — lowered to an ordinary `ratio` over (centre, on-circle WITNESS)
       // pairs: |centre₁·w₁| IS radius₁ (w₁ rides circle 1), so the existing ratio machinery — incl. the
