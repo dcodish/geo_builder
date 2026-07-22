@@ -203,6 +203,20 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
 // ── the scenarios (newest first) ───────────────────────────────────────────
 export const SCENARIOS: Scenario[] = [
   {
+    id: 'angle-alias-bare-digit-sign',
+    title: '«נסמן זוית CAD כ 1» binds the vertex-letter alias and draws the digit sign — never a silent ∠CAD=1° (#262 P1 + #263, ADR-386 Am.)',
+    guards:
+      "Operator prod play-test of #235 (2026-07-22, the screenshot figure — triangle ABC, D on CB, cevian AD): «נסמן זוית CAD כ 1» silently parsed as SET-ANGLE ∠CAD=1° (the naming-shaped utterance fell through to the value rule, which read the digit as degrees; «כ-1» even gave −1°, and the verb variants סימון/לסמן with «A1» read the 1 the same way). The alias rule is now ALL-OR-NOTHING for naming-shaped utterances (the ADR-024 leftover guard) with the widened verb/connector/decor grammar, a bare digit binds the canonical vertex-letter name (CAD כ 1 ⇒ A1), and the wedge sign renders the DIGIT alone (the vertex label already shows the letter — the operator's screenshot collision).",
+    steps: ['משולש ABC', 'D על CB', 'AD', 'נסמן זוית CAD כ 1'],
+    check(fig) {
+      allStepsOk(fig);
+      expect(fig.violations).toEqual([]);
+      expect(fig.construction.objects.find((o) => o.kind === 'angle-alias'), 'the canonical A1 binding').toMatchObject({ id: 'A1', vertex: 'A' });
+      expect(fig.labels.angles.map((a) => a.text), 'the digit sign, not «A1»').toContain('1');
+      expect(fig.construction.constraints.some((c) => c.type === 'angle'), 'no degree value was asserted').toBe(false);
+    },
+  },
+  {
     id: 'angle-alias-book-notation',
     title: 'The book-74 figure through the A1/D1 subscript notation: «נסמן זוית ACB כ-C1» + «זוית C1 = זוית E1» (#235, ADR-386)',
     guards:
@@ -228,10 +242,11 @@ export const SCENARIOS: Scenario[] = [
       expect(dist(B, D)).toBeCloseTo(8, 1);
       expect(dist(B, C)).toBeCloseTo(6, 1);
       expect(dist(B, E)).toBeCloseTo(6, 1);
-      // The wedges carry their bound names.
-      const texts = fig.labels.angles.map((a) => a.text);
-      expect(texts).toContain('C1');
-      expect(texts).toContain('E1');
+      // The wedges carry their bound names — as DIGIT signs per #263 (the vertex labels show the letters);
+      // the bindings themselves are the alias objects.
+      const aliases = fig.construction.objects.filter((o) => o.kind === 'angle-alias').map((o) => o.id).sort();
+      expect(aliases).toEqual(['C1', 'E1']);
+      expect(fig.labels.angles.filter((a) => a.text === '1')).toHaveLength(2);
     },
   },
   {

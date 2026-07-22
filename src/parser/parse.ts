@@ -1709,13 +1709,26 @@ const angleEquality: Rule = (s, ctx) => {
  * `alias-taken`, never a silent rebind; re-stating the SAME binding is an idempotent no-op.
  */
 const angleAliasRule: Rule = (s, ctx) => {
-  if (!/נסמן|denote|נסמנה/i.test(s)) return null;
+  if (!/נסמן|נסמנה|סימון|לסמן|מסמנים|denote|\bmark\b|\blabel\b/i.test(s)) return null;
   if (!/(?:angle|∠|∢|זוו?ית)/i.test(s)) return null;
+  // The name may be decorated («כזוית A1», «כ-∠A1») and may be the BARE DIGIT of the book convention
+  // («נסמן זוית CAD כ 1» — the sign near the vertex IS the digit): a bare digit binds the canonical
+  // VERTEX-letter + digit name (CAD כ 1 ⇒ A1), displayed as the digit alone (#262/#263, ADR-386 Am.).
   const m = s.match(
-    /(?:angle|∠|∢|ה?זוו?ית)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b[^A-Za-z]*?(?:כ-?\s*|ב-?\s*|\bas\s+|\bby\s+)([A-Z]\d+)(?![A-Za-z\d])/,
+    /(?:angle|∠|∢|ה?זוו?ית)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b[^A-Za-z\d]*?(?:כ|ב(?:תור)?|\bas\b|\bby\b)-?\s*(?:∠|∢|זוו?ית)?\s*-?\s*([A-Z]\d+|\d+)(?![A-Za-z\d])/,
   );
-  if (!m) return null;
-  const [r1, v, r2, name] = [up(m[1]), up(m[2]), up(m[3]), m[4]];
+  if (!m) {
+    // ALL-OR-NOTHING (the ADR-024 leftover guard; issue #262 P1): a NAMING-shaped utterance — the
+    // sign/denote verb + an angle + ANY digit and no stated «=» — that this rule cannot bind must
+    // NEVER fall through to the value rules, which read whatever digit they find as the angle's
+    // DEGREE VALUE («נסמן זוית CAD כ 1» silently set ∠CAD=1°, «כ-1» even −1°, «כ 5X» read the 5).
+    // Escalate the whole utterance instead. The digit-less measure form («נסמן זוית ABC ב-α») keeps
+    // its existing path untouched.
+    if (!/=/.test(s) && /\d/.test(s)) return 'stop';
+    return null;
+  }
+  const [r1, v, r2] = [up(m[1]), up(m[2]), up(m[3])];
+  const name = /^\d+$/.test(m[4]) ? `${v}${m[4]}` : m[4];
   if (new Set([r1, v, r2]).size !== 3) return null;
   const same = (ctx.angleAliases ?? []).find((al) => al.name === name);
   if (same && !(same.vertex === v && ((same.ray1 === r1 && same.ray2 === r2) || (same.ray1 === r2 && same.ray2 === r1))))

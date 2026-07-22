@@ -43,10 +43,10 @@ describe('the naming statement (#235)', () => {
     expect(cmds('נסמן זוית BAM ב-A1').find((c) => c.type === 'angle-alias')).toBeTruthy(); // the ב connector too
   });
 
-  it('builds with the arc mark and the name label on the wedge', () => {
+  it('builds with the arc mark and the DIGIT sign on the wedge (#263 — the vertex label already shows the letter)', () => {
     const fig = replay(factsOf(['משולש ABM', 'נסמן זוית BAM כ-A1']));
     for (const s of Object.values(fig.status)) expect(s).toBe('ok');
-    expect(fig.labels.angles).toContainEqual({ vertex: 'A', ray1: 'B', ray2: 'M', text: 'A1' });
+    expect(fig.labels.angles).toContainEqual({ vertex: 'A', ray1: 'B', ray2: 'M', text: '1' });
     expect(fig.angleMarks).toContainEqual({ vertex: 'A', ray1: 'B', ray2: 'M', right: false });
   });
 
@@ -67,6 +67,35 @@ describe('the naming statement (#235)', () => {
   it('«נסמן את שטח ABC ב-S» stays the area measure label', () => {
     const facts = factsOf(['משולש ABC']);
     expect(cmds('נסמן את שטח ABC ב-S', ctxOf(facts))[0].type).toBe('measure-area');
+  });
+
+  // ── #262 (P1): naming-intent NEVER falls through to the value rule ──
+  it('every naming variant binds the alias — never a silent degree value (the operator probe table)', () => {
+    const ctx = ctxOf(factsOf(['משולש ABC', 'D על CB', 'AD']));
+    for (const u of ['נסמן זוית CAD כ 1', 'נסמן זוית CAD כ-1', 'סימון זוית CAD כ A1', 'לסמן זוית CAD כ A1', 'נסמן זוית CAD כזוית A1', 'נסמן זוית CAD בתור A1', 'denote angle CAD as A1', 'mark angle CAD as A1']) {
+      const out = cmds(u, ctx);
+      expect(out.some((c) => c.type === 'set-angle'), `${u} must not set a value`).toBe(false);
+      expect(out.find((c) => c.type === 'angle-alias'), `${u} binds`).toMatchObject({ name: 'A1', vertex: 'A' });
+    }
+  });
+
+  it('a naming-shaped utterance the rule cannot bind escalates — never a value («נסמן זוית CAD כ 5X»)', () => {
+    const ctx = ctxOf(factsOf(['משולש ABC', 'D על CB', 'AD']));
+    const r = parse('נסמן זוית CAD כ 5X', ctx);
+    if (r.ok) expect(r.commands.some((c) => c.type === 'set-angle')).toBe(false);
+  });
+
+  // ── #263: the wedge sign is the DIGIT alone when the name is vertex+digits ──
+  it('«נסמן זוית CAD כ 1» draws the sign «1» (the vertex label already shows the A)', () => {
+    const fig = replay(factsOf(['משולש ABC', 'D על CB', 'AD', 'נסמן זוית CAD כ 1']));
+    for (const s of Object.values(fig.status)) expect(s).toBe('ok');
+    expect(fig.labels.angles).toContainEqual({ vertex: 'A', ray1: 'C', ray2: 'D', text: '1' });
+    expect(fig.construction.objects.find((o) => o.kind === 'angle-alias')).toMatchObject({ id: 'A1', vertex: 'A' });
+  });
+
+  it('a name bound at a DIFFERENT letter keeps the full name on the wedge', () => {
+    const fig = replay(factsOf(['משולש ABM', 'נסמן זוית BAM כ-K1']));
+    expect(fig.labels.angles).toContainEqual({ vertex: 'A', ray1: 'B', ray2: 'M', text: 'K1' });
   });
 });
 

@@ -556,9 +556,15 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       // A measure annotates the figure regardless of whether it adds a constraint.
       if (isMeasure(f.cmd)) addMeasureLabel(lenByKey, angByKey, areaByKey, f.cmd, measureLabelText(f.cmd, symtab));
       // An angle ALIAS annotates its wedge with the bound name (#235) — a name, not a value, so it
-      // rides the same label stream as a symbolic measure (the arc comes from angleMarkFor).
-      if (f.cmd.type === 'angle-alias')
-        addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: f.cmd.vertex, ray1: f.cmd.ray1, ray2: f.cmd.ray2 }, f.cmd.name);
+      // rides the same label stream as a symbolic measure (the arc comes from angleMarkFor). The book
+      // convention draws the DIGIT alone when the name is the vertex letter + digits (the vertex's own
+      // point label already shows the letter — «A1» next to «A» duplicated it, #263); a name bound at
+      // a DIFFERENT letter keeps the full name (unambiguous).
+      if (f.cmd.type === 'angle-alias') {
+        const digits = f.cmd.name.startsWith(f.cmd.vertex) ? f.cmd.name.slice(f.cmd.vertex.length) : '';
+        const text = /^\d+$/.test(digits) ? digits : f.cmd.name;
+        addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: f.cmd.vertex, ray1: f.cmd.ray1, ray2: f.cmd.ray2 }, text);
+      }
       // A point a lowered command would (re)create that an earlier fact owns but which
       // isn't in the figure now ⇒ its definition is gone, so this fact can't build either.
       const broken = intro.filter((id) => owned.has(id) && !cur.objects.some((o) => o.id === id));

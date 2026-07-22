@@ -22,6 +22,9 @@ commands* it produced (from the log), since the LLM is mocked in tests.
 
 ## Scenarios
 
+### `angle-alias-bare-digit-sign` — «נסמן זוית CAD כ 1» binds A1 and draws the digit sign, never ∠CAD=1° (#262 P1 + #263, ADR-386 Am.)
+Operator prod play-test of #235 (2026-07-22): the naming-shaped utterance fell through to the value rule — «כ 1» silently set ∠CAD=1° (green row), «כ-1» gave −1°, and the verb variants סימון/לסמן with «A1» read the digit the same way. The alias rule is now ALL-OR-NOTHING for naming-shaped utterances (the ADR-024 leftover guard) with the widened verbs (נסמן/נסמנה/סימון/לסמן/מסמנים · denote/mark/label), connectors (כ/ב/בתור · as/by), and «כזוית»/∠ decor; a bare digit binds the canonical vertex-letter name (CAD כ 1 ⇒ A1); the wedge sign renders the digit alone (the vertex label already shows the letter — the screenshot collision, #263). Probe-table + display locks in `angle-alias.test.ts`.
+
 ### `angle-alias-book-notation` — the book-74 figure through «נסמן זוית ACB כ-C1» + «זוית C1 = זוית E1» (#235, ADR-386)
 Prod session `ne810woo` (2026-07-20): «∠C=∠BED» died not-understood — C carries three edges, so the single-vertex resolution is honestly ambiguous, which is what the book's subscripts exist to solve; the tool had no way to state them. Now «נסמן זוית BAM כ-A1» binds an angle ALIAS (a data-only `angle-alias` object — id-registry visible, arc + name label on the wedge), «זוית A1» rewrites to the triple at the parse seam so every angle rule gains the notation, «∠B=∠C» resolves bare 2-edge vertices (ambiguous → the clarification now suggests נסמן), and the collision lanes refuse honestly (`alias-taken`, both directions). The scenario keeps the operator's equality-first order so ADR-384 composes. Unit locks in `angle-alias.test.ts`.
 
