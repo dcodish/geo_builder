@@ -2,6 +2,28 @@
 
 exports[`PAR-10 (b) — supported catalog examples parse to stable command types (He + En) > the {example → command types} map is pinned — a rule shadow that flips a line while still \`.ok\` breaks this 1`] = `
 {
+  "40 < angle ABC < 60": {
+    "en": [
+      "segment",
+      "segment",
+      "set-angle-bound",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "set-angle-bound",
+    ],
+  },
+  "5 < |AB| < 9": {
+    "en": [
+      "segment",
+      "set-length-bound",
+    ],
+    "he": [
+      "segment",
+      "set-length-bound",
+    ],
+  },
   "A is on circle O": {
     "en": [
       "circle",
@@ -644,6 +666,18 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     ],
     "he": [
       "measure-angle",
+    ],
+  },
+  "angle ABC > 40": {
+    "en": [
+      "segment",
+      "segment",
+      "set-angle-bound",
+    ],
+    "he": [
+      "segment",
+      "segment",
+      "set-angle-bound",
     ],
   },
   "angle ABC equals thirty degrees": {

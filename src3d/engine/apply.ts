@@ -215,6 +215,23 @@ function drawAtom(next: Construction3, atom: import('./types').VecAtom): void {
   if (atom.kind === 'pair' && !hasSegment(next, atom.from, atom.to)) next.segments.push([atom.from, atom.to]);
 }
 
+/** The two endpoint ids a VecAtom spans (a pair verbatim, a named vector's from→to), or null. */
+function atomEndpoints(c: Construction3, atom: import('./types').VecAtom): [Id, Id] | null {
+  if (atom.kind === 'pair') return [atom.from, atom.to];
+  const dv = c.vectors.get(atom.name);
+  return dv ? [dv.from, dv.to] : null;
+}
+
+/** The vecDef index of a symbol-defined point whose symbol is still FREE (no symbolPin yet), or null.
+ *  ADR-3D-056: the point a seg-perp/seg-par symbol-pin will drive (e.g. E on `AE=t·AS`). */
+function freeSymbolDef(c: Construction3, id: Id): number | null {
+  const pt = c.points.get(id);
+  if (!pt || pt.kind !== 'vec-defined') return null;
+  const vd = c.vecDefs[pt.def];
+  if (!vd?.symbol) return null;
+  return c.symbolPins.some((p) => p.def === pt.def) ? null : pt.def; // already pinned ⇒ can't pin twice
+}
+
 /** Apply-time validation of a claim's references (order matters, like every fact). */
 function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
   switch (claim.type) {
@@ -1085,6 +1102,24 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       const next = clone(c);
       drawAtom(next, cmd.u);
       drawAtom(next, cmd.v);
+      // ADR-3D-056 (#286): a PERPENDICULAR whose one arm carries a free symbol-defined point (E on AS
+      // via `AE=t·AS`) PINS that symbol — E slides to the foot of the perpendicular. Otherwise the ⊥ was
+      // pushed onto the free solid dims and held only at lucky seeds. Only when exactly ONE arm carries a
+      // still-unpinned symbol point (the other arm being the fixed reference); else the dims/claim path.
+      if (Math.abs(cmd.cos) < 1e-9) {
+        const up = atomEndpoints(c, cmd.u);
+        const vp = atomEndpoints(c, cmd.v);
+        const uDef = up && (freeSymbolDef(c, up[0]) ?? freeSymbolDef(c, up[1]));
+        const vDef = vp && (freeSymbolDef(c, vp[0]) ?? freeSymbolDef(c, vp[1]));
+        if (up && vp && uDef != null && vDef == null) {
+          next.symbolPins.push({ rel: 'seg-perp', a: up[0], b: up[1], c: vp[0], d: vp[1], def: uDef });
+          return { ok: true, next };
+        }
+        if (up && vp && vDef != null && uDef == null) {
+          next.symbolPins.push({ rel: 'seg-perp', a: vp[0], b: vp[1], c: up[0], d: up[1], def: vDef });
+          return { ok: true, next };
+        }
+      }
       if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-angle', u: cmd.u, v: cmd.v, cos: cmd.cos });
       else next.claims.push({ type: 'cos-angle-eq', u: cmd.u, v: cmd.v, cos: cmd.cos });
       return { ok: true, next };

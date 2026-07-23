@@ -8,7 +8,7 @@
  */
 
 import type { AnyCommand, Command, Constraint, Construction, FreePoint, GeoObject, Id, LineSpec, SolveDirective, Vec } from './types';
-import { LEN_EPS, isGeoPoint } from './types';
+import { LEN_EPS, isGeoPoint, isOrderConstraint } from './types';
 import { addCollinearOrder, applyCommand, mirrorComposition, normalizeShapeComposition, shapeLowersToConstraints, wouldInvertDependency } from './apply';
 import { lower } from './lower';
 import { evaluate, resolveDriven } from './evaluate';
@@ -160,6 +160,7 @@ function degenerateConstraintError(cmd: Command): string | null {
     // An angle's ray must leave its vertex — vertex === ray ⇒ a zero ray ⇒ angleDeg is NaN.
     case 'set-angle':
     case 'set-angle-acuteness':
+    case 'set-angle-bound':
       return cmd.vertex === cmd.ray1 || cmd.vertex === cmd.ray2
         ? `an angle needs three distinct points — "∠${cmd.ray1}${cmd.vertex}${cmd.ray2}" repeats its vertex`
         : null;
@@ -721,8 +722,7 @@ function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', 
     const sv = (o as { solve?: SolveDirective }).solve;
     if (sv === undefined || includeSolving === true) return true;
     if (includeSolving === 'soft-order') {
-      const t = sv.constraint.type;
-      return t === 'collinear-order' || t === 'angle-order' || t === 'length-order' || t === 'angle-acuteness';
+      return isOrderConstraint(sv.constraint);
     }
     return false;
   };
@@ -939,7 +939,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
     // and a lone carrier re-solved from a perturbed seed can satisfy an order by DEGENERACY (E collapsing
     // onto A zeroes the collinear-order residual) where the multi-carrier regularised solve stays healthy.
     // Region constraints keep the original minimal→full stages.
-    const isRegionK = K.type === 'angle-order' || K.type === 'length-order' || K.type === 'collinear-order' || K.type === 'angle-acuteness';
+    const isRegionK = isOrderConstraint(K);
     const base = minimal.length > 0 ? minimal : full;
     const stages: Id[][] = isRegionK ? [] : base.map((id) => [id]);
     if (base.length > 1 || (isRegionK && base.length > 0)) stages.push(base);
@@ -1065,7 +1065,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
     // Self-verifying: kept only if the FULL system then evaluates valid — it can never corrupt a figure,
     // only recover configurations the greedy one-constraint-per-carrier model couldn't reach. Region/order
     // constraints are skipped (they remove no DOF; withOrderCons already folds them into every joint cost).
-    const isRegion = K.type === 'angle-order' || K.type === 'length-order' || K.type === 'collinear-order' || K.type === 'angle-acuteness';
+    const isRegion = isOrderConstraint(K);
     if (!isRegion && !evaluate({ objects, constraints: [...c.constraints, ...added] }).ok) {
       const claimed = new Map<Id, SolveDirective>();
       for (const o of beforeK) {
@@ -1245,11 +1245,9 @@ function collinearByConstruction(objects: GeoObject[], p: Id, a: Id, b: Id): boo
  *  (issue #110: a collinear-order had over-recruited O + the radii, turning a solvable 1-DOF drive into a
  *  divergent multi-carrier joint solve). The freed orders stay in `constraints` as checks. */
 function driveHardOn(objects: GeoObject[], priorConstraints: Constraint[], carrier: Id, con: Constraint): Construction {
-  const isSoftOrder = (k: Constraint | undefined) =>
-    !!k && (k.type === 'collinear-order' || k.type === 'angle-order' || k.type === 'length-order' || k.type === 'angle-acuteness');
   const objs = objects.map((o) => {
     const sv = (o as { solve?: SolveDirective }).solve;
-    if (sv && isSoftOrder(sv.constraint) && o.id !== carrier) return { ...o, solve: undefined } as GeoObject;
+    if (sv && isOrderConstraint(sv.constraint) && o.id !== carrier) return { ...o, solve: undefined } as GeoObject;
     if (o.id === carrier && (o.kind === 'on-circle' || o.kind === 'on-segment' || o.kind === 'free-point'))
       return { ...o, solve: { constraint: con, branch: 0 } } as GeoObject;
     return o;

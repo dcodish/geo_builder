@@ -1680,7 +1680,7 @@ export function introducedIds(cmd: AnyCommand): Id[] {
   if (cmd.type === 'measure-length') return [cmd.a, cmd.b];
   if (cmd.type === 'measure-angle' || cmd.type === 'mark-angle') return [cmd.vertex, cmd.ray1, cmd.ray2];
   if (cmd.type === 'measure-area') return cmd.ids; // highlight the polygon the area annotates
-  if (cmd.type === 'set-var' || cmd.type === 'measure-order') return []; // a relation over variables — no object to highlight
+  if (cmd.type === 'set-var' || cmd.type === 'measure-order' || cmd.type === 'measure-bound') return []; // a relation over variables — no object to highlight
   if (cmd.type === 'shape-variant') return cmd.ids; // the named shape's vertices (ADR-138)
   if (cmd.type === 'inscribe') return variantVertices(cmd); // container + inscribed vertices (ADR-262)
   return applyCommand(emptyConstruction(), cmd).objects.map((o) => o.id);

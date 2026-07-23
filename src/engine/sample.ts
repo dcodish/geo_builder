@@ -17,7 +17,7 @@
  */
 
 import type { Constraint, Construction, FreePoint, Id, OnCirclePoint, OnLinePoint, SolveDirective } from './types';
-import { isGeoPoint } from './types';
+import { isGeoPoint, isOrderConstraint } from './types';
 import { carrierOf, isShapeCarrier } from './carriers';
 import { constraintRefs } from './solve';
 
@@ -32,10 +32,8 @@ import { constraintRefs } from './solve';
  * configuration for a forced one (e.g. an inscribed triangle whose `A,B,E` collinear-order recruited its
  * vertices froze them out of sampling, so every angle read as "definitive").
  */
-const isOrderOnlySolve = (o: { solve?: unknown }): boolean => {
-  const k = (o as { solve?: { constraint?: Constraint } }).solve?.constraint?.type;
-  return k === 'angle-order' || k === 'length-order' || k === 'collinear-order' || k === 'angle-acuteness';
-};
+const isOrderOnlySolve = (o: { solve?: unknown }): boolean =>
+  isOrderConstraint((o as { solve?: { constraint?: Constraint } }).solve?.constraint);
 
 /** A carrier's DOF is NOT consumed by a constraint: either undriven, or driven only by an order/region
  *  constraint (which removes 0 DOF). Such a carrier stays free for sampling. */
@@ -446,7 +444,7 @@ function rawMovableDof(o: Construction['objects'][number]): number {
  *  Counting it as 1 makes two tangent circles read their true shape freedom (the radius RATIO = 1 DOF,
  *  ADR-228 Am.2) instead of 0. A coincide between ordinary points still pins both coords (2). */
 function dofRemoved(con: Constraint, byId?: Map<Id, Construction['objects'][number]>): number {
-  if (con.type === 'angle-order' || con.type === 'length-order' || con.type === 'collinear-order' || con.type === 'angle-acuteness') return 0;
+  if (isOrderConstraint(con)) return 0;
   if (con.type === 'coincide') {
     const p = byId?.get(con.p), q = byId?.get(con.q);
     return p?.kind === 'radial-toward' && q?.kind === 'radial-toward' ? 1 : 2;

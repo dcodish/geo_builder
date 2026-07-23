@@ -695,6 +695,11 @@ export interface Construction3 {
     | { rel: 'parallel' | 'perp'; a: Id; b: Id; plane: Id[]; def: number }
     | { rel: 'length-rel'; a: Id; b: Id; pair2: [Id, Id]; c: number; def: number } // |ab| = c·|pair2| pins the symbol
     | { rel: 'value'; value: number; def: number } // k = ½ — direct assignment
+    // ADR-3D-056 (#286): a ⊥/∥ between two SEGMENTS where one endpoint is this symbol-defined point.
+    // «EO⊥AS» with E = A+t·AS pins t to the foot of the perpendicular — one root-find, not a dims drive
+    // (the ⊥ was being pushed onto the free solid dims, so it held only at lucky seeds). seg(a,b) is the
+    // arm carrying the unknown; seg(c,d) is the fixed reference.
+    | { rel: 'seg-perp' | 'seg-par'; a: Id; b: Id; c: Id; d: Id; def: number }
   )[];
   /** Every claim RECORDED by apply (incl. ones composite commands create) — derive3
    *  attributes them to facts by count-delta and verifies them all; a claim can

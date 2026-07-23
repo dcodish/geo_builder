@@ -612,6 +612,23 @@ function symbolPinResidual(
     if (!a1 || !b1 || !a2 || !b2) return NaN;
     return norm3(sub3(b1, a1)) - pin.c * norm3(sub3(b2, a2));
   }
+  if (pin.rel === 'seg-perp' || pin.rel === 'seg-par') {
+    // ADR-3D-056: seg(a,b) ⊥/∥ seg(c,d) as a function of the symbol. `a` (or `b`) is the unknown
+    // point, so its position varies with k; the reference seg(c,d) is fixed. Normalised, ∈ [−1,1]:
+    // seg-perp is the (signed) cosine — it crosses zero, so signChangeRoots brackets it; seg-par is the
+    // (non-negative) sine — it touches zero, so touchZeroRoots does.
+    const pa = get(pin.a);
+    const pb = get(pin.b);
+    const pc = get(pin.c);
+    const pd = get(pin.d);
+    if (!pa || !pb || !pc || !pd) return NaN;
+    const u = sub3(pb, pa);
+    const v = sub3(pd, pc);
+    const den = Math.max(norm3(u) * norm3(v), 1e-12);
+    return pin.rel === 'seg-perp' ? dot3(u, v) / den : norm3(cross3(u, v)) / den;
+  }
+  // the remaining kinds are ⟂/∥ to a PLANE (through `pin.plane`)
+  if (pin.rel !== 'parallel' && pin.rel !== 'perp') return NaN;
   const a = get(pin.a);
   const b = get(pin.b);
   const ring = pin.plane.map(get);
@@ -1098,6 +1115,9 @@ function evaluateSolidsAndPoints(
     if (rev.apex) pos.set(rev.apex, v3(origin.x, origin.y, origin.z + h));
   });
 
+  // ADR-3D-056 (#286): vec-defined points whose seg-perp/seg-par pin references a point placed LATER in
+  // insertion order (the reference segment, or O) — deferred here, placed in a 2nd pass once it exists.
+  const deferredSegPins: [Id, number][] = [];
   for (const [id, def] of c.points) {
     if (def.kind === 'solid-vertex' || def.kind === 'coord' || def.kind === 'rev-point') continue;
     if (def.kind === 'on-segment') {
@@ -1169,6 +1189,19 @@ function evaluateSolidsAndPoints(
       pos.set(id, inSpanPosition(c, def, pos));
     } else if (def.kind === 'vec-defined') {
       const vd = c.vecDefs[def.def];
+      // ADR-3D-056: a seg-perp/seg-par pin references points OUTSIDE the vecDef's terms (the fixed
+      // reference segment + O), which may be inserted LATER; defer to the 2nd pass once they are placed.
+      const segPin =
+        vd.symbol && !symbolOverride?.has(def.def) && !cheapSymbols
+          ? c.symbolPins.find(
+              (p): p is Extract<Construction3['symbolPins'][number], { rel: 'seg-perp' | 'seg-par' }> =>
+                (p.rel === 'seg-perp' || p.rel === 'seg-par') && p.def === def.def,
+            )
+          : undefined;
+      if (segPin && [segPin.a, segPin.b, segPin.c, segPin.d].some((q) => q !== vd.unknown && !pos.has(q))) {
+        deferredSegPins.push([id, def.def]);
+        continue;
+      }
       let k = 0;
       if (vd.symbol) {
         const pin = c.symbolPins.find((p) => p.def === def.def);
@@ -1181,9 +1214,9 @@ function evaluateSolidsAndPoints(
         } else if (pin) {
           const resid = (kk: number) => symbolPinResidual(c, pin, vd, pos, kk);
           const roots =
-            pin.rel === 'parallel'
+            pin.rel === 'parallel' || pin.rel === 'seg-perp' // signed residual (dot) — crosses zero
               ? signChangeRoots(resid)
-              : pin.rel === 'perp'
+              : pin.rel === 'perp' || pin.rel === 'seg-par' // non-negative residual (cross) — touches zero
                 ? touchZeroRoots(resid)
                 : (() => {
                     // length-rel: the residual can CROSS zero or only TOUCH it — the exam
@@ -1327,6 +1360,20 @@ function evaluateSolidsAndPoints(
         // parallel ⇒ no position — derive3 flags `line-misses-plane` honestly
       }
     }
+  }
+  // ADR-3D-056 (#286) — 2nd pass: place the seg-pin vec-defined points deferred above. Their reference
+  // points (O, the fixed segment) are now placed, so the symbol root-finds cleanly (E → the foot of the
+  // perpendicular). This holds at EVERY seed, where before the ⊥ was pushed onto the free dims and held
+  // only at lucky ones.
+  for (const [id, defIdx] of deferredSegPins) {
+    const vd = c.vecDefs[defIdx];
+    const pin = c.symbolPins.find((p) => (p.rel === 'seg-perp' || p.rel === 'seg-par') && p.def === defIdx);
+    if (!pin) continue;
+    const resid = (kk: number) => symbolPinResidual(c, pin, vd, pos, kk);
+    const roots = pin.rel === 'seg-perp' ? signChangeRoots(resid) : touchZeroRoots(resid);
+    if (roots.length === 0) continue; // unsatisfiable — left unpositioned, flagged upstream
+    const P = solveVecDef(c, vd, pos, roots[0]);
+    if (P) pos.set(id, P);
   }
 }
 

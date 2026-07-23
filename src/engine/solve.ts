@@ -14,15 +14,24 @@
  * kind, evaluator rule, or solver.
  */
 
-import type { Constraint, Id, SolvedOnSegmentPoint, Vec } from './types';
+import type { Constraint, Id, LengthBoundConstraint, SolvedOnSegmentPoint, Vec } from './types';
 import {
   ANGLE_EPS,
   ORDER_ANGLE_MARGIN_DEG,
   ORDER_ANGLE_MIN_GAP_DEG,
   ORDER_LEN_MARGIN_FRAC,
   ORDER_LEN_MIN_FRAC,
+  boundAim,
+  isOrderConstraint,
 } from './types';
 import { add, angleDeg, circumcenter, dist, polygonArea, polygonPerimeter, scale, solveParam, sub, unit } from './geometry';
+
+/** A length bound's aim/accept margins in LENGTH units: the order fractions taken against the stated
+ *  bound, then window-clamped (`boundAim`) so a narrow range keeps a reachable target (ADR-390). */
+function lengthBoundAim(con: LengthBoundConstraint): { margin: number; minGap: number } {
+  const ref = Math.max(Math.abs(con.max ?? con.min ?? 0), 1e-9);
+  return boundAim(con.min, con.max, ORDER_LEN_MARGIN_FRAC * ref, ORDER_LEN_MIN_FRAC * ref);
+}
 
 /** The point ids a constraint references. */
 export function constraintRefs(con: Constraint): Id[] {
@@ -52,8 +61,10 @@ export function constraintRefs(con: Constraint): Id[] {
       return [con.a, con.b, con.c];
     case 'collinear-order':
       return con.points;
-    case 'angle-acuteness':
+    case 'angle-bound':
       return [con.vertex, con.ray1, con.ray2];
+    case 'length-bound':
+      return [con.a, con.b];
     case 'area':
     case 'perimeter':
       return con.ids;
@@ -176,11 +187,26 @@ export function residual(con: Constraint, get: (id: Id) => Vec): number {
       for (let i = 0; i + 1 < proj.length; i++) r += Math.max(0, proj[i] - proj[i + 1] + ORDER_LEN_MARGIN_FRAC * L);
       return r;
     }
-    case 'angle-acuteness': {
-      // ONE-SIDED (≥ 0): 0 once the angle is at least MARGIN past 90° on the requested side. Obtuse aims
-      // ∠ ABOVE 90 (residual shrinks as ∠ grows); acute aims ∠ BELOW 90. Optimizer-driven, like the orders.
+    case 'angle-bound': {
+      // ONE-SIDED (≥ 0): 0 once the angle sits at least MARGIN inside every stated bound; the two sides
+      // SUM so a range drives from whichever end is violated. Acuteness is this at 90 ({min:90} obtuse /
+      // {max:90} acute — ADR-108), a student's numbers are the same shape (ADR-390). Optimizer-driven.
       const a = angleDeg(get(con.vertex), get(con.ray1), get(con.ray2));
-      return con.obtuse ? Math.max(0, 90 + ORDER_ANGLE_MARGIN_DEG - a) : Math.max(0, a - (90 - ORDER_ANGLE_MARGIN_DEG));
+      const { margin } = boundAim(con.min, con.max, ORDER_ANGLE_MARGIN_DEG, ORDER_ANGLE_MIN_GAP_DEG);
+      let r = 0;
+      if (con.min !== undefined) r += Math.max(0, con.min + margin - a);
+      if (con.max !== undefined) r += Math.max(0, a - (con.max - margin));
+      return r;
+    }
+    case 'length-bound': {
+      // The length twin: the margin is a FRACTION of the stated bound (the `length-order` convention),
+      // then clamped to the window exactly like the angle case.
+      const d = dist(get(con.a), get(con.b));
+      const { margin } = lengthBoundAim(con);
+      let r = 0;
+      if (con.min !== undefined) r += Math.max(0, con.min + margin - d);
+      if (con.max !== undefined) r += Math.max(0, d - (con.max - margin));
+      return r;
     }
     case 'area':
       // signed: area − value (area is length²). Passes through the target with a sign change as a DOF varies.
@@ -252,8 +278,10 @@ export function constraintScale(con: Constraint, get: (id: Id) => Vec): number {
     case 'collinear-order':
       return Math.max(dist(get(con.points[0]), get(con.points[con.points.length - 1])), 1e-9); // relative to the line span
     case 'angle-order':
-    case 'angle-acuteness':
+    case 'angle-bound':
       return 90; // an order residual is ≤ MARGIN degrees — scale it like a right angle so it sits ~O(0.1) alongside relative length residuals
+    case 'length-bound':
+      return Math.max(Math.abs(con.max ?? con.min ?? 0), 1e-9); // relative to the stated bound (the `distance` convention)
     case 'concyclic': {
       const c = concyclicCircle(con.points.map(get));
       return c ? Math.max(c.r, 1e-9) : 1; // relative to the circle's radius (a length-unit residual)
@@ -314,10 +342,20 @@ export function residualTolerance(con: Constraint, scale = 1): number {
     case 'coincide':
       return 1e-4; // a driven numeric solve won't hit exact zero — a looser "they meet"
     case 'angle-order':
-    case 'angle-acuteness':
       // Accept any config at least MIN_GAP past the bound: residual ≤ (MARGIN−MIN_GAP) ⇔ the angle is at
-      // least MIN_GAP° on the requested side of 90° (clearly obtuse / acute), not merely touching it.
+      // least MIN_GAP° on the requested side, not merely touching it.
       return ORDER_ANGLE_MARGIN_DEG - ORDER_ANGLE_MIN_GAP_DEG;
+    case 'angle-bound': {
+      // Same rule against the STATED bound, with the window-clamped margins (ADR-390). A two-sided
+      // range sums two one-sided residuals, but only one can be positive at a time (min < max), so the
+      // single-side tolerance is the right bar.
+      const { margin, minGap } = boundAim(con.min, con.max, ORDER_ANGLE_MARGIN_DEG, ORDER_ANGLE_MIN_GAP_DEG);
+      return margin - minGap;
+    }
+    case 'length-bound': {
+      const { margin, minGap } = lengthBoundAim(con);
+      return margin - minGap;
+    }
     case 'length-order':
       return (ORDER_LEN_MARGIN_FRAC - ORDER_LEN_MIN_FRAC) * scale; // scale = the longer length (constraintScale)
     case 'collinear-order':
@@ -353,12 +391,18 @@ export function isSatisfied(con: Constraint, get: (id: Id) => Vec): boolean {
 export function jointCostTerm(con: Constraint, get: (id: Id) => Vec): number {
   const sc = Math.max(constraintScale(con, get), 1e-9);
   const v = residual(con, get) / sc;
-  if (con.type === 'angle-order' || con.type === 'length-order' || con.type === 'collinear-order' || con.type === 'angle-acuteness') {
+  if (isOrderConstraint(con)) {
     const tolN = residualTolerance(con, sc) / sc;
     const over = Math.max(0, Math.abs(v) - tolN);
     return over * over;
   }
   return v * v;
+}
+
+/** "40 < ∠ABC < 60" / "∠ABC > 40" / "|AB| < 5" — a bound rendered the way the student wrote it. */
+function boundText(measure: string, min: number | undefined, max: number | undefined): string {
+  if (min !== undefined && max !== undefined) return `${min} < ${measure} < ${max}`;
+  return min !== undefined ? `${measure} > ${min}` : `${measure} < ${max}`;
 }
 
 /** Human-readable form of a constraint, for error messages. */
@@ -399,8 +443,10 @@ export function describeConstraint(con: Constraint): string {
       return `${con.a}, ${con.b}, ${con.c} collinear`;
     case 'collinear-order':
       return `${con.points.join('–')} in order on a line`;
-    case 'angle-acuteness':
-      return `∠${con.ray1}${con.vertex}${con.ray2} is ${con.obtuse ? 'obtuse' : 'acute'}`;
+    case 'angle-bound':
+      return `${boundText(`∠${con.ray1}${con.vertex}${con.ray2}`, con.min, con.max)}`;
+    case 'length-bound':
+      return `${boundText(`|${con.a}${con.b}|`, con.min, con.max)}`;
     case 'area':
       return `area(${con.ids.join('')}) = ${con.value}`;
     case 'area-ratio':

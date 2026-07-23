@@ -170,6 +170,33 @@ export interface PivotResult {
  * `evalCanonical(dims)` re-derives the canonical positions for a dim vector.
  * Returns every converged solution (both mirrors when both converge).
  */
+/**
+ * Is the figure's SCALE pinned — does ANY given carry absolute units?
+ *
+ * The gauge (place/rotate/scale) is pure null-space unless something fixes it. This predicate is the
+ * authority on that, and it answers two different questions with one list:
+ *  - {@link solvePivot} freezes the gauge when nothing pins it, or the solve falls into the scale→0
+ *    collapse basin (every normalized residual vanishes as the figure shrinks onto a point);
+ *  - `dataView` prints a DERIVED magnitude only when the scale is pinned, because with a free scale a
+ *    length is gauge, not knowledge — the first dim of every solid is frozen at 1, so a bare cube would
+ *    otherwise report |AB| = 1 as data (ADR-3D-054, issue #268; the ADR-052 cardinal sin).
+ *
+ * Absolute ⇒ pins the gauge: coordinate/vector/pair injections, a plane EQUATION, a `length` or `dot`
+ * scalar pin. Everything else (angles, cos/dot EQUALITIES, ratios, ⟂/∥-to-plane, line-plane angle) is
+ * similarity-INVARIANT and leaves the scale free. Keeping ONE list is the point: a new pin kind that
+ * carries units must be added here, or the two consumers would drift apart.
+ */
+export function scalePinned(c: Construction3): boolean {
+  if (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0) return true;
+  return !c.scalarPins.every(
+    (p) =>
+      p.kind === 'vangle' || p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane' || p.kind === 'length-rel' ||
+      // V8-f: cos/angle equalities and equal dot products are all similarity-INVARIANT
+      p.kind === 'cos-angle' || p.kind === 'dot-eq' || p.kind === 'cos-eq' ||
+      p.kind === 'line-plane-angle', // sin β is length-normalized → invariant
+  );
+}
+
 export function solvePivot(
   c: Construction3,
   evalCanonical: (dims: number[], symbolOverride?: Map<number, number>) => Positions3,
@@ -200,18 +227,11 @@ export function solvePivot(
   // the scale→0 collapse basin (all normalized residuals vanish as the figure shrinks
   // onto a point). Freeze the gauge to identity and solve the shape dims ONLY.
   const invariantOnly =
-    nSym === 0 && pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 &&
-    c.planePins.length === 0 && // a plane EQUATION is absolute-coordinates — it pins the gauge
+    nSym === 0 &&
     // an all-gauge run-carrier membership is similarity-invariant (extent-normalized);
     // a frozen member or a fixed equation plane pins the gauge instead
     memberPins.every((m) => !m.frozen && !m.plane) &&
-    c.scalarPins.every(
-      (p) =>
-        p.kind === 'vangle' || p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane' || p.kind === 'length-rel' ||
-        // V8-f: cos/angle equalities and equal dot products are all similarity-INVARIANT
-        p.kind === 'cos-angle' || p.kind === 'dot-eq' || p.kind === 'cos-eq' ||
-        p.kind === 'line-plane-angle', // sin β is length-normalized → invariant
-    );
+    !scalePinned(c);
 
   // ADR-3D-030: ids whose in-solve placement is provisional (symbol-defined points —
   // their symbol is root-found post-pivot); plane-pin residuals skip them.

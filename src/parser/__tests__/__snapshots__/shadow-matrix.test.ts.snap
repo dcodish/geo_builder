@@ -1387,6 +1387,36 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "angle ABC > 40",
+    "winner": "measureBound",
+  },
+  {
+    "lang": "he",
+    "text": "זווית ABC גדולה מ-40",
+    "winner": "measureBound",
+  },
+  {
+    "lang": "en",
+    "text": "40 < angle ABC < 60",
+    "winner": "measureBound",
+  },
+  {
+    "lang": "he",
+    "text": "40 < זווית ABC < 60",
+    "winner": "measureBound",
+  },
+  {
+    "lang": "en",
+    "text": "5 < |AB| < 9",
+    "winner": "measureBound",
+  },
+  {
+    "lang": "he",
+    "text": "5 < AB < 9",
+    "winner": "measureBound",
+  },
+  {
+    "lang": "en",
     "text": "angle ABC is obtuse",
     "winner": "angleAcuteness",
   },

@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedWordRelations, droppedCompoundRelation, droppedGivenVerbs, droppedRadiusSymbol, droppedRegionSubject, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedWordRelations, droppedCompoundRelation, droppedGivenVerbs, droppedComparison, droppedRadiusSymbol, droppedRegionSubject, classifyOutOfScope, looksCompound, buildParseCtx } from '@/parser';
 import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { Figure } from '@/render';
@@ -695,7 +695,11 @@ export default function App() {
       // The WORD sibling (ADR-360, #210): a relation stated as a word between circle nouns («שני
       // מעגלים זרים») that the lowering doesn't encode — never commit the unrelated pair.
       const droppedWordRels = droppedWordRelations(utterance, r.commands);
-      if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0 && droppedVerbs.length === 0 && droppedCompound.length === 0 && droppedWordRels.length === 0) {
+      // The COMPARISON sibling (ADR-390, the #277 P1): a measure compared to a NUMBER states a REGION.
+      // A lowering with no bound/order constraint read it as the EQUALITY at the bound — every label and
+      // the number itself land, so no older gate fires. Never commit the student's ">" as an "=".
+      const droppedCmp = droppedComparison(utterance, r.commands);
+      if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0 && droppedVerbs.length === 0 && droppedCompound.length === 0 && droppedWordRels.length === 0 && !droppedCmp) {
         // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
         // the commit, and every later replay of this content then run at TAIL speed on the main thread
         // (the one unbudgeted cold fold, measured ~26 s on the #59 figure, used to block the tab here).
@@ -895,6 +899,9 @@ export default function App() {
       // and the STRUCTURAL gate (#153/#145): the LLM must not re-introduce a truncated lowering of a
       // compound measure relation — the whole term list lands in one structured constraint, or refuse
       ...droppedCompoundRelation(utterance, llmCmds),
+      // and the COMPARISON gate (ADR-390, #277): a decomposition that turns a stated bound into the
+      // equality at the bound must refuse — the same silent misparse, arriving by the LLM seam
+      ...(droppedComparison(utterance, llmCmds) ? ['<>'] : []),
       // and the MEASURE-SYMBOL gate (issue #53): a decomposition that loses a stated radius symbol
       // ("שרדיוסו r") must name it — a lowercase measure letter trips none of the older gates
       ...droppedRadiusSymbol(utterance, llmCmds),

@@ -1573,6 +1573,11 @@ const centralAngle: Rule = (s, ctx) => {
 
 const angle: Rule = (s, ctx) => {
   if (!/(?:angle|∠|זוו?ית)/i.test(s)) return null;
+  // A COMPARISON is not a value (ADR-390, issue #277): "∠ABC > 40" states a REGION, and reading its
+  // bound as the degree value silently committed a figure the student never described. `measureBound`
+  // owns those — bail here too, so this rule's number-grabbing greed can't re-open the hole if rule
+  // ordering ever changes.
+  if (COMPARES_WITH_NUMBER.test(s)) return null;
   // The right-angle WORD form (#45 / ADR-299): "זוית B ישרה" / "זוית ABC ישרה" / "angle ABC is a right
   // angle" ≡ "= 90". Detected on the raw utterance; the "right angle" phrase is NOT a second angle
   // reference (the multi-angle guard below counts on a copy with the phrase removed).
@@ -1630,6 +1635,133 @@ const angle: Rule = (s, ctx) => {
  * two arms are resolved from the figure (the points C is joined to). Emits a one-sided angle constraint that
  * reshapes the figure so the angle falls on the requested side (ADR-108). Draws the arms (idempotent).
  */
+/** The comparison words, in both languages — the operator is a WORD as often as a glyph. */
+const CMP_BIG = String.raw`גדול[֐-׿]*|larger|longer|greater|bigger|more`;
+const CMP_SMALL = String.raw`קט[ןנ][֐-׿]*|smaller|shorter|less`; // BOTH nun forms: קטן (m) / קטנה (f) — a one-spelling gate silently drops the other
+/** A comparison against a NUMBER anywhere in the utterance — the tripwire the value rules check
+ *  before reading a bare number as an equality (ADR-390, issue #277). */
+export const COMPARES_WITH_NUMBER = new RegExp(
+  String.raw`(?:<=|>=|<|>|≤|≥)\s*-?\d|-?\d\s*(?:<=|>=|<|>|≤|≥)|(?:${CMP_BIG}|${CMP_SMALL})\s*(?:than\s+|מ-?|מן\s+)?\s*-?\d|בין\s*-?\d|between\s*-?\d`,
+  'i',
+);
+
+/** A measure a bound can be stated about: a named angle, a segment length, or a named variable. */
+type BoundOperand =
+  | { kind: 'ang'; v: Id; r1: Id; r2: Id }
+  | { kind: 'len'; a: Id; b: Id }
+  | { kind: 'var'; name: string };
+
+const isNumChunk = (t: string): boolean => /^\s*-?\d+(?:\.\d+)?\s*°?\s*$/.test(t);
+const numChunk = (t: string): number => parseFloat(t.replace(/°/g, '').trim());
+
+/**
+ * Read the MEASURE side of a bound: "∠ABC" / "זווית ABC" (also single-vertex "∠B", resolved from the
+ * figure like ADR-164), "|AB|" / "AB", or a bare named measure "α". Returns null when the chunk names
+ * no measure — the rule then defers rather than guessing.
+ */
+const boundOperand = (raw: string, ctx: ParseContext): BoundOperand | null => {
+  const t = raw.trim();
+  if (!t) return null;
+  if (new RegExp(String.raw`^${VAR}$`).test(t)) return { kind: 'var', name: t };
+  if (/(?:∠|∢|angle|זוו?ית)/i.test(t)) {
+    const stripped = t.replace(/∠|∢|angle|זוו?ית|the|של|את/gi, ' ');
+    const tri = labelRun(stripped, 3);
+    if (tri) return { kind: 'ang', v: tri[1], r1: tri[0], r2: tri[2] };
+    const one = labelRun(stripped, 1);
+    if (one) {
+      const nb = (ctx.neighbors ?? {})[one[0]] ?? [];
+      if (nb.length === 2) return { kind: 'ang', v: one[0], r1: nb[0], r2: nb[1] };
+    }
+    return null; // an angle we can't resolve — never guess a triple
+  }
+  const seg = t.match(new RegExp(String.raw`^\|?\s*(${PT})\s*(${PT})\s*\|?$`));
+  if (seg) return { kind: 'len', a: up(seg[1]), b: up(seg[2]) };
+  return null;
+};
+
+/** The commands a resolved bound lowers to: the measure's ink (idempotent) + the bound itself. */
+const boundCommands = (op: BoundOperand, min: number | undefined, max: number | undefined): AnyCommand[] | null => {
+  if (min !== undefined && max !== undefined && min >= max) return null; // an EMPTY window ("60 < α < 40") is a
+  // contradiction, not a statement: defer so the student is told it wasn't understood, never a silent no-op
+  if (op.kind === 'ang')
+    return [
+      { type: 'segment', a: op.v, b: op.r1 },
+      { type: 'segment', a: op.v, b: op.r2 },
+      { type: 'set-angle-bound', vertex: op.v, ray1: op.r1, ray2: op.r2, min, max },
+    ];
+  if (op.kind === 'len')
+    return [
+      { type: 'segment', a: op.a, b: op.b },
+      { type: 'set-length-bound', a: op.a, b: op.b, min, max },
+    ];
+  return [{ type: 'measure-bound', name: op.name, min, max }];
+};
+
+/**
+ * A NUMERIC BOUND on a measure ([ADR-390](docs/06-decisions.md#adr-390), issue #277) — "∠ABC > 40",
+ * "40 < ∠ABC < 60", "|AB| ≥ 5", "α > 40", "60 < α < 90", plus the word forms ("זווית ABC גדולה מ-40",
+ * "AB בין 5 ל-9", "angle ABC is less than 60", "between 5 and 9").
+ *
+ * A bound is NOT an equality: it states a REGION the figure must lie in, so it removes no DOF — the
+ * measure stays free and samplable, "show another configuration" varies it WITHIN the bound, and no
+ * value is ever reported for it (ADR-052). Acuteness ("קהה"/"חדה") is the same constraint at 90.
+ *
+ * Runs BEFORE the value-based angle rules, which read any number in the line as the degree value: that
+ * greed is what silently committed "∠ABC > 40" as "∠ABC = 40" (issue #277's P1). Those rules now also
+ * refuse a comparison outright (`COMPARES_WITH_NUMBER`), so ordering is not the only thing holding.
+ */
+const measureBound: Rule = (s, ctx) => {
+  if (!COMPARES_WITH_NUMBER.test(s)) return null;
+  const body = s.replace(/^\s*(?:נתון(?:\s+כי)?|given(?:\s+that)?)[\s:,-]*/i, '').trim();
+
+  // "X בין 40 ל-60" / "X is between 40 and 60" — the word form of a two-sided range.
+  const between = body.match(new RegExp(String.raw`^(.*?)\s*(?:בין|between)\s*${num}\s*(?:ל-?|עד|and|to)\s*${num}\s*$`, 'i'));
+  if (between) {
+    const op = boundOperand(between[1].replace(/\b(?:is|are|נמצאת|נמצא|הוא|היא)\b/gi, ' '), ctx);
+    if (!op) return null;
+    const lo = Math.min(parseFloat(between[2]), parseFloat(between[3]));
+    const hi = Math.max(parseFloat(between[2]), parseFloat(between[3]));
+    return boundCommands(op, lo, hi);
+  }
+
+  // Word comparison: "X גדולה מ-40" / "X is greater than 40" (and the small twin).
+  const word = body.match(new RegExp(String.raw`^(.*?)\s*(?:(${CMP_BIG})|(${CMP_SMALL}))\s*(?:than\s+|מ-?|מן\s+)?\s*${num}\s*°?\s*$`, 'i'));
+  if (word) {
+    const op = boundOperand(word[1].replace(/\b(?:is|are|הוא|היא)\b/gi, ' '), ctx);
+    if (!op) return null;
+    const n = parseFloat(word[4]);
+    return boundCommands(op, word[2] ? n : undefined, word[3] ? n : undefined);
+  }
+
+  // Symbol forms: split on the comparison glyphs so one/two-sided share a path.
+  const parts = body.split(/(<=|>=|<|>|≤|≥)/);
+  const normOp = (o: string) => (o === '≤' ? '<=' : o === '≥' ? '>=' : o);
+  const isLess = (o: string) => o === '<' || o === '<=';
+  if (parts.length === 3) {
+    const [l, o, r] = [parts[0], normOp(parts[1]), parts[2]];
+    if (isNumChunk(l) === isNumChunk(r)) return null; // need exactly one numeric side
+    if (isNumChunk(r)) {
+      const op = boundOperand(l, ctx);
+      if (!op) return null;
+      const n = numChunk(r);
+      return boundCommands(op, isLess(o) ? undefined : n, isLess(o) ? n : undefined); // X < n ⇒ max
+    }
+    const op = boundOperand(r, ctx);
+    if (!op) return null;
+    const n = numChunk(l);
+    return boundCommands(op, isLess(o) ? n : undefined, isLess(o) ? undefined : n); // n < X ⇒ min
+  }
+  if (parts.length === 5) {
+    const [a, o1, mid, o2, c] = [parts[0], normOp(parts[1]), parts[2], normOp(parts[3]), parts[4]];
+    if (!isNumChunk(a) || !isNumChunk(c) || isLess(o1) !== isLess(o2)) return null; // "40 < α > 60" states nothing
+    const op = boundOperand(mid, ctx);
+    if (!op) return null;
+    const [lo, hi] = isLess(o1) ? [numChunk(a), numChunk(c)] : [numChunk(c), numChunk(a)];
+    return boundCommands(op, lo, hi);
+  }
+  return null;
+};
+
 const angleAcuteness: Rule = (s, ctx) => {
   const obtuse = /קהה|obtuse/i.test(s);
   const acute = /חדה|acute/i.test(s);
@@ -7435,6 +7567,7 @@ export const RULES: Rule[] = [
   tangentsMeet, // #197 Am. 6: «המשיקים נפגשים בנקודה K» — the tangents' crossing, named
   lineLineIntersection,
   centralAngle, // #106: "זוית מרכזית COD" / "…נשענת על קשת CD" — before every generic angle rule
+  measureBound, // "∠ABC > 40" / "40 < ∠ABC < 60" / "|AB| > 5" / "α > 40" — a NUMERIC bound (ADR-390); before every value rule, which would read the bound as the value
   angleAcuteness, // "∠ABC קהה/חדה" (obtuse/acute) — before the value-based angle rules
   // Compound measure relations (#153/#145/#154/#144) — MUST precede every truncating relation rule
   // (arcEquality, angleEquality, chainedEquality, ratioConstraint, segmentRatio, equalSegments): each
@@ -8899,6 +9032,31 @@ export function droppedGivenVerbs(utterance: string, commands: AnyCommand[]): st
     if (!stated.every((L) => bound.has(L))) out.push(g.verb);
   }
   return out;
+}
+
+/**
+ * The COMPARISON sibling of the dropped-given gates ([ADR-390](docs/06-decisions.md#adr-390), issue #277).
+ * An utterance that compares a measure to a NUMBER ("∠ABC > 40", "AB בין 5 ל-9") states a REGION; a
+ * lowering that carries no bound/order constraint has read it as something else — and the something else
+ * is invariably the EQUALITY at the bound, because the value rules take any number in the line as the
+ * value. That committed a figure the student never described, with a green row (the P1 in issue #277).
+ *
+ * The older gates cannot see it: every label lands, the single number lands (`droppedGivenNumbers`), and
+ * no relation symbol is present (`droppedGivenRelations`) — only the OPERATOR is lost. So the operator
+ * gets its own gate, at the same chokepoint, and the class is closed rather than one rule fixed.
+ */
+export function droppedComparison(utterance: string, commands: AnyCommand[]): boolean {
+  if (!COMPARES_WITH_NUMBER.test(normalizeUtterance(utterance))) return false;
+  return !commands.some(
+    (c) =>
+      c.type === 'set-angle-bound' ||
+      c.type === 'set-length-bound' ||
+      c.type === 'measure-bound' ||
+      c.type === 'set-angle-acuteness' ||
+      c.type === 'set-angle-order' ||
+      c.type === 'set-length-order' ||
+      c.type === 'measure-order',
+  );
 }
 
 export function droppedGivenRelations(utterance: string, commands: AnyCommand[]): string[] {
