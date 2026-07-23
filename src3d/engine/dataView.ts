@@ -49,6 +49,17 @@ export interface DataPanel {
   pointCoords: Record<string, { text: string; kind: 'fact' | 'partial' }>;
 }
 
+/**
+ * Is there NOTHING to show? (#296) The panel renders `relations ∪ vectors ∪ points ∪ planes`, so
+ * "empty" must mean ALL FOUR are empty — `relations` included. It was omitted from the App's guard,
+ * so a figure whose only derived knowledge is relations (e.g. a free-scale square base yielding
+ * `|u|=|v|`, `u·v=0` with no scale-pinned magnitude/coord) rendered a false "empty", hiding real
+ * knowledge. The guard and the render must read emptiness the same way — hence one predicate.
+ */
+export function panelIsEmpty(p: DataPanel): boolean {
+  return p.relations.length === 0 && p.vectors.length === 0 && p.points.length === 0 && p.planes.length === 0;
+}
+
 const EPS = 1e-6;
 
 /** Render a number cleanly: integers plain, small fractions as p/q, else 2 decimals. */

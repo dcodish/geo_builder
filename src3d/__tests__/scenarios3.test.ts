@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { freeDofCount3 } from '../engine/evaluate';
 import { dist3 } from '../engine/vec3';
 import { derive3, useGeo3 } from '../store/store3';
-import { dataView } from '../engine/dataView';
+import { dataView, panelIsEmpty } from '../engine/dataView';
 
 function reset() {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
@@ -544,6 +544,33 @@ describe('#94 — a named angle is a highlightable marker (session 23mxaquw)', (
     expect(dataView(derived().construction, state().seed).relations.some((r) => r.startsWith('∠SDB'))).toBe(false);
     submit('∠SDB = α'); // naming it α upgrades the marker's label
     expect(derived().construction.angleMarks.find((m) => m.vertex === 'D')?.label).toBe('α');
+  });
+});
+
+// #296 — prod figure "dd" (square-base pyramid, E on AS, EO⊥AS): the data panel showed nothing although
+// the square base yields the scale-free relations |u|=|v| and u·v=0. Root cause: the App's empty-panel
+// guard checked vectors/points/planes but OMITTED relations, so a relations-only panel rendered "empty",
+// hiding real knowledge. `panelIsEmpty` now includes relations; the guard and render read emptiness alike.
+describe('#296 — a relations-only data panel is NOT empty', () => {
+  beforeEach(reset);
+  it('the "dd" figure surfaces |u|=|v| and u·v=0 (panel not empty)', () => {
+    [
+      'פירמידה שבסיסה ריבוע',
+      'אלכסוני הריבוע נחתכים בנקודה O',
+      'AD=u',
+      'AB=v',
+      'AS=w',
+      'AE=t*AS',
+      'EO',
+      '∠SAD=∠SAB=α',
+      '60<α<90',
+      'EO⊥AS',
+    ].forEach(submit);
+    expectAllOk();
+    const p = dataView(derived().construction, state().seed);
+    expect(p.vectors).toHaveLength(0); // free scale ⇒ no magnitude/coord is knowledge…
+    expect(p.relations).toEqual(expect.arrayContaining(['|u| = |v|', 'u·v = 0'])); // …but the square base still yields these
+    expect(panelIsEmpty(p)).toBe(false); // so the panel must NOT read as empty (the bug)
   });
 });
 

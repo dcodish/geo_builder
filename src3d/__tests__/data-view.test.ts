@@ -6,7 +6,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { dataView } from '../engine/dataView';
+import { dataView, panelIsEmpty, type DataPanel } from '../engine/dataView';
 import { derive3, useGeo3 } from '../store/store3';
 
 function reset() {
@@ -77,6 +77,14 @@ describe('dataView — organize your data', () => {
     const p2 = panel();
     const en2 = p2.vectors.find((v) => v.label === 'EN');
     expect(en2?.decomp).toBe('−1/4·u + 1/2·v + 1/4·w');
+  });
+
+  it('#296 panelIsEmpty: a relations-only panel is NOT empty', () => {
+    const empty: DataPanel = { relations: [], vectors: [], points: [], planes: [], pointCoords: {} };
+    expect(panelIsEmpty(empty)).toBe(true);
+    // the bug: only relations present → the App used to render "empty" and hide them
+    expect(panelIsEmpty({ ...empty, relations: ['|u| = |v|', 'u·v = 0'] })).toBe(false);
+    expect(panelIsEmpty({ ...empty, points: ['N(6, 6, 6)'] })).toBe(false);
   });
 
   it('perpendicular declared vectors surface as u·v = 0 (operator, 2026-07-08)', () => {

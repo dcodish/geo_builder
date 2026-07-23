@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { dataView } from './engine/dataView';
+import { dataView, panelIsEmpty } from './engine/dataView';
 import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
@@ -564,7 +564,7 @@ export default function App3() {
           )}
           {showData && dataPanel && (
             <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
-              {dataPanel.vectors.length === 0 && dataPanel.points.length === 0 && dataPanel.planes.length === 0 ? (
+              {panelIsEmpty(dataPanel) ? (
                 <p className="text-slate-400">{t('dataPanel.empty')}</p>
               ) : (
                 <ul className="flex flex-col gap-1" dir="ltr">
