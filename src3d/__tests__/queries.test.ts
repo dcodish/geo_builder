@@ -63,6 +63,38 @@ describe('ADR-3D-057 — the query lane answers only genuine knowledge', () => {
     });
   });
 
+  describe('a bare pair is the VECTOR, not the length (the operator asked for «AE»)', () => {
+    // the 2020-ב exam figure — fully determined, with an injected frame
+    const EXAM = [
+      'פירמידה ABCDS שבסיסה ריבוע',
+      'המקצוע AS הוא גובה בפירמידה',
+      'אורך המקצוע AS שווה לאורך צלע הריבוע ABCD',
+      'SE = 3/4 SD',
+      'נסמן: AD = u, AB = v, AS = w',
+      'SN = k·SC',
+      '|EN| = (√6/4)·|w|',
+      'נתון: A(0,0,0), B(0,12,0)',
+      'הקודקוד D נמצא על החלק החיובי של ציר ה-x',
+      'S נמצא על החלק החיובי של ציר ה-z',
+    ];
+    it('a bare pair shows the u/v/w decomposition AND the coordinates', () => {
+      expect(ans(EXAM, 'EN').answer).toBe('−1/4·u + 1/2·v + 1/4·w  =  (-3, 6, 3)');
+    });
+    it('a declared vector shows itself + its coordinates', () => {
+      expect(ans(EXAM, 'w').answer).toBe('w  =  (0, 0, 12)');
+    });
+    it('the BARS still mean length — |EN| is a number, EN is the vector', () => {
+      const len = ans(EXAM, '|EN|');
+      const vec = ans(EXAM, 'EN');
+      expect(len.answer).not.toContain('·'); // a scalar, no basis terms
+      expect(vec.answer).toContain('u'); // the vector, decomposed
+    });
+    it('an under-determined vector reports «not determined», never a sampled decomposition', () => {
+      // a bare pyramid: E on AS with a free t and a free apex — AE = t·w with t varying
+      expect(ans(['פירמידה ABCDS שבסיסה ריבוע', 'AS=w', 'AD=u', 'AB=v', 'AE=t*AS'], 'AE')).toMatchObject({ answer: null, note: 'undetermined' });
+    });
+  });
+
   describe('honestly refused — never a sampled number', () => {
     it('a length whose scale is free reports «depends on scale»', () => {
       expect(ans(['פירמידה ABCDS שבסיסה ריבוע'], '|AB|')).toMatchObject({ answer: null, note: 'scale' });

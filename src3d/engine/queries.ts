@@ -14,7 +14,7 @@
 
 import { resolve3 } from './evaluate';
 import { scalePinned } from './solve3';
-import { cleanNum } from './dataView';
+import { cleanNum, coordStr, decompStr, solve3x3 } from './dataView';
 import { centroid3, cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
 import type { Construction3, Id, Positions3 } from './types';
 
@@ -24,6 +24,7 @@ type Atom = { named: string } | { pair: [Id, Id] };
 type Query =
   | { kind: 'dot'; a: Atom; b: Atom }
   | { kind: 'length'; a: Atom }
+  | { kind: 'vector'; a: Atom } // the VECTOR itself — its u/v/w decomposition (+ coords when a frame exists)
   | { kind: 'angle-vertex'; p: Id; q: Id; r: Id }
   | { kind: 'angle-vec'; a: Atom; b: Atom }
   | { kind: 'area'; ids: Id[] }
@@ -84,10 +85,11 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
     if (a && b) return { kind: 'dot', a, b };
   }
 
-  // LENGTH: «|AB|» / «|w|» / «אורך AB» / «length w» / a bare pair «AB»
+  // LENGTH: «|AB|» / «|w|» / «אורך AB» / «length w» — the bars/word mark the MAGNITUDE. A BARE «AB» is
+  // the vector itself (handled last), following the math convention |AB| = length, AB = the vector.
   const barM = s.match(/^\|\s*(.+?)\s*\|$/);
   const lenWord = s.match(/^(?:אורך|length|the\s+length\s+of|גודל|norm)\s+(.+)$/i);
-  const lenTok = barM?.[1] ?? lenWord?.[1] ?? (/^[A-Za-z0-9'\s]+$/.test(s) ? s : undefined);
+  const lenTok = barM?.[1] ?? lenWord?.[1];
   if (lenTok) {
     const a = atomOf(c, lenTok);
     if (a) return { kind: 'length', a };
@@ -106,6 +108,11 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
     const ids = volM[1].match(new RegExp(PT, 'g')) ?? [];
     if (ids.length >= 4) return { kind: 'volume', ids };
   }
+
+  // VECTOR (last): a bare pair «AE» or a bare declared vector «w» — the vector itself, not its length.
+  const bare = s.replace(/^(?:ה?ו?וקטור|vector)\s+/i, '').replace(/[⃗→]/g, '').trim();
+  const va = atomOf(c, bare);
+  if (va) return { kind: 'vector', a: va };
 
   return null;
 }
@@ -170,7 +177,41 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3): number | null {
     }
     case 'volume':
       return solidVolume(c, q.ids, pos);
+    case 'vector':
+      return null; // handled in answerQuery (a vector isn't a single scalar), never reached here
   }
+}
+
+/** The VECTOR forms of a query: its u/v/w decomposition (frame-INVARIANT — knowledge whenever the
+ *  coefficients agree across seeds, even with a free scale) and its coordinates (only with a frame). */
+function vectorForms(c: Construction3, a: Atom, posArr: Positions3[]): string[] {
+  const parts: string[] = [];
+  const basis = [...c.vectors.entries()].slice(0, 3);
+  if (basis.length === 3) {
+    const names = basis.map(([n]) => n);
+    const per = posArr.map((pos) => {
+      const target = atomVec(c, a, pos);
+      const dirs = basis.map(([, d]) => {
+        const f = pos.get(d.from);
+        const t = pos.get(d.to);
+        return f && t ? sub3(t, f) : null;
+      });
+      return target && !dirs.some((x) => !x) ? solve3x3(dirs[0]!, dirs[1]!, dirs[2]!, target) : null;
+    });
+    if (!per.some((x) => !x)) {
+      const [c0, c1, c2] = per as [number, number, number][];
+      const agree = (u: number[], v: number[]) => u.every((x, i) => Math.abs(x - v[i]) < 2e-3);
+      if (agree(c0, c1) && agree(c0, c2)) parts.push(decompStr(c0.map((x, i) => (x + c1[i] + c2[i]) / 3) as [number, number, number], names));
+    }
+  }
+  const hasFrame = c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
+  if (hasFrame) {
+    const vs = posArr.map((pos) => atomVec(c, a, pos));
+    if (!vs.some((v) => !v) && vs.every((v) => Math.abs(v!.x - vs[0]!.x) < 1e-6 && Math.abs(v!.y - vs[0]!.y) < 1e-6 && Math.abs(v!.z - vs[0]!.z) < 1e-6)) {
+      parts.push(coordStr(vs[0]!));
+    }
+  }
+  return parts;
 }
 
 /** Answer one query against the figure — the whole honesty gate (stability + scale) lives here. */
@@ -178,6 +219,14 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
   const q = parseQuery(c, text);
   if (!q) return { text, answer: null, note: 'notUnderstood' };
   const seeds = [seed, seed + 1013, seed + 2027, seed + 3041];
+
+  if (q.kind === 'vector') {
+    const posArr = seeds.map((s) => resolve3(c, s).positions);
+    if (atomVec(c, q.a, posArr[0]) === null) return { text, answer: null, note: 'unavailable' };
+    const forms = vectorForms(c, q.a, posArr);
+    // a decomposition/coords the givens don't fix (a free basis, a variable direction) reports undetermined
+    return forms.length ? { text, answer: forms.join('  =  ') } : { text, answer: null, note: 'undetermined' };
+  }
   const vals = seeds.map((s) => evalQuery(c, q, resolve3(c, s).positions));
   if (vals.some((v) => v === null || !Number.isFinite(v))) return { text, answer: null, note: 'unavailable' };
   const nums = vals as number[];

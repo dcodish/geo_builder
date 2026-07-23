@@ -103,7 +103,7 @@
     "ui-command": "Marks appear automatically from the givens — instead of asking for a mark, state the given itself: e.g. \"angle D = 90\"."
   },
   "query": {
-    "placeholder": "calculate… e.g. w·v, |AB|, ∠SAB, area ABC",
+    "placeholder": "ask… e.g. AE (vector), |AE|, w·v, ∠SAB, area ABC",
     "add": "Calc",
     "remove": "remove",
     "note": {
