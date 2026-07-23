@@ -35,7 +35,12 @@ export interface PromptExample3 {
 /** Few-shot examples — a contract test re-parses every step (the PAR-10 pattern). */
 export const PROMPT_EXAMPLES_3D: PromptExample3[] = [
   { freeform: 'צייר קובייה עם אלכסון מהפינה C למעלה', steps: ['קובייה ABCD', "קטע CA'"] },
-  { freeform: 'a prism with M in the middle of the top edge BB prime', steps: ['right triangular prism ABC', "M is the midpoint of BB'"] },
+  // #290: the freeform must STATE "right" — a bare "a prism" must never be upgraded to a right prism (ADR-052).
+  { freeform: 'a right triangular prism with M in the middle of the top edge BB prime', steps: ['right triangular prism ABC', "M is the midpoint of BB'"] },
+  // #295: a prism NOT stated right is OBLIQUE — a parallelogram base ⇒ מקבילון (never invent "right").
+  { freeform: 'a prism whose base is a parallelogram', steps: ['מקבילון'] },
+  // #290: a prism with no base shape at all is not expressible — the honest output is an empty list.
+  { freeform: 'a prism', steps: [] },
   { freeform: 'סמן את הצלעות של הקובייה כוקטורים u v w', steps: ['קובייה ABCD', "נסמן: AB = u, AD = v, AA' = w"] },
   { freeform: 'שני מישורים שהזווית ביניהם 45 מעלות', steps: ['המישור π1: z - 3 = 0', 'המישור π2: ay + z - 8 = 0', 'הזווית בין המישורים π1 ו-π2 היא 45'] },
   { freeform: 'a cone with apex S over center O, radius 5 and height 12', steps: ['cone with apex S base center O radius 5 height 12'] },
@@ -54,6 +59,14 @@ export function buildSystemPrompt3(): string {
     '- Output each step in the SAME language the student wrote in. Labels (A, B, …) and numbers stay as-is.',
     "- Points are capital letters, optionally primed (A', B'). Vector names are single lowercase letters (u, v, w).",
     '- ONLY introduce points the student names. Reuse existing labels from the context.',
+    // #290 (ADR-052): the LLM must never assert a given the student did not state — the property twin
+    // of the "only introduce named points" rule. A silently-invented "right"/size/angle is the cardinal sin.
+    '- NEVER invent an unstated property. A prism NOT stated to be right (ישרה / ישר) is OBLIQUE — never emit',
+    '  a right/ישרה prism the student did not ask for (a parallelogram-base prism with no ישרה is `מקבילון`).',
+    '  Likewise do NOT fill in an omitted size / angle / relation. If a request cannot be expressed at all',
+    '  (e.g. a prism with no base shape given), return an EMPTY list rather than guessing.',
+    '- A statement about EXISTING objects is not a re-construction: never re-declare an existing point or solid.',
+    '  If you cannot express it with a supported NON-constructing form, return an empty list.',
     '- Decompose multi-part requests into several lines, in build order.',
     '- If the request cannot be expressed with the supported forms, return an empty list.',
     '',

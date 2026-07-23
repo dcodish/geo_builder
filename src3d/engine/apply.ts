@@ -331,6 +331,27 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    case 'make-right-prism': {
+      // #289 (M1): "the prism is right" — a statement about THE existing solid, never a re-construction.
+      // The oblique `parallelepiped` (parallelogram base + a FREE lateral vector) converts to `prism4` (the
+      // right prism over the SAME parallelogram base — identical vertex order & topology, prismRing(4), so
+      // the vertices/edges/faces are untouched and no id is re-declared); its lateral vector is now pinned ⟂
+      // base, dropping 2 DOF. An already-right prism is an idempotent no-op (the statement already holds).
+      const RIGHT_PRISM = new Set(['prism3', 'prism3e', 'prism4', 'prism4g', 'prism4sq', 'prism4r', 'prismReg5', 'prismReg6', 'box', 'cube']);
+      const oblique = c.solids.filter((s) => s.kind === 'parallelepiped');
+      const rightOnes = c.solids.filter((s) => RIGHT_PRISM.has(s.kind));
+      if (oblique.length === 0 && rightOnes.length === 0) return { ok: false, error: { code: 'no-prism-to-make-right' } };
+      if (oblique.length === 0) return { ok: true, next: c }; // every prism-like solid is already right — idempotent
+      if (oblique.length > 1) return { ok: false, error: { code: 'ambiguous-prism' } }; // which oblique prism?
+      const target = oblique[0];
+      const next = clone(c);
+      const idx = next.solids.findIndex(
+        (s) => s.kind === 'parallelepiped' && s.ids.length === target.ids.length && s.ids.every((id, i) => id === target.ids[i]),
+      );
+      next.solids[idx] = { ...next.solids[idx], kind: 'prism4' }; // same ids/edges/faces; lateral vector now ⟂ base
+      return { ok: true, next };
+    }
+
     case 'point-on-segment3': {
       if (c.points.has(cmd.id)) {
         // #199 M1 (ADR-3D-047): placing an EXISTING point on a segment is a GIVEN about it, never a
@@ -1181,6 +1202,7 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
 
     // ADR-3D-052 (#271) — a general angle equality between two independently-named angles. Same M1
     // routing as `angle-eq`: a free-dim solid is DRIVEN into shape, a determined figure is VERIFIED.
+    // (This is the kept #271 implementation; main's standalone `angles-equal` was the duplicate.)
     case 'angle-pair-eq': {
       const err = firstAtomError(c, [cmd.a, cmd.b, cmd.c, cmd.d]);
       if (err) return { ok: false, error: err };

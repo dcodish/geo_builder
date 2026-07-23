@@ -88,6 +88,7 @@ const COMMAND_TYPES = new Set<Command3['type']>([
   'right-pyramid-point',
   'tetra-altitude',
   'vec-mag',
+  'make-right-prism', // #289 (M1): «המנסרה ישרה» — added with the prism bundle so a saved figure reloads
 ]);
 
 export function serializeFigure3(facts: Fact3[], seed: number, name?: string, queries: string[] = []): string {
