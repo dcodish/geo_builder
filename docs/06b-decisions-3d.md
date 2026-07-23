@@ -778,3 +778,65 @@ Locked by `v8a-apex-diagonals.test.ts` (+3: the operator's exact «נפגשים 
 **Two fix-plan items from #286 not needed after (1):** because the symbol is driven, the ⊥ now holds at every seed, so there is nothing to flag amber (honesty backstop) and the config search never has to skip a ⊥-violating seed. They stay filed as defence-in-depth if a future un-drivable ⊥ appears.
 
 Locked by `perp-drives-symbol.test.ts` (EO⊥AS = 90° across a seed sweep, E on the AS foot, He + En, the stripped no-regression case, and a determined-segment ⊥ still a claim).
+
+## ADR-3D-057 — `המנסרה ישרה` makes an EXISTING solid a right prism (M1), never a re-construction (issue #289)
+
+**Status:** Accepted (2026-07-23; prod session `hz8m4ifk`; feature PR — bundle #289/#290/#291/#292/#271). *Files: `src3d/engine/types.ts` (`make-right-prism` command + `no-prism-to-make-right`/`ambiguous-prism` errors); `src3d/engine/apply.ts` (the case); `src3d/parser/parse3.ts` (`makeRightPrism` rule); `src3d/App3.tsx` + locales; `src3d/parser/catalog3.ts` (+1); `src3d/__tests__/make-right-prism.test.ts`.*
+
+**Class.** `המנסרה ישרה` ("the prism is right") was `not-handled` → the paid LLM, which can only express it as a *re-construction* (`right prism … ABCDA'B'C'D'`), re-declaring the existing vertices → `'A' כבר מוגדר`. A statement about an EXISTING object is M1 (ADR-3D-047), never a rebuild.
+
+**Fix.** A DEFINITE-form parser rule (`המנסרה [היא] ישרה` / `the prism is right` / `make the prism right`) lowers to `make-right-prism` (no target — parse3 is context-free). Geometrically a right prism is a `parallelepiped` (parallelogram base + a FREE lateral vector) with that vector pinned ⟂ base — which IS `prism4`. So apply resolves THE prism-like solid and converts an oblique `parallelepiped` → `prism4` in place (identical ids/edges/faces — both are `prismRing(4)`, so no vertex is re-declared; DOF drops 5→3); an already-right prism is an idempotent no-op; no prism ⇒ the honest `no-prism-to-make-right` refusal; >1 oblique ⇒ `ambiguous-prism`. The base-less CONSTRUCTION form `מנסרה ישרה` (no ה) is untouched — it stays a `rightPrism` "needs a base" refusal, not read as a statement.
+
+**Locks:** `make-right-prism.test.ts` — the definite forms parse (He+En); `מקבילון` → `המנסרה ישרה` becomes a right prism (top face straight above the base, DOF 5→3, no new points); already-right prism is idempotent (no move); the operator sequence no longer errors; no solid refuses keep-prior. Catalog +1.
+
+## ADR-3D-058 — the 3-D LLM fallback must never invent an unstated property (ADR-052 honesty, issue #290)
+
+**Status:** Accepted (2026-07-23; feature PR — the same bundle). *Files: `src3d/parser/llmShared3.ts` (the system-prompt rule + the corrected/added few-shots); `src3d/parser/__tests__/catalog3.test.ts` (the honesty assertions). The 2-D sibling audit is filed as #293 (deferred).*
+
+**Class.** A bare `מנסרה שבסיסה מקבילית` (no `ישרה`) is correctly refused by the deterministic parser (an oblique-vs-right prism is unstated, ADR-052), but the LLM prompt (a) had a few-shot mapping "a prism" → "**right** triangular prism" (inventing rightness AND a base) and (b) had a rule against inventing *points* but none against inventing *properties*. So prod silently upgraded the bare prism to a right one — the cardinal sin (a stated given the student never gave), confirmed live in session `vuttttda`.
+
+**Fix.** `buildSystemPrompt3` gains the property twin of the points rule: "NEVER invent an unstated property … a bare prism with no `ישרה` is NOT expressible — return an EMPTY list," plus "a statement about EXISTING objects is not a re-construction; never re-declare a point/solid." The misleading few-shot's freeform now states "right"; a new refusal example maps a bare parallelogram prism → `[]`.
+
+**Locks:** `catalog3.test.ts` — no `PROMPT_EXAMPLES_3D` entry maps a non-right freeform to a `right … prism` / `מנסרה ישרה` step; the prompt carries the ADR-052 rule; the PAR-10 re-parse contract stays (an empty-steps example is trivially valid).
+
+## ADR-3D-059 — free parallelogram-base solids seed VISIBLY OBLIQUE (issue #291)
+
+**Status:** Accepted (2026-07-23; the same bundle). *Files: `src3d/engine/evaluate.ts` (`solidDims` for `prism4`/`pyramidPar`/`parallelepiped`); `src3d/__tests__/parallelogram-seed.test.ts`.*
+
+**Class.** A parallelogram base's 2nd edge `AD=(dx,dy)` had `dx` sampled centered near 0, so the FIRST sample (seed 0 = the default view) landed `∠DAB ≈ 86°` — a `מקבילית` base rendering as a rectangle, silently asserting a right angle the student never gave (ADR-052: a default must not look like a special case). Operator: "`מנסרה שבסיסה מקבילית` seems to have created a מלבן."
+
+**Fix.** `dx` is sampled strictly positive and bounded away from 0 (`[0.3, 0.6]`) for `prism4`, `pyramidPar`, `parallelepiped`, so with `dy∈[0.6,1.2]` EVERY seed (incl. seed 0) has `∠DAB` in ~[45°, 76°]. Still a genuine free DOF that "show another configuration" varies; heights/lateral DOFs untouched.
+
+**Locks:** `parallelogram-seed.test.ts` — for each solid the base angle is in (38°, 82°) at every seed AND varies across seeds; the old near-90° default no longer occurs.
+
+## ADR-3D-060 — the DOF cue is monotone non-increasing on a ⟂ constraint (issue #292)
+
+**Status:** Accepted (2026-07-23; the same bundle). *Files: `src3d/engine/evaluate.ts` (`freeDofCount3`); `src3d/__tests__/dof-cue.test.ts`.*
+
+**Class.** A driving `cos-angle` (⟂/angle) constraint triggers a pivot solve, and `freeDofCount3` added the whole 7-DOF similarity gauge (`dims + 7 − pinCount`) even when NO absolute pins consumed it — so the "degrees of freedom remaining" cue JUMPED UP by 7 when a ⟂ was added (geometrically impossible; a constraint only removes freedom).
+
+**Fix.** Report SHAPE DOF (the 2-D ADR-101/112 idea) — subtract the free (unpinned) gauge and the driving scalar constraints: `max(0, dims − max(0, pinCount − 7) − scalarPins) + freeT + param`. A ⟂ drive with no absolute pins now DECREASES the cue (pyramidPar+u⊥v: 5→4). Read-only cue, no functional dependency; the only DOF-value-asserting tests are non-pivot figures (cone / prism bases / cube+plane / parametric line) — all still exact.
+
+**Locks:** `dof-cue.test.ts` — the cue is ≤ the prior value at every step of two ⟂ sequences (never +7), and exactly 5→4 / 3→2 for the two drives; the existing DOF-value tests + the 2020/2022/2023/2024/2019 exam gates stay green.
+
+## ADR-3D-061 — a general angle EQUALITY `∠SAB = ∠SAD` (issue #271)
+
+**Status:** Accepted (2026-07-23; prod 2026-07-22; the same bundle; P1 — silent-drop honesty). *Files: `src3d/engine/types.ts` (`angles-equal` command); `src3d/engine/apply.ts` (the case + the label-reuse equality in `angle-mark`); `src3d/parser/parse3.ts` (`angleEquality` rule); `src3d/parser/catalog3.ts` (+1); `src3d/__tests__/angle-equality.test.ts`.*
+
+**Class.** Stating two angles equal was impossible: `∠SAB = ∠SAD` (and the word/symbol forms) was `not-handled`, and labelling two angles with the same letter (`∠SAB = α` … `∠SBC = α`) produced two cosmetic stickers with NO relation asserted — a stated given silently dropped *and* a drawing that contradicts it (the cardinal sin, hence P1). The engine already had the relation (`cos-eq`), reachable only through the construction wording `AS יוצר זוויות שוות עם AB ו-AD`.
+
+**Fix.** A general `angleEquality` parser rule (`∠PQR = ∠XYZ`, symbol/word, He/En, incl. `שווה ל…` / `equals`) lowers the label-less form to a new `angles-equal` command = ∠(a,b)=∠(c,d) over four free atoms (no shared vertex required), which apply lowers to the SAME `cos-eq` scalarPin (drives a free-dim solid) / claim (verifies a determined one) as `angle-eq`. The chained `∠SAB = ∠SAD = α` draws both angle marks with the shared label; and `angle-mark` apply now ASSERTS equality whenever a label is reused on a different angle (a `cos-eq` to the first twin — transitivity chains the rest), so the solo-label form states the same equality instead of dropping it silently.
+
+**Locks:** `angle-equality.test.ts` — the symbol/word forms (He+En) lower to `angles-equal` (incl. the general non-shared-vertex `∠ABC = ∠SAD`); a free pyramid + `∠SAB = ∠SAD` holds the angles equal in every seed; the solo-label `∠SAB = α` … `∠SAD = α` asserts the same; the existing `יוצר זוויות שוות עם` form is unchanged. Catalog +1.
+
+## ADR-3D-062 — a bare `מנסרה שבסיסה מקבילית` builds an OBLIQUE `מקבילון`, not a refusal (issue #295; amends ADR-3D-058)
+
+**Status:** Accepted (2026-07-23; operator decision; feature — folded into PR #294). *Files: `src3d/parser/parse3.ts` (`parallelepiped` rule guard); `src3d/parser/llmShared3.ts` (the ADR-052 rule text + few-shots); `src3d/parser/catalog3.ts` (+1); `src3d/__tests__/oblique-prism.test.ts`.*
+
+**Class.** After #290 made a bare `מנסרה שבסיסה מקבילית` (no `ישרה`) refuse deterministically (and the LLM return empty), it built *nothing* — but the operator's ruling was "don't default the RIGHTNESS," not "don't build." Per ADR-052 an unstated property is a FREE DOF, so a parallelogram-base prism with no `ישרה` should build with its lateral tilt left free — which is exactly the oblique `מקבילון` (parallelepiped). This makes it a proper build entry point for the ADR-3D-057 "build → `המנסרה ישרה` pins it" workflow.
+
+**Fix.** The `parallelepiped` rule now also fires on `מנסרה`+`מקבילית` (He) / `prism`+`parallelogram` (En) when NO `ישרה`/right word is present → `parallelepiped` (same label handling as `מקבילון`: 8 ids, 4 auto-primed, or the default ABCD). `rightPrism` still owns the `ישרה` form (→ `prism4`, tried first). Only the parallelogram base has an oblique model, so a non-parallelogram base without `ישרה` stays `rightPrism`'s honest refusal.
+
+**Amends ADR-3D-058.** The LLM honesty rule is corrected from "a prism with no `ישרה` is NOT expressible" to "a prism NOT stated right is OBLIQUE — never emit a right/`ישרה` prism the student did not ask for (a parallelogram-base prism with no `ישרה` is `מקבילון`)." The misleading `'a prism whose base is a parallelogram' → []` few-shot becomes `→ ['מקבילון']`; a new genuinely-unexpressible example (`'a prism'`, no base → `[]`) keeps the empty-list lesson. The #290 honesty assertion (no example maps a non-right freeform to a right prism) still holds.
+
+**Locks:** `oblique-prism.test.ts` — `מנסרה שבסיסה מקבילית` / `prism with a parallelogram base` → `parallelepiped` (labelled + default); the `ישרה` form stays `prism4`; a non-parallelogram base refuses; end-to-end the bare form builds oblique (5 DOF) and `המנסרה ישרה` pins it right (3 DOF, top face above the base). Catalog +1; the PAR-10 + #290 honesty contracts stay green.

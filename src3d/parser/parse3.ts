@@ -135,11 +135,37 @@ const rightPrism: Rule = (s) => {
   return null;
 };
 
+/** #289 (M1): `המנסרה ישרה` / `המנסרה היא ישרה` / `the prism is right` / `make the prism right` — a
+ *  DEFINITE statement that THE existing solid is a RIGHT prism (no base noun, no labels). Lowers to
+ *  `make-right-prism`; apply converts an oblique `parallelepiped` to `prism4`, is idempotent on an
+ *  already-right prism, and refuses honestly when there is no prism (never re-constructs → no `already-defined`).
+ *  Scoped to the DEFINITE form (ה / "the") so a base-less CONSTRUCTION attempt (`מנסרה ישרה`) is untouched —
+ *  it stays a `rightPrism` refusal (needs a base) rather than being read as a statement. */
+const makeRightPrism: Rule = (s) => {
+  const he = /^המנסרה\s+(?:היא\s+)?ישרה$/.test(s);
+  const en = /^(?:make\s+)?the\s+prism\s+(?:is\s+)?(?:a\s+)?right(?:\s+prism)?$/i.test(s);
+  if (!he && !en) return null;
+  return [{ type: 'make-right-prism' }];
+};
+
 /** The oblique parallelepiped `מקבילון` / `parallelepiped` (#117): a parallelogram base translated by a
  *  FREE lateral vector — 8 labels, or 4 auto-primed, or the default ABCD base. Allowed despite being
- *  oblique: it is a NAMED oblique solid carrying its own free DOF, so it asserts no unstated "right" given. */
+ *  oblique: it is a NAMED oblique solid carrying its own free DOF, so it asserts no unstated "right" given.
+ *
+ *  #295: a bare `מנסרה שבסיסה מקבילית` / `prism with a parallelogram base` (a parallelogram-base prism with
+ *  NO `ישרה`) is the SAME oblique solid (ADR-052: rightness is unstated, so the lateral tilt is a free DOF,
+ *  pinned upright by `המנסרה ישרה`, #289). `rightPrism` owns the `ישרה` form (→ `prism4`); only the
+ *  parallelogram has an oblique model, so other bases without `ישרה` stay `rightPrism`'s honest refusal. */
 const parallelepiped: Rule = (s) => {
-  if (!/מקבילון/.test(s) && !/\bparallelepiped\b/i.test(s)) return null;
+  const named = /מקבילון/.test(s) || /\bparallelepiped\b/i.test(s);
+  const barePrismPar =
+    (/מנסרה/.test(s) || /\bprism\b/i.test(s)) &&
+    !/ישרה/.test(s) &&
+    !/\bright\b/i.test(s) &&
+    (/מקבילית/.test(s) || /\bparallelogram\b/i.test(s)) &&
+    !/מעוין/.test(s) &&
+    !/\brhombus\b/i.test(s);
+  if (!named && !barePrismPar) return null;
   const toks = firstLabelRun(s);
   if (toks.length === 8) return [{ type: 'solid', kind: 'parallelepiped', ids: toks }];
   if (toks.length === 4 && toks.every(unprimed)) return [{ type: 'solid', kind: 'parallelepiped', ids: [...toks, ...primeAll(toks)] }];
@@ -1536,6 +1562,32 @@ const vertexAngleClaim: Rule = (s0) => {
   return null;
 };
 
+/** #271: a general angle EQUALITY `∠PQR = ∠XYZ` (symbol/word, He/En; also `זווית … שווה ל…` and
+ *  `angle … equals …`), optionally chained with a display label `∠PQR = ∠XYZ = α`. ∠PQR is the angle at
+ *  the MIDDLE vertex Q with arms Q→P, Q→R. The label-less form lowers to `angles-equal` (the general
+ *  4-atom `cos-eq`); the LABELLED form draws both angle marks with the shared label, whose reuse asserts
+ *  the equality at apply — so a solo `∠SAB = α` then `∠SBC = α` states the same equality (never a silent
+ *  pair of stickers). Runs BEFORE vertexAngleClaim/angleMarker (a numeric or single-letter RHS is theirs). */
+const angleEquality: Rule = (s0) => {
+  const s = stripProofPrefix(s0).trim();
+  const A = String.raw`(?:∠|ה?זו?וית\s+|the\s+angle\s+|angle\s+)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)`;
+  const T = String.raw`([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)`;
+  const m =
+    s.match(new RegExp(`^${A}\\s*=\\s*${A}\\s*(?:=\\s*([A-Za-zα-ωΑ-Ω]))?\\s*$`)) ??
+    s.match(new RegExp(`^ה?זו?וית\\s+${T}\\s+שווה\\s+ל?(?:ה?זו?וית\\s+)?${T}\\s*$`)) ??
+    s.match(new RegExp(`^${A}\\s+(?:equals|is\\s+equal\\s+to)\\s+${A}\\s*$`, 'i'));
+  if (!m) return null;
+  const [, p1, v1, q1, p2, v2, q2, label] = m;
+  const pair = (from: string, to: string) => ({ kind: 'pair' as const, from, to });
+  if (label) {
+    return [
+      { type: 'angle-mark', vertex: v1, p: p1, q: q1, label },
+      { type: 'angle-mark', vertex: v2, p: p2, q: q2, label },
+    ];
+  }
+  return [{ type: 'angles-equal', a: pair(v1, p1), b: pair(v1, q1), c: pair(v2, p2), d: pair(v2, q2) }];
+};
+
 /** `∠SDB` / `∠SDB = α` — a named-angle MARKER (#94): draw the arc at the middle vertex, no value drives.
  *  A NUMERIC RHS (`∠SDB = 82`) is a claim (owned by `vertexAngleClaim`, before this); a `?`/bare `=` is a
  *  query (owned by scope3). A single-LETTER RHS (`= α`, Greek or Latin) is a display NAME for the angle. */
@@ -1850,6 +1902,7 @@ const RULES: Rule[] = [
   cubeOrBox,
   rhombusPrism,
   rightPrism,
+  makeRightPrism, // #289 (M1): `המנסרה ישרה` — make THE existing solid a right prism
   parallelepiped, // מקבילון / parallelepiped — an oblique named solid (#117)
   volumeEqPoly, // BEFORE volumePolyClaim: its RHS is a volume, not a number
   volumePolyClaim, // BEFORE rightPyramid: נפח הפירמידה ABCD must never build a pyramid
@@ -1882,6 +1935,7 @@ const RULES: Rule[] = [
   onLineMembership, // likewise for `על הישר ℓ`
   linePlaneAngle, // `הזווית בין הישר AC' לבין המישור ABCD היא 30` — before angleBetweenPlanes/angleSegClaim
   angleBetweenPlanes,
+  angleEquality, // #271: `∠PQR = ∠XYZ` — a general angle equality; BEFORE the single-angle claim/marker rules
   angleSegClaim,
   vertexAngleClaim,
   angleMarker, // `∠SDB` / `∠SDB = α` — a named-angle marker (no driver); after vertexAngleClaim (numeric = claim), #94

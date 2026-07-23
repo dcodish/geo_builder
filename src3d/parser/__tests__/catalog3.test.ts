@@ -38,3 +38,24 @@ describe('LLM prompt contract (PAR-10)', () => {
     expect(buildSystemPrompt3()).toContain('the volume of the cone');
   });
 });
+
+// #290 (ADR-052): the prompt must never teach the model to invent an unstated property.
+// The concrete regression: a bare "prism" was upgraded to a RIGHT prism (inventing ישרה).
+describe('#290 — the prompt never teaches inventing an unstated property', () => {
+  it('no example maps a non-right freeform to a RIGHT prism step', () => {
+    for (const ex of PROMPT_EXAMPLES_3D) {
+      const freeformSaysRight = /\bright\b/i.test(ex.freeform) || /ישר/.test(ex.freeform);
+      if (freeformSaysRight) continue;
+      for (const step of ex.steps) {
+        const inventsRight = /right[\s-]*\w*\s*(?:prism|pyramid)/i.test(step) || /מנסרה\s+ישר|פירמידה\s+ישר/.test(step);
+        expect(inventsRight, `"${ex.freeform}" → "${step}" silently invents "right"`).toBe(false);
+      }
+    }
+  });
+
+  it('the system prompt carries the ADR-052 property-honesty rule', () => {
+    const p = buildSystemPrompt3();
+    expect(p).toMatch(/never invent an unstated property/i);
+    expect(p).toMatch(/ישרה/); // names the prism-rightness case explicitly
+  });
+});

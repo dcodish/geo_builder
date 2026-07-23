@@ -330,6 +330,27 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    case 'make-right-prism': {
+      // #289 (M1): "the prism is right" — a statement about THE existing solid, never a re-construction.
+      // The oblique `parallelepiped` (parallelogram base + a FREE lateral vector) converts to `prism4` (the
+      // right prism over the SAME parallelogram base — identical vertex order & topology, prismRing(4), so
+      // the vertices/edges/faces are untouched and no id is re-declared); its lateral vector is now pinned ⟂
+      // base, dropping 2 DOF. An already-right prism is an idempotent no-op (the statement already holds).
+      const RIGHT_PRISM = new Set(['prism3', 'prism3e', 'prism4', 'prism4g', 'prism4sq', 'prism4r', 'prismReg5', 'prismReg6', 'box', 'cube']);
+      const oblique = c.solids.filter((s) => s.kind === 'parallelepiped');
+      const rightOnes = c.solids.filter((s) => RIGHT_PRISM.has(s.kind));
+      if (oblique.length === 0 && rightOnes.length === 0) return { ok: false, error: { code: 'no-prism-to-make-right' } };
+      if (oblique.length === 0) return { ok: true, next: c }; // every prism-like solid is already right — idempotent
+      if (oblique.length > 1) return { ok: false, error: { code: 'ambiguous-prism' } }; // which oblique prism?
+      const target = oblique[0];
+      const next = clone(c);
+      const idx = next.solids.findIndex(
+        (s) => s.kind === 'parallelepiped' && s.ids.length === target.ids.length && s.ids.every((id, i) => id === target.ids[i]),
+      );
+      next.solids[idx] = { ...next.solids[idx], kind: 'prism4' }; // same ids/edges/faces; lateral vector now ⟂ base
+      return { ok: true, next };
+    }
+
     case 'point-on-segment3': {
       if (c.points.has(cmd.id)) {
         // #199 M1 (ADR-3D-047): placing an EXISTING point on a segment is a GIVEN about it, never a
@@ -424,6 +445,20 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
         // «∠SDB» then «∠SDB = α» — naming an already-marked angle UPGRADES its display label (new object, no
         // prior-construction mutation since clone shares the refs).
         next.angleMarks = next.angleMarks.map((m) => (m === existing ? { ...m, label: cmd.label } : m));
+      }
+      // #271: reusing a label on a DIFFERENT angle is how a student states the two angles are EQUAL — it must
+      // ASSERT that equality (a `cos-eq` relation), never leave two cosmetic stickers the figure contradicts
+      // (the silent-drop cardinal sin, ADR-052/#271). `∠SAB = α` then `∠SBC = α` ⇒ ∠SAB = ∠SBC; the chained
+      // `∠SAB = ∠SAD = α` rides the same path (the 2nd mark finds the 1st twin). Relating to ONE twin suffices
+      // (transitivity chains the rest). Drives a free-dim solid, else a verified claim.
+      if (cmd.label) {
+        const twin = c.angleMarks.find((m) => m.label === cmd.label && !same(m));
+        if (twin) {
+          const atom = (v: Id, x: Id) => ({ kind: 'pair' as const, from: v, to: x });
+          const [a, b, cc, d] = [atom(cmd.vertex, cmd.p), atom(cmd.vertex, cmd.q), atom(twin.vertex, twin.p), atom(twin.vertex, twin.q)];
+          if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a, b, c: cc, d });
+          else next.claims.push({ type: 'cos-eq', a, b, c: cc, d });
+        }
       }
       for (const arm of [cmd.p, cmd.q]) if (!next.segments.some((s) => samePair(s, cmd.vertex, arm))) next.segments.push([cmd.vertex, arm]);
       return { ok: true, next };
@@ -1120,6 +1155,21 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       drawAtom(next, cmd.b);
       if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
       else next.claims.push({ type: 'cos-eq', a: cmd.base, b: cmd.a, c: cmd.base, d: cmd.b });
+      return { ok: true, next };
+    }
+
+    // #271 (G10 general): `∠PQR = ∠XYZ` — ∠(a,b) = ∠(c,d) with four free atoms (no shared vertex needed).
+    // Lowers to the SAME `cos-eq` engine relation as `angle-eq`: drives a free-dim solid, verifies otherwise.
+    case 'angles-equal': {
+      const err = firstAtomError(c, [cmd.a, cmd.b, cmd.c, cmd.d]);
+      if (err) return { ok: false, error: err };
+      const next = clone(c);
+      drawAtom(next, cmd.a);
+      drawAtom(next, cmd.b);
+      drawAtom(next, cmd.c);
+      drawAtom(next, cmd.d);
+      if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
+      else next.claims.push({ type: 'cos-eq', a: cmd.a, b: cmd.b, c: cmd.c, d: cmd.d });
       return { ok: true, next };
     }
 
