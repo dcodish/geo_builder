@@ -335,6 +335,11 @@ export interface Geo3State {
   toggle: (factId: string) => void;
   remove: (factId: string) => void;
   clear: () => void;
+  /** Data-panel QUERIES (ADR-3D-057, #274): quantities the student asked to see («w·v», «|AB|»…).
+   *  NOT facts — never replayed, never on the figure; saved with the file, undoable. */
+  queries: string[];
+  addQuery: (text: string) => void;
+  removeQuery: (index: number) => void;
   /** The figure's NAME (issue #42) - shown on the page, used as the save filename, derived from the
    *  loaded file's name. Session metadata: NOT in the undo history (partialize is facts+seed only);
    *  reset by `clear`. */
@@ -343,7 +348,7 @@ export interface Geo3State {
   resample: () => void;
   dismissError: () => void;
   /** Load a deserialised figure — ONE undoable set (never destructive: undo restores the prior session). */
-  loadFigure: (facts: Fact3[], seed: number) => void;
+  loadFigure: (facts: Fact3[], seed: number, queries?: string[]) => void;
   /** Surface a file-load refusal through the normal error banner. */
   reportLoadError: (reason: 'bad-file' | 'newer-schema') => void;
 }
@@ -353,6 +358,7 @@ export const useGeo3 = create<Geo3State>()(
     (set, get) => ({
       facts: [],
       seed: 0,
+      queries: [],
       figureName: '',
       lastError: null,
 
@@ -411,7 +417,18 @@ export const useGeo3 = create<Geo3State>()(
 
       remove: (factId) => set({ facts: get().facts.filter((f) => f.id !== factId), lastError: null }),
 
-      clear: () => set({ facts: [], figureName: '', lastError: null }),
+      clear: () => set({ facts: [], queries: [], figureName: '', lastError: null }),
+
+      // A query is a QUESTION about the figure, never a fact (ADR-3D-057): it never enters replay.
+      // Duplicates are dropped (asking twice adds nothing); trimmed; capped so the panel stays sane.
+      addQuery: (text) => {
+        const t = text.trim();
+        if (!t) return;
+        const cur = get().queries;
+        if (cur.includes(t) || cur.length >= 30) return;
+        set({ queries: [...cur, t] });
+      },
+      removeQuery: (index) => set({ queries: get().queries.filter((_, i) => i !== index) }),
 
       setFigureName: (name) => set({ figureName: name }),
 
@@ -427,15 +444,15 @@ export const useGeo3 = create<Geo3State>()(
 
       dismissError: () => set({ lastError: null }),
 
-      loadFigure: (facts, seed) => set({ facts, seed, lastError: null }),
+      loadFigure: (facts, seed, queries = []) => set({ facts, seed, queries, lastError: null }),
 
       reportLoadError: (reason) => set({ lastError: { code: reason } }),
     }),
     {
       // History tracks the durable inputs only; lastError is transient UI state,
       // and `equality` keeps error-only sets from pushing duplicate snapshots.
-      partialize: (s) => ({ facts: s.facts, seed: s.seed }) as Geo3State,
-      equality: (past, current) => past.facts === current.facts && past.seed === current.seed,
+      partialize: (s) => ({ facts: s.facts, seed: s.seed, queries: s.queries }) as Geo3State,
+      equality: (past, current) => past.facts === current.facts && past.seed === current.seed && past.queries === current.queries,
     },
   ),
 );

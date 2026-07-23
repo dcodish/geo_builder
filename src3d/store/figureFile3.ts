@@ -24,6 +24,8 @@ export interface FigureFile3 {
   name?: string;
   seed: number;
   facts: { utterance: string; cmds: Command3[]; enabled?: boolean }[];
+  /** Data-panel queries (ADR-3D-057, #274) — questions about the figure, not facts; optional. */
+  queries?: string[];
 }
 
 const COMMAND_TYPES = new Set<Command3['type']>([
@@ -56,9 +58,39 @@ const COMMAND_TYPES = new Set<Command3['type']>([
   'symbol-value',
   'midpoint-auto',
   'vertex-angle',
+  // ADR-3D-057 — the save whitelist had drifted: 23 command types the parser emits (many of them old)
+  // were absent, so any figure using them (`|u|=3` → vec-mag, `⊥` → cos-angle, a circle, a diagonal
+  // crossing, …) silently failed to RELOAD. A `figure-file3` guard test now asserts every command the
+  // catalog produces is whitelisted, so this can't drift again (issue #274 folded the repair in because
+  // queries persist to the same file — an unsaveable figure loses its query list too).
+  'altitude-foot',
+  'angle-bound3',
+  'angle-eq',
+  'angle-mark',
+  'angle-pair-eq',
+  'bisector-point',
+  'circle3',
+  'cos-angle',
+  'diag-intersection',
+  'dot-eq-chain',
+  'dot-given',
+  'draw-arrow',
+  'height-to-face',
+  'line-common-perp',
+  'line-plane-angle',
+  'line-projection',
+  'param-sign',
+  'perp-to-base',
+  'plane-cut',
+  'point-on-circle3',
+  'rect-complete',
+  'rel-plane',
+  'right-pyramid-point',
+  'tetra-altitude',
+  'vec-mag',
 ]);
 
-export function serializeFigure3(facts: Fact3[], seed: number, name?: string): string {
+export function serializeFigure3(facts: Fact3[], seed: number, name?: string, queries: string[] = []): string {
   const file: FigureFile3 = {
     schemaVersion: SCHEMA_VERSION_3D,
     app: '3d-builder',
@@ -66,12 +98,13 @@ export function serializeFigure3(facts: Fact3[], seed: number, name?: string): s
     ...(name ? { name } : {}),
     seed,
     facts: facts.map((f) => ({ utterance: f.utterance, cmds: f.cmds, ...(f.enabled ? {} : { enabled: false }) })),
+    ...(queries.length ? { queries } : {}),
   };
   return JSON.stringify(file, null, 2);
 }
 
 export type LoadResult3 =
-  | { ok: true; facts: Fact3[]; seed: number }
+  | { ok: true; facts: Fact3[]; seed: number; queries: string[] }
   | { ok: false; reason: 'bad-file' | 'newer-schema' };
 
 export function deserializeFigure3(text: string): LoadResult3 {
@@ -100,7 +133,8 @@ export function deserializeFigure3(text: string): LoadResult3 {
     // ids are session-local — always minted fresh on load
     facts.push({ id: nanoid(8), utterance: f.utterance, cmds: f.cmds, enabled: f.enabled !== false });
   }
-  return { ok: true, facts, seed: file.seed };
+  const queries = Array.isArray(file.queries) ? file.queries.filter((q): q is string => typeof q === 'string') : [];
+  return { ok: true, facts, seed: file.seed, queries };
 }
 
 /** This product's save-file suffix (issue #20; registry: docs/22-workflow.md §9). COPIED per product

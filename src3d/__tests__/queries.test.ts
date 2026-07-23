@@ -1,0 +1,141 @@
+/**
+ * The data-panel QUERY lane (ADR-3D-057, issue #274). A query is a QUESTION about the figure — never a
+ * fact: it never enters replay, never moves a point. And it is answered ONLY when its value is genuinely
+ * knowledge (the student's own «only if stable»): scale-free quantities (angles) whenever the shape is
+ * determined; unit-carrying quantities (dot/length/area/volume) only when the scale is pinned — except
+ * the scale-invariant value ~0 (a perpendicular dot). Everything else reports WHY, never a sampled number.
+ */
+
+import { beforeEach, describe, expect, it } from 'vitest';
+import { derive3, useGeo3 } from '../store/store3';
+import { answerQuery } from '../engine/queries';
+import { serializeFigure3, deserializeFigure3 } from '../store/figureFile3';
+import { parse3 } from '../parser/parse3';
+import { COMMAND_CATALOG_3D } from '../parser/catalog3';
+
+const reset = () => {
+  useGeo3.setState({ facts: [], seed: 0, queries: [], lastError: null });
+  useGeo3.temporal.getState().clear();
+};
+const submit = (u: string) => useGeo3.getState().submit(u);
+const build = (steps: string[]) => {
+  reset();
+  for (const u of steps) submit(u);
+  const st = useGeo3.getState();
+  return { c: derive3(st.facts, st.seed).construction, seed: st.seed };
+};
+const ans = (steps: string[], q: string) => {
+  const { c, seed } = build(steps);
+  return answerQuery(c, q, seed);
+};
+
+// a right triangular prism with the base legs pinned (|u|=3, |v|=4, ∠CAB=90) — scale is pinned
+const PRISM = ['מנסרה משולשת ישרה', 'זוית CAB=90', 'AB=u', 'AC=v', "AA'=w", '|u|=3', '|v|=4'];
+
+describe('ADR-3D-057 — the query lane answers only genuine knowledge', () => {
+  beforeEach(reset);
+
+  describe('answered', () => {
+    it('a perpendicular dot product is 0 (scale-invariant, so answered even before scale is pinned)', () => {
+      expect(ans(['קובייה', "AB=u", "AD=v"], 'u·v').answer).toBe('0');
+    });
+    it('a stated length, with scale pinned', () => {
+      expect(ans(PRISM, '|u|').answer).toBe('3');
+    });
+    it('a derived length forced by the givens', () => {
+      // |BC| = 5 (3-4-5 right triangle), scale pinned
+      expect(ans(PRISM, '|BC|').answer).toBe('5');
+    });
+    it('an angle — scale-free, answered whenever the shape is determined', () => {
+      expect(ans(PRISM, '∠CAB').answer).toBe('90°');
+      expect(ans(PRISM, '∠(u,v)').answer).toBe('90°');
+    });
+    it('a triangle area, scale pinned', () => {
+      expect(ans(PRISM, 'area ABC').answer).toBe('6'); // ½·3·4
+      expect(ans(PRISM, 'שטח ABC').answer).toBe('6');
+    });
+    it('the En «dot» word and point-pair operands', () => {
+      expect(ans(PRISM, 'u dot v').answer).toBe('0');
+      expect(ans(PRISM, 'AB·AC').answer).toBe('0');
+    });
+    it('a solid volume, with the box dims pinned', () => {
+      expect(ans(["תיבה ABCDA'B'C'D'", '|AB|=2', '|AD|=3', "|AA'|=4"], "volume ABCDA'B'C'D'").answer).toBe('24');
+    });
+  });
+
+  describe('honestly refused — never a sampled number', () => {
+    it('a length whose scale is free reports «depends on scale»', () => {
+      expect(ans(['פירמידה ABCDS שבסיסה ריבוע'], '|AB|')).toMatchObject({ answer: null, note: 'scale' });
+    });
+    it('a NON-zero dot with free scale is gauge — refused', () => {
+      // a cube's edge · base-diagonal = |AB||AC|cos45 = 1·√2·cos45 = 1 at the frozen gauge — that IS gauge
+      expect(ans(["קובייה ABCDA'B'C'D'"], 'AB·AC').note).toBe('scale');
+    });
+    it('an under-determined angle (bounded, not fixed) reports «not determined»', () => {
+      expect(ans(['פירמידה ABCDS שבסיסה ריבוע', '∠SAB=α', '60<α<90'], '∠SAB')).toMatchObject({ answer: null, note: 'undetermined' });
+    });
+    it('a query naming points not in the figure', () => {
+      expect(ans(PRISM, '|XY|').note).toBe('unavailable');
+    });
+    it('gibberish is «not recognised»', () => {
+      expect(ans(PRISM, 'hello world').note).toBe('notUnderstood');
+    });
+  });
+
+  describe('a query is a QUESTION, not a fact', () => {
+    it('adding a query never touches the fact list or the figure', () => {
+      build(PRISM);
+      const before = useGeo3.getState().facts.length;
+      useGeo3.getState().addQuery('u·v');
+      expect(useGeo3.getState().facts.length, 'no fact added').toBe(before);
+      expect(useGeo3.getState().queries).toEqual(['u·v']);
+    });
+    it('duplicates are dropped; blanks ignored', () => {
+      reset();
+      useGeo3.getState().addQuery('u·v');
+      useGeo3.getState().addQuery('u·v');
+      useGeo3.getState().addQuery('   ');
+      expect(useGeo3.getState().queries).toEqual(['u·v']);
+    });
+    it('removeQuery drops the right one', () => {
+      reset();
+      ['a', 'b', 'c'].forEach((q) => useGeo3.getState().addQuery(q));
+      useGeo3.getState().removeQuery(1);
+      expect(useGeo3.getState().queries).toEqual(['a', 'c']);
+    });
+  });
+
+  describe('queries persist with the figure file', () => {
+    // a figure whose commands are all save-whitelisted (a solid + a named vector)
+    const SAVEABLE = ["קובייה ABCDA'B'C'D'", 'AB=u'];
+    it('save → load round-trips the query list', () => {
+      build(SAVEABLE);
+      const facts = useGeo3.getState().facts;
+      const json = serializeFigure3(facts, 0, 'q-test', ['u·v', '|u|', '∠CAB']);
+      const r = deserializeFigure3(json);
+      expect(r.ok && r.queries).toEqual(['u·v', '|u|', '∠CAB']);
+    });
+    it('an old file with no queries loads with an empty list (never a bad-file)', () => {
+      build(SAVEABLE);
+      const json = serializeFigure3(useGeo3.getState().facts, 0, 'no-q');
+      expect(JSON.parse(json).queries).toBeUndefined(); // omitted when empty
+      const r = deserializeFigure3(json);
+      expect(r.ok && r.queries).toEqual([]);
+    });
+
+    // ADR-3D-057 drift guard: the save whitelist had lost 23 command types, so figures using them
+    // (⊥, |u|=3, circles, diagonals…) silently failed to reload. Every command the catalog can produce
+    // must round-trip through save→load, so the whitelist can never drift behind the parser again.
+    it('every cataloged utterance saves and reloads (no whitelist drift)', () => {
+      for (const e of COMMAND_CATALOG_3D) {
+        for (const utter of [e.he, e.en]) {
+          const r = parse3(utter);
+          if (!r.ok) continue;
+          const json = serializeFigure3([{ id: 'x', utterance: utter, cmds: r.commands, enabled: true }], 0);
+          const loaded = deserializeFigure3(json);
+          expect(loaded.ok, `"${utter}" → [${r.commands.map((c) => c.type).join(', ')}] must reload`).toBe(true);
+        }
+      }
+    });
+  });
+});

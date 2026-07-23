@@ -1,0 +1,190 @@
+/**
+ * The data-panel QUERY lane (ADR-3D-057, issue #274) — the operator's design: a SEPARATE input where the
+ * student asks for a specific quantity («w·v», «|AB|», «∠SAB», «area ABC», «volume SABCD») and sees its
+ * value WITHOUT adding anything to the figure. A query is a question, never a fact: it never enters
+ * `replay`, never moves a point, never appears in the step list.
+ *
+ * Honesty (the student's own «only if stable»): a query is answered only when its value is genuinely
+ * KNOWLEDGE. Angles are scale-free, so an angle is answered whenever the shape is determined (stable
+ * across sampled seeds). A dot product / length / area / volume carries units — it is gauge unless the
+ * figure's SCALE is pinned (`scalePinned`, ADR-3D-054), so it is answered only then (except the one
+ * scale-invariant value, ~0 — a perpendicular dot is knowledge at any scale). Everything else reports
+ * WHY it can't be answered — never a sampled number dressed as a fact (ADR-052).
+ */
+
+import { resolve3 } from './evaluate';
+import { scalePinned } from './solve3';
+import { cleanNum } from './dataView';
+import { centroid3, cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
+import type { Construction3, Id, Positions3 } from './types';
+
+/** An operand: a declared vector name, or an ordered point pair. */
+type Atom = { named: string } | { pair: [Id, Id] };
+
+type Query =
+  | { kind: 'dot'; a: Atom; b: Atom }
+  | { kind: 'length'; a: Atom }
+  | { kind: 'angle-vertex'; p: Id; q: Id; r: Id }
+  | { kind: 'angle-vec'; a: Atom; b: Atom }
+  | { kind: 'area'; ids: Id[] }
+  | { kind: 'volume'; ids: Id[] };
+
+export interface QueryResult {
+  /** The student's query text, verbatim. */
+  text: string;
+  /** The value (`0`, `6`, `90°`), or null when it can't be answered. */
+  answer: string | null;
+  /** Why it can't be answered — shown in place of a value. */
+  note?: string;
+}
+
+const PT = String.raw`[A-Z]\d*'?`;
+
+/** Resolve a token string to an operand against the figure: a declared vector, or a two-point pair. */
+function atomOf(c: Construction3, s: string): Atom | null {
+  const t = s.trim();
+  if (/^[a-z]$/.test(t) && c.vectors.has(t)) return { named: t };
+  const m = t.match(new RegExp(`^(${PT})\\s*(${PT})$`));
+  return m ? { pair: [m[1], m[2]] } : null;
+}
+
+/** The direction vector an atom spans at these positions (named vector's from→to, or the pair). */
+function atomVec(c: Construction3, a: Atom, pos: Positions3): Vec3 | null {
+  const [from, to] = 'named' in a ? (() => { const d = c.vectors.get(a.named); return d ? [d.from, d.to] : [undefined, undefined]; })() : a.pair;
+  if (!from || !to) return null;
+  const p = pos.get(from);
+  const q = pos.get(to);
+  return p && q ? sub3(q, p) : null;
+}
+
+/** Parse a query string into a typed request (no coordinates yet), or null if unrecognised. */
+export function parseQuery(c: Construction3, raw: string): Query | null {
+  const s = raw.replace(/[′’]/g, "'").replace(/\s+/g, ' ').trim();
+  if (!s) return null;
+
+  // ANGLE: «∠(u,v)» / «∠SAB» / «זווית SAB» / «angle SAB» / «angle between u and v»
+  const angM = s.match(/^(?:∠|∢|זו?וית|the\s+)?\s*angle\s+|^(?:∠|∢|זו?וית)\s*/i);
+  const angVec = s.match(/^(?:∠|∢|זו?וית|angle)\s*\(?\s*([a-z]|[A-Z]\d*'?[A-Z]\d*'?)\s*,\s*([a-z]|[A-Z]\d*'?[A-Z]\d*'?)\s*\)?$/i);
+  if (angVec) {
+    const a = atomOf(c, angVec[1]);
+    const b = atomOf(c, angVec[2]);
+    if (a && b) return { kind: 'angle-vec', a, b };
+  }
+  if (angM || /^∠/.test(s)) {
+    const body = s.replace(/^(?:∠|∢|זו?וית|the\s+angle|angle|of|של|בין)\s*/gi, '').replace(/\s+/g, '');
+    const tri = body.match(new RegExp(`^(${PT})(${PT})(${PT})$`));
+    if (tri) return { kind: 'angle-vertex', p: tri[1], q: tri[2], r: tri[3] };
+  }
+
+  // DOT: «w·v» / «AB·CD» / «w dot v»
+  const dotM = s.match(/^(.+?)\s*(?:·|•|⋅|\*|dot)\s*(.+)$/i);
+  if (dotM) {
+    const a = atomOf(c, dotM[1]);
+    const b = atomOf(c, dotM[2]);
+    if (a && b) return { kind: 'dot', a, b };
+  }
+
+  // LENGTH: «|AB|» / «|w|» / «אורך AB» / «length w» / a bare pair «AB»
+  const barM = s.match(/^\|\s*(.+?)\s*\|$/);
+  const lenWord = s.match(/^(?:אורך|length|the\s+length\s+of|גודל|norm)\s+(.+)$/i);
+  const lenTok = barM?.[1] ?? lenWord?.[1] ?? (/^[A-Za-z0-9'\s]+$/.test(s) ? s : undefined);
+  if (lenTok) {
+    const a = atomOf(c, lenTok);
+    if (a) return { kind: 'length', a };
+  }
+
+  // AREA: «area ABC» / «שטח ABC» / «S_{ABC}» / «SABC»
+  const areaM = s.match(/^(?:שטח|area|the\s+area\s+of)\s+([A-Z0-9'\s]+)$/i) ?? s.match(new RegExp(`^S_?\\{?\\s*((?:${PT}){3,})\\s*\\}?$`));
+  if (areaM) {
+    const ids = areaM[1].match(new RegExp(PT, 'g')) ?? [];
+    if (ids.length >= 3) return { kind: 'area', ids };
+  }
+
+  // VOLUME: «volume SABCD» / «נפח SABCD»
+  const volM = s.match(/^(?:נפח|volume|the\s+volume\s+of)\s+([A-Z0-9'\s]+)$/i);
+  if (volM) {
+    const ids = volM[1].match(new RegExp(PT, 'g')) ?? [];
+    if (ids.length >= 4) return { kind: 'volume', ids };
+  }
+
+  return null;
+}
+
+/** The convex-solid volume from its face rings (centroid fan → tetra sum; orientation-free). */
+function solidVolume(c: Construction3, ids: Id[], pos: Positions3): number | null {
+  // a named solid whose vertex SET matches `ids`, else a bare 4-point tetrahedron
+  const key = [...ids].sort().join('|');
+  const solid = c.solids.find((sd) => [...sd.ids].sort().join('|') === key);
+  if (!solid) {
+    if (ids.length !== 4) return null;
+    const ps = ids.map((id) => pos.get(id));
+    if (ps.some((p) => !p)) return null;
+    return Math.abs(dot3(sub3(ps[1]!, ps[0]!), cross3(sub3(ps[2]!, ps[0]!), sub3(ps[3]!, ps[0]!)))) / 6;
+  }
+  const verts = solid.ids.map((id) => pos.get(id));
+  if (verts.some((p) => !p)) return null;
+  const ctr = centroid3(verts as Vec3[]);
+  let V = 0;
+  for (const face of solid.faces) {
+    const fp = face.map((id) => pos.get(id));
+    if (fp.some((p) => !p)) return null;
+    for (let i = 1; i + 1 < fp.length; i++) {
+      V += Math.abs(dot3(sub3(fp[0]!, ctr), cross3(sub3(fp[i]!, ctr), sub3(fp[i + 1]!, ctr)))) / 6;
+    }
+  }
+  return V;
+}
+
+/** The raw numeric value of a query at one configuration; null when a referenced object is unplaced. */
+function evalQuery(c: Construction3, q: Query, pos: Positions3): number | null {
+  const angleBetween = (u: Vec3, v: Vec3): number | null => {
+    const n = norm3(u) * norm3(v);
+    return n < 1e-12 ? null : (Math.acos(Math.max(-1, Math.min(1, dot3(u, v) / n))) * 180) / Math.PI;
+  };
+  switch (q.kind) {
+    case 'dot': {
+      const u = atomVec(c, q.a, pos);
+      const v = atomVec(c, q.b, pos);
+      return u && v ? dot3(u, v) : null;
+    }
+    case 'length': {
+      const u = atomVec(c, q.a, pos);
+      return u ? norm3(u) : null;
+    }
+    case 'angle-vertex': {
+      const p = pos.get(q.p), qq = pos.get(q.q), r = pos.get(q.r);
+      return p && qq && r ? angleBetween(sub3(p, qq), sub3(r, qq)) : null;
+    }
+    case 'angle-vec': {
+      const u = atomVec(c, q.a, pos);
+      const v = atomVec(c, q.b, pos);
+      return u && v ? angleBetween(u, v) : null;
+    }
+    case 'area': {
+      const ps = q.ids.map((id) => pos.get(id));
+      if (ps.some((p) => !p)) return null;
+      // triangle: ½|cross|; polygon: Newell fan from vertex 0 (planar or not, the projected area)
+      let a = 0;
+      for (let i = 1; i + 1 < ps.length; i++) a += 0.5 * norm3(cross3(sub3(ps[i]!, ps[0]!), sub3(ps[i + 1]!, ps[0]!)));
+      return a;
+    }
+    case 'volume':
+      return solidVolume(c, q.ids, pos);
+  }
+}
+
+/** Answer one query against the figure — the whole honesty gate (stability + scale) lives here. */
+export function answerQuery(c: Construction3, text: string, seed: number): QueryResult {
+  const q = parseQuery(c, text);
+  if (!q) return { text, answer: null, note: 'notUnderstood' };
+  const seeds = [seed, seed + 1013, seed + 2027, seed + 3041];
+  const vals = seeds.map((s) => evalQuery(c, q, resolve3(c, s).positions));
+  if (vals.some((v) => v === null || !Number.isFinite(v))) return { text, answer: null, note: 'unavailable' };
+  const nums = vals as number[];
+  const stable = nums.every((v) => Math.abs(v - nums[0]) <= 1e-6 * Math.max(1, Math.abs(nums[0])));
+  if (!stable) return { text, answer: null, note: 'undetermined' };
+  const scaleFree = q.kind === 'angle-vertex' || q.kind === 'angle-vec';
+  if (!scaleFree && !scalePinned(c) && Math.abs(nums[0]) > 1e-9) return { text, answer: null, note: 'scale' };
+  const isAngle = q.kind === 'angle-vertex' || q.kind === 'angle-vec';
+  return { text, answer: `${cleanNum(nums[0])}${isAngle ? '°' : ''}` };
+}

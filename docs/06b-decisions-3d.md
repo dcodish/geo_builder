@@ -826,3 +826,17 @@ The one inequality-flavoured thing that existed — a stated plane SIDE (ADR-3D-
 **Recorded trap, twice in one night.** A Hebrew keyword gate must admit BOTH nun spellings — `קטן` (m) / `קטנה` (f). The 2-D fix (ADR-390) had to correct exactly this in `CMP_SMALL`, and the guard at the top of *this* rule then reintroduced it: the regex matched fine while a `קטן`-only early-out rejected the utterance before it ran. Write `קט[ןנ]`, as ADR-3D-035 wrote `מאונ[ךכ]`.
 
 Locked by `angle-measures.test.ts`; catalog3 +2.
+
+## ADR-3D-057 — The data-panel QUERY lane (issue #274)
+
+**Operator design (2026-07-22).** «for the data side, i want to see w·v. we don't have this in the engine since it does nothing. so … a separate data entry that … user can add specific sizes he wants to calc (only if stable) and will not garbage the shape builder data entry.»
+
+**Decision.** A SEPARATE input in the data panel where the student asks for a quantity and sees its value WITHOUT touching the figure. A query is a QUESTION, never a fact: `Construction3` is untouched, `replay` never sees it, it never appears in the step list. Stored on the store as `queries: string[]` (in `partialize` → undoable; saved in the `.geo3.json` → a reloaded figure keeps its questions), distinct from `facts`.
+
+**Supported (the operator's four types).** `answerQuery` (`src3d/engine/queries.ts`) parses `w·v` / `AB·CD` (dot), `|AB|` / `|w|` / bare `AB` (length), `∠SAB` / `∠(u,v)` (angle), `area ABC` / `שטח ABC` / `S_{ABC}` (area), `volume SABCD` / `נפח …` (solid volume via a centroid-fan of the face rings, or a 4-point tetra), He + En.
+
+**Honesty (the student's own «only if stable»).** A query is answered ONLY when its value is genuine knowledge, decided by two gates: (1) STABLE across sampled seeds — an under-determined quantity varies and reads «not determined»; (2) for a unit-carrying quantity (dot/length/area/volume) the SCALE must be pinned (`scalePinned`, ADR-3D-054) — else «depends on scale» — EXCEPT the one scale-invariant value ~0 (a perpendicular dot is knowledge at any scale). Angles are scale-free, answered whenever the shape is determined. A query naming absent points, or gibberish, says so. Never a sampled number dressed as a fact (ADR-052).
+
+**Folded-in repair — the save whitelist had drifted.** `deserializeFigure3`'s `COMMAND_TYPES` gate was missing **23** command types the parser emits (mostly old: `cos-angle`, `vec-mag`, `circle3`, `diag-intersection`, `angle-mark`, `plane-cut`, …), so any figure using them silently failed to RELOAD (`bad-file`). Queries persist to that same file, so an unsaveable figure would lose its query list too — hence the repair rides here. A behavioural guard test now asserts EVERY command the catalog produces round-trips through save→load, so the whitelist can never fall behind the parser again (filed as #288 for the record).
+
+Locked by `queries.test.ts` (18): each quantity answered when determined, refused with the right reason otherwise, a query never becomes a fact, add/remove/dedupe, save-load round-trip, and the whitelist drift guard.
