@@ -749,3 +749,18 @@ Dropping the gate outright would print `|AB| = 1` on a bare cube: an invented gi
 Measured after the fix: the operator's prism prints `|w| = 5/2` plus the other forced lengths; a bare cube and invariant-only givens (⟂, a ratio) print nothing; `|u| = 3` alone prints `|u|` only, leaving the still-free `|v|`/`|w|` unprinted.
 
 Locked by `derived-magnitudes.test.ts` (both directions: the forced value prints, the gauge never does).
+
+## ADR-3D-055 — The diagonal-crossing accepts «נפגש» and a TRAILING point (issue #284)
+
+**Operator (2026-07-23).** «אלכסוני הריבוע **נחתכים** בנקודה O» works; «אלכסוני הריבוע **נפגשים** בנקודה O» does not.
+
+**Root cause.** `diagIntersection` (`parse3.ts`) had two independent narrownesses, both exposed by the one phrasing:
+
+1. **The verb set omitted `נפגש`** (meet). It carried `מפגש`/`חיתוך`/`נחתכים` only, so «נפגשים» failed the verb guard outright — the CLAUDE.md `פוגש`/`פגש` shared-intersect-keyword lesson, one form further (and both nun endings, the ADR-3D-035 `קט[ןנ]` discipline: `נפגש` covers נפגשים/נפגשות).
+2. **The crossing point was read as the FIRST label**, but «…meet at O» / «…נפגשים בנקודה O» names it LAST. With explicit vertices this SILENTLY MIS-BOUND: «diagonals of ABCD meet at O» built `diag-intersection id=A, face=[B,C,D,O]` — the wrong figure, no error (the §honesty class).
+
+**Fix.** Add `נפגש` (+ broaden `נחתכים`→`נחתכ`) to the verb set, and read a TRAILING marker («בנקוד[הת] X» / «at X») as the crossing id when present, falling back to the first-label idiom («O מפגש אלכסוני ABCD») otherwise. Parser-only; the `diag-intersection`/`point-on-segment3` lowerings and every point-first form are byte-unchanged.
+
+**Not a regression from the measure work** (#282): the angle commits don't touch this rule; «נפגשים» never parsed in 3-D. "Yesterday it was" was the 2-D app, where the same phrasing has always resolved via `line-line-intersection`.
+
+Locked by `v8a-apex-diagonals.test.ts` (+3: the operator's exact «נפגשים בנקודה O», the «נחתכים» form still working, and the point-last explicit-vertices no-mis-bind, He + En).

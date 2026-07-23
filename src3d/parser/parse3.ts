@@ -443,10 +443,18 @@ const centroidRule: Rule = (s) => {
  */
 const diagIntersection: Rule = (s) => {
   if (!/אלכסו[ןנ]|diagonal/i.test(s)) return null;
-  if (!/מפגש|חיתוך|נחתכים|intersection|meet/i.test(s)) return null;
+  // the intersection verb, in every form the student writes it: מפגש (noun), חיתוך/נחתכ (cut),
+  // and נפגש (meet — both nun endings נפגשים/נפגשות, the ADR-3D-035 `קט[ןנ]` discipline). «נפגשים»
+  // was the one gap the operator hit — «נחתכים» worked, «נפגשים» didn't (#284).
+  if (!/מפגש|נפגש|נחתכ|חיתוך|intersection|meet/i.test(s)) return null;
   const toks = labelTokens(s);
   if (toks.length === 0) return null;
-  const [id, ...rest] = toks;
+  // The crossing point is named by a TRAILING marker when the student writes «…נפגשים בנקודה O» /
+  // «…meet at O» (the point LAST); otherwise it is the FIRST label («O מפגש אלכסוני ABCD», point
+  // first). Reading the first token as the crossing regardless — the old behaviour — silently
+  // mis-bound the point-last form (English «diagonals of ABCD meet at O» built id=A, face=[B,C,D,O]).
+  const trailing = s.match(/(?:בנקוד[הת]|at)\s+([A-Z]\d*'?)\s*$/i);
+  const [id, ...rest] = trailing ? [trailing[1], ...toks.filter((t) => t !== trailing[1])] : toks;
   const twoDiag = (s.match(/אלכסו[ןנ]|diagonal/gi) ?? []).length >= 2;
   if (rest.length === 4 && twoDiag) {
     const [a, b] = rest; // two explicit diagonals — the crossing is on the first, a–b

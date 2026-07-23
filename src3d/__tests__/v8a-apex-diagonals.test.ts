@@ -124,6 +124,42 @@ describe('V8-a — intersection of the diagonals (G3)', () => {
     expect(G.z).toBeCloseTo(m.z, 9);
   });
 
+  // #284 (ADR-3D-055) — the crossing named LAST («…נפגשים בנקודה O») + the «נפגש» verb.
+  // The operator narrowed it exactly: «נחתכים» worked, «נפגשים» didn't.
+  it('point-LAST: «אלכסוני הריבוע נפגשים בנקודה O» (the operator\'s exact utterance)', () => {
+    submit('קובייה');
+    submit('אלכסוני הריבוע נפגשים בנקודה O');
+    expectAllOk();
+    const pos = derived().positions;
+    const O = pos.get('O')!;
+    const m = mid(pos.get('A')!, pos.get('C')!);
+    expect(O.x).toBeCloseTo(m.x, 9);
+    expect(O.y).toBeCloseTo(m.y, 9);
+    expect(O.z).toBeCloseTo(m.z, 9);
+  });
+
+  it('«נחתכים» still works (the form that already did)', () => {
+    submit('קובייה');
+    submit('אלכסוני הריבוע נחתכים בנקודה O');
+    expectAllOk();
+    const O = derived().positions.get('O')!;
+    const m = mid(derived().positions.get('A')!, derived().positions.get('C')!);
+    expect(O.x).toBeCloseTo(m.x, 9);
+  });
+
+  it('point-LAST with explicit vertices binds the CROSSING, not the first label (no silent mis-bind)', () => {
+    // «diagonals of ABCD meet at O» used to build id=A, face=[B,C,D,O] — a wrong figure, silently.
+    submit("box ABCDA'B'C'D'");
+    submit('diagonals of ABCD meet at O');
+    expectAllOk();
+    const pos = derived().positions;
+    const O = pos.get('O')!;
+    const m = mid(pos.get('A')!, pos.get('C')!);
+    expect(O.x).toBeCloseTo(m.x, 9);
+    expect(O.y).toBeCloseTo(m.y, 9);
+    expect(O.z).toBeCloseTo(m.z, 9);
+  });
+
   it('the base sentinel refuses honestly with no single solid', () => {
     submit('O נקודת חיתוך אלכסוני הבסיס');
     expect(state().facts).toHaveLength(0);
