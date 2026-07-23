@@ -5,4 +5,4 @@
 - [Bagrut theorem source](bagrut-theorem-source.md) — the official theorem list PDF (canonical source for the theorem feature) + how to read it
 - [Readiness gate](readiness-gate.md) — don't call anything "ready" until its test gate passes; report tests honestly
 - [Memory in repo](memory-in-repo.md) — keep all durable memory in the repo (docs/), not local memory, so it travels across computers
-- [Work PC / cross-machine](work-pc-cross-machine.md) — this machine is David's work PC; he switches work/home, project syncs via Dropbox — pick up cross-machine progress at session start
+- [Work PC / cross-machine](work-pc-cross-machine.md) — David switches work/home PCs; project now syncs via git/GitHub (moved out of Dropbox 2026-07-23) — pick up cross-machine progress via git + source-of-truth docs at session start
