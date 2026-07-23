@@ -150,9 +150,22 @@ const makeRightPrism: Rule = (s) => {
 
 /** The oblique parallelepiped `מקבילון` / `parallelepiped` (#117): a parallelogram base translated by a
  *  FREE lateral vector — 8 labels, or 4 auto-primed, or the default ABCD base. Allowed despite being
- *  oblique: it is a NAMED oblique solid carrying its own free DOF, so it asserts no unstated "right" given. */
+ *  oblique: it is a NAMED oblique solid carrying its own free DOF, so it asserts no unstated "right" given.
+ *
+ *  #295: a bare `מנסרה שבסיסה מקבילית` / `prism with a parallelogram base` (a parallelogram-base prism with
+ *  NO `ישרה`) is the SAME oblique solid (ADR-052: rightness is unstated, so the lateral tilt is a free DOF,
+ *  pinned upright by `המנסרה ישרה`, #289). `rightPrism` owns the `ישרה` form (→ `prism4`); only the
+ *  parallelogram has an oblique model, so other bases without `ישרה` stay `rightPrism`'s honest refusal. */
 const parallelepiped: Rule = (s) => {
-  if (!/מקבילון/.test(s) && !/\bparallelepiped\b/i.test(s)) return null;
+  const named = /מקבילון/.test(s) || /\bparallelepiped\b/i.test(s);
+  const barePrismPar =
+    (/מנסרה/.test(s) || /\bprism\b/i.test(s)) &&
+    !/ישרה/.test(s) &&
+    !/\bright\b/i.test(s) &&
+    (/מקבילית/.test(s) || /\bparallelogram\b/i.test(s)) &&
+    !/מעוין/.test(s) &&
+    !/\brhombus\b/i.test(s);
+  if (!named && !barePrismPar) return null;
   const toks = firstLabelRun(s);
   if (toks.length === 8) return [{ type: 'solid', kind: 'parallelepiped', ids: toks }];
   if (toks.length === 4 && toks.every(unprimed)) return [{ type: 'solid', kind: 'parallelepiped', ids: [...toks, ...primeAll(toks)] }];
