@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { dataView } from './engine/dataView';
+import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
@@ -20,6 +21,8 @@ import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } fr
 function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: StoreError3): string | null {
   if (!err) return null;
   switch (err.code) {
+    case 'bound-unsatisfiable':
+      return t('err.boundUnsatisfiable', { id: err.id });
     case 'ambiguous-vector-length':
       return t('err.ambiguousVectorLength');
     case 'not-understood':
@@ -109,6 +112,9 @@ export default function App3() {
   const clear = useGeo3((s) => s.clear);
   const resample = useGeo3((s) => s.resample);
   const loadFigure = useGeo3((s) => s.loadFigure);
+  const queries = useGeo3((s) => s.queries);
+  const addQuery = useGeo3((s) => s.addQuery);
+  const removeQuery = useGeo3((s) => s.removeQuery);
   const reportLoadError = useGeo3((s) => s.reportLoadError);
 
   const submitSteps = useGeo3((s) => s.submitSteps);
@@ -199,7 +205,7 @@ export default function App3() {
       name = (window.prompt(t('actions.saveNamePrompt')) ?? '').trim();
       if (name) setFigureName(name);
     }
-    const blob = new Blob([serializeFigure3(facts, seed, name || undefined)], { type: 'application/json' });
+    const blob = new Blob([serializeFigure3(facts, seed, name || undefined, queries)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -217,7 +223,7 @@ export default function App3() {
     const r = deserializeFigure3(await f.text());
     if (r.ok) {
       logDebug3({ kind: 'action', action: 'load', detail: `${r.facts.length} facts` }); // #182: a load replaces the figure — the replay must know
-      loadFigure(r.facts, r.seed);
+      loadFigure(r.facts, r.seed, r.queries);
       setFigureName(figureNameFromFileName3(f.name)); // the FILENAME names the figure (issue #42)
     } else reportLoadError(r.reason);
   };
@@ -243,6 +249,13 @@ export default function App3() {
   }, []);
 
   const dataPanel = useMemo(() => (showData ? dataView(derived.construction, seed) : null), [showData, derived, seed]);
+  // #274 (ADR-3D-057): answer each saved query against the current figure. Coordinate-free honesty gate
+  // lives in `answerQuery` — a query it can't answer as knowledge reports WHY, never a sampled number.
+  const queryResults = useMemo(
+    () => (showData ? queries.map((q) => answerQuery(derived.construction, q, seed)) : []),
+    [showData, queries, derived, seed],
+  );
+  const [queryText, setQueryText] = useState('');
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -327,6 +340,14 @@ export default function App3() {
           <div className="flex flex-wrap gap-1" dir="ltr">
             {(
               [
+                // Greek letters for angle names (#272): 2-D has had these since ADR-039 — «∠SAB = α»
+                // is unusable when the letter can't be typed.
+                ['α', 'α', 0],
+                ['β', 'β', 0],
+                ['γ', 'γ', 0],
+                ['δ', 'δ', 0],
+                ['θ', 'θ', 0],
+                ['<', '<', 0], // a bound / ordering between measures
                 ['⃗', '⃗', 0],
                 ['|·|', '||', 1],
                 ['√', '√', 0],
@@ -501,6 +522,46 @@ export default function App3() {
             <input type="checkbox" checked={showData} onChange={(e) => setShowData(e.target.checked)} />
             {t('dataPanel.toggle')}
           </label>
+          {showData && (
+            /* #274 (ADR-3D-057): the query lane — ask for a quantity («w·v», «|AB|», «∠SAB», «area ABC»,
+               «volume SABCD») and see it if it's genuinely determined. A question, never a fact. */
+            <div className="rounded-xl border border-sky-200 bg-sky-50/40 p-3 text-sm">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  addQuery(queryText);
+                  setQueryText('');
+                }}
+                className="flex gap-1"
+              >
+                <input
+                  dir="ltr"
+                  value={queryText}
+                  onChange={(e) => setQueryText(e.target.value)}
+                  placeholder={t('query.placeholder')}
+                  className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2 py-1 text-sm"
+                />
+                <button type="submit" className="rounded-lg bg-sky-600 px-2 py-1 text-sm text-white hover:bg-sky-700">
+                  {t('query.add')}
+                </button>
+              </form>
+              {queryResults.length > 0 && (
+                <ul className="mt-2 flex flex-col gap-1" dir="ltr">
+                  {queryResults.map((r, i) => (
+                    <li key={r.text + i} className="flex items-center justify-between gap-2 border-b border-slate-100 pb-1 last:border-0">
+                      <span>
+                        {r.text}
+                        {r.answer !== null ? <span className="font-medium"> = {r.answer}</span> : <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>}
+                      </span>
+                      <button type="button" onClick={() => removeQuery(i)} className="shrink-0 text-slate-400 hover:text-rose-600" aria-label={t('query.remove')}>
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
           {showData && dataPanel && (
             <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
               {dataPanel.vectors.length === 0 && dataPanel.points.length === 0 && dataPanel.planes.length === 0 ? (

@@ -24,7 +24,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { applyCommand3 } from '../engine/apply';
-import { checkInSpan, memberHolds3, resolve3, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, firstSatisfyingSeed3, memberHolds3, resolve3, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
 import { cross3, dot3, norm3, sub3 } from '../engine/vec3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
@@ -65,6 +65,15 @@ export type StoreError3 =
  * `status` — and `submit` refuses it (keep-prior), so a wrong answer or an
  * unsatisfiable condition can never silently sit on the figure.
  */
+/** The first seed at/after `from` whose figure meets every stated requirement, or null when none does
+ *  within budget (ADR-3D-053). Requirement-free figures return `from` immediately — the search costs
+ *  nothing for the figures that state no inequality. */
+function seedForRequirements(facts: Fact3[], from: number): number | null {
+  const { construction } = derive3(facts, from);
+  if (construction.requirements.length === 0) return from;
+  return firstSatisfyingSeed3(construction, from);
+}
+
 export function derive3(facts: Fact3[], seed: number): Derived3 {
   let c: Construction3 = emptyConstruction3();
   const status: Record<string, FactStatus3> = {};
@@ -326,6 +335,11 @@ export interface Geo3State {
   toggle: (factId: string) => void;
   remove: (factId: string) => void;
   clear: () => void;
+  /** Data-panel QUERIES (ADR-3D-057, #274): quantities the student asked to see («w·v», «|AB|»…).
+   *  NOT facts — never replayed, never on the figure; saved with the file, undoable. */
+  queries: string[];
+  addQuery: (text: string) => void;
+  removeQuery: (index: number) => void;
   /** The figure's NAME (issue #42) - shown on the page, used as the save filename, derived from the
    *  loaded file's name. Session metadata: NOT in the undo history (partialize is facts+seed only);
    *  reset by `clear`. */
@@ -334,7 +348,7 @@ export interface Geo3State {
   resample: () => void;
   dismissError: () => void;
   /** Load a deserialised figure — ONE undoable set (never destructive: undo restores the prior session). */
-  loadFigure: (facts: Fact3[], seed: number) => void;
+  loadFigure: (facts: Fact3[], seed: number, queries?: string[]) => void;
   /** Surface a file-load refusal through the normal error banner. */
   reportLoadError: (reason: 'bad-file' | 'newer-schema') => void;
 }
@@ -344,6 +358,7 @@ export const useGeo3 = create<Geo3State>()(
     (set, get) => ({
       facts: [],
       seed: 0,
+      queries: [],
       figureName: '',
       lastError: null,
 
@@ -361,7 +376,15 @@ export const useGeo3 = create<Geo3State>()(
           set({ lastError: st }); // keep-prior: the bad fact is not added
           return;
         }
-        set({ facts: candidate, lastError: null });
+        // ADR-3D-053 (#273): a stated inequality determines nothing, so it can only be honoured by
+        // CHOOSING a configuration that satisfies it. Land on one before drawing; if none exists within
+        // budget, refuse and keep the prior figure rather than draw a figure that contradicts the given.
+        const found = seedForRequirements(candidate, seed);
+        if (found === null) {
+          set({ lastError: { code: 'bound-unsatisfiable', id: '' } });
+          return;
+        }
+        set({ facts: candidate, seed: found, lastError: null });
       },
 
       submitSteps: (utterance, steps) => {
@@ -394,23 +417,42 @@ export const useGeo3 = create<Geo3State>()(
 
       remove: (factId) => set({ facts: get().facts.filter((f) => f.id !== factId), lastError: null }),
 
-      clear: () => set({ facts: [], figureName: '', lastError: null }),
+      clear: () => set({ facts: [], queries: [], figureName: '', lastError: null }),
+
+      // A query is a QUESTION about the figure, never a fact (ADR-3D-057): it never enters replay.
+      // Duplicates are dropped (asking twice adds nothing); trimmed; capped so the panel stays sane.
+      addQuery: (text) => {
+        const t = text.trim();
+        if (!t) return;
+        const cur = get().queries;
+        if (cur.includes(t) || cur.length >= 30) return;
+        set({ queries: [...cur, t] });
+      },
+      removeQuery: (index) => set({ queries: get().queries.filter((_, i) => i !== index) }),
 
       setFigureName: (name) => set({ figureName: name }),
 
-      resample: () => set({ seed: get().seed + 1 }),
+      // "show another configuration": the next seed whose configuration still satisfies every stated
+      // requirement (ADR-3D-053). Was a blind `seed + 1`, which could show a drawing contradicting a
+      // stated bound; with no requirements the search accepts the very next seed, so behaviour is
+      // unchanged for every figure that states none.
+      resample: () => {
+        const { facts, seed } = get();
+        const next = seedForRequirements(facts, seed + 1);
+        set({ seed: next ?? seed + 1 });
+      },
 
       dismissError: () => set({ lastError: null }),
 
-      loadFigure: (facts, seed) => set({ facts, seed, lastError: null }),
+      loadFigure: (facts, seed, queries = []) => set({ facts, seed, queries, lastError: null }),
 
       reportLoadError: (reason) => set({ lastError: { code: reason } }),
     }),
     {
       // History tracks the durable inputs only; lastError is transient UI state,
       // and `equality` keeps error-only sets from pushing duplicate snapshots.
-      partialize: (s) => ({ facts: s.facts, seed: s.seed }) as Geo3State,
-      equality: (past, current) => past.facts === current.facts && past.seed === current.seed,
+      partialize: (s) => ({ facts: s.facts, seed: s.seed, queries: s.queries }) as Geo3State,
+      equality: (past, current) => past.facts === current.facts && past.seed === current.seed && past.queries === current.queries,
     },
   ),
 );

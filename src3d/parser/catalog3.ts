@@ -149,4 +149,9 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'drawing', he: "חץ A'C", en: "arrow A'C" },
   { category: 'drawing', he: 'אורך AB=BC', en: 'length AB = BC' },
   { category: 'drawing', he: 'אנך יורד מ-M לבסיס', en: 'drop a perpendicular from M to the base' },
+  // #271/#272/#273 (ADR-3D-052/053): the named-measure layer — equal angles, a value for a name, bounds
+  { category: 'relations', he: 'זווית SAB = זווית SAD', en: 'angle SAB = angle SAD' },
+  { category: 'relations', he: 'α = 70', en: 'α = 70' },
+  { category: 'relations', he: '60 < זווית SAB < 90', en: '60 < angle SAB < 90' },
+  { category: 'relations', he: 'זווית SAB גדולה מ-60', en: 'angle SAB is greater than 60' },
 ];

@@ -821,7 +821,13 @@ Locked by `perp-drives-symbol.test.ts` (EO⊥AS = 90° across a seed sweep, E on
 
 ## ADR-3D-061 — a general angle EQUALITY `∠SAB = ∠SAD` (issue #271)
 
-**Status:** Accepted (2026-07-23; prod 2026-07-22; the same bundle; P1 — silent-drop honesty). *Files: `src3d/engine/types.ts` (`angles-equal` command); `src3d/engine/apply.ts` (the case + the label-reuse equality in `angle-mark`); `src3d/parser/parse3.ts` (`angleEquality` rule); `src3d/parser/catalog3.ts` (+1); `src3d/__tests__/angle-equality.test.ts`.*
+> **SUPERSEDED on reconciliation (PR #282, 2026-07-23):** two sessions independently implemented #271. This
+> session's standalone `angles-equal` command was **removed** when PR #282 (the data & measure panel) merged;
+> the KEPT implementation is #282's `angle-pair-eq`, documented in **[ADR-3D-063](#adr-3d-063)** — it is the
+> version wired to the α-label/bound system (`∠SAB = α` binds α; `60 < α < 90` reads it). User-facing behavior
+> is identical. This ADR is retained as the historical record of the decision; the code it describes is gone.
+
+**Status:** Accepted then superseded (2026-07-23; prod 2026-07-22; P1 — silent-drop honesty). *Original files: `src3d/engine/types.ts` (`angles-equal` command — removed); `src3d/engine/apply.ts`; `src3d/parser/parse3.ts` (`angleEquality` rule — removed); `src3d/parser/catalog3.ts`; `src3d/__tests__/angle-equality.test.ts` — removed. See ADR-3D-063 for the kept `angle-pair-eq`.*
 
 **Class.** Stating two angles equal was impossible: `∠SAB = ∠SAD` (and the word/symbol forms) was `not-handled`, and labelling two angles with the same letter (`∠SAB = α` … `∠SBC = α`) produced two cosmetic stickers with NO relation asserted — a stated given silently dropped *and* a drawing that contradicts it (the cardinal sin, hence P1). The engine already had the relation (`cos-eq`), reachable only through the construction wording `AS יוצר זוויות שוות עם AB ו-AD`.
 
@@ -840,3 +846,65 @@ Locked by `perp-drives-symbol.test.ts` (EO⊥AS = 90° across a seed sweep, E on
 **Amends ADR-3D-058.** The LLM honesty rule is corrected from "a prism with no `ישרה` is NOT expressible" to "a prism NOT stated right is OBLIQUE — never emit a right/`ישרה` prism the student did not ask for (a parallelogram-base prism with no `ישרה` is `מקבילון`)." The misleading `'a prism whose base is a parallelogram' → []` few-shot becomes `→ ['מקבילון']`; a new genuinely-unexpressible example (`'a prism'`, no base → `[]`) keeps the empty-list lesson. The #290 honesty assertion (no example maps a non-right freeform to a right prism) still holds.
 
 **Locks:** `oblique-prism.test.ts` — `מנסרה שבסיסה מקבילית` / `prism with a parallelogram base` → `parallelepiped` (labelled + default); the `ישרה` form stays `prism4`; a non-parallelogram base refuses; end-to-end the bare form builds oblique (5 DOF) and `המנסרה ישרה` pins it right (3 DOF, top face above the base). Catalog +1; the PAR-10 + #290 honesty contracts stay green.
+## ADR-3D-063 — An angle EQUALITY is statable, and a reused label MEANS it (issue #271, the M4 defaults/statement class)
+
+**Operator report (prod, 2026-07-22).** «when I tried saying that angle SAB = angle SAD it failed. I wanted to tell it that angle SAB = angle SAD = alpha (using the symbol).»
+
+**Two symptoms, one class: there was no way to state that two angles are equal.**
+
+```
+∠SAB = ∠SAD · זווית SAB = זווית SAD · angle SAB = angle SAD · ∠ABC = ∠SAD   → all not-handled
+∠SAB = α  then  ∠SAD = α                                                    → two cosmetic stickers, NOTHING asserted
+```
+
+The implicit form is the worse half, because it is **silent**: labelling two angles with the same letter is how a student says "these are equal", and the tool recorded a second display marker, raised no error, and drew `α` on two angles the figure does not make equal. A stated given dropped *and* a drawing contradicting it — the class the 2-D honesty gates (ADR-264/089/250) exist to prevent.
+
+**Root cause.** The relation was already in the engine — `cos-eq` (V8-f/G10), with the M1 dual (drives a free-dim solid, verifies a determined one) — but reachable through exactly ONE phrasing, `AS יוצר זוויות שוות עם AB ו-AD`, because the rule was authored as a *construction* ("X makes equal angles with Y and Z") rather than as the equality a textbook states. And an angle label was a pure display string with no identity to relate.
+
+**Decision.**
+- A new command `angle-pair-eq` carrying FOUR independent `VecAtom`s, so a shared vertex/arm is a special case rather than a requirement (`∠ABC = ∠SAD` works). Its apply is the `angle-eq` twin — same M1 routing, zero new solver code. The existing `angle-eq` stays for the construction phrasing.
+- Parser `angleEquality3`, both languages, symbol/word forms, plus the chained `∠SAB = ∠SAD = α` which names both. Ordered BEFORE `angleMarker`, which would otherwise claim the left angle and drop the right-hand side.
+- **A label BINDS to its angle.** A second `angle-mark` carrying a label another angle already wears asserts the equality (same M1 routing). One binding still just names — no self-equality.
+- **A value for a name** (issue #272): `symbol-value` — the existing "give this symbol a value" command — resolves at APPLY against whatever the letter denotes (a vector-def parameter, or now a labelled angle), delegating to the ordinary angle claim so `α = 70` drives or verifies like any stated angle. Every angle wearing the label is pinned; that is what sharing a name means. A letter naming nothing is refused `unknown-symbol`, never invented. This is 2-D's `buildSymTab` insight (ADR-031) in the shape `src3d` already had: resolution happens where the figure is known, because `parse3` is context-free (the ADR-3D-048 pattern).
+- Greek letters (α β γ δ θ) and `<` join the 3-D symbol palette — `∠SAB = α` is unusable when the letter cannot be typed.
+
+Locked by `angle-measures.test.ts`; catalog3 +2.
+
+## ADR-3D-064 — A stated INEQUALITY is a REQUIREMENT: the 3-D bound + the configuration-search layer (issue #273)
+
+**Operator (prod, 2026-07-22).** «I wanted to say that 60 < alpha < 90 but I'm not sure if that would have worked.» It did not — `60 < α < 90`, `α > 60` and every spelled-out form were not-handled.
+
+**Why this needed a new layer rather than a new command.** A bound is not an equation: it determines nothing, so it can be neither a `ScalarPin` (no target to reach) nor a `Claim3` (a whole REGION satisfies it). The 2-D app enforces exactly this idea through `meetsRequirements` + a seed search (ADR-106/244/254) — and **`src3d` had no such layer at all**:
+
+| | 2-D | 3-D (before) |
+| --- | --- | --- |
+| region/inequality constraint | 4 kinds (ADR-039/108) | none |
+| valid-configuration search | `firstSatisfyingSeed` / `meetsRequirements` / `findValidConfig` | none |
+| "show another configuration" | searches for a config meeting every requirement | `set({ seed: seed + 1 })` — a blind bump |
+
+The one inequality-flavoured thing that existed — a stated plane SIDE (ADR-3D-015) — is enforced *constructively*: an on-plane point is BORN on the stated side (its sampled offset is multiplied by the side's sign), so it can never leave. Elegant, and it does not generalize: the angle in `60 < α < 90` is a nonlinear function of several free solid dims, not a coordinate whose sign can be fixed at birth.
+
+**Decision — build the missing layer, with bounds as its first client.**
+- `Construction3.requirements: Requirement3[]` (first kind `angle-bound`), and `meetsRequirements3(c, seed)` — the 3-D sibling of the 2-D predicate. Patterns are COPIED from `src/`, never imported (docs/20 §12).
+- `firstSatisfyingSeed3` + `seedForRequirements`: **submit lands on a configuration that satisfies the stated bounds**, and `resample` searches forward for the next one — `store3.ts`'s blind `seed + 1` is gone. A requirement-free figure returns immediately, so every existing figure is unchanged and pays nothing.
+- **The measure keeps its DOF.** A bound restricts which configuration may be shown; it never determines a value. So the angle still varies across configurations (locked by a test), and no value is ever reported for it — the ADR-052 discipline.
+- No configuration within budget ⇒ the honest `bound-unsatisfiable` refusal with keep-prior, never a drawing that contradicts the given.
+- Parser `angleBound3` mirrors the 2-D `measureBound` grammar (ADR-390): one/two-sided, glyph and word forms, both languages, spelled-out angle or a label (resolved at apply, like every other name). An empty window (`70 < ∠SAB < 60`) defers.
+
+**Recorded trap, twice in one night.** A Hebrew keyword gate must admit BOTH nun spellings — `קטן` (m) / `קטנה` (f). The 2-D fix (ADR-390) had to correct exactly this in `CMP_SMALL`, and the guard at the top of *this* rule then reintroduced it: the regex matched fine while a `קטן`-only early-out rejected the utterance before it ran. Write `קט[ןנ]`, as ADR-3D-035 wrote `מאונ[ךכ]`.
+
+Locked by `angle-measures.test.ts`; catalog3 +2.
+
+## ADR-3D-065 — The data-panel QUERY lane (issue #274)
+
+**Operator design (2026-07-22).** «for the data side, i want to see w·v. we don't have this in the engine since it does nothing. so … a separate data entry that … user can add specific sizes he wants to calc (only if stable) and will not garbage the shape builder data entry.»
+
+**Decision.** A SEPARATE input in the data panel where the student asks for a quantity and sees its value WITHOUT touching the figure. A query is a QUESTION, never a fact: `Construction3` is untouched, `replay` never sees it, it never appears in the step list. Stored on the store as `queries: string[]` (in `partialize` → undoable; saved in the `.geo3.json` → a reloaded figure keeps its questions), distinct from `facts`.
+
+**Supported.** `answerQuery` (`src3d/engine/queries.ts`) parses, He + En: `w·v` / `AB·CD` (dot); `|AB|` / `|w|` / `אורך AB` (length — the BARS/word mean magnitude); a BARE pair `AE` or declared vector `w` = the VECTOR itself, its u/v/w decomposition + coordinates (the math convention |AE| = length, AE = the vector — the operator asked for «AE» and meant the vector, not its size); `∠SAB` / `∠(u,v)` (angle); `area ABC` / `שטח ABC` / `S_{ABC}` (area); `volume SABCD` / `נפח …` (solid volume via a centroid-fan of the face rings, or a 4-point tetra). A vector's DECOMPOSITION is frame-invariant, so it is answered whenever the coefficients agree across seeds — even with a free scale — while its coordinates need an injected frame (the `dataView` discipline; the helpers `solve3x3`/`decompStr`/`coordStr` are shared, not re-derived).
+
+**Honesty (the student's own «only if stable»).** A query is answered ONLY when its value is genuine knowledge, decided by two gates: (1) STABLE across sampled seeds — an under-determined quantity varies and reads «not determined»; (2) for a unit-carrying quantity (dot/length/area/volume) the SCALE must be pinned (`scalePinned`, ADR-3D-054) — else «depends on scale» — EXCEPT the one scale-invariant value ~0 (a perpendicular dot is knowledge at any scale). Angles are scale-free, answered whenever the shape is determined. A query naming absent points, or gibberish, says so. Never a sampled number dressed as a fact (ADR-052).
+
+**Folded-in repair — the save whitelist had drifted.** `deserializeFigure3`'s `COMMAND_TYPES` gate was missing **23** command types the parser emits (mostly old: `cos-angle`, `vec-mag`, `circle3`, `diag-intersection`, `angle-mark`, `plane-cut`, …), so any figure using them silently failed to RELOAD (`bad-file`). Queries persist to that same file, so an unsaveable figure would lose its query list too — hence the repair rides here. A behavioural guard test now asserts EVERY command the catalog produces round-trips through save→load, so the whitelist can never fall behind the parser again (filed as #288 for the record).
+
+**«depends on α», not a bare «not determined» (operator, the bagrut Q2 figure).** When a quantity varies BECAUSE it is a function of a free NAMED parameter (α from «∠SAB = α», bounded 60–90 but unpinned), the note names it: `pinFreeMeasures` pins every labelled angle to its bound's midpoint and re-checks — if the value settles once α is fixed, the answer is «depends on α» (t, AE, w·v, EO all report it on that figure, matching the book's α-answers). The tool NEVER solves the relation (t = ⅔cosα needs symbolic algebra, the no-CAS D3 boundary — that is the STUDENT's derivation, not the drawing tool's); it only names the dependency, the pedagogical signal. A figure with no free named parameter stays plain «not determined» (never a false «depends»). The engine figure is verified correct — t = ⅔cosα holds to machine precision across sampled α. A BARE parameter letter «t» from «AE=t·AS» is a SYMBOL query — its solved value (`sym = [(E−A)−Σk·atom]·(Σp·atom)/|Σp·atom|²`), scale-invariant so answered on stability alone. Note the honesty this exposes: on the operator's own figure `t` (and therefore `AE`) read «not determined» — the pyramid's apex is free, so the ⊥-foot `t` genuinely varies (~0.19–0.38 across configurations); once the shape is constrained, `t`→a value and `AE`→its decomposition. Locked by `queries.test.ts` (25): each quantity answered when determined, refused with the right reason otherwise, a query never becomes a fact, add/remove/dedupe, save-load round-trip, and the whitelist drift guard.

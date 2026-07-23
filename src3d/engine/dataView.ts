@@ -66,7 +66,7 @@ export function cleanNum(x: number, tol = 1e-5): string {
 
 const cleanCoef = (x: number): string => cleanNum(x, 2e-3);
 
-const coordStr = (v: Vec3): string => `(${cleanNum(v.x)}, ${cleanNum(v.y)}, ${cleanNum(v.z)})`;
+export const coordStr = (v: Vec3): string => `(${cleanNum(v.x)}, ${cleanNum(v.y)}, ${cleanNum(v.z)})`;
 
 /** Render a UNIT-normalized plane (lead coefficient positive) as `20x - y + 2z - 5 = 0`:
  *  find the smallest integer scaling (the book form); fall back to the 2-decimal unit form. */
@@ -96,7 +96,7 @@ export function planeEqStr(u: { x: number; y: number; z: number; d: number }): s
 }
 
 /** Solve M·x = t for 3×3 M given by columns u,v,w; null when singular. */
-function solve3x3(u: Vec3, v: Vec3, w: Vec3, t: Vec3): [number, number, number] | null {
+export function solve3x3(u: Vec3, v: Vec3, w: Vec3, t: Vec3): [number, number, number] | null {
   const M = [
     [u.x, v.x, w.x, t.x],
     [u.y, v.y, w.y, t.y],
@@ -121,7 +121,7 @@ function solve3x3(u: Vec3, v: Vec3, w: Vec3, t: Vec3): [number, number, number] 
   return x as [number, number, number];
 }
 
-function decompStr(coefs: [number, number, number], names: string[]): string {
+export function decompStr(coefs: [number, number, number], names: string[]): string {
   const parts: string[] = [];
   coefs.forEach((cf, i) => {
     if (Math.abs(cf) < 1e-3) return;

@@ -711,9 +711,12 @@ const lengthRel: Rule = (s) => {
   return null;
 };
 
-/** `k = 1/2` (הציבו) — assign the named parameter. x/y/z stay coordinates. */
+/** `k = 1/2` (הציבו) — assign the named parameter; also `α = 70`, a value for an angle NAME
+ *  ([ADR-3D-052](docs/06b-decisions-3d.md), issue #272). One command for "give this symbol a value":
+ *  `apply` resolves what the letter denotes (a vector-def parameter or a labelled angle), the way 2-D's
+ *  `set-var` resolves through its symbol table. x/y/z stay coordinates. */
 const symbolValue: Rule = (s) => {
-  const m = s.match(/^([a-w])\s*=\s*(-?\d+(?:\.\d+)?)(?:\s*\/\s*(-?\d+(?:\.\d+)?))?\s*$/);
+  const m = s.match(/^([a-wα-ωΑ-Ω])\s*(?:=|היא|הוא|is)\s*(-?\d+(?:\.\d+)?)(?:\s*\/\s*(-?\d+(?:\.\d+)?))?\s*°?\s*$/);
   if (!m || 'xyz'.includes(m[1])) return null;
   const v = m[3] ? +m[2] / +m[3] : +m[2];
   return [{ type: 'symbol-value', symbol: m[1], value: v }];
@@ -1562,30 +1565,84 @@ const vertexAngleClaim: Rule = (s0) => {
   return null;
 };
 
-/** #271: a general angle EQUALITY `∠PQR = ∠XYZ` (symbol/word, He/En; also `זווית … שווה ל…` and
- *  `angle … equals …`), optionally chained with a display label `∠PQR = ∠XYZ = α`. ∠PQR is the angle at
- *  the MIDDLE vertex Q with arms Q→P, Q→R. The label-less form lowers to `angles-equal` (the general
- *  4-atom `cos-eq`); the LABELLED form draws both angle marks with the shared label, whose reuse asserts
- *  the equality at apply — so a solo `∠SAB = α` then `∠SBC = α` states the same equality (never a silent
- *  pair of stickers). Runs BEFORE vertexAngleClaim/angleMarker (a numeric or single-letter RHS is theirs). */
-const angleEquality: Rule = (s0) => {
+/**
+ * A stated numeric BOUND on an angle — `∠SAB > 60`, `60 < ∠SAB < 90`, `60 < α < 90`, `α > 60`, plus the
+ * word forms (`זווית SAB גדולה מ-60`, `angle SAB is between 60 and 90`) — [ADR-3D-053](docs/06b-decisions-3d.md),
+ * issue #273.
+ *
+ * A bound is NOT an equation: it determines nothing, so it becomes a REQUIREMENT on which sampled
+ * configuration may be shown (the angle keeps its DOF, and no value is ever reported for it). The
+ * grammar mirrors the 2-D `measureBound` (ADR-390) — patterns are copied, never imported.
+ */
+const angleBound3: Rule = (s0) => {
   const s = stripProofPrefix(s0).trim();
-  const A = String.raw`(?:∠|ה?זו?וית\s+|the\s+angle\s+|angle\s+)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)`;
-  const T = String.raw`([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)`;
-  const m =
-    s.match(new RegExp(`^${A}\\s*=\\s*${A}\\s*(?:=\\s*([A-Za-zα-ωΑ-Ω]))?\\s*$`)) ??
-    s.match(new RegExp(`^ה?זו?וית\\s+${T}\\s+שווה\\s+ל?(?:ה?זו?וית\\s+)?${T}\\s*$`)) ??
-    s.match(new RegExp(`^${A}\\s+(?:equals|is\\s+equal\\s+to)\\s+${A}\\s*$`, 'i'));
+  // both nun spellings: קטן (m) / קטנה (f) — a gate on one silently rejects the other (the ADR-3D-035
+  // kaf trap, nun edition; the same slip cost «זווית ABC קטנה מ-60» a wrong parse in 2-D, ADR-390)
+  if (!/(?:<|>|≤|≥|גדול|קט[ןנ]|בין|greater|less|between)/i.test(s)) return null;
+  const NUMB = String.raw`(-?\d+(?:\.\d+)?)`;
+  const ANG = String.raw`(?:(?:∠|ה?זו?וית\s+|(?:the\s+)?angle\s+)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)|([α-ωΑ-Ω]))`;
+  const mk = (m: RegExpMatchArray, i: number, min?: number, max?: number): Command3[] => {
+    if (min !== undefined && max !== undefined && min >= max) return []; // an empty window states nothing
+    const named = m[i + 3];
+    const cmd: Command3 = named
+      ? { type: 'angle-bound3', label: named, min, max }
+      : { type: 'angle-bound3', vertex: m[i + 1], p: m[i], q: m[i + 2], min, max };
+    return [cmd];
+  };
+  const one = (out: Command3[]) => (out.length ? out : null);
+  // "X בין 60 ל-90" / "X is between 60 and 90"
+  let m = s.match(new RegExp(String.raw`^${ANG}\s*(?:היא|הוא|is)?\s*(?:בין|between)\s*${NUMB}\s*(?:ל-?|עד|and|to)\s*${NUMB}\s*°?$`, 'i'));
+  if (m) return one(mk(m, 1, Math.min(+m[5], +m[6]), Math.max(+m[5], +m[6])));
+  // "X גדולה מ-60" / "X is greater than 60" (and the small twin)
+  m = s.match(new RegExp(String.raw`^${ANG}\s*(?:היא|הוא|is)?\s*(?:(גדול[֐-׿]*|greater|larger|bigger|more)|(קט[ןנ][֐-׿]*|smaller|less))\s*(?:than\s+|מ-?|מן\s+)?\s*${NUMB}\s*°?$`, 'i'));
+  if (m) return one(mk(m, 1, m[5] ? +m[7] : undefined, m[6] ? +m[7] : undefined));
+  // "60 < X < 90" (either direction)
+  m = s.match(new RegExp(String.raw`^${NUMB}\s*(<=|<|≤)\s*${ANG}\s*(<=|<|≤)\s*${NUMB}\s*°?$`));
+  if (m) return one(mk(m, 3, +m[1], +m[8]));
+  m = s.match(new RegExp(String.raw`^${NUMB}\s*(>=|>|≥)\s*${ANG}\s*(>=|>|≥)\s*${NUMB}\s*°?$`));
+  if (m) return one(mk(m, 3, +m[8], +m[1]));
+  // "X > 60" / "60 < X"
+  m = s.match(new RegExp(String.raw`^${ANG}\s*(<=|>=|<|>|≤|≥)\s*${NUMB}\s*°?$`));
+  if (m) {
+    const less = m[5] === '<' || m[5] === '<=' || m[5] === '≤';
+    return one(mk(m, 1, less ? undefined : +m[6], less ? +m[6] : undefined));
+  }
+  m = s.match(new RegExp(String.raw`^${NUMB}\s*(<=|>=|<|>|≤|≥)\s*${ANG}\s*°?$`));
+  if (m) {
+    const less = m[2] === '<' || m[2] === '<=' || m[2] === '≤';
+    return one(mk(m, 3, less ? +m[1] : undefined, less ? undefined : +m[1]));
+  }
+  return null;
+};
+
+/**
+ * `∠SAB = ∠SAD` / `זווית SAB = זווית SAD` / `angle SAB = angle SAD` / `הזווית SAB שווה לזווית SAD`, and
+ * the chained naming form `∠SAB = ∠SAD = α` — a general angle EQUALITY ([ADR-3D-052](docs/06b-decisions-3d.md),
+ * issue #271).
+ *
+ * The relation itself was already in the engine (`cos-eq`, V8-f/G10) but reachable through ONE phrasing —
+ * the construction wording "AS יוצר זוויות שוות עם AB ו-AD" — because the rule was written as a construction
+ * rather than as the equality a textbook states. The four atoms are independent, so a shared vertex/arm is a
+ * special case, not a requirement. Runs BEFORE `angleMarker`, which would otherwise claim the left angle and
+ * silently drop the right-hand side.
+ */
+const angleEquality3: Rule = (s0) => {
+  const s = stripProofPrefix(s0).trim();
+  const A = `(?:∠|ה?זו?וית\\s+|(?:the\\s+)?angle\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)`;
+  const EQ = `\\s*(?:=|שווה\\s*ל?|equals?|is\\s+equal\\s+to)\\s*`;
+  const m = s.match(new RegExp(`^${A}${EQ}${A}(?:\\s*=\\s*([A-Za-zα-ωΑ-Ω]))?\\s*$`));
   if (!m) return null;
   const [, p1, v1, q1, p2, v2, q2, label] = m;
-  const pair = (from: string, to: string) => ({ kind: 'pair' as const, from, to });
-  if (label) {
-    return [
-      { type: 'angle-mark', vertex: v1, p: p1, q: q1, label },
-      { type: 'angle-mark', vertex: v2, p: p2, q: q2, label },
-    ];
-  }
-  return [{ type: 'angles-equal', a: pair(v1, p1), b: pair(v1, q1), c: pair(v2, p2), d: pair(v2, q2) }];
+  if (v1 === p1 || v1 === q1 || v2 === p2 || v2 === q2) return null; // an angle needs three distinct points
+  const pair = (from: string, to: string): VecAtom => ({ kind: 'pair', from, to });
+  const out: Command3[] = [
+    { type: 'angle-mark', vertex: v1, p: p1, q: q1, ...(label ? { label } : {}) },
+    { type: 'angle-mark', vertex: v2, p: p2, q: q2, ...(label ? { label } : {}) },
+  ];
+  // With a trailing label the two marks share it, and the label-binding rule (apply) already asserts the
+  // equality — emitting it again here would double the pin. Without one, state it explicitly.
+  if (!label) out.push({ type: 'angle-pair-eq', a: pair(v1, p1), b: pair(v1, q1), c: pair(v2, p2), d: pair(v2, q2) });
+  return out;
 };
 
 /** `∠SDB` / `∠SDB = α` — a named-angle MARKER (#94): draw the arc at the middle vertex, no value drives.
@@ -1935,9 +1992,10 @@ const RULES: Rule[] = [
   onLineMembership, // likewise for `על הישר ℓ`
   linePlaneAngle, // `הזווית בין הישר AC' לבין המישור ABCD היא 30` — before angleBetweenPlanes/angleSegClaim
   angleBetweenPlanes,
-  angleEquality, // #271: `∠PQR = ∠XYZ` — a general angle equality; BEFORE the single-angle claim/marker rules
   angleSegClaim,
   vertexAngleClaim,
+  angleBound3, // `∠SAB > 60` / `60 < α < 90` — a stated numeric BOUND (ADR-3D-053, #273); before the equality/marker rules
+  angleEquality3, // `∠SAB = ∠SAD` — a general angle EQUALITY (ADR-3D-052, #271); BEFORE angleMarker, which would claim the left angle and drop the right
   angleMarker, // `∠SDB` / `∠SDB = α` — a named-angle marker (no driver); after vertexAngleClaim (numeric = claim), #94
   mutualPositionClaim,
   rectComplete,
