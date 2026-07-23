@@ -25,6 +25,7 @@ type Query =
   | { kind: 'dot'; a: Atom; b: Atom }
   | { kind: 'length'; a: Atom }
   | { kind: 'vector'; a: Atom } // the VECTOR itself — its u/v/w decomposition (+ coords when a frame exists)
+  | { kind: 'symbol'; sym: string } // a free parameter «t» from «AE=t·AS» — its solved value (scale-invariant)
   | { kind: 'angle-vertex'; p: Id; q: Id; r: Id }
   | { kind: 'angle-vec'; a: Atom; b: Atom }
   | { kind: 'area'; ids: Id[] }
@@ -114,7 +115,42 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
   const va = atomOf(c, bare);
   if (va) return { kind: 'vector', a: va };
 
+  // SYMBOL: a bare parameter letter «t» from «AE=t·AS» (a lowercase letter that is a vecDef symbol,
+  // NOT a declared vector — those became a vector query above). Its solved value.
+  if (/^[a-z]$/.test(bare) && c.vecDefs.some((vd) => vd.symbol === bare)) return { kind: 'symbol', sym: bare };
+
   return null;
+}
+
+/** Solve a vec-def's free symbol from the resolved positions: `unknown = from + Σ(k+p·sym)·atom` ⇒
+ *  `sym = [(unknown−from) − Σk·atom] · (Σp·atom) / |Σp·atom|²`. Null when the symbol carries no direction. */
+function solveSymbol(c: Construction3, sym: string, pos: Positions3): number | null {
+  const vd = c.vecDefs.find((d) => d.symbol === sym);
+  if (!vd) return null;
+  const from = pos.get(vd.from);
+  const unknown = pos.get(vd.unknown);
+  if (!from || !unknown) return null;
+  const termVec = (atom: (typeof vd.terms)[number]['atom']): Vec3 | null => {
+    if (atom.kind === 'pair') {
+      const a = pos.get(atom.from);
+      const b = pos.get(atom.to);
+      return a && b ? sub3(b, a) : null;
+    }
+    const d = c.vectors.get(atom.name);
+    const a = d && pos.get(d.from);
+    const b = d && pos.get(d.to);
+    return a && b ? sub3(b, a) : null;
+  };
+  let lhs = sub3(unknown, from); // (unknown − from) − Σ k·atom
+  let dir = { x: 0, y: 0, z: 0 }; // Σ p·atom  (the direction the symbol scales)
+  for (const t of vd.terms) {
+    const v = termVec(t.atom);
+    if (!v) return null;
+    lhs = sub3(lhs, { x: v.x * t.coeff.k, y: v.y * t.coeff.k, z: v.z * t.coeff.k });
+    dir = { x: dir.x + v.x * t.coeff.p, y: dir.y + v.y * t.coeff.p, z: dir.z + v.z * t.coeff.p };
+  }
+  const d2 = dot3(dir, dir);
+  return d2 < 1e-12 ? null : dot3(lhs, dir) / d2;
 }
 
 /** The convex-solid volume from its face rings (centroid fan → tetra sum; orientation-free). */
@@ -177,6 +213,8 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3): number | null {
     }
     case 'volume':
       return solidVolume(c, q.ids, pos);
+    case 'symbol':
+      return solveSymbol(c, q.sym, pos);
     case 'vector':
       return null; // handled in answerQuery (a vector isn't a single scalar), never reached here
   }
@@ -232,7 +270,9 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
   const nums = vals as number[];
   const stable = nums.every((v) => Math.abs(v - nums[0]) <= 1e-6 * Math.max(1, Math.abs(nums[0])));
   if (!stable) return { text, answer: null, note: 'undetermined' };
-  const scaleFree = q.kind === 'angle-vertex' || q.kind === 'angle-vec';
+  // angles and a free PARAMETER «t» (an affine ratio along a segment) are scale-invariant — knowledge
+  // whenever they are stable, no scale needed. A dot/length/area/volume still needs the scale pinned.
+  const scaleFree = q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'symbol';
   if (!scaleFree && !scalePinned(c) && Math.abs(nums[0]) > 1e-9) return { text, answer: null, note: 'scale' };
   const isAngle = q.kind === 'angle-vertex' || q.kind === 'angle-vec';
   return { text, answer: `${cleanNum(nums[0])}${isAngle ? '°' : ''}` };

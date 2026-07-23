@@ -95,6 +95,27 @@ describe('ADR-3D-057 — the query lane answers only genuine knowledge', () => {
     });
   });
 
+  describe('a free PARAMETER «t» from «AE=t·AS» — its value, when determined (operator follow-up)', () => {
+    it("the operator's figure: t (and AE) are honestly «not determined» — the apex is free, so t varies", () => {
+      // measured across seeds: t ranges ~0.19–0.38, so it is genuinely not a single value yet
+      const fig = ['פירמידה שבסיסה ריבוע', 'AS=w', 'AD=u', 'AB=v', 'AE=t*AS', 'O מפגש אלכסונים בריבוע', 'OE', 'OE אנך ל AS'];
+      expect(ans(fig, 't')).toMatchObject({ answer: null, note: 'undetermined' });
+      expect(ans(fig, 'AE')).toMatchObject({ answer: null, note: 'undetermined' });
+    });
+    it('a DETERMINED figure: t resolves to its value, and AE decomposes with it', () => {
+      const box = ["תיבה ABCDA'B'C'D'", '|AB|=3', '|AD|=4', "|AA'|=5", 'AB=v', 'AD=u', "AA'=w", "AE=t*AC'", "BE⊥AC'"];
+      const t = ans(box, 't');
+      expect(t.answer, 't resolves once the figure is determined').not.toBeNull();
+      expect(Number(t.answer)).toBeGreaterThan(0);
+      expect(ans(box, 'AE').answer, 'AE decomposes with the known t').toContain('·');
+    });
+    it('a parameter is scale-invariant — no size needs pinning for t to answer', () => {
+      // t is an affine ratio along AS; it never carries units, so it is answered on stability alone
+      const box = ["תיבה ABCDA'B'C'D'", '|AB|=3', '|AD|=4', "|AA'|=5", "AE=t*AC'", "BE⊥AC'"];
+      expect(ans(box, 't').answer).not.toBeNull();
+    });
+  });
+
   describe('honestly refused — never a sampled number', () => {
     it('a length whose scale is free reports «depends on scale»', () => {
       expect(ans(['פירמידה ABCDS שבסיסה ריבוע'], '|AB|')).toMatchObject({ answer: null, note: 'scale' });
