@@ -25,4 +25,6 @@ dist-3d
 # Assistant worktrees (stale copies can hold unreadable Dropbox placeholders;
 # ignoring the dir also stops git status descending into it)
 .claude/worktrees/
-.claude/memory/
+# NOTE: .claude/memory/ is deliberately TRACKED (2026-07-23). The project moved out of
+# Dropbox to C:\projects, so git is now the ONLY cross-machine sync — auto-memory travels
+# via GitHub like docs/, not via Dropbox. (Was gitignored under the old Dropbox scheme.)

@@ -24,7 +24,9 @@ The original implementation was a *shape-template matcher* that dead-ended (coul
 
 ## Project memory (rule)
 
-All durable project context lives **in this repo** — it syncs via Dropbox, so it travels to any machine David works from. The assistant's machine-local memory does **not** travel, so **never rely on it for this project.** At session start, read [`docs/PROJECT-MEMORY.md`](docs/PROJECT-MEMORY.md). Record decisions in the ADR log ([`docs/06-decisions.md`](docs/06-decisions.md)), status in the plan ([`docs/09-implementation-plan.md`](docs/09-implementation-plan.md)), and operational notes in `docs/PROJECT-MEMORY.md` — not only in local memory.
+All durable project context lives **in this repo** — it syncs via **git/GitHub**, so it travels to any machine David works from. At session start, read [`docs/PROJECT-MEMORY.md`](docs/PROJECT-MEMORY.md). Record decisions in the ADR log ([`docs/06-decisions.md`](docs/06-decisions.md)), status in the plan ([`docs/09-implementation-plan.md`](docs/09-implementation-plan.md)), and operational notes in `docs/PROJECT-MEMORY.md`.
+
+**Cross-machine setup (this project is NOT in Dropbox — 2026-07-23).** Dropbox kept corrupting `node_modules` (missing `@babel/core`), `.git` (conflict-copy refs), and source files (`…(conflicted copy)…` breaking `tsc`), so the project was moved to `C:\projects\geo_builder` and de-Dropboxed. **Everything syncs through git now.** On each machine: `gh repo clone dcodish/geo_builder C:\projects\geo_builder`, `npm install`, and copy `.env.local` (the API key — untracked, deliberately not in git). **Claude's auto-memory (`.claude/memory/`) is now git-TRACKED** (not gitignored, not Dropbox-synced) so it still travels between machines via GitHub — `autoMemoryDirectory` in `.claude/settings.json` points at the repo-local `.claude/memory`. This project is the deliberate exception to the workspace "keep projects in Dropbox for memory" convention.
 
 ## Multi-product workspace ([ADR-266](docs/06-decisions.md#adr-266), registry: [docs/22-workflow.md §9](docs/22-workflow.md))
 
