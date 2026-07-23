@@ -56,7 +56,7 @@ export function solidDims(kind: SolidKind, key: string, seed: number): number[] 
   // V8-d: free-apex parallelogram-base pyramid — the 2nd base edge (dx,dy) + the free apex
   if (kind === 'pyramidPar')
     return [
-      sample(seed, `${key}-dx`, -0.4, 0.4), sample(seed, `${key}-dy`, 0.5, 1.0),
+      sample(seed, `${key}-dx`, 0.3, 0.6), sample(seed, `${key}-dy`, 0.5, 1.0), // #291: oblique parallelogram base at every seed
       sample(seed, `${key}-ax`, 0.2, 0.8), sample(seed, `${key}-ay`, 0.2, 0.8), sample(seed, `${key}-az`, 0.8, 1.6),
     ];
   // V8-g: a FLAT polygon (z=0) — v0=(0,0), v1=(1,0) fix the gauge, the rest are free 2-D
@@ -76,7 +76,10 @@ export function solidDims(kind: SolidKind, key: string, seed: number): number[] 
   // #117: right prisms over more bases. The base's 1st edge AB=(1,0) is the similarity gauge; the height is
   // straight up (ז), the base shape is the free DOF(s). A parallelepiped adds a FREE lateral vector w.
   if (kind === 'prism4') // parallelogram base: 2nd edge AD=(dx,dy)
-    return [sample(seed, `${key}-dx`, -0.4, 0.5), sample(seed, `${key}-dy`, 0.6, 1.2), sample(seed, `${key}-height`, 0.7, 1.5)];
+    // #291: dx strictly positive & bounded away from 0, so ∠DAB stays visibly oblique (~45–76°) at EVERY seed
+    // (incl. the default seed 0) — a `מקבילית` base must never render as a rectangle (ADR-052: a default must
+    // not look like a special case). Still a free DOF (dx∈[0.3,0.6], dy∈[0.6,1.2]) that "show another" varies.
+    return [sample(seed, `${key}-dx`, 0.3, 0.6), sample(seed, `${key}-dy`, 0.6, 1.2), sample(seed, `${key}-height`, 0.7, 1.5)];
   if (kind === 'prism4g') // general quad base: C=(cx,cy), D=(dx,dy) free (A,B gauge)
     return [
       sample(seed, `${key}-cx`, 0.9, 1.5), sample(seed, `${key}-cy`, 0.6, 1.2),
@@ -86,7 +89,7 @@ export function solidDims(kind: SolidKind, key: string, seed: number): number[] 
     return [sample(seed, `${key}-height`, 0.7, 1.5)];
   if (kind === 'parallelepiped') // oblique: parallelogram base + a free lateral vector w
     return [
-      sample(seed, `${key}-dx`, -0.4, 0.5), sample(seed, `${key}-dy`, 0.6, 1.2),
+      sample(seed, `${key}-dx`, 0.3, 0.6), sample(seed, `${key}-dy`, 0.6, 1.2), // #291: oblique base at every seed
       sample(seed, `${key}-wx`, -0.35, 0.35), sample(seed, `${key}-wy`, -0.35, 0.35), sample(seed, `${key}-wz`, 0.7, 1.5),
     ];
   return [rad(sample(seed, `${key}-alpha`, 38, 72)), rad(sample(seed, `${key}-beta`, 38, 72)), sample(seed, `${key}-height`, 0.65, 1.5)];
@@ -506,11 +509,17 @@ function solve3x3(r1: Vec3, r2: Vec3, r3: Vec3, rhs: Vec3): Vec3 | null {
 }
 
 /**
- * The figure's FREE degrees of freedom (the V5 cue, the 2-D ADR-101 idea): sampled
- * solid dims + unstated revolution sizes + free on-segment sliders + an unpinned
- * parameter; after a converged pivot the absolute pins consume gauge+dims
- * (dims + 7 − pinCount, floored). An estimate by design — honest about what
- * "show another configuration" can still vary.
+ * The figure's FREE SHAPE degrees of freedom (the V5 cue, the 2-D ADR-101/112 idea):
+ * sampled solid dims + unstated revolution sizes + free on-segment sliders + an
+ * unpinned parameter, all reported modulo the place/rotate/scale similarity gauge.
+ *
+ * After a converged pivot the solve runs in the ABSOLUTE frame (dims + a 7-DOF gauge).
+ * Absolute pins consume the gauge FIRST (freeGauge = max(0, 7 − pinCount)); similarity-
+ * invariant scalar constraints (⊥ / angle / ratio DRIVES — the `scalarPins`) each remove
+ * one SHAPE DOF. Subtracting the free gauge is what makes a ⊥ constraint DECREASE the cue
+ * (#292) instead of spuriously adding the whole +7 gauge. Closed form (freeGauge folded in):
+ *   shapeDof = max(0, dims − max(0, pinCount − 7) − scalarPins) + freeT + param.
+ * An estimate by design — honest about what "show another configuration" can still vary.
  */
 export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   let dims = 0;
@@ -531,7 +540,9 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   if (resolved.pivot && resolved.pivot.solutions > 0) {
     let pinCount = c.vectorPins.length * 3;
     for (const p of c.pins) pinCount += (p.x !== null ? 1 : 0) + (p.y !== null ? 1 : 0) + (p.z !== null ? 1 : 0);
-    return Math.max(0, dims + 7 - pinCount) + freeT + param;
+    // #292: report SHAPE DOF — subtract the free (unpinned) gauge so a similarity-invariant drive
+    // (⊥/angle/ratio) lowers the cue rather than adding +7; scalarPins are those shape-reducing drives.
+    return Math.max(0, dims - Math.max(0, pinCount - 7) - c.scalarPins.length) + freeT + param;
   }
   return dims + freeT + param;
 }

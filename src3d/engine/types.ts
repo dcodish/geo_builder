@@ -591,7 +591,16 @@ export type Command3 =
   | { type: 'altitude-foot'; id: Id; from: Id; a: Id; b: Id }
   // triage 3-D: `DE גובה בטטראדר` — altitude from vertex `from` to the OPPOSITE face of the
   // single tetrahedron (apply resolves the face = the tetra's other 3 vertices → a foot-face point).
-  | { type: 'tetra-altitude'; id: Id; from: Id };
+  | { type: 'tetra-altitude'; id: Id; from: Id }
+  // #289 (M1): `[ה]מנסרה [היא] ישרה` — a statement that THE existing solid is a RIGHT prism. No target
+  // (parse3 is context-free); apply resolves the one prism-like solid and, if it is the oblique
+  // `parallelepiped`, converts it to `prism4` (lateral vector pinned ⟂ base); already-right prisms are
+  // an idempotent no-op; no prism → an honest refusal (never a re-construction that re-declares vertices).
+  | { type: 'make-right-prism' }
+  // #271: a general angle EQUALITY `∠PQR = ∠XYZ` — ∠(a,b) = ∠(c,d), four free atoms (no shared vertex
+  // required). Lowers (apply) to the same engine relation as the `angle-eq` shared-base form: a `cos-eq`
+  // scalarPin on a free-dim solid (drives it) or a `cos-eq` claim on a determined figure (verifies it).
+  | { type: 'angles-equal'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom };
 
 // ---------------------------------------------------------------------------
 // Construction (what apply builds, what evaluate consumes)
@@ -772,6 +781,8 @@ export type EngineError3 =
   | { code: 'size-on-solid' } // a numeric size on a free-dim solid figure — not supported yet (honest boundary)
   | { code: 'unknown-symbol'; id: string } // a value was assigned to a parameter no relation defines
   | { code: 'ambiguous-angle'; id: Id } // #251: a single-vertex angle whose arms cannot be resolved (≠2 edges at the vertex)
+  | { code: 'no-prism-to-make-right' } // #289: `המנסרה ישרה` but the figure has no prism-like solid to make right
+  | { code: 'ambiguous-prism' } // #289: `המנסרה ישרה` with more than one oblique prism — "the prism" is ambiguous
   | { code: 'claim-refuted' }; // the stated answer does not hold in the figure
 
 export type ApplyResult3 = { ok: true; next: Construction3 } | { ok: false; error: EngineError3 };
