@@ -764,3 +764,17 @@ Locked by `derived-magnitudes.test.ts` (both directions: the forced value prints
 **Not a regression from the measure work** (#282): the angle commits don't touch this rule; «נפגשים» never parsed in 3-D. "Yesterday it was" was the 2-D app, where the same phrasing has always resolved via `line-line-intersection`.
 
 Locked by `v8a-apex-diagonals.test.ts` (+3: the operator's exact «נפגשים בנקודה O», the «נחתכים» form still working, and the point-last explicit-vertices no-mis-bind, He + En).
+
+## ADR-3D-056 — A ⊥ whose arm carries a symbol-defined point DRIVES that symbol (issue #286)
+
+**Operator (session `gnudxdzn`).** «I don't think that EO⊥AS was calculated based on the way it looks on the canvas.» Correct — at the displayed seed `EO·AS` measured 121°, not 90°.
+
+**Diagnosis.** E is defined by `AE = t·AS` (E on edge AS, `t` a FREE symbol) and O is the base-diagonal centre. `EO⊥AS` is one linear equation in t — E should slide to the foot of the perpendicular from O onto AS, t = (O−A)·(S−A)/|S−A|². But `perpSegGiven` lowers ⊥ to a `cos-angle` scalar pin (ADR-3D-035), which the pivot satisfies by reshaping the free solid **dims**, never by solving the symbol. So t stayed randomly sampled and the ⊥ held only when the sample happened to land near the foot — **seed-dependent** (measured: 90° at seeds 0/2/5/…, 121–142° at 1/3/6/7/9/11), and accepted GREEN while violated. The extra givens (`|w|=3`) tighten the dims so the ⊥-via-dims can no longer coincidentally hold; the STRIPPED figure held at every seed by luck. Bound-independent — a plain `|w|=3` triggers it, so the fix lives on `main`, not the measure branch.
+
+**Fix — the ⊥ pins the symbol, not the dims.** A new `symbolPin` kind `seg-perp`/`seg-par` (the seg–seg twin of the existing ⊥/∥-to-plane pins): at APPLY, a `cos-angle`(=0) whose exactly one arm carries a still-unpinned symbol-defined point emits `seg-perp` for that point's def instead of the dims-driving `scalarPin`. The vec-defined evaluator then root-finds the symbol against the pin residual (signed dot → `signChangeRoots`), so E lands on the foot and `EO⊥AS` holds at **every** seed (locked). A subtlety: the pin references points OUTSIDE the vecDef's terms (O, the reference segment) which may be inserted LATER in order, so the placement loop **defers** such points to a 2nd pass once their references exist.
+
+**Scope.** Only the perpendicular (`cos=0`) case, and only when exactly one arm carries the free symbol (the other being the fixed reference); a general stated angle, or both arms symbol-bearing, still take the dims/claim path. The `seg-par` machinery is in place for a future ∥ given. A ⊥ between two DETERMINED segments (a cube's `AB⊥AA'`) is unchanged — still a verified claim.
+
+**Two fix-plan items from #286 not needed after (1):** because the symbol is driven, the ⊥ now holds at every seed, so there is nothing to flag amber (honesty backstop) and the config search never has to skip a ⊥-violating seed. They stay filed as defence-in-depth if a future un-drivable ⊥ appears.
+
+Locked by `perp-drives-symbol.test.ts` (EO⊥AS = 90° across a seed sweep, E on the AS foot, He + En, the stripped no-regression case, and a determined-segment ⊥ still a claim).
