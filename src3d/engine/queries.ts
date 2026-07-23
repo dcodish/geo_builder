@@ -38,6 +38,8 @@ export interface QueryResult {
   answer: string | null;
   /** Why it can't be answered — shown in place of a value. */
   note?: string;
+  /** For note `depends`: the free named parameter(s) the quantity is a function of («α»). */
+  param?: string;
 }
 
 const PT = String.raw`[A-Z]\d*'?`;
@@ -252,24 +254,61 @@ function vectorForms(c: Construction3, a: Atom, posArr: Positions3[]): string[] 
   return parts;
 }
 
+/**
+ * When a quantity varies, is it a FUNCTION of a free NAMED parameter (α from «∠SAB = α», bounded but
+ * unpinned)? Returns a construction with every such parameter PINNED to an in-bound value, plus the
+ * parameter names — so the caller can re-check: if the quantity settles once α is fixed, it «depends on α»
+ * ([ADR-3D-057](docs/06b-decisions-3d.md)). The tool never SOLVES the relation (t = ⅔cosα needs symbolic
+ * algebra, the no-CAS boundary) — it only names the dependency, which is the pedagogical point.
+ */
+function pinFreeMeasures(c: Construction3): { c: Construction3; params: string } | null {
+  const labels = [...new Set(c.angleMarks.map((m) => m.label).filter((l): l is string => !!l))];
+  if (labels.length === 0) return null;
+  const scalarPins = [...c.scalarPins];
+  for (const m of c.angleMarks) {
+    if (!m.label) continue;
+    const req = c.requirements.find((r) => r.kind === 'angle-bound' && r.vertex === m.vertex && ((r.p === m.p && r.q === m.q) || (r.p === m.q && r.q === m.p)));
+    const deg = req ? ((req.min ?? (req.max ?? 90) - 30) + (req.max ?? (req.min ?? 0) + 30)) / 2 : 60; // the bound's midpoint, else a generic acute value
+    scalarPins.push({ kind: 'vangle', vertex: m.vertex, p: m.p, q: m.q, deg });
+  }
+  return { c: { ...c, scalarPins }, params: labels.join(', ') };
+}
+
 /** Answer one query against the figure — the whole honesty gate (stability + scale) lives here. */
 export function answerQuery(c: Construction3, text: string, seed: number): QueryResult {
   const q = parseQuery(c, text);
   if (!q) return { text, answer: null, note: 'notUnderstood' };
   const seeds = [seed, seed + 1013, seed + 2027, seed + 3041];
+  const stableNums = (vals: (number | null)[]): number | null => {
+    if (vals.some((v) => v === null || !Number.isFinite(v))) return null;
+    const nums = vals as number[];
+    return nums.every((v) => Math.abs(v - nums[0]) <= 1e-6 * Math.max(1, Math.abs(nums[0]))) ? nums[0] : null;
+  };
 
   if (q.kind === 'vector') {
     const posArr = seeds.map((s) => resolve3(c, s).positions);
     if (atomVec(c, q.a, posArr[0]) === null) return { text, answer: null, note: 'unavailable' };
     const forms = vectorForms(c, q.a, posArr);
-    // a decomposition/coords the givens don't fix (a free basis, a variable direction) reports undetermined
-    return forms.length ? { text, answer: forms.join('  =  ') } : { text, answer: null, note: 'undetermined' };
+    if (forms.length) return { text, answer: forms.join('  =  ') };
+    // undetermined — but does it settle once a free named parameter α is fixed? Then «depends on α».
+    const pin = pinFreeMeasures(c);
+    if (pin && vectorForms(pin.c, q.a, seeds.map((s) => resolve3(pin.c, s).positions)).length) {
+      return { text, answer: null, note: 'depends', param: pin.params };
+    }
+    return { text, answer: null, note: 'undetermined' };
   }
   const vals = seeds.map((s) => evalQuery(c, q, resolve3(c, s).positions));
   if (vals.some((v) => v === null || !Number.isFinite(v))) return { text, answer: null, note: 'unavailable' };
   const nums = vals as number[];
-  const stable = nums.every((v) => Math.abs(v - nums[0]) <= 1e-6 * Math.max(1, Math.abs(nums[0])));
-  if (!stable) return { text, answer: null, note: 'undetermined' };
+  const val0 = stableNums(vals);
+  if (val0 === null) {
+    // undetermined — but does it settle once a free named parameter α is fixed? Then «depends on α».
+    const pin = pinFreeMeasures(c);
+    if (pin && stableNums(seeds.map((s) => evalQuery(pin.c, q, resolve3(pin.c, s).positions))) !== null) {
+      return { text, answer: null, note: 'depends', param: pin.params };
+    }
+    return { text, answer: null, note: 'undetermined' };
+  }
   // angles and a free PARAMETER «t» (an affine ratio along a segment) are scale-invariant — knowledge
   // whenever they are stable, no scale needed. A dot/length/area/volume still needs the scale pinned.
   const scaleFree = q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'symbol';

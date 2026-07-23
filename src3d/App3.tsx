@@ -547,7 +547,7 @@ export default function App3() {
                     <li key={r.text + i} className="flex items-center justify-between gap-2 border-b border-slate-100 pb-1 last:border-0">
                       <span>
                         {r.text}
-                        {r.answer !== null ? <span className="font-medium"> = {r.answer}</span> : <span className="text-slate-400"> — {t(`query.note.${r.note}`)}</span>}
+                        {r.answer !== null ? <span className="font-medium"> = {r.answer}</span> : <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>}
                       </span>
                       <button type="button" onClick={() => removeQuery(i)} className="shrink-0 text-slate-400 hover:text-rose-600" aria-label={t('query.remove')}>
                         ×

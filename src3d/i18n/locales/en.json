@@ -110,7 +110,8 @@
       "notUnderstood": "not recognised — try w·v, |AB|, ∠SAB, area ABC, volume SABCD",
       "unavailable": "those points aren't in the figure",
       "undetermined": "not determined by the givens",
-      "scale": "depends on the figure's scale (pin a size)"
+      "scale": "depends on the figure's scale (pin a size)",
+      "depends": "depends on {{param}}"
     }
   }
 }

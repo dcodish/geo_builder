@@ -116,6 +116,30 @@ describe('ADR-3D-057 — the query lane answers only genuine knowledge', () => {
     });
   });
 
+  describe('«depends on α» — a reason, not a wall (the bagrut Q2 figure)', () => {
+    // the operator's exact figure: t = ⅔cosα, so t / AE / w·v / EO all vary WITH α (the book's answer).
+    // The tool never SOLVES the relation (t = ⅔cosα needs CAS) — it only NAMES the dependency.
+    const Q2 = [
+      'פירמידה שבסיסה ריבוע', 'BD', 'AC', 'AS=w', 'AD=u', 'AB=v', 'AE=t*AS',
+      'מפגש אלכסונים בריבוע O', 'OE', 'OE אנך ל AS', '∠SAD=α', '∠SAB=α', '60<α<90', '|w|=3', '|u|=2',
+    ];
+    it('t reports «depends on α», naming the free parameter it is a function of', () => {
+      expect(ans(Q2, 't')).toMatchObject({ answer: null, note: 'depends', param: 'α' });
+    });
+    it('the vector AE and the dot w·v depend on α too (both are α-functions in the book)', () => {
+      expect(ans(Q2, 'AE')).toMatchObject({ note: 'depends', param: 'α' });
+      expect(ans(Q2, 'w·v')).toMatchObject({ note: 'depends', param: 'α' });
+    });
+    it('a pinned magnitude stays a clean value — |w| = 3', () => {
+      expect(ans(Q2, '|w|').answer).toBe('3');
+    });
+    it('an under-determined figure with NO named parameter stays plain «not determined» (never a false «depends»)', () => {
+      const noParam = ['פירמידה ABCDS שבסיסה ריבוע', 'AS=w', 'AD=u', 'AB=v', 'AE=t*AS'];
+      expect(ans(noParam, 't')).toMatchObject({ answer: null, note: 'undetermined' });
+      expect(ans(noParam, 't').param).toBeUndefined();
+    });
+  });
+
   describe('honestly refused — never a sampled number', () => {
     it('a length whose scale is free reports «depends on scale»', () => {
       expect(ans(['פירמידה ABCDS שבסיסה ריבוע'], '|AB|')).toMatchObject({ answer: null, note: 'scale' });
@@ -124,8 +148,8 @@ describe('ADR-3D-057 — the query lane answers only genuine knowledge', () => {
       // a cube's edge · base-diagonal = |AB||AC|cos45 = 1·√2·cos45 = 1 at the frozen gauge — that IS gauge
       expect(ans(["קובייה ABCDA'B'C'D'"], 'AB·AC').note).toBe('scale');
     });
-    it('an under-determined angle (bounded, not fixed) reports «not determined»', () => {
-      expect(ans(['פירמידה ABCDS שבסיסה ריבוע', '∠SAB=α', '60<α<90'], '∠SAB')).toMatchObject({ answer: null, note: 'undetermined' });
+    it('a bounded angle labelled α reports «depends on α» — it IS the free parameter', () => {
+      expect(ans(['פירמידה ABCDS שבסיסה ריבוע', '∠SAB=α', '60<α<90'], '∠SAB')).toMatchObject({ answer: null, note: 'depends', param: 'α' });
     });
     it('a query naming points not in the figure', () => {
       expect(ans(PRISM, '|XY|').note).toBe('unavailable');
