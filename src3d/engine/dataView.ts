@@ -216,18 +216,26 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   const vecNames = [...c.vectors.entries()];
   const basis = vecNames.slice(0, 3);
 
-  // ONE unpinned symbol (SN = k·SC before anything pins k): a k-dependent quantity is
-  // not unstable noise — it is AFFINE in k. Decompose at k=0 and k=1 (a value-pin on a
-  // cloned construction) and present the exam's symbolic form: (k − 3/4)·u + k·v + …
-  const freeSyms = c.vecDefs.map((vd, i) => ({ vd, i })).filter(({ vd, i }) => vd.symbol && !c.symbolPins.some((p) => p.def === i));
+  // ONE parameter symbol (SN = k·SC): a k-dependent quantity is not unstable noise — it is
+  // AFFINE in k. Decompose at k=0 and k=1 (a value-pin on a cloned construction) and present
+  // the symbolic form: (k − 3/4)·u + k·v + … The symbol may be FREE (unpinned k) OR CONSTRAINT-
+  // DRIVEN (#297: t in `AE=t·AS` with `EO⊥AS` pinning it, a `seg-perp` pin) — a driven symbol's
+  // VALUE is still shape-dependent, so the vector's numeric decomposition roams (the plain
+  // `decompose` returns null) and the PARAMETRIC form is the only stable representation. A symbol
+  // pinned to a VALUE is excluded — it is a number, not a parameter, and `decompose` shows it
+  // numerically. (Safe: `decomposeSym` runs only when the plain decompose is null, so the
+  // determined `|EN|=√6/4·|w|` path is untouched.)
+  const freeSyms = c.vecDefs.map((vd, i) => ({ vd, i })).filter(({ vd, i }) => vd.symbol && !c.symbolPins.some((p) => p.def === i && p.rel === 'value'));
   const freeSym = freeSyms.length === 1 ? freeSyms[0] : null;
   let posAtK: Map<number, typeof positions> | null = null;
   const positionsAtK = (kv: number) => {
     if (!posAtK) posAtK = new Map();
     if (!posAtK.has(kv)) {
+      // REPLACE any existing pin on this symbol (a driven t's `seg-perp`) with the k=value probe,
+      // so the t=0/t=1 evaluations aren't fought by the constraint that drives t.
       posAtK.set(
         kv,
-        seeds.map((s) => resolve3({ ...c, symbolPins: [...c.symbolPins, { rel: 'value', value: kv, def: freeSym!.i }] }, s).positions),
+        seeds.map((s) => resolve3({ ...c, symbolPins: [...c.symbolPins.filter((p) => p.def !== freeSym!.i), { rel: 'value', value: kv, def: freeSym!.i }] }, s).positions),
       );
     }
     return posAtK.get(kv)!;
@@ -394,6 +402,41 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     const [g0, g1, g2] = degs as number[];
     if (Math.abs(g0 - g1) > 0.05 || Math.abs(g0 - g2) > 0.05) continue; // seed-varying → not knowledge, no value
     relations.push(`${mk.label ?? `∠${mk.p}${mk.vertex}${mk.q}`} = ${cleanNum(g0)}°`);
+  }
+
+  // #297 — forced/stated ANGLE EQUALITIES (∠SAD = ∠SAB): when two+ markers are equal in EVERY sampled
+  // seed but their shared value is FREE (so the value loop above printed nothing), surface the equality
+  // itself — the same scale-free knowledge as |u| = |v| (∠SAD=∠SAB=α lowers to a cos-eq constraint, so the
+  // pair IS forced). A determined group is already printed per-marker by the value loop; an under-determined
+  // SINGLE marker (the #94 case) still prints nothing.
+  {
+    const marks = c.angleMarks
+      .map((mk) => ({
+        mk,
+        per: positions.map((pos) => {
+          const v = pos.get(mk.vertex), p = pos.get(mk.p), q = pos.get(mk.q);
+          if (!v || !p || !q) return null;
+          const u1 = sub3(p, v), u2 = sub3(q, v);
+          const n1 = Math.sqrt(dot3(u1, u1)), n2 = Math.sqrt(dot3(u2, u2));
+          if (n1 < EPS || n2 < EPS) return null;
+          return (Math.acos(Math.max(-1, Math.min(1, dot3(u1, u2) / (n1 * n2)))) * 180) / Math.PI;
+        }),
+      }))
+      .filter((m) => m.per.every((d) => d !== null));
+    const used = new Set<number>();
+    for (let i = 0; i < marks.length; i++) {
+      if (used.has(i)) continue;
+      const cls = [marks[i]];
+      for (let j = i + 1; j < marks.length; j++) {
+        if (!used.has(j) && marks[i].per.every((d, s) => Math.abs(d! - marks[j].per[s]!) < 0.05)) {
+          cls.push(marks[j]);
+          used.add(j);
+        }
+      }
+      if (cls.length < 2) continue; // a lone marker is handled by the value loop above
+      if (cls[0].per.every((d) => Math.abs(d! - cls[0].per[0]!) < 0.05)) continue; // determined → value loop printed it
+      relations.push(cls.map((m) => `∠${m.mk.p}${m.mk.vertex}${m.mk.q}`).join(' = '));
+    }
   }
 
   // points with STABLE coordinates (needs a frame; a pinned-only figure prints nothing sampled).
