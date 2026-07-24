@@ -994,3 +994,36 @@ Everything downstream of `parseParamExpr` inherits the widening for free — par
 **The two-param assumption — corrected, and filed separately as #301.** The operator's statement carries exactly **one** parameter, `k` (`u`,`v`,`w` are the declared basis vectors, not parameters); both coefficients are affine in `k` and exactly representable by the existing `LinExpr {k, p}` — `0.5 + k/6` → `{k:0.5, p:1/6}`, `k + 3.5` → `{k:3.5, p:1}`. **No new engine capability was needed for this input**, and none was built. Verified alongside: two *different* parameters in *separate* statements already work at the figure level (`AM = (k+1)u + 0.5w` then `AN = (m+1)v + 0.5w` — distinct free DOFs); the "one parameter per figure" limit lives only in `parseLinearEq`. Genuinely two unknowns in ONE expression (`AM = ku + mv`) remains unsupported — a real boundary in the data model (`LinExpr` is affine in a single symbol) that brushes the no-CAS D3 line, with an existing Greek two-unknown lane (`P על AM כך ש-KP = αu + βv` → `point-in-span`, Cramer). Scoping questions posed to the operator in #301; deliberately not bundled into a bug fix.
 
 **Locked by** `paren-coefficient.test.ts` (18): the divided symbol inside a sum in all four orders/signs; the operator's exact expression decomposed to both affine coefficients; the widened grammar's rational forms *and* its refusals (zero denominator, second symbol, bare `/3`, trailing junk); `(k/2)DB + kDC` asserted byte-identical **after** the carve-out's deletion — the proof that the general path subsumes it; the `parseLinearEq`/parametric-line forms unchanged; and the operator's statement end-to-end through the real store path in both locales.
+
+## ADR-3D-070 — A symbol the constraints have DETERMINED is a number, not a parameter (issue #302)
+
+**Status:** Accepted (2026-07-24; bug, P2). *Files: `src3d/engine/dataView.ts` (`parametricDecomp`'s parameter test); `src3d/__tests__/determined-symbol.test.ts`.*
+
+**Operator report (localhost session `nusn7bus`).** «the `AM⃗=(0.5+k/6)u+(k+3.5)w+0.5v` was accepted but the data panel cannot tell me what SM is.»
+
+**Class.** *A symbol the constraints have nailed to a CONSTANT is still counted as a free parameter, so one determined symbol anywhere in the figure suppresses every parametric row.*
+
+**The figure.** A box with `O` the base-diagonal crossing, basis `AA'=v, AB=w, AD=u`, `AS=(1-t)u+0.5v+tw` (symbol `t`), `SO⊥ABCD`, `AM=(0.5+k/6)u+(k+3.5)w+0.5v` (symbol `k`), then `SM`. Measured over seeds 0/1013/2027/7/33: **`t` = 0.500000 at every seed** (⊥ residual 0 — in a box the base normal is `v`, so `SO`'s `u` and `w` components must vanish ⇒ t = ½), while **`k` roams** (0.20, 0.78, 0.22, 0.39, 0.51). The panel printed `AS = 1/2·v + 1/2·w + 1/2·u` and `SO = −1/2·v` — both stable *because* t is fixed — but `SM` got no row at all.
+
+**Root cause.** `parametricDecomp` counted parameters by inspecting the PIN KIND:
+
+```ts
+.filter(({ vd, i }) => vd.symbol && !c.symbolPins.some((p) => p.def === i && p.rel === 'value'));
+if (syms.length !== 1) return null;
+```
+
+`t`'s pin is `rel:'perp'`, not `rel:'value'`, so it was not excluded → two "parameters" → bail. This is the docs/17 §2.2 tripwire: the predicate encodes a **proxy** (*what kind of pin does it have*) rather than the **semantic fact** (*does this symbol actually vary*). [ADR-3D-067](#adr-3d-067)'s own wording states the intent correctly — "a value-pinned symbol is a number, not a parameter" — it simply tested pin kind. In the #297 figure the driven `t` genuinely roamed (0.15–0.38, the apex being free), so proxy and semantics agreed there and the gap stayed hidden; here a driven `t` is constant and the proxy is just wrong.
+
+**Decision.** Decide it by MEASUREMENT: a symbol-carrying def whose own vector (`from → unknown`) has a *stable* numeric decomposition across the sample seeds is determined — a number. `basisDecompose` already computes exactly that (it is why `AS` prints numerically today), so the predicate is a reuse of the shared sample set, never a second sampler (M3). Value pins stay excluded as before. Then: one roaming symbol → the parametric row; **zero or ≥2 roaming → honest `null`** — two genuinely free symbols is the #301 two-parameter boundary and must never be faked as a single-parameter form.
+
+**Result.** The panel (and, sharing `parametricDecomp` since ADR-3D-067, the query lane) now reports
+
+```
+SM = (k + 3)·w + 1/6·k·u
+```
+
+matching the closed form `SM = M − S = (k/6 + t − ½)u + (k − t + 7/2)w` at `t = ½` ⇒ `(k/6)u + (k+3)w` — no `v` component, independent of the box dimensions.
+
+**Sibling audit.** `rel === 'value'` appears in `parametricDecomp`'s filter, in `positionsAtK`'s pin replacement (correct — that one *sets* a value pin, it does not classify), and in `evaluate.ts`'s residual (correct — the actual pin semantics). No other site classifies a symbol as free/determined, so this predicate was the only member. The re-typed `AC ו BD נחתכים בנקודה O` failing to parse deterministically was surfaced while reproducing (their figure was file-loaded, so it never bit them) and is filed separately as **#303** — not bundled.
+
+**Locked by** `determined-symbol.test.ts` (8): the operator's figure rebuilt from the logged commands (all facts ok); the measured `t = ½` at every seed with a genuine ⊥ residual < 1e-9 and `k` taking many values; `SM` reported parametrically; the **numeric** closed form verified against the engine at k = 0, 1, 2.5 across three seeds (u-coefficient `k/6`, w-coefficient `k+3`, zero `v`); the panel keeping its pre-existing `AC`/`DB`/`AS`/`SO` rows; and the class cases — a roaming driven symbol still parametric (the #297 regression), a wholly free symbol still parametric, and two roaming symbols returning `null`.

@@ -19,6 +19,9 @@ import { scalePinned } from './solve3';
 import { dot3, sub3, type Vec3 } from './vec3';
 import type { Construction3, Id, Positions3 } from './types';
 
+/** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
+type VecDef = Construction3['vecDefs'][number];
+
 export interface VecEntry {
   /** Display label, e.g. `EN` or a declared name like `w`. */
   label: string;
@@ -202,19 +205,31 @@ export function basisDecompose(basis: { from: Id; to: Id }[], posArr: Positions3
 /**
  * The PARAMETRIC decomposition of (from→to) in the first-3 declared-vector basis — the affine-in-parameter
  * form `1/2·u + 1/2·v − t·w` — when the construction has exactly one parameter symbol (FREE like `k` in
- * `SN=k·SC`, OR CONSTRAINT-DRIVEN like `t` in `AE=t·AS` with `EO⊥AS` pinning it). The value-pinned symbol
- * (a number, not a parameter) is excluded. Evaluated at symbol=0 and symbol=1 (REPLACING any existing pin
- * on that symbol so the probes aren't fought by the driving constraint) and linearised. Null when there is
- * no single such symbol, or the vector is not actually symbol-dependent. Shared by the data panel and the
- * query lane (#297) so they can never diverge.
+ * `SN=k·SC`, OR CONSTRAINT-DRIVEN like `t` in `AE=t·AS` with `EO⊥AS` pinning it). Evaluated at symbol=0
+ * and symbol=1 (REPLACING any existing pin on that symbol so the probes aren't fought by the driving
+ * constraint) and linearised. Null when there is no single such symbol, or the vector is not actually
+ * symbol-dependent. Shared by the data panel and the query lane (#297) so they can never diverge.
+ *
+ * A symbol counts as a PARAMETER only if it actually VARIES across configurations
+ * ([ADR-3D-070](../../docs/06b-decisions-3d.md), issue #302). A symbol the constraints have nailed to a
+ * constant is a number — whether it was pinned by value or, like `t` under `SO⊥ABCD` on a box, determined
+ * at exactly ½ by its driving constraint. Testing the PIN KIND instead of the symbol's behaviour let one
+ * determined symbol elsewhere in the figure suppress every parametric row.
  */
 export function parametricDecomp(c: Construction3, from: Id, to: Id, seeds: number[]): string | null {
   const basisEntries = [...c.vectors.entries()].slice(0, 3);
   if (basisEntries.length < 3) return null;
   const basis = basisEntries.map(([, d]) => d);
   const names = basisEntries.map(([n]) => n);
-  const syms = c.vecDefs.map((vd, i) => ({ vd, i })).filter(({ vd, i }) => vd.symbol && !c.symbolPins.some((p) => p.def === i && p.rel === 'value'));
-  if (syms.length !== 1) return null;
+  const posArr = seeds.map((s) => resolve3(c, s).positions);
+  // a def whose OWN vector decomposes to stable coefficients is determined — its symbol does not vary.
+  // `basisDecompose` already answers exactly this (it is why a pinned `AS` prints numerically), so the
+  // predicate is a reuse of the shared sample set, never a second sampler (M3).
+  const varies = ({ vd, i }: { vd: VecDef; i: number }) =>
+    !c.symbolPins.some((p) => p.def === i && p.rel === 'value') &&
+    basisDecompose(basis, posArr, vd.from, vd.unknown) === null;
+  const syms = c.vecDefs.map((vd, i) => ({ vd, i })).filter(({ vd, i }) => vd.symbol && varies({ vd, i }));
+  if (syms.length !== 1) return null; // 0 → nothing parametric; ≥2 → genuinely two-parameter (#301), never faked
   const sym = syms[0];
   const at = (kv: number): [number, number, number] | null => {
     const posArr = seeds.map((s) => resolve3({ ...c, symbolPins: [...c.symbolPins.filter((p) => p.def !== sym.i), { rel: 'value', value: kv, def: sym.i }] }, s).positions);
