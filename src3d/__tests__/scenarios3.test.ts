@@ -568,9 +568,26 @@ describe('#296 — a relations-only data panel is NOT empty', () => {
     ].forEach(submit);
     expectAllOk();
     const p = dataView(derived().construction, state().seed);
-    expect(p.vectors).toHaveLength(0); // free scale ⇒ no magnitude/coord is knowledge…
+    expect(p.vectors.every((v) => v.mag === null)).toBe(true); // free scale ⇒ no magnitude is knowledge…
     expect(p.relations).toEqual(expect.arrayContaining(['|u| = |v|', 'u·v = 0'])); // …but the square base still yields these
     expect(panelIsEmpty(p)).toBe(false); // so the panel must NOT read as empty (the bug)
+  });
+});
+
+// #297 — the same "dd" figure: parametric vectors for a DRIVEN parameter (EO = ½u+½v−t·w, AE = t·w) and the
+// forced angle equality (∠SAD = ∠SAB). t is pinned by EO⊥AS (seg-perp), so its VALUE roams with the free
+// apex — the parametric form is the only stable representation, exactly what the panel should surface.
+describe('#297 — parametric vectors (driven t) + angle equality', () => {
+  beforeEach(reset);
+  it('EO = ½u + ½v − t·w, AE = t·w, and ∠SAD = ∠SAB all surface', () => {
+    ['פירמידה שבסיסה ריבוע', 'אלכסוני הריבוע נחתכים בנקודה O', 'AD=u', 'AB=v', 'AS=w', 'AE=t*AS', 'EO', '∠SAD=∠SAB=α', '60<α<90', 'EO⊥AS'].forEach(submit);
+    expectAllOk();
+    const p = dataView(derived().construction, state().seed);
+    const eo = p.vectors.find((v) => v.label === 'EO');
+    const ae = p.vectors.find((v) => v.label === 'AE');
+    expect(eo?.decomp).toBe('1/2·u + 1/2·v − t·w'); // the parametric form of a driven-t vector
+    expect(ae?.decomp).toBe('t·w');
+    expect(p.relations).toContain('∠SAD = ∠SAB'); // the forced (cos-eq) equality, value-free
   });
 });
 

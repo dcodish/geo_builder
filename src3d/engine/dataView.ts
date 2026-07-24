@@ -17,7 +17,7 @@
 import { resolve3 } from './evaluate';
 import { scalePinned } from './solve3';
 import { dot3, sub3, type Vec3 } from './vec3';
-import type { Construction3, Id } from './types';
+import type { Construction3, Id, Positions3 } from './types';
 
 export interface VecEntry {
   /** Display label, e.g. `EN` or a declared name like `w`. */
@@ -173,6 +173,61 @@ function decompSymStr(a: [number, number, number], b: [number, number, number], 
   return parts.length ? parts.join(' ') : '0';
 }
 
+/**
+ * Decompose the vector (from→to) in a 3-vector `basis` across the resolved `posArr`, requiring the
+ * per-seed coefficients to AGREE — affine relations are frame-invariant, so the basis is usable per
+ * seed even when not world-stable. Returns the averaged coefficients, or null when a point is unplaced
+ * or the coefficients disagree (agreement tolerance sized for the double-root √noise class, ~1e-4).
+ */
+export function basisDecompose(basis: { from: Id; to: Id }[], posArr: Positions3[], from: Id, to: Id): [number, number, number] | null {
+  if (basis.length < 3) return null;
+  const per = posArr.map((pos) => {
+    const p = pos.get(from);
+    const q = pos.get(to);
+    const dirs = basis.map((d) => {
+      const f = pos.get(d.from);
+      const t = pos.get(d.to);
+      return f && t ? sub3(t, f) : null;
+    });
+    if (!p || !q || dirs.some((x) => !x)) return null;
+    return solve3x3(dirs[0]!, dirs[1]!, dirs[2]!, sub3(q, p));
+  });
+  if (per.some((x) => !x)) return null;
+  const [c0, c1, c2] = per as [number, number, number][];
+  const agree = (u: number[], v: number[]) => u.every((x, i) => Math.abs(x - v[i]) < 2e-3);
+  if (!agree(c0, c1) || !agree(c0, c2)) return null;
+  return c0.map((x, i) => (x + c1[i] + c2[i]) / 3) as [number, number, number];
+}
+
+/**
+ * The PARAMETRIC decomposition of (from→to) in the first-3 declared-vector basis — the affine-in-parameter
+ * form `1/2·u + 1/2·v − t·w` — when the construction has exactly one parameter symbol (FREE like `k` in
+ * `SN=k·SC`, OR CONSTRAINT-DRIVEN like `t` in `AE=t·AS` with `EO⊥AS` pinning it). The value-pinned symbol
+ * (a number, not a parameter) is excluded. Evaluated at symbol=0 and symbol=1 (REPLACING any existing pin
+ * on that symbol so the probes aren't fought by the driving constraint) and linearised. Null when there is
+ * no single such symbol, or the vector is not actually symbol-dependent. Shared by the data panel and the
+ * query lane (#297) so they can never diverge.
+ */
+export function parametricDecomp(c: Construction3, from: Id, to: Id, seeds: number[]): string | null {
+  const basisEntries = [...c.vectors.entries()].slice(0, 3);
+  if (basisEntries.length < 3) return null;
+  const basis = basisEntries.map(([, d]) => d);
+  const names = basisEntries.map(([n]) => n);
+  const syms = c.vecDefs.map((vd, i) => ({ vd, i })).filter(({ vd, i }) => vd.symbol && !c.symbolPins.some((p) => p.def === i && p.rel === 'value'));
+  if (syms.length !== 1) return null;
+  const sym = syms[0];
+  const at = (kv: number): [number, number, number] | null => {
+    const posArr = seeds.map((s) => resolve3({ ...c, symbolPins: [...c.symbolPins.filter((p) => p.def !== sym.i), { rel: 'value', value: kv, def: sym.i }] }, s).positions);
+    return basisDecompose(basis, posArr, from, to);
+  };
+  const c0 = at(0);
+  const c1 = at(1);
+  if (!c0 || !c1) return null;
+  const slope = c1.map((x, i) => x - c0[i]) as [number, number, number];
+  if (slope.every((x) => Math.abs(x) < 1e-9)) return null; // not actually symbol-dependent
+  return decompSymStr(c0, slope, names, sym.vd.symbol!);
+}
+
 const near = (a: number, b: number) => Math.abs(a - b) < EPS;
 const sameVec = (a: Vec3, b: Vec3) => near(a.x, b.x) && near(a.y, b.y) && near(a.z, b.z);
 
@@ -216,56 +271,15 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   const vecNames = [...c.vectors.entries()];
   const basis = vecNames.slice(0, 3);
 
-  // ONE unpinned symbol (SN = k·SC before anything pins k): a k-dependent quantity is
-  // not unstable noise — it is AFFINE in k. Decompose at k=0 and k=1 (a value-pin on a
-  // cloned construction) and present the exam's symbolic form: (k − 3/4)·u + k·v + …
-  const freeSyms = c.vecDefs.map((vd, i) => ({ vd, i })).filter(({ vd, i }) => vd.symbol && !c.symbolPins.some((p) => p.def === i));
-  const freeSym = freeSyms.length === 1 ? freeSyms[0] : null;
-  let posAtK: Map<number, typeof positions> | null = null;
-  const positionsAtK = (kv: number) => {
-    if (!posAtK) posAtK = new Map();
-    if (!posAtK.has(kv)) {
-      posAtK.set(
-        kv,
-        seeds.map((s) => resolve3({ ...c, symbolPins: [...c.symbolPins, { rel: 'value', value: kv, def: freeSym!.i }] }, s).positions),
-      );
-    }
-    return posAtK.get(kv)!;
-  };
-  // the basis is usable per-seed even when not world-stable: decompose per seed and
-  // require the COEFFICIENTS to agree (affine relations are frame-invariant)
-  const decomposeIn = (posArr: typeof positions, a: Id, b: Id): [number, number, number] | null => {
-    if (basis.length < 3) return null;
-    const per: ([number, number, number] | null)[] = posArr.map((pos) => {
-      const p = pos.get(a);
-      const q = pos.get(b);
-      const dirs = basis.map(([, d]) => {
-        const f = pos.get(d.from);
-        const t = pos.get(d.to);
-        return f && t ? sub3(t, f) : null;
-      });
-      if (!p || !q || dirs.some((x) => !x)) return null;
-      return solve3x3(dirs[0]!, dirs[1]!, dirs[2]!, sub3(q, p));
-    });
-    if (per.some((x) => !x)) return null;
-    const [c0, c1, c2] = per as [number, number, number][];
-    // agreement at the DOUBLE-ROOT precision class (k from a tangency is √noise-precise,
-    // ~1e-4); the averaged coefficients then render through the matching cleanCoef
-    const agree = (u: number[], v: number[]) => u.every((x, i) => Math.abs(x - v[i]) < 2e-3);
-    if (!agree(c0, c1) || !agree(c0, c2)) return null;
-    return c0.map((x, i) => (x + c1[i] + c2[i]) / 3) as [number, number, number];
-  };
-  const decompose = (a: Id, b: Id) => decomposeIn(positions, a, b);
-  /** The affine-in-k form when the plain decomposition is k-dependent. */
-  const decomposeSym = (a: Id, b: Id): string | null => {
-    if (!freeSym) return null;
-    const c0 = decomposeIn(positionsAtK(0), a, b);
-    const c1 = decomposeIn(positionsAtK(1), a, b);
-    if (!c0 || !c1) return null;
-    const slope = c1.map((x, i) => x - c0[i]) as [number, number, number];
-    if (slope.every((x) => Math.abs(x) < 1e-9)) return null; // not actually k-dependent
-    return decompSymStr(c0, slope, basis.map(([n]) => n), freeSym.vd.symbol!);
-  };
+  // Plain decomposition (numeric coefficients agreeing across seeds) and the PARAMETRIC form
+  // (affine in the construction's single free/driven parameter — #297) share their engine with
+  // the QUERY lane via `basisDecompose`/`parametricDecomp`, so a panel row and its query answer
+  // can never diverge (the operator's «AE» query used to fall through to «depends on α» while the
+  // panel showed `AE = t·w`). `decomposeSym` runs only when the plain `decompose` is null, so a
+  // determined figure (the `|EN|=√6/4·|w|` path) still shows its numeric decomposition.
+  const basisDefs = basis.map(([, d]) => d);
+  const decompose = (a: Id, b: Id) => basisDecompose(basisDefs, positions, a, b);
+  const decomposeSym = (a: Id, b: Id) => parametricDecomp(c, a, b, seeds);
 
   const lengths = statedLengths(c);
   const pairKey = (a: Id, b: Id) => [a, b].sort().join('|');
@@ -394,6 +408,41 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     const [g0, g1, g2] = degs as number[];
     if (Math.abs(g0 - g1) > 0.05 || Math.abs(g0 - g2) > 0.05) continue; // seed-varying → not knowledge, no value
     relations.push(`${mk.label ?? `∠${mk.p}${mk.vertex}${mk.q}`} = ${cleanNum(g0)}°`);
+  }
+
+  // #297 — forced/stated ANGLE EQUALITIES (∠SAD = ∠SAB): when two+ markers are equal in EVERY sampled
+  // seed but their shared value is FREE (so the value loop above printed nothing), surface the equality
+  // itself — the same scale-free knowledge as |u| = |v| (∠SAD=∠SAB=α lowers to a cos-eq constraint, so the
+  // pair IS forced). A determined group is already printed per-marker by the value loop; an under-determined
+  // SINGLE marker (the #94 case) still prints nothing.
+  {
+    const marks = c.angleMarks
+      .map((mk) => ({
+        mk,
+        per: positions.map((pos) => {
+          const v = pos.get(mk.vertex), p = pos.get(mk.p), q = pos.get(mk.q);
+          if (!v || !p || !q) return null;
+          const u1 = sub3(p, v), u2 = sub3(q, v);
+          const n1 = Math.sqrt(dot3(u1, u1)), n2 = Math.sqrt(dot3(u2, u2));
+          if (n1 < EPS || n2 < EPS) return null;
+          return (Math.acos(Math.max(-1, Math.min(1, dot3(u1, u2) / (n1 * n2)))) * 180) / Math.PI;
+        }),
+      }))
+      .filter((m) => m.per.every((d) => d !== null));
+    const used = new Set<number>();
+    for (let i = 0; i < marks.length; i++) {
+      if (used.has(i)) continue;
+      const cls = [marks[i]];
+      for (let j = i + 1; j < marks.length; j++) {
+        if (!used.has(j) && marks[i].per.every((d, s) => Math.abs(d! - marks[j].per[s]!) < 0.05)) {
+          cls.push(marks[j]);
+          used.add(j);
+        }
+      }
+      if (cls.length < 2) continue; // a lone marker is handled by the value loop above
+      if (cls[0].per.every((d) => Math.abs(d! - cls[0].per[0]!) < 0.05)) continue; // determined → value loop printed it
+      relations.push(cls.map((m) => `∠${m.mk.p}${m.mk.vertex}${m.mk.q}`).join(' = '));
+    }
   }
 
   // points with STABLE coordinates (needs a frame; a pinned-only figure prints nothing sampled).

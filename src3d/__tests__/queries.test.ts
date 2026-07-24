@@ -89,18 +89,20 @@ describe('ADR-3D-057 — the query lane answers only genuine knowledge', () => {
       expect(len.answer).not.toContain('·'); // a scalar, no basis terms
       expect(vec.answer).toContain('u'); // the vector, decomposed
     });
-    it('an under-determined vector reports «not determined», never a sampled decomposition', () => {
-      // a bare pyramid: E on AS with a free t and a free apex — AE = t·w with t varying
-      expect(ans(['פירמידה ABCDS שבסיסה ריבוע', 'AS=w', 'AD=u', 'AB=v', 'AE=t*AS'], 'AE')).toMatchObject({ answer: null, note: 'undetermined' });
+    it('a parameter-dependent vector shows its PARAMETRIC form (#297), never a sampled decomposition', () => {
+      // a bare pyramid: E on AS with parameter t and a free apex. The NUMERIC decomposition roams
+      // (t varies), so it is never shown as a sample — but AE = t·w is the stable parametric form.
+      expect(ans(['פירמידה ABCDS שבסיסה ריבוע', 'AS=w', 'AD=u', 'AB=v', 'AE=t*AS'], 'AE').answer).toBe('t·w');
     });
   });
 
   describe('a free PARAMETER «t» from «AE=t·AS» — its value, when determined (operator follow-up)', () => {
-    it("the operator's figure: t (and AE) are honestly «not determined» — the apex is free, so t varies", () => {
-      // measured across seeds: t ranges ~0.19–0.38, so it is genuinely not a single value yet
+    it("the operator's figure: t's VALUE is «not determined», but the vector AE shows its parametric form t·w (#297)", () => {
+      // measured across seeds: t ranges ~0.19–0.38, so its VALUE is genuinely not a single number — but
+      // the VECTOR AE = t·w is stable knowledge (the parametric form), so it is surfaced (query ⇄ panel)
       const fig = ['פירמידה שבסיסה ריבוע', 'AS=w', 'AD=u', 'AB=v', 'AE=t*AS', 'O מפגש אלכסונים בריבוע', 'OE', 'OE אנך ל AS'];
       expect(ans(fig, 't')).toMatchObject({ answer: null, note: 'undetermined' });
-      expect(ans(fig, 'AE')).toMatchObject({ answer: null, note: 'undetermined' });
+      expect(ans(fig, 'AE').answer).toBe('t·w');
     });
     it('a DETERMINED figure: t resolves to its value, and AE decomposes with it', () => {
       const box = ["תיבה ABCDA'B'C'D'", '|AB|=3', '|AD|=4', "|AA'|=5", 'AB=v', 'AD=u', "AA'=w", "AE=t*AC'", "BE⊥AC'"];
@@ -126,9 +128,9 @@ describe('ADR-3D-057 — the query lane answers only genuine knowledge', () => {
     it('t reports «depends on α», naming the free parameter it is a function of', () => {
       expect(ans(Q2, 't')).toMatchObject({ answer: null, note: 'depends', param: 'α' });
     });
-    it('the vector AE and the dot w·v depend on α too (both are α-functions in the book)', () => {
-      expect(ans(Q2, 'AE')).toMatchObject({ note: 'depends', param: 'α' });
-      expect(ans(Q2, 'w·v')).toMatchObject({ note: 'depends', param: 'α' });
+    it('the vector AE shows its parametric form t·w (#297); the dot w·v still depends on α', () => {
+      expect(ans(Q2, 'AE').answer).toBe('t·w'); // the parametric form — more informative than «depends on α»
+      expect(ans(Q2, 'w·v')).toMatchObject({ note: 'depends', param: 'α' }); // a dot carries no parameter form
     });
     it('a pinned magnitude stays a clean value — |w| = 3', () => {
       expect(ans(Q2, '|w|').answer).toBe('3');
@@ -214,5 +216,17 @@ describe('ADR-3D-057 — the query lane answers only genuine knowledge', () => {
         }
       }
     });
+  });
+});
+
+// #297 — a bare vector query for a DRIVEN-parameter vector shows the PARAMETRIC form, matching the data
+// panel exactly (the query lane and the panel now share `parametricDecomp`). The operator's «AE» used to
+// fall through to «depends on α»/«not determined»; it should read `t·w`.
+describe('#297 — parametric vector queries (shared with the data panel)', () => {
+  beforeEach(reset);
+  const DD = ['פירמידה שבסיסה ריבוע', 'אלכסוני הריבוע נחתכים בנקודה O', 'AD=u', 'AB=v', 'AS=w', 'AE=t*AS', 'EO', '∠SAD=∠SAB=α', '60<α<90', 'EO⊥AS'];
+  it('AE = t·w and EO = ½u + ½v − t·w (not «depends on α»)', () => {
+    expect(ans(DD, 'AE').answer).toBe('t·w');
+    expect(ans(DD, 'EO').answer).toBe('1/2·u + 1/2·v − t·w');
   });
 });
