@@ -80,6 +80,25 @@ describe('a parenthesised symbolic coefficient is one term', () => {
     expect(parseSymExpr('(1-t)u + kv')).toBeNull();
   });
 
+  it('reads a DIVIDED symbol as one term of a sum (ADR-3D-069 / #300)', () => {
+    // `(k/6)` alone always worked (a whole-paren fast path); inside a sum it did not
+    expect(coeffs('(0.5+k/6)u')).toEqual([{ k: 0.5, p: 1 / 6 }]);
+    expect(coeffs('(k/6)u')).toEqual([{ k: 0, p: 1 / 6 }]);
+    expect(coeffs('(k/6+0.5)u')).toEqual([{ k: 0.5, p: 1 / 6 }]);
+    expect(coeffs('(0.5-k/6)u')).toEqual([{ k: 0.5, p: -1 / 6 }]);
+  });
+
+  it('the operator #300 statement lowers with both coefficients affine in k', () => {
+    expect(parseSymExpr('(0.5+k/6)u+(k+3.5)w+0.5v')).toEqual({
+      terms: [
+        { coeff: { k: 0.5, p: 1 / 6 }, atom: { kind: 'named', name: 'u' } },
+        { coeff: { k: 3.5, p: 1 }, atom: { kind: 'named', name: 'w' } },
+        { coeff: { k: 0.5, p: 0 }, atom: { kind: 'named', name: 'v' } },
+      ],
+      symbol: 'k',
+    });
+  });
+
   it('leaves the pre-existing V7 forms byte-identical', () => {
     expect(parseSymExpr('(k/2)DB+kDC')).toEqual({
       terms: [
@@ -91,6 +110,24 @@ describe('a parenthesised symbolic coefficient is one term', () => {
     expect(parseVecExpr('1/2u + 1/2v + 5/3w')).toHaveLength(3);
     expect(parseParamExpr('m+6')).toEqual({ expr: { k: 6, p: 1 }, param: 'm' });
     expect(parseParamExpr('1-t')).toEqual({ expr: { k: 1, p: -1 }, param: 't' });
+    expect(parseParamExpr('5-m')).toEqual({ expr: { k: 5, p: -1 }, param: 'm' });
+    expect(parseParamExpr('-2')).toEqual({ expr: { k: -2, p: 0 } });
+    expect(parseParamExpr('2m')).toEqual({ expr: { k: 0, p: 2 }, param: 'm' });
+  });
+
+  it('the widened param grammar covers the rational forms, and only those', () => {
+    const p = (s: string) => parseParamExpr(s)?.expr;
+    expect(p('k/6')).toEqual({ k: 0, p: 1 / 6 });
+    expect(p('2k/3')).toEqual({ k: 0, p: 2 / 3 });
+    expect(p('1/6k')).toEqual({ k: 0, p: 1 / 6 });
+    expect(p('1/6')).toEqual({ k: 1 / 6, p: 0 });
+    expect(p('3.5')).toEqual({ k: 3.5, p: 0 });
+    // honest refusals — never a silent Infinity or a half-read
+    expect(parseParamExpr('k/0')).toBeNull();
+    expect(parseParamExpr('1/0')).toBeNull();
+    expect(parseParamExpr('k+m')).toBeNull(); // one parameter per expression (#301)
+    expect(parseParamExpr('/3')).toBeNull();
+    expect(parseParamExpr('k$')).toBeNull();
   });
 
   it('lowers through parse3 to a vec-rel carrying the symbol', () => {
@@ -149,6 +186,22 @@ describe('end-to-end — the affine interpolation form builds', () => {
     }
     // a default masquerading as fixed would collapse every seed to one placement
     expect(seen.size).toBeGreaterThan(1);
+  });
+
+  it("#300: the operator's divided-coefficient statement builds in both locales", () => {
+    for (const seq of [
+      ['קובייה ABCD', "נסמן: AB = u, AD = v, AA' = w", 'AM=(0.5+k/6)u+(k+3.5)w+0.5v'],
+      ['cube ABCD', "denote AB = u, AD = v, AA' = w", 'AM = (0.5+k/6)u + (k+3.5)w + 0.5v'],
+    ]) {
+      useGeo3.setState({ facts: [], seed: 0, lastError: null });
+      useGeo3.temporal.getState().clear();
+      seq.forEach(submit);
+      expect(state().facts).toHaveLength(3);
+      const d = derived();
+      for (const f of state().facts) expect(d.status[f.id], f.utterance).toBe('ok');
+      expect(state().lastError).toBeNull();
+      expect(d.positions.get('M')).toBeDefined();
+    }
   });
 
   it('the pair-atom form places S on line BC at every seed (t interpolates B→C)', () => {

@@ -969,3 +969,28 @@ Locked by `angle-measures.test.ts`; catalog3 +2.
 **Capability gained.** The affine-in-one-symbol vector lane now accepts the standard textbook interpolation `AS = (1-t)u + tw` (and `(2t+1)v`, `(t-1)u`, pair atoms `(1-t)AB + tAC`, and purely numeric groupings `(1-0.25)u`), in both product forms — `*`/`·` or juxtaposed. An unpinned symbol remains a free sampled DOF (ADR-3D-010/ADR-052); a later ⟂/∥ given pins it as before.
 
 **Locked by** `paren-coefficient.test.ts` (14): the tokenizer itself (top-level breaks, byte-compatibility with the naive split on paren-free input, unbalanced → null); both reported forms; sign mirrors; named AND pair atoms; the two-symbol refusal still standing; the pre-existing V7/`parseLinearEq` forms byte-identical; and the operator's exact input end-to-end through the real store path in **both locales**, plus a semantic gate — `AS = (1-t)AB + tAC` places S on line BC at every seed — and a free-DOF gate proving S is not frozen at one placement.
+
+## ADR-3D-069 — One grammar for a coefficient: the divided symbol inside a sum (issue #300; extends ADR-3D-068)
+
+**Status:** Accepted (2026-07-24; bug, P2). *Files: `src3d/parser/parse3.ts` (`PARAM_TERM` + `parseParamExpr`; the `(k/2)` carve-out DELETED from `parseSymExpr`); `src3d/parser/catalog3.ts` (+1); `src3d/__tests__/paren-coefficient.test.ts` (14 → 18).*
+
+**Operator report (continuing from #299).** «this works but then i run into this issue which is more complex `AM=(0.5+k/6)u+(k+3.5)w+0.5v`. I assume we will also need to support 2 params in a statement»
+
+**Class.** *A **coefficient sub-expression** is read by **two different grammars depending on where it sits** — a whole-paren fast path or the shared term scanner — and the shared one is the poorer, so a form supported in isolation is rejected inside a sum.* The same family as ADR-3D-068 (one notion, two implementations) one level down: 068 was the **split**, this is the **term**.
+
+**Root cause.** ADR-3D-068's tokenizer split the operator's input correctly; each term was then read term-by-term:
+
+```
+(k+3.5)w  → ok {k:3.5,p:1}      (k/6)u     → ok {k:0,p:1/6}
+0.5v      → ok {k:0.5,p:0}      (0.5+k/6)u → NULL
+```
+
+`parseSymExpr` carried a dedicated branch matching `^([a-w])/(\d+)$` — the `(k/2)` form — so a lone divided symbol never reached `parseParamExpr`, whose per-term regex `^([+-])?\s*(\d+(?:\.\d+)?)?\s*([a-w])?$` had **no division and no fraction at all**. Hence `(k/6)u` worked and `(0.5+k/6)u` did not: the moment `k/6` was one term of a sum it fell to the poorer grammar. The carve-out was not incidental to the bug — **it was what hid it**, masking the general path's poverty for the one shape the corpus exercised (docs/17 §2.1: a dedicated `if` at a shared decision point is the reliable patch signal).
+
+**Decision.** Widen the shared grammar and **delete the fast path**. `PARAM_TERM` now reads the rational forms a parameter coefficient actually takes — `5`, `3.5`, `1/6`, `m`, `2m`, `m/6`, `2m/3`, `1/6m` — with a denominator permitted on either side of the symbol (`2k/3` and `1/6k` are the same number and students write both), a zero denominator refused rather than becoming a silent `Infinity`, and a bare sign or lone `/3` rejected. `parseSymExpr` then routes **every** parenthesised coefficient through the one grammar. The chokepoint registry shrank again: 068 removed four duplicate tokenizers, 069 removes the last special-cased coefficient reader.
+
+Everything downstream of `parseParamExpr` inherits the widening for free — parenthesised plane coefficients (`(m+6)z`), parametric line components, and symbolic vector coefficients now all read the same forms.
+
+**The two-param assumption — corrected, and filed separately as #301.** The operator's statement carries exactly **one** parameter, `k` (`u`,`v`,`w` are the declared basis vectors, not parameters); both coefficients are affine in `k` and exactly representable by the existing `LinExpr {k, p}` — `0.5 + k/6` → `{k:0.5, p:1/6}`, `k + 3.5` → `{k:3.5, p:1}`. **No new engine capability was needed for this input**, and none was built. Verified alongside: two *different* parameters in *separate* statements already work at the figure level (`AM = (k+1)u + 0.5w` then `AN = (m+1)v + 0.5w` — distinct free DOFs); the "one parameter per figure" limit lives only in `parseLinearEq`. Genuinely two unknowns in ONE expression (`AM = ku + mv`) remains unsupported — a real boundary in the data model (`LinExpr` is affine in a single symbol) that brushes the no-CAS D3 line, with an existing Greek two-unknown lane (`P על AM כך ש-KP = αu + βv` → `point-in-span`, Cramer). Scoping questions posed to the operator in #301; deliberately not bundled into a bug fix.
+
+**Locked by** `paren-coefficient.test.ts` (18): the divided symbol inside a sum in all four orders/signs; the operator's exact expression decomposed to both affine coefficients; the widened grammar's rational forms *and* its refusals (zero denominator, second symbol, bare `/3`, trailing junk); `(k/2)DB + kDC` asserted byte-identical **after** the carve-out's deletion — the proof that the general path subsumes it; the `parseLinearEq`/parametric-line forms unchanged; and the operator's statement end-to-end through the real store path in both locales.

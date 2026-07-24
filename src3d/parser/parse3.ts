@@ -625,16 +625,13 @@ export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string }
     const [, sign, paren, numRaw, symLetter, pairA, pairB, named, divisor] = m;
     let coeff: LinExpr = { k: 1, p: 0 };
     if (paren) {
-      const inner = paren.match(/^([a-w])\s*\/\s*(\d+(?:\.\d+)?)$/); // the (k/2) form
-      if (inner) {
-        if (!bindSymbol(inner[1])) return null;
-        coeff = { k: 0, p: 1 / +inner[2] };
-      } else {
-        const pe = parseParamExpr(paren);
-        if (!pe) return null;
-        if (pe.param && !bindSymbol(pe.param)) return null;
-        coeff = pe.expr;
-      }
+      // every parenthesised coefficient goes through the ONE grammar — the `(k/2)`
+      // form has no fast path of its own (ADR-3D-069: the carve-out was what hid
+      // the gap, since it made `(k/6)` work where `(0.5+k/6)` did not)
+      const pe = parseParamExpr(paren);
+      if (!pe) return null;
+      if (pe.param && !bindSymbol(pe.param)) return null;
+      coeff = pe.expr;
     }
     if (numRaw !== undefined && numRaw !== '') {
       const n = parseCoeff(numRaw);
@@ -860,23 +857,38 @@ const canonicalLine = (s: string): string =>
     .map((ch) => (/\d/.test(ch) ? ch : String.fromCharCode(ch.charCodeAt(0) - 0x2080 + 48)))
     .join('')}`;
 
-/** Parse `m-1` / `5-m` / `-2` / `2m` → a LinExpr (k + p·param). Null on anything else. */
+/**
+ * One term of a parameter expression, in the RATIONAL forms a coefficient
+ * actually takes ([ADR-3D-069](../../docs/06b-decisions-3d.md)): `5`, `3.5`,
+ * `1/6`, `m`, `2m`, `m/6`, `2m/3`, `1/6m`. A denominator may sit on either side
+ * of the symbol — `2k/3` and `1/6k` are the same number, and students write both.
+ */
+const PARAM_TERM = /^([+-])?\s*(\d+(?:\.\d+)?)?\s*(?:\/\s*(\d+(?:\.\d+)?))?\s*·?\s*([a-w])?\s*(?:\/\s*(\d+(?:\.\d+)?))?$/;
+
+/** Parse `m-1` / `5-m` / `-2` / `2m` / `0.5+k/6` → a LinExpr (k + p·param). Null on anything else. */
 export function parseParamExpr(src: string): { expr: LinExpr; param?: string } | null {
   const terms = splitTopLevelTerms(src);
   if (!terms || terms.length === 0) return null;
   const expr: LinExpr = { k: 0, p: 0 };
   let param: string | undefined;
   for (const t of terms) {
-    const m = t.match(/^([+-])?\s*(\d+(?:\.\d+)?)?\s*([a-w])?$/);
-    if (!m || (m[2] === undefined && !m[3])) return null;
-    const sgn = m[1] === '-' ? -1 : 1;
-    const num = m[2] !== undefined ? parseFloat(m[2]) : 1;
-    if (m[3]) {
-      if (param && param !== m[3]) return null;
-      param = m[3];
-      expr.p += sgn * num;
+    const m = t.match(PARAM_TERM);
+    if (!m) return null;
+    const [, sign, numRaw, den1, letter, den2] = m;
+    if (numRaw === undefined && !letter) return null; // a bare sign or a lone `/3` is not a term
+    let value = (sign === '-' ? -1 : 1) * (numRaw !== undefined ? parseFloat(numRaw) : 1);
+    for (const den of [den1, den2]) {
+      if (den === undefined) continue;
+      const d = parseFloat(den);
+      if (d === 0) return null; // never a silent Infinity
+      value /= d;
+    }
+    if (letter) {
+      if (param && param !== letter) return null; // one parameter per expression (the V7 boundary)
+      param = letter;
+      expr.p += value;
     } else {
-      expr.k += sgn * num;
+      expr.k += value;
     }
   }
   return { expr, param };

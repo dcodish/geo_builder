@@ -110,6 +110,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'points', he: "A'K = 4/5 DN", en: "A'K = 4/5 DN" },
   { category: 'points', he: "DF = (k/2)DB + kDC'", en: "DF = (k/2)DB + kDC'" },
   { category: 'points', he: 'AS = (1-t)u + 0.5v + tw', en: 'AS = (1-t)u + 0.5v + tw' },
+  { category: 'points', he: 'AM = (0.5+k/6)u + (k+3.5)w', en: 'AM = (0.5+k/6)u + (k+3.5)w' },
   { category: 'points', he: 'EF מקביל למישור ABC', en: 'EF is parallel to plane ABC' },
   { category: 'points', he: 'ABEC מלבן', en: 'ABEC is a rectangle' },
   { category: 'points', he: 'D בראשית הצירים', en: 'D is at the origin' },
