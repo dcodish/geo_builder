@@ -23,7 +23,7 @@ import {
   sub,
   unit,
 } from './geometry';
-import { constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates } from './solve';
+import { constraintKey, constraintRefs, describeConstraint, isSatisfied, jointCostTerm, residual, residualTolerance, solvedOnSegmentCandidates } from './solve';
 
 /** A resolved line: a point on it (`anchor`) and a unit direction (`dir`). */
 export interface ResolvedLine {
@@ -73,10 +73,10 @@ export type EvalResult = EvalOk | EvalErr;
  * existing solution family where the order holds. Dedup against the carriers' own constraints.
  */
 function withOrderCons(cons: Constraint[], c: Construction): Constraint[] {
-  const seen = new Set(cons.map((k) => JSON.stringify(k)));
+  const seen = new Set(cons.map(constraintKey));
   for (const k of c.constraints) {
     if (!isOrderConstraint(k)) continue;
-    const key = JSON.stringify(k);
+    const key = constraintKey(k);
     if (seen.has(key)) continue;
     seen.add(key);
     cons.push(k);
@@ -257,7 +257,7 @@ export function resolveDriven(c: Construction): Construction {
  * Returns a function of evaluated positions so the callers reuse the positions their cost already
  * computed (no second evaluateCore).
  */
-function collapseBarrier(c: Construction, cons: Constraint[], carrierIds: Id[]): (pos: Map<Id, Vec>) => number {
+export function collapseBarrier(c: Construction, cons: Constraint[], carrierIds: Id[]): (pos: Map<Id, Vec>) => number {
   const refIds = [...new Set([...cons.flatMap((con) => constraintRefs(con)), ...carrierIds])];
   const exempt = new Set(c.constraints.filter((k) => k.type === 'coincide').map((k) => [k.p, k.q].sort().join('|')));
   const pairs: [Id, Id][] = [];
@@ -300,7 +300,7 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
   const seen = new Set<string>();
   const cons = freeCarriers
     .flatMap((cr) => [cr.solve!.constraint, ...(cr.solve!.also ?? [])]) // `also`: a co-driven 2nd constraint on this vertex's spare DOF (ADR-229)
-    .filter((k) => (seen.has(JSON.stringify(k)) ? false : (seen.add(JSON.stringify(k)), true)));
+    .filter((k) => (seen.has(constraintKey(k)) ? false : (seen.add(constraintKey(k)), true)));
   withOrderCons(cons, c); // also minimise any "α < β" ordering jointly with these vertices (ADR-039)
   const ids = freeCarriers.map((cr) => cr.id);
   const seed = freeCarriers.flatMap((cr) => [cr.x, cr.y]); // [x0,y0, x1,y1, …]
@@ -393,7 +393,7 @@ function resolveFreeDriven(c: Construction, freeCarriers: Extract<GeoObject, { k
  * (honest over-constraint → the caller keeps the prior figure). Pure refactor of the formerly-duplicated
  * basin-search/polish/accept loop in {@link resolveFreeDriven} and {@link resolveMixedCarriers}.
  */
-function multiStartSolve(
+export function multiStartSolve(
   seed: number[],
   restarts: number[][],
   searchStep: number,
@@ -607,7 +607,7 @@ function resolveMixedCarriers(c: Construction, carriers: GeoObject[]): Construct
     const seen = new Set<string>();
     const cons: Constraint[] = carrierList
       .flatMap((o) => { const sv = (o as { solve?: { constraint: Constraint; also?: Constraint[] } }).solve; return sv ? [sv.constraint, ...(sv.also ?? [])] : []; }) // `also`: co-driven 2nd constraint (ADR-229)
-      .filter((k) => (seen.has(JSON.stringify(k)) ? false : (seen.add(JSON.stringify(k)), true)));
+      .filter((k) => (seen.has(constraintKey(k)) ? false : (seen.add(constraintKey(k)), true)));
     withOrderCons(cons, c); // also minimise any "α < β" ordering jointly with these carriers (ADR-039)
     // Flat layout: normalised seed `u` (each carrier's params divided by their scale, so all DOFs ~O(1)).
     const seedU = specs.flatMap((s) => s.seed.map((v, i) => v / s.scale[i]));
@@ -808,7 +808,7 @@ function freePolygonVerticesToRecruit(c: Construction, carriers: GeoObject[]): G
 }
 
 /** Nelder–Mead downhill simplex — derivative-free joint minimisation of `f` from `x0`. */
-function nelderMead(f: (x: number[]) => number, x0: number[], iters = 300, step = 0.15): number[] {
+export function nelderMead(f: (x: number[]) => number, x0: number[], iters = 300, step = 0.15): number[] {
   const n = x0.length;
   let simplex = [x0.slice(), ...x0.map((_, i) => x0.map((v, j) => (j === i ? v + step : v)))];
   let fv = simplex.map(f);
@@ -847,7 +847,7 @@ function nelderMead(f: (x: number[]) => number, x0: number[], iters = 300, step 
 }
 
 /** Argument minimising `f` over [lo,hi]: grid scan for the basin, ternary-refine it. */
-function argMin(f: (v: number) => number, lo: number, hi: number, steps = 120): number {
+export function argMin(f: (v: number) => number, lo: number, hi: number, steps = 120): number {
   let bx = lo;
   let bf = Infinity;
   for (let i = 0; i <= steps; i++) {
@@ -879,7 +879,7 @@ function argMin(f: (v: number) => number, lo: number, hi: number, steps = 120): 
  * (sign-change bracketing in `solveParam` can't see a minimum that only *touches*
  * zero.) Deterministic; the list is the solution branches.
  */
-function drivenRoots(f: (v: number) => number, lo: number, hi: number, tol: number, steps = 360): number[] {
+export function drivenRoots(f: (v: number) => number, lo: number, hi: number, tol: number, steps = 360): number[] {
   const val = (v: number) => {
     const r = f(v);
     return isFinite(r) ? r : Infinity;
@@ -932,7 +932,7 @@ function drivenConstraintsOf(c: Construction): Constraint[] {
         ? o.constraint
         : (o as { solve?: { constraint: Constraint } }).solve?.constraint;
     if (!con) continue;
-    const key = JSON.stringify(con);
+    const key = constraintKey(con);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(con);

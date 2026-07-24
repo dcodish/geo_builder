@@ -1,7 +1,8 @@
 /**
  * ADR-346 — the anti-drift guard for the log-triage verifier.
  *
- * `.claude/skills/log-triage/triage.mjs` MIRRORS `App.tsx#submit` so that "is this still a gap?" is
+ * `.claude/skills/log-triage/triage.mjs` MIRRORS the submit pipeline (`src/app/submitPipeline.ts#runSubmit`,
+ * extracted from App.tsx by S0.4 of docs/24) so that "is this still a gap?" is
  * answered the way the product actually answers a student. That mirror has now drifted THREE times, each
  * time silently, each time turning the instrument we measure prod with into a source of confident false
  * signal (issue #35; the ADR-169 `parallels` drift documented in `src/parser/context.ts`'s header; the
@@ -22,6 +23,9 @@ import path from 'node:path';
 
 const root = path.resolve(__dirname, '../../..');
 const appSrc = readFileSync(path.join(root, 'src/App.tsx'), 'utf8');
+// The submit path itself lives in the extracted pipeline (S0.4 of docs/24) — the mirror contract
+// follows the code: routing/gates are checked against submitPipeline.ts, UI-side logging against App.tsx.
+const pipeSrc = readFileSync(path.join(root, 'src/app/submitPipeline.ts'), 'utf8');
 const triageSrc = readFileSync(path.join(root, '.claude/skills/log-triage/triage.mjs'), 'utf8');
 
 /** The literal category set of a `new Set([...])` assigned to `name`. */
@@ -36,7 +40,7 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
     // App.tsx short-circuits these categories with a guided message BEFORE paying for an LLM call
     // (ADR-289). If the harness misses one, that category's utterances are reported as grammar gaps
     // although the tool answers them on purpose — the 2026-07-17 `orientation` / `ui-command` rows.
-    expect(setLiteral(triageSrc, 'PRE_LLM')).toEqual(setLiteral(appSrc, 'PRE_LLM'));
+    expect(setLiteral(triageSrc, 'PRE_LLM')).toEqual(setLiteral(pipeSrc, 'PRE_LLM'));
   });
 
   it('every honesty gate the App submit path calls is also called by the harness', () => {
@@ -50,17 +54,17 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
       'droppedGivenVerbs',      // ADR-292
       'droppedCompoundRelation', // #153/#145
     ];
-    // Guard the guard: if App.tsx stops calling one of these, this list is stale and must be revisited
-    // (a silently-shrinking expectation would pass forever while proving nothing).
-    for (const g of GATES) expect(appSrc, `App.tsx no longer calls ${g} — update this guard + the harness`).toContain(`${g}(`);
-    for (const g of GATES) expect(triageSrc, `triage.mjs must mirror the App's ${g} gate (ADR-346)`).toContain(`${g}(`);
+    // Guard the guard: if the submit pipeline stops calling one of these, this list is stale and must be
+    // revisited (a silently-shrinking expectation would pass forever while proving nothing).
+    for (const g of GATES) expect(pipeSrc, `submitPipeline.ts no longer calls ${g} — update this guard + the harness`).toContain(`${g}(`);
+    for (const g of GATES) expect(triageSrc, `triage.mjs must mirror the submit pipeline's ${g} gate (ADR-346)`).toContain(`${g}(`);
   });
 
   it('the #186 circle-name auto-bind runs in both (the shared decision helper + the shared fact core)', () => {
     // App.submit binds a fresh circle name to an UNNAMED circle (impliedCircleBinding → nameCentre →
     // re-parse). A harness that skips the bind reports every such utterance as refused/clarify —
     // false gaps for input the App resolves silently.
-    for (const src of [appSrc, triageSrc]) expect(src).toContain('impliedCircleBinding(');
+    for (const src of [pipeSrc, triageSrc]) expect(src).toContain('impliedCircleBinding(');
     expect(triageSrc).toContain('nameCentreFacts(');
   });
 

@@ -12,7 +12,7 @@ import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, 
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
 import { add, dist, lineLineIntersect, pointInPolygon, reflectAcross, scale, sub } from './geometry';
-import { constraintRefs } from './solve';
+import { constraintKey, constraintRefs } from './solve';
 
 /**
  * A constraint either *drives* a free DOF or *checks* the figure (ADR-012/014).
@@ -202,8 +202,12 @@ function keepTangencyDriven(objects: GeoObject[], con: Constraint): void {
     .map((id) => objects.find((o) => o.id === id))
     .filter((o): o is Extract<GeoObject, { kind: 'radial-toward' }> => o?.kind === 'radial-toward');
   if (wit.length !== 2) return; // not the tangency device (an ordinary point-coincidence)
-  const key = JSON.stringify(con);
-  if (objects.some((o) => o.kind === 'free-point' && JSON.stringify((o as { solve?: { constraint: Constraint } }).solve?.constraint) === key)) return; // a centre already drives it
+  const key = constraintKey(con);
+  const drives = (o: GeoObject) => {
+    const k = (o as { solve?: { constraint: Constraint } }).solve?.constraint;
+    return k !== undefined && constraintKey(k) === key;
+  };
+  if (objects.some((o) => o.kind === 'free-point' && drives(o))) return; // a centre already drives it
   const circs = wit.map((w) => objects.find((o) => o.id === w.circle && o.kind === 'circle')) as (Extract<GeoObject, { kind: 'circle' }> | undefined)[];
   // Mark a free, unpinned, not-yet-driving CENTRE as the coincide's carrier (the gap DOF).
   for (const c of circs) {

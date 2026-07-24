@@ -84,7 +84,41 @@ The list itself is the smell: each is a point where a general decision is being 
 | Sampling loops (any new `for (seed…) replay/evaluate`) | M3 one sampler, budgeted |
 | Hard-coded defaults in shape macros (apex choice, right-angle vertex, equal pair) | M4 defaults yield to statements |
 
+## 3b. ParseContext — the deictic/semantic fence (S2.4 of docs/24)
+
+`ParseContext` (parse.ts) is a **registry**: adding a field is an ADR-worthy event, exactly like the
+§3 lists. Its fields split into two regimes with different rules:
+
+- **Semantic fields** are derived from the CONSTRUCTION (objects/constraints), never from drawn
+  coordinates: `circles, centrePoint, points, circleMembers, concentric, neighbors, onSegment,
+  midpointOf, lines, tangentAuxes, polygons, autoCenters, radiusSymbols, angleAliases,
+  commonTangents, radiusOrder`. These may inform meaning freely.
+- **Deictic fields** are derived from the DRAWN SEED's positions and exist **only to resolve
+  pointing references** — what the student is looking at: `circleSizes` («הגדול/הקטן» first
+  assignment), `circleXs` («הימני/השמאלי»), `circlePairPositions` (tangency classification, 3%
+  tolerance), `circlePairTouches` («נקודת ההשקה», 5% tolerance), `parallels` (opposite-base
+  resolution, ~0.3° tolerance — structurally justified for a trapezoid but measured positionally).
+
+**The three laws of deictic fields:**
+1. A deictic resolution must **emit a locking assertion** so sampling can never swap the referent
+   afterward (the `resolveSizeQualifier` → `set-radius-order` precedent; a pointing word both refers
+   AND asserts — the #102 ruling). A deictic read with no lock is a bug: the referent can silently
+   change on "show another configuration".
+2. Deictic fields never decide SEMANTICS of a non-pointing statement. If a rule wants coordinates to
+   decide what a statement *means*, stop — that is the §2.2 tripwire, parser edition.
+3. Prefer **apply-time M1 resolution** over a new ctx field when the statement is about an existing
+   object (the 3-D parser's architecture: context-free rules, resolution at apply — it never needed
+   a ParseContext at all). A new deictic field needs an ADR arguing why apply-time can't own it.
+
+The tolerance constants (0.03 / 0.05 / 5e-3) are part of this registry — changing one changes parse
+results and needs the same scrutiny as a rule change.
+
 ## 4. The designed mechanisms (where the general answer lives)
+
+> **The cross-layer solve ladder is written down in [docs/LADDER.md](LADDER.md)** (S0.2 of
+> [docs/24](24-foundation-hardening-plan.md)): the exact stage order from pre-gates to seed sweeps,
+> with the `StepResult.ladder` trace as its observable and `ladder-contract.test.ts` as its lock.
+> Every future mechanism ADR states "inserts at stage N.x" and updates that file.
 
 **M1 — Existing-id lowering.** A command that would create an object whose id already exists is not a
 conflict and not a re-creation: it **lowers to constraints on the existing object**, derived from the

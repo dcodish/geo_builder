@@ -1,10 +1,17 @@
-# 11 — Architecture as a Compiler Pipeline
+# 11 — Architecture as a Compiler Pipeline (revised: an incremental constraint interpreter)
 
-_Last updated: 2026-06-13._
+_Last updated: 2026-07-24 (truthed-up by the [docs/23](23-architecture-review-2026-07.md) review — S4.3 of [docs/24](24-foundation-hardening-plan.md)). Original 2026-06-13._
 
-A lens, not a new design. Geo Builder's spine is the pipeline **natural language → commands → constructive evaluation → rendered figure** — which is exactly a compiler front-end → IR → back-end, feeding a constraint-based *interpreter*. Naming the phases this way isn't cosmetic: it tells us where each existing decision belongs and, more usefully, **where new work slots in as the project grows**. This document is that map. It changes no code; it's here to keep the mental model sharp.
+A lens, not a new design — and the 2026-07 review found the lens **earned one expensive mistake and went stale in three places**, so this revision states the corrected model. What the system actually is: an **incremental, order-normalizing constraint interpreter** (deferral + HOIST assert that a statement's *position* in the list is presentation, not meaning — the opposite of an instruction stream), with **sampled model enumeration as its ground-truth semantics** (a relation is "true" when it holds in every valid configuration), fed by a **reference-resolving NL front end** whose meaning legitimately depends on the current model. Nearest relatives: a parametric-CAD kernel / SMT model enumeration — not `tsc`. The operative doctrine for day-to-day work is [docs/17](17-design-rules.md); this doc is the phase map.
 
-> If you're new to the codebase, read [04-design](04-design.md) first for the real architecture; this is a way of *seeing* it.
+**The four corrections (read these before applying the old lens):**
+
+1. **Re-mention is assertion, never redefinition.** The original lens mapped `commandConflict` to a compiler's "redefinition error" (ADR-009) — in a language of *accumulating assertions about one figure*, a second mention of an id is almost always a **given**. That single framing decision generated the largest defect class in the project's history (~24 members across both products) and M1 (docs/17 §4) is precisely the retreat from it. The correct model: statements are constraints on one growing model; ids are names, not declarations.
+2. **The phase boundary "the parser must not know about coordinates" is dead — deliberately.** The parser resolves *deictic* references («המעגל הגדול», «הימני», «נקודת ההשקה») from the drawn seed, under the three laws of docs/17 §3b (position-derived fields only for pointing references, every deictic read emits a locking assertion). The boundary that still holds: coordinates may resolve *reference*, never decide the *semantics* of a non-pointing statement.
+3. **The stored artifact is a mix of source and IR, not "the source program".** Facts carry both the utterance and the lowered commands, because source is not deterministically recompilable (LLM steps, cost). Consequences the compiler frame hides: edits re-lower against their *position's* prefix context (ADR-241), saved files are parser-output snapshots audited for drift on load (ADR-242/314/321). A compiler recompiles from source; this system audits its own stale IR — by design.
+4. **The solve ladder is part of the semantics.** Constraint satisfaction runs through an ordered cross-layer ladder (pre-gates → M1 chain → eager pick → evaluate escalation → failure ladder → deferral → HOIST → seed sweeps), written down in [docs/LADDER.md](LADDER.md). "Which mechanism fires" is observable (`StepResult.ladder`) and contract-tested.
+
+> If you're new to the codebase, read [04-design](04-design.md) for the layer map and [docs/17](17-design-rules.md) for the working doctrine; this doc is a way of *seeing* it.
 
 ---
 

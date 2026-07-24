@@ -14,7 +14,7 @@
  * kind, evaluator rule, or solver.
  */
 
-import type { Constraint, Id, LengthBoundConstraint, SolvedOnSegmentPoint, Vec } from './types';
+import type { Constraint, Construction, Id, LengthBoundConstraint, SolveDirective, SolvedOnSegmentPoint, Vec } from './types';
 import {
   ANGLE_EPS,
   ORDER_ANGLE_MARGIN_DEG,
@@ -524,4 +524,44 @@ export function solvedOnSegmentCandidates(
   // its root on the extension rather than snapping to a closer one on the segment proper.
   if (p.t0 !== undefined) cands.sort((x, y) => Math.abs(x - p.t0!) - Math.abs(y - p.t0!));
   return cands;
+}
+
+// ── Constraint identity (S0.5, docs/24 — the docs/23 two-regimes finding) ─────────────────────────
+//
+// Constraints have TWO identity regimes and each has one legitimate use:
+//  - REFERENCE identity is the OWNERSHIP regime: a solve directive's `constraint` must be the very
+//    object stored in `constraints[]`, because the orphan sweep, carrier counts, and the recruiter's
+//    case-(D) comparison all key by reference. A structural clone at a directive boundary breaks
+//    those paths SILENTLY — `unownedDirectiveConstraints` makes that loud.
+//  - CONTENT identity is the DEDUP regime: two structurally identical constraints count once in a
+//    solver's distinct-constraint list. Every content comparison goes through `constraintKey` —
+//    never an inline JSON.stringify (the inline copies were the latent-bug class).
+
+/** THE content-key for constraint dedup. Semantics: byte-stable JSON of the constraint as built
+ *  (property order is stable because constraints are built by literal object syntax at one site per
+ *  type). Not for ownership — see the regime note above. */
+export const constraintKey = (k: Constraint): string => JSON.stringify(k);
+
+/**
+ * The interning invariant: every directive-held constraint (an object's `solve.constraint`, each
+ * `solve.also` entry, and an `on-segment-solved`'s `constraint`) must be REFERENCE-present in
+ * `constraints[]`. Returns the violators (empty = healthy). Locked by
+ * `constraint-identity.test.ts`; run it against any new mechanism that copies or rebuilds
+ * directive-bearing objects.
+ */
+export function unownedDirectiveConstraints(c: Construction): Constraint[] {
+  const interned = new Set<Constraint>(c.constraints);
+  const out: Constraint[] = [];
+  const check = (k: Constraint | undefined) => {
+    if (k && !interned.has(k) && !out.includes(k)) out.push(k);
+  };
+  for (const o of c.objects) {
+    const sv = (o as { solve?: SolveDirective }).solve;
+    if (sv) {
+      check(sv.constraint);
+      for (const k of sv.also ?? []) check(k);
+    }
+    if (o.kind === 'on-segment-solved') check(o.constraint);
+  }
+  return out;
 }

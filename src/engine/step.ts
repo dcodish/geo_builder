@@ -22,12 +22,16 @@ export interface StepOk {
   ok: true;
   construction: Construction;
   positions: Map<Id, Vec>;
+  /** Ordered trace of the ladder stages traversed (docs/LADDER.md) — diagnostic metadata, never semantics. */
+  ladder?: string[];
 }
 export interface StepErr {
   ok: false;
   error: string;
   construction: Construction; // the previous (kept) construction
   positions: Map<Id, Vec>;
+  /** Ordered trace of the ladder stages traversed (docs/LADDER.md) — diagnostic metadata, never semantics. */
+  ladder?: string[];
 }
 export type StepResult = StepOk | StepErr;
 
@@ -349,21 +353,22 @@ function danglingCircleError(prev: Construction, cmd: Command): string | null {
 
 /** Apply one command and evaluate; keep the prior construction on failure. */
 export function applyStep(prev: Construction, cmd: Command): StepResult {
+  const trace: string[] = []; // the ladder trace (docs/LADDER.md) — diagnostic only
   const prevEval = evaluate(prev);
   const prevPositions = prevEval.ok ? prevEval.positions : new Map<Id, Vec>();
 
   const tangentErr = circlesTangentError(prev, cmd);
-  if (tangentErr) return { ok: false, error: tangentErr, construction: prev, positions: prevPositions };
+  if (tangentErr) return { ok: false, error: tangentErr, construction: prev, positions: prevPositions, ladder: ['pre:tangent'] };
 
   // A constraint on a structurally degenerate operand ("BB" ∥/⟂, "∠ABB", a repeated collinear point)
   // has a NaN residual: reject it here, before the solver churns on it (a freeze in the config search).
   const degenErr = degenerateConstraintError(cmd);
-  if (degenErr) return { ok: false, error: degenErr, construction: prev, positions: prevPositions };
+  if (degenErr) return { ok: false, error: degenErr, construction: prev, positions: prevPositions, ladder: ['pre:degenerate'] };
 
   // #186: a reference to a circle that doesn't exist refuses with the circle's NAME, never the
   // topological evaluator's internal "unresolved dependencies" (the student-facing honesty guard).
   const danglingErr = danglingCircleError(prev, cmd);
-  if (danglingErr) return { ok: false, error: danglingErr, construction: prev, positions: prevPositions };
+  if (danglingErr) return { ok: false, error: danglingErr, construction: prev, positions: prevPositions, ladder: ['pre:dangling'] };
 
   // Rotate a shape's vertices so an existing edge lands on its free base slots —
   // lets a shape build on an existing edge wherever that edge sits in the name
@@ -376,35 +381,35 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   // reinterpret it as a coincidence that drives a free DOF upstream (ADR-028).
   const conflict = commandConflict(prev, ncmd);
   if (conflict) {
-    const constrained =
-      reinterpretAsConstraint(prev, ncmd) ??
-      reinterpretAsCollinear(prev, ncmd, prevPositions) ??
-      replaceCyclicForDiameter(prev, ncmd) ??
-      reinterpretDiameter(prev, ncmd);
+    let constrained = reinterpretAsConstraint(prev, ncmd);
+    if (constrained) trace.push('m1:constraint');
+    if (!constrained && (constrained = reinterpretAsCollinear(prev, ncmd, prevPositions))) trace.push('m1:collinear');
+    if (!constrained && (constrained = replaceCyclicForDiameter(prev, ncmd))) trace.push('m1:cyclic-diameter');
+    if (!constrained && (constrained = reinterpretDiameter(prev, ncmd))) trace.push('m1:diameter');
     if (constrained) {
       const newCons = constrained.constraints.slice(prev.constraints.length);
       const r = evaluate(constrained);
-      if (r.ok && newConstraintsNonVacuous(constrained, r.positions, newCons)) return { ok: true, construction: constrained, positions: r.positions };
+      if (r.ok && newConstraintsNonVacuous(constrained, r.positions, newCons)) return { ok: true, construction: constrained, positions: r.positions, ladder: [...trace, 'm1:primary'] };
       // STAGE-0 (ADR-276): the new statement's own carriers over the FROZEN prior solution — minimal
       // movement, before any joint re-solve or recruiting.
       const settled = settleOnFrozenPrior(prev, constrained, newCons);
-      if (settled) return { ok: true, construction: settled.construction, positions: settled.positions };
+      if (settled) return { ok: true, construction: settled.construction, positions: settled.positions, ladder: [...trace, 'm1:settle'] };
       // The reinterpreted statement is a CONSTRAINT whose direct carrier alone couldn't satisfy it —
       // give it the SAME failure path a typed constraint gets (recruit the figure's other free DOFs,
       // ADR-028 extended) before giving up. One statement, one semantics, one solve path (M1/ADR-231).
-      const recruited = recruitFreeDofs(constrained, newCons);
+      const recruited = recruitFreeDofs(constrained, newCons, trace);
       if (recruited) {
         const r2 = evaluate(recruited);
-        if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions };
+        if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions, ladder: [...trace, 'm1:recruit'] };
       }
       // Surface the constraint's honest failure (over-constrained / unsatisfiable), never "already
       // defined" — the second statement about an existing object was a constraint, not a redefinition,
       // so the error must describe the RELATION that can't hold (M1/ADR-231). A solve that "passed"
       // only vacuously (the non-vacuous gate refused it) reports the same over-constraint shape.
       const vacuousErr = newCons.length ? `over-constrained: ${describeConstraint(newCons[0])} cannot hold` : 'over-constrained';
-      return { ok: false, error: r.ok ? vacuousErr : blameNewStatement(r.error, newCons), construction: prev, positions: prevPositions };
+      return { ok: false, error: r.ok ? vacuousErr : blameNewStatement(r.error, newCons), construction: prev, positions: prevPositions, ladder: [...trace, 'm1:refuse'] };
     }
-    return { ok: false, error: conflict, construction: prev, positions: prevPositions };
+    return { ok: false, error: conflict, construction: prev, positions: prevPositions, ladder: ['m1:conflict-refuse'] };
   }
 
   // Pass the prior figure's positions so a shape built on existing points is
@@ -420,13 +425,13 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   if (mirrored) {
     const alt = evaluate(mirrored);
     const choice = chooseComposition(prev, ncmd, prevPositions, next, res, mirrored, alt);
-    if (choice) return { ok: true, construction: choice.construction, positions: choice.positions };
+    if (choice) return { ok: true, construction: choice.construction, positions: choice.positions, ladder: [choice.construction === next ? 'main:primary' : 'main:mirror'] };
     // No coincidence-free placement. If a side merely STACKS (evaluates ok but two nodes coincide), this is
     // a default collision the composition can't dodge → keep prior with a clear message (ADR-123: avoid
     // default collisions; a constraint-DRIVEN coincidence is allowed below, not here). Otherwise fall
     // through to report the default's genuine error.
     const stack = (res.ok && res.coincidences?.length ? res.coincidences : alt.ok && alt.coincidences?.length ? alt.coincidences : null);
-    if (stack) return { ok: false, error: `${stack[0][0]} and ${stack[0][1]} would be at the same point`, construction: prev, positions: prevPositions };
+    if (stack) return { ok: false, error: `${stack[0][0]} and ${stack[0][1]} would be at the same point`, construction: prev, positions: prevPositions, ladder: ['main:stack-refuse'] };
   }
 
   // A primary solve that "passed" only VACUOUSLY (a new constraint's own referenced points collapsed —
@@ -453,17 +458,18 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
       if (sv) { owned.add(sv.constraint); for (const k of sv.also ?? []) owned.add(k); }
     }
     const orphans = next.constraints.filter((k) => k.type === 'coincide' && !owned.has(k) && !newCons.includes(k));
+    if (orphans.length) trace.push('main:orphans');
     // STAGE-0 (ADR-276, issue #37): before recruiting, try the new statement's own carriers over the
     // FROZEN prior solution — a satisfiable-by-its-own-carrier statement must not re-open (and land in a
     // compromise basin of) the whole already-valid coupled system.
     if (!orphans.length) {
       const settled = settleOnFrozenPrior(prev, next, newCons);
-      if (settled) return { ok: true, construction: settled.construction, positions: settled.positions };
+      if (settled) return { ok: true, construction: settled.construction, positions: settled.positions, ladder: [...trace, 'main:settle'] };
     }
-    const recruited = recruitFreeDofs(next, [...newCons, ...orphans]);
+    const recruited = recruitFreeDofs(next, [...newCons, ...orphans], trace);
     if (recruited) {
       const r2 = evaluate(recruited);
-      if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions };
+      if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions, ladder: [...trace, 'main:recruit'] };
     }
     // LAST RESORT — SCALE RESCUE (ADR-237): a figure with no absolute given yet is determined only up
     // to SIMILARITY (the ADR-101 gauge), so its FIRST size given is a statement about SCALE —
@@ -478,12 +484,12 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     const scaled = scaleRescue(next, newCons, prevPositions);
     if (scaled) {
       const rs = evaluate(scaled);
-      if (rs.ok && newConstraintsNonVacuous(scaled, rs.positions, newCons)) return { ok: true, construction: scaled, positions: rs.positions };
+      if (rs.ok && newConstraintsNonVacuous(scaled, rs.positions, newCons)) return { ok: true, construction: scaled, positions: rs.positions, ladder: [...trace, 'main:scale'] };
     }
     const vacuousMainErr = newCons.length ? `over-constrained: ${describeConstraint(newCons[0])} cannot hold` : 'over-constrained';
-    return { ok: false, error: res.ok ? vacuousMainErr : blameNewStatement(res.error, newCons), construction: prev, positions: prevPositions };
+    return { ok: false, error: res.ok ? vacuousMainErr : blameNewStatement(res.error, newCons), construction: prev, positions: prevPositions, ladder: [...trace, 'main:refuse'] };
   }
-  return { ok: true, construction: next, positions: res.positions };
+  return { ok: true, construction: next, positions: res.positions, ladder: ['main:primary'] };
 }
 
 /**
@@ -511,33 +517,34 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
  * composition to mirror. A run of ONE is just `applyStep`, so nothing outside a multi-constraint macro moves.
  */
 export function applyCoupledStep(prev: Construction, cmds: Command[]): StepResult {
+  const trace: string[] = []; // the ladder trace (docs/LADDER.md) — diagnostic only
   const prevEval = evaluate(prev);
   const prevPositions = prevEval.ok ? prevEval.positions : new Map<Id, Vec>();
   for (const cmd of cmds) {
     const degenErr = degenerateConstraintError(cmd);
-    if (degenErr) return { ok: false, error: degenErr, construction: prev, positions: prevPositions };
+    if (degenErr) return { ok: false, error: degenErr, construction: prev, positions: prevPositions, ladder: ['pre:degenerate'] };
   }
   // ATTACH every constraint before solving once (see above — this is the whole mechanism).
   let next = prev;
   for (const cmd of cmds) next = applyCommand(next, cmd, prevPositions);
   const newCons = next.constraints.slice(prev.constraints.length);
   const res = evaluate(next);
-  if (res.ok && newConstraintsNonVacuous(next, res.positions, newCons)) return { ok: true, construction: next, positions: res.positions };
+  if (res.ok && newConstraintsNonVacuous(next, res.positions, newCons)) return { ok: true, construction: next, positions: res.positions, ladder: ['coupled:primary'] };
   // The same failure ladder as applyStep, once, over the UNION of the coupled constraints.
   const settled = settleOnFrozenPrior(prev, next, newCons);
-  if (settled) return { ok: true, construction: settled.construction, positions: settled.positions };
-  const recruited = recruitFreeDofs(next, newCons);
+  if (settled) return { ok: true, construction: settled.construction, positions: settled.positions, ladder: ['coupled:settle'] };
+  const recruited = recruitFreeDofs(next, newCons, trace);
   if (recruited) {
     const r2 = evaluate(recruited);
-    if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions };
+    if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions, ladder: [...trace, 'coupled:recruit'] };
   }
   const scaled = scaleRescue(next, newCons, prevPositions);
   if (scaled) {
     const rs = evaluate(scaled);
-    if (rs.ok && newConstraintsNonVacuous(scaled, rs.positions, newCons)) return { ok: true, construction: scaled, positions: rs.positions };
+    if (rs.ok && newConstraintsNonVacuous(scaled, rs.positions, newCons)) return { ok: true, construction: scaled, positions: rs.positions, ladder: [...trace, 'coupled:scale'] };
   }
   const vacuousErr = newCons.length ? `over-constrained: ${describeConstraint(newCons[0])} cannot hold` : 'over-constrained';
-  return { ok: false, error: res.ok ? vacuousErr : blameNewStatement(res.error, newCons), construction: prev, positions: prevPositions };
+  return { ok: false, error: res.ok ? vacuousErr : blameNewStatement(res.error, newCons), construction: prev, positions: prevPositions, ladder: [...trace, 'coupled:refuse'] };
 }
 
 /**
@@ -875,7 +882,7 @@ function markDriven(o: GeoObject, K: Constraint): GeoObject {
  *      carrier and the joint solver sizes the figure. The constraint is already present as a check.
  * Returns the recruited construction, or null if there's nothing extra to move.
  */
-function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construction | null {
+function recruitFreeDofs(c: Construction, newCons: Constraint[] = [], trace?: string[]): Construction | null {
   let objects = [...c.objects];
   const added: Constraint[] = [];
   let changed = false;
@@ -888,6 +895,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
     recruits.delete(sp.id);
     if (recruits.size === 0) continue;
     changed = true;
+    trace?.push('recruit:A');
     added.push(K);
     objects = objects.map((o) => {
       if (o.id === sp.id) return { kind: 'on-segment', id: sp.id, a: sp.a, b: sp.b, t: 0.5, solve: { constraint: K, branch: 0 } };
@@ -950,7 +958,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
       if (evaluate({ objects: trial, constraints: [...c.constraints, ...added] }).ok) {
         objects = trial;
         changed = true;
-        
+        trace?.push('recruit:B');
         verified = true;
         break;
       }
@@ -959,7 +967,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
         // downstream cases (C)–(F) re-point/lend from it, and an honest over-constraint stays honest.
         objects = trial;
         changed = true;
-        
+        trace?.push('recruit:B-forced');
       }
     }
     // (D) FREE THE BLOCKER (R7(3) / [ADR-074](docs/06-decisions.md#adr-074)): K needs a free DOF that an
@@ -984,7 +992,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
           o.id === alt.id ? ({ ...o, solve: { constraint: K1, branch: 0 } } as GeoObject) : o.id === x.id ? markDriven(o, K) : o,
         );
         changed = true;
-
+        trace?.push('recruit:D');
         dDid = true;
         break;
       }
@@ -1019,6 +1027,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
     });
     if (steal && !budgetExceeded()) {
       changed = true;
+      trace?.push('recruit:C');
       objects = objects.map((o) => (o.id === steal.id ? markDriven(o, K) : o)); // K already in c.constraints (pushed as a check)
       // VERIFY, as for case (B)/(D) above ([ADR-139](docs/06-decisions.md#adr-139)): a steal that doesn't
       // resolve the over-constraint — e.g. a DEGENERATE self-steal where K is itself the over-subscribed
@@ -1046,7 +1055,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
       if (budgetExceeded()) break;
       const trial = objects.map((x) => (x.id === o.id ? markDriven(x, K) : x));
       const r = evaluate({ objects: trial, constraints: [...c.constraints, ...added] });
-      if (r.ok) { objects = trial; changed = true; break; }
+      if (r.ok) { objects = trial; changed = true; trace?.push('recruit:E'); break; }
     }
     // (F) FREEZE-AND-CO-DRIVE ([ADR-229](docs/06-decisions.md#adr-229)): every DOF is claimed and no
     // steal/lend rescued K, but a claimed FREE POINT among K's refs has a SPARE DOF — a free point is
@@ -1112,6 +1121,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = []): Construct
             });
             objects = evaluate({ objects: restored, constraints: [...c.constraints, ...added] }).ok ? restored : trial;
             changed = true;
+            trace?.push('recruit:F');
             break;
           }
         }

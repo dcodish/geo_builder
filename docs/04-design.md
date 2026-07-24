@@ -1,6 +1,6 @@
 # 04 — Design & Architecture
 
-_Last updated: 2026-06-10. Status: design; engine core (Phase 1) implemented in `src/engine/`, renderer/store/parser/UI still pending._
+_Last updated: 2026-07-24 (S4.3 of [docs/24](24-foundation-hardening-plan.md) — the layer map truthed-up to the built system; the original 2026-06-10 design text is kept where it still describes reality). Status: **built and in production** — everything below exists. The day-to-day working doctrine is [docs/17](17-design-rules.md); the solve-ladder contract is [docs/LADDER.md](LADDER.md); the current architectural assessment is [docs/23](23-architecture-review-2026-07.md)._
 
 ## 1. Guiding principles
 
@@ -86,23 +86,35 @@ A single boundary: `utterance → command[]`.
 - Path alias `@/` → `src/` (kept in sync between `tsconfig.json` and `vite.config.ts`).
 - Vitest for tests (notably the stability regression test).
 
-## 9. Planned module layout (`src/`)
-
-> Indicative; created as the build proceeds.
+## 9. Module layout (`src/`) — as built (2026-07-24)
 
 ```
 src/
-  engine/        dependency-graph model, topological solver, branches, over-constraint, computed measures
-  parse/         grammar parser (He/En) + LLM-fallback client (talks to the proxy)
-  store/         apply-command reducer + Zustand store (history, undo/redo, alternatives state)
-  render/        SVG components driven by engine output
-  theorems/      detect(figure) predicates
+  engine/        the constructive core: types (dependency-graph model), geometry, solve (constraints:
+                 refs/residual/describe + constraintKey identity), apply (applyCommand reducer + eager
+                 carrier pick), evaluate (topological sweep + the numeric driven solvers), step
+                 (applyStep/applyCoupledStep + the failure ladder — contract in docs/LADDER.md, trace on
+                 StepResult.ladder), sample, verify (givens verifier), relations/detectShapes (read-only
+                 detection over the shared sample core), inscribe/variants, solveBudget
+  parser/        parse.ts (deterministic bilingual grammar, ordered rules + post-pass chokepoints +
+                 honesty gates), catalog, context (buildParseCtx — the docs/17 §3b registry), scope,
+                 llm/llmShared (the LLM-fallback seam; re-parse + gate battery)
+  app/           submitPipeline.ts — the text→command orchestration, extracted from App.tsx and
+                 directly tested (S0.4)
+  store/         geoStore.ts (Zustand + zundo: the fact list as source of truth, replay fold memo,
+                 config searches, sample core, rename/swap/merge), figureFile (save/load), loadAudit,
+                 geoWork/geoWorker (the Web-Worker seam)
+  render/        transform + scene (pure figure→primitives) + Figure.tsx (declarative SVG, pan/zoom,
+                 hover picks); a pure consumer of engine output
+  theorems/      the authored theorem table + coverage disposition map + rank bands + audit harness
+  validation/    the differential coordinate oracle (engine-import-free; dev/CI only)
+  export/        question export (.docx)
   i18n/          locales (he/en)
-  components/    app shell, input bar, step history, theorem panel
-proxy/           server-side API proxy (key custody, gate, rate-limit) — deploy artifact
+server/          the shared LLM proxy + admin dashboards (parameterized by tool:, serves 2-D and 3-D)
+src3d/           the sibling 3-D product (pattern-copied, never imported — see CLAUDE.md §multi-product)
 ```
 
-## 10. Build order (de-risk the core first)
+## 10. Build order (de-risk the core first) — *historical: all steps complete*
 
 > The full phased plan (scope, dependencies, requirement coverage, per-phase gates, milestones) is in [`09-implementation-plan.md`](09-implementation-plan.md). The list below is the summary.
 
