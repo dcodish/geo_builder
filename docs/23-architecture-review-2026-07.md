@@ -1,6 +1,6 @@
 # 23 — Architecture review, 2026-07-24 (commissioned)
 
-_Status: **findings + recommendations — decisions pending operator.** Commissioned by the operator 2026-07-24 ("fresh review from an outside point of view … make sure the base of this whole project is solid"). Method: four independent full-depth reviews (engine · parser · derived layers/tests · ADR defect-class meta-analysis over all 390 2-D + 71 3-D ADRs), run blind to each other, then cross-checked — the sharpest engine claims were re-verified against the source by hand. This is the sibling of the 2026-07-06 review that produced [docs/17](17-design-rules.md); like it, nothing here is implemented — the operator picks what to schedule._
+_Status: **findings adopted — the execution program is [docs/24-foundation-hardening-plan.md](24-foundation-hardening-plan.md) (accepted 2026-07-24).** Commissioned by the operator 2026-07-24 ("fresh review from an outside point of view … make sure the base of this whole project is solid"). Method: four independent full-depth reviews (engine · parser · derived layers/tests · ADR defect-class meta-analysis over all 390 2-D + 71 3-D ADRs), run blind to each other, then cross-checked — the sharpest engine claims were re-verified against the source by hand. This is the sibling of the 2026-07-06 review that produced [docs/17](17-design-rules.md); like it, nothing here is implemented — the operator picks what to schedule._
 
 ---
 
