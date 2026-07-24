@@ -1,0 +1,10 @@
+{
+  "_comment": "The REVIEWED set of divergent shadow pairs ('winner → later divergent claimer') over the 3-D catalog corpus — the hard gate of shadow-matrix3.test.ts (S2.3 of docs/24; the 2-D A1/PAR-11 pattern copied per docs/20 §12). Every pair here was inspected and is intentional (a more-specific rule deliberately running before a coarser sibling that reads the same words differently — the ordering comments in parse3's RULES array document each). A NEW pair failing the gate means a rule edit created a fresh divergence: inspect it, fix the ordering/regex if it's a real shadow (the ADR-3D-071 class), or — only after review — regenerate deliberately with GEN_SHADOW3=1 and commit the reviewed diff. `vitest -u` cannot touch this file.",
+  "shadowPairs": [
+    "areaClaim → planarPolygon",
+    "bisectorPoint → onSegment",
+    "rightPyramidPoint → onSegment",
+    "rightTriangle → planarPolygon",
+    "volumeEqPoly → rightPyramid"
+  ]
+}

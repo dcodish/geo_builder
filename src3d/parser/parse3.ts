@@ -1995,7 +1995,11 @@ const tetraAltitude: Rule = (s) => {
   return m ? [{ type: 'tetra-altitude', id: m[2], from: m[1] }] : null;
 };
 
-const RULES: Rule[] = [
+/** Exported ONLY for the shadow-matrix ordering guard (`__tests__/shadow-matrix3.test.ts` — the 2-D
+ *  A1/PAR-11 pattern copied per docs/20 §12): the guard runs EVERY rule against the catalog corpus (not
+ *  stopping at the first match) and hard-gates the divergent winner/later-claimer pairs against a
+ *  reviewed allowlist. Zero runtime cost — production code must keep calling `parse3`. */
+export const RULES: Rule[] = [
   cubeOrBox,
   rhombusPrism,
   rightPrism,
@@ -2080,10 +2084,16 @@ const RULES: Rule[] = [
 
 // ---------------------------------------------------------------------------
 
-export function parse3(utterance: string): ParseResult3 {
-  // an explicit vector arrow (⃗/→, stripped by normalize3) marks bare pair=pair as a
-  // VECTOR equation; without it, AS = AB reads as a LENGTH equality (the bagrut default)
+/** Set the per-parse VECTOR-marked flag from the RAW utterance (an explicit arrow ⃗/→ or the vector
+ *  word — both stripped by `normalize3` — mark bare pair=pair as a VECTOR equation; without them
+ *  `AS = AB` reads as a LENGTH equality, the bagrut default). Extracted from `parse3` and exported
+ *  ONLY so the shadow-matrix guard can run rules under the exact pre-state `parse3` gives them. */
+export function markVectorContext(utterance: string): void {
   VEC_MARKED = /[→⃗⟶]/.test(utterance) || /(?:^|[\s:,])(?:ה?ו?וקטור|vectors?)\s/i.test(utterance);
+}
+
+export function parse3(utterance: string): ParseResult3 {
+  markVectorContext(utterance);
   const s = normalize3(utterance);
   if (!s) return NOT_HANDLED;
   if (!VEC_MARKED && /^([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*$/.test(s))

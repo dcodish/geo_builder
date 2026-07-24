@@ -28,6 +28,7 @@ import { checkInSpan, firstSatisfyingSeed3, memberHolds3, resolve3, type Resolve
 import { verifyClaim } from '../engine/claims';
 import { cross3, dot3, norm3, sub3 } from '../engine/vec3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
+import { droppedGivenNumbers3, droppedNewLabels3 } from '../parser/honesty3';
 import { parse3 } from '../parser/parse3';
 
 export interface Fact3 {
@@ -52,6 +53,9 @@ export type StoreError3 =
   | EngineError3
   | { code: 'not-understood' }
   | { code: 'ambiguous-vector-length' }
+  /** The LLM decomposition lost part of the stated input (docs/24 S2.3 honesty gates) — `items` names
+   *  the dropped labels/magnitudes; nothing was committed. */
+  | { code: 'dropped-given'; items: string }
   | { code: 'bad-file' }
   | { code: 'newer-schema' }
   | null;
@@ -402,6 +406,21 @@ export const useGeo3 = create<Geo3State>()(
           return;
         }
         const { facts, seed } = get();
+        // HONESTY GATES on the LLM seam (docs/24 S2.3 — the 2-D ADR-240/ADR-250 line, copied per
+        // docs/20 §12): the decomposition must account for every NEW label and every stated magnitude
+        // of the student's ORIGINAL utterance, or the commit refuses NAMING what was lost — a
+        // silently-partial figure must never sit on the canvas with a green row. The deterministic
+        // path needs no gate here (the rules parse the utterance itself; the catalog corpus is
+        // asserted gate-clean in honesty3.test.ts) — the LLM round-trip is where meaning can leak.
+        const prior = derive3(facts, seed).construction;
+        const lost = [
+          ...droppedNewLabels3(utterance, all, [...prior.points.keys()], [...prior.vectors.keys()]),
+          ...droppedGivenNumbers3(utterance, all),
+        ];
+        if (lost.length > 0) {
+          set({ lastError: { code: 'dropped-given', items: lost.join(', ') } });
+          return;
+        }
         const fact: Fact3 = { id: nanoid(8), utterance: utterance.trim(), cmds: all, enabled: true };
         const candidate = [...facts, fact];
         const st = derive3(candidate, seed).status[fact.id];

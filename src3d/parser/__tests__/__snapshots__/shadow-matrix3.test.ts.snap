@@ -1,0 +1,1291 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`3-D parser shadow-matrix — catalog corpus > divergent later-claimers (candidate shadows) per catalog utterance are stable 1`] = `
+[
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "rightPyramid",
+    ],
+    "text": "volume of pyramid SENB equals volume of pyramid CENB",
+    "winner": "volumeEqPoly",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "rightPyramid",
+    ],
+    "text": "נפח הפירמידה SENB שווה לנפח הפירמידה CENB",
+    "winner": "volumeEqPoly",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "planarPolygon",
+    ],
+    "text": "the area of triangle ABC = 4.5",
+    "winner": "areaClaim",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "planarPolygon",
+    ],
+    "text": "שטח המשולש ABC = 4.5",
+    "winner": "areaClaim",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "onSegment",
+    ],
+    "text": "D on AC such that OD bisects angle AOC",
+    "winner": "bisectorPoint",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "onSegment",
+    ],
+    "text": "D על AC כך ש-OD חוצה-זווית AOC",
+    "winner": "bisectorPoint",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "planarPolygon",
+    ],
+    "text": "right triangle ABC",
+    "winner": "rightTriangle",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "planarPolygon",
+    ],
+    "text": "משולש ABC ישר זווית",
+    "winner": "rightTriangle",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "onSegment",
+    ],
+    "text": "T on SC such that TABCD is a right pyramid",
+    "winner": "rightPyramidPoint",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "onSegment",
+    ],
+    "text": "T על הקטע SC כך ש-TABCD היא פירמידה ישרה",
+    "winner": "rightPyramidPoint",
+  },
+]
+`;
+
+exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog utterance is stable 1`] = `
+[
+  {
+    "lang": "en",
+    "text": "cube ABCD",
+    "winner": "cubeOrBox",
+  },
+  {
+    "lang": "he",
+    "text": "קובייה ABCD",
+    "winner": "cubeOrBox",
+  },
+  {
+    "lang": "en",
+    "text": "box ABCDA'B'C'D'",
+    "winner": "cubeOrBox",
+  },
+  {
+    "lang": "he",
+    "text": "תיבה ABCDA'B'C'D'",
+    "winner": "cubeOrBox",
+  },
+  {
+    "lang": "en",
+    "text": "right triangular prism ABC",
+    "winner": "rightPrism",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה ישרה משולשת ABC",
+    "winner": "rightPrism",
+  },
+  {
+    "lang": "en",
+    "text": "right prism with an equilateral triangle base",
+    "winner": "rightPrism",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה ישרה שבסיסה משולש שווה צלעות",
+    "winner": "rightPrism",
+  },
+  {
+    "lang": "en",
+    "text": "right prism with a parallelogram base",
+    "winner": "rightPrism",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה ישרה שבסיסה מקבילית",
+    "winner": "rightPrism",
+  },
+  {
+    "lang": "en",
+    "text": "right prism with a square base",
+    "winner": "rightPrism",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה ישרה שבסיסה ריבוע",
+    "winner": "rightPrism",
+  },
+  {
+    "lang": "en",
+    "text": "right prism with a quadrilateral base",
+    "winner": "rightPrism",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה ישרה שבסיסה מרובע",
+    "winner": "rightPrism",
+  },
+  {
+    "lang": "en",
+    "text": "right prism with a pentagon base",
+    "winner": "rightPrism",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה ישרה שבסיסה מחומש",
+    "winner": "rightPrism",
+  },
+  {
+    "lang": "en",
+    "text": "parallelepiped ABCDEFGH",
+    "winner": "parallelepiped",
+  },
+  {
+    "lang": "he",
+    "text": "מקבילון ABCDEFGH",
+    "winner": "parallelepiped",
+  },
+  {
+    "lang": "en",
+    "text": "prism with a parallelogram base",
+    "winner": "parallelepiped",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה שבסיסה מקבילית",
+    "winner": "parallelepiped",
+  },
+  {
+    "lang": "en",
+    "text": "the prism is right",
+    "winner": "makeRightPrism",
+  },
+  {
+    "lang": "he",
+    "text": "המנסרה ישרה",
+    "winner": "makeRightPrism",
+  },
+  {
+    "lang": "en",
+    "text": "right pyramid with an equilateral triangle base",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "פירמידה ישרה שבסיסה משולש שווה צלעות",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
+    "text": "pyramid SABCD with a parallelogram base",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "פירמידה SABCD שבסיסה מקבילית",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
+    "text": "right pyramid ABCDS with a square base",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "פירמידה ישרה ABCDS שבסיסה ריבוע",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
+    "text": "pyramid ABCDS with a square base",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "פירמידה ABCDS שבסיסה ריבוע",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
+    "text": "pyramid SABCD with a square base",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "פירמידה SABCD שבסיסה ריבוע",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
+    "text": "tetrahedron ABCD",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "טטראדר ABCD",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
+    "text": "|EN| = (√6/4)·|w|",
+    "winner": "lengthRel",
+  },
+  {
+    "lang": "he",
+    "text": "|EN| = (√6/4)·|w|",
+    "winner": "lengthRel",
+  },
+  {
+    "lang": "en",
+    "text": "|AS| = |AB|",
+    "winner": "lengthRel",
+  },
+  {
+    "lang": "he",
+    "text": "אורך AS שווה לאורך AB",
+    "winner": "lengthRel",
+  },
+  {
+    "lang": "en",
+    "text": "vector SE = 3/4 vector SD",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "he",
+    "text": "וקטור SE = 3/4 וקטור SD",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "en",
+    "text": "k = 1/2",
+    "winner": "symbolValue",
+  },
+  {
+    "lang": "he",
+    "text": "k = 1/2",
+    "winner": "symbolValue",
+  },
+  {
+    "lang": "en",
+    "text": "D is on the positive x-axis",
+    "winner": "onAxes",
+  },
+  {
+    "lang": "he",
+    "text": "הקודקוד D נמצא על החלק החיובי של ציר ה-x",
+    "winner": "onAxes",
+  },
+  {
+    "lang": "en",
+    "text": "volume of pyramid SENB equals volume of pyramid CENB",
+    "winner": "volumeEqPoly",
+  },
+  {
+    "lang": "he",
+    "text": "נפח הפירמידה SENB שווה לנפח הפירמידה CENB",
+    "winner": "volumeEqPoly",
+  },
+  {
+    "lang": "en",
+    "text": "∠SAB = ∠SAD",
+    "winner": "angleEquality3",
+  },
+  {
+    "lang": "he",
+    "text": "∠SAB = ∠SAD",
+    "winner": "angleEquality3",
+  },
+  {
+    "lang": "en",
+    "text": "cone with apex S base center O radius 5 height 12",
+    "winner": "revolutionSolid",
+  },
+  {
+    "lang": "he",
+    "text": "חרוט שקודקודו S ומרכז בסיסו O, רדיוסו 5 וגובהו 12",
+    "winner": "revolutionSolid",
+  },
+  {
+    "lang": "en",
+    "text": "cylinder with base center O radius 3 height 7",
+    "winner": "revolutionSolid",
+  },
+  {
+    "lang": "he",
+    "text": "גליל שמרכז בסיסו O, רדיוסו 3 וגובהו 7",
+    "winner": "revolutionSolid",
+  },
+  {
+    "lang": "en",
+    "text": "sphere with center O radius 3",
+    "winner": "revolutionSolid",
+  },
+  {
+    "lang": "he",
+    "text": "כדור שמרכזו O ורדיוסו 3",
+    "winner": "revolutionSolid",
+  },
+  {
+    "lang": "en",
+    "text": "M is the midpoint of BB'",
+    "winner": "midpoint",
+  },
+  {
+    "lang": "he",
+    "text": "M אמצע BB'",
+    "winner": "midpoint",
+  },
+  {
+    "lang": "en",
+    "text": "midpoint of BB'",
+    "winner": "midpoint",
+  },
+  {
+    "lang": "he",
+    "text": "אמצע BB'",
+    "winner": "midpoint",
+  },
+  {
+    "lang": "en",
+    "text": "angle at O is right",
+    "winner": "vertexAngleClaim",
+  },
+  {
+    "lang": "he",
+    "text": "זווית O ישרה",
+    "winner": "vertexAngleClaim",
+  },
+  {
+    "lang": "en",
+    "text": "K on AA' such that AK = 2KA'",
+    "winner": "onSegment",
+  },
+  {
+    "lang": "he",
+    "text": "K על AA' כך ש-AK = 2KA'",
+    "winner": "onSegment",
+  },
+  {
+    "lang": "en",
+    "text": "E on AC such that AE:EC = 2:1",
+    "winner": "onSegment",
+  },
+  {
+    "lang": "he",
+    "text": "E על AC כך ש-AE:EC = 2:1",
+    "winner": "onSegment",
+  },
+  {
+    "lang": "en",
+    "text": "E is the centroid of triangle BC'D",
+    "winner": "centroidRule",
+  },
+  {
+    "lang": "he",
+    "text": "E מפגש התיכונים של משולש BC'D",
+    "winner": "centroidRule",
+  },
+  {
+    "lang": "en",
+    "text": "O is the intersection of the diagonals of face ABCD",
+    "winner": "diagIntersection",
+  },
+  {
+    "lang": "he",
+    "text": "O מפגש האלכסונים של הפאה ABCD",
+    "winner": "diagIntersection",
+  },
+  {
+    "lang": "en",
+    "text": "A(2,-2,6)",
+    "winner": "coordPoint",
+  },
+  {
+    "lang": "he",
+    "text": "A(2,-2,6)",
+    "winner": "coordPoint",
+  },
+  {
+    "lang": "en",
+    "text": "point M(k,1,3), k is a positive parameter",
+    "winner": "coordPoint",
+  },
+  {
+    "lang": "he",
+    "text": "נתונה נקודה M(k,1,3), k הוא פרמטר חיובי",
+    "winner": "coordPoint",
+  },
+  {
+    "lang": "en",
+    "text": "P on AM such that KP = αu + βv",
+    "winner": "spanPoint",
+  },
+  {
+    "lang": "he",
+    "text": "P על AM כך ש-KP = αu + βv",
+    "winner": "spanPoint",
+  },
+  {
+    "lang": "en",
+    "text": "denote AB = u, AD = v, AA' = w",
+    "winner": "nameVectors",
+  },
+  {
+    "lang": "he",
+    "text": "נסמן: AB = u, AD = v, AA' = w",
+    "winner": "nameVectors",
+  },
+  {
+    "lang": "en",
+    "text": "given: v = (10,-5,0), u = (5,5,-5)",
+    "winner": "injectionList",
+  },
+  {
+    "lang": "he",
+    "text": "נתון: v = (10,-5,0), u = (5,5,-5)",
+    "winner": "injectionList",
+  },
+  {
+    "lang": "en",
+    "text": "plane π1: z - 3 = 0",
+    "winner": "planeByEquation",
+  },
+  {
+    "lang": "he",
+    "text": "המישור π1: z - 3 = 0",
+    "winner": "planeByEquation",
+  },
+  {
+    "lang": "en",
+    "text": "line ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)",
+    "winner": "parametricLine",
+  },
+  {
+    "lang": "he",
+    "text": "הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)",
+    "winner": "parametricLine",
+  },
+  {
+    "lang": "en",
+    "text": "a parametric representation of line AB is x = (0,7,6) + t(0,2,1)",
+    "winner": "parametricLine",
+  },
+  {
+    "lang": "he",
+    "text": "הצגה פרמטרית של הישר AB היא x = (0,7,6) + t(0,2,1)",
+    "winner": "parametricLine",
+  },
+  {
+    "lang": "en",
+    "text": "the angle between planes π1 and π2 is 45",
+    "winner": "angleBetweenPlanes",
+  },
+  {
+    "lang": "he",
+    "text": "הזווית בין המישורים π1 ו-π2 היא 45",
+    "winner": "angleBetweenPlanes",
+  },
+  {
+    "lang": "en",
+    "text": "line ℓ is perpendicular to plane π1",
+    "winner": "linePerpPlane",
+  },
+  {
+    "lang": "he",
+    "text": "הישר ℓ ניצב למישור π1",
+    "winner": "linePerpPlane",
+  },
+  {
+    "lang": "en",
+    "text": "from A drop a perpendicular to plane π1, it cuts it at B",
+    "winner": "dropPerpToPlane",
+  },
+  {
+    "lang": "he",
+    "text": "מ-A מורידים אנך למישור π1 החותך אותו בנקודה B",
+    "winner": "dropPerpToPlane",
+  },
+  {
+    "lang": "en",
+    "text": "from B drop a perpendicular to line ℓ, it cuts it at C",
+    "winner": "dropPerpToLine",
+  },
+  {
+    "lang": "he",
+    "text": "מ-B מעבירים אנך לישר ℓ החותך אותו בנקודה C",
+    "winner": "dropPerpToLine",
+  },
+  {
+    "lang": "en",
+    "text": "ℓ is the intersection line of π1 and π2",
+    "winner": "intersectionLine",
+  },
+  {
+    "lang": "he",
+    "text": "ℓ ישר החיתוך בין המישורים π1 ו-π2",
+    "winner": "intersectionLine",
+  },
+  {
+    "lang": "en",
+    "text": "ℓ is the intersection line of plane BC'D and plane BCC'B'",
+    "winner": "pointPlanesLine",
+  },
+  {
+    "lang": "he",
+    "text": "ℓ ישר החיתוך בין המישור BC'D ובין המישור BCC'B'",
+    "winner": "pointPlanesLine",
+  },
+  {
+    "lang": "en",
+    "text": "plane BC'D",
+    "winner": "planeThroughBare",
+  },
+  {
+    "lang": "he",
+    "text": "המישור BC'D",
+    "winner": "planeThroughBare",
+  },
+  {
+    "lang": "en",
+    "text": "plane π through F perpendicular to SC",
+    "winner": "relPlaneRule",
+  },
+  {
+    "lang": "he",
+    "text": "מישור π דרך F וניצב ל-SC",
+    "winner": "relPlaneRule",
+  },
+  {
+    "lang": "en",
+    "text": "plane π through K and P parallel to CD",
+    "winner": "relPlaneRule",
+  },
+  {
+    "lang": "he",
+    "text": "מישור π דרך K ו-P ומקביל ל-CD",
+    "winner": "relPlaneRule",
+  },
+  {
+    "lang": "en",
+    "text": "plane π cuts SA at E",
+    "winner": "planeCut",
+  },
+  {
+    "lang": "he",
+    "text": "המישור π חותך את SA בנקודה E",
+    "winner": "planeCut",
+  },
+  {
+    "lang": "en",
+    "text": "AF is the height of the pyramid to face BDC",
+    "winner": "heightOfSolid",
+  },
+  {
+    "lang": "he",
+    "text": "AF גובה הפירמידה לפאה BDC",
+    "winner": "heightOfSolid",
+  },
+  {
+    "lang": "en",
+    "text": "E is on plane ABC",
+    "winner": "pointRelPlane",
+  },
+  {
+    "lang": "he",
+    "text": "E על המישור ABC",
+    "winner": "pointRelPlane",
+  },
+  {
+    "lang": "en",
+    "text": "E is above plane ABC",
+    "winner": "pointRelPlane",
+  },
+  {
+    "lang": "he",
+    "text": "E מעל המישור ABC",
+    "winner": "pointRelPlane",
+  },
+  {
+    "lang": "en",
+    "text": "E is below plane ABC",
+    "winner": "pointRelPlane",
+  },
+  {
+    "lang": "he",
+    "text": "E מתחת למישור ABC",
+    "winner": "pointRelPlane",
+  },
+  {
+    "lang": "en",
+    "text": "ℓ cuts plane π1 at A",
+    "winner": "lineCutsPlane",
+  },
+  {
+    "lang": "he",
+    "text": "ℓ חותך את π1 בנקודה A",
+    "winner": "lineCutsPlane",
+  },
+  {
+    "lang": "en",
+    "text": "line A'C cuts plane BC'D at K",
+    "winner": "segLineCutsPointPlane",
+  },
+  {
+    "lang": "he",
+    "text": "הישר A'C חותך את המישור BC'D בנקודה K",
+    "winner": "segLineCutsPointPlane",
+  },
+  {
+    "lang": "en",
+    "text": "A is on one of the planes",
+    "winner": "membership",
+  },
+  {
+    "lang": "he",
+    "text": "A נמצאת על אחד המישורים",
+    "winner": "membership",
+  },
+  {
+    "lang": "en",
+    "text": "B is on line ℓ",
+    "winner": "onLineMembership",
+  },
+  {
+    "lang": "he",
+    "text": "B על הישר ℓ",
+    "winner": "onLineMembership",
+  },
+  {
+    "lang": "en",
+    "text": "line ℓ1: x = (0,0,0) + t(1,0,0)",
+    "winner": "parametricLine",
+  },
+  {
+    "lang": "he",
+    "text": "הישר ℓ1: x = (0,0,0) + t(1,0,0)",
+    "winner": "parametricLine",
+  },
+  {
+    "lang": "en",
+    "text": "d is the common perpendicular of ℓ1 and ℓ2",
+    "winner": "commonPerp",
+  },
+  {
+    "lang": "he",
+    "text": "הישר d מאונך לישר ℓ1 ולישר ℓ2",
+    "winner": "commonPerp",
+  },
+  {
+    "lang": "en",
+    "text": "the z-coordinate of C' is positive",
+    "winner": "signGiven",
+  },
+  {
+    "lang": "he",
+    "text": "שיעור ה-z של C' חיובי",
+    "winner": "signGiven",
+  },
+  {
+    "lang": "en",
+    "text": "AM = 1/2u + 1/2v + 5/3w",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "he",
+    "text": "AM = 1/2u + 1/2v + 5/3w",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "en",
+    "text": "CA' is perpendicular to plane BC'D",
+    "winner": "perpPlaneClaim",
+  },
+  {
+    "lang": "he",
+    "text": "CA' מאונך למישור BC'D",
+    "winner": "perpPlaneClaim",
+  },
+  {
+    "lang": "en",
+    "text": "SM is perpendicular to DB",
+    "winner": "perpSegGiven",
+  },
+  {
+    "lang": "he",
+    "text": "SM מאונך ל-DB",
+    "winner": "perpSegGiven",
+  },
+  {
+    "lang": "en",
+    "text": "u ⊥ v",
+    "winner": "perpSegGiven",
+  },
+  {
+    "lang": "he",
+    "text": "u ⊥ v",
+    "winner": "perpSegGiven",
+  },
+  {
+    "lang": "en",
+    "text": "E, C, A' are collinear",
+    "winner": "collinearClaim",
+  },
+  {
+    "lang": "he",
+    "text": "E, C, A' על ישר אחד",
+    "winner": "collinearClaim",
+  },
+  {
+    "lang": "en",
+    "text": "AB = 3",
+    "winner": "lengthClaim",
+  },
+  {
+    "lang": "he",
+    "text": "AB = 3",
+    "winner": "lengthClaim",
+  },
+  {
+    "lang": "en",
+    "text": "the area of triangle ABC = 4.5",
+    "winner": "areaClaim",
+  },
+  {
+    "lang": "he",
+    "text": "שטח המשולש ABC = 4.5",
+    "winner": "areaClaim",
+  },
+  {
+    "lang": "en",
+    "text": "A = (2, 0, -10)",
+    "winner": "coordsClaim",
+  },
+  {
+    "lang": "he",
+    "text": "A = (2, 0, -10)",
+    "winner": "coordsClaim",
+  },
+  {
+    "lang": "en",
+    "text": "plane KBC: x + 2y + 3z - 26 = 0",
+    "winner": "planeEqClaim",
+  },
+  {
+    "lang": "he",
+    "text": "המישור KBC: x + 2y + 3z - 26 = 0",
+    "winner": "planeEqClaim",
+  },
+  {
+    "lang": "en",
+    "text": "the angle between A'C and BC' is 90",
+    "winner": "angleSegClaim",
+  },
+  {
+    "lang": "he",
+    "text": "הזווית בין A'C לבין BC' היא 90",
+    "winner": "angleSegClaim",
+  },
+  {
+    "lang": "en",
+    "text": "A'K : A'C = 2 : 3",
+    "winner": "lengthRatioClaim",
+  },
+  {
+    "lang": "he",
+    "text": "A'K : A'C = 2 : 3",
+    "winner": "lengthRatioClaim",
+  },
+  {
+    "lang": "en",
+    "text": "ℓ is not parallel to plane π1 for every m",
+    "winner": "neverParallelClaim",
+  },
+  {
+    "lang": "he",
+    "text": "ℓ אינו מקביל ל-π1 לכל m",
+    "winner": "neverParallelClaim",
+  },
+  {
+    "lang": "en",
+    "text": "the volume of the cone = 100π",
+    "winner": "volumeClaim",
+  },
+  {
+    "lang": "he",
+    "text": "נפח החרוט = 100π",
+    "winner": "volumeClaim",
+  },
+  {
+    "lang": "en",
+    "text": "the lateral area of the cone = 65π",
+    "winner": "lateralAreaClaim",
+  },
+  {
+    "lang": "he",
+    "text": "שטח המעטפת של החרוט = 65π",
+    "winner": "lateralAreaClaim",
+  },
+  {
+    "lang": "en",
+    "text": "A'K = 4/5 DN",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "he",
+    "text": "A'K = 4/5 DN",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "en",
+    "text": "DF = (k/2)DB + kDC'",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "he",
+    "text": "DF = (k/2)DB + kDC'",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "en",
+    "text": "AS = (1-t)u + 0.5v + tw",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "he",
+    "text": "AS = (1-t)u + 0.5v + tw",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "en",
+    "text": "AM = (0.5+k/6)u + (k+3.5)w",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "he",
+    "text": "AM = (0.5+k/6)u + (k+3.5)w",
+    "winner": "vecEqClaim",
+  },
+  {
+    "lang": "en",
+    "text": "EF is parallel to plane ABC",
+    "winner": "segParallelPlane",
+  },
+  {
+    "lang": "he",
+    "text": "EF מקביל למישור ABC",
+    "winner": "segParallelPlane",
+  },
+  {
+    "lang": "en",
+    "text": "ABEC is a rectangle",
+    "winner": "rectComplete",
+  },
+  {
+    "lang": "he",
+    "text": "ABEC מלבן",
+    "winner": "rectComplete",
+  },
+  {
+    "lang": "en",
+    "text": "D is at the origin",
+    "winner": "onAxes",
+  },
+  {
+    "lang": "he",
+    "text": "D בראשית הצירים",
+    "winner": "onAxes",
+  },
+  {
+    "lang": "en",
+    "text": "A is on the positive x-axis",
+    "winner": "onAxes",
+  },
+  {
+    "lang": "he",
+    "text": "A על ציר ה-x החיובי",
+    "winner": "onAxes",
+  },
+  {
+    "lang": "en",
+    "text": "∠BAC = 90",
+    "winner": "vertexAngleClaim",
+  },
+  {
+    "lang": "he",
+    "text": "∠BAC = 90",
+    "winner": "vertexAngleClaim",
+  },
+  {
+    "lang": "en",
+    "text": "NK and PL are skew",
+    "winner": "mutualPositionClaim",
+  },
+  {
+    "lang": "he",
+    "text": "NK ו-PL מצטלבים",
+    "winner": "mutualPositionClaim",
+  },
+  {
+    "lang": "en",
+    "text": "the cosine of the angle between u and w is √35/10",
+    "winner": "cosAngleGiven",
+  },
+  {
+    "lang": "he",
+    "text": "קוסינוס הזווית בין הוקטורים u ו-w הוא √35/10",
+    "winner": "cosAngleGiven",
+  },
+  {
+    "lang": "en",
+    "text": "cos∠ACB = 3/4",
+    "winner": "cosAngleGiven",
+  },
+  {
+    "lang": "he",
+    "text": "קוסינוס הזווית ACB = 3/4",
+    "winner": "cosAngleGiven",
+  },
+  {
+    "lang": "en",
+    "text": "u·v = v·w = u·w",
+    "winner": "dotEqGiven",
+  },
+  {
+    "lang": "he",
+    "text": "u·v = v·w = u·w",
+    "winner": "dotEqGiven",
+  },
+  {
+    "lang": "en",
+    "text": "AE makes equal angles with AB and AD",
+    "winner": "equalAnglesGiven",
+  },
+  {
+    "lang": "he",
+    "text": "AE יוצר זוויות שוות עם AB ו-AD",
+    "winner": "equalAnglesGiven",
+  },
+  {
+    "lang": "en",
+    "text": "D on AC such that OD bisects angle AOC",
+    "winner": "bisectorPoint",
+  },
+  {
+    "lang": "he",
+    "text": "D על AC כך ש-OD חוצה-זווית AOC",
+    "winner": "bisectorPoint",
+  },
+  {
+    "lang": "en",
+    "text": "triangle ABC",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "משולש ABC",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "right triangle ABC",
+    "winner": "rightTriangle",
+  },
+  {
+    "lang": "he",
+    "text": "משולש ABC ישר זווית",
+    "winner": "rightTriangle",
+  },
+  {
+    "lang": "en",
+    "text": "quadrilateral MKNL",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "מרובע MKNL",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "pentagon ABCDE",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "מחומש ABCDE",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "CD is the altitude to AB",
+    "winner": "altitudeFoot",
+  },
+  {
+    "lang": "he",
+    "text": "גובה המשולש לצלע AB הוא CD",
+    "winner": "altitudeFoot",
+  },
+  {
+    "lang": "en",
+    "text": "sphere",
+    "winner": "revolutionSolid",
+  },
+  {
+    "lang": "he",
+    "text": "כדור",
+    "winner": "revolutionSolid",
+  },
+  {
+    "lang": "en",
+    "text": "tetrahedron ABCD",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "ABCD ארבעון",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
+    "text": "CD is the median in triangle ABC",
+    "winner": "medianFoot",
+  },
+  {
+    "lang": "he",
+    "text": "CD תיכון במשולש ABC",
+    "winner": "medianFoot",
+  },
+  {
+    "lang": "en",
+    "text": "DE is the altitude in the tetrahedron",
+    "winner": "tetraAltitude",
+  },
+  {
+    "lang": "he",
+    "text": "DE גובה בטטראדר",
+    "winner": "tetraAltitude",
+  },
+  {
+    "lang": "en",
+    "text": "plane x-y+z=1",
+    "winner": "planeByEquation",
+  },
+  {
+    "lang": "he",
+    "text": "המישור x-y+z=1",
+    "winner": "planeByEquation",
+  },
+  {
+    "lang": "en",
+    "text": "the angle between line AC' and plane ABCD is 30",
+    "winner": "linePlaneAngle",
+  },
+  {
+    "lang": "he",
+    "text": "הזווית בין הישר AC' לבין המישור ABCD היא 30",
+    "winner": "linePlaneAngle",
+  },
+  {
+    "lang": "en",
+    "text": "d is the common perpendicular of AB and CD",
+    "winner": "commonPerp",
+  },
+  {
+    "lang": "he",
+    "text": "הישר d מאונך לישר AB ולישר CD",
+    "winner": "commonPerp",
+  },
+  {
+    "lang": "en",
+    "text": "BE is the projection of line TB onto plane ABCD",
+    "winner": "lineProjection",
+  },
+  {
+    "lang": "he",
+    "text": "BE היטל הישר TB על המישור ABCD",
+    "winner": "lineProjection",
+  },
+  {
+    "lang": "en",
+    "text": "circle A tangent to line BC at F",
+    "winner": "circleTangentLine",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל A משיק לישר BC בנקודה F",
+    "winner": "circleTangentLine",
+  },
+  {
+    "lang": "en",
+    "text": "D is on the circle",
+    "winner": "onCircle3",
+  },
+  {
+    "lang": "he",
+    "text": "D על המעגל",
+    "winner": "onCircle3",
+  },
+  {
+    "lang": "en",
+    "text": "T on SC such that TABCD is a right pyramid",
+    "winner": "rightPyramidPoint",
+  },
+  {
+    "lang": "he",
+    "text": "T על הקטע SC כך ש-TABCD היא פירמידה ישרה",
+    "winner": "rightPyramidPoint",
+  },
+  {
+    "lang": "en",
+    "text": "segment CA'",
+    "winner": "bareSegment",
+  },
+  {
+    "lang": "he",
+    "text": "קטע CA'",
+    "winner": "bareSegment",
+  },
+  {
+    "lang": "en",
+    "text": "connect D'F",
+    "winner": "bareSegment",
+  },
+  {
+    "lang": "he",
+    "text": "נחבר את D'F",
+    "winner": "bareSegment",
+  },
+  {
+    "lang": "en",
+    "text": "the diagonal BD'",
+    "winner": "bareSegment",
+  },
+  {
+    "lang": "he",
+    "text": "אלכסון BD'",
+    "winner": "bareSegment",
+  },
+  {
+    "lang": "en",
+    "text": "∠SDB",
+    "winner": "angleMarker",
+  },
+  {
+    "lang": "he",
+    "text": "∠SDB",
+    "winner": "angleMarker",
+  },
+  {
+    "lang": "en",
+    "text": "∠SDB = α",
+    "winner": "angleMarker",
+  },
+  {
+    "lang": "he",
+    "text": "∠SDB = α",
+    "winner": "angleMarker",
+  },
+  {
+    "lang": "en",
+    "text": "arrow A'C",
+    "winner": "drawArrow",
+  },
+  {
+    "lang": "he",
+    "text": "חץ A'C",
+    "winner": "drawArrow",
+  },
+  {
+    "lang": "en",
+    "text": "length AB = BC",
+    "winner": "lengthRel",
+  },
+  {
+    "lang": "he",
+    "text": "אורך AB=BC",
+    "winner": "lengthRel",
+  },
+  {
+    "lang": "en",
+    "text": "drop a perpendicular from M to the base",
+    "winner": "perpToBase",
+  },
+  {
+    "lang": "he",
+    "text": "אנך יורד מ-M לבסיס",
+    "winner": "perpToBase",
+  },
+  {
+    "lang": "en",
+    "text": "angle SAB = angle SAD",
+    "winner": "angleEquality3",
+  },
+  {
+    "lang": "he",
+    "text": "זווית SAB = זווית SAD",
+    "winner": "angleEquality3",
+  },
+  {
+    "lang": "en",
+    "text": "α = 70",
+    "winner": "symbolValue",
+  },
+  {
+    "lang": "he",
+    "text": "α = 70",
+    "winner": "symbolValue",
+  },
+  {
+    "lang": "en",
+    "text": "60 < angle SAB < 90",
+    "winner": "angleBound3",
+  },
+  {
+    "lang": "he",
+    "text": "60 < זווית SAB < 90",
+    "winner": "angleBound3",
+  },
+  {
+    "lang": "en",
+    "text": "angle SAB is greater than 60",
+    "winner": "angleBound3",
+  },
+  {
+    "lang": "he",
+    "text": "זווית SAB גדולה מ-60",
+    "winner": "angleBound3",
+  },
+]
+`;
