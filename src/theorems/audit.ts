@@ -11,8 +11,8 @@
  * to run over hundreds of sessions; the L3 lane gets its own treatment in T4.
  */
 
-import { replay, groupKey } from '../store/geoStore';
-import type { Fact } from '../store/geoStore';
+import { replay, groupKey } from '../replay/core';
+import type { Fact } from '../replay/core';
 import { detectTheorems } from './detect';
 import type { TheoremFeedEntry } from './types';
 

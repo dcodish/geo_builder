@@ -19,8 +19,8 @@
  */
 
 import type { AnyCommand, Id } from '../engine/types';
-import type { Fact } from '../store/geoStore';
-import { commandPointIds } from '../store/geoStore';
+import type { Fact } from '../replay/core';
+import { commandPointIds } from '../replay/core';
 import type { DiscoveryLevel, MatchCtx, Salience, TheoremDef, TheoremMatch } from './types';
 
 // ---------- premise-scan helpers (symbolic; no coordinates) ----------

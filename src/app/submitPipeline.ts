@@ -42,6 +42,7 @@ import { isGeoPoint } from '@/engine';
 import type { Construction, Id, Vec } from '@/engine';
 import { deferralWorthwhile, dryRunOutcome, primeFoldFor, replay, trialFacts, useGeoStore } from '@/store/geoStore';
 import { geoWork, isCancelled } from '@/store/geoWork';
+import { spanShadow } from '@/parser/spanAccounting';
 import { logDebug } from '@/debug/sessionLog';
 
 export interface SubmitUi {
@@ -274,7 +275,11 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
       if (outcome.produced) {
         // One utterance → one BATCH commit (one group id, one set, ONE undo entry — E4/STO-4).
         store().executeMany(r.commands, utterance);
-        logDebug({ kind: 'input', utterance, locale, source: 'parser', commands: r.commands });
+        // SPAN-ACCOUNTING SHADOW (S3.1 of docs/24 — never refuses; the enforcing flip is the
+        // operator's, §4.2): log what the total accountant WOULD have flagged on this committed
+        // parse, so real traffic accumulates the divergence evidence the flip decision needs.
+        const shadow = spanShadow(utterance, r.commands);
+        logDebug({ kind: 'input', utterance, locale, source: 'parser', commands: r.commands, ...(shadow ? { spanShadow: shadow } : {}) });
         ui.clearText();
         deps.resolveAfterCommit();
         return;

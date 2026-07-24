@@ -11,7 +11,7 @@
 import { buildMatchCtx } from './context';
 import { THEOREM_TABLE } from './table';
 import type { DetectInput, MatchCtx, TheoremFeedEntry, TheoremId } from './types';
-import { groupKey, type Fact } from '../store/geoStore';
+import { groupKey, type Fact } from '../replay/core';
 
 /** Salience order: headline entries rank above the collapsed background family rows. */
 const salienceRank = (s: TheoremFeedEntry['salience']): number => (s === 'headline' ? 0 : 1);

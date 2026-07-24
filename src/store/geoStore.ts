@@ -457,6 +457,12 @@ export const useGeoStore = create<GeoState>()(
         // parameter just re-derives downstream; an incompatible change makes
         // dependents auto-drop, reversibly — no redefinition conflict, since the
         // edited id isn't yet present at its own slot during replay (ADR-015).
+        //
+        // PARITY CAVEAT (docs/24 S4.2, docs/23 finding): unlike `replaceGroup` (the ✎ edit path the
+        // App actually uses), this single-fact action runs NO settle-variant/seed-advance pass — the
+        // view can be left on a seed violating extension/distinctness requirements until a later
+        // search. No UI caller exists today; if one is ever added, route it through `replaceGroup`'s
+        // parity dance (the ADR-241 edit-path class) rather than calling this raw action.
         set({ facts: get().facts.map((f) => (f.id === id ? { ...f, cmd, utterance } : f)) });
       },
 

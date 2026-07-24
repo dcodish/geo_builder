@@ -6,7 +6,7 @@
 
 import type { Circle, Construction, Id, Line } from '../engine/types';
 import { circleMembers, pointNeighbors } from '../engine/step';
-import { groupKey, type Fact } from '../store/geoStore';
+import { groupKey, type Fact } from '../replay/core';
 import type { DetectedShape } from '../engine/detectShapes';
 import type { MatchCtx, ObservedInputs } from './types';
 

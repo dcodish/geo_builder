@@ -10,7 +10,7 @@
  */
 
 import type { Construction, Id } from '../engine/types';
-import type { Fact } from '../store/geoStore';
+import type { Fact } from '../replay/core';
 import type { DetectedShape, SimilarClass } from '../engine/detectShapes';
 import type { RelationsResult } from '../engine/relations';
 
