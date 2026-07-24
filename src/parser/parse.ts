@@ -20,6 +20,7 @@
  */
 
 import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
+import { NUM } from './lexicon';
 
 export type ParseResult =
   | { ok: true; commands: AnyCommand[] }
@@ -190,7 +191,7 @@ const up = (c: string): Id => c.toUpperCase();
  *  Lets a NAMED-segment rule (altitude/midsegment) tell a student label ("CD") from a lowercase connector
  *  word the regex would otherwise read as two single-letter labels ("to" → T,O, "in" → I,N). */
 const isUpperLabel = (c: string | undefined): boolean => !!c && c === c.toUpperCase() && /[A-Z]/.test(c);
-const num = String.raw`(-?\d+(?:\.\d+)?)`;
+const num = `(${NUM})`; // the one number grammar — src/parser/lexicon.ts (S2.1; the ratchet test caps inline copies)
 
 /** Deterministic circle id from its centre letter — so "circle O" is referenceable by name. */
 const circleId = (center: string): Id => `circle-${center.toUpperCase()}`;

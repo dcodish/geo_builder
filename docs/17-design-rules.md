@@ -83,6 +83,7 @@ The list itself is the smell: each is a point where a general decision is being 
 | Keyword bow-outs between parser rules (`return null` on a word test) | parser precedence + leftover guard (ADR-024) |
 | Sampling loops (any new `for (seed…) replay/evaluate`) | M3 one sampler, budgeted |
 | Hard-coded defaults in shape macros (apex choice, right-angle vertex, equal pair) | M4 defaults yield to statements |
+| Inline lexical fragments in parser rules (label token, number grammar, keyword morphology) | `src/parser/lexicon.ts` atoms + the `lexical-ratchet.test.ts` ceilings (S2.1 of docs/24 — counts may only go DOWN; compose new rules from the atoms) |
 
 ## 3b. ParseContext — the deictic/semantic fence (S2.4 of docs/24)
 
