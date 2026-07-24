@@ -27,6 +27,14 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: 'המנסרה ישרה', en: 'the prism is right' }, // #289 (M1): make the existing prism a right prism
   { category: 'solids', he: 'פירמידה ישרה שבסיסה משולש שווה צלעות', en: 'right pyramid with an equilateral triangle base' },
   { category: 'solids', he: 'פירמידה SABCD שבסיסה מקבילית', en: 'pyramid SABCD with a parallelogram base' },
+  // #305: the rest of the QUAD bases. `ישרה` (apex over the base's centre) needs a centro-symmetric
+  // base, so only the rhombus/parallelogram/square/rectangle have a right form.
+  { category: 'solids', he: 'פירמידה SABCD שבסיסה מעוין', en: 'pyramid SABCD with a rhombus base' },
+  { category: 'solids', he: 'פירמידה ישרה SABCD שבסיסה מעוין', en: 'right pyramid SABCD with a rhombus base' },
+  { category: 'solids', he: 'פירמידה ישרה SABCD שבסיסה מקבילית', en: 'right pyramid SABCD with a parallelogram base' },
+  { category: 'solids', he: 'פירמידה SABCD שבסיסה דלתון', en: 'pyramid SABCD with a kite base' },
+  { category: 'solids', he: 'פירמידה SABCD שבסיסה טרפז', en: 'pyramid SABCD with a trapezoid base' },
+  { category: 'solids', he: 'פירמידה SABCD שבסיסה מרובע', en: 'pyramid SABCD with a quadrilateral base' },
   { category: 'solids', he: 'פירמידה ישרה ABCDS שבסיסה ריבוע', en: 'right pyramid ABCDS with a square base' },
   { category: 'solids', he: 'פירמידה ABCDS שבסיסה ריבוע', en: 'pyramid ABCDS with a square base' },
   { category: 'solids', he: 'פירמידה SABCD שבסיסה ריבוע', en: 'pyramid SABCD with a square base' },

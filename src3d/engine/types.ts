@@ -156,7 +156,13 @@ export type SolidKind =
   | 'polygon3' | 'polygon4' | 'polygon5'
   // #117: right prisms over more bases — parallelogram / general quad / square / regular pentagon+hexagon —
   // and the oblique parallelepiped (מקבילון: a parallelogram base translated by a FREE lateral vector w).
-  | 'prism4' | 'prism4g' | 'prism4sq' | 'prismReg5' | 'prismReg6' | 'parallelepiped';
+  | 'prism4' | 'prism4g' | 'prism4sq' | 'prismReg5' | 'prismReg6' | 'parallelepiped'
+  // #305 (ADR-3D-072): the rest of the QUAD pyramid bases. A solid is a BASE × a TOP; the base
+  // ring of each lives once in `baseShapes.ts` and the whole family is driven by the
+  // `QUAD_PYRAMIDS` table there, so a base written for one top exists for the other.
+  // `…R` = a RIGHT pyramid (apex over the base's centre of symmetry — only a centro-symmetric
+  // base has one, which is why there is no right kite/trapezoid/quad pyramid).
+  | 'pyramidRhomb' | 'pyramidRhombR' | 'pyramidParR' | 'pyramidKite' | 'pyramidTrap' | 'pyramidQuad';
 // The 4-base pyramid family: rightness (ישרה — apex above the base centre) and base shape
 // are INDEPENDENT stated givens (ADR-052). Square must be STATED (שבסיסה ריבוע); an
 // unstated base is a free-aspect rectangle DOF. pyramid4: right+square (dims [h]);

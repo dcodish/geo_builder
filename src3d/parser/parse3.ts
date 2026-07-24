@@ -109,6 +109,77 @@ const cubeOrBox: Rule = (s) => {
   return null;
 };
 
+// ---------------------------------------------------------------------------
+// The BASE-SHAPE vocabulary (#304 / #305, ADR-3D-072)
+// ---------------------------------------------------------------------------
+
+/** Every base shape a student can NAME — the closed vocabulary, independent of which solids
+ *  can currently stand on it. */
+type BaseNoun = 'triangle' | 'equilateral' | 'square' | 'rectangle' | 'rhombus' | 'parallelogram' | 'kite' | 'trapezoid' | 'quad' | 'pentagon' | 'hexagon';
+
+/**
+ * The one base-noun table, shared by every solid rule.
+ *
+ * Before #304 each rule tested base words inline and ended in an `else` that fell through
+ * to its UNSTATED-base default — so a stated noun the rule happened not to test (מעוין,
+ * דלתון, טרפז, מרובע…) was silently dropped AND replaced by that default: `פירמידה שבסיסה
+ * מעוין` drew a RECTANGLE. Recognising a base noun and being able to LOWER one are now two
+ * separate questions: this table answers the first for every rule, and each rule's own kind
+ * table answers the second — so a noun a rule cannot lower DEFERS (escalates / honest
+ * refusal) instead of quietly becoming a different shape (ADR-052, M4).
+ *
+ * Order matters: the more specific noun wins (`שווה צלעות` before `משולש`).
+ */
+const BASE_NOUNS: { re: RegExp; base: BaseNoun }[] = [
+  { re: /שווה[\s-]?צלעות|\bequilateral\b/i, base: 'equilateral' },
+  { re: /משולש|\btriangular\b|\btriangle\b/i, base: 'triangle' },
+  { re: /ריבוע|\bsquare\b/i, base: 'square' },
+  { re: /מלבן|\brectangl/i, base: 'rectangle' },
+  { re: /מעויי?ן|\brhombus\b/i, base: 'rhombus' },
+  { re: /מקבילית|\bparallelogram\b/i, base: 'parallelogram' },
+  { re: /דלתון|\bkite\b/i, base: 'kite' },
+  { re: /טרפז|\btrapez(?:oid|ium)\b/i, base: 'trapezoid' },
+  { re: /מרובע|\bquadrilateral\b|\bquad\b/i, base: 'quad' },
+  { re: /מחומש|\bpentagon(?:al)?\b/i, base: 'pentagon' },
+  { re: /משושה|\bhexagon(?:al)?\b/i, base: 'hexagon' },
+];
+
+/** The base shape this utterance STATES, or null when it names none. */
+function statedBase(s: string): BaseNoun | null {
+  for (const { re, base } of BASE_NOUNS) if (re.test(s)) return base;
+  return null;
+}
+
+/** The 3-vertex bases (a triangular solid), as opposed to the 4-vertex quad bases. */
+const TRIANGLE_BASES: ReadonlySet<BaseNoun> = new Set<BaseNoun>(['triangle', 'equilateral']);
+
+/** Which RIGHT PRISM each stated base lowers to, and its base-vertex count.
+ *  A base absent here has no prism model yet ⇒ the rule DEFERS (kite/trapezoid: #305, deferred
+ *  by the operator — no corpus question uses one). `rhombus` is owned by `rhombusPrism`. */
+const PRISM_BASE_KIND: Partial<Record<BaseNoun, { kind: SolidKind; bn: number }>> = {
+  triangle: { kind: 'prism3', bn: 3 },
+  equilateral: { kind: 'prism3e', bn: 3 },
+  square: { kind: 'prism4sq', bn: 4 },
+  rectangle: { kind: 'box', bn: 4 },
+  parallelogram: { kind: 'prism4', bn: 4 },
+  quad: { kind: 'prism4g', bn: 4 },
+  pentagon: { kind: 'prismReg5', bn: 5 },
+  hexagon: { kind: 'prismReg6', bn: 6 },
+};
+
+/** Which QUAD-base pyramid each stated base lowers to — `right` (apex over the base's centre of
+ *  symmetry) and `free` (apex anywhere). `right: null` = that base HAS no centre of symmetry, so
+ *  `ישרה` over it is not a defined solid and the rule DEFERS rather than inventing a centroid. */
+const PYRAMID_BASE_KIND: Partial<Record<BaseNoun, { right: SolidKind | null; free: SolidKind }>> = {
+  square: { right: 'pyramid4', free: 'pyramid4g' },
+  rectangle: { right: 'pyramid4r', free: 'pyramid4gr' },
+  rhombus: { right: 'pyramidRhombR', free: 'pyramidRhomb' },
+  parallelogram: { right: 'pyramidParR', free: 'pyramidPar' },
+  kite: { right: null, free: 'pyramidKite' },
+  trapezoid: { right: null, free: 'pyramidTrap' },
+  quad: { right: null, free: 'pyramidQuad' },
+};
+
 /** Right prism, dispatched by its BASE shape (#117): `מנסרה ישרה [שבסיסה <shape>] <labels>`.
  *  triangle→prism3, equilateral→prism3e, parallelogram→prism4, general quad→prism4g, square→prism4sq,
  *  rectangle→box, pentagon→prismReg5, hexagon→prismReg6. (Rhombus is left to `rhombusPrism`.) Labels: the
@@ -117,16 +188,15 @@ const cubeOrBox: Rule = (s) => {
 const rightPrism: Rule = (s) => {
   if (!/מנסרה/.test(s) && !/\bprism\b/i.test(s)) return null;
   if (!/ישרה/.test(s) && !/\bright\b/i.test(s)) return null; // oblique unsupported — honest refusal
-  if (/מעוין/.test(s) || /\brhombus\b/i.test(s)) return null; // rhombus base → rhombusPrism
-  const equi = /שווה[\s-]?צלעות/.test(s) || /כל\s+מקצועותיה\s+שוו/.test(s) || /\bequilateral\b/i.test(s);
-  let kind: SolidKind, bn: number, namedBase: boolean;
-  if (/מקבילית/.test(s) || /\bparallelogram\b/i.test(s)) { kind = 'prism4'; bn = 4; namedBase = true; }
-  else if (/מלבן/.test(s) || /\brectangle\b/i.test(s)) { kind = 'box'; bn = 4; namedBase = true; }
-  else if (/ריבוע/.test(s) || /\bsquare\b/i.test(s)) { kind = 'prism4sq'; bn = 4; namedBase = true; }
-  else if (/מרובע/.test(s) || /\bquadrilateral\b/i.test(s) || /\bquad\b/i.test(s)) { kind = 'prism4g'; bn = 4; namedBase = true; }
-  else if (/מחומש/.test(s) || /\bpentagon\b/i.test(s)) { kind = 'prismReg5'; bn = 5; namedBase = true; }
-  else if (/משושה/.test(s) || /\bhexagon\b/i.test(s)) { kind = 'prismReg6'; bn = 6; namedBase = true; }
-  else { kind = equi ? 'prism3e' : 'prism3'; bn = 3; namedBase = /משולש/.test(s) || /\btriangular\b/i.test(s) || equi; }
+  if (/מעוין/.test(s) || /\brhombus\b/i.test(s)) return null; // rhombus base → rhombusPrism (owns it)
+  const equi = /כל\s+מקצועותיה\s+שוו/.test(s) || statedBase(s) === 'equilateral';
+  const noun = equi ? 'equilateral' : statedBase(s);
+  // #304: a CLOSED table — a stated base this rule cannot lower DEFERS (kite/trapezoid prisms are
+  // deliberately not built yet, #305), never falls through to the no-noun triangular default.
+  const spec = noun === null ? { kind: 'prism3' as SolidKind, bn: 3 } : PRISM_BASE_KIND[noun];
+  if (!spec) return null;
+  const { kind, bn } = spec;
+  const namedBase = noun !== null;
   const base = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, bn);
   const toks = firstLabelRun(s);
   if (toks.length === 2 * bn) return [{ type: 'solid', kind, ids: toks }];
@@ -158,13 +228,13 @@ const makeRightPrism: Rule = (s) => {
  *  parallelogram has an oblique model, so other bases without `ישרה` stay `rightPrism`'s honest refusal. */
 const parallelepiped: Rule = (s) => {
   const named = /מקבילון/.test(s) || /\bparallelepiped\b/i.test(s);
+  // #304: "is the stated base a parallelogram?" is asked ONCE, via the shared vocabulary — so a
+  // rhombus (or any other noun) simply isn't a parallelogram here, with no keyword bow-out needed.
   const barePrismPar =
     (/מנסרה/.test(s) || /\bprism\b/i.test(s)) &&
     !/ישרה/.test(s) &&
     !/\bright\b/i.test(s) &&
-    (/מקבילית/.test(s) || /\bparallelogram\b/i.test(s)) &&
-    !/מעוין/.test(s) &&
-    !/\brhombus\b/i.test(s);
+    statedBase(s) === 'parallelogram';
   if (!named && !barePrismPar) return null;
   const toks = firstLabelRun(s);
   if (toks.length === 8) return [{ type: 'solid', kind: 'parallelepiped', ids: toks }];
@@ -230,7 +300,9 @@ const rightPyramidPoint: Rule = (s) => {
 };
 
 /** Right pyramid: `פירמידה ישרה ABCDS` / `ABCS`. WITHOUT ישרה, 4 ids = a GENERAL tetrahedron (V7 T2).
- *  V8-d: an equilateral triangular base → `pyramid3e`; a parallelogram base → `pyramidPar`. */
+ *  V8-d: an equilateral triangular base → `pyramid3e`; a parallelogram base → `pyramidPar`.
+ *  #305: every QUAD base (rhombus / kite / trapezoid / general quad too) via `PYRAMID_BASE_KIND`;
+ *  a stated base with no lowering, or a base-noun/label-count contradiction, DEFERS (#304). */
 const rightPyramid: Rule = (s) => {
   // `טטראדר`/`tetrahedron` IS a triangular pyramid by definition — it carries its own base
   // `טטראדר`/`טטרדר` (transliterations, the [אה] optional so a missing vowel-letter still reads),
@@ -238,9 +310,10 @@ const rightPyramid: Rule = (s) => {
   const tetraWord = /טטר[אה]?ה?דר(?:ון)?/.test(s) || /ארבעון/.test(s) || /\btetrahedr(?:on)?\b/i.test(s);
   if (!/פירמידה/.test(s) && !/\bpyramid\b/i.test(s) && !tetraWord) return null;
   const right = /ישרה?/.test(s) || /\bright\b/i.test(s); // ישרה (fem, פירמידה) or ישר (masc, טטראדר)
-  const square = /ריבוע/.test(s) || /\bsquare\b/i.test(s);
-  const equi = /שווה[\s-]?צלעות/.test(s) || /\bequilateral\b/i.test(s);
-  const par = /מקבילית/.test(s) || /\bparallelogram\b/i.test(s);
+  // #304: the base the student STATED (null = none stated), from the one shared vocabulary.
+  // `tetraWord` carries its own triangular base, so it wins over any other noun in the text.
+  const noun: BaseNoun | null = tetraWord ? 'triangle' : statedBase(s);
+  const equi = noun === 'equilateral';
   // #199 (ADR-3D-047): «שווה מקצועות» on a TETRA is a macro (the ADR-110 pattern) — the solid plus
   // five equal-edge `length-rel` constraints, M1 at apply (drives a free tetra into the regular one,
   // verifies a pinned one). On any other kind the qualifier has no lowering — DEFER (escalate),
@@ -256,27 +329,37 @@ const rightPyramid: Rule = (s) => {
   };
   // the triangular-base pyramid kind (equilateral only when right — a right equilateral pyramid)
   const triKind = right ? (equi ? 'pyramid3e' : 'pyramid3') : 'tetra';
+  const tri = noun !== null && TRIANGLE_BASES.has(noun);
+  /** The QUAD-base kind for the stated noun — or null when the base has no (right) pyramid model.
+   *  With NO noun stated the historical default stands: a free-aspect RECTANGLE base (ADR-052 —
+   *  its aspect is a free DOF, not a pinned given; see `types.ts`). */
+  const quadKind = (): SolidKind | null => {
+    if (noun === null) return right ? 'pyramid4r' : 'pyramid4gr';
+    const spec = PYRAMID_BASE_KIND[noun];
+    if (!spec) return null; // pentagon / hexagon — no pyramid model yet ⇒ DEFER
+    return right ? spec.right : spec.free; // `right: null` ⇒ no centre of symmetry ⇒ DEFER
+  };
   if (firstLabelRun(s).length === 0) {
     // label-less: a stated base word makes the shape determined — default lettering
-    const rect = /מלבן/.test(s) || /\brectang/i.test(s);
-    const tri = tetraWord || /משולש/.test(s) || /\btriangular\b/i.test(s) || equi;
-    if (par) return withEqEdges([{ type: 'solid', kind: 'pyramidPar', ids: ['A', 'B', 'C', 'D', 'S'] }]);
     if (tri) return withEqEdges([{ type: 'solid', kind: triKind, ids: ['A', 'B', 'C', 'D'] }]);
-    if (square || rect) {
-      const kind = right ? (square ? 'pyramid4' : 'pyramid4r') : square ? ('pyramid4g' as const) : 'pyramid4gr';
-      return withEqEdges([{ type: 'solid', kind, ids: ['A', 'B', 'C', 'D', 'S'] }]);
-    }
-    return null;
+    if (noun === null) return null; // no base, no labels — nothing to build (honest refusal)
+    const kind = quadKind();
+    return kind ? withEqEdges([{ type: 'solid', kind, ids: ['A', 'B', 'C', 'D', 'S'] }]) : null;
   }
   const toks = orientPyramid(s, firstLabelRun(s));
   // a tetrahedron has exactly 4 vertices — a 5-label `טטראדר` is contradictory (refuse → honest)
   if (toks.length === 5 && !tetraWord) {
-    if (par) return withEqEdges([{ type: 'solid', kind: 'pyramidPar', ids: toks }]);
+    if (tri) return null; // #304: a stated TRIANGLE base with 5 labels contradicts itself — defer
     // rightness and base shape are INDEPENDENT givens (ADR-052): a square base must be STATED
-    const kind = right ? (square ? 'pyramid4' : 'pyramid4r') : square ? ('pyramid4g' as const) : 'pyramid4gr';
-    return withEqEdges([{ type: 'solid', kind, ids: toks }]);
+    const kind = quadKind();
+    return kind ? withEqEdges([{ type: 'solid', kind, ids: toks }]) : null;
   }
-  if (toks.length === 4) return withEqEdges([{ type: 'solid', kind: triKind, ids: toks }]);
+  if (toks.length === 4) {
+    // #304: a stated QUAD base needs 5 labels (4 base + apex) — 4 labels contradicts it, so defer
+    // rather than silently building the triangular pyramid the label count alone suggests.
+    if (noun !== null && !tri) return null;
+    return withEqEdges([{ type: 'solid', kind: triKind, ids: toks }]);
+  }
   return null;
 };
 

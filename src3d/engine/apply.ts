@@ -3,11 +3,12 @@
  * Pure — returns a new construction or a structured error; never mutates.
  */
 
+import { QUAD_PYRAMIDS } from './baseShapes';
 import { exprPointIds, exprVectorNames } from './vecExpr';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, SolidCommand, SolidObj, VecAtom } from './types';
 
-const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8 };
+export const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8, pyramidRhomb: 5, pyramidRhombR: 5, pyramidParR: 5, pyramidKite: 5, pyramidTrap: 5, pyramidQuad: 5 };
 
 /** The base-polygon vertex count of a 2n-vertex prism/parallelepiped (#117), or null for other solids. */
 function prismBaseN(kind: SolidCommand['kind']): number | null {
@@ -38,6 +39,24 @@ function polygonN(kind: SolidCommand['kind']): number | null {
   return kind === 'polygon3' ? 3 : kind === 'polygon4' ? 4 : kind === 'polygon5' ? 5 : null;
 }
 
+/** The BASE-ring size of a pyramid (base ring [0..n-1] then the APEX at n), or null for other solids.
+ *  #305: the quad family is read off the shared `QUAD_PYRAMIDS` table, so a new base needs no edit here. */
+function pyramidBaseN(kind: SolidCommand['kind']): number | null {
+  if (QUAD_PYRAMIDS[kind]) return 4;
+  if (kind === 'pyramid3' || kind === 'tetra' || kind === 'pyramid3e') return 3;
+  return null;
+}
+
+/** Generic pyramid topology: base ring [0..n-1] + apex n. */
+function pyramidRing(n: number): { edges: [number, number][]; faces: number[][] } {
+  const edges: [number, number][] = [];
+  for (let i = 0; i < n; i++) edges.push([i, (i + 1) % n]); // base ring
+  for (let i = 0; i < n; i++) edges.push([i, n]); // lateral edges to the apex
+  const faces: number[][] = [Array.from({ length: n }, (_, i) => i)]; // the base
+  for (let i = 0; i < n; i++) faces.push([i, (i + 1) % n, n]); // lateral triangles
+  return { edges, faces };
+}
+
 /** Edge index pairs per solid kind (indices into `ids`). */
 function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
   const bn = prismBaseN(kind);
@@ -51,18 +70,8 @@ function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
       [0, 3], [1, 4], [2, 5], // verticals
     ];
   }
-  if (kind === 'pyramid4' || kind === 'pyramid4g' || kind === 'pyramid4r' || kind === 'pyramid4gr' || kind === 'pyramidPar') {
-    return [
-      [0, 1], [1, 2], [2, 3], [3, 0], // base ring
-      [0, 4], [1, 4], [2, 4], [3, 4], // lateral edges to the apex
-    ];
-  }
-  if (kind === 'pyramid3' || kind === 'tetra' || kind === 'pyramid3e') {
-    return [
-      [0, 1], [1, 2], [2, 0], // base ring
-      [0, 3], [1, 3], [2, 3], // lateral edges to the apex
-    ];
-  }
+  const yn = pyramidBaseN(kind);
+  if (yn) return pyramidRing(yn).edges; // #305: every pyramid, 3- or 4-base
   if (kind === 'prism4r') {
     return [
       [0, 1], [1, 2], [2, 3], [3, 0],
@@ -97,18 +106,8 @@ function faceIndices(kind: SolidCommand['kind']): number[][] {
       [0, 1, 4, 3], [1, 2, 5, 4], [2, 0, 3, 5], // sides
     ];
   }
-  if (kind === 'pyramid4' || kind === 'pyramid4g' || kind === 'pyramid4r' || kind === 'pyramid4gr' || kind === 'pyramidPar') {
-    return [
-      [0, 1, 2, 3], // base
-      [0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4], // lateral triangles
-    ];
-  }
-  if (kind === 'pyramid3' || kind === 'tetra' || kind === 'pyramid3e') {
-    return [
-      [0, 1, 2], // base
-      [0, 1, 3], [1, 2, 3], [2, 0, 3], // lateral triangles
-    ];
-  }
+  const yn = pyramidBaseN(kind);
+  if (yn) return pyramidRing(yn).faces; // #305: every pyramid, 3- or 4-base
   if (kind === 'prism4r') {
     return [
       [0, 1, 2, 3],
@@ -172,7 +171,9 @@ function relPointIds(c: Construction3, from: Id, to: Id, terms: { atom: import('
 }
 
 /** How many FREE dims the figure's solids carry (a scalar statement on such a figure is a GIVEN, not a check). */
-const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2, pyramid4g: 3, pyramid4r: 2, pyramid4gr: 4, prism3e: 1, pyramid3e: 1, pyramidPar: 5, polygon3: 2, polygon4: 4, polygon5: 6, prism4: 3, prism4g: 5, prism4sq: 1, prismReg5: 1, prismReg6: 1, parallelepiped: 5 };
+// (kept an explicit exhaustive Record so a new SolidKind without an entry is a COMPILE error;
+//  `solid-kind-integrity.test.ts` asserts every entry equals `solidDims(kind).length`, so it cannot drift.)
+export const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2, pyramid4g: 3, pyramid4r: 2, pyramid4gr: 4, prism3e: 1, pyramid3e: 1, pyramidPar: 5, polygon3: 2, polygon4: 4, polygon5: 6, prism4: 3, prism4g: 5, prism4sq: 1, prismReg5: 1, prismReg6: 1, parallelepiped: 5, pyramidRhomb: 4, pyramidRhombR: 2, pyramidParR: 3, pyramidKite: 5, pyramidTrap: 6, pyramidQuad: 7 };
 function freeDims(c: Construction3): number {
   let n = 0;
   for (const s of c.solids) n += DIM_COUNT[s.kind];
