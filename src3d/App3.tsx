@@ -25,6 +25,8 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.boundUnsatisfiable', { id: err.id });
     case 'ambiguous-vector-length':
       return t('err.ambiguousVectorLength');
+    case 'dropped-given':
+      return t('err.droppedGiven', { items: err.items });
     case 'not-understood':
       return t('err.notUnderstood');
     case 'bad-file':
