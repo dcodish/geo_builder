@@ -15,6 +15,8 @@ import { intersectPlanes, type Resolved3, type ResolvedLine, type ResolvedPlane 
 import type { Construction3, Id, Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
+import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
+import { isRightAngleValue, rightAngles3 } from './rightAngles';
 
 export interface ScenePoint3 {
   id: Id;
@@ -242,19 +244,6 @@ const fmt = (x: number): string => {
   return String(Object.is(r, -0) ? 0 : r);
 };
 
-/** A stable in-plane orthonormal basis for a plane's patch. */
-function planeBasis(n: Vec3): { e1: Vec3; e2: Vec3 } {
-  const nn = normalize3(n);
-  const seed = Math.abs(nn.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
-  const e1 = normalize3(cross3(nn, seed));
-  return { e1, e2: normalize3(cross3(nn, e1)) };
-}
-
-const projectOntoPlane = (p: Vec3, pl: ResolvedPlane): Vec3 =>
-  sub3(p, scale3(pl.n, (dot3(pl.n, p) + pl.d) / dot3(pl.n, pl.n)));
-
-const projectOntoLine = (p: Vec3, ln: ResolvedLine): Vec3 =>
-  add3(ln.anchor, scale3(ln.dir, dot3(sub3(p, ln.anchor), ln.dir) / Math.max(dot3(ln.dir, ln.dir), 1e-12)));
 
 export function buildScene3(
   c: Construction3,
@@ -404,6 +393,8 @@ export function buildScene3(
     ];
     const seen = new Set<string>();
     for (const g of stated) {
+      // #307: a right angle is drawn as a KNEE (the textbook mark), not an arc labelled "90°"
+      if (isRightAngleValue(g.deg)) continue;
       const key = `${g.vertex}|${[g.p, g.q].sort().join('|')}|${g.deg}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -533,31 +524,16 @@ export function buildScene3(
     }
   }
 
+  // #307: a knee for EVERY right angle the figure asserts — stated (`AB ⊥ AD`, `u ⊥ v`,
+  // `∠ABC = 90`, `CA' ⊥ plane BC'D`) as well as constructed (every foot kind). The wedges come
+  // from the shared collector; the legs are built in WORLD space along the two arm directions and
+  // projected below, so the knee lies in the plane of the arms and foreshortens with the orbit.
   const wMarks: Vec3[][] = [];
-  for (const [id, def] of c.points) {
-    if (def.kind !== 'foot-plane' && def.kind !== 'foot-line') continue;
-    const foot = positions.get(id);
-    const from = positions.get(def.from);
-    if (!foot || !from || dist3(foot, from) < 1e-9) continue;
-    const leg1 = normalize3(sub3(from, foot));
-    let leg2: Vec3 | null = null;
-    if (def.kind === 'foot-line') {
-      const ln = resolved.lines.get(def.line);
-      if (ln) leg2 = ln.dir;
-    } else {
-      const pl = resolved.planes.get(def.plane);
-      if (pl) {
-        const q = sub3(projectOntoPlane(center, pl), foot);
-        leg2 = norm3(q) > 1e-6 ? normalize3(q) : planeBasis(pl.n).e1;
-      }
-    }
-    if (!leg2) continue;
+  for (const m of rightAngles3(c, resolved, radius)) {
     const s = radius * 0.07;
-    wMarks.push([
-      add3(foot, scale3(leg1, s)),
-      add3(foot, add3(scale3(leg1, s), scale3(leg2, s))),
-      add3(foot, scale3(leg2, s)),
-    ]);
+    const l1 = scale3(m.u1, s);
+    const l2 = scale3(m.u2, s);
+    wMarks.push([add3(m.vertex, l1), add3(m.vertex, add3(l1, l2)), add3(m.vertex, l2)]);
   }
 
   // ---- projection + isotropic fit (over the points AND the auxiliary geometry)
