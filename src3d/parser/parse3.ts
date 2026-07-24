@@ -498,19 +498,32 @@ const diagIntersection: Rule = (s) => {
   // the intersection verb, in every form the student writes it: מפגש (noun), חיתוך/נחתכ (cut),
   // and נפגש (meet — both nun endings נפגשים/נפגשות, the ADR-3D-035 `קט[ןנ]` discipline). «נפגשים»
   // was the one gap the operator hit — «נחתכים» worked, «נפגשים» didn't (#284).
-  if (!/מפגש|נפגש|נחתכ|חיתוך|intersection|meet/i.test(s)) return null;
+  // `intersect` (not `intersection`) so the VERB forms match too — the noun-only spelling
+  // meant `…intersect at point O` fell through while `…meet at O` worked
+  if (!/מפגש|נפגש|נחתכ|חיתוך|intersect|meet/i.test(s)) return null;
   const toks = labelTokens(s);
   if (toks.length === 0) return null;
   // The crossing point is named by a TRAILING marker when the student writes «…נפגשים בנקודה O» /
   // «…meet at O» (the point LAST); otherwise it is the FIRST label («O מפגש אלכסוני ABCD», point
   // first). Reading the first token as the crossing regardless — the old behaviour — silently
   // mis-bound the point-last form (English «diagonals of ABCD meet at O» built id=A, face=[B,C,D,O]).
-  const trailing = s.match(/(?:בנקוד[הת]|at)\s+([A-Z]\d*'?)\s*$/i);
+  // `…at O` and `…at point O` are the same marker (the Hebrew `בנקודה` carries the noun
+  // inside the word, so the English noun was simply missing — with it unmatched, the id fell
+  // back to the FIRST label and the rule built a garbage quad)
+  const trailing = s.match(/(?:בנקוד[הת]|at(?:\s+the)?(?:\s+point)?)\s+([A-Z]\d*'?)\s*$/i);
   const [id, ...rest] = trailing ? [trailing[1], ...toks.filter((t) => t !== trailing[1])] : toks;
-  const twoDiag = (s.match(/אלכסו[ןנ]|diagonal/gi) ?? []).length >= 2;
-  if (rest.length === 4 && twoDiag) {
-    const [a, b] = rest; // two explicit diagonals — the crossing is on the first, a–b
-    if (id === a || id === b || a === b) return null;
+  // TWO EXPLICITLY NAMED DIAGONALS vs. a NAMED QUAD is decided by how the student GROUPED
+  // the letters — `AC ו BD` is two runs of two, `ABCD` is one run of four ([ADR-3D-071](
+  // ../../docs/06b-decisions-3d.md)). Counting occurrences of the word `אלכסון` instead read
+  // the Hebrew PLURAL `האלכסונים AC ו BD` (both diagonals in ONE word) as a single mention,
+  // fell through to the cyclic-quad branch as the quad A→C→B→D, and silently put the crossing
+  // on edge A–B instead of the face centre.
+  const groups = (s.match(RUN) ?? [])
+    .map((r) => r.match(TOKEN) ?? [])
+    .filter((g) => !(g.length === 1 && g[0] === id));
+  if (rest.length === 4 && groups.length === 2 && groups.every((g) => g.length === 2)) {
+    const [a, b] = groups[0]; // two explicit diagonals — the crossing is on the first, a–b
+    if (new Set(rest).size !== 4 || rest.includes(id)) return null;
     return [{ type: 'point-on-segment3', id, a, b, t: 0.5 }];
   }
   if (rest.length === 4) return [{ type: 'diag-intersection', id, face: rest }]; // named quad, cyclic
