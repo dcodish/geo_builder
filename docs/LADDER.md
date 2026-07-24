@@ -70,7 +70,7 @@ Cooperative budget (`budgetExceeded()`) can bail between cases — armed only ar
 3. `resolveMixedCarriers` internal escalation: near-first accept → grid-scan seed → binding-aware Gauss–Seidel seed → cardinal restarts → convex-then-relaxed → **anti-collapse barrier retry** (retry-only; primary descent untouched).
 4. **The honesty backstop (always):** every driven constraint is re-verified against final positions — a best-effort solve that missed fails the evaluate loudly. This is what makes stages 2–3 unable to commit a lying figure.
 
-## Stage 5 — the store fold (`computeFold`, geoStore.ts)
+## Stage 5 — the replay fold (`computeFold`, src/replay/core.ts — moved out of the store by S1.2)
 
 M4 pre-scans (soft-equal / right-angle reseat / trapezoid rotate / centre promotion / softPair swap) → per-fact `applyStep`/`applyCoupledStep` (content-keyed fold memo, per-seed tail) → **ADR-104 deferral fixpoint** (still-failed constraint-only facts retried against the completed figure; reference-identical failures skipped) → atomic-group poisoning fixpoint → **HOIST** (order-independence re-fold, depth ≤ 2, per-seed acceptance) → pending-vs-error classification.
 
@@ -78,11 +78,13 @@ M4 pre-scans (soft-equal / right-angle reseat / trapezoid rotate / centre promot
 
 `firstSatisfyingSeed` (strict → relaxed extension bar → converged fallback, reflection-mask tiers in seed high bits) · `meetsRequirements` · `findValidConfig` (bounded branch combinatorics) · `searchResample` (shape-fingerprint difference). Budgets: worker 12 s (`WORKER_SEARCH_BUDGET_MS`), main-thread sync fallback 2.5 s, tests ∞. A budget-aborted fold is never cached.
 
-## Known as-found asymmetries (inputs to S1.1)
+## As-found asymmetries — RESOLVED by S1.1 (one `runFailureLadder`, 2026-07-24)
 
-| # | Asymmetry | Status |
+| # | Asymmetry | Resolution |
 |---|---|---|
-| L1 | M1 branch: no orphan sweep, no scale rescue | S1.1 decides intent-or-drift, makes it an explicit parameter |
-| L2 | `applyCoupledStep`: no orphan sweep | same |
-| L3 | case 3C steal persists on failed verification (M2 law ii violation, compensated downstream) | S1.1 fixes to restore-on-failure |
-| L4 | case 3B's last rung commits the widest marking on failure | deliberate (downstream cases re-point from it) — S1.1 keeps, documents |
+| L1 | M1 branch: no orphan sweep, no scale rescue | **DRIFT — unified.** An M1-reinterpreted command also runs apply's radius routing, so it can orphan a coincide; the sweep was added to the main branch (2026-07-06 review F1) and never mirrored. Scale rescue is structurally a no-op on M1 today (no positive `distance` emitted) — included uniformly. |
+| L2 | `applyCoupledStep`: no orphan sweep | same — unified |
+| L3 | case 3C steal persisted on failed verification (M2 law ii violation, compensated downstream) | **FIXED** — restore-on-failure; case 3D got the same treatment; the downstream compensations' comments updated (the early-stop guard remains for 3B-forced) |
+| L4 | case 3B's last rung commits the widest marking on failure | deliberate (downstream cases re-point from it) — kept, documented |
+
+All three entry points now call the ONE `runFailureLadder()` (step.ts) with a `prefix` trace tag; the stages of §2e–2i run identically everywhere.

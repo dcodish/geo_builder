@@ -325,6 +325,75 @@ function settleOnFrozenPrior(
 }
 
 /**
+ * THE failure ladder (S1.1 of docs/24 — docs/LADDER.md stages 2e–2i), shared by all three entry
+ * points (`applyStep`'s main branch, its M1/conflict branch, and `applyCoupledStep`). Before this
+ * extraction the ladder existed as THREE divergent inlined copies whose omissions were undocumented
+ * (the docs/23 review's L1/L2 findings): the M1 and coupled copies lacked the orphaned-coincide
+ * re-home and (M1) the scale rescue. Resolution: DRIFT, not intent — an M1-reinterpreted or coupled
+ * command also runs apply's radius routing (`applyRadiusGiven`/`keepTangencyDriven`), so it can
+ * orphan a `coincide` exactly like the main path (the sweep was added to the main branch by the
+ * 2026-07-06 review's F1 fix and never mirrored); and an M1 lowering emits no positive `distance`
+ * today, so the scale rescue is structurally a no-op there — uniform inclusion is free and stays
+ * correct if a future reinterpretation ever emits one. Every stage remains try-and-verify
+ * (evaluate + the vacuous gate), so unification can only widen rescue power, never corrupt.
+ *
+ * Order (one statement, one semantics, one solve path — M1/ADR-231):
+ *   orphan sweep (M2 law i) → settle-on-frozen-prior (ADR-276; skipped when orphans exist) →
+ *   recruit (cases A–F, docs/LADDER.md stage 3) → scale rescue (ADR-237, last resort) →
+ *   honest refusal blaming the student's NEW statement (never a collateral casualty).
+ */
+function runFailureLadder(
+  prev: Construction,
+  next: Construction,
+  newCons: Constraint[],
+  prevPositions: Map<Id, Vec>,
+  primary: EvalResult,
+  trace: string[],
+  prefix: 'main' | 'm1' | 'coupled',
+): StepResult {
+  // OWNERSHIP RE-HOME (M2/ADR-231): a `coincide` is a placement obligation the engine always creates
+  // WITH an owner; a size given that pins the radius that drove it (applyRadiusGiven drops the stale
+  // directive; keepTangencyDriven's free-centre handoff can come up empty when every centre is already
+  // claimed) leaves it ORPHANED — unsatisfiable by the topological pass and invisible to the recruiter,
+  // whose list held only the NEW constraints (a `set-radius` adds none — the review's F1). Any unowned
+  // coincide joins the recruit list so the general machinery (re-point/steal/lend, cases B–F) re-homes
+  // it — the general form of the free-centre handoff.
+  const owned = new Set<Constraint>();
+  for (const o of next.objects) {
+    const sv = (o as { solve?: SolveDirective }).solve;
+    if (sv) { owned.add(sv.constraint); for (const k of sv.also ?? []) owned.add(k); }
+  }
+  const orphans = next.constraints.filter((k) => k.type === 'coincide' && !owned.has(k) && !newCons.includes(k));
+  if (orphans.length) trace.push(`${prefix}:orphans`);
+  // STAGE-0 (ADR-276, issue #37): before recruiting, try the new statement's own carriers over the
+  // FROZEN prior solution — a satisfiable-by-its-own-carrier statement must not re-open (and land in a
+  // compromise basin of) the whole already-valid coupled system.
+  if (!orphans.length) {
+    const settled = settleOnFrozenPrior(prev, next, newCons);
+    if (settled) return { ok: true, construction: settled.construction, positions: settled.positions, ladder: [...trace, `${prefix}:settle`] };
+  }
+  const recruited = recruitFreeDofs(next, [...newCons, ...orphans], trace);
+  if (recruited) {
+    const r2 = evaluate(recruited);
+    if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions, ladder: [...trace, `${prefix}:recruit`] };
+  }
+  // LAST RESORT — SCALE RESCUE (ADR-237): a figure with no absolute given yet is determined only up
+  // to SIMILARITY, so its FIRST size given is a statement about SCALE — satisfiable exactly by scaling
+  // every free DOF by k = stated/measured. Runs strictly AFTER the recruiter (least perturbation wins
+  // when a minimal solve suffices); try-and-verify, so any other absolute given a global scale would
+  // break falls through to the honest error unharmed.
+  const scaled = scaleRescue(next, newCons, prevPositions);
+  if (scaled) {
+    const rs = evaluate(scaled);
+    if (rs.ok && newConstraintsNonVacuous(scaled, rs.positions, newCons)) return { ok: true, construction: scaled, positions: rs.positions, ladder: [...trace, `${prefix}:scale`] };
+  }
+  // Honest refusal: name the STUDENT'S new statement (blame honesty, issue #37); a solve that "passed"
+  // only vacuously (the non-vacuous gate refused it) reports the same over-constraint shape.
+  const vacuousErr = newCons.length ? `over-constrained: ${describeConstraint(newCons[0])} cannot hold` : 'over-constrained';
+  return { ok: false, error: primary.ok ? vacuousErr : blameNewStatement(primary.error, newCons), construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:refuse`] };
+}
+
+/**
  * #186 belt-and-braces: a command that would CREATE A NEW POINT riding a circle id that exists nowhere
  * — not in the prior figure and not defined by the command itself — can only produce a dangling object
  * that the topological evaluator reports as the cryptic internal "unresolved dependencies for: X".
@@ -390,24 +459,10 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
       const newCons = constrained.constraints.slice(prev.constraints.length);
       const r = evaluate(constrained);
       if (r.ok && newConstraintsNonVacuous(constrained, r.positions, newCons)) return { ok: true, construction: constrained, positions: r.positions, ladder: [...trace, 'm1:primary'] };
-      // STAGE-0 (ADR-276): the new statement's own carriers over the FROZEN prior solution — minimal
-      // movement, before any joint re-solve or recruiting.
-      const settled = settleOnFrozenPrior(prev, constrained, newCons);
-      if (settled) return { ok: true, construction: settled.construction, positions: settled.positions, ladder: [...trace, 'm1:settle'] };
-      // The reinterpreted statement is a CONSTRAINT whose direct carrier alone couldn't satisfy it —
-      // give it the SAME failure path a typed constraint gets (recruit the figure's other free DOFs,
-      // ADR-028 extended) before giving up. One statement, one semantics, one solve path (M1/ADR-231).
-      const recruited = recruitFreeDofs(constrained, newCons, trace);
-      if (recruited) {
-        const r2 = evaluate(recruited);
-        if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions, ladder: [...trace, 'm1:recruit'] };
-      }
-      // Surface the constraint's honest failure (over-constrained / unsatisfiable), never "already
-      // defined" — the second statement about an existing object was a constraint, not a redefinition,
-      // so the error must describe the RELATION that can't hold (M1/ADR-231). A solve that "passed"
-      // only vacuously (the non-vacuous gate refused it) reports the same over-constraint shape.
-      const vacuousErr = newCons.length ? `over-constrained: ${describeConstraint(newCons[0])} cannot hold` : 'over-constrained';
-      return { ok: false, error: r.ok ? vacuousErr : blameNewStatement(r.error, newCons), construction: prev, positions: prevPositions, ladder: [...trace, 'm1:refuse'] };
+      // The reinterpreted statement is a CONSTRAINT — give it the SAME failure path a typed constraint
+      // gets. One statement, one semantics, ONE solve path (M1/ADR-231; unified by S1.1 — the honest
+      // failure surfaces the RELATION that can't hold, never "already defined").
+      return runFailureLadder(prev, constrained, newCons, prevPositions, r, trace, 'm1');
     }
     return { ok: false, error: conflict, construction: prev, positions: prevPositions, ladder: ['m1:conflict-refuse'] };
   }
@@ -440,54 +495,10 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   const newConsMain = next.constraints.slice(prev.constraints.length);
   const mainVacuous = res.ok && !newConstraintsNonVacuous(next, res.positions, newConsMain);
   if (!res.ok || mainVacuous) {
-    // A constraint its direct carrier alone can't satisfy ("cannot place F on AB
-    // so |DE|=|DF|" — F is stuck on the segment) may still hold if the figure's
-    // OTHER free DOFs move too. Recruit them and solve jointly before giving up
-    // (ADR-028, extended): "find a possible configuration and use it".
-    const newCons = newConsMain;
-    // OWNERSHIP RE-HOME (M2/ADR-231): a `coincide` is a placement obligation the engine always creates
-    // WITH an owner; a size given that pins the radius that drove it (applyRadiusGiven drops the stale
-    // directive; keepTangencyDriven's free-centre handoff can come up empty when every centre is already
-    // claimed) leaves it ORPHANED — unsatisfiable by the topological pass and invisible to the recruiter,
-    // whose list held only the NEW constraints (a `set-radius` adds none — the review's F1). Any unowned
-    // coincide joins the recruit list so the general machinery (re-point/steal/lend, cases B–F) re-homes
-    // it — the general form of the free-centre handoff.
-    const owned = new Set<Constraint>();
-    for (const o of next.objects) {
-      const sv = (o as { solve?: SolveDirective }).solve;
-      if (sv) { owned.add(sv.constraint); for (const k of sv.also ?? []) owned.add(k); }
-    }
-    const orphans = next.constraints.filter((k) => k.type === 'coincide' && !owned.has(k) && !newCons.includes(k));
-    if (orphans.length) trace.push('main:orphans');
-    // STAGE-0 (ADR-276, issue #37): before recruiting, try the new statement's own carriers over the
-    // FROZEN prior solution — a satisfiable-by-its-own-carrier statement must not re-open (and land in a
-    // compromise basin of) the whole already-valid coupled system.
-    if (!orphans.length) {
-      const settled = settleOnFrozenPrior(prev, next, newCons);
-      if (settled) return { ok: true, construction: settled.construction, positions: settled.positions, ladder: [...trace, 'main:settle'] };
-    }
-    const recruited = recruitFreeDofs(next, [...newCons, ...orphans], trace);
-    if (recruited) {
-      const r2 = evaluate(recruited);
-      if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions, ladder: [...trace, 'main:recruit'] };
-    }
-    // LAST RESORT — SCALE RESCUE (ADR-237): a figure with no absolute given yet is determined only up
-    // to SIMILARITY (the ADR-101 gauge), so its FIRST size given is a statement about SCALE —
-    // satisfiable exactly by scaling every free DOF by k = stated/measured, with stated (`length`)
-    // values held. The driven/recruited solves can't find that move (it is spread across EVERY carrier
-    // at once — the reloaded two-tangent-circles figure needed the gap, a radius, N, and both touch
-    // params to grow together, a 9-DOF walk the solver never converges on, while the scale map solves
-    // it in closed form). Runs strictly AFTER the recruiter so a figure a minimal solve can satisfy
-    // keeps the least-perturbation behavior (stability principle); try-and-verify — accepted only if
-    // the full evaluation then holds, so any other absolute given (which a global scale would break)
-    // falls through to the honest error unharmed.
-    const scaled = scaleRescue(next, newCons, prevPositions);
-    if (scaled) {
-      const rs = evaluate(scaled);
-      if (rs.ok && newConstraintsNonVacuous(scaled, rs.positions, newCons)) return { ok: true, construction: scaled, positions: rs.positions, ladder: [...trace, 'main:scale'] };
-    }
-    const vacuousMainErr = newCons.length ? `over-constrained: ${describeConstraint(newCons[0])} cannot hold` : 'over-constrained';
-    return { ok: false, error: res.ok ? vacuousMainErr : blameNewStatement(res.error, newCons), construction: prev, positions: prevPositions, ladder: [...trace, 'main:refuse'] };
+    // A constraint its direct carrier alone can't satisfy ("cannot place F on AB so |DE|=|DF|" — F is
+    // stuck on the segment) may still hold if the figure's OTHER free DOFs move too (ADR-028, extended):
+    // the unified failure ladder (S1.1) — orphan re-home → settle → recruit → scale → honest refusal.
+    return runFailureLadder(prev, next, newConsMain, prevPositions, res, trace, 'main');
   }
   return { ok: true, construction: next, positions: res.positions, ladder: ['main:primary'] };
 }
@@ -530,21 +541,8 @@ export function applyCoupledStep(prev: Construction, cmds: Command[]): StepResul
   const newCons = next.constraints.slice(prev.constraints.length);
   const res = evaluate(next);
   if (res.ok && newConstraintsNonVacuous(next, res.positions, newCons)) return { ok: true, construction: next, positions: res.positions, ladder: ['coupled:primary'] };
-  // The same failure ladder as applyStep, once, over the UNION of the coupled constraints.
-  const settled = settleOnFrozenPrior(prev, next, newCons);
-  if (settled) return { ok: true, construction: settled.construction, positions: settled.positions, ladder: ['coupled:settle'] };
-  const recruited = recruitFreeDofs(next, newCons, trace);
-  if (recruited) {
-    const r2 = evaluate(recruited);
-    if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions, ladder: [...trace, 'coupled:recruit'] };
-  }
-  const scaled = scaleRescue(next, newCons, prevPositions);
-  if (scaled) {
-    const rs = evaluate(scaled);
-    if (rs.ok && newConstraintsNonVacuous(scaled, rs.positions, newCons)) return { ok: true, construction: scaled, positions: rs.positions, ladder: [...trace, 'coupled:scale'] };
-  }
-  const vacuousErr = newCons.length ? `over-constrained: ${describeConstraint(newCons[0])} cannot hold` : 'over-constrained';
-  return { ok: false, error: res.ok ? vacuousErr : blameNewStatement(res.error, newCons), construction: prev, positions: prevPositions, ladder: [...trace, 'coupled:refuse'] };
+  // The SAME unified failure ladder as applyStep (S1.1), once, over the UNION of the coupled constraints.
+  return runFailureLadder(prev, next, newCons, prevPositions, res, trace, 'coupled');
 }
 
 /**
@@ -913,10 +911,11 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = [], trace?: st
   for (const K of newCons) {
     if (budgetExceeded()) break; // armed only around view searches — see engine/solveBudget.ts
     // Once the system already evaluates VALID (an earlier K's recruit fixed the step), STOP: the remaining
-    // new constraints are satisfied in that solution too, and the exploratory cases below MUTATE the carrier
-    // assignment even when their own verification fails (case (C) documents its steal persisting) — running
-    // them against an already-valid figure can only wreck it (observed: the (F) fix for a `collinear` was
-    // undone by the sibling `collinear-order`'s failed experiments). (ADR-229.)
+    // new constraints are satisfied in that solution too, and case (B)'s last rung still COMMITS its widest
+    // marking even on failure (deliberate — docs/LADDER.md L4: downstream cases re-point from it), so
+    // running further experiments against an already-valid figure can only wreck it (observed: the (F) fix
+    // for a `collinear` was undone by the sibling `collinear-order`'s failed experiments). (ADR-229; the
+    // (C)/(D) failed-experiment mutations themselves are RESTORED since S1.1 — M2 law ii.)
     if (changed && evaluate({ objects, constraints: [...c.constraints, ...added] }).ok) break;
     const beforeK = objects; // snapshot for the last-resort (F) rebuild — see below
     
@@ -978,7 +977,8 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = [], trace?: st
     // |BC|=5 so an equilateral / AAS triangle (every side or two-angles+side stated) solves instead of
     // falsely over-constraining. Runs ONLY on the failure path, so eagerly-satisfied figures (e.g. a
     // stated-extension point a relation must NOT drag, ADR-064) never reach it and are untouched.
-    let dDid = false; // case (D) mutated the assignment (so its result is not yet evaluated)
+    let dDid = false; // case (D) mutated the assignment (verified just below)
+    const preD = objects; // TRANSACTIONAL (M2 law ii / S1.1): a failed (D) experiment restores exactly
     if (!verified) {
       const reachable = new Set(constraintRefs(K).flatMap((ref) => ancestors(objects, ref, 'drivable', true, true)));
       for (const x of objects) {
@@ -991,8 +991,6 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = [], trace?: st
         objects = objects.map((o) =>
           o.id === alt.id ? ({ ...o, solve: { constraint: K1, branch: 0 } } as GeoObject) : o.id === x.id ? markDriven(o, K) : o,
         );
-        changed = true;
-        trace?.push('recruit:D');
         dDid = true;
         break;
       }
@@ -1006,9 +1004,13 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = [], trace?: st
     // So `did` only earns a skip when the recruitment ACTUALLY makes the whole system valid; otherwise fall
     // through to (C)/(E), which are self-verifying (a lend is accepted only if `evaluate` passes) and so can
     // never rescue a genuinely-impossible figure. The (B) stages above are already self-verified, so only a
-    // case-(D) mutation needs the extra `evaluate` here — on the already-failing path only.
+    // case-(D) mutation needs the extra `evaluate` here — on the already-failing path only. A FAILED (D)
+    // RESTORES its mutation (M2 law ii / S1.1), so (C)/(E) run from the clean state.
     if (verified) continue;
-    if (dDid && evaluate({ objects, constraints: [...c.constraints, ...added] }).ok) continue;
+    if (dDid) {
+      if (evaluate({ objects, constraints: [...c.constraints, ...added] }).ok) { changed = true; trace?.push('recruit:D'); continue; }
+      objects = preD; // restore exactly — leave no failed-experiment mutation for later cases to compensate for
+    }
     // (C) R7 JOINT RE-BIND ([ADR-045](docs/06-decisions.md#adr-045) step 3): no FREE DOF is reachable —
     // every DOF K could move is already CLAIMED by an earlier constraint (e.g. HF=4/GE=5 took a
     // parallelogram's free vertices, so a later "ABHD concyclic" finds them all busy). The figure can
@@ -1026,15 +1028,19 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = [], trace?: st
       return reach.has(o.id) && sv && (carrierCount.get(sv.constraint) ?? 0) >= 2;
     });
     if (steal && !budgetExceeded()) {
-      changed = true;
-      trace?.push('recruit:C');
+      const preC = objects; // TRANSACTIONAL (M2 law ii / S1.1 — was: the steal PERSISTED on failed
+      // verification, and two downstream sites carried compensations for it: the early-stop guard's
+      // "failed experiments can wreck a found solution" rationale, and (F)'s beforeK snapshot)
       objects = objects.map((o) => (o.id === steal.id ? markDriven(o, K) : o)); // K already in c.constraints (pushed as a check)
       // VERIFY, as for case (B)/(D) above ([ADR-139](docs/06-decisions.md#adr-139)): a steal that doesn't
       // resolve the over-constraint — e.g. a DEGENERATE self-steal where K is itself the over-subscribed
       // constraint (driveOrCheck gave it a carrier at apply-time AND case (B) added the decoy A, so K has 2
       // carriers and `steal` re-points one of K's own carriers back to K, a no-op) — must NOT pre-empt the
-      // self-verifying redundant-lend (E). Fall through when it doesn't help.
-      if (evaluate({ objects, constraints: [...c.constraints, ...added] }).ok) continue;
+      // self-verifying redundant-lend (E). Fall through RESTORED when it doesn't help — (E) then tries its
+      // lends from the clean state (a SUPERSET of candidates: the un-stolen carrier is lendable again) and
+      // can only accept a whole-system-valid one.
+      if (evaluate({ objects, constraints: [...c.constraints, ...added] }).ok) { changed = true; trace?.push('recruit:C'); continue; }
+      objects = preC;
     }
     // (E) REDUNDANT-CARRIER LEND: no free DOF and no over-subscribed carrier — yet the figure may still be
     // solvable when an earlier constraint K1 is REDUNDANT (already implied by the rest, e.g. a kite's `AB=AD`
@@ -1068,7 +1074,7 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = [], trace?: st
     // (1) BAKE the current valid solution — `resolveDriven` writes every driven carrier's solved params
     //     and clears the directives (its normal output form);
     // (2) re-drive ONLY the carriers K references, restoring each one's ORIGINAL constraint (from the
-    //     pre-mutation snapshot — case (C)'s steal mutates even when its verification fails) and adding K
+    //     pre-mutation snapshot — case (B)'s forced last rung still commits its marking on failure) and adding K
     //     via `solve.also` on the free-point host;
     // (3) everything else stays FROZEN at its solved position, so its constraints hold by construction.
     // Self-verifying: kept only if the FULL system then evaluates valid — it can never corrupt a figure,

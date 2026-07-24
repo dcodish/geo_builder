@@ -101,8 +101,10 @@ src/
                  llm/llmShared (the LLM-fallback seam; re-parse + gate battery)
   app/           submitPipeline.ts — the text→command orchestration, extracted from App.tsx and
                  directly tested (S0.4)
-  store/         geoStore.ts (Zustand + zundo: the fact list as source of truth, replay fold memo,
-                 config searches, sample core, rename/swap/merge), figureFile (save/load), loadAudit,
+  replay/        core.ts — the PURE replay layer (S1.2): fold memo + deferral + HOIST + seed/config
+                 searches + the shared sample core; engine ← replay ← store enforced by test
+  store/         geoStore.ts (Zustand + zundo: the fact list as source of truth, actions,
+                 rename/swap/merge; re-exports the replay layer), figureFile (save/load), loadAudit,
                  geoWork/geoWorker (the Web-Worker seam)
   render/        transform + scene (pure figure→primitives) + Figure.tsx (declarative SVG, pan/zoom,
                  hover picks); a pure consumer of engine output
