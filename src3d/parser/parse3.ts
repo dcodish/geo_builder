@@ -406,14 +406,40 @@ function parseCoeff(s: string | undefined): number | null {
 const TERM =
   /^([+-])?\s*((?:\d+\s*\/\s*\d+)|(?:\d*\.\d+)|(?:\d+)|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛])?\s*[·×*]?\s*(?:([a-z])|([A-Z]\d*'?)([A-Z]\d*'?))\s*$/;
 
+/**
+ * Split a linear expression into its terms at TOP-LEVEL `+`/`-` only
+ * ([ADR-3D-068](../../docs/06b-decisions-3d.md)).
+ *
+ * The one tokenizer every linear-expression parser here shares. A naive
+ * `split(/(?=[+-])/)` is paren-BLIND — it breaks `(1-t)u` into `(1` and `-t)u`,
+ * so a grouped coefficient carrying an internal sign is shredded before any term
+ * regex ever sees it. Depth tracking is the whole fix: a term keeps its own
+ * leading sign, and an unbalanced paren returns null so a malformed expression is
+ * rejected outright rather than half-read (the all-or-nothing discipline).
+ */
+export function splitTopLevelTerms(src: string): string[] | null {
+  const terms: string[] = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of src.trim()) {
+    if (ch === '(') depth++;
+    else if (ch === ')' && --depth < 0) return null;
+    if ((ch === '+' || ch === '-') && depth === 0 && cur.trim() !== '') {
+      terms.push(cur.trim());
+      cur = ch;
+      continue;
+    }
+    cur += ch;
+  }
+  if (depth !== 0) return null;
+  if (cur.trim() !== '') terms.push(cur.trim());
+  return terms;
+}
+
 /** Parse a linear combination `½u + 5/3·w - 1/3v` / `AM` / `2KA'`. Null when any term is malformed. */
 export function parseVecExpr(src: string): VecExpr | null {
-  const parts = src
-    .trim()
-    .split(/(?=[+-])/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  if (parts.length === 0) return null;
+  const parts = splitTopLevelTerms(src);
+  if (!parts || parts.length === 0) return null;
   const expr: VecExpr = [];
   for (const part of parts) {
     const m = part.match(TERM);
@@ -584,12 +610,8 @@ const SYM_TERM =
   /^([+-])?\s*(?:\(([^()]+)\)\s*[·×*]?\s*)?((?:\d+(?:\.\d+)?)?\s*(?:√\s*\d+(?:\.\d+)?)?(?:\s*\/\s*\d+(?:\.\d+)?)?|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛])?\s*[·×*]?\s*([a-w])?\s*[·×*]?\s*(?:([A-Z]\d*'?)([A-Z]\d*'?)|([a-z]))\s*(?:\/\s*(\d+(?:\.\d+)?))?$/;
 
 export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string } | null {
-  const parts = src
-    .trim()
-    .split(/(?=[+-])/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  if (parts.length === 0) return null;
+  const parts = splitTopLevelTerms(src);
+  if (!parts || parts.length === 0) return null;
   const terms: SymTerm[] = [];
   let symbol: string | undefined;
   const bindSymbol = (letter: string): boolean => {
@@ -840,12 +862,8 @@ const canonicalLine = (s: string): string =>
 
 /** Parse `m-1` / `5-m` / `-2` / `2m` → a LinExpr (k + p·param). Null on anything else. */
 export function parseParamExpr(src: string): { expr: LinExpr; param?: string } | null {
-  const terms = src
-    .trim()
-    .split(/(?=[+-])/)
-    .map((t) => t.trim())
-    .filter(Boolean);
-  if (terms.length === 0) return null;
+  const terms = splitTopLevelTerms(src);
+  if (!terms || terms.length === 0) return null;
   const expr: LinExpr = { k: 0, p: 0 };
   let param: string | undefined;
   for (const t of terms) {
@@ -898,11 +916,8 @@ export function parseLinearEq(eq: string): { cx: LinExpr; cy: LinExpr; cz: LinEx
       return '';
     });
     if (rest.includes('§') || rest.includes('(') || rest.includes(')')) return false;
-    const terms = rest
-      .trim()
-      .split(/(?=[+-])/)
-      .map((t) => t.trim())
-      .filter(Boolean);
+    const terms = splitTopLevelTerms(rest); // paren-free by the guard above — the shared tokenizer regardless
+    if (!terms) return false;
     if (terms.length === 0) return hadParen;
     for (const term of terms) {
       const m = term.match(/^([+-])?\s*(\d+(?:\.\d+)?)?\s*([a-w])?\s*([xyz])?$/);

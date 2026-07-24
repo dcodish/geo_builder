@@ -934,3 +934,38 @@ Locked by `angle-measures.test.ts`; catalog3 +2.
 **3. The QUERY lane shares the panel's engine.** The operator's «AE» query (the data-panel query box) fell through to «depends on α»/«not determined» because `answerQuery`'s `vectorForms` had its OWN numeric-only decomposition, separate from the panel — so a query and its panel row could diverge. Fix: the parametric decomposition is extracted to two exported functions in `dataView.ts` — `basisDecompose` (numeric coefficients across seeds) and `parametricDecomp` (the affine-in-parameter string) — and BOTH the panel (`dataView`) and the query lane (`vectorForms`) call them. `vectorForms` now falls back to `parametricDecomp` when the numeric decomposition is unstable, so «AE» → `t·w` and «EO» → `½u + ½v − t·w`, identical to the panel rows. No duplication: one decomposition engine, two consumers.
 
 **Result.** The «dd» panel now reads `|u|=|v|`, `u·v=0`, `∠SAD = ∠SAB`, `AE⃗ = t·w`, `EO⃗ = ½u + ½v − t·w`, and querying `AE`/`EO` returns the same parametric forms. Locked by scenario #297 + `queries.test.ts` (#297) + the untouched exam/#94 gates.
+
+## ADR-3D-068 — A parenthesised coefficient carrying an internal sign is ONE term: the shared linear-expression tokenizer (issue #299)
+
+**Status:** Accepted (2026-07-24; bug, P2). *Files: `src3d/parser/parse3.ts` (`splitTopLevelTerms` + its four call sites); `src3d/parser/catalog3.ts` (+1); `src3d/__tests__/paren-coefficient.test.ts`.*
+
+**Operator report.** «why can't the engine understand an input such as `AS=(1-t)*u+0.5*v+t*w` or `AS=(1-t)u+0.5v+tw`?» Both returned `not-handled` and escalated to the LLM.
+
+**Class.** *A **term-splitting tokenizer** over a **linear expression whose coefficients may be parenthesised** treats **every `+`/`-` as a term boundary regardless of paren depth**, so any grouped sub-expression carrying an internal sign is shredded before a term regex ever sees it.* Instance-level phrasing ("the `(1-t)` form fails") would have named one utterance; the class names the tokenizer, which is why the fix is one helper and not one rule.
+
+**Root cause.** `parseSymExpr` split its input with `src.split(/(?=[+-])/)` — a paren-blind lookahead:
+
+```
+"(1-t)*u+0.5*v+t*w"  →  ["(1", "-t)*u", "+0.5*v", "+t*w"]
+```
+
+`"(1"` matches no term grammar, so `parseSymExpr` returned null, `vecEqClaim` returned null, and the utterance fell through to not-handled. **Nothing downstream was wrong**: `SYM_TERM` already matched the intact `(1-t)u` (paren group `1-t`, atom `u`); `parseParamExpr('1-t')` already returned the affine `{k:1, p:-1, param:'t'}`; and `evaluate.ts` already evaluates `coeff.k + coeff.p·kValue`, so a mixed k≠0/p≠0 coefficient was always supported. No CAS boundary is involved — `(1-t)` is exactly representable as the existing `LinExpr`. The V7 lane simply never received a well-formed term.
+
+**Why it survived since V7.** Every cataloged symbolic form — `(k/2)DB`, `kDC`, `2k·u`, `t·BE` — happens to carry no `+`/`-` inside its parens, so the naive split was accidentally safe for the whole corpus. The first student to write the standard interpolation `(1-t)a + tb` hit it.
+
+**Sibling audit (the grep).** `grep -rn 'split(/(?=' src3d/ src/ server/` found **four** copies of the same paren-blind split, all in `parse3.ts`, and **none** in the 2-D app or the server (so nothing to file cross-product):
+
+| Site | Reached by parens today? |
+| --- | --- |
+| `parseSymExpr` | **yes — the reported defect** |
+| `parseVecExpr` | reachable; its `TERM` has no paren group, so such input failed there too (honestly, via the term regex) |
+| `parseParamExpr` | no — only ever receives paren-inner content, which `[^()]+` forbids from nesting |
+| `parseLinearEq` | no — parens are stripped and a leftover paren hard-fails before the split |
+
+**Decision.** ONE exported `splitTopLevelTerms(src)` — depth-tracked, each term keeping its own leading sign, `null` on unbalanced parens (all-or-nothing, never a half-read) — replaces all four copies. The three provably-unreachable sites are converted too: not to fix a live bug, but so the mechanism has a single implementation and the next grouped-coefficient feature cannot re-open the class at a site someone forgot. Four ad-hoc copies collapsing into one helper means the chokepoint registry **shrank**; no list grew.
+
+**Behaviour delta is provably confined.** A paren-aware split differs from the naive one only on input containing parens with an internal sign — which today is rejected everywhere. At the three converted sites the term grammars have no paren group, so such terms still reject honestly; only `parseSymExpr` (whose `SYM_TERM` does) newly accepts. Full 3-D suite confirms zero movement elsewhere.
+
+**Capability gained.** The affine-in-one-symbol vector lane now accepts the standard textbook interpolation `AS = (1-t)u + tw` (and `(2t+1)v`, `(t-1)u`, pair atoms `(1-t)AB + tAC`, and purely numeric groupings `(1-0.25)u`), in both product forms — `*`/`·` or juxtaposed. An unpinned symbol remains a free sampled DOF (ADR-3D-010/ADR-052); a later ⟂/∥ given pins it as before.
+
+**Locked by** `paren-coefficient.test.ts` (14): the tokenizer itself (top-level breaks, byte-compatibility with the naive split on paren-free input, unbalanced → null); both reported forms; sign mirrors; named AND pair atoms; the two-symbol refusal still standing; the pre-existing V7/`parseLinearEq` forms byte-identical; and the operator's exact input end-to-end through the real store path in **both locales**, plus a semantic gate — `AS = (1-t)AB + tAC` places S on line BC at every seed — and a free-DOF gate proving S is not frozen at one placement.
