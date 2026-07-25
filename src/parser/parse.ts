@@ -20,7 +20,7 @@
  */
 
 import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
-import { NUM } from './lexicon';
+import { NUM, LABEL } from './lexicon';
 
 export type ParseResult =
   | { ok: true; commands: AnyCommand[] }
@@ -39,7 +39,11 @@ export type ParseResult =
   // «נסמן זוית BAM כ-A1» whose NAME is already taken (an existing point, or an alias bound to a
   // DIFFERENT angle) — the collision is the student's to resolve (pick another name), never a silent
   // rebind and never an LLM guess (issue #235, ADR-386).
-  | { ok: false; reason: 'alias-taken'; name: string };
+  | { ok: false; reason: 'alias-taken'; name: string }
+  // A BOUND radius SYMBOL (ctx.radiusSymbols — «רדיוס מעגל O הוא R») reused as a POINT label («מיתר AR»):
+  // once bound, the letter IS the parametric measure, never a node (operator ruling 2026-07-18, #198). The
+  // student picks another letter — a deterministic clarification, never a paid LLM call that mints a node R.
+  | { ok: false; reason: 'reserved-symbol'; symbol: string };
 
 /**
  * Figure context the parser may consult to resolve implicit references — chiefly
@@ -1591,7 +1595,11 @@ const angle: Rule = (s, ctx) => {
   // regressed that form to an LLM escalation (review 2026-07-03, P2).
   if (((s.replace(/right[\s-]?angle/gi, ' ').match(/(?:angle|זוו?ית)(?:\s*∠)?|∠/gi) ?? []).length) > 1) return null;
   const stripped = s.replace(/angle|∠|זוו?ית|ישרה|right/gi, ' ');
-  const valM = stripped.match(new RegExp(num));
+  // A degree value must be a standalone number, NEVER a label's subscript digit: «∠CAD=A1» (an angle
+  // ALIAS, #267) used to read the "1" of "A1" as value 1° and silently set ∠CAD=1°. The lookbehind keeps
+  // this rule from grabbing a digit glued to a preceding letter (a subscripted label), so such input
+  // falls through to `angleAliasRule` / an honest escalation instead of a silent wrong given.
+  const valM = stripped.match(new RegExp(String.raw`(?<![A-Za-z])` + num));
   if (!valM && !rightWord) return null; // no degree value AND not a right-angle word → not this rule
   const value = valM ? parseFloat(valM[1]) : 90;
   const ids = labelRun(stripped, 3);
@@ -1847,9 +1855,14 @@ const angleAliasRule: Rule = (s, ctx) => {
   // The name may be decorated («כזוית A1», «כ-∠A1») and may be the BARE DIGIT of the book convention
   // («נסמן זוית CAD כ 1» — the sign near the vertex IS the digit): a bare digit binds the canonical
   // VERTEX-letter + digit name (CAD כ 1 ⇒ A1), displayed as the digit alone (#262/#263, ADR-386 Am.).
-  const m = s.match(
-    /(?:angle|∠|∢|ה?זוו?ית)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b[^A-Za-z\d]*?(?:כ|ב(?:תור)?|\bas\b|\bby\b)-?\s*(?:∠|∢|זוו?ית)?\s*-?\s*([A-Z]\d+|\d+)(?![A-Za-z\d])/,
-  );
+  const m =
+    s.match(
+      /(?:angle|∠|∢|ה?זוו?ית)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\s*([A-Za-z]\d*)\b[^A-Za-z\d]*?(?:כ|ב(?:תור)?|\bas\b|\bby\b)-?\s*(?:∠|∢|זוו?ית)?\s*-?\s*([A-Z]\d+|\d+)(?![A-Za-z\d])/,
+    ) ??
+    // The «=» binder (#267): «נסמן ∠CAD=A1» / «denote ∠CAD = A1» — the notation-first spelling the toolbar
+    // «∠» invites. The name MUST be a letter+digit LABEL (A1/B2), never a bare number — «∠CAD=40» is a
+    // VALUE (owned by the `angle` rule) and «∠CAD=∠DEF» an EQUALITY; both are excluded by requiring `[A-Z]\d+`.
+    s.match(new RegExp(String.raw`(?:angle|∠|∢|ה?זוו?ית)\s*(${LABEL})\s*(${LABEL})\s*(${LABEL})\b\s*=\s*(?:∠|∢|זוו?ית)?\s*([A-Z]\d+)(?![A-Za-z\d])`));
   if (!m) {
     // ALL-OR-NOTHING (the ADR-024 leftover guard; issue #262 P1): a NAMING-shaped utterance — the
     // sign/denote verb + an angle + ANY digit and no stated «=» — that this rule cannot bind must
@@ -1998,7 +2011,10 @@ const pointsOnSegment: Rule = (s) => {
   // (else "נקודות" only partly matches and the rule misses).
   const m = s.match(
     new RegExp(
-      String.raw`\b([A-Za-z]\d*)\s*(?:,|and|ו-?)\s*([A-Za-z]\d*)\b\s*(?:are\s+)?(?:points?|נקוד[א-ת]*)?\s*(?:on|על)\s+${SEG_NOUN}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`,
+      // The verb «נמצאות/נמצאים» ("are located on") sits between the "points" noun and «על» — the singular
+      // `pointOnSegment` and the circle-list rule (ADR-240) both accept it, so the TWO-points form must too,
+      // else «M ו N נמצאות על הצלע BC» escalated to the LLM (#245). En «lie/lies/are located on».
+      String.raw`\b([A-Za-z]\d*)\s*(?:,|and|ו-?)\s*([A-Za-z]\d*)\b\s*(?:are\s+|is\s+)?(?:points?|נקוד[א-ת]*)?\s*(?:נמצא[א-ת]*\s+|lie[sn]?\s+|located\s+)?(?:on|על)\s+${SEG_NOUN}([A-Za-z]\d*)\s*([A-Za-z]\d*)\b`,
       'i',
     ),
   );
@@ -4642,6 +4658,7 @@ const chord: Rule = (s, ctx) => {
   // those constraint rules already run before `chord`.)
   if (CARRIER_RELATION_TAIL.test(s)) return null;
   let center = resolveCenter(s, ctx);
+  let prepend: AnyCommand[] = [];
   const body = dropCircleRef(s).replace(/chords?|מיתרים|מיתר/gi, ' ');
   // A plural declaration names SEVERAL chords at once — "AB ו DC מיתרים" / "AB and DC are chords"
   // (issue #151): the single labelRun read asserted only the FIRST pair, silently dropping the
@@ -4664,7 +4681,14 @@ const chord: Rule = (s, ctx) => {
   if (chordPairs.some(([a, b]) => a === b)) return null; // a degenerate "AA" pair is not a chord list
   // #221: unnamed beside SEVERAL circles — resolve by the endpoints' MEMBERSHIP (the one common host).
   if (!center && chordPairs.length === 1) center = commonHostCentre(ctx, chordPairs[0][0], chordPairs[0][1]);
-  if (!center) return null;
+  if (!center) {
+    // «מיתר» presupposes its circle — INTRODUCE one on a circle-less figure (#231; the ADR-367 `implied`
+    // discipline, «קוטר»/«משיק»'s sibling). The endpoints then land on the minted circle as on a named one.
+    const intro = resolveOrIntroduceCircle(s, ctx, { implied: true });
+    if (!intro) return null;
+    center = intro.center;
+    prepend = intro.prepend;
+  }
   // #152 (the diameter rule's sibling): a chord endpoint that IS this circle's own CENTRE is
   // impossible — «OB מיתר» is not a chord of circle O. Defer; never emit the impossible membership.
   if (!centrePt(ctx, up(center)).startsWith('@') && chordPairs.some(([a, b]) => up(a) === up(center) || up(b) === up(center))) return null;
@@ -4672,6 +4696,7 @@ const chord: Rule = (s, ctx) => {
   const members: Id[] = [];
   for (const [a, b] of chordPairs) for (const id of [a, b]) if (!members.includes(id)) members.push(id);
   return [
+    ...prepend,
     ...members.map((id) => ({ type: 'point-on-circle' as const, id, circle: circ })),
     ...chordPairs.map(([a, b]) => ({ type: 'segment' as const, a, b })),
   ];
@@ -4924,6 +4949,31 @@ const arcMidpoint: Rule = (s, ctx) => {
   return /midpoint|אמצע/i.test(m[2])
     ? [{ type: 'arc-midpoint', id, circle: circleId(center), from, to, ...(major ? { branch: 1 } : {}) }]
     : [{ type: 'point-on-circle', id, circle: circleId(center), between: [from, to], ...(major ? { major: true } : {}) }];
+};
+
+/** A glued PAIR on a circle — "BC על מעגל" / "BC on circle [O]" (#231): both endpoints on the circle AND the
+ *  segment drawn — the chord semantic (ADR-077: a bare pair IS the segment; ADR-119's `withChordMembership`
+ *  shape). `pointOnCircle` deliberately excludes a glued pair (it would split "BC" into two subjects and steal
+ *  the chord/segment reading), so this owns it. The circle is resolved OR introduced (implied), like `chord`. */
+const pairOnCircle: Rule = (s, ctx) => {
+  if (!/circle|מעגל/i.test(s)) return null;
+  if (POINT_ON_CARRIER.test(s)) return null; // "D על המיתר AB" is a point on a chord, not a pair on the circle
+  // Exactly a glued 2-letter pair as the subject of "on [the] circle": "BC על [ה]מעגל [O]" / "BC on circle
+  // [O]". Anchored full-match — a LIST ("B ו C") is pointOnCircle's, a longer run / compound is not this rule.
+  const m = s.match(new RegExp(String.raw`^\s*(?:ה?קטע\s+|segment\s+)?([A-Z]\d*)([A-Z]\d*)\s+(?:על|on)\s+(?:ה?מעגל|(?:the\s+)?circle)(?:\s+${LABEL})?\s*\.?\s*$`, 'i'));
+  if (!m) return null;
+  const [a, b] = [up(m[1]), up(m[2])];
+  if (a === b) return null;
+  const intro = resolveOrIntroduceCircle(s, ctx, { implied: true });
+  if (!intro) return null;
+  if (!centrePt(ctx, up(intro.center)).startsWith('@') && (a === up(intro.center) || b === up(intro.center))) return null; // an endpoint that IS the centre is no chord (#152)
+  const circ = circleId(intro.center);
+  return [
+    ...intro.prepend,
+    { type: 'point-on-circle' as const, id: a, circle: circ },
+    { type: 'point-on-circle' as const, id: b, circle: circ },
+    { type: 'segment' as const, a, b },
+  ];
 };
 
 /** "A is on circle O" / "A על מעגל O" — inscribed point(s). The subject may be a LIST — "A ו C נמצאות
@@ -6761,6 +6811,17 @@ const circumcircle: Rule = (s, ctx) => {
   return [{ type: 'circumcircle', id: circleId(center), center, a: ids[0], b: ids[1], c: ids[2] }];
 };
 
+/** The apex-binding clause shared by the altitude/median rules: "from [the] [point/vertex] X" /
+ *  "מ[נקודה/קודקוד] X", the descriptor noun OPTIONAL (bare "from D" / "מ-D"). Captures the apex in group 1.
+ *  The LOCATIVE form ("<keyword> בנקודה A" / "… at point A", #242) is NOT folded in here: «בנקודה X» /
+ *  «at point X» are the universal CROSSING markers elsewhere, so a free-floating match would mis-read a
+ *  crossing point as an apex — the locative is detected keyword-anchored per rule (`LOCATIVE_APEX`). */
+const APEX_FROM = String.raw`(?:\bfrom\s+(?:the\s+)?(?:point\s+|vertex\s+)?|מ-?\s*(?:ה?נקודה\s+|ה?קודקוד\s+)?)(${LABEL})\b`;
+/** The keyword-anchored LOCATIVE apex "<special-line keyword> בנקודה/בקודקוד X" / "… at [the] point/vertex
+ *  X" (#242). Anchored to the keyword so it can never grab a crossing "…בנקודה K". `%KW%` is replaced with
+ *  the rule's own keyword alternation; the apex is captured in group 1. */
+const LOCATIVE_APEX = String.raw`(?:%KW%)\s+(?:ב-?\s*(?:ה?נקודה|ה?קודקוד)\s+|at\s+(?:the\s+)?(?:point|vertex)\s+)(${LABEL})\b`;
+
 /**
  * "median from A in ABC" / "תיכון מ-A במשולש ABC" — the median from a vertex to the
  * midpoint of the opposite side. Emits the triangle (idempotent if it exists),
@@ -6810,9 +6871,11 @@ const median: Rule = (s, ctx) => {
     ];
   }
 
-  // Classic form "median from A in ABC" / "תיכון מ-A במשולש ABC" / "מהנקודה C הורידו תיכון לצלע AB"
-  // — auto-named midpoint. The "from"/"מ" apex tolerates a point/vertex descriptor noun.
-  const apexM = s.match(/(?:\bfrom\s+(?:the\s+)?(?:point\s+|vertex\s+)?|מ-?\s*(?:ה?נקודה\s+|ה?קודקוד\s+)?)([A-Za-z]\d*)\b/i);
+  // Classic form "median from A in ABC" / "תיכון מ-A במשולש ABC" / "מהנקודה C הורידו תיכון לצלע AB" /
+  // the LOCATIVE "תיכון בנקודה A" (#242) — auto-named midpoint. from/מ via the shared `APEX_FROM`; the
+  // keyword-anchored locative via `LOCATIVE_APEX` (both capture the apex in group 1).
+  const apexM =
+    s.match(new RegExp(APEX_FROM, 'i')) ?? s.match(new RegExp(LOCATIVE_APEX.replace('%KW%', 'median|תיכון'), 'i'));
   if (!apexM) {
     // #71 (log-triage): the VERTEX-LESS side form — "הוסף תיכון לצלע AB" / "add the median to
     // side AB". The apex is the unique third vertex of a figure triangle carrying side AB
@@ -6933,7 +6996,11 @@ const altitude: Rule = (s, ctx) => {
   // The classic UNNAMED form gives the apex via "from D" / "from point D" / "מD" / "מ-D" / "מנקודה D"
   // (the descriptor noun נקודה/point tolerated) and auto-names the foot. Detect it first so the
   // keyword-first named branch never misreads "גובה מ-A ל BC" — there the apex is given, not a name.
-  const apexM = s.match(/(?:\bfrom\s+(?:the\s+)?(?:point\s+|vertex\s+)?|מ-?\s*(?:ה?נקודה\s+|ה?קודקוד\s+)?)([A-Za-z]\d*)\b/i);
+  // from/מ via the shared `APEX_FROM`; the keyword-anchored LOCATIVE "גובה בנקודה A" / "height at point A"
+  // (#242) via `LOCATIVE_APEX` (anchored to the height keyword, so a crossing "…בנקודה K" is never grabbed).
+  const apexM =
+    s.match(new RegExp(APEX_FROM, 'i')) ??
+    (isHeight ? s.match(new RegExp(LOCATIVE_APEX.replace('%KW%', 'height|altitude|גובה'), 'i')) : null);
   // The named segment, in either word order. The keyword-first form requires the two labels to sit
   // IMMEDIATELY after the keyword (whitespace only) so "גובה מ-A ל BC" / "altitude from A to BC" — where
   // a connector word/letter intervenes — can never be read as a name (and the !apexM guard backs that up).
@@ -7605,6 +7672,7 @@ export const RULES: Rule[] = [
   circle,
   foot, // before `pointOnSegment`
   pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)
+  pairOnCircle, // "BC על מעגל" — a glued PAIR on the circle = a chord (#231); before pointOnCircle (which excludes glued pairs) and segment
   pointOnCircle, // "A on circle O" / the LIST "A ו C על המעגל" (every subject gets the membership) — before segment/pointOnSegment
   pointVsCircle, // "M מחוץ למעגל / בתוך המעגל" — a point's SIDE of a circle (ADR-254); tight full-match, after the external-point compounds
   pointsVsLine, // «C ו-D בצדדים שונים של AB» — points' relative side of a LINE (#265, ADR-389); tight full-match, the pointVsCircle sibling
@@ -8373,6 +8441,40 @@ const normalizeInscriptionSlip = (s: string): string =>
     )
     .replace(/circumscrib\w+(?=\s+in\s+(?:a\s+|the\s+|another\s+)?(?:circle|triangle|square|rectangle|rhombus|kite|trapezoid|parallelogram|quadrilateral))/gi, 'inscribed');
 
+/** The bare POINT labels a command list DEFINES/REFERENCES as nodes — the geometry-POSITION fields only, so
+ *  a circle id ("circle-O") contributes nothing and a bound radius symbol used purely in a radius RELATION
+ *  ("R = 1.5r" → `set-radius-ratio {c1:'circle-O', c2:'circle-P'}`) is not caught. Used by the #198 guard. */
+const POINT_FIELDS = ['id', 'a', 'b', 'c', 'from', 'to', 'p', 'q', 'vertex', 'ray1', 'ray2', 'apex', 'foot', 'center'];
+const LABEL_ONLY = new RegExp(`^${LABEL}$`);
+const pointLabelsOf = (commands: AnyCommand[]): Set<string> => {
+  const out = new Set<string>();
+  const add = (v: unknown) => { if (typeof v === 'string' && LABEL_ONLY.test(v)) out.add(v); };
+  for (const c of commands) {
+    const o = c as unknown as Record<string, unknown>;
+    for (const f of POINT_FIELDS) add(o[f]);
+    for (const f of ['ids', 'between', 'vertices']) { const arr = o[f]; if (Array.isArray(arr)) arr.forEach(add); }
+  }
+  return out;
+};
+/** A BOUND radius SYMBOL used as a POINT (#198): the operator ruling (2026-07-18) is that once «רדיוס מעגל O
+ *  הוא R» binds R, the letter IS the parametric radius — never a node. So a parse that lands a bound symbol as
+ *  a NEW point («מיתר AR» → a chord endpoint R) is the hijack: return the symbol so `parse` refuses with a
+ *  deterministic clarification instead of drawing a node R (case-sensitive — R and r are different radii). */
+const reservedSymbolAsPoint = (commands: AnyCommand[], ctx: ParseContext): string | null => {
+  const bound = (ctx.radiusSymbols ?? []).map((r) => r.name);
+  if (!bound.length) return null;
+  const existing = new Set(ctx.points ?? []); // a symbol the student ALSO owns as a real point is theirs to reuse
+  const pts = pointLabelsOf(commands);
+  return bound.find((sym) => !existing.has(sym) && pts.has(sym)) ?? null;
+};
+/** Refuse a parse that hijacked a bound radius symbol as a point (#198) — applied to every `ok` result of
+ *  `parse` so the deterministic lane never commits a node R nor pays the LLM to. */
+const withReservedGuard = (r: ParseResult, ctx: ParseContext): ParseResult => {
+  if (!r.ok) return r;
+  const sym = reservedSymbolAsPoint(r.commands, ctx);
+  return sym ? { ok: false, reason: 'reserved-symbol', symbol: sym } : r;
+};
+
 export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult {
   let s = normalizeUtterance(raw);
   if (!s) return { ok: false, reason: 'not-handled' };
@@ -8408,9 +8510,9 @@ export function parse(raw: string, ctx: ParseContext = NO_CONTEXT): ParseResult 
     const idx = ordM[1] ? ['ראשון', 'שני', 'שלישי', 'רביעי'].indexOf(ordM[1]) : ['first', 'second', 'third', 'fourth'].indexOf(ordM[2].toLowerCase());
     const target = idx >= 0 && (ctx.circles?.length ?? 0) > idx ? ctx.circles![idx] : null;
     if (!target) return { ok: false, reason: 'not-handled' };
-    return parseResolved(s.replace(ordM[0], ordM[1] ? `מעגל ${target}` : `circle ${target}`), ctx);
+    return withReservedGuard(parseResolved(s.replace(ordM[0], ordM[1] ? `מעגל ${target}` : `circle ${target}`), ctx), ctx);
   }
-  return parseResolved(s, ctx);
+  return withReservedGuard(parseResolved(s, ctx), ctx);
 }
 
 /** The size-qualifier resolution (issue #102): rewrite each «[ל/ב/…]המעגל הגדול/הקטן» / "the big/small

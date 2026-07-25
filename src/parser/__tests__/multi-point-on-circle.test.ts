@@ -86,9 +86,12 @@ describe('multi-point on-circle (ADR-240)', () => {
     expect(membershipIds(r.commands).sort()).toEqual(['A', 'B']);
   });
 
-  it('a glued pair "AB על המעגל" is NOT split into two memberships (stays out-of-grammar)', () => {
+  it('a glued pair "AB על המעגל" is a CHORD — both endpoints on the circle + the segment drawn (#231)', () => {
     const { ctx } = circleCtx();
     const r = parse('AB על המעגל', ctx);
-    expect(r.ok).toBe(false); // the chord/segment readings own glued pairs; this phrasing escalates
+    expect(r.ok).toBe(true); // #231: a bare pair means the segment (ADR-077); on-circle = both endpoints member
+    if (!r.ok) return;
+    expect(membershipIds(r.commands).sort()).toEqual(['A', 'B']);
+    expect(r.commands).toContainEqual({ type: 'segment', a: 'A', b: 'B' });
   });
 });
