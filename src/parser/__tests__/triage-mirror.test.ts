@@ -60,6 +60,17 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
     for (const g of GATES) expect(triageSrc, `triage.mjs must mirror the submit pipeline's ${g} gate (ADR-346)`).toContain(`${g}(`);
   });
 
+  it('the pre-LLM FORMAT guards (LaTeX, שורש-word) are mirrored in both (#329/#246, ADR-391)', () => {
+    // Two pre-LLM guidance short-circuits added in the P3 guided-message batch — a `$…$`/`\`-command LaTeX
+    // paste (pre-parse) and a «שורש N» word-form magnitude (at the escalation seam). If the harness skips
+    // one, those prod utterances read as grammar gaps although the App answers them with guidance — exactly
+    // the #35 false-signal class this ADR-346 guard exists to prevent.
+    for (const src of [pipeSrc, triageSrc]) {
+      expect(src, 'looksLikeLatex (#329) must be called in submitPipeline.ts AND triage.mjs').toContain('looksLikeLatex(');
+      expect(src, 'wordRootMagnitude (#246) must be called in submitPipeline.ts AND triage.mjs').toContain('wordRootMagnitude(');
+    }
+  });
+
   it('the #186 circle-name auto-bind runs in both (the shared decision helper + the shared fact core)', () => {
     // App.submit binds a fresh circle name to an UNNAMED circle (impliedCircleBinding → nameCentre →
     // re-parse). A harness that skips the bind reports every such utterance as refused/clarify —

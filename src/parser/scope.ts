@@ -38,7 +38,9 @@ export type ScopeCategory =
   | 'orientation' // canvas layout words (horizontal / upper / rotate…) — not geometry givens
   | 'bare-point' // a lone point label — say WHERE it sits
   | 'unnamed-sides' // "one side 10, other side 5" — name the sides (AB=10, BC=5) — #105
-  | 'compound-relation'; // a compound measure relation the vocabulary doesn't cover (mixed units, unequal-degree product) — #153/#154/#144
+  | 'compound-relation' // a compound measure relation the vocabulary doesn't cover (mixed units, unequal-degree product) — #153/#154/#144
+  | 'latex' // LaTeX-pasted input ($…$, \triangle, \parallel) — use plain notation / the symbol palette (#329)
+  | 'word-root'; // a magnitude written with the WORD «שורש N» — use the √ symbol (toolbar), operator ruling (#246)
 
 export interface ScopeMatch {
   category: ScopeCategory;
@@ -171,9 +173,12 @@ const RULES: ScopeRule[] = [
  * CASE-SENSITIVE — a label is an UPPERCASE letter, so a lowercase greeting isn't mistaken for one)…
  */
 const GEO_SYMBOL = /[A-Z]\d*|\d|[∠°⊥⟂∥√△▲◯=<>]/;
-/** …or a geometry keyword in Hebrew or English (case-insensitive). Text with NONE of these is `unrelated`. */
+/** …or a geometry keyword in Hebrew or English (case-insensitive). Text with NONE of these is `unrelated`.
+ *  The angle stem is `זו?וי` — BOTH the single-vav «זוית» and double-vav «זווית» spellings (the ADR-3D-032
+ *  vav class): «זווי» alone missed the single-vav form, so «זוית abc» (lowercase labels, so no GEO_SYMBOL
+ *  either) was mis-classified `unrelated` and got a "not geometry" brush-off (#244). */
 const GEO_KEYWORD =
-  /נקוד|זווי|ישר|קטע|מעגל|עיגול|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקביל|אנך|מאונך|חוצה|תיכון|גובה|קוטר|מיתר|רדיוס|משיק|חותך|דלתון|מחומש|משושה|צלע|point|line|segment|circle|triangle|square|rectangle|quad|angle|tangent|chord|radius|diameter|perpendicular|parallel|bisect|median|midpoint|pentagon|hexagon/i;
+  /נקוד|זו?וי|ישר|קטע|מעגל|עיגול|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקביל|אנך|מאונך|חוצה|תיכון|גובה|קוטר|מיתר|רדיוס|משיק|חותך|דלתון|מחומש|משושה|צלע|point|line|segment|circle|triangle|square|rectangle|quad|angle|tangent|chord|radius|diameter|perpendicular|parallel|bisect|median|midpoint|pentagon|hexagon/i;
 
 /** Statement separators for the compound-input heuristic — list/clause punctuation plus the common He/En
  *  conjunctions and sentence enders. Also the bare Hebrew ו glued to a following construct noun ("…ומעגל…"):
@@ -212,3 +217,21 @@ export function classifyOutOfScope(utterance: string): ScopeMatch | null {
   if (!GEO_SYMBOL.test(s) && !GEO_KEYWORD.test(s)) return { category: 'unrelated', messageKey: 'input.scope.unrelated' };
   return null; // has geometric content but unmatched → a real gap to implement (stays 'not-understood').
 }
+
+/**
+ * A FORMAT (not semantic) guidance detector for input that can never build usefully — checked on the RAW
+ * utterance regardless of whether the deterministic parse partially succeeded (unlike `classifyOutOfScope`,
+ * which runs only on a FAILED parse). Two families:
+ *  - `'latex'` (#329): a `$…$` delimiter or a `\`-command (`\triangle`, `\parallel`, `\frac`, …). Plain
+ *    input uses the Unicode glyphs (△ ∥ ∠ ⊥ · √) and NEVER a `$` or a backslash-command, so this cannot
+ *    swallow a real construction — which is why it can run PRE-parse (a `$…$` ratio partial-parses to a
+ *    wrong figure, so the post-failure register would miss it). Checked pre-parse.
+ *  - `'word-root'` (#246, operator ruling 2026-07-21): a magnitude written with the WORD «שורש N» (the
+ *    #105 `שורש→√` normalization handles the forms that DO build, e.g. «AB = שורש 27»; the rest — the area
+ *    copula «שטח … שווה לשורש 27» — reach the escalation seam and get the "use the √ symbol" nudge instead
+ *    of a paid LLM call). Checked ONLY at the escalation seam, so a form that already builds is untouched.
+ */
+export const looksLikeLatex = (utterance: string): boolean =>
+  /\$[^$\n]*\$/.test(utterance) || /\\[a-zA-Z]{2,}/.test(utterance); // a $…$ span, or a \command (≥2 letters — never a stray backslash)
+/** A «שורש N» word-form magnitude (the word + a number/paren). Case-less; the symbol form (√) never matches. */
+export const wordRootMagnitude = (utterance: string): boolean => /שורש\s*[\d(]/.test(utterance);

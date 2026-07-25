@@ -66,6 +66,7 @@ import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, buildParseCtx, classifyOutOfScope,
+  looksLikeLatex, wordRootMagnitude,
   droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs, droppedCompoundRelation,
 } from '../../../src/parser/index.ts';
 import { replay, nameCentreFacts } from '../../../src/store/geoStore.ts';
@@ -249,6 +250,8 @@ function session2d(evs) {
       // geometry command and must never be counted as a grammar gap.
       if (parseNameCenter(u, pctx) || parseRename(u) || parseMerge(u) || parseSwap(u)) {
         res = { now: 'store-op', detail: 'rename/merge/swap/name-centre' };
+      } else if (looksLikeLatex(u)) {
+        res = { now: 'guided', detail: 'scope:latex' }; // #329: pre-parse LaTeX guard, mirrors submitPipeline
       } else {
         let r = parse(u, pctx);
         // #186 mirror: a circle referenced by a name that matches no circle, with UNNAMED circles in the
@@ -271,13 +274,17 @@ function session2d(evs) {
           res = { now: 'clarify', detail: r.reason };
         } else if (!r.ok) {
           const oos = classifyOutOfScope(u);
-          res = oos && PRE_LLM.has(oos.category)
-            ? { now: 'guided', detail: `scope:${oos.category}` }
+          res =
+            oos && PRE_LLM.has(oos.category) ? { now: 'guided', detail: `scope:${oos.category}` }
+            : wordRootMagnitude(u) ? { now: 'guided', detail: 'scope:word-root' } // #246: escalation-seam √ guard, mirrors submitPipeline
             : { now: 'not-handled', detail: oos ? `${r.reason} (scope:${oos.category})` : r.reason };
         } else {
           const dropped = droppedBy(u, r.commands, pctx);
           if (dropped.length) {
-            res = { now: 'would-escalate', detail: `dropped:${dropped.join(',').slice(0, 40)}` };
+            // #246: a dropped שורש magnitude gets the √ nudge at the seam, not an LLM escalation (mirrors submitPipeline)
+            res = wordRootMagnitude(u)
+              ? { now: 'guided', detail: 'scope:word-root' }
+              : { now: 'would-escalate', detail: `dropped:${dropped.join(',').slice(0, 40)}` };
           } else {
             const next = [...facts, ...r.commands.map((cmd, k) => ({ id: `f${facts.length}-${k}`, group: `g${out.length}`, cmd, enabled: true }))];
             const d = replay(next, 0);

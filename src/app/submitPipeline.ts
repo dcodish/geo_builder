@@ -30,6 +30,8 @@ import {
   droppedWordRelations,
   impliedCircleBinding,
   looksCompound,
+  looksLikeLatex,
+  wordRootMagnitude,
   parse,
   parseMerge,
   parseNameCenter,
@@ -128,6 +130,15 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     logDebug({ kind: 'input', utterance, locale, source: 'merge', rename: mrg, result: res.ok ? 'ok' : res.reason });
     if (res.ok) ui.clearText();
     else ui.setRenameNote(t(`input.merge_${res.reason}`, { from: mrg.from, to: mrg.to }));
+    return;
+  }
+  // LaTeX-pasted input ($…$, \triangle, \parallel) — a FORMAT guide (#329, ADR-289 family). Checked
+  // PRE-parse because a `$…$` ratio partial-parses to a WRONG figure (so the post-failure register would
+  // miss it), and a `$`/`\`-command never appears in real input, so this can never swallow a construction.
+  // Points the student at the plain notation / the symbol palette; never a paid LLM call on LaTeX.
+  if (looksLikeLatex(utterance)) {
+    logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:latex' });
+    ui.setInputNote(t('input.scope.latex'));
     return;
   }
   // From here on the path runs SYNCHRONOUS solves — the dry-run, the commit replay, and (last) the
@@ -353,6 +364,17 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
       weak = 'dropped'; // a typo dropped a stated label/number/relation/verb/compound-structure → escalate rather than commit the partial parse
       logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound].join(',')}`, commands: r.commands, intermediate: true });
     }
+  }
+  // A magnitude written with the WORD «שורש N» that reached the escalation seam — the #105 `שורש→√`
+  // normalization already builds the forms that CAN (e.g. «AB = שורש 27»), so those never get here; the
+  // rest (the area copula «שטח … שווה לשורש 27») get the "use the √ symbol" nudge instead of a paid LLM
+  // call that would only re-fail (#246, operator ruling 2026-07-21). Only at the seam, so a working שורש
+  // form is never brushed off. The FORMAT twin of the pre-parse LaTeX guard above.
+  if (wordRootMagnitude(utterance)) {
+    logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:word-root' });
+    ui.setInputNote(t('input.scope.word-root'));
+    ui.setBusy(false);
+    return;
   }
   // out of grammar, OR a deterministic parse that built nothing → ask the LLM (a SECOND try),
   // using the current figure as context. The spinner is already up (painted at the top of submit) and
