@@ -14,6 +14,7 @@
  */
 
 import type { AnyCommand, Command, Construction, GivenViolation, Id, ResolvedCircle, Vec } from '@/engine';
+import { formatMeasure } from '@/format';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintRefs, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
@@ -1479,7 +1480,7 @@ export function dryRunOutcome(facts: Fact[], commands: AnyCommand[], seed = 0, o
   return { produced: false, reason: 'empty' };
 }
 
-const fmtMeasure = (n: number): string => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(3))));
+const fmtMeasure = formatMeasure; // THE shared formatter (#164, ADR-393) — stated labels match derived at 2dp
 
 /** Record a measure label; `fillOnly` writes only if that segment/angle isn't already labelled (numeric fallback). */
 function addMeasureLabel(

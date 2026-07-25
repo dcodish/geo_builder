@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import i18n from '@/i18n';
-import { humanizeError, type Translate } from '@/i18n/humanizeError';
+import { humanizeError, sanitizeIds, type Translate } from '@/i18n/humanizeError';
 
 // Use the real configured i18n instance (Hebrew-pinned, as the app runs) so the test
 // exercises the actual key → message resolution, not a stub.
@@ -16,7 +16,7 @@ const hasHebrew = (s: string) => /[֐-׿]/.test(s);
 const CASES: { raw: string; contains: string[] }[] = [
   // step.ts danglingCircleError (#186) — a reference to a circle that doesn't exist
   { raw: "circle 'O2' is not defined", contains: ['O2'] },
-  { raw: 'unresolved dependencies for: A, B, circle-O', contains: ['A, B, circle-O'] },
+  { raw: 'unresolved dependencies for: A, B, circle-O', contains: ['A, B, O'] },
   { raw: 'non-finite position computed', contains: [] },
   { raw: '|AB| = |AD| references an unknown point', contains: ['|AB| = |AD|'] },
   { raw: 'over-constrained: |AC| = 9 cannot hold', contains: ['|AC| = 9'] },
@@ -27,8 +27,8 @@ const CASES: { raw: string; contains: string[] }[] = [
     contains: ['E'],
   },
   { raw: 'cannot place E: B is at the centre of circle-O', contains: ['E', 'B'] },
-  { raw: 'cannot take a tangent at the centre of circle-O', contains: ['circle-O'] },
-  { raw: 'cannot construct A: circles circle-O and circle-P do not meet', contains: ['A', 'circle-O', 'circle-P'] },
+  { raw: 'cannot take a tangent at the centre of circle-O', contains: ['O'] },
+  { raw: 'cannot construct A: circles circle-O and circle-P do not meet', contains: ['A', 'O', 'P'] },
   { raw: 'C and E would be at the same point', contains: ['C', 'E'] },
   { raw: "'O' is already defined — it can't be redefined as something different", contains: ['O'] },
   { raw: 'tangent circles need a fixed radius (a radius-through-a-point circle is not supported yet)', contains: [] },
@@ -59,5 +59,30 @@ describe('humanizeError', () => {
   it('handles null / empty input', () => {
     expect(humanizeError(null, t)).toBe('');
     expect(humanizeError('', t)).toBe('');
+  });
+});
+
+describe('#200 — sanitizeIds: internal object ids + raw floats never reach the student', () => {
+  it('strips named-object id PREFIXES to the student letters', () => {
+    expect(sanitizeIds('line sec-KE does not meet circle circle-O')).toBe('line KE does not meet circle O');
+    expect(sanitizeIds('line chord-CA is tangent to circle circle-O at A')).toBe('line CA is tangent to circle O at A');
+    expect(sanitizeIds('@ctr-O')).toBe('O');
+  });
+  it('rounds a raw 16-digit float to display precision (#164 sibling)', () => {
+    expect(sanitizeIds('|OB| = 1.0583005244258363·|OC| cannot hold')).toBe('|OB| = 1.06·|OC| cannot hold');
+  });
+  it('suppresses anonymous ~-scaffold ids (a helper point the student never named)', () => {
+    expect(sanitizeIds('cannot construct ~A: something')).toBe('cannot construct ⟨…⟩: something');
+    expect(sanitizeIds('|P~radw-circle-P|')).toBe('|P⟨…⟩|');
+  });
+  it('the operator-reported messages carry NO internal id after humanizing', () => {
+    for (const raw of [
+      'cannot construct ~A: line sec-KE does not meet circle circle-O',
+      'cannot place ~E: line chord-CA is tangent to circle circle-O',
+      'over-constrained: |OB| = 1.0583005244258363·|P~radw-circle-P| cannot hold',
+    ]) {
+      const out = humanizeError(raw, t);
+      expect(out, `leaked in: ${out}`).not.toMatch(/~|@|circle-|sec-|chord-|radw|\.\d{3,}/);
+    }
   });
 });

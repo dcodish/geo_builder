@@ -70,8 +70,32 @@ export function panelIsEmpty(p: DataPanel): boolean {
 
 const EPS = 1e-6;
 
-/** Render a number cleanly: integers plain, small fractions as p/q, else 2 decimals. */
-export function cleanNum(x: number, tol = 1e-5): string {
+/** A SURD tier for `cleanNum` (#269): x = (p/q)·√n for a small non-square n (bagrut magnitudes are routinely
+ *  surds — √5, 2√5, √5/2). Ascending n returns the SIMPLIFIED form (√12 → "2√3"). OPT-IN and tight-tolerance
+ *  only: enabled where a magnitude / coordinate is expected, NEVER for angles (∠SDB = 35.26° stays decimal),
+ *  plane-equation coefficients (integerized upstream), or the loose `cleanCoef` (2e-3 √noise) — so a
+ *  genuinely irrational value falls through to 2 decimals instead of being dressed up as a surd it isn't. */
+function trySurd(x: number, tol: number): string | null {
+  const ax = Math.abs(x);
+  if (ax < tol) return null;
+  const sign = x < 0 ? '−' : '';
+  for (let n = 2; n <= 50; n++) {
+    const r = Math.round(Math.sqrt(n));
+    if (r * r === n) continue; // n must be NON-square (n=4/9/16… are the integer/rational tiers' job)
+    const c = ax / Math.sqrt(n); // the rational coefficient of √n
+    const ci = Math.round(c);
+    if (Math.abs(c - ci) < tol && ci >= 1 && ci <= 20) return `${sign}${ci === 1 ? '' : ci}√${n}`;
+    for (let q = 2; q <= 12; q++) {
+      const p = c * q;
+      const pi = Math.round(p);
+      if (Math.abs(p - pi) < tol && pi >= 1 && pi <= 60) return `${sign}${pi === 1 ? '' : pi}√${n}/${q}`;
+    }
+  }
+  return null;
+}
+
+/** Render a number cleanly: integers plain, small fractions as p/q, an opt-in SURD tier (#269), else 2 decimals. */
+export function cleanNum(x: number, tol = 1e-5, surd = false): string {
   // default tolerance sized for the pivot's numeric floor (~1e-7), far under display
   // grain; coefficients from a DOUBLE-ROOT solve carry the intrinsic √noise (~1e-4)
   // and pass tol = 2e-3 (cleanCoef) — claims still guard correctness at 2e-5
@@ -80,12 +104,15 @@ export function cleanNum(x: number, tol = 1e-5): string {
     const p = x * q;
     if (Math.abs(p - Math.round(p)) < tol && Math.abs(Math.round(p)) <= 400) return `${Math.round(p)}/${q}`;
   }
+  if (surd) { const s = trySurd(x, tol); if (s) return s; }
   return x.toFixed(2);
 }
+/** A magnitude / coordinate value — the same tiers as `cleanNum` plus the surd tier (#269). */
+export const cleanMag = (x: number): string => cleanNum(x, 1e-5, true);
 
 const cleanCoef = (x: number): string => cleanNum(x, 2e-3);
 
-export const coordStr = (v: Vec3): string => `(${cleanNum(v.x)}, ${cleanNum(v.y)}, ${cleanNum(v.z)})`;
+export const coordStr = (v: Vec3): string => `(${cleanMag(v.x)}, ${cleanMag(v.y)}, ${cleanMag(v.z)})`;
 
 /** Render a UNIT-normalized plane (lead coefficient positive) as `20x - y + 2z - 5 = 0`:
  *  find the smallest integer scaling (the book form); fall back to the 2-decimal unit form. */
@@ -411,7 +438,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       label,
       decomp: coefs ? decompStr(coefs, basisNames) : symDecomp,
       coords: vectorFrame && d ? coordStr(d) : null, // #315: seed-stability distinguishes derivable from gauge for vectors; translation alone needs the explicit anchor
-      mag: mag !== undefined ? `|${label}| = ${cleanNum(mag)}` : null,
+      mag: mag !== undefined ? `|${label}| = ${cleanMag(mag)}` : null,
       sq: mag !== undefined ? `${label}² = ${cleanNum(mag * mag)}` : null,
     };
     if (entry.decomp || entry.coords || entry.mag) entries.push(entry);
@@ -463,7 +490,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
         const derived =
           stated === undefined && hasScale && per.every((m) => Math.abs(m - per[0]) < 1e-6 * Math.max(1, per[0])) ? per[0] : undefined;
         const val = stated ?? derived;
-        relations.push(cls.map((n) => `|${n}|`).join(' = ') + (val !== undefined ? ` = ${cleanNum(val)}` : ''));
+        relations.push(cls.map((n) => `|${n}|`).join(' = ') + (val !== undefined ? ` = ${cleanMag(val)}` : ''));
       }
     }
   }
@@ -580,7 +607,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
           const sg = c.signGivens.find((g) => g.id === id && g.axis === ax);
           return sg ? (sg.positive ? '+?' : '−?') : '?';
         };
-        const cs = `(${axes.map((ax, i) => (stableAx[i] ? cleanNum(ps[0]![ax]) : free(ax))).join(', ')})`;
+        const cs = `(${axes.map((ax, i) => (stableAx[i] ? cleanMag(ps[0]![ax]) : free(ax))).join(', ')})`;
         pointCoords[id] = { text: cs, kind: 'partial' };
         points.push(`${id}${cs}`);
       }
