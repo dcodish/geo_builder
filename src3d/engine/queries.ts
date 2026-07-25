@@ -251,8 +251,26 @@ function vectorForms(c: Construction3, a: Atom, posArr: Positions3[], seeds: num
       if (sym) parts.push(sym);
     }
   }
-  const hasFrame = c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
-  if (hasFrame) {
+  // #315 (ADR-3D-074): a queried VECTOR's coordinates are a difference — translation cancels — so
+  // they need the ORIENTATION pinned (two independent pinned directions, or a real point frame, or
+  // the atom itself being the injected pair), never just "something was injected" (a single pair pin
+  // leaves a residual rotation the pivot's deterministic gauge fixes, which would print as knowledge).
+  const translationPinned = c.pins.length > 0;
+  const dirs = [
+    ...c.vectorPins.map((p) => ({ x: p.x, y: p.y, z: p.z })),
+    ...c.pairPins.map((p) => ({ x: p.x, y: p.y, z: p.z })),
+  ];
+  const indep = (u: { x: number; y: number; z: number }, w: { x: number; y: number; z: number }) => {
+    const cx = u.y * w.z - u.z * w.y, cy = u.z * w.x - u.x * w.z, cz = u.x * w.y - u.y * w.x;
+    return Math.hypot(cx, cy, cz) > 1e-9 * Math.max(1, Math.hypot(u.x, u.y, u.z) * Math.hypot(w.x, w.y, w.z));
+  };
+  const orientationPinned = translationPinned || dirs.some((u) => dirs.some((w) => indep(u, w)));
+  const ownFt: [Id, Id] | null = 'named' in a ? (() => { const d = c.vectors.get(a.named); return d ? ([d.from, d.to] as [Id, Id]) : null; })() : a.pair;
+  const ownPinned = !!ownFt && (
+    c.pairPins.some((p) => (p.a === ownFt[0] && p.b === ownFt[1]) || (p.a === ownFt[1] && p.b === ownFt[0])) ||
+    ('named' in a && c.vectorPins.some((vp) => vp.name === a.named))
+  );
+  if (orientationPinned || ownPinned) {
     const vs = posArr.map((pos) => atomVec(c, a, pos));
     if (!vs.some((v) => !v) && vs.every((v) => Math.abs(v!.x - vs[0]!.x) < 1e-6 && Math.abs(v!.y - vs[0]!.y) < 1e-6 && Math.abs(v!.z - vs[0]!.z) < 1e-6)) {
       parts.push(coordStr(vs[0]!));
