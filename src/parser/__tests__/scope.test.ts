@@ -6,7 +6,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { classifyOutOfScope, looksCompound } from '../scope';
+import { classifyOutOfScope, looksCompound, looksLikeLatex, wordRootMagnitude } from '../scope';
+import { parse } from '../parse';
 
 describe('classifyOutOfScope — analytic / coordinate geometry (a different, planned tool)', () => {
   for (const he of [
@@ -183,5 +184,45 @@ describe('#43 — NO THEFT: every supported catalog example stays unclassified (
     expect(classifyOutOfScope('הוסף חוצה זווית מ-A')?.category).not.toBe('ui-command');
     // a valued angle is a given, not a query
     expect(classifyOutOfScope('∠DEF = 60')).toBeNull();
+  });
+});
+
+describe('#244 — lowercase angle labels are NOT mis-classified `unrelated` (the keyword carries it)', () => {
+  it.each(['זוית abc', 'זוית ABC', 'זווית abc', 'זווית ABC'])('«%s» → null (a real gap → honest escalation)', (u) => {
+    expect(classifyOutOfScope(u)).toBeNull();
+  });
+  it.each(['hello there', 'שלום מה שלומך', 'thanks a lot'])('genuine free text «%s» stays `unrelated`', (u) => {
+    expect(classifyOutOfScope(u)?.category).toBe('unrelated');
+  });
+});
+
+describe('#329 — LaTeX-pasted input is detected (looksLikeLatex)', () => {
+  it.each([
+    'במשולש $\\triangle ABC$, הנקודה $D$ על $AB$ כך ש-$DE \\parallel BC$.',
+    'היחס בין הקטעים הוא $AD:DB = 1:2$.',
+    'the ratio is $AD:DB=1:2$',
+    'triangle \\triangle ABC',
+  ])('LaTeX «%s» → true', (u) => expect(looksLikeLatex(u)).toBe(true));
+  it.each([
+    'היחס בין הקטעים הוא AD:DB = 1:2', // same ratio, no $ — must still parse
+    'משולש ABC, DE ∥ BC',
+    'AD:DB = 1:2',
+    'C:\\x', // a stray single backslash+letter is not a \command (needs ≥2 letters)
+  ])('plain «%s» → false (never swallows a construction)', (u) => expect(looksLikeLatex(u)).toBe(false));
+  it('the no-$ ratio still parses (the false-positive guard)', () => {
+    expect(parse('AD:DB = 1:2').ok).toBe(true);
+  });
+});
+
+describe('#246 — a «שורש N» word-form magnitude is detected (wordRootMagnitude)', () => {
+  it.each(['שטח משולש BEC שווה לשורש 27', 'AB = שורש 27', 'שורש 27', 'רדיוס שורש(5)'])('«%s» → true', (u) =>
+    expect(wordRootMagnitude(u)).toBe(true),
+  );
+  it.each(['שטח ABC = √27', 'שורש של המשולש', 'משולש ABC'])('«%s» → false (symbol form / no magnitude)', (u) =>
+    expect(wordRootMagnitude(u)).toBe(false),
+  );
+  it('the √-SYMBOL form still builds (guidance is only for the WORD at the escalation seam)', () => {
+    expect(parse('AB = √27').ok).toBe(true);
+    expect(parse('AB = שורש 27').ok).toBe(true); // #105 normalization builds this — never reaches the seam
   });
 });

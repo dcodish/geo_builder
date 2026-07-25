@@ -153,3 +153,41 @@ describe('submit pipeline — LLM second attempt', () => {
     expect(calls.resolved).toBe(1);
   });
 });
+
+describe('submit pipeline — the P3 guided-message batch (#329/#246, ADR-391)', () => {
+  it('#329: LaTeX-pasted input → the latex guidance, PRE-parse, never an LLM call', async () => {
+    const { deps, calls, notes } = makeDeps();
+    await runSubmit('היחס בין הקטעים הוא $AD:DB = 1:2$.', deps);
+    expect(notes()).toEqual(['input.scope.latex']);
+    expect(llmParseMock).not.toHaveBeenCalled(); // pre-parse guard — no paid call
+    expect(calls.resolved).toBe(0); // nothing committed
+  });
+  it('#329: the LaTeX compound (partial-parses to a wrong figure) is still caught pre-parse', async () => {
+    const { deps, notes } = makeDeps();
+    await runSubmit('במשולש $\\triangle ABC$, $D$ על $AB$, $DE \\parallel BC$', deps);
+    expect(notes()).toEqual(['input.scope.latex']);
+    expect(llmParseMock).not.toHaveBeenCalled();
+  });
+  it('#329 NO THEFT: the same ratio WITHOUT $ is never brushed off as latex', async () => {
+    const { deps, notes } = makeDeps();
+    llmParseMock.mockResolvedValue({ built: [], dropped: [] }); // if it escalates, don't crash the post-LLM path
+    await runSubmit('היחס בין הקטעים הוא AD:DB = 1:2', deps);
+    expect(notes()).not.toContain('input.scope.latex');
+  });
+  it('#246: a «שורש N» magnitude that would escalate → the √ nudge, never an LLM call', async () => {
+    const { deps, calls, notes } = makeDeps();
+    // area-with-word-root drops its value (honesty gate) → reaches the seam → guidance
+    await runSubmit('שטח משולש BEC שווה לשורש 27', deps);
+    expect(notes()).toEqual(['input.scope.word-root']);
+    expect(llmParseMock).not.toHaveBeenCalled();
+    expect(calls.resolved).toBe(0);
+  });
+  it('#246 NO THEFT: «AB = שורש 27» on a figure with A,B BUILDS the measure (not the √ nudge)', async () => {
+    const { deps, calls, notes } = makeDeps();
+    await runSubmit('קטע AB', deps); // establish A, B first (the realistic order)
+    await runSubmit('AB = שורש 27', deps); // #105 normalizes שורש→√ → measure-length commits
+    expect(notes()).not.toContain('input.scope.word-root'); // never brushed off
+    expect(calls.resolved).toBeGreaterThanOrEqual(2); // both steps committed
+    expect(llmParseMock).not.toHaveBeenCalled();
+  });
+});
