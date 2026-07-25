@@ -489,6 +489,86 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "given the points: A(1, 4, -3), B(2t, t, k)",
+    "winner": "injectionList",
+  },
+  {
+    "lang": "he",
+    "text": "נתונות הנקודות: A(1, 4, -3), B(2t, t, k)",
+    "winner": "injectionList",
+  },
+  {
+    "lang": "en",
+    "text": "t is a positive parameter",
+    "winner": "paramSign",
+  },
+  {
+    "lang": "he",
+    "text": "t פרמטר חיובי",
+    "winner": "paramSign",
+  },
+  {
+    "lang": "en",
+    "text": "t > 0",
+    "winner": "paramSign",
+  },
+  {
+    "lang": "he",
+    "text": "t > 0",
+    "winner": "paramSign",
+  },
+  {
+    "lang": "en",
+    "text": "base ABCD lies on a plane parallel to the xy-plane",
+    "winner": "coordPlaneRel",
+  },
+  {
+    "lang": "he",
+    "text": "הבסיס ABCD מונח על מישור שמקביל למישור [xy]",
+    "winner": "coordPlaneRel",
+  },
+  {
+    "lang": "en",
+    "text": "plane ABC lies on the xy-plane",
+    "winner": "coordPlaneRel",
+  },
+  {
+    "lang": "he",
+    "text": "המישור ABC מונח על המישור [xy]",
+    "winner": "coordPlaneRel",
+  },
+  {
+    "lang": "en",
+    "text": "plane ABC is perpendicular to the xz-plane",
+    "winner": "coordPlaneRel",
+  },
+  {
+    "lang": "he",
+    "text": "המישור ABC מאונך למישור [xz]",
+    "winner": "coordPlaneRel",
+  },
+  {
+    "lang": "en",
+    "text": "plane ABC is parallel to the z-axis",
+    "winner": "coordPlaneRel",
+  },
+  {
+    "lang": "he",
+    "text": "המישור ABC מקביל לציר ה-z",
+    "winner": "coordPlaneRel",
+  },
+  {
+    "lang": "en",
+    "text": "the base lies in a plane parallel to the xy-plane",
+    "winner": "coordPlaneRel",
+  },
+  {
+    "lang": "he",
+    "text": "הבסיס מונח במישור המקביל למישור ה-xy",
+    "winner": "coordPlaneRel",
+  },
+  {
+    "lang": "en",
     "text": "denote AB = u, AD = v, AA' = w",
     "winner": "nameVectors",
   },

@@ -40,6 +40,17 @@ export function centroid3(ps: Vec3[]): Vec3 {
   return scale3(s, 1 / ps.length);
 }
 
+/** The circumcentre of triangle a-b-c in R³ (ADR-3D-080), or null when collinear. */
+export function circumcenter3(a: Vec3, b: Vec3, c: Vec3): Vec3 | null {
+  const ab = sub3(b, a);
+  const ac = sub3(c, a);
+  const n = cross3(ab, ac);
+  const n2 = dot3(n, n);
+  if (n2 < 1e-18) return null;
+  const term = add3(scale3(cross3(n, ab), dot3(ac, ac)), scale3(cross3(ac, n), dot3(ab, ab)));
+  return add3(a, scale3(term, 1 / (2 * n2)));
+}
+
 /** Newell's method — a polygon's normal from its vertex ring (internal device). */
 export function newellNormal(pts: Vec3[]): Vec3 {
   let n = v3(0, 0, 0);

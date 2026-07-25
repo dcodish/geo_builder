@@ -40,6 +40,7 @@ const COMMAND_TYPES = new Set<Command3['type']>([
   'point-in-span',
   'claim',
   'point3',
+  'coord-plane-rel', // #324 (ADR-3D-079): ring ∥/⟂/on a coordinate plane or axis
   'plane3',
   'plane-angle',
   'on-planes',

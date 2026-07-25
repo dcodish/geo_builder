@@ -614,6 +614,14 @@ export default function App3() {
                   {dataPanel.points.map((p) => (
                     <li key={p}>{p}</li>
                   ))}
+                  {/* #325 (ADR-3D-079 Am. 2): the open symbols of B(2t,t,k) — a determined value
+                      prints, a free one reads open with a hint, so the given visibly registered */}
+                  {dataPanel.params.map((p) => (
+                    <li key={p.sym} className={p.open ? 'text-slate-500' : undefined}>
+                      {p.text}
+                      {p.open && <span dir="rtl" className="mr-1 text-xs text-slate-400"> — {t('dataPanel.openParam')}</span>}
+                    </li>
+                  ))}
                   {dataPanel.planes.map((p) => (
                     <li key={p} className="border-t border-slate-100 pt-1">
                       {p}

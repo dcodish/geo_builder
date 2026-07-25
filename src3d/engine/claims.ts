@@ -9,7 +9,7 @@
 
 import { evaluate3, lineAtParam, planeAtParam } from './evaluate';
 import { atomVec, evalExpr } from './vecExpr';
-import { cross3, dot3, norm3, sub3, v3 } from './vec3';
+import { cross3, dot3, newellNormal, norm3, sub3, v3 } from './vec3';
 import type { Claim3, Construction3, Positions3 } from './types';
 
 /** Claim tolerance. Closed-form figures verify to ~1e-15; a figure placed by the V4
@@ -71,6 +71,23 @@ function holdsAt(claim: Claim3, c: Construction3, pos: Positions3): boolean {
       if (!p) return false;
       const target = v3(claim.x, claim.y, claim.z);
       return norm3(sub3(p, target)) <= REL_TOL * Math.max(norm3(target), 1);
+    }
+    case 'coord-plane-rel': {
+      // #324 (ADR-3D-079): the ring's relation to a coordinate plane/axis on the FINAL figure
+      const ps = claim.ids.map((id) => pos.get(id));
+      if (ps.some((p) => !p)) return false;
+      const ring = ps as { x: number; y: number; z: number }[];
+      let extent = 0;
+      for (let i = 1; i < ring.length; i++) extent = Math.max(extent, norm3(sub3(ring[i], ring[0])));
+      const tol = REL_TOL * Math.max(extent, 1);
+      if (claim.mode === 'share') return ring.every((p) => Math.abs(p[claim.axis] - ring[0][claim.axis]) <= tol);
+      if (claim.mode === 'zero') return ring.every((p) => Math.abs(p[claim.axis]) <= tol);
+      const n = newellNormal(ring.map((p) => v3(p.x, p.y, p.z)));
+      const nn = norm3(n);
+      if (nn < 1e-12) return false; // the ring does not span a plane at all
+      if (Math.abs(n[claim.axis]) > REL_TOL * nn) return false;
+      if (claim.mode === 'contains') return Math.abs(dot3(n, ring[0])) <= REL_TOL * nn * Math.max(extent, 1);
+      return true;
     }
     case 'plane-eq': {
       const ps = claim.ids.map((id) => pos.get(id));

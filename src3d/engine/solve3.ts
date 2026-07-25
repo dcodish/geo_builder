@@ -158,6 +158,8 @@ export interface PivotResult {
   dims: number[];
   /** V8-c — the jointly-solved values of the coupled symbols (in `coupled.defs` order). */
   symbols?: number[];
+  /** #325 (ADR-3D-079) — the solved values of the pins' OPEN symbols (`B(2t,t,k)` → t, k). */
+  pinSymbols?: Record<string, number>;
   err: number;
   /** The solved parameter vector [t, w, logScale, dims…] — the warm-start vehicle: a
    *  later DRIVE (ADR-3D-033) perturbs the pinned figure from here, so it lands in the
@@ -211,7 +213,7 @@ export function solvePivot(
   const memberPins = members ?? [];
   if (
     pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 && c.scalarPins.length === 0 &&
-    c.planePins.length === 0 && memberPins.length === 0
+    c.planePins.length === 0 && memberPins.length === 0 && c.coordPlanePins.length === 0
   )
     return [];
 
@@ -222,12 +224,44 @@ export function solvePivot(
   const nDims = dims0.length;
   const nSym = coupled?.defs.length ?? 0;
 
+  // #325 (ADR-3D-079): the pins' OPEN symbols (`B(2t,t,k)` → t, k) are pivot unknowns too,
+  // appended AFTER the coupled symbols. Unknown layout: [gauge 7 | dims | coupled | pinSyms].
+  const pinSyms: string[] = [];
+  for (const pin of pointPins) {
+    for (const comp of [pin.x, pin.y, pin.z]) {
+      if (comp !== null && typeof comp === 'object' && !pinSyms.includes(comp.sym)) pinSyms.push(comp.sym);
+    }
+  }
+  const nPinSym = pinSyms.length;
+  /** A pin component's target value at the trial unknowns (null = unconstrained). */
+  const compTarget = (comp: number | null | import('./types').SymComp, x: number[]): number | null => {
+    if (comp === null) return null;
+    if (typeof comp === 'number') return comp;
+    return comp.c + comp.k * x[7 + nDims + nSym + pinSyms.indexOf(comp.sym)];
+  };
+  // #325 (ADR-3D-079 Am. 2): an UNDETERMINED pin symbol must VARY with the seed (ADR-052 —
+  // a value the sampler never explores is a default masquerading as determined; the params
+  // panel would print an invented `t = 6/5`). Each open symbol gets a SEED-DEPENDENT soft
+  // anchor (the dims0 mechanism), sign-aware so a stated «t חיובי» parks on the stated side;
+  // a genuinely determining given overrides the 1e-4 pull exactly like it overrides dims0.
+  const symAnchorTargets = pinSyms.map((sym, i) => {
+    const frac = (Math.abs(Math.sin((seed + 1) * 12.9898 + (i + 1) * 78.233)) * 43758.5453) % 1;
+    const raw = -1.6 + 3.2 * frac;
+    const sgn = c.paramSigns.find((ps) => ps.sym === sym);
+    if (!sgn) return raw;
+    return sgn.positive ? 0.4 + Math.abs(raw) : -(0.4 + Math.abs(raw));
+  });
+
   // When EVERY pin is similarity-INVARIANT (angles, ⟂/∥-to-plane — no coordinate,
   // length or dot given anywhere), the gauge is pure null-space: solving it invites
   // the scale→0 collapse basin (all normalized residuals vanish as the figure shrinks
   // onto a point). Freeze the gauge to identity and solve the shape dims ONLY.
   const invariantOnly =
     nSym === 0 &&
+    nPinSym === 0 &&
+    // #324: a coordinate-plane relation is ABSOLUTE-frame (it must be able to rotate the
+    // figure) — never solvable with the gauge frozen
+    c.coordPlanePins.length === 0 &&
     // an all-gauge run-carrier membership is similarity-invariant (extent-normalized);
     // a frozen member or a fixed equation plane pins the gauge instead
     memberPins.every((m) => !m.frozen && !m.plane) &&
@@ -250,9 +284,13 @@ export function solvePivot(
         continue;
       }
       const q = applyGauge(p, g);
-      if (pin.x !== null) out.push(q.x - pin.x);
-      if (pin.y !== null) out.push(q.y - pin.y);
-      if (pin.z !== null) out.push(q.z - pin.z);
+      // #325: a symbolic component's target is evaluated at the trial pin-symbol values
+      const tx = compTarget(pin.x, x);
+      const ty = compTarget(pin.y, x);
+      const tz = compTarget(pin.z, x);
+      if (tx !== null) out.push(q.x - tx);
+      if (ty !== null) out.push(q.y - ty);
+      if (tz !== null) out.push(q.z - tz);
     }
     for (const pin of vecPins) {
       const def = c.vectors.get(pin.name);
@@ -300,6 +338,31 @@ export function solvePivot(
       const p = pos.get(id);
       return p ? applyGauge(p, g) : null;
     };
+    // #324 (ADR-3D-079): a ring's relation to a COORDINATE plane/axis. Absolute-frame
+    // residuals (like injections). `share`/`perp` are normalized by the ring's extent /
+    // the normal's length so shrinking the figure can never zero them "for free" (the
+    // collapse-basin class); `zero` is a genuine absolute placement of a coordinate.
+    for (const pin of c.coordPlanePins) {
+      const pts = pin.ids.map(at);
+      if (pts.some((p) => !p)) {
+        out.push(10);
+        continue;
+      }
+      const ring = pts as Vec3[];
+      let extent = 0;
+      for (let i = 1; i < ring.length; i++) extent = Math.max(extent, dist3(ring[i], ring[0]));
+      const ext = Math.max(extent, 1e-9);
+      if (pin.mode === 'share') {
+        for (let i = 1; i < ring.length; i++) out.push((ring[i][pin.axis] - ring[0][pin.axis]) / ext);
+      } else if (pin.mode === 'zero') {
+        for (const p of ring) out.push(p[pin.axis] / ext);
+      } else {
+        const n = newellNormal(ring);
+        const nn = Math.max(norm3(n), 1e-12);
+        out.push(n[pin.axis] / nn);
+        if (pin.mode === 'contains') out.push(dot3(n, ring[0]) / (nn * ext));
+      }
+    }
     // V8-f: a VecAtom operand → its (gauge-transformed) direction
     const dirOf = (atom: import('./types').VecAtom): Vec3 | null => {
       if (atom.kind === 'named') {
@@ -495,11 +558,13 @@ export function solvePivot(
   for (let i = 0; i < 8; i++) {
     const k = (i + seed) % 8;
     const symStart = Array.from({ length: nSym }, () => 0.2 + 0.2 * (k % 3)); // 0.2/0.4/0.6 spread
-    starts.push([0, 0, 0, axes[k].x * angles[k], axes[k].y * angles[k], axes[k].z * angles[k], 0, ...dims0, ...symStart]);
+    // #325: pin symbols start on a ± spread so a sign given can find its branch
+    const pinSymStart = Array.from({ length: nPinSym }, () => (k < 4 ? 1 : -1) * (0.3 + 0.3 * (k % 3)));
+    starts.push([0, 0, 0, axes[k].x * angles[k], axes[k].y * angles[k], axes[k].z * angles[k], 0, ...dims0, ...symStart, ...pinSymStart]);
   }
   // the warm start (a prior solve's exact solution) goes FIRST so a drive perturbs the
   // pinned figure's own basin before gambling on the rotation spread (ADR-3D-033)
-  if (warmStart && warmStart.length === 7 + nDims + nSym) starts.unshift([...warmStart]);
+  if (warmStart && warmStart.length === 7 + nDims + nSym + nPinSym) starts.unshift([...warmStart]);
 
   const results: PivotResult[] = [];
   // ADR-3D-030: plane-equation pins reach solvePivot ONLY on the drive path (the normal
@@ -509,14 +574,14 @@ export function solvePivot(
   // sample, the invariantOnly REG pattern), (b) judged on its PRIMARY residuals so
   // exact solutions are never rejected for carrying the anchor's pull, and (c) filtered:
   // a candidate whose solid has two coincident vertices is not a figure at all.
-  const planeDrive = c.planePins.length > 0 || memberPins.length > 0;
+  const planeDrive = c.planePins.length > 0 || memberPins.length > 0 || c.coordPlanePins.length > 0;
   // ...and when NOTHING pins an absolute length (no point/vector/pair injection, no
   // length/dot scalar), placement alone can satisfy the equations — Stage A below.
   const scaleFree =
     nSym === 0 && planeDrive && pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 &&
     c.scalarPins.every((p) => p.kind !== 'length' && p.kind !== 'dot');
   const REG_SF = 1e-4;
-  const ACCEPT = planeDrive ? 1e-10 : 1e-12; // reg equilibrium floors primary at ~(REG·pull)²
+  const ACCEPT = planeDrive || nPinSym > 0 ? 1e-10 : 1e-12; // reg equilibrium floors primary at ~(REG·pull)²
   /** A candidate whose solid carries two coincident vertices is DEGENERATE — never a figure. */
   const degenerate = (x: number[]): boolean => {
     if (!planeDrive) return false;
@@ -543,7 +608,10 @@ export function solvePivot(
   // (D on +x with S on −z vs D on −x with S on +z). With sign givens present, keep
   // every distinct converged solution so the selector sees the full pool; without
   // them, the fast best-per-mirror path stands.
-  const collectAll = c.signGivens.length > 0;
+  // #325 (ADR-3D-079 Am. 3): a sign given on a PIN SYMBOL selects the same way — `AB=7`
+  // with `B(2t,t,k)` roots t at 4 OR −1.6 (discrete), and best-per-mirror may keep only
+  // the wrong-signed root, refusing `t > 0` although a positive root exists.
+  const collectAll = c.signGivens.length > 0 || (nPinSym > 0 && c.paramSigns.length > 0);
   for (const mirror of [false, true]) {
     const fPrimary = residualsFor(mirror);
     if (scaleFree) {
@@ -571,13 +639,23 @@ export function solvePivot(
         continue; // this mirror solved by placement alone
       }
     }
-    const f = planeDrive
-      ? (x: number[]) => [...fPrimary(x), REG_SF * x[6], ...x.slice(7, 7 + nDims).map((v, i) => REG_SF * (v - dims0[i]))]
+    // #325: pin-symbol seed-anchors ride whether or not this is a plane drive — any solve
+    // with open symbols is `anchored`, and its acceptance moves to the PRIMARY residuals
+    // (the anchor equilibrium floors the full error above the raw thresholds).
+    const anchored = planeDrive || nPinSym > 0;
+    const symAnchorTerms = (x: number[]): number[] =>
+      symAnchorTargets.map((tgt, i) => REG_SF * (x[7 + nDims + nSym + i] - tgt));
+    const f = anchored
+      ? (x: number[]) => [
+          ...fPrimary(x),
+          ...(planeDrive ? [REG_SF * x[6], ...x.slice(7, 7 + nDims).map((v, i) => REG_SF * (v - dims0[i]))] : []),
+          ...symAnchorTerms(x),
+        ]
       : fPrimary;
     // best-selection stays on the FULL error (the anchor's pull punishes the collapse
     // basin); ACCEPTANCE is on the primary residuals so exact solutions always pass.
     const primaryErr = (x: number[]): number =>
-      planeDrive ? fPrimary(x).reduce((s, v) => s + v * v, 0) : NaN;
+      anchored ? fPrimary(x).reduce((s, v) => s + v * v, 0) : NaN;
     let best: { x: number[]; err: number } | null = null;
     const seen = new Set<string>();
     for (const x0 of starts) {
@@ -589,19 +667,25 @@ export function solvePivot(
         r0 = r2;
       }
       if (degenerate(r0.x)) continue; // a collapsed solid is not a figure (general position)
-      const rAccept = planeDrive ? primaryErr(r0.x) : r0.err;
+      const rAccept = anchored ? primaryErr(r0.x) : r0.err;
       if (collectAll && rAccept < ACCEPT) {
         const g = { ...unpack(r0.x), mirror };
-        // dedupe by the transform's ACTION (probe frame), not its parameters (axis-angle wraps)
-        const sig = [v3(0, 0, 0), v3(1, 0, 0), v3(0, 1, 0), v3(0, 0, 1)]
-          .map((p) => applyGauge(p, g))
-          .map((q) => `${q.x.toFixed(5)},${q.y.toFixed(5)},${q.z.toFixed(5)}`)
-          .join('|');
+        // dedupe by the transform's ACTION (probe frame), not its parameters (axis-angle wraps).
+        // Am. 3: two pin-symbol ROOTS can share one gauge (t = 4 vs −1.6 moves only B) — the
+        // symbol values join the signature so the sign selector sees both (nPinSym = 0 ⇒ the
+        // signature is byte-identical to before).
+        const sig =
+          [v3(0, 0, 0), v3(1, 0, 0), v3(0, 1, 0), v3(0, 0, 1)]
+            .map((p) => applyGauge(p, g))
+            .map((q) => `${q.x.toFixed(5)},${q.y.toFixed(5)},${q.z.toFixed(5)}`)
+            .join('|') +
+          (nPinSym > 0 ? '#' + r0.x.slice(7 + nDims + nSym).map((v) => v.toFixed(4)).join(',') : '');
         if (!seen.has(sig)) {
           seen.add(sig);
           const dims = r0.x.slice(7, 7 + nDims);
-          const symbols = coupled ? r0.x.slice(7 + nDims) : undefined;
-          results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, err: rAccept, x: [...r0.x] });
+          const symbols = coupled ? r0.x.slice(7 + nDims, 7 + nDims + nSym) : undefined;
+          const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((s, i) => [s, r0.x[7 + nDims + nSym + i]])) : undefined;
+          results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, err: rAccept, x: [...r0.x] });
         }
       }
       if (!best || r0.err < best.err) best = r0; // FULL err — the anchor punishes collapse
@@ -609,12 +693,13 @@ export function solvePivot(
     }
     // acceptance: per-residual ~1e-6 — far under the 2e-5 claim tolerance (the numeric-
     // Jacobian floor rises with mixed scalar residuals; 1e-16 was V4-era point-pins-only)
-    const bestAccept = best ? (planeDrive ? primaryErr(best.x) : best.err) : Infinity;
+    const bestAccept = best ? (anchored ? primaryErr(best.x) : best.err) : Infinity;
     if (!collectAll && best && bestAccept < ACCEPT) {
       const g = { ...unpack(best.x), mirror };
       const dims = best.x.slice(7, 7 + nDims);
-      const symbols = coupled ? best.x.slice(7 + nDims) : undefined;
-      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, err: bestAccept, x: [...best.x] });
+      const symbols = coupled ? best.x.slice(7 + nDims, 7 + nDims + nSym) : undefined;
+      const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((s, i) => [s, best.x[7 + nDims + nSym + i]])) : undefined;
+      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, err: bestAccept, x: [...best.x] });
     }
   }
   return results;

@@ -42,6 +42,12 @@ export const PROMPT_EXAMPLES_3D: PromptExample3[] = [
   // #321: the parallelogram FAMILY builds oblique with its base stated — never downgrade a rhombus/
   // rectangle/square base to a plain parallelogram (that silently drops the stated base shape).
   { freeform: 'a prism whose base is a rhombus', steps: ['מנסרה שבסיסה מעוין'] },
+  // #324/#325 (ADR-3D-079): coordinate-frame givens — the base's relation to a coordinate plane
+  // (lowercase x/y/z) and affine symbolic coordinates (symbols stay OPEN until data pins them)
+  {
+    freeform: 'הבסיס מונח במישור המקביל למישור xy ונתונות הנקודות B(2t,t,k), A(1,4,-3)',
+    steps: ['הבסיס ABCD מונח על מישור שמקביל למישור [xy]', 'נתונות הנקודות: A(1, 4, -3), B(2t, t, k)'],
+  },
   // #290: a prism with no base shape at all is not expressible — the honest output is an empty list.
   { freeform: 'a prism', steps: [] },
   { freeform: 'סמן את הצלעות של הקובייה כוקטורים u v w', steps: ['קובייה ABCD', "נסמן: AB = u, AD = v, AA' = w"] },

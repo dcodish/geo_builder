@@ -15,8 +15,9 @@
 import { sample } from './rng';
 import { solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { decompose3 } from './vecExpr';
+import { pinSymsOf } from './types';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
-import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
+import { add3, centroid3, circumcenter3, cross3, dist3, dot3, lerp3, newellNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 /** Deg → rad. */
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -277,8 +278,9 @@ export interface Resolved3 {
   lines: Map<string, ResolvedLine>;
   /** The parameter's chosen value + every root of the pinning relation (branches), when one exists. */
   param: { name: string; value: number; roots: number[] } | null;
-  /** The V4 pivot's outcome, when injections exist: how many placements converged and which was chosen. */
-  pivot: { solutions: number; chosen: number; err: number } | null;
+  /** The V4 pivot's outcome, when injections exist: how many placements converged and which was chosen.
+   *  #325: `pinSymbols` carries the chosen solution's values for the pins' OPEN symbols (`B(2t,t,k)`). */
+  pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number> } | null;
   /** V6 — resolved solids of revolution (world centre/apex + numeric radius/height) for the renderer. */
   revolutions: { kind: 'cylinder' | 'cone' | 'sphere'; center: Vec3; apex?: Vec3; r: number; h: number }[];
   /** V8-i — resolved circles in R³ (world centre + unit normal + radius + in-plane basis) for the renderer + on-circle checks. */
@@ -539,7 +541,13 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   const param = c.param && pinningGivens(c) === 0 && c.paramGivens.length === 0 ? 1 : 0;
   if (resolved.pivot && resolved.pivot.solutions > 0) {
     let pinCount = c.vectorPins.length * 3;
+    // #325: a symbolic component (`B(2t,t,k)`) constrains like a numeric one, and each distinct
+    // OPEN symbol is an extra unknown — B(2t,t,k) nets ONE constraint (3 comps − 2 symbols).
     for (const p of c.pins) pinCount += (p.x !== null ? 1 : 0) + (p.y !== null ? 1 : 0) + (p.z !== null ? 1 : 0);
+    dims += pinSymsOf(c).length;
+    // #324: a coordinate-plane relation consumes DOF like pins (its residual count)
+    for (const cp of c.coordPlanePins)
+      pinCount += cp.mode === 'share' ? cp.ids.length - 1 : cp.mode === 'zero' ? cp.ids.length : cp.mode === 'perp' ? 1 : 2;
     // #292: report SHAPE DOF — subtract the free (unpinned) gauge so a similarity-invariant drive
     // (⊥/angle/ratio) lowers the cue rather than adding +7; scalarPins are those shape-reducing drives.
     return Math.max(0, dims - Math.max(0, pinCount - 7) - c.scalarPins.length) + freeT + param;
@@ -681,7 +689,7 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 }
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'right-apex']);
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number): Resolved3 {
@@ -787,7 +795,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   const warm: { x?: number[] } = {}; // the applied solution's vector — the drive's warm start (ADR-3D-033)
   if (
     (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0 ||
-      c.planePins.length > 0 || drivableMemberships.length > 0) &&
+      c.planePins.length > 0 || c.coordPlanePins.length > 0 || drivableMemberships.length > 0) &&
     c.solids.length > 0
   ) {
     const dims0 = c.solids.flatMap((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed));
@@ -810,6 +818,13 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     const applySolutions = (solutions: PivotResult[]): void => {
       const satisfiesSigns = (sol: PivotResult): boolean => {
         const p2 = evalCanonical(sol.dims, false, overrideOf(sol));
+        // #325: a sign given on a PIN symbol (`t פרמטר חיובי` after `B(2t,t,k)`) selects
+        // among pivot solutions, exactly like a coordinate sign given
+        const symsOk = c.paramSigns.every((s) => {
+          const v = sol.pinSymbols?.[s.sym];
+          return v === undefined ? true : s.positive ? v > 1e-9 : v < -1e-9;
+        });
+        if (!symsOk) return false;
         return c.signGivens.every((g) => {
           const q = p2.get(g.id);
           if (!q) return false;
@@ -831,7 +846,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
           if (gauge) pos.set(id, chosen.transform(q));
           else pos.set(id, q);
         }
-        pivot = { solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err };
+        pivot = { solutions: pool.length, chosen: pool.indexOf(chosen), err: chosen.err, pinSymbols: chosen.pinSymbols };
       } else {
         pivot = { solutions: 0, chosen: -1, err: Infinity };
       }
@@ -1145,9 +1160,30 @@ function evaluateSolidsAndPoints(
       const axisSeed = Math.abs(nn.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
       const e1 = normalize3(cross3(nn, axisSeed));
       const e2 = cross3(nn, e1);
-      const u = sample(seed, `onplane-u-${id}`, -0.6, 0.6) * spread;
-      const v = sample(seed, `onplane-v-${id}`, -0.6, 0.6) * spread;
-      let p = add3(centre, add3(scale3(e1, u), scale3(e2, v)));
+      const candidate = (k: number): Vec3 => {
+        const suf = k === 0 ? '' : `-${k}`;
+        const cu = sample(seed, `onplane-u-${id}${suf}`, -0.6, 0.6) * spread;
+        const cv = sample(seed, `onplane-v-${id}${suf}`, -0.6, 0.6) * spread;
+        return add3(centre, add3(scale3(e1, cu), scale3(e2, cv)));
+      };
+      // ADR-3D-080 (general position, the 2-D ADR-253 pattern): a rider parked next to an
+      // existing point reads as "on" it (operator: S on the top plane landed "on A"). Step
+      // deterministically to a clear spot; k = 0 keeps the legacy sample keys, so a figure
+      // whose rider already sits clear is byte-identical.
+      const sepOf = (q: Vec3): number => placed.reduce((m, r) => Math.min(m, dist3(q, r)), Infinity);
+      const minSep = 0.22 * spread;
+      let p = candidate(0);
+      if (sepOf(p) < minSep) {
+        let bestSep = sepOf(p);
+        for (let k = 1; k <= 11 && bestSep < minSep; k++) {
+          const q = candidate(k);
+          const sq = sepOf(q);
+          if (sq > bestSep) {
+            p = q;
+            bestSep = sq;
+          }
+        }
+      }
       if (def.side) {
         // "above" = the +z side; a vertical plane keeps its own orientation here and the
         // derive-time check refuses the fact honestly (plane-side-undefined)
@@ -1338,6 +1374,21 @@ function evaluateSolidsAndPoints(
             const resid = norm3(add3(a0, scale3(d0, t)));
             if (resid < 1e-6 * Math.max(norm3(sub3(B, A)), 1e-9)) pos.set(id, lerp3(A, B, t)); // else no right pyramid — left unplaced (honest)
           }
+        }
+      }
+    } else if (def.kind === 'right-apex') {
+      // ADR-3D-080: the right-pyramid apex SEATED on its carrier plane — the ⊥ line through the
+      // base's centre (triangle: circumcentre, the solid-pyramid convention; quad: centroid) cut
+      // with the point-run plane. Carrier ⊥ the base ⇒ no crossing ⇒ left unplaced (honest).
+      const bp = def.base.map((q) => pos.get(q)).filter((q): q is Vec3 => q !== undefined);
+      const pl = planes.get(def.plane) ?? planeFromPointRun(c, def.plane, pos);
+      if (bp.length === def.base.length && bp.length >= 3 && pl) {
+        const centre = bp.length === 3 ? circumcenter3(bp[0], bp[1], bp[2]) : centroid3(bp);
+        const nb = cross3(sub3(bp[1], bp[0]), sub3(bp[2], bp[0]));
+        const denom = dot3(pl.n, nb);
+        if (centre && Math.abs(denom) > 1e-10 * Math.max(norm3(pl.n) * norm3(nb), 1e-12)) {
+          const s = -(dot3(pl.n, centre) + pl.d) / denom;
+          pos.set(id, add3(centre, scale3(nb, s)));
         }
       }
     } else if (def.kind === 'foot-face') {
