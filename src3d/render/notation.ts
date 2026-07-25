@@ -29,6 +29,11 @@ export function vectorNotation(utterance: string, vecNames: Set<string>): string
   return u;
 }
 
+/** Is this fact a VECTOR statement? (#313: the MathML layer applies only where this is true —
+ *  an arrow on a segment name in a prose row would assert vector-ness the statement never had.) */
+export const isVectorFact3 = (f: { cmds: { type: string; claim?: { type: string } }[] }): boolean =>
+  f.cmds.some((cmd) => VEC_CMD_TYPES.has(cmd.type) || (cmd.type === 'claim' && cmd.claim?.type === 'vec-eq'));
+
 /** The step-row display: vector facts get notation, everything else passes through verbatim. */
 export function factDisplay3(f: { utterance: string; cmds: { type: string; claim?: { type: string } }[] }, vecNames: Set<string>): string {
   const isVec = f.cmds.some((cmd) => VEC_CMD_TYPES.has(cmd.type) || (cmd.type === 'claim' && cmd.claim?.type === 'vec-eq'));
