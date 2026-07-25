@@ -10,7 +10,6 @@ const UV = new Set(['u', 'v']);
 const UVW = new Set(['u', 'v', 'w']);
 const U_UNDER = 'u̲';
 const V_UNDER = 'v̲';
-const W_UNDER = 'w̲';
 
 describe('vectorNotation — atom styling boundaries', () => {
   it('styles a divided atom: u/6 (the operator’s exact report)', () => {
