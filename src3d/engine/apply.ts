@@ -586,6 +586,28 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       // M1 (V7 T2): a scalar statement on a figure with FREE dims is a GIVEN — it
       // drives the solve instead of being "checked" against an arbitrary sample.
       if (freeDims(c) > 0) {
+        // #316 (ADR-3D-075): the COORDS twin — «D=(8,10,-12)» on an under-determined figure is the
+        // same statement as «D(8,10,-12)» (one statement, one semantics, docs/17 §2.3; the `=` sign
+        // must not turn a GIVEN into a refused claim). It lowers to the pivot pin exactly like
+        // point3-on-an-existing-id; on a DETERMINED figure it falls through to the claim lane below,
+        // so the V2 verify-your-answer register (claim-refuted) is byte-preserved.
+        const cl = cmd.claim; // const so the narrowing survives into the closure below
+        if (
+          cl.type === 'coords-eq' &&
+          c.points.has(cl.id) &&
+          // …but never for a SYMBOL-defined point (SN=k·SC): its position belongs to the symbol/
+          // root-find lane, and a pivot pin on it perturbs the k-pinning chain (the ADR-3D-030
+          // rule — symbol-defined points are skipped in pin residuals — applied at the entry).
+          !c.vecDefs.some((vd) => vd.symbol && vd.unknown === cl.id)
+        ) {
+          // pin AND claim — the ADR-3D-030 plane-eq pattern: the pin lets the pivot DRIVE the free
+          // figure toward the stated coords; the recorded claim stays the FINAL ARBITER, so an
+          // inconsistent statement (the 2020 wrong-K gate) still refuses with the claim register
+          // even where the pivot only best-efforts its pins.
+          next.pins.push({ id: cl.id, x: cl.x, y: cl.y, z: cl.z });
+          next.claims.push(cl);
+          return { ok: true, next };
+        }
         if (cmd.claim.type === 'length-eq') {
           next.scalarPins.push({ kind: 'length', a: cmd.claim.a, b: cmd.claim.b, value: cmd.claim.value });
           return { ok: true, next };
