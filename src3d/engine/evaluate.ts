@@ -647,6 +647,62 @@ function symbolPinResidual(
   return pin.rel === 'parallel' ? dot3(d, n) / den : norm3(cross3(d, n)) / den;
 }
 
+/** A characteristic size of the currently-placed figure (radius about its centroid); ≥1. */
+function figureScale(pos: Positions3): number {
+  const pts = [...pos.values()];
+  if (pts.length === 0) return 1;
+  const ctr = centroid3(pts);
+  let s = 1;
+  for (const p of pts) s = Math.max(s, dist3(p, ctr));
+  return s;
+}
+
+/** Length of the pin's DRIVEN segment (the one carrying the symbol's unknown point) at value k. */
+function pinDrivenSegLen(
+  c: Construction3,
+  pin: Construction3['symbolPins'][number],
+  vd: VecDef,
+  pos: Positions3,
+  k: number,
+): number {
+  const P = solveVecDef(c, vd, pos, k);
+  if (!P) return 0;
+  const get = (id: Id): Vec3 | undefined => (id === vd.unknown ? P : pos.get(id));
+  const seg = (a: Id, b: Id): number => {
+    const pa = get(a);
+    const pb = get(b);
+    return pa && pb ? norm3(sub3(pb, pa)) : 0;
+  };
+  if (pin.rel === 'length-rel') return seg(pin.a, pin.b);
+  if (pin.rel === 'seg-perp' || pin.rel === 'seg-par')
+    return pin.a === vd.unknown || pin.b === vd.unknown ? seg(pin.a, pin.b) : seg(pin.c, pin.d);
+  if (pin.rel === 'parallel' || pin.rel === 'perp') return seg(pin.a, pin.b);
+  return Infinity; // a value pin has no driven segment to collapse
+}
+
+/**
+ * ADR-3D-083 (#332): the first symbol root whose DRIVEN segment is non-degenerate, or undefined.
+ * A ∥/⊥/length pin's residual is NORMALISED by the driven segment length, so the driven point
+ * coinciding with its reference is a VACUOUS zero (a zero vector is trivially parallel/⊥ to
+ * anything, a zero length trivially matches a zero target). Selecting such a root places the
+ * defined point on top of its reference and commits a false-green figure. Skipping the collapse
+ * root — and, when none remains, leaving the point unpositioned so the store refuses honestly
+ * (no-solution, keep-prior) — is the 3-D analogue of the 2-D anti-collapse / general-position
+ * principle (ADR-238 / ADR-253). Healthy figures are unaffected: a valid root has a segment of
+ * order the figure scale, far above the tolerance, so the first root is chosen exactly as before.
+ */
+function firstNonDegenerateRoot(
+  c: Construction3,
+  pin: Construction3['symbolPins'][number],
+  vd: VecDef,
+  pos: Positions3,
+  roots: number[],
+): number | undefined {
+  const tol = 1e-6 * figureScale(pos);
+  for (const k of roots) if (pinDrivenSegLen(c, pin, vd, pos, k) > tol) return k;
+  return undefined;
+}
+
 /** A point-run plane's numeric form from the CURRENT positions (Newell); null while
  *  its defining points are unplaced or degenerate (collinear). */
 function planeFromPointRun(c: Construction3, name: string, pos: Positions3): ResolvedPlane | null {
@@ -1283,8 +1339,9 @@ function evaluateSolidsAndPoints(
                     for (const r of sc) if (!swallowed.has(r)) out.push(r);
                     return [...new Set(out.map((x) => +x.toFixed(9)))].sort((a, b) => a - b);
                   })();
-          if (roots.length === 0) continue; // unsatisfiable — left unpositioned, flagged upstream
-          k = roots[0];
+          const chosen = firstNonDegenerateRoot(c, pin, vd, pos, roots);
+          if (chosen === undefined) continue; // no non-degenerate root — unpositioned, store refuses (no-solution)
+          k = chosen;
         } else {
           k = sample(seed, `sym-${vd.symbol}-${vd.unknown}`, 0.2, 0.8); // an unpinned symbol is a FREE DOF
         }
@@ -1422,8 +1479,9 @@ function evaluateSolidsAndPoints(
     if (!pin) continue;
     const resid = (kk: number) => symbolPinResidual(c, pin, vd, pos, kk);
     const roots = pin.rel === 'seg-perp' ? signChangeRoots(resid) : touchZeroRoots(resid);
-    if (roots.length === 0) continue; // unsatisfiable — left unpositioned, flagged upstream
-    const P = solveVecDef(c, vd, pos, roots[0]);
+    const chosen = firstNonDegenerateRoot(c, pin, vd, pos, roots);
+    if (chosen === undefined) continue; // no non-degenerate root — unpositioned, flagged upstream
+    const P = solveVecDef(c, vd, pos, chosen);
     if (P) pos.set(id, P);
   }
 }
