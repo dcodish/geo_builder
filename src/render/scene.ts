@@ -12,6 +12,7 @@
 import type { Construction, Id, Circle, Vec } from '@/engine/types';
 import { isGeoPoint } from '@/engine/types';
 import { len, rot90, sub, unit } from '@/engine/geometry';
+import { formatMeasure, formatAngle } from '@/format';
 import { resolveCircle, resolveDrawnLines, type DefiniteAngle, type DefiniteLength, type RelationsResult, type ResolvedCircle } from '@/engine';
 
 export interface ScenePoint {
@@ -621,17 +622,10 @@ export function relationMarks(relations: RelationsResult, positions: Map<Id, Vec
   return { ticks, angles, values, rightAngles, lengths };
 }
 
-/** A definitive angle value for display: an integer when it's within 0.1° of one (60°), else one decimal. */
-function formatDeg(v: number): string {
-  const rounded = Math.round(v);
-  return `${Math.abs(v - rounded) < 0.1 ? rounded : v.toFixed(1)}°`;
-}
-
-/** A definitive length value for display: an integer when it's within 0.05 of one, else one decimal. */
-function formatLen(v: number): string {
-  const rounded = Math.round(v);
-  return Math.abs(v - rounded) < 0.05 ? String(rounded) : v.toFixed(1);
-}
+// Canvas measure labels use THE shared formatter (#164, ADR-393): 2dp trailing-trimmed, so a derived
+// `AC = 7.34` reads "7.34" (was "7.3"), identical to stated labels and the readout panel.
+const formatDeg = formatAngle;
+const formatLen = formatMeasure;
 
 // ── Hover-to-focus picking (the "explore equals on the diagram" interaction, ADR-167 Am.) ──────────────
 // The relations layer is a firehose when a figure is rich (every equal-length tick + equal-angle arc at once).

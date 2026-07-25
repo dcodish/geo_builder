@@ -22,10 +22,30 @@
  * test (`__tests__/humanize-error.test.ts`) asserts every current shape is covered.
  */
 
+import { formatMeasure } from '@/format';
+
 /** The subset of i18next's `t` we need — a key plus interpolation params → string. */
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
 const EMDASH = '—'; // — , used literally in two engine messages
+
+/**
+ * Turn INTERNAL object ids + raw floats into student-facing text (#200, ADR-393). Engine errors embed
+ * implementation ids the student never saw — `circle-O`, `sec-KE`, `chord-CA`, the anonymous scaffold
+ * `~A`/`~radw-circle-P`/`@ctr-O`, and 16-digit floats. Run FIRST, so both the matched-pattern params and
+ * the fall-through string are clean:
+ *   - a long float → display precision (the #164 shared formatter);
+ *   - a named-object id → the student's LETTERS (`circle-O` → `O`, `sec-KE` → `KE`, `@ctr-O` → `O`);
+ *   - an anonymous `~`-scaffold (a helper point the student never named) → a generic ⟨…⟩ placeholder — its
+ *     raw id is meaningless to the student (naming the STEP that made it needs the figure, out of scope here).
+ */
+export function sanitizeIds(s: string): string {
+  return s
+    .replace(/-?\d+\.\d{3,}/g, (m) => formatMeasure(parseFloat(m))) // 1.0583005… → 1.06
+    .replace(/~[A-Za-z0-9'-]+/g, '⟨…⟩') // anonymous scaffold points/witnesses — suppress (before prefix-strip)
+    .replace(/@ctr-([A-Za-z0-9']+)/g, '$1') // an anonymous centre token → its circle's letter
+    .replace(/\b(?:tanaux|circle|chord|perp|line|arc|poly|seg|bis|sec|tan|foot|mid)-([A-Za-z][A-Za-z0-9']*)/g, '$1'); // circle-O → O
+}
 
 /** One mapping: a regex over the raw error and how to build the translation from its groups. */
 interface Pattern {
@@ -102,10 +122,12 @@ const PATTERNS: Pattern[] = [
  */
 export function humanizeError(raw: string | null | undefined, t: Translate): string {
   if (!raw) return '';
-  const s = raw.trim();
+  // Sanitize FIRST (#200): the patterns then match a clean string and every extracted param (`circle: m[1]`)
+  // is already the student's letter — no internal id can reach the message, matched or fall-through.
+  const s = sanitizeIds(raw.trim());
   for (const p of PATTERNS) {
     const m = s.match(p.re);
     if (m) return t(p.key, p.params ? p.params(m) : undefined);
   }
-  return raw;
+  return s;
 }

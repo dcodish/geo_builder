@@ -10,8 +10,31 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { dataView } from '../engine/dataView';
+import { dataView, cleanNum, cleanMag } from '../engine/dataView';
 import { derive3, useGeo3 } from '../store/store3';
+
+describe('#269 — the SURD tier (cleanMag): bagrut magnitudes print as radicals, not decimals', () => {
+  it.each([
+    [Math.sqrt(5), '√5'],
+    [2 * Math.sqrt(5), '2√5'],
+    [Math.sqrt(5) / 2, '√5/2'],
+    [Math.sqrt(2), '√2'],
+    [3 * Math.sqrt(2), '3√2'],
+    [Math.sqrt(12), '2√3'], // simplified (ascending n)
+  ])('cleanMag(%f) = %s', (x, want) => expect(cleanMag(x)).toBe(want));
+
+  it.each([
+    [6, '6'], // integer
+    [2.5, '5/2'], // small rational — the existing tier, not a surd
+    [7 / 3, '7/3'],
+    [Math.PI, '3.14'], // genuine irrational → decimal, NOT a fake surd
+  ])('cleanMag(%f) = %s (no false surd)', (x, want) => expect(cleanMag(x)).toBe(want));
+
+  it('the DEFAULT cleanNum (angles, coefficients) is surd-free — 35.264° stays 35.26', () => {
+    expect(cleanNum(35.264, 1e-3)).toBe('35.26');
+    expect(cleanNum(Math.sqrt(5))).toBe('2.24'); // no surd unless opted in
+  });
+});
 
 const reset = () => {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });

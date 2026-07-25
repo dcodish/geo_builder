@@ -16,6 +16,7 @@
  */
 
 import type { AnyCommand, Command, Id, MeasureExpr, SymbolicCommand } from './types';
+import { formatMeasure } from '@/format';
 import { expandShapeVariant } from './shapeVariants';
 import { expandInscribe } from './inscribe';
 
@@ -236,7 +237,7 @@ export function lower(cmds: AnyCommand[]): Command[] {
   return cmds.flatMap((c) => lowerOne(c, tab));
 }
 
-const fmtNum = (n: number): string => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(3))));
+const fmtNum = formatMeasure; // THE shared formatter (#164, ADR-393) — symbolic coefficients/values at 2dp
 
 /** Render a variable with its exponent: ½ → √x, 2 → x², 3 → x³, n → x^n, else x. */
 const powVar = (v: string, pow?: number): string => {

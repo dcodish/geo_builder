@@ -52,7 +52,7 @@ describe('definite values on hover (#126)', () => {
     const angPick = relationAt(res, pos, { x: A.x + (bis.x / L) * 0.35, y: A.y + (bis.y / L) * 0.35 }, seg, vert);
     expect(angPick?.kind).toBe('valueAngle');
     const vals = relationMarks(relationsForPick(res, angPick!), pos).values;
-    expect(vals.map((v) => v.text)).toEqual(['36.9°']);
+    expect(vals.map((v) => v.text)).toEqual(['36.87°']); // arctan(3/4), now 2dp (#164, ADR-393)
   });
 
   it('a forced 90° stays a knee on hover (operator: keep knee, not the number)', () => {

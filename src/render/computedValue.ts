@@ -16,6 +16,7 @@
 import type { AnyCommand, Command, Id, Vec } from '@/engine';
 import { buildSymTab, lowerOne } from '@/engine';
 import { angleDeg, dist, polygonArea, polygonPerimeter } from '@/engine/geometry';
+import { formatMeasure } from '@/format';
 
 /** One measured line in a readout. `strong` marks the seed-invariant verdict (a ratio, or the pinned value). */
 export interface ReadoutItem {
@@ -28,11 +29,9 @@ export interface Readout {
   verdict: ReadoutItem; // the seed-invariant knowledge: a ratio, or a pinned absolute
 }
 
-const fmt = (n: number): string => {
-  if (!Number.isFinite(n)) return '—';
-  const r = Math.abs(n) >= 100 ? Math.round(n) : Math.round(n * 10) / 10;
-  return Number.isInteger(r) ? String(r) : r.toFixed(Math.abs(r) >= 100 ? 0 : 1);
-};
+// THE shared measure formatter (#164, ADR-393): 2dp trailing-trimmed, no ≥100→0dp special case — so a
+// 143.7 area reads "143.7" (was "144"), consistent with the canvas + stated labels.
+const fmt = formatMeasure;
 /** Relative match with a floor, so a solver that lands 15.02 for a stated 15 reads ✓. */
 const matches = (measured: number, target: number, tol = 0.02): boolean =>
   Math.abs(measured - target) <= tol * Math.max(1, Math.abs(target));
