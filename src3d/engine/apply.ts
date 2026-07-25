@@ -322,7 +322,26 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
   }
 }
 
+/** Drop DEEP-EQUAL duplicates from a pin/claim list, keeping the first (#322). Re-typing a constraint-macro
+ *  utterance (the #199 equal-edges tetra, the #321 rhombus/rectangle/square base macros) re-emits its
+ *  `length-rel`/`cos-angle` on every submit — a SECOND identical ScalarPin, which drops the DOF cue once per
+ *  re-type and carries a redundant residual. The M1 re-declare no-op (ADR-3D-047) covers only the SOLID; this
+ *  is the same idempotence for the constraints, at the one PUSH chokepoint (the apply wrapper). */
+const dedupDeep = <T>(arr: T[]): T[] => {
+  const seen = new Set<string>();
+  return arr.filter((x) => { const k = JSON.stringify(x); return seen.has(k) ? false : (seen.add(k), true); });
+};
+
+/** The public reducer (#322): run the case reducer, then idempotently dedup the ScalarPin list so a
+ *  re-typed macro utterance is a true no-op (mirrors ADR-3D-047's solid re-declare). Claims are left
+ *  untouched — derive3 attributes them by COUNT-DELTA, and a re-verify of the same claim is harmless. */
 export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
+  const r = applyCommand3Inner(c, cmd);
+  if (r.ok) r.next.scalarPins = dedupDeep(r.next.scalarPins);
+  return r;
+}
+
+function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
   switch (cmd.type) {
     case 'solid': {
       const n = VERTEX_COUNT[cmd.kind];

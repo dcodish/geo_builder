@@ -126,6 +126,20 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
     const ids = volM[1].match(new RegExp(PT, 'g')) ?? [];
     if (ids.length >= 4) return { kind: 'volume', ids };
   }
+  // #328: a DEFINITE bare solid NOUN with no vertex run — «נפח המנסרה» / «volume of the prism» — resolves to
+  // THE one solid of that kind (the ADR-029 / ADR-3D-048 definite-reference pattern). Zero or several of that
+  // kind → fall through to the honest "not recognized" note, never a silent guess.
+  const defVolM = s.match(/^(?:נפח|volume(?:\s+of\s+the)?)\s+(ה?מנסרה|ה?פירמידה|ה?קובייה|ה?תיבה|ה?מקבילון|prism|pyramid|cube|box|parallelepiped)$/i);
+  if (defVolM) {
+    const noun = defVolM[1];
+    const kindRe =
+      /מנסרה|מקבילון|prism|parallelepiped/.test(noun) ? /^(prism|parallelepiped)/
+      : /פירמידה|pyramid/.test(noun) ? /^(pyramid|tetra)/
+      : /קובייה|cube/.test(noun) ? /^cube/
+      : /^box/; // תיבה / box
+    const matches = c.solids.filter((sd) => kindRe.test(sd.kind));
+    if (matches.length === 1) return { kind: 'volume', ids: [...matches[0].ids] };
+  }
 
   // VECTOR (last): a bare pair «AE» or a bare declared vector «w» — the vector itself, not its length.
   const bare = s.replace(/^(?:ה?ו?וקטור|vector)\s+/i, '').replace(/[⃗→]/g, '').trim();
