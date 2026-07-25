@@ -6,7 +6,7 @@
 import { exprPointIds, exprVectorNames } from './vecExpr';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { pinSymsOf } from './types';
-import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, SolidCommand, SolidObj, SymComp, VecAtom } from './types';
+import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8 };
 
@@ -343,6 +343,54 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       if (c.solids.some((sld) => sld.kind === cmd.kind && sld.ids.length === cmd.ids.length && sld.ids.every((id, i) => id === cmd.ids[i]))) {
         return { ok: true, next: c };
       }
+      // ADR-3D-080 (M1): a PYRAMID whose ids ALL exist is a statement ABOUT those points —
+      // «SBCD פירמידה ישרה» on a figure carrying S, B, C, D (operator, 2026-07-25). Draw the
+      // pyramid's ink; a RIGHT kind adds the rightness: a free plane-rider apex is SEATED at
+      // the closed-form right-apex (the ⊥ line through the base's centre cut with its carrier
+      // plane — the ADR-255 reseat pattern), any other apex takes equal-lateral-edge givens
+      // (apex over the circumcentre ⇔ |apex·bᵢ| all equal), M1-routed to drive or verify.
+      const PYR_BASE: Partial<Record<SolidKind, number>> = {
+        tetra: 3, pyramid3: 3, pyramid3e: 3, pyramid4: 4, pyramid4r: 4, pyramid4g: 4, pyramid4gr: 4, pyramidPar: 4,
+      };
+      const baseN = PYR_BASE[cmd.kind];
+      // NOT a statement: ids that are exactly an existing solid's id SET (a CONTRADICTING
+      // re-declare — pyramidPar vs pyramid4g on SABCD) or that lie within ONE FACE of an
+      // existing solid (flat by construction — «טטראדר ABCD» over a cube's base) keep the
+      // honest already-defined refusal below (the ADR-3D-047 locks).
+      const statementConflict = (): boolean => {
+        const idSet = new Set(cmd.ids);
+        return c.solids.some(
+          (sld) =>
+            (sld.ids.length === idSet.size && sld.ids.every((id) => idSet.has(id))) ||
+            sld.faces.some((ring) => cmd.ids.every((id) => ring.includes(id))),
+        );
+      };
+      if (baseN !== undefined && cmd.ids.length === baseN + 1 && cmd.ids.every((id) => c.points.has(id)) && !statementConflict()) {
+        const base = cmd.ids.slice(0, baseN);
+        const apex = cmd.ids[baseN];
+        const next = clone(c);
+        for (let i = 0; i < baseN; i++) {
+          const a = base[i];
+          const b = base[(i + 1) % baseN];
+          if (!hasSegment(next, a, b)) next.segments.push([a, b]);
+          if (!hasSegment(next, apex, a)) next.segments.push([apex, a]);
+        }
+        const right = cmd.kind === 'pyramid3' || cmd.kind === 'pyramid3e' || cmd.kind === 'pyramid4' || cmd.kind === 'pyramid4r';
+        if (!right) return { ok: true, next };
+        const apexDef = next.points.get(apex);
+        if (apexDef?.kind === 'on-plane' && !apexDef.side && c.pointPlanes.has(apexDef.plane)) {
+          next.points.set(apex, { kind: 'right-apex', base, plane: apexDef.plane });
+          return { ok: true, next };
+        }
+        let acc: Construction3 = next;
+        for (let i = 1; i < baseN; i++) {
+          const r = applyCommand3(acc, { type: 'length-rel', a1: apex, b1: base[0], rhs: { pair: [apex, base[i]] }, c: 1 });
+          if (!r.ok) return r;
+          acc = r.next;
+        }
+        return { ok: true, next: acc };
+      }
+
       const taken = cmd.ids.find((id) => c.points.has(id));
       if (taken !== undefined) return { ok: false, error: { code: 'already-defined', id: taken } };
 

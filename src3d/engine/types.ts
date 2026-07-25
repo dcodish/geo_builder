@@ -654,6 +654,9 @@ export type PointDef =
   // parameter (LinExpr components; absolute, never gauge). Unpinned k = a sampled free
   // DOF; a recorded given referencing the point (paramGivens) root-finds it post-pivot.
   | { kind: 'coord-sym'; x: LinExpr; y: LinExpr; z: LinExpr }
+  // ADR-3D-080: the RIGHT-pyramid apex seated on its carrier plane — the ⊥ line through the
+  // base's centre (triangle: circumcentre; quad: centroid) cut with the point-run plane.
+  | { kind: 'right-apex'; base: Id[]; plane: string }
   | { kind: 'foot-plane'; from: Id; plane: string }
   | { kind: 'foot-line'; from: Id; line: string }
   | { kind: 'line-plane'; line: string; plane: string }

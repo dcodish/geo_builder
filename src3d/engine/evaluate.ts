@@ -17,7 +17,7 @@ import { solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { decompose3 } from './vecExpr';
 import { pinSymsOf } from './types';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
-import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
+import { add3, centroid3, circumcenter3, cross3, dist3, dot3, lerp3, newellNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 /** Deg → rad. */
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -689,7 +689,7 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 }
 
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
-const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex']);
+const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'right-apex']);
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number): Resolved3 {
@@ -1160,9 +1160,30 @@ function evaluateSolidsAndPoints(
       const axisSeed = Math.abs(nn.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
       const e1 = normalize3(cross3(nn, axisSeed));
       const e2 = cross3(nn, e1);
-      const u = sample(seed, `onplane-u-${id}`, -0.6, 0.6) * spread;
-      const v = sample(seed, `onplane-v-${id}`, -0.6, 0.6) * spread;
-      let p = add3(centre, add3(scale3(e1, u), scale3(e2, v)));
+      const candidate = (k: number): Vec3 => {
+        const suf = k === 0 ? '' : `-${k}`;
+        const cu = sample(seed, `onplane-u-${id}${suf}`, -0.6, 0.6) * spread;
+        const cv = sample(seed, `onplane-v-${id}${suf}`, -0.6, 0.6) * spread;
+        return add3(centre, add3(scale3(e1, cu), scale3(e2, cv)));
+      };
+      // ADR-3D-080 (general position, the 2-D ADR-253 pattern): a rider parked next to an
+      // existing point reads as "on" it (operator: S on the top plane landed "on A"). Step
+      // deterministically to a clear spot; k = 0 keeps the legacy sample keys, so a figure
+      // whose rider already sits clear is byte-identical.
+      const sepOf = (q: Vec3): number => placed.reduce((m, r) => Math.min(m, dist3(q, r)), Infinity);
+      const minSep = 0.22 * spread;
+      let p = candidate(0);
+      if (sepOf(p) < minSep) {
+        let bestSep = sepOf(p);
+        for (let k = 1; k <= 11 && bestSep < minSep; k++) {
+          const q = candidate(k);
+          const sq = sepOf(q);
+          if (sq > bestSep) {
+            p = q;
+            bestSep = sq;
+          }
+        }
+      }
       if (def.side) {
         // "above" = the +z side; a vertical plane keeps its own orientation here and the
         // derive-time check refuses the fact honestly (plane-side-undefined)
@@ -1353,6 +1374,21 @@ function evaluateSolidsAndPoints(
             const resid = norm3(add3(a0, scale3(d0, t)));
             if (resid < 1e-6 * Math.max(norm3(sub3(B, A)), 1e-9)) pos.set(id, lerp3(A, B, t)); // else no right pyramid — left unplaced (honest)
           }
+        }
+      }
+    } else if (def.kind === 'right-apex') {
+      // ADR-3D-080: the right-pyramid apex SEATED on its carrier plane — the ⊥ line through the
+      // base's centre (triangle: circumcentre, the solid-pyramid convention; quad: centroid) cut
+      // with the point-run plane. Carrier ⊥ the base ⇒ no crossing ⇒ left unplaced (honest).
+      const bp = def.base.map((q) => pos.get(q)).filter((q): q is Vec3 => q !== undefined);
+      const pl = planes.get(def.plane) ?? planeFromPointRun(c, def.plane, pos);
+      if (bp.length === def.base.length && bp.length >= 3 && pl) {
+        const centre = bp.length === 3 ? circumcenter3(bp[0], bp[1], bp[2]) : centroid3(bp);
+        const nb = cross3(sub3(bp[1], bp[0]), sub3(bp[2], bp[0]));
+        const denom = dot3(pl.n, nb);
+        if (centre && Math.abs(denom) > 1e-10 * Math.max(norm3(pl.n) * norm3(nb), 1e-12)) {
+          const s = -(dot3(pl.n, centre) + pl.d) / denom;
+          pos.set(id, add3(centre, scale3(nb, s)));
         }
       }
     } else if (def.kind === 'foot-face') {
