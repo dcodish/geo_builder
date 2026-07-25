@@ -51,7 +51,7 @@ export function tokenizeRow(row: string, vecNames: Set<string>): Tok[] {
       continue;
     }
     const first = s[0];
-    if (vecNames.has(first) && !isLetter(s[1]) && s[1] !== '̲') {
+    if (vecNames.has(first) && !isLetter(s[1])) {
       const vecTok: Tok = { k: 'vec', text: first };
       s = s.slice(1);
       if (s.startsWith('̲')) s = s.slice(1); // combining underline replaced by munder

@@ -42,9 +42,16 @@ describe('VecMath', () => {
     expect(isVectorFact3({ cmds: [{ type: 'claim', claim: { type: 'vec-eq' } }] })).toBe(true);
   });
 
-  it('tokenizer: the combining arrow/underline from the legacy formatter are absorbed, never doubled', () => {
-    const toks = tokenizeRow('SD⃗ = u̲/6', UV);
+  it('tokenizer: the combining arrow/underline from the legacy formatter are absorbed AND the atom stays a VECTOR token (the operator’s «u and v have no underlines» — the guard rejected u̲)', () => {
+    const toks = tokenizeRow('SD⃗ = u̲/6 - v̲/6', UV);
     expect(JSON.stringify(toks)).not.toContain('⃗');
     expect(JSON.stringify(toks)).not.toContain('̲');
+    // u̲/6 must be a FRACTION with a vec numerator; v̲ likewise — never demoted to plain text
+    const fracs = toks.filter((t) => t.k === 'frac');
+    expect(fracs.length).toBe(2);
+    expect(JSON.stringify(fracs)).toContain('"k":"vec"');
+    const out = html('FE⃗ = u̲/6 - v̲/6'); // the EXACT factDisplay3 output shape the step rows pass in
+    expect(out).toMatch(/<mfrac><mover[^>]*><munder[^>]*><mi>u<\/mi>/);
+    expect(out).toMatch(/<mfrac><mover[^>]*><munder[^>]*><mi>v<\/mi>/);
   });
 });
