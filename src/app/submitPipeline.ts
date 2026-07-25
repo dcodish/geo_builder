@@ -278,7 +278,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
         // SPAN-ACCOUNTING SHADOW (S3.1 of docs/24 — never refuses; the enforcing flip is the
         // operator's, §4.2): log what the total accountant WOULD have flagged on this committed
         // parse, so real traffic accumulates the divergence evidence the flip decision needs.
-        const shadow = spanShadow(utterance, r.commands);
+        const shadow = spanShadow(utterance, r.commands, { existingPoints: pctx.points, radiusSymbols: (pctx.radiusSymbols ?? []).map((x) => x.name), angleAliases: (pctx.angleAliases ?? []).map((x) => x.name) });
         logDebug({ kind: 'input', utterance, locale, source: 'parser', commands: r.commands, ...(shadow ? { spanShadow: shadow } : {}) });
         ui.clearText();
         deps.resolveAfterCommit();

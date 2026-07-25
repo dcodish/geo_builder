@@ -81,7 +81,17 @@ const wordAccounted = (word: string): boolean => {
  *  - a RELATION SYMBOL (=, ⊥/⟂, ∥, <, >, ≅, ~) requires at least one constraint-ish command;
  *  - a WORD must be filler or a known keyword stem — else it lands in `unknown-word`.
  */
-export function accountUtterance(utterance: string, commands: AnyCommand[]): UnaccountedSpan[] {
+export interface AccountCtx {
+  /** Labels already ON the figure — a reference to an existing point is context, never a drop
+   *  (mirrors droppedNewLabels' exemption; closes the idempotent-membership + circumscribe classes). */
+  existingPoints?: string[];
+  /** Bound radius-symbol letters (R/r, #54) — measure names, not points. */
+  radiusSymbols?: string[];
+  /** Bound angle-alias names (ADR-386, «נסמן זוית BAM כ-A1») — notation, not points. */
+  angleAliases?: string[];
+}
+
+export function accountUtterance(utterance: string, commands: AnyCommand[], actx: AccountCtx = {}): UnaccountedSpan[] {
   const s = normalizeUtterance(utterance);
   // Label accounting is CASE-SENSITIVE over command string VALUES: an id like 'seg-AB' contributes
   // the uppercase tokens A,B (its lowercase machine prefix contributes nothing), so a field name or
@@ -97,17 +107,51 @@ export function accountUtterance(utterance: string, commands: AnyCommand[]): Una
   const cmdNumbers = (JSON.stringify(commands).match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
   const out: UnaccountedSpan[] = [];
 
-  // labels: split glued runs (ABCD → A,B,C,D; O1 stays O1)
+  // labels: split glued runs (ABCD → A,B,C,D; O1 stays O1). The AREA MARKER S is notation, not a
+  // point (the ADR-121/236 class): in «S_{ABC}» / the normalized glued «SABC», the leading S names
+  // the measure — mask it exactly like the honesty gates do.
+  const areaMarker = /(?<![A-Za-z])S(?=[A-Z]{3,4}(?![A-Z]))/.test(s) || /S_/.test(utterance);
+  const existing = new Set((actx.existingPoints ?? []).map((x) => x.toUpperCase()));
+  const symbols = new Set([...(actx.radiusSymbols ?? []), ...(actx.angleAliases ?? [])]);
   for (const run of s.match(/(?:[A-Z]\d*)+/g) ?? []) {
     for (const label of run.match(/[A-Z]\d*/g) ?? []) {
+      if (label === 'S' && areaMarker) continue;
+      if (existing.has(label) || symbols.has(label)) continue;
       if (!valueLabels.has(label)) out.push({ kind: 'label', text: label });
     }
   }
-  // numbers
-  for (const n of s.match(/-?\d+(?:\.\d+)?/g) ?? []) {
+  // numbers — the divergence classes the first catalog sweep surfaced (reports/span-accounting-shadow.md):
+  //  · a minus glued after a Hebrew letter is the maqaf preposition («מ-40»), not a sign → lookbehind;
+  //  · a stated value may LOWER halved (diameter→radius; circumference 6π → r = 6/2) or ÷100 (40% → t=0.4);
+  //  · a stated ratio pair «3/4» lowers to the single quotient 0.75 — accept both members when a/b lands.
+  const ratioPairs = new Set<string>();
+  for (const m of s.matchAll(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/g)) {
+    const q = Number(m[1]) / Number(m[2]);
+    if (cmdNumbers.some((c) => Math.abs(c - q) < 1e-9)) {
+      ratioPairs.add(m[1]);
+      ratioPairs.add(m[2]);
+    }
+  }
+  // colon ratios «DF:FC=1:4» lower to the single parameter a/(a+b) (or its complement)
+  for (const m of s.matchAll(/(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/g)) {
+    const a = Number(m[1]), b = Number(m[2]);
+    const t1 = a / (a + b), t2 = b / (a + b), t3 = a / b;
+    if (cmdNumbers.some((c) => [t1, t2, t3].some((t) => Math.abs(c - t) < 1e-9))) {
+      ratioPairs.add(m[1]);
+      ratioPairs.add(m[2]);
+    }
+  }
+  for (const n of s.match(/(?<![֐-׿])-?\d+(?:\.\d+)?/g) ?? []) {
     if (/[A-Z]\d*/.test(n)) continue; // part of a label like O1 (already handled)
-    const v = Number(n);
-    const hit = cmdNumbers.some((c) => Math.abs(c - v) < 1e-9 || Math.abs(Math.abs(c) - v) < 1e-9);
+    if (ratioPairs.has(n.replace(/^-/, ''))) continue;
+    const v = Math.abs(Number(n));
+    const hit = cmdNumbers.some(
+      (c) =>
+        Math.abs(Math.abs(c) - v) < 1e-9 ||
+        Math.abs(Math.abs(c) - v / 2) < 1e-9 ||
+        Math.abs(Math.abs(c) - v / 100) < 1e-9 ||
+        Math.abs(Math.abs(c) - Math.sqrt(v)) < 1e-9, // «√3·CO» keeps sqrt(3); «שטח = 81π» lowers r = 9
+    );
     if (!hit) out.push({ kind: 'number', text: n });
   }
   // relation symbols
@@ -127,8 +171,8 @@ export function accountUtterance(utterance: string, commands: AnyCommand[]): Una
 /** The shadow verdict for logging: null when fully accounted (labels/numbers/relations — the
  *  buckets today's gates cover), else the compact span list. `unknown-word` spans are reported
  *  separately: they are the accountant's own coverage debt, not the parse's. */
-export function spanShadow(utterance: string, commands: AnyCommand[]): { hard: UnaccountedSpan[]; words: UnaccountedSpan[] } | null {
-  const spans = accountUtterance(utterance, commands);
+export function spanShadow(utterance: string, commands: AnyCommand[], actx: AccountCtx = {}): { hard: UnaccountedSpan[]; words: UnaccountedSpan[] } | null {
+  const spans = accountUtterance(utterance, commands, actx);
   if (spans.length === 0) return null;
   const hard = spans.filter((x) => x.kind !== 'unknown-word');
   const words = spans.filter((x) => x.kind === 'unknown-word');

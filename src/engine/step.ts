@@ -16,6 +16,7 @@ import type { EvalResult } from './evaluate';
 import { circleCircleIntersect, dist, sub } from './geometry';
 import { budgetExceeded } from './solveBudget';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
+import { componentOf, minimalComponentOf } from './components';
 import { constraintRefs, describeConstraint, solvedOnSegmentCandidates } from './solve';
 
 export interface StepOk {
@@ -325,6 +326,62 @@ function settleOnFrozenPrior(
 }
 
 /**
+ * JOINT-FIRST component solve (S3.2 stage (b), docs/25 §4 — operator-approved 2026-07-25).
+ *
+ * Before the recruit ladder negotiates ownership rung by rung, solve the NEW statement's constraint
+ * COMPONENT as ONE system (ADR-338's semantics promoted from applyCoupledStep's special case to the
+ * default failure path): the minimal closed sub-component first (the ADR-281 least-ownership lesson
+ * at component granularity), the full component second. The assignment is derived, not negotiated —
+ * every component DOF becomes a carrier and every component constraint attaches (one directive
+ * carries the set via `solve.also`, the ADR-229 mechanism; `resolveMixedCarriers` already minimises
+ * every constraint on every carrier, so attaching all-then-evaluating IS the joint solve). Fully
+ * try-and-verify (evaluate + the vacuous gate) with the S1.1 ladder as LIVE FALLBACK — this stage
+ * can only widen rescue power; rung retirement is stage (c), evidence-gated per docs/25 §4.
+ * Size-guarded (≤16 DOFs, ≤24 constraints) so a pathological whole-figure component falls through
+ * to the staged ladder instead of a huge joint descent.
+ */
+function jointFirst(
+  next: Construction,
+  newCons: Constraint[],
+  trace: string[],
+): Construction | null {
+  const real = newCons.filter((k) => !isOrderConstraint(k));
+  if (!real.length || budgetExceeded()) return null;
+  const tried = new Set<string>();
+  for (const [tag, comp] of [
+    ['minimal', minimalComponentOf(next, real, allDrivableAncestors)],
+    ['full', componentOf(next, real, allDrivableAncestors)],
+  ] as const) {
+    if (!comp || comp.dofs.length === 0) continue;
+    if (comp.dofs.length > 16 || comp.constraints.length > 24) continue;
+    const key = comp.dofs.join('|') + '§' + comp.constraints.length;
+    if (tried.has(key)) continue; // minimal == full — one attempt
+    tried.add(key);
+    trace.push(`component:${tag}{cons:${comp.constraints.length},dofs:${comp.dofs.length}}`);
+    const members = comp.constraints.filter((k) => !isOrderConstraint(k)); // orders ride withOrderCons
+    if (!members.length) continue;
+    const [head, ...rest] = members;
+    let headCarried = false;
+    const objects = next.objects.map((o) => {
+      if (!comp.dofs.includes(o.id)) return o;
+      const carrier = carrierOf(o);
+      if (!carrier || carrier.family === 'line') return o;
+      if (!headCarried) {
+        headCarried = true;
+        return { ...o, solve: { constraint: head, branch: 0, ...(rest.length ? { also: rest } : {}) } } as GeoObject;
+      }
+      return { ...o, solve: { constraint: head, branch: 0 } } as GeoObject;
+    });
+    if (!headCarried) continue;
+    const trial: Construction = { objects, constraints: next.constraints };
+    const r = evaluate(trial);
+    if (r.ok && newConstraintsNonVacuous(trial, r.positions, newCons)) return trial;
+    if (budgetExceeded()) return null;
+  }
+  return null;
+}
+
+/**
  * THE failure ladder (S1.1 of docs/24 — docs/LADDER.md stages 2e–2i), shared by all three entry
  * points (`applyStep`'s main branch, its M1/conflict branch, and `applyCoupledStep`). Before this
  * extraction the ladder existed as THREE divergent inlined copies whose omissions were undocumented
@@ -376,6 +433,19 @@ function runFailureLadder(
   if (recruited) {
     const r2 = evaluate(recruited);
     if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions, ladder: [...trace, `${prefix}:recruit`] };
+  }
+  // S3.2 stage (b) — the component-joint solve as a RESCUE TIER after the recruit rungs (docs/25 §4,
+  // amended by measurement 2026-07-25): the original joint-BEFORE-rungs placement solved the ADR-103
+  // figure but moved a rectangle base vertex ~0.35 where the staged path moved it 0 (the
+  // stability-snapshot delta) — the staged rungs embody least-movement, so they keep first claim.
+  // Here the component solve adds PURE rescue power for the G2 class (couplings no rung expresses),
+  // at zero stability cost to everything the ladder already solves. Promotion to joint-FIRST (the
+  // rung-retirement enabler) waits on LM-seeded minimal-movement matching the staged path — solveLM's
+  // two-phase regularizer is the landed prerequisite.
+  const joint = jointFirst(next, newCons, trace);
+  if (joint) {
+    const rj = evaluate(joint);
+    if (rj.ok && newConstraintsNonVacuous(joint, rj.positions, newCons)) return { ok: true, construction: joint, positions: rj.positions, ladder: [...trace, `${prefix}:component`] };
   }
   // LAST RESORT — SCALE RESCUE (ADR-237): a figure with no absolute given yet is determined only up
   // to SIMILARITY, so its FIRST size given is a statement about SCALE — satisfiable exactly by scaling
@@ -839,7 +909,12 @@ function lineSpecPoints(spec: LineSpec): Id[] {
  * a `line-intersection`'s defining lines, so a constraint whose points are all fixed by a construction
  * (e.g. |BD| with D = bisector∩bisector) still reaches the free triangle legs (FR-EN-11 / ADR-032).
  */
-const freeDrivableAncestors = (objects: GeoObject[], start: Id): Id[] => ancestors(objects, start, 'drivable');
+export const freeDrivableAncestors = (objects: GeoObject[], start: Id): Id[] => ancestors(objects, start, 'drivable');
+
+/** The COMPONENT-partition walker (S3.2): like {@link freeDrivableAncestors} but INCLUDING carriers
+ *  already claimed by a directive — ownership is what the partition derives, so a currently-claimed
+ *  DOF still belongs to its component (excluding it split coupled constraints into false singletons). */
+export const allDrivableAncestors = (objects: GeoObject[], start: Id): Id[] => ancestors(objects, start, 'drivable', true, true);
 
 /**
  * A reference a blocked constraint's claimer can be RE-POINTED to instead (the "free the blocker"

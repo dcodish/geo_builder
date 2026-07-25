@@ -47,7 +47,7 @@ describe('ladder contract (docs/LADDER.md)', () => {
     expect(r.ladder?.[r.ladder.length - 1]).toMatch(/^m1:(primary|settle|recruit)$/);
   });
 
-  it('a constraint the eager carrier pick cannot satisfy accepts via the recruiter (ADR-103 figure)', () => {
+  it('a constraint the eager carrier pick cannot satisfy accepts via the recruiter (ADR-103 figure; the S3.2 component tier sits BEHIND the rungs — stability measurement 2026-07-25)', () => {
     const r = run([
       { type: 'circle', id: 'circle-O', center: 'O', radius: 5, freeRadius: true, autoCenter: true },
       { type: 'circle', id: 'circle-P', center: 'P', radius: 3.6, freeRadius: true, autoCenter: true },

@@ -13,6 +13,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { COMMAND_CATALOG, parse } from '@/parser';
 import { spanShadow } from '../spanAccounting';
+import { SCENARIOS, ctxOf, factsOf } from '../../__tests__/scenarios-corpus';
 
 describe('span-accounting shadow sweep (catalog corpus)', () => {
   it('sweeps every supported catalog example; SPAN_SHADOW=1 writes the operator report', () => {
@@ -41,6 +42,34 @@ describe('span-accounting shadow sweep (catalog corpus)', () => {
       `span-shadow: swept ${swept} catalog utterances — ${hardRows.length} with HARD divergences, ` +
         `${rows.length - hardRows.length} with unknown-word-only debt`,
     );
+    // The SECOND sweep (report mode only — it replays prefixes): every STRING step of the scenario
+    // corpus, parsed with its REAL prefix context via the harness's own factsOf/ctxOf (no drift) —
+    // ~real bagrut sequences, the strongest pre-flip evidence available offline.
+    const corpusRows: { utterance: string; hard: string[] }[] = [];
+    let corpusSwept = 0;
+    if (process.env.SPAN_SHADOW) {
+      for (const sc of SCENARIOS) {
+        for (let i = 0; i < sc.steps.length; i++) {
+          const step = sc.steps[i];
+          if (typeof step !== 'string') continue;
+          let prefix;
+          try {
+            prefix = factsOf(sc.steps.slice(0, i));
+          } catch {
+            break; // an earlier non-string step this offline mirror can't build — skip the rest
+          }
+          const pctx = ctxOf(prefix);
+          const r = parse(step, pctx);
+          if (!r.ok) continue; // LLM-escalated in the app — outside the grammar accountant's remit
+          corpusSwept++;
+          const shadow = spanShadow(step, r.commands, { existingPoints: pctx.points, radiusSymbols: (pctx.radiusSymbols ?? []).map((x) => x.name), angleAliases: (pctx.angleAliases ?? []).map((x) => x.name) });
+          if (shadow && shadow.hard.length) {
+            corpusRows.push({ utterance: step, hard: shadow.hard.map((s) => `${s.kind}:${s.text}`) });
+          }
+        }
+      }
+      console.log(`span-shadow: swept ${corpusSwept} scenario-corpus steps — ${corpusRows.length} hard divergences`);
+    }
     if (process.env.SPAN_SHADOW) {
       const lines = [
         '# Span-accounting shadow report (S3.1 of docs/24)',
@@ -52,6 +81,12 @@ describe('span-accounting shadow sweep (catalog corpus)', () => {
         '',
         ...(hardRows.length
           ? hardRows.map((r) => `- \`${r.utterance}\` → ${r.hard.join(', ')}`)
+          : ['- none 🎉']),
+        '',
+        `**Scenario-corpus sweep** (${corpusSwept} string steps with REAL prefix contexts):`,
+        '',
+        ...(corpusRows.length
+          ? corpusRows.map((r) => `- \`${r.utterance}\` → ${r.hard.join(', ')}`)
           : ['- none 🎉']),
         '',
         '**Unknown-word debt** (the accountant does not yet classify these words — grow the',

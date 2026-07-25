@@ -22,7 +22,7 @@
 
 import { buildMatchCtx } from './context';
 import { makeAttributor } from './detect';
-import { rightAngleFacts, parallelFacts, bisectorStatements, statedDiameterFacts, medianFacts, midsegmentFacts, externalSecantHubs, tangentsByCircle, triangleVertexSets, structuralTriangles } from './table';
+import { rightAngleFacts, parallelFacts, bisectorStatements, statedDiameterFacts, medianFacts, midsegmentFacts, externalSecantHubs, tangentsByCircle, triangleVertexSets, structuralTriangles } from './evidence';
 import type { Id } from '../engine/types';
 import type { DetectInput, MatchCtx, TheoremId, TheoremMatch } from './types';
 
