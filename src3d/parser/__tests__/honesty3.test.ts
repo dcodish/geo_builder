@@ -17,7 +17,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { Command3 } from '../../engine/types';
 import { useGeo3 } from '../../store/store3';
 import { COMMAND_CATALOG_3D } from '../catalog3';
-import { droppedGivenNumbers3, droppedNewLabels3 } from '../honesty3';
+import { droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3 } from '../honesty3';
 import { parse3 } from '../parse3';
 
 /** Parse a canonical line through the REAL grammar (a fixture line must parse — fail loudly if not). */
@@ -182,6 +182,7 @@ describe('false-positive net — no catalog utterance trips either gate (both lo
         if (!p.ok) return;
         expect(droppedNewLabels3(text, p.commands), `labels gate tripped on: ${text}`).toEqual([]);
         expect(droppedGivenNumbers3(text, p.commands), `numbers gate tripped on: ${text}`).toEqual([]);
+        expect(droppedShapeNoun3(text, p.commands), `shape-noun gate tripped on: ${text}`).toEqual([]);
       });
     }
   }

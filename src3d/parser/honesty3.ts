@@ -37,6 +37,55 @@ import { labelTokens, normalize3 } from './parse3';
  * `existingPoints` / `existingVectors`: ids already on the figure — a stated label that already exists
  * but isn't re-referenced is CONTEXT (e.g. a relation about existing points), never a drop.
  */
+/**
+ * A stated BASE-SHAPE noun whose DEFINING property the committed solid does not carry — the sign the
+ * decomposition SILENTLY changed the base into a different shape (the ADR-3D-084 class: a pyramid/prism
+ * base noun the LLM lowers to a CONTRADICTING kind, e.g. rhombus → rectangle, dropping the equal-sides
+ * given). Returns the lost base nouns (empty = pass).
+ *
+ * Scoped to a prism/pyramid CONSTRUCTION utterance — the ONLY place a base-shape noun carries this
+ * meaning; a bare `ABEC מלבן` rectangle-completion or a flat `מרובע ABCD` polygon means something else
+ * and is owned by its own rule (the §2.4 word-presence-is-not-semantics discipline).
+ *
+ * Base properties (a general quad has none): `eqAdj` = adjacent base sides equal; `right` = a right base
+ * angle. They come from the solid KIND (square ⇒ both, rectangle ⇒ right, rhombus ⇒ eqAdj,
+ * parallelogram/general ⇒ none) OR an explicit constraint (`length-rel` c=1 ⇒ eqAdj, `cos-angle` 0 ⇒
+ * right — command-side GENEROUS per the gate doctrine, so a false account only suppresses a warning while
+ * a false drop would refuse a working input). rhombus needs eqAdj, rectangle needs right, square needs
+ * both; kite/trapezoid have no 3-D base template ⇒ always unaccounted (an honest refusal, never a silent
+ * substitute). parallelogram/quadrilateral/triangle are generic (no defining property) — not checked.
+ */
+export function droppedShapeNoun3(utterance: string, commands: Command3[]): string[] {
+  const s = normalize3(utterance);
+  if (!/מנסרה|פירמידה|\bprism\b|\bpyramid\b/i.test(s)) return []; // only a solid-base context
+  const props = new Set<'eqAdj' | 'right'>();
+  const SQUARE = new Set(['cube', 'prism4sq', 'pyramid4', 'pyramid4g']);
+  const RECT = new Set(['box', 'pyramid4r', 'pyramid4gr']);
+  const RHOMB = new Set(['prism4r']);
+  for (const c of commands) {
+    if (c.type === 'solid') {
+      if (SQUARE.has(c.kind)) props.add('eqAdj').add('right');
+      else if (RECT.has(c.kind)) props.add('right');
+      else if (RHOMB.has(c.kind)) props.add('eqAdj');
+    } else if (c.type === 'length-rel' && c.c === 1) props.add('eqAdj');
+    else if (c.type === 'cos-angle' && c.cos === 0) props.add('right');
+  }
+  const need: [RegExp, Array<'eqAdj' | 'right'> | 'unsupported'][] = [
+    [/מעויי?ן|\brhombus\b/i, ['eqAdj']],
+    [/מלבן|\brectang\w*/i, ['right']],
+    [/ריבוע|\bsquare\b/i, ['eqAdj', 'right']],
+    [/דלתון|\bkite\b/i, 'unsupported'],
+    [/טרפז\w*|\btrapez\w*/i, 'unsupported'],
+  ];
+  const lost: string[] = [];
+  for (const [re, req] of need) {
+    const m = s.match(re);
+    if (!m) continue;
+    if (req === 'unsupported' || !req.every((p) => props.has(p))) lost.push(m[0]);
+  }
+  return lost;
+}
+
 export function droppedNewLabels3(
   utterance: string,
   commands: Command3[],

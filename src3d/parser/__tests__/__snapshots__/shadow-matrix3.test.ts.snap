@@ -279,6 +279,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "pyramid with a rhombus base",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "פירמידה שבסיסה מעוין",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
     "text": "tetrahedron ABCD",
     "winner": "rightPyramid",
   },

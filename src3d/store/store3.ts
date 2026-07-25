@@ -28,7 +28,7 @@ import { checkInSpan, firstSatisfyingSeed3, memberHolds3, resolve3, type Resolve
 import { verifyClaim } from '../engine/claims';
 import { cross3, dot3, norm3, sub3 } from '../engine/vec3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
-import { droppedGivenNumbers3, droppedNewLabels3 } from '../parser/honesty3';
+import { droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3 } from '../parser/honesty3';
 import { parse3 } from '../parser/parse3';
 
 export interface Fact3 {
@@ -429,6 +429,7 @@ export const useGeo3 = create<Geo3State>()(
         const lost = [
           ...droppedNewLabels3(utterance, all, [...prior.points.keys()], [...prior.vectors.keys()]),
           ...droppedGivenNumbers3(utterance, all),
+          ...droppedShapeNoun3(utterance, all), // ADR-3D-084 (#304): a stated base shape silently changed
         ];
         if (lost.length > 0) {
           set({ lastError: { code: 'dropped-given', items: lost.join(', ') } });

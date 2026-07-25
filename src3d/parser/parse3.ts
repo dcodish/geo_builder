@@ -276,13 +276,26 @@ const rightPyramid: Rule = (s) => {
     const rel = (a1: Id, b1: Id): Command3 => ({ type: 'length-rel', a1, b1, rhs: { pair: [a, b] }, c: 1 });
     return [solid, rel(a, c3), rel(a, d), rel(b, c3), rel(b, d), rel(c3, d)];
   };
+  // #304 (ADR-3D-084): a RHOMBUS base is a parallelogram base PLUS adjacent sides equal — the ADR-3D-078
+  // prism macro, pyramid edition (`pyramidPar` + `length-rel |AB|=|AD|`, no new engine construct). A stated
+  // rhombus must NEVER silently fall to the rectangle default `pyramid4gr` (dropping the equal-sides given
+  // and asserting an unstated right angle). The OBLIQUE form builds it; the RIGHT form defers (there is no
+  // right-parallelogram-base pyramid template) rather than drop the shape — the LLM lane + honesty gate
+  // then keep it honest.
+  const rhombus = /מעויי?ן/.test(s) || /\brhombus\b/i.test(s);
+  const parPyramid = (ids: Id[]): Command3[] | null => {
+    if (rhombus && right) return null; // right + rhombus: no template — defer (never drop the shape)
+    const cmds: Command3[] = [{ type: 'solid', kind: 'pyramidPar', ids }];
+    if (rhombus) cmds.push({ type: 'length-rel', a1: ids[0], b1: ids[1], rhs: { pair: [ids[0], ids[3]] }, c: 1 });
+    return withEqEdges(cmds);
+  };
   // the triangular-base pyramid kind (equilateral only when right — a right equilateral pyramid)
   const triKind = right ? (equi ? 'pyramid3e' : 'pyramid3') : 'tetra';
   if (firstLabelRun(s).length === 0) {
     // label-less: a stated base word makes the shape determined — default lettering
     const rect = /מלבן/.test(s) || /\brectang/i.test(s);
     const tri = tetraWord || /משולש/.test(s) || /\btriangular\b/i.test(s) || equi;
-    if (par) return withEqEdges([{ type: 'solid', kind: 'pyramidPar', ids: ['A', 'B', 'C', 'D', 'S'] }]);
+    if (par || rhombus) return parPyramid(['A', 'B', 'C', 'D', 'S']);
     if (tri) return withEqEdges([{ type: 'solid', kind: triKind, ids: ['A', 'B', 'C', 'D'] }]);
     if (square || rect) {
       const kind = right ? (square ? 'pyramid4' : 'pyramid4r') : square ? ('pyramid4g' as const) : 'pyramid4gr';
@@ -293,7 +306,7 @@ const rightPyramid: Rule = (s) => {
   const toks = orientPyramid(s, firstLabelRun(s));
   // a tetrahedron has exactly 4 vertices — a 5-label `טטראדר` is contradictory (refuse → honest)
   if (toks.length === 5 && !tetraWord) {
-    if (par) return withEqEdges([{ type: 'solid', kind: 'pyramidPar', ids: toks }]);
+    if (par || rhombus) return parPyramid(toks);
     // rightness and base shape are INDEPENDENT givens (ADR-052): a square base must be STATED
     const kind = right ? (square ? 'pyramid4' : 'pyramid4r') : square ? ('pyramid4g' as const) : 'pyramid4gr';
     return withEqEdges([{ type: 'solid', kind, ids: toks }]);
