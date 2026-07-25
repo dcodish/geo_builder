@@ -44,6 +44,30 @@ describe('#73 — ui-command (marks derive from givens)', () => {
   it('סימון זווית ישרה D', () => expect(classifyGuidance3('סימון זווית ישרה D')?.category).toBe('ui-command'));
 });
 
+describe('#321 — oblique-prism (a base with no oblique model — say what works)', () => {
+  for (const u of [
+    'מנסרה שבסיסה משולש',
+    'מנסרה שבסיסה מרובע',
+    'מנסרה שבסיסה מחומש',
+    'מנסרה משולשת',
+    'מנסרה נטויה',
+    'prism with a triangle base',
+    'triangular prism ABC',
+    'oblique prism',
+  ]) {
+    it(u, () => expect(classifyGuidance3(u)?.category).toBe('oblique-prism'));
+  }
+  it('the SUPPORTED parallelogram-family bare forms stay null (they build oblique)', () => {
+    for (const u of ['מנסרה שבסיסה מעוין', 'מנסרה שבסיסה מעויין', 'מנסרה שבסיסה ריבוע', 'מנסרה שבסיסה מלבן', 'מנסרה שבסיסה מקבילית', 'prism with a rhombus base']) {
+      expect(classifyGuidance3(u), u).toBeNull();
+    }
+  });
+  it('the ישרה forms stay null (they parse as right prisms)', () => {
+    expect(classifyGuidance3('מנסרה ישרה שבסיסה משולש שווה צלעות')).toBeNull();
+    expect(classifyGuidance3('right triangular prism ABC')).toBeNull();
+  });
+});
+
 describe('#73 — NO THEFT: the whole supported catalog classifies null (both locales)', () => {
   it('catalog sweep', () => {
     for (const entry of COMMAND_CATALOG_3D) {

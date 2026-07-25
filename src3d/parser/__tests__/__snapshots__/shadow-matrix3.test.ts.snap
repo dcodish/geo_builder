@@ -189,6 +189,36 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "prism with a rhombus base",
+    "winner": "parallelepiped",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה שבסיסה מעוין",
+    "winner": "parallelepiped",
+  },
+  {
+    "lang": "en",
+    "text": "prism with a rectangle base",
+    "winner": "parallelepiped",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה שבסיסה מלבן",
+    "winner": "parallelepiped",
+  },
+  {
+    "lang": "en",
+    "text": "prism with a square base",
+    "winner": "parallelepiped",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה שבסיסה ריבוע",
+    "winner": "parallelepiped",
+  },
+  {
+    "lang": "en",
     "text": "the prism is right",
     "winner": "makeRightPrism",
   },

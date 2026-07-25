@@ -13,12 +13,16 @@
  *  - `bare-solid` — a bare «פירמידה»/«מנסרה» (deliberately refused, the base is ambiguous): say
  *    WHAT to add instead of a flat refusal.
  *  - `ui-command` — «סימון זווית ישרה D»: marks derive from givens; state the given («זווית D = 90»).
+ *  - `oblique-prism` (#321, ADR-3D-078) — a prism NOT stated right over a base OUTSIDE the
+ *    parallelogram family (triangle / general quad / n-gon), or an explicit «מנסרה נטויה»: no oblique
+ *    model exists for these bases — say what works (add «ישרה», or a parallelogram-family base which
+ *    builds oblique and is pinned by «המנסרה ישרה»).
  *
  * No-theft invariant (locked by scope3.test.ts): every supported catalog3 example, both locales,
  * classifies null — a real construction never gets a guidance brush-off.
  */
 
-export type ScopeCategory3 = 'valueless-query' | 'cross-app' | 'bare-solid' | 'ui-command';
+export type ScopeCategory3 = 'valueless-query' | 'cross-app' | 'bare-solid' | 'ui-command' | 'oblique-prism';
 
 export interface ScopeMatch3 {
   category: ScopeCategory3;
@@ -64,6 +68,18 @@ const RULES3: ScopeRule3[] = [
     // #247: «פרמידה» (missing-yod spelling) + the same «נתון» prefix tolerance.
     category: 'bare-solid',
     patterns: [/^\s*(?:נתו(?:ן|נה)\s*:?\s+)?(?:ה?פי?רמידה|מנסרה)\s*\.?\s*$/, /^\s*(?:given\s+a\s+)?(?:pyramid|prism)\s*\.?\s*$/i],
+  },
+  {
+    // #321 (ADR-3D-078): a prism NOT stated right over a base with no oblique model (triangle /
+    // general quad / n-gon), or an explicitly-oblique «מנסרה נטויה». The parallelogram family
+    // (מקבילית/מעוין/מלבן/ריבוע) BUILDS oblique — excluded so a supported form is never brushed off.
+    category: 'oblique-prism',
+    patterns: [
+      // the noun is anchored to the base marker / the adjectival slot, so a failed utterance that merely
+      // MENTIONS a triangle near an existing prism is never stolen from the LLM lane
+      /^(?!.*ישרה)(?=.*מנסרה)[\s\S]*(?:שבסיס[הו]\s+ה?(?:משולש|מרובע|מחומש|משושה)|מנסרה\s+(?:משולשת|מרובעת|מחומשת|משושה)|נטויה)/,
+      /^(?!.*\bright\b)(?=.*\bprism\b)[\s\S]*(?:\b(?:triangular|quadrilateral|pentagonal|hexagonal)\s+prism\b|\b(?:triangle|triangular|quadrilateral|quad|pentagon|hexagon)\s+base\b|\bbase\s+is\s+(?:a\s+)?(?:triangle|quadrilateral|quad|pentagon|hexagon)\b|\boblique\b)/i,
+    ],
   },
 ];
 

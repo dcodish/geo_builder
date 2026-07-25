@@ -24,6 +24,10 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: 'מנסרה ישרה שבסיסה מחומש', en: 'right prism with a pentagon base' },
   { category: 'solids', he: 'מקבילון ABCDEFGH', en: 'parallelepiped ABCDEFGH' },
   { category: 'solids', he: 'מנסרה שבסיסה מקבילית', en: 'prism with a parallelogram base' }, // #295: bare (no ישרה) ⇒ oblique מקבילון
+  // #321 (ADR-3D-078): the whole parallelogram FAMILY builds oblique — מקבילון + the base's constraints
+  { category: 'solids', he: 'מנסרה שבסיסה מעוין', en: 'prism with a rhombus base' },
+  { category: 'solids', he: 'מנסרה שבסיסה מלבן', en: 'prism with a rectangle base' },
+  { category: 'solids', he: 'מנסרה שבסיסה ריבוע', en: 'prism with a square base' },
   { category: 'solids', he: 'המנסרה ישרה', en: 'the prism is right' }, // #289 (M1): make the existing prism a right prism
   { category: 'solids', he: 'פירמידה ישרה שבסיסה משולש שווה צלעות', en: 'right pyramid with an equilateral triangle base' },
   { category: 'solids', he: 'פירמידה SABCD שבסיסה מקבילית', en: 'pyramid SABCD with a parallelogram base' },
