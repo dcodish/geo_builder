@@ -57,6 +57,30 @@ describe('ADR-3D-080 — S on the top plane, then «SBCD פירמידה ישרה
     }
   });
 
+  it('«SBCE פירמידה ישרה» — a CONSTRUCTED base letter defeats the run heuristic; the apex is found semantically (Am. 1)', () => {
+    submit('AE⃗ = (3/7)AB⃗');
+    submit("S על מישור A'B'C'");
+    submit('SBCE פירמידה ישרה'); // parses [S,B,C,E] apex-LAST (B,C,E is no run) — apply re-orients: the rider S is the apex
+    expect(err()).toBeNull(); // was: injection-unsatisfiable (drove |ES|=|EB|=|EC| with E as apex)
+    for (const seed of [0, 1]) {
+      const d = derive3(state().facts, seed);
+      const S = d.positions.get('S')!;
+      const [B, C, E] = ['B', 'C', 'E'].map((n) => d.positions.get(n)!);
+      expect(len(S, B), `seed ${seed}`).toBeCloseTo(len(S, C), 6);
+      expect(len(S, B), `seed ${seed}`).toBeCloseTo(len(S, E), 6);
+      expect(Math.abs(S.z - d.positions.get("A'")!.z), `seed ${seed}`).toBeLessThan(1e-4);
+    }
+  });
+
+  it('a SECOND right-pyramid statement on the seated apex refuses (S cannot top both bases)', () => {
+    submit('AE⃗ = (3/7)AB⃗');
+    submit("S על מישור A'B'C'");
+    submit('SBCD פירמידה ישרה');
+    expect(err()).toBeNull();
+    submit('SBCE פירמידה ישרה'); // circum(BCD) ≠ circum(BCE) — genuinely contradictory
+    expect(err()).not.toBeNull(); // honest keep-prior refusal
+  });
+
   it('«SBCD פירמידה ישרה» is a STATEMENT — S is seated at the right-apex on its carrier plane', () => {
     submit("S על מישור A'B'C'");
     submit('SBCD פירמידה ישרה');

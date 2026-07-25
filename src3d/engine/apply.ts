@@ -366,8 +366,19 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
         );
       };
       if (baseN !== undefined && cmd.ids.length === baseN + 1 && cmd.ids.every((id) => c.points.has(id)) && !statementConflict()) {
-        const base = cmd.ids.slice(0, baseN);
-        const apex = cmd.ids[baseN];
+        // ADR-3D-080 Am. 1: the APEX of an all-existing pyramid statement is identified
+        // SEMANTICALLY, never by letter position — «SBCE פירמידה ישרה» defeated the parser's
+        // consecutive-run apex-first heuristic (E is a CONSTRUCTED letter, so B,C,E is not a
+        // run) and read base S,B,C with apex E. The unique free plane-rider (or already-seated
+        // right-apex) IS the apex; with none or several, the template order (apex last) stands.
+        let ids = cmd.ids;
+        const apexish = cmd.ids.filter((id) => {
+          const d = c.points.get(id);
+          return d?.kind === 'on-plane' || d?.kind === 'right-apex';
+        });
+        if (apexish.length === 1 && ids[baseN] !== apexish[0]) ids = [...ids.filter((id) => id !== apexish[0]), apexish[0]];
+        const base = ids.slice(0, baseN);
+        const apex = ids[baseN];
         const next = clone(c);
         for (let i = 0; i < baseN; i++) {
           const a = base[i];
