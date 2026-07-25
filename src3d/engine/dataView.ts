@@ -177,13 +177,51 @@ function decompSymStr(a: [number, number, number], b: [number, number, number], 
 }
 
 /**
- * Decompose the vector (from→to) in a 3-vector `basis` across the resolved `posArr`, requiring the
- * per-seed coefficients to AGREE — affine relations are frame-invariant, so the basis is usable per
- * seed even when not world-stable. Returns the averaged coefficients, or null when a point is unplaced
- * or the coefficients disagree (agreement tolerance sized for the double-root √noise class, ~1e-4).
+ * Solve target = Σcᵢ·dirᵢ over 1–3 basis directions (issue #311 / [ADR-3D-072]). Three independent
+ * vectors span R³, so n=3 keeps the exact `solve3x3` (null on singular). With FEWER declared basis
+ * vectors — the planar/collinear sub-figures common in bagrut questions («SB=u, BC=v» and everything
+ * happens in plane SBC) — the system is solved by the n×n Gram normal equations, and the answer is
+ * accepted only when the RESIDUAL vanishes: an in-span target decomposes over the declared names, an
+ * out-of-span one stays honestly null (never a least-squares approximation printed as knowledge).
+ * Coefficients are padded with 0 to the fixed triple shape every consumer already uses.
+ */
+function nBasisSolve(dirs: Vec3[], target: Vec3): [number, number, number] | null {
+  const dot = (a: Vec3, b: Vec3) => a.x * b.x + a.y * b.y + a.z * b.z;
+  const len = (a: Vec3) => Math.sqrt(dot(a, a));
+  const scale = Math.max(1, len(target), ...dirs.map(len));
+  const RESID_TOL = 2e-4; // far above solver noise, far below any genuine out-of-span component
+  if (dirs.length === 3) return solve3x3(dirs[0], dirs[1], dirs[2], target);
+  let c: [number, number, number];
+  if (dirs.length === 2) {
+    const [d1, d2] = dirs;
+    const g11 = dot(d1, d1), g12 = dot(d1, d2), g22 = dot(d2, d2);
+    const det = g11 * g22 - g12 * g12;
+    if (Math.abs(det) < 1e-10 * scale * scale * scale * scale) return null; // parallel/degenerate pair
+    const r1 = dot(d1, target), r2 = dot(d2, target);
+    c = [(r1 * g22 - r2 * g12) / det, (r2 * g11 - r1 * g12) / det, 0];
+  } else if (dirs.length === 1) {
+    const d = dirs[0];
+    const g = dot(d, d);
+    if (g < 1e-12) return null;
+    c = [dot(d, target) / g, 0, 0];
+  } else return null;
+  const rx = target.x - c[0] * dirs[0].x - (dirs[1] ? c[1] * dirs[1].x : 0);
+  const ry = target.y - c[0] * dirs[0].y - (dirs[1] ? c[1] * dirs[1].y : 0);
+  const rz = target.z - c[0] * dirs[0].z - (dirs[1] ? c[1] * dirs[1].z : 0);
+  if (Math.hypot(rx, ry, rz) > RESID_TOL * scale) return null; // out of the declared span — honest null
+  return c;
+}
+
+/**
+ * Decompose the vector (from→to) in the declared 1–3-vector `basis` across the resolved `posArr`,
+ * requiring the per-seed coefficients to AGREE — affine relations are frame-invariant, so the basis is
+ * usable per seed even when not world-stable. Returns the averaged coefficients (padded to a triple),
+ * or null when a point is unplaced, the coefficients disagree (agreement tolerance sized for the
+ * double-root √noise class, ~1e-4), or the target is outside the declared span. Before #311 this
+ * hard-required THREE basis vectors, so a planar figure («SB=u, BC=v») refused every decomposition.
  */
 export function basisDecompose(basis: { from: Id; to: Id }[], posArr: Positions3[], from: Id, to: Id): [number, number, number] | null {
-  if (basis.length < 3) return null;
+  if (basis.length < 1 || basis.length > 3) return null;
   const per = posArr.map((pos) => {
     const p = pos.get(from);
     const q = pos.get(to);
@@ -193,7 +231,7 @@ export function basisDecompose(basis: { from: Id; to: Id }[], posArr: Positions3
       return f && t ? sub3(t, f) : null;
     });
     if (!p || !q || dirs.some((x) => !x)) return null;
-    return solve3x3(dirs[0]!, dirs[1]!, dirs[2]!, sub3(q, p));
+    return nBasisSolve(dirs as Vec3[], sub3(q, p));
   });
   if (per.some((x) => !x)) return null;
   const [c0, c1, c2] = per as [number, number, number][];
@@ -218,7 +256,7 @@ export function basisDecompose(basis: { from: Id; to: Id }[], posArr: Positions3
  */
 export function parametricDecomp(c: Construction3, from: Id, to: Id, seeds: number[]): string | null {
   const basisEntries = [...c.vectors.entries()].slice(0, 3);
-  if (basisEntries.length < 3) return null;
+  if (basisEntries.length < 1) return null; // 1–2 declared vectors are a real basis for a planar/collinear figure (#311)
   const basis = basisEntries.map(([, d]) => d);
   const names = basisEntries.map(([n]) => n);
   const posArr = seeds.map((s) => resolve3(c, s).positions);

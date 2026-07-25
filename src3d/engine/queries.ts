@@ -14,7 +14,7 @@
 
 import { resolve3 } from './evaluate';
 import { scalePinned } from './solve3';
-import { cleanNum, coordStr, decompStr, parametricDecomp, solve3x3 } from './dataView';
+import { basisDecompose, cleanNum, coordStr, decompStr, parametricDecomp } from './dataView';
 import { centroid3, cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
 import type { Construction3, Id, Positions3 } from './types';
 
@@ -228,32 +228,26 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3): number | null {
  *  a query answer and its panel row can't diverge), and its coordinates (only with a frame). */
 function vectorForms(c: Construction3, a: Atom, posArr: Positions3[], seeds: number[]): string[] {
   const parts: string[] = [];
-  const basis = [...c.vectors.entries()].slice(0, 3);
-  if (basis.length === 3) {
-    const names = basis.map(([n]) => n);
-    const per = posArr.map((pos) => {
-      const target = atomVec(c, a, pos);
-      const dirs = basis.map(([, d]) => {
-        const f = pos.get(d.from);
-        const t = pos.get(d.to);
-        return f && t ? sub3(t, f) : null;
-      });
-      return target && !dirs.some((x) => !x) ? solve3x3(dirs[0]!, dirs[1]!, dirs[2]!, target) : null;
-    });
+  const basisEntries = [...c.vectors.entries()].slice(0, 3);
+  // 1–2 declared vectors are a real basis for a planar/collinear figure (#311); the decomposition
+  // itself is the SHARED `basisDecompose` (this function used to carry its own inline 3×3 copy —
+  // the exact panel/query duplication #297 was meant to end — so the 3-basis gate lived on here).
+  if (basisEntries.length >= 1) {
+    const names = basisEntries.map(([n]) => n);
+    const basisDefs = basisEntries.map(([, d]) => d);
+    const ft: [Id, Id] | null = 'named' in a ? (() => { const d = c.vectors.get(a.named); return d ? ([d.from, d.to] as [Id, Id]) : null; })() : a.pair;
     let pushedDecomp = false;
-    if (!per.some((x) => !x)) {
-      const [c0, c1, c2] = per as [number, number, number][];
-      const agree = (u: number[], v: number[]) => u.every((x, i) => Math.abs(x - v[i]) < 2e-3);
-      if (agree(c0, c1) && agree(c0, c2)) {
-        parts.push(decompStr(c0.map((x, i) => (x + c1[i] + c2[i]) / 3) as [number, number, number], names));
+    if (ft) {
+      const coefs = basisDecompose(basisDefs, posArr, ft[0], ft[1]);
+      if (coefs) {
+        parts.push(decompStr(coefs, names));
         pushedDecomp = true;
       }
     }
     // #297 — the numeric decomposition isn't stable (a driven-parameter vector: AE = t·w): show the
     // PARAMETRIC form instead, the same one the data panel surfaces (shared `parametricDecomp`).
-    if (!pushedDecomp) {
-      const ft: [Id, Id] | null = 'named' in a ? (() => { const d = c.vectors.get(a.named); return d ? ([d.from, d.to] as [Id, Id]) : null; })() : a.pair;
-      const sym = ft ? parametricDecomp(c, ft[0], ft[1], seeds) : null;
+    if (!pushedDecomp && ft) {
+      const sym = parametricDecomp(c, ft[0], ft[1], seeds);
       if (sym) parts.push(sym);
     }
   }
