@@ -257,6 +257,39 @@ describe('#324 — the statement alone DRIVES a free figure', () => {
   });
 });
 
+describe('Am. 3 — a sign given SELECTS among discrete symbol roots (operator screenshot, 2026-07-25)', () => {
+  beforeEach(reset);
+  // «AB=7» + A(1,4,−3) roots t: (2t−1)² + (t−4)² = 49 ⇒ t = 4 OR t = −1.6 — two exact
+  // solutions sharing one gauge. Best-per-mirror kept only one basin, so «t > 0» refused
+  // sign-unsatisfiable although the positive root exists (the operator's «מה אני עושה לא בסדר»).
+  const SEQ = ['תיבה', 'נתונות הנקודות: A(1, 4, -3), B(2t, t, k)', 'הבסיס ABCD מונח על מישור שמקביל למישור [xy]', 'AB=7'];
+
+  it('«t > 0» selects t = 4 (B = (8, 4, −3)) at every seed instead of refusing', () => {
+    for (const u of SEQ) {
+      submit(u);
+      expect(err(), u).toBeNull();
+    }
+    submit('t > 0');
+    expect(err()).toBeNull();
+    for (const seed of [0, 1, 2]) {
+      const d = derive3(state().facts, seed);
+      expect(d.resolved.pivot?.pinSymbols?.t, `seed ${seed}`).toBeCloseTo(4, 3);
+      const B = d.positions.get('B')!;
+      expect(B.x, `seed ${seed}`).toBeCloseTo(8, 2);
+      expect(B.y, `seed ${seed}`).toBeCloseTo(4, 2);
+      expect(B.z, `seed ${seed}`).toBeCloseTo(-3, 2);
+    }
+  });
+
+  it('«t < 0» selects the −1.6 root', () => {
+    for (const u of SEQ) submit(u);
+    submit('t < 0');
+    expect(err()).toBeNull();
+    const d = derive3(state().facts, state().seed);
+    expect(d.resolved.pivot?.pinSymbols?.t).toBeCloseTo(-1.6, 2);
+  });
+});
+
 describe('guards', () => {
   beforeEach(reset);
   it('a pin symbol clashing with the coord-sym figure parameter refuses two-params', () => {

@@ -608,7 +608,10 @@ export function solvePivot(
   // (D on +x with S on −z vs D on −x with S on +z). With sign givens present, keep
   // every distinct converged solution so the selector sees the full pool; without
   // them, the fast best-per-mirror path stands.
-  const collectAll = c.signGivens.length > 0;
+  // #325 (ADR-3D-079 Am. 3): a sign given on a PIN SYMBOL selects the same way — `AB=7`
+  // with `B(2t,t,k)` roots t at 4 OR −1.6 (discrete), and best-per-mirror may keep only
+  // the wrong-signed root, refusing `t > 0` although a positive root exists.
+  const collectAll = c.signGivens.length > 0 || (nPinSym > 0 && c.paramSigns.length > 0);
   for (const mirror of [false, true]) {
     const fPrimary = residualsFor(mirror);
     if (scaleFree) {
@@ -667,11 +670,16 @@ export function solvePivot(
       const rAccept = anchored ? primaryErr(r0.x) : r0.err;
       if (collectAll && rAccept < ACCEPT) {
         const g = { ...unpack(r0.x), mirror };
-        // dedupe by the transform's ACTION (probe frame), not its parameters (axis-angle wraps)
-        const sig = [v3(0, 0, 0), v3(1, 0, 0), v3(0, 1, 0), v3(0, 0, 1)]
-          .map((p) => applyGauge(p, g))
-          .map((q) => `${q.x.toFixed(5)},${q.y.toFixed(5)},${q.z.toFixed(5)}`)
-          .join('|');
+        // dedupe by the transform's ACTION (probe frame), not its parameters (axis-angle wraps).
+        // Am. 3: two pin-symbol ROOTS can share one gauge (t = 4 vs −1.6 moves only B) — the
+        // symbol values join the signature so the sign selector sees both (nPinSym = 0 ⇒ the
+        // signature is byte-identical to before).
+        const sig =
+          [v3(0, 0, 0), v3(1, 0, 0), v3(0, 1, 0), v3(0, 0, 1)]
+            .map((p) => applyGauge(p, g))
+            .map((q) => `${q.x.toFixed(5)},${q.y.toFixed(5)},${q.z.toFixed(5)}`)
+            .join('|') +
+          (nPinSym > 0 ? '#' + r0.x.slice(7 + nDims + nSym).map((v) => v.toFixed(4)).join(',') : '');
         if (!seen.has(sig)) {
           seen.add(sig);
           const dims = r0.x.slice(7, 7 + nDims);
