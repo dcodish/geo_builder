@@ -251,8 +251,16 @@ function vectorForms(c: Construction3, a: Atom, posArr: Positions3[], seeds: num
       if (sym) parts.push(sym);
     }
   }
-  const hasFrame = c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
-  if (hasFrame) {
+  // #315 (ADR-3D-074): a queried VECTOR's coordinates are a difference — translation cancels — so
+  // they need the ORIENTATION pinned (two independent pinned directions, or a real point frame, or
+  // the atom itself being the injected pair), never just "something was injected" (a single pair pin
+  // leaves a residual rotation the pivot's deterministic gauge fixes, which would print as knowledge).
+  // #315 amendment (operator-validated): vector coords keep the frame + seed-stability gate — the
+  // seeds vary the rotation/dims gauge, so only genuinely-derivable vector coords survive the
+  // stability check (u suppressed, v = 3·DE printed). Translation is the one deterministic gauge;
+  // POINT-coordinate answers are gated at their own sites.
+  const vectorFrame = c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
+  if (vectorFrame) {
     const vs = posArr.map((pos) => atomVec(c, a, pos));
     if (!vs.some((v) => !v) && vs.every((v) => Math.abs(v!.x - vs[0]!.x) < 1e-6 && Math.abs(v!.y - vs[0]!.y) < 1e-6 && Math.abs(v!.z - vs[0]!.z) < 1e-6)) {
       parts.push(coordStr(vs[0]!));
