@@ -353,7 +353,11 @@ const volumePolyClaim: Rule = (s) => {
  *  #225 (ADR-3D-048): the UN-named `אמצע BB'` / `midpoint of BB'` (2 tokens) lowers to
  *  `midpoint-auto` — the label is picked at APPLY, where the taken ids are known. */
 const midpoint: Rule = (s) => {
-  if (!/אמצע/.test(s) && !/\b(midpoint|middle)\b/i.test(s)) return null;
+  // #330: `אמצע` (midpoint) but NOT `אמצעי`/`אמצעים`/`אמצעית` — the perpendicular-bisector adjective
+  // (`אנך אמצעי`) and the midsegment (`קטע אמצעים`) share the `אמצע` prefix and must not be reduced to
+  // a bare midpoint (dropping their meaning + any named line). The `(?!י)` word-boundary is the fix; the
+  // perp-bisector then escalates honestly (a 3-D perp-bisector construct is a needs-operator decision).
+  if (!/אמצע(?!י)/.test(s) && !/\b(midpoint|middle)\b/i.test(s)) return null;
   const toks = labelTokens(s);
   if (toks.length === 2) {
     const [a, b] = toks;
@@ -505,16 +509,43 @@ const nameVectors: Rule = (s) => {
   ]);
 };
 
-/** `E מפגש התיכונים של משולש BC'D` / `E is the centroid of triangle BC'D` — also draws the triangle. */
+/**
+ * The centroid = where a triangle's three MEDIANS meet: `P מפגש התיכונים של משולש SAB` /
+ * `P מפגש תיכונים במשולש SAB` (ה optional) / `E is the centroid of triangle BC'D`. Also draws the triangle.
+ *
+ * #330: the point is named FIRST or LAST — the book writes `תיכוני הפאה SAB נפגשים בנקודה P` /
+ * `מפגש התיכונים של משולש SAB הוא P`. The point-last forms were silently absorbed by `planarPolygon`
+ * (a bare triangle SAB, the centroid point P dropped). Widened to both orders, ה optional, `פאה`/`משולש`,
+ * the construct-state `תיכוני` as well as `תיכונים`, and the English point-last mirrors. The centroid
+ * signal (medians + a MEETING word) keeps it disjoint from the single-median rule (`CD תיכון…`, medianFoot).
+ */
 const centroidRule: Rule = (s) => {
-  const m = s.match(
-    /^([A-Z]\d*'?)\s+(?:מפגש\s+התיכונים\s+(?:של\s+|ב)?משולש|is\s+the\s+centroid\s+of\s+(?:triangle\s+)?|is\s+the\s+intersection\s+of\s+the\s+medians\s+of\s+(?:triangle\s+)?)\s*([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s*$/,
-  );
-  if (!m) return null;
-  const [, id, a, b, c] = m;
+  const he = /תיכונ/.test(s) && /מפגש|נפגש|נחתכ|חיתוך/.test(s);
+  const en = /\bcentroid\b/i.test(s) || (/\bmedians?\b/i.test(s) && /\b(meet|intersect|intersection)\b/i.test(s));
+  if (!he && !en) return null;
+  const L = String.raw`([A-Z]\d*'?)`;
+  const MED = String.raw`ה?תיכוני(?:ם)?`; // תיכוני (construct) / התיכונים (absolute)
+  const T = String.raw`(?:ה?משולש\s+|ה?פאה\s+|triangle\s+)?`;
+  const RUN = `${L}${L}${L}`;
+  let id: string, a: string, b: string, c: string;
+  // point-FIRST
+  let m =
+    s.match(new RegExp(`^${L}\\s+מפגש\\s+${MED}\\s+(?:של\\s+|ב)?${T}\\s*${RUN}\\s*$`)) ??
+    s.match(new RegExp(`^${L}\\s+is\\s+the\\s+centroid\\s+of\\s+${T}${RUN}\\s*$`, 'i')) ??
+    s.match(new RegExp(`^${L}\\s+is\\s+the\\s+intersection\\s+of\\s+the\\s+medians\\s+of\\s+${T}${RUN}\\s*$`, 'i'));
+  if (m) [, id, a, b, c] = m;
+  else {
+    // point-LAST
+    m =
+      s.match(new RegExp(`^(?:מפגש\\s+)?${MED}\\s+(?:של\\s+|ב)?${T}\\s*${RUN}\\s+(?:נפגשים|נפגשות|נחתכים|הוא|היא|=)\\s+(?:ב?נקוד[הת]\\s+)?${L}\\s*$`)) ??
+      s.match(new RegExp(`^(?:the\\s+)?medians\\s+of\\s+${T}${RUN}\\s+(?:meet|intersect)\\s+(?:at\\s+)?(?:the\\s+)?(?:point\\s+)?${L}\\s*$`, 'i')) ??
+      s.match(new RegExp(`^(?:the\\s+)?(?:centroid|intersection\\s+of\\s+the\\s+medians)\\s+of\\s+${T}${RUN}\\s+is\\s+(?:the\\s+)?(?:point\\s+)?${L}\\s*$`, 'i'));
+    if (!m) return null;
+    [, a, b, c, id] = m;
+  }
   if (new Set([id, a, b, c]).size !== 4) return null;
   return [
-    { type: 'segment3', a, b: b },
+    { type: 'segment3', a, b },
     { type: 'segment3', a: b, b: c },
     { type: 'segment3', a: c, b: a },
     { type: 'centroid3', id, of: [a, b, c] },
@@ -2078,6 +2109,11 @@ const rightTriangle: Rule = (s) => {
 
 const planarPolygon: Rule = (s) => {
   if (/מנסרה|פירמידה|\bprism\b|\bpyramid\b/i.test(s)) return null;
+  // #330 leftover guard (ADR-024): a SPECIAL-LINE statement about a derived point/line OF the polygon
+  // (a median-meet / bisector / altitude / diagonal-meet) is not a bare polygon declaration — its own
+  // rule owns it, and if that rule misses a phrasing this must ESCALATE, never silently drop the derived
+  // point by building a bare triangle (the #330 silent-wrong-build class).
+  if (/תיכונ|חוצ|גובה|אלכסו[ןנ]|\b(median|centroid|bisect|altitude|diagonal)\b/i.test(s)) return null;
   const kind: 'polygon3' | 'polygon4' | 'polygon5' | null =
     /משולש/.test(s) || /\btriangle\b/i.test(s) ? 'polygon3' :
     /מרובע/.test(s) || /\b(quadrilateral|quad)\b/i.test(s) ? 'polygon4' :
@@ -2101,7 +2137,20 @@ const altitudeFoot: Rule = (s) => {
   const SIDE = String.raw`(?:ל|אל\s+)?(?:ה?צלע\s+)?`;
   // the altitude-foot command creates the foot AND draws the segment — never emit a segment3
   // first (it would reference the not-yet-created foot). apex = the altitude's first letter.
-  let m = s.match(new RegExp(`גובה\\s+(?:ה?משולש\\s+)?${SIDE}${L}${L}\\s+(?:הוא|היא)\\s+${L}${L}`)); // ...לצלע AB הוא CD
+  // #330 vertex form (mirrors medianFoot): `CD גובה במשולש ABC` — the opposite side is inferred from the
+  // named triangle (apex = CD's first letter, the foot drops onto the other two vertices). BEFORE the
+  // explicit-side forms so `במשולש ABC` is read as the triangle, never as a `ל<side>` fragment.
+  let m =
+    s.match(new RegExp(`^${L}${L}\\s+(?:הוא\\s+|היא\\s+)?גובה\\s+(?:ב|ל?)?(?:ה?משולש\\s+)${L}${L}${L}\\s*$`)) ??
+    s.match(new RegExp(`^${L}${L}\\s+is\\s+(?:the\\s+)?altitude\\s+(?:in|of)\\s+(?:triangle\\s+)?${L}${L}${L}\\s*$`, 'i'));
+  if (m) {
+    const [, from, foot, a, b, c] = m;
+    const tri = [a, b, c];
+    if (!tri.includes(from) || new Set(tri).size !== 3) return null;
+    const opp = tri.filter((x) => x !== from);
+    return [{ type: 'altitude-foot', id: foot, from, a: opp[0], b: opp[1] }];
+  }
+  m = s.match(new RegExp(`גובה\\s+(?:ה?משולש\\s+)?${SIDE}${L}${L}\\s+(?:הוא|היא)\\s+${L}${L}`)); // ...לצלע AB הוא CD
   if (m) return [{ type: 'altitude-foot', id: m[4], from: m[3], a: m[1], b: m[2] }];
   m = s.match(new RegExp(`${L}${L}\\s+(?:הוא\\s+|היא\\s+)?גובה\\s+(?:ה?משולש\\s+)?${SIDE}${L}${L}`)); // CD גובה לצלע AB
   if (m) return [{ type: 'altitude-foot', id: m[2], from: m[1], a: m[3], b: m[4] }];
