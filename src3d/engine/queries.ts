@@ -14,7 +14,7 @@
 
 import { resolve3 } from './evaluate';
 import { scalePinned } from './solve3';
-import { basisDecompose, cleanNum, coordStr, decompStr, parametricDecomp } from './dataView';
+import { basisDecompose, cleanNum, coordStr, decompStr, linePlaneAngleAt, newellNormal, parametricDecomp } from './dataView';
 import { centroid3, cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
 import type { Construction3, Id, Positions3 } from './types';
 
@@ -22,6 +22,8 @@ import type { Construction3, Id, Positions3 } from './types';
 type Atom = { named: string } | { pair: [Id, Id] };
 
 type Query =
+  | { kind: 'line-plane'; a: Id; b: Id; plane: Id[] } // #319: «הזווית בין SB למישור ABC» — the angle itself
+  | { kind: 'plane-plane'; p1: Id[]; p2: Id[] } // #319: «הזווית בין מישור ABC למישור SBC» (dihedral, acute)
   | { kind: 'dot'; a: Atom; b: Atom }
   | { kind: 'length'; a: Atom }
   | { kind: 'vector'; a: Atom } // the VECTOR itself — its u/v/w decomposition (+ coords when a frame exists)
@@ -65,6 +67,19 @@ function atomVec(c: Construction3, a: Atom, pos: Positions3): Vec3 | null {
 export function parseQuery(c: Construction3, raw: string): Query | null {
   const s = raw.replace(/[′’]/g, "'").replace(/\s+/g, ' ').trim();
   if (!s) return null;
+
+  // #319 — LINE↔PLANE angle: «הזווית בין SB למישור ABC» / «angle between SB and plane ABC»
+  // (valueless — a QUESTION; the statement form with a value/label is the linePlaneAngle fact rule).
+  {
+    const lp =
+      s.match(new RegExp(`^ה?זו?וית\\s+(?:ש)?בין\\s+(?:ה?ישר\\s+|ה?קטע\\s+|ה?מקצוע\\s+)?(${PT})(${PT})\\s+(?:[לו]?בין\\s+)?[לו]?-?ה?מישור\\s+((?:${PT}){3,4})$`)) ??
+      s.match(new RegExp(`^(?:the\\s+)?angle\\s+between\\s+(?:the\\s+)?(?:line\\s+|segment\\s+|edge\\s+)?(${PT})(${PT})\\s+and\\s+(?:the\\s+)?plane\\s+((?:${PT}){3,4})$`, 'i'));
+    if (lp) return { kind: 'line-plane', a: lp[1], b: lp[2], plane: lp[3].match(new RegExp(PT, 'g'))! };
+    const pp =
+      s.match(new RegExp(`^ה?זו?וית\\s+(?:ש)?בין\\s+ה?מישור\\s+((?:${PT}){3,4})\\s+(?:[לו]?בין\\s+)?[לו]?-?ה?מישור\\s+((?:${PT}){3,4})$`)) ??
+      s.match(new RegExp(`^(?:the\\s+)?angle\\s+between\\s+(?:the\\s+)?planes?\\s+((?:${PT}){3,4})\\s+and\\s+(?:the\\s+)?(?:plane\\s+)?((?:${PT}){3,4})$`, 'i'));
+    if (pp) return { kind: 'plane-plane', p1: pp[1].match(new RegExp(PT, 'g'))!, p2: pp[2].match(new RegExp(PT, 'g'))! };
+  }
 
   // ANGLE: «∠(u,v)» / «∠SAB» / «זווית SAB» / «angle SAB» / «angle between u and v»
   const angM = s.match(/^(?:∠|∢|זו?וית|the\s+)?\s*angle\s+|^(?:∠|∢|זו?וית)\s*/i);
@@ -205,6 +220,18 @@ function evalQuery(c: Construction3, q: Query, pos: Positions3): number | null {
       const v = atomVec(c, q.b, pos);
       return u && v ? angleBetween(u, v) : null;
     }
+    case 'line-plane':
+      return linePlaneAngleAt(pos, q.a, q.b, q.plane);
+    case 'plane-plane': {
+      const ps1 = q.p1.map((id) => pos.get(id));
+      const ps2 = q.p2.map((id) => pos.get(id));
+      if (ps1.some((x) => !x) || ps2.some((x) => !x)) return null;
+      const n1 = newellNormal(ps1 as { x: number; y: number; z: number }[]);
+      const n2 = newellNormal(ps2 as { x: number; y: number; z: number }[]);
+      const den = norm3(n1) * norm3(n2);
+      if (den < 1e-12) return null;
+      return (Math.acos(Math.min(1, Math.abs(dot3(n1, n2)) / den)) * 180) / Math.PI; // acute dihedral
+    }
     case 'area': {
       const ps = q.ids.map((id) => pos.get(id));
       if (ps.some((p) => !p)) return null;
@@ -326,8 +353,8 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
   }
   // angles and a free PARAMETER «t» (an affine ratio along a segment) are scale-invariant — knowledge
   // whenever they are stable, no scale needed. A dot/length/area/volume still needs the scale pinned.
-  const scaleFree = q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'symbol';
+  const scaleFree = q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'symbol' || q.kind === 'line-plane' || q.kind === 'plane-plane';
   if (!scaleFree && !scalePinned(c) && Math.abs(nums[0]) > 1e-9) return { text, answer: null, note: 'scale' };
-  const isAngle = q.kind === 'angle-vertex' || q.kind === 'angle-vec';
+  const isAngle = q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'line-plane' || q.kind === 'plane-plane';
   return { text, answer: `${cleanNum(nums[0])}${isAngle ? '°' : ''}` };
 }

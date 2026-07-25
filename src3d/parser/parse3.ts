@@ -1080,14 +1080,17 @@ const pointRelPlane: Rule = (s) => {
 const linePlaneAngle: Rule = (s) => {
   const m =
     s.match(
-      new RegExp(`^ה?זו?וית\\s+בין\\s+ה?ישר\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+ל?בין\\s+ה?מישור\\s+((?:[A-Z]\\d*'?){3,4})\\s*(?:היא|הוא|=)\\s*(${NUM})\\s*°?$`),
+      new RegExp(`^ה?זו?וית\\s+(?:ש)?בין\\s+(?:ה?ישר\\s+|ה?קטע\\s+|ה?מקצוע\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+(?:[לו]?בין\\s+)?[לו]?-?ה?מישור\\s+((?:[A-Z]\\d*'?){3,4})\\s*(?:היא|הוא|=|שווה\\s+ל?-?)\\s*(${NUM}|[αβγδθ])\\s*°?$`),
     ) ??
     s.match(
-      new RegExp(`^the\\s+angle\\s+between\\s+(?:the\\s+)?line\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+and\\s+(?:the\\s+)?plane\\s+((?:[A-Z]\\d*'?){3,4})\\s*(?:is|=)\\s*(${NUM})\\s*°?$`, 'i'),
+      new RegExp(`^(?:the\\s+)?angle\\s+between\\s+(?:the\\s+)?(?:line\\s+|segment\\s+|edge\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+and\\s+(?:the\\s+)?plane\\s+((?:[A-Z]\\d*'?){3,4})\\s*(?:is|=)\\s*(${NUM}|[αβγδθ])\\s*°?$`, 'i'),
     );
   if (!m) return null;
   const plane = m[3].match(/[A-Z]\d*'?/g)!;
-  return [{ type: 'line-plane-angle', a: m[1], b: m[2], plane, deg: +m[4] }];
+  const val = m[4];
+  // #319: a GREEK value NAMES the measure (a mark, never a driver — the panel derives its degrees)
+  if (/^[αβγδθ]$/.test(val)) return [{ type: 'line-plane-angle', a: m[1], b: m[2], plane, label: val }];
+  return [{ type: 'line-plane-angle', a: m[1], b: m[2], plane, deg: +val }];
 };
 
 const angleBetweenPlanes: Rule = (s) => {

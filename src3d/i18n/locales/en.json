@@ -39,7 +39,10 @@
     "empty": "No givens yet — type one or click an example",
     "delete": "Delete",
     "toggleTitle": "Include/exclude this given",
-    "claimVerified": "The claim was verified against the figure"
+    "claimVerified": "The claim was verified against the figure",
+    "planeFace": "face only",
+    "planeFull": "full plane",
+    "planeToggleTitle": "Plane {{name}} display — click to switch between face only and full plane"
   },
   "status": {
     "inactive": "Inactive — a given it depends on is off"

@@ -110,6 +110,33 @@ export function planeEqStr(u: { x: number; y: number; z: number; d: number }): s
 }
 
 /** Solve M·x = t for 3×3 M given by columns u,v,w; null when singular. */
+/** Newell normal of a point ring (3–4 points) — THE shared plane-normal for display derivations
+ *  (#319: the panel's labeled line↔plane angles and the query lane share it, so they can't diverge). */
+export function newellNormal(pts: Vec3[]): Vec3 {
+  let nx = 0, ny = 0, nz = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p1 = pts[i];
+    const p2 = pts[(i + 1) % pts.length];
+    nx += (p1.y - p2.y) * (p1.z + p2.z);
+    ny += (p1.z - p2.z) * (p1.x + p2.x);
+    nz += (p1.x - p2.x) * (p1.y + p2.y);
+  }
+  return { x: nx, y: ny, z: nz };
+}
+
+/** The line↔plane angle in DEGREES at one configuration (sin β = |n·u|/(|n||u|)), or null. */
+export function linePlaneAngleAt(pos: Positions3, a: Id, b: Id, plane: Id[]): number | null {
+  const p = pos.get(a);
+  const q = pos.get(b);
+  const pts = plane.map((id) => pos.get(id));
+  if (!p || !q || pts.some((x) => !x)) return null;
+  const u = { x: q.x - p.x, y: q.y - p.y, z: q.z - p.z };
+  const n = newellNormal(pts as Vec3[]);
+  const den = Math.hypot(n.x, n.y, n.z) * Math.hypot(u.x, u.y, u.z);
+  if (den < 1e-12) return null;
+  return (Math.asin(Math.min(1, Math.abs(n.x * u.x + n.y * u.y + n.z * u.z) / den)) * 180) / Math.PI;
+}
+
 export function solve3x3(u: Vec3, v: Vec3, w: Vec3, t: Vec3): [number, number, number] | null {
   const M = [
     [u.x, v.x, w.x, t.x],
@@ -392,6 +419,16 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // derived magnitude equalities among the declared vectors: |u| = |v| = |w| — equal in
   // EVERY sampled configuration (each seed has its own scale; the EQUALITY is the fact)
   const relations: string[] = [];
+  // #319 — LABELED line↔plane angles («זוית בין SB ומישור ABC היא α»): derive `α = X°` when the
+  // angle is identical in every sampled configuration (angles are scale-free — no scale gate;
+  // the same knowledge discipline as every derived value). sin β = |n·u|/(|n||u|), n = Newell
+  // normal of the plane's point-run.
+  for (const mk of c.linePlaneMarks) {
+    const per = positions.map((pos) => linePlaneAngleAt(pos, mk.a, mk.b, mk.plane));
+    if (per.every((v): v is number => v !== null) && per.every((v) => Math.abs(v - per[0]!) < 1e-4)) {
+      relations.push(`${mk.label} = ${cleanNum(per[0]!, 1e-3)}°`);
+    }
+  }
   {
     const mags = vecNames.map(([name, d]) => ({
       name,

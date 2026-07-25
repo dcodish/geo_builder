@@ -26,6 +26,9 @@ export interface FigureFile3 {
   facts: { utterance: string; cmds: Command3[]; enabled?: boolean }[];
   /** Data-panel queries (ADR-3D-057, #274) — questions about the figure, not facts; optional. */
   queries?: string[];
+  /** Per-plane patch display (#318): plane name → 'face' (patch = the defining polygon only).
+   *  Absent key = 'full' (the default growing patch), so only non-defaults are stored. */
+  planeDisplay?: Record<string, 'face' | 'full'>;
 }
 
 const COMMAND_TYPES = new Set<Command3['type']>([
@@ -91,7 +94,13 @@ const COMMAND_TYPES = new Set<Command3['type']>([
   'make-right-prism', // #289 (M1): «המנסרה ישרה» — added with the prism bundle so a saved figure reloads
 ]);
 
-export function serializeFigure3(facts: Fact3[], seed: number, name?: string, queries: string[] = []): string {
+export function serializeFigure3(
+  facts: Fact3[],
+  seed: number,
+  name?: string,
+  queries: string[] = [],
+  planeDisplay: Record<string, 'face' | 'full'> = {},
+): string {
   const file: FigureFile3 = {
     schemaVersion: SCHEMA_VERSION_3D,
     app: '3d-builder',
@@ -100,12 +109,13 @@ export function serializeFigure3(facts: Fact3[], seed: number, name?: string, qu
     seed,
     facts: facts.map((f) => ({ utterance: f.utterance, cmds: f.cmds, ...(f.enabled ? {} : { enabled: false }) })),
     ...(queries.length ? { queries } : {}),
+    ...(Object.keys(planeDisplay).length ? { planeDisplay } : {}),
   };
   return JSON.stringify(file, null, 2);
 }
 
 export type LoadResult3 =
-  | { ok: true; facts: Fact3[]; seed: number; queries: string[] }
+  | { ok: true; facts: Fact3[]; seed: number; queries: string[]; planeDisplay: Record<string, 'face' | 'full'> }
   | { ok: false; reason: 'bad-file' | 'newer-schema' };
 
 export function deserializeFigure3(text: string): LoadResult3 {
@@ -135,7 +145,14 @@ export function deserializeFigure3(text: string): LoadResult3 {
     facts.push({ id: nanoid(8), utterance: f.utterance, cmds: f.cmds, enabled: f.enabled !== false });
   }
   const queries = Array.isArray(file.queries) ? file.queries.filter((q): q is string => typeof q === 'string') : [];
-  return { ok: true, facts, seed: file.seed, queries };
+  // #318: lenient like `queries` — keep only well-formed entries; anything else falls back to 'full'
+  const planeDisplay: Record<string, 'face' | 'full'> = {};
+  if (typeof file.planeDisplay === 'object' && file.planeDisplay !== null && !Array.isArray(file.planeDisplay)) {
+    for (const [k, v] of Object.entries(file.planeDisplay)) {
+      if (v === 'face' || v === 'full') planeDisplay[k] = v;
+    }
+  }
+  return { ok: true, facts, seed: file.seed, queries, planeDisplay };
 }
 
 /** This product's save-file suffix (issue #20; registry: docs/22-workflow.md §9). COPIED per product
