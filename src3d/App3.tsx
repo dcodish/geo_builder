@@ -17,7 +17,8 @@ import { classifyGuidance3 } from './parser/scope3';
 import Figure3 from './render/Figure3';
 import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
 import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
-import { factDisplay3 } from './render/notation';
+import { factDisplay3, isVectorFact3 } from './render/notation';
+import { VecMath } from './render/VecMath';
 
 function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: StoreError3): string | null {
   if (!err) return null;
@@ -411,7 +412,11 @@ export default function App3() {
                   statusDot(derived.status[f.id])
                 )}
                 <span dir="auto" className="min-w-0 flex-1 truncate text-sm">
-                  {factDisplay(f, new Set(derived.construction.vectors.keys()))}
+                  {isVectorFact3(f) ? (
+                    <VecMath text={factDisplay(f, new Set(derived.construction.vectors.keys()))} vecNames={new Set(derived.construction.vectors.keys())} />
+                  ) : (
+                    f.utterance
+                  )}
                 </span>
                 <button
                   type="button"
@@ -541,8 +546,15 @@ export default function App3() {
                   {queryResults.map((r, i) => (
                     <li key={r.text + i} className="flex items-center justify-between gap-2 border-b border-slate-100 pb-1 last:border-0">
                       <span>
-                        {r.text}
-                        {r.answer !== null ? <span className="font-medium"> = {r.answer}</span> : <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>}
+                        <VecMath text={r.text} vecNames={new Set(derived.construction.vectors.keys())} />
+                        {r.answer !== null ? (
+                          <span className="font-medium">
+                            {' = '}
+                            <VecMath text={r.answer} vecNames={new Set(derived.construction.vectors.keys())} />
+                          </span>
+                        ) : (
+                          <span className="text-slate-400"> — {t(`query.note.${r.note}`, { param: r.param })}</span>
+                        )}
                       </span>
                       <button type="button" onClick={() => removeQuery(i)} className="shrink-0 text-slate-400 hover:text-rose-600" aria-label={t('query.remove')}>
                         ×
@@ -568,12 +580,12 @@ export default function App3() {
                     <li key={v.label} className="border-b border-slate-100 pb-1 last:border-0">
                       {v.decomp && (
                         <div>
-                          {v.label}⃗ = {v.decomp}
+                          <VecMath text={`${v.label} = ${v.decomp}`} vecNames={new Set(derived.construction.vectors.keys())} />
                         </div>
                       )}
                       {v.coords && (
                         <div>
-                          {v.label}⃗ = {v.coords}
+                          <VecMath text={`${v.label} = ${v.coords}`} vecNames={new Set(derived.construction.vectors.keys())} />
                         </div>
                       )}
                       {v.mag && (
