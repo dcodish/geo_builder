@@ -1324,8 +1324,14 @@ const parametricLine: Rule = (s) => {
         `^(?:given\\s+that\\s+)?(?:the\\s+|a\\s+)?(?:equation|parametric\\s+(?:representation|form|equation))\\s+of\\s+(?:the\\s+)?(?:line\\s+)?${NAME}\\s+is\\s*:?\\s*(.+)$`,
       ),
     );
-  if (!head) return null;
-  const m = head[2].match(/^(?:x\s*=\s*)?\(([^()]*)\)\s*\+\s*t\s*[·×*]?\s*\(([^()]*)\)$/);
+  // #275: the BARE form «x = (a,b,c) + t(d,e,f)» typed with NO «הישר ℓ:» prefix (the textbook's exact
+  // notation) auto-binds the canonical ℓ. Gated to a leading «x = (» so a plane equation («x-y+z=1») is
+  // never stolen (and the `+ t(…)` tail below is the real discriminator). A second bare line collides on ℓ
+  // at apply — never a silently-minted ℓ2 (the ADR-3D-038 indexed names are the student's to state).
+  const headName = head ? head[1] : /^\s*x\s*=\s*\(/.test(s) ? 'ℓ' : null;
+  const body = head ? head[2] : s;
+  if (headName === null) return null;
+  const m = body.match(/^(?:x\s*=\s*)?\(([^()]*)\)\s*\+\s*t\s*[·×*]?\s*\(([^()]*)\)$/);
   if (!m) return null;
   const triple = (str: string) => str.split(',').map((p) => parseParamExpr(p));
   const anchor = triple(m[1]);
@@ -1333,8 +1339,8 @@ const parametricLine: Rule = (s) => {
   if (anchor.length !== 3 || dir.length !== 3 || [...anchor, ...dir].some((x) => !x)) return null;
   const params = new Set([...anchor, ...dir].flatMap((x) => (x!.param ? [x!.param] : [])));
   if (params.size > 1) return null;
-  const isLineName = LINE_NAME_ONLY.test(head[1]);
-  const name = isLineName ? canonicalLine(head[1]) : head[1];
+  const isLineName = LINE_NAME_ONLY.test(headName);
+  const name = isLineName ? canonicalLine(headName) : headName;
   const cmds: Command3[] = [
     {
       type: 'line3',
