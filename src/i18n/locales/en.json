@@ -55,6 +55,7 @@
     "alreadyDrawn": "That's already on the figure — nothing to add.",
     "ambiguousAngle": "There's more than one angle at {{vertex}}, so I can't tell which one you mean. Name all three letters of the angle — e.g. \"∠A{{vertex}}C = 90\" — or give it a name: \"denote angle A{{vertex}}C as {{vertex}}1\".",
     "aliasTaken": "The name {{name}} is already taken on this figure, so it can't name an angle. Pick another name — e.g. a letter with a different digit.",
+    "reservedSymbol": "The letter {{symbol}} denotes the circle's radius, not a point. Pick another letter for a point on the circle.",
     "ambiguousCircle": "There are two circles around {{center}}, so I can't tell which one you mean. Say \"the outer circle\" or \"the inner circle\".",
     "unknownCircle": "There is no circle named {{center}}. More than one unnamed circle is drawn — name one first, e.g.: the centre of the right circle is {{center}}.",
     "partial": "Couldn't draw this part",

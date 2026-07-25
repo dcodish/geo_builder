@@ -183,6 +183,15 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     ui.setBusy(false);
     return;
   }
+  // A BOUND radius symbol («R» after «רדיוס מעגל O הוא R») reused as a POINT label («מיתר AR») — once bound,
+  // the letter IS the parametric radius, never a node (operator ruling, #198). Say so deterministically and
+  // keep the text so the student renames the point; never a paid LLM call that would mint the node R.
+  if (!r.ok && r.reason === 'reserved-symbol') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `reserved-symbol:${r.symbol}` });
+    ui.setInputNote(t('input.reservedSymbol', { symbol: r.symbol }));
+    ui.setBusy(false);
+    return;
+  }
   // A reference to a centre carrying a CONCENTRIC PAIR with no outer/inner qualifier (ADR-244) — ask
   // WHICH circle is meant instead of picking silently or escalating to the LLM (which would only guess).
   if (!r.ok && r.reason === 'ambiguous-circle') {

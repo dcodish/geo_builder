@@ -2,7 +2,6 @@
   "_comment": "The REVIEWED set of divergent shadow pairs ('winner → later divergent claimer') over the catalog corpus — the hard gate of shadow-matrix.test.ts (A1/PAR-11; hardened per the 2026-07-03 review, M2: the snapshot form was silently absorbable by `vitest -u`). Every pair here was inspected and is intentional (a more-specific rule deliberately running before a coarser sibling that reads the same words differently). A NEW pair failing the gate means a rule edit created a fresh divergence: inspect it, fix the ordering/regex if it's a real shadow, or — only after review — add it here with the reason understood. '(anon)' entries are unnamed arrow-function rules (position-stable).",
   "shadowPairs": [
     "(anon) → (anon)",
-    "angleAliasRule → angle",
     "arcMidpoint → midpoint",
     "arcValue → ratioConstraint",
     "area → (anon)",
