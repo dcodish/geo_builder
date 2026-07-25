@@ -22,6 +22,9 @@ export interface Figure3Props {
    *  toggle). Knowledge only — a value identical in every sampled configuration;
    *  '?' marks a free component. Undetermined points carry no label (ADR-3D-030 Am.). */
   coordLabels?: Record<string, { text: string; kind: 'fact' | 'partial' }>;
+  /** #318: per-plane patch display — 'face' draws a named plane's patch as exactly its
+   *  defining polygon; absent = 'full' (the growing patch). */
+  planeDisplay?: Record<string, 'face' | 'full'>;
 }
 
 /** Per-index plane patch colours (translucent — patches never occlude, docs/20 §11). */
@@ -36,14 +39,14 @@ const VECTOR_COLOR = '#0d9488';
  *  reorder it — `(0, 7, 6)` used to render as `(6 ,7 ,0)` on the canvas (LRI…PDI). */
 const ltr = (s: string) => `⁦${s}⁩`;
 
-export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels }: Figure3Props) {
+export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay }: Figure3Props) {
   const [cam, setCam] = useState<Camera3>(HOME_CAMERA);
   const [zoom, setZoom] = useState(1);
   const drag = useRef<{ x: number; y: number } | null>(null);
 
   const scene = useMemo(
-    () => buildScene3(construction, resolved, cam, { width, height }, zoom),
-    [construction, resolved, cam, width, height, zoom],
+    () => buildScene3(construction, resolved, cam, { width, height }, zoom, planeDisplay),
+    [construction, resolved, cam, width, height, zoom, planeDisplay],
   );
 
   const onPointerDown = (e: RPointerEvent<SVGSVGElement>) => {

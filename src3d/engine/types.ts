@@ -593,7 +593,7 @@ export type Command3 =
   // V8-f (G11): `D על AC כך ש-OD חוצה-זווית AOC` — D on segment a–b, ray apex→D bisects ∠(a)(apex)(b).
   | { type: 'bisector-point'; id: Id; a: Id; b: Id; apex: Id }
   // triage 3-D: `הזווית בין הישר AC' לבין המישור ABCD היא 30` — the angle between a line and a plane
-  | { type: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number }
+  | { type: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg?: number; label?: string } // #319: a Greek value NAMES the measure (never a driver); the panel derives its degrees
   // V8-j (G12): `T על SC כך ש-TABCD פירמידה ישרה` — T on segment a–b so pyramid(base, apex=T) is right.
   | { type: 'right-pyramid-point'; id: Id; a: Id; b: Id; base: Id[] }
   // V8-g: `גובה המשולש לצלע AB הוא CD` — D = foot of the ⟂ from vertex `from` onto side a–b.
@@ -664,6 +664,10 @@ export interface Construction3 {
   segments: [Id, Id][];
   /** #94 — named-angle MARKERS (`∠SDB` / `∠SDB = α`): pedagogical arc highlights, no DOF, no verification. */
   angleMarks: { vertex: Id; p: Id; q: Id; label?: string }[];
+  /** #319 — LABELED line↔plane angle measures («זוית בין SB ומישור ABC היא α»): pedagogical naming,
+   *  never a driver; the panel prints `label = X°` when the angle is seed-stable (angles are
+   *  scale-free, so no scale gate — the ADR-3D-054 taxonomy). */
+  linePlaneMarks: { a: Id; b: Id; plane: Id[]; label: string }[];
   /** Stated inequalities the DISPLAYED configuration must satisfy (ADR-3D-053) — see {@link Requirement3}. */
   requirements: Requirement3[];
   /** V2 — planes by equation, name → def (insertion-ordered). */
@@ -737,6 +741,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   arrows: [],
   segments: [],
   angleMarks: [],
+  linePlaneMarks: [],
   requirements: [],
   planes: new Map(),
   lines: new Map(),

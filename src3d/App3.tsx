@@ -119,6 +119,8 @@ export default function App3() {
   const queries = useGeo3((s) => s.queries);
   const addQuery = useGeo3((s) => s.addQuery);
   const removeQuery = useGeo3((s) => s.removeQuery);
+  const planeDisplay = useGeo3((s) => s.planeDisplay);
+  const togglePlaneDisplay = useGeo3((s) => s.togglePlaneDisplay);
   const reportLoadError = useGeo3((s) => s.reportLoadError);
 
   const submitSteps = useGeo3((s) => s.submitSteps);
@@ -197,7 +199,7 @@ export default function App3() {
       name = (window.prompt(t('actions.saveNamePrompt')) ?? '').trim();
       if (name) setFigureName(name);
     }
-    const blob = new Blob([serializeFigure3(facts, seed, name || undefined, queries)], { type: 'application/json' });
+    const blob = new Blob([serializeFigure3(facts, seed, name || undefined, queries, planeDisplay)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -215,7 +217,7 @@ export default function App3() {
     const r = deserializeFigure3(await f.text());
     if (r.ok) {
       logDebug3({ kind: 'action', action: 'load', detail: `${r.facts.length} facts` }); // #182: a load replaces the figure — the replay must know
-      loadFigure(r.facts, r.seed, r.queries);
+      loadFigure(r.facts, r.seed, r.queries, r.planeDisplay);
       setFigureName(figureNameFromFileName3(f.name)); // the FILENAME names the figure (issue #42)
     } else reportLoadError(r.reason);
   };
@@ -418,6 +420,19 @@ export default function App3() {
                     f.utterance
                   )}
                 </span>
+                {/* #318: a fact that names a plane gets a per-plane patch-display toggle; the
+                    label shows the mode the click SWITCHES TO (face only ↔ full plane) */}
+                {[...new Set(f.cmds.flatMap((cm) => (cm.type === 'plane-through' ? [cm.name] : [])))].map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    title={t('facts.planeToggleTitle', { name })}
+                    onClick={() => togglePlaneDisplay(name)}
+                    className="shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] leading-4 text-slate-500 hover:border-sky-400 hover:text-sky-700"
+                  >
+                    {(planeDisplay[name] ?? 'full') === 'full' ? t('facts.planeFace') : t('facts.planeFull')}
+                  </button>
+                ))}
                 <button
                   type="button"
                   aria-label={t('facts.delete')}
@@ -459,6 +474,7 @@ export default function App3() {
           <Figure3
             construction={derived.construction}
             resolved={derived.resolved}
+            planeDisplay={planeDisplay}
             coordLabels={showData && dataPanel ? dataPanel.pointCoords : undefined}
             width={canvasW}
             height={Math.max(360, Math.round(canvasW * 0.72))}

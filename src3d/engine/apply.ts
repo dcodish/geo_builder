@@ -127,6 +127,7 @@ function clone(c: Construction3): Construction3 {
   return {
     solids: [...c.solids],
     points: new Map(c.points),
+    linePlaneMarks: [...c.linePlaneMarks],
     vectors: new Map(c.vectors),
     arrows: c.arrows.map(([f, t]) => [f, t] as [Id, Id]),
     segments: [...c.segments],
@@ -1270,9 +1271,17 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       if (missing) return { ok: false, error: missing };
       const next = clone(c);
       if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]); // draw the line
+      // #319: a LABELED angle («… היא α») NAMES the measure — a pedagogical mark, never a driver;
+      // the panel derives `α = X°` when the angle is seed-stable.
+      if (cmd.label !== undefined) {
+        if (!next.linePlaneMarks.some((mk) => mk.a === cmd.a && mk.b === cmd.b && mk.label === cmd.label))
+          next.linePlaneMarks.push({ a: cmd.a, b: cmd.b, plane: [...cmd.plane], label: cmd.label });
+        return { ok: true, next };
+      }
+      const deg = cmd.deg!;
       if (freeDims(c) > 0 && c.solids.length > 0)
-        next.scalarPins.push({ kind: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg: cmd.deg });
-      else next.claims.push({ type: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg: cmd.deg });
+        next.scalarPins.push({ kind: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg });
+      else next.claims.push({ type: 'line-plane-angle', a: cmd.a, b: cmd.b, plane: [...cmd.plane], deg });
       return { ok: true, next };
     }
 

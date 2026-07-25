@@ -262,6 +262,9 @@ export function buildScene3(
   cam: Camera3,
   viewport: Viewport,
   zoom = 1,
+  /** #318: per-plane patch display — 'face' draws a point-run plane's patch as EXACTLY its
+   *  defining polygon; absent/'full' keeps the growing fold-anchored patch (the default). */
+  planeDisplay: Record<string, 'face' | 'full'> = {},
 ): Scene3 {
   const positions = resolved.positions;
   const frame = cameraFrame(cam);
@@ -306,7 +309,20 @@ export function buildScene3(
       return { center: projectOntoPlane(center, pl), e1, e2 };
     })();
   const wPlanes: { name: string; corners: Vec3[] }[] = [];
+  const facePatches = new Set<string>(); // planes actually drawn as their defining polygon (#318)
   for (const [name, pl] of resolved.planes) {
+    // #318 'face' display: the patch IS the defining point-run polygon, in the stated order —
+    // no growing extents, no fold-anchored frame. Only a point-run plane has a face to show;
+    // an equation plane (or an unplaced run) falls through to the 'full' patch unchanged.
+    if (planeDisplay[name] === 'face') {
+      const run = c.pointPlanes.get(name);
+      const facePts = run?.map((id) => positions.get(id));
+      if (facePts && facePts.length >= 3 && facePts.every((p): p is Vec3 => p !== undefined)) {
+        wPlanes.push({ name, corners: facePts });
+        facePatches.add(name);
+        continue;
+      }
+    }
     const fr = frameOf(name, pl);
     const ext = { u1: -h, u2: h, v1: -h, v2: h };
     const grow = (p: Vec3) => {
@@ -706,6 +722,13 @@ export function buildScene3(
 
   const scenePlanes: ScenePlane3[] = wPlanes.map(({ name, corners }) => {
     const sc = corners.map(w2s);
+    // a 'face' patch's corners ARE labelled vertices — its name label moves to the centroid
+    // so it never sits on a point label; 'full' patches keep the first-corner label as before
+    if (facePatches.has(name)) {
+      const lx = sc.reduce((s, p) => s + p.x, 0) / sc.length;
+      const ly = sc.reduce((s, p) => s + p.y, 0) / sc.length;
+      return { name, corners: sc, labelX: lx, labelY: ly };
+    }
     return { name, corners: sc, labelX: sc[0].x, labelY: sc[0].y - 8 };
   });
 

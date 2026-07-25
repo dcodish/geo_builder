@@ -344,6 +344,11 @@ export interface Geo3State {
   queries: string[];
   addQuery: (text: string) => void;
   removeQuery: (index: number) => void;
+  /** Per-plane patch display (#318): 'face' = the patch is EXACTLY the defining point-run
+   *  polygon (the triangle/quad itself); absent = 'full', today's growing patch. Display
+   *  state, not a fact — saved with the file and undoable, like `queries`; reset by `clear`. */
+  planeDisplay: Record<string, 'face' | 'full'>;
+  togglePlaneDisplay: (name: string) => void;
   /** The figure's NAME (issue #42) - shown on the page, used as the save filename, derived from the
    *  loaded file's name. Session metadata: NOT in the undo history (partialize is facts+seed only);
    *  reset by `clear`. */
@@ -352,7 +357,7 @@ export interface Geo3State {
   resample: () => void;
   dismissError: () => void;
   /** Load a deserialised figure — ONE undoable set (never destructive: undo restores the prior session). */
-  loadFigure: (facts: Fact3[], seed: number, queries?: string[]) => void;
+  loadFigure: (facts: Fact3[], seed: number, queries?: string[], planeDisplay?: Record<string, 'face' | 'full'>) => void;
   /** Surface a file-load refusal through the normal error banner. */
   reportLoadError: (reason: 'bad-file' | 'newer-schema') => void;
 }
@@ -363,6 +368,7 @@ export const useGeo3 = create<Geo3State>()(
       facts: [],
       seed: 0,
       queries: [],
+      planeDisplay: {},
       figureName: '',
       lastError: null,
 
@@ -436,7 +442,7 @@ export const useGeo3 = create<Geo3State>()(
 
       remove: (factId) => set({ facts: get().facts.filter((f) => f.id !== factId), lastError: null }),
 
-      clear: () => set({ facts: [], queries: [], figureName: '', lastError: null }),
+      clear: () => set({ facts: [], queries: [], planeDisplay: {}, figureName: '', lastError: null }),
 
       // A query is a QUESTION about the figure, never a fact (ADR-3D-057): it never enters replay.
       // Duplicates are dropped (asking twice adds nothing); trimmed; capped so the panel stays sane.
@@ -448,6 +454,17 @@ export const useGeo3 = create<Geo3State>()(
         set({ queries: [...cur, t] });
       },
       removeQuery: (index) => set({ queries: get().queries.filter((_, i) => i !== index) }),
+
+      // #318: flip a named plane's patch between 'full' (default) and 'face'. The record keeps
+      // only non-default entries — toggling back to 'full' DELETES the key, so a saved file
+      // never carries redundant defaults and "absent = full" stays the single convention.
+      togglePlaneDisplay: (name) => {
+        const cur = get().planeDisplay;
+        const next = { ...cur };
+        if ((cur[name] ?? 'full') === 'full') next[name] = 'face';
+        else delete next[name];
+        set({ planeDisplay: next });
+      },
 
       setFigureName: (name) => set({ figureName: name }),
 
@@ -463,15 +480,16 @@ export const useGeo3 = create<Geo3State>()(
 
       dismissError: () => set({ lastError: null }),
 
-      loadFigure: (facts, seed, queries = []) => set({ facts, seed, queries, lastError: null }),
+      loadFigure: (facts, seed, queries = [], planeDisplay = {}) => set({ facts, seed, queries, planeDisplay, lastError: null }),
 
       reportLoadError: (reason) => set({ lastError: { code: reason } }),
     }),
     {
       // History tracks the durable inputs only; lastError is transient UI state,
       // and `equality` keeps error-only sets from pushing duplicate snapshots.
-      partialize: (s) => ({ facts: s.facts, seed: s.seed, queries: s.queries }) as Geo3State,
-      equality: (past, current) => past.facts === current.facts && past.seed === current.seed && past.queries === current.queries,
+      partialize: (s) => ({ facts: s.facts, seed: s.seed, queries: s.queries, planeDisplay: s.planeDisplay }) as Geo3State,
+      equality: (past, current) =>
+        past.facts === current.facts && past.seed === current.seed && past.queries === current.queries && past.planeDisplay === current.planeDisplay,
     },
   ),
 );
