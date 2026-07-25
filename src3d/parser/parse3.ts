@@ -75,6 +75,9 @@ export function normalize3(s: string): string {
 }
 
 const TOKEN = /[A-Z]\d*'?/g;
+/** The label-token SOURCE fragment (no captures) — compose new rules from this, never re-spell
+ *  the fragment inline (the S2.1 lexical-ratchet discipline). */
+const LBL = String.raw`[A-Z]\d*'?`;
 /** A label RUN: starts an uppercase letter not embedded in a latin word (so `Cube` yields nothing). */
 const RUN = /(?<![A-Za-z])[A-Z][A-Z0-9']*(?![a-z])/g;
 
@@ -201,7 +204,7 @@ function isConsecutiveRun(toks: Id[]): boolean {
 
 /** The base run named by `שבסיסה ABCD` / `whose base ABCD` / `with base ABCD`, if present. */
 function namedBaseIds(s: string): Id[] | null {
-  const m = s.match(/(?:שבסיס[הו]|whose\s+base|with\s+(?:an?\s+)?base)\s+((?:[A-Z]\d*'?)+)/);
+  const m = s.match(new RegExp(String.raw`(?:שבסיס[הו]|whose\s+base|with\s+(?:an?\s+)?base)\s+((?:${LBL})+)`));
   if (!m) return null;
   const ids = m[1].match(TOKEN);
   return ids && ids.length >= 3 ? ids : null;
@@ -1006,8 +1009,11 @@ const planeByEquation: Rule = (s) => {
 const NUM = String.raw`-?\d+(?:\.\d+)?`;
 
 /** A tuple component: a number, or an AFFINE symbolic expression (#325, ADR-3D-079) —
- *  `t` / `2t` / `-t` / `2·t` / `t+1` / `2t-3` is coefficient·symbol + constant. */
-const COMP = String.raw`(?:-?\d+(?:\.\d+)?\s*[·*]?\s*[a-w](?:\s*[+-]\s*\d+(?:\.\d+)?)?|-?[a-w](?:\s*[+-]\s*\d+(?:\.\d+)?)?|${NUM})`;
+ *  `t` / `2t` / `-t` / `2·t` / `t+1` / `2t-3` is coefficient·symbol + constant.
+ *  Composed from the shared NUM atom (the S2.1 lexical-ratchet discipline). */
+const COMP = String.raw`(?:${NUM}\s*[·*]?\s*[a-w](?:\s*[+-]\s*${NUM})?|-?[a-w](?:\s*[+-]\s*${NUM})?|${NUM})`;
+const COMP_NUM_RE = new RegExp(String.raw`^${NUM}$`);
+const COMP_TERM_RE = new RegExp(String.raw`^(-|${NUM})?[·*]?([a-w])(?:([+-])(${NUM}))?$`);
 /** #325: attach symExprs only when they carry STRUCTURE beyond bare distinct letters — a
  *  coefficient/offset (`2t`, `t+1`) or a symbol SHARED across components (`B(t,t,3)`). Bare
  *  distinct letters keep the V4 register byte-identical: placeholders, not open symbols. */
@@ -1022,8 +1028,8 @@ function symStructure(
 /** Parse one component: a plain number, or {sym, k, c} for k·sym + c. */
 function parseComp(t: string): { num: number | null; expr: SymComp | null } {
   const s = t.replace(/\s+/g, '');
-  if (/^-?\d+(?:\.\d+)?$/.test(s)) return { num: +s, expr: null };
-  const m = s.match(/^(-|-?\d+(?:\.\d+)?)?[·*]?([a-w])(?:([+-])(\d+(?:\.\d+)?))?$/);
+  if (COMP_NUM_RE.test(s)) return { num: +s, expr: null };
+  const m = s.match(COMP_TERM_RE);
   if (!m) return { num: null, expr: null };
   const k = m[1] === undefined ? 1 : m[1] === '-' ? -1 : +m[1];
   const c = m[3] ? (m[3] === '-' ? -1 : 1) * +m[4] : 0;
@@ -1463,7 +1469,7 @@ const coordPlaneRel: Rule = (s) => {
   let rest: string;
   let polyKind: 'polygon3' | 'polygon4' | null = null;
   const subj = s.match(
-    /(?:ה?בסיס|ה?מישור|ה?פאה|ה?משולש|ה?מרובע|(?:the\s+)?(?:base|plane|face|triangle|quadrilateral))\s+((?:[A-Z]\d*'?){3,})/,
+    new RegExp(String.raw`(?:ה?בסיס|ה?מישור|ה?פאה|ה?משולש|ה?מרובע|(?:the\s+)?(?:base|plane|face|triangle|quadrilateral))\s+((?:${LBL}){3,})`),
   );
   if (subj) {
     ids = subj[1].match(TOKEN)!;
