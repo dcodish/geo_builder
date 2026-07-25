@@ -236,6 +236,30 @@ function freeSymbolDef(c: Construction3, id: Id): number | null {
   return c.symbolPins.some((p) => p.def === pt.def) ? null : pt.def; // already pinned ⇒ can't pin twice
 }
 
+/** #324 (ADR-3D-079): a solid's BASE ring — the drawing convention everywhere in the engine is
+ *  base ids first (prisms: first half; pyramids: all but the apex-last; flat polygons: all). */
+function baseRingOf(s: SolidObj): Id[] | null {
+  switch (s.kind) {
+    case 'cube': case 'box': case 'parallelepiped':
+    case 'prism4': case 'prism4g': case 'prism4sq': case 'prism4r':
+      return s.ids.slice(0, 4);
+    case 'prism3': case 'prism3e':
+      return s.ids.slice(0, 3);
+    case 'prismReg5':
+      return s.ids.slice(0, 5);
+    case 'prismReg6':
+      return s.ids.slice(0, 6);
+    case 'tetra': case 'pyramid3': case 'pyramid3e':
+      return s.ids.slice(0, 3);
+    case 'pyramid4': case 'pyramid4r': case 'pyramid4g': case 'pyramid4gr': case 'pyramidPar':
+      return s.ids.slice(0, 4);
+    case 'polygon3': case 'polygon4': case 'polygon5':
+      return [...s.ids];
+    default:
+      return null;
+  }
+}
+
 /** Apply-time validation of a claim's references (order matters, like every fact). */
 function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
   switch (claim.type) {
@@ -688,12 +712,21 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       // #324 (ADR-3D-079): the named ring's relation to a COORDINATE plane/axis is a GIVEN —
       // a pivot residual family (drives the free gauge/dims, like injections) + a recorded
       // claim (the final arbiter on the final coordinates, the ADR-3D-030 pattern).
-      const missing = missingPoint(c, cmd.ids);
+      // The definite bare «הבסיס» (ids []) resolves to THE one solid's base ring here, where
+      // the figure is known (the ADR-3D-048 context-at-apply pattern).
+      let ids = cmd.ids;
+      if (ids.length === 0) {
+        if (c.solids.length !== 1) return { ok: false, error: { code: 'no-such-solid', id: 'בסיס' } };
+        const ring = baseRingOf(c.solids[0]);
+        if (!ring) return { ok: false, error: { code: 'no-such-solid', id: 'בסיס' } };
+        ids = ring;
+      }
+      const missing = missingPoint(c, ids);
       if (missing) return { ok: false, error: missing };
-      if (cmd.ids.length < 3) return { ok: false, error: { code: 'unknown-point', id: cmd.ids[0] ?? '?' } };
+      if (ids.length < 3) return { ok: false, error: { code: 'unknown-point', id: ids[0] ?? '?' } };
       const next = clone(c);
-      next.coordPlanePins.push({ ids: cmd.ids, axis: cmd.axis, mode: cmd.mode });
-      next.claims.push({ type: 'coord-plane-rel', ids: cmd.ids, axis: cmd.axis, mode: cmd.mode });
+      next.coordPlanePins.push({ ids, axis: cmd.axis, mode: cmd.mode });
+      next.claims.push({ type: 'coord-plane-rel', ids, axis: cmd.axis, mode: cmd.mode });
       return { ok: true, next };
     }
 

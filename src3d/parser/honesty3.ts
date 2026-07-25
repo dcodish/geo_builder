@@ -92,6 +92,9 @@ export function droppedGivenNumbers3(utterance: string, commands: Command3[]): s
 
   // ---- utterance side (conservative): blank every token whose digits are NOT magnitudes ----
   let s = normalize3(utterance);
+  // a comparison to ZERO is sign notation (`t > 0` / `k < 0`, ADR-3D-079 Am. 1), not a magnitude;
+  // a non-zero bound (`> 0.5`, `< 90`) stays a real number the commands must account for
+  s = s.replace(/[<>]\s*0(?![.\d])/g, ' ');
   // name subscripts are names, not numbers: ℓ1/ℓ2 line names (typed l1 too), π1/π2 plane names
   s = s.replace(/[ℓπ]\d+/g, ' ').replace(/(?<![A-Za-z])l\d+(?![A-Za-z])/g, ' ');
   // label-glued digits are subscripts (O1, A2), and blanking every latin letter also removes words

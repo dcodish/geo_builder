@@ -509,6 +509,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "t > 0",
+    "winner": "paramSign",
+  },
+  {
+    "lang": "he",
+    "text": "t > 0",
+    "winner": "paramSign",
+  },
+  {
+    "lang": "en",
     "text": "base ABCD lies on a plane parallel to the xy-plane",
     "winner": "coordPlaneRel",
   },
@@ -545,6 +555,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   {
     "lang": "he",
     "text": "המישור ABC מקביל לציר ה-z",
+    "winner": "coordPlaneRel",
+  },
+  {
+    "lang": "en",
+    "text": "the base lies in a plane parallel to the xy-plane",
+    "winner": "coordPlaneRel",
+  },
+  {
+    "lang": "he",
+    "text": "הבסיס מונח במישור המקביל למישור ה-xy",
     "winner": "coordPlaneRel",
   },
   {

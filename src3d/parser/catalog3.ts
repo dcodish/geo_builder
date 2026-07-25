@@ -68,11 +68,13 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
     en: 'given the points: A(1, 4, -3), B(2t, t, k)',
   },
   { category: 'points', he: 't פרמטר חיובי', en: 't is a positive parameter' },
+  { category: 'points', he: 't > 0', en: 't > 0' },
   // #324 (ADR-3D-079): a ring's relation to a COORDINATE plane (lowercase x/y/z) or axis
   { category: 'planesLines', he: 'הבסיס ABCD מונח על מישור שמקביל למישור [xy]', en: 'base ABCD lies on a plane parallel to the xy-plane' },
   { category: 'planesLines', he: 'המישור ABC מונח על המישור [xy]', en: 'plane ABC lies on the xy-plane' },
   { category: 'planesLines', he: 'המישור ABC מאונך למישור [xz]', en: 'plane ABC is perpendicular to the xz-plane' },
   { category: 'planesLines', he: 'המישור ABC מקביל לציר ה-z', en: 'plane ABC is parallel to the z-axis' },
+  { category: 'planesLines', he: 'הבסיס מונח במישור המקביל למישור ה-xy', en: 'the base lies in a plane parallel to the xy-plane' },
   // --- vectors ---
   { category: 'vectors', he: "נסמן: AB = u, AD = v, AA' = w", en: "denote AB = u, AD = v, AA' = w" },
   { category: 'vectors', he: 'נתון: v = (10,-5,0), u = (5,5,-5)', en: 'given: v = (10,-5,0), u = (5,5,-5)' },

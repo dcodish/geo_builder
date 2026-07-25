@@ -1440,10 +1440,27 @@ const injectionList: Rule = (s) => {
  * dually (∥ axis ⇔ normal ⟂ axis; ⟂ axis ⇔ shares it; lies on the axis ⇔ contains it).
  */
 const coordPlaneRel: Rule = (s) => {
-  const subj = s.match(/(?:ה?בסיס|ה?מישור|ה?פאה|(?:the\s+)?(?:base|plane|face))\s+((?:[A-Z]\d*'?){3,})/);
-  if (!subj) return null;
-  const ids = subj[1].match(TOKEN)!;
-  const rest = s.slice((subj.index ?? 0) + subj[0].length);
+  // Subject: a noun + run; a POLYGON noun + run (also BUILDS the flat polygon, so a first-line
+  // «המרובע ABCD מונח במישור [xy]» works — the polygon rule used to claim it and silently DROP
+  // the plane clause); or the definite bare «הבסיס» (ids [] — resolved to THE solid's base ring
+  // at apply, the ADR-3D-048 context-at-apply pattern).
+  let ids: Id[] = [];
+  let rest: string;
+  let polyKind: 'polygon3' | 'polygon4' | null = null;
+  const subj = s.match(
+    /(?:ה?בסיס|ה?מישור|ה?פאה|ה?משולש|ה?מרובע|(?:the\s+)?(?:base|plane|face|triangle|quadrilateral))\s+((?:[A-Z]\d*'?){3,})/,
+  );
+  if (subj) {
+    ids = subj[1].match(TOKEN)!;
+    rest = s.slice((subj.index ?? 0) + subj[0].length);
+    if (/משולש|triangle/i.test(subj[0])) polyKind = 'polygon3';
+    else if (/מרובע|quadrilateral/i.test(subj[0])) polyKind = 'polygon4';
+    if (polyKind && ids.length !== (polyKind === 'polygon3' ? 3 : 4)) return null;
+  } else {
+    const bare = s.match(/^\s*(?:ה?בסיס(?:\s+ה?(?:מנסרה|פירמידה|תיבה|קוביי?ה))?|the\s+base)\s+/);
+    if (!bare) return null;
+    rest = s.slice(bare[0].length);
+  }
   const obj = (txt: string): { axis: 'x' | 'y' | 'z'; kind: 'plane' | 'axis' } | null => {
     const ax = txt.match(/ציר\s+ה?[-־‑]?\s*([xyz])|(?:the\s+)?([xyz])\s*[- ]?axis/);
     if (ax) return { axis: (ax[1] ?? ax[2]) as 'x' | 'y' | 'z', kind: 'axis' };
@@ -1453,8 +1470,12 @@ const coordPlaneRel: Rule = (s) => {
     return missing ? { axis: missing as 'x' | 'y' | 'z', kind: 'plane' } : null;
   };
   const par = rest.match(/(?:(?:ש|ה)?מקביל(?:ה|ים|ות)?|parallel)\s*(?:ל[-\s]?\s*|to\s+)?(.+)$/i);
-  const perp = rest.match(/(?:(?:ש|ה)?מאונ[ךכ](?:ת|ים)?|(?:ש|ה)?ניצב(?:ת|ים)?|perpendicular)\s*(?:ל[-\s]?\s*|to\s+)?(.+)$/i);
-  const on = rest.match(/(?:מונח(?:ת|ים)?\s+על|נמצא(?:ת|ים)?\s+על|lies?\s+(?:on|in)|is\s+on)\s+(.+)$/i);
+  const perp = rest.match(
+    /(?:(?:ש|ה)?מאונ[ךכ](?:ת|ים)?|(?:ש|ה)?ניצב(?:ת|ים)?|(?:ש|ה)?אנכי(?:ת|ים)?|perpendicular)\s*(?:ל[-\s]?\s*|to\s+)?(.+)$/i,
+  );
+  const on = rest.match(
+    /(?:(?:מונח(?:ת|ים)?|נמצא(?:ת|ים)?|שוכ(?:ן|נת|נים))\s+(?:על\s+|ב-?\s*)|lies?\s+(?:on|in)\s+|is\s+(?:on|in)\s+)(.+)$/i,
+  );
   const pick = par ?? perp ?? on;
   if (!pick) return null;
   const o = obj(pick[1]);
@@ -1463,19 +1484,21 @@ const coordPlaneRel: Rule = (s) => {
     par ? (o.kind === 'plane' ? 'share' : 'perp')
     : perp ? (o.kind === 'plane' ? 'perp' : 'share')
     : o.kind === 'plane' ? 'zero' : 'contains';
-  return [{ type: 'coord-plane-rel', ids, axis: o.axis, mode }];
+  const rel: Command3 = { type: 'coord-plane-rel', ids, axis: o.axis, mode };
+  return polyKind ? [{ type: 'solid', kind: polyKind, ids }, rel] : [rel];
 };
 
 /** ADR-3D-032: `k הוא פרמטר חיובי` / `k חיובי` / `k > 0` / `k is (a) positive (parameter)` —
  *  a sign given on the figure's symbolic parameter (selects among the root branches).
  *  A letter the figure doesn't carry as its parameter refuses at apply (unknown-symbol). */
 const paramSign: Rule = (s) => {
+  // #325 widening: «הפרמטר t חיובי», «t הוא מספר חיובי», "the parameter t is positive" (+ number)
   const m =
-    s.match(/^([a-w])\s+(?:הוא\s+)?(?:פרמטר\s+)?(חיובי|שלילי)$/) ??
-    s.match(/^([a-w])\s+is\s+(?:a\s+)?(positive|negative)(?:\s+parameter)?$/) ??
+    s.match(/^(?:ה?פרמטר\s+)?([a-w])\s+(?:הוא\s+)?(?:פרמטר\s+|מספר\s+)?(חיובי|שלילי)$/) ??
+    s.match(/^(?:the\s+parameter\s+)?([a-w])\s+is\s+(?:a\s+)?(positive|negative)(?:\s+(?:parameter|number))?$/i) ??
     s.match(/^([a-w])\s*([<>])\s*0$/);
   if (!m) return null;
-  return [{ type: 'param-sign', sym: m[1], positive: m[2] === 'חיובי' || m[2] === 'positive' || m[2] === '>' }];
+  return [{ type: 'param-sign', sym: m[1], positive: /^(?:חיובי|positive|>)$/i.test(m[2]) }];
 };
 
 /** Standalone `v = (10,-5,0)` — a single vector injection. */
@@ -2095,6 +2118,9 @@ const tetraAltitude: Rule = (s) => {
  *  stopping at the first match) and hard-gates the divergent winner/later-claimer pairs against a
  *  reviewed allowlist. Zero runtime cost — production code must keep calling `parse3`. */
 export const RULES: Rule[] = [
+  // #324: FIRST — gated by the lowercase-coordinate object so it can never steal, while the
+  // polygon rules WOULD steal its polygon-noun subjects (building the shape, dropping the clause)
+  coordPlaneRel,
   cubeOrBox,
   rhombusPrism,
   rightPrism,
@@ -2112,7 +2138,6 @@ export const RULES: Rule[] = [
   volumeClaim,
   lateralAreaClaim,
   parametricLine, // before planeByEquation: both carry `:`, but ℓ ≠ π so either order is safe — kept explicit
-  coordPlaneRel, // #324: ring ∥/⟂/on a COORDINATE plane/axis — object must be lowercase x/y/z (no theft)
   planeByEquation,
   planeEqClaim, // plane named by POINTS + an equation — a claim, not a definition
   relPlaneRule, // `מישור π דרך F וניצב ל-SC` — before planeThroughBare (which is bare points)

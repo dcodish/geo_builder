@@ -49,6 +49,52 @@ describe('#324 — parse: ring ∥/⟂/on a coordinate plane or axis', () => {
   });
 });
 
+describe('#324 — Hebrew variant registers (operator: "all kinds of hebrew variants")', () => {
+  it('the ב-preposition register + the ה-xy article', () => {
+    expect(parse3('הבסיס ABCD מונח במישור המקביל למישור ה-xy')).toMatchObject({
+      ok: true,
+      commands: [{ type: 'coord-plane-rel', ids: ['A', 'B', 'C', 'D'], axis: 'z', mode: 'share' }],
+    });
+    expect(parse3('הבסיס ABCD שוכן במישור ה-xy')).toMatchObject({ ok: true, commands: [{ axis: 'z', mode: 'zero' }] });
+    expect(parse3('המישור ABC אנכי למישור [xz]')).toMatchObject({ ok: true, commands: [{ axis: 'y', mode: 'perp' }] });
+  });
+  it('a POLYGON-noun subject also BUILDS the flat polygon (the polygon rule used to drop the clause)', () => {
+    expect(parse3('המרובע ABCD מונח במישור [xy]')).toEqual({
+      ok: true,
+      commands: [
+        { type: 'solid', kind: 'polygon4', ids: ['A', 'B', 'C', 'D'] },
+        { type: 'coord-plane-rel', ids: ['A', 'B', 'C', 'D'], axis: 'z', mode: 'zero' },
+      ],
+    });
+    expect(parse3('המשולש ABC נמצא במישור xy')).toMatchObject({
+      ok: true,
+      commands: [{ type: 'solid', kind: 'polygon3' }, { type: 'coord-plane-rel', mode: 'zero' }],
+    });
+    // a plain polygon with NO coordinate clause stays the polygon rule's — no theft the other way
+    expect(parse3('מרובע ABCD')).toMatchObject({ ok: true, commands: [{ type: 'solid', kind: 'polygon4' }] });
+  });
+  it('the definite bare «הבסיס» (no letters) → ids [] resolved at apply; En mirror', () => {
+    expect(parse3('הבסיס מונח במישור המקביל למישור ה-xy')).toMatchObject({
+      ok: true,
+      commands: [{ type: 'coord-plane-rel', ids: [], axis: 'z', mode: 'share' }],
+    });
+    expect(parse3('the base lies in a plane parallel to the xy-plane')).toMatchObject({
+      ok: true,
+      commands: [{ type: 'coord-plane-rel', ids: [], axis: 'z', mode: 'share' }],
+    });
+  });
+});
+
+describe('#325 — parameter sign variants (t > 0 / t < 0 and the word registers)', () => {
+  it('comparison and word forms parse', () => {
+    expect(parse3('t > 0')).toEqual({ ok: true, commands: [{ type: 'param-sign', sym: 't', positive: true }] });
+    expect(parse3('t<0')).toEqual({ ok: true, commands: [{ type: 'param-sign', sym: 't', positive: false }] });
+    expect(parse3('הפרמטר t חיובי')).toMatchObject({ ok: true, commands: [{ positive: true }] });
+    expect(parse3('t הוא מספר חיובי')).toMatchObject({ ok: true, commands: [{ positive: true }] });
+    expect(parse3('the parameter t is positive')).toMatchObject({ ok: true, commands: [{ positive: true }] });
+  });
+});
+
 describe('#325 — parse: affine symbolic components', () => {
   it('B(2t, t, k) — coefficients and two open symbols', () => {
     expect(parse3('B(2t, t, k)')).toEqual({
@@ -127,6 +173,16 @@ describe('the book snippet end-to-end (box figure)', () => {
     const d = derive3(state().facts, state().seed);
     expect(freeDofCount3(d.construction, d.resolved)).toBeGreaterThan(0); // t (and box dims) still open
   });
+
+  it('«t < 0» on the determined figure refuses sign-unsatisfiable (t = 2); «t > 0» passes', () => {
+    for (const u of BOOK.slice(0, 3)) submit(u); // without the sign line
+    submit('B(4, n, p)'); // determines t = 2
+    expect(err()).toBeNull();
+    submit('t > 0');
+    expect(err()).toBeNull();
+    submit('t < 0');
+    expect(err()).toEqual({ code: 'sign-unsatisfiable', id: 't' });
+  });
 });
 
 describe('#324 — verify on a DETERMINED figure (the claim is the arbiter)', () => {
@@ -155,6 +211,17 @@ describe('#324 — the statement alone DRIVES a free figure', () => {
       const zs = ['A', 'B', 'C', 'D'].map((id) => d.positions.get(id)!.z);
       expect(Math.max(...zs) - Math.min(...zs), `seed ${seed}`).toBeLessThan(1e-6);
     }
+  });
+  it('the bare «הבסיס» resolves to THE solid\'s base ring; with no solid it refuses honestly', () => {
+    submit('הבסיס מונח במישור המקביל למישור ה-xy');
+    expect(err()).toEqual({ code: 'no-such-solid', id: 'בסיס' });
+    reset();
+    submit('תיבה');
+    submit('הבסיס מונח במישור המקביל למישור ה-xy');
+    expect(err()).toBeNull();
+    const d = derive3(state().facts, 0);
+    const zs = ['A', 'B', 'C', 'D'].map((id) => d.positions.get(id)!.z);
+    expect(Math.max(...zs) - Math.min(...zs)).toBeLessThan(1e-6);
   });
 });
 
