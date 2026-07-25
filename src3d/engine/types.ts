@@ -68,7 +68,9 @@ export type Claim3 =
   | { type: 'dot-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // u·v = v·w (a chained-equality link)
   | { type: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // ∠(a,b) = ∠(c,d) — AE makes equal angles with AB, AD
   // triage 3-D: the angle between a LINE (a–b) and a PLANE (point-run) — `sin β = |n·u|/(|n||u|)`
-  | { type: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number };
+  | { type: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number }
+  // #324 (ADR-3D-079): the ring's relation to a coordinate plane/axis (see coordPlanePins)
+  | { type: 'coord-plane-rel'; ids: Id[]; axis: 'x' | 'y' | 'z'; mode: 'share' | 'zero' | 'perp' | 'contains' };
 
 /** V7 T2 — a SCALAR given that DRIVES the figure (a residual in the global solve). */
 export type ScalarPin =
@@ -283,6 +285,14 @@ export interface ClaimCommand {
  * principle: a statement about an existing point is a constraint). A component may
  * be null (`A(3,n,p)` — a symbolic letter): only the numeric components constrain.
  */
+/** #325 (ADR-3D-079): an AFFINE symbolic component of a typed coordinate — `2t` / `t` / `k` /
+ *  `2t-3` is k·sym + c. The symbol is an OPEN unknown until data determines it. */
+export interface SymComp {
+  sym: string;
+  k: number;
+  c: number;
+}
+
 export interface Point3Command {
   type: 'point3';
   id: Id;
@@ -293,6 +303,11 @@ export interface Point3Command {
    *  On a NEW id with ONE distinct letter the point becomes `coord-sym` (the letter is the
    *  figure's single parameter); an EXISTING id keeps the V4 partial-pin semantics. */
   syms?: [string | null, string | null, string | null];
+  /** #325 (ADR-3D-079): the full affine expression behind each symbolic component
+   *  (`B(2t,t,k)` → [{sym:'t',k:2,c:0},{sym:'t',k:1,c:0},{sym:'k',k:1,c:0}]). On an EXISTING
+   *  id these become symbolic pivot pins (each distinct symbol an extra pivot unknown, left
+   *  OPEN until data determines it); a NEW id supports one distinct symbol (coord-sym). */
+  symExprs?: [SymComp | null, SymComp | null, SymComp | null];
 }
 
 /** ADR-3D-032: `k הוא פרמטר חיובי` — a sign given on the figure's symbolic parameter
@@ -542,6 +557,9 @@ export type Command3 =
   | PointInSpanCommand
   | ClaimCommand
   | Point3Command
+  // #324 (ADR-3D-079): a named ring's relation to a COORDINATE plane/axis — lowered to a
+  // coordPlanePins entry (drives the free gauge/dims) + a recorded claim (the final arbiter)
+  | { type: 'coord-plane-rel'; ids: Id[]; axis: 'x' | 'y' | 'z'; mode: 'share' | 'zero' | 'perp' | 'contains' }
   | ParamSignCommand
   | Plane3Command
   | PlaneAngleCommand
@@ -684,8 +702,10 @@ export interface Construction3 {
   linePerps: LinePerpPlaneCommand[];
   /** V3 — membership givens on lines (verified). */
   onLines: OnLineCommand[];
-  /** V4 — coordinate injections on existing points (null components don't constrain). */
-  pins: { id: Id; x: number | null; y: number | null; z: number | null }[];
+  /** V4 — coordinate injections on existing points (null components don't constrain).
+   *  #325 (ADR-3D-079): a component may be a symbolic AFFINE expression (`B(2t,t,k)`) —
+   *  each distinct symbol joins the pivot as an extra unknown, OPEN until data pins it. */
+  pins: { id: Id; x: number | null | SymComp; y: number | null | SymComp; z: number | null | SymComp }[];
   /** V4 — injected numeric values for declared vectors. */
   vectorPins: { name: string; x: number; y: number; z: number }[];
   /** V4 — sign branch givens (select among pivot solutions). */
@@ -730,8 +750,14 @@ export interface Construction3 {
    *  branches; the D3 numeric-only boundary). */
   paramGivens: Claim3[];
   /** ADR-3D-032 — sign givens on the figure parameter (`k הוא פרמטר חיובי`): select
-   *  among the root branches. */
+   *  among the root branches. #325: also on a pin symbol (selects among pivot solutions). */
   paramSigns: ParamSignCommand[];
+  /** #324 (ADR-3D-079) — a named ring's relation to a COORDINATE plane/axis, as pivot
+   *  residuals (absolute-frame, like injections): `share` = the ring shares its `axis`
+   *  coordinate (∥ the coordinate plane ⟂ axis / ⟂ that axis), `zero` = that coordinate is 0
+   *  (lies ON the coordinate plane), `perp` = the ring's normal ⟂ e_axis (⟂ that coordinate
+   *  plane / ∥ that axis), `contains` = perp + the ring's plane passes through the origin. */
+  coordPlanePins: { ids: Id[]; axis: 'x' | 'y' | 'z'; mode: 'share' | 'zero' | 'perp' | 'contains' }[];
 }
 
 export const emptyConstruction3 = (): Construction3 => ({
@@ -765,7 +791,19 @@ export const emptyConstruction3 = (): Construction3 => ({
   planePins: [],
   paramGivens: [],
   paramSigns: [],
+  coordPlanePins: [],
 });
+
+/** #325 (ADR-3D-079): the distinct OPEN symbols carried by the pins' affine components. */
+export function pinSymsOf(c: Construction3): string[] {
+  const out: string[] = [];
+  for (const pin of c.pins) {
+    for (const comp of [pin.x, pin.y, pin.z]) {
+      if (comp !== null && typeof comp === 'object' && !out.includes(comp.sym)) out.push(comp.sym);
+    }
+  }
+  return out;
+}
 
 // ---------------------------------------------------------------------------
 // Results

@@ -107,7 +107,8 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     }
     let st: FactStatus3 = 'ok';
     const claimsBefore = c.claims.length;
-    const pinsBefore = c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length + c.planePins.length;
+    const pinsBefore =
+      c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length + c.planePins.length + c.coordPlanePins.length;
     for (const cmd of f.cmds) {
       if (droppedSoft(cmd)) continue; // an explicit ∠=90 on this triangle superseded the soft default
       const r = applyCommand3(c, cmd);
@@ -122,7 +123,11 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     if (c.claims.length > claimsBefore) claimOwners.push({ factId: f.id, from: claimsBefore, to: c.claims.length });
     // pin ownership (same count-delta discipline): a fact that contributed ANY pivot
     // pin must not read ok when the pivot finds no placement (honesty — no silent seed figure)
-    if (c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length + c.planePins.length > pinsBefore) pinOwnerIds.add(f.id);
+    if (
+      c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length + c.planePins.length + c.coordPlanePins.length >
+      pinsBefore
+    )
+      pinOwnerIds.add(f.id);
     status[f.id] = st;
   }
 
@@ -179,8 +184,10 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
           break;
         }
       } else if (cmd.type === 'param-sign') {
-        // ADR-3D-032: the chosen parameter value must honour the stated sign
-        const v = resolved.param?.value;
+        // ADR-3D-032: the chosen parameter value must honour the stated sign.
+        // #325 (ADR-3D-079): the sign may name a PIN symbol (`B(2t,t,k)` → t) — read the
+        // pivot's solved value for it instead of the coord-sym parameter.
+        const v = resolved.param?.name === cmd.sym ? resolved.param.value : resolved.pivot?.pinSymbols?.[cmd.sym];
         if (v === undefined || !Number.isFinite(v) || (cmd.positive ? v <= 1e-9 : v >= -1e-9)) {
           status[f.id] = { code: 'sign-unsatisfiable', id: cmd.sym };
           break;

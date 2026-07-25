@@ -17,7 +17,7 @@
  *    refuse rather than silently drop it.
  */
 
-import type { Command3, Id, LinExpr, SolidKind, SymTerm, VecAtom, VecExpr } from '../engine/types';
+import type { Command3, Id, LinExpr, SolidKind, SymComp, SymTerm, VecAtom, VecExpr } from '../engine/types';
 
 export type ParseResult3 =
   | { ok: true; commands: Command3[] }
@@ -1002,9 +1002,30 @@ const planeByEquation: Rule = (s) => {
 
 const NUM = String.raw`-?\d+(?:\.\d+)?`;
 
-/** A tuple component: a number, or a lowercase letter = a symbolic unknown (V4: only numerics constrain). */
-const COMP = `(?:${NUM}|[a-w])`;
-const compVal = (t: string): number | null => (/^[a-w]$/.test(t) ? null : +t);
+/** A tuple component: a number, or an AFFINE symbolic expression (#325, ADR-3D-079) —
+ *  `t` / `2t` / `-t` / `2·t` / `t+1` / `2t-3` is coefficient·symbol + constant. */
+const COMP = String.raw`(?:-?\d+(?:\.\d+)?\s*[·*]?\s*[a-w](?:\s*[+-]\s*\d+(?:\.\d+)?)?|-?[a-w](?:\s*[+-]\s*\d+(?:\.\d+)?)?|${NUM})`;
+/** #325: attach symExprs only when they carry STRUCTURE beyond bare distinct letters — a
+ *  coefficient/offset (`2t`, `t+1`) or a symbol SHARED across components (`B(t,t,3)`). Bare
+ *  distinct letters keep the V4 register byte-identical: placeholders, not open symbols. */
+function symStructure(
+  comps: { num: number | null; expr: SymComp | null }[],
+): [SymComp | null, SymComp | null, SymComp | null] | undefined {
+  const named = comps.flatMap((t) => (t.expr !== null ? [t.expr] : []));
+  const structured = named.some((e) => e.k !== 1 || e.c !== 0) || new Set(named.map((e) => e.sym)).size < named.length;
+  return structured ? (comps.map((t) => t.expr) as [SymComp | null, SymComp | null, SymComp | null]) : undefined;
+}
+
+/** Parse one component: a plain number, or {sym, k, c} for k·sym + c. */
+function parseComp(t: string): { num: number | null; expr: SymComp | null } {
+  const s = t.replace(/\s+/g, '');
+  if (/^-?\d+(?:\.\d+)?$/.test(s)) return { num: +s, expr: null };
+  const m = s.match(/^(-|-?\d+(?:\.\d+)?)?[·*]?([a-w])(?:([+-])(\d+(?:\.\d+)?))?$/);
+  if (!m) return { num: null, expr: null };
+  const k = m[1] === undefined ? 1 : m[1] === '-' ? -1 : +m[1];
+  const c = m[3] ? (m[3] === '-' ? -1 : 1) * +m[4] : 0;
+  return { num: null, expr: { sym: m[2], k, c } };
+}
 
 /** `A(2,-2,6)` / `A(3,n,p)` / `נתונה נקודה M(k,1,3), k הוא פרמטר חיובי` (+ optional
  *  membership tail: `נמצאת על אחד המישורים` / `על המישור π2` / `על הישר ℓ`). */
@@ -1014,11 +1035,13 @@ const coordPoint: Rule = (s) => {
   );
   if (!m) return null;
   const [, id, x, y, z, restRaw] = m;
-  const syms = [x, y, z].map((t) => (/^[a-w]$/.test(t) ? t : null)) as [string | null, string | null, string | null];
+  const comps = [x, y, z].map(parseComp);
+  const syms = comps.map((t) => t.expr?.sym ?? null) as [string | null, string | null, string | null];
+  const symExprs = symStructure(comps);
   const cmds: Command3[] = [
-    syms.some((t) => t !== null)
-      ? { type: 'point3', id, x: compVal(x), y: compVal(y), z: compVal(z), syms }
-      : { type: 'point3', id, x: compVal(x), y: compVal(y), z: compVal(z) },
+    comps.some((t) => t.expr !== null)
+      ? { type: 'point3', id, x: comps[0].num, y: comps[1].num, z: comps[2].num, syms, ...(symExprs ? { symExprs } : {}) }
+      : { type: 'point3', id, x: comps[0].num, y: comps[1].num, z: comps[2].num },
   ];
   let rest = restRaw.trim();
   // ADR-3D-032: the exam's appositive sign clause — `M(k,1,3), k הוא פרמטר חיובי` /
@@ -1371,7 +1394,12 @@ const onLineMembership: Rule = (s) => {
  * partial: `A(3,n,p)`). One utterance, many givens.
  */
 const injectionList: Rule = (s) => {
-  const m = s.match(/^(?:נתון|נתונים|given)\s*:?\s+(.+)$/i);
+  // #326 (ADR-3D-079): the book register inflects the prefix — «נתונות הנקודות: …» / bare
+  // «הנקודות …» / "given the points …". PLURAL nouns only: the singular «נתונה (ה)נקודה M(k,1,3),
+  // k הוא פרמטר חיובי» belongs to coordPoint, whose appositive sign tail this rule would drop.
+  const m = s.match(
+    /^(?:(?:נתון|נתונים|נתונות|given)\s*:?\s*(?:ה?נקודות|the\s+points)?\s*:?\s+|ה?נקודות\s+|the\s+points\s+)(.+)$/i,
+  );
   if (!m) return null;
   const itemRe = new RegExp(
     `(?:([a-w])\\s*=\\s*|([A-Z]\\d*'?)\\s*=?\\s*)\\(\\s*(${COMP})\\s*,\\s*(${COMP})\\s*,\\s*(${COMP})\\s*\\)`,
@@ -1379,15 +1407,63 @@ const injectionList: Rule = (s) => {
   );
   const cmds: Command3[] = [];
   for (const g of m[1].matchAll(itemRe)) {
-    const [x, y, z] = [compVal(g[3]), compVal(g[4]), compVal(g[5])];
+    const comps = [g[3], g[4], g[5]].map(parseComp);
+    const [x, y, z] = comps.map((t) => t.num);
     if (g[1]) {
       if (x === null || y === null || z === null) return null; // a vector value must be numeric
       cmds.push({ type: 'inject-vector', name: g[1], x, y, z });
+    } else if (comps.some((t) => t.expr !== null)) {
+      // #325: symbolic affine components ride the list too (`נתונות הנקודות: B(2t, t, k)`)
+      const symExprs = symStructure(comps);
+      cmds.push({
+        type: 'point3', id: g[2], x, y, z,
+        syms: comps.map((t) => t.expr?.sym ?? null) as [string | null, string | null, string | null],
+        ...(symExprs ? { symExprs } : {}),
+      });
     } else {
       cmds.push({ type: 'point3', id: g[2], x, y, z });
     }
   }
   return cmds.length > 0 ? cmds : null;
+};
+
+/**
+ * #324 (ADR-3D-079): a named ring's relation to a COORDINATE plane or axis —
+ * «הבסיס ABCD מונח על מישור שמקביל למישור [xy]» (parallel), «המישור ABC מאונך למישור [xz]»,
+ * «הבסיס ABCD מונח על המישור [xy]» (lies ON it), «המישור ABC מקביל לציר ה-z», En mirrors
+ * («base ABCD lies on a plane parallel to the xy-plane», «plane ABC is perpendicular to the
+ * xz-plane», «parallel to the z-axis»). Coordinate letters are LOWERCASE x/y/z (deliberate —
+ * uppercase X,Y,Z are point labels, so «מקביל למישור XYZ» is a plane∥plane statement, not ours).
+ * Lowers to `coord-plane-rel` (pivot residuals + a recorded claim). Everything reduces to the
+ * axis ⟂ to the named coordinate plane: ∥ plane ⇔ the ring SHARES that axis coordinate; ON the
+ * plane ⇔ that coordinate is 0; ⟂ plane ⇔ the ring's normal ⟂ that axis; an AXIS object maps
+ * dually (∥ axis ⇔ normal ⟂ axis; ⟂ axis ⇔ shares it; lies on the axis ⇔ contains it).
+ */
+const coordPlaneRel: Rule = (s) => {
+  const subj = s.match(/(?:ה?בסיס|ה?מישור|ה?פאה|(?:the\s+)?(?:base|plane|face))\s+((?:[A-Z]\d*'?){3,})/);
+  if (!subj) return null;
+  const ids = subj[1].match(TOKEN)!;
+  const rest = s.slice((subj.index ?? 0) + subj[0].length);
+  const obj = (txt: string): { axis: 'x' | 'y' | 'z'; kind: 'plane' | 'axis' } | null => {
+    const ax = txt.match(/ציר\s+ה?[-־‑]?\s*([xyz])|(?:the\s+)?([xyz])\s*[- ]?axis/);
+    if (ax) return { axis: (ax[1] ?? ax[2]) as 'x' | 'y' | 'z', kind: 'axis' };
+    const pl = txt.match(/\[?\s*([xyz])\s*,?\s*([xyz])\s*\]?/);
+    if (!pl || pl[1] === pl[2]) return null;
+    const missing = ['x', 'y', 'z'].find((a) => a !== pl[1] && a !== pl[2]);
+    return missing ? { axis: missing as 'x' | 'y' | 'z', kind: 'plane' } : null;
+  };
+  const par = rest.match(/(?:(?:ש|ה)?מקביל(?:ה|ים|ות)?|parallel)\s*(?:ל[-\s]?\s*|to\s+)?(.+)$/i);
+  const perp = rest.match(/(?:(?:ש|ה)?מאונ[ךכ](?:ת|ים)?|(?:ש|ה)?ניצב(?:ת|ים)?|perpendicular)\s*(?:ל[-\s]?\s*|to\s+)?(.+)$/i);
+  const on = rest.match(/(?:מונח(?:ת|ים)?\s+על|נמצא(?:ת|ים)?\s+על|lies?\s+(?:on|in)|is\s+on)\s+(.+)$/i);
+  const pick = par ?? perp ?? on;
+  if (!pick) return null;
+  const o = obj(pick[1]);
+  if (!o) return null; // the object is not a coordinate plane/axis — not this rule (no theft)
+  const mode: 'share' | 'zero' | 'perp' | 'contains' =
+    par ? (o.kind === 'plane' ? 'share' : 'perp')
+    : perp ? (o.kind === 'plane' ? 'perp' : 'share')
+    : o.kind === 'plane' ? 'zero' : 'contains';
+  return [{ type: 'coord-plane-rel', ids, axis: o.axis, mode }];
 };
 
 /** ADR-3D-032: `k הוא פרמטר חיובי` / `k חיובי` / `k > 0` / `k is (a) positive (parameter)` —
@@ -2036,6 +2112,7 @@ export const RULES: Rule[] = [
   volumeClaim,
   lateralAreaClaim,
   parametricLine, // before planeByEquation: both carry `:`, but ℓ ≠ π so either order is safe — kept explicit
+  coordPlaneRel, // #324: ring ∥/⟂/on a COORDINATE plane/axis — object must be lowercase x/y/z (no theft)
   planeByEquation,
   planeEqClaim, // plane named by POINTS + an equation — a claim, not a definition
   relPlaneRule, // `מישור π דרך F וניצב ל-SC` — before planeThroughBare (which is bare points)

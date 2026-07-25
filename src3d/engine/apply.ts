@@ -5,7 +5,8 @@
 
 import { exprPointIds, exprVectorNames } from './vecExpr';
 import { cross3, dot3, normalize3, v3 } from './vec3';
-import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, SolidCommand, SolidObj, VecAtom } from './types';
+import { pinSymsOf } from './types';
+import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, SolidCommand, SolidObj, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8 };
 
@@ -156,6 +157,7 @@ function clone(c: Construction3): Construction3 {
     planePins: [...c.planePins],
     paramGivens: [...c.paramGivens],
     paramSigns: [...c.paramSigns],
+    coordPlanePins: [...c.coordPlanePins],
   };
 }
 
@@ -264,6 +266,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       if (!c.planes.has(claim.plane)) return { code: 'unknown-plane', id: claim.plane };
       return null;
     case 'plane-eq':
+      return missingPoint(c, claim.ids);
+    case 'coord-plane-rel':
       return missingPoint(c, claim.ids);
     case 'angle-seg-eq':
       return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
@@ -637,28 +641,38 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
     case 'point3': {
       if (c.points.has(cmd.id)) {
         // the id EXISTS — a coordinate statement about an existing point is a GIVEN,
-        // never an error: it becomes a pivot pin (the 2-D M1 principle; V4 ADR-3D-007)
+        // never an error: it becomes a pivot pin (the 2-D M1 principle; V4 ADR-3D-007).
+        // #325 (ADR-3D-079): a symbolic AFFINE component (`B(2t,t,k)`) pins too — each
+        // distinct symbol joins the pivot as an extra unknown, OPEN until data pins it.
+        // The letters share one namespace per role: a pin symbol that is ALSO the figure's
+        // coord-sym parameter would be resolved by two different mechanisms — refused.
+        const exprs = cmd.symExprs ?? [null, null, null];
+        if (c.param && exprs.some((e) => e !== null && e.sym === c.param)) return { ok: false, error: { code: 'two-params' } };
         const next = clone(c);
-        next.pins.push({ id: cmd.id, x: cmd.x, y: cmd.y, z: cmd.z });
+        const comp = (v: number | null, e: SymComp | null): number | null | SymComp => (v !== null ? v : e);
+        next.pins.push({ id: cmd.id, x: comp(cmd.x, exprs[0]), y: comp(cmd.y, exprs[1]), z: comp(cmd.z, exprs[2]) });
         return { ok: true, next };
       }
       if (cmd.x === null || cmd.y === null || cmd.z === null) {
         // ADR-3D-032: a NEW point whose symbolic components all carry ONE letter is a
         // coord-sym point — the letter becomes the figure's single parameter (a sampled
         // free DOF until a recorded given pins it, ADR-052). Distinct letters stay the
-        // honest under-determination refusal.
+        // honest under-determination refusal (#325 lifts this only for EXISTING points,
+        // where the solid gives the symbols a figure to ride).
         const letters = [...new Set((cmd.syms ?? []).flatMap((s) => (s !== null ? [s] : [])))];
         if (letters.length === 1) {
           const sym = letters[0];
           if (c.param && c.param !== sym) return { ok: false, error: { code: 'two-params' } };
-          const comp = (v: number | null, s: string | null): { k: number; p: number } =>
-            v !== null ? { k: v, p: 0 } : s ? { k: 0, p: 1 } : { k: 0, p: 0 };
+          // #325: a coefficient/const on the symbol (`M(2k,1,3)`) flows into the LinExpr
+          const exprs = cmd.symExprs ?? [null, null, null];
+          const comp = (v: number | null, s: string | null, e: SymComp | null): { k: number; p: number } =>
+            v !== null ? { k: v, p: 0 } : e ? { k: e.c, p: e.k } : s ? { k: 0, p: 1 } : { k: 0, p: 0 };
           const next = clone(c);
           next.points.set(cmd.id, {
             kind: 'coord-sym',
-            x: comp(cmd.x, cmd.syms![0]),
-            y: comp(cmd.y, cmd.syms![1]),
-            z: comp(cmd.z, cmd.syms![2]),
+            x: comp(cmd.x, cmd.syms![0], exprs[0]),
+            y: comp(cmd.y, cmd.syms![1], exprs[1]),
+            z: comp(cmd.z, cmd.syms![2], exprs[2]),
           });
           next.param = sym;
           return { ok: true, next };
@@ -670,8 +684,23 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    case 'coord-plane-rel': {
+      // #324 (ADR-3D-079): the named ring's relation to a COORDINATE plane/axis is a GIVEN —
+      // a pivot residual family (drives the free gauge/dims, like injections) + a recorded
+      // claim (the final arbiter on the final coordinates, the ADR-3D-030 pattern).
+      const missing = missingPoint(c, cmd.ids);
+      if (missing) return { ok: false, error: missing };
+      if (cmd.ids.length < 3) return { ok: false, error: { code: 'unknown-point', id: cmd.ids[0] ?? '?' } };
+      const next = clone(c);
+      next.coordPlanePins.push({ ids: cmd.ids, axis: cmd.axis, mode: cmd.mode });
+      next.claims.push({ type: 'coord-plane-rel', ids: cmd.ids, axis: cmd.axis, mode: cmd.mode });
+      return { ok: true, next };
+    }
+
     case 'param-sign': {
-      if (c.param !== cmd.sym) return { ok: false, error: { code: 'unknown-symbol', id: cmd.sym } };
+      // #325: the sign given also applies to a PIN symbol (`t פרמטר חיובי` after `B(2t,t,k)`) —
+      // it selects among pivot solutions the way it selects among root branches for c.param.
+      if (c.param !== cmd.sym && !pinSymsOf(c).includes(cmd.sym)) return { ok: false, error: { code: 'unknown-symbol', id: cmd.sym } };
       const next = clone(c);
       next.paramSigns.push(cmd);
       return { ok: true, next };
