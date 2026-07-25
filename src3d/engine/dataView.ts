@@ -318,18 +318,12 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // translation cancels) need the ORIENTATION pinned: two independent pinned directions, or the
   // pair itself being the injected one (its coords are literally the given).
   const translationPinned = c.pins.length > 0;
-  const pinnedDirs: Vec3[] = [
-    ...c.vectorPins.map((p) => ({ x: p.x, y: p.y, z: p.z })),
-    ...c.pairPins.map((p) => ({ x: p.x, y: p.y, z: p.z })),
-  ];
-  const indep = (a: Vec3, b: Vec3) => {
-    const cx = a.y * b.z - a.z * b.y, cy = a.z * b.x - a.x * b.z, cz = a.x * b.y - a.y * b.x;
-    return Math.hypot(cx, cy, cz) > 1e-9 * Math.max(1, Math.hypot(a.x, a.y, a.z) * Math.hypot(b.x, b.y, b.z));
-  };
-  const orientationPinned = translationPinned || pinnedDirs.some((a) => pinnedDirs.some((b) => indep(a, b)));
-  const ownPairPinned = (a: Id, b: Id) =>
-    c.pairPins.some((p) => (p.a === a && p.b === b) || (p.a === b && p.b === a)) ||
-    [...c.vectors.entries()].some(([n, d]) => ((d.from === a && d.to === b) || (d.from === b && d.to === a)) && c.vectorPins.some((vp) => vp.name === n));
+  // Vector coordinates (a difference — translation cancels) keep the FRAME + seed-stability gate:
+  // the seeds VARY the rotation/dims gauge (operator-validated 2026-07-25: with only DE=(0,2,0)
+  // pinned, u's coords correctly do NOT print while v = 3·DE — parallel to the pin, genuinely
+  // derivable — correctly DOES). Only TRANSLATION is a deterministic gauge the seeds never vary,
+  // which is why the point/plane families need the explicit translationPinned anchor.
+  const vectorFrame = translationPinned || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
   // ADR-3D-054 (#268) — a LENGTH needs less than a coordinate does. A coordinate without a frame is
   // pure gauge, but a length is gauge only when the SCALE is free, and an absolute size given ("|u| = 3")
   // pins the scale with no coordinate frame anywhere. Gating magnitudes on `hasFrame` therefore withheld
@@ -384,7 +378,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     const entry: VecEntry = {
       label,
       decomp: coefs ? decompStr(coefs, basisNames) : symDecomp,
-      coords: (orientationPinned || ownPairPinned(a, b)) && d ? coordStr(d) : null, // #315: a vector's coords need the ORIENTATION pinned (or to BE the injected pair)
+      coords: vectorFrame && d ? coordStr(d) : null, // #315: seed-stability distinguishes derivable from gauge for vectors; translation alone needs the explicit anchor
       mag: mag !== undefined ? `|${label}| = ${cleanNum(mag)}` : null,
       sq: mag !== undefined ? `${label}² = ${cleanNum(mag * mag)}` : null,
     };

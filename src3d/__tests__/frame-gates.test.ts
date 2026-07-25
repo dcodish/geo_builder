@@ -42,16 +42,20 @@ describe('#315 — a pure pair injection must not mint point coordinates', () =>
     expect(de?.coords).toBe('(0, 2, 0)');
   });
 
-  it('another vector’s coordinates do NOT print (residual rotation is gauge)', () => {
-    for (const v of panel.vectors) {
-      if (v.label === 'DE') continue;
-      expect(v.coords, v.label).toBeNull();
-    }
+  it('a vector PARALLEL to the pin prints its derivable coords; a non-parallel one stays gauge (the operator-screenshot asymmetry)', () => {
+    // v ∥ DE (DE = ⅓v) ⇒ v = 3·DE = (0, 6, 0) is genuinely derivable — must print.
+    const v = panel.vectors.find((x) => x.label === 'v');
+    expect(v?.coords).toBe('(0, 6, 0)');
+    // u is NOT parallel to the pin — its coords are rotation gauge; the seeds vary it → no print.
+    const u = panel.vectors.find((x) => x.label === 'u');
+    expect(u?.coords ?? null).toBeNull();
   });
 
-  it('the query lane agrees: DE answers its coords/decomp, u does not answer coords', () => {
+  it('the query lane agrees: DE and v answer coords, u never gets gauge coordinates', () => {
     const de = answerQuery(d.construction, 'DE', 0);
     expect(de.answer).toBeTruthy();
+    const vq = answerQuery(d.construction, 'וקטור v', 0);
+    expect(vq.answer ?? '').toContain('(0, 6, 0)');
     const u = answerQuery(d.construction, 'וקטור u', 0);
     expect(u.answer ?? '').not.toMatch(/\(/); // a decomposition at most — never gauge coordinates
   });
