@@ -100,7 +100,8 @@
     "toggle": "Organize the data",
     "title": "Organize the data",
     "hint": "derived vector, coordinate and magnitude presentations — laid out the way you would on paper",
-    "empty": "nothing stable to show yet"
+    "empty": "nothing stable to show yet",
+    "openParam": "free parameter — pinned once more data arrives"
   },
   "scope": {
     "valueless-query": "This tool draws and verifies givens — it does not solve. To act on an angle, state a value: e.g. \"the angle between line AC' and plane ABCD is 30\", and it will be enforced or verified.",

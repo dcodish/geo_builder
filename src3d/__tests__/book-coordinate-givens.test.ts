@@ -13,6 +13,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { parse3 } from '../parser/parse3';
 import { freeDofCount3 } from '../engine/evaluate';
+import { dataView } from '../engine/dataView';
 import { derive3, useGeo3 } from '../store/store3';
 
 function reset() {
@@ -144,6 +145,7 @@ describe('the book snippet end-to-end (box figure)', () => {
       submit(u);
       expect(err(), u).toBeNull();
     }
+    const ts: number[] = [];
     for (const seed of [0, 1, 2]) {
       const d = derive3(state().facts, seed);
       const B = d.positions.get('B')!;
@@ -151,7 +153,37 @@ describe('the book snippet end-to-end (box figure)', () => {
       expect(B.z, `seed ${seed}: base rides A's plane`).toBeCloseTo(-3, 3);
       expect(d.resolved.pivot?.pinSymbols?.t, `seed ${seed}: t solved positive`).toBeGreaterThan(0);
       expect(d.resolved.pivot?.pinSymbols?.k, `seed ${seed}: k forced by the parallel given`).toBeCloseTo(-3, 3);
+      ts.push(d.resolved.pivot!.pinSymbols!.t);
     }
+    // ADR-052 conformance: an OPEN symbol must VARY with the seed — a value the sampler never
+    // explores is a default masquerading as determined (the seed-anchor lock, Am. 2)
+    expect(Math.max(...ts) - Math.min(...ts)).toBeGreaterThan(1e-3);
+  });
+
+  it('the data panel tells the story: «t = ?» (open, hint) and «k = -3» (determined)', () => {
+    for (const u of BOOK) submit(u);
+    const d = derive3(state().facts, state().seed);
+    const params = dataView(d.construction, state().seed).params;
+    expect(params).toEqual([
+      { sym: 't', text: 't = ?', open: true },
+      { sym: 'k', text: 'k = -3', open: false },
+    ]);
+  });
+
+  it('the book lines survive their punctuation: one-sentence sign tail + trailing periods', () => {
+    // the sign clause IN the same utterance is picked up, never silently dropped
+    expect(parse3('נתונות הנקודות: B(2t, t, k), A(1, 4, -3). t פרמטר חיובי.')).toMatchObject({
+      ok: true,
+      commands: [
+        { type: 'point3', id: 'B' },
+        { type: 'point3', id: 'A' },
+        { type: 'param-sign', sym: 't', positive: true },
+      ],
+    });
+    expect(parse3('t פרמטר חיובי.')).toMatchObject({ ok: true, commands: [{ type: 'param-sign' }] });
+    expect(parse3('הבסיס ABCD מונח על מישור שמקביל למישור [xy].')).toMatchObject({ ok: true });
+    // an OTHER meaningful tail defers the whole utterance (honesty — no silent drop)
+    expect(parse3('נתונות הנקודות: A(1, 4, -3) וגם משהו חשוב')).toEqual({ ok: false, reason: 'not-handled' });
   });
 
   it('«more data» determines the symbols: x_B = 4 lands B = (4, 2, −3) and t = 2 at every seed', () => {

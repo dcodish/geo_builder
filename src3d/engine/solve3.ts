@@ -239,6 +239,18 @@ export function solvePivot(
     if (typeof comp === 'number') return comp;
     return comp.c + comp.k * x[7 + nDims + nSym + pinSyms.indexOf(comp.sym)];
   };
+  // #325 (ADR-3D-079 Am. 2): an UNDETERMINED pin symbol must VARY with the seed (ADR-052 —
+  // a value the sampler never explores is a default masquerading as determined; the params
+  // panel would print an invented `t = 6/5`). Each open symbol gets a SEED-DEPENDENT soft
+  // anchor (the dims0 mechanism), sign-aware so a stated «t חיובי» parks on the stated side;
+  // a genuinely determining given overrides the 1e-4 pull exactly like it overrides dims0.
+  const symAnchorTargets = pinSyms.map((sym, i) => {
+    const frac = (Math.abs(Math.sin((seed + 1) * 12.9898 + (i + 1) * 78.233)) * 43758.5453) % 1;
+    const raw = -1.6 + 3.2 * frac;
+    const sgn = c.paramSigns.find((ps) => ps.sym === sym);
+    if (!sgn) return raw;
+    return sgn.positive ? 0.4 + Math.abs(raw) : -(0.4 + Math.abs(raw));
+  });
 
   // When EVERY pin is similarity-INVARIANT (angles, ⟂/∥-to-plane — no coordinate,
   // length or dot given anywhere), the gauge is pure null-space: solving it invites
@@ -569,7 +581,7 @@ export function solvePivot(
     nSym === 0 && planeDrive && pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 &&
     c.scalarPins.every((p) => p.kind !== 'length' && p.kind !== 'dot');
   const REG_SF = 1e-4;
-  const ACCEPT = planeDrive ? 1e-10 : 1e-12; // reg equilibrium floors primary at ~(REG·pull)²
+  const ACCEPT = planeDrive || nPinSym > 0 ? 1e-10 : 1e-12; // reg equilibrium floors primary at ~(REG·pull)²
   /** A candidate whose solid carries two coincident vertices is DEGENERATE — never a figure. */
   const degenerate = (x: number[]): boolean => {
     if (!planeDrive) return false;
@@ -624,13 +636,23 @@ export function solvePivot(
         continue; // this mirror solved by placement alone
       }
     }
-    const f = planeDrive
-      ? (x: number[]) => [...fPrimary(x), REG_SF * x[6], ...x.slice(7, 7 + nDims).map((v, i) => REG_SF * (v - dims0[i]))]
+    // #325: pin-symbol seed-anchors ride whether or not this is a plane drive — any solve
+    // with open symbols is `anchored`, and its acceptance moves to the PRIMARY residuals
+    // (the anchor equilibrium floors the full error above the raw thresholds).
+    const anchored = planeDrive || nPinSym > 0;
+    const symAnchorTerms = (x: number[]): number[] =>
+      symAnchorTargets.map((tgt, i) => REG_SF * (x[7 + nDims + nSym + i] - tgt));
+    const f = anchored
+      ? (x: number[]) => [
+          ...fPrimary(x),
+          ...(planeDrive ? [REG_SF * x[6], ...x.slice(7, 7 + nDims).map((v, i) => REG_SF * (v - dims0[i]))] : []),
+          ...symAnchorTerms(x),
+        ]
       : fPrimary;
     // best-selection stays on the FULL error (the anchor's pull punishes the collapse
     // basin); ACCEPTANCE is on the primary residuals so exact solutions always pass.
     const primaryErr = (x: number[]): number =>
-      planeDrive ? fPrimary(x).reduce((s, v) => s + v * v, 0) : NaN;
+      anchored ? fPrimary(x).reduce((s, v) => s + v * v, 0) : NaN;
     let best: { x: number[]; err: number } | null = null;
     const seen = new Set<string>();
     for (const x0 of starts) {
@@ -642,7 +664,7 @@ export function solvePivot(
         r0 = r2;
       }
       if (degenerate(r0.x)) continue; // a collapsed solid is not a figure (general position)
-      const rAccept = planeDrive ? primaryErr(r0.x) : r0.err;
+      const rAccept = anchored ? primaryErr(r0.x) : r0.err;
       if (collectAll && rAccept < ACCEPT) {
         const g = { ...unpack(r0.x), mirror };
         // dedupe by the transform's ACTION (probe frame), not its parameters (axis-angle wraps)
@@ -663,7 +685,7 @@ export function solvePivot(
     }
     // acceptance: per-residual ~1e-6 — far under the 2e-5 claim tolerance (the numeric-
     // Jacobian floor rises with mixed scalar residuals; 1e-16 was V4-era point-pins-only)
-    const bestAccept = best ? (planeDrive ? primaryErr(best.x) : best.err) : Infinity;
+    const bestAccept = best ? (anchored ? primaryErr(best.x) : best.err) : Infinity;
     if (!collectAll && best && bestAccept < ACCEPT) {
       const g = { ...unpack(best.x), mirror };
       const dims = best.x.slice(7, 7 + nDims);

@@ -67,7 +67,10 @@ export function normalize3(s: string): string {
       .replace(/⅓/g, '1/3')
       .replace(/⅔/g, '2/3')
       .replace(/\s+/g, ' ')
-      .trim(),
+      .trim()
+      // ADR-3D-079 Am. 2: a trailing sentence period is decoration (book lines end with «.» —
+      // «t פרמטר חיובי.» used to dead-end); a decimal never ends in a bare dot, so this is safe
+      .replace(/\s*\.+$/, ''),
   );
 }
 
@@ -1406,7 +1409,9 @@ const injectionList: Rule = (s) => {
     'g',
   );
   const cmds: Command3[] = [];
+  let lastEnd = 0;
   for (const g of m[1].matchAll(itemRe)) {
+    lastEnd = (g.index ?? 0) + g[0].length;
     const comps = [g[3], g[4], g[5]].map(parseComp);
     const [x, y, z] = comps.map((t) => t.num);
     if (g[1]) {
@@ -1424,7 +1429,17 @@ const injectionList: Rule = (s) => {
       cmds.push({ type: 'point3', id: g[2], x, y, z });
     }
   }
-  return cmds.length > 0 ? cmds : null;
+  if (cmds.length === 0) return null;
+  // ADR-3D-079 Am. 2: the book states the sign IN THE SAME SENTENCE — «נתונות הנקודות: B(2t, t, k),
+  // A(1, 4, -3). t פרמטר חיובי». A trailing sign clause is picked up; any OTHER meaningful trailing
+  // text defers the whole utterance (never a silent drop of a stated given).
+  const tail = m[1].slice(lastEnd).replace(/^[\s.,;:]+|[\s.,;:]+$/g, '');
+  if (tail) {
+    const signCmds = paramSign(tail);
+    if (!signCmds) return null;
+    cmds.push(...signCmds);
+  }
+  return cmds;
 };
 
 /**

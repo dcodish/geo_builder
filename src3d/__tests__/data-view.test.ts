@@ -80,7 +80,7 @@ describe('dataView — organize your data', () => {
   });
 
   it('#296 panelIsEmpty: a relations-only panel is NOT empty', () => {
-    const empty: DataPanel = { relations: [], vectors: [], points: [], planes: [], pointCoords: {} };
+    const empty: DataPanel = { relations: [], vectors: [], points: [], planes: [], pointCoords: {}, params: [] };
     expect(panelIsEmpty(empty)).toBe(true);
     // the bug: only relations present → the App used to render "empty" and hide them
     expect(panelIsEmpty({ ...empty, relations: ['|u| = |v|', 'u·v = 0'] })).toBe(false);

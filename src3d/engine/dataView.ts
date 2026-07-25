@@ -17,6 +17,7 @@
 import { resolve3 } from './evaluate';
 import { scalePinned } from './solve3';
 import { dot3, sub3, type Vec3 } from './vec3';
+import { pinSymsOf } from './types';
 import type { Construction3, Id, Positions3 } from './types';
 
 /** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
@@ -50,6 +51,10 @@ export interface DataPanel {
    *  while the base still tilts about AB). A point with NO stable component gets no
    *  label — a sample coordinate is not knowledge (operator rule, 2026-07-09). */
   pointCoords: Record<string, { text: string; kind: 'fact' | 'partial' }>;
+  /** #325 (ADR-3D-079 Am. 2): the pins' OPEN symbols (`B(2t,t,k)` → t, k) — a determined
+   *  symbol (identical across every sampled configuration) prints its value (`k = -3`); a
+   *  still-free one prints open (`t = ?`), so the stated given visibly took effect. */
+  params: { sym: string; text: string; open: boolean }[];
 }
 
 /**
@@ -60,7 +65,7 @@ export interface DataPanel {
  * knowledge. The guard and the render must read emptiness the same way — hence one predicate.
  */
 export function panelIsEmpty(p: DataPanel): boolean {
-  return p.relations.length === 0 && p.vectors.length === 0 && p.points.length === 0 && p.planes.length === 0;
+  return p.relations.length === 0 && p.vectors.length === 0 && p.points.length === 0 && p.planes.length === 0 && p.params.length === 0;
 }
 
 const EPS = 1e-6;
@@ -617,5 +622,16 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     }
   }
 
-  return { relations, vectors: entries, points, pointCoords, planes };
+  // #325 (ADR-3D-079 Am. 2): the pins' open symbols — determined values print, free ones read
+  // open, so `B(2t, t, k)` visibly registers even while the coordinates still read `?`.
+  const params: DataPanel['params'] = [];
+  for (const sym of pinSymsOf(c)) {
+    const vals = resolved.map((r) => r.pivot?.pinSymbols?.[sym]);
+    const nums = vals.filter((v): v is number => v !== undefined && Number.isFinite(v));
+    const stable =
+      nums.length === resolved.length && nums.every((v) => Math.abs(v - nums[0]) <= 1e-4 * Math.max(1, Math.abs(nums[0])));
+    params.push(stable ? { sym, text: `${sym} = ${cleanNum(nums[0], 1e-4)}`, open: false } : { sym, text: `${sym} = ?`, open: true });
+  }
+
+  return { relations, vectors: entries, points, pointCoords, planes, params };
 }
