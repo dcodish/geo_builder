@@ -106,7 +106,8 @@
     "valueless-query": "This tool draws and verifies givens — it does not solve. To act on an angle, state a value: e.g. \"the angle between line AC' and plane ABCD is 30\", and it will be enforced or verified.",
     "cross-app": "Plane geometry (circle, rectangle, rhombus, inscribed-in-circle…) is built in the 2-D tool: themathbible.com/geo-builder. A circle IN SPACE is supported here in the form \"circle centered at O tangent to line AB at B\".",
     "bare-solid": "A pyramid or prism needs its base: e.g. \"pyramid SABCD with a square base\" or \"right triangular prism ABC\". A cube, box or tetrahedron builds without details.",
-    "ui-command": "Marks appear automatically from the givens — instead of asking for a mark, state the given itself: e.g. \"angle D = 90\"."
+    "ui-command": "Marks appear automatically from the givens — instead of asking for a mark, state the given itself: e.g. \"angle D = 90\".",
+    "oblique-prism": "A prism not stated \"right\" builds oblique only over the parallelogram family: parallelogram, rhombus, rectangle or square (e.g. \"prism with a rhombus base\"), and \"the prism is right\" straightens it. For any other base, state \"right\": e.g. \"right prism with a triangle base\"."
   },
   "query": {
     "placeholder": "ask… e.g. AE (vector), |AE|, w·v, ∠SAB, area ABC",

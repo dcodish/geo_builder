@@ -154,23 +154,39 @@ const makeRightPrism: Rule = (s) => {
  *
  *  #295: a bare `מנסרה שבסיסה מקבילית` / `prism with a parallelogram base` (a parallelogram-base prism with
  *  NO `ישרה`) is the SAME oblique solid (ADR-052: rightness is unstated, so the lateral tilt is a free DOF,
- *  pinned upright by `המנסרה ישרה`, #289). `rightPrism` owns the `ישרה` form (→ `prism4`); only the
- *  parallelogram has an oblique model, so other bases without `ישרה` stay `rightPrism`'s honest refusal. */
+ *  pinned upright by `המנסרה ישרה`, #289). `rightPrism` owns the `ישרה` form (→ `prism4`).
+ *
+ *  #321 (ADR-3D-078): the bare form DISPATCHES by base noun across the parallelogram FAMILY — a rhombus /
+ *  rectangle / square IS a parallelogram plus its own defining constraints, so each lowers to the same
+ *  `parallelepiped` + the constraint macro (the ADR-110/#199 pattern, no new engine construct): rhombus ⇒
+ *  adjacent sides equal (`length-rel |AB|=|AD|`), rectangle ⇒ a right base angle (`cos-angle (AB,AD)=0`),
+ *  square ⇒ both. M1 at apply drives the free base dims; `המנסרה ישרה` still pins the tilt upright.
+ *  Bases OUTSIDE the family (triangle / general quad / n-gon) have no oblique model — they stay refused
+ *  (the `oblique-prism` guidance family in scope3 says what works). */
 const parallelepiped: Rule = (s) => {
   const named = /מקבילון/.test(s) || /\bparallelepiped\b/i.test(s);
-  const barePrismPar =
+  const rhombus = /מעויי?ן/.test(s) || /\brhombus\b/i.test(s);
+  const square = /ריבוע/.test(s) || /\bsquare\b/i.test(s);
+  const rect = /מלבן/.test(s) || /\brectang/i.test(s);
+  const par = /מקבילית/.test(s) || /\bparallelogram\b/i.test(s);
+  const barePrismQuad =
     (/מנסרה/.test(s) || /\bprism\b/i.test(s)) &&
     !/ישרה/.test(s) &&
     !/\bright\b/i.test(s) &&
-    (/מקבילית/.test(s) || /\bparallelogram\b/i.test(s)) &&
-    !/מעוין/.test(s) &&
-    !/\brhombus\b/i.test(s);
-  if (!named && !barePrismPar) return null;
+    (par || rhombus || square || rect);
+  if (!named && !barePrismQuad) return null;
   const toks = firstLabelRun(s);
-  if (toks.length === 8) return [{ type: 'solid', kind: 'parallelepiped', ids: toks }];
-  if (toks.length === 4 && toks.every(unprimed)) return [{ type: 'solid', kind: 'parallelepiped', ids: [...toks, ...primeAll(toks)] }];
-  if (toks.length === 0) return [{ type: 'solid', kind: 'parallelepiped', ids: ['A', 'B', 'C', 'D', ...primeAll(['A', 'B', 'C', 'D'])] }];
-  return null;
+  let ids: Id[] | null = null;
+  if (toks.length === 8) ids = toks;
+  else if (toks.length === 4 && toks.every(unprimed)) ids = [...toks, ...primeAll(toks)];
+  else if (toks.length === 0) ids = ['A', 'B', 'C', 'D', ...primeAll(['A', 'B', 'C', 'D'])];
+  if (!ids) return null;
+  const cmds: Command3[] = [{ type: 'solid', kind: 'parallelepiped', ids }];
+  const [a, b, , d] = ids; // base ring a-b-c-d: adjacent sides at `a` are a–b and a–d
+  if (rhombus || square) cmds.push({ type: 'length-rel', a1: a, b1: b, rhs: { pair: [a, d] }, c: 1 });
+  if (rect || square)
+    cmds.push({ type: 'cos-angle', u: { kind: 'pair', from: a, to: b }, v: { kind: 'pair', from: a, to: d }, cos: 0 });
+  return cmds;
 };
 
 /** A maximal consecutive alphabetical run of single unprimed letters (e.g. A,B,C). */

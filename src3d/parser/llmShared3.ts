@@ -39,6 +39,9 @@ export const PROMPT_EXAMPLES_3D: PromptExample3[] = [
   { freeform: 'a right triangular prism with M in the middle of the top edge BB prime', steps: ['right triangular prism ABC', "M is the midpoint of BB'"] },
   // #295: a prism NOT stated right is OBLIQUE — a parallelogram base ⇒ מקבילון (never invent "right").
   { freeform: 'a prism whose base is a parallelogram', steps: ['מקבילון'] },
+  // #321: the parallelogram FAMILY builds oblique with its base stated — never downgrade a rhombus/
+  // rectangle/square base to a plain parallelogram (that silently drops the stated base shape).
+  { freeform: 'a prism whose base is a rhombus', steps: ['מנסרה שבסיסה מעוין'] },
   // #290: a prism with no base shape at all is not expressible — the honest output is an empty list.
   { freeform: 'a prism', steps: [] },
   { freeform: 'סמן את הצלעות של הקובייה כוקטורים u v w', steps: ['קובייה ABCD', "נסמן: AB = u, AD = v, AA' = w"] },
@@ -63,6 +66,9 @@ export function buildSystemPrompt3(): string {
     // of the "only introduce named points" rule. A silently-invented "right"/size/angle is the cardinal sin.
     '- NEVER invent an unstated property. A prism NOT stated to be right (ישרה / ישר) is OBLIQUE — never emit',
     '  a right/ישרה prism the student did not ask for (a parallelogram-base prism with no ישרה is `מקבילון`).',
+    // #321: the drop twin of the never-invent rule — a stated base SHAPE must survive the decomposition.
+    '  NEVER drop a stated base shape either: a rhombus/rectangle/square base prism with no ישרה is',
+    '  `מנסרה שבסיסה מעוין` / `מנסרה שבסיסה מלבן` / `מנסרה שבסיסה ריבוע` — never a plain `מקבילון`.',
     '  Likewise do NOT fill in an omitted size / angle / relation. If a request cannot be expressed at all',
     '  (e.g. a prism with no base shape given), return an EMPTY list rather than guessing.',
     '- A statement about EXISTING objects is not a re-construction: never re-declare an existing point or solid.',
