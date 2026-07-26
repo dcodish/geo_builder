@@ -1431,16 +1431,20 @@ const parametricLine: Rule = (s) => {
       ),
     );
   // #275: the BARE form «x = (a,b,c) + t(d,e,f)» typed with NO «הישר ℓ:» prefix (the textbook's exact
-  // notation) auto-binds the canonical ℓ. Gated to a leading «x = (» so a plane equation («x-y+z=1») is
-  // never stolen (and the `+ t(…)` tail below is the real discriminator). A second bare line collides on ℓ
-  // at apply — never a silently-minted ℓ2 (the ADR-3D-038 indexed names are the student's to state).
-  const headName = head ? head[1] : /^\s*x\s*=\s*\(/.test(s) ? 'ℓ' : null;
+  // notation) auto-binds the canonical ℓ. Gated to a leading «x = (» — or «x = t(» for the #351 anchor-less
+  // form below — so a plane equation («x-y+z=1») is never stolen (and the `t(…)` tail is the real
+  // discriminator). A second bare line collides on ℓ at apply — never a silently-minted ℓ2 (the
+  // ADR-3D-038 indexed names are the student's to state).
+  const headName = head ? head[1] : /^\s*x\s*=\s*(?:\(|t\s*[·×*]?\s*\()/.test(s) ? 'ℓ' : null;
   const body = head ? head[2] : s;
   if (headName === null) return null;
-  const m = body.match(/^(?:x\s*=\s*)?\(([^()]*)\)\s*\+\s*t\s*[·×*]?\s*\(([^()]*)\)$/);
+  // #351: the anchor is OPTIONAL — a line through the ORIGIN is written `x = t(d,e,f)` with no `(a,b,c) +`
+  // part at all (prod: `l1:x=t(0,m,2m-2)`). A missing anchor means (0,0,0); everything downstream (the
+  // symbolic components, the single-param guard, the point-pair membership) is untouched.
+  const m = body.match(/^(?:x\s*=\s*)?(?:\(([^()]*)\)\s*\+\s*)?t\s*[·×*]?\s*\(([^()]*)\)$/);
   if (!m) return null;
   const triple = (str: string) => str.split(',').map((p) => parseParamExpr(p));
-  const anchor = triple(m[1]);
+  const anchor = triple(m[1] ?? '0,0,0');
   const dir = triple(m[2]);
   if (anchor.length !== 3 || dir.length !== 3 || [...anchor, ...dir].some((x) => !x)) return null;
   const params = new Set([...anchor, ...dir].flatMap((x) => (x!.param ? [x!.param] : [])));
@@ -1453,7 +1457,8 @@ const parametricLine: Rule = (s) => {
       name,
       anchor: [anchor[0]!.expr, anchor[1]!.expr, anchor[2]!.expr],
       dir: [dir[0]!.expr, dir[1]!.expr, dir[2]!.expr],
-      src: `x = (${m[1].trim()}) + t·(${m[2].trim()})`,
+      // the echoed form always shows the anchor, so an anchor-less input reads back as the origin it means
+      src: `x = (${(m[1] ?? '0,0,0').trim()}) + t·(${m[2].trim()})`,
       param: [...params][0],
     },
   ];

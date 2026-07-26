@@ -1398,3 +1398,22 @@ Locked by `lowercase-nudge.test.ts` (8: the reported case with the corrected spe
 **A right angle is a knee, not an arc.** A stated 90° previously drew an arc labelled "90°" through the `wAngles` stream ([ADR-3D-032](#adr-3d-032) Am.). It now draws the knee instead — the textbook mark — with the arc suppressed for exactly 90° and every other stated value unchanged. Duplicate assertions of the same corner (stated twice, or stated *and* constructed) collapse via a rounded WEDGE key — vertex plus the two arm directions — the [ADR-167](06-decisions.md#adr-167) Am. (3) pattern rather than keying by point ids, so the same physical corner named two ways is marked once.
 
 **Locked by** `right-angle-knee.test.ts` (20): every statement form He/En (segments word + symbol, named vectors, vertex angle, ⊥-plane) draws a knee; the knee sits at the shared vertex with unit legs along the arms that are genuinely ⊥; all four foot kinds (incl. the two that drew nothing); **the 3-D property tested operationally** — over four camera orientations each projected leg stays parallel to its projected arm and the corner closes as a foreshortened parallelogram, plus an assertion that the home-camera knee is *not* a right angle on screen (a fake 2-D knee would be); and the honesty set — a skew ⊥ draws no knee while the relation still holds exactly, crossing diagonals are marked at the crossing, a double assertion is marked once, and a figure with no ⊥ draws none.
+
+### ADR-3D-091 — A parametric line's ANCHOR is optional: omitted means the origin (#351)
+
+**Class.** *A grammar requires a syntactic part the mathematics treats as defaulted, so the shortest correct spelling of a construct is unreachable.* The small sibling of [ADR-3D-069](#adr-3d-069) (one grammar for a coefficient): nothing downstream was missing, only the entry form.
+
+**Instance (prod, log-triage 2026-07-26).** `l1:x=t(0,m,2m-2)` — a line through the origin with a symbolic direction — came back not-understood, while the identical line written `l1:x=(0,0,0)+t(0,m,2m-2)` built fine. `parametricLine`'s body regex made the `(a,b,c) +` group mandatory:
+
+```
+/^(?:x\s*=\s*)?\(([^()]*)\)\s*\+\s*t\s*[·×*]?\s*\(([^()]*)\)$/
+                ^^^^^^^^^^^^^^^^^^^^^^ required
+```
+
+Everything else already worked: the `l1`→`ℓ1` canonicalization ([ADR-3D-038](#adr-3d-038)), the affine symbolic components, the single-parameter guard, the point-pair membership lane ([ADR-3D-031](#adr-3d-031)).
+
+**Fix.** The anchor group becomes optional and defaults to `(0,0,0)`; the #275 bare-form gate widens from `x = (` to also admit `x = t(` so the un-prefixed textbook spelling still auto-binds the canonical `ℓ`. The echoed `src` always prints the anchor, so an anchor-less input reads back as the origin it means. One regex, no new construct — the anchor-less form lowers to *byte-identical* commands to the explicit-origin form (asserted).
+
+**Boundaries held.** A plane equation is still never stolen (the `t(…)` tail remains the discriminator), and two distinct parameters in one line stay refused (the no-CAS boundary, D3).
+
+Locked by `origin-line.test.ts` (7: the prod utterance; equality with the explicit-origin lowering; the named/prefixed/bare forms He+En; point-pair membership intact; the anchored form unchanged; no plane-equation theft; the two-param refusal); catalog +1.
