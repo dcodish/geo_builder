@@ -5503,3 +5503,26 @@ Locked by `main-thread-sweeps.test.ts` (the source ratchet — the recorded main
 **Perf (docs/17 §7).** The gate is O(constraints+objects) key hashing per rescue accept — trivial beside the evaluate it follows; the repair path (one extra evaluate) runs only when a destruction actually occurred. Measured suite wall unchanged (membership-conversion 76 s before/after within noise).
 
 Locked by `obligation-preservation.test.ts` (the four storage shapes; the case-(1) guard keeping a rider's directive intact; the equal surviving + holding in every entry order) and the flipped `membership-conversion.test.ts` sizes-early assertion (exact book values — the test that had been waiting for this fix). Exposure: `settleOnFrozenPrior` landed 2026-07-11 (ADR-276), so ~2.5 weeks of prod.
+### ADR-403 — The active-voice extension verb; «BC בסיס» is orientation; a container-less containment ASKS (#350/#352/#354)
+
+Three input-convention fixes from the 2026-07-26 log-triage, each an operator decision.
+
+**#350 — the extension lane was gated on the NOUN.** «מאריכים את הצלע AB עד לנקודה D» ("we extend side AB up to point D") — the textbook's own register — escalated to the LLM, while «D על המשך AB» built fine. [ADR-054](#adr-054)'s directional semantics were never the problem: `pointOnExtension` requires the extension *noun* (`המשך`/`extension`), and the verb form also names its arguments in the opposite order (segment first, point last). A narrow sibling rule `extendVerb` accepts the verb register and reuses `pointOnExtension`'s lowering *verbatim* (same `t`, same order, same existing-point `set-line` branch), so the two spellings cannot drift; it bows out when the noun is present, so there is one lowering per spelling. Deliberately narrow: the target must be a NAMED point after «עד ל…»/"to", so «מאריכים את AB עד שהוא חותך את המעגל» stays with the cut lane.
+
+*Trap re-encountered:* the Hebrew verb carries a **medial כ** in `מאריכ·ים` and a **final ך** in the singular `מאריך`. The first draft spelled only one and silently rejected half the register — the [ADR-3D-035](06b-decisions-3d.md#adr-3d-035) lesson, 2-D edition. Both forms are now admitted, asserted by a dedicated test.
+
+**#352 — «BC בסיס» is an ORIENTATION wish (operator: reject and point at the align tool).** Which side reads as "the base" is layout, not geometry ([ADR-052](#adr-052)); the tool that actually delivers it is **Rotate & align** ("make a segment horizontal"). The existing `orientation` family gains the bare statement (a pair + the base noun and nothing else, `בסיסים` excluded so a trapezoid's real parallel bases are untouched), and — the more valuable half — its **message now names the align tool**, which it never did: it used to explain that layout isn't a given and offer no way to get what the student wanted. That improves every existing orientation row, not just the new one.
+
+**#354 — a container-less containment ASKS which circle.** «מעגל מוכל» was reported as unsupported; it is not (ADR-376 builds it: with no circles the container is introduced, with one that circle IS the container). It only defers with **2+ circles**, where the container genuinely cannot be inferred. Deferring sent it to the LLM, which could only guess, so it now returns a new `ambiguous-container` clarification naming the candidates — the [ADR-164](#adr-164) third-`ParseResult`-variant shape that does NOT escalate. The 0/1-circle cases are asserted byte-identical, so the change is provably confined to the ambiguous one.
+
+*Lock note:* #354's lock is a unit test rather than an e2e scenario by design — the scenario harness treats a step that does not parse as a harness error (a clarification is not a figure), so the corpus cannot express a parse-level refusal.
+
+Locked by `input-conventions.test.ts` (33) + scenario `extend-verb-active-voice` (the order — D beyond B, collinear A→B→D — and the drawn continuation, which is the part a parse test cannot see).
+
+### ADR-404 — The 2-D grammar already accepts lowercase labels: the reported row was a different gap (#353)
+
+Triage read the prod row «זוית abc» as a case problem and the operator ruled "insist on uppercase, message the convention — both apps". Measuring first (docs/17 §2.2 — never a proxy for the semantic fact) showed the 2-D premise was wrong: **`parse` upper-cases labels itself**, so `ab=5`, `ab=cd`, `משולש abc`, `ריבוע abcd`, `זוית abc = 40` and `נקודה d על ab` all parse as typed.
+
+«זוית abc» fails because a **valueless bare angle is not a 2-D construct** — open issue #248 — and it fails *identically* when typed «זוית ABC», which is the proof that case is not the issue. A convention nudge in 2-D would therefore have been unreachable code: the guidance can only fire when the original fails AND the upper-cased form parses, and a case-insensitive grammar makes that set empty.
+
+So the 2-D half is deliberately **not built**, and the finding is asserted (the six lowercase forms above, plus the both-cases-fail proof) so it cannot silently rot: if the case-insensitivity assumption ever breaks, those tests fail. The convention nudge ships in the 3-D app only, where lowercase genuinely fails — [ADR-3D-092](06b-decisions-3d.md#adr-3d-092).

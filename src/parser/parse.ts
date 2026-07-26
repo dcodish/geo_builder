@@ -33,6 +33,11 @@ export type ParseResult =
   // outer/inner qualifier and no disambiguating stated membership — WHICH circle is meant is the
   // student's to say ("המעגל החיצוני"/"the inner circle"), never a silent pick or an LLM guess.
   | { ok: false; reason: 'ambiguous-circle'; center: string }
+  // #354 (ADR-403): a CONTAINMENT with no container named («מעגל מוכל») on a figure that already has two or
+  // more circles — which one contains it cannot be inferred and must not be guessed (ADR-052). With 0 or 1
+  // circles the container IS determined (introduced / the single circle, ADR-376) and it builds; only the
+  // genuinely ambiguous case asks. `centers` are the candidates, so the message can name them.
+  | { ok: false; reason: 'ambiguous-container'; centers: string[] }
   // Every common tangent of the requested kind is already drawn (two of a kind / four in all) — a
   // further one does not exist; refuse deterministically, never a solver grind (#197 Am. 3).
   | { ok: false; reason: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' }
@@ -187,7 +192,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string };
+type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -1477,6 +1482,43 @@ const midpoint: Rule = (s, ctx) => {
  *  Also the COPULA form (issue #47) — "the extension of CD is point A" / "המשך CD היא [נקודה] A" — which names
  *  the extension point AFTER the segment (extension word first, point last), the mirror phrasing. Same
  *  semantics either way. */
+/**
+ * #350 (ADR-403): the ACTIVE-VOICE extension — «מאריכים את הצלע AB עד לנקודה D» ("we extend side AB up
+ * to point D"), the textbook's own register. The extension lane itself (ADR-054's directional `המשך`
+ * semantics) was correct; it was gated on the extension NOUN, so every verb form escalated to the LLM.
+ *
+ * Deliberately narrow: the target must be a NAMED point after «עד ל…»/"to", so an extension stated as a
+ * CUT — «מאריכים את AB עד שהוא חותך את המעגל» ("…until it meets the circle") — is untouched and keeps
+ * going to the cut lane. The lowering is {@link pointOnExtension}'s verbatim (same t / order / existing-point
+ * `set-line` branch), so the two spellings can never drift apart.
+ */
+const extendVerb: Rule = (s, ctx) => {
+  // He: מאריכים / מאריך / נאריך / האריכו / הארכנו …   En: "extend AB to D" / "AB is extended to D".
+  // BOTH kaf forms are admitted — `מאריכ·ים` carries the medial כ, the singular `מאריך` the FINAL ך. A gate
+  // spelling only one silently rejects half the register (the ADR-3D-035 lesson, 2-D edition).
+  const verb = /[מנה]?אריכ(?:ים|ות|ה|ן|ו)?(?![א-ת])|[מנה]אריך(?![א-ת])|הארכנו|\bextend(?:ed|s|ing)?\b/i;
+  if (!verb.test(s)) return null;
+  if (/המש(?:ך|כי(?:ם|הם|הן)?)|extension/i.test(s)) return null; // the noun form owns those — one lowering per spelling
+  // «… <SEG> עד ל[נקודה] <ID>» — the segment is the label run BEFORE the target marker, the point after it.
+  // the target marker tolerates every ל / נקודה combination the register uses: «עד לנקודה D», «עד נקודה D»,
+  // «עד ל-D», «עד D», "to point D", "to D"
+  const m = s.match(
+    /([\s\S]*?)(?:עד\s*(?:ל[-\s]*)?(?:ה?נקודה\s*(?:ל[-\s]*)?)?|\bto\s+(?:the\s+)?(?:point\s+)?)([A-Za-z]\d*)(?![A-Za-z])/i,
+  );
+  if (!m) return null;
+  const seg = labelRun(m[1].replace(FILLER, ' '), 2);
+  if (!seg) return null;
+  const id = up(m[2]);
+  if (seg.includes(id)) return null; // "extend AB to B" is not an extension
+  if ((ctx.points ?? []).includes(id))
+    return [
+      { type: 'segment', a: seg[0], b: seg[1] },
+      { type: 'segment', a: seg[1], b: id },
+      { type: 'set-line', points: [seg[0], seg[1], id] },
+    ];
+  return [{ type: 'point-on-segment', id, a: seg[0], b: seg[1], t: 1.3, extension: true }];
+};
+
 const pointOnExtension: Rule = (s, ctx) => {
   if (!/extension|המש(?:ך|כי(?:ם|הם|הן)?)/i.test(s)) return null;
   let seg: string[] | null = null;
@@ -5362,7 +5404,10 @@ const definiteTwoCircles = (s: string, ctx: ParseContext): [Id, Id] | null => {
  * `set-circle-position contained` REQUIREMENT then seats it (verifier + `meetsRequirements`, #196).
  * Named subjects («מעגל O2 מוכל…») and plural forms («שני מעגלים מוכלים») keep their existing owners.
  */
-const containedNewInExisting = (s: string, ctx: ParseContext): AnyCommand[] | null => {
+const containedNewInExisting = (
+  s: string,
+  ctx: ParseContext,
+): AnyCommand[] | { clarify: 'ambiguous-container'; centers: string[] } | null => {
   // an INDEFINITE subject: the circle noun right before מוכל carries no definite ה and no letter
   // (one optional Hebrew adjective tolerated: «מעגל קטן מוכל…»); En "a circle … contained"
   const subj =
@@ -5389,7 +5434,10 @@ const containedNewInExisting = (s: string, ctx: ParseContext): AnyCommand[] | nu
     outer = 'O'; // the containment presupposes its container — introduce it (ADR-367 `implied`)
     outerNew = true;
   } else {
-    return null; // 2+ circles, no reference — ambiguous container, defer
+    // #354 (ADR-403): 2+ circles and no reference — WHICH one contains it cannot be inferred (ADR-052).
+    // ASK, rather than deferring into a paid LLM call that could only guess: the student names the
+    // container («מעגל מוכל בתוך מעגל O»). The 0/1-circle cases above stay determined and build.
+    return { clarify: 'ambiguous-container', centers: circs };
   }
   const inner = freeLabel([outer, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['P', 'Q', 'K', 'S']);
   const cmds: AnyCommand[] = [];
@@ -5413,7 +5461,7 @@ const twoCirclesPosition: Rule = (s, ctx) => {
   // the bare form has ONE circle noun.
   if (contained) {
     const out = containedNewInExisting(s, ctx);
-    if (out) return out;
+    if (out) return out; // commands, or the #354 ambiguous-container question — both propagate
   }
   const circleNouns = (s.match(/circle|מעגל/gi) ?? []).length;
   const plural = /שני\s+ה?מעגלים|מעגלים|\bcircles\b/i.test(s);
@@ -7690,6 +7738,7 @@ export const RULES: Rule[] = [
   circleSizeExisting, // "היקף מעגל O1 הוא 6π" on an EXISTING circle → set-radius; before `circle` (which would re-create + drop the size)
   circle,
   foot, // before `pointOnSegment`
+  extendVerb, // #350: «מאריכים את הצלע AB עד לנקודה D» — the active-voice twin of pointOnExtension
   pointOnExtension, // before `pointOnSegment` ("on … extension" must not read "ex" as labels)
   pairOnCircle, // "BC על מעגל" — a glued PAIR on the circle = a chord (#231); before pointOnCircle (which excludes glued pairs) and segment
   pointOnCircle, // "A on circle O" / the LIST "A ו C על המעגל" (every subject gets the membership) — before segment/pointOnSegment
@@ -8862,6 +8911,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
     }
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).
     if (res.clarify === 'ambiguous-angle') return { ok: false, reason: 'ambiguous-angle', vertex: res.vertex };
+    if (res.clarify === 'ambiguous-container') return { ok: false, reason: 'ambiguous-container', centers: res.centers };
     if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };
     if (res.clarify === 'alias-taken') return { ok: false, reason: 'alias-taken', name: res.name };
     return { ok: false, reason: 'ambiguous-circle', center: res.center };

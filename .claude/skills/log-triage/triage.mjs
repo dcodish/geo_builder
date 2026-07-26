@@ -71,7 +71,7 @@ import {
 } from '../../../src/parser/index.ts';
 import { replay, nameCentreFacts } from '../../../src/store/geoStore.ts';
 import { parse3 } from '../../../src3d/parser/parse3.ts';
-import { classifyGuidance3 } from '../../../src3d/parser/scope3.ts';
+import { classifyGuidance3, upperCasedLabelCandidate3 } from '../../../src3d/parser/scope3.ts';
 import { derive3 } from '../../../src3d/store/store3.ts';
 
 // ---- args ----------------------------------------------------------------
@@ -270,7 +270,7 @@ function session2d(evs) {
         }
         if (bindClarify) {
           res = { now: 'clarify', detail: `unknown-circle:${bindClarify}` };
-        } else if (!r.ok && (r.reason === 'ambiguous-angle' || r.reason === 'ambiguous-circle')) {
+        } else if (!r.ok && (r.reason === 'ambiguous-angle' || r.reason === 'ambiguous-circle' || r.reason === 'ambiguous-container')) {
           res = { now: 'clarify', detail: r.reason };
         } else if (!r.ok) {
           const oos = classifyOutOfScope(u);
@@ -353,8 +353,14 @@ function session3d(evs) {
       if (!r.ok) {
         // #243 mirror: App3 consults the ADR-3D-040 guidance register BEFORE the LLM escalation
         // (App3.tsx#onSubmit) — a guided family is a deliberate answer, never a grammar gap.
+        // #353: the lowercase-node CONVENTION nudge is consulted first, exactly as App3 orders it —
+        // proof-based (the upper-cased candidate must actually parse), so a real gap stays a real gap.
+        const upper3 = upperCasedLabelCandidate3(u);
         const g = classifyGuidance3(u);
-        res = g ? { now: 'guided', detail: `scope:${g.category}` } : { now: 'not-handled', detail: r.reason };
+        res =
+          upper3 && parse3(upper3).ok ? { now: 'guided', detail: 'scope:lowercase-labels' }
+          : g ? { now: 'guided', detail: `scope:${g.category}` }
+          : { now: 'not-handled', detail: r.reason };
       } else {
         const id = `f${facts.length}`;
         const next = [...facts, { id, utterance: u, cmds: r.commands, enabled: true }];

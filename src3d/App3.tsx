@@ -13,7 +13,8 @@ import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
 import { escalate3 } from './parser/llm3';
-import { classifyGuidance3 } from './parser/scope3';
+import { classifyGuidance3, upperCasedLabelCandidate3 } from './parser/scope3';
+import { parse3 } from './parser/parse3';
 import Figure3 from './render/Figure3';
 import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
 import { auditLoad3 } from './store/loadAudit3';
@@ -277,6 +278,16 @@ export default function App3() {
     if (err?.code === 'not-understood') {
       // #73 (ADR-3D-040): the GUIDANCE register short-circuits BEFORE the LLM — a non-constructive
       // family can never build, so an LLM call on it is pure cost (the 2-D ADR-289 twin, copied).
+      // #353: lowercase NODE labels — if reading them as uppercase makes the utterance parse, the only
+      // problem was the case convention. Say so (with the corrected spelling) instead of paying for an LLM
+      // call. Proof-based, so a genuine gap stays a genuine gap; checked before the pattern register.
+      const upper = upperCasedLabelCandidate3(text);
+      if (upper && parse3(upper).ok) {
+        logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'scope', result: 'scope:lowercase-labels' });
+        setGuidanceNote(t('scope.lowercase-labels', { corrected: upper }));
+        useGeo3.setState({ lastError: null });
+        return;
+      }
       const g = classifyGuidance3(text);
       if (g) {
         logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'scope', result: `scope:${g.category}` });

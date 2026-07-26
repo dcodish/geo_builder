@@ -22,7 +22,7 @@
  * classifies null — a real construction never gets a guidance brush-off.
  */
 
-export type ScopeCategory3 = 'valueless-query' | 'cross-app' | 'bare-solid' | 'ui-command' | 'oblique-prism';
+export type ScopeCategory3 = 'valueless-query' | 'cross-app' | 'bare-solid' | 'ui-command' | 'oblique-prism' | 'lowercase-labels';
 
 export interface ScopeMatch3 {
   category: ScopeCategory3;
@@ -98,4 +98,33 @@ export function classifyGuidance3(utterance: string): ScopeMatch3 | null {
     if (rule.patterns.some((p) => p.test(s))) return { category: rule.category, messageKey: `scope.${rule.category}` };
   }
   return null;
+}
+
+/**
+ * #353 (ADR-397, operator ruling 2026-07-26): a candidate re-spelling of an utterance whose NODE labels
+ * were typed lowercase — «as=w» for «AS=w». The 2-D `upperCasedLabelCandidate` COPIED per docs/20 §12
+ * (the guidance registers are deliberately never shared across products).
+ *
+ * The 3-D convention is load-bearing in both directions: node labels are UPPERCASE, while lowercase
+ * letters are vectors (u, v, w), parameters (t, k, m) and coordinates (x, y, z) — and angle measures are
+ * GREEK (α, β, γ, θ; the operator's ruling: a latin `a` is not an acceptable angle label). So the case is
+ * never silently accepted; the caller offers the convention as guidance, and only when it would actually
+ * have helped: this returns the upper-cased candidate, the caller re-parses it, and the note fires only if
+ * that candidate parses. A genuine gap fails either way and stays a genuine gap.
+ *
+ * Only maximal 2–4 character lowercase runs are lifted — a single lowercase letter is far more likely a
+ * vector/parameter than a node, and lifting it would fight the convention being taught.
+ */
+/** A plane equation with SYMBOLIC coefficients (`ax+by+cz+d=0`, issue #339) — those lowercase letters are
+ *  coefficients, never nodes (operator: "except for the plane equation we have open where aX+bY+cZ+D=0
+ *  are not nodes"), so the family is excluded by construction. */
+const SYMBOLIC_PLANE_EQ3 = /[a-z]\s*[xyz]\s*[-+=]/;
+export function upperCasedLabelCandidate3(utterance: string): string | null {
+  if (SYMBOLIC_PLANE_EQ3.test(utterance)) return null;
+  let changed = false;
+  const out = utterance.replace(/(?<![A-Za-z])([a-z][a-z0-9']{1,3})(?![A-Za-z])/g, (run: string) => {
+    changed = true;
+    return run.toUpperCase();
+  });
+  return changed ? out : null;
 }

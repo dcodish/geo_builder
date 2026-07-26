@@ -1700,4 +1700,26 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs(ab - cd), 'equal chords AB = CD (the forced consequence)').toBeLessThan(1e-3 * Math.max(ab, cd));
     },
   },
+  {
+    id: 'extend-verb-active-voice',
+    title: 'issue #350 / ADR-403: «מאריכים את הצלע AB עד לנקודה D» — the active-voice extension builds the same figure as «D על המשך AB»',
+    guards:
+      'prod (log-triage 2026-07-26) escalated this to the LLM: the ADR-054 extension lane was gated on the extension NOUN, so the textbook’s own verb register never reached it. The end-to-end risk is not the parse but the ORDER — an extension must land D beyond B (A→B→D), never between A and B, and the continuation must be DRAWN.',
+    steps: ['משולש ABC', 'מאריכים את הצלע AB עד לנקודה D'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const [A, B, D] = ['A', 'B', 'D'].map((id) => at(fig, id));
+      // D is beyond B on ray A→B: collinear, and |AD| > |AB| with B between A and D
+      const ab = dist(A, B);
+      const ad = dist(A, D);
+      const bd = dist(B, D);
+      expect(ad, 'D lies beyond B (|AD| > |AB|)').toBeGreaterThan(ab);
+      expect(ab + bd, 'A, B, D are collinear in that order').toBeCloseTo(ad, 6);
+      // the stated continuation is visible (ADR-250 honesty §6)
+      const hasBD = fig.construction.objects.some(
+        (o) => o.kind === 'segment' && ((o.a === 'B' && o.b === 'D') || (o.a === 'D' && o.b === 'B')),
+      );
+      expect(hasBD, 'the extension leg B–D is drawn').toBe(true);
+    },
+  },
 ];
