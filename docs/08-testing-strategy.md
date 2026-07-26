@@ -26,6 +26,22 @@ Define how Geo Builder is tested and — critically — **what must pass before 
 | Component | Vitest + React Testing Library + jsdom | SVG renderer output from a given figure |
 | E2E | Playwright _(proposed, headline flows)_ | Build → render → cycle alternative → export, in a real browser |
 
+## Two tiers ([ADR-394](06-decisions.md#adr-394), issue #344)
+
+| Command | Scope | Cost | Role |
+|---|---|---|---|
+| `npm run test:full` | everything | ~6 min | **The gate.** Run before every commit and every deploy. |
+| `npm run test:fast` | every file measured under 60 s | **~40 s**, ~5060 tests | The development loop. **Never a gate.** |
+| `npm run test:tiers` | — | instant | Which slow files have actually caught something |
+
+**The split is measured, never hand-written.** `test:full` records the files exceeding 60 s into `reports/test-tiers.json`; `test:fast` derives its `--exclude` list from it. A newly-slow test joins the slow tier by itself — the drift that quietly undid [ADR-280](06-decisions.md#adr-280)'s 3-min suite over two weeks. The file is rewritten only when *membership* changes, so a routine green run leaves the tree clean. Commit it: the fast tier must mean the same thing on every machine.
+
+**Why the fast tier is not a gate.** Measured by mutation: blinding `meetsRequirements` or `checkGivens` is caught in the fast tier within 42 s, but blinding `requirementSamples` (the [ADR-256](06-decisions.md#adr-256)/[ADR-295](06-decisions.md#adr-295) detection filter) passes 5007 fast tests and is caught by **exactly one** slow-tier test. The fast tier is a fast *signal*, not a proof.
+
+**Unique catches are tracked.** When a full run fails and every failure is in a slow-only file, the fast tier would have been green — that is appended to `reports/tier-catches.jsonl`. `npm run test:tiers` ranks the slow files by how often they were the only thing that caught a regression, and lists those that never have (candidates to speed up or fold into a shard). The tier split is a coverage/speed trade, so it should be re-argued from evidence rather than assumed.
+
+**Corollary for new tests — put a scenario's oracles in ONE test.** vitest isolates each *file* in its own worker, so the [ADR-280](06-decisions.md#adr-280) fold memo cannot cross files: a second oracle in a second file re-pays the entire cold solve (measured: repeat replay of the same content **0 ms** in-process, a different seed **4.9%**, a cold one **100%**). Adding a new corpus-wide property as its own file is how the suite got to 13 minutes. Add it to `scenarios-harness.ts` and call it from the shard's per-scenario test instead.
+
 ## What we test, per layer
 
 ### Engine (core — highest rigor)

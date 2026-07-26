@@ -57,7 +57,10 @@ Test strategy and per-step acceptance gates live in [`docs/08-testing-strategy.m
 
 - `npm run dev` — Vite dev server
 - `npm run build` — `tsc -b` typecheck then `vite build`
-- `npm test` — Vitest (watch mode), FULL suite — the bar before any deploy. Single file: `npx vitest run <path>`. Single test by name: `npx vitest run -t "<name>"`
+- `npm test` — Vitest (watch mode). Single file: `npx vitest run <path>`. Single test by name: `npx vitest run -t "<name>"`
+- **`npm run test:full`** — the FULL suite (~6 min) — **the bar before any commit and any deploy**. Also refreshes the measured tier membership and records any failure the fast tier would have missed ([ADR-394](docs/06-decisions.md#adr-394)).
+- **`npm run test:fast`** — every file measured under 60 s (**~40 s**, ~5060 tests) — the development loop, **never a gate**. Its exclusion list is derived from `reports/test-tiers.json`, not hand-maintained, so a newly-slow test joins the slow tier automatically.
+- `npm run test:tiers` — which slow files have actually caught a regression the fast tier missed, and which never have. **When adding a corpus-wide property, put it in `scenarios-harness.ts` and call it from the shard's per-scenario test — a new FILE re-pays every cold solve (vitest isolates files, so the ADR-280 fold memo can't cross them).**
 - `npm run test:2d` / `npm run test:3d` — per-product slice (product tree + the shared `server/` tests); one-shot: `test:run:2d` / `test:run:3d`. CI mirrors this split ([ADR-266](docs/06-decisions.md#adr-266)): a diff touching only one product runs only that lane; shared surface (server/, package.json, tsconfig, vite.config.ts, .github/) runs all lanes.
 - Path alias `@/` → `src/` (keep `tsconfig.json` and `vite.config.ts` in sync). **The alias belongs to the 2-D app only** — `vite.config.3d.ts` deliberately has none, and `server/__tests__/isolation.test.ts` fails any cross-product import (src ↔ src3d).
 
