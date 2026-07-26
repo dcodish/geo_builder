@@ -35,8 +35,9 @@
 
 import { expect } from 'vitest';
 import { parse, buildParseCtx, impliedCircleBinding } from '@/parser';
-import { replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts } from '@/store/geoStore';
+import { replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, meetsRequirements, useGeoStore } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
+import { freeDofs } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 
 export type Step =
@@ -144,14 +145,224 @@ export function factsOf(steps: Step[]): Fact[] {
   return facts;
 }
 
-/** Replay a scenario through the real parse→fact→replay path and return the derived figure. */
-export function run(steps: Step[]): Derived {
-  const facts = factsOf(steps);
+/** Replay an ALREADY-BUILT fact list at the seed the app would display (ADR-098 auto-advance). Split out
+ *  of {@link run} so a caller that needs the facts for a further oracle (the co-located seed sweep, the
+ *  round-trip properties — ADR-394) builds them ONCE and every later replay of the same content is a
+ *  fold-memo hit rather than a fresh solve. */
+export function replayFacts(facts: Fact[]): Derived {
   // Mirror the app: when a figure has free DOFs whose default placement breaks an extension's directional
   // order ("המשך" must reach the far side), the store auto-advances to the first satisfying configuration.
   // `firstSatisfyingSeed` returns 0 for any figure without that issue, so non-extension scenarios are
   // unchanged. (ADR-098.)
   return replay(facts, firstSatisfyingSeed(facts));
+}
+
+/** Replay a scenario through the real parse→fact→replay path and return the derived figure. */
+export function run(steps: Step[]): Derived {
+  return replayFacts(factsOf(steps));
+}
+
+// ── the seed-sweep oracle ──────────────────────────────────────────────────
+/**
+ * Seed-sweep oracle ([docs/15-hardening-plan.md](../../docs/15-hardening-plan.md) A2 / TST-1).
+ *
+ * The `run` check tests each scenario at ONE seed (the app's default, `firstSatisfyingSeed`). But the
+ * dominant historical escape class is *wrong-configuration-at-another-seed* — a figure that builds clean
+ * yet is geometrically wrong in some OTHER valid draw the student can reach via "show another
+ * configuration" (ADR-085/098/127/166 all shipped past seed-0 suites). This re-runs each scenario's OWN
+ * geometric `check` — the independent oracle that already exists — at EVERY seed the app would actually
+ * DISPLAY (`meetsRequirements` true), asserting the ground-truth relations hold in every shown config,
+ * not just the default one.
+ *
+ * Scope (principled, not arbitrary): only scenarios with FREE DOFs are swept — a determined figure is
+ * seed-invariant, so the single-seed check already covers it. Heavy figures are skipped and LOGGED (no
+ * silent caps — repo rule). A scenario whose `check` asserts a CONFIG-SPECIFIC fact (a branch / vertex
+ * order that legitimately varies) opts out via {@link SEED_SWEEP_EXEMPT}.
+ *
+ * CO-LOCATED (ADR-394): this runs inside the per-scenario e2e test, against the fact list that test
+ * already built, so the seed-0 solve is a fold-memo hit and only the extra seeds cost anything (measured:
+ * a same-facts different-seed replay is ~5% of a cold one). It used to be one corpus-wide `it()` in its
+ * own file, which re-paid every cold solve — 601 s, the single largest test in the suite.
+ */
+
+/**
+ * CONFIG-SPECIFIC scenarios exempt from the seed-sweep — their `check` asserts a value that legitimately
+ * VARIES across the valid configs "show another configuration" reaches (a free radius, an unstated
+ * extension distance, an arc position, a size-dependent separation / convexity gap), so it can only hold at
+ * the default seed. Their geometric INVARIANTS (angle relations, on-circle membership, collinearity) DO
+ * hold across seeds — verified when this oracle was built; only the config-pinned numbers move. The
+ * single-seed check still guards each at its default. (Kept as ONE legible list, id → why.)
+ */
+export const SEED_SWEEP_EXEMPT: Record<string, string> = {
+  'symbolic-2alpha-drives-shape-not-the-fixed-point': 'D is on an UNSTATED extension (המשך BC, no distance) — an ADR-052 free DOF, so its t legitimately varies; the ∠BOC=2∠CAD invariant holds every seed',
+  'two-collinear-chain-solves': 'the check pins circle P’s radius (|PD|≈3.6) — a free-radius DOF that varies across views',
+  'line-through-intersection-collinear': 'pins |PC| to the default free radius; the collinearity invariant holds every seed',
+  'second-intersection-avoids-shared-point': 'pins E’s distance to the default radius and a size-dependent A–C separation; E stays on the circle',
+  'redefine-existing-point-onto-circle': 'the E–A separation (>0.5) scales with the free radii; E stays ON circle P and A,C,E collinear every seed',
+  'point-on-arc-no-midpoint-word': 'a FREE point on the arc — its position varies by design (ADR-042); no fixed arc coordinate is an invariant',
+  'perp-constraint-keeps-quad-convex': 'the convex-gap threshold (15°) is stricter than the app’s displayable-convexity gate; a valid ~12° corner appears at some seeds',
+  'tangent-chord-bisector': 'same convex-gap threshold vs the displayable gate — a valid tight corner at one seed',
+  'tangent-secant-detection-honours-valid-configs': 'the check runs detectRelations/detectShapes, which sample the figure internally across their own seeds — the ground-truth relations it asserts are seed-invariant by construction, so a per-display-seed re-run only repeats the same internal detection',
+};
+
+/**
+ * KNOWN-HEAVY scenarios (a single replay is slow — coupled solves / reflection sweeps / large corpora),
+ * pre-skipped so the default sweep doesn't pay their cost even to MEASURE them. The `THRESHOLD_MS` guard
+ * in {@link sweepSeeds} still auto-catches any NEW heavy scenario. Populated from the sweep's own timing
+ * log; each is swept only in the deep pass (`SEED_SWEEP_MULT` set). Their default config is still guarded
+ * by the per-scenario e2e check.
+ */
+export const SEED_SWEEP_HEAVY = new Set<string>([
+  'segment-meet-lands-on-segments', 'emergent-shapes-through-crossings', 'incircle-of-trapezoid-flexes-tangential',
+  'area-ratio-converges-points-allowed', 'driven-extension-point-stays-beyond', 'q4-constraints-order-independent',
+  'collinear-flexes-redundant-carrier-kite-tangents', 'diameter-from-point-cuts-side-onto-segment',
+  'alpha-less-than-beta-reshapes', 'kite-tangents-redundant-equality-not-over-constrained',
+  // Was skipped DYNAMICALLY by the pre-ADR-394 `replay(facts, 0)` timing guard (a ~29 s sweep), so it has
+  // never actually been swept. Listing it keeps that same behaviour explicit rather than accidental. The
+  // deep pass (SEED_SWEEP_MULT) does sweep it, and there it FAILS at seed 2 with
+  // `over-constrained: |O2M| = 16 cannot hold` — a genuine pre-existing cross-seed defect, filed as #345.
+  'common-tangent-two-circles',
+]);
+
+/**
+ * Run the seed sweep for ONE scenario over the fact list its e2e check already built. Throws (failing that
+ * scenario's own test) if any displayable config violates the scenario's check — so a cross-seed break is
+ * attributed to the scenario that broke, instead of being pooled into one corpus-wide failure list.
+ */
+export function sweepSeeds(sc: Scenario, facts: Fact[]): void {
+  const deep = !!process.env.SEED_SWEEP_MULT;
+  const N = Number(process.env.SEED_SWEEP_MULT) || 3; // seeds 0..N-1; a cross-seed bug shows at a low seed
+  // A seed's replay slower than this ⇒ a heavy coupled figure; stop sweeping it and LOG (the backstop that
+  // auto-catches a NEW heavy scenario). NOTE it measures a SWEPT seed, not `replay(facts, 0)` as the
+  // pre-ADR-394 standalone oracle did: co-located, seed 0 is a memo hit and would always time at ~0 ms,
+  // silently disabling this guard. A swept seed is also the honest number — it IS the marginal cost.
+  const THRESHOLD_MS = 700;
+  if (sc.expectViolations || SEED_SWEEP_EXEMPT[sc.id]) return; // intentional-flag / config-specific → not this oracle
+  if (!deep && SEED_SWEEP_HEAVY.has(sc.id)) return; // known-heavy, listed above (visible, not silent)
+  const base = replay(facts, 0);
+  if (freeDofs(base.construction).length === 0) return; // determined ⇒ seed-invariant; the single-seed check covers it
+
+  const failures: string[] = [];
+  for (let s = 0; s < N; s++) {
+    if (!meetsRequirements(facts, s)) continue; // the app would not display this config
+    const t0 = performance.now();
+    const fig = replay(facts, s);
+    const elapsed = performance.now() - t0;
+    try {
+      sc.check(fig);
+    } catch (e) {
+      failures.push(`seed ${s}: ${(e as Error).message.split('\n')[0]}`);
+    }
+    if (elapsed > THRESHOLD_MS && s + 1 < N) {
+      // No silent caps: a newly-heavy scenario announces itself and names the list to add it to.
+      // eslint-disable-next-line no-console
+      console.log(`seed-sweep: [${sc.id}] stopped after seed ${s} (${Math.round(elapsed)}ms/replay) — add to SEED_SWEEP_HEAVY`);
+      break;
+    }
+  }
+  expect(failures, `[${sc.id}] configs the app would display but that fail the scenario check:\n${failures.join('\n')}`).toEqual([]);
+}
+
+// ── E7 / TST-4: algebraic round-trip properties ────────────────────────────
+/**
+ * Algebraic ROUND-TRIP properties over the scenario corpus (ADR-206). Store ops mutate facts via
+ * JSON/string rewriting — historically the highest-density bug area (ADR-122's relabel corruption; the
+ * review's S1 partial structured-id rename) — yet only example-based tests existed. The real scenarios
+ * ARE the generator (no fast-check needed):
+ *   1. swap(a,b) ∘ swap(a,b) = identity (commands AND utterances byte-equal);
+ *   2. rename A→Z9 ∘ rename Z9→A = identity;
+ *   3. disable-then-re-enable a fact restores the exact figure (replay is deterministic in content);
+ *   4. permuting two trailing constraint-only sibling groups leaves the figure verifier-clean
+ *      (ADR-104 order-independence, exercised on real corpora).
+ *
+ * CO-LOCATED (ADR-394): runs against the fact list the scenario's e2e check already built. Properties
+ * 1–3 then cost almost nothing (string ops + fold-memo hits), so they now run over the WHOLE corpus
+ * instead of the old `SCENARIOS.slice(0, 40)` / `slice(0, 12)` samples — broader coverage, less time.
+ * Property 4 genuinely re-solves (a permuted fact list is new content, so a new memo key), hence a
+ * per-slice cap. Standalone, these three tests cost 765 s, most of it re-deriving facts the shards had
+ * already derived.
+ */
+export interface RoundTripCounters {
+  swapped: number;
+  renamed: number;
+  toggled: number;
+  permuted: number;
+}
+export const newRoundTripCounters = (): RoundTripCounters => ({ swapped: 0, renamed: 0, toggled: 0, permuted: 0 });
+
+const pointLabelsOf = (facts: Fact[]): string[] => {
+  const set = new Set<string>();
+  for (const f of facts)
+    for (const [k, v] of Object.entries(f.cmd)) {
+      if (k === 'expr' || k === 'type') continue;
+      for (const e of Array.isArray(v) ? v : [v]) if (typeof e === 'string' && /^[A-Z]\d*$/.test(e)) set.add(e);
+    }
+  return [...set];
+};
+const snapshot = (facts: Fact[]) =>
+  JSON.stringify(facts.map((f) => ({ cmd: f.cmd, utterance: f.utterance, enabled: f.enabled })));
+
+/**
+ * Run the round-trip properties for ONE scenario, tallying what was actually exercised into `c` so the
+ * slice can assert it didn't silently stop exercising them (the "no silent caps" repo rule).
+ * `permCap` bounds property 4's genuinely-new solves per slice.
+ */
+export function roundTripProps(sc: Scenario, facts: Fact[], c: RoundTripCounters, permCap = 2): void {
+  const store = () => useGeoStore.getState();
+  const before = snapshot(facts);
+  const labels = pointLabelsOf(facts);
+
+  // 1 + 2 — swap∘swap and rename∘rename⁻¹ are identities (Z9 is never a scenario label).
+  if (labels.length >= 2) {
+    const [a, b] = labels;
+    useGeoStore.setState({ facts });
+    if (store().swap(a, b).ok) {
+      store().swap(a, b);
+      expect(snapshot(store().facts), `[${sc.id}] swap(${a},${b}) twice must be the identity`).toBe(before);
+      c.swapped++;
+    }
+    useGeoStore.setState({ facts });
+    if (store().rename(a, 'Z9').ok) {
+      expect(store().rename('Z9', a).ok).toBe(true);
+      expect(snapshot(store().facts), `[${sc.id}] rename ${a}→Z9→${a} must be the identity`).toBe(before);
+      c.renamed++;
+    }
+  }
+
+  // 3 — disable then re-enable the last fact restores the exact figure.
+  if (facts.length >= 2) {
+    const baseline = replay(facts, 0);
+    useGeoStore.setState({ facts, seed: 0 });
+    const target = store().facts[store().facts.length - 1];
+    store().toggle(target.id);
+    store().toggle(target.id);
+    const after = replay(store().facts, 0);
+    expect(after.lastError, `[${sc.id}] re-enable must restore a clean build`).toBe(baseline.lastError);
+    for (const [id, p] of baseline.positions) {
+      const q = after.positions.get(id);
+      expect(q, `[${sc.id}] ${id} exists after the round-trip`).toBeTruthy();
+      expect(Math.hypot(p.x - q!.x, p.y - q!.y), `[${sc.id}] ${id} restored`).toBeLessThan(1e-9);
+    }
+    c.toggled++;
+  }
+
+  // 4 — permuting two trailing constraint-only groups keeps the figure verifier-clean (ADR-104).
+  const isConstraintOnly = (f: Fact) => f.cmd.type.startsWith('set-');
+  const n = facts.length;
+  if (c.permuted < permCap && !sc.expectViolations && n >= 3) {
+    const [x, y] = [facts[n - 2], facts[n - 1]];
+    if (isConstraintOnly(x) && isConstraintOnly(y) && x.group !== y.group) {
+      const base = replay(facts, 0);
+      if (base.lastError === null && base.violations.length === 0) {
+        const fig = replay([...facts.slice(0, n - 2), y, x], 0);
+        expect(fig.lastError, `[${sc.id}] trailing-constraint order must not matter`).toBeNull();
+        expect(fig.violations, `[${sc.id}] permuted figure stays verifier-clean`).toEqual([]);
+        c.permuted++;
+      }
+    }
+  }
+
+  useGeoStore.getState().clear();
 }
 
 // ── check helpers ──────────────────────────────────────────────────────────

@@ -12,9 +12,10 @@
  * solution, transactional — rolled back if it breaks any sibling given).
  */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { dot3, norm3, dist3 } from '../engine/vec3';
 import { derive3, useGeo3 } from '../store/store3';
+import type { Fact3 } from '../store/store3';
 
 function reset() {
   useGeo3.setState({ facts: [], seed: 0, lastError: null });
@@ -23,6 +24,18 @@ function reset() {
 const submit = (u: string) => useGeo3.getState().submit(u);
 const state = () => useGeo3.getState();
 const derived = (seed = state().seed) => derive3(state().facts, seed);
+
+/**
+ * A built store state, captured once and restored per test (ADR-394). The store is fact-driven
+ * (derive-on-demand), so `{facts, seed}` IS the whole build — restoring it is exactly equivalent to
+ * having typed the utterances again, minus the ~60 s of re-solving. The exam sequence is still TYPED
+ * end-to-end through the real `submit` path (in `beforeAll` below, and again in its own order for the
+ * order-independence test), so the standing "the operator's exact sequence is the regression" rule is
+ * satisfied — it just isn't paid for five times.
+ */
+type Built = { facts: Fact3[]; seed: number };
+const capture = (): Built => ({ facts: structuredClone(state().facts), seed: state().seed });
+const restore = (b: Built) => useGeo3.setState({ facts: structuredClone(b.facts), seed: b.seed, lastError: null });
 
 const planeDist = (d: ReturnType<typeof derived>, plane: string, id: string): number => {
   const pl = d.resolved.planes.get(plane)!;
@@ -43,12 +56,24 @@ const EXAM = [
   'k>0',
 ];
 
+/** The exam typed ONCE through the real submit path, and the same figure with the operator's final
+ *  membership utterance applied — the two states every scenario test below starts from. */
+let EXAM_BUILT: Built;
+let DRIVEN: Built;
+
+beforeAll(() => {
+  reset();
+  for (const u of EXAM) submit(u); // the operator's exact sequence, typed end-to-end
+  EXAM_BUILT = capture();
+  submit("M על מישור DCC'D'"); // the operator's exact final utterance
+  DRIVEN = capture();
+});
+
 describe('ADR-3D-033 — scenario: M on a face plane drives the box depth (session n6lmx1rj)', () => {
   beforeEach(reset);
 
   it("the operator's exact sequence builds; the depth lands at 40√3/9 and every given still holds", () => {
-    for (const u of EXAM) submit(u);
-    submit("M על מישור DCC'D'"); // the operator's exact final utterance
+    restore(DRIVEN);
     expect(state().lastError).toBeNull();
     const d = derived();
     expect(Object.values(d.status).every((s) => s === 'ok')).toBe(true);
@@ -73,8 +98,7 @@ describe('ADR-3D-033 — scenario: M on a face plane drives the box depth (sessi
   });
 
   it('"show another configuration" keeps the membership satisfied (a requirement, not a sample)', () => {
-    for (const u of EXAM) submit(u);
-    submit("M על מישור DCC'D'");
+    restore(DRIVEN);
     for (const seed of [1, 2, 3]) {
       const d = derived(seed);
       expect(Object.values(d.status).every((s) => s === 'ok')).toBe(true);
@@ -141,7 +165,7 @@ describe('ADR-3D-033 — the class, beyond the reported instance', () => {
   });
 
   it('a degenerate-only "solution" is rejected: B on face DCC\'D\' would need depth 0 (a collapsed box)', () => {
-    for (const u of EXAM) submit(u);
+    restore(EXAM_BUILT);
     const n = state().facts.length;
     submit("B על מישור DCC'D'"); // B−C ∥ the face normal — only a zero depth "satisfies" it
     expect(state().facts).toHaveLength(n);
@@ -149,8 +173,7 @@ describe('ADR-3D-033 — the class, beyond the reported instance', () => {
   });
 
   it("a driven membership never breaks sibling givens (transactional): the figure with M on the WRONG side still keeps A's sign", () => {
-    for (const u of EXAM) submit(u);
-    submit("M על מישור DCC'D'");
+    restore(DRIVEN);
     const d = derived();
     expect(d.resolved.positions.get('A')!.y).toBeLessThan(0); // the sign given held through the drive
     expect(d.resolved.param?.roots?.length).toBeGreaterThan(0); // the root-find survived

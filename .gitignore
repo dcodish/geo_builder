@@ -19,7 +19,14 @@ logs/
 
 # Vite temp config
 vite.config.ts.timestamp-*.mjs
-reports/
+# Reports are local scratch (audit dumps, fill orders) — EXCEPT the two test-tier artifacts, which are
+# durable project state and must travel between machines like docs/ (ADR-394): the measured tier
+# membership that `npm run test:fast` derives its exclusion list from, and the longitudinal record of
+# which full-suite failures the fast tier would have missed. Both are low-churn by construction —
+# the tier file is rewritten only when membership actually changes, the log only appended on a failure.
+reports/*
+!reports/test-tiers.json
+!reports/tier-catches.jsonl
 dist-3d
 
 # Assistant worktrees (stale copies can hold unreadable Dropbox placeholders;
