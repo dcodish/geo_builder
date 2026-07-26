@@ -13,10 +13,10 @@
  *  - `bare-solid` — a bare «פירמידה»/«מנסרה» (deliberately refused, the base is ambiguous): say
  *    WHAT to add instead of a flat refusal.
  *  - `ui-command` — «סימון זווית ישרה D»: marks derive from givens; state the given («זווית D = 90»).
- *  - `oblique-prism` (#321, ADR-3D-078) — a prism NOT stated right over a base OUTSIDE the
- *    parallelogram family (triangle / general quad / n-gon), or an explicit «מנסרה נטויה»: no oblique
- *    model exists for these bases — say what works (add «ישרה», or a parallelogram-family base which
- *    builds oblique and is pinned by «המנסרה ישרה»).
+ *  - `oblique-prism` (#321, ADR-3D-078; narrowed by #349/ADR-3D-089) — a prism NOT stated right whose
+ *    base has no honest oblique model: a REGULAR pentagon/hexagon (the template would assert unstated
+ *    regularity, ADR-052), or a base-less «מנסרה נטויה». Triangle / quad / parallelogram-family bases
+ *    now BUILD oblique, so they are deliberately excluded.
  *
  * No-theft invariant (locked by scope3.test.ts): every supported catalog3 example, both locales,
  * classifies null — a real construction never gets a guidance brush-off.
@@ -70,15 +70,22 @@ const RULES3: ScopeRule3[] = [
     patterns: [/^\s*(?:נתו(?:ן|נה)\s*:?\s+)?(?:ה?פי?רמידה|מנסרה)\s*\.?\s*$/, /^\s*(?:given\s+a\s+)?(?:pyramid|prism)\s*\.?\s*$/i],
   },
   {
-    // #321 (ADR-3D-078): a prism NOT stated right over a base with no oblique model (triangle /
-    // general quad / n-gon), or an explicitly-oblique «מנסרה נטויה». The parallelogram family
-    // (מקבילית/מעוין/מלבן/ריבוע) BUILDS oblique — excluded so a supported form is never brushed off.
+    // #321 (ADR-3D-078), narrowed by #349 (ADR-3D-089): a prism NOT stated right whose base has no
+    // honest oblique model. Since #349 obliqueness is a MODIFIER of any prism kind, so the triangle /
+    // general-quad / parallelogram-family bases all BUILD oblique and are excluded here.
+    // What REMAINS refused:
+    //  - a REGULAR pentagon/hexagon base — the only template asserts regularity, which the student did
+    //    not state (ADR-052), so building it would invent a given;
+    //  - an explicitly-oblique «מנסרה נטויה» / «oblique prism» with NO base noun — the base is missing,
+    //    the same ambiguity as the bare «מנסרה» (`bare-solid`).
     category: 'oblique-prism',
     patterns: [
       // the noun is anchored to the base marker / the adjectival slot, so a failed utterance that merely
-      // MENTIONS a triangle near an existing prism is never stolen from the LLM lane
-      /^(?!.*ישרה)(?=.*מנסרה)[\s\S]*(?:שבסיס[הו]\s+ה?(?:משולש|מרובע|מחומש|משושה)|מנסרה\s+(?:משולשת|מרובעת|מחומשת|משושה)|נטויה)/,
-      /^(?!.*\bright\b)(?=.*\bprism\b)[\s\S]*(?:\b(?:triangular|quadrilateral|pentagonal|hexagonal)\s+prism\b|\b(?:triangle|triangular|quadrilateral|quad|pentagon|hexagon)\s+base\b|\bbase\s+is\s+(?:a\s+)?(?:triangle|quadrilateral|quad|pentagon|hexagon)\b|\boblique\b)/i,
+      // MENTIONS a pentagon near an existing prism is never stolen from the LLM lane
+      /^(?!.*ישרה)(?=.*מנסרה)[\s\S]*(?:שבסיס[הו]\s+ה?(?:מחומש|משושה)|מנסרה\s+(?:מחומשת|משושה))/,
+      /^(?!.*ישרה)(?=.*מנסרה\s+נטויה)(?!.*(?:שבסיס[הו]|משולשת|מרובעת|מקבילון))/,
+      /^(?!.*\bright\b)(?=.*\bprism\b)[\s\S]*(?:\b(?:pentagonal|hexagonal)\s+prism\b|\b(?:pentagon|hexagon)\s+base\b|\bbase\s+is\s+(?:a\s+)?(?:pentagon|hexagon)\b)/i,
+      /^(?!.*\bright\b)(?=.*\boblique\b)(?=.*\bprism\b)(?!.*\bbase\b)/i,
     ],
   },
 ];

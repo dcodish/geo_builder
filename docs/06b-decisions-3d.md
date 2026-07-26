@@ -1294,3 +1294,34 @@ This is the docs/17 §2.2 class — *one relation reachable through only one phr
 **A regression caught in flight, worth recording.** The first cut of the atom put its triple regex in a plain template literal instead of `String.raw`, so `\s+` collapsed to `s+`. `∠SAB = ∠SAD` still passed (that branch has no `\s`), while `זווית SAB שווה לזווית SAD` silently stopped parsing — a form that had worked for months. The probe caught it because it exercised the must-not-change forms alongside the new ones; the lock now asserts all three spellings explicitly.
 
 Locked by `angle-phrase.test.ts` (11 — both languages of the reported wording, the `נתון ש` framing, noun interchangeability, declared-vector operands, mixed forms, and the unchanged triple / chained-label / numeric-RHS / distinct-point behaviours). 7 of the 11 verified failing against the pre-fix parser; the other 4 are the must-not-change guards. Catalog +1.
+### ADR-3D-089 — Obliqueness is a MODIFIER of any prism kind, not a base-specific template (#349)
+
+**Class.** *A property that applies uniformly across a family is implemented as one member's bespoke template, so every other member of the family is unreachable — and the refusal is then rationalized as a geometric limit.* The sibling of ADR-3D-069 (one grammar for a coefficient, where a carve-out HID the gap) and ADR-3D-071 (a proxy signal standing in for the semantic fact): here the proxy was "which KIND is it" for the question "is the top ring translated straight up, or freely".
+
+**Instance (prod, log-triage 2026-07-26).** One user typed `מנסרה שבסיסה משולש` **five times** and `מנסרה משולשת` once, each bouncing off the `oblique-prism` guidance. The operator's reaction — *"we must support מנסרה משולשת and מנסרה שבסיסה משולש. not sure what adr078 would say we dont"* — was right: nothing geometric was in the way.
+
+**Why it refused.** [ADR-3D-078](#adr-3d-078) refused because of an implementation fact, not a geometric one. `solidPositions` built every prism as *a base ring in the z=origin plane plus a copy translated upward*, and the only template whose translation was a FREE vector was `parallelepiped` — hard-wired to a 4-vertex parallelogram base:
+
+```
+prism3  (triangle)  base from (α,β)     + (0,0,h)   right
+prism4  (par'gram)  AB=(1,0), AD=(dx,dy)+ (0,0,h)   right
+prism4g (gen. quad) A,B gauge; C,D free + (0,0,h)   right
+parallelepiped      AB=(1,0), AD=(dx,dy)+ w (FREE)  ← the one oblique template
+```
+
+Since [ADR-3D-058](#adr-3d-058) forbids inventing an unstated "right" ([ADR-052](06-decisions.md#adr-052)), a triangular base left only two options: refuse with guidance (what shipped) or assert rightness (forbidden). The guidance text even said "no oblique model exists for these bases" — true of the code, misleading about the geometry.
+
+**Root fix.** Obliqueness is **one lateral translation**, so it becomes a flag rather than a kind:
+
+- **`prismBaseDims` / `prismBaseRing`** (evaluate.ts) — the base ring's dims and geometry factored out of the lateral translation, per prism kind, with sample keys and ranges **verbatim** from the branches they replace (so every right prism is bit-identical). This pair *is* the mechanism: every prism, right or oblique, is now `baseRing + one lateral` — `(0,0,h)` or the free `w`.
+- **`oblique?: true`** on `SolidCommand`/`SolidObj`. Dims = base dims + `(wx,wy,wz)` instead of + `height` (2 DOF more, counted by the new shared `solidDimCount`). Topology is untouched — an oblique prism has the same ring as the right prism of its kind, which is exactly why the tilt can be a flag.
+- **`parallelepiped` is now a spelling, not a kind** — `apply` normalizes it to `prism4` + `oblique` at the one entry point every construction passes through (typed commands *and* loaded `.geo3.json` files), leaving **exactly one oblique code path** in the engine. The evaluator additionally treats the legacy kind as implicitly oblique, so an un-normalized one could never render as a right prism.
+- **`make-right-prism` (#289) clears the flag** for any base, replacing the `parallelepiped → prism4` special case. So «המנסרה ישרה» straightens a triangular prism exactly as it straightens a מקבילון.
+- **The M1 re-declare path** (ADR-3D-047) now compares obliqueness: the same prism re-declared *right* (`מנסרה משולשת` → `מנסרה ישרה שבסיסה משולש`) is the statement that it is right and straightens it, instead of the idempotent no-op that would have silently dropped the stated rightness (ADR-3D-058). The converse keeps the honest `already-defined` conflict.
+- **Parser:** `parallelepiped` → `obliquePrism`, dispatching the SAME base nouns as `rightPrism` with the tilt left free. Non-template bases ride the ADR-110 constraint macros unchanged (rhombus ⇒ `length-rel`, rectangle ⇒ `cos-angle 0`, square ⇒ both).
+
+**Deliberately still refused.** A **regular** pentagon/hexagon base: its only template asserts REGULARITY, which the student did not state — building it would trade one ADR-052 violation for another. The `oblique-prism` guidance family narrows to that plus a base-less «מנסרה נטויה», and its message now leads with what *does* work.
+
+**Locks moved deliberately.** Five test files asserted the old representation (`kind === 'parallelepiped'`) or the old refusal; each was updated with the reason recorded in-file, and every one keeps its *semantic* assertion (a shared lateral vector, the driven base constraints, the DOF counts). The inverted ones are explicit: `oblique-prism.test.ts`'s "a base OUTSIDE the family stays the honest refusal" and `parse3.test.ts`'s "an OBLIQUE prism is refused" now assert the build. `מקבילון`'s sample key changes with its kind, so its seed-0 drawing is a different (equally valid) sample of the same free DOFs — no assertion depended on the values.
+
+Locked by `oblique-any-base.test.ts` (the reported utterances build oblique He+En; the lateral is shared by every vertical edge AND non-vertical; the tilt varies across seeds so it is a genuine free DOF, not a default; «המנסרה ישרה» straightens the triangular prism to a ⟂ lateral and drops exactly 2 DOF; the M1 re-declare straightens rather than no-ops; the DOF cue is monotone; מקבילון unchanged at 5→3 DOF — the proof the general path subsumes the special one; pentagon/hexagon still refused) + the updated #117/#295/#321 locks; catalog +3.

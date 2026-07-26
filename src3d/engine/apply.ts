@@ -176,9 +176,14 @@ function relPointIds(c: Construction3, from: Id, to: Id, terms: { atom: import('
 
 /** How many FREE dims the figure's solids carry (a scalar statement on such a figure is a GIVEN, not a check). */
 const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2, pyramid4g: 3, pyramid4r: 2, pyramid4gr: 4, prism3e: 1, pyramid3e: 1, pyramidPar: 5, polygon3: 2, polygon4: 4, polygon5: 6, prism4: 3, prism4g: 5, prism4sq: 1, prismReg5: 1, prismReg6: 1, parallelepiped: 5 };
+/** #349: an OBLIQUE prism trades its single height for the free lateral vector w — two dims more than
+ *  the right prism of the same kind (the counts above are the RIGHT ones; `parallelepiped` already
+ *  counts its w, being oblique by definition). */
+export const solidDimCount = (s: { kind: SolidCommand['kind']; oblique?: true }): number =>
+  DIM_COUNT[s.kind] + (s.oblique && s.kind !== 'parallelepiped' ? 2 : 0);
 function freeDims(c: Construction3): number {
   let n = 0;
-  for (const s of c.solids) n += DIM_COUNT[s.kind];
+  for (const s of c.solids) n += solidDimCount(s);
   for (const r of c.revolutions) {
     if (r.radius === undefined) n++;
     if (r.kind !== 'sphere' && r.height === undefined) n++;
@@ -344,6 +349,12 @@ export function applyCommand3(c: Construction3, cmd: Command3): ApplyResult3 {
 function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
   switch (cmd.type) {
     case 'solid': {
+      // #349 (ADR-3D-089): `parallelepiped` is the legacy spelling of `prism4` + `oblique` — normalize it
+      // HERE, at the one entry point every construction passes through (typed commands and loaded
+      // `.geo3.json` files alike), so the engine downstream has exactly ONE oblique code path.
+      if (cmd.kind === 'parallelepiped') {
+        return applyCommand3(c, { ...cmd, kind: 'prism4', oblique: true });
+      }
       const n = VERTEX_COUNT[cmd.kind];
       if (cmd.ids.length !== n || new Set(cmd.ids).size !== n) {
         return { ok: false, error: { code: 'bad-solid', kind: cmd.kind } };
@@ -359,8 +370,18 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // about the figure, not a re-creation — idempotent no-op (the solid-shaped sibling of the
       // #116 flat-polygon path above and the segment3 convention below). A different kind or a
       // partial id overlap keeps the honest conflict error.
-      if (c.solids.some((sld) => sld.kind === cmd.kind && sld.ids.length === cmd.ids.length && sld.ids.every((id, i) => id === cmd.ids[i]))) {
+      const sameIds = (sld: SolidObj): boolean =>
+        sld.kind === cmd.kind && sld.ids.length === cmd.ids.length && sld.ids.every((id, i) => id === cmd.ids[i]);
+      if (c.solids.some((sld) => sameIds(sld) && !!sld.oblique === !!cmd.oblique)) {
         return { ok: true, next: c };
+      }
+      // #349: the SAME prism re-declared with the tilt resolved — «מנסרה משולשת» then «מנסרה ישרה שבסיסה
+      // משולש» — is the M1 statement that it is right, not a re-creation: straighten it (the shared
+      // `make-right-prism` path), never a silent no-op that would drop the stated rightness (ADR-3D-058).
+      // The converse (a RIGHT prism re-declared oblique) contradicts the figure and keeps the honest
+      // `already-defined` conflict below.
+      if (!cmd.oblique && c.solids.some((sld) => sameIds(sld) && sld.oblique)) {
+        return applyCommand3(c, { type: 'make-right-prism' });
       }
       // ADR-3D-080 (M1): a PYRAMID whose ids ALL exist is a statement ABOUT those points —
       // «SBCD פירמידה ישרה» on a figure carrying S, B, C, D (operator, 2026-07-25). Draw the
@@ -429,8 +450,11 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const solid: SolidObj = {
         kind: cmd.kind,
         ids: [...cmd.ids],
+        // #349: an oblique prism has the SAME topology as the right prism of its kind (same ring) — only
+        // its dims and positions differ, which is what lets the tilt be a flag rather than a kind.
         edges: edgeIndices(cmd.kind).map(([i, j]) => [at(i), at(j)] as [Id, Id]),
         faces: faceIndices(cmd.kind).map((ring) => ring.map(at)),
+        ...(cmd.oblique ? { oblique: true as const } : {}),
       };
       const solidIndex = next.solids.length;
       next.solids.push(solid);
@@ -440,22 +464,24 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
 
     case 'make-right-prism': {
       // #289 (M1): "the prism is right" — a statement about THE existing solid, never a re-construction.
-      // The oblique `parallelepiped` (parallelogram base + a FREE lateral vector) converts to `prism4` (the
-      // right prism over the SAME parallelogram base — identical vertex order & topology, prismRing(4), so
-      // the vertices/edges/faces are untouched and no id is re-declared); its lateral vector is now pinned ⟂
-      // base, dropping 2 DOF. An already-right prism is an idempotent no-op (the statement already holds).
+      // #349 (ADR-3D-089): straightening is now CLEARING THE OBLIQUE FLAG, for any base — the lateral
+      // vector w is replaced by a height ⟂ the base (2 DOF fewer) while the kind, vertex order and
+      // topology are untouched, so no id is re-declared. Works uniformly for the triangular / quad /
+      // parallelogram (מקבילון) prisms because they share one oblique mechanism.
+      // An already-right prism is an idempotent no-op (the statement already holds).
       const RIGHT_PRISM = new Set(['prism3', 'prism3e', 'prism4', 'prism4g', 'prism4sq', 'prism4r', 'prismReg5', 'prismReg6', 'box', 'cube']);
-      const oblique = c.solids.filter((s) => s.kind === 'parallelepiped');
-      const rightOnes = c.solids.filter((s) => RIGHT_PRISM.has(s.kind));
+      const oblique = c.solids.filter((s) => s.oblique);
+      const rightOnes = c.solids.filter((s) => !s.oblique && RIGHT_PRISM.has(s.kind));
       if (oblique.length === 0 && rightOnes.length === 0) return { ok: false, error: { code: 'no-prism-to-make-right' } };
       if (oblique.length === 0) return { ok: true, next: c }; // every prism-like solid is already right — idempotent
       if (oblique.length > 1) return { ok: false, error: { code: 'ambiguous-prism' } }; // which oblique prism?
       const target = oblique[0];
       const next = clone(c);
       const idx = next.solids.findIndex(
-        (s) => s.kind === 'parallelepiped' && s.ids.length === target.ids.length && s.ids.every((id, i) => id === target.ids[i]),
+        (s) => s.oblique && s.kind === target.kind && s.ids.length === target.ids.length && s.ids.every((id, i) => id === target.ids[i]),
       );
-      next.solids[idx] = { ...next.solids[idx], kind: 'prism4' }; // same ids/edges/faces; lateral vector now ⟂ base
+      const { oblique: _wasOblique, ...right } = next.solids[idx]; // same ids/edges/faces; lateral now ⟂ base
+      next.solids[idx] = right;
       return { ok: true, next };
     }
 

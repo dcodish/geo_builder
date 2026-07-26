@@ -31,8 +31,63 @@ function apexFromBaseAngles(alpha: number, beta: number): { x: number; y: number
   return { x, y };
 }
 
-/** The FREE dims a solid kind carries (sampled per seed; the pivot solves over them — ADR-3D-007). */
-export function solidDims(kind: SolidKind, key: string, seed: number): number[] {
+/**
+ * #349 (ADR-3D-089): a prism's BASE dims — every dim EXCEPT the trailing lateral one. The lateral is a
+ * single height (right) or the free vector w (oblique), which is exactly what makes obliqueness a
+ * modifier rather than a per-base template: the base ring is sampled and built identically either way.
+ * Returns null for a non-prism kind (cube/box/pyramids/flat polygons own their whole dim vector).
+ *
+ * Sample keys and ranges are preserved verbatim from the per-kind branches this replaces, so every
+ * RIGHT prism's dims are bit-identical to before the refactor.
+ */
+function prismBaseDims(kind: SolidKind, key: string, seed: number): number[] | null {
+  switch (kind) {
+    case 'prism3': // general triangle base: the two base angles
+      return [rad(sample(seed, `${key}-alpha`, 38, 72)), rad(sample(seed, `${key}-beta`, 38, 72))];
+    // parallelogram base: 2nd edge AD=(dx,dy). #291: dx bounded away from 0 so ∠DAB reads visibly oblique at
+    // EVERY seed (a `מקבילית` base must never render as a rectangle — ADR-052: a default must not look like a
+    // special case). `parallelepiped` is the legacy spelling of prism4+oblique and shares its base exactly.
+    case 'prism4': case 'parallelepiped':
+      return [sample(seed, `${key}-dx`, 0.3, 0.6), sample(seed, `${key}-dy`, 0.6, 1.2)];
+    case 'prism4g': // general quad base: C=(cx,cy), D=(dx,dy) free (A,B are the gauge)
+      return [
+        sample(seed, `${key}-cx`, 0.9, 1.5), sample(seed, `${key}-cy`, 0.6, 1.2),
+        sample(seed, `${key}-dx`, -0.3, 0.4), sample(seed, `${key}-dy`, 0.6, 1.2),
+      ];
+    case 'prism4r': // rhombus base: the base angle at A (side 1 = gauge)
+      return [rad(sample(seed, `${key}-angle`, 45, 75))];
+    case 'prism3e': case 'prism4sq': case 'prismReg5': case 'prismReg6':
+      return []; // the base shape IS the gauge — nothing free about it
+    default:
+      return null;
+  }
+}
+
+/** A right prism's height range, per base kind (verbatim from the branches `prismBaseDims` replaces). */
+const PRISM_HEIGHT: Partial<Record<SolidKind, [number, number]>> = {
+  prism3: [0.65, 1.5], prism3e: [0.8, 1.6], prism4: [0.7, 1.5], prism4g: [0.7, 1.5],
+  prism4r: [0.7, 1.5], prism4sq: [0.7, 1.5], prismReg5: [0.7, 1.5], prismReg6: [0.7, 1.5],
+  parallelepiped: [0.7, 1.5], // unused (always oblique) — present so the lookup is total
+};
+
+/** The legacy `parallelepiped` kind IS oblique by definition; apply normalizes it to prism4+oblique, and
+ *  this keeps it correct even if an un-normalized one ever reaches the evaluator (e.g. an old save file). */
+const isObliqueSolid = (kind: SolidKind, oblique?: boolean): boolean => oblique === true || kind === 'parallelepiped';
+
+/** An OBLIQUE prism's lateral vector w — a free tilt (wx,wy) plus a rise (wz). Ranges verbatim from the
+ *  former `parallelepiped` branch, so a מקבילון keeps the same shape envelope it always had. */
+const lateralDims = (key: string, seed: number): number[] => [
+  sample(seed, `${key}-wx`, -0.35, 0.35), sample(seed, `${key}-wy`, -0.35, 0.35), sample(seed, `${key}-wz`, 0.7, 1.5),
+];
+
+/** The FREE dims a solid kind carries (sampled per seed; the pivot solves over them — ADR-3D-007).
+ *  `oblique` (#349) swaps a prism's trailing height for the free lateral vector w. */
+export function solidDims(kind: SolidKind, key: string, seed: number, oblique?: boolean): number[] {
+  const base = prismBaseDims(kind, key, seed);
+  if (base) {
+    const [lo, hi] = PRISM_HEIGHT[kind]!;
+    return [...base, ...(isObliqueSolid(kind, oblique) ? lateralDims(key, seed) : [sample(seed, `${key}-height`, lo, hi)])];
+  }
   if (kind === 'cube') return []; // edge = the similarity gauge
   if (kind === 'box') return [sample(seed, `${key}-depth`, 0.55, 1.7), sample(seed, `${key}-height`, 0.5, 1.4)];
   if (kind === 'pyramid4') return [sample(seed, `${key}-height`, 0.8, 1.6)]; // square base side = gauge
@@ -43,7 +98,6 @@ export function solidDims(kind: SolidKind, key: string, seed: number): number[] 
       rad(sample(seed, `${key}-alpha`, 42, 68)), rad(sample(seed, `${key}-beta`, 42, 68)),
       sample(seed, `${key}-ax`, 0.2, 0.8), sample(seed, `${key}-ay`, 0.15, 0.6), sample(seed, `${key}-az`, 0.8, 1.6),
     ];
-  if (kind === 'prism4r') return [rad(sample(seed, `${key}-angle`, 45, 75)), sample(seed, `${key}-height`, 0.7, 1.5)];
   if (kind === 'pyramid4g')
     return [sample(seed, `${key}-ax`, 0.2, 0.8), sample(seed, `${key}-ay`, 0.2, 0.8), sample(seed, `${key}-az`, 0.8, 1.6)];
   if (kind === 'pyramid4r') return [sample(seed, `${key}-aspect`, 0.6, 1.6), sample(seed, `${key}-height`, 0.8, 1.6)];
@@ -52,8 +106,9 @@ export function solidDims(kind: SolidKind, key: string, seed: number): number[] 
       sample(seed, `${key}-aspect`, 0.6, 1.6),
       sample(seed, `${key}-ax`, 0.2, 0.8), sample(seed, `${key}-ay`, 0.2, 0.8), sample(seed, `${key}-az`, 0.8, 1.6),
     ];
-  // V8-d: equilateral-base prism/pyramid — the base is the similarity gauge, only the height is free
-  if (kind === 'prism3e' || kind === 'pyramid3e') return [sample(seed, `${key}-height`, 0.8, 1.6)];
+  // V8-d: equilateral-base pyramid — the base is the similarity gauge, only the height is free
+  // (its prism twin `prism3e` rides the shared prism path above).
+  if (kind === 'pyramid3e') return [sample(seed, `${key}-height`, 0.8, 1.6)];
   // V8-d: free-apex parallelogram-base pyramid — the 2nd base edge (dx,dy) + the free apex
   if (kind === 'pyramidPar')
     return [
@@ -74,26 +129,9 @@ export function solidDims(kind: SolidKind, key: string, seed: number): number[] 
       sample(seed, `${key}-x3`, 0.3, 0.7), sample(seed, `${key}-y3`, 0.95, 1.3),
       sample(seed, `${key}-x4`, -0.35, 0.2), sample(seed, `${key}-y4`, 0.35, 0.8),
     ];
-  // #117: right prisms over more bases. The base's 1st edge AB=(1,0) is the similarity gauge; the height is
-  // straight up (ז), the base shape is the free DOF(s). A parallelepiped adds a FREE lateral vector w.
-  if (kind === 'prism4') // parallelogram base: 2nd edge AD=(dx,dy)
-    // #291: dx strictly positive & bounded away from 0, so ∠DAB stays visibly oblique (~45–76°) at EVERY seed
-    // (incl. the default seed 0) — a `מקבילית` base must never render as a rectangle (ADR-052: a default must
-    // not look like a special case). Still a free DOF (dx∈[0.3,0.6], dy∈[0.6,1.2]) that "show another" varies.
-    return [sample(seed, `${key}-dx`, 0.3, 0.6), sample(seed, `${key}-dy`, 0.6, 1.2), sample(seed, `${key}-height`, 0.7, 1.5)];
-  if (kind === 'prism4g') // general quad base: C=(cx,cy), D=(dx,dy) free (A,B gauge)
-    return [
-      sample(seed, `${key}-cx`, 0.9, 1.5), sample(seed, `${key}-cy`, 0.6, 1.2),
-      sample(seed, `${key}-dx`, -0.3, 0.4), sample(seed, `${key}-dy`, 0.6, 1.2), sample(seed, `${key}-height`, 0.7, 1.5),
-    ];
-  if (kind === 'prism4sq' || kind === 'prismReg5' || kind === 'prismReg6') // fixed base shape (gauge) — only the height is free
-    return [sample(seed, `${key}-height`, 0.7, 1.5)];
-  if (kind === 'parallelepiped') // oblique: parallelogram base + a free lateral vector w
-    return [
-      sample(seed, `${key}-dx`, 0.3, 0.6), sample(seed, `${key}-dy`, 0.6, 1.2), // #291: oblique base at every seed
-      sample(seed, `${key}-wx`, -0.35, 0.35), sample(seed, `${key}-wy`, -0.35, 0.35), sample(seed, `${key}-wz`, 0.7, 1.5),
-    ];
-  return [rad(sample(seed, `${key}-alpha`, 38, 72)), rad(sample(seed, `${key}-beta`, 38, 72)), sample(seed, `${key}-height`, 0.65, 1.5)];
+  // Every prism kind (incl. prism3, whose branch this used to be) rides `prismBaseDims` above, and every
+  // other kind is handled explicitly — nothing reaches here.
+  return [];
 }
 
 /** A revolution solid's resolved size: stated dims pin; unstated ones are FREE sampled DOFs (ADR-052). */
@@ -111,9 +149,64 @@ function circumcenter2(cx: number, cy: number): { x: number; y: number } {
   return { x: 0.5, y: ((cx - 0.5) * (cx - 0.5) + cy * cy - 0.25) / (2 * cy) };
 }
 
-/** World positions of one solid's vertices, in `ids` order, from its dim vector. */
-function solidPositions(kind: SolidKind, dims: number[], origin: Vec3): Vec3[] {
+/**
+ * #349 (ADR-3D-089): a prism's BASE ring in the z=origin plane, from its base dims (the twin of
+ * {@link prismBaseDims} — same kinds, same order). Null for a non-prism kind.
+ *
+ * This is the whole reason obliqueness can be a modifier: EVERY prism, right or oblique, is this ring
+ * plus one lateral translation — `(0,0,h)` when right, the free `w` when oblique. Geometry verbatim from
+ * the per-kind branches it replaces, so right prisms are bit-identical.
+ */
+function prismBaseRing(kind: SolidKind, baseDims: number[], o: Vec3): Vec3[] | null {
+  switch (kind) {
+    case 'prism3': { // general triangle from its two base angles
+      const c = apexFromBaseAngles(baseDims[0], baseDims[1]);
+      return [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + c.x, o.y + c.y, o.z)];
+    }
+    case 'prism3e': { // equilateral (side 1 = gauge)
+      const cy = Math.sqrt(3) / 2;
+      return [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 0.5, o.y + cy, o.z)];
+    }
+    case 'prism4': case 'parallelepiped': { // parallelogram AB=(1,0), AD=(dx,dy), C=B+AD
+      const [dx, dy] = baseDims;
+      return [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1 + dx, o.y + dy, o.z), v3(o.x + dx, o.y + dy, o.z)];
+    }
+    case 'prism4g': { // general quad: A,B gauge; C,D free
+      const [cx, cy, dx, dy] = baseDims;
+      return [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + cx, o.y + cy, o.z), v3(o.x + dx, o.y + dy, o.z)];
+    }
+    case 'prism4r': { // rhombus (side 1 = gauge; base angle at A)
+      const [theta] = baseDims;
+      const dx = Math.cos(theta), dy = Math.sin(theta);
+      return [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1 + dx, o.y + dy, o.z), v3(o.x + dx, o.y + dy, o.z)];
+    }
+    case 'prism4sq': // unit square (gauge)
+      return [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1, o.y + 1, o.z), v3(o.x, o.y + 1, o.z)];
+    case 'prismReg5': case 'prismReg6': { // regular n-gon on a unit-circumradius circle (gauge)
+      const n = kind === 'prismReg5' ? 5 : 6;
+      return Array.from({ length: n }, (_, i) => {
+        const a = (2 * Math.PI * i) / n;
+        return v3(o.x + Math.cos(a), o.y + Math.sin(a), o.z);
+      });
+    }
+    default:
+      return null;
+  }
+}
+
+/** World positions of one solid's vertices, in `ids` order, from its dim vector.
+ *  `oblique` (#349): the top ring is the base translated by the free lateral vector w, not by a height. */
+function solidPositions(kind: SolidKind, dims: number[], origin: Vec3, oblique?: boolean): Vec3[] {
   const o = origin;
+  // Every prism: base ring + ONE lateral translation. Right → (0,0,h); oblique → w=(wx,wy,wz).
+  const nBase = dims.length - (isObliqueSolid(kind, oblique) ? 3 : 1);
+  const ring = nBase >= 0 ? prismBaseRing(kind, dims.slice(0, nBase), o) : null;
+  if (ring) {
+    const lat = isObliqueSolid(kind, oblique)
+      ? { x: dims[nBase], y: dims[nBase + 1], z: dims[nBase + 2] }
+      : { x: 0, y: 0, z: dims[nBase] };
+    return [...ring, ...ring.map((p) => v3(p.x + lat.x, p.y + lat.y, p.z + lat.z))];
+  }
   if (kind === 'cube') {
     const s = 1; // scale gauge — see file header
     return [
@@ -180,14 +273,6 @@ function solidPositions(kind: SolidKind, dims: number[], origin: Vec3): Vec3[] {
       v3(o.x + ax, o.y + ay, o.z + az),
     ];
   }
-  if (kind === 'prism4r') {
-    // right prism over a rhombus (side 1 = gauge; dims: base angle at A + height)
-    const [theta, h] = dims;
-    const dx = Math.cos(theta);
-    const dy = Math.sin(theta);
-    const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1 + dx, o.y + dy, o.z), v3(o.x + dx, o.y + dy, o.z)];
-    return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
-  }
   if (kind === 'pyramid3e') {
     // equilateral-base right pyramid: apex above the base centroid (= circumcentre)
     const [h] = dims;
@@ -196,13 +281,6 @@ function solidPositions(kind: SolidKind, dims: number[], origin: Vec3): Vec3[] {
       v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 0.5, o.y + cy, o.z),
       v3(o.x + 0.5, o.y + cy / 3, o.z + h),
     ];
-  }
-  if (kind === 'prism3e') {
-    // equilateral-base right prism: base ABC equilateral (side 1 = gauge), tops straight up
-    const [h] = dims;
-    const cy = Math.sqrt(3) / 2;
-    const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 0.5, o.y + cy, o.z)];
-    return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
   }
   if (kind === 'pyramidPar') {
     // free-apex parallelogram-base pyramid: base AB=(1,0), AD=(dx,dy); C = B + AD; apex free
@@ -218,41 +296,8 @@ function solidPositions(kind: SolidKind, dims: number[], origin: Vec3): Vec3[] {
     for (let i = 0; i < dims.length; i += 2) pts.push(v3(o.x + dims[i], o.y + dims[i + 1], o.z));
     return pts;
   }
-  // #117: right prisms over more bases — base ring in the z=origin plane, tops straight up by `h`.
-  if (kind === 'prism4') {
-    const [dx, dy, h] = dims; // parallelogram base AB=(1,0), AD=(dx,dy), C=B+AD
-    const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1 + dx, o.y + dy, o.z), v3(o.x + dx, o.y + dy, o.z)];
-    return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
-  }
-  if (kind === 'prism4g') {
-    const [cx, cy, dx, dy, h] = dims; // general quad base: A,B gauge; C,D free
-    const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + cx, o.y + cy, o.z), v3(o.x + dx, o.y + dy, o.z)];
-    return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
-  }
-  if (kind === 'prism4sq') {
-    const [h] = dims; // unit square base (gauge)
-    const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1, o.y + 1, o.z), v3(o.x, o.y + 1, o.z)];
-    return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
-  }
-  if (kind === 'prismReg5' || kind === 'prismReg6') {
-    const [h] = dims; // regular n-gon base on a unit-circumradius circle (gauge)
-    const n = kind === 'prismReg5' ? 5 : 6;
-    const base = Array.from({ length: n }, (_, i) => {
-      const a = (2 * Math.PI * i) / n;
-      return v3(o.x + Math.cos(a), o.y + Math.sin(a), o.z);
-    });
-    return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
-  }
-  if (kind === 'parallelepiped') {
-    const [dx, dy, wx, wy, wz] = dims; // parallelogram base translated by the FREE lateral vector w (oblique)
-    const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + 1 + dx, o.y + dy, o.z), v3(o.x + dx, o.y + dy, o.z)];
-    return [...base, ...base.map((p) => v3(p.x + wx, p.y + wy, p.z + wz))];
-  }
-  // prism3 — right triangular prism: base ABC in the z=origin plane, tops straight up.
-  const [alpha, beta, h] = dims;
-  const c = apexFromBaseAngles(alpha, beta);
-  const base = [v3(o.x, o.y, o.z), v3(o.x + 1, o.y, o.z), v3(o.x + c.x, o.y + c.y, o.z)];
-  return [...base, ...base.map((p) => v3(p.x, p.y, p.z + h))];
+  // Every prism kind rides the shared base-ring + lateral path at the top of this function.
+  return [];
 }
 
 // ---------------------------------------------------------------------------
@@ -526,7 +571,7 @@ function solve3x3(r1: Vec3, r2: Vec3, r3: Vec3, rhs: Vec3): Vec3 | null {
 export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
   let dims = 0;
   c.solids.forEach((solid) => {
-    dims += solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, 0).length;
+    dims += solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, 0, solid.oblique).length;
   });
   for (const rev of c.revolutions) {
     if (rev.radius === undefined) dims++;
@@ -854,7 +899,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       c.planePins.length > 0 || c.coordPlanePins.length > 0 || drivableMemberships.length > 0) &&
     c.solids.length > 0
   ) {
-    const dims0 = c.solids.flatMap((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed));
+    const dims0 = c.solids.flatMap((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed, solid.oblique));
     const evalCanonical = (dims: number[], cheap = true, override?: Map<number, number>): Positions3 => {
       const p2: Positions3 = new Map<Id, Vec3>();
       for (const [id, def] of c.points) {
@@ -1173,10 +1218,10 @@ function evaluateSolidsAndPoints(
   c.solids.forEach((solid, i) => {
     const key = `solid-${solid.kind}-${solid.ids.join('')}`;
     const origin = v3(i * 2.5, 0, 0); // side-by-side when a figure ever holds two solids
-    const own = solidDims(solid.kind, key, seed);
+    const own = solidDims(solid.kind, key, seed, solid.oblique);
     const dims = dimOverride ? dimOverride.slice(dimCursor, dimCursor + own.length) : own;
     dimCursor += own.length;
-    const ps = solidPositions(solid.kind, dims, origin);
+    const ps = solidPositions(solid.kind, dims, origin, solid.oblique);
     solid.ids.forEach((id, j) => pos.set(id, ps[j]));
   });
 

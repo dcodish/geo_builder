@@ -41,9 +41,15 @@ describe('#117 — right-prism base dispatch (parser)', () => {
     expect(kindOf('מנסרה ישרה שבסיסה מעוין')).toBe('prism4r');
     expect(parse3('מנסרה ישרה').ok).toBe(false); // no base noun, no labels → honest ADR-052 refusal
   });
+  // #349 (ADR-3D-089): מקבילון IS `prism4` + the oblique modifier — the legacy `parallelepiped` kind is
+  // its spelling, normalized at apply, so exactly one oblique code path exists in the engine.
   it('מקבילון / parallelepiped parses (oblique named solid)', () => {
-    expect(kindOf('מקבילון')).toBe('parallelepiped');
-    expect(kindOf('parallelepiped ABCDEFGH')).toBe('parallelepiped');
+    expect(kindOf('מקבילון')).toBe('prism4');
+    expect(kindOf('parallelepiped ABCDEFGH')).toBe('prism4');
+    for (const u of ['מקבילון', 'parallelepiped ABCDEFGH']) {
+      const r = parse3(u);
+      expect(r.ok && r.commands[0], u).toMatchObject({ type: 'solid', kind: 'prism4', oblique: true });
+    }
   });
 });
 
