@@ -1,3 +1,29 @@
 ﻿{
-  "autoMemoryDirectory": "C:/projects/geo_builder/.claude/memory"
+  "autoMemoryDirectory": "C:/projects/geo_builder/.claude/memory",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/session-sync.mjs\" start",
+            "timeout": 45,
+            "statusMessage": "Syncing with GitHub..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR:-.}/scripts/session-sync.mjs\" end",
+            "timeout": 45
+          }
+        ]
+      }
+    ]
+  }
 }

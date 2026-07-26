@@ -6,3 +6,8 @@
 - [Readiness gate](readiness-gate.md) — don't call anything "ready" until its test gate passes; report tests honestly
 - [Memory in repo](memory-in-repo.md) — keep all durable memory in the repo (docs/), not local memory, so it travels across computers
 - [Work PC / cross-machine](work-pc-cross-machine.md) — David switches work/home PCs; project now syncs via git/GitHub (moved out of Dropbox 2026-07-23) — pick up cross-machine progress via git + source-of-truth docs at session start
+- [Never patch, fix root](never-patch-fix-root.md) — never special-case the erroring input; fix the core engine feature even if big; ask when unsure of scope
+- [No autonomous API calls](no-autonomous-api-calls.md) — only the operator authorises live Anthropic/Haiku calls; be the oracle myself with the session model
+- [Triage-only during testing](triage-only-during-testing.md) — operator reports = file issue + diagnosis + fix plan, then STOP; even dictated/trivial changes wait for the fix session
+- [Commit+deploy still needs a PR](commit-deploy-still-needs-pr.md) — the instruction waives only play-and-approve; branch + PR + self-merge, never direct-to-main
+- [Commit means push](commit-means-push.md) — when the operator says "commit", also push to GitHub (it is the only channel to the other machine)
