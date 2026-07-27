@@ -319,6 +319,56 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "pyramid with a kite base",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "פירמידה שבסיסה דלתון",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
+    "text": "pyramid with a trapezoid base",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "פירמידה שבסיסה טרפז",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
+    "text": "pyramid with a quadrilateral base",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "פירמידה שבסיסה מרובע",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
+    "text": "right pyramid SABCD with a rhombus base",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "פירמידה ישרה SABCD שבסיסה מעוין",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
+    "text": "right pyramid SABCD with a parallelogram base",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "פירמידה ישרה SABCD שבסיסה מקבילית",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
     "text": "tetrahedron ABCD",
     "winner": "rightPyramid",
   },

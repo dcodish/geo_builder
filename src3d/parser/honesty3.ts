@@ -27,6 +27,7 @@
  */
 
 import type { Command3, Id } from '../engine/types';
+import { QUAD_PYRAMIDS, type QuadBase } from '../engine/baseShapes';
 import { labelTokens, normalize3 } from './parse3';
 
 /**
@@ -58,31 +59,49 @@ import { labelTokens, normalize3 } from './parse3';
 export function droppedShapeNoun3(utterance: string, commands: Command3[]): string[] {
   const s = normalize3(utterance);
   if (!/מנסרה|פירמידה|\bprism\b|\bpyramid\b/i.test(s)) return []; // only a solid-base context
+  // #305 (ADR-3D-090): which base a KIND stands on comes from the ONE registry, so this gate can
+  // never drift behind the parser again (it used to keep its own kind lists and marked kite /
+  // trapezoid permanently `unsupported` — both are real bases now).
+  const BASE_OF_PRISM: Partial<Record<string, QuadBase>> = {
+    cube: 'square', prism4sq: 'square', box: 'rectangle', prism4r: 'rhombus',
+    prism4: 'parallelogram', parallelepiped: 'parallelogram', prism4g: 'quad',
+  };
+  const baseOf = (kind: string): QuadBase | undefined =>
+    (QUAD_PYRAMIDS as Partial<Record<string, { base: QuadBase; right: boolean }>>)[kind]?.base ?? BASE_OF_PRISM[kind];
+  /** The defining properties a base GUARANTEES by construction. */
+  const BASE_PROPS: Partial<Record<QuadBase, Array<'eqAdj' | 'right'>>> = {
+    square: ['eqAdj', 'right'], rectangle: ['right'], rhombus: ['eqAdj'],
+  };
   const props = new Set<'eqAdj' | 'right'>();
-  const SQUARE = new Set(['cube', 'prism4sq', 'pyramid4', 'pyramid4g']);
-  const RECT = new Set(['box', 'pyramid4r', 'pyramid4gr']);
-  const RHOMB = new Set(['prism4r']);
+  const built = new Set<QuadBase>();
   for (const c of commands) {
     if (c.type === 'solid') {
-      if (SQUARE.has(c.kind)) props.add('eqAdj').add('right');
-      else if (RECT.has(c.kind)) props.add('right');
-      else if (RHOMB.has(c.kind)) props.add('eqAdj');
+      const b = baseOf(c.kind);
+      if (b) {
+        built.add(b);
+        for (const pr of BASE_PROPS[b] ?? []) props.add(pr);
+      }
     } else if (c.type === 'length-rel' && c.c === 1) props.add('eqAdj');
     else if (c.type === 'cos-angle' && c.cos === 0) props.add('right');
   }
-  const need: [RegExp, Array<'eqAdj' | 'right'> | 'unsupported'][] = [
+  // A stated noun is honoured when the built base carries its defining property (rhombus / rectangle
+  // / square — which several kinds can satisfy) or IS that base (kite / trapezoid / parallelogram /
+  // quad, whose identity is the kind itself). A noun with neither is still an honest refusal.
+  const need: [RegExp, Array<'eqAdj' | 'right'> | QuadBase][] = [
     [/מעויי?ן|\brhombus\b/i, ['eqAdj']],
     [/מלבן|\brectang\w*/i, ['right']],
     [/ריבוע|\bsquare\b/i, ['eqAdj', 'right']],
-    [/דלתון|\bkite\b/i, 'unsupported'],
-    [/טרפז\w*|\btrapez\w*/i, 'unsupported'],
+    [/דלתון|\bkite\b/i, 'kite'],
+    [/טרפז\w*|\btrapez\w*/i, 'trapezoid'],
   ];
   const lost: string[] = [];
   for (const [re, req] of need) {
     const m = s.match(re);
     if (!m) continue;
-    if (req === 'unsupported' || !req.every((p) => props.has(p))) lost.push(m[0]);
+    const ok = typeof req === 'string' ? built.has(req) : req.every((pr) => props.has(pr));
+    if (!ok) lost.push(m[0]);
   }
+
   return lost;
 }
 

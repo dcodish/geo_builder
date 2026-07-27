@@ -65,6 +65,8 @@ export type Claim3 =
   // operand is a VecAtom (a declared vector or a point pair), so `cos∠ACB` (vertex →
   // pairs) and `cos(u,v)` (named vectors) share one form.
   | { type: 'cos-angle-eq'; u: VecAtom; v: VecAtom; cos: number } // cos∠ACB = 3/4 · cos(w,u) = √35/10
+  // #305 (ADR-3D-090): the four ids lie on ONE circle — Ptolemy on the ring order A,B,C,D
+  | { type: 'concyclic'; ids: Id[] }
   | { type: 'dot-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // u·v = v·w (a chained-equality link)
   | { type: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // ∠(a,b) = ∠(c,d) — AE makes equal angles with AB, AD
   // triage 3-D: the angle between a LINE (a–b) and a PLANE (point-run) — `sin β = |n·u|/(|n||u|)`
@@ -87,7 +89,11 @@ export type ScalarPin =
   | { kind: 'dot-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // u·v = v·w (G9 chain link)
   | { kind: 'cos-eq'; a: VecAtom; b: VecAtom; c: VecAtom; d: VecAtom } // ∠(a,b) = ∠(c,d) — equal angles (G10)
   // triage 3-D: the angle between line a–b and plane (point-run) is `deg` — similarity-invariant
-  | { kind: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number };
+  | { kind: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number }
+  // #305 (ADR-3D-090): the base of a RIGHT pyramid over a general quad must be CYCLIC.
+  // A convex quad is cyclic iff opposite angles are supplementary (cos A + cos C = 0) — a
+  // scale-free, SIGN-CHANGING residual, so it needs no new solver machinery.
+  | { kind: 'concyclic'; ids: Id[] };
 
 // ---------------------------------------------------------------------------
 // The algebraic lane (V2 — docs/20 §6.3): coefficients may carry ONE symbolic
@@ -151,6 +157,12 @@ export type SolidKind =
   | 'cube' | 'box' | 'prism3' | 'pyramid4' | 'pyramid3' | 'tetra' | 'prism4r' | 'pyramid4g' | 'pyramid4r' | 'pyramid4gr'
   // V8-d: equilateral-triangle-base right prism/pyramid, and a free-apex parallelogram-base pyramid
   | 'prism3e' | 'pyramid3e' | 'pyramidPar'
+  // #305/#341/#358 (ADR-3D-090): the rest of the BASE × TOP cross-product for quad-base pyramids.
+  // These names are LABELS for (base, right?) pairs in `baseShapes.QUAD_PYRAMIDS` — the geometry
+  // is defined once in that registry, never per kind. `…R` = a RIGHT apex (over the base's
+  // circumcentre); the base's `CYCLIC_FIX` constraint is what makes that circumcentre exist.
+  | 'pyramidParR' | 'pyramidRhomb' | 'pyramidRhombR' | 'pyramidKite' | 'pyramidKiteR'
+  | 'pyramidTrap' | 'pyramidTrapR' | 'pyramidQuad' | 'pyramidQuadR'
   // V8-g: a FLAT polygon of free points in the z=0 plane (the 2-D vector lane) — triangle /
   // quadrilateral / pentagon. Modelled as a "solid" so it reuses the dims-sampler + the
   // pivot (free case → sampled shape; metric givens → the pivot drives it); double-sided
@@ -604,7 +616,8 @@ export type Command3 =
   | { type: 'perp-to-base'; from: Id } // #72: `אנך יורד מ-M לבסיס` — foot auto-minted at apply (parse3 is context-free)
   // V8-f (G6): cos of the angle between two operands = a value. `cos∠ACB = 3/4`
   // (vertex ⇒ pairs) · `קוסינוס הזווית בין הוקטורים w ו-u הוא √35/10` (named vectors).
-  | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number; soft?: boolean } // `soft` (issue #116): a right-triangle's DEFAULT right-angle vertex, dropped in derive3 when an explicit ∠=90 on the same triangle is stated (M4 defaults-yield)
+  | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number; soft?: boolean }
+  | { type: 'concyclic'; ids: Id[] } // #305: A,B,C,D on one circle (the right-pyramid base fix) // `soft` (issue #116): a right-triangle's DEFAULT right-angle vertex, dropped in derive3 when an explicit ∠=90 on the same triangle is stated (M4 defaults-yield)
   // V8-f (G9): a CHAIN of dot products all equal — `u·v = v·w = u·w`. Apply lowers to
   // pairwise dot-eq relations (drive on a free figure, else verify).
   | { type: 'dot-eq-chain'; ops: [VecAtom, VecAtom][] }

@@ -18,6 +18,7 @@
  */
 
 import type { Command3, Id, LinExpr, SolidKind, SymComp, SymTerm, VecAtom, VecExpr } from '../engine/types';
+import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 
 export type ParseResult3 =
   | { ok: true; commands: Command3[] }
@@ -254,6 +255,61 @@ const rightPyramidPoint: Rule = (s) => {
   return [{ type: 'right-pyramid-point', id: pt, a, b, base }];
 };
 
+/**
+ * #305/#341/#358 (ADR-3D-090): the quad base a stated noun names. ONE vocabulary, so a base a
+ * rule RECOGNISES is exactly a base it can LOWER — the ADR-3D-084 class (a noun the positive-test
+ * chain did not happen to test took the "no noun was stated" path and silently drew a rectangle)
+ * cannot recur. Ordered specific → generic, so `מעוין` is never claimed by the generic `מרובע`.
+ */
+function statedQuadBase(s: string): QuadBase | null {
+  if (/ריבוע/.test(s) || /\bsquare\b/i.test(s)) return 'square';
+  if (/מלבן/.test(s) || /\brectang/i.test(s)) return 'rectangle';
+  if (/מעויי?ן/.test(s) || /\brhombus\b/i.test(s)) return 'rhombus';
+  if (/מקבילית/.test(s) || /\bparallelogram\b/i.test(s)) return 'parallelogram';
+  if (/דלתון/.test(s) || /\bkite\b/i.test(s)) return 'kite';
+  if (/טרפז/.test(s) || /\btrapez/i.test(s)) return 'trapezoid';
+  if (/מרובע/.test(s) || /\bquadrilateral\b/i.test(s)) return 'quad';
+  return null;
+}
+
+/** (base x rightness) → the kind naming that pair. Rightness is a MODIFIER of ANY base (ADR-3D-090). */
+const QUAD_PYRAMID_KIND: Record<QuadBase, { free: SolidKind; right: SolidKind }> = {
+  square: { free: 'pyramid4g', right: 'pyramid4' },
+  rectangle: { free: 'pyramid4gr', right: 'pyramid4r' },
+  rhombus: { free: 'pyramidRhomb', right: 'pyramidRhombR' },
+  parallelogram: { free: 'pyramidPar', right: 'pyramidParR' },
+  kite: { free: 'pyramidKite', right: 'pyramidKiteR' },
+  trapezoid: { free: 'pyramidTrap', right: 'pyramidTrapR' },
+  quad: { free: 'pyramidQuad', right: 'pyramidQuadR' },
+};
+
+/**
+ * The constraint «ישרה» adds so the stated base becomes CYCLIC — the operator's 2026-07-27 ruling
+ * (#305). A right pyramid's apex sits over the base's circumcentre, which exists iff the base is
+ * cyclic; rather than refuse, the base is constrained into the cyclic member of its OWN family and
+ * a build notice names what it became. Nothing is invented: the base noun and «ישרה» jointly
+ * ENTAIL it (the ADR-165 / ADR-123 allowed-with-a-notice precedent). Lowered as ordinary relations —
+ * the ADR-110 macro pattern — so the solver does the work and no new engine construct is needed.
+ * A contradiction with a STATED value stays an honest over-constraint refusal (ADR-052 / ADR-114).
+ */
+function cyclicFixCommands(base: QuadBase, ring: Id[]): Command3[] {
+  const fix = CYCLIC_MEMBER[base].fix;
+  switch (fix.kind) {
+    case 'none':
+      return [];
+    case 'right-angle': {
+      const v = ring[fix.vertex];
+      const prev = ring[(fix.vertex + 3) % 4];
+      const nxt = ring[(fix.vertex + 1) % 4];
+      return [{ type: 'cos-angle', u: { kind: 'pair', from: v, to: prev }, v: { kind: 'pair', from: v, to: nxt }, cos: 0 }];
+    }
+    case 'equal-legs': // an isosceles trapezoid: the legs AD and BC are equal
+      return [{ type: 'length-rel', a1: ring[0], b1: ring[3], rhs: { pair: [ring[1], ring[2]] }, c: 1 }];
+    case 'concyclic':
+      return [{ type: 'concyclic', ids: [...ring] }];
+  }
+}
+
 /** Right pyramid: `פירמידה ישרה ABCDS` / `ABCS`. WITHOUT ישרה, 4 ids = a GENERAL tetrahedron (V7 T2).
  *  V8-d: an equilateral triangular base → `pyramid3e`; a parallelogram base → `pyramidPar`. */
 const rightPyramid: Rule = (s) => {
@@ -263,9 +319,7 @@ const rightPyramid: Rule = (s) => {
   const tetraWord = /טטר[אה]?ה?דר(?:ון)?/.test(s) || /ארבעון/.test(s) || /\btetrahedr(?:on)?\b/i.test(s);
   if (!/פירמידה/.test(s) && !/\bpyramid\b/i.test(s) && !tetraWord) return null;
   const right = /ישרה?/.test(s) || /\bright\b/i.test(s); // ישרה (fem, פירמידה) or ישר (masc, טטראדר)
-  const square = /ריבוע/.test(s) || /\bsquare\b/i.test(s);
   const equi = /שווה[\s-]?צלעות/.test(s) || /\bequilateral\b/i.test(s);
-  const par = /מקבילית/.test(s) || /\bparallelogram\b/i.test(s);
   // #199 (ADR-3D-047): «שווה מקצועות» on a TETRA is a macro (the ADR-110 pattern) — the solid plus
   // five equal-edge `length-rel` constraints, M1 at apply (drives a free tetra into the regular one,
   // verifies a pinned one). On any other kind the qualifier has no lowering — DEFER (escalate),
@@ -279,40 +333,33 @@ const rightPyramid: Rule = (s) => {
     const rel = (a1: Id, b1: Id): Command3 => ({ type: 'length-rel', a1, b1, rhs: { pair: [a, b] }, c: 1 });
     return [solid, rel(a, c3), rel(a, d), rel(b, c3), rel(b, d), rel(c3, d)];
   };
-  // #304 (ADR-3D-084): a RHOMBUS base is a parallelogram base PLUS adjacent sides equal — the ADR-3D-078
-  // prism macro, pyramid edition (`pyramidPar` + `length-rel |AB|=|AD|`, no new engine construct). A stated
-  // rhombus must NEVER silently fall to the rectangle default `pyramid4gr` (dropping the equal-sides given
-  // and asserting an unstated right angle). The OBLIQUE form builds it; the RIGHT form defers (there is no
-  // right-parallelogram-base pyramid template) rather than drop the shape — the LLM lane + honesty gate
-  // then keep it honest.
-  const rhombus = /מעויי?ן/.test(s) || /\brhombus\b/i.test(s);
-  const parPyramid = (ids: Id[]): Command3[] | null => {
-    if (rhombus && right) return null; // right + rhombus: no template — defer (never drop the shape)
-    const cmds: Command3[] = [{ type: 'solid', kind: 'pyramidPar', ids }];
-    if (rhombus) cmds.push({ type: 'length-rel', a1: ids[0], b1: ids[1], rhs: { pair: [ids[0], ids[3]] }, c: 1 });
+  // #305 (ADR-3D-090): ANY stated quad base x rightness, from the registry. A right form over a
+  // base that is not cyclic by default carries its family's CYCLIC_FIX, so it BUILDS (constrained,
+  // with a build notice) instead of deferring -- superseding #304's right+rhombus bail.
+  const quadPyramid = (ids: Id[], base: QuadBase): Command3[] | null => {
+    const kind = right ? QUAD_PYRAMID_KIND[base].right : QUAD_PYRAMID_KIND[base].free;
+    const cmds: Command3[] = [{ type: 'solid', kind, ids }];
+    // the base's OWN defining constraint (a rhombus is a parallelogram ring + equal adjacent sides)
+    if (base === 'rhombus') cmds.push({ type: 'length-rel', a1: ids[0], b1: ids[1], rhs: { pair: [ids[0], ids[3]] }, c: 1 });
+    if (right) cmds.push(...cyclicFixCommands(base, ids.slice(0, 4)));
     return withEqEdges(cmds);
   };
   // the triangular-base pyramid kind (equilateral only when right — a right equilateral pyramid)
   const triKind = right ? (equi ? 'pyramid3e' : 'pyramid3') : 'tetra';
   if (firstLabelRun(s).length === 0) {
     // label-less: a stated base word makes the shape determined — default lettering
-    const rect = /מלבן/.test(s) || /\brectang/i.test(s);
     const tri = tetraWord || /משולש/.test(s) || /\btriangular\b/i.test(s) || equi;
-    if (par || rhombus) return parPyramid(['A', 'B', 'C', 'D', 'S']);
     if (tri) return withEqEdges([{ type: 'solid', kind: triKind, ids: ['A', 'B', 'C', 'D'] }]);
-    if (square || rect) {
-      const kind = right ? (square ? 'pyramid4' : 'pyramid4r') : square ? ('pyramid4g' as const) : 'pyramid4gr';
-      return withEqEdges([{ type: 'solid', kind, ids: ['A', 'B', 'C', 'D', 'S'] }]);
-    }
+    const base = statedQuadBase(s);
+    if (base) return quadPyramid(['A', 'B', 'C', 'D', 'S'], base);
     return null;
   }
   const toks = orientPyramid(s, firstLabelRun(s));
   // a tetrahedron has exactly 4 vertices — a 5-label `טטראדר` is contradictory (refuse → honest)
   if (toks.length === 5 && !tetraWord) {
-    if (par || rhombus) return parPyramid(toks);
-    // rightness and base shape are INDEPENDENT givens (ADR-052): a square base must be STATED
-    const kind = right ? (square ? 'pyramid4' : 'pyramid4r') : square ? ('pyramid4g' as const) : 'pyramid4gr';
-    return withEqEdges([{ type: 'solid', kind, ids: toks }]);
+    // rightness and base shape are INDEPENDENT givens (ADR-052): a square base must be STATED.
+    // An unstated base keeps its historical free-aspect RECTANGLE default (documented in types.ts).
+    return quadPyramid(toks, statedQuadBase(s) ?? 'rectangle');
   }
   if (toks.length === 4) return withEqEdges([{ type: 'solid', kind: triKind, ids: toks }]);
   return null;

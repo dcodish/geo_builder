@@ -195,6 +195,7 @@ export function scalePinned(c: Construction3): boolean {
       p.kind === 'vangle' || p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane' || p.kind === 'length-rel' ||
       // V8-f: cos/angle equalities and equal dot products are all similarity-INVARIANT
       p.kind === 'cos-angle' || p.kind === 'dot-eq' || p.kind === 'cos-eq' ||
+      p.kind === 'concyclic' || // #305: a ratio of lengths ⇒ similarity-invariant
       p.kind === 'line-plane-angle', // sin β is length-normalized → invariant
   );
 }
@@ -408,6 +409,23 @@ export function solvePivot(
         const a2 = at(pin.a2);
         const b2 = at(pin.b2);
         out.push(a1 && b1 && a2 && b2 ? norm3(sub3(b1, a1)) - pin.c * norm3(sub3(b2, a2)) : 10);
+      } else if (pin.kind === 'concyclic') {
+        // #305: a convex quad is CYCLIC iff its opposite angles are supplementary, i.e.
+        // cos(A) + cos(C) = 0. Deliberately NOT Ptolemy (|AC|.|BD| - |AB|.|CD| - |BC|.|AD|):
+        // that expression is non-negative, so it TOUCHES zero instead of crossing it and the
+        // least-squares descent stalls a visible ~1e-3 short (the ADR-3D-006 touch-zero lesson).
+        // This form changes SIGN through the cyclic configuration and is scale-free (cosines).
+        const q = pin.ids.map((id) => at(id));
+        if (q.length === 4 && q.every((v): v is Vec3 => v !== undefined)) {
+          const [A, B, C, D] = q as Vec3[];
+          const cosAt = (v: Vec3, p1: Vec3, p2: Vec3) => {
+            const u1 = sub3(p1, v);
+            const u2 = sub3(p2, v);
+            const den = Math.max(norm3(u1) * norm3(u2), 1e-12);
+            return dot3(u1, u2) / den;
+          };
+          out.push(cosAt(A, B, D) + cosAt(C, B, D));
+        } else out.push(10);
       } else if (pin.kind === 'cos-angle') {
         const u = dirOf(pin.u);
         const v = dirOf(pin.v);

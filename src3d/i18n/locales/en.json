@@ -123,5 +123,20 @@
     }
   },
   "load.unbuildable": "The file opened, but no step could be rebuilt in this version ({{count}} steps) — it may have been saved by a newer build. The steps are kept exactly as saved.",
-  "load.partial": "The file opened, but {{count}} step(s) could not be rebuilt (step {{steps}}) — they are flagged in the list. The steps are kept exactly as saved."
+  "load.partial": "The file opened, but {{count}} step(s) could not be rebuilt (step {{steps}}) — they are flagged in the list. The steps are kept exactly as saved.",
+  "notice": {
+    "baseConstrained": "For the pyramid to be right, the base ({{ids}}) was constrained from a {{from}} to a {{to}}.",
+    "shape": {
+      "square": "square",
+      "rectangle": "rectangle",
+      "rhombus": "rhombus",
+      "parallelogram": "parallelogram",
+      "kite": "kite",
+      "trapezoid": "trapezoid",
+      "quad": "quadrilateral",
+      "rightKite": "right kite",
+      "isoTrapezoid": "isosceles trapezoid",
+      "cyclicQuad": "cyclic quadrilateral"
+    }
+  }
 }

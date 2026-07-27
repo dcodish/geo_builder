@@ -5,10 +5,13 @@
 
 import { exprPointIds, exprVectorNames } from './vecExpr';
 import { cross3, dot3, normalize3, v3 } from './vec3';
+import { isQuadPyramid, quadPyramidDimCount } from './baseShapes';
 import { pinSymsOf } from './types';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
 
-const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8 };
+const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
+  // #305 (ADR-3D-090): every quad pyramid is a 4-ring + apex, whatever its base or top
+  pyramidParR: 5, pyramidRhomb: 5, pyramidRhombR: 5, pyramidKite: 5, pyramidKiteR: 5, pyramidTrap: 5, pyramidTrapR: 5, pyramidQuad: 5, pyramidQuadR: 5 };
 
 /** The base-polygon vertex count of a 2n-vertex prism/parallelepiped (#117), or null for other solids. */
 function prismBaseN(kind: SolidCommand['kind']): number | null {
@@ -52,7 +55,7 @@ function edgeIndices(kind: SolidCommand['kind']): [number, number][] {
       [0, 3], [1, 4], [2, 5], // verticals
     ];
   }
-  if (kind === 'pyramid4' || kind === 'pyramid4g' || kind === 'pyramid4r' || kind === 'pyramid4gr' || kind === 'pyramidPar') {
+  if (isQuadPyramid(kind)) {
     return [
       [0, 1], [1, 2], [2, 3], [3, 0], // base ring
       [0, 4], [1, 4], [2, 4], [3, 4], // lateral edges to the apex
@@ -98,7 +101,7 @@ function faceIndices(kind: SolidCommand['kind']): number[][] {
       [0, 1, 4, 3], [1, 2, 5, 4], [2, 0, 3, 5], // sides
     ];
   }
-  if (kind === 'pyramid4' || kind === 'pyramid4g' || kind === 'pyramid4r' || kind === 'pyramid4gr' || kind === 'pyramidPar') {
+  if (isQuadPyramid(kind)) {
     return [
       [0, 1, 2, 3], // base
       [0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4], // lateral triangles
@@ -175,7 +178,15 @@ function relPointIds(c: Construction3, from: Id, to: Id, terms: { atom: import('
 }
 
 /** How many FREE dims the figure's solids carry (a scalar statement on such a figure is a GIVEN, not a check). */
-const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2, pyramid4g: 3, pyramid4r: 2, pyramid4gr: 4, prism3e: 1, pyramid3e: 1, pyramidPar: 5, polygon3: 2, polygon4: 4, polygon5: 6, prism4: 3, prism4g: 5, prism4sq: 1, prismReg5: 1, prismReg6: 1, parallelepiped: 5 };
+const DIM_COUNT: Record<SolidCommand['kind'], number> = { cube: 0, box: 2, prism3: 3, pyramid4: 1, pyramid3: 3, tetra: 5, prism4r: 2, pyramid4g: 3, pyramid4r: 2, pyramid4gr: 4, prism3e: 1, pyramid3e: 1, pyramidPar: 5, polygon3: 2, polygon4: 4, polygon5: 6, prism4: 3, prism4g: 5, prism4sq: 1, prismReg5: 1, prismReg6: 1, parallelepiped: 5,
+  // #305 (ADR-3D-090): base dims + top dims, read off the registry so the count can never drift
+  // from the geometry (the legacy quad-pyramid entries above agree with it — asserted by the
+  // totality lock in quad-pyramid-bases.test.ts).
+  pyramidParR: quadPyramidDimCount('pyramidParR')!, pyramidRhomb: quadPyramidDimCount('pyramidRhomb')!,
+  pyramidRhombR: quadPyramidDimCount('pyramidRhombR')!, pyramidKite: quadPyramidDimCount('pyramidKite')!,
+  pyramidKiteR: quadPyramidDimCount('pyramidKiteR')!, pyramidTrap: quadPyramidDimCount('pyramidTrap')!,
+  pyramidTrapR: quadPyramidDimCount('pyramidTrapR')!, pyramidQuad: quadPyramidDimCount('pyramidQuad')!,
+  pyramidQuadR: quadPyramidDimCount('pyramidQuadR')! };
 /** #349: an OBLIQUE prism trades its single height for the free lateral vector w — two dims more than
  *  the right prism of the same kind (the counts above are the RIGHT ones; `parallelepiped` already
  *  counts its w, being oblique by definition). */
@@ -244,6 +255,7 @@ function freeSymbolDef(c: Construction3, id: Id): number | null {
 /** #324 (ADR-3D-079): a solid's BASE ring — the drawing convention everywhere in the engine is
  *  base ids first (prisms: first half; pyramids: all but the apex-last; flat polygons: all). */
 function baseRingOf(s: SolidObj): Id[] | null {
+  if (isQuadPyramid(s.kind)) return s.ids.slice(0, 4); // #305: any base × any top — one rule
   switch (s.kind) {
     case 'cube': case 'box': case 'parallelepiped':
     case 'prism4': case 'prism4g': case 'prism4sq': case 'prism4r':
@@ -256,8 +268,7 @@ function baseRingOf(s: SolidObj): Id[] | null {
       return s.ids.slice(0, 6);
     case 'tetra': case 'pyramid3': case 'pyramid3e':
       return s.ids.slice(0, 3);
-    case 'pyramid4': case 'pyramid4r': case 'pyramid4g': case 'pyramid4gr': case 'pyramidPar':
-      return s.ids.slice(0, 4);
+
     case 'polygon3': case 'polygon4': case 'polygon5':
       return [...s.ids];
     default:
@@ -272,6 +283,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return missingPoint(c, [claim.a1, claim.b1, claim.a2, claim.b2]);
     case 'volume-eq-poly':
       return missingPoint(c, [...claim.ids1, ...claim.ids2]);
+    case 'concyclic':
+      return missingPoint(c, claim.ids);
     case 'vec-eq': {
       const pointErr = missingPoint(c, [...exprPointIds(claim.lhs), ...exprPointIds(claim.rhs)]);
       if (pointErr) return pointErr;
@@ -390,7 +403,8 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // plane — the ADR-255 reseat pattern), any other apex takes equal-lateral-edge givens
       // (apex over the circumcentre ⇔ |apex·bᵢ| all equal), M1-routed to drive or verify.
       const PYR_BASE: Partial<Record<SolidKind, number>> = {
-        tetra: 3, pyramid3: 3, pyramid3e: 3, pyramid4: 4, pyramid4r: 4, pyramid4g: 4, pyramid4gr: 4, pyramidPar: 4,
+        tetra: 3, pyramid3: 3, pyramid3e: 3,
+        ...(Object.fromEntries((Object.keys(VERTEX_COUNT) as SolidKind[]).filter(isQuadPyramid).map((k) => [k, 4])) as Partial<Record<SolidKind, number>>),
       };
       const baseN = PYR_BASE[cmd.kind];
       // NOT a statement: ids that are exactly an existing solid's id SET (a CONTRADICTING
@@ -1326,6 +1340,19 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       }
       if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-angle', u: cmd.u, v: cmd.v, cos: cmd.cos });
       else next.claims.push({ type: 'cos-angle-eq', u: cmd.u, v: cmd.v, cos: cmd.cos });
+      return { ok: true, next };
+    }
+
+    // #305 (ADR-3D-090): A,B,C,D are CONCYCLIC — emitted by «ישרה» over a general-quad base
+    // (a right pyramid needs a cyclic base). M1, like every relation: a free-dim figure is
+    // DRIVEN into shape, a determined one is VERIFIED.
+    case 'concyclic': {
+      const miss = missingPoint(c, cmd.ids);
+      if (miss) return { ok: false, error: miss };
+      if (cmd.ids.length !== 4) return { ok: false, error: { code: 'bad-solid', kind: 'pyramidQuadR' } };
+      const next = clone(c);
+      if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'concyclic', ids: cmd.ids });
+      else next.claims.push({ type: 'concyclic', ids: cmd.ids });
       return { ok: true, next };
     }
 
