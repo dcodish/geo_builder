@@ -45,18 +45,26 @@ describe('#73 — ui-command (marks derive from givens)', () => {
 });
 
 describe('#321 — oblique-prism (a base with no oblique model — say what works)', () => {
+  // #349 (ADR-3D-089) NARROWED this family: obliqueness is a modifier of any prism kind now, so a
+  // triangle / general-quad / parallelogram-family base BUILDS oblique. What is still refused is a base
+  // whose only template would assert a given the student never stated (a REGULAR pentagon/hexagon —
+  // ADR-052), or an explicitly-oblique prism with no base noun at all (the base is missing).
   for (const u of [
-    'מנסרה שבסיסה משולש',
-    'מנסרה שבסיסה מרובע',
     'מנסרה שבסיסה מחומש',
-    'מנסרה משולשת',
+    'מנסרה שבסיסה משושה',
+    'מנסרה מחומשת',
     'מנסרה נטויה',
-    'prism with a triangle base',
-    'triangular prism ABC',
+    'prism with a pentagon base',
+    'pentagonal prism ABCDE',
     'oblique prism',
   ]) {
     it(u, () => expect(classifyGuidance3(u)?.category).toBe('oblique-prism'));
   }
+  it('#349: the triangle / general-quad bare forms are no longer brushed off (they build oblique)', () => {
+    for (const u of ['מנסרה שבסיסה משולש', 'מנסרה שבסיסה מרובע', 'מנסרה משולשת', 'prism with a triangle base', 'triangular prism ABC']) {
+      expect(classifyGuidance3(u), u).toBeNull();
+    }
+  });
   it('the SUPPORTED parallelogram-family bare forms stay null (they build oblique)', () => {
     for (const u of ['מנסרה שבסיסה מעוין', 'מנסרה שבסיסה מעויין', 'מנסרה שבסיסה ריבוע', 'מנסרה שבסיסה מלבן', 'מנסרה שבסיסה מקבילית', 'prism with a rhombus base']) {
       expect(classifyGuidance3(u), u).toBeNull();

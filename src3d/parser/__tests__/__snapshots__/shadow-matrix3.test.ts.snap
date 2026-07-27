@@ -170,52 +170,82 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   {
     "lang": "en",
     "text": "parallelepiped ABCDEFGH",
-    "winner": "parallelepiped",
+    "winner": "obliquePrism",
   },
   {
     "lang": "he",
     "text": "מקבילון ABCDEFGH",
-    "winner": "parallelepiped",
+    "winner": "obliquePrism",
   },
   {
     "lang": "en",
     "text": "prism with a parallelogram base",
-    "winner": "parallelepiped",
+    "winner": "obliquePrism",
   },
   {
     "lang": "he",
     "text": "מנסרה שבסיסה מקבילית",
-    "winner": "parallelepiped",
+    "winner": "obliquePrism",
   },
   {
     "lang": "en",
     "text": "prism with a rhombus base",
-    "winner": "parallelepiped",
+    "winner": "obliquePrism",
   },
   {
     "lang": "he",
     "text": "מנסרה שבסיסה מעוין",
-    "winner": "parallelepiped",
+    "winner": "obliquePrism",
   },
   {
     "lang": "en",
     "text": "prism with a rectangle base",
-    "winner": "parallelepiped",
+    "winner": "obliquePrism",
   },
   {
     "lang": "he",
     "text": "מנסרה שבסיסה מלבן",
-    "winner": "parallelepiped",
+    "winner": "obliquePrism",
   },
   {
     "lang": "en",
     "text": "prism with a square base",
-    "winner": "parallelepiped",
+    "winner": "obliquePrism",
   },
   {
     "lang": "he",
     "text": "מנסרה שבסיסה ריבוע",
-    "winner": "parallelepiped",
+    "winner": "obliquePrism",
+  },
+  {
+    "lang": "en",
+    "text": "triangular prism ABC",
+    "winner": "obliquePrism",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה משולשת ABC",
+    "winner": "obliquePrism",
+  },
+  {
+    "lang": "en",
+    "text": "prism with a triangle base",
+    "winner": "obliquePrism",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה שבסיסה משולש",
+    "winner": "obliquePrism",
+  },
+  {
+    "lang": "en",
+    "text": "prism with a quadrilateral base",
+    "winner": "obliquePrism",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה שבסיסה מרובע",
+    "winner": "obliquePrism",
   },
   {
     "lang": "en",

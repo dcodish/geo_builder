@@ -156,8 +156,9 @@ export type SolidKind =
   // pivot (free case → sampled shape; metric givens → the pivot drives it); double-sided
   // (two opposite faces) so a flat figure never renders fully hidden.
   | 'polygon3' | 'polygon4' | 'polygon5'
-  // #117: right prisms over more bases — parallelogram / general quad / square / regular pentagon+hexagon —
-  // and the oblique parallelepiped (מקבילון: a parallelogram base translated by a FREE lateral vector w).
+  // #117: prisms over more bases — parallelogram / general quad / square / regular pentagon+hexagon.
+  // Each is RIGHT on its own and OBLIQUE with `oblique` (#349) — the tilt is the modifier, not the kind.
+  // `parallelepiped` (מקבילון) is the legacy spelling of `prism4` + `oblique`, normalized at apply.
   | 'prism4' | 'prism4g' | 'prism4sq' | 'prismReg5' | 'prismReg6' | 'parallelepiped';
 // The 4-base pyramid family: rightness (ישרה — apex above the base centre) and base shape
 // are INDEPENDENT stated givens (ADR-052). Square must be STATED (שבסיסה ריבוע); an
@@ -171,6 +172,16 @@ export interface SolidCommand {
   type: 'solid';
   kind: SolidKind;
   ids: Id[];
+  /**
+   * #349 (ADR-3D-089): OBLIQUE — the top ring is the base translated by a FREE lateral vector w
+   * instead of straight up by a height. Obliqueness is a MODIFIER of any prism kind, not a base-specific
+   * template: the base ring is computed identically either way, so `prism3` + `oblique` is a general
+   * oblique triangular prism, `prism4` + `oblique` is the מקבילון, and so on. A prism the student did
+   * not state "right" is oblique (ADR-052 — rightness is a given, never assumed); `make-right-prism`
+   * clears the flag. The legacy `parallelepiped` kind is normalized to `prism4` + `oblique` at apply,
+   * so exactly ONE oblique code path exists in the engine.
+   */
+  oblique?: true;
 }
 
 /**
@@ -636,6 +647,9 @@ export interface SolidObj {
   ids: Id[];
   edges: [Id, Id][];
   faces: Id[][];
+  /** #349: this prism is OBLIQUE — see {@link SolidCommand.oblique}. Topology is identical to the
+   *  right prism of the same kind (same ring), so only the dims and positions differ. */
+  oblique?: true;
 }
 
 export type PointDef =

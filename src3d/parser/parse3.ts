@@ -154,43 +154,46 @@ const makeRightPrism: Rule = (s) => {
   return [{ type: 'make-right-prism' }];
 };
 
-/** The oblique parallelepiped `מקבילון` / `parallelepiped` (#117): a parallelogram base translated by a
- *  FREE lateral vector — 8 labels, or 4 auto-primed, or the default ABCD base. Allowed despite being
- *  oblique: it is a NAMED oblique solid carrying its own free DOF, so it asserts no unstated "right" given.
+/** An OBLIQUE prism — the mirror of {@link rightPrism}, dispatched by the SAME base nouns but with the
+ *  lateral tilt left FREE (#349, ADR-3D-089). A prism the student did not state `ישרה` is oblique
+ *  (ADR-052: rightness is a given, never assumed) and `המנסרה ישרה` (#289) pins it upright later.
  *
- *  #295: a bare `מנסרה שבסיסה מקבילית` / `prism with a parallelogram base` (a parallelogram-base prism with
- *  NO `ישרה`) is the SAME oblique solid (ADR-052: rightness is unstated, so the lateral tilt is a free DOF,
- *  pinned upright by `המנסרה ישרה`, #289). `rightPrism` owns the `ישרה` form (→ `prism4`).
+ *  Covers: `מקבילון` / `parallelepiped` (the named parallelogram-base solid — 8 labels, 4 auto-primed, or
+ *  the default ABCD base), the bare `מנסרה שבסיסה <shape>` over the parallelogram family (#295/#321), and
+ *  — new in #349 — the TRIANGLE and general-QUAD bases the `oblique-prism` guidance used to refuse:
+ *  `מנסרה משולשת` / `מנסרה שבסיסה משולש` / `triangular prism`, equilateral (`prism3e`), `מנסרה מרובעת`.
  *
- *  #321 (ADR-3D-078): the bare form DISPATCHES by base noun across the parallelogram FAMILY — a rhombus /
- *  rectangle / square IS a parallelogram plus its own defining constraints, so each lowers to the same
- *  `parallelepiped` + the constraint macro (the ADR-110/#199 pattern, no new engine construct): rhombus ⇒
- *  adjacent sides equal (`length-rel |AB|=|AD|`), rectangle ⇒ a right base angle (`cos-angle (AB,AD)=0`),
- *  square ⇒ both. M1 at apply drives the free base dims; `המנסרה ישרה` still pins the tilt upright.
- *  Bases OUTSIDE the family (triangle / general quad / n-gon) have no oblique model — they stay refused
- *  (the `oblique-prism` guidance family in scope3 says what works). */
-const parallelepiped: Rule = (s) => {
+ *  Base shapes that are not a template on their own ride the ADR-110/#199 constraint-macro pattern (no new
+ *  engine construct): rhombus ⇒ adjacent sides equal (`length-rel |AB|=|AD|`), rectangle ⇒ a right base
+ *  angle (`cos-angle (AB,AD)=0`), square ⇒ both. Regular pentagon/hexagon bases stay with the guidance —
+ *  their only template asserts REGULARITY, which the student did not state (ADR-052). */
+const obliquePrism: Rule = (s) => {
   const named = /מקבילון/.test(s) || /\bparallelepiped\b/i.test(s);
   const rhombus = /מעויי?ן/.test(s) || /\brhombus\b/i.test(s);
   const square = /ריבוע/.test(s) || /\bsquare\b/i.test(s);
   const rect = /מלבן/.test(s) || /\brectang/i.test(s);
   const par = /מקבילית/.test(s) || /\bparallelogram\b/i.test(s);
-  const barePrismQuad =
-    (/מנסרה/.test(s) || /\bprism\b/i.test(s)) &&
-    !/ישרה/.test(s) &&
-    !/\bright\b/i.test(s) &&
-    (par || rhombus || square || rect);
-  if (!named && !barePrismQuad) return null;
+  const equi = /שווה[\s-]?צלעות/.test(s) || /כל\s+מקצועותיה\s+שוו/.test(s) || /\bequilateral\b/i.test(s);
+  const tri = /משולש/.test(s) || /\btriangular\b/i.test(s) || /\btriangle\s+base\b/i.test(s) || /\bbase\s+is\s+(?:a\s+)?triangle\b/i.test(s);
+  const quad = /מרובע/.test(s) || /\bquadrilateral\b/i.test(s) || /\bquad\b/i.test(s);
+  const isPrism = /מנסרה/.test(s) || /\bprism\b/i.test(s);
+  const stated = par || rhombus || square || rect || tri || quad;
+  const barePrism = isPrism && !/ישרה/.test(s) && !/\bright\b/i.test(s) && stated;
+  if (!named && !barePrism) return null;
+  // The base template: a triangle/quad of its own, else the parallelogram carrying the family's constraints.
+  const kind: SolidKind = tri && !quad ? (equi ? 'prism3e' : 'prism3') : quad && !par && !rhombus && !square && !rect ? 'prism4g' : 'prism4';
+  const bn = kind === 'prism3' || kind === 'prism3e' ? 3 : 4;
+  const base = ['A', 'B', 'C', 'D'].slice(0, bn);
   const toks = firstLabelRun(s);
   let ids: Id[] | null = null;
-  if (toks.length === 8) ids = toks;
-  else if (toks.length === 4 && toks.every(unprimed)) ids = [...toks, ...primeAll(toks)];
-  else if (toks.length === 0) ids = ['A', 'B', 'C', 'D', ...primeAll(['A', 'B', 'C', 'D'])];
+  if (toks.length === 2 * bn) ids = toks;
+  else if (toks.length === bn && toks.every(unprimed)) ids = [...toks, ...primeAll(toks)];
+  else if (toks.length === 0) ids = [...base, ...primeAll(base)];
   if (!ids) return null;
-  const cmds: Command3[] = [{ type: 'solid', kind: 'parallelepiped', ids }];
+  const cmds: Command3[] = [{ type: 'solid', kind, ids, oblique: true }];
   const [a, b, , d] = ids; // base ring a-b-c-d: adjacent sides at `a` are a–b and a–d
-  if (rhombus || square) cmds.push({ type: 'length-rel', a1: a, b1: b, rhs: { pair: [a, d] }, c: 1 });
-  if (rect || square)
+  if (bn === 4 && (rhombus || square)) cmds.push({ type: 'length-rel', a1: a, b1: b, rhs: { pair: [a, d] }, c: 1 });
+  if (bn === 4 && (rect || square))
     cmds.push({ type: 'cos-angle', u: { kind: 'pair', from: a, to: b }, v: { kind: 'pair', from: a, to: d }, cos: 0 });
   return cmds;
 };
@@ -2295,7 +2298,7 @@ export const RULES: Rule[] = [
   rhombusPrism,
   rightPrism,
   makeRightPrism, // #289 (M1): `המנסרה ישרה` — make THE existing solid a right prism
-  parallelepiped, // מקבילון / parallelepiped — an oblique named solid (#117)
+  obliquePrism, // #349: a prism NOT stated right — מקבילון (#117) + every base noun rightPrism dispatches
   volumeEqPoly, // BEFORE volumePolyClaim: its RHS is a volume, not a number
   volumePolyClaim, // BEFORE rightPyramid: נפח הפירמידה ABCD must never build a pyramid
   rightPyramidPoint, // V8-j: `T על SC כך ש-TABCD פירמידה ישרה` — before rightPyramid (which would build a solid)

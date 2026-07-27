@@ -49,9 +49,15 @@ describe('solids', () => {
     expectSolid('right triangular prism ABC', 'prism3', ids);
   });
 
-  it('an OBLIQUE prism (no ישרה/right) is refused, not silently assumed right (ADR-052)', () => {
-    expect(parse3('מנסרה משולשת ABC')).toEqual({ ok: false, reason: 'not-handled' });
-    expect(parse3('prism ABC')).toEqual({ ok: false, reason: 'not-handled' });
+  // #349 (ADR-3D-089): a prism with no stated rightness is OBLIQUE — it builds with a free lateral tilt,
+  // which is what ADR-052 actually demands (the old refusal existed only because no oblique template
+  // covered a triangular base). A prism with NO base noun is still refused: the base is genuinely absent.
+  it('an OBLIQUE prism (no ישרה/right) builds with a FREE tilt, never silently right (ADR-052)', () => {
+    expect(parse3('מנסרה משולשת ABC')).toEqual({
+      ok: true,
+      commands: [{ type: 'solid', kind: 'prism3', oblique: true, ids: ['A', 'B', 'C', "A'", "B'", "C'"] }],
+    });
+    expect(parse3('prism ABC')).toEqual({ ok: false, reason: 'not-handled' }); // no base noun — ambiguous
   });
 
   it('a wrong label count is refused', () => {

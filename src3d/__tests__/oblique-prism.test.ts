@@ -1,12 +1,16 @@
 /**
- * #295: a bare `מנסרה שבסיסה מקבילית` (parallelogram base, NO ישרה) builds an OBLIQUE `מקבילון`
- * (parallelepiped) — the lateral tilt is a free DOF (ADR-052: rightness is unstated, not defaulted to
- * right), and `המנסרה ישרה` (#289) pins it upright. `מנסרה ישרה שבסיסה מקבילית` stays a right `prism4`.
+ * #295: a bare `מנסרה שבסיסה מקבילית` (parallelogram base, NO ישרה) builds an OBLIQUE prism — the lateral
+ * tilt is a free DOF (ADR-052: rightness is unstated, not defaulted to right), and `המנסרה ישרה` (#289)
+ * pins it upright. `מנסרה ישרה שבסיסה מקבילית` stays a right `prism4`.
  *
  * #321 (ADR-3D-078): the bare form covers the whole parallelogram FAMILY — a rhombus / rectangle /
- * square base lowers to the SAME parallelepiped plus the base's defining constraints (equal adjacent
+ * square base lowers to the same oblique prism plus the base's defining constraints (equal adjacent
  * sides / a right base angle / both), driven by the pivot at every seed; `המנסרה ישרה` still pins the
- * tilt, landing the right prism over that base. Bases outside the family stay refused (scope3 guidance).
+ * tilt, landing the right prism over that base.
+ *
+ * #349 (ADR-3D-089): obliqueness became a MODIFIER (`oblique: true`) of any prism kind rather than the
+ * base-specific `parallelepiped` template, so these parses now read `prism4` + `oblique` — the same solid,
+ * one mechanism — and the bases that used to be refused (triangle, general quad) build oblique too.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { parse3 } from '../parser/parse3';
@@ -26,20 +30,20 @@ describe('#295 — bare parallelogram prism parses to an oblique parallelepiped'
   it('«מנסרה שבסיסה מקבילית» → parallelepiped (default ABCD base)', () => {
     expect(parse3('מנסרה שבסיסה מקבילית')).toEqual({
       ok: true,
-      commands: [{ type: 'solid', kind: 'parallelepiped', ids: ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"] }],
+      commands: [{ type: 'solid', kind: 'prism4', oblique: true, ids: ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"] }],
     });
   });
 
   it('«prism with a parallelogram base» → parallelepiped', () => {
     const r = parse3('prism with a parallelogram base');
     expect(r.ok).toBe(true);
-    expect(r.ok && r.commands[0]).toMatchObject({ type: 'solid', kind: 'parallelepiped' });
+    expect(r.ok && r.commands[0]).toMatchObject({ type: 'solid', kind: 'prism4', oblique: true });
   });
 
   it('labelled «מנסרה שבסיסה מקבילית ABCDA\'B\'C\'D\'» keeps the given ids', () => {
     expect(parse3("מנסרה שבסיסה מקבילית ABCDA'B'C'D'")).toEqual({
       ok: true,
-      commands: [{ type: 'solid', kind: 'parallelepiped', ids: ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"] }],
+      commands: [{ type: 'solid', kind: 'prism4', oblique: true, ids: ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"] }],
     });
   });
 
@@ -53,15 +57,24 @@ describe('#295 — bare parallelogram prism parses to an oblique parallelepiped'
     expect(parse3('מקבילון').ok).toBe(true);
   });
 
-  it('a base OUTSIDE the parallelogram family without ישרה stays the honest refusal (→ scope3 guidance)', () => {
-    expect(parse3('מנסרה שבסיסה משולש')).toEqual({ ok: false, reason: 'not-handled' });
-    expect(parse3('מנסרה שבסיסה מרובע')).toEqual({ ok: false, reason: 'not-handled' });
+  // #349 (ADR-3D-089) INVERTED this lock deliberately: a triangle / general-quad base has an honest
+  // oblique model now (the tilt is a free DOF), so it BUILDS instead of being refused. What still gets
+  // the guidance is a base whose only template would assert an unstated given — see scope3.test.ts.
+  it('#349: a triangle / general-quad base without ישרה now BUILDS oblique (was the honest refusal)', () => {
+    expect(parse3('מנסרה שבסיסה משולש')).toEqual({
+      ok: true,
+      commands: [{ type: 'solid', kind: 'prism3', oblique: true, ids: ['A', 'B', 'C', "A'", "B'", "C'"] }],
+    });
+    expect(parse3('מנסרה שבסיסה מרובע')).toEqual({
+      ok: true,
+      commands: [{ type: 'solid', kind: 'prism4g', oblique: true, ids: ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"] }],
+    });
   });
 });
 
 describe('#321 — the parallelogram FAMILY builds oblique: base noun → מקבילון + its constraints', () => {
   const IDS = ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"];
-  const SOLID = { type: 'solid', kind: 'parallelepiped', ids: IDS };
+  const SOLID = { type: 'solid', kind: 'prism4', oblique: true, ids: IDS };
   const EQUAL_SIDES = { type: 'length-rel', a1: 'A', b1: 'B', rhs: { pair: ['A', 'D'] }, c: 1 };
   const RIGHT_CORNER = {
     type: 'cos-angle',

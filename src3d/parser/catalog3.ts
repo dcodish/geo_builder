@@ -28,6 +28,11 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: 'מנסרה שבסיסה מעוין', en: 'prism with a rhombus base' },
   { category: 'solids', he: 'מנסרה שבסיסה מלבן', en: 'prism with a rectangle base' },
   { category: 'solids', he: 'מנסרה שבסיסה ריבוע', en: 'prism with a square base' },
+  // #349 (ADR-3D-089): obliqueness is a MODIFIER of any prism kind, so the triangle / general-quad bases
+  // build oblique too — the tilt is a free DOF and «המנסרה ישרה» pins it upright.
+  { category: 'solids', he: 'מנסרה משולשת ABC', en: 'triangular prism ABC' },
+  { category: 'solids', he: 'מנסרה שבסיסה משולש', en: 'prism with a triangle base' },
+  { category: 'solids', he: 'מנסרה שבסיסה מרובע', en: 'prism with a quadrilateral base' },
   { category: 'solids', he: 'המנסרה ישרה', en: 'the prism is right' }, // #289 (M1): make the existing prism a right prism
   { category: 'solids', he: 'פירמידה ישרה שבסיסה משולש שווה צלעות', en: 'right pyramid with an equilateral triangle base' },
   { category: 'solids', he: 'פירמידה SABCD שבסיסה מקבילית', en: 'pyramid SABCD with a parallelogram base' },
