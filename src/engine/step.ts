@@ -17,7 +17,8 @@ import { circleCircleIntersect, dist, sub } from './geometry';
 import { budgetExceeded } from './solveBudget';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 import { componentOf, minimalComponentOf } from './components';
-import { constraintRefs, describeConstraint, solvedOnSegmentCandidates } from './solve';
+import { applySeed, freeDofs } from './sample';
+import { constraintKey, constraintRefs, describeConstraint, solvedOnSegmentCandidates } from './solve';
 
 export interface StepOk {
   ok: true;
@@ -464,6 +465,91 @@ function runFailureLadder(
 }
 
 /**
+ * OWNERSHIP AT ACCEPT (#150, [ADR-399](../../docs/06-decisions.md#adr-399)) — the M2 twin of the
+ * failure ladder, for a constraint the current drawing ALREADY satisfies.
+ *
+ * `driveOrCheck`'s eager pick and the recruiter assign a consuming constraint its DOF owner only on
+ * the FAILURE path; a constraint whose references are all derived and whose residual happens to be 0
+ * at the accepted draw committed as an UNOWNED CHECK — the docs/17 §2.2 tripwire verbatim: the
+ * routing depended on the OBSERVED RESIDUAL (solver state), not on what the statement means. Default
+ * placements are deliberately regular (evenly-spread on-circle points, midpoints, general-position
+ * spins), so "accidentally exactly satisfied" is common — Q27's two default chords are symmetric to
+ * machine epsilon, so `EF=EG` landed as a check, no DOF was claimed, nothing re-solved per seed, and
+ * every sampled configuration violated it: the valid-config space collapsed to the one accidental
+ * draw (1/64 seeds), starving the detection pool and making the mirror labeling unreachable (#150).
+ *
+ * The pass: for new consuming constraints that landed unowned, PROBE with the real sampler
+ * (`applySeed`) — the semantic question is "does this constraint restrict the sampled family?", and
+ * the sampler IS that family's definition. A probe whose evaluate blames a new constraint (the
+ * ADR-398 `violated` attribution) proves it BINDS → run the standard recruiter AT THE PROBE STATE
+ * (where it genuinely fails, so the normal self-verifying rungs decide) and transplant ONLY the
+ * directive markings back onto the accepted construction — values untouched, verified stable, so the
+ * accepted figure does not move (stability is structural). A structurally-implied (redundant)
+ * statement survives every probe and honestly stays a check: it consumes no freedom, and claiming a
+ * DOF for it would freeze sampling variety (the ADR-139/140 redundant-kite-equality class). Probe
+ * seeds' candidate markings are compared and the FEWEST-carrier one wins (M2 least ownership,
+ * ADR-281): a single-carrier owner re-solves per seed via the robust full-range 1-D scan, where a
+ * wide joint marking re-solves fragilely.
+ */
+function ensureOwnership(
+  next: Construction,
+  newCons: Constraint[],
+  positions: Map<Id, Vec>,
+): { construction: Construction; positions: Map<Id, Vec> } | null {
+  const ownedKeys = new Set<string>();
+  for (const o of next.objects) {
+    const sv = (o as { solve?: SolveDirective }).solve;
+    if (sv) {
+      ownedKeys.add(constraintKey(sv.constraint));
+      for (const k of sv.also ?? []) ownedKeys.add(constraintKey(k));
+    }
+    if (o.kind === 'on-segment-solved') ownedKeys.add(constraintKey(o.constraint));
+  }
+  const unowned = newCons.filter((k) => !isOrderConstraint(k) && !ownedKeys.has(constraintKey(k)));
+  if (!unowned.length) return null;
+  if (freeDofs(next).length === 0) return null; // rigid figure → a genuine verify; nothing samples
+  const unownedKeys = new Set(unowned.map(constraintKey));
+  let span = 1;
+  for (const p of positions.values()) span = Math.max(span, Math.abs(p.x), Math.abs(p.y));
+  let best: { construction: Construction; positions: Map<Id, Vec>; marks: number } | null = null;
+  for (const probeSeed of [1, 2, 3]) {
+    const probe = applySeed(next, probeSeed);
+    const e = evaluate(probe);
+    if (e.ok) continue; // the new constraints survived this sample — evidence they don't bind
+    if (!(e.violated ?? []).some((v) => unownedKeys.has(constraintKey(v)))) continue; // broke something else — inconclusive
+    const marked = recruitFreeDofs(probe, unowned);
+    if (!marked) continue;
+    // Transplant the MARKING only: each object the recruiter gave a directive gets it on the accepted
+    // construction; values stay the accepted (satisfied) ones. A recruiter solution that re-pointed an
+    // EXISTING owner is too invasive to graft onto an already-valid figure — skip it (keep today's
+    // behavior for that probe).
+    const byId = new Map(marked.objects.map((o) => [o.id, o] as const));
+    let clash = false;
+    let marks = 0;
+    const objects = next.objects.map((o) => {
+      const m = byId.get(o.id) as { solve?: SolveDirective } | undefined;
+      if (!m?.solve) return o;
+      if ((o as { solve?: SolveDirective }).solve) {
+        if (!deepEqual((o as { solve?: SolveDirective }).solve, m.solve)) clash = true;
+        return o;
+      }
+      marks++;
+      return { ...o, solve: m.solve };
+    });
+    if (clash || !marks || (best && marks >= best.marks)) continue;
+    const owned = { ...next, objects };
+    const r = evaluate(owned);
+    if (!r.ok || !newConstraintsNonVacuous(owned, r.positions, newCons)) continue;
+    // The marking must not move the just-accepted figure: the driven re-solve from an exactly-satisfied
+    // state keeps its values (nearest-root ordering); verify it actually did.
+    if (maxDelta(positions, r.positions, [...positions.keys()]) > 1e-3 * span) continue;
+    best = { construction: owned, positions: r.positions, marks };
+    if (marks === 1) break; // a single owner can't be beaten
+  }
+  return best ? { construction: best.construction, positions: best.positions } : null;
+}
+
+/**
  * #186 belt-and-braces: a command that would CREATE A NEW POINT riding a circle id that exists nowhere
  * — not in the prior figure and not defined by the command itself — can only produce a dangling object
  * that the topological evaluator reports as the cryptic internal "unresolved dependencies for: X".
@@ -528,7 +614,11 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     if (constrained) {
       const newCons = constrained.constraints.slice(prev.constraints.length);
       const r = evaluate(constrained);
-      if (r.ok && newConstraintsNonVacuous(constrained, r.positions, newCons)) return { ok: true, construction: constrained, positions: r.positions, ladder: [...trace, 'm1:primary'] };
+      if (r.ok && newConstraintsNonVacuous(constrained, r.positions, newCons)) {
+        const owned = ensureOwnership(constrained, newCons, r.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF
+        if (owned) return { ok: true, construction: owned.construction, positions: owned.positions, ladder: [...trace, 'm1:primary', 'm1:own'] };
+        return { ok: true, construction: constrained, positions: r.positions, ladder: [...trace, 'm1:primary'] };
+      }
       // The reinterpreted statement is a CONSTRAINT — give it the SAME failure path a typed constraint
       // gets. One statement, one semantics, ONE solve path (M1/ADR-231; unified by S1.1 — the honest
       // failure surfaces the RELATION that can't hold, never "already defined").
@@ -550,7 +640,13 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   if (mirrored) {
     const alt = evaluate(mirrored);
     const choice = chooseComposition(prev, ncmd, prevPositions, next, res, mirrored, alt);
-    if (choice) return { ok: true, construction: choice.construction, positions: choice.positions, ladder: [choice.construction === next ? 'main:primary' : 'main:mirror'] };
+    if (choice) {
+      const token = choice.construction === next ? 'main:primary' : 'main:mirror';
+      const newConsChoice = choice.construction.constraints.slice(prev.constraints.length);
+      const owned = ensureOwnership(choice.construction, newConsChoice, choice.positions); // ADR-399
+      if (owned) return { ok: true, construction: owned.construction, positions: owned.positions, ladder: [token, 'main:own'] };
+      return { ok: true, construction: choice.construction, positions: choice.positions, ladder: [token] };
+    }
     // No coincidence-free placement. If a side merely STACKS (evaluates ok but two nodes coincide), this is
     // a default collision the composition can't dodge → keep prior with a clear message (ADR-123: avoid
     // default collisions; a constraint-DRIVEN coincidence is allowed below, not here). Otherwise fall
@@ -569,6 +665,10 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     // stuck on the segment) may still hold if the figure's OTHER free DOFs move too (ADR-028, extended):
     // the unified failure ladder (S1.1) — orphan re-home → settle → recruit → scale → honest refusal.
     return runFailureLadder(prev, next, newConsMain, prevPositions, res, trace, 'main');
+  }
+  {
+    const owned = ensureOwnership(next, newConsMain, res.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF
+    if (owned) return { ok: true, construction: owned.construction, positions: owned.positions, ladder: ['main:primary', 'main:own'] };
   }
   return { ok: true, construction: next, positions: res.positions, ladder: ['main:primary'] };
 }
@@ -610,7 +710,11 @@ export function applyCoupledStep(prev: Construction, cmds: Command[]): StepResul
   for (const cmd of cmds) next = applyCommand(next, cmd, prevPositions);
   const newCons = next.constraints.slice(prev.constraints.length);
   const res = evaluate(next);
-  if (res.ok && newConstraintsNonVacuous(next, res.positions, newCons)) return { ok: true, construction: next, positions: res.positions, ladder: ['coupled:primary'] };
+  if (res.ok && newConstraintsNonVacuous(next, res.positions, newCons)) {
+    const owned = ensureOwnership(next, newCons, res.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF
+    if (owned) return { ok: true, construction: owned.construction, positions: owned.positions, ladder: ['coupled:primary', 'coupled:own'] };
+    return { ok: true, construction: next, positions: res.positions, ladder: ['coupled:primary'] };
+  }
   // The SAME unified failure ladder as applyStep (S1.1), once, over the UNION of the coupled constraints.
   return runFailureLadder(prev, next, newCons, prevPositions, res, trace, 'coupled');
 }

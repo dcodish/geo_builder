@@ -1669,4 +1669,35 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'q27-chords-equal-distances-drives',
+    title: 'issue #150 / ADR-399: bagrut Q27 — «EF=EG» on the two-chords-through-E figure CLAIMS a DOF though the default draw already satisfies it',
+    guards:
+      "operator session qx5a19co: two chords AB, CD of circle O meet at E; the circle on diameter EO cuts them at F, G; given EF=EG. The DEFAULT placement is symmetric to machine epsilon (|EF|−|EG| ≈ 8e-15 before the equality is even typed), so the set-equal committed via main:primary as an UNOWNED CHECK — no DOF claimed, nothing re-solved per seed, and the constraint converged from exactly 1/64 seeds (the accidental draw itself). Detection ran on a 1-sample pool and the book labeling BE=DE was unreachable by 'show another configuration'. ADR-399: the accept path now probes with the real sampler and, when a probe blames the new constraint (ADR-398 violated attribution), assigns ownership with the standard recruiter (minimal marking — here D's on-circle θ) without moving the accepted figure. Post-fix: 64/64 seeds re-solve, ~27/64 displayable, both labelings reachable (per-seed health locked in src/replay/__tests__/basin-ownership.test.ts). This check asserts the DISPLAYED figure's geometric consequences — F, G are the chord midpoints (Thales: ∠EFO=90 ⇒ OF⟂AB) and EF=EG forces the chords equidistant from O, hence AB=CD.",
+    steps: [
+      'מעגל O',
+      'AB מיתר',
+      'CD מיתר',
+      'AB ו CD נחתכים בנקודה E',
+      'P אמצע EO',
+      'קוטר מעגל P הוא EO',
+      'מעגל P חותך את AB בנקודה F',
+      'מעגל P חותך את DC בנקודה G',
+      'EF=EG',
+    ],
+    check: (fig) => {
+      allStepsOk(fig);
+      const [E, F, G, A, B, C, D] = ['E', 'F', 'G', 'A', 'B', 'C', 'D'].map((id) => at(fig, id));
+      const ef = dist(E, F);
+      const eg = dist(E, G);
+      expect(Math.abs(ef - eg), 'the stated given |EF| = |EG| holds').toBeLessThan(1e-3 * Math.max(ef, eg, 1e-9));
+      // Thales on diameter EO: F and G are the feet of the perpendiculars from O — i.e. the chord MIDPOINTS
+      expect(dist(A, F), 'F bisects chord AB').toBeCloseTo(dist(B, F), 3);
+      expect(dist(C, G), 'G bisects chord CD').toBeCloseTo(dist(D, G), 3);
+      // EF=EG ⇒ the chords are equidistant from the centre ⇒ equal chords
+      const ab = dist(A, B);
+      const cd = dist(C, D);
+      expect(Math.abs(ab - cd), 'equal chords AB = CD (the forced consequence)').toBeLessThan(1e-3 * Math.max(ab, cd));
+    },
+  },
 ];

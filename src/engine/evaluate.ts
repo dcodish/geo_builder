@@ -593,6 +593,48 @@ function setCarrierVals(c: Construction, vals: Map<Id, number[]>): Construction 
 }
 
 /**
+ * Warm-start every directive-carrying carrier's params in `to` from `from`'s committed values
+ * (#359, [ADR-400](docs/06-decisions.md#adr-400)). The per-seed tail re-solves a fold's driven
+ * system from the SAMPLED configuration; a sampled start outside the system's convergence basin
+ * fails the evaluate even though the fold's own committed solution is a start that provably
+ * converges. The copied values are STARTS for the re-solve, never results — `evaluate` re-solves
+ * the directives, and the sampled NON-driven DOFs keep their sampled values, so genuine sampling
+ * variety is untouched (a determined figure just lands back on its one shape). Only objects that
+ * still carry a `solve` in `to` are warmed (a dialed radius, whose solve the override cleared,
+ * keeps the student's value). Returns null when there is nothing to warm, so the retry costs
+ * nothing on carrier-less figures. Kind-switch kept exhaustive alongside {@link carrierSpec} /
+ * {@link setCarrierVals} — a new carrier kind must be added to all three.
+ */
+export function warmStartCarriers(to: Construction, from: Construction): Construction | null {
+  const src = new Map(from.objects.map((o) => [o.id, o] as const));
+  let any = false;
+  const warm = <T extends GeoObject>(o: T): T => {
+    any = true;
+    return o;
+  };
+  const objects = to.objects.map((o) => {
+    if ((o as { solve?: unknown }).solve === undefined) return o;
+    const f = src.get(o.id);
+    if (!f || f.kind !== o.kind) return o;
+    switch (o.kind) {
+      case 'free-point': return warm({ ...o, x: (f as typeof o).x, y: (f as typeof o).y });
+      case 'on-circle': return warm({ ...o, theta: (f as typeof o).theta });
+      case 'on-segment': return warm({ ...o, t: (f as typeof o).t });
+      case 'circle': {
+        const fr = (f as typeof o).radius;
+        return o.radius.via === 'free' && fr.via === 'free' ? warm({ ...o, radius: { via: 'free' as const, value: fr.value } }) : o;
+      }
+      case 'perp-offset': return warm({ ...o, dist: (f as typeof o).dist });
+      case 'rotated': return warm({ ...o, angleDeg: (f as typeof o).angleDeg });
+      case 'scaled-offset': return warm({ ...o, k: (f as typeof o).k });
+      case 'on-line': return warm({ ...o, offset: (f as typeof o).offset });
+      default: return o;
+    }
+  });
+  return any ? { ...to, objects } : null;
+}
+
+/**
  * Drive a heterogeneous set of carriers so their constraints hold, choosing the configuration
  * NEAREST the current one (regularised). Generalises {@link resolveFreeDriven} to mix free
  * vertices with the parametric and shape-scalar DOFs — so e.g. a rectangle's width (a free

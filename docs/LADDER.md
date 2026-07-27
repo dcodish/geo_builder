@@ -36,6 +36,7 @@ Then the M1 branch's own mini-ladder: **primary** evaluate + non-vacuous gate (`
 | 2b | primary `evaluate` | `main:primary` on accept |
 | 2c | `mirrorComposition`/`chooseComposition` — shape-on-existing-edge side choice; both sides stacking → refuse (`main:stack-refuse`) | `main:mirror` when the mirror wins |
 | 2d | vacuous-satisfaction gate `newConstraintsNonVacuous` at EVERY accept (issue #7) | — |
+| 2d′ | `ensureOwnership` at every PRIMARY accept ([ADR-399](06-decisions.md#adr-399), #150) — a new consuming constraint that landed UNOWNED while the current draw satisfies it is probed with the real sampler (`applySeed` 1..3); a probe whose evaluate BLAMES it (ADR-398 `violated`) runs the stage-3 recruiter at the probe state and transplants the fewest-carrier directive marking, values untouched (verified stable). A redundant statement survives the probes and stays a check. Twins on the m1/coupled accepts. | `main:own` / `m1:own` / `coupled:own` |
 | — | **failure path** (primary failed or vacuous): | |
 | 2e | orphaned-`coincide` re-home sweep (M2 law i) — unowned coincides join the recruit list | `main:orphans` |
 | 2f | `settleOnFrozenPrior` (stage-0, ADR-276) — **skipped when orphans exist** | `main:settle` |
@@ -73,6 +74,8 @@ Cooperative budget (`budgetExceeded()`) can bail between cases — armed only ar
 ## Stage 5 — the replay fold (`computeFold`, src/replay/core.ts — moved out of the store by S1.2)
 
 M4 pre-scans (soft-equal / right-angle reseat / trapezoid rotate / centre promotion / softPair swap) → per-fact `applyStep`/`applyCoupledStep` (content-keyed fold memo, per-seed tail) → **ADR-104 deferral fixpoint** (still-failed constraint-only facts retried against the completed figure; reference-identical failures skipped) → atomic-group poisoning fixpoint → **HOIST** (order-independence re-fold, depth ≤ 2, per-seed acceptance) → pending-vs-error classification.
+
+**The per-seed tail (`runTail`)**: reflections → `applySeed` → radius overrides → ONE evaluate → **the [ADR-400](06-decisions.md#adr-400) basin retry** (#359): a failed evaluate retries ONCE with every directive-carrying carrier warm-started from the fold's committed values (`warmStartCarriers`) — the ADR-238 retry-only pattern at the tail seam, so a clean seed never pays it and sampled non-driven DOFs keep their variety. Only then does `tailChoice`'s rescue-chain fallback (a weaker/pending fold) come into play. Then the ADR-398 status attribution and per-seed presentation.
 
 ## Stage 6 — seed/config sweeps (view searches; budgeted)
 

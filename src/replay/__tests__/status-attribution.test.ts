@@ -14,57 +14,51 @@
  * fold-time failure would (the operator's taste ruling): to the student, "this given cannot hold in the
  * configuration being attempted" reads identically in both cases.
  *
- * The reproduction figure is #150's (bagrut Q27 — two chords through E, the small circle on diameter EO,
- * given EF=EG): the driven equality converges at seed 0 and diverges at most other seeds, which is
- * exactly the fold-ok / tail-broken split this defect lives in. Diagnosing #150 with `status` as the
- * instrument produced a wrong "64/64 converged" reading — the measurement trap this fix closes.
+ * REPRODUCTION HISTORY: the original lock used #150's Q27 chords figure (fold-ok / tail-broken on 63/64
+ * seeds). ADR-399 (ownership at accept) + ADR-400 (the tail's warm-start basin retry) HEALED that figure
+ * — it now evaluates at every seed, which this file's vacuous-guard correctly refused to ignore. The
+ * lock now uses a figure whose per-seed failure survives both mechanisms BY CONSTRUCTION: a square with
+ * E on AB and |CE| = 5.2 — feasible at the default side (5.2 ∈ [s, s√2]), but the sampled sides at some
+ * seeds push 5.2 outside E's reachable range, and a 1-D bounded root that does not exist cannot be
+ * rescued by any retry start. That is exactly the honest fold-ok / tail-broken split ADR-398 attributes.
  */
 
 import { describe, expect, it } from 'vitest';
 import { factsOf } from '@/__tests__/scenarios-harness';
 import { meetsRequirements, replay } from '@/store/geoStore';
 
-const Q27_CHORDS = [
-  'מעגל O',
-  'AB מיתר',
-  'CD מיתר',
-  'AB ו CD נחתכים בנקודה E',
-  'P אמצע EO',
-  'קוטר מעגל P הוא EO',
-  'מעגל P חותך את AB בנקודה F',
-  'מעגל P חותך את DC בנקודה G',
-  'EF=EG',
-];
+const SQUARE_CE = ['ריבוע ABCD', 'נקודה E על AB', 'CE=5.2'];
 
 describe('#360 — a per-seed evaluate failure is attributed to its owning fact row', () => {
-  const facts = factsOf(Q27_CHORDS);
-  const eqFact = facts.find((f) => f.cmd.type === 'set-equal')!;
+  const facts = factsOf(SQUARE_CE);
+  const eFact = facts.find((f) => f.cmd.type === 'point-on-segment')!;
+  const squareFact = facts.find((f) => f.cmd.type === 'square')!;
 
   it('the reproduction still has both kinds of seed (guards against the test going vacuous)', () => {
-    const kinds = new Set([0, 1, 2, 3].map((s) => (replay(facts, s).lastError === null ? 'clean' : 'broken')));
+    const kinds = new Set([0, 1, 2, 3, 4].map((s) => (replay(facts, s).lastError === null ? 'clean' : 'broken')));
     expect(kinds).toEqual(new Set(['clean', 'broken']));
   });
 
-  it('AGREEMENT: whenever lastError reports the failed equality, the EF=EG row carries it — and only that row', () => {
-    for (const seed of [0, 1, 2, 3]) {
+  it('AGREEMENT: whenever lastError reports the unplaceable point, its row carries it — and only its row', () => {
+    for (const seed of [0, 1, 2, 3, 4, 5, 6, 7]) {
       const fig = replay(facts, seed);
       if (fig.lastError === null) {
         // a clean seed: every row ok, nothing over-attributed
         for (const f of facts) if (f.enabled) expect(fig.status[f.id], `seed ${seed}, "${f.utterance}"`).toBe('ok');
       } else {
-        expect(fig.lastError).toContain('|EF| = |EG|');
+        expect(fig.lastError).toContain('cannot place E');
         // the owning row carries the SAME error string the banner shows (the taste ruling)
-        expect(fig.status[eqFact.id], `seed ${seed}: the set-equal row must not read green under a red banner`).toBe(fig.lastError);
-        // …and attribution is PRECISE — no blanket reddening of innocent rows
-        for (const f of facts) {
-          if (f.enabled && f.id !== eqFact.id) expect(fig.status[f.id], `seed ${seed}, "${f.utterance}" is innocent`).toBe('ok');
-        }
+        expect(fig.status[eFact.id], `seed ${seed}: E's row must not read green under a red banner`).toBe(fig.lastError);
+        // …and attribution is PRECISE — the untouched shape rows stay green
+        expect(fig.status[squareFact.id], `seed ${seed}: the square is innocent`).toBe('ok');
+        const red = facts.filter((f) => f.enabled && fig.status[f.id] !== 'ok');
+        expect(red.length, `seed ${seed}: no blanket reddening`).toBeLessThanOrEqual(2);
       }
     }
   });
 
-  it('the ADR-397 displayability clause now does real work: a broken seed fails the every-fact-ok test itself', () => {
-    for (const seed of [0, 1, 2, 3]) {
+  it('the ADR-397 displayability clause does real work: a broken seed fails the every-fact-ok test itself', () => {
+    for (const seed of [0, 1, 2, 3, 4, 5, 6, 7]) {
       const fig = replay(facts, seed);
       const allOk = facts.every((f) => !f.enabled || fig.status[f.id] === 'ok');
       // the headline #360 invariant: the two channels agree

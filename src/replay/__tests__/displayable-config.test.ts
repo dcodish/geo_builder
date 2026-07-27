@@ -9,37 +9,35 @@
  *
  * So a seed where a stated given settled `over-constrained` was still offered to the student by "show
  * another configuration", with the given silently not applying. On the two-tangent-circles figure of
- * `common-tangent-two-circles`, seeds 0–1 land |O2M| = 16 while seeds 2–3 leave it at ~2.9 / ~1.25 with
- * the step refused — and all four were called displayable.
+ * `common-tangent-two-circles` (the reported instance), seeds 0–1 landed |O2M| = 16 while seeds 2–3
+ * left it at ~2.9 / ~1.25 with the step refused — and all four were called displayable.
  *
  * This is the cross-seed escape class (ADR-085/098/127/166) one level up: not a requirement the sampler
  * forgot, but the step statuses themselves.
+ *
+ * REPRODUCTION HISTORY: the original seed-split figure was the two-tangent-circles one; ADR-400 (the
+ * tail's warm-start basin retry, #359) HEALED it — every seed now builds the closed form — which this
+ * file's vacuous-guard correctly refused to ignore. The lock now uses the same figure as the ADR-398
+ * attribution lock: a square with E on AB and |CE| = 5.2, whose split survives every rescue tier by
+ * construction (a bounded 1-D root that does not exist at some sampled sides cannot be retried into
+ * existence). The healed figure keeps its own every-seed lock in `basin-ownership.test.ts`.
  */
 
 import { describe, expect, it } from 'vitest';
 import { factsOf } from '@/__tests__/scenarios-harness';
 import { meetsRequirements, replay } from '@/store/geoStore';
 
-/** The ADR-239 / ADR-230 two-tangent-circles figure — the reported instance. */
-const TWO_TANGENT_CIRCLES = [
-  'שני מעגלים O1 ו O2 משיקים מבחוץ בנקודה M',
-  'AB משיק משותף לשני המעגלים',
-  'מנקודה N יוצאים שני משיקים למעגל O1 בנקודות M ו B',
-  'מנקודה N יוצאים שני משיקים למעגל O2 בנקודות M ו A',
-  'A נמצאת על המשך BN',
-  'O1M=9',
-  'O2M=16',
-];
+const SQUARE_CE = ['ריבוע ABCD', 'נקודה E על AB', 'CE=5.2'];
 
 describe('#345 — displayability requires the figure to satisfy its own commands', () => {
   it('a seed whose committed step is over-constrained is NOT displayable', () => {
-    const facts = factsOf(TWO_TANGENT_CIRCLES);
+    const facts = factsOf(SQUARE_CE);
     const dist = (a?: { x: number; y: number }, b?: { x: number; y: number }) =>
       a && b ? Math.hypot(a.x - b.x, a.y - b.y) : NaN;
 
     let good = 0;
     let refusedAndHidden = 0;
-    for (let seed = 0; seed < 4; seed++) {
+    for (let seed = 0; seed < 8; seed++) {
       const fig = replay(facts, seed);
       const allOk = facts.every((f) => !f.enabled || fig.status[f.id] === 'ok');
       const displayable = meetsRequirements(facts, seed);
@@ -49,8 +47,8 @@ describe('#345 — displayability requires the figure to satisfy its own command
 
       if (allOk) {
         good++;
-        // a displayable config really does honour the stated size given
-        expect(dist(fig.positions.get('O2'), fig.positions.get('M')), `seed ${seed}: |O2M| = 16`).toBeCloseTo(16, 2);
+        // a config whose steps all hold really does honour the stated size given
+        expect(dist(fig.positions.get('C'), fig.positions.get('E')), `seed ${seed}: |CE| = 5.2`).toBeCloseTo(5.2, 2);
       } else {
         refusedAndHidden++;
         expect(displayable, `seed ${seed} is correctly hidden`).toBe(false);

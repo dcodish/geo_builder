@@ -15,7 +15,7 @@
 
 import type { AnyCommand, Command, Construction, GivenViolation, Id, ResolvedCircle, Vec } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, warmStartCarriers, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -820,7 +820,7 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
   const sampled = applyReflections(applySeed(applyReflections(cur, preMask), baseSeedOf(seed)), postMask);
   // A dialed radius (the DOF slider) overrides the sampled value for that free circle — a viewing
   // scratchpad (ADR-048): it's cleared by "show another configuration", never a fixed given (ADR-052).
-  const figure =
+  let figure =
     Object.keys(radiusOverrides).length === 0
       ? sampled
       : {
@@ -833,7 +833,26 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
               : o,
           ),
         };
-  const e = evaluate(figure);
+  let e = evaluate(figure);
+  // #359 ([ADR-400](docs/06-decisions.md#adr-400)): per-seed BASIN RETRY. The fold's ladder (recruit /
+  // settle / scale, docs/LADDER.md stages 2e–3) runs only at fold time; the tail is one evaluate, so a
+  // seed whose sampled solver STARTS fall outside the driven system's convergence basin failed here even
+  // though the fold's own committed solution is a start that provably converges — and tailChoice then
+  // fell back to a weaker (pending) fold, silently shrinking the valid-configuration space (the
+  // two-tangent-circles figure lost half its seeds this way). Retry ONCE with every directive-carrying
+  // carrier warm-started from the fold's committed values: the ADR-238 pattern — retry-only, so a seed
+  // that evaluates clean never reaches this and previously-green seeds are bit-identical; the sampled
+  // non-driven DOFs keep their sampled values, so genuine variety is untouched.
+  if (!e.ok) {
+    const warmed = warmStartCarriers(figure, cur);
+    if (warmed) {
+      const w = evaluate(warmed);
+      if (w.ok) {
+        e = w;
+        figure = warmed;
+      }
+    }
+  }
   // A dialed radius override (or a seed) can break a figure that BUILT fine — surface that failure so the
   // error reflects what's actually drawn (and so `setRadius` can reject an impossible dial). `lastError`
   // was build-only, so an override that made `evaluate` fail left it null with the figure silently gone.
