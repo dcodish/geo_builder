@@ -53,6 +53,14 @@ export interface EvalErr {
   error: string;
   /** True when the failure is two distinct points sharing a location. */
   coincide?: boolean;
+  /** #360 (ADR-398): the CONSTRAINTS that could not be satisfied — the structured twin of the joined
+   *  `error` string, so the replay tail can attribute the failure to the fact rows that introduced
+   *  them (via the fold's owner map, keyed by `constraintKey`). Only the constraint-violation paths
+   *  set it; absent on resolver/dependency failures. */
+  violated?: Constraint[];
+  /** #360 (ADR-398): the OBJECT ids the failure names — a point/line/circle whose resolution failed or
+   *  never completed. The attribution twin of `violated` for the non-constraint failure paths. */
+  stuckIds?: Id[];
 }
 export type EvalResult = EvalOk | EvalErr;
 
@@ -923,7 +931,7 @@ function withParam(c: Construction, id: Id, v: number): Construction {
  * `evaluateCore`'s final loop never verifies them. Gathered from the ORIGINAL construction, before
  * `resolveDriven` clears the solve directives.
  */
-function drivenConstraintsOf(c: Construction): Constraint[] {
+export function drivenConstraintsOf(c: Construction): Constraint[] {
   const out: Constraint[] = [];
   const seen = new Set<string>();
   for (const o of c.objects) {
@@ -984,17 +992,19 @@ function evaluateUncached(c: Construction): EvalResult {
   // ~0 residual and passes `isSatisfied`; only the genuinely-conflicting ones fail it. So the set that
   // fails `isSatisfied` IS the conflict — report them all ("X and Y cannot hold").
   const violated: string[] = [];
+  const violatedCons: Constraint[] = []; // #360: the structured twin of `violated` (all members, incl. same-description duplicates)
   const seenDesc = new Set<string>();
   for (const con of driven) {
     for (const id of constraintRefs(con)) {
-      if (!res.positions.has(id)) return { ok: false, error: `${describeConstraint(con)} references an unknown point` };
+      if (!res.positions.has(id)) return { ok: false, error: `${describeConstraint(con)} references an unknown point`, violated: [con] };
     }
     if (!isSatisfied(con, (id) => res.positions.get(id)!)) {
+      violatedCons.push(con);
       const d = describeConstraint(con);
       if (!seenDesc.has(d)) { seenDesc.add(d); violated.push(d); }
     }
   }
-  if (violated.length) return { ok: false, error: `over-constrained: ${violated.join(' and ')} cannot hold` };
+  if (violated.length) return { ok: false, error: `over-constrained: ${violated.join(' and ')} cannot hold`, violated: violatedCons };
   return res;
 }
 
@@ -1020,7 +1030,7 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
       if (!remainingCircles.has(o.id)) continue;
       const r = resolveCircle(o, pos, circles);
       if (r === 'pending') continue;
-      if (typeof r === 'string') return { ok: false, error: r };
+      if (typeof r === 'string') return { ok: false, error: r, stuckIds: [o.id] };
       circles.set(o.id, r);
       remainingCircles.delete(o.id);
       progressed = true;
@@ -1029,7 +1039,7 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
       if (!remainingLines.has(l.id)) continue;
       const r = resolveLine(l, pos, circles);
       if (r === 'pending') continue;
-      if (typeof r === 'string') return { ok: false, error: r };
+      if (typeof r === 'string') return { ok: false, error: r, stuckIds: [l.id] };
       lines.set(l.id, r);
       remainingLines.delete(l.id);
       progressed = true;
@@ -1038,7 +1048,7 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
       if (!remaining.has(p.id)) continue;
       const r = tryEval(p, pos, lines, circles);
       if (r === 'pending') continue;
-      if (typeof r === 'string') return { ok: false, error: r };
+      if (typeof r === 'string') return { ok: false, error: r, stuckIds: [p.id] };
       pos.set(p.id, r);
       remaining.delete(p.id);
       progressed = true;
@@ -1046,7 +1056,7 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
   }
   if (remaining.size > 0 || remainingLines.size > 0 || remainingCircles.size > 0) {
     const stuck = [...remaining, ...remainingLines, ...remainingCircles];
-    return { ok: false, error: `unresolved dependencies for: ${stuck.join(', ')}` };
+    return { ok: false, error: `unresolved dependencies for: ${stuck.join(', ')}`, stuckIds: stuck };
   }
 
   for (const v of pos.values()) {
@@ -1103,11 +1113,11 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
 
   for (const con of c.constraints) {
     for (const id of constraintRefs(con)) {
-      if (!pos.get(id)) return { ok: false, error: `${describeConstraint(con)} references an unknown point` };
+      if (!pos.get(id)) return { ok: false, error: `${describeConstraint(con)} references an unknown point`, violated: [con] };
     }
     const get = (id: Id) => pos.get(id)!;
     if (!isSatisfied(con, get)) {
-      return { ok: false, error: `over-constrained: ${describeConstraint(con)} cannot hold` };
+      return { ok: false, error: `over-constrained: ${describeConstraint(con)} cannot hold`, violated: [con] };
     }
   }
 

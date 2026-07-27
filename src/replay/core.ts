@@ -15,7 +15,7 @@
 
 import type { AnyCommand, Command, Construction, GivenViolation, Id, ResolvedCircle, Vec } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintRefs, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -236,6 +236,15 @@ interface FoldNode {
   applied: Command[];
   pending: boolean;
   buildError: string | null;
+  /** #360 ([ADR-398](docs/06-decisions.md#adr-398)): `constraintKey` → the INDEX of the fact whose commit
+   *  first introduced that constraint (from `cur.constraints` AND the objects' solve directives, via
+   *  `drivenConstraintsOf` — driven constraints are NOT in `c.constraints`). Lets the per-seed tail
+   *  attribute an `evaluate` failure to the fact rows that own it. String-keyed on purpose: clone-safe
+   *  across the ADR-290 worker transplant, and immune to object re-wrapping in the tail transforms. */
+  ownerByConKey: Map<string, number>;
+  /** #360: object id → the INDEX of the fact whose commit first put that object in the figure — the
+   *  attribution twin for the resolver/stuck failure paths, which name objects rather than constraints. */
+  ownerByObjId: Map<Id, number>;
   rtReorderByIndex: [number, [Id, Id, Id]][];
   lens: [string, MeasureLabels['lengths'][number]][];
   angs: [string, MeasureLabels['angles'][number]][];
@@ -276,6 +285,9 @@ function translateFold(node: FoldNode, permToOrig: number[]): FoldNode {
     ...node,
     statusByIndex,
     rtReorderByIndex: node.rtReorderByIndex.map(([permIdx, ids]) => [permToOrig[permIdx], ids] as [number, [Id, Id, Id]]),
+    // #360: the owner maps carry fact INDICES in the permuted order — translate them like statusByIndex.
+    ownerByConKey: new Map([...node.ownerByConKey].map(([k, permIdx]) => [k, permToOrig[permIdx]])),
+    ownerByObjId: new Map([...node.ownerByObjId].map(([k, permIdx]) => [k, permToOrig[permIdx]])),
     iterOrder: node.iterOrder.map((permIdx) => permToOrig[permIdx]),
     rescue: node.rescue ? translateFold(node.rescue, permToOrig) : null,
   };
@@ -491,6 +503,19 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
     const status: Record<string, FactStatus> = {};
     const owned = new Set<Id>();
     const applied: Command[] = [];
+    // #360 (ADR-398): ownership maps for per-seed failure attribution — filled after each successful
+    // commit, first-wins (the fact whose commit first made the constraint/object appear owns it). The
+    // constraint harvest mirrors `evaluate`'s own extraction exactly: `cur.constraints` (the check list)
+    // PLUS `drivenConstraintsOf` (directive-carried constraints, which are NOT in `c.constraints`).
+    const ownerByConKey = new Map<string, number>();
+    const ownerByObjId = new Map<Id, number>();
+    const recordOwnership = (fi: number) => {
+      for (const o of cur.objects) if (!ownerByObjId.has(o.id)) ownerByObjId.set(o.id, fi);
+      for (const con of [...cur.constraints, ...drivenConstraintsOf(cur)]) {
+        const k = constraintKey(con);
+        if (!ownerByConKey.has(k)) ownerByConKey.set(k, fi);
+      }
+    };
     // The construction (by REFERENCE) a fact last failed against. `applyStep` is pure, so retrying the
     // same fact against the identical construction re-runs the identical (expensive — the failure-path
     // recruiter) search to the identical failure. The ADR-104 deferral retry below skips a fact whose
@@ -501,7 +526,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
     lenByKey.clear();
     angByKey.clear();
     areaByKey.clear();
-    for (const f of facts) {
+    for (const [fi, f] of facts.entries()) {
       // Lower the fact to the engine command(s) it produces (symbolic measures →
       // ratio/distance/angle/[]; engine commands pass through; a `shape-variant` → base shape + the
       // variant-selected equal pairs, with an explicit equality pinning the variant — ADR-138).
@@ -593,6 +618,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
         cur = trial;
         status[f.id] = 'ok';
         applied.push(...(engineCmds as Command[]));
+        recordOwnership(fi); // #360: whatever this commit added, this fact owns
       }
       claim();
     }
@@ -612,7 +638,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
     };
     for (let pass = 0; pass < facts.length && facts.some(deferrable); pass++) {
       let progressed = false;
-      for (const f of facts) {
+      for (const [fi, f] of facts.entries()) {
         if (!deferrable(f)) continue;
         // Purity skip (ADR-280): the figure hasn't changed since this fact failed against it, so the
         // retry would re-run the identical expensive search to the identical failure.
@@ -629,12 +655,13 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
           cur = trial;
           status[f.id] = 'ok';
           applied.push(...(engineCmds as Command[]));
+          recordOwnership(fi); // #360: a deferral-retry commit owns its additions just like an in-order one
           progressed = true;
         } else failedWith.set(f.id, cur);
       }
       if (!progressed) break;
     }
-    return { cur, status, applied };
+    return { cur, status, applied, ownerByConKey, ownerByObjId };
   };
   // Classify what (if anything) remains unsatisfiable after the retries. A still-failed step that is a
   // DEFERRABLE constraint while the figure is still UNDER-DETERMINED isn't a contradiction — it's just
@@ -649,7 +676,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
     });
     return { failedFacts, pending };
   };
-  let { cur, status, applied } = runBuild(new Map());
+  let { cur, status, applied, ownerByConKey, ownerByObjId } = runBuild(new Map());
   let { failedFacts, pending } = classify(cur, status);
   // ATOMIC GROUP: one utterance lowers to a GROUP of commands (e.g. "EF ⟂ BC" → segment EF + segment BC +
   // set-perpendicular). If the constraint HARD-fails (a genuine contradiction, not a pending under-determined
@@ -681,7 +708,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
         }
       }
       if (!grew) break; // no newly-mixed group — the figure is at the atomic fixpoint
-      ({ cur, status, applied } = runBuild(forced));
+      ({ cur, status, applied, ownerByConKey, ownerByObjId } = runBuild(forced));
       ({ failedFacts, pending } = classify(cur, status));
       if (pending) break; // a deferral state emerged — keep scaffolding per ADR-104
     }
@@ -753,6 +780,8 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
     lens: [...lenByKey],
     angs: [...angByKey],
     areas: [...areaByKey],
+    ownerByConKey,
+    ownerByObjId,
     iterOrder: facts.map((_, i) => i),
     rescue,
   };
@@ -809,6 +838,31 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
   // error reflects what's actually drawn (and so `setRadius` can reject an impossible dial). `lastError`
   // was build-only, so an override that made `evaluate` fail left it null with the figure silently gone.
   if (!e.ok && !lastError) lastError = e.error;
+  // #360 ([ADR-398](docs/06-decisions.md#adr-398)): attribute a PER-SEED evaluate failure to the fact
+  // rows that own the violated constraint / stuck object. `status` came from the seed-independent fold
+  // (which is what keeps the ADR-280 memo sound), so a seed where a stated given cannot hold used to show
+  // EVERY row green while the banner said the opposite — the step list read `status` as "does this step
+  // HOLD in the figure I'm looking at" and the data only ever answered "did it APPLY at fold time"
+  // (App.tsx's own contract: "the step list and the error banner must tell the truth about what just
+  // happened"). The override lives here, in the tail, where the per-seed truth is discovered; the fold's
+  // memoized statusByIndex is never touched. The row shows the SAME error string a fold-time failure
+  // would (the operator's taste ruling): to the student, "this given cannot hold in the configuration
+  // being attempted" reads identically in both cases.
+  if (!e.ok) {
+    const owners = new Set<number>();
+    for (const con of e.violated ?? []) {
+      const fi = fold.ownerByConKey?.get(constraintKey(con)); // `?.` — a node cloned from a pre-ADR-398 worker bundle lacks the maps
+      if (fi !== undefined) owners.add(fi);
+    }
+    for (const id of e.stuckIds ?? []) {
+      const fi = fold.ownerByObjId?.get(id);
+      if (fi !== undefined) owners.add(fi);
+    }
+    for (const fi of owners) {
+      const f = facts[fi];
+      if (f && f.enabled && status[f.id] === 'ok') status[f.id] = e.error;
+    }
+  }
   // Numeric measures (a plain `AB = 5` / `∠ABC = 37`, and symbolic ones once resolved)
   // surface as distance/angle constraints — label them from the figure, filling any
   // key a symbolic fact didn't already own (FR-RN-2).

@@ -4,7 +4,7 @@ export * from './types';
 export * from './geometry';
 export * from './solve';
 export { applyCommand } from './apply';
-export { evaluate, resolveLine, resolveCircle, otherCrossing, bySide } from './evaluate';
+export { evaluate, resolveLine, resolveCircle, otherCrossing, bySide, drivenConstraintsOf } from './evaluate';
 export type { EvalResult, EvalOk, EvalErr, ResolvedLine, ResolvedCircle } from './evaluate';
 export {
   applyStep,
