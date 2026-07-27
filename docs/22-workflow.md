@@ -18,6 +18,16 @@ Every operator report and feature request becomes a **GitHub issue** on `dcodish
 **Links:** ADR-NNN, related issues
 ```
 
+**Passing the body — write a file, then `--body-file`, then VERIFY.** `gh`'s `--body` takes a *literal string*: it has no stdin form, so `--body @-` (the `curl` / `gh api -f` idiom) silently files an issue whose entire body is the two characters `@-`, and `gh issue create` still exits 0 and prints a URL. This destroyed the root-cause diagnosis of six issues before it was noticed (#304, #307, #309, #361, #362, #363 — the four open ones were reconstructed from code on 2026-07-27; the diagnoses are gone). So:
+
+```sh
+# write the body to a real file first (scratchpad is fine), then:
+gh issue create --title "…" --label bug --label P2 --label 2d --body-file /path/to/body.md
+gh issue view <NN> --json body -q '.body' | head -3   # ← never skip: confirm it is not empty
+```
+
+A heredoc into `--body "$(cat <<'EOF' … EOF)"` also works. The verify step is the part that matters — a filing failure here is silent and costs the whole diagnosis.
+
 **Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3`; one *app* — `2d` | `3d` | `server`; plus `needs-operator` when blocked on an operator decision.
 
 **"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. (The historical backlog in [14-backlog.md](14-backlog.md) and ADR prose was partially migrated at adoption; sweep opportunistically.)
