@@ -5312,3 +5312,40 @@ Two independent measurements set the direction:
 **Hazard handled.** The sweep's heavy-figure backstop measured a cold `replay(facts, 0)`; co-located that is a memo hit timing ~0 ms, which would have silently disabled the guard. It now measures a *swept* seed — the honest marginal cost, and the number the budget is actually about. This immediately surfaced a scenario the old timing guard had been skipping invisibly (`common-tangent-two-circles` fails at seed 2 with `over-constrained: |O2M| = 16 cannot hold` while `meetsRequirements` calls that config displayable). Out of scope here, so it is listed in `SEED_SWEEP_HEAVY` — same behaviour as before, now explicit — and filed as **#345**.
 
 **Consequences / tests.** Measured on the same machine: `src/__tests__` **765 s → 220 s**; `member-drive` **381 s → 106 s** (the exam figure is typed once through the real `submit` path and restored per test, so the operator-sequence rule still holds while the 9-step solve is paid once); **full suite 790 s → 361 s**, and the fast tier is **~42 s over 5011 tests**. `.gitignore` gains a narrow exception so the two tier artifacts travel between machines like `docs/`. No assertion was deleted and no scenario dropped: the suite goes **5532 → 5536 passing** (−1 seed-sweep, −3 round-trip corpus-wide tests, +8 per-slice "the round-trip properties were exercised" guards, which replace the old global `expect(swapped).toBeGreaterThan(SLICE/2)` counters at finer grain).
+
+---
+
+### ADR-395
+
+**The 2-D LLM prompt must forbid inventing an unstated property — and must not TEACH one by example.** *(2026-07-27; issue #293; the 2-D twin of [ADR-3D-058](06b-decisions-3d.md#adr-3d-058))*
+
+**Context.** [ADR-052](#adr-052) is the project's cardinal rule: every unstated magnitude is a free degree of freedom, never a fixed value. The engine was audited against it and fixed. The **LLM fallback prompt was not.**
+
+`src/parser/llmShared.ts` carried a rule forbidding invented **points** ("ONLY introduce points the student actually names") and nothing at all about invented **properties**. Worse, one few-shot demonstrated the sin outright:
+
+```
+"a circle with a triangle inscribed in it" → ["circle centered at O radius 5", "triangle ABC inscribed in circle O"]
+```
+
+The student said nothing about a radius of 5. The example taught the model to fabricate one.
+
+**The measurement.** Both forms were run through the real parser + `replay`:
+
+| steps | resulting circle | object set |
+|---|---|---|
+| `circle centered at O radius 5` + `triangle ABC inscribed in circle O` | `radius {via:'length', value:5}` — **pinned** | identical |
+| `triangle ABC inscribed in circle O` alone | `radius {via:'free', value:5}` — **a free DOF**, 5 only the seed | identical |
+
+The inscribe line creates circle O by itself and produces the *same* objects. So the fabricated line was not merely wrong — it was **unnecessary**, and its only effect was to convert a free DOF into a given the question never gave. The engine's own ADR-052 audit had removed exactly this ("a single-circle radius pinned at 5"); the prompt went on teaching it.
+
+**Decision.**
+
+1. **Fix the offending example** — drop the invented line; the example is now the single inscribe step, with a note recording *why* it has no radius.
+2. **Add the property-honesty rule** (the property twin of the points rule): never fill in a size, length, angle, radius or relation the student did not give — "a circle" has no radius, "a triangle" is not isosceles or right, "a quadrilateral" is not a parallelogram — emit the plain form and let the app keep the unstated parts free.
+3. **Add its never-drop twin**, mirroring the 3-D pairing ([ADR-3D-078](06b-decisions-3d.md#adr-3d-078)/#321): a property the student *did* state must survive into the steps; if it cannot be expressed, return an empty list rather than a weaker figure.
+
+**The structural guard.** A prose rule does not stop the *next* example from drifting — the offending one sat in the prompt while the engine was being audited for the identical fault. So the lock is mechanical: **every standalone magnitude appearing in an example's steps must also appear in its freeform.** Digits belonging to a label (`O1`, `O2`) are excluded via a `(?<![A-Za-z])` guard — they are names, not magnitudes. A future example that invents a number fails the contract test, naming the example and the number.
+
+**Scope note.** This changes what the model is *told*, not what it is *permitted to emit*: the honesty gates on the commit path (`droppedNewLabels`, `droppedGivenRelations`, `droppedGivenNumbers`, `droppedShapeNoun`) still police the output independently. Prompt and gates are complementary — the prompt reduces bad output, the gates refuse it. No live API call was made; per operator policy the prompt is verified by contract test, not by calling the model.
+
+Locked by `llm-contract.test.ts` PAR-10 (e) — the magnitude guard, the specific circle-example regression, and the presence of both prompt rules; all three verified failing against the pre-fix prompt.

@@ -59,7 +59,12 @@ export interface PromptExample {
 
 export const PROMPT_EXAMPLES: PromptExample[] = [
   { freeform: 'draw a square and both diagonals', steps: ['square ABCD', 'segment AC', 'segment BD'] },
-  { freeform: 'a circle with a triangle inscribed in it', steps: ['circle centered at O radius 5', 'triangle ABC inscribed in circle O'] },
+  // #293 (ADR-052): this example USED to emit `circle centered at O radius 5` first — a radius the student
+  // never stated. Measured: with that line the circle's radius is `{via:'length', value:5}` (PINNED); the
+  // inscribe line ALONE produces an identical object set with `{via:'free', value:5}` (a free DOF, 5 being
+  // only the seed). So the fabricated line was both unnecessary and an invented given — the exact sin the
+  // engine's own ADR-052 audit removed from the engine, still being taught here.
+  { freeform: 'a circle with a triangle inscribed in it', steps: ['triangle ABC inscribed in circle O'], note: 'no radius invented — the circle comes with the inscribe, its size stays free' },
   { freeform: 'put M in the middle of AB and connect it to C', steps: ['M is the midpoint of AB', 'segment MC'] },
   { freeform: 'מקבילית שבה AB שווה ל-6', steps: ['מקבילית ABCD', 'AB = 6'], note: 'Hebrew request → Hebrew steps' },
   { freeform: 'צייר משולש ABC וגובה מ-A', steps: ['משולש ABC', 'גובה מ-A במשולש ABC'] },
@@ -103,6 +108,17 @@ export function buildSystemPrompt(): string {
     '- ONLY introduce points the student actually names. Do NOT invent extra/intermediate points: "the extension',
     '  of AB" is just the line AB — do not create a new point on it. A phrase like "the tangent at D and AB meet',
     '  at E" has exactly one new point (E).',
+    // #293 (ADR-052), the 2-D twin of the 3-D rule added by #290: the model must never assert a given the
+    // student did not state — the PROPERTY twin of the "only introduce named points" rule above. A silently
+    // invented size / angle / right-angle / shape specialisation is the cardinal sin: the engine treats every
+    // unstated magnitude as a free degree of freedom, so a fabricated given quietly narrows the figure to one
+    // the question never described.
+    '- NEVER invent an unstated property. Do NOT fill in a size, length, angle, radius or relation the student',
+    '  did not give: "a circle" has NO radius (just name it — its size stays free), "a triangle" is not',
+    '  isosceles or right, "a quadrilateral" is not a parallelogram. Emit the plain form and let the app keep',
+    '  the unstated parts free.',
+    '- NEVER drop a property the student DID state: a stated shape word, size, angle or relation must survive',
+    '  into the steps. If you cannot express it, return an empty list rather than emitting a weaker figure.',
     '- Decompose a multi-part request into several lines, in build order.',
     '- If you cannot express the request with the supported forms, return an empty list.',
     '',
