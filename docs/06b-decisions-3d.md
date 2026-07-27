@@ -1211,3 +1211,34 @@ Locked by `pyramid-rhombus-base.test.ts` (the rhombus base builds a true rhombus
 **Scope note / deferred (for the operator).** The honesty is enforced by leftover guards on the two coarse absorbers (`planarPolygon`, `midpoint`), NOT by a blanket deterministic-lane `droppedNewLabels3` gate: adding a gate to every deterministic `submit` carries a false-refusal risk on inputs outside the test corpus, and the leftover guards already close the reported class at the mechanism. A general deterministic-lane gate remains available if new absorbers surface. Still deferred as P2 (escalate honestly today, no silent wrong build): the bare angle-bisector short forms (`OD חוצה זווית AOC`, single-vertex `AD חוצה זווית A`) — they need a new point-on-bisector construct + the 2-D ADR-261/164 figure-resolution ported — and `גובה מ A` (altitude from a vertex with no side named — needs figure context + an auto-named foot). The perpendicular-bisector construct semantics (plane vs line vs refuse) is **needs-operator**.
 
 Locked by `special-line-phrasing.test.ts` (every centroid phrasing → `centroid3` with P referenced, never a bare triangle; the book point-last form builds green end-to-end; `אנך אמצעי`/midsegment escalate; the plain midpoint and bare polygon still parse; the altitude-in-triangle vertex form).
+
+---
+
+### ADR-3D-086
+
+**A save whitelist must be a TOTAL FUNCTION over the command union, not a maintained list.** *(2026-07-27; issue #288 follow-up; amends [ADR-3D-005](#adr-3d-005))*
+
+**Context.** `deserializeFigure3` gates every loaded command against a `COMMAND_TYPES` set; an unlisted type makes the whole file `bad-file`. Because a `.geo3.json` stores the lowered commands (ADR-3D-005 — replay inputs, never positions), a type the parser emits but the whitelist omits produces the worst shape of failure available here: the figure **saves cleanly and then cannot be re-opened**. Silent data loss on a round-trip, discovered only when the student comes back to their own file.
+
+Issue #288 found 23 such types and restored them, adding a catalog-driven guard: every `COMMAND_CATALOG_3D` example must round-trip through `serialize → deserialize`.
+
+**The finding.** That guard cannot close the class. It reaches only the types some catalog example happens to emit, so a command with no catalog entry stays invisible to it. `inject-pair` — the V7-T2 pair-vector injection (`BD = (-4,5,12)`, emitted by `parse3`, applied by `apply`) — was exactly that: never restored, never caught, the same silent reload failure still live on `main` after #288 was called fixed. The list had already begun drifting again.
+
+This is the docs/17 §2.2 tripwire in its structural form: a hand-maintained enumeration standing in for a property of the type system. The entries were the symptom; **the fact that the whitelist could disagree with the union at all** was the defect.
+
+**Decision.** Replace the `Set` literal with an exhaustive classification:
+
+```ts
+const COMMAND_SAVEABLE: Record<Command3['type'], boolean> = { … };
+const COMMAND_TYPES = new Set<Command3['type']>(
+  (Object.keys(COMMAND_SAVEABLE) as Command3['type'][]).filter((t) => COMMAND_SAVEABLE[t]),
+);
+```
+
+`Record<Command3['type'], …>` is total: TypeScript requires a key for **every** union member, so adding a command type without classifying it as loadable or deliberately excluded is a **compile error**. The whitelist can no longer fall behind the parser, because it is no longer a list — it is a function over the union, checked by `tsc` on every build. The `false` branch is retained deliberately so a genuinely non-persistable command has an honest home rather than being quietly omitted.
+
+**Consequences.** `inject-pair` now round-trips (the one live gap; `tsc --force` confirms every other member was already classified). The catalog guard in `queries.test.ts` stays — it is a useful behavioural check — but it is no longer the thing preventing drift. Cost is one boolean per command type at the point where a type is introduced, which is where the author already knows the answer.
+
+**Not addressed here.** A file whose commands pass this gate but fail to *build* still reports success and renders an empty canvas — a different failure (honest schema, dishonest outcome), tracked as #309; the 2-D answer is the `loadAudit` of [ADR-242](06-decisions.md#adr-242) and 3-D has no equivalent yet.
+
+Locked by `figure-file3.test.ts` — the `inject-pair` round-trip (asserted failing before the fix) plus a gate-still-gates check on an unknown type.

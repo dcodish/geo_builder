@@ -87,3 +87,38 @@ describe('namedFigureFileName3 (issue #20)', () => {
     expect(namedFigureFileName3(null, now)).toBe('figure-3d-2026-07-11.geo3.json');
   });
 });
+
+/**
+ * Issue #288 follow-up — the save whitelist must be a TOTAL function over `Command3['type']`,
+ * not a hand-maintained list.
+ *
+ * #288 restored 23 types that had fallen out of the whitelist and added a catalog-driven round-trip
+ * guard. But that guard can only reach types some `COMMAND_CATALOG_3D` example happens to emit, so
+ * `inject-pair` — the V7-T2 pair-vector injection, emitted by `parse3` and applied by `apply` — stayed
+ * missing: the figure SAVED and then failed to RELOAD (`bad-file`), the same silent round-trip data
+ * loss #288 was filed for. The structural fix is the exhaustive `COMMAND_SAVEABLE` record, which makes
+ * an unclassified command type a COMPILE error; these are its behavioural locks.
+ */
+import { parse3 } from '../../parser/parse3';
+
+describe('#288 — no save-whitelist drift (structural)', () => {
+  it('a pair-vector injection reloads (`BD = (-4,5,12)` — saved fine, could not be re-opened)', () => {
+    const r = parse3('BD = (-4,5,12)');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.commands.some((c) => c.type === 'inject-pair')).toBe(true);
+
+    const json = serializeFigure3([{ id: 'x', utterance: 'BD = (-4,5,12)', cmds: r.commands, enabled: true }], 0);
+    const loaded = deserializeFigure3(json);
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(loaded.facts[0].cmds).toEqual(r.commands);
+  });
+
+  it('an unknown command type is still rejected (the gate still gates)', () => {
+    const json = serializeFigure3([{ id: 'x', utterance: 'x', cmds: [], enabled: true }], 0);
+    const doctored = JSON.parse(json);
+    doctored.facts[0].cmds = [{ type: 'not-a-real-command' }];
+    expect(deserializeFigure3(JSON.stringify(doctored)).ok).toBe(false);
+  });
+});
