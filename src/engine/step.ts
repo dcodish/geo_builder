@@ -400,6 +400,26 @@ function jointFirst(
  *   recruit (cases A–F, docs/LADDER.md stage 3) → scale rescue (ADR-237, last resort) →
  *   honest refusal blaming the student's NEW statement (never a collateral casualty).
  */
+/**
+ * Every constraint OBLIGATION a construction carries, keyed by content ([ADR-402](../../docs/06-decisions.md#adr-402)):
+ * the listed `constraints[]`, an `on-segment-solved`'s embedded constraint, every solve directive's
+ * constraint, and its `also` co-drive list. A student's given always lives in at least one of these
+ * shapes — this enumeration is what "the given still exists" means. Exported for the #258 locks.
+ */
+export function obligationsOf(c: Construction): Map<string, Constraint> {
+  const m = new Map<string, Constraint>();
+  for (const k of c.constraints) m.set(constraintKey(k), k);
+  for (const o of c.objects) {
+    if (o.kind === 'on-segment-solved') m.set(constraintKey(o.constraint), o.constraint);
+    const sv = (o as { solve?: SolveDirective }).solve;
+    if (sv) {
+      m.set(constraintKey(sv.constraint), sv.constraint);
+      for (const a of sv.also ?? []) m.set(constraintKey(a), a);
+    }
+  }
+  return m;
+}
+
 function runFailureLadder(
   prev: Construction,
   next: Construction,
@@ -409,6 +429,30 @@ function runFailureLadder(
   trace: string[],
   prefix: 'main' | 'm1' | 'coupled',
 ): StepResult {
+  // THE PRESERVATION GATE (issue #258, [ADR-402](../../docs/06-decisions.md#adr-402)) — a rescue stage
+  // may not LOSE an obligation `next` carried. The rescue stages bake, replace, and re-point carriers,
+  // and an obligation whose ONLY copy lives inside a carrier (driveOrCheck case (1) embeds without
+  // listing) is destroyed by a bake whose restore law knows only the `solve`-directive shape — the
+  // settle stage annihilated an embedded |BC|=|BE| this way, then ACCEPTED, because dropping a
+  // constraint makes the system easier and the acceptance tests only look at the NEW constraints.
+  // The gate is measured against NEXT (never `prev`): the apply boundary may deliberately rewrite
+  // obligations (the M1 reinterpretations), but a rescue of the apply's own output may not shrink it.
+  // On a miss, REPAIR: resurrect the dropped obligations as listed checks and re-verify — accepted only
+  // if the whole figure (including them) still evaluates; otherwise the stage's accept FAILS and the
+  // ladder falls through to the next stage, which sees `next` intact.
+  const baseline = obligationsOf(next);
+  const accept = (construction: Construction, positions: Map<Id, Vec>, token: string): StepResult | null => {
+    const have = obligationsOf(construction);
+    const missing = [...baseline].filter(([k]) => !have.has(k)).map(([, con]) => con);
+    if (!missing.length) return { ok: true, construction, positions, ladder: [...trace, token] };
+    const repaired: Construction = { ...construction, constraints: [...construction.constraints, ...missing] };
+    const r = evaluate(repaired);
+    if (r.ok && newConstraintsNonVacuous(repaired, r.positions, newCons)) {
+      return { ok: true, construction: repaired, positions: r.positions, ladder: [...trace, token, 'preserve:repair'] };
+    }
+    trace.push('preserve:reject'); // the stage won by dropping a given — its accept is void; keep climbing
+    return null;
+  };
   // OWNERSHIP RE-HOME (M2/ADR-231): a `coincide` is a placement obligation the engine always creates
   // WITH an owner; a size given that pins the radius that drove it (applyRadiusGiven drops the stale
   // directive; keepTangencyDriven's free-centre handoff can come up empty when every centre is already
@@ -428,12 +472,18 @@ function runFailureLadder(
   // compromise basin of) the whole already-valid coupled system.
   if (!orphans.length) {
     const settled = settleOnFrozenPrior(prev, next, newCons);
-    if (settled) return { ok: true, construction: settled.construction, positions: settled.positions, ladder: [...trace, `${prefix}:settle`] };
+    if (settled) {
+      const a = accept(settled.construction, settled.positions, `${prefix}:settle`);
+      if (a) return a;
+    }
   }
   const recruited = recruitFreeDofs(next, [...newCons, ...orphans], trace);
   if (recruited) {
     const r2 = evaluate(recruited);
-    if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) return { ok: true, construction: recruited, positions: r2.positions, ladder: [...trace, `${prefix}:recruit`] };
+    if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) {
+      const a = accept(recruited, r2.positions, `${prefix}:recruit`);
+      if (a) return a;
+    }
   }
   // S3.2 stage (b) — the component-joint solve as a RESCUE TIER after the recruit rungs (docs/25 §4,
   // amended by measurement 2026-07-25): the original joint-BEFORE-rungs placement solved the ADR-103
@@ -446,7 +496,10 @@ function runFailureLadder(
   const joint = jointFirst(next, newCons, trace);
   if (joint) {
     const rj = evaluate(joint);
-    if (rj.ok && newConstraintsNonVacuous(joint, rj.positions, newCons)) return { ok: true, construction: joint, positions: rj.positions, ladder: [...trace, `${prefix}:component`] };
+    if (rj.ok && newConstraintsNonVacuous(joint, rj.positions, newCons)) {
+      const a = accept(joint, rj.positions, `${prefix}:component`);
+      if (a) return a;
+    }
   }
   // LAST RESORT — SCALE RESCUE (ADR-237): a figure with no absolute given yet is determined only up
   // to SIMILARITY, so its FIRST size given is a statement about SCALE — satisfiable exactly by scaling
@@ -456,7 +509,10 @@ function runFailureLadder(
   const scaled = scaleRescue(next, newCons, prevPositions);
   if (scaled) {
     const rs = evaluate(scaled);
-    if (rs.ok && newConstraintsNonVacuous(scaled, rs.positions, newCons)) return { ok: true, construction: scaled, positions: rs.positions, ladder: [...trace, `${prefix}:scale`] };
+    if (rs.ok && newConstraintsNonVacuous(scaled, rs.positions, newCons)) {
+      const a = accept(scaled, rs.positions, `${prefix}:scale`);
+      if (a) return a;
+    }
   }
   // Honest refusal: name the STUDENT'S new statement (blame honesty, issue #37); a solve that "passed"
   // only vacuously (the non-vacuous gate refused it) reports the same over-constraint shape.
@@ -1162,13 +1218,20 @@ function recruitFreeDofs(c: Construction, newCons: Constraint[] = [], trace?: st
       const reachable = new Set(constraintRefs(K).flatMap((ref) => ancestors(objects, ref, 'drivable', true, true)));
       for (const x of objects) {
         if (!reachable.has(x.id)) continue;
-        const sv = (x as { solve?: { constraint: Constraint } }).solve;
+        const sv = (x as { solve?: SolveDirective }).solve;
         if (!sv || sv.constraint === K) continue; // x must be CLAIMED by a DIFFERENT constraint K1
         const K1 = sv.constraint;
         const alt = objects.find((o) => o.id !== x.id && recruitableFreeDof(o) && constraintRefs(K1).includes(o.id));
         if (!alt) continue;
+        // The displaced directive's `also` co-drive list moves WITH K1 to the receiving carrier
+        // ([ADR-402](docs/06-decisions.md#adr-402), #258 sibling audit) — dropping it destroyed the
+        // co-driven obligations exactly like the settle bake did.
         objects = objects.map((o) =>
-          o.id === alt.id ? ({ ...o, solve: { constraint: K1, branch: 0 } } as GeoObject) : o.id === x.id ? markDriven(o, K) : o,
+          o.id === alt.id
+            ? ({ ...o, solve: { constraint: K1, branch: 0, ...(sv.also?.length ? { also: sv.also } : {}) } } as GeoObject)
+            : o.id === x.id
+              ? markDriven(o, K)
+              : o,
         );
         dDid = true;
         break;

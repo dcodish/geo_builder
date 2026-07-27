@@ -105,8 +105,17 @@ function driveOrCheck(objects: GeoObject[], constraints: Constraint[], con: Cons
   // positioned explicitly — "D on the extension of BC" (t=1.3), "E on AC at 40%" — is a GIVEN, not a
   // DOF, so an unrelated later constraint must drive the figure's real freedom (a free vertex) instead
   // of silently relocating D (operator: a central-angle "∠BOC=2α" was dragging the fixed D and failing).
+  // A rider ALREADY driving a constraint is not available ([ADR-402](../../docs/06-decisions.md#adr-402),
+  // issue #258 — M2: at most one owning constraint per DOF). Every sibling branch below checks
+  // `solve === undefined`; this one did not, and its claim is DESTRUCTIVE — the replacement is a fresh
+  // `on-segment-solved` literal, so the displaced directive (a student's earlier given, NOT in
+  // `constraints[]` while driven this way) vanished from the figure with nothing left to detect.
   const onSegs = idxs.filter(
-    (i) => i >= 0 && objects[i].kind === 'on-segment' && (objects[i] as Extract<GeoObject, { kind: 'on-segment' }>).free === true,
+    (i) =>
+      i >= 0 &&
+      objects[i].kind === 'on-segment' &&
+      (objects[i] as Extract<GeoObject, { kind: 'on-segment' }>).free === true &&
+      (objects[i] as { solve?: unknown }).solve === undefined,
   );
   const onSeg = onSegs.find((i) => !pinned.has(objects[i].id)) ?? onSegs[0];
   if (onSeg !== undefined) {

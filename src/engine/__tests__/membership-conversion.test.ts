@@ -78,16 +78,15 @@ describe('membership conversion (#236, ADR-384)', () => {
     expect(fig.lastError).toBeNull();
   });
 
-  it('sizes-early builds without a false over-constraint — KNOWN RESIDUAL #258: the equality may settle amber', () => {
-    // Before ADR-384 this order hard-failed «over-constrained: E, A, B collinear cannot hold». Now every
-    // step applies; the |BC|=|BE| equality can still SETTLE unsatisfied (amber) because an amber-settled
-    // driven constraint never re-enters the order-independence machinery (deferral/HOIST fire on
-    // failed/pending only) — filed as #258. Asserted as-is so the #258 fix flips this test.
-    const facts = factsOf(SIZES_EARLY);
-    const fig = replay(facts, firstSatisfyingSeed(facts));
-    for (const [id, s] of Object.entries(fig.status)) expect(s, `status ${id}`).toBe('ok');
-    expect(fig.lastError).toBeNull();
-    expect(fig.violations.length, 'KNOWN RESIDUAL #258 — flip to 0 when the amber-settled re-fold lands').toBeLessThanOrEqual(1);
+  it('sizes-early builds to the exact book values — the #258 preservation gate (ADR-402)', () => {
+    // Before ADR-384 this order hard-failed «over-constrained: E, A, B collinear cannot hold»; after it,
+    // the order built but the |BC|=|BE| equality was silently DESTROYED (a HOIST-permuted fold embedded
+    // it in carrier B via driveOrCheck case (1), and the settle stage's bake stripped it — the restore
+    // law knew only the solve-directive shape), so the figure drew |BE|=4.71 with every row green and
+    // only the verifier amber. The ADR-402 preservation gate rejects a rescue stage that lost an
+    // obligation `next` carried, so the ladder falls through to the recruiter, which re-homes the
+    // equality — and the order now lands the same book values as the other three.
+    bookValues(SIZES_EARLY);
   });
 
   // ── the conversion's fences ──

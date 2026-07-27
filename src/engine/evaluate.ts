@@ -976,16 +976,23 @@ function withParam(c: Construction, id: Id, v: number): Construction {
 export function drivenConstraintsOf(c: Construction): Constraint[] {
   const out: Constraint[] = [];
   const seen = new Set<string>();
-  for (const o of c.objects) {
-    const con =
-      o.kind === 'on-segment-solved'
-        ? o.constraint
-        : (o as { solve?: { constraint: Constraint } }).solve?.constraint;
-    if (!con) continue;
+  const add = (con: Constraint) => {
     const key = constraintKey(con);
-    if (seen.has(key)) continue;
+    if (seen.has(key)) return;
     seen.add(key);
     out.push(con);
+  };
+  for (const o of c.objects) {
+    if (o.kind === 'on-segment-solved') add(o.constraint);
+    const sv = (o as { solve?: { constraint: Constraint; also?: Constraint[] } }).solve;
+    if (sv) {
+      add(sv.constraint);
+      // The `also` co-drive list (ADR-229) is driven too ([ADR-402](../../docs/06-decisions.md#adr-402),
+      // #258 sibling audit): skipping it left a co-driven constraint out of the post-solve re-verify
+      // (an unsatisfiable one could read ok unless it happened to be listed) and out of the ADR-398
+      // owner maps (mis-attributed failures).
+      for (const a of sv.also ?? []) add(a);
+    }
   }
   return out;
 }

@@ -42,6 +42,7 @@ Then the M1 branch's own mini-ladder: **primary** evaluate + non-vacuous gate (`
 | 2f | `settleOnFrozenPrior` (stage-0, ADR-276) — **skipped when orphans exist** | `main:settle` |
 | 2g | `recruitFreeDofs` over newCons + orphans (→ stage 3) | `main:recruit` |
 | 2h | `scaleRescue` (ADR-237) — first size given on a similarity-gauge figure, closed-form scale, try-and-verify | `main:scale` |
+| 2h′ | **the preservation gate** wraps EVERY 2f–2h accept ([ADR-402](06-decisions.md#adr-402), #258): a rescue stage may not LOSE an obligation `next` carried (`obligationsOf` — listed ∪ embedded ∪ directive ∪ `also`; measured against **next**, never `prev`, so deliberate M1 rewrites are exempt). On a miss: repair by re-listing the dropped obligations as checks + re-evaluate, else the stage's accept is VOID and the ladder climbs on. Dropping a given made a rescue MORE likely to pass 2b/2d — the settle bake stripped an embedded `on-segment-solved` constraint (the restore law knew only the `solve`-directive shape) and won by it. | `preserve:repair` on a repaired accept; `preserve:reject` pushed when a stage's accept is voided |
 | 2i | refuse: `blameNewStatement` / vacuous-shaped over-constraint | `main:refuse` |
 
 ### `applyCoupledStep` (ADR-338 — a macro's N constraints as one system)

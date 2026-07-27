@@ -5,59 +5,67 @@
   "slow": [
     {
       "file": "src/__tests__/scenarios-e2e-5.test.ts",
-      "ms": 206211
-    },
-    {
-      "file": "src3d/__tests__/right-apex.test.ts",
-      "ms": 169390
+      "ms": 214388
     },
     {
       "file": "src3d/__tests__/adr-3d-032.test.ts",
-      "ms": 166641
+      "ms": 169195
     },
     {
-      "file": "src/theorems/__tests__/b-corpus.test.ts",
-      "ms": 115883
+      "file": "src3d/__tests__/right-apex.test.ts",
+      "ms": 136831
     },
     {
       "file": "src/engine/__tests__/membership-conversion.test.ts",
-      "ms": 113237
+      "ms": 123920
     },
     {
-      "file": "src/__tests__/scenarios-e2e-7.test.ts",
-      "ms": 96207
+      "file": "src/theorems/__tests__/b-corpus.test.ts",
+      "ms": 119851
     },
     {
       "file": "src3d/__tests__/book-coordinate-givens.test.ts",
-      "ms": 96080
+      "ms": 100355
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-7.test.ts",
+      "ms": 97278
     },
     {
       "file": "src3d/__tests__/member-drive.test.ts",
-      "ms": 92728
+      "ms": 97048
+    },
+    {
+      "file": "src/engine/__tests__/obligation-preservation.test.ts",
+      "ms": 93974
     },
     {
       "file": "src/__tests__/scenarios-props-submit-gate.test.ts",
-      "ms": 86891
+      "ms": 89195
     },
     {
       "file": "src/__tests__/scenarios-e2e-1.test.ts",
-      "ms": 84630
+      "ms": 86930
     },
     {
       "file": "src/__tests__/scenarios-e2e-3.test.ts",
-      "ms": 74752
+      "ms": 76854
     },
     {
       "file": "src/__tests__/scenarios-e2e-8.test.ts",
-      "ms": 70068
+      "ms": 73275
     },
     {
       "file": "src/__tests__/scenarios-e2e-4.test.ts",
-      "ms": 68903
+      "ms": 70864
     },
     {
       "file": "src/replay/__tests__/basin-ownership.test.ts",
-      "ms": 66524
+      "ms": 67952
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-6.test.ts",
+      "ms": 60636
     }
   ]
 }
