@@ -1347,3 +1347,7 @@ over all four (ADR-041).
 ### `named-measure-bound-reshapes` — «∠ABC = α» then «60 < α < 90» bounds what the symbol names (#277, ADR-390)
 
 **Guards against:** the named form needing its own machinery instead of resolving through the same symbol table `α < β` (ADR-039) uses. **Asserts:** the angle labelled α lies strictly between 60 and 90. Unit coverage: `measure-bound.test.ts`.
+
+### `collinear-list-of-four-keeps-every-point` — «B C F E נמצאות על ישר אחד» keeps ALL FOUR (#348, ADR-396)
+
+**Guards against:** a collinearity list silently truncating to its first three points. `labelRun(s, n)` returns EXACTLY n, so the rule matched the whole list and kept three — E was dropped, `droppedNewLabels` caught the orphan, and the step went to the LLM, which failed: the student lost the given to an unnecessary paid round-trip. The engine had the variadic `set-line` (ADR-050) all along — the sibling «הישר ABCD» rule already emitted it. **Asserts:** all four points are actually collinear in the built figure (perpendicular distance to the B–C line ~0), not merely present in the lowering. The four points are created first by design: a collinearity is a CONSTRAINT on existing points, not a construction — standalone, the long-standing glued «הישר ABCD» fails identically, so that is pre-existing family behaviour the fix deliberately leaves alone. Unit coverage: `adr-396.test.ts`.

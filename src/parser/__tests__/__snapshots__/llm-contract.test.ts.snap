@@ -248,6 +248,14 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "segment",
     ],
   },
+  "AD:DB = 1:2": {
+    "en": [
+      "set-ratio",
+    ],
+    "he": [
+      "set-ratio",
+    ],
+  },
   "BC parallel to AD": {
     "en": [
       "segment",
@@ -388,6 +396,16 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
     ],
     "he": [
       "foot",
+    ],
+  },
+  "G divides DC in ratio 1:2": {
+    "en": [
+      "segment",
+      "point-on-segment",
+    ],
+    "he": [
+      "segment",
+      "point-on-segment",
     ],
   },
   "G is the intersection of circle O and circle P": {

@@ -414,6 +414,9 @@ const REQUEST_WORDS =
  * are stripped here so "connect A to B" can't read "to" as the labels T,O.
  */
 const PT = String.raw`[A-Za-z]\d*`; // a point token: a letter + an optional digit subscript (O, O1, A12)
+/** #348: the longest collinear list a single statement is read as — a generous bound, since
+ *  `labelRun` returns EXACTLY n and the rule probes downward for the longest run that matches. */
+const MAX_COLLINEAR_RUN = 12;
 function labelRun(s: string, n: number): Id[] | null {
   const t = s.replace(FILLER, ' ');
   // A single word of exactly n tokens ("ABCD", "O1O2") — split it back into tokens.
@@ -3223,8 +3226,24 @@ const collinearConstraint: Rule = (s) => {
     ];
   }
   // "A, B, C collinear" / "A B C על ישר אחד / על אותו ישר / קו אחד".
+  //
+  // #348 (ADR-396): read the WHOLE label run, not the first three. `labelRun(s, n)` returns EXACTLY n,
+  // so asking for 3 silently truncated a longer list — «B C F E נמצאות על ישר אחד» lowered to
+  // `set-collinear B,C,F` and dropped E (the glued «ABCD collinear» dropped D the same way). The engine
+  // has had the N-point construct all along: ADR-050's `set-line` is variadic, and the sibling
+  // «הישר ABCD» rule above already emits it. This rule was simply emitting the narrow 3-slot command.
+  // Exactly three still lowers to `set-collinear`, so every existing figure and lock is byte-identical.
   if (/\bcollinear\b|same\s+line|on\s+one\s+line|על\s+(?:אות[הו]\s+)?(?:ישר|קו)(?:\s+אחד|\s+אחת)?|אות[הו]\s+(?:ישר|קו)/i.test(s)) {
-    const ids = labelRun(s.replace(/collinear|are|lie\s+on|על|אות[הו]|ה?ישר|ה?קו|אחד|אחת|same|one|line|,/gi, ' '), 3);
+    const cleaned = s.replace(/collinear|are|lie\s+on|על|אות[הו]|ה?ישר|ה?קו|אחד|אחת|same|one|line|,/gi, ' ');
+    // Longest run wins: probe down from a generous bound so the spaced AND glued forms both read whole.
+    let run: Id[] | null = null;
+    for (let n = MAX_COLLINEAR_RUN; n >= 3; n--) {
+      run = labelRun(cleaned, n);
+      if (run) break;
+    }
+    // A repeated label would make a degenerate `set-line`; fall back to the 3-slot form rather than guess.
+    if (run && run.length > 3 && new Set(run).size === run.length) return [{ type: 'set-line', points: run }];
+    const ids = run && run.length >= 3 ? run.slice(0, 3) : labelRun(cleaned, 3);
     if (ids) return [{ type: 'set-collinear', a: ids[0], b: ids[1], c: ids[2] }];
   }
   return null;
@@ -8177,6 +8196,28 @@ export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): 
   // level `/` is accounted here; a lone plain number falls through to the digit loop below, which owns the
   // π / percent / diameter lowerings.
   const spans: [number, number][] = [];
+  // #347 (ADR-396): a stated COLON ratio is the same kind of lowering as a slash fraction — `p:q` never
+  // survives as its literal digits. `BM:MF=1:2` lowers to `set-ratio k=p/q`; «G מחלקת את DC ביחס 1:2»
+  // lowers to `point-on-segment t=p/(p+q)`. The gate consumed `a/b` whole (evaluating it before comparing)
+  // but had no colon form, so both digits read as dropped and the whole colon-ratio family — which parses
+  // perfectly — was thrown away at the commit boundary and escalated to the LLM. Consumed whole here, and
+  // accounted GENEROUSLY (the value it can legitimately produce from either side, as a ratio or as a
+  // position along the segment) per this gate's own doctrine: a false account only suppresses a warning,
+  // while a false drop breaks a working input.
+  // built from the shared `num` atom (S2.1 lexical ratchet — no fresh inline number fragments)
+  for (const m of s.matchAll(new RegExp(String.raw`${num}\s*:\s*${num}`, 'g'))) {
+    const i = m.index!;
+    if (spans.some(([x, y]) => i >= x && i < y)) continue;
+    spans.push([i, i + m[0].length]);
+    const p = parseFloat(m[1]);
+    const qv = parseFloat(m[2]);
+    const sum = p + qv;
+    const cands = [p / qv, qv / p, ...(sum !== 0 ? [p / sum, qv / sum] : [])];
+    if (!ok(cands) && !seen.has(m[0])) {
+      seen.add(m[0]);
+      dropped.push(q(p / qv));
+    }
+  }
   for (const m of s.matchAll(new RegExp(String.raw`(${TERM})(?:\s*\/\s*(${TERM}))?`, 'g'))) {
     if (!/√|\//.test(m[0])) continue; // a bare number → the single-number loop (with its π/%/diameter candidates)
     const i = m.index!;

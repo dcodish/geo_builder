@@ -1652,4 +1652,21 @@ export const SCENARIOS_4: Scenario[] = [
       expect(a, 'α respects its upper bound').toBeLessThan(90);
     },
   },
+  {
+    id: 'collinear-list-of-four-keeps-every-point',
+    title: 'issue #348 / ADR-396: «B C F E נמצאות על ישר אחד» puts ALL FOUR on one line (the 4th was dropped)',
+    guards:
+      'the exact prod submit, which logged not-understood. The rule matched the whole list and then kept only the first three, because labelRun(s, n) returns EXACTLY n — so E was silently dropped, the droppedNewLabels gate caught the orphan, and the step went to the LLM, which failed. The engine already had the variadic set-line (ADR-050); the rule was emitting the narrow 3-slot command. Asserted geometrically, not just on the lowering: all four must actually be collinear in the built figure. The four points are created first BY DESIGN: a collinearity is a CONSTRAINT on existing points, not a construction — standalone, the long-standing glued «הישר ABCD» fails with the same "references an unknown point", so that is pre-existing family behaviour this fix deliberately leaves alone.',
+    steps: ['נקודה B', 'נקודה C', 'נקודה F', 'נקודה E', 'B C F E נמצאות על ישר אחד'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const [B, C, F, E] = ['B', 'C', 'F', 'E'].map((id) => at(fig, id));
+      // every point lies on the line through the first two (cross product ~ 0, scaled by the span)
+      const span = Math.max(Math.hypot(C.x - B.x, C.y - B.y), 1e-9);
+      for (const [name, p] of [['F', F], ['E', E]] as const) {
+        const cross = Math.abs((C.x - B.x) * (p.y - B.y) - (C.y - B.y) * (p.x - B.x)) / span;
+        expect(cross, `${name} lies on the line through B and C`).toBeLessThan(1e-6);
+      }
+    },
+  },
 ];

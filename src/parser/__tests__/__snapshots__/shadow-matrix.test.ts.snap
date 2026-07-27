@@ -1291,6 +1291,26 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "AD:DB = 1:2",
+    "winner": "segmentRatioColon",
+  },
+  {
+    "lang": "he",
+    "text": "AD:DB = 1:2",
+    "winner": "segmentRatioColon",
+  },
+  {
+    "lang": "en",
+    "text": "G divides DC in ratio 1:2",
+    "winner": "dividesInRatio",
+  },
+  {
+    "lang": "he",
+    "text": "G מחלקת את DC ביחס 1:2",
+    "winner": "dividesInRatio",
+  },
+  {
+    "lang": "en",
     "text": "AB perpendicular to CD",
     "winner": "perpendicularConstraint",
   },

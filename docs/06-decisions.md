@@ -5349,3 +5349,33 @@ The inscribe line creates circle O by itself and produces the *same* objects. So
 **Scope note.** This changes what the model is *told*, not what it is *permitted to emit*: the honesty gates on the commit path (`droppedNewLabels`, `droppedGivenRelations`, `droppedGivenNumbers`, `droppedShapeNoun`) still police the output independently. Prompt and gates are complementary — the prompt reduces bad output, the gates refuse it. No live API call was made; per operator policy the prompt is verified by contract test, not by calling the model.
 
 Locked by `llm-contract.test.ts` PAR-10 (e) — the magnitude guard, the specific circle-example regression, and the presence of both prompt rules; all three verified failing against the pre-fix prompt.
+
+---
+
+### ADR-396
+
+**Two ways a SUPPORTED construct was unreachable in production.** *(2026-07-27; issues #348 + #347, both found by `/log-triage` on the 2026-07-26 prod log)*
+
+Filed separately, fixed together because they are the same failure *shape*: the deterministic parser handles the input correctly, and something downstream throws the result away — so the student's given is lost to an LLM round-trip that then fails. Neither is a missing capability.
+
+#### #348 — a collinearity list truncated to its first three points
+
+`labelRun(s, n)` returns **exactly** n labels. The collinear-list rule asked for 3, so it matched a longer list and then kept only part of its own match: «B C F E נמצאות על ישר אחד» lowered to `set-collinear B,C,F` and dropped **E** (the glued «ABCD collinear» dropped D the same way, in all four phrasings, He and En).
+
+The engine has had the N-point construct all along — [ADR-050](#adr-050)'s `set-line` is variadic, and the sibling «הישר ABCD» rule in the same function already emits it. This rule was simply emitting the narrow command when the general one existed.
+
+**Fix:** probe downward from a generous bound for the longest run that matches, and emit `set-line` with every label when there are more than three. **Exactly three still lowers to `set-collinear`**, so every existing figure and lock is byte-identical. A repeated label falls back to the 3-slot form rather than emitting a degenerate `set-line`.
+
+**Deliberately unchanged:** a collinearity is a **constraint on existing points, not a construction** — standalone, `B C F E …` (and the long-standing `הישר ABCD`) fails with "references an unknown point" because the points do not exist yet. That is consistent pre-existing behaviour across the whole family, not something this fix introduced, and creating points implicitly would be inventing objects the student did not construct. The scenario therefore states its points first.
+
+#### #347 — the colon-ratio family discarded by an honesty gate
+
+The whole family parses correctly and was then thrown away at the commit boundary by `droppedGivenNumbers`, which reported the stated digits as dropped. The gate consumed a **slash** fraction whole (evaluating `a/b` before comparing) but had **no colon form** — and a stated `p:q` never survives as its literal digits: it lowers to `k = p/q` (`set-ratio`) or `t = p/(p+q)` (the divider). So both digits looked unaccounted, and `BM:MF=1:2`, `AD:DB = 2:3`, «G מחלקת את DC ביחס 1:2» and their En/He variants were all escalated to the LLM — which, in one of the two prod occurrences, failed.
+
+The gate's own doctrine is that accounting must be generous: *"a false account only suppresses a warning, while a false drop would break a working input."* This was exactly that false drop.
+
+**Fix:** a colon pass consuming `p:q` whole (registering its span, like the fraction pass, so the digits are not re-read) and accounting the values it can legitimately produce — `p/q`, `q/p`, `p/(p+q)`, `q/(p+q)`. The sibling gates were audited in the same pass and have **no** colon blindness.
+
+**Why nothing caught it:** the colon-ratio family had no `catalog.ts` entry, so the coverage guard never exercised these utterances — the concrete instance of #140. Two catalog entries were added with the fix, which is what stops the family going dark again.
+
+Locked by `adr-396.test.ts` (16 — every row of both issue tables, plus the byte-identical 3-point and glued-form guards, plus a check that the colon pass stays generous without going blind to a genuinely dropped magnitude) and the end-to-end scenario `collinear-list-of-four-keeps-every-point`, which asserts the four points are actually collinear in the built figure rather than merely present in the lowering. 11 of the 16 verified failing against the pre-fix parser; the other 5 are the unchanged-behaviour guards.
