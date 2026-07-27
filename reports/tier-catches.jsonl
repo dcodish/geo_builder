@@ -1,0 +1,1 @@
+{"at":"2026-07-27T06:44:48.941Z","sha":"e106946","unique":false,"failingFiles":["src/parser/__tests__/lexical-ratchet.test.ts","src/parser/__tests__/shadow-matrix.test.ts"],"tests":["lexical ratchet — inline fragment counts must not grow (docs/24 S2.1) parse.ts number-fragment inlines ≤ ceiling","parser shadow-matrix — catalog corpus winner rule per catalog utterance is stable"]}
