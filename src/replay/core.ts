@@ -13,7 +13,8 @@
  * The store re-exports this module's surface, so existing consumers are untouched.
  */
 
-import type { AnyCommand, Command, Construction, GivenViolation, Id, ResolvedCircle, Vec } from '@/engine';
+import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
+import { classifyShapesFromSamples, detectRelationsAcross } from '@/engine';
 import { formatMeasure } from '@/format';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, warmStartCarriers, withVariant, withReflectMask } from '@/engine';
 
@@ -1630,7 +1631,25 @@ export function variantConfigs(facts: Fact[]): Fact[][] {
  * (viewRelations' call sites are synchronous) runs the same jobs inline. Invalidated by facts identity,
  * like the relations/shapes layer caches.
  */
-let sampleMemo: { facts: Fact[]; constructions: Construction[]; samples: Map<Id, Vec>[] } | null = null;
+let sampleMemo: { facts: Fact[]; key: string; constructions: Construction[]; samples: Map<Id, Vec>[] } | null = null;
+/**
+ * The sample sweep counter — the perf canary for the M3 "one sampler" law (the twin of
+ * {@link foldStats}). A test can assert that N detection layers over one fact list cost ONE sweep.
+ */
+export const sampleStats = { sweeps: 0 };
+/**
+ * The memo is keyed by fact-list CONTENT, not array identity ([ADR-401](docs/06-decisions.md#adr-401)).
+ * Identity was enough while every consumer lived on the main thread and shared the store's one facts
+ * array; once the sweep runs in the geometry WORKER the facts arrive as a fresh structured CLONE per
+ * message, so an identity check misses every time and each detection layer re-sampled the same figure
+ * (~9 s each on the #157 figure). Content-keying is the same discipline {@link foldCache} already uses,
+ * and it subsumes identity (a re-used array has the same content).
+ */
+function memoHit(facts: Fact[]): { constructions: Construction[]; samples: Map<Id, Vec>[] } | null {
+  if (!sampleMemo) return null;
+  if (sampleMemo.facts === facts) return sampleMemo;
+  return sampleMemo.key === foldKey(facts) ? sampleMemo : null;
+}
 /**
  * Each sample's resolved circles, keyed by its OWN positions map (issue #228). A side table rather than a
  * parallel array on purpose: the pool then passes through `convergedSamples` → `distinctSamples` →
@@ -1667,12 +1686,13 @@ export function samplingJobs(facts: Fact[]) {
     // its sample filter lives HERE (the store core), not in the object-level `requirementSamples`.
     const within = requirementSamples(c0, distinctSamples(c0, converged)).filter((pos) => segmentsCrossWithin(facts, pos));
     const strict = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived));
-    if (strict.length >= 2) return (sampleMemo = { facts, constructions, samples: strict });
+    const key = foldKey(facts);
+    if (strict.length >= 2) return (sampleMemo = { facts, key, constructions, samples: strict });
     // The ADR-267 preference ladder: when the letter-order side is unachievable (no strict samples), the
     // RELAXED shared-endpoint bar (ADR-142) is the figure's real validity — filter by it before giving up
     // to the unfiltered converged pool (which would count wrong-side samples as configurations).
     const relaxed = within.filter((pos) => extensionsClear(facts, { construction: c0, positions: pos } as Derived, true));
-    return (sampleMemo = { facts, constructions, samples: relaxed.length >= 2 ? relaxed : converged });
+    return (sampleMemo = { facts, key, constructions, samples: relaxed.length >= 2 ? relaxed : converged });
   };
   return { jobs, finish };
 }
@@ -1723,7 +1743,9 @@ export function forcedCrossingKeys(samples: { constructions: Construction[]; sam
 // always runs so there is never an empty pool for a buildable figure. Tests run deadline-free (E2).
 const SAMPLE_BUDGET_MS: number = import.meta.env?.MODE === 'test' ? Number.POSITIVE_INFINITY : 5000;
 export function sharedSamples(facts: Fact[]): { constructions: Construction[]; samples: Map<Id, Vec>[] } {
-  if (sampleMemo?.facts === facts) return sampleMemo;
+  const hit = memoHit(facts);
+  if (hit) return hit;
+  sampleStats.sweeps++;
   const { jobs, finish } = samplingJobs(facts);
   const deadline = Date.now() + SAMPLE_BUDGET_MS;
   // Armed inside the solve ladder too (engine/solveBudget.ts, issue #59): a variant job builds NEW fact
@@ -1736,18 +1758,38 @@ export function sharedSamples(facts: Fact[]): { constructions: Construction[]; s
     return finish();
   });
 }
-export async function sharedSamplesAsync(facts: Fact[]): Promise<{ constructions: Construction[]; samples: Map<Id, Vec>[] }> {
-  if (sampleMemo?.facts === facts) return sampleMemo;
-  const { jobs, finish } = samplingJobs(facts);
-  const deadline = Date.now() + SAMPLE_BUDGET_MS;
-  for (let i = 0; i < jobs.length; i++) {
-    if (i > 0 && Date.now() > deadline) break;
-    // Each job runs under the ladder budget individually (the await below must run OUTSIDE the arm —
-    // withSolveBudget's restore is synchronous, and the yield is where other work interleaves).
-    withSolveBudget(deadline, jobs[i]);
-    if ((i & 3) === 3) await new Promise<void>((res) => setTimeout(res, 0)); // yield every 4 samples
-  }
-  return finish();
+// `sharedSamplesAsync` — the main-thread BATCHED sampler that yielded to the event loop every 4 samples —
+// was DELETED with #157 ([ADR-401](docs/06-decisions.md#adr-401)). Its yield granularity assumed cheap
+// samples; on a coupled figure one sample is seconds, so it froze the tab in multi-second chunks while
+// looking non-blocking. The sweep now runs in the geometry worker ({@link detectAll}), and leaving a
+// main-thread sampler in the module would only invite the next call site back onto the UI thread.
+
+/** The three detection layers' verdicts over ONE shared sample pool — see {@link detectAll}. */
+export interface DetectAllResult {
+  relations: RelationsResult;
+  shapes: ShapesResult;
+  /** The forced ink crossings (ADR-380) — a `Set` so it survives the worker's structured clone as-is. */
+  crossings: Set<string>;
+}
+
+/**
+ * Every detection layer's verdict, from ONE sample sweep ([ADR-401](docs/06-decisions.md#adr-401)).
+ *
+ * The M3 law says the layers share one sampler; this makes that shareable ACROSS THREADS. Sampling is
+ * the dominant per-step cost on a coupled figure (measured on the #157 trapezoid-midsegment figure: one
+ * sample ≈ 0–4 s depending on the seed, 16 samples ≈ 9 s), and all three consumers ran it on the main
+ * thread — `viewRelations` synchronously, `detectShapes`/`detectCrossings` in main-thread batches whose
+ * every-4-samples yield assumed cheap samples. Returning the finished VERDICTS (small, pure data) rather
+ * than the pool keeps the boundary narrow: the `circlesOfSample` side table (a `WeakMap` keyed by a
+ * positions map) never has to cross a thread, and the heavy classification runs where the samples are.
+ */
+export function detectAll(facts: Fact[]): DetectAllResult {
+  const shared = sharedSamples(facts);
+  return {
+    relations: detectRelationsAcross(shared.constructions, { positions: shared.samples }),
+    shapes: classifyShapesFromSamples(shared.constructions[0], shared.samples),
+    crossings: forcedCrossingKeys(shared),
+  };
 }
 
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */

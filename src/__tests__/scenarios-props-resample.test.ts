@@ -51,7 +51,7 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       if (!r.ok) return;
       for (const cmd of r.commands) st.execute(cmd, u, `g-${u}`);
     }
-    useGeoStore.getState().viewRelations();
+    await useGeoStore.getState().viewRelations();
     const rel = useGeoStore.getState().relations!.result;
     // The wedge at M toward A/K (K lies on MA — one ray) equals the wedge toward E: one class holds both.
     // Ray-merge may name the shared ray by either A or K, so accept either name.
@@ -80,7 +80,7 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
     st.clear();
   });
 
-  it('[q9-degenerate-wedge-quantifier] the Q9 two-circle figure reports the part-א classes ∠ACE=∠ABE and ∠AFD=∠ABD (#193)', () => {
+  it('[q9-degenerate-wedge-quantifier] the Q9 two-circle figure reports the part-א classes ∠ACE=∠ABE and ∠AFD=∠ABD (#193)', async () => {
     // Operator (booklet Q9, the #191/#192 build): "when I try to see similar angles, they are not shown
     // as equal. For instance ACE and ABE." Both pairs are FORCED (inscribed angles on one arc) and hold
     // EXACTLY in every converged sample — but the angle-universe gate killed any wedge that is within 2°
@@ -112,7 +112,7 @@ describe('reported scenarios — "show another configuration" keeps a polygon va
       if (!r.ok) return;
       for (const cmd of r.commands) st.execute(cmd, u, `g-${u}`);
     }
-    useGeoStore.getState().viewRelations();
+    await useGeoStore.getState().viewRelations();
     const rel = useGeoStore.getState().relations!.result;
     // Ray-merge may rename an arm lying on the secant (C,D,E,F collinear) to the class representative,
     // so accept any collinear stand-in for the merged arm.

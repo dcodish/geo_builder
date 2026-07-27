@@ -731,22 +731,14 @@ export default function App() {
 
   // Discovery level 3 (Observed, ADR-219) surfaces theorems whose premise only the evaluated coordinates
   // reveal — those matchers read the emergent detected shapes. So whenever L3 is active and the shape
-  // layer is stale (a new fact clears it, since it's keyed on `facts`), auto-run the heavy synchronous
-  // detection to keep the observed-level feed live. Paint a busy state first; the guards make it fire once
-  // per staleness (detecting-true short-circuits, then shapesLayer-truthy short-circuits).
+  // layer is stale (a new fact clears it, since it's keyed on `facts`), auto-run the detection to keep the
+  // observed-level feed live. The sweep runs in the geometry worker (#157 / ADR-401), so the busy state
+  // just brackets the await; the guards make it fire once per staleness (detecting-true short-circuits,
+  // then shapesLayer-truthy short-circuits).
   useEffect(() => {
     if (discoveryLevel !== 3 || shapesLayer || detecting || facts.length === 0) return;
     setDetecting(true);
-    const id = requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        try {
-          detectShapes();
-        } finally {
-          setDetecting(false);
-        }
-      }),
-    );
-    return () => cancelAnimationFrame(id);
+    void detectShapes().finally(() => setDetecting(false));
   }, [discoveryLevel, shapesLayer, detecting, facts, detectShapes]);
 
   // The first point with an unshown discrete solution to step to — circle∩circle, line∩circle,
@@ -1338,18 +1330,10 @@ export default function App() {
                   clearRelations();
                   return;
                 }
-                // Synchronous detection (samples + replays the figure) — paint a "working" state FIRST
-                // (double rAF) so a heavy figure doesn't freeze with no feedback, then run it.
+                // The detection sweep runs in the geometry WORKER (#157 / ADR-401) — the tab stays live
+                // while it samples, so this is a plain busy state around an await, no paint dance.
                 setAnalysing(true);
-                requestAnimationFrame(() =>
-                  requestAnimationFrame(() => {
-                    try {
-                      viewRelations();
-                    } finally {
-                      setAnalysing(false);
-                    }
-                  }),
-                );
+                void viewRelations().finally(() => setAnalysing(false));
               }}
             >
               {analysing ? t('actions.analysing') : relationsLayer ? t('actions.hideRelations') : t('actions.viewRelations')}
@@ -1374,8 +1358,8 @@ export default function App() {
                   return;
                 }
                 setDetecting(true);
-                // `detectShapes` is async + chunked (yields between sample batches), so the spinner paints and
-                // the page stays responsive while a coupled figure is analysed (was a multi-second freeze).
+                // `detectShapes` samples in the geometry WORKER (#157 / ADR-401), so the spinner paints and
+                // the page stays fully responsive while a coupled figure is analysed.
                 void (async () => {
                   try {
                     await detectShapes();

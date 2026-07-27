@@ -19,14 +19,31 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { AnyCommand, Id, RelationsResult, ShapesResult } from '@/engine';
-import { branchCount, classifyShapesFromSamples, cyclableVariant, deepEqual, detectRelationsAcross, variantCountOf, withVariant } from '@/engine';
+import { branchCount, cyclableVariant, deepEqual, variantCountOf, withVariant } from '@/engine';
 import type { FigureFile } from './figureFile';
 
 // S1.2 (docs/24): the replay layer moved to src/replay/core.ts — re-exported here so every
 // existing consumer path ('@/store/geoStore') keeps working; the store is now a thin stateful shell.
 export * from '@/replay/core';
-import { replay, groupKey, firstSatisfyingSeed, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, pointsDistinct, commandPointIds, extensionsClear, intersectionsWithinSegments, sharedSamples, sharedSamplesAsync, forcedCrossingKeys, BRANCH_CYCLE_KINDS } from '@/replay/core';
-import type { Fact } from '@/replay/core';
+import { replay, groupKey, firstSatisfyingSeed, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, pointsDistinct, commandPointIds, extensionsClear, intersectionsWithinSegments, BRANCH_CYCLE_KINDS } from '@/replay/core';
+import type { DetectAllResult, Fact } from '@/replay/core';
+import { geoWork, isCancelled } from './geoWork';
+
+/**
+ * Run the shared detection sweep for `facts` off the main thread and return its verdicts, or null when
+ * the answer must be discarded ([ADR-401](docs/06-decisions.md#adr-401)): the fact list changed while we
+ * sampled (a step/undo raced us — a layer for another figure must never be written), or the sweep was
+ * superseded/cancelled. The three detection actions share one in-flight sweep per fact list.
+ */
+async function detectFor(facts: Fact[], get: () => GeoState): Promise<DetectAllResult | null> {
+  try {
+    const r = await geoWork.detect(facts);
+    return get().facts === facts ? r : null;
+  } catch (err) {
+    if (isCancelled(err)) return null;
+    throw err;
+  }
+}
 
 /** Flip one display flag (hidden/dashed) on a segment's style entry, keeping only the TRUE flags
  *  (so the entry stays minimal — `{dashed:true}`, not `{dashed:true,hidden:false}`); drop it when empty. */
@@ -278,7 +295,8 @@ export interface GeoState {
   setFigureName: (name: string) => void;
   /** Compute the ground-truth relations of the current figure and turn the layer ON (ADR-134). Synchronous
    *  (samples the figure); the caller paints a busy state first. A no-op-safe re-press recomputes. */
-  viewRelations: () => void;
+  /** #157/ADR-401: async — the sample sweep runs in the geometry worker (shared with the other layers). */
+  viewRelations: () => Promise<void>;
   /** Turn the relations layer off. */
   clearRelations: () => void;
   /** Detect the named shapes of the current figure and turn the badges layer ON ([FR-SH]). Synchronous
@@ -532,49 +550,45 @@ export const useGeoStore = create<GeoState>()(
         set({ figureName: name });
       },
 
-      viewRelations: () => {
+      viewRelations: async () => {
+        // #157 ([ADR-401](docs/06-decisions.md#adr-401)): the sample sweep runs in the geometry WORKER,
+        // shared with detectShapes/detectCrossings through `geoWork.detect` (M3's one-sampler law, now
+        // across the thread boundary). It used to run SYNCHRONOUSLY here — measured at ~9 s uncapped /
+        // the full 5 s `SAMPLE_BUDGET_MS` on the #157 trapezoid-midsegment figure, with the tab frozen
+        // for all of it. Sampling contract unchanged (ADR-138 variant configs, requirement-satisfying
+        // base seed per ADR-166); only the thread and the memo key (content, not identity) differ.
         const facts = get().facts;
-        // ONE shared sample set with detectShapes (perf, 2026-07-06 review hotspot #1 — the two layers ran
-        // identical variantConfigs × firstSatisfyingSeed × 16-evaluate loops, so pressing both solved the
-        // whole figure twice). Sampling contract unchanged (ADR-138 variant configs, requirement-satisfying
-        // base seed per ADR-166, facts-ref-keyed invalidation).
-        const shared = sharedSamples(facts);
-        const result = detectRelationsAcross(shared.constructions, { positions: shared.samples });
-        set({ relations: { result, facts } });
+        const r = await detectFor(facts, get);
+        if (!r) return; // superseded/cancelled — never overwrite with a layer for another figure
+        set({ relations: { result: r.relations, facts } });
       },
 
       clearRelations: () => set({ relations: null }),
 
       detectShapes: async () => {
-        // Same shared sample core as viewRelations (one solve pass between the two layers).
-        //
-        // NON-BLOCKING (operator 2026-07-05): a coupled figure's driven-constraint solve is ~15 ms per evaluate
-        // (e.g. two right triangles sharing a hypotenuse, whose second right angle is a driven ⟂ constraint —
-        // ADR-223), and detection evaluates the figure N× per variant. Run synchronously that froze the main
-        // thread for a noticeable beat (the "identify shapes button stuck" report). So sample in small BATCHES,
-        // yielding to the event loop between them — the spinner paints and the page stays responsive — then run
-        // the fast, pure classification on the collected samples.
+        // Same shared sweep as viewRelations/detectCrossings — one solve pass between all three layers.
+        // (Before ADR-401 this ran on the main thread in batches that yielded every 4 samples; the yield
+        // granularity assumed cheap samples, and on a coupled figure ONE sample can be seconds — so the
+        // "non-blocking" path still froze the tab in multi-second chunks.)
         const facts = get().facts;
-        const shared = await sharedSamplesAsync(facts);
-        if (get().facts !== facts) return; // a step/undo raced us while sampling — don't overwrite with a stale layer
-        const result = classifyShapesFromSamples(shared.constructions[0], shared.samples);
-        set({ shapes: { result, facts } });
+        const r = await detectFor(facts, get);
+        if (!r) return;
+        set({ shapes: { result: r.shapes, facts } });
       },
 
       clearShapes: () => set({ shapes: null }),
 
       detectCrossings: async () => {
         // The crossing-dot affordance is ALWAYS on, so unlike the relations/shapes layers this runs after
-        // every step rather than behind a toggle — hence the async, shared-pool path (issue #228, option A):
-        // the figure draws immediately and the dots resolve a beat later, off the main thread's critical
-        // path. Nothing extra is paid when the student also presses relations/shapes — the sample pool is
-        // the same facts-keyed memo. Until it resolves, the previous step's verdict is still displayed and
-        // stale-guarded below, so a dot never flashes onto a figure it was not computed for.
+        // every step rather than behind a toggle — which is exactly why its sweep must not be on the main
+        // thread (issue #157): every step paid it. The figure draws immediately and the dots resolve a
+        // beat later; until then the previous step's verdict is still displayed and stale-guarded below,
+        // so a dot never flashes onto a figure it was not computed for.
         const facts = get().facts;
         if (get().crossings?.facts === facts) return;
-        const shared = await sharedSamplesAsync(facts);
-        if (get().facts !== facts) return; // a step/undo raced us — never overwrite with a stale layer
-        set({ crossings: { forced: forcedCrossingKeys(shared), facts } });
+        const r = await detectFor(facts, get);
+        if (!r) return;
+        set({ crossings: { forced: r.crossings, facts } });
       },
 
       cycleAlt: (pointId) => {

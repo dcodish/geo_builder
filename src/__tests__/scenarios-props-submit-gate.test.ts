@@ -181,7 +181,7 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
     expect(fs.lastError, 'it surfaces as a hard error').toMatch(/over-constrained/i);
   });
 
-  it('[isosceles-pin-soft-pair] "AB=AC" after "משולש שווה שוקיים" COMMITS (pins the soft pair) — was wrongly "already drawn" (session z4v1zza3)', () => {
+  it('[isosceles-pin-soft-pair] "AB=AC" after "משולש שווה שוקיים" COMMITS (pins the soft pair) — was wrongly "already drawn" (session z4v1zza3)', async () => {
     // The isosceles draws with a SOFT default pair (apex A ⇒ |AB|=|AC|) that is NOT reported as forced —
     // "which pair is equal" is genuinely unstated (ADR-052/138). When the student then states `AB=AC`
     // (naming the pair) it happens to MATCH the hidden default, so the geometry doesn't move — and the gate
@@ -211,13 +211,13 @@ describe('reported scenarios — App.submit gate commits a deferrable constraint
     };
     // 1. the isosceles draws; the pair is unspecified → "show equal length" reports NOTHING forced.
     commit('משולש ABC שווה שוקיים');
-    useGeoStore.getState().viewRelations();
+    await useGeoStore.getState().viewRelations();
     expect(useGeoStore.getState().relations!.result.equalSegments, 'no forced equality yet (pair unspecified)').toEqual([]);
     // 2. "AB=AC" is the student CHOOSING the pair — it COMMITS (was a "noop"/already-drawn dead-end).
     expect(classify('AB=AC').kind, 'AB=AC pins the soft default → commits').toBe('commit');
     commit('AB=AC');
     // 3. now the equality IS reported (the pin flips soft → forced) and holds geometrically.
-    useGeoStore.getState().viewRelations();
+    await useGeoStore.getState().viewRelations();
     expect(useGeoStore.getState().relations!.result.equalSegments.length, 'AB=AC now reported as forced equal').toBeGreaterThan(0);
     const fig = replay(useGeoStore.getState().facts, useGeoStore.getState().seed);
     expect(dist(at(fig, 'A'), at(fig, 'B')), '|AB| = |AC| holds').toBeCloseTo(dist(at(fig, 'A'), at(fig, 'C')), 3);

@@ -5460,3 +5460,28 @@ Locked by `basin-ownership.test.ts` (ownership present, 64-seed health, both lab
 **Measured.** #359 acceptance met: the closed form (r1=9, r2=16, |O1O2|=25, |NM|=12) at **every swept seed** (16/16, was 12/16 with the pending-fold fallback shown at the rest). Cost: one extra evaluate on failing seeds only — the failure path stays cheaper than a lost configuration.
 
 Locked by `basin-ownership.test.ts` (every-seed closed form + never-pending) riding the existing `common-tangent-two-circles` / `shared-touch-tangents-sizes-last` scenarios (their seed-sweep oracles now pass through the retried seeds).
+
+### ADR-401
+
+**2026-07-27 — The detection sample sweep runs in the geometry worker; the seam is the only path for heavy geometry (issue [#157](https://github.com/dcodish/geo_builder/issues/157)).**
+
+**Class (docs/17 §1).** A **heavy geometry sweep** (any loop that replays/evaluates a figure many times) reaches the **main thread** whenever it is entered through a **store action**, because the ADR-290 worker seam was wired op-by-op as individual hot paths got reported — `resample`, `autoResolve`, `prefold` — leaving every un-reported sweep on the UI thread. The class is not "this figure is slow"; it is "the seam is a list of rescued call sites instead of the execution path."
+
+**Instance + the measurement that overturned the filed diagnosis.** The issue blamed the submit-time `firstSatisfyingSeed` ("the primary fix") and `viewRelations`. Reconstructing its trapezoid-midsegment figure (`טרפז ABCD` · `EF קטע אמצעים` · `AC` · `BD` · `G על המשך AB` · `H על CD` · `ישר GFH` · `GH מקביל ל AD`) and timing each path says otherwise:
+
+| path | measured (deadline-free) |
+| --- | --- |
+| `firstSatisfyingSeed` after each step | **0 ms** (early return — the figure's one extension is satisfied at seed 0) |
+| per-step cold fold (append a plain segment between two EXISTING nodes) | 1.5 s — already off-thread since the submit path prefolds (ADR-290) |
+| per-seed tail | 0 / 24 / 759 / **4192** ms at seeds 0/1/2/3 |
+| `sharedSamples` (16 samples) | **9.0 s** — ON the main thread |
+
+So the freeze is the DETECTION sweep, and one sample is seconds, not milliseconds. That also condemns the "non-blocking" batched sampler: `sharedSamplesAsync` yielded every 4 samples, a granularity that assumed cheap samples — on this figure it froze the tab in ~16 s chunks while looking asynchronous. And `detectCrossings` (always-on since #228) pays it after **every step**, which is the operator's "even drawing a line between two existing nodes takes long."
+
+**Decision.** (1) `detectAll(facts)` (replay layer) returns all three layers' verdicts from ONE sweep, and a new `detect` worker op runs it — the CLASSIFICATION runs where the samples are, so only small pure verdicts cross the boundary and the `circlesOfSample` side table never has to. (2) The sample memo is keyed by fact-list **content**, not array identity: identity misses on every worker message (the facts arrive as a fresh structured clone), which would have made each layer re-sample the same figure. (3) The seam gets **two lanes**, each its own worker: `interactive` (resample / autoResolve / prefold — what the student waits for) and `detect` (the background layers). One worker runs one message at a time, so a shared worker would have converted the freeze into a queueing delay behind the always-on sweep; a superseded detect is killed, never awaited. (4) `sharedSamplesAsync` is **deleted** — leaving a main-thread sampler in the module is what invites the next call site back onto the UI thread.
+
+**What is NOT fixed (honest).** Two main-thread costs remain, both recorded in the ratchet's baseline: the seed auto-advance in `commitCommands`/`replaceGroup` (`firstSatisfyingSeed`, budget-capped at 2.5 s — moving it splits the one-transaction commit and makes the pre-search configuration briefly visible, a UX call for the operator), and the display tail on render (0–4 s on this figure, since the worker returns the fold and the main thread still evaluates its seed). Filed as follow-ups with these numbers, not smuggled in here. A third finding rides along: the fold memo is keyed by WHOLE fact-list content, so appending a step re-folds the entire figure from scratch — prefix reuse is a separate (and much deeper) piece of work, filed.
+
+**Sibling audit.** Grepped every caller of `sharedSamples`/`sharedSamplesAsync`/`firstSatisfyingSeed`/`findValidConfig`/`searchAnotherView`/`searchResample` outside the seam, the replay layer and the dev-only validation oracle: the three detection actions were the whole remaining set on the main thread, and all three are fixed. `geoWork`/`geoWorker` were repointed from `@/store/geoStore` to `@/replay/core` (the same re-exported functions) so the store can consume the seam without an import cycle.
+
+Locked by `main-thread-sweeps.test.ts` (the source ratchet — the recorded main-thread call sites may only go DOWN, with the message naming `geoWork` as the fix) and `detect-lane.test.ts` (three layers = one sweep; content-keyed reuse across a cloned array; a superseded layer is never written). No behavioural test can observe the threading itself — vitest has no `Worker`, so the suite exercises the seam's synchronous fallback, whose semantics are identical by construction.

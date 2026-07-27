@@ -6,22 +6,24 @@
  *   - `prefold`   — warm the seed-independent FOLD for a fact-list's content, returned for the main
  *                   thread to transplant into its own cache (`primeFoldFor`), after which every
  *                   main-thread replay of that content runs at tail speed.
+ *   - `detect`    — the shared detection sample sweep + all three layers' verdicts ([ADR-401](docs/06-decisions.md#adr-401)).
  *
  * The worker imports the SAME store module (zustand/zundo are DOM-free); its fold/replay caches are its
  * own module instance — results cross the boundary as structured clones (FoldNode is pure data).
  * Cancellation is by TERMINATION (the client kills + respawns the worker): a JS worker can't be
  * interrupted mid-computation any other way, and a fresh worker only costs re-warming its caches.
  */
-import { searchAnotherView, findValidConfig, meetsRequirements, replay, getFoldFor, WORKER_SEARCH_BUDGET_MS, type Fact, type FoldNode } from './geoStore';
+import { searchAnotherView, findValidConfig, meetsRequirements, replay, getFoldFor, detectAll, WORKER_SEARCH_BUDGET_MS, type DetectAllResult, type Fact, type FoldNode } from '@/replay/core';
 
 export type GeoWorkRequest =
   | { id: number; op: 'resample'; facts: Fact[]; seed: number }
   | { id: number; op: 'autoResolve'; facts: Fact[]; seed: number }
-  | { id: number; op: 'prefold'; facts: Fact[]; seed: number };
+  | { id: number; op: 'prefold'; facts: Fact[]; seed: number }
+  | { id: number; op: 'detect'; facts: Fact[]; seed: number };
 
 export type GeoWorkResponse =
   | { id: number; progress: { k: number; n: number } }
-  | { id: number; done: ResampleDone | AutoResolveDone | PrefoldDone }
+  | { id: number; done: ResampleDone | AutoResolveDone | PrefoldDone | DetectDone }
   | { id: number; error: string };
 
 // ADR-340 (#175): the search returns the whole validated COMPOSITE (facts may carry a branch/variant
@@ -31,6 +33,8 @@ export type AutoResolveDone =
   | { op: 'autoResolve'; ok: true }
   | { op: 'autoResolve'; found: { facts: Fact[]; seed: number; fold: FoldNode | null } | null };
 export type PrefoldDone = { op: 'prefold'; fold: FoldNode | null };
+/** #157 ([ADR-401](docs/06-decisions.md#adr-401)): all three detection layers from ONE sample sweep. */
+export type DetectDone = { op: 'detect'; result: DetectAllResult };
 
 const post = (msg: GeoWorkResponse): void => (self as unknown as Worker).postMessage(msg);
 
@@ -61,6 +65,10 @@ self.onmessage = (e: MessageEvent<GeoWorkRequest>) => {
     } else if (req.op === 'prefold') {
       replay(req.facts, req.seed);
       post({ id: req.id, done: { op: 'prefold', fold: getFoldFor(req.facts) } });
+    } else if (req.op === 'detect') {
+      // #157: the sample sweep — the dominant per-step cost on a coupled figure — with the three
+      // layers' classification done HERE, so only the small verdicts cross back (ADR-401).
+      post({ id: req.id, done: { op: 'detect', result: detectAll(req.facts) } });
     }
   } catch (err) {
     post({ id: req.id, error: String((err as Error)?.message ?? err) });

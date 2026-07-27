@@ -56,20 +56,20 @@ describe('cycleVariant — no-op when no variant shape', () => {
 });
 
 describe('B2 — viewRelations samples across variants', () => {
-  it('a lone kite reports NO forced segment-equality (the equal-pair is a free choice, ADR-138)', () => {
+  it('a lone kite reports NO forced segment-equality (the equal-pair is a free choice, ADR-138)', async () => {
     s().execute({ type: 'shape-variant', shape: 'kite', ids: ['A', 'B', 'C', 'D'], variant: 0 } as AnyCommand, 'kite', 'g');
-    s().viewRelations();
+    await s().viewRelations();
     // axis-AC's |AB|=|AD| holds in the drawn config but not axis-BD — so across the variants nothing is forced.
     expect(s().relations!.result.equalSegments).toEqual([]);
   });
 
-  it('a rhombus (no variant) still reports its four equal sides', () => {
+  it('a rhombus (no variant) still reports its four equal sides', async () => {
     // Built from primitives (parser-independent): a quad with all four sides equal.
     s().execute({ type: 'quadrilateral', ids: ['A', 'B', 'C', 'D'] } as AnyCommand, 'q', 'g');
     s().execute({ type: 'set-equal', a: 'A', b: 'B', c: 'B', d: 'C' } as AnyCommand, 'q', 'g');
     s().execute({ type: 'set-equal', a: 'B', b: 'C', c: 'C', d: 'D' } as AnyCommand, 'q', 'g');
     s().execute({ type: 'set-equal', a: 'C', b: 'D', c: 'D', d: 'A' } as AnyCommand, 'q', 'g');
-    s().viewRelations();
+    await s().viewRelations();
     expect(s().relations!.result.equalSegments.length).toBeGreaterThan(0); // the equal sides ARE forced
   });
 });
@@ -104,7 +104,7 @@ describe('inscribed rhombus — drawn, detected, equal sides reported (ADR-262)'
     await s().detectShapes();
     expect(s().shapes!.result.shapes.some((sh) => sh.type === 'rhombus')).toBe(true);
     // (3) equal segments — the four sides in one class.
-    s().viewRelations();
+    await s().viewRelations();
     const cls = s().relations!.result.equalSegments;
     expect(cls.some((c) => c.length === 4)).toBe(true);
     // (4) corresponding angle at a point ON a side: ∠B = ∠CDE (DE∥AB) must surface — an inscribe variant is a

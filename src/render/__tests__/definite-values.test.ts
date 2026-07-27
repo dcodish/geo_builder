@@ -9,35 +9,35 @@ import { parse } from '@/parser';
 import { relationAt, relationsForPick, relationMarks } from '@/render/scene';
 import type { RelationsResult } from '@/engine';
 
-function build(u: string) {
+async function build(u: string) {
   useGeoStore.setState({ facts: [], seed: 0, relations: null });
   for (const p of u.split(' + ')) {
     const r = parse(p, {} as never);
     if ('ok' in r && r.ok) useGeoStore.getState().executeMany(r.commands, p);
   }
-  useGeoStore.getState().viewRelations();
+  await useGeoStore.getState().viewRelations();
   const st = useGeoStore.getState() as unknown as { relations: { result: RelationsResult } };
   return { res: st.relations.result, pos: replay(useGeoStore.getState().facts, useGeoStore.getState().seed).positions };
 }
 
 describe('definite values on hover (#126)', () => {
-  it('a FREE figure has no definite lengths (they float across the scale gauge)', () => {
-    expect(build('triangle ABC').res.definiteLengths).toEqual([]);
+  it('a FREE figure has no definite lengths (they float across the scale gauge)', async () => {
+    expect((await build('triangle ABC')).res.definiteLengths).toEqual([]);
     // a lone right triangle: the 90° is definite (scale-invariant), but no length is
-    const rt = build('right triangle ABC');
+    const rt = await build('right triangle ABC');
     expect(rt.res.definiteAngles.map((a) => Math.round(a.valueDeg))).toEqual([90]);
     expect(rt.res.definiteLengths).toEqual([]);
   });
 
-  it('a SIZED figure has definite lengths equal to the pinned world lengths (3-4-5)', () => {
-    const { res } = build('right triangle ABC + AB=5 + AC=4');
+  it('a SIZED figure has definite lengths equal to the pinned world lengths (3-4-5)', async () => {
+    const { res } = await build('right triangle ABC + AB=5 + AC=4');
     const byPair = Object.fromEntries(res.definiteLengths.map((l) => [[l.a, l.b].sort().join(''), Math.round(l.value)]));
     expect(byPair).toEqual({ AB: 5, AC: 4, BC: 3 });
     expect(res.definiteAngles.map((a) => Math.round(a.valueDeg)).sort((x, y) => x - y)).toEqual([37, 53, 90]);
   });
 
-  it('hovering a side body picks its length; hovering into a wedge picks its angle', () => {
-    const { res, pos } = build('right triangle ABC + AB=5 + AC=4');
+  it('hovering a side body picks its length; hovering into a wedge picks its angle', async () => {
+    const { res, pos } = await build('right triangle ABC + AB=5 + AC=4');
     const A = pos.get('A')!, B = pos.get('B')!, C = pos.get('C')!;
     const seg = 0.5, vert = 0.5; // small screen-proportional reaches
     const midBC = { x: (B.x + C.x) / 2, y: (B.y + C.y) / 2 };
@@ -55,8 +55,8 @@ describe('definite values on hover (#126)', () => {
     expect(vals.map((v) => v.text)).toEqual(['36.87°']); // arctan(3/4), now 2dp (#164, ADR-393)
   });
 
-  it('a forced 90° stays a knee on hover (operator: keep knee, not the number)', () => {
-    const { res, pos } = build('right triangle ABC');
+  it('a forced 90° stays a knee on hover (operator: keep knee, not the number)', async () => {
+    const { res, pos } = await build('right triangle ABC');
     const A = pos.get('A')!, B = pos.get('B')!, C = pos.get('C')!;
     // the right angle is at C — hover just inside its wedge
     const bis = { x: (A.x - C.x) + (B.x - C.x), y: (A.y - C.y) + (B.y - C.y) };

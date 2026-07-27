@@ -5,67 +5,59 @@
   "slow": [
     {
       "file": "src/__tests__/scenarios-e2e-5.test.ts",
-      "ms": 221747
+      "ms": 206211
     },
     {
       "file": "src3d/__tests__/right-apex.test.ts",
-      "ms": 180419
+      "ms": 169390
     },
     {
       "file": "src3d/__tests__/adr-3d-032.test.ts",
-      "ms": 173456
-    },
-    {
-      "file": "src/engine/__tests__/membership-conversion.test.ts",
-      "ms": 122824
+      "ms": 166641
     },
     {
       "file": "src/theorems/__tests__/b-corpus.test.ts",
-      "ms": 121247
+      "ms": 115883
+    },
+    {
+      "file": "src/engine/__tests__/membership-conversion.test.ts",
+      "ms": 113237
     },
     {
       "file": "src/__tests__/scenarios-e2e-7.test.ts",
-      "ms": 104369
+      "ms": 96207
     },
     {
       "file": "src3d/__tests__/book-coordinate-givens.test.ts",
-      "ms": 102609
+      "ms": 96080
     },
     {
       "file": "src3d/__tests__/member-drive.test.ts",
-      "ms": 99703
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-1.test.ts",
-      "ms": 90461
+      "ms": 92728
     },
     {
       "file": "src/__tests__/scenarios-props-submit-gate.test.ts",
-      "ms": 89501
+      "ms": 86891
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-1.test.ts",
+      "ms": 84630
     },
     {
       "file": "src/__tests__/scenarios-e2e-3.test.ts",
-      "ms": 80087
+      "ms": 74752
     },
     {
       "file": "src/__tests__/scenarios-e2e-8.test.ts",
-      "ms": 76969
+      "ms": 70068
     },
     {
       "file": "src/__tests__/scenarios-e2e-4.test.ts",
-      "ms": 74989
+      "ms": 68903
     },
     {
       "file": "src/replay/__tests__/basin-ownership.test.ts",
-      "ms": 70041
-    },
-    {
-      "file": "src/store/__tests__/coincidence.test.ts",
-      "ms": 64158
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-6.test.ts",
-      "ms": 62477
+      "ms": 66524
     }
   ]
 }

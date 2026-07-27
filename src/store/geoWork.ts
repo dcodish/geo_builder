@@ -15,25 +15,45 @@ import {
   meetsRequirements,
   replay,
   getFoldFor,
+  detectAll,
+  type DetectAllResult,
   type Fact,
   type FoldNode,
-} from './geoStore';
-import type { GeoWorkResponse, ResampleDone, AutoResolveDone, PrefoldDone } from './geoWorker';
+} from '@/replay/core';
+import type { GeoWorkResponse, ResampleDone, AutoResolveDone, PrefoldDone, DetectDone } from './geoWorker';
 
+type Done = ResampleDone | AutoResolveDone | PrefoldDone | DetectDone;
 type Pending = {
-  resolve: (done: ResampleDone | AutoResolveDone | PrefoldDone) => void;
+  resolve: (done: Done) => void;
   reject: (err: Error & { cancelled?: boolean }) => void;
   onProgress?: (k: number, n: number) => void;
 };
 
-const hasWorker = typeof Worker !== 'undefined' && typeof document !== 'undefined';
-let worker: Worker | null = null;
-let nextId = 1;
-const pending = new Map<number, Pending>();
+/**
+ * Two LANES, each its own worker instance ([ADR-401](docs/06-decisions.md#adr-401)). A worker runs one
+ * message at a time, and since #228 the crossing detection is ALWAYS-ON (it re-runs after every step) —
+ * so a single shared worker would put a multi-second sample sweep in front of every user-initiated
+ * search, converting the main-thread freeze this fixes into a queueing delay. `interactive` carries what
+ * the student is waiting for (resample / autoResolve / prefold); `detect` carries the background layers,
+ * and superseding it is free (terminate the detect worker only — the interactive lane keeps its caches).
+ */
+type Lane = 'interactive' | 'detect';
+const LANE_OF: Record<'resample' | 'autoResolve' | 'prefold' | 'detect', Lane> = {
+  resample: 'interactive',
+  autoResolve: 'interactive',
+  prefold: 'interactive',
+  detect: 'detect',
+};
 
-function ensureWorker(): Worker {
-  if (worker) return worker;
-  worker = new Worker(new URL('./geoWorker.ts', import.meta.url), { type: 'module' });
+const hasWorker = typeof Worker !== 'undefined' && typeof document !== 'undefined';
+const workers: Record<Lane, Worker | null> = { interactive: null, detect: null };
+let nextId = 1;
+const pending = new Map<number, Pending & { lane: Lane }>();
+
+function ensureWorker(lane: Lane): Worker {
+  const existing = workers[lane];
+  if (existing) return existing;
+  const worker = new Worker(new URL('./geoWorker.ts', import.meta.url), { type: 'module' });
   worker.onmessage = (e: MessageEvent<GeoWorkResponse>) => {
     const msg = e.data;
     const p = pending.get(msg.id);
@@ -47,36 +67,50 @@ function ensureWorker(): Worker {
     else p.resolve(msg.done);
   };
   worker.onerror = () => {
-    // a worker crash rejects everything in flight; the next call respawns
+    // a worker crash rejects everything in flight on ITS lane; the next call respawns
     const err = new Error('geometry worker crashed');
-    for (const p of pending.values()) p.reject(err);
-    pending.clear();
-    worker?.terminate();
-    worker = null;
+    for (const [id, p] of [...pending]) {
+      if (p.lane !== lane) continue;
+      p.reject(err);
+      pending.delete(id);
+    }
+    workers[lane]?.terminate();
+    workers[lane] = null;
   };
+  workers[lane] = worker;
   return worker;
 }
 
-/** Kill the in-flight work (terminate + respawn-on-demand). In-flight promises reject `{cancelled}`. */
-export function cancelGeoWork(): void {
-  if (worker) {
-    worker.terminate();
-    worker = null;
+/** Kill a lane's in-flight work (terminate + respawn-on-demand). Its promises reject `{cancelled}`. */
+function cancelLane(lane: Lane): void {
+  if (workers[lane]) {
+    workers[lane]!.terminate();
+    workers[lane] = null;
   }
   const err = Object.assign(new Error('cancelled'), { cancelled: true });
-  for (const p of pending.values()) p.reject(err);
-  pending.clear();
+  for (const [id, p] of [...pending]) {
+    if (p.lane !== lane) continue;
+    p.reject(err);
+    pending.delete(id);
+  }
+}
+
+/** Kill the in-flight work the STUDENT is waiting on (the ✕ cancel button) — the interactive lane. The
+ *  background detection lane is left alone: nothing is waiting on it, and killing it would only throw
+ *  away a sweep the next step has to pay for again. */
+export function cancelGeoWork(): void {
+  cancelLane('interactive');
 }
 
 /** True when the error is a deliberate `cancelGeoWork` — callers go quiet, never surface it. */
 export const isCancelled = (err: unknown): boolean => Boolean((err as { cancelled?: boolean })?.cancelled);
 
 function call(
-  op: 'resample' | 'autoResolve' | 'prefold',
+  op: 'resample' | 'autoResolve' | 'prefold' | 'detect',
   facts: Fact[],
   seed: number,
   onProgress?: (k: number, n: number) => void,
-): Promise<ResampleDone | AutoResolveDone | PrefoldDone> {
+): Promise<Done> {
   if (!hasWorker) {
     // synchronous fallback — the same functions, same semantics, main thread (tests / no-Worker envs)
     try {
@@ -86,6 +120,7 @@ function call(
         const found = findValidConfig(facts, 0);
         return Promise.resolve({ op, found: found ? { ...found, fold: null } : null } as AutoResolveDone);
       }
+      if (op === 'detect') return Promise.resolve({ op, result: detectAll(facts) });
       replay(facts, seed);
       return Promise.resolve({ op: 'prefold', fold: getFoldFor(facts) } as PrefoldDone);
     } catch (err) {
@@ -93,9 +128,10 @@ function call(
     }
   }
   const id = nextId++;
+  const lane = LANE_OF[op];
   return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject, onProgress });
-    ensureWorker().postMessage({ id, op, facts, seed });
+    pending.set(id, { resolve, reject, onProgress, lane });
+    ensureWorker(lane).postMessage({ id, op, facts, seed });
   });
 }
 
@@ -120,4 +156,26 @@ export const geoWork = {
     const done = (await call('prefold', facts, seed)) as PrefoldDone;
     return done.fold;
   },
+  /**
+   * All three detection layers' verdicts from ONE off-thread sample sweep (#157 / ADR-401).
+   *
+   * The three store actions (`viewRelations`, `detectShapes`, `detectCrossings`) fire independently —
+   * two behind toggles, one after every step — so the in-flight promise is SHARED per fact list: three
+   * callers on the same figure cost one sweep, which is the M3 law expressed at the thread boundary.
+   * A sweep for superseded content is killed rather than awaited: nothing displays it, and the next
+   * step would otherwise queue behind its full budget.
+   */
+  detect(facts: Fact[]): Promise<DetectAllResult> {
+    if (detectInFlight?.facts === facts) return detectInFlight.promise;
+    if (detectInFlight) cancelLane('detect'); // superseded — its figure is no longer on screen
+    const promise = call('detect', facts, 0)
+      .then((done) => (done as DetectDone).result)
+      .finally(() => {
+        if (detectInFlight?.promise === promise) detectInFlight = null;
+      });
+    detectInFlight = { facts, promise };
+    return promise;
+  },
 };
+
+let detectInFlight: { facts: Fact[]; promise: Promise<DetectAllResult> } | null = null;
