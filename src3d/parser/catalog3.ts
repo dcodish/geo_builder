@@ -43,6 +43,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'points', he: 'הקודקוד D נמצא על החלק החיובי של ציר ה-x', en: 'D is on the positive x-axis' },
   { category: 'claims', he: 'נפח הפירמידה SENB שווה לנפח הפירמידה CENB', en: 'volume of pyramid SENB equals volume of pyramid CENB' },
   { category: 'claims', he: '∠SAB = ∠SAD', en: '∠SAB = ∠SAD' }, // #271: a general angle equality (drives a free-dim solid / verifies a determined one)
+  // #337: the SAME relation in the corpus's between-form wording (vector / line / segment nouns all accepted)
+  { category: 'claims', he: 'הזווית שבין AB לבין AC שווה לזווית שבין AB לבין AD', en: 'the angle between AB and AC = the angle between AB and AD' },
   { category: 'solids', he: 'חרוט שקודקודו S ומרכז בסיסו O, רדיוסו 5 וגובהו 12', en: 'cone with apex S base center O radius 5 height 12' },
   { category: 'solids', he: 'גליל שמרכז בסיסו O, רדיוסו 3 וגובהו 7', en: 'cylinder with base center O radius 3 height 7' },
   { category: 'solids', he: 'כדור שמרכזו O ורדיוסו 3', en: 'sphere with center O radius 3' },

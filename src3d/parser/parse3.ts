@@ -418,8 +418,20 @@ const onSegment: Rule = (s) => {
 const GREEK = /[α-ωΑ-Ω]/;
 
 /** An optional proof-verb prefix (`הוכיחו כי`, `prove that`) — claims accept it and ignore it. */
-const stripProofPrefix = (s: string): string =>
-  s.replace(/^(?:הוכיחו?\s+(?:כי|ש-?)\s*|הראו?\s+(?:כי|ש-?)\s*|prove\s+that\s+|show\s+that\s+)/i, '');
+/**
+ * Strip a leading DISCOURSE marker — text that frames the statement without being part of it.
+ *
+ * Two families, one class: the proof framing (`הוכיחו כי` / `prove that`) and the given framing
+ * (`נתון ש` / `נתון כי` / `given that`). Neither changes WHAT is asserted — drive-vs-verify is decided
+ * by the figure's freedom at apply (M1), never by the wording — so a rule that understands the bare
+ * statement must understand the framed one. #337 (ADR-3D-088): the corpus wording
+ * «נתון שהזווית שבין … שווה לזווית שבין …» reached no rule for want of exactly this.
+ */
+const stripStatementPrefix = (s: string): string =>
+  s.replace(
+    /^(?:הוכיחו?\s+(?:כי|ש-?)\s*|הראו?\s+(?:כי|ש-?)\s*|prove\s+that\s+|show\s+that\s+|נתון\s+(?:כי\s+|ש-?)\s*|given\s+that\s+)/i,
+    '',
+  );
 
 const FRACTION_GLYPHS: Record<string, number> = {
   '½': 1 / 2, '⅓': 1 / 3, '⅔': 2 / 3, '¼': 1 / 4, '¾': 3 / 4,
@@ -601,7 +613,7 @@ const diagIntersection: Rule = (s) => {
  *  The plane keyword is optional when the target run is 3–4 points (`MO ⊥ABCD`, issue #14) —
  *  a run of ≥3 points can only be a plane (a segment is exactly 2), so the symbol form is unambiguous. */
 const perpPlaneClaim: Rule = (s0) => {
-  const s = stripProofPrefix(s0);
+  const s = stripStatementPrefix(s0);
   const m = s.match(
     /^([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:מאונך|ניצב|אנך|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור|plane)?\s*([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)?\s*$/,
   );
@@ -639,7 +651,7 @@ const perpOperand = (tok: string): VecAtom | null => {
  * A target run of 3–4 points is a PLANE and stays with perpPlaneClaim (which runs first).
  */
 const perpSegGiven: Rule = (s0) => {
-  const s = stripProofPrefix(s0);
+  const s = stripStatementPrefix(s0);
   if (!/⊥|מאונ[ךכ]|ניצב|אנך|perpendicular/i.test(s)) return null; // מאונ[ךכ]: the plural מאונכים has a REGULAR kaf
   const TOK = String.raw`([A-Z]\d*'?[A-Z]\d*'?|[a-w])`;
   const NOUN = String.raw`(?:ה?קטע\s+|ה?מקצוע\s+|ה?ישר\s+|ה?ו?וקטור\s+|(?:the\s+)?(?:segment|edge|line|vector)\s+)?`;
@@ -656,7 +668,7 @@ const perpSegGiven: Rule = (s0) => {
 
 /** `E, C, A' על ישר אחד` / `E, C, A' are collinear` — a CLAIM. */
 const collinearClaim: Rule = (s0) => {
-  const s = stripProofPrefix(s0);
+  const s = stripStatementPrefix(s0);
   if (!/על\s+ישר\s+אחד|on\s+one\s+line|collinear/i.test(s)) return null;
   const ids = labelTokens(s);
   if (ids.length < 3 || new Set(ids).size !== ids.length) return null;
@@ -832,7 +844,7 @@ const volumeEqPoly: Rule = (s) => {
 };
 
 const vecEqClaim: Rule = (s0) => {
-  const s = stripProofPrefix(s0);
+  const s = stripStatementPrefix(s0);
   if (GREEK.test(s)) return null; // unknown scalars belong to spanPoint, never a claim
   const parts = s.split('=');
   if (parts.length !== 2) return null;
@@ -1657,7 +1669,7 @@ const segLineCutsPointPlane: Rule = (s) => {
 /** `הזווית בין A'C לבין BC' היא 90` / the exam's `גודל הזווית שבין הישר AB ובין הישר AM
  *  הוא 60` — the angle between two SEGMENT-lines (≤90°), a claim. */
 const angleSegClaim: Rule = (s0) => {
-  const s = stripProofPrefix(s0);
+  const s = stripStatementPrefix(s0);
   const m =
     s.match(
       new RegExp(
@@ -1772,7 +1784,7 @@ const onAxes: Rule = (s) => {
  *  #251 (ADR-3D-049): also the `ישרה`/`is right` word-form (deg 90), and the SINGLE-VERTEX form
  *  (`זוית O ישרה`, `זווית O = 90`, `angle at O is right`) → `vertex-angle`, arms resolved at APPLY. */
 const vertexAngleClaim: Rule = (s0) => {
-  const s = stripProofPrefix(s0);
+  const s = stripStatementPrefix(s0);
   const L = String.raw`([A-Z]\d*'?)`;
   const PRE = String.raw`(?:∠|ה?זו?וית\s+|the angle\s+(?:at\s+)?|angle\s+(?:at\s+)?)`;
   const RIGHT = String.raw`(?:היא\s+|הוא\s+)?ישרה|is\s+(?:a\s+)?right(?:\s+angle)?`;
@@ -1804,7 +1816,7 @@ const vertexAngleClaim: Rule = (s0) => {
  * grammar mirrors the 2-D `measureBound` (ADR-390) — patterns are copied, never imported.
  */
 const angleBound3: Rule = (s0) => {
-  const s = stripProofPrefix(s0).trim();
+  const s = stripStatementPrefix(s0).trim();
   // both nun spellings: קטן (m) / קטנה (f) — a gate on one silently rejects the other (the ADR-3D-035
   // kaf trap, nun edition; the same slip cost «זווית ABC קטנה מ-60» a wrong parse in 2-D, ADR-390)
   if (!/(?:<|>|≤|≥|גדול|קט[ןנ]|בין|greater|less|between)/i.test(s)) return null;
@@ -1855,30 +1867,99 @@ const angleBound3: Rule = (s0) => {
  * special case, not a requirement. Runs BEFORE `angleMarker`, which would otherwise claim the left angle and
  * silently drop the right-hand side.
  */
+/**
+ * ONE angle phrase → its two arm vectors (#337, [ADR-3D-088]).
+ *
+ * The same angle is written two ways in the corpus and they mean exactly the same thing:
+ *   - the glued VERTEX TRIPLE  `∠SAB` / `זווית SAB` / `angle SAB`         → arms A→S and A→B
+ *   - the BETWEEN form         `הזווית שבין הוקטור BE לבין הוקטור BC'`     → the two named operands
+ *
+ * Only the triple was ever expressible in an equality, so the textbook's between-form wording reached
+ * no rule and fell to the LLM. The noun prefix (הוקטור / הישר / הקטע / vector / line / segment) is
+ * optional and interchangeable — it says how the student pictures the operand, not which relation is
+ * meant — and an operand may equally be a declared vector (`u`).
+ */
+const PT3 = String.raw`[A-Z]\d*'?`;
+const VEC_NOUN3 = String.raw`(?:ה?(?:ו?וקטור|ישר|קטע)\s+|(?:the\s+)?(?:vector|line|segment)\s+)?`;
+
+interface AnglePhrase3 {
+  a: VecAtom;
+  b: VecAtom;
+  /** the wedge to mark, when the two arms share a tail (always for a triple) */
+  mark?: { vertex: string; p: string; q: string };
+  /** segments the phrase named explicitly and should therefore draw */
+  draw: Command3[];
+}
+
+/** One operand of a between-form angle: a point pair (`BE`) or a declared vector (`u`). */
+function angleOperand3(t: string): VecAtom | null {
+  const body = t.trim().replace(new RegExp(`^${VEC_NOUN3}`), '').trim();
+  const pair = body.match(new RegExp(`^(${PT3})(${PT3})$`));
+  if (pair) return pair[1] === pair[2] ? null : { kind: 'pair', from: pair[1], to: pair[2] };
+  const named = body.match(/^([a-w])$/);
+  return named ? { kind: 'named', name: named[1] } : null;
+}
+
+function parseAnglePhrase3(t: string): AnglePhrase3 | null {
+  const s = t.trim();
+  const tri = s.match(new RegExp(String.raw`^(?:∠|ה?זו?וית\s+|(?:the\s+)?angle\s+)` + `(${PT3})(${PT3})(${PT3})$`));
+  if (tri) {
+    const [, p, v, q] = tri;
+    if (v === p || v === q) return null; // an angle needs three distinct points
+    return { a: { kind: 'pair', from: v, to: p }, b: { kind: 'pair', from: v, to: q }, mark: { vertex: v, p, q }, draw: [] };
+  }
+  const bet = s.match(
+    /^(?:גודל\s+)?(?:ה?זו?וית\s+ש?בין|(?:the\s+)?angle\s+between)\s+(.+?)\s+(?:לבין|ובין|and|ל|ו)-?\s*(.+)$/,
+  );
+  if (!bet) return null;
+  const a = angleOperand3(bet[1]);
+  const b = angleOperand3(bet[2]);
+  if (!a || !b) return null;
+  const draw: Command3[] = [];
+  for (const at of [a, b]) if (at.kind === 'pair') draw.push({ type: 'segment3', a: at.from, b: at.to });
+  const mark =
+    a.kind === 'pair' && b.kind === 'pair' && a.from === b.from ? { vertex: a.from, p: a.to, q: b.to } : undefined;
+  return { a, b, mark, draw };
+}
+
 const angleEquality3: Rule = (s0) => {
-  const s = stripProofPrefix(s0).trim();
-  const A = `(?:∠|ה?זו?וית\\s+|(?:the\\s+)?angle\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)`;
-  const EQ = `\\s*(?:=|שווה\\s*ל?|equals?|is\\s+equal\\s+to)\\s*`;
-  const m = s.match(new RegExp(`^${A}${EQ}${A}(?:\\s*=\\s*([A-Za-zα-ωΑ-Ω]))?\\s*$`));
-  if (!m) return null;
-  const [, p1, v1, q1, p2, v2, q2, label] = m;
-  if (v1 === p1 || v1 === q1 || v2 === p2 || v2 === q2) return null; // an angle needs three distinct points
-  const pair = (from: string, to: string): VecAtom => ({ kind: 'pair', from, to });
-  const out: Command3[] = [
-    { type: 'angle-mark', vertex: v1, p: p1, q: q1, ...(label ? { label } : {}) },
-    { type: 'angle-mark', vertex: v2, p: p2, q: q2, ...(label ? { label } : {}) },
-  ];
+  const s = stripStatementPrefix(s0).trim();
+  // #337 (ADR-3D-088): the two SIDES are parsed by the shared angle-phrase atom, so an angle written as
+  // the glued vertex triple (`∠SAB`) and one written as the between-form (`הזווית שבין הוקטור BE לבין
+  // הוקטור BC'`) are the same operand to this rule — previously only the triple was expressible, so the
+  // textbook wording reached no rule at all and fell to the LLM (docs/17 §2.2: one relation reachable
+  // through only one phrasing). The equality may also mix the two forms.
+  const parts = s
+    .split(/(?:=|שווה\s*ל?|equals?|is\s+equal\s+to)/i)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  if (parts.length < 2 || parts.length > 3) return null;
+  // the chained naming form `∠SAB = ∠SAD = α` — a trailing single letter NAMES both angles
+  const label = parts.length === 3 ? (/^[A-Za-zα-ωΑ-Ω]$/.test(parts[2]) ? parts[2] : null) : undefined;
+  if (label === null) return null;
+  const left = parseAnglePhrase3(parts[0]);
+  const right = parseAnglePhrase3(parts[1]);
+  if (!left || !right) return null;
+  const out: Command3[] = [];
+  // A between-form operand names its segments explicitly, so draw them (the `angleSegClaim` precedent);
+  // a vertex triple draws nothing, exactly as before.
+  for (const ph of [left, right]) out.push(...ph.draw);
+  // An arc is drawn only where the two arms share a vertex — always for a triple, and for a between-form
+  // whose operands share their tail (BE / BC' both from B). Otherwise there is no wedge to mark.
+  for (const ph of [left, right]) {
+    if (ph.mark) out.push({ type: 'angle-mark', vertex: ph.mark.vertex, p: ph.mark.p, q: ph.mark.q, ...(label ? { label } : {}) });
+  }
   // With a trailing label the two marks share it, and the label-binding rule (apply) already asserts the
   // equality — emitting it again here would double the pin. Without one, state it explicitly.
-  if (!label) out.push({ type: 'angle-pair-eq', a: pair(v1, p1), b: pair(v1, q1), c: pair(v2, p2), d: pair(v2, q2) });
-  return out;
+  if (!label) out.push({ type: 'angle-pair-eq', a: left.a, b: left.b, c: right.a, d: right.b });
+  return out.length ? out : null;
 };
 
 /** `∠SDB` / `∠SDB = α` — a named-angle MARKER (#94): draw the arc at the middle vertex, no value drives.
  *  A NUMERIC RHS (`∠SDB = 82`) is a claim (owned by `vertexAngleClaim`, before this); a `?`/bare `=` is a
  *  query (owned by scope3). A single-LETTER RHS (`= α`, Greek or Latin) is a display NAME for the angle. */
 const angleMarker: Rule = (s0) => {
-  const s = stripProofPrefix(s0).trim();
+  const s = stripStatementPrefix(s0).trim();
   const m = s.match(
     new RegExp(`^(?:∠|ה?זו?וית\\s+|the angle\\s+)([A-Z]\\d*'?)([A-Z]\\d*'?)([A-Z]\\d*'?)\\s*(?:(?:=|היא|הוא|is)\\s*([A-Za-zα-ωΑ-Ω]))?\\s*$`),
   );
@@ -1980,7 +2061,7 @@ const bisectorPoint: Rule = (s) => {
 
 /** `NK ו-PL מצטלבים` / `NK and PL are skew` (+ מקבילים/parallel, נחתכים/intersect) — mutual-position claims. */
 const mutualPositionClaim: Rule = (s0) => {
-  const s = stripProofPrefix(s0);
+  const s = stripStatementPrefix(s0);
   const m =
     s.match(/^(?:הישרים\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+ו-?([A-Z]\d*'?)([A-Z]\d*'?)\s+(מצטלבים|מקבילים|נחתכים)$/) ??
     s.match(/^(?:lines\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+and\s+([A-Z]\d*'?)([A-Z]\d*'?)\s+are\s+(skew|parallel|intersecting)$/);

@@ -1264,3 +1264,33 @@ Only ENABLED rows are audited — a deliberately disabled row is not part of the
 **Relation to the 2-D audit.** `src/store/loadAudit.ts` (ADR-242) audits a different axis of the same honesty problem: its `dropped` / `drift` findings compare the stored lowering against the *current parser*. That check presumes the figure builds at all. This one asks whether it does — they are complementary, and the 3-D app now has the more fundamental half. Pattern copied, not imported (docs/20 §12). The `dropped`/`drift` half remains available to 3-D if a file ever needs it.
 
 Locked by `load-audit3.test.ts`: the unbuildable case (asserting the pre-fix state explicitly — deserialize ok, `lastError` null, zero positions — so the regression is visible in the test itself), a healthy file auditing clean, a partially-broken file naming the 1-based failing row without claiming unbuildable, a disabled broken row being ignored, and the empty-file edge.
+
+---
+
+### ADR-3D-088
+
+**One relation, every phrasing: the angle operand becomes a shared atom.** *(2026-07-27; issue #337)*
+
+**Context.** The bagrut wording
+
+> נתון שהזווית שבין הוקטור **BE** לבין הוקטור **BC′** שווה לזווית שבין הוקטור **BE** לבין הוקטור **BA′**
+
+reached no rule and fell to the LLM. Not for want of the relation — the engine has had it since V8-f / [ADR-3D-052](#adr-3d-052): `angle-pair-eq`, M1-routed (it drives a free-dim solid, or verifies a determined one). The gap was **purely the parser surface**.
+
+`angleEquality3`'s operand grammar was the glued VERTEX TRIPLE alone (`∠SAB`). An angle written as *"the angle between X and Y"* — the form the textbook uses whenever the arms are named vectors or segments rather than three consecutive letters — was inexpressible in an equality. `angleSegClaim` accepted the between-form but only with a NUMERIC right-hand side; `equalAnglesGiven` reached the same relation but demanded the construction verb `יוצר`. So the relation had three partial doors and none of them fit the sentence.
+
+This is the docs/17 §2.2 class — *one relation reachable through only one phrasing* — the same class ADR-3D-052 closed for the triple form and did not extend.
+
+**Decision (parser only, no engine change).**
+
+1. **A shared angle-phrase atom.** `parseAnglePhrase3` reads ONE angle phrase into its two arm vectors, accepting either surface form: the vertex triple (`∠SAB` → arms A→S, A→B) or the between-form (`הזווית שבין … לבין …` / `the angle between … and …`). The noun prefix — `הוקטור` / `הישר` / `הקטע` / `vector` / `line` / `segment` — is optional and interchangeable, because it says how the student pictures the operand, not which relation is meant. An operand may equally be a declared vector (`u`).
+2. **`angleEquality3` parses each SIDE with that atom**, so the two forms are the same operand to the rule and may be mixed across the `=`.
+3. **A between-form draws its named segments** (the `angleSegClaim` precedent — the student named them explicitly) and marks a wedge only where the arms share a tail. A vertex triple draws nothing, exactly as before.
+
+**The given-framing prefix.** The corpus sentence opens `נתון ש…`. The shared prefix stripper handled the proof framing (`הוכיחו כי` / `prove that`) but not the given framing — the same class: text that frames a statement without being part of it, and which cannot change what is asserted, since drive-vs-verify is decided by the figure's freedom at apply (M1), never by the wording. So `נתון ש` / `נתון כי` / `given that` joined it, and the function was renamed `stripStatementPrefix` so its name stops under-describing what it does. All 10 call sites inherit it.
+
+**Evidence the widening stole nothing:** the 3-D shadow-matrix snapshot pins the winning rule for every catalog utterance in both languages. After the change, the only diff is the two new entries — **no existing utterance changed which rule claims it**, across all 10 rules that now accept the given framing.
+
+**A regression caught in flight, worth recording.** The first cut of the atom put its triple regex in a plain template literal instead of `String.raw`, so `\s+` collapsed to `s+`. `∠SAB = ∠SAD` still passed (that branch has no `\s`), while `זווית SAB שווה לזווית SAD` silently stopped parsing — a form that had worked for months. The probe caught it because it exercised the must-not-change forms alongside the new ones; the lock now asserts all three spellings explicitly.
+
+Locked by `angle-phrase.test.ts` (11 — both languages of the reported wording, the `נתון ש` framing, noun interchangeability, declared-vector operands, mixed forms, and the unchanged triple / chained-label / numeric-RHS / distinct-point behaviours). 7 of the 11 verified failing against the pre-fix parser; the other 4 are the must-not-change guards. Catalog +1.
