@@ -16,6 +16,7 @@ import { escalate3 } from './parser/llm3';
 import { classifyGuidance3 } from './parser/scope3';
 import Figure3 from './render/Figure3';
 import { deserializeFigure3, figureNameFromFileName3, namedFigureFileName3, serializeFigure3 } from './store/figureFile3';
+import { auditLoad3 } from './store/loadAudit3';
 import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } from './store/store3';
 import { factDisplay3, isVectorFact3 } from './render/notation';
 import { VecMath } from './render/VecMath';
@@ -145,6 +146,7 @@ export default function App3() {
   const [busy, setBusy] = useState(false);
   // #73 (ADR-3D-040): the guidance register's what-to-do-instead note (shown in place of an error)
   const [guidanceNote, setGuidanceNote] = useState<string | null>(null);
+  const [loadNote, setLoadNote] = useState<string | null>(null); // #309: a loaded file that does not rebuild
   const fileInput = useRef<HTMLInputElement>(null);
   const canvasBox = useRef<HTMLDivElement>(null);
   const [canvasW, setCanvasW] = useState(640);
@@ -219,6 +221,17 @@ export default function App3() {
       logDebug3({ kind: 'action', action: 'load', detail: `${r.facts.length} facts` }); // #182: a load replaces the figure — the replay must know
       loadFigure(r.facts, r.seed, r.queries, r.planeDisplay);
       setFigureName(figureNameFromFileName3(f.name)); // the FILENAME names the figure (issue #42)
+      // #309 (ADR-3D-087): deserializing checks the SCHEMA, not the OUTCOME. A file this build cannot
+      // rebuild used to load with lastError cleared and an empty canvas. The load still opens the file
+      // exactly as saved (never destructive) — it just stops claiming the figure is fine when it is not.
+      const audit = auditLoad3(r.facts, r.seed);
+      setLoadNote(
+        audit.failed.length === 0
+          ? null
+          : audit.unbuildable
+            ? t('load.unbuildable', { count: audit.total })
+            : t('load.partial', { count: audit.failed.length, steps: audit.failed.map((x) => x.step).join(', ') }),
+      );
     } else reportLoadError(r.reason);
   };
 
@@ -255,6 +268,7 @@ export default function App3() {
     e.preventDefault();
     if (!text.trim() || busy) return;
     setGuidanceNote(null); // a fresh submit clears the previous guidance
+    setLoadNote(null); // …and the load note, which described the file as opened
     submit(text);
     let err = useGeo3.getState().lastError;
     logDebug3({ kind: 'input', utterance: text, locale: i18n.language, source: 'parser', result: err ? err.code : 'ok', intermediate: err?.code === 'not-understood' });
@@ -367,6 +381,13 @@ export default function App3() {
             ))}
           </div>
 
+          {/* #309 (ADR-3D-087): a file that deserializes cleanly but does not REBUILD must say so —
+              it used to load "successfully" onto a blank canvas. Persists until the next submit. */}
+          {loadNote && !busy && (
+            <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              {loadNote}
+            </div>
+          )}
           {guidanceNote && !lastError && !busy && (
             <div role="note" className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
               {guidanceNote}

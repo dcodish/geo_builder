@@ -1242,3 +1242,25 @@ const COMMAND_TYPES = new Set<Command3['type']>(
 **Not addressed here.** A file whose commands pass this gate but fail to *build* still reports success and renders an empty canvas — a different failure (honest schema, dishonest outcome), tracked as #309; the 2-D answer is the `loadAudit` of [ADR-242](06-decisions.md#adr-242) and 3-D has no equivalent yet.
 
 Locked by `figure-file3.test.ts` — the `inject-pair` round-trip (asserted failing before the fix) plus a gate-still-gates check on an unknown type.
+
+---
+
+### ADR-3D-087
+
+**A load reports the OUTCOME, not just the schema.** *(2026-07-27; issue #309; the 3-D sibling of [ADR-242](06-decisions.md#adr-242))*
+
+**Context.** Opening a `.geo3.json` ran exactly one check: `deserializeFigure3` validated the schema version, the file shape, and that every command type was whitelisted. On success `loadFigure` committed the facts and set `lastError: null`.
+
+Passing that gate means the file is *well-formed*. It says nothing about whether this build can still **rebuild** the figure. A file saved by a newer build — or one holding a construct whose semantics have since changed — deserializes cleanly and then fails at `apply`. The student got a load that reported success and a **blank canvas**.
+
+The failure was never unknown: `derive3` had already recorded it per fact in `status` (the reproduction lands `{code:'bad-solid'}` with `positions.size === 0`). Nothing looked at it. The load was answering a question — *is this file well-formed?* — that the student had not asked, and reporting the answer as though it were the one they had: *did my figure come back?*
+
+**Decision.** Add `src3d/store/loadAudit3.ts` — a pure, read-only `auditLoad3(facts, seed)` that replays the loaded facts and returns the rows that failed, plus an `unbuildable` flag for the case the issue was filed for (nothing drew at all). `App3.onLoadFile` surfaces it as a persistent amber note, distinguishing "some steps are broken" from "this file does not open in this version", and clears it on the next submit.
+
+**The load itself is unchanged.** A file we cannot rebuild is still the student's file, so it still opens exactly as saved and is never refused — consistent with [ADR-3D-005](#adr-3d-005) / [ADR-232](06-decisions.md#adr-232) (a load is non-destructive; one undo restores the prior session). Only the *claim* changed: the tool stops asserting the figure is fine when it is not.
+
+Only ENABLED rows are audited — a deliberately disabled row is not part of the figure, so its failure is not something the load should warn about.
+
+**Relation to the 2-D audit.** `src/store/loadAudit.ts` (ADR-242) audits a different axis of the same honesty problem: its `dropped` / `drift` findings compare the stored lowering against the *current parser*. That check presumes the figure builds at all. This one asks whether it does — they are complementary, and the 3-D app now has the more fundamental half. Pattern copied, not imported (docs/20 §12). The `dropped`/`drift` half remains available to 3-D if a file ever needs it.
+
+Locked by `load-audit3.test.ts`: the unbuildable case (asserting the pre-fix state explicitly — deserialize ok, `lastError` null, zero positions — so the regression is visible in the test itself), a healthy file auditing clean, a partially-broken file naming the 1-based failing row without claiming unbuildable, a disabled broken row being ignored, and the empty-file edge.
