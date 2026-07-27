@@ -5379,3 +5379,32 @@ The gate's own doctrine is that accounting must be generous: *"a false account o
 **Why nothing caught it:** the colon-ratio family had no `catalog.ts` entry, so the coverage guard never exercised these utterances — the concrete instance of #140. Two catalog entries were added with the fix, which is what stops the family going dark again.
 
 Locked by `adr-396.test.ts` (16 — every row of both issue tables, plus the byte-identical 3-point and glued-form guards, plus a check that the colon pass stays generous without going blind to a genuinely dropped magnitude) and the end-to-end scenario `collinear-list-of-four-keeps-every-point`, which asserts the four points are actually collinear in the built figure rather than merely present in the lowering. 11 of the 16 verified failing against the pre-fix parser; the other 5 are the unchanged-behaviour guards.
+
+---
+
+### ADR-397
+
+**A configuration is displayable only if the figure satisfies its own commands.** *(2026-07-27; issue #345)*
+
+**Context.** `meetsRequirements(facts, seed)` is the predicate every configuration search consults — `findValidConfig`, `resample`, `firstSatisfyingSeed`, the shared detection sampler ([ADR-231](#adr-231) M3), and the corpus seed-sweep oracle. It answers *"would the app show the student this configuration?"*
+
+It checked the store's `lastError`, the verifier's `violations`, and the geometric requirements: extension directions ([ADR-098](#adr-098)/[ADR-267](#adr-267)), crossings within their segments ([ADR-166](#adr-166)), point distinctness ([ADR-123](#adr-123)), polygon convexity. It never asked whether the figure satisfies **its own committed commands**.
+
+**The finding.** On the two-tangent-circles figure (`common-tangent-two-circles`), one fact list replayed across seeds:
+
+| seed | \|O2M\| | step status | `meetsRequirements` |
+| --- | --- | --- | --- |
+| 0, 1 | 16.000 | ok | true |
+| 2, 3 | 2.907 / 1.250 | `over-constrained: \|O2M\| = 16 cannot hold` | **true** |
+
+Nothing about the parse or the commands differs between seeds — only the sampled configuration the solver descends from. Yet all four were judged displayable, so **"show another configuration" could walk a student into a view where a stated given silently did not apply.** That is the cardinal sin this project defines for itself ([ADR-052](#adr-052)): a drawing that contradicts the givens.
+
+**The class.** This is the cross-seed escape family (ADR-085/098/127/166) one level up. Each of those added a *geometric requirement* the sampler had forgotten. Here nothing was forgotten at that level — the predicate simply never consulted the step statuses, which is where "this given did not hold" is actually recorded. The engine knew; the predicate did not ask. (Compare the same shape in [ADR-3D-087](06b-decisions-3d.md#adr-3d-087): a load that validated the schema and never asked whether the figure rebuilt.)
+
+**Decision.** `meetsRequirements` additionally requires every ENABLED fact to have status `'ok'`. A disabled fact is not part of the figure, so it is exempt by definition; the status vocabulary is `'ok'` / `'disabled'` / an error string, so the test needs no new machinery.
+
+**Consequences.** Measured, not assumed: the full suite is green at the same counts with zero scenario changes, and suite wall-clock is unchanged (568 s vs 564 s). A search can now return `null` where it previously returned a flawed configuration — the caller then keeps the current figure flagged amber, which is the honest outcome. `common-tangent-two-circles` was removed from `SEED_SWEEP_HEAVY`: it had been parked there with a comment recording that it FAILED at seed 2, i.e. the gap was documented but never tested; it now sweeps clean (the bad seeds are skipped as non-displayable, exactly the intended semantics) at ~29 s.
+
+**Deliberately NOT fixed here.** *Why* the solver cannot drive r2 to 16 from a small sampled start — seeds 0–1 reach it, 2–3 park near the seed value — is a solver-basin question, untouched by this change. This ADR stops a wrong figure being **shown**; it does not make seed 2 **solvable**. Filed separately so the two are not conflated.
+
+Locked by `displayable-config.test.ts` (the invariant `displayable ⇒ every committed step ok`, asserted per seed on the reported figure, plus a healthy-figure no-regression case and the disabled-row exemption) and by the now-swept `common-tangent-two-circles` scenario. Verified failing against the pre-fix predicate.

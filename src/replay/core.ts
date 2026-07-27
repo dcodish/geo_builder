@@ -1211,6 +1211,14 @@ export function meetsRequirements(facts: Fact[], seed = 0, relaxExtensions = fal
   const fig = replay(facts, seed);
   return (
     fig.lastError === null &&
+    // #345 (ADR-397): a configuration in which a COMMITTED step did not hold is not displayable.
+    // This predicate judged the geometry (orders, sides, convexity) and the verifier's violations, but
+    // never asked the most basic question — does the figure satisfy its own commands? So a seed where a
+    // stated given settled `over-constrained` was still offered to the student by "show another
+    // configuration", with the given silently not applying. The cross-seed escape class
+    // (ADR-085/098/127/166), one level up: not a requirement the sampler forgot, but the step statuses
+    // themselves. A disabled fact is not part of the figure, so it is exempt by definition.
+    facts.every((f) => !f.enabled || fig.status[f.id] === 'ok') &&
     fig.violations.length === 0 &&
     // relaxExtensions: the ADR-142 acceptance bar for a config `firstSatisfyingSeed` returned as its
     // shared-endpoint FALLBACK — the letter-order side is unachievable, so either extension counts

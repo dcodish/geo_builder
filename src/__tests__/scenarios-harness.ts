@@ -217,11 +217,6 @@ export const SEED_SWEEP_HEAVY = new Set<string>([
   'area-ratio-converges-points-allowed', 'driven-extension-point-stays-beyond', 'q4-constraints-order-independent',
   'collinear-flexes-redundant-carrier-kite-tangents', 'diameter-from-point-cuts-side-onto-segment',
   'alpha-less-than-beta-reshapes', 'kite-tangents-redundant-equality-not-over-constrained',
-  // Was skipped DYNAMICALLY by the pre-ADR-394 `replay(facts, 0)` timing guard (a ~29 s sweep), so it has
-  // never actually been swept. Listing it keeps that same behaviour explicit rather than accidental. The
-  // deep pass (SEED_SWEEP_MULT) does sweep it, and there it FAILS at seed 2 with
-  // `over-constrained: |O2M| = 16 cannot hold` — a genuine pre-existing cross-seed defect, filed as #345.
-  'common-tangent-two-circles',
 ]);
 
 /**
