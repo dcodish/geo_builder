@@ -11,7 +11,7 @@
  * never occlude (docs/20 §11).
  */
 
-import { hasAbsoluteFrameObject, intersectPlanes, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
+import { hasAbsoluteFrameObject, intersectPlanes, pinningGivens, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
 import type { Construction3, Id, Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
@@ -446,15 +446,28 @@ export function buildScene3(
     wAngles.push({ pts, label, text: mk.label ?? '' });
   }
 
+  // #371: a number on the canvas must be seed-invariant KNOWLEDGE ([ADR-3D-030](docs/06b-decisions-3d.md)
+  // Am. 2 — the rule that removed sampled coordinate labels from nodes). A line whose components carry an
+  // UNPINNED parameter is drawn at one sampled value of it, so echoing the resolved numbers shows ONE
+  // configuration's line as if it were the given (measured: the same `l1:x=t(0,m,2m-2)` echoed four
+  // different directions over four seeds). Echo the student's own symbolic form instead. Once a given pins
+  // the parameter the numbers ARE knowledge, so they come back.
+  const paramFree = !!c.param && pinningGivens(c) === 0 && c.paramGivens.length === 0;
   const wLines: { name: string; a: Vec3; b: Vec3; form: string }[] = [];
   for (const [name, ln] of resolved.lines) {
     const mid = projectOntoLine(center, ln);
     const reach = radius * 1.1;
+    const def = c.lines.get(name);
+    const carriesParam =
+      def?.kind === 'parametric' && [...def.anchor, ...def.dir].some((e) => e.p !== 0);
     wLines.push({
       name,
       a: sub3(mid, scale3(ln.dir, reach)),
       b: add3(mid, scale3(ln.dir, reach)),
-      form: `${name}: x = (${fmt(ln.anchor.x)}, ${fmt(ln.anchor.y)}, ${fmt(ln.anchor.z)}) + t·(${fmt(ln.dir.x)}, ${fmt(ln.dir.y)}, ${fmt(ln.dir.z)})`,
+      form:
+        carriesParam && paramFree && def?.kind === 'parametric'
+          ? `${name}: ${def.src}`
+          : `${name}: x = (${fmt(ln.anchor.x)}, ${fmt(ln.anchor.y)}, ${fmt(ln.anchor.z)}) + t·(${fmt(ln.dir.x)}, ${fmt(ln.dir.y)}, ${fmt(ln.dir.z)})`,
     });
   }
 

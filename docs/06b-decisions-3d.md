@@ -1452,3 +1452,22 @@ Only the SHAPE dims are sampled. A and B are bit-identical at every seed.
 **Stability note.** Adding an absolute object now moves the solid once, because the figure genuinely changes character: what was a shape defined up to similarity becomes a shape placed in a frame. Adding facts to a figure with no absolute object still never moves anything (asserted).
 
 Locked by `placement-gauge.test.ts` (7: the operator's exact sequence with every vertex clearing ℓ1 across 24 seeds; the placement varying and A off the origin; the motion being rigid — `|AB|` unchanged; the no-absolute-object figure still frozen at the canonical placement; a pinned figure untouched by the pivot; an equation plane behaving as the same class; the predicate itself).
+
+### ADR-3D-096 — A canvas echo shows the STUDENT's form while the value is sampled (issue #371)
+
+**Class.** *A number derived from a sampled free DOF is displayed as if it were knowledge.* The rule is the operator's own, set in [ADR-3D-030](#adr-3d-030) Am. 2 when `sample`-kind coordinate labels were removed from nodes: **a number on the canvas must be seed-invariant** — one drawing's values are not information the givens contain. The line echo was never swept into it.
+
+**Instance (operator, 2026-07-28).** `l1:x=t(0,m,2m-2)` echoed `ℓ1: x = (0, 0, 0) + t·(0, 0.736, -0.529)` — *"it translated the m to something I'm not sure by what logic"*. The logic was: `m` is unpinned, so it is a sampled free DOF, and the echo printed the line at whatever value this seed drew. Measured over four seeds of one given:
+
+```
+seed 0: t·(0,  0.736, -0.529)     seed 2: t·(0, -1.136, -4.272)
+seed 1: t·(0, -2.091, -6.182)     seed 4: t·(0, -1.338, -4.676)
+```
+
+**Root cause.** `scene3` built the echo from the RESOLVED numeric line. The student's own form was already on the definition as `src` (it is even written to the save file) and simply unused.
+
+**Fix.** A line whose anchor/direction components carry the parameter (`p !== 0`) echoes `src` while the parameter is unpinned; with no parameter, or once a given pins it, the resolved numbers return — they are knowledge then. The 2024-Q2 figure is the lock on both sides: symbolic while `m` is open, `t·(-6, 10, -2)` once `ℓ ⟂ π` pins m = −5.
+
+**Known residual (recorded, not fixed).** The predicate asks whether a *pinning given exists*, not whether the parameter is thereby *determined*. A degenerate given — `ℓ: x=(1,2,3)+t(m,m,m)` ⟂ a plane with normal (1,1,1), satisfied for every m — makes the root-finder return an arbitrary value that still varies by seed (−25 vs −24.92), and the echo would print it. The deeper predicate is "is this value seed-invariant", which needs the sampled set the renderer does not have; the honest general answer belongs with the under-determined-root problem, not here.
+
+Locked by `parametric-echo.test.ts` (3).
