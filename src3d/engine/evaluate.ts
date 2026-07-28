@@ -611,6 +611,9 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     // #324: a coordinate-plane relation consumes DOF like pins (its residual count)
     for (const cp of c.coordPlanePins)
       pinCount += cp.mode === 'share' ? cp.ids.length - 1 : cp.mode === 'zero' ? cp.ids.length : cp.mode === 'perp' ? 1 : 2;
+    // #375: aligning a figure-derived plane with an absolute direction removes TWO rotational DOFs
+    // (the spin about that direction stays free)
+    pinCount += 2 * c.planeLinePerps.length;
     // #292: report SHAPE DOF — subtract the free (unpinned) gauge so a similarity-invariant drive
     // (⊥/angle/ratio) lowers the cue rather than adding +7; scalarPins are those shape-reducing drives.
     return Math.max(0, dims - Math.max(0, pinCount - 7) - c.scalarPins.length) + freeT + param;
@@ -930,7 +933,8 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   const warm: { x?: number[] } = {}; // the applied solution's vector — the drive's warm start (ADR-3D-033)
   if (
     (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0 ||
-      c.planePins.length > 0 || c.coordPlanePins.length > 0 || drivableMemberships.length > 0) &&
+      c.planePins.length > 0 || c.coordPlanePins.length > 0 || c.planeLinePerps.length > 0 ||
+      drivableMemberships.length > 0) &&
     c.solids.length > 0
   ) {
     const dims0 = c.solids.flatMap((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed, solid.oblique));
@@ -999,14 +1003,14 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     const hasOtherPins = c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0;
 
     // 1) the normal solve — no symbol unknowns, so bit-identical to the pre-V8-c path.
-    if (hasOtherPins) applySolutions(solvePivot(cNoPlanes, EC, dims0, seed));
+    if (hasOtherPins) applySolutions(solvePivot(cNoPlanes, EC, dims0, seed, undefined, undefined, undefined, lines));
 
     // 2) failure-path retry (V8-c): a ⟂/∥-pinned symbol whose point could NOT be placed
     //    (no root-find value exists at the pivot's chosen dims) is COUPLED to a free dim —
     //    re-solve the symbol and the dim JOINTLY (the D3 numeric-only path, no CAS).
     const unplaced = coupledPins.some((p) => !pos.has(c.vecDefs[p.def].unknown));
     if (unplaced && coupledDefs.length > 0 && dims0.length > 0) {
-      const retry = solvePivot(cNoPlanes, EC, dims0, seed, { defs: coupledDefs, pins: coupledPins });
+      const retry = solvePivot(cNoPlanes, EC, dims0, seed, { defs: coupledDefs, pins: coupledPins }, undefined, undefined, lines);
       if (retry.length > 0) applySolutions(retry);
     }
 
@@ -1024,7 +1028,29 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
         });
       });
       if (!hasOtherPins || unmet) {
-        const retry = solvePivot(c, EC, dims0, seed);
+        const retry = solvePivot(c, EC, dims0, seed, undefined, undefined, undefined, lines);
+        if (retry.length > 0) applySolutions(retry);
+        else if (!hasOtherPins) pivot = { solutions: 0, chosen: -1, err: Infinity };
+      }
+    }
+
+    // 3b) #375: the plane⟂LINE drive — the same failure-path shape as (3), for the same reason. The
+    //     plane rides the figure and the line does not, so the relation is satisfied by ROTATING the
+    //     figure; nothing else here can do that. It runs when no other pin places the figure (this
+    //     relation is then the only thing orienting it) or when the pinned solve leaves it unmet. If
+    //     the joint solve finds nothing, the prior figure stands and the recorded claim refuses
+    //     honestly (`claim-refuted`) rather than a silently wrong drawing.
+    if (c.planeLinePerps.length > 0) {
+      const unmet = c.planeLinePerps.some((pin) => {
+        const ring = pin.ids.map((id) => pos.get(id));
+        const ln = lines.get(pin.line);
+        if (ring.some((p) => !p) || !ln) return true;
+        const n = newellNormal(ring as Vec3[]);
+        const den = norm3(n) * norm3(ln.dir);
+        return den < 1e-12 || norm3(cross3(n, ln.dir)) / den > 1e-4;
+      });
+      if (!hasOtherPins || unmet) {
+        const retry = solvePivot(c, EC, dims0, seed, undefined, undefined, undefined, lines);
         if (retry.length > 0) applySolutions(retry);
         else if (!hasOtherPins) pivot = { solutions: 0, chosen: -1, err: Infinity };
       }
@@ -1083,7 +1109,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
           const signsBefore = signsHold();
           // warm-started from the pinned figure's own solution so the drive PERTURBS it
           // (branch choices preserved, minimal movement) instead of re-rolling the basins
-          const retry = solvePivot(c, EC, dims0, seed, undefined, members, warm.x);
+          const retry = solvePivot(c, EC, dims0, seed, undefined, members, warm.x, lines);
           // several basins converge (mirrors, rotations) and not every one satisfies the
           // membership on FINAL positions — validate each candidate and keep the first
           // fully-good one (membership + signs + the param root-find), never seed-modulo
@@ -1120,7 +1146,27 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   // The canonical placement is then an unstated choice, not a gauge — sample it, so the solid sits
   // somewhere different against the line/plane in every configuration instead of asserting the
   // coincidence that the canonical origin happens to produce.
-  if (pivot === null && c.solids.length > 0 && hasAbsoluteFrameObject(c)) {
+  // #375: the same question, one step further. A ⟂-to-a-line relation constrains only which way the
+  // figure FACES — where it sits is still unstated, and the pivot's least-squares has no reason to move
+  // it, so a driven figure settles at the canonical origin and a line through the origin passes through
+  // vertex A again (measured: dist(A, ℓ1) = 0.0000 at every seed). The guard below must therefore run on
+  // the DRIVEN path too, restricted to the part the drive left free.
+  //
+  // BOUNDARY, stated honestly: this fires only when translation is free ENTIRELY — nothing pins where the
+  // figure sits and no absolute POINT exists for a length or angle to couple to. A figure whose position
+  // is partly pinned keeps whatever the solve chose; sampling a subspace of the residual's null space is
+  // the general form and is not built here.
+  const positionPinned =
+    c.pins.length > 0 ||
+    c.planePins.length > 0 ||
+    c.coordPlanePins.length > 0 ||
+    c.memberships.length > 0 ||
+    c.scalarPins.length > 0 ||
+    c.vectorPins.length > 0 ||
+    c.pairPins.length > 0 ||
+    [...c.points.values()].some((d) => d.kind === 'coord' || d.kind === 'coord-sym');
+  const rotationSolved = pivot !== null;
+  if ((pivot === null || !positionPinned) && c.solids.length > 0 && hasAbsoluteFrameObject(c)) {
     const gaugeIds: Id[] = [];
     for (const [id, def] of c.points) {
       if (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane))) gaugeIds.push(id);
@@ -1198,7 +1244,9 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
         const axis = normalize3(v3(k('ax'), k('ay'), k('az') + 0.3));
         const g = {
           t: v3(k('tx') * extent * 1.5, k('ty') * extent * 1.5, k('tz') * extent * 1.5),
-          w: scale3(axis, sample(seed, `placement-${attempt}-angle`, 0, 2 * Math.PI)),
+          // when a drive solved the ORIENTATION, only the translation is still free — re-rotating here
+          // would undo the relation the student stated
+          w: rotationSolved ? v3(0, 0, 0) : scale3(axis, sample(seed, `placement-${attempt}-angle`, 0, 2 * Math.PI)),
           s: 1,
           mirror: false,
         };

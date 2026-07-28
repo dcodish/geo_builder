@@ -104,6 +104,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   },
   { category: 'planesLines', he: 'הזווית בין המישורים π1 ו-π2 היא 45', en: 'the angle between planes π1 and π2 is 45' },
   { category: 'planesLines', he: 'הישר ℓ ניצב למישור π1', en: 'line ℓ is perpendicular to plane π1' },
+  // #375 (ADR-3D-100): the plane written as its POINT RUN — either order, and the noun is not what decides
+  { category: 'planesLines', he: 'מישור ABC אנך לישר ℓ', en: 'plane ABC is perpendicular to line ℓ' },
   { category: 'planesLines', he: 'מ-A מורידים אנך למישור π1 החותך אותו בנקודה B', en: 'from A drop a perpendicular to plane π1, it cuts it at B' },
   { category: 'planesLines', he: 'מ-B מעבירים אנך לישר ℓ החותך אותו בנקודה C', en: 'from B drop a perpendicular to line ℓ, it cuts it at C' },
   { category: 'planesLines', he: 'ℓ ישר החיתוך בין המישורים π1 ו-π2', en: 'ℓ is the intersection line of π1 and π2' },

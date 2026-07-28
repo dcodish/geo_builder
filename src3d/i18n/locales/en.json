@@ -138,6 +138,7 @@
       "rightKite": "right kite",
       "isoTrapezoid": "isosceles trapezoid",
       "cyclicQuad": "cyclic quadrilateral"
-    }
+    },
+    "lineCalledPlane": "Note: {{line}} is a line, not a plane. Read as \"plane {{ids}} is perpendicular to line {{line}}\"."
   }
 }

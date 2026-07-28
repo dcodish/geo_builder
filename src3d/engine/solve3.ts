@@ -208,13 +208,18 @@ export function solvePivot(
   coupled?: { defs: number[]; pins: Construction3['symbolPins'] },
   members?: MemberPin[],
   warmStart?: number[],
+  /** #375: the figure's resolved lines. An absolute line is not a gauge object, so a residual that
+   *  relates it to a figure-derived plane needs it verbatim; passing it in keeps solve3 free of any
+   *  import from evaluate (which imports solve3). */
+  lines?: Map<string, { anchor: Vec3; dir: Vec3 }>,
 ): PivotResult[] {
   const pointPins = c.pins;
   const vecPins = c.vectorPins;
   const memberPins = members ?? [];
   if (
     pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 && c.scalarPins.length === 0 &&
-    c.planePins.length === 0 && memberPins.length === 0 && c.coordPlanePins.length === 0
+    c.planePins.length === 0 && memberPins.length === 0 && c.coordPlanePins.length === 0 &&
+    c.planeLinePerps.length === 0
   )
     return [];
 
@@ -263,6 +268,9 @@ export function solvePivot(
     // #324: a coordinate-plane relation is ABSOLUTE-frame (it must be able to rotate the
     // figure) — never solvable with the gauge frozen
     c.coordPlanePins.length === 0 &&
+    // #375: same reason — one operand is figure-derived and the other is an absolute line, so
+    // satisfying it ROTATES the figure. Frozen to identity, the residual could never reach zero.
+    c.planeLinePerps.length === 0 &&
     // an all-gauge run-carrier membership is similarity-invariant (extent-normalized);
     // a frozen member or a fixed equation plane pins the gauge instead
     memberPins.every((m) => !m.frozen && !m.plane) &&
@@ -364,6 +372,30 @@ export function solvePivot(
         if (pin.mode === 'contains') out.push(dot3(n, ring[0]) / (nn * ext));
       }
     }
+    // #375: a POINT-RUN plane stated ⟂ a named LINE. The plane rides the figure (its normal is
+    // recomputed from the candidate positions) while the line does NOT — it is absolute — so the
+    // residual is what rotates the figure into place. Normalized by both magnitudes: a direction
+    // vector's scale is arbitrary and a shrinking figure must not zero it for free (the
+    // collapse-basin class, ADR-3D-079).
+    for (const pin of c.planeLinePerps) {
+      const pts = pin.ids.map(at);
+      const ln = lines?.get(pin.line);
+      if (pts.some((p) => !p) || !ln) {
+        out.push(10);
+        continue;
+      }
+      const n = newellNormal(pts as Vec3[]);
+      const nn = norm3(n);
+      const dn = norm3(ln.dir);
+      if (nn < 1e-12 || dn < 1e-12) {
+        out.push(10);
+        continue;
+      }
+      // plane ⟂ line ⟺ the plane's normal is PARALLEL to the direction ⟺ their cross vanishes
+      const x = cross3(n, ln.dir);
+      out.push(x.x / (nn * dn), x.y / (nn * dn), x.z / (nn * dn));
+    }
+
     // V8-f: a VecAtom operand → its (gauge-transformed) direction
     const dirOf = (atom: import('./types').VecAtom): Vec3 | null => {
       if (atom.kind === 'named') {
@@ -592,7 +624,7 @@ export function solvePivot(
   // sample, the invariantOnly REG pattern), (b) judged on its PRIMARY residuals so
   // exact solutions are never rejected for carrying the anchor's pull, and (c) filtered:
   // a candidate whose solid has two coincident vertices is not a figure at all.
-  const planeDrive = c.planePins.length > 0 || memberPins.length > 0 || c.coordPlanePins.length > 0;
+  const planeDrive = c.planePins.length > 0 || memberPins.length > 0 || c.coordPlanePins.length > 0 || c.planeLinePerps.length > 0;
   // ...and when NOTHING pins an absolute length (no point/vector/pair injection, no
   // length/dot scalar), placement alone can satisfy the equations — Stage A below.
   const scaleFree =
