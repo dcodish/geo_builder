@@ -224,10 +224,13 @@ the allowlist plumbing (empty allowlist for now). Gate: the doors' figures clear
 locks (`placement-gauge`, `view-legibility`, `plane-line-perp` Am. 1) still green **through the funnel**,
 their per-path guards deleted.
 
-**S1 — atoms + wrappers + TABLE + battery harness** *(the heart; 1–2 sessions)*. Operand tokenizer +
-thunk resolver; the existing ⟂/∥/angle rules become thin wrappers (identical names, identical lowerings);
-RELATION_TABLE seeded with today's `supported` cells; the battery runs over them. Gate: **shadow snapshot
-zero-diff**, full suite green, battery green — externally invisible by design.
+**S1 — atoms + TABLE + battery harness** *(landed 2026-07-28, [ADR-3D-102](06b-decisions-3d.md#adr-3d-102))*.
+Operand tokenizer + thunk resolver; RELATION_TABLE seeded with the measured `supported` cells; the battery
+over them; `planeLinePerp` migrated as the exemplar. **Amendment vs v2:** the remaining rules migrate
+PER-FAMILY in the slice that widens that family's cells (S2/S3/S4) — migrating a rule twice, once for form
+and again for function, is waste, and the zero-diff gate is cleanest kept absolute. Gate met: **shadow
+snapshot zero-byte diff**, full suite green, battery green. First find: #380 (primed labels rejected by the
+seg↔plane family).
 
 **S2 — the named-line column** *(the reported item first)*. Point-on-ℓ phrasings → the existing `on-line`
 command; ∥/⟂/angle for ℓ operands via the classifier (gauge×absolute → pivot residual; absolute×absolute
