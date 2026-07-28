@@ -86,6 +86,13 @@ const RULES: ScopeRule[] = [
     patterns: [
       /אופקית?|אנכית?(?![א-ת])|בסיס\s+למטה|למעלה|למטה|ה?עליו(?:ן|נה)|ה?תחתו(?:ן|נה)|מימין\s+ל|משמאל\s+ל|תזיז|הזז|סובב|תסובב/,
       /\bhorizontal\b|\bvertical\b|\bupper\b|\blower\b|\bleftmost\b|\brightmost\b|\brotate\b|\bmove\s+(?:the|it)\b/i,
+      // #352: naming a side THE BASE — «BC בסיס» / «הבסיס הוא BC» / "BC is the base". Which side reads as
+      // the base is layout, not geometry (ADR-052), and the Rotate & align tool is what actually does it —
+      // the message names it. Kept to the BARE statement (a pair + the base noun and nothing else) so a real
+      // construction that merely mentions a base is never brushed off; `בסיסים` (a trapezoid's two parallel
+      // bases, a genuine geometric reference — #185) is excluded by the negative lookahead.
+      /^\s*(?:ה?בסיס(?!ים|י)\s+(?:הוא\s+)?[A-Z]\d*[A-Z]\d*|[A-Z]\d*[A-Z]\d*\s+(?:הוא\s+)?ה?בסיס(?!ים|י))\s*\.?\s*$/,
+      /^\s*(?:the\s+base\s+is\s+[A-Z]\d*[A-Z]\d*|[A-Z]\d*[A-Z]\d*\s+is\s+the\s+base)\s*\.?\s*$/i,
     ],
   },
   {

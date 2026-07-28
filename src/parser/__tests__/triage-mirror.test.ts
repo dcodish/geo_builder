@@ -43,6 +43,17 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
     expect(setLiteral(triageSrc, 'PRE_LLM')).toEqual(setLiteral(pipeSrc, 'PRE_LLM'));
   });
 
+  it('#353 — the PREDICATE-based pre-LLM short-circuits are mirrored too (not just the PRE_LLM set)', () => {
+    // A guided family whose trigger is a PREDICATE rather than a `scope` category is invisible to the
+    // set-literal check above, so each one needs its own mirror assertion — otherwise the App answers the
+    // input on purpose while the harness keeps reporting it as a LIVE grammar gap (the ADR-346 drift, 4th
+    // instance). Both sides must call the same predicate.
+    for (const p of ['looksLikeLatex', 'wordRootMagnitude']) {
+      expect(pipeSrc, `submitPipeline.ts no longer calls ${p} — update this guard + the harness`).toContain(`${p}(`);
+      expect(triageSrc, `triage.mjs must mirror the submit pipeline's ${p} short-circuit (ADR-346)`).toContain(`${p}(`);
+    }
+  });
+
   it('every honesty gate the App submit path calls is also called by the harness', () => {
     // A gate the harness skips = a partial parse the App would escalate but the harness reports as
     // `built` — i.e. a real gap silently marked "already fixed". The inverse of the #35 defect, and
@@ -143,6 +154,11 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
     const s3 = triageSrc.slice(triageSrc.indexOf('function session3d'));
     expect(s3, 'session3d must consult the guidance register on a failed parse (#243)').toContain('classifyGuidance3(');
     expect(s3, "a guidance match must land in the 'guided' bucket, never 'not-handled'").toContain("now: 'guided'");
+    // #353: App3 also short-circuits on the lowercase-node CONVENTION nudge, whose trigger is a PREDICATE
+    // (not a scope category) and so is invisible to a register check — session3d must call it too, or those
+    // utterances keep being reported as LIVE gaps while the App answers them on purpose.
+    expect(app3Src, 'App3 must consult the lowercase-label nudge before the LLM (#353)').toContain('upperCasedLabelCandidate3(');
+    expect(s3, 'session3d must mirror the lowercase-label nudge (#353, ADR-346)').toContain('upperCasedLabelCandidate3(');
   });
 
   it('all-time counts survive the incremental split (the ranking rule the operator kept)', () => {

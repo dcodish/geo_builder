@@ -211,6 +211,14 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     ui.setBusy(false);
     return;
   }
+  // #354: a containment whose CONTAINER was not named, on a figure with 2+ circles — which one contains it
+  // is the student's to say (ADR-052), so ask instead of escalating to an LLM that could only guess.
+  if (!r.ok && r.reason === 'ambiguous-container') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `ambiguous-container:${r.centers.join(',')}` });
+    ui.setInputNote(t('input.ambiguousContainer', { circles: r.centers.join(', ') }));
+    ui.setBusy(false);
+    return;
+  }
   // Every common tangent of the requested kind is already drawn (#197 Am. 3) — a further one does not
   // exist; say so plainly instead of escalating or grinding an impossible solve.
   if (!r.ok && r.reason === 'tangents-exhausted') {
