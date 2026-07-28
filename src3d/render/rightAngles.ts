@@ -182,6 +182,22 @@ export function rightAngles3(c: Construction3, resolved: Resolved3, scale: numbe
     if (sp.rel === 'seg-perp') segPairs.push({ a: sp.a, b: sp.b, c: sp.c, d: sp.d });
     else if (sp.rel === 'perp') addPlaneRun(sp.a, sp.b, sp.plane);
   }
+  // A NAMED LINE stated ⟂ a NAMED PLANE (`הישר ℓ ניצב למישור π`) asserts a right angle exactly like
+  // the segment forms above — it was simply a record kind this sweep never read, so the one given
+  // whose whole content IS a right angle drew no knee. Its arms come from the resolved geometry
+  // rather than point ids: the line's direction, and an in-plane direction at the crossing.
+  for (const lp of c.linePerps) {
+    const ln = resolved.lines.get(lp.line);
+    const pl = resolved.planes.get(lp.plane);
+    if (!ln || !pl) continue;
+    const denom = dot3(pl.n, ln.dir);
+    if (Math.abs(denom) < EPS) continue; // parallel — no crossing to mark
+    const t = -(dot3(pl.n, ln.anchor) + pl.d) / denom;
+    const vertex = add3(ln.anchor, scale3(ln.dir, t));
+    const u1 = normalize3(ln.dir);
+    const u2 = inPlaneDir(pl, vertex, pos);
+    if (u2) out.push({ vertex, u1, u2 });
+  }
 
   // --- (2) CONSTRUCTED perpendicularity: EVERY foot kind, not a whitelist of two -----
   for (const [id, def] of c.points) {

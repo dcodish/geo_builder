@@ -339,6 +339,15 @@ export function buildScene3(
       const p = positions.get(id);
       if (p) grow(projectOntoPlane(p, pl));
     }
+    // Where a drawn LINE crosses this plane is a point ON the plane, and it is the one place the
+    // student reads a line↔plane relation. A patch that stops short of it draws `ℓ ⟂ π` as a line
+    // and a rectangle that never meet — the same visual contradiction as an on-plane point drawn
+    // outside the patch (the rule this sweep already states), one member short.
+    for (const ln of resolved.lines.values()) {
+      const denom = dot3(pl.n, ln.dir);
+      if (Math.abs(denom) < 1e-9) continue; // parallel to the plane — no crossing
+      grow(add3(ln.anchor, scale3(ln.dir, -(dot3(pl.n, ln.anchor) + pl.d) / denom)));
+    }
     patchExtent.set(name, ext);
     const at = (u: number, v: number) => add3(fr.center, add3(scale3(fr.e1, u), scale3(fr.e2, v)));
     wPlanes.push({ name, corners: [at(ext.u1, ext.v1), at(ext.u2, ext.v1), at(ext.u2, ext.v2), at(ext.u1, ext.v2)] });

@@ -1471,3 +1471,19 @@ seed 1: t·(0, -2.091, -6.182)     seed 4: t·(0, -1.338, -4.676)
 **Known residual (recorded, not fixed).** The predicate asks whether a *pinning given exists*, not whether the parameter is thereby *determined*. A degenerate given — `ℓ: x=(1,2,3)+t(m,m,m)` ⟂ a plane with normal (1,1,1), satisfied for every m — makes the root-finder return an arbitrary value that still varies by seed (−25 vs −24.92), and the echo would print it. The deeper predicate is "is this value seed-invariant", which needs the sampled set the renderer does not have; the honest general answer belongs with the under-determined-root problem, not here.
 
 Locked by `parametric-echo.test.ts` (3).
+
+### ADR-3D-097 — A line ⟂ a plane must be DRAWN as perpendicular: the knee and the patch's reach (issue #373)
+
+**Class.** *A rule is stated correctly and applied to an enumeration that is one member short.* Both halves of this report are that shape, and both mechanisms already existed — only their input lists were incomplete. The third instance today, after [ADR-3D-095](#adr-3d-095) (the absolute-frame enumeration) and its renderer twin.
+
+**Instance (operator, 2026-07-28).** On the 2024-Q2 figure, after `הישר ℓ ניצב למישור π` pins m = −5, the canvas showed a small plane patch off to one side, the line passing nowhere near it, and no right-angle mark: *"when we say a line is perpendicular, we should increase the plane or move it so it shows they are perpendicular and include a knee"*. A given whose entire content is "these meet at a right angle" was drawn as a line and a rectangle that never meet.
+
+**Root cause A — no knee.** `rightAngles3` ([ADR-3D-093](#adr-3d-093), "every right angle the figure asserts") sweeps `scalarPins`, `claims`, `paramGivens`, `symbolPins` and all four foot kinds, but never `c.linePerps` — the record a named LINE ⟂ a named PLANE lands in. Measured: 0 marks on this figure. Note the irony: ADR-3D-093 exists precisely because the knee's trigger was an enumeration, and it replaced a whitelist of point KINDS with a sweep over recorded assertions — which was itself still an enumeration, and this record kind was outside it.
+
+**Root cause B — the patch stops short.** The patch-growth sweep states the right rule in its own comment — *a patch must COVER every figure point that lies ON its plane, because a point drawn outside it visually contradicts the given* — and grows for on-plane points and for a side-stated point's ⟂ projection. Where a drawn LINE crosses the plane is equally a point on the plane, and is the one place a line↔plane relation is read; it was not in the sweep.
+
+**Fix.** (A) The sweep reads `c.linePerps`, deriving the wedge from resolved geometry rather than point ids — the crossing as vertex, the line's direction as one arm, `inPlaneDir` as the other (the same second arm every segment-⟂-plane knee uses); a line parallel to the plane has no crossing and draws nothing. (B) The patch grows to include each drawn line's crossing point — general, not ⟂-specific: any drawn line crossing a drawn plane now has its crossing inside the patch.
+
+**Boundaries.** No new construct and no new chokepoint entry; both changes are inside mechanisms that already own the question. The knee still obeys the ADR-3D-093 R³ honesty rule (a mark only where the objects genuinely meet).
+
+Locked by `line-perp-plane-mark.test.ts` (2), **asserted to fail before the fix** (0 knees; the drawn line never entering the drawn patch's screen box) — the knee's vertex verified to lie on both the line and the plane, its arms verified mutually perpendicular with the second lying in the plane.
