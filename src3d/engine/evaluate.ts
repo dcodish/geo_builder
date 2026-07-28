@@ -13,7 +13,7 @@
  */
 
 import { sample } from './rng';
-import { solvePivot, type MemberPin, type PivotResult } from './solve3';
+import { applyGauge, solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { decompose3 } from './vecExpr';
 import { pinSymsOf } from './types';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
@@ -809,6 +809,22 @@ function resolvedPlaneAt(c: Construction3, name: string, pos: Positions3, planes
 /** Kinds the pivot's similarity applies to (gauge-frame points; Lane-A objects are already absolute). */
 const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span', 'vec-defined', 'vec-pair', 'plane-cut', 'foot-face', 'bisector-seg', 'foot-seg', 'right-pyramid-apex', 'right-apex']);
 
+/**
+ * #367: is anything in the figure stated in ABSOLUTE coordinates — a typed parametric line, a plane
+ * given by its equation, a point given by its coordinates? While the answer is NO, the canonical
+ * placement (first vertex at the origin, second along +x) is pure gauge and freezing it costs
+ * nothing. The moment the answer is YES, that placement stops being a gauge and becomes a real,
+ * UNSTATED degree of freedom: where the solid sits relative to the absolute object is something the
+ * student never said, so it must be sampled (ADR-052 / M4), not frozen at a value that happens to
+ * put the canonical origin exactly on a line through the origin.
+ */
+export function hasAbsoluteFrameObject(c: Construction3): boolean {
+  if (c.planes.size > 0 || c.pins.length > 0) return true;
+  for (const def of c.lines.values()) if (def.kind === 'parametric') return true;
+  for (const def of c.points.values()) if (def.kind === 'coord' || def.kind === 'coord-sym') return true;
+  return false;
+}
+
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */
 export function resolve3(c: Construction3, seed: number): Resolved3 {
   const pos: Positions3 = new Map<Id, Vec3>();
@@ -1096,6 +1112,76 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
           }
         }
       }
+    }
+  }
+
+  // ---- #367: nothing pinned the placement, but the figure DOES carry an absolute-frame object.
+  // The canonical placement is then an unstated choice, not a gauge — sample it, so the solid sits
+  // somewhere different against the line/plane in every configuration instead of asserting the
+  // coincidence that the canonical origin happens to produce.
+  if (pivot === null && c.solids.length > 0 && hasAbsoluteFrameObject(c)) {
+    const gaugeIds: Id[] = [];
+    for (const [id, def] of c.points) {
+      if (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane))) gaugeIds.push(id);
+    }
+    if (gaugeIds.length > 0) {
+      const pts = gaugeIds.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
+      const mid = pts.length ? centroid3(pts) : v3(0, 0, 0);
+      let extent = 1;
+      for (const p of pts) extent = Math.max(extent, dist3(p, mid));
+
+      // The absolute objects the placement must stay CLEAR of. Sampling alone is not enough: a
+      // seed that lands a vertex a hundredth of an edge from the line draws exactly the coincidence
+      // this fix exists to remove (measured: seed 26 of the reported figure cleared by 0.066).
+      // General position is the 2-D ADR-253 rule, placement edition.
+      const clearance = (): number => {
+        let worst = Infinity;
+        for (const id of gaugeIds) {
+          const p = pos.get(id);
+          if (!p) continue;
+          for (const L of lines.values()) {
+            const dn = norm3(L.dir);
+            if (dn < 1e-9) continue;
+            const ap = sub3(p, L.anchor);
+            worst = Math.min(worst, norm3(sub3(ap, scale3(L.dir, dot3(ap, L.dir) / (dn * dn)))));
+          }
+          for (const pl of planes.values()) {
+            const nn = norm3(pl.n);
+            if (nn > 1e-9) worst = Math.min(worst, Math.abs(dot3(pl.n, p) + pl.d) / nn);
+          }
+          for (const [id2, def2] of c.points) {
+            if (def2.kind !== 'coord' && def2.kind !== 'coord-sym') continue;
+            const q = pos.get(id2);
+            if (q) worst = Math.min(worst, dist3(p, q));
+          }
+        }
+        return worst;
+      };
+
+      const canonical = new Map(gaugeIds.map((id) => [id, pos.get(id)!] as const));
+      const place = (g: Parameters<typeof applyGauge>[1]): void => {
+        for (const id of gaugeIds) {
+          const p = canonical.get(id);
+          if (p) pos.set(id, applyGauge(p, g));
+        }
+      };
+      const MARGIN = 0.25 * extent;
+      let best: { g: Parameters<typeof applyGauge>[1]; clear: number } | null = null;
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const k = (n: string) => sample(seed, `placement-${attempt}-${n}`, -1, 1);
+        const axis = normalize3(v3(k('ax'), k('ay'), k('az') + 0.3));
+        const g = {
+          t: v3(k('tx') * extent * 1.5, k('ty') * extent * 1.5, k('tz') * extent * 1.5),
+          w: scale3(axis, sample(seed, `placement-${attempt}-angle`, 0, 2 * Math.PI)),
+          s: 1,
+          mirror: false,
+        };
+        place(g);
+        const clear = clearance();
+        if (!best || clear > best.clear) best = { g, clear };
+        if (clear >= MARGIN) break;
+      }
+      if (best) place(best.g);
     }
   }
 

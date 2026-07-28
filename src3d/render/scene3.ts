@@ -11,7 +11,7 @@
  * never occlude (docs/20 §11).
  */
 
-import { intersectPlanes, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
+import { hasAbsoluteFrameObject, intersectPlanes, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
 import type { Construction3, Id, Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
@@ -257,7 +257,12 @@ export function buildScene3(
 ): Scene3 {
   const positions = resolved.positions;
   const frame = cameraFrame(cam);
-  const laneA = c.planes.size > 0 || c.pins.length > 0 || [...c.points.values()].some((d) => d.kind === 'coord');
+  // #367: "is anything in this figure absolute?" is ONE question — it decides both whether the
+  // solid's placement is a gauge (evaluate) and whether the coordinate axes are drawn (here). It
+  // used to be answered by two separate enumerations, and this one omitted a typed parametric
+  // line, so a figure framed by a line drew no axes. One predicate, no drift (the `scalePinned`
+  // precedent, ADR-3D-054).
+  const laneA = hasAbsoluteFrameObject(c);
 
   // ---- world-space auxiliary geometry, computed BEFORE the fit so it's always in frame
   const worldPts = [...positions.values()];
