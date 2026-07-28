@@ -555,13 +555,8 @@ export function buildScene3(
   // `∠ABC = 90`, `CA' ⊥ plane BC'D`) as well as constructed (every foot kind). The wedges come
   // from the shared collector; the legs are built in WORLD space along the two arm directions and
   // projected below, so the knee lies in the plane of the arms and foreshortens with the orbit.
-  const wMarks: Vec3[][] = [];
-  for (const m of rightAngles3(c, resolved, radius)) {
-    const s = radius * 0.07;
-    const l1 = scale3(m.u1, s);
-    const l2 = scale3(m.u2, s);
-    wMarks.push([add3(m.vertex, l1), add3(m.vertex, add3(l1, l2)), add3(m.vertex, l2)]);
-  }
+  // Their SIZE, however, is a screen quantity — see below, after the fit.
+  const wedges = rightAngles3(c, resolved, radius);
 
   // ---- projection + isotropic fit (over the points AND the auxiliary geometry)
   const projOf = (p: Vec3): { x: number; y: number } => {
@@ -597,6 +592,47 @@ export function buildScene3(
     y: viewport.height / 2 + (p.y - cy) * k,
   });
   const w2s = (p: Vec3) => toScreen(projOf(p));
+
+  // #374: a knee is an ANNOTATION — its size belongs to the screen, not to the world. It used to be
+  // `radius * 0.07`, where `radius` measures the spread of the figure's POINTS; a figure whose content
+  // is a line and a plane has no points at all, so radius fell back to its floor of 1.5 while the
+  // drawing spanned ~10 units, and the knee came out 2.11 px × 0.38 px — emitted, correct, invisible.
+  // (The same proxy inflates the knee when a far-flung point stretches `radius` — the other half of the
+  // complaint.) `k` is the fit's world→screen scale, so `KNEE_PX / k` is the world length that draws at
+  // a fixed pixel size; legs still run along the world arm directions, so an arm pointing away from the
+  // camera still foreshortens and the knee stays three-dimensional. Marks take no part in computing `k`
+  // (they are not in `extras`), so reading it here is not circular.
+  const KNEE_PX = 13;
+  /** Projected length of a unit world direction — how much of an arm survives the foreshortening. */
+  const projLen = (u: Vec3): number => {
+    const o = projOf(v3(0, 0, 0));
+    const p = projOf(u);
+    return Math.hypot(p.x - o.x, p.y - o.y);
+  };
+  const wMarks: Vec3[][] = wedges.map((m) => {
+    const s = KNEE_PX / k;
+    // A ⟂-to-plane knee's second arm is ARBITRARY — every direction in the plane witnesses the same
+    // assertion — so pick the one that reads best from this camera instead of the first that came to
+    // hand. Without this the operator's figure drew a 12.8 px leg against a 2.3 px one: correct, and
+    // unreadable. A wedge whose both arms are real objects carries no `planeN` and is never rotated.
+    let u2 = m.u2;
+    if (m.planeN) {
+      const { e1, e2 } = planeBasis(m.planeN);
+      let best = projLen(u2);
+      for (let i = 0; i < 24; i++) {
+        const th = (i * Math.PI) / 24;
+        const cand = normalize3(add3(scale3(e1, Math.cos(th)), scale3(e2, Math.sin(th))));
+        const len = projLen(cand);
+        if (len > best) {
+          best = len;
+          u2 = cand;
+        }
+      }
+    }
+    const l1 = scale3(m.u1, s);
+    const l2 = scale3(u2, s);
+    return [add3(m.vertex, l1), add3(m.vertex, add3(l1, l2)), add3(m.vertex, l2)];
+  });
 
   const screen = new Map<Id, { x: number; y: number }>();
   for (const [id, p] of proj) screen.set(id, toScreen(p));

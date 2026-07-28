@@ -1487,3 +1487,19 @@ Locked by `parametric-echo.test.ts` (3).
 **Boundaries.** No new construct and no new chokepoint entry; both changes are inside mechanisms that already own the question. The knee still obeys the ADR-3D-093 R³ honesty rule (a mark only where the objects genuinely meet).
 
 Locked by `line-perp-plane-mark.test.ts` (2), **asserted to fail before the fix** (0 knees; the drawn line never entering the drawn patch's screen box) — the knee's vertex verified to lie on both the line and the plane, its arms verified mutually perpendicular with the second lying in the plane.
+
+### ADR-3D-098 — A knee is an ANNOTATION: its size is a screen quantity, not a world one (issue #374)
+
+**Class.** *A screen quantity is derived from a world-space proxy.* A knee is an annotation — the same family as a label, a tick or an arrowhead — and annotations are sized in the drawing, not in the model. Sizing one by a world length only works while that length happens to track the drawing's on-screen extent, and nothing enforces that.
+
+**Instance (operator, 2026-07-28, saved figure `test3`).** A line, a plane, `הישר ℓ ניצב למישור π` — and *"there is no knee"*. There was one, at exactly the right place (the crossing `(2, 0, -10)`, the exam's own point A), drawn **2.11 px × 0.38 px**.
+
+**Root cause.** The legs were `radius * 0.07`, and `radius` is the spread of the figure's **points**. This figure has *no points at all* — its entire content is a line and a plane — so `radius` sat at its floor of 1.5 while the drawing spanned ~10 world units. The proxy fails in both directions: measured pre-fix, the identical annotation drew **30.08 px** on a unit box and **2.11 px** here, a 14× spread. That upper direction is almost certainly the "huge knee" the operator sighted and we dismissed as a one-off (#368) — a far-flung point stretches `radius` and inflates every knee on the figure.
+
+**Fix.** The fit's world→screen scale `k` is computed a few lines below from all the drawn geometry, and marks take no part in computing it (they are deliberately absent from `extras`), so it can be read without circularity. The wedges are still collected before the fit; only their SIZE moves after it, as `KNEE_PX / k` — the world length that draws at a fixed pixel size. Legs still run along the world arm directions, so an arm pointing away from the camera still foreshortens and the knee stays genuinely three-dimensional rather than becoming a screen-space square.
+
+**Honest foreshortening kept.** On this figure the line's own direction projects at 0.179 of unit length — it points nearly at the camera — so its leg draws ~2.3 px against the other's 13 px. That is correct: seen almost end-on, a perpendicularity genuinely is hard to see, and the remedy is the viewpoint (#372), never a distorted mark. Only the *arbitrary* arm is chosen for legibility: a ⟂-to-plane knee's second arm may be any direction in the plane, so it is picked for maximum projected length instead of whatever `inPlaneDir` returned — a guard on the no-points fallback, which takes an arbitrary basis vector. Measured effect here: 0.984 → 1.000, i.e. negligible on this figure; it protects the degenerate case, it is not the fix.
+
+**Also closes** the substance of #369 (marks are excluded from the projection fit): a 13 px annotation cannot escape the 44 px margin, asserted.
+
+Locked by `knee-screen-size.test.ts` (3), **asserted to fail pre-fix** in both directions — 2.11 px on the operator's pointless figure, and 30.08 px on a compact box against the same 10–30 px band.

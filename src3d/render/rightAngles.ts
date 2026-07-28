@@ -36,6 +36,13 @@ export interface RightAngle3 {
   vertex: Vec3;
   u1: Vec3;
   u2: Vec3;
+  /**
+   * For a ⟂-to-PLANE right angle the second arm is genuinely arbitrary — every direction lying in the
+   * plane witnesses the same assertion — so the renderer may rotate it within the plane to whichever
+   * reads best from the current camera. `planeN` is that plane's normal; absent for a wedge whose both
+   * arms are real objects (a segment pair), where the arms must not be touched.
+   */
+  planeN?: Vec3;
 }
 
 /** A perpendicularity between two SEGMENTS, named by their endpoint ids. */
@@ -196,7 +203,7 @@ export function rightAngles3(c: Construction3, resolved: Resolved3, scale: numbe
     const vertex = add3(ln.anchor, scale3(ln.dir, t));
     const u1 = normalize3(ln.dir);
     const u2 = inPlaneDir(pl, vertex, pos);
-    if (u2) out.push({ vertex, u1, u2 });
+    if (u2) out.push({ vertex, u1, u2, planeN: pl.n });
   }
 
   // --- (2) CONSTRUCTED perpendicularity: EVERY foot kind, not a whitelist of two -----
@@ -232,7 +239,7 @@ export function rightAngles3(c: Construction3, resolved: Resolved3, scale: numbe
     if (!vertex) continue;
     const u1 = armDir(sp.a, sp.b, vertex, pos);
     const u2 = inPlaneDir(sp.plane, vertex, pos);
-    if (u1 && u2) out.push({ vertex, u1, u2 });
+    if (u1 && u2) out.push({ vertex, u1, u2, planeN: sp.plane.n });
   }
 
   const seen = new Set<string>();
