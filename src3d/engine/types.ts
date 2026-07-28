@@ -26,6 +26,20 @@ export type Id = string;
 // Vector expressions & claims (V1 — the bounded symbolic layer)
 // ---------------------------------------------------------------------------
 
+/**
+ * S1 of the relations program (docs/26 v2 §3.1, #378): the CLOSED operand set every line/plane relation
+ * draws from. A relation names its operands as atoms; the parser classifies text into them
+ * (`parser/operandToken.ts`) and the engine gives them geometry (`engine/operands.ts`) — so a new
+ * operand kind is wired once, never per rule (the ADR-3D-100 class, closed at the mechanism).
+ */
+export type Operand3 =
+  | { kind: 'point'; id: Id }
+  | { kind: 'segment'; a: Id; b: Id }
+  | { kind: 'vector'; name: string }
+  | { kind: 'line'; name: string }
+  | { kind: 'plane-run'; ids: Id[] }
+  | { kind: 'plane-named'; name: string };
+
 export type VecAtom =
   | { kind: 'named'; name: string } // a declared vector, e.g. u
   | { kind: 'pair'; from: Id; to: Id }; // AM ≡ M − A

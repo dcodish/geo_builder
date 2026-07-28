@@ -17,6 +17,7 @@
  *    refuse rather than silently drop it.
  */
 
+import { readOperand } from './operandToken';
 import type { Command3, Id, LinExpr, SolidKind, SymComp, SymTerm, VecAtom, VecExpr } from '../engine/types';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 
@@ -1496,32 +1497,21 @@ const planeLinePerp: Rule = (s0) => {
   );
   if (parts.length !== 2) return null;
 
-  const RUN = /^(?:[A-Z]\d*'?){3,4}$/;
-  const read = (raw: string): { run?: string[]; line?: string; noun?: 'plane' | 'line' } | null => {
-    let t = raw.trim();
-    let noun: 'plane' | 'line' | undefined;
-    const nm = t.match(/^(ה?מישור|ה?ישר|the\s+plane|the\s+line|plane|line)\s+/);
-    if (nm) {
-      noun = /מישור|plane/.test(nm[1]) ? 'plane' : 'line';
-      t = t.slice(nm[0].length).trim();
-    }
-    if (LINE_NAME_ONLY.test(t)) return { line: canonicalLine(t), noun };
-    if (RUN.test(t)) return { run: t.match(/[A-Z]\d*'?/g)!, noun };
-    return null;
-  };
-
-  const a = read(parts[0]);
-  const b = read(parts[1]);
+  // S1 (#378): the sides are classified by the shared operand tokenizer — by what each token IS,
+  // never by its noun (the ADR-3D-100 lesson, now a mechanism). This rule owns exactly the
+  // plane-run × line cell; every other operand pair falls through to its own rule unchanged.
+  const a = readOperand(parts[0]);
+  const b = readOperand(parts[1]);
   if (!a || !b) return null;
-  const plane = a.run ? a : b.run ? b : null;
-  const line = a.line ? a : b.line ? b : null;
-  if (!plane?.run || !line?.line) return null;
+  const plane = a.op.kind === 'plane-run' ? a : b.op.kind === 'plane-run' ? b : null;
+  const line = a.op.kind === 'line' ? a : b.op.kind === 'line' ? b : null;
+  if (!plane || plane.op.kind !== 'plane-run' || !line || line.op.kind !== 'line') return null;
 
   return [
     {
       type: 'plane-line-perp',
-      ids: plane.run,
-      line: line.line,
+      ids: plane.op.ids,
+      line: canonicalLine(line.op.name),
       // the student attached a PLANE noun to the line — build it, and say so
       ...(line.noun === 'plane' ? { statedAsPlane: true as const } : {}),
     },
