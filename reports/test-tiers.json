@@ -1,71 +1,75 @@
 {
   "_comment": "MEASURED tier membership (ADR-394). Rewritten by `npm run test:full` only when the set of slow files changes. `npm run test:fast` derives its --exclude list from `slow`.",
   "thresholdMs": 60000,
-  "updatedAt": "2026-07-27",
+  "updatedAt": "2026-07-28",
   "slow": [
     {
       "file": "src/__tests__/scenarios-e2e-5.test.ts",
-      "ms": 214388
-    },
-    {
-      "file": "src3d/__tests__/adr-3d-032.test.ts",
-      "ms": 169195
+      "ms": 213122
     },
     {
       "file": "src3d/__tests__/right-apex.test.ts",
-      "ms": 136831
+      "ms": 176649
+    },
+    {
+      "file": "src3d/__tests__/adr-3d-032.test.ts",
+      "ms": 174227
     },
     {
       "file": "src/engine/__tests__/membership-conversion.test.ts",
-      "ms": 123920
+      "ms": 126008
     },
     {
       "file": "src/theorems/__tests__/b-corpus.test.ts",
-      "ms": 119851
+      "ms": 123234
     },
     {
       "file": "src3d/__tests__/book-coordinate-givens.test.ts",
-      "ms": 100355
+      "ms": 103424
     },
     {
       "file": "src/__tests__/scenarios-e2e-7.test.ts",
-      "ms": 97278
+      "ms": 100986
     },
     {
       "file": "src3d/__tests__/member-drive.test.ts",
-      "ms": 97048
+      "ms": 100016
     },
     {
       "file": "src/engine/__tests__/obligation-preservation.test.ts",
-      "ms": 93974
+      "ms": 98683
     },
     {
       "file": "src/__tests__/scenarios-props-submit-gate.test.ts",
-      "ms": 89195
+      "ms": 91767
     },
     {
       "file": "src/__tests__/scenarios-e2e-1.test.ts",
-      "ms": 86930
+      "ms": 87679
     },
     {
       "file": "src/__tests__/scenarios-e2e-3.test.ts",
-      "ms": 76854
+      "ms": 78017
     },
     {
       "file": "src/__tests__/scenarios-e2e-8.test.ts",
-      "ms": 73275
+      "ms": 74182
     },
     {
       "file": "src/__tests__/scenarios-e2e-4.test.ts",
-      "ms": 70864
+      "ms": 72304
     },
     {
       "file": "src/replay/__tests__/basin-ownership.test.ts",
-      "ms": 67952
+      "ms": 69197
     },
     {
       "file": "src/__tests__/scenarios-e2e-6.test.ts",
-      "ms": 60636
+      "ms": 62191
+    },
+    {
+      "file": "src3d/__tests__/v8c-coupled-symbol.test.ts",
+      "ms": 60027
     }
   ]
 }
