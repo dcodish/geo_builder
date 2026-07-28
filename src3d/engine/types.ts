@@ -72,7 +72,9 @@ export type Claim3 =
   // triage 3-D: the angle between a LINE (a–b) and a PLANE (point-run) — `sin β = |n·u|/(|n||u|)`
   | { type: 'line-plane-angle'; a: Id; b: Id; plane: Id[]; deg: number }
   // #324 (ADR-3D-079): the ring's relation to a coordinate plane/axis (see coordPlanePins)
-  | { type: 'coord-plane-rel'; ids: Id[]; axis: 'x' | 'y' | 'z'; mode: 'share' | 'zero' | 'perp' | 'contains' };
+  | { type: 'coord-plane-rel'; ids: Id[]; axis: 'x' | 'y' | 'z'; mode: 'share' | 'zero' | 'perp' | 'contains' }
+  // #375: a POINT-RUN plane stated ⟂ a named LINE (see planeLinePerps)
+  | { type: 'plane-line-perp'; ids: Id[]; line: string };
 
 /** V7 T2 — a SCALAR given that DRIVES the figure (a residual in the global solve). */
 export type ScalarPin =
@@ -583,6 +585,9 @@ export type Command3 =
   // #324 (ADR-3D-079): a named ring's relation to a COORDINATE plane/axis — lowered to a
   // coordPlanePins entry (drives the free gauge/dims) + a recorded claim (the final arbiter)
   | { type: 'coord-plane-rel'; ids: Id[]; axis: 'x' | 'y' | 'z'; mode: 'share' | 'zero' | 'perp' | 'contains' }
+  // #375: a POINT-RUN plane ⟂ a named LINE — lowered to a planeLinePerps entry (drives the free
+  // gauge rotation) + a recorded claim (the final arbiter, per the ADR-3D-079 shape)
+  | { type: 'plane-line-perp'; ids: Id[]; line: string; statedAsPlane?: true }
   | ParamSignCommand
   | Plane3Command
   | PlaneAngleCommand
@@ -793,6 +798,11 @@ export interface Construction3 {
    *  (lies ON the coordinate plane), `perp` = the ring's normal ⟂ e_axis (⟂ that coordinate
    *  plane / ∥ that axis), `contains` = perp + the ring's plane passes through the origin. */
   coordPlanePins: { ids: Id[]; axis: 'x' | 'y' | 'z'; mode: 'share' | 'zero' | 'perp' | 'contains' }[];
+  /** #375: a POINT-RUN plane stated ⟂ a named LINE («מישור ACD אנך לישר ℓ1»). ABSOLUTE-frame like
+   *  `coordPlanePins`: one operand is figure-derived and the other is not, so satisfying it ROTATES
+   *  the figure — it must never be solved with the gauge frozen. `statedAsPlane` records that the
+   *  student called the line a plane, so the build notice can correct the wording (issue #375, A). */
+  planeLinePerps: { ids: Id[]; line: string; statedAsPlane?: true }[];
 }
 
 export const emptyConstruction3 = (): Construction3 => ({
@@ -827,6 +837,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   paramGivens: [],
   paramSigns: [],
   coordPlanePins: [],
+  planeLinePerps: [],
 });
 
 /** #325 (ADR-3D-079): the distinct OPEN symbols carried by the pins' affine components. */

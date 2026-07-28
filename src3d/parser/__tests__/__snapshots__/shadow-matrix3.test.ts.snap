@@ -739,6 +739,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "plane ABC is perpendicular to line ℓ",
+    "winner": "planeLinePerp",
+  },
+  {
+    "lang": "he",
+    "text": "מישור ABC אנך לישר ℓ",
+    "winner": "planeLinePerp",
+  },
+  {
+    "lang": "en",
     "text": "from A drop a perpendicular to plane π1, it cuts it at B",
     "winner": "dropPerpToPlane",
   },

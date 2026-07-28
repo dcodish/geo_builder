@@ -20,15 +20,23 @@ import type { QuadBase } from './baseShapes';
 import type { Construction3, Id, SolidKind } from './types';
 
 /** A non-error message attached to a successfully built figure. */
-export interface BuildNotice3 {
-  /** A stated base was constrained into the cyclic member of its family so «ישרה» could hold. */
-  kind: 'base-constrained';
-  /** The solid's vertex ids (so the UI can name the solid the way the student did). */
-  ids: Id[];
-  /** The base the student stated, and the shape it became — both i18n keys. */
-  from: QuadBase;
-  to: string;
-}
+export type BuildNotice3 =
+  | {
+      /** A stated base was constrained into the cyclic member of its family so «ישרה» could hold. */
+      kind: 'base-constrained';
+      /** The solid's vertex ids (so the UI can name the solid the way the student did). */
+      ids: Id[];
+      /** The base the student stated, and the shape it became — both i18n keys. */
+      from: QuadBase;
+      to: string;
+    }
+  | {
+      /** #375: the student called a LINE a plane («ACD אנך למישור ℓ1»). The kinds are known, so the
+       *  relation is built — and the wording is corrected here rather than silently ignored. */
+      kind: 'line-called-plane';
+      ids: Id[];
+      line: string;
+    };
 
 /**
  * Every notice the figure currently warrants. Recomputed on each derive — a notice is a property of
@@ -36,6 +44,10 @@ export interface BuildNotice3 {
  */
 export function buildNotices3(c: Construction3): BuildNotice3[] {
   const out: BuildNotice3[] = [];
+  // #375: derived from the pin's own flag, so it survives save/load and undo exactly like every notice
+  for (const pin of c.planeLinePerps) {
+    if (pin.statedAsPlane) out.push({ kind: 'line-called-plane', ids: [...pin.ids], line: pin.line });
+  }
   for (const s of c.solids) {
     const spec = (QUAD_PYRAMIDS as Partial<Record<SolidKind, { base: QuadBase; right: boolean }>>)[s.kind];
     if (!spec?.right) continue;

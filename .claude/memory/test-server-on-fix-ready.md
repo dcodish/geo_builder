@@ -1,24 +1,36 @@
 ---
 name: test-server-on-fix-ready
-description: A fix is not "done" until a dev test server is already running and the operator has the URL plus concrete test cases
-metadata:
+description: Never ask the operator to test anything without first starting the server and giving the URL plus the exact cases to type
+metadata: 
+  node_type: memory
   type: feedback
+  originSessionId: 37aeea55-dbe9-442d-a749-4712c96b6f5a
+  modified: 2026-07-28T05:45:17.539Z
 ---
 
-When reporting a fix as complete or ready, the operator must be able to play it immediately. Before
-saying done: start the dev server (`npm run dev`, background), confirm it is serving, and give them
-**the URL** (http://localhost:5173/ by default — dev serves at the root, not `/geo-builder/`) plus
-**the concrete test cases for that fix**: the exact utterances to type, what to look for, and any
-before/after comparison worth making (prod still runs the previous deploy, so it is a free "before").
+Whenever I put the operator at the keyboard — reporting a fix as done, walking them through PRs waiting
+for play-and-approve, or asking them to confirm anything in the app — they must be able to play it
+immediately. Before saying it: start the dev server (`npm run dev`, background), confirm it is serving,
+and give them **the URL** (http://localhost:5173/ by default — dev serves at the root, not
+`/geo-builder/`; 3-D is `/3d.html` on the same server) plus **the concrete cases**: the exact utterances
+to type, what to look for, and any before/after comparison worth making (prod runs the previous deploy,
+so it is a free "before"). If the code to play lives on a branch, rebase and serve it — never hand them
+a branch name and a list of utterances.
 
-**Why:** they asked for this on 2026-07-27, after a session where a fix was reported green with the
-suite passing and they then had to ask both "how would I test this" and "what server do I use". Tests
-green is my gate, not theirs — a fix they cannot play is not a fix they can accept, and the gap between
-"committed" and "playable" was landing on them every time.
+**Why:** they asked for this on 2026-07-27, after a fix was reported green and they had to ask both
+"how would I test this" and "what server do I use". They restated it more broadly on 2026-07-28 when I
+walked them through four waiting PRs with utterances but no running server: *"we have a rule — you never
+just tell me to test something without telling me where to test (you start a server for me) and what to
+test."* Tests green is my gate, not theirs — anything they cannot play is not something they can accept.
 
-**How to apply:** the `Stop` hook `scripts/ensure-test-server.mjs` enforces it — it reads the message I
-just wrote, and if it announces a finished fix while nothing is listening on 5173–5176 it blocks the turn
-and hands the instruction back. Treat a block as the reminder working, not an obstacle: start the server,
-then reply with URL + cases. It fails open on any error, so it can nag but never wedge a session. The
-whole gate lives in the repo (script + `.claude/settings.json`), so it travels to the other machine.
-Related: [[readiness-gate]], [[commit-means-push]], [[triage-only-during-testing]].
+**How to apply:** the `Stop` hook `scripts/ensure-test-server.mjs` enforces the reporting-a-fix case — it
+reads the message I just wrote, and if it announces a finished fix while nothing is listening on
+5173–5176 it blocks the turn and hands the instruction back. Treat a block as the reminder working, not
+an obstacle. It fails open on any error, so it can nag but never wedge a session. The hook only catches
+the fix-is-done phrasing, so the wider rule (any "go try this") is mine to keep. Also: check the server
+is not STALE — a vite process older than the current HEAD will lie to them (a "crash" once turned out to
+be a server predating the fix). And never rebase or switch branches under a server they are actively using:
+on 2026-07-28 branch surgery mid-session hot-swapped pre-fix modules into their open tab, and they reported
+a working feature as broken. Do the git work first, or restart and tell them to hard-reload. The whole gate lives in the repo (script + `.claude/settings.json`), so
+it travels to the other machine. Related: [[readiness-gate]], [[commit-means-push]],
+[[triage-only-during-testing]].

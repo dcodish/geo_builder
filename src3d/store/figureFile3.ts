@@ -54,7 +54,8 @@ const COMMAND_SAVEABLE: Record<Command3['type'], boolean> = {
   'point-in-span': true,
   claim: true,
   point3: true,
-  'coord-plane-rel': true, // #324 (ADR-3D-079): ring ∥/⟂/on a coordinate plane or axis
+  'coord-plane-rel': true,
+  'plane-line-perp': true, // #324 (ADR-3D-079): ring ∥/⟂/on a coordinate plane or axis
   plane3: true,
   'plane-angle': true,
   'on-planes': true,

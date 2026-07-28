@@ -1475,6 +1475,59 @@ const linePerpPlane: Rule = (s) => {
   return [{ type: 'line-perp-plane', line: canonicalLine(m[1]), plane: canonicalPlane(m[2]) }];
 };
 
+/**
+ * #375: a POINT-RUN plane stated ⟂ a named LINE — «מישור ACD אנך לישר ℓ1», «הישר l1 ניצב למישור ACD»,
+ * and the English mirrors. `linePerpPlane` above covers only a NAMED (equation) plane, so this cell of
+ * the operand matrix — a plane written as its points against a line — was unreachable.
+ *
+ * Rather than enumerate phrasings, the rule SPLITS on the perpendicularity connective and classifies
+ * each side by what it IS: a run of 3–4 labels is the plane, a line name is the line. Order therefore
+ * costs nothing (ADR-3D-088, "one relation, every phrasing"), and neither does the noun — which is what
+ * lets the operator's own «ACD אנך למישור l1» work: they called ℓ1 a plane, but ℓ1 is a line, and the
+ * kinds are known. That slip is recorded as `statedAsPlane` so the build notice can correct the wording
+ * instead of the tool silently pretending it was never made (issue #375, operator ruling A).
+ */
+const planeLinePerp: Rule = (s0) => {
+  const s = stripStatementPrefix(s0).trim();
+  const parts = s.split(
+    // the plural suffix is ־ים, not ־ם: `ניצבים?` would demand the yod and reject the bare `ניצב`
+    // (the ADR-3D-035 morphology trap — a Hebrew keyword gate must admit every form it names)
+    /\s*(?:(?:is|are)\s+)?(?:מאונ[ךכ](?:ים)?|ניצב(?:ים|ות)?|אנך|⊥|perpendicular)\s*(?:ל(?=\S)|to\s+)?\s*/,
+  );
+  if (parts.length !== 2) return null;
+
+  const RUN = /^(?:[A-Z]\d*'?){3,4}$/;
+  const read = (raw: string): { run?: string[]; line?: string; noun?: 'plane' | 'line' } | null => {
+    let t = raw.trim();
+    let noun: 'plane' | 'line' | undefined;
+    const nm = t.match(/^(ה?מישור|ה?ישר|the\s+plane|the\s+line|plane|line)\s+/);
+    if (nm) {
+      noun = /מישור|plane/.test(nm[1]) ? 'plane' : 'line';
+      t = t.slice(nm[0].length).trim();
+    }
+    if (LINE_NAME_ONLY.test(t)) return { line: canonicalLine(t), noun };
+    if (RUN.test(t)) return { run: t.match(/[A-Z]\d*'?/g)!, noun };
+    return null;
+  };
+
+  const a = read(parts[0]);
+  const b = read(parts[1]);
+  if (!a || !b) return null;
+  const plane = a.run ? a : b.run ? b : null;
+  const line = a.line ? a : b.line ? b : null;
+  if (!plane?.run || !line?.line) return null;
+
+  return [
+    {
+      type: 'plane-line-perp',
+      ids: plane.run,
+      line: line.line,
+      // the student attached a PLANE noun to the line — build it, and say so
+      ...(line.noun === 'plane' ? { statedAsPlane: true as const } : {}),
+    },
+  ];
+};
+
 /** `ℓ חותך את π בנקודה A` / `ℓ cuts plane π at A` — the line∩plane point. */
 const lineCutsPlane: Rule = (s) => {
   const m =
@@ -2390,6 +2443,7 @@ export const RULES: Rule[] = [
   mutualPositionClaim,
   rectComplete,
   linePerpPlane,
+  planeLinePerp, // #375: after linePerpPlane (named plane) — this one takes the POINT-RUN plane
   neverParallelClaim,
   lineCutsPlane,
   dropPerpToPlane,

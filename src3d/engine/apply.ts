@@ -161,6 +161,7 @@ function clone(c: Construction3): Construction3 {
     paramGivens: [...c.paramGivens],
     paramSigns: [...c.paramSigns],
     coordPlanePins: [...c.coordPlanePins],
+    planeLinePerps: [...c.planeLinePerps],
   };
 }
 
@@ -285,6 +286,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return missingPoint(c, [...claim.ids1, ...claim.ids2]);
     case 'concyclic':
       return missingPoint(c, claim.ids);
+    case 'plane-line-perp':
+      return missingPoint(c, claim.ids) ?? (c.lines.has(claim.line) ? null : { code: 'unknown-line', id: claim.line });
     case 'vec-eq': {
       const pointErr = missingPoint(c, [...exprPointIds(claim.lhs), ...exprPointIds(claim.rhs)]);
       if (pointErr) return pointErr;
@@ -855,6 +858,20 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const next = clone(c);
       next.coordPlanePins.push({ ids, axis: cmd.axis, mode: cmd.mode });
       next.claims.push({ type: 'coord-plane-rel', ids, axis: cmd.axis, mode: cmd.mode });
+      return { ok: true, next };
+    }
+
+    // #375: «מישור ACD אנך לישר ℓ1» — a POINT-RUN plane ⟂ a named LINE. Both operands must already
+    // exist (M1: this is a statement ABOUT the figure, never a construction), and it lowers to the
+    // ADR-3D-079 pair: a pin that drives the free gauge rotation + a claim that is the final arbiter.
+    case 'plane-line-perp': {
+      const missing = missingPoint(c, cmd.ids);
+      if (missing) return { ok: false, error: missing };
+      if (cmd.ids.length < 3) return { ok: false, error: { code: 'unknown-point', id: cmd.ids[0] ?? '?' } };
+      if (!c.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
+      const next = clone(c);
+      next.planeLinePerps.push({ ids: [...cmd.ids], line: cmd.line, ...(cmd.statedAsPlane ? { statedAsPlane: true as const } : {}) });
+      next.claims.push({ type: 'plane-line-perp', ids: [...cmd.ids], line: cmd.line });
       return { ok: true, next };
     }
 

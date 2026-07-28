@@ -7,10 +7,10 @@
  * 2-D tool's relation detection uses, applied to answers.
  */
 
-import { evaluate3, lineAtParam, planeAtParam } from './evaluate';
+import { lineAtParam, planeAtParam, resolve3, type Resolved3 } from './evaluate';
 import { atomVec, evalExpr } from './vecExpr';
 import { cross3, dot3, newellNormal, norm3, sub3, v3, type Vec3 } from './vec3';
-import type { Claim3, Construction3, Positions3 } from './types';
+import type { Claim3, Construction3 } from './types';
 
 /** Claim tolerance. Closed-form figures verify to ~1e-15; a figure placed by the V4
  *  NUMERIC pivot carries the finite-difference-Jacobian floor (~1e-6 in loosely
@@ -21,7 +21,11 @@ const REL_TOL = 2e-5;
 /** Seeds checked for every claim: the display seed plus fixed offsets (deterministic). */
 export const claimSeeds = (seed: number): number[] => [seed, seed + 1013, seed + 2027, seed + 4057];
 
-function holdsAt(claim: Claim3, c: Construction3, pos: Positions3): boolean {
+function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean {
+  // #375: a claim may reference a resolved LINE, not only positions. `evaluate3` is literally
+  // `resolve3(...).positions`, so taking the whole Resolved3 costs nothing and stops the claim lane
+  // being blind to everything the figure resolves besides its points.
+  const pos = resolved.positions;
   switch (claim.type) {
     case 'vec-eq': {
       const l = evalExpr(claim.lhs, c, pos);
@@ -88,6 +92,22 @@ function holdsAt(claim: Claim3, c: Construction3, pos: Positions3): boolean {
       if (Math.abs(n[claim.axis]) > REL_TOL * nn) return false;
       if (claim.mode === 'contains') return Math.abs(dot3(n, ring[0])) <= REL_TOL * nn * Math.max(extent, 1);
       return true;
+    }
+    case 'plane-line-perp': {
+      // #375: the point-run plane's normal must be PARALLEL to the line's direction (the plane ⟂ the
+      // line). Judged on the FINAL figure, normalized by both magnitudes so neither a shrinking figure
+      // nor an arbitrarily scaled direction vector can zero it for free.
+      const ps = claim.ids.map((id) => pos.get(id));
+      if (ps.length < 3 || ps.some((p) => !p)) return false;
+      const ring = (ps as { x: number; y: number; z: number }[]).map((p) => v3(p.x, p.y, p.z));
+      const n = newellNormal(ring);
+      const nn = norm3(n);
+      if (nn < 1e-12) return false; // the named points do not span a plane
+      const ln = resolved.lines.get(claim.line);
+      if (!ln) return false;
+      const dn = norm3(ln.dir);
+      if (dn < 1e-12) return false;
+      return norm3(cross3(n, ln.dir)) <= REL_TOL * nn * dn;
     }
     case 'plane-eq': {
       const ps = claim.ids.map((id) => pos.get(id));
@@ -237,5 +257,5 @@ function holdsAt(claim: Claim3, c: Construction3, pos: Positions3): boolean {
 
 /** True iff the claim holds in EVERY sampled configuration. */
 export function verifyClaim(claim: Claim3, c: Construction3, seed: number): boolean {
-  return claimSeeds(seed).every((s) => holdsAt(claim, c, evaluate3(c, s)));
+  return claimSeeds(seed).every((s) => holdsAt(claim, c, resolve3(c, s)));
 }
