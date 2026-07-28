@@ -17,7 +17,8 @@ import { solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { decompose3 } from './vecExpr';
 import { pinSymsOf } from './types';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
-import { add3, centroid3, circumcenter3, cross3, dist3, dot3, lerp3, newellNormal, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
+import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
+import { quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -88,6 +89,11 @@ export function solidDims(kind: SolidKind, key: string, seed: number, oblique?: 
     const [lo, hi] = PRISM_HEIGHT[kind]!;
     return [...base, ...(isObliqueSolid(kind, oblique) ? lateralDims(key, seed) : [sample(seed, `${key}-height`, lo, hi)])];
   }
+  // #305 (ADR-3D-090): every quad-base pyramid — its base's dims then its top's — from the ONE
+  // registry. This SUBSUMES the legacy pyramid4/4g/4r/4gr/pyramidPar branches below: the keys and
+  // ranges are identical, so those figures are bit-identical (asserted in quad-pyramid-bases.test.ts).
+  const qpd = quadPyramidDims(kind, key, seed);
+  if (qpd) return qpd;
   if (kind === 'cube') return []; // edge = the similarity gauge
   if (kind === 'box') return [sample(seed, `${key}-depth`, 0.55, 1.7), sample(seed, `${key}-height`, 0.5, 1.4)];
   if (kind === 'pyramid4') return [sample(seed, `${key}-height`, 0.8, 1.6)]; // square base side = gauge
@@ -220,6 +226,16 @@ function solidPositions(kind: SolidKind, dims: number[], origin: Vec3, oblique?:
     return [
       v3(o.x, o.y, o.z), v3(o.x + a, o.y, o.z), v3(o.x + a, o.y + b, o.z), v3(o.x, o.y + b, o.z),
       v3(o.x, o.y, o.z + h), v3(o.x + a, o.y, o.z + h), v3(o.x + a, o.y + b, o.z + h), v3(o.x, o.y + b, o.z + h),
+    ];
+  }
+  // #305 (ADR-3D-090): the whole quad-pyramid family — base ring from the registry, apex either
+  // free or over the base's CIRCUMCENTRE (equal lateral edges). Subsumes the five legacy branches
+  // that follow, which are kept only as documentation of the pre-registry layout.
+  const qpl = quadPyramidLayout(kind, dims);
+  if (qpl) {
+    return [
+      ...qpl.ring.map((p) => v3(o.x + p.x, o.y + p.y, o.z)),
+      v3(o.x + qpl.apex.x, o.y + qpl.apex.y, o.z + qpl.apex.z),
     ];
   }
   if (kind === 'pyramid4') {
@@ -1485,7 +1501,11 @@ function evaluateSolidsAndPoints(
       const bp = def.base.map((q) => pos.get(q)).filter((q): q is Vec3 => q !== undefined);
       const pl = planes.get(def.plane) ?? planeFromPointRun(c, def.plane, pos);
       if (bp.length === def.base.length && bp.length >= 3 && pl) {
-        const centre = bp.length === 3 ? circumcenter3(bp[0], bp[1], bp[2]) : centroid3(bp);
+        // #305 (ADR-3D-090): the circumcentre for EVERY base, not just a triangle. A right pyramid
+        // means equal lateral edges, so the apex's foot is equidistant from every base vertex; the
+        // old quad `centroid3` was only correct where centroid = circumcentre (square/rectangle) and
+        // would have gone live silently the moment an isosceles-trapezoid or right-kite base existed.
+        const centre = ringCircumcentre3(bp);
         const nb = cross3(sub3(bp[1], bp[0]), sub3(bp[2], bp[0]));
         const denom = dot3(pl.n, nb);
         if (centre && Math.abs(denom) > 1e-10 * Math.max(norm3(pl.n) * norm3(nb), 1e-12)) {

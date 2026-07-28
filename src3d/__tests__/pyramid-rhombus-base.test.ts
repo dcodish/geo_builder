@@ -38,9 +38,13 @@ describe('#304 — rhombus-base pyramid builds correctly (parser)', () => {
     'pyramid with a rhombus base ABCDS',
     'פירמידה שבסיסה מעוין', // label-less
   ]) {
-    it(`"${u}" → pyramidPar + equal adjacent sides (a rhombus, not a rectangle)`, () => {
+    // LOCK MOVED DELIBERATELY (#305, ADR-3D-090): the rhombus base is now its OWN registry base
+    // (`pyramidRhomb`), not "a parallelogram kind plus a constraint". The SEMANTIC assertion — a
+    // rhombus is built, never the rectangle default, and the equal-adjacent-sides relation is
+    // present — is unchanged, and the geometry test below still proves four equal sides.
+    it(`"${u}" → a rhombus base + equal adjacent sides (never the rectangle default)`, () => {
       const c = cmds(u);
-      expect(c.some((x) => x.type === 'solid' && x.kind === 'pyramidPar')).toBe(true);
+      expect(c.some((x) => x.type === 'solid' && x.kind === 'pyramidRhomb')).toBe(true);
       expect(c.some((x) => x.type === 'solid' && (x.kind === 'pyramid4gr' || x.kind === 'pyramid4r'))).toBe(false);
       expect(c.some((x) => x.type === 'length-rel' && x.c === 1)).toBe(true);
     });
@@ -60,8 +64,22 @@ describe('#304 — rhombus-base pyramid builds correctly (parser)', () => {
     }
   });
 
-  it('the right+rhombus combination DEFERS (no template) rather than dropping the shape', () => {
-    expect(parse3('פירמידה ישרה שבסיסה מעוין ABCDS').ok).toBe(false); // → escalates, honesty gate guards the LLM output
+  // LOCK INVERTED DELIBERATELY (#305, ADR-3D-090). This assertion recorded a MISSING CAPABILITY,
+  // not a desired behaviour: #304 had to defer right+rhombus because no right-parallelogram-base
+  // template existed. Rightness is a modifier of any base now, and the operator's 2026-07-27 ruling
+  // says a right pyramid over a non-cyclic base is CONSTRAINED into its family's cyclic member
+  // (rhombus → square) with a notice, never refused. The honesty requirement the old test protected
+  // — the stated shape is never silently dropped — is now met by building it, and asserted here.
+  it('right + rhombus BUILDS, constrained to the cyclic member (a square), with a notice', () => {
+    submit('פירמידה ישרה שבסיסה מעוין ABCDS');
+    expect(state().facts.length).toBe(1);
+    const d = derive3(state().facts, 0);
+    expect(d.status[state().facts[0].id]).toBe('ok');
+    // all four lateral edges equal ⇔ the apex sits over the base's circumcentre ⇔ the base is cyclic
+    const apex = d.positions.get('S')!;
+    const lat = ['A', 'B', 'C', 'D'].map((p) => dist3(apex, d.positions.get(p)!));
+    for (const l of lat) expect(l).toBeCloseTo(lat[0], 4);
+    expect(d.notices.some((n) => n.kind === 'base-constrained' && n.from === 'rhombus')).toBe(true);
   });
 });
 

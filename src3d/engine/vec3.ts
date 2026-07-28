@@ -61,3 +61,55 @@ export function newellNormal(pts: Vec3[]): Vec3 {
   }
   return n;
 }
+
+// ---------------------------------------------------------------------------
+// #305 (ADR-3D-090): the circumcentre of a RING — where a right pyramid's apex sits above
+// ---------------------------------------------------------------------------
+
+/**
+ * The least-squares (algebraic) circumcentre of a 2-D ring: solve x²+y² = 2cx·x + 2cy·y + k.
+ *
+ * EXACT for any triangle and for any cyclic ring. For a ring the solver has not yet driven
+ * cyclic it returns the best-fit centre, which keeps a right pyramid's apex continuous (and
+ * so the figure drawable and the residual differentiable) all the way to convergence.
+ * Degenerate (collinear) input falls back to the centroid rather than blowing up.
+ */
+export function ringCircumcentre2(pts: { x: number; y: number }[]): { x: number; y: number } {
+  const n = pts.length;
+  let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, sr = 0, srx = 0, sry = 0;
+  for (const p of pts) {
+    const r = p.x * p.x + p.y * p.y;
+    sx += p.x; sy += p.y; sxx += p.x * p.x; syy += p.y * p.y; sxy += p.x * p.y;
+    sr += r; srx += r * p.x; sry += r * p.y;
+  }
+  const m = [[sxx, sxy, sx], [sxy, syy, sy], [sx, sy, n]];
+  const rhs = [srx, sry, sr];
+  const det3 = (a: number[][]) =>
+    a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) -
+    a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0]) +
+    a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
+  const D = det3(m);
+  const centroid = { x: sx / n, y: sy / n };
+  if (!Number.isFinite(D) || Math.abs(D) < 1e-14) return centroid;
+  const col = (i: number) => m.map((row, r) => row.map((v, cIdx) => (cIdx === i ? rhs[r] : v)));
+  const c = { x: det3(col(0)) / D / 2, y: det3(col(1)) / D / 2 };
+  return Number.isFinite(c.x) && Number.isFinite(c.y) ? c : centroid;
+}
+
+/**
+ * The circumcentre of a COPLANAR 3-D ring — project onto the ring's own plane basis, fit
+ * there, lift back. The n-gon generalization of {@link circumcenter3}: for 3 points the two
+ * agree to machine precision. Null when the ring has no well-defined plane (degenerate).
+ */
+export function ringCircumcentre3(pts: Vec3[]): Vec3 | null {
+  if (pts.length < 3) return null;
+  const o = centroid3(pts);
+  const n = newellNormal(pts);
+  if (norm3(n) < 1e-14) return null; // collinear / degenerate ring — no plane, no centre
+  // an orthonormal in-plane basis (u,v)
+  const seed = Math.abs(n.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
+  const u = normalize3(cross3(n, seed));
+  const v = normalize3(cross3(n, u));
+  const c2 = ringCircumcentre2(pts.map((p) => ({ x: dot3(sub3(p, o), u), y: dot3(sub3(p, o), v) })));
+  return add3(o, add3(scale3(u, c2.x), scale3(v, c2.y)));
+}

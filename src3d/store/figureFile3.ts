@@ -102,7 +102,7 @@ const COMMAND_SAVEABLE: Record<Command3['type'], boolean> = {
   'right-pyramid-point': true,
   'tetra-altitude': true,
   'vec-mag': true,
-  'make-right-prism': true, // #289 (M1): «המנסרה ישרה» — a saved figure reloads
+  'make-right-prism': true, concyclic: true, // #289 (M1): «המנסרה ישרה» — a saved figure reloads
 };
 
 const COMMAND_TYPES = new Set<Command3['type']>(

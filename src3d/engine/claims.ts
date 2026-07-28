@@ -9,7 +9,7 @@
 
 import { evaluate3, lineAtParam, planeAtParam } from './evaluate';
 import { atomVec, evalExpr } from './vecExpr';
-import { cross3, dot3, newellNormal, norm3, sub3, v3 } from './vec3';
+import { cross3, dot3, newellNormal, norm3, sub3, v3, type Vec3 } from './vec3';
 import type { Claim3, Construction3, Positions3 } from './types';
 
 /** Claim tolerance. Closed-form figures verify to ~1e-15; a figure placed by the V4
@@ -163,6 +163,19 @@ function holdsAt(claim: Claim3, c: Construction3, pos: Positions3): boolean {
       if (claim.rel === 'parallel') return parallel;
       if (claim.rel === 'intersect') return !parallel && coplanar;
       return !parallel && !coplanar; // skew (מצטלבים)
+    }
+    case 'concyclic': {
+      // #305 (ADR-3D-090): the ScalarPin's twin — opposite angles supplementary (see solve3).
+      const q = claim.ids.map((id) => pos.get(id));
+      if (q.length !== 4 || q.some((v) => !v)) return false;
+      const [A, B, C, D] = q as Vec3[];
+      const cosAt = (v: Vec3, p1: Vec3, p2: Vec3) => {
+        const u1 = sub3(p1, v);
+        const u2 = sub3(p2, v);
+        const den = Math.max(norm3(u1) * norm3(u2), 1e-12);
+        return dot3(u1, u2) / den;
+      };
+      return Math.abs(cosAt(A, B, D) + cosAt(C, B, D)) <= REL_TOL * 10;
     }
     case 'cos-angle-eq': {
       // V8-f (G6) on a determined figure: cos of the angle between two operands = value

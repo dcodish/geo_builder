@@ -21,6 +21,7 @@
  */
 
 import { create } from 'zustand';
+import { buildNotices3, type BuildNotice3 } from '../engine/notices';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { applyCommand3 } from '../engine/apply';
@@ -47,6 +48,8 @@ export interface Derived3 {
   /** Convenience alias of resolved.positions. */
   positions: Positions3;
   status: Record<string, FactStatus3>;
+  /** #305 (ADR-3D-090): non-error "built, and here is what changed" messages, derived from the figure. */
+  notices: BuildNotice3[];
 }
 
 export type StoreError3 =
@@ -333,7 +336,7 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     }
   }
 
-  return { construction: c, resolved, positions, status };
+  return { construction: c, resolved, positions, status, notices: buildNotices3(c) };
 }
 
 export interface Geo3State {

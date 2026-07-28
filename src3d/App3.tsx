@@ -152,6 +152,7 @@ export default function App3() {
   const [canvasW, setCanvasW] = useState(640);
   const derived = useMemo(() => derive3(facts, seed), [facts, seed]);
   const dof = useMemo(() => freeDofCount3(derived.construction, derived.resolved), [derived]);
+  const notices = derived.notices; // #305 (ADR-3D-090): non-error "here is what changed" messages
 
   // responsive canvas: track the container's width (V5)
   useEffect(() => {
@@ -388,6 +389,14 @@ export default function App3() {
               {loadNote}
             </div>
           )}
+          {/* #305 (ADR-3D-090): a NON-error build notice — the step committed, and the figure was
+              adjusted so the statement could hold («ישרה» over a non-cyclic base). Distinct from the
+              amber error strip: nothing failed, so it reads as information, not a warning. */}
+          {!busy && notices.map((n, i) => (
+            <div key={`notice-${i}`} role="note" className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+              {t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })}
+            </div>
+          ))}
           {guidanceNote && !lastError && !busy && (
             <div role="note" className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
               {guidanceNote}

@@ -39,7 +39,14 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: 'פירמידה ישרה ABCDS שבסיסה ריבוע', en: 'right pyramid ABCDS with a square base' },
   { category: 'solids', he: 'פירמידה ABCDS שבסיסה ריבוע', en: 'pyramid ABCDS with a square base' },
   { category: 'solids', he: 'פירמידה SABCD שבסיסה ריבוע', en: 'pyramid SABCD with a square base' },
-  { category: 'solids', he: 'פירמידה שבסיסה מעוין', en: 'pyramid with a rhombus base' }, // #304: pyramidPar + |AB|=|AD|
+  { category: 'solids', he: 'פירמידה שבסיסה מעוין', en: 'pyramid with a rhombus base' }, // #304: a rhombus base + |AB|=|AD|
+  // #305/#341/#358 (ADR-3D-090): rightness is a MODIFIER of any base — a base that is not cyclic is
+  // constrained into the cyclic member of its own family (with a build notice) instead of refusing.
+  { category: 'solids', he: 'פירמידה שבסיסה דלתון', en: 'pyramid with a kite base' },
+  { category: 'solids', he: 'פירמידה שבסיסה טרפז', en: 'pyramid with a trapezoid base' },
+  { category: 'solids', he: 'פירמידה שבסיסה מרובע', en: 'pyramid with a quadrilateral base' },
+  { category: 'solids', he: 'פירמידה ישרה SABCD שבסיסה מעוין', en: 'right pyramid SABCD with a rhombus base' },
+  { category: 'solids', he: 'פירמידה ישרה SABCD שבסיסה מקבילית', en: 'right pyramid SABCD with a parallelogram base' },
   { category: 'solids', he: 'טטראדר ABCD', en: 'tetrahedron ABCD' },
   { category: 'vectors', he: '|EN| = (√6/4)·|w|', en: '|EN| = (√6/4)·|w|' },
   { category: 'vectors', he: 'אורך AS שווה לאורך AB', en: '|AS| = |AB|' },
