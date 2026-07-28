@@ -2600,6 +2600,33 @@ const planeRelAngle: Rule = (s) => {
 };
 
 
+/**
+ * S5 (#378, ADR-3D-106): a stated DISTANCE between two operands — «המרחק בין A למישור ABC הוא 6»,
+ * «המרחק בין הישר l1 לישר l2 שווה 4», «the distance between A and plane ABC is 6».
+ *
+ * The curriculum's four cases (point–plane, point–line, skew lines, parallel planes) are all the one
+ * command; which formula applies is the geometry's business, not the grammar's. A distance carries
+ * UNITS, so unlike every other relation here it pins the figure's scale.
+ */
+const distanceGiven: Rule = (s) => {
+  const m =
+    s.match(new RegExp(`^ה?מרחק\\s+(?:ש)?בין\\s+(.+?)\\s+(?:[לו]בין\\s+|ל-?\\s*|ו-?\\s*)(.+?)\\s*(?:הוא|היא|=|שווה\\s+ל?-?)\\s*(${NUM})\\s*$`)) ??
+    s.match(new RegExp(`^(?:the\\s+)?distance\\s+(?:from|between)\\s+(.+?)\\s+(?:and|to)\\s+(.+?)\\s*(?:is|=)\\s*(${NUM})\\s*$`, 'i'));
+  if (!m) return null;
+  const a = readOperand(m[1]);
+  const b = readOperand(m[2]);
+  if (!a || !b) return null;
+  if (sameOperand(a.op, b.op)) return null;
+  // a point-to-point distance is the MAGNITUDE family's (`|AB| = 5`) — never double-owned here
+  if (a.op.kind === 'point' && b.op.kind === 'point') return null;
+  const canon = (op: Operand3): Operand3 =>
+    op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) }
+    : op.kind === 'line' ? { kind: 'line', name: canonicalLine(op.name) }
+    : op;
+  return [{ type: 'distance-rel', a: canon(a.op), b: canon(b.op), value: +m[3] }];
+};
+
+
 export const RULES: Rule[] = [
   // #324: FIRST — gated by the lowercase-coordinate object so it can never steal, while the
   // polygon rules WOULD steal its polygon-noun subjects (building the shape, dropping the clause)
@@ -2659,6 +2686,7 @@ export const RULES: Rule[] = [
   intersectionLine,
   dropPerpToLine,
   lineRelGiven, // S2 (#378): ∥/⟂ with a NAMED-LINE side — after the line⟂π / plane-run⟂line / common-perp owners
+  distanceGiven, // S5 (#378): a stated distance between two operands
   planeRelAngle, // S3 (#378): an angle value with a PLANE side — after linePlaneAngle/angleBetweenPlanes
   planeRelGiven, // S3 (#378): ∥/⟂/coincident with a PLANE side — after every frozen plane owner
   nameVectors,

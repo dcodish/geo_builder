@@ -97,7 +97,9 @@ export type Claim3 =
   | { type: 'mutual-rel'; rel: MutualRel3; a: Operand3; b: Operand3 }
   // S3 (#378): a DIRECTION relation (⟂ / ∥ / a stated angle / coincident) where at least one side is
   // a PLANE — the claim twin of `planeRels`. Directional-only pairs keep their frozen owners.
-  | { type: 'plane-rel'; rel: PlaneRel3; deg?: number; a: Operand3; b: Operand3 };
+  | { type: 'plane-rel'; rel: PlaneRel3; deg?: number; a: Operand3; b: Operand3 }
+  // S5 (#378): a stated DISTANCE between two operands — «המרחק בין A למישור ABC הוא 6».
+  | { type: 'distance-rel'; a: Operand3; b: Operand3; value: number };
 
 /** S3 (#378) — the relations a PLANE takes part in. `coincident` is the plane twin of S4's. */
 export type PlaneRel3 = 'perp' | 'parallel' | 'angle' | 'coincident';
@@ -136,7 +138,10 @@ export type ScalarPin =
   | { kind: 'mutual'; rel: 'coincident' | 'parallel' | 'intersecting'; a: Operand3; b: Operand3 }
   // S3 (#378): a plane-bearing direction relation between two GAUGE operands. Every residual is
   // an angle between characteristic vectors (or a size-normalized offset), so it is scale-free.
-  | { kind: 'plane-rel'; rel: PlaneRel3; deg?: number; a: Operand3; b: Operand3 };
+  | { kind: 'plane-rel'; rel: PlaneRel3; deg?: number; a: Operand3; b: Operand3 }
+  // S5 (#378): |a b| = value. The ONE ScalarPin kind besides `length`/`dot` that is NOT
+  // similarity-invariant — a distance is an absolute size, so it fixes the scale.
+  | { kind: 'distance'; a: Operand3; b: Operand3; value: number };
 
 // ---------------------------------------------------------------------------
 // The algebraic lane (V2 — docs/20 §6.3): coefficients may carry ONE symbolic
@@ -649,6 +654,9 @@ export type Command3 =
   // per the frame classifier: a similarity-invariant DRIVE when both sides ride the gauge, a pivot
   // residual when one is absolute, and the parameter root-find when both are (docs/26 §2.3).
   | { type: 'plane-rel'; rel: PlaneRel3; deg?: number; a: Operand3; b: Operand3 }
+  // S5 (#378): a stated DISTANCE. Unlike every other relation in the program it carries UNITS, so
+  // it PINS THE SCALE — a free-dim figure is driven to it, a determined one verifies (M1).
+  | { type: 'distance-rel'; a: Operand3; b: Operand3; value: number }
   | ParamSignCommand
   | Plane3Command
   | PlaneAngleCommand

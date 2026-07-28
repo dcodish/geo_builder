@@ -8,7 +8,7 @@
  */
 
 import { lineAtParam, planeAtParam, resolve3, type Resolved3 } from './evaluate';
-import { lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
+import { lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, distanceBetween, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { atomVec, evalExpr } from './vecExpr';
 import { cross3, dot3, newellNormal, norm3, sub3, v3, type Vec3 } from './vec3';
 import type { Claim3, Construction3 } from './types';
@@ -142,6 +142,16 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
           ? planeCoincidenceDeviation(ga, gb, figureExtent(pos))
           : relDeviation(claim.rel, claim.deg, ga, gb);
       return dev !== null && dev <= 1e-4;
+    }
+    case 'distance-rel': {
+      // S5 (#378): one geometry function, shared with the drive residual and the query lane.
+      const abs = { lines: resolved.lines, planes: resolved.planes };
+      const at = (id: string) => pos.get(id) ?? null;
+      const ga = resolveOperand(claim.a, c, abs)(at);
+      const gb = resolveOperand(claim.b, c, abs)(at);
+      if (!ga || !gb) return false;
+      const d = distanceBetween(ga, gb);
+      return d !== null && Math.abs(d - claim.value) <= REL_TOL * Math.max(1, Math.abs(claim.value));
     }
     case 'plane-eq': {
       const ps = claim.ids.map((id) => pos.get(id));

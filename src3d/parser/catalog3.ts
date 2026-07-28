@@ -181,6 +181,10 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'המישור ABC מתלכד עם המישור ABD', en: 'plane ABC coincides with plane ABD' },
   { category: 'planesLines', he: 'π1 ניצב ל-π2', en: 'π1 is perpendicular to π2' },
   { category: 'planesLines', he: 'u מאונך למישור ABC', en: 'u is perpendicular to plane ABC' },
+  // S5 (#378, ADR-3D-106): the DISTANCE family — the one relation carrying units
+  { category: 'planesLines', he: 'המרחק בין D למישור ABC הוא 6', en: 'the distance between D and plane ABC is 6' },
+  { category: 'planesLines', he: 'המרחק בין D לישר AB הוא 5', en: 'the distance between D and line AB is 5' },
+  { category: 'planesLines', he: 'המרחק בין AB לבין CD הוא 3', en: 'the distance between AB and CD is 3' },
   // --- V8-f: vector-relation givens ---
   { category: 'vectors', he: 'קוסינוס הזווית בין הוקטורים u ו-w הוא √35/10', en: 'the cosine of the angle between u and w is √35/10' },
   { category: 'vectors', he: 'קוסינוס הזווית ACB = 3/4', en: 'cos∠ACB = 3/4' },

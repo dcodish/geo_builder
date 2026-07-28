@@ -321,6 +321,7 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return lineRelRefsError(c, claim.op, claim.line);
     case 'mutual-rel':
     case 'plane-rel':
+    case 'distance-rel':
       return operandRefsError(c, claim.a) ?? operandRefsError(c, claim.b);
     case 'vec-eq': {
       const pointErr = missingPoint(c, [...exprPointIds(claim.lhs), ...exprPointIds(claim.rhs)]);
@@ -976,6 +977,25 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         next.scalarPins.push({ kind: 'plane-rel', rel: cmd.rel, ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}), a: cmd.a, b: cmd.b });
       }
       next.claims.push({ type: 'plane-rel', rel: cmd.rel, ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}), a: cmd.a, b: cmd.b });
+      return { ok: true, next };
+    }
+
+    case 'distance-rel': {
+      const err = operandRefsError(c, cmd.a) ?? operandRefsError(c, cmd.b);
+      if (err) return { ok: false, error: err };
+      if (sameOperand(cmd.a, cmd.b)) return { ok: false, error: { code: 'vacuous-relation' } };
+      const next = clone(c);
+      for (const op of [cmd.a, cmd.b]) {
+        if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
+        if (op.kind === 'plane-run') {
+          const name = op.ids.join('');
+          if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...op.ids]);
+        }
+      }
+      // A distance carries UNITS, so it is meaningful against an absolute object too — but the
+      // gauge×absolute DRIVE is the pivot's lane (#386); those instances stay claim-verified.
+      if (!isAbsolute(cmd.a) && !isAbsolute(cmd.b)) next.scalarPins.push({ kind: 'distance', a: cmd.a, b: cmd.b, value: cmd.value });
+      next.claims.push({ type: 'distance-rel', a: cmd.a, b: cmd.b, value: cmd.value });
       return { ok: true, next };
     }
 

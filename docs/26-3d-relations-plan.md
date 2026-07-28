@@ -1,6 +1,6 @@
 # 3-D relations — the operand-atom program
 
-**Status: PROPOSED v2 (2026-07-28).** v1 written same day; **v2 supersedes it after a max-effort design
+**Status: COMPLETE (2026-07-28) — all six slices landed.** Originally PROPOSED v2 (2026-07-28). v1 written same day; **v2 supersedes it after a max-effort design
 review** that corrected §2 (the single `relate3` command is withdrawn — it would break saves and the
 fixtures drift-net), corrected S1's gate (rule identities are preserved, so the shadow snapshot goal is
 ZERO diff, not "pure addition"), and **found two live bugs by review alone** (§4, the S0 doors — verified
@@ -265,10 +265,14 @@ Three path-bound guards found and fixed en route — the general-position check 
 two solve paths (a plane coincidence flattened a box to zero height and reported success), and the
 funnel treated a plane-locked base as free to rotate. **Out:** `contains` («מוכל»).
 
-**S5 — distances**. point–plane, skew lines, parallel planes: givens (`scalePinned` joins), claims, and
-the query lane («המרחק בין…»).
+**S5 — distances** *(landed 2026-07-28, [ADR-3D-106](06b-decisions-3d.md#adr-3d-106))*. One
+`distanceBetween` over the operand pair covers the curriculum's four cases (point–plane, point–line,
+skew lines, parallel planes); intersecting objects are honestly 0 apart rather than a special case.
+The one relation carrying UNITS, so a stated distance PINS THE SCALE and a derived one prints only
+once the scale is pinned — on a bare cube the edge-distance is stable and still not knowledge. 11
+cells; the point-to-point case stays the magnitude family's. Query lane included.
 
-Order: **S0 ✓ → S1 ✓ → S2 ✓ → S4 ✓ → S3 ✓ → S5.** S2–S5 are independent once S1 lands;
+Order: **S0 ✓ → S1 ✓ → S2 ✓ → S4 ✓ → S3 ✓ → S5 ✓ — the program is COMPLETE.** S2–S5 are independent once S1 lands;
 S4 is promoted because it is the operator's named ask. Rough total: 6–8 focused sessions, one PR per
 slice (S0 as a bug fix goes straight to main per the workflow).
 
