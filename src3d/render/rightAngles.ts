@@ -205,6 +205,42 @@ export function rightAngles3(c: Construction3, resolved: Resolved3, scale: numbe
     const u2 = inPlaneDir(pl, vertex, pos);
     if (u2) out.push({ vertex, u1, u2, planeN: pl.n });
   }
+  // S2 (#378, ADR-3D-103): a STATED ⟂ (or 90°) between a segment/vector operand and a NAMED LINE —
+  // the knee sits where the segment genuinely meets the line (an endpoint on it, or a crossing
+  // inside the drawn segment); a ⟂ that never meets stays unmarked (the R³ honesty rule above)
+  // and is still reported in the data panel.
+  for (const r of c.lineRels) {
+    const perp = r.rel === 'perp' || (r.rel === 'angle' && isRight(r.deg ?? NaN));
+    if (!perp) continue;
+    const pair =
+      r.op.kind === 'segment' ? ([r.op.a, r.op.b] as [Id, Id])
+      : r.op.kind === 'vector' ? atomPair({ kind: 'named', name: r.op.name }, c)
+      : null;
+    const ln = resolved.lines.get(r.line);
+    if (!pair || !ln) continue;
+    const pa = pos.get(pair[0]);
+    const pb = pos.get(pair[1]);
+    if (!pa || !pb) continue;
+    const d1 = sub3(pb, pa);
+    const d2 = ln.dir;
+    const rr = sub3(pa, ln.anchor);
+    const a = dot3(d1, d1);
+    const b = dot3(d1, d2);
+    const cc = dot3(d2, d2);
+    const dd = dot3(d1, rr);
+    const e = dot3(d2, rr);
+    const den = a * cc - b * b;
+    if (Math.abs(den) < EPS || a < EPS || cc < EPS) continue; // parallel or degenerate
+    const t1 = (b * e - cc * dd) / den; // along the segment
+    const t2 = (a * e - b * dd) / den; // along the (unbounded) line
+    const c1 = add3(pa, scale3(d1, t1));
+    const c2 = add3(ln.anchor, scale3(d2, t2));
+    if (dist3(c1, c2) > s * 1e-6) continue; // skew — perpendicular but never meeting
+    if (t1 < -1e-6 || t1 > 1 + 1e-6) continue; // the crossing is off the drawn segment
+    const u1 = armDir(pair[0], pair[1], c1, pos);
+    const u2 = normalize3(ln.dir);
+    if (u1 && norm3(cross3(u1, u2)) > 1e-6) out.push({ vertex: c1, u1, u2 });
+  }
 
   // --- (2) CONSTRUCTED perpendicularity: EVERY foot kind, not a whitelist of two -----
   for (const [id, def] of c.points) {

@@ -48,6 +48,12 @@ export const PROMPT_EXAMPLES_3D: PromptExample3[] = [
     freeform: 'הבסיס מונח במישור המקביל למישור xy ונתונות הנקודות B(2t,t,k), A(1,4,-3)',
     steps: ['הבסיס ABCD מונח על מישור שמקביל למישור [xy]', 'נתונות הנקודות: A(1, 4, -3), B(2t, t, k)'],
   },
+  // S2 (#378, ADR-3D-103): relations to a NAMED LINE (∥/⟂/angle, point-on-ℓ) parse deterministically —
+  // keep the line's name and the relation word in the canonical spelling.
+  {
+    freeform: 'ישר l1 עובר דרך הראשית בכיוון (1,2,0), הצלע AB מאונכת אליו ו-E נמצאת עליו',
+    steps: ['הישר ℓ1: x = (0,0,0) + t(1,2,0)', 'AB מאונך לישר l1', 'E על l1'],
+  },
   // #290: a prism with no base shape at all is not expressible — the honest output is an empty list.
   { freeform: 'a prism', steps: [] },
   { freeform: 'סמן את הצלעות של הקובייה כוקטורים u v w', steps: ['קובייה ABCD', "נסמן: AB = u, AD = v, AA' = w"] },

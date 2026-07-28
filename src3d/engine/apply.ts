@@ -4,10 +4,11 @@
  */
 
 import { exprPointIds, exprVectorNames } from './vecExpr';
+import { lineDirCarriesParam, planeNormalCarriesParam } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { isQuadPyramid, quadPyramidDimCount } from './baseShapes';
 import { pinSymsOf } from './types';
-import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
+import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, Operand3, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
 
 const VERTEX_COUNT: Record<SolidCommand['kind'], number> = { cube: 8, box: 8, prism3: 6, pyramid4: 5, pyramid3: 4, tetra: 4, prism4r: 8, pyramid4g: 5, pyramid4r: 5, pyramid4gr: 5, prism3e: 6, pyramid3e: 4, pyramidPar: 5, polygon3: 3, polygon4: 4, polygon5: 5, prism4: 8, prism4g: 8, prism4sq: 8, prismReg5: 10, prismReg6: 12, parallelepiped: 8,
   // #305 (ADR-3D-090): every quad pyramid is a 4-ring + apex, whatever its base or top
@@ -162,6 +163,7 @@ function clone(c: Construction3): Construction3 {
     paramSigns: [...c.paramSigns],
     coordPlanePins: [...c.coordPlanePins],
     planeLinePerps: [...c.planeLinePerps],
+    lineRels: [...c.lineRels],
   };
 }
 
@@ -278,6 +280,31 @@ function baseRingOf(s: SolidObj): Id[] | null {
 }
 
 /** Apply-time validation of a claim's references (order matters, like every fact). */
+/** S2 (#378, ADR-3D-103): every reference a line-rel names must exist — the operand's points /
+ *  vector / line / plane, and the named line itself (a typed or derived line in `lines`, or a
+ *  through-line in `pointLines`). Shared by the command case and claimRefsError so the two can
+ *  never drift apart. */
+function lineRelRefsError(c: Construction3, op: Operand3, line: string): EngineError3 | null {
+  const opErr = ((): EngineError3 | null => {
+    switch (op.kind) {
+      case 'point':
+        return missingPoint(c, [op.id]);
+      case 'segment':
+        return missingPoint(c, [op.a, op.b]);
+      case 'plane-run':
+        return missingPoint(c, op.ids);
+      case 'vector':
+        return c.vectors.has(op.name) ? null : { code: 'unknown-vector', id: op.name };
+      case 'line':
+        return c.lines.has(op.name) || c.pointLines.has(op.name) ? null : { code: 'unknown-line', id: op.name };
+      case 'plane-named':
+        return c.planes.has(op.name) || c.pointPlanes.has(op.name) || c.relPlanes.has(op.name) ? null : { code: 'unknown-plane', id: op.name };
+    }
+  })();
+  if (opErr) return opErr;
+  return c.lines.has(line) || c.pointLines.has(line) ? null : { code: 'unknown-line', id: line };
+}
+
 function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
   switch (claim.type) {
     case 'length-rel':
@@ -288,6 +315,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return missingPoint(c, claim.ids);
     case 'plane-line-perp':
       return missingPoint(c, claim.ids) ?? (c.lines.has(claim.line) ? null : { code: 'unknown-line', id: claim.line });
+    case 'line-rel':
+      return lineRelRefsError(c, claim.op, claim.line);
     case 'vec-eq': {
       const pointErr = missingPoint(c, [...exprPointIds(claim.lhs), ...exprPointIds(claim.rhs)]);
       if (pointErr) return pointErr;
@@ -875,6 +904,28 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    // S2 (#378, ADR-3D-103): ∥/⟂/angle with a NAMED LINE on one side — the whole named-line
+    // column lowers to ONE family. The frame classifier routes each instance at evaluate by its
+    // operands (gauge op → pivot residual; absolute op with a symbolic direction → parameter
+    // root-find); the recorded claim is always the final arbiter, so no instance can escape
+    // verification whatever lane it solves in.
+    case 'line-rel': {
+      const err = lineRelRefsError(c, cmd.op, cmd.line);
+      if (err) return { ok: false, error: err };
+      const next = clone(c);
+      // a stated relation draws its operand (the ADR-3D-035 rule — the statement must leave ink)
+      if (cmd.op.kind === 'segment') drawAtom(next, { kind: 'pair', from: cmd.op.a, to: cmd.op.b });
+      next.lineRels.push({
+        rel: cmd.rel,
+        ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}),
+        op: cmd.op,
+        line: cmd.line,
+        ...(cmd.statedAsPlane ? { statedAsPlane: true as const } : {}),
+      });
+      next.claims.push({ type: 'line-rel', rel: cmd.rel, ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}), op: cmd.op, line: cmd.line });
+      return { ok: true, next };
+    }
+
     case 'param-sign': {
       // #325: the sign given also applies to a PIN symbol (`t פרמטר חיובי` after `B(2t,t,k)`) —
       // it selects among pivot solutions the way it selects among root branches for c.param.
@@ -1021,6 +1072,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (!c.planes.has(cmd.plane)) return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
       const next = clone(c);
       next.linePerps.push(cmd);
+      // S2 (#378): when NEITHER direction carries the figure parameter there is nothing to pin —
+      // the statement is a pure claim, so record it (M1 duality): a false numeric ⟂ now refuses
+      // `claim-refuted` instead of silently passing. With a parameter in play the root-find's
+      // `no-roots` refusal is the arbiter, and a recorded claim would double-report.
+      if (!lineDirCarriesParam(c, cmd.line) && !planeNormalCarriesParam(c, cmd.plane)) {
+        next.claims.push({ type: 'line-rel', rel: 'perp', op: { kind: 'plane-named', name: cmd.plane }, line: cmd.line });
+      }
       return { ok: true, next };
     }
 

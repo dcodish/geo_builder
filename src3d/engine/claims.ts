@@ -8,6 +8,7 @@
  */
 
 import { lineAtParam, planeAtParam, resolve3, type Resolved3 } from './evaluate';
+import { lineRelDeviation, resolveOperand } from './operands';
 import { atomVec, evalExpr } from './vecExpr';
 import { cross3, dot3, newellNormal, norm3, sub3, v3, type Vec3 } from './vec3';
 import type { Claim3, Construction3 } from './types';
@@ -108,6 +109,18 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       const dn = norm3(ln.dir);
       if (dn < 1e-12) return false;
       return norm3(cross3(n, ln.dir)) <= REL_TOL * nn * dn;
+    }
+    case 'line-rel': {
+      // S2 (#378, ADR-3D-103): resolved through the ONE operand seam (engine/operands.ts), so the
+      // claim judges exactly the geometry the drive drove. Tolerance is the DRIVE's numeric floor
+      // (the memberHolds3 reasoning, 1e-4) — the unmet trigger uses the same bar, so a figure the
+      // drive accepts can never flap to claim-refuted; a wrong bagrut relation misses by ≥ ~1e-2.
+      const ln = resolved.lines.get(claim.line);
+      if (!ln) return false;
+      const geom = resolveOperand(claim.op, c, { lines: resolved.lines, planes: resolved.planes })((id) => pos.get(id) ?? null);
+      if (!geom) return false;
+      const dev = lineRelDeviation(claim.rel, claim.deg, geom, ln.dir);
+      return dev !== null && dev <= 1e-4;
     }
     case 'plane-eq': {
       const ps = claim.ids.map((id) => pos.get(id));

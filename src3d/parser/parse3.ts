@@ -18,7 +18,7 @@
  */
 
 import { readOperand } from './operandToken';
-import type { Command3, Id, LinExpr, SolidKind, SymComp, SymTerm, VecAtom, VecExpr } from '../engine/types';
+import type { Command3, Id, LinExpr, Operand3, SolidKind, SymComp, SymTerm, VecAtom, VecExpr } from '../engine/types';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 
 export type ParseResult3 =
@@ -1488,13 +1488,16 @@ const linePerpPlane: Rule = (s) => {
  * kinds are known. That slip is recorded as `statedAsPlane` so the build notice can correct the wording
  * instead of the tool silently pretending it was never made (issue #375, operator ruling A).
  */
+// The ⟂ / ∥ connective SPLITTERS shared by the operand-classified relation rules (planeLinePerp,
+// lineRelGiven). No capture groups on purpose — String.split would splice captures into the parts.
+// The plural suffix is ־ים, not ־ם: `ניצבים?` would demand the yod and reject the bare `ניצב`
+// (the ADR-3D-035 morphology trap — a Hebrew keyword gate must admit every form it names).
+const PERP_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מאונ[ךכ](?:ים)?|ניצב(?:ים|ות)?|אנך|⊥|perpendicular)\s*(?:ל(?=\S)|to\s+)?-?\s*/;
+const PAR_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מקביל(?:ים|ות|ה)?|∥|parallel)\s*(?:ל(?=\S)|to\s+)?-?\s*/;
+
 const planeLinePerp: Rule = (s0) => {
   const s = stripStatementPrefix(s0).trim();
-  const parts = s.split(
-    // the plural suffix is ־ים, not ־ם: `ניצבים?` would demand the yod and reject the bare `ניצב`
-    // (the ADR-3D-035 morphology trap — a Hebrew keyword gate must admit every form it names)
-    /\s*(?:(?:is|are)\s+)?(?:מאונ[ךכ](?:ים)?|ניצב(?:ים|ות)?|אנך|⊥|perpendicular)\s*(?:ל(?=\S)|to\s+)?\s*/,
-  );
+  const parts = s.split(PERP_SPLIT);
   if (parts.length !== 2) return null;
 
   // S1 (#378): the sides are classified by the shared operand tokenizer — by what each token IS,
@@ -1544,13 +1547,106 @@ const neverParallelClaim: Rule = (s) => {
   return [{ type: 'claim', claim: { type: 'never-parallel', line: canonicalLine(m[1]), plane: canonicalPlane(m[2]) } }];
 };
 
-/** Standalone `B על הישר ℓ` / `B is on line ℓ` — an on-line membership GIVEN (verified). */
+/** Standalone `B על הישר ℓ` / `B is on line ℓ` — an on-line membership statement (M1 at apply:
+ *  an EXISTING id is a verified/driven given, a NEW id becomes a free 1-DOF rider, ADR-3D-031).
+ *  S2 (#378, the #377 reported item): the noun is OPTIONAL on both sides — `B על l1`,
+ *  `נקודה B נמצאת על ישר l1`, `point B on l1` all reach the built on-line capability; the
+ *  LINE_NAME token after על/on is what keeps `B על AC` (a segment rider) with onSegment. */
 const onLineMembership: Rule = (s) => {
   const m = s.match(
-    new RegExp(`^([A-Z]\\d*'?)\\s+(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על הישר|on (?:the )?line)\\s+(${LINE_NAME.source})$`),
+    new RegExp(
+      `^(?:ה?נקודה\\s+|(?:the\\s+)?point\\s+)?([A-Z]\\d*'?)\\s+(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על\\s+ה?ישר|on\\s+(?:the\\s+)?line|על|on)\\s+(${LINE_NAME.source})$`,
+    ),
   );
   if (!m) return null;
   return [{ type: 'on-line', id: m[1], line: canonicalLine(m[2]) }];
+};
+
+/**
+ * S2 (#378, ADR-3D-103): ∥ / ⟂ where ONE side is a NAMED LINE (ℓ, l1, …) — the named-line column
+ * of the RELATION_TABLE, one rule. Splits on the shared connective and classifies each side through
+ * the operand tokenizer — kinds decide, nouns never (the ADR-3D-100 mechanism): «AB מאונך לישר l1»,
+ * «l1 ⊥ AB», «u מקביל ל-l1», «הישר l1 מקביל לישר l2», «הישר l1 מקביל למישור π/ACD», the flipped
+ * «המישור π מאונך לישר l1», and the English mirrors — order and noun both cost nothing.
+ *
+ * Ownership boundaries (first-match-wins): `linePerpPlane` keeps line⟂π (this rule emits the SAME
+ * frozen lowering for the flipped order); `planeLinePerp` keeps plane-run⟂line (runs earlier; the
+ * plane-run⟂ combination here defers to it); a statement with NO line-kind side returns null, so
+ * the segment/vector rules (perpSegGiven, segParallelPlane, …) keep their cells untouched.
+ */
+const lineRelGiven: Rule = (s0) => {
+  const s = stripStatementPrefix(s0).trim();
+  for (const [rel, splitter] of [['perp', PERP_SPLIT], ['parallel', PAR_SPLIT]] as const) {
+    const parts = s.split(splitter);
+    if (parts.length !== 2) continue;
+    const a = readOperand(parts[0]);
+    const b = readOperand(parts[1]);
+    if (!a || !b) continue;
+    const line = a.op.kind === 'line' ? a : b.op.kind === 'line' ? b : null;
+    if (!line || line.op.kind !== 'line') continue;
+    const other = line === a ? b : a;
+    const op = other.op;
+    if (op.kind === 'point') return null; // a point has no direction — nothing to relate
+    if (op.kind === 'line' && op.name === line.op.name) return null; // a line related to itself is vacuous
+    if (rel === 'perp') {
+      // line ⟂ named plane is the FROZEN line-perp-plane lowering (linePerpPlane owns the
+      // line-first order; the plane-first order lands here and lowers identically)
+      if (op.kind === 'plane-named') return [{ type: 'line-perp-plane', line: canonicalLine(line.op.name), plane: canonicalPlane(op.name) }];
+      if (op.kind === 'plane-run') return null; // planeLinePerp's cell (it runs earlier — defensive)
+    }
+    const canonical: Operand3 =
+      op.kind === 'line' ? { kind: 'line', name: canonicalLine(op.name) }
+      : op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) }
+      : op;
+    return [
+      {
+        type: 'line-rel',
+        rel,
+        op: canonical,
+        line: canonicalLine(line.op.name),
+        // the student attached a PLANE noun to the line — build it, and say so (ADR-3D-100)
+        ...(line.noun === 'plane' ? { statedAsPlane: true as const } : {}),
+      },
+    ];
+  }
+  return null;
+};
+
+/**
+ * S2 (#378, ADR-3D-103): a stated ANGLE VALUE where one side is a NAMED LINE — «הזווית בין הישר l1
+ * לבין המישור ACD היא 30», «הזווית בין l1 לבין l2 היא 60», «the angle between AB and line l1 is 45».
+ * Requires a line-kind side, so `linePlaneAngle` (segment×point-run, its lowering frozen) and
+ * `angleBetweenPlanes` (π×π param-root) keep their cells; a valueless "what is the angle" query
+ * stays not-handled (outside the reproduce-and-verify charter).
+ */
+const lineRelAngle: Rule = (s) => {
+  const m =
+    s.match(new RegExp(`^ה?זו?וית\\s+(?:ש)?בין\\s+(.+?)\\s+(?:[לו]בין\\s+|ו-?\\s*|ל-?\\s*)(.+?)\\s*(?:היא|הוא|=|שווה\\s+ל?-?)\\s*(${NUM})\\s*°?$`)) ??
+    s.match(new RegExp(`^(?:the\\s+)?angle\\s+between\\s+(.+?)\\s+and\\s+(.+?)\\s*(?:is|=)\\s*(${NUM})\\s*°?$`, 'i'));
+  if (!m) return null;
+  const a = readOperand(m[1]);
+  const b = readOperand(m[2]);
+  if (!a || !b) return null;
+  const line = a.op.kind === 'line' ? a : b.op.kind === 'line' ? b : null;
+  if (!line || line.op.kind !== 'line') return null;
+  const other = line === a ? b : a;
+  const op = other.op;
+  if (op.kind === 'point') return null;
+  if (op.kind === 'line' && op.name === line.op.name) return null;
+  const canonical: Operand3 =
+    op.kind === 'line' ? { kind: 'line', name: canonicalLine(op.name) }
+    : op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) }
+    : op;
+  return [
+    {
+      type: 'line-rel',
+      rel: 'angle',
+      deg: +m[3],
+      op: canonical,
+      line: canonicalLine(line.op.name),
+      ...(line.noun === 'plane' ? { statedAsPlane: true as const } : {}),
+    },
+  ];
 };
 
 // ---------------------------------------------------------------------------
@@ -2425,6 +2521,7 @@ export const RULES: Rule[] = [
   onLineMembership, // likewise for `על הישר ℓ`
   linePlaneAngle, // `הזווית בין הישר AC' לבין המישור ABCD היא 30` — before angleBetweenPlanes/angleSegClaim
   angleBetweenPlanes,
+  lineRelAngle, // S2 (#378): an angle value with a NAMED-LINE side — after the frozen segment×plane-run and π×π owners
   angleSegClaim,
   vertexAngleClaim,
   angleBound3, // `∠SAB > 60` / `60 < α < 90` — a stated numeric BOUND (ADR-3D-053, #273); before the equality/marker rules
@@ -2442,6 +2539,7 @@ export const RULES: Rule[] = [
   circleTangentLine, // V8-i: `מעגל O משיק לישר AB בנקודה B`
   intersectionLine,
   dropPerpToLine,
+  lineRelGiven, // S2 (#378): ∥/⟂ with a NAMED-LINE side — after the line⟂π / plane-run⟂line / common-perp owners
   nameVectors,
   centroidRule,
   diagIntersection, // `מפגש האלכסונים` — before onSegment/midpoint grab the tokens
