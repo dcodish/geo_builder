@@ -139,6 +139,22 @@ export default function Figure3({ construction, resolved, width = 640, height = 
             strokeWidth={1.2}
           />
         ))}
+        {/* S4 (#378): the rung of a stated SKEW pair — dashed, so it reads as an annotation rather
+            than figure ink, and thin enough not to compete with the objects it is about. */}
+        {scene.rungs.map((r, i) => (
+          <line
+            key={`rung-${i}`}
+            data-testid="skew-rung"
+            x1={r.x1}
+            y1={r.y1}
+            x2={r.x2}
+            y2={r.y2}
+            stroke="#94a3b8"
+            strokeWidth={1.1}
+            strokeDasharray="4 4"
+            strokeLinecap="round"
+          />
+        ))}
         {scene.angles.map((a, i) => (
           <g key={`angle-${i}`} data-testid="plane-angle">
             <polyline

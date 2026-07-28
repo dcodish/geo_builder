@@ -241,11 +241,18 @@ spelling-tolerance "decision (filed separately)" was never actually filed** — 
 silently dropped; file it when the spelling recurs in a log. Through-line (`pointLines`) operands stay
 claim-only until an exam needs the drive (recorded in the table notes).
 
-**S4 — mutual positions, complete** *(promoted — the operator's explicit skew ask)*. intersecting /
-parallel / skew / coincident over every operand pair, as claims AND as givens (the requirement lane for
-the open conditions). **Showing skew**: a data-panel row always; whether the common perpendicular
-([ADR-3D-028](06b-decisions-3d.md#adr-3d-028)) auto-draws dashed with its length is an **operator UX
-decision** flagged for the slice, not pre-decided here.
+**S4 — mutual positions** *(landed 2026-07-28, [ADR-3D-104](06b-decisions-3d.md#adr-3d-104))*.
+intersecting / parallel / skew / coincident as first-class statements over the operand pair. The
+mechanism follows the CLOSED/OPEN split, not the relation name: the closed three carry a scale-free
+residual (signed components — the ADR-3D-006 touch-zero lesson) and drive when both operands ride the
+gauge; `skew` is an inequality and lives entirely in the requirement lane, which also carries the open
+half of the others (a crossing must land WITHIN the segments). 12 cells flipped. **Operator UX call,
+made:** a stated skew draws the dashed common perpendicular ALWAYS, plus the data-panel row — the
+projection can draw skew lines as crossing, so the rung is the proof. Two root findings en route: a
+verdict about LINES is not one about SEGMENTS (coplanar-but-missing is not skew — it let an impossible
+given build silently), and «X ו-Y מקבילים» / «X מקביל ל-Y» had two different semantics, now one.
+**Out, filed as #386:** the gauge×absolute closed drive (needs the pivot trigger generalized, not a
+second parallel array).
 
 **S3 — plane ↔ plane**. ∥/⟂/angle mostly fall out of dir-relations on the resolvers' normals; the
 intersection line's mixed-operand cell (named π × point-run) is a tokenizer fix.
@@ -253,7 +260,7 @@ intersection line's mixed-operand cell (named π × point-run) is a tokenizer fi
 **S5 — distances**. point–plane, skew lines, parallel planes: givens (`scalePinned` joins), claims, and
 the query lane («המרחק בין…»).
 
-Order: **S0 → (merge #376 after play) → S1 → S2 → S4 → S3 → S5.** S2–S5 are independent once S1 lands;
+Order: **S0 ✓ → S1 ✓ → S2 ✓ → S4 ✓ → S3 → S5.** S2–S5 are independent once S1 lands;
 S4 is promoted because it is the operator's named ask. Rough total: 6–8 focused sessions, one PR per
 slice (S0 as a bug fix goes straight to main per the workflow).
 

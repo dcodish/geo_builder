@@ -1299,6 +1299,56 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "AB is parallel to CD",
+    "winner": "mutualPositionClaim",
+  },
+  {
+    "lang": "he",
+    "text": "AB מקביל ל-CD",
+    "winner": "mutualPositionClaim",
+  },
+  {
+    "lang": "en",
+    "text": "AC and BD intersect",
+    "winner": "mutualPositionClaim",
+  },
+  {
+    "lang": "he",
+    "text": "AC ו-BD נחתכים",
+    "winner": "mutualPositionClaim",
+  },
+  {
+    "lang": "en",
+    "text": "AB and l1 are skew",
+    "winner": "mutualPositionClaim",
+  },
+  {
+    "lang": "he",
+    "text": "AB ו-l1 מצטלבים",
+    "winner": "mutualPositionClaim",
+  },
+  {
+    "lang": "en",
+    "text": "l1 and l2 are skew",
+    "winner": "mutualPositionClaim",
+  },
+  {
+    "lang": "he",
+    "text": "l1 ו-l2 מצטלבים",
+    "winner": "mutualPositionClaim",
+  },
+  {
+    "lang": "en",
+    "text": "AB coincides with CD",
+    "winner": "mutualPositionClaim",
+  },
+  {
+    "lang": "he",
+    "text": "AB מתלכד עם CD",
+    "winner": "mutualPositionClaim",
+  },
+  {
+    "lang": "en",
     "text": "the cosine of the angle between u and w is √35/10",
     "winner": "cosAngleGiven",
   },

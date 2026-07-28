@@ -8,7 +8,7 @@
  */
 
 import { lineAtParam, planeAtParam, resolve3, type Resolved3 } from './evaluate';
-import { lineRelDeviation, resolveOperand } from './operands';
+import { lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, resolveOperand } from './operands';
 import { atomVec, evalExpr } from './vecExpr';
 import { cross3, dot3, newellNormal, norm3, sub3, v3, type Vec3 } from './vec3';
 import type { Claim3, Construction3 } from './types';
@@ -122,6 +122,13 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       const dev = lineRelDeviation(claim.rel, claim.deg, geom, ln.dir);
       return dev !== null && dev <= 1e-4;
     }
+    case 'mutual-rel': {
+      // S4 (#378): the general operand pair, through the same seam and the same classifier the
+      // drive and the requirement gate read — one answer to "where do these two lie".
+      const sides = mutualSides(claim.a, claim.b, c, { lines: resolved.lines, planes: resolved.planes }, (id) => pos.get(id) ?? null);
+      if (!sides) return false;
+      return mutualHolds(claim.rel, sides[0], sides[1], MUTUAL_VERIFY_TOL);
+    }
     case 'plane-eq': {
       const ps = claim.ids.map((id) => pos.get(id));
       if (ps.length < 3 || ps.some((p) => !p)) return false;
@@ -186,16 +193,18 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       return v1 !== null && v2 !== null && Math.abs(v1 - v2) <= REL_TOL * Math.max(v1, v2, 1);
     }
     case 'lines-rel': {
+      // S4 (#378): delegates to the ONE shared classifier — the same scalars the mutual-position
+      // drive, the data panel and the requirement gate read, so a driven figure can never disagree
+      // with its own claim. The segments are BOUNDED sides (`מצטלבים`/`נחתכים` are statements about
+      // the drawn segments, not their continuations — the 2-D ADR-166 reading in R³).
       const [a1, b1, a2, b2] = [claim.a1, claim.b1, claim.a2, claim.b2].map((id) => pos.get(id));
       if (!a1 || !b1 || !a2 || !b2) return false;
-      const d1 = sub3(b1, a1);
-      const d2 = sub3(b2, a2);
-      const den = Math.max(norm3(d1) * norm3(d2), 1e-12);
-      const parallel = norm3(cross3(d1, d2)) / den <= 1e-7;
-      const coplanar = Math.abs(dot3(sub3(a2, a1), cross3(d1, d2))) / Math.max(den * norm3(sub3(a2, a1)), 1e-12) <= 1e-7;
-      if (claim.rel === 'parallel') return parallel;
-      if (claim.rel === 'intersect') return !parallel && coplanar;
-      return !parallel && !coplanar; // skew (מצטלבים)
+      const s1 = { geom: { point: a1, dir: sub3(b1, a1) }, bounded: true };
+      const s2 = { geom: { point: a2, dir: sub3(b2, a2) }, bounded: true };
+      // `parallel` here keeps its historic reading — two segments lying on ONE line satisfied the
+      // old `cross ≈ 0` test, and a saved figure may rely on it.
+      if (claim.rel === 'parallel') return mutualHolds('parallel', s1, s2, MUTUAL_VERIFY_TOL) || mutualHolds('coincident', s1, s2, MUTUAL_VERIFY_TOL);
+      return mutualHolds(claim.rel === 'intersect' ? 'intersecting' : 'skew', s1, s2, MUTUAL_VERIFY_TOL);
     }
     case 'concyclic': {
       // #305 (ADR-3D-090): the ScalarPin's twin — opposite angles supplementary (see solve3).

@@ -4,7 +4,7 @@
  */
 
 import { exprPointIds, exprVectorNames } from './vecExpr';
-import { lineDirCarriesParam, planeNormalCarriesParam } from './operands';
+import { isAbsolute, lineDirCarriesParam, planeNormalCarriesParam, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
 import { isQuadPyramid, quadPyramidDimCount } from './baseShapes';
 import { pinSymsOf } from './types';
@@ -284,23 +284,25 @@ function baseRingOf(s: SolidObj): Id[] | null {
  *  vector / line / plane, and the named line itself (a typed or derived line in `lines`, or a
  *  through-line in `pointLines`). Shared by the command case and claimRefsError so the two can
  *  never drift apart. */
+export function operandRefsError(c: Construction3, op: Operand3): EngineError3 | null {
+  switch (op.kind) {
+    case 'point':
+      return missingPoint(c, [op.id]);
+    case 'segment':
+      return missingPoint(c, [op.a, op.b]);
+    case 'plane-run':
+      return missingPoint(c, op.ids);
+    case 'vector':
+      return c.vectors.has(op.name) ? null : { code: 'unknown-vector', id: op.name };
+    case 'line':
+      return c.lines.has(op.name) || c.pointLines.has(op.name) ? null : { code: 'unknown-line', id: op.name };
+    case 'plane-named':
+      return c.planes.has(op.name) || c.pointPlanes.has(op.name) || c.relPlanes.has(op.name) ? null : { code: 'unknown-plane', id: op.name };
+  }
+}
+
 function lineRelRefsError(c: Construction3, op: Operand3, line: string): EngineError3 | null {
-  const opErr = ((): EngineError3 | null => {
-    switch (op.kind) {
-      case 'point':
-        return missingPoint(c, [op.id]);
-      case 'segment':
-        return missingPoint(c, [op.a, op.b]);
-      case 'plane-run':
-        return missingPoint(c, op.ids);
-      case 'vector':
-        return c.vectors.has(op.name) ? null : { code: 'unknown-vector', id: op.name };
-      case 'line':
-        return c.lines.has(op.name) || c.pointLines.has(op.name) ? null : { code: 'unknown-line', id: op.name };
-      case 'plane-named':
-        return c.planes.has(op.name) || c.pointPlanes.has(op.name) || c.relPlanes.has(op.name) ? null : { code: 'unknown-plane', id: op.name };
-    }
-  })();
+  const opErr = operandRefsError(c, op);
   if (opErr) return opErr;
   return c.lines.has(line) || c.pointLines.has(line) ? null : { code: 'unknown-line', id: line };
 }
@@ -317,6 +319,8 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       return missingPoint(c, claim.ids) ?? (c.lines.has(claim.line) ? null : { code: 'unknown-line', id: claim.line });
     case 'line-rel':
       return lineRelRefsError(c, claim.op, claim.line);
+    case 'mutual-rel':
+      return operandRefsError(c, claim.a) ?? operandRefsError(c, claim.b);
     case 'vec-eq': {
       const pointErr = missingPoint(c, [...exprPointIds(claim.lhs), ...exprPointIds(claim.rhs)]);
       if (pointErr) return pointErr;
@@ -923,6 +927,31 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         ...(cmd.statedAsPlane ? { statedAsPlane: true as const } : {}),
       });
       next.claims.push({ type: 'line-rel', rel: cmd.rel, ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}), op: cmd.op, line: cmd.line });
+      return { ok: true, next };
+    }
+
+    case 'mutual-rel': {
+      const err = operandRefsError(c, cmd.a) ?? operandRefsError(c, cmd.b);
+      if (err) return { ok: false, error: err };
+      // a relation between an object and ITSELF says nothing — refuse rather than record a vacuous truth
+      if (sameOperand(cmd.a, cmd.b)) return { ok: false, error: { code: 'vacuous-relation' } };
+      const next = clone(c);
+      // a stated relation draws its operands (the ADR-3D-035 rule — the statement must leave ink)
+      for (const op of [cmd.a, cmd.b]) if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
+
+      // (1) the REQUIREMENT — always. It carries `skew` entirely, and the open half (really meeting,
+      // and meeting WITHIN the segments) of the closed relations. Sample-and-gate, never least-squares.
+      next.requirements.push({ kind: 'mutual', rel: cmd.rel, a: cmd.a, b: cmd.b });
+
+      // (2) the DRIVE — only for a CLOSED relation whose operands both ride the gauge (the frame
+      // classifier, docs/26 §2.3). A relation against an ABSOLUTE object would have to MOVE the
+      // figure, which is the pivot's lane, not a similarity-invariant pin's; it stays claim-gated.
+      if (cmd.rel !== 'skew' && !isAbsolute(cmd.a) && !isAbsolute(cmd.b)) {
+        next.scalarPins.push({ kind: 'mutual', rel: cmd.rel, a: cmd.a, b: cmd.b });
+      }
+
+      // (3) the CLAIM — the final arbiter on the finished figure, per the ADR-3D-079 shape
+      next.claims.push({ type: 'mutual-rel', rel: cmd.rel, a: cmd.a, b: cmd.b });
       return { ok: true, next };
     }
 

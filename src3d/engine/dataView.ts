@@ -18,7 +18,8 @@ import { resolve3 } from './evaluate';
 import { scalePinned } from './solve3';
 import { dot3, sub3, type Vec3 } from './vec3';
 import { pinSymsOf } from './types';
-import type { Construction3, Id, Positions3 } from './types';
+import { mutualHolds, mutualSides, MUTUAL_VERIFY_TOL } from './operands';
+import type { Construction3, Id, MutualRel3, Operand3, Positions3 } from './types';
 
 /** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
 type VecDef = Construction3['vecDefs'][number];
@@ -525,6 +526,31 @@ export function dataView(c: Construction3, seed: number): DataPanel {
         });
         if (perp) relations.push(`${dirs[i].name}·${dirs[j].name} = 0`);
       }
+    }
+  }
+
+  // S4 (#378, ADR-3D-104): a stated MUTUAL POSITION reads as a row.
+  //
+  // This is docs/26 §5.9's "and show that": a skew pair is drawn with its rung, but the RELATION
+  // itself — which the orthographic projection can misrepresent (#384: a true 90° reading as 40°) —
+  // needs saying in words. Same multi-sample discipline as the equalities above: printed only when
+  // it holds in EVERY sampled configuration, never on the strength of one drawing.
+  {
+    const SYMBOL: Record<MutualRel3, string> = { skew: '⤫', intersecting: '✕', parallel: '∥', coincident: '≡' };
+    const name = (op: Operand3): string | null =>
+      op.kind === 'segment' ? `${op.a}${op.b}`
+      : op.kind === 'line' || op.kind === 'vector' ? op.name
+      : null;
+    for (const req of c.requirements) {
+      if (req.kind !== 'mutual') continue;
+      const l = name(req.a);
+      const r = name(req.b);
+      if (!l || !r) continue;
+      const holdsEverywhere = resolved.every((res) => {
+        const sides = mutualSides(req.a, req.b, c, { lines: res.lines, planes: res.planes }, (id) => res.positions.get(id) ?? null);
+        return !!sides && mutualHolds(req.rel, sides[0], sides[1], MUTUAL_VERIFY_TOL);
+      });
+      if (holdsEverywhere) relations.push(`${l} ${SYMBOL[req.rel]} ${r}`);
     }
   }
 

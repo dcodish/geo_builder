@@ -53,6 +53,12 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'angle|segment|vector',
       'angle|vector|line',
       'angle|vector|vector',
+      // S4 (#378, ADR-3D-104): mutual positions over {segment, line}² + the ∥ gauge cells
+      'coincident|line|line',
+      'coincident|segment|line',
+      'coincident|segment|segment',
+      'intersecting|line|line',
+      'intersecting|segment|line',
       'intersecting|segment|segment',
       'on|point|line',
       'on|point|plane-named',
@@ -64,7 +70,9 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'parallel|segment|line',
       'parallel|segment|plane-run',
       'parallel|segment|segment',
+      'parallel|segment|vector',
       'parallel|vector|line',
+      'parallel|vector|vector',
       'perp|line|line',
       'perp|line|plane-named',
       'perp|line|plane-run',
@@ -74,6 +82,8 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'perp|segment|vector',
       'perp|vector|line',
       'perp|vector|vector',
+      'skew|line|line',
+      'skew|segment|line',
       'skew|segment|segment',
     ]);
   });
@@ -98,6 +108,19 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'parallel|line|line',
       'angle|line|line',
       'parallel|line|plane-named',
+      // S4 (#378, ADR-3D-104) — the mutual-position column
+      'skew|segment|segment',
+      'skew|segment|line',
+      'skew|line|line',
+      'intersecting|segment|segment',
+      'intersecting|segment|line',
+      'intersecting|line|line',
+      'coincident|segment|segment',
+      'coincident|segment|line',
+      'coincident|line|line',
+      'parallel|segment|segment',
+      'parallel|segment|vector',
+      'parallel|vector|vector',
     ]);
     const BATTERY_PENDING = new Set([
       // S1 seeds the harness with 7 rows; these supported cells are exercised by their own
@@ -105,8 +128,6 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'perp|segment|plane-run', // perp-seg / perp-plane suites (ADR-3D-035, V1)
       'perp|segment|vector', // perp-seg.test.ts (ADR-3D-035)
       'perp|vector|vector', // perp-seg.test.ts
-      'parallel|segment|segment', // V7-T3 mutual-position suites
-      'intersecting|segment|segment', // V7-T3 mutual-position suites
       'angle|segment|segment', // adr-3d-032 / V7
       'angle|segment|vector', // V8-f suites
       'angle|vector|vector', // V8-f suites
@@ -197,6 +218,82 @@ describe('the battery — supported cells exercised end-to-end', () => {
     submit("תיבה ABCDA'B'C'D'");
     submit('AC ו-BD מצטלבים'); // the base diagonals CROSS — skew must refuse
     expect(state().lastError).not.toBeNull();
+  });
+
+  // ---- S4 (#378, ADR-3D-104): the MUTUAL-POSITION column -------------------------------
+
+  it('skew|segment|line + skew|line|line — a named line is a first-class side', () => {
+    for (const u of ['פירמידה משולשת ABCD', 'l1:x=(0,1,0)+t(1,2,0)', 'AB ו-l1 מצטלבים']) submit(u);
+    expect(state().lastError).toBeNull();
+    state().clear();
+    for (const u of ['l1:x=(0,0,0)+t(1,0,0)', 'l2:x=(0,0,5)+t(0,1,0)', 'l1 ו-l2 מצטלבים']) submit(u);
+    expect(state().lastError).toBeNull();
+    state().clear();
+    // …and a FALSE one is refused rather than drawn (both absolute — the claim is the whole answer)
+    for (const u of ['l1:x=(0,0,0)+t(1,0,0)', 'l2:x=(0,0,5)+t(0,1,0)', 'l1 ו-l2 נחתכים']) submit(u);
+    expect(state().lastError).not.toBeNull();
+  });
+
+  it('intersecting|segment|segment — the crossing must land WITHIN both segments, both locales', () => {
+    // The DIAGONALS of a quad cross; its opposite SIDES do not. Both pairs are coplanar, so the
+    // difference is entirely the within-extent half — which is the requirement gate's job, not the
+    // residual's. This row is that distinction.
+    for (const u of ['מרובע ABCD', 'AC ו-BD נחתכים']) submit(u);
+    expect(state().lastError, 'the diagonals cross').toBeNull();
+    for (const seed of [0, 1]) {
+      const p = derive3(state().facts, seed).resolved.positions;
+      // the crossing parameter along AC must sit inside [0,1] at every DISPLAYED seed
+      const d1 = vsub(p.get('C')!, p.get('A')!);
+      const d2 = vsub(p.get('D')!, p.get('B')!);
+      const w = vsub(p.get('B')!, p.get('A')!);
+      const cx = vcross(d1, d2);
+      const t = vdot(vcross(w, d2), cx) / Math.max(vdot(cx, cx), 1e-18);
+      expect(t, `crossing within AC at seed ${seed}`).toBeGreaterThan(-1e-4);
+      expect(t, `crossing within AC at seed ${seed}`).toBeLessThan(1 + 1e-4);
+    }
+    state().clear();
+    for (const u of ['quadrilateral ABCD', 'AC intersects BD']) submit(u);
+    expect(state().lastError).toBeNull();
+    state().clear();
+    // …and the opposite SIDES are refused — their lines meet, but far outside the drawn segments
+    for (const u of ['מרובע ABCD', 'AB ו-CD נחתכים']) submit(u);
+    expect(state().lastError, 'opposite sides do not cross').not.toBeNull();
+  });
+
+  it('coincident|segment|segment + |segment|line — «מתלכדים» builds, both locales', () => {
+    for (const u of ['מרובע ABCD', 'AB מתלכד עם CD']) submit(u);
+    expect(state().lastError).toBeNull();
+    state().clear();
+    for (const u of ['quadrilateral ABCD', 'AB coincides with CD']) submit(u);
+    expect(state().lastError).toBeNull();
+  });
+
+  it('parallel|segment|segment — the DIRECTED given drives (the form that used to be refused)', () => {
+    submit('מרובע ABCD');
+    const sinAt = (seed: number): number => {
+      const p = derive3(state().facts, seed).resolved.positions;
+      const d1 = vsub(p.get('B')!, p.get('A')!);
+      const d2 = vsub(p.get('C')!, p.get('D')!);
+      return vnorm(vcross(d1, d2)) / Math.max(vnorm(d1) * vnorm(d2), 1e-12);
+    };
+    for (const seed of [0, 1]) expect(sinAt(seed), `not ∥ before, seed ${seed}`).toBeGreaterThan(1e-3);
+    submit('AB מקביל ל-DC');
+    expect(state().lastError).toBeNull();
+    for (const seed of [0, 1, 2]) expect(sinAt(seed), `∥ at seed ${seed}`).toBeLessThan(1e-4);
+  });
+
+  it('parallel|segment|vector + parallel|vector|vector — a free vector is a direction, so ∥ applies', () => {
+    for (const u of ['פירמידה משולשת ABCD', 'AB=u', 'CD מקביל ל-u']) submit(u);
+    expect(state().lastError).toBeNull();
+    for (const seed of [0, 1]) {
+      const p = derive3(state().facts, seed).resolved.positions;
+      const d1 = vsub(p.get('D')!, p.get('C')!);
+      const d2 = vsub(p.get('B')!, p.get('A')!);
+      expect(vnorm(vcross(d1, d2)) / Math.max(vnorm(d1) * vnorm(d2), 1e-12), `∥ at seed ${seed}`).toBeLessThan(1e-4);
+    }
+    state().clear();
+    for (const u of ['פירמידה משולשת ABCD', 'AB=u', 'CD=v', 'u מקביל ל-v']) submit(u);
+    expect(state().lastError).toBeNull();
   });
 
   it('angle|segment|plane-run — drives a free box to the stated 30 degrees', () => {

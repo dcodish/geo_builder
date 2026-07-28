@@ -90,7 +90,18 @@ export type Claim3 =
   // #375: a POINT-RUN plane stated ⟂ a named LINE (see planeLinePerps)
   | { type: 'plane-line-perp'; ids: Id[]; line: string }
   // S2 (#378): ∥/⟂/angle where one side is a NAMED LINE — the claim twin of lineRels
-  | { type: 'line-rel'; rel: 'perp' | 'parallel' | 'angle'; deg?: number; op: Operand3; line: string };
+  | { type: 'line-rel'; rel: 'perp' | 'parallel' | 'angle'; deg?: number; op: Operand3; line: string }
+  // S4 (#378): the MUTUAL POSITION of two located objects, over the general operand pair — the
+  // claim twin of `mutualRels`. (`lines-rel` above is the frozen V7-T3 segment-pair spelling; both
+  // verdicts come from the one `mutualPosition` classifier, so they cannot disagree.)
+  | { type: 'mutual-rel'; rel: MutualRel3; a: Operand3; b: Operand3 };
+
+/**
+ * S4 (#378) — the four mutually exclusive positions two located directions can occupy in R³.
+ * Mirrors `MutualRel` in engine/operands (which owns the geometry); declared here so commands,
+ * claims and requirements can name it without importing the resolver.
+ */
+export type MutualRel3 = 'coincident' | 'parallel' | 'intersecting' | 'skew';
 
 /** V7 T2 — a SCALAR given that DRIVES the figure (a residual in the global solve). */
 export type ScalarPin =
@@ -111,7 +122,12 @@ export type ScalarPin =
   // #305 (ADR-3D-090): the base of a RIGHT pyramid over a general quad must be CYCLIC.
   // A convex quad is cyclic iff opposite angles are supplementary (cos A + cos C = 0) — a
   // scale-free, SIGN-CHANGING residual, so it needs no new solver machinery.
-  | { kind: 'concyclic'; ids: Id[] };
+  | { kind: 'concyclic'; ids: Id[] }
+  // S4 (#378): a CLOSED mutual position between two GAUGE operands — ∥ / meeting / coincident.
+  // The residual is `mutualDeviation`, normalized to be scale-free, so it is similarity-invariant
+  // and joins the gauge-frozen dims-only solve like every other ScalarPin. `skew` is deliberately
+  // not representable here: it is an inequality, and belongs to the requirement lane.
+  | { kind: 'mutual'; rel: 'coincident' | 'parallel' | 'intersecting'; a: Operand3; b: Operand3 };
 
 // ---------------------------------------------------------------------------
 // The algebraic lane (V2 — docs/20 §6.3): coefficients may carry ONE symbolic
@@ -611,6 +627,14 @@ export type Command3 =
   // root-find when a symbolic direction is present, else a pure claim. `statedAsPlane` records the
   // ADR-3D-100 noun slip (the student called the line a plane) for the build-notice correction.
   | { type: 'line-rel'; rel: 'perp' | 'parallel' | 'angle'; deg?: number; op: Operand3; line: string; statedAsPlane?: true }
+  // S4 (#378): the MUTUAL POSITION of two located objects — «AB ו-CD מצטלבים» (skew), «נחתכים»
+  // (intersecting), «מקבילים» (parallel), «מתלכדים» (coincident) over the general operand pair.
+  // Lowered to a recorded claim ALWAYS (the final arbiter) plus, per the frame classifier:
+  //   · a REQUIREMENT for the open half — `skew` entirely, and the non-parallel / within-extent
+  //     half of the closed relations. An inequality has no residual; it is sample-and-gated.
+  //   · a similarity-invariant DRIVE (`mutual` ScalarPin) for the closed half when both operands
+  //     ride the gauge, so a free-dim figure is flexed into the stated position (M1 duality).
+  | { type: 'mutual-rel'; rel: MutualRel3; a: Operand3; b: Operand3 }
   | ParamSignCommand
   | Plane3Command
   | PlaneAngleCommand
@@ -896,7 +920,13 @@ export function pinSymsOf(c: Construction3): string[] {
  * `src3d` had no such layer at all (its `resample` was a blind `seed + 1`), so this is that layer, with
  * angle bounds as its first client. Patterns are COPIED from `src/`, never imported (docs/20 §12).
  */
-export type Requirement3 = { kind: 'angle-bound'; vertex: Id; p: Id; q: Id; min?: number; max?: number };
+export type Requirement3 =
+  | { kind: 'angle-bound'; vertex: Id; p: Id; q: Id; min?: number; max?: number }
+  // S4 (#378): the displayed configuration must actually show the stated mutual position. This is
+  // the ONLY mechanism for `skew` (an inequality: not parallel AND not meeting), and it carries the
+  // open half of the closed relations too — that `intersecting` really crosses WITHIN both segments
+  // rather than out on their continuations, which no least-squares residual can express.
+  | { kind: 'mutual'; rel: MutualRel3; a: Operand3; b: Operand3 };
 
 export type EngineError3 =
   | { code: 'already-defined'; id: Id }
@@ -929,6 +959,7 @@ export type EngineError3 =
   | { code: 'no-prism-to-make-right' } // #289: `המנסרה ישרה` but the figure has no prism-like solid to make right
   | { code: 'ambiguous-prism' } // #289: `המנסרה ישרה` with more than one oblique prism — "the prism" is ambiguous
   | { code: 'bound-unsatisfiable'; id: Id } // #273: no sampled configuration puts the measure inside the stated bound
+  | { code: 'vacuous-relation' } // S4 (#378): a mutual position stated between an object and itself
   | { code: 'claim-refuted' }; // the stated answer does not hold in the figure
 
 export type ApplyResult3 = { ok: true; next: Construction3 } | { ok: false; error: EngineError3 };

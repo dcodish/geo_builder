@@ -1598,3 +1598,29 @@ Locked by `relation-battery.test.ts` (11) + the zero-diff snapshot + the untouch
 **Out (stated).** The `l1=x:` spelling tolerance docs/26 mentions was never actually filed — left out deliberately, pending its own decision. A relation against a THROUGH-line (`pointLines`) stays claim-only (verified on final positions, never driven) — recorded in the table notes; the drive arm arrives when a real exam needs it.
 
 Locked by `relation-battery.test.ts` (35: the exact-list lock, the ratchet, 12 S2 rows) + `right-angle-knee.test.ts` (+2) + the addition-only shadow snapshot. 3-D lane green, `tsc -b` + both builds clean.
+
+### ADR-3D-104 — S4 of the relations program: MUTUAL POSITIONS, closed and open (#378, the operator's skew ask)
+
+**Context.** S2 closed the named-line column for the DIRECTION relations (∥/⟂/angle). What two objects' *mutual position* is — do they meet, miss, run parallel, coincide — was reachable only as a V7-T3 CLAIM over a plural segment pair (`NK ו-PL מצטלבים`). The operator commissioned the program partly for this: *"we also have [skew]… I want to have a big task here to just do all of them."*
+
+**Decision.** Mutual position becomes a first-class STATEMENT — `mutual-rel {rel, a: Operand3, b: Operand3}` — over the general operand pair, routed by the frame classifier like every other relation. Four decisions carry it:
+
+**1. The CLOSED/OPEN split decides the mechanism, not the relation's name.** `parallel`, `intersecting` and `coincident` assert an equality, so they carry a residual and can drive. `skew` asserts two *inequalities* (not parallel AND not coplanar); least-squares cannot express that, and pretending otherwise is how a solver settles in a degenerate basin. So `skew` is carried entirely by the REQUIREMENT lane (sample-and-gate, the ADR-3D-064 layer), and the closed relations put their *open half* there too — that a crossing really lands within the segments. One `Requirement3` member, one predicate.
+
+**2. A verdict about LINES is not a verdict about SEGMENTS.** The first implementation classified coplanar-but-missing segments as `skew`, and a test caught it: two coplanar segments that merely miss are **not** skew — skew means *not coplanar* — and calling them skew both reports a false property and let an impossible given («AB ו-CD מצטלבים» on a flat quad) build silently. Fixed at the source: `mutualPosition` answers about the two LINES (total, mutually exclusive), and `mutualHolds` applies the statement semantics on top, consulting the extents only for `intersecting`. «נחתכים» means the drawn segments cross — the 2-D [ADR-166](06-decisions.md#adr-166) reading, R³ edition.
+
+**3. Residuals are SIGNED COMPONENTS, never magnitudes.** |d₁×d₂| and |w·(d₁×d₂)| are non-negative: they TOUCH zero instead of crossing it, and the descent stalls short — the [ADR-3D-006](#adr-3d-006) lesson, already restated in the `concyclic` branch. The `mutual` pin pushes the cross-product components (parallel/coincident) and the signed triple product (intersecting), all normalized by the operand magnitudes, so they are scale-free and join the gauge-frozen dims-only solve.
+
+**4. One statement, one semantics.** «AB ו-CD מקבילים» and «AB מקביל ל-CD» say the same thing; they had two different behaviours (the plural verified, the singular was refused with a "coming" message). Both now lower to `mutual-rel`, whose apply decides claim-vs-drive per M1. The shadow snapshot freezes the winning RULE, not the lowering, so unifying them cost zero snapshot diff — and the `seg-parallel-given` guidance is DELETED rather than reworded, because guidance for a form the parser handles is a lie.
+
+**Showing it (operator decision, 2026-07-28).** Asked whether a stated skew should draw anything, the operator chose **the dashed common perpendicular, always** — plus the data-panel row. The reason is the #384 lesson: orthographic projection routinely draws two skew lines crossing, and a true 90° was measured reading as ~40°, so the drawing alone cannot distinguish "misses" from "meets". The rung between the closest points is the visual proof; it is an ANNOTATION, so it gets its own scene stream rather than joining the edges ([ADR-3D-098](#adr-3d-098)'s distinction).
+
+**A free vector has no mutual position.** `skew`/`intersecting`/`coincident` against a vector operand are `n/a` with a reason: a free vector has direction and magnitude but no place, so there is nothing for the relation to be true about. Its DIRECTION relations (∥/⟂/angle) stay fully supported — `parallel|segment|vector` and `parallel|vector|vector` are flipped in this slice.
+
+**Cells.** 12 flipped: mutual positions over {segment, line}² (9) + the ∥ gauge cells (`segment|vector`, `vector|vector`) + `parallel|segment|segment` upgraded from claim-only to a driving given.
+
+**Out (stated, filed as #386).** A CLOSED mutual position against an ABSOLUTE named line («AB חותך את l1») has no drive — it is honest (requirement + claim, so a false statement refuses) but M1-incomplete. The residual maths is done; what it needs is generalizing the pivot's trigger from "gauge lineRels" to "relations pinning the gauge against an absolute object", and adding a second parallel array instead would have grown the very chokepoint the program exists to shrink. `skew|segment|line` is unaffected — an open condition is what sampling is good at.
+
+**Budget (docs/17 §7).** The gauge drive is one more residual block inside the existing `scalarPins` loop — no new solve. The requirement adds one `resolve3` per candidate seed, the ADR-3D-064 cost, and only for figures that state a mutual position.
+
+Locked by `mutual-position.test.ts` (15, the pure classifier incl. the bounded/unbounded boundary) + `mutual-rel.test.ts` (12, end-to-end drives, the refusals, the rung and the panel row) + `relation-battery.test.ts` (5 new rows, exact-list and ratchet updated). 3-D lane 1700 green, `tsc -b` + both builds clean.

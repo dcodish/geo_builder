@@ -14,7 +14,16 @@
 
 import { sample } from './rng';
 import { defaultViewFrame } from './defaultView';
-import { isAbsolute, lineDirCarriesParam, lineRelDeviation, planeNormalCarriesParam, resolveOperand } from './operands';
+import {
+  isAbsolute,
+  lineDirCarriesParam,
+  lineRelDeviation,
+  mutualHolds,
+  mutualSides,
+  MUTUAL_VERIFY_TOL,
+  planeNormalCarriesParam,
+  resolveOperand,
+} from './operands';
 import { applyGauge, solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { decompose3 } from './vecExpr';
 import { pinSymsOf } from './types';
@@ -1907,6 +1916,13 @@ export function meetsRequirements3(c: Construction3, seed: number): boolean {
   if (c.requirements.length === 0) return true;
   const r = resolve3(c, seed);
   return c.requirements.every((req) => {
+    if (req.kind === 'mutual') {
+      // S4 (#378): the drawn configuration must actually SHOW the stated position. For `skew` this
+      // is the whole mechanism (an inequality has no residual); for the closed relations it is the
+      // open half the drive cannot express — that the crossing really falls within both segments.
+      const sides = mutualSides(req.a, req.b, c, { lines: r.lines, planes: r.planes }, (id) => r.positions.get(id) ?? null);
+      return !!sides && mutualHolds(req.rel, sides[0], sides[1], MUTUAL_VERIFY_TOL);
+    }
     const v = r.positions.get(req.vertex);
     const p = r.positions.get(req.p);
     const q = r.positions.get(req.q);

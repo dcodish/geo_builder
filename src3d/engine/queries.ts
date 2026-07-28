@@ -16,7 +16,7 @@ import { resolve3 } from './evaluate';
 import { scalePinned } from './solve3';
 import { basisDecompose, cleanNum, coordStr, decompStr, linePlaneAngleAt, newellNormal, parametricDecomp } from './dataView';
 import { centroid3, cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
-import type { Construction3, Id, Positions3 } from './types';
+import type { Construction3, Id, Positions3, Requirement3 } from './types';
 
 /** An operand: a declared vector name, or an ordered point pair. */
 type Atom = { named: string } | { pair: [Id, Id] };
@@ -323,7 +323,10 @@ function pinFreeMeasures(c: Construction3): { c: Construction3; params: string }
   const scalarPins = [...c.scalarPins];
   for (const m of c.angleMarks) {
     if (!m.label) continue;
-    const req = c.requirements.find((r) => r.kind === 'angle-bound' && r.vertex === m.vertex && ((r.p === m.p && r.q === m.q) || (r.p === m.q && r.q === m.p)));
+    const req = c.requirements.find(
+      (r): r is Extract<Requirement3, { kind: 'angle-bound' }> =>
+        r.kind === 'angle-bound' && r.vertex === m.vertex && ((r.p === m.p && r.q === m.q) || (r.p === m.q && r.q === m.p)),
+    );
     const deg = req ? ((req.min ?? (req.max ?? 90) - 30) + (req.max ?? (req.min ?? 0) + 30)) / 2 : 60; // the bound's midpoint, else a generic acute value
     scalarPins.push({ kind: 'vangle', vertex: m.vertex, p: m.p, q: m.q, deg });
   }

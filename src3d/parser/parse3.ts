@@ -18,7 +18,8 @@
  */
 
 import { readOperand } from './operandToken';
-import type { Command3, Id, LinExpr, Operand3, SolidKind, SymComp, SymTerm, VecAtom, VecExpr } from '../engine/types';
+import { sameOperand } from '../engine/operands';
+import type { Command3, Id, LinExpr, MutualRel3, Operand3, SolidKind, SymComp, SymTerm, VecAtom, VecExpr } from '../engine/types';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 
 export type ParseResult3 =
@@ -2253,19 +2254,73 @@ const bisectorPoint: Rule = (s) => {
   return [{ type: 'bisector-point', id: d, a, b, apex }];
 };
 
-/** `NK ו-PL מצטלבים` / `NK and PL are skew` (+ מקבילים/parallel, נחתכים/intersect) — mutual-position claims. */
+/**
+ * MUTUAL POSITION — «NK ו-PL מצטלבים» / «NK and PL are skew» / «AB מקביל ל-CD» / «AB חותך את CD»,
+ * over the general operand pair (S4, #378, ADR-3D-104).
+ *
+ * V7-T3 read only the plural SEGMENT-pair spelling and lowered it to a `lines-rel` claim. S4 widens
+ * it two ways at once, which is why it stays ONE rule rather than growing a second:
+ *
+ *  - OPERANDS are read by the shared tokenizer, so a named line is a first-class side
+ *    («ℓ1 ו-ℓ2 מצטלבים») — the S2 lesson that a relation's sides are classified by what they ARE.
+ *  - the DIRECTED singular («AB מקביל ל-CD») is the same statement as the plural, so both now lower
+ *    to `mutual-rel`, whose apply decides claim-vs-drive per M1. Two spellings of one statement had
+ *    two different semantics — the plural verified, the singular was refused with "coming".
+ *
+ * Ownership (first-match-wins): ∥ with a NAMED-LINE side stays S2's `lineRelGiven` cell; a crossing
+ * that NAMES its point («אלכסוני… נחתכים בנקודה O») is `diagIntersection`'s — the `$` anchor after
+ * the relation word leaves it untouched.
+ */
+const MUTUAL_WORDS: { rel: MutualRel3; plural: RegExp; directed: RegExp }[] = [
+  { rel: 'skew', plural: /מצטלב(?:ים|ות)|skew/, directed: /\s+(?:מצטלב(?:ת)?\s+עם|is\s+skew\s+(?:to|with)|skew\s+(?:to|with))\s+/ },
+  {
+    rel: 'intersecting',
+    plural: /נחתכ(?:ים|ות)|נפגש(?:ים|ות)|intersecting|intersect|meet/,
+    directed: /\s+(?:חותכ(?:ת)?\s+את|פוגש(?:ת)?\s+את|נחתך\s+עם|intersects?|meets?)\s+(?:the\s+)?/,
+  },
+  { rel: 'parallel', plural: /מקביל(?:ים|ות)|parallel/, directed: PAR_SPLIT },
+  { rel: 'coincident', plural: /מתלכד(?:ים|ות)|coincident|coinciding|coincide/, directed: /\s+(?:מתלכד(?:ת)?\s+עם|coincides?\s+with|is\s+coincident\s+with)\s+/ },
+];
+
 const mutualPositionClaim: Rule = (s0) => {
-  const s = stripStatementPrefix(s0);
-  const m =
-    s.match(/^(?:הישרים\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+ו-?([A-Z]\d*'?)([A-Z]\d*'?)\s+(מצטלבים|מקבילים|נחתכים)$/) ??
-    s.match(/^(?:lines\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s+and\s+([A-Z]\d*'?)([A-Z]\d*'?)\s+are\s+(skew|parallel|intersecting)$/);
-  if (!m) return null;
-  const rel = m[5] === 'מצטלבים' || m[5] === 'skew' ? 'skew' : m[5] === 'מקבילים' || m[5] === 'parallel' ? 'parallel' : 'intersect';
-  return [
-    { type: 'segment3', a: m[1], b: m[2] },
-    { type: 'segment3', a: m[3], b: m[4] },
-    { type: 'claim', claim: { type: 'lines-rel', a1: m[1], b1: m[2], a2: m[3], b2: m[4], rel } },
-  ];
+  const s = stripStatementPrefix(s0).trim();
+  for (const { rel, plural, directed } of MUTUAL_WORDS) {
+    // FORM A — plural/symmetric: «X ו-Y מצטלבים» · «X and Y are skew»
+    const a =
+      s.match(new RegExp(`^(?:ה?ישרים\\s+|ה?קטעים\\s+)?(.+?)\\s+ו-?\\s*(.+?)\\s+(?:${plural.source})$`)) ??
+      // `are` is optional: English states this both adjectivally («are skew») and verbally
+      // («intersect», «meet», «coincide») — one form per relation would drop half the register
+      s.match(new RegExp(`^(?:lines\\s+|segments\\s+)?(.+?)\\s+and\\s+(.+?)\\s+(?:are\\s+)?(?:${plural.source})$`, 'i'));
+    // FORM B — directed: «AB מקביל ל-CD» · «AB intersects CD»
+    const bParts = a ? null : s.split(directed);
+    const pair =
+      a ? [a[1], a[2]]
+      : bParts && bParts.length === 2 ? bParts
+      : null;
+    if (!pair) continue;
+    const o1 = readOperand(pair[0]);
+    const o2 = readOperand(pair[1]);
+    if (!o1 || !o2) continue;
+    const [x, y] = [o1.op, o2.op];
+    if (sameOperand(x, y)) return null; // says nothing — let it escalate rather than record a vacuous truth
+    // ∥ with a named-line side is S2's cell (drive-gauge / param-root) — it owns the lowering
+    if (rel === 'parallel' && (x.kind === 'line' || y.kind === 'line')) return null;
+    const located = (op: Operand3) => op.kind === 'segment' || op.kind === 'line';
+    const directional = (op: Operand3) => located(op) || op.kind === 'vector';
+    // a mutual POSITION needs located objects; ∥ is a direction relation, so a free vector qualifies
+    const ok = rel === 'parallel' ? directional(x) && directional(y) : located(x) && located(y);
+    if (!ok) continue;
+    const canon = (op: Operand3): Operand3 => (op.kind === 'line' ? { kind: 'line', name: canonicalLine(op.name) } : op);
+    return [
+      // the statement leaves ink (the ADR-3D-035 rule); apply draws it too, so this is belt-and-braces
+      // for the pair RECORD (ADR-3D-030 Am.) that a bare solid edge would otherwise not get
+      ...([x, y].filter((op) => op.kind === 'segment') as Extract<Operand3, { kind: 'segment' }>[]).map(
+        (op) => ({ type: 'segment3', a: op.a, b: op.b }) as const,
+      ),
+      { type: 'mutual-rel', rel, a: canon(x), b: canon(y) },
+    ];
+  }
+  return null;
 };
 
 /** `ABEC מלבן` / `ABEC is a rectangle` — completes the single unknown corner (verified right-angled). */
