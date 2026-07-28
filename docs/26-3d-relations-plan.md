@@ -256,13 +256,19 @@ given build silently), and «X ו-Y מקבילים» / «X מקביל ל-Y» had
 **Out, filed as #386:** the gauge×absolute closed drive (needs the pivot trigger generalized, not a
 second parallel array).
 
-**S3 — plane ↔ plane**. ∥/⟂/angle mostly fall out of dir-relations on the resolvers' normals; the
-intersection line's mixed-operand cell (named π × point-run) is a tokenizer fix.
+**S3 — plane ↔ plane** *(landed 2026-07-28, [ADR-3D-105](06b-decisions-3d.md#adr-3d-105))*. They did
+fall out of the resolvers' normals — via ONE generalization: a relation reads off the angle between
+the sides' characteristic vectors (direction, or normal) and inverts exactly when the sides are of
+different types, so `relDeviation` serves the whole matrix and `lineRelDeviation` is a special case
+of it. 15 cells; gauge×gauge drives, absolute×absolute claims, gauge×absolute is claim-gated (#386).
+Three path-bound guards found and fixed en route — the general-position check ran on only one of the
+two solve paths (a plane coincidence flattened a box to zero height and reported success), and the
+funnel treated a plane-locked base as free to rotate. **Out:** `contains` («מוכל»).
 
 **S5 — distances**. point–plane, skew lines, parallel planes: givens (`scalePinned` joins), claims, and
 the query lane («המרחק בין…»).
 
-Order: **S0 ✓ → S1 ✓ → S2 ✓ → S4 ✓ → S3 → S5.** S2–S5 are independent once S1 lands;
+Order: **S0 ✓ → S1 ✓ → S2 ✓ → S4 ✓ → S3 ✓ → S5.** S2–S5 are independent once S1 lands;
 S4 is promoted because it is the operator's named ask. Rough total: 6–8 focused sessions, one PR per
 slice (S0 as a bug fix goes straight to main per the workflow).
 

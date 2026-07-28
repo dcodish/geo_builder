@@ -131,17 +131,86 @@ export function lineRelDeviation(
   geom: OperandGeom,
   lineDir: Vec3,
 ): number | null {
-  const planar = !geom.dir && !!geom.normal;
-  const d = geom.dir ?? geom.normal;
-  if (!d) return null;
-  const den = norm3(d) * norm3(lineDir);
+  // a named line IS a directional operand — so this is `relDeviation` with the line as side B
+  return relDeviation(rel, deg, geom, { dir: lineDir });
+}
+
+/** A side's CHARACTERISTIC VECTOR: the direction it runs along, or the normal it is perpendicular to.
+ *  `planar` is what decides how the relation reads — see {@link relDeviation}. */
+const characteristic = (g: OperandGeom): { v: Vec3; planar: boolean } | null =>
+  g.dir ? { v: g.dir, planar: false } : g.normal ? { v: g.normal, planar: true } : null;
+
+/**
+ * S3 (#378) — the scalar MISALIGNMENT of a DIRECTION relation (⟂ / ∥ / a stated angle) between ANY
+ * two operands, planar or directional. 0 ⟺ the relation holds; `null` when unanswerable.
+ *
+ * Every such relation reduces to the angle between the two sides' characteristic vectors — a
+ * direction for a segment/vector/line, a normal for a plane — with ONE twist: the reading INVERTS
+ * exactly when the sides are of different types.
+ *
+ *  | sides | ⟂ means | ∥ means |
+ *  | --- | --- | --- |
+ *  | dir × dir | the directions are ⟂ ⇒ \|cos\| = 0 | the directions align ⇒ \|sin\| = 0 |
+ *  | plane × plane | the NORMALS are ⟂ ⇒ \|cos\| = 0 | the normals align ⇒ \|sin\| = 0 |
+ *  | dir × plane | the line runs ALONG the normal ⇒ \|sin\| = 0 | the line avoids it ⇒ \|cos\| = 0 |
+ *
+ * So same-type pairs read alike and only the MIXED pair flips — which is why one function serves the
+ * whole matrix instead of a rule per cell (`lineRelDeviation` is now literally this with a bare
+ * direction as side B). The stated ANGLE follows the same split: between two lines or two planes it
+ * is the ordinary \|cos\|, between a line and a plane it is the formula sheet's sin β = \|n·u\|/(\|n\|\|u\|).
+ */
+export function relDeviation(
+  rel: 'perp' | 'parallel' | 'angle',
+  deg: number | undefined,
+  a: OperandGeom,
+  b: OperandGeom,
+): number | null {
+  const ca = characteristic(a);
+  const cb = characteristic(b);
+  if (!ca || !cb) return null;
+  const den = norm3(ca.v) * norm3(cb.v);
   if (den < 1e-12) return null;
-  const cos = Math.abs(dot3(d, lineDir)) / den;
-  const sin = norm3(cross3(d, lineDir)) / den;
-  if (rel === 'perp') return planar ? sin : cos;
-  if (rel === 'parallel') return planar ? cos : sin;
+  const cos = Math.abs(dot3(ca.v, cb.v)) / den;
+  const sin = norm3(cross3(ca.v, cb.v)) / den;
+  const mixed = ca.planar !== cb.planar; // one plane, one direction — the relation reads inverted
+  if (rel === 'perp') return mixed ? sin : cos;
+  if (rel === 'parallel') return mixed ? cos : sin;
   const target = ((deg ?? 0) * Math.PI) / 180;
-  return Math.abs(cos - (planar ? Math.sin(target) : Math.cos(target)));
+  return Math.abs(cos - (mixed ? Math.sin(target) : Math.cos(target)));
+}
+
+/** The figure's size — the yardstick an OFFSET must be measured against to stay scale-free (a gap of
+ *  0.01 means something different on a unit cube than on a 100-unit one). Min 1 so an empty or
+ *  degenerate figure can never divide by ~0. */
+export function figureExtent(pos: ReadonlyMap<Id, Vec3>): number {
+  const ps = [...pos.values()];
+  if (ps.length === 0) return 1;
+  let cx = 0, cy = 0, cz = 0;
+  for (const p of ps) { cx += p.x; cy += p.y; cz += p.z; }
+  const c = { x: cx / ps.length, y: cy / ps.length, z: cz / ps.length };
+  let e = 1;
+  for (const p of ps) e = Math.max(e, norm3(sub3(p, c)));
+  return e;
+}
+
+/**
+ * S3 (#378) — how far two PLANES are from being the same plane. Null unless both sides are planar.
+ * Coincidence is parallelism PLUS a shared offset, measured relative to the figure's own size so the
+ * residual stays scale-free (an offset gap of 0.01 means something different on a unit cube than on
+ * a 100-unit one).
+ */
+export function planeCoincidenceDeviation(a: OperandGeom, b: OperandGeom, extent = 1): number | null {
+  if (!a.normal || !b.normal || a.d === undefined || b.d === undefined) return null;
+  const na = norm3(a.normal);
+  const nb = norm3(b.normal);
+  if (na < 1e-12 || nb < 1e-12) return null;
+  const par = relDeviation('parallel', undefined, a, b);
+  if (par === null) return null;
+  // signed offsets of the two unit-normalized planes; the sign of one is flipped when the normals
+  // point opposite ways, so an anti-parallel pair of the SAME plane still reads as coincident
+  const flip = dot3(a.normal, b.normal) < 0 ? -1 : 1;
+  const gap = Math.abs(a.d / na - (flip * b.d) / nb) / Math.max(extent, 1e-12);
+  return Math.hypot(par, gap);
 }
 
 // ---------------------------------------------------------------------------

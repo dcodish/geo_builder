@@ -10,6 +10,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { REL3, OPERAND_KINDS, cellStatus, supportedCells } from '../engine/relationTable';
 import { freeDofCount3 } from '../engine/evaluate';
 import { readOperand } from '../parser/operandToken';
+import { relDeviation } from '../engine/operands';
+import { newellNormal } from '../engine/vec3';
 import { derive3, useGeo3 } from '../store/store3';
 import type { Vec3 } from '../engine/vec3';
 
@@ -47,7 +49,10 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'angle|line|plane-named',
       'angle|line|plane-run',
       'angle|plane-named|plane-named',
+      'angle|plane-run|plane-named',
+      'angle|plane-run|plane-run',
       'angle|segment|line',
+      'angle|segment|plane-named',
       'angle|segment|plane-run',
       'angle|segment|segment',
       'angle|segment|vector',
@@ -55,6 +60,9 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'angle|vector|vector',
       // S4 (#378, ADR-3D-104): mutual positions over {segment, line}² + the ∥ gauge cells
       'coincident|line|line',
+      'coincident|plane-named|plane-named',
+      'coincident|plane-run|plane-named',
+      'coincident|plane-run|plane-run',
       'coincident|segment|line',
       'coincident|segment|segment',
       'intersecting|line|line',
@@ -67,20 +75,32 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'parallel|line|line',
       'parallel|line|plane-named',
       'parallel|line|plane-run',
+      'parallel|plane-named|plane-named',
+      'parallel|plane-run|plane-named',
+      'parallel|plane-run|plane-run',
       'parallel|segment|line',
+      'parallel|segment|plane-named',
       'parallel|segment|plane-run',
       'parallel|segment|segment',
       'parallel|segment|vector',
       'parallel|vector|line',
+      'parallel|vector|plane-named',
+      'parallel|vector|plane-run',
       'parallel|vector|vector',
       'perp|line|line',
       'perp|line|plane-named',
       'perp|line|plane-run',
+      'perp|plane-named|plane-named',
+      'perp|plane-run|plane-named',
+      'perp|plane-run|plane-run',
       'perp|segment|line',
+      'perp|segment|plane-named',
       'perp|segment|plane-run',
       'perp|segment|segment',
       'perp|segment|vector',
       'perp|vector|line',
+      'perp|vector|plane-named',
+      'perp|vector|plane-run',
       'perp|vector|vector',
       'skew|line|line',
       'skew|segment|line',
@@ -121,6 +141,25 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'parallel|segment|segment',
       'parallel|segment|vector',
       'parallel|vector|vector',
+      // S3 (#378, ADR-3D-105) — the plane column
+      'perp|plane-run|plane-run',
+      'parallel|plane-run|plane-run',
+      'angle|plane-run|plane-run',
+      'coincident|plane-run|plane-run',
+      'perp|vector|plane-run',
+      'parallel|vector|plane-run',
+      'angle|plane-run|plane-named',
+      'perp|plane-named|plane-named',
+      'parallel|plane-named|plane-named',
+      'coincident|plane-named|plane-named',
+      'perp|segment|plane-named',
+      'parallel|segment|plane-named',
+      'angle|segment|plane-named',
+      'perp|plane-run|plane-named',
+      'parallel|plane-run|plane-named',
+      'coincident|plane-run|plane-named',
+      'perp|vector|plane-named',
+      'parallel|vector|plane-named',
     ]);
     const BATTERY_PENDING = new Set([
       // S1 seeds the harness with 7 rows; these supported cells are exercised by their own
@@ -294,6 +333,79 @@ describe('the battery — supported cells exercised end-to-end', () => {
     state().clear();
     for (const u of ['פירמידה משולשת ABCD', 'AB=u', 'CD=v', 'u מקביל ל-v']) submit(u);
     expect(state().lastError).toBeNull();
+  });
+
+  // ---- S3 (#378, ADR-3D-105): the PLANE column ------------------------------------------
+
+  it('plane-run × plane-run — ⟂ / angle DRIVE a free tetra (asserted non-satisfied before)', () => {
+    submit('פירמידה משולשת ABCD');
+    const dev = (seed: number, rel: 'perp' | 'angle', deg?: number): number => {
+      const pos = derive3(state().facts, seed).resolved.positions;
+      const n = (ids: string[]) => newellNormal(ids.map((id) => pos.get(id)!));
+      return relDeviation(rel, deg, { normal: n(['A', 'B', 'C']) }, { normal: n(['A', 'B', 'D']) })!;
+    };
+    for (const seed of [0, 1]) expect(dev(seed, 'perp'), `not ⟂ before, seed ${seed}`).toBeGreaterThan(1e-3);
+    submit('המישור ABC מאונך למישור ABD');
+    expect(state().lastError).toBeNull();
+    for (const seed of [0, 1, 2]) expect(dev(seed, 'perp'), `⟂ at seed ${seed}`).toBeLessThan(1e-4);
+    state().clear();
+    for (const u of ['tetrahedron ABCD', 'the angle between plane ABC and plane ABD is 60']) submit(u);
+    expect(state().lastError).toBeNull();
+    expect(dev(0, 'angle', 60)).toBeLessThan(1e-4);
+  });
+
+  it('plane-run × plane-run — ∥ and coincident verify, and a false one refuses', () => {
+    for (const u of ["תיבה ABCDA'B'C'D'", "המישור ABC מקביל למישור A'B'C'"]) submit(u);
+    expect(state().lastError).toBeNull();
+    state().clear();
+    for (const u of ["תיבה ABCDA'B'C'D'", 'המישור ABC מתלכד עם המישור ABD']) submit(u); // one base plane
+    expect(state().lastError).toBeNull();
+    state().clear();
+    for (const u of ["תיבה ABCDA'B'C'D'", "המישור ABC מתלכד עם המישור A'B'C'"]) submit(u); // would collapse the box
+    expect(state().lastError, 'a collapsed solid is not a figure').not.toBeNull();
+  });
+
+  it('vector × plane-run — ⟂ drives the apex over the base; ∥ verifies', () => {
+    for (const u of ['פירמידה משולשת ABCD', 'AD=u', 'u מאונך למישור ABC']) submit(u);
+    expect(state().lastError).toBeNull();
+    for (const seed of [0, 1]) {
+      const pos = derive3(state().facts, seed).resolved.positions;
+      const n = newellNormal(['A', 'B', 'C'].map((id) => pos.get(id)!));
+      expect(relDeviation('perp', undefined, { dir: vsub(pos.get('D')!, pos.get('A')!) }, { normal: n })!, `⟂ at seed ${seed}`).toBeLessThan(1e-4);
+    }
+    state().clear();
+    for (const u of ['פירמידה משולשת ABCD', 'AB=u', 'u מקביל למישור ABD']) submit(u); // AB lies in ABD
+    expect(state().lastError).toBeNull();
+  });
+
+  it('plane-named × plane-named — the absolute lane is a claim: true verifies, false refuses', () => {
+    for (const u of ['המישור π1: z = 0', 'המישור π2: x = 0', 'π1 ניצב ל-π2']) submit(u);
+    expect(state().lastError).toBeNull();
+    state().clear();
+    for (const u of ['המישור π1: z = 0', 'המישור π2: z - 3 = 0', 'π1 מקביל ל-π2']) submit(u);
+    expect(state().lastError).toBeNull();
+    state().clear();
+    for (const u of ['המישור π1: z = 0', 'המישור π2: z = 0', 'π1 מתלכד עם π2']) submit(u);
+    expect(state().lastError).toBeNull();
+    state().clear();
+    for (const u of ['המישור π1: z = 0', 'המישור π2: z - 3 = 0', 'π1 ניצב ל-π2']) submit(u);
+    expect(state().lastError, 'a false ⟂ is refused, not drawn').not.toBeNull();
+  });
+
+  it('gauge × ABSOLUTE plane — claim-gated: a true statement verifies on a frame-pinned figure', () => {
+    // These cells have no drive (the figure would have to MOVE — the pivot lane, #386). They are
+    // honest: true verifies, false refuses. Pinning the base to the xy-plane gives a true instance.
+    for (const u of ["תיבה ABCDA'B'C'D'", 'הבסיס ABCD שוכן במישור ה-xy', 'המישור π1: z = 0']) submit(u);
+    expect(state().lastError).toBeNull();
+    for (const u of ['המישור ABC מתלכד עם המישור π1', 'AB מקביל למישור π1', "AA' מאונך למישור π1"]) {
+      submit(u);
+      expect(state().lastError, u).toBeNull();
+    }
+  });
+
+  it('gauge × ABSOLUTE plane — a FALSE statement refuses rather than drawing a wrong figure', () => {
+    for (const u of ["תיבה ABCDA'B'C'D'", 'הבסיס ABCD שוכן במישור ה-xy', 'המישור π1: z = 0', 'AB מאונך למישור π1']) submit(u);
+    expect(state().lastError, 'a base edge is not ⟂ to the base plane').not.toBeNull();
   });
 
   it('angle|segment|plane-run — drives a free box to the stated 30 degrees', () => {

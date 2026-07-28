@@ -320,6 +320,7 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
     case 'line-rel':
       return lineRelRefsError(c, claim.op, claim.line);
     case 'mutual-rel':
+    case 'plane-rel':
       return operandRefsError(c, claim.a) ?? operandRefsError(c, claim.b);
     case 'vec-eq': {
       const pointErr = missingPoint(c, [...exprPointIds(claim.lhs), ...exprPointIds(claim.rhs)]);
@@ -952,6 +953,29 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
 
       // (3) the CLAIM — the final arbiter on the finished figure, per the ADR-3D-079 shape
       next.claims.push({ type: 'mutual-rel', rel: cmd.rel, a: cmd.a, b: cmd.b });
+      return { ok: true, next };
+    }
+
+    case 'plane-rel': {
+      const err = operandRefsError(c, cmd.a) ?? operandRefsError(c, cmd.b);
+      if (err) return { ok: false, error: err };
+      if (sameOperand(cmd.a, cmd.b)) return { ok: false, error: { code: 'vacuous-relation' } };
+      const next = clone(c);
+      // the statement leaves ink; a POINT-RUN side is also materialised as a plane so the patch
+      // exists to grow toward the other operand (#383 — a stated relation must leave a visible trace)
+      for (const op of [cmd.a, cmd.b]) {
+        if (op.kind === 'segment') drawAtom(next, { kind: 'pair', from: op.a, to: op.b });
+        if (op.kind === 'plane-run') {
+          const name = op.ids.join('');
+          if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...op.ids]);
+        }
+      }
+      // the DRIVE — only when both operands ride the gauge (an absolute side would have to MOVE the
+      // figure, which is the pivot's lane; those instances stay claim-verified, see #386's sibling)
+      if (!isAbsolute(cmd.a) && !isAbsolute(cmd.b)) {
+        next.scalarPins.push({ kind: 'plane-rel', rel: cmd.rel, ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}), a: cmd.a, b: cmd.b });
+      }
+      next.claims.push({ type: 'plane-rel', rel: cmd.rel, ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}), a: cmd.a, b: cmd.b });
       return { ok: true, next };
     }
 

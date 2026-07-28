@@ -1268,7 +1268,12 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     gaugeLineRels.length === 0 && // S2 (#378): a driven line relation pinned the orientation
     c.planePins.length === 0 &&
     c.memberships.length === 0 &&
-    !c.coordPlanePins.some((cp) => cp.mode === 'share' || cp.mode === 'perp' || cp.mode === 'contains');
+    // S3 (#378): `zero` belongs here too. It says the ring LIES IN a coordinate plane («הבסיס ABCD
+    // שוכן במישור ה-xy»), which fixes the ring's orientation as surely as it fixes its offset — it
+    // was listed under translation only, so the moment any absolute object entered the figure the
+    // funnel judged rotation free, spun the solid, and tipped the base off the plane it was pinned
+    // to. Silent destruction of a stated given; the ADR-3D-101 classification, completed.
+    !c.coordPlanePins.some((cp) => cp.mode === 'share' || cp.mode === 'perp' || cp.mode === 'contains' || cp.mode === 'zero');
   if ((translationFree || rotationFree) && c.solids.length > 0 && hasAbsoluteFrameObject(c)) {
     const gaugeIds: Id[] = [];
     for (const [id, def] of c.points) {

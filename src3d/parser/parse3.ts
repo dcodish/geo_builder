@@ -19,7 +19,7 @@
 
 import { readOperand } from './operandToken';
 import { sameOperand } from '../engine/operands';
-import type { Command3, Id, LinExpr, MutualRel3, Operand3, SolidKind, SymComp, SymTerm, VecAtom, VecExpr } from '../engine/types';
+import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SymComp, SymTerm, VecAtom, VecExpr } from '../engine/types';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 
 export type ParseResult3 =
@@ -2536,6 +2536,70 @@ const tetraAltitude: Rule = (s) => {
  *  A1/PAR-11 pattern copied per docs/20 §12): the guard runs EVERY rule against the catalog corpus (not
  *  stopping at the first match) and hard-gates the divergent winner/later-claimer pairs against a
  *  reviewed allowlist. Zero runtime cost — production code must keep calling `parse3`. */
+/**
+ * S3 (#378, ADR-3D-105): a DIRECTION relation with a PLANE on at least one side —
+ * «המישור ABC מקביל למישור A'B'C'», «π1 ניצב ל-π2», «AB מקביל למישור π»,
+ * «הזווית בין המישור ABC לבין המישור ABD היא 60», «המישורים מתלכדים».
+ *
+ * Ownership (first-match-wins): every rule with a FROZEN lowering runs earlier and keeps its cell —
+ * `linePerpPlane` (ℓ⟂π), `planeLinePerp` (point-run ⟂ ℓ), `angleBetweenPlanes` (π×π angle, the
+ * param-root 2022-Q2 form), `perpPlaneClaim` and `segParallelPlane` (segment × point-run). What
+ * reaches here is exactly the matrix's unfilled plane cells, so the rule DEFERS unless a plane is
+ * present and no earlier owner applies.
+ */
+const planeRelGiven: Rule = (s0) => {
+  const s = stripStatementPrefix(s0).trim();
+  const forms: [PlaneRel3, RegExp][] = [
+    ['perp', PERP_SPLIT],
+    ['parallel', PAR_SPLIT],
+    ['coincident', /\s*(?:מתלכד(?:ים|ות)?\s*(?:עם\s*)?|coincides?\s+with|are\s+coincident\s+with|is\s+coincident\s+with)\s*-?\s*/],
+  ];
+  for (const [rel, splitter] of forms) {
+    const parts = s.split(splitter);
+    if (parts.length !== 2) continue;
+    const a = readOperand(parts[0]);
+    const b = readOperand(parts[1]);
+    if (!a || !b) continue;
+    const planar = (op: Operand3) => op.kind === 'plane-run' || op.kind === 'plane-named';
+    if (!planar(a.op) && !planar(b.op)) continue; // no plane: not this rule's business
+    if (a.op.kind === 'line' || b.op.kind === 'line') continue; // a named line's cells are S2's
+    if (a.op.kind === 'point' || b.op.kind === 'point') return null; // a point has no direction
+    if (sameOperand(a.op, b.op)) return null;
+    // the frozen segment × POINT-RUN owners keep their cells (they run earlier; defensive)
+    if (rel !== 'coincident' && (a.op.kind === 'segment' || b.op.kind === 'segment')) {
+      const other = a.op.kind === 'segment' ? b.op : a.op;
+      if (other.kind === 'plane-run') continue;
+    }
+    if (rel === 'coincident' && (!planar(a.op) || !planar(b.op))) continue; // only planes coincide here
+    const canon = (op: Operand3): Operand3 => (op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) } : op);
+    return [{ type: 'plane-rel', rel, a: canon(a.op), b: canon(b.op) }];
+  }
+  return null;
+};
+
+/** S3 (#378): a stated ANGLE VALUE with a PLANE on at least one side that `linePlaneAngle` (segment ×
+ *  point-run) and `angleBetweenPlanes` (named π × π) do not already own. */
+const planeRelAngle: Rule = (s) => {
+  const m =
+    s.match(new RegExp(`^ה?זו?וית\\s+(?:ש)?בין\\s+(.+?)\\s+(?:[לו]בין\\s+|ו-?\\s*|ל-?\\s*)(.+?)\\s*(?:היא|הוא|=|שווה\\s+ל?-?)\\s*(${NUM})\\s*°?$`)) ??
+    s.match(new RegExp(`^(?:the\\s+)?angle\\s+between\\s+(.+?)\\s+and\\s+(.+?)\\s*(?:is|=)\\s*(${NUM})\\s*°?$`, 'i'));
+  if (!m) return null;
+  const a = readOperand(m[1]);
+  const b = readOperand(m[2]);
+  if (!a || !b) return null;
+  const planar = (op: Operand3) => op.kind === 'plane-run' || op.kind === 'plane-named';
+  if (!planar(a.op) && !planar(b.op)) return null;
+  if (a.op.kind === 'line' || b.op.kind === 'line') return null; // S2's cells
+  if (a.op.kind === 'point' || b.op.kind === 'point') return null;
+  if (sameOperand(a.op, b.op)) return null;
+  // `linePlaneAngle` owns SEGMENT × point-run (its `line-plane-angle` lowering is frozen). Deferring
+  // here rather than relying on rule order keeps the two from being a divergent shadow pair at all.
+  if ((a.op.kind === 'segment' && b.op.kind === 'plane-run') || (b.op.kind === 'segment' && a.op.kind === 'plane-run')) return null;
+  const canon = (op: Operand3): Operand3 => (op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) } : op);
+  return [{ type: 'plane-rel', rel: 'angle', deg: +m[3], a: canon(a.op), b: canon(b.op) }];
+};
+
+
 export const RULES: Rule[] = [
   // #324: FIRST — gated by the lowercase-coordinate object so it can never steal, while the
   // polygon rules WOULD steal its polygon-noun subjects (building the shape, dropping the clause)
@@ -2595,6 +2659,8 @@ export const RULES: Rule[] = [
   intersectionLine,
   dropPerpToLine,
   lineRelGiven, // S2 (#378): ∥/⟂ with a NAMED-LINE side — after the line⟂π / plane-run⟂line / common-perp owners
+  planeRelAngle, // S3 (#378): an angle value with a PLANE side — after linePlaneAngle/angleBetweenPlanes
+  planeRelGiven, // S3 (#378): ∥/⟂/coincident with a PLANE side — after every frozen plane owner
   nameVectors,
   centroidRule,
   diagIntersection, // `מפגש האלכסונים` — before onSegment/midpoint grab the tokens

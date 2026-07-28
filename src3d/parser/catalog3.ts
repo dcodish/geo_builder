@@ -174,6 +174,13 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'AB ו-l1 מצטלבים', en: 'AB and l1 are skew' },
   { category: 'planesLines', he: 'l1 ו-l2 מצטלבים', en: 'l1 and l2 are skew' },
   { category: 'planesLines', he: 'AB מתלכד עם CD', en: 'AB coincides with CD' },
+  // S3 (#378, ADR-3D-105): the PLANE column — ⟂ / ∥ / angle / coincident wherever a plane is a side
+  { category: 'planesLines', he: "המישור ABC מקביל למישור A'B'C'", en: "plane ABC is parallel to plane A'B'C'" },
+  { category: 'planesLines', he: 'המישור ABC מאונך למישור ABD', en: 'plane ABC is perpendicular to plane ABD' },
+  { category: 'planesLines', he: 'הזווית בין המישור ABC לבין המישור ABD היא 60', en: 'the angle between plane ABC and plane ABD is 60' },
+  { category: 'planesLines', he: 'המישור ABC מתלכד עם המישור ABD', en: 'plane ABC coincides with plane ABD' },
+  { category: 'planesLines', he: 'π1 ניצב ל-π2', en: 'π1 is perpendicular to π2' },
+  { category: 'planesLines', he: 'u מאונך למישור ABC', en: 'u is perpendicular to plane ABC' },
   // --- V8-f: vector-relation givens ---
   { category: 'vectors', he: 'קוסינוס הזווית בין הוקטורים u ו-w הוא √35/10', en: 'the cosine of the angle between u and w is √35/10' },
   { category: 'vectors', he: 'קוסינוס הזווית ACB = 3/4', en: 'cos∠ACB = 3/4' },

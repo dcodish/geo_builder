@@ -1349,6 +1349,66 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "plane ABC is parallel to plane A'B'C'",
+    "winner": "planeRelGiven",
+  },
+  {
+    "lang": "he",
+    "text": "המישור ABC מקביל למישור A'B'C'",
+    "winner": "planeRelGiven",
+  },
+  {
+    "lang": "en",
+    "text": "plane ABC is perpendicular to plane ABD",
+    "winner": "planeRelGiven",
+  },
+  {
+    "lang": "he",
+    "text": "המישור ABC מאונך למישור ABD",
+    "winner": "planeRelGiven",
+  },
+  {
+    "lang": "en",
+    "text": "the angle between plane ABC and plane ABD is 60",
+    "winner": "planeRelAngle",
+  },
+  {
+    "lang": "he",
+    "text": "הזווית בין המישור ABC לבין המישור ABD היא 60",
+    "winner": "planeRelAngle",
+  },
+  {
+    "lang": "en",
+    "text": "plane ABC coincides with plane ABD",
+    "winner": "planeRelGiven",
+  },
+  {
+    "lang": "he",
+    "text": "המישור ABC מתלכד עם המישור ABD",
+    "winner": "planeRelGiven",
+  },
+  {
+    "lang": "en",
+    "text": "π1 is perpendicular to π2",
+    "winner": "planeRelGiven",
+  },
+  {
+    "lang": "he",
+    "text": "π1 ניצב ל-π2",
+    "winner": "planeRelGiven",
+  },
+  {
+    "lang": "en",
+    "text": "u is perpendicular to plane ABC",
+    "winner": "planeRelGiven",
+  },
+  {
+    "lang": "he",
+    "text": "u מאונך למישור ABC",
+    "winner": "planeRelGiven",
+  },
+  {
+    "lang": "en",
     "text": "the cosine of the angle between u and w is √35/10",
     "winner": "cosAngleGiven",
   },
