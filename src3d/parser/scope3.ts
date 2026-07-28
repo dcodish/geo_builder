@@ -29,8 +29,10 @@ export type ScopeCategory3 =
   | 'ui-command'
   | 'oblique-prism'
   | 'lowercase-labels'
-  // S2 (#378, DoD 12): the named-line column's UNSUPPORTED neighbours get guidance, not LLM roulette
-  | 'plane-plane-rel';
+  // S2 (#378, DoD 12) added two forward-pointing categories; S4 and S3 have since retired both by
+  // SUPPORTING their forms. Guidance for something the parser handles is a lie — the #73 no-theft
+  // sweep enforces that, and it is what caught the stale entry.
+  ;
 
 export interface ScopeMatch3 {
   category: ScopeCategory3;
@@ -99,16 +101,9 @@ const RULES3: ScopeRule3[] = [
   // S4 (#378, ADR-3D-104): the `seg-parallel-given` guidance is RETIRED — «AB מקביל ל-CD» is now
   // a supported given (it drives, the plural spelling lowers identically). Guidance for a form the
   // parser handles would be a lie, so the category is deleted rather than reworded.
-  {
-    // S2 (#378): a plane↔plane ∥/⟂ — the S3 slice's cells. The angle-between-planes form IS
-    // supported for named planes; the message points at it.
-    category: 'plane-plane-rel',
-    patterns: [
-      // a COORDINATE plane target ([xy], xz…) is the supported ADR-3D-079 family — excluded
-      /^ה?מישור\s+\S+\s+(?:ש?מקביל|מאונ[ךכ]|ניצב|אנ[ךכ])\s*.*ל-?\s*ה?מישור\s+(?!\[?(?:xy|xz|yz)\]?(?:\s|$))/,
-      /^(?:the\s+)?plane\s+.+(?:parallel|perpendicular)\s+to\s+(?:the\s+)?plane\s+(?!\[?(?:xy|xz|yz)\]?(?:\s|$))/i,
-    ],
-  },
+  // S3 (#378, ADR-3D-105): the `plane-plane-rel` guidance is RETIRED for the same reason — a
+  // plane↔plane ∥/⟂ is now a supported given. Both of S2's guidance categories have now been
+  // consumed by the slices they were pointing forward to, which is what guidance is FOR.
 ];
 
 /** Classify a FAILED utterance into a guidance family, or null = a genuine gap (stays not-understood). */
