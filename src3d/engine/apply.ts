@@ -802,6 +802,16 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         // honest under-determination refusal (#325 lifts this only for EXISTING points,
         // where the solid gives the symbols a figure to ride).
         const letters = [...new Set((cmd.syms ?? []).flatMap((s) => (s !== null ? [s] : [])))];
+        // ADR-3D-094 (#276): NO letters at all means the nulls are simply UNSTATED numeric
+        // components («D על החלק החיובי של ציר ה-x» → y=z=0, x free) — the M1 dual of the
+        // existing-point partial PIN: a NEW id becomes a `partial` point whose null
+        // components are free sampled DOFs (the on-plane/on-line rider shape, axis edition;
+        // a stated sign-given selects the sample's sign at resolve time).
+        if (letters.length === 0) {
+          const next = clone(c);
+          next.points.set(cmd.id, { kind: 'partial', x: cmd.x, y: cmd.y, z: cmd.z });
+          return { ok: true, next };
+        }
         if (letters.length === 1) {
           const sym = letters[0];
           if (c.param && c.param !== sym) return { ok: false, error: { code: 'two-params' } };
