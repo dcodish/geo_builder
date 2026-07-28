@@ -13,6 +13,7 @@
  */
 
 import { sample } from './rng';
+import { defaultViewFrame } from './defaultView';
 import { applyGauge, solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { decompose3 } from './vecExpr';
 import { pinSymsOf } from './types';
@@ -1134,16 +1135,38 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       // seed that lands a vertex a hundredth of an edge from the line draws exactly the coincidence
       // this fix exists to remove (measured: seed 26 of the reported figure cleared by 0.066).
       // General position is the 2-D ADR-253 rule, placement edition.
+      // #372: clearing in R³ is necessary and NOT sufficient — the student judges the DRAWING, and a
+      // line can miss a vertex by a wide margin in space while projecting straight through it (measured
+      // on the reported figure: 0.28 of an edge in world space, 4.9 px on screen). So a candidate is
+      // scored on BOTH: its world clearance, and its clearance as seen from the DEFAULT view. Fixed
+      // direction, never the live camera — scoring against that would re-place the figure as the student
+      // orbits. A plane is excluded from the projected test on purpose: it projects to a region, so a
+      // point drawn "inside" it is ordinary depth ambiguity, not a claimed coincidence.
+      const view = defaultViewFrame();
+      const flat = (p: Vec3) => ({ x: dot3(p, view.right), y: dot3(p, view.up) });
       const clearance = (): number => {
         let worst = Infinity;
         for (const id of gaugeIds) {
           const p = pos.get(id);
           if (!p) continue;
+          const fp = flat(p);
           for (const L of lines.values()) {
             const dn = norm3(L.dir);
             if (dn < 1e-9) continue;
             const ap = sub3(p, L.anchor);
             worst = Math.min(worst, norm3(sub3(ap, scale3(L.dir, dot3(ap, L.dir) / (dn * dn)))));
+            // …and the same separation in the projection
+            const fa = flat(L.anchor);
+            const fd = flat(add3(L.anchor, L.dir));
+            const ex = fd.x - fa.x;
+            const ey = fd.y - fa.y;
+            const len = Math.hypot(ex, ey);
+            worst = Math.min(
+              worst,
+              len < 1e-9
+                ? Math.hypot(fp.x - fa.x, fp.y - fa.y) // the line points at the viewer: it draws as a dot
+                : Math.abs((fp.x - fa.x) * ey - (fp.y - fa.y) * ex) / len,
+            );
           }
           for (const pl of planes.values()) {
             const nn = norm3(pl.n);
@@ -1152,7 +1175,10 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
           for (const [id2, def2] of c.points) {
             if (def2.kind !== 'coord' && def2.kind !== 'coord-sym') continue;
             const q = pos.get(id2);
-            if (q) worst = Math.min(worst, dist3(p, q));
+            if (!q) continue;
+            worst = Math.min(worst, dist3(p, q));
+            const fq = flat(q);
+            worst = Math.min(worst, Math.hypot(fp.x - fq.x, fp.y - fq.y));
           }
         }
         return worst;

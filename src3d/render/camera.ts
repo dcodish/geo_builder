@@ -9,6 +9,7 @@
  * Orbit never changes the figure — it is strictly a view concern (docs/20 §6.4).
  */
 
+import { DEFAULT_VIEW } from '../engine/defaultView';
 import { cross3, dot3, normalize3, v3, type Vec3 } from '../engine/vec3';
 
 export interface Camera3 {
@@ -20,8 +21,12 @@ export interface Camera3 {
 
 const rad = (d: number) => (d * Math.PI) / 180;
 
-/** The classic ¾ textbook view: from the front-right, a little above. */
-export const HOME_CAMERA: Camera3 = { yaw: rad(-60), pitch: rad(20) };
+/**
+ * The classic ¾ textbook view: from the front-right, a little above. The angles live in
+ * `engine/defaultView` because the engine scores unstated placements against this same direction
+ * (#372) — one definition, so the view it optimises for is the view the student gets.
+ */
+export const HOME_CAMERA: Camera3 = { yaw: rad(DEFAULT_VIEW.yawDeg), pitch: rad(DEFAULT_VIEW.pitchDeg) };
 
 export const MAX_PITCH = rad(85);
 

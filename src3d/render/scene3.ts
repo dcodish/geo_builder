@@ -465,14 +465,21 @@ export function buildScene3(
   const wLines: { name: string; a: Vec3; b: Vec3; form: string }[] = [];
   for (const [name, ln] of resolved.lines) {
     const mid = projectOntoLine(center, ln);
+    // #372: a direction vector's MAGNITUDE is arbitrary — `(0, m, 2m-2)` has whatever length the sampled
+    // m gives it — so the drawn reach must be taken along the UNIT direction. Unnormalized, a line with
+    // |dir| ≈ 8 drew eight times too long, which blew out the isotropic fit and shrank the rest of the
+    // figure to a corner: the operator's vertices sat 4 px from the line while genuinely clearing it by
+    // 0.3 world units. The line is infinite; how much of it we draw is a presentation choice and must
+    // not depend on how the student happened to scale its direction.
+    const dir = norm3(ln.dir) > 1e-9 ? normalize3(ln.dir) : ln.dir;
     const reach = radius * 1.1;
     const def = c.lines.get(name);
     const carriesParam =
       def?.kind === 'parametric' && [...def.anchor, ...def.dir].some((e) => e.p !== 0);
     wLines.push({
       name,
-      a: sub3(mid, scale3(ln.dir, reach)),
-      b: add3(mid, scale3(ln.dir, reach)),
+      a: sub3(mid, scale3(dir, reach)),
+      b: add3(mid, scale3(dir, reach)),
       form:
         carriesParam && paramFree && def?.kind === 'parametric'
           ? `${name}: ${def.src}`

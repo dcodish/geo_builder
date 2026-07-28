@@ -1503,3 +1503,19 @@ Locked by `line-perp-plane-mark.test.ts` (2), **asserted to fail before the fix*
 **Also closes** the substance of #369 (marks are excluded from the projection fit): a 13 px annotation cannot escape the 44 px margin, asserted.
 
 Locked by `knee-screen-size.test.ts` (3), **asserted to fail pre-fix** in both directions — 2.11 px on the operator's pointless figure, and 30.08 px on a compact box against the same 10–30 px band.
+
+### ADR-3D-099 — A placement must READ correctly, not merely be correct (issue #372)
+
+**Class.** *A geometric guarantee is enforced in the model and judged in the view.* [ADR-3D-095](#adr-3d-095) made an unstated placement a sampled DOF and guaranteed it clears every absolute object in R³ — necessary, and not sufficient: a line can miss a vertex by a wide margin in space and project straight through it. The student reads the drawing.
+
+**Instance (operator, 2026-07-28, within minutes of ADR-3D-095 shipping).** On the reported figure, screen distance from the nearest vertex to the drawn line, home camera: 51.0 px at seed 0 but **4.9 px at seed 4** and **1.1 px at seed 8** — configurations that draw exactly the coincidence ADR-3D-095 exists to remove, reachable through the very "show another configuration" that ADR-3D-095 added.
+
+**Operator ruling (2026-07-28).** Of the three options offered — score placements against a canonical view, adapt the default camera to the figure, or accept it — **score against the view**. The camera-adaptation route (the ADR-3D-025 face-on idea) stays deferred; it fights the student once they orbit manually.
+
+**Fix, part 1 — the view enters the score.** `src3d/engine/defaultView.ts` holds the canonical viewing direction, and `render/camera.ts` builds `HOME_CAMERA` from the same angles, so the direction the engine optimises for is the direction the student gets (asserted frame-by-frame). Placement candidates are now scored on world clearance **and** separation in that projection. It is deliberately the FIXED default view, never the live camera: scoring against the live camera would re-place the figure as the student orbits, which is worse than the problem it solves. A plane is excluded from the projected test on purpose — it projects to a region, so a point drawn "inside" it is ordinary depth ambiguity, not a claimed coincidence.
+
+**Fix, part 2 — the one that actually dominated.** Part 1 alone moved the worst case only 4.9 → 12.9 px, and a candidate sweep four times wider changed nothing: the projected clearances *were* being satisfied (0.279–0.611 world units) while still drawing at 4 px. The cause was elsewhere. A line's drawn extent was `scale3(ln.dir, reach)` with an **unnormalized** direction — and a direction vector's magnitude is arbitrary (`(0, m, 2m-2)` has whatever length the sampled m gives it), so a line with |dir| ≈ 8 drew eight times too long, blew out the isotropic fit, and shrank the figure into a corner. How much of an infinite line we draw is a presentation choice; it must not depend on how the student happened to scale its direction. Taking the reach along the unit direction moved the worst case 3.9 → **23.8 px**.
+
+**Measured.** Worst screen separation over the seed sweep: **1.1 px → 23.8 px**. The widened candidate search was reverted after measuring it bought nothing once the fit was right (12 candidates, unchanged from ADR-3D-095) — the sweep was fine; the drawing scale was lying to it.
+
+Locked by `view-legibility.test.ts` (3), **asserted to fail pre-fix**: the seed sweep's worst separation, a line's drawn length being independent of its direction's scale, and the engine/renderer view frames agreeing.
