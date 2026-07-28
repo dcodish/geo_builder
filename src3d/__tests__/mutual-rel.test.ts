@@ -13,6 +13,7 @@ import { derive3, useGeo3 } from '../store/store3';
 import { buildScene3 } from '../render/scene3';
 import { HOME_CAMERA } from '../render/camera';
 import { dataView } from '../engine/dataView';
+import { scalePinned } from '../engine/solve3';
 import type { Vec3 } from '../engine/vec3';
 
 const submit = (u: string) => useGeo3.getState().submit(u);
@@ -149,6 +150,29 @@ describe('surfacing — the DATA PANEL says it, the canvas stays clean (operator
     for (const u of ["תיבה ABCDA'B'C'D'", 'AB', 'BC']) submit(u);
     const panel = dataView(derive3(state().facts, state().seed).construction, state().seed);
     expect(panel.mutual.some((m) => (m.a === 'AB' && m.b === 'BC') || (m.a === 'BC' && m.b === 'AB'))).toBe(false);
+  });
+});
+
+describe('a mutual relation is similarity-INVARIANT — it must not pin the scale', () => {
+  it('«AB מקביל ל-DC» on a free quad reports NO magnitude (operator, 2026-07-28)', () => {
+    // The regression this locks: `scalePinned` was an EXCLUSION list, so the new `mutual` pin
+    // defaulted to "pins the scale" and the panel began printing `AB = 1` — a number that is pure
+    // gauge (a figure's first dim is the frozen unit) and that the student was never given.
+    for (const u of ['מרובע ABCD', 'AB מקביל ל-DC']) submit(u);
+    expect(state().lastError).toBeNull();
+    const panel = dataView(derive3(state().facts, state().seed).construction, state().seed);
+    expect(panel.relations.filter((r) => /^\|[A-Z]/.test(r) && r.includes('=')), 'no invented magnitude').toEqual([]);
+    expect(panel.vectors.every((v) => v.mag === null), 'no vector magnitude either').toBe(true);
+  });
+
+  it('scalePinned stays FALSE for a figure whose only given is a mutual relation', () => {
+    for (const u of ['פירמידה ABCD', 'AB ו-CD מצטלבים']) submit(u);
+    expect(scalePinned(derive3(state().facts, 0).construction)).toBe(false);
+  });
+
+  it('…and TRUE the moment a real size is stated — the predicate still works', () => {
+    for (const u of ['מרובע ABCD', 'AB מקביל ל-DC', '|AB| = 3']) submit(u);
+    expect(scalePinned(derive3(state().facts, 0).construction)).toBe(true);
   });
 });
 
