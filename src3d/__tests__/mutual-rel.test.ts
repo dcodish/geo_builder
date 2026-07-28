@@ -106,27 +106,49 @@ describe('intersecting — the closed half drives, the open half is gated', () =
   });
 });
 
-describe('surfacing — a skew pair must READ as skew (the operator call, 2026-07-28)', () => {
-  it('draws the dashed common-perpendicular RUNG between the two closest points', () => {
+describe('surfacing — the DATA PANEL says it, the canvas stays clean (operator, 2026-07-28)', () => {
+  it('the canvas draws NO extra ink for a stated relation', () => {
     for (const u of ['פירמידה ABCD', 'AB ו-CD מצטלבים']) submit(u);
     expect(state().lastError).toBeNull();
     const d = derive3(state().facts, state().seed);
-    const scene = buildScene3(d.construction, d.resolved, HOME_CAMERA, { width: 640, height: 460 });
-    expect(scene.rungs.length, 'one rung per stated skew pair').toBe(1);
-    const r = scene.rungs[0];
-    expect(Math.hypot(r.x2 - r.x1, r.y2 - r.y1), 'the rung has visible length').toBeGreaterThan(1);
-  });
-
-  it('no rung without a stated skew — the resting figure stays clean', () => {
+    const withRel = buildScene3(d.construction, d.resolved, HOME_CAMERA, { width: 640, height: 460 });
+    state().clear();
     submit('פירמידה ABCD');
-    const d = derive3(state().facts, state().seed);
-    expect(buildScene3(d.construction, d.resolved, HOME_CAMERA, { width: 640, height: 460 }).rungs).toEqual([]);
+    const d0 = derive3(state().facts, state().seed);
+    const without = buildScene3(d0.construction, d0.resolved, HOME_CAMERA, { width: 640, height: 460 });
+    // the segments AB/CD are drawn by the statement; nothing ELSE appears — in particular no dashed
+    // rung, since dashed already means HIDDEN in this renderer and would read as a hidden edge
+    expect(Object.keys(withRel)).toEqual(Object.keys(without));
+    expect(withRel.marks.length).toBe(without.marks.length);
+    expect(withRel.seams.length).toBe(without.seams.length);
+    expect(withRel.curves.length).toBe(without.curves.length);
   });
 
-  it('the data panel says it in words — the projection can lie, the row cannot', () => {
+  it('the panel reports the STATED relation as a structured row (words are the App\'s to pick)', () => {
     for (const u of ['פירמידה ABCD', 'AB ו-CD מצטלבים']) submit(u);
     const panel = dataView(derive3(state().facts, state().seed).construction, state().seed);
-    expect(panel.relations.some((r) => r.includes('AB') && r.includes('CD') && r.includes('⤫'))).toBe(true);
+    expect(panel.mutual).toContainEqual({ a: 'AB', b: 'CD', rel: 'skew' });
+  });
+
+  it('…and reports a relation the figure merely HOLDS, never stated', () => {
+    // the operator's ask: "we should also be able to calc such cases and write them if figure holds
+    // them". A cube's AB and CC′ are skew by construction — the student never says so.
+    for (const u of ["תיבה ABCDA'B'C'D'", 'AB', "CC'"]) submit(u);
+    const panel = dataView(derive3(state().facts, state().seed).construction, state().seed);
+    expect(panel.mutual.some((m) => m.rel === 'skew' && m.a === 'AB' && m.b === "CC'")).toBe(true);
+  });
+
+  it('derived PERPENDICULARITY between drawn segments is reported alongside the position', () => {
+    for (const u of ["תיבה ABCDA'B'C'D'", 'AB', "CC'"]) submit(u);
+    const panel = dataView(derive3(state().facts, state().seed).construction, state().seed);
+    // AB and CC′ are skew AND perpendicular — both facts, so both rows
+    expect(panel.mutual.some((m) => m.rel === 'perpendicular' && m.a === 'AB' && m.b === "CC'")).toBe(true);
+  });
+
+  it('a pair SHARING an endpoint is skipped — "they meet at B" is noise, not knowledge', () => {
+    for (const u of ["תיבה ABCDA'B'C'D'", 'AB', 'BC']) submit(u);
+    const panel = dataView(derive3(state().facts, state().seed).construction, state().seed);
+    expect(panel.mutual.some((m) => (m.a === 'AB' && m.b === 'BC') || (m.a === 'BC' && m.b === 'AB'))).toBe(false);
   });
 });
 

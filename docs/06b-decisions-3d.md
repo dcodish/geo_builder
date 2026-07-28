@@ -1613,7 +1613,18 @@ Locked by `relation-battery.test.ts` (35: the exact-list lock, the ratchet, 12 S
 
 **4. One statement, one semantics.** «AB ו-CD מקבילים» and «AB מקביל ל-CD» say the same thing; they had two different behaviours (the plural verified, the singular was refused with a "coming" message). Both now lower to `mutual-rel`, whose apply decides claim-vs-drive per M1. The shadow snapshot freezes the winning RULE, not the lowering, so unifying them cost zero snapshot diff — and the `seg-parallel-given` guidance is DELETED rather than reworded, because guidance for a form the parser handles is a lie.
 
-**Showing it (operator decision, 2026-07-28).** Asked whether a stated skew should draw anything, the operator chose **the dashed common perpendicular, always** — plus the data-panel row. The reason is the #384 lesson: orthographic projection routinely draws two skew lines crossing, and a true 90° was measured reading as ~40°, so the drawing alone cannot distinguish "misses" from "meets". The rung between the closest points is the visual proof; it is an ANNOTATION, so it gets its own scene stream rather than joining the edges ([ADR-3D-098](#adr-3d-098)'s distinction).
+**Showing it (operator decision, 2026-07-28 — revised during play).** First implemented as a dashed common perpendicular on the canvas plus a data-panel row. The operator rejected the canvas mark on sight, and was right twice over:
+
+- **`strokeDasharray` already means HIDDEN in this renderer** (edges, vectors, curves). A dashed rung therefore reads as "an edge behind the solid" — the opposite of its message. The original decision was taken from an ASCII mockup that never surfaced this collision; the choice was under-informed, and the fault is the question's, not the answer's.
+- **The panel row used an INVENTED symbol.** There is no standard notation for skew lines — the textbook writes «מצטלבים» in words — so `AB ⤫ CD` taught a symbol that does not exist, in a panel whose neighbouring rows (`|u| = |v|`, `u·v = 0`) are genuine universal notation.
+
+**Settled: the canvas draws nothing; the data panel says it in WORDS.** And the operator widened the ask past the reported case: *"we should also be able to calc such cases and write them if figure holds them. same of other types of intersections and parallelism and perpendicularity."* So the panel reports the relation whether it was STATED or merely HOLDS — a student organizing their data needs the forced relations they never thought to write down (a cube's `AB` and `CC'` are skew and perpendicular; nobody types that).
+
+Three consequences follow:
+
+- rows are emitted **structured** (`MutualRow {a, b, rel}`), not as formatted strings — with no symbol available, the words belong to the App, in the reader's language, and `dir="auto"` keeps the Latin labels LTR inside a Hebrew predicate;
+- the scan's universe is the objects the student **NAMED** (drawn segments + named lines), never every solid edge — a cube's 12 edges are 66 pairs of mostly noise. Pairs sharing an endpoint are skipped: "they meet at B" is not knowledge;
+- ⟂ is reported **alongside** a mutual position, not instead of it — two skew lines can be perpendicular, and both facts are true.
 
 **A free vector has no mutual position.** `skew`/`intersecting`/`coincident` against a vector operand are `n/a` with a reason: a free vector has direction and magnitude but no place, so there is nothing for the relation to be true about. Its DIRECTION relations (∥/⟂/angle) stay fully supported — `parallel|segment|vector` and `parallel|vector|vector` are flipped in this slice.
 
@@ -1623,4 +1634,4 @@ Locked by `relation-battery.test.ts` (35: the exact-list lock, the ratchet, 12 S
 
 **Budget (docs/17 §7).** The gauge drive is one more residual block inside the existing `scalarPins` loop — no new solve. The requirement adds one `resolve3` per candidate seed, the ADR-3D-064 cost, and only for figures that state a mutual position.
 
-Locked by `mutual-position.test.ts` (15, the pure classifier incl. the bounded/unbounded boundary) + `mutual-rel.test.ts` (12, end-to-end drives, the refusals, the rung and the panel row) + `relation-battery.test.ts` (5 new rows, exact-list and ratchet updated). 3-D lane 1700 green, `tsc -b` + both builds clean.
+Locked by `mutual-position.test.ts` (15, the pure classifier incl. the bounded/unbounded boundary) + `mutual-rel.test.ts` (14, end-to-end drives, the refusals, the canvas staying clean, the stated AND derived panel rows, the shared-endpoint filter) + `relation-battery.test.ts` (5 new rows, exact-list and ratchet updated). 3-D lane 1705 green, `tsc -b` + both builds clean.

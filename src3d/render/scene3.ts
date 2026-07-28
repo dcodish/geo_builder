@@ -14,7 +14,6 @@
 import { hasAbsoluteFrameObject, intersectPlanes, pinningGivens, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
 import type { Construction3, Id, Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
-import { closestPoints, mutualSides } from '../engine/operands';
 import { cameraFrame, project3, type Camera3 } from './camera';
 import { planeBasis, projectOntoLine, projectOntoPlane } from './planeGeom';
 import { isRightAngleValue, rightAngles3 } from './rightAngles';
@@ -122,22 +121,6 @@ export interface SceneCurve3 {
   hidden: boolean;
 }
 
-/**
- * S4 (#378, ADR-3D-104) — the RUNG of a stated SKEW pair: the common perpendicular between the two
- * closest points, drawn dashed.
- *
- * Orthographic projection of two skew lines routinely LOOKS like a crossing — the drawing alone
- * cannot tell "misses" from "meets", and #384 measured exactly that failure for a true 90°. The rung
- * is the visual proof they miss. It is an ANNOTATION, not figure ink (the ADR-3D-098 distinction),
- * so it lives in its own stream rather than among the edges.
- */
-export interface SceneRung3 {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-}
-
 export interface Scene3 {
   points: ScenePoint3[];
   edges: SceneEdge3[];
@@ -149,7 +132,6 @@ export interface Scene3 {
   seams: SceneSeam3[];
   angles: SceneAngle3[];
   curves: SceneCurve3[];
-  rungs: SceneRung3[];
 }
 
 export interface Viewport {
@@ -600,7 +582,7 @@ export function buildScene3(
   ].map(projOf);
   const all = [...proj.values(), ...extras];
   if (all.length === 0) {
-    return { points: [], edges: [], vectors: [], axes: [], planes: [], lines: [], marks: [], seams: [], angles: [], curves: [], rungs: [] };
+    return { points: [], edges: [], vectors: [], axes: [], planes: [], lines: [], marks: [], seams: [], angles: [], curves: [] };
   }
 
   const xs = all.map((p) => p.x);
@@ -817,19 +799,5 @@ export function buildScene3(
 
   const curves: SceneCurve3[] = wCurves.map(({ pts, hidden }) => ({ pts: pts.map(w2s), hidden }));
 
-  // S4 (#378): one dashed rung per stated SKEW pair — read from the REQUIREMENTS, which is where a
-  // stated skew lives (it has no residual). Both endpoints come from the shared operand seam, so the
-  // rung lands exactly between the objects the relation is about.
-  const rungs: SceneRung3[] = [];
-  for (const req of c.requirements) {
-    if (req.kind !== 'mutual' || req.rel !== 'skew') continue;
-    const sides = mutualSides(req.a, req.b, c, { lines: resolved.lines, planes: resolved.planes }, (id) => positions.get(id) ?? null);
-    const feet = sides && closestPoints(sides[0], sides[1]);
-    if (!feet || feet.distance < 1e-9) continue;
-    const sp = w2s(feet.p);
-    const sq = w2s(feet.q);
-    rungs.push({ x1: sp.x, y1: sp.y, x2: sq.x, y2: sq.y });
-  }
-
-  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves, rungs };
+  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves };
 }

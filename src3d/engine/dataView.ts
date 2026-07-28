@@ -37,9 +37,20 @@ export interface VecEntry {
   sq: string | null;
 }
 
+/** S4 (#378): how two named objects lie relative to one another — STRUCTURED, because there is no
+ *  standard symbol for skew lines (the textbook says «מצטלבים»), so the words are the App's to pick
+ *  in the reader's language. `perpendicular` rides alongside a mutual position, not instead of it. */
+export interface MutualRow {
+  a: string;
+  b: string;
+  rel: MutualRel3 | 'perpendicular';
+}
+
 export interface DataPanel {
   /** Derived equalities among declared vectors, e.g. `|u| = |v| = |w|` (+ stated value). */
   relations: string[];
+  /** Mutual positions among the figure's NAMED objects — stated or merely holding. */
+  mutual: MutualRow[];
   vectors: VecEntry[];
   points: string[]; // `N(6, 6, 6)` — stable coordinates only
   /** Named planes whose equation is FORCED (identical up to scale in every sampled
@@ -66,7 +77,7 @@ export interface DataPanel {
  * knowledge. The guard and the render must read emptiness the same way — hence one predicate.
  */
 export function panelIsEmpty(p: DataPanel): boolean {
-  return p.relations.length === 0 && p.vectors.length === 0 && p.points.length === 0 && p.planes.length === 0 && p.params.length === 0;
+  return p.relations.length === 0 && p.mutual.length === 0 && p.vectors.length === 0 && p.points.length === 0 && p.planes.length === 0 && p.params.length === 0;
 }
 
 const EPS = 1e-6;
@@ -452,6 +463,7 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // derived magnitude equalities among the declared vectors: |u| = |v| = |w| — equal in
   // EVERY sampled configuration (each seed has its own scale; the EQUALITY is the fact)
   const relations: string[] = [];
+  const mutual: MutualRow[] = [];
   // #319 — LABELED line↔plane angles («זוית בין SB ומישור ABC היא α»): derive `α = X°` when the
   // angle is identical in every sampled configuration (angles are scale-free — no scale gate;
   // the same knowledge discipline as every derived value). sin β = |n·u|/(|n||u|), n = Newell
@@ -529,28 +541,48 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     }
   }
 
-  // S4 (#378, ADR-3D-104): a stated MUTUAL POSITION reads as a row.
+  // S4 (#378, ADR-3D-104): how the figure's named objects LIE relative to one another.
   //
-  // This is docs/26 §5.9's "and show that": a skew pair is drawn with its rung, but the RELATION
-  // itself — which the orthographic projection can misrepresent (#384: a true 90° reading as 40°) —
-  // needs saying in words. Same multi-sample discipline as the equalities above: printed only when
-  // it holds in EVERY sampled configuration, never on the strength of one drawing.
+  // Operator, 2026-07-28: *"the data panel should say AB and CD מצטלבים. it is true that in this case
+  // user entered it so its obvious but we still put those things in the data panel. we should also be
+  // able to calc such cases and write them if figure holds them."* So this reports the relation
+  // whether it was STATED or merely holds — the panel's job is to lay out what is true, and a student
+  // organizing their data needs the forced relations they did not think to write down.
+  //
+  // Scope is the flood control: pairs are drawn from the objects the student NAMED (drawn segments +
+  // named lines), never every solid edge — a cube's 12 edges would be 66 pairs of mostly noise. Pairs
+  // SHARING an endpoint are skipped too: two segments from one vertex obviously meet there.
+  //
+  // Emitted STRUCTURED, not as a formatted string: there is no standard symbol for skew lines (the
+  // textbook writes «מצטלבים» in words), so rendering is the App's job, in the reader's language.
   {
-    const SYMBOL: Record<MutualRel3, string> = { skew: '⤫', intersecting: '✕', parallel: '∥', coincident: '≡' };
-    const name = (op: Operand3): string | null =>
-      op.kind === 'segment' ? `${op.a}${op.b}`
-      : op.kind === 'line' || op.kind === 'vector' ? op.name
-      : null;
-    for (const req of c.requirements) {
-      if (req.kind !== 'mutual') continue;
-      const l = name(req.a);
-      const r = name(req.b);
-      if (!l || !r) continue;
-      const holdsEverywhere = resolved.every((res) => {
-        const sides = mutualSides(req.a, req.b, c, { lines: res.lines, planes: res.planes }, (id) => res.positions.get(id) ?? null);
-        return !!sides && mutualHolds(req.rel, sides[0], sides[1], MUTUAL_VERIFY_TOL);
-      });
-      if (holdsEverywhere) relations.push(`${l} ${SYMBOL[req.rel]} ${r}`);
+    const named: { op: Operand3; label: string; ids: Id[] }[] = [
+      ...c.segments.map(([a, b]) => ({ op: { kind: 'segment', a, b } as Operand3, label: `${a}${b}`, ids: [a, b] })),
+      ...[...c.lines.keys(), ...c.pointLines.keys()].map((n) => ({ op: { kind: 'line', name: n } as Operand3, label: n, ids: [] as Id[] })),
+    ];
+    const REL_ORDER: MutualRel3[] = ['coincident', 'parallel', 'intersecting', 'skew'];
+    for (let i = 0; i < named.length; i++) {
+      for (let j = i + 1; j < named.length; j++) {
+        const A = named[i];
+        const B = named[j];
+        if (A.ids.some((id) => B.ids.includes(id))) continue; // shared endpoint: the meeting is trivial
+        const sidesAt = resolved.map((res) =>
+          mutualSides(A.op, B.op, c, { lines: res.lines, planes: res.planes }, (id) => res.positions.get(id) ?? null),
+        );
+        if (sidesAt.some((s) => !s)) continue;
+        // the SAME relation must hold in every sampled configuration — one drawing is not knowledge
+        const rel = REL_ORDER.find((r) => sidesAt.every((s) => mutualHolds(r, s![0], s![1], MUTUAL_VERIFY_TOL)));
+        if (rel) mutual.push({ a: A.label, b: B.label, rel });
+        // ⟂ is a DIRECTION relation, independent of position: two skew lines can be perpendicular,
+        // so it is reported alongside rather than instead of the mutual position.
+        const perp = sidesAt.every((s) => {
+          const d1 = s![0].geom.dir!;
+          const d2 = s![1].geom.dir!;
+          const den = Math.hypot(d1.x, d1.y, d1.z) * Math.hypot(d2.x, d2.y, d2.z);
+          return den > EPS && Math.abs(dot3(d1, d2)) / den < 1e-4;
+        });
+        if (perp) mutual.push({ a: A.label, b: B.label, rel: 'perpendicular' });
+      }
     }
   }
 
@@ -686,5 +718,5 @@ export function dataView(c: Construction3, seed: number): DataPanel {
     params.push(stable ? { sym, text: `${sym} = ${cleanNum(nums[0], 1e-4)}`, open: false } : { sym, text: `${sym} = ?`, open: true });
   }
 
-  return { relations, vectors: entries, points, pointCoords, planes, params };
+  return { relations, mutual, vectors: entries, points, pointCoords, planes, params };
 }

@@ -639,6 +639,14 @@ export default function App3() {
                       {r}
                     </li>
                   ))}
+                  {/* S4 (#378): mutual positions read as WORDS in the reader's language — there is no
+                      standard symbol for skew lines. `dir="auto"` keeps the Latin labels LTR while the
+                      Hebrew predicate lays out correctly. */}
+                  {dataPanel.mutual.map((m) => (
+                    <li key={`${m.rel}-${m.a}-${m.b}`} dir="auto" className="border-b border-slate-100 pb-1 font-medium">
+                      {t(`dataPanel.mutual.${m.rel}`, { a: m.a, b: m.b })}
+                    </li>
+                  ))}
                   {dataPanel.vectors.map((v) => (
                     <li key={v.label} className="border-b border-slate-100 pb-1 last:border-0">
                       {v.decomp && (

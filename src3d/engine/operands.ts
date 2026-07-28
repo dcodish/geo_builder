@@ -17,7 +17,7 @@
 
 import type { Construction3, Id, MutualRel3, Operand3 } from './types';
 import type { ResolvedLine, ResolvedPlane } from './evaluate';
-import { add3, cross3, dot3, newellNormal, norm3, scale3, sub3, type Vec3 } from './vec3';
+import { cross3, dot3, newellNormal, norm3, sub3, type Vec3 } from './vec3';
 
 /** What an operand contributes to a residual: a location, a direction, and/or an oriented plane. */
 export interface OperandGeom {
@@ -312,23 +312,6 @@ export function mutualHolds(rel: MutualRel, s1: MutualSide, s2: MutualSide, tol 
  * line-rel reasoning). A genuinely wrong relation misses by ≥ ~1e-2, far above this.
  */
 export const MUTUAL_VERIFY_TOL = 1e-4;
-
-/**
- * The two closest points of the operands' lines — the feet of their COMMON PERPENDICULAR — clamped
- * to a bounded side's extent. Null when parallel (no unique common perpendicular) or unresolvable.
- *
- * This is what makes a stated `skew` visible: orthographic projection routinely draws two skew lines
- * crossing, so the drawing alone cannot distinguish "meets" from "misses". The rung between these
- * two points is the proof, and its length is the distance between them.
- */
-export function closestPoints(s1: MutualSide, s2: MutualSide): { p: Vec3; q: Vec3; distance: number } | null {
-  const parts = mutualParts(s1.geom, s2.geom);
-  if (!parts || parts.t1 === null || parts.t2 === null) return null;
-  const clamp = (t: number, bounded: boolean) => (bounded ? Math.max(0, Math.min(1, t)) : t);
-  const p = add3(s1.geom.point!, scale3(s1.geom.dir!, clamp(parts.t1, s1.bounded)));
-  const q = add3(s2.geom.point!, scale3(s2.geom.dir!, clamp(parts.t2, s2.bounded)));
-  return { p, q, distance: norm3(sub3(q, p)) };
-}
 
 /**
  * The scale-free residual of a CLOSED mutual relation — 0 ⟺ it holds, `null` when unanswerable.

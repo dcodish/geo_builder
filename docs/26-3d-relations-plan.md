@@ -247,8 +247,10 @@ mechanism follows the CLOSED/OPEN split, not the relation name: the closed three
 residual (signed components — the ADR-3D-006 touch-zero lesson) and drive when both operands ride the
 gauge; `skew` is an inequality and lives entirely in the requirement lane, which also carries the open
 half of the others (a crossing must land WITHIN the segments). 12 cells flipped. **Operator UX call,
-made:** a stated skew draws the dashed common perpendicular ALWAYS, plus the data-panel row — the
-projection can draw skew lines as crossing, so the rung is the proof. Two root findings en route: a
+made and then revised in play:** the canvas draws NOTHING (dashed already means *hidden* in this
+renderer, so a rung read as a hidden edge) and the DATA PANEL says it in words (there is no standard
+symbol for skew — the first cut invented one). The ask widened past the reported case: the panel
+reports a relation whether STATED or merely HOLDING, over segments and named lines, ⟂ included. Two root findings en route: a
 verdict about LINES is not one about SEGMENTS (coplanar-but-missing is not skew — it let an impossible
 given build silently), and «X ו-Y מקבילים» / «X מקביל ל-Y» had two different semantics, now one.
 **Out, filed as #386:** the gauge×absolute closed drive (needs the pivot trigger generalized, not a
