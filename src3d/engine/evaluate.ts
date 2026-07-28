@@ -1152,21 +1152,40 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   // vertex A again (measured: dist(A, ℓ1) = 0.0000 at every seed). The guard below must therefore run on
   // the DRIVEN path too, restricted to the part the drive left free.
   //
-  // BOUNDARY, stated honestly: this fires only when translation is free ENTIRELY — nothing pins where the
-  // figure sits and no absolute POINT exists for a length or angle to couple to. A figure whose position
-  // is partly pinned keeps whatever the solve chose; sampling a subspace of the residual's null space is
-  // the general form and is not built here.
-  const positionPinned =
-    c.pins.length > 0 ||
-    c.planePins.length > 0 ||
-    c.coordPlanePins.length > 0 ||
-    c.memberships.length > 0 ||
-    c.scalarPins.length > 0 ||
-    c.vectorPins.length > 0 ||
-    c.pairPins.length > 0 ||
-    [...c.points.values()].some((d) => d.kind === 'coord' || d.kind === 'coord-sym');
-  const rotationSolved = pivot !== null;
-  if ((pivot === null || !positionPinned) && c.solids.length > 0 && hasAbsoluteFrameObject(c)) {
+  // #379 (ADR-3D-101) — the LANDING FUNNEL. This guard was bypassed four times in one day (#372,
+  // #375 Am. 1, and the two #379 doors), every time for the same reason: a boolean per-path proxy
+  // (`pivot === null`, `positionPinned`, `rotationSolved`) standing in for the semantic question —
+  // which gauge components did the solve actually DETERMINE? The question is now asked per COMPONENT,
+  // from the residual families present, conservatively: a component is sampled only when it is
+  // PROVABLY free (unstated pinning is the lesser evil; sampling a constrained component would undo
+  // what the solve established).
+  //
+  //  - TRANSLATION is pinned by: a point pin (even a partial one), a plane-equation pin, a driven
+  //    membership, or a coordinate-plane relation that places coordinates (`zero`/`contains`).
+  //    Vector/pair injections pin direction+scale and NEVER translation (door (a) — dataView documents
+  //    the pivot rooting translation at a deterministic origin); similarity-invariant scalar pins pin
+  //    SHAPE, not place (door (b)).
+  //  - ROTATION is pinned by: any point pin (rotating about the gauge origin would drag a pinned point
+  //    off its pin — rotation about the pinned point itself is a real remaining freedom, deferred and
+  //    documented), vector/pair injections, a plane⟂line pin, a plane-equation pin, a membership, or an
+  //    orientation-carrying coordinate-plane relation (`share`/`perp`/`contains`). An `invariantOnly`
+  //    pivot FROZE the gauge rather than solving it, and a rigid motion preserves every similarity-
+  //    invariant pin by definition — so nothing a frozen solve established can break here.
+  //  - SCALE is never sampled (it is the similarity gauge; ADR-3D-054 owns when it is pinned).
+  const translationFree =
+    c.pins.length === 0 &&
+    c.planePins.length === 0 &&
+    c.memberships.length === 0 &&
+    !c.coordPlanePins.some((cp) => cp.mode === 'zero' || cp.mode === 'contains');
+  const rotationFree =
+    c.pins.length === 0 &&
+    c.vectorPins.length === 0 &&
+    c.pairPins.length === 0 &&
+    c.planeLinePerps.length === 0 &&
+    c.planePins.length === 0 &&
+    c.memberships.length === 0 &&
+    !c.coordPlanePins.some((cp) => cp.mode === 'share' || cp.mode === 'perp' || cp.mode === 'contains');
+  if ((translationFree || rotationFree) && c.solids.length > 0 && hasAbsoluteFrameObject(c)) {
     const gaugeIds: Id[] = [];
     for (const [id, def] of c.points) {
       if (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane))) gaugeIds.push(id);
@@ -1242,11 +1261,10 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       for (let attempt = 0; attempt < 12; attempt++) {
         const k = (n: string) => sample(seed, `placement-${attempt}-${n}`, -1, 1);
         const axis = normalize3(v3(k('ax'), k('ay'), k('az') + 0.3));
+        // only PROVABLY free components are sampled — a constrained one keeps what the solve chose
         const g = {
-          t: v3(k('tx') * extent * 1.5, k('ty') * extent * 1.5, k('tz') * extent * 1.5),
-          // when a drive solved the ORIENTATION, only the translation is still free — re-rotating here
-          // would undo the relation the student stated
-          w: rotationSolved ? v3(0, 0, 0) : scale3(axis, sample(seed, `placement-${attempt}-angle`, 0, 2 * Math.PI)),
+          t: translationFree ? v3(k('tx') * extent * 1.5, k('ty') * extent * 1.5, k('tz') * extent * 1.5) : v3(0, 0, 0),
+          w: rotationFree ? scale3(axis, sample(seed, `placement-${attempt}-angle`, 0, 2 * Math.PI)) : v3(0, 0, 0),
           s: 1,
           mirror: false,
         };
