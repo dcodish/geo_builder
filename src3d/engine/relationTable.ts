@@ -68,10 +68,10 @@ const CELLS: Record<string, CellStatus> = {
   'perp|segment|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'seg-plane-rel / perp-plane claim' },
   'perp|segment|plane-named': { status: 'planned', slice: 'S3', note: 'perpPlaneClaim reads label runs only today' },
   'perp|line|plane-run': { status: 'supported', actions: ['drive-gauge', 'claim'], note: '#375 / ADR-3D-100' },
-  'perp|line|plane-named': { status: 'supported', actions: ['param-root'], note: 'linePerpPlane — pins m (2024-Q2)' },
-  'perp|line|segment': { status: 'planned', slice: 'S2' },
-  'perp|line|vector': { status: 'planned', slice: 'S2' },
-  'perp|line|line': { status: 'planned', slice: 'S2' },
+  'perp|line|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: 'linePerpPlane pins m (2024-Q2); S2 records the numeric claim + the flipped מישור-first order' },
+  'perp|line|segment': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: lineRels pivot residual (ADR-3D-103)' },
+  'perp|line|vector': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: lineRels (ADR-3D-103)' },
+  'perp|line|line': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2: symbolic dir pins; numeric verifies (ADR-3D-103)' },
   'perp|plane-run|plane-run': { status: 'planned', slice: 'S3' },
   'perp|plane-run|plane-named': { status: 'planned', slice: 'S3' },
   'perp|plane-named|plane-named': { status: 'planned', slice: 'S3' },
@@ -88,11 +88,11 @@ const CELLS: Record<string, CellStatus> = {
   'parallel|segment|plane-named': { status: 'planned', slice: 'S3' },
   'parallel|segment|vector': { status: 'planned', slice: 'S4' },
   'parallel|vector|vector': { status: 'planned', slice: 'S4' },
-  'parallel|line|line': { status: 'planned', slice: 'S2', note: 'symbolic dirs pin m — the 2010-Q3 family' },
-  'parallel|line|segment': { status: 'planned', slice: 'S2' },
-  'parallel|line|vector': { status: 'planned', slice: 'S2' },
-  'parallel|line|plane-run': { status: 'planned', slice: 'S2' },
-  'parallel|line|plane-named': { status: 'planned', slice: 'S2' },
+  'parallel|line|line': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2: symbolic dirs pin m (the 2010-Q3 family); numeric verifies' },
+  'parallel|line|segment': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: lineRels (ADR-3D-103)' },
+  'parallel|line|vector': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: lineRels (ADR-3D-103)' },
+  'parallel|line|plane-run': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: line ∥ point-run plane ⟺ dir ⟂ normal' },
+  'parallel|line|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2: dir(m)·n(m) = 0 pins; numeric verifies' },
   'parallel|vector|plane-run': { status: 'planned', slice: 'S3' },
   'parallel|vector|plane-named': { status: 'planned', slice: 'S3' },
   'parallel|plane-run|plane-run': { status: 'planned', slice: 'S3' },
@@ -112,7 +112,9 @@ const CELLS: Record<string, CellStatus> = {
   // ---- point membership ----------------------------------------------------------------
   'on|point|plane-run': { status: 'supported', actions: ['rider', 'drive-gauge', 'claim'], note: 'ADR-3D-015/033' },
   'on|point|plane-named': { status: 'supported', actions: ['rider', 'claim'], note: 'ADR-3D-015; branch-SELECT on `any`' },
-  'on|point|line': { status: 'planned', slice: 'S2', note: 'THE reported gap (#377): `B על l1` — on-line exists, unreachable' },
+  'on|point|line': { status: 'supported', actions: ['rider', 'drive-gauge', 'claim'], note: 'S2 (#377): `B על l1` — the built on-line (ADR-3D-031), now reachable' },
+  'on|point|point': { status: 'n/a', note: 'a point on a point is a coincidence statement, not a membership' },
+  'on|point|vector': { status: 'n/a', note: 'a vector is not a carrier — membership lives on segments/lines/planes/circles' },
   'on|point|segment': { status: 'supported', actions: ['rider', 'claim'], note: 'point-on-segment3, V0; numeric t verifies (ADR-3D-047)' },
 
   // ---- angle with a value --------------------------------------------------------------
@@ -121,10 +123,11 @@ const CELLS: Record<string, CellStatus> = {
   'angle|vector|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'cos∠(u,v), V8-f' },
   'angle|segment|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'line-plane-angle, ADR-3D-027' },
   'angle|segment|plane-named': { status: 'planned', slice: 'S3' },
-  'angle|line|plane-run': { status: 'planned', slice: 'S2' },
-  'angle|line|plane-named': { status: 'planned', slice: 'S2' },
-  'angle|line|segment': { status: 'planned', slice: 'S2' },
-  'angle|line|line': { status: 'planned', slice: 'S2' },
+  'angle|line|plane-run': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: sin β = |cos(n,dir)| (ADR-3D-103)' },
+  'angle|line|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2 (ADR-3D-103)' },
+  'angle|line|segment': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2 (ADR-3D-103)' },
+  'angle|line|vector': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2 (ADR-3D-103)' },
+  'angle|line|line': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2 (ADR-3D-103)' },
   'angle|plane-named|plane-named': { status: 'supported', actions: ['param-root'], note: 'planeAngles — the 2022-Q2 45°' },
   'angle|plane-run|plane-run': { status: 'planned', slice: 'S3' },
   'angle|plane-run|plane-named': { status: 'planned', slice: 'S3' },
@@ -143,9 +146,22 @@ const CELLS: Record<string, CellStatus> = {
   },
 };
 
+// S2 (#378, ADR-3D-103): CELLS is written in HUMAN order (`perp|line|segment`), but lookups go
+// through the canonical `key()` (symmetric relations sort operands by OPERAND_KINDS index) — so a
+// literal in the "wrong" order used to be a DEAD entry that silently fell to the defaults. Re-key
+// every literal through `key()` at module init so the written order can never matter. Two literals
+// collapsing onto one canonical cell is a self-contradiction — fail loudly, never last-wins.
+const CANONICAL_CELLS: Record<string, CellStatus> = {};
+for (const [k, v] of Object.entries(CELLS)) {
+  const [rel, l, r] = k.split('|') as [Rel3, OperandKind, OperandKind];
+  const canon = key(rel, l, r);
+  if (CANONICAL_CELLS[canon]) throw new Error(`relationTable: duplicate cell ${k} (canonical ${canon})`);
+  CANONICAL_CELLS[canon] = v;
+}
+
 /** Total classification: every (rel, l, r) answers. */
 export function cellStatus(rel: Rel3, l: OperandKind, r: OperandKind): CellStatus {
-  const hit = CELLS[key(rel, l, r)];
+  const hit = CANONICAL_CELLS[key(rel, l, r)];
   if (hit) return hit;
 
   // ---- defaults: the combinatorial floor, stated once ---------------------------------

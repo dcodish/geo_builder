@@ -407,7 +407,9 @@ export default function App3() {
             <div key={`notice-${i}`} role="note" className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
               {n.kind === 'base-constrained'
                 ? t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
-                : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
+                : n.kind === 'line-rel-noun'
+                  ? t('notice.lineRelNoun', { line: n.line })
+                  : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
             </div>
           ))}
           {guidanceNote && !lastError && !busy && (

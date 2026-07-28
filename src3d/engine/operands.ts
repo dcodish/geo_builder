@@ -17,7 +17,7 @@
 
 import type { Construction3, Id, Operand3 } from './types';
 import type { ResolvedLine, ResolvedPlane } from './evaluate';
-import { newellNormal, norm3, sub3, type Vec3 } from './vec3';
+import { cross3, dot3, newellNormal, norm3, sub3, type Vec3 } from './vec3';
 
 /** What an operand contributes to a residual: a location, a direction, and/or an oriented plane. */
 export interface OperandGeom {
@@ -92,4 +92,54 @@ export function resolveOperand(op: Operand3, c: Construction3, abs: AbsoluteCtx)
       return () => geom;
     }
   }
+}
+
+/** S2 (#378): does this equation plane's NORMAL carry the figure parameter? (The offset `d` alone
+ *  cannot change a direction relation, so it deliberately does not count.) */
+export const planeNormalCarriesParam = (c: Construction3, name: string): boolean => {
+  const def = c.planes.get(name);
+  return !!def && (def.cx.p !== 0 || def.cy.p !== 0 || def.cz.p !== 0);
+};
+
+/** S2 (#378): does this named line's DIRECTION carry the figure parameter? A parametric line's
+ *  anchor alone doesn't count (∥/⟂/angle read the direction only); a plane∩plane line inherits
+ *  from its planes' normals. Derived kinds (common-perp, projection, through) stay `false` —
+ *  their relations live in the claim lane. */
+export const lineDirCarriesParam = (c: Construction3, name: string): boolean => {
+  const def = c.lines.get(name);
+  if (!def) return false;
+  if (def.kind === 'parametric') return def.dir.some((e) => e.p !== 0);
+  if (def.kind === 'plane-plane') return planeNormalCarriesParam(c, def.p1) || planeNormalCarriesParam(c, def.p2);
+  return false;
+};
+
+/**
+ * S2 (#378, ADR-3D-103): the scalar MISALIGNMENT of a line-rel instance — 0 ⟺ the relation holds
+ * exactly, `null` when the geometry is degenerate/unresolvable. ONE answer for every consumer
+ * (the drive's unmet trigger, the claim checker, tests), so the drive and the verify can never
+ * disagree about what the relation means.
+ *
+ * A DIRECTIONAL operand (segment/vector/line — `geom.dir`) relates its direction to the line's:
+ * ⟂ ⇒ |cos|, ∥ ⇒ |sin|, angle ⇒ ||cos| − cos(deg)| (angles between lines are undirected, ≤ 90°).
+ * A PLANAR operand (`geom.normal`) relates the LINE to the PLANE through the normal:
+ * plane ⟂ line ⇒ normal ∥ dir ⇒ |sin|; line ∥ plane ⇒ dir ⟂ normal ⇒ |cos|; and the line↔plane
+ * angle is the formula sheet's sin β = |n·u|/(|n||u|) ⇒ ||cos(n,u)| − sin(deg)|.
+ */
+export function lineRelDeviation(
+  rel: 'perp' | 'parallel' | 'angle',
+  deg: number | undefined,
+  geom: OperandGeom,
+  lineDir: Vec3,
+): number | null {
+  const planar = !geom.dir && !!geom.normal;
+  const d = geom.dir ?? geom.normal;
+  if (!d) return null;
+  const den = norm3(d) * norm3(lineDir);
+  if (den < 1e-12) return null;
+  const cos = Math.abs(dot3(d, lineDir)) / den;
+  const sin = norm3(cross3(d, lineDir)) / den;
+  if (rel === 'perp') return planar ? sin : cos;
+  if (rel === 'parallel') return planar ? cos : sin;
+  const target = ((deg ?? 0) * Math.PI) / 180;
+  return Math.abs(cos - (planar ? Math.sin(target) : Math.cos(target)));
 }

@@ -14,6 +14,7 @@
 
 import { sample } from './rng';
 import { defaultViewFrame } from './defaultView';
+import { isAbsolute, lineDirCarriesParam, lineRelDeviation, planeNormalCarriesParam, resolveOperand } from './operands';
 import { applyGauge, solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { decompose3 } from './vecExpr';
 import { pinSymsOf } from './types';
@@ -462,6 +463,44 @@ function perpResidual(c: Construction3, line: string, plane: string, a: number):
   return norm3(cross3(ln.dir, pl.n));
 }
 
+/** S2 (#378): the ABSOLUTE-lane line relations that can actually PIN the parameter — both sides
+ *  are absolute AND a referenced direction carries it. An absolute pair with no parameter
+ *  dependence is a pure claim (its residual is constant in `a` — root-finding over it would
+ *  either flood or fabricate a `no-roots` refusal for a parameter it cannot constrain). */
+function paramPinningLineRels(c: Construction3): Construction3['lineRels'] {
+  if (!c.param) return [];
+  return c.lineRels.filter((r) => {
+    if (!isAbsolute(r.op)) return false;
+    const opCarries = r.op.kind === 'line' ? lineDirCarriesParam(c, r.op.name) : r.op.kind === 'plane-named' && planeNormalCarriesParam(c, r.op.name);
+    return lineDirCarriesParam(c, r.line) || opCarries;
+  });
+}
+
+/** S2 (#378): the SIGNED residual of an absolute-lane line relation at parameter value `a` —
+ *  0 ⟺ the relation holds. Perp (line×line) and ∥ (line×plane) cross zero with a sign change;
+ *  ∥ (line×line) is non-negative (touch-zero); the angle forms are |cos| − target. */
+function lineRelParamResidual(c: Construction3, r: Construction3['lineRels'][number], a: number): number {
+  const ln = lineAtParam(c, r.line, a);
+  if (!ln) return NaN;
+  let other: Vec3 | null = null;
+  let planar = false;
+  if (r.op.kind === 'line') {
+    other = lineAtParam(c, r.op.name, a)?.dir ?? null;
+  } else if (r.op.kind === 'plane-named') {
+    other = planeAt(c, r.op.name, a).n;
+    planar = true;
+  }
+  if (!other) return NaN;
+  const den = norm3(other) * norm3(ln.dir);
+  if (den < 1e-12) return NaN;
+  const cos = dot3(other, ln.dir) / den;
+  const sin = norm3(cross3(other, ln.dir)) / den;
+  if (r.rel === 'perp') return planar ? sin : cos;
+  if (r.rel === 'parallel') return planar ? cos : sin;
+  const target = ((r.deg ?? 0) * Math.PI) / 180;
+  return Math.abs(cos) - (planar ? Math.sin(target) : Math.cos(target));
+}
+
 /** Does the parameter value satisfy EVERY pinning given (angles + ⟂s)? */
 function satisfiesAllPins(c: Construction3, a: number): boolean {
   for (const g of c.planeAngles) {
@@ -472,11 +511,16 @@ function satisfiesAllPins(c: Construction3, a: number): boolean {
     const r = perpResidual(c, g.line, g.plane, a);
     if (Number.isNaN(r) || r > 1e-5) return false;
   }
+  for (const r of paramPinningLineRels(c)) {
+    const res = lineRelParamResidual(c, r, a);
+    if (Number.isNaN(res) || Math.abs(res) > 1e-5) return false;
+  }
   return true;
 }
 
 /** How many givens pin the parameter (none ⇒ it is a free sampled DOF). */
-export const pinningGivens = (c: Construction3): number => c.planeAngles.length + c.linePerps.length;
+export const pinningGivens = (c: Construction3): number =>
+  c.planeAngles.length + c.linePerps.length + paramPinningLineRels(c).length;
 
 /**
  * All parameter values satisfying EVERY pinning given — 1-DOF numeric root-finding
@@ -493,6 +537,12 @@ export function paramRoots(c: Construction3): number[] {
   }
   for (const g of c.linePerps) {
     candidates.push(...touchZeroRoots((a) => perpResidual(c, g.line, g.plane, a)));
+  }
+  for (const r of paramPinningLineRels(c)) {
+    // sign-change catches crossings; touch-zero catches the non-negative forms (∥ of two lines)
+    // and double roots — the paramGivens belt-and-braces pattern
+    const f = (a: number) => lineRelParamResidual(c, r, a);
+    candidates.push(...signChangeRoots(f), ...touchZeroRoots((a) => Math.abs(f(a))));
   }
   return snapAndDedupe(candidates.filter((a) => satisfiesAllPins(c, a)));
 }
@@ -614,6 +664,13 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     // #375: aligning a figure-derived plane with an absolute direction removes TWO rotational DOFs
     // (the spin about that direction stays free)
     pinCount += 2 * c.planeLinePerps.length;
+    // S2 (#378): a gauge operand related to an absolute line — full alignment (a direction made ∥,
+    // a plane made ⟂) removes two rotational DOFs; a single ⟂ or a stated angle removes one.
+    for (const r of c.lineRels) {
+      if (isAbsolute(r.op)) continue; // absolute×absolute never touches the figure
+      const directional = r.op.kind !== 'plane-run';
+      pinCount += (directional ? r.rel === 'parallel' : r.rel === 'perp') ? 2 : 1;
+    }
     // #292: report SHAPE DOF — subtract the free (unpinned) gauge so a similarity-invariant drive
     // (⊥/angle/ratio) lowers the cue rather than adding +7; scalarPins are those shape-reducing drives.
     return Math.max(0, dims - Math.max(0, pinCount - 7) - c.scalarPins.length) + freeT + param;
@@ -928,13 +985,18 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     (m) => !m.side && m.plane !== 'any' && (c.pointPlanes.has(m.plane) || c.planes.has(m.plane)),
   );
 
+  // S2 (#378, ADR-3D-103): the gauge-lane line relations (a figure operand against an absolute
+  // named line) — they drive the pivot exactly like planeLinePerps. Absolute-lane entries never
+  // involve the figure (parameter root-find / claim lanes).
+  const gaugeLineRels = c.lineRels.filter((r) => !isAbsolute(r.op));
+
   // ---- the V4 pivot: injected coordinates pin the gauge (ADR-3D-007)
   let pivot: Resolved3['pivot'] = null;
   const warm: { x?: number[] } = {}; // the applied solution's vector — the drive's warm start (ADR-3D-033)
   if (
     (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.scalarPins.length > 0 ||
       c.planePins.length > 0 || c.coordPlanePins.length > 0 || c.planeLinePerps.length > 0 ||
-      drivableMemberships.length > 0) &&
+      gaugeLineRels.length > 0 || drivableMemberships.length > 0) &&
     c.solids.length > 0
   ) {
     const dims0 = c.solids.flatMap((solid) => solidDims(solid.kind, `solid-${solid.kind}-${solid.ids.join('')}`, seed, solid.oblique));
@@ -1040,15 +1102,27 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     //     relation is then the only thing orienting it) or when the pinned solve leaves it unmet. If
     //     the joint solve finds nothing, the prior figure stands and the recorded claim refuses
     //     honestly (`claim-refuted`) rather than a silently wrong drawing.
-    if (c.planeLinePerps.length > 0) {
-      const unmet = c.planeLinePerps.some((pin) => {
-        const ring = pin.ids.map((id) => pos.get(id));
-        const ln = lines.get(pin.line);
-        if (ring.some((p) => !p) || !ln) return true;
-        const n = newellNormal(ring as Vec3[]);
-        const den = norm3(n) * norm3(ln.dir);
-        return den < 1e-12 || norm3(cross3(n, ln.dir)) / den > 1e-4;
-      });
+    if (c.planeLinePerps.length > 0 || gaugeLineRels.length > 0) {
+      const unmet =
+        c.planeLinePerps.some((pin) => {
+          const ring = pin.ids.map((id) => pos.get(id));
+          const ln = lines.get(pin.line);
+          if (ring.some((p) => !p) || !ln) return true;
+          const n = newellNormal(ring as Vec3[]);
+          const den = norm3(n) * norm3(ln.dir);
+          return den < 1e-12 || norm3(cross3(n, ln.dir)) / den > 1e-4;
+        }) ||
+        // S2 (#378): a gauge-lane line relation left unmet is the same trigger. A line that only
+        // resolves post-pivot (a through-line) is not drivable here — the recorded claim is its
+        // arbiter — so it never counts as unmet.
+        gaugeLineRels.some((pin) => {
+          const ln = lines.get(pin.line);
+          if (!ln) return false;
+          const geom = resolveOperand(pin.op, c, { lines, planes })((id) => pos.get(id) ?? null);
+          if (!geom) return true;
+          const dev = lineRelDeviation(pin.rel, pin.deg, geom, ln.dir);
+          return dev === null || dev > 1e-4;
+        });
       if (!hasOtherPins || unmet) {
         const retry = solvePivot(c, EC, dims0, seed, undefined, undefined, undefined, lines);
         if (retry.length > 0) applySolutions(retry);
@@ -1182,6 +1256,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     c.vectorPins.length === 0 &&
     c.pairPins.length === 0 &&
     c.planeLinePerps.length === 0 &&
+    gaugeLineRels.length === 0 && // S2 (#378): a driven line relation pinned the orientation
     c.planePins.length === 0 &&
     c.memberships.length === 0 &&
     !c.coordPlanePins.some((cp) => cp.mode === 'share' || cp.mode === 'perp' || cp.mode === 'contains');

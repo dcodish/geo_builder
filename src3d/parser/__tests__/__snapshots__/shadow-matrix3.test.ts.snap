@@ -909,6 +909,116 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "point B on l1",
+    "winner": "onLineMembership",
+  },
+  {
+    "lang": "he",
+    "text": "B על l1",
+    "winner": "onLineMembership",
+  },
+  {
+    "lang": "en",
+    "text": "point B is on line l1",
+    "winner": "onLineMembership",
+  },
+  {
+    "lang": "he",
+    "text": "נקודה B נמצאת על ישר l1",
+    "winner": "onLineMembership",
+  },
+  {
+    "lang": "en",
+    "text": "AB is perpendicular to line l1",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "he",
+    "text": "AB מאונך לישר l1",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "en",
+    "text": "AB is parallel to line l1",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "he",
+    "text": "AB מקביל לישר l1",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "en",
+    "text": "line l1 is parallel to line l2",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "he",
+    "text": "הישר l1 מקביל לישר l2",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "en",
+    "text": "l1 is perpendicular to l2",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "he",
+    "text": "l1 מאונך לישר l2",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "en",
+    "text": "line l1 is parallel to plane π1",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "he",
+    "text": "הישר l1 מקביל למישור π1",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "en",
+    "text": "line l1 is parallel to plane ACD",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "he",
+    "text": "הישר l1 מקביל למישור ACD",
+    "winner": "lineRelGiven",
+  },
+  {
+    "lang": "en",
+    "text": "the angle between line l1 and plane ACD is 30",
+    "winner": "lineRelAngle",
+  },
+  {
+    "lang": "he",
+    "text": "הזווית בין הישר l1 לבין המישור ACD היא 30",
+    "winner": "lineRelAngle",
+  },
+  {
+    "lang": "en",
+    "text": "the angle between AB and line l1 is 60",
+    "winner": "lineRelAngle",
+  },
+  {
+    "lang": "he",
+    "text": "הזווית בין AB לבין הישר l1 היא 60",
+    "winner": "lineRelAngle",
+  },
+  {
+    "lang": "en",
+    "text": "the angle between l1 and l2 is 60",
+    "winner": "lineRelAngle",
+  },
+  {
+    "lang": "he",
+    "text": "הזווית בין l1 לבין l2 היא 60",
+    "winner": "lineRelAngle",
+  },
+  {
+    "lang": "en",
     "text": "line ℓ1: x = (0,0,0) + t(1,0,0)",
     "winner": "parametricLine",
   },

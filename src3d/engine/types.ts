@@ -88,7 +88,9 @@ export type Claim3 =
   // #324 (ADR-3D-079): the ring's relation to a coordinate plane/axis (see coordPlanePins)
   | { type: 'coord-plane-rel'; ids: Id[]; axis: 'x' | 'y' | 'z'; mode: 'share' | 'zero' | 'perp' | 'contains' }
   // #375: a POINT-RUN plane stated ⟂ a named LINE (see planeLinePerps)
-  | { type: 'plane-line-perp'; ids: Id[]; line: string };
+  | { type: 'plane-line-perp'; ids: Id[]; line: string }
+  // S2 (#378): ∥/⟂/angle where one side is a NAMED LINE — the claim twin of lineRels
+  | { type: 'line-rel'; rel: 'perp' | 'parallel' | 'angle'; deg?: number; op: Operand3; line: string };
 
 /** V7 T2 — a SCALAR given that DRIVES the figure (a residual in the global solve). */
 export type ScalarPin =
@@ -602,6 +604,13 @@ export type Command3 =
   // #375: a POINT-RUN plane ⟂ a named LINE — lowered to a planeLinePerps entry (drives the free
   // gauge rotation) + a recorded claim (the final arbiter, per the ADR-3D-079 shape)
   | { type: 'plane-line-perp'; ids: Id[]; line: string; statedAsPlane?: true }
+  // S2 (#378, ADR-3D-103): ∥/⟂/angle where one side is a NAMED LINE and `op` is the other side.
+  // Lowered to a lineRels entry + a recorded claim; the FRAME CLASSIFIER routes each instance at
+  // evaluate by its operands (docs/26 §2.3) — a gauge op (segment/vector/plane-run) makes it a pivot
+  // residual that rotates the figure; an absolute op (line/plane-named) makes it a parameter
+  // root-find when a symbolic direction is present, else a pure claim. `statedAsPlane` records the
+  // ADR-3D-100 noun slip (the student called the line a plane) for the build-notice correction.
+  | { type: 'line-rel'; rel: 'perp' | 'parallel' | 'angle'; deg?: number; op: Operand3; line: string; statedAsPlane?: true }
   | ParamSignCommand
   | Plane3Command
   | PlaneAngleCommand
@@ -817,6 +826,11 @@ export interface Construction3 {
    *  the figure — it must never be solved with the gauge frozen. `statedAsPlane` records that the
    *  student called the line a plane, so the build notice can correct the wording (issue #375, A). */
   planeLinePerps: { ids: Id[]; line: string; statedAsPlane?: true }[];
+  /** S2 (#378, ADR-3D-103): ∥/⟂/angle relations with a NAMED LINE on one side. Routed per instance
+   *  by the frame classifier over `op` (`isAbsolute`, engine/operands.ts): gauge op → a pivot residual
+   *  (the planeLinePerps stage); absolute op → a parameter root-find when a direction carries the
+   *  figure parameter, else verify-only (the recorded claim is always the final arbiter). */
+  lineRels: { rel: 'perp' | 'parallel' | 'angle'; deg?: number; op: Operand3; line: string; statedAsPlane?: true }[];
 }
 
 export const emptyConstruction3 = (): Construction3 => ({
@@ -852,6 +866,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   paramSigns: [],
   coordPlanePins: [],
   planeLinePerps: [],
+  lineRels: [],
 });
 
 /** #325 (ADR-3D-079): the distinct OPEN symbols carried by the pins' affine components. */

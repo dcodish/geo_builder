@@ -36,6 +36,12 @@ export type BuildNotice3 =
       kind: 'line-called-plane';
       ids: Id[];
       line: string;
+    }
+  | {
+      /** S2 (#378): the same slip on a general line relation («AB מקביל למישור l1») — the relation
+       *  is built against the line, and the wording is corrected. */
+      kind: 'line-rel-noun';
+      line: string;
     };
 
 /**
@@ -47,6 +53,10 @@ export function buildNotices3(c: Construction3): BuildNotice3[] {
   // #375: derived from the pin's own flag, so it survives save/load and undo exactly like every notice
   for (const pin of c.planeLinePerps) {
     if (pin.statedAsPlane) out.push({ kind: 'line-called-plane', ids: [...pin.ids], line: pin.line });
+  }
+  // S2 (#378): the same flag on the general line-relation family
+  for (const r of c.lineRels) {
+    if (r.statedAsPlane) out.push({ kind: 'line-rel-noun', line: r.line });
   }
   for (const s of c.solids) {
     const spec = (QUAD_PYRAMIDS as Partial<Record<SolidKind, { base: QuadBase; right: boolean }>>)[s.kind];

@@ -209,3 +209,34 @@ describe('#307 — honesty: no knee where the arms do not meet', () => {
     expect(scene(['פירמידה SABCD שבסיסה מקבילית']).marks).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// S2 (#378, ADR-3D-103) — a stated ⊥ against a NAMED LINE
+// ---------------------------------------------------------------------------
+
+describe('S2 — a stated ⊥ between a segment and a named line', () => {
+  beforeEach(reset);
+
+  it('a segment genuinely CROSSING ℓ at 90° is marked at the crossing', () => {
+    // A(0,-1,0)–B(0,1,0) crosses ℓ1 (the x-axis) at the origin, perpendicularly — a determined
+    // figure (coordinate points), so the relation lands as a verified claim
+    const ms = wedges(['A(0,-1,0)', 'B(0,1,0)', 'AB', 'l1:x=(0,0,0)+t(1,0,0)', 'AB מאונך לישר l1']);
+    expect(ms).toHaveLength(1);
+    expect(dist3(ms[0].vertex, { x: 0, y: 0, z: 0 })).toBeLessThan(1e-9);
+  });
+
+  it('a driven ⊥ whose segment never meets ℓ draws NO knee (the R³ honesty rule)', () => {
+    const d = build(['פירמידה משולשת ABCD', 'l1:x=(0,1,0)+t(1,2,0)', 'AB מאונך לישר l1']);
+    const p = (id: string) => d.resolved.positions.get(id)!;
+    const ln = d.resolved.lines.get('ℓ1')!;
+    const u = sub3(p('B'), p('A'));
+    // the relation itself HOLDS…
+    expect(Math.abs(dot3(u, ln.dir)) / (norm3(u) * norm3(ln.dir))).toBeLessThan(1e-4);
+    // …and since the funnel keeps the figure clear of the line, no crossing exists to mark
+    const pts = [...d.resolved.positions.values()];
+    const c0 = pts.reduce((a, q) => ({ x: a.x + q.x / pts.length, y: a.y + q.y / pts.length, z: a.z + q.z / pts.length }), { x: 0, y: 0, z: 0 });
+    const radius = Math.max(...pts.map((q) => dist3(q, c0)), 1e-6);
+    const ms = rightAngles3(d.construction, d.resolved, radius);
+    expect(ms).toHaveLength(0);
+  });
+});

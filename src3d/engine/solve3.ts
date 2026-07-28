@@ -17,6 +17,7 @@
  */
 
 import type { Construction3, Id, Positions3 } from './types';
+import { isAbsolute, resolveOperand } from './operands';
 import { add3, cross3, dist3, dot3, newellNormal, norm3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 export interface GaugeParams {
@@ -216,10 +217,14 @@ export function solvePivot(
   const pointPins = c.pins;
   const vecPins = c.vectorPins;
   const memberPins = members ?? [];
+  // S2 (#378, ADR-3D-103): the GAUGE-lane line relations — a segment/vector/point-run-plane operand
+  // against an absolute named line. Absolute-lane entries (line×line, line×π) never involve the
+  // figure, so they contribute nothing here (they live in the parameter root-find / claim lanes).
+  const gaugeLineRels = c.lineRels.filter((r) => !isAbsolute(r.op));
   if (
     pointPins.length === 0 && vecPins.length === 0 && c.pairPins.length === 0 && c.scalarPins.length === 0 &&
     c.planePins.length === 0 && memberPins.length === 0 && c.coordPlanePins.length === 0 &&
-    c.planeLinePerps.length === 0
+    c.planeLinePerps.length === 0 && gaugeLineRels.length === 0
   )
     return [];
 
@@ -271,6 +276,8 @@ export function solvePivot(
     // #375: same reason — one operand is figure-derived and the other is an absolute line, so
     // satisfying it ROTATES the figure. Frozen to identity, the residual could never reach zero.
     c.planeLinePerps.length === 0 &&
+    // S2 (#378): a gauge-lane line relation is the same absolute-frame class
+    gaugeLineRels.length === 0 &&
     // an all-gauge run-carrier membership is similarity-invariant (extent-normalized);
     // a frozen member or a fixed equation plane pins the gauge instead
     memberPins.every((m) => !m.frozen && !m.plane) &&
@@ -394,6 +401,40 @@ export function solvePivot(
       // plane ⟂ line ⟺ the plane's normal is PARALLEL to the direction ⟺ their cross vanishes
       const x = cross3(n, ln.dir);
       out.push(x.x / (nn * dn), x.y / (nn * dn), x.z / (nn * dn));
+    }
+    // S2 (#378, ADR-3D-103): a GAUGE operand related to an absolute named LINE — ∥ / ⟂ / angle.
+    // The operand re-resolves from the CANDIDATE positions through the one operand seam
+    // (engine/operands.ts) while the line is fixed, so satisfying the relation rotates the
+    // figure (the planeLinePerps pattern). Every residual is normalized by both magnitudes —
+    // scale-free, so a shrinking figure can never zero it (the collapse-basin class). A line
+    // that only resolves post-pivot (a through-line) contributes nothing: the recorded claim
+    // still verifies it on the final figure, so nothing escapes checking.
+    for (const pin of gaugeLineRels) {
+      const ln = lines?.get(pin.line);
+      if (!ln) continue;
+      const directional = pin.op.kind !== 'plane-run';
+      const wide = directional ? pin.rel === 'parallel' : pin.rel === 'perp'; // full alignment: 3 cross components
+      const geom = resolveOperand(pin.op, c, { lines: lines ?? new Map(), planes: new Map() })(at);
+      const d = geom ? (directional ? geom.dir : geom.normal) : undefined;
+      const dn2 = norm3(ln.dir);
+      if (!d || norm3(d) < 1e-12 || dn2 < 1e-12) {
+        for (let i = 0; i < (wide ? 3 : 1); i++) out.push(10);
+        continue;
+      }
+      const den = norm3(d) * dn2;
+      if (wide) {
+        // seg/vec ∥ line (dirs aligned) · plane-run ⟂ line (normal aligned): the cross vanishes
+        const x = cross3(d, ln.dir);
+        out.push(x.x / den, x.y / den, x.z / den);
+      } else if (pin.rel === 'perp') {
+        out.push(dot3(d, ln.dir) / den); // seg/vec ⟂ line
+      } else if (pin.rel === 'parallel') {
+        out.push(dot3(d, ln.dir) / den); // line ∥ plane ⟺ the line's dir ⟂ the plane's normal
+      } else {
+        // a stated angle: between lines |cos| = cos(deg); between a line and a plane sin β = |cos(n,dir)|
+        const target = ((pin.deg ?? 0) * Math.PI) / 180;
+        out.push(Math.abs(dot3(d, ln.dir)) / den - (directional ? Math.cos(target) : Math.sin(target)));
+      }
     }
 
     // V8-f: a VecAtom operand → its (gauge-transformed) direction
@@ -624,7 +665,9 @@ export function solvePivot(
   // sample, the invariantOnly REG pattern), (b) judged on its PRIMARY residuals so
   // exact solutions are never rejected for carrying the anchor's pull, and (c) filtered:
   // a candidate whose solid has two coincident vertices is not a figure at all.
-  const planeDrive = c.planePins.length > 0 || memberPins.length > 0 || c.coordPlanePins.length > 0 || c.planeLinePerps.length > 0;
+  const planeDrive =
+    c.planePins.length > 0 || memberPins.length > 0 || c.coordPlanePins.length > 0 || c.planeLinePerps.length > 0 ||
+    gaugeLineRels.length > 0; // S2: same absolute-frame drive class (anchored, degeneracy-filtered, Stage A)
   // ...and when NOTHING pins an absolute length (no point/vector/pair injection, no
   // length/dot scalar), placement alone can satisfy the equations — Stage A below.
   const scaleFree =

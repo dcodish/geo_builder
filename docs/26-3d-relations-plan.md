@@ -232,9 +232,14 @@ and again for function, is waste, and the zero-diff gate is cleanest kept absolu
 snapshot zero-byte diff**, full suite green, battery green. First find: #380 (primed labels rejected by the
 seg↔plane family).
 
-**S2 — the named-line column** *(the reported item first)*. Point-on-ℓ phrasings → the existing `on-line`
-command; ∥/⟂/angle for ℓ operands via the classifier (gauge×absolute → pivot residual; absolute×absolute
-symbolic → param-root). Includes the `l1=x:` spelling-tolerance decision (filed separately).
+**S2 — the named-line column** *(landed 2026-07-28, [ADR-3D-103](06b-decisions-3d.md#adr-3d-103))*.
+Point-on-ℓ phrasings → the existing `on-line` command; ∥/⟂/angle for ℓ operands via the classifier
+(gauge×absolute → the `lineRels` pivot residual; absolute×absolute symbolic → param-root, gated on a
+DIRECTION carrying the parameter; numeric → claim). 14 cells flipped; two root fixes en route (the
+table's dead non-canonical literal keys, the never-verified numeric line⟂π). **The `l1=x:`
+spelling-tolerance "decision (filed separately)" was never actually filed** — carried forward, not
+silently dropped; file it when the spelling recurs in a log. Through-line (`pointLines`) operands stay
+claim-only until an exam needs the drive (recorded in the table notes).
 
 **S4 — mutual positions, complete** *(promoted — the operator's explicit skew ask)*. intersecting /
 parallel / skew / coincident over every operand pair, as claims AND as givens (the requirement lane for

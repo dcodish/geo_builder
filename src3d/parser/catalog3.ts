@@ -122,6 +122,19 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: "הישר A'C חותך את המישור BC'D בנקודה K", en: "line A'C cuts plane BC'D at K" },
   { category: 'planesLines', he: 'A נמצאת על אחד המישורים', en: 'A is on one of the planes' },
   { category: 'planesLines', he: 'B על הישר ℓ', en: 'B is on line ℓ' },
+  // S2 (#378, ADR-3D-103): the NAMED-LINE column — point-on-ℓ short forms + ∥/⟂/angle with a
+  // named-line operand (segment / vector / second line / named plane / point-run plane)
+  { category: 'planesLines', he: 'B על l1', en: 'point B on l1' },
+  { category: 'planesLines', he: 'נקודה B נמצאת על ישר l1', en: 'point B is on line l1' },
+  { category: 'planesLines', he: 'AB מאונך לישר l1', en: 'AB is perpendicular to line l1' },
+  { category: 'planesLines', he: 'AB מקביל לישר l1', en: 'AB is parallel to line l1' },
+  { category: 'planesLines', he: 'הישר l1 מקביל לישר l2', en: 'line l1 is parallel to line l2' },
+  { category: 'planesLines', he: 'l1 מאונך לישר l2', en: 'l1 is perpendicular to l2' },
+  { category: 'planesLines', he: 'הישר l1 מקביל למישור π1', en: 'line l1 is parallel to plane π1' },
+  { category: 'planesLines', he: 'הישר l1 מקביל למישור ACD', en: 'line l1 is parallel to plane ACD' },
+  { category: 'planesLines', he: 'הזווית בין הישר l1 לבין המישור ACD היא 30', en: 'the angle between line l1 and plane ACD is 30' },
+  { category: 'planesLines', he: 'הזווית בין AB לבין הישר l1 היא 60', en: 'the angle between AB and line l1 is 60' },
+  { category: 'planesLines', he: 'הזווית בין l1 לבין l2 היא 60', en: 'the angle between l1 and l2 is 60' },
   // #69 (ADR-3D-038): digit-indexed line names ℓ1/ℓ2 — several parametric lines coexist
   { category: 'planesLines', he: 'הישר ℓ1: x = (0,0,0) + t(1,0,0)', en: 'line ℓ1: x = (0,0,0) + t(1,0,0)' },
   // #351 (ADR-3D-091): through the ORIGIN — the anchor may be omitted entirely
