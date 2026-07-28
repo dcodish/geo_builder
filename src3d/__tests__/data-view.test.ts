@@ -80,11 +80,13 @@ describe('dataView — organize your data', () => {
   });
 
   it('#296 panelIsEmpty: a relations-only panel is NOT empty', () => {
-    const empty: DataPanel = { relations: [], vectors: [], points: [], planes: [], pointCoords: {}, params: [] };
+    const empty: DataPanel = { relations: [], mutual: [], vectors: [], points: [], planes: [], pointCoords: {}, params: [] };
     expect(panelIsEmpty(empty)).toBe(true);
     // the bug: only relations present → the App used to render "empty" and hide them
     expect(panelIsEmpty({ ...empty, relations: ['|u| = |v|', 'u·v = 0'] })).toBe(false);
     expect(panelIsEmpty({ ...empty, points: ['N(6, 6, 6)'] })).toBe(false);
+    // S4 (#378): the same trap for the mutual rows — guard and render must read emptiness alike
+    expect(panelIsEmpty({ ...empty, mutual: [{ a: 'AB', b: 'CD', rel: 'skew' }] })).toBe(false);
   });
 
   it('perpendicular declared vectors surface as u·v = 0 (operator, 2026-07-08)', () => {

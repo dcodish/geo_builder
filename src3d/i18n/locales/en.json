@@ -76,6 +76,7 @@
     "sizeOnSolid": "A numeric size on a free-dimension solid isn't supported here yet",
     "boundUnsatisfiable": "No configuration of the figure puts the angle at {{id}} inside the stated bound",
     "claimRefuted": "The claim doesn't hold in the figure — check the computation",
+    "vacuousRelation": "The relation names one object twice — it needs two different objects",
     "badFile": "This is not a valid Space Builder figure file",
     "newerSchema": "The file was saved by a newer version of the tool — refresh the page and try again",
     "unknownSymbol": "the parameter {{id}} isn't defined in the figure",
@@ -101,7 +102,14 @@
     "title": "Organize the data",
     "hint": "derived vector, coordinate and magnitude presentations — laid out the way you would on paper",
     "empty": "nothing stable to show yet",
-    "openParam": "free parameter — pinned once more data arrives"
+    "openParam": "free parameter — pinned once more data arrives",
+    "mutual": {
+      "skew": "{{a}} and {{b}} are skew",
+      "parallel": "{{a}} and {{b}} are parallel",
+      "intersecting": "{{a}} and {{b}} intersect",
+      "coincident": "{{a}} and {{b}} coincide",
+      "perpendicular": "{{a}} is perpendicular to {{b}}"
+    }
   },
   "scope": {
     "valueless-query": "This tool draws and verifies givens — it does not solve. To act on an angle, state a value: e.g. \"the angle between line AC' and plane ABCD is 30\", and it will be enforced or verified.",
@@ -110,7 +118,6 @@
     "ui-command": "Marks appear automatically from the givens — instead of asking for a mark, state the given itself: e.g. \"angle D = 90\".",
     "oblique-prism": "A prism not stated \"right\" builds oblique — the tilt is a degree of freedom, and \"the prism is right\" straightens it. For a pentagon or hexagon base state \"right\" (e.g. \"right prism with a pentagon base\"), since a regular base is not a stated given. If you meant an oblique prism, name its base: e.g. \"prism with a triangle base\".",
     "lowercase-labels": "Vertex labels are written in UPPERCASE — AS, not as. Lowercase letters are reserved for vectors (u, v, w), parameters (t, k, m) and coordinates (x, y, z), and angles are named with Greek letters (α, β, γ, θ). Try: {{corrected}}",
-    "seg-parallel-given": "Parallel segments are currently checked as a plural claim: \"AB ו-CD מקבילים\" (AB and CD are parallel). The directed given \"AB is parallel to CD\" is coming.",
     "plane-plane-rel": "A direct plane-to-plane relation (parallel/perpendicular) is not supported yet. You can state the angle between them: \"the angle between planes π1 and π2 is 45\"."
   },
   "query": {

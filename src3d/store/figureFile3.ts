@@ -46,6 +46,7 @@ export interface FigureFile3 {
  *  stayed missing and the same silent-reload-failure class stayed open. A list that must be maintained
  *  by hand will drift again; a total function over the union cannot. */
 const COMMAND_SAVEABLE: Record<Command3['type'], boolean> = {
+  'mutual-rel': true, // S4 (#378): a stated mutual position is a given — it must survive a round-trip
   solid: true,
   'point-on-segment3': true,
   'name-vector': true,

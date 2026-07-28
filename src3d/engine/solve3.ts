@@ -16,8 +16,8 @@
  * (`שיעור ה-z של C' חיובי`) select among the surviving solutions, else the seed.
  */
 
-import type { Construction3, Id, Positions3 } from './types';
-import { isAbsolute, resolveOperand } from './operands';
+import type { Construction3, Id, Positions3, ScalarPin } from './types';
+import { isAbsolute, mutualSides, resolveOperand } from './operands';
 import { add3, cross3, dist3, dot3, newellNormal, norm3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 export interface GaugeParams {
@@ -189,16 +189,36 @@ export interface PivotResult {
  * similarity-INVARIANT and leaves the scale free. Keeping ONE list is the point: a new pin kind that
  * carries units must be added here, or the two consumers would drift apart.
  */
+/**
+ * Does this scalar pin fix the figure's SCALE, or is it similarity-INVARIANT (true of the figure and
+ * of every rescaling of it)?
+ *
+ * A `Record` over the union, so TypeScript requires an entry for every kind: adding a `ScalarPin`
+ * without classifying it here is a COMPILE ERROR. It used to be an exclusion list — `every(p => p.kind
+ * === 'vangle' || …)` — which meant an unlisted kind silently defaulted to "pins the scale". S4's
+ * scale-free `mutual` pin fell straight into it: `AB מקביל ל-DC` on a free quad made `scalePinned`
+ * true, and the data panel began printing `AB = 1`, a number that is pure gauge (a figure's first dim
+ * is the frozen unit) and that the student was never given. The COMMAND_SAVEABLE lesson (#288): a
+ * hand-maintained list drifts; a total function over the union cannot.
+ */
+const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
+  length: true, // |DC| = 4 — an absolute size
+  dot: true, // u·v = 24 scales as s², so it fixes s
+  'length-rel': false, // a RATIO of lengths
+  vangle: false,
+  'seg-perp-plane': false,
+  'seg-par-plane': false,
+  'cos-angle': false, // V8-f: cosines and equal dot products are similarity-invariant
+  'dot-eq': false,
+  'cos-eq': false,
+  concyclic: false, // #305
+  'line-plane-angle': false, // sin β is length-normalized
+  mutual: false, // S4 (#378): every residual is normalized by the operand magnitudes
+};
+
 export function scalePinned(c: Construction3): boolean {
   if (c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0) return true;
-  return !c.scalarPins.every(
-    (p) =>
-      p.kind === 'vangle' || p.kind === 'seg-perp-plane' || p.kind === 'seg-par-plane' || p.kind === 'length-rel' ||
-      // V8-f: cos/angle equalities and equal dot products are all similarity-INVARIANT
-      p.kind === 'cos-angle' || p.kind === 'dot-eq' || p.kind === 'cos-eq' ||
-      p.kind === 'concyclic' || // #305: a ratio of lengths ⇒ similarity-invariant
-      p.kind === 'line-plane-angle', // sin β is length-normalized → invariant
-  );
+  return c.scalarPins.some((p) => PIN_FIXES_SCALE[p.kind]);
 }
 
 export function solvePivot(
@@ -499,6 +519,43 @@ export function solvePivot(
           };
           out.push(cosAt(A, B, D) + cosAt(C, B, D));
         } else out.push(10);
+      } else if (pin.kind === 'mutual') {
+        // S4 (#378): a CLOSED mutual position between two gauge operands.
+        //
+        // Every residual here is a SIGNED COMPONENT, never a magnitude. The natural scalars —
+        // |d1×d2| for parallel, |w·(d1×d2)| for meeting — are non-negative, so they TOUCH zero
+        // instead of crossing it and the least-squares descent stalls short of the solution (the
+        // ADR-3D-006 lesson, restated in the `concyclic` branch above and measured again here).
+        // The component forms change sign through the configuration, so the descent runs into it.
+        // All are normalized by the operand magnitudes ⇒ scale-free ⇒ similarity-invariant, so a
+        // shrinking figure can never zero them (the collapse-basin class).
+        const sides = mutualSides(pin.a, pin.b, c, { lines: lines ?? new Map(), planes: new Map() }, (id) => at(id) ?? null);
+        const wide = pin.rel !== 'intersecting'; // parallel/coincident align directions: 3 components
+        if (!sides) {
+          for (let i = 0; i < (pin.rel === 'coincident' ? 6 : wide ? 3 : 1); i++) out.push(10);
+          continue;
+        }
+        const [s1, s2] = sides;
+        const d1 = s1.geom.dir!;
+        const d2 = s2.geom.dir!;
+        const w = sub3(s2.geom.point!, s1.geom.point!);
+        const n1 = norm3(d1);
+        const n2 = norm3(d2);
+        const cxd = cross3(d1, d2);
+        if (pin.rel === 'intersecting') {
+          // coplanarity, SIGNED: the triple product crosses zero as the lines pass through meeting
+          const den = Math.max(n1 * n2 * norm3(w), 1e-12);
+          out.push(dot3(w, cxd) / den);
+        } else {
+          const den = Math.max(n1 * n2, 1e-12);
+          out.push(cxd.x / den, cxd.y / den, cxd.z / den); // directions aligned
+          if (pin.rel === 'coincident') {
+            // …and side 2's anchor lies ON side 1: w × d1 vanishes (again componentwise)
+            const wx = cross3(w, d1);
+            const den2 = Math.max(n1 * norm3(w), 1e-12);
+            out.push(wx.x / den2, wx.y / den2, wx.z / den2);
+          }
+        }
       } else if (pin.kind === 'cos-angle') {
         const u = dirOf(pin.u);
         const v = dirOf(pin.v);

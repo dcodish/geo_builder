@@ -30,7 +30,6 @@ export type ScopeCategory3 =
   | 'oblique-prism'
   | 'lowercase-labels'
   // S2 (#378, DoD 12): the named-line column's UNSUPPORTED neighbours get guidance, not LLM roulette
-  | 'seg-parallel-given'
   | 'plane-plane-rel';
 
 export interface ScopeMatch3 {
@@ -97,16 +96,9 @@ const RULES3: ScopeRule3[] = [
       /^(?!.*\bright\b)(?=.*\boblique\b)(?=.*\bprism\b)(?!.*\bbase\b)/i,
     ],
   },
-  {
-    // S2 (#378): a SINGULAR ∥ GIVEN between two bare segments — the S4 slice's cell. The plural
-    // CLAIM form («AB ו-CD מקבילים») is already supported; point at it instead of LLM roulette.
-    // Two bare 2-letter runs only, so the supported line/plane operand forms are never touched.
-    category: 'seg-parallel-given',
-    patterns: [
-      /^ה?(?:קטע\s+|מקצוע\s+)?[A-Z]\d*'?[A-Z]\d*'?\s*(?:מקביל\s+ל-?|∥)\s*(?:ה?קטע\s+|ה?מקצוע\s+)?[A-Z]\d*'?[A-Z]\d*'?\s*$/,
-      /^[A-Z]\d*'?[A-Z]\d*'?\s+is\s+parallel\s+to\s+[A-Z]\d*'?[A-Z]\d*'?\s*$/i,
-    ],
-  },
+  // S4 (#378, ADR-3D-104): the `seg-parallel-given` guidance is RETIRED — «AB מקביל ל-CD» is now
+  // a supported given (it drives, the plural spelling lowers identically). Guidance for a form the
+  // parser handles would be a lie, so the category is deleted rather than reworded.
   {
     // S2 (#378): a plane↔plane ∥/⟂ — the S3 slice's cells. The angle-between-planes form IS
     // supported for named planes; the message points at it.

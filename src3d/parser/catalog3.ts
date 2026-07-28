@@ -167,6 +167,13 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'points', he: 'A על ציר ה-x החיובי', en: 'A is on the positive x-axis' },
   { category: 'claims', he: '∠BAC = 90', en: '∠BAC = 90' },
   { category: 'claims', he: 'NK ו-PL מצטלבים', en: 'NK and PL are skew' },
+  // S4 (#378, ADR-3D-104): the MUTUAL-POSITION column — skew / intersecting / parallel / coincident
+  // over segments and named lines alike, as GIVENS as well as claims.
+  { category: 'planesLines', he: 'AB מקביל ל-CD', en: 'AB is parallel to CD' },
+  { category: 'planesLines', he: 'AC ו-BD נחתכים', en: 'AC and BD intersect' },
+  { category: 'planesLines', he: 'AB ו-l1 מצטלבים', en: 'AB and l1 are skew' },
+  { category: 'planesLines', he: 'l1 ו-l2 מצטלבים', en: 'l1 and l2 are skew' },
+  { category: 'planesLines', he: 'AB מתלכד עם CD', en: 'AB coincides with CD' },
   // --- V8-f: vector-relation givens ---
   { category: 'vectors', he: 'קוסינוס הזווית בין הוקטורים u ו-w הוא √35/10', en: 'the cosine of the angle between u and w is √35/10' },
   { category: 'vectors', he: 'קוסינוס הזווית ACB = 3/4', en: 'cos∠ACB = 3/4' },

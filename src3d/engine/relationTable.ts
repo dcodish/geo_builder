@@ -81,14 +81,14 @@ const CELLS: Record<string, CellStatus> = {
   // ---- parallel -----------------------------------------------------------------------
   'parallel|segment|segment': {
     status: 'supported',
-    actions: ['claim'],
-    note: 'PLURAL claim form only (`AB ו-CD מקבילים`, V7-T3); the singular given is S4',
+    actions: ['drive-dims', 'claim'],
+    note: 'S4: both spellings (plural `AB ו-CD מקבילים` and directed `AB מקביל ל-CD`) lower alike (ADR-3D-104)',
   },
+  'parallel|segment|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S4: a direction relation — a free vector qualifies (ADR-3D-104)' },
+  'parallel|vector|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S4 (ADR-3D-104)' },
   'parallel|segment|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'seg-par-plane' },
   'parallel|segment|plane-named': { status: 'planned', slice: 'S3' },
-  'parallel|segment|vector': { status: 'planned', slice: 'S4' },
-  'parallel|vector|vector': { status: 'planned', slice: 'S4' },
-  'parallel|line|line': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2: symbolic dirs pin m (the 2010-Q3 family); numeric verifies' },
+  'parallel|line|line':{ status: 'supported', actions: ['param-root', 'claim'], note: 'S2: symbolic dirs pin m (the 2010-Q3 family); numeric verifies' },
   'parallel|line|segment': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: lineRels (ADR-3D-103)' },
   'parallel|line|vector': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: lineRels (ADR-3D-103)' },
   'parallel|line|plane-run': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: line ∥ point-run plane ⟺ dir ⟂ normal' },
@@ -99,9 +99,22 @@ const CELLS: Record<string, CellStatus> = {
   'parallel|plane-run|plane-named': { status: 'planned', slice: 'S3' },
   'parallel|plane-named|plane-named': { status: 'planned', slice: 'S3' },
 
-  // ---- skew / intersecting / coincident (mutual positions) ----------------------------
-  'skew|segment|segment': { status: 'supported', actions: ['claim'], note: 'מצטלבים, V7-T3; the GIVEN (requirement) is S4' },
-  'intersecting|segment|segment': { status: 'supported', actions: ['claim'], note: 'נחתכים, V7-T3' },
+  // ---- skew / intersecting / coincident (mutual positions) — S4 (#378, ADR-3D-104) -----
+  //
+  // Routing follows the frame classifier, and the CLOSED/OPEN split decides the mechanism:
+  // `skew` is an inequality (not parallel AND not coplanar), so it can only ever be a requirement +
+  // a claim — there is nothing to least-squares. The closed relations add a drive when BOTH sides
+  // ride the gauge; against an absolute named line the figure would have to MOVE, which is the
+  // pivot's lane and is not built — those cells are honest claim+requirement (see #386).
+  'skew|segment|segment': { status: 'supported', actions: ['requirement', 'claim'], note: 'מצטלבים — open condition, sample-and-gate' },
+  'skew|segment|line': { status: 'supported', actions: ['requirement', 'claim'], note: 'S4' },
+  'skew|line|line': { status: 'supported', actions: ['claim'], note: 'S4: both absolute — nothing to gate, the claim is the answer' },
+  'intersecting|segment|segment': { status: 'supported', actions: ['drive-dims', 'requirement', 'claim'], note: 'נחתכים — coplanarity drives, within-extent gates' },
+  'intersecting|segment|line': { status: 'supported', actions: ['requirement', 'claim'], note: 'S4: claim-gated — the gauge×absolute drive is #386' },
+  'intersecting|line|line': { status: 'supported', actions: ['claim'], note: 'S4: both absolute' },
+  'coincident|segment|segment': { status: 'supported', actions: ['drive-dims', 'requirement', 'claim'], note: 'מתלכדים — S4' },
+  'coincident|segment|line': { status: 'supported', actions: ['requirement', 'claim'], note: 'S4: claim-gated — see #386' },
+  'coincident|line|line': { status: 'supported', actions: ['claim'], note: 'S4: both absolute' },
 
   // ---- contains (an object lying IN a plane / ON a line) ------------------------------
   'contains|plane-run|segment': { status: 'planned', slice: 'S3', note: 'a segment lying in a plane' },
@@ -181,6 +194,14 @@ export function cellStatus(rel: Rel3, l: OperandKind, r: OperandKind): CellStatu
       : { status: 'n/a', note: 'a point has no direction — this relation needs two directional/planar operands' };
   }
   if (rel === 'skew' || rel === 'intersecting' || rel === 'coincident') {
+    // S4 (#378): a mutual position is a question about LOCATED objects. A named vector is a free
+    // vector — it has a direction and a magnitude but no place in space, so "u and v are skew /
+    // intersect / coincide" has no referent to be true or false about. (Its direction relations —
+    // ∥, ⟂, angle — remain perfectly meaningful and are supported.) Widen only if an exam asks it,
+    // and then by resolving the vector through its witness pair, which is a different statement.
+    if (l === 'vector' || r === 'vector') {
+      return { status: 'n/a', note: 'a free vector has no location — mutual position needs located objects (∥/⟂/angle do apply)' };
+    }
     if (DIRECTIONAL.has(l) && DIRECTIONAL.has(r)) return { status: 'planned', slice: 'S4' };
     if (PLANAR.has(l) && PLANAR.has(r)) {
       return rel === 'skew'
