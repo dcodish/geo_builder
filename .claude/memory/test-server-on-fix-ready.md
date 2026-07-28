@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 37aeea55-dbe9-442d-a749-4712c96b6f5a
-  modified: 2026-07-28T05:45:17.539Z
+  modified: 2026-07-28T16:51:29.742Z
 ---
 
 Whenever I put the operator at the keyboard — reporting a fix as done, walking them through PRs waiting
@@ -22,6 +22,13 @@ a branch name and a list of utterances.
 walked them through four waiting PRs with utterances but no running server: *"we have a rule — you never
 just tell me to test something without telling me where to test (you start a server for me) and what to
 test."* Tests green is my gate, not theirs — anything they cannot play is not something they can accept.
+
+**Format the cases for COPY-PASTE — one utterance per line, nothing else on the line.** They asked for
+this on 2026-07-28: *"when you give me test cases, i need them line by line for copy paste."* So put each
+scenario in a fenced code block with one utterance per line, in the order to type them. Never join steps
+with arrows (`A → B → C`), never bury an utterance inside prose or a table cell, never add commentary,
+quotes, bullets, or numbering on the utterance line — every one of those has to be hand-stripped before
+it can be pasted into the app. Put the "what to look for" in prose above or below the block, not inside it.
 
 **How to apply:** the `Stop` hook `scripts/ensure-test-server.mjs` enforces the reporting-a-fix case — it
 reads the message I just wrote, and if it announces a finished fix while nothing is listening on
