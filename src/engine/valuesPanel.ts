@@ -19,7 +19,7 @@ import { polygonArea } from './geometry';
 import type { Construction, Id, Vec } from './types';
 
 export interface ValueRow {
-  kind: 'length' | 'angle' | 'radius' | 'area';
+  kind: 'length' | 'angle' | 'radius' | 'area' | 'perimeter';
   /** ids to highlight on the canvas when the row is clicked (endpoints / wedge / polygon / centre). */
   ids: Id[];
   /** the math label — 'AB', '∠ABC', 'O' (radius), 'ABC' (area). The App adds the i18n dressing. */
@@ -101,10 +101,12 @@ export function computeValuesPanel(
   const statedLen = new Set<string>();
   const statedAng = new Set<string>();
   const statedArea = new Set<string>();
+  const statedPerim = new Set<string>();
   for (const con of c.constraints) {
     if (con.type === 'distance') statedLen.add(segKey(con.a, con.b));
     if (con.type === 'angle' && !con.arcOf) statedAng.add(`${con.vertex}|${con.ray1}|${con.ray2}`);
     if (con.type === 'area') statedArea.add([...con.ids].sort().join(''));
+    if (con.type === 'perimeter') statedPerim.add([...con.ids].sort().join(''));
   }
 
   // ---- lengths over the figure's edge universe (the detection layers' own, scaffold-filtered) ---
@@ -164,9 +166,16 @@ export function computeValuesPanel(
       kind: 'radius', ids: [o.center], label: o.center, value: v, exact: exactOrNull(v),
       stated: o.radius.via === 'length', // a STATED radius stays via 'length' (free/through/tangent are derived)
     });
-    // the circle's area rides the same knowledge (πr² — the exact-form showcase)
+    // The circle's area AND circumference ride the same knowledge — both are the same one-step derivation
+    // from the same radius, so printing one and withholding the other read as an oversight (#414). ADR-228
+    // already lowers a STATED circumference to a radius (r = C/2π); this is that constant forwards.
     const area = Math.PI * v * v;
     rows.push({ kind: 'area', ids: [o.center], label: `(${o.center})`, value: area, exact: exactOrNull(area), stated: false });
+    const circumference = 2 * Math.PI * v;
+    rows.push({
+      kind: 'perimeter', ids: [o.center], label: `(${o.center})`, value: circumference,
+      exact: exactOrNull(circumference), stated: false,
+    });
   }
 
   // ---- polygon areas + ratio classes ------------------------------------------------------------
@@ -191,6 +200,26 @@ export function computeValuesPanel(
     rows.push({
       kind: 'area', ids: [...o.vertices], label: o.vertices.join(''), value: v, exact: exactOrNull(v),
       stated: statedArea.has([...o.vertices].sort().join('')),
+    });
+  });
+  // The polygon twin of the circle's circumference (#414): `perimeter` is a first-class measure and
+  // constraint (ADR-228), so a determined polygon's Σ of sides is knowledge the panel should carry beside
+  // its area. Same invariance gate as every other row — a figure whose sides are not all fixed prints none.
+  polys.forEach((o) => {
+    const v = per((pos) => {
+      let sum = 0;
+      for (let k = 0; k < o.vertices.length; k++) {
+        const p = pos.get(o.vertices[k]);
+        const q = pos.get(o.vertices[(k + 1) % o.vertices.length]);
+        if (!p || !q) return null;
+        sum += dist(p, q);
+      }
+      return sum;
+    });
+    if (v === null) return;
+    rows.push({
+      kind: 'perimeter', ids: [...o.vertices], label: o.vertices.join(''), value: v, exact: exactOrNull(v),
+      stated: statedPerim.has([...o.vertices].sort().join('')),
     });
   });
   // ratio classes (req 3): a fixed small-rational ratio in EVERY sample, even when absolutes vary.

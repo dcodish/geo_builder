@@ -389,6 +389,7 @@
     "none": "No fixed values yet — add size givens (a length, an angle, a radius)",
     "radius": "radius {{c}}",
     "area": "area {{ids}}",
+    "perimeter": "perimeter {{ids}}",
     "rowHint": "Click to highlight on the canvas"
   }
 }
