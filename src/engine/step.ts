@@ -251,6 +251,47 @@ function newConstraintsNonVacuous(c: Construction, positions: Map<Id, Vec>, newC
 }
 
 /**
+ * #408 (ADR-413): a DECLARED polygon driven to ZERO AREA is not a solution. The solver satisfied
+ * `D = mid(AB) ∧ D ∈ AC` by flattening triangle ABC — every residual at zero, reported green, no
+ * notice (the operator's all-collinear screenshot). Nothing in the accept path asserts a declared
+ * polygon has positive area: `polygonsConvex` lives in the VIEW-SEARCH layer only, covers only the
+ * 4+-gon shape facts, and skips triangles entirely. Collinearity is judged extent-relative against
+ * the polygon's own span (1e-4) — a numeric collapse sits orders of magnitude below it, the thinnest
+ * legitimately-constructible triangle orders above.
+ */
+function collapsedPolygon(c: Construction, positions: Map<Id, Vec>): boolean {
+  for (const o of c.objects) {
+    if (o.kind !== 'polygon') continue;
+    const pts = o.vertices.map((id) => positions.get(id));
+    if (pts.length < 3 || pts.some((p) => !p)) continue;
+    // The line through the two most-separated vertices; every vertex within tol of it = collapsed.
+    let ai = 0, bi = 1, span = -1;
+    for (let i = 0; i < pts.length; i++)
+      for (let j = i + 1; j < pts.length; j++) {
+        const d = Math.hypot(pts[i]!.x - pts[j]!.x, pts[i]!.y - pts[j]!.y);
+        if (d > span) { span = d; ai = i; bi = j; }
+      }
+    if (span <= 0) continue; // all vertices coincide — the coincidence machinery's concern, not this gate's
+    const A = pts[ai]!, B = pts[bi]!;
+    const ux = (B.x - A.x) / span, uy = (B.y - A.y) / span;
+    const off = pts.reduce((m, p) => Math.max(m, Math.abs((p!.x - A.x) * uy - (p!.y - A.y) * ux)), 0);
+    if (off < 1e-4 * span) return true;
+  }
+  return false;
+}
+
+/**
+ * THE step-accept predicate — one TOTAL gate at every accept event (the docs/17 guard-binds-to-the-
+ * event rule): the new constraints hold non-vacuously (#7) AND no declared polygon has collapsed to a
+ * line (#408). A rejecting accept routes the solve into the same failure ladder as a genuine
+ * over-constraint, so the recruiter hunts for a REAL configuration and, when only degenerate ones
+ * exist, the refusal honestly names the student's statement (ADR-276).
+ */
+function stepAccepted(c: Construction, positions: Map<Id, Vec>, newCons: Constraint[]): boolean {
+  return newConstraintsNonVacuous(c, positions, newCons) && !collapsedPolygon(c, positions);
+}
+
+/**
  * Blame honesty (issue #37): an over-constrained refusal names the STUDENT'S new statement, not a
  * collateral casualty. The primary joint solve's violated set can be an EARLIER given the compromise
  * basin broke while satisfying the new one ("ישר BAE" refused as "|GA| = |AC| cannot hold") — the
@@ -310,7 +351,7 @@ function settleOnFrozenPrior(
   if (!anyFrozen) return null; // nothing was jointly driven before — the primary attempt already was minimal
   const trial: Construction = { ...next, objects: trialObjects };
   const r = evaluate(trial);
-  if (!r.ok || !newConstraintsNonVacuous(trial, r.positions, newCons)) return null;
+  if (!r.ok || !stepAccepted(trial, r.positions, newCons)) return null;
   // Re-attach the standing directives on top of the SOLVED params (ownership restore).
   const solvedTrial = resolveDriven(trial);
   const stById = new Map(solvedTrial.objects.map((o) => [o.id, o] as const));
@@ -322,7 +363,7 @@ function settleOnFrozenPrior(
   });
   const restored: Construction = { ...next, objects: restoredObjects };
   const r3 = evaluate(restored);
-  if (r3.ok && newConstraintsNonVacuous(restored, r3.positions, newCons)) return { construction: restored, positions: r3.positions };
+  if (r3.ok && stepAccepted(restored, r3.positions, newCons)) return { construction: restored, positions: r3.positions };
   return { construction: trial, positions: r.positions };
 }
 
@@ -376,7 +417,7 @@ function jointFirst(
     if (!headCarried) continue;
     const trial: Construction = { objects, constraints: next.constraints };
     const r = evaluate(trial);
-    if (r.ok && newConstraintsNonVacuous(trial, r.positions, newCons)) return trial;
+    if (r.ok && stepAccepted(trial, r.positions, newCons)) return trial;
     if (budgetExceeded()) return null;
   }
   return null;
@@ -447,7 +488,7 @@ function runFailureLadder(
     if (!missing.length) return { ok: true, construction, positions, ladder: [...trace, token] };
     const repaired: Construction = { ...construction, constraints: [...construction.constraints, ...missing] };
     const r = evaluate(repaired);
-    if (r.ok && newConstraintsNonVacuous(repaired, r.positions, newCons)) {
+    if (r.ok && stepAccepted(repaired, r.positions, newCons)) {
       return { ok: true, construction: repaired, positions: r.positions, ladder: [...trace, token, 'preserve:repair'] };
     }
     trace.push('preserve:reject'); // the stage won by dropping a given — its accept is void; keep climbing
@@ -480,7 +521,7 @@ function runFailureLadder(
   const recruited = recruitFreeDofs(next, [...newCons, ...orphans], trace);
   if (recruited) {
     const r2 = evaluate(recruited);
-    if (r2.ok && newConstraintsNonVacuous(recruited, r2.positions, newCons)) {
+    if (r2.ok && stepAccepted(recruited, r2.positions, newCons)) {
       const a = accept(recruited, r2.positions, `${prefix}:recruit`);
       if (a) return a;
     }
@@ -496,7 +537,7 @@ function runFailureLadder(
   const joint = jointFirst(next, newCons, trace);
   if (joint) {
     const rj = evaluate(joint);
-    if (rj.ok && newConstraintsNonVacuous(joint, rj.positions, newCons)) {
+    if (rj.ok && stepAccepted(joint, rj.positions, newCons)) {
       const a = accept(joint, rj.positions, `${prefix}:component`);
       if (a) return a;
     }
@@ -509,7 +550,7 @@ function runFailureLadder(
   const scaled = scaleRescue(next, newCons, prevPositions);
   if (scaled) {
     const rs = evaluate(scaled);
-    if (rs.ok && newConstraintsNonVacuous(scaled, rs.positions, newCons)) {
+    if (rs.ok && stepAccepted(scaled, rs.positions, newCons)) {
       const a = accept(scaled, rs.positions, `${prefix}:scale`);
       if (a) return a;
     }
@@ -595,7 +636,7 @@ function ensureOwnership(
     if (clash || !marks || (best && marks >= best.marks)) continue;
     const owned = { ...next, objects };
     const r = evaluate(owned);
-    if (!r.ok || !newConstraintsNonVacuous(owned, r.positions, newCons)) continue;
+    if (!r.ok || !stepAccepted(owned, r.positions, newCons)) continue;
     // The marking must not move the just-accepted figure: the driven re-solve from an exactly-satisfied
     // state keeps its values (nearest-root ordering); verify it actually did.
     if (maxDelta(positions, r.positions, [...positions.keys()]) > 1e-3 * span) continue;
@@ -670,7 +711,7 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
     if (constrained) {
       const newCons = constrained.constraints.slice(prev.constraints.length);
       const r = evaluate(constrained);
-      if (r.ok && newConstraintsNonVacuous(constrained, r.positions, newCons)) {
+      if (r.ok && stepAccepted(constrained, r.positions, newCons)) {
         const owned = ensureOwnership(constrained, newCons, r.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF
         if (owned) return { ok: true, construction: owned.construction, positions: owned.positions, ladder: [...trace, 'm1:primary', 'm1:own'] };
         return { ok: true, construction: constrained, positions: r.positions, ladder: [...trace, 'm1:primary'] };
@@ -712,11 +753,12 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   }
 
   // A primary solve that "passed" only VACUOUSLY (a new constraint's own referenced points collapsed —
-  // 0 = 0) is not a success: route it through the same failure path as a genuine over-constraint so the
-  // recruiter searches for a real configuration (issue #7, the B13 finding).
+  // 0 = 0, issue #7 / the B13 finding) or by FLATTENING a declared polygon (#408) is not a success:
+  // route it through the same failure path as a genuine over-constraint so the recruiter searches for
+  // a real configuration and, when none exists, the refusal names the student's statement.
   const newConsMain = next.constraints.slice(prev.constraints.length);
-  const mainVacuous = res.ok && !newConstraintsNonVacuous(next, res.positions, newConsMain);
-  if (!res.ok || mainVacuous) {
+  const mainRejected = res.ok && !stepAccepted(next, res.positions, newConsMain);
+  if (!res.ok || mainRejected) {
     // A constraint its direct carrier alone can't satisfy ("cannot place F on AB so |DE|=|DF|" — F is
     // stuck on the segment) may still hold if the figure's OTHER free DOFs move too (ADR-028, extended):
     // the unified failure ladder (S1.1) — orphan re-home → settle → recruit → scale → honest refusal.
@@ -766,7 +808,7 @@ export function applyCoupledStep(prev: Construction, cmds: Command[]): StepResul
   for (const cmd of cmds) next = applyCommand(next, cmd, prevPositions);
   const newCons = next.constraints.slice(prev.constraints.length);
   const res = evaluate(next);
-  if (res.ok && newConstraintsNonVacuous(next, res.positions, newCons)) {
+  if (res.ok && stepAccepted(next, res.positions, newCons)) {
     const owned = ensureOwnership(next, newCons, res.positions); // ADR-399: a satisfied-at-accept binding constraint still claims its DOF
     if (owned) return { ok: true, construction: owned.construction, positions: owned.positions, ladder: ['coupled:primary', 'coupled:own'] };
     return { ok: true, construction: next, positions: res.positions, ladder: ['coupled:primary'] };

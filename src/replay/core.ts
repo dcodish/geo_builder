@@ -505,6 +505,40 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
     .flatMap((f) => lowerOne(f.cmd, symtab))
     .filter((c): c is Extract<Command, { type: 'point-on-segment' }> => c.type === 'point-on-segment')
     .map((c) => ({ id: c.id, a: c.a, b: c.b }));
+  // A base-less midsegment's ANCHOR SIDE is an unstated default that yields to an explicit membership
+  // ([ADR-412](docs/06-decisions.md#adr-412), issue #407 — the ADR-163 pre-scan shape, M4). The named-
+  // triangle (#71) and implicit-triangle (#405) forms seat the pair's first letter on a DEFAULT side and
+  // pin it to that side's midpoint; a later «D על AC» names the side the student MEANT. Stacked as a
+  // constraint instead, the system is satisfiable only DEGENERATELY (mid(AB) ∈ AC ⇒ B on line AC — the
+  // #408 collapse). Identification is STRUCTURAL: only a rider fact sharing its GROUP with the
+  // shape-variant is a rule-made default — a student-stated rider lives in its own group and never moves.
+  // Re-seat = rewrite the rider's host to the stated side + re-anchor the variant ids so the free letter
+  // cycles over the remaining two sides.
+  const msRiderMove = new Map<string, [Id, Id]>(); // default-rider fact id → the stated host side
+  const msSvMove = new Map<string, Id[]>(); // shape-variant fact id → re-anchored [P',Q',R',E,G]
+  for (const sv of facts) {
+    if (!sv.enabled || sv.cmd.type !== 'shape-variant' || sv.cmd.shape !== 'midsegment') continue;
+    const [p, q, rr, e, g] = sv.cmd.ids;
+    const svGroup = groupKey(sv);
+    const rider = facts.find(
+      (f) => f.enabled && groupKey(f) === svGroup && f.cmd.type === 'point-on-segment' && f.cmd.id === e && f.cmd.a === p && f.cmd.b === q,
+    );
+    if (!rider) continue; // the anchor was stated by the student (ADR-199 1-anchored) — no default to yield
+    const tri = new Set([p, q, rr]);
+    const stated = facts.find((f) => {
+      if (!f.enabled || groupKey(f) === svGroup || f.cmd.type !== 'point-on-segment' || f.cmd.id !== e) return false;
+      const { a, b } = f.cmd;
+      if (a === b || !tri.has(a) || !tri.has(b)) return false;
+      return !((a === p && b === q) || (a === q && b === p)); // a DIFFERENT side than the default
+    });
+    if (!stated || stated.cmd.type !== 'point-on-segment') continue;
+    const sa = stated.cmd.a;
+    const sb = stated.cmd.b;
+    const third = [p, q, rr].find((v) => v !== sa && v !== sb);
+    if (!third) continue;
+    msRiderMove.set(rider.id, [sa, sb]);
+    msSvMove.set(sv.id, [sa, sb, third, e, g]);
+  }
   // #365 (ADR-406): the GLOBAL-pre-scan signature, restricted to the first `count` facts. Two facts
   // lists share a prefix fold ONLY when this signature agrees — i.e. the appended facts introduce no
   // symbol binding, centre promotion, soft-supersession, right-triangle reseat, trapezoid rotation,
@@ -525,6 +559,8 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       soft: [...supersededSoft].filter(inPrefix).map((id) => factIdxById.get(id)).sort((a, b) => a! - b!),
       rt: [...rtReorder].filter(([id]) => inPrefix(id)).map(([id, ids]) => [factIdxById.get(id), ids]),
       trap: [...trapRotate].filter(([id]) => inPrefix(id)).map(([id, ids]) => [factIdxById.get(id), ids]),
+      msr: [...msRiderMove].filter(([id]) => inPrefix(id)).map(([id, v]) => [factIdxById.get(id), v]),
+      mss: [...msSvMove].filter(([id]) => inPrefix(id)).map(([id, v]) => [factIdxById.get(id), v]),
       ctr: [...centrePromotions].sort(),
       pair: [...pairSwapByGroup].filter(([g]) => prefixGroups.has(g)).map(([g, m]) => [groupPartition.get(g), [...m].sort()]),
       eqs: explicitEqs,
@@ -541,7 +577,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
   // break `owned`). Only point-shaped ids are judged (scaffold `~`/`@` and typed object ids like
   // `circle-O`/`seg-AB` are never "dangling references" in this sense).
   const factCmds = (g: Fact): Command[] =>
-    (g.cmd.type === 'shape-variant' ? expandShapeVariant(g.cmd, explicitEqs)
+    (g.cmd.type === 'shape-variant' ? expandShapeVariant(g.cmd, explicitEqs, explicitOnSegs)
     : g.cmd.type === 'inscribe' ? expandInscribe(g.cmd, explicitOnSegs)
     : lowerOne(g.cmd, symtab)) as Command[];
   let introduciblePts: Set<Id> | null = null;
@@ -639,12 +675,16 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       // variant-selected equal pairs, with an explicit equality pinning the variant — ADR-138).
       // 0 commands ⇒ a label-only / data-only fact (a free representative or `set-var`) — applied as a no-op.
       let engineCmds =
-        f.cmd.type === 'shape-variant' ? expandShapeVariant(f.cmd, explicitEqs)
+        f.cmd.type === 'shape-variant' ?
+          expandShapeVariant(msSvMove.has(f.id) ? { ...f.cmd, ids: msSvMove.get(f.id)! } : f.cmd, explicitEqs, explicitOnSegs)
         : f.cmd.type === 'inscribe' ? expandInscribe(f.cmd, explicitOnSegs)
         : lowerOne(f.cmd, symtab);
       // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see pre-scan).
       const reseat = rtReorder.get(f.id);
       if (reseat) engineCmds = engineCmds.map((ec) => (ec.type === 'right-triangle' ? { ...ec, ids: reseat } : ec));
+      // Re-seat a midsegment default rider onto the side the student explicitly stated (ADR-412 pre-scan).
+      const riderMove = msRiderMove.get(f.id);
+      if (riderMove) engineCmds = engineCmds.map((ec) => (ec.type === 'point-on-segment' ? { ...ec, a: riderMove[0], b: riderMove[1] } : ec));
       // Rotate a trapezoid whose stated base order contradicts the template's long-base default (ADR-341).
       const trot = trapRotate.get(f.id);
       if (trot) engineCmds = engineCmds.map((ec) => (ec.type === 'trapezoid' ? { ...ec, ids: trot } : ec));

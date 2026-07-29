@@ -97,11 +97,21 @@ export function pinsSoftVariant(
  * placed `E` on side `PQ` of triangle `PQR` and called `EG` a midsegment, without naming the parallel base.
  * A midsegment joins two MIDPOINTS, so `E` is pinned to the midpoint of `PQ` (a `set-equal` drives the free
  * on-segment point), and `G` is the midpoint of one of the two OTHER sides — `PR` (variant 0 ⇒ EG ∥ QR) or
- * `QR` (variant 1 ⇒ EG ∥ PR). Which side is genuinely unstated (ADR-052), so it is the cyclable variant.
+ * `QR` (variant 1 ⇒ EG ∥ PR). Which side is genuinely unstated (ADR-052), so it is the cyclable variant —
+ * UNLESS the student states it: an explicit `point-on-segment` placing `G` on PR or QR PINS the variant
+ * ([ADR-412](docs/06-decisions.md#adr-412), issue #407 — the on-segment sibling of the kite/isosceles
+ * explicit-equality pin and the inscribe `explicitOnSegs` pin, ADR-262).
  */
-function expandMidsegment(ids: Id[], variant: number): Command[] {
+function expandMidsegment(ids: Id[], variant: number, explicitOnSegs: { id: Id; a: Id; b: Id }[] = []): Command[] {
   const [p, q, r, e, g] = ids;
-  const chosen = ((variant % 2) + 2) % 2;
+  let chosen = ((variant % 2) + 2) % 2;
+  for (let v = 0; v < 2; v++) {
+    const [sa, sb] = v === 0 ? [p, r] : [q, r];
+    if (explicitOnSegs.some((o) => o.id === g && ((o.a === sa && o.b === sb) || (o.a === sb && o.b === sa)))) {
+      chosen = v;
+      break;
+    }
+  }
   const other: [Id, Id] = chosen === 0 ? [p, r] : [q, r]; // G rides PR (v0) or QR (v1)
   return [
     { type: 'set-equal', a: p, b: e, c: e, d: q }, // E is the midpoint of PQ: |PE| = |EQ|
@@ -120,8 +130,9 @@ function expandMidsegment(ids: Id[], variant: number): Command[] {
 export function expandShapeVariant(
   cmd: { shape: VariantShape; ids: Id[]; variant: number },
   explicitEqs: { a: Id; b: Id; c: Id; d: Id }[],
+  explicitOnSegs: { id: Id; a: Id; b: Id }[] = [],
 ): Command[] {
-  if (cmd.shape === 'midsegment') return expandMidsegment(cmd.ids, cmd.variant);
+  if (cmd.shape === 'midsegment') return expandMidsegment(cmd.ids, cmd.variant, explicitOnSegs);
   const all = variantPairs(cmd.shape, cmd.ids);
   const n = all.length;
   const matchesAny = (pair: EqTuple) => explicitEqs.some((eq) => eqMatchesPair(eq, pair));
