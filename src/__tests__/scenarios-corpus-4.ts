@@ -1745,6 +1745,9 @@ export const SCENARIOS_4: Scenario[] = [
       // the stated ∥ drives
       const par = Math.abs(cross(G, H, { x: G.x + (D.x - A.x), y: G.y + (D.y - A.y) })) / Math.max(dist(G, H) * dist(A, D), 1e-9);
       expect(par, 'GH ∥ AD holds').toBeLessThan(1e-4);
+    },
+  },
+  {
     id: 'implied-circle-membership',
     title: 'issue #362 / ADR-409: «A ו-C נמצאות על המעגל» on a circle-less figure INTRODUCES the presupposed circle; «M מחוץ למעגל» then binds it',
     guards:
