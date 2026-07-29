@@ -88,3 +88,38 @@ describe('the values panel rows', () => {
     expect(r.rows.filter((x) => x.kind === 'length' || x.kind === 'area')).toHaveLength(0);
   });
 });
+
+describe('#414 — היקף rides the same knowledge as the area', () => {
+  it("a circle's circumference prints beside its area (6π for r = 3)", () => {
+    const facts = factsFrom(['מעגל O שרדיוסו 3']);
+    const r = computeValues(facts);
+    const per = r.rows.find((x) => x.kind === 'perimeter' && x.label === '(O)');
+    expect(per?.value, 'circumference 2πr').toBeCloseTo(6 * Math.PI, 4);
+    expect(per?.exact && formatExactText(per.exact), 'exact form').toBe('6π');
+    expect(per?.stated, 'derived from the radius, not stated').toBe(false);
+    // the pair is the point: printing one and withholding the other was the oversight
+    expect(r.rows.some((x) => x.kind === 'area' && x.label === '(O)'), 'area still there').toBe(true);
+  });
+
+  it("a sized square's perimeter is 16 beside its area 16", () => {
+    const facts = factsFrom(['ריבוע ABCD', 'AB = 4']);
+    const r = computeValues(facts);
+    const per = r.rows.find((x) => x.kind === 'perimeter' && x.label.split('').sort().join('') === 'ABCD');
+    expect(per?.value, 'Σ of the four sides').toBeCloseTo(16, 3);
+    expect(per?.stated, 'derived from the side given').toBe(false);
+  });
+
+  it('a STATED perimeter is marked נתון', () => {
+    const facts = factsFrom(['משולש ABC', 'היקף ABC = 20']);
+    const r = computeValues(facts);
+    const per = r.rows.find((x) => x.kind === 'perimeter' && x.label.split('').sort().join('') === 'ABC');
+    expect(per?.value).toBeCloseTo(20, 3);
+    expect(per?.stated, 'the student stated it').toBe(true);
+  });
+
+  it('a FREE figure prints no perimeter either (the knowledge gate is not bypassed)', () => {
+    const facts = factsFrom(['משולש ABC']);
+    const r = computeValues(facts);
+    expect(r.rows.filter((x) => x.kind === 'perimeter')).toHaveLength(0);
+  });
+});

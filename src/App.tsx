@@ -1421,7 +1421,7 @@ export default function App() {
                           const hl: [Id, Id][] =
                             r.kind === 'length' ? [[r.ids[0], r.ids[1]]]
                             : r.kind === 'angle' ? [[r.ids[1], r.ids[0]], [r.ids[1], r.ids[2]]]
-                            : r.kind === 'area' && r.ids.length >= 3 ? r.ids.map((id, k) => [id, r.ids[(k + 1) % r.ids.length]] as [Id, Id])
+                            : (r.kind === 'area' || r.kind === 'perimeter') && r.ids.length >= 3 ? r.ids.map((id, k) => [id, r.ids[(k + 1) % r.ids.length]] as [Id, Id])
                             : [];
                           setValueHl((cur) => (cur && JSON.stringify(cur) === JSON.stringify(hl) ? null : hl));
                         }}
@@ -1429,6 +1429,7 @@ export default function App() {
                         <bdi style={{ direction: 'ltr' }}>
                           {r.kind === 'radius' ? t('values.radius', { c: r.label })
                             : r.kind === 'area' ? t('values.area', { ids: r.label })
+                            : r.kind === 'perimeter' ? t('values.perimeter', { ids: r.label })
                             : r.label}
                         </bdi>
                         <span>=</span>
@@ -1441,15 +1442,31 @@ export default function App() {
               {valuesLayer.areaClasses.length > 0 && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>{t('values.areaRatios')}</div>
+                  {/* One ROW per ratio (#415): these are independent facts, so the ` · ` run read as a single
+                      expression — and in RTL, with Latin labels and ½S terms mixed in, the boundaries were the
+                      hardest part to find. Each row now gets the same treatment (and click-to-highlight) as its
+                      siblings in the נתון/נגזר sections; a class stays visually grouped by its indent. */}
                   {valuesLayer.areaClasses.map((cls, ci) => (
-                    <div key={ci} style={{ color: '#334155', padding: '1px 2px' }}>
+                    <div key={ci} style={{ display: 'flex', flexDirection: 'column' }}>
                       {cls.labels.map((lab, k) => (
-                        <span key={lab}>
-                          {k > 0 && <span> · </span>}
+                        <button
+                          key={lab}
+                          type="button"
+                          style={{ display: 'flex', gap: 6, alignItems: 'baseline', background: 'none', border: 'none', cursor: 'pointer', padding: '1px 2px', font: 'inherit', color: '#334155', textAlign: 'inherit' }}
+                          title={t('values.rowHint')}
+                          onClick={() => {
+                            const ids = cls.idsPer[k];
+                            const hl: [Id, Id][] =
+                              ids && ids.length >= 3 ? ids.map((id, j) => [id, ids[(j + 1) % ids.length]] as [Id, Id]) : [];
+                            setValueHl((cur) => (cur && JSON.stringify(cur) === JSON.stringify(hl) ? null : hl));
+                          }}
+                        >
                           <bdi style={{ direction: 'ltr' }}>{t('values.area', { ids: lab })}</bdi>
-                          {' = '}
-                          <bdi style={{ direction: 'ltr' }}>{cls.coefs[k] === 1 ? cls.letter : cls.coefs[k] === 0.5 ? `½${cls.letter}` : `${formatMeasure(cls.coefs[k])}${cls.letter}`}</bdi>
-                        </span>
+                          <span>=</span>
+                          <bdi style={{ direction: 'ltr' }}>
+                            {cls.coefs[k] === 1 ? cls.letter : cls.coefs[k] === 0.5 ? `½${cls.letter}` : `${formatMeasure(cls.coefs[k])}${cls.letter}`}
+                          </bdi>
+                        </button>
                       ))}
                     </div>
                   ))}
