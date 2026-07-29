@@ -530,6 +530,37 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       ons: explicitOnSegs,
     });
   };
+  // #403 (ADR-407): FUTILITY — a failed fact referencing a POINT label that NO fact in the list
+  // introduces can never succeed, whatever the order. The deferral retries and HOIST re-folds it
+  // used to trigger were pure waste — measured 29.8 s (unbudgeted) to report «references an unknown
+  // point» on the #157 figure, against the docs/17 §7 rule that the failure path must be CHEAPER
+  // than the success path. The universe is the STATIC `introducedPointIds` over the fold's own
+  // command expansion — the same authority the fold's ownership/claim logic trusts — so a point any
+  // reorder could make available is always in it (over-approximation-safe: a miss here would also
+  // break `owned`). Only point-shaped ids are judged (scaffold `~`/`@` and typed object ids like
+  // `circle-O`/`seg-AB` are never "dangling references" in this sense).
+  const factCmds = (g: Fact): Command[] =>
+    (g.cmd.type === 'shape-variant' ? expandShapeVariant(g.cmd, explicitEqs)
+    : g.cmd.type === 'inscribe' ? expandInscribe(g.cmd, explicitOnSegs)
+    : lowerOne(g.cmd, symtab)) as Command[];
+  let introduciblePts: Set<Id> | null = null;
+  const futileCache = new Map<string, boolean>();
+  const futileFact = (f: Fact): boolean => {
+    const hit = futileCache.get(f.id);
+    if (hit !== undefined) return hit;
+    if (!introduciblePts) {
+      introduciblePts = new Set<Id>();
+      for (const g of facts) {
+        if (!g.enabled) continue;
+        for (const c of factCmds(g)) for (const id of introducedPointIds(c)) introduciblePts.add(id);
+      }
+    }
+    const dangling = factCmds(f)
+      .flatMap((c) => commandObjectIds(c))
+      .some((id) => /^[A-Z]/.test(id) && !introduciblePts!.has(id));
+    futileCache.set(f.id, dangling);
+    return dangling;
+  };
   // #365: PREFIX REUSE — the append case (submit, dry-run, edit-at-the-end) re-folded every fact from
   // scratch because the memo is keyed by whole-list content. A cached fold of a strict PREFIX is a valid
   // resume point exactly when (a) it is fully CLEAN — no failure, no pending, no rescue — so the ADR-104
@@ -701,6 +732,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
     // build the same whatever order the constraints were typed (the operator's "order shouldn't matter").
     const deferrable = (f: Fact): boolean => {
       if (forced.has(f.id) || !f.enabled || status[f.id] === 'ok' || status[f.id] === 'disabled') return false;
+      if (futileFact(f)) return false; // #403: a dangling reference can never resolve by retrying
       const ec = lowerOne(f.cmd, symtab);
       return ec.length > 0 && ec.every((c) => introducedPointIds(c).length === 0);
     };
@@ -799,6 +831,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
   if (failedFacts.length && hoistDepth < 2) {
     const hoistable = failedFacts.filter((f) => {
       if (!f.enabled) return false;
+      if (futileFact(f)) return false; // #403: no permutation can create a point no fact introduces
       const ec = lowerOne(f.cmd, symtab);
       return ec.length > 0 && ec.every(isRelationCommand);
     });

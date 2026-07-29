@@ -1031,6 +1031,18 @@ export function evaluate(c: Construction): EvalResult {
 
 function evaluateUncached(c: Construction): EvalResult {
   const driven = drivenConstraintsOf(c);
+  // #403 (ADR-407): a driven constraint referencing an id with NO OBJECT behind it can never be
+  // satisfied — no solve can conjure a position for a point the construction doesn't contain. This
+  // used to be discovered AFTER the full solve (below), and the apply ladder re-evaluates per rung,
+  // multiplying one dangling reference into a ~30 s refusal (docs/17 §7: the failure path must be
+  // cheaper than the success path). Same error, same first-offender order — just before the solve.
+  for (const con of driven) {
+    for (const id of constraintRefs(con)) {
+      if (!c.objects.some((o) => o.id === id)) {
+        return { ok: false, error: `${describeConstraint(con)} references an unknown point`, violated: [con] };
+      }
+    }
+  }
   const res = evaluateCore(resolveDriven(c));
   if (!res.ok || driven.length === 0) return res;
   // Report the whole CONFLICT SET, not one arbitrary member. When a joint solve can't satisfy an
