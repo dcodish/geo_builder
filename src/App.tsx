@@ -36,7 +36,7 @@ import { auditLoadedFigure, liveAuditFindings, refreshLoadedFigure } from '@/sto
 import type { LoadAuditFinding } from '@/store/loadAudit';
 import { logDebug } from '@/debug/sessionLog';
 import { runSubmit } from '@/app/submitPipeline';
-import { humanizeError } from '@/i18n/humanizeError';
+import { humanizeError, translateParams } from '@/i18n/humanizeError';
 /**
  * Resolve AFTER the browser has had a chance to paint. A just-set React state (e.g. a "thinking"
  * spinner) is only committed to the DOM on the next frame; a blocking SYNCHRONOUS solve started in
@@ -1105,7 +1105,10 @@ export default function App() {
               <div style={{ fontWeight: 600, marginBottom: 4 }}>⚠ {t('figure.mismatch')}</div>
               <ul style={{ margin: 0, paddingInlineStart: 18 }}>
                 {violations.map((v) => (
-                  <li key={`${v.relation}-${v.ids.join('-')}`}>{t(v.messageKey, v.params)}</li>
+                  // The verifier's `figure.v.constraint` embeds a `describeConstraint` fragment in its
+                  // `desc` param, so it needs the same vocabulary pass as the error banner (#413) —
+                  // otherwise an amber notice says «… collinear אינו מתקיים בציור».
+                  <li key={`${v.relation}-${v.ids.join('-')}`}>{t(v.messageKey, translateParams(v.params, t))}</li>
                 ))}
               </ul>
             </div>

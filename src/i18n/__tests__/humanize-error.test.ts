@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import i18n from '@/i18n';
-import { humanizeError, sanitizeIds, type Translate } from '@/i18n/humanizeError';
+import { humanizeError, sanitizeIds, translateConstraintWords, translateParams, type Translate } from '@/i18n/humanizeError';
+import { describeConstraint } from '@/engine/solve';
+import type { Constraint } from '@/engine/types';
 
 // Use the real configured i18n instance (Hebrew-pinned, as the app runs) so the test
 // exercises the actual key → message resolution, not a stub.
@@ -83,6 +85,84 @@ describe('#200 — sanitizeIds: internal object ids + raw floats never reach the
     ]) {
       const out = humanizeError(raw, t);
       expect(out, `leaked in: ${out}`).not.toMatch(/~|@|circle-|sec-|chord-|radw|\.\d{3,}/);
+    }
+  });
+});
+
+/**
+ * #413 — the CONSTRAINT VOCABULARY is fully translated.
+ *
+ * The fixture is a `Record` over every `Constraint['type']`, so adding a constraint kind to the engine
+ * fails the BUILD until it is described here — the totality guard that keeps this from regressing to
+ * "one more word leaked". The assertion is a property, not a word list: after humanising, no run of two
+ * or more LOWERCASE Latin letters may survive. Point labels are uppercase and a radius symbol is a single
+ * letter (`r`/`R`, ADR-304), so any multi-letter lowercase run is by construction an untranslated word.
+ */
+const ONE_OF_EACH: Record<Constraint['type'], Constraint> = {
+  angle: { type: 'angle', vertex: 'B', ray1: 'A', ray2: 'C', value: 40 },
+  distance: { type: 'distance', a: 'A', b: 'B', value: 5 },
+  equal: { type: 'equal', a: 'A', b: 'B', c: 'C', d: 'D' },
+  ratio: { type: 'ratio', a: 'A', b: 'B', c: 'C', d: 'D', k: 2 },
+  parallel: { type: 'parallel', a: 'A', b: 'B', c: 'C', d: 'D' },
+  perpendicular: { type: 'perpendicular', a: 'A', b: 'B', c: 'C', d: 'D' },
+  'angle-ratio': { type: 'angle-ratio', a1: 'A', v1: 'B', b1: 'C', a2: 'D', v2: 'E', b2: 'F', k: 2 },
+  coincide: { type: 'coincide', p: 'P', q: 'Q' },
+  'angle-order': { type: 'angle-order', a1: 'A', v1: 'B', b1: 'C', a2: 'D', v2: 'E', b2: 'F' },
+  'length-order': { type: 'length-order', a: 'A', b: 'B', c: 'C', d: 'D' },
+  concyclic: { type: 'concyclic', points: ['A', 'B', 'C', 'D'] },
+  collinear: { type: 'collinear', a: 'H', b: 'C', c: 'D' },
+  'collinear-order': { type: 'collinear-order', points: ['A', 'B', 'C'] },
+  'angle-bound': { type: 'angle-bound', vertex: 'B', ray1: 'A', ray2: 'C', min: 40, max: 60 },
+  'length-bound': { type: 'length-bound', a: 'A', b: 'B', max: 5 },
+  'length-radius': { type: 'length-radius', a: 'A', b: 'B', circle: 'circle-O', witness: 'A', k: 1 },
+  area: { type: 'area', ids: ['A', 'B', 'C'], value: 13 },
+  'area-ratio': { type: 'area-ratio', ids1: ['A', 'B', 'C'], ids2: ['D', 'E', 'F'], k: 2 },
+  perimeter: { type: 'perimeter', ids: ['A', 'B', 'C'], value: 20 },
+  'perimeter-ratio': { type: 'perimeter-ratio', ids1: ['A', 'B', 'C'], ids2: ['D', 'E', 'F'], k: 2 },
+  'measure-sum': { type: 'measure-sum', unit: 'length', points: ['A', 'B', 'C', 'D'], coefs: [1, 1], target: 10 },
+  'length-product': { type: 'length-product', lhs: ['A', 'B', 'C', 'D'], rhs: ['E', 'F', 'G', 'H'], k: 1 },
+};
+
+describe('#413 — no English word survives in a student-facing message', () => {
+  const LOWERCASE_RUN = /[a-z]{2,}/;
+
+  for (const [kind, con] of Object.entries(ONE_OF_EACH)) {
+    it(`${kind}: its description is fully translated inside a refusal`, () => {
+      const desc = describeConstraint(con);
+      const msg = humanizeError(`over-constrained: ${desc} cannot hold`, t);
+      expect(hasHebrew(msg), `«${msg}» is Hebrew`).toBe(true);
+      const leak = msg.match(LOWERCASE_RUN);
+      expect(leak, `«${msg}» still contains the English word "${leak?.[0]}" (from «${desc}»)`).toBeNull();
+    });
+  }
+
+  it('the reported message reads fully in Hebrew', () => {
+    const msg = humanizeError('over-constrained: H, C, D collinear cannot hold', t);
+    expect(msg).toContain('H, C, D');
+    expect(msg).toContain(i18n.t('errors.desc.collinear') as string);
+    expect(msg).not.toContain('collinear');
+  });
+
+  it('a WRAPPER that keys on the same word still matches its own pattern', () => {
+    // «collinear points must be distinct — "A" is named twice» must not be broken by the pass:
+    // patterns are matched BEFORE the vocabulary is translated, exactly so this keeps working.
+    const msg = humanizeError('collinear points must be distinct — "A" is named twice', t);
+    expect(hasHebrew(msg)).toBe(true);
+    expect(msg).toContain('A');
+    expect(msg).not.toMatch(LOWERCASE_RUN);
+  });
+
+  it('the verifier params path is translated too', () => {
+    const out = translateParams({ desc: 'H, C, D collinear' }, t);
+    expect(out?.desc).not.toContain('collinear');
+    expect(out?.desc).toContain('H, C, D');
+    // a non-fragment param is untouched
+    expect(translateParams({ center: 'O2' }, t)?.center).toBe('O2');
+  });
+
+  it('symbolic fragments are left alone (they are locale-neutral)', () => {
+    for (const raw of ['|AC| = 9', '∠DOE = 2·∠COE', 'AB ∥ CD', 'AB ⟂ CD']) {
+      expect(translateConstraintWords(raw, t), raw).toBe(raw);
     }
   });
 });
