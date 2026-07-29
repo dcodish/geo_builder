@@ -72,15 +72,20 @@ describe('ladder contract (docs/LADDER.md)', () => {
     expect(r.ladder).toEqual(['m1:conflict-refuse']);
   });
 
-  it('a restatement that FORCES a coincidence is allowed (ADR-123) and traces the m1 ladder', () => {
+  // Deliberately UPDATED by ADR-413 (#408): mid(AB) = mid(AC) forces B ≡ C — but B and C are the
+  // DECLARED triangle's own vertices, so the "allowed with a notice" lane (ADR-123 — justified there
+  // because the merged point, the kite's N≡O centre, was never user-defined) would leave a "triangle"
+  // that is a segment on screen. A forced coincidence that FLATTENS a declared polygon now refuses
+  // honestly via the collapse accept gate; point-level forced coincidences that keep every declared
+  // shape real are untouched (locked by scenario `area-ratio-converges-points-allowed`).
+  it('a restatement whose forced coincidence would FLATTEN the declared triangle is refused (ADR-413 narrows ADR-123)', () => {
     const r = run([
       { type: 'triangle', ids: ['A', 'B', 'C'] },
       { type: 'midpoint', id: 'M', a: 'A', b: 'B' },
-      { type: 'midpoint', id: 'M', a: 'A', b: 'C' }, // mid(AB)=mid(AC) ⇔ B≡C — a forced coincidence, allowed with a notice
+      { type: 'midpoint', id: 'M', a: 'A', b: 'C' }, // mid(AB)=mid(AC) ⇔ B≡C ⇔ triangle ABC collapses
     ]);
-    expect(r.ok).toBe(true);
-    expect(r.ladder?.[0]).toBe('m1:constraint');
-    expect(r.ladder?.[r.ladder.length - 1]).toMatch(/^m1:(primary|settle|recruit)$/);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toMatch(/over-constrained|cannot hold|same point/);
   });
 
   it('a contradicted absolute given walks the main failure ladder and refuses with blame', () => {

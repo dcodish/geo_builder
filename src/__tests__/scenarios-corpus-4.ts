@@ -1737,4 +1737,75 @@ export const SCENARIOS_4: Scenario[] = [
       }
     },
   },
+  {
+    id: 'midsegment-both-endpoints-anchored-prod-figure',
+    title: 'issue #405 / ADR-411: «DE קטע אמצעים» with D,E ALREADY on their sides pins BOTH midpoints (the operator\'s prod figure, GE=3DG driving F)',
+    guards:
+      'prod save `bad-2d-1` (2026-07-29): «DE קטע אמצעים» after «D על AB»+«E על AC» fell through `midsegmentBaseless` (which handled only exactly-one-anchored) to the plain-segment rule — a bare `segment D E`, the given SILENTLY DROPPED, every row ✓ (masked at seed 0 by the rider sampling at t=0.5). A 6-ref worktree sweep back to ADR-199\'s birth showed the bare-segment claim byte-identical at every prod tag — a hole since the rule was born, never a regression. Root fix: the DETERMINED both-anchored lowering (one midpoint pin per endpoint, host-agnostic) + the `droppedMidsegment` chokepoint gate so NO midsegment-flavoured utterance can ever commit without midpoint semantics.',
+    steps: ['משולש ABC', 'D על AB', 'E על AC', 'DE קטע אמצעים', 'F על BC', 'AF', 'G = חיתוך DE ו-AF', 'GE=3DG'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, C, D, E, F, G] = ['A', 'B', 'C', 'D', 'E', 'F', 'G'].map((id) => at(fig, id));
+      expect(Math.abs(dist(A, D) - dist(D, B)), 'D is the midpoint of AB').toBeLessThan(1e-6);
+      expect(Math.abs(dist(A, E) - dist(E, C)), 'E is the midpoint of AC').toBeLessThan(1e-6);
+      // DE is a real midsegment: parallel to BC (was: an unconstrained segment that only LOOKED right).
+      const de = { x: E.x - D.x, y: E.y - D.y }, bc = { x: C.x - B.x, y: C.y - B.y };
+      expect(Math.abs(de.x * bc.y - de.y * bc.x) / (Math.hypot(de.x, de.y) * Math.hypot(bc.x, bc.y)), 'DE ∥ BC').toBeLessThan(1e-4);
+      // The stated ratio holds and DRIVES F: DG/GE = BF/FC (similarity through the midsegment), so GE=3DG ⇒ FC=3BF.
+      expect(Math.abs(dist(G, E) - 3 * dist(D, G)), '|GE| = 3|DG| holds').toBeLessThan(1e-4 * dist(D, E));
+      expect(Math.abs(dist(F, C) - 3 * dist(B, F)), 'the ratio drove F to the quarter point of BC').toBeLessThan(1e-3 * dist(B, C));
+    },
+  },
+  {
+    id: 'midsegment-bare-binds-the-one-triangle',
+    title: 'issue #405 / ADR-411 + #407 / ADR-412: bare «DE קטע אמצעים» binds to THE triangle; the later «D על AC» re-seats the default rider',
+    guards:
+      'operator screenshot (2026-07-29): the zero-anchored bare form fell through to the plain-segment rule — D and E minted as FREE points, E floating off the triangle, all rows ✓. Fix: with exactly ONE triangle in the figure the utterance binds to it (the ADR-245 definite-reference pattern, the #71 decomposition), and the rule\'s default side for D (the stored first side) YIELDS to the student\'s later explicit «D על AC» via the ADR-412 pre-scan (rider + shape-variant re-anchored, structurally identified by the shared group).',
+    steps: ['משולש ABC', 'DE קטע אמצעים', 'D על AC'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, C, D, E] = ['A', 'B', 'C', 'D', 'E'].map((id) => at(fig, id));
+      expect(Math.abs(dist(A, D) - dist(D, C)), 'D re-seated: the midpoint of AC (the stated side)').toBeLessThan(1e-6);
+      const eMidAB = Math.abs(dist(A, E) - dist(E, B)) < 1e-6;
+      const eMidCB = Math.abs(dist(C, E) - dist(E, B)) < 1e-6;
+      expect(eMidAB || eMidCB, 'E is the midpoint of one of the other two sides (cyclable)').toBe(true);
+      const areaABC = Math.abs((B.x - A.x) * (C.y - A.y) - (C.x - A.x) * (B.y - A.y)) / 2;
+      expect(areaABC, 'the triangle stayed a triangle').toBeGreaterThan(1);
+      const de = { x: E.x - D.x, y: E.y - D.y };
+      const base = eMidAB ? { x: B.x - C.x, y: B.y - C.y } : { x: B.x - A.x, y: B.y - A.y };
+      expect(Math.abs(de.x * base.y - de.y * base.x) / (Math.hypot(de.x, de.y) * Math.hypot(base.x, base.y)), 'DE ∥ the opposite side').toBeLessThan(1e-3);
+    },
+  },
+  {
+    id: 'midsegment-restated-side-reseats-never-collapses',
+    title: 'issue #407 / ADR-412: «DE קטע אמצעים במשולש ABC» then «D על AC» re-seats D — the triangle never flattens',
+    guards:
+      'operator screenshot (2026-07-29): the #71 named-triangle branch seats D on the FIRST named side AB and pins it to that midpoint; the later explicit «D על AC» STACKED as a membership constraint, and the solver satisfied `mid(AB) ∈ AC` by flattening the whole triangle onto one line — area exactly 0, all rows ✓, no notice (prod since 2026-07-14; before that the form escalated to the LLM). The M4 defaults-yield fix: the pre-scan re-seats the rule-made rider (structural: it shares the shape-variant\'s GROUP) onto the stated side, so the statement WINS instead of contradicting the default. The degeneracy half is #408/ADR-413 (`collapse-gate.test.ts`).',
+    steps: ['משולש ABC', 'DE קטע אמצעים במשולש ABC', 'D על AC'],
+    check(fig) {
+      allStepsOk(fig);
+      const [A, B, C, D, E] = ['A', 'B', 'C', 'D', 'E'].map((id) => at(fig, id));
+      expect(Math.abs(dist(A, D) - dist(D, C)), 'D is the midpoint of AC (the stated side won)').toBeLessThan(1e-6);
+      const eMidAB = Math.abs(dist(A, E) - dist(E, B)) < 1e-6;
+      const eMidCB = Math.abs(dist(C, E) - dist(E, B)) < 1e-6;
+      expect(eMidAB || eMidCB, 'E is the midpoint of one of the other two sides').toBe(true);
+      const areaABC = Math.abs((B.x - A.x) * (C.y - A.y) - (C.x - A.x) * (B.y - A.y)) / 2;
+      expect(areaABC, 'NOT collapsed (was: every point on one line, area = 0)').toBeGreaterThan(1);
+    },
+  },
+  {
+    id: 'midpoint-membership-contradiction-refuses',
+    title: 'issue #408 / ADR-413: «D אמצע AB» + «D על AC» is REFUSED honestly — never a silently flattened triangle',
+    guards:
+      'the degeneracy half of the operator\'s collapse screenshot, isolated from the yield: a constraint system whose only solutions flatten a DECLARED polygon used to be "solved" by collapse (every residual zero, green). The collapse check now rides the ONE step-accept predicate (`stepAccepted`, beside the #7 vacuous gate), so every accept path rejects a flattened figure and the failure ladder ends in the honest ADR-276 refusal naming the student\'s statement, keep-prior.',
+    steps: ['משולש ABC', 'D אמצע AB', 'D על AC'],
+    expectViolations: true, // the last step is INTENTIONALLY refused — the kept figure is the prior one
+    check(fig) {
+      expect(fig.lastError, 'the honest over-constrained refusal').toMatch(/over-constrained|cannot hold|לא ניתן/);
+      const [A, B, C, D] = ['A', 'B', 'C', 'D'].map((id) => at(fig, id));
+      const areaABC = Math.abs((B.x - A.x) * (C.y - A.y) - (C.x - A.x) * (B.y - A.y)) / 2;
+      expect(areaABC, 'the prior triangle is kept intact').toBeGreaterThan(1);
+      expect(Math.abs(dist(A, D) - dist(D, B)), 'D stays the midpoint of AB').toBeLessThan(1e-6);
+    },
+  },
 ];
