@@ -82,3 +82,43 @@ describe('a line ⟂ a plane is DRAWN as perpendicular', () => {
     expect(cross).toBeTruthy();
   });
 });
+
+/**
+ * #383 (ADR-3D-109): the POINT-RUN twins. «מישור ACD אנך לישר l1» (#375 → planeLinePerps) and the
+ * S2 line-rel forms with a plane-run operand referenced the ids WITHOUT drawing the plane — no
+ * patch, so nothing grew to the crossing — and rightAngles3 never read planeLinePerps, so even a
+ * drawn patch got no knee. Both asserted to FAIL pre-fix (measured 2026-07-29).
+ */
+describe('#383 — a stated relation with a POINT-RUN plane leaves its trace', () => {
+  beforeEach(() => useGeo3.getState().clear());
+  const BASE = ['פירמידה משולשת ABCD', 'הישר l1: x = (2,0,1) + t(1,1,1)'];
+
+  it('«מישור ACD אנך לישר l1» draws the plane AND a knee at the crossing', () => {
+    for (const u of [...BASE, 'מישור ACD אנך לישר l1']) submit(u);
+    expect(state().lastError).toBeNull();
+    const d = derive3(state().facts, state().seed);
+    expect(d.construction.pointPlanes.has('ACD'), 'the point-run carrier is materialised').toBe(true);
+    const scene = buildScene3(d.construction, d.resolved, HOME_CAMERA, { width: 640, height: 460 }, 1);
+    expect(scene.planes.some((p) => p.name === 'ACD'), 'the patch is drawn').toBe(true);
+    const marks = rightAngles3(d.construction, d.resolved, 1.5);
+    expect(marks.length, 'the stated ⟂ produces a knee').toBeGreaterThan(0);
+    // the knee's second arm lies IN the plane and ⟂ the line's direction
+    const ln = d.resolved.lines.get('ℓ1')!; // typed l1 canonicalises to ℓ1 (ADR-3D-038)
+    const m = marks[0];
+    expect(Math.abs(dot3(m.u1, m.u2)) / (norm3(m.u1) * norm3(m.u2)), 'arms perpendicular').toBeLessThan(1e-6);
+    const q = sub3(m.vertex, ln.anchor);
+    const t = dot3(q, ln.dir) / dot3(ln.dir, ln.dir);
+    expect(norm3(sub3(q, scale3(ln.dir, t))), 'knee sits ON the line').toBeLessThan(1e-6);
+  });
+
+  it('«הישר l1 מקביל למישור ACD» draws the plane; parallel ⇒ NO knee for that relation', () => {
+    for (const u of [...BASE, 'הישר l1 מקביל למישור ACD']) submit(u);
+    expect(state().lastError).toBeNull();
+    const d = derive3(state().facts, state().seed);
+    expect(d.construction.pointPlanes.has('ACD'), 'the point-run carrier is materialised').toBe(true);
+    const scene = buildScene3(d.construction, d.resolved, HOME_CAMERA, { width: 640, height: 460 }, 1);
+    expect(scene.planes.some((p) => p.name === 'ACD'), 'the patch is drawn').toBe(true);
+    const marks = rightAngles3(d.construction, d.resolved, 1.5);
+    expect(marks, 'a ∥ relation marks no right angle').toHaveLength(0);
+  });
+});

@@ -205,6 +205,21 @@ export function rightAngles3(c: Construction3, resolved: Resolved3, scale: numbe
     const u2 = inPlaneDir(pl, vertex, pos);
     if (u2) out.push({ vertex, u1, u2, planeN: pl.n });
   }
+  // #383 (ADR-3D-109): the POINT-RUN twin — «מישור ACD אנך לישר l1» lowers to `planeLinePerps`
+  // (#375), a record this sweep never read (the ADR-3D-093/097 enumeration class, one more
+  // member). Identical geometry; the plane resolves from its ids' positions instead of by name.
+  for (const lp of c.planeLinePerps) {
+    const ln = resolved.lines.get(lp.line);
+    const pl = planeFromIds(lp.ids, pos);
+    if (!ln || !pl) continue;
+    const denom = dot3(pl.n, ln.dir);
+    if (Math.abs(denom) < EPS) continue; // parallel — no crossing to mark
+    const t = -(dot3(pl.n, ln.anchor) + pl.d) / denom;
+    const vertex = add3(ln.anchor, scale3(ln.dir, t));
+    const u1 = normalize3(ln.dir);
+    const u2 = inPlaneDir(pl, vertex, pos);
+    if (u2) out.push({ vertex, u1, u2, planeN: pl.n });
+  }
   // S2 (#378, ADR-3D-103): a STATED ⟂ (or 90°) between a segment/vector operand and a NAMED LINE —
   // the knee sits where the segment genuinely meets the line (an endpoint on it, or a crossing
   // inside the drawn segment); a ⟂ that never meets stays unmarked (the R³ honesty rule above)

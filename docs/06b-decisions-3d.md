@@ -1724,3 +1724,13 @@ Five findings from the operator's PR #390/#391 play session (2026-07-29), one sh
 The #318 store lock pinning the two-state cycle was **deliberately updated** to pin the three-state one (its intent — cycling returns to the default with the key DELETED — is unchanged; the ADR-3D-047 updated-lock precedent).
 
 Locked by `panel-bundle.test.ts` (10 — the exact play utterances for rows/notices/cycle/round-trip, the figure-object and param-pinning notice negatives), `witness.test.ts` (8 — |witness| = distance on all five gap cases, scene draw + toggle + knee, hidden patch/seam), and the #398 appends in `vecmath.test.tsx`/`notation.test.ts` (≥3-run prose, primed runs, the digit-prefixed pair regression guard).
+
+### ADR-3D-109 — A stated relation's point-run carrier leaves its trace: patch + knee (#383)
+
+**Class:** the ADR-3D-093/097 enumeration class, two more members — a correct rule applied to a list one member short. (1) "The carrier of a stated relation is drawn" (ADR-3D-015, S3): `plane-rel`/`distance-rel` materialise their plane-run operands, but `plane-line-perp` (#375) and `line-rel` (S2) did not — no drawn plane, so the ADR-3D-097 patch-growth sweep (already general) had nothing to grow to the crossing, and «מישור ACD אנך לישר l1» showed a plane-less line. (2) `rightAngles3` swept every recorded ⟂ — scalarPins, claims, symbolPins, `linePerps`, `lineRels` — except `planeLinePerps`, the record #375 lowers to; even with a patch, the point-run⟂line drew no knee.
+
+**Fix, both at the existing chokepoints:** the two apply cases gain plane-rel's exact idempotent materialisation block (zero new renderer code — the patch, its growth to the crossing, and the fold machinery all follow); `rightAngles3` gains the `planeLinePerps` sweep as the verbatim point-run twin of its `linePerps` block (plane resolved from the ids' positions via the existing `planeFromIds`, `planeN` set so the in-plane arm stays legibility-rotated).
+
+**Verification-sweep provenance (2026-07-29):** re-measured before fixing — S2/S3 had fixed the NEIGHBOUR commands, not these; both holes confirmed live, and the new locks were run against the pre-fix tree and FAILED (2/2), then pass post-fix. The same sweep closed #377 by measurement (10/11 matrix cells delivered by S0–S5; the residual line∩point-run-plane cell filed as #401).
+
+Locked by the `#383` block in `line-perp-plane-mark.test.ts` (the ⟂ twin: carrier materialised + patch drawn + knee ON the line with perpendicular arms; the ∥ twin: patch drawn, NO knee — parallel marks nothing).

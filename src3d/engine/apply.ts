@@ -921,6 +921,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (cmd.ids.length < 3) return { ok: false, error: { code: 'unknown-point', id: cmd.ids[0] ?? '?' } };
       if (!c.lines.has(cmd.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.line } };
       const next = clone(c);
+      // #383 (ADR-3D-109): the stated relation's point-run CARRIER is drawn (the ADR-3D-015 /
+      // S3 rule) — without a drawn plane, the ADR-3D-097 patch-growth sweep has nothing to grow
+      // to the crossing and the relation leaves no visible trace where the objects meet.
+      {
+        const name = cmd.ids.join('');
+        if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...cmd.ids]);
+      }
       next.planeLinePerps.push({ ids: [...cmd.ids], line: cmd.line, ...(cmd.statedAsPlane ? { statedAsPlane: true as const } : {}) });
       next.claims.push({ type: 'plane-line-perp', ids: [...cmd.ids], line: cmd.line });
       return { ok: true, next };
@@ -937,6 +944,12 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       const next = clone(c);
       // a stated relation draws its operand (the ADR-3D-035 rule — the statement must leave ink)
       if (cmd.op.kind === 'segment') drawAtom(next, { kind: 'pair', from: cmd.op.a, to: cmd.op.b });
+      // #383 (ADR-3D-109): a POINT-RUN operand is materialised as a drawn plane (the S3 rule,
+      // plane-rel's exact block) — so the patch exists and grows to the line's crossing.
+      if (cmd.op.kind === 'plane-run') {
+        const name = cmd.op.ids.join('');
+        if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...cmd.op.ids]);
+      }
       next.lineRels.push({
         rel: cmd.rel,
         ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}),
