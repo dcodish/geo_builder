@@ -50,6 +50,11 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'solids', he: 'טטראדר ABCD', en: 'tetrahedron ABCD' },
   { category: 'vectors', he: '|EN| = (√6/4)·|w|', en: '|EN| = (√6/4)·|w|' },
   { category: 'vectors', he: 'אורך AS שווה לאורך AB', en: '|AS| = |AB|' },
+  // #393/#335 (ADR-3D-107): chained + expression magnitudes
+  { category: 'vectors', he: '|u|=|v|=1', en: '|u|=|v|=1' },
+  { category: 'vectors', he: '|u|=|v|=|w|', en: '|u|=|v|=|w|' },
+  { category: 'vectors', he: '|w+u| = |w-u|', en: '|w+u| = |w-u|' },
+  { category: 'vectors', he: '|2w+3v| = |3v-2w|', en: '|2w+3v| = |3v-2w|' },
   { category: 'vectors', he: 'וקטור SE = 3/4 וקטור SD', en: 'vector SE = 3/4 vector SD' },
   { category: 'vectors', he: 'k = 1/2', en: 'k = 1/2' },
   { category: 'points', he: 'הקודקוד D נמצא על החלק החיובי של ציר ה-x', en: 'D is on the positive x-axis' },

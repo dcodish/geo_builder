@@ -873,6 +873,66 @@ const lengthRel: Rule = (s) => {
   return null;
 };
 
+/**
+ * Magnitude equality over vector EXPRESSIONS, chained (#393/#335, ADR-3D-107):
+ * `|u|=|v|=1` · `|u|=|v|=|w|` · `|w+u| = |w-u|` · `|2w+3v|=|3v-2w|` · `|AB+AC|=|AB-AC|` ·
+ * `2|u| = |v|` · `|u| שווה ל-|v|`.
+ *
+ * Runs AFTER lengthRel, so every form that rule owns (`|w|=2`, `|AB|=5`, `|EN|=(√6/4)·|w|`…)
+ * keeps its owner byte-identical; this rule takes only what used to fall to the LLM. Grammar:
+ * links separated by `=`/«שווה ל», each link a magnitude `[c·]|expr|[·c]` (radical coefficient,
+ * expr via the ONE shared parseVecExpr — so `(1-t)u` with a SYMBOL is honestly rejected, the
+ * all-or-nothing discipline) or a NUMBER. All stated numbers must agree; each magnitude then
+ * pins to the value (`mag-val`, |e| = v/c), else adjacent pairs relate (`mag-rel`,
+ * |eᵢ| = (cᵢ₊₁/cᵢ)·|eᵢ₊₁|). Apply normalizes simple atoms onto vec-mag/length-eq/length-rel.
+ */
+const magEquality: Rule = (s) => {
+  if (!s.includes('|')) return null;
+  const links = s.split(/\s*=\s*|\s+שווה\s+ל-?\s*/).map((t0) => t0.trim()).filter((t0) => t0 !== '');
+  if (links.length < 2) return null;
+  type MagLink = { expr: VecExpr; c: number };
+  const mags: MagLink[] = [];
+  const nums: number[] = [];
+  for (const link of links) {
+    const num = evalRadical(link);
+    if (num !== null) {
+      nums.push(num);
+      continue;
+    }
+    let cs = '';
+    let inner = '';
+    let m = link.match(/^(.*?)\s*[·×*]?\s*\|([^|]+)\|\s*$/);
+    if (m) {
+      cs = m[1].trim();
+      inner = m[2];
+    } else {
+      m = link.match(/^\|([^|]+)\|\s*[·×*]?\s*(.+)$/);
+      if (!m) return null;
+      inner = m[1];
+      cs = m[2].trim();
+    }
+    const c = cs === '' ? 1 : evalRadical(cs);
+    if (c === null || c <= 0) return null;
+    const expr = parseVecExpr(inner);
+    if (!expr || expr.length === 0) return null;
+    mags.push({ expr, c });
+  }
+  if (mags.length === 0) return null;
+  if (new Set(nums).size > 1) return null; // |u|=1=2 is a contradiction, not a parse
+  const draw = (e: VecExpr): Command3[] => segmentsOf(e);
+  if (nums.length > 0) {
+    const v = nums[0];
+    return mags.flatMap((mg) => [...draw(mg.expr), { type: 'mag-val', e: mg.expr, value: v / mg.c } as Command3]);
+  }
+  if (mags.length < 2) return null; // a lone magnitude with no value/partner says nothing
+  const out: Command3[] = [];
+  for (let i = 0; i + 1 < mags.length; i++) {
+    out.push(...draw(mags[i].expr), ...draw(mags[i + 1].expr));
+    out.push({ type: 'mag-rel', e1: mags[i].expr, e2: mags[i + 1].expr, c: mags[i + 1].c / mags[i].c } as Command3);
+  }
+  return out;
+};
+
 /** `k = 1/2` (הציבו) — assign the named parameter; also `α = 70`, a value for an angle NAME
  *  ([ADR-3D-052](docs/06b-decisions-3d.md), issue #272). One command for "give this symbol a value":
  *  `apply` resolves what the letter denotes (a vector-def parameter or a labelled angle), the way 2-D's
@@ -2701,6 +2761,7 @@ export const RULES: Rule[] = [
   spanPoint, // MUST precede onSegment: Greek scalars would otherwise parse as a free point, silently dropping the condition
   onSegment,
   lengthRel, // BEFORE vecEqClaim: bare AS = AB is a LENGTH equality unless ⃗-marked
+  magEquality, // #393/#335: chained/expression magnitudes — AFTER lengthRel (its forms keep their owner)
   symbolValue,
   vecEqClaim,
   coordsClaim,

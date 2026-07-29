@@ -307,6 +307,16 @@ function lineRelRefsError(c: Construction3, op: Operand3, line: string): EngineE
   return c.lines.has(line) || c.pointLines.has(line) ? null : { code: 'unknown-line', id: line };
 }
 
+/** #393/#335 (ADR-3D-107): a vector EXPRESSION's references — pair points + named vectors. */
+function exprRefsError(c: Construction3, expr: import('./types').VecExpr): EngineError3 | null {
+  const pointErr = missingPoint(c, exprPointIds(expr));
+  if (pointErr) return pointErr;
+  for (const name of exprVectorNames(expr)) {
+    if (!c.vectors.has(name)) return { code: 'unknown-vector', id: name };
+  }
+  return null;
+}
+
 function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
   switch (claim.type) {
     case 'length-rel':
@@ -331,6 +341,12 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
       }
       return null;
     }
+    // #393/#335 (ADR-3D-107): magnitude claims validate exactly like vec-eq — every pair
+    // atom's points and every named vector must exist.
+    case 'mag-rel':
+      return exprRefsError(c, [...claim.e1, ...claim.e2]);
+    case 'mag-val':
+      return exprRefsError(c, claim.e);
     case 'perp-plane':
       return missingPoint(c, [...claim.seg, ...claim.plane]);
     case 'collinear3':
@@ -1498,6 +1514,55 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       }
       if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'cos-angle', u: cmd.u, v: cmd.v, cos: cmd.cos });
       else next.claims.push({ type: 'cos-angle-eq', u: cmd.u, v: cmd.v, cos: cmd.cos });
+      return { ok: true, next };
+    }
+
+    // #393/#335 (ADR-3D-107): |e1| = c·|e2| over vector EXPRESSIONS. Simple unit-coefficient
+    // atoms NORMALIZE onto the existing owners at this one entry point (the parallelepiped
+    // precedent, #349) — so |u|=|v| gets length-rel's whole machinery (symbolPins included)
+    // and only genuine expressions reach the mag-rel pin/claim lanes. M1 routes the rest.
+    case 'mag-rel': {
+      const err = exprRefsError(c, [...cmd.e1, ...cmd.e2]);
+      if (err) return { ok: false, error: err };
+      const single = (e: import('./types').VecExpr): VecAtom | null =>
+        e.length === 1 && Math.abs(e[0].coeff - 1) < 1e-12 ? e[0].atom : null;
+      const a1 = single(cmd.e1);
+      const a2 = single(cmd.e2);
+      if (a1?.kind === 'pair' && a2) {
+        return applyCommand3(c, {
+          type: 'length-rel', a1: a1.from, b1: a1.to,
+          rhs: a2.kind === 'pair' ? { pair: [a2.from, a2.to] } : { vec: a2.name }, c: cmd.c,
+        });
+      }
+      if (a1?.kind === 'named' && a2?.kind === 'pair' && cmd.c > 1e-12) {
+        // |u| = c·|pair| ⟺ |pair| = (1/c)·|u| — the pair-LHS spelling length-rel owns
+        return applyCommand3(c, { type: 'length-rel', a1: a2.from, b1: a2.to, rhs: { vec: a1.name }, c: 1 / cmd.c });
+      }
+      const next = clone(c);
+      for (const t of [...cmd.e1, ...cmd.e2]) {
+        if (t.atom.kind === 'pair' && !hasSegment(next, t.atom.from, t.atom.to)) next.segments.push([t.atom.from, t.atom.to]);
+      }
+      if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c });
+      else next.claims.push({ type: 'mag-rel', e1: cmd.e1, e2: cmd.e2, c: cmd.c });
+      return { ok: true, next };
+    }
+
+    // #393/#335: |e| = value — the absolute-size twin. Same normalization: a bare named
+    // vector is vec-mag verbatim, a bare pair is the ordinary length given.
+    case 'mag-val': {
+      const err = exprRefsError(c, cmd.e);
+      if (err) return { ok: false, error: err };
+      if (cmd.e.length === 1 && Math.abs(cmd.e[0].coeff - 1) < 1e-12) {
+        const a = cmd.e[0].atom;
+        if (a.kind === 'named') return applyCommand3(c, { type: 'vec-mag', name: a.name, value: cmd.value });
+        return applyCommand3(c, { type: 'claim', claim: { type: 'length-eq', a: a.from, b: a.to, value: cmd.value } });
+      }
+      const next = clone(c);
+      for (const t of cmd.e) {
+        if (t.atom.kind === 'pair' && !hasSegment(next, t.atom.from, t.atom.to)) next.segments.push([t.atom.from, t.atom.to]);
+      }
+      if (freeDims(c) > 0 && c.solids.length > 0) next.scalarPins.push({ kind: 'mag-val', e: cmd.e, value: cmd.value });
+      else next.claims.push({ type: 'mag-val', e: cmd.e, value: cmd.value });
       return { ok: true, next };
     }
 

@@ -3,6 +3,7 @@
   "shadowPairs": [
     "areaClaim → planarPolygon",
     "bisectorPoint → onSegment",
+    "lengthRel → magEquality",
     "rightPyramidPoint → onSegment",
     "rightTriangle → planarPolygon",
     "volumeEqPoly → rightPyramid"

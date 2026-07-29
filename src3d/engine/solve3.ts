@@ -216,6 +216,8 @@ const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
   mutual: false, // S4 (#378): every residual is normalized by the operand magnitudes
   'plane-rel': false, // S3 (#378): angles between characteristic vectors; the offset is size-normalized
   distance: true, // S5 (#378): a distance is an absolute size — it fixes the scale
+  'mag-rel': false, // #393/#335: a RATIO of expression magnitudes — both sides scale together
+  'mag-val': true, // #393/#335: |expr| = value is an absolute size, like `length`/`distance`
 };
 
 export function scalePinned(c: Construction3): boolean {
@@ -473,6 +475,16 @@ export function solvePivot(
       return a && b ? sub3(b, a) : null;
     };
     const cosOf = (u: Vec3, v: Vec3) => dot3(u, v) / Math.max(norm3(u) * norm3(v), 1e-12);
+    // #393/#335 (ADR-3D-107): Σ coeff·atom at the trial positions — evalExpr's in-solve twin
+    const exprAt = (expr: import('./types').VecExpr): Vec3 | null => {
+      let acc: Vec3 = { x: 0, y: 0, z: 0 };
+      for (const { coeff, atom } of expr) {
+        const w = dirOf(atom);
+        if (!w) return null;
+        acc = { x: acc.x + coeff * w.x, y: acc.y + coeff * w.y, z: acc.z + coeff * w.z };
+      }
+      return acc;
+    };
     for (const pin of c.scalarPins) {
       if (pin.kind === 'length') {
         const a = at(pin.a);
@@ -504,6 +516,16 @@ export function solvePivot(
         const a2 = at(pin.a2);
         const b2 = at(pin.b2);
         out.push(a1 && b1 && a2 && b2 ? norm3(sub3(b1, a1)) - pin.c * norm3(sub3(b2, a2)) : 10);
+      } else if (pin.kind === 'mag-rel') {
+        // #393/#335 (ADR-3D-107): |e1| − c·|e2| over vector EXPRESSIONS — the expression twin of
+        // length-rel, same signed-difference form (a difference of magnitudes crosses zero).
+        const e1 = exprAt(pin.e1);
+        const e2 = exprAt(pin.e2);
+        out.push(e1 && e2 ? norm3(e1) - pin.c * norm3(e2) : 10);
+      } else if (pin.kind === 'mag-val') {
+        // #393/#335: |e| − value — the absolute-size twin of `length`.
+        const e = exprAt(pin.e);
+        out.push(e ? norm3(e) - pin.value : 10);
       } else if (pin.kind === 'concyclic') {
         // #305: a convex quad is CYCLIC iff its opposite angles are supplementary, i.e.
         // cos(A) + cos(C) = 0. Deliberately NOT Ptolemy (|AC|.|BD| - |AB|.|CD| - |BC|.|AD|):

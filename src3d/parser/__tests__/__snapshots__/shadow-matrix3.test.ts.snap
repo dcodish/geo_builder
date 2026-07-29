@@ -5,6 +5,30 @@ exports[`3-D parser shadow-matrix — catalog corpus > divergent later-claimers 
   {
     "lang": "en",
     "shadowedBy": [
+      "magEquality",
+    ],
+    "text": "|EN| = (√6/4)·|w|",
+    "winner": "lengthRel",
+  },
+  {
+    "lang": "he",
+    "shadowedBy": [
+      "magEquality",
+    ],
+    "text": "|EN| = (√6/4)·|w|",
+    "winner": "lengthRel",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
+      "magEquality",
+    ],
+    "text": "|AS| = |AB|",
+    "winner": "lengthRel",
+  },
+  {
+    "lang": "en",
+    "shadowedBy": [
       "rightPyramid",
     ],
     "text": "volume of pyramid SENB equals volume of pyramid CENB",
@@ -396,6 +420,46 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
     "lang": "he",
     "text": "אורך AS שווה לאורך AB",
     "winner": "lengthRel",
+  },
+  {
+    "lang": "en",
+    "text": "|u|=|v|=1",
+    "winner": "magEquality",
+  },
+  {
+    "lang": "he",
+    "text": "|u|=|v|=1",
+    "winner": "magEquality",
+  },
+  {
+    "lang": "en",
+    "text": "|u|=|v|=|w|",
+    "winner": "magEquality",
+  },
+  {
+    "lang": "he",
+    "text": "|u|=|v|=|w|",
+    "winner": "magEquality",
+  },
+  {
+    "lang": "en",
+    "text": "|w+u| = |w-u|",
+    "winner": "magEquality",
+  },
+  {
+    "lang": "he",
+    "text": "|w+u| = |w-u|",
+    "winner": "magEquality",
+  },
+  {
+    "lang": "en",
+    "text": "|2w+3v| = |3v-2w|",
+    "winner": "magEquality",
+  },
+  {
+    "lang": "he",
+    "text": "|2w+3v| = |3v-2w|",
+    "winner": "magEquality",
   },
   {
     "lang": "en",

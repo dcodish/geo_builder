@@ -99,7 +99,12 @@ export type Claim3 =
   // a PLANE — the claim twin of `planeRels`. Directional-only pairs keep their frozen owners.
   | { type: 'plane-rel'; rel: PlaneRel3; deg?: number; a: Operand3; b: Operand3 }
   // S5 (#378): a stated DISTANCE between two operands — «המרחק בין A למישור ABC הוא 6».
-  | { type: 'distance-rel'; a: Operand3; b: Operand3; value: number };
+  | { type: 'distance-rel'; a: Operand3; b: Operand3; value: number }
+  // #393/#335 (ADR-3D-107): magnitude of a vector EXPRESSION — |e1| = c·|e2| (a ratio,
+  // similarity-invariant) and |e| = value (an absolute size). Simple-atom instances are
+  // normalized onto vec-mag/length-eq/length-rel at apply; only genuine expressions land here.
+  | { type: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number }
+  | { type: 'mag-val'; e: VecExpr; value: number };
 
 /** S3 (#378) — the relations a PLANE takes part in. `coincident` is the plane twin of S4's. */
 export type PlaneRel3 = 'perp' | 'parallel' | 'angle' | 'coincident';
@@ -141,7 +146,13 @@ export type ScalarPin =
   | { kind: 'plane-rel'; rel: PlaneRel3; deg?: number; a: Operand3; b: Operand3 }
   // S5 (#378): |a b| = value. The ONE ScalarPin kind besides `length`/`dot` that is NOT
   // similarity-invariant — a distance is an absolute size, so it fixes the scale.
-  | { kind: 'distance'; a: Operand3; b: Operand3; value: number };
+  | { kind: 'distance'; a: Operand3; b: Operand3; value: number }
+  // #393/#335 (ADR-3D-107): |e1| = c·|e2| over vector EXPRESSIONS — a ratio of magnitudes,
+  // similarity-invariant (both sides scale together), the expression twin of `length-rel`.
+  | { kind: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number }
+  // #393/#335: |e| = value — an absolute size on an expression magnitude; fixes the scale
+  // exactly like `length`/`distance`.
+  | { kind: 'mag-val'; e: VecExpr; value: number };
 
 // ---------------------------------------------------------------------------
 // The algebraic lane (V2 — docs/20 §6.3): coefficients may carry ONE symbolic
@@ -614,6 +625,13 @@ export type Command3 =
   // |w| = 2 — a numeric magnitude on a NAMED vector; apply resolves the pair and
   // delegates to the ordinary length given (claim when pinned, driving pin when free)
   | { type: 'vec-mag'; name: string; value: number }
+  // #393/#335 (ADR-3D-107): magnitude equality over vector EXPRESSIONS — |e1| = c·|e2| and
+  // |e| = value (a chain link lowers to these per adjacent pair / per stated value). Apply
+  // NORMALIZES simple unit-coefficient atoms onto the existing owners (vec-mag / length-eq /
+  // length-rel — the parallelepiped-normalization precedent), so only genuine expressions
+  // reach the mag-* pin/claim lanes; M1 routes drive-vs-verify like every scalar given.
+  | { type: 'mag-rel'; e1: VecExpr; e2: VecExpr; c: number }
+  | { type: 'mag-val'; e: VecExpr; value: number }
   // הציבו k = ½ — assign the named parameter directly (replaces any prior pin on it)
   | { type: 'symbol-value'; symbol: string; value: number }
   | SolidCommand
