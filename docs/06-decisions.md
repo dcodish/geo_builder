@@ -5655,3 +5655,22 @@ Measured on the operator's play figure (`טרפז ABCD / EF קטע אמצעים 
 **Not widened, deliberately.** Two adjacent mechanisms were left alone because measurement did not implicate them: the `'soft-order'` ancestor mode (which lets a HARD constraint claim a carrier a satisfied order holds — the documented "the claimer frees the order" behaviour) is wired at exactly ONE call site and stage (B) does not use it; and `addCollinearOrder` still claims carriers for an order that is already satisfied. Both are the general form of this figure's second half, and either would be a broad failure-path change; with the flag corrected, no measured case needs them. Filed as the residual, not bundled. **#260** (two-host membership on a FREE interior rider whose hosts are loose) was probed and is a genuinely different sub-case — it still refuses, and stays open honestly.
 
 Locked by `created-rider-class.test.ts` (6 — the flags at creation on both sides, the interior-slider control, ADR-052 sampling variation, and the two follow-on statements; 5 of the 6 asserted to fail pre-fix) + scenarios `newlabel-collinear-rider` (ratchet retired) and `newlabel-collinear-rider-workaround-twin`.
+
+### ADR-415 — The collinearity family reads its noun on EITHER side of the labels (#417)
+
+**Class:** one family missing the word-order freedom every sibling family has, so a natural register routes to the paid LLM. Operator, playing PR #406 (2026-07-29): «ישר GFH» works, «GFH ישר» does not. Measured across families with figure context:
+
+| utterance | before |
+|---|---|
+| `ישר GFH` · `הישר GFH` | ✅ `set-line` |
+| `GFH ישר` · `GFH הישר` | ❌ **not-handled** → LLM |
+| `ריבוע ABCD` / `ABCD ריבוע` · `משולש ABC` / `ABC משולש` · `מעוין ABCD` / `ABCD מעוין` | ✅ / ✅ |
+| `קטע אמצעים EF` / `EF קטע אמצעים` · `מיתר AB` / `AB מיתר` | ✅ / ✅ |
+
+The house convention CLAUDE.md states ("keyword-order-independent rules") held everywhere except here, because the siblings are built the position-free way — `shapeMacro`/`triShape`/`quadShape` **strip the noun wherever it stands** (`s.replace(strip, ' ')`) and read the label run out of what remains, guarded by `SHAPE_LEFTOVER` so nothing geometry-significant is silently dropped — while `lineN` and `dashCollinear` used regexes ANCHORED with the noun before the labels.
+
+**Mechanism (the sibling shape, line edition):** strip the line noun, then require the remainder to be *nothing but* a run of ≥3 uppercase labels. That all-labels demand IS the guard, and it is what makes the change safe rather than greedy: the family's richer phrasings each leave a word behind and so keep their own (different!) lowering — «P על הישר QR» leaves «על» and stays an UNORDERED `set-collinear` (reading it as an ordered run would silently assert "Q between P and R"), «ישר QR עובר דרך P» leaves the verb, and a 2-label «הישר AC» is a line REFERENCE, not a collinearity. Both order-rigid rules in the family were swept, not just the reported one. The noun is kept as a non-global/global regex PAIR on purpose: a `g`-flagged regex carries `lastIndex` across `.test()` calls, so sharing one constant would make the presence check alternate true/false between utterances.
+
+Not a new grammar entry point and not a second accepted spelling — the rule now asks the semantic question ("is this utterance the line noun plus a label run?") instead of a positional one. The `collinear`/«על ישר אחד» branches were already position-free (they clean the keywords out and read the run), which is why «B C F E נמצאות על ישר אחד» always worked — further evidence the two anchored rules were the outliers.
+
+Locked by `collinear-word-order.test.ts` (8 — both orders for `ישר`/`הישר`/`קו`/`הקו`/English, spaced + glued + 4-label runs, the dashed form both ways, the two no-steal guards, and a **PARITY ratchet** asserting the collinearity family matches its siblings on noun order so a future rule cannot reintroduce a rigid order; 6 of the 8 asserted to fail pre-fix, the 2 passing being the no-steal guards that must hold either way) + scenario `newlabel-collinear-noun-last` (the operator's figure end-to-end with the noun last, so the created rider and its ADR-414 drivability survive the word order).

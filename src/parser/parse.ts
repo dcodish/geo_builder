@@ -3169,13 +3169,24 @@ const lineThroughCenters: Rule = (s, ctx) => {
 };
 
 /**
+ * The line NOUN of the collinearity family, in the two forms a rule needs (#417). Kept as a pair rather
+ * than one `g`-flagged constant on purpose: a global regex carries `lastIndex` across `.test()` calls, so
+ * sharing one would make the presence check alternate true/false between utterances.
+ */
+const LINE_NOUN_RE = /(?:the\s+)?(?:line|ה?ישר|ה?קו)/i;
+const LINE_NOUN_G = /(?:the\s+)?(?:line|ה?ישר|ה?קו)/gi;
+
+/**
  * A DASH-separated ordered collinear list — "A-O1-O2-B" / "ישר A-O1-O2-B" (ADR-228 Am.4). The dashes make
  * the order explicit (the most direct way to say "these points are collinear, in this order"), so it lowers
  * to `set-line` and draws the spanning segment (first→last). 3+ labels, each distinct. A 2-label "A-B" is
  * left alone (that's a segment, handled elsewhere).
  */
 const dashCollinear: Rule = (s) => {
-  const m = s.match(/^\s*(?:(?:the\s+)?(?:line|ה?ישר|ה?קו)\s+)?([A-Z]\d*(?:\s*-\s*[A-Z]\d*){2,})\s*$/);
+  // The noun is order-free here too (#417): «ישר A-O1-O2-B» and «A-O1-O2-B ישר» are one statement. Strip
+  // it wherever it stands, then require the remainder to be exactly the dashed run.
+  const bare = LINE_NOUN_RE.test(s) ? s.replace(LINE_NOUN_G, ' ') : s;
+  const m = bare.match(/^\s*([A-Z]\d*(?:\s*-\s*[A-Z]\d*){2,})\s*$/);
   if (!m) return null;
   const pts = m[1].match(/[A-Z]\d*/g)?.map(up) ?? [];
   if (pts.length < 3 || new Set(pts).size !== pts.length) return null; // 3+ DISTINCT labels
@@ -3274,13 +3285,24 @@ const collinearConstraint: Rule = (s) => {
   // readable utterance (T1 wiring finding, ADR-236). `ifAbsent` makes it existence-agnostic — the parse
   // context may not know the point (unit/harness callers), and apply skips it when the id exists.
   const ensure = (P: Id): AnyCommand[] => [{ type: 'free-point', id: P, x: 3, y: 2, free: true, ifAbsent: true }];
-  // "line ABE" / "ישר ABE" / "line ABEF" — three or more points collinear AND IN ORDER (B between A and
-  // E). Uppercase labels only (so a lowercase word like "through" isn't read as labels), the whole tail
-  // after the keyword. Emits one `set-line` (collinearity + order). Two labels ("line AB") fall through.
-  const lineN = s.match(/^\s*(?:the\s+)?(?:line|ה?ישר|ה?קו)\s+((?:[A-Z]\d*\s*){3,})$/);
-  if (lineN) {
-    const pts = lineN[1].match(/[A-Z]\d*/g)?.map(up) ?? [];
-    if (pts.length >= 3) return [{ type: 'set-line', points: pts }];
+  // "line ABE" / "ישר ABE" / "GFH ישר" / "line ABEF" — three or more points collinear AND IN ORDER (B
+  // between A and E). Emits one `set-line` (collinearity + order). Two labels ("line AB") fall through.
+  //
+  // The noun sits on EITHER side of the labels (#417): «ישר GFH» and «GFH ישר» are one statement, and
+  // order-independence is this grammar's house convention — the polygon family, the midsegment and the
+  // chord all STRIP their noun wherever it stands and then read the label run. This family alone demanded
+  // noun-first, so a student's noun-last register fell through to the paid LLM. Read it the sibling way:
+  // strip the noun, then require what REMAINS to be nothing but a run of ≥3 uppercase labels. That
+  // all-labels demand is the guard (the `SHAPE_LEFTOVER` idea, line edition) — it keeps every richer
+  // phrasing with the branches below, which own them and mean something different: «P על הישר QR» leaves
+  // «על» behind (P on the line, unordered), «ישר QR עובר דרך P» leaves the verb, and a 2-label «הישר AC»
+  // is a line REFERENCE, not a collinearity.
+  if (LINE_NOUN_RE.test(s)) {
+    const bare = s.replace(LINE_NOUN_G, ' ');
+    if (/^\s*(?:[A-Z]\d*\s*){3,}$/.test(bare)) {
+      const pts = bare.match(/[A-Z]\d*/g)?.map(up) ?? [];
+      if (pts.length >= 3) return [{ type: 'set-line', points: pts }];
+    }
   }
   // "line QR passes through P" / "(ה)ישר QR עובר [דרך/בנקודה] P" — drive a point OF the line (Q/R) onto P.
   const through = s.match(

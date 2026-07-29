@@ -1382,3 +1382,6 @@ over all four (ADR-041).
 ### `newlabel-collinear-rider-workaround-twin` — H defined FIRST keeps the declared trapezoid too (#404, ADR-414)
 
 **Guards against:** locking only the created-rider flow while the pre-#402 workaround ORDER (define H on CD first, then «ישר GFH», then the ∥) regresses — the morph was probe-verified on main in both flows, and a student who defines H first must get the same figure. **Asserts:** every step ok, GH ∥ AD holds, and the verifier is silent (no "no longer a trapezoid" morph). Unit coverage: `created-rider-class.test.ts`.
+### `newlabel-collinear-noun-last` — «GFH ישר» builds the same figure as «ישר GFH» (#417, ADR-415)
+
+**Guards against:** the collinearity family demanding noun-FIRST while the polygon/midsegment/chord families take the noun on either side — the operator's own play typed «GFH ישר» and it fell through to the paid LLM. **Asserts:** the noun-last form still creates H on line GF beyond F (the stated order survives the word order), «GH מקביל ל AD» drives, and the declared trapezoid is preserved. Unit coverage: `collinear-word-order.test.ts` (both orders across `ישר`/`הישר`/`קו`/English, spaced/glued/4-label runs, the dashed form, the no-steal guards, and the cross-family parity ratchet).

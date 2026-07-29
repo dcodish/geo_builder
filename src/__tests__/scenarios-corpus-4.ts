@@ -1745,6 +1745,24 @@ export const SCENARIOS_4: Scenario[] = [
     },
   },
   {
+    id: 'newlabel-collinear-noun-last',
+    title: 'issue #417 / ADR-415: «GFH ישר» (noun LAST) builds the same figure as «ישר GFH» — the collinearity family is order-free like its siblings',
+    guards:
+      'the operator’s play of PR #406 (2026-07-29): «ישר GFH» worked and «GFH ישר» did not — the collinearity rule demanded noun-first while the polygon family, the midsegment and the chord all take the noun on either side, so a natural register fell through to the paid LLM and came back not-understood. Locked end-to-end (not only at the parser) so the noun-last form keeps producing the created rider AND the drivability ADR-414 gave it.',
+    steps: ['טרפז ABCD', 'EF קטע אמצעים', 'DB', 'AC', 'G על המשך AB', 'GFH ישר', 'GH מקביל ל AD'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(fig.violations.map((v) => v.message).join('|'), 'the declared trapezoid is preserved').toBe('');
+      const [A, D, G, F, H] = ['A', 'D', 'G', 'F', 'H'].map((id) => at(fig, id));
+      const cross = (P: Vec, Q: Vec, R: Vec) => (Q.x - P.x) * (R.y - P.y) - (Q.y - P.y) * (R.x - P.x);
+      expect(Math.abs(cross(G, F, H)) / Math.max(dist(G, F), 1e-9), 'H rides line GF').toBeLessThan(1e-5);
+      const t = ((H.x - G.x) * (F.x - G.x) + (H.y - G.y) * (F.y - G.y)) / (dist(G, F) ** 2);
+      expect(t, 'H lies beyond F — the stated order G→F→H survives the word order').toBeGreaterThan(1);
+      const par = Math.abs(cross(G, H, { x: G.x + (D.x - A.x), y: G.y + (D.y - A.y) })) / Math.max(dist(G, H) * dist(A, D), 1e-9);
+      expect(par, 'GH ∥ AD holds').toBeLessThan(1e-4);
+    },
+  },
+  {
     id: 'newlabel-collinear-rider-workaround-twin',
     title: 'issue #404: the same figure with H defined FIRST keeps the declared trapezoid too — the pre-#402 workaround flow',
     guards:
