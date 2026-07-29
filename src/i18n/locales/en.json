@@ -377,5 +377,18 @@
   },
   "view": {
     "stale": "The current state cannot be drawn — showing the last good configuration. Undo or fix the last step."
+  },
+  "values": {
+    "hint": "Every known value in the figure — given and derived — computed on request",
+    "compute": "Compute values",
+    "hide": "Hide values",
+    "computing": "Computing…",
+    "given": "Given",
+    "derived": "Derived",
+    "areaRatios": "Area ratios",
+    "none": "No fixed values yet — add size givens (a length, an angle, a radius)",
+    "radius": "radius {{c}}",
+    "area": "area {{ids}}",
+    "rowHint": "Click to highlight on the canvas"
   }
 }

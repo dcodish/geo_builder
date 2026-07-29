@@ -780,6 +780,25 @@ function midsegmentBaseless(s: string, ctx: ParseContext): AnyCommand[] | null {
   };
   const anchored = tryOrder(pair[0], pair[1]) ?? tryOrder(pair[1], pair[0]);
   if (anchored) return anchored;
+  // #405 (ADR-411): BOTH endpoints already anchored — the DETERMINED midsegment, no variant. «DE קטע
+  // אמצעים» after «D על AB» + «E על AC» is a statement about EXISTING points (M1): it asserts each
+  // endpoint is the MIDPOINT of its host — definitional (a midsegment joins two midpoints), host-
+  // agnostic (triangle sides share a vertex, trapezoid legs don't — both are midsegments), and needs
+  // no shape resolution at all. Each `set-equal` drives a free rider to its host's midpoint (the
+  // expandMidsegment pin, ADR-033) and passes as a check on an existing `midpointOf` anchor (ADR-199
+  // Am.). Used to return null here → the plain-segment rule claimed the utterance and the given was
+  // SILENTLY DROPPED (the operator's prod figure: D, E at arbitrary spots, every row ✓).
+  const hostA = anchor(pair[0]);
+  const hostB = anchor(pair[1]);
+  if (hostA && hostB) {
+    const same = (hostA[0] === hostB[0] && hostA[1] === hostB[1]) || (hostA[0] === hostB[1] && hostA[1] === hostB[0]);
+    if (same) return null; // both midpoints of ONE segment ⇒ the endpoints coincide — not a midsegment (the gate refuses loudly)
+    return [
+      { type: 'set-equal', a: hostA[0], b: pair[0], c: pair[0], d: hostA[1] }, // pair[0] is the midpoint of its host
+      { type: 'set-equal', a: hostB[0], b: pair[1], c: pair[1], d: hostB[1] }, // pair[1] is the midpoint of its host
+      { type: 'segment', a: pair[0], b: pair[1] },
+    ];
+  }
   // #71 (log-triage): BOTH letters fresh + an explicitly NAMED triangle — "EF קטע אמצעים במשולש
   // DCB". E rides the FIRST named side (the student's own vertex order signals the base — a
   // discrete labeling read, not an invented magnitude) and F cycles between the other two sides
@@ -801,6 +820,25 @@ function midsegmentBaseless(s: string, ctx: ParseContext): AnyCommand[] | null {
         { type: 'point-on-segment', id: pair[0], a: tri[0], b: tri[1] },
         { type: 'shape-variant', shape: 'midsegment', ids: [tri[0], tri[1], tri[2], pair[0], pair[1]], variant: 0 },
       ];
+  }
+  // #405 (ADR-411): ZERO-anchored bare form — «DE קטע אמצעים» with both letters fresh and NO named
+  // triangle. The definite-reference pattern (ADR-245, polygon edition): with exactly ONE triangle in
+  // the figure the utterance binds to it — same decomposition as the #71 branch (the first letter rides
+  // the triangle's first stored side, a DEFAULT the ADR-412 pre-scan re-seats when the student later
+  // states the side; the second letter's side cycles via the shape-variant channel). 0 or ≥2 candidate
+  // triangles ⇒ null — and the droppedMidsegment gate turns THAT fall-through into an honest
+  // escalation, never the bare `segment D E` that minted two free points (E floating off the figure).
+  {
+    const have = new Set(ctx.points ?? []);
+    const tris = (ctx.polygons ?? []).filter((v) => v.length === 3);
+    if (!have.has(pair[0]) && !have.has(pair[1]) && tris.length === 1) {
+      const tri = tris[0].map(up);
+      if (!tri.includes(pair[0]) && !tri.includes(pair[1]))
+        return [
+          { type: 'point-on-segment', id: pair[0], a: tri[0], b: tri[1] },
+          { type: 'shape-variant', shape: 'midsegment', ids: [tri[0], tri[1], tri[2], pair[0], pair[1]], variant: 0 },
+        ];
+    }
   }
   return null;
 }
@@ -5056,15 +5094,26 @@ const pointOnCircle: Rule = (s, ctx) => {
   const m = s.match(/^(.*?\b[A-Za-z]\d*\b.*?)(?:\bon\b|על)(?=.*?(?:circle|מעגל))/i);
   if (!m) return null;
   // The circle: its named centre ("circle O"), or — for a DEFINITE/unnamed reference ("on the
-  // circle" / "על המעגל" / "נמצאת על המעגל") — the figure's single circle, via context.
-  const center = resolveCenter(s, ctx);
-  if (!center) return null; // 0 or 2+ unnamed circles ⇒ ambiguous → defer/escalate
+  // circle" / "על המעגל" / "נמצאת על המעגל") — the figure's single circle, via context. A NAMED
+  // reference (known or not) stays on this path so the #186 naming-by-use seam (withImplicitCircles
+  // tagging + impliedCircleBinding) keeps owning it.
+  let center = resolveCenter(s, ctx);
+  let prepend: AnyCommand[] = [];
+  // #362 (ADR-409): an UNNAMED membership on a circle-LESS figure presupposes its circle — one is
+  // INTRODUCED (free centre + free radius) instead of the old defer-to-LLM (the ADR-367 `implied`
+  // discipline; the chord/diameter/tangent siblings' helper, finally adopted here). Reached only
+  // when resolveCenter had nothing: 2+ unnamed circles still return null (the ADR-244 bail).
+  if (!center) {
+    const intro = resolveOrIntroduceCircle(s, ctx);
+    if (intro) ({ center, prepend } = intro);
+  }
+  if (!center) return null; // 2+ unnamed circles ⇒ ambiguous → defer/escalate
   const ids = (m[1].match(/[A-Z]\d*/g) ?? []).map(up);
   // A distinct uppercase run is the subject list; anything else falls back to the legacy
   // first-single-label read (e.g. a lowercase label) so looser phrasings keep parsing as before.
   const subjects =
     ids.length > 0 && new Set(ids).size === ids.length ? ids : [up(m[1].match(/\b([A-Za-z]\d*)\b/)![1])];
-  return subjects.map((id) => ({ type: 'point-on-circle' as const, id, circle: circleId(center) }));
+  return [...prepend, ...subjects.map((id) => ({ type: 'point-on-circle' as const, id, circle: circleId(center) }))];
 };
 
 /** "M מחוץ למעגל [O]" / "הנקודה M נמצאת בתוך המעגל" / "M is outside circle O" / "point M lies inside
@@ -5081,12 +5130,21 @@ const pointVsCircle: Rule = (s, ctx) => {
   );
   if (!m) return null;
   const side = /מחוץ|outside/i.test(m[2]) ? ('outside' as const) : ('inside' as const);
-  const center = resolveCenter(s, ctx);
-  if (!center) return null; // no named circle and 0 or 2+ in the figure ⇒ ambiguous → defer/escalate
+  // #362 (ADR-409): «M מחוץ למעגל» on a circle-less figure presupposes the circle — introduce it
+  // (the same fallback as pointOnCircle above; a NAMED reference stays with resolveCenter so the
+  // #186 seam keeps owning it); the ADR-254 side seeding works against the freshly minted free
+  // circle exactly as against a built one (locked). 2+ unnamed circles still defer.
+  let center = resolveCenter(s, ctx);
+  let prepend: AnyCommand[] = [];
+  if (!center) {
+    const intro = resolveOrIntroduceCircle(s, ctx);
+    if (intro) ({ center, prepend } = intro);
+  }
+  if (!center) return null; // 2+ unnamed circles ⇒ ambiguous → defer/escalate
   // UPPERCASE labels only (the ADR-076 list convention) — a lowercase run like "and" is a connective.
   const subjects = (m[1].match(/[A-Z]\d*/g) ?? []).map(up);
   if (subjects.length === 0 || new Set(subjects).size !== subjects.length) return null;
-  return subjects.map((id) => ({ type: 'point-circle-side' as const, id, circle: circleId(center), side }));
+  return [...prepend, ...subjects.map((id) => ({ type: 'point-circle-side' as const, id, circle: circleId(center), side }))];
 };
 
 /** «נקודת C ו D נמצאות בצדדים שונים של AB» / «C ו-D באותו צד של הישר AB» / "C and D are on different
@@ -8682,6 +8740,7 @@ function parseResolved(s: string, ctx: ParseContext): ParseResult {
   if (
     (whole.ok &&
       (droppedShapeNoun(s, whole.commands, ctx) ||
+        droppedMidsegment(s, whole.commands) ||
         droppedCirclePredicate(s, whole.commands) ||
         droppedRadiusSymbol(s, whole.commands).length > 0 ||
         droppedGivenRelations(s, whole.commands).length > 0 ||
@@ -8795,6 +8854,22 @@ function regionSideFallback(s: string, ctx: ParseContext): ParseResult | null {
  */
 const POLY_NOUN =
   /משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|מקבילית|מחומש|משושה|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|kite|parallelogram|pentagon|hexagon/gi;
+
+/**
+ * #405 (ADR-411): a midsegment-flavoured utterance whose winning parse carries NO midpoint semantics
+ * was claimed by a generic rule (the plain segment) and the student's given SILENTLY DROPPED — the
+ * third member of the flavoured-segment-noun family (chord → ADR-119's `withChordMembership`; here
+ * `קטע אמצעים`/midsegment). `droppedShapeNoun` guards polygon nouns only and `droppedGivenRelations`
+ * symbol relations only, so nothing tripped. Semantics present = a `midpoint`, a midsegment
+ * `shape-variant`, or a midpoint-pinning `set-equal` (the ADR-411 determined lowering). Fires the
+ * same escalate-never-commit route as its siblings, on the grammar AND the LLM commit paths.
+ */
+export function droppedMidsegment(utterance: string, commands: AnyCommand[]): boolean {
+  if (!/midsegment|mid-?segment|midline|קטע\s+ה?אמצעים/i.test(utterance)) return false;
+  return !commands.some(
+    (c) => c.type === 'midpoint' || (c.type === 'shape-variant' && c.shape === 'midsegment') || c.type === 'set-equal',
+  );
+}
 function droppedShapeNoun(s: string, commands: AnyCommand[], ctx: ParseContext): boolean {
   if (commands.some((c) => Array.isArray((c as { ids?: unknown }).ids) && ((c as { ids: unknown[] }).ids.length >= 3))) return false;
   const known = new Set([
@@ -8978,6 +9053,7 @@ function splitStatements(s0: string, ctx: ParseContext): ParseResult | null {
     if (
       r.ok &&
       !droppedShapeNoun(p, r.commands, c0) &&
+      !droppedMidsegment(p, r.commands) &&
       !droppedCirclePredicate(p, r.commands) &&
       droppedRadiusSymbol(p, r.commands).length === 0
     )

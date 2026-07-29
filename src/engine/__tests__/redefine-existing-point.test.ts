@@ -65,13 +65,32 @@ describe('redefining an EXISTING point constrains it (ADR-107 Am.)', () => {
     ] as Command[]); // build() asserts every step ok
   });
 
-  it('free vertex: triangle ABC then A = midpoint of BC → A driven to the midpoint', () => {
+  it('free point: E free then E = midpoint of AB → E driven to the midpoint (never "already defined")', () => {
     const p = pos(build([
-      { type: 'triangle', ids: ['A', 'B', 'C'] },
-      { type: 'midpoint', id: 'A', a: 'B', b: 'C' },
+      { type: 'free-point', id: 'A', x: 0, y: 0, free: true }, { type: 'free-point', id: 'B', x: 8, y: 2, free: true },
+      { type: 'free-point', id: 'E', x: 1, y: 5, free: true },
+      { type: 'midpoint', id: 'E', a: 'A', b: 'B' },
     ] as Command[]));
-    expect(p('A').x).toBeCloseTo((p('B').x + p('C').x) / 2, 2);
-    expect(p('A').y).toBeCloseTo((p('B').y + p('C').y) / 2, 2);
+    expect(p('E').x).toBeCloseTo((p('A').x + p('B').x) / 2, 2);
+    expect(p('E').y).toBeCloseTo((p('A').y + p('B').y) / 2, 2);
+  });
+
+  // Deliberately UPDATED by ADR-413 (#408): this case used to assert A DRIVEN to the midpoint of BC —
+  // i.e. a vertex on its own opposite side, the declared triangle silently FLATTENED to a line (the
+  // exact dishonesty the collapse gate abolishes). The M1 point stands — the statement is still read as
+  // a constraint (the refusal has the over-constrained RELATION shape, never "already defined") — but a
+  // system whose only solutions collapse a declared polygon now refuses honestly, keep-prior.
+  it('free vertex: triangle ABC then A = midpoint of BC → the HONEST refusal (ADR-413), not a flat triangle', () => {
+    let c = emptyConstruction();
+    const r1 = applyStep(c, { type: 'triangle', ids: ['A', 'B', 'C'] } as Command);
+    expect(r1.ok).toBe(true);
+    if (r1.ok) c = r1.construction;
+    const r2 = applyStep(c, { type: 'midpoint', id: 'A', a: 'B', b: 'C' } as Command);
+    expect(r2.ok).toBe(false);
+    if (!r2.ok) {
+      expect(r2.error).not.toMatch(/already defined/); // the M1 lock: still a constraint-shaped refusal
+      expect(r2.error).toMatch(/over-constrained|cannot hold/);
+    }
   });
 });
 

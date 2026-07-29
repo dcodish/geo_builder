@@ -24,6 +24,7 @@ import {
   droppedGivenNumbers,
   droppedGivenRelations,
   droppedGivenVerbs,
+  droppedMidsegment,
   droppedNewLabels,
   droppedRadiusSymbol,
   droppedRegionSubject,
@@ -511,6 +512,10 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     // region-clause utterance («M בתוך המשולש ABC») that references the subject label nowhere
     // dropped the student's statement about it — the grammar path already held this line
     ...(droppedRegionSubject(utterance, llmCmds) ? ['בתוך/מחוץ'] : []),
+    // and the MIDSEGMENT gate (#405/ADR-411): a decomposition of a midsegment-flavoured utterance
+    // that carries no midpoint semantics dropped the given — the grammar chokepoint holds this line,
+    // so the LLM seam must too (the ADR-240 pattern: the second attempt never commits the same drop)
+    ...(droppedMidsegment(utterance, llmCmds) ? ['קטע אמצעים'] : []),
   ];
   if (stillDropped.length > 0) {
     logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `dropped-labels:${stillDropped.join(',')}`, commands: llmCmds });

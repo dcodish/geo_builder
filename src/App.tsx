@@ -18,6 +18,8 @@ import { Figure } from '@/render';
 import { crossingCommands } from '@/engine';
 import type { Crossing } from '@/engine';
 import { MathText, hasMath } from '@/render/mathText';
+import { MathValue } from '@/render/MathValue';
+import { formatMeasure } from '@/format';
 import { readoutForGroup } from '@/render/computedValue';
 import type { DetectedShape, Id, SimilarClass } from '@/engine';
 import { bookUrl } from '@/shapes/shapeCatalog';
@@ -83,6 +85,9 @@ export default function App() {
   const hiddenCircles = useGeoStore((s) => s.hiddenCircles);
   const toggleCircleHidden = useGeoStore((s) => s.toggleCircleHidden);
   const relations = useGeoStore((s) => s.relations);
+  const valuesState = useGeoStore((s) => s.values);
+  const viewValues = useGeoStore((s) => s.viewValues);
+  const clearValues = useGeoStore((s) => s.clearValues);
   const viewRelations = useGeoStore((s) => s.viewRelations);
   const clearRelations = useGeoStore((s) => s.clearRelations);
   const shapes = useGeoStore((s) => s.shapes);
@@ -116,6 +121,8 @@ export default function App() {
   const [resampling, setResampling] = useState(false);
   const [altProgress, setAltProgress] = useState(''); // "show another configuration" search in flight (synchronous; we paint a busy state first)
   const [analysing, setAnalysing] = useState(false); // "view relations" detection in flight (synchronous; paint a busy state first)
+  const [computingValues, setComputingValues] = useState(false); // #217: the values panel compute in flight (worker-side)
+  const [valueHl, setValueHl] = useState<[Id, Id][] | null>(null); // #217: the clicked value row's canvas highlight
   const [detecting, setDetecting] = useState(false); // "detect shapes" detection in flight (synchronous; paint a busy state first)
   const [openShape, setOpenShape] = useState<DetectedShape | null>(null); // the shape badge whose inline book-link card is open
   const [hoverShape, setHoverShape] = useState<DetectedShape | null>(null); // the shape badge being hovered (transient highlight preview)
@@ -566,6 +573,7 @@ export default function App() {
   // any fact change makes a new `facts` array (≠ the cached ref), so the layer auto-clears (ADR-134). Ground
   // truths are invariant across configurations, so it deliberately survives "show another configuration".
   const relationsLayer = relations && relations.facts === facts ? relations.result : null;
+  const valuesLayer = valuesState && valuesState.facts === facts ? valuesState.result : null;
 
   // The "detect shapes" badge layer — same facts-keyed cache contract as the relations layer above.
   const shapesLayer = shapes && shapes.facts === facts ? shapes.result : null;
@@ -855,7 +863,7 @@ export default function App() {
             width={canvasSize.w}
             height={canvasSize.h}
             highlight={theoremHighlight ?? shapeHighlight ?? highlight}
-            highlightEdges={theoremHighlight ? undefined : shapeHighlightEdges}
+            highlightEdges={theoremHighlight ? undefined : (shapeHighlightEdges ?? valueHl ?? undefined)}
             onPickIntersection={markIntersection}
             forcedCrossings={crossings?.facts === facts ? crossings.forced : undefined}
             intersectionLabel={t('actions.markIntersection')}
@@ -1371,7 +1379,84 @@ export default function App() {
             >
               {detecting ? t('shapes.analysing') : shapesLayer ? t('shapes.hide') : t('shapes.detect')}
             </button>
+            {/* #217 (ADR-410): the VALUES panel — pull-only (req 4: never computed during build). The
+                worker classifies the shared sample pool; rows show only seed-invariant knowledge. */}
+            <button
+              type="button"
+              style={valuesLayer ? shapesBtnOn : exploreToggle}
+              disabled={computingValues}
+              title={t('values.hint')}
+              onClick={() => {
+                if (computingValues) return;
+                if (valuesLayer) {
+                  setValueHl(null);
+                  clearValues();
+                  return;
+                }
+                setComputingValues(true);
+                void viewValues().finally(() => setComputingValues(false));
+              }}
+            >
+              {computingValues ? t('values.computing') : valuesLayer ? t('values.hide') : t('values.compute')}
+            </button>
           </div>
+          {valuesLayer && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '8px 10px' }}>
+              {valuesLayer.rows.length === 0 && valuesLayer.areaClasses.length === 0 && (
+                <span style={{ color: '#64748b', fontSize: 12 }}>{t('values.none')}</span>
+              )}
+              {(['given', 'derived'] as const).map((grp) => {
+                const rows = valuesLayer.rows.filter((r) => (grp === 'given') === r.stated);
+                if (rows.length === 0) return null;
+                return (
+                  <div key={grp}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>{t(`values.${grp}`)}</div>
+                    {rows.map((r, i) => (
+                      <button
+                        key={`${r.kind}-${r.label}-${i}`}
+                        type="button"
+                        style={{ display: 'flex', gap: 6, alignItems: 'baseline', background: 'none', border: 'none', cursor: 'pointer', padding: '1px 2px', font: 'inherit', color: '#334155' }}
+                        title={t('values.rowHint')}
+                        onClick={() => {
+                          const hl: [Id, Id][] =
+                            r.kind === 'length' ? [[r.ids[0], r.ids[1]]]
+                            : r.kind === 'angle' ? [[r.ids[1], r.ids[0]], [r.ids[1], r.ids[2]]]
+                            : r.kind === 'area' && r.ids.length >= 3 ? r.ids.map((id, k) => [id, r.ids[(k + 1) % r.ids.length]] as [Id, Id])
+                            : [];
+                          setValueHl((cur) => (cur && JSON.stringify(cur) === JSON.stringify(hl) ? null : hl));
+                        }}
+                      >
+                        <bdi style={{ direction: 'ltr' }}>
+                          {r.kind === 'radius' ? t('values.radius', { c: r.label })
+                            : r.kind === 'area' ? t('values.area', { ids: r.label })
+                            : r.label}
+                        </bdi>
+                        <span>=</span>
+                        <MathValue value={r.value} exact={r.exact} degrees={r.kind === 'angle'} />
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+              {valuesLayer.areaClasses.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>{t('values.areaRatios')}</div>
+                  {valuesLayer.areaClasses.map((cls, ci) => (
+                    <div key={ci} style={{ color: '#334155', padding: '1px 2px' }}>
+                      {cls.labels.map((lab, k) => (
+                        <span key={lab}>
+                          {k > 0 && <span> · </span>}
+                          <bdi style={{ direction: 'ltr' }}>{t('values.area', { ids: lab })}</bdi>
+                          {' = '}
+                          <bdi style={{ direction: 'ltr' }}>{cls.coefs[k] === 1 ? cls.letter : cls.coefs[k] === 0.5 ? `½${cls.letter}` : `${formatMeasure(cls.coefs[k])}${cls.letter}`}</bdi>
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {relationsLayer && relationsLayer.equalSegments.length === 0 && relationsLayer.equalAngles.length === 0 && (
             <span style={{ fontSize: 12, color: '#64748b' }}>{t('actions.relationsNone')}</span>
