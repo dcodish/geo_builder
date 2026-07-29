@@ -48,9 +48,15 @@ describe('parse — point vs circle side (He/En, named/implicit, multi-subject)'
     for (const c of sideCmds(r.commands)) expect(c.circle).toBe('circle-O');
   });
 
-  it('with NO circle and an unnamed reference it defers (ambiguous → escalate), never guesses', () => {
+  it('with NO circle and an unnamed reference it INTRODUCES the presupposed circle (#362, ADR-409 — was: defer)', () => {
+    // deliberately updated from the pre-#362 defer semantics: «M מחוץ למעגל» is unambiguous — the
+    // statement presupposes its circle (the ADR-367 implied discipline, the chord/tangent siblings).
+    // The ambiguity bail this test really guarded (2+ circles → defer) lives on in
+    // implied-circle-membership.test.ts.
     const r = parse('M מחוץ למעגל', buildParseCtx(replay([]).construction, replay([]).positions));
-    expect(r.ok).toBe(false);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.commands.some((c) => c.type === 'circle'), 'the presupposed circle is minted').toBe(true);
   });
 
   it('a NAMED circle that does not exist yet is auto-materialised (the implicit-circle post-pass)', () => {
