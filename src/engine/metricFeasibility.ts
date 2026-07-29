@@ -102,8 +102,11 @@ export function metricImpossibility(constraints: Constraint[]): MetricImpossibil
   return null;
 }
 
-/** The engine-side English diagnostic; `humanizeError` maps it to the student's language (#413/ADR-416). */
+/**
+ * The engine-side English diagnostic; `humanizeError` maps it to the student's language (#413/ADR-416).
+ * The intermediates are COMMA-separated so the humaniser can tell the triangle case (exactly one) from a
+ * longer cycle and pick the wording the curriculum uses for each.
+ */
 export function metricImpossibilityError(m: MetricImpossibility): string {
-  const via = m.via.length ? m.via.join('') : '';
-  return `impossible: |${m.a}${m.b}| = ${m.value} exceeds ${m.sum}, the distance from ${m.a} to ${m.b} via ${via}`;
+  return `impossible: |${m.a}${m.b}| = ${m.value} exceeds ${m.sum}, the distance from ${m.a} to ${m.b} via ${m.via.join(', ')}`;
 }

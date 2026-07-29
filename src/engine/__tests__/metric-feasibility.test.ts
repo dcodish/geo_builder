@@ -70,13 +70,21 @@ describe('#420 — end to end', () => {
     expect(ms, `whole sequence took ${ms} ms`).toBeLessThan(8000);
   }, 120_000);
 
-  it('the message reads as impossible in Hebrew, naming the path and the sum', () => {
+  it('the TRIANGLE case states the curriculum rule, naming the two sides', () => {
     const msg = humanizeError('impossible: |AC| = 9 exceeds 8, the distance from A to C via B', t);
-    expect(msg).toContain('AC');
+    // the operator's own sentence (2026-07-29) — the phrasing a student is taught
+    expect(msg).toContain('סכום שתי צלעות תמיד גדול מהצלע השלישית');
+    expect(msg, 'the two sides that fall short are named').toContain('|AB| + |BC|');
     expect(msg).toContain('8');
-    expect(msg).toContain('B');
     expect(msg).not.toMatch(/[a-z]{2,}/); // #413's property: no English word survives
     expect(msg, 'not the pending wording').not.toBe(i18n.t('figure.pending'));
+  });
+
+  it('a LONGER cycle does not claim the triangle rule — it states the general principle', () => {
+    const msg = humanizeError('impossible: |AD| = 9 exceeds 3, the distance from A to D via B, C', t);
+    expect(msg, 'the triangle sentence would be false here').not.toContain('סכום שתי צלעות');
+    expect(msg).toContain('3');
+    expect(msg).not.toMatch(/[a-z]{2,}/);
   });
 
   it('is NOT reported as pending — the figure carries a hard error', () => {

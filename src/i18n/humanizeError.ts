@@ -96,6 +96,8 @@ export function translateParams(params: Record<string, string> | undefined, t: T
 interface Pattern {
   re: RegExp;
   key: string;
+  /** Pick the key from the match when one shape has several wordings (see the metric-impossibility entry). */
+  keyOf?: (m: RegExpMatchArray) => string;
   /** Map the regex match groups to interpolation params for the i18n key. */
   params?: (m: RegExpMatchArray) => Record<string, string>;
 }
@@ -104,10 +106,26 @@ interface Pattern {
 // anchored and specific enough that the first match is the right one.
 const PATTERNS: Pattern[] = [
   // metricFeasibility.ts (#420, ADR-417) — `impossible: |AC| = 9 exceeds 8, the distance from A to C via B`
+  //
+  // TWO wordings, because the message must state the geometry that actually applies. With exactly one
+  // intermediate point the figure is a TRIANGLE and the curriculum's own sentence is the right one
+  // («סכום שתי צלעות תמיד גדול מהצלע השלישית», operator 2026-07-29) — and the two sides can be named from
+  // a, b and the intermediate. With a longer cycle (a pinned quadrilateral) that sentence would be false,
+  // so the general principle is stated instead: a straight segment is shorter than any other path between
+  // its endpoints.
   {
-    re: /^impossible: \|(\S+?)\| = (\S+) exceeds (\S+), the distance from (\S+) to (\S+) via (\S*)$/,
+    re: /^impossible: \|(\S+?)\| = (\S+) exceeds (\S+), the distance from (\S+) to (\S+) via (.*)$/,
     key: 'errors.metricImpossible',
-    params: (m) => ({ seg: m[1], value: m[2], sum: m[3], a: m[4], b: m[5], via: m[6] }),
+    keyOf: (m) => (m[6].includes(',') ? 'errors.metricImpossiblePath' : 'errors.metricImpossibleTriangle'),
+    params: (m) => ({
+      seg: m[1],
+      value: m[2],
+      sum: m[3],
+      a: m[4],
+      b: m[5],
+      via: m[6],
+      sides: `|${m[4]}${m[6]}| + |${m[6]}${m[5]}|`,
+    }),
   },
   // step.ts danglingCircleError (#186) — `circle 'O2' is not defined`
   { re: /^circle '(.+)' is not defined$/, key: 'errors.unknownCircle', params: (m) => ({ center: m[1] }) },
@@ -187,7 +205,7 @@ export function humanizeError(raw: string | null | undefined, t: Translate): str
     const translated = params
       ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t)]))
       : undefined;
-    return t(p.key, translated);
+    return t(p.keyOf ? p.keyOf(m) : p.key, translated);
   }
   // No known shape — still translate the vocabulary, so an unmatched message is never worse and never
   // leaks an English word we already know how to say.
