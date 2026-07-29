@@ -8,31 +8,7 @@ Start the app with `npm run dev` and open **`http://localhost:5173/3d.html`** fo
 
 ---
 
-## PR #399 — the magnitude bundle (#393 + #335, ADR-3D-107) · PR #400 — the panel bundle (#384/#395–#398, ADR-3D-108)
-
-Both built 2026-07-29 (operator-commissioned fix session). **One checkout plays both**: branch `play/2026-07-29` merges the two PR branches over `main` (which also carries the #389 מעויין fix). The full copy-paste scripts live in the session's handoff message; highlights:
-
-```
-תיבה ABCDA'B'C'D'
-נסמן: AB=u, AD=v, AA'=w
-|u|=|v|=1
-```
-
-```
-מקבילון ABCDEFGH
-נסמן: AB=u, AD=v, AE=w
-|w+u|=|w-u|
-```
-
-```
-פירמידה משולשת ABCD
-המרחק בין D למישור ABC הוא 6
-```
-(→ dashed height witness + knee + `d(D, ABC) = 6` panel row; the plane's fact-row button now cycles מישור מלא ← פאה בלבד ← מוסתר; the query «המרחק בין D למישור ABC» renders RTL with the plane name un-arrowed.)
-
-Note: `main` is AHEAD of prod — `prod/2026-07-28-3` predates S3+S5, #389, and both bundles. A deployment session follows the play.
-
----
+**The queue is EMPTY** (2026-07-29, end of day). PRs #399 (magnitude bundle) and #400 (panel bundle) were played ("all validates and work"), merged, and DEPLOYED together with S3+S5 and the #389 fix as `prod/2026-07-29` — prod and `main` are level.
 
 ## Housekeeping
 
