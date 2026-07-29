@@ -94,7 +94,13 @@ export type Claim3 =
   // S4 (#378): the MUTUAL POSITION of two located objects, over the general operand pair — the
   // claim twin of `mutualRels`. (`lines-rel` above is the frozen V7-T3 segment-pair spelling; both
   // verdicts come from the one `mutualPosition` classifier, so they cannot disagree.)
-  | { type: 'mutual-rel'; rel: MutualRel3; a: Operand3; b: Operand3 };
+  | { type: 'mutual-rel'; rel: MutualRel3; a: Operand3; b: Operand3 }
+  // S3 (#378): a DIRECTION relation (⟂ / ∥ / a stated angle / coincident) where at least one side is
+  // a PLANE — the claim twin of `planeRels`. Directional-only pairs keep their frozen owners.
+  | { type: 'plane-rel'; rel: PlaneRel3; deg?: number; a: Operand3; b: Operand3 };
+
+/** S3 (#378) — the relations a PLANE takes part in. `coincident` is the plane twin of S4's. */
+export type PlaneRel3 = 'perp' | 'parallel' | 'angle' | 'coincident';
 
 /**
  * S4 (#378) — the four mutually exclusive positions two located directions can occupy in R³.
@@ -127,7 +133,10 @@ export type ScalarPin =
   // The residual is `mutualDeviation`, normalized to be scale-free, so it is similarity-invariant
   // and joins the gauge-frozen dims-only solve like every other ScalarPin. `skew` is deliberately
   // not representable here: it is an inequality, and belongs to the requirement lane.
-  | { kind: 'mutual'; rel: 'coincident' | 'parallel' | 'intersecting'; a: Operand3; b: Operand3 };
+  | { kind: 'mutual'; rel: 'coincident' | 'parallel' | 'intersecting'; a: Operand3; b: Operand3 }
+  // S3 (#378): a plane-bearing direction relation between two GAUGE operands. Every residual is
+  // an angle between characteristic vectors (or a size-normalized offset), so it is scale-free.
+  | { kind: 'plane-rel'; rel: PlaneRel3; deg?: number; a: Operand3; b: Operand3 };
 
 // ---------------------------------------------------------------------------
 // The algebraic lane (V2 — docs/20 §6.3): coefficients may carry ONE symbolic
@@ -635,6 +644,11 @@ export type Command3 =
   //   · a similarity-invariant DRIVE (`mutual` ScalarPin) for the closed half when both operands
   //     ride the gauge, so a free-dim figure is flexed into the stated position (M1 duality).
   | { type: 'mutual-rel'; rel: MutualRel3; a: Operand3; b: Operand3 }
+  // S3 (#378): ⟂ / ∥ / angle / coincident with a PLANE on at least one side — «המישור ABC מקביל
+  // למישור A'B'C'», «π1 ניצב ל-π2», «AB מקביל למישור π». Lowered to a recorded claim ALWAYS plus,
+  // per the frame classifier: a similarity-invariant DRIVE when both sides ride the gauge, a pivot
+  // residual when one is absolute, and the parameter root-find when both are (docs/26 §2.3).
+  | { type: 'plane-rel'; rel: PlaneRel3; deg?: number; a: Operand3; b: Operand3 }
   | ParamSignCommand
   | Plane3Command
   | PlaneAngleCommand

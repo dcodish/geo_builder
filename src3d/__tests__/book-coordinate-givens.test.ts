@@ -46,7 +46,16 @@ describe('#324 — parse: ring ∥/⟂/on a coordinate plane or axis', () => {
     expect(parse3('plane ABC is parallel to the z-axis')).toMatchObject({ ok: true, commands: [{ axis: 'z', mode: 'perp' }] });
   });
   it('NO THEFT: uppercase letters are point labels, not coordinate planes', () => {
-    expect(parse3('המישור ABC מקביל למישור XYZ')).toEqual({ ok: false, reason: 'not-handled' });
+    // S3 (#378) widened this: the utterance is now HANDLED — as a relation between two POINT-RUN
+    // planes, which is what it says. The no-theft intent is unchanged and asserted more sharply
+    // here than before: `XYZ` must be read as three point labels, never as the coordinate plane,
+    // so the lowering is a `plane-rel` over point runs and NEVER a `coord-plane-rel`.
+    const r = parse3('המישור ABC מקביל למישור XYZ');
+    expect(r).toMatchObject({
+      ok: true,
+      commands: [{ type: 'plane-rel', rel: 'parallel', a: { kind: 'plane-run', ids: ['A', 'B', 'C'] }, b: { kind: 'plane-run', ids: ['X', 'Y', 'Z'] } }],
+    });
+    expect(r.ok && r.commands.some((c) => c.type === 'coord-plane-rel')).toBe(false);
   });
 });
 

@@ -1637,3 +1637,35 @@ Three consequences follow:
 **Budget (docs/17 §7).** The gauge drive is one more residual block inside the existing `scalarPins` loop — no new solve. The requirement adds one `resolve3` per candidate seed, the ADR-3D-064 cost, and only for figures that state a mutual position.
 
 Locked by `mutual-position.test.ts` (15, the pure classifier incl. the bounded/unbounded boundary) + `mutual-rel.test.ts` (17, end-to-end drives, the refusals, the canvas staying clean, the stated AND derived panel rows, the shared-endpoint filter) + `relation-battery.test.ts` (5 new rows, exact-list and ratchet updated). 3-D lane 1708 green, `tsc -b` + both builds clean.
+
+### ADR-3D-105 — S3 of the relations program: the PLANE column (#378)
+
+**Context.** After S2 (named lines) and S4 (mutual positions), the matrix's remaining hole was the plane: `perp|plane-run|plane-run`, `parallel|plane-named|plane-named`, `angle|segment|plane-named` and a dozen siblings were all `planned`. The capabilities existed for *some* spellings — `perpPlaneClaim`, `segParallelPlane`, `linePlaneAngle`, `angleBetweenPlanes` — each reading one operand shape.
+
+**Decision. One rule generalizes the whole matrix.** `lineRelDeviation` already contained the insight without stating it: a relation between two objects reads off the angle between their CHARACTERISTIC vectors — a direction for a segment/vector/line, a NORMAL for a plane — and the reading **inverts exactly when the two sides are of different types**:
+
+| sides | ⟂ means | ∥ means |
+| --- | --- | --- |
+| dir × dir | the directions are ⟂ ⇒ \|cos\| = 0 | the directions align ⇒ \|sin\| = 0 |
+| plane × plane | the NORMALS are ⟂ ⇒ \|cos\| = 0 | the normals align ⇒ \|sin\| = 0 |
+| dir × plane | the line runs ALONG the normal ⇒ \|sin\| = 0 | the line lies in it ⇒ \|cos\| = 0 |
+
+Same-type pairs read alike; only the mixed pair flips. So `relDeviation(rel, deg, a, b)` serves every cell, and `lineRelDeviation` becomes literally this with a bare direction as side B. The stated ANGLE follows the same split — between two lines or two planes the ordinary cosine, between a line and a plane the formula sheet's sin β. **The chokepoint shrank: one function replaced a rule per cell, and the new command (`plane-rel`) carries no geometry of its own.**
+
+Routing is the frame classifier, unchanged: gauge×gauge drives (a similarity-invariant `plane-rel` ScalarPin), absolute×absolute is a claim (or the existing `planeAngles` param-root), gauge×absolute is claim-gated — honest (true verifies, false refuses) but driveless, folded into **#386** with S4's identical cells.
+
+**15 cells flipped**, 59 supported in total.
+
+**Three defects found by building it, each the same shape — a guard bound to a PATH instead of to the event it guards:**
+
+1. **The general-position guard ran on only one of the two solve paths.** `degenerate()` opened with `if (!planeDrive) return false;` and was called only from the gauge-solving loop. A similarity-invariant given routes to the `invariantOnly` dims-only solver instead, which never consulted it — so «המישור ABC מתלכד עם המישור A'B'C'» on a box drove its height to **zero** and reported success, because in the collapsed figure the two planes genuinely do coincide. A collapsed solid is not a figure whichever solver produced it: the gate is deleted and the check now runs on both paths.
+
+2. **The landing funnel treated a plane-locked base as free to rotate.** `coord-plane-rel` mode `zero` («הבסיס ABCD שוכן במישור ה-xy») was listed as pinning translation but not rotation — yet lying IN a plane fixes orientation as surely as offset. The moment any absolute object joined the figure, [ADR-3D-101](#adr-3d-101)'s funnel judged rotation free, spun the solid, and tipped the base off the plane it was pinned to. Silent destruction of a stated given, in a figure that still reported green.
+
+3. (Carried from S4's review, same night: `scalePinned` was an exclusion list — see [ADR-3D-104](#adr-3d-104).)
+
+The recurrence is the point. Four times now the mechanism has been *correct* and its APPLICABILITY has been decided by a per-path proxy. Where a guard is cheap and total, prefer the total form: `PIN_FIXES_SCALE` is now a `Record` over the union; `degenerate` now applies unconditionally.
+
+**Out (stated).** `contains` — a segment or line lying IN a plane («מוכל») — is still `planned`; it is a two-residual cell (direction ⟂ normal AND a point on the plane) and no exam in the corpus needed it tonight.
+
+Locked by `plane-rel.test.ts` (16, incl. the pure `relDeviation` matrix and the collapse refusal) + 6 battery rows covering all 15 cells. 3-D lane 1730 green, `tsc -b` + both builds clean; shadow snapshot addition-only (60 insertions, 0 deletions), allowlist unchanged.

@@ -66,17 +66,17 @@ const CELLS: Record<string, CellStatus> = {
   'perp|segment|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'mixed atoms, ADR-3D-035' },
   'perp|vector|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'u ⊥ v' },
   'perp|segment|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'seg-plane-rel / perp-plane claim' },
-  'perp|segment|plane-named': { status: 'planned', slice: 'S3', note: 'perpPlaneClaim reads label runs only today' },
+  'perp|segment|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
   'perp|line|plane-run': { status: 'supported', actions: ['drive-gauge', 'claim'], note: '#375 / ADR-3D-100' },
   'perp|line|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: 'linePerpPlane pins m (2024-Q2); S2 records the numeric claim + the flipped מישור-first order' },
   'perp|line|segment': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: lineRels pivot residual (ADR-3D-103)' },
   'perp|line|vector': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: lineRels (ADR-3D-103)' },
   'perp|line|line': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2: symbolic dir pins; numeric verifies (ADR-3D-103)' },
-  'perp|plane-run|plane-run': { status: 'planned', slice: 'S3' },
-  'perp|plane-run|plane-named': { status: 'planned', slice: 'S3' },
-  'perp|plane-named|plane-named': { status: 'planned', slice: 'S3' },
-  'perp|vector|plane-run': { status: 'planned', slice: 'S3' },
-  'perp|vector|plane-named': { status: 'planned', slice: 'S3' },
+  'perp|plane-run|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
+  'perp|plane-run|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
+  'perp|plane-named|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): absolute×absolute — the claim is the whole answer' },
+  'perp|vector|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
+  'perp|vector|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
 
   // ---- parallel -----------------------------------------------------------------------
   'parallel|segment|segment': {
@@ -87,17 +87,17 @@ const CELLS: Record<string, CellStatus> = {
   'parallel|segment|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S4: a direction relation — a free vector qualifies (ADR-3D-104)' },
   'parallel|vector|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S4 (ADR-3D-104)' },
   'parallel|segment|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'seg-par-plane' },
-  'parallel|segment|plane-named': { status: 'planned', slice: 'S3' },
+  'parallel|segment|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
   'parallel|line|line':{ status: 'supported', actions: ['param-root', 'claim'], note: 'S2: symbolic dirs pin m (the 2010-Q3 family); numeric verifies' },
   'parallel|line|segment': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: lineRels (ADR-3D-103)' },
   'parallel|line|vector': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: lineRels (ADR-3D-103)' },
   'parallel|line|plane-run': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: line ∥ point-run plane ⟺ dir ⟂ normal' },
   'parallel|line|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2: dir(m)·n(m) = 0 pins; numeric verifies' },
-  'parallel|vector|plane-run': { status: 'planned', slice: 'S3' },
-  'parallel|vector|plane-named': { status: 'planned', slice: 'S3' },
-  'parallel|plane-run|plane-run': { status: 'planned', slice: 'S3' },
-  'parallel|plane-run|plane-named': { status: 'planned', slice: 'S3' },
-  'parallel|plane-named|plane-named': { status: 'planned', slice: 'S3' },
+  'parallel|vector|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
+  'parallel|vector|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
+  'parallel|plane-run|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
+  'parallel|plane-run|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
+  'parallel|plane-named|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): absolute×absolute — the claim is the whole answer' },
 
   // ---- skew / intersecting / coincident (mutual positions) — S4 (#378, ADR-3D-104) -----
   //
@@ -115,6 +115,10 @@ const CELLS: Record<string, CellStatus> = {
   'coincident|segment|segment': { status: 'supported', actions: ['drive-dims', 'requirement', 'claim'], note: 'מתלכדים — S4' },
   'coincident|segment|line': { status: 'supported', actions: ['requirement', 'claim'], note: 'S4: claim-gated — see #386' },
   'coincident|line|line': { status: 'supported', actions: ['claim'], note: 'S4: both absolute' },
+
+  'coincident|plane-run|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
+  'coincident|plane-run|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
+  'coincident|plane-named|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): absolute×absolute — the claim is the whole answer' },
 
   // ---- contains (an object lying IN a plane / ON a line) ------------------------------
   'contains|plane-run|segment': { status: 'planned', slice: 'S3', note: 'a segment lying in a plane' },
@@ -135,15 +139,15 @@ const CELLS: Record<string, CellStatus> = {
   'angle|segment|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'cos-angle with value (V8-f)' },
   'angle|vector|vector': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'cos∠(u,v), V8-f' },
   'angle|segment|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'line-plane-angle, ADR-3D-027' },
-  'angle|segment|plane-named': { status: 'planned', slice: 'S3' },
+  'angle|segment|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
   'angle|line|plane-run': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2: sin β = |cos(n,dir)| (ADR-3D-103)' },
   'angle|line|plane-named': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2 (ADR-3D-103)' },
   'angle|line|segment': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2 (ADR-3D-103)' },
   'angle|line|vector': { status: 'supported', actions: ['drive-gauge', 'claim'], note: 'S2 (ADR-3D-103)' },
   'angle|line|line': { status: 'supported', actions: ['param-root', 'claim'], note: 'S2 (ADR-3D-103)' },
   'angle|plane-named|plane-named': { status: 'supported', actions: ['param-root'], note: 'planeAngles — the 2022-Q2 45°' },
-  'angle|plane-run|plane-run': { status: 'planned', slice: 'S3' },
-  'angle|plane-run|plane-named': { status: 'planned', slice: 'S3' },
+  'angle|plane-run|plane-run': { status: 'supported', actions: ['drive-dims', 'claim'], note: 'S3 (ADR-3D-105): gauge×gauge — drives' },
+  'angle|plane-run|plane-named': { status: 'supported', actions: ['claim'], note: 'S3 (ADR-3D-105): gauge×absolute — claim-gated; the drive needs the pivot lane (#386)' },
 
   // ---- distance with a value -----------------------------------------------------------
   'distance|point|plane-run': { status: 'planned', slice: 'S5' },

@@ -214,6 +214,7 @@ const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
   concyclic: false, // #305
   'line-plane-angle': false, // sin β is length-normalized
   mutual: false, // S4 (#378): every residual is normalized by the operand magnitudes
+  'plane-rel': false, // S3 (#378): angles between characteristic vectors; the offset is size-normalized
 };
 
 export function scalePinned(c: Construction3): boolean {
@@ -586,6 +587,50 @@ export function solvePivot(
           const den = Math.max(norm3(n) * norm3(u), 1e-12);
           out.push(Math.abs(dot3(n, u)) / den - Math.sin((pin.deg * Math.PI) / 180)); // sin β − sin(given)
         }
+      } else if (pin.kind === 'plane-rel') {
+        // S3 (#378): a plane-bearing direction relation between two GAUGE operands. Residuals are
+        // SIGNED COMPONENTS (the ADR-3D-006 touch-zero lesson): a magnitude like |n1×n2| touches
+        // zero instead of crossing it and the descent stalls short. Which form applies follows the
+        // one rule in `relDeviation` — same-type sides read one way, a mixed pair inverts.
+        const abs = { lines: lines ?? new Map(), planes: new Map() };
+        const ga = resolveOperand(pin.a, c, abs)(at);
+        const gb = resolveOperand(pin.b, c, abs)(at);
+        const va = ga?.dir ?? ga?.normal;
+        const vb = gb?.dir ?? gb?.normal;
+        const mixed = !!ga && !!gb && !ga.dir !== !gb.dir; // exactly one side is planar
+        const wide = pin.rel === 'parallel' || pin.rel === 'coincident' ? !mixed : mixed; // 3 components vs 1
+        const count = pin.rel === 'coincident' ? 4 : pin.rel === 'angle' ? 1 : wide ? 3 : 1;
+        if (!va || !vb || norm3(va) < 1e-12 || norm3(vb) < 1e-12) {
+          for (let i = 0; i < count; i++) out.push(10);
+          continue;
+        }
+        const den = Math.max(norm3(va) * norm3(vb), 1e-12);
+        if (pin.rel === 'angle') {
+          const t = ((pin.deg ?? 0) * Math.PI) / 180;
+          out.push(Math.abs(dot3(va, vb)) / den - (mixed ? Math.sin(t) : Math.cos(t)));
+        } else if (wide || pin.rel === 'coincident') {
+          const x = cross3(va, vb);
+          out.push(x.x / den, x.y / den, x.z / den);
+        } else {
+          out.push(dot3(va, vb) / den);
+        }
+        if (pin.rel === 'coincident') {
+          // …and the planes must share an offset. Size-normalized so the residual is scale-free.
+          const na = norm3(va);
+          const nb = norm3(vb);
+          const da = ga!.d;
+          const db = gb!.d;
+          if (da === undefined || db === undefined) out.push(10);
+          else {
+            const flip = dot3(va, vb) < 0 ? -1 : 1;
+            let extent = 1;
+            for (const id of c.points.keys()) {
+              const q = at(id);
+              if (q) extent = Math.max(extent, norm3(q));
+            }
+            out.push((da / na - (flip * db) / nb) / extent);
+          }
+        }
       } else {
         const a = at(pin.a);
         const b = at(pin.b);
@@ -662,6 +707,33 @@ export function solvePivot(
     return out;
   };
 
+  const degenerate = (x: number[]): boolean => {
+    // S3 (#378): NOT gated on `planeDrive` any more. A collapsed solid is not a figure whatever
+    // given caused the collapse — the gate was a per-path proxy for the semantic question (the
+    // ADR-3D-101 class, and the same shape as `scalePinned`'s exclusion list). It let a plane
+    // COINCIDENCE between a box's base and its top flatten the box to zero height and report
+    // success: the claim then verified, because in the collapsed figure the planes really do
+    // coincide. The threshold is a hard collapse (1e-4 of the solid's own span), so a figure with
+    // legitimately close vertices is untouched.
+    const dims = x.slice(7, 7 + nDims);
+    const override = coupled ? new Map(coupled.defs.map((d, i) => [d, x[7 + nDims + i]])) : undefined;
+    const pos = evalCanonical(dims, override);
+    for (const solid of c.solids) {
+      const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
+      let maxD = 0;
+      let minD = Infinity;
+      for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+          const d = norm3(sub3(pts[j], pts[i]));
+          if (d > maxD) maxD = d;
+          if (d < minD) minD = d;
+        }
+      }
+      if (pts.length >= 2 && minD <= 1e-4 * Math.max(maxD, 1e-12)) return true;
+    }
+    return false;
+  };
+
   if (invariantOnly) {
     if (dims0.length === 0) return []; // nothing to flex — the condition either holds or is refused downstream
     const f = residualsFor(false); // mirror is also invariant here
@@ -684,6 +756,12 @@ export function solvePivot(
         if (r2.err >= r.err * 0.99) break;
         r = r2;
       }
+      // S3 (#378): the general-position guard applies HERE too. It used to live only on the
+      // gauge-solving path below, so a similarity-invariant given could flatten the figure
+      // unchecked — «המישור ABC מתלכד עם המישור A'B'C'» drove a box's height to 0 and reported
+      // success, because in the collapsed figure the two planes genuinely do coincide. A
+      // collapsed solid is not a figure, whichever solver produced it.
+      if (degenerate([0, 0, 0, 0, 0, 0, 0, ...r.x])) continue;
       if (!best || r.err < best.err) best = r;
       if (best.err < 1e-22) break;
     }
@@ -733,26 +811,6 @@ export function solvePivot(
   const REG_SF = 1e-4;
   const ACCEPT = planeDrive || nPinSym > 0 ? 1e-10 : 1e-12; // reg equilibrium floors primary at ~(REG·pull)²
   /** A candidate whose solid carries two coincident vertices is DEGENERATE — never a figure. */
-  const degenerate = (x: number[]): boolean => {
-    if (!planeDrive) return false;
-    const dims = x.slice(7, 7 + nDims);
-    const override = coupled ? new Map(coupled.defs.map((d, i) => [d, x[7 + nDims + i]])) : undefined;
-    const pos = evalCanonical(dims, override);
-    for (const solid of c.solids) {
-      const pts = solid.ids.map((id) => pos.get(id)).filter((p): p is Vec3 => !!p);
-      let maxD = 0;
-      let minD = Infinity;
-      for (let i = 0; i < pts.length; i++) {
-        for (let j = i + 1; j < pts.length; j++) {
-          const d = norm3(sub3(pts[j], pts[i]));
-          if (d > maxD) maxD = d;
-          if (d < minD) minD = d;
-        }
-      }
-      if (pts.length >= 2 && minD <= 1e-4 * Math.max(maxD, 1e-12)) return true;
-    }
-    return false;
-  };
   // Sign givens select among DISCRETE placement branches — and those are not only the
   // two mirrors: within one mirror, different rotation BASINS are exact solutions too
   // (D on +x with S on −z vs D on −x with S on +z). With sign givens present, keep

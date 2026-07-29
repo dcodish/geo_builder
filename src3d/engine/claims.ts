@@ -8,7 +8,7 @@
  */
 
 import { lineAtParam, planeAtParam, resolve3, type Resolved3 } from './evaluate';
-import { lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, resolveOperand } from './operands';
+import { lineRelDeviation, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, figureExtent, planeCoincidenceDeviation, relDeviation, resolveOperand } from './operands';
 import { atomVec, evalExpr } from './vecExpr';
 import { cross3, dot3, newellNormal, norm3, sub3, v3, type Vec3 } from './vec3';
 import type { Claim3, Construction3 } from './types';
@@ -128,6 +128,20 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       const sides = mutualSides(claim.a, claim.b, c, { lines: resolved.lines, planes: resolved.planes }, (id) => pos.get(id) ?? null);
       if (!sides) return false;
       return mutualHolds(claim.rel, sides[0], sides[1], MUTUAL_VERIFY_TOL);
+    }
+    case 'plane-rel': {
+      // S3 (#378): the general direction relation, through the one operand seam and the one
+      // deviation function the drive uses — so a driven figure can never disagree with its claim.
+      const abs = { lines: resolved.lines, planes: resolved.planes };
+      const at = (id: string) => pos.get(id) ?? null;
+      const ga = resolveOperand(claim.a, c, abs)(at);
+      const gb = resolveOperand(claim.b, c, abs)(at);
+      if (!ga || !gb) return false;
+      const dev =
+        claim.rel === 'coincident'
+          ? planeCoincidenceDeviation(ga, gb, figureExtent(pos))
+          : relDeviation(claim.rel, claim.deg, ga, gb);
+      return dev !== null && dev <= 1e-4;
     }
     case 'plane-eq': {
       const ps = claim.ids.map((id) => pos.get(id));
