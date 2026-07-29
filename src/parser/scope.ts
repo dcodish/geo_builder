@@ -40,12 +40,19 @@ export type ScopeCategory =
   | 'unnamed-sides' // "one side 10, other side 5" — name the sides (AB=10, BC=5) — #105
   | 'compound-relation' // a compound measure relation the vocabulary doesn't cover (mixed units, unequal-degree product) — #153/#154/#144
   | 'latex' // LaTeX-pasted input ($…$, \triangle, \parallel) — use plain notation / the symbol palette (#329)
-  | 'word-root'; // a magnitude written with the WORD «שורש N» — use the √ symbol (toolbar), operator ruling (#246)
+  | 'word-root' // a magnitude written with the WORD «שורש N» — use the √ symbol (toolbar), operator ruling (#246)
+  // #108 (operator ruling, log-triage 2026-07-13): a shape noun with a property GLUED on, or several
+  // sentences on one line. ADR-264's clause split handles compounds joined by a CONNECTOR; these have
+  // none, and the ruling is explicitly NOT to auto-parse them but to TEACH the one-statement-at-a-time
+  // discipline — naming the pieces we found so the student can retype them in order.
+  | 'split-statements';
 
 export interface ScopeMatch {
   category: ScopeCategory;
   /** i18n key for the tailored student-facing message. */
   messageKey: string;
+  /** Interpolation for messages that quote what was found (the `split-statements` pieces). */
+  params?: Record<string, string>;
 }
 
 interface ScopeRule {
@@ -56,8 +63,16 @@ interface ScopeRule {
 const RULES: ScopeRule[] = [
   {
     // #43: a 3-D SOLID typed into the 2-D tool — the sibling app exists; point the student there.
+    // #109: the noun list is the SOLID VOCABULARY, not a sample of it — «פרמידה» (single yod), the
+    // revolution solids (גליל / כדור / חרוט) and «תלת ממדי» used to fall through to the generic
+    // `unrelated` message ("no construction detected") or, for «מעגל תלת ממדי», to the paid LLM. Landing in
+    // the wrong product is a specific, answerable situation: say which tool to open.
     category: 'cross-app',
-    patterns: [/תיבה|קוביי?ה|פירמידה|מנסרה|טטרא?דר|ארבעון/, /\bbox\b|\bcube\b|pyramid|prism|tetrahedron/i],
+    patterns: [
+      /תיבה|קוביי?ה|פ[יו]?רמידה|מנסרה|טטרא?דר|טטרא?הדרון|ארבעון|מקבילון|גליל|כדור|חרוט/,
+      /תלת[\s-]*מ[יו]?מד/,
+      /\bbox\b|\bcube\b|cuboid|pyramid|prism|tetrahedron|cylinder|sphere|cone\b|\b3-?d\b/i,
+    ],
   },
   {
     // #43: UI/mark commands — "תוסיף זוויות", "תסמן זוית ישרה", "להוסיף את מרכז המעגל", "E זוית ישרה
@@ -107,7 +122,13 @@ const RULES: ScopeRule[] = [
     // rule builds it, so it never reaches this classifier (which runs only on a FAILED parse).
     category: 'analytic',
     patterns: [
-      /מערכת\s*צירים|ראשית\s*הצירים|צירים|ציר\s+ה|ציר\s*[-]?\s*[xy]|שיפוע|קואורדינ|שיעורי\s+ה|שיעור\S*\s*ה?-?\s*[xy]|משוואת?\s+ה?(?:ישר|קו|פונקצי)|קרטזי/, // axes / origin / slope / coordinates ("שיעורי הנקודה" / "שיעור ה-x") / line-equation / cartesian
+      // #109: the axis letter may be UPPERCASE («ציר X» — this pattern carries no `i` flag, so `[xy]` alone
+      // missed it), and a coordinate GRID («רשת X Y») is the same frame by another name.
+      /מערכת\s*צירים|ראשית\s*הצירים|צירים|ציר\s+ה|ציר\s*[-]?\s*[xyXY]|רשת\s*[-]?\s*[xyXY]|שיפוע|קואורדינ|שיעורי\s+ה|שיעור\S*\s*ה?-?\s*[xyXY]|משוואת?\s+ה?(?:ישר|קו|פונקצי)|קרטזי/, // axes / origin / slope / coordinates ("שיעורי הנקודה" / "שיעור ה-x") / line-equation / cartesian / grid
+      // #109: a LIST of points given by absolute coordinates — «נקודה A(1,4) B(1,1) C(5,1)». Two or more
+      // pairs, so the single «A = (3,5)» free point (which parses deliberately) is untouched; and this
+      // classifier only ever runs on a FAILED parse, so it can never intercept that rule.
+      /[A-Z]\d*\s*\(\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*\)[\s,]*[A-Z]\d*\s*\(\s*-?\d+(?:\.\d+)?\s*,/,
       /\b[xy][-\s]?axis\b|\baxes\b|\baxis\b|\bslope\b|\bcoordinate(?:s)?\b|\bcartesian\b|\borigin\b|equation\s+of\s+(?:the\s+)?(?:line|curve|function)/i,
       /(?:^|[^A-Za-z])[yY]\s*=\s*[-+\d.\s/*]*[xX](?![A-Za-z])/, // a line equation "y = 2x + 3" / "y = -x" (needs both y= and an x term)
     ],
@@ -212,6 +233,51 @@ export function looksCompound(utterance: string): boolean {
  * Classify a failed utterance as a deliberately out-of-scope concept, or `null` if it's a GENUINE
  * construction gap (which keeps the plain "couldn't read that" message + the `not-understood` tag).
  */
+
+/**
+ * #108 — offer the SPLIT of a compound line into the separate statements it contains.
+ *
+ * Two shapes, in order of confidence:
+ *  1. several SENTENCES on one line («משולש ABC. זוית BAC ישרה. AB שווה לBC.») — the pieces are literal;
+ *  2. a shape noun with a relation glued on and NO separator («משולש ABC שווה שוקיים AB=AC») — split at the
+ *     relation, so piece 1 is the construction and piece 2 the given.
+ *
+ * Confident-only: ≥2 substantial pieces and at least one relation operator, and for shape 2 the first piece
+ * must actually carry the shape noun. An ordinary single statement is never second-guessed.
+ *
+ * NOT a `classifyOutOfScope` category rule, and the catalog no-theft guard is why: a SUPPORTED compound
+ * («דלתון ABCD, AB=AD» — ADR-264's clause form) matches this shape too, and it parses. So this is checked at
+ * the ESCALATION SEAM, where the parse is already known to have failed — the same placement `looksLikeLatex`
+ * and `wordRootMagnitude` use, and for the same reason.
+ */
+const SENTENCE_SPLIT = /(?:\.\s+|\s*;\s*|\s*\n\s*|\.\s*$)/;
+const RELATION_OP = /=|≠|⟂|⊥|∥|>|<|שווה\s+ל|שווים|מקביל|מאונך|ניצב|ישרה/;
+const SHAPE_NOUN =
+  /(?:משולש|מרובע|ריבוע|מלבן|מעוין|מעויין|טרפז|מקבילית|דלתון|מחומש|משושה)|\b(?:triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite|pentagon|hexagon)\b/i;
+const tidy = (p: string) => p.replace(/\s+/g, ' ').trim().replace(/[.,;]+$/, '');
+
+export function splitGuidance(utterance: string): ScopeMatch | null {
+  const s = utterance.trim();
+  const parts = (list: string[]): ScopeMatch => ({
+    category: 'split-statements',
+    messageKey: 'input.scope.split-statements',
+    params: { first: list[0], second: list[1], all: list.map((p, i) => `(${i + 1}) ${p}`).join('  ') },
+  });
+  const sentences = s.split(SENTENCE_SPLIT).map(tidy).filter((p) => p.length > 1);
+  if (sentences.length >= 2 && sentences.some((p) => RELATION_OP.test(p)) && sentences.some((p) => SHAPE_NOUN.test(p))) {
+    return parts(sentences);
+  }
+  if (!SHAPE_NOUN.test(s)) return null;
+  const op = s.search(RELATION_OP);
+  if (op <= 0) return null;
+  let cut = op;
+  while (cut > 0 && /[A-Za-z0-9\s]/.test(s[cut - 1])) cut--; // keep the operand with its operator
+  const head = tidy(s.slice(0, cut));
+  const tail = tidy(s.slice(cut));
+  if (head.length < 2 || tail.length < 2 || !SHAPE_NOUN.test(head)) return null;
+  return parts([head, tail]);
+}
+
 export function classifyOutOfScope(utterance: string): ScopeMatch | null {
   const s = utterance.trim();
   if (!s) return null;
