@@ -18,9 +18,13 @@ function reset() {
 describe('planeDisplay (#318)', () => {
   beforeEach(reset);
 
-  it("toggle: 'full' (absent) → 'face' → back to absent (never a stored default)", () => {
+  it("toggle cycles 'full' (absent) → 'face' → 'hidden' → back to absent (never a stored default; #395/ADR-3D-108)", () => {
+    // deliberately updated from the two-state #318 cycle: the INTENT this test pins — cycling
+    // returns to the default with the key DELETED, never stored — is unchanged; 'hidden' joined.
     useGeo3.getState().togglePlaneDisplay('ABC');
     expect(useGeo3.getState().planeDisplay).toEqual({ ABC: 'face' });
+    useGeo3.getState().togglePlaneDisplay('ABC');
+    expect(useGeo3.getState().planeDisplay).toEqual({ ABC: 'hidden' });
     useGeo3.getState().togglePlaneDisplay('ABC');
     expect(useGeo3.getState().planeDisplay).toEqual({});
   });

@@ -42,6 +42,16 @@ export function tokenizeRow(row: string, vecNames: Set<string>): Tok[] {
       s = s.slice(mWord[0].length);
       continue;
     }
+    // #398 (ADR-3D-108): a run of THREE-plus labels is a POINT-RUN (a plane/polygon name like
+    // ABC/ABCD), never a pair + leftovers. Without this, «למישור ABC» tokenized as text 'A' +
+    // pair 'BC' and the plane wore a vector arrow — the operand's KIND is decided by the run
+    // grammar (2 labels = pair, 3+ = run), not by whatever the pair regex can bite off.
+    const mRun3 = s.match(/^(?:[A-Z]\d*'?){3,}/);
+    if (mRun3 && !isLetter(s[mRun3[0].length])) {
+      out.push({ k: 'text', text: mRun3[0] });
+      s = s.slice(mRun3[0].length);
+      continue;
+    }
     const mPair = s.match(PAIR);
     if (mPair && mPair[0].length >= 2 && !isLetter(s[mPair[0].length])) {
       out.push({ k: 'pair', text: mPair[0].replace(/⃗/g, '') });

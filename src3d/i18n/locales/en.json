@@ -40,9 +40,10 @@
     "delete": "Delete",
     "toggleTitle": "Include/exclude this given",
     "claimVerified": "The claim was verified against the figure",
-    "planeFace": "face only",
-    "planeFull": "full plane",
-    "planeToggleTitle": "Plane {{name}} display — click to switch between face only and full plane"
+    "planeFace": "Face only",
+    "planeFull": "Full plane",
+    "planeToggleTitle": "Plane {{name}} display — click cycles full → face → hidden",
+    "planeHide": "Hide plane"
   },
   "status": {
     "inactive": "Inactive — a given it depends on is off"
@@ -148,6 +149,10 @@
       "cyclicQuad": "cyclic quadrilateral"
     },
     "lineCalledPlane": "Note: {{line}} is a line, not a plane. Read as \"plane {{ids}} is perpendicular to line {{line}}\".",
-    "lineRelNoun": "Note: {{line}} is a line, not a plane — the relation was built against line {{line}}."
+    "lineRelNoun": "Note: {{line}} is a line, not a plane — the relation was built against line {{line}}.",
+    "redundantRelation": "The relation between {{a}} and {{b}} was verified ✓ — but it already follows from their definitions, so this given adds no new information."
+  },
+  "display": {
+    "witnesses": "Show the distance witness segment (the height)"
   }
 }

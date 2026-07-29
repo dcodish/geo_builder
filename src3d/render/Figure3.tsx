@@ -6,6 +6,7 @@
  */
 
 import { useMemo, useRef, useState, type PointerEvent as RPointerEvent, type WheelEvent as RWheelEvent } from 'react';
+import type { PlaneDisplayMode3Map } from '../store/figureFile3';
 import type { Resolved3 } from '../engine/evaluate';
 import type { Construction3 } from '../engine/types';
 import { HOME_CAMERA, MAX_PITCH, type Camera3 } from './camera';
@@ -22,9 +23,11 @@ export interface Figure3Props {
    *  toggle). Knowledge only — a value identical in every sampled configuration;
    *  '?' marks a free component. Undetermined points carry no label (ADR-3D-030 Am.). */
   coordLabels?: Record<string, { text: string; kind: 'fact' | 'partial' }>;
-  /** #318: per-plane patch display — 'face' draws a named plane's patch as exactly its
-   *  defining polygon; absent = 'full' (the growing patch). */
-  planeDisplay?: Record<string, 'face' | 'full'>;
+  /** #318 + #395: per-plane patch display — 'face' draws a named plane's patch as exactly its
+   *  defining polygon, 'hidden' draws no patch at all; absent = 'full' (the growing patch). */
+  planeDisplay?: PlaneDisplayMode3Map;
+  /** #397 (ADR-3D-108): draw the closest-point witness of every stated distance. Default true. */
+  showWitnesses?: boolean;
 }
 
 /** Per-index plane patch colours (translucent — patches never occlude, docs/20 §11). */
@@ -39,14 +42,14 @@ const VECTOR_COLOR = '#0d9488';
  *  reorder it — `(0, 7, 6)` used to render as `(6 ,7 ,0)` on the canvas (LRI…PDI). */
 const ltr = (s: string) => `⁦${s}⁩`;
 
-export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay }: Figure3Props) {
+export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay, showWitnesses = true }: Figure3Props) {
   const [cam, setCam] = useState<Camera3>(HOME_CAMERA);
   const [zoom, setZoom] = useState(1);
   const drag = useRef<{ x: number; y: number } | null>(null);
 
   const scene = useMemo(
-    () => buildScene3(construction, resolved, cam, { width, height }, zoom, planeDisplay),
-    [construction, resolved, cam, width, height, zoom, planeDisplay],
+    () => buildScene3(construction, resolved, cam, { width, height }, zoom, planeDisplay, showWitnesses),
+    [construction, resolved, cam, width, height, zoom, planeDisplay, showWitnesses],
   );
 
   const onPointerDown = (e: RPointerEvent<SVGSVGElement>) => {
@@ -138,6 +141,17 @@ export default function Figure3({ construction, resolved, width = 640, height = 
             stroke="#64748b"
             strokeWidth={1.2}
           />
+        ))}
+        {/* #397 (ADR-3D-108): the stated distance's WITNESS — dashed height/gap + its value.
+            Dashed here means AUXILIARY, drawn in its own colour so it never reads as a hidden
+            edge (the ADR-3D-104 lesson about dash semantics). */}
+        {scene.witnesses.map((w, i) => (
+          <g key={`witness-${i}`} data-testid="distance-witness">
+            <line x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} stroke="#d97706" strokeWidth={1.6} strokeDasharray="5 4" strokeLinecap="round" />
+            <text x={w.labelX} y={w.labelY} fontSize={12} fill="#b45309" style={{ paintOrder: 'stroke', stroke: '#fff', strokeWidth: 3 }}>
+              {ltr(w.text)}
+            </text>
+          </g>
         ))}
         {scene.angles.map((a, i) => (
           <g key={`angle-${i}`} data-testid="plane-angle">

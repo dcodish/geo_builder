@@ -17,7 +17,7 @@
 
 import type { Construction3, Id, MutualRel3, Operand3 } from './types';
 import type { ResolvedLine, ResolvedPlane } from './evaluate';
-import { cross3, dot3, newellNormal, norm3, sub3, type Vec3 } from './vec3';
+import { cross3, dot3, newellNormal, norm3, sub3, v3, type Vec3 } from './vec3';
 
 /** What an operand contributes to a residual: a location, a direction, and/or an oriented plane. */
 export interface OperandGeom {
@@ -44,6 +44,14 @@ export interface AbsoluteCtx {
  * point ids rides the gauge.
  */
 export const isAbsolute = (op: Operand3): boolean => op.kind === 'line' || op.kind === 'plane-named';
+
+/** #384/#396 (ADR-3D-108): the display label of an operand — the one spelling every panel row,
+ *  notice and witness label shares, so an operand can never be named two ways. */
+export const operandLabel = (op: Operand3): string =>
+  op.kind === 'point' ? op.id
+  : op.kind === 'segment' ? `${op.a}${op.b}`
+  : op.kind === 'plane-run' ? op.ids.join('')
+  : op.name;
 
 /** Resolve an operand to its geometry thunk. Null geometry (missing point, unknown name) at call time
  *  means "not answerable at these positions" — callers treat it exactly like a missing reference. */
@@ -233,6 +241,73 @@ export function distanceBetween(a: OperandGeom, b: OperandGeom): number | null {
     if (norm3(cross3(a.normal!, b.normal!)) > 1e-12 * na * nb) return 0; // they intersect
     const flip = dot3(a.normal!, b.normal!) < 0 ? -1 : 1;
     return Math.abs(a.d! / na - (flip * b.d!) / nb);
+  }
+  return null;
+}
+
+/**
+ * #397 (ADR-3D-108) — the WITNESS of a distance: the pair of closest points [on a, on b], i.e. the
+ * segment whose length IS `distanceBetween(a, b)`. The educational realisation of the height/gap the
+ * student stated. Case structure mirrors `distanceBetween` exactly (the two must never disagree —
+ * a unit lock asserts |witness| = distance on every case). `null` where the distance is (or where
+ * the objects meet — a zero gap draws nothing useful).
+ */
+export function distanceWitness(a: OperandGeom, b: OperandGeom): [Vec3, Vec3] | null {
+  const scaleV = (v: Vec3, k: number): Vec3 => v3(v.x * k, v.y * k, v.z * k);
+  const addV = (p: Vec3, q: Vec3): Vec3 => v3(p.x + q.x, p.y + q.y, p.z + q.z);
+  const planeFoot = (p: Vec3, pl: OperandGeom): Vec3 | null => {
+    if (!pl.normal || pl.d === undefined) return null;
+    const n2 = dot3(pl.normal, pl.normal);
+    if (n2 < 1e-24) return null;
+    return addV(p, scaleV(pl.normal, -(dot3(pl.normal, p) + pl.d) / n2));
+  };
+  const lineFoot = (p: Vec3, ln: OperandGeom): Vec3 | null => {
+    if (!ln.dir || !ln.point) return null;
+    const d2 = dot3(ln.dir, ln.dir);
+    if (d2 < 1e-24) return null;
+    return addV(ln.point, scaleV(ln.dir, dot3(sub3(p, ln.point), ln.dir) / d2));
+  };
+  const isPlane = (g: OperandGeom) => !!g.normal && !g.dir;
+  const isLine = (g: OperandGeom) => !!g.dir;
+  const isPoint = (g: OperandGeom) => !g.dir && !g.normal && !!g.point;
+
+  if (isPoint(a)) {
+    const p = a.point!;
+    const q = isPlane(b) ? planeFoot(p, b) : isLine(b) ? lineFoot(p, b) : (b.point ?? null);
+    return q ? [p, q] : null;
+  }
+  if (isPoint(b)) {
+    const w = distanceWitness(b, a);
+    return w ? [w[1], w[0]] : null;
+  }
+  if (isLine(a) && isLine(b)) {
+    // skew: the common-perpendicular feet (closed form); parallel: any foot pair
+    const d1 = a.dir!;
+    const d2 = b.dir!;
+    const cx = cross3(d1, d2);
+    const cn2 = dot3(cx, cx);
+    if (cn2 < 1e-24 * dot3(d1, d1) * dot3(d2, d2)) {
+      const q = lineFoot(a.point!, b);
+      return q ? [a.point!, q] : null;
+    }
+    const w = sub3(b.point!, a.point!);
+    const t1 = dot3(cross3(w, d2), cx) / cn2;
+    const t2 = dot3(cross3(w, d1), cx) / cn2;
+    return [addV(a.point!, scaleV(d1, t1)), addV(b.point!, scaleV(d2, t2))];
+  }
+  if (isLine(a) && isPlane(b)) {
+    if (Math.abs(dot3(a.dir!, b.normal!)) > 1e-12 * norm3(a.dir!) * norm3(b.normal!)) return null; // they meet — no gap
+    const q = planeFoot(a.point!, b);
+    return q ? [a.point!, q] : null;
+  }
+  if (isPlane(a) && isLine(b)) {
+    const w = distanceWitness(b, a);
+    return w ? [w[1], w[0]] : null;
+  }
+  if (isPlane(a) && isPlane(b)) {
+    if (!a.point) return null;
+    const q = planeFoot(a.point, b);
+    return q ? [a.point, q] : null;
   }
   return null;
 }

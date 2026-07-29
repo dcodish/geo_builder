@@ -28,8 +28,14 @@ export interface FigureFile3 {
   queries?: string[];
   /** Per-plane patch display (#318): plane name → 'face' (patch = the defining polygon only).
    *  Absent key = 'full' (the default growing patch), so only non-defaults are stored. */
-  planeDisplay?: Record<string, 'face' | 'full'>;
+  planeDisplay?: PlaneDisplayMode3Map;
 }
+
+/** #318 + #395 (ADR-3D-108): a named plane's patch display — 'full' (default: the growing
+ *  fold-anchored patch) / 'face' (exactly the defining polygon) / 'hidden' (no ink; the
+ *  relations the plane takes part in stay enforced). Absent = 'full', the one convention. */
+export type PlaneDisplayMode3 = 'face' | 'full' | 'hidden';
+export type PlaneDisplayMode3Map = Record<string, PlaneDisplayMode3>;
 
 /** Every `Command3` type, classified as loadable (`true`) or deliberately excluded (`false`).
  *
@@ -119,7 +125,7 @@ export function serializeFigure3(
   seed: number,
   name?: string,
   queries: string[] = [],
-  planeDisplay: Record<string, 'face' | 'full'> = {},
+  planeDisplay: PlaneDisplayMode3Map = {},
 ): string {
   const file: FigureFile3 = {
     schemaVersion: SCHEMA_VERSION_3D,
@@ -135,7 +141,7 @@ export function serializeFigure3(
 }
 
 export type LoadResult3 =
-  | { ok: true; facts: Fact3[]; seed: number; queries: string[]; planeDisplay: Record<string, 'face' | 'full'> }
+  | { ok: true; facts: Fact3[]; seed: number; queries: string[]; planeDisplay: PlaneDisplayMode3Map }
   | { ok: false; reason: 'bad-file' | 'newer-schema' };
 
 export function deserializeFigure3(text: string): LoadResult3 {
@@ -166,10 +172,10 @@ export function deserializeFigure3(text: string): LoadResult3 {
   }
   const queries = Array.isArray(file.queries) ? file.queries.filter((q): q is string => typeof q === 'string') : [];
   // #318: lenient like `queries` — keep only well-formed entries; anything else falls back to 'full'
-  const planeDisplay: Record<string, 'face' | 'full'> = {};
+  const planeDisplay: PlaneDisplayMode3Map = {};
   if (typeof file.planeDisplay === 'object' && file.planeDisplay !== null && !Array.isArray(file.planeDisplay)) {
     for (const [k, v] of Object.entries(file.planeDisplay)) {
-      if (v === 'face' || v === 'full') planeDisplay[k] = v;
+      if (v === 'face' || v === 'full' || v === 'hidden') planeDisplay[k] = v;
     }
   }
   return { ok: true, facts, seed: file.seed, queries, planeDisplay };

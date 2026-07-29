@@ -16,8 +16,9 @@
  */
 
 import { CYCLIC_MEMBER, CYCLIC_MEMBER_NAME, QUAD_PYRAMIDS } from './baseShapes';
+import { isAbsolute, lineDirCarriesParam, operandLabel, planeNormalCarriesParam } from './operands';
 import type { QuadBase } from './baseShapes';
-import type { Construction3, Id, SolidKind } from './types';
+import type { Construction3, Id, Operand3, SolidKind } from './types';
 
 /** A non-error message attached to a successfully built figure. */
 export type BuildNotice3 =
@@ -42,6 +43,16 @@ export type BuildNotice3 =
        *  is built against the line, and the wording is corrected. */
       kind: 'line-rel-noun';
       line: string;
+    }
+  | {
+      /** #396 (ADR-3D-108): a stated relation between two ABSOLUTE objects (equation planes, typed
+       *  lines) verified true but could never have driven anything — the objects are fully determined
+       *  by their own defining equations, so the statement adds no information. The student sees the
+       *  ✓ AND learns the given was redundant. Deliberately NOT emitted for claims on figure points:
+       *  there a claim is the verify-your-answer register (the tool's charter), not redundancy. */
+      kind: 'redundant-relation';
+      a: string;
+      b: string;
     };
 
 /**
@@ -64,6 +75,27 @@ export function buildNotices3(c: Construction3): BuildNotice3[] {
     const entry = CYCLIC_MEMBER[spec.base];
     if (entry.fix.kind === 'none') continue; // square / rectangle are cyclic already — nothing changed
     out.push({ kind: 'base-constrained', ids: [...s.ids], from: spec.base, to: CYCLIC_MEMBER_NAME[spec.base] });
+  }
+  // #396 (ADR-3D-108): a relation between two ABSOLUTE objects that could never drive is
+  // REDUNDANT — say so (it was verified at commit, or it would have refused claim-refuted).
+  // Excluded: any side whose direction/normal carries the figure parameter — there the
+  // statement PINNED the parameter (2024-Q2's «ℓ ⟂ π»), which is real information.
+  {
+    const carriesParam = (op: Operand3): boolean =>
+      op.kind === 'line' ? lineDirCarriesParam(c, op.name)
+      : op.kind === 'plane-named' ? planeNormalCarriesParam(c, op.name)
+      : false;
+    const pairOf = (cl: Construction3['claims'][number]): [Operand3, Operand3] | null =>
+      cl.type === 'plane-rel' || cl.type === 'mutual-rel' || cl.type === 'distance-rel' ? [cl.a, cl.b]
+      : cl.type === 'line-rel' ? [cl.op, { kind: 'line', name: cl.line }] : null;
+    for (const cl of c.claims) {
+      const pair = pairOf(cl);
+      if (!pair) continue;
+      const [a, b] = pair;
+      if (!isAbsolute(a) || !isAbsolute(b)) continue;
+      if (carriesParam(a) || carriesParam(b)) continue;
+      out.push({ kind: 'redundant-relation', a: operandLabel(a), b: operandLabel(b) });
+    }
   }
   return out;
 }

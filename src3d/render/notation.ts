@@ -19,7 +19,11 @@ export const VEC_CMD_TYPES = new Set(['name-vector', 'vec-rel', 'dot-given', 'in
 /** Apply textbook vector notation to a vector-statement utterance: pair arrows + name underlines. */
 export function vectorNotation(utterance: string, vecNames: Set<string>): string {
   let u = utterance.replace(/(?:^|(?<=[\s,:]))(?:ה?ו?וקטור|vectors?)\s+/gi, '');
-  u = u.replace(/([A-Z]\d*'?[A-Z]\d*'?)(?![⃗A-Za-z\d'])/g, '$1⃗');
+  // #398 (ADR-3D-108): the lookBEHIND is the twin of the existing lookahead — inside a ≥3-label
+  // point-run (ABC), the tail 'BC' used to pass the lookahead (nothing follows) and take an arrow
+  // mid-run. A letter/quote before the pair means it is part of a LONGER run, so it is not a pair.
+  // Digits stay allowed before (a glued coefficient «2KA'» is a real vector term).
+  u = u.replace(/(?<![A-Za-z'⃗])([A-Z]\d*'?[A-Z]\d*'?)(?![⃗A-Za-z\d'])/g, '$1⃗');
   if (vecNames.size > 0) {
     const names = [...vecNames].join('|');
     // standalone-letter-token boundaries: no letter before (digits/parens/operators fine — «2v»,
