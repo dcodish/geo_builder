@@ -16,7 +16,9 @@ import { resolve3 } from './evaluate';
 import { scalePinned } from './solve3';
 import { basisDecompose, cleanNum, coordStr, decompStr, linePlaneAngleAt, newellNormal, parametricDecomp } from './dataView';
 import { centroid3, cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
-import type { Construction3, Id, Positions3, Requirement3 } from './types';
+import { distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
+import { readOperand } from '../parser/operandToken';
+import type { Construction3, Id, Operand3, Positions3, Requirement3 } from './types';
 
 /** An operand: a declared vector name, or an ordered point pair. */
 type Atom = { named: string } | { pair: [Id, Id] };
@@ -31,7 +33,10 @@ type Query =
   | { kind: 'angle-vertex'; p: Id; q: Id; r: Id }
   | { kind: 'angle-vec'; a: Atom; b: Atom }
   | { kind: 'area'; ids: Id[] }
-  | { kind: 'volume'; ids: Id[] };
+  | { kind: 'volume'; ids: Id[] }
+  // S5 (#378): «המרחק בין D למישור ABC» — the distance itself, no value stated. NOT scale-free:
+  // it is reported only when the figure's scale is pinned (the ADR-3D-054 discipline).
+  | { kind: 'distance'; a: Operand3; b: Operand3 };
 
 export interface QueryResult {
   /** The student's query text, verbatim. */
@@ -79,6 +84,19 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
       s.match(new RegExp(`^ה?זו?וית\\s+(?:ש)?בין\\s+ה?מישור\\s+((?:${PT}){3,4})\\s+(?:[לו]?בין\\s+)?[לו]?-?ה?מישור\\s+((?:${PT}){3,4})$`)) ??
       s.match(new RegExp(`^(?:the\\s+)?angle\\s+between\\s+(?:the\\s+)?planes?\\s+((?:${PT}){3,4})\\s+and\\s+(?:the\\s+)?(?:plane\\s+)?((?:${PT}){3,4})$`, 'i'));
     if (pp) return { kind: 'plane-plane', p1: pp[1].match(new RegExp(PT, 'g'))!, p2: pp[2].match(new RegExp(PT, 'g'))! };
+  }
+
+  // S5 (#378) — DISTANCE, valueless: «המרחק בין D למישור ABC» / «distance between D and plane ABC».
+  // The stated form (with a value) is the `distanceGiven` FACT rule; this is the question.
+  {
+    const dm =
+      s.match(/^ה?מרחק\s+(?:ש)?בין\s+(.+?)\s+(?:[לו]בין\s+|ל-?\s*|ו-?\s*)(.+?)$/) ??
+      s.match(/^(?:the\s+)?distance\s+(?:from|between)\s+(.+?)\s+(?:and|to)\s+(.+?)$/i);
+    if (dm) {
+      const oa = readOperand(dm[1]);
+      const ob = readOperand(dm[2]);
+      if (oa && ob) return { kind: 'distance', a: oa.op, b: ob.op };
+    }
   }
 
   // ANGLE: «∠(u,v)» / «∠SAB» / «זווית SAB» / «angle SAB» / «angle between u and v»
@@ -210,12 +228,19 @@ function solidVolume(c: Construction3, ids: Id[], pos: Positions3): number | nul
 }
 
 /** The raw numeric value of a query at one configuration; null when a referenced object is unplaced. */
-function evalQuery(c: Construction3, q: Query, pos: Positions3): number | null {
+function evalQuery(c: Construction3, q: Query, pos: Positions3, abs?: AbsoluteCtx): number | null {
   const angleBetween = (u: Vec3, v: Vec3): number | null => {
     const n = norm3(u) * norm3(v);
     return n < 1e-12 ? null : (Math.acos(Math.max(-1, Math.min(1, dot3(u, v) / n))) * 180) / Math.PI;
   };
   switch (q.kind) {
+    case 'distance': {
+      const ctx = abs ?? { lines: new Map(), planes: new Map() };
+      const at = (id: Id) => pos.get(id) ?? null;
+      const ga = resolveOperand(q.a, c, ctx)(at);
+      const gb = resolveOperand(q.b, c, ctx)(at);
+      return ga && gb ? distanceBetween(ga, gb) : null;
+    }
     case 'dot': {
       const u = atomVec(c, q.a, pos);
       const v = atomVec(c, q.b, pos);
@@ -356,14 +381,20 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
     }
     return { text, answer: null, note: 'undetermined' };
   }
-  const vals = seeds.map((s) => evalQuery(c, q, resolve3(c, s).positions));
+  const vals = seeds.map((s) => {
+    const r = resolve3(c, s);
+    return evalQuery(c, q, r.positions, { lines: r.lines, planes: r.planes });
+  });
   if (vals.some((v) => v === null || !Number.isFinite(v))) return { text, answer: null, note: 'unavailable' };
   const nums = vals as number[];
   const val0 = stableNums(vals);
   if (val0 === null) {
     // undetermined — but does it settle once a free named parameter α is fixed? Then «depends on α».
     const pin = pinFreeMeasures(c);
-    if (pin && stableNums(seeds.map((s) => evalQuery(pin.c, q, resolve3(pin.c, s).positions))) !== null) {
+    if (pin && stableNums(seeds.map((s) => {
+      const r = resolve3(pin.c, s);
+      return evalQuery(pin.c, q, r.positions, { lines: r.lines, planes: r.planes });
+    })) !== null) {
       return { text, answer: null, note: 'depends', param: pin.params };
     }
     return { text, answer: null, note: 'undetermined' };

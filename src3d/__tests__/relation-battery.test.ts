@@ -65,6 +65,18 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'coincident|plane-run|plane-run',
       'coincident|segment|line',
       'coincident|segment|segment',
+      // S5 (#378, ADR-3D-106): the distance family
+      'distance|line|line',
+      'distance|plane-named|plane-named',
+      'distance|plane-run|plane-named',
+      'distance|plane-run|plane-run',
+      'distance|point|line',
+      'distance|point|plane-named',
+      'distance|point|plane-run',
+      'distance|point|segment',
+      'distance|segment|line',
+      'distance|segment|plane-run',
+      'distance|segment|segment',
       'intersecting|line|line',
       'intersecting|segment|line',
       'intersecting|segment|segment',
@@ -160,6 +172,18 @@ describe('RELATION_TABLE — totality and honesty', () => {
       'coincident|plane-run|plane-named',
       'perp|vector|plane-named',
       'parallel|vector|plane-named',
+      // S5 (#378, ADR-3D-106) — the distance family
+      'distance|line|line',
+      'distance|plane-named|plane-named',
+      'distance|plane-run|plane-named',
+      'distance|plane-run|plane-run',
+      'distance|point|line',
+      'distance|point|plane-named',
+      'distance|point|plane-run',
+      'distance|point|segment',
+      'distance|segment|line',
+      'distance|segment|plane-run',
+      'distance|segment|segment',
     ]);
     const BATTERY_PENDING = new Set([
       // S1 seeds the harness with 7 rows; these supported cells are exercised by their own
@@ -406,6 +430,36 @@ describe('the battery — supported cells exercised end-to-end', () => {
   it('gauge × ABSOLUTE plane — a FALSE statement refuses rather than drawing a wrong figure', () => {
     for (const u of ["תיבה ABCDA'B'C'D'", 'הבסיס ABCD שוכן במישור ה-xy', 'המישור π1: z = 0', 'AB מאונך למישור π1']) submit(u);
     expect(state().lastError, 'a base edge is not ⟂ to the base plane').not.toBeNull();
+  });
+
+  // ---- S5 (#378, ADR-3D-106): the DISTANCE family --------------------------------------
+
+  it('distance point×plane-run / point×segment / segment×segment — DRIVE a free tetra', () => {
+    for (const u of ['פירמידה משולשת ABCD', 'המרחק בין D למישור ABC הוא 6']) submit(u);
+    expect(state().lastError).toBeNull();
+    for (const seed of [0, 1]) {
+      const pos = derive3(state().facts, seed).resolved.positions;
+      const ring = ['A', 'B', 'C'].map((id) => pos.get(id)!);
+      const n = newellNormal(ring);
+      expect(Math.abs(vdot(n, vsub(pos.get('D')!, ring[0]))) / vnorm(n), `seed ${seed}`).toBeCloseTo(6, 4);
+    }
+    state().clear();
+    for (const u of ['פירמידה משולשת ABCD', 'המרחק בין D לישר AB הוא 5']) submit(u);
+    expect(state().lastError).toBeNull();
+    state().clear();
+    for (const u of ['פירמידה משולשת ABCD', 'המרחק בין AB לבין CD הוא 3']) submit(u); // skew segments
+    expect(state().lastError).toBeNull();
+  });
+
+  it('distance against an ABSOLUTE object — claim-gated: true verifies, false refuses', () => {
+    for (const u of ["תיבה ABCDA'B'C'D'", 'הבסיס ABCD שוכן במישור ה-xy', 'המישור π1: z = 0', 'המרחק בין A למישור π1 הוא 0']) submit(u);
+    expect(state().lastError, 'A lies in the xy-plane, so the distance is 0').toBeNull();
+    state().clear();
+    for (const u of ["תיבה ABCDA'B'C'D'", 'הבסיס ABCD שוכן במישור ה-xy', 'המישור π1: z = 0', 'המרחק בין A למישור π1 הוא 7']) submit(u);
+    expect(state().lastError, 'a false distance refuses rather than drawing').not.toBeNull();
+    state().clear();
+    for (const u of ['l1:x=(0,0,0)+t(1,0,0)', 'l2:x=(0,0,7)+t(0,1,0)', 'המרחק בין l1 לבין l2 הוא 7']) submit(u);
+    expect(state().lastError, 'two absolute skew lines — the claim is the answer').toBeNull();
   });
 
   it('angle|segment|plane-run — drives a free box to the stated 30 degrees', () => {

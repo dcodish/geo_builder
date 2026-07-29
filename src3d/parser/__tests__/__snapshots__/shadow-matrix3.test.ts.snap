@@ -1409,6 +1409,36 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "the distance between D and plane ABC is 6",
+    "winner": "distanceGiven",
+  },
+  {
+    "lang": "he",
+    "text": "המרחק בין D למישור ABC הוא 6",
+    "winner": "distanceGiven",
+  },
+  {
+    "lang": "en",
+    "text": "the distance between D and line AB is 5",
+    "winner": "distanceGiven",
+  },
+  {
+    "lang": "he",
+    "text": "המרחק בין D לישר AB הוא 5",
+    "winner": "distanceGiven",
+  },
+  {
+    "lang": "en",
+    "text": "the distance between AB and CD is 3",
+    "winner": "distanceGiven",
+  },
+  {
+    "lang": "he",
+    "text": "המרחק בין AB לבין CD הוא 3",
+    "winner": "distanceGiven",
+  },
+  {
+    "lang": "en",
     "text": "the cosine of the angle between u and w is √35/10",
     "winner": "cosAngleGiven",
   },

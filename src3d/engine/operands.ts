@@ -179,6 +179,64 @@ export function relDeviation(
   return Math.abs(cos - (mixed ? Math.sin(target) : Math.cos(target)));
 }
 
+/**
+ * S5 (#378) — the DISTANCE between any two operands, in world units. `null` when either side is
+ * unresolvable.
+ *
+ * Distance is the shortest gap, so it is **0 whenever the objects meet** — two intersecting lines,
+ * a line crossing a plane, two non-parallel planes. That is the honest answer, not a special case:
+ * the interesting distances are exactly the ones between objects that DON'T meet, which is why the
+ * curriculum's four cases are point–plane, point–line, SKEW lines and PARALLEL planes.
+ *
+ * Unlike every other relation in this program, a distance carries UNITS — so a stated one pins the
+ * figure's scale (`PIN_FIXES_SCALE`), and a derived one may only be reported when the scale is
+ * already pinned ([ADR-3D-054](../../docs/06b-decisions-3d.md#adr-3d-054)).
+ */
+export function distanceBetween(a: OperandGeom, b: OperandGeom): number | null {
+  const planeDist = (p: Vec3, pl: OperandGeom): number | null => {
+    if (!pl.normal || pl.d === undefined) return null;
+    const n = norm3(pl.normal);
+    return n < 1e-12 ? null : Math.abs(dot3(pl.normal, p) + pl.d) / n;
+  };
+  const lineDist = (p: Vec3, ln: OperandGeom): number | null => {
+    if (!ln.dir || !ln.point) return null;
+    const n = norm3(ln.dir);
+    return n < 1e-12 ? null : norm3(cross3(sub3(p, ln.point), ln.dir)) / n;
+  };
+  const isPlane = (g: OperandGeom) => !!g.normal && !g.dir;
+  const isLine = (g: OperandGeom) => !!g.dir;
+  const isPoint = (g: OperandGeom) => !g.dir && !g.normal && !!g.point;
+
+  // point × anything
+  if (isPoint(a)) return isPlane(b) ? planeDist(a.point!, b) : isLine(b) ? lineDist(a.point!, b) : b.point ? norm3(sub3(b.point, a.point!)) : null;
+  if (isPoint(b)) return distanceBetween(b, a);
+
+  // line × line — parallel ⇒ point-to-line; skew ⇒ the common-perpendicular gap; crossing ⇒ 0
+  if (isLine(a) && isLine(b)) {
+    const cx = cross3(a.dir!, b.dir!);
+    const cn = norm3(cx);
+    if (cn < 1e-12 * norm3(a.dir!) * norm3(b.dir!)) return lineDist(b.point!, a); // parallel
+    return Math.abs(dot3(sub3(b.point!, a.point!), cx)) / cn; // 0 exactly when they intersect
+  }
+
+  // line × plane — a gap only while the line misses the plane (i.e. runs parallel to it)
+  if (isLine(a) && isPlane(b)) {
+    return Math.abs(dot3(a.dir!, b.normal!)) > 1e-12 * norm3(a.dir!) * norm3(b.normal!) ? 0 : planeDist(a.point!, b);
+  }
+  if (isPlane(a) && isLine(b)) return distanceBetween(b, a);
+
+  // plane × plane — a gap only while they are parallel
+  if (isPlane(a) && isPlane(b)) {
+    const na = norm3(a.normal!);
+    const nb = norm3(b.normal!);
+    if (na < 1e-12 || nb < 1e-12) return null;
+    if (norm3(cross3(a.normal!, b.normal!)) > 1e-12 * na * nb) return 0; // they intersect
+    const flip = dot3(a.normal!, b.normal!) < 0 ? -1 : 1;
+    return Math.abs(a.d! / na - (flip * b.d!) / nb);
+  }
+  return null;
+}
+
 /** The figure's size — the yardstick an OFFSET must be measured against to stay scale-free (a gap of
  *  0.01 means something different on a unit cube than on a 100-unit one). Min 1 so an empty or
  *  degenerate figure can never divide by ~0. */

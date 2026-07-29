@@ -1669,3 +1669,24 @@ The recurrence is the point. Four times now the mechanism has been *correct* and
 **Out (stated).** `contains` — a segment or line lying IN a plane («מוכל») — is still `planned`; it is a two-residual cell (direction ⟂ normal AND a point on the plane) and no exam in the corpus needed it tonight.
 
 Locked by `plane-rel.test.ts` (16, incl. the pure `relDeviation` matrix and the collapse refusal) + 6 battery rows covering all 15 cells. 3-D lane 1730 green, `tsc -b` + both builds clean; shadow snapshot addition-only (60 insertions, 0 deletions), allowlist unchanged.
+
+### ADR-3D-106 — S5 of the relations program: DISTANCE, the relation that carries units (#378)
+
+**Context.** The last column of the matrix. The curriculum asks for four distances — point→plane, point→line, between SKEW lines, between PARALLEL planes — and the 2010-Q3 exam pins a parameter with one.
+
+**Decision. One function, four formulas, and no special-casing of "they meet".** `distanceBetween(a, b)` dispatches on what each side IS (point / directional / planar) and returns the shortest gap. Objects that intersect are **0 apart** — that is the honest answer, not an error case, and it falls out of the same formulas: the skew-line expression `|w·(d₁×d₂)|/|d₁×d₂|` is exactly 0 when the lines cross; a line piercing a plane is 0 from it. The curriculum's four cases are simply the configurations where the answer is *interesting*, which is why they are the ones textbooks name.
+
+**The one relation that carries UNITS.** Every other relation in this program is an angle or a ratio — similarity-invariant, leaving the gauge alone. A distance is an absolute size, so:
+
+- as a GIVEN it **pins the scale** (`PIN_FIXES_SCALE['distance'] = true`, joining only `length` and `dot`), and drives a free-dim figure to it;
+- as a derived QUERY it may be reported **only when the scale is already pinned** — the [ADR-3D-054](#adr-3d-054) discipline. On a bare cube, "the distance from A′ to the base" is stable across seeds and still not knowledge: it is the frozen gauge unit, and printing "1" would hand the student an invented given. The query lane's existing scale gate covers this without a new mechanism, and the two refusals are kept distinct — `scale` (shape known, size free) versus `undetermined` (shape itself free).
+
+**A point-to-point distance is NOT in this family.** It is the magnitude family's (`|AB| = 5`), which already owns it; the parser defers rather than creating a second owner for one quantity. The table records it `n/a` with that reason.
+
+**Routing** is the frame classifier, unchanged from S2/S3/S4: gauge×gauge drives, absolute×absolute is a claim (two typed parametric lines — the 2010-Q3 shape), gauge×absolute is claim-gated (#386).
+
+**11 cells flipped**, 70 supported in total — the matrix's distance row is complete.
+
+Locked by `distance-rel.test.ts` (16: the four curriculum cases as pure geometry incl. the sign-safe anti-parallel plane pair, the drives with per-seed assertions, the scale-pinning fact, both query refusals, and the point-to-point deferral) + 2 battery rows. 3-D lane 1784 green, `tsc -b` + both builds clean; shadow snapshot addition-only, allowlist unchanged.
+
+**The relations program (#378) is COMPLETE**: S0 ✓ S1 ✓ S2 ✓ S4 ✓ S3 ✓ S5 ✓. What remains is recorded, not forgotten — #386 (the gauge×absolute drive, one routing refactor serving every slice's identical cells) and `contains` (S3).

@@ -17,7 +17,7 @@
  */
 
 import type { Construction3, Id, Positions3, ScalarPin } from './types';
-import { isAbsolute, mutualSides, resolveOperand } from './operands';
+import { distanceBetween, isAbsolute, mutualSides, resolveOperand } from './operands';
 import { add3, cross3, dist3, dot3, newellNormal, norm3, scale3, sub3, v3, type Vec3 } from './vec3';
 
 export interface GaugeParams {
@@ -215,6 +215,7 @@ const PIN_FIXES_SCALE: Record<ScalarPin['kind'], boolean> = {
   'line-plane-angle': false, // sin β is length-normalized
   mutual: false, // S4 (#378): every residual is normalized by the operand magnitudes
   'plane-rel': false, // S3 (#378): angles between characteristic vectors; the offset is size-normalized
+  distance: true, // S5 (#378): a distance is an absolute size — it fixes the scale
 };
 
 export function scalePinned(c: Construction3): boolean {
@@ -587,6 +588,13 @@ export function solvePivot(
           const den = Math.max(norm3(n) * norm3(u), 1e-12);
           out.push(Math.abs(dot3(n, u)) / den - Math.sin((pin.deg * Math.PI) / 180)); // sin β − sin(given)
         }
+      } else if (pin.kind === 'distance') {
+        // S5 (#378): |a b| = value, through the same geometry the claim and the query lane read.
+        const abs = { lines: lines ?? new Map(), planes: new Map() };
+        const ga = resolveOperand(pin.a, c, abs)(at);
+        const gb = resolveOperand(pin.b, c, abs)(at);
+        const d = ga && gb ? distanceBetween(ga, gb) : null;
+        out.push(d === null ? 10 : d - pin.value); // signed: crosses zero through the solution
       } else if (pin.kind === 'plane-rel') {
         // S3 (#378): a plane-bearing direction relation between two GAUGE operands. Residuals are
         // SIGNED COMPONENTS (the ADR-3D-006 touch-zero lesson): a magnitude like |n1×n2| touches
