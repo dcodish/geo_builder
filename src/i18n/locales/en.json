@@ -159,6 +159,7 @@
     }
   },
   "errors": {
+    "metricImpossible": "Impossible: |{{seg}}| = {{value}} — the distance from {{a}} to {{b}} via {{via}} is {{sum}}, and a straight segment cannot be longer than a path around. Check the givens.",
     "desc": {
       "collinear": "collinear",
       "concyclic": "concyclic",

@@ -114,7 +114,7 @@ const ONE_OF_EACH: Record<Constraint['type'], Constraint> = {
   'collinear-order': { type: 'collinear-order', points: ['A', 'B', 'C'] },
   'angle-bound': { type: 'angle-bound', vertex: 'B', ray1: 'A', ray2: 'C', min: 40, max: 60 },
   'length-bound': { type: 'length-bound', a: 'A', b: 'B', max: 5 },
-  'length-radius': { type: 'length-radius', a: 'A', b: 'B', circle: 'circle-O', witness: 'A', k: 1 },
+  'length-radius': { type: 'length-radius', a: 'A', b: 'B', circle: 'circle-O', center: 'O', witness: 'A', k: 1 },
   area: { type: 'area', ids: ['A', 'B', 'C'], value: 13 },
   'area-ratio': { type: 'area-ratio', ids1: ['A', 'B', 'C'], ids2: ['D', 'E', 'F'], k: 2 },
   perimeter: { type: 'perimeter', ids: ['A', 'B', 'C'], value: 20 },

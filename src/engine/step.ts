@@ -17,6 +17,7 @@ import { circleCircleIntersect, dist, sub } from './geometry';
 import { budgetExceeded } from './solveBudget';
 import { carrierOf, isShapeCarrier, isParamCarrier } from './carriers';
 import { componentOf, minimalComponentOf } from './components';
+import { metricImpossibility, metricImpossibilityError } from './metricFeasibility';
 import { applySeed, freeDofs } from './sample';
 import { constraintKey, constraintRefs, describeConstraint, solvedOnSegmentCandidates } from './solve';
 
@@ -691,6 +692,17 @@ export function applyStep(prev: Construction, cmd: Command): StepResult {
   // topological evaluator's internal "unresolved dependencies" (the student-facing honesty guard).
   const danglingErr = danglingCircleError(prev, cmd);
   if (danglingErr) return { ok: false, error: danglingErr, construction: prev, positions: prevPositions, ladder: ['pre:dangling'] };
+
+  // #420 (ADR-417): a pinned distance that exceeds the shortest pinned PATH between its endpoints is
+  // impossible in the plane — no placement, no free radius, no remaining DOF can satisfy it. Proven
+  // before the ladder, so the refusal is instant (measured 27.8 s → ms on «AB=4, BC=4, AC=9») and
+  // HONEST: without this the contradiction reached `constraintIsPending`, whose "the residual moves"
+  // probe called it a deferrable PENDING state. Sound one way only — a violation proves impossibility;
+  // passing proves nothing and the ordinary ladder still runs.
+  const metricErr = metricImpossibility(applyCommand(prev, cmd).constraints);
+  if (metricErr) {
+    return { ok: false, error: metricImpossibilityError(metricErr), construction: prev, positions: prevPositions, ladder: ['pre:impossible'] };
+  }
 
   // Rotate a shape's vertices so an existing edge lands on its free base slots —
   // lets a shape build on an existing edge wherever that edge sits in the name

@@ -103,6 +103,12 @@ interface Pattern {
 // Order matters only where one pattern's text is a prefix of another's; each regex below is
 // anchored and specific enough that the first match is the right one.
 const PATTERNS: Pattern[] = [
+  // metricFeasibility.ts (#420, ADR-417) — `impossible: |AC| = 9 exceeds 8, the distance from A to C via B`
+  {
+    re: /^impossible: \|(\S+?)\| = (\S+) exceeds (\S+), the distance from (\S+) to (\S+) via (\S*)$/,
+    key: 'errors.metricImpossible',
+    params: (m) => ({ seg: m[1], value: m[2], sum: m[3], a: m[4], b: m[5], via: m[6] }),
+  },
   // step.ts danglingCircleError (#186) — `circle 'O2' is not defined`
   { re: /^circle '(.+)' is not defined$/, key: 'errors.unknownCircle', params: (m) => ({ center: m[1] }) },
 

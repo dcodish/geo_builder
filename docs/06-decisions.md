@@ -5698,3 +5698,27 @@ Locked by `values-panel.test.ts` (+4: the circle's 6π beside 9π, a sized squar
 **The totality guard is the real deliverable.** `humanize-error.test.ts` gains a fixture typed `Record<Constraint['type'], Constraint>` — so adding a constraint kind to the engine fails the BUILD until its description is covered — and asserts a PROPERTY rather than a word list: after humanising, no run of two or more lowercase Latin letters may survive. Point labels are uppercase and a radius symbol is a single letter (`r`/`R`, ADR-304), so any multi-letter lowercase run is by construction an untranslated word. Measured before/after on four real messages (collinear · concyclic · area( · coincides with), all four now fully Hebrew.
 
 Locked by `humanize-error.test.ts` (+27: one per constraint kind, the reported message, the wrapper-still-matches guard, the verifier params path, and a guard that symbolic fragments are left untouched).
+
+### ADR-417 — A PROVEN impossibility is refused, not deferred: the metric necessary condition, checked before the ladder (#420)
+
+**Class:** a proxy predicate standing in for the semantic fact (docs/17 §2.2) — the **fourth instance this session**, after [ADR-414](#adr-414) (a flag read as the DOF class), [ADR-415](#adr-415) (noun POSITION read as the statement's identity) and [ADR-3D-070](06b-decisions-3d.md#adr-3d-070) (pin KIND read as "is this symbol determined").
+
+Operator screenshot: on «מעגל O / A ו-C נמצאות על המעגל / משולש ABC / AB = 4 / BC = 4 / AC = 9» the row was marked ✗ בעיה while the banner said ⓘ «הנתון נרשם אך לא משפיע בינתיים על הצורה» — two verdicts for one step — and it took **27.8 s** to say it.
+
+**Root cause.** The engine's own verdict was already correct (`over-constrained: |AC| = 9 cannot hold`), but `lastError` was null because `classify` had downgraded the failure to the ADR-104 PENDING info state. That downgrade rests on `constraintIsPending`, which decides "can this constraint still become satisfiable?" by probing five seeds and asking:
+
+```ts
+return vals.length >= 2 && Math.max(...vals) - Math.min(...vals) > 0.05; // the relation flexes ⇒ pending
+```
+
+**"The residual MOVES" is not "the residual can reach ZERO."** Here |AC| genuinely varies with the free radius and the placement, so the contradiction looked deferrable — while |AC| ≤ |AB| + |BC| = 8 caps it away from 9 in every configuration that will ever exist.
+
+**Mechanism — a sound necessary condition, general over n.** `metricImpossibility` (new `src/engine/metricFeasibility.ts`) reads the pinned-distance graph and asks whether any pinned edge exceeds the **shortest pinned PATH between its endpoints** (Dijkstra per edge, excluding the edge itself). In the plane a straight segment can never be longer than a path around, so a violation *proves* unsatisfiability. Deliberately not a triangle rule: a quadrilateral with four pinned sides, or any cycle in the pinned-distance graph, is the same code — and no cycle enumeration is needed. Equality passes (a flat collinear figure is a real configuration; a degenerate POLYGON is [ADR-413](#adr-413)'s concern), so only a strict excess beyond a relative tolerance is flagged.
+
+**Sound in ONE direction, and that is the whole design:** a violation proves impossibility ⇒ refuse honestly and instantly; passing proves nothing ⇒ the ordinary ladder still runs, so this can never turn a buildable figure into a refusal. Only numeric `distance` constraints feed it — an `equal`/`ratio` chain could propagate more pinned lengths, but every admitted edge must be *certainly* pinned for the verdict to stay sound, so widening the source set is a separate, evidence-led step.
+
+**Two seams, one for each half of the report.** The check runs at applyStep's PRE-SOLVE gate (beside the ADR-202 degenerate and #186 dangling gates, ladder token `pre:impossible`) so the refusal costs nothing — the perf half is a *consequence* of the honesty fix, not separate work — and inside `constraintIsPending`, so a proven contradiction can never be classified as pending even if it reaches the classifier by another route. Message: a new `errors.metricImpossible` naming the bound and the path («המרחק מ-A ל-C דרך B הוא 8, וקטע ישר אינו יכול להיות ארוך מדרך עקיפה»), which teaches instead of only refusing.
+
+**Measured:** the operator's 6-step sequence **27.8 s → 0.52 s** (53×), verdict `impossible: |AC| = 9 exceeds 8`, `pending === false`, keep-prior leaving the 4-4 triangle intact.
+
+Locked by `metric-feasibility.test.ts` (9 — the pure check incl. the 4-side quadrilateral and the tightest-duplicate-edge case; the realisable 3-4-5 and the FLAT 4-4-8 that must NOT be flagged; the no-alternative-path and no-cycle cases; the end-to-end refusal with an 8 s wall bound; the Hebrew message; `pending === false`; and the realisable AC = 5 sibling building clean) + scenario `impossible-triangle-refuses-instantly`.
