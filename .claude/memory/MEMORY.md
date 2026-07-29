@@ -12,3 +12,4 @@
 - [Triage-only during testing](triage-only-during-testing.md) — operator reports = file issue + diagnosis + fix plan, then STOP; even dictated/trivial changes wait for the fix session
 - [Commit+deploy still needs a PR](commit-deploy-still-needs-pr.md) — the instruction waives only play-and-approve; branch + PR + self-merge, never direct-to-main
 - [Commit means push](commit-means-push.md) — when the operator says "commit", also push to GitHub (it is the only channel to the other machine)
+- [Operator tests Hebrew only](operator-tests-hebrew-only.md) — never put English cases in play scripts; the suite covers En mirrors
