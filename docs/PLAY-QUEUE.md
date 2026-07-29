@@ -8,9 +8,29 @@ Start the app with `npm run dev` and open **`http://localhost:5173/3d.html`** fo
 
 ---
 
-**The queue is EMPTY** (2026-07-29). PRs #390 (S3 — plane relations) and #391 (S5 — distances) were played on the work PC — all 13 tests passed — and merged; the relations program (#378) is fully on `main`. Play findings were filed as #395/#396/#397/#398 + a #384 widening (triage-first; none built yet).
+## PR #399 — the magnitude bundle (#393 + #335, ADR-3D-107) · PR #400 — the panel bundle (#384/#395–#398, ADR-3D-108)
 
-Note: `main` is AHEAD of prod — `prod/2026-07-28-3` predates S3+S5. Deploying is an operator call.
+Both built 2026-07-29 (operator-commissioned fix session). **One checkout plays both**: branch `play/2026-07-29` merges the two PR branches over `main` (which also carries the #389 מעויין fix). The full copy-paste scripts live in the session's handoff message; highlights:
+
+```
+תיבה ABCDA'B'C'D'
+נסמן: AB=u, AD=v, AA'=w
+|u|=|v|=1
+```
+
+```
+מקבילון ABCDEFGH
+נסמן: AB=u, AD=v, AE=w
+|w+u|=|w-u|
+```
+
+```
+פירמידה משולשת ABCD
+המרחק בין D למישור ABC הוא 6
+```
+(→ dashed height witness + knee + `d(D, ABC) = 6` panel row; the plane's fact-row button now cycles מישור מלא ← פאה בלבד ← מוסתר; the query «המרחק בין D למישור ABC» renders RTL with the plane name un-arrowed.)
+
+Note: `main` is AHEAD of prod — `prod/2026-07-28-3` predates S3+S5, #389, and both bundles. A deployment session follows the play.
 
 ---
 
