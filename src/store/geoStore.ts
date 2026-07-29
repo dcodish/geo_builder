@@ -18,6 +18,7 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
+import type { ValuesPanelResult } from '@/engine/valuesPanel';
 import type { AnyCommand, Id, RelationsResult, ShapesResult } from '@/engine';
 import { branchCount, cyclableVariant, deepEqual, variantCountOf, withVariant } from '@/engine';
 import type { FigureFile } from './figureFile';
@@ -27,7 +28,7 @@ import type { FigureFile } from './figureFile';
 export * from '@/replay/core';
 import { replay, groupKey, firstSatisfyingSeed, meetsRequirements, findValidConfig, searchAnotherView, settleVariantDefaults, pointsDistinct, commandPointIds, extensionsClear, intersectionsWithinSegments, BRANCH_CYCLE_KINDS } from '@/replay/core';
 import type { DetectAllResult, Fact } from '@/replay/core';
-import { geoWork, isCancelled } from './geoWork';
+import { geoWork, geoValues, isCancelled } from './geoWork';
 
 /**
  * Run the shared detection sweep for `facts` off the main thread and return its verdicts, or null when
@@ -251,6 +252,9 @@ export interface GeoState {
    *  (seed change keeps the same `facts` ref); any FACT change makes a new `facts` array, so a selector that
    *  checks `relations.facts === facts` auto-clears it (no edits to the mutating actions needed). */
   relations: { result: RelationsResult; facts: Fact[] } | null;
+  /** #217 (ADR-410): the VALUES panel — every fixed/known value, stated + derived, computed on user
+   *  request from the shared sample pool (off-thread). Tagged by facts so a stale result never shows. */
+  values: { result: ValuesPanelResult; facts: Fact[] } | null;
 
   /** The "detect shapes" layer ([FR-SH](docs/02-requirements.md)): the named shapes (kite, rhombus,
    *  isosceles triangle, …) the figure geometrically contains, cached with the EXACT `facts` array they
@@ -299,6 +303,9 @@ export interface GeoState {
   viewRelations: () => Promise<void>;
   /** Turn the relations layer off. */
   clearRelations: () => void;
+  /** #217: compute the values panel (pull-only — req 4: never in the submit path). */
+  viewValues: () => Promise<void>;
+  clearValues: () => void;
   /** Detect the named shapes of the current figure and turn the badges layer ON ([FR-SH]). Synchronous
    *  (samples the figure); the caller paints a busy state first. A re-press recomputes. */
   detectShapes: () => Promise<void>;
@@ -446,6 +453,7 @@ export const useGeoStore = create<GeoState>()(
       segStyle: {},
       hiddenCircles: [],
       relations: null,
+      values: null,
       shapes: null,
       crossings: null,
 
@@ -564,6 +572,20 @@ export const useGeoStore = create<GeoState>()(
       },
 
       clearRelations: () => set({ relations: null }),
+
+      viewValues: async () => {
+        // #217 (ADR-410): the 2-D dataView. Off-thread, pull-only (req 4) — the detect lane's worker
+        // computes the rows from the shared pool (a pure classification pass when the sweep is warm).
+        const facts = get().facts;
+        try {
+          const result = await geoValues(facts);
+          if (get().facts !== facts) return; // superseded — never show another figure's values
+          set({ values: { result, facts } });
+        } catch (err) {
+          if (!isCancelled(err)) throw err;
+        }
+      },
+      clearValues: () => set({ values: null }),
 
       detectShapes: async () => {
         // Same shared sweep as viewRelations/detectCrossings — one solve pass between all three layers.
@@ -855,7 +877,7 @@ export const useGeoStore = create<GeoState>()(
       },
 
       clear: () => {
-        set({ facts: [], selectedId: null, figureName: '', seed: 0, radiusOverrides: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, shapes: null });
+        set({ facts: [], selectedId: null, figureName: '', seed: 0, radiusOverrides: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, values: null, shapes: null });
         useGeoStore.temporal.getState().clear();
       },
 

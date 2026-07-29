@@ -14,6 +14,7 @@
  */
 
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
+import { computeValuesPanel, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross } from '@/engine';
 import { formatMeasure } from '@/format';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, warmStartCarriers, withVariant, withReflectMask } from '@/engine';
@@ -1932,6 +1933,22 @@ export function detectAll(facts: Fact[]): DetectAllResult {
     shapes: classifyShapesFromSamples(shared.constructions[0], shared.samples),
     crossings: forcedCrossingKeys(shared),
   };
+}
+
+/**
+ * #217 (ADR-410): the VALUES-PANEL rows — a FOURTH consumer of the ONE shared sample pool (M3),
+ * computed only on user request (the panel is pull, never push — req 4: zero cost in the submit
+ * path; when the detect sweep already ran, the pool memo makes this a pure classification pass).
+ * Runs where the samples are (the worker), so the `circlesOfSample` side table stays thread-local.
+ */
+export function computeValues(facts: Fact[]): ValuesPanelResult {
+  const shared = sharedSamples(facts);
+  const circles = shared.samples.map((pos) => circlesOfSample.get(pos) ?? new Map<Id, ResolvedCircle>());
+  let areaLetter: string | null = null;
+  for (const f of facts) {
+    if (f.enabled && f.cmd.type === 'measure-area' && 'var' in f.cmd.expr) areaLetter = f.cmd.expr.var;
+  }
+  return computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter);
 }
 
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */

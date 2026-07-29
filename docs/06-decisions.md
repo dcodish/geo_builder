@@ -5572,6 +5572,19 @@ Locked by the `#365` block in `fold-cache.test.ts` (6): append resumes AND equal
 
 Locked by `futile-failure.test.ts` (3): the exact operator sequence (honest error + one fold + a 3 s wall bound), the deleted-step orphan (defining fact disabled ⇒ equally futile), and the deferral-intact guard. Sibling capability: #402 (a NEW label in a collinearity statement should be CREATED — after it lands, this exact instance disappears while the class, e.g. a typo'd «ישר GFX», keeps the instant refusal).
 
+### ADR-410 — The VALUES PANEL: the student's "what do I know so far" index (#217)
+
+**What (operator-commissioned 2026-07-19, rulings same day):** the 2-D edition of the 3-D "organize your data" sidebar — every fixed/known value the figure carries, stated (נתון) and derived (נגזר) alike, surfaced passively in a panel: segment lengths over the detection layers' own edge universe, polygon-corner and stated angles, radii, polygon/circle areas, and **area-ratio classes** (S, 2S, ½S — similarity-gauge-invariant knowledge even on an unscaled figure; the student's own letter reused when ADR-121 bound one). The 3-D `dataView` precedent COPIED, never imported (docs/20 §12).
+
+**Knowledge discipline:** a number prints only when it is IDENTICAL across every sampled configuration — the ADR-295/#88 gate (`freeDofCount === 0` figures accept any pool; sampled ones need ≥ 4 agreeing samples). On a free figure the panel prints ratio classes and nothing numeric — seed-invariance IS the 2-D scale gate (free points are sampled, so an unsized square's side varies by seed and correctly never prints; unlike the 3-D frozen gauge there is no `AB = 1` trap to special-case).
+
+**Exact forms (ruling: full scope + 2-decimal fallback):** a shared recognizer in `@/format` (the #164 formatter EXTENDED — never a sixth ad-hoc one): `p/q`, `(p/q)√n`, `(p/q)π`, `(p/q)√n·π`, bounded (q ≤ 12, n ≤ 50 non-square, simplified — √12 prints 2√3), tolerance 1e-6 so 7.34 is never dressed as exact. Rendering is REAL mathematics (req 5): `MathValue` builds MathML (radical bars, stacked fractions, π) via string-tag `createElement` — the 3-D VecMath pattern, copied.
+
+**Pull-only, off-thread (req 4):** a `values` op on the detect-lane worker, called ONLY when the student opens the panel — zero cost in the submit path; when the detect sweep already ran, the content-keyed pool memo makes it a pure classification pass (M3: a FOURTH consumer of the ONE sampler, never a second one). Results are facts-tagged so a stale panel never displays. Row click highlights the object on canvas (the theorem-feed premise pattern, via `highlightEdges`).
+
+**Ratio classes (ruling: denominator ≤ 4):** pairwise polygon-area ratios stable across every sample and small-rational join one class; the letter is the student's bound S when present.
+
+Locked by `values-panel.test.ts` (6): the recognizer's curriculum forms + never-dress-a-decimal; the sized square (stated vs derived sides, the 4√2 diagonal, shoelace 16, right angles); the 9π circle area; the median's S/S class on a FREE triangle (no absolute row leaks); the free-figure nothing-numeric gate.
 ### ADR-409 — A membership statement presupposes its circle: the `implied` discipline adopted by the last two rules (#362)
 
 **Class:** the ADR-367 `implied` discipline — a statement that PRESUPPOSES an object introduces it rather than deferring — had 10 call sites (`מיתר`, `קוטר`, `משיק`, the glued pair…) and two holdouts: `pointOnCircle` (single/list «A ו-C נמצאות על המעגל») and `pointVsCircle` («M מחוץ למעגל»), both still answering "which EXISTING circle?" via `resolveCenter` and deferring to the LLM on a circle-less figure — an escalation for a statement whose meaning is unambiguous. Adoption debt, not a new mechanism.
