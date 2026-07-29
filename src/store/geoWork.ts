@@ -16,13 +16,14 @@ import {
   replay,
   getFoldFor,
   detectAll,
+  computeValues,
   type DetectAllResult,
   type Fact,
   type FoldNode,
 } from '@/replay/core';
-import type { GeoWorkResponse, ResampleDone, AutoResolveDone, PrefoldDone, DetectDone } from './geoWorker';
+import type { GeoWorkResponse, ResampleDone, AutoResolveDone, PrefoldDone, DetectDone, ValuesDone } from './geoWorker';
 
-type Done = ResampleDone | AutoResolveDone | PrefoldDone | DetectDone;
+type Done = ResampleDone | AutoResolveDone | PrefoldDone | DetectDone | ValuesDone;
 type Pending = {
   resolve: (done: Done) => void;
   reject: (err: Error & { cancelled?: boolean }) => void;
@@ -38,11 +39,12 @@ type Pending = {
  * and superseding it is free (terminate the detect worker only — the interactive lane keeps its caches).
  */
 type Lane = 'interactive' | 'detect';
-const LANE_OF: Record<'resample' | 'autoResolve' | 'prefold' | 'detect', Lane> = {
+const LANE_OF: Record<'resample' | 'autoResolve' | 'prefold' | 'detect' | 'values', Lane> = {
   resample: 'interactive',
   autoResolve: 'interactive',
   prefold: 'interactive',
   detect: 'detect',
+  values: 'detect', // #217: same background lane — rides the same memoized pool
 };
 
 const hasWorker = typeof Worker !== 'undefined' && typeof document !== 'undefined';
@@ -106,7 +108,7 @@ export function cancelGeoWork(): void {
 export const isCancelled = (err: unknown): boolean => Boolean((err as { cancelled?: boolean })?.cancelled);
 
 function call(
-  op: 'resample' | 'autoResolve' | 'prefold' | 'detect',
+  op: 'resample' | 'autoResolve' | 'prefold' | 'detect' | 'values',
   facts: Fact[],
   seed: number,
   onProgress?: (k: number, n: number) => void,
@@ -121,6 +123,7 @@ function call(
         return Promise.resolve({ op, found: found ? { ...found, fold: null } : null } as AutoResolveDone);
       }
       if (op === 'detect') return Promise.resolve({ op, result: detectAll(facts) });
+      if (op === 'values') return Promise.resolve({ op, result: computeValues(facts) });
       replay(facts, seed);
       return Promise.resolve({ op: 'prefold', fold: getFoldFor(facts) } as PrefoldDone);
     } catch (err) {
@@ -179,3 +182,8 @@ export const geoWork = {
 };
 
 let detectInFlight: { facts: Fact[]; promise: Promise<DetectAllResult> } | null = null;
+
+/** #217: the values-panel rows, off-thread on user request; shares the detect lane + pool memo. */
+export function geoValues(facts: Fact[]): Promise<import('@/engine/valuesPanel').ValuesPanelResult> {
+  return call('values', facts, 0).then((done) => (done as ValuesDone).result);
+}
