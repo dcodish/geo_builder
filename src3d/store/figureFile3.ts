@@ -108,6 +108,7 @@ const COMMAND_SAVEABLE: Record<Command3['type'], boolean> = {
   'vec-mag': true,
   'make-right-prism': true, concyclic: true, // #289 (M1): «המנסרה ישרה» — a saved figure reloads
   'line-rel': true, // S2 (#378, ADR-3D-103): ∥/⟂/angle with a named-line side
+  'mag-rel': true, 'mag-val': true, // #393/#335 (ADR-3D-107): expression/chained magnitudes
 };
 
 const COMMAND_TYPES = new Set<Command3['type']>(
