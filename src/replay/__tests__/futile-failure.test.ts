@@ -29,8 +29,11 @@ function trapezoidFigure(tag: string): Fact[] {
 }
 
 describe('futile failures refuse instantly (#403, ADR-407)', () => {
-  it('the exact operator sequence: «ישר GFH» with H undefined — honest error, ONE fold, no HOIST grind', () => {
-    const facts = [...trapezoidFigure('a'), F('a-gfh', { type: 'set-line', points: ['G', 'F', 'H'] } as AnyCommand)];
+  it('a dangling reference on the operator figure — honest error, ONE fold, no HOIST grind', () => {
+    // #402 (ADR-408) made the ORIGINAL vehicle («ישר GFH») CREATE H — that flow is now the
+    // newlabel-collinear-rider scenario. The CLASS stays: a constraint referencing a label no fact
+    // introduces (a typo, a deleted step's orphan) must refuse instantly; set-parallel creates nothing.
+    const facts = [...trapezoidFigure('a'), F('a-px', { type: 'set-parallel', a: 'G', b: 'X', c: 'A', d: 'D' } as AnyCommand)];
     const before = foldStats.computes;
     const t0 = performance.now();
     const d = replay(facts, 0);
@@ -46,7 +49,8 @@ describe('futile failures refuse instantly (#403, ADR-407)', () => {
       F('b1', { type: 'free-point', id: 'A', x: 0, y: 0, free: true } as AnyCommand),
       F('b2', { type: 'free-point', id: 'B', x: 8, y: 0, free: true } as AnyCommand),
       F('b3', { type: 'free-point', id: 'C', x: 4, y: 5, free: true } as AnyCommand, false), // disabled — removed
-      F('b4', { type: 'set-line', points: ['A', 'B', 'C'] } as AnyCommand),
+      // set-distance creates nothing (unlike set-line post-ADR-408, which would re-define C as a rider)
+      F('b4', { type: 'set-distance', a: 'A', b: 'C', value: 3 } as AnyCommand),
     ];
     const before = foldStats.computes;
     const d = replay(facts, 0);

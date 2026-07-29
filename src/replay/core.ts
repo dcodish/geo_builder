@@ -552,7 +552,14 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       introduciblePts = new Set<Id>();
       for (const g of facts) {
         if (!g.enabled) continue;
-        for (const c of factCmds(g)) for (const id of introducedPointIds(c)) introduciblePts.add(id);
+        for (const c of factCmds(g)) {
+          for (const id of introducedPointIds(c)) introduciblePts.add(id);
+          // #402 (ADR-408): a collinearity statement MAY create its new labels as riders — those
+          // labels are introducible, so a sibling fact referencing them is never falsely futile
+          // (deliberate over-approximation; the safe direction for this predicate).
+          if (c.type === 'set-line') for (const id of c.points) introduciblePts.add(id);
+          if (c.type === 'set-collinear') for (const id of [c.a, c.b, c.c]) introduciblePts.add(id);
+        }
       }
     }
     const dangling = factCmds(f)

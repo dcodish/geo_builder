@@ -5571,3 +5571,18 @@ Locked by the `#365` block in `fold-cache.test.ts` (6): append resumes AND equal
 **Measured:** the operator's exact sequence 29.8 s → milliseconds (the whole 3-test lock file runs in 54 ms); structural lock `foldStats.computes` delta = 1 (no HOIST re-fold). The ADR-104 behaviour is preserved by the NOT-futile guard: a constraint typed before its defining fact still defers and resolves.
 
 Locked by `futile-failure.test.ts` (3): the exact operator sequence (honest error + one fold + a 3 s wall bound), the deleted-step orphan (defining fact disabled ⇒ equally futile), and the deferral-intact guard. Sibling capability: #402 (a NEW label in a collinearity statement should be CREATED — after it lands, this exact instance disappears while the class, e.g. a typo'd «ישר GFX», keeps the instant refusal).
+
+### ADR-408 — A NEW label in a collinearity statement is DEFINED by it (#402)
+
+**Class:** the M1 DUAL, collinearity edition — every sibling already creates a new id from the statement that names it (ADR-236's named-line free slider, ADR-050's ordered `line ABE`, 3-D's on-line rider), but `set-line`/`set-collinear` demanded every point pre-exist, so the operator's «ישר GFH» (dev session `2je0eb0n`-adjacent `2je0eg0n`) refused `references an unknown point` and forced a define-H-first workaround.
+
+**Mechanism — creation at the ONE lowering seam** (`applyCommand`'s set-line/set-collinear cases, never per parser rule): `ensureCollinearRiders` creates each new label as an on-segment rider on the line through the statement's existing anchors (≥2 required — fewer keeps the honest refusal, instant per ADR-407). The default follows the STATED ORDER for `set-line` (a trailing letter lands beyond the far anchor at `t = 1.5` — the recruitable-extension class, ADR-074; a leading letter beyond the near anchor on the reversed pair; an interior letter between as a FREE slider, sampled per ADR-052); `set-collinear` states no order, so its new labels are free interior sliders. Two solver-hygiene consequences, both measured:
+
+- **a created rider is STRUCTURALLY collinear** — the driven collinears are added only over the genuine anchors (an identically-zero residual on the rider gave the root-finder nothing and read «cannot hold»); all-existing statements lower byte-identically (asserted);
+- **the rider's solve slot stays FREE** — `addCollinearOrder` used to claim it for the just-satisfied order (its default `t` encodes the side), starving a later constraint of its natural carrier (the ADR-276 satisfied-order-is-a-preference lesson); the order stays a CHECK the standard rungs re-drive if ever violated.
+
+The ADR-407 futility universe counts set-line/set-collinear labels as introducible (deliberate over-approximation — a sibling fact referencing a to-be-created rider is never falsely futile). `introducedPointIds` deliberately does NOT list them (that would flip every set-line out of the ADR-104 deferral/HOIST lanes); the fold's ownership claims are unaffected because a created rider that later conflicts is handled by M1 at apply like any existing id.
+
+**Found en route, filed not bundled:** #404 — the subsequent «GH מקביל ל AD» morphs the declared trapezoid into a parallelogram (ADR-165 amber) instead of sliding the referenced extension rider G; probe-proved PRE-EXISTING on main (the operator's own workaround flow morphs identically). The scenario carries it as an asserted known-issue ratchet.
+
+Locked by `newlabel-collinear.test.ts` (7) + scenario `newlabel-collinear-rider` (the exact operator sequence).
