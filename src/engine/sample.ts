@@ -470,8 +470,29 @@ function similarityGauge(c: Construction, cons: Set<Constraint>): number {
   if (npts === 0) return 0;
   const pinned = pts.filter((p) => p.kind === 'free-point' && (p as FreePoint).pinned).length;
   const hasCircle = c.objects.some((o) => o.kind === 'circle');
-  const scaleFixed =
-    pinned >= 2 ||
+  const t = pinned === 0 ? 2 : 0;
+  const r = npts >= 2 && pinned <= 1 ? 1 : 0;
+  const s = (npts >= 2 || hasCircle) && !scalePinned(c, cons) ? 1 : 0;
+  return t + r + s;
+}
+
+/**
+ * Is the figure's absolute SIZE fixed by a given — as opposed to being whatever the solver happened to
+ * draw? This is the scale component of {@link similarityGauge}, extracted so that every layer deciding
+ * whether an absolute magnitude is KNOWLEDGE asks the same question the DOF counter does (the 3-D
+ * `scalePinned` precedent, [ADR-3D-054](docs/06b-decisions-3d.md#adr-3d-054)).
+ *
+ * The distinction matters because `freeDofCount === 0` means *rigid up to similarity* ([ADR-101](docs/06-decisions.md#adr-101)),
+ * NOT *every magnitude known*: a bare square has no free shape DOF and no known side. Consumers that
+ * print a number must gate on THIS, never on the DOF count (#426) or on sampled variance (a determined
+ * figure is sampled once, so variance cannot speak).
+ *
+ * `cons` defaults to the construction's own constraints plus the driven ones carried on `solve`
+ * directives — the same set {@link freeDofCount} gathers.
+ */
+export function scalePinned(c: Construction, cons: Set<Constraint> = allConstraints(c)): boolean {
+  return (
+    c.objects.filter((o) => isGeoPoint(o) && !o.id.startsWith('~') && o.kind === 'free-point' && (o as FreePoint).pinned).length >= 2 ||
     [...cons].some(
       (k) =>
         k.type === 'distance' ||
@@ -484,11 +505,18 @@ function similarityGauge(c: Construction, cons: Set<Constraint>): number {
         (k.type === 'measure-sum' && k.unit === 'length' && k.target !== 0) ||
         (k.type === 'length-product' && k.lhs.length !== k.rhs.length),
     ) ||
-    c.objects.some((o) => o.kind === 'circle' && o.radius.via === 'length'); // a numeric radius
-  const t = pinned === 0 ? 2 : 0;
-  const r = npts >= 2 && pinned <= 1 ? 1 : 0;
-  const s = (npts >= 2 || hasCircle) && !scaleFixed ? 1 : 0;
-  return t + r + s;
+    c.objects.some((o) => o.kind === 'circle' && o.radius.via === 'length') // a numeric radius
+  );
+}
+
+/** Every constraint the figure enforces: the checked list PLUS the driven ones living on `solve`. */
+function allConstraints(c: Construction): Set<Constraint> {
+  const cons = new Set<Constraint>(c.constraints);
+  for (const o of c.objects) {
+    const sv = (o as { solve?: { constraint: Constraint } }).solve;
+    if (sv?.constraint) cons.add(sv.constraint);
+  }
+  return cons;
 }
 
 /**
@@ -503,11 +531,7 @@ function similarityGauge(c: Construction, cons: Set<Constraint>): number {
  */
 export function freeDofCount(c: Construction): number {
   const raw = c.objects.reduce((n, o) => n + rawMovableDof(o), 0);
-  const cons = new Set<Constraint>(c.constraints);
-  for (const o of c.objects) {
-    const sv = (o as { solve?: { constraint: Constraint } }).solve;
-    if (sv?.constraint) cons.add(sv.constraint);
-  }
+  const cons = allConstraints(c);
   const byId = new Map(c.objects.map((o) => [o.id, o] as const));
   let removed = 0;
   for (const con of cons) removed += dofRemoved(con, byId);

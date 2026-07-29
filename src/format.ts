@@ -92,3 +92,33 @@ export function formatValue(v: number): string {
   if (f && (f.root > 1 || f.pi)) return formatExactText(f);
   return formatMeasure(v);
 }
+
+/**
+ * A magnitude expressed in the student's OWN declared unit (#427) — `AB = a` ([ADR-031](docs/06-decisions.md#adr-031)
+ * symbolic measures) states no number, so the world scale stays a free DOF; but it names a unit, and on a
+ * shape-determined figure every derived magnitude is then a fixed MULTIPLE of it. A ratio is invariant under
+ * the similarity gauge ([ADR-101](docs/06-decisions.md#adr-101)), so `AC = a√2` is genuine seed-invariant
+ * knowledge where the absolute `AC = 5√2` is only the drawing's arbitrary scale (issue #426).
+ */
+export interface UnitValue {
+  /** the student's symbol — 'a', 'x', 'R'. */
+  sym: string;
+  /** 1 for a length/perimeter/radius, 2 for an area (a²). */
+  pow: 1 | 2;
+  /** the seed-invariant quotient `value / unitLength^pow` — THIS is the knowledge, not the absolute. */
+  coef: number;
+  /** `coef` recognized as an exact form (√2, 1/3, …), else null → the 2-decimal fallback ("1.37a"). */
+  exact: ExactForm | null;
+}
+
+/** Plain-text rendering of a unit-expressed magnitude: a, 4a, a√2, a√10/3, a/2, a², 2a². */
+export function formatUnitText(u: UnitValue): string {
+  const sym = `${u.sym}${u.pow === 2 ? '²' : ''}`;
+  const f = u.exact;
+  if (!f) return `${formatMeasure(u.coef)}${sym}`; // an unrecognized ratio is still knowledge
+  const coefAbs = Math.abs(f.p);
+  const sign = f.p < 0 ? '−' : '';
+  const symbols = `${sym}${f.root > 1 ? `√${f.root}` : ''}${f.pi ? 'π' : ''}`;
+  const num = coefAbs === 1 ? symbols : `${coefAbs}${symbols}`;
+  return `${sign}${num}${f.q > 1 ? `/${f.q}` : ''}`;
+}

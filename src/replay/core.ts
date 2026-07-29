@@ -15,7 +15,7 @@
 
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
 import { metricImpossibility } from '@/engine/metricFeasibility';
-import { computeValuesPanel, type ValuesPanelResult } from '@/engine/valuesPanel';
+import { computeValuesPanel, declaredLengthUnit, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross } from '@/engine';
 import { formatMeasure } from '@/format';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, warmStartCarriers, withVariant, withReflectMask } from '@/engine';
@@ -1961,7 +1961,10 @@ export function computeValues(facts: Fact[]): ValuesPanelResult {
   for (const f of facts) {
     if (f.enabled && f.cmd.type === 'measure-area' && 'var' in f.cmd.expr) areaLetter = f.cmd.expr.var;
   }
-  return computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter);
+  // #427: the student's declared length unit («AB = a») — read off the ENABLED facts, so deselecting the
+  // statement that named it returns the panel to plain magnitudes.
+  const unit = declaredLengthUnit(facts.filter((f) => f.enabled).map((f) => f.cmd));
+  return computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter, unit);
 }
 
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */
