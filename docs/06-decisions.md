@@ -5735,3 +5735,26 @@ return vals.length >= 2 && Math.max(...vals) - Math.min(...vals) > 0.05; // the 
 **Measured:** the operator's 6-step sequence **27.8 s → 0.52 s** (53×), verdict `impossible: |AC| = 9 exceeds 8`, `pending === false`, keep-prior leaving the 4-4 triangle intact.
 
 Locked by `metric-feasibility.test.ts` (9 — the pure check incl. the 4-side quadrilateral and the tightest-duplicate-edge case; the realisable 3-4-5 and the FLAT 4-4-8 that must NOT be flagged; the no-alternative-path and no-cycle cases; the end-to-end refusal with an 8 s wall bound; the Hebrew message; `pending === false`; and the realisable AC = 5 sibling building clean) + scenario `impossible-triangle-refuses-instantly`.
+
+### ADR-419 — Two more prod classes answered instead of escalated: the solid vocabulary, the coordinate frame, and "one statement at a time" (#109, #108)
+
+**Found by reading the code before writing any:** [ADR-289](#adr-289) had already built the guidance register (`src/parser/scope.ts`) *and* the pre-LLM short-circuit #109 asked for, and the two messages already say exactly what the operator decided in the 2026-07-13 triage — the `cross-app` text names `themathbible.com/3d-builder`, the `analytic` text promises the future tool. So #109 was not a mechanism to build; it was a **coverage gap in two pattern sets**, measured against the utterances the triage recorded:
+
+| class | before | after |
+|---|---|---|
+| 3-D solids | 4 of 9 answered; «פרמידה» (single yod), גליל, כדור, חרוט fell into the GENERIC `unrelated` message, and «מעגל תלת ממדי» reached the paid LLM | 9 of 9 → `cross-app` |
+| analytic | 5 of 8; «ציר X» missed because the pattern carries no `i` flag so `[xy]` never saw an uppercase axis letter, plus grid and coordinate LISTS | 8 of 8 → `analytic` |
+
+The lesson is the recurring one: **the noun list was a sample, not the vocabulary.** A solid that fell through did not merely miss a message — it got the *wrong* one ("no geometric construction detected") for a student who typed a perfectly clear box.
+
+**#108 is genuinely new, and is a TEACHING answer, not a parser.** The operator's ruling is explicit: do not auto-parse a compound line; teach the split. ADR-264's clause split handles compounds joined by a CONNECTOR (כלומר / שבו / dash), so the space-separated «משולש ABC שווה שוקיים AB=AC» and the sentence-separated «משולש ABC. זוית BAC ישרה. AB שווה לBC.» had no family and escalated. `splitGuidance` now recognises both and quotes the pieces back — «(1) משולש ABC (2) AB=AC» — as a new `split-statements` family in the same register, which puts it in the pre-LLM set (an LLM call here is both cost *and* the wrong answer: it would silently parse the compound the ruling forbids). Confident-only: ≥2 substantial pieces, a relation present, and for the glued form the first piece must carry the shape noun — so an ordinary single statement is never second-guessed (asserted over six of them).
+
+**Relationship to `looksCompound` (the existing sibling), stated so the two are not confused.** The register already had a compound HINT — but it fires only *after* the LLM has also failed, and its advice is generic («break it into smaller steps», `input.tooManyParts`). `splitGuidance` is the confident, specific, PRE-LLM half: it recognises the two shapes above and quotes the actual pieces back as numbered steps, so the LLM is never paid for a line the ruling says must be split. `looksCompound` stays as the broad post-LLM net for compounds this one is deliberately not confident about. Two layers, one intent — not a duplicate mechanism.
+
+**Where it is checked, and why that matters.** `splitGuidance` is NOT a `classifyOutOfScope` category rule: the catalog no-theft guard caught the first attempt immediately, because a SUPPORTED compound (ADR-264's connector form «דלתון ABCD, AB=AD») matches the same shape and parses. It is checked at the ESCALATION SEAM instead — where the parse is already known to have failed — the same placement `looksLikeLatex` and `wordRootMagnitude` use, for the same reason. The guard did its job on the first run; the design followed it.
+
+**Remainder, stated not hidden:** «שוטט משולש שווה שוקיים שזווית הבסיס 20 מעלות» still escalates. Its second statement is a ש-prefixed clause carrying a magnitude rather than a relation operator, and every split point available put a bare «20 מעלות» in the tail — a suggestion worse than no suggestion. Left for the connector-aware pass (ADR-264's territory) rather than shipped as a bad guess.
+
+**Recorded trap (a repeat of the 3-D NUL-byte lesson, docs/06b ADR-3D-006):** patching these regexes through a shell heredoc wrote `"\b"` as a literal **backspace byte** (0x08) into two regex literals — a valid regex that matches a control character, so `tsc` was happy and only `cat -A` showed it. Every file touched that way was scanned for control characters afterwards; the check belongs in any session that edits regex literals through a shell layer.
+
+Locked by `guided-refusals.test.ts` (9 — every solid noun, every analytic form, the two messages carrying the operator's decisions, a no-mislabel guard over real constructions, both split shapes with their quoted pieces, and six single statements that must stay untouched).

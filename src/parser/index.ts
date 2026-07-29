@@ -4,7 +4,7 @@ export { parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCirc
   droppedComparison, droppedRadiusSymbol, droppedRegionSubject, droppedMidsegment, normalizeUtterance } from './parse';
 export type { ParseResult, ParseContext } from './parse';
 export { buildParseCtx } from './context';
-export { classifyOutOfScope, looksCompound, looksLikeLatex, wordRootMagnitude } from './scope';
+export { classifyOutOfScope, looksCompound, looksLikeLatex, splitGuidance, wordRootMagnitude } from './scope';
 export type { ScopeCategory, ScopeMatch } from './scope';
 export { COMMAND_CATALOG, CATEGORY_ORDER, CATEGORY_LABELS } from './catalog';
 export type { CommandDoc, Category } from './catalog';

@@ -33,6 +33,7 @@ import {
   looksCompound,
   looksLikeLatex,
   wordRootMagnitude,
+  splitGuidance,
   parse,
   parseMerge,
   parseNameCenter,
@@ -251,7 +252,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     const PRE_LLM = new Set(['analytic', 'cross-app', 'ui-command', 'valueless-query', 'orientation', 'bare-point', 'unnamed-sides', 'compound-relation']);
     if (oos && PRE_LLM.has(oos.category)) {
       logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${oos.category}` });
-      ui.setInputNote(t(oos.messageKey));
+      ui.setInputNote(t(oos.messageKey, oos.params));
       ui.setBusy(false);
       return;
     }
@@ -382,6 +383,18 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   if (wordRootMagnitude(utterance)) {
     logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:word-root' });
     ui.setInputNote(t('input.scope.word-root'));
+    ui.setBusy(false);
+    return;
+  }
+  // #108 (operator ruling): a COMPOUND line — a shape noun with a property glued on, or several sentences
+  // at once — is TAUGHT, not auto-parsed: quote the pieces back as numbered steps. Checked at the seam (like
+  // the two guards above) because a SUPPORTED compound (ADR-264's connector form «דלתון ABCD, AB=AD»)
+  // matches the same shape and parses — so this must only ever see input the grammar already declined. An
+  // LLM call here would be both cost and the wrong answer: it would silently parse what the ruling forbids.
+  const split = splitGuidance(utterance);
+  if (split) {
+    logDebug({ kind: 'input', utterance, locale, source: 'scope', result: `scope:${split.category}` });
+    ui.setInputNote(t(split.messageKey, split.params));
     ui.setBusy(false);
     return;
   }
