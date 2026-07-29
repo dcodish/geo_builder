@@ -5526,3 +5526,19 @@ Triage read the prod row «זוית abc» as a case problem and the operator rul
 «זוית abc» fails because a **valueless bare angle is not a 2-D construct** — open issue #248 — and it fails *identically* when typed «זוית ABC», which is the proof that case is not the issue. A convention nudge in 2-D would therefore have been unreachable code: the guidance can only fire when the original fails AND the upper-cased form parses, and a case-insensitive grammar makes that set empty.
 
 So the 2-D half is deliberately **not built**, and the finding is asserted (the six lowercase forms above, plus the both-cases-fail proof) so it cannot silently rot: if the case-insensitivity assumption ever breaks, those tests fail. The convention nudge ships in the 3-D app only, where lowercase genuinely fails — [ADR-3D-092](06b-decisions-3d.md#adr-3d-092).
+
+### ADR-405 — Spelling variants fold to the canonical form at the orthography boundary (#389)
+
+**Class:** a **plene/defective (מלא/חסר) spelling variant** of a **known grammar noun** is **rejected by every rule at once**, because each rule hard-codes the one canonical spelling — «מעוין» alone is matched literally at ~20 sites, so admitting «מעויין» rule-by-rule would fix one rule of twenty and re-open on the next rule added. The reported instance (prod, log-triage 2026-07-28): one user typed «מעויין ABHD» and «ABHD מעויין» — the shape grammar exactly right, only the spelling plene — and both escalated to the paid LLM, **while the 3-D app's cross-app guidance refers students to this tool using exactly that spelling** (`scope3.ts` matches `מעויי?ן` on purpose, #247). We rejected a word we tell students to type.
+
+**Mechanism:** the fix lives at the existing orthography chokepoint — the `orth` chain in `normalizeUtterance` (`src/parser/parse.ts`), where עיגול→מעגל, glyph variants, and Cyrillic homoglyphs already normalise. Three folds added, each running before any rule sees the text, so the WHOLE grammar (and every future rule) inherits them:
+
+- `מעויין` → `מעוין` (the reported variant);
+- `עפיפון` → `דלתון` (the kite synonym, ADR-110's i18n twin) — this one was **half-supported**: the kite macro and the area rule listed it, but `POLY_WORDS_HE`, `CONTAINER_NOUNS_HE`, the inscribe kind-classifiers and the leftover guard did not, so «מעגל חסום בעפיפון» mis-lowered while «עפיפון ABCD» worked. The **seven scattered per-rule alternations were deleted** (the ADR-3D-069 discipline: the general path must subsume the special cases, proven by equality-of-parse tests) — the registry shrank;
+- standalone defective `שוה` → `שווה`, guarded on both sides (`(?<![א-ת])…(?![א-ת])`) so it never fires inside another word — enables «משולש שוה שוקיים» while «השוה»/«שוהם» stay untouched.
+
+**Sibling audit:** `מקבילית` — no attested or plausible alternation, left alone. `פירמידה`/`פרמידה` — no 2-D grammar site exists (the 3-D-solid redirect is #109's scope), nothing to fold. The kaf-morphology trap (`מאונ[כך]`) — already owned by the `lexicon.ts` atoms + `morphology-matrix.test.ts`; verified covered. `spanAccounting.ts` already listed both «מעויין» and «שוה» — the honesty layer knew words the grammar rejected, the #361 shape; this ADR closes those two members (#361 remains open for the rest of its inventory).
+
+**Honesty/behaviour:** canonical spellings are byte-untouched (asserted); no rule semantics changed — only which surface strings reach them.
+
+Locked by `spelling-normalization.test.ts` (8 — equality-of-parse with the canonical form, the half-supported inscribe case, word-boundary guards) + scenario `plene-spelling-rhombus` (the exact prod utterance end-to-end: parse → replay → all four sides equal).

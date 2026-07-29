@@ -1722,4 +1722,19 @@ export const SCENARIOS_4: Scenario[] = [
       expect(hasBD, 'the extension leg B–D is drawn').toBe(true);
     },
   },
+  {
+    id: 'plene-spelling-rhombus',
+    title: 'issue #389 / ADR-405: «מעויין ABHD» (plene spelling) builds the rhombus — the spelling fold at normalizeUtterance',
+    guards:
+      'prod (log-triage 2026-07-28): one user typed the plene «מעויין» in both word orders and both escalated to the LLM, while the 3-D app’s cross-app guidance refers students to this tool with exactly that spelling. The fix is a fold at the orthography boundary, so EVERY rule inherits the variant; this scenario locks the exact prod utterance end-to-end (parse → replay → an actual rhombus, all four sides equal).',
+    steps: ['מעויין ABHD'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const [A, B, H, D] = ['A', 'B', 'H', 'D'].map((id) => at(fig, id));
+      const sides = [dist(A, B), dist(B, H), dist(H, D), dist(D, A)];
+      for (const s of sides.slice(1)) {
+        expect(Math.abs(s - sides[0]), 'all four sides equal (a rhombus, not a generic quad)').toBeLessThan(1e-6 * Math.max(s, sides[0]));
+      }
+    },
+  },
 ];

@@ -590,7 +590,7 @@ function shapeLabels(bare: string, n: number, ctx: ParseContext, hasLeftover: bo
  * shape phrases שווה־צלעות / שווה־שוקיים are stripped as UNITS by their owners before the test.)
  */
 const SHAPE_LEFTOVER =
-  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?|sides?|every|each|triangles?|squares?|rectangles?|rhombus(?:es)?|trapezoids?|kites?|parallelograms?|quadrilaterals?)\b|[=⊥⟂∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונ[כך]|אנ[כך]|מקביל|חוצ|אמצע|תיכון|גובה|המש(?:ך|כי(?:ם|הם|הן)?)|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ|צלע|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|עפיפון|מקבילית|(?<![א-ת])[ובשלמכ]?כל(?![א-ת])/i;
+  /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?|sides?|every|each|triangles?|squares?|rectangles?|rhombus(?:es)?|trapezoids?|kites?|parallelograms?|quadrilaterals?)\b|[=⊥⟂∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונ[כך]|אנ[כך]|מקביל|חוצ|אמצע|תיכון|גובה|המש(?:ך|כי(?:ם|הם|הן)?)|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ|צלע|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|מקבילית|(?<![א-ת])[ובשלמכ]?כל(?![א-ת])/i;
 
 /** True if, after removing the shape keyword, geometry the shape can't express remains. */
 const shapeHasLeftover = (s: string, re: RegExp): boolean => SHAPE_LEFTOVER.test(s.replace(re, ' '));
@@ -677,10 +677,11 @@ const shapeMacro =
     return make(ids);
   };
 
-/** "kite ABCD" / "דלתון ABCD" (also "עפיפון") → a `shape-variant` whose equal-pair AXIS is a cyclable choice
+/** "kite ABCD" / "דלתון ABCD" ("עפיפון" folds to דלתון at normalizeUtterance, ADR-405) → a `shape-variant`
+ *  whose equal-pair AXIS is a cyclable choice
  *  ([ADR-138](docs/06-decisions.md#adr-138)): variant 0 = axis AC (|AB|=|AD|, |CB|=|CD|), variant 1 = axis BD.
  *  `replay` expands it to a free quad + the selected pair; an explicit `AB=BC` pins the other axis. */
-const kite = shapeMacro(/kite|דלתון|עפיפון/i, /kite|דלתון|עפיפון/gi, 4, (ids) => [
+const kite = shapeMacro(/kite|דלתון/i, /kite|דלתון/gi, 4, (ids) => [
   { type: 'shape-variant', shape: 'kite', ids: [ids[0], ids[1], ids[2], ids[3]], variant: 0 },
 ]);
 
@@ -2651,7 +2652,7 @@ const measurePi: Rule = (s) => {
 
 // ── AREA measures & relations ([ADR-118](docs/06-decisions.md#adr-118)) ────────────────────────────────
 // Hebrew shape nouns / English shape words that may sit between the area marker and the vertex letters.
-const AREA_SHAPE = String.raw`(?:ה?(?:משולש|מרובע|דלתון|עפיפון|מלבן|מקבילית|טרפז|מעוין|ריבוע)|triangle|quadrilateral|rectangle|parallelogram|trapez\w*|rhombus|kite|square)`;
+const AREA_SHAPE = String.raw`(?:ה?(?:משולש|מרובע|דלתון|מלבן|מקבילית|טרפז|מעוין|ריבוע)|triangle|quadrilateral|rectangle|parallelogram|trapez\w*|rhombus|kite|square)`;
 
 /** Every "area of a polygon" reference in `s`, in order. Forms: compact `SABC`; verbose `שטח [ה<shape>] ABC`
  *  / `area [of] [the] [<shape>] ABC`. Returns each polygon's vertex ids with the marker's string position. */
@@ -3791,7 +3792,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
     : /square|ריבוע/i.test(s) ? 'square'
     : /rectangle|מלבן/i.test(s) ? 'rectangle'
     : /rhombus|מעוין/i.test(s) ? 'rhombus'
-    : /kite|דלתון|עפיפון/i.test(s) ? 'kite'
+    : /kite|דלתון/i.test(s) ? 'kite'
     : /trapez|טרפז/i.test(s) ? 'trapezoid'
     : /quad|מרובע/i.test(s) ? 'quad'
     : null;
@@ -3832,7 +3833,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   const named = circleCenter(s); // may be null — "inscribed in a circle" need not name the centre
   const r = parseRadius(s);
   let rest = dropCircleRef(s).replace(
-    /equilateral|שווה[\s-]?צלעות|isosceles|שווה[\s-]?שוקיים|right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|kite|דלתון|עפיפון|trapez\w*|טרפז|quad\w*|מרובע|polygon|מצולע|inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
+    /equilateral|שווה[\s-]?צלעות|isosceles|שווה[\s-]?שוקיים|right[\s-]?angled|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|square|ריבוע|rectangle|מלבן|rhombus|מעוין|kite|דלתון|trapez\w*|טרפז|quad\w*|מרובע|polygon|מצולע|inscrib\w*|חסום|בר[\s-]?חסימה|cyclic|concyclic|circle|מעגל|cent\w*|radius|רדיוס\S*|שמרכזו|מרכזו|העובר|דרך/gi,
     ' ',
   );
   if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
@@ -3977,7 +3978,7 @@ const containerRole = (word: string): { kind: 'triangle' | 'quad'; create: strin
   if (/rhombus|מעוין/i.test(word)) return { kind: 'quad', create: 'rhombus' };
   if (/parallelogram|מקבילית/i.test(word)) return { kind: 'quad', create: 'parallelogram' };
   if (/trapez|טרפז/i.test(word)) return { kind: 'quad', create: 'trapezoid' };
-  if (/quad|מרובע|kite|דלתון|עפיפון/i.test(word)) return { kind: 'quad', create: 'quad' };
+  if (/quad|מרובע|kite|דלתון/i.test(word)) return { kind: 'quad', create: 'quad' };
   return null;
 };
 
@@ -4479,7 +4480,7 @@ const incircle: Rule = (s, ctx) => {
     : /square|ריבוע/i.test(s) ? 'square'
     : /rectangle|מלבן/i.test(s) ? 'rectangle'
     : /rhombus|מעוין/i.test(s) ? 'rhombus'
-    : /kite|דלתון|עפיפון/i.test(s) ? 'kite'
+    : /kite|דלתון/i.test(s) ? 'kite'
     : /trapez|טרפז/i.test(s) ? 'trapezoid'
     : /parallelogram|מקבילית/i.test(s) ? 'parallelogram'
     : /quad\w*|מרובע/i.test(s) ? 'quad'
@@ -4491,7 +4492,7 @@ const incircle: Rule = (s, ctx) => {
   const namedC = circleCenter(s);
   const incLabel = incenterLabel(s);
   let rest = dropCircleRef(s).replace(
-    /incircle|inscrib\w*|חסום|circumscrib\w*|חוסם|triangle|משולש|square|ריבוע|rectangle|מלבן|rhombus|מעוין|kite|דלתון|עפיפון|trapez\w*|טרפז|parallelogram|מקבילית|quad\w*|מרובע|polygon|circles?|מעגל\w*|cent(?:er|re)\w*|ה?מרכז\w*/gi,
+    /incircle|inscrib\w*|חסום|circumscrib\w*|חוסם|triangle|משולש|square|ריבוע|rectangle|מלבן|rhombus|מעוין|kite|דלתון|trapez\w*|טרפז|parallelogram|מקבילית|quad\w*|מרובע|polygon|circles?|מעגל\w*|cent(?:er|re)\w*|ה?מרכז\w*/gi,
     ' ',
   );
   if (namedC) rest = rest.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ');
@@ -8475,6 +8476,16 @@ export function normalizeUtterance(raw: string): string {
     .replace(/־/g, '-')
     .replace(/[؜​-‏‪-‮⁦-⁩﻿]/g, '')
     .replace(/עיגול/g, 'מעגל')
+    // Spelling folds (#389, ADR-405): a plene/defective (מלא/חסר) spelling VARIANT of a known noun used
+    // to miss every rule at once, because each rule hard-codes the one canonical spelling (~20 sites for
+    // «מעוין» alone). Folding the variant onto the canonical form HERE — the one boundary every rule
+    // reads — makes the whole grammar accept it, and a newly-added rule inherits it for free. עפיפון ≡
+    // דלתון (kite synonym, the ADR-110 i18n twin) joins the same fold, replacing three per-rule
+    // alternations that had it HALF-supported (kite/area yes, inscribe/POLY_WORDS no); the standalone
+    // defective «שוה» folds to «שווה» (guarded on both sides so it never fires inside another word).
+    .replace(/מעויין/g, 'מעוין')
+    .replace(/עפיפון/g, 'דלתון')
+    .replace(/(?<![א-ת])שוה(?![א-ת])/g, 'שווה')
     // Angle/degree GLYPH variants (#45 / ADR-299): the ∡ MEASURED-ANGLE (U+2221) and ∢ SPHERICAL-ANGLE
     // (U+2222) glyphs are the same student intent as ∠ (U+2220); the SUPERSCRIPT ZERO ⁰ (U+2070), typed for
     // degrees ("90⁰"), is the ° sign. Normalising here means every angle rule reads the canonical glyphs.
@@ -8521,7 +8532,7 @@ export function normalizeUtterance(raw: string): string {
  * (חוסם מעגל) circumscribes statements carry no conflicting marker and are untouched; the En
  * twin "circumscribed in a circle" gets the same treatment.
  */
-const CONTAINER_NOUNS_HE = 'מעגל|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|עפיפון|מקבילית';
+const CONTAINER_NOUNS_HE = 'מעגל|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|מקבילית';
 const HOSEM_TO_PASSIVE: Record<string, string> = { 'חוסם': 'חסום', 'חוסמת': 'חסומה', 'חוסמים': 'חסומים', 'חוסמות': 'חסומות' };
 const normalizeInscriptionSlip = (s: string): string =>
   s
