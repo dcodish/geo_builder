@@ -206,6 +206,20 @@ function holdsAt(claim: Claim3, c: Construction3, resolved: Resolved3): boolean 
       const target = claim.c * norm3(sub3(b2, a2));
       return Math.abs(norm3(sub3(b1, a1)) - target) <= REL_TOL * Math.max(target, 1);
     }
+    // #393/#335 (ADR-3D-107): magnitude of a vector EXPRESSION — the length-rel/length-eq
+    // twins, evaluated through the one evalExpr every expression consumer shares.
+    case 'mag-rel': {
+      const e1 = evalExpr(claim.e1, c, pos);
+      const e2 = evalExpr(claim.e2, c, pos);
+      if (!e1 || !e2) return false;
+      const target = claim.c * norm3(e2);
+      return Math.abs(norm3(e1) - target) <= REL_TOL * Math.max(target, 1);
+    }
+    case 'mag-val': {
+      const e = evalExpr(claim.e, c, pos);
+      if (!e) return false;
+      return Math.abs(norm3(e) - claim.value) <= REL_TOL * Math.max(Math.abs(claim.value), 1);
+    }
     case 'volume-eq-poly': {
       const vol = (ids: string[]): number | null => {
         const ps = ids.map((id) => pos.get(id));
