@@ -2243,8 +2243,14 @@ function ensureCollinearRiders(objects: GeoObject[], pts: Id[], ordered = true):
     // `set-collinear` states no ORDER — a new label is a free interior slider (its side/position is
     // the sampler's, ADR-052); only the ordered `set-line` reads a stated side from letter position.
     if (!ordered) addObj(objects, { kind: 'on-segment', id: p, a: a1, b: a2, t: 0.5, free: true });
-    else if (i < first) addObj(objects, { kind: 'on-segment', id: p, a: a2, b: a1, t: 1.5 });
-    else if (i > last) addObj(objects, { kind: 'on-segment', id: p, a: a1, b: a2, t: 1.5 });
+    // A rider BEYOND an anchor is the EXTENSION class, and must say so: `extension` is the flag every
+    // mechanism reads to learn what this DOF is — the driven range ([1.02, 12] vs an interior [0, 1],
+    // `evaluate`'s `range`/clamp), `recruitableFreeDof`'s failure-path eligibility, and the sampler's
+    // ADR-052 variation. Born flag-less, a t = 1.5 rider contradicted its own class: its solve range was
+    // the interior [0, 1] (so driving it CLAMPED it off the side the letter order states), no failure-path
+    // rung could recruit it, and its t was never sampled — a fixed default masquerading as fixed (#412).
+    else if (i < first) addObj(objects, { kind: 'on-segment', id: p, a: a2, b: a1, t: 1.5, extension: true });
+    else if (i > last) addObj(objects, { kind: 'on-segment', id: p, a: a1, b: a2, t: 1.5, extension: true });
     else addObj(objects, { kind: 'on-segment', id: p, a: a1, b: a2, t: (i - first) / (last - first), free: true });
   }
   return created;

@@ -1726,16 +1726,13 @@ export const SCENARIOS_4: Scenario[] = [
     id: 'newlabel-collinear-rider',
     title: 'issue #402 / ADR-408: «ישר GFH» with H undefined CREATES H as a rider on line GF — the operator’s intended flow, no workaround',
     guards:
-      'dev session 2je0eg0n (play-testing ADR-406): «ישר GFH» refused `references an unknown point` (and slowly — the #403 half); the operator had to define H first («H על CD») before the line statement worked. The M1 dual: a NEW label in a collinearity statement is DEFINED by it — created as an on-segment rider following the stated order (trailing ⇒ beyond the far anchor), its solve slot left FREE so a later constraint (the ∥ here) can drive it or its neighbours.',
+      'dev session 2je0eg0n (play-testing ADR-406): «ישר GFH» refused `references an unknown point` (and slowly — the #403 half); the operator had to define H first («H על CD») before the line statement worked. The M1 dual: a NEW label in a collinearity statement is DEFINED by it — created as an on-segment rider following the stated order (trailing ⇒ beyond the far anchor), its solve slot left FREE so a later constraint (the ∥ here) can drive it or its neighbours. The operator’s play then exposed #412: the rider was born with no `extension` flag, so the ∥ could not slide it or G and REFUSED — fixed at the creation site (ADR-414), which also retired this scenario’s #404 morph ratchet.',
     steps: ['טרפז ABCD', 'EF קטע אמצעים', 'DB', 'AC', 'G על המשך AB', 'ישר GFH', 'GH מקביל ל AD'],
-    // KNOWN ISSUE #404 (pre-existing on main, probe-verified with the operator's workaround flow too):
-    // the ∥ morphs the declared trapezoid into a parallelogram (ADR-165 amber) instead of sliding the
-    // referenced extension rider G. Flipping this to expectViolations-free is #404's acceptance test.
-    expectViolations: true,
     check: (fig) => {
       allStepsOk(fig);
-      expect(fig.violations.map((v) => v.message).join('|'), 'the ONLY violation is the #404 morph flag').toMatch(/no longer a trapezoid/);
-      expect(fig.violations, 'exactly the one known-issue violation').toHaveLength(1);
+      // #404 CLOSED by ADR-414: the ∥ slides the referenced extension rider G instead of recruiting the
+      // free trapezoid vertex D and morphing the declared shape into a parallelogram (was ADR-165 amber).
+      expect(fig.violations.map((v) => v.message).join('|'), 'the declared trapezoid is preserved — no morph').toBe('');
       const [A, D, G, F, H] = ['A', 'D', 'G', 'F', 'H'].map((id) => at(fig, id));
       // H exists ON line GF (the created rider), beyond F per the stated order G→F→H
       const cross = (P: Vec, Q: Vec, R: Vec) => (Q.x - P.x) * (R.y - P.y) - (Q.y - P.y) * (R.x - P.x);
@@ -1743,6 +1740,21 @@ export const SCENARIOS_4: Scenario[] = [
       const t = ((H.x - G.x) * (F.x - G.x) + (H.y - G.y) * (F.y - G.y)) / (dist(G, F) ** 2);
       expect(t, 'H lies beyond F (G→F→H, the stated order)').toBeGreaterThan(1);
       // the stated ∥ drives
+      const par = Math.abs(cross(G, H, { x: G.x + (D.x - A.x), y: G.y + (D.y - A.y) })) / Math.max(dist(G, H) * dist(A, D), 1e-9);
+      expect(par, 'GH ∥ AD holds').toBeLessThan(1e-4);
+    },
+  },
+  {
+    id: 'newlabel-collinear-rider-workaround-twin',
+    title: 'issue #404: the same figure with H defined FIRST keeps the declared trapezoid too — the pre-#402 workaround flow',
+    guards:
+      'the twin #404 asked for: the morph was probe-verified on main in BOTH flows, so locking only the created-rider flow would leave the workaround order free to regress (a student who defines H first must get the same figure). H here is a genuine free rider on CD, so the ∥ has a carrier either way — the assertion is that the DECLARED trapezoid survives.',
+    steps: ['טרפז ABCD', 'EF קטע אמצעים', 'DB', 'AC', 'G על המשך AB', 'H על CD', 'ישר GFH', 'GH מקביל ל AD'],
+    check: (fig) => {
+      allStepsOk(fig);
+      expect(fig.violations.map((v) => v.message).join('|'), 'no shape morph in the workaround order either').toBe('');
+      const [A, D, G, H] = ['A', 'D', 'G', 'H'].map((id) => at(fig, id));
+      const cross = (P: Vec, Q: Vec, R: Vec) => (Q.x - P.x) * (R.y - P.y) - (Q.y - P.y) * (R.x - P.x);
       const par = Math.abs(cross(G, H, { x: G.x + (D.x - A.x), y: G.y + (D.y - A.y) })) / Math.max(dist(G, H) * dist(A, D), 1e-9);
       expect(par, 'GH ∥ AD holds').toBeLessThan(1e-4);
     },
