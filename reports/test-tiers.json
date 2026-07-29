@@ -5,87 +5,35 @@
   "slow": [
     {
       "file": "src/__tests__/scenarios-e2e-5.test.ts",
-      "ms": 235326
-    },
-    {
-      "file": "src3d/__tests__/adr-3d-032.test.ts",
-      "ms": 227304
+      "ms": 177300
     },
     {
       "file": "src3d/__tests__/right-apex.test.ts",
-      "ms": 214172
+      "ms": 154534
+    },
+    {
+      "file": "src3d/__tests__/adr-3d-032.test.ts",
+      "ms": 153570
     },
     {
       "file": "src3d/__tests__/book-coordinate-givens.test.ts",
-      "ms": 172064
-    },
-    {
-      "file": "src/theorems/__tests__/b-corpus.test.ts",
-      "ms": 154433
-    },
-    {
-      "file": "src/engine/__tests__/membership-conversion.test.ts",
-      "ms": 142108
-    },
-    {
-      "file": "src3d/__tests__/named-parametric-line.test.ts",
-      "ms": 115524
-    },
-    {
-      "file": "src/__tests__/scenarios-props-submit-gate.test.ts",
-      "ms": 112014
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-1.test.ts",
-      "ms": 111023
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-7.test.ts",
-      "ms": 104943
-    },
-    {
-      "file": "src3d/__tests__/plane-eq-drive.test.ts",
-      "ms": 90113
-    },
-    {
-      "file": "src/engine/__tests__/obligation-preservation.test.ts",
-      "ms": 86890
-    },
-    {
-      "file": "src3d/__tests__/exam-2026-2.test.ts",
-      "ms": 86311
-    },
-    {
-      "file": "src/replay/__tests__/basin-ownership.test.ts",
-      "ms": 85079
+      "ms": 90514
     },
     {
       "file": "src3d/__tests__/member-drive.test.ts",
-      "ms": 84594
+      "ms": 84034
     },
     {
-      "file": "src/__tests__/scenarios-e2e-8.test.ts",
-      "ms": 83172
+      "file": "src/theorems/__tests__/b-corpus.test.ts",
+      "ms": 77038
     },
     {
-      "file": "src/__tests__/scenarios-e2e-3.test.ts",
-      "ms": 82756
+      "file": "src/engine/__tests__/membership-conversion.test.ts",
+      "ms": 66442
     },
     {
-      "file": "src/__tests__/scenarios-props-resample.test.ts",
-      "ms": 75080
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-2.test.ts",
-      "ms": 74717
-    },
-    {
-      "file": "src/engine/__tests__/inscribe-joint-solve.test.ts",
-      "ms": 74389
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-4.test.ts",
-      "ms": 71447
+      "file": "src/__tests__/scenarios-e2e-1.test.ts",
+      "ms": 62507
     }
   ]
 }
