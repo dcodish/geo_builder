@@ -5572,6 +5572,20 @@ Locked by the `#365` block in `fold-cache.test.ts` (6): append resumes AND equal
 
 Locked by `futile-failure.test.ts` (3): the exact operator sequence (honest error + one fold + a 3 s wall bound), the deleted-step orphan (defining fact disabled ⇒ equally futile), and the deferral-intact guard. Sibling capability: #402 (a NEW label in a collinearity statement should be CREATED — after it lands, this exact instance disappears while the class, e.g. a typo'd «ישר GFX», keeps the instant refusal).
 
+### ADR-408 — A NEW label in a collinearity statement is DEFINED by it (#402)
+
+**Class:** the M1 DUAL, collinearity edition — every sibling already creates a new id from the statement that names it (ADR-236's named-line free slider, ADR-050's ordered `line ABE`, 3-D's on-line rider), but `set-line`/`set-collinear` demanded every point pre-exist, so the operator's «ישר GFH» (dev session `2je0eb0n`-adjacent `2je0eg0n`) refused `references an unknown point` and forced a define-H-first workaround.
+
+**Mechanism — creation at the ONE lowering seam** (`applyCommand`'s set-line/set-collinear cases, never per parser rule): `ensureCollinearRiders` creates each new label as an on-segment rider on the line through the statement's existing anchors (≥2 required — fewer keeps the honest refusal, instant per ADR-407). The default follows the STATED ORDER for `set-line` (a trailing letter lands beyond the far anchor at `t = 1.5` — the recruitable-extension class, ADR-074; a leading letter beyond the near anchor on the reversed pair; an interior letter between as a FREE slider, sampled per ADR-052); `set-collinear` states no order, so its new labels are free interior sliders. Two solver-hygiene consequences, both measured:
+
+- **a created rider is STRUCTURALLY collinear** — the driven collinears are added only over the genuine anchors (an identically-zero residual on the rider gave the root-finder nothing and read «cannot hold»); all-existing statements lower byte-identically (asserted);
+- **the rider's solve slot stays FREE** — `addCollinearOrder` used to claim it for the just-satisfied order (its default `t` encodes the side), starving a later constraint of its natural carrier (the ADR-276 satisfied-order-is-a-preference lesson); the order stays a CHECK the standard rungs re-drive if ever violated.
+
+The ADR-407 futility universe counts set-line/set-collinear labels as introducible (deliberate over-approximation — a sibling fact referencing a to-be-created rider is never falsely futile). `introducedPointIds` deliberately does NOT list them (that would flip every set-line out of the ADR-104 deferral/HOIST lanes); the fold's ownership claims are unaffected because a created rider that later conflicts is handled by M1 at apply like any existing id.
+
+**Found en route, filed not bundled:** #404 — the subsequent «GH מקביל ל AD» morphs the declared trapezoid into a parallelogram (ADR-165 amber) instead of sliding the referenced extension rider G; probe-proved PRE-EXISTING on main (the operator's own workaround flow morphs identically). The scenario carries it as an asserted known-issue ratchet.
+
+Locked by `newlabel-collinear.test.ts` (7) + scenario `newlabel-collinear-rider` (the exact operator sequence).
 ### ADR-410 — The VALUES PANEL: the student's "what do I know so far" index (#217)
 
 **What (operator-commissioned 2026-07-19, rulings same day):** the 2-D edition of the 3-D "organize your data" sidebar — every fixed/known value the figure carries, stated (נתון) and derived (נגזר) alike, surfaced passively in a panel: segment lengths over the detection layers' own edge universe, polygon-corner and stated angles, radii, polygon/circle areas, and **area-ratio classes** (S, 2S, ½S — similarity-gauge-invariant knowledge even on an unscaled figure; the student's own letter reused when ADR-121 bound one). The 3-D `dataView` precedent COPIED, never imported (docs/20 §12).
@@ -5619,3 +5633,44 @@ Locked by `midseg-reseat.test.ts` (4 — re-seat, same-side no-op, free-endpoint
 **Two prior locks deliberately updated** (each asserted the exact dishonesty this ADR abolishes): `redefine-existing-point.test.ts`'s "A = midpoint of BC drives A" — the driven result IS the flattened triangle; the M1 mechanism keeps its lock via a new non-degenerate free-point case, and the degenerate case now asserts the honest constraint-shaped refusal (never "already defined"). And `ladder-contract.test.ts`'s ADR-123 case "mid(AB)=mid(AC) forces B≡C, allowed" — **ADR-413 NARROWS ADR-123 at the declared-polygon boundary**: ADR-123's own justification was that the merged point (the kite's N≡O) was *never user-defined*, whereas B,C are the declared triangle's own vertices and merging them leaves a "triangle" that is a segment; a forced coincidence that flattens a declared polygon now refuses, while point-level forced coincidences keeping every declared shape real stay allowed (scenario `area-ratio-converges-points-allowed`, green). *Operator may overrule the narrowing (the #408 issue flags refuse-vs-amber as their call); flagged in the fix report.*
 
 Locked by `collapse-gate.test.ts` (the «D אמצע AB»+«D על AC» refusal + the thin-but-legit 3° triangle regression) + scenario `midpoint-membership-contradiction-refuses`.
+
+### ADR-414 — An engine-CREATED carrier must declare its DOF class: the flag IS the interface (#412, closes #404)
+
+**Class:** a mechanism keyed on a FLAG, and an object born without the flag its own position class implies. `ensureCollinearRiders` ([ADR-408](#adr-408)) creates a new label in a collinearity statement as a rider on the anchors' line, placing a trailing/leading letter BEYOND an anchor at `t = 1.5` — the extension class, as its own comment says ("the recruitable-extension class, ADR-074") — but emitted the object with **neither `free` nor `extension`** set, while the same function's interior/unordered branches correctly set `free: true`. An inconsistency inside one function; the canonical creation site ([apply.ts](../src/engine/apply.ts) `point-on-segment`) had the contract right all along (`...(cmd.extension ? { extension: true } : {})`).
+
+**Why one missing flag produced two false over-constraints.** `extension` is not decoration — it is the interface three independent mechanisms read to learn what the DOF is:
+
+| reader | with the flag | without it (the bug) |
+|---|---|---|
+| `evaluate`'s driven range + clamp | `[1.02, 12]` | the interior `[0, 1]` — driving the rider CLAMPS it off the side the letter order states, so the solve could not even represent the answer |
+| `recruitableFreeDof` | eligible (`free === true \|\| extension === true`) | ineligible — no failure-path rung can recruit it, and it cannot take the satisfied `collinear-order` off its neighbour as case (D)'s `alt` |
+| the sampler's `isSamplableExtension` | varied per seed (ADR-052) | never sampled — frozen at `t = 1.5` in every configuration, the exact "default masquerading as fixed" smell that predicate's own doc names |
+
+Measured on the operator's play figure (`טרפז ABCD / EF קטע אמצעים / DB / AC / G על המשך AB / ישר GFH`): **«H על CD»** refused `over-constrained: H, C, D collinear cannot hold` although line GF crosses segment CD at `t = 2.0` with H sitting at `t = 1.5` (`u = 0.135`, strictly inside CD) — a slide along the rider's own carrier; and **«GH מקביל ל AD»** refused although sliding G sweeps GF's direction through AD's. The second failure needed BOTH halves of the flag's absence: `addCollinearOrder` claims every rider it sequences, so the pre-existing extension rider **G** — the ∥'s natural carrier ([#404](https://github.com/dcodish/geo_builder/issues/404)) — was owned by a `collinear-order` that its own construction already satisfied, and case (D) could not re-point that order onto H because H was ineligible. One flag restored both: the order moves to H, G takes the ∥.
+
+**#404 closes with it, not separately.** With G reachable, the ∥ slides the referenced extension rider instead of recruiting the free trapezoid vertex D, so the declared trapezoid is no longer morphed into a parallelogram — the amber that issue was filed for. Its scenario ratchet (`expectViolations: true` on `newlabel-collinear-rider`) is retired to the clean assertion, which was its stated acceptance test, and the workaround-flow twin it asked for is locked as its own scenario.
+
+**Ladder evidence** (`StepResult.ladder`, docs/LADDER.md): «H על CD» went `m1:collinear → recruit:B-forced → component:minimal → component:full → m1:refuse` (14.6 s) → `m1:collinear → m1:primary` (0.8 s) — it now succeeds at the PRIMARY stage with no failure ladder at all, because the carrier the statement names can finally move. «GH ∥ AD»: `recruit:B → component:minimal → main:refuse` → `recruit:B → component:minimal → main:component`.
+
+**Not widened, deliberately.** Two adjacent mechanisms were left alone because measurement did not implicate them: the `'soft-order'` ancestor mode (which lets a HARD constraint claim a carrier a satisfied order holds — the documented "the claimer frees the order" behaviour) is wired at exactly ONE call site and stage (B) does not use it; and `addCollinearOrder` still claims carriers for an order that is already satisfied. Both are the general form of this figure's second half, and either would be a broad failure-path change; with the flag corrected, no measured case needs them. Filed as the residual, not bundled. **#260** (two-host membership on a FREE interior rider whose hosts are loose) was probed and is a genuinely different sub-case — it still refuses, and stays open honestly.
+
+Locked by `created-rider-class.test.ts` (6 — the flags at creation on both sides, the interior-slider control, ADR-052 sampling variation, and the two follow-on statements; 5 of the 6 asserted to fail pre-fix) + scenarios `newlabel-collinear-rider` (ratchet retired) and `newlabel-collinear-rider-workaround-twin`.
+
+### ADR-415 — The collinearity family reads its noun on EITHER side of the labels (#417)
+
+**Class:** one family missing the word-order freedom every sibling family has, so a natural register routes to the paid LLM. Operator, playing PR #406 (2026-07-29): «ישר GFH» works, «GFH ישר» does not. Measured across families with figure context:
+
+| utterance | before |
+|---|---|
+| `ישר GFH` · `הישר GFH` | ✅ `set-line` |
+| `GFH ישר` · `GFH הישר` | ❌ **not-handled** → LLM |
+| `ריבוע ABCD` / `ABCD ריבוע` · `משולש ABC` / `ABC משולש` · `מעוין ABCD` / `ABCD מעוין` | ✅ / ✅ |
+| `קטע אמצעים EF` / `EF קטע אמצעים` · `מיתר AB` / `AB מיתר` | ✅ / ✅ |
+
+The house convention CLAUDE.md states ("keyword-order-independent rules") held everywhere except here, because the siblings are built the position-free way — `shapeMacro`/`triShape`/`quadShape` **strip the noun wherever it stands** (`s.replace(strip, ' ')`) and read the label run out of what remains, guarded by `SHAPE_LEFTOVER` so nothing geometry-significant is silently dropped — while `lineN` and `dashCollinear` used regexes ANCHORED with the noun before the labels.
+
+**Mechanism (the sibling shape, line edition):** strip the line noun, then require the remainder to be *nothing but* a run of ≥3 uppercase labels. That all-labels demand IS the guard, and it is what makes the change safe rather than greedy: the family's richer phrasings each leave a word behind and so keep their own (different!) lowering — «P על הישר QR» leaves «על» and stays an UNORDERED `set-collinear` (reading it as an ordered run would silently assert "Q between P and R"), «ישר QR עובר דרך P» leaves the verb, and a 2-label «הישר AC» is a line REFERENCE, not a collinearity. Both order-rigid rules in the family were swept, not just the reported one. The noun is kept as a non-global/global regex PAIR on purpose: a `g`-flagged regex carries `lastIndex` across `.test()` calls, so sharing one constant would make the presence check alternate true/false between utterances.
+
+Not a new grammar entry point and not a second accepted spelling — the rule now asks the semantic question ("is this utterance the line noun plus a label run?") instead of a positional one. The `collinear`/«על ישר אחד» branches were already position-free (they clean the keywords out and read the run), which is why «B C F E נמצאות על ישר אחד» always worked — further evidence the two anchored rules were the outliers.
+
+Locked by `collinear-word-order.test.ts` (8 — both orders for `ישר`/`הישר`/`קו`/`הקו`/English, spaced + glued + 4-label runs, the dashed form both ways, the two no-steal guards, and a **PARITY ratchet** asserting the collinearity family matches its siblings on noun order so a future rule cannot reintroduce a rigid order; 6 of the 8 asserted to fail pre-fix, the 2 passing being the no-steal guards that must hold either way) + scenario `newlabel-collinear-noun-last` (the operator's figure end-to-end with the noun last, so the created rider and its ADR-414 drivability survive the word order).

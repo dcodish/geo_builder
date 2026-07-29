@@ -2168,9 +2168,14 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     // when all three are determined (e.g. "A, B, C collinear" on fixed points → over-constraint
     // detection). Generic via driveOrCheck + the sin∠ residual in solve.ts; the FIRST point is
     // preferred as the carrier (so "E on line AC" slides E, not A or C).
-    case 'set-collinear':
-      addCollinear(objects, constraints, cmd.a, cmd.b, cmd.c);
+    case 'set-collinear': {
+      // unordered — no side is stated; a CREATED rider is structurally on the line, so the driven
+      // collinear is only added when all three pre-existed (an identically-zero residual on a rider
+      // gives the solver nothing to root-find — the redundancy, not the geometry, was the failure)
+      const created = ensureCollinearRiders(objects, [cmd.a, cmd.b, cmd.c], false);
+      if (created.size === 0) addCollinear(objects, constraints, cmd.a, cmd.b, cmd.c);
       break;
+    }
 
     // "line ABE…" (ADR-050 Am.3): the points are collinear AND in the listed order (B between A and E).
     // Collinearity puts each later point on the line through the first two (reusing the second-intersection
@@ -2180,15 +2185,75 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
     case 'set-line': {
       const pts = cmd.points;
       if (pts.length >= 2) {
+        // #402: created riders are STRUCTURALLY on the anchors' line — only the genuine anchors
+        // need the driven collinears (identical to before when nothing was created), while the
+        // collinear-order below still sequences the WHOLE stated list, riders included.
+        const created = ensureCollinearRiders(objects, pts);
         addObj(objects, segment(pts[0], pts[pts.length - 1]));
-        for (let i = 2; i < pts.length; i++) addCollinear(objects, constraints, pts[i], pts[0], pts[1]);
-        if (pts.length >= 3) addCollinearOrder(objects, constraints, pts);
+        const anchors = pts.filter((p) => !created.has(p));
+        for (let i = 2; i < anchors.length; i++) addCollinear(objects, constraints, anchors[i], anchors[0], anchors[1]);
+        if (pts.length >= 3) {
+          addCollinearOrder(objects, constraints, pts);
+          // #402: a JUST-CREATED rider satisfies the stated order BY CONSTRUCTION (its default t
+          // encodes the side), so occupying its solve slot with the order would only starve a later
+          // constraint of its natural carrier (the ADR-276 satisfied-order-is-a-preference lesson —
+          // «GH ∥ AD» wants to slide H along line GF). The order stays a CHECK; the standard rungs
+          // re-drive it if a later solve ever violates it.
+          for (const p of created) {
+            const i = objects.findIndex((o) => o.id === p);
+            const o = objects[i];
+            if (o?.kind === 'on-segment' && (o.solve?.constraint as { type?: string } | undefined)?.type === 'collinear-order') {
+              objects[i] = { ...o, solve: undefined };
+            }
+          }
+        }
       }
       break;
     }
   }
 
   return { objects, constraints };
+}
+
+/**
+ * #402 (ADR-408): the M1 DUAL for collinearity — a NEW label in a `set-line`/`set-collinear`
+ * statement is DEFINED by it («ישר GFH» with H undefined used to refuse `references an unknown
+ * point`, dev session `2je0eg0n`). Each new label is created as an on-segment RIDER on the line
+ * through the statement's existing anchors, its default `t` following the STATED ORDER (the
+ * ADR-050/ADR-054 directional reading): a letter after the last anchor lands beyond it (`t = 1.5`,
+ * the recruitable-extension class — never eagerly grabbed, ADR-074), a letter before the first
+ * anchor lands beyond it on the other side, and an interior letter sits between as a FREE slider
+ * (ADR-052 — an unstated interior position is sampled). The rider makes the statement's own
+ * collinearity structurally true, while `collinear-order` can still drive its `t`.
+ * Requires ≥2 existing anchors — with fewer, nothing is created and the honest unknown-point
+ * refusal stands (instant per ADR-407). The ADR-236 named-line free-slider precedent, engine edition.
+ */
+function ensureCollinearRiders(objects: GeoObject[], pts: Id[], ordered = true): Set<Id> {
+  const created = new Set<Id>();
+  const exists = (id: Id) => objects.some((o) => o.id === id);
+  const anchorIdx = pts.map((_, i) => i).filter((i) => exists(pts[i]));
+  if (anchorIdx.length < 2) return created;
+  const first = anchorIdx[0];
+  const last = anchorIdx[anchorIdx.length - 1];
+  const a1 = pts[first];
+  const a2 = pts[last];
+  for (const [i, p] of pts.entries()) {
+    if (exists(p)) continue;
+    created.add(p);
+    // `set-collinear` states no ORDER — a new label is a free interior slider (its side/position is
+    // the sampler's, ADR-052); only the ordered `set-line` reads a stated side from letter position.
+    if (!ordered) addObj(objects, { kind: 'on-segment', id: p, a: a1, b: a2, t: 0.5, free: true });
+    // A rider BEYOND an anchor is the EXTENSION class, and must say so: `extension` is the flag every
+    // mechanism reads to learn what this DOF is — the driven range ([1.02, 12] vs an interior [0, 1],
+    // `evaluate`'s `range`/clamp), `recruitableFreeDof`'s failure-path eligibility, and the sampler's
+    // ADR-052 variation. Born flag-less, a t = 1.5 rider contradicted its own class: its solve range was
+    // the interior [0, 1] (so driving it CLAMPED it off the side the letter order states), no failure-path
+    // rung could recruit it, and its t was never sampled — a fixed default masquerading as fixed (#412).
+    else if (i < first) addObj(objects, { kind: 'on-segment', id: p, a: a2, b: a1, t: 1.5, extension: true });
+    else if (i > last) addObj(objects, { kind: 'on-segment', id: p, a: a1, b: a2, t: 1.5, extension: true });
+    else addObj(objects, { kind: 'on-segment', id: p, a: a1, b: a2, t: (i - first) / (last - first), free: true });
+  }
+  return created;
 }
 
 /**
