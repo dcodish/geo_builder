@@ -159,6 +159,17 @@
     }
   },
   "errors": {
+    "metricImpossibleTriangle": "Impossible: |{{seg}}| = {{value}} — the sum of two sides of a triangle is always greater than the third side, and {{sides}} = {{sum}}. Check the givens.",
+    "metricImpossiblePath": "Impossible: |{{seg}}| = {{value}} — the path from {{a}} to {{b}} via {{via}} is {{sum}}, and a straight segment is shorter than any other path between its endpoints. Check the givens.",
+    "desc": {
+      "collinear": "collinear",
+      "concyclic": "concyclic",
+      "inOrderOnALine": "in order on a line",
+      "coincidesWith": "coincides with",
+      "coincidesTarget": "coincides with its constructed target",
+      "areaOf": "area(",
+      "perimeterOf": "perimeter("
+    },
     "overConstrained": "Can't do that: {{what}} contradicts an earlier given — they can't both hold.",
     "unknownPoint": "{{what}} refers to a point that hasn't been defined yet. Create it first.",
     "unresolvedDeps": "This step relies on {{ids}}, which aren't defined yet (or an earlier step it depends on failed). Define them first.",

@@ -14,6 +14,7 @@
  */
 
 import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
+import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross } from '@/engine';
 import { formatMeasure } from '@/format';
@@ -1162,6 +1163,11 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
   const probe = cmds.reduce((c, cmd) => applyCommand(c, cmd), cur);
   const newCons = probe.constraints.slice(cur.constraints.length);
   if (newCons.length === 0) return false;
+  // #420 (ADR-417): a PROVEN metric contradiction is never "waiting for more givens". The flex probe
+  // below asks whether the residual MOVES, which is not whether it can reach ZERO — on «AB=4, BC=4,
+  // AC=9» the free radius and placement do move |AC|, so the impossibility was reported as a pending
+  // info state. Where impossibility is provable, say so.
+  if (metricImpossibility(probe.constraints)) return false;
   return newCons.some((con) => {
     const vals: number[] = [];
     for (const s of [0, 1, 2, 3, 4]) {
