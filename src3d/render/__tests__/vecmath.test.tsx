@@ -55,3 +55,16 @@ describe('VecMath', () => {
     expect(out).toMatch(/<mfrac><mover[^>]*><munder[^>]*><mi>v<\/mi>/);
   });
 });
+
+describe('#398 (ADR-3D-108) — a ≥3-label run is a POINT-RUN, never pair + leftovers', () => {
+  it('«המרחק בין D למישור ABC» carries NO pair token — the plane name stays prose', () => {
+    const toks = tokenizeRow('המרחק בין D למישור ABC', UV);
+    expect(toks.filter((t) => t.k === 'pair')).toEqual([]);
+    expect(JSON.stringify(toks)).toContain('ABC');
+  });
+  it("a 4-label run (ABCD) and a primed run (A'B'C') stay text; a genuine pair still dresses", () => {
+    expect(tokenizeRow('מישור ABCD', UV).filter((t) => t.k === 'pair')).toEqual([]);
+    expect(tokenizeRow("המישור A'B'C'", UV).filter((t) => t.k === 'pair')).toEqual([]);
+    expect(tokenizeRow('AB = u', UV).filter((t) => t.k === 'pair').length).toBe(1);
+  });
+});

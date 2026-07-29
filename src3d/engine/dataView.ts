@@ -16,9 +16,9 @@
 
 import { resolve3 } from './evaluate';
 import { scalePinned } from './solve3';
-import { dot3, sub3, type Vec3 } from './vec3';
+import { cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
 import { pinSymsOf } from './types';
-import { mutualHolds, mutualSides, MUTUAL_VERIFY_TOL } from './operands';
+import { distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, resolveOperand } from './operands';
 import type { Construction3, Id, MutualRel3, Operand3, Positions3 } from './types';
 
 /** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
@@ -583,6 +583,75 @@ export function dataView(c: Construction3, seed: number): DataPanel {
         });
         if (perp) mutual.push({ a: A.label, b: B.label, rel: 'perpendicular' });
       }
+    }
+  }
+
+  // #384 (ADR-3D-108): the PLANE pairs — the S3 column's panel presence (operator play, test 3:
+  // «המישור ABC מקביל למישור A'B'C'» verified and the panel said nothing). Same scope rule as the
+  // S4 block above (a patch exists only for a plane the student NAMED), same multi-sample gate.
+  // Only the INFORMATIVE relations: two generic planes always intersect, so a plain 'intersecting'
+  // row would be noise — parallel / perpendicular / coincident are knowledge.
+  {
+    const planeOps: { op: Operand3; label: string }[] = [
+      ...[...c.pointPlanes.entries()].map(([n, ids]) => ({ op: { kind: 'plane-run', ids: [...ids] } as Operand3, label: n })),
+      ...[...c.planes.keys()].map((n) => ({ op: { kind: 'plane-named', name: n } as Operand3, label: n })),
+      ...[...c.relPlanes.keys()].map((n) => ({ op: { kind: 'plane-named', name: n } as Operand3, label: n })),
+    ];
+    const TOL = 1e-4;
+    for (let i = 0; i < planeOps.length; i++) {
+      for (let j = i + 1; j < planeOps.length; j++) {
+        const geoms = resolved.map((res) => {
+          const at = (id: Id) => res.positions.get(id) ?? null;
+          const abs = { lines: res.lines, planes: res.planes };
+          return [resolveOperand(planeOps[i].op, c, abs)(at), resolveOperand(planeOps[j].op, c, abs)(at)] as const;
+        });
+        if (geoms.some(([a, b]) => !a?.normal || !b?.normal)) continue;
+        const meas = geoms.map(([a, b]) => {
+          const na = a!.normal!;
+          const nb = b!.normal!;
+          const den = Math.max(norm3(na) * norm3(nb), 1e-12);
+          return { cos: dot3(na, nb) / den, cross: norm3(cross3(na, nb)) / den };
+        });
+        if (meas.every((x) => x.cross < TOL)) {
+          const coin = geoms.every(([a, b], k) => {
+            const dev = planeCoincidenceDeviation(a!, b!, figureExtent(positions[k]));
+            return dev !== null && Math.abs(dev) < TOL;
+          });
+          mutual.push({ a: planeOps[i].label, b: planeOps[j].label, rel: coin ? 'coincident' : 'parallel' });
+        } else if (meas.every((x) => Math.abs(x.cos) < TOL)) {
+          mutual.push({ a: planeOps[i].label, b: planeOps[j].label, rel: 'perpendicular' });
+        }
+      }
+    }
+  }
+
+  // #384: stated DISTANCES — «המרחק בין AB לבין CD הוא 3» left the panel silent (operator play,
+  // test 10). One row per stated distance (pin or claim, deduped), printed FROM THE FIGURE via the
+  // same geometry the drive/claim read — so the row is confirmation, not an echo: it appears only
+  // when the drawing realises the stated value in every sampled configuration. A distance carries
+  // units, so a stated one pins the scale and the hasScale gate is naturally met.
+  {
+    const opLabel = operandLabel;
+    const stated: { a: Operand3; b: Operand3 }[] = [
+      ...c.scalarPins.flatMap((p) => (p.kind === 'distance' ? [{ a: p.a, b: p.b }] : [])),
+      ...c.claims.flatMap((cl) => (cl.type === 'distance-rel' ? [{ a: cl.a, b: cl.b }] : [])),
+    ];
+    const seen = new Set<string>();
+    for (const { a, b } of stated) {
+      const key = JSON.stringify([a, b]);
+      if (seen.has(key) || !hasScale) continue;
+      seen.add(key);
+      const ds = resolved.map((res) => {
+        const at = (id: Id) => res.positions.get(id) ?? null;
+        const abs = { lines: res.lines, planes: res.planes };
+        const ga = resolveOperand(a, c, abs)(at);
+        const gb = resolveOperand(b, c, abs)(at);
+        return ga && gb ? distanceBetween(ga, gb) : null;
+      });
+      if (ds.some((d) => d === null)) continue;
+      const [d0, d1, d2] = ds as number[];
+      if (Math.abs(d0 - d1) > 1e-4 * Math.max(d0, 1) || Math.abs(d0 - d2) > 1e-4 * Math.max(d0, 1)) continue;
+      relations.push(`d(${opLabel(a)}, ${opLabel(b)}) = ${cleanMag(d0)}`);
     }
   }
 

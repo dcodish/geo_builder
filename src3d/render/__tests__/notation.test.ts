@@ -54,3 +54,11 @@ describe('factDisplay3 — routing', () => {
     expect(factDisplay3(plain, UV)).toBe('F אמצע SC');
   });
 });
+
+describe('#398 (ADR-3D-108) — vectorNotation never arrows the tail of a longer run', () => {
+  it("ABC gets no mid-run arrow; a digit-prefixed pair (2KA') still does", () => {
+    const out = vectorNotation('למישור ABC', new Set(['u', 'v']));
+    expect(out).not.toContain('⃗');
+    expect(vectorNotation("2KA'", new Set())).toContain("KA'⃗");
+  });
+});

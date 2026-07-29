@@ -21,6 +21,7 @@
  */
 
 import { create } from 'zustand';
+import type { PlaneDisplayMode3Map } from './figureFile3';
 import { buildNotices3, type BuildNotice3 } from '../engine/notices';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
@@ -357,7 +358,7 @@ export interface Geo3State {
   /** Per-plane patch display (#318): 'face' = the patch is EXACTLY the defining point-run
    *  polygon (the triangle/quad itself); absent = 'full', today's growing patch. Display
    *  state, not a fact — saved with the file and undoable, like `queries`; reset by `clear`. */
-  planeDisplay: Record<string, 'face' | 'full'>;
+  planeDisplay: PlaneDisplayMode3Map;
   togglePlaneDisplay: (name: string) => void;
   /** The figure's NAME (issue #42) - shown on the page, used as the save filename, derived from the
    *  loaded file's name. Session metadata: NOT in the undo history (partialize is facts+seed only);
@@ -367,7 +368,7 @@ export interface Geo3State {
   resample: () => void;
   dismissError: () => void;
   /** Load a deserialised figure — ONE undoable set (never destructive: undo restores the prior session). */
-  loadFigure: (facts: Fact3[], seed: number, queries?: string[], planeDisplay?: Record<string, 'face' | 'full'>) => void;
+  loadFigure: (facts: Fact3[], seed: number, queries?: string[], planeDisplay?: PlaneDisplayMode3Map) => void;
   /** Surface a file-load refusal through the normal error banner. */
   reportLoadError: (reason: 'bad-file' | 'newer-schema') => void;
 }
@@ -466,13 +467,15 @@ export const useGeo3 = create<Geo3State>()(
       },
       removeQuery: (index) => set({ queries: get().queries.filter((_, i) => i !== index) }),
 
-      // #318: flip a named plane's patch between 'full' (default) and 'face'. The record keeps
-      // only non-default entries — toggling back to 'full' DELETES the key, so a saved file
-      // never carries redundant defaults and "absent = full" stays the single convention.
+      // #318 + #395 (ADR-3D-108): cycle a named plane's patch full → face → hidden → full. The
+      // record keeps only non-default entries — cycling back to 'full' DELETES the key, so a saved
+      // file never carries redundant defaults and "absent = full" stays the single convention.
       togglePlaneDisplay: (name) => {
         const cur = get().planeDisplay;
         const next = { ...cur };
-        if ((cur[name] ?? 'full') === 'full') next[name] = 'face';
+        const mode = cur[name] ?? 'full';
+        if (mode === 'full') next[name] = 'face';
+        else if (mode === 'face') next[name] = 'hidden';
         else delete next[name];
         set({ planeDisplay: next });
       },

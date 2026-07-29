@@ -113,6 +113,7 @@ export default function App3() {
   // the "organize your data" panel (ADR-3D-014): derived vector/point presentations,
   // OPT-IN by checkbox — it shows derived results, so the student chooses to peek
   const [showData, setShowData] = useState(false);
+  const [showWitness, setShowWitness] = useState(true); // #397: distance witnesses, default on
   const lastError = useGeo3((s) => s.lastError);
   const submit = useGeo3((s) => s.submit);
   const toggle = useGeo3((s) => s.toggle);
@@ -411,7 +412,9 @@ export default function App3() {
                 ? t('notice.baseConstrained', { ids: n.ids.join(''), from: t(`notice.shape.${n.from}`), to: t(`notice.shape.${n.to}`) })
                 : n.kind === 'line-rel-noun'
                   ? t('notice.lineRelNoun', { line: n.line })
-                  : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
+                  : n.kind === 'redundant-relation'
+                    ? t('notice.redundantRelation', { a: n.a, b: n.b })
+                    : t('notice.lineCalledPlane', { ids: n.ids.join(''), line: n.line })}
             </div>
           ))}
           {guidanceNote && !lastError && !busy && (
@@ -467,9 +470,18 @@ export default function App3() {
                     f.utterance
                   )}
                 </span>
-                {/* #318: a fact that names a plane gets a per-plane patch-display toggle; the
-                    label shows the mode the click SWITCHES TO (face only ↔ full plane) */}
-                {[...new Set(f.cmds.flatMap((cm) => (cm.type === 'plane-through' ? [cm.name] : [])))].map((name) => (
+                {/* #318 + #395 (ADR-3D-108): a fact that MATERIALISES a plane patch gets the
+                    per-plane display cycle (full → face → hidden → full); the label shows the mode
+                    the click SWITCHES TO. Enumeration covers relation-operand planes too — a patch
+                    born from «המישור ABC מאונך למישור ABD» is toggleable exactly like a stated
+                    «מישור ABC» (the operator's play-1/7/8 ask). */}
+                {[...new Set(f.cmds.flatMap((cm) =>
+                  cm.type === 'plane-through' ? [cm.name]
+                  : cm.type === 'plane-rel' || cm.type === 'mutual-rel' || cm.type === 'distance-rel'
+                    ? [cm.a, cm.b].flatMap((op) => (op.kind === 'plane-run' ? [op.ids.join('')] : []))
+                    : cm.type === 'line-rel' && cm.op.kind === 'plane-run' ? [cm.op.ids.join('')]
+                    : [],
+                ))].map((name) => (
                   <button
                     key={name}
                     type="button"
@@ -477,7 +489,7 @@ export default function App3() {
                     onClick={() => togglePlaneDisplay(name)}
                     className="shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] leading-4 text-slate-500 hover:border-sky-400 hover:text-sky-700"
                   >
-                    {(planeDisplay[name] ?? 'full') === 'full' ? t('facts.planeFace') : t('facts.planeFull')}
+                    {(planeDisplay[name] ?? 'full') === 'full' ? t('facts.planeFace') : (planeDisplay[name] === 'face' ? t('facts.planeHide') : t('facts.planeFull'))}
                   </button>
                 ))}
                 <button
@@ -522,6 +534,7 @@ export default function App3() {
             construction={derived.construction}
             resolved={derived.resolved}
             planeDisplay={planeDisplay}
+            showWitnesses={showWitness}
             coordLabels={showData && dataPanel ? dataPanel.pointCoords : undefined}
             width={canvasW}
             height={Math.max(360, Math.round(canvasW * 0.72))}
@@ -581,6 +594,13 @@ export default function App3() {
             <input type="checkbox" checked={showData} onChange={(e) => setShowData(e.target.checked)} />
             {t('dataPanel.toggle')}
           </label>
+          {/* #397 (ADR-3D-108): the stated-distance witness (the "height") — on by default,
+              hideable "for educational purposes" per the operator's ask. Only rendered relevant
+              when a distance given exists; harmless otherwise. */}
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" checked={showWitness} onChange={(e) => setShowWitness(e.target.checked)} />
+            {t('display.witnesses')}
+          </label>
           {showData && (
             /* #274 (ADR-3D-057): the query lane — ask for a quantity («w·v», «|AB|», «∠SAB», «area ABC»,
                «volume SABCD») and see it if it's genuinely determined. A question, never a fact. */
@@ -605,9 +625,13 @@ export default function App3() {
                 </button>
               </form>
               {queryResults.length > 0 && (
-                <ul className="mt-2 flex flex-col gap-1" dir="ltr">
+                <ul className="mt-2 flex flex-col gap-1">
+                  {/* #398 (ADR-3D-108): per-row dir="auto" — a Hebrew query («המרחק בין D למישור ABC»)
+                      lays out RTL with the math tokens as isolated LTR islands (the ADR-3D-031 Am. 2
+                      bidi rule, panel edition); a symbol-only query (|AB|, w·v) stays LTR. The old
+                      list-wide dir="ltr" scrambled every Hebrew sentence. */}
                   {queryResults.map((r, i) => (
-                    <li key={r.text + i} className="flex items-center justify-between gap-2 border-b border-slate-100 pb-1 last:border-0">
+                    <li key={r.text + i} dir="auto" className="flex items-center justify-between gap-2 border-b border-slate-100 pb-1 last:border-0">
                       <span>
                         <VecMath text={r.text} vecNames={new Set(derived.construction.vectors.keys())} />
                         {r.answer !== null ? (

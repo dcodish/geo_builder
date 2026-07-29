@@ -12,6 +12,7 @@
  */
 
 import { hasAbsoluteFrameObject, intersectPlanes, pinningGivens, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
+import { distanceWitness, resolveOperand } from '../engine/operands';
 import type { Construction3, Id, Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
 import { cameraFrame, project3, type Camera3 } from './camera';
@@ -121,6 +122,17 @@ export interface SceneCurve3 {
   hidden: boolean;
 }
 
+/** #397 (ADR-3D-108): a stated distance's WITNESS — the closest-point segment + its stated value. */
+export interface SceneWitness3 {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  labelX: number;
+  labelY: number;
+  text: string;
+}
+
 export interface Scene3 {
   points: ScenePoint3[];
   edges: SceneEdge3[];
@@ -132,6 +144,7 @@ export interface Scene3 {
   seams: SceneSeam3[];
   angles: SceneAngle3[];
   curves: SceneCurve3[];
+  witnesses: SceneWitness3[];
 }
 
 export interface Viewport {
@@ -253,7 +266,9 @@ export function buildScene3(
   zoom = 1,
   /** #318: per-plane patch display — 'face' draws a point-run plane's patch as EXACTLY its
    *  defining polygon; absent/'full' keeps the growing fold-anchored patch (the default). */
-  planeDisplay: Record<string, 'face' | 'full'> = {},
+  planeDisplay: Record<string, 'face' | 'full' | 'hidden'> = {},
+  /** #397 (ADR-3D-108): draw the closest-point WITNESS of every stated distance (dashed + value). */
+  showWitnesses = true,
 ): Scene3 {
   const positions = resolved.positions;
   const frame = cameraFrame(cam);
@@ -269,6 +284,43 @@ export function buildScene3(
   const center = worldPts.length ? centroid3(worldPts) : v3(0, 0, 0);
   let radius = 1.5;
   for (const p of worldPts) radius = Math.max(radius, dist3(p, center));
+
+  // #397 (ADR-3D-108): the WITNESS of every stated distance — the closest-point segment whose
+  // length IS the stated value (the "height" the operator asked to see). World-space, BEFORE the
+  // patch sweep (a foot on a plane must grow that plane's patch — the ADR-3D-097 rule: the patch
+  // must cover what a relation is read against) and before the fit (so it is always in frame).
+  const wWitnesses: { a: Vec3; b: Vec3; text: string; planeFeet: { n: Vec3; d: number }[]; wedge?: { vertex: Vec3; u1: Vec3; u2: Vec3; planeN?: Vec3 } }[] = [];
+  if (showWitnesses) {
+    const atW = (id: Id) => positions.get(id) ?? null;
+    const absW = { lines: resolved.lines, planes: resolved.planes };
+    const statedD = [
+      ...c.scalarPins.flatMap((p) => (p.kind === 'distance' ? [{ a: p.a, b: p.b, value: p.value }] : [])),
+      ...c.claims.flatMap((cl) => (cl.type === 'distance-rel' ? [{ a: cl.a, b: cl.b, value: cl.value }] : [])),
+    ];
+    const seenD = new Set<string>();
+    for (const st of statedD) {
+      const key = JSON.stringify([st.a, st.b]);
+      if (seenD.has(key)) continue;
+      seenD.add(key);
+      const ga = resolveOperand(st.a, c, absW)(atW);
+      const gb = resolveOperand(st.b, c, absW)(atW);
+      const w = ga && gb ? distanceWitness(ga, gb) : null;
+      if (!w || dist3(w[0], w[1]) < 1e-9) continue; // met objects have no gap to draw
+      // the ⟂ KNEE at a foot: on a plane the second arm is arbitrary in-plane (legibility-rotated
+      // via planeN, the rightAngles3 convention); on a line it IS the line — a real object.
+      const planeFeet: { n: Vec3; d: number }[] = [];
+      let wedge: { vertex: Vec3; u1: Vec3; u2: Vec3; planeN?: Vec3 } | undefined;
+      for (const [g, foot, other] of [[ga!, w[1], w[0]], [gb!, w[0], w[1]]] as const) {
+        if (g.normal && !g.dir && g.d !== undefined) {
+          planeFeet.push({ n: g.normal, d: g.d });
+          wedge = { vertex: foot, u1: normalize3(sub3(other, foot)), u2: planeBasis(g.normal).e1, planeN: g.normal };
+        } else if (g.dir && !g.normal && !wedge) {
+          wedge = { vertex: foot, u1: normalize3(sub3(other, foot)), u2: normalize3(g.dir) };
+        }
+      }
+      wWitnesses.push({ a: w[0], b: w[1], text: fmt(st.value), planeFeet, wedge });
+    }
+  }
 
   // Intersecting planes must VISIBLY cross (operator: "the visualization of planes is
   // critical"): every pair's fold line is computed, and each such plane's patch is
@@ -305,6 +357,9 @@ export function buildScene3(
   const wPlanes: { name: string; corners: Vec3[] }[] = [];
   const facePatches = new Set<string>(); // planes actually drawn as their defining polygon (#318)
   for (const [name, pl] of resolved.planes) {
+    // #395 (ADR-3D-108): a HIDDEN plane draws no patch (and no label/seam below) — the RELATION
+    // stays enforced in the engine; only the ink is suppressed, per the operator's show/hide ask.
+    if (planeDisplay[name] === 'hidden') continue;
     // #318 'face' display: the patch IS the defining point-run polygon, in the stated order —
     // no growing extents, no fold-anchored frame. Only a point-run plane has a face to show;
     // an equation plane (or an unplaced run) falls through to the 'full' patch unchanged.
@@ -331,6 +386,13 @@ export function buildScene3(
     for (const p of positions.values()) {
       if (Math.abs(dot3(pl.n, p) + pl.d) > 1e-6 * (1 + norm3(pl.n))) continue; // only points ON the plane
       grow(p);
+    }
+    // #397: a distance witness FOOT on this plane is read against the patch — same coverage rule
+    // as an on-plane point (ADR-3D-097's "the patch must cover what a relation is read against")
+    for (const wt of wWitnesses) {
+      for (const p of [wt.a, wt.b]) {
+        if (Math.abs(dot3(pl.n, p) + pl.d) <= 1e-6 * (1 + norm3(pl.n))) grow(p);
+      }
     }
     // a point stated ABOVE/BELOW this plane floats off it — its ⟂ projection must still
     // land INSIDE the patch (the patch is what the student reads the side against)
@@ -361,6 +423,7 @@ export function buildScene3(
   const wSeams: { a: Vec3; b: Vec3 }[] = [];
   for (const { n1, n2, line, focus } of pairLines) {
     if (namedPairs.has([n1, n2].sort().join('|'))) continue;
+    if (planeDisplay[n1] === 'hidden' || planeDisplay[n2] === 'hidden') continue; // #395: no patch ⇒ no seam
     const d = normalize3(line.dir);
     const e1 = patchExtent.get(n1);
     const e2 = patchExtent.get(n2);
@@ -564,6 +627,11 @@ export function buildScene3(
   // projected below, so the knee lies in the plane of the arms and foreshortens with the orbit.
   // Their SIZE, however, is a screen quantity — see below, after the fit.
   const wedges = rightAngles3(c, resolved, radius);
+  // #397: the witness meets its plane/line at a genuine right angle — mark it with the same
+  // knee pipeline (screen-sized, foreshortening-preserving, in-plane arm legibility-rotated).
+  for (const wt of wWitnesses) {
+    if (wt.wedge) wedges.push(wt.wedge);
+  }
 
   // ---- projection + isotropic fit (over the points AND the auxiliary geometry)
   const projOf = (p: Vec3): { x: number; y: number } => {
@@ -579,10 +647,11 @@ export function buildScene3(
     ...wSeams.flatMap((s) => [s.a, s.b]),
     ...wAngles.flatMap((a) => [...a.pts, a.label]),
     ...wCurves.flatMap((cu) => cu.pts),
+    ...wWitnesses.flatMap((wt) => [wt.a, wt.b]), // #397: the witness stays in frame
   ].map(projOf);
   const all = [...proj.values(), ...extras];
   if (all.length === 0) {
-    return { points: [], edges: [], vectors: [], axes: [], planes: [], lines: [], marks: [], seams: [], angles: [], curves: [] };
+    return { points: [], edges: [], vectors: [], axes: [], planes: [], lines: [], marks: [], seams: [], angles: [], curves: [], witnesses: [] };
   }
 
   const xs = all.map((p) => p.x);
@@ -799,5 +868,12 @@ export function buildScene3(
 
   const curves: SceneCurve3[] = wCurves.map(({ pts, hidden }) => ({ pts: pts.map(w2s), hidden }));
 
-  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves };
+  // #397: the distance witnesses — dashed segment + the stated value beside the midpoint
+  const witnesses: SceneWitness3[] = wWitnesses.map((wt) => {
+    const p = w2s(wt.a);
+    const q = w2s(wt.b);
+    return { x1: p.x, y1: p.y, x2: q.x, y2: q.y, labelX: (p.x + q.x) / 2 + 9, labelY: (p.y + q.y) / 2 - 7, text: wt.text };
+  });
+
+  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves, witnesses };
 }
