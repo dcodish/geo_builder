@@ -254,6 +254,15 @@ interface FoldNode {
    *  so duplicate-keyed angle marks dedupe exactly as the old recursive replay did. */
   iterOrder: number[];
   rescue: FoldNode | null;
+  /** #365 (ADR-406): the fold's GLOBAL-pre-scan signature — the symbol table and every default-yield
+   *  pre-scan artifact AS APPLIED to this fact list (fact-scoped entries by INDEX, groups by partition
+   *  number, so a dry-run trial array and the committed array still share). Appending facts may resume
+   *  from this node ONLY when the full list's pre-scans, restricted to the prefix, produce the same
+   *  signature — i.e. the appended facts change nothing about how the prefix folded. */
+  prescanSig: string;
+  /** #365: the point ids claimed by the fold's facts (`owned`) — the resume state a prefix append
+   *  needs that isn't derivable from the other fields without re-lowering every prefix fact. */
+  ownedIds: Id[];
 }
 
 /**
@@ -266,7 +275,7 @@ interface FoldNode {
  */
 const foldCache = new Map<string, FoldNode>();
 const FOLD_CACHE_MAX = 8;
-export const foldStats = { computes: 0 };
+export const foldStats = { computes: 0, resumes: 0 };
 function foldKey(facts: Fact[]): string {
   const groupIdx = new Map<string, number>();
   const parts: string[] = [];
@@ -495,21 +504,71 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
     .flatMap((f) => lowerOne(f.cmd, symtab))
     .filter((c): c is Extract<Command, { type: 'point-on-segment' }> => c.type === 'point-on-segment')
     .map((c) => ({ id: c.id, a: c.a, b: c.b }));
+  // #365 (ADR-406): the GLOBAL-pre-scan signature, restricted to the first `count` facts. Two facts
+  // lists share a prefix fold ONLY when this signature agrees — i.e. the appended facts introduce no
+  // symbol binding, centre promotion, soft-supersession, right-triangle reseat, trapezoid rotation,
+  // softPair swap, explicit equality or explicit on-segment that would change how a PREFIX fact folds.
+  // Fact-scoped entries are keyed by INDEX and groups by partition number (never by fact id), so a
+  // dry-run trial array and the committed array — same content, different ids — still share (ADR-280).
+  const factIdxById = new Map<string, number>(facts.map((f, i) => [f.id, i]));
+  const groupPartition = new Map<string, number>();
+  for (const f of facts) {
+    const g = groupKey(f);
+    if (!groupPartition.has(g)) groupPartition.set(g, groupPartition.size);
+  }
+  const prescanSigFor = (count: number): string => {
+    const inPrefix = (id: string) => (factIdxById.get(id) ?? Infinity) < count;
+    const prefixGroups = new Set(facts.slice(0, count).map(groupKey));
+    return JSON.stringify({
+      sym: { vars: [...symtab.vars.entries()], radiusCircle: symtab.radiusCircle ?? null, radiusOf: [...symtab.radiusOf.entries()] },
+      soft: [...supersededSoft].filter(inPrefix).map((id) => factIdxById.get(id)).sort((a, b) => a! - b!),
+      rt: [...rtReorder].filter(([id]) => inPrefix(id)).map(([id, ids]) => [factIdxById.get(id), ids]),
+      trap: [...trapRotate].filter(([id]) => inPrefix(id)).map(([id, ids]) => [factIdxById.get(id), ids]),
+      ctr: [...centrePromotions].sort(),
+      pair: [...pairSwapByGroup].filter(([g]) => prefixGroups.has(g)).map(([g, m]) => [groupPartition.get(g), [...m].sort()]),
+      eqs: explicitEqs,
+      ons: explicitOnSegs,
+    });
+  };
+  // #365: PREFIX REUSE — the append case (submit, dry-run, edit-at-the-end) re-folded every fact from
+  // scratch because the memo is keyed by whole-list content. A cached fold of a strict PREFIX is a valid
+  // resume point exactly when (a) it is fully CLEAN — no failure, no pending, no rescue — so the ADR-104
+  // deferral, the atomic poisoning and the HOIST rescue all provably did nothing in it, and (b) the
+  // pre-scan signature above says the appended facts change nothing about how the prefix folded. Then
+  // the fold starts from the cached construction and pays only the NEW facts. Conservative by design:
+  // any doubt (a new symbol, a new explicit equality, a mixed group…) falls back to the full fold.
+  let resumeFrom: { node: FoldNode; count: number } | null = null;
+  if (hoistDepth === 0 && foldCache.size) {
+    const fullKey = foldKey(facts);
+    for (const [k, node] of foldCache) {
+      if (!fullKey.startsWith(`${k}\n`)) continue;
+      const count = k.split('\n').length;
+      if (resumeFrom && count <= resumeFrom.count) continue;
+      if (node.pending || node.buildError !== null || node.rescue !== null) continue;
+      if (node.statusByIndex.some((s) => s !== 'ok' && s !== 'disabled')) continue;
+      if (node.prescanSig !== prescanSigFor(count)) continue;
+      resumeFrom = { node, count };
+    }
+    if (resumeFrom) foldStats.resumes++;
+  }
   // Build the construction by folding the enabled facts. `forced` maps a fact id to a status string that
   // BLOCKS it (an atomic-group casualty — see the poisoning pass below): the fact is neither applied nor
   // measured, only its owned points are claimed so genuine dependents still cascade-fail. Runs at most twice
   // (once clean, once with the poisoned groups blocked), so the label maps are cleared on each entry.
-  const runBuild = (forced: Map<string, string>) => {
-    let cur = emptyConstruction();
+  // #365: `start` resumes from a clean prefix fold — the prefix facts keep their cached statuses and the
+  // loop begins at `start.count`. The poisoning rebuild always runs WITHOUT `start` (a forced block can
+  // reach prefix groups, so the resumed state would be stale).
+  const runBuild = (forced: Map<string, string>, start: { node: FoldNode; count: number } | null = null) => {
+    let cur = start ? start.node.cur : emptyConstruction();
     const status: Record<string, FactStatus> = {};
-    const owned = new Set<Id>();
-    const applied: Command[] = [];
+    const owned = new Set<Id>(start ? start.node.ownedIds : []);
+    const applied: Command[] = start ? [...start.node.applied] : [];
     // #360 (ADR-398): ownership maps for per-seed failure attribution — filled after each successful
     // commit, first-wins (the fact whose commit first made the constraint/object appear owns it). The
     // constraint harvest mirrors `evaluate`'s own extraction exactly: `cur.constraints` (the check list)
     // PLUS `drivenConstraintsOf` (directive-carried constraints, which are NOT in `c.constraints`).
-    const ownerByConKey = new Map<string, number>();
-    const ownerByObjId = new Map<Id, number>();
+    const ownerByConKey = start ? new Map(start.node.ownerByConKey) : new Map<string, number>();
+    const ownerByObjId = start ? new Map(start.node.ownerByObjId) : new Map<Id, number>();
     const recordOwnership = (fi: number) => {
       for (const o of cur.objects) if (!ownerByObjId.has(o.id)) ownerByObjId.set(o.id, fi);
       for (const con of [...cur.constraints, ...drivenConstraintsOf(cur)]) {
@@ -527,7 +586,15 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
     lenByKey.clear();
     angByKey.clear();
     areaByKey.clear();
+    if (start) {
+      // #365: the prefix facts' measure labels and statuses come from the cached node verbatim
+      for (const [k, v] of start.node.lens) lenByKey.set(k, v);
+      for (const [k, v] of start.node.angs) angByKey.set(k, v);
+      for (const [k, v] of start.node.areas) areaByKey.set(k, v);
+      for (let i = 0; i < start.count; i++) status[facts[i].id] = start.node.statusByIndex[i];
+    }
     for (const [fi, f] of facts.entries()) {
+      if (start && fi < start.count) continue; // #365: already folded — resumed from the cached prefix
       // Lower the fact to the engine command(s) it produces (symbolic measures →
       // ratio/distance/angle/[]; engine commands pass through; a `shape-variant` → base shape + the
       // variant-selected equal pairs, with an explicit equality pinning the variant — ADR-138).
@@ -662,7 +729,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
       }
       if (!progressed) break;
     }
-    return { cur, status, applied, ownerByConKey, ownerByObjId };
+    return { cur, status, applied, ownerByConKey, ownerByObjId, owned };
   };
   // Classify what (if anything) remains unsatisfiable after the retries. A still-failed step that is a
   // DEFERRABLE constraint while the figure is still UNDER-DETERMINED isn't a contradiction — it's just
@@ -677,7 +744,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
     });
     return { failedFacts, pending };
   };
-  let { cur, status, applied, ownerByConKey, ownerByObjId } = runBuild(new Map());
+  let { cur, status, applied, ownerByConKey, ownerByObjId, owned } = runBuild(new Map(), resumeFrom);
   let { failedFacts, pending } = classify(cur, status);
   // ATOMIC GROUP: one utterance lowers to a GROUP of commands (e.g. "EF ⟂ BC" → segment EF + segment BC +
   // set-perpendicular). If the constraint HARD-fails (a genuine contradiction, not a pending under-determined
@@ -709,7 +776,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
         }
       }
       if (!grew) break; // no newly-mixed group — the figure is at the atomic fixpoint
-      ({ cur, status, applied, ownerByConKey, ownerByObjId } = runBuild(forced));
+      ({ cur, status, applied, ownerByConKey, ownerByObjId, owned } = runBuild(forced));
       ({ failedFacts, pending } = classify(cur, status));
       if (pending) break; // a deferral state emerged — keep scaffolding per ADR-104
     }
@@ -785,6 +852,8 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
     ownerByObjId,
     iterOrder: facts.map((_, i) => i),
     rescue,
+    prescanSig: prescanSigFor(facts.length),
+    ownedIds: [...owned],
   };
 }
 

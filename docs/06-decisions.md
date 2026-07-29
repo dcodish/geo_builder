@@ -5542,3 +5542,18 @@ So the 2-D half is deliberately **not built**, and the finding is asserted (the 
 **Honesty/behaviour:** canonical spellings are byte-untouched (asserted); no rule semantics changed — only which surface strings reach them.
 
 Locked by `spelling-normalization.test.ts` (8 — equality-of-parse with the canonical form, the half-supported inscribe case, word-boundary guards) + scenario `plene-spelling-rhombus` (the exact prod utterance end-to-end: parse → replay → all four sides equal).
+
+### ADR-406 — Fold PREFIX REUSE: appending a step pays only the new fact (#365)
+
+**Class:** the ADR-280 fold memo is keyed by the WHOLE fact list's content, so the commonest interaction — APPENDING a step — was always a cache miss and re-folded every fact from scratch. On the #157 trapezoid-midsegment figure, drawing a plain segment between existing nodes (zero solving needed) cost a full re-fold; measured per-step append costs of tens of seconds (unbudgeted) on the late steps.
+
+**Why naive reuse is unsound — and the guard that makes it sound.** The fold is not a pure left fold: seven GLOBAL pre-scans (the symbol table, soft-equality supersession, right-triangle reseat, trapezoid rotation, centre promotions, softPair swaps, the explicit-equality and explicit-on-segment pin lists) let a LATER fact change how an EARLIER fact folds, and the ADR-104 deferral / atomic poisoning / M2 HOIST passes rewrite history on failure. So a cached prefix fold is a valid resume point exactly when:
+
+1. **the prefix is fully CLEAN** — every status ok/disabled, not pending, no buildError, no rescue — so deferral, poisoning and HOIST all provably did nothing in it; and
+2. **the pre-scan SIGNATURE agrees** — each `FoldNode` now stores `prescanSig`, the canonical serialization of all seven artifacts AS APPLIED to its list (fact-scoped entries by INDEX, groups by partition number — never fact ids, so the dry-run trial array and the committed array still share, the ADR-280 discipline); a resume requires the full list's artifacts, restricted to the prefix, to serialize identically. Any doubt — a new symbol binding, a new explicit equality, a reseating 90°, a mixed group — refuses and falls back to the full fold.
+
+`runBuild` gains a `start` parameter (the cached construction, statuses, owner maps, measure labels, and the new `ownedIds`) and begins the loop at the prefix length; the poisoning rebuild always runs from scratch (a forced block can reach prefix groups). The failure-path passes run over the full list as before — with a clean prefix only appended facts can be failed, so they are cheap.
+
+**Measured (docs/17 §7):** the heavy issue-#59 fixture (22 facts): last-step append 201 ms → **0 ms**; the full incremental build 261 ms total where the old behaviour paid ~a full fold per step (~4.4 s); 18/21 appends resume (the refusals are the guards working). The #157 sequence (unbudgeted test env): per-step append 25.1 s / 20.7 s → **4 ms / 120 ms** on the steps whose new fact is cheap; the still-heavy steps are the appended fact's OWN recruit-ladder cost (a different issue — #4's class), and one resume is correctly refused on a PENDING prefix. The submit dry-run (committed facts + `~try` group) is exactly the append shape, so every submit now pays only the new step.
+
+Locked by the `#365` block in `fold-cache.test.ts` (6): append resumes AND equals the cold fold bit-for-bit (positions + statuses, cache force-evicted); a later symbol binding refuses resume and still drives the prefix measure (|AB| = 3x = 6); an explicit equality after an isosceles refuses resume and pins the pair (ADR-114/234) with cold-equivalence; a dirty prefix never resumes.
