@@ -1745,6 +1745,24 @@ export const SCENARIOS_4: Scenario[] = [
     },
   },
   {
+    id: 'impossible-triangle-refuses-instantly',
+    title: 'issue #420 / ADR-417: «AB = 4, BC = 4, AC = 9» is refused as IMPOSSIBLE, not recorded as pending',
+    guards:
+      'the operator’s play session (2026-07-29): the row showed ✗ while the banner said «הנתון נרשם אך לא משפיע בינתיים על הצורה» — two verdicts for one step — after 27.8 s. `constraintIsPending` asks whether the residual MOVES (it does: the free radius and placement change |AC|), not whether it can reach ZERO, which the triangle inequality forbids forever. A pinned distance exceeding the shortest pinned PATH between its endpoints is now proven impossible before the ladder runs.',
+    steps: ['מעגל O', 'A ו-C נמצאות על המעגל', 'משולש ABC', 'AB = 4', 'BC = 4', 'AC = 9'],
+    expectViolations: true,
+    check: (fig) => {
+      const entries = Object.entries(fig.status);
+      const last = entries[entries.length - 1]!;
+      expect(String(last[1]), 'refused as impossible, naming the bound').toMatch(/^impossible: \|AC\| = 9 exceeds 8/);
+      expect(fig.pending, 'a proven contradiction is never a pending info state').toBe(false);
+      // keep-prior: the 4-4 triangle the student did build is still there
+      const [A, B, C] = ['A', 'B', 'C'].map((id) => at(fig, id));
+      expect(dist(A, B), '|AB| = 4 survives').toBeCloseTo(4, 3);
+      expect(dist(B, C), '|BC| = 4 survives').toBeCloseTo(4, 3);
+    },
+  },
+  {
     id: 'newlabel-collinear-noun-last',
     title: 'issue #417 / ADR-415: «GFH ישר» (noun LAST) builds the same figure as «ישר GFH» — the collinearity family is order-free like its siblings',
     guards:

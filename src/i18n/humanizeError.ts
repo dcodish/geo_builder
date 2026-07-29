@@ -47,10 +47,57 @@ export function sanitizeIds(s: string): string {
     .replace(/\b(?:tanaux|circle|chord|perp|line|arc|poly|seg|bis|sec|tan|foot|mid)-([A-Za-z][A-Za-z0-9']*)/g, '$1'); // circle-O → O
 }
 
+/**
+ * Translate the WORDS a constraint description can contain (#413).
+ *
+ * `describeConstraint` emits two kinds of fragment. Most are locale-neutral symbols a 17-year-old in
+ * Israel reads unchanged — `|AC| = 9`, `∠DOE = 2·∠COE`, `AB ∥ CD`, `AB ⟂ CD` — and this module's design
+ * deliberately keeps those as-is. But a handful are English WORDS, and those reached the student inside a
+ * Hebrew sentence: «לא ניתן: הנתון **H, C, D collinear** סותר נתון קודם» (operator screenshot,
+ * 2026-07-29). The engine cannot translate them itself — it is pure and must not import i18n (the
+ * `engine ← replay ← store` layering) — so the fragment's vocabulary is translated HERE, at the one
+ * humanising layer, the same place the wrapper sentence is already translated.
+ *
+ * The list below is the COMPLETE vocabulary `describeConstraint` can produce; `humanize-error.test.ts`
+ * holds a compile-time-exhaustive fixture (a `Record` over every `Constraint['type']`) and asserts no
+ * multi-letter lowercase Latin run survives this pass — so a new constraint kind whose description
+ * introduces a new word fails the build or the test rather than leaking silently.
+ *
+ * Longest-first: `coincides with its constructed target` must be tried before `coincides with`.
+ */
+const DESC_WORDS: [RegExp, string][] = [
+  [/\bcoincides with its constructed target\b/g, 'errors.desc.coincidesTarget'],
+  [/\bcoincides with\b/g, 'errors.desc.coincidesWith'],
+  [/\bin order on a line\b/g, 'errors.desc.inOrderOnALine'],
+  [/\bconcyclic\b/g, 'errors.desc.concyclic'],
+  [/\bcollinear\b/g, 'errors.desc.collinear'],
+  [/\barea\(/g, 'errors.desc.areaOf'],
+  [/\bperimeter\(/g, 'errors.desc.perimeterOf'],
+];
+
+/** Replace every English word of the constraint vocabulary with its translation. Pure; unknown text passes through. */
+export function translateConstraintWords(s: string, t: Translate): string {
+  let out = s;
+  for (const [re, key] of DESC_WORDS) out = out.replace(re, () => t(key));
+  return out;
+}
+
+/**
+ * The same pass over an i18n params bag — for the verifier's messages, which carry a `describeConstraint`
+ * fragment in `params.desc` and are rendered directly with `t(messageKey, params)` rather than through
+ * {@link humanizeError}. Values that contain no fragment vocabulary come back identical.
+ */
+export function translateParams(params: Record<string, string> | undefined, t: Translate): Record<string, string> | undefined {
+  if (!params) return params;
+  return Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t)]));
+}
+
 /** One mapping: a regex over the raw error and how to build the translation from its groups. */
 interface Pattern {
   re: RegExp;
   key: string;
+  /** Pick the key from the match when one shape has several wordings (see the metric-impossibility entry). */
+  keyOf?: (m: RegExpMatchArray) => string;
   /** Map the regex match groups to interpolation params for the i18n key. */
   params?: (m: RegExpMatchArray) => Record<string, string>;
 }
@@ -58,6 +105,28 @@ interface Pattern {
 // Order matters only where one pattern's text is a prefix of another's; each regex below is
 // anchored and specific enough that the first match is the right one.
 const PATTERNS: Pattern[] = [
+  // metricFeasibility.ts (#420, ADR-417) — `impossible: |AC| = 9 exceeds 8, the distance from A to C via B`
+  //
+  // TWO wordings, because the message must state the geometry that actually applies. With exactly one
+  // intermediate point the figure is a TRIANGLE and the curriculum's own sentence is the right one
+  // («סכום שתי צלעות תמיד גדול מהצלע השלישית», operator 2026-07-29) — and the two sides can be named from
+  // a, b and the intermediate. With a longer cycle (a pinned quadrilateral) that sentence would be false,
+  // so the general principle is stated instead: a straight segment is shorter than any other path between
+  // its endpoints.
+  {
+    re: /^impossible: \|(\S+?)\| = (\S+) exceeds (\S+), the distance from (\S+) to (\S+) via (.*)$/,
+    key: 'errors.metricImpossible',
+    keyOf: (m) => (m[6].includes(',') ? 'errors.metricImpossiblePath' : 'errors.metricImpossibleTriangle'),
+    params: (m) => ({
+      seg: m[1],
+      value: m[2],
+      sum: m[3],
+      a: m[4],
+      b: m[5],
+      via: m[6],
+      sides: `|${m[4]}${m[6]}| + |${m[6]}${m[5]}|`,
+    }),
+  },
   // step.ts danglingCircleError (#186) — `circle 'O2' is not defined`
   { re: /^circle '(.+)' is not defined$/, key: 'errors.unknownCircle', params: (m) => ({ center: m[1] }) },
 
@@ -127,7 +196,18 @@ export function humanizeError(raw: string | null | undefined, t: Translate): str
   const s = sanitizeIds(raw.trim());
   for (const p of PATTERNS) {
     const m = s.match(p.re);
-    if (m) return t(p.key, p.params ? p.params(m) : undefined);
+    if (!m) continue;
+    const params = p.params?.(m);
+    // Translate the constraint vocabulary AFTER matching, never before: several wrapper patterns key on
+    // the very same English words («collinear points must be distinct …»), so translating first would
+    // stop them matching. Every param goes through the pass — it only touches known fragment words, so a
+    // non-fragment param (a circle letter, an id) is untouched.
+    const translated = params
+      ? Object.fromEntries(Object.entries(params).map(([k, v]) => [k, translateConstraintWords(v, t)]))
+      : undefined;
+    return t(p.keyOf ? p.keyOf(m) : p.key, translated);
   }
-  return s;
+  // No known shape — still translate the vocabulary, so an unmatched message is never worse and never
+  // leaks an English word we already know how to say.
+  return translateConstraintWords(s, t);
 }

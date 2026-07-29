@@ -5,35 +5,39 @@
   "slow": [
     {
       "file": "src/__tests__/scenarios-e2e-5.test.ts",
-      "ms": 180636
-    },
-    {
-      "file": "src3d/__tests__/adr-3d-032.test.ts",
-      "ms": 152673
+      "ms": 187313
     },
     {
       "file": "src3d/__tests__/right-apex.test.ts",
-      "ms": 152332
+      "ms": 157187
+    },
+    {
+      "file": "src3d/__tests__/adr-3d-032.test.ts",
+      "ms": 156834
     },
     {
       "file": "src3d/__tests__/book-coordinate-givens.test.ts",
-      "ms": 88041
+      "ms": 91328
     },
     {
       "file": "src3d/__tests__/member-drive.test.ts",
-      "ms": 82766
+      "ms": 85060
     },
     {
       "file": "src/theorems/__tests__/b-corpus.test.ts",
-      "ms": 75289
-    },
-    {
-      "file": "src/engine/__tests__/membership-conversion.test.ts",
-      "ms": 64258
+      "ms": 77888
     },
     {
       "file": "src/__tests__/scenarios-e2e-1.test.ts",
-      "ms": 62223
+      "ms": 67542
+    },
+    {
+      "file": "src/engine/__tests__/membership-conversion.test.ts",
+      "ms": 66120
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-7.test.ts",
+      "ms": 60030
     }
   ]
 }
