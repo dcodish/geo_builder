@@ -1745,6 +1745,21 @@ export const SCENARIOS_4: Scenario[] = [
       // the stated ∥ drives
       const par = Math.abs(cross(G, H, { x: G.x + (D.x - A.x), y: G.y + (D.y - A.y) })) / Math.max(dist(G, H) * dist(A, D), 1e-9);
       expect(par, 'GH ∥ AD holds').toBeLessThan(1e-4);
+    id: 'implied-circle-membership',
+    title: 'issue #362 / ADR-409: «A ו-C נמצאות על המעגל» on a circle-less figure INTRODUCES the presupposed circle; «M מחוץ למעגל» then binds it',
+    guards:
+      'the single/list membership and side forms answered "which EXISTING circle?" (resolveCenter) and deferred to the LLM on a circle-less figure, while the glued pair and «מיתר» already introduced one — the ADR-367 implied-discipline adoption gap. The 2+-circle ambiguity bail and the #186 named-reference seam are locked unchanged in implied-circle-membership.test.ts.',
+    steps: ['A ו-C נמצאות על המעגל', 'M מחוץ למעגל'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const circle = [...fig.circles.values()][0];
+      expect(circle, 'the presupposed circle was minted and resolved').toBeTruthy();
+      for (const id of ['A', 'C']) {
+        const p = at(fig, id);
+        expect(Math.abs(Math.hypot(p.x - circle.center.x, p.y - circle.center.y) - circle.r), `${id} rides the circle`).toBeLessThan(1e-6);
+      }
+      const M = at(fig, 'M');
+      expect(Math.hypot(M.x - circle.center.x, M.y - circle.center.y), 'M is outside').toBeGreaterThan(circle.r);
     },
   },
   {

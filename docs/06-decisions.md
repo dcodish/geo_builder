@@ -5586,3 +5586,12 @@ The ADR-407 futility universe counts set-line/set-collinear labels as introducib
 **Found en route, filed not bundled:** #404 — the subsequent «GH מקביל ל AD» morphs the declared trapezoid into a parallelogram (ADR-165 amber) instead of sliding the referenced extension rider G; probe-proved PRE-EXISTING on main (the operator's own workaround flow morphs identically). The scenario carries it as an asserted known-issue ratchet.
 
 Locked by `newlabel-collinear.test.ts` (7) + scenario `newlabel-collinear-rider` (the exact operator sequence).
+### ADR-409 — A membership statement presupposes its circle: the `implied` discipline adopted by the last two rules (#362)
+
+**Class:** the ADR-367 `implied` discipline — a statement that PRESUPPOSES an object introduces it rather than deferring — had 10 call sites (`מיתר`, `קוטר`, `משיק`, the glued pair…) and two holdouts: `pointOnCircle` (single/list «A ו-C נמצאות על המעגל») and `pointVsCircle` («M מחוץ למעגל»), both still answering "which EXISTING circle?" via `resolveCenter` and deferring to the LLM on a circle-less figure — an escalation for a statement whose meaning is unambiguous. Adoption debt, not a new mechanism.
+
+**Mechanism:** `resolveOrIntroduceCircle` as a FALLBACK only — `resolveCenter` stays primary, so a NAMED reference (known or unknown) keeps flowing through the #186 naming-by-use seam (`withImplicitCircles` tagging → `impliedCircleBinding`); the first cut replaced it wholesale and broke exactly that seam (caught by the #186 locks — the invented circle lost its `implied` tag and «מעגל O2» would have minted a second circle instead of binding the unnamed one). The fallback fires only for an UNNAMED reference on a 0-circle figure; 2+ unnamed circles still return null (the ADR-244 ambiguity bail, asserted). The ADR-254 side seeding works against the freshly minted free circle unchanged (asserted: default seeding lands M outside; a violating raw seed is FLAGGED, never silently inside).
+
+One pre-#362 lock (`circle-side.test.ts`'s "no circle ⇒ defers") deliberately updated to pin the new semantics; the ambiguity half it really guarded lives on in the new suite.
+
+Locked by `implied-circle-membership.test.ts` (9) + scenario `implied-circle-membership` (list membership + side form binding the same minted circle).

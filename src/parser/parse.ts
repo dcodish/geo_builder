@@ -5056,15 +5056,26 @@ const pointOnCircle: Rule = (s, ctx) => {
   const m = s.match(/^(.*?\b[A-Za-z]\d*\b.*?)(?:\bon\b|על)(?=.*?(?:circle|מעגל))/i);
   if (!m) return null;
   // The circle: its named centre ("circle O"), or — for a DEFINITE/unnamed reference ("on the
-  // circle" / "על המעגל" / "נמצאת על המעגל") — the figure's single circle, via context.
-  const center = resolveCenter(s, ctx);
-  if (!center) return null; // 0 or 2+ unnamed circles ⇒ ambiguous → defer/escalate
+  // circle" / "על המעגל" / "נמצאת על המעגל") — the figure's single circle, via context. A NAMED
+  // reference (known or not) stays on this path so the #186 naming-by-use seam (withImplicitCircles
+  // tagging + impliedCircleBinding) keeps owning it.
+  let center = resolveCenter(s, ctx);
+  let prepend: AnyCommand[] = [];
+  // #362 (ADR-409): an UNNAMED membership on a circle-LESS figure presupposes its circle — one is
+  // INTRODUCED (free centre + free radius) instead of the old defer-to-LLM (the ADR-367 `implied`
+  // discipline; the chord/diameter/tangent siblings' helper, finally adopted here). Reached only
+  // when resolveCenter had nothing: 2+ unnamed circles still return null (the ADR-244 bail).
+  if (!center) {
+    const intro = resolveOrIntroduceCircle(s, ctx);
+    if (intro) ({ center, prepend } = intro);
+  }
+  if (!center) return null; // 2+ unnamed circles ⇒ ambiguous → defer/escalate
   const ids = (m[1].match(/[A-Z]\d*/g) ?? []).map(up);
   // A distinct uppercase run is the subject list; anything else falls back to the legacy
   // first-single-label read (e.g. a lowercase label) so looser phrasings keep parsing as before.
   const subjects =
     ids.length > 0 && new Set(ids).size === ids.length ? ids : [up(m[1].match(/\b([A-Za-z]\d*)\b/)![1])];
-  return subjects.map((id) => ({ type: 'point-on-circle' as const, id, circle: circleId(center) }));
+  return [...prepend, ...subjects.map((id) => ({ type: 'point-on-circle' as const, id, circle: circleId(center) }))];
 };
 
 /** "M מחוץ למעגל [O]" / "הנקודה M נמצאת בתוך המעגל" / "M is outside circle O" / "point M lies inside
@@ -5081,12 +5092,21 @@ const pointVsCircle: Rule = (s, ctx) => {
   );
   if (!m) return null;
   const side = /מחוץ|outside/i.test(m[2]) ? ('outside' as const) : ('inside' as const);
-  const center = resolveCenter(s, ctx);
-  if (!center) return null; // no named circle and 0 or 2+ in the figure ⇒ ambiguous → defer/escalate
+  // #362 (ADR-409): «M מחוץ למעגל» on a circle-less figure presupposes the circle — introduce it
+  // (the same fallback as pointOnCircle above; a NAMED reference stays with resolveCenter so the
+  // #186 seam keeps owning it); the ADR-254 side seeding works against the freshly minted free
+  // circle exactly as against a built one (locked). 2+ unnamed circles still defer.
+  let center = resolveCenter(s, ctx);
+  let prepend: AnyCommand[] = [];
+  if (!center) {
+    const intro = resolveOrIntroduceCircle(s, ctx);
+    if (intro) ({ center, prepend } = intro);
+  }
+  if (!center) return null; // 2+ unnamed circles ⇒ ambiguous → defer/escalate
   // UPPERCASE labels only (the ADR-076 list convention) — a lowercase run like "and" is a connective.
   const subjects = (m[1].match(/[A-Z]\d*/g) ?? []).map(up);
   if (subjects.length === 0 || new Set(subjects).size !== subjects.length) return null;
-  return subjects.map((id) => ({ type: 'point-circle-side' as const, id, circle: circleId(center), side }));
+  return [...prepend, ...subjects.map((id) => ({ type: 'point-circle-side' as const, id, circle: circleId(center), side }))];
 };
 
 /** «נקודת C ו D נמצאות בצדדים שונים של AB» / «C ו-D באותו צד של הישר AB» / "C and D are on different
