@@ -1899,4 +1899,18 @@ export const SCENARIOS_4: Scenario[] = [
       expect(Math.abs(dist(A, D) - dist(D, B)), 'D stays the midpoint of AB').toBeLessThan(1e-6);
     },
   },
+  {
+    id: 'unnamed-concurrency-point',
+    title: 'issue #363 / ADR-418: «נקודת מפגש האלכסונים» with no label builds the crossing, auto-named M',
+    guards:
+      '`specialPointMeet` resolved the meet verb, the centre family and the host polygon and then bailed on `if (!X) return null` for want of a visible NAME — so a determined construction escalated to the paid LLM. Every command it emits is fixed without the label; the grammar already auto-names elsewhere (the midsegment endpoints, ADR-263’s altitude foot).',
+    steps: ['ריבוע ABCD', 'נקודת מפגש האלכסונים'],
+    check: (fig) => {
+      allStepsOk(fig);
+      const [A, B, C, D, M] = ['A', 'B', 'C', 'D', 'M'].map((id) => at(fig, id));
+      expect(M, 'the crossing was created and labelled M').toBeTruthy();
+      // the diagonal crossing of a square is equidistant from all four vertices
+      for (const v of [B, C, D]) expect(dist(M, v), 'M is the centre').toBeCloseTo(dist(M, A), 6);
+    },
+  },
 ];

@@ -1010,8 +1010,7 @@ const specialPointMeet: Rule = (s, ctx) => {
   // intersection …" (before). Precise so a shape vertex is never mistaken for the result point.
   const after = s.match(/(?:בנקודה|\bat\b(?:\s+point)?)\s+([A-Za-z]\d*)\b/i);
   const before = s.match(/^\s*([A-Za-z]\d*)\s+(?:היא\s+|הוא\s+|is\s+)?(?:ה?נקודת\s+)?(?:מפגש|the\s+(?:intersection|meeting|concurrency)\b)/i);
-  const X = after ? up(after[1]) : leadingNamedPoint(s) ?? (before ? up(before[1]) : null);
-  if (!X) return null;
+  const named = after ? up(after[1]) : leadingNamedPoint(s) ?? (before ? up(before[1]) : null);
   // Resolve the shape: a named qualifier's label run of the right size, else the figure's single polygon.
   const shapeM = s.match(
     /(?:משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|triangle|quadrilateral|square|rectangle|rhombus|trapezoid|parallelogram|kite)\s+((?:[A-Za-z]\d*\s*){3,4})/i,
@@ -1026,6 +1025,26 @@ const specialPointMeet: Rule = (s, ctx) => {
     if (cands.length === 1) poly = cands[0].map(up);
   }
   if (!poly) return null; // ambiguous / unknown shape → defer (ADR-052)
+  // #363: the result LABEL is optional. «נקודת מפגש האלכסונים» / «האלכסונים נחתכים» / "the diagonals meet"
+  // names no point, and nothing about the construction depends on one — every command below is fully
+  // determined without it, so refusing for want of a name sent a perfectly readable utterance to the paid
+  // LLM. Auto-name it the way this grammar already does elsewhere (the midsegment endpoints, ADR-263's
+  // altitude foot): `freeLabel` over the polygon's own vertices plus every existing point, preferring the
+  // CONVENTIONAL centre letter of that family — the letter a textbook would use (H for the orthocentre,
+  // O for the circumcentre, I for the incentre, M for a centroid / diagonal crossing).
+  //
+  // A real letter rather than an ADR-297 `@`-dot, deliberately: that convention is for points a
+  // DECOMPOSITION needs internally and the student never mentioned (an incircle touch point). Here the
+  // crossing IS the subject of the student's own sentence, so it gets a visible, referenceable label — and
+  // being drawn, it cannot silently hijack a letter the student later reaches for.
+  const PREFERRED: Record<string, string[]> = {
+    diag: ['M', 'O', 'K', 'P'],
+    median: ['M', 'G', 'K', 'P'],
+    altitude: ['H', 'M', 'K', 'P'],
+    bisector: ['I', 'O', 'M', 'K'],
+    perpbis: ['O', 'M', 'K', 'P'],
+  };
+  const X = named ?? freeLabel([...poly, ...(ctx.points ?? [])], PREFERRED[fam.key] ?? []);
   const [A, B, C, D] = poly; // D undefined for a triangle
   // Only the CENTRE point is drawn — every construction line/point (diagonals, medians, altitudes, ⊥-bisectors
   // and their feet/midpoints) is SCAFFOLDING (operator, 2026-07-14): a `~`-prefixed helper point is not

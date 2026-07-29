@@ -5685,6 +5685,19 @@ Both from the operator's play of the values panel (2026-07-29): *"for circle, ad
 
 Locked by `values-panel.test.ts` (+4: the circle's 6π beside 9π, a sized square's perimeter 16, a stated perimeter marked נתון, and a free figure printing no perimeter). #415 is presentation — its lock is the unchanged ratio-class data plus operator play; no scenario can assert a layout.
 
+### ADR-418 — A determined construction is not refused for want of a NAME: the concurrency point auto-labels (#363)
+
+**Class:** a rule that resolves everything it needs and then bails on a missing *label*. `specialPointMeet` matched the meet verb, the centre family and the host polygon, and ended at `if (!X) return null` — so «נקודת מפגש האלכסונים» / «האלכסונים נחתכים» / "the diagonals meet" escalated to the paid LLM although **every command it would emit is fully determined without the label**; `X` is only the visible name. The rule already auto-names its own scaffolding (`~med-BC`, `~alt-A`, `~pb-AB`), so it demonstrably knew how to name things — it just refused to name its own result.
+
+**Mechanism:** `freeLabel` over the host polygon's vertices plus every existing point, preferring the **conventional centre letter of that family** — `H` orthocentre, `O` circumcentre, `I` incentre, `M` centroid and quad-diagonal crossing — i.e. the letter a textbook would print. Named forms are byte-identical (the label match still wins), and the ambiguous-host defer is untouched: a label is not a licence to guess a *shape* (ADR-052).
+
+**Parser-side, not the ADR-3D-048 apply-time sentinel** the issue sketched. That precedent picks the letter at apply *because parse3 is context-free*; the 2-D parser is context-carrying by design (ADR-171's `buildParseCtx`), and its own established pattern is parser-side auto-naming with `ctx.points` — the midsegment's endpoints and ADR-263's altitude foot both do exactly this. Copying the 3-D mechanism here would have added a sentinel kind for a problem this grammar has already solved.
+
+**A real letter, not an ADR-297 `@`-dot.** That convention exists for points a DECOMPOSITION needs internally and the student never mentioned (an incircle touch point), precisely to avoid the namespace-hijack class. Here the crossing IS the subject of the student's own sentence, so it gets a visible, referenceable label — and being drawn, it cannot silently hijack a letter the student later reaches for.
+
+The sibling sweep the issue asked for came back clean: this was the only `if (!X) return null` bail of its kind in the parser.
+
+Locked by `unnamed-concurrency.test.ts` (6 — three registers, the conventional letter per family, named forms unchanged, never stealing a taken letter or a host vertex, the ambiguous-host defer, and the built figure's centre property) + scenario `unnamed-concurrency-point`.
 ### ADR-416 — A constraint description's WORDS are translated at the humanising layer; its symbols are not (#413)
 
 **Class:** user-facing text assembled from two sources with different locale status, where only one was handled. Operator screenshot (2026-07-29): «לא ניתן: הנתון **H, C, D collinear** סותר נתון קודם» — a correct Hebrew sentence with an English clause inside it.
