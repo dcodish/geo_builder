@@ -1,43 +1,43 @@
 {
   "_comment": "MEASURED tier membership (ADR-394). Rewritten by `npm run test:full` only when the set of slow files changes. `npm run test:fast` derives its --exclude list from `slow`.",
   "thresholdMs": 60000,
-  "updatedAt": "2026-07-29",
+  "updatedAt": "2026-07-30",
   "slow": [
     {
       "file": "src/__tests__/scenarios-e2e-5.test.ts",
-      "ms": 187313
-    },
-    {
-      "file": "src3d/__tests__/right-apex.test.ts",
-      "ms": 157187
+      "ms": 180524
     },
     {
       "file": "src3d/__tests__/adr-3d-032.test.ts",
-      "ms": 156834
+      "ms": 154235
+    },
+    {
+      "file": "src3d/__tests__/right-apex.test.ts",
+      "ms": 152038
     },
     {
       "file": "src3d/__tests__/book-coordinate-givens.test.ts",
-      "ms": 91328
+      "ms": 89642
     },
     {
       "file": "src3d/__tests__/member-drive.test.ts",
-      "ms": 85060
+      "ms": 82801
     },
     {
       "file": "src/theorems/__tests__/b-corpus.test.ts",
-      "ms": 77888
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-1.test.ts",
-      "ms": 67542
+      "ms": 75085
     },
     {
       "file": "src/engine/__tests__/membership-conversion.test.ts",
-      "ms": 66120
+      "ms": 66117
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-1.test.ts",
+      "ms": 63352
     },
     {
       "file": "src/__tests__/scenarios-e2e-7.test.ts",
-      "ms": 60030
+      "ms": 62815
     }
   ]
 }
