@@ -5758,3 +5758,29 @@ The lesson is the recurring one: **the noun list was a sample, not the vocabular
 **Recorded trap (a repeat of the 3-D NUL-byte lesson, docs/06b ADR-3D-006):** patching these regexes through a shell heredoc wrote `"\b"` as a literal **backspace byte** (0x08) into two regex literals — a valid regex that matches a control character, so `tsc` was happy and only `cat -A` showed it. Every file touched that way was scanned for control characters afterwards; the check belongs in any session that edits regex literals through a shell layer.
 
 Locked by `guided-refusals.test.ts` (9 — every solid noun, every analytic form, the two messages carrying the operator's decisions, a no-mislabel guard over real constructions, both split shapes with their quoted pieces, and six single statements that must stay untouched).
+
+### ADR-420 — A magnitude is reported in the student's OWN declared unit (#427)
+
+**Context.** The operator, on a square figure carrying `AB = a`: *"when I assign a param to a segment — like `AB=a`, the data panel assigns a=5 and shows all values by that."* The panel printed `AB = 5`, `AC = 5√2`, `AG = 5√10/3`, `S = 25`.
+
+The `5` is the default drawing scale. `AB = a` ([ADR-031](#adr-031) symbolic measures) states **no number** — its lowering deliberately emits no constraint, so the world scale stays a free DOF — and the panel had no way to say so, printing the arbitrary scale instead. (That the panel prints a scale it was never given is a separate and wider defect, **#426**, which fires even with no symbol anywhere; it is filed P1 and is not this ADR.)
+
+**Decision.** Naming a segment declares a **unit**, and on a figure with no shape freedom every derived magnitude is then a fixed multiple of it. A ratio is invariant under the similarity gauge ([ADR-101](#adr-101)), so `AC = a√2` is genuine seed-invariant knowledge exactly where the absolute `AC = 5√2` is not. The panel reports the multiple.
+
+```
+AB = a   AD = a   AC = a√2   AG = a√10/3   S(ABCD) = a²   P(ABCD) = 4a
+```
+
+**Mechanism.** No new sampler and no new recognizer:
+
+- `declaredLengthUnit(cmds)` reads the unit off the **same symbol table the lowering uses** (`lower.ts`), so the panel and the engine can never disagree about what the symbol means. A var qualifies when it is a length binding that stays symbolic — no value given, exponent 1, no additive constant.
+- Each magnitude's ratio to the unit length (squared, for an area) is checked for invariance across the **shared sample pool** (M3), beside the existing absolute check. A row now survives when *either* is knowledge.
+- The quotient goes through the existing `exactFormOf` recognizer, so `√2`, `√10/3`, `1/2` arrive already recognized; `formatUnitText` / `MathValue` set the symbol in front of them. `4a`, `a²`, `3x√2` all fall out — the coefficient form `AB = 3x` was never special-cased.
+
+**Boundaries (each locked).** A **pinned scale wins**: once any size given exists the absolute IS knowledge, so `AB = a` + `BC = 4` prints real numbers — and a resolved `a = 6` reaches that same path through the existing lowering. **Two independent symbols withhold** rather than print `CD = 1.5a` at a student who named it `b` (the operator's scoping call). A **non-linear or affine** binding (`12√x`, `k+2`) is not a unit — expressing other lengths in it would be arithmetic the student never wrote. A figure with genuine shape freedom still reports only what the unit fixes: a free triangle prints `AB = a` and no siblings.
+
+**Rode along.** `scalePinned(c)` — the scale component of `similarityGauge`, extracted so every layer deciding whether an absolute magnitude is knowledge asks the question the DOF counter already answers (the 3-D [ADR-3D-054](06b-decisions-3d.md#adr-3d-054) precedent). `freeDofCount === 0` means *rigid up to similarity*, **not** *every magnitude known* — a bare square has no free shape DOF and no known side. #426 consumes this same predicate.
+
+**Deliberately not widened.** The canvas's own definite-length labels (#126) still print absolutes; they are #426's to silence, and giving them the symbolic form is the natural follow-up once it has.
+
+Locked by `symbolic-unit.test.ts` (13 — the operator's square, the fraction-with-radical form, נתון marking, the coefficient form, and every boundary above).

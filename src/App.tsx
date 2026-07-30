@@ -1436,7 +1436,7 @@ export default function App() {
                             : r.label}
                         </bdi>
                         <span>=</span>
-                        <MathValue value={r.value} exact={r.exact} degrees={r.kind === 'angle'} />
+                        <MathValue value={r.value} exact={r.exact} degrees={r.kind === 'angle'} unit={r.unit} />
                       </button>
                     ))}
                   </div>

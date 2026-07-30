@@ -12,11 +12,11 @@
  * never a sixth ad-hoc one).
  */
 
-import { exactFormOf, formatExactText, formatMeasure, type ExactForm } from '@/format';
+import { exactFormOf, formatExactText, formatMeasure, formatUnitText, type ExactForm, type UnitValue } from '@/format';
 import { figureEdges } from './relations';
-import { freeDofCount } from './sample';
+import { freeDofCount, scalePinned } from './sample';
 import { polygonArea } from './geometry';
-import type { Construction, Id, Vec } from './types';
+import type { AnyCommand, Construction, Id, Vec } from './types';
 
 export interface ValueRow {
   kind: 'length' | 'angle' | 'radius' | 'area' | 'perimeter';
@@ -29,6 +29,54 @@ export interface ValueRow {
   exact: ExactForm | null;
   /** נתון (stated by the student) vs נגזר (forced by the figure). */
   stated: boolean;
+  /**
+   * The value in the student's DECLARED unit (#427) — `a`, `a√2`, `a²`. Present only when the figure
+   * carries a unit ({@link declaredLengthUnit}) and this row's ratio to it is seed-invariant; the UI
+   * prints it INSTEAD of `value`, which under a free similarity gauge is only the drawing's scale.
+   */
+  unit?: UnitValue;
+}
+
+/**
+ * The student's declared length unit (#427): `AB = a` binds the unit `a` to |AB|; `AB = 3x` binds `x`
+ * to |AB|/3. Read off the same symbol table the lowering uses ([ADR-031](docs/06-decisions.md#adr-031),
+ * `lower.ts`) so the panel and the engine can never disagree about what the symbol means.
+ */
+export interface DeclaredUnit {
+  sym: string;
+  /** the representative segment: |a→b| = `coef` · sym, so the unit length is |a→b| / coef. */
+  a: Id;
+  b: Id;
+  coef: number;
+  /** every segment the student annotated with this symbol — those rows are נתון, not נגזר. */
+  statedRefs: [Id, Id][];
+}
+
+/**
+ * Which symbol (if any) the figure's magnitudes should be expressed in.
+ *
+ * A var qualifies as a unit when it is a LENGTH binding that stays symbolic: no value given (a valued
+ * var is lowered to real distances — the scale is then pinned and plain numbers are the right answer),
+ * exponent 1 and no additive constant (`12√x` / `k+2` are not linear multiples of a unit, so expressing
+ * other lengths in them would be arithmetic the student never wrote).
+ *
+ * TWO independent symbols withhold rather than guess (the operator's scoping call): on a determined
+ * figure |CD|/|AB| is fixed, so everything COULD be printed in `a` — but a student who named `b` did not
+ * ask to read `CD` as `1.5a`.
+ */
+export function declaredLengthUnit(cmds: AnyCommand[]): DeclaredUnit | null {
+  const valued = new Set<string>();
+  for (const c of cmds) if (c.type === 'set-var') valued.add(c.name);
+  const bySym = new Map<string, DeclaredUnit>();
+  for (const c of cmds) {
+    if (c.type !== 'measure-length' || !('var' in c.expr)) continue;
+    const e = c.expr;
+    if (valued.has(e.var) || (e.pow ?? 1) !== 1 || (e.const ?? 0) !== 0 || !(e.coef > 0)) continue;
+    const cur = bySym.get(e.var);
+    if (cur) cur.statedRefs.push([c.a, c.b]);
+    else bySym.set(e.var, { sym: e.var, a: c.a, b: c.b, coef: e.coef, statedRefs: [[c.a, c.b]] });
+  }
+  return bySym.size === 1 ? [...bySym.values()][0] : null;
 }
 
 /** Areas in a fixed small-rational ratio though neither absolute value is known: S, 2S, ½S… */
@@ -59,6 +107,7 @@ const invariant = (vals: number[]): number | null => {
 };
 
 const dist = (a: Vec, b: Vec): number => Math.hypot(b.x - a.x, b.y - a.y);
+const segKey = (a: Id, b: Id): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
 const angleAt = (v: Vec, p: Vec, q: Vec): number => {
   const d1 = { x: p.x - v.x, y: p.y - v.y };
   const d2 = { x: q.x - v.x, y: q.y - v.y };
@@ -77,6 +126,8 @@ export function computeValuesPanel(
   circlesPerSample: Map<Id, { center: Vec; r: number }>[],
   /** the student's own area letter («נסמן את שטח ABCD ב-S», ADR-121) when one was bound. */
   areaLetter?: string | null,
+  /** the declared length unit («AB = a», #427) — every magnitude is then reported as a multiple of it. */
+  unit?: DeclaredUnit | null,
 ): ValuesPanelResult {
   const c = constructions[0];
   const rows: ValueRow[] = [];
@@ -86,18 +137,65 @@ export function computeValuesPanel(
   const enough = samples.length >= 4 || freeDofCount(c) === 0;
   if (!enough) return { rows, areaClasses, sampleCount: samples.length };
 
-  const per = (f: (pos: Map<Id, Vec>, i: number) => number | null): number | null => {
+  type Measure = (pos: Map<Id, Vec>, i: number) => number | null;
+  const samplesOf = (f: Measure): number[] | null => {
     const vals: number[] = [];
     for (const [i, pos] of samples.entries()) {
       const v = f(pos, i);
       if (v === null) return null;
       vals.push(v);
     }
-    return invariant(vals);
+    return vals;
+  };
+  const per = (f: Measure): number | null => {
+    const vals = samplesOf(f);
+    return vals === null ? null : invariant(vals);
+  };
+
+  // ---- the declared-unit lane (#427) -----------------------------------------------------------
+  // The measure divided by the unit length (squared, for an area) in EVERY sample. A ratio is invariant
+  // under the similarity gauge, so this survives on figures whose absolute magnitudes are only the
+  // drawing's scale — which is exactly when the student's own symbol is the honest thing to print.
+  // A pinned SCALE yields to real numbers: once a size given exists the absolute IS knowledge, and the
+  // student who wrote «AB = a, BC = 4» is better served learning a = 4 than reading `a` back.
+  const useUnit = !!unit && !scalePinned(c);
+  const unitCoefOf = (f: Measure, pow: 1 | 2): UnitValue | null => {
+    if (!unit || !useUnit) return null;
+    const vals: number[] = [];
+    for (const [i, pos] of samples.entries()) {
+      const v = f(pos, i);
+      const pa = pos.get(unit.a);
+      const pb = pos.get(unit.b);
+      if (v === null || !pa || !pb) return null;
+      const u = dist(pa, pb) / unit.coef;
+      if (!(u > 1e-9)) return null;
+      vals.push(v / Math.pow(u, pow));
+    }
+    const k = invariant(vals);
+    return k === null ? null : { sym: unit.sym, pow, coef: k, exact: exactFormOf(k) };
+  };
+
+  // The segments the student themself annotated with the symbol are נתון, not נגזר.
+  const unitStated = new Set((unit?.statedRefs ?? []).map(([a, b]) => segKey(a, b)));
+
+  /**
+   * Emit one MAGNITUDE row (length / radius / area / perimeter). The row survives when its ABSOLUTE is
+   * seed-invariant (as before) OR when only its ratio to the declared unit is — in which case `value`
+   * carries the current drawing's measurement for reference and `unit` is what the UI prints.
+   */
+  const magnitude = (
+    kind: ValueRow['kind'], ids: Id[], label: string, stated: boolean, pow: 1 | 2, f: Measure,
+  ): void => {
+    const vals = samplesOf(f);
+    if (vals === null) return;
+    const abs = invariant(vals);
+    const u = unitCoefOf(f, pow);
+    if (abs === null && u === null) return;
+    const value = abs ?? vals.reduce((x, y) => x + y, 0) / vals.length;
+    rows.push({ kind, ids, label, value, exact: abs === null ? null : exactOrNull(value), stated, ...(u ? { unit: u } : {}) });
   };
 
   // ---- stated markers (נתון) from the construction's own constraints/objects --------------------
-  const segKey = (a: Id, b: Id) => (a < b ? `${a}|${b}` : `${b}|${a}`);
   const statedLen = new Set<string>();
   const statedAng = new Set<string>();
   const statedArea = new Set<string>();
@@ -111,15 +209,10 @@ export function computeValuesPanel(
 
   // ---- lengths over the figure's edge universe (the detection layers' own, scaffold-filtered) ---
   for (const [a, b] of figureEdges(c, samples)) {
-    const v = per((pos) => {
+    magnitude('length', [a, b], `${a}${b}`, statedLen.has(segKey(a, b)) || unitStated.has(segKey(a, b)), 1, (pos) => {
       const p = pos.get(a);
       const q = pos.get(b);
       return p && q ? dist(p, q) : null;
-    });
-    if (v === null) continue;
-    rows.push({
-      kind: 'length', ids: [a, b], label: `${a}${b}`, value: v, exact: exactOrNull(v),
-      stated: statedLen.has(segKey(a, b)),
     });
   }
 
@@ -160,21 +253,19 @@ export function computeValuesPanel(
   // ---- radii ------------------------------------------------------------------------------------
   for (const o of c.objects) {
     if (o.kind !== 'circle') continue;
-    const v = per((_pos, i) => circlesPerSample[i]?.get(o.id)?.r ?? null);
-    if (v === null) continue;
-    rows.push({
-      kind: 'radius', ids: [o.center], label: o.center, value: v, exact: exactOrNull(v),
-      stated: o.radius.via === 'length', // a STATED radius stays via 'length' (free/through/tangent are derived)
-    });
+    const radiusAt = (_pos: Map<Id, Vec>, i: number) => circlesPerSample[i]?.get(o.id)?.r ?? null;
+    // a STATED radius stays via 'length' (free/through/tangent are derived)
+    magnitude('radius', [o.center], o.center, o.radius.via === 'length', 1, radiusAt);
     // The circle's area AND circumference ride the same knowledge — both are the same one-step derivation
     // from the same radius, so printing one and withholding the other read as an oversight (#414). ADR-228
     // already lowers a STATED circumference to a radius (r = C/2π); this is that constant forwards.
-    const area = Math.PI * v * v;
-    rows.push({ kind: 'area', ids: [o.center], label: `(${o.center})`, value: area, exact: exactOrNull(area), stated: false });
-    const circumference = 2 * Math.PI * v;
-    rows.push({
-      kind: 'perimeter', ids: [o.center], label: `(${o.center})`, value: circumference,
-      exact: exactOrNull(circumference), stated: false,
+    magnitude('area', [o.center], `(${o.center})`, false, 2, (pos, i) => {
+      const r = radiusAt(pos, i);
+      return r === null ? null : Math.PI * r * r;
+    });
+    magnitude('perimeter', [o.center], `(${o.center})`, false, 1, (pos, i) => {
+      const r = radiusAt(pos, i);
+      return r === null ? null : 2 * Math.PI * r;
     });
   }
 
@@ -193,20 +284,16 @@ export function computeValuesPanel(
     }
     return vals;
   });
-  polys.forEach((o, i) => {
-    const vals = perPolyVals[i];
-    const v = vals ? invariant(vals) : null;
-    if (v === null) return;
-    rows.push({
-      kind: 'area', ids: [...o.vertices], label: o.vertices.join(''), value: v, exact: exactOrNull(v),
-      stated: statedArea.has([...o.vertices].sort().join('')),
-    });
+  polys.forEach((o) => {
+    magnitude('area', [...o.vertices], o.vertices.join(''), statedArea.has([...o.vertices].sort().join('')), 2, (pos) =>
+      areaOf(o.vertices, pos),
+    );
   });
   // The polygon twin of the circle's circumference (#414): `perimeter` is a first-class measure and
   // constraint (ADR-228), so a determined polygon's Σ of sides is knowledge the panel should carry beside
   // its area. Same invariance gate as every other row — a figure whose sides are not all fixed prints none.
   polys.forEach((o) => {
-    const v = per((pos) => {
+    magnitude('perimeter', [...o.vertices], o.vertices.join(''), statedPerim.has([...o.vertices].sort().join('')), 1, (pos) => {
       let sum = 0;
       for (let k = 0; k < o.vertices.length; k++) {
         const p = pos.get(o.vertices[k]);
@@ -215,11 +302,6 @@ export function computeValuesPanel(
         sum += dist(p, q);
       }
       return sum;
-    });
-    if (v === null) return;
-    rows.push({
-      kind: 'perimeter', ids: [...o.vertices], label: o.vertices.join(''), value: v, exact: exactOrNull(v),
-      stated: statedPerim.has([...o.vertices].sort().join('')),
     });
   });
   // ratio classes (req 3): a fixed small-rational ratio in EVERY sample, even when absolutes vary.
@@ -258,5 +340,9 @@ export function computeValuesPanel(
 }
 
 
-/** Display text for a row's value — exact when recognized, else the shared 2-decimal fallback. */
-export const valueText = (row: ValueRow): string => (row.exact ? formatExactText(row.exact) : formatMeasure(row.value));
+/**
+ * Display text for a row's value — the student's own unit when the row carries one (#427: `a√2` beats
+ * `5√2`, whose 5 is only the drawing's scale), else exact when recognized, else the 2-decimal fallback.
+ */
+export const valueText = (row: ValueRow): string =>
+  row.unit ? formatUnitText(row.unit) : row.exact ? formatExactText(row.exact) : formatMeasure(row.value);
