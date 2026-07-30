@@ -1083,7 +1083,7 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
   }
   // Verify the OUTPUT against the ORIGINAL givens: relations the input asserted that don't actually
   // hold in the final coordinates (a point off its circle, …) — caught even when every step is 'ok'.
-  const violations = e.ok ? checkGivens(applied, e.positions, e.circles) : [];
+  const violations = e.ok ? checkGivens(applied, e.positions, e.circles, figure) : [];
   // Free-radius circles the student can dial (base = stable seed radius for the slider range; current =
   // what's drawn). Read from the pre-seed construction so the range doesn't shift as the value changes.
   // Show a slider only for a FREE, not-currently-driven radius — a radius the solver drives is pinned by

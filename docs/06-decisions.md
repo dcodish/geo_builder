@@ -5878,3 +5878,73 @@ Locked by `circle-reference.test.ts` (9 — hidden circles as referents, both lo
 the named form unchanged, and each of the four bounds: no-circle mints, all-existing mints, a stated
 radius mints, 2+ circles never guesses) and scenarios `definite-circle-ref-binds-semicircle` +
 `second-inscribe-of-existing-points-still-mints`.
+
+### ADR-423 — Which part of a circle is DRAWN is engine knowledge (#429)
+
+**Reported (operator, 2026-07-30):** *"when i draw half a circle, all references to the circle need to be
+to the drawn half and not the part that isnt shown."*
+
+```
+חצי מעגל
+משולש CDE חסום במעגל
+```
+
+put **E at θ = 280°** — floating in empty space below the semicircle's diameter, attached to no visible
+ink, with `lastError: null` and no verifier violation.
+
+**Root cause: a circle's drawn extent was RENDERER-ONLY knowledge.** `arc` objects were read at exactly
+one site in the whole codebase (`render/scene.ts`), and the two decisions that fix *which* part is drawn —
+the bulge flip (`bulgeRef`/`bulgeToward`) and the traversal direction that realises the intended span —
+were both resolved at render time, deliberately, "because the side needs coordinates". So the engine's
+circle was always the **full** circle: every reference to a semicircle resolved against 360°, and **no
+requirement or sampling mechanism could have restricted anything to the ink, because the engine could not
+even ask the question.** This is the [ADR-167](#adr-167) shape ("the node-definition issue, again") in the
+ARC dimension: the universe of *where may a point on this circle be* was the whole circle when it should
+have been the drawn ink.
+
+**Fix — one chokepoint owning the question, with the renderer as its consumer.** `src/engine/arcs.ts` is
+the arc twin of `resolveDrawnLines` ([ADR-380](#adr-380)) and exists for the identical stated reason: the
+renderer and the engine must resolve "what ink exists" from ONE definition. `orientArc` holds the
+orientation decision (bulge flip, then traversal) extracted verbatim from the renderer; `scene.ts`'s
+`arcGeometry` now calls it, so the two **can never disagree about the drawn extent** — before, they could
+not be compared at all. `drawnArcSpans` folds those spans per circle and returns **null when a circle has
+no arcs**, which every consumer reads as "unrestricted": that null is the blast-radius guarantee, and it
+is asserted.
+
+**The free/driven split is the principle, not a convenience.**
+
+ - a **FREE** on-circle point is confined to the ink (`angleIntoSpans`, proportional and monotone so
+   sampling keeps its variety, inset 4% at each end so a point never lands ON a named endpoint — the
+   operator's "strictly inside" ruling and the `0.92` discipline the ADR-042 rider already used). Where an
+   unstated point sits is a choice nobody made, so putting it on the invisible part asserts something the
+   student never said — [ADR-052](#adr-052), the same reasoning that makes every unstated magnitude a DOF.
+ - a **DRIVEN or PINNED** point is deliberately *not* confined. Its position is a consequence, so the
+   engine must not silently override the constraint; the verifier reports it (`figure.v.pointOffArc`) and,
+   because `meetsRequirements` already gates on a clean verifier, the sampler and "show another
+   configuration" keep every free vertex on the ink for free.
+ - a **structurally forced** departure is allowed and excluded from the violation (the operator's ruling,
+   the [ADR-123](#adr-123)/[ADR-165](#adr-165) allow-with-a-notice precedent): an `antipode` of a point on
+   a semicircle is *always* on the other half, so flagging it would be both dishonest and unsatisfiable —
+   no seed could clear it and the config search would burn its whole budget proving so.
+
+**The degenerate fallback was the sharpest member.** A semicircle's endpoints are antipodal, so the arc
+bisector vanishes and both the `between` rider and `arc-midpoint` fell back to `bis = rot90(u1)` — an
+arbitrary half, blind to the ink. That single line is why «F אמצע הקשת AB» **deterministically, at 0 DOF**
+gave the midpoint of the arc that is not there (θ = 270°). `drawnSign` now picks the drawn candidate.
+
+**Generality:** everything is expressed over spans, never special-cased to 180°, so quarter-circles and
+sectors ([ADR-357](#adr-357)) — the same hidden-circle + `arc` construct family — are covered by
+construction, and the quarter case is locked.
+
+**Measured, before → after** (`חצי מעגל` + `משולש CDE חסום במעגל`): E θ = 280° → the three vertices at
+9.5° / 82° / 136°, all on the drawn half, at r = 5.0000; across 12 seeds every free vertex stays on the ink
+while the configurations still genuinely vary. `F אמצע הקשת AB`: θ = 270° → 90°. Whole suite green with no
+scenario or fixture changes — the null-means-unrestricted contract holding.
+
+**Companion:** [ADR-422](#adr-422) (#430) fixed which *circle* a definite reference resolves to; this fixes
+which *part* of it may be occupied. Both were needed before the reported figure drew correctly.
+
+Locked by `arcs.test.ts` (14 — the span helpers incl. the null contract, engine↔renderer extent parity on
+semicircle and quarter, the four class members end-to-end, multi-seed confinement that still varies, the
+quarter generality, and the full-circle byte-identical guarantee) and scenarios
+`semicircle-references-land-on-the-drawn-arc` + `arc-midpoint-takes-the-drawn-arc`.

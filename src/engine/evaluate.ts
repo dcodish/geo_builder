@@ -8,6 +8,7 @@
 import type { Circle, Constraint, Construction, GeoObject, GeoPoint, Id, Line, Vec } from './types';
 import { LEN_EPS, isGeoPoint, isOrderConstraint, objectParents } from './types';
 import { isShapeCarrier } from './carriers';
+import { angleIntoSpans, drawnArcSpans, drawnSign, type ArcSpan } from './arcs';
 import {
   add,
   circleCircleIntersect,
@@ -1079,6 +1080,19 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
   const remaining = new Set(points.map((p) => p.id));
   const remainingLines = new Set(lineObjs.map((l) => l.id));
   const remainingCircles = new Set(circleObjs.map((o) => o.id));
+  // #429 (ADR-423): which part of each circle carries ink. Resolved LAZILY against the sweep's current
+  // positions — an arc's endpoints are ordinary points and may not be placed yet, in which case the
+  // circle reads as fully drawn (unknown, never "empty"), exactly as it did before this existed. A
+  // figure with no `arc` objects gets null everywhere ⇒ byte-identical behaviour.
+  const arcObjs = c.objects.filter((o) => o.kind === 'arc');
+  const hasArcs = arcObjs.length > 0;
+  const spansOf = hasArcs
+    ? (circleId: Id): ArcSpan[] | null => {
+        const co = circleObjs.find((o) => o.id === circleId);
+        const rc = circles.get(circleId);
+        return co && rc ? drawnArcSpans(arcObjs, pos, co.center, rc.r) : null;
+      }
+    : undefined;
 
   // One fixed-point sweep resolves circles, lines, and points together: a circle
   // needs its centre point; a tangent line needs its circle; an on-circle /
@@ -1107,7 +1121,7 @@ function evaluateCore(c: Construction, opts?: { skipConstraints?: boolean }): Ev
     }
     for (const p of points) {
       if (!remaining.has(p.id)) continue;
-      const r = tryEval(p, pos, lines, circles);
+      const r = tryEval(p, pos, lines, circles, spansOf);
       if (r === 'pending') continue;
       if (typeof r === 'string') return { ok: false, error: r, stuckIds: [p.id] };
       pos.set(p.id, r);
@@ -1286,6 +1300,8 @@ function tryEval(
   pos: Map<Id, Vec>,
   lines: Map<Id, ResolvedLine>,
   circles: Map<Id, ResolvedCircle>,
+  /** #429: the drawn ink of a circle, or null/absent when the whole circle is drawn. */
+  spansOf?: (circleId: Id) => ArcSpan[] | null,
 ): Vec | 'pending' | string {
   switch (p.kind) {
     case 'free-point':
@@ -1425,7 +1441,14 @@ function tryEval(
         const u1 = unit(sub(from, c.center));
         const u2 = unit(sub(to, c.center));
         let bis = add(u1, u2); // points to the midpoint of the minor arc from→to
-        if (len(bis) < 1e-9) bis = rot90(u1); // antipodal endpoints → arc midpoint is perpendicular
+        if (len(bis) < 1e-9) {
+          // Antipodal endpoints (a semicircle's A and B) → the bisector degenerates and BOTH
+          // perpendiculars are equally "the midpoint". #429: pick the one that is actually DRAWN,
+          // instead of an arbitrary half that put the rider on the invisible arc.
+          const cand = rot90(u1);
+          const sgn = drawnSign(Math.atan2(cand.y, cand.x), spansOf?.(p.circle) ?? null);
+          bis = sgn === 1 ? cand : { x: -cand.x, y: -cand.y };
+        }
         // The MAJOR arc (#90): its midpoint is the antipodal direction (−bis) and its half-span is the
         // reflex complement (π − minorHalf), so F rides the far side of from→to.
         const minorHalf = Math.acos(Math.max(-1, Math.min(1, u1.x * u2.x + u1.y * u2.y))) / 2;
@@ -1436,7 +1459,14 @@ function tryEval(
         const ang = baseAng + frac * 0.92 * half; // 0.92 keeps F strictly inside (never onto from/to)
         return add(c.center, { x: c.r * Math.cos(ang), y: c.r * Math.sin(ang) });
       }
-      return add(c.center, { x: c.r * Math.cos(p.theta), y: c.r * Math.sin(p.theta) });
+      // #429 (ADR-423): a FREE (unstated) on-circle point is confined to the DRAWN ink. Where the point
+      // sits is a choice nobody made, so choosing a spot on the invisible part asserts something the
+      // student never said (ADR-052) — the same reasoning that makes every unstated magnitude a free DOF.
+      // A DRIVEN or PINNED point is deliberately NOT confined: its position is a consequence, and a
+      // forced departure from the ink is honest — the verifier reports it (`figure.v.pointOffArc`) rather
+      // than the engine silently overriding the constraint. A circle with no arcs returns null ⇒ unchanged.
+      const theta = p.free && p.solve === undefined ? angleIntoSpans(p.theta, spansOf?.(p.circle) ?? null) : p.theta;
+      return add(c.center, { x: c.r * Math.cos(theta), y: c.r * Math.sin(theta) });
     }
 
     case 'antipode': {
@@ -1454,7 +1484,14 @@ function tryEval(
       const u1 = unit(sub(from, c.center));
       const u2 = unit(sub(to, c.center));
       let bis = add(u1, u2); // points to the midpoint of the arc between from→to
-      if (len(bis) < 1e-9) bis = rot90(u1); // from/to antipodal → arc midpoint is perpendicular
+      if (len(bis) < 1e-9) {
+        // from/to antipodal → both perpendiculars are "the midpoint". #429: take the DRAWN one. This is
+        // the sharpest member of the class — «F אמצע הקשת AB» on a semicircle is 0-DOF and deterministic,
+        // so the student named arc AB and reliably got the midpoint of the arc that isn't there.
+        const cand = rot90(u1);
+        const sgn = drawnSign(Math.atan2(cand.y, cand.x), spansOf?.(p.circle) ?? null);
+        bis = sgn === 1 ? cand : { x: -cand.x, y: -cand.y };
+      }
       const dir = unit(bis);
       const sign = p.branch % 2 === 1 ? -1 : 1; // the other arc's midpoint is antipodal
       return add(c.center, scale(dir, sign * c.r));

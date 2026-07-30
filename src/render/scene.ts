@@ -13,7 +13,7 @@ import type { Construction, Id, Circle, Vec } from '@/engine/types';
 import { isGeoPoint } from '@/engine/types';
 import { len, rot90, sub, unit } from '@/engine/geometry';
 import { formatMeasure, formatAngle } from '@/format';
-import { resolveCircle, resolveDrawnLines, type DefiniteAngle, type DefiniteLength, type RelationsResult, type ResolvedCircle } from '@/engine';
+import { resolveCircle, resolveDrawnLines, orientArc, type DefiniteAngle, type DefiniteLength, type RelationsResult, type ResolvedCircle } from '@/engine';
 
 export interface ScenePoint {
   id: Id;
@@ -173,25 +173,29 @@ export interface Scene {
  * central-angle constraint lets the SOLVE itself land the mirrored configuration. Without `spanDeg`
  * the identity stays the legacy model-frame CCW from→to (parity-corrected under a mirrored view).
  */
-function arcGeometry(center: Vec, from: Vec, to: Vec, id: Id, opts?: { spanDeg?: number; minor?: boolean; mirrored?: boolean }): SceneArc | null {
-  const r = len(sub(from, center));
-  if (r < 1e-9) return null;
-  const TAU = 2 * Math.PI;
-  const angA = Math.atan2(from.y - center.y, from.x - center.x);
-  const angB = Math.atan2(to.y - center.y, to.x - center.x);
-  let ccw = (angB - angA) % TAU; // CCW span from `from` to `to` in the RECEIVED frame
-  if (ccw <= 1e-9) ccw += TAU;
-  const intended =
-    opts?.spanDeg !== undefined ? (opts.spanDeg * Math.PI) / 180
-    : opts?.minor ? Math.min(ccw, TAU - ccw) // the textbook wedge (ADR-357) — parity-invariant
-    : opts?.mirrored ? TAU - ccw : ccw;
-  // Traverse whichever way realises the intended span (tie — a semicircle — keeps CCW; the bulge
-  // mechanism has already oriented a semicircle's from/to in this frame).
-  const goCcw = Math.abs(ccw - intended) <= Math.abs(TAU - ccw - intended);
-  const extent = goCcw ? ccw : TAU - ccw;
+function arcGeometry(
+  center: Vec,
+  from: Vec,
+  to: Vec,
+  id: Id,
+  opts?: { spanDeg?: number; minor?: boolean; mirrored?: boolean; bulgeRef?: Vec; bulgeToward?: boolean },
+): SceneArc | null {
+  // #429 (ADR-423): the orientation decision — the bulge flip AND the traversal that realises the
+  // intended span — lives in the ENGINE (`orientArc`), because it is what decides which part of a
+  // circle is drawn, and the engine has to be able to ask that. The renderer is now a consumer, so the
+  // two can never disagree about the drawn extent (before, they could not even be compared).
+  const or = orientArc(center, from, to, opts);
+  if (!or) return null;
+  const extent = Math.abs(or.sweepAng);
   // The renderer flips Y to screen (y-down), where SVG sweep-flag 1 is *clockwise*. A received-frame
   // CCW arc traverses right→top→left (visually counter-clockwise on screen) ⇒ sweep 0; CW ⇒ sweep 1.
-  return { id, center, from, to, r, largeArc: extent > Math.PI ? 1 : 0, sweep: goCcw ? 0 : 1, startAng: angA, sweepAng: goCcw ? extent : -extent };
+  return {
+    id, center, from: or.from, to: or.to, r: or.r,
+    largeArc: extent > Math.PI ? 1 : 0,
+    sweep: or.goCcw ? 0 : 1,
+    startAng: or.startAng,
+    sweepAng: or.sweepAng,
+  };
 }
 
 /**
@@ -338,21 +342,15 @@ export function buildScene(
       let from = positions.get(o.from);
       let to = positions.get(o.to);
       if (center && from && to) {
-        // A semicircle "outside"/"inside" a shape: flip from↔to so the arc's apex sits on the far side of
-        // the diameter from `bulgeRef` (outward, default) or the same side (`bulgeToward`, inward). The
-        // apex of the CCW arc from `from` is 90° CCW around the centre; `side()` is the signed half-plane
-        // of a point relative to the diameter line (through the centre, along to−from).
-        const ref = o.bulgeRef ? positions.get(o.bulgeRef) : undefined;
-        if (ref) {
-          const r = len(sub(from, center));
-          const u = unit(sub(from, center));
-          const apex = { x: center.x - u.y * r, y: center.y + u.x * r }; // centre + r·rot90CCW(u)
-          const dia = sub(to, from);
-          const side = (p: Vec) => (p.x - center.x) * dia.y - (p.y - center.y) * dia.x;
-          const sameSide = side(apex) * side(ref) > 0;
-          if (sameSide !== !!o.bulgeToward) [from, to] = [to, from]; // wrong side → the other semicircle
-        }
-        const a = arcGeometry(center, from, to, o.id, { spanDeg: o.spanDeg, minor: o.minor, mirrored: opts?.mirrored });
+        // The bulge flip (a semicircle "outside"/"inside" a shape) is part of the shared orientation
+        // decision in the engine now — see `orientArc` (#429/ADR-423).
+        const a = arcGeometry(center, from, to, o.id, {
+          spanDeg: o.spanDeg,
+          minor: o.minor,
+          mirrored: opts?.mirrored,
+          bulgeRef: o.bulgeRef ? positions.get(o.bulgeRef) : undefined,
+          bulgeToward: o.bulgeToward,
+        });
         if (a) arcs.push(a);
       }
     }

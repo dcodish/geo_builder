@@ -1945,4 +1945,39 @@ export const SCENARIOS_4: Scenario[] = [
       for (const id of ['A', 'B', 'C']) expect(dist(P, at(fig, id))).toBeCloseTo(R, 4);
     },
   },
+  {
+    id: 'semicircle-references-land-on-the-drawn-arc',
+    title: 'issue #429 / ADR-423: every reference to a half circle lands on the DRAWN half',
+    guards:
+      'the operator\'s report — "when i draw half a circle, all references to the circle need to be to the drawn half and not the part that isnt shown". A circle\'s drawn extent was RENDERER-ONLY knowledge (`arc` objects were read at exactly one site, and both decisions fixing which part is drawn were resolved at render time), so the engine\'s circle was always the FULL circle and E landed at θ = 280° — floating below the diameter, lastError null, no violation. The ADR-167 shape in the arc dimension: the universe of "where may a point on this circle be" was the whole circle when it should be the drawn ink.',
+    steps: ['חצי מעגל', 'משולש CDE חסום במעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const ctr = at(fig, '@ctr-O');
+      const A = at(fig, 'A');
+      const R = dist(ctr, A);
+      for (const id of ['C', 'D', 'E']) {
+        const p = at(fig, id);
+        expect(dist(ctr, p), `${id} is genuinely on the circle`).toBeCloseTo(R, 6);
+        // the drawn half is the one carrying the arc — measured as the side of the A–B diameter the ink is on
+        const deg = ((Math.atan2(p.y - ctr.y, p.x - ctr.x) * 180) / Math.PI + 360) % 360;
+        expect(deg > 0.5 && deg < 179.5, `${id} on the DRAWN half (θ=${deg.toFixed(1)}°)`).toBe(true);
+      }
+    },
+  },
+  {
+    id: 'arc-midpoint-takes-the-drawn-arc',
+    title: 'issue #429 / ADR-423: «F אמצע הקשת AB» is the midpoint of the arc that EXISTS',
+    guards:
+      'the sharpest member of the #429 class: a semicircle\'s endpoints are antipodal, so the arc bisector degenerates and both `between` riders and `arc-midpoint` fell back to an arbitrary perpendicular (`rot90(u1)`) blind to which half carries ink. 0-DOF and deterministic — the student named arc AB and reliably got the midpoint of the arc that is not drawn (θ = 270°).',
+    steps: ['חצי מעגל', 'F אמצע הקשת AB'],
+    check(fig) {
+      allStepsOk(fig);
+      const ctr = at(fig, '@ctr-O');
+      const F = at(fig, 'F');
+      expect(dist(ctr, F)).toBeCloseTo(dist(ctr, at(fig, 'A')), 6);
+      const deg = ((Math.atan2(F.y - ctr.y, F.x - ctr.x) * 180) / Math.PI + 360) % 360;
+      expect(deg, 'the top of the DRAWN half, not θ=270°').toBeCloseTo(90, 3);
+    },
+  },
 ];

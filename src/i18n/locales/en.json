@@ -147,6 +147,7 @@
       "radiusOrder": "the inner circle (radius {{ri}}) should stay inside the outer circle (radius {{ro}})",
       "outsideCircle": "{{point}} should lie outside circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
       "insideCircle": "{{point}} should lie inside circle {{circle}} (radius {{radius}}) but is {{dist}} from its centre",
+      "pointOffArc": "{{point}} should lie on the drawn part of circle {{circle}}, but sits {{off}}° beyond it",
       "lineSideDifferent": "{{points}} should lie on different sides of {{seg}}, but they don't in this drawing",
       "lineSideSame": "{{points}} should lie on the same side of {{seg}}, but they don't in this drawing",
       "outsideRegion": "{{point}} should lie outside {{poly}}",

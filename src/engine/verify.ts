@@ -12,14 +12,15 @@
  * tangency point. Expandable to constraint residuals (distance/angle/parallel/⟂) and collinearity.
  */
 
-import type { Command, Constraint, Id, Vec } from './types';
+import type { Command, Constraint, Construction, Id, Vec } from './types';
 import type { ResolvedCircle } from './evaluate';
 import { dist, pointInPolygon } from './geometry';
+import { angleOffSpans, angleOnSpans, drawnArcSpans, type ArcSpan } from './arcs';
 import { constraintRefs, describeConstraint, isSatisfied, residual } from './solve';
 
 export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
-  relation: 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'line-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | Constraint['type'];
+  relation: 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'line-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | 'point-off-arc' | Constraint['type'];
   ids: Id[];
   /** English fallback, e.g. "E should lie on circle P (radius 3.60) but is 7.42 from its centre". */
   message: string;
@@ -107,6 +108,10 @@ export function checkGivens(
   commands: Command[],
   positions: Map<Id, Vec>,
   circles: Map<Id, ResolvedCircle>,
+  /** #429: the resolved construction — needed to tell a CONFINED free on-circle point (which cannot
+   *  violate the drawn-arc requirement) from a DRIVEN one (whose departure is real information).
+   *  Optional so the command-only callers keep working; the arc check simply doesn't run without it. */
+  construction?: Construction,
 ): GivenViolation[] {
   const violations: GivenViolation[] = [];
 
@@ -227,6 +232,58 @@ export function checkGivens(
         messageKey: cmd.side === 'outside' ? 'figure.v.outsideCircle' : 'figure.v.insideCircle',
         params: { point: cmd.id, circle: circleName(cmd.circle), radius: c.r.toFixed(2), dist: d.toFixed(2) },
       });
+    }
+  }
+
+  // #429 (ADR-423): a point asserted ON a circle must land on the part of it that is DRAWN. A FREE
+  // on-circle point is already confined by `evaluate` (its position was an unstated choice, so it is made
+  // on the ink), which leaves the cases where the position is a CONSEQUENCE — a driven carrier, a pinned
+  // θ, a derived crossing. There a departure is real information, so it surfaces amber rather than being
+  // silently overridden, and because `meetsRequirements` gates on a clean verifier the sampler and "show
+  // another configuration" keep every free vertex on the ink.
+  //
+  // Structurally-forced departures are EXCLUDED and reported as a notice instead (the operator's ruling,
+  // and the ADR-123 allow-with-a-notice precedent): an `antipode` of a point on a semicircle is ALWAYS on
+  // the other half, so flagging it would be both dishonest and unsatisfiable — no seed could clear it, and
+  // the config search would burn its whole budget proving that.
+  if (construction) {
+    const arcs = construction.objects.filter((o) => o.kind === 'arc');
+    if (arcs.length > 0) {
+      const cache = new Map<Id, ArcSpan[] | null>();
+      const spansFor = (circleId: Id): ArcSpan[] | null => {
+        if (!cache.has(circleId)) {
+          const co = construction.objects.find((o) => o.kind === 'circle' && o.id === circleId) as { center: Id } | undefined;
+          const rc = circles.get(circleId);
+          cache.set(circleId, co && rc ? drawnArcSpans(arcs, positions, co.center, rc.r) : null);
+        }
+        return cache.get(circleId) ?? null;
+      };
+      // ids whose position is STRUCTURALLY opposite the ink — see the note above
+      const forcedOff = new Set<Id>(
+        construction.objects.filter((o) => o.kind === 'antipode').map((o) => o.id),
+      );
+      for (const o of construction.objects) {
+        if (o.kind !== 'on-circle') continue;
+        if (o.free && o.solve === undefined) continue; // confined by `evaluate` — cannot violate
+        if (forcedOff.has(o.id)) continue;
+        const rc = circles.get(o.circle);
+        const p = positions.get(o.id);
+        if (!rc || !p || rc.r <= 1e-9) continue;
+        const spans = spansFor(o.circle);
+        if (!spans || spans.length === 0) continue; // the whole circle is drawn
+        const ang = Math.atan2(p.y - rc.center.y, p.x - rc.center.x);
+        // angular slack matching the on-circle position tolerance, so a point AT an endpoint passes
+        const tol = Math.max(1e-6, onCircleTol(rc.r) / rc.r);
+        if (angleOnSpans(ang, spans, tol)) continue;
+        const off = ((angleOffSpans(ang, spans) * 180) / Math.PI).toFixed(1);
+        violations.push({
+          relation: 'point-off-arc',
+          ids: [o.id, o.circle],
+          message: `${o.id} should lie on the drawn part of ${circleLabel(o.circle)}, but sits ${off}° beyond it`,
+          messageKey: 'figure.v.pointOffArc',
+          params: { point: o.id, circle: circleName(o.circle), off },
+        });
+      }
     }
   }
 
