@@ -127,7 +127,8 @@ const rightPrism: Rule = (s) => {
   if (!/מנסרה/.test(s) && !/\bprism\b/i.test(s)) return null;
   if (!/ישרה/.test(s) && !/\bright\b/i.test(s)) return null; // oblique unsupported — honest refusal
   if (/מעוין/.test(s) || /\brhombus\b/i.test(s)) return null; // rhombus base → rhombusPrism
-  const equi = /שווה[\s-]?צלעות/.test(s) || /כל\s+מקצועותיה\s+שוו/.test(s) || /\bequilateral\b/i.test(s);
+  const tri3 = statedTriShape(s); // #424: ONE vocabulary — `שווה שוקיים` used to be read nowhere
+  const equi = tri3 === 'equilateral';
   let kind: SolidKind, bn: number, namedBase: boolean;
   if (/מקבילית/.test(s) || /\bparallelogram\b/i.test(s)) { kind = 'prism4'; bn = 4; namedBase = true; }
   else if (/מלבן/.test(s) || /\brectangle\b/i.test(s)) { kind = 'box'; bn = 4; namedBase = true; }
@@ -135,13 +136,18 @@ const rightPrism: Rule = (s) => {
   else if (/מרובע/.test(s) || /\bquadrilateral\b/i.test(s) || /\bquad\b/i.test(s)) { kind = 'prism4g'; bn = 4; namedBase = true; }
   else if (/מחומש/.test(s) || /\bpentagon\b/i.test(s)) { kind = 'prismReg5'; bn = 5; namedBase = true; }
   else if (/משושה/.test(s) || /\bhexagon\b/i.test(s)) { kind = 'prismReg6'; bn = 6; namedBase = true; }
-  else { kind = equi ? 'prism3e' : 'prism3'; bn = 3; namedBase = /משולש/.test(s) || /\btriangular\b/i.test(s) || equi; }
+  else { kind = equi ? 'prism3e' : 'prism3'; bn = 3; namedBase = /משולש/.test(s) || /\btriangular\b/i.test(s) || tri3 !== null; }
   const base = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, bn);
   const toks = firstLabelRun(s);
-  if (toks.length === 2 * bn) return [{ type: 'solid', kind, ids: toks }];
-  if (toks.length === bn && toks.every(unprimed)) return [{ type: 'solid', kind, ids: [...toks, ...primeAll(toks)] }];
-  if (toks.length === 0 && namedBase) return [{ type: 'solid', kind, ids: [...base, ...primeAll(base)] }];
-  return null;
+  let ids: Id[] | null = null;
+  if (toks.length === 2 * bn) ids = toks;
+  else if (toks.length === bn && toks.every(unprimed)) ids = [...toks, ...primeAll(toks)];
+  else if (toks.length === 0 && namedBase) ids = [...base, ...primeAll(base)];
+  if (!ids) return null;
+  // #424: `prism3e` already IS the equilateral base, so it needs no constraints (bit-identical);
+  // an isosceles base has no template of its own and rides the macro on the base ring.
+  const shape = bn === 3 && kind === 'prism3' ? tri3 : null;
+  return [{ type: 'solid', kind, ids }, ...(shape ? triShapeCommands(shape, ids.slice(0, 3)) : [])];
 };
 
 /** #289 (M1): `המנסרה ישרה` / `המנסרה היא ישרה` / `the prism is right` / `make the prism right` — a
@@ -176,7 +182,8 @@ const obliquePrism: Rule = (s) => {
   const square = /ריבוע/.test(s) || /\bsquare\b/i.test(s);
   const rect = /מלבן/.test(s) || /\brectang/i.test(s);
   const par = /מקבילית/.test(s) || /\bparallelogram\b/i.test(s);
-  const equi = /שווה[\s-]?צלעות/.test(s) || /כל\s+מקצועותיה\s+שוו/.test(s) || /\bequilateral\b/i.test(s);
+  const tri3 = statedTriShape(s); // #424: ONE vocabulary — `שווה שוקיים` used to be read nowhere
+  const equi = tri3 === 'equilateral';
   const tri = /משולש/.test(s) || /\btriangular\b/i.test(s) || /\btriangle\s+base\b/i.test(s) || /\bbase\s+is\s+(?:a\s+)?triangle\b/i.test(s);
   const quad = /מרובע/.test(s) || /\bquadrilateral\b/i.test(s) || /\bquad\b/i.test(s);
   const isPrism = /מנסרה/.test(s) || /\bprism\b/i.test(s);
@@ -198,6 +205,9 @@ const obliquePrism: Rule = (s) => {
   if (bn === 4 && (rhombus || square)) cmds.push({ type: 'length-rel', a1: a, b1: b, rhs: { pair: [a, d] }, c: 1 });
   if (bn === 4 && (rect || square))
     cmds.push({ type: 'cos-angle', u: { kind: 'pair', from: a, to: b }, v: { kind: 'pair', from: a, to: d }, cos: 0 });
+  // #424: a TRIANGLE base's stated qualifier, on the same macro footing as the quad family above
+  // (`prism3e` already IS equilateral, so only the template-less isosceles needs constraints).
+  if (kind === 'prism3' && tri3) cmds.push(...triShapeCommands(tri3, ids.slice(0, 3)));
   return cmds;
 };
 
@@ -274,6 +284,72 @@ function statedQuadBase(s: string): QuadBase | null {
   return null;
 }
 
+/**
+ * #424: the TRIANGLE shape a stated qualifier names — the triangle sibling of {@link statedQuadBase},
+ * carrying the same doctrine: ONE vocabulary, so a qualifier a rule RECOGNISES is exactly a qualifier
+ * it can LOWER. Before this existed each position tested for `שווה צלעות` inline (three copies) and
+ * for `שווה שוקיים` nowhere, so which (qualifier × position) pairs worked was an accident of which
+ * regex someone happened to write — `ABC משולש שווה צלעות` drew a scalene triangle and reported ✓.
+ *
+ * Ordered specific → generic: an equilateral triangle IS isosceles, but the student said equilateral.
+ */
+export type TriShape = 'equilateral' | 'isosceles';
+
+function statedTriShapeWord(s: string): TriShape | null {
+  if (/שווה[\s-]?צלעות/.test(s) || /כל\s+מקצועותיה\s+שוו/.test(s) || /\bequilateral\b/i.test(s)) return 'equilateral';
+  if (/שווה[\s-]?שוקיים/.test(s) || /\bisosceles\b/i.test(s)) return 'isosceles';
+  return null;
+}
+
+/**
+ * The triangle qualifier stated FOR A TRIANGLE. A qualifier modifies the noun it was written beside:
+ * `טרפז שווה שוקיים` is an isosceles TRAPEZOID, so a stated quad base takes its qualifier with it
+ * (that quad reading is {@link quadShapeCommands}) and no triangle may claim it.
+ */
+function statedTriShape(s: string): TriShape | null {
+  return statedQuadBase(s) ? null : statedTriShapeWord(s);
+}
+
+/**
+ * The constraints a qualifier stated on a QUAD base adds beyond the base kind itself (#424) — today
+ * exactly one pair needs it: `טרפז שווה שוקיים` / `isosceles trapezoid`, whose equal legs are already
+ * the registry's own `CYCLIC_MEMBER.trapezoid.fix`. Every other quad qualifier is carried by a noun of
+ * its own (an equilateral parallelogram is a `מעוין`), so this stays a one-member reading rather than
+ * a second vocabulary. `already` are the commands the caller has emitted, so a RIGHT trapezoid — which
+ * receives the same constraint from its cyclic fix — is not given it twice.
+ */
+function quadShapeCommands(s: string, base: QuadBase, ring: Id[], already: Command3[]): Command3[] {
+  if (base !== 'trapezoid' || statedTriShapeWord(s) !== 'isosceles') return [];
+  const legs = cyclicFixCommands('trapezoid', ring);
+  const has = already.some((c) => c.type === 'length-rel' && legs.some((l) => l.type === 'length-rel' && l.a1 === c.a1 && l.b1 === c.b1));
+  return has ? [] : legs;
+}
+
+/**
+ * The constraints a stated triangle qualifier lowers to on a ring `[a,b,c]` — the ADR-110/#199 macro
+ * pattern (no new engine construct: `length-rel` is already M1-routed, so it DRIVES a free figure and
+ * VERIFIES a determined one, and the solver flexes the ring into shape).
+ *
+ *  - **equilateral** → all three sides equal, HARD: the words leave the student no further choice.
+ *  - **isosceles** → ONE **soft** pair at `apex` (default: the first-named vertex). "Isosceles" asserts
+ *    only that SOME two sides are equal — WHICH pair is the student's to state (ADR-052) — so the
+ *    default yields to a later explicit pair (M4 / ADR-114 / the #116 ruling already applied to
+ *    `rightTriangle`), instead of stacking with it into an equilateral triangle nobody asked for.
+ *
+ * `apex` lets a caller that knows better name the vertex: for a RIGHT isosceles triangle the equal
+ * sides are necessarily the two legs, so the right-angle vertex is the apex (`|BA| = |BC|`) — the
+ * first-vertex default would demand a leg equal to the hypotenuse, which no triangle satisfies.
+ */
+function triShapeCommands(shape: TriShape, ring: Id[], apex: Id = ring[0]): Command3[] {
+  const [a, b, c] = ring;
+  const rel = (a1: Id, b1: Id, pair: [Id, Id], soft?: boolean): Command3 => ({
+    type: 'length-rel', a1, b1, rhs: { pair }, c: 1, ...(soft ? { soft: true } : {}),
+  });
+  if (shape === 'equilateral') return [rel(a, b, [b, c]), rel(b, c, [c, a])];
+  const [p, q] = ring.filter((v) => v !== apex);
+  return [rel(apex, p, [apex, q], true)];
+}
+
 /** (base x rightness) → the kind naming that pair. Rightness is a MODIFIER of ANY base (ADR-3D-090). */
 const QUAD_PYRAMID_KIND: Record<QuadBase, { free: SolidKind; right: SolidKind }> = {
   square: { free: 'pyramid4g', right: 'pyramid4' },
@@ -321,7 +397,8 @@ const rightPyramid: Rule = (s) => {
   const tetraWord = /טטר[אה]?ה?דר(?:ון)?/.test(s) || /ארבעון/.test(s) || /\btetrahedr(?:on)?\b/i.test(s);
   if (!/פירמידה/.test(s) && !/\bpyramid\b/i.test(s) && !tetraWord) return null;
   const right = /ישרה?/.test(s) || /\bright\b/i.test(s); // ישרה (fem, פירמידה) or ישר (masc, טטראדר)
-  const equi = /שווה[\s-]?צלעות/.test(s) || /\bequilateral\b/i.test(s);
+  const tri3 = statedTriShape(s); // #424: ONE vocabulary (was an inline equilateral-only test)
+  const equi = tri3 === 'equilateral';
   // #199 (ADR-3D-047): «שווה מקצועות» on a TETRA is a macro (the ADR-110 pattern) — the solid plus
   // five equal-edge `length-rel` constraints, M1 at apply (drives a free tetra into the regular one,
   // verifies a pinned one). On any other kind the qualifier has no lowering — DEFER (escalate),
@@ -344,14 +421,24 @@ const rightPyramid: Rule = (s) => {
     // the base's OWN defining constraint (a rhombus is a parallelogram ring + equal adjacent sides)
     if (base === 'rhombus') cmds.push({ type: 'length-rel', a1: ids[0], b1: ids[1], rhs: { pair: [ids[0], ids[3]] }, c: 1 });
     if (right) cmds.push(...cyclicFixCommands(base, ids.slice(0, 4)));
+    cmds.push(...quadShapeCommands(s, base, ids.slice(0, 4), cmds)); // #424: `שבסיסה טרפז שווה שוקיים`
     return withEqEdges(cmds);
   };
-  // the triangular-base pyramid kind (equilateral only when right — a right equilateral pyramid)
+  // the triangular-base pyramid kind. #424: the base SHAPE and rightness are independent givens
+  // (ADR-3D-090's ruling, triangle edition) — `pyramid3e` is the one kind whose base is equilateral by
+  // construction, and every other (shape × rightness) cell carries the qualifier as CONSTRAINTS
+  // instead of dropping it (`פירמידה שבסיסה משולש שווה צלעות`, with no `ישרה`, used to draw a scalene tetra).
   const triKind = right ? (equi ? 'pyramid3e' : 'pyramid3') : 'tetra';
+  const withTriShape = (cmds: Command3[] | null): Command3[] | null => {
+    if (!cmds || !tri3 || triKind === 'pyramid3e') return cmds; // pyramid3e's base IS equilateral
+    const solid = cmds[0];
+    if (solid.type !== 'solid') return cmds;
+    return [...cmds, ...triShapeCommands(tri3, solid.ids.slice(0, 3))];
+  };
   if (firstLabelRun(s).length === 0) {
     // label-less: a stated base word makes the shape determined — default lettering
-    const tri = tetraWord || /משולש/.test(s) || /\btriangular\b/i.test(s) || equi;
-    if (tri) return withEqEdges([{ type: 'solid', kind: triKind, ids: ['A', 'B', 'C', 'D'] }]);
+    const tri = tetraWord || /משולש/.test(s) || /\btriangular\b/i.test(s) || tri3 !== null;
+    if (tri) return withTriShape(withEqEdges([{ type: 'solid', kind: triKind, ids: ['A', 'B', 'C', 'D'] }]));
     const base = statedQuadBase(s);
     if (base) return quadPyramid(['A', 'B', 'C', 'D', 'S'], base);
     return null;
@@ -363,7 +450,7 @@ const rightPyramid: Rule = (s) => {
     // An unstated base keeps its historical free-aspect RECTANGLE default (documented in types.ts).
     return quadPyramid(toks, statedQuadBase(s) ?? 'rectangle');
   }
-  if (toks.length === 4) return withEqEdges([{ type: 'solid', kind: triKind, ids: toks }]);
+  if (toks.length === 4) return withTriShape(withEqEdges([{ type: 'solid', kind: triKind, ids: toks }]));
   return null;
 };
 
@@ -2491,9 +2578,14 @@ const rightTriangle: Rule = (s) => {
   const ids = toks.length === 3 ? toks : toks.length === 0 ? ['A', 'B', 'C'] : null;
   if (!ids) return null;
   const [a, mid, b] = ids;
+  // #424: a right triangle may ALSO be stated isosceles/equilateral — the qualifier must not vanish
+  // just because this rule claimed the utterance first. The equal pair is anchored at the RIGHT-ANGLE
+  // vertex, since a right triangle's equal sides can only be its two legs.
+  const shape = statedTriShape(s);
   return [
     { type: 'solid', kind: 'polygon3', ids },
     { type: 'cos-angle', u: { kind: 'pair', from: mid, to: a }, v: { kind: 'pair', from: mid, to: b }, cos: 0, soft: true },
+    ...(shape ? triShapeCommands(shape, ids, mid) : []),
   ];
 };
 
@@ -2511,9 +2603,13 @@ const planarPolygon: Rule = (s) => {
   if (!kind) return null;
   const n = kind === 'polygon3' ? 3 : kind === 'polygon4' ? 4 : 5;
   const toks = firstLabelRun(s);
-  if (toks.length === n) return [{ type: 'solid', kind, ids: toks }];
-  if (toks.length === 0) return [{ type: 'solid', kind, ids: ['A', 'B', 'C', 'D', 'E'].slice(0, n) }];
-  return null;
+  const ids = toks.length === n ? toks : toks.length === 0 ? ['A', 'B', 'C', 'D', 'E'].slice(0, n) : null;
+  if (!ids) return null;
+  // #424: the stated qualifier lowers to its constraints (the V8-g flat lane was built for FREE-point
+  // polygons and never got the macro treatment, so `ABC משולש שווה צלעות` silently drew a scalene
+  // triangle — byte-identical to the plain `משולש ABC` — and reported ✓).
+  const shape = kind === 'polygon3' ? statedTriShape(s) : null;
+  return [{ type: 'solid', kind, ids }, ...(shape ? triShapeCommands(shape, ids) : [])];
 };
 
 /**

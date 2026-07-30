@@ -30,7 +30,7 @@ import { checkInSpan, firstSatisfyingSeed3, memberHolds3, resolve3, type Resolve
 import { verifyClaim } from '../engine/claims';
 import { cross3, dot3, norm3, sub3 } from '../engine/vec3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
-import { droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3 } from '../parser/honesty3';
+import { droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
 import { parse3 } from '../parser/parse3';
 
 export interface Fact3 {
@@ -90,8 +90,14 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
   // #116 (M4 defaults-yield): a right-triangle's SOFT default right angle (a `cos-angle` cos:0 at the
   // middle vertex) is dropped when an EXPLICIT ∠=90 on the SAME three vertices is stated — the student's
   // choice of right-angle vertex wins over the soft guess (ADR-052/163). Scanned once before the fold.
+  // #424 generalizes the same mechanism to the SECOND relation kind that carries a soft default: an
+  // isosceles triangle's equal pair. Keyed by the TRIANGLE (not the pair), because ADR-114's whole
+  // point is that a soft `|AB|=|AC|` plus an explicit `|AB|=|BC|` would stack into an EQUILATERAL
+  // triangle the student never asked for — so any explicit equal pair among the three sides retires
+  // the guess. One registry per soft kind, so a third slots in without new branching.
   const key3 = (labels: string[]) => [...labels].sort().join('');
   const explicitRightAngles = new Set<string>();
+  const explicitEqualSides = new Set<string>();
   for (const f of facts) {
     if (!f.enabled) continue;
     for (const cmd of f.cmds) {
@@ -99,11 +105,23 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
         explicitRightAngles.add(key3([cmd.u.from, cmd.u.to, cmd.v.to]));
       if (cmd.type === 'claim' && cmd.claim.type === 'angle-seg-eq' && Math.abs(cmd.claim.deg - 90) < 1e-9 && cmd.claim.a1 === cmd.claim.a2)
         explicitRightAngles.add(key3([cmd.claim.a1, cmd.claim.b1, cmd.claim.b2]));
+      // an explicit |xy| = |zw| whose two pairs span exactly THREE labels names a triangle's side pair
+      if (cmd.type === 'length-rel' && !cmd.soft && cmd.c === 1 && 'pair' in cmd.rhs) {
+        const labels = new Set([cmd.a1, cmd.b1, ...cmd.rhs.pair]);
+        if (labels.size === 3) explicitEqualSides.add(key3([...labels]));
+      }
     }
   }
-  const droppedSoft = (cmd: Command3): boolean =>
-    cmd.type === 'cos-angle' && !!cmd.soft && cmd.u.kind === 'pair' && cmd.v.kind === 'pair' &&
-    explicitRightAngles.has(key3([cmd.u.from, cmd.u.to, cmd.v.to]));
+  const droppedSoft = (cmd: Command3): boolean => {
+    if (cmd.type === 'cos-angle')
+      return !!cmd.soft && cmd.u.kind === 'pair' && cmd.v.kind === 'pair' &&
+        explicitRightAngles.has(key3([cmd.u.from, cmd.u.to, cmd.v.to]));
+    if (cmd.type === 'length-rel' && cmd.soft && 'pair' in cmd.rhs) {
+      const labels = new Set([cmd.a1, cmd.b1, ...cmd.rhs.pair]);
+      return labels.size === 3 && explicitEqualSides.has(key3([...labels]));
+    }
+    return false;
+  };
   for (const f of facts) {
     if (!f.enabled) {
       status[f.id] = 'disabled';
@@ -390,6 +408,14 @@ export const useGeo3 = create<Geo3State>()(
           return;
         }
         const { facts, seed } = get();
+        // #424: the ONE honesty gate that also guards the DETERMINISTIC path. A grammar rule that reads
+        // a shape noun and ignores its qualifier loses a stated given exactly as an LLM decomposition
+        // can, and no path-bound gate can see it (see droppedTriShape3).
+        const lostShape = droppedTriShape3(utterance, parsed.commands);
+        if (lostShape.length > 0) {
+          set({ lastError: { code: 'dropped-given', items: lostShape.join(', ') } });
+          return;
+        }
         const fact: Fact3 = { id: nanoid(8), utterance: utterance.trim(), cmds: parsed.commands, enabled: true };
         const candidate = [...facts, fact];
         const st = derive3(candidate, seed).status[fact.id];
@@ -434,6 +460,7 @@ export const useGeo3 = create<Geo3State>()(
           ...droppedNewLabels3(utterance, all, [...prior.points.keys()], [...prior.vectors.keys()]),
           ...droppedGivenNumbers3(utterance, all),
           ...droppedShapeNoun3(utterance, all), // ADR-3D-084 (#304): a stated base shape silently changed
+          ...droppedTriShape3(utterance, all), // #424: a stated triangle qualifier silently dropped
         ];
         if (lost.length > 0) {
           set({ lastError: { code: 'dropped-given', items: lost.join(', ') } });

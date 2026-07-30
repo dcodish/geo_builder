@@ -199,6 +199,12 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // --- V8-g: the 2-D vector lane (flat polygons in the plane) ---
   { category: 'solids', he: 'משולש ABC', en: 'triangle ABC' },
   { category: 'solids', he: 'משולש ABC ישר זווית', en: 'right triangle ABC' },
+  // #424 (ADR-3D-109): a stated triangle qualifier lowers to its constraints in EVERY position
+  { category: 'solids', he: 'ABC משולש שווה צלעות', en: 'equilateral triangle ABC' },
+  { category: 'solids', he: 'ABC משולש שווה שוקיים', en: 'isosceles triangle ABC' },
+  { category: 'solids', he: 'מנסרה שבסיסה משולש שווה שוקיים', en: 'prism with an isosceles triangle base' },
+  { category: 'solids', he: 'פירמידה שבסיסה משולש שווה צלעות', en: 'pyramid with an equilateral triangle base' },
+  { category: 'solids', he: 'פירמידה ישרה שבסיסה טרפז שווה שוקיים', en: 'right pyramid with an isosceles trapezoid base' },
   { category: 'solids', he: 'מרובע MKNL', en: 'quadrilateral MKNL' },
   { category: 'solids', he: 'מחומש ABCDE', en: 'pentagon ABCDE' },
   { category: 'points', he: 'גובה המשולש לצלע AB הוא CD', en: 'CD is the altitude to AB' },

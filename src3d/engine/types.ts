@@ -621,7 +621,10 @@ export type Command3 =
   // |EN| = (√6/4)·|w| — a stated LENGTH relation (|a1b1| = c·|rhs|); rhs is a point
   // pair or a NAMED vector (resolved to its pair at apply). Drives a symbol / the
   // dims (similarity-invariant), or verifies as a claim when everything is pinned.
-  | { type: 'length-rel'; a1: Id; b1: Id; rhs: { pair: [Id, Id] } | { vec: string }; c: number }
+  // `soft` (#424): a named-shape macro's DEFAULT equal pair — an isosceles triangle's apex, which the
+  // student did not choose. Dropped in derive3 when an EXPLICIT equal pair on the same triangle is
+  // stated, so the stated pair wins instead of stacking into an equilateral (M4 / ADR-114).
+  | { type: 'length-rel'; a1: Id; b1: Id; rhs: { pair: [Id, Id] } | { vec: string }; c: number; soft?: boolean }
   // |w| = 2 — a numeric magnitude on a NAMED vector; apply resolves the pair and
   // delegates to the ordinary length given (claim when pinned, driving pin when free)
   | { type: 'vec-mag'; name: string; value: number }

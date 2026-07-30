@@ -1734,3 +1734,73 @@ Locked by `panel-bundle.test.ts` (10 — the exact play utterances for rows/noti
 **Verification-sweep provenance (2026-07-29):** re-measured before fixing — S2/S3 had fixed the NEIGHBOUR commands, not these; both holes confirmed live, and the new locks were run against the pre-fix tree and FAILED (2/2), then pass post-fix. The same sweep closed #377 by measurement (10/11 matrix cells delivered by S0–S5; the residual line∩point-run-plane cell filed as #401).
 
 Locked by the `#383` block in `line-perp-plane-mark.test.ts` (the ⟂ twin: carrier materialised + patch drawn + knee ON the line with perpendicular arms; the ∥ twin: patch drawn, NO knee — parallel marks nothing).
+
+### ADR-3D-110 — A stated shape QUALIFIER is read from one vocabulary and always lowers (#424)
+
+**Reported (operator, 2026-07-29):** `ABC משולש שווה צלעות` "is not recognized". It was worse than
+unrecognized — it parsed `ok`, committed with no error and no note, and drew a **scalene** triangle
+**byte-identical** to the plain `משולש ABC` (measured 1.000 / 1.102 / 1.281 at seed 0 for both). The
+operator read the drawing and correctly concluded the tool had not understood; the tool's own report
+was a clean ✓. The ADR-052 cardinal sin — a figure contradicting its own givens — with no warning
+attached (docs/17 §6).
+
+**Class:** *a stated shape qualifier is read by an inline, POSITION-LOCAL test rather than from one
+vocabulary — so which (qualifier × position) pairs work is an accident of which regex someone happened
+to write, and an unread qualifier is dropped on the floor.* Measured across the matrix before fixing,
+the class was far wider than the report: `שווה צלעות` was tested inline in **three** copies
+(`rightPrism`, `obliquePrism`, `rightPyramid`) and so worked there, but not in the flat lane and not in
+a non-right pyramid (`פירמידה שבסיסה משולש שווה צלעות` → a scalene `tetra`); `שווה שוקיים` was read
+**nowhere** as a triangle qualifier and was therefore silently dropped in **all five** positions. This
+is the ADR-3D-069 shape verbatim — *"the carve-out is what HID the gap"* — and the (base × rightness)
+enumeration gap of ADR-3D-089/090 in the triangle dimension.
+
+**Second half of the class — the backstop was bound to a PATH, not to the event.** The honesty gates
+run only on the LLM seam (`submitSteps`), on the reasoning that "the deterministic path needs no gate
+here — the rules parse the utterance itself". That reasoning is exactly what failed: a rule that reads
+the shape NOUN and ignores its qualifier loses a stated given precisely as an LLM decomposition can, and
+no path-bound gate can see an event that happens on the other path. (The same shape as the four defects
+recorded in ADR-3D-105 — *a guard bound to a path rather than to the event it guards*.)
+
+**Fix — the governing mechanism, not a fourth regex.** `statedTriShape` is the triangle sibling of
+`statedQuadBase` (#305) and carries its doctrine verbatim: **ONE vocabulary, so a qualifier a rule
+RECOGNISES is exactly a qualifier it can LOWER.** All five positions read it, and one
+`triShapeCommands` lowers it — the ADR-110/#199 macro pattern, **no new engine construct**: `length-rel`
+is already M1-routed, so it drives a free figure and verifies a determined one.
+
+- **equilateral** → all three sides equal, **hard** (the words leave no further choice). `prism3e` /
+  `pyramid3e` already ARE the equilateral base and receive no constraints, so those two cells stay
+  bit-identical; every other cell carries the qualifier as constraints instead of dropping it.
+- **isosceles** → **one SOFT pair** at the apex (M4 / ADR-114 / the #116 ruling already applied to
+  `rightTriangle` in this file): "isosceles" asserts only that SOME two sides are equal, and WHICH pair
+  is the student's to state (ADR-052). `soft` is added to `length-rel` and `derive3`'s soft-drop
+  generalised to it — keyed by the **triangle**, not the pair, because ADR-114's whole point is that a
+  soft `|AB|=|AC|` plus an explicit `|AB|=|BC|` would stack into an equilateral triangle nobody asked
+  for. One registry per soft kind, so a third slots in without new branching.
+
+**Attachment is by the noun the qualifier was written beside**, not by word presence: a stated quad base
+takes its qualifier with it, so `טרפז שווה שוקיים` is an isosceles TRAPEZOID and no triangle reading may
+claim it. (The first cut of this fix regressed exactly there — `פירמידה ישרה שבסיסה טרפז שווה שוקיים`
+built a triangular pyramid — which is why the matrix is measured, not assumed.) That quad reading is
+`quadShapeCommands`, whose constraint is already in the registry as `CYCLIC_MEMBER.trapezoid.fix`
+(`equal-legs`), emitted once and never doubled by a right form's cyclic fix.
+
+**Ride-along, same class:** `rightTriangle` claimed `משולש ישר זווית ושווה שוקיים` first and dropped the
+second qualifier. It now lowers it too, anchored at the **right-angle vertex** — a right triangle's equal
+sides can only be its two legs, so the first-vertex default would demand a leg equal to the hypotenuse.
+Measured 1.000 / 1.000 / 1.414.
+
+**The gate:** `droppedTriShape3` runs on **both** commit paths — the one honesty gate bound to the event
+rather than to a path. Command side generous per the gate doctrine (any `length-rel` c=1, a `concyclic`
+cyclic fix, or an equilateral-by-construction kind accounts), so a false account only suppresses a
+warning while a false drop would refuse a working input; asserted false-positive-free over every shipped
+form.
+
+**Out of scope, unchanged:** flat QUADRILATERAL shapes (`ריבוע ABCD`, `מעוין ABCD`) still refuse honestly
+(`not-handled` → escalate). A refusal is honest, not a lie — that is a feature gap of a different
+priority, filed separately.
+
+Locked by `flat-shape-qualifier.test.ts` (26), every assertion **geometric** (side lengths at four
+seeds, never "a length-rel was emitted"): the operator's exact utterance; the isosceles default and an
+explicit pair overriding it; all five positions × both qualifiers; `משולש ABC` still genuinely scalene;
+the trapezoid attachment; right+isosceles; and the gate's own false-positive sweep. Shadow matrix: pure
+addition (10 entries, 0 changed winners). Catalog +5.

@@ -1573,6 +1573,56 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "equilateral triangle ABC",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "ABC משולש שווה צלעות",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "isosceles triangle ABC",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "he",
+    "text": "ABC משולש שווה שוקיים",
+    "winner": "planarPolygon",
+  },
+  {
+    "lang": "en",
+    "text": "prism with an isosceles triangle base",
+    "winner": "obliquePrism",
+  },
+  {
+    "lang": "he",
+    "text": "מנסרה שבסיסה משולש שווה שוקיים",
+    "winner": "obliquePrism",
+  },
+  {
+    "lang": "en",
+    "text": "pyramid with an equilateral triangle base",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "פירמידה שבסיסה משולש שווה צלעות",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
+    "text": "right pyramid with an isosceles trapezoid base",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "he",
+    "text": "פירמידה ישרה שבסיסה טרפז שווה שוקיים",
+    "winner": "rightPyramid",
+  },
+  {
+    "lang": "en",
     "text": "quadrilateral MKNL",
     "winner": "planarPolygon",
   },

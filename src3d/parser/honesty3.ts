@@ -105,6 +105,38 @@ export function droppedShapeNoun3(utterance: string, commands: Command3[]): stri
   return lost;
 }
 
+/**
+ * A stated TRIANGLE-shape qualifier (`שווה צלעות` / `שווה שוקיים` / equilateral / isosceles) that no
+ * committed command accounts for (#424). Returns the lost qualifiers (empty = pass).
+ *
+ * **This gate runs on BOTH commit paths, not just the LLM seam** — and that is the point. The drop it
+ * exists to catch was a GRAMMAR rule's: `ABC משולש שווה צלעות` parsed `ok`, committed with no error,
+ * and drew a scalene triangle byte-identical to the plain `משולש ABC`. The sibling gates guard only
+ * `submitSteps` on the reasoning that "the rules parse the utterance itself" — but a rule that reads
+ * the shape NOUN and ignores the qualifier loses a given exactly as an LLM decomposition can. A guard
+ * bound to a PATH cannot see an event that happens on the other one; this one is bound to the event.
+ *
+ * Doctrine (the sibling gates'): the utterance side is CONSERVATIVE and the command side GENEROUS — a
+ * false account only suppresses a warning, while a false drop would refuse a working input. So ANY
+ * equal-length relation accounts for the qualifier (an isosceles TRAPEZOID's `equal-legs` lowering
+ * accounts for its own `שווה שוקיים`), as does a kind whose triangular base is equilateral by
+ * construction.
+ */
+const EQUILATERAL_BY_KIND = new Set(['prism3e', 'pyramid3e']);
+
+export function droppedTriShape3(utterance: string, commands: Command3[]): string[] {
+  const s = normalize3(utterance);
+  const m = s.match(/שווה[\s-]?צלעות|שווה[\s-]?שוקיים|\bequilateral\b|\bisosceles\b/i);
+  if (!m) return [];
+  const accounted = commands.some(
+    (c) =>
+      (c.type === 'length-rel' && c.c === 1) ||
+      c.type === 'concyclic' || // a cyclic-fix macro reshaped the base per its own stated noun
+      (c.type === 'solid' && EQUILATERAL_BY_KIND.has(c.kind)),
+  );
+  return accounted ? [] : [m[0]];
+}
+
 export function droppedNewLabels3(
   utterance: string,
   commands: Command3[],
