@@ -5948,3 +5948,53 @@ Locked by `arcs.test.ts` (14 — the span helpers incl. the null contract, engin
 semicircle and quarter, the four class members end-to-end, multi-seed confinement that still varies, the
 quarter generality, and the full-circle byte-identical guarantee) and scenarios
 `semicircle-references-land-on-the-drawn-arc` + `arc-midpoint-takes-the-drawn-arc`.
+
+### ADR-424 — A structurally VACUOUS collinear removes no degree of freedom (#432)
+
+**Context.** The operator's two-secant power-of-a-point figure (2026-07-30): `AB`, two secants from A
+(«מנקודה A יוצא חותך למעגל בנקודות C ו B» / «… D ו E»), `AB=10a`, `AE=8a`, «ישר ADE», «ישר ACB», `BC=2DE`.
+The figure has ONE genuine shape DOF left — the angle at A between the secants (measured: CD/a swings
+1.2–5.9 across seeds while AC/AD/AE stay locked at 4/5/8) — yet `freeDofCount` read **0**. Every consumer
+of the count inherited the lie: the shared sample core took the determined-figure single-sample fast path
+(M3/ADR-231), the values panel's knowledge gate (`freeDofCount === 0` accepts any pool — ADR-295/#88)
+then judged every measure "invariant" over that one drawing and printed `CD = 4.12a`, `BE = 8.24a`,
+`radius = 4.15a` — one seed's accident presented as forced knowledge, contradicted by the next «הציגו
+תצורה אחרת» — and the DOF cue showed "✓ נקבע במלואו" on an under-determined figure (ADR-052's cardinal
+sin, in the epistemic dimension).
+
+**Root cause.** «ישר ADE» lowers to a `collinear` constraint — but E is *defined* as the line∩circle
+crossing riding the `line-through A D`, so the residual is identically zero at every configuration of
+every figure ({A,C,B} likewise: B is `coincide`-pinned onto the sec-AC crossing `~B`). `dofRemoved`
+counted every non-order, non-coincide constraint as removing 1: raw 9 − removed 6 (coincide 2 + ratios 2
++ **two vacuous collinears**) − gauge 4 = −1 → clamped to 0. The class (docs/17 §2.2): constraint-count
+ARITHMETIC as a proxy for the semantic fact *"does anything still vary?"* — the 2-D twin of
+[ADR-3D-070](06b-decisions-3d.md#adr-3d-070)'s lesson. Note the driven twin of the same emptiness: the
+ישר statements' collinears also sat as `solve` directives on C/D's θ, "driving" a residual that is flat —
+which is why the DOF stayed empirically free while the count said otherwise.
+
+**Decision.** `freeDofCount` skips a `collinear` constraint that is STRUCTURALLY IMPLIED by the dependency
+graph (`vacuousCollinearPredicate`, sample.ts): every referenced point — resolved through `coincide`
+identification (union-find), so a free point pinned onto a line-riding helper counts as riding the line —
+provably lies on ONE construction line. Line carriers are read off the definitions themselves: a `Line`
+object's defining points (`through` a/b, a bisector's vertex, a tangent's touch), `on-line` / `line-circle`
+/ `line-intersection` riders, and the point-pair lane (`on-segment`(+`-solved`) / `midpoint` / `foot` /
+4-point `line-line-intersection` / `antipode` / `radial-toward` — each provably on the line through its
+defining pair, whose endpoints are members by definition). The test is a CONSERVATIVE sufficient condition
+— purely structural, never a numeric probe; a false negative keeps today's count for that constraint.
+Deliberately NOT applied to `isOverRecruited`'s `dofRemoved` call: that site decides perturbation policy
+and its behaviour is locked by existing sampling expectations; this site decides the COUNT.
+
+**Effect on the reported figure.** `freeDofCount` 0 → 1; the pool widens to the honest order-respecting
+samples (8); the panel prints exactly the FORCED closed form — `AB = 10a`(נתון), `AE = 8a`(נתון),
+`AC = 4a`, `AD = 5a`, `BC = 6a`, `DE = 3a` (power of the point + BC = 2DE) — and withholds CD/BE/radius/
+circle-area/perimeter, which genuinely vary; the cue honestly reports the remaining freedom.
+
+**Boundary / residual.** The predicate closes the structural-collinear member; other rank-deficiencies
+(mutually redundant explicit constraints, structurally-implied `parallel`/`perpendicular`) can still
+over-subtract. The general defense the fix plan named — the determined-figure single-sample fast path
+verifying with one extra seed (decide by MEASUREMENT) — is deliberately not bundled; it lives in the
+sample core and deserves its own measured slice. Filed as the follow-up on #432's plan.
+
+Locked by `dof-vacuous.test.ts` (4 — the operator figure's count with a no-ישר control, the panel's exact
+printed/withheld row set, a NON-vacuous «ישר ABD» over a free point still consuming its DOF, the midpoint
+pair-key lane) + scenario `two-secants-vacuous-line-restatements-keep-dof`.

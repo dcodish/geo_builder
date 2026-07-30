@@ -48,6 +48,37 @@ import { at, dist, angle, allStepsOk, convexQuad } from './scenarios-harness';
 
 export const SCENARIOS_4: Scenario[] = [
   {
+    id: 'two-secants-vacuous-line-restatements-keep-dof',
+    title: 'two secants from A + AB=10a/AE=8a/BC=2DE + ישר ADE/ACB — the re-statements cost no DOF',
+    guards:
+      "#432 (ADR-424, operator 2026-07-30): «ישר ADE»/«ישר ACB» lower to `collinear` constraints that are STRUCTURALLY VACUOUS (E is defined as the line∩circle crossing on the line through A,D; B is coincide-pinned onto the sec-AC crossing), yet each was counted as removing 1 DOF — the shape count clamped to 0 on a figure with one genuine DOF left (the inter-secant angle), the shared sample pool starved to a single drawing, the values panel printed one seed's CD = 4.12a / radius = 4.15a as forced knowledge, and the cue read '✓ fully determined'. The forced multiples (power of the point + BC=2DE ⇒ AC=4a, AD=5a, BC=6a, DE=3a) must keep holding.",
+    steps: [
+      'AB',
+      'מנקודה A יוצא חותך למעגל בנקודות C ו B',
+      'מנקודה A יוצא חותך למעגל בנקודות D ו E',
+      'CD',
+      'BE',
+      'AB=10a',
+      'AE=8a',
+      'ישר ADE',
+      'ישר ACB',
+      'BC=2DE',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // the vacuous collinears removed nothing: one genuine shape DOF remains (the angle at A).
+      expect(freeDofCount(fig.construction), 'under-determined — never "fully determined"').toBe(1);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C'), D = at(fig, 'D'), E = at(fig, 'E');
+      // the forced closed form, in units of a = |AB|/10: AC = 4a, AD = 5a, BC = 6a, DE = 3a.
+      const a = dist(A, B) / 10;
+      expect(dist(A, E) / a).toBeCloseTo(8, 2);
+      expect(dist(A, C) / a).toBeCloseTo(4, 2);
+      expect(dist(A, D) / a).toBeCloseTo(5, 2);
+      expect(dist(B, C) / a).toBeCloseTo(6, 2);
+      expect(dist(D, E) / a).toBeCloseTo(3, 2);
+    },
+  },
+  {
     id: 'trapezoid-dc-greater-than-ab',
     title: 'inscribed trapezoid + "DC>AB" reshapes so |DC| > |AB| (segment-length inequality)',
     guards: 'session ei99765k: "DC>AB" escalated to the LLM and returned not-understood — the parser only read single-letter named-measure orderings (measureOrder), so a direct segment-length inequality had no rule even though the engine already supports set-length-order/length-order (ADR-039). The default trapezoid always drew |AB| > |DC| with no way to flip it.',
