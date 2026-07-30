@@ -5814,3 +5814,67 @@ The `5` is the solver's default world scale. The tool was asserting a size the q
 **Provenance.** Built from work found stranded uncommitted in the shared tree by a session that had ended; its design (this extraction, both consumers) was adopted, re-fitted onto the `magnitude()` emitter ADR-420 had meanwhile introduced, renumbered off the ADR-420 collision, and given the test locks it lacked.
 
 Locked by the `#426` block in `values-panel.test.ts` (5 — the bare square's silence WITH its right angles still printing, the canvas half, an unsized circle, the one-size-given control that turns everything back on, and the ratio class that never depended on scale).
+
+### ADR-422 — A definite circle reference resolves through ONE seam (#430)
+
+**Found while triaging #429** (not operator-reported, but the same honesty class):
+
+```
+חצי מעגל
+משולש CDE חסום במעגל
+```
+
+built a **second, unrelated circle** and inscribed the triangle in that. On the radius-5 `circle-O` at the
+origin, C, D, E landed **11.695 / 4.043 / 12.288** from that centre — with `lastError: null` and
+`violations: []`. Completely silent: the student said "triangle CDE inscribed in the circle" and got a
+triangle attached to a circle drawn elsewhere, with nothing on screen saying the tool had not understood.
+
+**Class:** *a definite/implicit circle reference is resolved by SOME circle-consuming rules and silently
+re-created by others, because each rule decides "bind or create" for itself instead of asking one seam.*
+The tell that this is a class and not an instance: `pointOnCircle` bound the very same reference
+correctly (`C, D, E על המעגל` → `circle: circle-O`), so the rules **disagreed with each other** about
+whether a `hidden: true` circle is a referent at all. It is: `ctx.circles` has always listed it.
+
+**Sibling audit (measured, not assumed).** Rather than hand-read ~20 circle-minting sites, every
+supported catalog example mentioning a circle was re-parsed against a figure already holding one circle,
+and each lowering checked for a freshly-created circle. 42 examples mint — and all but the **inscribe
+family** do so legitimately: they name a second circle explicitly (`AB משיק למעגל C`, `מעגל O ומעגל P`),
+or minting IS their meaning (`two circles`, `מעגל מוכל בתוך המעגל הגדול`, `circle through A B C`). The
+genuine class members were exactly the unnamed «חסום במעגל» forms — i.e. `inscribedPolygon`, which
+resolved a NAMED reference (its M1 branch, ADR-099) but never the definite/implicit one.
+
+**Fix.** The resolve-only half of `resolveOrIntroduceCircle` is split out as `existingCircleRef` — the
+named centre when that circle is drawn, or, with no name and exactly ONE circle in the figure, that
+circle (ADR-029's operator principle: *with one circle in the diagram you needn't name it*). The seam
+itself is refactored **onto** it, so there is one implementation of "which existing circle does this
+refer to" rather than two, and `inscribedPolygon` asks it instead of deciding. The chokepoint registry
+**shrinks**.
+
+**The fix is BOUNDED, and the bound came from a locked counter-example, not from taste.** Binding every
+unnamed reference broke `second-inscribed-circle-fresh-centre`: inscribing `ABED`, then `ABC`, must give
+**two** circles — binding would force C onto the first. Two limits, both stated in the code:
+
+ - **the vertices must not ALL pre-exist.** Existing vertices carry their own positions and definitions,
+   so «ABC חסום במעגל» over them reads as "the circle THROUGH them" — their circumcircle, the branch
+   that already existed. New vertices, by contrast, have to be placed *somewhere*, and "the circle" is
+   the one on screen. Naming the circle remains the explicit signal to bind either way.
+ - **a stated RADIUS excludes it.** «חסום במעגל שרדיוסו 5» is also a statement about the circle's SIZE,
+   and binding alone would silently drop it (§6 honesty). That case keeps its prior behaviour; #53 owns
+   the size-given-on-an-inscribe reading.
+
+**Blast radius, measured:** the whole 2-D suite passes; three failing scenarios were the one
+counter-example above (now bounded), and the fourth was `fixtures/equilateral-inscribed.geo.json`, whose
+stored lowering **captured the bug** (`מעגל O` + `משולש שווה צלעות ABC חסום במעגל` minting a second
+circle). It was re-lowered through the real pipeline and now records the correct figure — the fixtures
+net doing precisely its job.
+
+**Explicitly NOT fixed here — #429.** Binding puts C, D, E on the right *circle*; they may still land on
+the semicircle's **undrawn** half (E measured at (0.87, −4.92)). That is the drawn-arc *extent* half of
+the family, a mechanism change of its own (a new engine concept plus extracting the drawn-extent decision
+out of the renderer), with the operator's two rulings now recorded on the issue: an unavoidable off-arc
+reference is **allowed with a notice**, and points sit **strictly inside** the arc endpoints.
+
+Locked by `circle-reference.test.ts` (9 — hidden circles as referents, both locales, triangle and quad,
+the named form unchanged, and each of the four bounds: no-circle mints, all-existing mints, a stated
+radius mints, 2+ circles never guesses) and scenarios `definite-circle-ref-binds-semicircle` +
+`second-inscribe-of-existing-points-still-mints`.

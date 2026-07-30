@@ -332,19 +332,38 @@ const resolveMentionedCircle = (s: string, ctx: ParseContext): string | null =>
  * Callers PREPEND the returned commands. Rules that must NOT introduce (a plain line∩line reading a
  * stray circle word — `resolveMentionedCircle`'s contract) keep the resolve-only helpers.
  */
+/**
+ * The EXISTING circle a reference resolves to, or null when it has no referent yet — the RESOLVE-ONLY
+ * half of {@link resolveOrIntroduceCircle}, split out (#430) so a rule that must decide "bind or create"
+ * for itself asks the same question every other circle-consuming rule asks, instead of re-deciding.
+ *
+ * The named centre when that circle is already drawn, or — when no centre is named and the figure holds
+ * exactly ONE circle — that circle (ADR-029's operator principle: *with one circle in the diagram you
+ * needn't name it*). A HIDDEN circle counts: a semicircle's circle is a circle, and `pointOnCircle`
+ * already resolved to it, so a rule that did not was simply disagreeing with its siblings.
+ */
+const existingCircleRef = (s: string, ctx: ParseContext): string | null => {
+  const namedRaw = circleCenter(s);
+  // A real centre label is uppercase — guard against an English article read as a label ("the circle a line" → "a").
+  const named = namedRaw && /^[A-Z]/.test(namedRaw) ? up(namedRaw) : null;
+  const circles = (ctx.circles ?? []).filter((c) => !c.startsWith('~'));
+  if (named) return circles.some((c) => up(c) === named) ? named : null;
+  return circles.length === 1 ? circles[0] : null;
+};
+
 const resolveOrIntroduceCircle = (s: string, ctx: ParseContext, opts?: { implied?: boolean }): { center: string; prepend: AnyCommand[] } | null => {
   const namedRaw = circleCenter(s);
   // A real centre label is uppercase — guard against an English article read as a label ("the circle a line" → "a").
   const named = namedRaw && /^[A-Z]/.test(namedRaw) ? up(namedRaw) : null;
   const circles = (ctx.circles ?? []).filter((c) => !c.startsWith('~'));
+  const existing = existingCircleRef(s, ctx);
+  if (existing) return { center: existing, prepend: [] };
   if (named) {
-    if (circles.some((c) => up(c) === named)) return { center: named, prepend: [] };
     return {
       center: named,
       prepend: [{ type: 'circle', id: circleId(named), center: named, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true }],
     };
   }
-  if (circles.length === 1) return { center: circles[0], prepend: [] };
   // `implied` (#184): a construct noun that presupposes its circle — a bare «קוטר»/"a diameter",
   // «משיק»/"a tangent" — introduces one even without the circle word.
   if (circles.length === 0 && (mentionsCircle(s) || opts?.implied)) {
@@ -3970,14 +3989,35 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // point already in the figure (a second inscribed circle must not reuse the first's centre 'O').
   const center = named ?? freeLabel([...ids, ...(ctx.points ?? []), ...(ctx.circles ?? [])], ['O', 'P', 'Q', 'K', 'S', 'T', 'U']);
   const circ = circleId(center);
-  // Inscribing in an EXISTING named circle ("מרובע EBAD חסום במעגל O" where O is already drawn): do NOT
-  // re-create the circle — that re-emits `circumcircle`/`circle` for circle-O and redefines its centre
-  // ("'O' is already defined"). The intent is "these vertices lie on THIS circle": assert membership per
-  // vertex (idempotent for a point already on it — an intersection / line∩circle — and converting a free
-  // one to slide on it) and draw the polygon. Works whether the vertices pre-exist or are fresh.
-  if (named != null && (ctx.circles ?? []).some((c) => up(c) === up(named))) {
+  // Inscribing in an EXISTING circle ("מרובע EBAD חסום במעגל O" where O is already drawn, or the
+  // DEFINITE «חסום במעגל» beside the figure's one circle): do NOT re-create it — that re-emits
+  // `circumcircle`/`circle` and redefines the centre ("'O' is already defined"). The intent is "these
+  // vertices lie on THIS circle": assert membership per vertex (idempotent for a point already on it —
+  // an intersection / line∩circle — and converting a free one to slide on it) and draw the polygon.
+  // Works whether the vertices pre-exist or are fresh.
+  //
+  // #430: the UNNAMED half used to be missing, so «משולש CDE חסום במעגל» after a semicircle minted a
+  // SECOND circle elsewhere and inscribed the triangle in that — silently, `lastError: null`. The
+  // reference now resolves through the shared `existingCircleRef` seam, so this rule agrees with
+  // `pointOnCircle` (which already bound the same reference) instead of deciding for itself.
+  //
+  // Two deliberate limits on the UNNAMED half (a NAMED circle binds unconditionally, as it always did):
+  //
+  //  - the vertices must not ALL pre-exist. Existing vertices carry their own positions and
+  //    definitions, and «ABC חסום במעגל» over them reads as "the circle THROUGH them" — their
+  //    circumcircle, the branch below. That is the operator-locked reading of a SECOND inscribe
+  //    (scenario `second-inscribed-circle-fresh-centre`: inscribing ABED, then ABC, must give two
+  //    circles, not force C onto the first). Naming the circle is the explicit signal to bind instead.
+  //  - a stated RADIUS excludes it: «חסום במעגל שרדיוסו 5» is also a statement about the circle's SIZE,
+  //    and binding alone would silently drop it (§6 honesty). That case keeps its existing behaviour;
+  //    #53 owns the size-given-on-an-inscribe reading.
+  const allExist = ids.every((id) => (ctx.points ?? []).includes(id));
+  const namedExisting = named != null && (ctx.circles ?? []).some((c) => up(c) === up(named)) ? up(named) : null;
+  const bound = namedExisting ?? (allExist || r.numeric || r.symbolic ? null : existingCircleRef(s, ctx));
+  if (bound != null) {
+    const boundCirc = circleId(bound);
     return [
-      ...ids.map((id): AnyCommand => ({ type: 'point-on-circle', id, circle: circ })),
+      ...ids.map((id): AnyCommand => ({ type: 'point-on-circle', id, circle: boundCirc })),
       ...basePlusShape(ids),
     ];
   }
@@ -3985,8 +4025,8 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // (that would detach them from their own definitions — A from segment CD, etc.). A triangle's
   // three existing points have a unique CIRCUMCIRCLE through them. A quad's four are generally NOT
   // concyclic, so a `concyclic` constraint drives a free DOF among them until they share one circle
-  // (ADR-041); the circle is drawn ("inscribed"/חסום) or hidden ("cyclic"/בר-חסימה).
-  const allExist = ids.every((id) => (ctx.points ?? []).includes(id));
+  // (ADR-041); the circle is drawn ("inscribed"/חסום) or hidden ("cyclic"/בר-חסימה). `allExist` is
+  // computed above (the unnamed-bind guard needs it).
   // IDEMPOTENT re-inscribe: if these points are ALREADY all on an existing circle, REUSE it — re-issuing the
   // inscribe must not mint a duplicate circumcircle with a fresh auto-centre (O→P→Q stacking on the same
   // circumcentre — the "O and P on the same point" bug). Only the shape is re-asserted (deterministic ids →

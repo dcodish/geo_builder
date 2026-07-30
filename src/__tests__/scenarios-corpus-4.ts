@@ -1913,4 +1913,36 @@ export const SCENARIOS_4: Scenario[] = [
       for (const v of [B, C, D]) expect(dist(M, v), 'M is the centre').toBeCloseTo(dist(M, A), 6);
     },
   },
+  {
+    id: 'definite-circle-ref-binds-semicircle',
+    title: 'issue #430 / ADR-422: «חסום במעגל» binds THE drawn circle instead of inventing a second one',
+    guards:
+      'the definite/implicit circle reference was resolved by SOME circle-consuming rules and silently re-created by others, because each decided for itself instead of asking the one resolution seam. After «חצי מעגל», «משולש CDE חסום במעגל» minted a SECOND circle P elsewhere and inscribed the triangle in that — C, D, E measured 11.7 / 4.0 / 12.3 from the semicircle centre — with lastError null and no violation. `pointOnCircle` had bound the very same reference correctly, so the rules disagreed about whether a hidden circle is a referent at all. `inscribedPolygon` now resolves through the shared `existingCircleRef` seam.',
+    steps: ['חצי מעגל', 'משולש CDE חסום במעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      // exactly ONE circle — no invented sibling beside the semicircle's
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles, 'the semicircle’s circle is the only one').toHaveLength(1);
+      // and the triangle rides it: every vertex at the same distance from its centre as A and B
+      const ctr = at(fig, '@ctr-O');
+      const R = dist(ctr, at(fig, 'A'));
+      for (const id of ['C', 'D', 'E']) expect(dist(ctr, at(fig, id)), `${id} on the drawn circle`).toBeCloseTo(R, 6);
+    },
+  },
+  {
+    id: 'second-inscribe-of-existing-points-still-mints',
+    title: 'issue #430 / ADR-422: an inscribe whose vertices ALL pre-exist still builds their own circumcircle',
+    guards:
+      'the counter-example that bounds the #430 fix: binding every unnamed «חסום במעגל» to the one existing circle would force a second inscribe’s vertices onto the first circle. Existing vertices carry their own positions, so «ABC חסום במעגל» over them reads as the circle THROUGH them — the operator-locked two-circle reading (`second-inscribed-circle-fresh-centre`). Naming the circle stays the explicit signal to bind instead.',
+    steps: ['משולש CDE', 'A על CD', 'B על CE', 'מרובע ABED חסום במעגל', 'משולש ABC חסום במעגל'],
+    check(fig) {
+      allStepsOk(fig);
+      const circles = fig.construction.objects.filter((o) => o.kind === 'circle');
+      expect(circles.length, 'two distinct circles — the second inscribe minted its own').toBe(2);
+      const P = at(fig, 'P');
+      const R = dist(P, at(fig, 'A'));
+      for (const id of ['A', 'B', 'C']) expect(dist(P, at(fig, id))).toBeCloseTo(R, 4);
+    },
+  },
 ];
