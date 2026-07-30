@@ -5,7 +5,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { exactFormOf, formatExactText, formatValue } from '@/format';
-import { computeValues } from '@/replay/core';
+import { computeValues, detectAll } from '@/replay/core';
+import { freeDofCount } from '@/engine/sample';
 import { parse } from '@/parser/parse';
 import { buildParseCtx } from '@/parser/context';
 import { replay } from '@/store/geoStore';
@@ -121,5 +122,51 @@ describe('#414 — היקף rides the same knowledge as the area', () => {
     const facts = factsFrom(['משולש ABC']);
     const r = computeValues(facts);
     expect(r.rows.filter((x) => x.kind === 'perimeter')).toHaveLength(0);
+  });
+});
+
+describe('#426 (ADR-421) — an absolute magnitude needs the SCALE pinned, not merely a rigid shape', () => {
+  it('a bare square states no size, so it prints no length/area/perimeter — but keeps its right angles', () => {
+    const facts = factsFrom(['ריבוע ABCD', 'AC']);
+    const r = computeValues(facts);
+    // freeDofCount is 0 (rigid UP TO SIMILARITY) and the pool is a single sample, so every magnitude
+    // trivially "agreed with itself" and the drawing's arbitrary 5 printed as a given.
+    expect(freeDofCount(replay(facts, 0).construction), 'shape-rigid').toBe(0);
+    expect(r.rows.filter((x) => x.kind === 'length'), 'no invented lengths').toHaveLength(0);
+    expect(r.rows.filter((x) => x.kind === 'area'), 'no invented area').toHaveLength(0);
+    expect(r.rows.filter((x) => x.kind === 'perimeter'), 'no invented perimeter').toHaveLength(0);
+    // the asymmetry IS the point — angles are scale-free knowledge on the very same figure
+    const angles = r.rows.filter((x) => x.kind === 'angle');
+    expect(angles.length).toBeGreaterThan(0);
+    expect(angles[0].value).toBeCloseTo(90, 3);
+  });
+
+  it('the CANVAS half: a bare square offers no definite length either (the #126 labels)', () => {
+    const { relations } = detectAll(factsFrom(['ריבוע ABCD', 'AC']));
+    expect(relations.definiteLengths, 'the drawing scale is not a length label').toHaveLength(0);
+    // …while the equal-side classes, which are ratios, still stand
+    expect(relations.equalSegments.length, 'equal sides are scale-free knowledge').toBeGreaterThan(0);
+  });
+
+  it('a circle with no stated size prints neither radius nor its derived area/circumference', () => {
+    const r = computeValues(factsFrom(['מעגל O']));
+    expect(r.rows.filter((x) => x.kind === 'radius')).toHaveLength(0);
+    expect(r.rows.filter((x) => x.kind === 'area' || x.kind === 'perimeter')).toHaveLength(0);
+  });
+
+  it('ONE size given turns the whole figure back on (the control — nothing else changed)', () => {
+    const facts = factsFrom(['ריבוע ABCD', 'AC', 'BC = 4']);
+    const r = computeValues(facts);
+    const len = (lab: string) => r.rows.find((x) => x.kind === 'length' && [...x.label].sort().join('') === [...lab].sort().join(''));
+    expect(len('BC')?.value).toBeCloseTo(4, 4);
+    expect(len('AB')?.value, 'derived from the one given').toBeCloseTo(4, 4);
+    expect(len('AC')?.value).toBeCloseTo(4 * Math.SQRT2, 4);
+    expect(r.rows.find((x) => x.kind === 'area')?.value).toBeCloseTo(16, 3);
+    expect(detectAll(facts).relations.definiteLengths.length, 'the canvas prints again too').toBeGreaterThan(0);
+  });
+
+  it('a ratio class survives with no absolute anywhere (it never depended on the scale)', () => {
+    const r = computeValues(factsFrom(['משולש ABC', 'D אמצע BC', 'משולש ABD', 'משולש ACD']));
+    expect(r.areaClasses.length, 'S / S / 2S still reported').toBeGreaterThan(0);
   });
 });

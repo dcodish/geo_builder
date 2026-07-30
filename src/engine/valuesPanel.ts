@@ -158,7 +158,16 @@ export function computeValuesPanel(
   // drawing's scale — which is exactly when the student's own symbol is the honest thing to print.
   // A pinned SCALE yields to real numbers: once a size given exists the absolute IS knowledge, and the
   // student who wrote «AB = a, BC = 4» is better served learning a = 4 than reading `a` back.
-  const useUnit = !!unit && !scalePinned(c);
+  //
+  // #426 (ADR-421) makes that same question the gate on the ABSOLUTE lane too: under the free similarity
+  // gauge the solver picks the world scale itself (the default 5), so a length/area/perimeter/radius read
+  // off such a figure is a per-drawing measure — printing it asserts a size the question never gave
+  // ([ADR-052](docs/06-decisions.md#adr-052)). The seed-invariance gate above cannot catch it: `freeDofCount`
+  // deliberately subtracts the free gauge (ADR-101), so a shape-rigid figure samples ONCE and every
+  // magnitude trivially agrees with itself. ANGLES and the area RATIO classes are scale-free and keep
+  // printing on the very same figure — that asymmetry is the whole point.
+  const sized = scalePinned(c);
+  const useUnit = !!unit && !sized;
   const unitCoefOf = (f: Measure, pow: 1 | 2): UnitValue | null => {
     if (!unit || !useUnit) return null;
     const vals: number[] = [];
@@ -179,16 +188,18 @@ export function computeValuesPanel(
   const unitStated = new Set((unit?.statedRefs ?? []).map(([a, b]) => segKey(a, b)));
 
   /**
-   * Emit one MAGNITUDE row (length / radius / area / perimeter). The row survives when its ABSOLUTE is
-   * seed-invariant (as before) OR when only its ratio to the declared unit is — in which case `value`
-   * carries the current drawing's measurement for reference and `unit` is what the UI prints.
+   * Emit one MAGNITUDE row (length / radius / area / perimeter). Exactly one lane can speak: with the scale
+   * PINNED the absolute is knowledge when seed-invariant (#426); without it only the ratio to a declared
+   * unit is (#427), and `value` then carries the current drawing's measurement purely for reference. A
+   * figure that is neither sized nor given a unit emits no magnitude at all — that silence IS the fix.
    */
   const magnitude = (
     kind: ValueRow['kind'], ids: Id[], label: string, stated: boolean, pow: 1 | 2, f: Measure,
   ): void => {
+    if (!sized && !useUnit) return;
     const vals = samplesOf(f);
     if (vals === null) return;
-    const abs = invariant(vals);
+    const abs = sized ? invariant(vals) : null;
     const u = unitCoefOf(f, pow);
     if (abs === null && u === null) return;
     const value = abs ?? vals.reduce((x, y) => x + y, 0) / vals.length;
@@ -208,7 +219,8 @@ export function computeValuesPanel(
   }
 
   // ---- lengths over the figure's edge universe (the detection layers' own, scaffold-filtered) ---
-  for (const [a, b] of figureEdges(c, samples)) {
+  // (the edge sweep is real work — skip it outright when no lane can speak)
+  for (const [a, b] of sized || useUnit ? figureEdges(c, samples) : []) {
     magnitude('length', [a, b], `${a}${b}`, statedLen.has(segKey(a, b)) || unitStated.has(segKey(a, b)), 1, (pos) => {
       const p = pos.get(a);
       const q = pos.get(b);

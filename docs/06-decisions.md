@@ -5784,3 +5784,33 @@ AB = a   AD = a   AC = a√2   AG = a√10/3   S(ABCD) = a²   P(ABCD) = 4a
 **Deliberately not widened.** The canvas's own definite-length labels (#126) still print absolutes; they are #426's to silence, and giving them the symbolic form is the natural follow-up once it has.
 
 Locked by `symbolic-unit.test.ts` (13 — the operator's square, the fraction-with-radical form, נתון marking, the coefficient form, and every boundary above).
+
+### ADR-421 — An absolute magnitude is knowledge only when the SCALE is pinned (#426)
+
+**Context.** Raised by the operator's #427 report ("the data panel assigns a=5"), the probe found the symbol was not the trigger at all. A **bare square — no size stated anywhere** — already printed, measured on HEAD:
+
+```
+panel : AB=5  AD=5  BC=5  CD=5   area ABCD=25   perimeter ABCD=20
+canvas: AB=5  AD=5  BC=5  CD=5            (definiteLengths, #126)
+```
+
+The `5` is the solver's default world scale. The tool was asserting a size the question never gave — [ADR-052](#adr-052), the sin CLAUDE.md ranks with drawing a figure that violates its givens. Hence P1.
+
+**Root cause — one class, two consumers.** The gate for magnitudes asked *"does this value vary across the sample pool?"*, a **proxy** for *"is the scale pinned?"*. The proxy inverts silently: `samplingJobs` takes **one** sample when `freeDofCount === 0`, which is right for SHAPE questions — but `freeDofCount` deliberately subtracts the free similarity gauge ([ADR-101](#adr-101)), so it means *rigid up to similarity*, **not** *every magnitude known*. At one sample there is nothing to vary against and every magnitude trivially agrees with itself. The docs/17 §2.2 tripwire; the 2-D twin of the 3-D [ADR-3D-054](06b-decisions-3d.md#adr-3d-054)/-070/-071 family.
+
+`definiteLengths` is the sharpest illustration: **its own comment states the correct rule** — *"NOT scale-invariant (unlike an angle) … empty until a size given pins the scale"* — and then trusts sampling variance to enforce it. True at 16 samples, false at 1.
+
+**Decision.** Ask the semantic question directly. `scalePinned(c)` (landed by [ADR-420](#adr-420), extracted from `similarityGauge`'s own `scaleFixed`, which still computes through it so the gauge count and the print gates cannot drift) now gates:
+
+- the values panel's magnitude rows — one condition in the shared `magnitude()` emitter, which also skips the `figureEdges` sweep outright when no lane can speak;
+- `definiteLengths`' canvas labels.
+
+**The asymmetry is the whole point.** ANGLES and the area RATIO classes are scale-free, so they remain knowledge on the very same figure and keep printing — a bare square still reports its four right angles and a median still reports S / S / 2S. Only absolute magnitudes depend on the scale.
+
+**Interaction with [ADR-420](#adr-420).** Exactly one lane speaks per row: scale pinned ⇒ the absolute; not pinned but a unit declared ⇒ the multiple (`a√2`); neither ⇒ **nothing**, and that silence is the fix.
+
+**Deliberately unchanged.** `samplingJobs`' `N = 1` — it is correct for its own question, and raising it would only re-hide this behind a slower proxy.
+
+**Provenance.** Built from work found stranded uncommitted in the shared tree by a session that had ended; its design (this extraction, both consumers) was adopted, re-fitted onto the `magnitude()` emitter ADR-420 had meanwhile introduced, renumbered off the ADR-420 collision, and given the test locks it lacked.
+
+Locked by the `#426` block in `values-panel.test.ts` (5 — the bare square's silence WITH its right angles still printing, the canvas half, an unsized circle, the one-size-given control that turns everything back on, and the ratio class that never depended on scale).

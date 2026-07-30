@@ -20,7 +20,7 @@
 import type { Construction, GeoObject, Id, LineSpec, Vec } from './types';
 import { isGeoPoint } from './types';
 import { evaluate } from './evaluate';
-import { applySeed, freeDofCount } from './sample';
+import { applySeed, freeDofCount, scalePinned } from './sample';
 import { pointNeighbors } from './step';
 import { dist, sub, len } from './geometry';
 
@@ -567,8 +567,14 @@ export function detectRelationsAcross(constructions: Construction[], opts: Detec
   //    across seeds (the sampler moves the gauge, verified — `triangle ABC`'s |AB| spans 5.09…7.26), so this
   //    is empty until a size given pins the scale — exactly when reading a length off the drawing is
   //    meaningful. Same non-starved-pool gate as the angles.
+  //
+  //    #426 (ADR-421): that reasoning was RIGHT and the sampling proxy was the wrong way to enforce it. A
+  //    shape-rigid figure (a bare square) is sampled ONCE — `freeDofCount` subtracts the free similarity
+  //    gauge (ADR-101) — so `segLen` had nothing to vary against and every length trivially agreed with
+  //    itself, printing the arbitrary drawing scale as a given. Ask the semantic question directly.
   const definiteLengths: DefiniteLength[] = [];
-  for (let i = 0; trustDefinite && i < segs.length; i++) {
+  const sized = scalePinned(c0);
+  for (let i = 0; sized && trustDefinite && i < segs.length; i++) {
     if (!segUsable[i]) continue;
     const vals = segLen[i];
     const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
