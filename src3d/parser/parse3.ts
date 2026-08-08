@@ -106,16 +106,35 @@ const primeAll = (ts: Id[]) => ts.map((t) => `${t}'`);
 
 type Rule = (s: string) => Command3[] | null;
 
-/** cube / box: 8 vertices as given, or 4 base vertices auto-primed to the top face. */
+/** cube / box: 8 vertices as given, or 4 base vertices auto-primed to the top face.
+ *
+ *  #438: the sentence may state a SPACE DIAGONAL along with the solid («תיבה מלבנית עם אלכסון תיבה»,
+ *  typed by two users as their opening move). This rule used to read its own noun, branch on the label
+ *  count and return — the words `עם אלכסון תיבה` were never read at all, so the student who asked for a
+ *  box *with a diagonal* got a box, reported ✓. A rule that claims an utterance owns the WHOLE of it:
+ *  the ids it just assigned are exactly what naming the diagonal needs, so it emits the segment itself.
+ *
+ *  Only the UNAMBIGUOUS solid-qualified form («אלכסון תיבה» / «אלכסון קובייה» / "space diagonal") is
+ *  built. A bare «אלכסון» on a box could mean a FACE diagonal, and guessing between them would assert a
+ *  given the student never gave (ADR-052) — it stays unbuilt and is now caught by `droppedConstructNoun3`
+ *  as an honest refusal instead of a silent drop. Naming the endpoints («אלכסון תיבה AC'») is #449. */
+const SPACE_DIAGONAL_RE = /אלכסו[ןנ]\s*(?:ה?(?:תיבה|קוביי?ה))|\b(?:space|body|main)\s+diagonal\b/i;
+
 const cubeOrBox: Rule = (s) => {
   const kind = /קוביי?ה/.test(s) || /\bcube\b/i.test(s) ? 'cube' : /תיבה/.test(s) || /\b(box|cuboid)\b/i.test(s) ? 'box' : null;
   if (!kind) return null;
   const toks = labelTokens(s);
-  if (toks.length === 8) return [{ type: 'solid', kind, ids: toks }];
-  if (toks.length === 4 && toks.every(unprimed)) return [{ type: 'solid', kind, ids: [...toks, ...primeAll(toks)] }];
-  // label-less: a cube/box is fully determined — default lettering, no LLM needed
-  if (toks.length === 0) return [{ type: 'solid', kind, ids: ['A', 'B', 'C', 'D', ...primeAll(['A', 'B', 'C', 'D'])] }];
-  return null;
+  // the solid's 8 ids, base-first then top (the drawing convention everywhere in the engine), or null
+  const ids =
+    toks.length === 8 ? toks
+    : toks.length === 4 && toks.every(unprimed) ? [...toks, ...primeAll(toks)]
+    // label-less: a cube/box is fully determined — default lettering, no LLM needed
+    : toks.length === 0 ? ['A', 'B', 'C', 'D', ...primeAll(['A', 'B', 'C', 'D'])]
+    : null;
+  if (!ids) return null;
+  const solid: Command3 = { type: 'solid', kind, ids };
+  // a space diagonal joins a base vertex to the top vertex DIAGONALLY opposite it: base[0] → top[2].
+  return SPACE_DIAGONAL_RE.test(s) ? [solid, { type: 'segment3', a: ids[0], b: ids[6] }] : [solid];
 };
 
 /** Right prism, dispatched by its BASE shape (#117): `מנסרה ישרה [שבסיסה <shape>] <labels>`.
@@ -2713,7 +2732,20 @@ const polygonCircle3: Rule = (s) => {
   const named = s.match(/(?:מעגל|circle)\s+([A-Z]\d*)/);
   const id = named ? `circle-${named[1]}` : `circle-${ring.join('')}`;
   const def: Circle3Def = circleIsContainer ? { kind: 'circum', ring } : { kind: 'incircle', ring };
-  return [{ type: 'circle3', id, def }];
+  // #440: the sentence states TWO objects — the polygon AND its circle — so it must emit both. This rule
+  // took the utterance off `planarPolygon` (the ADR-024 leftover guard at its head), which made the
+  // POLYGON the newly-dropped half: `משולש ABC חסום במעגל` as an opening move referenced A, B, C that
+  // nothing had declared and refused `unknown-point A`. Declaring the ring here is unconditional and
+  // context-free — M1 owns existence: a flat polygon whose ids ALL exist is a statement ABOUT those
+  // points, an idempotent no-op (apply.ts, #116), which is exactly the operator's pyramid-base case
+  // («ABC» already a face) and why this cannot re-declare anything.
+  const arity = /משולש|\btriangle\b/i.test(s) ? 3 : /מרובע|\b(quadrilateral|quad)\b/i.test(s) ? 4 : /מחומש|\bpentagon\b/i.test(s) ? 5 : 0;
+  const polyKind = arity === 3 ? 'polygon3' : arity === 4 ? 'polygon4' : arity === 5 ? 'polygon5' : null;
+  if (!polyKind || ring.length !== arity) return [{ type: 'circle3', id, def }];
+  // #424's ONE vocabulary: a qualifier the parser recognises must be one it can lower, on every rule
+  // that declares a polygon — `משולש שווה שוקיים ABC חסום במעגל` states the equal pair too.
+  const shape: TriSpec = polyKind === 'polygon3' ? statedTriShape(s) : { equal: null, right: false };
+  return [{ type: 'solid', kind: polyKind, ids: ring }, ...triShapeCommands(shape, ring), { type: 'circle3', id, def }];
 };
 
 const planarPolygon: Rule = (s) => {

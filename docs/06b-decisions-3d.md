@@ -1931,3 +1931,72 @@ coplanar with it; an incircle by the ⟂ distance from its centre to all three s
 and every vertex lying strictly outside; the pyramid-base case with the apex proved OFF the circle and the
 solid proved un-redeclared (M1); the quad refusal; a named circle keeping its letter; the #440 no-op
 regression; and the scene gaining exactly one sampled outline (0 → 1) — the ink that was missing.
+
+## ADR-3D-113 — a stated OBJECT must materialise: the dropped-construct gate
+
+**Status:** accepted, 2026-08-09 · **Issues:** #438, #440 (bugs) · **Sibling filed:** #456 (2-D), #457 (3-D debt)
+
+**The class.** *A sentence states two objects — a shape and a construct on it. The one rule that recognises
+its own noun claims the whole utterance, emits only its own object, and silently discards the rest of the
+sentence.* Three independent instances landed in the single triage of 2026-08-08: `cubeOrBox` reading
+`תיבה` and never reading `עם אלכסון תיבה` (#438 — typed by **two** prod users as their opening move), the
+flat-polygon rule reading `משולש` and discarding `חסום במעגל` (#440), and the pyramid base qualifier
+(#435, fixed separately). Not one of the four honesty gates could see any of them: they ask about labels,
+numbers, base-shape nouns and triangle qualifiers, and **nothing asked whether a stated object materialised
+at all.** A rule can only drop what no gate is watching, so the durable fix is the missing question, asked
+once, for every rule at once.
+
+**#440 had already half-moved.** [ADR-3D-112](#adr-3d-112) built the circle and took the utterance off
+`planarPolygon` with an ADR-024 leftover guard — which made the **polygon** the newly-dropped half. Measured
+at that HEAD: `משולש ABC חסום במעגל` as an *opening* move emitted only `circle3`, referenced A, B, C that
+nothing had declared, and refused `unknown-point A`. The same defect, mirrored: the rule that now owned the
+sentence read *its* noun and discarded the rest. It survived review because the operator's own context had
+the ring already on the figure (ABC as a pyramid base), where the drop is invisible.
+
+**Decision — two halves, and the second is the one that closes the class.**
+
+- **Capability.** `polygonCircle3` declares the ring polygon it names, then the circle: the sentence states
+  two objects, so it emits two. The declaration is unconditional and context-free — **M1 owns existence**.
+  A flat polygon whose ids all exist is a statement *about* those points, an idempotent no-op
+  (`apply.ts`, #116), which is exactly the pyramid-base case and why this cannot re-declare anything. It
+  routes the stated triangle qualifier through `statedTriShape`/`triShapeCommands` too, so #424's one
+  vocabulary reaches this rule as well. `cubeOrBox` emits the stated space diagonal — the ids it just
+  assigned are precisely what naming `A→C'` needs. Only the **unambiguous** solid-qualified form is built
+  (`אלכסון תיבה` / `אלכסון קובייה` / "space diagonal"): a bare `אלכסון` on a box could be a FACE diagonal,
+  and choosing between them would assert a given the student never gave ([ADR-052](06-decisions.md#adr-052)).
+  Naming the endpoints (`אלכסון תיבה AC'`) stays #449.
+- **Mechanism.** `droppedConstructNoun3` — a stated construct noun that no command produced. Bound to the
+  **event, not to a path**, like `droppedTriShape3` and for the same reason (`src3d/CLAUDE.md`: "a guard
+  bound to a code path rather than to the event it guards will be bypassed") — both reported drops were
+  GRAMMAR drops, where the LLM-seam gates never run.
+
+**The accounting is the class predicate itself, and that is the whole finding.** The first draft mapped each
+noun to the object kind it *should* produce — a diagonal to a segment, a circle to a `circle3`, a height to
+an altitude. It **false-flagged 28 working inputs**: `O נקודת חיתוך אלכסוני הבסיס` lowers a diagonal to a
+POINT, `AS גובה` lowers a height to a PERPENDICULARITY, `וגובהו 12` carries a height as a FIELD of a
+revolution solid. Enumerating the lowerings recreates the enumeration-is-not-a-rule trap this tree's
+recurring-traps list already names. The generic question does not:
+
+> a stated construct noun is accounted when the commands carry **anything beyond the bare shape
+> declarations** — any non-`solid` command at all, or a `solid` carrying payload past its own identity.
+
+That is one sentence, it is exactly the event ("the rule emitted only its own object"), and it flagged
+**zero** of the 1855 3-D tests and zero catalog utterances. Generous by construction, per the gate doctrine:
+a false account only suppresses a warning, a false drop would refuse a working input.
+
+**What it turns honest that was silent.** `קובייה עם אלכסון`, `תיבה מלבנית ובה אלכסון` (ambiguous, refused
+on purpose) and `פירמידה ABCD עם גובה` — the last being the silent-drop face of **#448**, which stays the
+capability. They now refuse naming the lost statement and escalate, instead of committing a bare solid with
+a green ✓.
+
+**Sibling audit** (docs/17 §1 / ADR-W-004). **`src/` HAS this class** — measured, not assumed:
+`מלבן ABCD עם אלכסונים` commits a bare rectangle, the diagonals gone, and none of 2-D's seven deterministic
+gates asks the general question. Narrower than 3-D's only by luck — the other three phrasings happen to be
+`not-handled`. Filed as **#456** with the port plan (copied as a pattern per docs/20 §12, never imported),
+not fixed here: different product, different lane, different log.
+
+**Blast radius.** Additive. Shadow matrix: pure addition (2 catalog rows, **0 changed winners**). Locked by
+`dropped-construct.test.ts` (22), asserted geometrically — the space diagonal by the box identity
+|AC'|² = |AB|² + |BC|² + |AA'|² *and* by being longer than either face diagonal, the polygon by the ring
+existing and the solid count staying at one; plus the refusals, the M1 no-ops, and the generosity cases that
+the 28 false positives came from. `droppedConstructNoun3` joins the catalog false-positive net.

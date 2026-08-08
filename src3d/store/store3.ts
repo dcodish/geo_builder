@@ -30,7 +30,7 @@ import { checkInSpan, firstSatisfyingSeed3, memberHolds3, resolve3, type Resolve
 import { verifyClaim } from '../engine/claims';
 import { cross3, dot3, norm3, sub3 } from '../engine/vec3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
-import { droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
+import { droppedConstructNoun3, droppedGivenNumbers3, droppedNewLabels3, droppedShapeNoun3, droppedTriShape3 } from '../parser/honesty3';
 import { parse3 } from '../parser/parse3';
 
 export interface Fact3 {
@@ -408,10 +408,14 @@ export const useGeo3 = create<Geo3State>()(
           return;
         }
         const { facts, seed } = get();
-        // #424: the ONE honesty gate that also guards the DETERMINISTIC path. A grammar rule that reads
-        // a shape noun and ignores its qualifier loses a stated given exactly as an LLM decomposition
-        // can, and no path-bound gate can see it (see droppedTriShape3).
-        const lostShape = droppedTriShape3(utterance, parsed.commands);
+        // #424 / #438 / #440: the honesty gates that also guard the DETERMINISTIC path. A grammar rule
+        // that reads a shape noun and ignores the REST of the sentence loses a stated given exactly as an
+        // LLM decomposition can, and no path-bound gate can see it (see droppedTriShape3 /
+        // droppedConstructNoun3). Both are bound to the EVENT, not to a commit path.
+        const lostShape = [
+          ...droppedTriShape3(utterance, parsed.commands),
+          ...droppedConstructNoun3(utterance, parsed.commands),
+        ];
         if (lostShape.length > 0) {
           set({ lastError: { code: 'dropped-given', items: lostShape.join(', ') } });
           return;
@@ -461,6 +465,7 @@ export const useGeo3 = create<Geo3State>()(
           ...droppedGivenNumbers3(utterance, all),
           ...droppedShapeNoun3(utterance, all), // ADR-3D-084 (#304): a stated base shape silently changed
           ...droppedTriShape3(utterance, all), // #424: a stated triangle qualifier silently dropped
+          ...droppedConstructNoun3(utterance, all), // #438/#440: a stated OBJECT never materialised
         ];
         if (lost.length > 0) {
           set({ lastError: { code: 'dropped-given', items: lost.join(', ') } });

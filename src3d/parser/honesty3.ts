@@ -151,6 +151,57 @@ export function droppedTriShape3(utterance: string, commands: Command3[]): strin
   return lost;
 }
 
+/**
+ * A stated CONSTRUCT NOUN — an object the student asked to EXIST — that no committed command
+ * materialised (#438/#440). Returns the lost nouns (empty = pass).
+ *
+ * **The class this gate exists for**: *a sentence states two objects, the one rule that recognises its
+ * own noun claims the whole utterance, emits only its own object, and silently discards the rest.* Three
+ * independent instances landed in a single triage — `cubeOrBox` reading `תיבה` and discarding
+ * `עם אלכסון תיבה` (#438), the V8-g polygon rule reading `משולש` and discarding `חסום במעגל` (#440), and
+ * the pyramid-base qualifier (#435) — and the sibling gates could see none of them: they ask about
+ * labels, numbers, base-shape nouns and triangle qualifiers, and **nothing asked whether a stated
+ * OBJECT materialised at all.** A rule can only drop what some gate is not watching, so the durable fix
+ * is the missing question, asked once, for every rule at once.
+ *
+ * **Bound to the EVENT, not to a path** — like `droppedTriShape3` and for the same reason (`src3d/CLAUDE.md`:
+ * "a guard bound to a code path rather than to the event it guards will be bypassed"). Both #438 and #440
+ * were GRAMMAR-rule drops on the deterministic path, where the LLM-seam gates never run.
+ *
+ * Doctrine (the sibling gates'): the utterance side is CONSERVATIVE and the command side GENEROUS — a
+ * false account only suppresses a warning, while a false drop would refuse a working input. So each noun
+ * is accounted by any plausible lowering, and a noun already satisfied by the EXISTING figure (`המעגל`
+ * referring to a circle drawn earlier) is context, never a drop.
+ */
+export function droppedConstructNoun3(utterance: string, commands: Command3[]): string[] {
+  const s = normalize3(utterance);
+  // The nouns that name an OBJECT OF THEIR OWN — something a bare shape declaration can never be. Each
+  // is a construct the curriculum draws ON a figure, so stating one and committing nothing but the
+  // figure is precisely the drop. (A shape's own PROPERTY — right-angled, isosceles, rhombic — is not
+  // here: `droppedTriShape3` / `droppedShapeNoun3` own those, and they must not be double-gated.)
+  const CONSTRUCT_NOUNS =
+    /מעגל|אלכסו[ןנ]|גובה|גבהי|תיכונ|חוצ[הת]?[-\s]?זו?וית|\b(?:circle|diagonal|altitude|height|median|bisect\w*)\b/i;
+  const m = s.match(CONSTRUCT_NOUNS);
+  if (!m) return [];
+  // ACCOUNTING — the class predicate itself, not a per-noun object map. The defect is always the same
+  // event: *a rule claims the utterance on its shape noun and emits nothing but that shape*. So the
+  // question is whether the commands carry ANYTHING beyond the bare shape declarations — any non-`solid`
+  // command at all (a segment, a circle, a derived point, a perpendicularity, a constraint), or a
+  // `solid` carrying payload past its own identity (a cone's `height`/`radius` — «וגובהו 12» states a
+  // height as a FIELD of the solid, not as a separate object).
+  //
+  // Deliberately GENEROUS, per the gate doctrine and by measurement: an earlier draft mapped each noun
+  // to the object kind it "should" produce and false-flagged 28 working inputs — `O נקודת חיתוך אלכסוני
+  // הבסיס` lowers a diagonal to a POINT, `AS גובה` lowers a height to a PERPENDICULARITY. Enumerating
+  // the lowerings recreates the enumeration-is-not-a-rule trap the parser already learned; asking
+  // whether the sentence produced anything at all does not.
+  const BARE_SHAPE_KEYS = new Set(['type', 'kind', 'ids', 'oblique']);
+  const accounted = commands.some(
+    (c) => c.type !== 'solid' || Object.keys(c).some((k) => !BARE_SHAPE_KEYS.has(k)),
+  );
+  return accounted ? [] : [m[0]];
+}
+
 export function droppedNewLabels3(
   utterance: string,
   commands: Command3[],
