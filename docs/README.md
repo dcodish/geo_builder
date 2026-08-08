@@ -1,6 +1,8 @@
 # Geo Builder — Documentation
 
-Living project documentation (last updated 2026-07-10). Both apps are **built and in production** (themathbible.com/geo-builder/ + /3d-builder/); for current state and the resume pointer see the repo-root [`CLAUDE.md`](../CLAUDE.md) and [09-implementation-plan.md](09-implementation-plan.md). Day-to-day process lives in [22-workflow.md](22-workflow.md) (issues → PRs → main → deploy) and [RUNBOOK.md](RUNBOOK.md).
+Living project documentation. Both apps are **built and in production** (themathbible.com/geo-builder/ + /3d-builder/).
+
+**For current state, read the tail of [06-decisions.md](06-decisions.md) / [06b-decisions-3d.md](06b-decisions-3d.md), `gh issue list`, and [DEPLOY-LOG.md](DEPLOY-LOG.md)** — those are the records actually kept current ([ADR-W-002](06w-decisions-workspace.md#adr-w-002)). The repo-root [`CLAUDE.md`](../CLAUDE.md) is an **orientation** file (what exists, where it lives, what must never be done) and deliberately carries no status; [09-implementation-plan.md](09-implementation-plan.md) and [PROJECT-MEMORY.md](PROJECT-MEMORY.md) are background that lags. Day-to-day process lives in [22-workflow.md](22-workflow.md) (issues → PRs → main → deploy) and [RUNBOOK.md](RUNBOOK.md).
 
 ## Contents
 
@@ -31,11 +33,11 @@ Living project documentation (last updated 2026-07-10). Both apps are **built an
 | 22 | [Project Workflow](22-workflow.md) | **The standard operating route (ADR-265):** GitHub issues for every report, priority rubric P1–P3, bug vs feature routes, PRs to `main`, deploy tagging |
 | — | [RUNBOOK](RUNBOOK.md) | Ops: deploy procedures for both apps + the proxy, verification, troubleshooting index, rollback, logs |
 | — | [DEPLOY-LOG](DEPLOY-LOG.md) | Append-only record of what is live in production (paired with `prod/*` git tags) |
-| — | [Project Memory](PROJECT-MEMORY.md) | Travelling memory: where memory lives, operational notes, resume pointer (read at session start) |
+| — | [Project Memory](PROJECT-MEMORY.md) | Operational notes and a dated session log. **Background, not status** — it lags the ADR logs (ADR-W-002) |
 | — | [Paper & Theory](paper/README.md) | Academic writing + the theory/algorithmic lineage behind the implementation (method↔citation mapping, paper outline, dated discussion logs) |
 
 ## How to use these
 
 - **Read in order** for a full picture; 01 → 02/03 establish *what* and *why*, 04 establishes *how*.
-- These are **living documents** — update them as the design evolves, and add an ADR to `06` whenever a significant decision is made or changed.
-- The repo-root `CLAUDE.md` is the quick orientation for Claude Code sessions and points here for depth.
+- These are **living documents** — update them as the design evolves, and add an ADR whenever a significant decision is made or changed: `06` for the 2-D app, `06b` for 3-D, `06w` for anything cross-product.
+- The repo-root `CLAUDE.md` (and `src3d/CLAUDE.md`) is the quick orientation for Claude Code sessions and points here for depth. It holds no history or status by design — a dated progress entry belongs in its ADR.
