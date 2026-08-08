@@ -142,8 +142,11 @@ Planned products (recommendation accepted 2026-07-10): **analytic geometry** —
 
 ### Isolation rules (operator authority — generalizes docs/20 §12)
 
-- A product's source tree **never imports another product's tree** — patterns are **COPIED**, not shared. Enforced mechanically by `server/__tests__/isolation.test.ts` (extend it when a product is added). Exception: *within* one product family (e.g. the analytic tool's 471/572 levels) sharing is free — they are one product with profiles.
-- The **shared server is the one deliberate sharing point** — parameterized by a `tool:` field (`server/parseHandler`, `handleLog`, admin `DashboardProfile`), never forked per product.
+- **`BOUNDARIES.json` (repo root) is the authority** ([ADR-W-003](06w-decisions-workspace.md#adr-w-003)): trees, layers, and every import edge with its rationale. `server/__tests__/isolation.test.ts` **reads** it — adding a product or an edge is a manifest edit, not a test edit, and the rule is never restated in two places that can drift.
+- A product's source tree **never imports another product's tree** — patterns are **COPIED**, not shared. Exception: *within* one product family (e.g. the analytic tool's 471/572 levels) sharing is free — they are one product with profiles.
+- The **shared server is the one deliberate sharing point** — parameterized by a `tool:` field (`server/parseHandler`, `handleLog`, admin `DashboardProfile`), never forked per product. It imports from BOTH product trees on purpose; that coupling is recorded in the manifest as an `allowed` edge, so it can never be mistaken for the violation it superficially resembles. A product never imports the server back — it talks to the proxy over HTTP.
+- **Every directory carries a layer** — `engine` (reasons about points/lines/planes/DOF/constraints; copied, never shared), `lexicon` (vocabulary, noun→shape), `shell` (everything else). Classification is total: an unclassified directory fails the test. Whether a non-`engine` layer may be *physically* shared is deliberately undecided — see ADR-W-003's trigger. Before copying a file because the sibling tree has one like it, apply the copy tripwire ([17 §2](17-design-rules.md), item 8).
+- **A diagnosed bug class is checked against the sibling product** and the answer stated in the ADR ([ADR-W-004](06w-decisions-workspace.md#adr-w-004)) — the products copy patterns by design, so they copy defects by design.
 - The 2-D locale files, ADR logs, and status text of one product are never touched by another product's work.
 - Full-suite runs (`npm run test:run`) remain the bar **before any deploy** and for changes to the shared surface; the per-product lanes are for the edit-push loop.
 

@@ -1,0 +1,131 @@
+{
+  "$comment": [
+    "AUTHORITATIVE product/layer boundary map (ADR-W-003, docs/06w-decisions-workspace.md).",
+    "server/__tests__/isolation.test.ts READS this file. Do not restate these edges in prose",
+    "anywhere else — a registry and a test that disagree is a rule held by interpretation.",
+    "Adding a product, a directory, or an import edge means editing THIS file."
+  ],
+  "version": 1,
+
+  "layers": {
+    "$comment": [
+      "A CLASSIFICATION vocabulary. Whether a non-engine layer may be physically shared (a shared/",
+      "tree) is DEFERRED — see ADR-W-003 'What this does not decide' and its named trigger.",
+      "Classifying a directory today costs nothing and makes that later decision measurable."
+    ],
+    "engine": {
+      "question": "Does it reason about points, lines, planes, DOF, or constraints?",
+      "sharing": "copied-never-shared",
+      "rationale": "2-D and 3-D geometry differ in kind; an abstraction over both leaks. docs/20 §12 stands unchanged here."
+    },
+    "lexicon": {
+      "question": "Does it name Hebrew/English vocabulary, or map a noun to a shape?",
+      "sharing": "undecided",
+      "rationale": "The vocabulary is identical across products even though the lowering to constraints is not. No directory carries this layer yet; it is declared so the split is nameable when one does."
+    },
+    "shell": {
+      "question": "Neither of the above.",
+      "sharing": "undecided",
+      "rationale": "Not geometry. If it is ever shared it must be parameterized by the caller — branching on product identity inside a shared module is a fork wearing a shared file's name."
+    }
+  },
+
+  "trees": {
+    "src": { "product": "2d", "label": "2d", "adrLog": "docs/06-decisions.md" },
+    "src3d": { "product": "3d", "label": "3d", "adrLog": "docs/06b-decisions-3d.md" },
+    "server": { "product": "server", "label": "server", "adrLog": "docs/06-decisions.md" }
+  },
+
+  "plannedTrees": {
+    "$comment": "Registered in docs/22 §9, not yet on disk. Moving one into 'trees' + classifying its directories is all that is needed to guard it on arrival.",
+    "src-analytic": { "product": "analytic", "label": "analytic", "adrLog": "docs/06c-decisions-analytic.md" },
+    "src-complex": { "product": "complex", "label": "complex", "adrLog": "docs/06d-decisions-complex.md" }
+  },
+
+  "aliases": {
+    "$comment": "tsconfig maps @/* repo-wide, so a stray @/ in a tree forbidden from src/ typechecks and resolves while silently coupling the products. The forbidden edges below are enforced against alias specifiers too.",
+    "@/": "src"
+  },
+
+  "imports": {
+    "allowed": [
+      {
+        "from": "server",
+        "to": "src",
+        "why": "The shared proxy binds BOTH apps' LLM prompts (server/parseHandler.ts imports src/parser/llmShared). This is the one deliberate sharing point, parameterized by tool: — never forked per product."
+      },
+      {
+        "from": "server",
+        "to": "src3d",
+        "why": "Same binding point: src3d/parser/llmShared3. Listed so the coupling is visible rather than folklore that merely looks like a violation."
+      }
+    ],
+    "forbidden": [
+      {
+        "from": "src",
+        "to": "src3d",
+        "why": "Product trees never import each other (ADR-266; docs/20 §12). A change in one product must not be able to break another."
+      },
+      {
+        "from": "src3d",
+        "to": "src",
+        "why": "Same rule, and the direction the @/ alias makes easy to violate by accident."
+      },
+      {
+        "from": "src",
+        "to": "server",
+        "why": "A product talks to the proxy over HTTP, never by import — otherwise the browser bundle can reach server-only code (and the API key handling that lives there)."
+      },
+      {
+        "from": "src3d",
+        "to": "server",
+        "why": "Same as src -> server: the 3-D app posts to the proxy over HTTP (/geo-builder/api/parse with tool:'3d'). Importing server code would pull the key-handling path into a browser bundle."
+      }
+    ]
+  },
+
+  "exemptDirs": {
+    "$comment": "Excluded from classification totality, deliberately and not by oversight.",
+    "__tests__": "Tests carry the layer of what they test.",
+    "__snapshots__": "Generated.",
+    "locales": "Translation data; carries its parent's layer.",
+    "node_modules": "Vendored."
+  },
+
+  "classification": {
+    "$comment": "TOTAL over every directory in every declared tree. A tree's own key covers the files sitting directly in it. An unclassified directory fails the isolation test — that is the copy tripwire made mechanical.",
+
+    "src": "shell",
+    "src/app": "engine",
+    "src/debug": "shell",
+    "src/engine": "engine",
+    "src/export": "shell",
+    "src/i18n": "shell",
+    "src/parser": "engine",
+    "src/render": "engine",
+    "src/replay": "engine",
+    "src/shapes": "shell",
+    "src/store": "engine",
+    "src/theorems": "engine",
+    "src/ui": "shell",
+    "src/validation": "engine",
+
+    "src3d": "shell",
+    "src3d/debug": "shell",
+    "src3d/engine": "engine",
+    "src3d/i18n": "shell",
+    "src3d/parser": "engine",
+    "src3d/render": "engine",
+    "src3d/store": "engine",
+
+    "server": "shell"
+  },
+
+  "classificationNotes": {
+    "src/app": "The submit pipeline reasons about parse results, dry-run outcomes and the honesty gates — it decides what a statement MEANS for the figure, so it is engine, not chrome, despite sitting next to the UI.",
+    "src/render": "A pure consumer of engine output, but it reasons about geometry (label wedges, arc extents, foreshortening). Copied, not shared.",
+    "src/validation": "engine-layer by subject, and additionally forbidden from importing the engine at all — its oracle must stay independent (enforced separately by its own tests).",
+    "src/shapes": "A ShapeType -> book-URL reference table. Not geometry reasoning and not vocabulary.",
+    "server": "Only __tests__ sits below it; the tree key covers the proxy sources themselves."
+  }
+}
