@@ -1,6 +1,8 @@
 # Geo Builder — Documentation
 
-Living project documentation (last updated 2026-07-10). Both apps are **built and in production** (themathbible.com/geo-builder/ + /3d-builder/); for current state and the resume pointer see the repo-root [`CLAUDE.md`](../CLAUDE.md) and [09-implementation-plan.md](09-implementation-plan.md). Day-to-day process lives in [22-workflow.md](22-workflow.md) (issues → PRs → main → deploy) and [RUNBOOK.md](RUNBOOK.md).
+Living project documentation. Both apps are **built and in production** (themathbible.com/geo-builder/ + /3d-builder/).
+
+**For current state, read the tail of [06-decisions.md](06-decisions.md) / [06b-decisions-3d.md](06b-decisions-3d.md), `gh issue list`, and [DEPLOY-LOG.md](DEPLOY-LOG.md)** — those are the records actually kept current ([ADR-W-002](06w-decisions-workspace.md#adr-w-002)). The repo-root [`CLAUDE.md`](../CLAUDE.md) is an **orientation** file (what exists, where it lives, what must never be done) and deliberately carries no status; [09-implementation-plan.md](09-implementation-plan.md) and [PROJECT-MEMORY.md](PROJECT-MEMORY.md) are background that lags. Day-to-day process lives in [22-workflow.md](22-workflow.md) (issues → PRs → main → deploy) and [RUNBOOK.md](RUNBOOK.md).
 
 ## Contents
 
@@ -13,6 +15,7 @@ Living project documentation (last updated 2026-07-10). Both apps are **built an
 | 05 | [Glossary](05-glossary.md) | Shared vocabulary for the domain and the system |
 | 06 | [Decisions (ADR log)](06-decisions.md) | Key decisions and the reasoning behind each |
 | 06b | [Decisions — 3-D tool](06b-decisions-3d.md) | The 3-D track's own ADR log (`ADR-3D-NNN`) — separate by design so parallel sessions never race on one numbering (docs/20 §12) |
+| 06w | [Decisions — workspace](06w-decisions-workspace.md) | Cross-product decisions (`ADR-W-nnn`): ones belonging to no single product — the registry, boundaries, documentation structure. `06c`/`06d` are reserved for the planned analytic and complex products |
 | 07 | [Theorem Reference](07-theorem-reference.md) | The official bagrut theorem list (109 + appendices), bilingual, IDs + role tags — canonical source for the theorem feature |
 | 08 | [Testing Strategy](08-testing-strategy.md) | Test levels, per-layer coverage, golden fixtures, requirement→test traceability, and the "definition of ready" gate |
 | 09 | [Implementation Plan](09-implementation-plan.md) | Phased build plan: scope, dependencies, requirement coverage, per-phase gates, and milestones |
@@ -30,11 +33,11 @@ Living project documentation (last updated 2026-07-10). Both apps are **built an
 | 22 | [Project Workflow](22-workflow.md) | **The standard operating route (ADR-265):** GitHub issues for every report, priority rubric P1–P3, bug vs feature routes, PRs to `main`, deploy tagging |
 | — | [RUNBOOK](RUNBOOK.md) | Ops: deploy procedures for both apps + the proxy, verification, troubleshooting index, rollback, logs |
 | — | [DEPLOY-LOG](DEPLOY-LOG.md) | Append-only record of what is live in production (paired with `prod/*` git tags) |
-| — | [Project Memory](PROJECT-MEMORY.md) | Travelling memory: where memory lives, operational notes, resume pointer (read at session start) |
+| — | [Project Memory](PROJECT-MEMORY.md) | Operational notes and a dated session log. **Background, not status** — it lags the ADR logs (ADR-W-002) |
 | — | [Paper & Theory](paper/README.md) | Academic writing + the theory/algorithmic lineage behind the implementation (method↔citation mapping, paper outline, dated discussion logs) |
 
 ## How to use these
 
 - **Read in order** for a full picture; 01 → 02/03 establish *what* and *why*, 04 establishes *how*.
-- These are **living documents** — update them as the design evolves, and add an ADR to `06` whenever a significant decision is made or changed.
-- The repo-root `CLAUDE.md` is the quick orientation for Claude Code sessions and points here for depth.
+- These are **living documents** — update them as the design evolves, and add an ADR whenever a significant decision is made or changed: `06` for the 2-D app, `06b` for 3-D, `06w` for anything cross-product.
+- The repo-root `CLAUDE.md` (and `src3d/CLAUDE.md`) is the quick orientation for Claude Code sessions and points here for depth. It holds no history or status by design — a dated progress entry belongs in its ADR.
