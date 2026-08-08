@@ -28,7 +28,8 @@ import { applyGauge, solvePivot, type MemberPin, type PivotResult } from './solv
 import { decompose3 } from './vecExpr';
 import { pinSymsOf } from './types';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
-import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
+import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
+  triangleIncircle3} from './vec3';
 import { quadPyramidDims, quadPyramidLayout } from './baseShapes';
 
 /** Deg → rad. */
@@ -1441,9 +1442,33 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   // circle's PLANE (under its id) so a line can intersect it.
   const circles3: Resolved3['circles3'] = [];
   for (const k of c.circles3) {
+    let normal: Vec3, radius: number, e1: Vec3, e2: Vec3;
+    // #442: a POLYGON's circle — the centre is DERIVED from the ring, not a named point, and the
+    // circle lives in the ring's OWN plane (so a flat polygon and a solid's face resolve alike).
+    if (k.def.kind === 'circum' || k.def.kind === 'incircle') {
+      const got = k.def.ring.map((id) => pos.get(id));
+      if (got.some((p) => !p)) continue; // a vertex isn't placed yet — a different failure mode
+      const vs = got as Vec3[];
+      const nn = newellNormal(vs);
+      if (norm3(nn) < 1e-12) continue; // collinear ring — no plane, no circle
+      const solved =
+        k.def.kind === 'circum'
+          ? (() => {
+              const cc = ringCircumcentre3(vs);
+              return cc ? { center: cc, radius: norm3(sub3(vs[0], cc)) } : null;
+            })()
+          : triangleIncircle3(vs);
+      if (!solved) continue;
+      normal = normalize3(nn);
+      const seedC = Math.abs(normal.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
+      e1 = normalize3(cross3(normal, seedC));
+      e2 = cross3(normal, e1);
+      circles3.push({ id: k.id, center: solved.center, normal, radius: solved.radius, e1, e2 });
+      planes.set(k.id, { n: normal, d: -dot3(normal, solved.center) });
+      continue;
+    }
     const center = pos.get(k.def.center);
     if (!center) continue;
-    let normal: Vec3, radius: number, e1: Vec3, e2: Vec3;
     if (k.def.kind === 'tangent-line') {
       const ln = lines.get(k.def.line);
       if (!ln) continue;

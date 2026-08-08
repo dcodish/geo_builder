@@ -1876,3 +1876,58 @@ the base angle is 90° at five seeds for the reported label-less pyramid, the la
 isosceles legs verified equal), the prism sibling and the flat lane; plus the (qualifier × position ×
 locale) matrix with its no-qualifier controls, the English solid-survives rows, and the gate's own
 false-positive row.
+
+## ADR-3D-112 — a polygon's CIRCUMSCRIBED and INSCRIBED circle in R³
+
+**Status:** accepted, 2026-08-08 · **Issue:** #442 (feature) · **Closes the capability half of #440**
+
+**Asked for.** Operator, 2026-08-08: "I still want to be able to have מעגל חוסם וחסום in the 3d tool."
+The bug half (#440) was that every inscription phrasing **silently dropped the circle**: `משולש ABC חסום
+במעגל` committed a bare triangle byte-identical to `משולש ABC`, and on a pyramid — the operator's real
+context, ABC being the base — it added a green step row that changed **nothing at all** (facts 1→2,
+`lastError: null`, solids unchanged, no circle, no new points).
+
+**Smaller than #253 implied.** A survey before building found the substrate already in place: `circle3` is
+a real command and object with a `Circle3Def` union, `point-on-circle3` exists, `scene3` already samples
+an arbitrary world-space circle from two in-plane basis vectors (`circlePts`, the revolution-solid
+machinery), and `ringCircumcentre3` was already there from [ADR-3D-090](#adr-3d-090). So this is two new
+`Circle3Def` kinds plus parser reach — not a new subsystem.
+
+**Decision.**
+
+- Two kinds, `{kind:'circum', ring}` and `{kind:'incircle', ring}`. Neither carries a `center` point id:
+  the centre is DERIVED, and minting a label for it would assert a name the student never gave (the V6
+  unnamed-centre rule). Both resolve in the ring's OWN plane, so **a flat V8-g polygon and a solid's face
+  are the same case** — one implementation serves the operator's pyramid base and a standalone triangle.
+- The circumcircle is `ringCircumcentre3` (exact for a triangle); the incircle is a new closed-form
+  `triangleIncircle3` (`I = (a·A+b·B+c·C)/(a+b+c)`, `r = Area/s`) — no solver, no CAS.
+- **Roles are assigned by the CONTAINER MARKER** — the noun carrying ב / "in" — wherever it sits, never by
+  word order. This is [ADR-245](06-decisions.md#adr-245) ported verbatim, and it is ported *because* 2-D
+  learned it the hard way: the order test silently built the CONVERSE for every inverted Hebrew passive,
+  in production, for months. It is also what settles the operator's own mixed phrasing `משולש ABC חוסם
+  במעגל` — circumscribe VERB, but the ב marker sits on מעגל, so the circle contains. All four phrasings ×
+  both locales resolve correctly.
+
+**Honesty boundary.** `incircle` is **triangles only**. Every triangle is tangential; a general
+quadrilateral is not, so a best-fit circle for a 4-gon would be tangent to nothing — a figure that lies.
+The quad case returns a new `incircle-needs-triangle` refusal with a bilingual message. (The tangential-quad
+constraint is a genuine extension, not a defect, and is left unbuilt deliberately.)
+
+**A guidance category RETIRED.** `scope3`'s `cross-app` rule matched `חסום במעגל` / "inscribed in a
+circle" and pointed the student at the 2-D app. With the capability built, that guidance became a lie —
+the rule this register's own header states ("guidance for something the parser handles is a lie — the #73
+no-theft sweep enforces that"). The pattern is removed; the third category retired by SUPPORTING its form,
+after S3 and S4. The bare-noun patterns (a lone `מעגל`, `מלבן`, …) stay: those are still 2-D constructions
+with no 3-D meaning. The no-theft catalog sweep caught this automatically — the instrument working.
+
+**Blast radius.** Additive: a new `Circle3Def` member, one parser rule ahead of the polygon rules with the
+ADR-024 leftover guard on `planarPolygon` (without it the polygon rule re-declares the triangle and drops
+the circle — the exact #440 defect), and `circle3` was already save-whitelisted. Shadow matrix: **pure
+addition** (4 rows, 0 changed winners, no new divergent pairs).
+
+Locked by `polygon-circle.test.ts` (13), asserted GEOMETRICALLY on the resolved figure at four seeds —
+never "a command was emitted": a circumcircle by every vertex being equidistant from the centre AND
+coplanar with it; an incircle by the ⟂ distance from its centre to all three sides equalling the radius
+and every vertex lying strictly outside; the pyramid-base case with the apex proved OFF the circle and the
+solid proved un-redeclared (M1); the quad refusal; a named circle keeping its letter; the #440 no-op
+regression; and the scene gaining exactly one sampled outline (0 → 1) — the ink that was missing.

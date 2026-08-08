@@ -27,6 +27,8 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
   switch (err.code) {
     case 'bound-unsatisfiable':
       return t('err.boundUnsatisfiable', { id: err.id });
+    case 'incircle-needs-triangle': // #442 — only a tangential polygon has an incircle
+      return t('err.incircleNeedsTriangle');
     case 'ambiguous-vector-length':
       return t('err.ambiguousVectorLength');
     case 'dropped-given':

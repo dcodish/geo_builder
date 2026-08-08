@@ -218,6 +218,9 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'הישר d מאונך לישר AB ולישר CD', en: 'd is the common perpendicular of AB and CD' },
   { category: 'planesLines', he: 'BE היטל הישר TB על המישור ABCD', en: 'BE is the projection of line TB onto plane ABCD' },
   { category: 'solids', he: 'מעגל A משיק לישר BC בנקודה F', en: 'circle A tangent to line BC at F' },
+  // #442 — the circle of a polygon (ring may be a flat polygon OR a solid's face)
+  { category: 'solids', he: 'משולש ABC חסום במעגל', en: 'triangle ABC inscribed in a circle' },
+  { category: 'solids', he: 'מעגל חסום במשולש ABC', en: 'circle inscribed in triangle ABC' },
   { category: 'points', he: 'D על המעגל', en: 'D is on the circle' },
   { category: 'points', he: 'T על הקטע SC כך ש-TABCD היא פירמידה ישרה', en: 'T on SC such that TABCD is a right pyramid' },
   // --- drawing ---
