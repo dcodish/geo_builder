@@ -6233,3 +6233,51 @@ text. Obligations 1 and 2 are available immediately and land first.
 **Open, flagged not decided:** the question export (ADR-251/252) prints the verbatim utterances as the
 paper's givens. Once the step list echoes canonically the two will disagree, and the export is the more
 public artifact — worth the operator's call in the slice that builds obligation 3.
+
+## ADR-429 — honesty accounting is a MULTISET: an occurrence predicate, not a value predicate
+
+**Status:** accepted, 2026-08-09 · **Issue:** #437 (bug) · **Split out:** #458 (the capability half) ·
+**Sibling filed:** #457 (3-D debt)
+
+**The instance.** Log-triage 2026-08-08, prod session `vgrm5pjb`: `ריבוע במידות 4*4` logged `parser/ok` — it
+committed a square with **no size at all**, green ✓, the entire dimensions given gone. The same sentence
+with distinct numbers, `מלבן במידות 4*6`, escalated honestly. The difference was not the shape and not the
+phrasing: it was that the two stated numbers were **equal**.
+
+**The class.** `droppedGivenNumbers` accumulated every command's numeric payload into a `Set<number>` and
+asked *"does this VALUE appear among the payloads?"* — a proxy predicate standing in for the semantic fact
+it exists to test, *"is this OCCURRENCE consumed by a command?"* (docs/17 §2.2, the ADR-3D-069/070/071
+family). The two questions agree until a number repeats. A square's own `ids.length` is `4`, which supplies
+a single account for the value 4, and set membership let that one account vouch for **both** stated 4s. So
+the class is much wider than dimensions: **any given whose number repeats elsewhere in the utterance could
+be dropped for free** — `AB=5, CD=5` with one side lost is the same shape, and it would have committed with
+a ✓ just as silently.
+
+**Decision.** Accounting becomes a multiset (`Map<number, count>`), and each account is **spent** when it
+pays for an occurrence. Generosity is untouched and still per-occurrence: an occurrence is still tried
+against every candidate lowering it has (n/2 for a diameter, n·π for a circumference, n/100 for a percent, a
+ratio's quotient, a radical's value) — but a candidate that already paid for an earlier occurrence can no
+longer pay for this one. Three lines of the gate change; the doctrine does not.
+
+This is the smallest change that makes the predicate mean what the gate's own docstring already claimed, and
+that is the test for a root fix here: the gate did not gain a case, it gained the right question.
+
+**The capability half is deliberately NOT built.** `מידות` appears nowhere in `parse.ts` — there is no
+dimensions rule at all. That is a missing capability, and per CLAUDE.md a capability is a `feature`, filed
+and scoped, never built under a bug's banner: **#458**. Note the perverse split this fix leaves standing in
+the interim, honestly: `ריבוע במידות 4*4` now escalates to the LLM rather than committing a lie, but it does
+not yet *build*. Escalating is the correct behaviour for input the grammar cannot represent; #458 is what
+makes it land deterministically.
+
+**Sibling audit** (docs/17 §1 / ADR-W-004). `droppedGivenNumbers3` (`src3d/parser/honesty3.ts`) carries the
+**identical `Set<number>` structure**, so the class is present in the sibling product's code. Measured
+several 3-D candidates and could construct **no reproducing input** from the current grammar: 3-D's
+array-length account is the solid's vertex count (8 or 4, rarely colliding with a stated magnitude — where
+2-D's `square` `ids.length` is exactly the 4 that paid for `4*4`), and its numeric payloads sit in named
+per-field slots that each carry their own number. Latent, not live — so filed as **#457** (`debt`, P3) with
+the port, not as a bug, and not fixed in this commit.
+
+**Locked** by `repeated-given-number.test.ts` (8): the prod utterance, the distinct-number sibling that was
+always honest, the class member beyond dimensions (`מלבן 4 על 4`), and — the half that matters more — the
+generosity cases that must NOT flag, so the fix cannot quietly become strict: two sides stated at the same
+length, two angles stated at the same size, and an occurrence still reaching every candidate lowering.

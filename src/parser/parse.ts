@@ -8372,20 +8372,45 @@ function withCarrierSegments(commands: AnyCommand[]): AnyCommand[] {
  */
 export function droppedGivenNumbers(utterance: string, commands: AnyCommand[]): number[] {
   const q = (n: number): number => Math.round(n * 1e6) / 1e6;
-  const acc = new Set<number>();
+  // #437 — accounting is a MULTISET, not a set. The gate used to ask *"does this VALUE appear among the
+  // payloads?"*, which is a proxy predicate standing in for the semantic fact it means to test:
+  // *"is this OCCURRENCE consumed by a command?"* (docs/17 §2.2). The two questions differ exactly when a
+  // number REPEATS: `ריבוע במידות 4*4` states two 4s, the commands supply a single account for `4` (the
+  // square's own `ids.length`), and a set-membership test let that one account vouch for BOTH — so the
+  // entire dimensions given vanished and the figure committed size-less with a green ✓, while the very
+  // same sentence with distinct numbers (`מלבן במידות 4*6`) escalated honestly. The class is wider than
+  // dimensions: ANY given whose number repeats elsewhere in the utterance could be dropped for free
+  // (`AB=5, CD=5` with one side lost is the same shape).
+  //
+  // So each account is CONSUMED once. Generosity is unchanged and still per-occurrence — an occurrence
+  // may still be accounted by any of its candidate lowerings (n/2, n·π, n%, a ratio's quotient…) — but a
+  // candidate that has already paid for an earlier occurrence can no longer pay for this one.
+  const acc = new Map<number, number>();
+  const add = (n: number): void => { acc.set(q(n), (acc.get(q(n)) ?? 0) + 1); };
   const walk = (v: unknown): void => {
-    if (typeof v === 'number' && Number.isFinite(v)) acc.add(q(v));
+    if (typeof v === 'number' && Number.isFinite(v)) add(v);
     else if (typeof v === 'string') {
-      for (const m of v.match(/\d+(?:\.\d+)?/g) ?? []) acc.add(q(parseFloat(m)));
+      for (const m of v.match(/\d+(?:\.\d+)?/g) ?? []) add(parseFloat(m));
     } else if (Array.isArray(v)) {
-      if (v.length && v.every((x) => typeof x === 'string')) acc.add(v.length);
+      if (v.length && v.every((x) => typeof x === 'string')) add(v.length);
       for (const x of v) walk(x);
     } else if (v && typeof v === 'object') {
       for (const x of Object.values(v)) walk(x);
     }
   };
   for (const c of commands) walk(c);
-  const ok = (cands: number[]): boolean => cands.some((v) => Number.isFinite(v) && acc.has(q(v)));
+  /** Account this occurrence against the first candidate lowering still unspent — and SPEND it. */
+  const ok = (cands: number[]): boolean => {
+    for (const v of cands) {
+      if (!Number.isFinite(v)) continue;
+      const left = acc.get(q(v)) ?? 0;
+      if (left > 0) {
+        acc.set(q(v), left - 1);
+        return true;
+      }
+    }
+    return false;
+  };
   // stated numbers: blank labels FIRST (a subscript digit — O1, A2 — is part of a label, not a number)
   const raw = normalizeUtterance(utterance);
   // A COUNT is not a MAGNITUDE (issue #160): a bare integer QUANTIFYING a plural countable noun
