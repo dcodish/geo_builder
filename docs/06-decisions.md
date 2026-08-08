@@ -6122,3 +6122,53 @@ seeds — the honest property, since a raw low seed is simply a different, rejec
 configuration of a stated-concave polygon is convex, the kite relations still hold in the dart, stated
 convex and the unstated default stay convex, the qualifier lowers from every polygon position in both
 locales, and the contradictory square reads amber.
+
+## ADR-427 — a named shape's OWN equal sides are a second channel, marked distinctly
+
+**Status:** accepted, 2026-08-08 · **Issue:** #444 · **Refines [ADR-234](#adr-234) / [ADR-138](#adr-138)**
+
+**Reported.** Operator, on the ADR-426 concave kite: "it doesn't look visually like it creates 2 equal
+sides." The figure was correct — both pairs exact in every sample — but the panel *agreed with them*,
+printing «לא נמצאו צלעות או זוויות שוות בהכרח» (*no necessarily-equal sides found*) on a kite. Ruling:
+show them, **"not only for kites … any case where a user would expect to see 2 equal sides but he never
+said which — like משולש שווה שוקיים"**, and make them **"visually different … but there must be text next
+to it explaining"**.
+
+**Correcting the first diagnosis.** The issue originally blamed ADR-234's soft-default suppression. There
+is no suppression flag. `detectRelationsAcross` pools samples across every variant alternative
+(`variantConfigs`), so a pair true only in the DRAWN variant fails its holds-in-every-sample bar. **That
+is correct and must not be broken**: cycling the variant moves the pair, so reporting it as a discovered
+invariant would be a lie in the other direction.
+
+**The insight the layer was missing.** What is forced is the **disjunction** — that *some* two sides are
+equal. The shape word guarantees it; only the choice of pair is free (ADR-052). The relations layer could
+express "forced" and "not forced" but not "forced, on a label set you chose", so it fell back to the one
+answer that is actually false: *none*.
+
+**Decision.** A SECOND channel, never folded into the first:
+
+- `statedShapeEqualities` reads the pairs from `expandShapeVariant` itself — the same function that builds
+  the constraints — so it generalises over the operator's whole class by CONSTRUCTION rather than a
+  per-shape list (the #435 lesson). Kite, isosceles triangle, and anything later that encodes an equality
+  choice in its variant, all with no new code.
+- **A pair the student stated explicitly is excluded automatically**, because `expandShapeVariant` already
+  filters it — so it stays in the genuinely-forced channel where it belongs. This matters: ADR-234 exists
+  precisely so that stating the pair *commits* it, and the tool must not then second-guess the student's
+  own words by re-labelling it a guess.
+- A shape whose equality is HARD (isosceles trapezoid's legs, a square's sides) declares nothing and keeps
+  reporting as forced — no double-reporting, asserted.
+- **Visually distinct, per the ruling:** dashed **amber** ticks with a `?` on the canvas (forced ticks stay
+  solid, in their class colour), and a panel row that names the source and says what is uncertain — *the
+  tool chose WHICH sides are equal; the given didn't say. Another configuration may make a different pair
+  equal.* The `?` alone would be a puzzle; the text is what makes it teach.
+- Declared marks show **whenever the layer is on**, not on hover: they are the shape's own marking, one or
+  two classes, and the student who typed «דלתון» turned the layer on precisely to see them. The ADR-167
+  hover discipline exists to tame a flood of discovered relations — this is not one.
+
+**Honesty note.** These marks move when the configuration is cycled. That is the point, and the panel says
+so; hiding them was the worse error, because "none found" asserted something untrue about the figure.
+
+Locked by `stated-shape-equalities.test.ts` (8): both reported shapes and the concave kite; the hard-equality
+shapes declaring nothing; the explicit-pair case moving OUT of the channel; a plain triangle declaring
+nothing; and the marks carrying the `stated` flag while forced ticks never do — so the renderer cannot draw
+one as the other.

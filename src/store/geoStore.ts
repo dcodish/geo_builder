@@ -19,7 +19,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import type { ValuesPanelResult } from '@/engine/valuesPanel';
-import type { AnyCommand, Id, RelationsResult, ShapesResult } from '@/engine';
+import type { AnyCommand, Id, RelationsResult, ShapesResult, StatedShapeEquality } from '@/engine';
 import { branchCount, cyclableVariant, deepEqual, variantCountOf, withVariant } from '@/engine';
 import type { FigureFile } from './figureFile';
 
@@ -251,7 +251,7 @@ export interface GeoState {
    *  Ground truths are invariant across configurations, so the layer survives "show another configuration"
    *  (seed change keeps the same `facts` ref); any FACT change makes a new `facts` array, so a selector that
    *  checks `relations.facts === facts` auto-clears it (no edits to the mutating actions needed). */
-  relations: { result: RelationsResult; facts: Fact[] } | null;
+  relations: { result: RelationsResult; stated: StatedShapeEquality[]; facts: Fact[] } | null;
   /** #217 (ADR-410): the VALUES panel — every fixed/known value, stated + derived, computed on user
    *  request from the shared sample pool (off-thread). Tagged by facts so a stale result never shows. */
   values: { result: ValuesPanelResult; facts: Fact[] } | null;
@@ -568,7 +568,7 @@ export const useGeoStore = create<GeoState>()(
         const facts = get().facts;
         const r = await detectFor(facts, get);
         if (!r) return; // superseded/cancelled — never overwrite with a layer for another figure
-        set({ relations: { result: r.relations, facts } });
+        set({ relations: { result: r.relations, stated: r.stated, facts } });
       },
 
       clearRelations: () => set({ relations: null }),

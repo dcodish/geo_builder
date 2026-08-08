@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
 import { buildScene, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
-import type { MeasureLabels, RelationPick } from './scene';
+import type { MeasureLabels, RelationMarks, RelationPick } from './scene';
 import type { RelationsResult, ResolvedCircle } from '@/engine';
 import { findInkCrossings, drawnPointIds, resolveDrawnLines } from '@/engine';
 import type { Crossing } from '@/engine';
@@ -64,6 +64,11 @@ export interface FigureProps {
   /** The "view relations" ground-truth layer (ADR-134): equal-segment ticks + equal-angle arcs. When set,
    *  it's drawn on the current figure; omit/undefined = layer off. */
   relations?: RelationsResult | null;
+  /** #444 — equal classes DECLARED by the drawn variant of a named shape (kite / isosceles / …). Shown
+   *  whenever the layer is on (they are the shape's own marks, one or two classes, so they need no hover
+   *  to stay legible), and drawn distinctly: dashed amber with a `?`, because WHICH pair is equal was the
+   *  tool's choice, not the student's statement. */
+  statedEqual?: [Id, Id][][];
   /** Show the measure labels + angle marks (default true); the host's "show measures" toggle drives this. */
   showMeasures?: boolean;
   /** Reveal every circle's centre + label (ADR-059); driven by the host's "show centres" toggle. */
@@ -187,6 +192,7 @@ export function Figure({
   labels,
   angleMarks,
   relations,
+  statedEqual,
   showMeasures = true,
   hidden,
   showCenters = false,
@@ -376,7 +382,23 @@ export function Figure({
   // `relMarks` draws just that class, and a hovered length class also gets accent strokes on its members.
   const [hoverRel, setHoverRel] = useState<RelationPick | null>(null);
   const activeHover = relations ? hoverRel : null; // ignore a stale pick once the layer is off
-  const relMarks = relations && activeHover ? relationMarks(relationsForPick(relations, activeHover), oriented) : null;
+  const hoverMarks = relations && activeHover ? relationMarks(relationsForPick(relations, activeHover), oriented) : null;
+  // #444: a DECLARED equality needs no hover — it is the named shape's own marking, and the student who
+  // typed «דלתון» / «משולש שווה שוקיים» turned the layer on precisely to see it.
+  const statedMarks =
+    relations && statedEqual && statedEqual.length > 0
+      ? relationMarks({ equalSegments: [], equalAngles: [], definiteAngles: [], definiteLengths: [], samplesUsed: 0 }, oriented, statedEqual)
+      : null;
+  const relMarks: RelationMarks | null =
+    hoverMarks || statedMarks
+      ? {
+          ticks: [...(hoverMarks?.ticks ?? []), ...(statedMarks?.ticks ?? [])],
+          angles: hoverMarks?.angles ?? [],
+          values: hoverMarks?.values ?? [],
+          rightAngles: hoverMarks?.rightAngles ?? [],
+          lengths: hoverMarks?.lengths ?? [],
+        }
+      : null;
   const relAccentEdges: [Id, Id][] =
     relations && activeHover?.kind === 'segment' && relations.equalSegments[activeHover.classIndex]
       ? (relations.equalSegments[activeHover.classIndex] as [Id, Id][])
@@ -939,12 +961,32 @@ export function Figure({
                       y1={cy - ny * half}
                       x2={cx + nx * half}
                       y2={cy + ny * half}
-                      stroke={relColor(tk.count)}
+                      stroke={tk.stated ? '#d97706' : relColor(tk.count)}
                       strokeWidth={stroke * 1.4}
                       strokeLinecap="round"
+                      strokeDasharray={tk.stated ? `${1.1 * r} ${0.9 * r}` : undefined}
                     />
                   );
-                });
+                }).concat(
+                  // #444: a `?` beside a DECLARED (not discovered) equality — which pair is equal was the
+                  // tool's choice, not the student's statement, so the mark must not read as a fact.
+                  tk.stated
+                    ? [
+                        <text
+                          key={`rt-${i}-q`}
+                          x={mx + nx * half * 2.1}
+                          y={my + ny * half * 2.1}
+                          fontSize={3.4 * r}
+                          fill="#d97706"
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          style={{ pointerEvents: 'none', userSelect: 'none' }}
+                        >
+                          ?
+                        </text>,
+                      ]
+                    : [],
+                );
               })}
               {relMarks.angles.flatMap((an, i) => {
                 const V = transform.toScreen(an.vertex);

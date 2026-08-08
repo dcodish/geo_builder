@@ -295,7 +295,8 @@
     "relationsHint": "Mark which sides and angles are equal in every possible drawing of the figure",
     "relationsNone": "No sides or angles are necessarily equal",
     "relationsHover": "Hover a side or angle to see what's equal to it — or its value, once it's determined",
-    "language": "עברית"
+    "language": "עברית",
+    "relationsStated": "from the stated {{shape}} {{ids}} — the tool chose WHICH sides are equal; the given didn't say. Another configuration may make a different pair equal."
   },
   "file": {
     "save": "Save to file",
@@ -407,5 +408,11 @@
     "area": "area {{ids}}",
     "perimeter": "perimeter {{ids}}",
     "rowHint": "Click to highlight on the canvas"
+  },
+  "shapeName": {
+    "kite": "kite",
+    "isosceles": "isosceles triangle",
+    "isoTrapezoid": "isosceles trapezoid",
+    "midsegment": "midsegment"
   }
 }

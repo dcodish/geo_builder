@@ -114,6 +114,11 @@ export interface SceneEqualTick {
   a: Vec;
   b: Vec;
   count: number;
+  /** #444 — this equality is DECLARED by the drawn variant of a named shape, not discovered as forced.
+   *  WHICH pair is equal is the student's free choice (ADR-052), so cycling the variant moves it; the
+   *  renderer draws these dashed + amber with a `?`, and the panel explains, so the two can never be
+   *  mistaken for one another (operator ruling, 2026-08-08). */
+  stated?: boolean;
 }
 
 /** A relations-layer EQUAL-ANGLE mark: draw `count` concentric arcs at `vertex` between the rays to p1, p2.
@@ -507,13 +512,28 @@ export function scenePositions(scene: Scene): Vec[] {
  * notation. The relation says WHICH ids are equal; the marks are placed on the CURRENT drawing's positions.
  * A degenerate or missing endpoint is skipped rather than drawn at a bogus spot (mirrors the scene builder).
  */
-export function relationMarks(relations: RelationsResult, positions: Map<Id, Vec>): RelationMarks {
+export function relationMarks(
+  relations: RelationsResult,
+  positions: Map<Id, Vec>,
+  /** #444 — the equal classes the DRAWN named shape declares, marked distinctly (see SceneEqualTick). */
+  stated: [Id, Id][][] = [],
+): RelationMarks {
   const ticks: SceneEqualTick[] = [];
   relations.equalSegments.forEach((cls, i) => {
     for (const [a, b] of cls) {
       const pa = positions.get(a);
       const pb = positions.get(b);
       if (pa && pb && len(sub(pa, pb)) > 1e-9) ticks.push({ a: pa, b: pb, count: i + 1 });
+    }
+  });
+  // #444: the stated classes continue the tick-count sequence so two DIFFERENT stated classes (a kite's
+  // two pairs) still read as different groups, while the dashed amber styling separates them from forced.
+  stated.forEach((cls, i) => {
+    for (const [a, b] of cls) {
+      const pa = positions.get(a);
+      const pb = positions.get(b);
+      if (pa && pb && len(sub(pa, pb)) > 1e-9)
+        ticks.push({ a: pa, b: pb, count: i + 1, stated: true });
     }
   });
   // Value labels + right-angle squares FIRST (definite measures), so the equal-angle arcs below can skip any

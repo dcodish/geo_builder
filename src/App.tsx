@@ -573,6 +573,11 @@ export default function App() {
   // any fact change makes a new `facts` array (≠ the cached ref), so the layer auto-clears (ADR-134). Ground
   // truths are invariant across configurations, so it deliberately survives "show another configuration".
   const relationsLayer = relations && relations.facts === facts ? relations.result : null;
+  // #444: the equalities the DRAWN named shape DECLARES — a separate channel from the discovered ones
+  // (which pool across variants and so never report a variant-specific pair). Flattened to classes for
+  // the canvas; the panel below keeps the shape labels so it can explain WHERE they come from.
+  const statedEq = relations && relations.facts === facts ? relations.stated : null;
+  const statedClasses: [Id, Id][][] = statedEq ? statedEq.flatMap((s0) => s0.classes) : [];
   const valuesLayer = valuesState && valuesState.facts === facts ? valuesState.result : null;
 
   // The "detect shapes" badge layer — same facts-keyed cache contract as the relations layer above.
@@ -872,6 +877,7 @@ export default function App() {
             labels={labels}
             angleMarks={angleMarks}
             relations={relationsLayer}
+            statedEqual={statedClasses}
             showMeasures={showMeasures}
             showCenters={showCenters}
             hidden={hiddenSet}
@@ -1478,8 +1484,26 @@ export default function App() {
             </div>
           )}
 
-          {relationsLayer && relationsLayer.equalSegments.length === 0 && relationsLayer.equalAngles.length === 0 && (
+          {relationsLayer && relationsLayer.equalSegments.length === 0 && relationsLayer.equalAngles.length === 0 && statedClasses.length === 0 && (
             <span style={{ fontSize: 12, color: '#64748b' }}>{t('actions.relationsNone')}</span>
+          )}
+          {/* #444 — the named shape's OWN equal pairs. Marked dashed-amber with a `?` on the canvas and
+              explained here, because WHICH pair is equal was the tool's choice, not the student's
+              statement: cycling the configuration moves it. Never folded into the forced rows above. */}
+          {statedEq && statedEq.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 2 }}>
+              {statedEq.map((sh) => (
+                <div key={`${sh.shape}-${sh.ids.join('')}`} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'baseline' }}>
+                  <span style={{ fontSize: 12, color: '#d97706', fontWeight: 600 }}>?</span>
+                  <bdi style={{ direction: 'ltr', fontSize: 12, color: '#b45309' }}>
+                    {sh.classes.map((cls) => cls.map(([a, b]) => `${a}${b}`).join(' = ')).join(', ')}
+                  </bdi>
+                  <span style={{ fontSize: 11, color: '#92400e' }}>
+                    {t('actions.relationsStated', { shape: t(`shapeName.${sh.shape}`), ids: sh.ids.join('') })}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
           {relationsLayer && (relationsLayer.equalSegments.length > 0 || relationsLayer.equalAngles.length > 0) && (
             <span style={{ fontSize: 12, color: '#64748b' }}>{t('actions.relationsHover')}</span>

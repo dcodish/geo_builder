@@ -151,3 +151,44 @@ export function expandShapeVariant(
     .map(([a, b, c, d]) => ({ type: 'set-equal', a, b, c, d }) as Command);
   return [baseCommand(cmd.shape, cmd.ids), ...eqs];
 }
+
+/**
+ * #444 — the equal-side pairs the DRAWN variant of a named shape declares.
+ *
+ * These are NOT discovered relations and must never be reported as such. `detectRelationsAcross` pools
+ * samples across every variant alternative ({@link variantConfigs}), so a pair true only in the drawn
+ * variant correctly fails its "holds in every sample" bar — which is right: WHICH pair is equal is the
+ * student's free choice (ADR-052), and cycling the variant moves it.
+ *
+ * What IS forced is the DISJUNCTION — that some two sides are equal — and that is exactly what a student
+ * who typed «דלתון» or «משולש שווה שוקיים» expects to see marked. The relations layer had no way to say
+ * it, so it said «no equal sides found»: the one answer that is actually false. This channel says it,
+ * separately, so the UI can mark it in a visually distinct way with an explanation (operator ruling,
+ * 2026-08-08) rather than passing it off as a discovered invariant.
+ *
+ * Generalises over the whole class by CONSTRUCTION, not a per-shape list: every `shape-variant` whose
+ * variant encodes an equality choice contributes (kite, isosceles triangle, isosceles trapezoid, and
+ * anything added later), because the pairs come from {@link expandShapeVariant} itself — the same
+ * function that builds the constraints. A pair the student stated EXPLICITLY is excluded by that
+ * expansion, so it stays in the genuinely-forced channel where it belongs.
+ */
+export interface StatedShapeEquality {
+  shape: VariantShape;
+  ids: Id[];
+  /** Each inner array is one class of segments the shape declares equal (≥2 segments). */
+  classes: [Id, Id][][];
+}
+
+export function statedShapeEqualities(
+  cmds: { shape: VariantShape; ids: Id[]; variant: number }[],
+  explicitEqs: { a: Id; b: Id; c: Id; d: Id }[],
+): StatedShapeEquality[] {
+  const out: StatedShapeEquality[] = [];
+  for (const cmd of cmds) {
+    const classes = expandShapeVariant(cmd, explicitEqs)
+      .filter((c): c is Extract<Command, { type: 'set-equal' }> => c.type === 'set-equal')
+      .map((c) => [[c.a, c.b], [c.c, c.d]] as [Id, Id][]);
+    if (classes.length > 0) out.push({ shape: cmd.shape, ids: [...cmd.ids], classes });
+  }
+  return out;
+}

@@ -13,10 +13,10 @@
  * The store re-exports this module's surface, so existing consumers are untouched.
  */
 
-import type { AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
+import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
 import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, type ValuesPanelResult } from '@/engine/valuesPanel';
-import { classifyShapesFromSamples, detectRelationsAcross } from '@/engine';
+import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, withVariant, withReflectMask } from '@/engine';
 
@@ -1938,6 +1938,10 @@ export function sharedSamples(facts: Fact[]): { constructions: Construction[]; s
 
 /** The three detection layers' verdicts over ONE shared sample pool — see {@link detectAll}. */
 export interface DetectAllResult {
+  /** #444 — the equal pairs the DRAWN named shape declares (kite / isosceles / isosceles trapezoid).
+   *  Reported SEPARATELY from `relations` because they hold in this configuration, not in every valid
+   *  one; the UI marks them distinctly and says so. */
+  stated: StatedShapeEquality[];
   relations: RelationsResult;
   shapes: ShapesResult;
   /** The forced ink crossings (ADR-380) — a `Set` so it survives the worker's structured clone as-is. */
@@ -1957,7 +1961,19 @@ export interface DetectAllResult {
  */
 export function detectAll(facts: Fact[]): DetectAllResult {
   const shared = sharedSamples(facts);
+  // #444: the DRAWN variant's declared equal pairs — a SEPARATE channel from the discovered relations
+  // (which pool across variants and therefore, correctly, never report a variant-specific pair). The
+  // student who typed «דלתון» / «משולש שווה שוקיים» must still see the two equal sides they expect.
+  const symtabD = buildSymTab(facts.filter((f) => f.enabled).map((f) => f.cmd));
+  const explicitEqs = facts
+    .filter((f) => f.enabled && f.cmd.type !== 'shape-variant')
+    .flatMap((f) => lowerOne(f.cmd, symtabD))
+    .filter((c): c is Extract<Command, { type: 'set-equal' }> => c.type === 'set-equal');
+  const variantCmds = facts
+    .filter((f) => f.enabled && f.cmd.type === 'shape-variant')
+    .map((f) => f.cmd as { shape: VariantShape; ids: Id[]; variant: number });
   return {
+    stated: statedShapeEqualities(variantCmds, explicitEqs),
     relations: detectRelationsAcross(shared.constructions, { positions: shared.samples }),
     shapes: classifyShapesFromSamples(shared.constructions[0], shared.samples),
     crossings: forcedCrossingKeys(shared),
