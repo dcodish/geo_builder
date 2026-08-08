@@ -191,3 +191,28 @@ describe('submit pipeline — the P3 guided-message batch (#329/#246, ADR-391)',
     expect(llmParseMock).not.toHaveBeenCalled();
   });
 });
+
+describe('#436 — a negated statement is refused, never committed as its opposite', () => {
+  it('refuses PRE-parse and adds no fact, where it used to commit set-angle = 90', async () => {
+    const { deps, notes } = makeDeps();
+    // build the figure the reported session had (a shape whose vertex A has exactly two edges, so the
+    // ADR-164 single-vertex path WOULD resolve the angle — this is the case that used to invert)
+    await runSubmit('דלתון קמור', deps);
+    const before = useGeoStore.getState().facts.length;
+    expect(before).toBeGreaterThan(0);
+
+    await runSubmit('זווית A לא ישרה', deps);
+
+    expect(useGeoStore.getState().facts.length).toBe(before); // nothing committed
+    expect(notes().some((n) => n.startsWith('input.scope.negation'))).toBe(true);
+    expect(llmParseMock).not.toHaveBeenCalled(); // refused before the paid call
+  });
+
+  it('the POSITIVE form still commits — the refusal is about the negation, not the phrasing', async () => {
+    const { deps } = makeDeps();
+    await runSubmit('דלתון קמור', deps);
+    const before = useGeoStore.getState().facts.length;
+    await runSubmit('זווית A ישרה', deps);
+    expect(useGeoStore.getState().facts.length).toBeGreaterThan(before);
+  });
+});

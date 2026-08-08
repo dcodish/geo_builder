@@ -5998,3 +5998,63 @@ sample core and deserves its own measured slice. Filed as the follow-up on #432'
 Locked by `dof-vacuous.test.ts` (4 — the operator figure's count with a no-ישר control, the panel's exact
 printed/withheld row set, a NON-vacuous «ישר ABD» over a free point still consuming its DOF, the midpoint
 pair-key lane) + scenario `two-secants-vacuous-line-restatements-keep-dof`.
+
+## ADR-425 — a statement the parser cannot represent is REFUSED, never lowered to its opposite (negation)
+
+**Status:** accepted, 2026-08-08 · **Issue:** #436 (P1)
+
+**Reported.** Prod (log-triage 2026-08-08, session `syw8vcx4`): a student built two intersecting circles,
+a chord, and an inscribed 60° angle, then tried to exclude a degenerate case — `שזוות A לא תהיה ישרה`,
+then `לא תהיה ישרה`. Their input escaped only by a **typo**: `זוות` is missing the yod, so the `זוו?ית`
+keyword gate did not match. Spelled correctly, the tool would have built the opposite of what they asked.
+
+**Measured, with a 4-point figure context:**
+
+| utterance | commands |
+|---|---|
+| `זווית A ישרה` (positive control) | `set-angle A = 90` |
+| `זווית A לא ישרה` | `set-angle A = 90` |
+| `זווית A אינה ישרה` | `set-angle A = 90` |
+| `משולש ABC לא שווה שוקיים` | `shape-variant isosceles ABC` |
+
+The negated form is **byte-identical** to the positive one.
+
+**The class.** *A statement carrying an operator the parser has no representation for is lowered as
+though the operator were absent* — so the figure asserts the negation of the given, with a green ✓. It is
+not one rule's defect: the last row inverts through a completely different rule. Negation appears nowhere
+in the parser — no rule guard, no `FILLER` entry (English-only), no honesty gate — so `לא` is simply an
+unmatched token every rule steps over. In `angle`, `ישרה` even folds into `value = 90` while `לא` sits in
+the stripped remainder. **None of the seven honesty gates can see it**: every label lands, no number is
+dropped, and the relation/verb gates have no negation vocabulary.
+
+The nearest sibling is [ADR-390](#adr-390)/#277 — *a measure compared to a NUMBER states a REGION; a
+lowering with no bound read it as the EQUALITY at the bound.* Same shape: an operator that changes the
+assertion is ignored and the bare equality committed. That one was caught by `droppedComparison` because
+`>` is a token a gate could look for; negation had no such vocabulary to look for.
+
+**Decision.** Refuse **pre-parse**, in the `looksLikeLatex` position and for its reason verbatim — *the
+negated form partial-parses to a WRONG figure, so the post-failure register would never see it* (the
+scope register runs only on `!r.ok`, and here the grammar wrongly succeeds). One vocabulary
+(`statedNegation` in `scope.ts`) is read by the one refusal, so there is no second place to drift.
+
+Refusing is not a placeholder for the capability — it is the correct answer while the capability is
+absent. **A wrong figure that agrees with nothing the student said is the worst output the tool can
+produce**, and it is strictly worse than saying so.
+
+**The vocabulary is deliberately narrow**, because a false positive here refuses a *working*
+construction: a Hebrew negation word must stand alone (optionally carrying a ש/ו/ה prefix), so `מלא` and
+`כלא` can never match, and the English forms are `\b`-bounded. Verified against **all 294 catalog
+examples: zero false positives** (the #140 gate-false-positive discipline), plus a 21-utterance sweep of
+the constructions nearest the vocabulary.
+
+**Not built here (filed, propose P3).** The capability: "angle A is not right" is an **exclusion**, not
+an equation — it keeps the DOF and belongs in the requirement lane (`meetsRequirements` + `checkGivens`,
+the [ADR-244](#adr-244) recipe), not the constraint lane. The engine has no `≠` command; the closest,
+`set-angle-acuteness`, is one-sided. 3-D precedent for a DOF-keeping inequality: ADR-3D-064. When it
+lands, this check narrows from "any negation" to "a negation we cannot yet represent."
+
+Locked by `negation.test.ts` (33 — the reported utterances, the correctly-spelled form that would have
+inverted, the second rule's inversion, both locales, the substring-safety rows, and the catalog sweep) and
+by `submitPipeline.test.ts`, which is the App-faithful gate: the reported figure commits nothing, the note
+is the negation guidance, **no paid LLM call is made**, and the POSITIVE form still commits — so the
+refusal is about the negation, not the phrasing.

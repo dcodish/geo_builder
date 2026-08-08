@@ -32,6 +32,7 @@ import {
   impliedCircleBinding,
   looksCompound,
   looksLikeLatex,
+  statedNegation,
   wordRootMagnitude,
   splitGuidance,
   parse,
@@ -141,6 +142,17 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   if (looksLikeLatex(utterance)) {
     logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:latex' });
     ui.setInputNote(t('input.scope.latex'));
+    return;
+  }
+  // A NEGATED statement (#436, the P1) — refused here, PRE-parse, for the LaTeX reason verbatim: every
+  // rule stepped over the negation word, so the negated form lowered to the POSITIVE form's commands
+  // («זווית A לא ישרה» → `set-angle A = 90`) and committed the opposite of the given with a green ✓.
+  // A wrong figure that agrees with nothing the student said is the worst outcome the tool can produce;
+  // an honest refusal is strictly better until the requirement lane can represent an exclusion.
+  const negated = statedNegation(utterance);
+  if (negated) {
+    logDebug({ kind: 'input', utterance, locale, source: 'scope', result: 'scope:negation' });
+    ui.setInputNote(t('input.scope.negation', { word: negated }));
     return;
   }
   // From here on the path runs SYNCHRONOUS solves — the dry-run, the commit replay, and (last) the

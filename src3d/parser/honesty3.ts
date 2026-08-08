@@ -126,15 +126,29 @@ const EQUILATERAL_BY_KIND = new Set(['prism3e', 'pyramid3e']);
 
 export function droppedTriShape3(utterance: string, commands: Command3[]): string[] {
   const s = normalize3(utterance);
-  const m = s.match(/שווה[\s-]?צלעות|שווה[\s-]?שוקיים|\bequilateral\b|\bisosceles\b/i);
-  if (!m) return [];
-  const accounted = commands.some(
-    (c) =>
-      (c.type === 'length-rel' && c.c === 1) ||
-      c.type === 'concyclic' || // a cyclic-fix macro reshaped the base per its own stated noun
-      (c.type === 'solid' && EQUILATERAL_BY_KIND.has(c.kind)),
-  );
-  return accounted ? [] : [m[0]];
+  // #435: right-angledness joins the vocabulary this gate watches. It is checked SEPARATELY from the
+  // equal-sides family because the two are independent givens — a figure that accounts for the equal
+  // pair while dropping the right angle (the reported defect) must still be caught.
+  const eq = s.match(/שווה[\s-]?צלעות|שווה[\s-]?שוקיים|\bequilateral\b|\bisosceles\b/i);
+  const rt = s.match(/ישר\s*[-\s]?\s*זו?וית|\bright[-\s]?(?:angled\s+)?triangle\b/i);
+  if (!eq && !rt) return [];
+  const lost: string[] = [];
+  if (eq) {
+    const accounted = commands.some(
+      (c) =>
+        (c.type === 'length-rel' && c.c === 1) ||
+        c.type === 'concyclic' || // a cyclic-fix macro reshaped the base per its own stated noun
+        (c.type === 'solid' && EQUILATERAL_BY_KIND.has(c.kind)),
+    );
+    if (!accounted) lost.push(eq[0]);
+  }
+  // A right angle is accounted for by any perpendicularity the commands assert (`cos-angle` 0), or by
+  // a kind whose template carries a right angle of its own. Generous per the gate doctrine above.
+  if (rt) {
+    const accounted = commands.some((c) => c.type === 'cos-angle' && c.cos === 0);
+    if (!accounted) lost.push(rt[0]);
+  }
+  return lost;
 }
 
 export function droppedNewLabels3(

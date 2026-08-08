@@ -77,22 +77,6 @@ exports[`3-D parser shadow-matrix — catalog corpus > divergent later-claimers 
   {
     "lang": "en",
     "shadowedBy": [
-      "planarPolygon",
-    ],
-    "text": "right triangle ABC",
-    "winner": "rightTriangle",
-  },
-  {
-    "lang": "he",
-    "shadowedBy": [
-      "planarPolygon",
-    ],
-    "text": "משולש ABC ישר זווית",
-    "winner": "rightTriangle",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
       "onSegment",
     ],
     "text": "T on SC such that TABCD is a right pyramid",

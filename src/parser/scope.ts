@@ -45,7 +45,11 @@ export type ScopeCategory =
   // sentences on one line. ADR-264's clause split handles compounds joined by a CONNECTOR; these have
   // none, and the ruling is explicitly NOT to auto-parse them but to TEACH the one-statement-at-a-time
   // discipline — naming the pieces we found so the student can retype them in order.
-  | 'split-statements';
+  | 'split-statements'
+  // #436 (the P1): a NEGATED statement. Refused pre-parse — the negated form used to lower to the
+  // POSITIVE form's commands, asserting the opposite of the given. The capability is the requirement
+  // lane (an exclusion keeps the DOF), not the constraint lane.
+  | 'negation';
 
 export interface ScopeMatch {
   category: ScopeCategory;
@@ -308,3 +312,32 @@ export const looksLikeLatex = (utterance: string): boolean =>
   /\$[^$\n]*\$/.test(utterance) || /\\[a-zA-Z]{2,}/.test(utterance); // a $…$ span, or a \command (≥2 letters — never a stray backslash)
 /** A «שורש N» word-form magnitude (the word + a number/paren). Case-less; the symbol form (√) never matches. */
 export const wordRootMagnitude = (utterance: string): boolean => /שורש\s*[\d(]/.test(utterance);
+
+/**
+ * A NEGATED statement (#436, the P1) — «זווית A לא ישרה», «AB אינו מקביל ל-CD», «angle A is not right».
+ *
+ * Negation had NO representation anywhere in the parser: no rule guard, no `FILLER` entry, no honesty
+ * gate. Every rule simply stepped over the negation word, so the negated form lowered to **exactly the
+ * commands of the positive form** — `זווית A לא ישרה` emitted `set-angle A = 90`, byte-identical to
+ * `זווית A ישרה`. The tool asserted the opposite of what the student said, with a green ✓ and no notice.
+ * It is not one rule's defect: `משולש ABC לא שווה שוקיים` inverted through a completely different rule.
+ *
+ * Checked PRE-parse for the `looksLikeLatex` reason, verbatim: the negated form partial-parses to a
+ * WRONG figure, so the post-failure register would never see it. Refusing is the honest answer until the
+ * capability exists — a negation is an EXCLUSION, which keeps the DOF and belongs in the requirement
+ * lane (`meetsRequirements` + `checkGivens`, the ADR-244 recipe), not in the constraint lane; the engine
+ * has no `≠` command today and `set-angle-acuteness` is one-sided.
+ *
+ * The vocabulary is deliberately narrow — a Hebrew negation word must stand alone (optionally carrying a
+ * ש/ו prefix), so `מלא`/`כלא` and any word merely CONTAINING the letters can never match, and the
+ * English forms are `\b`-bounded. A false match here would refuse a working construction, so the words
+ * are the unambiguous ones only.
+ */
+const NEGATION_WORDS =
+  /(?:^|[\s,.;:!?("'‘’“”-])(?:[שוה]?לא|אינ[הוםן]|איננ[הו]|אין)(?=$|[\s,.;:!?)"'‘’“”-])|≠|\bnot\b|\bisn't\b|\baren't\b|\bdoesn't\b/i;
+
+/** The negation a statement carries, or null. One vocabulary: the pipeline's refusal reads exactly this. */
+export const statedNegation = (utterance: string): string | null => {
+  const m = utterance.match(NEGATION_WORDS);
+  return m ? m[0].trim() : null;
+};

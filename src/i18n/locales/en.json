@@ -52,6 +52,7 @@
       "unnamed-sides": "To set lengths, name the sides: type e.g. \"AB = 10\" and \"BC = 5\" (or start with \"triangle ABC\", then the lengths), instead of \"one side… the other side…\".",
       "compound-relation": "Part of this compound relation isn’t supported yet. Supported: same-unit sums like \"arc AC + arc BE = arc AD + arc BC\", \"AB + CD = EF\", \"∠A + ∠B = 180\", and length products/proportions like \"DM·ME = BM·DR\" or \"DM/ME = BM/DM\". A sum can’t mix lengths with angles, and a product needs the same number of segments on each side — restate the given in one of these forms.",
       "latex": "It looks like you pasted a LaTeX formula (with $ or commands like \\triangle). Write it in plain notation — the toolbar has buttons: △ ∥ ∠ ⊥ √. E.g. \"triangle ABC\", \"DE ∥ BC\", \"AD:DB = 1:2\".",
+      "negation": "Negation (\"{{word}}\") isn't supported yet. State what IS given instead — e.g. \"angle A = 50\" or \"angle A is acute\". Anything you don't state stays free.",
       "word-root": "Write the root value with the √ symbol — there's a √() button in the toolbar. E.g. \"√27\" instead of the word \"root 27\"."
     },
     "producedNothing": "I understood that but it didn't build anything on the figure — I tried rephrasing it too. Check the names/relations, or word it differently.",

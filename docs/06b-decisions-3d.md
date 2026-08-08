@@ -1804,3 +1804,75 @@ seeds, never "a length-rel was emitted"): the operator's exact utterance; the is
 explicit pair overriding it; all five positions × both qualifiers; `משולש ABC` still genuinely scalene;
 the trapezoid attachment; right+isosceles; and the gate's own false-positive sweep. Shadow matrix: pure
 addition (10 entries, 0 changed winners). Catalog +5.
+
+## ADR-3D-111 — a stated shape qualifier is lowered wherever it is recognised, and never read as a DIFFERENT noun's modifier
+
+**Status:** accepted, 2026-08-08 · **Issue:** #435 (P1) · **Supersedes nothing; extends [ADR-3D-110](#adr-3d-110)**
+
+**Reported.** Prod, 2 distinct users (log-triage 2026-08-08, sessions `u5vrlgt0` / `o7xr8bc5`):
+`פירמידה עם בסיס משולש ישר זווית` and `שרטט פירמידה SABC שבסיסה משולש ישר זווית ושווה שוקיים ABC`. Both
+logged `parser/ok`. Neither drew a right angle.
+
+**The class.** *A qualifier is read by an inline, position-local test rather than from one vocabulary, so
+which (qualifier × position) pairs work is an accident of which regex someone wrote.* This is
+[ADR-3D-110](#adr-3d-110)'s own class statement, verbatim — and ADR-3D-110 built `statedTriShape` as the
+ONE triangle vocabulary to close it. It closed the members it enumerated (`שווה צלעות`, `שווה שוקיים`)
+and left `ישר זווית` outside, so the class survived in the member nobody listed. The ADR-3D-069 lesson
+again: **the carve-out is what hid the gap** — `rightTriangle` lowered the right angle inline, which made
+the flat lane look correct and hid that no other position could.
+
+**Two faces, one root.** Because the vocabulary did not own the qualifier:
+
+1. **It was silently dropped.** `statedTriShape` had no right-angled member, so `withTriShape` added
+   nothing; and `droppedTriShape3` — the gate ADR-3D-110 built for exactly this — watched only the
+   equal-sides words, so nothing warned. Measured: `⊾ = 0` for every pyramid and prism phrasing.
+2. **Its words were read by the SOLID.** `rightPyramid` decided its own rightness with
+   `/ישרה?/.test(s)` over the whole utterance, so the `ישר` of `ישר זווית` — a word describing the
+   **base** — made a free `tetra` into a `pyramid3` (apex over the circumcentre). The controls isolate
+   it: `פירמידה SABC שבסיסה משולש ABC` → `tetra`, and adding only `ישר זווית` → `pyramid3`. A property
+   the student never stated, asserted with a green ✓ — the [ADR-052](06-decisions.md#adr-052) cardinal
+   sin, and precisely the rule [ADR-3D-058](#adr-3d-058) put in the LLM prompt, violated by the
+   deterministic parser itself.
+
+**Sibling audit (measured, not reasoned).** The same rightness test appears in three rules. Hebrew was
+broken only in `rightPyramid` (`/ישרה?/` admits the masculine `ישר`; the prism rules demand the feminine
+`ישרה`). **English was broken in all three** — `\bright\b` cannot tell "right prism" from "right
+triangle" — and there it also *diverted the sentence away from the solid rules entirely*: the solid rule
+declined, and `rightTriangle` answered with a flat `polygon3`, so `prism with a right triangle base`
+dropped the **prism**. A third defect the report did not mention and reasoning alone would have missed.
+
+**Decision.**
+
+- `TriSpec = { equal, right }` replaces the single-valued return: equal-sidedness and right-angledness are
+  **independent givens** and the vocabulary answers both at once, so no caller can ask about one and
+  silently lose the other.
+- `triShapeCommands` lowers both, via the [ADR-110](06-decisions.md#adr-110) macro pattern — **no new
+  engine construct**; the right angle is the `cos-angle` (cos 0) `rightTriangle` already used, `soft` so a
+  later explicit angle wins (M4). When both are stated the equal pair anchors at the right-angle vertex: a
+  right triangle's equal sides can only be its legs.
+- A solid's own rightness is tested on `withoutTriQualifier(s)` — the utterance **with the triangle's
+  qualifier words removed**. This is a removal, not a keyword bow-out (docs/17 §2.4): the solid still
+  answers its own question, on the part of the sentence that is actually about it. It follows from the
+  doctrine `statedTriShape` already stated — *a qualifier modifies the noun it was written beside* — and
+  fixes He and En with one mechanism.
+- `rightTriangle` becomes a **consumer** of the vocabulary (its inline regex and inline `cos-angle` are
+  deleted) and gains the solid leftover guard (ADR-024) that `planarPolygon` had and it lacked, so a solid
+  sentence can never be answered with a flat triangle.
+- `droppedTriShape3` watches the same vocabulary, checking the two givens **separately** — the reported
+  figure accounted for the equal pair while dropping the right angle, so a single combined check would
+  still have passed it.
+
+**Blast radius.** `prism3e`/`pyramid3e` are equilateral by construction, so their equal half stays
+unconstrained and those figures are bit-identical. **The shadow matrix changed by pure DELETION** —
+`rightTriangle → planarPolygon` is no longer a divergent pair, because the two rules now agree about the
+same sentence: the registry SHRANK (5 pairs → 4), which is the evidence this is a mechanism repair and not
+another exception.
+
+**Not fixed here, filed:** the honesty gates run only on the parse seam per rule family; a general
+"stated construct noun that no command materialises" gate (`droppedConstructNoun3`) is #438/#440's.
+
+Locked by `right-triangle-base.test.ts` (26), every assertion **geometric** where geometry is the claim —
+the base angle is 90° at five seeds for the reported label-less pyramid, the labelled pyramid (with its
+isosceles legs verified equal), the prism sibling and the flat lane; plus the (qualifier × position ×
+locale) matrix with its no-qualifier controls, the English solid-survives rows, and the gate's own
+false-positive row.
