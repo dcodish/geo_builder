@@ -74,11 +74,19 @@ const NO_BORDERS = {
   insideVertical: NO_BORDER,
 } as const;
 
-/** A4 usable width at default 1" margins ≈ 9026 twips; ~55% text / ~45% image. */
-const TEXT_COL_DXA = 4960;
-const IMAGE_COL_DXA = 4060;
-/** Printed figure width: 8 cm ≈ 302 px at 96 DPI (docx transformation units are px@96dpi). */
-const IMAGE_WIDTH_PX = 302;
+/** A4 usable width at default 1" margins ≈ 9026 twips. #451 rebalanced this toward the FIGURE (was
+ *  4960/4060): a geometry figure with labelled vertices needs the room more than the givens list, which
+ *  wraps happily. Text ≈ 42%, image ≈ 58%. */
+const TEXT_COL_DXA = 3800;
+const IMAGE_COL_DXA = 5226;
+/**
+ * Printed figure width in px@96dpi (docx transformation units). 9.5 cm ≈ 360 px — up from 8 cm/302 px
+ * (#451). Exported ALSO as the print width the renderer normalises its ink to: `svgToPng` scales stroke
+ * weights and label sizes by `canvasWidth / this`, so the printed figure reads the same whatever the size
+ * of the user's browser window. The two must therefore stay the SAME number — hence one constant, shared.
+ */
+export const QUESTION_IMAGE_WIDTH_PX = 360;
+const IMAGE_WIDTH_PX = QUESTION_IMAGE_WIDTH_PX;
 
 export function buildQuestionDoc(input: QuestionDocInput): Document {
   const { heading, lines, png } = input;

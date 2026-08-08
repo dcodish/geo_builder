@@ -12,6 +12,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
 import { buildScene, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
+// #451: the ONE print width — the renderer normalises its ink to exactly the width the docx prints at,
+// so the two can never drift apart and leave the figure faint again.
+import { QUESTION_IMAGE_WIDTH_PX } from '@/export/questionDoc';
 import type { MeasureLabels, RelationMarks, RelationPick } from './scene';
 import type { RelationsResult, ResolvedCircle } from '@/engine';
 import { findInkCrossings, drawnPointIds, resolveDrawnLines } from '@/engine';
@@ -306,7 +309,7 @@ export function Figure({
   async function saveQuestion() {
     if (!svgRef.current || !onSaveQuestion) return;
     try {
-      await onSaveQuestion(await svgToPng(svgRef.current));
+      await onSaveQuestion(await svgToPng(svgRef.current, 2, QUESTION_IMAGE_WIDTH_PX));
     } catch {
       setExportFlash('err');
       window.setTimeout(() => setExportFlash(''), 1400);
@@ -828,6 +831,7 @@ export function Figure({
                 ) : (
                   <>
                     <circle
+                      data-ink-dot="1"
                       cx={s.x}
                       cy={s.y}
                       r={lit(pt.id) ? pointR * 2 : pointR}
@@ -1316,7 +1320,44 @@ export function Figure({
  * A white rect is painted first so the PNG isn't transparent; `scale` over-samples
  * for a crisp result. `encodeURIComponent` (not btoa) carries Hebrew labels safely.
  */
-async function svgToPng(svg: SVGSVGElement, scale = 2): Promise<Blob> {
+/**
+ * #451 — normalise the INK to the printed size.
+ *
+ * `r`, `stroke` and `fontSize` are absolute pixel constants in the SOURCE canvas, and the `.docx` prints
+ * the PNG at a fixed physical width. So the printed line weight and label size were
+ * `constant x (printedWidth / canvasWidth)` — on a ~700 px canvas printed at 8 cm that is 0.43x, i.e. a
+ * 0.65 px line and a ~1.8 mm label: the operator's "not really useful". Worse, it made the printed figure
+ * depend on the SIZE OF THE USER'S BROWSER WINDOW — a wide monitor exported a fainter, smaller-lettered
+ * figure than a narrow one, for the same construction.
+ *
+ * This is [ADR-3D-098](../../docs/06b-decisions-3d.md#adr-3d-098) in the print dimension: an annotation's
+ * weight is a property of the OUTPUT medium, never of the source geometry. Passing the print width makes
+ * the ink deterministic — scaled by `canvasWidth / printWidth`, so after the page's downscale it lands at
+ * exactly the weight the constants describe, whatever the window.
+ *
+ * The 2x oversample is unrelated and stays: it buys resolution, never apparent size.
+ */
+export function scaleInkForTest(root: SVGSVGElement, k: number): void { scaleInk(root, k); }
+
+function scaleInk(root: SVGSVGElement, k: number): void {
+  if (!(k > 0) || Math.abs(k - 1) < 1e-6) return;
+  const num = (v: string | null) => (v === null ? null : Number.parseFloat(v));
+  for (const el of [...root.querySelectorAll<SVGElement>('*')]) {
+    const sw = num(el.getAttribute('stroke-width'));
+    if (sw !== null && Number.isFinite(sw)) el.setAttribute('stroke-width', String(sw * k));
+    const fs = num(el.getAttribute('font-size'));
+    if (fs !== null && Number.isFinite(fs)) el.setAttribute('font-size', String(fs * k));
+    const da = el.getAttribute('stroke-dasharray');
+    if (da) el.setAttribute('stroke-dasharray', da.trim().split(/[\s,]+/).map((v) => String(Number.parseFloat(v) * k)).join(' '));
+    // only a POINT DOT's radius is ink; a drawn circle's `r` is GEOMETRY and must never be touched
+    if (el.hasAttribute('data-ink-dot')) {
+      const rr = num(el.getAttribute('r'));
+      if (rr !== null && Number.isFinite(rr)) el.setAttribute('r', String(rr * k));
+    }
+  }
+}
+
+async function svgToPng(svg: SVGSVGElement, scale = 2, printWidthPx?: number): Promise<Blob> {
   const w = Number(svg.getAttribute('width')) || svg.clientWidth || 600;
   const h = Number(svg.getAttribute('height')) || svg.clientHeight || 600;
   const clone = svg.cloneNode(true) as SVGSVGElement;
@@ -1333,6 +1374,7 @@ async function svgToPng(svg: SVGSVGElement, scale = 2): Promise<Blob> {
   revert('data-export-fill', 'fill');
   revert('data-export-r', 'r');
   revert('data-export-weight', 'font-weight');
+  if (printWidthPx) scaleInk(clone, w / printWidthPx); // #451 — ink is a property of the PRINTED page
   const data = new XMLSerializer().serializeToString(clone);
   const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data)}`;
   const img = new Image();
