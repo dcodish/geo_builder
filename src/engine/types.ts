@@ -1079,6 +1079,16 @@ export type Command =
   // (figure.v.lineSideDifferent/lineSideSame), so `meetsRequirements` (sampler / "show another") skips
   // it — never a driven equality.
   | { type: 'points-line-side'; a: Id; b: Id; subjects: Id[]; rel: 'different' | 'same' }
+  // «דלתון קעור» / «מרובע קמור» / "concave kite" (issue #441) — a polygon's CONVEXITY, stated. Convexity
+  // was a blanket DEFAULT (`polygonsConvex` in the requirement predicate), so a stated concave polygon
+  // was both dropped by the parser AND unreachable by any configuration search: `דלתון קעור` drew a
+  // CONVEX kite, the opposite of the given, with a green check. The shape needs no new geometry — a dart
+  // satisfies the very same kite relations, so convex vs concave is a configuration BRANCH of the
+  // existing constraint set. Modelled as a REQUIREMENT (ADR-244), never a constraint: an inequality has
+  // no residual, and the polygon keeps its DOF. The blanket default now applies only where nothing was
+  // stated; `checkGivens` enforces a stated one (figure.v.concavePolygon / convexPolygon), so sampling
+  // and "show another configuration" can never flip it back.
+  | { type: 'set-polygon-convexity'; ids: Id[]; convex: boolean }
   // «CD חותך את AB» with NO crossing point named (issue #241, ADR-383): the two segments CROSS, stated as
   // a point-free REQUIREMENT — the ADR-166 within-both-segments meaning without minting a node (reading
   // (a): typing STATES the crossing; the ADR-380 forced-crossing dot then OFFERS the naming). The ADR-244

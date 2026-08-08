@@ -18,7 +18,7 @@ import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, variantCountOf, variantVertices, warmStartCarriers, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -1493,6 +1493,22 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
       if (Date.now() > deadline) return null; // out of budget — caller keeps the current figure, amber
       if (meetsRequirements(facts, s)) return { facts, seed: s };
     }
+    // Discrete REFLECTION alternatives (#441). The sweep above varies only the CONTINUOUS jitter — the
+    // base seed — while the reflection mask lives in the seed's HIGH bits (`REFLECT_STRIDE`). So a
+    // requirement that needs a MIRROR configuration is unreachable by that sweep however many seeds it
+    // burns: a stated-concave kite has ~2% of raw seeds satisfying it (measured), purely the ones whose
+    // high bits happen to be set. `firstSatisfyingSeed` does explore masks, but it judges only the
+    // extension/segment bars, not the full requirement set — so nothing was searching this dimension
+    // against `meetsRequirements`. General, not convexity-specific: the ADR-166 apex-side family gains
+    // the same coverage.
+    const reflectable = reflectableFreePoints(replay(facts).construction).length;
+    for (let m = 1; m < 1 << Math.min(reflectable, REFLECT_MAX); m++) {
+      for (let s = fromSeed; s < fromSeed + 6; s++) {
+        if (Date.now() > deadline) return null;
+        const sm = withReflectMask(m, s);
+        if (meetsRequirements(facts, sm)) return { facts, seed: sm };
+      }
+    }
     // Discrete branch alternatives — vary which intersection/side each branchable point takes.
     const base = replay(facts).construction;
     const branchy = facts
@@ -2033,11 +2049,37 @@ const POLYGON_SHAPES = new Set(['square', 'rectangle', 'rhombus', 'parallelogram
  * another configuration" must not surface them (ADR-018 — alternatives are valid *drawings*).
  * Triangles (3 vertices, always convex/simple) are skipped — only 4+-gons are checked.
  */
+/** A ring's identity, independent of where the cycle starts or which way round it is read. */
+export function ringKey(ids: Id[]): string {
+  const n = ids.length;
+  const rots: string[] = [];
+  for (const seq of [ids, [...ids].reverse()])
+    for (let i = 0; i < n; i++) rots.push(seq.slice(i).concat(seq.slice(0, i)).join(','));
+  return rots.sort()[0];
+}
+
 export function polygonsConvex(facts: Fact[], positions: Map<Id, Vec>): boolean {
+  // #441: convexity is the default only where the student stated NOTHING. A polygon stated concave is
+  // exempt here — otherwise the requirement would be unsatisfiable and the figure could never draw —
+  // and `checkGivens` enforces the statement instead. A stated-concave ring must still be SIMPLE, which
+  // is the part of this guard that was never about convexity: `ringSimple` keeps rejecting the tangled
+  // drawing, so "concave" buys the dart and nothing else.
+  const statedConcave = new Set<string>();
+  for (const f of facts) {
+    if (!f.enabled || f.cmd.type !== 'set-polygon-convexity') continue;
+    const c = f.cmd as { ids: Id[]; convex: boolean };
+    if (!c.convex) statedConcave.add(ringKey(c.ids));
+  }
   for (const f of facts) {
     if (!f.enabled || !POLYGON_SHAPES.has(f.cmd.type)) continue;
     const ids = (f.cmd as { ids?: Id[] }).ids;
     if (!ids || ids.length < 4) continue;
+    if (statedConcave.has(ringKey(ids))) {
+      const pts0 = ids.map((id) => positions.get(id));
+      if (pts0.some((p) => !p)) continue;
+      if (!ringSimple(pts0 as Vec[])) return false;
+      continue;
+    }
     const pts = ids.map((id) => positions.get(id));
     if (pts.some((p) => !p)) continue; // a vertex that didn't resolve — not this guard's concern
     const n = ids.length;

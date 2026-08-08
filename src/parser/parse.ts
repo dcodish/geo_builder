@@ -9062,6 +9062,38 @@ function withRadiusSymbolBinding(commands: AnyCommand[], s: string, ctx: ParseCo
   return out;
 }
 
+/**
+ * The stated CONVEXITY of a polygon (#441) — ONE vocabulary, read at the winning-parse seam so EVERY
+ * polygon rule inherits it. Written as a post-pass for the {@link withChordMembership} reason: the
+ * qualifier is orthogonal to which shape rule claimed the utterance (`דלתון קעור`, `מרובע קעור`,
+ * `מצולע קמור`), so per-rule tests would be the ADR-3D-110 mistake — a qualifier some positions
+ * recognise and others silently drop, which is exactly how `קעור` came to draw a CONVEX kite.
+ *
+ * Only 4+-gons carry it: a triangle is always convex, so the word there is a harmless tautology rather
+ * than a given to enforce.
+ */
+function statedConvexity(s: string): boolean | null {
+  // NB `\b` is useless around Hebrew — Hebrew letters are not `\w`, so `\bקעור\b` never matches. The
+  // word is delimited explicitly instead (the same trap the #436 negation vocabulary had to avoid).
+  const heWord = (stem: string) => new RegExp(`(?:^|[\\s,.;:!?("'-])ה?${stem}(?:ה|ים|ות)?(?=$|[\\s,.;:!?)"'-])`);
+  if (heWord('קעור').test(s) || /\bconcave\b/i.test(s)) return false;
+  if (heWord('קמור').test(s) || /\bconvex\b/i.test(s)) return true;
+  return null;
+}
+
+function withStatedConvexity(commands: AnyCommand[], s: string): AnyCommand[] {
+  const convex = statedConvexity(s);
+  if (convex === null) return commands;
+  if (commands.some((c) => c.type === 'set-polygon-convexity')) return commands;
+  // the polygon this statement is about: the ring the commands created (every polygon creator carries
+  // a ≥3-id `ids`, the ADR-357 discipline), 4+ vertices only
+  const ring = commands
+    .map((c) => (c as { ids?: Id[] }).ids)
+    .find((ids): ids is Id[] => Array.isArray(ids) && ids.length >= 4);
+  if (!ring) return commands;
+  return [...commands, { type: 'set-polygon-convexity', ids: [...ring], convex }];
+}
+
 /** The first-match-wins pass over `RULES` for ONE statement — the body `parse` always ran; extracted so
  *  the clause fallback (ADR-264) can parse each piece without re-entering the fallback itself. */
 function runRules(s: string, ctx: ParseContext): ParseResult {
@@ -9073,7 +9105,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
       // Concentric resolution runs LAST (ADR-244): the other post-passes mint the pair's OUTER id
       // (`circleId(centre)`), and this one redirects/confirms per qualifier or asks to clarify.
       const resolved = withConcentricResolution(withImplicitCircles(withOnCircleMembership(withCarrierMembership(withCarrierSegments(res), s, ctx), s, ctx), ctx), s, ctx);
-      if (Array.isArray(resolved)) return { ok: true, commands: withAnonymousAutoCentres(withMetricCentreBinding(withRadiusSymbolBinding(resolved, s, ctx), ctx)) };
+      if (Array.isArray(resolved)) return { ok: true, commands: withStatedConvexity(withAnonymousAutoCentres(withMetricCentreBinding(withRadiusSymbolBinding(resolved, s, ctx), ctx)), s) };
       return { ok: false, reason: 'ambiguous-circle', center: resolved.center };
     }
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).

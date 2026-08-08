@@ -20,7 +20,7 @@ import { constraintRefs, describeConstraint, isSatisfied, residual } from './sol
 
 export interface GivenViolation {
   /** The kind of relation that doesn't hold — an on-circle/tangent incidence, or any constraint type. */
-  relation: 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'line-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | 'point-off-arc' | Constraint['type'];
+  relation: 'on-circle' | 'tangent' | 'radius-order' | 'radius-ratio' | 'circle-side' | 'region-side' | 'line-side' | 'circles-disjoint' | 'circle-contained' | 'tangent-kind' | 'tangent-distinct' | 'segments-cross' | 'point-off-arc' | 'convexity' | Constraint['type'];
   ids: Id[];
   /** English fallback, e.g. "E should lie on circle P (radius 3.60) but is 7.42 from its centre". */
   message: string;
@@ -438,6 +438,38 @@ export function checkGivens(
         message: `${cmd.id} should lie ${cmd.side} ${polyName}`,
         messageKey: cmd.side === 'outside' ? 'figure.v.outsideRegion' : 'figure.v.insideRegion',
         params: { point: cmd.id, poly: polyName },
+      });
+    }
+  }
+
+  // A stated CONVEXITY (#441): «דלתון קעור» must actually draw concave. Convexity used to be a blanket
+  // default nobody could state, so a stated concave polygon was drawn convex — the opposite of the given.
+  // The requirement discipline (ADR-244): `meetsRequirements` gates on a clean verifier, so the sampler
+  // and "show another configuration" can never flip a stated concavity back; a genuinely unreachable one
+  // reads amber rather than being silently satisfied the other way.
+  for (const cmd of commands) {
+    if (cmd.type !== 'set-polygon-convexity') continue;
+    const verts = cmd.ids.map((v) => positions.get(v));
+    if (verts.some((v) => v === undefined) || cmd.ids.length < 4) continue;
+    const vs = verts as Vec[];
+    const n = vs.length;
+    let sign = 0;
+    let convex = true;
+    for (let i = 0; i < n; i++) {
+      const o = vs[i], a = vs[(i + 1) % n], b = vs[(i + 2) % n];
+      const turn = Math.sign((a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x));
+      if (turn === 0) continue;
+      if (sign === 0) sign = turn;
+      else if (turn !== sign) { convex = false; break; }
+    }
+    if (convex !== cmd.convex) {
+      const polyName = cmd.ids.join('');
+      violations.push({
+        relation: 'convexity',
+        ids: [...cmd.ids],
+        message: `${polyName} should be ${cmd.convex ? 'convex' : 'concave'}`,
+        messageKey: cmd.convex ? 'figure.v.convexPolygon' : 'figure.v.concavePolygon',
+        params: { poly: polyName },
       });
     }
   }

@@ -152,6 +152,8 @@
       "lineSideDifferent": "{{points}} should lie on different sides of {{seg}}, but they don't in this drawing",
       "lineSideSame": "{{points}} should lie on the same side of {{seg}}, but they don't in this drawing",
       "outsideRegion": "{{point}} should lie outside {{poly}}",
+      "concavePolygon": "{{poly}} should be concave, but it is drawn convex.",
+      "convexPolygon": "{{poly}} should be convex, but it is drawn concave.",
       "insideRegion": "{{point}} should lie inside {{poly}}",
       "radiusRatio": "radius of circle {{c1}} ({{r1}}) should be {{k}} × radius of circle {{c2}} ({{r2}})",
       "circlesDisjoint": "circles {{c1}} and {{c2}} should be disjoint (centre gap {{d}} is not larger than the radii sum {{sum}})",

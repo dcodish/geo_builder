@@ -6058,3 +6058,67 @@ inverted, the second rule's inversion, both locales, the substring-safety rows, 
 by `submitPipeline.test.ts`, which is the App-faithful gate: the reported figure commits nothing, the note
 is the negation guidance, **no paid LLM call is made**, and the POSITIVE form still commits — so the
 refusal is about the negation, not the phrasing.
+
+## ADR-426 — convexity is a statable REQUIREMENT, not a blanket default nobody can address
+
+**Status:** accepted, 2026-08-08 · **Issue:** #441 (P1)
+
+**Reported.** Operator, 2026-08-08: "I want support for `דלתון קעור` as well as `קמור`." Measured, it was
+not a missing capability but a **silent wrong build**, the third instance of today's class:
+
+```
+דלתון קמור → shape-variant kite A,B,C,D    signs 1,1,1,1  CONVEX
+דלתון קעור → shape-variant kite A,B,C,D    signs 1,1,1,1  CONVEX   ← the opposite of the given
+```
+
+Byte-identical commands; the dart drawn as a convex kite with a green ✓. `קמור` "worked" only by luck —
+convex is what would have been drawn anyway.
+
+**The class.** *A qualifier is in no vocabulary, so it is dropped* (#435's class, third member — `מרובע
+קעור` loses it too) **compounded by a second, more interesting layer**: *a property the engine treats as
+a universal DEFAULT has no way to be stated, so even a carried qualifier is unreachable.* `polygonsConvex`
+is one of the predicates `meetsRequirements` ANDs together, so **every** configuration search rejected the
+dart outright. The parser fix alone would have produced a figure that could never satisfy its own given.
+
+**What the shape needed: nothing.** A dart satisfies the very same kite relations (`|AB|=|AD|`,
+`|CB|=|CD|`) — convex vs concave is a configuration BRANCH of the existing constraint set, not new
+geometry. Measured before any fix: 7 of 300 raw seeds already produced a clean, violation-free dart.
+
+**Decision.** Model it as a REQUIREMENT ([ADR-244](#adr-244)), never a constraint — an inequality has no
+residual and the polygon keeps every DOF:
+
+- `set-polygon-convexity {ids, convex}`, emitted by ONE vocabulary read at the winning-parse seam
+  (`withStatedConvexity`, beside `withChordMembership`) so **every** polygon rule inherits it. Per-rule
+  tests would repeat the #435 mistake exactly. Only 4+-gons carry it: a triangle is always convex, so the
+  word there is a tautology, not a given.
+- `polygonsConvex` becomes the **unstated** default: a ring stated concave is exempt. It still enforces
+  `ringSimple` on that ring — the part of the guard that was never about convexity — so "concave" buys
+  the reflex corner and not a tangled quad.
+- `checkGivens` enforces the statement (`figure.v.concavePolygon` / `convexPolygon`). Since
+  `meetsRequirements` gates on a clean verifier, sampling and "show another configuration" can never flip
+  a stated convexity back, and a **contradictory** statement (`ריבוע קעור` — a square cannot be concave)
+  reads amber rather than being quietly satisfied the other way.
+- `applyCommand` improves the default SEAT: reflecting a vertex across the line through its two
+  NEIGHBOURS flips the turn there while preserving **both** adjacent side lengths exactly, so the dart
+  satisfies every constraint by construction and is what the student sees first. (Recorded trap: the seat
+  lives on the free-point OBJECT — a `pos.set` is silently discarded, since `applySeed`/`evaluate`
+  re-derive positions from the objects. The first cut wrote to `pos` and did nothing at all.)
+
+**The general fix underneath.** `findValidConfig`'s seed sweep varies only the CONTINUOUS jitter (the base
+seed), while the reflection mask lives in the seed's HIGH bits (`REFLECT_STRIDE`) — so a requirement
+needing a MIRROR configuration was unreachable by that sweep however many seeds it burned. That is why
+only ~2% of raw seeds worked: precisely those whose high bits happened to be set. `firstSatisfyingSeed`
+does explore masks but judges only the extension/segment bars, so **nothing was searching this dimension
+against the full requirement set**. A reflection tier now does. Not convexity-specific — the ADR-166
+apex-side family gains the same coverage.
+
+**Filed, not bundled:** the convexity DEFAULT skips macro-declared shapes entirely (`polygonsConvex`
+iterates `POLYGON_SHAPES` fact types, and a kite is a `shape-variant` that only becomes a polygon at
+replay), so a bare `דלתון` can already draw as a dart — pre-existing, and extending the default touches
+every figure containing a macro shape, so it needs its own measured pass (#443).
+
+Locked by `concave-polygon.test.ts` (15), asserted over **valid configurations** rather than arbitrary
+seeds — the honest property, since a raw low seed is simply a different, rejected configuration: no valid
+configuration of a stated-concave polygon is convex, the kite relations still hold in the dart, stated
+convex and the unstated default stay convex, the qualifier lowers from every polygon position in both
+locales, and the contradictory square reads amber.

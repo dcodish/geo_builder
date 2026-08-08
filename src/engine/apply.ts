@@ -11,7 +11,7 @@
 import type { Command, Constraint, Construction, GeoObject, Id, SolveDirective, Vec } from './types';
 import { isGeoPoint, objectParents } from './types';
 import { shapeConstraints } from './inscribe';
-import { add, dist, lineLineIntersect, pointInPolygon, reflectAcross, scale, sub } from './geometry';
+import { add, dist, lineLineIntersect, pointInPolygon, reflectAcross, ringSimple, scale, sub } from './geometry';
 import { constraintKey, constraintRefs } from './solve';
 
 /**
@@ -1384,6 +1384,57 @@ export function applyCommand(prev: Construction, cmd: Command, pos: Map<Id, Vec>
       break;
     }
 
+    case 'set-polygon-convexity': {
+      // #441 — a pure REQUIREMENT record (the ADR-244 shape): `checkGivens` re-derives the convexity
+      // from the final coordinates and `meetsRequirements` gates sampling on a clean verifier, so
+      // nothing is pushed to `constraints` — an inequality has nothing to drive, and the polygon keeps
+      // every DOF it had. The default seat needs no improvement: the vertices are already free, so the
+      // config search cannot be relied on to stumble onto the dart. What we DO here is the recipe's
+      // other half — improve the default SEAT: reflecting a vertex across the line through its two
+      // NEIGHBOURS flips the turn at that vertex while preserving BOTH adjacent side lengths EXACTLY,
+      // so a kite maps to its dart with every equal-side constraint still satisfied. That makes the
+      // stated shape what the student sees first, rather than something the sampler might find.
+      if (cmd.convex) break; // convex is already the default seat everywhere
+      const n = cmd.ids.length;
+      if (n < 4) break; // a triangle is always convex — the word there is a tautology, not a given
+      const seatOf = (id: Id): Vec | undefined => {
+        const o = objects.find((x) => x.id === id);
+        return o && o.kind === 'free-point' ? { x: o.x, y: o.y } : pos.get(id);
+      };
+      const seats = cmd.ids.map(seatOf);
+      if (seats.some((p) => !p)) break;
+      const vs = seats as Vec[];
+      const turns = (arr: Vec[]) =>
+        arr.map((_, i) => {
+          const o = arr[i], a = arr[(i + 1) % n], b = arr[(i + 2) % n];
+          return Math.sign((a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x));
+        });
+      const convexRing = (arr: Vec[]) => {
+        const s = turns(arr).filter((x) => x !== 0);
+        return s.every((x) => x === s[0]);
+      };
+      if (!convexRing(vs)) break; // already concave — the statement holds; never move a figure that fits
+      for (let i = 0; i < n; i++) {
+        const p = vs[(i + n - 1) % n], v = vs[i], q = vs[(i + 1) % n];
+        const dx = q.x - p.x, dy = q.y - p.y;
+        const L2 = dx * dx + dy * dy;
+        if (L2 < 1e-12) continue;
+        const t = ((v.x - p.x) * dx + (v.y - p.y) * dy) / L2;
+        const refl = { x: 2 * (p.x + t * dx) - v.x, y: 2 * (p.y + t * dy) - v.y };
+        const trial = vs.map((w, k) => (k === i ? refl : w));
+        if (!convexRing(trial) && ringSimple(trial)) {
+          // the seat lives on the free-point OBJECT (a `pos` write is discarded — `applySeed`/`evaluate`
+          // re-derive positions from the objects), and only a non-pinned free vertex may be moved
+          const j = objects.findIndex((o) => o.id === cmd.ids[i]);
+          const o = j >= 0 ? objects[j] : undefined;
+          if (o && o.kind === 'free-point' && !o.pinned) {
+            objects[j] = { ...o, x: refl.x, y: refl.y };
+            break;
+          }
+        }
+      }
+      break;
+    }
     case 'points-line-side': {
       // «C ו-D בצדדים שונים של AB» / "C and D on different (the same) sides of AB" (issue #265,
       // ADR-389) — the ADR-254 circle-side shape, LINE edition. The command is the RELATIONAL side

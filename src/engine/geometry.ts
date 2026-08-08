@@ -227,3 +227,24 @@ export function circleCircleIntersect(c1: Vec, r1: number, c2: Vec, r2: number):
   const perp = rot90(dir);
   return [add(mid, scale(perp, h)), add(mid, scale(perp, -h))];
 }
+
+/** Whether a closed ring is SIMPLE — no two non-adjacent edges cross. True for any convex ring; the part
+ *  of the convexity guard that a stated-concave polygon must still satisfy (a dart is simple, a tangled
+ *  quad is not). */
+export function ringSimple(pts: Vec[]): boolean {
+  const n = pts.length;
+  const seg = (i: number): [Vec, Vec] => [pts[i], pts[(i + 1) % n]];
+  const cross = (o: Vec, a: Vec, b: Vec) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const proper = (p1: Vec, p2: Vec, p3: Vec, p4: Vec) => {
+    const d1 = Math.sign(cross(p3, p4, p1)), d2 = Math.sign(cross(p3, p4, p2));
+    const d3 = Math.sign(cross(p1, p2, p3)), d4 = Math.sign(cross(p1, p2, p4));
+    return d1 !== d2 && d3 !== d4;
+  };
+  for (let i = 0; i < n; i++)
+    for (let j = i + 1; j < n; j++) {
+      if (j === i || (j + 1) % n === i || (i + 1) % n === j) continue; // adjacent edges share a vertex
+      const [a, b] = seg(i), [c, d] = seg(j);
+      if (proper(a, b, c, d)) return false;
+    }
+  return true;
+}
