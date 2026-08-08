@@ -20,9 +20,16 @@ describe('#73 — valueless-query (the reproduce-verify charter, student-facing)
 
 describe('#73 — cross-app (bare 2-D nouns → the 2-D tool)', () => {
   // #247: prod piyrx56a spellings/prefix — «נתון מעויין», bare «מעויין» (double yod), «נתון»-prefixed nouns.
-  for (const u of ['מעגל', 'מלבן', 'מעוין', 'חסום במעגל', 'מעויין', 'נתון מעויין', 'נתון מעוין', 'נתונה מקבילית', 'given a rhombus']) {
+  for (const u of ['מעגל', 'מלבן', 'מעוין', 'מעויין', 'נתון מעויין', 'נתון מעוין', 'נתונה מקבילית', 'given a rhombus']) {
     it(u, () => expect(classifyGuidance3(u)?.category).toBe('cross-app'));
   }
+  // #442 RETIRED the inscription form from this category — the 3-D tool now BUILDS a polygon's
+  // circumscribed / inscribed circle, and guidance for something the parser handles is a lie (the
+  // header's own rule; the third category retired by SUPPORTING its form, after S3 and S4).
+  it('an inscription statement is BUILT now, not guided away', () => {
+    expect(classifyGuidance3('משולש ABC חסום במעגל')).toBeNull();
+    expect(classifyGuidance3('מעגל חסום במשולש ABC')).toBeNull();
+  });
   it('the SUPPORTED in-space circle form stays null', () => {
     expect(classifyGuidance3('מעגל שמרכזו O משיק לישר AB בנקודה B')).toBeNull();
   });

@@ -69,7 +69,10 @@ const RULES3: ScopeRule3[] = [
     category: 'cross-app',
     patterns: [
       /^\s*(?:נתו(?:ן|נה)\s*:?\s+)?(?:ה?מעגל|מעגל|עיגול|מלבן|מעויי?ן|טרפז|דלתון|מקבילית)\s*\.?\s*$/,
-      /חסום\s+במעגל|inscribed\s+in\s+(?:a\s+|the\s+)?circle/i,
+      // #442 RETIRED the inscription pattern (`חסום במעגל` / `inscribed in a circle`): the 3-D tool now
+      // BUILDS a polygon's circumscribed and inscribed circle, so pointing the student at the 2-D app
+      // would be guidance for something the parser handles — the lie this register's own header forbids,
+      // and the third category retired this way after S3/S4.
       /^\s*(?:given\s+a\s+)?(?:circle|rectangle|rhombus|trapezoid|kite|parallelogram)\s*\.?\s*$/i,
     ],
   },

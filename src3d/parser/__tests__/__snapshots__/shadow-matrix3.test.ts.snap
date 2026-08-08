@@ -1727,6 +1727,26 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "triangle ABC inscribed in a circle",
+    "winner": "polygonCircle3",
+  },
+  {
+    "lang": "he",
+    "text": "משולש ABC חסום במעגל",
+    "winner": "polygonCircle3",
+  },
+  {
+    "lang": "en",
+    "text": "circle inscribed in triangle ABC",
+    "winner": "polygonCircle3",
+  },
+  {
+    "lang": "he",
+    "text": "מעגל חסום במשולש ABC",
+    "winner": "polygonCircle3",
+  },
+  {
+    "lang": "en",
     "text": "D is on the circle",
     "winner": "onCircle3",
   },

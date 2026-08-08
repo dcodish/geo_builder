@@ -468,7 +468,14 @@ export interface LineThroughCommand {
  */
 export type Circle3Def =
   | { kind: 'tangent-line'; center: Id; line: string }
-  | { kind: 'center-plane-radius'; center: Id; plane: string; radius: number };
+  | { kind: 'center-plane-radius'; center: Id; plane: string; radius: number }
+  // #442: the circle of a POLYGON — `circum` passes through the ring's vertices (the polygon is
+  // inscribed IN it), `incircle` is tangent to the ring's sides (it is inscribed in the POLYGON).
+  // Both live in the ring's OWN plane, so the same definition serves a flat V8-g polygon and a solid's
+  // face. Neither carries a `center` point id: the centre is DERIVED, and inventing a label for it
+  // would assert a name the student never gave (the V6 unnamed-centre rule).
+  | { kind: 'circum'; ring: Id[] }
+  | { kind: 'incircle'; ring: Id[] };
 
 /** `מעגל O במישור π משיק לישר ℓ בנקודה B` — a circle in R³ (id `circle-<centre>` unless named). */
 export interface Circle3Command {
@@ -1003,7 +1010,10 @@ export type EngineError3 =
   | { code: 'ambiguous-prism' } // #289: `המנסרה ישרה` with more than one oblique prism — "the prism" is ambiguous
   | { code: 'bound-unsatisfiable'; id: Id } // #273: no sampled configuration puts the measure inside the stated bound
   | { code: 'vacuous-relation' } // S4 (#378): a mutual position stated between an object and itself
-  | { code: 'claim-refuted' }; // the stated answer does not hold in the figure
+  | { code: 'claim-refuted' } // the stated answer does not hold in the figure
+  // #442: only a TANGENTIAL polygon has an incircle, and every triangle is one. A best-fit circle for a
+  // general quad would be tangent to nothing — refuse rather than draw a figure that lies.
+  | { code: 'incircle-needs-triangle' };
 
 export type ApplyResult3 = { ok: true; next: Construction3 } | { ok: false; error: EngineError3 };
 

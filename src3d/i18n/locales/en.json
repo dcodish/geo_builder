@@ -76,6 +76,7 @@
     "lineMissesPlane": "The line is parallel to the plane at the chosen parameter value — no crossing point '{{id}}'",
     "sizeOnSolid": "A numeric size on a free-dimension solid isn't supported here yet",
     "boundUnsatisfiable": "No configuration of the figure puts the angle at {{id}} inside the stated bound",
+    "incircleNeedsTriangle": "An inscribed circle can only be drawn in a triangle — a general quadrilateral has none.",
     "claimRefuted": "The claim doesn't hold in the figure — check the computation",
     "vacuousRelation": "The relation names one object twice — it needs two different objects",
     "badFile": "This is not a valid Space Builder figure file",

@@ -1471,7 +1471,14 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     // centre & the line, tangent to it — the touch point is the ⟂ foot of the centre onto the line.
     case 'circle3': {
       if (c.circles3.some((k) => k.id === cmd.id)) return { ok: false, error: { code: 'already-defined', id: cmd.id } };
-      if (cmd.def.kind === 'tangent-line') {
+      if (cmd.def.kind === 'circum' || cmd.def.kind === 'incircle') {
+        // #442: every ring vertex must exist — the circle is DERIVED from them (M1: the statement is
+        // about the polygon the student already drew, never a re-creation of its vertices).
+        const missingRing = missingPoint(c, cmd.def.ring);
+        if (missingRing) return { ok: false, error: missingRing };
+        if (cmd.def.kind === 'incircle' && cmd.def.ring.length !== 3)
+          return { ok: false, error: { code: 'incircle-needs-triangle' } };
+      } else if (cmd.def.kind === 'tangent-line') {
         if (!c.points.has(cmd.def.center)) return { ok: false, error: { code: 'unknown-point', id: cmd.def.center } };
         if (!c.lines.has(cmd.def.line) && !c.pointLines.has(cmd.def.line)) return { ok: false, error: { code: 'unknown-line', id: cmd.def.line } };
       } else {

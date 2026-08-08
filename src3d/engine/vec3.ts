@@ -113,3 +113,24 @@ export function ringCircumcentre3(pts: Vec3[]): Vec3 | null {
   const c2 = ringCircumcentre2(pts.map((p) => ({ x: dot3(sub3(p, o), u), y: dot3(sub3(p, o), v) })));
   return add3(o, add3(scale3(u, c2.x), scale3(v, c2.y)));
 }
+
+/**
+ * The INCIRCLE of a coplanar 3-D triangle — centre and radius of the circle tangent to all three
+ * sides, living in the triangle's own plane (#442). Closed form, no solver:
+ * `I = (a·A + b·B + c·C)/(a+b+c)` with `a=|BC|` etc., and `r = Area/s`.
+ *
+ * TRIANGLES ONLY, deliberately. Every triangle has an incircle; a general quadrilateral does NOT (only
+ * a tangential one does), so a best-fit circle for a 4-gon would draw a figure tangent to nothing — the
+ * lie this returning `null` prevents. The parser refuses the quad case with a message instead.
+ */
+export function triangleIncircle3(pts: Vec3[]): { center: Vec3; radius: number } | null {
+  if (pts.length !== 3) return null;
+  const [A, B, C] = pts;
+  const a = norm3(sub3(B, C)), b = norm3(sub3(C, A)), c = norm3(sub3(A, B));
+  const per = a + b + c;
+  if (per < 1e-12) return null;
+  const center = scale3(add3(add3(scale3(A, a), scale3(B, b)), scale3(C, c)), 1 / per);
+  const area = norm3(cross3(sub3(B, A), sub3(C, A))) / 2;
+  if (area < 1e-12) return null; // degenerate (collinear) triangle — no incircle
+  return { center, radius: (2 * area) / per };
+}

@@ -19,7 +19,7 @@
 
 import { readOperand } from './operandToken';
 import { sameOperand } from '../engine/operands';
-import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SymComp, SymTerm, VecAtom, VecExpr } from '../engine/types';
+import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 
 export type ParseResult3 =
@@ -2659,8 +2659,69 @@ const rightTriangle: Rule = (s) => {
   return [{ type: 'solid', kind: 'polygon3', ids }, ...triShapeCommands(statedTriShape(s), ids, mid)];
 };
 
+/** The polygon nouns an inscription statement can name — one alternation per language, shared by the
+ *  container-marker test and the ring reader below so the two can never drift (the 2-D ADR-245 lesson:
+ *  a noun missing from one list silently built the CONVERSE figure). */
+const POLY_WORDS_HE3 = 'משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|מקבילית|דלתון|מצולע';
+const POLY_WORDS_EN3 = String.raw`triangle|quad\w*|square|rectangle|rhombus|trapez\w*|parallelogram|kite|polygon`;
+
+/**
+ * #442 — a circle INSCRIBED IN / CIRCUMSCRIBED ABOUT a polygon, in R³.
+ *
+ * Roles are assigned by the CONTAINER MARKER — the noun carrying Hebrew's ב prefix or English "in" —
+ * wherever it sits in the sentence, never by word order. This is [ADR-245](docs/06-decisions.md#adr-245)
+ * ported verbatim, and it is ported because 2-D learned it the hard way: the order test silently built
+ * the CONVERSE for every inverted Hebrew passive, in production, for months. It also settles the
+ * operator's own mixed phrasing `משולש ABC חוסם במעגל` — circumscribe VERB, but the ב marker sits on
+ * מעגל, so the circle is the container and the triangle is inscribed in it.
+ *
+ *   משולש ABC חסום במעגל   → the triangle is IN the circle  → `circum` (through A,B,C)
+ *   מעגל חסום במשולש ABC   → the circle is IN the triangle  → `incircle`
+ *   מעגל חוסם את משולש ABC → the circle contains it         → `circum`
+ *   משולש ABC חוסם מעגל    → the triangle contains it       → `incircle`
+ *
+ * The ring may be a flat polygon or a SOLID'S FACE (the operator's case: ABC as a pyramid base) — both
+ * are just a run of existing labels lying in a plane, so one rule serves both. The circle's centre is
+ * derived, never a created point (the V6 unnamed-centre rule).
+ */
+const polygonCircle3: Rule = (s) => {
+  if (!/חסומ?|חוסמ?|inscrib\w*|circumscrib\w*/i.test(s)) return null;
+  if (!/מעגל|\bcircle\b/i.test(s)) return null;
+  const polyRe = new RegExp(`${POLY_WORDS_HE3}|${POLY_WORDS_EN3}`, 'i');
+  if (!polyRe.test(s)) return null;
+  // which noun carries the "in" marker — the CONTAINER
+  const polyContainer = new RegExp(
+    String.raw`(?:ב|בתוך\s+ה?)(?:${POLY_WORDS_HE3})|\bin(?:side)?\s+(?:an?\s+|the\s+)?(?:${POLY_WORDS_EN3})`,
+    'i',
+  ).test(s);
+  const circContainer = /(?:ב|בתוך\s+ה?)מעגל|\bin(?:side)?\s+(?:an?\s+|the\s+)?circle/i.test(s);
+  let circleIsContainer: boolean;
+  if (polyContainer !== circContainer) circleIsContainer = circContainer;
+  else {
+    // neither (or both) marked — fall back to the VERB: «חוסם» names what CONTAINS.
+    const circIdx = s.search(/מעגל|\bcircle\b/i);
+    const polyIdx = s.search(polyRe);
+    if (circIdx < 0 || polyIdx < 0) return null;
+    circleIsContainer = /חוסמ?\s*(?:את\s*)?(?:ה?מעגל)|circumscrib\w*\s+(?:about|around)/i.test(s)
+      ? false
+      : circIdx < polyIdx;
+  }
+  const ring = firstLabelRun(s);
+  if (ring.length < 3) return null; // the polygon must be NAMED — an unnamed one has no ring to fit
+  // an explicitly named circle keeps its letter; otherwise the id is derived from the ring, so the
+  // implicit-reference lane (`c.circles3.length === 1`) still resolves «המעגל»
+  const named = s.match(/(?:מעגל|circle)\s+([A-Z]\d*)/);
+  const id = named ? `circle-${named[1]}` : `circle-${ring.join('')}`;
+  const def: Circle3Def = circleIsContainer ? { kind: 'circum', ring } : { kind: 'incircle', ring };
+  return [{ type: 'circle3', id, def }];
+};
+
 const planarPolygon: Rule = (s) => {
   if (/מנסרה|פירמידה|\bprism\b|\bpyramid\b/i.test(s)) return null;
+  // #442 leftover guard (ADR-024): an INSCRIPTION statement is about the circle of an existing polygon,
+  // not a bare polygon declaration — `polygonCircle3` owns it. Without this, `משולש ABC חסום במעגל`
+  // re-declares the triangle and silently drops the circle (the exact #440 defect).
+  if (/(?:חסומ?|חוסמ?|inscrib\w*|circumscrib\w*)/i.test(s) && /מעגל|\bcircle\b/i.test(s)) return null;
   // #330 leftover guard (ADR-024): a SPECIAL-LINE statement about a derived point/line OF the polygon
   // (a median-meet / bisector / altitude / diagonal-meet) is not a bare polygon declaration — its own
   // rule owns it, and if that rule misses a phrasing this must ESCALATE, never silently drop the derived
@@ -2941,6 +3002,7 @@ export const RULES: Rule[] = [
   heightOfSolid,
   drawArrow, // #72: an unnamed ink arrow — before bareSegment (the noun must not read as a label)
   perpToBase, // #72: the base-directed ⟂ from a point (auto-minted foot)
+  polygonCircle3, // #442: a circle inscribed in / circumscribed about a polygon — BEFORE the polygon rules
   rightTriangle, // #116: `משולש … ישר זווית` — BEFORE planarPolygon (which would swallow bare `משולש`)
   planarPolygon, // V8-g: bare `משולש/מרובע/מחומש` — after the שטח/מפגש/prism/pyramid consumers of those nouns
   bareSegment,
