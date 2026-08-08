@@ -5,6 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 88027cdc-952d-4125-8f14-2fb88bd19212
+  modified: 2026-08-08T20:36:29.798Z
 ---
 
 David is OK throwing away the current code and rebuilding from scratch; the existing repo is a **requirements baseline**, not something to preserve. Goal: a small, free-to-distribute utility for Israeli high-school geometry (teachers/students), no expectation of large scale but must not surprise-bill. Decisions settled June 2026 (see [[vision-and-stall]] for the vision and why the template engine dead-ended):
@@ -21,4 +22,4 @@ David is OK throwing away the current code and rebuilding from scratch; the exis
 
 Planning model: this design work runs on Opus 4.8 (sweet spot); Fable not needed for it.
 
-**Status (2026-06-10):** Phase 1 (engine core) **complete** — `src/engine/` + `phase1.test.ts` 6/6 green, milestone M1. Validation is **corpus-driven**: `docs/sample questions/` holds 7 real bagrut problems (text+image); reproduce each *figure* (never solve), compare visually to the official image. Next: Phase 2 (SVG renderer) → Phase 5a → reproduce Q1. Work on branch `rebuild-foundation`. Note: this memory is **local to one machine**; the cross-computer handoff lives in the repo (`CLAUDE.md` + `docs/`), which syncs via Dropbox. See [[readiness-gate]] and [[bagrut-theorem-source]].
+**This entry records the settled DIRECTION, not status.** Every one of these decisions is long since built; current state is read from the ADR-log tails (`docs/06-decisions.md`, `docs/06b-decisions-3d.md`) and `gh issue list`, never from here. Validation is **corpus-driven**: `docs/sample questions/` holds real bagrut problems (text+image); reproduce each *figure* (never solve), compare against the official image. See [[vision-and-stall]] and [[bagrut-theorem-source]].

@@ -126,7 +126,8 @@ This repo is **one workspace hosting several sibling products**. Every artifact 
 | **Entry / build** | `index.html` · `npm run build` → `dist/` | `3d.html` · `npm run build:3d` → `dist-3d/` | `npm run build:proxy` → `dist-server/` |
 | **Prod path** | `/geo-builder/` | `/3d-builder/` | proxy service `:8788` |
 | **ADR log** | [06-decisions.md](06-decisions.md) (`ADR-NNN`) | [06b-decisions-3d.md](06b-decisions-3d.md) (`ADR-3D-NNN`) | in 06 (repo-wide/infra ADRs also live here) |
-| **Plan / status** | [09-implementation-plan.md](09-implementation-plan.md) + CLAUDE.md current-state | [20-space-vectors-tool.md](20-space-vectors-tool.md) + CLAUDE.md 3-D section | RUNBOOK.md |
+| **Plan / status** | the [06](06-decisions.md) tail + `gh issue list` ([20](20-space-vectors-tool.md)/[09](09-implementation-plan.md) for background) | the [06b](06b-decisions-3d.md) tail + `gh issue list` | RUNBOOK.md |
+| **Orientation file** | [CLAUDE.md](../CLAUDE.md) | [src3d/CLAUDE.md](../src3d/CLAUDE.md) | in the root CLAUDE.md |
 | **Issue label** | `2d` | `3d` | `server` |
 | **Tests (local)** | `npm run test:2d` (= `vitest src/ server/`) | `npm run test:3d` (= `vitest src3d/ server/`) | runs in **every** lane |
 | **CI lane** | `test-2d` | `test-3d` | both |
@@ -134,6 +135,10 @@ This repo is **one workspace hosting several sibling products**. Every artifact 
 | **Save-file suffix** | `-geo` (`<name>-geo.json`, ADR-274) | `-vectors` (`<name>-vectors.json`, ADR-3D-036) | — |
 
 Planned products (recommendation accepted 2026-07-10): **analytic geometry** — the 471 (4-pt) + 572 (5-pt) analytic-geometry questions as ONE engine with curriculum-level profiles (`src-analytic/`, ADR log `06c-decisions-analytic.md`, ids `ADR-AG-NNN`, label `analytic`); **complex numbers** (`src-complex/`, ADR log `06d-decisions-complex.md`, ids `ADR-CX-NNN`, label `complex`).
+
+**Cross-product decisions** — ones belonging to no single product (this registry, the isolation rule, deploy topology, documentation structure) — go in [06w-decisions-workspace.md](06w-decisions-workspace.md) as `ADR-W-nnn`, under the issue label `workspace` ([ADR-W-001](06w-decisions-workspace.md#adr-w-001)). Pre-existing workspace decisions keep their original homes and ids: [ADR-266](06-decisions.md#adr-266) stays in the 2-D log, deliberately — over 200 ADR ids are referenced from docs and code comments, and stable anchors beat tidy filing.
+
+**Orientation files carry no history or status** ([ADR-W-002](06w-decisions-workspace.md#adr-w-002)): CLAUDE.md and src3d/CLAUDE.md say what exists, where it lives, and what must never be done. A dated progress entry belongs in the ADR, which is the copy actually kept current; `server/__tests__/docs-hygiene.test.ts` enforces this in every CI lane.
 
 ### Isolation rules (operator authority — generalizes docs/20 §12)
 
