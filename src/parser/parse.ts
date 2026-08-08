@@ -1438,15 +1438,27 @@ const diameterCutsSegment: Rule = (s, ctx) => {
   return out;
 };
 
-/** "right triangle ABC" / "משולש ישר-זווית ABC" — right angle at the last named vertex. */
-const rightTriangle: Rule = (s) => {
-  if (!/right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זוו?ית/i.test(s)) return null;
-  const cleaned = s.replace(/right[\s-]?angled|right[\s-]?angle|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|ישרה/gi, ' ');
-  const ids = labelRun(cleaned, 3);
-  if (!ids) return null;
-  if (SHAPE_LEFTOVER.test(cleaned)) return 'stop'; // a modifier remains — escalate, don't half-parse
-  return [{ type: 'right-triangle', ids: [ids[0], ids[1], ids[2]] }];
-};
+/**
+ * "right triangle ABC" / "משולש ישר-זווית ABC" — right angle at the last named vertex.
+ *
+ * #446: routed through {@link shapeMacro} like every other shape factory. It used to be hand-written and
+ * returned null with no labels, making it the SINGLE member of the label-less family that did not build —
+ * `משולש` · `ריבוע` · `מלבן` · `מעוין` · `טרפז` · `דלתון קמור` · `משולש שווה שוקיים` · `משולש שווה צלעות`
+ * all auto-name their vertices, and only this one did not. A student who has learned "I can just name the
+ * shape" met one arbitrary exception, which is the kind of inconsistency [ADR-428](docs/06-decisions.md#adr-428)
+ * exists to remove. The factory's own leftover/auto-label discipline is unchanged, so the LABELLED form is
+ * byte-identical.
+ */
+const rightTriangleShape = shapeMacro(
+  /right[\s-]?(?:angled\s+)?triangle|ישר[\s-]?זוו?ית/i,
+  /right[\s-]?angled|right[\s-]?angle|right|triangle|משולש|ישר[\s-]?זוו?ית|זוו?ית|ישרה/gi,
+  3,
+  (ids) => [{ type: 'right-triangle', ids: [ids[0], ids[1], ids[2]] }],
+);
+// The named wrapper keeps this rule NAMED in the shadow-matrix instrument: `shapeMacro` returns an
+// anonymous closure, and the matrix reads `rule.name`, so calling it directly would drop a previously
+// named rule into the `(anon)` bucket and make its diffs unreadable.
+const rightTriangle: Rule = (s, ctx) => rightTriangleShape(s, ctx);
 
 const BISECTOR_KW = /bisector|חוצ/i; // English "bisector"; Hebrew חוצה / חוצי
 

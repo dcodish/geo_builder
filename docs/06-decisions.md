@@ -6172,3 +6172,62 @@ Locked by `stated-shape-equalities.test.ts` (8): both reported shapes and the co
 shapes declaring nothing; the explicit-pair case moving OUT of the channel; a plain triangle declaring
 nothing; and the marks carrying the `stated` flag while forced ticks never do — so the renderer cannot draw
 one as the other.
+
+## ADR-428 — the tool TEACHES the canonical form; it does not merely accept what was typed
+
+**Status:** accepted, 2026-08-08 (operator ruling) · **Governs:** every input path — grammar, LLM fallback,
+guidance register, the step list, and the catalog
+
+**The ruling.** Operator, 2026-08-08:
+
+> "as people enter data, we need to help them enter it correctly. Otherwise it will sometimes work,
+> sometimes not, depending on the LLM behavior. … if a user says `A=40` … the user actually meant angle A
+> equals 40 degrees. The LLM recovered that, but we should tell the user in the future what he needs to
+> write for better performance. And in the input items, instead of writing `A=40` like the user entered,
+> maybe we could enter the correct form. So users see what the correct form is and not just copy-paste
+> what the user did."
+
+**The problem it names.** Accepting a non-canonical phrasing is not neutral. Today `A=40` reaches the LLM,
+which recovers it *this time* — so the student learns that `A=40` works. It is not in the grammar, so
+whether it works next time depends on LLM behaviour: **the same input is sometimes understood and
+sometimes not, and the student has no way to know why.** Worse, the step list echoes their own text back,
+so the sloppy form is what they see, copy, and re-enter. The tool is silently teaching an unreliable
+dialect of its own input language.
+
+This is the input-layer twin of the honesty invariants (docs/17 §6). Those say *never silently drop what
+the student stated*; this says *never silently accept a form you cannot promise to accept again.*
+
+**The decision — three obligations on every input path.**
+
+1. **Prefer the grammar to the LLM.** A phrasing seen from real students belongs in the deterministic
+   grammar, so its behaviour is a property of the code and not of a model's mood. An LLM recovery is a
+   *diagnosis of a missing rule*, not a resolution — the log-triage `llm-built` bucket is a worklist, not
+   a success column.
+2. **Teach on acceptance.** When input is understood but NOT in canonical form, say so and show the
+   canonical form. Reuses the existing input-note channel (the ADR-289 guidance surface); it is a note on
+   a SUCCESSFUL step, never a refusal.
+3. **Echo canonically.** The step list shows the canonical form of what was committed, not the verbatim
+   text. Users copy what they see, so the step list is a teaching surface and must show the form we can
+   promise to accept. The verbatim text is preserved on the fact (and remains reachable) — this is a
+   DISPLAY decision, never a rewrite of what the student said, and it may only fire where the lowering is
+   unambiguous.
+
+**Why the echo is honest.** The step row already claims to describe the committed step. Showing the
+canonical form shows *what the tool understood*, which is strictly more informative than the input text —
+and when the two differ materially, that difference is exactly what the student needs to see. The rule
+that keeps it honest: canonicalise only from the LOWERED COMMANDS, never by re-writing the input string.
+
+**Consequences / what this forbids.** A phrasing may not be left to the LLM once it is known to recur. A
+guidance message may not describe a workaround without naming the canonical form. And a new construct is
+not "done" when it parses — it is done when the canonical form is in `catalog.ts` (which drives the in-app
+commands panel and is the single source of truth for what the tool advertises).
+
+**Build order (the mechanism does not exist yet).** There is no command→text renderer in 2-D
+(`factDisplay3` in 3-D only decorates the utterance; `questionLines` filters verbatim text). Obligation 3
+therefore needs a new `canonicalUtterance(commands, locale)` — but deliberately NOT an inverse of the
+whole parser: it renders the command families we actually teach, and every other step keeps its verbatim
+text. Obligations 1 and 2 are available immediately and land first.
+
+**Open, flagged not decided:** the question export (ADR-251/252) prints the verbatim utterances as the
+paper's givens. Once the step list echoes canonically the two will disagree, and the export is the more
+public artifact — worth the operator's call in the slice that builds obligation 3.
