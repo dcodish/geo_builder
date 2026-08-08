@@ -1460,6 +1460,41 @@ const rightTriangleShape = shapeMacro(
 // named rule into the `(anon)` bucket and make its diffs unreadable.
 const rightTriangle: Rule = (s, ctx) => rightTriangleShape(s, ctx);
 
+/**
+ * #447 (ADR-428) — the BARE vertex angle: `A = 40`, with no angle noun at all.
+ *
+ * Measured in prod: two students, the identical flow (`דלתון קמור` → `A=40` → a point on a side → a
+ * perpendicular). Both meant *angle A = 40°*, and the LLM recovered it — which is exactly the failure
+ * ADR-428 names: it worked that day, and whether it works the next depends on the model rather than on
+ * this codebase. A phrasing real students use belongs in the grammar.
+ *
+ * The angle machinery already exists — ADR-164 resolves a single-vertex angle from `ctx.neighbors` — and
+ * the ONLY thing missing was the noun-less spelling, since every angle rule is hard-gated on
+ * `angle|∠|זוו?ית` before anything else.
+ *
+ * Guards, in order of what they protect:
+ *  - the label must be an EXISTING POINT, so a bound radius symbol (`R = 5`) or an area marker
+ *    (`S = 13`) is never stolen — those are not points;
+ *  - registered AFTER `setRadius` / `radiusRelation` / `area` so those keep precedence outright;
+ *  - exactly two edges at the vertex, else the existing `ambiguous-angle` clarification ("name all three
+ *    letters") — never a guess about which angle was meant.
+ *
+ * Accepting it is only half the obligation: `teachCanonical` surfaces the canonical spelling on commit,
+ * so the student learns the form rather than keeping a habit that happens to work.
+ */
+const bareVertexAngle: Rule = (s, ctx) => {
+  // UPPERCASE only: in this grammar a lowercase letter is a SYMBOL (a unit variable `a = 6`, a bound
+  // radius symbol `r`), never a point label. Coercing case here claimed `a = 6` and — because a vertex
+  // with a different edge count clarifies — made it unparseable, killing the symbolic-unit rule downstream.
+  const m = s.match(/^\s*([A-Z]\d*)\s*=\s*(\d+(?:\.\d+)?)\s*°?\s*\.?\s*$/);
+  if (!m) return null;
+  const v = m[1];
+  if (!(ctx.points ?? []).includes(v)) return null; // not a point → not an angle statement
+  const nb = (ctx.neighbors ?? {})[v] ?? [];
+  if (nb.length !== 2) return { clarify: 'ambiguous-angle', vertex: v };
+  return [{ type: 'set-angle', vertex: v, ray1: nb[0], ray2: nb[1], value: Number(m[2]) }];
+};
+
 const BISECTOR_KW = /bisector|חוצ/i; // English "bisector"; Hebrew חוצה / חוצי
 
 /**
@@ -7868,6 +7903,7 @@ export const RULES: Rule[] = [
   angleEquality, // "∠ABC = ∠DEF" (two angles equal, incl. single-vertex «∠B=∠C» via ctx.neighbors — #235) — before measureAngle/angle, which expect a value RHS
   measureAngle, // "∠ABC = 2α" (symbolic) — before `angle`, which reads the coef as the degree value
   angle,
+  bareVertexAngle, // #447: `A = 40` — the noun-less vertex angle; AFTER setRadius/radiusRelation/area (which own `R = 5` / `S = 13`) and after every angle rule
   tangentsFromExternal, // TWO tangents from an external point — before the single tangentLine
   tangentFromExternal, // ONE tangent from an external point — before tangentLine (tangent AT a point)
   tangentLine, // a *drawn* tangent (after the tangent∩line compound)

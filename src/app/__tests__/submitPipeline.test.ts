@@ -216,3 +216,27 @@ describe('#436 — a negated statement is refused, never committed as its opposi
     expect(useGeoStore.getState().facts.length).toBeGreaterThan(before);
   });
 });
+
+describe('#447 (ADR-428) — the canonical form is TAUGHT on a successful commit', () => {
+  it('`A=40` commits AND leaves a hint naming the canonical spelling', async () => {
+    const { deps, notes } = makeDeps();
+    await runSubmit('דלתון קמור', deps);
+    const before = useGeoStore.getState().facts.length;
+
+    await runSubmit('A=40', deps);
+
+    // committed — this is a note on SUCCESS, never a refusal
+    expect(useGeoStore.getState().facts.length).toBeGreaterThan(before);
+    expect(notes().some((n) => n.startsWith('input.canonicalHint'))).toBe(true);
+    expect(llmParseMock).not.toHaveBeenCalled(); // the grammar owns it now, not the model
+  });
+
+  it('the canonical form commits with NO hint — we never nag someone writing it right', async () => {
+    const { deps, notes } = makeDeps();
+    await runSubmit('דלתון קמור', deps);
+    const before = useGeoStore.getState().facts.length;
+    await runSubmit('זווית A = 40', deps);
+    expect(useGeoStore.getState().facts.length).toBeGreaterThan(before);
+    expect(notes().some((n) => n.startsWith('input.canonicalHint'))).toBe(false);
+  });
+});

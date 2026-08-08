@@ -32,6 +32,7 @@ import {
   impliedCircleBinding,
   looksCompound,
   looksLikeLatex,
+  teachCanonical,
   statedNegation,
   wordRootMagnitude,
   splitGuidance,
@@ -322,6 +323,11 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
         // parse, so real traffic accumulates the divergence evidence the flip decision needs.
         const shadow = spanShadow(utterance, r.commands, { existingPoints: pctx.points, radiusSymbols: (pctx.radiusSymbols ?? []).map((x) => x.name), angleAliases: (pctx.angleAliases ?? []).map((x) => x.name) });
         logDebug({ kind: 'input', utterance, locale, source: 'parser', commands: r.commands, ...(shadow ? { spanShadow: shadow } : {}) });
+        // ADR-428 obligation 2 — TEACH on acceptance. The step committed; if the phrasing was understood
+        // but is not the canonical form, show the canonical spelling so the habit the student builds is
+        // one we can promise to honour. A note on a SUCCESSFUL step, never a refusal.
+        const teach = teachCanonical(utterance, r.commands, locale);
+        if (teach) ui.setInputNote(t('input.canonicalHint', { canonical: teach }));
         ui.clearText();
         deps.resolveAfterCommit();
         return;

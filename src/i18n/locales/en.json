@@ -87,7 +87,8 @@
     "tangentsExhaustedNoInternal": "Circles in this configuration have no internal common tangent.",
     "tangentsExhaustedExtTangent": "All three common tangents are already drawn — externally tangent circles have exactly three: two separate and one at the touch point.",
     "tangentsExhaustedTouchTaken": "The only internal tangent — the one at the touch point — is already drawn.",
-    "tangentsExhaustedIntTangent": "The single common tangent is already drawn — internally tangent circles have exactly one, at the touch point."
+    "tangentsExhaustedIntTangent": "The single common tangent is already drawn — internally tangent circles have exactly one, at the touch point.",
+    "canonicalHint": "Got it. Next time you can write: {{canonical}} — that form always works."
   },
   "explore": {
     "title": "Explore the figure"
