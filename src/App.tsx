@@ -394,7 +394,7 @@ export default function App() {
   // to Figure's ✕ export flash.
   const saveQuestion = async (png: Blob) => {
     const { pngDimensions, questionDocxBlob, questionFileName } = await import('@/export/questionDoc');
-    const lines = questionLines(useGeoStore.getState().facts);
+    const lines = questionLines(useGeoStore.getState().facts, canonLocale);
     const data = new Uint8Array(await png.arrayBuffer());
     const blob = await questionDocxBlob({
       title: useGeoStore.getState().figureName.trim() || undefined,
@@ -931,7 +931,7 @@ export default function App() {
             onLoadFile={() => fileInputRef.current?.click()}
             saveFileDisabled={facts.length === 0}
             onSaveQuestion={saveQuestion}
-            saveQuestionDisabled={questionLines(facts).length === 0}
+            saveQuestionDisabled={questionLines(facts, canonLocale).length === 0}
           />
           {/* Empty canvas → a call to action so a new user knows what to do. The
               container ignores pointer events (so panning isn't blocked); the
