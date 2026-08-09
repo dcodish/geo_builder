@@ -1198,8 +1198,48 @@ const perpToBase: Rule = (s) => {
     s.match(/^ה?אנך\s+(?:ה?יורד\s+)?מ-?\s*([A-Z]\d*'?)\s*ל-?\s*ה?בסיס\s*$/) ??
     s.match(/^מ-?\s*([A-Z]\d*'?)\s+(?:מורידים|הורידו|מעבירים|העבירו)\s+אנך\s+ל-?\s*ה?בסיס\s*$/) ??
     s.match(/^(?:drop\s+)?(?:a\s+|the\s+)?perpendicular\s+from\s+([A-Z]\d*'?)\s+to\s+(?:the\s+)?base\s*$/i);
+  if (m) return [{ type: 'perp-to-base', from: m[1] }];
+  return heightFromApex(s);
+};
+
+/**
+ * #448 — the height stated by its APEX instead of by its segment: `גובה הפירמידה מנקודה D`,
+ * `גובה לפירמידה מ-D`, `גובה מנקודה D לבסיס ABC`, `גובה מ D לבסיס`.
+ *
+ * Operator, 2026-08-09: *"I want to be able to support גובה הפירמידה מנקודה X … without having to name
+ * the segment (of course we can if user wants but tool should understand the meaning)."* Every existing
+ * `גובה` rule requires the student to name the segment FIRST (`AS גובה הפירמידה`, `CD גובה במשולש ABC`),
+ * which is not how a bagrut question words it — it names the apex and the base, and the foot is a point
+ * the student never mentions. That foot is exactly what `perp-to-base` already auto-mints (#72), so this
+ * is a phrasing gap, not a missing construct: the whole family lowers onto the existing command.
+ *
+ * **A solid noun or a base clause is REQUIRED — the bare `גובה מנקודה D` deliberately does not match.**
+ * The operator ruled that form genuinely unclear (#467: no solid, no base, nothing to drop onto), so it
+ * must keep falling through to the guidance register rather than being silently resolved here. That is
+ * the one thing this rule must not over-reach on, and it is why the two optional groups are checked
+ * rather than merely allowed.
+ */
+const heightFromApex: Rule = (s) => {
+  const L = String.raw`([A-Z]\d*'?)`;
+  const FROM = String.raw`מ-?\s*(?:נקודה\s+|ה?קודקוד\s+)?`;
+  const SOLID = String.raw`(?:ה|ל|של\s+ה)?(?:פירמידה|מנסרה|חרוט|גוף)`;
+  const m =
+    s.match(new RegExp(`^ה?גובה(\\s+${SOLID})?\\s+${FROM}${L}(?:\\s+ל-?\\s*ה?בסיס(?:\\s+${L}${L}${L})?)?\\s*$`)) ??
+    s.match(
+      new RegExp(
+        `^(?:the\\s+)?(?:height|altitude)(\\s+(?:of|to)\\s+(?:the\\s+)?(?:pyramid|prism|cone|solid))?` +
+          `\\s+from\\s+(?:point\\s+|vertex\\s+)?${L}(?:\\s+to\\s+(?:the\\s+)?base(?:\\s+${L}${L}${L})?)?\\s*$`,
+        'i',
+      ),
+    );
   if (!m) return null;
-  return [{ type: 'perp-to-base', from: m[1] }];
+  const [, solid, from, b1, b2, b3] = m;
+  const face = b1 && b2 && b3 ? [b1, b2, b3] : undefined;
+  // the base clause is present iff the utterance said בסיס/base at all — a named face implies it
+  const saidBase = /ל-?\s*ה?בסיס|to\s+(?:the\s+)?base/i.test(s);
+  if (!solid && !saidBase) return null; // the #467 bare form — guidance, never a guess
+  if (face && new Set(face).size !== 3) return null;
+  return [{ type: 'perp-to-base', from, ...(face ? { face } : {}) }];
 };
 
 /** A bare auxiliary segment: `AM` / `קטע AM` / `segment CA'` — plus the #72 prod forms: the

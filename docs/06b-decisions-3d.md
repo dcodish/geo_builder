@@ -2034,3 +2034,47 @@ gates differently and does not carry this defect. Confirmed by measurement, not 
 **Locked** in `dropped-construct.test.ts`: both locales must still carry `{{items}}` and must not contain
 the partial-commit phrasing — a property over the copy, so a future rewording cannot quietly reintroduce
 the claim.
+
+## ADR-3D-115 — a height is stated by its APEX, not by its segment
+
+**Status:** accepted, 2026-08-09 · **Issue:** #448 (feature) · **Boundary:** #467 (the bare form)
+
+**The ask.** Operator, 2026-08-09: *"I want to be able to support `גובה הפירמידה מנקודה X` just like we
+support in the 2-D `גובה מנקודה A`, without having to name the segment (of course we can if user wants but
+tool should understand the meaning)."*
+
+**The gap, measured.** Every `גובה` rule in this tree required the student to name the segment FIRST —
+`AS גובה הפירמידה`, `CD גובה במשולש ABC`, `DE גובה בטטראדר`, `AF גובה הפירמידה לפאה BDC`. Each of those
+builds today. But a bagrut question does not word it that way: it names the **apex** and the **base**, and
+the FOOT is a point the question never mentions. So the supported set was exactly the phrasings a student
+would not type, and `גובה הפירמידה מנקודה D`, `גובה לפירמידה מנקודה D`, `גובה מנקודה D לבסיס ABC` and
+`גובה מ D לבסיס ABC` were all `not-handled`.
+
+**The finding: this is a PHRASING gap, not a missing construct.** The foot nobody names is exactly what
+`perp-to-base` has auto-minted since [#72](#adr-3d-035) — it mints the first unused label at apply and
+delegates to `height-to-face`. So the whole family lowers onto the existing command and **no geometry was
+written for this ADR**. The rule joins `perpToBase` (last, after every segment-named owner), which is why
+the shadow matrix shows a **pure addition: 4 new catalog rows, 0 changed winners.**
+
+**One engine change, and it is an honesty fix rather than a capability.** `perp-to-base` gains an optional
+`face`. Without it, apply resolves the figure's single solid — correct for `גובה הפירמידה מנקודה D`, and it
+still refuses when several solids make the base ambiguous. But `גובה מנקודה D לבסיס ABC` **names** the base,
+and resolving `solids[0].ids.slice(0,3)` there would drop the height onto a different plane while reporting
+success: the student's own words, silently overridden. A stated base now wins, and a base naming a point
+that does not exist refuses instead of inventing it.
+
+**The boundary is the operator's earlier ruling, and the rule enforces it deliberately.** The bare
+`גובה מנקודה D` — no solid, no base — he ruled genuinely unclear (#467, guidance rather than a guess). The
+new rule therefore requires **a solid noun or a base clause**, and returns null otherwise, so the bare form
+keeps falling through to the guidance register. That check is the one thing this rule must not relax: with
+both groups merely optional it would happily claim the ambiguous form and start guessing a base. Locked
+with the supported phrasings, in the same file, so the two can never drift apart.
+
+**Locked** by `height-from-apex.test.ts` (12): every new phrasing asserted GEOMETRICALLY on the resolved
+figure — the foot lies in the base plane and apex→foot runs along the base normal, never "a command was
+emitted" — plus the stated-base case built on a face that is *not* the solid's first (the assertion that
+would have passed under the old resolution and is the point of the engine change), the ambiguity refusals,
+the four segment-named forms keeping their existing owners, and the #467 bare form staying `not-handled`.
+
+**Still open in #448:** `גובה הפירמידה` with **no apex named**. It needs the apex derived from the solid's
+vertex layout, which is figure resolution of a different kind, and it is not what was asked for here.
