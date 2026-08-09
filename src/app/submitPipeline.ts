@@ -16,6 +16,7 @@
  *  - the store is RE-READ after every await that can yield to user actions (the stale-commit race);
  *  - the honesty gates run on BOTH commit paths — a partial parse is never committed.
  */
+import { ltrIsolate } from '@/i18n/bidi';
 import {
   buildParseCtx,
   classifyOutOfScope,
@@ -332,8 +333,13 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
         // ADR-428 obligation 2 — TEACH on acceptance. The step committed; if the phrasing was understood
         // but is not the canonical form, show the canonical spelling so the habit the student builds is
         // one we can promise to honour. A note on a SUCCESSFUL step, never a refusal.
+        // BIDI (#464): the hint splices this LTR run into an RTL Hebrew sentence, and `∠BAC = 50` opens
+        // with a NEUTRAL glyph — which the bidi algorithm resolves to the paragraph direction and lays
+        // out on the wrong side of its own letters. Isolated at the interpolation, never inside the
+        // value: the canonical text is re-parsed in its round-trip test and must stay exactly what a
+        // student would type.
         const teach = teachCanonical(utterance, r.commands, locale);
-        if (teach) ui.setInputNote(t('input.canonicalHint', { canonical: teach }));
+        if (teach) ui.setInputNote(t('input.canonicalHint', { canonical: ltrIsolate(teach) }));
         ui.clearText();
         deps.resolveAfterCommit();
         return;

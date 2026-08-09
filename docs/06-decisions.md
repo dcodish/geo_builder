@@ -6258,6 +6258,23 @@ cases, so the invariant survived by omission. The input box is RTL Hebrew, where
 visually ambiguous about which way it points — precisely the argument for "helpfully" adding `>` later and
 silently turning every `DE > FG` into an angle. Locked in that file.
 
+*The glyph needs BIDI ISOLATION, and the word form was hiding that (#464).* Operator, on playing the
+amendment: the hint rendered `∠BAC = 50` with the glyph detached to the wrong end. `∠` is a **neutral**
+character, so between the Hebrew sentence and the Latin labels the bidi algorithm resolves it to the
+paragraph direction (RTL) and lays it out on the far side of the letters it introduces. `זווית BAC = 50`
+never showed this because it opens with a strong RTL character — the amendment did not create the
+weakness, it removed the accident that was masking it.
+
+Isolated with U+2066/U+2069 via `ltrIsolate` (`src/i18n/bidi.ts`) **at the interpolation site, never
+inside the value**: the canonical text is re-parsed by `parse()` in its own round-trip test, and baking
+layout characters into it would make the taught string differ from what a student would type. Isolates
+rather than the older LRE/PDF embeddings, because they cannot leak if the sentence is truncated. The same
+class exists in **five other authored strings** where the run is literal rather than interpolated and the
+helper cannot reach it — `input.ambiguousAngle` (a teaching string, so a student copies the mis-ordered
+form), `input.scope.latex`, `input.scope.compound-relation`, and two in `src3d/`. Measured by scanning
+both Hebrew locales, and filed as **#464** with the three candidate approaches rather than fixed here:
+they are pre-existing and unreported, and two belong to the other product's lane.
+
 ## ADR-429 — honesty accounting is a MULTISET: an occurrence predicate, not a value predicate
 
 **Status:** accepted, 2026-08-09 · **Issue:** #437 (bug) · **Split out:** #458 (the capability half) ·

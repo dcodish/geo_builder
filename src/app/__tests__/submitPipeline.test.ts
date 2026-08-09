@@ -239,4 +239,17 @@ describe('#447 (ADR-428) — the canonical form is TAUGHT on a successful commit
     expect(useGeoStore.getState().facts.length).toBeGreaterThan(before);
     expect(notes().some((n) => n.startsWith('input.canonicalHint'))).toBe(false);
   });
+
+  it('the hint is BIDI-ISOLATED — an RTL sentence cannot reorder «∠BAC = 50» (#464)', async () => {
+    // `∠` is a NEUTRAL character: between the Hebrew sentence and the Latin labels the bidi algorithm
+    // resolves it to the paragraph direction and lays it out on the far side of its own letters. The
+    // word form this replaced opened with a strong RTL character, which is why it never showed.
+    const { deps, notes } = makeDeps();
+    await runSubmit('דלתון קמור', deps);
+    await runSubmit('A=40', deps);
+    const hint = notes().find((n) => n.startsWith('input.canonicalHint'));
+    expect(hint).toBeTruthy();
+    expect(hint, 'the canonical run is wrapped in LRI…PDI').toContain('⁦∠');
+    expect(hint).toContain('⁩');
+  });
 });
