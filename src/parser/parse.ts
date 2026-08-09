@@ -9106,6 +9106,90 @@ export function droppedRadiusSymbol(utterance: string, commands: AnyCommand[]): 
   return accounted ? [] : [...new Set(syms)];
 }
 
+/** The shape DECLARATIONS — a bare n-gon assertion and nothing else. Everything the parser can emit
+ *  outside this set is, by construction, something beyond the shape: a segment, a derived point, a
+ *  constraint, a circle, a measure. (`right-triangle` is a declaration too — its right angle is part of
+ *  the shape's identity, not a construct drawn ON it.) */
+const BARE_SHAPE_TYPES = new Set([
+  'square', 'quadrilateral', 'parallelogram', 'rectangle', 'rhombus',
+  'trapezoid', 'triangle', 'right-triangle', 'polygon',
+]);
+/** A shape declaration's OWN identity. A key past these is payload the shape is carrying for the
+ *  student (`square.side`), which accounts for a stated magnitude the same way a separate command does. */
+const BARE_SHAPE_KEYS = new Set(['type', 'ids']);
+/** Nouns that name an OBJECT OF THEIR OWN — something a bare shape declaration can never be. A shape's
+ *  own PROPERTY (right-angled, isosceles, convex) is deliberately absent: `shape-variant` and the
+ *  convexity gates own those, and double-gating would refuse working input. Both Hebrew forms of the
+ *  final nun are spelled out — this tree folds no final letters (cf. `נחתך`/`נחתכ`, :1180). */
+const CONSTRUCT_NOUNS =
+  /מעגל|אלכסו[ןנ]|גובה|גבהי|תיכו[ןנ]|חוצ[הת]?[-\s]?זו?וית|\b(?:circle|diagonal|altitude|height|median|bisect\w*)\b/i;
+
+/**
+ * A stated CONSTRUCT NOUN that no command produced — issue #456, [ADR-430](../../docs/06-decisions.md#adr-430).
+ *
+ * The class, ported from 3-D's `droppedConstructNoun3` ([ADR-3D-113](../../docs/06b-decisions-3d.md#adr-3d-113))
+ * as a PATTERN, never an import (docs/20 §12 — the products share no code): *a sentence states two
+ * objects, a shape and a construct on it; the one rule that recognises its own noun claims the whole
+ * utterance, emits only its own object, and silently discards the rest.* `מלבן ABCD עם אלכסונים`
+ * committed a bare rectangle with a green ✓, and none of the seven deterministic gates could see it —
+ * they ask about labels, numbers, relations, verbs, compounds, word-relations and comparisons, and
+ * **nothing asked whether a stated object materialised at all.**
+ *
+ * The accounting is the class predicate itself, not a per-noun map of "which object kind should this
+ * produce". That map is what the 3-D draft tried first, and it false-flagged 28 working inputs, because
+ * the lowerings are genuinely many-to-many: a diagonal lowers to a `segment` OR a `line-line-intersection`
+ * («האלכסונים נחתכים בנקודה E»), an altitude to a `foot`, a median to a `midpoint`. Enumerating them
+ * recreates the enumeration-is-not-a-rule trap. The generic question does not:
+ *
+ * > a stated construct noun is accounted when the commands carry **anything beyond the bare shape
+ * > declarations** — any non-shape command at all, or a shape carrying payload past its own identity.
+ *
+ * Generous by construction, per the gate doctrine: a false account only suppresses a warning, while a
+ * false drop would refuse a working input. The noun set grows by measured demand, exactly like the
+ * catalog — a construct with no noun here is simply not yet guarded, which is where 2-D already was.
+ *
+ * **The RESTATEMENT account is 2-D's own, and it is why this is a port and not a copy.** 3-D's M1 emits
+ * a flat polygon unconditionally and lets `apply` no-op it, so its commands always narrate the whole
+ * sentence. 2-D decided the opposite at [ADR-156](../../docs/06-decisions.md#adr-156): a construct REUSES
+ * an existing object satisfying its definition, and the rule then emits nothing for it — re-typing
+ * «מרובע ABCD חסום במעגל» lowers to two idempotent `quadrilateral` re-declarations, the circle omitted
+ * precisely because it is already there and re-minting it stacked duplicate centres. Measured: that is
+ * the ONLY false flag in 1202 committed corpus steps. So the account is "did this utterance assert
+ * anything NEW" — an utterance that introduces no new point restated a figure that already holds its
+ * construct, and has nothing to drop.
+ *
+ * The known boundary, stated honestly: a construct noun added to an ALREADY-DECLARED shape
+ * («מלבן ABCD» then «מלבן ABCD עם אלכסונים») introduces no new point either, so it is not flagged.
+ * Closing that needs the question *"is the construct on the figure?"*, which is noun-by-noun — the
+ * enumeration this gate exists to avoid. Per the doctrine the miss is a lost warning, never a false
+ * refusal, and the principled fix is the other end: have the reuse path reference the object it reused
+ * so the commands narrate the sentence, as 3-D's M1 already does.
+ */
+export function droppedConstructNoun(
+  utterance: string,
+  commands: AnyCommand[],
+  existingPoints: Id[] = [],
+): string[] {
+  const s = normalizeUtterance(utterance);
+  const m = s.match(CONSTRUCT_NOUNS);
+  if (!m) return [];
+  const accounted = commands.some(
+    (c) => !BARE_SHAPE_TYPES.has(c.type) || Object.keys(c).some((k) => !BARE_SHAPE_KEYS.has(k)),
+  );
+  if (accounted) return [];
+  const have = new Set(existingPoints);
+  const assertsSomethingNew = commands.some((c) =>
+    ((c as { ids?: Id[] }).ids ?? []).some((id) => !have.has(id)),
+  );
+  if (!assertsSomethingNew) return [];
+  // Report the student's WHOLE word, never the regex's stem: the Hebrew alternatives match an inflection
+  // point («אלכסו[ןנ]» stops mid-word on the plural «אלכסונים»), and an error naming «אלכסונ» would be
+  // naming our own pattern rather than what they typed — the honesty invariant is the STATEMENT.
+  let end = m.index! + m[0].length;
+  while (end < s.length && /[א-ת]/.test(s[end])) end++;
+  return [s.slice(m.index!, end)];
+}
+
 /**
  * Radius-symbol BINDING post-pass (issue #54 — the ADR-119 chokepoint pattern, so EVERY circle rule
  * gains the "שרדיוסו r" binding at once instead of each rule learning the clause): a stated symbolic

@@ -6306,3 +6306,67 @@ always honest, the class member beyond dimensions (`מלבן 4 על 4`), and —
 generosity cases that must NOT flag, so the fix cannot quietly become strict: two sides stated at the same
 length, two angles stated at the same size, and an occurrence still reaching every candidate lowering.
 
+
+## ADR-430 — a stated OBJECT must materialise in 2-D too: the dropped-construct gate
+
+**Status:** accepted, 2026-08-09 · **Issue:** #456 (bug) · **Sibling of:** [ADR-3D-113](06b-decisions-3d.md#adr-3d-113)
+
+**The class.** *A sentence states two objects — a shape and a construct on it. The one rule that
+recognises its own noun claims the whole utterance, emits only its own object, and silently discards the
+rest.* Found in `src/` by the sibling audit (docs/17 §1 / [ADR-W-004](06w-decisions-workspace.md)) run
+while fixing the 3-D twins #438/#440, and **measured, not assumed**: `מלבן ABCD עם אלכסונים` lowered to a
+bare `rectangle A,B,C,D`, the diagonals gone, committed with a green ✓. 2-D runs **seven** deterministic
+honesty gates plus four narrow object-ish ones, and they ask about labels, numbers, relations, verbs,
+compound structure, word-relations and comparisons — **none asks whether a stated object materialised at
+all.** A rule can only drop what no gate is watching.
+
+Narrower than 3-D's by luck rather than by mechanism: the other three phrasings (`ריבוע ABCD עם אלכסון`,
+`משולש ABC עם גובה`, `משולש ABC עם תיכון`) happen to be `not-handled` today, which is honest. Luck is not
+a guard, and a capability landing on any of those phrasings would open the hole without touching the gate.
+
+**Decision — the MECHANISM only; the capability is a feature.** `droppedConstructNoun`, copied from
+`droppedConstructNoun3` as a **pattern, never imported** (docs/20 §12 — `src/` and `src3d/` share no
+code), wired beside the existing seven on the deterministic path **and** into the LLM seam. Bound to the
+commit EVENT, not to a code path, for the reason `src3d/CLAUDE.md` already states: *a guard bound to a
+code path rather than to the event it guards will be bypassed* — both reported 3-D drops were GRAMMAR
+drops, where the LLM-seam gates never run. Building `מלבן ABCD עם אלכסונים` deterministically is a
+missing **capability**, so per CLAUDE.md it is a feature, filed separately, never built under a bug's
+banner. Until it lands, the utterance escalates to the LLM instead of committing a lie — which is the
+correct rung of the ladder for input the grammar cannot represent.
+
+**The accounting is the class predicate itself.** Not a per-noun map of "which object kind should this
+noun produce" — that draft is what false-flagged 28 working inputs in 3-D, because the lowerings are
+genuinely many-to-many: a diagonal lowers to a `segment` OR to a `line-line-intersection`
+(«האלכסונים נחתכים בנקודה E»), an altitude to a `foot`, a median to a `midpoint`. Enumerating them
+recreates the enumeration-is-not-a-rule trap. The generic question does not:
+
+> a stated construct noun is accounted when the commands carry **anything beyond the bare shape
+> declarations** — any non-shape command at all, or a shape carrying payload past its own identity.
+
+**The RESTATEMENT account is 2-D's own, and it is the finding that makes this a port and not a copy.**
+3-D's M1 emits a flat polygon unconditionally and lets `apply` no-op it, so its commands always narrate
+the whole sentence. 2-D decided the opposite at [ADR-156](#adr-156): a construct **reuses** an existing
+object satisfying its definition, and the rule then emits nothing for it. Re-typing
+`מרובע ABCD חסום במעגל` lowers to two idempotent `quadrilateral` re-declarations with **no circle command
+at all** — precisely because the circle is already there and re-minting it stacked duplicate centres.
+Measured against the whole corpus, that was the **only** false flag in 1202 committed steps. Refusing it
+would break a working input, so the account gains one clause: an utterance that introduces **no new
+point** restated a figure that already holds its construct, and has nothing to drop.
+
+**The boundary, stated honestly.** A construct noun added to an ALREADY-DECLARED shape (`מלבן ABCD` then
+`מלבן ABCD עם אלכסונים`) introduces no new point either, so it is **not** flagged. Closing that needs the
+question *"is the construct on the figure?"*, which is noun-by-noun — the enumeration this gate exists to
+avoid. Per the gate doctrine the miss is a lost warning, never a false refusal. The principled fix is at
+the other end: have the ADR-156 reuse path **reference** the object it reused, so the commands narrate the
+sentence as 3-D's M1 already does. Filed, not smuggled in here.
+
+**Measurement (the reason to trust the generosity).** 0 flags across **294** supported catalog examples in
+both locales; 0 flags across **1202** committed steps of the reported-bug scenario corpus. The gate reports
+the student's **whole word**, not the regex stem — `אלכסו[ןנ]` stops mid-word on the plural, and an error
+naming `אלכסונ` would name our own pattern rather than their statement.
+
+**Locked** by `dropped-construct-noun.test.ts` (the audit case, the whole-word reporting, the bare-shape
+no-ops, the six generosity lowerings, the ADR-156 reuse case, and the catalog net) plus `gateProps` in
+`scenarios-harness.ts` — a corpus-wide property called from each of the eight shards against the fact list
+they already built, so it costs no extra solve ([ADR-394](#adr-394)) and counts the steps it examined so it
+cannot pass vacuously.

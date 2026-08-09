@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SCENARIOS, factsOf, replayFacts, sweepSeeds, roundTripProps, newRoundTripCounters } from './scenarios-corpus';
+import { SCENARIOS, factsOf, replayFacts, sweepSeeds, roundTripProps, newRoundTripCounters, gateProps } from './scenarios-corpus';
 
 // Slice 6/8 of the end-to-end scenario corpus (issue #60): membership is index % 8 === 5.
 // Same tests, same assertions as the old single-file loop — sharded so vitest's per-FILE parallelism
@@ -12,6 +12,7 @@ import { SCENARIOS, factsOf, replayFacts, sweepSeeds, roundTripProps, newRoundTr
 // corpus-wide files costing 601 s and 765 s.
 describe('reported scenarios — end-to-end replay of real bug reports (slice 6/8)', () => {
   const rt = newRoundTripCounters();
+  const gc = { gateChecked: 0 };
 
   for (const [i, sc] of SCENARIOS.entries()) {
     if (i % 8 !== 5) continue;
@@ -29,15 +30,19 @@ describe('reported scenarios — end-to-end replay of real bug reports (slice 6/
       sweepSeeds(sc, facts);
       // The E7 store-op round-trip properties (ADR-206), against the same facts.
       roundTripProps(sc, facts, rt);
+      // The honesty-gate false-positive net (#456/ADR-430): every committed step of a reported-bug
+      // scenario is input that must keep working, so the corpus IS the generosity net.
+      gateProps(sc, facts, gc);
     });
   }
 
   // No silent caps: the round-trip properties must have actually run on this slice. If a store-op
   // signature changes so every `swap`/`rename`/`toggle` bails, the properties would pass vacuously —
   // this fails instead. Runs last; vitest executes a file's tests in declaration order.
-  it('the round-trip properties were exercised on this slice', () => {
+  it('the round-trip and gate properties were exercised on this slice', () => {
     expect(rt.swapped, 'swap∘swap exercised').toBeGreaterThan(0);
     expect(rt.renamed, 'rename round-trip exercised').toBeGreaterThan(0);
     expect(rt.toggled, 'disable/re-enable exercised').toBeGreaterThan(0);
+    expect(gc.gateChecked, 'construct-noun gate net exercised').toBeGreaterThan(0);
   });
 });

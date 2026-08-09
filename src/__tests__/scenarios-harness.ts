@@ -34,10 +34,10 @@
  */
 
 import { expect } from 'vitest';
-import { parse, buildParseCtx, impliedCircleBinding } from '@/parser';
+import { parse, buildParseCtx, impliedCircleBinding, droppedConstructNoun } from '@/parser';
 import { replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, meetsRequirements, useGeoStore } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
-import { freeDofs } from '@/engine';
+import { freeDofs, isGeoPoint } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 
 export type Step =
@@ -402,5 +402,38 @@ export const convexQuad = (fig: Derived, ids: [Id, Id, Id, Id], center: Id, minG
     expect(gap, `gap after vertex ${ids[i]}`).toBeGreaterThan((minGapDeg * Math.PI) / 180);
   }
 };
+
+/**
+ * Corpus-wide FALSE-POSITIVE net for the construct-noun honesty gate (#456, ADR-430).
+ *
+ * A honesty gate is only as good as its generosity: one that refuses working input is strictly worse
+ * than the silent drop it replaces, and 3-D's first draft of this gate false-flagged 28 working inputs.
+ * Every committed step of every reported-bug scenario is, by definition, input that must keep working —
+ * so the whole corpus doubles as the net. Runs against the fact list the shard already built, so it
+ * costs no extra solve (ADR-394: a corpus-wide property lives HERE, called per-scenario, never in a new
+ * file that would re-pay every cold replay).
+ *
+ * Counts the steps it actually examined so a signature change can't make it pass vacuously.
+ */
+export function gateProps(sc: Scenario, facts: Fact[], c: { gateChecked: number }): void {
+  const key = (f: Fact) => f.group ?? f.id;
+  const order: string[] = [];
+  const byGroup = new Map<string, { utterance: string; cmds: AnyCommand[] }>();
+  for (const f of facts) {
+    const k = key(f);
+    if (!byGroup.has(k)) { byGroup.set(k, { utterance: f.utterance ?? '', cmds: [] }); order.push(k); }
+    byGroup.get(k)!.cmds.push(f.cmd);
+  }
+  for (const g of order) {
+    const { utterance, cmds } = byGroup.get(g)!;
+    const prior = facts.slice(0, facts.findIndex((f) => key(f) === g));
+    const pts = replay(prior).construction.objects.filter(isGeoPoint).map((o) => o.id);
+    c.gateChecked++;
+    expect(
+      droppedConstructNoun(utterance, cmds, pts),
+      `[${sc.id}] droppedConstructNoun must not refuse a working step: «${utterance}»`,
+    ).toEqual([]);
+  }
+}
 
 // ── the scenarios (newest first) ───────────────────────────────────────────

@@ -21,6 +21,7 @@ import {
   classifyOutOfScope,
   droppedComparison,
   droppedCompoundRelation,
+  droppedConstructNoun,
   droppedGivenNumbers,
   droppedGivenRelations,
   droppedGivenVerbs,
@@ -299,7 +300,12 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     // A lowering with no bound/order constraint read it as the EQUALITY at the bound — every label and
     // the number itself land, so no older gate fires. Never commit the student's ">" as an "=".
     const droppedCmp = droppedComparison(utterance, r.commands);
-    if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0 && droppedVerbs.length === 0 && droppedCompound.length === 0 && droppedWordRels.length === 0 && !droppedCmp) {
+    // The OBJECT sibling (ADR-430, #456 — the 3-D ADR-3D-113 class, ported as a pattern): the utterance
+    // states a shape AND a construct on it, and the rule that recognised its own noun emitted only the
+    // shape («מלבן ABCD עם אלכסונים» → a bare rectangle, ✓). Every gate above asks about labels, numbers,
+    // relations, verbs, compounds, words and comparisons — none asks whether a stated OBJECT materialised.
+    const droppedConstruct = droppedConstructNoun(utterance, r.commands, pts);
+    if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0 && droppedVerbs.length === 0 && droppedCompound.length === 0 && droppedWordRels.length === 0 && !droppedCmp && droppedConstruct.length === 0) {
       const st = store();
       // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
       // the commit, and every later replay of this content then run at TAIL speed on the main thread
@@ -389,8 +395,8 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
       // become a second analytics `submit` (else the dashboard double-counts the utterance). See sessionLog.
       logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:${outcome.reason}`, detail: outcome.detail, commands: r.commands, intermediate: true });
     } else {
-      weak = 'dropped'; // a typo dropped a stated label/number/relation/verb/compound-structure → escalate rather than commit the partial parse
-      logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound].join(',')}`, commands: r.commands, intermediate: true });
+      weak = 'dropped'; // a typo dropped a stated label/number/relation/verb/compound-structure/object → escalate rather than commit the partial parse
+      logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `weak:dropped:${[...dropped, ...droppedNums, ...droppedRels, ...droppedVerbs, ...droppedCompound, ...droppedConstruct].join(',')}`, commands: r.commands, intermediate: true });
     }
   }
   // A magnitude written with the WORD «שורש N» that reached the escalation seam — the #105 `שורש→√`
@@ -547,6 +553,10 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     // that carries no midpoint semantics dropped the given — the grammar chokepoint holds this line,
     // so the LLM seam must too (the ADR-240 pattern: the second attempt never commits the same drop)
     ...(droppedMidsegment(utterance, llmCmds) ? ['קטע אמצעים'] : []),
+    // and the OBJECT gate (ADR-430, #456): a decomposition that states a shape and a construct on it but
+    // emits only the bare shape must name what it lost. Bound to the commit EVENT on both paths, not to a
+    // code path — the reported 3-D twins were GRAMMAR drops, where the LLM-seam gates never run at all.
+    ...droppedConstructNoun(utterance, llmCmds, llmFig.objects.filter(isGeoPoint).map((o) => o.id)),
   ];
   if (stillDropped.length > 0) {
     logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `dropped-labels:${stillDropped.join(',')}`, commands: llmCmds });
