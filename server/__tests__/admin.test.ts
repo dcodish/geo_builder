@@ -10,7 +10,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { writeFile, rm, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { handleAdmin, aggregate, filterEvents, releasesOf, readVerdicts, PROFILE_3D, type Stats } from '../admin';
+import { handleAdmin, aggregate, filterEvents, releasesOf, readVerdicts, sessionsOf, unattributedCount, formatCommands, PROFILE_3D, type Stats } from '../admin';
 import type { UsageEvent } from '../eventLog';
 
 const OPTS = { username: 'teacher', password: 's3cret', cookieSecret: 'sign-me', base: '/admin' };
@@ -502,5 +502,143 @@ describe('#183 — the gap card re-verifies against the triage verdict map', () 
     expect(res.body).toContain('נבדק מחדש מול הקוד הנוכחי');
     expect(res.body).not.toContain('תוקן מאז');
     expect(res.body).toContain('גובה מ B');
+  });
+});
+
+describe('#470 — the sessions view (what one visit typed, in order)', () => {
+  // Two interleaved sessions + one unattributable event: flat time order tells you nothing about either.
+  const evs: UsageEvent[] = [
+    { serverTs: '2026-06-20T09:00:00Z', iph: 'h1', ev: 'session', sid: 's1', rel: 'abc123' },
+    { serverTs: '2026-06-20T09:00:30Z', iph: 'h2', ev: 'session', sid: 's2', rel: 'abc123' },
+    { serverTs: '2026-06-20T09:01:00Z', iph: 'h1', ev: 'submit', sid: 's1', utterance: 'ריבוע ABCD', locale: 'he', source: 'parser' },
+    { serverTs: '2026-06-20T09:01:30Z', iph: 'h2', ev: 'submit', sid: 's2', utterance: 'other session line', locale: 'en', source: 'parser' },
+    { serverTs: '2026-06-20T09:02:00Z', iph: 'h1', ev: 'submit', sid: 's1', utterance: 'נקודה G על AD', locale: 'he', source: 'llm', result: 'ok', commands: '["point G on AD"]' },
+    { serverTs: '2026-06-20T09:02:30Z', iph: 'h1', ev: 'action', sid: 's1', action: 'show-another', detail: 'seed=7', result: 'changed' },
+    { serverTs: '2026-06-20T09:03:00Z', iph: 'h1', ev: 'submit', sid: 's1', utterance: 'משהו שלא הובן', locale: 'he', source: 'llm', result: 'not-understood' },
+    { serverTs: '2026-06-20T09:04:00Z', iph: 'h9', ev: 'submit', utterance: 'no session id', locale: 'he', source: 'parser' },
+  ];
+
+  async function dash(url: string) {
+    await writeFile(logPath, evs.map((e) => JSON.stringify(e)).join('\n'), 'utf8');
+    const login = mockRes();
+    await run(mockReq('POST', '/admin/login', ['username=teacher&password=s3cret']), login, logPath);
+    const cookie = cookieFrom(login.headers['set-cookie']);
+    const res = mockRes();
+    await run(mockReq('GET', url, [], { cookie }), res, logPath);
+    return res;
+  }
+
+  /** Just the sessions PANEL — the page below it (recent activity, top utterances) repeats the same text. */
+  const panel = (body: string) => {
+    const from = body.indexOf('סשנים — מה הוקלד');
+    return from < 0 ? '' : body.slice(from, body.indexOf('פעילות יומית', from));
+  };
+
+  it('sessionsOf groups by sid, keeps log order inside a session, and counts submits + gaps', () => {
+    const rows = sessionsOf(evs);
+    expect(rows.map((r) => r.sid)).toEqual(['s2', 's1']); // newest-started session first (s2 loaded 30 s after s1)
+    const s1 = rows.find((r) => r.sid === 's1')!;
+    expect(s1.submits).toBe(3);
+    expect(s1.gaps).toBe(1); // the llm/not-understood one
+    expect(s1.locale).toBe('he');
+    expect(s1.rel).toBe('abc123');
+    expect(s1.start).toBe('2026-06-20T09:00:00Z');
+    expect(s1.end).toBe('2026-06-20T09:03:00Z');
+    // the `session` page-load marker bounds the session but is not a step; the action IS one, in place
+    expect(s1.steps.map((st) => st.ev)).toEqual(['submit', 'submit', 'action', 'submit']);
+    expect(s1.steps.map((st) => st.utterance ?? st.action)).toEqual(['ריבוע ABCD', 'נקודה G על AD', 'show-another', 'משהו שלא הובן']);
+    expect(s1.steps[1].commands).toBe('["point G on AD"]');
+    expect(s1.steps[3].outcome).toBe('not-understood');
+  });
+
+  it('an event with no sid is never folded into a fake session — it is counted instead', () => {
+    expect(sessionsOf(evs).some((r) => r.steps.some((s) => s.utterance === 'no session id'))).toBe(false);
+    expect(unattributedCount(evs)).toBe(1);
+  });
+
+  it('the sessions card links to ?view=sessions and the panel is not rendered until opened', async () => {
+    const res = await dash('/admin');
+    expect(res.body).toContain('view=sessions');
+    expect(res.body).not.toContain('סשנים — מה הוקלד');
+  });
+
+  it('?view=sessions renders each session with its ordered steps, LLM commands and actions', async () => {
+    const res = await dash('/admin?view=sessions');
+    expect(res.body).toContain('סשנים — מה הוקלד'); // panel title
+    expect(res.body).toContain('ריבוע ABCD');
+    expect(res.body).toContain('↳ point G on AD'); // the committed commands, flattened readably
+    expect(res.body).toContain('["point G on AD"]'.replace(/"/g, '&quot;')); // …with the raw JSON kept in the title
+    expect(res.body).toContain('show-another'); // the store action sits inside the timeline
+    expect(res.body).toContain('seed=7');
+    expect(res.body).toContain('1 אירועים ללא מזהה סשן'); // the unattributable event is stated, not dropped silently
+    // s1's steps live inside s1's OWN block (after its id, and after the whole s2 block), in typed order
+    const s1Block = panel(res.body).slice(panel(res.body).indexOf('>s1<'));
+    expect(s1Block.indexOf('ריבוע ABCD')).toBeGreaterThan(-1);
+    expect(s1Block.indexOf('ריבוע ABCD')).toBeLessThan(s1Block.indexOf('משהו שלא הובן'));
+    expect(s1Block).not.toContain('other session line'); // s2 is a separate block, rendered before s1
+  });
+
+  it('?sid= pins one session (open) and hides the others', async () => {
+    const res = await dash('/admin?view=sessions&sid=s1');
+    expect(panel(res.body)).toContain('ריבוע ABCD');
+    expect(panel(res.body)).not.toContain('other session line');
+    expect(panel(res.body)).toContain('<details class="sess" open>');
+  });
+
+  it('an unknown session id says so honestly instead of showing an empty list', async () => {
+    const res = await dash('/admin?view=sessions&sid=nope');
+    expect(panel(res.body)).toContain('לא נמצא סשן');
+    expect(panel(res.body)).not.toContain('ריבוע ABCD');
+  });
+
+  it('the sessions view respects the date filter', async () => {
+    const res = await dash('/admin?view=sessions&since=2026-06-25');
+    expect(panel(res.body)).toContain('אין סשנים בטווח');
+    expect(panel(res.body)).not.toContain('ריבוע ABCD');
+  });
+
+  it('recent activity links each row to its session', async () => {
+    const res = await dash('/admin');
+    expect(res.body).toContain('view=sessions&sid=s1');
+  });
+
+  it('formatCommands flattens both products’ shapes and never hides an unparseable one', () => {
+    // 2-D: an array of command objects
+    expect(formatCommands('[{"type":"segment","a":"A","b":"C"},{"type":"point-on-segment","id":"B","a":"A","b":"C"}]')).toBe(
+      'segment A C · point-on-segment B A C',
+    );
+    // 3-D: an array of canonical lines
+    expect(formatCommands('["ABCD.EFGH קובייה","AB=u"]')).toBe('ABCD.EFGH קובייה · AB=u');
+    // truncated by the 900-char cap / not JSON at all → shown verbatim, never swallowed
+    expect(formatCommands('[{"type":"segm')).toBe('[{"type":"segm');
+    expect(formatCommands('{"type":"segment"}')).toBe('{"type":"segment"}');
+  });
+
+  it('the 3-D profile classifies a session’s steps with its OWN outcome labels', () => {
+    const rows = sessionsOf(
+      [
+        { serverTs: '2026-06-20T09:00:00Z', iph: 'h1', ev: 'session', sid: 'x1' },
+        { serverTs: '2026-06-20T09:01:00Z', iph: 'h1', ev: 'submit', sid: 'x1', utterance: 'מנסרה נטויה', locale: 'he', source: 'parser', result: 'oblique-prism' },
+      ],
+      PROFILE_3D,
+    );
+    expect(rows[0].steps[0].outcome).toBe('refused'); // a reasoned refusal, NOT a gap
+    expect(rows[0].gaps).toBe(0);
+  });
+});
+
+describe('#470 — a session that spans midnight states its end DATE (not a bare HH:MM)', () => {
+  const evs: UsageEvent[] = [
+    { serverTs: '2026-06-20T23:50:00Z', iph: 'h1', ev: 'session', sid: 'n1' },
+    { serverTs: '2026-06-21T00:10:00Z', iph: 'h1', ev: 'submit', sid: 'n1', utterance: 'ריבוע ABCD', locale: 'he', source: 'parser' },
+  ];
+
+  it('renders the full end timestamp when the session ends on a later day', async () => {
+    await writeFile(logPath, evs.map((e) => JSON.stringify(e)).join('\n'), 'utf8');
+    const login = mockRes();
+    await run(mockReq('POST', '/admin/login', ['username=teacher&password=s3cret']), login, logPath);
+    const res = mockRes();
+    await run(mockReq('GET', '/admin?view=sessions', [], { cookie: cookieFrom(login.headers['set-cookie']) }), res, logPath);
+    expect(res.body).toContain('→ 2026-06-21 00:10'); // not a bare "00:10", which would read as running backwards
   });
 });

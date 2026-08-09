@@ -4,7 +4,8 @@
  * A self-contained Hebrew-RTL report over `events.jsonl` (written by
  * `server/eventLog.ts`): visitor / session counts, daily traffic, utterance
  * volume, parse-outcome breakdown, language split, top utterances, recent
- * activity. No DB, no external deps — the HTML (inline CSS + inline SVG bars) is
+ * activity, and the per-SESSION timelines (#470 — what one visit actually typed,
+ * in order). No DB, no external deps — the HTML (inline CSS + inline SVG bars) is
  * emitted as one string so the proxy bundle stays a single file.
  *
  * Auth mirrors the isbot dashboard's UX (username + password from env → session →
@@ -331,6 +332,105 @@ export const PROFILE_3D: DashboardProfile = {
   verdictsFile: 'verdicts-3d.json',
 };
 
+/**
+ * One step of a session timeline (#470) — a `submit` or a store `action`, in LOG order.
+ *
+ * The dashboard's every other utterance surface is flat: «פעילות אחרונה» interleaves all sessions by
+ * time, and the drill lists group by TEXT (so the session that produced a row is gone). `ev:'action'`
+ * rows — logged since #84 / #182 precisely so a session replays end-to-end — were stored and never
+ * shown anywhere. A step keeps whatever its event carried, so the timeline reads as what the student
+ * actually did: the utterance, its outcome, the LLM's committed canonical commands, the edits/sliders.
+ */
+export interface SessionStep {
+  ts: string;
+  ev: 'submit' | 'action';
+  utterance?: string;
+  locale?: string;
+  source?: string;
+  result?: string;
+  /** submit (LLM path): the committed canonical commands (#84 / #182). */
+  commands?: string;
+  /** action: edit / slider / show-another / delete / undo / … */
+  action?: string;
+  detail?: string;
+  /** submit: the profile's outcome key (`parsed` / `llm-built` / `not-understood` / …). */
+  outcome?: string;
+}
+
+/** One session (`sid` = one page load) with its ordered steps — the unit the sessions view renders. */
+export interface SessionRow {
+  sid: string;
+  /** Salted visitor hash — the same person across sessions, never an IP. */
+  iph: string;
+  rel: string;
+  locale: string;
+  start: string;
+  end: string;
+  submits: number;
+  /** How many of this session's submits landed in the profile's real-gap bucket. */
+  gaps: number;
+  steps: SessionStep[];
+  /** Steps beyond the per-session cap, dropped from `steps` (stated, never silently truncated). */
+  dropped: number;
+}
+
+/** Per-session step cap — a runaway session can't blow up the page; the overflow is REPORTED, not hidden. */
+const MAX_SESSION_STEPS = 300;
+
+/**
+ * Group events into per-session timelines (#470), newest session first.
+ *
+ * Pure + unit-tested, like `aggregate`. Log order is preserved inside a session (the file is appended
+ * chronologically, and equal-millisecond events must not be scrambled by a sort). Events with no `sid`
+ * are NOT merged into a synthetic session — that would invent a conversation that never happened; they
+ * are counted and reported by the caller instead.
+ */
+export function sessionsOf(events: UsageEvent[], profile: DashboardProfile = PROFILE_2D): SessionRow[] {
+  const rows = new Map<string, SessionRow>();
+  for (const e of events) {
+    if (!e.sid) continue; // unattributable — counted by `unattributedCount`, never folded into a fake session
+    const ts = e.serverTs ?? e.t ?? '';
+    let row = rows.get(e.sid);
+    if (!row) {
+      row = { sid: e.sid, iph: e.iph ?? '', rel: e.rel ?? '', locale: '', start: ts, end: ts, submits: 0, gaps: 0, steps: [], dropped: 0 };
+      rows.set(e.sid, row);
+    }
+    if (ts) {
+      if (!row.start || ts < row.start) row.start = ts;
+      if (ts > row.end) row.end = ts;
+    }
+    if (e.rel && !row.rel) row.rel = e.rel;
+    if (e.ev === 'session') continue; // the page-load marker only bounds the session; it is not a step
+    if (e.ev === 'submit') {
+      row.submits++;
+      if (e.locale) row.locale = e.locale;
+    }
+    const outcome = e.ev === 'submit' ? profile.classify(e) : undefined;
+    if (outcome === profile.gapKey) row.gaps++;
+    if (row.steps.length >= MAX_SESSION_STEPS) {
+      row.dropped++;
+      continue;
+    }
+    row.steps.push({
+      ts,
+      ev: e.ev,
+      ...(e.utterance !== undefined ? { utterance: e.utterance } : {}),
+      ...(e.locale !== undefined ? { locale: e.locale } : {}),
+      ...(e.source !== undefined ? { source: e.source } : {}),
+      ...(e.result !== undefined ? { result: e.result } : {}),
+      ...(e.commands !== undefined ? { commands: e.commands } : {}),
+      ...(e.action !== undefined ? { action: e.action } : {}),
+      ...(e.detail !== undefined ? { detail: e.detail } : {}),
+      ...(outcome ? { outcome } : {}),
+    });
+  }
+  return [...rows.values()].sort((a, b) => (a.start < b.start ? 1 : a.start > b.start ? -1 : 0));
+}
+
+/** Events the sessions view cannot attribute to a session (no `sid`) — surfaced so nothing vanishes silently. */
+export const unattributedCount = (events: UsageEvent[]): number =>
+  events.filter((e) => !e.sid && (e.ev === 'submit' || e.ev === 'action')).length;
+
 export interface Stats {
   total: number;
   sessions: number;
@@ -483,12 +583,14 @@ export function aggregate(events: UsageEvent[], profile: DashboardProfile = PROF
   };
 }
 
-/** Dashboard filter state, parsed from the query string (`?since=YYYY-MM-DD&rel=<build>&view=gaps`). */
+/** Dashboard filter state, parsed from the query string (`?since=YYYY-MM-DD&rel=<build>&view=gaps&sid=abc`). */
 export interface Filter {
   since?: string;
   rel?: string;
-  /** Which card's drill-down list is open (`gaps` / `scope`), if any. Not a data filter — a view toggle. */
+  /** Which drill view is open (`gaps` / `scope` / `sessions`), if any. Not a data filter — a view toggle. */
   view?: string;
+  /** Sessions view: show only this session id (a bug report's «give me the session id» — docs/22 §2b). */
+  sid?: string;
 }
 
 /** Build a dashboard query string from the filter (+ overrides), dropping empties. `view:undefined` closes a drill. */
@@ -498,6 +600,7 @@ function queryString(cur: Filter, extra: Partial<Filter> = {}): string {
   if (f.since) parts.push(`since=${encodeURIComponent(f.since)}`);
   if (f.rel && f.rel !== 'all') parts.push(`rel=${encodeURIComponent(f.rel)}`);
   if (f.view) parts.push(`view=${encodeURIComponent(f.view)}`);
+  if (f.sid && f.view === 'sessions') parts.push(`sid=${encodeURIComponent(f.sid)}`); // a session pin belongs to that view only
   return parts.length ? `?${parts.join('&')}` : '';
 }
 
@@ -567,6 +670,18 @@ const pageHead = (title = 'Geo Builder — דוח שימוש') => `<!doctype htm
   .login button{width:100%;background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:9px;font-size:14px;cursor:pointer}
   .err{color:#b91c1c;font-size:13px;margin-bottom:8px}
   code{background:#f3f4f6;padding:1px 5px;border-radius:4px;font-size:12px;direction:ltr;display:inline-block}
+  details.sess{border:1px solid #e5e7eb;border-radius:8px;margin-bottom:8px;background:#fcfcfd}
+  details.sess>summary{cursor:pointer;padding:8px 10px;font-size:13px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;list-style:none}
+  details.sess>summary::-webkit-details-marker{display:none}
+  details.sess>summary::before{content:'▸';color:#6b7280;font-size:11px}
+  details.sess[open]>summary::before{content:'▾'}
+  details.sess[open]>summary{border-bottom:1px solid #f0f1f3;background:#fff}
+  details.sess .body{padding:4px 10px 10px}
+  .sess .gapn{color:#b91c1c;font-weight:600}
+  .sess .okn{color:#059669}
+  .stepn{color:#9ca3af;font-size:11px}
+  .cmds{color:#6b7280;font-size:11px;direction:ltr;display:block;margin-top:3px;white-space:pre-wrap;word-break:break-word}
+  .act{background:#eef2ff;color:#3730a3;border-radius:4px;padding:1px 6px;font-size:12px}
 </style></head><body><div class="wrap">`;
 const PAGE_FOOT = `</div></body></html>`;
 
@@ -642,6 +757,125 @@ function gapDrillPanel(title: string, rows: DrillRow[], closeHref: string, fmt: 
   return `<div class="panel">${head}${vNote}${openTbl}${fixedTbl}</div>`;
 }
 
+/** How many sessions one page renders (newest first); the remainder is stated, never silently cut. */
+const MAX_SESSIONS_SHOWN = 60;
+
+/**
+ * Render an LLM step's committed `commands` readably. The field is a JSON string whose SHAPE belongs to
+ * the product (2-D command objects, 3-D canonical lines), and this renderer serves both — so it stays
+ * structural: an array is flattened to `type value value · …`, and anything that doesn't parse is shown
+ * verbatim. The raw JSON is kept in the row's `title`, so the compaction never hides what was committed.
+ */
+export function formatCommands(raw: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return raw; // not JSON (or truncated by the 900-char cap) — show it as stored
+  }
+  if (!Array.isArray(parsed)) return raw;
+  return parsed
+    .map((c) => {
+      if (typeof c === 'string') return c;
+      if (!c || typeof c !== 'object') return String(c);
+      const o = c as Record<string, unknown>;
+      const rest = Object.entries(o)
+        .filter(([k]) => k !== 'type')
+        .map(([, v]) => (v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v)));
+      return [o.type !== undefined ? String(o.type) : '', ...rest].join(' ').trim();
+    })
+    .join(' · ');
+}
+
+/** One step line of a session timeline: the utterance (or the store action) + what came of it. */
+function sessionStepRow(st: SessionStep, i: number, profile: DashboardProfile): string {
+  const time = st.ts ? esc(st.ts.slice(11, 19)) : '';
+  const body =
+    st.ev === 'action'
+      ? `<span class="act">⚙ ${esc(st.action ?? '')}</span>${st.detail ? ` <code>${esc(st.detail)}</code>` : ''}`
+      : `<code>${esc(st.utterance ?? '')}</code>${
+          st.commands ? `<span class="cmds" title="${esc(st.commands)}">↳ ${esc(formatCommands(st.commands))}</span>` : ''
+        }`;
+  const verdict =
+    st.ev === 'submit' ? (profile.outcomeLabels[st.outcome ?? ''] ?? st.result ?? '') : (st.result ?? '');
+  return `<tr><td class="stepn" style="width:26px">${i + 1}</td><td class="muted" style="width:64px">${time}</td>
+    <td>${body}</td><td class="muted" style="width:150px">${esc(verdict)}</td></tr>`;
+}
+
+/** One session block: a summary line (when / who / how many / how many gaps) that expands to its steps. */
+function sessionBlock(r: SessionRow, base: string, cur: Filter, fmt: (ts: string | null) => string, profile: DashboardProfile, open: boolean): string {
+  const pinHref = `${esc(base)}${queryString(cur, { view: 'sessions', sid: r.sid })}`;
+  const counts = `${r.submits} משפטים${r.gaps ? ` · <span class="gapn">${r.gaps} פערים</span>` : ''}`;
+  const acts = r.steps.filter((s) => s.ev === 'action').length;
+  // A tab left open overnight ends on a LATER day — showing the bare HH:MM would read as time running backwards.
+  const sameDay = r.start.slice(0, 10) === r.end.slice(0, 10);
+  const summary = `<summary>
+      <b>${esc(fmt(r.start || null))}</b>
+      <span class="muted">→ ${esc(sameDay ? r.end.slice(11, 16) : fmt(r.end || null))}</span>
+      <code>${esc(r.sid)}</code>
+      <span>${counts}</span>
+      ${acts ? `<span class="muted">${acts} פעולות</span>` : ''}
+      ${r.locale ? `<span class="muted">${esc(r.locale)}</span>` : ''}
+      ${r.rel ? `<span class="muted">גרסה ${esc(r.rel)}</span>` : ''}
+      <span class="muted">מבקר ${esc(r.iph.slice(0, 6))}</span>
+      <a class="chip" href="${pinHref}" style="margin-inline-start:auto">קישור לסשן ›</a>
+    </summary>`;
+  const body = r.steps.length
+    ? `<div class="body"><table>${r.steps.map((s, i) => sessionStepRow(s, i, profile)).join('')}</table>
+       ${r.dropped ? `<div class="muted" style="margin-top:6px">…ועוד ${r.dropped} צעדים מעבר לתקרת התצוגה</div>` : ''}</div>`
+    : `<div class="body muted">כניסה ללא פעולות (נטענה ולא הוקלד דבר)</div>`;
+  return `<details class="sess"${open ? ' open' : ''}>${summary}${body}</details>`;
+}
+
+/**
+ * The SESSIONS view (#470) — what one user's visit actually looked like, in order.
+ *
+ * Every other utterance surface on this page is flat: «פעילות אחרונה» interleaves all sessions by time and
+ * the drill lists group by text, so "what did this student try, and in what order" was unanswerable without
+ * grepping `events.jsonl` on the box. Sessions are newest-first, each expanding to its ordered steps
+ * (submits + the store actions from #84/#182), and `?sid=` pins one — the surface a bug report's session id
+ * lands on (docs/22 §2b).
+ */
+function sessionsPanel(
+  rows: SessionRow[],
+  base: string,
+  cur: Filter,
+  closeHref: string,
+  fmt: (ts: string | null) => string,
+  profile: DashboardProfile,
+  unattributed: number,
+): string {
+  const head = `<div class="top" style="margin-bottom:8px"><h2 style="flex:1;margin:0">סשנים — מה הוקלד בכל כניסה, לפי הסדר</h2><a class="chip" href="${esc(closeHref)}">סגירה ✕</a></div>`;
+  // Look up one session by id (the id a student/bug report hands over), keeping the date + release filters.
+  const lookup = `<form class="filters" method="get" action="${esc(base)}" style="margin:0 0 12px">
+      <input type="hidden" name="view" value="sessions">
+      ${cur.since ? `<input type="hidden" name="since" value="${esc(cur.since)}">` : ''}
+      ${cur.rel && cur.rel !== 'all' ? `<input type="hidden" name="rel" value="${esc(cur.rel)}">` : ''}
+      <label>מזהה סשן <input name="sid" value="${esc(cur.sid ?? '')}" placeholder="לדוגמה k3f9x2ab"></label>
+      <button type="submit">הצג</button>
+      ${cur.sid ? `<a class="chip" href="${esc(base)}${esc(queryString({ ...cur, sid: undefined }))}">כל הסשנים</a>` : ''}
+    </form>`;
+  const pinned = cur.sid ? rows.filter((r) => r.sid === cur.sid) : rows;
+  const note = unattributed
+    ? `<div class="muted" style="margin-bottom:8px">${unattributed} אירועים ללא מזהה סשן אינם מוצגים כאן (הם נספרים בשאר הדוח)</div>`
+    : '';
+  if (!pinned.length) {
+    const why = cur.sid
+      ? `לא נמצא סשן <code>${esc(cur.sid)}</code> בטווח הסינון הנוכחי (ייתכן שהוא מחוץ לטווח התאריכים או שפג בשמירת הנתונים)`
+      : 'אין סשנים בטווח/הסינון הנוכחי';
+    return `<div class="panel">${head}${lookup}${note}<div class="muted">${why}</div></div>`;
+  }
+  const shown = pinned.slice(0, MAX_SESSIONS_SHOWN);
+  // A pinned session (or a lone one) opens expanded; otherwise the list stays scannable and each opens on click.
+  const openAll = !!cur.sid || shown.length === 1;
+  const more =
+    pinned.length > shown.length
+      ? `<div class="muted" style="margin-top:8px">מוצגים ${shown.length} מתוך ${pinned.length} סשנים בטווח — צמצם את הטווח כדי לראות את השאר</div>`
+      : '';
+  return `<div class="panel">${head}${lookup}${note}
+    ${shown.map((r) => sessionBlock(r, base, cur, fmt, profile, openAll)).join('')}${more}</div>`;
+}
+
 function dailyChart(byDay: Stats['byDay']): string {
   if (!byDay.length) return '<div class="muted">אין נתונים עדיין</div>';
   const max = Math.max(1, ...byDay.map((d) => d.submits));
@@ -681,7 +915,9 @@ function filterBar(base: string, releases: string[], cur: Filter, presets: { lab
   // drill list in place (the operator's "the drill should take the filter into account").
   const chips = presets.map((p) => `<a class="chip" href="${esc(base)}${esc(queryString(cur, { since: p.since }))}">${esc(p.label)}</a>`).join(' ');
   const active = !!(cur.since || (cur.rel && cur.rel !== 'all'));
-  const keepView = cur.view ? `<input type="hidden" name="view" value="${esc(cur.view)}">` : '';
+  const keepView =
+    (cur.view ? `<input type="hidden" name="view" value="${esc(cur.view)}">` : '') +
+    (cur.sid && cur.view === 'sessions' ? `<input type="hidden" name="sid" value="${esc(cur.sid)}">` : '');
   return `<form class="filters" method="get" action="${esc(base)}">
       <label>גרסה <select name="rel">${relOpts}</select></label>
       <label>מתאריך <input type="date" name="since" value="${esc(cur.since ?? '')}"></label>
@@ -700,6 +936,8 @@ function dashboard(
   presets: { label: string; since: string }[],
   profile: DashboardProfile,
   vm: VerdictMap | null = null,
+  sessions: SessionRow[] = [],
+  unattributed = 0,
 ): string {
   const fmt = (ts: string | null) => (ts ? ts.replace('T', ' ').slice(0, 16) : '—');
   const range = s.firstSeen ? `${fmt(s.firstSeen)} — ${fmt(s.lastSeen)}` : 'אין נתונים';
@@ -720,7 +958,7 @@ function dashboard(
      ${filterBar(base, releases, cur, presets)}
      <div class="cards">
        ${card(s.visitors, 'מבקרים ייחודיים')}
-       ${card(s.sessions, 'כניסות (sessions)')}
+       ${cardLink(s.sessions, 'כניסות (sessions)', `${esc(base)}${queryString(cur, { view: cur.view === 'sessions' ? undefined : 'sessions', sid: undefined })}`, cur.view === 'sessions')}
        ${card(s.submits, 'פעולות / משפטים')}
        ${card(s.llmFallbacks, 'נפילה ל-LLM')}
        ${cardLink(gapCount, gapLabel, `${esc(base)}${queryString(cur, { view: cur.view === 'gaps' ? undefined : 'gaps' })}`, cur.view === 'gaps')}
@@ -731,7 +969,9 @@ function dashboard(
          ? gapDrillPanel(profile.gapDrillTitle, s.gapUtterances, `${esc(base)}${queryString(cur, { view: undefined })}`, fmt, vm)
          : cur.view === 'scope'
            ? drillPanel(profile.secondaryDrillTitle, s.scopeUtterances, `${esc(base)}${queryString(cur, { view: undefined })}`, fmt)
-           : ''
+           : cur.view === 'sessions'
+             ? sessionsPanel(sessions, base, cur, `${esc(base)}${queryString(cur, { view: undefined, sid: undefined })}`, fmt, profile, unattributed)
+             : ''
      }
      <div class="panel"><h2>פעילות יומית (30 ימים אחרונים)</h2>${dailyChart(s.byDay)}</div>
      <div class="panel"><h2>תוצאות ניתוח</h2>${outcomeBars(s.outcomes)}</div>
@@ -754,7 +994,7 @@ function dashboard(
        }</table>
      </div>
      <div class="panel"><h2>פעילות אחרונה</h2>
-       <table><tr><th style="width:130px">זמן</th><th style="width:50px">שפה</th><th>משפט</th><th style="width:120px">תוצאה</th></tr>
+       <table><tr><th style="width:130px">זמן</th><th style="width:50px">שפה</th><th>משפט</th><th style="width:120px">תוצאה</th><th style="width:90px">סשן</th></tr>
        ${
          s.recent.length
            ? s.recent
@@ -763,10 +1003,11 @@ function dashboard(
                    `<tr><td class="muted">${esc(fmt(e.serverTs ?? e.t ?? null))}</td>
                     <td>${esc(e.locale ?? '')}</td>
                     <td><code>${esc(e.utterance ?? '')}</code></td>
-                    <td class="muted">${esc(profile.outcomeLabels[profile.classify(e)] ?? e.result ?? '')}</td></tr>`,
+                    <td class="muted">${esc(profile.outcomeLabels[profile.classify(e)] ?? e.result ?? '')}</td>
+                    <td>${e.sid ? `<a class="chip" href="${esc(base)}${queryString(cur, { view: 'sessions', sid: e.sid })}">${esc(e.sid)}</a>` : '<span class="muted">—</span>'}</td></tr>`,
                )
                .join('')
-           : '<tr><td class="muted">אין נתונים עדיין</td><td></td><td></td><td></td></tr>'
+           : '<tr><td class="muted">אין נתונים עדיין</td><td></td><td></td><td></td><td></td></tr>'
        }</table>
      </div>` +
     PAGE_FOOT
@@ -839,13 +1080,14 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
   // #183: the triage verdict map, uploaded beside the events file (`triage.mjs`). Absent → the gap
   // drill states plainly that nothing was re-verified, never implying verification that didn't happen.
   const vm = await readVerdicts(opts.verdictsPath ?? join(dirname(logPath), profile.verdictsFile ?? 'verdicts.json'));
-  // Filter state from the query string (?since=YYYY-MM-DD&rel=<build>&view=gaps|scope) — empty = show everything.
+  // Filter state from the query string (?since=YYYY-MM-DD&rel=<build>&view=gaps|scope|sessions&sid=…) — empty = show everything.
   const q = new URLSearchParams((req.url ?? '').split('?')[1] ?? '');
   const view = q.get('view');
   const cur: Filter = {
     since: q.get('since') || undefined,
     rel: q.get('rel') || undefined,
-    view: view === 'gaps' || view === 'scope' ? view : undefined, // ignore unknown view values
+    view: view === 'gaps' || view === 'scope' || view === 'sessions' ? view : undefined, // ignore unknown view values
+    sid: q.get('sid')?.trim().slice(0, 32) || undefined, // a session id is short; bound what a URL can inject
   };
   const releases = releasesOf(all);
   const events = filterEvents(all, cur);
@@ -856,5 +1098,8 @@ export async function handleAdmin(req: IncomingMessage, res: ServerResponse, opt
     { label: '7 ימים', since: dayMinus(7) },
     { label: '30 ימים', since: dayMinus(30) },
   ];
-  return send(res, 200, dashboard(base, aggregate(events, profile), releases, cur, presets, profile, vm));
+  // The per-session timelines (#470) are built only for the view that shows them — every other view pays nothing.
+  const sessions = cur.view === 'sessions' ? sessionsOf(events, profile) : [];
+  const unattributed = cur.view === 'sessions' ? unattributedCount(events) : 0;
+  return send(res, 200, dashboard(base, aggregate(events, profile), releases, cur, presets, profile, vm, sessions, unattributed));
 }
