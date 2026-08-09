@@ -77,3 +77,47 @@ describe('#468 — the shape of a run, including the 3-D hazards', () => {
     expect(isolateLtrRuns3(input)).toBe(expected);
   });
 });
+
+/**
+ * #482 — the transform must also cover the STUDENT'S OWN text. ADR-3D-116 put the isolation on the
+ * i18next post-processor, which is one chokepoint for every translated message and the right place for
+ * those — but an utterance never passes through `t()`, so the fact list rendered the operator's own
+ * equations reversed. These are the exact rows from the prod session of 2026-08-09.
+ */
+describe('#482 — a student utterance is isolated like a message', () => {
+  const UTTERANCES = [
+    'ישר l - x=(1,2,3)+t(m-2,m, m+2)',
+    'מישור π1 - x+(m-2)y+(m-1)z-5',
+    'l מקביל ל- π1',
+    'הישר ℓ מקביל למישור π1',
+    'B על מישור π2',
+    'A נקודת החיתוך של ℓ עם π1',
+  ];
+
+  it.each(UTTERANCES)('%s gets an isolate around its technical run', (u) => {
+    expect(isolateLtrRuns3(u)).toContain(LRI);
+  });
+
+  it.each(UTTERANCES)('%s is byte-for-byte recoverable (display-only, never the stored fact)', (u) => {
+    const stripped = isolateLtrRuns3(u).split(LRI).join('').split(PDI).join('');
+    expect(stripped).toBe(u);
+  });
+
+  it('is idempotent, so a re-render cannot nest isolates', () => {
+    for (const u of UTTERANCES) {
+      const once = isolateLtrRuns3(u);
+      expect(isolateLtrRuns3(once)).toBe(once);
+    }
+  });
+
+  it('a pure-LTR utterance is returned untouched (an English session is unaffected)', () => {
+    const en = 'line l: x = (1,2,3) + t(m-2, m, m+2)';
+    expect(isolateLtrRuns3(en)).toBe(en);
+  });
+
+  it("the operator's plane equation keeps its whole run together, not letter by letter", () => {
+    // the defect looked like this: the neutral run `- x+(m-2)y+(m-1)z-5` resolving to the RTL paragraph
+    const out = isolateLtrRuns3('מישור π1 - x+(m-2)y+(m-1)z-5');
+    expect(out.split(LRI).length - 1, 'one run, one isolate — not one per token').toBe(1);
+  });
+});

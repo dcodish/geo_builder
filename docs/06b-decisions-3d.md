@@ -2288,3 +2288,44 @@ subject noun, English with/without `the`, and the crossing's two frames × two l
 point-run) asserted to yield the **same commands**. Plus the negative side, because a widened pattern
 that poaches its neighbours is the real risk: the diagonal crossing keeps its own rule, and a non-line
 operand is still refused. The catalog gained the new forms, so the guard test holds them in He **and** En.
+
+## ADR-3D-121 — the bidi isolation covers the STUDENT'S text, not only the tool's
+
+**Status:** accepted, 2026-08-09 · **Issue:** #482 · **Extends:** [ADR-3D-116](#adr-3d-116) / #468
+
+**The report.** Operator, 2026-08-09, prod: *"data entry in Hebrew mixed with English is hard. During data
+entry it is hard to understand what I wrote, and at the end the bidi is wrong."* The fact list showed
+`מישור π1 - x+(m-2)y+(m-1)z-5` with the equation laid out against the sentence.
+
+**Root cause: the chokepoint sits at the translation seam, not at the event it guards.** ADR-3D-116
+registered `isolateLtrRuns3` as an **i18next post-processor**, reasoning — correctly — that a run is
+composed from a template's literals plus a value, so isolation belongs at render, and that one
+post-processor covers messages written later without their authors thinking about bidi. All true, and it
+covers exactly one class of string: **what the tool says**. What the *student* writes never passes through
+`t()`, and their utterances are denser in LTR technical runs than any message, because they *are* the
+equations. The guard was bound to a code path (`t()`) rather than to the event (rendering a
+mixed-direction string).
+
+**Fixed at the display site**, since the stored fact must stay byte-exact: the fact row isolates
+`f.utterance` on the way to the DOM. The function was already safe for this — total, idempotent
+(`if (s.includes(LRI)) return s`), and byte-reversible, which its own safety property asserts over every
+locale leaf; the new tests assert the same three properties over **student text**, which is the point,
+since arbitrary input is a wider corpus than any authored message.
+
+**A vector fact is deliberately left alone.** `VecMath` emits one element per token, so the bidi algorithm
+sees structure rather than one neutral run, and feeding its tokenizer characters it has no token for would
+trade a layout bug for a parsing one. Recorded as a decision rather than an oversight — and it is the one
+part of this ADR that is unverified against a real report, so it should be revisited if a vector row is
+ever reported garbled.
+
+**What is NOT fixed here, and why.** The operator's *"during data entry"* half — the input box itself —
+needs a ruling, not a patch. Isolate characters cannot be injected into an editable value without
+corrupting what the student typed and where their caret sits, and forcing `dir="ltr"` is the fix 2-D
+already tried and **reverted** (#118 / ADR-312: it reversed a Hebrew sentence that merely contained a
+radical). The recommendation on the issue is the third option — a read-only live preview under the input,
+rendered isolated, which is what 2-D ended up with (`#77`/`#40`) and which 3-D has no equivalent of. Left
+open on #482 rather than guessed at.
+
+**The 2-D twin has the same structure** (`src/i18n/bidi.ts` is a post-processor too) and is labelled on the
+issue. Not fixed here: this ADR is 3-D, the pattern is copied and never imported (docs/20 §12 rule 1), and
+2-D's fact rows were not what the operator reported.

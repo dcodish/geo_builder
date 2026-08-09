@@ -12,6 +12,7 @@ import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
+import { isolateLtrRuns3 } from './i18n/bidi';
 import { escalate3 } from './parser/llm3';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from './parser/scope3';
 import { parse3 } from './parser/parse3';
@@ -465,11 +466,20 @@ export default function App3() {
                 ) : (
                   statusDot(derived.status[f.id])
                 )}
+                {/* #482 (ADR-3D-121): the STUDENT'S OWN text needs the same bidi isolation the
+                    messages get. ADR-3D-116 registered `isolateLtrRuns3` as an i18next post-processor —
+                    one chokepoint for every translated string, and the right place for those — but an
+                    utterance never passes through `t()`, so «מישור π1 - x+(m-2)y+(m-1)z-5» rendered with
+                    its equation reversed against the Hebrew. Display-only: the stored fact is untouched,
+                    and the transform is idempotent and byte-reversible (its safety property).
+                    A VECTOR fact is left alone deliberately — `VecMath` emits one element per token, so
+                    the bidi algorithm sees structure rather than one neutral run, and injecting isolates
+                    into its input would feed the tokenizer characters it has no token for. */}
                 <span dir="auto" className="min-w-0 flex-1 truncate text-sm">
                   {isVectorFact3(f) ? (
                     <VecMath text={factDisplay(f, new Set(derived.construction.vectors.keys()))} vecNames={new Set(derived.construction.vectors.keys())} />
                   ) : (
-                    f.utterance
+                    isolateLtrRuns3(f.utterance)
                   )}
                 </span>
                 {/* #318 + #395 (ADR-3D-108): a fact that MATERIALISES a plane patch gets the
