@@ -45,26 +45,39 @@ const CLOSE = ')]}"';
 const LRI = '⁦'; // LEFT-TO-RIGHT ISOLATE
 const PDI = '⁩'; // POP DIRECTIONAL ISOLATE
 
+/** One stretch of a message, tagged with the direction it must be laid out in. */
+export interface BidiSegment {
+  text: string;
+  /** True for a technical run that must read left-to-right regardless of the surrounding direction. */
+  ltr: boolean;
+}
+
 /**
- * Wrap every LTR technical run of `s` in an isolate, leaving Hebrew and surrounding punctuation alone.
+ * Split `s` into directional segments — the one place that decides where a technical run begins and ends.
  *
- * A "run" is the span between two Hebrew letters (or string edges), trimmed to its first and last CORE
- * character. A string with no Hebrew at all is returned untouched — an English message is already laid
- * out in its own direction and needs nothing.
+ * A run is the span between two Hebrew letters (or string edges), trimmed to its first and last CORE
+ * character, then extended over any balanced delimiter pair hugging it. Both consumers below are built on
+ * this, so the browser and the .docx can never disagree about what counts as a run.
  */
-export function isolateLtrRuns(s: string, rtlParagraph = false): string {
+export function bidiSegments(s: string, rtlParagraph = false): BidiSegment[] {
   // The Hebrew test is a proxy for "this text will be laid out RTL", which is right for a UI message
   // whose direction is derived from its own content. It is WRONG wherever the paragraph direction is
   // imposed from outside — the .docx export forces `w:bidi`, so an all-Latin given like `|BC| = 10` sits
   // in an RTL paragraph and scrambles even though it contains no Hebrew at all. Those callers say so.
-  if (!rtlParagraph && !HEBREW_LETTER.test(s)) return s;
-  if (s.includes(LRI)) return s; // already isolated — never nest
+  if (!rtlParagraph && !HEBREW_LETTER.test(s)) return s ? [{ text: s, ltr: false }] : [];
 
-  let out = '';
+  const segs: BidiSegment[] = [];
+  const push = (text: string, ltr: boolean) => {
+    if (!text) return;
+    const prev = segs[segs.length - 1];
+    if (prev && prev.ltr === ltr) prev.text += text; // coalesce, so a Hebrew word is one segment
+    else segs.push({ text, ltr });
+  };
+
   let gap = ''; // the current non-Hebrew span, accumulated until a Hebrew letter closes it
   const flush = () => {
     let first = [...gap].findIndex((c) => CORE.test(c));
-    if (first < 0) { out += gap; gap = ''; return; }
+    if (first < 0) { push(gap, false); gap = ''; return; }
     let last = gap.length - 1;
     while (last > first && !CORE.test(gap[last])) last--;
     // absorb balanced delimiters that hug the run, outermost last: `("AB")` takes the quotes, then the
@@ -76,15 +89,31 @@ export function isolateLtrRuns(s: string, rtlParagraph = false): string {
       first--;
       last++;
     }
-    out += gap.slice(0, first) + LRI + gap.slice(first, last + 1) + PDI + gap.slice(last + 1);
+    push(gap.slice(0, first), false);
+    push(gap.slice(first, last + 1), true);
+    push(gap.slice(last + 1), false);
     gap = '';
   };
 
   for (const ch of s) {
-    if (HEBREW_LETTER.test(ch)) { flush(); out += ch; } else gap += ch;
+    if (HEBREW_LETTER.test(ch)) { flush(); push(ch, false); } else gap += ch;
   }
   flush();
-  return out;
+  return segs;
+}
+
+/**
+ * Wrap every LTR technical run in a bidi ISOLATE — the DOM rendering strategy.
+ *
+ * Suitable where the renderer honours the Unicode control characters and never draws them, which is true
+ * of a browser. It is NOT true of Word: `.docx` shows U+2066/U+2069 as missing-glyph boxes, so the export
+ * uses `bidiSegments` directly and marks direction per RUN instead ([ADR-431](../../docs/06-decisions.md#adr-431) Am. 1).
+ */
+export function isolateLtrRuns(s: string, rtlParagraph = false): string {
+  if (s.includes(LRI)) return s; // already isolated — never nest
+  return bidiSegments(s, rtlParagraph)
+    .map((g) => (g.ltr ? LRI + g.text + PDI : g.text))
+    .join('');
 }
 
 /**

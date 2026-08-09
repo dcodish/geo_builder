@@ -6492,9 +6492,20 @@ the "no command-type jargon" rule (ADR-252) is untouched.
 could rely on the bidi algorithm alone and inject no control characters, *"the same … the browser step
 list already renders correctly."* That premise was false: the browser renders such runs correctly only
 since [ADR-431](#adr-431). Word runs the same algorithm, so `|BC| = 10` prints as `10 = |BC|` on the page —
-and this amendment sends `∠BAC = 50` straight into it. Each given is now isolated.
+and this amendment sends `∠BAC = 50` straight into it.
 
-That surfaced a real limit in `isolateLtrRuns`: its Hebrew test is a **proxy** for "this text will be laid
+**The browser's remedy does NOT port, and the operator caught it in the .docx.** The first attempt reused
+`isolateLtrRuns`, and Word printed visible **⟦LRI⟧ / ⟦PDI⟧ boxes** in the givens list — it has no glyph for
+U+2066/U+2069. An isolate is a rendering instruction the DOM honours silently and Word does not, so the
+same class needs a different expression per medium: OOXML's own mechanism is **per-RUN direction**. A given
+is now SPLIT and each technical run emitted as a run without `w:rtl`.
+
+The segmentation itself is shared — `bidiSegments` is the one place that decides where a run begins and
+ends, and both `isolateLtrRuns` (DOM) and the export are built on it, so the two media can never disagree
+about *what* a run is while differing in *how* they mark it. That split is the actual lesson: the earlier
+mistake was treating "isolate characters" as the fix rather than as one encoding of it.
+
+This also exposed a real limit in the helper: its Hebrew test is a **proxy** for "this text will be laid
 out RTL", which holds for a UI message whose direction comes from its own content and fails wherever the
 direction is *imposed from outside*. The export forces `w:bidi`, so an all-Latin given sits in an RTL
 paragraph and scrambles with no Hebrew anywhere in it. Callers in that position now say so explicitly

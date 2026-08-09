@@ -13,8 +13,10 @@
  * resolves to the paragraph direction. Word runs the same algorithm, so the same scramble reaches the
  * page — and #465 now sends `∠BAC = 50` through here, which is precisely that shape.
  *
- * So each given is wrapped with `isolateLtrRuns` (U+2066/U+2069, zero-width, layout-only) when the
- * paragraph is RTL. What the original stance got RIGHT and is unchanged: list numbers use REAL Word
+ * The browser's remedy — U+2066/U+2069 isolates — does NOT port here: Word has no glyph for them and
+ * prints visible boxes in the givens list. OOXML's own mechanism is per-RUN direction, so a given is
+ * SPLIT (`bidiSegments`, shared with the browser so the two agree on where a run begins) and each
+ * technical run is emitted as a run without `w:rtl`. What the original stance got RIGHT and is unchanged: list numbers use REAL Word
  * numbering, never a literal "1. " prefix — a European digit + neutral period at an RTL run boundary is
  * the classic scramble (renders ".1"), and Word's list number is layout chrome resolved by paragraph
  * direction, outside the bidi text stream entirely.
@@ -23,7 +25,7 @@
  * the IHDR header bytes, not decoded via Image/canvas, so the same code is
  * unit-tested in node.
  */
-import { isolateLtrRuns } from '@/i18n/bidi';
+import { bidiSegments } from '@/i18n/bidi';
 import {
   AlignmentType,
   BorderStyle,
@@ -126,9 +128,16 @@ export function buildQuestionDoc(input: QuestionDocInput): Document {
             bidirectional: rtl,
             numbering: { reference: 'givens', level: 0 },
             spacing: { after: 80 },
-            // #464/#465: isolate the LTR technical runs. Word runs the same bidi algorithm the browser
-            // does, so `|BC| = 10` scrambles to `10 = |BC|` here for exactly the reason it did on screen.
-            children: [new TextRun({ text: rtl ? isolateLtrRuns(line, true) : line, rightToLeft: rtl })],
+            // #464/#465: Word runs the same bidi algorithm the browser does, so `|BC| = 10` scrambles to
+            // `10 = |BC|` here for exactly the reason it did on screen. The browser's fix — U+2066/U+2069
+            // isolates — is WRONG in a .docx: Word has no glyph for them and prints visible ⟦LRI⟧ boxes.
+            // OOXML's own mechanism is per-RUN direction, so the line is split and each technical run is
+            // emitted as a run WITHOUT `w:rtl`. Same segmentation as the browser, different expression.
+            children: rtl
+              ? bidiSegments(line, true).map(
+                  (seg) => new TextRun({ text: seg.text, rightToLeft: seg.ltr ? undefined : true }),
+                )
+              : [new TextRun({ text: line })],
           }),
       ),
     ],

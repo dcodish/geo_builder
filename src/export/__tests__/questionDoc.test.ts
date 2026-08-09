@@ -191,13 +191,13 @@ describe('buildQuestionDoc', () => {
     const zip = await JSZip.loadAsync(buf);
     const xml = await zip.file('word/document.xml')!.async('string');
 
-    // Content survived. NOT byte-identical any more: since #464 an RTL paragraph has its LTR technical
-    // runs wrapped in bidi isolates, because Word scrambles them exactly as the browser did. The
-    // invariant is that isolation is LAYOUT-ONLY — strip the two zero-width characters and the given is
-    // back verbatim. (Asserted as a property of its own below.)
-    const visible = xml.replace(/[⁦⁩]/g, '');
-    expect(visible).toContain('במשולש ABC הזווית ∠ABC = 37°');
-    expect(visible).toContain('AB קוטר במעגל O');
+    // Content survived — but no longer as ONE contiguous string. Since #464 an RTL given is SPLIT into
+    // per-direction runs (Word scrambles a technical run exactly as the browser did, and its own
+    // mechanism for that is `w:rtl` per run, not control characters). The invariant is that splitting is
+    // layout-only: concatenating the runs gives the given back verbatim.
+    const body = [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join('');
+    expect(body).toContain('במשולש ABC הזווית ∠ABC = 37°');
+    expect(body).toContain('AB קוטר במעגל O');
     expect(xml).toContain('נתון:');
 
     expect(xml).toContain('<w:bidi'); // RTL paragraphs
@@ -246,7 +246,7 @@ describe('#465 — the export follows the CANONICAL form (ADR-428 reserved decis
   });
 });
 
-describe('#464/#465 — the .docx isolates its LTR runs', () => {
+describe('#464/#465 — the .docx marks direction PER RUN, with no control characters', () => {
   const base = {
     heading: 'נתון:',
     png: { data: PNG_2X1, ...pngDimensions(PNG_2X1) },
@@ -255,27 +255,47 @@ describe('#464/#465 — the .docx isolates its LTR runs', () => {
     const buf = await Packer.toBuffer(buildQuestionDoc({ ...base, ...over }));
     return (await JSZip.loadAsync(buf)).file('word/document.xml')!.async('string');
   };
+  /** The <w:t> payloads in document order, paired with whether their run carries <w:rtl/>. */
+  const runs = (xml: string) =>
+    [...xml.matchAll(/<w:r>(?:<w:rPr>(.*?)<\/w:rPr>)?<w:t[^>]*>([^<]*)<\/w:t><\/w:r>/g)].map((m) => ({
+      text: m[2],
+      rtl: (m[1] ?? '').includes('<w:rtl/>'),
+    }));
 
-  it('an RTL document wraps a technical run so Word cannot reverse it', async () => {
-    // Word runs the same bidi algorithm as the browser: unisolated, «|BC| = 10» prints as «10 = |BC|».
-    // This module used to inject no control characters, on the premise that the browser rendered such a
-    // run correctly unaided — which was only true AFTER ADR-431 added the isolation post-processor.
+  it('NO bidi control characters reach the document — Word draws them as boxes', () => {
+    // The operator saw literal ⟦LRI⟧/⟦PDI⟧ boxes in the givens list: the browser's isolate strategy does
+    // not port to .docx, because Word has no glyph for U+2066/U+2069. This is the regression guard.
+    return docXml({ rtl: true, lines: ['|BC| = 10', 'במשולש ABC הזווית ∠ABC = 37°'] }).then((xml) => {
+      expect(xml).not.toContain('\u2066');
+      expect(xml).not.toContain('\u2069');
+    });
+  });
+
+  it('a technical run is emitted as its own run WITHOUT w:rtl, so Word lays it out LTR', async () => {
+    const xml = await docXml({ rtl: true, lines: ['במשולש ABC הזווית ∠ABC = 37°'] });
+    const ltr = runs(xml).filter((r) => !r.rtl).map((r) => r.text);
+    expect(ltr).toContain('ABC');
+    expect(ltr.some((t) => t.includes('∠ABC = 37'))).toBe(true);
+    // ...and the Hebrew stays RTL
+    expect(runs(xml).filter((r) => r.rtl).some((r) => r.text.includes('במשולש'))).toBe(true);
+  });
+
+  it('an all-Latin given still gets an LTR run — the RTL paragraph would otherwise reverse it', async () => {
+    // No Hebrew anywhere, yet `w:bidi` is forced on the paragraph, so `|BC| = 10` scrambles without this.
     const xml = await docXml({ rtl: true, lines: ['|BC| = 10'] });
-    expect(xml).toContain('\u2066|BC| = 10\u2069');
+    expect(runs(xml).filter((r) => !r.rtl).map((r) => r.text)).toContain('|BC| = 10');
   });
 
-  it('an LTR document is left alone — nothing to isolate', async () => {
-    const xml = await docXml({ rtl: false, lines: ['|BC| = 10'] });
-    expect(xml).not.toContain('\u2066');
-    expect(xml).toContain('|BC| = 10');
-  });
-
-  it('isolation is layout-only — every visible character of the given survives', async () => {
-    // The same safety property the i18n post-processor carries: stripping the isolates must return the
-    // line byte-for-byte. A transform over exported worksheet text is only acceptable with that held.
+  it('splitting is layout-only — the given reassembles byte-for-byte', async () => {
     const line = 'במשולש ABC הזווית ∠ABC = 37°';
     const xml = await docXml({ rtl: true, lines: [line] });
-    const runs = [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]);
-    expect(runs.map((r) => r.replace(/[\u2066\u2069]/g, ''))).toContain(line);
+    const body = runs(xml).map((r) => r.text).join('');
+    expect(body).toContain(line);
+  });
+
+  it('an LTR document is untouched — one run, no splitting', async () => {
+    const xml = await docXml({ rtl: false, lines: ['|BC| = 10'] });
+    expect(xml).toContain('|BC| = 10');
+    expect(xml).not.toContain('<w:rtl/>');
   });
 });
