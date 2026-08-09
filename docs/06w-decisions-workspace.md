@@ -185,3 +185,21 @@ scoped with the operator, not smuggled in under one product's banner.
 **Consequences.** One grep and one sentence per class fix, against classes that have historically cost a
 full diagnosis session each to rediscover. It is a discipline, not a guard — no test can assert that a
 question was asked honestly, which is why it is written into the definition of done where it will be read.
+
+## ADR-W-005 — CI is BEST-EFFORT; the local full suite is the gate
+
+**Status:** accepted, 2026-08-09 · **Issue:** #388 (closed as not-an-issue) · **Operator ruling**
+
+**The decision.** GitHub Actions has been blocked on billing since 2026-07-25, and #388 tracked that as a
+defect to repair. The operator's ruling closes it: *"not an issue — we should close it and just acknowledge
+that it will sometimes work and sometimes not."* CI is therefore **best-effort infrastructure**, not a
+gate, and a red or absent CI run is not by itself a reason to hold a merge.
+
+**What this does NOT relax, and the reason to write it down.** The bar is unchanged — it simply has one
+owner instead of two. `npm run test:full` **green locally, plus `tsc -b` and both builds clean**, remains
+required before every commit and every deploy (root CLAUDE.md standing rule 5). With CI unreliable, that
+local run is the *only* thing standing between a regression and `main`, so the honest consequence of this
+ruling is that skipping it is now strictly worse than it was, not more acceptable.
+
+Report the result truthfully in the commit or the PR — counts, and any skips — since no second opinion is
+coming. A session that cannot run the full suite says so rather than implying a gate that did not happen.
