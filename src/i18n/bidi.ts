@@ -1,28 +1,76 @@
 /**
- * Bidi isolation for LTR technical runs embedded in RTL sentences — issue #464.
+ * Bidi isolation for LTR technical runs inside RTL sentences — issue #464.
  *
- * The UI is RTL Hebrew by default, and our messages routinely splice an LTR technical run into a Hebrew
- * sentence: a canonical utterance, a label, a formula. The Unicode bidi algorithm resolves a NEUTRAL
- * character (`∠`, `⊥`, `∥`, `=`, `·`) sitting between an RTL run and an LTR run to the PARAGRAPH
- * direction — RTL — so a leading `∠` is laid out on the far side of the letters it belongs to. The
- * operator saw exactly that: `∠BAC = 50` rendered with the glyph detached to the wrong end.
+ * The UI is RTL Hebrew, and our messages constantly splice an LTR technical run into a Hebrew sentence:
+ * `|BC| = 10`, `∠BAC = 50`, `DE ∥ BC`, `|AC| + |BA| = 9`. Almost every character in such a run —
+ * `| = + · ×`, digits, parentheses, `∠ ⊥ ∥ △ √` — is NEUTRAL or weak to the Unicode bidi algorithm, which
+ * resolves it to the PARAGRAPH direction. In an RTL paragraph that reverses the run: the operator saw
+ * `|BC| = 10` rendered as `10 = |BC|`, and `|AC| + |BA| = 9` as `9 = |BA| + |AC|`.
  *
- * The word forms this replaced (`זווית BAC = 50`) hid the problem because they START with a strong RTL
- * character, so nothing neutral ever had to be resolved.
+ * **Why this is a post-processor and not per-value escaping.** The first attempt isolated the
+ * INTERPOLATED value at its call site. That cannot work in general, because the run is usually composed
+ * from the template's own literals plus the value — `"|{{seg}}| = {{value}}"` builds its pipes and its
+ * `=` in the message, not in the argument. The only place the complete run exists is the RENDERED string,
+ * so that is where the isolation belongs. Registering it as an i18next post-processor makes it one
+ * chokepoint for every `t()` call in the app, including messages written after this one.
  *
  * An isolate says "lay this substring out on its own, LTR, and do not let it interact with the
- * surrounding direction" — which is precisely the intent, and unlike the older embedding controls
- * (LRE/PDF) it cannot leak if the string is truncated. Both characters are zero-width and invisible;
- * they affect layout only, never the text's value.
- *
- * Apply at the INTERPOLATION site, never inside the value itself: a canonical utterance is re-parsed by
- * `parse()` in its own round-trip test, and baking layout characters into it would make the string mean
- * something different from what the student would type.
+ * surrounding direction". Unlike the older LRE/PDF embeddings it cannot leak if the text is truncated.
+ * Both characters are zero-width: they affect layout only, never the string's meaning — and note the
+ * transformation never reorders anything itself, it only tells the renderer not to.
  */
+
+/** Hebrew LETTERS (not the whole block — Hebrew punctuation and niqqud must not split a run). */
+const HEBREW_LETTER = /[א-ת]/;
+
+/**
+ * The characters that make a span worth isolating: labels, numbers, and the geometry glyphs. Deliberately
+ * excludes bare punctuation and whitespace, which is what keeps a trailing `.` or a leading `:` OUTSIDE
+ * the isolate — isolating those would move the sentence's own punctuation to the wrong end.
+ */
+const CORE = /[A-Za-z0-9|∠∡∢⊥∥△▲√⌢°]/;
+
 const LRI = '⁦'; // LEFT-TO-RIGHT ISOLATE
 const PDI = '⁩'; // POP DIRECTIONAL ISOLATE
 
-/** Wrap an LTR technical run so a surrounding RTL sentence cannot reorder its neutral characters. */
-export function ltrIsolate(s: string): string {
-  return `${LRI}${s}${PDI}`;
+/**
+ * Wrap every LTR technical run of `s` in an isolate, leaving Hebrew and surrounding punctuation alone.
+ *
+ * A "run" is the span between two Hebrew letters (or string edges), trimmed to its first and last CORE
+ * character. A string with no Hebrew at all is returned untouched — an English message is already laid
+ * out in its own direction and needs nothing.
+ */
+export function isolateLtrRuns(s: string): string {
+  if (!HEBREW_LETTER.test(s)) return s;
+  if (s.includes(LRI)) return s; // already isolated — never nest
+
+  let out = '';
+  let gap = ''; // the current non-Hebrew span, accumulated until a Hebrew letter closes it
+  const flush = () => {
+    const first = [...gap].findIndex((c) => CORE.test(c));
+    if (first < 0) { out += gap; gap = ''; return; }
+    let last = gap.length - 1;
+    while (last > first && !CORE.test(gap[last])) last--;
+    out += gap.slice(0, first) + LRI + gap.slice(first, last + 1) + PDI + gap.slice(last + 1);
+    gap = '';
+  };
+
+  for (const ch of s) {
+    if (HEBREW_LETTER.test(ch)) { flush(); out += ch; } else gap += ch;
+  }
+  flush();
+  return out;
 }
+
+/**
+ * The i18next post-processor. Registered globally in `./index.ts`, so it covers every message without
+ * each call site having to remember — which is the point: the defect class was authors not thinking
+ * about bidi, and a rule that relies on them thinking about it has not fixed the class.
+ */
+export const bidiPostProcessor = {
+  type: 'postProcessor' as const,
+  name: 'bidiIsolate',
+  process(value: string): string {
+    return typeof value === 'string' ? isolateLtrRuns(value) : value;
+  },
+};

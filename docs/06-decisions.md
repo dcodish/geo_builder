@@ -6418,3 +6418,50 @@ no-ops, the six generosity lowerings, the ADR-156 reuse case, and the catalog ne
 `scenarios-harness.ts` — a corpus-wide property called from each of the eight shards against the fact list
 they already built, so it costs no extra solve ([ADR-394](#adr-394)) and counts the steps it examined so it
 cannot pass vacuously.
+
+## ADR-431 — bidi isolation is a RENDER-time chokepoint, not per-value escaping
+
+**Status:** accepted, 2026-08-09 · **Issue:** #464 (bug) · **Supersedes:** the interpolation-site helper added under [ADR-428](#adr-428) Am. 1
+
+**The report.** The triangle-inequality error rendered `|BC| = 10` as **`10 = |BC|`**, and
+`|AC| + |BA| = 9` as **`9 = |BA| + |AC|`**. Operator: *"check all similar messages and fix this issue."*
+
+**The class.** The UI is RTL Hebrew and our messages constantly splice an LTR technical run into a Hebrew
+sentence. Almost every character in such a run — `|`, `=`, `+`, digits, parentheses, `∠ ⊥ ∥ △ √` — is
+NEUTRAL or weak to the Unicode bidi algorithm, which resolves it to the **paragraph** direction. In an RTL
+paragraph that reverses the run. Nothing is wrong with the string; the renderer is doing what the standard
+says, and the author had no way to see it.
+
+**Why the first fix was the wrong shape, which is the finding.** ADR-428 Am. 1 isolated the
+**interpolated value** at its call site (`ltrIsolate(teach)`), and it worked for the one message that
+prompted it — a message whose entire run *is* the value. It cannot work in general, and this report is the
+proof: `"לא ניתן: |{{seg}}| = {{value}} … וכאן {{sides}} = {{sum}}"` builds its pipes and its `=` **in the
+template**, so isolating `{{seg}}` leaves every neutral character around it still exposed. **The complete
+run exists only in the rendered string** — so that, and nothing earlier, is where the isolation belongs.
+The per-value helper is deleted rather than kept alongside: two mechanisms for one class is how the two
+teaching surfaces drifted apart in the first place (Am. 1 itself).
+
+**Decision.** An **i18next post-processor**, registered once in `src/i18n/index.ts`, so every `t()` call in
+the app is covered — including messages written after this one. That property is the actual fix: the defect
+class is authors not thinking about bidi, and any remedy that depends on each author remembering has not
+closed it.
+
+The transform isolates, per Hebrew-free gap, the span from its first to its last **CORE** character
+(`A-Za-z0-9 | ∠ ∡ ∢ ⊥ ∥ △ ▲ √ ⌢ °`). Trimming to CORE is what keeps the sentence's own punctuation
+**outside** the isolate — a naive gap-wrap would drag the leading `:` and the trailing `.` in and move
+them to the wrong end, turning one rendering bug into another. A string with no Hebrew is returned
+untouched, and a string already carrying isolates is never nested.
+
+**The load-bearing test is the SAFETY property, not any single message.** A sweeping transform over every
+user-facing string is only acceptable if it cannot corrupt one: *stripping the isolates from any processed
+message returns the original byte-for-byte*, asserted over **every leaf string of `he.json`** (and English
+returned unchanged). Isolates are zero-width and the transform never reorders anything itself — it only
+tells the renderer not to. On top of that, a **coverage** sweep asserts that every Hebrew message
+containing a technical run actually receives one; it is derived from the bundle rather than hand-listed, so
+a message added later is covered without anyone remembering to add it — which is the operator's
+"all similar messages" made mechanical. 458 assertions in `src/i18n/__tests__/bidi.test.ts`.
+
+**Not done here.** `src3d/` has its own i18n bootstrap and its own two affected strings; the same
+post-processor should be registered there, but it is a different product, lane and log, so it never shares
+a commit with a 2-D fix. The question export (#465) writes `.docx` rather than DOM and does not pass
+through `t()`, so it is untouched by this and its decision stays open.

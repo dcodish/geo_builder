@@ -240,16 +240,17 @@ describe('#447 (ADR-428) — the canonical form is TAUGHT on a successful commit
     expect(notes().some((n) => n.startsWith('input.canonicalHint'))).toBe(false);
   });
 
-  it('the hint is BIDI-ISOLATED — an RTL sentence cannot reorder «∠BAC = 50» (#464)', async () => {
-    // `∠` is a NEUTRAL character: between the Hebrew sentence and the Latin labels the bidi algorithm
-    // resolves it to the paragraph direction and lays it out on the far side of its own letters. The
-    // word form this replaced opened with a strong RTL character, which is why it never showed.
+  it('the hint carries the RAW canonical text — bidi isolation belongs to the i18n layer (#464)', async () => {
+    // The pipeline must NOT pre-escape. The run is composed from the message template's own literals
+    // plus this value, so only the RENDERED string holds the complete run; isolating here would both
+    // miss the literals and nest inside the post-processor's own isolate. Locked as an explicit
+    // expectation because an earlier version of this fix did pre-escape, and it looked like it worked.
     const { deps, notes } = makeDeps();
     await runSubmit('דלתון קמור', deps);
     await runSubmit('A=40', deps);
     const hint = notes().find((n) => n.startsWith('input.canonicalHint'));
     expect(hint).toBeTruthy();
-    expect(hint, 'the canonical run is wrapped in LRI…PDI').toContain('⁦∠');
-    expect(hint).toContain('⁩');
+    expect(hint).toContain('∠BAD = 40');
+    expect(hint, 'no isolate characters at this layer').not.toMatch(/[⁦⁩]/);
   });
 });
