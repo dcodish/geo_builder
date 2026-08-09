@@ -16,7 +16,7 @@
  * `S = 13` (an area marker) are the same SHAPE of utterance and must never be read as angles.
  */
 import { describe, expect, it } from 'vitest';
-import { buildParseCtx, canonicalText, parse, teachCanonical } from '@/parser';
+import { buildParseCtx, canonicalText, parse, stepLabel, teachCanonical } from '@/parser';
 import { useGeoStore, replay } from '@/store/geoStore';
 
 function figure(utterances: string[]) {
@@ -162,5 +162,54 @@ describe('#447 — it TEACHES the canonical form (ADR-428 obligation 2)', () => 
     const r = parse('AB = 5', ctx);
     if (!r.ok) throw new Error('parse');
     expect(teachCanonical('AB = 5', r.commands, 'he')).toBeNull();
+  });
+});
+
+describe('#450 (ADR-428 obligation 3) — the STEP ROW echoes the canonical form', () => {
+  const cmdsOf = (lines: string[]) => {
+    const ctx = figure(lines.slice(0, -1));
+    const r = parse(lines[lines.length - 1], ctx);
+    if (!r.ok) throw new Error(`did not parse: ${lines[lines.length - 1]}`);
+    return r.commands;
+  };
+
+  it('«A=40» is shown as «∠BAD = 40», not as the typed text', () => {
+    const cmds = cmdsOf(['דלתון קמור', 'A=40']);
+    expect(stepLabel(cmds, 'A=40', 'he')).toMatch(/^∠[A-Z]{3} = 40$/);
+  });
+
+  it('the keyboard «<» form is shown canonically too', () => {
+    const cmds = cmdsOf(['דלתון קמור', '<BAD = 40']);
+    expect(stepLabel(cmds, '<BAD = 40', 'he')).toBe('∠BAD = 40');
+  });
+
+  it('a row the renderer cannot express KEEPS its verbatim text — silence is safe', () => {
+    // Deliberately conservative: canonicalText renders only the families we teach, so a shape
+    // declaration, a length, and anything compound must pass through untouched.
+    for (const [lines, typed] of [
+      [['משולש ABC'], 'משולש ABC'],
+      [['משולש ABC', 'AB = 5'], 'AB = 5'],
+    ] as [string[], string][]) {
+      expect(stepLabel(cmdsOf(lines), typed, 'he'), typed).toBe(typed);
+    }
+  });
+
+  it('the echoed label RE-PARSES to the same lowering — the ✎ box is seeded with it', () => {
+    // App seeds the edit input from the displayed label, so a label that did not round-trip would
+    // corrupt the step on the next edit.
+    const ctx = figure(['דלתון קמור']);
+    const cmds = cmdsOf(['דלתון קמור', 'A=40']);
+    const label = stepLabel(cmds, 'A=40', 'he');
+    const back = parse(label, ctx);
+    expect(back.ok, label).toBe(true);
+    if (!back.ok) return;
+    const a = back.commands.find((c) => c.type === 'set-angle') as { vertex: string; value: number };
+    expect(a.vertex).toBe('A');
+    expect(a.value).toBe(40);
+  });
+
+  it('falls back to the command types only when there is no utterance at all', () => {
+    const cmds = cmdsOf(['משולש ABC']);
+    expect(stepLabel(cmds, undefined, 'he')).toBe(cmds.map((c) => c.type).join(' + '));
   });
 });

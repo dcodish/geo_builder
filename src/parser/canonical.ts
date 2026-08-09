@@ -59,6 +59,21 @@ export function canonicalText(cmds: AnyCommand[], locale: Locale): string | null
  * rendered). Conservative by construction: a hint appears only when the utterance is missing the very
  * word that names the construct, which is the difference the student needs to see.
  */
+/**
+ * The label a STEP ROW shows — ADR-428 obligation 3 (#450).
+ *
+ * The row reports what the tool UNDERSTOOD, in the spelling we teach, rather than preserving a phrasing
+ * we merely tolerate: a student who typed `A=50` sees `∠BAC = 50` on the step and builds the habit the
+ * acceptance hint just asked for. Anything `canonicalText` cannot render faithfully keeps its verbatim
+ * text — which is most rows today, and deliberately so (silence is safe, a wrong label is not).
+ *
+ * Lives here rather than in the component so it is testable and so the step list and the hint can never
+ * disagree about what "canonical" means — they now share one renderer.
+ */
+export function stepLabel(cmds: AnyCommand[], utterance: string | undefined, locale: Locale): string {
+  return canonicalText(cmds, locale) ?? utterance ?? cmds.map((c) => c.type).join(' + ');
+}
+
 export function teachCanonical(utterance: string, cmds: AnyCommand[], locale: Locale): string | null {
   const text = canonicalText(cmds, locale);
   if (!text) return null;

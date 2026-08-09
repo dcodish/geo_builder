@@ -6275,6 +6275,37 @@ form), `input.scope.latex`, `input.scope.compound-relation`, and two in `src3d/`
 both Hebrew locales, and filed as **#464** with the three candidate approaches rather than fixed here:
 they are pre-existing and unreported, and two belong to the other product's lane.
 
+**Amendment 2 (2026-08-09) — obligation 3 lands: the STEP ROW echoes the canonical form (#450).** The
+operator's ruling, asked for three times: a row that reads `A=50` preserves a phrasing the tool merely
+tolerates, immediately after the hint has asked the student to write `∠BAC = 50`. The step list now
+reports what the tool **understood**, in the spelling it teaches.
+
+*Built as one renderer, not two.* `stepLabel(cmds, utterance, locale)` sits in `canonical.ts` beside
+`teachCanonical` and delegates to the same `canonicalText`, so the hint and the row can never disagree
+about what "canonical" means — a divergence between two teaching surfaces is the defect Amendment 1 was
+about, and building the echo on its own renderer would have recreated it one layer down. It lives in the
+parser module rather than the component for the CLAUDE.md reason (behaviour never inline in the
+component) and because there is no component-test harness in this tree — a decision inside `App.tsx`
+would have shipped unlocked.
+
+*Conservative by inheritance.* `canonicalText` renders only the families we teach and returns null for a
+compound lowering, so the fallback chain is canonical → verbatim → command types. Today that means angle
+rows change and every other row is byte-identical, which is the honest scope of the obligation and not a
+limitation to work around: silence is safe, a wrong label is not.
+
+*The ✎ box is seeded from the DISPLAYED label, not the superseded typed text.* Leaving the editor showing
+`A=50` under a row reading `∠BAC = 50` would make the two contradict each other at the moment the student
+is most likely to be paying attention. Safe because the canonical text re-parses to the same lowering —
+now locked as an explicit round-trip property, since the edit path is what makes that a correctness
+requirement rather than a nicety.
+
+*The reserved decision is now due, and is still the operator's.* This ADR flagged the question export
+(ADR-251/252) as undecided "in the slice that builds obligation 3". That slice is this one, so the export
+and the screen now disagree on angle rows. Deliberately NOT resolved here: the export is the more public
+artifact, the readable form on paper is not obviously the readable form in an input box, and "canonical in
+the export" drags in #464's unresolved literal-string half via the leading `∠`. Filed as **#465**
+(`needs-operator`) with the three candidates.
+
 ## ADR-429 — honesty accounting is a MULTISET: an occurrence predicate, not a value predicate
 
 **Status:** accepted, 2026-08-09 · **Issue:** #437 (bug) · **Split out:** #458 (the capability half) ·
