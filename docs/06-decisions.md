@@ -6478,3 +6478,28 @@ Brackets are deliberately NOT added to CORE — a lone `(` opening a Hebrew pare
 immediately wrapping the core span**, outermost last so `("AB")` takes the quotes and then the parens.
 An unbalanced delimiter, whose partner belongs to the Hebrew sentence, is left exactly where it is —
 locked by that case alongside the positive ones.
+
+**Amendment 3 (2026-08-09) — the question EXPORT follows the canonical form (#465).** This ADR reserved
+the decision for *"the slice that builds obligation 3"*; Amendment 2 built it, so the screen and the paper
+had begun to disagree — a student reading both saw `∠BAC = 50` on the step list and `A=50` in the
+worksheet. Operator ruling: *"docx export follows cannonical form."* `questionLines` now renders through
+the **same `canonicalText`** as the step row and the acceptance hint, so all three surfaces cannot drift;
+it stays conservative by inheritance, and a lowering the renderer cannot express keeps its verbatim text.
+An utterance is still *required* — canonicalisation changes how a line reads, never whether it appears, so
+the "no command-type jargon" rule (ADR-252) is untouched.
+
+**The export needed the bidi fix too, and its own docstring was the evidence.** `questionDoc.ts` argued it
+could rely on the bidi algorithm alone and inject no control characters, *"the same … the browser step
+list already renders correctly."* That premise was false: the browser renders such runs correctly only
+since [ADR-431](#adr-431). Word runs the same algorithm, so `|BC| = 10` prints as `10 = |BC|` on the page —
+and this amendment sends `∠BAC = 50` straight into it. Each given is now isolated.
+
+That surfaced a real limit in `isolateLtrRuns`: its Hebrew test is a **proxy** for "this text will be laid
+out RTL", which holds for a UI message whose direction comes from its own content and fails wherever the
+direction is *imposed from outside*. The export forces `w:bidi`, so an all-Latin given sits in an RTL
+paragraph and scrambles with no Hebrew anywhere in it. Callers in that position now say so explicitly
+(`rtlParagraph`) rather than the helper guessing — the same docs/17 §2.2 shape as ADR-429's value-vs-
+occurrence proxy, found the same way: by a caller the proxy was never true for.
+
+What the original stance got **right** is unchanged: list numbers stay real Word numbering, never a
+literal `"1. "`, because a digit + neutral period at an RTL boundary is the classic scramble.

@@ -4,20 +4,26 @@
  * givens list beside the figure image (single borderless 1×2 table, text on
  * the right for Hebrew via `visuallyRightToLeft`).
  *
- * RTL/bidi stance: utterances mix Hebrew words with Latin point labels, digits
- * and ∠/⟂/° symbols. We rely on the same Unicode bidi algorithm the browser
- * step list already renders correctly, activated in Word by `w:bidi` on the
- * paragraph + `w:rtl` on the run — the utterance stays verbatim, no LRM/RLM
- * control characters are injected. List numbers use REAL Word numbering, never
- * a literal "1. " prefix: a European digit + neutral period at an RTL run
- * boundary is the classic bidi-scramble case (renders ".1"), while Word's list
- * number is layout chrome resolved by paragraph direction, outside the bidi
- * text stream.
+ * RTL/bidi stance (REVISED by #464 — the original is recorded because its reasoning is still half-right):
+ * givens mix Hebrew words with Latin point labels, digits and ∠/⟂/° symbols, and this module used to rely
+ * on the bidi algorithm alone, injecting no control characters, on the grounds that "the browser step list
+ * already renders it correctly". That premise turned out to be false — the browser renders it correctly
+ * only SINCE the isolation post-processor ([ADR-431](../../docs/06-decisions.md#adr-431)); before it,
+ * `|BC| = 10` displayed as `10 = |BC|`, because almost every character of such a run is bidi-NEUTRAL and
+ * resolves to the paragraph direction. Word runs the same algorithm, so the same scramble reaches the
+ * page — and #465 now sends `∠BAC = 50` through here, which is precisely that shape.
+ *
+ * So each given is wrapped with `isolateLtrRuns` (U+2066/U+2069, zero-width, layout-only) when the
+ * paragraph is RTL. What the original stance got RIGHT and is unchanged: list numbers use REAL Word
+ * numbering, never a literal "1. " prefix — a European digit + neutral period at an RTL run boundary is
+ * the classic scramble (renders ".1"), and Word's list number is layout chrome resolved by paragraph
+ * direction, outside the bidi text stream entirely.
  *
  * This module is browser- and node-safe (no DOM): PNG dimensions are read from
  * the IHDR header bytes, not decoded via Image/canvas, so the same code is
  * unit-tested in node.
  */
+import { isolateLtrRuns } from '@/i18n/bidi';
 import {
   AlignmentType,
   BorderStyle,
@@ -120,7 +126,9 @@ export function buildQuestionDoc(input: QuestionDocInput): Document {
             bidirectional: rtl,
             numbering: { reference: 'givens', level: 0 },
             spacing: { after: 80 },
-            children: [new TextRun({ text: line, rightToLeft: rtl })],
+            // #464/#465: isolate the LTR technical runs. Word runs the same bidi algorithm the browser
+            // does, so `|BC| = 10` scrambles to `10 = |BC|` here for exactly the reason it did on screen.
+            children: [new TextRun({ text: rtl ? isolateLtrRuns(line, true) : line, rightToLeft: rtl })],
           }),
       ),
     ],

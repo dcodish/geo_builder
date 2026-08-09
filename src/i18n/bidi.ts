@@ -52,8 +52,12 @@ const PDI = '⁩'; // POP DIRECTIONAL ISOLATE
  * character. A string with no Hebrew at all is returned untouched — an English message is already laid
  * out in its own direction and needs nothing.
  */
-export function isolateLtrRuns(s: string): string {
-  if (!HEBREW_LETTER.test(s)) return s;
+export function isolateLtrRuns(s: string, rtlParagraph = false): string {
+  // The Hebrew test is a proxy for "this text will be laid out RTL", which is right for a UI message
+  // whose direction is derived from its own content. It is WRONG wherever the paragraph direction is
+  // imposed from outside — the .docx export forces `w:bidi`, so an all-Latin given like `|BC| = 10` sits
+  // in an RTL paragraph and scrambles even though it contains no Hebrew at all. Those callers say so.
+  if (!rtlParagraph && !HEBREW_LETTER.test(s)) return s;
   if (s.includes(LRI)) return s; // already isolated — never nest
 
   let out = '';

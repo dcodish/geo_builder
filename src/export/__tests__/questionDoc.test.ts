@@ -110,7 +110,8 @@ describe('questionLines', () => {
       fact({ id: 'f2', utterance: 'נקודה G על AD', cmd: { type: 'point-on-segment', id: 'G', a: 'A', b: 'D' } }),
       fact({ id: 'f3', utterance: 'זווית GBA = 37', cmd: { type: 'set-angle', vertex: 'B', ray1: 'G', ray2: 'A', value: 37 } }),
     ];
-    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'נקודה G על AD', 'זווית GBA = 37']);
+    // #465: an angle line now exports in the CANONICAL form — the export follows the step list.
+    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'נקודה G על AD', '∠GBA = 37']);
   });
 
   it('a bare segment whose NEW endpoint a later given references is kept', () => {
@@ -119,7 +120,8 @@ describe('questionLines', () => {
       fact({ id: 'f2', utterance: 'BE', cmd: { type: 'segment', a: 'B', b: 'E' } }), // creates E
       fact({ id: 'f3', utterance: 'זווית ABE = 30', cmd: { type: 'set-angle', vertex: 'B', ray1: 'A', ray2: 'E', value: 30 } }),
     ];
-    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'BE', 'זווית ABE = 30']);
+    // #465: an angle line now exports in the CANONICAL form — the export follows the step list.
+    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'BE', '∠ABE = 30']);
   });
 
   it('a membership statement about an EXISTING point is a given (M1), never scaffolding — and it keeps its carrier', () => {
@@ -152,7 +154,8 @@ describe('questionLines', () => {
 
   it('real parser: the canonical square figure keeps every line (marker referenced by the angle)', () => {
     const facts = factsFromUtterances(['ריבוע ABCD', 'נקודה G על AD', 'זווית GBA = 37']);
-    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'נקודה G על AD', 'זווית GBA = 37']);
+    // #465: an angle line now exports in the CANONICAL form — the export follows the step list.
+    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'נקודה G על AD', '∠GBA = 37']);
   });
 });
 
@@ -188,9 +191,13 @@ describe('buildQuestionDoc', () => {
     const zip = await JSZip.loadAsync(buf);
     const xml = await zip.file('word/document.xml')!.async('string');
 
-    // verbatim content survived, untransformed
-    expect(xml).toContain('במשולש ABC הזווית ∠ABC = 37°');
-    expect(xml).toContain('AB קוטר במעגל O');
+    // Content survived. NOT byte-identical any more: since #464 an RTL paragraph has its LTR technical
+    // runs wrapped in bidi isolates, because Word scrambles them exactly as the browser did. The
+    // invariant is that isolation is LAYOUT-ONLY — strip the two zero-width characters and the given is
+    // back verbatim. (Asserted as a property of its own below.)
+    const visible = xml.replace(/[⁦⁩]/g, '');
+    expect(visible).toContain('במשולש ABC הזווית ∠ABC = 37°');
+    expect(visible).toContain('AB קוטר במעגל O');
     expect(xml).toContain('נתון:');
 
     expect(xml).toContain('<w:bidi'); // RTL paragraphs
@@ -210,5 +217,65 @@ describe('buildQuestionDoc', () => {
     expect(xml).toContain('square ABCD');
     expect(xml).not.toContain('<w:bidi ');
     expect(xml).not.toContain('bidiVisual');
+  });
+});
+
+describe('#465 — the export follows the CANONICAL form (ADR-428 reserved decision)', () => {
+  // Operator ruling 2026-08-09: once the step list echoes canonically (#450), a worksheet still saying
+  // «A=50» disagrees with the screen the student is reading. Same renderer as the step row and the
+  // acceptance hint, so all three surfaces cannot drift apart.
+  const angle = { type: 'set-angle', vertex: 'A', ray1: 'B', ray2: 'C', value: 50 } as unknown as Fact['cmd'];
+
+  it('a bare-vertex angle exports as «∠BAC = 50», not as the typed text', () => {
+    const facts: Fact[] = [fact({ id: 'f1', utterance: 'A=50', group: 'g1', cmd: angle })];
+    expect(questionLines(facts, 'he')).toEqual(['∠BAC = 50']);
+  });
+
+  it('a line the renderer cannot express keeps its verbatim utterance', () => {
+    const facts: Fact[] = [
+      fact({ id: 'f1', utterance: 'ריבוע ABCD', group: 'g1', cmd: { type: 'square', ids: ['A', 'B', 'C', 'D'] } as unknown as Fact['cmd'] }),
+    ];
+    expect(questionLines(facts, 'he')).toEqual(['ריבוע ABCD']);
+  });
+
+  it('an utterance is still REQUIRED — a canonical form never resurrects a jargon line', () => {
+    // The header rule stands: a group with no typed utterance is skipped rather than rendered as a
+    // command-type join. Canonicalisation changes how a line READS, never whether it appears.
+    const facts: Fact[] = [fact({ id: 'f1', group: 'g1', cmd: angle })];
+    expect(questionLines(facts, 'he')).toEqual([]);
+  });
+});
+
+describe('#464/#465 — the .docx isolates its LTR runs', () => {
+  const base = {
+    heading: 'נתון:',
+    png: { data: PNG_2X1, ...pngDimensions(PNG_2X1) },
+  };
+  const docXml = async (over: { rtl: boolean; lines: string[] }) => {
+    const buf = await Packer.toBuffer(buildQuestionDoc({ ...base, ...over }));
+    return (await JSZip.loadAsync(buf)).file('word/document.xml')!.async('string');
+  };
+
+  it('an RTL document wraps a technical run so Word cannot reverse it', async () => {
+    // Word runs the same bidi algorithm as the browser: unisolated, «|BC| = 10» prints as «10 = |BC|».
+    // This module used to inject no control characters, on the premise that the browser rendered such a
+    // run correctly unaided — which was only true AFTER ADR-431 added the isolation post-processor.
+    const xml = await docXml({ rtl: true, lines: ['|BC| = 10'] });
+    expect(xml).toContain('\u2066|BC| = 10\u2069');
+  });
+
+  it('an LTR document is left alone — nothing to isolate', async () => {
+    const xml = await docXml({ rtl: false, lines: ['|BC| = 10'] });
+    expect(xml).not.toContain('\u2066');
+    expect(xml).toContain('|BC| = 10');
+  });
+
+  it('isolation is layout-only — every visible character of the given survives', async () => {
+    // The same safety property the i18n post-processor carries: stripping the isolates must return the
+    // line byte-for-byte. A transform over exported worksheet text is only acceptable with that held.
+    const line = 'במשולש ABC הזווית ∠ABC = 37°';
+    const xml = await docXml({ rtl: true, lines: [line] });
+    const runs = [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]);
+    expect(runs.map((r) => r.replace(/[\u2066\u2069]/g, ''))).toContain(line);
   });
 });
