@@ -15,7 +15,7 @@
 
 import type { StatedShapeEquality, VariantShape, AnyCommand, Command, Construction, GivenViolation, Id, RelationsResult, ResolvedCircle, ShapesResult, Vec } from '@/engine';
 import { metricImpossibility } from '@/engine/metricFeasibility';
-import { computeValuesPanel, declaredLengthUnit, type ValuesPanelResult } from '@/engine/valuesPanel';
+import { computeValuesPanel, declaredLengthUnit, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
 import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, withVariant, withReflectMask } from '@/engine';
@@ -2014,7 +2014,7 @@ export function detectAll(facts: Fact[]): DetectAllResult {
  * path; when the detect sweep already ran, the pool memo makes this a pure classification pass).
  * Runs where the samples are (the worker), so the `circlesOfSample` side table stays thread-local.
  */
-export function computeValues(facts: Fact[]): ValuesPanelResult {
+export function computeValues(facts: Fact[], queries: QueryInput[] = []): ValuesPanelResult {
   const shared = sharedSamples(facts);
   const circles = shared.samples.map((pos) => circlesOfSample.get(pos) ?? new Map<Id, ResolvedCircle>());
   let areaLetter: string | null = null;
@@ -2024,7 +2024,7 @@ export function computeValues(facts: Fact[]): ValuesPanelResult {
   // #427: the student's declared length unit («AB = a») — read off the ENABLED facts, so deselecting the
   // statement that named it returns the panel to plain magnitudes.
   const unit = declaredLengthUnit(facts.filter((f) => f.enabled).map((f) => f.cmd));
-  return computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter, unit);
+  return computeValuesPanel(shared.constructions, shared.samples, circles, areaLetter, unit, queries);
 }
 
 /** The object ids a command introduces — used to highlight a selected fact on the canvas. */

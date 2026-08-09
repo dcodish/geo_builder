@@ -6524,3 +6524,50 @@ worked.
 asserting all three halves together: that the given really is consumed (zero surviving `angle`
 constraints, so the test would pass vacuously if the drive stopped happening), that `37°` is printed at B,
 and that the figure genuinely measures 37° so the label is not a lie.
+
+## ADR-433 — the values-panel QUERY lane: ask for a quantity, get it when it is knowledge
+
+**Status:** accepted, 2026-08-09 · **Issue:** #477 (feature) · **Operator design** · **3-D original:** [ADR-3D-057](06b-decisions-3d.md#adr-3d-057) (#274)
+
+**Where it came from.** #476 asked which DERIVED wedges the values panel should auto-enumerate, and every
+answer was a bad trade: all pairs at a vertex is C(k,2) and drowns the panel; adjacent-only is a guess
+about intent. The operator's answer dissolved the question — *"in the values area a user could
+specifically write an angle or a segment, and if it is possible to calculate it, we will."* **Asking beats
+guessing**, and the panel stays scannable. Operator rulings on the three open points: the lane
+**replaces** auto-enumeration, the input lives **inside the values panel**, and queries **persist** with
+the figure.
+
+**The two invariants carried over from 3-D, and they are the whole feature.**
+
+1. **A query is a question, never a fact.** It never enters `replay`, never moves a point, never appears
+   in the step list. This is what stops "let me just check something" from silently becoming a given —
+   asserted against the STORE, since that is the only layer where it could be violated.
+2. **An answer is only ever knowledge**, and a refusal says WHY ([ADR-052](#adr-052)).
+
+**Computed INSIDE `computeValuesPanel`, which is the load-bearing design choice.** A query rides the same
+call as the rows, so it shares the sample pool, the ADR-295/#88 knowledge gate, `scalePinned`, and the
+exact-form recognizer. This extends M3 ("never a second sampler") from a second *sampler* to a second
+*consumer*: a query answered by any other path could contradict the list printed directly above it, and a
+panel that disagrees with itself is worse than a short one. Locked by a test asserting a query and its
+auto row agree to 9 places for the same quantity.
+
+**The scale asymmetry is inherited, not re-litigated.** An angle is scale-free, so it answers whenever the
+shape is determined — which is exactly what makes the operator's `∠GBC` answerable at 53° on a square with
+no size. A length/area/perimeter carries units, so under the free similarity gauge it is refused (`scale`)
+rather than reporting this drawing's arbitrary size (#426/ADR-421) — unless the student declared a unit
+(#427), where 2-D can answer in their own symbol where 3-D must refuse outright.
+
+**Parsing sits in `@/parser`, not the engine** — the engine may not import the parser, so it is handed a
+structured `ValueQuery` and never a string to interpret. The upside is that a query inherits every
+orthographic fold a given gets: `<GBC` and `∡GBC` arrive as `∠GBC` ([ADR-381](#adr-381)). A student should
+not have to type a question differently from the way they type a fact. Unrecognised text returns null and
+the lane says so — it must never fall through to "probably a length", because a wrong answer about a
+figure is indistinguishable from a fact. Degenerate references (`∠ABA`, `AA`, `שטח ABA`) are refused for
+the same reason: each would otherwise produce a confident 0 or NaN.
+
+**Deliberately NOT in `catalog.ts`.** The catalog documents what goes in the MAIN input, and `∠GBC` typed
+there is an angle marker (#94), not a question. A catalog row would advertise a command that does
+something else. The lane advertises itself where it lives — its placeholder and hint name the four forms.
+
+**Does not close #476.** The *stated* `∠GBA` missing from the auto rows stays a bug: a student must never
+have to ask for the value they themselves typed.
