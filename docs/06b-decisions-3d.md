@@ -2078,3 +2078,30 @@ the four segment-named forms keeping their existing owners, and the #467 bare fo
 
 **Still open in #448:** `גובה הפירמידה` with **no apex named**. It needs the apex derived from the solid's
 vertex layout, which is figure resolution of a different kind, and it is not what was asked for here.
+
+## ADR-3D-116 — the bidi isolation post-processor, ported
+
+**Status:** accepted, 2026-08-09 · **Issue:** #468 · **2-D original:** [ADR-431](06-decisions.md#adr-431)
+
+**Why 3-D needs it at least as much.** The class is an LTR technical run inside an RTL Hebrew sentence,
+whose neutral characters the bidi algorithm resolves to the paragraph direction and therefore reverses.
+3-D messages are unusually dense with precisely that content: primed label runs (`ABCDA'B'C'D'`),
+coordinate triples, plane equations, parametric lines.
+
+**Copied as a pattern, never imported** (docs/20 §12 rule 1) — `src3d/` shares no code with `src/`, and
+`server/__tests__/isolation.test.ts` enforces it. The port is deliberate rather than mechanical in two
+places:
+
+- **`'` joins CORE.** 3-D labels are primed, so a run ending in `A'` would otherwise be trimmed
+  mid-label, leaving the prime outside the isolate.
+- **Balanced hugging delimiters are absorbed** — the improvement this port *caused*, since a 3-D
+  coordinate triple `(1, 2, -3)` is exactly a parenthesised run. Fixed in the 2-D original too
+  ([ADR-431](06-decisions.md#adr-431) Am. 1) rather than left to diverge; the two copies stay identical
+  apart from the prime.
+
+**Locked** by `bidi3.test.ts` (189) with the same two properties the original carries, because they are
+what make a transform over every user-facing string safe: the **safety** property — stripping the isolates
+from any processed message returns the original byte-for-byte, over every leaf of the 3-D `he.json`, with
+English untouched — and a bundle-**derived** coverage sweep, so a message added later is checked without
+anyone remembering. Plus the primed-label and coordinate-triple cases, which are the two shapes the 2-D
+corpus could not have caught.
