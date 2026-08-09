@@ -2011,4 +2011,21 @@ export const SCENARIOS_4: Scenario[] = [
       expect(deg, 'the top of the DRAWN half, not θ=270°').toBeCloseTo(90, 3);
     },
   },
+  {
+    id: 'driven-angle-keeps-its-label',
+    title: 'issue #474: «זווית GBA = 37» that DRIVES the figure is still printed on it',
+    guards:
+      'operator-reported: the value the whole figure was built around was the one value the figure would not show. Measure labels were derived from the SURVIVING constraint list, so a given the solver CONSUMES vanished from the drawing — here the angle drives G along AD until it holds, leaving no `angle` constraint behind. The wedge arc still drew (marks come from the facts), which is exactly the asymmetry: mark from the fact, value from the constraint. This is CLAUDE.md\'s flagship interaction, so the demo figure lost its own label precisely because the feature works, and it breaks the stated invariant "everything the student stated is visible on the figure". Labels now come from the fact too.',
+    steps: ['ריבוע ABCD', 'נקודה G על AD', 'זווית GBA = 37'],
+    check(fig) {
+      allStepsOk(fig);
+      // the angle really drives — G is not at a default spot and no angle constraint survives
+      expect(fig.construction.constraints.filter((c) => c.type === 'angle').length, 'the given was consumed by the drive').toBe(0);
+      const lab = fig.labels.angles.find((a) => a.vertex === 'B' && [a.ray1, a.ray2].sort().join('') === 'AG');
+      expect(lab, 'the stated 37 is printed at B').toBeTruthy();
+      expect(lab!.text).toBe('37°');
+      // and the figure actually honours it, so the label is not a lie
+      expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'G'))).toBeCloseTo(37, 3);
+    },
+  },
 ];

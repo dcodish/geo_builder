@@ -1034,6 +1034,34 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
       if (f && f.enabled && status[f.id] === 'ok') status[f.id] = e.error;
     }
   }
+  // #474: a stated magnitude labels from the FACT, not only from a SURVIVING constraint.
+  //
+  // The constraint pass below is the original source, and it silently loses every given the solver
+  // CONSUMES. When a stated angle drives a free DOF — «ריבוע ABCD» / «נקודה G על AD» / «זווית GBA = 37»,
+  // G sliding along AD until the angle holds — no `angle` constraint remains in the resolved figure, so
+  // the value that shaped the whole drawing was the one value the drawing would not show. That breaks the
+  // honesty invariant "everything the student stated is visible on the figure", and it broke it on this
+  // product's flagship interaction.
+  //
+  // Sourced exactly like the angle MARK below (facts, `status === 'ok'`), which is why the wedge was drawn
+  // but bare — mark from the fact, value from the constraint. `fillOnly` keeps a symbolic label ("2α",
+  // an alias name) ahead of the raw number, so this only ever fills a gap.
+  for (const fi of fold.iterOrder) {
+    const f = facts[fi];
+    if (status[f.id] !== 'ok') continue;
+    const c = f.cmd;
+    if (c.type === 'set-angle') {
+      const text = `${fmtMeasure(c.value)}°`;
+      if (c.arcOf) {
+        const k = `${c.arcOf}:${[c.ray1, c.ray2].sort().join('')}`;
+        if (!arcByKey.has(k)) arcByKey.set(k, { circle: c.arcOf, a: c.ray1, b: c.ray2, text });
+      } else {
+        addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-angle', vertex: c.vertex, ray1: c.ray1, ray2: c.ray2 }, text, true);
+      }
+    } else if (c.type === 'set-distance') {
+      addMeasureLabel(lenByKey, angByKey, areaByKey, { type: 'measure-length', a: c.a, b: c.b }, fmtMeasure(c.value), true);
+    }
+  }
   // Numeric measures (a plain `AB = 5` / `∠ABC = 37`, and symbolic ones once resolved)
   // surface as distance/angle constraints — label them from the figure, filling any
   // key a symbolic fact didn't already own (FR-RN-2).

@@ -6478,3 +6478,49 @@ Brackets are deliberately NOT added to CORE — a lone `(` opening a Hebrew pare
 immediately wrapping the core span**, outermost last so `("AB")` takes the quotes and then the parens.
 An unbalanced delimiter, whose partner belongs to the Hebrew sentence, is left exactly where it is —
 locked by that case alongside the positive ones.
+
+## ADR-432 — a stated magnitude is labelled from the FACT, not from the surviving constraint
+
+**Status:** accepted, 2026-08-09 · **Issue:** #474 (bug, P2)
+
+**The report.** Operator, on the flagship figure: *"if user wrote 37 it should appear in the diagram"* —
+`ריבוע ABCD` / `נקודה G על AD` / `זווית GBA = 37` drew the wedge arc at B and printed no value, with
+«הציגו מידות» on.
+
+**Measured, and the shape of it is the finding.** A numeric angle labels perfectly well — *until the
+solver consumes it*:
+
+| figure | surviving `angle` constraints | label |
+| --- | --- | --- |
+| `משולש ABC` + `זווית ABC = 37` | 1 | ✅ `37°` |
+| `ריבוע ABCD` + `נקודה G על AD` + `זווית GBA = 37` | **0** | ❌ none |
+| `משולש ABC` + `זווית ABC = 2α` | — | ✅ `2α` (symbolic, added from the fact) |
+
+**Root cause.** Numeric labels were derived from the **surviving constraint list** — the loop over
+`figure.constraints` that emits one label per `distance`/`angle`/`area`. When a given DRIVES a free DOF
+(G slides along AD until the angle holds) the solver consumes it, no `angle` constraint remains, and the
+label goes with it. Symbolic measures escaped only because they are added earlier, from the FACT.
+
+The angle MARK is already sourced from the facts, which is exactly why the wedge drew but stayed bare.
+That asymmetry — *mark from the fact, value from the constraint* — is the whole defect, and it is a
+proxy-predicate of the docs/17 §2.2 family: "is there a constraint for it?" standing in for "did the
+student state it?". The two agree right up until the solver does its job.
+
+**Why P2 and not polish.** It breaks a documented honesty invariant (CLAUDE.md → Conventions:
+*everything the student stated is visible on the figure*), and it broke it on the product's flagship
+interaction — the sequence in CLAUDE.md's own opening paragraph. The figure lost its label **because the
+feature works**.
+
+**Decision.** A stated `set-angle` / `set-distance` registers its label from the fact, in the same
+fact-sourced, `status === 'ok'`-gated pass the angle marks use. `fillOnly` keeps a symbolic label (`2α`,
+an alias name) ahead of the raw number, so this only ever fills a gap — no existing label changes owner,
+which is what keeps the blast radius to "a value that used to be missing now appears".
+
+The constraint pass stays: it still covers magnitudes that reach the figure without a stated fact of their
+own (a symbolic measure once resolved). The fix adds the missing source rather than replacing the one that
+worked.
+
+**Locked** by the scenario `driven-angle-keeps-its-label` (corpus 4) — the operator's exact sequence,
+asserting all three halves together: that the given really is consumed (zero surviving `angle`
+constraints, so the test would pass vacuously if the drive stopped happening), that `37°` is printed at B,
+and that the figure genuinely measures 37° so the label is not a lie.
