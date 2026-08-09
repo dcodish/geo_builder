@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, impliedCircleBinding, buildParseCtx } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, impliedCircleBinding, buildParseCtx, stepLabel } from '@/parser';
 import { Figure } from '@/render';
 import { crossingCommands } from '@/engine';
 import type { Crossing } from '@/engine';
@@ -261,6 +261,8 @@ export default function App() {
     { label: 'S_{}', insert: 'S_{}', caret: 3 }, // area: S_{ABC} = 13 — caret lands between the braces
   ];
   const he = i18n.language === 'he';
+  /** The locale `canonicalText` renders in — the same normalisation the submit pipeline uses (#450). */
+  const canonLocale: 'he' | 'en' = i18n.language?.startsWith('he') ? 'he' : 'en';
 
   // Base text direction for a mixed He/En string (geometry labels, numbers, and
   // operators are Latin/neutral even inside Hebrew). `dir="auto"` keys only off
@@ -1159,7 +1161,14 @@ export default function App() {
                   const brokenFact = g.facts.find((f) => f.enabled && status[f.id] !== 'ok');
                   const state = !anyOn ? 'disabled' : brokenFact ? 'broken' : 'ok';
                   const errText = brokenFact ? explainError(status[brokenFact.id] as string) : undefined;
-                  const label = g.facts[0].utterance ?? g.facts.map((f) => f.cmd.type).join(' + ');
+                  // ADR-428 obligation 3 (#450): the row shows the CANONICAL form of what the tool
+                  // UNDERSTOOD, not the verbatim text — so the step list teaches the same spelling the
+                  // acceptance hint does, instead of preserving a phrasing we only tolerate. Rendered
+                  // from the group's COMMANDS, never by rewriting the typed string (canonical.ts's
+                  // load-bearing rule). `canonicalText` is deliberately conservative — a compound
+                  // lowering, or one whose family has no renderer, returns null and the row keeps its
+                  // verbatim text, which is most rows today.
+                  const label = stepLabel(g.facts.map((f) => f.cmd), g.facts[0].utterance, canonLocale);
                   const editing = editingId === g.key;
                   return (
                     <li key={g.key} style={factRow(state, g.key === selectedId)}>
@@ -1228,7 +1237,11 @@ export default function App() {
                           <span style={{ fontSize: 12, width: 16, textAlign: 'center' }}>
                             {state === 'ok' ? <span style={{ color: '#16a34a' }}>✓</span> : state === 'broken' ? <span style={{ color: '#dc2626' }}>✗</span> : <span style={{ color: '#94a3b8' }}>○</span>}
                           </span>
-                          <button type="button" style={iconBtn('#64748b')} title={t('actions.edit')} onClick={() => startEdit(g.key, g.facts[0].utterance)}>
+                          {/* Edit what is DISPLAYED, not the superseded typed text (#450): the row now
+                              shows the canonical form, and seeding the editor with the old phrasing
+                              would make the ✎ box contradict the row. Safe because the canonical text
+                              re-parses to the same lowering — locked by the round-trip property. */}
+                          <button type="button" style={iconBtn('#64748b')} title={t('actions.edit')} onClick={() => startEdit(g.key, label)}>
                             ✎
                           </button>
                           <button type="button" style={del} title={t('actions.delete')} onClick={() => { logDebug({ kind: 'action', action: 'delete', detail: g.key }); removeGroup(g.key); }}>
