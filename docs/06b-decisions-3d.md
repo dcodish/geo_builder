@@ -2140,3 +2140,67 @@ the cause was a **literal backspace byte** in the source: the rule had been writ
 Python string, where `\b` is a real escape (`\s` survived only because it is not). Regexes must never be
 generated through a layer that owns their escape characters. A repo-wide scan for stray control bytes
 came back clean.
+
+## ADR-3D-118 — a parameter's value is knowledge only when the givens leave ONE branch
+
+**Status:** accepted, 2026-08-09 · **Issues:** #479 (P1), #481 · **Operator ruling on priority** ·
+**Supersedes the predicate of:** [ADR-3D-030](#adr-3d-030) Am. 2 / #371
+
+**The report.** Operator, 2026-08-09, prod: *"once I wrote the line is parallel to the plane, m was
+replaced with a value of −√2. When I ask for another config, I get m = +√2. So the issue is that since
+there are 2 possible values, m should not be replaced."* The canvas read
+`ℓ: x = (1, 2, 3) + t·(-3.414, -1.414, 0.586)` — one branch's numbers, printed as the line's definition.
+
+**Why this is the honesty class and not a display nit.** `dir·n = (m−2) + m(m−2) + (m+2)(m−1) = 2m² − 4`,
+so `m = ±√2`: two genuine configurations, and the drawn direction differs between them. Printing either
+one asserts a magnitude the student never gave — the same cardinal sin as drawing a figure that violates
+a given ([ADR-052](06-decisions.md#adr-052)). The operator reclassified it **P1** over the P2 this was
+filed at, on exactly that reading; recorded here because the precedent it was filed against (#371) was
+P2 and the next reader will otherwise see an inconsistency.
+
+**The root cause is a proxy standing in for a property.** #371 established the rule — *a number on the
+canvas must be seed-invariant knowledge* — and enforced it with
+
+```ts
+const paramFree = !!c.param && pinningGivens(c) === 0 && c.paramGivens.length === 0;
+```
+
+which asks **"is the parameter unpinned?"** The property that actually licenses printing a number is
+**"is the parameter's value forced?"**. The two coincide only while every pin has a single root, which is
+every case the original test corpus contained (the 2024-Q2 line pins `m = −5`). A pin with two roots is
+pinned and undetermined at once, so the proxy waved it straight through. This is the tree's own
+documented trap twice over: *a guard bound to a code path rather than to the event it guards*, and
+*an enumeration is not a rule*.
+
+**The fix publishes the property rather than testing for it.** `resolve3` now returns, alongside the raw
+candidate `roots`, the **`branches`** the figure can actually occupy — the roots surviving every
+selection given — and `value` is drawn from `branches` by seed. So `branches.length === 1` is not a
+heuristic meaning "probably determined"; it is that statement **by construction**, and "show another
+configuration" cycles precisely that list. One exported predicate, `paramIsKnowledge(resolved.param)`,
+is the only thing call sites ask (the `scalePinned` / `memberHolds3` precedent — a second copy of a
+question drifts from the first).
+
+**Why `branches` and not simply `roots.length === 1`.** A **sign** given can cut two roots to one, and
+that value *is* knowledge. `adr-3d-032.test.ts` already contains such a figure (`k = ±2√15`, the sign
+picks `+`), so the naive predicate would have regressed a case the suite holds — the reason the raw
+candidate set is kept as well as the effective one.
+
+**A latent sibling fixed on the way.** Sign givens were honoured on the `paramGivens` path (`pinParam`)
+and **silently ignored** on the plane-angle / line-⟂ / line-rel path, so `m הוא פרמטר חיובי` plus a ⟂
+given could draw the negative root — a figure contradicting a stated given. Both paths now narrow through
+the same pool. Found by asking what `branches` must mean, not by a report; it is the class-first check
+docs/17 asks for, and it is why the fix touched the engine rather than the renderer alone.
+
+**#481 — one number formatter.** The canvas owned a private 3-decimal rounder whose comment justified
+itself with *"the bagrut answers are clean numbers"*. That is false exactly where the parameter lane
+lives: a root of a quadratic residual is a surd by default, which is how `√2` reached the operator as
+`1.414`. The canvas now uses the panel's `cleanMag` (integer / `p/q` / surd / 2 decimals). Note the
+**boundary this exposes**: a component here is `−2−√2`, a rational + surd *sum*, which no tier can render
+and which must not grow one — that is the docs/20 §12 rule 3 no-CAS line. It needs no rendering, because
+a figure with an unforced parameter shows `m-2` instead, which states it exactly in the student's own
+notation.
+
+**Locked** in `parametric-echo.test.ts`: the operator's three utterances echo symbolically and
+**identically at every seed**, with neither `±3.414` appearing; a sign given added on top brings the
+numbers back (`roots` 2, `branches` 1); and the pre-existing single-root and no-parameter cases are
+unchanged.

@@ -11,7 +11,8 @@
  * never occlude (docs/20 §11).
  */
 
-import { hasAbsoluteFrameObject, intersectPlanes, pinningGivens, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
+import { cleanMag } from '../engine/dataView';
+import { hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
 import { distanceWitness, resolveOperand } from '../engine/operands';
 import type { Construction3, Id, Positions3 } from '../engine/types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from '../engine/vec3';
@@ -251,11 +252,14 @@ function labelDir(incident: { dx: number; dy: number }[]): { dx: number; dy: num
   return { dx: Math.cos(bestMid), dy: Math.sin(bestMid) };
 }
 
-/** Round for the parametric echo — the bagrut answers are clean numbers. */
-const fmt = (x: number): string => {
-  const r = Math.round(x * 1000) / 1000;
-  return String(Object.is(r, -0) ? 0 : r);
-};
+/**
+ * #481 — the canvas uses the SAME number formatter as the data panel (`cleanMag`: integer / p·q⁻¹ /
+ * surd / 2 decimals). It used to own a private 3-decimal rounder justified by "the bagrut answers are
+ * clean numbers", which is false precisely where the parameter lane lives: a root of a quadratic
+ * residual is a surd by default, and √2 printed as `1.414`. A second formatter on a user-facing surface
+ * is a second set of rounding rules to keep in step, so there is now one.
+ */
+const fmt = (x: number): string => cleanMag(Object.is(x, -0) ? 0 : x);
 
 
 export function buildScene3(
@@ -519,12 +523,17 @@ export function buildScene3(
   }
 
   // #371: a number on the canvas must be seed-invariant KNOWLEDGE ([ADR-3D-030](docs/06b-decisions-3d.md)
-  // Am. 2 — the rule that removed sampled coordinate labels from nodes). A line whose components carry an
-  // UNPINNED parameter is drawn at one sampled value of it, so echoing the resolved numbers shows ONE
-  // configuration's line as if it were the given (measured: the same `l1:x=t(0,m,2m-2)` echoed four
-  // different directions over four seeds). Echo the student's own symbolic form instead. Once a given pins
-  // the parameter the numbers ARE knowledge, so they come back.
-  const paramFree = !!c.param && pinningGivens(c) === 0 && c.paramGivens.length === 0;
+  // Am. 2 — the rule that removed sampled coordinate labels from nodes). A line whose components carry a
+  // parameter the givens do not FORCE is drawn at one value of it, so echoing the resolved numbers shows
+  // ONE configuration's line as if it were the given (measured: the same `l1:x=t(0,m,2m-2)` echoed four
+  // different directions over four seeds). Echo the student's own symbolic form instead. Once the givens
+  // determine the parameter the numbers ARE knowledge, so they come back.
+  //
+  // #479: "the givens determine it" is asked of the engine (`paramIsKnowledge`), not re-derived here. The
+  // predicate this replaced — "nothing pins the parameter" — was a proxy that held only while every pin had
+  // a single root; the operator's `ℓ ∥ π1` pins m to ±√2, whereupon the echo printed one branch's numbers
+  // and CHANGED them on "show another configuration".
+  const paramUnforced = !!c.param && !paramIsKnowledge(resolved.param);
   const wLines: { name: string; a: Vec3; b: Vec3; form: string }[] = [];
   for (const [name, ln] of resolved.lines) {
     const mid = projectOntoLine(center, ln);
@@ -544,7 +553,7 @@ export function buildScene3(
       a: sub3(mid, scale3(dir, reach)),
       b: add3(mid, scale3(dir, reach)),
       form:
-        carriesParam && paramFree && def?.kind === 'parametric'
+        carriesParam && paramUnforced && def?.kind === 'parametric'
           ? `${name}: ${def.src}`
           : `${name}: x = (${fmt(ln.anchor.x)}, ${fmt(ln.anchor.y)}, ${fmt(ln.anchor.z)}) + t·(${fmt(ln.dir.x)}, ${fmt(ln.dir.y)}, ${fmt(ln.dir.z)})`,
     });

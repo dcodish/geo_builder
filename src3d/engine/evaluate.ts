@@ -349,8 +349,20 @@ export interface Resolved3 {
   positions: Positions3;
   planes: Map<string, ResolvedPlane>;
   lines: Map<string, ResolvedLine>;
-  /** The parameter's chosen value + every root of the pinning relation (branches), when one exists. */
-  param: { name: string; value: number; roots: number[] } | null;
+  /**
+   * The parameter's fate, when one exists.
+   *
+   * `roots` is every root of the pinning relation — the raw candidate set (empty for an unpinned
+   * parameter, and empty for the honest `no-roots` contradiction, which the store tells apart by
+   * whether anything pins at all).
+   *
+   * `branches` is the pool the figure can ACTUALLY occupy: the roots that survive every selection
+   * given (a stated sign, a membership, an explicit branch index). `value` is always drawn from it,
+   * by seed — so `branches.length === 1` is not a heuristic for "the givens force this value", it is
+   * that statement by construction, and `showAnotherConfiguration` cycles exactly this list.
+   * Use {@link paramIsKnowledge} rather than reading the length at a call site (#479).
+   */
+  param: { name: string; value: number; roots: number[]; branches: number[] } | null;
   /** The V4 pivot's outcome, when injections exist: how many placements converged and which was chosen.
    *  #325: `pinSymbols` carries the chosen solution's values for the pins' OPEN symbols (`B(2t,t,k)`). */
   pivot: { solutions: number; chosen: number; err: number; pinSymbols?: Record<string, number> } | null;
@@ -557,6 +569,24 @@ export function paramRoots(c: Construction3): number[] {
   return snapAndDedupe(candidates.filter((a) => satisfiesAllPins(c, a)));
 }
 
+/**
+ * #479 — is the figure parameter's VALUE knowledge, i.e. forced by the givens rather than picked for
+ * this drawing? THE question every surface that prints a parameter-carrying number must ask, and the
+ * reason it is exported from here rather than re-derived per surface: the canvas echo, the data panel
+ * and the query lane have to answer it identically or a value shown in one place contradicts another
+ * (the `scalePinned` / `memberHolds3` precedent).
+ *
+ * It reads the effective branch pool, so it is the property itself and not a proxy for it. Its
+ * predecessor asked "is the parameter unpinned?" — true only of a parameter nothing constrains — which
+ * silently equated "pinned" with "determined". A pin with TWO roots is pinned and undetermined at once:
+ * `ℓ ∥ π` over `dir·n = 2m²−4` gives m = ±√2, and the drawn line differs between them, so printing one
+ * branch's components asserts a magnitude the student never gave ([ADR-052](docs/06-decisions.md#adr-052)).
+ * Conversely a sign given can cut two roots down to one, and that IS knowledge — which is why this reads
+ * `branches` (post-selection) and not `roots` (raw candidates).
+ */
+export const paramIsKnowledge = (param: Resolved3['param']): boolean =>
+  !!param && Number.isFinite(param.value) && param.branches.length === 1;
+
 const onPlane = (p: Vec3, pl: ResolvedPlane): boolean => Math.abs(dot3(pl.n, p) + pl.d) <= 1e-7 * (1 + norm3(pl.n));
 
 /** A stated membership's arbiter (ADR-3D-033): the point lies on the plane to within the
@@ -573,7 +603,7 @@ export const memberHolds3 = (p: Vec3, pl: ResolvedPlane): boolean =>
  * another configuration" = the other branch); an unpinned parameter is a FREE
  * DOF, sampled (ADR-052 — never a silent fixed default).
  */
-function chooseParam(c: Construction3, coordPos: Positions3, seed: number): { value: number; roots: number[] } | null {
+function chooseParam(c: Construction3, coordPos: Positions3, seed: number): { value: number; roots: number[]; branches: number[] } | null {
   if (!c.param) return null;
   const roots = paramRoots(c);
   if (pinningGivens(c) === 0) {
@@ -581,22 +611,36 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number): { va
     // `k הוא פרמטר חיובי`) constrains the sample's half-line, never flags it
     const sign = c.paramSigns.find(() => true);
     const range: [number, number] = sign ? (sign.positive ? [0.3, 3] : [-3, -0.3]) : [-3, 3];
-    return { value: sample(seed, `param-${c.param}`, range[0], range[1]), roots: [] };
+    return { value: sample(seed, `param-${c.param}`, range[0], range[1]), roots: [], branches: [] };
   }
-  if (roots.length === 0) return { value: NaN, roots }; // no-roots — surfaced as an honest error
+  if (roots.length === 0) return { value: NaN, roots, branches: [] }; // no-roots — surfaced as an honest error
+
+  // #479 — narrow the candidate roots to the branches the figure can ACTUALLY occupy, in one place.
+  // Every selection given below used to be applied by RETURNING a value early, which left the caller
+  // unable to tell a forced value from one of several equally-drawable ones; the pool makes that
+  // difference structural. Sign givens are applied HERE for the first time: they were honoured on the
+  // paramGivens path (`pinParam`) but silently ignored on this one, so `k הוא פרמטר חיובי` plus a ⟂
+  // given could draw the negative root — a figure contradicting a stated given.
+  const signed = roots.filter((t) => c.paramSigns.every((g) => (g.positive ? t > 1e-9 : t < -1e-9)));
+  const pool = signed.length > 0 ? signed : roots; // an unsatisfiable sign is refused downstream, not here
+  const pick = (branches: number[], value: number) => ({ value, roots, branches });
+
   const explicit = [...c.planeAngles, ...c.linePerps].find((g) => g.branch !== undefined)?.branch;
-  if (explicit !== undefined) return { value: roots[((explicit % roots.length) + roots.length) % roots.length], roots };
+  if (explicit !== undefined) {
+    const chosen = pool[((explicit % pool.length) + pool.length) % pool.length];
+    return pick([chosen], chosen); // the student named the configuration — one branch, by their choice
+  }
   for (const m of c.memberships) {
     if (m.side) continue; // a side given never selects the parameter (verified downstream)
     const p = coordPos.get(m.id);
     if (!p) continue;
-    for (const root of roots) {
+    for (const root of pool) {
       // only EQUATION planes depend on the parameter — point-run plane names are skipped
       const names = (m.plane === 'any' ? [...c.planes.keys()] : [m.plane]).filter((name) => c.planes.has(name));
-      if (names.some((name) => onPlane(p, planeAt(c, name, root)))) return { value: root, roots };
+      if (names.some((name) => onPlane(p, planeAt(c, name, root)))) return pick([root], root);
     }
   }
-  return { value: roots[seed % roots.length], roots };
+  return pick(pool, pool[seed % pool.length]);
 }
 
 function footOnPlane(from: Vec3, pl: ResolvedPlane): Vec3 {
@@ -930,7 +974,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   // semantics: a param sign given selects, otherwise the seed cycles; no root = the
   // honest no-roots refusal). A closure (deterministic, so idempotent) because the
   // ADR-3D-033 membership drive re-runs it after moving the figure.
-  let paramOut: { value: number; roots: number[] } | null = param;
+  let paramOut: { value: number; roots: number[]; branches: number[] } | null = param;
   const pinParam = (): void => {
     if (!c.param || c.paramGivens.length === 0) return;
     const symAt = (id: Id, t: number): Vec3 | undefined => {
@@ -967,9 +1011,9 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
       for (const [id, d] of c.points) {
         if (d.kind === 'coord-sym') pos.set(id, v3(linVal(d.x, value), linVal(d.y, value), linVal(d.z, value)));
       }
-      paramOut = { value, roots };
+      paramOut = { value, roots, branches: pool }; // #479: `pool` IS the effective branch set here
     } else {
-      paramOut = { value: NaN, roots: [] };
+      paramOut = { value: NaN, roots: [], branches: [] };
     }
   };
 
@@ -1505,7 +1549,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     positions: pos,
     planes,
     lines,
-    param: c.param && paramOut ? { name: c.param, value: paramOut.value, roots: paramOut.roots } : null,
+    param: c.param && paramOut ? { name: c.param, value: paramOut.value, roots: paramOut.roots, branches: paramOut.branches } : null,
     pivot,
     revolutions,
     circles3,
