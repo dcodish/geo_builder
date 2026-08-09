@@ -81,6 +81,40 @@ const TOKEN = /[A-Z]\d*'?/g;
 /** The label-token SOURCE fragment (no captures) — compose new rules from this, never re-spell
  *  the fragment inline (the S2.1 lexical-ratchet discipline). */
 const LBL = String.raw`[A-Z]\d*'?`;
+
+/**
+ * #486 — Hebrew noun gates, shared. Two things a student writes freely and a hand-written rule keeps
+ * forgetting:
+ *
+ * 1. **The definite article is optional.** «B על מישור π2» and «B על המישור π2» are the same sentence;
+ *    a gate spelling only the second is a SILENT drop, which then costs a paid LLM call on input the
+ *    parser can already lower. This is the register in `src3d/CLAUDE.md` (`מאונ[ךכ]`, `זו?וית`,
+ *    `ניצבים?`) — the article is the same class and belongs in it.
+ * 2. **The subject noun is optional.** «הנקודה B …» / «נקודה B …» / «B …» all name the same point.
+ *
+ * Written once and consumed by the rules, so a rule added later inherits the tolerance instead of
+ * re-learning it one report at a time.
+ */
+const HE_PLANE = String.raw`ה?מישור`;
+const HE_LINE = String.raw`ה?ישר`;
+const HE_SEG = String.raw`ה?(?:קטע|צלע|מקצוע)`;
+/** An optional «the point» / «the vertex» before a label. */
+const HE_SUBJ = String.raw`(?:ה?(?:נקוד[הת]|קודקוד)\s+)?`;
+/** The optional «is / lies» copula that can precede a membership verb, in either language. */
+const IS_AT = String.raw`(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?`;
+
+/**
+ * #485 — the INTERSECTION vocabulary, shared. A crossing is stated in two frames — verb-headed
+ * («ℓ חותך את π בנקודה A») and noun-headed («A נקודת החיתוך של ℓ עם π») — and a rule that spells only
+ * one silently drops the other. The diagonal-crossing rule already discovered this and centralised the
+ * WORDS; the FRAMES stayed per-rule, so every new crossing rule paid the tuition again. Both live here.
+ */
+const CROSS_HE_VERB = String.raw`חותך|חותכת|פוגש|פוגשת|נחתך|חוצה`;
+const CROSS_HE_NOUN = String.raw`נקודת\s+ה?חיתוך|נקודת\s+ה?מפגש|ה?חיתוך|ה?מפגש`;
+const CROSS_EN_VERB = String.raw`cuts|intersects|meets|crosses`;
+const CROSS_EN_NOUN = String.raw`intersection\s+point|point\s+of\s+intersection|intersection|meeting\s+point`;
+/** A plane written as a point RUN — three or four labels («ABC», «BC'D»). */
+const RUN_3_4 = String.raw`(?:[A-Z]\d*'?){3,4}`;
 /** A label RUN: starts an uppercase letter not embedded in a latin word (so `Cube` yields nothing). */
 const RUN = /(?<![A-Za-z])[A-Z][A-Z0-9']*(?![a-z])/g;
 
@@ -629,7 +663,9 @@ function ratioT(s: string, id: Id, a: Id, b: Id): number | 'invalid' | undefined
 /** `K על AA'` (+ optional `כך ש-AK = 2KA'`) / `K on AA' such that AK = 2KA'`. No ratio ⇒ a free slider. */
 const onSegment: Rule = (s) => {
   if (GREEK.test(s)) return null; // Greek scalars = the spanPoint form; never swallow its condition as a free point
-  const m = s.match(/^([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+|is\s+)?(?:על|on)\s+(?:הקטע\s+|הצלע\s+|segment\s+|edge\s+)?([A-Z]\d*'?)([A-Z]\d*'?)(?![A-Z0-9'])/);
+  const m = s.match(
+    new RegExp(`^${HE_SUBJ}(${LBL})\\s+(?:נמצאת\\s+|נמצא\\s+|is\\s+)?(?:על|on)\\s+(?:${HE_SEG}\\s+|segment\\s+|edge\\s+)?(${LBL})(${LBL})(?![A-Z0-9'])`),
+  );
   if (!m) return null;
   const [, id, a, b] = m;
   if (id === a || id === b || a === b) return null;
@@ -1448,13 +1484,13 @@ const coordPoint: Rule = (s) => {
     rest = '';
   }
   if (rest) {
-    const onLine = rest.match(new RegExp(`^(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על הישר|on (?:the )?line)\\s+(${LINE_NAME.source})$`));
+    const onLine = rest.match(new RegExp(`^${IS_AT}(?:על\\s+${HE_LINE}|on\\s+(?:the\\s+)?line)\\s+(${LINE_NAME.source})$`));
     if (/^(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?(?:על אחד המישורים|on one of the planes)$/.test(rest)) {
       cmds.push({ type: 'on-planes', id, plane: 'any' });
     } else if (onLine) {
       cmds.push({ type: 'on-line', id, line: canonicalLine(onLine[1]) });
     } else {
-      const named = rest.match(new RegExp(`^(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על המישור|on plane)\\s+(${PLANE_NAME.source})$`));
+      const named = rest.match(new RegExp(`^${IS_AT}(?:על\\s+${HE_PLANE}|on\\s+(?:the\\s+)?plane)\\s+(${PLANE_NAME.source})$`));
       if (!named) return null; // trailing text we don't understand — refuse the whole utterance
       cmds.push({ type: 'on-planes', id, plane: canonicalPlane(named[1]) });
     }
@@ -1464,9 +1500,11 @@ const coordPoint: Rule = (s) => {
 
 /** Standalone membership for an existing point. */
 const membership: Rule = (s) => {
-  const any = s.match(/^([A-Z]\d*'?)\s+(?:נמצאת\s+|נמצא\s+|is\s+|lies\s+)?(?:על אחד המישורים|on one of the planes)$/);
+  const any = s.match(new RegExp(`^${HE_SUBJ}(${LBL})\\s+${IS_AT}(?:על אחד המישורים|on one of the planes)$`));
   if (any) return [{ type: 'on-planes', id: any[1], plane: 'any' }];
-  const named = s.match(new RegExp(`^([A-Z]\\d*'?)\\s+(?:נמצאת\\s+|נמצא\\s+|is\\s+|lies\\s+)?(?:על המישור|on plane)\\s+(${PLANE_NAME.source})$`));
+  const named = s.match(
+    new RegExp(`^${HE_SUBJ}(${LBL})\\s+${IS_AT}(?:על\\s+${HE_PLANE}|on\\s+(?:the\\s+)?plane)\\s+(${PLANE_NAME.source})$`),
+  );
   if (named) return [{ type: 'on-planes', id: named[1], plane: canonicalPlane(named[2]) }];
   return null;
 };
@@ -1480,7 +1518,7 @@ const pointRelPlane: Rule = (s) => {
   const RUN = `(?:[A-Z]\\d*'?){3,4}`;
   const m =
     s.match(
-      new RegExp(`^([A-Z]\\d*'?)\\s+(?:נמצאת\\s+|נמצא\\s+)?(מעל|מתחת|על)\\s+ל?ה?מישור\\s+(${RUN}|${PLANE_NAME.source})$`),
+      new RegExp(`^${HE_SUBJ}(${LBL})\\s+(?:נמצאת\\s+|נמצא\\s+)?(מעל|מתחת|על)\\s+ל?${HE_PLANE}\\s+(${RUN}|${PLANE_NAME.source})$`),
     ) ??
     s.match(
       new RegExp(`^([A-Z]\\d*'?)\\s+(?:is\\s+|lies\\s+)?(on|above|below)\\s+(?:the\\s+)?plane\\s+(${RUN}|${PLANE_NAME.source})$`),
@@ -1797,15 +1835,62 @@ const planeLinePerp: Rule = (s0) => {
   ];
 };
 
-/** `ℓ חותך את π בנקודה A` / `ℓ cuts plane π at A` — the line∩plane point. */
+/**
+ * The line∩plane point, in BOTH frames a student writes it (#485, #401):
+ *
+ * - **verb**, line-first: `ℓ חותך את π בנקודה A` · `ℓ cuts plane π at A`
+ * - **noun**, point-first: `A נקודת החיתוך של ℓ עם π` · `A = חיתוך ℓ עם π` ·
+ *   `A is the intersection of ℓ and π`
+ *
+ * Only the first existed, so the operator's «A נקודת חיתוך של l עם π1» was a silent drop on a capability
+ * the engine had all along. The *file already learned this* for the diagonal crossing, whose comments
+ * record the same lesson ("the intersection verb, in EVERY form the student writes it") — the vocabulary
+ * was centralised there but the FRAMES stayed enumerated per rule, so each new rule re-paid the tuition.
+ * `CROSS_HE` / `CROSS_EN` are that vocabulary, shared, and both frames are lowered here.
+ *
+ * The plane side takes a π-name **or** a point run (#401 — `הישר l1 חותך את מישור ACD בנקודה E`), which
+ * the engine already accepted; a run additionally materialises the plane, exactly as the two-point-line
+ * sibling rule does, so referencing it also draws it.
+ */
 const lineCutsPlane: Rule = (s) => {
+  // NAMED groups, not positions: `PLANE_NAME` carries its own inner capture, so the operand indices
+  // shift under the plane alternation — the trap the old `m[m.length - 1]` idiom was dodging rather
+  // than fixing, and which silently read a point id of "1" out of «π1» the moment a second frame
+  // widened the pattern.
+  const PLANE_SIDE = `(?<plane>${RUN_3_4}|${PLANE_NAME.source})`;
+  const LINE_SIDE = `(?<line>${LINE_NAME.source})`;
+  const ID = `(?<id>${LBL})`;
   const m =
+    // verb frame — Hebrew / English
     s.match(
-      new RegExp(`^(?:הישר\\s+)?(${LINE_NAME.source})\\s+חותך\\s+(?:את\\s+)?(?:המישור\\s+)?(${PLANE_NAME.source})\\s+בנקודה\\s+([A-Z]\\d*'?)$`),
+      new RegExp(`^(?:${HE_LINE}\\s+)?${LINE_SIDE}\\s+(?:${CROSS_HE_VERB})\\s+(?:את\\s+)?(?:${HE_PLANE}\\s+)?${PLANE_SIDE}\\s+בנקודה\\s+${ID}$`),
     ) ??
-    s.match(new RegExp(`^(?:line\\s+)?(${LINE_NAME.source})\\s+cuts\\s+(?:the\\s+)?plane\\s+(${PLANE_NAME.source})\\s+at\\s+([A-Z]\\d*'?)$`));
-  if (!m) return null;
-  return [{ type: 'line-plane-point', id: m[m.length - 1], line: canonicalLine(m[1]), plane: canonicalPlane(m[2]) }];
+    s.match(
+      new RegExp(`^(?:line\\s+)?${LINE_SIDE}\\s+(?:${CROSS_EN_VERB})\\s+(?:the\\s+)?plane\\s+${PLANE_SIDE}\\s+at\\s+${ID}$`, 'i'),
+    ) ??
+    // noun frame — the point is named first and DEFINED as the crossing
+    s.match(
+      new RegExp(
+        `^${HE_SUBJ}${ID}\\s*(?:היא\\s+|הוא\\s+|=\\s*)?(?:${CROSS_HE_NOUN})\\s+(?:של\\s+)?(?:${HE_LINE}\\s+)?${LINE_SIDE}\\s+(?:עם|ו|[לו])-?\\s*(?:${HE_PLANE}\\s+)?${PLANE_SIDE}$`,
+      ),
+    ) ??
+    s.match(
+      new RegExp(
+        `^(?:point\\s+)?${ID}\\s*(?:is\\s+|=\\s*)?(?:the\\s+)?(?:${CROSS_EN_NOUN})\\s+(?:of\\s+)?(?:line\\s+)?${LINE_SIDE}\\s+(?:and|with)\\s+(?:the\\s+)?(?:plane\\s+)?${PLANE_SIDE}$`,
+        'i',
+      ),
+    );
+  if (!m?.groups) return null;
+  const { line, plane: planeTok, id } = m.groups as { line: string; plane: string; id: string };
+  const ids = planeTok.match(/[A-Z]\d*'?/g);
+  const cmds: Command3[] = [];
+  if (ids && ids.length >= 3) {
+    // a POINT-RUN plane must exist before it can be cut (#401) — idempotent, like every plane-through
+    cmds.push({ type: 'plane-through', name: planeTok, ids });
+    cmds.push({ type: 'line-plane-point', id, line: canonicalLine(line), plane: planeTok });
+    return cmds;
+  }
+  return [{ type: 'line-plane-point', id, line: canonicalLine(line), plane: canonicalPlane(planeTok) }];
 };
 
 /** `ℓ אינו מקביל ל-π לכל m` / `ℓ is not parallel to plane π for every m` — the 2024-א probe, a CLAIM. */

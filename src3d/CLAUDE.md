@@ -68,7 +68,19 @@ The remaining niche is low-frequency and coordinate-expressible: orthoscheme / d
   are digit-indexed (`ℓ1`/`ℓ2`, typed `l1`/`l2`); no primes.
 - **Hebrew morphology gates must admit every spelling**: `מאונ[ךכ]` (both kaf forms — the final-ך gate
   silently rejected the plural `מאונכים`), `זו?וית` (single and double vav), `ניצבים?` (the yod). A keyword
-  gate that admits one spelling is a silent drop.
+  gate that admits one spelling is a silent drop. Two entries are **optional prefixes** rather than
+  spellings and are the easiest to forget: the **definite article** (`ה?מישור` — «B על מישור π2» is the
+  same sentence as «B על המישור π2») and the **subject noun** (`הנקודה B` / `נקודה B` / `B`). Use the
+  shared tokens `HE_PLANE` / `HE_LINE` / `HE_SEG` / `HE_SUBJ` / `IS_AT` in `parse3.ts` — do not re-spell
+  a noun gate inline.
+- **A relation is stated in more than one FRAME.** The same fact comes verb-headed («ℓ חותך את π בנקודה A»)
+  or noun-headed («A נקודת החיתוך של ℓ עם π»), and a rule carrying one frame silently drops the other on a
+  capability the engine already has. Vocabulary lives in `CROSS_HE_VERB` / `CROSS_HE_NOUN` (+ En); reach
+  for both frames when adding a rule.
+- **`PLANE_NAME` contains its own capture group**, so positional match indices SHIFT when a pattern grows
+  an alternation. Use **named groups** (`(?<id>…)`) in any rule with more than one operand — a rule that
+  reads `m[m.length - 1]` is dodging this rather than fixing it, and it read a point id of `"1"` out of
+  `π1` the first time the pattern widened.
 - **The prime `′` normalises to `'`** at the parse seam; canonical form everywhere downstream.
 - **A non-negative residual never changes sign**, so a descent stalls short of a touching root — use a
   minima-scan plus ternary search (`touchZeroRoots`), or make the residual signed.

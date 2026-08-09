@@ -128,6 +128,9 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'E מעל המישור ABC', en: 'E is above plane ABC' },
   { category: 'planesLines', he: 'E מתחת למישור ABC', en: 'E is below plane ABC' },
   { category: 'planesLines', he: 'ℓ חותך את π1 בנקודה A', en: 'ℓ cuts plane π1 at A' },
+  // #485 — the same crossing said the other way round (noun-headed, point first), and #401's point-run plane
+  { category: 'planesLines', he: 'A נקודת החיתוך של ℓ עם π1', en: 'A is the intersection of ℓ and π1' },
+  { category: 'planesLines', he: 'הישר ℓ1 חותך את מישור ACD בנקודה E', en: 'line ℓ1 cuts plane ACD at E' },
   { category: 'planesLines', he: "הישר A'C חותך את המישור BC'D בנקודה K", en: "line A'C cuts plane BC'D at K" },
   { category: 'planesLines', he: 'A נמצאת על אחד המישורים', en: 'A is on one of the planes' },
   { category: 'planesLines', he: 'B על הישר ℓ', en: 'B is on line ℓ' },

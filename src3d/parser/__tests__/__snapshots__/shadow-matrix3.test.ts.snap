@@ -947,6 +947,26 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "A is the intersection of ℓ and π1",
+    "winner": "lineCutsPlane",
+  },
+  {
+    "lang": "he",
+    "text": "A נקודת החיתוך של ℓ עם π1",
+    "winner": "lineCutsPlane",
+  },
+  {
+    "lang": "en",
+    "text": "line ℓ1 cuts plane ACD at E",
+    "winner": "lineCutsPlane",
+  },
+  {
+    "lang": "he",
+    "text": "הישר ℓ1 חותך את מישור ACD בנקודה E",
+    "winner": "lineCutsPlane",
+  },
+  {
+    "lang": "en",
     "text": "line A'C cuts plane BC'D at K",
     "winner": "segLineCutsPointPlane",
   },

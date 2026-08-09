@@ -2245,3 +2245,46 @@ because this path could prove it another way.
 an unpinned parameter answers «undetermined» and reads `m = ?` in the panel; a letter that is not this
 figure's symbol stays `notUnderstood`; and panel row and query answer are asserted **equal**, so the two
 surfaces cannot drift.
+
+## ADR-3D-120 — noun gates and relation FRAMES are shared vocabulary, not per-rule spellings
+
+**Status:** accepted, 2026-08-09 · **Issues:** #486, #485 (and #401, closed with it)
+
+**Two reports, one shape.** Operator, 2026-08-09, prod: *«B על מישור π2» is not supported* and
+*«A נקודת חיתוך של l עם π1» is not supported*. Both name capabilities the engine **already had** — the
+membership and the line∩plane point each build correctly when phrased the one way their rule happened to
+spell. Measured: `B על המישור π2` parsed and `B על מישור π2` did not; `ℓ חותך את π1 בנקודה A` parsed and
+`A נקודת החיתוך של ℓ עם π1` did not. A silent `not-handled` on lowerable input is not merely a miss — it
+spends a paid LLM call and teaches the student nothing.
+
+**#486 — the optional prefix is a morphology class, and it was missing from the register.** The tree
+documents the trap («a keyword gate that admits one spelling is a silent drop») and lists `מאונ[ךכ]`,
+`זו?וית`, `ניצבים?`. The **definite article** and the **subject noun** («הנקודה B») are the same class and
+were not in it, which is why they keep resurfacing: `ה?מישור` appeared in some rules and `המישור` in
+others, with nothing making the choice deliberate. Fixed as shared tokens — `HE_PLANE`, `HE_LINE`,
+`HE_SEG`, `HE_SUBJ`, `IS_AT` — applied across the membership, point-on-plane, point-on-segment and
+appositive-tail rules, and both prefixes added to the register in `src3d/CLAUDE.md`. The English side
+gained `(?:the\s+)?` where it was equally absent.
+
+**#485 — the FRAME is the second axis, and only the vocabulary had been centralised.** A crossing is
+stated verb-headed («ℓ חותך את π1 בנקודה A») or noun-headed («A נקודת החיתוך של ℓ עם π1»). The diagonal
+rule had already been through this — its comments record the lesson, *"the intersection verb, in every
+form the student writes it"* — but what it centralised was the **words**; each rule still enumerated its
+own **frames**, so `lineCutsPlane` carried one and dropped the other. `CROSS_HE_VERB` / `CROSS_HE_NOUN`
+(+ En) now hold both, and `lineCutsPlane` lowers either into the same command. **#401 came free**: the
+plane side takes a point RUN as well as a π-name, materialising the plane exactly as its two-point-line
+sibling does — the issue had said "parser reach only; the engine already accepts it", and so it proved.
+
+**A trap found while widening, worth more than either fix.** `PLANE_NAME` carries an inner capture
+group, so operand indices SHIFT the moment a pattern grows an alternation. The old rule read
+`m[m.length - 1]`, which dodged the problem rather than fixing it — and the first widening duly read a
+point id of `"1"` out of `π1`, caught here only because the probe printed every lowering. The rule now
+uses **named groups**, and the hazard is recorded in `src3d/CLAUDE.md` as a rule for any multi-operand
+pattern.
+
+**Locked** in `morphology-matrix3.test.ts` — the natural home, since both fixes are "these surface forms
+must parse equivalently": article-ful ≡ article-less ≡ bare for plane/segment nouns, with/without the
+subject noun, English with/without `the`, and the crossing's two frames × two languages × (π-name,
+point-run) asserted to yield the **same commands**. Plus the negative side, because a widened pattern
+that poaches its neighbours is the real risk: the diagonal crossing keeps its own rule, and a non-line
+operand is still refused. The catalog gained the new forms, so the guard test holds them in He **and** En.
