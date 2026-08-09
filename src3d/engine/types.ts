@@ -715,7 +715,11 @@ export type Command3 =
   | { type: 'plane-cut'; id: Id; plane: string; a: Id; b: Id } // V8-b (G2): a point = plane ∩ segment a–b
   | { type: 'height-to-face'; id: Id; from: Id; face: Id[] } // V8-e (G5): `AF גובה … לפאה BDC` — F = foot of ⟂ from A onto plane BDC
   | { type: 'draw-arrow'; from: Id; to: Id } // #72: `חץ A'C` — an UNNAMED ink arrow (draws the segment too)
-  | { type: 'perp-to-base'; from: Id } // #72: `אנך יורד מ-M לבסיס` — foot auto-minted at apply (parse3 is context-free)
+  // #72 / #448: `אנך יורד מ-M לבסיס`, `גובה הפירמידה מנקודה D`, `גובה מנקודה D לבסיס ABC` — the ⟂ from a
+  // point onto a base plane; the foot is auto-minted at apply (parse3 is context-free). `face` is the
+  // STATED base when the student named one — without it apply resolves the figure's single solid, and
+  // honouring a named base is what keeps «לבסיס ABC» from silently using a different face (ADR-3D-115).
+  | { type: 'perp-to-base'; from: Id; face?: Id[] }
   // V8-f (G6): cos of the angle between two operands = a value. `cos∠ACB = 3/4`
   // (vertex ⇒ pairs) · `קוסינוס הזווית בין הוקטורים w ו-u הוא √35/10` (named vectors).
   | { type: 'cos-angle'; u: VecAtom; v: VecAtom; cos: number; soft?: boolean }

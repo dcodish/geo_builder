@@ -120,6 +120,10 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'מישור π דרך K ו-P ומקביל ל-CD', en: 'plane π through K and P parallel to CD' },
   { category: 'planesLines', he: 'המישור π חותך את SA בנקודה E', en: 'plane π cuts SA at E' },
   { category: 'planesLines', he: 'AF גובה הפירמידה לפאה BDC', en: 'AF is the height of the pyramid to face BDC' },
+  // #448: the same height stated by its APEX instead of its segment — the foot is auto-minted, so the
+  // student never has to name a point the question does not give them.
+  { category: 'planesLines', he: 'גובה הפירמידה מנקודה D', en: 'height of the pyramid from D' },
+  { category: 'planesLines', he: 'גובה מנקודה D לבסיס ABC', en: 'height from D to base ABC' },
   { category: 'planesLines', he: 'E על המישור ABC', en: 'E is on plane ABC' },
   { category: 'planesLines', he: 'E מעל המישור ABC', en: 'E is above plane ABC' },
   { category: 'planesLines', he: 'E מתחת למישור ABC', en: 'E is below plane ABC' },

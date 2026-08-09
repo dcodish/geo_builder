@@ -738,10 +738,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // #72: `אנך יורד מ-M לבסיס` — the ⟂ from a point onto the solid's BASE plane. The foot
       // carries no stated name (parse3 is context-free), so the first unused label is minted
       // HERE and the command delegates to the height-to-face foot machinery (V8-e).
-      const missing = missingPoint(c, [cmd.from]);
+      const missing = missingPoint(c, [cmd.from, ...(cmd.face ?? [])]);
       if (missing) return { ok: false, error: missing };
-      if (c.solids.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
-      const face = c.solids[0].ids.slice(0, 3);
+      // A STATED base wins (#448): «גובה מנקודה D לבסיס ABC» names the face, so resolving the solid's
+      // first face instead would silently drop the student's own words onto a different plane. Only the
+      // UNSTATED case needs the figure, and it stays honest about ambiguity — several solids, no answer.
+      if (!cmd.face && c.solids.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+      const face = cmd.face ?? c.solids[0].ids.slice(0, 3);
       let foot: Id | null = null;
       for (const ch of 'EFGHKLMNPQRSTUVWXYZABCD') {
         if (!c.points.has(ch)) {
