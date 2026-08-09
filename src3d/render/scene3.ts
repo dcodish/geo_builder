@@ -11,6 +11,7 @@
  * never occlude (docs/20 §11).
  */
 
+import { openCrossings3 } from '../engine/crossings3';
 import { cleanMag } from '../engine/dataView';
 import { hasAbsoluteFrameObject, intersectPlanes, paramIsKnowledge, type Resolved3, type ResolvedLine, type ResolvedPlane } from '../engine/evaluate';
 import { distanceWitness, resolveOperand } from '../engine/operands';
@@ -95,6 +96,17 @@ export interface SceneLine3 {
   form: string;
 }
 
+/**
+ * #483 — an UNNAMED ℓ∩π crossing, offered as a clickable dot. Carries the operands (not just the
+ * screen position) because clicking must produce a real utterance naming them, not a bare coordinate.
+ */
+export interface SceneCrossing3 {
+  line: string;
+  plane: string;
+  x: number;
+  y: number;
+}
+
 /** A right-angle knee mark at a ⟂ foot: a 3-point screen polyline. */
 export interface SceneMark3 {
   pts: { x: number; y: number }[];
@@ -146,6 +158,8 @@ export interface Scene3 {
   angles: SceneAngle3[];
   curves: SceneCurve3[];
   witnesses: SceneWitness3[];
+  /** #483 — determined-but-unnamed line∩plane crossings the student can click to name. */
+  crossings: SceneCrossing3[];
 }
 
 export interface Viewport {
@@ -660,7 +674,7 @@ export function buildScene3(
   ].map(projOf);
   const all = [...proj.values(), ...extras];
   if (all.length === 0) {
-    return { points: [], edges: [], vectors: [], axes: [], planes: [], lines: [], marks: [], seams: [], angles: [], curves: [], witnesses: [] };
+    return { points: [], edges: [], vectors: [], axes: [], planes: [], lines: [], marks: [], seams: [], angles: [], curves: [], witnesses: [], crossings: [] };
   }
 
   const xs = all.map((p) => p.x);
@@ -884,5 +898,12 @@ export function buildScene3(
     return { x1: p.x, y1: p.y, x2: q.x, y2: q.y, labelX: (p.x + q.x) / 2 + 9, labelY: (p.y + q.y) / 2 - 7, text: wt.text };
   });
 
-  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves, witnesses };
+  // #483 — the crossings the givens determine and nobody has named. The SET is the engine's call
+  // (`openCrossings3` owns the honesty gate); the renderer only says where each one lands on screen.
+  const crossings: SceneCrossing3[] = openCrossings3(c, resolved).map((k) => {
+    const s = w2s(k.point);
+    return { line: k.line, plane: k.plane, x: s.x, y: s.y };
+  });
+
+  return { points, edges, vectors, axes, planes: scenePlanes, lines: sceneLines, marks, seams, angles, curves, witnesses, crossings };
 }
