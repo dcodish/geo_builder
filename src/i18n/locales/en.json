@@ -408,7 +408,16 @@
     "radius": "radius {{c}}",
     "area": "area {{ids}}",
     "perimeter": "perimeter {{ids}}",
-    "rowHint": "Click to highlight on the canvas"
+    "rowHint": "Click to highlight on the canvas",
+    "queryTitle": "Ask for a value",
+    "queryPlaceholder": "e.g. ∠GBC, AB, area ABC",
+    "queryAdd": "Compute",
+    "queryRemove": "Remove",
+    "queryHint": "Type an angle, segment, area or perimeter — the value appears when the givens pin it",
+    "q.not-understood": "Not recognised — try ∠ABC, AB, area ABC or perimeter ABC",
+    "q.unavailable": "Those points are not in the figure",
+    "q.undetermined": "Not determined by the givens",
+    "q.scale": "Depends on the scale — state one size in the figure"
   },
   "shapeName": {
     "kite": "kite",

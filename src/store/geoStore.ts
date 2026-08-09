@@ -21,6 +21,7 @@ import { nanoid } from 'nanoid';
 import type { ValuesPanelResult } from '@/engine/valuesPanel';
 import type { AnyCommand, Id, RelationsResult, ShapesResult, StatedShapeEquality } from '@/engine';
 import { branchCount, cyclableVariant, deepEqual, variantCountOf, withVariant } from '@/engine';
+import { parseValueQuery } from '@/parser/valueQuery';
 import type { FigureFile } from './figureFile';
 
 // S1.2 (docs/24): the replay layer moved to src/replay/core.ts — re-exported here so every
@@ -255,6 +256,10 @@ export interface GeoState {
   /** #217 (ADR-410): the VALUES panel — every fixed/known value, stated + derived, computed on user
    *  request from the shared sample pool (off-thread). Tagged by facts so a stale result never shows. */
   values: { result: ValuesPanelResult; facts: Fact[] } | null;
+  /** #477: the student's own value QUERIES, verbatim as typed, in ask order. A question, never a fact —
+   *  they never enter `replay`, never move a point and never appear in the step list; they only ride the
+   *  values computation. Persisted with the figure, so a saved worksheet reopens with its questions. */
+  queries: string[];
 
   /** The "detect shapes" layer ([FR-SH](docs/02-requirements.md)): the named shapes (kite, rhombus,
    *  isosceles triangle, …) the figure geometrically contains, cached with the EXACT `facts` array they
@@ -306,6 +311,9 @@ export interface GeoState {
   /** #217: compute the values panel (pull-only — req 4: never in the submit path). */
   viewValues: () => Promise<void>;
   clearValues: () => void;
+  /** #477: ask for / drop a specific quantity in the values panel. */
+  addQuery: (text: string) => void;
+  removeQuery: (text: string) => void;
   /** Detect the named shapes of the current figure and turn the badges layer ON ([FR-SH]). Synchronous
    *  (samples the figure); the caller paints a busy state first. A re-press recomputes. */
   detectShapes: () => Promise<void>;
@@ -454,6 +462,7 @@ export const useGeoStore = create<GeoState>()(
       hiddenCircles: [],
       relations: null,
       values: null,
+      queries: [],
       shapes: null,
       crossings: null,
 
@@ -577,15 +586,29 @@ export const useGeoStore = create<GeoState>()(
         // #217 (ADR-410): the 2-D dataView. Off-thread, pull-only (req 4) — the detect lane's worker
         // computes the rows from the shared pool (a pure classification pass when the sweep is warm).
         const facts = get().facts;
+        const asked = get().queries;
         try {
-          const result = await geoValues(facts);
-          if (get().facts !== facts) return; // superseded — never show another figure's values
+          const result = await geoValues(facts, asked.map((text) => ({ text, q: parseValueQuery(text) })));
+          if (get().facts !== facts || get().queries !== asked) return; // superseded — never show another figure's values
           set({ values: { result, facts } });
         } catch (err) {
           if (!isCancelled(err)) throw err;
         }
       },
       clearValues: () => set({ values: null }),
+
+      /** #477: ask for a quantity. The panel recomputes so the answer comes from the same pool as the
+       *  rows; a duplicate question is a no-op rather than a second identical line. */
+      addQuery: (text: string) => {
+        const t = text.trim();
+        if (!t || get().queries.includes(t)) return;
+        set({ queries: [...get().queries, t] });
+        void get().viewValues();
+      },
+      removeQuery: (text: string) => {
+        set({ queries: get().queries.filter((q) => q !== text) });
+        void get().viewValues();
+      },
 
       detectShapes: async () => {
         // Same shared sweep as viewRelations/detectCrossings — one solve pass between all three layers.
@@ -877,7 +900,7 @@ export const useGeoStore = create<GeoState>()(
       },
 
       clear: () => {
-        set({ facts: [], selectedId: null, figureName: '', seed: 0, radiusOverrides: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, values: null, shapes: null });
+        set({ facts: [], selectedId: null, figureName: '', seed: 0, radiusOverrides: {}, hidden: [], segStyle: {}, hiddenCircles: [], relations: null, values: null, shapes: null, queries: [] });
         useGeoStore.temporal.getState().clear();
       },
 
@@ -889,6 +912,7 @@ export const useGeoStore = create<GeoState>()(
           facts: file.facts,
           seed: file.seed,
           radiusOverrides: file.radiusOverrides,
+          queries: file.queries ?? [],
           selectedId: null,
           relations: null,
           shapes: null,

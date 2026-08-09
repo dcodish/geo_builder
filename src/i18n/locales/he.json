@@ -408,7 +408,16 @@
     "radius": "רדיוס {{c}}",
     "area": "שטח {{ids}}",
     "perimeter": "היקף {{ids}}",
-    "rowHint": "לחיצה מדגישה על השרטוט"
+    "rowHint": "לחיצה מדגישה על השרטוט",
+    "queryTitle": "שאלו על ערך",
+    "queryPlaceholder": "למשל ∠GBC, AB, שטח ABC",
+    "queryAdd": "חשב",
+    "queryRemove": "הסר",
+    "queryHint": "הקלידו זווית, קטע, שטח או היקף — הערך יוצג אם הנתונים קובעים אותו",
+    "q.not-understood": "לא זוהה — נסו ∠ABC, AB, שטח ABC או היקף ABC",
+    "q.unavailable": "הנקודות האלו אינן בציור",
+    "q.undetermined": "לא נקבע על ידי הנתונים",
+    "q.scale": "תלוי בקנה המידה — ציינו גודל אחד בציור"
   },
   "shapeName": {
     "kite": "הדלתון",
