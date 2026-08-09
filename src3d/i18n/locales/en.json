@@ -119,7 +119,8 @@
     "bare-solid": "A pyramid or prism needs its base: e.g. \"pyramid SABCD with a square base\" or \"right triangular prism ABC\". A cube, box or tetrahedron builds without details.",
     "ui-command": "Marks appear automatically from the givens — instead of asking for a mark, state the given itself: e.g. \"angle D = 90\".",
     "oblique-prism": "A prism not stated \"right\" builds oblique — the tilt is a degree of freedom, and \"the prism is right\" straightens it. For a pentagon or hexagon base state \"right\" (e.g. \"right prism with a pentagon base\"), since a regular base is not a stated given. If you meant an oblique prism, name its base: e.g. \"prism with a triangle base\".",
-    "lowercase-labels": "Vertex labels are written in UPPERCASE — AS, not as. Lowercase letters are reserved for vectors (u, v, w), parameters (t, k, m) and coordinates (x, y, z), and angles are named with Greek letters (α, β, γ, θ). Try: {{corrected}}"
+    "lowercase-labels": "Vertex labels are written in UPPERCASE — AS, not as. Lowercase letters are reserved for vectors (u, v, w), parameters (t, k, m) and coordinates (x, y, z), and angles are named with Greek letters (α, β, γ, θ). Try: {{corrected}}",
+    "ambiguous-height": "A height from a single point does not say which plane to drop it onto — there are several options. Name the base or the segment: \"height from D to base ABC\", \"height of the pyramid from D\", or \"CD is the altitude in triangle ABC\"."
   },
   "query": {
     "placeholder": "ask… e.g. AE (vector), |AE|, w·v, ∠SAB, area ABC",
