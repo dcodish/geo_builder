@@ -1,43 +1,103 @@
 {
   "_comment": "MEASURED tier membership (ADR-394). Rewritten by `npm run test:full` only when the set of slow files changes. `npm run test:fast` derives its --exclude list from `slow`.",
   "thresholdMs": 60000,
-  "updatedAt": "2026-07-30",
+  "updatedAt": "2026-08-09",
   "slow": [
     {
+      "file": "src/__tests__/scenarios-e2e-6.test.ts",
+      "ms": 359875
+    },
+    {
       "file": "src3d/__tests__/adr-3d-032.test.ts",
-      "ms": 158548
+      "ms": 331364
     },
     {
       "file": "src3d/__tests__/right-apex.test.ts",
-      "ms": 157966
-    },
-    {
-      "file": "src/__tests__/scenarios-e2e-6.test.ts",
-      "ms": 156629
-    },
-    {
-      "file": "src3d/__tests__/book-coordinate-givens.test.ts",
-      "ms": 90592
-    },
-    {
-      "file": "src3d/__tests__/member-drive.test.ts",
-      "ms": 86512
+      "ms": 320578
     },
     {
       "file": "src/__tests__/scenarios-e2e-1.test.ts",
-      "ms": 85367
+      "ms": 225059
+    },
+    {
+      "file": "src3d/__tests__/book-coordinate-givens.test.ts",
+      "ms": 217478
     },
     {
       "file": "src/theorems/__tests__/b-corpus.test.ts",
-      "ms": 76343
-    },
-    {
-      "file": "src/engine/__tests__/membership-conversion.test.ts",
-      "ms": 64653
+      "ms": 198488
     },
     {
       "file": "src/__tests__/scenarios-e2e-5.test.ts",
-      "ms": 61242
+      "ms": 196793
+    },
+    {
+      "file": "src/engine/__tests__/membership-conversion.test.ts",
+      "ms": 181383
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-4.test.ts",
+      "ms": 171184
+    },
+    {
+      "file": "src3d/__tests__/member-drive.test.ts",
+      "ms": 160573
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-7.test.ts",
+      "ms": 157984
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-8.test.ts",
+      "ms": 137949
+    },
+    {
+      "file": "src3d/__tests__/named-parametric-line.test.ts",
+      "ms": 137142
+    },
+    {
+      "file": "src/__tests__/scenarios-props-submit-gate.test.ts",
+      "ms": 129314
+    },
+    {
+      "file": "src3d/__tests__/plane-eq-drive.test.ts",
+      "ms": 111086
+    },
+    {
+      "file": "src3d/__tests__/exam-2026-2.test.ts",
+      "ms": 106462
+    },
+    {
+      "file": "src/engine/__tests__/obligation-preservation.test.ts",
+      "ms": 104016
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-3.test.ts",
+      "ms": 98632
+    },
+    {
+      "file": "src/replay/__tests__/basin-ownership.test.ts",
+      "ms": 95310
+    },
+    {
+      "file": "src/__tests__/scenarios-e2e-2.test.ts",
+      "ms": 86876
+    },
+    {
+      "file": "src/__tests__/scenarios-props-resample.test.ts",
+      "ms": 79881
+    },
+    {
+      "file": "src/engine/__tests__/inscribe-joint-solve.test.ts",
+      "ms": 79551
+    },
+    {
+      "file": "src/engine/__tests__/dof-vacuous.test.ts",
+      "ms": 74256
+    },
+    {
+      "file": "src/store/__tests__/coincidence.test.ts",
+      "ms": 65089
     }
   ]
 }
