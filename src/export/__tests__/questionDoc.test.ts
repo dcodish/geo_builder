@@ -110,7 +110,8 @@ describe('questionLines', () => {
       fact({ id: 'f2', utterance: 'נקודה G על AD', cmd: { type: 'point-on-segment', id: 'G', a: 'A', b: 'D' } }),
       fact({ id: 'f3', utterance: 'זווית GBA = 37', cmd: { type: 'set-angle', vertex: 'B', ray1: 'G', ray2: 'A', value: 37 } }),
     ];
-    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'נקודה G על AD', 'זווית GBA = 37']);
+    // #465: an angle line now exports in the CANONICAL form — the export follows the step list.
+    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'נקודה G על AD', '∠GBA = 37']);
   });
 
   it('a bare segment whose NEW endpoint a later given references is kept', () => {
@@ -119,7 +120,8 @@ describe('questionLines', () => {
       fact({ id: 'f2', utterance: 'BE', cmd: { type: 'segment', a: 'B', b: 'E' } }), // creates E
       fact({ id: 'f3', utterance: 'זווית ABE = 30', cmd: { type: 'set-angle', vertex: 'B', ray1: 'A', ray2: 'E', value: 30 } }),
     ];
-    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'BE', 'זווית ABE = 30']);
+    // #465: an angle line now exports in the CANONICAL form — the export follows the step list.
+    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'BE', '∠ABE = 30']);
   });
 
   it('a membership statement about an EXISTING point is a given (M1), never scaffolding — and it keeps its carrier', () => {
@@ -152,7 +154,8 @@ describe('questionLines', () => {
 
   it('real parser: the canonical square figure keeps every line (marker referenced by the angle)', () => {
     const facts = factsFromUtterances(['ריבוע ABCD', 'נקודה G על AD', 'זווית GBA = 37']);
-    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'נקודה G על AD', 'זווית GBA = 37']);
+    // #465: an angle line now exports in the CANONICAL form — the export follows the step list.
+    expect(questionLines(facts)).toEqual(['ריבוע ABCD', 'נקודה G על AD', '∠GBA = 37']);
   });
 });
 
@@ -188,9 +191,13 @@ describe('buildQuestionDoc', () => {
     const zip = await JSZip.loadAsync(buf);
     const xml = await zip.file('word/document.xml')!.async('string');
 
-    // verbatim content survived, untransformed
-    expect(xml).toContain('במשולש ABC הזווית ∠ABC = 37°');
-    expect(xml).toContain('AB קוטר במעגל O');
+    // Content survived — but no longer as ONE contiguous string. Since #464 an RTL given is SPLIT into
+    // per-direction runs (Word scrambles a technical run exactly as the browser did, and its own
+    // mechanism for that is `w:rtl` per run, not control characters). The invariant is that splitting is
+    // layout-only: concatenating the runs gives the given back verbatim.
+    const body = [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]).join('');
+    expect(body).toContain('במשולש ABC הזווית ∠ABC = 37°');
+    expect(body).toContain('AB קוטר במעגל O');
     expect(xml).toContain('נתון:');
 
     expect(xml).toContain('<w:bidi'); // RTL paragraphs
@@ -210,5 +217,85 @@ describe('buildQuestionDoc', () => {
     expect(xml).toContain('square ABCD');
     expect(xml).not.toContain('<w:bidi ');
     expect(xml).not.toContain('bidiVisual');
+  });
+});
+
+describe('#465 — the export follows the CANONICAL form (ADR-428 reserved decision)', () => {
+  // Operator ruling 2026-08-09: once the step list echoes canonically (#450), a worksheet still saying
+  // «A=50» disagrees with the screen the student is reading. Same renderer as the step row and the
+  // acceptance hint, so all three surfaces cannot drift apart.
+  const angle = { type: 'set-angle', vertex: 'A', ray1: 'B', ray2: 'C', value: 50 } as unknown as Fact['cmd'];
+
+  it('a bare-vertex angle exports as «∠BAC = 50», not as the typed text', () => {
+    const facts: Fact[] = [fact({ id: 'f1', utterance: 'A=50', group: 'g1', cmd: angle })];
+    expect(questionLines(facts, 'he')).toEqual(['∠BAC = 50']);
+  });
+
+  it('a line the renderer cannot express keeps its verbatim utterance', () => {
+    const facts: Fact[] = [
+      fact({ id: 'f1', utterance: 'ריבוע ABCD', group: 'g1', cmd: { type: 'square', ids: ['A', 'B', 'C', 'D'] } as unknown as Fact['cmd'] }),
+    ];
+    expect(questionLines(facts, 'he')).toEqual(['ריבוע ABCD']);
+  });
+
+  it('an utterance is still REQUIRED — a canonical form never resurrects a jargon line', () => {
+    // The header rule stands: a group with no typed utterance is skipped rather than rendered as a
+    // command-type join. Canonicalisation changes how a line READS, never whether it appears.
+    const facts: Fact[] = [fact({ id: 'f1', group: 'g1', cmd: angle })];
+    expect(questionLines(facts, 'he')).toEqual([]);
+  });
+});
+
+describe('#464/#465 — the .docx marks direction PER RUN, with no control characters', () => {
+  const base = {
+    heading: 'נתון:',
+    png: { data: PNG_2X1, ...pngDimensions(PNG_2X1) },
+  };
+  const docXml = async (over: { rtl: boolean; lines: string[] }) => {
+    const buf = await Packer.toBuffer(buildQuestionDoc({ ...base, ...over }));
+    return (await JSZip.loadAsync(buf)).file('word/document.xml')!.async('string');
+  };
+  /** The <w:t> payloads in document order, paired with whether their run carries <w:rtl/>. */
+  const runs = (xml: string) =>
+    [...xml.matchAll(/<w:r>(?:<w:rPr>(.*?)<\/w:rPr>)?<w:t[^>]*>([^<]*)<\/w:t><\/w:r>/g)].map((m) => ({
+      text: m[2],
+      rtl: (m[1] ?? '').includes('<w:rtl/>'),
+    }));
+
+  it('NO bidi control characters reach the document — Word draws them as boxes', () => {
+    // The operator saw literal ⟦LRI⟧/⟦PDI⟧ boxes in the givens list: the browser's isolate strategy does
+    // not port to .docx, because Word has no glyph for U+2066/U+2069. This is the regression guard.
+    return docXml({ rtl: true, lines: ['|BC| = 10', 'במשולש ABC הזווית ∠ABC = 37°'] }).then((xml) => {
+      expect(xml).not.toContain('\u2066');
+      expect(xml).not.toContain('\u2069');
+    });
+  });
+
+  it('a technical run is emitted as its own run WITHOUT w:rtl, so Word lays it out LTR', async () => {
+    const xml = await docXml({ rtl: true, lines: ['במשולש ABC הזווית ∠ABC = 37°'] });
+    const ltr = runs(xml).filter((r) => !r.rtl).map((r) => r.text);
+    expect(ltr).toContain('ABC');
+    expect(ltr.some((t) => t.includes('∠ABC = 37'))).toBe(true);
+    // ...and the Hebrew stays RTL
+    expect(runs(xml).filter((r) => r.rtl).some((r) => r.text.includes('במשולש'))).toBe(true);
+  });
+
+  it('an all-Latin given still gets an LTR run — the RTL paragraph would otherwise reverse it', async () => {
+    // No Hebrew anywhere, yet `w:bidi` is forced on the paragraph, so `|BC| = 10` scrambles without this.
+    const xml = await docXml({ rtl: true, lines: ['|BC| = 10'] });
+    expect(runs(xml).filter((r) => !r.rtl).map((r) => r.text)).toContain('|BC| = 10');
+  });
+
+  it('splitting is layout-only — the given reassembles byte-for-byte', async () => {
+    const line = 'במשולש ABC הזווית ∠ABC = 37°';
+    const xml = await docXml({ rtl: true, lines: [line] });
+    const body = runs(xml).map((r) => r.text).join('');
+    expect(body).toContain(line);
+  });
+
+  it('an LTR document is untouched — one run, no splitting', async () => {
+    const xml = await docXml({ rtl: false, lines: ['|BC| = 10'] });
+    expect(xml).toContain('|BC| = 10');
+    expect(xml).not.toContain('<w:rtl/>');
   });
 });

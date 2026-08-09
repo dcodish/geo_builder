@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Construction, Id, Vec } from '@/engine/types';
-import { buildScene, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
+import { ANGLE_ARC_R, angleValueOffset, buildScene, relationMarks, relationAt, relationsForPick, scenePositions } from './scene';
 // #451: the ONE print width — the renderer normalises its ink to exactly the width the docx prints at,
 // so the two can never drift apart and leave the figure faint again.
 import { QUESTION_IMAGE_WIDTH_PX } from '@/export/questionDoc';
@@ -887,10 +887,12 @@ export function Figure({
             scene.measures.map((m, i) => {
               const s = transform.toScreen(m.pos);
               const sd = unitVec({ x: m.dir.x, y: -m.dir.y }); // world→screen Y-flip
-              // An angle value sits FURTHER into the wedge (just inside its bigger arc, below) and is drawn a
-              // bit LARGER than a length, so it's clear WHICH angle it labels and легible (operator request).
+              // An angle value sits OUTSIDE its own arc, along the wedge bisector, and is drawn a bit LARGER
+              // than a length — so it is clear WHICH angle it labels and the number is never overprinted by
+              // the mark (#475). Moving outward also carries it AWAY from a vertex sitting on the figure's
+              // edge, where the old inside-the-arc placement clipped it against the frame.
               // An AREA label sits AT the polygon's centroid (no offset).
-              const off = m.kind === 'area' ? 0 : m.kind === 'angle' ? r * 4.2 + fontSize * 0.7 : r * 1.4 + fontSize * 0.55;
+              const off = m.kind === 'area' ? 0 : m.kind === 'angle' ? angleValueOffset(r, fontSize) : r * 1.4 + fontSize * 0.55;
               // A measure is a math expression (12√2, 7k/5, 2α, 37°). `MathSvg` lays out a radical (√ + a real
               // vinculum) or a fraction as pure SVG so it EXPORTS (#98 — MathML/foreignObject rasterizes blank);
               // a plain label stays the single haloed <text> it always was. LTR is forced inside so the RTL page
@@ -924,7 +926,7 @@ export function Figure({
               }
               // arc: sample the SHORT signed angle from ray1 to ray2 (the interior angle). Drawn well clear
               // of the vertex so it's obvious WHICH angle is marked, not a tiny nick at the corner (operator).
-              const ar = 6.5 * r;
+              const ar = ANGLE_ARC_R * r;
               const th1 = Math.atan2(u1.y, u1.x);
               let dth = Math.atan2(u2.y, u2.x) - th1;
               while (dth > Math.PI) dth -= 2 * Math.PI;

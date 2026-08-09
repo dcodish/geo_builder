@@ -47,5 +47,6 @@ export type { StatedShapeEquality, VariantShape } from './shapeVariants';
 export { expandInscribe, inscribePlacements, inscribeVariantCount } from './inscribe';
 export type { InscribeShape, InscribeCmd } from './inscribe';
 export { variantCountOf, cyclableVariant, withVariant, variantVertices } from './variants';
-export { computeValuesPanel, valueText } from './valuesPanel';
+export { computeValuesPanel, queryLabel, valueText } from './valuesPanel';
+export type { QueryInput, QueryNote, QueryRow, ValueQuery } from './valuesPanel';
 export type { ValueRow, AreaClassRow, ValuesPanelResult } from './valuesPanel';

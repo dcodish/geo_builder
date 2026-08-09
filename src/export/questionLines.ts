@@ -32,6 +32,8 @@
 import type { AnyCommand, Id } from '@/engine';
 import type { Fact } from '@/store/geoStore';
 import { commandObjectIds, groupKey, introducedIds } from '@/store/geoStore';
+import { canonicalText } from '@/parser';
+import type { Locale } from '@/parser/canonical';
 
 /**
  * Is this command pure scaffolding in context — drawing/marking that states no
@@ -57,7 +59,19 @@ const isScaffoldCmd = (c: AnyCommand, defined: Set<Id>): boolean => {
   }
 };
 
-export function questionLines(facts: Fact[]): string[] {
+/**
+ * #465 (operator ruling 2026-08-09) — the export follows the CANONICAL form.
+ *
+ * [ADR-428](../../docs/06-decisions.md#adr-428) reserved this decision for "the slice that builds
+ * obligation 3"; obligation 3 (#450) made the step list echo canonically, so the screen and the paper had
+ * begun to disagree — a student reading both saw `∠BAC = 50` on screen and `A=50` in the worksheet. The
+ * ruling closes that: the paper says what the tool understood, in the spelling it teaches.
+ *
+ * Rendered through the SAME `canonicalText` the step row and the acceptance hint use, so all three
+ * surfaces cannot drift. It stays conservative by inheritance: a lowering the renderer cannot express
+ * faithfully keeps its verbatim utterance, which is most lines.
+ */
+export function questionLines(facts: Fact[], locale: Locale = 'he'): string[] {
   const order: string[] = [];
   const byGroup = new Map<string, Fact[]>();
   for (const f of facts) {
@@ -107,7 +121,9 @@ export function questionLines(facts: Fact[]): string[] {
     if (!group.some((f) => f.enabled)) continue; // off in the step list ⇒ not a given
     if (!keep.has(k)) continue; // scaffolding — ink/markers nothing kept refers to (ADR-252)
     const utterance = group.find((f) => f.utterance)?.utterance?.trim();
-    if (utterance) lines.push(utterance);
+    // An utterance is still REQUIRED (see the header: a command-type join is developer jargon, not
+    // textbook text) — the canonical form replaces how the line reads, never whether it appears.
+    if (utterance) lines.push(canonicalText(group.map((f) => f.cmd), locale) ?? utterance);
   }
   return lines;
 }

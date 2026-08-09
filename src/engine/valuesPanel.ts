@@ -91,13 +91,74 @@ export interface AreaClassRow {
   idsPer: Id[][];
 }
 
+/**
+ * A quantity the student ASKED for — #477, the 3-D query lane ([ADR-3D-057](../../docs/06b-decisions-3d.md#adr-3d-057),
+ * #274) ported as a pattern, never imported.
+ *
+ * Structured, not text: parsing lives in `@/parser/valueQuery` because the engine may not import the
+ * parser (the `engine ← replay ← store` layering). The engine is handed what was meant, and answers it.
+ */
+export type ValueQuery =
+  | { kind: 'angle'; vertex: Id; ray1: Id; ray2: Id }
+  | { kind: 'length'; a: Id; b: Id }
+  | { kind: 'area'; ids: Id[] }
+  | { kind: 'perimeter'; ids: Id[] };
+
+/** Why a query could not be answered. Never a sampled number dressed as a fact (ADR-052). */
+export type QueryNote =
+  /** the text isn't a quantity this lane understands */
+  | 'not-understood'
+  /** it parses, but those points aren't in the figure */
+  | 'unavailable'
+  /** the givens don't pin it — it differs across sampled configurations */
+  | 'undetermined'
+  /** it carries units and the figure's scale is free, with no declared unit to express it in */
+  | 'scale';
+
+/** One answered (or honestly refused) query. */
+export interface QueryRow {
+  /** exactly what the student typed — echoed back so the list reads as their own questions. */
+  text: string;
+  kind: ValueQuery['kind'] | null;
+  /** the canonical label («∠GBC»), or null when the text wasn't understood. */
+  label: string | null;
+  /** ids to highlight on the canvas, as with a `ValueRow`. */
+  ids: Id[];
+  value: number | null;
+  exact: ExactForm | null;
+  unit?: UnitValue;
+  note?: QueryNote;
+}
+
+/** A query as it arrives: the student's text, plus its parse (null ⇒ not understood). */
+export interface QueryInput {
+  text: string;
+  q: ValueQuery | null;
+}
+
 export interface ValuesPanelResult {
   rows: ValueRow[];
   areaClasses: AreaClassRow[];
   sampleCount: number;
+  /** answers to the student's own questions (#477) — empty when none were asked. */
+  queryRows: QueryRow[];
 }
 
 const REL_TOL = 1e-4;
+
+/** The canonical label for a query — the same notation the auto rows use, so the two lists read alike. */
+export function queryLabel(q: ValueQuery): string {
+  switch (q.kind) {
+    case 'angle': return `∠${q.ray1}${q.vertex}${q.ray2}`;
+    case 'length': return `${q.a}${q.b}`;
+    case 'area': return `(${q.ids.join('')})`;
+    case 'perimeter': return `${q.ids.join('')}`;
+  }
+}
+
+/** The point ids a query refers to — all of them must exist before it can be answered. */
+const queryIds = (q: ValueQuery): Id[] =>
+  q.kind === 'angle' ? [q.ray1, q.vertex, q.ray2] : q.kind === 'length' ? [q.a, q.b] : q.ids;
 
 const invariant = (vals: number[]): number | null => {
   if (vals.length === 0 || vals.some((v) => !Number.isFinite(v))) return null;
@@ -128,14 +189,27 @@ export function computeValuesPanel(
   areaLetter?: string | null,
   /** the declared length unit («AB = a», #427) — every magnitude is then reported as a multiple of it. */
   unit?: DeclaredUnit | null,
+  /** the student's own questions (#477) — answered from THIS pool, never a second sampler (M3). */
+  queries: QueryInput[] = [],
 ): ValuesPanelResult {
   const c = constructions[0];
   const rows: ValueRow[] = [];
   const areaClasses: AreaClassRow[] = [];
-  if (!c || samples.length === 0) return { rows, areaClasses, sampleCount: 0 };
+  /** Refuse every query for one reason — the paths that can answer nothing at all. */
+  const allRefused = (note: QueryNote): QueryRow[] =>
+    queries.map((qi) => ({
+      text: qi.text,
+      kind: qi.q?.kind ?? null,
+      label: qi.q ? queryLabel(qi.q) : null,
+      ids: [],
+      value: null,
+      exact: null,
+      note: qi.q ? note : 'not-understood',
+    }));
+  if (!c || samples.length === 0) return { rows, areaClasses, sampleCount: 0, queryRows: allRefused('undetermined') };
   // the knowledge gate (ADR-295/#88): determined figures print on any pool; sampled ones need ≥4
   const enough = samples.length >= 4 || freeDofCount(c) === 0;
-  if (!enough) return { rows, areaClasses, sampleCount: samples.length };
+  if (!enough) return { rows, areaClasses, sampleCount: samples.length, queryRows: allRefused('undetermined') };
 
   type Measure = (pos: Map<Id, Vec>, i: number) => number | null;
   const samplesOf = (f: Measure): number[] | null => {
@@ -348,7 +422,54 @@ export function computeValuesPanel(
     }
   }
 
-  return { rows, areaClasses, sampleCount: samples.length };
+  // ---- the QUERY lane (#477) --------------------------------------------------------------------
+  // The student names a quantity and gets it back WHEN IT IS KNOWLEDGE. Answered from the very helpers
+  // the rows above use — `samplesOf`/`invariant` for seed-invariance, `sized`/`unitCoefOf` for the
+  // scale discipline — because a query resolved by any other path could contradict the rows printed
+  // directly above it, which is worse than not answering. That is the M3 "never a second sampler" rule
+  // applied to a second CONSUMER, not just a second sampler.
+  //
+  // The asymmetry is the whole honesty story, and it is the same one the rows obey: an ANGLE is
+  // scale-free, so it answers whenever the shape is determined; a LENGTH/AREA/PERIMETER carries units,
+  // so under a free similarity gauge the number is only this drawing's scale — refused as `scale`
+  // unless the student declared a unit (#427), in which case it answers as a multiple of their own
+  // symbol. Everything unanswerable says WHY (ADR-052).
+  const known = new Set(samples[0].keys());
+  const queryRows: QueryRow[] = queries.map((qi) => {
+    const q = qi.q;
+    const base = { text: qi.text, kind: q?.kind ?? null, label: q ? queryLabel(q) : null, ids: [] as Id[], value: null, exact: null };
+    if (!q) return { ...base, note: 'not-understood' as const };
+    const ids = queryIds(q);
+    if (ids.some((id) => !known.has(id))) return { ...base, note: 'unavailable' as const };
+
+    const measure: Measure =
+      q.kind === 'angle'
+        ? (pos) => { const V = pos.get(q.vertex), P = pos.get(q.ray1), Q = pos.get(q.ray2); return V && P && Q ? angleAt(V, P, Q) : null; }
+        : q.kind === 'length'
+        ? (pos) => { const A = pos.get(q.a), B = pos.get(q.b); return A && B ? dist(A, B) : null; }
+        : q.kind === 'perimeter'
+        ? (pos) => { const pts = q.ids.map((id) => pos.get(id)); return pts.every(Boolean) ? q.ids.reduce((sum, _id, i) => sum + dist(pts[i]!, pts[(i + 1) % pts.length]!), 0) : null; }
+        : (pos) => { const pts = q.ids.map((id) => pos.get(id)); return pts.every(Boolean) ? Math.abs(polygonArea(pts as Vec[])) : null; };
+
+    if (q.kind === 'angle') {
+      const val = per(measure);
+      return val === null
+        ? { ...base, ids, note: 'undetermined' as const }
+        : { ...base, ids, value: val, exact: exactOrNull(val) };
+    }
+    // a magnitude: the scale discipline decides which lane may speak
+    if (!sized && !useUnit) return { ...base, ids, note: 'scale' as const };
+    const vals = samplesOf(measure);
+    if (vals === null) return { ...base, ids, note: 'undetermined' as const };
+    const pow = q.kind === 'area' ? 2 : 1;
+    const abs = sized ? invariant(vals) : null;
+    const u = unitCoefOf(measure, pow);
+    if (abs === null && u === null) return { ...base, ids, note: 'undetermined' as const };
+    const value = abs ?? vals.reduce((x, y) => x + y, 0) / vals.length;
+    return { ...base, ids, value, exact: abs === null ? null : exactOrNull(value), ...(u ? { unit: u } : {}) };
+  });
+
+  return { rows, areaClasses, sampleCount: samples.length, queryRows };
 }
 
 

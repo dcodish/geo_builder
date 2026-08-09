@@ -807,3 +807,21 @@ function atomicDefiniteAngles(defs: DefiniteAngle[]): DefiniteAngle[] {
     return true;
   });
 }
+
+/**
+ * Radius of an ASSERTED angle's arc, in units of the base radius `r`.
+ *
+ * Lives here, beside {@link angleValueOffset}, because the mark and its number were tuned independently
+ * in the renderer (arc at 6.5·r, value at 4.2·r) and the value ended up UNDER its own arc — unreadable at
+ * a tight vertex, and clipped when the vertex sits on the figure's frame (operator, #475). One anchor,
+ * one derived offset, and a test asserting the relation, so the two cannot drift apart again.
+ */
+export const ANGLE_ARC_R = 6.5;
+
+/**
+ * Where an angle's VALUE sits along the wedge bisector: just OUTSIDE its own arc. Must stay strictly
+ * greater than `ANGLE_ARC_R * r` — that is the property, not the constants.
+ */
+export function angleValueOffset(r: number, fontSize: number): number {
+  return ANGLE_ARC_R * r + fontSize * 0.6;
+}

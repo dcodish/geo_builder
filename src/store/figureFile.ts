@@ -55,6 +55,10 @@ export interface FigureFile {
   radiusOverrides: Record<Id, number>;
   facts: Fact[];
   display?: FigureFileDisplay;
+  /** #477: the student's value QUERIES, verbatim. Questions, not facts — they are stored so a saved
+   *  worksheet reopens with the quantities its author was tracking, and they never enter `replay`.
+   *  Absent in files written before the lane existed, hence optional. */
+  queries?: string[];
 }
 
 export type FigureLoadFailure = 'bad-json' | 'not-figure' | 'newer-version' | 'no-facts';
@@ -62,7 +66,7 @@ export type FigureLoadResult = { ok: true; file: FigureFile } | { ok: false; rea
 
 /** Serialize the session to pretty-printed JSON (human-diffable — the point of a text format). */
 export function serializeFigure(
-  state: { facts: Fact[]; seed: number; radiusOverrides: Record<Id, number>; display?: FigureFileDisplay },
+  state: { facts: Fact[]; seed: number; radiusOverrides: Record<Id, number>; display?: FigureFileDisplay; queries?: string[] },
   meta: { locale?: string; savedAt?: string; name?: string } = {},
 ): string {
   const file: FigureFile = {
@@ -75,6 +79,7 @@ export function serializeFigure(
     radiusOverrides: state.radiusOverrides,
     facts: state.facts.map(sanitizeFactOut),
     ...(state.display ? { display: state.display } : {}),
+    ...(state.queries?.length ? { queries: state.queries } : {}),
   };
   return JSON.stringify(file, null, 2);
 }
