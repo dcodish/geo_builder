@@ -6465,3 +6465,16 @@ a message added later is covered without anyone remembering to add it — which 
 post-processor should be registered there, but it is a different product, lane and log, so it never shares
 a commit with a 2-D fix. The question export (#465) writes `.docx` rather than DOM and does not pass
 through `t()`, so it is untouched by this and its decision stays open.
+
+**Amendment 1 (2026-08-09) — balanced delimiters that HUG a run belong inside the isolate.** Found while
+porting the mechanism to 3-D (#468) and measuring both bundles: **7 messages in `he.json` and 5 in the 3-D
+one** wrap their technical run in brackets or quotes — `(1, 2, -3)`, `("AB")`, `(O1)`. The original trim
+stopped at the first CORE character, leaving the brackets outside, where they are still neutrals: the
+algorithm mirrors them, so the pair renders **inverted around content that is itself laid out LTR**. A
+coordinate triple is exactly this shape, which is why 3-D surfaced it.
+
+Brackets are deliberately NOT added to CORE — a lone `(` opening a Hebrew parenthetical
+(`הצורה (ראו ABC)`) would then be isolated on its own. They are absorbed only as a **balanced pair
+immediately wrapping the core span**, outermost last so `("AB")` takes the quotes and then the parens.
+An unbalanced delimiter, whose partner belongs to the Hebrew sentence, is left exactly where it is —
+locked by that case alongside the positive ones.

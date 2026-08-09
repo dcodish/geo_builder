@@ -30,6 +30,18 @@ const HEBREW_LETTER = /[א-ת]/;
  */
 const CORE = /[A-Za-z0-9|∠∡∢⊥∥△▲√⌢°]/;
 
+/**
+ * Delimiters that HUG a run and belong inside the isolate with it — `(1, 2, -3)`, `("AB")`.
+ *
+ * They are not CORE, because a lone `(` in a gap (a Hebrew parenthetical, `הצורה (ראו ABC)`) must not be
+ * isolated by itself. They are only absorbed as a BALANCED pair immediately wrapping the core span, which
+ * is what tells us they belong to the technical run rather than to the Hebrew sentence around it. Left
+ * outside, a bracket is a neutral and the algorithm mirrors it — the pair renders inverted around content
+ * that is itself laid out LTR.
+ */
+const OPEN = '([{"';
+const CLOSE = ')]}"';
+
 const LRI = '⁦'; // LEFT-TO-RIGHT ISOLATE
 const PDI = '⁩'; // POP DIRECTIONAL ISOLATE
 
@@ -47,10 +59,19 @@ export function isolateLtrRuns(s: string): string {
   let out = '';
   let gap = ''; // the current non-Hebrew span, accumulated until a Hebrew letter closes it
   const flush = () => {
-    const first = [...gap].findIndex((c) => CORE.test(c));
+    let first = [...gap].findIndex((c) => CORE.test(c));
     if (first < 0) { out += gap; gap = ''; return; }
     let last = gap.length - 1;
     while (last > first && !CORE.test(gap[last])) last--;
+    // absorb balanced delimiters that hug the run, outermost last: `("AB")` takes the quotes, then the
+    // parens. An unbalanced one (its partner is elsewhere in the sentence) is left where it is.
+    for (;;) {
+      if (first === 0 || last + 1 >= gap.length) break;
+      const o = OPEN.indexOf(gap[first - 1]);
+      if (o < 0 || gap[last + 1] !== CLOSE[o]) break;
+      first--;
+      last++;
+    }
     out += gap.slice(0, first) + LRI + gap.slice(first, last + 1) + PDI + gap.slice(last + 1);
     gap = '';
   };

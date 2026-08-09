@@ -89,7 +89,13 @@ describe('#464 — the shape of a run', () => {
     ['trailing punctuation stays out', 'וכאן AB = 9.', `וכאן ${LRI}AB = 9${PDI}.`],
     ['leading punctuation stays out', 'לא ניתן: AB = 9', `לא ניתן: ${LRI}AB = 9${PDI}`],
     ['no core char → untouched', 'אין כאן — כלום', 'אין כאן — כלום'],
-    ['quotes stay outside', 'כמו "DE ∥ BC" למשל', `כמו "${LRI}DE ∥ BC${PDI}" למשל`],
+    // Balanced delimiters that HUG the run come INSIDE it: left outside they are neutrals, and the
+    // algorithm mirrors them — the pair would render inverted around content laid out LTR.
+    ['hugging quotes come inside', 'כמו "DE ∥ BC" למשל', `כמו ${LRI}"DE ∥ BC"${PDI} למשל`],
+    ['a coordinate triple keeps its parens', 'הנקודה (1, 2, -3) בחלל', `הנקודה ${LRI}(1, 2, -3)${PDI} בחלל`],
+    ['nested quote-in-paren', 'ראו ("AB") כאן', `ראו ${LRI}("AB")${PDI} כאן`],
+    // ...but only when BALANCED. Here the `(` belongs to the Hebrew sentence, not to the run.
+    ['an unbalanced bracket is left alone', 'הצורה (ראו ABC) כאן', `הצורה (ראו ${LRI}ABC${PDI}) כאן`],
   ])('%s', (_label, input, expected) => {
     expect(isolateLtrRuns(input)).toBe(expected);
   });
