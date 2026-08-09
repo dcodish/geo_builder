@@ -21,11 +21,22 @@ export type Locale = 'he' | 'en';
 /** Does the utterance already name an angle? Used to tell a canonical phrasing from a bare one. */
 const NAMES_ANGLE = /זוו?ית|\bangle\b|∠/i;
 
-/** `set-angle` → `זווית BAC = 40` / `angle BAC = 40`. The full triple is used deliberately: it is
- *  unambiguous whatever the vertex's edge count, so it is the form worth teaching. */
-function angleText(vertex: Id, ray1: Id, ray2: Id, value: number, locale: Locale): string {
-  const triple = `${ray1}${vertex}${ray2}`;
-  return locale === 'he' ? `זווית ${triple} = ${value}` : `angle ${triple} = ${value}`;
+/** `set-angle` → `∠BAC = 40`. The full triple is used deliberately: it is unambiguous whatever the
+ *  vertex's edge count, so it is the form worth teaching.
+ *
+ *  **The GLYPH, not the word** (operator ruling 2026-08-09, #460 — [ADR-428](../../docs/06-decisions.md#adr-428)
+ *  Am. 1). Every other teaching surface in the app already says `∠`: `err.latex` points at the toolbar
+ *  ("△ ∥ ∠ ⊥ √"), `err.ambiguousAngle` spells its example as `∠A{v}C = 90`, and there is a `∠` button
+ *  sitting beside the input box. This hint was the one surface teaching a different canonical spelling
+ *  from the rest of the tool. The glyph is locale-independent — only the surrounding copy is not.
+ *
+ *  Note what deliberately does NOT change: `<BAC = 50` still receives a hint. The prefix `<` is a
+ *  keyboard APPROXIMATION of `∠` ([ADR-381](../../docs/06-decisions.md#adr-381), #237 — students type it
+ *  because `∠` isn't on a keyboard), tolerated input rather than a canonical form, so nudging it toward
+ *  the glyph is this module doing its job. Teaching a student out of the approximation and onto the
+ *  button is the whole point; suppressing that hint would strand them on it. */
+function angleText(vertex: Id, ray1: Id, ray2: Id, value: number, _locale: Locale): string {
+  return `∠${ray1}${vertex}${ray2} = ${value}`;
 }
 
 /**

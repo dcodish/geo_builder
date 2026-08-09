@@ -6234,6 +6234,30 @@ text. Obligations 1 and 2 are available immediately and land first.
 paper's givens. Once the step list echoes canonically the two will disagree, and the export is the more
 public artifact — worth the operator's call in the slice that builds obligation 3.
 
+**Amendment 1 (2026-08-09) — the canonical angle form is the GLYPH `∠BAC = 50`, not the word.** Operator
+ruling on #460, after playing obligation 2 in prod. `angleText` rendered `זווית BAC = 50` / `angle BAC = 50`,
+and it was **the only teaching surface in the app spelling the angle that way**: `err.latex` points the
+student at the toolbar ("△ ∥ ∠ ⊥ √"), `err.ambiguousAngle` writes its own example as `∠A{v}C = 90`, and
+there is a `∠` button beside the input box. A tool that teaches two canonical forms teaches neither, so
+the hint moves to the glyph. The full triple is unchanged — it is unambiguous whatever the vertex's edge
+count, which is why this ADR chose it.
+
+*What deliberately does NOT change, because the first draft of the fix got it backwards.* The report also
+proposed adding `<` to `NAMES_ANGLE` so that `<BAC = 50` — measured as receiving a hint — would stop
+receiving one. That is the wrong conclusion: the prefix `<` is a keyboard **approximation** of `∠`
+([ADR-381](#adr-381), #237 — students type it because `∠` isn't on a keyboard), *tolerated input*, never a
+canonical form. Hinting it is this module doing its job; suppressing the hint would strand the student on
+the approximation instead of moving them to the button. `זווית BAC = 50` and `∠BAC = 50` both stay
+hint-free: `∠` is what we **teach**, not the only form we **accept**.
+
+*The lock that generalises.* A canonical form that is not canonical by the module's own predicate is the
+defect class, so the taught text now round-trips: it re-parses to the same lowering **and** produces no
+further hint. Plus the mirror invariant the ruling exposed as unguarded — `>` is never an angle. It never
+was (`normalizeUtterance` maps only `<`), but `angle-bracket.test.ts` held eight `<` cases and zero `>`
+cases, so the invariant survived by omission. The input box is RTL Hebrew, where a typed bracket is
+visually ambiguous about which way it points — precisely the argument for "helpfully" adding `>` later and
+silently turning every `DE > FG` into an angle. Locked in that file.
+
 ## ADR-429 — honesty accounting is a MULTISET: an occurrence predicate, not a value predicate
 
 **Status:** accepted, 2026-08-09 · **Issue:** #437 (bug) · **Split out:** #458 (the capability half) ·
@@ -6281,3 +6305,4 @@ the port, not as a bug, and not fixed in this commit.
 always honest, the class member beyond dimensions (`מלבן 4 על 4`), and — the half that matters more — the
 generosity cases that must NOT flag, so the fix cannot quietly become strict: two sides stated at the same
 length, two angles stated at the same size, and an occurrence still reaching every candidate lowering.
+

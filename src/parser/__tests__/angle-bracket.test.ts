@@ -57,3 +57,25 @@ describe('normalizeAngleBracket (#237)', () => {
     expect(normalizeUtterance('<ABCD')).toBe('<ABCD');
   });
 });
+
+/**
+ * The MIRROR half — operator ruling, 2026-08-09 (#460).
+ *
+ * Only `<` is the keyboard stand-in for `∠`; `>` is never an angle. The invariant held from the day
+ * ADR-381 landed, but purely by omission — nothing asserted it, and this file's eight cases were all
+ * about `<`. That matters because the input box is RTL Hebrew, where a typed angle bracket is visually
+ * ambiguous about which way it points: the very argument someone could use to "helpfully" add `>` to the
+ * normaliser later, silently turning every `DE > FG` length comparison into an angle. Locked here.
+ */
+describe('the mirror bracket is NOT an angle (#460)', () => {
+  it('a prefix > is left alone by the orth pass', () => {
+    for (const u of ['>BAC = 50', '>A=50', '> BAC = 50']) {
+      expect(normalizeUtterance(u), u).toBe(u);
+    }
+  });
+
+  it('> and < both keep their INFIX comparison meaning', () => {
+    expect(cmds('x>y')[0]).toEqual({ type: 'measure-order', left: 'x', op: '>', right: 'y' });
+    expect(cmds('x<y')[0]).toEqual({ type: 'measure-order', left: 'x', op: '<', right: 'y' });
+  });
+});

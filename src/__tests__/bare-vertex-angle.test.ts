@@ -103,7 +103,33 @@ describe('#447 — it TEACHES the canonical form (ADR-428 obligation 2)', () => 
     const r = parse('A=40', ctx);
     if (!r.ok) throw new Error('parse');
     const hint = teachCanonical('A=40', r.commands, 'he');
-    expect(hint).toMatch(/^זווית [A-Z]{3} = 40$/);
+    // The GLYPH, not the word (#460, operator ruling 2026-08-09): every other teaching surface in the
+    // app — err.latex, err.ambiguousAngle, the toolbar button — already says ∠.
+    expect(hint).toMatch(/^∠[A-Z]{3} = 40$/);
+  });
+
+  it('the keyboard approximation «<» is still nudged toward the glyph (#460)', () => {
+    // ADR-381 accepts a prefix `<` because ∠ isn't on a keyboard — TOLERATED input, not a canonical
+    // form. So it must keep getting a hint, and that hint is what moves the student onto the button.
+    const ctx = figure(['דלתון קמור']);
+    const r = parse('<BAD = 40', ctx);
+    if (!r.ok) throw new Error('parse');
+    expect(teachCanonical('<BAD = 40', r.commands, 'he')).toBe('∠BAD = 40');
+  });
+
+  it('the taught form is itself canonical — the hint never hints again', () => {
+    // A canonical form that is not canonical by the module's own test is the #460 defect class. Guards
+    // against a future renderer emitting a spelling the non-canonical predicate would flag right back.
+    const ctx = figure(['דלתון קמור']);
+    const r = parse('A=40', ctx);
+    if (!r.ok) throw new Error('parse');
+    for (const locale of ['he', 'en'] as const) {
+      const hint = teachCanonical('A=40', r.commands, locale);
+      expect(hint).toBeTruthy();
+      const back = parse(hint!, ctx);
+      expect(back.ok, hint!).toBe(true);
+      if (back.ok) expect(teachCanonical(hint!, back.commands, locale), hint!).toBeNull();
+    }
   });
 
   it('the CANONICAL form gets no hint — we never nag someone already writing it right', () => {
