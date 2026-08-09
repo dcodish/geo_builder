@@ -92,3 +92,28 @@ describe('#73 — NO THEFT: the whole supported catalog classifies null (both lo
     }
   });
 });
+
+describe('#467 — a height from a POINT ALONE is guidance, never a guess', () => {
+  // Operator ruling, 2026-08-09: "גובה מנקודה D in 3d setting should give a message saying there are
+  // several options for this and user should give better input." With no solid and no base named there
+  // is nothing to drop the ⟂ onto, and picking a plane would assert a given the student never gave
+  // (ADR-052). Unlike #448 this never becomes buildable, so the guidance is the END STATE.
+  for (const u of ['גובה מנקודה D', 'גובה מ D', 'גובה מהקודקוד S', 'height from D', 'the altitude from S']) {
+    it(u, () => expect(classifyGuidance3(u)?.category).toBe('ambiguous-height'));
+  }
+
+  // The #448 forms all PARSE, so the register never sees them — but a pattern whose own semantics are
+  // wrong is a trap for whoever widens it next, so the lookaheads are asserted directly.
+  for (const u of [
+    'גובה הפירמידה מנקודה D',
+    'גובה לפירמידה מנקודה D',
+    'גובה מנקודה D לבסיס ABC',
+    'גובה מ D לבסיס',
+    'CD גובה במשולש ABC',
+    'DE גובה בטטראדר',
+    'height of the pyramid from D',
+    'height from D to base ABC',
+  ]) {
+    it(`${u} is NOT brushed off`, () => expect(classifyGuidance3(u)).toBeNull());
+  }
+});

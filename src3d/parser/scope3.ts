@@ -29,6 +29,7 @@ export type ScopeCategory3 =
   | 'ui-command'
   | 'oblique-prism'
   | 'lowercase-labels'
+  | 'ambiguous-height'
   // S2 (#378, DoD 12) added two forward-pointing categories; S4 and S3 have since retired both by
   // SUPPORTING their forms. Guidance for something the parser handles is a lie — the #73 no-theft
   // sweep enforces that, and it is what caught the stale entry.
@@ -46,6 +47,25 @@ interface ScopeRule3 {
 }
 
 const RULES3: ScopeRule3[] = [
+  {
+    /**
+     * #467 — a height stated from a POINT ALONE. Operator ruling, 2026-08-09: *"גובה מנקודה D in 3d
+     * setting should give a message saying there are several options for this and user should give
+     * better input."* With no solid and no base named there is genuinely nothing to drop the ⟂ onto, so
+     * guessing a plane would assert a given the student never gave (ADR-052) — and unlike #448 this does
+     * not become buildable later, so the guidance is the END STATE, not a placeholder.
+     *
+     * The lookaheads are what keep this honest: any utterance that DOES name a base, a solid, a face or
+     * a triangle is a #448 form that parses, so it must never reach here. Belt and braces — the register
+     * only runs on a FAILED parse — but a pattern whose own semantics are wrong is a trap for the next
+     * person to widen it.
+     */
+    category: 'ambiguous-height',
+    patterns: [
+      /^ה?גובה\s+מ(?![\s\S]*(?:ל-?\s*ה?בסיס|פירמידה|מנסרה|משולש|פאה|טטר|ארבעון|חרוט))/,
+      /^(?:the\s+)?(?:height|altitude)\s+from\s+(?![\s\S]*(?:base|pyramid|prism|triangle|face|tetrahedr|cone))/i,
+    ],
+  },
   {
     // marks derive from GIVENS — state the given itself. Before valueless-query (its ∠ pattern is generic).
     category: 'ui-command',

@@ -2105,3 +2105,38 @@ from any processed message returns the original byte-for-byte, over every leaf o
 English untouched — and a bundle-**derived** coverage sweep, so a message added later is checked without
 anyone remembering. Plus the primed-label and coordinate-triple cases, which are the two shapes the 2-D
 corpus could not have caught.
+
+## ADR-3D-117 — a height from a POINT ALONE is guidance, and permanently so
+
+**Status:** accepted, 2026-08-09 · **Issue:** #467 · **Operator ruling** · **Sibling:** [ADR-3D-115](#adr-3d-115)
+
+**The ruling.** Operator, 2026-08-09: *"גובה מנקודה D in 3d setting should give a message saying there are
+several options for this and user should give better input."*
+
+**Why guidance rather than a capability, and why that is not a stopgap.** With no solid and no base named
+there is genuinely nothing to drop the perpendicular onto; choosing a plane would assert a given the
+student never gave ([ADR-052](06-decisions.md#adr-052)). This is the sharp contrast with its sibling: the
+same session BUILT `גובה הפירמידה מנקודה D` and `גובה מנקודה D לבסיס ABC` (ADR-3D-115), because those name
+the plane. The bare form never becomes buildable, so the message is the **end state**, not a placeholder —
+which is exactly what makes it belong in the guidance register ([ADR-3D-040](#adr-3d-040)) rather than in a
+backlog. Before this it fell through as an ordinary `not-handled`, which meant a paid LLM call on input we
+have already decided never to build, and a student who learns nothing about how to say it.
+
+**The message names only forms that work today** — `גובה מנקודה D לבסיס ABC`, `גובה הפירמידה מנקודה D`,
+`CD גובה במשולש ABC` — all three verified against the parser in this same commit. A guidance message
+pointing at a second dead end is worse than no message, and the register's own no-theft sweep does not
+catch that (it asserts supported input is not brushed off, not that the advice is buildable).
+
+**The trigger is negative, deliberately.** It matches a height clause that names **no** base, solid, face
+or triangle. Every ADR-3D-115 form parses, so the register never sees them — the lookaheads are belt and
+braces. They are there because a pattern whose own semantics are wrong is a trap for whoever widens it
+next, and they are asserted directly rather than left to the parse order.
+
+**Locked** in `scope3.test.ts`: the five bare phrasings classify `ambiguous-height`, and the eight
+ADR-3D-115 / segment-named forms classify null.
+
+**A tooling note worth keeping.** The English pattern initially failed while the Hebrew one passed, and
+the cause was a **literal backspace byte** in the source: the rule had been written through a non-raw
+Python string, where `\b` is a real escape (`\s` survived only because it is not). Regexes must never be
+generated through a layer that owns their escape characters. A repo-wide scan for stray control bytes
+came back clean.
