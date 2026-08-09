@@ -14,10 +14,11 @@
 
 import { resolve3 } from './evaluate';
 import { scalePinned } from './solve3';
-import { basisDecompose, cleanNum, coordStr, decompStr, linePlaneAngleAt, newellNormal, parametricDecomp } from './dataView';
+import { basisDecompose, cleanNum, coordStr, decompStr, formatBranches, linePlaneAngleAt, newellNormal, parametricDecomp } from './dataView';
 import { centroid3, cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
 import { distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
 import { readOperand } from '../parser/operandToken';
+import { figureSymbolsOf } from './types';
 import type { Construction3, Id, Operand3, Positions3, Requirement3 } from './types';
 
 /** An operand: a declared vector name, or an ordered point pair. */
@@ -164,9 +165,12 @@ export function parseQuery(c: Construction3, raw: string): Query | null {
   const va = atomOf(c, bare);
   if (va) return { kind: 'vector', a: va };
 
-  // SYMBOL: a bare parameter letter «t» from «AE=t·AS» (a lowercase letter that is a vecDef symbol,
-  // NOT a declared vector — those became a vector query above). Its solved value.
-  if (/^[a-z]$/.test(bare) && c.vecDefs.some((vd) => vd.symbol === bare)) return { kind: 'symbol', sym: bare };
+  // SYMBOL: a bare parameter letter the figure carries — «t» from «AE=t·AS», a pin's open symbol, or the
+  // algebraic lane's parameter «m» (NOT a declared vector — those became a vector query above). Its solved
+  // value. #480: read from the one registry, so every symbol kind is askable rather than the one this
+  // rule's author had in mind; the letter must still BE a symbol of this figure, or every stray `m` in a
+  // query box would be treated as one.
+  if (/^[a-z]$/.test(bare) && figureSymbolsOf(c).includes(bare)) return { kind: 'symbol', sym: bare };
 
   return null;
 }
@@ -368,6 +372,18 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
     const nums = vals as number[];
     return nums.every((v) => Math.abs(v - nums[0]) <= 1e-6 * Math.max(1, Math.abs(nums[0]))) ? nums[0] : null;
   };
+
+  // #480 — the algebraic lane's parameter is answered from its BRANCH SET, not by sampling. The generic
+  // numeric path below asks four seeds to agree, which is the right question for a measured quantity but
+  // the wrong one here: with two branches the seeds disagree by design and the query would read
+  // «undetermined», when the honest answer is that the givens allow exactly ±√2 — the answer the exam
+  // wants. A single branch answers as a plain value; none at all (an unpinned parameter) is genuinely
+  // undetermined and says so.
+  if (q.kind === 'symbol' && q.sym === c.param) {
+    const branches = resolve3(c, seed).param?.branches ?? [];
+    const shown = formatBranches(branches);
+    return shown ? { text, answer: shown } : { text, answer: null, note: 'undetermined' };
+  }
 
   if (q.kind === 'vector') {
     const posArr = seeds.map((s) => resolve3(c, s).positions);

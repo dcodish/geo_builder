@@ -948,6 +948,25 @@ export const emptyConstruction3 = (): Construction3 => ({
 });
 
 /** #325 (ADR-3D-079): the distinct OPEN symbols carried by the pins' affine components. */
+/**
+ * #480 — EVERY symbol the figure carries, in one place. Three kinds exist and they live in three
+ * different fields: a vec-def's ratio symbol (`t` from `AE = t·AS`), a pin's open coordinate symbol
+ * (`B(2t, t, k)`), and the algebraic lane's single figure parameter (`c.param`, the `m` in
+ * `x + (m-2)y + (m-1)z - 5 = 0`). Each surface that shows symbols to a student used to consult
+ * whichever subset its author had in mind — the query lane knew the first, the data panel the second,
+ * and neither knew the third, so asking for `m` answered «לא זוהה» while the engine held its value.
+ *
+ * Derived rather than enumerated, so a fourth symbol kind reaches every surface by adding it here
+ * (`src3d/CLAUDE.md`: *an enumeration is not a rule*).
+ */
+export function figureSymbolsOf(c: Construction3): string[] {
+  const out = new Set<string>();
+  for (const vd of c.vecDefs) if (vd.symbol) out.add(vd.symbol);
+  for (const s of pinSymsOf(c)) out.add(s);
+  if (c.param) out.add(c.param);
+  return [...out];
+}
+
 export function pinSymsOf(c: Construction3): string[] {
   const out: string[] = [];
   for (const pin of c.pins) {

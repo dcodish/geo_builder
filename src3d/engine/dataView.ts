@@ -17,7 +17,7 @@
 import { resolve3 } from './evaluate';
 import { scalePinned } from './solve3';
 import { cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
-import { pinSymsOf } from './types';
+import { figureSymbolsOf } from './types';
 import { distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, resolveOperand } from './operands';
 import type { Construction3, Id, MutualRel3, Operand3, Positions3 } from './types';
 
@@ -123,6 +123,30 @@ export function cleanNum(x: number, tol = 1e-5, surd = false): string {
 export const cleanMag = (x: number): string => cleanNum(x, 1e-5, true);
 
 const cleanCoef = (x: number): string => cleanNum(x, 2e-3);
+
+/**
+ * #480 — how a figure parameter's value is written, for the data panel AND the query lane. Shared so a
+ * panel row and a query answer can never disagree about the same symbol.
+ *
+ * The presentation is the SOLUTION SET, not the branch this drawing happens to show ([ADR-052](docs/06-decisions.md#adr-052),
+ * and [ADR-3D-118](docs/06b-decisions-3d.md) for the canvas edition of the same rule): with two roots the
+ * honest answer to «what is m?» is `±√2` — the student's own answer to that exam question — and printing
+ * `-1.41` instead would state one of them as if the givens had forced it. Language-neutral by
+ * construction (`±`, `{…}`), because it renders inside both locales.
+ *
+ * `null` means the figure does not determine the symbol at all — the caller decides whether that reads
+ * as an open `?` row or an «undetermined» note.
+ */
+export function formatBranches(branches: number[]): string | null {
+  if (branches.length === 0) return null;
+  if (branches.length === 1) return cleanMag(branches[0]);
+  const sorted = [...branches].sort((a, b) => a - b);
+  // a symmetric pair is the common bagrut shape (±√2, ±2√15) and reads best in ± form
+  if (sorted.length === 2 && Math.abs(sorted[0] + sorted[1]) <= 1e-6 * Math.max(1, Math.abs(sorted[1]))) {
+    return `±${cleanMag(Math.abs(sorted[1]))}`;
+  }
+  return `{${sorted.map(cleanMag).join(', ')}}`;
+}
 
 export const coordStr = (v: Vec3): string => `(${cleanMag(v.x)}, ${cleanMag(v.y)}, ${cleanMag(v.z)})`;
 
@@ -779,7 +803,18 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // #325 (ADR-3D-079 Am. 2): the pins' open symbols — determined values print, free ones read
   // open, so `B(2t, t, k)` visibly registers even while the coordinates still read `?`.
   const params: DataPanel['params'] = [];
-  for (const sym of pinSymsOf(c)) {
+  for (const sym of figureSymbolsOf(c)) {
+    // #480: the ALGEBRAIC lane's parameter is not a pivot pin symbol — its value lives in
+    // `resolved.param`, and its branch set is the answer whenever the givens leave more than one.
+    if (sym === c.param) {
+      const perSeed = resolved.map((r) => r.param?.branches ?? []);
+      // the branch set is a property of the GIVENS, so it must agree across seeds; if it somehow
+      // does not, the symbol is not knowledge and reads open rather than picking a seed's version
+      const agree = perSeed.every((b) => b.length === perSeed[0].length && b.every((v, i) => Math.abs(v - perSeed[0][i]) <= 1e-6 * Math.max(1, Math.abs(v))));
+      const text = agree ? formatBranches(perSeed[0]) : null;
+      params.push(text ? { sym, text: `${sym} = ${text}`, open: false } : { sym, text: `${sym} = ?`, open: true });
+      continue;
+    }
     const vals = resolved.map((r) => r.pivot?.pinSymbols?.[sym]);
     const nums = vals.filter((v): v is number => v !== undefined && Number.isFinite(v));
     const stable =

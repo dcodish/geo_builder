@@ -9,6 +9,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
 import { answerQuery } from '../engine/queries';
+import { dataView } from '../engine/dataView';
 import { serializeFigure3, deserializeFigure3 } from '../store/figureFile3';
 import { parse3 } from '../parser/parse3';
 import { COMMAND_CATALOG_3D } from '../parser/catalog3';
@@ -228,5 +229,55 @@ describe('#297 — parametric vector queries (shared with the data panel)', () =
   it('AE = t·w and EO = ½u + ½v − t·w (not «depends on α»)', () => {
     expect(ans(DD, 'AE').answer).toBe('t·w');
     expect(ans(DD, 'EO').answer).toBe('1/2·u + 1/2·v − t·w');
+  });
+});
+
+/**
+ * #480 — the algebraic lane's parameter is a symbol like any other. Three symbol kinds live in three
+ * fields (`vecDefs.symbol`, the pivot's pin symbols, `c.param`) and each surface used to consult a
+ * different subset, so the operator's «m» answered «לא זוהה» while the engine held ±√2.
+ */
+describe('#480 — the figure parameter is askable, and answers its BRANCH SET', () => {
+  beforeEach(reset);
+
+  const OPERATOR = [
+    'הישר ℓ: x = (1,2,3) + t(m-2, m, m+2)',
+    'המישור π1: x + (m-2)y + (m-1)z - 5 = 0',
+    'הישר ℓ מקביל למישור π1', // dir·n = 2m² − 4 ⇒ m = ±√2
+  ];
+
+  it("the operator's question: «m» answers ±√2, not a decimal and not «not understood»", () => {
+    const r = ans(OPERATOR, 'm');
+    expect(r.note, 'it is understood now').toBeUndefined();
+    expect(r.answer, 'the solution SET, in the form the exam wants').toBe('±√2');
+  });
+
+  it('a SINGLE root answers as a plain value', () => {
+    const r = ans(['הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)', 'המישור π: 3x + my + (m+6)z + 4 = 0', 'הישר ℓ ניצב למישור π'], 'm');
+    expect(r.answer, 'm = -5, the book answer').toBe('-5');
+  });
+
+  it('an UNPINNED parameter is honestly undetermined — never the sampled value', () => {
+    const r = ans(['הישר ℓ: x = (1,2,3) + t(m-2, m, m+2)'], 'm');
+    expect(r).toMatchObject({ answer: null, note: 'undetermined' });
+  });
+
+  it('the letter must be a symbol OF THIS FIGURE — a stray letter is still not understood', () => {
+    expect(ans(OPERATOR, 'q')).toMatchObject({ answer: null, note: 'notUnderstood' });
+  });
+
+  it('the data panel and the query lane agree — one formatter, no drift', () => {
+    const { c, seed } = build(OPERATOR);
+    const row = dataView(c, seed).params.find((p) => p.sym === 'm');
+    expect(row, 'the panel lists the parameter at all').toBeDefined();
+    expect(row!.open).toBe(false);
+    expect(row!.text).toBe('m = ±√2');
+    expect(row!.text).toBe(`m = ${answerQuery(c, 'm', seed).answer}`);
+  });
+
+  it('an unpinned parameter reads OPEN in the panel, like a pin symbol does', () => {
+    const { c, seed } = build(['הישר ℓ: x = (1,2,3) + t(m-2, m, m+2)']);
+    const row = dataView(c, seed).params.find((p) => p.sym === 'm');
+    expect(row).toMatchObject({ text: 'm = ?', open: true });
   });
 });

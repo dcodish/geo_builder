@@ -2204,3 +2204,44 @@ notation.
 **identically at every seed**, with neither `±3.414` appearing; a sign given added on top brings the
 numbers back (`roots` 2, `branches` 1); and the pre-existing single-root and no-parameter cases are
 unchanged.
+
+## ADR-3D-119 — one symbol registry, and a parameter answers with its SOLUTION SET
+
+**Status:** accepted, 2026-08-09 · **Issue:** #480 · **Sibling:** [ADR-3D-118](#adr-3d-118)
+
+**The report.** Operator, 2026-08-09, prod: *"the side panel for data. When I ask to see m, it's not
+recognized. I would expect it either not to give a value since there is more than one option (but say
+there is no single value) or, since there are 2 options, give plus minus sqrt 2."* Measured: `m` →
+`notUnderstood`, and the panel's params list empty — while `resolved.param` held `[-√2, +√2]` exactly.
+
+**Root cause: three symbol kinds, three fields, and every surface knowing a different subset.** A
+vec-def's ratio symbol (`t` from `AE = t·AS`) lives in `c.vecDefs`, a pin's open coordinate symbol
+(`B(2t,t,k)`) in `c.pins`, and the algebraic lane's figure parameter in `c.param`. The query lane's
+bare-letter rule tested `c.vecDefs.some(...)`; the panel's params loop walked `pinSymsOf(c)`. Neither
+knew the third, so the symbol the exam question is actually *about* was the one symbol a student could
+not ask for. Not a boundary anyone chose — the tree's documented trap, *an enumeration is not a rule*.
+
+`figureSymbolsOf(c)` now derives the union, and both surfaces consume it; a fourth symbol kind reaches
+them by being added there. The bare-letter guard still requires membership in **this figure's** symbols,
+so a stray letter in the query box remains `notUnderstood` rather than becoming a silent query.
+
+**The answer is the solution set, not the drawn branch.** The generic query path asks four seeds to
+agree — the right question for a measured quantity, the wrong one here: with two branches the seeds
+disagree *by design*, and the honest reading of that disagreement is not "undetermined" but "the givens
+allow exactly these two". So the parameter is answered from `branches` ([ADR-3D-118](#adr-3d-118)) rather
+than by sampling: `±√2` for a symmetric pair (the bagrut shape, and the form the student writes),
+`{a, b, c}` otherwise, a plain value at one branch, and an honest «undetermined» when nothing pins it —
+which is also exactly what the operator asked for, both halves of it.
+
+**One formatter, `formatBranches`, shared by the panel row and the query answer**, because two
+presentations of one symbol are two chances to disagree about it — the drift the `scalePinned` and
+`memberHolds3` precedents exist to prevent. It is language-neutral (`±`, `{…}`) since it renders inside
+both locales. The panel additionally checks the branch set agrees across its three seeds and reads the
+row OPEN if it somehow does not: the set is a property of the *givens*, so seed-dependence there would
+mean the value is not knowledge, and the panel's multi-sample discipline should not be bypassed just
+because this path could prove it another way.
+
+**Locked** in `queries.test.ts`: the operator's figure answers `±√2`; a single-root figure answers `-5`;
+an unpinned parameter answers «undetermined» and reads `m = ?` in the panel; a letter that is not this
+figure's symbol stays `notUnderstood`; and panel row and query answer are asserted **equal**, so the two
+surfaces cannot drift.
