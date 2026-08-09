@@ -88,6 +88,8 @@ export default function App() {
   const valuesState = useGeoStore((s) => s.values);
   const viewValues = useGeoStore((s) => s.viewValues);
   const clearValues = useGeoStore((s) => s.clearValues);
+  const addQuery = useGeoStore((s) => s.addQuery);
+  const removeQuery = useGeoStore((s) => s.removeQuery);
   const viewRelations = useGeoStore((s) => s.viewRelations);
   const clearRelations = useGeoStore((s) => s.clearRelations);
   const shapes = useGeoStore((s) => s.shapes);
@@ -107,6 +109,7 @@ export default function App() {
 
   const [text, setText] = useState('');
   const [inputNote, setInputNote] = useState(''); // a problem message under the input (not-understood / built-nothing)
+  const [queryText, setQueryText] = useState(''); // #477: the values-panel query box
   const [thinking, setThinking] = useState(false); // LLM fallback in flight (Phase 7)
   // Re-entry gate + abort for the submit pipeline (E3/STO-3). `busyRef` is the SYNCHRONOUS truth —
   // React state lags a render, so two rapid example-chip clicks could both enter `submit` and race
@@ -369,6 +372,7 @@ export default function App() {
           showMeasures: st.showMeasures,
           showCenters: st.showCenters,
         },
+        queries: st.queries, // #477: questions travel with the figure
       },
       { locale: i18n.language, savedAt: new Date().toISOString(), ...(name ? { name } : {}) },
     );
@@ -1461,6 +1465,55 @@ export default function App() {
                   </div>
                 );
               })}
+              {/* #477 — the QUERY lane. The auto rows above are what the figure volunteers; this is where
+                  the student ASKS. Deliberately inside the values panel (operator ruling), because the
+                  answer belongs beside the list it extends and is computed from the very same sample
+                  pool — a separate widget would invite a separate computation, and two lists that can
+                  disagree are worse than one short list. */}
+              <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #e2e8f0' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>{t('values.queryTitle')}</div>
+                {valuesLayer.queryRows.map((qr) => (
+                  <div key={qr.text} style={{ display: 'flex', gap: 6, alignItems: 'baseline', padding: '1px 2px' }}>
+                    <button
+                      type="button"
+                      title={t('values.queryRemove')}
+                      onClick={() => removeQuery(qr.text)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', font: 'inherit', padding: 0 }}
+                    >
+                      ×
+                    </button>
+                    <bdi style={{ direction: 'ltr', color: '#334155' }}>{qr.label ?? qr.text}</bdi>
+                    {qr.value !== null ? (
+                      <>
+                        <span style={{ color: '#334155' }}>=</span>
+                        <MathValue value={qr.value} exact={qr.exact} degrees={qr.kind === 'angle'} unit={qr.unit} />
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 11, color: '#94a3b8' }}>{t(`values.q.${qr.note ?? 'undetermined'}`)}</span>
+                    )}
+                  </div>
+                ))}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    addQuery(queryText);
+                    setQueryText('');
+                  }}
+                  style={{ display: 'flex', gap: 4, marginTop: 3 }}
+                >
+                  <input
+                    value={queryText}
+                    onChange={(e) => setQueryText(e.target.value)}
+                    placeholder={t('values.queryPlaceholder')}
+                    title={t('values.queryHint')}
+                    dir={textDir(queryText)}
+                    style={{ flex: 1, minWidth: 0, fontSize: 12, padding: '2px 6px', border: '1px solid #cbd5e1', borderRadius: 4 }}
+                  />
+                  <button type="submit" disabled={!queryText.trim()} style={{ fontSize: 12, padding: '2px 8px', borderRadius: 4, border: '1px solid #cbd5e1', background: '#f8fafc', cursor: queryText.trim() ? 'pointer' : 'default' }}>
+                    {t('values.queryAdd')}
+                  </button>
+                </form>
+              </div>
               {valuesLayer.areaClasses.length > 0 && (
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8' }}>{t('values.areaRatios')}</div>

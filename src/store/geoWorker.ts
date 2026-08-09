@@ -14,14 +14,14 @@
  * interrupted mid-computation any other way, and a fresh worker only costs re-warming its caches.
  */
 import { searchAnotherView, findValidConfig, meetsRequirements, replay, getFoldFor, detectAll, computeValues, WORKER_SEARCH_BUDGET_MS, type DetectAllResult, type Fact, type FoldNode } from '@/replay/core';
-import type { ValuesPanelResult } from '@/engine/valuesPanel';
+import type { QueryInput, ValuesPanelResult } from '@/engine/valuesPanel';
 
 export type GeoWorkRequest =
   | { id: number; op: 'resample'; facts: Fact[]; seed: number }
   | { id: number; op: 'autoResolve'; facts: Fact[]; seed: number }
   | { id: number; op: 'prefold'; facts: Fact[]; seed: number }
   | { id: number; op: 'detect'; facts: Fact[]; seed: number }
-  | { id: number; op: 'values'; facts: Fact[]; seed: number };
+  | { id: number; op: 'values'; facts: Fact[]; seed: number; queries?: QueryInput[] };
 
 export type GeoWorkResponse =
   | { id: number; progress: { k: number; n: number } }
@@ -73,7 +73,7 @@ self.onmessage = (e: MessageEvent<GeoWorkRequest>) => {
       // layers' classification done HERE, so only the small verdicts cross back (ADR-401).
       post({ id: req.id, done: { op: 'detect', result: detectAll(req.facts) } });
     } else if (req.op === 'values') {
-      post({ id: req.id, done: { op: 'values', result: computeValues(req.facts) } });
+      post({ id: req.id, done: { op: 'values', result: computeValues(req.facts, req.queries ?? []) } });
     }
   } catch (err) {
     post({ id: req.id, error: String((err as Error)?.message ?? err) });

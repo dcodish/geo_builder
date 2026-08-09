@@ -6306,6 +6306,42 @@ artifact, the readable form on paper is not obviously the readable form in an in
 the export" drags in #464's unresolved literal-string half via the leading `∠`. Filed as **#465**
 (`needs-operator`) with the three candidates.
 
+**Amendment 3 (2026-08-09) — the question EXPORT follows the canonical form (#465).** This ADR reserved
+the decision for *"the slice that builds obligation 3"*; Amendment 2 built it, so the screen and the paper
+had begun to disagree — a student reading both saw `∠BAC = 50` on the step list and `A=50` in the
+worksheet. Operator ruling: *"docx export follows cannonical form."* `questionLines` now renders through
+the **same `canonicalText`** as the step row and the acceptance hint, so all three surfaces cannot drift;
+it stays conservative by inheritance, and a lowering the renderer cannot express keeps its verbatim text.
+An utterance is still *required* — canonicalisation changes how a line reads, never whether it appears, so
+the "no command-type jargon" rule (ADR-252) is untouched.
+
+**The export needed the bidi fix too, and its own docstring was the evidence.** `questionDoc.ts` argued it
+could rely on the bidi algorithm alone and inject no control characters, *"the same … the browser step
+list already renders correctly."* That premise was false: the browser renders such runs correctly only
+since [ADR-431](#adr-431). Word runs the same algorithm, so `|BC| = 10` prints as `10 = |BC|` on the page —
+and this amendment sends `∠BAC = 50` straight into it.
+
+**The browser's remedy does NOT port, and the operator caught it in the .docx.** The first attempt reused
+`isolateLtrRuns`, and Word printed visible **⟦LRI⟧ / ⟦PDI⟧ boxes** in the givens list — it has no glyph for
+U+2066/U+2069. An isolate is a rendering instruction the DOM honours silently and Word does not, so the
+same class needs a different expression per medium: OOXML's own mechanism is **per-RUN direction**. A given
+is now SPLIT and each technical run emitted as a run without `w:rtl`.
+
+The segmentation itself is shared — `bidiSegments` is the one place that decides where a run begins and
+ends, and both `isolateLtrRuns` (DOM) and the export are built on it, so the two media can never disagree
+about *what* a run is while differing in *how* they mark it. That split is the actual lesson: the earlier
+mistake was treating "isolate characters" as the fix rather than as one encoding of it.
+
+This also exposed a real limit in the helper: its Hebrew test is a **proxy** for "this text will be laid
+out RTL", which holds for a UI message whose direction comes from its own content and fails wherever the
+direction is *imposed from outside*. The export forces `w:bidi`, so an all-Latin given sits in an RTL
+paragraph and scrambles with no Hebrew anywhere in it. Callers in that position now say so explicitly
+(`rtlParagraph`) rather than the helper guessing — the same docs/17 §2.2 shape as ADR-429's value-vs-
+occurrence proxy, found the same way: by a caller the proxy was never true for.
+
+What the original stance got **right** is unchanged: list numbers stay real Word numbering, never a
+literal `"1. "`, because a digit + neutral period at an RTL boundary is the classic scramble.
+
 ## ADR-429 — honesty accounting is a MULTISET: an occurrence predicate, not a value predicate
 
 **Status:** accepted, 2026-08-09 · **Issue:** #437 (bug) · **Split out:** #458 (the capability half) ·
@@ -6479,38 +6515,95 @@ immediately wrapping the core span**, outermost last so `("AB")` takes the quote
 An unbalanced delimiter, whose partner belongs to the Hebrew sentence, is left exactly where it is —
 locked by that case alongside the positive ones.
 
-**Amendment 3 (2026-08-09) — the question EXPORT follows the canonical form (#465).** This ADR reserved
-the decision for *"the slice that builds obligation 3"*; Amendment 2 built it, so the screen and the paper
-had begun to disagree — a student reading both saw `∠BAC = 50` on the step list and `A=50` in the
-worksheet. Operator ruling: *"docx export follows cannonical form."* `questionLines` now renders through
-the **same `canonicalText`** as the step row and the acceptance hint, so all three surfaces cannot drift;
-it stays conservative by inheritance, and a lowering the renderer cannot express keeps its verbatim text.
-An utterance is still *required* — canonicalisation changes how a line reads, never whether it appears, so
-the "no command-type jargon" rule (ADR-252) is untouched.
+## ADR-432 — a stated magnitude is labelled from the FACT, not from the surviving constraint
 
-**The export needed the bidi fix too, and its own docstring was the evidence.** `questionDoc.ts` argued it
-could rely on the bidi algorithm alone and inject no control characters, *"the same … the browser step
-list already renders correctly."* That premise was false: the browser renders such runs correctly only
-since [ADR-431](#adr-431). Word runs the same algorithm, so `|BC| = 10` prints as `10 = |BC|` on the page —
-and this amendment sends `∠BAC = 50` straight into it.
+**Status:** accepted, 2026-08-09 · **Issue:** #474 (bug, P2)
 
-**The browser's remedy does NOT port, and the operator caught it in the .docx.** The first attempt reused
-`isolateLtrRuns`, and Word printed visible **⟦LRI⟧ / ⟦PDI⟧ boxes** in the givens list — it has no glyph for
-U+2066/U+2069. An isolate is a rendering instruction the DOM honours silently and Word does not, so the
-same class needs a different expression per medium: OOXML's own mechanism is **per-RUN direction**. A given
-is now SPLIT and each technical run emitted as a run without `w:rtl`.
+**The report.** Operator, on the flagship figure: *"if user wrote 37 it should appear in the diagram"* —
+`ריבוע ABCD` / `נקודה G על AD` / `זווית GBA = 37` drew the wedge arc at B and printed no value, with
+«הציגו מידות» on.
 
-The segmentation itself is shared — `bidiSegments` is the one place that decides where a run begins and
-ends, and both `isolateLtrRuns` (DOM) and the export are built on it, so the two media can never disagree
-about *what* a run is while differing in *how* they mark it. That split is the actual lesson: the earlier
-mistake was treating "isolate characters" as the fix rather than as one encoding of it.
+**Measured, and the shape of it is the finding.** A numeric angle labels perfectly well — *until the
+solver consumes it*:
 
-This also exposed a real limit in the helper: its Hebrew test is a **proxy** for "this text will be laid
-out RTL", which holds for a UI message whose direction comes from its own content and fails wherever the
-direction is *imposed from outside*. The export forces `w:bidi`, so an all-Latin given sits in an RTL
-paragraph and scrambles with no Hebrew anywhere in it. Callers in that position now say so explicitly
-(`rtlParagraph`) rather than the helper guessing — the same docs/17 §2.2 shape as ADR-429's value-vs-
-occurrence proxy, found the same way: by a caller the proxy was never true for.
+| figure | surviving `angle` constraints | label |
+| --- | --- | --- |
+| `משולש ABC` + `זווית ABC = 37` | 1 | ✅ `37°` |
+| `ריבוע ABCD` + `נקודה G על AD` + `זווית GBA = 37` | **0** | ❌ none |
+| `משולש ABC` + `זווית ABC = 2α` | — | ✅ `2α` (symbolic, added from the fact) |
 
-What the original stance got **right** is unchanged: list numbers stay real Word numbering, never a
-literal `"1. "`, because a digit + neutral period at an RTL boundary is the classic scramble.
+**Root cause.** Numeric labels were derived from the **surviving constraint list** — the loop over
+`figure.constraints` that emits one label per `distance`/`angle`/`area`. When a given DRIVES a free DOF
+(G slides along AD until the angle holds) the solver consumes it, no `angle` constraint remains, and the
+label goes with it. Symbolic measures escaped only because they are added earlier, from the FACT.
+
+The angle MARK is already sourced from the facts, which is exactly why the wedge drew but stayed bare.
+That asymmetry — *mark from the fact, value from the constraint* — is the whole defect, and it is a
+proxy-predicate of the docs/17 §2.2 family: "is there a constraint for it?" standing in for "did the
+student state it?". The two agree right up until the solver does its job.
+
+**Why P2 and not polish.** It breaks a documented honesty invariant (CLAUDE.md → Conventions:
+*everything the student stated is visible on the figure*), and it broke it on the product's flagship
+interaction — the sequence in CLAUDE.md's own opening paragraph. The figure lost its label **because the
+feature works**.
+
+**Decision.** A stated `set-angle` / `set-distance` registers its label from the fact, in the same
+fact-sourced, `status === 'ok'`-gated pass the angle marks use. `fillOnly` keeps a symbolic label (`2α`,
+an alias name) ahead of the raw number, so this only ever fills a gap — no existing label changes owner,
+which is what keeps the blast radius to "a value that used to be missing now appears".
+
+The constraint pass stays: it still covers magnitudes that reach the figure without a stated fact of their
+own (a symbolic measure once resolved). The fix adds the missing source rather than replacing the one that
+worked.
+
+**Locked** by the scenario `driven-angle-keeps-its-label` (corpus 4) — the operator's exact sequence,
+asserting all three halves together: that the given really is consumed (zero surviving `angle`
+constraints, so the test would pass vacuously if the drive stopped happening), that `37°` is printed at B,
+and that the figure genuinely measures 37° so the label is not a lie.
+
+## ADR-433 — the values-panel QUERY lane: ask for a quantity, get it when it is knowledge
+
+**Status:** accepted, 2026-08-09 · **Issue:** #477 (feature) · **Operator design** · **3-D original:** [ADR-3D-057](06b-decisions-3d.md#adr-3d-057) (#274)
+
+**Where it came from.** #476 asked which DERIVED wedges the values panel should auto-enumerate, and every
+answer was a bad trade: all pairs at a vertex is C(k,2) and drowns the panel; adjacent-only is a guess
+about intent. The operator's answer dissolved the question — *"in the values area a user could
+specifically write an angle or a segment, and if it is possible to calculate it, we will."* **Asking beats
+guessing**, and the panel stays scannable. Operator rulings on the three open points: the lane
+**replaces** auto-enumeration, the input lives **inside the values panel**, and queries **persist** with
+the figure.
+
+**The two invariants carried over from 3-D, and they are the whole feature.**
+
+1. **A query is a question, never a fact.** It never enters `replay`, never moves a point, never appears
+   in the step list. This is what stops "let me just check something" from silently becoming a given —
+   asserted against the STORE, since that is the only layer where it could be violated.
+2. **An answer is only ever knowledge**, and a refusal says WHY ([ADR-052](#adr-052)).
+
+**Computed INSIDE `computeValuesPanel`, which is the load-bearing design choice.** A query rides the same
+call as the rows, so it shares the sample pool, the ADR-295/#88 knowledge gate, `scalePinned`, and the
+exact-form recognizer. This extends M3 ("never a second sampler") from a second *sampler* to a second
+*consumer*: a query answered by any other path could contradict the list printed directly above it, and a
+panel that disagrees with itself is worse than a short one. Locked by a test asserting a query and its
+auto row agree to 9 places for the same quantity.
+
+**The scale asymmetry is inherited, not re-litigated.** An angle is scale-free, so it answers whenever the
+shape is determined — which is exactly what makes the operator's `∠GBC` answerable at 53° on a square with
+no size. A length/area/perimeter carries units, so under the free similarity gauge it is refused (`scale`)
+rather than reporting this drawing's arbitrary size (#426/ADR-421) — unless the student declared a unit
+(#427), where 2-D can answer in their own symbol where 3-D must refuse outright.
+
+**Parsing sits in `@/parser`, not the engine** — the engine may not import the parser, so it is handed a
+structured `ValueQuery` and never a string to interpret. The upside is that a query inherits every
+orthographic fold a given gets: `<GBC` and `∡GBC` arrive as `∠GBC` ([ADR-381](#adr-381)). A student should
+not have to type a question differently from the way they type a fact. Unrecognised text returns null and
+the lane says so — it must never fall through to "probably a length", because a wrong answer about a
+figure is indistinguishable from a fact. Degenerate references (`∠ABA`, `AA`, `שטח ABA`) are refused for
+the same reason: each would otherwise produce a confident 0 or NaN.
+
+**Deliberately NOT in `catalog.ts`.** The catalog documents what goes in the MAIN input, and `∠GBC` typed
+there is an angle marker (#94), not a question. A catalog row would advertise a command that does
+something else. The lane advertises itself where it lives — its placeholder and hint name the four forms.
+
+**Does not close #476.** The *stated* `∠GBA` missing from the auto rows stays a bug: a student must never
+have to ask for the value they themselves typed.

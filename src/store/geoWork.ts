@@ -9,6 +9,7 @@
  * synchronously — semantics identical, only the threading differs — so the whole test suite and the
  * scenario harness keep driving the store exactly as before.
  */
+import type { QueryInput } from '@/engine/valuesPanel';
 import {
   searchAnotherView,
   findValidConfig,
@@ -112,6 +113,8 @@ function call(
   facts: Fact[],
   seed: number,
   onProgress?: (k: number, n: number) => void,
+  /** #477: the student's value queries — carried on the `values` op only. */
+  queries: QueryInput[] = [],
 ): Promise<Done> {
   if (!hasWorker) {
     // synchronous fallback — the same functions, same semantics, main thread (tests / no-Worker envs)
@@ -123,7 +126,7 @@ function call(
         return Promise.resolve({ op, found: found ? { ...found, fold: null } : null } as AutoResolveDone);
       }
       if (op === 'detect') return Promise.resolve({ op, result: detectAll(facts) });
-      if (op === 'values') return Promise.resolve({ op, result: computeValues(facts) });
+      if (op === 'values') return Promise.resolve({ op, result: computeValues(facts, queries) });
       replay(facts, seed);
       return Promise.resolve({ op: 'prefold', fold: getFoldFor(facts) } as PrefoldDone);
     } catch (err) {
@@ -134,7 +137,7 @@ function call(
   const lane = LANE_OF[op];
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject, onProgress, lane });
-    ensureWorker(lane).postMessage({ id, op, facts, seed });
+    ensureWorker(lane).postMessage({ id, op, facts, seed, ...(queries.length ? { queries } : {}) });
   });
 }
 
@@ -183,7 +186,9 @@ export const geoWork = {
 
 let detectInFlight: { facts: Fact[]; promise: Promise<DetectAllResult> } | null = null;
 
-/** #217: the values-panel rows, off-thread on user request; shares the detect lane + pool memo. */
-export function geoValues(facts: Fact[]): Promise<import('@/engine/valuesPanel').ValuesPanelResult> {
-  return call('values', facts, 0).then((done) => (done as ValuesDone).result);
+/** #217: the values-panel rows, off-thread on user request; shares the detect lane + pool memo.
+ *  #477: the student's queries ride the SAME call, so their answers come from the same sample pool as
+ *  the rows they sit beside — a second call could disagree with the list directly above it. */
+export function geoValues(facts: Fact[], queries: QueryInput[] = []): Promise<import('@/engine/valuesPanel').ValuesPanelResult> {
+  return call('values', facts, 0, undefined, queries).then((done) => (done as ValuesDone).result);
 }
