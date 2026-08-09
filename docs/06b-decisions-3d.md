@@ -2000,3 +2000,37 @@ not fixed here: different product, different lane, different log.
 |AC'|² = |AB|² + |BC|² + |AA'|² *and* by being longer than either face diagonal, the polygon by the ring
 existing and the solid count staying at one; plus the refusals, the M1 no-ops, and the generosity cases that
 the 28 false positives came from. `droppedConstructNoun3` joins the catalog false-positive net.
+
+## ADR-3D-114 — the refusal SENTENCE: no path commits partially, so the copy must not say it did
+
+**Status:** accepted, 2026-08-09 · **Issue:** #459 (bug)
+
+**The report.** Operator, testing [ADR-3D-113](#adr-3d-113) before deploy: `פירמידה ABCD עם גובה` returned
+*"חלק מהקלט לא הגיע לציור (גובה) — לא נוסף דבר"* — and the reaction was *"the text indicates that part of
+the sentence was not added but nothing is drawn at all, so it's not just part."*
+
+**The refusal is correct and does not change.** ADR-3D-113 deliberately refuses the whole utterance rather
+than commit a bare pyramid with a green ✓ (the height itself is #448, the capability). All-or-nothing is
+the designed behaviour. This ADR is the sentence only.
+
+**Root cause — one string describing an event that does not exist.** `droppedConstructNoun3` shares the
+`dropped-given` error code with the four older gates (`store3.ts`), and that code renders a single string
+whose two clauses contradict each other: **"part of the input** did not reach the figure ({{items}})
+**— nothing was added"**. The lead clause was written for the *number/label* gates, whose mental model is
+"a magnitude leaked out of an otherwise-good decomposition". But **all five gates `return` before
+committing** — no path has ever added part of an utterance. The lead clause has been inaccurate since it
+was written; the construct-noun gate is merely where a reader first noticed, because a dropped OBJECT is
+visible in a way a dropped number is not.
+
+So the fix is not "the new gate needs its own string" — that would leave four gates still describing a
+phantom partial commit. It is one reword of the shared string, stating the outcome first and then naming
+what could not be drawn: accurate for all five gates, no per-gate branching, no new error code.
+`{{items}}` still names the student's own words, so the honesty invariant is untouched.
+
+**Sibling audit** (docs/17 §1 / [ADR-W-004](06w-decisions-workspace.md)). `err.droppedGiven` exists **only**
+in `src3d/i18n/locales/` — grep of `src/i18n/locales/*.json` finds no counterpart, so 2-D words its seven
+gates differently and does not carry this defect. Confirmed by measurement, not assumed.
+
+**Locked** in `dropped-construct.test.ts`: both locales must still carry `{{items}}` and must not contain
+the partial-commit phrasing — a property over the copy, so a future rewording cannot quietly reintroduce
+the claim.

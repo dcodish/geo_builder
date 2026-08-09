@@ -20,6 +20,8 @@
  * |AC'|² = |AB|² + |AD|² + |AA'|², a circle by its own defining property — never "a command was emitted".
  */
 import { describe, expect, it } from 'vitest';
+import he from '../i18n/locales/he.json';
+import en from '../i18n/locales/en.json';
 import { derive3, useGeo3 } from '../store/store3';
 import { droppedConstructNoun3 } from '../parser/honesty3';
 import { parse3 } from '../parser/parse3';
@@ -157,6 +159,27 @@ describe('droppedConstructNoun3 — a stated construct that no command produced 
       const p = parse3(line);
       expect(p.ok, line).toBe(true);
       if (p.ok) expect(droppedConstructNoun3(line, p.commands), line).toEqual([]);
+    }
+  });
+});
+
+/**
+ * #459 — the refusal SENTENCE, not the refusal.
+ *
+ * `droppedConstructNoun3` shares the `dropped-given` error code with the four older gates, and that one
+ * string opened with "part of the input did not reach the figure" and closed with "nothing was added".
+ * The operator read the two clauses as contradicting each other, and they do: **every one of the five
+ * gates returns before committing**, so no path has ever added part of an utterance. The "part" framing
+ * was written for the number/label gates and was inaccurate for all of them; the construct-noun gate is
+ * simply where a reader first noticed, because a dropped OBJECT is visible in a way a number is not.
+ */
+describe('#459 — the shared refusal message claims no partial commit', () => {
+  it.each([['he', he], ['en', en]])('%s', (_loc, bundle) => {
+    const msg = (bundle as { err: { droppedGiven: string } }).err.droppedGiven;
+    expect(msg).toContain('{{items}}'); // still NAMES the lost statement (the honesty invariant)
+    // No path commits partially, so the copy must not imply one did.
+    for (const partial of ['חלק מהקלט', 'Part of the input', 'part of the input']) {
+      expect(msg, `must not claim a partial commit: ${partial}`).not.toContain(partial);
     }
   });
 });

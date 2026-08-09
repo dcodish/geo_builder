@@ -84,7 +84,7 @@
     "unknownSymbol": "the parameter {{id}} isn't defined in the figure",
     "ambiguousAngle": "identifying the angle at {{id}} needs exactly two edges in the figure — name all three letters (e.g. ∠AOB = 90)",
     "ambiguousVectorLength": "vector or length? write vector AB = vector CD (or AB⃗ = CD⃗), or |AB| = |CD|",
-    "droppedGiven": "Part of the input did not reach the figure ({{items}}) — nothing was added. Try splitting the statement into shorter givens or rephrasing",
+    "droppedGiven": "The statement was not added to the figure, because we could not draw: {{items}}. Try splitting it into shorter givens or rephrasing",
     "noPrismToMakeRight": "there is no prism in the figure to make right — build a prism or a parallelepiped first",
     "ambiguousPrism": "there is more than one prism in the figure — it's unclear which one you mean"
   },
