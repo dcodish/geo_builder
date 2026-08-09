@@ -6607,3 +6607,62 @@ something else. The lane advertises itself where it lives — its placeholder an
 
 **Does not close #476.** The *stated* `∠GBA` missing from the auto rows stays a bug: a student must never
 have to ask for the value they themselves typed.
+---
+
+## ADR-434 — the usage log is a set of SESSIONS, not a stream of rows: the admin sessions view
+
+**Status:** accepted, 2026-08-09 · **Issue:** [#470](https://github.com/dcodish/geo_builder/issues/470) ·
+**Applies to:** both dashboards (`/admin` · `/admin3`) via the shared renderer
+
+**Operator.** «in admin pages, i would like to be able to see the commands entered by session so i can
+understand what a user session looks like. currently they are ordered by datetime only. for 2d and 3d»
+
+**Context.** The stored event already carries `sid` — one id per page load, stamped by both loggers
+([ADR-3D-016](06b-decisions-3d.md)) — and, since [#84](https://github.com/dcodish/geo_builder/issues/84) /
+[#182](https://github.com/dcodish/geo_builder/issues/182), the LLM's committed `commands` and an
+`ev:'action'` row per store interaction, logged *expressly* so a session replays end-to-end. Every surface
+`server/admin.ts` rendered over that data was nonetheless **flat**: «פעילות אחרונה» interleaves all
+sessions by time, and both drills group by utterance TEXT, which discards the session that produced it.
+The `action` rows were stored and displayed **nowhere**. So the one question the log can answer best — what
+did one student try, in what order, and what happened — was answerable only by grepping `events.jsonl` on
+the box. This is the ADR-352 shape again: the data was there and the surface didn't read it.
+
+**Decision — the session is a first-class view, not a sort order.**
+
+1. **`sessionsOf(events, profile)`** (pure, unit-tested, beside `aggregate`): groups by `sid`, preserves
+   **log order** inside a session (equal-millisecond events must not be scrambled by a sort), and yields
+   `SessionRow{ sid, iph, rel, locale, start, end, submits, gaps, steps, dropped }`. A step is a `submit` or
+   an `action` — the `session` marker only *bounds* the session, it is not something the student did. Each
+   submit step carries the **profile's** outcome key, so 2-D and 3-D each classify with their own map (a 3-D
+   `oblique-prism` is a reasoned refusal, never a gap).
+2. **`?view=sessions`**, opened by making the existing «כניסות (sessions)» card clickable like the two drill
+   cards. Sessions newest-first; each expands (`<details>`, no JS) to its ordered steps: the utterance, its
+   outcome label, the LLM's committed commands under it (`↳ …`), and the store actions in place.
+3. **`?sid=` pins one session** — the surface a bug report's session id lands on (docs/22 §2b, "give me the
+   session id"), reachable three ways: the query param, a lookup box in the panel, and a per-row link now in
+   «פעילות אחרונה» so any time-ordered row opens the session it belongs to. The date/release filters apply
+   to it unchanged, and a pinned id that isn't in range says **why** rather than rendering an empty list.
+4. **Nothing is silently truncated.** Steps past a per-session cap are counted and stated; sessions past the
+   page cap are stated with the total; and an event with **no** `sid` is never folded into a synthetic
+   session — that would invent a conversation that never happened — it is counted and reported instead.
+
+**Why not a per-session page or a client-side app.** The dashboard is one self-contained string in the proxy
+bundle with no DB and no external deps; `<details>` + a query param buys expand/collapse and deep links with
+zero of that. The timelines are built **only** for the view that shows them, so every other view pays nothing.
+
+**Sibling product ([ADR-W-004](06w-decisions-workspace.md)).** Nothing to mirror: `server/admin.ts` is the
+one renderer both products share, parameterized by `DashboardProfile` — 3-D gets the view in the same commit,
+with its own labels and classifier. Locked by a `PROFILE_3D` case in the #470 test block.
+
+**The committed commands are flattened, not dumped.** `formatCommands` renders the stored JSON as
+`type value value · …` (2-D command objects) or as its canonical lines (3-D) — structural, so one renderer
+serves both products without knowing either's command vocabulary — and anything that doesn't parse (a
+string truncated by the 900-char cap) is shown verbatim. The raw JSON stays in the row's `title`, so the
+compaction never hides what actually landed on the figure.
+
+**Tests.** `admin.test.ts` #470 block (12): grouping + log order + submit/gap counts, the `session` marker
+excluded and the `action` row included in place, the sid-less event never folded in (and counted), the card
+link, the rendered timeline with commands + actions, `?sid=` pinning + the honest not-found, the date filter,
+the recent-activity session links, `formatCommands` over both products' shapes + an unparseable one, the
+3-D profile's own classification, and a session spanning midnight stating its end DATE. 52 admin tests /
+100 server tests green.
