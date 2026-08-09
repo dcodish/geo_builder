@@ -2329,3 +2329,57 @@ open on #482 rather than guessed at.
 **The 2-D twin has the same structure** (`src/i18n/bidi.ts` is a post-processor too) and is labelled on the
 issue. Not fixed here: this ADR is 3-D, the pattern is copied and never imported (docs/20 §12 rule 1), and
 2-D's fact rows were not what the operator reported.
+
+## ADR-3D-122 — the ℓ∩π crossing is OFFERED, and the offer is gated on knowledge
+
+**Status:** accepted, 2026-08-09 · **Issue:** #483 · **Depends on:** [ADR-3D-118](#adr-3d-118) (the gate),
+[ADR-3D-120](#adr-3d-120) (the sentence a click writes)
+
+**The report.** Operator, 2026-08-09, prod: *"when we now have l perpendicular to π1, I would expect to
+see the intersection point between them like we have in the 2d tool. When there is an intersection, give
+a dot the user can click and name."*
+
+**What was actually missing.** Not the capability — `ℓ חותך את π בנקודה A` has always lowered to
+`line-plane-point` and the engine materialises the point correctly. Measured on the operator's ⟂ figure:
+`m` pinned to a single root, both objects concrete, and `positions` **empty**. The student had to know
+that sentence and think of it unprompted; nothing on the canvas said a point was there to be had. So this
+ADR adds an *offer*, not a construct.
+
+**Naming goes through the ordinary submit path.** A click synthesises a real sentence
+(`A נקודת החיתוך של ℓ עם π1`) and submits it, so the result is an ordinary fact — readable in the step
+list, undoable, re-orderable, and replayed on load. The alternative (pushing a command, or marking the
+point render-only) would have produced a point the student cannot see the origin of and a file that does
+not round-trip. This is the 2-D `crossingCommands` lesson (ADR-379), copied as a **pattern** — `src3d/`
+imports nothing from `src/`. It also makes [ADR-3D-120](#adr-3d-120)'s noun frame a hard prerequisite
+rather than a nicety: the click's own sentence has to parse, in both languages, and the test asserts it.
+
+**The honesty gate is the whole design.** A dot invites the student to name a point, so the point must be
+one the *givens* fix and not one this drawing happens to show. `openCrossings3` refuses to offer anything
+while the figure parameter is unforced — reusing `paramIsKnowledge` ([ADR-3D-118](#adr-3d-118)) rather
+than growing a second opinion about it, so the dot and the canvas echo can never disagree about whether
+the figure is determined. The operator's own session is the case that motivates it twice over: unpinned,
+the line is a sample of itself; pinned by `ℓ ∥ π1` to m = ±√2, there is no crossing at all.
+
+**"Already named" is decided by POSITION, not by provenance.** Anything standing at the crossing retires
+the offer — a coordinate point, a rider, a solid's vertex, or the same crossing named through the verb
+frame. Enumerating the ways a point can be born is how the offer would come back as a duplicate dot on
+top of an existing point (`src3d/CLAUDE.md`: *an enumeration is not a rule*); a test covers exactly that
+path.
+
+**The set is the engine's call, the pixels are the renderer's.** `openCrossings3` lives in `engine/`
+because "is this crossing knowledge?" is a statement about the figure, and because the query lane and the
+data panel should be able to ask it without a second implementation. `scene3` only projects. A dot is
+drawn hollow, dashed and in the plane palette so it reads as *available* rather than as an existing
+point, under real points so a named point always wins the pixels, with a transparent 11 px hit target so
+it is tappable without enlarging the mark.
+
+**Scope: ℓ∩π only.** It is the case reported, the one with an existing command, and the one whose operands
+are absolute. Plane∩plane already has `ישר החיתוך`; segment∩plane has `planeCutsSegment`. Widening the
+offer to those is a separate decision about what deserves a dot, not a mechanical extension.
+
+**Locked** in `crossing-dots.test.ts`: the ⟂ figure offers exactly one crossing, and the offered point is
+verified to lie on both operands and to be identical across seeds; an unforced parameter offers **nothing
+even though the line does cross the plane at the sampled value** (the gate, stated as its own test); the
+∥ figure offers nothing; the synthesized sentence parses in He and En, lands the point where the dot was,
+and retires the offer; naming the same point through the verb frame retires it too; and a figure with no
+algebraic objects offers nothing.

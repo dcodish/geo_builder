@@ -26,6 +26,7 @@
     "clear": "Clear all",
     "another": "Show another configuration",
     "resetView": "Reset view",
+    "nameCrossing": "Click to name this intersection point",
     "save": "Save to file",
     "namePlaceholder": "Figure name (optional)",
     "saveNamePrompt": "Name the file — exam date, page and book, or anything else",

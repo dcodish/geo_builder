@@ -10,7 +10,7 @@ import type { PlaneDisplayMode3Map } from '../store/figureFile3';
 import type { Resolved3 } from '../engine/evaluate';
 import type { Construction3 } from '../engine/types';
 import { HOME_CAMERA, MAX_PITCH, type Camera3 } from './camera';
-import { buildScene3 } from './scene3';
+import { buildScene3, type SceneCrossing3 } from './scene3';
 
 export interface Figure3Props {
   construction: Construction3;
@@ -28,6 +28,11 @@ export interface Figure3Props {
   planeDisplay?: PlaneDisplayMode3Map;
   /** #397 (ADR-3D-108): draw the closest-point witness of every stated distance. Default true. */
   showWitnesses?: boolean;
+  /** #483: a determined-but-unnamed ℓ∩π crossing was clicked — the App names it through the normal
+   *  submit path. Absent = the offer is not drawn at all, which keeps this component a pure view. */
+  onNameCrossing?: (c: SceneCrossing3) => void;
+  /** Tooltip on a crossing dot (i18n-injected, like `resetLabel` — this component stays translation-free). */
+  crossingLabel?: string;
 }
 
 /** Per-index plane patch colours (translucent — patches never occlude, docs/20 §11). */
@@ -42,7 +47,7 @@ const VECTOR_COLOR = '#0d9488';
  *  reorder it — `(0, 7, 6)` used to render as `(6 ,7 ,0)` on the canvas (LRI…PDI). */
 const ltr = (s: string) => `⁦${s}⁩`;
 
-export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay, showWitnesses = true }: Figure3Props) {
+export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay, showWitnesses = true, onNameCrossing, crossingLabel }: Figure3Props) {
   const [cam, setCam] = useState<Camera3>(HOME_CAMERA);
   const [zoom, setZoom] = useState(1);
   const drag = useRef<{ x: number; y: number } | null>(null);
@@ -262,6 +267,27 @@ export default function Figure3({ construction, resolved, width = 640, height = 
             )}
           </g>
         ))}
+        {/* #483 — the OFFER: a hollow dot where a determined line∩plane crossing has no name yet.
+            Hollow and in the plane palette so it reads as "available", never as an existing point;
+            drawn before the real points so a named point always wins the pixels. The generous
+            transparent hit target is what makes it clickable on a tablet without enlarging the mark.
+            `stopPropagation` keeps the click off the orbit drag underneath. */}
+        {onNameCrossing &&
+          scene.crossings.map((k) => (
+            <g
+              key={`${k.line}|${k.plane}`}
+              className="cursor-pointer"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onNameCrossing(k);
+              }}
+            >
+              <title>{crossingLabel}</title>
+              <circle cx={k.x} cy={k.y} r={11} fill="transparent" />
+              <circle cx={k.x} cy={k.y} r={4} fill="#ffffff" stroke={PLANE_COLORS[0]} strokeWidth={1.6} strokeDasharray="2.5 2" />
+            </g>
+          ))}
         {scene.points.map((p) => (
           <g key={p.id}>
             <circle cx={p.x} cy={p.y} r={3} fill="#0f172a" />

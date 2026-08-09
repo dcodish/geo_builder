@@ -13,6 +13,7 @@ import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
 import { isolateLtrRuns3 } from './i18n/bidi';
+import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from './parser/scope3';
 import { parse3 } from './parser/parse3';
@@ -271,6 +272,29 @@ export default function App3() {
     [showData, queries, derived, seed],
   );
   const [queryText, setQueryText] = useState('');
+
+  /**
+   * #483 — clicking an offered ℓ∩π crossing NAMES it. Deliberately routed through the ordinary
+   * `submit` with a real sentence rather than pushed as a command: the click then produces a fact the
+   * student can read, undo, re-order and save, and replaying the file re-derives the same point. That
+   * is why #485's noun frame had to land first — this utterance has to parse in both languages.
+   */
+  const onNameCrossing = (k: { line: string; plane: string }) => {
+    if (busy) return;
+    const id = nextFreeLabel3(derived.construction);
+    if (!id) return; // A–Z exhausted — no name to give, so no silent renaming of something else
+    setGuidanceNote(null);
+    setLoadNote(null);
+    const utterance = crossingUtterance3({ ...k, point: { x: 0, y: 0, z: 0 } }, id, i18n.language !== 'en');
+    submit(utterance);
+    logDebug3({
+      kind: 'input',
+      utterance,
+      locale: i18n.language,
+      source: 'parser',
+      result: useGeo3.getState().lastError?.code ?? 'ok',
+    });
+  };
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -551,6 +575,8 @@ export default function App3() {
             width={canvasW}
             height={Math.max(360, Math.round(canvasW * 0.72))}
             resetLabel={t('actions.resetView')}
+            crossingLabel={t('actions.nameCrossing')}
+            onNameCrossing={onNameCrossing}
           />
           {facts.length > 0 && (
             <p className="text-xs text-slate-500" data-testid="dof-cue">
