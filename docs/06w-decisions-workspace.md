@@ -361,3 +361,38 @@ dispatch is now guarded by an is-main check so the pure rule can be imported wit
 commit tier refreshes measured on the faster PC") is retired — refreshes from either machine may now be
 committed. The per-file `ms` values in the file are the writing machine's and remain informational; only the
 SET is meaningful, and only a change to the SET (or to the rule) rewrites the file.
+
+## ADR-W-010 — An instrument must report what it does not know (#489, #439, #48)
+
+Three P3s about the tooling, sharing one failure: **a surface that answers confidently where it has no
+information.** All three were found by the instruments themselves, which is the argument for keeping them
+honest rather than merely useful.
+
+**#489 — a warning with no reason.** `git pull` writes its progress banner to stderr, so `e.stderr` is
+non-empty on essentially every failure and the first line is `From https://github.com/…` — git's transport
+chatter, not a reason for anything. A real session start printed exactly that while `main` sat 17 commits
+behind: the safety net reported nothing actionable in the one case it exists for. The selector's intent
+(prefer stderr) was right and its first-line assumption was noise by construction. `gitReason` now drops the
+chatter, prefers a line in git's own error vocabulary, and falls back through to the raw text — never to
+nothing. Applied to the `push failed` sibling too, which selected identically and would have misled the
+same way. The `needs a PROXY deploy` hint from [ADR-W-007](#adr-w-007--pushed-is-not-the-finish-line-session-start-reports-merged-ness-and-deployed-ness) now excludes
+`server/__tests__`: a hint that fires on a test-only change teaches the operator to ignore the hint.
+
+**#439 — "fixed" and "aged out" were indistinguishable.** The prod sink keeps 7 days by design (a
+minors'-data retention policy, and correct). The triage built BOTH report sections from the current log, so
+an open row whose events expired simply stopped being emitted — the 2026-07-28 run's four carried-over rows
+were absent from 2026-08-08's, which reads as *all resolved* when only one could be shown to be. The
+dangerous direction, and the #35/#183 family again on the time axis instead of the context axis. The state
+file still holds every surfaced row, so those rows are now re-verified against HEAD and reported with the
+caveat carried in the DETAIL rather than in the `degraded` flag — forcing the flag would have routed every
+still-failing aged row into `? UNVERIFIED`, i.e. off the worklist again, which is the same defect wearing a
+different heading. The header also stops claiming `window: all time`, which has been untrue since retention
+was set; it prints the span the log actually covers.
+
+**#48 — the open-issues report** is now defined in [docs/22 §2c](22-workflow.md): trigger, per-row format
+(including complexity read from the issue's OWN fix plan), the ordering rules, and two honesty clauses — an
+issue missing its fix plan is FLAGGED rather than improvised into one at report time, and the report says
+which rows can land directly on `main` versus which need a PR and the operator's play-and-approve. That last
+distinction, not the priority, is usually what decides how much a session can actually close. **Batchability
+is an explicit sort key**, because the P3 queue is the evidence: these ten items were only worth doing as
+clusters sharing a root cause and one gate run, and that is precisely why they had accumulated.

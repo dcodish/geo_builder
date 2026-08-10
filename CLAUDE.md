@@ -46,7 +46,7 @@ The layering `engine ← replay ← store` is mechanically enforced by
 **No state in this file.** The live sources, in order of reliability:
 
 - **[`docs/06-decisions.md`](docs/06-decisions.md)** (2-D, `ADR-NNN`) and **[`docs/06b-decisions-3d.md`](docs/06b-decisions-3d.md)** (3-D, `ADR-3D-NNN`) — the decision logs. The tail of each is the most recent work, and these are the records that are actually maintained. **An ADR is required for any significant decision.**
-- **`gh issue list`** — the live queue (labels: type + priority + product).
+- **`gh issue list`** — the live queue (labels: type + priority + product). "What's open / what's next" is answered with the **open-issues report** ([docs/22 §2c](docs/22-workflow.md)) — grouped, with complexity and a recommended order — never a raw dump.
 - **`gh pr list`** — work that is finished and pushed but **not merged**: an open PR is a feature awaiting the operator's play-and-approve, and nothing else records it. Pushed is not the finish line ([ADR-W-007](docs/06w-decisions-workspace.md)).
 - **[`docs/DEPLOY-LOG.md`](docs/DEPLOY-LOG.md)** — canonical deploy history, one entry per `prod/YYYY-MM-DD` tag. It records what WAS deployed, never what is awaiting deploy — for that, compare the newest `prod/*` tag against `main` (the session-start hook reports both).
 

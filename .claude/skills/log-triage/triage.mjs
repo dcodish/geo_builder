@@ -154,7 +154,13 @@ function load(a) {
     if (e.iph) visitors.add(e.iph);
     events.push(e);
   }
-  return { events, submits: events.filter((e) => e.ev === 'submit'), sessions: sessions.size, visitors: visitors.size };
+  // #439 — the ACTUAL span the log covers. The header used to print «all time» whenever `--days` was
+  // unset, which has been untrue since the prod sink adopted EVENTS_RETENTION_DAYS=7: what it really
+  // shows is «whatever survived 7 days». A window claim nobody can check is the same class of quiet
+  // false signal as the vanishing rows it sits above.
+  const stamps = events.map((e) => e.serverTs).filter(Boolean).sort();
+  const span = stamps.length ? { from: stamps[0].slice(0, 10), to: stamps[stamps.length - 1].slice(0, 10) } : null;
+  return { events, submits: events.filter((e) => e.ev === 'submit'), sessions: sessions.size, visitors: visitors.size, span };
 }
 
 // ---- incremental state (ADR-346 Am. 2) -----------------------------------
@@ -486,7 +492,7 @@ function bestOutcome(outs) {
 function reportFor(a) {
   // `events` carries submits AND the store `action` rows (needed by the session replay); every STAT and
   // candidate below is over `submits` only, so the counts stay comparable to server/admin.ts.
-  const { events, submits, sessions, visitors } = load(a);
+  const { events, submits, sessions, visitors, span } = load(a);
   const byBucket = {};
   for (const e of submits) (byBucket[classify(a, e)] ??= []).push(e);
   const total = submits.length;
@@ -527,6 +533,45 @@ function reportFor(a) {
   for (const c of cands) {
     c.verify = noVerify ? { now: '?', detail: '' } : bestOutcome(byUtterance.get(c.u));
     c.reportedAt = surfaced.surfaced[rowKey(a, c.u)] ?? state.utterances[c.u]?.reportedAt ?? null;
+  }
+
+  // #439 — a row that AGED OUT of the 7-day retention window must not vanish from the worklist.
+  // Both report sections were built from the current log, and the prod sink keeps 7 days by design
+  // (a deliberate minors'-data policy), so an open row simply stopped being emitted once its events
+  // expired — making "fixed" and "aged out" INDISTINGUISHABLE in the output, in the dangerous
+  // direction: the 2026-07-28 run's four carried-over rows were absent from 2026-08-08's, which reads
+  // as "all resolved" when only one could be shown to be. The #35/#183 family again, on the time axis.
+  //
+  // The state file still holds every surfaced row, so they are re-verified against HEAD here. They have
+  // no session context left, so each is replayed ALONE through the same machinery (never a second
+  // verifier) and its verdict is marked degraded — a row that now builds moves to ✓ already-fixed on
+  // its own, and one that still fails stays on the worklist saying exactly why it is unusual.
+  const inWindow = new Set(cands.map((c) => c.u));
+  const agedRows = Object.entries(state.utterances ?? {})
+    .filter(([u, r]) => r?.reportedAt && !inWindow.has(u) && u !== '(empty)')
+    .map(([u, r]) => ({ u, reportedAt: r.reportedAt }));
+  if (agedRows.length && !noVerify) {
+    const agedEvents = agedRows.map((r, i) => ({ sid: `__aged-${i}`, ev: 'submit', utterance: r.u, source: 'parser', result: 'ok' }));
+    const scratch = { version: 1, lastRun: null, sessions: {}, utterances: {} }; // never poisons the real cache
+    const { byUtterance: agedBy } = verifyAll(a, agedEvents, scratch);
+    for (const r of agedRows) {
+      const v = bestOutcome(agedBy.get(r.u));
+      cands.push({
+        u: r.u,
+        bucket: 'aged-out',
+        count: 0,
+        users: 0,
+        codes: [],
+        locales: [],
+        firstSeen: r.reportedAt,
+        reportedAt: r.reportedAt,
+        // The verdict keeps whatever `degraded` the replay itself produced — NOT a forced one. Forcing
+        // it would route every still-failing aged row into `? UNVERIFIED`, i.e. off the worklist again,
+        // which is the defect wearing a different section heading. The caveat rides the DETAIL instead,
+        // where it is read alongside the verdict rather than replacing it.
+        verify: { ...v, detail: `${v.detail || v.now} · re-checked context-free — no longer in the log window` },
+      });
+    }
   }
 
   // sort each candidate into a REPORT bucket by its CURRENT (post-fix) outcome
@@ -573,7 +618,11 @@ function reportFor(a) {
   const tblSeen = (arr) => [`| # | users | subs | utterance | logged | now | loc | 1st seen |`, `|--:|--:|--:|---|---|---|---|---|`, ...arr.slice(0, top).map(rowSeen)].join('\n') + (arr.length > top ? `\n_(+${arr.length - top} more)_` : '');
 
   let s = `\n# ${NAME} — usage triage\n`;
-  s += `window: ${days > 0 ? `last ${days}d` : 'all time'}${release ? ` · rel~"${release}"` : ''} · submits ${total} · sessions ${sessions} · visitors ${visitors}\n`;
+  // #439: the ACTUAL span, not «all time» — see the note in `load()`.
+  const windowText = span
+    ? `${span.from} … ${span.to}${days > 0 ? ` (--days ${days})` : ' — server retention, NOT all time'}`
+    : 'no events';
+  s += `window: ${windowText}${release ? ` · rel~"${release}"` : ''} · submits ${total} · sessions ${sessions} · visitors ${visitors}\n`;
   s += `buckets: ` + Object.entries(counts).sort((x, y) => y[1] - x[1]).map(([b, n]) => `${b} ${n} (${((100 * n) / total || 0).toFixed(0)}%)`).join(' · ') + '\n';
   s += `verify: session-context replay of the App submit path (ADR-346)${noVerify ? ' — SKIPPED (--no-verify)' : ` · ${replayed} sessions replayed, ${cached} from cache @ ${headRev}${reverify ? ' (--reverify: full sweep)' : cached ? ' (--reverify for a full sweep)' : ''}`}\n`;
   s += prevRun ? `previous triage: ${prevRun.slice(0, 10)} — counts below are ALL-TIME; the worklist splits new vs carried-over\n` : `previous triage: none (first run — every row is new)\n`;

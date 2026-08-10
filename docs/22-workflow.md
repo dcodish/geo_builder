@@ -55,6 +55,38 @@ Fixing happens in **dedicated fix sessions**: the operator opens one and picks i
 
 **Exceptions:** (a) the operator explicitly says to fix/build it *now* in this session; (b) a **P1 prod-down / honesty emergency** — drop-everything still applies, but say so before starting.
 
+## 2c. The OPEN-ISSUES REPORT (#48, operator-approved 2026-07-11)
+
+**Trigger.** The operator asks what is open / what is next / how to plan a building session. The answer is
+this report, not a `gh issue list` dump — the queue is 60+ items, and an unordered dump moves the ranking
+work onto the operator every time.
+
+**Content.** All open issues, grouped by product label (`2d` / `3d` / `server` / workspace), one row each:
+
+> `#NN · type · priority · one-line summary · complexity (S/M/L) · value note · blocked-on`
+
+Complexity comes from the **issue's own fix plan** (S = a mechanism already exists and the fix is local;
+M = a new mechanism or a cross-file change; L = a program of work, or a ruling is needed first). `blocked-on`
+carries `needs-operator` and any dependency on another issue.
+
+**Recommendation.** A proposed implementation ORDER with the rationale, sorted by:
+
+1. **P1 first** — this band should be empty; a P1 preempts everything and is announced before work starts.
+2. **Dependency order** — an issue whose fix plan builds on another's lands after it.
+3. **Value per complexity** within a priority band — an S that closes a class beats an L that closes one input.
+4. **Batchability** — issues sharing a root cause are proposed as ONE batch with a single gate run. Most of
+   the P3 queue only ever pays for itself this way; that is why it accumulates otherwise.
+
+State explicitly when two orderings are defensible and why one was picked.
+
+**Honesty rule.** The report reflects the issues **as filed**. An issue missing its fix plan (a triage-first
+violation, §2b) is FLAGGED as such rather than improvised into a plan inline — a plan invented at report time
+has had none of the diagnosis the queue is supposed to carry.
+
+**Route awareness.** The report says which rows can land directly on `main` (bug/debt) and which need a PR
+plus the operator's play-and-approve (feature, §4). That distinction, not the priority, is usually what
+decides how much can be closed in one session.
+
 ## 3. The bug route (operator reports something broken)
 
 Steps 1–3 run in the reporting session; steps 4–6 run **only in a dedicated fix session or on an explicit "fix now"** (§2b).
