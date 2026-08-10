@@ -6666,3 +6666,89 @@ link, the rendered timeline with commands + actions, `?sid=` pinning + the hones
 the recent-activity session links, `formatCommands` over both products' shapes + an unparseable one, the
 3-D profile's own classification, and a session spanning midnight stating its end DATE. 52 admin tests /
 100 server tests green.
+---
+
+## ADR-435 — the leftover gate fails CLOSED: an unknown word is content, not filler
+
+**Status:** accepted, 2026-08-10 · **Issue:** [#497](https://github.com/dcodish/geo_builder/issues/497)
+(P1, operator report) · **Sibling:** [#498](https://github.com/dcodish/geo_builder/issues/498) (3-D, filed) ·
+**Applies to:** every shape-rule honesty gate in `parse.ts`; `labelRun`; `REQUEST_WORDS`; `normalizeUtterance`
+
+**Operator.** Typed «טרפז ישר זוות» (misspelling of «זווית»); the app committed the row with a green ✓ and
+drew a **generic** trapezoid — DOF chip 3, no right angle anywhere. The stated property vanished silently.
+
+**The class (docs/17 §1).** *A word the parser does not recognize, surviving after a rule consumed its own
+vocabulary and labels, is treated as ignorable filler instead of unconsumed content — so any unknown or
+misspelled modifier silently drops and the rule half-parses.* `SHAPE_LEFTOVER` (the ADR-024 leftover
+mechanism all shape rules share) was a **denylist of correctly-spelled geometry words**: it necessarily
+fails open on a word it has never met, and a typo of a significant word is by definition such a word. This
+is the docs/23 **G1** pattern — an enumerating honesty gate grows one token at a time, and every
+unenumerated token is a silent drop (#27, #437, #2, #456). Members verified before the fix: «טרפז ישר
+זוות», «טרפז שוה שוקים», «משולש שווה צלוות», "isoceles trapezoid", «טרפז ABCD יפה מאוד», «טרפז ABCD 5»,
+«טרפז abcde» — every one committed the bare shape with ✓. Regression provenance: the labelless case had
+worked in prod — it fell to `not-handled` → the LLM (which reads typos) until `e7e3960` (2026-06-26)
+auto-named bare shapes through the same fail-open gate; the labelled hole predates it.
+
+**Decision — `shapeLeftover`, the fail-closed half.** The denylist stays for its curated catches (the
+relation symbols, the «כל» quantifier) and a closure joins it: after a rule consumed its own vocabulary and
+its labels, **every surviving token must be positively harmless** — En filler (`FILLER`), a request verb
+(`REQUEST_WORDS`), a neutral connective / post-pass adjective (`NEUTRAL_HE_WORDS` / `NEUTRAL_EN_WORDS` in
+`lexicon.ts` — the convexity words are consumed by `withStatedConvexity` *after* the rules, so the gate
+must pass them), or a prosthetic-prefix remnant («הטרפז» → «ה»). A digit run is a stated magnitude; a
+surviving Latin token is an unclaimed label or an unknown word; an unknown Hebrew word is a statement we
+did not read. All escalate. The asymmetry that decides the design: **growing the neutral allowlist costs
+an unneeded LLM escalation; growing the denylist's gaps cost a wrong figure under a green ✓.** Routed
+through every shape honesty gate (`shapeMacro`, the inscribe/regular-polygon/semicircle/quarter/sector
+'stop' sites). Deliberately NOT routed through the deferral predicates (`sizeStatementLeftover`, the
+circle-through guard): they ask "does another RULE own this?" — a question about known vocabulary — and
+fail-closed there would refuse deixis their own callers resolve («רדיוס המעגל הגדול»).
+
+**The one observed misspelling folds.** «זוות» → «זווית» at the ADR-405 chokepoint (guarded like «שוה»),
+so the whole ישר-זווית family reads the operator's keystroke deterministically. Unobserved variants
+(«זויית», «זות»…) are **not** enumerated — they escalate honestly; folds are added on prod-log evidence
+only. (The two-layer answer to "should we handle all typos?": the gate makes them *honest*, the LLM makes
+them *work*, a fold makes a frequent one *fast*.)
+
+**What the closure flushed out (each a latent bug the denylist had hidden):**
+1. **`labelRun` read lowercase words as label runs** — "draw a square ABCD" built square **D,R,A,W**,
+   "let triangle ABC" the triangle **L,E,T**, silently, on prod. Labels are UPPERCASE by convention
+   (`namesVertices`); `labelRun` now prefers an uppercase run and falls back to case-insensitive only when
+   none exists («ריבוע abcd» still works).
+2. **`quadShape`/`triShape` gated BEFORE label extraction** — unfixable under fail-closed (a lowercase run
+   is indistinguishable from an unknown word until claimed), and the pre-label order was why (1) survived.
+   Both are now thin delegates of `shapeMacro` (the ADR-428 route), so all shapes share ONE post-label gate.
+3. **Contiguous claimed runs survived per-id removal** at the semicircle/quarter/sector gates (`\bA\b`
+   cannot reach inside «AOB») — invisible to a words-only denylist, fatal under fail-closed. One shared
+   `removeClaimed` (joined run, then ids) now serves every gate.
+4. **`REQUEST_WORDS` had the final-nun trap** (the lexicon's recorded ADR-3D-035 kaf class): «נתון» ends
+   in ן, so it never matched inside «נתונה»/«נתונות»; «נתונים» was a hand-listed symptom of the same hole.
+   Now `נתו[נן](?:ים|ה|ות)?`. The denylist itself has the same trap («אלכסון» never saw «אלכסונים» — the
+   very hole that made #456 necessary); the fail-closed half catches all inflections without fixing each.
+5. **`dropCircleRef` orphaned rule nouns** — «רבע מעגל C» lost «מעגל C» first, leaving a bare «רבע» no
+   compound alternative could match; bare «רבע»/«חצי»/half/quarter joined those rules' strips.
+6. **A consumed numeric radius flagged as leftover** — `stripConsumedNumber` removes digits only when
+   `parseRadius` actually read a number; an unconsumed numeral keeps flagging.
+
+**Shadow matrix as proof.** Regenerating the A1/PAR-11 matrix removed **six** divergent shadow pairs and
+added **none** — the deleted pairs were exactly the "plain shape rule half-claims a modified shape" ghosts
+(`rightTriangle → (anon)` etc.). `shadow-allowlist.json` shrank accordingly (reviewed, removals only).
+
+**Relation to S3.1 (docs/24).** Span accounting remains the total mechanism and its enforcement flip an
+operator decision. This gate narrows the same G1 hole at the shape chokepoint *now*, and catches one case
+token-level accounting cannot (a known-stem word unclaimed by any command — «שוקים» matches stem «שוק»).
+They compose; neither substitutes the other.
+
+**Sibling audit (ADR-W-004).** Class **present** in `src3d/parser/parse3.ts` — same enumerating guards;
+verified: «משולש ישר זוות ABC» → bare `solid`, right angle dropped. Filed as
+[#498](https://github.com/dcodish/geo_builder/issues/498) with the port pattern; not fixed here (different
+product, different lane).
+
+**Perf.** The predicate is O(tokens) regex work per rule gate, no `replay`/`evaluate` involvement — not
+measurable against a solve.
+
+**Tests.** `issue-497.test.ts` (fold + exact keystrokes + the escalation family + the predicate + the
+uppercase-run preference); parser-coverage PARSES/ESCALATES rows (both locales); fixture
+`issue-497-right-trapezoid-typo.geo.json` (the operator's exact utterance through the real load path —
+replay green, verifier clean, parser-drift net); retargeted adr-250/#437/#456 tests now assert the
+*stronger* property (escalation at parse, with each gate's own math kept as the LLM-commit net);
+shadow-matrix snapshots + allowlist regenerated.

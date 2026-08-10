@@ -1,0 +1,39 @@
+{
+  "app": "geo-builder",
+  "schemaVersion": 1,
+  "locale": "he",
+  "savedAt": "2026-08-10T00:00:00.000Z",
+  "name": "issue-497-right-trapezoid-typo",
+  "seed": 0,
+  "radiusOverrides": {},
+  "facts": [
+    {
+      "id": "g0.0",
+      "utterance": "טרפז ישר זוות",
+      "group": "g0",
+      "cmd": {
+        "type": "trapezoid",
+        "ids": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "g0.1",
+      "utterance": "טרפז ישר זוות",
+      "group": "g0",
+      "cmd": {
+        "type": "set-perpendicular",
+        "a": "A",
+        "b": "D",
+        "c": "A",
+        "d": "B"
+      },
+      "enabled": true
+    }
+  ]
+}

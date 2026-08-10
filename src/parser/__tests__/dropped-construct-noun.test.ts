@@ -38,10 +38,12 @@ function gate(utterances: string[]): { ok: boolean; dropped: string[] } {
 }
 
 describe('#456 — a stated construct that no command produced is refused, not committed', () => {
-  it('the audit case: «מלבן ABCD עם אלכסונים» no longer commits a bare rectangle with a green ✓', () => {
-    const r = gate(['מלבן ABCD עם אלכסונים']);
-    expect(r.ok).toBe(true); // the rectangle rule still claims it…
-    expect(r.dropped).toEqual(['אלכסונים']); // …and the gate now names what vanished
+  it('the audit case: «מלבן ABCD עם אלכסונים» now escalates at the PARSE (#497) — never a bare rectangle', () => {
+    // The rectangle rule's denylist spelled «אלכסון» with a FINAL nun, so it could never see the
+    // plural «אלכסונים» (the lexicon's ADR-3D-035 trap) — which is exactly why this utterance used to
+    // half-parse and #456 needed the noun gate. The #497 fail-closed gate flags the plural as an
+    // unknown word and the whole line escalates; the noun gate stays the LLM-commit path's net.
+    expect(gate(['מלבן ABCD עם אלכסונים']).ok).toBe(false);
   });
 
   it('names the student\'s WHOLE word, never the regex stem (the honesty invariant)', () => {

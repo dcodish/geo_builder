@@ -56,5 +56,17 @@ export const MEET_KW = String.raw`(?:נ?פגש${HE_SUFFIX}|פוגש${HE_SUFFIX}|
 /** Tangent (word forms): משיק/משיקים/tangent. */
 export const TANGENT_KW = String.raw`(?:משיק${HE_SUFFIX}|tangent)`;
 
+// ── Gate-neutral vocabulary (#497 — the fail-closed leftover gate) ───────────────────────────────
+/** Hebrew tokens a shape rule may legitimately leave unconsumed: bare connectives/copulas a construct
+ *  sentence wraps around its nouns, plus the convexity adjectives a POST-PASS (`withStatedConvexity`),
+ *  not the claiming rule, consumes («דלתון קמור»). Everything else that survives a rule's own
+ *  vocabulary + labels is CONTENT — unknown words included, which is the point: the gate fails
+ *  CLOSED. Growing this list costs an unnecessary LLM escalation; growing the old denylist's gaps
+ *  cost a WRONG figure under a green ✓. */
+export const NEUTRAL_HE_WORDS = String.raw`של|עם|גם|הוא|היא|זה|זו|כך|אז|אחר(?:ת|ים|ות)?|קמור(?:ה|ים|ות)?|קעור(?:ה|ים|ות)?`;
+/** The English twin — FILLER/REQUEST_WORDS (parse.ts) are stripped before the gate tokenizes, so only
+ *  the post-pass adjectives and the request/copula words those regexes lack belong here. */
+export const NEUTRAL_EN_WORDS = String.raw`convex|concave|sketch|construct|let|be|another|other|whose`;
+
 /** Compile an atom-composed fragment case-insensitively (the parser's convention). */
 export const rx = (fragment: string, flags = 'i'): RegExp => new RegExp(fragment, flags);
