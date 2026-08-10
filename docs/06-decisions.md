@@ -6752,3 +6752,52 @@ uppercase-run preference); parser-coverage PARSES/ESCALATES rows (both locales);
 replay green, verifier clean, parser-drift net); retargeted adr-250/#437/#456 tests now assert the
 *stronger* property (escalation at parse, with each gate's own math kept as the LLM-commit net);
 shadow-matrix snapshots + allowlist regenerated.
+
+## ADR-436 — The honesty battery gets a total false-positive net, and a mirror for what it ADDS (#140, #255, #462)
+
+Three P3s filed against the same battery, fixed together because they are three faces of one thing: the
+gates were only ever measured in the direction someone thought to measure them.
+
+**#140 — the net.** #138 was a P1 prod regression in which the ADR-292 verb gate blocked the aux-circle
+external tangent, a construction the grammar has always supported, and it shipped past 3478 tests. Running
+that gate over the supported catalog flags the four exact broken forms: **the regression was sitting in the
+enumerated vocabulary the whole time, and nothing looked.** Only `droppedGivenNumbers` had a catalog-wide
+guard (ADR-250); every other gate had per-case tests, which prove the cases someone thought of. The catalog
+IS the enumeration of constructs that legitimately carry a verb, a label, a relation, a number, a construct
+noun — so the property is exact and total: *every supported catalog example that parses must pass EVERY gate
+with an empty result.* A gate that flags one is not protecting honesty, it is refusing the tool's own
+documented input. The gate LIST is extracted from `submitPipeline.ts` (ADR-W-006), so gate #12 fails the day
+it is wired rather than the day someone remembers.
+
+**It found one on its first run**, which is the argument for it: «circle O and circle P are tangent
+internally at M» — a supported catalog form — was flagged by the word-relation gate, whose satisfied set
+listed `common-tangent` and `tangent` and missed `circles-tangent`, the mutual-position lowering that
+carries the stated kind in its own `external` field. The Hebrew twin escaped by accident («משיקים» is
+plural, which the presence test excludes), so this was English-only and invisible. Fixed by DERIVING the
+satisfied set from the type name (`/tangent/i`) instead of listing three of them.
+
+**#255 — the mirror.** `droppedNewLabels` returns `inputLabels.filter(…)`: it ranges only over labels
+extracted from the utterance and is structurally blind to labels the lowering ADDS. The family nonetheless
+claims "the figure says exactly what the student said", and that was half true. Session `i1mt2us8`: «AB חותך
+את CD» escalated, the LLM normalised it to «M חיתוך AB ו-CD» — inventing M — and the log records
+`dropped: []`. `introducedNewLabels` keys on the LLM's canonical LINES rather than its commands, and that
+choice is the design: the grammar legitimately mints labels while lowering (a foot, a midpoint, the
+ADR-263/270 family), so a command-side gate would need a list of every auto-naming construct — the
+enumeration trap, and the reason this gate did not already exist. A label the LLM WROTE, that the student
+never wrote and the figure does not have, is an invention; a label the grammar mints appears in no line at
+all. It refuses with its own message: naming a point is the student's to do.
+
+**#462 — the silence that forced a clause.** ADR-156 is right that re-inscribing must not mint a second
+circumcircle (the stacked O→P→Q defect), but it achieved that by emitting **nothing** for the object it
+reused, so «מרובע ABCD חסום במעגל» lowered to two idempotent shape re-declarations with no trace of the
+circle. Measured, that was the ONLY false flag in 1202 corpus steps, and it forced `droppedConstructNoun`'s
+restatement clause — which cost a real miss («מלבן ABCD» then «…עם אלכסונים» introduces no new point either).
+Both reuse paths now emit an idempotent REFERENCE to what they reused (`point-on-circle` on points already
+on that circle is case (a) of apply — a true no-op), the commands narrate the sentence as 3-D's M1 always
+has, and the clause is **deleted rather than maintained**. The ADR-156 scenario (no stacked centres, incircle
+distinct) still passes, which is the check that mattered.
+
+**Locked** in `gate-false-positives.test.ts` (the derived gate list + the whole-catalog net + a
+non-vacuity assertion), `introduced-labels.test.ts` (the reported session, the auto-label cases that must
+NEVER flag, multi-line decompositions), and `dropped-construct-noun.test.ts` (the reuse now narrates; the
+gate asks its own question directly).

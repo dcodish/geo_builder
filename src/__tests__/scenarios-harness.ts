@@ -37,7 +37,7 @@ import { expect } from 'vitest';
 import { parse, buildParseCtx, impliedCircleBinding, droppedConstructNoun } from '@/parser';
 import { replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, meetsRequirements, useGeoStore } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
-import { freeDofs, isGeoPoint } from '@/engine';
+import { freeDofs } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
 
 export type Step =
@@ -426,11 +426,9 @@ export function gateProps(sc: Scenario, facts: Fact[], c: { gateChecked: number 
   }
   for (const g of order) {
     const { utterance, cmds } = byGroup.get(g)!;
-    const prior = facts.slice(0, facts.findIndex((f) => key(f) === g));
-    const pts = replay(prior).construction.objects.filter(isGeoPoint).map((o) => o.id);
     c.gateChecked++;
     expect(
-      droppedConstructNoun(utterance, cmds, pts),
+      droppedConstructNoun(utterance, cmds),
       `[${sc.id}] droppedConstructNoun must not refuse a working step: «${utterance}»`,
     ).toEqual([]);
   }

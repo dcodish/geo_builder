@@ -15,7 +15,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildParseCtx, droppedConstructNoun, parse } from '@/parser';
 import { COMMAND_CATALOG } from '@/parser/catalog';
-import { isGeoPoint } from '@/engine';
 import type { AnyCommand } from '@/engine';
 import { replay } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
@@ -33,8 +32,7 @@ function gate(utterances: string[]): { ok: boolean; dropped: string[] } {
   const last = utterances[utterances.length - 1];
   const r = parse(last, buildParseCtx(fig.construction, fig.positions));
   if (!r.ok) return { ok: false, dropped: [] };
-  const pts = fig.construction.objects.filter(isGeoPoint).map((o) => o.id);
-  return { ok: true, dropped: droppedConstructNoun(last, r.commands, pts) };
+  return { ok: true, dropped: droppedConstructNoun(last, r.commands) };
 }
 
 describe('#456 — a stated construct that no command produced is refused, not committed', () => {
@@ -53,7 +51,7 @@ describe('#456 — a stated construct that no command produced is refused, not c
     // #456's own table — and a capability landing later must not silently retire this check).
     const bare = [{ type: 'rectangle', ids: ['A', 'B', 'C', 'D'] }] as unknown as AnyCommand[];
     for (const w of ['אלכסונים', 'אלכסון', 'גבהים', 'תיכונים', 'תיכון']) {
-      expect(droppedConstructNoun(`מלבן ABCD עם ${w}`, bare, []), w).toEqual([w]);
+      expect(droppedConstructNoun(`מלבן ABCD עם ${w}`, bare), w).toEqual([w]);
     }
   });
 
@@ -95,10 +93,39 @@ describe('#456 — the false-positive nets that chose the generic predicate', ()
         const r = parse(u, buildParseCtx(fig.construction, fig.positions));
         if (!r.ok) continue;
         checked++;
-        if (droppedConstructNoun(u, r.commands, []).length) flagged.push(u);
+        if (droppedConstructNoun(u, r.commands).length) flagged.push(u);
       }
     }
     expect(checked).toBeGreaterThan(250); // the corpus is real, not an empty loop
     expect(flagged).toEqual([]);
+  });
+});
+
+describe('#462 — the REUSE path narrates what it reused, so the gate needs no restatement clause', () => {
+  it('re-typing «מרובע ABCD חסום במעגל» references the existing circle instead of emitting nothing', () => {
+    const facts: Parameters<typeof replay>[0] = [];
+    const step = (u: string) => {
+      const fig = replay(facts);
+      const r = parse(u, buildParseCtx(fig.construction, fig.positions));
+      expect(r.ok, u).toBe(true);
+      if (!r.ok) return [];
+      for (const c of r.commands) facts.push({ id: `${facts.length}`, group: u, enabled: true, utterance: u, cmd: c });
+      return r.commands;
+    };
+    step('מרובע ABCD חסום במעגל');
+    const again = step('מרובע ABCD חסום במעגל');
+    // ADR-156's outcome is unchanged — no second circle is minted…
+    expect(again.some((c) => c.type === 'circumcircle' || c.type === 'circle')).toBe(false);
+    // …but the sentence's circle is no longer INVISIBLE in the lowering (the load-bearing silence that
+    // made a restatement indistinguishable from a genuine drop, and forced the gate's extra clause).
+    expect(again.filter((c) => c.type === 'point-on-circle').length).toBe(4);
+    expect(droppedConstructNoun('מרובע ABCD חסום במעגל', again)).toEqual([]);
+  });
+
+  it('the gate now asks its own question directly — a bare shape beside a construct noun is flagged', () => {
+    // With the restatement clause gone this holds regardless of whether the utterance introduces a NEW
+    // point, which is exactly the miss the clause bought («מלבן ABCD» then «…עם אלכסונים»).
+    const bare = [{ type: 'rectangle', ids: ['A', 'B', 'C', 'D'] }] as never;
+    expect(droppedConstructNoun('מלבן ABCD עם אלכסונים', bare)).toEqual(['אלכסונים']);
   });
 });

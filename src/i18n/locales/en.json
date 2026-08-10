@@ -65,6 +65,7 @@
     "unknownCircle": "There is no circle named {{center}}. More than one unnamed circle is drawn — name one first, e.g.: the centre of the right circle is {{center}}.",
     "partial": "Couldn't draw this part",
     "labelsDropped": "I only partly understood — I couldn't place {{labels}}. Rephrase the step (e.g. split it in two).",
+    "labelsInvented": "I wasn't sure which point you meant — building this needs a name for {{labels}}. Give it a name of your own (e.g. “the intersection point is M”) and try again.",
     "rename_no-source": "There's no point {{from}} to rename.",
     "rename_target-taken": "{{to}} is already a point — pick a free letter, or swap them (click the segment → Swap endpoints, or type \"swap {{from}} and {{to}}\").",
     "rename_same": "{{from}} and {{to}} are the same letter.",

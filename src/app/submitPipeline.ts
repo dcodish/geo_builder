@@ -27,6 +27,7 @@ import {
   droppedGivenVerbs,
   droppedMidsegment,
   droppedNewLabels,
+  introducedNewLabels,
   droppedRadiusSymbol,
   droppedRegionSubject,
   droppedWordRelations,
@@ -304,7 +305,7 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     // states a shape AND a construct on it, and the rule that recognised its own noun emitted only the
     // shape («מלבן ABCD עם אלכסונים» → a bare rectangle, ✓). Every gate above asks about labels, numbers,
     // relations, verbs, compounds, words and comparisons — none asks whether a stated OBJECT materialised.
-    const droppedConstruct = droppedConstructNoun(utterance, r.commands, pts);
+    const droppedConstruct = droppedConstructNoun(utterance, r.commands);
     if (dropped.length === 0 && droppedNums.length === 0 && droppedRels.length === 0 && droppedVerbs.length === 0 && droppedCompound.length === 0 && droppedWordRels.length === 0 && !droppedCmp && droppedConstruct.length === 0) {
       const st = store();
       // #41 (ADR-290): warm the candidate content's FOLD in the geometry WORKER first — the dry-run,
@@ -556,11 +557,29 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     // and the OBJECT gate (ADR-430, #456): a decomposition that states a shape and a construct on it but
     // emits only the bare shape must name what it lost. Bound to the commit EVENT on both paths, not to a
     // code path — the reported 3-D twins were GRAMMAR drops, where the LLM-seam gates never run at all.
-    ...droppedConstructNoun(utterance, llmCmds, llmFig.objects.filter(isGeoPoint).map((o) => o.id)),
+    ...droppedConstructNoun(utterance, llmCmds),
   ];
   if (stillDropped.length > 0) {
     logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `dropped-labels:${stillDropped.join(',')}`, commands: llmCmds });
     ui.setInputNote(t('input.labelsDropped', { labels: stillDropped.join(', ') }));
+    ui.setBusy(false);
+    return;
+  }
+  // The MIRROR gate (#255): every gate above asks what the decomposition LOST. None asked what it
+  // ADDED, so an LLM that invents a label — «AB חותך את CD» normalised to «M חיתוך AB ו-CD», session
+  // i1mt2us8 — put a node into the student's namespace with `dropped: []` and a green row. Read off the
+  // LLM's own canonical lines, so a label the GRAMMAR mints while lowering them (a foot, a midpoint,
+  // the ADR-263/270 auto-label family) is never mistaken for an invention. Refuse and keep the text:
+  // naming a point is the student's, and a silent commit is the one outcome that cannot be undone by
+  // reading the figure.
+  const invented = introducedNewLabels(
+    utterance,
+    out!.built.map((g) => g.step),
+    llmFig.objects.filter(isGeoPoint).map((o) => o.id),
+  );
+  if (invented.length > 0) {
+    logDebug({ kind: 'input', utterance, locale, source: 'llm', result: `invented-labels:${invented.join(',')}`, commands: llmCmds });
+    ui.setInputNote(t('input.labelsInvented', { labels: invented.join(', ') }));
     ui.setBusy(false);
     return;
   }

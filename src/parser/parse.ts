@@ -4101,7 +4101,17 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // no duplicate). Skipped when the student named a DIFFERENT circle than the one they're on. [ADR-156]
   const onCircle = circleContaining(ctx, ids, named);
   if (allExist && onCircle && (!named || up(named) === up(onCircle))) {
-    return basePlusShape(ids);
+    // #462: the reuse REFERENCES the circle it reused instead of emitting nothing for it. ADR-156 is
+    // right about the outcome it defends (no stacked duplicate centres O→P→Q), but it achieved that by
+    // making the lowering UNDER-REPORT the sentence — «מרובע ABCD חסום במעגל» lowered to two idempotent
+    // shape re-declarations with no trace of the circle at all — and every consumer of the commands then
+    // inherits the silence: it was the only false flag in 1202 corpus steps when `droppedConstructNoun`
+    // was measured, and it forced that gate's restatement clause, whose cost was a real missed drop
+    // («מלבן ABCD» then «מלבן ABCD עם אלכסונים»). A membership on a point ALREADY on that circle is
+    // exactly case (a) of apply's `point-on-circle` — "already on this circle ⇒ idempotent" — so this
+    // mints nothing, constrains nothing, and changes no figure. It only makes the commands say what the
+    // sentence said, which is what 3-D's M1 has always done.
+    return [...basePlusShape(ids), ...ids.map((id) => ({ type: 'point-on-circle', id, circle: circleId(up(onCircle)) }) as AnyCommand)];
   }
   if (isTri && allExist) {
     return [{ type: 'circumcircle', id: circ, center: up(center), a: ids[0], b: ids[1], c: ids[2] }, ...shapeCmds(ids)];
@@ -4748,7 +4758,13 @@ const incircle: Rule = (s, ctx) => {
   // polygon was already built — re-asserting it must not mint a duplicate incentre + circle (a fresh auto-named
   // O→P). Just re-assert the shape. [ADR-156]
   const lines = new Set(ctx.lines ?? []);
-  if (lines.has(bis0) && lines.has(bis1)) return [shapeCmd];
+  // #462: the SIBLING reuse path, and the same treatment — re-assert the shape AND reference the
+  // incircle that already exists, so the lowering narrates the whole sentence. The first edge's
+  // tangency foot is deterministic (`anonId('f', …)`) and already lies on that circle, so apply's
+  // `point-on-circle` case (a) makes this a true no-op. Both reuse paths had to move together: a gate
+  // that stops special-casing one of them would false-refuse the other.
+  if (lines.has(bis0) && lines.has(bis1))
+    return [shapeCmd, { type: 'point-on-circle', id: anonId('f', `${v[0]}${v[1]}`), circle: circleId(I) }];
   const cmds: AnyCommand[] = [
     shapeCmd,
     { type: 'bisector', id: bis0, vertex: v[0], p: a0p, q: a0q },
@@ -9183,11 +9199,7 @@ const CONSTRUCT_NOUNS =
  * refusal, and the principled fix is the other end: have the reuse path reference the object it reused
  * so the commands narrate the sentence, as 3-D's M1 already does.
  */
-export function droppedConstructNoun(
-  utterance: string,
-  commands: AnyCommand[],
-  existingPoints: Id[] = [],
-): string[] {
+export function droppedConstructNoun(utterance: string, commands: AnyCommand[]): string[] {
   const s = normalizeUtterance(utterance);
   const m = s.match(CONSTRUCT_NOUNS);
   if (!m) return [];
@@ -9195,11 +9207,13 @@ export function droppedConstructNoun(
     (c) => !BARE_SHAPE_TYPES.has(c.type) || Object.keys(c).some((k) => !BARE_SHAPE_KEYS.has(k)),
   );
   if (accounted) return [];
-  const have = new Set(existingPoints);
-  const assertsSomethingNew = commands.some((c) =>
-    ((c as { ids?: Id[] }).ids ?? []).some((id) => !have.has(id)),
-  );
-  if (!assertsSomethingNew) return [];
+  // #462 — the RESTATEMENT clause is GONE, and its removal is the point of that issue. It existed
+  // because ADR-156's reuse paths emitted a bare shape and nothing for the object they reused, making
+  // a restated «מרובע ABCD חסום במעגל» indistinguishable from a genuinely dropped circle; the clause
+  // ("an utterance introducing no NEW point has nothing to drop") bought that at the price of a real
+  // miss — «מלבן ABCD» then «מלבן ABCD עם אלכסונים» introduces no new point either, so the dropped
+  // diagonals went unflagged. Both reuse paths now emit an idempotent reference to what they reused,
+  // so the commands narrate the sentence and the gate can ask its own question directly.
   // Report the student's WHOLE word, never the regex's stem: the Hebrew alternatives match an inflection
   // point («אלכסו[ןנ]» stops mid-word on the plural «אלכסונים»), and an error naming «אלכסונ» would be
   // naming our own pattern rather than what they typed — the honesty invariant is the STATEMENT.
@@ -9442,6 +9456,43 @@ export function droppedNewLabels(utterance: string, commands: AnyCommand[], exis
 }
 
 /**
+ * #255 — the MIRROR of {@link droppedNewLabels}, and the half the gate family never had.
+ *
+ * Every gate above asks *"what did the student state that the commands lost?"* — `droppedNewLabels`
+ * literally returns `inputLabels.filter(…)`, so it ranges only over labels extracted FROM THE UTTERANCE
+ * and is structurally blind to labels the lowering ADDS. The family nonetheless claims to guarantee
+ * "the figure says exactly what the student said", and that claim was only ever half true.
+ *
+ * The evidence (session `i1mt2us8`, 2026-07-21): «AB חותך את CD» escalated, the LLM normalised it to
+ * «M חיתוך AB ו-CD» — inventing the point **M**, which the student never named — and the log records
+ * `dropped: []`. A labelled node entered the student's namespace with no gate tripped and no notice.
+ * ADR-383 closed the reported vector by giving the bare crossing statement a deterministic lane, but
+ * the hole is general: ANY escalated utterance can come back carrying extra labelled objects.
+ *
+ * WHY IT KEYS ON THE CANONICAL LINES, not on the commands. The grammar legitimately MINTS labels while
+ * lowering — a midpoint's auto-name, a perpendicular's foot, the ADR-263/270 auto-label family — and a
+ * gate reading the commands could not tell those from an invention, so it would have to re-enumerate
+ * every auto-naming construct (the enumeration-is-not-a-rule trap, and the reason this gate did not
+ * already exist). The LLM's own TEXT settles it without any such list: a label the LLM wrote into a
+ * canonical line, that the student never wrote and the figure does not already have, is an invention.
+ * A label the grammar mints while lowering that same line appears in no line at all.
+ *
+ * Scaffolding is exempt by construction: `~`-hidden and `@`-anonymous ids are minted at apply and are
+ * not uppercase label runs. Conservative on purpose — a missed invention is a missed warning, while a
+ * false flag would refuse a working decomposition.
+ */
+export function introducedNewLabels(utterance: string, canonicalLines: string[], existingPoints: Id[] = []): Id[] {
+  const labelsOf = (s: string): Set<string> => new Set(normalizeUtterance(s).match(/[A-Z]\d*/g) ?? []);
+  const stated = labelsOf(utterance);
+  const have = new Set(existingPoints.map((p) => p.toUpperCase()));
+  const out = new Set<Id>();
+  for (const line of canonicalLines) {
+    for (const L of labelsOf(line)) if (!stated.has(L) && !have.has(L)) out.add(L);
+  }
+  return [...out];
+}
+
+/**
  * Symbol-form RELATION givens (`AB=CD`, `AB⊥CD`, `AB∥CD` — exactly two labels each side) that the parsed
  * commands do NOT carry — the third honesty gate, sibling of `droppedNewLabels` (ADR-089) and
  * `droppedGivenNumbers` (ADR-250). The hole it closes (ADR-264): a stated equality between points that
@@ -9510,7 +9561,14 @@ export function droppedWordRelations(utterance: string, commands: AnyCommand[]):
   if (
     /חיצוני|מבחוץ|פנימי|מבפנים|אלכסוני|external|internal/i.test(s) &&
     /(?<![א-ת])ה?משיק(?!ים)(?![א-ת])|tangent(?!s)/i.test(s) &&
-    !commands.some((c) => c.type === 'common-tangent' || c.type === 'tangent')
+    // #140: the satisfied set is DERIVED from the type name, not enumerated. It listed
+    // `common-tangent` + `tangent` and missed `circles-tangent` — the mutual-position lowering, which
+    // carries the stated kind in its own `external` field — so the supported catalog form «circle O and
+    // circle P are tangent internally at M» was FALSE-BLOCKED and escalated to the LLM. (The Hebrew
+    // twin escaped only by accident: «משיקים» is plural, which the presence test excludes.) That is the
+    // #138 defect verbatim — a gate validated against some of the constructions carrying its word — and
+    // it is why the catalog-wide net in `gate-false-positives.test.ts` now runs over every gate.
+    !commands.some((c) => /tangent/i.test(c.type))
   )
     out.push('משיק');
   return out;
