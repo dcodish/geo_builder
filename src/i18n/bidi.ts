@@ -27,8 +27,15 @@ const HEBREW_LETTER = /[א-ת]/;
  * The characters that make a span worth isolating: labels, numbers, and the geometry glyphs. Deliberately
  * excludes bare punctuation and whitespace, which is what keeps a trailing `.` or a leading `:` OUTSIDE
  * the isolate — isolating those would move the sentence's own punctuation to the wrong end.
+ *
+ * #482 (reported against 3-D, fixed in both trees — copied pattern, docs/20 §12 rule 1): this class was
+ * hand-authored against a GUESSED alphabet and had drifted from the one the app itself offers. Twelve of
+ * the characters in `ui/symbols.ts` were absent — every Greek letter, `²`, `^`, `≅`, `~`, `<`, `_`. A
+ * missing character does not merely fail to START a run, it SPLITS one, because `first`/`last` below scan
+ * for CORE: `AB = x²` trimmed to `AB = x`, orphaning the `²`. `__tests__/bidi.test.ts` now asserts the
+ * palette is a SUBSET of this class, so adding a button without teaching bidi about it fails the suite.
  */
-const CORE = /[A-Za-z0-9|∠∡∢⊥∥△▲√⌢°]/;
+const CORE = /[A-Za-z0-9^_~<≅²³½¾·Α-ω|∠∡∢⊥∥△▲√⌢°]/;
 
 /**
  * Delimiters that HUG a run and belong inside the isolate with it — `(1, 2, -3)`, `("AB")`.
@@ -41,6 +48,14 @@ const CORE = /[A-Za-z0-9|∠∡∢⊥∥△▲√⌢°]/;
  */
 const OPEN = '([{"';
 const CLOSE = ')]}"';
+
+/**
+ * The run alphabet, exported for the drift lock only (`__tests__/bidi.test.ts`) — nothing at runtime
+ * should branch on these. The test asserts `ui/symbols.ts` ⊆ `RUN_CORE ∪ RUN_DELIMS`, which is what makes
+ * "someone added a palette button" a test failure rather than a rendering bug found in prod.
+ */
+export const RUN_CORE = CORE;
+export const RUN_DELIMS = OPEN + CLOSE;
 
 const LRI = '⁦'; // LEFT-TO-RIGHT ISOLATE
 const PDI = '⁩'; // POP DIRECTIONAL ISOLATE
@@ -80,6 +95,34 @@ export function bidiSegments(s: string, rtlParagraph = false): BidiSegment[] {
     if (first < 0) { push(gap, false); gap = ''; return; }
     let last = gap.length - 1;
     while (last > first && !CORE.test(gap[last])) last--;
+
+    /** How many of `ch` sit inside the currently-selected span. */
+    const countIn = (ch: string) => {
+      let n = 0;
+      for (let i = first; i <= last; i++) if (gap[i] === ch) n++;
+      return n;
+    };
+
+    // #482: a delimiter whose PARTNER is inside the span belongs to the run too. `√(2/3)` trims to
+    // `√(2/3` because a closer is not CORE, and the orphaned `)` is then a bidi NEUTRAL — it resolves to
+    // the RTL paragraph, MIRRORS to `(`, and lands at the wrong end of the line. The hug loop below
+    // cannot reach this: it only absorbs a pair wrapping the span END TO END, whereas here the opener
+    // sits in the middle of the run. Grow the span over any partner it is owed first.
+    // A quote is inert here (`"` is its own opener and closer, so the debt is always zero) — it stays the
+    // hug loop's business, where balance is what identifies the pair.
+    for (;;) {
+      let grew = false;
+      if (last + 1 < gap.length) {
+        const c = CLOSE.indexOf(gap[last + 1]);
+        if (c >= 0 && countIn(OPEN[c]) > countIn(CLOSE[c])) { last++; grew = true; }
+      }
+      if (first > 0) {
+        const o = OPEN.indexOf(gap[first - 1]);
+        if (o >= 0 && countIn(CLOSE[o]) > countIn(OPEN[o])) { first--; grew = true; }
+      }
+      if (!grew) break;
+    }
+
     // absorb balanced delimiters that hug the run, outermost last: `("AB")` takes the quotes, then the
     // parens. An unbalanced one (its partner is elsewhere in the sentence) is left where it is.
     for (;;) {

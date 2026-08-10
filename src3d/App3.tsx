@@ -13,6 +13,7 @@ import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
 import { isolateLtrRuns3 } from './i18n/bidi';
+import { SYMBOL_PALETTE_3 } from './ui/symbols3';
 import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from './parser/scope3';
@@ -388,30 +389,7 @@ export default function App3() {
           </form>
 
           <div className="flex flex-wrap gap-1" dir="ltr">
-            {(
-              [
-                // Greek letters for angle names (#272): 2-D has had these since ADR-039 — «∠SAB = α»
-                // is unusable when the letter can't be typed.
-                ['α', 'α', 0],
-                ['β', 'β', 0],
-                ['γ', 'γ', 0],
-                ['δ', 'δ', 0],
-                ['θ', 'θ', 0],
-                ['<', '<', 0], // a bound / ordering between measures
-                ['⃗', '⃗', 0],
-                ['|·|', '||', 1],
-                ['√', '√', 0],
-                ['½', '½', 0],
-                ['¾', '¾', 0],
-                ['·', '·', 0],
-                ['⊥', '⊥', 0],
-                ['∠', '∠', 0],
-                ['°', '°', 0],
-                ['′', '′', 0],
-                ['ℓ', 'ℓ', 0],
-                ['π', 'π', 0],
-              ] as [string, string, number][]
-            ).map(([label, sym, back]) => (
+            {SYMBOL_PALETTE_3.map(([label, sym, back]) => (
               <button
                 key={label}
                 type="button"

@@ -26,8 +26,20 @@ const HEBREW_LETTER = /[א-ת]/;
  *
  * `'` is included on top of the 2-D set: 3-D labels are primed (`A'`, `B'C'`), and a run ending in a prime
  * must keep it inside the isolate.
+ *
+ * #482: this class was hand-authored against a GUESSED alphabet and drifted from the one the tool itself
+ * offers — 13 of the 18 characters in `ui/symbols3.ts` were missing, including every Greek letter and `ℓ`,
+ * which are how planes and lines are NAMED here. A missing character does not merely fail to start a run:
+ * it SPLITS one, because `first`/`last` below scan for CORE, so `מישור π1: …` isolated from the `1` and
+ * left the `π` outside as its own stray LTR run. The additions are exactly the palette's own vocabulary
+ * (Greek letters, `ℓ`, `′`, `·`, `½`, `¾`, `<`, the combining vector arrow) plus the superscripts that end
+ * a measure (`x²`), and `__tests__/bidi3.test.ts` now asserts the palette is a SUBSET of this class, so the
+ * two cannot drift apart again.
  */
-const CORE = /[A-Za-z0-9'|∠∡∢⊥∥△▲√⌢°]/;
+// The combining vector arrow is written as `⃗`, never literally: typed as itself it would combine
+// with the preceding character in THIS source file, making the class unreadable and easy to break by
+// accident. `Α-ω` is the Greek letter span (Α…ω) — π, α, β, γ, δ, θ all live in it.
+const CORE = /[A-Za-z0-9'′·<½¾²³ℓ\u20D7Α-ω|∠∡∢⊥∥△▲√⌢°]/;
 
 /**
  * Delimiters that HUG a run and belong inside the isolate with it — `(1, 2, -3)` is the 3-D case that
@@ -40,6 +52,14 @@ const CORE = /[A-Za-z0-9'|∠∡∢⊥∥△▲√⌢°]/;
  */
 const OPEN = '([{"';
 const CLOSE = ')]}"';
+
+/**
+ * The run alphabet, exported for the drift lock only (`__tests__/bidi3.test.ts`) — nothing at runtime
+ * should branch on these. The test asserts `ui/symbols3.ts` ⊆ `RUN_CORE ∪ RUN_DELIMS`, which is what
+ * makes "someone added a palette button" a test failure rather than a rendering bug found in prod.
+ */
+export const RUN_CORE = CORE;
+export const RUN_DELIMS = OPEN + CLOSE;
 
 const LRI = '⁦'; // LEFT-TO-RIGHT ISOLATE
 const PDI = '⁩'; // POP DIRECTIONAL ISOLATE
@@ -59,6 +79,35 @@ export function isolateLtrRuns3(s: string): string {
     if (first < 0) { out += gap; gap = ''; return; }
     let last = gap.length - 1;
     while (last > first && !CORE.test(gap[last])) last--;
+
+    /** How many of `ch` sit inside the currently-selected span. */
+    const countIn = (ch: string) => {
+      let n = 0;
+      for (let i = first; i <= last; i++) if (gap[i] === ch) n++;
+      return n;
+    };
+
+    // #482, and the defect the HUG loop below could never reach: a delimiter whose PARTNER is inside the
+    // span belongs to the run too. `t(m+2,m,m-2)` trims to `t(m+2,m,m-2` because a closer is not CORE,
+    // and the orphaned `)` is then a bidi NEUTRAL — it resolves to the RTL paragraph, MIRRORS to `(`, and
+    // lands at the far left of the row. That is the stray paren the operator screenshotted. The hug loop
+    // cannot fix it: it only absorbs a pair wrapping the span END TO END, and here the opener sits in the
+    // middle of the run (after `t`), not before it. Grow the span over any partner it is owed instead.
+    // A quote is deliberately inert here (`"` is its own opener and closer, so the debt is always zero) —
+    // it stays the hug loop's business, where balance is what identifies the pair.
+    for (;;) {
+      let grew = false;
+      if (last + 1 < gap.length) {
+        const c = CLOSE.indexOf(gap[last + 1]);
+        if (c >= 0 && countIn(OPEN[c]) > countIn(CLOSE[c])) { last++; grew = true; }
+      }
+      if (first > 0) {
+        const o = OPEN.indexOf(gap[first - 1]);
+        if (o >= 0 && countIn(CLOSE[o]) > countIn(OPEN[o])) { first--; grew = true; }
+      }
+      if (!grew) break;
+    }
+
     // absorb balanced delimiters that hug the run, outermost last: `("AB")` takes the quotes, then the
     // parens. An unbalanced one (its partner is elsewhere in the sentence) is left where it is.
     for (;;) {

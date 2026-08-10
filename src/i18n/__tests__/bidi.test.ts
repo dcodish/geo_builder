@@ -15,7 +15,8 @@
  * any message. A sweeping transform that can corrupt one string in 300 is worse than the bug it fixes.
  */
 import { describe, expect, it } from 'vitest';
-import { isolateLtrRuns } from '../bidi';
+import { isolateLtrRuns, RUN_CORE, RUN_DELIMS } from '../bidi';
+import { GREEK, SYMBOLS } from '@/ui/symbols';
 import he from '../locales/he.json';
 import en from '../locales/en.json';
 
@@ -98,5 +99,78 @@ describe('#464 — the shape of a run', () => {
     ['an unbalanced bracket is left alone', 'הצורה (ראו ABC) כאן', `הצורה (ראו ${LRI}ABC${PDI}) כאן`],
   ])('%s', (_label, input, expected) => {
     expect(isolateLtrRuns(input)).toBe(expected);
+  });
+});
+
+/**
+ * #482 — reported against 3-D, fixed in both trees (copied pattern, docs/20 §12 rule 1).
+ *
+ * Two defects, one root: the run BOUNDARY rule and the run ALPHABET. The boundary trimmed to the last
+ * CORE character, so a run ending in a closer — `√(2/3)`, a coordinate pair, `S_{ABC}` — orphaned that
+ * closer outside the isolate, where it is a neutral: it takes the RTL paragraph direction, MIRRORS, and
+ * lands at the wrong end of the line. The alphabet had drifted from `ui/symbols.ts`, so twelve characters
+ * the app OFFERS were unknown to bidi and SPLIT any run they appeared in.
+ *
+ * The lesson from round 1 in the 3-D tree: asserting an isolate EXISTS passes on a broken transform. The
+ * property is that it COVERS the run.
+ */
+describe('#482 — the isolate must COVER the run, and the alphabet must not drift', () => {
+  /** Every character of `s` that ends up outside an isolate. */
+  const outside = (s: string): string => {
+    let depth = 0;
+    let out = '';
+    for (const ch of isolateLtrRuns(s)) {
+      if (ch === LRI) depth++;
+      else if (ch === PDI) depth--;
+      else if (depth === 0) out += ch;
+    }
+    return out;
+  };
+
+  const CORPUS = [
+    'הצלע AD = √(2/3) במשולש',
+    'השטח S_{ABC} = 13 והשאר',
+    'הקשת ⌢{AC} שווה לקשת ⌢{BE}',
+    'הזווית α קטנה מ-β',
+    'הצלע AB = x² והשנייה ½',
+    'המשולש ABC ≅ DEF כאן',
+    'הצורה ABC ~ DEF דומה',
+    'הנקודה (1, 2) במישור',
+    'וכאן |BC| = 10 בסוף',
+  ];
+
+  it.each(CORPUS)('no technical character is orphaned outside the isolate: %s', (s) => {
+    const orphans = [...outside(s)].filter((c) => RUN_CORE.test(c));
+    expect(orphans, `left for the RTL paragraph to reorder: ${JSON.stringify(orphans)}`).toEqual([]);
+  });
+
+  it.each(CORPUS)('no delimiter is separated from its partner: %s', (s) => {
+    const out = outside(s);
+    for (const [open, close] of [['(', ')'], ['[', ']'], ['{', '}']]) {
+      const opens = [...out].filter((c) => c === open).length;
+      const closes = [...out].filter((c) => c === close).length;
+      expect(opens, `an unmatched ${open} escaped the isolate in "${s}"`).toBe(closes);
+    }
+  });
+
+  it('a run ending in a closer keeps it: √(2/3)', () => {
+    expect(isolateLtrRuns('הצלע AD = √(2/3) במשולש')).toBe(`הצלע ${LRI}AD = √(2/3)${PDI} במשולש`);
+  });
+
+  it('the sentence’s OWN punctuation still stays outside — not traded away for the fix', () => {
+    expect(isolateLtrRuns('וכאן AB = 9.')).toBe(`וכאן ${LRI}AB = 9${PDI}.`);
+    expect(isolateLtrRuns('הצורה (ראו ABC) כאן')).toBe(`הצורה (ראו ${LRI}ABC${PDI}) כאן`);
+  });
+
+  it('every character the symbol palette inserts is CORE or a run delimiter', () => {
+    const holes = new Set<string>();
+    for (const ins of [...GREEK, ...SYMBOLS.map((s) => s.insert)]) {
+      for (const ch of ins) if (!RUN_CORE.test(ch) && !RUN_DELIMS.includes(ch)) holes.add(ch);
+    }
+    expect(
+      [...holes],
+      'a palette button offers a character bidi does not know is technical — it will SPLIT the run it ' +
+        'appears in. Add it to CORE in i18n/bidi.ts rather than deleting it here.',
+    ).toEqual([]);
   });
 });

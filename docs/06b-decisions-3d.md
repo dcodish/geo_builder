@@ -2383,3 +2383,50 @@ even though the line does cross the plane at the sampled value** (the gate, stat
 ∥ figure offers nothing; the synthesized sentence parses in He and En, lands the point where the dot was,
 and retires the offer; naming the same point through the verb frame retires it too; and a figure with no
 algebraic objects offers nothing.
+
+## ADR-3D-123 — a bidi run is bounded by its DELIMITERS and spelled in the tool's OWN alphabet
+
+**Context.** [ADR-3D-121](#adr-3d-121) (#482) extended the bidi isolation to the student's own utterance.
+The operator re-tested it the next morning and the fact row was still wrong: «ישר l - x=(1,2,3)+t(m+2,m,m-2)»
+rendered with a stray `(` at the far left, and «מישור π1: …» split the plane's name from its digit. The
+suite was green throughout.
+
+**Two defects, one root — the run's definition was wrong in both directions.**
+
+*The boundary.* `flush()` selected the run by trimming to the first and last **CORE** character. A closing
+delimiter is not CORE, so any run ENDING in one — every parametric line, every trailing coordinate triple —
+left that closer outside the isolate. Outside, a lone bracket is a bidi **neutral**: it resolves to the
+paragraph direction, is **mirrored**, and is laid out at the far end of the row. The `)` closing `t(…)`
+became a `(` at the left margin. The existing absorption loop could never reach it — it only takes a
+balanced pair wrapping the span *end to end*, whereas here the opener sits in the middle of the run.
+The rule is now: **grow the span over any delimiter whose partner is unmatched inside it**, then hug.
+
+*The alphabet.* `CORE` was hand-authored against a guessed character set while the symbol palette grew
+independently inside the JSX, with nothing connecting them. **13 of the 18 characters the tool OFFERS were
+absent** — every Greek letter, `ℓ`, `′`, `·`, `½`, `¾`, `<`, the vector arrow. A missing character does not
+merely fail to start a run, it **splits** one, because the scan looks for CORE: `π` fell outside and `1: x+…`
+began the isolate. π and ℓ are how planes and lines are *named* here, so the gap sat on the tree's most
+common utterances. The 2-D mirror had the same hole for twelve characters (`α…θ`, `²`, `^`, `≅`, `~`, `<`, `_`).
+
+**Why the green suite shipped it.** The ADR-3D-121 assertions were `toContain(LRI)`, byte-reversibility,
+idempotence, and one-isolate-not-one-per-token. **Every one of them is true of a broken transform.** None
+said the isolate *covers* the run — the only property visible on screen. The lesson generalises past bidi:
+an existence assertion over a transform is nearly free of content; assert the invariant the user sees.
+
+**The mechanism, not the two characters.** Adding π would have been the patch. The palette moved out of the
+JSX into `ui/symbols3.ts` / `ui/symbols.ts` so the vocabulary is a declared, importable thing, and the suites
+now assert **palette ⊆ CORE ∪ delimiters**. Adding a button without teaching bidi about it is a test failure,
+which is the only version of this fix that survives the next author. `RUN_CORE`/`RUN_DELIMS` are exported
+for that test alone; nothing branches on them at runtime.
+
+**Both trees, copied not shared** (docs/20 §12 rule 1). 2-D's `bidiSegments` is also the `.docx` export's
+run-splitter ([ADR-431](06-decisions.md#adr-431) Am. 1), so the boundary correction lands in Word output too.
+
+**Half (b) of #482 is still open and still needs an operator ruling** — the input box cannot take isolate
+characters without corrupting the caret, and forcing `dir="ltr"` is what 2-D tried and reverted (#118). The
+recommendation remains a read-only isolated preview under the input, the 2-D live-math-preview pattern.
+
+**Locked** in `bidi3.test.ts` and `i18n/__tests__/bidi.test.ts`: over a corpus of real utterances, **no CORE
+character and no half of a delimiter pair may sit outside an isolate**; the operator's exact line ends at the
+paren; `π1` is one run; the sentence's own punctuation still stays outside (the property the fix must not
+trade away); and the palette-subset drift lock in both trees.

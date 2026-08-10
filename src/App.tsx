@@ -26,6 +26,7 @@ import { bookUrl } from '@/shapes/shapeCatalog';
 import { detectTheorems, detectPrinciples, activeBoosts, visibleFeed, PRINCIPLES_VISIBLE } from '@/theorems';
 import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
+import { GREEK, SYMBOLS } from '@/ui/symbols';
 import { btn, card as themeCard, color as pal, foldToggle, fs, pill, sectionTitle } from '@/ui/theme';
 import { groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
@@ -244,25 +245,8 @@ export default function App() {
       }
     });
   }
-  const GREEK = ['α', 'β', 'γ', 'δ', 'θ'];
-  // Math symbols. `label` is shown on the button; `insert` is what lands in the box
-  // (x²/xⁿ show their meaning but insert just the operator so the caret sits after it).
-  const SYMBOLS: { label: string; insert: string; caret?: number }[] = [
-    { label: '√()', insert: '√()', caret: 2 }, // AD = √(2/3) — inserts the EXPLICIT radicand group, caret between the parens (#77 Am.: √() disambiguates √(2/3) from √2/3)
-    { label: 'x²', insert: '²' }, // AB = x²
-    { label: 'xⁿ', insert: '^' }, // AB = x^3
-    { label: 'π', insert: 'π' }, // AB = 2π
-    { label: '∠', insert: '∠' }, // ∠ABC = 37°
-    { label: '⌢{}', insert: '⌢{}', caret: 2 }, // arc template (issue #155, the √()/S_{} discipline): ⌢{AC} + ⌢{BE} = … — caret lands between the braces; rendered as an over-arc by MathText (bare ⌢AC and קשת AC parse too)
-    { label: '°', insert: '°' },
-    { label: '⊥', insert: '⊥' }, // AB ⊥ CD
-    { label: '∥', insert: '∥' }, // AB ∥ CD
-    { label: '△', insert: '△' }, // △ABC (triangle) / △ABC ≅ △DEF
-    { label: '≅', insert: '≅' }, // ABC ≅ DEF (congruent)
-    { label: '~', insert: '~' }, // ABC ~ DEF (similar)
-    { label: '<', insert: '<' }, // α < β (order between two named measures)
-    { label: 'S_{}', insert: 'S_{}', caret: 3 }, // area: S_{ABC} = 13 — caret lands between the braces
-  ];
+  // The palette lives in `ui/symbols.ts` (#482): inline in the JSX it was invisible to everything but
+  // this render, which is how it drifted out of step with the bidi CORE class. A module can be asserted.
   const he = i18n.language === 'he';
   /** The locale `canonicalText` renders in — the same normalisation the submit pipeline uses (#450). */
   const canonLocale: 'he' | 'en' = i18n.language?.startsWith('he') ? 'he' : 'en';
