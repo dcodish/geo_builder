@@ -47,7 +47,8 @@ The layering `engine ← replay ← store` is mechanically enforced by
 
 - **[`docs/06-decisions.md`](docs/06-decisions.md)** (2-D, `ADR-NNN`) and **[`docs/06b-decisions-3d.md`](docs/06b-decisions-3d.md)** (3-D, `ADR-3D-NNN`) — the decision logs. The tail of each is the most recent work, and these are the records that are actually maintained. **An ADR is required for any significant decision.**
 - **`gh issue list`** — the live queue (labels: type + priority + product).
-- **[`docs/DEPLOY-LOG.md`](docs/DEPLOY-LOG.md)** — canonical deploy history, one entry per `prod/YYYY-MM-DD` tag.
+- **`gh pr list`** — work that is finished and pushed but **not merged**: an open PR is a feature awaiting the operator's play-and-approve, and nothing else records it. Pushed is not the finish line ([ADR-W-007](docs/06w-decisions-workspace.md)).
+- **[`docs/DEPLOY-LOG.md`](docs/DEPLOY-LOG.md)** — canonical deploy history, one entry per `prod/YYYY-MM-DD` tag. It records what WAS deployed, never what is awaiting deploy — for that, compare the newest `prod/*` tag against `main` (the session-start hook reports both).
 
 Older narrative logs (`docs/09-implementation-plan.md`, `docs/09b-status-log.md`, `docs/PROJECT-MEMORY.md`)
 carry useful background but **lag behind the ADR logs** — read them for context, never as current status.

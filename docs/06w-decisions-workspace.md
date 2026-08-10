@@ -69,9 +69,13 @@ at the moment it recurs.
 - **CLAUDE.md is an orientation file**: what exists, where it lives, what must never be done. It carries **no
   history and no status**. The prose is **deleted, not moved** — it is already in the ADR logs, and moving it
   into another session-loaded file (per the 09b precedent) just relocates the problem. Git history is the net.
-- **Current state is read from the live sources only**: the ADR-log tails, `gh issue list`, and
-  `docs/DEPLOY-LOG.md`. The older narrative logs (`09-implementation-plan.md`, `09b-status-log.md`,
-  `PROJECT-MEMORY.md`) are labelled as background that lags, never as current status.
+- **Current state is read from the live sources only**: the ADR-log tails, `gh issue list`,
+  **`gh pr list`** and `docs/DEPLOY-LOG.md`. The older narrative logs (`09-implementation-plan.md`,
+  `09b-status-log.md`, `PROJECT-MEMORY.md`) are labelled as background that lags, never as current status.
+  *(Amended 2026-08-10, [#488](https://github.com/dcodish/geo_builder/issues/488): `gh pr list` was missing
+  from this list, and `DEPLOY-LOG.md` records what WAS deployed, never what is awaiting deploy — so a cold
+  session following this list faithfully still could not see a finished feature sitting in an open PR. The
+  omission was not the trim's doing; the trim made it load-bearing by making this the one canonical list.)*
 - **The 3-D section moves to `src3d/CLAUDE.md`** — condensed to an orientation file for that tree, not
   relocated verbatim. It is picked up when a session works in `src3d/`, so 2-D sessions stop paying for 3-D
   history, and it matches the product-isolation doctrine already enforced mechanically.
@@ -240,6 +244,45 @@ existing honesty-gate check does this) so a stale list is loud rather than quiet
 **Not fixed here:** the two false verdicts already on the prod dashboard. They are corrected by the next
 triage run, which is operator-invoked (it fetches from prod and uploads) — flagged rather than done
 autonomously.
+
+## ADR-W-007 — PUSHED is not the finish line: session start reports merged-ness and deployed-ness
+
+**Status:** accepted, 2026-08-10 · **Issue:** [#488](https://github.com/dcodish/geo_builder/issues/488)
+
+**What happened.** PR #471 (the admin sessions view) was built, green and pushed on the work PC on
+2026-08-09, and never merged — the play-and-approve gate was still open when the day ended. The operator
+switched to the home PC, looked at the live admin pages, and found the feature missing. Nothing in the
+session-start report, in `CLAUDE.md`, or in any log said *a finished feature is sitting in an open PR*.
+
+**Root cause — the wrong predicate, applied consistently.** `scripts/session-sync.mjs` encodes one model:
+*git is the only channel, so anything not committed-and-pushed does not exist on the other machine.* Every
+check keys on it — uncommitted files, unpushed commits, dependency drift, stray auto-memory. PR #471 was
+committed **and** pushed, so by that model nothing was wrong and the script correctly said nothing. The
+model is true and **insufficient**: there are two further states where work is complete and still invisible,
+and both bit on the same day — *pushed but not merged* (on a branch, awaiting the operator), and *merged but
+not deployed* (the proxy had gone undeployed since `prod/2026-07-27-2`, two weeks of static-only deploys,
+with nothing ever saying so). Same shape as [ADR-352](06-decisions.md#adr-352) and
+[ADR-434](06-decisions.md#adr-434): the data was always available (`gh pr list`, `git log prod/…..main`) and
+no surface read it.
+
+**Decision.** `session-sync.mjs` **start** mode gains both checks — it already fires on exactly the failing
+event (session start / machine switch), already exists to report things needing a human decision, and
+already fails open. It now prints any open PR with its branch, and any commit on the trunk newer than the
+most recent `prod/*` tag, calling out how many touch `server/` (a proxy deploy is a rebuild + restart, not a
+static push). Both are best-effort by contract: a missing or unauthenticated `gh`, an offline box, or a repo
+with no prod tag prints nothing and exits 0 — **a hook must never wedge a session**, and `gh` gets a 10 s
+timeout because a hook that hangs is worse than one that reports nothing.
+
+**The documentation half, which is the durable part.** [ADR-W-002](#adr-w-002--claudemd-is-an-orientation-file-not-a-session-log)
+made one canonical list of live state sources, and that list had a hole: open PRs were not on it, and
+`DEPLOY-LOG.md` records what *was* deployed, never what is *awaiting* deploy. A cold session following
+`CLAUDE.md` faithfully still could not see #471. So: `gh pr list` joins the list in both `CLAUDE.md` and
+ADR-W-002, DEPLOY-LOG's entry says explicitly what it does not answer, and the `/handoff` skill gains a step
+naming open PRs and undeployed commits before it may declare a session handed off — it previously mentioned
+neither.
+
+**Acceptance.** A session started with an open PR and undeployed `main` commits prints both lines; a clean,
+merged, deployed tree prints neither. Verified on this machine: 2 undeployed commits reported, no open PRs.
 
 ## ADR-W-008 — A per-machine artifact may not feed a cross-machine decision
 
