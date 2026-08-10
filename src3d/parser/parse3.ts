@@ -1425,6 +1425,16 @@ const planeByEquation: Rule = (s) => {
   ];
 };
 
+/** #487 (ADR-3D-124): «מישור π2» / «נתון מישור π2» / «plane π2» — a FREE plane, declared before
+ *  anything about it is known. The NOUN is required (operator ruling 2: a bare «π2» line is too easy to
+ *  produce by accident and the query lane may want the token), and the utterance must END at the name —
+ *  a trailing equation belongs to `planeByEquation`, a trailing point-run to `planeThrough`. */
+const freePlaneDecl: Rule = (s) => {
+  const m = s.match(new RegExp(`^(?:נתון\\s+)?(?:${HE_PLANE}|(?:the\\s+)?plane)\\s+(${PLANE_NAME.source})$`));
+  if (!m) return null;
+  return [{ type: 'free-plane', name: canonicalPlane(m[1]) }];
+};
+
 const NUM = String.raw`-?\d+(?:\.\d+)?`;
 
 /** A tuple component: a number, or an AFFINE symbolic expression (#325, ADR-3D-079) —
@@ -3093,6 +3103,7 @@ export const RULES: Rule[] = [
   lateralAreaClaim,
   parametricLine, // before planeByEquation: both carry `:`, but ℓ ≠ π so either order is safe — kept explicit
   planeByEquation,
+  freePlaneDecl, // #487: AFTER planeByEquation — a name followed by an equation is never stolen (this rule demands END after the name)
   planeEqClaim, // plane named by POINTS + an equation — a claim, not a definition
   relPlaneRule, // `מישור π דרך F וניצב ל-SC` — before planeThroughBare (which is bare points)
   planeCut, // `המישור π חותך את SA בנקודה E` — before onSegment/coordPoint grab the tokens

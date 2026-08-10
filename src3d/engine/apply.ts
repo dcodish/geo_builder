@@ -6,6 +6,7 @@
 import { exprPointIds, exprVectorNames } from './vecExpr';
 import { isAbsolute, lineDirCarriesParam, planeNormalCarriesParam, sameOperand } from './operands';
 import { cross3, dot3, normalize3, v3 } from './vec3';
+import { FREE_PLANE_TOKEN, freePlaneDef } from './freePlane';
 import { isQuadPyramid, quadPyramidDimCount } from './baseShapes';
 import { pinSymsOf } from './types';
 import type { ApplyResult3, Claim3, Command3, Construction3, EngineError3, Id, LinExpr, Operand3, SolidCommand, SolidKind, SolidObj, SymComp, VecAtom } from './types';
@@ -360,6 +361,9 @@ function claimRefsError(c: Construction3, claim: Claim3): EngineError3 | null {
     case 'never-parallel':
       if (!c.lines.has(claim.line)) return { code: 'unknown-line', id: claim.line };
       if (!c.planes.has(claim.plane)) return { code: 'unknown-plane', id: claim.plane };
+      // #487: "∦ for EVERY parameter value" quantifies over an equation's parameter — a FREE plane has
+      // no equation to quantify over, and scanning its placeholder would answer about z=0 instead.
+      if (c.planes.get(claim.plane)!.free) return { code: 'plane-not-determined', id: claim.plane };
       return null;
     case 'plane-eq':
       return missingPoint(c, claim.ids);
@@ -1072,7 +1076,10 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'plane3': {
-      if (c.planes.has(cmd.name)) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
+      // #487 (M1, the plane3 edition): an equation stated for an already-FREE plane is not a clash —
+      // it is the given that PINS it. The free placeholder yields to the stated equation.
+      const existing = c.planes.get(cmd.name);
+      if (existing && !existing.free) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
       if (cmd.param && c.param && cmd.param !== c.param) return { ok: false, error: { code: 'two-params' } };
       const next = clone(c);
       next.planes.set(cmd.name, cmd.plane);
@@ -1080,9 +1087,27 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       return { ok: true, next };
     }
 
+    case 'free-plane': {
+      // #487 (ADR-3D-124): «מישור π2» — a named plane with NOTHING yet known about it. Idempotent when
+      // the free plane already exists (re-declaring is the deterministic-id convention); a clash with a
+      // DEFINED plane of any lane (or a line) is refused — the name is taken by an object that is not
+      // "free to be told about later".
+      if (c.planes.get(cmd.name)?.free) return { ok: true, next: c };
+      if (c.planes.has(cmd.name) || c.pointPlanes.has(cmd.name) || c.relPlanes.has(cmd.name) || c.lines.has(cmd.name))
+        return { ok: false, error: { code: 'already-defined', id: cmd.name } };
+      const next = clone(c);
+      next.planes.set(cmd.name, freePlaneDef(cmd.name));
+      return { ok: true, next };
+    }
+
     case 'plane-angle': {
       for (const p of [cmd.p1, cmd.p2]) {
         if (!c.planes.has(p)) return { ok: false, error: { code: 'unknown-plane', id: p } };
+        // #487 honest boundary: an angle given between planes drives the PARAMETER machinery, which
+        // reads equations — a FREE plane has none, and its placeholder would fabricate roots. Pinning a
+        // free plane's orientation to a stated dihedral angle is the follow-up on the issue, not silent
+        // wrongness here.
+        if (c.planes.get(p)!.free) return { ok: false, error: { code: 'plane-not-determined', id: p } };
       }
       const next = clone(c);
       next.planeAngles.push(cmd);
@@ -1090,13 +1115,21 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
     }
 
     case 'on-planes': {
-      if (cmd.plane !== 'any' && !c.planes.has(cmd.plane) && !c.pointPlanes.has(cmd.plane))
+      // #487 ruling 1 (ADR-3D-124): a membership naming an UNDECLARED plane CREATES it as a free plane —
+      // the operator chose the forgiving incremental flow over refuse-with-guidance, accepting that a
+      // typo'd name conjures a plane. Bounded by ruling 2 at the grammar: every on-planes rule requires
+      // the plane NOUN («על המישור π2»), so no bare-symbol path can create anything. Only a NAMED-plane
+      // token (π-style) qualifies — a missing point-run name (ABC) still means mistyped labels, refused.
+      const autoCreate =
+        cmd.plane !== 'any' && !c.planes.has(cmd.plane) && !c.pointPlanes.has(cmd.plane) && FREE_PLANE_TOKEN.test(cmd.plane);
+      if (!autoCreate && cmd.plane !== 'any' && !c.planes.has(cmd.plane) && !c.pointPlanes.has(cmd.plane))
         return { ok: false, error: { code: 'unknown-plane', id: cmd.plane } };
       if (!c.points.has(cmd.id)) {
         // M1 dual (the 2-D ADR-236 shape): a NEW id stated onto — or above/below — a NAMED
         // plane is CREATED as a free point riding it (2 DOF; 3 with a stated side)
         if (cmd.plane === 'any') return { ok: false, error: { code: 'unknown-point', id: cmd.id } };
         const next = clone(c);
+        if (autoCreate) next.planes.set(cmd.plane, freePlaneDef(cmd.plane));
         next.points.set(
           cmd.id,
           cmd.side
@@ -1106,6 +1139,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         return { ok: true, next };
       }
       const next = clone(c);
+      if (autoCreate) next.planes.set(cmd.plane, freePlaneDef(cmd.plane));
       next.memberships.push(cmd);
       return { ok: true, next };
     }

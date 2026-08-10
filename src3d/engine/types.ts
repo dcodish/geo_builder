@@ -172,6 +172,15 @@ export interface PlaneDef {
   cz: LinExpr;
   d: LinExpr;
   src: string;
+  /**
+   * #487 (ADR-3D-124) — a FREE plane: declared by name only, no equation stated. The coefficients above
+   * are placeholders (never knowledge); `resolve3` overwrites the resolved entry per seed via
+   * `resolveFreePlane`, pinned by whatever memberships/relations exist and SAMPLED beyond them. Living
+   * inside `planes` (rather than a fourth map) is deliberate: every existence check, operand resolver
+   * and renderer sees the plane without enumeration edits — consumers that need the plane's numbers as
+   * KNOWLEDGE (the equation claim, the parameter machinery, printing) must gate on this flag instead.
+   */
+  free?: true;
 }
 
 export type Line3Def =
@@ -526,6 +535,19 @@ export interface Plane3Command {
   param?: string;
 }
 
+/**
+ * #487 (ADR-3D-124) — «מישור π2»: a FREE-standing named plane, declared before anything about it is
+ * known. Its orientation (unit normal, 2 DOF) and offset (1 DOF) are genuine ADR-052 free DOFs: sampled
+ * per seed, resampled on "show another configuration", pinned as memberships and stated relations
+ * accumulate. The declaration requires the NOUN (operator ruling: a bare «π2» line stays not-understood);
+ * a membership on an undeclared named plane AUTO-creates one through this same command (ruling 1 —
+ * the M1 duality, creation edition).
+ */
+export interface FreePlaneCommand {
+  type: 'free-plane';
+  name: string;
+}
+
 /** `הזווית בין המישורים היא 45°` — PINS the parameter (its roots are the figure's branches). */
 export interface PlaneAngleCommand {
   type: 'plane-angle';
@@ -687,6 +709,7 @@ export type Command3 =
   | { type: 'distance-rel'; a: Operand3; b: Operand3; value: number }
   | ParamSignCommand
   | Plane3Command
+  | FreePlaneCommand
   | PlaneAngleCommand
   | OnPlanesCommand
   | FootOnPlaneCommand
@@ -1033,6 +1056,7 @@ export type EngineError3 =
   | { code: 'ambiguous-prism' } // #289: `המנסרה ישרה` with more than one oblique prism — "the prism" is ambiguous
   | { code: 'bound-unsatisfiable'; id: Id } // #273: no sampled configuration puts the measure inside the stated bound
   | { code: 'vacuous-relation' } // S4 (#378): a mutual position stated between an object and itself
+  | { code: 'plane-not-determined'; id: string } // #487: this construct needs a plane with a stated equation — π is still free
   | { code: 'claim-refuted' } // the stated answer does not hold in the figure
   // #442: only a TANGENTIAL polygon has an incircle, and every triangle is one. A best-fit circle for a
   // general quad would be tangent to nothing — refuse rather than draw a figure that lies.
