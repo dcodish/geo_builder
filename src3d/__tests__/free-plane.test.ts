@@ -37,8 +37,15 @@ describe('#487 — the declaration parses (and the bare symbol deliberately does
     if (r.ok) expect(r.commands).toEqual([{ type: 'free-plane', name: 'π2' }]);
   });
 
-  it('ruling 2: a bare «π2» line is not a declaration', () => {
-    expect(parse3('π2').ok).toBe(false);
+  it('Am. 1 (operator play, 2026-08-10): a bare «π2» line IS a declaration — deterministic, no LLM call', () => {
+    // The original ruling 2 required the noun; play showed the bare form escalating to the LLM, which
+    // drew the plane anyway — a paid, non-deterministic detour to the same outcome. π-notation is a
+    // plane by convention, so the deterministic parser owns it.
+    for (const u of ['π2', 'π', 'pi2', 'נתון π2']) {
+      const r = parse3(u);
+      expect(r.ok, u).toBe(true);
+      if (r.ok) expect(r.commands[0].type).toBe('free-plane');
+    }
   });
 
   it('a name followed by an equation still belongs to planeByEquation', () => {

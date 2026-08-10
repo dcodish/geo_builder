@@ -1425,12 +1425,15 @@ const planeByEquation: Rule = (s) => {
   ];
 };
 
-/** #487 (ADR-3D-124): «מישור π2» / «נתון מישור π2» / «plane π2» — a FREE plane, declared before
- *  anything about it is known. The NOUN is required (operator ruling 2: a bare «π2» line is too easy to
- *  produce by accident and the query lane may want the token), and the utterance must END at the name —
- *  a trailing equation belongs to `planeByEquation`, a trailing point-run to `planeThrough`. */
+/** #487 (ADR-3D-124): «מישור π2» / «נתון מישור π2» / «plane π2» — and, per Am. 1, bare «π2» — a FREE
+ *  plane, declared before anything about it is known. The noun was REQUIRED by the original ruling 2;
+ *  the operator's play reversed it (2026-08-10): the bare form escalated to the LLM, which drew the
+ *  plane anyway — a paid, non-deterministic detour to the same outcome — and «π…» is standard notation
+ *  ("anything that starts with pi is commonly referred to as a plane"). The utterance must still END
+ *  at the name — a trailing equation belongs to `planeByEquation`, a trailing point-run to the
+ *  point-run rules. */
 const freePlaneDecl: Rule = (s) => {
-  const m = s.match(new RegExp(`^(?:נתון\\s+)?(?:${HE_PLANE}|(?:the\\s+)?plane)\\s+(${PLANE_NAME.source})$`));
+  const m = s.match(new RegExp(`^(?:נתון\\s+)?(?:(?:${HE_PLANE}|(?:the\\s+)?plane)\\s+)?(${PLANE_NAME.source})$`));
   if (!m) return null;
   return [{ type: 'free-plane', name: canonicalPlane(m[1]) }];
 };

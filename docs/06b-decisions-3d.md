@@ -2556,3 +2556,17 @@ declare-then-ride byte-identically; per-pin-level DOF counts; the three-member s
 ∥/⟂/equation pinning with green claims; the coexisting-parameter guard — m = 4 survives a free plane;
 round-trip) and `fixtures3/free-plane-487.geo3.json` (the operator's incremental order through the real
 load path).
+
+### ADR-3D-124 Am. 1 — bare «π2» declares (ruling 2 reversed from play)
+
+The operator play-tested the PR and found the deliberately-rejected bare form taking the OTHER door:
+«π2» alone escalated to the LLM, which emitted the declaration and drew the plane anyway. So the
+original ruling 2 was not preventing creation — it was routing it through a paid, non-deterministic
+call to the same outcome, which is the worst of both options. Ruling reversed (2026-08-10): *"anything
+that starts with pi is commonly referred to as a plane"* — the notation IS the noun, and the
+deterministic parser owns it. The noun-carrying forms all still parse; «נתון π2» rides along. The
+original concern (an accidental bare symbol conjuring geometry) is retired by the observation that it
+was being conjured regardless — now it is at least free, instant, and reproducible.
+
+**Locked**: «π2», «π», «pi2», «נתון π2» → `free-plane` deterministically; the shadow-matrix snapshot
+carries the bare corpus entries with `freePlaneDecl` as winner (nothing shadowed).

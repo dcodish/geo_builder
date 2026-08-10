@@ -102,6 +102,7 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'planesLines', he: 'המישור π1: z - 3 = 0', en: 'plane π1: z - 3 = 0' },
   // #487 (ADR-3D-124): a FREE plane — declared by name alone, orientation sampled until later givens pin it
   { category: 'planesLines', he: 'מישור π2', en: 'plane π2' },
+  { category: 'planesLines', he: 'π2', en: 'π2' }, // Am. 1: the bare notation declares too — deterministic, no LLM call
   { category: 'planesLines', he: 'B על המישור π2', en: 'B on plane π2' },
   { category: 'planesLines', he: 'הישר ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)', en: 'line ℓ: x = (-1,5,-11) + t(m-1, 5-m, -2)' },
   {
