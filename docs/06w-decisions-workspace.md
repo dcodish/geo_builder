@@ -203,3 +203,75 @@ ruling is that skipping it is now strictly worse than it was, not more acceptabl
 
 Report the result truthfully in the commit or the PR — counts, and any skips — since no second opinion is
 coming. A session that cannot run the full suite says so rather than implying a gate that did not happen.
+
+## ADR-W-006 — A mirror's contract is DERIVED from the mirrored source, never enumerated
+
+**Status:** accepted, 2026-08-10 · **Issue:** [#501](https://github.com/dcodish/geo_builder/issues/501) ·
+**Extends:** [ADR-346](06-decisions.md#adr-346)
+
+**What happened.** The 2026-08-10 log triage reported «שזוות A לא תהיה ישרה» and «לא תהיה ישרה» as ▶ LIVE
+grammar gaps. Both are false: the App refuses them PRE-parse through the #436 negation guard
+(`statedNegation`, `submitPipeline.ts`) and answers with guidance. `triage.mjs` never learned that check,
+so its replay fell through to `parse` → `not-handled` → "LIVE gap" — and the run **uploaded those verdicts
+to prod**, where the admin dashboard's «פערים אמיתיים» card now annotates two deliberately-answered inputs
+as open gaps. Fourth drift of the same mirror, and the fourth time the instrument produced confident false
+signal in the exact place it exists to prevent it.
+
+**Root cause — the guard was an enumeration.** ADR-346's anti-drift test already checked the predicate-based
+short-circuits, but against a hard-coded list: `for (const p of ['looksLikeLatex', 'wordRootMagnitude'])`.
+**A guard that enumerates the predicates it knows about cannot fail on a predicate it does not know about.**
+#436 added a third pre-parse guard and nothing forced either the list or the harness to follow. This is the
+one-directional-guard shape #255 documents, applied to the guard itself — the instrument that measures
+drift drifted, silently, because its contract was a copy rather than a derivation.
+
+**The decision.** *Where one artifact mirrors another, the guard extracts the contract from the mirrored
+SOURCE rather than restating it.* Concretely: the pre-parse guards are now read out of `submitPipeline.ts`
+by structure — every `ident(utterance)` call between the store-op block and the `parse(` call — and each
+extracted name must appear in `triage.mjs`. A new pre-parse guard fails the test the day it lands, with
+nobody having to remember anything. Both anchors are asserted present, and the extraction is asserted
+non-empty, so an anchor drift cannot silently shrink the expectation into a test that passes forever while
+proving nothing.
+
+**Scope.** This is the general rule, not a one-off: the same shape applies to any place a script, a doc, or
+a second product restates a list the source already owns. Where a derivation is genuinely impossible, the
+enumeration must at least be guarded from BOTH sides (assert the source still has each member — the
+existing honesty-gate check does this) so a stale list is loud rather than quiet.
+
+**Not fixed here:** the two false verdicts already on the prod dashboard. They are corrected by the next
+triage run, which is operator-invoked (it fetches from prod and uploads) — flagged rather than done
+autonomously.
+
+## ADR-W-008 — A per-machine artifact may not feed a cross-machine decision
+
+**Status:** accepted, 2026-08-10 · **Issue:** [#502](https://github.com/dcodish/geo_builder/issues/502) ·
+**Extends:** [ADR-346](06-decisions.md#adr-346) Am. 2
+
+**What happened.** The 2026-08-10 triage header read *previous triage: 2026-07-23*, and its ▶ LIVE **NEW**
+sections listed rows that had been put in front of the operator two days earlier on the other PC — «אלכסון
+תיבה AC'» (filed #449, approved), «שזוות A לא תהיה ישרה» (filed #436, fixed and closed), the #448 height
+form (approved, partly built). The "spend your attention on NEW" rule inverted into its opposite: attention
+re-spent on already-triaged, already-approved, even already-FIXED rows, with a live risk of re-filing them.
+The session caught it only because the issues happened to cite the 08-08 triage in their bodies.
+
+**Root cause.** `logs/triage-state-<app>.json` is per-machine and gitignored — **correct** for the raw
+utterances it holds (this skill's privacy posture) — and the NEW-vs-carried split was *derived from it*. So
+a decision that is inherently cross-machine ("have we already shown the operator this row?") was reading an
+artifact that by construction knows only about one machine. Third instance of the same workspace class in a
+week: #484 (test-tier membership measured per machine), #488 (merged/deployed-ness invisible after a
+switch), and this.
+
+**Decision — split the artifact by what it holds, not by what it is for.** The per-machine state keeps the
+verdict cache and the raw text, unchanged. A second, **git-tracked** file `reports/triage-surfaced.json`
+answers only *was this row surfaced, and when*: hashed row keys (`sha256(salt + app + utterance)`,
+truncated) and dates. No utterance text, so the privacy rationale that keeps the state file out of git is
+preserved exactly; the salt is a namespace, not a secret, and the file says so rather than implying
+protection it does not give. `--reverify` / `--no-state` semantics are unchanged, and a machine with no
+local state still does a full verification sweep — it just no longer mislabels old rows as new.
+
+**Migration, so the first run does not erase history.** A row this machine had already surfaced carries its
+REAL date into the tracked file rather than being re-stamped with today's, or the fix would have destroyed
+the "sitting there unactioned since" signal on the very run that introduced it.
+
+**The general rule, which is the reusable part:** *when a decision spans machines, the state it reads must
+travel; when the data is private, split the artifact so the ANSWER travels and the DATA does not.* Reach
+for that split before concluding a per-machine cache is unavoidable.

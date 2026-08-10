@@ -43,12 +43,29 @@ describe('ADR-346 — log-triage mirrors the App submit path', () => {
     expect(setLiteral(triageSrc, 'PRE_LLM')).toEqual(setLiteral(pipeSrc, 'PRE_LLM'));
   });
 
-  it('#353 — the PREDICATE-based pre-LLM short-circuits are mirrored too (not just the PRE_LLM set)', () => {
+  it('#501 — the PRE-PARSE predicate guards are DERIVED from the pipeline source, never enumerated', () => {
     // A guided family whose trigger is a PREDICATE rather than a `scope` category is invisible to the
-    // set-literal check above, so each one needs its own mirror assertion — otherwise the App answers the
-    // input on purpose while the harness keeps reporting it as a LIVE grammar gap (the ADR-346 drift, 4th
-    // instance). Both sides must call the same predicate.
-    for (const p of ['looksLikeLatex', 'wordRootMagnitude']) {
+    // set-literal check above. This check used to enumerate the predicates it knew about — and a guard
+    // that lists what it knows cannot fail on what it does not: #436 added `statedNegation` as a third
+    // pre-parse guard, nothing forced the list to follow, and the harness reported two deliberately
+    // refused utterances as LIVE grammar gaps, shipping false verdicts to the prod dashboard (#501, the
+    // 4th ADR-346 drift). So the list is now EXTRACTED from the pipeline: everything called with the
+    // bare utterance between the store-op block and the `parse(` call is a pre-parse guard, and a new
+    // one fails this test the day it lands, with nobody having to remember anything.
+    const start = pipeSrc.indexOf('parseMerge(utterance)');
+    const end = pipeSrc.indexOf('parse(utterance,');
+    expect(start, 'the store-op anchor moved — re-anchor this extraction').toBeGreaterThan(0);
+    expect(end, 'the parse anchor moved — re-anchor this extraction').toBeGreaterThan(start);
+    const guards = [...new Set([...pipeSrc.slice(start, end).matchAll(/\b([a-z]\w*)\(utterance\)/g)].map((m) => m[1]))];
+    // The extraction must actually find something: an anchor drift that silently yields an empty list
+    // would make this test pass forever while proving nothing (the shrinking-expectation trap).
+    expect(guards.length, 'no pre-parse guards extracted — the anchors are wrong').toBeGreaterThanOrEqual(2);
+    for (const p of guards) {
+      expect(triageSrc, `triage.mjs must mirror the submit pipeline's pre-parse ${p}() short-circuit (ADR-346)`).toContain(`${p}(`);
+    }
+    // `wordRootMagnitude` guards the ESCALATION seam (after the parse), outside the extracted region,
+    // so it keeps an explicit assertion of its own.
+    for (const p of ['wordRootMagnitude']) {
       expect(pipeSrc, `submitPipeline.ts no longer calls ${p} — update this guard + the harness`).toContain(`${p}(`);
       expect(triageSrc, `triage.mjs must mirror the submit pipeline's ${p} short-circuit (ADR-346)`).toContain(`${p}(`);
     }

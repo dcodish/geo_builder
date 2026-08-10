@@ -27,6 +27,10 @@ vite.config.ts.timestamp-*.mjs
 reports/*
 !reports/test-tiers.json
 !reports/tier-catches.jsonl
+# #502: the log-triage NEW/carried split must travel between the two PCs. This file holds only HASHED
+# row keys + dates — no utterance text — so the privacy posture that keeps `logs/triage-state-*.json`
+# out of git is preserved while the "was this already put in front of the operator" answer travels.
+!reports/triage-surfaced.json
 dist-3d
 
 # Assistant worktrees (stale copies can hold unreadable Dropbox placeholders;

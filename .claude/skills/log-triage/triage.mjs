@@ -54,6 +54,10 @@
  *     window, so a slow-burning cluster (3 users over 3 months) would read as 1 user and rank low, breaking
  *     the skill's core prioritization rule. Instead the LIVE worklist SPLITS: rows never reported before are
  *     ▶ NEW; rows surfaced in an earlier run collapse into ↩ carried-over with their first-seen date.
+ *     The split itself is CROSS-MACHINE (#502): it was derived from the per-machine state file, so after a
+ *     PC switch it lied — rows filed and approved two days earlier on the other PC resurfaced as ▶ NEW.
+ *     `reports/triage-surfaced.json` is git-TRACKED and holds only hashed row keys + dates (no utterance
+ *     text, so the privacy posture stands), answering just "was this already surfaced, and when".
  *
  * Options: --server root@themathbible.com  --remote-dir /var/www/geo-proxy
  *          --days N (0=all)  --release <substr>  --top 80  --no-fetch  --no-verify
@@ -62,11 +66,12 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, buildParseCtx, classifyOutOfScope,
-  looksLikeLatex, wordRootMagnitude,
+  looksLikeLatex, wordRootMagnitude, statedNegation,
   droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs, droppedCompoundRelation,
 } from '../../../src/parser/index.ts';
 import { replay, nameCentreFacts } from '../../../src/store/geoStore.ts';
@@ -168,6 +173,40 @@ const loadState = (a) => {
   return { version: 1, lastRun: null, sessions: {}, utterances: {} };
 };
 const saveState = (a, s) => { if (!noState && !noVerify) writeFileSync(STATE(a), JSON.stringify(s)); };
+
+// ---- the CROSS-MACHINE half of the NEW/carried split (#502) ---------------
+// The state file above is per-machine and gitignored — correct for the raw utterances it holds, and
+// wrong for the NEW-vs-carried split derived from it: after a PC switch the split LIES. Measured
+// 2026-08-10 — rows filed, approved and even FIXED from the 2026-08-08 triage on the other machine
+// resurfaced as ▶ NEW, so "spend attention on NEW" (ADR-346 Am. 2) inverted into its opposite.
+// So the SPLIT travels while the TEXT does not: a git-tracked file holding only hashed row keys and
+// dates. It answers exactly one question — "was this row already surfaced, and when".
+// On the salt, honestly: it keeps utterance TEXT out of git, which is the stated privacy posture. It
+// is NOT a secret (it is committed) and offers no protection against someone who has the repo and
+// guesses candidate utterances — it is a namespace, not a cipher.
+const SURFACED = path.join(reportsDir, 'triage-surfaced.json');
+const SURFACED_SALT = 'geo-builder/log-triage/surfaced/v1';
+const SURFACED_COMMENT =
+  'Git-tracked so the log-triage NEW-vs-carried split survives a machine switch (#502). Keys are ' +
+  `sha256('${SURFACED_SALT}' + app + utterance), truncated — NO utterance text is stored here, which is why ` +
+  'this file may be committed while logs/triage-state-*.json may not. Values are the date the row was first ' +
+  'put in front of the operator. Written by .claude/skills/log-triage/triage.mjs on every run.';
+const rowKey = (a, u) => createHash('sha256').update(`${SURFACED_SALT}\n${a}\n${u}`).digest('hex').slice(0, 16);
+const loadSurfaced = () => {
+  if (!noState) {
+    try {
+      const s = JSON.parse(readFileSync(SURFACED, 'utf8'));
+      if (s.version === 1) return { ...s, lastRun: s.lastRun ?? {}, surfaced: s.surfaced ?? {} };
+    } catch { /* first run / unreadable / stale schema → start clean */ }
+  }
+  return { version: 1, _comment: SURFACED_COMMENT, lastRun: {}, surfaced: {} };
+};
+const saveSurfaced = (s) => {
+  if (noState || noVerify) return;
+  // stable key order, so the committed diff shows only what actually changed
+  const surfaced = Object.fromEntries(Object.entries(s.surfaced).sort(([x], [y]) => (x < y ? -1 : 1)));
+  writeFileSync(SURFACED, `${JSON.stringify({ version: 1, _comment: SURFACED_COMMENT, lastRun: s.lastRun, surfaced }, null, 2)}\n`);
+};
 const headRev = (() => {
   try { return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim(); } catch { return '?'; }
 })();
@@ -252,6 +291,12 @@ function session2d(evs) {
         res = { now: 'store-op', detail: 'rename/merge/swap/name-centre' };
       } else if (looksLikeLatex(u)) {
         res = { now: 'guided', detail: 'scope:latex' }; // #329: pre-parse LaTeX guard, mirrors submitPipeline
+      } else if (statedNegation(u)) {
+        // #436: a NEGATED statement is refused PRE-parse with guidance («זווית A לא תהיה ישרה» used to
+        // lower to the POSITIVE form's commands). Mirrored here at the App's own position — without it
+        // the replay fell through to `parse` → not-handled and reported a deliberate refusal as a LIVE
+        // grammar gap, shipping false verdicts to the dashboard (#501, the 4th ADR-346 drift).
+        res = { now: 'guided', detail: 'scope:negation' };
       } else {
         let r = parse(u, pctx);
         // #186 mirror: a circle referenced by a name that matches no circle, with UNNAMED circles in the
@@ -469,7 +514,10 @@ function reportFor(a) {
   // Verify by replaying every session in order (the App's submit path, in context), then judge each
   // distinct utterance by its BEST outcome across occurrences (ADR-346).
   const state = loadState(a);
-  const prevRun = state.lastRun;
+  // #502: the tracked keys answer "already surfaced?" first; the per-machine state is the fallback for
+  // rows this machine surfaced before the tracked file existed.
+  const surfaced = loadSurfaced();
+  const prevRun = surfaced.lastRun[a] ?? state.lastRun;
   const { byUtterance, replayed, cached } = noVerify
     ? { byUtterance: new Map(), replayed: 0, cached: 0 }
     : verifyAll(a, events, state);
@@ -478,7 +526,7 @@ function reportFor(a) {
   // merely that it existed in the log.
   for (const c of cands) {
     c.verify = noVerify ? { now: '?', detail: '' } : bestOutcome(byUtterance.get(c.u));
-    c.reportedAt = state.utterances[c.u]?.reportedAt ?? null;
+    c.reportedAt = surfaced.surfaced[rowKey(a, c.u)] ?? state.utterances[c.u]?.reportedAt ?? null;
   }
 
   // sort each candidate into a REPORT bucket by its CURRENT (post-fix) outcome
@@ -505,9 +553,17 @@ function reportFor(a) {
   const liveNew = live.filter((c) => !c.reportedAt);
   const liveOld = live.filter((c) => c.reportedAt);
   const today = new Date().toISOString().slice(0, 10);
-  for (const c of live) (state.utterances[c.u] ??= {}).reportedAt ??= today; // stamp AFTER the split
+  for (const c of live) {
+    (state.utterances[c.u] ??= {}).reportedAt ??= today; // stamp AFTER the split
+    // …and in the tracked half, so the OTHER PC agrees (#502). A row this machine surfaced BEFORE the
+    // tracked file existed migrates with its real date, not with today's — otherwise the first run after
+    // the fix would re-date the whole local history and lose the "sitting there since" signal.
+    surfaced.surfaced[rowKey(a, c.u)] ??= c.reportedAt ?? today;
+  }
   state.lastRun = new Date().toISOString();
+  surfaced.lastRun[a] = state.lastRun;
   saveState(a, state);
+  saveSurfaced(surfaced);
 
   const NAME = a === '2d' ? 'Geo Builder (2-D)' : 'Space Builder (3-D)';
   const row = (c, i) => `| ${i + 1} | ${c.users} | ${c.count} | \`${norm(c.u).replace(/\|/g, '\\|').slice(0, 120)}\` | ${c.bucket} | ${c.verify.detail || ''} | ${c.locales.join('/')} |`;
