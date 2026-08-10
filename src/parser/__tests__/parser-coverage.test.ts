@@ -54,6 +54,14 @@ const PARSES: [string, string][] = [
   ['טרפז ישר-זווית ABCD', 'set-perpendicular'],
   ['טרפז ישר זווית ABCD', 'set-perpendicular'], // plene spelling, space not hyphen
   ['טרפז ABCD ישר זוית', 'set-perpendicular'], // defective spelling, label-first, no hyphen
+  // «זוות» — the one OBSERVED misspelling of the angle noun, folded at normalizeUtterance (#497,
+  // operator report 2026-08-10: it used to HALF-PARSE to a bare trapezoid with a green ✓)
+  ['טרפז ישר זוות ABCD', 'set-perpendicular'],
+  ['טרפז ישר זוות', 'set-perpendicular'], // the operator's exact labelless keystroke
+  ['משולש ישר זוות ABC', 'right-triangle'],
+  // labels are UPPERCASE by convention — an uppercase run wins over a lowercase English word (#497:
+  // "draw a square ABCD" used to read "draw" as the label run and build square D,R,A,W)
+  ['let triangle ABC', 'triangle'],
   // a named triangle shape ON an inscribe carries its equal-side relations (ADR-117), not just a generic triangle
   ['equilateral triangle ABC inscribed in a circle', 'set-equal'],
   ['ABC משולש שווה צלעות חסום במעגל', 'set-equal'],
@@ -201,6 +209,15 @@ const PARSES: [string, string][] = [
 
 /** Utterances that must escalate (not-handled) rather than half-parse or draw a wrong figure. */
 const ESCALATES: string[] = [
+  // ── a TYPO'D shape modifier is an UNKNOWN word, not filler (#497) — the fail-closed leftover gate
+  //    escalates it; only the observed «זוות» is folded, everything else goes to the LLM (whose job
+  //    is typos). Each of these used to HALF-PARSE to the bare shape with a green ✓. ──
+  'טרפז ישר זויית ABCD', // unfolded misspelling of זווית
+  'טרפז שוה שוקים ABCD', // שוקים for שוקיים → the isosceles modifier must not vanish
+  'משולש שווה צלוות ABC', // צלוות for צלעות → the equilateral modifier must not vanish
+  'isoceles trapezoid ABCD', // the classic English misspelling
+  'טרפז ABCD יפה מאוד', // an unknown word is content until proven filler — never dropped
+  'טרפז ABCD 5', // a bare stated magnitude the shape rule cannot express
   // ── modified shapes the engine can't build → must not drop the modifier ──
   'square ABCD inscribed in a circle with AB = 6', // inscribed + a constraint on top
   // ── shape + a constraint (compound — LLM should decompose) ──

@@ -41,16 +41,15 @@ describe('reported scenario — carrier segments drawn + a typo never silently d
       const segs = new Set(fig.construction.objects.filter((o) => o.kind === 'segment').map((o) => o.id));
       for (const want of ['seg-BC', 'seg-CD', 'seg-AE', 'seg-DE']) expect(segs, `missing drawn carrier ${want}`).toContain(want);
     }
-    // (2) the typo: the grammar claims it as a bare triangle BUT the number guard refuses the commit…
+    // (2) the typo: the #497 fail-closed leftover gate stops the triangle rule AT THE PARSE — the
+    // partial (wrong) meaning never even forms. (It used to half-parse to a bare △AEB and rely on the
+    // ADR-250 number guard to refuse the commit; that guard remains the LLM-commit path's net.)
     const typo = 'שטח AEB גדול פי 2.25 משוטח משולש CED';
     {
       const ctx = ctxOf(useGeoStore.getState().facts);
       const r = parse(typo, ctx);
-      expect(r.ok).toBe(true);
-      if (r.ok) {
-        expect(r.commands.some((c) => c.type === 'set-area-ratio')).toBe(false); // the partial (wrong) meaning
-        expect(droppedGivenNumbers(typo, r.commands)).toEqual([2.25]); // → the gate escalates instead
-      }
+      expect(r.ok).toBe(false); // escalates whole to the LLM, whose job is typos
+      expect(droppedGivenNumbers(typo, [{ type: 'triangle', ids: ['A', 'E', 'B'] } as AnyCommand])).toEqual([2.25]); // the net still names the drop
     }
     // …and the LLM second attempt (mocked: the corrected phrasing's own lowering) carries the ratio.
     const corrected = parse('שטח AEB גדול פי 2.25 משטח משולש CED', ctxOf(useGeoStore.getState().facts));

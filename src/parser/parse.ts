@@ -20,7 +20,7 @@
  */
 
 import { RADIUS_VAR, type AnyCommand, type Command, type Id, type MeasureExpr, type SymbolicCommand } from '@/engine';
-import { NUM, LABEL } from './lexicon';
+import { NUM, LABEL, NEUTRAL_HE_WORDS, NEUTRAL_EN_WORDS, rx } from './lexicon';
 
 export type ParseResult =
   | { ok: true; commands: AnyCommand[] }
@@ -425,8 +425,11 @@ const FILLER = /\b(?:a|an|to|the|and|of|is|are|at|on|in|with|from|that|so|such)\
  * (FILLER's discipline). NOT global filler — only rules whose semantics are "draw me the construct"
  * may consume a request verb.
  */
+// «נתו[נן](?:ים|ה|ות)?» (#497): the given-marker in ALL its inflections — the bare «נתון» ends in FINAL
+// nun, so it can never match as a prefix of «נתונה»/«נתונות», whose nun is medial (the lexicon's
+// ADR-3D-035 final-kaf trap, nun edition). «נתונים» was a hand-listed special case of the same hole.
 const REQUEST_WORDS =
-  /הוסיפי|להוסיף|תוסיפי|תוסיף|הוסיף|הוסף|ציירי|צייר|העבירו|העבר|נתונים|נתון|(?<![א-ת])יש(?![א-ת])|(?<![א-ת])את(?![א-ת])|\b(?:add|draw|given|please)\b/g;
+  /הוסיפי|להוסיף|תוסיפי|תוסיף|הוסיף|הוסף|ציירי|צייר|העבירו|העבר|נתו[נן](?:ים|ה|ות)?|(?<![א-ת])יש(?![א-ת])|(?<![א-ת])את(?![א-ת])|\b(?:add|draw|given|please)\b/g;
 
 /**
  * Find a run of `n` point labels, as a contiguous token ("ABCD", "O1O2") or `n`
@@ -443,13 +446,20 @@ const PT = String.raw`[A-Za-z]\d*`; // a point token: a letter + an optional dig
 const MAX_COLLINEAR_RUN = 12;
 function labelRun(s: string, n: number): Id[] | null {
   const t = s.replace(FILLER, ' ');
+  // #497: labels are UPPERCASE by convention (see namesVertices) — an uppercase run wins over any
+  // case-insensitive read, so a lowercase English word can never shadow the student's labels
+  // ("draw a square ABCD" used to build square D,R,A,W — "draw" is four PT tokens and scans first).
+  // A lowercase run is still accepted when no uppercase one exists («ריבוע abcd»).
+  return runOf(t, n, String.raw`[A-Z]\d*`) ?? runOf(t, n, PT);
+}
+function runOf(t: string, n: number, tok: string): Id[] | null {
   // A single word of exactly n tokens ("ABCD", "O1O2") — split it back into tokens.
-  const contiguous = t.match(new RegExp(String.raw`\b(?:${PT}){${n}}\b`));
+  const contiguous = t.match(new RegExp(String.raw`\b(?:${tok}){${n}}\b`));
   if (contiguous) {
-    const toks = contiguous[0].match(new RegExp(PT, 'g'));
+    const toks = contiguous[0].match(new RegExp(tok, 'g'));
     if (toks && toks.length === n) return toks.map(up);
   }
-  const spaced = t.match(new RegExp(Array.from({ length: n }, () => String.raw`\b(${PT})\b`).join(String.raw`\s+`)));
+  const spaced = t.match(new RegExp(Array.from({ length: n }, () => String.raw`\b(${tok})\b`).join(String.raw`\s+`)));
   if (spaced) return spaced.slice(1, n + 1).map(up);
   return null;
 }
@@ -578,20 +588,6 @@ const existingPolygon = (ctx: ParseContext, n: number): Id[] | null => {
 const namesVertices = (s: string): boolean => /[A-Z]/.test(s);
 
 /**
- * Vertex labels for an n-vertex shape rule: the run the student wrote, or — when they named NONE and
- * nothing else geometry-significant remains — auto-named vertices (A,B,C,…). Returns null when SOME but
- * not a clean run of n labels is present (a typo / compound) OR a leftover survives (a circle/constraint
- * belongs to another rule), so the caller defers/escalates exactly as before. `bare` is the utterance with
- * the shape's own keyword(s) already stripped; `hasLeftover` is the rule's SHAPE_LEFTOVER verdict.
- */
-function shapeLabels(bare: string, n: number, ctx: ParseContext, hasLeftover: boolean): Id[] | null {
-  const ids = labelRun(bare, n);
-  if (ids) return ids;
-  if (hasLeftover || namesVertices(bare)) return null; // defer (leftover) / escalate (partial labels)
-  return autoVertexLabels(n, ctx.points ?? []);
-}
-
-/**
  * Geometry-significant words/operators a *shape* rule does not itself consume —
  * a circle, a special line, a constraint, an inscription, an angle. If any of
  * these survives after a shape's keyword + labels are removed, the utterance
@@ -611,36 +607,102 @@ function shapeLabels(bare: string, n: number, ctx: ParseContext, hasLeftover: bo
 const SHAPE_LEFTOVER =
   /\b(?:inscrib\w*|circumscrib\w*|circles?|tangents?|diameters?|chords?|arcs?|radius|radii|perpendiculars?|parallels?|bisects?|bisectors?|midpoints?|medians?|heights?|altitudes?|foot|feet|intersections?|extensions?|angles?|segments?|diagonals?|connect|congruent|similar|points?|sides?|every|each|triangles?|squares?|rectangles?|rhombus(?:es)?|trapezoids?|kites?|parallelograms?|quadrilaterals?)\b|[=⊥⟂∥∩°≅~∼∽]|חסום|חוסם|מעגל|משיק|קוטר|מיתר|קשת|רדיוס|מאונ[כך]|אנ[כך]|מקביל|חוצ|אמצע|תיכון|גובה|המש(?:ך|כי(?:ם|הם|הן)?)|חיתוך|זוו?ית|קטע|אלכסון|חבר|נקוד|חופ|דומ|צלע|משולש|מרובע|ריבוע|מלבן|מעוין|טרפז|דלתון|מקבילית|(?<![א-ת])[ובשלמכ]?כל(?![א-ת])/i;
 
-/** True if, after removing the shape keyword, geometry the shape can't express remains. */
-const shapeHasLeftover = (s: string, re: RegExp): boolean => SHAPE_LEFTOVER.test(s.replace(re, ' '));
+/**
+ * The fail-closed half of the leftover discipline (#497). `SHAPE_LEFTOVER` above enumerates the KNOWN
+ * construct vocabulary — still necessary for its curated catches (the symbols, the quantifier) — but a
+ * denylist fails OPEN on a word it has never met, and a TYPO of a significant word is by definition such
+ * a word: «טרפז ישר זוות» survived it, the modifier silently dropped, and a generic trapezoid shipped
+ * under a green ✓. The closure: after a rule consumed its own vocabulary and its labels, every surviving
+ * TOKEN must be POSITIVELY harmless — En filler (FILLER), a request verb (REQUEST_WORDS), a neutral
+ * connective / post-pass adjective (NEUTRAL_*: the convexity words are consumed by `withStatedConvexity`
+ * AFTER the rules, so the gate lets them through), or a bare prosthetic-prefix remnant (the «ה» left
+ * when the strip removed the noun out of «הטרפז»). A digit run is a stated magnitude; a surviving Latin
+ * token is an unclaimed label or an unknown word; an unrecognised Hebrew word is a statement we did not
+ * read. All escalate: the LLM reads typos, a silently narrower figure lies (the honesty invariant).
+ * Growing the neutral allowlist costs an unneeded escalation; the denylist's gaps cost a wrong figure.
+ *
+ * Deliberately NOT routed here: the deferral predicates (`sizeStatementLeftover`, the circle-through
+ * guard) — they ask "does another RULE own this?", a question about known vocabulary, and fail-closed
+ * there would refuse deixis their own callers resolve («רדיוס המעגל הגדול»). Bare symbols (non-word
+ * tokens) stay the denylist's curated business.
+ */
+const NEUTRAL_HE = rx(`^(?:${NEUTRAL_HE_WORDS})$`);
+const NEUTRAL_EN = rx(`^(?:${NEUTRAL_EN_WORDS})$`);
+const HE_PREFIX_REMNANT = /^[ובלכשמה]{1,3}$/; // «הטרפז» → «ה»; the כל quantifier is SHAPE_LEFTOVER's, tested first
+/** Remove the labels a rule CLAIMED from its leftover: the contiguous run first («AOB» — a per-id
+ *  `\bA\b` can never reach inside it), then each id (the spaced form). Every gate site must use this —
+ *  the semicircle/quarter/sector sites used to do per-id only, which the old denylist never noticed
+ *  (uppercase runs aren't denylist words) and the fail-closed gate does (#497). */
+const removeClaimed = (s: string, ids: Id[]): string =>
+  ids.reduce(
+    (a, id) => a.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
+    ids.length ? s.replace(new RegExp(String.raw`\b${ids.join('')}\b`, 'i'), ' ') : s,
+  );
+/** Strip the numeric radius/diameter value a rule already CONSUMED via `parseRadius` — those digits
+ *  are the rule's own vocabulary and the fail-closed gate would flag them (#497). Only when the rule
+ *  actually read a number (`consumed`): an unconsumed numeral must keep flagging. */
+const NUM_G = rx(NUM, 'g'); // the lexicon atom (S2.1 — never re-spell the number fragment inline)
+const stripConsumedNumber = (s: string, consumed: boolean): string =>
+  consumed ? s.replace(NUM_G, ' ') : s;
+export const shapeLeftover = (s: string): boolean => {
+  if (SHAPE_LEFTOVER.test(s)) return true;
+  const rest = s.replace(FILLER, ' ').replace(REQUEST_WORDS, ' ');
+  for (const t of rest.match(/[A-Za-z0-9]+|[א-ת]+/g) ?? []) {
+    if (/^\d/.test(t)) return true; // a magnitude this rule cannot express
+    if (/^[A-Za-z]/.test(t)) {
+      if (!NEUTRAL_EN.test(t)) return true; // an unclaimed label or an unknown word
+    } else if (!NEUTRAL_HE.test(t) && !NEUTRAL_HE.test(t.replace(/^[ובלכשמה]{1,3}/, '')) && !HE_PREFIX_REMNANT.test(t)) {
+      return true;
+    }
+  }
+  return false;
+};
 
-/** A quad-shape rule factory: keyword (either order) + 4 labels → command. */
-const quadShape =
-  (re: RegExp, make: (ids: [Id, Id, Id, Id]) => Command): Rule =>
+/**
+ * A named-shape MACRO ([ADR-110](docs/06-decisions.md#adr-110)): a keyword (He/En) + n labels decomposed into a sequence of
+ * already-supported canonical commands — e.g. a kite = a general quad + two equal-adjacent-side
+ * constraints. The figure is built from declared relationships on existing primitives (the constraint
+ * solver does the work), so no new engine construct is needed. `trigger` (what fires the rule) and
+ * `strip` (every keyword word to remove before reading labels) are separate, because a shape like
+ * "isosceles triangle" fires on "isosceles" yet must strip "triangle" too. The leftover gate is
+ * `shapeLeftover` (#497 fail-closed) and runs AFTER label extraction — the order matters: a lowercase
+ * label run («ריבוע abcd») is indistinguishable from an unknown word until `labelRun` has claimed it.
+ */
+const shapeMacro =
+  (trigger: RegExp, strip: RegExp, n: number, make: (ids: Id[]) => AnyCommand[], defer?: (s: string) => boolean): Rule =>
   (s, ctx) => {
-    if (!re.test(s)) return null;
-    const leftover = shapeHasLeftover(s, re);
-    const ids = shapeLabels(s.replace(re, ' '), 4, ctx, leftover); // explicit run, or auto-named A,B,C,D for a bare shape
-    if (!ids) return null;
-    if (leftover) return 'stop'; // labels + a modifier left over → don't drop it, escalate
-    return [make([ids[0], ids[1], ids[2], ids[3]])];
+    if (defer?.(s)) return null; // a downstream rule owns this phrasing (e.g. a triangle through/around a circle)
+    if (!trigger.test(s)) return null;
+    const bare = s.replace(strip, ' ');
+    const ids = labelRun(bare, n);
+    if (!ids) {
+      // No label run. Auto-name a bare named shape ("דלתון" → A,B,C,D) when the student named NO labels and
+      // nothing geometry-significant remains; a partial run / leftover defers or escalates exactly as before.
+      if (namesVertices(bare) || shapeLeftover(bare)) return null;
+      return make(autoVertexLabels(n, ctx.points ?? []));
+    }
+    // After keyword + labels are consumed, nothing geometry-significant should remain — a constraint/extra
+    // construct ("kite ABCD with AB = 6") means a compound → escalate, don't half-parse (mirrors inscribedPolygon).
+    if (shapeLeftover(removeClaimed(bare, ids))) return 'stop';
+    return make(ids);
   };
 
-/** A triangle rule factory: keyword (either order) + 3 labels → command. */
-const triShape =
-  (re: RegExp, make: (ids: [Id, Id, Id]) => Command): Rule =>
-  (s, ctx) => {
-    // "the circle CIRCUMSCRIBING triangle ABC …" names a circumcircle, not a free triangle — defer so the
-    // "משולש ABC" inside it doesn't make this rule `stop` (the circumcircle rules sit after the polygons).
-    // BEFORE `re.test` so the early return doesn't leave the `g`-flagged `re`'s lastIndex advanced.
-    if (/circle|מעגל/i.test(s) && /circumscrib|חוסם|\bthrough\b|דרך/i.test(s)) return null;
-    if (!re.test(s)) return null;
-    const leftover = shapeHasLeftover(s, re);
-    const ids = shapeLabels(s.replace(re, ' '), 3, ctx, leftover); // explicit run, or auto-named A,B,C for a bare shape
-    if (!ids) return null;
-    if (leftover) return 'stop';
-    return [make([ids[0], ids[1], ids[2]])];
-  };
+/** A triangle phrasing that names a circle it is THROUGH / circumscribes belongs to the circumcircle/incircle
+ *  rules downstream — defer (matches the `triShape` guard) so "isosceles triangle ABC … חוסם במעגל" isn't
+ *  half-claimed by the macro. (Inscribed/"חסום" is NOT here — that escalates as a genuine compound.) */
+const triThroughCircle = (s: string): boolean =>
+  /circle|מעגל/i.test(s) && /circumscrib\w*|חוסם|\bthrough\b|דרך/i.test(s);
+
+/** A quad-shape rule: keyword (either order) + 4 labels → one command — `shapeMacro` with a single
+ *  command, so the quads share its post-label leftover gate (#497: quadShape used to run its OWN gate
+ *  BEFORE label extraction, which the fail-closed predicate cannot survive — see the shapeMacro note).
+ *  The trigger is compiled g-less so `test` carries no lastIndex state. */
+const quadShape = (re: RegExp, make: (ids: [Id, Id, Id, Id]) => Command): Rule =>
+  shapeMacro(rx(re.source), re, 4, (ids) => [make([ids[0], ids[1], ids[2], ids[3]])]);
+
+/** The triangle twin — defers a circumscribing/through phrasing to the circle rules (`triThroughCircle`). */
+const triShape = (re: RegExp, make: (ids: [Id, Id, Id]) => Command): Rule =>
+  shapeMacro(rx(re.source), re, 3, (ids) => [make([ids[0], ids[1], ids[2]])], triThroughCircle);
 
 /** "square ABCD" / "ריבוע ABCD" — keyword and labels in either order. */
 const square = quadShape(/square|ריבוע/gi, (ids) => ({ type: 'square', ids }));
@@ -664,38 +726,6 @@ const quadrilateral = quadShape(/quadrilateral|quad|מרובע/gi, (ids) => ({ t
  *  the construction counterpart of `∠` for angles, so `△ABC` builds a triangle like `∠ABC` states an angle.) */
 const triangle = triShape(/triangle|משולש|[△▲]/gi, (ids) => ({ type: 'triangle', ids }));
 
-/**
- * A named-shape MACRO ([ADR-110](docs/06-decisions.md#adr-110)): a keyword (He/En) + n labels decomposed into a sequence of
- * already-supported canonical commands — e.g. a kite = a general quad + two equal-adjacent-side
- * constraints. The figure is built from declared relationships on existing primitives (the constraint
- * solver does the work), so no new engine construct is needed. Mirrors `quadShape`/`triShape` (label run +
- * SHAPE_LEFTOVER escalation) but `trigger` (what fires the rule) and `strip` (every keyword word to remove
- * before reading labels) are separate, because a shape like "isosceles triangle" fires on "isosceles" yet
- * must strip "triangle" too.
- */
-const shapeMacro =
-  (trigger: RegExp, strip: RegExp, n: number, make: (ids: Id[]) => AnyCommand[], defer?: (s: string) => boolean): Rule =>
-  (s, ctx) => {
-    if (defer?.(s)) return null; // a downstream rule owns this phrasing (e.g. a triangle through/around a circle)
-    if (!trigger.test(s)) return null;
-    const bare = s.replace(strip, ' ');
-    const ids = labelRun(bare, n);
-    if (!ids) {
-      // No label run. Auto-name a bare named shape ("דלתון" → A,B,C,D) when the student named NO labels and
-      // nothing geometry-significant remains; a partial run / leftover defers or escalates exactly as before.
-      if (namesVertices(bare) || SHAPE_LEFTOVER.test(bare)) return null;
-      return make(autoVertexLabels(n, ctx.points ?? []));
-    }
-    // After keyword + labels are consumed, nothing geometry-significant should remain — a constraint/extra
-    // construct ("kite ABCD with AB = 6") means a compound → escalate, don't half-parse (mirrors inscribedPolygon).
-    const leftover = ids.reduce(
-      (a, id) => a.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
-      bare.replace(new RegExp(String.raw`\b${ids.join('')}\b`, 'i'), ' '),
-    );
-    if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
-    return make(ids);
-  };
-
 /** "kite ABCD" / "דלתון ABCD" ("עפיפון" folds to דלתון at normalizeUtterance, ADR-405) → a `shape-variant`
  *  whose equal-pair AXIS is a cyclable choice
  *  ([ADR-138](docs/06-decisions.md#adr-138)): variant 0 = axis AC (|AB|=|AD|, |CB|=|CD|), variant 1 = axis BD.
@@ -703,12 +733,6 @@ const shapeMacro =
 const kite = shapeMacro(/kite|דלתון/i, /kite|דלתון/gi, 4, (ids) => [
   { type: 'shape-variant', shape: 'kite', ids: [ids[0], ids[1], ids[2], ids[3]], variant: 0 },
 ]);
-
-/** A triangle phrasing that names a circle it is THROUGH / circumscribes belongs to the circumcircle/incircle
- *  rules downstream — defer (matches the `triShape` guard) so "isosceles triangle ABC … חוסם במעגל" isn't
- *  half-claimed by the macro. (Inscribed/"חסום" is NOT here — that escalates as a genuine compound.) */
-const triThroughCircle = (s: string): boolean =>
-  /circle|מעגל/i.test(s) && /circumscrib\w*|חוסם|\bthrough\b|דרך/i.test(s);
 
 /** "isosceles triangle ABC" / "משולש שווה שוקיים ABC" → a `shape-variant` whose APEX is a cyclable choice
  *  ([ADR-138](docs/06-decisions.md#adr-138), subsuming the ADR-114 soft default): variant 0 = apex A
@@ -3983,6 +4007,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   );
   if (named) rest = rest.replace(new RegExp(String.raw`\b${named}\b`, 'gi'), ' ');
   if (r.symbolic) rest = rest.replace(new RegExp(String.raw`\b[Rr]\b${r.sym && !/^[Rr]$/.test(r.sym) ? String.raw`|\b${r.sym}\b` : ''}`, 'g'), ' '); // the radius symbol is not a vertex (ADR-034; #54 — any bound letter)
+  rest = stripConsumedNumber(rest, r.numeric); // a CONSUMED radius value is not leftover either (#497)
   // The vertices the student named, or — when the shape word is explicit but UNLABELED ("מרובע חסום
   // במעגל" / "triangle inscribed in a circle") — auto-named A,B,C(,D), avoiding existing points and the
   // named centre. A PARTIAL label run (some letters but not n) stays a defer/escalate (a typo / compound).
@@ -3995,11 +4020,7 @@ const inscribedPolygon: Rule = (s, ctx) => {
   // After the circle, the shape, and the vertices are consumed, nothing
   // geometry-significant should remain — a constraint/extra construct means a
   // compound ("inscribed … with AB = 6") → escalate, don't half-parse.
-  const leftover = ids.reduce(
-    (a, id) => a.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
-    rest.replace(new RegExp(String.raw`\b${ids.join('')}\b`, 'i'), ' '),
-  );
-  if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
+  if (shapeLeftover(removeClaimed(rest, ids))) return 'stop';
   // The equal-side relations for a named inscribed triangle shape (ADR-117), appended to whichever branch
   // builds the figure. Equilateral = both adjacent pairs equal; isosceles = a SOFT default |AB|=|AC| that
   // yields to an explicit pair (ADR-114), matching the standalone macros. Empty for a plain/quad inscribe.
@@ -4243,15 +4264,11 @@ const regularPolygon: Rule = (s, ctx) => {
   // still escalates. (A generic "regular polygon" with no labels already returned null above: n is unknown.)
   const ids =
     labelRun(rest, n) ??
-    (!namesVertices(rest) && !SHAPE_LEFTOVER.test(rest)
+    (!namesVertices(rest) && !shapeLeftover(rest)
       ? autoVertexLabels(n, [...(ctx.points ?? []), ...(named ? [named] : [])])
       : null);
   if (!ids) return null;
-  const leftover = ids.reduce(
-    (a, id) => a.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
-    rest.replace(new RegExp(String.raw`\b${ids.join('')}\b`, 'i'), ' '),
-  );
-  if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
+  if (shapeLeftover(removeClaimed(rest, ids))) return 'stop';
   // Routing: a regular triangle is equilateral; a regular quadrilateral is a square.
   if (n === 3) return [
     { type: 'triangle', ids: [ids[0], ids[1], ids[2]] },
@@ -4400,8 +4417,10 @@ const semicircle: Rule = (s, ctx) => {
   // strips its OWN words; the quantified «על כל צלע של ריבוע…» still stops on the surviving כל/ריבוע).
   // The "outside/inside the <shape>" bulge clause is stripped too (its shape+labels must not be read as
   // the diameter or trip the leftover guard); it's resolved to a bulge reference below.
+  // Bare «חצי»/"half" join the strip (#497): dropCircleRef removes a «מעגל X» mention BEFORE this
+  // regex runs, orphaning the noun's first half so the compound alternative can no longer match it.
   const stripped = dropCircleRef(s).replace(BULGE_CLAUSE, ' ').replace(
-    /semicircle|half[\s-]?circle|חצי[\s-]?ה?מעגל|חצי[\s-]?ה?עיגול|diameter|קוטר|שקוטרו|צלע\S*|\bsides?\b|(?<![א-ת])יש(?![א-ת])|על|\bon\b|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
+    /semicircle|half[\s-]?circle|חצי[\s-]?ה?מעגל|חצי[\s-]?ה?עיגול|(?<![א-ת])חצי(?![א-ת])|\bhalf\b|diameter|קוטר|שקוטרו|צלע\S*|\bsides?\b|(?<![א-ת])יש(?![א-ת])|על|\bon\b|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
     ' ',
   );
   const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
@@ -4412,8 +4431,7 @@ const semicircle: Rule = (s, ctx) => {
   const freshDia = autoVertexLabels(2, ctx.points ?? []);
   const [a, b] = dia ?? (freshDia.length === 2 ? freshDia : ['A', 'B']);
   const bulge = semicircleBulge(s, ctx, up(a), up(b));
-  const leftover = [a, b].reduce((acc, id) => acc.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '), restNoC);
-  if (SHAPE_LEFTOVER.test(leftover)) return 'stop'; // a compound ("semicircle … with AC=5") → escalate, don't half-parse
+  if (shapeLeftover(stripConsumedNumber(removeClaimed(restNoC, [a, b]), r.numeric))) return 'stop'; // a compound ("semicircle … with AC=5") → escalate, don't half-parse
   // The unnamed-centre pick consults ctx.circles too (#213): an ADR-342 ANONYMOUS centre ('@ctr-O')
   // never appears in ctx.points — the ctx.points-only pick re-chose O for every unnamed semicircle,
   // so the second one re-emitted the first's ids and refused «coincides with its constructed target».
@@ -4478,8 +4496,9 @@ const quarterCircle: Rule = (s, ctx) => {
   // collapsed so circleCenter's circle-noun forms see a plain «מעגל» (ADR-355; the semicircle
   // rule's own namedC discipline).
   const namedC = circleCenter(s.replace(/רבע[\s-]?|quarter[\s-]?/gi, ''));
+  // Bare «רבע»/"quarter" join the strip (#497) — the semicircle rule's dropCircleRef-orphan note.
   const stripped = dropCircleRef(s).replace(
-    /quarter[\s-]?circle|רבע[\s-]?ה?מעגל|רבע[\s-]?ה?עיגול|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
+    /quarter[\s-]?circle|רבע[\s-]?ה?מעגל|רבע[\s-]?ה?עיגול|(?<![א-ת])רבע(?![א-ת])|\bquarter\b|radius|רדיוס\S*|circle|מעגל|cent\w*|מרכז\S*/gi,
     ' ',
   );
   const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
@@ -4488,11 +4507,7 @@ const quarterCircle: Rule = (s, ctx) => {
   // Anything geometry-significant surviving the rule's own words + labels («החסום במשולש», a cut
   // compound) is meaning this rule cannot express — escalate, never half-build (ADR-355; the
   // semicircle rule's SHAPE_LEFTOVER discipline).
-  const leftover = [...(named ?? []), ...(endsRun ?? [])].reduce(
-    (acc, id) => acc.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
-    restNoC,
-  );
-  if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
+  if (shapeLeftover(stripConsumedNumber(removeClaimed(restNoC, [...(named ?? []), ...(endsRun ?? [])]), r.numeric))) return 'stop';
   // Defaults NEVER bind existing points the utterance didn't name (the ADR-116/263 label-hijack
   // class): an unnamed centre picks a free centre letter, unnamed ends pick fresh vertex letters.
   const taken = ctx.points ?? [];
@@ -4559,11 +4574,7 @@ const sector: Rule = (s, ctx) => {
   const restNoC = namedC ? stripped.replace(new RegExp(String.raw`\b${namedC}\b`, 'gi'), ' ') : stripped;
   const run = labelRun(restNoC, 3);
   const endsRun = !run && namedC ? labelRun(restNoC, 2) : null;
-  const leftover = [...(run ?? []), ...(endsRun ?? [])].reduce(
-    (acc, id) => acc.replace(new RegExp(String.raw`\b${id}\b`, 'gi'), ' '),
-    restNoC,
-  );
-  if (SHAPE_LEFTOVER.test(leftover)) return 'stop';
+  if (shapeLeftover(removeClaimed(restNoC, [...(run ?? []), ...(endsRun ?? [])]))) return 'stop';
   const taken = ctx.points ?? [];
   const exists = (p: string) => taken.some((q) => up(q) === up(p));
   let center: string, a: string, b: string;
@@ -8698,6 +8709,13 @@ export function normalizeUtterance(raw: string): string {
     .replace(/מעויין/g, 'מעוין')
     .replace(/עפיפון/g, 'דלתון')
     .replace(/(?<![א-ת])שוה(?![א-ת])/g, 'שווה')
+    // «זוות» → «זווית» (#497): the one OBSERVED misspelling of the angle noun (operator report,
+    // 2026-08-10 — «טרפז ישר זוות»), phonetically identical, not a Hebrew word of its own. Folding it
+    // here makes the whole ישר-זווית family (right trapezoid/triangle, angle statements) read it
+    // deterministically; unobserved variants (זויית, זות…) are NOT enumerated — they hit the
+    // fail-closed leftover gate and escalate to the LLM, which reads typos. Guarded like the שוה fold
+    // so it never fires inside another word.
+    .replace(/(?<![א-ת])זוות(?![א-ת])/g, 'זווית')
     // Angle/degree GLYPH variants (#45 / ADR-299): the ∡ MEASURED-ANGLE (U+2221) and ∢ SPHERICAL-ANGLE
     // (U+2222) glyphs are the same student intent as ∠ (U+2220); the SUPERSCRIPT ZERO ⁰ (U+2070), typed for
     // degrees ("90⁰"), is the ° sign. Normalising here means every angle rule reads the canonical glyphs.

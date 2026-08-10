@@ -5,62 +5,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "right triangle ABC",
-    "winner": "rightTriangle",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "isosceles triangle ABC",
-    "winner": "(anon)",
-  },
-  {
-    "lang": "he",
-    "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "משולש שווה שוקיים ABC",
-    "winner": "(anon)",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "equilateral triangle ABC",
-    "winner": "(anon)",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "isosceles trapezoid ABCD",
-    "winner": "(anon)",
-  },
-  {
-    "lang": "he",
-    "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "טרפז שווה שוקיים ABCD",
-    "winner": "(anon)",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "right trapezoid ABCD",
-    "winner": "(anon)",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
       "pointsOnSegment",
       "pointOnSegment",
     ],
@@ -87,18 +31,9 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "he",
     "shadowedBy": [
-      "(anon)",
       "diagonals",
     ],
     "text": "G מפגש האלכסונים במרובע ABCD",
-    "winner": "specialPointMeet",
-  },
-  {
-    "lang": "he",
-    "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "M מפגש התיכונים במשולש ABC",
     "winner": "specialPointMeet",
   },
   {
@@ -107,14 +42,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
       "bisectorIntersection",
     ],
     "text": "O is the intersection of the angle bisectors of triangle ABC",
-    "winner": "specialPointMeet",
-  },
-  {
-    "lang": "he",
-    "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "H מפגש הגבהים במשולש ABC",
     "winner": "specialPointMeet",
   },
   {
@@ -128,7 +55,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
   {
     "lang": "en",
     "shadowedBy": [
-      "(anon)",
       "segment",
     ],
     "text": "midsegment to BC in triangle ABC",
@@ -140,14 +66,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
       "segment",
     ],
     "text": "קטע האמצעים לצלע BC במשולש ABC",
-    "winner": "midsegment",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "midsegment of trapezoid ABCD",
     "winner": "midsegment",
   },
   {
@@ -189,14 +107,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     ],
     "text": "DM*ME = BM*DR",
     "winner": "lengthProduct",
-  },
-  {
-    "lang": "he",
-    "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "שטח המשולש ABC הוא 13",
-    "winner": "area",
   },
   {
     "lang": "en",
@@ -362,22 +272,6 @@ exports[`parser shadow-matrix — catalog corpus > divergent later-claimers (can
     ],
     "text": "AB ו-AD משיקים למעגל O בנקודות E ו-K",
     "winner": "cornerTangentCircle",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "cyclic quadrilateral ABCD",
-    "winner": "inscribedPolygon",
-  },
-  {
-    "lang": "he",
-    "shadowedBy": [
-      "(anon)",
-    ],
-    "text": "מרובע ABCD בר חסימה",
-    "winner": "inscribedPolygon",
   },
   {
     "lang": "en",

@@ -34,18 +34,18 @@ const segPairs = (cmds: AnyCommand[]): string[] =>
   cmds.flatMap((c) => (c.type === 'segment' ? [[c.a, c.b].sort().join('')] : []));
 
 describe('ADR-250/1 — droppedGivenNumbers (no stated magnitude is silently dropped)', () => {
-  it("flags the operator's typo: the triangle rule claims the area-ratio utterance and drops 2.25", () => {
+  it("the operator's typo escalates at the PARSE now (#497) — the triangle rule can no longer claim the area-ratio utterance", () => {
     const { last } = parseSteps([
       'משולש ABC שווה צלעות חסום במעגל',
       'D על המשך הצלע BC',
       'AD חותך את המעגל בנקודה E',
       'שטח AEB גדול פי 2.25 משוטח משולש CED', // ← the typo (משוטח for משטח)
     ]);
-    expect(last.ok).toBe(true); // the triangle rule still claims it…
-    if (last.ok) {
-      expect(last.commands.some((c) => c.type === 'set-area-ratio')).toBe(false); // …with the ratio GONE
-      expect(droppedGivenNumbers('שטח AEB גדול פי 2.25 משוטח משולש CED', last.commands)).toEqual([2.25]); // → escalate, never commit
-    }
+    // The #497 fail-closed leftover gate stops the triangle rule on the surviving «שטח … פי … משוטח»,
+    // so the drop never even forms — the whole line escalates to the LLM (whose job is typos).
+    expect(last.ok).toBe(false);
+    // The gate itself remains the LLM-commit path's net: on a bare-triangle lowering it still names the drop.
+    expect(droppedGivenNumbers('שטח AEB גדול פי 2.25 משוטח משולש CED', [{ type: 'triangle', ids: ['A', 'E', 'B'] } as AnyCommand])).toEqual([2.25]);
   });
 
   it('the CORRECT spelling parses to the ratio and the guard stays silent', () => {

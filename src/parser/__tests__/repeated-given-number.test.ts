@@ -20,6 +20,7 @@ import { describe, expect, it } from 'vitest';
 import { buildParseCtx, droppedGivenNumbers, parse } from '@/parser';
 import { replay } from '@/store/geoStore';
 import type { Fact } from '@/store/geoStore';
+import type { AnyCommand } from '@/engine';
 
 /** Parse one utterance on a figure built from the preceding ones, and run the gate on the result. */
 function gate(utterances: string[]): { ok: boolean; dropped: number[] } {
@@ -37,18 +38,20 @@ function gate(utterances: string[]): { ok: boolean; dropped: number[] } {
 }
 
 describe('#437 — a REPEATED stated magnitude cannot be accounted twice by one payload', () => {
-  it("the prod utterance: «ריבוע במידות 4*4» no longer commits size-less with a green ✓", () => {
-    const r = gate(['ריבוע במידות 4*4']);
-    expect(r.ok).toBe(true); // the square rule still claims it…
-    expect(r.dropped).toContain(4); // …but the gate now sees the unconsumed 4 and the App escalates
+  it("the prod utterance: «ריבוע במידות 4*4» now escalates at the PARSE (#497) — never a size-less square", () => {
+    // The fail-closed leftover gate stops the square rule on the surviving «במידות 4*4», so the
+    // whole line goes to the LLM instead of committing a size-less square with a green ✓.
+    expect(gate(['ריבוע במידות 4*4']).ok).toBe(false);
+    expect(gate(['מלבן במידות 4*6']).ok).toBe(false);
+    expect(gate(['מלבן 4 על 4']).ok).toBe(false);
   });
 
-  it('the distinct-number sibling is unchanged — it was always honest', () => {
-    expect(gate(['מלבן במידות 4*6']).dropped).toContain(6);
-  });
-
-  it('the class beyond dimensions: a repeated number in ANY given (`4 על 4`)', () => {
-    expect(gate(['מלבן 4 על 4']).dropped).toContain(4);
+  it('the gate itself stays a MULTISET on the LLM-commit path: one payload cannot vouch for both 4s', () => {
+    const square = [{ type: 'square', ids: ['A', 'B', 'C', 'D'] } as AnyCommand];
+    const rect = [{ type: 'rectangle', ids: ['A', 'B', 'C', 'D'] } as AnyCommand];
+    expect(droppedGivenNumbers('ריבוע במידות 4*4', square)).toContain(4); // ids.length accounts ONE 4, not both
+    expect(droppedGivenNumbers('מלבן במידות 4*6', rect)).toContain(6); // the distinct sibling was always honest
+    expect(droppedGivenNumbers('מלבן 4 על 4', rect)).toContain(4); // the class beyond dimensions
   });
 
   it('the honest phrasing still refuses or builds — never a silent size-less commit', () => {
