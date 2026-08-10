@@ -88,6 +88,42 @@ describe('#396 — a relation between two ABSOLUTE objects gets the redundancy n
     expect(state().lastError).toBeNull();
     expect(derived().notices.filter((n) => n.kind === 'redundant-relation')).toEqual([]);
   });
+
+  // #500 — the operator's exact prod sequence (2026-08-10). A FREE plane (#487) is absolute but NOT
+  // self-determined: the stated relation is what ORIENTS it (freePlane.ts), so calling the given
+  // redundant asserts the opposite of the truth.
+  it('«π1» → «π2» → «π1 ניצב ל-π2» — the relation PINS two free planes, so no notice', () => {
+    submit('π1');
+    submit('π2');
+    submit('π1 ניצב ל-π2');
+    expect(state().lastError).toBeNull();
+    expect(derived().notices.filter((n) => n.kind === 'redundant-relation')).toEqual([]);
+  });
+
+  it('a free plane ∥ an EQUATION plane — the free side is still driven, so no notice', () => {
+    submit('המישור π1: z = 0');
+    submit('מישור π2');
+    submit('π2 מקביל ל-π1');
+    expect(state().lastError).toBeNull();
+    expect(derived().notices.filter((n) => n.kind === 'redundant-relation')).toEqual([]);
+  });
+
+  it('a typed LINE ⟂ a free plane (the line-rel lane) — same pin, same silence', () => {
+    submit('הישר ℓ: x = (0,0,0) + t(1,0,0)');
+    submit('מישור π2');
+    submit('הישר ℓ מאונך למישור π2');
+    expect(state().lastError).toBeNull();
+    expect(derived().notices.filter((n) => n.kind === 'redundant-relation')).toEqual([]);
+  });
+
+  it('a free plane REPLACED by its equation makes a later relation genuinely redundant — notice returns', () => {
+    submit('π1');
+    submit('המישור π1: z = 0');
+    submit('המישור π2: x = 0');
+    submit('π1 ניצב ל-π2');
+    expect(state().lastError).toBeNull();
+    expect(derived().notices).toContainEqual({ kind: 'redundant-relation', a: 'π1', b: 'π2' });
+  });
 });
 
 describe('#395 — the plane display cycle + persistence', () => {

@@ -45,6 +45,24 @@ export interface AbsoluteCtx {
  */
 export const isAbsolute = (op: Operand3): boolean => op.kind === 'line' || op.kind === 'plane-named';
 
+/**
+ * #500 (ADR-3D-124 Am. 2): is the operand fixed by its OWN definition — so a relation stated about it
+ * could never have driven anything? This is a STRICTLY different question from `isAbsolute`, and the
+ * two coincided only until the free plane existed:
+ *
+ *  - `isAbsolute` — does the operand ride the gauge? (the FRAME classifier: may this relation be solved
+ *    with the figure frozen). A free plane is absolute — it is named, not built from point ids.
+ *  - `isSelfDetermined` — are the operand's numbers knowledge before any relation is stated? A FREE
+ *    plane's are not: it is declared with no equation, and the ∥/⟂ relations stated about it are
+ *    precisely what `resolveFreePlane` pins it with (engine/freePlane.ts).
+ *
+ * Ask this one whenever the question is "did this statement add information"; ask `isAbsolute` when the
+ * question is "must the figure move to satisfy it". Free planes are today's only absolute-but-not-self-
+ * determined kind — a typed line has no free variant, so `line` needs no exception.
+ */
+export const isSelfDetermined = (c: Construction3, op: Operand3): boolean =>
+  isAbsolute(op) && !(op.kind === 'plane-named' && c.planes.get(op.name)?.free);
+
 /** #384/#396 (ADR-3D-108): the display label of an operand — the one spelling every panel row,
  *  notice and witness label shares, so an operand can never be named two ways. */
 export const operandLabel = (op: Operand3): string =>

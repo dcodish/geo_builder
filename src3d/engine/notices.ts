@@ -16,7 +16,7 @@
  */
 
 import { CYCLIC_MEMBER, CYCLIC_MEMBER_NAME, QUAD_PYRAMIDS } from './baseShapes';
-import { isAbsolute, lineDirCarriesParam, operandLabel, planeNormalCarriesParam } from './operands';
+import { isSelfDetermined, lineDirCarriesParam, operandLabel, planeNormalCarriesParam } from './operands';
 import type { QuadBase } from './baseShapes';
 import type { Construction3, Id, Operand3, SolidKind } from './types';
 
@@ -76,10 +76,13 @@ export function buildNotices3(c: Construction3): BuildNotice3[] {
     if (entry.fix.kind === 'none') continue; // square / rectangle are cyclic already — nothing changed
     out.push({ kind: 'base-constrained', ids: [...s.ids], from: spec.base, to: CYCLIC_MEMBER_NAME[spec.base] });
   }
-  // #396 (ADR-3D-108): a relation between two ABSOLUTE objects that could never drive is
+  // #396 (ADR-3D-108): a relation between two SELF-DETERMINED objects that could never drive is
   // REDUNDANT — say so (it was verified at commit, or it would have refused claim-refuted).
   // Excluded: any side whose direction/normal carries the figure parameter — there the
   // statement PINNED the parameter (2024-Q2's «ℓ ⟂ π»), which is real information.
+  // #500: the predicate is `isSelfDetermined`, NOT `isAbsolute` — a FREE plane (#487) is absolute
+  // and carries no parameter, yet the stated relation is the very thing that orients it, so the
+  // notice would have been a false statement about the student's own given.
   {
     const carriesParam = (op: Operand3): boolean =>
       op.kind === 'line' ? lineDirCarriesParam(c, op.name)
@@ -92,7 +95,7 @@ export function buildNotices3(c: Construction3): BuildNotice3[] {
       const pair = pairOf(cl);
       if (!pair) continue;
       const [a, b] = pair;
-      if (!isAbsolute(a) || !isAbsolute(b)) continue;
+      if (!isSelfDetermined(c, a) || !isSelfDetermined(c, b)) continue;
       if (carriesParam(a) || carriesParam(b)) continue;
       out.push({ kind: 'redundant-relation', a: operandLabel(a), b: operandLabel(b) });
     }

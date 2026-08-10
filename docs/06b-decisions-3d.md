@@ -2570,3 +2570,42 @@ was being conjured regardless — now it is at least free, instant, and reproduc
 
 **Locked**: «π2», «π», «pi2», «נתון π2» → `free-plane` deterministically; the shadow-matrix snapshot
 carries the bare corpus entries with `freePlaneDecl` as winner (nothing shadowed).
+
+### ADR-3D-124 Am. 2 — «absolute» and «self-determined» are two questions (#500)
+
+The operator's first prod session with the free plane typed «π1», «π2», «π1 ניצב ל-π2» and got the #396
+redundancy notice: *"the relation was verified ✓ — but it already follows from their definitions, so the
+given adds no new information."* On that figure the sentence is **false in both halves**: two bare-declared
+planes have no defining equations for anything to follow from, and the stated ⟂ is the only thing orienting
+them relative to each other. The figure, the drive and the ✓ were all correct — only the explanation lied.
+
+**Root cause — one predicate answering two questions.** `isAbsolute` (`engine/operands.ts`) is the FRAME
+classifier: *does relating a gauge object to this one require the figure to move?* The #396 notice needed a
+different property: *are this object's numbers knowledge before any relation is stated?* Until #487 the two
+were extensionally equal — every `plane-named` was an equation plane — so one predicate served both and no
+one had to name the distinction. The free plane separates them: it is absolute (named, not built from point
+ids — the frame classifier is right about it) and **not** self-determined (its orientation comes from
+precisely the ∥/⟂ relations `resolveFreePlane` pins it with). #487 gated every consumer that reads a free
+plane's coefficients as knowledge — `evaluate` ×8, `apply` ×3, `dataView` — and `notices.ts` was the missed
+one. The carries-param escape hatch could not save it: the placeholder's coefficients are all `p: 0`.
+
+**The fix names the distinction rather than testing for the symptom.** `isSelfDetermined(c, op)` joins
+`isAbsolute` at the operand seam, with the doc comment separating the two meanings so the *next* consumer
+picks deliberately; `buildNotices3` is its first caller. The remaining seven `isAbsolute` sites were audited
+(`apply.ts:987/1012/1033`, `evaluate.ts:502/747/1078`, `solve3.ts:247`) and all genuinely mean gauge-frame:
+each decides drive-vs-claim, and routing a free plane's relation into the claim lane is exactly what makes
+`resolveFreePlane` see it. No behaviour there changes. Consequence, and correct: a free plane pinned by
+three memberships is still `free`, so a relation stated against it is the verify register with no notice —
+consistent with the #396 ruling that figure objects never notice.
+
+**Adjacent check** (the fix plan called for it): a DISTANCE stated against a free plane refuses
+`claim-refuted` — the plane's pin sources are an enumeration and distance is not on it, so information the
+student gave becomes an accusation that they are wrong. Filed [#508](https://github.com/dcodish/geo_builder/issues/508)
+(P2 feature), not folded in here — it is a capability, not this defect.
+
+**Locked** in `panel-bundle.test.ts`: the operator's exact three utterances → no notice; a free plane ∥ an
+equation plane → no notice; a typed line ⟂ a free plane (the `line-rel` lane, whose own suite scenario was
+firing the false notice unasserted) → no notice; and the positive control that a free plane REPLACED by its
+equation makes a later relation genuinely redundant, notice restored. The two equation-plane and
+figure-object controls from #396 stay green.
+
