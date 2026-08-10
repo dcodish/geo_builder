@@ -445,6 +445,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "C(√2,1,0)",
+    "winner": "coordPoint",
+  },
+  {
+    "lang": "he",
+    "text": "C(√2,1,0)",
+    "winner": "coordPoint",
+  },
+  {
+    "lang": "en",
     "text": "volume of pyramid SENB equals volume of pyramid CENB",
     "winner": "volumeEqPoly",
   },

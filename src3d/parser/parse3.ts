@@ -753,9 +753,12 @@ const dotGiven: Rule = (s) => {
 
 /** `BD = (-4,5,12)` — a PAIR-vector injection (V7 T2). */
 const pairInjection: Rule = (s) => {
-  const m = s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)$/);
+  // #510: the shared VALUE atom + reader — a pair injection reads «√2» exactly as a coordinate does.
+  const m = s.match(new RegExp(String.raw`^(${LBL})(${LBL})\s*=\s*\(\s*(${VAL})\s*,\s*(${VAL})\s*,\s*(${VAL})\s*\)$`));
   if (!m) return null;
-  return [{ type: 'inject-pair', a: m[1], b: m[2], x: +m[3], y: +m[4], z: +m[5] }];
+  const [x, y, z] = [m[3], m[4], m[5]].map(literalValue);
+  if (x === null || y === null || z === null) return null;
+  return [{ type: 'inject-pair', a: m[1], b: m[2], x, y, z }];
 };
 
 /** `נפח הפירמידה ABCD = 64` — a tetrahedron volume claim (V7 T2). */
@@ -872,6 +875,16 @@ function parseCoeff(s: string | undefined): number | null {
   // c=1 ambiguity), instead of falling through to not-handled → the LLM.
   const v = parseFloat(s);
   return Number.isFinite(v) ? v : null;
+}
+
+/** #510 — the reader paired with the `VAL` atom: a signed VALUE literal (`-√2`, `½`, `5/3`, `1.5`).
+ *  One reader for the family, so a coordinate, a vector injection and a point in an injection LIST can
+ *  never disagree about what «√6/4» means. Null on malformed — never a silent NaN in a figure. */
+function literalValue(raw: string): number | null {
+  const t = raw.replace(/\s+/g, '');
+  const neg = t.startsWith('-');
+  const v = parseCoeff(neg ? t.slice(1) : t);
+  return v === null || !Number.isFinite(v) ? null : neg ? -v : v;
 }
 
 const TERM =
@@ -1604,11 +1617,28 @@ const freePlaneDecl: Rule = (s) => {
 
 const NUM = String.raw`-?\d+(?:\.\d+)?`;
 
-/** A tuple component: a number, or an AFFINE symbolic expression (#325, ADR-3D-079) —
+/**
+ * #510 — a VALUE literal: everything {@link parseCoeff} already reads. `√2`, `2√3`, `√6/4`, `5/3`,
+ * `0.5`, `½` — the forms this tool offers on its own symbol palette and accepts as a stated magnitude
+ * («|BD'| = √48» parses today). A coordinate component accepted only DECIMALS, so «C(√2,1,0)» refused
+ * while the same character in a length given worked: offered in one slot and refused in another, the
+ * asymmetry #493 was filed on.
+ *
+ * `VAL` is the LEXICAL half and `parseCoeff` the reader — they are defined as a pair on purpose. The
+ * filed plan was to widen `NUM` itself, and that would have been a silent NaN generator: ~47 rules
+ * compose from `NUM` and read their capture with `+`/`parseFloat`, so a widened atom without a widened
+ * reader turns «√48» into `NaN` INSIDE a committed figure — far worse than the refusal it fixes.
+ * Migrating those rules onto `VAL` one at a time, each with its reader, is filed as follow-up work.
+ */
+const VAL = String.raw`-?(?:\d+\s*\/\s*\d+|\d*\.\d+|(?:\d+(?:\.\d+)?)?\s*√\s*\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?|\d+|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛])`;
+
+/** A tuple component: a VALUE literal (#510), or an AFFINE symbolic expression (#325, ADR-3D-079) —
  *  `t` / `2t` / `-t` / `2·t` / `t+1` / `2t-3` is coefficient·symbol + constant.
- *  Composed from the shared NUM atom (the S2.1 lexical-ratchet discipline). */
-const COMP = String.raw`(?:${NUM}\s*[·*]?\s*[a-w](?:\s*[+-]\s*${NUM})?|-?[a-w](?:\s*[+-]\s*${NUM})?|${NUM})`;
-const COMP_NUM_RE = new RegExp(String.raw`^${NUM}$`);
+ *  Composed from the shared atoms (the S2.1 lexical-ratchet discipline). The SYMBOLIC branch keeps
+ *  `NUM` for its coefficient and offset: widening those runs into the affine model itself, which is
+ *  #509's territory and needs a design ruling, not a lexical change. */
+const COMP = String.raw`(?:${NUM}\s*[·*]?\s*[a-w](?:\s*[+-]\s*${NUM})?|-?[a-w](?:\s*[+-]\s*${NUM})?|${VAL})`;
+const COMP_NUM_RE = new RegExp(String.raw`^${VAL}$`);
 const COMP_TERM_RE = new RegExp(String.raw`^(-|${NUM})?[·*]?([a-w])(?:([+-])(${NUM}))?$`);
 /** #325: attach symExprs only when they carry STRUCTURE beyond bare distinct letters — a
  *  coefficient/offset (`2t`, `t+1`) or a symbol SHARED across components (`B(t,t,3)`). Bare
@@ -1624,13 +1654,23 @@ function symStructure(
 /** Parse one component: a plain number, or {sym, k, c} for k·sym + c. */
 function parseComp(t: string): { num: number | null; expr: SymComp | null } {
   const s = t.replace(/\s+/g, '');
-  if (COMP_NUM_RE.test(s)) return { num: +s, expr: null };
+  // #510: the literal branch is read by `parseCoeff` — the ONE reader for this literal family, already
+  // used by the vec-rel coefficient lane. A second evaluator here would be a second set of rounding and
+  // malformed-input rules to keep in step (docs/17: reuse the chokepoint).
+  if (COMP_NUM_RE.test(s)) return { num: literalValue(s), expr: null };
   const m = s.match(COMP_TERM_RE);
   if (!m) return { num: null, expr: null };
   const k = m[1] === undefined ? 1 : m[1] === '-' ? -1 : +m[1];
   const c = m[3] ? (m[3] === '-' ? -1 : 1) * +m[4] : 0;
   return { num: null, expr: { sym: m[2], k, c } };
 }
+
+/** #510 — a component that matched LEXICALLY but could not be evaluated (`1/0`): neither a number nor a
+ *  symbol. Before the VALUE atom this could not happen — anything matching `COMP` parsed — so the rules
+ *  read `num: null` as "symbolic". Left ungated, a malformed literal would commit as an UNKNOWN
+ *  coordinate, which is the honesty invariant inverted: the student stated a value and the figure would
+ *  claim not to know it. The rules decline instead, and the LLM lane gets it. */
+const unreadableComp = (t: { num: number | null; expr: SymComp | null }): boolean => t.num === null && t.expr === null;
 
 /** `A(2,-2,6)` / `A(3,n,p)` / `נתונה נקודה M(k,1,3), k הוא פרמטר חיובי` (+ optional
  *  membership tail: `נמצאת על אחד המישורים` / `על המישור π2` / `על הישר ℓ`). */
@@ -1641,6 +1681,7 @@ const coordPoint: Rule = (s) => {
   if (!m) return null;
   const [, id, x, y, z, restRaw] = m;
   const comps = [x, y, z].map(parseComp);
+  if (comps.some(unreadableComp)) return null; // #510: a malformed literal is never an unknown coordinate
   const syms = comps.map((t) => t.expr?.sym ?? null) as [string | null, string | null, string | null];
   const symExprs = symStructure(comps);
   const cmds: Command3[] = [
@@ -2230,6 +2271,7 @@ const injectionList: Rule = (s) => {
   for (const g of m[1].matchAll(itemRe)) {
     lastEnd = (g.index ?? 0) + g[0].length;
     const comps = [g[3], g[4], g[5]].map(parseComp);
+    if (comps.some(unreadableComp)) return null; // #510, as above — all-or-nothing, never a partial read
     const [x, y, z] = comps.map((t) => t.num);
     if (g[1]) {
       if (x === null || y === null || z === null) return null; // a vector value must be numeric
@@ -2335,9 +2377,11 @@ const paramSign: Rule = (s) => {
 
 /** Standalone `v = (10,-5,0)` — a single vector injection. */
 const vectorInjection: Rule = (s) => {
-  const m = s.match(new RegExp(`^([a-w])\\s*=\\s*\\(\\s*(${NUM})\\s*,\\s*(${NUM})\\s*,\\s*(${NUM})\\s*\\)$`));
+  const m = s.match(new RegExp(`^([a-w])\\s*=\\s*\\(\\s*(${VAL})\\s*,\\s*(${VAL})\\s*,\\s*(${VAL})\\s*\\)$`));
   if (!m) return null;
-  return [{ type: 'inject-vector', name: m[1], x: +m[2], y: +m[3], z: +m[4] }];
+  const [x, y, z] = [m[2], m[3], m[4]].map(literalValue); // #510: the shared reader, never a bare `+`
+  if (x === null || y === null || z === null) return null;
+  return [{ type: 'inject-vector', name: m[1], x, y, z }];
 };
 
 /** `שיעור ה-z של C' חיובי` / `the z-coordinate of C' is positive` — a sign branch given.

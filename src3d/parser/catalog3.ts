@@ -58,6 +58,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   { category: 'vectors', he: 'וקטור SE = 3/4 וקטור SD', en: 'vector SE = 3/4 vector SD' },
   { category: 'vectors', he: 'k = 1/2', en: 'k = 1/2' },
   { category: 'points', he: 'הקודקוד D נמצא על החלק החיובי של ציר ה-x', en: 'D is on the positive x-axis' },
+  // #510: a coordinate takes the same VALUE literals as a stated magnitude — √, fractions, the palette's ½
+  { category: 'points', he: 'C(√2,1,0)', en: 'C(√2,1,0)' },
   { category: 'claims', he: 'נפח הפירמידה SENB שווה לנפח הפירמידה CENB', en: 'volume of pyramid SENB equals volume of pyramid CENB' },
   { category: 'claims', he: '∠SAB = ∠SAD', en: '∠SAB = ∠SAD' }, // #271: a general angle equality (drives a free-dim solid / verifies a determined one)
   // #337: the SAME relation in the corpus's between-form wording (vector / line / segment nouns all accepted)
