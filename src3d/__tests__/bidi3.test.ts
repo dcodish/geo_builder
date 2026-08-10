@@ -259,3 +259,52 @@ describe('#482(b) — the input preview appears exactly when the box lies about 
     expect(textDir3('line l: x=(1,2,3)')).toBe('ltr');
   });
 });
+
+/**
+ * #482(b) round 2 — the operator typed and "got the same output as I type": mid-way through
+ * «…+t(m-2,…» the text ends in `t(m-`, and the finished-sentence boundary rule left that `-` outside
+ * the isolate — a neutral in an RTL paragraph, it jumped to the far left, and the preview reproduced
+ * the box's lie at exactly the moment it exists to correct.
+ *
+ * The lock is a TYPING SIMULATION, not the one screenshot: at every prefix of the operator's line, the
+ * preview must never leave a non-Hebrew tail dangling after the last isolate. The strict rule is a
+ * property of finished sentences; a live line's tail is an incomplete run by definition.
+ */
+describe('#482(b) — the live-tail rule: no keystroke may dangle', () => {
+  const LINE = 'הישר l: x=(1,2,3)+t(m-2,m,m+2)';
+
+  it('every prefix of the operator’s line previews with the tail INSIDE the last isolate', () => {
+    for (let n = 1; n <= LINE.length; n++) {
+      const prefix = LINE.slice(0, n);
+      const p = inputPreview3(prefix);
+      if (p === null) continue; // no run yet — nothing to lay out
+      const tail = p.slice(p.lastIndexOf(PDI) + 1);
+      expect(
+        tail === '' || HEBREW.test(tail),
+        `at keystroke ${n} («${prefix}») the tail «${tail}» dangles outside the isolate`,
+      ).toBe(true);
+    }
+  });
+
+  it('the mid-typing moment from the screenshot: the trailing hyphen is covered', () => {
+    const p = inputPreview3('הישר l: x=(1,2,3)+t(m-')!;
+    expect(p.endsWith(PDI), 'the isolate must extend through the unfinished tail').toBe(true);
+    expect(p.split(LRI).join('').split(PDI).join('')).toBe('הישר l: x=(1,2,3)+t(m-');
+  });
+
+  it('a Hebrew continuation after the run is NOT swallowed', () => {
+    const p = inputPreview3('הישר l מקביל למישור');
+    // runs isolated, Hebrew tail outside — the live-tail rule only claims a non-Hebrew tail
+    if (p !== null) expect(HEBREW.test(p.slice(p.lastIndexOf(PDI) + 1))).toBe(true);
+  });
+
+  it('the FACT LIST keeps the strict finished-sentence rule — the live-tail rule is preview-only', () => {
+    // a submitted sentence's trailing period stays outside (isolateLtrRuns3 is unchanged by this rule)
+    expect(isolateLtrRuns3('וכאן AB = 9.')).toBe(`וכאן ${LRI}AB = 9${PDI}.`);
+  });
+
+  it('still byte-exact and still gated: pure-Hebrew and pure-LTR lines preview as null', () => {
+    expect(inputPreview3('שרטטו קובייה')).toBeNull();
+    expect(inputPreview3('line l: x=(1,2,3)+t(m-')).toBeNull();
+  });
+});

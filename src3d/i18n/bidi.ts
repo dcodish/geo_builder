@@ -148,7 +148,20 @@ export const textDir3 = (s: string): 'rtl' | 'ltr' => (HEBREW_LETTER.test(s) ? '
  * gate is the transform itself, so the preview appears exactly when the box is lying about the layout.
  */
 export const inputPreview3 = (s: string): string | null => {
-  const iso = isolateLtrRuns3(s);
+  let iso = isolateLtrRuns3(s);
+  // The LIVE-TAIL rule (the operator's second screenshot): a finished sentence's trailing non-CORE
+  // characters are punctuation and belong OUTSIDE the run («וכאן AB = 9.») — but a line BEING TYPED has
+  // no trailing punctuation, it has an incomplete expression. Mid-way through «…+t(m-2,…» the text ends
+  // in `t(m-`, and the strict rule leaves that `-` outside the isolate, where it is a neutral in an RTL
+  // paragraph — it jumps to the far LEFT, and the preview reproduces the box's lie at exactly the moment
+  // it exists to correct. So here, and only here (the fact list renders finished sentences and keeps the
+  // strict rule), the last isolate swallows the tail: if everything after the final PDI is non-Hebrew,
+  // it is the run's own unfinished end, and the isolate extends over it.
+  const lastPdi = iso.lastIndexOf(PDI);
+  if (lastPdi >= 0) {
+    const tail = iso.slice(lastPdi + 1);
+    if (tail && !HEBREW_LETTER.test(tail)) iso = iso.slice(0, lastPdi) + tail + PDI;
+  }
   return iso === s ? null : iso;
 };
 

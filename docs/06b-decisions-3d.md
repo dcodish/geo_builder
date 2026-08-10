@@ -2449,3 +2449,19 @@ Container direction comes from `textDir3` — content-decided, never `dir="auto"
 
 **Locked** in `bidi3.test.ts`: mixed-direction lines preview isolated and byte-identical under stripping;
 pure-Hebrew and pure-LTR lines preview as `null`; `textDir3` decides by content («C במרחק…» is RTL).
+
+### ADR-3D-123 Am. 2 — the preview's LIVE-TAIL rule
+
+The operator play-tested Am. 1 and "got the same output as I type": mid-way through «…+t(m-2,…» the input
+ends in `t(m-`, and the finished-sentence boundary rule — which rightly keeps a trailing `.` outside the
+run — left that `-` outside the isolate, where it is a neutral in an RTL paragraph and jumps to the far
+left. The preview reproduced the box's lie at exactly the moment it exists to correct.
+
+**The rule split is semantic, not cosmetic:** a *finished* sentence's trailing non-CORE characters are
+punctuation (strict rule, unchanged — the fact list and every message keep it); a *live* line's tail is an
+incomplete expression by definition, because the cursor sits at its end. `inputPreview3` therefore extends
+the final isolate over any non-Hebrew tail. A Hebrew continuation («l מקביל למישור») is never swallowed.
+
+**Locked** as a typing simulation, not an example: at EVERY prefix of the operator's line, the preview
+leaves no non-Hebrew tail dangling after the last isolate; the strict rule is separately asserted intact
+for the fact list.
