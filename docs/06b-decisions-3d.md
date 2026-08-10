@@ -2494,3 +2494,65 @@ no equation lane and no construct this rule could match.
 **Locked**: the five declaration forms split into the two named islands; the danger corpus does NOT split
 (`x-5=0`, spaced `x - 5 = 0`, `m-2`, the no-`=` dash phrase); the preview splits mid-typing the moment the
 `=` lands; byte-exactness over the split (two pairs of marks, nothing else).
+
+## ADR-3D-124 — the FREE-standing named plane: declare first, tell later
+
+**Context.** The operator's prod session (#487): *"just writing π2 is not supported. I thought I would
+create π2 and then say B is on it."* Every plane in the tree had to arrive fully determined — by equation
+(`plane3`) or through named points (`pointPlanes`/`relPlanes`) — so the natural incremental order
+(declare, then constrain) was unavailable, and even the LLM could not rescue it: the command vocabulary
+had nothing to express "a plane I will tell you about in a moment" (measured live: Haiku returned its
+cannot-express marker). This ran against the workspace's defining interaction and the tree's own
+under-determination-is-welcome principle.
+
+**Operator rulings (2026-08-10).** (1) A membership naming an undeclared plane **auto-creates** it —
+the forgiving flow, chosen over refuse-with-guidance; the accepted, recorded cost is that a typo'd name
+conjures a plane, bounded by (2): **the noun is required** — «מישור π2» declares, a bare «π2» line stays
+not-understood, and every membership phrasing carries the noun by grammar, so no bare-symbol path can
+create anything. (3) A free plane draws as a patch that **visibly resamples** until pinned.
+
+**The model.** A free plane is a `planes` entry whose `PlaneDef` carries `free: true` — deliberately NOT
+a fourth map: every existence check, operand resolver and renderer sees it without enumeration edits,
+and the flag gates the consumers that need its numbers as knowledge. Its 3 DOFs (unit normal 2 +
+offset 1) are ADR-052 free DOFs: `resolveFreePlane` honours whatever the figure PINS exactly and samples
+the remainder per seed —
+
+- a MEMBERSHIP of an existing point pins the offset and each member-chord constrains the normal; three
+  non-collinear members determine the plane (the stability lock: it stops resampling); a contradictory
+  fourth refuses `not-on-plane` at submit (keep-prior);
+- «ℓ ⊥ π» pins the normal outright; «ℓ ∥ π» removes one normal DOF — these `linePerps`/`lineRels`
+  entries are EXCLUDED from the parameter machinery for a free plane (`paramLinePerps`), because there
+  they pin the PLANE, not the parameter (measured hazard: «l(m) ∥ π2» would otherwise root-find m
+  against the placeholder);
+- a stated ∥/⟂ plane relation (claim-gated by the S3 disposition map) pins through the SAME resolution,
+  after which the recorded claim verifies green — the M1 duality: one sentence drives a free object or
+  verifies a determined one;
+- a LATER equation (`plane3` on a free name) replaces the free def outright — M1, the plane3 edition.
+
+**The count is the sampler.** `resolveFreePlane` returns its remaining-DOF count with the resolution;
+`Resolved3.freePlaneDofs` carries it and `freeDofCount3` adds it — one source for both, so the ADR-052
+conformance smell (sampled but uncounted) cannot re-open.
+
+**Placement coherence.** Free planes resolve BEFORE the point pass (riders and feet read a real plane,
+never the placeholder), with one re-run from `resolve3` when a mid-pass member moved a plane (the
+ADR-3D-033 re-evaluation pattern). The #367 placement funnel stays conservative per its own doctrine:
+a free plane pinned to FIGURE CONTENT (a plane-run relation) pins the placement's rotation — sampling it
+would rotate the run out from under the pin; memberships already pinned both components via the existing
+lists. A free plane pinned to ABSOLUTES, or pure-sampled, leaves placement sampling untouched.
+
+**Honest boundaries.** `plane-angle` and `never-parallel` on a free plane refuse the new
+`plane-not-determined` (their machinery reads equations; pinning orientation from a dihedral angle is
+the recorded follow-up). The data panel surfaces a free plane through the EXISTING multi-sample
+stability gate: while it resamples nothing prints; once pinned its forced equation appears — the exam's
+«מצאו את משוואת המישור» moment, honest by construction. `chooseParam`'s membership root-selection skips
+free planes (no parameter rides them).
+
+**Shared with #253 by design.** The mechanism (declare-free → sample → pin-by-accumulated-givens →
+report DOFs from the resolution) is the shape the free circle needs; #253 should reuse
+`resolveFreePlane`'s structure rather than grow a sibling.
+
+**Locked** in `free-plane.test.ts` (declaration forms He/En; bare-«π2» refusal; auto-create ≡
+declare-then-ride byte-identically; per-pin-level DOF counts; the three-member stability regression;
+∥/⟂/equation pinning with green claims; the coexisting-parameter guard — m = 4 survives a free plane;
+round-trip) and `fixtures3/free-plane-487.geo3.json` (the operator's incremental order through the real
+load path).

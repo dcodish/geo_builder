@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "app": "3d-builder",
+  "savedAt": "2026-08-10T08:56:52.625Z",
+  "name": "free-plane-487",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "קובייה ABCD",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "cube",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "A'",
+            "B'",
+            "C'",
+            "D'"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "מישור π2",
+      "cmds": [
+        {
+          "type": "free-plane",
+          "name": "π2"
+        }
+      ]
+    },
+    {
+      "utterance": "B על המישור π2",
+      "cmds": [
+        {
+          "type": "on-planes",
+          "id": "B",
+          "plane": "π2"
+        }
+      ]
+    },
+    {
+      "utterance": "E על המישור π2",
+      "cmds": [
+        {
+          "type": "on-planes",
+          "id": "E",
+          "plane": "π2"
+        }
+      ]
+    },
+    {
+      "utterance": "המישור π2 מקביל למישור ABC",
+      "cmds": [
+        {
+          "type": "plane-rel",
+          "rel": "parallel",
+          "a": {
+            "kind": "plane-named",
+            "name": "π2"
+          },
+          "b": {
+            "kind": "plane-run",
+            "ids": [
+              "A",
+              "B",
+              "C"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

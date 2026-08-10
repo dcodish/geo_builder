@@ -7,3 +7,4 @@
 {"at":"2026-08-08T19:40:49.198Z","sha":"a0e7b37","unique":false,"failingFiles":["src/engine/__tests__/symbolic-unit.test.ts"],"tests":["#427 — the boundaries (what must NOT enter the unit lane) a RESOLVED symbol returns to plain numbers"]}
 {"at":"2026-08-08T19:44:38.862Z","sha":"a0e7b37","unique":false,"failingFiles":["src/engine/__tests__/symbolic-unit.test.ts"],"tests":["#427 — the boundaries (what must NOT enter the unit lane) a RESOLVED symbol returns to plain numbers"]}
 {"at":"2026-08-10T06:19:10.394Z","sha":"2a4e1f1","unique":false,"failingFiles":["server/__tests__/isolation.test.ts"],"tests":["product boundaries (BOUNDARIES.json is the authority) every directory in every tree carries a layer classification"]}
+{"at":"2026-08-10T09:10:39.913Z","sha":"0565ba2","unique":false,"failingFiles":["src3d/parser/__tests__/shadow-matrix3.test.ts"],"tests":["3-D parser shadow-matrix — catalog corpus winner rule per catalog utterance is stable"]}
