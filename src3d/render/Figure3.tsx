@@ -10,6 +10,7 @@ import type { PlaneDisplayMode3Map } from '../store/figureFile3';
 import type { Resolved3 } from '../engine/evaluate';
 import type { Construction3 } from '../engine/types';
 import { HOME_CAMERA, MAX_PITCH, type Camera3 } from './camera';
+import { faceOnView, planarNormal } from '../engine/defaultView';
 import { buildScene3, type SceneCrossing3 } from './scene3';
 
 export interface Figure3Props {
@@ -48,13 +49,33 @@ const VECTOR_COLOR = '#0d9488';
 const ltr = (s: string) => `⁦${s}⁩`;
 
 export default function Figure3({ construction, resolved, width = 640, height = 460, resetLabel = 'reset view', coordLabels, planeDisplay, showWitnesses = true, onNameCrossing, crossingLabel }: Figure3Props) {
-  const [cam, setCam] = useState<Camera3>(HOME_CAMERA);
+  /**
+   * #5 — the HOME camera for THIS figure. A purely planar figure is read face-on (`planarNormal` /
+   * `faceOnView`, engine/defaultView); everything else keeps the ¾ textbook view. Derived from the
+   * resolved positions, so it follows the figure rather than being decided once at mount.
+   *
+   * NOT changed: the direction the ENGINE scores unstated placements against (#372) stays the fixed
+   * default view. Orbiting is a view concern (docs/20 §6.4) and this is orbiting — letting a flat
+   * figure's own plane feed back into placement scoring would make the geometry depend on the camera,
+   * which is the one thing that module's header forbids.
+   */
+  const home = useMemo<Camera3>(() => {
+    const n = planarNormal([...resolved.positions.values()]);
+    if (!n) return HOME_CAMERA;
+    const v = faceOnView(n, (MAX_PITCH * 180) / Math.PI);
+    return { yaw: (v.yawDeg * Math.PI) / 180, pitch: (v.pitchDeg * Math.PI) / 180 };
+  }, [resolved]);
+
+  const [cam, setCam] = useState<Camera3 | null>(null); // null = "follow home" (never orbited yet)
   const [zoom, setZoom] = useState(1);
   const drag = useRef<{ x: number; y: number } | null>(null);
+  // An UNTOUCHED camera follows the figure: build a flat triangle and it is face-on immediately, not
+  // after pressing reset. Once the student orbits, the camera is theirs and the figure never moves it.
+  const view = cam ?? home;
 
   const scene = useMemo(
-    () => buildScene3(construction, resolved, cam, { width, height }, zoom, planeDisplay, showWitnesses),
-    [construction, resolved, cam, width, height, zoom, planeDisplay, showWitnesses],
+    () => buildScene3(construction, resolved, view, { width, height }, zoom, planeDisplay, showWitnesses),
+    [construction, resolved, view, width, height, zoom, planeDisplay, showWitnesses],
   );
 
   const onPointerDown = (e: RPointerEvent<SVGSVGElement>) => {
@@ -66,10 +87,15 @@ export default function Figure3({ construction, resolved, width = 640, height = 
     const dx = e.clientX - drag.current.x;
     const dy = e.clientY - drag.current.y;
     drag.current = { x: e.clientX, y: e.clientY };
-    setCam((c) => ({
-      yaw: c.yaw - dx * ORBIT_SPEED,
-      pitch: Math.max(-MAX_PITCH, Math.min(MAX_PITCH, c.pitch + dy * ORBIT_SPEED)),
-    }));
+    // The first drag ADOPTS the current home view and makes it the student's (#5): orbiting from
+    // `null` must start where they can see the figure, not snap back to the ¾ view.
+    setCam((c) => {
+      const from = c ?? home;
+      return {
+        yaw: from.yaw - dx * ORBIT_SPEED,
+        pitch: Math.max(-MAX_PITCH, Math.min(MAX_PITCH, from.pitch + dy * ORBIT_SPEED)),
+      };
+    });
   };
   const onPointerUp = () => {
     drag.current = null;
@@ -330,7 +356,7 @@ export default function Figure3({ construction, resolved, width = 640, height = 
         title={resetLabel}
         className="absolute top-2 end-2 rounded-lg border border-slate-300 bg-white/90 px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
         onClick={() => {
-          setCam(HOME_CAMERA);
+          setCam(null); // back to following the figure's own home view (#5)
           setZoom(1);
         }}
       >

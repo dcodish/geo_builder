@@ -2737,3 +2737,48 @@ prints the one component that HAS an exact form as that form. Rendering all thre
 would assert that none of them are exact, which is false, and the alternative — growing `trySurd` into a
 general symbolic form for `√2−2` — is the docs/20 §12 no-CAS boundary. **Flagged for the operator as a
 presentation call**: the mixed rendering is a pedagogy question, and only the precision half was a defect.
+
+### ADR-3D-128 — Reading the figure: a latin angle label refused with guidance, a flat figure read face-on, and the leftover spin spent on legibility (#394, #5, #385)
+
+**#394 — a deliberate NON-feature gets a reasoned refusal.** «60<a<90» reached prod (2026-07-28) and
+died as a silent not-understood. Operator ruling (2026-07-29, re-affirming earlier ones): lowercase
+latin is this product's vector/parameter namespace (`u,v,w`, `t,k,m`), so admitting it as an angle label
+would collide with it — the answer is to tell the student what to use instead. The guidance offers both
+supported forms: name the angle by its vertices («∠ABC», whose bounds already work, ADR-3D-064) or use a
+Greek label from the palette («60 < α < 90», ADR-3D-063). Two guards keep it honest — the register only
+runs on a FAILED parse, so the sign givens («t > 0») can never be stolen, and the RESERVED letters are
+excluded by name, so «60<t<90» stays an honest gap rather than being answered with advice about angles.
+**Deliberately not extended** to «זווית a»: the #181 anchored uplift already owns a single letter after
+an angle noun (it reads as point A, and «angle b = 60» builds the vertex angle at B), so steering that
+to "use ∠ABC" would describe something the tool did not do.
+
+**#5 — a purely planar figure is read FACE-ON.** The ¾ view exists to give a SOLID depth cues; a flat
+figure has no depth to cue, so the same view only foreshortens it — a square in `z = 0` reads as a
+parallelogram, which is the shape this tool spends its life not drawing unless the student said so (the
+V8-g flat lane is full of these). `planarNormal` answers "do all points lie on one plane" scale-relative
+to the figure's own spread, and `faceOnView` turns that normal into view angles, clamped below the pole
+because the orthographic frame is `cross(forward, z)` and degenerates at ±90° — precisely the top-down
+case a `z = 0` figure asks for. The camera FOLLOWS the figure until the student orbits, at which point it
+is theirs; the reset button returns it to following. **What did not change is the engine's scoring
+direction** (#372): orbiting is a view concern (docs/20 §6.4), and letting a flat figure's own plane feed
+back into placement scoring would make the geometry depend on the camera, which that module forbids.
+
+**#385 — the leftover rotation, spent on legibility.** A driven «AB מאונך לישר ℓ1» pins ONE rotational
+DOF, and the funnel conservatively froze rotation entirely (the documented ADR-3D-101 deferral). But
+rotation about ℓ's own direction PRESERVES the relation exactly — the angle a vector makes with an axis
+is invariant under rotation about that axis — so a whole circle of placements satisfies the given, and
+which one is drawn was pure luck of the seed. **Measured on this figure, before: `[78.8, 78.8, 78.8,
+81.8, 76.4, 79.6, 1.2, 81.1]` — seed 6 drew a true perpendicular as 1.2°, i.e. very nearly PARALLEL.**
+The relation was correct and the drawing lied about it, which is the ADR-3D-098/099 rule.
+
+The subgroup is offered only when the rotation-pinning records are ALL line relations sharing ONE
+direction; two non-parallel lines have no common preserving spin, and every other pin kind keeps the
+conservative freeze. Candidates are ranked clearance-first (never draw a false coincidence) and
+legibility-second, and with no spin axis the legibility term is 0 for every candidate, so the ranking
+reduces exactly to the previous clearance-only rule — which is why no existing figure moved. **After:
+worst deviation ~12°, most seeds within 5°.** Stated as an improvement, not a guarantee: the sampler
+takes the best of a bounded number of candidates under a clearance floor.
+
+The `faceOnView` test flushed out a defect in its own subject — the function read `asin(z)` off a raw
+normal, which is only an angle for a unit vector, and `planarNormal` returning unit vectors is exactly
+why that would have gone unnoticed.

@@ -8755,6 +8755,17 @@ export function normalizeUtterance(raw: string): string {
     // The Hebrew word "שורש N" (square root) ≡ the √ glyph (issue #105) — normalise it HERE so every
     // length/ratio/radius value path inherits it. Only before a number or "(" (so "שורש של" etc. is untouched).
     .replace(/שורש\s*(?=[\d(])/g, '√')
+    // «ן-» → «ו-» (#506): the final-nun key sits beside vav, and the slip recurs across the 2026-08-10
+    // triage INSIDE otherwise-real constructions — «O - חיתוך של AC ן- DB», «הנקודות F ו- G הן אמצעי
+    // הקטעים BC ן- DO». Each occurrence turns a mostly-parseable compound into a partial parse the
+    // honesty gates (correctly) stop, costing a paid escalation on input whose intent is unambiguous.
+    // Safe because a STANDALONE final-nun is not a Hebrew word: in the connective position between two
+    // label tokens it can only be the ו-connective mistyped. POSITION-ANCHORED, never a global replace —
+    // final-nun legitimately ENDS words («סימון», «אלכסון»), so the match requires the ן to stand alone
+    // (a non-Hebrew character on each side) and to sit where a connective sits: before a hyphen, or
+    // between two uppercase labels.
+    .replace(/(?<![א-ת])ן(?=-)/g, 'ו')
+    .replace(/(?<=[A-Z]\d?\s)ן(?=\s*[A-Z])/g, 'ו')
     // Verbose length frame "אורך/הצלע/הקטע <seg> הוא/היא/שווה <value>" → "<seg> = <value>" (issue #105), so
     // the existing length rules handle the wordy phrasing. Requires a VALUE (√/digit/"(") after the copula,
     // so the ratio form "הצלע BC גדולה פי 2 …" (no copula, a comparative) is left to `ratioConstraint`.
