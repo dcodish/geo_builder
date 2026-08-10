@@ -128,6 +128,30 @@ export function isolateLtrRuns3(s: string): string {
   return out;
 }
 
+/**
+ * Base direction for a string whose direction must be decided by CONTENT — the 2-D #118/ADR-312 lesson,
+ * copied: `dir="auto"` keys off the FIRST strong character, so a Hebrew sentence that happens to start
+ * with a point label («C במרחק…») gets an LTR base and reorders into garbage. Any Hebrew letter ⇒ RTL.
+ */
+export const textDir3 = (s: string): 'rtl' | 'ltr' => (HEBREW_LETTER.test(s) ? 'rtl' : 'ltr');
+
+/**
+ * #482 half (b) — the operator's ruling (2026-08-10): OPTION 3, a read-only live preview under the input.
+ *
+ * The input box itself cannot be fixed: isolate characters inside an editable value corrupt what the
+ * student typed and where their caret sits, and forcing `dir="ltr"` is what 2-D tried and REVERTED
+ * (#118). So the box stays raw, and this seam feeds a preview that shows what the line MEANS, laid out
+ * correctly, while it is being typed.
+ *
+ * Returns the isolated text when isolation would CHANGE the layout, `null` otherwise — a pure-Hebrew or
+ * pure-LTR line already renders correctly in the box, and echoing it verbatim underneath is noise. This
+ * gate is the transform itself, so the preview appears exactly when the box is lying about the layout.
+ */
+export const inputPreview3 = (s: string): string | null => {
+  const iso = isolateLtrRuns3(s);
+  return iso === s ? null : iso;
+};
+
 /** The i18next post-processor, registered on the 3-D instance in `./index.ts`. */
 export const bidiPostProcessor3 = {
   type: 'postProcessor' as const,

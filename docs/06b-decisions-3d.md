@@ -2430,3 +2430,22 @@ recommendation remains a read-only isolated preview under the input, the 2-D liv
 character and no half of a delimiter pair may sit outside an isolate**; the operator's exact line ends at the
 paren; `π1` is one run; the sentence's own punctuation still stays outside (the property the fix must not
 trade away); and the palette-subset drift lock in both trees.
+
+### ADR-3D-123 Am. 1 — half (b) ruled: OPTION 3, the read-only isolated preview
+
+The operator ruled on the input box (2026-08-10), having also weighed a fourth option raised in session —
+a richtext/contenteditable input that could carry isolates inside the editable value. **Ruling: option 3.**
+Contenteditable buys marginal UX at a disproportionate defect surface (caret jumps on programmatic edits,
+IME/mobile composition around zero-width controls, paste sanitization against the byte-exactness
+invariant, undo ownership, React's uncontrolled-component friction); the preview delivers the same
+information — the line laid out correctly, visible while typing — with none of it.
+
+**Mechanism.** `inputPreview3` in `i18n/bidi.ts` is the pure seam: the isolated text when isolation would
+CHANGE the layout, `null` otherwise — so the preview appears exactly when, and only when, the box is lying
+about direction. A pure-Hebrew or pure-LTR line previews as nothing; an English session never sees it.
+Container direction comes from `textDir3` — content-decided, never `dir="auto"`'s first-strong-character
+(the 2-D #118/ADR-312 lesson, copied). The box itself stays byte-raw; the preview is `aria-hidden`
+(a screen reader has the input itself).
+
+**Locked** in `bidi3.test.ts`: mixed-direction lines preview isolated and byte-identical under stripping;
+pure-Hebrew and pure-LTR lines preview as `null`; `textDir3` decides by content («C במרחק…» is RTL).

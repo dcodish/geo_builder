@@ -13,7 +13,7 @@
  * isolate or a run would end mid-label.
  */
 import { describe, expect, it } from 'vitest';
-import { isolateLtrRuns3, RUN_CORE, RUN_DELIMS } from '../i18n/bidi';
+import { inputPreview3, isolateLtrRuns3, RUN_CORE, RUN_DELIMS, textDir3 } from '../i18n/bidi';
 import { SYMBOL_PALETTE_3 } from '../ui/symbols3';
 import he from '../i18n/locales/he.json';
 import en from '../i18n/locales/en.json';
@@ -220,5 +220,42 @@ describe('#482 — the bidi alphabet cannot drift from the palette the tool offe
     expect(inserts).toContain('⊥');
     // ASCII `||` is the MAGNITUDE insert and must never double as "parallel" — `|AB|` would go ambiguous.
     expect(inserts.filter((i) => i === '||'), 'exactly one owner of ASCII ||').toHaveLength(1);
+  });
+});
+
+/**
+ * #482 half (b) — the operator's ruling (2026-08-10): OPTION 3, the read-only live preview.
+ *
+ * The input box stays raw (isolates corrupt an editable value's caret; forced dir="ltr" is the reverted
+ * 2-D #118). `inputPreview3` is the pure seam the App renders: the isolated text when isolation would
+ * change the layout, null when the box already shows the truth — so the preview appears exactly when,
+ * and only when, the box is lying.
+ */
+describe('#482(b) — the input preview appears exactly when the box lies about layout', () => {
+  it.each([
+    'ישר l2 : x=(m,2m,3)+t(1,1,1)',
+    'הישר l: x=(1,2,3)+t(m-2,m,m+2)',
+    'מישור π1: x+(m-2)y+(m-1)z-5=0',
+    'B על המישור π2',
+  ])('a mixed-direction line previews, isolated: %s', (s) => {
+    const p = inputPreview3(s);
+    expect(p, 'mixed He+math must preview').not.toBeNull();
+    expect(p!).toContain(LRI);
+    expect(p!.split(LRI).join('').split(PDI).join(''), 'the preview is the SAME text, laid out — never rewritten').toBe(s);
+  });
+
+  it('a pure-Hebrew line has no preview (the box already shows the truth)', () => {
+    expect(inputPreview3('שרטטו קובייה גדולה')).toBeNull();
+  });
+
+  it('a pure-LTR line has no preview (an English session is unaffected)', () => {
+    expect(inputPreview3('line l: x=(1,2,3)+t(m-2,m,m+2)')).toBeNull();
+    expect(inputPreview3('')).toBeNull();
+  });
+
+  it('the preview container direction is decided by CONTENT, not by the first strong char (#118)', () => {
+    // the 2-D lesson: «C במרחק…» starts with a strong-LTR label, but it is a Hebrew sentence.
+    expect(textDir3('C במרחק 4 מהמישור')).toBe('rtl');
+    expect(textDir3('line l: x=(1,2,3)')).toBe('ltr');
   });
 });

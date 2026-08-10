@@ -12,7 +12,7 @@ import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
-import { isolateLtrRuns3 } from './i18n/bidi';
+import { inputPreview3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
 import { SYMBOL_PALETTE_3 } from './ui/symbols3';
 import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
@@ -387,6 +387,25 @@ export default function App3() {
               {busy ? t('input.thinking') : t('input.add')}
             </button>
           </form>
+
+          {/* #482 half (b), operator ruling 2026-08-10 — OPTION 3 (ADR-3D-123 Am. 1): a read-only live
+              preview of the input, isolated at render, shown only while isolation would CHANGE the
+              layout (the gate lives in inputPreview3). The box itself stays raw — isolates cannot enter
+              an editable value without corrupting the caret, and dir="ltr" is what 2-D reverted (#118).
+              aria-hidden: it duplicates the input for sighted users; a screen reader has the input. */}
+          {(() => {
+            const preview = inputPreview3(text);
+            return preview === null ? null : (
+              <div
+                aria-hidden="true"
+                data-testid="bidi-preview"
+                dir={textDir3(text)}
+                className="overflow-x-auto whitespace-nowrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600"
+              >
+                {preview}
+              </div>
+            );
+          })()}
 
           <div className="flex flex-wrap gap-1" dir="ltr">
             {SYMBOL_PALETTE_3.map(([label, sym, back]) => (
