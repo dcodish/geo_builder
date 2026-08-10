@@ -2782,3 +2782,45 @@ takes the best of a bounded number of candidates under a clearance floor.
 The `faceOnView` test flushed out a defect in its own subject — the function read `asin(z)` off a raw
 normal, which is only an angle for a unit vector, and `planarNormal` returning unit vectors is exactly
 why that would have gone unnoticed.
+
+### ADR-3D-129 — The RUNNING parameter of a parametric line is the student's letter (#422)
+
+«l1:x=(4,5,-1)+m(k, 1,0)» was not understood, while the same line spelled with `t` builds end-to-end —
+the engine, the sampler, the echo and the save whitelist all support it. **Only the grammar rejected the
+student's choice of letter.**
+
+**Root cause — two letters, two roles, and only one of them ours.** A parametric line carries a RUNNING
+parameter outside the parens and a FIGURE parameter inside a component:
+
+- the **running** parameter (`m` here) is a BOUND variable — the student picks it and its identity means
+  nothing to the figure;
+- the **figure** parameter (`k` here) is a free DOF the givens later pin, which `parseParamExpr` already
+  reads correctly.
+
+The grammar fixed the bound one at the literal `t` in two places (the body match and the anchor-less bare
+gate), so the identical geometry with the two letters swapped between roles had no rule. This is the
+[ADR-3D-038](#adr-3d-038) shape — *"the single-ℓ model was a PARSER artifact"*, where ten rules hard-coded
+`ℓ` for a name that was the student's to choose — and the same family as ADR-3D-069/070/071.
+
+**No new engine concept.** Position decides the roles unambiguously: a constant scale on a direction
+vector is meaningless, so the letter outside the parens can only be the running parameter. The charset is
+`[a-w]`, mirroring `PARAM_TERM`'s, which keeps the axes out — «x = x(1,0,0)» can never be read as a line.
+
+**A genuine collision is DEFERRED, not guessed.** «m(m-1, 5-m, -2)» uses one letter in both roles; which
+the student meant is not ours to decide, so it escalates rather than building a figure on an assumption.
+
+**The echo speaks the student's notation.** Both echo sites — the parse-time `src` and the canvas's
+numeric form — rewrote the letter back to `t`, telling the student their own line in a notation they did
+not use. The letter now rides on `Line3Command`/`Line3Def` as an optional `runner`, recorded ONLY when it
+differs from `t`, so every existing `.geo3.json` loads and re-saves byte-identically (the save whitelist
+is per-command-type, so the field rides along with no whitelist change). It is display-only: nothing
+reads it as geometry, which is the honest encoding of a bound variable.
+
+**Left open** (the issue's own sub-question, unanswered): whether a GREEK running parameter (`λ`) should
+parse. Greek letters currently mean something else here — the unknown scalars of the `point-in-span` lane
+— so admitting one would need a ruling rather than a regex.
+
+**Locked** in `line-param-letter.test.ts`, verified to fail 5-of-9 before the fix: the operator's exact
+utterance; m/s/t yielding an identical line bar the echoed letter; the figure parameter still read from
+the components; the 2024-Q2 form byte-identical AND carrying no `runner`; the anchor-less #351 form; the
+same-letter collision deferred; the axis letter refused; and the echo carrying «m» at every seed.

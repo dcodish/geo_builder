@@ -191,6 +191,8 @@ export type Line3Def =
       anchor: [LinExpr, LinExpr, LinExpr];
       dir: [LinExpr, LinExpr, LinExpr];
       src: string;
+      /** #422 — the student's own running-parameter letter, when not `t`. Display only. */
+      runner?: string;
     }
   | {
       /** A line THROUGH two existing points (V5 — `הישר A'C`), resolved from final positions. */
@@ -619,6 +621,11 @@ export interface Line3Command {
   src: string;
   /** The parameter letter used in the components, if any. */
   param?: string;
+  /** #422 — the RUNNING parameter the student wrote (`m` in «x=(4,5,-1)+m(k,1,0)»), when it is not the
+   *  conventional `t`. A BOUND variable: it names nothing in the figure, so nothing reads it as
+   *  geometry — it exists so the echo can show the student their own textbook form. Optional and
+   *  absent when it IS `t`, so every existing `.geo3.json` loads and re-saves byte-identically. */
+  runner?: string;
 }
 
 /** `הישר ℓ ניצב למישור π` — PINS the parameter (dir ∥ normal; the roots are branches). */

@@ -1201,7 +1201,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       if (c.lines.has(cmd.name)) return { ok: false, error: { code: 'already-defined', id: cmd.name } };
       if (cmd.param && c.param && cmd.param !== c.param) return { ok: false, error: { code: 'two-params' } };
       const next = clone(c);
-      next.lines.set(cmd.name, { kind: 'parametric', anchor: cmd.anchor, dir: cmd.dir, src: cmd.src });
+      next.lines.set(cmd.name, { kind: 'parametric', anchor: cmd.anchor, dir: cmd.dir, src: cmd.src, ...(cmd.runner ? { runner: cmd.runner } : {}) });
       if (cmd.param) next.param = cmd.param;
       return { ok: true, next };
     }

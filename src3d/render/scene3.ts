@@ -575,7 +575,9 @@ export function buildScene3(
       form:
         carriesParam && paramUnforced && def?.kind === 'parametric'
           ? `${name}: ${def.src}`
-          : `${name}: x = (${fmt(ln.anchor.x)}, ${fmt(ln.anchor.y)}, ${fmt(ln.anchor.z)}) + t·(${fmt(ln.dir.x)}, ${fmt(ln.dir.y)}, ${fmt(ln.dir.z)})`,
+          // #422: the student's own running letter, when they chose one — the numeric echo used to
+          // rewrite «m» back to «t», telling them their line in a notation they did not use.
+          : `${name}: x = (${fmt(ln.anchor.x)}, ${fmt(ln.anchor.y)}, ${fmt(ln.anchor.z)}) + ${def?.kind === 'parametric' ? (def.runner ?? 't') : 't'}·(${fmt(ln.dir.x)}, ${fmt(ln.dir.y)}, ${fmt(ln.dir.z)})`,
     });
   }
 

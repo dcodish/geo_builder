@@ -1927,20 +1927,35 @@ const parametricLine: Rule = (s) => {
   // form below — so a plane equation («x-y+z=1») is never stolen (and the `t(…)` tail is the real
   // discriminator). A second bare line collides on ℓ at apply — never a silently-minted ℓ2 (the
   // ADR-3D-038 indexed names are the student's to state).
-  const headName = head ? head[1] : /^\s*x\s*=\s*(?:\(|t\s*[·×*]?\s*\()/.test(s) ? 'ℓ' : null;
+  const headName = head ? head[1] : /^\s*x\s*=\s*(?:\(|[a-w]\s*[·×*]?\s*\()/.test(s) ? 'ℓ' : null;
   const body = head ? head[2] : s;
   if (headName === null) return null;
   // #351: the anchor is OPTIONAL — a line through the ORIGIN is written `x = t(d,e,f)` with no `(a,b,c) +`
   // part at all (prod: `l1:x=t(0,m,2m-2)`). A missing anchor means (0,0,0); everything downstream (the
   // symbolic components, the single-param guard, the point-pair membership) is untouched.
-  const m = body.match(/^(?:x\s*=\s*)?(?:\(([^()]*)\)\s*\+\s*)?t\s*[·×*]?\s*\(([^()]*)\)$/);
+  // #422 — the RUNNING parameter letter is the STUDENT'S, not ours. A parametric line carries two
+  // letters in two roles and only one of them is the tool's business: the running parameter (outside the
+  // parens) is a BOUND variable whose identity means nothing to the figure, while a letter INSIDE a
+  // component is the figure parameter — a free DOF the givens later pin. The grammar fixed the bound one
+  // at `t`, so «l1: x=(4,5,-1)+m(k,1,0)» — the identical geometry with the two letters swapped between
+  // roles — had no rule, while the `t` spelling of that exact line builds end-to-end. The ADR-3D-038
+  // shape again: a fixed token standing in for something the student states.
+  //
+  // Position decides the roles unambiguously (a constant scale on a direction vector is meaningless), so
+  // no new engine concept is needed. `[a-w]` mirrors `PARAM_TERM`'s symbol charset, which keeps x/y/z out
+  // — «x = x(1,0,0)» can never be read as a line.
+  const m = body.match(/^(?:x\s*=\s*)?(?:\(([^()]*)\)\s*\+\s*)?([a-w])\s*[·×*]?\s*\(([^()]*)\)$/);
   if (!m) return null;
+  const runner = m[2];
   const triple = (str: string) => str.split(',').map((p) => parseParamExpr(p));
   const anchor = triple(m[1] ?? '0,0,0');
-  const dir = triple(m[2]);
+  const dir = triple(m[3]);
   if (anchor.length !== 3 || dir.length !== 3 || [...anchor, ...dir].some((x) => !x)) return null;
   const params = new Set([...anchor, ...dir].flatMap((x) => (x!.param ? [x!.param] : [])));
   if (params.size > 1) return null;
+  // #422: one letter in BOTH roles («m(m-1, 5-m, -2)») conflates a bound variable with a figure DOF.
+  // Defer rather than guess which the student meant — the LLM lane is where an ambiguous form belongs.
+  if (params.has(runner)) return null;
   const isLineName = LINE_NAME_ONLY.test(headName);
   const name = isLineName ? canonicalLine(headName) : headName;
   const cmds: Command3[] = [
@@ -1950,7 +1965,9 @@ const parametricLine: Rule = (s) => {
       anchor: [anchor[0]!.expr, anchor[1]!.expr, anchor[2]!.expr],
       dir: [dir[0]!.expr, dir[1]!.expr, dir[2]!.expr],
       // the echoed form always shows the anchor, so an anchor-less input reads back as the origin it means
-      src: `x = (${(m[1] ?? '0,0,0').trim()}) + t·(${m[2].trim()})`,
+      src: `x = (${(m[1] ?? '0,0,0').trim()}) + ${runner}·(${m[3].trim()})`,
+      // #422: recorded only when it is NOT the conventional `t`, so every existing save round-trips unchanged
+      ...(runner === 't' ? {} : { runner }),
       param: [...params][0],
     },
   ];
