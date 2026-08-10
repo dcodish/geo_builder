@@ -60,9 +60,21 @@ describe('#353 — the boundaries', () => {
   });
 
   it('#181 uplift still wins where it applies — those inputs PARSE, so no nudge is ever shown', () => {
-    for (const u of ['∠sdb', 'זווית sdb', 'תיבה abcd', 'זוית abc = 90']) {
+    for (const u of ['∠sdb', 'זווית sdb', 'זוית abc = 90']) {
       expect(parse3(u).ok, u).toBe(true);
     }
+  });
+
+  // #498: «תיבה abcd» was in the list above on a false premise — «תיבה» is not an uplift ANCHOR, so
+  // nothing ever lifted `abcd`. It "parsed" because `cubeOrBox` found no uppercase run, took the
+  // label-less branch and auto-lettered A,B,C,D — silently discarding what the student wrote (harmless
+  // here only because abcd ≡ ABCD; «תיבה klmn» would have drawn ABCD). The fail-closed declaration
+  // gate now declines it, which routes it to precisely the mechanism #353 built for this: the nudge
+  // fires with the corrected spelling, free and instant, instead of a paid LLM call or a wrong figure.
+  it('a lowercase run with NO uplift anchor gets the nudge, not a silently auto-lettered solid', () => {
+    expect(parse3('תיבה abcd').ok).toBe(false);
+    expect(upperCasedLabelCandidate3('תיבה abcd')).toBe('תיבה ABCD');
+    expect(nudges('תיבה abcd')).toBe(true);
   });
 
   it('the pattern-based guidance register is untouched by this addition', () => {

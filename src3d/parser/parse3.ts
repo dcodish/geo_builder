@@ -64,6 +64,19 @@ export function normalize3(s: string): string {
       .replace(/[→⃗⟶]/g, '')
       .replace(/[−־]/g, '-')
       .replace(/(?:^|(?<=[\s:,]))(?:ה?ו?וקטור|vectors?)\s+/gi, '') // the vector WORD marks vector meaning (recorded before normalize), then reads as decoration
+      // «מעויין» → «מעוין» (#498, the ADR-405 fold ported): the plene spelling was HALF-supported —
+      // `statedQuadBase` reads `מעויי?ן`, but `rhombusPrism` and `rightPrism`'s rhombus bail-out spell
+      // the defective form only, so «מנסרה ישרה שבסיסה מעויין …» fell through to the TRIANGULAR default
+      // and dropped the stated base (caught downstream by `droppedShapeNoun3`, but only as a refusal).
+      // Folding at the one boundary every rule reads makes the whole grammar accept both spellings.
+      .replace(/מעויין/g, 'מעוין')
+      // «זוות» → «זווית» (#498, the #497 fold ported): the one OBSERVED misspelling of the angle noun
+      // (operator report, 2026-08-10 — «משולש ישר זוות ABC» drew a bare triangle). Phonetically
+      // identical, not a Hebrew word of its own. Folding it HERE — the one boundary every rule reads —
+      // makes the whole ישר-זווית family read it; unobserved variants (זויית, זות…) are deliberately NOT
+      // enumerated: they hit the fail-closed declaration gate and escalate to the LLM, whose job is
+      // typos. Guarded on both sides so it can never fire inside another word («זוויות» is untouched).
+      .replace(/(?<![א-ת])זוות(?![א-ת])/g, 'זווית')
       .replace(/½/g, '1/2')
       .replace(/¼/g, '1/4')
       .replace(/¾/g, '3/4')
@@ -135,10 +148,139 @@ const unprimed = (t: Id) => !t.includes("'");
 const primeAll = (ts: Id[]) => ts.map((t) => `${t}'`);
 
 // ---------------------------------------------------------------------------
+// The fail-closed DECLARATION gate (#498 — the #497 class, 3-D edition)
+// ---------------------------------------------------------------------------
+
+/**
+ * A solid/polygon DECLARATION rule reads its noun, takes the label run, and builds. Everything it did
+ * not read it silently discarded — and every guard written against that was a DENYLIST of correctly
+ * spelled vocabulary (the per-rule bow-outs at `planarPolygon`, `rightTriangle`), which necessarily
+ * **fails open on a word it has never met**. A typo of a significant modifier is by definition such a
+ * word: «משולש ישר זוות ABC» drew a bare triangle with the right angle dropped and a green ✓, exactly
+ * as «טרפז ישר זוות» did in 2-D ([ADR-435](../../docs/06-decisions.md#adr-435), #497). Ported as a
+ * PATTERN, never imported (docs/20 §12) — the mechanism is the same, the vocabulary is this tree's.
+ *
+ * The closure: after a rule has consumed its own vocabulary and its labels, every surviving token must
+ * be POSITIVELY harmless — declaration vocabulary ({@link DECL_VOCAB}), a neutral connective/request
+ * word ({@link NEUTRAL3_HE}/{@link NEUTRAL3_EN}), or a bare prefix remnant. A digit is a stated
+ * magnitude this family cannot express; an unclaimed label is an object it did not build; an
+ * unrecognised word is a statement nobody read. All three DECLINE the rule, which is the escalation
+ * path (`parse3` falls through to `not-handled` → the LLM, whose job is typos).
+ *
+ * The asymmetry that makes this the right default: growing the neutral list costs one unnecessary LLM
+ * call; a gap in the denylist costs a WRONG FIGURE under a green ✓ — the honesty invariant.
+ *
+ * **Division of labour with the honesty gates.** A noun that IS known vocabulary but produced no
+ * object is `droppedConstructNoun3`'s business ({@link CONSTRUCT_NOUNS} — «אלכסון» on a box, «גובה» on
+ * a pyramid), and those nouns are therefore part of the gate's known vocabulary rather than leftovers:
+ * they get the honest refusal that ADR-3D chose for them, not a paid escalation. This gate answers the
+ * question no gate could: *was there a word here that no vocabulary knows at all?*
+ */
+
+/**
+ * The CONSTRUCT nouns — objects a student asks to EXIST, which a bare shape declaration can never be.
+ * Lives here (rather than in `honesty3.ts`, which imports this module) so the declaration gate and
+ * `droppedConstructNoun3` read ONE list: a noun the gate lets through is exactly a noun the honesty
+ * gate is watching, and neither can drift into a silent drop while the other believes it is covered.
+ */
+export const CONSTRUCT_NOUNS =
+  /מעגל|אלכסו[ןנ]|גובה|גבהי|תיכונ|חוצ[הת]?[-\s]?זו?וית|\b(?:circle|diagonal|altitude|height|median|bisect\w*)\b/i;
+
+/**
+ * Every word the declaration family itself reads: the solid nouns, the base/flat-shape nouns, the
+ * qualifiers (`statedTriShape` / `statedQuadBase` / the rightness tests), and the base clause. Written
+ * with the tolerances `src3d/CLAUDE.md` records — both kaf/nun forms, `זו?וית`'s single and double vav,
+ * the optional definite article and the prosthetic prefixes — because a spelling this list misses is
+ * now an ESCALATION rather than a silent drop, which is the safe direction but still a lost parse.
+ */
+const HE_PREFIX = String.raw`(?:[ובלכשמה]{1,3})?`;
+const DECL_WORDS_HE = [
+  // solids
+  'מנסרה', 'מנסרות', 'פירמיד[הות]+', 'תיב[הות]+', 'קוביי?[הות]+', 'מקבילונ?ים?', 'מקבילון',
+  // final-form trap (`src3d/CLAUDE.md`): «ארבעון» ends in FINAL nun, so a medial-נ stem can never
+  // match it — the first draft of this very list got it wrong and the tetra corpus caught it
+  'טטר[אה]?ה?דר(?:ו[ןנ]|ים)?', 'ארבעו[ןנ](?:ים)?',
+  // base / flat-shape nouns (the `statedQuadBase` + polygon vocabulary)
+  // the adjectival forms a book sentence uses for the same shape («תיבה מלבנית», «מנסרה משולשת») are
+  // part of the SAME vocabulary — a gate that knows the noun but not its adjective fails on real input
+  'משולש(?:ת|ים|ות)?', 'מרובע(?:ת|ים|ות)?', 'ריבוע(?:י[תםי]?|ים)?', 'מלבני(?:ת|ים|ות)?', 'מלבנים', 'מלבן',
+  'מעויי?נ(?:ת|ים|ות)?', 'מעויי?ן',
+  'מקבילי(?:ת|ות)', 'טרפז(?:ים|ות)?', 'דלתונ?ים?', 'דלתון', 'מחומש(?:ים)?', 'משושה?', 'מצולע(?:ים)?',
+  // qualifiers: rightness, the equal-sides family, the edge family
+  'ישר(?:ה|ים|ות)?', 'זו?וית', 'זו?ויות', 'שוו?ה', 'שוו[יו]ם', 'צלעות', 'שוקיים', 'מקצועות(?:יו|יה)?',
+  // the base clause and the solid's own parts
+  'שבסיס[הו]', 'בסיס(?:ה|ו|ים)?', 'קודקוד(?:ה|ו|ים)?', 'פאה', 'פאות',
+].join('|');
+const DECL_WORDS_EN = String.raw`prisms?|pyramids?|box(?:es)?|cuboids?|cubes?|parallelepipeds?|tetrahedr(?:on|a)|triangles?|triangular|quadrilaterals?|quads?|squares?|rectangles?|rhombus(?:es)?|parallelograms?|trapez\w*|kites?|pentagons?|hexagons?|polygons?|right|angled|isosceles|equilateral|regular|bases?|edges?|vert(?:ex|ices)|faces?`;
+const DECL_VOCAB = new RegExp(`(?:${HE_PREFIX}(?:${DECL_WORDS_HE}))|\\b(?:${DECL_WORDS_EN})\\b`, 'gi');
+
+/** Tokens a declaration sentence may legitimately wrap around its nouns without stating geometry —
+ *  the connectives, copulas, request verbs and book-register words. «נתו[נן]…» carries the final-nun
+ *  trap the 2-D fix flushed out (the recorded ADR-3D-035 kaf class): the bare «נתון» ends in FINAL nun,
+ *  so it can never match as a prefix of «נתונה», whose nun is medial. */
+const NEUTRAL3_HE = /^(?:של|עם|גם|הוא|היא|הם|הן|זה|זו|כך|אז|את|יש|כאשר|אשר|במרחב|מרחב|כל|נתו[נן](?:ים|ה|ות)?|שרטט(?:ו|י)?|ציירי?|צייר(?:ו)?|לשרטט|לצייר|אנא|בבקשה|לפניכם|הבא(?:ה)?|נסמן)$/;
+const NEUTRAL3_EN = /^(?:a|an|the|is|are|be|of|in|on|with|and|to|it|its|this|that|has|have|whose|let|there|draw|sketch|construct|given|add|please|called|named|space|shown|below)$/i;
+/** «הטרפז» → «ה» once the noun is stripped; the prosthetic prefixes, standing alone. */
+const HE_PREFIX_REMNANT3 = /^[ובלכשמה]{1,3}$/;
+
+/** Remove the label RUNS a rule CLAIMED — run-aware, because a per-id `\bA\b` can never reach inside a
+ *  glued «ABCD» (the removal trap #497 recorded). A run every one of whose tokens is claimed is the
+ *  rule's own; a run carrying an UNCLAIMED label survives, and the gate then flags it. */
+const removeClaimedRuns = (s: string, ids: Id[]): string => {
+  const claimed = new Set(ids);
+  return s.replace(new RegExp(RUN.source, 'g'), (r) => {
+    const toks = r.match(TOKEN) ?? [];
+    return toks.length > 0 && toks.every((t) => claimed.has(t)) ? ' ' : r;
+  });
+};
+
+/**
+ * The gate itself. `ids` are the labels the rule claimed; `consumed` is any EXTRA vocabulary this
+ * particular rule read beyond the shared set (e.g. `cubeOrBox`'s space-diagonal phrase, which it
+ * emits a segment for). True ⇒ something in the sentence was never read ⇒ the rule must decline.
+ */
+function declLeftover(s: string, ids: Id[], consumed?: RegExp): boolean {
+  let rest = removeClaimedRuns(s, ids);
+  if (consumed) rest = rest.replace(consumed, ' ');
+  rest = rest.replace(CONSTRUCT_NOUNS, ' ').replace(DECL_VOCAB, ' ');
+  for (const t of rest.match(/[A-Za-z0-9']+|[א-ת]+/g) ?? []) {
+    if (/\d/.test(t)) return true; // a stated magnitude this family cannot express
+    if (/^[A-Za-z]/.test(t)) {
+      if (!NEUTRAL3_EN.test(t)) return true; // an unclaimed label, or an unknown English word
+    } else if (!NEUTRAL3_HE.test(t) && !NEUTRAL3_HE.test(t.replace(/^[ובלכשמה]{1,3}/, '')) && !HE_PREFIX_REMNANT3.test(t)) {
+      return true; // a Hebrew word nothing in this family knows — content, not filler
+    }
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Rules
 // ---------------------------------------------------------------------------
 
 type Rule = (s: string) => Command3[] | null;
+
+/**
+ * Wrap a DECLARATION rule in the fail-closed gate (#498). The labels the rule CLAIMED are read back off
+ * the commands it emitted (the `droppedNewLabels3` trick — command type strings and field keys are all
+ * lowercase, so an uppercase match in the JSON is a label and nothing else), so the gate needs no
+ * per-rule plumbing: it is applied ONCE, in the rule list, and a rule that later grows a new branch or
+ * a new label path inherits it rather than having to remember it. `consumed` is extra vocabulary this
+ * one rule reads beyond the shared {@link DECL_VOCAB}.
+ */
+const gated = (rule: Rule, consumed?: RegExp): Rule => {
+  const wrapped: Rule = (s) => {
+    const cmds = rule(s);
+    if (!cmds) return null;
+    const claimed = [...new Set(JSON.stringify(cmds).match(/[A-Z]\d*'?/g) ?? [])];
+    return declLeftover(s, claimed, consumed) ? null : cmds;
+  };
+  // The wrapper INHERITS the rule's name: the shadow matrix identifies rules by `fn.name`, so an
+  // anonymous wrapper would rename every gated rule to `(anon)` and blind the instrument that measures
+  // exactly this kind of change.
+  Object.defineProperty(wrapped, 'name', { value: rule.name });
+  return wrapped;
+};
 
 /** cube / box: 8 vertices as given, or 4 base vertices auto-primed to the top face.
  *
@@ -3088,15 +3230,15 @@ export const RULES: Rule[] = [
   // #324: FIRST — gated by the lowercase-coordinate object so it can never steal, while the
   // polygon rules WOULD steal its polygon-noun subjects (building the shape, dropping the clause)
   coordPlaneRel,
-  cubeOrBox,
-  rhombusPrism,
-  rightPrism,
+  gated(cubeOrBox, SPACE_DIAGONAL_RE), // #498: the fail-closed declaration gate, applied at the ONE seam
+  gated(rhombusPrism),
+  gated(rightPrism),
   makeRightPrism, // #289 (M1): `המנסרה ישרה` — make THE existing solid a right prism
-  obliquePrism, // #349: a prism NOT stated right — מקבילון (#117) + every base noun rightPrism dispatches
+  gated(obliquePrism), // #349: a prism NOT stated right — מקבילון (#117) + every base noun rightPrism dispatches
   volumeEqPoly, // BEFORE volumePolyClaim: its RHS is a volume, not a number
   volumePolyClaim, // BEFORE rightPyramid: נפח הפירמידה ABCD must never build a pyramid
   rightPyramidPoint, // V8-j: `T על SC כך ש-TABCD פירמידה ישרה` — before rightPyramid (which would build a solid)
-  rightPyramid,
+  gated(rightPyramid),
   dotEqGiven, // `u·v = v·w` (a dot RHS) — before dotGiven, which only matches a numeric RHS
   dotGiven,
   cosAngleGiven, // V8-f (G6): cos∠ACB / cos(u,v) — before the plane-angle & vertex-angle rules
@@ -3174,8 +3316,8 @@ export const RULES: Rule[] = [
   drawArrow, // #72: an unnamed ink arrow — before bareSegment (the noun must not read as a label)
   perpToBase, // #72: the base-directed ⟂ from a point (auto-minted foot)
   polygonCircle3, // #442: a circle inscribed in / circumscribed about a polygon — BEFORE the polygon rules
-  rightTriangle, // #116: `משולש … ישר זווית` — BEFORE planarPolygon (which would swallow bare `משולש`)
-  planarPolygon, // V8-g: bare `משולש/מרובע/מחומש` — after the שטח/מפגש/prism/pyramid consumers of those nouns
+  gated(rightTriangle), // #116: `משולש … ישר זווית` — BEFORE planarPolygon (which would swallow bare `משולש`)
+  gated(planarPolygon), // V8-g: bare `משולש/מרובע/מחומש` — after the שטח/מפגש/prism/pyramid consumers of those nouns
   bareSegment,
 ];
 

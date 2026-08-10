@@ -28,7 +28,7 @@
 
 import type { Command3, Id } from '../engine/types';
 import { QUAD_PYRAMIDS, type QuadBase } from '../engine/baseShapes';
-import { labelTokens, normalize3 } from './parse3';
+import { CONSTRUCT_NOUNS, labelTokens, normalize3 } from './parse3';
 
 /**
  * Uppercase point labels (and conventional vector names) the utterance STATES but the committed
@@ -179,8 +179,8 @@ export function droppedConstructNoun3(utterance: string, commands: Command3[]): 
   // is a construct the curriculum draws ON a figure, so stating one and committing nothing but the
   // figure is precisely the drop. (A shape's own PROPERTY — right-angled, isosceles, rhombic — is not
   // here: `droppedTriShape3` / `droppedShapeNoun3` own those, and they must not be double-gated.)
-  const CONSTRUCT_NOUNS =
-    /מעגל|אלכסו[ןנ]|גובה|גבהי|תיכונ|חוצ[הת]?[-\s]?זו?וית|\b(?:circle|diagonal|altitude|height|median|bisect\w*)\b/i;
+  // #498: the list lives in `parse3.ts` and is shared with the fail-closed declaration gate, so a noun
+  // that gate lets THROUGH is exactly a noun this one is watching — neither can assume the other covers it.
   const m = s.match(CONSTRUCT_NOUNS);
   if (!m) return [];
   // ACCOUNTING — the class predicate itself, not a per-noun object map. The defect is always the same

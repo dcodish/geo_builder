@@ -29,38 +29,6 @@ exports[`3-D parser shadow-matrix — catalog corpus > divergent later-claimers 
   {
     "lang": "en",
     "shadowedBy": [
-      "rightPyramid",
-    ],
-    "text": "volume of pyramid SENB equals volume of pyramid CENB",
-    "winner": "volumeEqPoly",
-  },
-  {
-    "lang": "he",
-    "shadowedBy": [
-      "rightPyramid",
-    ],
-    "text": "נפח הפירמידה SENB שווה לנפח הפירמידה CENB",
-    "winner": "volumeEqPoly",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
-      "planarPolygon",
-    ],
-    "text": "the area of triangle ABC = 4.5",
-    "winner": "areaClaim",
-  },
-  {
-    "lang": "he",
-    "shadowedBy": [
-      "planarPolygon",
-    ],
-    "text": "שטח המשולש ABC = 4.5",
-    "winner": "areaClaim",
-  },
-  {
-    "lang": "en",
-    "shadowedBy": [
       "onSegment",
     ],
     "text": "D on AC such that OD bisects angle AOC",

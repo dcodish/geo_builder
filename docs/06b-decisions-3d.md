@@ -2609,3 +2609,68 @@ firing the false notice unasserted) → no notice; and the positive control that
 equation makes a later relation genuinely redundant, notice restored. The two equation-plane and
 figure-object controls from #396 stay green.
 
+### ADR-3D-125 — the declaration gate fails CLOSED: an unread word is content (#498)
+
+The docs/17 §1 sibling audit run while fixing the 2-D #497 found the same class alive here, and the
+verification was blunt: «משולש ישר זוות ABC» → `["solid"]`, the right angle silently dropped under a
+green ✓, against «משולש ישר זווית ABC» → `["solid","cos-angle"]`. One transposed letter, and the tool
+drew a figure the student did not describe and told them it was right.
+
+**Root cause — the same one, because the pattern was copied.** Every leftover guard in this tree
+enumerates KNOWN vocabulary: `planarPolygon`'s bow-outs for the special-line and inscription families,
+`rightTriangle`'s prism/pyramid bow-out, the honesty gates' noun lists. An enumerating guard **fails
+open on a word it has never met**, and a typo of a significant modifier is by definition such a word
+(the `src3d/CLAUDE.md` register: *an enumeration is not a rule*). The products copy the ADR-024 leftover
+discipline by design (docs/20 §12), so they copied its defect too — this is the second half of one
+finding, not two bugs.
+
+**The mechanism.** `declLeftover` is the fail-closed half: after a rule has consumed its own vocabulary
+and its labels, every surviving TOKEN must be POSITIVELY harmless — declaration vocabulary
+(`DECL_VOCAB`, one list covering the solid nouns, base nouns, qualifiers and base clause the family
+reads), a construct noun the honesty gates own (`CONSTRUCT_NOUNS`), a neutral connective/request word,
+or a prosthetic-prefix remnant. A digit is a magnitude this family cannot express; an unclaimed label is
+an object it did not build; an unrecognised word is a statement nobody read. All three DECLINE, which is
+the escalation path — the LLM's job is typos, while a silently narrower figure lies. The asymmetry is
+the whole argument: growing the neutral list costs one unnecessary LLM call; a gap in an enumerating
+denylist costs a WRONG FIGURE under a green ✓.
+
+**Applied as a combinator, not per rule.** `gated(rule)` wraps the seven declaration rules in the RULES
+array and reads the claimed labels back off the commands the rule emitted (the `droppedNewLabels3`
+trick), so the gate needs no per-rule plumbing and a rule that later grows a branch inherits it instead
+of having to remember it. The wrapper inherits `fn.name` — the shadow matrix identifies rules by it, and
+an anonymous wrapper would have blinded the very instrument that measures this change.
+
+**Division of labour, made explicit.** A noun that IS known vocabulary but produced no object stays
+`droppedConstructNoun3`'s business — «אלכסון» on a bare box keeps the honest refusal ADR-3D chose for it
+rather than being diverted to a paid escalation. `CONSTRUCT_NOUNS` therefore moved into `parse3.ts` and
+is imported by `honesty3.ts`: one list, so a noun the gate lets through is exactly a noun the honesty
+gate is watching, and neither can assume the other covers it.
+
+**Two folds, one observed and one half-supported.** «זוות» → «זווית» is the reported misspelling,
+folded at `normalize3` (the ADR-405 chokepoint's 3-D twin) so the whole ישר-זווית family reads it
+deterministically; unobserved variants are NOT enumerated — they hit the gate and escalate. «מעויין» →
+«מעוין» came out of the closure: the plene spelling was HALF-supported — `statedQuadBase` reads
+`מעויי?ן` while `rhombusPrism` and `rightPrism`'s rhombus bail-out spell only the defective form, so
+«מנסרה ישרה שבסיסה מעויין …» fell through to the TRIANGULAR default and lost the stated base (a refusal
+only because `droppedShapeNoun3` caught it downstream).
+
+**What the closure flushed out.** (a) The tetra word «ארבעון» ends in FINAL nun — the first draft of
+`DECL_VOCAB` spelled a medial stem and the corpus caught it within one run, the recorded kaf/nun class
+striking the very list written to respect it. (b) «תיבה abcd» was pinned in `lowercase-nudge.test.ts` as
+"parses via the #181 uplift" on a false premise: «תיבה» is not an uplift anchor, so nothing ever lifted
+`abcd` — `cubeOrBox` found no uppercase run, took the label-less branch and auto-lettered A,B,C,D,
+discarding what the student wrote (harmless only because abcd ≡ ABCD; «תיבה klmn» would have drawn
+ABCD). It now routes to the mechanism #353 built for exactly this — the nudge, free and instant, with
+the corrected spelling. (c) The 2-D `labelRun` trap has no 3-D twin: `RUN` is uppercase-only, so a
+lowercase English word can never shadow a label run here.
+
+**Measured, not asserted.** The shadow matrix removed **two** divergent shadow pairs
+(`areaClaim → planarPolygon`, `volumeEqPoly → rightPyramid`) and added none — the coarse declaration
+rules stopped claiming sentences that were never theirs. Catalog guard (387 rows, both locales) and the
+honesty false-positive net (395 rows) stay green.
+
+**Locked** in `issue-498.test.ts`: both folds with their word-boundary guards, the operator's exact
+utterance emitting the right angle, the escalation family (unfolded typos, unknown adjectives, a bare
+magnitude, an unclaimed label), the keep-parsing corpus (request verbs, the given-marker's feminine
+inflection, the adjectival «מלבנית», the final-nun «ארבעון», both locales), and the construct-noun
+boundary that must NOT escalate.
