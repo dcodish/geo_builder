@@ -318,3 +318,46 @@ the "sitting there unactioned since" signal on the very run that introduced it.
 **The general rule, which is the reusable part:** *when a decision spans machines, the state it reads must
 travel; when the data is private, split the artifact so the ANSWER travels and the DATA does not.* Reach
 for that split before concluding a per-machine cache is unavoidable.
+
+## ADR-W-009 — A measured threshold is a RATIO, never a wall-clock constant
+
+**Status:** accepted, 2026-08-10 · **Issue:** [#484](https://github.com/dcodish/geo_builder/issues/484) ·
+**Amends:** [ADR-394](06-decisions.md#adr-394)
+
+**What happened.** Every `npm run test:full` rewrote `reports/test-tiers.json`, and the result depended on
+which PC ran it — one measured refresh was *14 insertions, 70 deletions* against a refresh from the other PC
+committed hours earlier. The file flip-flopped on every machine switch: spurious diffs on an artifact no
+human reads, and a near-certain conflict on any branch that happened to touch it.
+
+**Root cause.** Tier membership was "every file measured **over 60 seconds**" — an **absolute** threshold
+applied to a **machine-dependent** measurement. The home PC is faster, so few files crossed it; the work PC
+is slower, so many did. Both lists were correct for the machine that produced them and wrong for the other.
+ADR-394 commits the file deliberately *"so the fast tier matches on every machine"* — the intent is right,
+and an absolute wall-clock cutoff simply cannot deliver it. This is the measurement analogue of
+[ADR-052](06-decisions.md#adr-052)'s fixed-default smell: **a value that looks like a constant but is really
+a free variable of the environment.**
+
+**Decision — state the property, not one machine's reading of it.** The slow tier is now the heaviest files
+that together hold `SLOW_SHARE` (0.75) of the suite's total file-time, each at least `MIN_MEAN_MULT` (3×)
+the mean file duration. Both conditions are ratios, so a uniform speed difference cannot change the answer,
+and both machines derive the SAME membership from their own timings. This is also precisely the intent the
+60 s number was chosen to approximate — the original comment argued it from the distribution ("39 files over
+it hold 73% of all compute, 5277 under 1 s hold 1%"), so the share formulation states directly what the
+threshold was standing in for. The ADR-394 property worth keeping is kept: a test that gets slower still
+joins the slow tier by itself.
+
+The mean-multiple condition is not decoration: on a FLAT distribution nothing is "one of the heavy few", and
+a share rule alone would sweep most of the suite into the slow tier. Flat ⇒ empty slow tier, which is the
+honest answer.
+
+**Guarded by the property itself.** `server/__tests__/test-tiers.test.ts` scales every timing by ×0.25 … ×10
+and demands identical membership — *the old rule fails that test by construction, which is why it is the
+test* — plus the flat/empty/zero degenerate cases and order-independence (ties break by name, so two
+machines cannot disagree over equal timings). It lives in `server/__tests__/` for the `isolation.test.ts`
+reason: those tests run in every per-product lane and this script belongs to no product. The script's CLI
+dispatch is now guarded by an is-main check so the pure rule can be imported without running the suite.
+
+**Consequences.** The committed artifact becomes stable by construction, so the interim rule in #484 ("do not
+commit tier refreshes measured on the faster PC") is retired — refreshes from either machine may now be
+committed. The per-file `ms` values in the file are the writing machine's and remain informational; only the
+SET is meaningful, and only a change to the SET (or to the rule) rewrites the file.
