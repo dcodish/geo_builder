@@ -772,7 +772,12 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // המישור). An equation-plane was GIVEN by equation — nothing to derive.
   const planes: string[] = [];
   if (translationPinned) { // #315: a plane equation's d-term is translation-dependent — same anchor requirement
-    for (const name of [...c.pointPlanes.keys(), ...c.relPlanes.keys()]) {
+    // #487 (ADR-3D-124): a FREE plane joins the same multi-sample gate — while unpinned it RESAMPLES,
+    // so the agreement check drops it (a sampled equation is not knowledge, the #371/#481 rule); once
+    // pinned it is identical in every configuration and its forced equation surfaces, which is exactly
+    // the exam's «מצאו את משוואת המישור» moment.
+    const freeNames = [...c.planes.keys()].filter((n) => c.planes.get(n)!.free);
+    for (const name of [...c.pointPlanes.keys(), ...c.relPlanes.keys(), ...freeNames]) {
       const per = resolved.map((r) => r.planes.get(name));
       if (per.some((p) => !p)) continue;
       const canon = per.map((p) => {

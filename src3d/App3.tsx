@@ -104,6 +104,8 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.claimRefuted');
     case 'vacuous-relation':
       return t('err.vacuousRelation');
+    case 'plane-not-determined':
+      return t('err.planeNotDetermined', { id: err.id });
   }
 }
 
@@ -510,6 +512,7 @@ export default function App3() {
                     «מישור ABC» (the operator's play-1/7/8 ask). */}
                 {[...new Set(f.cmds.flatMap((cm) =>
                   cm.type === 'plane-through' ? [cm.name]
+                  : cm.type === 'free-plane' ? [cm.name] // #487: the declaring row cycles its patch like any other plane-materialising fact
                   : cm.type === 'plane-rel' || cm.type === 'mutual-rel' || cm.type === 'distance-rel'
                     ? [cm.a, cm.b].flatMap((op) => (op.kind === 'plane-run' ? [op.ids.join('')] : []))
                     : cm.type === 'line-rel' && cm.op.kind === 'plane-run' ? [cm.op.ids.join('')]

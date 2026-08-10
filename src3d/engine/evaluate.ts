@@ -27,6 +27,7 @@ import {
 import { applyGauge, solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { decompose3 } from './vecExpr';
 import { pinSymsOf } from './types';
+import { resolveFreePlane } from './freePlane';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
   triangleIncircle3} from './vec3';
@@ -370,6 +371,9 @@ export interface Resolved3 {
   revolutions: { kind: 'cylinder' | 'cone' | 'sphere'; center: Vec3; apex?: Vec3; r: number; h: number }[];
   /** V8-i — resolved circles in R³ (world centre + unit normal + radius + in-plane basis) for the renderer + on-circle checks. */
   circles3: { id: string; center: Vec3; normal: Vec3; radius: number; e1: Vec3; e2: Vec3 }[];
+  /** #487 (ADR-3D-124) — per FREE plane, how many of its 3 DOFs stayed SAMPLED this resolution. Derived
+   *  by the same code that did the pinning, so the DOF cue can never disagree with the sampler. */
+  freePlaneDofs: Map<string, number>;
 }
 
 const linVal = (e: LinExpr, a: number): number => e.k + e.p * a;
@@ -396,6 +400,9 @@ export function lineAtParam(c: Construction3, name: string, a: number): Resolved
   // through / common-perp / line-projection all depend on other resolved lines/planes → resolved later
   if (def.kind === 'through' || def.kind === 'common-perp' || def.kind === 'line-projection') return null;
   if (!c.planes.has(def.p1) || !c.planes.has(def.p2)) return null;
+  // #487: a FREE plane's placeholder must never feed a line — defer to the second line pass,
+  // which reads the RESOLVED planes map (the free plane is resolved by then).
+  if (c.planes.get(def.p1)?.free || c.planes.get(def.p2)?.free) return null;
   return planePlaneLine(planeAt(c, def.p1, a), planeAt(c, def.p2, a));
 }
 
@@ -493,6 +500,10 @@ function paramPinningLineRels(c: Construction3): Construction3['lineRels'] {
   if (!c.param) return [];
   return c.lineRels.filter((r) => {
     if (!isAbsolute(r.op)) return false;
+    // #487: a relation whose plane operand is FREE pins the PLANE (resolveFreePlane), never the
+    // parameter — even when the line side carries it. «l(m) ∥ π2» leaves m free and turns π2 to l;
+    // rooting over the placeholder here would fabricate a pin on a plane that has no equation.
+    if (r.op.kind === 'plane-named' && c.planes.get(r.op.name)?.free) return false;
     const opCarries = r.op.kind === 'line' ? lineDirCarriesParam(c, r.op.name) : r.op.kind === 'plane-named' && planeNormalCarriesParam(c, r.op.name);
     return lineDirCarriesParam(c, r.line) || opCarries;
   });
@@ -529,7 +540,7 @@ function satisfiesAllPins(c: Construction3, a: number): boolean {
     const cos = planesCos(c, g.p1, g.p2, a);
     if (Number.isNaN(cos) || Math.abs(cos - Math.cos((g.deg * Math.PI) / 180)) > 1e-6) return false;
   }
-  for (const g of c.linePerps) {
+  for (const g of paramLinePerps(c)) {
     const r = perpResidual(c, g.line, g.plane, a);
     if (Number.isNaN(r) || r > 1e-5) return false;
   }
@@ -540,9 +551,15 @@ function satisfiesAllPins(c: Construction3, a: number): boolean {
   return true;
 }
 
+/** #487 (ADR-3D-124): «ℓ ⊥ π2» on a FREE plane pins the PLANE (its normal ∥ the line), never the
+ *  parameter — the free plane's placeholder carries no parameter and must not enter the root-finds,
+ *  where `planeAt` would read `z = 0`. One filter, shared by every parameter-machinery consumer. */
+const paramLinePerps = (c: Construction3): Construction3['linePerps'] =>
+  c.linePerps.filter((g) => !c.planes.get(g.plane)?.free);
+
 /** How many givens pin the parameter (none ⇒ it is a free sampled DOF). */
 export const pinningGivens = (c: Construction3): number =>
-  c.planeAngles.length + c.linePerps.length + paramPinningLineRels(c).length;
+  c.planeAngles.length + paramLinePerps(c).length + paramPinningLineRels(c).length;
 
 /**
  * All parameter values satisfying EVERY pinning given — 1-DOF numeric root-finding
@@ -557,7 +574,7 @@ export function paramRoots(c: Construction3): number[] {
     const target = Math.cos((g.deg * Math.PI) / 180);
     candidates.push(...signChangeRoots((a) => planesCos(c, g.p1, g.p2, a) - target));
   }
-  for (const g of c.linePerps) {
+  for (const g of paramLinePerps(c)) {
     candidates.push(...touchZeroRoots((a) => perpResidual(c, g.line, g.plane, a)));
   }
   for (const r of paramPinningLineRels(c)) {
@@ -625,7 +642,7 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number): { va
   const pool = signed.length > 0 ? signed : roots; // an unsatisfiable sign is refused downstream, not here
   const pick = (branches: number[], value: number) => ({ value, roots, branches });
 
-  const explicit = [...c.planeAngles, ...c.linePerps].find((g) => g.branch !== undefined)?.branch;
+  const explicit = [...c.planeAngles, ...paramLinePerps(c)].find((g) => g.branch !== undefined)?.branch;
   if (explicit !== undefined) {
     const chosen = pool[((explicit % pool.length) + pool.length) % pool.length];
     return pick([chosen], chosen); // the student named the configuration — one branch, by their choice
@@ -635,8 +652,11 @@ function chooseParam(c: Construction3, coordPos: Positions3, seed: number): { va
     const p = coordPos.get(m.id);
     if (!p) continue;
     for (const root of pool) {
-      // only EQUATION planes depend on the parameter — point-run plane names are skipped
-      const names = (m.plane === 'any' ? [...c.planes.keys()] : [m.plane]).filter((name) => c.planes.has(name));
+      // only EQUATION planes depend on the parameter — point-run plane names are skipped, and so is
+      // a FREE plane (#487): its placeholder carries no parameter and must never select a root
+      const names = (m.plane === 'any' ? [...c.planes.keys()] : [m.plane]).filter(
+        (name) => c.planes.has(name) && !c.planes.get(name)!.free,
+      );
       if (names.some((name) => onPlane(p, planeAt(c, name, root)))) return pick([root], root);
     }
   }
@@ -706,6 +726,9 @@ export function freeDofCount3(c: Construction3, resolved: Resolved3): number {
     if (def.kind === 'partial') freeT += [def.x, def.y, def.z].filter((v) => v === null).length; // each unstated component is a free DOF (ADR-3D-094)
   }
   const param = c.param && pinningGivens(c) === 0 && c.paramGivens.length === 0 ? 1 : 0;
+  // #487 (ADR-3D-124): a FREE plane's remaining sampled DOFs, reported by the resolution itself —
+  // the count and the sampling share one source, so neither can drift from the other (ADR-052).
+  for (const dof of resolved.freePlaneDofs.values()) freeT += dof;
   if (resolved.pivot && resolved.pivot.solutions > 0) {
     let pinCount = c.vectorPins.length * 3;
     // #325: a symbolic component (`B(2t,t,k)`) constrains like a numeric one, and each distinct
@@ -967,7 +990,14 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     if (line) lines.set(name, line);
   }
 
-  evaluateSolidsAndPoints(c, seed, pos, planes, lines);
+  const freePlaneDofs = new Map<string, number>();
+  evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs);
+  // #487: a free plane pinned by a member that was itself only placed DURING the pass (a midpoint, a
+  // rider of another carrier) resolves against stale positions the first time — re-run the point pass
+  // once so riders and derived points read the pinned plane. Deterministic, so the fixpoint is 2 passes.
+  if (resolveFreePlanes3(c, seed, pos, planes, lines, freePlaneDofs)) {
+    evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs);
+  }
 
   // ---- ADR-3D-032: a given referencing a coord-sym point pins the parameter — a
   // post-pivot 1-DOF root-find over FINAL positions (roots = branches, the ADR-3D-006
@@ -1036,7 +1066,10 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   // (it rides the figure) or a numeric equation plane. `'any'` keeps its branch-SELECTION
   // semantics (chooseParam); a side statement is an inequality (sampled + verified).
   const drivableMemberships = c.memberships.filter(
-    (m) => !m.side && m.plane !== 'any' && (c.pointPlanes.has(m.plane) || c.planes.has(m.plane)),
+    // #487: a FREE plane's membership never drives the FIGURE — the plane has the free DOFs, and its
+    // resolution passes through the members by construction. Driving the figure toward a sampled
+    // orientation would invert the relationship (the plane is the unknown, not the solid).
+    (m) => !m.side && m.plane !== 'any' && (c.pointPlanes.has(m.plane) || (c.planes.has(m.plane) && !c.planes.get(m.plane)!.free)),
   );
 
   // S2 (#378, ADR-3D-103): the gauge-lane line relations (a figure operand against an absolute
@@ -1305,6 +1338,19 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     c.planePins.length === 0 &&
     c.memberships.length === 0 &&
     !c.coordPlanePins.some((cp) => cp.mode === 'zero' || cp.mode === 'contains');
+  // #487 (ADR-3D-124): a FREE plane pinned to FIGURE CONTENT (a plane-rel claim against a point-run)
+  // resolves BEFORE this block, reading the figure's current positions — sampling the rotation after
+  // that would rotate the run out from under the pin and refute the very claim the resolution honoured.
+  // The funnel's own doctrine decides it: a component is sampled only when PROVABLY free, and here it
+  // is provably NOT. (A free plane pinned to an ABSOLUTE line, or pure-sampled, is unaffected — nothing
+  // it reads moves with the figure.) Memberships already pin both components via the existing lists.
+  const freePlaneFigurePinned = c.claims.some(
+    (cl) =>
+      cl.type === 'plane-rel' &&
+      (cl.rel === 'parallel' || cl.rel === 'perp') &&
+      [cl.a, cl.b].some((op) => op.kind === 'plane-named' && c.planes.get(op.name)?.free) &&
+      [cl.a, cl.b].some((op) => op.kind === 'plane-run'),
+  );
   const rotationFree =
     c.pins.length === 0 &&
     c.vectorPins.length === 0 &&
@@ -1313,6 +1359,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     gaugeLineRels.length === 0 && // S2 (#378): a driven line relation pinned the orientation
     c.planePins.length === 0 &&
     c.memberships.length === 0 &&
+    !freePlaneFigurePinned &&
     // S3 (#378): `zero` belongs here too. It says the ring LIES IN a coordinate plane («הבסיס ABCD
     // שוכן במישור ה-xy»), which fixes the ring's orientation as surely as it fixes its offset — it
     // was listed under translation only, so the moment any absolute object entered the figure the
@@ -1553,6 +1600,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     pivot,
     revolutions,
     circles3,
+    freePlaneDofs,
   };
 }
 
@@ -1570,6 +1618,7 @@ function evaluateSolidsAndPoints(
   dimOverride?: number[],
   cheapSymbols?: boolean,
   symbolOverride?: Map<number, number>, // V8-c: def index → jointly-solved symbol value
+  freePlaneDofs?: Map<string, number>, // #487: out-param — per-free-plane SAMPLED DOF count (the cue's number)
 ): void {
   let dimCursor = 0;
   c.solids.forEach((solid, i) => {
@@ -1588,24 +1637,23 @@ function evaluateSolidsAndPoints(
     if (rev.apex) pos.set(rev.apex, v3(origin.x, origin.y, origin.z + h));
   });
 
+  // #487 (ADR-3D-124): FREE planes resolve BEFORE the point pass — a rider (and any point derived
+  // from one, like a foot or a cut) must read the plane's real resolution, never the placeholder.
+  // A pinning member that is itself placed later in this loop is the reason resolve3 re-runs this
+  // whole pass once when a free plane moves.
+  resolveFreePlanes3(c, seed, pos, planes, lines, freePlaneDofs);
+
   // ADR-3D-056 (#286): vec-defined points whose seg-perp/seg-par pin references a point placed LATER in
   // insertion order (the reference segment, or O) — deferred here, placed in a 2nd pass once it exists.
   const deferredSegPins: [Id, number][] = [];
-  for (const [id, def] of c.points) {
-    if (def.kind === 'solid-vertex' || def.kind === 'coord' || def.kind === 'rev-point') continue;
-    if (def.kind === 'on-segment') {
-      const a = pos.get(def.a);
-      const b = pos.get(def.b);
-      if (!a || !b) continue; // unreachable if apply enforced parents; stay total anyway
-      const t = def.t ?? sample(seed, `t-${id}-${def.a}-${def.b}`, 0.22, 0.78);
-      pos.set(id, lerp3(a, b, t));
-    } else if (def.kind === 'on-plane') {
-      // a free point riding a named plane (ADR-3D-015): sampled u,v in an in-plane frame
-      // centred on the plane's own points (point-run) or the projected figure centroid
-      // (equation plane); a stated side adds a sampled offset along the +z-oriented normal.
-      // Only EARLIER points are read (insertion order), so adding later facts never moves it.
+  const placeOnPlaneRider = (id: Id, def: Extract<PointDef, { kind: 'on-plane' }>): void => {
+    // a free point riding a named plane (ADR-3D-015): sampled u,v in an in-plane frame
+    // centred on the plane's own points (point-run) or the projected figure centroid
+    // (equation plane); a stated side adds a sampled offset along the +z-oriented normal.
+    // Only EARLIER points are read (insertion order), so adding later facts never moves it.
+    {
       const pl = planes.get(def.plane) ?? planeFromPointRun(c, def.plane, pos);
-      if (!pl) continue; // degenerate/unplaced plane — flagged downstream (not-coplanar)
+      if (!pl) return; // degenerate/unplaced plane — flagged downstream (not-coplanar)
       const runIds = c.pointPlanes.get(def.plane);
       const anchors = runIds?.map((q) => pos.get(q)).filter((q): q is Vec3 => q !== undefined);
       const placed = [...pos.values()];
@@ -1649,6 +1697,18 @@ function evaluateSolidsAndPoints(
         p = add3(p, scale3(up, def.side * sample(seed, `onplane-h-${id}`, 0.45, 1.05) * spread));
       }
       pos.set(id, p);
+    }
+  };
+  for (const [id, def] of c.points) {
+    if (def.kind === 'solid-vertex' || def.kind === 'coord' || def.kind === 'rev-point') continue;
+    if (def.kind === 'on-segment') {
+      const a = pos.get(def.a);
+      const b = pos.get(def.b);
+      if (!a || !b) continue; // unreachable if apply enforced parents; stay total anyway
+      const t = def.t ?? sample(seed, `t-${id}-${def.a}-${def.b}`, 0.22, 0.78);
+      pos.set(id, lerp3(a, b, t));
+    } else if (def.kind === 'on-plane') {
+      placeOnPlaneRider(id, def);
     } else if (def.kind === 'partial') {
       // ADR-3D-094 (#276): a NEW point with PARTIALLY-known numeric coordinates — each null
       // component is a free sampled DOF (Lane-A absolute, like `coord`). A stated sign-given
@@ -1908,6 +1968,40 @@ function evaluateSolidsAndPoints(
     const P = solveVecDef(c, vd, pos, chosen);
     if (P) pos.set(id, P);
   }
+
+}
+
+/**
+ * #487 (ADR-3D-124) — resolve every FREE plane from the current state: whatever the figure pins
+ * (members, «ℓ⊥π», stated ∥/⟂) is honoured exactly, the rest sampled per seed. Insertion order, so a
+ * relation between two free planes reads the earlier one resolved. Returns whether any plane MOVED —
+ * `resolve3` uses that to re-run the point pass once, because a pinning member placed mid-loop (a
+ * midpoint, a rider of another carrier) is only positioned after the first pass, and the established
+ * answer to a late pin is RE-EVALUATION (the ADR-3D-033 drive's pattern), never a stale read.
+ */
+function resolveFreePlanes3(
+  c: Construction3,
+  seed: number,
+  pos: Positions3,
+  planes: Map<string, ResolvedPlane>,
+  lines: Map<string, ResolvedLine>,
+  freePlaneDofs?: Map<string, number>,
+): boolean {
+  const resolvedNormals = new Map<string, Vec3>();
+  for (const [pname, rp] of planes) resolvedNormals.set(pname, rp.n);
+  const lineDirs = new Map<string, Vec3>();
+  for (const [lname, ln] of lines) lineDirs.set(lname, ln.dir);
+  let moved = false;
+  for (const [pname, pdef] of c.planes) {
+    if (!pdef.free) continue;
+    const r = resolveFreePlane(c, pname, seed, pos, resolvedNormals, lineDirs);
+    const prev = planes.get(pname);
+    if (!prev || dist3(prev.n, r.n) > 1e-9 || Math.abs(prev.d - r.d) > 1e-9) moved = true;
+    planes.set(pname, { n: r.n, d: r.d });
+    resolvedNormals.set(pname, r.n);
+    freePlaneDofs?.set(pname, r.dof);
+  }
+  return moved;
 }
 
 /** The declared basis in a stable order, or null if not exactly 3 / endpoints unplaced. */
