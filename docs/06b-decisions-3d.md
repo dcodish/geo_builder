@@ -2465,3 +2465,32 @@ the final isolate over any non-Hebrew tail. A Hebrew continuation («l מקבי�
 **Locked** as a typing simulation, not an example: at EVERY prefix of the operator's line, the preview
 leaves no non-Hebrew tail dangling after the last isolate; the strict rule is separately asserted intact
 for the fact list.
+
+### ADR-3D-123 Am. 3 — a DECLARATION's name hugs the noun; its equation is the island
+
+Third round of operator play: "I write הישר l and the rest — the l is placed at the end of the line."
+Correct diagnosis. One mega-island for «l: x=(1,2,3)+t(m-2,m,m+2)» puts the run's FIRST character — the
+object's NAME — at the island's far edge, visually the end of the RTL row, severed from the Hebrew noun
+that names it. Typographically «הישר l» is a noun phrase; only the equation is foreign matter.
+
+**The layout follows from splitting, not from positioning:** name island · separator · equation island.
+The separator is then a neutral BETWEEN isolates and takes its natural place in the RTL flow — «הישר»,
+`l`, `:`, equation block. No coordinates were harmed; the bidi algorithm does the placement.
+
+**The gate is the decision.** Content-blind splitting is dangerous — a naive dash split renders `x-5=0`
+REVERSED. A split fires only when the run OPENS with an algebraic OBJECT NAME (`l`/`ℓ`/`π` + digits — the
+lane's naming grammar; axis/parameter letters x,y,z,t,m can never match), followed by a COLON (a colon
+after a name IS the declaration form) or a SPACED dash with an `=` beyond it (the operator's
+«ישר l - x=…»; an arithmetic minus is unspaced, and a dash phrase carrying no equation — the 2026-08-09
+prod line «מישור π1 - x+(m-2)y+(m-1)z-5» — stays one island).
+
+The Am. 2 live-tail rule moved INTO `isolateLtrRuns3` as a mode (`liveTail`) rather than a post-step in
+`inputPreview3`, because the split must SEE the tail: mid-way through «l - x=» the just-typed `=` is what
+licenses the dash split, and a post-hoc PDI move would hide it.
+
+**Not mirrored to 2-D**: the name-colon-equation declaration is the 3-D algebraic lane's syntax; 2-D has
+no equation lane and no construct this rule could match.
+
+**Locked**: the five declaration forms split into the two named islands; the danger corpus does NOT split
+(`x-5=0`, spaced `x - 5 = 0`, `m-2`, the no-`=` dash phrase); the preview splits mid-typing the moment the
+`=` lands; byte-exactness over the split (two pairs of marks, nothing else).

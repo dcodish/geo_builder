@@ -65,20 +65,44 @@ const LRI = '⁦'; // LEFT-TO-RIGHT ISOLATE
 const PDI = '⁩'; // POP DIRECTIONAL ISOLATE
 
 /**
+ * #482 Am. 3 — a DECLARATION's name belongs to the Hebrew sentence; only its EQUATION is the island.
+ *
+ * «הישר l: x=(1,2,3)+t(m-2,m,m+2)» as ONE island puts `l` — the run's first character — at the island's
+ * far edge, visually the END of the RTL line, severed from the noun that names it (the operator: "I write
+ * הישר l and the rest; the l is placed at the end of the line"). The textbook layout is «הישר», the name,
+ * the separator, THEN the equation block — which is exactly what two islands produce: the separator is a
+ * neutral between isolates and takes its place in the RTL flow.
+ *
+ * The gate is deliberately narrow, because a content-blind split is dangerous — a naive dash split turns
+ * `x-5=0` into visual garbage. A split happens only when the run OPENS with an algebraic OBJECT NAME
+ * (`l`/`ℓ`/`π` + optional digits — the lane's naming; axis/parameter letters like x,t,m can never match),
+ * followed by a colon (a colon after a name IS the declaration form) or a SPACED dash with an `=` further
+ * on (the operator's «ישר l - x=…»; an arithmetic minus is unspaced, and a dash phrase without an
+ * equation — «מישור π1 - x+(m-2)y…» with no `=` — stays one island).
+ */
+const DECL_SPLIT = /^([lℓπ][0-9]{0,2}[′']?)(\s*:\s*|\s+-\s+)(.+)$/;
+
+/**
  * Wrap every LTR technical run of `s` in an isolate, leaving Hebrew and surrounding punctuation alone.
  * A string with no Hebrew is returned untouched; one already carrying isolates is never nested.
+ *
+ * `liveTail` is the PREVIEW's mode (#482 Am. 2): a finished sentence's trailing non-CORE characters are
+ * punctuation and stay outside the run — but a line BEING TYPED has no trailing punctuation, it has an
+ * incomplete expression, so the final gap's run extends to the end of the string. It lives here, not as a
+ * post-step in `inputPreview3`, so the declaration split above sees the tail: mid-way through «l - x=»
+ * the `=` is what licenses the dash split, and a post-hoc PDI move would hide it.
  */
-export function isolateLtrRuns3(s: string): string {
+export function isolateLtrRuns3(s: string, liveTail = false): string {
   if (!HEBREW_LETTER.test(s)) return s;
   if (s.includes(LRI)) return s;
 
   let out = '';
   let gap = '';
-  const flush = () => {
+  const flush = (isFinal = false) => {
     let first = [...gap].findIndex((c) => CORE.test(c));
     if (first < 0) { out += gap; gap = ''; return; }
     let last = gap.length - 1;
-    while (last > first && !CORE.test(gap[last])) last--;
+    if (!(liveTail && isFinal)) while (last > first && !CORE.test(gap[last])) last--;
 
     /** How many of `ch` sit inside the currently-selected span. */
     const countIn = (ch: string) => {
@@ -117,14 +141,20 @@ export function isolateLtrRuns3(s: string): string {
       first--;
       last++;
     }
-    out += gap.slice(0, first) + LRI + gap.slice(first, last + 1) + PDI + gap.slice(last + 1);
+    const span = gap.slice(first, last + 1);
+    const decl = DECL_SPLIT.exec(span);
+    const body =
+      decl && (decl[2].includes(':') || decl[3].includes('='))
+        ? LRI + decl[1] + PDI + decl[2] + LRI + decl[3] + PDI // name island · separator · equation island
+        : LRI + span + PDI;
+    out += gap.slice(0, first) + body + gap.slice(last + 1);
     gap = '';
   };
 
   for (const ch of s) {
     if (HEBREW_LETTER.test(ch)) { flush(); out += ch; } else gap += ch;
   }
-  flush();
+  flush(true);
   return out;
 }
 
@@ -148,20 +178,11 @@ export const textDir3 = (s: string): 'rtl' | 'ltr' => (HEBREW_LETTER.test(s) ? '
  * gate is the transform itself, so the preview appears exactly when the box is lying about the layout.
  */
 export const inputPreview3 = (s: string): string | null => {
-  let iso = isolateLtrRuns3(s);
-  // The LIVE-TAIL rule (the operator's second screenshot): a finished sentence's trailing non-CORE
-  // characters are punctuation and belong OUTSIDE the run («וכאן AB = 9.») — but a line BEING TYPED has
-  // no trailing punctuation, it has an incomplete expression. Mid-way through «…+t(m-2,…» the text ends
-  // in `t(m-`, and the strict rule leaves that `-` outside the isolate, where it is a neutral in an RTL
-  // paragraph — it jumps to the far LEFT, and the preview reproduces the box's lie at exactly the moment
-  // it exists to correct. So here, and only here (the fact list renders finished sentences and keeps the
-  // strict rule), the last isolate swallows the tail: if everything after the final PDI is non-Hebrew,
-  // it is the run's own unfinished end, and the isolate extends over it.
-  const lastPdi = iso.lastIndexOf(PDI);
-  if (lastPdi >= 0) {
-    const tail = iso.slice(lastPdi + 1);
-    if (tail && !HEBREW_LETTER.test(tail)) iso = iso.slice(0, lastPdi) + tail + PDI;
-  }
+  // `liveTail` — the Am. 2 rule: a line being typed has an incomplete expression at its end, never
+  // trailing sentence punctuation, so the final run extends to the end of the string. The mechanics live
+  // in `isolateLtrRuns3` itself so the declaration split can see the tail (an `=` still being typed is
+  // what licenses the dash split).
+  const iso = isolateLtrRuns3(s, true);
   return iso === s ? null : iso;
 };
 

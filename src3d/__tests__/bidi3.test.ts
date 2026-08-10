@@ -180,10 +180,10 @@ describe('#482 round 2 — the isolate must COVER the run, not merely exist', ()
     expect(out.endsWith(PDI), `the run must end at the paren, got ${JSON.stringify(out.slice(-4))}`).toBe(true);
   });
 
-  it('a plane name is not split from its own digit', () => {
+  it('a plane name is not split from its own digit — and (Am. 3) is its OWN island beside the noun', () => {
     const out = isolateLtrRuns3('מישור π1: x+(m-2)y+(m-1)z-5=0');
-    expect(out).toContain(`${LRI}π1:`);
-    expect(out.split(LRI).length - 1, 'π and 1 belong to ONE run').toBe(1);
+    expect(out, 'π1 whole, hugging המישור').toContain(`${LRI}π1${PDI}`);
+    expect(out, 'the equation is its own island').toContain(`${LRI}x+(m-2)y+(m-1)z-5=0${PDI}`);
   });
 
   it('the sentence’s OWN punctuation still stays outside — the property this must not trade away', () => {
@@ -306,5 +306,53 @@ describe('#482(b) — the live-tail rule: no keystroke may dangle', () => {
   it('still byte-exact and still gated: pure-Hebrew and pure-LTR lines preview as null', () => {
     expect(inputPreview3('שרטטו קובייה')).toBeNull();
     expect(inputPreview3('line l: x=(1,2,3)+t(m-')).toBeNull();
+  });
+});
+
+/**
+ * #482 Am. 3 — the operator's third screenshot: "I write הישר l and the rest; the l is placed at the end
+ * of the line." One mega-island puts the run's FIRST character — the object's name — at the island's far
+ * edge, visually the end of the RTL row, severed from the Hebrew noun that names it. A declaration splits
+ * into name island · separator · equation island, and the separator, a neutral between isolates, takes
+ * its natural place in the RTL flow — the textbook layout.
+ *
+ * The gate is the interesting part: content-blind splitting is DANGEROUS, so these tests are mostly about
+ * what must NOT split.
+ */
+describe('#482 Am. 3 — a declaration’s NAME hugs the noun; its equation is the island', () => {
+  it.each([
+    ['colon form', 'הישר l: x=(1,2,3)+t(m-2,m,m+2)', 'l', 'x=(1,2,3)+t(m-2,m,m+2)'],
+    ['spaced-dash form', 'ישר l - x=(1,2,3)+t(m+2,m,m-2)', 'l', 'x=(1,2,3)+t(m+2,m,m-2)'],
+    ['digit-indexed name, spaced colon', 'ישר l2 : x=(m,2m,3)+t(1,1,1)', 'l2', 'x=(m,2m,3)+t(1,1,1)'],
+    ['plane', 'מישור π1: x+(m-2)y+(m-1)z-5=0', 'π1', 'x+(m-2)y+(m-1)z-5=0'],
+    ['script ℓ', 'הישר ℓ: x = (0,2,0) + t(2,-2,0)', 'ℓ', 'x = (0,2,0) + t(2,-2,0)'],
+  ])('%s: two islands', (_label, input, name, eq) => {
+    const out = isolateLtrRuns3(input);
+    expect(out).toContain(`${LRI}${name}${PDI}`);
+    expect(out).toContain(`${LRI}${eq}${PDI}`);
+  });
+
+  it.each([
+    // the danger cases — a split here would REVERSE the reading
+    ['a bare equation is not a declaration', 'המישור x-5=0'],
+    ['a spaced equation is not a declaration (x is an axis, never a name)', 'המישור x - 5 = 0'],
+    ['an arithmetic difference', 'וכאן m-2 חיובי'],
+    ['a dash phrase with NO equation stays whole (the prod line of 2026-08-09)', 'מישור π1 - x+(m-2)y+(m-1)z-5'],
+  ])('%s: ONE island', (_label, input) => {
+    const out = isolateLtrRuns3(input);
+    expect(out.split(LRI).length - 1, 'no split — one isolate').toBe(1);
+  });
+
+  it('the preview splits too, and live-tail still licenses the dash split mid-typing', () => {
+    // at «הישר l - x=» the strict boundary would exclude the `=` and the dash split would never fire;
+    // liveTail extends the run first, so the = is visible to the gate the moment it is typed
+    const p = inputPreview3('הישר l - x=')!;
+    expect(p).toContain(`${LRI}l${PDI}`);
+    expect(p).toContain(`${LRI}x=${PDI}`);
+  });
+
+  it('byte-exactness survives the split (two pairs of zero-width marks, nothing else)', () => {
+    const s = 'הישר l: x=(1,2,3)+t(m-2,m,m+2)';
+    expect(isolateLtrRuns3(s).split(LRI).join('').split(PDI).join('')).toBe(s);
   });
 });
