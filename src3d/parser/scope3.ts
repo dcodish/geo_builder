@@ -30,6 +30,7 @@ export type ScopeCategory3 =
   | 'oblique-prism'
   | 'lowercase-labels'
   | 'ambiguous-height'
+  | 'latin-angle-label'
   // S2 (#378, DoD 12) added two forward-pointing categories; S4 and S3 have since retired both by
   // SUPPORTING their forms. Guidance for something the parser handles is a lie — the #73 no-theft
   // sweep enforces that, and it is what caught the stale entry.
@@ -94,6 +95,36 @@ const RULES3: ScopeRule3[] = [
       // would be guidance for something the parser handles — the lie this register's own header forbids,
       // and the third category retired this way after S3/S4.
       /^\s*(?:given\s+a\s+)?(?:circle|rectangle|rhombus|trapezoid|kite|parallelogram)\s*\.?\s*$/i,
+    ],
+  },
+  {
+    /**
+     * #394 — an angle labelled with a LOWERCASE LATIN letter («60<a<90», prod 2026-07-28).
+     * **Operator ruling (2026-07-29, re-affirming earlier ones): not supported, and the student is told
+     * what to use instead.** Lowercase latin is this product's vector/parameter namespace (u,v,w and
+     * t,k,m), so admitting it as an angle label would collide with it — this is a deliberate
+     * NON-feature, and its end state is guidance, never a build.
+     *
+     * Both supported forms are offered by the message: name the angle by its POINTS («∠ABC», whose
+     * bounds already work — ADR-3D-064) or use a Greek label from the palette («60 < α < 90»,
+     * ADR-3D-063).
+     *
+     * The guard that keeps it honest: a parameter-SIGN given («t > 0», «k חיובי», ADR-3D-079) is the
+     * same shape and must never be stolen. Two things prevent it — the register only runs on a FAILED
+     * parse (those forms parse), and the pattern demands a two-sided bound or an explicit angle noun,
+     * which a sign given never has.
+     */
+    category: 'latin-angle-label',
+    patterns: [
+      // a TWO-SIDED numeric bound around a lone lowercase letter: 60<a<90, 60 ≤ a ≤ 90.
+      // The RESERVED letters are excluded by name — «60<t<90» is a student bounding the figure
+      // PARAMETER, and answering it with "use ∠ABC or α" would be guidance about the wrong thing; it
+      // stays an honest not-understood until a parameter-bound form exists.
+      /^\s*\d+(?:\.\d+)?\s*[<≤]\s*(?![tkmuvwxyz](?![a-z]))[a-z]\s*[<≤]\s*\d+(?:\.\d+)?\s*$/,
+      // Deliberately NOT extended to «זווית a» / «angle a = 60»: the #181 ANCHORED UPLIFT already owns
+      // a single letter after an angle noun — it reads as the point label A and «angle b = 60» builds
+      // the vertex angle at B. Steering that to "use ∠ABC or α" would describe something the tool did
+      // not do. The two-sided bound is the reported form precisely because no anchor precedes the letter.
     ],
   },
   {

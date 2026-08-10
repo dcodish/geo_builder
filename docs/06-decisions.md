@@ -6801,3 +6801,19 @@ distinct) still passes, which is the check that mattered.
 non-vacuity assertion), `introduced-labels.test.ts` (the reported session, the auto-label cases that must
 NEVER flag, multi-line decompositions), and `dropped-construct-noun.test.ts` (the reuse now narrates; the
 gate asks its own question directly).
+
+## ADR-437 — The «ן-» connective slip is normalised at the input seam (#506)
+
+Final-nun sits beside vav on the keyboard, and the slip recurs across the 2026-08-10 triage INSIDE
+otherwise-real constructions — «O - חיתוך של AC ן- DB», «הנקודות F ו- G הן אמצעי הקטעים BC ן- DO». Each
+occurrence turned a mostly-parseable compound into a partial parse that the honesty gates (correctly)
+stopped, costing a paid LLM escalation on input whose intent is unambiguous. That is the same
+silent-cost failure as the 3-D clitic (#494, ADR-3D-126): the tool appears to work in prod while paying
+for a non-deterministic answer to something it could read for free.
+
+Normalised at the existing input seam (the #105 «שורש»→√ chokepoint), so every rule inherits it and none
+needs to know. The safety argument is POSITION, not vocabulary: a standalone final-nun is not a Hebrew
+word, so in the connective position — before a hyphen, or between two uppercase label tokens — it can
+only be the ו-connective mistyped. A global replace would have corrupted «אלכסון», «סימון» and «הן»,
+which is why the match is anchored on both sides and asserted against the whole catalog rather than
+argued about.

@@ -1366,7 +1366,44 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     // funnel judged rotation free, spun the solid, and tipped the base off the plane it was pinned
     // to. Silent destruction of a stated given; the ADR-3D-101 classification, completed.
     !c.coordPlanePins.some((cp) => cp.mode === 'share' || cp.mode === 'perp' || cp.mode === 'contains' || cp.mode === 'zero');
-  if ((translationFree || rotationFree) && c.solids.length > 0 && hasAbsoluteFrameObject(c)) {
+  /**
+   * #385 — the LEFTOVER rotation, spent on LEGIBILITY.
+   *
+   * A driven «AB מאונך לישר ℓ1» pins ONE rotational DOF, and the funnel conservatively treats rotation
+   * as fully pinned (the documented ADR-3D-101 deferral: "partial freedoms stay conservatively pinned").
+   * But rotation ABOUT ℓ's own direction preserves the relation exactly — the angle a vector makes with
+   * an axis is invariant under rotation about that axis — so a whole circle of placements satisfies the
+   * given equally, and which one is drawn is pure luck of the seed. Measured on the PR #382 figure: the
+   * true 90° projects to ~40° at the home view on seeds 0/1 and ~88° on seed 2. The relation is correct
+   * and the drawing lies about it, which is the ADR-3D-098/099 rule — a placement must READ correctly,
+   * not merely BE correct.
+   *
+   * The subgroup is available only when the rotation-pinning records are ALL line relations sharing ONE
+   * direction. Two non-parallel named lines have no common preserving spin, and any other pin kind
+   * (points, vectors, planes, memberships, coordinate planes) constrains rotation in ways a spin about
+   * a line does not preserve — so those keep the conservative freeze, unchanged.
+   */
+  const spinAxis = ((): Vec3 | null => {
+    if (rotationFree) return null; // already fully free — the ordinary sampler owns it
+    const rotPinnedElsewhere =
+      c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0 ||
+      c.memberships.length > 0 || freePlaneFigurePinned ||
+      c.coordPlanePins.some((cp) => cp.mode === 'share' || cp.mode === 'perp' || cp.mode === 'contains' || cp.mode === 'zero');
+    if (rotPinnedElsewhere) return null;
+    const names = [...gaugeLineRels.map((r) => r.line), ...c.planeLinePerps.map((g) => g.line)];
+    if (names.length === 0) return null;
+    let axis: Vec3 | null = null;
+    for (const n of names) {
+      const ln = lines.get(n);
+      if (!ln || norm3(ln.dir) < 1e-9) return null; // an unresolved line — nothing provable, stay frozen
+      const d = normalize3(ln.dir);
+      if (!axis) axis = d;
+      else if (norm3(cross3(axis, d)) > 1e-6) return null; // two directions ⇒ no common preserving spin
+    }
+    return axis;
+  })();
+
+  if ((translationFree || rotationFree || spinAxis) && c.solids.length > 0 && hasAbsoluteFrameObject(c)) {
     const gaugeIds: Id[] = [];
     for (const [id, def] of c.points) {
       if (GAUGE_KINDS.has(def.kind) || (def.kind === 'on-plane' && c.pointPlanes.has(def.plane))) gaugeIds.push(id);
@@ -1437,22 +1474,73 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
           if (p) pos.set(id, applyGauge(p, g));
         }
       };
+      /**
+       * #385 — how faithfully the stated line relations READ at the default view. 0 = perfect (a ⟂
+       * projects to 90°, a ∥ to 0°); the value is the worst deviation in degrees over every stated
+       * relation, so one badly-drawn relation cannot hide behind a well-drawn one.
+       *
+       * Deliberately scored at the FIXED default view, never the live camera — the ADR-3D-099 rule.
+       * A relation whose operand does not resolve to a direction contributes nothing rather than a
+       * guess: a missing score must never look like a good one.
+       */
+      const legibility = (): number => {
+        if (!spinAxis) return 0;
+        const screenDir = (a: Vec3, b: Vec3): { x: number; y: number } | null => {
+          const fa = flat(a);
+          const fb = flat(b);
+          const dx = fb.x - fa.x;
+          const dy = fb.y - fa.y;
+          const m = Math.hypot(dx, dy);
+          return m < 1e-9 ? null : { x: dx / m, y: dy / m };
+        };
+        let worst = 0;
+        for (const r of gaugeLineRels) {
+          if (r.rel !== 'perp' && r.rel !== 'parallel') continue;
+          const ln = lines.get(r.line);
+          if (!ln) continue;
+          const geom = resolveOperand(r.op, c, { lines, planes })((id) => pos.get(id) ?? null);
+          if (!geom?.point || !geom.dir) continue;
+          const segScreen = screenDir(geom.point, add3(geom.point, geom.dir));
+          const lineScreen = screenDir(ln.anchor, add3(ln.anchor, ln.dir));
+          if (!segScreen || !lineScreen) continue;
+          const cos = Math.abs(segScreen.x * lineScreen.x + segScreen.y * lineScreen.y);
+          const deg = (Math.acos(Math.min(1, cos)) * 180) / Math.PI; // 0..90, undirected
+          worst = Math.max(worst, Math.abs(deg - (r.rel === 'perp' ? 90 : 0)));
+        }
+        return worst;
+      };
+
       const MARGIN = 0.25 * extent;
-      let best: { g: Parameters<typeof applyGauge>[1]; clear: number } | null = null;
+      // #385: a spin candidate is judged on legibility FIRST among the placements that clear well
+      // enough — clearance is a correctness-adjacent floor (never draw a false coincidence), legibility
+      // is what the leftover freedom is then spent on.
+      const LEGIBLE = 8; // degrees: a 90° that draws within 8° of square reads as square
+      let best: { g: Parameters<typeof applyGauge>[1]; clear: number; legib: number } | null = null;
       for (let attempt = 0; attempt < 12; attempt++) {
         const k = (n: string) => sample(seed, `placement-${attempt}-${n}`, -1, 1);
         const axis = normalize3(v3(k('ax'), k('ay'), k('az') + 0.3));
         // only PROVABLY free components are sampled — a constrained one keeps what the solve chose
+        // Rotation is sampled FREELY when provably free, on the PRESERVING SUBGROUP when a line
+        // relation pinned it (#385 — a spin about that line's own direction keeps the relation exact),
+        // and not at all otherwise.
+        const spin = spinAxis ? scale3(spinAxis, sample(seed, `placement-spin-${attempt}`, 0, 2 * Math.PI)) : null;
         const g = {
           t: translationFree ? v3(k('tx') * extent * 1.5, k('ty') * extent * 1.5, k('tz') * extent * 1.5) : v3(0, 0, 0),
-          w: rotationFree ? scale3(axis, sample(seed, `placement-${attempt}-angle`, 0, 2 * Math.PI)) : v3(0, 0, 0),
+          w: rotationFree ? scale3(axis, sample(seed, `placement-${attempt}-angle`, 0, 2 * Math.PI)) : (spin ?? v3(0, 0, 0)),
           s: 1,
           mirror: false,
         };
         place(g);
         const clear = clearance();
-        if (!best || clear > best.clear) best = { g, clear };
-        if (clear >= MARGIN) break;
+        const legib = legibility();
+        // Ranking: clear the absolute objects first (a false coincidence is a drawing that LIES), then
+        // read correctly. Without a spin axis `legib` is 0 for every candidate, so this reduces exactly
+        // to the previous clearance-only rule — the existing figures cannot move.
+        const better =
+          !best ||
+          (best.clear < MARGIN ? clear > best.clear : clear >= MARGIN && legib < best.legib);
+        if (better) best = { g, clear, legib };
+        if (clear >= MARGIN && (!spinAxis || legib <= LEGIBLE)) break;
       }
       if (best) place(best.g);
     }
