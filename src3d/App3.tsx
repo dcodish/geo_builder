@@ -12,7 +12,8 @@ import { answerQuery } from './engine/queries';
 import { freeDofCount3 } from './engine/evaluate';
 import { COMMAND_CATALOG_3D } from './parser/catalog3';
 import { logDebug3 } from './debug/sessionLog3';
-import { isolateLtrRuns3 } from './i18n/bidi';
+import { inputPreview3, isolateLtrRuns3, textDir3 } from './i18n/bidi';
+import { SYMBOL_PALETTE_3 } from './ui/symbols3';
 import { crossingUtterance3, nextFreeLabel3 } from './engine/crossings3';
 import { escalate3 } from './parser/llm3';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from './parser/scope3';
@@ -387,31 +388,27 @@ export default function App3() {
             </button>
           </form>
 
+          {/* #482 half (b), operator ruling 2026-08-10 — OPTION 3 (ADR-3D-123 Am. 1): a read-only live
+              preview of the input, isolated at render, shown only while isolation would CHANGE the
+              layout (the gate lives in inputPreview3). The box itself stays raw — isolates cannot enter
+              an editable value without corrupting the caret, and dir="ltr" is what 2-D reverted (#118).
+              aria-hidden: it duplicates the input for sighted users; a screen reader has the input. */}
+          {(() => {
+            const preview = inputPreview3(text);
+            return preview === null ? null : (
+              <div
+                aria-hidden="true"
+                data-testid="bidi-preview"
+                dir={textDir3(text)}
+                className="overflow-x-auto whitespace-nowrap rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-600"
+              >
+                {preview}
+              </div>
+            );
+          })()}
+
           <div className="flex flex-wrap gap-1" dir="ltr">
-            {(
-              [
-                // Greek letters for angle names (#272): 2-D has had these since ADR-039 — «∠SAB = α»
-                // is unusable when the letter can't be typed.
-                ['α', 'α', 0],
-                ['β', 'β', 0],
-                ['γ', 'γ', 0],
-                ['δ', 'δ', 0],
-                ['θ', 'θ', 0],
-                ['<', '<', 0], // a bound / ordering between measures
-                ['⃗', '⃗', 0],
-                ['|·|', '||', 1],
-                ['√', '√', 0],
-                ['½', '½', 0],
-                ['¾', '¾', 0],
-                ['·', '·', 0],
-                ['⊥', '⊥', 0],
-                ['∠', '∠', 0],
-                ['°', '°', 0],
-                ['′', '′', 0],
-                ['ℓ', 'ℓ', 0],
-                ['π', 'π', 0],
-              ] as [string, string, number][]
-            ).map(([label, sym, back]) => (
+            {SYMBOL_PALETTE_3.map(([label, sym, back]) => (
               <button
                 key={label}
                 type="button"

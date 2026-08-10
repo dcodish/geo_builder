@@ -2383,3 +2383,114 @@ even though the line does cross the plane at the sampled value** (the gate, stat
 ∥ figure offers nothing; the synthesized sentence parses in He and En, lands the point where the dot was,
 and retires the offer; naming the same point through the verb frame retires it too; and a figure with no
 algebraic objects offers nothing.
+
+## ADR-3D-123 — a bidi run is bounded by its DELIMITERS and spelled in the tool's OWN alphabet
+
+**Context.** [ADR-3D-121](#adr-3d-121) (#482) extended the bidi isolation to the student's own utterance.
+The operator re-tested it the next morning and the fact row was still wrong: «ישר l - x=(1,2,3)+t(m+2,m,m-2)»
+rendered with a stray `(` at the far left, and «מישור π1: …» split the plane's name from its digit. The
+suite was green throughout.
+
+**Two defects, one root — the run's definition was wrong in both directions.**
+
+*The boundary.* `flush()` selected the run by trimming to the first and last **CORE** character. A closing
+delimiter is not CORE, so any run ENDING in one — every parametric line, every trailing coordinate triple —
+left that closer outside the isolate. Outside, a lone bracket is a bidi **neutral**: it resolves to the
+paragraph direction, is **mirrored**, and is laid out at the far end of the row. The `)` closing `t(…)`
+became a `(` at the left margin. The existing absorption loop could never reach it — it only takes a
+balanced pair wrapping the span *end to end*, whereas here the opener sits in the middle of the run.
+The rule is now: **grow the span over any delimiter whose partner is unmatched inside it**, then hug.
+
+*The alphabet.* `CORE` was hand-authored against a guessed character set while the symbol palette grew
+independently inside the JSX, with nothing connecting them. **13 of the 18 characters the tool OFFERS were
+absent** — every Greek letter, `ℓ`, `′`, `·`, `½`, `¾`, `<`, the vector arrow. A missing character does not
+merely fail to start a run, it **splits** one, because the scan looks for CORE: `π` fell outside and `1: x+…`
+began the isolate. π and ℓ are how planes and lines are *named* here, so the gap sat on the tree's most
+common utterances. The 2-D mirror had the same hole for twelve characters (`α…θ`, `²`, `^`, `≅`, `~`, `<`, `_`).
+
+**Why the green suite shipped it.** The ADR-3D-121 assertions were `toContain(LRI)`, byte-reversibility,
+idempotence, and one-isolate-not-one-per-token. **Every one of them is true of a broken transform.** None
+said the isolate *covers* the run — the only property visible on screen. The lesson generalises past bidi:
+an existence assertion over a transform is nearly free of content; assert the invariant the user sees.
+
+**The mechanism, not the two characters.** Adding π would have been the patch. The palette moved out of the
+JSX into `ui/symbols3.ts` / `ui/symbols.ts` so the vocabulary is a declared, importable thing, and the suites
+now assert **palette ⊆ CORE ∪ delimiters**. Adding a button without teaching bidi about it is a test failure,
+which is the only version of this fix that survives the next author. `RUN_CORE`/`RUN_DELIMS` are exported
+for that test alone; nothing branches on them at runtime.
+
+**Both trees, copied not shared** (docs/20 §12 rule 1). 2-D's `bidiSegments` is also the `.docx` export's
+run-splitter ([ADR-431](06-decisions.md#adr-431) Am. 1), so the boundary correction lands in Word output too.
+
+**Half (b) of #482 is still open and still needs an operator ruling** — the input box cannot take isolate
+characters without corrupting the caret, and forcing `dir="ltr"` is what 2-D tried and reverted (#118). The
+recommendation remains a read-only isolated preview under the input, the 2-D live-math-preview pattern.
+
+**Locked** in `bidi3.test.ts` and `i18n/__tests__/bidi.test.ts`: over a corpus of real utterances, **no CORE
+character and no half of a delimiter pair may sit outside an isolate**; the operator's exact line ends at the
+paren; `π1` is one run; the sentence's own punctuation still stays outside (the property the fix must not
+trade away); and the palette-subset drift lock in both trees.
+
+### ADR-3D-123 Am. 1 — half (b) ruled: OPTION 3, the read-only isolated preview
+
+The operator ruled on the input box (2026-08-10), having also weighed a fourth option raised in session —
+a richtext/contenteditable input that could carry isolates inside the editable value. **Ruling: option 3.**
+Contenteditable buys marginal UX at a disproportionate defect surface (caret jumps on programmatic edits,
+IME/mobile composition around zero-width controls, paste sanitization against the byte-exactness
+invariant, undo ownership, React's uncontrolled-component friction); the preview delivers the same
+information — the line laid out correctly, visible while typing — with none of it.
+
+**Mechanism.** `inputPreview3` in `i18n/bidi.ts` is the pure seam: the isolated text when isolation would
+CHANGE the layout, `null` otherwise — so the preview appears exactly when, and only when, the box is lying
+about direction. A pure-Hebrew or pure-LTR line previews as nothing; an English session never sees it.
+Container direction comes from `textDir3` — content-decided, never `dir="auto"`'s first-strong-character
+(the 2-D #118/ADR-312 lesson, copied). The box itself stays byte-raw; the preview is `aria-hidden`
+(a screen reader has the input itself).
+
+**Locked** in `bidi3.test.ts`: mixed-direction lines preview isolated and byte-identical under stripping;
+pure-Hebrew and pure-LTR lines preview as `null`; `textDir3` decides by content («C במרחק…» is RTL).
+
+### ADR-3D-123 Am. 2 — the preview's LIVE-TAIL rule
+
+The operator play-tested Am. 1 and "got the same output as I type": mid-way through «…+t(m-2,…» the input
+ends in `t(m-`, and the finished-sentence boundary rule — which rightly keeps a trailing `.` outside the
+run — left that `-` outside the isolate, where it is a neutral in an RTL paragraph and jumps to the far
+left. The preview reproduced the box's lie at exactly the moment it exists to correct.
+
+**The rule split is semantic, not cosmetic:** a *finished* sentence's trailing non-CORE characters are
+punctuation (strict rule, unchanged — the fact list and every message keep it); a *live* line's tail is an
+incomplete expression by definition, because the cursor sits at its end. `inputPreview3` therefore extends
+the final isolate over any non-Hebrew tail. A Hebrew continuation («l מקביל למישור») is never swallowed.
+
+**Locked** as a typing simulation, not an example: at EVERY prefix of the operator's line, the preview
+leaves no non-Hebrew tail dangling after the last isolate; the strict rule is separately asserted intact
+for the fact list.
+
+### ADR-3D-123 Am. 3 — a DECLARATION's name hugs the noun; its equation is the island
+
+Third round of operator play: "I write הישר l and the rest — the l is placed at the end of the line."
+Correct diagnosis. One mega-island for «l: x=(1,2,3)+t(m-2,m,m+2)» puts the run's FIRST character — the
+object's NAME — at the island's far edge, visually the end of the RTL row, severed from the Hebrew noun
+that names it. Typographically «הישר l» is a noun phrase; only the equation is foreign matter.
+
+**The layout follows from splitting, not from positioning:** name island · separator · equation island.
+The separator is then a neutral BETWEEN isolates and takes its natural place in the RTL flow — «הישר»,
+`l`, `:`, equation block. No coordinates were harmed; the bidi algorithm does the placement.
+
+**The gate is the decision.** Content-blind splitting is dangerous — a naive dash split renders `x-5=0`
+REVERSED. A split fires only when the run OPENS with an algebraic OBJECT NAME (`l`/`ℓ`/`π` + digits — the
+lane's naming grammar; axis/parameter letters x,y,z,t,m can never match), followed by a COLON (a colon
+after a name IS the declaration form) or a SPACED dash with an `=` beyond it (the operator's
+«ישר l - x=…»; an arithmetic minus is unspaced, and a dash phrase carrying no equation — the 2026-08-09
+prod line «מישור π1 - x+(m-2)y+(m-1)z-5» — stays one island).
+
+The Am. 2 live-tail rule moved INTO `isolateLtrRuns3` as a mode (`liveTail`) rather than a post-step in
+`inputPreview3`, because the split must SEE the tail: mid-way through «l - x=» the just-typed `=` is what
+licenses the dash split, and a post-hoc PDI move would hide it.
+
+**Not mirrored to 2-D**: the name-colon-equation declaration is the 3-D algebraic lane's syntax; 2-D has
+no equation lane and no construct this rule could match.
+
+**Locked**: the five declaration forms split into the two named islands; the danger corpus does NOT split
+(`x-5=0`, spaced `x - 5 = 0`, `m-2`, the no-`=` dash phrase); the preview splits mid-typing the moment the
+`=` lands; byte-exactness over the split (two pairs of marks, nothing else).
