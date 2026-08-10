@@ -277,6 +277,27 @@ export default function App3() {
   const [queryText, setQueryText] = useState('');
 
   /**
+   * #336 — "clear the session" has TWO OWNERS: the store (facts / queries / plane display / figure
+   * name / lastError, all reset by `clear()`) and this component's own session state. The button was
+   * wired to the store half only, so the command input kept the text the student had just cleared —
+   * along with the guidance note and the data-panel query box. 2-D closed exactly this in #146 by
+   * routing its button through one handler that resets both owners; 3-D never received that fix, so
+   * the same defect lived on a product apart. Both owners now clear in one place.
+   *
+   * Deliberately NOT reset: display and language preferences (`showData`, the locale). Those are
+   * session-INDEPENDENT — 2-D's rule, kept identical here — and clearing a figure is not a request to
+   * put the panels back the way they started.
+   */
+  const clearAll = () => {
+    logDebug3({ kind: 'action', action: 'clear' });
+    clear();
+    setText('');
+    setGuidanceNote(null);
+    setQueryText('');
+    setLoadNote(null);
+  };
+
+  /**
    * #483 — clicking an offered ℓ∩π crossing NAMES it. Deliberately routed through the ordinary
    * `submit` with a real sentence rather than pushed as a command: the click then produces a fact the
    * student can read, undo, re-order and save, and replaying the file re-derives the same point. That
@@ -596,7 +617,7 @@ export default function App3() {
             <button type="button" onClick={() => { logDebug3({ kind: 'action', action: 'redo' }); redo3(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-100">
               {t('actions.redo')}
             </button>
-            <button type="button" onClick={() => { logDebug3({ kind: 'action', action: 'clear' }); clear(); }} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50">
+            <button type="button" onClick={clearAll} className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50">
               {t('actions.clear')}
             </button>
             <span className="mx-1 self-center text-slate-300">|</span>

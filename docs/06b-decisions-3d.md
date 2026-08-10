@@ -2718,3 +2718,22 @@ recorded because a plausible wrong hypothesis is the part of a bug worth remembe
 enumerated: a Hebrew word whose leading clitic can be removed to leave a word the catalog itself uses
 standalone is a prefix+noun, so the generator needs no vocabulary of its own and grows with the corpus.
 
+### ADR-3D-127 — Two owners for "clear", one owner for precision (#336, #491)
+
+**#336** — "clear the session" spans the store (facts / queries / plane display / figure name) and
+`App3.tsx`'s own state (the command input, the guidance note, the query box). The button was wired to the
+store half only, so the text the student had just cleared stayed on screen. 2-D closed exactly this in #146
+by routing its button through one handler resetting both owners; 3-D never received the fix — the same
+defect, a product apart, which is the recurring cost of copying patterns rather than sharing them (and still
+the right trade, per docs/20 §12). Display and language preferences stay untouched: clearing a figure is not
+a request to put the panels back.
+
+**#491** — #481 correctly replaced the canvas's private 3-decimal rounder with the panel's shared formatter,
+and inherited its 2-place fallback along with it, coarsening `-0.586` to `-0.59`. That was collateral, not
+intent. Precision is a property of the SURFACE — a canvas has room a panel row does not — so the decimal
+fallback is now the caller's to choose while every exact tier stays shared; asking for more places can never
+trade away a surd. What this deliberately does NOT do is make a mixed triple uniform: `(-0.586, √2, 3.414)`
+prints the one component that HAS an exact form as that form. Rendering all three as decimals to look tidy
+would assert that none of them are exact, which is false, and the alternative — growing `trySurd` into a
+general symbolic form for `√2−2` — is the docs/20 §12 no-CAS boundary. **Flagged for the operator as a
+presentation call**: the mixed rendering is a pedagogy question, and only the precision half was a defect.

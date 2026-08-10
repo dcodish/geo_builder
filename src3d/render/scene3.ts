@@ -273,7 +273,13 @@ function labelDir(incident: { dx: number; dy: number }[]): { dx: number; dy: num
  * residual is a surd by default, and √2 printed as `1.414`. A second formatter on a user-facing surface
  * is a second set of rounding rules to keep in step, so there is now one.
  */
-const fmt = (x: number): string => cleanMag(Object.is(x, -0) ? 0 : x);
+/** #491: the canvas asks for THREE decimal places. #481 replaced this surface's private 3-decimal
+ *  rounder with the panel's formatter — correctly, so there is one set of rounding rules — but it also
+ *  inherited the panel's 2-place fallback, coarsening an unrepresentable component from -0.586 to
+ *  -0.59. That was collateral, not the intent. Precision is a property of the SURFACE (the canvas has
+ *  room a panel row does not); the tiers stay shared, so a component with an exact form still prints
+ *  it and a triple can read `(-0.586, √2, 3.414)` — mixed, and honest about which parts are exact. */
+const fmt = (x: number): string => cleanMag(Object.is(x, -0) ? 0 : x, 3);
 
 
 export function buildScene3(
