@@ -1374,7 +1374,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         if (!hasSegment(next, cmd.a, cmd.b)) next.segments.push([cmd.a, cmd.b]);
         return { ok: true, next };
       }
-      if (cmd.rel === 'perp' && plane.length === 3) {
+      // #380: a point-run plane is THREE OR FOUR labels — the `RUN_3_4` shape this product uses
+      // everywhere, and what the S1 operand resolver already accepts (`newellNormal` over the whole
+      // run). This branch demanded exactly 3, so a stated box FACE fell through to `no-solution`, and
+      // that engine limitation is precisely why the parser had been truncating «MO ⊥ ABCD» to ABC —
+      // a silent drop covering for a refusal. The claim's geometry needs three points to fix the
+      // plane; the remaining labels of a well-formed run lie on it by construction.
+      if (cmd.rel === 'perp' && plane.length >= 3) {
         const asClaim = applyCommand3(c, { type: 'claim', claim: { type: 'perp-plane', seg: [cmd.a, cmd.b], plane: [plane[0], plane[1], plane[2]] } });
         if (!asClaim.ok || hasSegment(asClaim.next, cmd.a, cmd.b)) return asClaim;
         const withSeg = clone(asClaim.next);

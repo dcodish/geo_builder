@@ -2674,3 +2674,47 @@ utterance emitting the right angle, the escalation family (unfolded typos, unkno
 magnitude, an unclaimed label), the keep-parsing corpus (request verbs, the given-marker's feminine
 inflection, the adjectival «מלבנית», the final-nun «ארבעון», both locales), and the construct-noun
 boundary that must NOT escalate.
+
+### ADR-3D-126 — The gate battery's predicates, and three spellings the rules did not admit (#457, #463, #494, #380)
+
+A P3 batch over two clusters that turned out to share one sentence: *a rule spells ONE form of something
+the student writes in several.*
+
+**#457 — the accounting is a MULTISET.** `droppedGivenNumbers3` asked *"does this VALUE appear among the
+payloads?"* as a proxy for *"is this OCCURRENCE consumed?"* (docs/17 §2.2). They differ exactly when a number
+REPEATS: one account then vouches for every occurrence. In 2-D that shipped — «ריבוע במידות 4*4» committed
+size-less because the square's own `ids.length === 4` paid for both stated 4s. Here the class was LATENT (the
+array-length account is a vertex count, 8 or 4, which rarely collides with a stated magnitude), and latent is
+not fixed: a new rule whose payload carries a value the utterance states twice reopens it silently. Ported
+per ADR-W-004 — the honest reading of a sibling audit is that the same predicate is the same defect wherever
+it is written.
+
+**#463 — «תיכון» ends in FINAL nun.** `ן` (U+05DF) is a different character from `נ`, and this tree folds no
+final letters — it spells both forms everywhere else. The diagonal alternative got it right (`אלכסו[ןנ]`);
+the median did not, so `תיכונ` matched only the PLURAL and the singular a student actually types was
+ungated. Same fix, plus: the gate now reports the student's WHOLE WORD rather than the regex stem
+(`אלכסו[ןנ]` on «אלכסונים» yielded `אלכסונ` — an error naming our own pattern instead of their statement,
+which the honesty invariant forbids).
+
+**#494 — a DETACHED clitic re-binds.** `ל ב מ ה ש כ` are prefixes and every gate spells them glued
+(`ל?מישור`, `ב-?`), so «מקביל ל π1» was not-handled while «מקביל לπ1» parsed. The spaced form is not a typo:
+a Hebrew writer separates the prefix exactly when the operand is a SYMBOL rather than a word, because «לπ1»
+looks wrong — so the failing spelling is the natural keystroke in precisely the figures that need it, and it
+was escalating to the LLM, burning a paid call for a non-deterministic answer (the silent-cost failure, not
+a visible one). Folded at `normalize3`, one level below the ADR-3D-120 shared-vocabulary seam, so a rule
+added later inherits it. «ו» is deliberately excluded — it is the conjunction between labels, not a prefix.
+
+**#380 — a plane run is THREE OR FOUR labels**, the `RUN_3_4` shape used everywhere else. The ∥ rule spelled
+three inline and REJECTED a box face outright; the ⟂ rule matched an optional fourth label and then
+DISCARDED it, committing the triangle ABC for a stated ABCD under a green ✓. And the truncation was covering
+for a refusal one layer down: `apply`'s claim branch demanded `plane.length === 3`, so the honest 4-point
+form would have returned `no-solution`. Both halves are fixed — the parser carries every label the student
+named and draws the ring at that arity, `apply` accepts a run of 3 or more (the claim's geometry needs three
+points; the rest of a well-formed run lie on it by construction). **The filed diagnosis blamed PRIMED
+labels; measurement says primes were always fine** (`A'B' ⟂ ABC` parses) and the arity was the cause —
+recorded because a plausible wrong hypothesis is the part of a bug worth remembering.
+
+**Locked** in `input-tolerance.test.ts`, whose clitic property is DERIVED from the catalog rather than
+enumerated: a Hebrew word whose leading clitic can be removed to leave a word the catalog itself uses
+standalone is a prefix+noun, so the generator needs no vocabulary of its own and grows with the corpus.
+

@@ -199,7 +199,15 @@ export function droppedConstructNoun3(utterance: string, commands: Command3[]): 
   const accounted = commands.some(
     (c) => c.type !== 'solid' || Object.keys(c).some((k) => !BARE_SHAPE_KEYS.has(k)),
   );
-  return accounted ? [] : [m[0]];
+  // #463: report the student's WHOLE WORD, not the regex stem. `אלכסו[ןנ]` matching «אלכסונים» yields
+  // `אלכסונ` — an error message naming OUR pattern instead of the student's statement, which the honesty
+  // invariant forbids ("error messages name the conflicting statement, never internal state"). Extend
+  // the match over the trailing Hebrew letters it stopped inside.
+  const whole = (raw: string, at: number): string => {
+    const tail = s.slice(at + raw.length).match(/^[א-ת]+/);
+    return tail ? raw + tail[0] : raw;
+  };
+  return accounted ? [] : [whole(m[0], m.index ?? 0)];
 }
 
 export function droppedNewLabels3(
@@ -240,20 +248,48 @@ export function droppedNewLabels3(
 export function droppedGivenNumbers3(utterance: string, commands: Command3[]): string[] {
   const q = (n: number): number => Math.round(n * 1e6) / 1e6;
   // ---- accounting side (generous): every numeric payload of every command ----
-  const acc = new Set<number>();
+  // #457 — a MULTISET, not a set (the #437 fix ported per the docs/17 §1 sibling audit). The set form
+  // asks *"does this VALUE appear among the payloads?"* as a proxy for the semantic fact it means to
+  // test: *"is this OCCURRENCE consumed?"* (docs/17 §2.2). The two differ exactly when a number REPEATS
+  // — one account then vouches for every occurrence, and a repeated given can vanish for free under a
+  // green ✓. In 2-D that shipped: «ריבוע במידות 4*4» committed size-less because the square's own
+  // `ids.length === 4` paid for both stated 4s, while «מלבן במידות 4*6» escalated honestly.
+  //
+  // Here the class was LATENT, not live: 3-D's array-length account is a solid's vertex count (8 or 4),
+  // which rarely collides with a stated magnitude, and its payloads sit in named per-field slots that
+  // carry each stated number separately. Latent is not fixed — a new rule whose payload happens to carry
+  // a value the utterance states twice reopens it silently — and the honest reading of a sibling audit
+  // is that the same predicate is the same defect wherever it is written.
+  //
+  // Generosity is unchanged and still per-occurrence: an occurrence may be accounted by any of its
+  // candidate lowerings (−n, n·π, n/(n+1), cos n°…), but a candidate that already paid for an earlier
+  // occurrence can no longer pay for this one.
+  const acc = new Map<number, number>();
+  const add = (n: number): void => { acc.set(q(n), (acc.get(q(n)) ?? 0) + 1); };
   const walk = (v: unknown): void => {
-    if (typeof v === 'number' && Number.isFinite(v)) acc.add(q(v));
+    if (typeof v === 'number' && Number.isFinite(v)) add(v);
     else if (typeof v === 'string') {
-      for (const m of v.match(/\d+(?:\.\d+)?/g) ?? []) acc.add(q(parseFloat(m)));
+      for (const m of v.match(/\d+(?:\.\d+)?/g) ?? []) add(parseFloat(m));
     } else if (Array.isArray(v)) {
-      if (v.length && v.every((x) => typeof x === 'string')) acc.add(v.length); // a count lowered by structure
+      if (v.length && v.every((x) => typeof x === 'string')) add(v.length); // a count lowered by structure
       for (const x of v) walk(x);
     } else if (v && typeof v === 'object') {
       for (const x of Object.values(v)) walk(x);
     }
   };
   for (const c of commands) walk(c);
-  const has = (vals: number[]): boolean => vals.some((v) => Number.isFinite(v) && acc.has(q(v)));
+  /** Account this occurrence against the first candidate lowering still unspent — and SPEND it. */
+  const has = (vals: number[]): boolean => {
+    for (const v of vals) {
+      if (!Number.isFinite(v)) continue;
+      const left = acc.get(q(v)) ?? 0;
+      if (left > 0) {
+        acc.set(q(v), left - 1);
+        return true;
+      }
+    }
+    return false;
+  };
 
   // ---- utterance side (conservative): blank every token whose digits are NOT magnitudes ----
   let s = normalize3(utterance);

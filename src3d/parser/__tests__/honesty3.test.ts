@@ -130,6 +130,19 @@ describe('droppedGivenNumbers3 — a stated magnitude must land in the committed
     expect(droppedGivenNumbers3('60 < זווית SAB < 90', cmds('60 < זווית SAB < 90'))).toEqual([]);
     expect(droppedGivenNumbers3('∠BAC = 90', cmds('קטע AB'))).toEqual(['90']);
   });
+
+  // #457 — the accounting is a MULTISET (the #437 fix ported): each account is SPENT once, so one
+  // payload can no longer vouch for two occurrences of the same number. Under the old `Set`, the tetra's
+  // own `ids.length === 4` paid for BOTH stated 4s and the whole dimensions given vanished green.
+  it('a REPEATED stated number cannot be paid for twice by a single account', () => {
+    const tetra = [{ type: 'solid', kind: 'tetra', ids: ['A', 'B', 'C', 'D'] }] as never;
+    expect(droppedGivenNumbers3('תיבה שאורכה 4 ורוחבה 4', tetra)).toEqual(['4']);
+    // the control that made the 2-D twin visible: distinct numbers always escalated honestly
+    expect(droppedGivenNumbers3('תיבה שאורכה 4 ורוחבה 6', tetra)).toEqual(['6']);
+    // …and a command that genuinely carries both occurrences still passes
+    const both = [{ type: 'x', a: 4, b: 4 }] as never;
+    expect(droppedGivenNumbers3('תיבה שאורכה 4 ורוחבה 4', both)).toEqual([]);
+  });
 });
 
 describe('the gates hold at the LLM commit seam (store3.submitSteps) — wiring lock', () => {

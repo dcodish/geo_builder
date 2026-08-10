@@ -48,7 +48,11 @@ describe('issue #14 — parsing: ⟂ between two segments / named vectors', () =
     expect(cmd('AB ⊥ w')).toMatchObject([{ type: 'cos-angle', u: { kind: 'pair', from: 'A', to: 'B' }, v: { kind: 'named', name: 'w' }, cos: 0 }]);
   });
   it('symbol-form seg⟂PLANE (3–4-point run, no plane word) — session tgsnh4do', () => {
-    expect(cmd('MO ⊥ABCD').at(-1)).toMatchObject({ type: 'seg-plane-rel', rel: 'perp', a: 'M', b: 'O', plane: ['A', 'B', 'C'] });
+    // #380: the FOURTH label reaches the command. This assertion used to read `['A','B','C']` — it was
+    // pinning a silent drop: the rule matched an optional 4th label and then discarded it, so a stated
+    // box FACE committed as a triangle, green. (What kept that invisible was apply's own `length === 3`
+    // gate, which turned the honest 4-point form into `no-solution`; both halves are fixed together.)
+    expect(cmd('MO ⊥ABCD').at(-1)).toMatchObject({ type: 'seg-plane-rel', rel: 'perp', a: 'M', b: 'O', plane: ['A', 'B', 'C', 'D'] });
     expect(cmd('MO⊥ABCD').at(-1)).toMatchObject({ type: 'seg-plane-rel', rel: 'perp', a: 'M', b: 'O' });
     expect(cmd("AS ⊥ BC'D").at(-1)).toMatchObject({ type: 'seg-plane-rel', rel: 'perp', plane: ['B', "C'", 'D'] });
   });

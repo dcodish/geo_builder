@@ -141,6 +141,23 @@ describe('droppedConstructNoun3 — a stated construct that no command produced 
     expect((st.lastError as { items: string }).items).toContain('אלכסון');
   });
 
+  // #463 — «תיכון» ends in FINAL nun, a different character from the medial נ, so the stem `תיכונ`
+  // matched only the plural and the SINGULAR — the form a student actually types — was ungated.
+  it('the SINGULAR «תיכון» is gated, not just the plural (the final-nun slip)', () => {
+    const bare = [{ type: 'solid', kind: 'tetra', ids: ['A', 'B', 'C', 'D'] }] as never;
+    expect(droppedConstructNoun3('פירמידה ABCD עם תיכון', bare)).toEqual(['תיכון']);
+    expect(droppedConstructNoun3('פירמידה ABCD עם תיכונים', bare)).toEqual(['תיכונים']);
+  });
+
+  // #463 — and the report is the student's WHOLE WORD, never the regex stem: `אלכסו[ןנ]` matching
+  // «אלכסונים» used to yield `אלכסונ`, an error naming OUR pattern instead of their statement.
+  it('reports the student\'s whole word, not the pattern stem', () => {
+    const bare = [{ type: 'solid', kind: 'box', ids: ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"] }] as never;
+    for (const [u, word] of [['תיבה עם אלכסונים', 'אלכסונים'], ['פירמידה עם גבהים', 'גבהים']] as const) {
+      expect(droppedConstructNoun3(u, bare)).toEqual([word]);
+    }
+  });
+
   it('a bare shape with NO construct noun is untouched', () => {
     for (const line of ['תיבה מלבנית', 'קובייה ABCDA\'B\'C\'D\'', 'משולש ABC', 'פירמידה ABCD']) {
       const { st } = build([line]);

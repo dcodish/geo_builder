@@ -64,6 +64,16 @@ export function normalize3(s: string): string {
       .replace(/[→⃗⟶]/g, '')
       .replace(/[−־]/g, '-')
       .replace(/(?:^|(?<=[\s:,]))(?:ה?ו?וקטור|vectors?)\s+/gi, '') // the vector WORD marks vector meaning (recorded before normalize), then reads as decoration
+      // #494 — a DETACHED clitic re-binds to its operand. Hebrew's ל/ב/מ/ה/ש/כ are prefixes, and every
+      // gate in this tree spells them glued (`ל?מישור`, `ב-?`), so «מקביל ל π1» was not-handled while
+      // «מקביל לπ1» parsed. The spaced form is not a typo: a Hebrew writer separates the prefix exactly
+      // when the operand is a SYMBOL rather than a word, because «לπ1» looks wrong — so the failing form
+      // is the natural keystroke in precisely the figures that need it, and it was escalating to the LLM,
+      // burning a paid call for a non-deterministic answer (the silent-cost failure, not a visible one).
+      // Folded HERE rather than per-rule so every frame inherits it, including frames added later — the
+      // ADR-3D-120 shared-vocabulary seam, one level lower. «ו» is deliberately NOT in the set: it is the
+      // conjunction between labels («A ו B»), not a prefix, and gluing it would corrupt label lists.
+      .replace(/(?<![א-ת])([לבמהשכ])\s+(?=[א-תA-Zπℓ])/g, '$1')
       // «מעויין» → «מעוין» (#498, the ADR-405 fold ported): the plene spelling was HALF-supported —
       // `statedQuadBase` reads `מעויי?ן`, but `rhombusPrism` and `rightPrism`'s rhombus bail-out spell
       // the defective form only, so «מנסרה ישרה שבסיסה מעויין …» fell through to the TRIANGULAR default
@@ -183,8 +193,13 @@ const primeAll = (ts: Id[]) => ts.map((t) => `${t}'`);
  * `droppedConstructNoun3` read ONE list: a noun the gate lets through is exactly a noun the honesty
  * gate is watching, and neither can drift into a silent drop while the other believes it is covered.
  */
+// #463: «תיכון» ends in FINAL nun (ן, U+05DF) — a different character from the medial נ — so the stem
+// `תיכונ` matched the PLURAL «תיכונים» and never the singular a student actually types. The diagonal
+// alternative beside it got this right (`אלכסו[ןנ]`); the median did not, and this tree folds no final
+// letters (it spells both forms out everywhere else). A stated median that no command produced was
+// therefore ungated — the exact #438/#440 class the gate exists to close, left open for one noun.
 export const CONSTRUCT_NOUNS =
-  /מעגל|אלכסו[ןנ]|גובה|גבהי|תיכונ|חוצ[הת]?[-\s]?זו?וית|\b(?:circle|diagonal|altitude|height|median|bisect\w*)\b/i;
+  /מעגל|אלכסו[ןנ]|גובה|גבהי|תיכו[ןנ]|חוצ[הת]?[-\s]?זו?וית|\b(?:circle|diagonal|altitude|height|median|bisect\w*)\b/i;
 
 /**
  * Every word the declaration family itself reads: the solid nouns, the base/flat-shape nouns, the
@@ -1019,8 +1034,13 @@ const diagIntersection: Rule = (s) => {
  *  a run of ≥3 points can only be a plane (a segment is exactly 2), so the symbol form is unambiguous. */
 const perpPlaneClaim: Rule = (s0) => {
   const s = stripStatementPrefix(s0);
+  // #380: the plane run is the SHARED 3–4-label atom, and every one of its labels reaches the command.
+  // This rule used to match an optional 4th label and then DISCARD it — «A'B' מאונך למישור ABCD» parsed
+  // green while the committed plane was the TRIANGLE ABC, a stated point silently gone from a figure
+  // whose most common plane is a box FACE. (The filed diagnosis blamed primed labels; measurement says
+  // primes were always fine — `A'B' ⟂ ABC` parses — and the real cause is the run's arity.)
   const m = s.match(
-    /^([A-Z]\d*'?)([A-Z]\d*'?)\s*(?:מאונך|ניצב|אנך|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור|plane)?\s*([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)?\s*$/,
+    new RegExp(String.raw`^(${LBL})(${LBL})\s*(?:מאונך|ניצב|אנך|⊥|(?:is\s+)?perpendicular)\s*(?:ל|to\s+(?:the\s+)?)?\s*(?:מישור|plane)?\s*(?<run>${RUN_3_4})\s*$`),
   );
   if (!m) {
     // "AS ניצב לבסיס / למישור הבסיס" / "AS is perpendicular to the base" — the base
@@ -1029,14 +1049,14 @@ const perpPlaneClaim: Rule = (s0) => {
     if (!mb) return null;
     return [{ type: 'seg-plane-rel', rel: 'perp', a: mb[1], b: mb[2], plane: [] }];
   }
-  const [, s1, s2, p1, p2, p3] = m;
+  const [, s1, s2] = m;
+  const ring = m.groups!.run.match(TOKEN) ?? [];
   // lowered as a RELATION: the engine decides — a symbol PIN when an endpoint is a
-  // symbolic vec-defined point (V7), else the V1 perp-plane claim (segments drawn by apply)
+  // symbolic vec-defined point (V7), else the V1 perp-plane claim (segments drawn by apply).
+  // The ring's edges are drawn for whatever arity the student named (#380).
   return [
-    { type: 'segment3', a: p1, b: p2 },
-    { type: 'segment3', a: p2, b: p3 },
-    { type: 'segment3', a: p3, b: p1 },
-    { type: 'seg-plane-rel', rel: 'perp', a: s1, b: s2, plane: [p1, p2, p3] },
+    ...ring.map((p, i): Command3 => ({ type: 'segment3', a: p, b: ring[(i + 1) % ring.length] })),
+    { type: 'seg-plane-rel', rel: 'perp', a: s1, b: s2, plane: ring },
   ];
 };
 
@@ -1327,9 +1347,11 @@ const vecEqClaim: Rule = (s0) => {
 
 /** `EF מקביל למישור ABC` / `EF is parallel to plane ABC` — pins a symbol or (⟂ only) claims. */
 const segParallelPlane: Rule = (s) => {
+  // #380: the shared 3–4-label plane atom, like its ⟂ twin. Spelling THREE labels inline rejected the
+  // 4-label box FACE outright — «AB מקביל למישור ABCD» was not-handled and paid for an LLM call.
   const m =
-    s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+מקביל\s+למישור\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s*$/) ??
-    s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+(?:is\s+)?parallel\s+to\s+(?:the\s+)?plane\s+([A-Z]\d*'?)([A-Z]\d*'?)([A-Z]\d*'?)\s*$/);
+    s.match(new RegExp(String.raw`^(${LBL})(${LBL})\s+מקביל\s+למישור\s+(?<run>${RUN_3_4})\s*$`)) ??
+    s.match(new RegExp(String.raw`^(${LBL})(${LBL})\s+(?:is\s+)?parallel\s+to\s+(?:the\s+)?plane\s+(?<run>${RUN_3_4})\s*$`, 'i'));
   if (!m) {
     const mb =
       s.match(/^([A-Z]\d*'?)([A-Z]\d*'?)\s+מקביל\s+ל(?:מישור\s+)?ה?בסיס\s*$/) ??
@@ -1337,7 +1359,7 @@ const segParallelPlane: Rule = (s) => {
     if (!mb) return null;
     return [{ type: 'seg-plane-rel', rel: 'parallel', a: mb[1], b: mb[2], plane: [] }];
   }
-  return [{ type: 'seg-plane-rel', rel: 'parallel', a: m[1], b: m[2], plane: [m[3], m[4], m[5]] }];
+  return [{ type: 'seg-plane-rel', rel: 'parallel', a: m[1], b: m[2], plane: m.groups!.run.match(TOKEN) ?? [] }];
 };
 
 /** `AS גובה (הפירמידה)` / `AS אנך` / `AS is the height` — a solid's stated height: the
