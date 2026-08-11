@@ -8,6 +8,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { derive3, useGeo3 } from '../store/store3';
+import { resolve3 } from '../engine/evaluate';
 import { answerQuery } from '../engine/queries';
 import { dataView } from '../engine/dataView';
 import { serializeFigure3, deserializeFigure3 } from '../store/figureFile3';
@@ -309,5 +310,47 @@ describe('#517 — the query lane answers CB on the operator’s literal points'
     // B − C = (½−√2, 0, 0); the difference has no exact surd/fraction form, so the decimal tier prints
     expect(ans(['C(√2,1,0)', 'B(½,1,0)'], 'CB').answer).toBe('(-0.91, 0, 0)');
     expect(ans(['C(√2,1,0)', 'B(½,1,0)'], '|CB|').answer).toBe('0.91');
+  });
+});
+
+// #518 (ADR-3D-133) — the gauge's SCALE is seed-varied like every other DOF the pivot solves. A cube
+// with ONE pinned vertex has a genuinely free edge length, but the pivot's logScale started at a fixed
+// 0 with a fixed anchor, so every seed drew |AB| = 1 and the stability gate printed the frozen default
+// as knowledge (the ADR-052 cardinal sin, reachable in prod). The standard mechanism now applies: an
+// undetermined scale varies across the sample seeds and the shared stability gate refuses it.
+describe('#518 — an undetermined scale is never knowledge', () => {
+  beforeEach(reset);
+
+  it('a single pinned vertex does not determine the cube edge: |AB| refuses', () => {
+    const r = ans(["קובייה ABCDA'B'C'D'", 'A(1,2,3)'], '|AB|');
+    expect(r.answer).toBeNull();
+  });
+
+  it('the mechanism: the edge length actually VARIES across seeds while the pin holds exactly', () => {
+    const { c } = build(["קובייה ABCDA'B'C'D'", 'A(1,2,3)']);
+    const perSeed = [0, 1013, 2027].map((s) => {
+      const pos = resolve3(c, s).positions;
+      const A = pos.get('A')!;
+      const B = pos.get('B')!;
+      expect(A.x).toBeCloseTo(1, 6); // the stated given holds at every seed
+      expect(A.y).toBeCloseTo(2, 6);
+      expect(A.z).toBeCloseTo(3, 6);
+      return Math.hypot(B.x - A.x, B.y - A.y, B.z - A.z);
+    });
+    expect(Math.max(...perSeed) - Math.min(...perSeed)).toBeGreaterThan(0.01);
+  });
+
+  it('a genuinely determined figure still answers exactly (the anchor yields to real givens)', () => {
+    // the 2026-ב exam chain: fully determined — EN decomposes and evaluates to (-3, 6, 3)
+    const exam = [
+      'פירמידה ABCDS שבסיסה ריבוע',
+      'המקצוע AS הוא גובה בפירמידה',
+      'אורך המקצוע AS שווה לאורך צלע הריבוע ABCD',
+      'נסמן: AD = u, AB = v, AS = w',
+      'נתון: A(0,0,0), B(0,12,0)',
+      'הקודקוד D נמצא על החלק החיובי של ציר ה-x',
+      'S נמצא על החלק החיובי של ציר ה-z',
+    ];
+    expect(ans(exam, '|AB|').answer).toBe('12');
   });
 });

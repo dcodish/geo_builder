@@ -2941,3 +2941,58 @@ ask different, solver-local questions and were deliberately left alone.
 never prints) and `queries.test.ts` (`CB` answers in coordinates, `|CB|` answers, the detached solid's
 |AB| still refuses `scale`). The operator's exact √/½ utterances join these locks on the #510 branch
 (PR #515), where the literal grammar lives.
+
+### ADR-3D-133 — an undriven SCALE parks at the seed's target, post-hoc (#518)
+
+`קובייה ABCDA'B'C'D'` + `A(1,2,3)`: the query «|AB|» answered **1** at every seed and the panel would
+print it — but one pinned vertex determines only translation, and the cube's edge is genuinely free. A
+number the student never stated printed as knowledge (the ADR-052 cardinal sin), reachable in prod
+through any pin that does not actually determine size. Found by ADR-3D-132's hazard probing; the
+operator's ruling (2026-08-11): *"there should be a degree of freedom there… whatever mechanism we have
+for all of our tools should be applied here — I don't see any reason that this should even be a
+question."*
+
+**Root cause — one solved DOF was exempt from the standard mechanism.** The law (ADR-3D-079 Am. 2):
+*"a value the sampler never explores is a default masquerading as determined."* Every DOF the pivot
+solves varies with the seed when undetermined — rotation via seed-rotated starts, dims via the seed's
+`dims0`, open pin symbols via `symAnchorTargets` — except the gauge's logScale, which an undriven solve
+left exactly at its start (0, zero gradient) at every seed. Seed-stable without being knowledge, and the
+multi-sample stability gate structurally cannot see a DOF the sampler never varies. That is why
+«vector AB» refused honestly (rotation varies) while «|AB|» lied (scale never did).
+
+**Mechanism — the base solve is UNTOUCHED; an undriven scale is parked post-hoc.** An accepted solution
+whose logScale never left its start (|logScale| < 1e-9 — the zero-gradient signature; a driven scale was
+MOVED by its residuals) is re-solved from that warm point with the scale HARD-pinned (weight 1e3) to a
+seed-hashed target, and the park is kept only if the PRIMARY residuals stay exact — a secretly-driven
+scale makes the park fail and be discarded, so a determined figure is structurally unreachable. Applied
+at both acceptance sites (the per-mirror best, and each collected branch of a sign-selection pool).
+
+**Why not an in-solve anchor — two full-suite calibrations ruled it out.**
+1. *Not the starts:* moving every start's logScale to the seed value shifted convergence basins and cost
+   hard figures real solution branches (a mirror branch gone → a ± choice printed as fact; a sign branch
+   gone → `sign-unsatisfiable` on a satisfiable figure; a drive failing at one seed).
+2. *Not a soft anchor at any weight:* at the dims' 1e-4 the pull measurably displaced determined
+   coordinates (~2e-5 off integer — `cleanNum` stopped snapping); at 1e-6 it stalled LM on TANGENTIAL
+   constraint directions — a quadratic root (2023-Q2's A.z² = 0) progresses at the same error magnitude
+   as the anchor's floor, so LM read "no improvement" and stopped at z ≈ 1e-3, and the claim gate
+   refused a correct figure. An anchor that shares the objective fights LM termination; a post-hoc pin
+   cannot.
+
+The plane-drive lane's own REG_SF·logScale pull (the ADR-3D-030 anti-collapse punishment) is untouched
+— weakening it 100× admitted the shrink basin back on real plane-eq figures. The deliberately-frozen
+lanes stay categorical-gated: invariantOnly and Stage A never solve scale (`scalePinned`/`scaleKnown3`
+own them), and the no-pivot canonical lane keeps ADR-101's frozen first dim — hence ADR-3D-132's
+`scaleKnown3` solids guard STAYS; the mixed-figure per-quantity refinement remains open.
+
+**Perf (docs/17 §7):** back-to-back same-conditions cold-resolve of the 2026-ב exam figure: 136.46
+(baseline) vs 137.33 ms (parked) — noise; the base solve is byte-identical and the park is gated to
+undriven scales. (An earlier +41% reading was ambient-load contamination; corrected on #520, whose
+structural LM tail-burn analysis for the anchored lanes still stands as filed perf debt.)
+
+**Sibling audit.** In-product: the other solved DOFs already comply (this reuses their law). 2-D: its
+solver has no similarity pivot of this shape; magnitudes gate on the constraint-derived `scalePinned`
+(sample.ts), which counts pinned points — no undriven-solved-scale lane to exempt.
+
+**Locked** in `queries.test.ts`: |AB| refuses on the pinned-vertex cube; the mechanism itself (the edge
+length varies across seeds while A holds (1,2,3) exactly); and the determined exam figure still answers
+|AB| = 12 exactly.

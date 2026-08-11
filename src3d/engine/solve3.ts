@@ -805,6 +805,16 @@ export function solvePivot(
     return [{ transform: (p) => p, mirror: false, dims: best.x, err: primary, x: [0, 0, 0, 0, 0, 0, 0, ...best.x] }];
   }
 
+  // #518 (ADR-3D-133): the gauge's SCALE gets a seed-dependent SOFT ANCHOR, like every other DOF the
+  // pivot solves (rotation is seed-rotated, dims pull to the seed's dims0, open symbols to
+  // symAnchorTargets). It was the one solved DOF with a fixed default — anchor target 0 — so when no
+  // residual determined the scale (a cube with one pinned vertex), every seed converged to |AB| = 1 and
+  // the multi-sample stability gate read the frozen default as knowledge. The anchor is the TARGET
+  // only: the starts keep logScale 0, because shifting the whole start set moved convergence basins and
+  // cost hard figures real solution branches (a mirror gone, a sign branch gone — the first attempt's
+  // full-suite failures). A genuinely determining given overrides the 1e-4 pull, exactly as it
+  // overrides dims0 and the symbol anchors.
+  const logScale0 = -0.3 + 0.7 * ((Math.abs(Math.sin((seed + 1) * 12.9898 + 39.425)) * 43758.5453) % 1);
   // deterministic multi-start: several initial rotations, seed-rotated so "show
   // another configuration" explores different manifold points when under-determined
   const starts: number[][] = [];
@@ -894,8 +904,28 @@ export function solvePivot(
       : fPrimary;
     // best-selection stays on the FULL error (the anchor's pull punishes the collapse
     // basin); ACCEPTANCE is on the primary residuals so exact solutions always pass.
-    const primaryErr = (x: number[]): number =>
-      anchored ? fPrimary(x).reduce((s, v) => s + v * v, 0) : NaN;
+    const primaryErr = (x: number[]): number => fPrimary(x).reduce((s, v) => s + v * v, 0);
+    /**
+     * #518 (ADR-3D-133) — park an UNDRIVEN scale at the seed's target, POST-HOC. In-solve anchors were
+     * tried at two weights and both failed a full-suite calibration: 1e-4 measurably displaced
+     * determined coordinates, and even 1e-6 stalls LM on TANGENTIAL constraint directions (a quadratic
+     * root like A.z² = 0 progresses at the same error magnitude as the anchor's floor, so LM reads
+     * "no improvement" and stops at z ≈ 1e-3). So the base solve stays EXACTLY rev-ADR-3D-079 —
+     * machine-exact, every basin untouched — and only an accepted solution whose scale never left its
+     * start (|logScale| < 1e-9: the zero-gradient signature of an undriven scale; a driven scale was
+     * MOVED by its residuals) is re-solved from that warm point with the scale HARD-pinned (weight 1e3)
+     * to the seed target. The park is kept only if the PRIMARY residuals stay exact — a secretly-driven
+     * scale makes the park fail and be discarded, so a determined figure is structurally unreachable.
+     */
+    const parkScale = (x: number[]): number[] | null => {
+      if (Math.abs(x[6]) > 1e-9) return null;
+      const fPark = (y: number[]) => [...fPrimary(y), 1e3 * (y[6] - logScale0)];
+      const x0 = [...x];
+      x0[6] = logScale0;
+      const r = leastSquares(fPark, x0);
+      if (degenerate(r.x)) return null;
+      return primaryErr(r.x) < ACCEPT ? r.x : null;
+    };
     let best: { x: number[]; err: number } | null = null;
     const seen = new Set<string>();
     for (const x0 of starts) {
@@ -909,6 +939,8 @@ export function solvePivot(
       if (degenerate(r0.x)) continue; // a collapsed solid is not a figure (general position)
       const rAccept = anchored ? primaryErr(r0.x) : r0.err;
       if (collectAll && rAccept < ACCEPT) {
+        const parked = parkScale(r0.x); // #518: an undriven scale parks at the seed target, exactly
+        if (parked) r0 = { x: parked, err: r0.err };
         const g = { ...unpack(r0.x), mirror };
         // dedupe by the transform's ACTION (probe frame), not its parameters (axis-angle wraps).
         // Am. 3: two pin-symbol ROOTS can share one gauge (t = 4 vs −1.6 moves only B) — the
@@ -935,11 +967,13 @@ export function solvePivot(
     // Jacobian floor rises with mixed scalar residuals; 1e-16 was V4-era point-pins-only)
     const bestAccept = best ? (anchored ? primaryErr(best.x) : best.err) : Infinity;
     if (!collectAll && best && bestAccept < ACCEPT) {
-      const g = { ...unpack(best.x), mirror };
-      const dims = best.x.slice(7, 7 + nDims);
-      const symbols = coupled ? best.x.slice(7 + nDims, 7 + nDims + nSym) : undefined;
-      const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((s, i) => [s, best.x[7 + nDims + nSym + i]])) : undefined;
-      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, err: bestAccept, x: [...best.x] });
+      // #518: an undriven scale parks at the seed target, exactly
+      const bx = parkScale(best.x) ?? best.x;
+      const g = { ...unpack(bx), mirror };
+      const dims = bx.slice(7, 7 + nDims);
+      const symbols = coupled ? bx.slice(7 + nDims, 7 + nDims + nSym) : undefined;
+      const pinSymbols = nPinSym > 0 ? Object.fromEntries(pinSyms.map((s, i) => [s, bx[7 + nDims + nSym + i]])) : undefined;
+      results.push({ transform: (p) => applyGauge(p, g), mirror, dims, symbols, pinSymbols, err: bestAccept, x: [...bx] });
     }
   }
   return results;
