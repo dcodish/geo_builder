@@ -2065,6 +2065,22 @@ export function commandPointIds(cmd: AnyCommand): Id[] {
   return out;
 }
 
+/**
+ * #539 — the point labels the STUDENT never typed: ids introduced by the enabled commands that appear
+ * in NO enabled fact's utterance. The parser auto-mints visible labels (a mutual tangency's touch «M»,
+ * the ADR-263/270 macro families), and `rename`/`nameCentre` rewrite both commands AND utterances — so
+ * "absent from every utterance" is exactly "auto-named as it currently stands", with no per-rule marker
+ * to wire or drift. Consumed by the `impliedPointBinding` naming-by-use decision (the #186 pattern,
+ * point edition): a student's fresh label may bind to one of THESE, never to a label the student chose.
+ */
+export function autoNamedLabels(facts: Fact[]): Set<Id> {
+  const typed = new Set<string>();
+  for (const f of facts) if (f.enabled && f.utterance) for (const m of f.utterance.match(/[A-Z]\d*/g) ?? []) typed.add(m);
+  const out = new Set<Id>();
+  for (const f of facts) if (f.enabled) for (const id of commandPointIds(f.cmd)) if (!typed.has(id)) out.add(id);
+  return out;
+}
+
 /** Every OBJECT id a command mentions — points (`A`, `O1`) plus prefixed object ids (`circle-O`,
  *  `line-…`, `seg-…`, …) — the dependency set the HOIST pass needs to place a relation fact at the
  *  earliest position where everything it references exists, and the reference set the question

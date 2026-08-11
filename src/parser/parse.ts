@@ -103,6 +103,17 @@ export interface ParseContext {
   /** Centre letters that were AUTO-assigned to an unnamed circle (hidden until named) — «מרכז המעגל
    *  הוא P» renames one of these to P and reveals it, instead of creating a second circle (issue #112). */
   autoCenters?: string[];
+  /** #539: points that lie structurally BETWEEN two others BY CONSTRUCTION (a mutual tangency's touch
+   *  between the centres, a midpoint, an interior rider) — the candidate set for the point naming-by-use
+   *  binding: a fresh set-line label whose stated slot exactly one of these occupies IS that point.
+   *  SEMANTIC field: object kinds only, never drawn coordinates. */
+  structuralBetween?: { point: string; a: string; b: string }[];
+  /** #538: the (exactly two) unnamed auto circles are structurally IDENTICAL under swapping the pair —
+   *  a fresh pair macro nothing yet distinguishes (free radii, no members, no size order, a symmetric
+   *  relation). Binding a student's fresh circle name to either is then pure gauge (the ADR-244
+   *  creation-binding argument), so `impliedCircleBinding` picks deterministically instead of asking a
+   *  question with no informative answer. SEMANTIC field: computed from the construction only. */
+  autosInterchangeable?: boolean;
   /** Radius symbols already bound in the figure (issue #54) — "מעגל שרדיוסו R" / "רדיוס מעגל P הוא r"
    *  stamp the letter on the circle; relations between the letters ("R = 1.5r", "R > r") resolve each
    *  to its circle here. Keyed by the letter, CASE-SENSITIVE (bagrut convention: R vs r are different
@@ -3743,23 +3754,35 @@ const sizeStatementLeftover = (s: string): boolean =>
   );
 
 /**
- * "the radius of circle P is 4" / "רדיוס מעגל P הוא 4" / "radius of P = 4" — set an EXISTING circle's radius
+ * "the radius of circle P is 4" / "רדיוס מעגל P הוא 4" / "radius of P = 4" — set a circle's radius
  * to a value, with NO segment drawn and NO point invented (ADR-087). Distinct from circle CREATION
- * ("circle O radius 5"): fires only when the named circle ALREADY EXISTS — otherwise it falls through to
- * `circle`. The circle is named ("circle P" / "מעגל P"), a bare label that is a known circle centre, or
- * the single circle in context. The engine sizes it by flexing the figure (an incircle stays the incircle).
+ * ("circle O radius 5" / «מעגל O שרדיוסו 4»): a creation puts the circle NOUN first and the size after
+ * it — a DESCRIPTION of the circle being introduced — while this rule's forms lead with the size
+ * keyword, a statement ABOUT a circle. On an EXISTING circle both amount to the same resize (M1), so
+ * either order fires; on a FRESH name the keyword-first form is a REFERENCE (#538 — it flows to
+ * `withImplicitCircles` + the #186 binding, so it can mean a drawn unnamed circle instead of minting a
+ * phantom), and the noun-first form stays a creation → `circle`. The circle is named ("circle P" /
+ * "מעגל P"), a bare label that is a known circle centre, or the single circle in context. The engine
+ * sizes it by flexing the figure (an incircle stays the incircle).
  */
 const setRadius: Rule = (s, ctx) => {
   if (!/radius|רדיוס/i.test(s)) return null;
   if (sizeStatementLeftover(s)) return null; // a construction carrying a size clause — not a size statement
   const valM = s.replace(/[A-Z]\d*/g, ' ').match(new RegExp(num)); // value with circle labels (e.g. P1) stripped first
   if (!valM) return null; // a magnitude must be given
-  let center = circleCenter(s);
-  if (!center) {
-    const labels = (s.match(/[A-Z]\d*/g) ?? []).map(up);
-    center = (ctx.circles ?? []).find((c) => labels.includes(up(c))) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
+  const center =
+    circleCenter(s) ??
+    (() => {
+      const labels = (s.match(/[A-Z]\d*/g) ?? []).map(up);
+      return (ctx.circles ?? []).find((c) => labels.includes(up(c))) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
+    })();
+  if (!center) return null;
+  if (!(ctx.circles ?? []).some((c) => up(c) === up(center))) {
+    // FRESH name: only the keyword-FIRST reference form claims it (#538); a noun-first creation
+    // description («מעגל O רדיוס 4», «מעגל O שרדיוסו 4», "circle O radius 5") stays with `circle`.
+    const noun = s.search(/circle|מעגל/i);
+    if (noun >= 0 && noun < s.search(/radius|רדיוס/i)) return null;
   }
-  if (!center || !(ctx.circles ?? []).some((c) => up(c) === up(center))) return null; // EXISTING circle only (creation → `circle`)
   return [{ type: 'set-radius', circle: circleId(center), value: parseFloat(valM[1]) }];
 };
 
@@ -3778,9 +3801,15 @@ const radiusSymbolStatement: Rule = (s, ctx) => {
   const m = s.match(/(?:הוא|היא|=|\bis\b)\s*([A-Za-z])\s*\.?\s*$/);
   if (!m || m.index === undefined) return null;
   const head = s.slice(0, m.index);
+  // A NAMED «מעגל X» form may be FRESH (#538 — the reference flows to the implied-creation + naming-by-
+  // use binding) when the radius keyword LEADS («רדיוס מעגל O1 הוא R»); a noun-first creation
+  // («מעגל O שרדיוסו R») stays with `circle`. The lone-circle fallback requires that one circle to exist.
   const center = circleCenter(head) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
   if (!center) return null;
-  if (!(ctx.circles ?? []).some((c) => up(c) === up(center))) return null; // EXISTING circle only
+  if (!(ctx.circles ?? []).some((c) => up(c) === up(center))) {
+    const noun = head.search(/circle|מעגל/i);
+    if (noun >= 0 && noun < head.search(/radius|רדיוס/i)) return null;
+  }
   const leftover = head
     .replace(/radius|רדיוס\S*|circles?|ה?מעגל\w*|של/gi, ' ')
     .replace(new RegExp(String.raw`\b${center}\b`, 'gi'), ' ')
@@ -3826,22 +3855,25 @@ const radiusRelation: Rule = (s, ctx) => {
 };
 
 /**
- * A circumference or area given on an EXISTING circle (ADR-228 Am.): "היקף מעגל O1 הוא 6π" / "the area of
+ * A circumference or area given on a NAMED circle (ADR-228 Am.): "היקף מעגל O1 הוא 6π" / "the area of
  * circle O is 9π" SETS that circle's radius (r = C/2π or √(A/π)) via `set-radius` — flexing the circle in
  * place. Mirrors `setRadius` (which does the same for a numeric "radius = 4"), and reuses the same
- * `circleSizeRadius` the `circle` CREATION rule uses. Fires ONLY when the circle already exists: without it,
- * `circle` would re-emit a `circle` command for the same id, which `addObj` ignores (keeps the first
- * definition) — silently dropping the stated size, exactly the operator's "it won't let me set the
- * circumference" bug. A NEW circle sized this way still flows through `circle`. Runs before `circle`.
+ * `circleSizeRadius` the `circle` CREATION rule uses. A size statement is a REFERENCE to its circle, so a
+ * NAMED «מעגל X» form fires whether or not circle-X exists (#538): when it doesn't, `withImplicitCircles`
+ * materialises it and the #186 naming-by-use binding decides whether the fresh name means a drawn unnamed
+ * circle — the old exists-only guard routed that case to `circle`, which minted a PHANTOM circle beside
+ * the drawn pair and attached the student's stated size to it with a green ✓ (the operator's two-tangent-
+ * circles session). A BARE label with no «מעגל» word still requires a known circle (a polygon area lane
+ * must not be claimed). Runs before `circle`.
  */
 const circleSizeExisting: Rule = (s, ctx) => {
   const r = circleSizeRadius(s);
   if (r === null) return null; // no circumference/area value present
   if (sizeStatementLeftover(s)) return null; // a construction carrying a size clause — not a size statement
-  // Resolve the target circle: "מעגל X", else a bare label that is a KNOWN circle — so "שטח O2 הוא 81π"
-  // (the area of circle O2, no "מעגל" word) also sets its radius, not just "שטח מעגל O2 …" (mirrors how
-  // `setRadius` resolves a bare circle label). A polygon area ("שטח ABC", 3–4 vertices) is claimed earlier
-  // by the `area` rule and never reaches here; a label that is NOT a known circle bows out.
+  // Resolve the target circle: "מעגל X" (known or fresh — #538), else a bare label that is a KNOWN
+  // circle — so "שטח O2 הוא 81π" (the area of circle O2, no "מעגל" word) also sets its radius. A polygon
+  // area ("שטח ABC", 3–4 vertices) is claimed earlier by the `area` rule and never reaches here; a bare
+  // label that is NOT a known circle bows out.
   let center = circleCenter(s);
   if (!center) {
     // UPPERCASE labels only — a point/circle label is always uppercase, so this can't grab a stray letter
@@ -3850,7 +3882,13 @@ const circleSizeExisting: Rule = (s, ctx) => {
     center = (ctx.circles ?? []).map(up).find((c) => labels.includes(c)) ?? null;
   }
   if (!center) return null;
-  if (!(ctx.circles ?? []).some((c) => up(c) === up(center))) return null; // not existing → `circle` creates it
+  if (!(ctx.circles ?? []).some((c) => up(c) === up(center))) {
+    // FRESH name: only the keyword-FIRST reference form claims it (#538 — «היקף מעגל O1 הוא 6π»); a
+    // noun-first creation description («מעגל O1 שהיקפו 6π», "circle O1 whose area is 9π") is the circle
+    // being INTRODUCED with its size — it stays with the `circle` creation rule, old shape preserved.
+    const noun = s.search(/circle|מעגל/i);
+    if (noun >= 0 && noun < s.search(/שהיקפו|היקפו|היקף|circumference|perimeter|ששטחו|שטחו|שטח|area/i)) return null;
+  }
   return [{ type: 'set-radius', circle: circleId(center), value: r }];
 };
 
@@ -8035,7 +8073,13 @@ const consumedCircleId = (cmd: AnyCommand): Id | null =>
   cmd.type === 'arc-midpoint' ||
   cmd.type === 'line-circle-intersection' ||
   cmd.type === 'diameter' ||
-  cmd.type === 'extend-onto-circle'
+  cmd.type === 'extend-onto-circle' ||
+  // #538: a SIZE/naming statement is a REFERENCE to its circle, exactly like a membership — «היקף מעגל
+  // O1 הוא 6π» on a figure with unnamed circles must reach the naming-by-use binding (#186), never mint
+  // a phantom circle beside the drawn pair. Listing them here routes the size lane through the SAME
+  // implied-creation + binding chokepoint every other circle reference already uses.
+  cmd.type === 'set-radius' ||
+  cmd.type === 'radius-symbol'
     ? cmd.circle
     : null;
 
@@ -8063,7 +8107,10 @@ function withImplicitCircles(commands: AnyCommand[], ctx: ParseContext): AnyComm
     if (!cid || !cid.startsWith('circle-') || definedHere.has(cid) || created.has(cid)) continue;
     const center = cid.slice('circle-'.length).toUpperCase();
     if (!center || have.has(center)) continue;
-    prefix.push({ type: 'circle', id: cid, center, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, implied: true });
+    // `apart` when other circles exist — the #196 seating rule at the shared chokepoint: an implied NEW
+    // circle beside drawn ones must seat clear of them, not visually assert intersections (#538 moved
+    // the size lane's creations here, where they previously got `apart` from the `circle` rule).
+    prefix.push({ type: 'circle', id: cid, center, radius: RADIUS_DEFAULT, freeRadius: true, ifAbsent: true, implied: true, ...((ctx.circles ?? []).length ? { apart: true } : {}) });
     created.add(cid);
   }
   return prefix.length ? [...prefix, ...commands] : commands;
@@ -8107,7 +8154,62 @@ export function impliedCircleBinding(
   const signal = new Set(subjects.filter((p) => points.has(p)).flatMap((p) => autos.filter((tok) => members.get(circleId(tok))?.has(p))));
   if (signal.size === 1) return { from: [...signal][0], to: X };
   if (autos.length === 1) return { from: autos[0], to: X };
+  // #538: two unnamed circles NOTHING yet distinguishes (a fresh pair macro — free radii, no members,
+  // no size order, a symmetric mutual relation) are interchangeable: binding the student's name to
+  // either asserts nothing, so pick the first deterministically. «שני מעגלים משיקים מבחוץ» → «היקף
+  // מעגל O1 הוא 6π» names one of the drawn pair; a clarify here would ask a question with no
+  // informative answer (the student cannot prefer one of two identical circles). Any structural
+  // asymmetry (computed conservatively in buildParseCtx) falls through to the honest clarify.
+  if (autos.length === 2 && ctx.autosInterchangeable) return { from: autos[0], to: X };
   return { clarify: 'unknown-circle', center: X };
+}
+
+/**
+ * #539 — the POINT edition of the #186 naming-by-use binding: a FRESH label in a `set-line` whose
+ * stated order slot an existing AUTO-NAMED point structurally occupies is that point under the
+ * student's own name — never a duplicate node. The reported instance: «שני מעגלים משיקים מבחוץ»
+ * auto-names the touch «M»; the student's worksheet calls it E, so they type «ישר A O1 E O2 C» —
+ * minting a second free rider beside M puts every later given about E on a phantom (the 2-D twin of
+ * the 3-D ADR-3D-139 P1, and the same FR-RN-8 argument as #186: the auto name is the ENGINE's, so a
+ * fresh name aimed at the drawn point is a naming, not a new object).
+ *
+ * Pure decision (shared by App.submit, the edit path, the scenario harness, and the log-triage
+ * mirror — one implementation, no ADR-346 drift): returns the rename to perform ({from: auto label,
+ * to: student label}) or null. Criteria, ALL structural (never drawn coordinates):
+ *  - the label is FRESH (not an existing point) and sits BETWEEN two existing anchors in the stated
+ *    order (an end slot extends the line — nothing it must coincide with);
+ *  - exactly ONE auto-named point (`autoNamedLabels` — a label appearing in no fact utterance) lies
+ *    structurally between those SAME anchors by construction (`ctx.structuralBetween`);
+ *  - several candidates → no binding (the fresh rider is a legitimate reading; never a silent pick).
+ * One binding per call — the caller renames, re-parses, and loops (the #186 shape).
+ */
+export function impliedPointBinding(
+  commands: AnyCommand[],
+  ctx: ParseContext,
+  autoNamed: ReadonlySet<string>,
+): { from: string; to: string } | null {
+  const points = new Set((ctx.points ?? []).map(up));
+  for (const cmd of commands) {
+    if (cmd.type !== 'set-line') continue;
+    const pts = cmd.points.map(up);
+    for (let i = 0; i < pts.length; i++) {
+      const L = pts[i];
+      if (points.has(L)) continue; // an existing point — nothing to bind
+      let X: string | null = null;
+      let Y: string | null = null;
+      for (let j = i - 1; j >= 0; j--) if (points.has(pts[j])) { X = pts[j]; break; }
+      for (let j = i + 1; j < pts.length; j++) if (points.has(pts[j])) { Y = pts[j]; break; }
+      if (!X || !Y) continue; // an END slot — the line extends, no drawn point is implied
+      const cands = (ctx.structuralBetween ?? []).filter(
+        (e) =>
+          autoNamed.has(e.point) &&
+          !pts.includes(up(e.point)) && // named elsewhere in the same statement — two roles, not one
+          ((up(e.a) === X && up(e.b) === Y) || (up(e.a) === Y && up(e.b) === X)),
+      );
+      if (cands.length === 1) return { from: cands[0].point, to: L };
+    }
+  }
+  return null;
 }
 
 /**

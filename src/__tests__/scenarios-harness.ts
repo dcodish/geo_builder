@@ -34,8 +34,8 @@
  */
 
 import { expect } from 'vitest';
-import { parse, buildParseCtx, impliedCircleBinding, droppedConstructNoun } from '@/parser';
-import { replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, meetsRequirements, useGeoStore } from '@/store/geoStore';
+import { parse, buildParseCtx, impliedCircleBinding, impliedPointBinding, droppedConstructNoun } from '@/parser';
+import { autoNamedLabels, replay, firstSatisfyingSeed, settleVariantDefaults, nameCentreFacts, renameFacts, meetsRequirements, useGeoStore } from '@/store/geoStore';
 import type { Derived, Fact } from '@/store/geoStore';
 import { freeDofs } from '@/engine';
 import type { AnyCommand, Id, Vec } from '@/engine';
@@ -95,10 +95,19 @@ export function factsOf(steps: Step[]): Fact[] {
       // circle via the shared decision helper + fact core, then re-parses against the renamed prefix.
       for (let guard = 0; er.ok && guard < 3; guard++) {
         const bind = impliedCircleBinding(er.commands, ctxOf(facts.slice(0, start)));
-        if (!bind || 'clarify' in bind) break;
-        const nc = nameCentreFacts(facts, bind.from, bind.to);
-        if (!nc.ok) break;
-        facts = nc.facts;
+        if (bind && 'clarify' in bind) break;
+        if (bind) {
+          const nc = nameCentreFacts(facts, bind.from, bind.to);
+          if (!nc.ok) break;
+          facts = nc.facts;
+        } else {
+          // #539 mirror (the App's point auto-bind): a fresh set-line label binds an auto-named point.
+          const pbind = impliedPointBinding(er.commands, ctxOf(facts.slice(0, start)), autoNamedLabels(facts));
+          if (!pbind) break;
+          const rn = renameFacts(facts, pbind.from, pbind.to);
+          if (!rn.ok) break;
+          facts = rn.facts;
+        }
         er = parse(step.edit.to, ctxOf(facts.slice(0, start)));
       }
       const r = er;
@@ -121,10 +130,20 @@ export function factsOf(steps: Step[]): Fact[] {
       // the figure, binds one of them (shared decision helper + fact core) and re-parses.
       for (let guard = 0; r.ok && guard < 3; guard++) {
         const bind = impliedCircleBinding(r.commands, ctxOf(facts));
-        if (!bind || 'clarify' in bind) break;
-        const nc = nameCentreFacts(facts, bind.from, bind.to);
-        if (!nc.ok) break;
-        facts = nc.facts;
+        if (bind && 'clarify' in bind) break;
+        if (bind) {
+          const nc = nameCentreFacts(facts, bind.from, bind.to);
+          if (!nc.ok) break;
+          facts = nc.facts;
+        } else {
+          // #539 mirror (App.submit's point auto-bind): a fresh set-line label whose slot an auto-named
+          // drawn point structurally occupies renames that point instead of minting a duplicate.
+          const pbind = impliedPointBinding(r.commands, ctxOf(facts), autoNamedLabels(facts));
+          if (!pbind) break;
+          const rn = renameFacts(facts, pbind.from, pbind.to);
+          if (!rn.ok) break;
+          facts = rn.facts;
+        }
         r = parse(step, ctxOf(facts));
       }
       if (!r.ok) throw new Error(`scenario step did not parse (would escalate to the LLM): ${JSON.stringify(step)}`);

@@ -70,11 +70,11 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
-  parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, buildParseCtx, classifyOutOfScope,
+  parse, parseRename, parseMerge, parseSwap, parseNameCenter, impliedCircleBinding, impliedPointBinding, buildParseCtx, classifyOutOfScope,
   looksLikeLatex, wordRootMagnitude, statedNegation,
   droppedNewLabels, droppedGivenNumbers, droppedGivenRelations, droppedGivenVerbs, droppedCompoundRelation,
 } from '../../../src/parser/index.ts';
-import { replay, nameCentreFacts } from '../../../src/store/geoStore.ts';
+import { replay, nameCentreFacts, renameFacts, autoNamedLabels } from '../../../src/store/geoStore.ts';
 import { parse3 } from '../../../src3d/parser/parse3.ts';
 import { classifyGuidance3, upperCasedLabelCandidate3 } from '../../../src3d/parser/scope3.ts';
 import { derive3 } from '../../../src3d/store/store3.ts';
@@ -311,11 +311,21 @@ function session2d(evs) {
         let bindClarify = null;
         for (let guard = 0; r.ok && guard < 3; guard++) {
           const bind = impliedCircleBinding(r.commands, pctx);
-          if (!bind) break;
-          if (bind.clarify) { bindClarify = bind.center; break; }
-          const nc = nameCentreFacts(facts, bind.from, bind.to);
-          if (!nc.ok) break;
-          advance(nc.facts, replay(nc.facts, 0)); // #189: its own history entry (the store's nameCentre set())
+          if (bind && bind.clarify) { bindClarify = bind.center; break; }
+          if (bind) {
+            const nc = nameCentreFacts(facts, bind.from, bind.to);
+            if (!nc.ok) break;
+            advance(nc.facts, replay(nc.facts, 0)); // #189: its own history entry (the store's nameCentre set())
+          } else {
+            // #539 mirror (App.submit's point auto-bind): a fresh set-line label whose stated slot an
+            // AUTO-NAMED drawn point structurally occupies renames that point (shared decision helper +
+            // the pure `renameFacts` core) instead of minting a duplicate node.
+            const pbind = impliedPointBinding(r.commands, pctx, autoNamedLabels(facts));
+            if (!pbind) break;
+            const rn = renameFacts(facts, pbind.from, pbind.to);
+            if (!rn.ok) break;
+            advance(rn.facts, replay(rn.facts, 0));
+          }
           pctx = buildParseCtx(fig.construction, fig.positions);
           r = parse(u, pctx);
         }

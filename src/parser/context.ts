@@ -21,6 +21,59 @@ import type { ParseContext } from './parse';
  *  carries the translation back to the real point id for rules that use a centre AS A POINT. */
 const ctrToken = (centerId: string): string => (centerId.startsWith('@ctr-') ? centerId.slice(5) : centerId);
 
+/**
+ * #538 — are the (exactly two) unnamed auto circles INTERCHANGEABLE: is the construction structurally
+ * identical under swapping the pair? A fresh pair macro («שני מעגלים משיקים מבחוץ») draws two circles
+ * nothing yet distinguishes — binding a student's fresh circle name («היקף מעגל O1 הוא 6π») to either
+ * asserts nothing (pure gauge, the ADR-244 creation-binding argument), so the #186 binding may pick
+ * deterministically instead of asking a question with no informative answer.
+ *
+ * The test is a literal ISOMORPHISM check, so it cannot drift from the relation vocabulary: serialize
+ * every object and constraint twice — once as-is, once with the pair's ids swapped — and compare the
+ * sorted multisets. Normalisation drops what is SEED, not statement (a free radius' value, a free
+ * centre's coordinates, `solve` bookkeeping — docs/17 §2.2), and wildcards scaffolding ids (`~…`
+ * twins and the auto-minted `radial-toward` touch family, which the tangency `coincide` makes one
+ * point). CONSERVATIVE by construction: any member point, stated size/order, or asymmetric relation
+ * (containment, internal tangency) serializes differently → NOT interchangeable → the honest clarify.
+ */
+function autosInterchangeable(construction: Construction): boolean {
+  const autos = construction.objects.filter(
+    (o): o is Extract<Construction['objects'][number], { kind: 'circle' }> =>
+      o.kind === 'circle' && o.autoCenter === true && !o.center.startsWith('~'),
+  );
+  if (autos.length !== 2) return false;
+  const [c1, c2] = autos;
+  if (c1.radius.via !== 'free' || c2.radius.via !== 'free') return false; // a stated size distinguishes
+  const map = new Map<string, string>([
+    [c1.id, c2.id],
+    [c2.id, c1.id],
+    [c1.center, c2.center],
+    [c2.center, c1.center],
+  ]);
+  const wild = new Set(construction.objects.flatMap((o) => (o.id.startsWith('~') || o.kind === 'radial-toward' ? [o.id] : [])));
+  const norm = (v: unknown, swap: boolean): unknown => {
+    if (typeof v === 'string') return wild.has(v) ? '*' : swap ? (map.get(v) ?? v) : v;
+    if (Array.isArray(v)) return v.map((x) => norm(x, swap));
+    if (v && typeof v === 'object') {
+      const o = v as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+      for (const k of Object.keys(o).sort()) {
+        if (k === 'solve') continue; // solver bookkeeping, never semantics (docs/17 §2.2)
+        if (k === 'value' && o.via === 'free') continue; // a free radius' SEED value
+        if ((k === 'x' || k === 'y') && o.kind === 'free-point' && !o.pinned && !o.rigid) continue; // a free point's seed
+        out[k] = norm(o[k], swap);
+      }
+      return out;
+    }
+    return v;
+  };
+  const canon = (swap: boolean): string =>
+    [...construction.objects.map((o) => JSON.stringify(norm(o, swap))), ...construction.constraints.map((k) => JSON.stringify(norm(k, swap)))]
+      .sort()
+      .join('\n');
+  return canon(false) === canon(true);
+}
+
 export function buildParseCtx(construction: Construction, positions: Map<Id, Vec>): ParseContext {
   return {
     // Exclude pure SCAFFOLDING circles (a tangent's Thales aux), marked by a `~`-prefixed centre — the
@@ -37,6 +90,34 @@ export function buildParseCtx(construction: Construction, positions: Map<Id, Vec
     // Centre letters that were AUTO-assigned (unnamed circle → hidden centre): «מרכז המעגל הוא P» renames
     // one of these to the student's letter instead of minting a second circle (issue #112).
     autoCenters: construction.objects.flatMap((o) => (o.kind === 'circle' && o.autoCenter && !o.center.startsWith('~') ? [ctrToken(o.center)] : [])),
+    // #538: whether the two unnamed circles are structurally identical under the pair swap — lets the
+    // #186 binding name-by-use deterministically when asking "which circle?" has no informative answer.
+    autosInterchangeable: autosInterchangeable(construction),
+    // #539: points that lie structurally BETWEEN two others BY CONSTRUCTION — the candidates a fresh
+    // set-line label may bind to by naming-by-use (SEMANTIC: read off object kinds, never coordinates).
+    structuralBetween: (() => {
+      const out: { point: Id; a: Id; b: Id }[] = [];
+      const byId = new Map(construction.objects.map((o) => [o.id, o] as const));
+      const centreOf = new Map(construction.objects.flatMap((o) => (o.kind === 'circle' ? [[o.id, o.center] as [Id, Id]] : [])));
+      // The EXTERNAL mutual-tangency touch: a coincide of two radial-toward twins, EACH aimed at the
+      // other's centre — that touch is between the centres by construction. (The internal lowering aims
+      // its witness at the touch point, not a centre — correctly excluded: an internal touch is outside.)
+      for (const k of construction.constraints) {
+        if (k.type !== 'coincide') continue;
+        const p = byId.get(k.p);
+        const q = byId.get(k.q);
+        if (p?.kind !== 'radial-toward' || q?.kind !== 'radial-toward') continue;
+        const pc = centreOf.get(p.circle);
+        const qc = centreOf.get(q.circle);
+        if (!pc || !qc || p.toward !== qc || q.toward !== pc) continue;
+        for (const t of [p, q]) if (!t.id.startsWith('~')) out.push({ point: t.id, a: pc, b: qc });
+      }
+      for (const o of construction.objects) {
+        if (o.kind === 'midpoint') out.push({ point: o.id, a: o.a, b: o.b });
+        else if (o.kind === 'on-segment' && !o.extension) out.push({ point: o.id, a: o.a, b: o.b });
+      }
+      return out;
+    })(),
     // Concentric pairs (ADR-244): the bound roles, read off the inner circle's `innerOf` marker.
     concentric: construction.objects.flatMap((o) =>
       o.kind === 'circle' && o.innerOf ? [{ center: o.center, outer: o.innerOf, inner: o.id }] : [],

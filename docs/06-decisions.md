@@ -6853,3 +6853,61 @@ rationale (never blame an earlier given) stands unchanged.
 free-radius control, the blame member) + the `two-tangent-circles-sizes-bind-touch-named-centre-line-
 builds` scenario.
 
+## ADR-439 — A size statement on a NAMED circle is a REFERENCE: the size lane reaches the #186 naming-by-use binding, with an interchangeability rung (#538)
+
+«שני מעגלים משיקים מבחוץ» then «היקף מעגל O1 הוא 6π» built FOUR circles with a green ✓: the size lane
+(`circleSizeExisting`/`setRadius`/`radiusSymbolStatement`) bowed out when the named circle didn't
+exist, deferring to the `circle` CREATION rule — a phantom circle-O1 beside the drawn pair, the
+student's stated 6π attached to a circle they cannot see (the P1 honesty breach: a silently-wrong
+figure). Class: **a statement that references a circle by a fresh name reaches the #186 binding only
+when the referencing rule EMITS a reference — a rule that creates its own circle bypasses the ruling.**
+Fix at the shared chokepoints: the size rules always emit `set-radius`/`radius-symbol` for a NAMED
+«מעגל X» (bare labels still require a known circle — the polygon-area lane is untouched);
+`consumedCircleId` lists both command kinds, so `withImplicitCircles` materialises the missing circle
+`implied` and `impliedCircleBinding` decides. The implied creation now carries `apart` beside existing
+circles — the #196 seating rule at the chokepoint the size lane's creations moved to.
+
+**The interchangeability rung** (the reason a clarify is NOT the answer here): with TWO unnamed autos
+(«שני מעגלים משיקים מבחוץ») the old resolution order (membership signal → sole auto → clarify) would
+ask «which circle is O1?» — a question with NO informative answer, because a fresh pair macro's circles
+are indistinguishable. `buildParseCtx` now computes `autosInterchangeable`: a literal ISOMORPHISM check
+— serialize every object+constraint as-is and under the pair swap, compare sorted multisets — with
+seed-vs-statement normalisation (free radius values, free-point coordinates, `solve` bookkeeping
+dropped per docs/17 §2.2) and scaffolding ids wildcarded (`~…` twins, the auto-minted `radial-toward`
+touch family, which the tangency coincide makes one point). Binding to either circle is then pure gauge
+(the ADR-244 creation-binding argument, generalised to the post-creation figure), so the binding picks
+the first deterministically. Conservative by construction: any member point, stated size/order, or
+asymmetric relation (containment, internal tangency) serializes differently → the honest clarify —
+locked by the negative tests. ParseContext registry additions (docs/17 §3b): `autosInterchangeable`
+(semantic, construction-only) and `structuralBetween` (ADR-440's — same commit family).
+
+**Sibling audit:** the 3-D parser resolves references at apply time with no ParseContext and no
+auto-centred circles — class not present in `src3d/`. Locks:
+`parser/__tests__/size-name-binding.test.ts` (He+En, circumference/area/numeric-radius, empty-canvas
+and named-existing controls, both NOT-interchangeable negatives) + the Q11 scenario.
+
+## ADR-440 — Naming-by-use for POINTS: a fresh set-line label binds the auto-named point whose slot it states (#539)
+
+«ישר A O1 E O2 C» after the tangent pair minted a duplicate free rider E beside the auto-named touch M
+— two nodes where the figure has one point, every later given about E attaching to the phantom. The
+2-D twin of the 3-D P1 fixed the same day (ADR-3D-139), and the #186 argument verbatim: the auto label
+is the ENGINE's choice, not the student's, so a fresh name aimed at the drawn point is a NAMING.
+Class: **a statement's fresh label that a drawn auto-named point structurally satisfies is minted as a
+duplicate instead of binding.** Mechanism, all three pieces general: (1) `autoNamedLabels` (replay
+layer) — a label appearing in NO enabled fact's utterance was auto-minted; `rename`/`nameCentre`
+rewrite both commands AND utterances, so the predicate needs no per-rule marker and cannot drift as
+rules add auto-labels. (2) `ctx.structuralBetween` (semantic ParseContext field) — points between two
+others BY CONSTRUCTION: the external mutual-tangency touch between the centres (recognised from the
+coincide-of-radial-toward-twins lowering, each aimed at the other's centre — the internal pattern aims
+at the touch and is correctly excluded), midpoints, interior riders. (3) `impliedPointBinding` (pure,
+exported beside `impliedCircleBinding`) — a fresh `set-line` label with existing anchors on BOTH sides
+whose slot exactly ONE auto-named candidate occupies → rename it to the student's letter; an end slot
+extends the line (no binding); several candidates → the fresh-rider reading stands (never a silent
+pick). Wired at all four consumers in one commit (App.submit loop, the edit path, the scenario
+harness, the log-triage mirror — the ADR-346 obligation), through the new pure `renameFacts` core (the
+`nameCentreFacts` precedent, point edition).
+
+**Sibling audit:** the 3-D twin was the ADR-3D-139 P1 (a point-naming marker binds its own label) —
+already fixed on its own lane; the 3-D parser mints no visible auto point labels outside that marker
+family. Locks: `parser/__tests__/point-name-binding.test.ts` (He+En bind, the student-named-touch
+negative, the internal-tangency negative, the end-slot negative, the pure decision) + the Q11 scenario.

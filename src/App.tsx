@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from 'zustand';
 import { firstCyclableBranch, freeDofs, freeDofCount, isGeoPoint, VARIANT_COUNT } from '@/engine';
-import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, impliedCircleBinding, buildParseCtx, stepLabel } from '@/parser';
+import { CATEGORY_LABELS, CATEGORY_ORDER, COMMAND_CATALOG, parse, impliedCircleBinding, impliedPointBinding, buildParseCtx, stepLabel } from '@/parser';
 import { Figure } from '@/render';
 import { crossingCommands } from '@/engine';
 import type { Crossing } from '@/engine';
@@ -28,7 +28,7 @@ import type { TheoremFeedEntry, TheoremId, DiscoveryLevel } from '@/theorems';
 import { Modal } from '@/ui/Modal';
 import { GREEK, SYMBOLS } from '@/ui/symbols';
 import { btn, card as themeCard, color as pal, foldToggle, fs, pill, sectionTitle } from '@/ui/theme';
-import { groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
+import { autoNamedLabels, groupKey, introducedIds, meetsRequirements, primeFoldFor, replay, useGeoStore, viewUsable } from '@/store/geoStore';
 import { cancelGeoWork, geoWork, isCancelled } from '@/store/geoWork';
 import type { Fact } from '@/store/geoStore';
 import { chooseSaveName, deserializeFigure, figureNameFromFileName, namedFigureFileName, serializeFigure } from '@/store/figureFile';
@@ -291,14 +291,23 @@ export default function App() {
     // same way submit does (the prod session's «מעגל O!» → «מעגל O1» edit) — clarify when ambiguous.
     for (let guard = 0; r.ok && guard < 3; guard++) {
       const bind = impliedCircleBinding(r.commands, ectx);
-      if (!bind) break;
-      if ('clarify' in bind) {
+      if (bind && 'clarify' in bind) {
         setInputNote(t('input.unknownCircle', { center: bind.center }));
         setEditError(true);
         return;
       }
-      const res = nameCentre(bind.from, bind.to);
-      if (!res.ok) break;
+      if (bind) {
+        const res = nameCentre(bind.from, bind.to);
+        if (!res.ok) break;
+      } else {
+        // #539: the POINT edition, mirroring submit — a fresh set-line label whose slot an auto-named
+        // drawn point structurally occupies renames that point (auto-named judged over ALL facts, so a
+        // label the student typed anywhere is never grabbed).
+        const pbind = impliedPointBinding(r.commands, ectx, autoNamedLabels(useGeoStore.getState().facts));
+        if (!pbind) break;
+        const res = rename(pbind.from, pbind.to);
+        if (!res.ok) break;
+      }
       ectx = prefixCtx();
       r = parse(editText, ectx);
     }

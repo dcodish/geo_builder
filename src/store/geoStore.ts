@@ -122,6 +122,31 @@ const relabelUtterance = (utt: string | undefined, from: Id, to: Id): string | u
 export type RenameResult = { ok: true } | { ok: false; reason: 'same' | 'no-source' | 'target-taken' };
 
 /**
+ * The PURE fact-list core of the `rename` store action — the `nameCentreFacts` precedent, point
+ * edition (#539): extracted so the point naming-by-use binding (`impliedPointBinding`) can run on
+ * plain fact arrays in the App's submit loop, the scenario harness, and the log-triage verifier with
+ * THE SAME implementation (a re-implementation is the ADR-346 drift class this repo keeps paying for).
+ */
+export function renameFacts(facts: Fact[], from: Id, to: Id): { ok: true; facts: Fact[] } | { ok: false; reason: 'same' | 'no-source' | 'target-taken' } {
+  const F = from.toUpperCase();
+  const T = to.toUpperCase();
+  if (F === T) return { ok: false, reason: 'same' };
+  const all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
+  if (!all.has(F)) return { ok: false, reason: 'no-source' };
+  if (all.has(T)) return { ok: false, reason: 'target-taken' }; // would merge two distinct points
+  return {
+    ok: true,
+    facts: facts.map((f) => ({
+      ...f,
+      cmd: renameInCommand(f.cmd, F, T),
+      // The step row shows the utterance; relabel the letter there too (whole labels only,
+      // so a `C1`/`O1` isn't corrupted — Hebrew words and lowercase keywords are untouched).
+      utterance: relabelUtterance(f.utterance, F, T),
+    })),
+  };
+}
+
+/**
  * The PURE fact-list core of the `nameCentre` store action (ADR-342 / #186): resolve the centre token
  * `from` (a letter, or a raw '@ctr-…' id) to the owning circle's real centre and rename it — plus the
  * circle's reference id letter-half and the auto-centre reveal — to `to`, across every fact. Extracted
@@ -752,19 +777,10 @@ export const useGeoStore = create<GeoState>()(
       rename: (from, to) => {
         const F = from.toUpperCase();
         const T = to.toUpperCase();
-        if (F === T) return { ok: false, reason: 'same' };
-        const facts = get().facts;
-        const all = new Set(facts.flatMap((f) => commandPointIds(f.cmd)));
-        if (!all.has(F)) return { ok: false, reason: 'no-source' };
-        if (all.has(T)) return { ok: false, reason: 'target-taken' }; // would merge two distinct points
+        const r = renameFacts(get().facts, F, T); // the pure core (#539) — shared with the harness/triage mirrors
+        if (!r.ok) return r;
         set({
-          facts: facts.map((f) => ({
-            ...f,
-            cmd: renameInCommand(f.cmd, F, T),
-            // The step row shows the utterance; relabel the letter there too (whole labels only,
-            // so a `C1`/`O1` isn't corrupted — Hebrew words and lowercase keywords are untouched).
-            utterance: relabelUtterance(f.utterance, F, T),
-          })),
+          facts: r.facts,
           hidden: get().hidden.map((h) => (h === F ? T : h)), // a hidden point keeps its hidden state under the new letter
           segStyle: renameSegStyle(get().segStyle, F, T), // a styled segment keeps its style under the renamed endpoint
           hiddenCircles: get().hiddenCircles.map((c) => (c === `circle-${F}` ? `circle-${T}` : c)), // a hidden circle tracks its renamed centre

@@ -32,6 +32,7 @@ import {
   droppedRegionSubject,
   droppedWordRelations,
   impliedCircleBinding,
+  impliedPointBinding,
   looksCompound,
   looksLikeLatex,
   teachCanonical,
@@ -48,7 +49,7 @@ import { llmParse } from '@/parser/llm';
 import { figureContext } from '@/parser/llmShared';
 import { isGeoPoint } from '@/engine';
 import type { Construction, Id, Vec } from '@/engine';
-import { deferralWorthwhile, dryRunOutcome, primeFoldFor, replay, trialFacts, useGeoStore } from '@/store/geoStore';
+import { autoNamedLabels, deferralWorthwhile, dryRunOutcome, primeFoldFor, replay, trialFacts, useGeoStore } from '@/store/geoStore';
 import { geoWork, isCancelled } from '@/store/geoWork';
 import { spanShadow } from '@/parser/spanAccounting';
 import { logDebug } from '@/debug/sessionLog';
@@ -178,17 +179,28 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
   let boundName = false; // a #186 auto-bind happened — the submission already changed the figure (a naming)
   for (let guard = 0; r.ok && guard < 3; guard++) {
     const bind = impliedCircleBinding(r.commands, pctx);
-    if (!bind) break;
-    if ('clarify' in bind) {
+    if (bind && 'clarify' in bind) {
       logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `unknown-circle:${bind.center}` });
       ui.setInputNote(t('input.unknownCircle', { center: bind.center }));
       ui.setBusy(false);
       return;
     }
-    const res = store().nameCentre(bind.from, bind.to);
-    if (!res.ok) break; // can't bind (e.g. letter taken) — the implicit creation stands, as before
-    boundName = true;
-    logDebug({ kind: 'input', utterance, locale, source: 'name-center', rename: bind, result: 'auto-bind', intermediate: true });
+    if (bind) {
+      const res = store().nameCentre(bind.from, bind.to);
+      if (!res.ok) break; // can't bind (e.g. letter taken) — the implicit creation stands, as before
+      boundName = true;
+      logDebug({ kind: 'input', utterance, locale, source: 'name-center', rename: bind, result: 'auto-bind', intermediate: true });
+    } else {
+      // #539 — the POINT edition: a fresh set-line label whose stated slot an AUTO-NAMED drawn point
+      // structurally occupies is that point under the student's name (the touch «M» typed as «E») —
+      // rename it instead of minting a duplicate node beside it.
+      const pbind = impliedPointBinding(r.commands, pctx, autoNamedLabels(store().facts));
+      if (!pbind) break;
+      const res = store().rename(pbind.from, pbind.to);
+      if (!res.ok) break; // can't bind — the fresh-rider reading stands, as before
+      boundName = true;
+      logDebug({ kind: 'input', utterance, locale, source: 'rename', rename: pbind, result: 'auto-bind-point', intermediate: true });
+    }
     const st = store();
     const d = replay(st.facts, st.seed, st.radiusOverrides);
     pctx = buildParseCtx(d.construction, d.positions);

@@ -2028,4 +2028,66 @@ export const SCENARIOS_4: Scenario[] = [
       expect(angle(at(fig, 'A'), at(fig, 'B'), at(fig, 'G'))).toBeCloseTo(37, 3);
     },
   },
+  {
+    id: 'two-tangent-circles-sizes-bind-touch-named-centre-line-builds',
+    title: 'issues #538/#539/#541: bagrut Q11 — the sizes bind the DRAWN pair, E names the touch, the centre line builds',
+    guards:
+      "operator session s0cr31 (2026-08-11), three defects on one figure: (#538) «היקף מעגל O1 הוא 6π» after «שני מעגלים משיקים מבחוץ» minted a PHANTOM circle-O1 beside the drawn pair — the size lane never reached the #186 naming-by-use binding, so the stated 6π/81π landed on circles the student can't see, green ✓; (#539) «ישר A O1 E O2 C» minted a duplicate free rider E beside the auto-named touch M — every later given about E would attach to a phantom node; (#541) the collinearity was refused «over-constrained: … cannot hold» though the official figure exists — the drivable walk dead-ended at the tangency touch C (a circle∩circle behind a Thales aux whose centre is DERIVED), so with the radii pinned by the sizes no reachable DOF remained, while the free-radius variant escaped via the radius DOF and masked the gap.",
+    steps: [
+      'שני מעגלים משיקים מבחוץ',
+      'היקף מעגל O1 הוא 6π',
+      'שטח מעגל O2 הוא 81π',
+      'A על מעגל O1',
+      'AD משיק למעגל O2 בנקודה D',
+      'B על המשך AD',
+      'BC משיק למעגל O2 בנקודה C',
+      'ישר A O1 E O2 C',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      // #538 — the sizes bound the DRAWN pair: exactly TWO student-facing circles (aux Thales circles are scaffolding)
+      const circles = fig.construction.objects.filter(
+        (o): o is Extract<typeof o, { kind: 'circle' }> => o.kind === 'circle' && !o.id.startsWith('tanaux-'),
+      );
+      expect(circles.map((c) => c.id).sort(), 'no phantom circle beside the drawn pair').toEqual(['circle-O1', 'circle-O2']);
+      const rOf = (id: string) => {
+        const c = circles.find((x) => x.id === id)!;
+        return 'value' in c.radius ? c.radius.value : NaN;
+      };
+      expect(rOf('circle-O1'), '6π circumference ⇒ r = 3 on the drawn small circle').toBe(3);
+      expect(rOf('circle-O2'), '81π area ⇒ r = 9 on the drawn big circle').toBe(9);
+      // #539 — ONE point at the touch, under the student's name E (the auto-named M was renamed, not duplicated)
+      expect(fig.construction.objects.some((o) => o.id === 'M'), 'no leftover auto-named M').toBe(false);
+      const O1 = at(fig, 'O1');
+      const O2 = at(fig, 'O2');
+      const E = at(fig, 'E');
+      expect(dist(O1, O2), 'external tangency with pinned radii: |O1O2| = 3 + 9').toBeCloseTo(12, 4);
+      expect(dist(O1, E), 'E IS the touch: on circle O1').toBeCloseTo(3, 4);
+      expect(dist(O2, E), 'E IS the touch: on circle O2').toBeCloseTo(9, 4);
+      // #541 — the stated line A–O1–E–O2–C holds, in the stated ORDER
+      const A = at(fig, 'A');
+      const C = at(fig, 'C');
+      const cross = (p: Vec, q: Vec, r: Vec) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+      for (const [p, q, r] of [
+        [A, O1, O2],
+        [A, O2, C],
+        [O1, E, O2],
+      ] as [Vec, Vec, Vec][]) {
+        expect(Math.abs(cross(p, q, r)), 'collinear').toBeLessThan(1e-2);
+      }
+      const t = (p: Vec) => ((p.x - A.x) * (C.x - A.x) + (p.y - A.y) * (C.y - A.y)) / (dist(A, C) * dist(A, C));
+      expect(t(O1), 'order A→O1').toBeGreaterThan(0);
+      expect(t(E), 'order O1→E').toBeGreaterThan(t(O1));
+      expect(t(O2), 'order E→O2').toBeGreaterThan(t(E));
+      expect(t(O2), 'order O2→C').toBeLessThan(1);
+      // and the tangents are genuine: D and C on circle O2, with the radius ⟂ the tangent segment
+      const D = at(fig, 'D');
+      const B = at(fig, 'B');
+      expect(dist(O2, D)).toBeCloseTo(9, 4);
+      expect(dist(O2, C)).toBeCloseTo(9, 4);
+      const dot = (p: Vec, q: Vec, r: Vec) => (q.x - p.x) * (r.x - p.x) + (q.y - p.y) * (r.y - p.y);
+      expect(Math.abs(dot(D, O2, A)), 'AD tangent at D (O2D ⟂ DA)').toBeLessThan(1e-2);
+      expect(Math.abs(dot(C, O2, B)), 'BC tangent at C (O2C ⟂ CB)').toBeLessThan(1e-2);
+    },
+  },
 ];
