@@ -2862,3 +2862,46 @@ than fixed here (different product, different lane).
 **Locked** in `line-param-letter.test.ts`: the operator's exact utterance returns the typed reason with
 the letter (both anchor forms, any letter); the store surfaces `param-roles-conflated` and commits
 nothing; the ADR-3D-129 controls still build with the student's runner.
+
+### ADR-3D-132 — knowledge gates derive their absolute sources from the construction (#517)
+
+Operator play (2026-08-11): «C(√2,1,0)» + «B(½,1,0)» built green, but no coordinate labels appeared on
+the canvas, the data panel read «אין עדיין נתונים יציבים להצגה», and the query «CB» answered «לא נקבע
+על ידי הנתונים» — though both points are fully pinned and the engine held the exact positions at every
+seed. Reproduced identically with plain decimals: pre-existing prod behavior, not a #510 regression.
+
+**Root cause / class:** *a knowledge gate derives "determined-in-principle" from a private enumeration of
+absolute sources instead of the construction's own classifier.* A FRESH coordinate point lands in
+`c.points` as kind `'coord'` (apply.ts) — `c.pins` holds only coordinate statements about EXISTING points
+— and three gates enumerated pin lists alone: `translationPinned = c.pins.length > 0` (dataView), the
+private `vectorFrame` composites (dataView + queries, drifted copies of each other), and `scalePinned`
+(solve3). The engine's own `hasAbsoluteFrameObject` knew all the sources; the display gates re-derived
+weaker private predicates — the `figureSymbolsOf` lesson (*an enumeration is not a rule*), cross-file
+edition.
+
+**Mechanism.** One shared reader, `absolutePointCount` (types.ts — a leaf, importable everywhere), and
+shared predicates in evaluate.ts: `translationPinned3` (pins ∪ absolute points; pair/vector injections
+still deliberately do NOT count — the #315 constraint, operator-validated), `vectorFramePinned3` (one
+composite for the panel and the query lane, so they can never disagree again), and `scaleKnown3`.
+`hasAbsoluteFrameObject` now composes from the same reader.
+
+**The scale split — deliberately TWO questions.** `scalePinned` (solve3) answers the SOLVER's question —
+"may the pivot freeze the gauge?" — and bare coordinate points never enter the pivot's residuals, so they
+must NOT unfreeze it (collapse-basin risk). `scaleKnown3` answers the KNOWLEDGE question — two absolute
+points state the distances among them as absolutely as a `length` pin — and counts them, **gated on
+`c.solids.length === 0`**: a solid's first dim is the frozen similarity gauge, so a DETACHED cube's
+|AB| = 1 is seed-stable without being knowledge, and a categorical gate cannot tell which subgraph a
+magnitude lives in. Withhold rather than lie (ADR-052); the mixed-figure refinement is per-quantity
+anchoring, out of scope here. Probing this hazard exposed that the PINS path already prints a detached
+frozen gauge today (`קובייה` + `A(1,2,3)` → |AB| answers 1) — pre-existing, filed as its own P1, not
+silently fixed under this ADR.
+
+**Sibling audit.** 2-D is healthy: its `scalePinned` (sample.ts) derives from the full constraint set and
+already counts `pinned free-points >= 2` — the exact analog of `absolutePointCount >= 2`. The 3-D gate
+was the outlier. The solver-internal composites in evaluate.ts (gauge classification at 1084/1152/1389)
+ask different, solver-local questions and were deliberately left alone.
+
+**Locked** in `data-view.test.ts` (two bare injected points print as facts; a detached solid's gauge
+never prints) and `queries.test.ts` (`CB` answers in coordinates, `|CB|` answers, the detached solid's
+|AB| still refuses `scale`). The operator's exact √/½ utterances join these locks on the #510 branch
+(PR #515), where the literal grammar lives.

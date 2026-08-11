@@ -159,4 +159,31 @@ describe('dataView — organize your data', () => {
     // S on the z-axis flattens the base, so D's z = 0 becomes a fact too — only its ± sign waits for the D placement
     expect(p.pointCoords.D).toEqual({ text: '(?, 0, 0)', kind: 'partial' });
   });
+
+  // #517 — the knowledge gates must SEE bare coordinate points. A fresh `C(2,1,0)` lands in
+  // `c.points` as kind 'coord', never in `c.pins`; the gates' private `c.pins.length > 0`
+  // enumerations suppressed every knowledge family for a figure of injected points (operator,
+  // 2026-08-11: no canvas labels, an empty panel, and «CB — לא נקבע על ידי הנתונים» on two fully
+  // pinned points). The gates now derive from the construction (translationPinned3 / scaleKnown3).
+  it('#517 — two bare injected points ARE a frame: labels print as facts', () => {
+    ['C(2,1,0)', 'B(1,1,0)'].forEach(submit);
+    expect(useGeo3.getState().lastError).toBeNull();
+    const p = panel();
+    expect(p.pointCoords.C).toEqual({ text: '(2, 1, 0)', kind: 'fact' });
+    expect(p.pointCoords.B).toEqual({ text: '(1, 1, 0)', kind: 'fact' });
+    expect(p.points).toContain('C(2, 1, 0)');
+    expect(p.points).toContain('B(1, 1, 0)');
+  });
+
+  it('#517 — a DETACHED solid beside absolute points stays honest: its gauge never prints', () => {
+    // The solid's placement is sampled (landing funnel) and its first dim is the frozen similarity
+    // gauge — neither is knowledge. The points print; the cube's vertices and |AB| must not.
+    ["קובייה ABCDA'B'C'D'", 'P(0,0,9)', 'Q(0,0,3)'].forEach(submit);
+    expect(useGeo3.getState().lastError).toBeNull();
+    const p = panel();
+    expect(p.pointCoords.P).toEqual({ text: '(0, 0, 9)', kind: 'fact' });
+    expect(p.pointCoords.Q).toEqual({ text: '(0, 0, 3)', kind: 'fact' });
+    expect(p.pointCoords.A).toBeUndefined(); // sampled placement — a sample is not knowledge
+    expect(p.points.some((s) => s.startsWith('A'))).toBe(false);
+  });
 });

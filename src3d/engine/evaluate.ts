@@ -24,9 +24,9 @@ import {
   planeNormalCarriesParam,
   resolveOperand,
 } from './operands';
-import { applyGauge, solvePivot, type MemberPin, type PivotResult } from './solve3';
+import { applyGauge, scalePinned, solvePivot, type MemberPin, type PivotResult } from './solve3';
 import { decompose3 } from './vecExpr';
-import { pinSymsOf } from './types';
+import { absolutePointCount, pinSymsOf } from './types';
 import { resolveFreePlane } from './freePlane';
 import type { Construction3, Id, LinExpr, PointDef, Positions3, SolidKind } from './types';
 import { add3, centroid3, cross3, dist3, dot3, lerp3, newellNormal, ringCircumcentre3, norm3, normalize3, scale3, sub3, v3, type Vec3,
@@ -959,8 +959,49 @@ const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span'
 export function hasAbsoluteFrameObject(c: Construction3): boolean {
   if (c.planes.size > 0 || c.pins.length > 0) return true;
   for (const def of c.lines.values()) if (def.kind === 'parametric') return true;
-  for (const def of c.points.values()) if (def.kind === 'coord' || def.kind === 'coord-sym') return true;
-  return false;
+  return absolutePointCount(c) > 0;
+}
+
+/**
+ * #517 — is the figure's TRANSLATION anchored by a stated absolute POSITION? The knowledge gates
+ * (canvas coordinate labels, the data panel's point/plane families) need this because translation is
+ * a deterministic gauge the sample seeds never vary (#315): without an anchor, the pivot roots the
+ * figure at a fixed origin and an unpinned coordinate would read seed-stable — gauge printing as
+ * data, the ADR-052 cardinal sin. The anchoring sources are `c.pins` (coords stated for an EXISTING
+ * point) and the absolute points of `c.points` (a FRESH `C(2,1,0)` never reaches a pin list —
+ * apply stores it as kind 'coord'). dataView asked `c.pins.length > 0` alone, so a figure of bare
+ * injected points had every knowledge family suppressed while the engine held the exact positions
+ * (operator, 2026-08-11). Pure pair/vector injections deliberately do NOT count — they fix
+ * direction+scale, never translation (#315, operator-validated 2026-07-25).
+ */
+export function translationPinned3(c: Construction3): boolean {
+  return c.pins.length > 0 || absolutePointCount(c) > 0;
+}
+
+/** #517 — the frame gate for VECTOR coordinates (a difference — translation cancels), shared by the
+ *  data panel and the query lane so they can never disagree: any absolute position, or a pinned
+ *  orientation source (vector/pair/plane pins). Seed-stability stays the per-quantity arbiter. */
+export function vectorFramePinned3(c: Construction3): boolean {
+  return translationPinned3(c) || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
+}
+
+/**
+ * #517 — is a derived MAGNITUDE knowledge (the data panel / query lane's scale gate)? This is
+ * deliberately a DIFFERENT question from {@link scalePinned}, which answers the SOLVER's question —
+ * "may the pivot freeze the gauge without losing a solution?". Bare coordinate points never enter the
+ * pivot's residuals (they are placed directly, pre-pivot), so they must NOT unfreeze the gauge — but
+ * TWO of them state the distances among them as absolutely as a `length` pin does, so for the
+ * KNOWLEDGE question they count. Keeping the two questions in one predicate is what hid the operator's
+ * `|CB|` on two injected points behind a 'scale' refusal (2026-08-11).
+ */
+export function scaleKnown3(c: Construction3): boolean {
+  if (scalePinned(c)) return true;
+  // TWO absolute points state the distances among them — but only a figure with NO solid can take
+  // that as figure-wide scale knowledge: a solid's first dim is the frozen similarity gauge, so a
+  // DETACHED cube's |AB| = 1 is seed-stable without being knowledge, and a categorical (per-figure)
+  // gate cannot tell which subgraph a magnitude lives in. Withhold rather than lie (ADR-052); the
+  // mixed-figure refinement is per-quantity anchoring, deliberately out of #517's scope.
+  return absolutePointCount(c) >= 2 && c.solids.length === 0;
 }
 
 /** Resolve the FULL figure: parameter → planes → lines → points → the V4 pivot → point-planes. */

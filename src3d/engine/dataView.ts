@@ -14,8 +14,7 @@
  * which is why the App gates it behind an explicit student checkbox.
  */
 
-import { resolve3 } from './evaluate';
-import { scalePinned } from './solve3';
+import { resolve3, scaleKnown3, translationPinned3, vectorFramePinned3 } from './evaluate';
 import { cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
 import { figureSymbolsOf } from './types';
 import { distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, resolveOperand } from './operands';
@@ -415,13 +414,16 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // need TRANSLATION pinned (a real point injection); a VECTOR's coordinates (a difference —
   // translation cancels) need the ORIENTATION pinned: two independent pinned directions, or the
   // pair itself being the injected one (its coords are literally the given).
-  const translationPinned = c.pins.length > 0;
+  // #517: both anchors are the SHARED predicates in evaluate.ts — a fresh `C(2,1,0)` lands in
+  // `c.points` as kind 'coord', never in `c.pins`, and the private `c.pins.length > 0` enumeration
+  // here suppressed every knowledge family for a figure of bare injected points.
+  const translationPinned = translationPinned3(c);
   // Vector coordinates (a difference — translation cancels) keep the FRAME + seed-stability gate:
   // the seeds VARY the rotation/dims gauge (operator-validated 2026-07-25: with only DE=(0,2,0)
   // pinned, u's coords correctly do NOT print while v = 3·DE — parallel to the pin, genuinely
   // derivable — correctly DOES). Only TRANSLATION is a deterministic gauge the seeds never vary,
   // which is why the point/plane families need the explicit translationPinned anchor.
-  const vectorFrame = translationPinned || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
+  const vectorFrame = vectorFramePinned3(c);
   // ADR-3D-054 (#268) — a LENGTH needs less than a coordinate does. A coordinate without a frame is
   // pure gauge, but a length is gauge only when the SCALE is free, and an absolute size given ("|u| = 3")
   // pins the scale with no coordinate frame anywhere. Gating magnitudes on `hasFrame` therefore withheld
@@ -429,9 +431,10 @@ export function dataView(c: Construction3, seed: number): DataPanel {
   // never |w| = 2.5, though it is forced by the givens and identical in every sampled configuration.
   // The second gate is still needed — the first dim of every solid is the frozen similarity gauge, so a
   // bare cube reports |AB| = 1.000000 at every seed and dropping the check outright would print that as
-  // data (the ADR-052 cardinal sin). `scalePinned` is the right question, and lives with the solver that
-  // asks it too, so the two can't drift.
-  const hasScale = scalePinned(c);
+  // data (the ADR-052 cardinal sin). #517: the KNOWLEDGE question is `scaleKnown3` — the solver's
+  // narrower `scalePinned` (gauge-freeze safety) must not count bare coordinate points, but two of
+  // them state a distance and so DO make magnitudes knowledge.
+  const hasScale = scaleKnown3(c);
 
   const vecNames = [...c.vectors.entries()];
   const basis = vecNames.slice(0, 3);

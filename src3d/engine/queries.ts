@@ -7,13 +7,12 @@
  * Honesty (the student's own «only if stable»): a query is answered only when its value is genuinely
  * KNOWLEDGE. Angles are scale-free, so an angle is answered whenever the shape is determined (stable
  * across sampled seeds). A dot product / length / area / volume carries units — it is gauge unless the
- * figure's SCALE is pinned (`scalePinned`, ADR-3D-054), so it is answered only then (except the one
+ * figure's SCALE is pinned (`scaleKnown3`, ADR-3D-054 / #517), so it is answered only then (except the one
  * scale-invariant value, ~0 — a perpendicular dot is knowledge at any scale). Everything else reports
  * WHY it can't be answered — never a sampled number dressed as a fact (ADR-052).
  */
 
-import { resolve3 } from './evaluate';
-import { scalePinned } from './solve3';
+import { resolve3, scaleKnown3, vectorFramePinned3 } from './evaluate';
 import { basisDecompose, cleanNum, coordStr, decompStr, formatBranches, linePlaneAngleAt, newellNormal, parametricDecomp } from './dataView';
 import { centroid3, cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
 import { distanceBetween, resolveOperand, type AbsoluteCtx } from './operands';
@@ -329,7 +328,9 @@ function vectorForms(c: Construction3, a: Atom, posArr: Positions3[], seeds: num
   // seeds vary the rotation/dims gauge, so only genuinely-derivable vector coords survive the
   // stability check (u suppressed, v = 3·DE printed). Translation is the one deterministic gauge;
   // POINT-coordinate answers are gated at their own sites.
-  const vectorFrame = c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0;
+  // #517: the SHARED frame predicate (evaluate.ts) — the private enumeration here was blind to fresh
+  // coordinate points (kind 'coord' in `c.points`, never a pin), refusing `CB` on two injected points.
+  const vectorFrame = vectorFramePinned3(c);
   if (vectorFrame) {
     const vs = posArr.map((pos) => atomVec(c, a, pos));
     if (!vs.some((v) => !v) && vs.every((v) => Math.abs(v!.x - vs[0]!.x) < 1e-6 && Math.abs(v!.y - vs[0]!.y) < 1e-6 && Math.abs(v!.z - vs[0]!.z) < 1e-6)) {
@@ -418,7 +419,7 @@ export function answerQuery(c: Construction3, text: string, seed: number): Query
   // angles and a free PARAMETER «t» (an affine ratio along a segment) are scale-invariant — knowledge
   // whenever they are stable, no scale needed. A dot/length/area/volume still needs the scale pinned.
   const scaleFree = q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'symbol' || q.kind === 'line-plane' || q.kind === 'plane-plane';
-  if (!scaleFree && !scalePinned(c) && Math.abs(nums[0]) > 1e-9) return { text, answer: null, note: 'scale' };
+  if (!scaleFree && !scaleKnown3(c) && Math.abs(nums[0]) > 1e-9) return { text, answer: null, note: 'scale' };
   const isAngle = q.kind === 'angle-vertex' || q.kind === 'angle-vec' || q.kind === 'line-plane' || q.kind === 'plane-plane';
   return { text, answer: `${cleanNum(nums[0])}${isAngle ? '°' : ''}` };
 }
