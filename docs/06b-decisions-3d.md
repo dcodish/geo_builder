@@ -2860,3 +2860,84 @@ own gate run — not a late sweep riding on this one.
 reaching a vector, a pair and a list injection; the decimal forms byte-identical; the symbolic branch
 untouched (incl. `C(p^2,…)` still refused, deliberately); and the malformed-literal refusal. Catalog
 entry added, so the in-app commands panel documents it.
+
+### ADR-3D-131 — a recognized ambiguity is a TYPED refusal, never a decline (#516; amends ADR-3D-129)
+
+Operator play of ADR-3D-129 (2026-08-11): the must-refuse control «l1:x=m(m-1, 5-m, -2)» **built** — the
+fact list showed the student's utterance while the canvas echoed `ℓ1: x = (0,0,0) + t·(m-1, 5-m, -2)`,
+the outer `m` silently reinterpreted as `t`.
+
+**Root cause — a refusal implemented as a decline is not a refusal.** The `params.has(runner)` guard
+worked exactly as designed, but it declined via `return null`, and the pipeline maps every untyped parse
+failure to `not-understood` — the one code the App **escalates to the LLM lane**. The lane whose job is
+to guess then resolved precisely the ambiguity the guard had refused to resolve: Haiku canonicalized the
+input to the `t` spelling and the canonical line re-parsed and built. ADR-3D-129 chose this deferral
+deliberately (*"the LLM lane is where an ambiguous form belongs"*) — this ADR reverses that ruling. The
+two readings are geometrically different (same-letter `x = m·(m-1, 5-m, -2)` is a quadratic curve, not a
+line), so the build asserted a reading the student never stated. Not a regression: pre-#422 the utterance
+was equally `not-handled` and equally escalated — prod builds it the same way today.
+
+**Class:** *a statement the parser recognizes as ambiguous is declined as not-understood instead of
+refused with a clarification, so the escalation lane resolves the ambiguity by guessing.* The correct
+chokepoint already existed — the typed refusal channel (`ambiguous-vector-length`), which surfaces a
+clarification and never escalates.
+
+**Mechanism.** The guard records the letter (`PARAM_CONFLATED`, reset per parse); `parse3`'s fallthrough
+— reached only when NO rule matched, so nothing is ever stolen from a rule that legitimately owns the
+utterance — surfaces `{ ok: false, reason: 'param-roles-conflated', letter }`. The store maps it to its
+own error code (only genuine `not-handled` may become `not-understood`), the App renders a clarification
+naming the letter and its two roles (he + en), and the escalation gate (`err.code === 'not-understood'`)
+never sees it.
+
+**Sibling audits.** In-product: the vector-length ambiguity already used the typed channel; this was the
+outlier. Sibling product: `src/parser/parse.ts` has a RICH typed-refusal union (ambiguous-angle/-circle/
+-container, tangents-exhausted…) but also several recognized-ambiguity declines that reach the LLM
+(deferral comments at parse.ts:259, 330, 894, 899) — same class shape, filed as a 2-D audit issue rather
+than fixed here (different product, different lane).
+
+**Locked** in `line-param-letter.test.ts`: the operator's exact utterance returns the typed reason with
+the letter (both anchor forms, any letter); the store surfaces `param-roles-conflated` and commits
+nothing; the ADR-3D-129 controls still build with the student's runner.
+
+### ADR-3D-132 — knowledge gates derive their absolute sources from the construction (#517)
+
+Operator play (2026-08-11): «C(√2,1,0)» + «B(½,1,0)» built green, but no coordinate labels appeared on
+the canvas, the data panel read «אין עדיין נתונים יציבים להצגה», and the query «CB» answered «לא נקבע
+על ידי הנתונים» — though both points are fully pinned and the engine held the exact positions at every
+seed. Reproduced identically with plain decimals: pre-existing prod behavior, not a #510 regression.
+
+**Root cause / class:** *a knowledge gate derives "determined-in-principle" from a private enumeration of
+absolute sources instead of the construction's own classifier.* A FRESH coordinate point lands in
+`c.points` as kind `'coord'` (apply.ts) — `c.pins` holds only coordinate statements about EXISTING points
+— and three gates enumerated pin lists alone: `translationPinned = c.pins.length > 0` (dataView), the
+private `vectorFrame` composites (dataView + queries, drifted copies of each other), and `scalePinned`
+(solve3). The engine's own `hasAbsoluteFrameObject` knew all the sources; the display gates re-derived
+weaker private predicates — the `figureSymbolsOf` lesson (*an enumeration is not a rule*), cross-file
+edition.
+
+**Mechanism.** One shared reader, `absolutePointCount` (types.ts — a leaf, importable everywhere), and
+shared predicates in evaluate.ts: `translationPinned3` (pins ∪ absolute points; pair/vector injections
+still deliberately do NOT count — the #315 constraint, operator-validated), `vectorFramePinned3` (one
+composite for the panel and the query lane, so they can never disagree again), and `scaleKnown3`.
+`hasAbsoluteFrameObject` now composes from the same reader.
+
+**The scale split — deliberately TWO questions.** `scalePinned` (solve3) answers the SOLVER's question —
+"may the pivot freeze the gauge?" — and bare coordinate points never enter the pivot's residuals, so they
+must NOT unfreeze it (collapse-basin risk). `scaleKnown3` answers the KNOWLEDGE question — two absolute
+points state the distances among them as absolutely as a `length` pin — and counts them, **gated on
+`c.solids.length === 0`**: a solid's first dim is the frozen similarity gauge, so a DETACHED cube's
+|AB| = 1 is seed-stable without being knowledge, and a categorical gate cannot tell which subgraph a
+magnitude lives in. Withhold rather than lie (ADR-052); the mixed-figure refinement is per-quantity
+anchoring, out of scope here. Probing this hazard exposed that the PINS path already prints a detached
+frozen gauge today (`קובייה` + `A(1,2,3)` → |AB| answers 1) — pre-existing, filed as its own P1, not
+silently fixed under this ADR.
+
+**Sibling audit.** 2-D is healthy: its `scalePinned` (sample.ts) derives from the full constraint set and
+already counts `pinned free-points >= 2` — the exact analog of `absolutePointCount >= 2`. The 3-D gate
+was the outlier. The solver-internal composites in evaluate.ts (gauge classification at 1084/1152/1389)
+ask different, solver-local questions and were deliberately left alone.
+
+**Locked** in `data-view.test.ts` (two bare injected points print as facts; a detached solid's gauge
+never prints) and `queries.test.ts` (`CB` answers in coordinates, `|CB|` answers, the detached solid's
+|AB| still refuses `scale`). The operator's exact √/½ utterances join these locks on the #510 branch
+(PR #515), where the literal grammar lives.

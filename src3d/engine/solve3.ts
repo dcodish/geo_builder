@@ -176,13 +176,15 @@ export interface PivotResult {
 /**
  * Is the figure's SCALE pinned — does ANY given carry absolute units?
  *
- * The gauge (place/rotate/scale) is pure null-space unless something fixes it. This predicate is the
- * authority on that, and it answers two different questions with one list:
- *  - {@link solvePivot} freezes the gauge when nothing pins it, or the solve falls into the scale→0
- *    collapse basin (every normalized residual vanishes as the figure shrinks onto a point);
- *  - `dataView` prints a DERIVED magnitude only when the scale is pinned, because with a free scale a
- *    length is gauge, not knowledge — the first dim of every solid is frozen at 1, so a bare cube would
- *    otherwise report |AB| = 1 as data (ADR-3D-054, issue #268; the ADR-052 cardinal sin).
+ * The gauge (place/rotate/scale) is pure null-space unless something fixes it. This predicate answers
+ * the SOLVER's question: {@link solvePivot} freezes the gauge when nothing pins it, or the solve falls
+ * into the scale→0 collapse basin (every normalized residual vanishes as the figure shrinks onto a
+ * point). #517: the KNOWLEDGE question — "may the data panel / query lane print a derived magnitude?"
+ * — is `scaleKnown3` in evaluate.ts, which composes this predicate with the absolute-point count
+ * (bare coordinate points state distances but never enter the pivot's residuals, so they must count
+ * there and must NOT unfreeze the gauge here). With a free scale a length is gauge, not knowledge —
+ * the first dim of every solid is frozen at 1, so a bare cube would otherwise report |AB| = 1 as data
+ * (ADR-3D-054, issue #268; the ADR-052 cardinal sin).
  *
  * Absolute ⇒ pins the gauge: coordinate/vector/pair injections, a plane EQUATION, a `length` or `dot`
  * scalar pin. Everything else (angles, cos/dot EQUALITIES, ratios, ⟂/∥-to-plane, line-plane angle) is

@@ -57,6 +57,9 @@ export type StoreError3 =
   | EngineError3
   | { code: 'not-understood' }
   | { code: 'ambiguous-vector-length' }
+  /** #516: one letter as both the running parameter and a figure DOF — a recognized ambiguity
+   *  surfaces a clarification and NEVER escalates to the LLM lane (which would guess). */
+  | { code: 'param-roles-conflated'; letter: string }
   /** The LLM decomposition lost part of the stated input (docs/24 S2.3 honesty gates) — `items` names
    *  the dropped labels/magnitudes; nothing was committed. */
   | { code: 'dropped-given'; items: string }
@@ -404,7 +407,16 @@ export const useGeo3 = create<Geo3State>()(
       submit: (utterance) => {
         const parsed = parse3(utterance);
         if (!parsed.ok) {
-          set({ lastError: { code: parsed.reason === 'ambiguous-vector-length' ? 'ambiguous-vector-length' : 'not-understood' } });
+          // #516: every TYPED refusal keeps its identity — only a genuine `not-handled` may read as
+          // not-understood, because not-understood is what the App escalates to the LLM lane.
+          set({
+            lastError:
+              parsed.reason === 'ambiguous-vector-length'
+                ? { code: 'ambiguous-vector-length' }
+                : parsed.reason === 'param-roles-conflated'
+                  ? { code: 'param-roles-conflated', letter: parsed.letter }
+                  : { code: 'not-understood' },
+          });
           return;
         }
         const { facts, seed } = get();

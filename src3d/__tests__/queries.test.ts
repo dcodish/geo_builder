@@ -281,3 +281,22 @@ describe('#480 — the figure parameter is askable, and answers its BRANCH SET',
     expect(row).toMatchObject({ text: 'm = ?', open: true });
   });
 });
+
+// #517 — the query lane's frame/scale gates must SEE bare coordinate points (they land in `c.points`
+// as kind 'coord', never in a pin list; the private enumerations here refused «CB» and «|CB|» on two
+// fully pinned points — operator, 2026-08-11). Shared predicates now: vectorFramePinned3/scaleKnown3.
+describe('#517 — bare injected points are a frame for the query lane', () => {
+  beforeEach(reset);
+
+  it('the vector between two injected points answers in coordinates', () => {
+    expect(ans(['C(2,1,0)', 'B(1,1,0)'], 'CB').answer).toBe('(-1, 0, 0)');
+  });
+
+  it('its length answers too — two absolute points state the scale', () => {
+    expect(ans(['C(2,1,0)', 'B(1,1,0)'], '|CB|').answer).toBe('1');
+  });
+
+  it('a DETACHED solid beside the points stays honest: its frozen-gauge |AB| still refuses', () => {
+    expect(ans(["קובייה ABCDA'B'C'D'", 'P(0,0,9)', 'Q(0,0,3)'], '|AB|')).toMatchObject({ answer: null, note: 'scale' });
+  });
+});

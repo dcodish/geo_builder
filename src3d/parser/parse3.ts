@@ -27,7 +27,13 @@ export type ParseResult3 =
   | { ok: false; reason: 'not-handled' }
   // bare `AS = AB` — vector equation or length equality? NEVER assumed (operator rule):
   // the student is asked to write וקטור AS = וקטור AB (or with the ⃗ arrow), or |AS| = |AB|.
-  | { ok: false; reason: 'ambiguous-vector-length' };
+  | { ok: false; reason: 'ambiguous-vector-length' }
+  // #516: «x=m(m-1, 5-m, -2)» — one letter as BOTH the running parameter and a figure DOF. A typed
+  // refusal, never `not-handled`: an ambiguity the parser RECOGNIZED must surface a clarification,
+  // because `not-handled` escalates to the LLM lane, whose job is to guess — and it resolved exactly
+  // the ambiguity this guard refused to resolve (built the `t` reading, silently rewriting the
+  // student's letter). A refusal implemented as a decline is not a refusal.
+  | { ok: false; reason: 'param-roles-conflated'; letter: string };
 
 const NOT_HANDLED: ParseResult3 = { ok: false, reason: 'not-handled' };
 
@@ -1189,6 +1195,12 @@ export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string }
  */
 let VEC_MARKED = false; // set per-parse; see parse3()
 
+/** #516 — the letter `parametricLine`'s both-roles guard refused on, recorded so `parse3`'s
+ *  fallthrough can surface the TYPED refusal instead of `not-handled` (which would hand the
+ *  ambiguity to the LLM lane to guess). Set by the rule, read only after NO rule matched — so it
+ *  can never steal an utterance some other rule legitimately owns. Reset per-parse. */
+let PARAM_CONFLATED: string | null = null;
+
 /** Evaluate a small numeric expression with radicals: 3, 3/4, √6/4, 2√3, (√6/4). */
 function evalRadical(raw: string): number | null {
   const s0 = raw.trim().replace(/^\((.*)\)$/, '$1').trim();
@@ -1995,8 +2007,14 @@ const parametricLine: Rule = (s) => {
   const params = new Set([...anchor, ...dir].flatMap((x) => (x!.param ? [x!.param] : [])));
   if (params.size > 1) return null;
   // #422: one letter in BOTH roles («m(m-1, 5-m, -2)») conflates a bound variable with a figure DOF.
-  // Defer rather than guess which the student meant — the LLM lane is where an ambiguous form belongs.
-  if (params.has(runner)) return null;
+  // #516: which the student meant is not ours to guess — and not the LLM lane's either. Deferring via
+  // `return null` alone sent this to the fallback, which happily built the `t` reading (operator play,
+  // 2026-08-11): a refusal implemented as a decline is not a refusal. The rule still declines (rule
+  // contract), but records the letter so parse3's fallthrough surfaces the TYPED clarification.
+  if (params.has(runner)) {
+    PARAM_CONFLATED = runner;
+    return null;
+  }
   const isLineName = LINE_NAME_ONLY.test(headName);
   const name = isLineName ? canonicalLine(headName) : headName;
   const cmds: Command3[] = [
@@ -3416,6 +3434,7 @@ export function markVectorContext(utterance: string): void {
 
 export function parse3(utterance: string): ParseResult3 {
   markVectorContext(utterance);
+  PARAM_CONFLATED = null;
   const s = normalize3(utterance);
   if (!s) return NOT_HANDLED;
   if (!VEC_MARKED && /^([A-Z]\d*'?)([A-Z]\d*'?)\s*=\s*([A-Z]\d*'?)([A-Z]\d*'?)\s*$/.test(s))
@@ -3424,5 +3443,8 @@ export function parse3(utterance: string): ParseResult3 {
     const commands = rule(s);
     if (commands) return { ok: true, commands };
   }
+  // #516: no rule matched, but a rule RECOGNIZED an ambiguity — that is a refusal with a
+  // clarification, never `not-handled` (which escalates to the LLM lane, whose job is to guess).
+  if (PARAM_CONFLATED) return { ok: false, reason: 'param-roles-conflated', letter: PARAM_CONFLATED };
   return NOT_HANDLED;
 }

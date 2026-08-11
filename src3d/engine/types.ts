@@ -997,6 +997,21 @@ export function figureSymbolsOf(c: Construction3): string[] {
   return [...out];
 }
 
+/**
+ * #517 — the figure's ABSOLUTE points: fresh coordinate injections (`C(2,1,0)` → kind 'coord'; the
+ * coord-sym `M(k,1,3)`, absolute like a coord point per ADR-3D-032). They anchor the frame exactly as
+ * `c.pins` do, but they live in `c.points`, not in a pin list — so any gate that asks "did something
+ * absolute anchor this?" by enumerating pin lists alone is blind to them. That blindness suppressed
+ * the canvas coordinate labels, the data panel and the query lane for a figure of bare injected
+ * points (operator, 2026-08-11). Derived rather than enumerated — the `figureSymbolsOf` discipline
+ * (`src3d/CLAUDE.md`: *an enumeration is not a rule*).
+ */
+export function absolutePointCount(c: Construction3): number {
+  let n = 0;
+  for (const def of c.points.values()) if (def.kind === 'coord' || def.kind === 'coord-sym') n++;
+  return n;
+}
+
 export function pinSymsOf(c: Construction3): string[] {
   const out: string[] = [];
   for (const pin of c.pins) {
