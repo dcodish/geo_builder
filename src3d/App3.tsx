@@ -34,6 +34,8 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.incircleNeedsTriangle');
     case 'ambiguous-vector-length':
       return t('err.ambiguousVectorLength');
+    case 'param-roles-conflated':
+      return t('err.paramRolesConflated', { letter: err.letter });
     case 'dropped-given':
       return t('err.droppedGiven', { items: err.items });
     case 'not-understood':

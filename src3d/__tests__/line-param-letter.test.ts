@@ -57,10 +57,15 @@ describe('#422 — the reported utterance, and the letters that must agree', () 
     expect(cmds('l1:x=m(0,k,2)')).not.toBeNull();
   });
 
-  it('ONE letter in BOTH roles is deferred, never guessed', () => {
+  it('ONE letter in BOTH roles is REFUSED with a clarification, never guessed and never escalated (#516)', () => {
     // «m(m-1, 5-m, -2)» conflates a bound variable with a figure DOF. Which the student meant is not
-    // ours to decide, so it escalates instead of building a figure on an assumption.
-    expect(cmds('l1:x=m(m-1, 5-m, -2)')).toBeNull();
+    // ours to decide — and not the LLM lane's either: deferring this as `not-handled` sent it to the
+    // fallback, which built the `t` reading and silently rewrote the student's letter (operator play,
+    // 2026-08-11). A recognized ambiguity is a TYPED refusal carrying the letter for the message.
+    expect(cmds('l1:x=m(m-1, 5-m, -2)')).toBeNull(); // the rule itself still declines…
+    expect(parse3('l1:x=m(m-1, 5-m, -2)')).toEqual({ ok: false, reason: 'param-roles-conflated', letter: 'm' });
+    // …in the anchor-full form too, and regardless of the letter
+    expect(parse3('l1:x=(4,5,-1)+k(k, 1,0)')).toEqual({ ok: false, reason: 'param-roles-conflated', letter: 'k' });
   });
 
   it('an AXIS letter can never be read as a running parameter', () => {
@@ -95,5 +100,13 @@ describe('#422 — the figure builds, and the echo speaks the student\'s notatio
     const d = derive3(useGeo3.getState().facts, 0);
     const forms = buildScene3(d.construction, d.resolved, HOME_CAMERA, { width: 640, height: 460 }).lines.map((l) => l.form ?? '');
     expect(forms.some((f) => f.includes('t·('))).toBe(true);
+  });
+
+  it('#516 — the store surfaces the typed refusal, so the App can NEVER escalate it to the LLM lane', () => {
+    // The App's escalation gate is `err.code === 'not-understood'` — this code is the whole guarantee:
+    // as long as the conflated form carries its own code, no fallback call can launder it into a build.
+    useGeo3.getState().submit('l1:x=m(m-1, 5-m, -2)');
+    expect(useGeo3.getState().lastError).toEqual({ code: 'param-roles-conflated', letter: 'm' });
+    expect(useGeo3.getState().facts).toHaveLength(0); // nothing committed
   });
 });

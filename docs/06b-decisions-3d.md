@@ -2824,3 +2824,41 @@ parse. Greek letters currently mean something else here — the unknown scalars 
 utterance; m/s/t yielding an identical line bar the echoed letter; the figure parameter still read from
 the components; the 2024-Q2 form byte-identical AND carrying no `runner`; the anchor-less #351 form; the
 same-letter collision deferred; the axis letter refused; and the echo carrying «m» at every seed.
+
+### ADR-3D-131 — a recognized ambiguity is a TYPED refusal, never a decline (#516; amends ADR-3D-129)
+
+Operator play of ADR-3D-129 (2026-08-11): the must-refuse control «l1:x=m(m-1, 5-m, -2)» **built** — the
+fact list showed the student's utterance while the canvas echoed `ℓ1: x = (0,0,0) + t·(m-1, 5-m, -2)`,
+the outer `m` silently reinterpreted as `t`.
+
+**Root cause — a refusal implemented as a decline is not a refusal.** The `params.has(runner)` guard
+worked exactly as designed, but it declined via `return null`, and the pipeline maps every untyped parse
+failure to `not-understood` — the one code the App **escalates to the LLM lane**. The lane whose job is
+to guess then resolved precisely the ambiguity the guard had refused to resolve: Haiku canonicalized the
+input to the `t` spelling and the canonical line re-parsed and built. ADR-3D-129 chose this deferral
+deliberately (*"the LLM lane is where an ambiguous form belongs"*) — this ADR reverses that ruling. The
+two readings are geometrically different (same-letter `x = m·(m-1, 5-m, -2)` is a quadratic curve, not a
+line), so the build asserted a reading the student never stated. Not a regression: pre-#422 the utterance
+was equally `not-handled` and equally escalated — prod builds it the same way today.
+
+**Class:** *a statement the parser recognizes as ambiguous is declined as not-understood instead of
+refused with a clarification, so the escalation lane resolves the ambiguity by guessing.* The correct
+chokepoint already existed — the typed refusal channel (`ambiguous-vector-length`), which surfaces a
+clarification and never escalates.
+
+**Mechanism.** The guard records the letter (`PARAM_CONFLATED`, reset per parse); `parse3`'s fallthrough
+— reached only when NO rule matched, so nothing is ever stolen from a rule that legitimately owns the
+utterance — surfaces `{ ok: false, reason: 'param-roles-conflated', letter }`. The store maps it to its
+own error code (only genuine `not-handled` may become `not-understood`), the App renders a clarification
+naming the letter and its two roles (he + en), and the escalation gate (`err.code === 'not-understood'`)
+never sees it.
+
+**Sibling audits.** In-product: the vector-length ambiguity already used the typed channel; this was the
+outlier. Sibling product: `src/parser/parse.ts` has a RICH typed-refusal union (ambiguous-angle/-circle/
+-container, tangents-exhausted…) but also several recognized-ambiguity declines that reach the LLM
+(deferral comments at parse.ts:259, 330, 894, 899) — same class shape, filed as a 2-D audit issue rather
+than fixed here (different product, different lane).
+
+**Locked** in `line-param-letter.test.ts`: the operator's exact utterance returns the typed reason with
+the letter (both anchor forms, any letter); the store surfaces `param-roles-conflated` and commits
+nothing; the ADR-3D-129 controls still build with the student's runner.
