@@ -3261,7 +3261,7 @@ const altitudeFoot: Rule = (s) => {
   // named triangle (apex = CD's first letter, the foot drops onto the other two vertices). BEFORE the
   // explicit-side forms so `במשולש ABC` is read as the triangle, never as a `ל<side>` fragment.
   let m =
-    s.match(new RegExp(`^${L}${L}\\s+(?:הוא\\s+|היא\\s+)?גובה\\s+(?:ב|ל?)?(?:ה?משולש\\s+)${L}${L}${L}\\s*$`)) ??
+    s.match(new RegExp(`^${L}${L}\\s+(?:הוא\\s+|היא\\s+)?ה?גובה\\s+(?:ב|ל?)?(?:ה?משולש\\s+)${L}${L}${L}\\s*$`)) ??
     s.match(new RegExp(`^${L}${L}\\s+is\\s+(?:the\\s+)?altitude\\s+(?:in|of)\\s+(?:triangle\\s+)?${L}${L}${L}\\s*$`, 'i'));
   if (m) {
     const [, from, foot, a, b, c] = m;
@@ -3272,7 +3272,10 @@ const altitudeFoot: Rule = (s) => {
   }
   m = s.match(new RegExp(`גובה\\s+(?:ה?משולש\\s+)?${SIDE}${L}${L}\\s+(?:הוא|היא)\\s+${L}${L}`)); // ...לצלע AB הוא CD
   if (m) return [{ type: 'altitude-foot', id: m[4], from: m[3], a: m[1], b: m[2] }];
-  m = s.match(new RegExp(`${L}${L}\\s+(?:הוא\\s+|היא\\s+)?גובה\\s+(?:ה?משולש\\s+)?${SIDE}${L}${L}`)); // CD גובה לצלע AB
+  // #8 (2012-קיץ-ב): «SM הגובה לצלע BC במשולש SBC» — the DEFINITE article on the noun, and the naming
+  // triangle stated AFTER the side. Ordinary book phrasing on a construct that already exists; the
+  // in-face altitude needed no new geometry once the dihedral vocabulary (#524) let the face be named.
+  m = s.match(new RegExp(`${L}${L}\\s+(?:הוא\\s+|היא\\s+)?ה?גובה\\s+(?:ה?משולש\\s+)?${SIDE}${L}${L}(?:\\s+ב?ה?משולש\\s+${L}${L}${L})?\\s*$`)); // CD גובה לצלע AB
   if (m) return [{ type: 'altitude-foot', id: m[2], from: m[1], a: m[3], b: m[4] }];
   m = s.match(new RegExp(`${L}${L}\\s+is\\s+the\\s+altitude\\s+(?:to|onto)\\s+(?:side\\s+)?${L}${L}`, 'i')); // CD is the altitude to AB
   if (m) return [{ type: 'altitude-foot', id: m[2], from: m[1], a: m[3], b: m[4] }];
@@ -3359,7 +3362,7 @@ const planeRelGiven: Rule = (s0) => {
     // a new operand. So: the point-run cell lowers to the #324 `coord-plane-rel` command, which DRIVES
     // and is the one spelling authority for this relation; every other gauge pairing DEFERS (escalates)
     // rather than committing a claim that can be wrongly refuted. The missing drives are filed, not
-    // faked (#536).
+    // faked (#537).
     const frame = a.op.kind === 'plane-coord' ? a.op : b.op.kind === 'plane-coord' ? b.op : null;
     if (frame) {
       const other = (a.op === frame ? b : a).op;
@@ -3399,7 +3402,7 @@ const planeRelAngle: Rule = (s) => {
   if (!isPlanar(a.op) && !isPlanar(b.op)) return null;
   if (a.op.kind === 'line' || b.op.kind === 'line') return null; // S2's cells
   // #512: an ANGLE to the coordinate frame has no `coord-plane-rel` mode to drive it, so it stays a
-  // CLAIM — and the store's placement guard is what keeps an unfixed figure from refuting it (#536).
+  // CLAIM — and the store's placement guard is what keeps an unfixed figure from refuting it (#537).
   if ([a.op, b.op].some((op) => op.kind === 'axis')) return null; // the axis cells have no home yet
   if (a.op.kind === 'point' || b.op.kind === 'point') return null;
   if (sameOperand(a.op, b.op)) return null;

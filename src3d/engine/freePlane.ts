@@ -122,12 +122,29 @@ export function resolveFreePlane(
     const dir = lineDirs.get(g.line);
     if (dir && norm3(dir) > 1e-9) parallelTo = normalize3(dir);
   }
+  // #534 — a stated line↔plane ANGLE pins the normal onto a CONE about the line's direction. The two
+  // cases below are that same relation at its endpoints — «ℓ ⊥ π» is β = 90° (n ∥ û) and «ℓ ∥ π» is
+  // β = 0° (n ⊥ û) — so honouring only those two enumerated the ends of a continuum and dropped
+  // everything between: «זווית בין ישר ℓ למישור π = 45» left the orientation sampled and was refused,
+  // a satisfiable given the engine had every means to honour. With |n̂| = 1, sin β = |n̂·û|, so the
+  // angle between n̂ and û is (90° − β): a cone whose SPIN is one genuinely free DOF, sampled.
+  let coneAxis: Vec3 | null = null;
+  let coneHalfAngle = 0;
   for (const r of c.lineRels) {
     if (r.op.kind !== 'plane-named' || r.op.name !== name) continue;
     const dir = lineDirs.get(r.line);
     if (!dir || norm3(dir) < 1e-9) continue;
     if (r.rel === 'perp') parallelTo = normalize3(dir);
     else if (r.rel === 'parallel') dirConstraints.push(normalize3(dir));
+    else if (r.rel === 'angle' && r.deg !== undefined) {
+      const beta = Math.max(0, Math.min(90, r.deg)); // a line↔plane angle is undirected, ≤ 90°
+      if (beta >= 90 - 1e-9) parallelTo = normalize3(dir); // the ⟂ endpoint, exactly
+      else if (beta <= 1e-9) dirConstraints.push(normalize3(dir)); // the ∥ endpoint, exactly
+      else {
+        coneAxis = normalize3(dir);
+        coneHalfAngle = ((90 - beta) * Math.PI) / 180;
+      }
+    }
   }
 
   // member chords constrain the normal exactly like a ⟂ relation does
@@ -165,6 +182,17 @@ export function resolveFreePlane(
   if (parallelTo) {
     n = parallelTo;
     nSampled = 0;
+  } else if (coneAxis) {
+    // #534: the normal rides a cone about the line — the half-angle is knowledge, the SPIN is not, so
+    // the spin is sampled and "show another configuration" walks the whole family of planes that
+    // satisfy the stated angle. Exactly the treatment the 1-constraint branch below gives its spin.
+    const [e1, e2] = orthoBasis(coneAxis);
+    const phi = sample(seed, `freeplane-cone-${name}`, 0, Math.PI * 2);
+    n = add3(
+      scale3(coneAxis, Math.cos(coneHalfAngle)),
+      scale3(add3(scale3(e1, Math.cos(phi)), scale3(e2, Math.sin(phi))), Math.sin(coneHalfAngle)),
+    );
+    nSampled = 1;
   } else {
     // keep only independent constraints (drop near-parallel duplicates)
     const indep: Vec3[] = [];
