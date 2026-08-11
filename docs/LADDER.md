@@ -55,6 +55,8 @@ Degenerate pre-gate per command → attach ALL constraints → one evaluate (`co
 
 Cooperative budget (`budgetExceeded()`) can bail between cases — armed only around view searches, never the primary submit fold.
 
+> **The candidate universe** (stages 2g/3 and the S3.2 component partition alike) is defined by the `ancestors(…,'drivable')` walk, which since [ADR-438](06-decisions.md#adr-438) traverses a DERIVED circle centre (midpoint/circumcenter/…) to the DOFs behind it — so a constraint on a Thales-aux tangency touch reaches the external apex's parameter. Before that, pinning a radius could remove the walk's only visible escape and refuse a satisfiable figure.
+
 | # | Case | What | Verified? | Trace token |
 |---|---|---|---|---|
 | 3A | on-segment-solved widening | a closed-form solved point that can't satisfy alone → back to numeric + recruit its free param ancestors | no (joint solve decides) | `recruit:A` |

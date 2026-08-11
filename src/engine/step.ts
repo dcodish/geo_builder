@@ -300,9 +300,29 @@ function stepAccepted(c: Construction, positions: Map<Id, Vec>, newCons: Constra
  * only for the over-constrained shape (an unknown-point / dependency error stays verbatim) and only
  * when the failure step actually added constraints.
  */
-function blameNewStatement(error: string, newCons: Constraint[]): string {
+/**
+ * #541 — the constraint whose description REFUSES a multi-member statement. A variadic `set-line`
+ * lowers to several collinear triples; naming `newCons[0]` blamed systematically the FIRST triple, so
+ * the operator was told «O2, A, O1 collinear cannot hold» on a figure where that very triple builds —
+ * misdirecting the debugging toward a given that holds. Which member is the infeasible one is not
+ * knowable at the refuse seam (the driven solvers early-out on the first failure, so `violated` names
+ * the first casualty, not the culprit) — but the STATEMENT is: prefer the member that carries the whole
+ * stated list (the `collinear-order`), so the refusal names what the student typed; fall back to a
+ * violated NEW member, then to the first. A single-member statement keeps its exact description.
+ */
+function describeNewStatement(newCons: Constraint[], violated?: Constraint[]): Constraint {
+  const real = newCons.filter((k) => !isOrderConstraint(k));
+  if (real.length <= 1) return real[0] ?? newCons[0];
+  return (
+    newCons.find((k) => k.type === 'collinear-order') ??
+    violated?.find((v) => newCons.includes(v) || newCons.some((k) => constraintKey(k) === constraintKey(v))) ??
+    newCons[0]
+  );
+}
+
+function blameNewStatement(error: string, newCons: Constraint[], violated?: Constraint[]): string {
   if (!newCons.length || !error.startsWith('over-constrained')) return error;
-  return `over-constrained: ${describeConstraint(newCons[0])} cannot hold`;
+  return `over-constrained: ${describeConstraint(describeNewStatement(newCons, violated))} cannot hold`;
 }
 
 /**
@@ -558,8 +578,8 @@ function runFailureLadder(
   }
   // Honest refusal: name the STUDENT'S new statement (blame honesty, issue #37); a solve that "passed"
   // only vacuously (the non-vacuous gate refused it) reports the same over-constraint shape.
-  const vacuousErr = newCons.length ? `over-constrained: ${describeConstraint(newCons[0])} cannot hold` : 'over-constrained';
-  return { ok: false, error: primary.ok ? vacuousErr : blameNewStatement(primary.error, newCons), construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:refuse`] };
+  const vacuousErr = newCons.length ? `over-constrained: ${describeConstraint(describeNewStatement(newCons))} cannot hold` : 'over-constrained';
+  return { ok: false, error: primary.ok ? vacuousErr : blameNewStatement(primary.error, newCons, primary.violated), construction: prev, positions: prevPositions, ladder: [...trace, `${prefix}:refuse`] };
 }
 
 /**
@@ -1041,6 +1061,19 @@ function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', 
         if (ctr && ctr.kind === 'free-point' && !ctr.pinned && !ctr.rigid && avail(ctr) && !seen.has(ctr.id)) {
           seen.add(ctr.id);
           result.push(ctr.id);
+        } else if (ctr && ctr.kind !== 'free-point' && isGeoPoint(ctr)) {
+          // A DERIVED centre (midpoint/circumcenter/…) is a FUNCTION of its parents, so the circle —
+          // and every point derived from it — moves with THEM: keep walking through the centre to the
+          // DOFs that actually position the circle (issue #541). The touch point of a tangent drawn
+          // from an external point B is a circle∩circle crossing on a Thales aux circle centred at
+          // midpoint(centre, B); without this hop a constraint on the touch point could reach ONLY the
+          // main circle's own DOFs, so pinning its radius (a stated size) made the constraint falsely
+          // over-constrained while the same figure with a free radius solved (the radius was the one
+          // escape the walk could see). The old fear here — "the Thales-aux chain over-recruits" (the
+          // ADR-095-era comment below) — predates staged recruiting (ADR-281, candidates tried ALONE
+          // first) and the joint component solve (docs/25 S3.2), whose regulariser keeps a surfaced-
+          // but-unneeded ancestor at its seed.
+          queue.push(circ.center);
         }
       }
       if (o.kind === 'line') { queue.push(...lineSpecPoints(o.spec)); continue; }
@@ -1048,8 +1081,8 @@ function ancestors(objects: GeoObject[], start: Id, mode: 'param' | 'drivable', 
       // on such a derived point can reach the free apex upstream (ADR-095): e.g. "∠CAE = 45" on the secant
       // point A (= line BE ∩ circle) must reach the external point B to be driven; without this the walk
       // dead-ended (pointParents has no case for it) and the angle falsely over-constrained. (A circle∩circle
-      // crossing is deliberately NOT traversed: its Thales-aux chain reaches too many DOFs and over-recruits,
-      // breaking sibling constraints — the secant path already reaches the apex.)
+      // crossing has no traversal case of its own: its circles' DOFs — radius, free centre, and, since
+      // issue #541, the parents of a DERIVED centre — are surfaced by the circle loop above.)
       if (o.kind === 'line-circle') {
         queue.push(o.line);
         continue;

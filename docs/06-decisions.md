@@ -6817,3 +6817,39 @@ word, so in the connective position — before a hyphen, or between two uppercas
 only be the ו-connective mistyped. A global replace would have corrupted «אלכסון», «סימון» and «הן»,
 which is why the match is anchored on both sides and asserted against the whole catalog rather than
 argued about.
+
+## ADR-438 — The drivable walk traverses DERIVED circle centres; a multi-member refusal blames the whole statement (#541)
+
+The operator's bagrut Q11 («שני מעגלים משיקים מבחוץ» pair, sizes 6π/81π, two tangents, then «ישר A O1
+E O2 C» / «AC עובר דרך מרכזי המעגלים») was refused «over-constrained: O2, A, O1 collinear cannot hold»
+on every seed, though the official figure exists (r=3, r=9, |O1O2|=12). Class: **a constraint on a
+point derived from an auxiliary circle could not reach the free DOFs that actually position that
+circle.** The tangent-from-external-point construction places its touch as a circle∩circle crossing on
+a Thales aux circle whose centre is *midpoint(centre, apex)* — a DERIVED point — and the
+`ancestors(…,'drivable')` walk surfaced only a circle's own free radius / free-point centre, never
+walking THROUGH a derived centre (an ADR-095-era deliberate stop: "the Thales-aux chain over-recruits",
+which predates ADR-281's staged try-alone recruiting and the docs/25 S3.2 joint component solve whose
+regulariser keeps a surfaced-but-unneeded ancestor at its seed). With free radii the joint solve
+escaped via the radius DOF — which is exactly what masked the gap: the figure worked unsized and failed
+the moment the stated sizes pinned the radii, i.e. *adding a given removed the solver's only visible
+escape*. Fix at the walk chokepoint (`step.ts` `ancestors`, drivable mode): a non-free-point centre is
+queued for traversal, so the walk continues centre → its parents → the apex's extension parameter. One
+edit heals `jointFirst`, `minimalComponentOf`, and every recruiter rung at once (they share the walk).
+Ladder stage: widens the DOF universe of stages 2g/3 and the S3.2 component partition; inserts no new
+stage. **Perf (docs/17 §7):** scenarios-e2e-5 (the heaviest shard) 61.9 s → 49.3 s test-time — the
+previously-grinding failure paths now resolve; the new Q11 scenario itself solves in ~2.7 s.
+
+**Blame honesty (second defect, same issue):** the refusal named `newCons[0]` — systematically the
+FIRST lowered triple of a variadic `set-line`, here a triple that *builds fine* on the same figure.
+Which member is infeasible is unknowable at the refuse seam (the driven solvers early-out on the first
+casualty, so `violated` names a casualty, not the culprit) — but the STATEMENT is knowable:
+`describeNewStatement` prefers the member carrying the whole stated list (the `collinear-order` →
+«A–B–D–C in order on a line»), falling back to a violated NEW member, then the first. The #37
+rationale (never blame an earlier given) stands unchanged.
+
+**Sibling audit:** `src3d/` has no ancestors/drivable walk and no Thales-aux tangency construction
+(solid-geometry engine, membership-based) — class not present. Locks:
+`engine/__tests__/issue-541.test.ts` (walk reach, all three phrasings with radii pinned, the
+free-radius control, the blame member) + the `two-tangent-circles-sizes-bind-touch-named-centre-line-
+builds` scenario.
+
