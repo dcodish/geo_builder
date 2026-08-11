@@ -3088,3 +3088,64 @@ moves DOWN, per the ratchet's own rule (lower when you sweep, never raise).
 agreement with the spelling that already worked, the family across coefficient/divisor/fraction
 radicands, the same atom serving a coordinate component (`C(√(2),1,0)` ≡ `C(√2,1,0)`), the honest
 refusal of `√(4*3)`, and byte-identical behaviour for every form that already parsed.
+
+### ADR-3D-138 — a stated DISTANCE pins a free plane's offset; no free plane accuses the student (#508)
+
+Found by the #500 fix session as the adjacent check that issue's plan called for:
+
+```
+פירמידה משולשת ABCD
+מישור π2                       → free plane declared (#487)
+המרחק בין A למישור π2 הוא 5    → ✗ claim-refuted, the fact NOT committed
+```
+
+`claim-refuted` reads *your stated distance is wrong*. Nothing was wrong with it. The plane simply had a
+**sampled** offset that nothing had tried to move — and the missing pin was itself the reason for the
+accusation. Sibling of ADR-3D-134's pair, and worse than #492: there the statement was at least
+unsatisfiable; here it is perfectly satisfiable and the tool called it false.
+
+**Root cause — the pin set was an enumeration.** `resolveFreePlane` honoured exactly two sources,
+memberships and ∥/⟂ relations: the kinds that existed when #487 landed. Anything else that constrains a
+plane and is not on that list silently became a refuted claim (docs/17 — *an enumeration is not a rule*;
+the same shape as #500, where the notice classifier was the missed consumer of the same flag).
+
+**Two halves, and the second is what closes the class.**
+1. **The capability.** A distance from a known point pins the OFFSET exactly: with a unit normal,
+   `|n·p + d| = value ⟺ d = −n·p ± value` — precisely the DOF the resolver samples when no member fixes
+   it. Which SIDE of the point the plane sits on is a genuine unstated choice, so it is a sampled
+   BRANCH (ADR-052): "show another configuration" flips it, and the normal keeps its two free DOFs, so
+   the figure still visibly varies while the stated distance holds exactly at every seed.
+2. **The class.** A claim about a plane whose relevant DOF is still SAMPLED can never be *refuted* — the
+   configuration it "fails" in is one the tool invented, not one the student stated. It now degrades to
+   the honest `plane-not-determined`, naming the plane. So a constraint kind this resolver does not yet
+   pin costs a refusal, never a false accusation. The guard reads the claim's plane references by a
+   STRUCTURAL walk rather than a switch over claim kinds — an enumeration is what the issue was filed
+   on, and a claim kind added later must not quietly escape it.
+
+**Two mechanisms had to follow the pin, both found by measurement, not by reading.** The pin was
+correct and the drawn distance was still wrong (6.75 at seed 0), because the offset is pinned to a
+POINT and two later stages move points:
+- *The free-plane resolution is now a bounded FIXPOINT.* #487's two fixed passes assumed the dependency
+  ran one way (planes read positions, then riders read planes). An offset pin makes it genuinely mutual,
+  so the loop re-runs the point pass only while the resolution actually moved something, and exits on
+  `moved === false` — which is what guarantees planes and positions agree. The cap only bounds a figure
+  that will not settle, where behaviour is exactly today's.
+- *The landing funnel (ADR-3D-101) treats it as pinned.* A distance-pinned plane ties the figure to
+  where a point SITS, so sampling translation would slide that point off the plane just fitted to it,
+  and rotation about the gauge origin moves it too. The funnel's own doctrine settles it exactly as it
+  did for #487: *a component is sampled only when PROVABLY free*, and neither is. Only the slide
+  PARALLEL to the plane is genuinely free; partial freedoms stay conservatively pinned, the documented
+  ADR-3D-101 deferral.
+
+**Deliberately left open, and honest about it.** A SECOND distance is real information (it would
+constrain the normal) that this resolver does not pin — it refuses `plane-not-determined` rather than
+pretending. Filed as follow-up rather than half-built.
+
+**Scope check:** the whole 3-D lane (128 files, 2480 tests) passes with **zero** tests moved — including
+`free-plane`, `landing-funnel` and `member-drive`, the three that own the mechanisms touched.
+
+**Locked** in `free-plane-distance.test.ts`: the operator's exact sequence committing and holding to 1e-6
+at eight seeds, the DOF cue reading 2 (offset pinned, orientation free), both sides reachable across
+seeds, the orientation still resampling, the same result with no solid in the figure, the second-distance
+case reading `plane-not-determined`, a DETERMINED plane still producing an ordinary `claim-refuted` (the
+guard did not swallow real refutations), and the unpinned + membership lanes unchanged.

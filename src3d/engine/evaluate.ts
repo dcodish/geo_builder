@@ -1035,8 +1035,17 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs);
   // #487: a free plane pinned by a member that was itself only placed DURING the pass (a midpoint, a
   // rider of another carrier) resolves against stale positions the first time — re-run the point pass
-  // once so riders and derived points read the pinned plane. Deterministic, so the fixpoint is 2 passes.
-  if (resolveFreePlanes3(c, seed, pos, planes, lines, freePlaneDofs)) {
+  // so riders and derived points read the pinned plane.
+  //
+  // #508 made the dependency genuinely MUTUAL: an offset pinned by a distance reads a point's position,
+  // and the point pass that follows can move that point (a solid's placement is itself sampled once the
+  // figure carries an absolute-frame object, ADR-3D-095), which left the stated distance holding at the
+  // pre-pass position and not the drawn one. So this is now a bounded FIXPOINT rather than a fixed two
+  // passes: resolve, and re-run the points only while the resolution actually moved something. Exiting
+  // on `moved === false` is what guarantees planes and positions agree; the cap only bounds a figure
+  // that will not settle, where the behaviour is exactly today's. Every step is deterministic, so the
+  // whole loop is, and in practice it settles in two.
+  for (let pass = 0; pass < 3 && resolveFreePlanes3(c, seed, pos, planes, lines, freePlaneDofs); pass++) {
     evaluateSolidsAndPoints(c, seed, pos, planes, lines, undefined, undefined, undefined, freePlaneDofs);
   }
 
@@ -1374,10 +1383,25 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
   //    pivot FROZE the gauge rather than solving it, and a rigid motion preserves every similarity-
   //    invariant pin by definition — so nothing a frozen solve established can break here.
   //  - SCALE is never sampled (it is the similarity gauge; ADR-3D-054 owns when it is pinned).
+  // #508 — a free plane whose OFFSET is pinned by a stated distance to a FIGURE POINT is tied to where
+  // that point SITS, not merely to how the figure faces. Sampling translation would slide the point
+  // away from the plane the resolution just fitted to it, and a rotation about the gauge origin moves
+  // the point too — so the stated distance would hold at the position the resolver read and not at the
+  // one drawn. The funnel's own doctrine decides it exactly as it did for #487 above: a component is
+  // sampled only when PROVABLY free, and here neither is. (Only the slide PARALLEL to the plane is
+  // genuinely free; partial freedoms stay conservatively pinned, the documented ADR-3D-101 deferral.
+  // The plane's own normal is still sampled, so the configuration visibly varies.)
+  const freePlaneOffsetPinned = c.claims.some(
+    (cl) =>
+      cl.type === 'distance-rel' &&
+      [cl.a, cl.b].some((op) => op.kind === 'plane-named' && c.planes.get(op.name)?.free) &&
+      [cl.a, cl.b].some((op) => op.kind === 'point'),
+  );
   const translationFree =
     c.pins.length === 0 &&
     c.planePins.length === 0 &&
     c.memberships.length === 0 &&
+    !freePlaneOffsetPinned &&
     !c.coordPlanePins.some((cp) => cp.mode === 'zero' || cp.mode === 'contains');
   // #487 (ADR-3D-124): a FREE plane pinned to FIGURE CONTENT (a plane-rel claim against a point-run)
   // resolves BEFORE this block, reading the figure's current positions — sampling the rotation after
@@ -1401,6 +1425,8 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     c.planePins.length === 0 &&
     c.memberships.length === 0 &&
     !freePlaneFigurePinned &&
+    !freePlaneOffsetPinned && // #508: rotation about the gauge origin moves the distance-pinned point
+
     // S3 (#378): `zero` belongs here too. It says the ring LIES IN a coordinate plane («הבסיס ABCD
     // שוכן במישור ה-xy»), which fixes the ring's orientation as surely as it fixes its offset — it
     // was listed under translation only, so the moment any absolute object entered the figure the
@@ -1428,7 +1454,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     if (rotationFree) return null; // already fully free — the ordinary sampler owns it
     const rotPinnedElsewhere =
       c.pins.length > 0 || c.vectorPins.length > 0 || c.pairPins.length > 0 || c.planePins.length > 0 ||
-      c.memberships.length > 0 || freePlaneFigurePinned ||
+      c.memberships.length > 0 || freePlaneFigurePinned || freePlaneOffsetPinned ||
       c.coordPlanePins.some((cp) => cp.mode === 'share' || cp.mode === 'perp' || cp.mode === 'contains' || cp.mode === 'zero');
     if (rotPinnedElsewhere) return null;
     const names = [...gaugeLineRels.map((r) => r.line), ...c.planeLinePerps.map((g) => g.line)];

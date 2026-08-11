@@ -21,8 +21,16 @@
  *    earlier free plane). The relation lands in the claims list (the S3 disposition map is claim-gated
  *    for plane×plane) — resolving the free plane TO the stated relation is what makes the claim verify
  *    green: the M1 duality, where the same sentence drives a free object and verifies a determined one.
+ *  - #508: a stated DISTANCE from a known point, which pins the OFFSET (`d = −n·p ± value`, the sign a
+ *    sampled branch). Same duality: the given that used to be "refuted" against a sampled offset is
+ *    what fixes the offset.
  *
  * Riders (`on-plane` points) are NOT pins — they are defined BY the plane and are placed after it.
+ *
+ * These are a RULE over the recorded constraints, not the enumeration of kinds that existed when #487
+ * landed. A constraint kind this resolver does not yet pin must never reach the claim verifier and be
+ * reported as the student's error — the store's `plane-not-determined` guard closes that class, so the
+ * worst case of a missing pin is an honest "pin this plane first", never a false accusation.
  */
 import { sample } from './rng';
 import { add3, centroid3, cross3, dist3, dot3, norm3, normalize3, scale3, sub3, v3, type Vec3 } from './vec3';
@@ -128,6 +136,29 @@ export function resolveFreePlane(
     if (norm3(u) > 1e-9) dirConstraints.push(normalize3(u));
   }
 
+  // #508 — a stated DISTANCE from a known POINT to this plane pins the OFFSET exactly. With a unit
+  // normal, |n·p + d| = value ⟺ d = −n·p ± value: precisely the one DOF the resolver samples when no
+  // member fixes it. Before this, the distance was recorded only as a claim, verified against a plane
+  // whose offset nothing had tried to move, and the student was told their perfectly good given was
+  // WRONG (`claim-refuted`) — a false accusation, and the missed pin was the reason for it.
+  //
+  // The pin set is now a RULE over the recorded constraints rather than the list of kinds that existed
+  // when #487 landed (docs/17: an enumeration is not a rule). The remaining members of the class are
+  // handled by the store's honesty guard rather than silently: a claim about a plane whose relevant DOF
+  // is still SAMPLED can never be refuted, because there is nothing yet to refute it against.
+  let offsetPin: { p: Vec3; value: number } | null = null;
+  for (const cl of c.claims) {
+    if (cl.type !== 'distance-rel') continue;
+    const other =
+      cl.a.kind === 'plane-named' && cl.a.name === name ? cl.b : cl.b.kind === 'plane-named' && cl.b.name === name ? cl.a : null;
+    if (!other || other.kind !== 'point') continue;
+    const p = pos.get(other.id);
+    // a RIDER of this plane is at distance 0 by construction — it defines nothing about the offset
+    if (!p || c.points.get(other.id)?.kind === 'on-plane') continue;
+    offsetPin = { p, value: cl.value };
+    break; // the first pins it; a second distance is verified downstream, exactly like an extra member
+  }
+
   // ---- the normal -----------------------------------------------------------------------
   let n: Vec3;
   let nSampled: number; // how many of the normal's 2 DOFs stayed free
@@ -165,6 +196,12 @@ export function resolveFreePlane(
   let dSampled: number;
   if (members.length > 0) {
     d = -dot3(n, members[0]);
+    dSampled = 0;
+  } else if (offsetPin) {
+    // WHICH SIDE of the point the plane sits on is a genuine free choice the student did not state, so
+    // it is a sampled BRANCH (ADR-052) — "show another configuration" flips it — not a silent default.
+    const side = sample(seed, `freeplane-side-${name}`, -1, 1) < 0 ? -1 : 1;
+    d = -dot3(n, offsetPin.p) + side * offsetPin.value;
     dSampled = 0;
   } else {
     // seat the sampled plane near the figure: through a point offset from the centroid, scaled to
