@@ -196,7 +196,13 @@ describe('GATE — 2022 חורף Q2 (the algebraic lane: planes, parameter, feet
     HE.slice(0, 2).forEach(submit);
     submit('הזווית בין המישורים π1 ו-π2 היא 95');
     expect(state().facts).toHaveLength(2);
-    expect(state().lastError).toEqual({ code: 'no-roots' });
+    // #492 (ADR-3D-134): the payload names the parameter and the refused statement (message honesty)
+    expect(state().lastError).toEqual({
+      code: 'no-roots',
+      sym: 'a',
+      stated: 'הזווית בין המישורים π1 ו-π2 היא 95',
+      others: [],
+    });
   });
 
   it('without the membership given, "show another configuration" cycles the a = ±1 branches', () => {

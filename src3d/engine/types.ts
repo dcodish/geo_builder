@@ -1058,7 +1058,9 @@ export type EngineError3 =
   | { code: 'no-solution'; id: Id } // the driven t has no value satisfying the condition
   | { code: 'not-on-segment'; id: Id } // the driven t lands outside the stated segment
   | { code: 'two-params' } // only ONE symbolic parameter per figure (V2 boundary)
-  | { code: 'no-roots' } // no parameter value satisfies the stated angle — over-constrained, honestly
+  // #492: NO REAL parameter value satisfies the pinning givens — strictly stronger than "the claim
+  // fails in this drawing", so the message says so and names the statements in conflict.
+  | { code: 'no-roots'; sym: string; stated: string; others: string[] }
   | { code: 'not-on-plane'; id: Id } // a stated membership does not hold in any branch
   | { code: 'not-coplanar'; id: string } // a plane's named points do not determine a single plane
   | { code: 'plane-side-undefined'; id: string } // above/below a (near-)vertical plane is meaningless
@@ -1066,7 +1068,10 @@ export type EngineError3 =
   | { code: 'not-on-line'; id: Id } // a stated on-line membership does not hold
   | { code: 'line-misses-plane'; id: Id } // ℓ ∥ π at the chosen parameter — no crossing point
   | { code: 'symbolic-new-point'; id: Id } // a NEW point with symbolic components is under-determined
-  | { code: 'injection-unsatisfiable' } // no placement of the figure matches the injected coordinates
+  | { code: 'injection-unsatisfiable' } // no placement of the figure matches the injected COORDINATES
+  // #425: the same "no placement" finding on a figure whose pins are not coordinates (angles, equal
+  // sides, plane equations) — the givens contradict each other, and the message names which.
+  | { code: 'givens-contradict'; stated: string; others: string[] }
   | { code: 'sign-unsatisfiable'; id: Id } // no pivot solution has the stated coordinate sign
   | { code: 'no-such-solid'; id: string } // a volume/area claim names a solid kind the figure doesn't have (or has twice)
   | { code: 'free-size-claim'; id: string } // a numeric volume/area claim on a solid whose dims are unstated

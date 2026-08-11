@@ -26,7 +26,10 @@ const CEILINGS = {
   parse2Label: 342, // '[A-Za-z]\d*' in parse.ts
   parse2Num: 31, //    '\d+(?:\.\d+)?' in parse.ts
   parse3Label: 163, // '[A-Z]\d*' in parse3.ts
-  parse3Num: 24, //    '\d+(?:\.\d+)?' in parse3.ts
+  // #513 (ADR-3D-135) swept parse3's number fragment onto the new `UNUM` atom while widening the
+  // radicand: 24 → 14. The ratchet worked exactly as designed — it caught the fix inlining fresh
+  // copies, and the fix composed from an atom instead.
+  parse3Num: 14, //    '\d+(?:\.\d+)?' in parse3.ts
 };
 
 describe('lexical ratchet — inline fragment counts must not grow (docs/24 S2.1)', () => {

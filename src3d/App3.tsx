@@ -25,6 +25,10 @@ import { derive3, redo3, undo3, useGeo3, type FactStatus3, type StoreError3 } fr
 import { factDisplay3, isVectorFact3 } from './render/notation';
 import { VecMath } from './render/VecMath';
 
+/** #492/#425: the student's own statements, quoted and comma-joined, for a refusal that names the
+ *  conflict. Quoting keeps a multi-word utterance readable as ONE item in the list. */
+const quoteList = (items: string[]): string => items.map((s) => (s === '…' ? s : `«${s}»`)).join(', ');
+
 function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: StoreError3): string | null {
   if (!err) return null;
   switch (err.code) {
@@ -66,8 +70,17 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.badSolid');
     case 'two-params':
       return t('err.twoParams');
+    // #492/#425: the refusal quotes the student's own statements — the honesty invariant (name the
+    // conflicting STATEMENT, never internal state). The «…With» variant is used only when there are
+    // other statements to name, so the message never trails an empty list.
     case 'no-roots':
-      return t('err.noRoots');
+      return err.others.length > 0
+        ? t('err.noRootsWith', { sym: err.sym, stated: err.stated, others: quoteList(err.others) })
+        : t('err.noRoots', { sym: err.sym, stated: err.stated });
+    case 'givens-contradict':
+      return err.others.length > 0
+        ? t('err.givensContradict', { stated: err.stated, others: quoteList(err.others) })
+        : t('err.givensContradictAlone', { stated: err.stated });
     case 'not-on-plane':
       return t('err.notOnPlane', { id: err.id });
     case 'not-coplanar':

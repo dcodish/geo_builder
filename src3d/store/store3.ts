@@ -26,7 +26,7 @@ import { buildNotices3, type BuildNotice3 } from '../engine/notices';
 import { temporal } from 'zundo';
 import { nanoid } from 'nanoid';
 import { applyCommand3 } from '../engine/apply';
-import { checkInSpan, firstSatisfyingSeed3, memberHolds3, resolve3, type Resolved3 } from '../engine/evaluate';
+import { checkInSpan, firstSatisfyingSeed3, memberHolds3, pinningGivens, resolve3, type Resolved3 } from '../engine/evaluate';
 import { verifyClaim } from '../engine/claims';
 import { cross3, dot3, norm3, sub3 } from '../engine/vec3';
 import { emptyConstruction3, type Command3, type Construction3, type EngineError3, type Positions3 } from '../engine/types';
@@ -90,6 +90,16 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
   const status: Record<string, FactStatus3> = {};
   const claimOwners: { factId: string; from: number; to: number }[] = [];
   const pinOwnerIds = new Set<string>();
+  /** #425: the pins that are COORDINATES (an injected point or vector) — the only pins whose refusal
+   *  may speak of «the given coordinates». Tracked apart from the general pin set because the guard
+   *  below was deliberately widened to EVERY pin kind while the message it emits stayed the
+   *  injection-specific one, so a figure carrying no coordinate at all was told to check its. */
+  const coordPinOwnerIds = new Set<string>();
+  /** #492: the facts that contributed something CONSTRAINING THE PARAMETER — a pinning given
+   *  (`pinningGivens`: plane angles, line⟂plane, S2 line relations) or a `paramGivens` claim. Kept in
+   *  fact order, so the LAST is the newest statement: a refusal names what the student just said
+   *  (the ADR-276 blame-honesty precedent), not an arbitrary member of the conflicting set. */
+  const paramPinOwners: string[] = [];
   // #116 (M4 defaults-yield): a right-triangle's SOFT default right angle (a `cos-angle` cos:0 at the
   // middle vertex) is dropped when an EXPLICIT ∠=90 on the SAME three vertices is stated — the student's
   // choice of right-angle vertex wins over the soft guess (ADR-052/163). Scanned once before the fold.
@@ -134,6 +144,8 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
     const claimsBefore = c.claims.length;
     const pinsBefore =
       c.pins.length + c.vectorPins.length + c.pairPins.length + c.scalarPins.length + c.planePins.length + c.coordPlanePins.length;
+    const coordPinsBefore = c.pins.length + c.vectorPins.length;
+    const paramPinsBefore = pinningGivens(c) + c.paramGivens.length;
     for (const cmd of f.cmds) {
       if (droppedSoft(cmd)) continue; // an explicit ∠=90 on this triangle superseded the soft default
       const r = applyCommand3(c, cmd);
@@ -153,45 +165,100 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
       pinsBefore
     )
       pinOwnerIds.add(f.id);
+    if (c.pins.length + c.vectorPins.length > coordPinsBefore) coordPinOwnerIds.add(f.id);
+    if (pinningGivens(c) + c.paramGivens.length > paramPinsBefore) paramPinOwners.push(f.id);
     status[f.id] = st;
   }
 
   const resolved = resolve3(c, seed);
   const positions = resolved.positions;
 
-  // verify every recorded claim against the FINAL figure, attributed to its fact
-  for (const owner of claimOwners) {
-    if (status[owner.factId] !== 'ok') continue;
-    for (let i = owner.from; i < owner.to; i++) {
-      const claim = c.claims[i];
-      // ADR-3D-032: a claim that PINS the figure parameter (references a coord-sym
-      // point) is a given, not a size statement — no root = the honest no-roots.
-      const pinsParam = c.paramGivens.includes(claim);
-      if (pinsParam && resolved.param && resolved.param.roots.length === 0) {
-        status[owner.factId] = { code: 'no-roots' };
-        break;
-      }
-      // V2 honest boundary: a numeric size on a free-dim solid figure is a SCALE
-      // statement, not a check — refuse with a clear message rather than "refute" it.
-      if (!pinsParam && (claim.type === 'length-eq' || claim.type === 'area-eq') && c.solids.length > 0) {
-        status[owner.factId] = { code: 'size-on-solid' };
-        break;
-      }
-      if (!verifyClaim(claim, c, seed)) {
-        status[owner.factId] = { code: 'claim-refuted' };
-        break;
+  /**
+   * #425/#492 — the statements a refusal must NAME. The honesty invariant is that an error names the
+   * conflicting STATEMENT, never internal state, so every refusal built here quotes the student's own
+   * utterances. Capped at three with a visible «…» rather than a silent truncation.
+   */
+  const namedStatements = (ids: Iterable<string>, exclude: string): string[] => {
+    const want = new Set(ids);
+    want.delete(exclude);
+    const out = facts.filter((f) => f.enabled && want.has(f.id)).map((f) => f.utterance);
+    return out.length > 3 ? [...out.slice(0, 3), '…'] : out;
+  };
+
+  /**
+   * #492 — the givens admit NO REAL PARAMETER VALUE. This is knowledge the engine already has
+   * (`paramRoots` returned nothing while something pinned the parameter), and it is strictly stronger
+   * than "the claim fails here": no configuration of this figure can ever satisfy it.
+   *
+   * It is gated on the PROPERTY — did this fact contribute something that constrains the parameter —
+   * and no longer on a LIST of command types. The list («plane-angle», «line-perp-plane») was written
+   * when those were the only pinning kinds; S2 (#378) added the line relations and never joined it, so
+   * «l ∥ π1» over `d·n = 2((m−1)²+1)` fell through to the claim verifier and was reported as
+   * «the claim doesn't hold in the figure — check your computation» — blaming the student's arithmetic
+   * for a claim no real m can satisfy. `pinningGivens` is the same count the root-finder itself uses,
+   * so a future pinning kind is covered the day it is added (docs/17: an enumeration is not a rule).
+   *
+   * The claim pass is SKIPPED in this state: with no valid parameter value there is no configuration to
+   * verify against, so every param-dependent claim would "fail" and earlier, innocent facts would be
+   * marked refuted too. A claim cannot be refuted by a figure that has none.
+   */
+  const paramContradiction = resolved.param !== null && paramPinOwners.length > 0 && resolved.param.roots.length === 0;
+  if (paramContradiction) {
+    const blamed = paramPinOwners[paramPinOwners.length - 1];
+    if (status[blamed] === 'ok')
+      status[blamed] = {
+        code: 'no-roots',
+        sym: resolved.param!.name,
+        stated: facts.find((f) => f.id === blamed)?.utterance ?? '',
+        others: namedStatements(paramPinOwners, blamed),
+      };
+  } else {
+    // verify every recorded claim against the FINAL figure, attributed to its fact
+    for (const owner of claimOwners) {
+      if (status[owner.factId] !== 'ok') continue;
+      for (let i = owner.from; i < owner.to; i++) {
+        const claim = c.claims[i];
+        // V2 honest boundary: a numeric size on a free-dim solid figure is a SCALE
+        // statement, not a check — refuse with a clear message rather than "refute" it.
+        if (!c.paramGivens.includes(claim) && (claim.type === 'length-eq' || claim.type === 'area-eq') && c.solids.length > 0) {
+          status[owner.factId] = { code: 'size-on-solid' };
+          break;
+        }
+        if (!verifyClaim(claim, c, seed)) {
+          status[owner.factId] = { code: 'claim-refuted' };
+          break;
+        }
       }
     }
   }
 
+  /**
+   * A pin-contributing fact with NO pivot placement — an honest refusal, never a silent fallback to
+   * the unsolved seed figure (class: any pin kind, not only injections).
+   *
+   * #425 — the REFUSAL is now split the same way the GUARD is. The guard was deliberately widened to
+   * every pin kind (its own comment says so) while the message it emitted stayed the injection-specific
+   * «no placement of the solid matches the given coordinates». On the equilateral-base pyramid
+   * (∠DAB = 120 then ∠DAC = 53.13 — impossible in R³ by the spherical triangle inequality, and
+   * correctly refused) the figure contains no coordinate at all: the student was told to check
+   * coordinates they never entered, and NOT told the one thing that mattered — that those two angles
+   * cannot both hold on an equilateral base. Only a COORDINATE pin may speak of coordinates; every
+   * other pin kind reports the contradiction it actually found and names the statements in conflict.
+   *
+   * Blame lands on the NEWEST pin owner alone (ADR-276): the earlier givens were satisfiable until
+   * this one arrived, so marking all of them red — which the previous loop did — accuses statements
+   * that are not at fault. `pinOwnerIds` is insertion-ordered in fact order, so the last is the newest.
+   */
+  const blamedPinOwner = [...pinOwnerIds].pop();
+  if (blamedPinOwner !== undefined && status[blamedPinOwner] === 'ok' && resolved.pivot && resolved.pivot.solutions === 0) {
+    const f = facts.find((x) => x.id === blamedPinOwner)!;
+    status[blamedPinOwner] = coordPinOwnerIds.has(blamedPinOwner)
+      ? { code: 'injection-unsatisfiable' }
+      : { code: 'givens-contradict', stated: f.utterance, others: namedStatements(pinOwnerIds, blamedPinOwner) };
+  }
+
   for (const f of facts) {
     if (status[f.id] !== 'ok') continue;
-    // a pin-contributing fact with NO pivot placement — honest refusal, never a silent
-    // fallback to the unsolved seed figure (class: any pin kind, not only injections)
-    if (pinOwnerIds.has(f.id) && resolved.pivot && resolved.pivot.solutions === 0) {
-      status[f.id] = { code: 'injection-unsatisfiable' };
-      continue;
-    }
     for (const cmd of f.cmds) {
       if (cmd.type === 'point-in-span') {
         const def = c.points.get(cmd.id);
@@ -201,12 +268,6 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
             status[f.id] = { code: verdict, id: cmd.id };
             break;
           }
-        }
-      } else if (cmd.type === 'plane-angle' || cmd.type === 'line-perp-plane') {
-        // the stated relation admits NO parameter value — over-constrained, honestly
-        if (resolved.param && resolved.param.roots.length === 0) {
-          status[f.id] = { code: 'no-roots' };
-          break;
         }
       } else if (cmd.type === 'param-sign') {
         // ADR-3D-032: the chosen parameter value must honour the stated sign.

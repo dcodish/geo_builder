@@ -108,3 +108,47 @@ describe('#380 — a point-run plane is THREE OR FOUR labels, in both relation f
     expect(cmds('AB is parallel to plane ABC')).toMatchObject([{ type: 'seg-plane-rel', plane: ['A', 'B', 'C'] }]);
   });
 });
+
+/**
+ * #513 (ADR-3D-135) — the third member of the cluster, and the third instance of PAREN-BLINDNESS in a
+ * scalar reader (#299, #300). `√48` parsed; `√(48)` did not, though parenthesising a radicand is the
+ * ordinary way to write it. Same silent-cost shape as #494: the operator needed FOUR attempts and burnt
+ * two paid LLM escalations to state one magnitude, and nothing in the UI signals which spelling is
+ * required. Fixed at the shared `RADICAND` fragment + `evalRadical` — the one atom and the one reader
+ * #510 deliberately paired — so every slot that composes from them gains it at once.
+ */
+describe('#513 — a PARENTHESISED radicand reads as the bare one, in every slot', () => {
+  const value = (u: string) => {
+    const cs = cmds(u);
+    const claim = cs?.find((c) => c.type === 'claim');
+    return claim && 'claim' in claim && 'value' in claim.claim ? claim.claim.value : null;
+  };
+
+  it('the operator’s exact utterance parses, and agrees with the spelling that already worked', () => {
+    expect(value("|BD'|=√(48)")).toBeCloseTo(Math.sqrt(48), 9);
+    expect(value("|BD'|=√(48)")).toBe(value("|BD'|=√48"));
+  });
+
+  it('the whole family agrees across spellings — coefficient, divisor, fraction radicand', () => {
+    expect(value("|BD'|=2√(3)")).toBe(value("|BD'|=2√3"));
+    expect(value("|BD'|=√(48)/4")).toBeCloseTo(Math.sqrt(48) / 4, 9);
+    expect(value("|BD'|=√(12/4)")).toBeCloseTo(Math.sqrt(3), 9);
+  });
+
+  it('the same atom serves a COORDINATE component — one reader, not one per slot (#510)', () => {
+    expect(cmds('C(√(2),1,0)')).toEqual(cmds('C(√2,1,0)'));
+    expect(cmds('C(√(2),1,0)')).toMatchObject([{ type: 'point3', id: 'C', x: Math.SQRT2 }]);
+  });
+
+  it('a radicand needing ARITHMETIC still refuses honestly — that is #509’s reader, not a fourth branch', () => {
+    expect(cmds("|BD'|=√(4*3)")).toBeNull();
+  });
+
+  it('the forms that already worked are byte-identical (no widening of what a scalar means)', () => {
+    expect(value("|BD'|=√48")).toBeCloseTo(Math.sqrt(48), 9);
+    expect(value("|BD'|=2√3")).toBeCloseTo(2 * Math.sqrt(3), 9);
+    expect(value("|BD'|=√6/4")).toBeCloseTo(Math.sqrt(6) / 4, 9);
+    expect(value("|BD'|=5")).toBe(5);
+    expect(value("|BD'|=2.5")).toBe(2.5);
+  });
+});

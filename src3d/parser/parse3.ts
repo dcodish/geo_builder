@@ -1138,11 +1138,34 @@ const spanPoint: Rule = (s) => {
 };
 
 /**
+ * #513 — a RADICAND: a bare number, or a PARENTHESISED number or fraction. `√48` parsed while
+ * `√(48)` did not, though parenthesising the radicand is the ordinary way to write it and nothing in
+ * the UI signals that the bare spelling is the required one — the operator needed four attempts and
+ * burnt two paid LLM escalations to state one magnitude.
+ *
+ * It is ONE fragment, shared by every √-bearing lexical atom below ({@link VAL}, {@link SYM_TERM}),
+ * and read by the ONE reader {@link evalRadical}. That pairing is the point: the recurring
+ * paren-blindness class (#299, #300, and this) keeps coming back because each reader grows its own
+ * private term grammar, so widening the atom without widening the reader — or one atom without its
+ * siblings — is how the next instance gets written. A radicand needing real ARITHMETIC (`√(4·3)`)
+ * still refuses honestly; that is the arithmetic-expression reader ruled for #509, not a fourth
+ * private branch here.
+ */
+/** The UNSIGNED decimal — the atom every numeric fragment in this file is built from, and the one
+ *  {@link NUM} signs. Introduced with #513 because the lexical ratchet (docs/24 S2.1) is right: a new
+ *  regex must COMPOSE from an atom, never inline a fresh copy. Composing the radicand work from it
+ *  retires more inline copies than the fix adds, so the recorded ceiling moves DOWN. */
+const UNUM = String.raw`\d+(?:\.\d+)?`;
+
+const RADICAND = String.raw`(?:\(\s*${UNUM}(?:\s*\/\s*${UNUM})?\s*\)|${UNUM})`;
+
+/**
  * A term whose coefficient may carry ONE scalar symbol (V7): `(k/2)DB`, `kDC`,
  * `2k·u`, `t·BE`, plus every numeric form. Null on anything else.
  */
-const SYM_TERM =
-  /^([+-])?\s*(?:\(([^()]+)\)\s*[·×*]?\s*)?((?:\d+(?:\.\d+)?)?\s*(?:√\s*\d+(?:\.\d+)?)?(?:\s*\/\s*\d+(?:\.\d+)?)?|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛])?\s*[·×*]?\s*([a-w])?\s*[·×*]?\s*(?:([A-Z]\d*'?)([A-Z]\d*'?)|([a-z]))\s*(?:\/\s*(\d+(?:\.\d+)?))?$/;
+const SYM_TERM = new RegExp(
+  String.raw`^([+-])?\s*(?:\(([^()]+)\)\s*[·×*]?\s*)?((?:${UNUM})?\s*(?:√\s*${RADICAND})?(?:\s*\/\s*${UNUM})?|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛])?\s*[·×*]?\s*([a-w])?\s*[·×*]?\s*(?:([A-Z]\d*'?)([A-Z]\d*'?)|([a-z]))\s*(?:\/\s*(${UNUM}))?$`,
+);
 
 export function parseSymExpr(src: string): { terms: SymTerm[]; symbol?: string } | null {
   const parts = splitTopLevelTerms(src);
@@ -1201,14 +1224,29 @@ let VEC_MARKED = false; // set per-parse; see parse3()
  *  can never steal an utterance some other rule legitimately owns. Reset per-parse. */
 let PARAM_CONFLATED: string | null = null;
 
-/** Evaluate a small numeric expression with radicals: 3, 3/4, √6/4, 2√3, (√6/4). */
+/** The VALUE of a {@link RADICAND} capture — `48`, `(48)`, `(12/4)`. Null on a zero denominator, so a
+ *  malformed radicand refuses rather than reaching a figure as NaN or Infinity. */
+const RADICAND_FRAC_RE = new RegExp(String.raw`^(${UNUM})\s*\/\s*(${UNUM})$`);
+function radicandValue(raw: string): number | null {
+  const inner = raw.trim().replace(/^\(\s*(.*?)\s*\)$/, '$1');
+  const frac = inner.match(RADICAND_FRAC_RE);
+  if (frac) return +frac[2] === 0 ? null : +frac[1] / +frac[2];
+  const v = +inner;
+  return Number.isFinite(v) ? v : null;
+}
+
+/** Evaluate a small numeric expression with radicals: 3, 3/4, √6/4, 2√3, (√6/4), and — #513 — a
+ *  parenthesised radicand: √(48), 2√(3), √(12/4), √(48)/4. */
+const RADICAL_RE = new RegExp(String.raw`^(${UNUM})?\s*(?:√\s*(${RADICAND}))?\s*(?:\/\s*(${UNUM}))?$`);
 function evalRadical(raw: string): number | null {
   const s0 = raw.trim().replace(/^\((.*)\)$/, '$1').trim();
   if (s0 === '') return null;
-  const m = s0.match(/^(\d+(?:\.\d+)?)?\s*(?:√\s*(\d+(?:\.\d+)?))?\s*(?:\/\s*(\d+(?:\.\d+)?))?$/);
+  const m = s0.match(RADICAL_RE);
   if (!m || (!m[1] && !m[2])) return null;
   const a = m[1] ? +m[1] : 1;
-  const r = m[2] ? Math.sqrt(+m[2]) : 1;
+  const radicand = m[2] !== undefined ? radicandValue(m[2]) : 1;
+  if (radicand === null || radicand < 0) return null; // √ of a negative is not a real magnitude
+  const r = m[2] !== undefined ? Math.sqrt(radicand) : 1;
   const d = m[3] ? +m[3] : 1;
   if (d === 0) return null;
   return (a * r) / d;
@@ -1627,7 +1665,7 @@ const freePlaneDecl: Rule = (s) => {
   return [{ type: 'free-plane', name: canonicalPlane(m[1]) }];
 };
 
-const NUM = String.raw`-?\d+(?:\.\d+)?`;
+const NUM = String.raw`-?${UNUM}`;
 
 /**
  * #510 — a VALUE literal: everything {@link parseCoeff} already reads. `√2`, `2√3`, `√6/4`, `5/3`,
@@ -1642,7 +1680,7 @@ const NUM = String.raw`-?\d+(?:\.\d+)?`;
  * reader turns «√48» into `NaN` INSIDE a committed figure — far worse than the refusal it fixes.
  * Migrating those rules onto `VAL` one at a time, each with its reader, is filed as follow-up work.
  */
-const VAL = String.raw`-?(?:\d+\s*\/\s*\d+|\d*\.\d+|(?:\d+(?:\.\d+)?)?\s*√\s*\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)?|\d+|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛])`;
+const VAL = String.raw`-?(?:\d+\s*\/\s*\d+|\d*\.\d+|(?:${UNUM})?\s*√\s*${RADICAND}(?:\s*\/\s*${UNUM})?|\d+|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛])`;
 
 /** A tuple component: a VALUE literal (#510), or an AFFINE symbolic expression (#325, ADR-3D-079) —
  *  `t` / `2t` / `-t` / `2·t` / `t+1` / `2t-3` is coefficient·symbol + constant.

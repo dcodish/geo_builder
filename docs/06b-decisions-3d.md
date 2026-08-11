@@ -2996,3 +2996,95 @@ solver has no similarity pivot of this shape; magnitudes gate on the constraint-
 **Locked** in `queries.test.ts`: |AB| refuses on the pinned-vertex cube; the mechanism itself (the edge
 length varies across seeds while A holds (1,2,3) exactly); and the determined exam figure still answers
 |AB| = 12 exactly.
+
+### ADR-3D-134 — a refusal names the cause it actually FOUND (#492, #425)
+
+Two operator reports, one class. In both the engine's refusal was **correct in substance** and its
+*explanation* named the wrong cause — because the explanation was picked from an **enumeration of
+kinds** while the finding itself was general (docs/17: *an enumeration is not a rule*). The tool knew
+more than it said, which is the honesty invariant running in reverse.
+
+**#492 — «the claim doesn't hold in the figure — check your computation».** On
+`ℓ: x=(1,2,3)+t(m+2,m,m-2)` + `π1: x+(m-2)y+(m-1)z-5=0` + `ℓ ∥ π1`, the residual is
+`d·n = 2m² − 4m + 4 = 2((m−1)² + 1)` — strictly positive, so **no real m exists**. The engine had
+already computed exactly that (`paramRoots` returned nothing while `pinningGivens` was 1), yet the
+refusal blamed the student's arithmetic and scoped itself to *this drawing*, implying another
+configuration might work. None can. Root cause: `no-roots` was gated on `cmd.type` being
+`plane-angle` or `line-perp-plane` — the only pinning kinds when it was written. S2 (#378) added the
+line relations to `pinningGivens` and never joined that list, so the statement fell through to the
+claim verifier, whose register is *verify-your-answer*. The operator read the refusal as a regression;
+it was not (the transposed twin `t(m-2,m,m+2)` gives `2m²−4`, roots ±√2, and still builds — the
+ADR-3D-118 branch pair).
+
+**#425 — «no placement matches the given coordinates» on a figure with no coordinates.** Triangular
+pyramid, equilateral base, `∠DAB = 120` then `∠DAC = 53.13`: impossible in R³, since ∠BAC = 60° and the
+spherical triangle inequality forces ∠DAC ≥ 60°. The engine reproduces that bound exactly (60.1
+accepted, 59.9 refused) — the solver was never at fault. Root cause: the pivot guard was **deliberately
+widened to every pin kind** (its own comment says so) while the message it emits stayed the
+injection-specific one. The student was told to check coordinates they never entered, and *not* told the
+one thing that mattered.
+
+**Mechanism — gate the refusal on the PROPERTY, and split it where the guard splits.**
+1. `no-roots` now fires when a fact **owns a pinning given** (`pinningGivens` + `paramGivens`, tracked
+   by the same count-delta discipline that already attributes claims and pins), so a pinning kind added
+   later is covered the day it is added. It is hoisted **above** the claim pass, and that pass is
+   SKIPPED in this state: with no valid parameter value there is no configuration to verify against, so
+   every param-dependent claim would "fail" and earlier, innocent facts would be marked refuted too. A
+   claim cannot be refuted by a figure that has none.
+2. The pivot refusal splits the way its guard does: a **coordinate** pin (`pins`/`vectorPins`) keeps
+   `injection-unsatisfiable`; every other pin kind reports `givens-contradict`.
+3. Both payloads **name the statements** — the parameter, the refused utterance, and the givens it
+   fights with (capped at three with a visible «…», never a silent truncation). This is the honesty
+   invariant's own requirement: name the conflicting *statement*, never internal state.
+4. Blame lands on the **newest** owner alone (ADR-276). The previous loop marked every pin owner, so a
+   saved file showed four red rows accusing statements that were satisfiable until the last one arrived.
+
+**Deliberately not changed.** The `size-on-solid` boundary and the V2 verify-your-answer register are
+byte-preserved — a claim that merely fails at *this* configuration still reads `claim-refuted`. The
+pivot-lane claim pass was examined for the same "no configuration to verify against" argument and left
+alone: no measured case reaches it, and widening it would be a change with no evidence behind it.
+
+**Scope check (the whole 3-D lane ran):** exactly two tests moved, both ours, both asserting the old
+bare `{ code: 'no-roots' }` payload — and both now carry the correct symbol and statement. No case
+changed *whether* it refuses; only *what it says*. That is the evidence the generalisation was
+faithful.
+
+**Locked** in `refusal-honesty.test.ts`: the operator's two #492 figures side by side (the impossible
+one refuses `no-roots` naming m; the satisfiable twin still pins ±√2), the residual-level discrimination
+(`roots` empty vs two) so the lock is the finding and not the wording, the #425 feasibility boundary
+(65/61/60.1 accepted — 59.9/55/53.13 refused), the absence of any coordinate in that figure, a
+coordinate contradiction still reading `injection-unsatisfiable`, and single-statement blame.
+
+### ADR-3D-135 — the √ reader accepts a PARENTHESISED radicand, at the shared atom (#513)
+
+`|BD'| = √48` parsed; `|BD'| = √(48)` did not. Parenthesising a radicand is the ordinary way to write
+it and nothing in the UI signals that the bare spelling is the required one: the log shows the operator
+taking **four attempts and two paid LLM escalations** to state one magnitude, with the fallback once
+answering `dropped-given`.
+
+This is the **third** instance of paren-blindness in a scalar reader (#299, #300), and the issue's own
+recommendation was to fold it into #509's arithmetic-expression reader rather than add a fourth local
+branch. **Operator ruling (2026-08-11): fix the shared pair now, leave real arithmetic to #509.** The
+distinction that makes this not-a-patch: `√` has exactly ONE lexical atom and ONE reader, deliberately
+paired by #510 (*"a widened atom without a widened reader turns √48 into NaN inside a committed
+figure"*). The fix adds the paren form to a single shared `RADICAND` fragment consumed by `VAL`,
+`SYM_TERM` and `evalRadical` together, so every slot composing from them — length givens, coordinate
+components, coefficients — gains it in one place. `SYM_TERM` was folded in for exactly this reason: it
+already reads through `parseCoeff` → `evalRadical`, so leaving its private spelling behind would have
+recreated the drift on day one.
+
+`√(4·3)` still refuses honestly — a radicand needing arithmetic is #509's ruled Option-B reader, not a
+fourth private branch here. `radicandValue` returns null on a zero denominator and `evalRadical` rejects
+a negative radicand, so a malformed magnitude refuses rather than reaching a figure as NaN.
+
+**The lexical ratchet caught the first draft, and was right.** Composing `RADICAND` from inline
+`\d+(?:\.\d+)?` copies pushed parse3's number-fragment count 24 → 26, and the docs/24 S2.1 guard failed
+the suite. That is exactly the defect the ratchet exists to stop — *the fix for a lexical bug inlining a
+fresh lexical copy* — so the fragments were composed from a new `UNUM` atom instead, which `NUM`,
+`VAL`, `SYM_TERM`, `RADICAND` and both radical readers now share. Net **24 → 14**; the recorded ceiling
+moves DOWN, per the ratchet's own rule (lower when you sweep, never raise).
+
+**Locked** in `input-tolerance.test.ts` (the cluster's third member): the operator's exact utterance,
+agreement with the spelling that already worked, the family across coefficient/divisor/fraction
+radicands, the same atom serving a coordinate component (`C(√(2),1,0)` ≡ `C(√2,1,0)`), the honest
+refusal of `√(4*3)`, and byte-identical behaviour for every form that already parsed.

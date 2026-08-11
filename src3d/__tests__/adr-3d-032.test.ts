@@ -147,6 +147,8 @@ describe('ADR-3D-032 — M(k,1,3): the coord-sym point (part ד)', () => {
     // |AM| ≥ dist(A, the x-through-(?,1,3) line) — 1 is unreachably small
     submit('אורך המקצוע AM הוא 1');
     expect(state().facts).toHaveLength(n); // keep-prior
-    expect(state().lastError).toEqual({ code: 'no-roots' });
+    // #492 (ADR-3D-134): the refusal carries WHICH parameter has no value and WHICH statement it
+    // refuses — the message says so instead of blaming the student's arithmetic.
+    expect(state().lastError).toEqual({ code: 'no-roots', sym: 'k', stated: 'אורך המקצוע AM הוא 1', others: [] });
   });
 });
