@@ -17,8 +17,8 @@
  *    refuse rather than silently drop it.
  */
 
-import { readOperand } from './operandToken';
-import { sameOperand } from '../engine/operands';
+import { readOperand, readRelationSides } from './operandToken';
+import { isPlanar, sameOperand } from '../engine/operands';
 import type { Command3, Id, LinExpr, MutualRel3, Operand3, PlaneRel3, SolidKind, SymComp, SymTerm, VecAtom, VecExpr, Circle3Def } from '../engine/types';
 import { CYCLIC_MEMBER, type QuadBase } from '../engine/baseShapes';
 
@@ -1704,6 +1704,17 @@ const freePlaneDecl: Rule = (s) => {
 const NUM = String.raw`-?${UNUM}`;
 
 /**
+ * #523 — what an angle's value slot accepts: a number, or a GREEK NAME for the measure.
+ *
+ * `#319` gave the naming form to `linePlaneAngle`'s value reader alone, so «…היא α» worked for exactly
+ * one operand pairing (segment × point-run) and the identical sentence refused the moment either side
+ * changed kind. The angle sentence is read by three parallel rules split by operand kind; a value form
+ * added to one of them is a divergent shadow pair by construction. One atom, used by all three.
+ */
+const ANGLE_VAL = String.raw`${NUM}|[αβγδθ]`;
+const ANGLE_LABEL_RE = /^[αβγδθ]$/;
+
+/**
  * #510 — a VALUE literal: everything {@link parseCoeff} already reads. `√2`, `2√3`, `√6/4`, `5/3`,
  * `0.5`, `½` — the forms this tool offers on its own symbol palette and accepts as a stated magnitude
  * («|BD'| = √48» parses today). A coordinate component accepted only DECIMALS, so «C(√2,1,0)» refused
@@ -2133,7 +2144,11 @@ const linePerpPlane: Rule = (s) => {
 // lineRelGiven). No capture groups on purpose — String.split would splice captures into the parts.
 // The plural suffix is ־ים, not ־ם: `ניצבים?` would demand the yod and reject the bare `ניצב`
 // (the ADR-3D-035 morphology trap — a Hebrew keyword gate must admit every form it names).
-const PERP_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מאונ[ךכ](?:ים)?|ניצב(?:ים|ות)?|אנך|⊥|perpendicular)\s*(?:ל(?=\S)|to\s+)?-?\s*/;
+// #522/#524 — the predicate AGREES with its subject, so every number-and-gender form must be admitted
+// wherever one is: «מאונכים» for a plural subject, «מאונכת» for a feminine one (which is exactly what
+// «הפאה» takes). `מקביל(?:ים|ות|ה)?` below already carried its full set; ⟂ carried only the plural, so
+// the face/base vocabulary would have parsed its operands and then failed on the verb.
+const PERP_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מאונ[ךכ](?:ים|ות|ת)?|ניצב(?:ים|ות|ה)?|אנך|⊥|perpendicular)\s*(?:ל(?=\S)|to\s+)?-?\s*/;
 const PAR_SPLIT = /\s*(?:(?:is|are)\s+)?(?:מקביל(?:ים|ות|ה)?|∥|parallel)\s*(?:ל(?=\S)|to\s+)?-?\s*/;
 
 const planeLinePerp: Rule = (s0) => {
@@ -2144,9 +2159,9 @@ const planeLinePerp: Rule = (s0) => {
   // S1 (#378): the sides are classified by the shared operand tokenizer — by what each token IS,
   // never by its noun (the ADR-3D-100 lesson, now a mechanism). This rule owns exactly the
   // plane-run × line cell; every other operand pair falls through to its own rule unchanged.
-  const a = readOperand(parts[0]);
-  const b = readOperand(parts[1]);
-  if (!a || !b) return null;
+  const sides = readRelationSides(parts[0], parts[1]);
+  if (!sides) return null;
+  const [a, b] = sides;
   const plane = a.op.kind === 'plane-run' ? a : b.op.kind === 'plane-run' ? b : null;
   const line = a.op.kind === 'line' ? a : b.op.kind === 'line' ? b : null;
   if (!plane || plane.op.kind !== 'plane-run' || !line || line.op.kind !== 'line') return null;
@@ -2267,9 +2282,9 @@ const lineRelGiven: Rule = (s0) => {
   for (const [rel, splitter] of [['perp', PERP_SPLIT], ['parallel', PAR_SPLIT]] as const) {
     const parts = s.split(splitter);
     if (parts.length !== 2) continue;
-    const a = readOperand(parts[0]);
-    const b = readOperand(parts[1]);
-    if (!a || !b) continue;
+    const sides = readRelationSides(parts[0], parts[1]);
+    if (!sides) continue;
+    const [a, b] = sides;
     const line = a.op.kind === 'line' ? a : b.op.kind === 'line' ? b : null;
     if (!line || line.op.kind !== 'line') continue;
     const other = line === a ? b : a;
@@ -2309,12 +2324,12 @@ const lineRelGiven: Rule = (s0) => {
  */
 const lineRelAngle: Rule = (s) => {
   const m =
-    s.match(new RegExp(`^ה?זו?וית\\s+(?:ש)?בין\\s+(.+?)\\s+(?:[לו]בין\\s+|ו-?\\s*|ל-?\\s*)(.+?)\\s*(?:היא|הוא|=|שווה\\s+ל?-?)\\s*(${NUM})\\s*°?$`)) ??
-    s.match(new RegExp(`^(?:the\\s+)?angle\\s+between\\s+(.+?)\\s+and\\s+(.+?)\\s*(?:is|=)\\s*(${NUM})\\s*°?$`, 'i'));
+    s.match(new RegExp(`^ה?זו?וית\\s+(?:ש)?בין\\s+(.+?)\\s+(?:[לו]בין\\s+|ו-?\\s*|ל-?\\s*)(.+?)\\s*(?:היא|הוא|=|שווה\\s+ל?-?)\\s*(${ANGLE_VAL})\\s*°?$`)) ??
+    s.match(new RegExp(`^(?:the\\s+)?angle\\s+between\\s+(.+?)\\s+and\\s+(.+?)\\s*(?:is|=)\\s*(${ANGLE_VAL})\\s*°?$`, 'i'));
   if (!m) return null;
-  const a = readOperand(m[1]);
-  const b = readOperand(m[2]);
-  if (!a || !b) return null;
+  const sides = readRelationSides(m[1], m[2]);
+  if (!sides) return null;
+  const [a, b] = sides;
   const line = a.op.kind === 'line' ? a : b.op.kind === 'line' ? b : null;
   if (!line || line.op.kind !== 'line') return null;
   const other = line === a ? b : a;
@@ -2329,7 +2344,8 @@ const lineRelAngle: Rule = (s) => {
     {
       type: 'line-rel',
       rel: 'angle',
-      deg: +m[3],
+      // #523: a Greek NAME states which measure the question is about, not a value — mark, never drive
+      ...(ANGLE_LABEL_RE.test(m[3]) ? { label: m[3] } : { deg: +m[3] }),
       op: canonical,
       line: canonicalLine(line.op.name),
       ...(line.noun === 'plane' ? { statedAsPlane: true as const } : {}),
@@ -3331,12 +3347,31 @@ const planeRelGiven: Rule = (s0) => {
   for (const [rel, splitter] of forms) {
     const parts = s.split(splitter);
     if (parts.length !== 2) continue;
-    const a = readOperand(parts[0]);
-    const b = readOperand(parts[1]);
-    if (!a || !b) continue;
-    const planar = (op: Operand3) => op.kind === 'plane-run' || op.kind === 'plane-named';
-    if (!planar(a.op) && !planar(b.op)) continue; // no plane: not this rule's business
+    const sides = readRelationSides(parts[0], parts[1]);
+    if (!sides) continue;
+    const [a, b] = sides;
+    if (!isPlanar(a.op) && !isPlanar(b.op)) continue; // no plane: not this rule's business
     if (a.op.kind === 'line' || b.op.kind === 'line') continue; // a named line's cells are S2's
+    // #512 — a COORDINATE-FRAME side. Relating a gauge object to the absolute frame requires the
+    // FIGURE to move, which is the pivot's lane and not a similarity-invariant pin's (#386). Lowering
+    // it to `plane-rel` would record a claim nothing drives, so a perfectly satisfiable «BD' ⊥ [xy]»
+    // would come back `claim-refuted` — the false accusation ADR-3D-138 exists to kill, re-created by
+    // a new operand. So: the point-run cell lowers to the #324 `coord-plane-rel` command, which DRIVES
+    // and is the one spelling authority for this relation; every other gauge pairing DEFERS (escalates)
+    // rather than committing a claim that can be wrongly refuted. The missing drives are filed, not
+    // faked (#536).
+    const frame = a.op.kind === 'plane-coord' ? a.op : b.op.kind === 'plane-coord' ? b.op : null;
+    if (frame) {
+      const other = (a.op === frame ? b : a).op;
+      // the POINT-RUN cell already HAS a driving command — reuse it rather than record a second
+      // spelling of the same relation (the issue's "one spelling authority"). Every other pairing
+      // stays a claim, kept honest by the store's placement guard rather than by a parse-time refusal.
+      if (other.kind === 'plane-run' && rel !== 'coincident') {
+        const axis = frame.axes === 'xy' ? 'z' : frame.axes === 'yz' ? 'x' : 'y';
+        return [{ type: 'coord-plane-rel', ids: other.ids, axis, mode: rel === 'perp' ? 'perp' : 'share' }];
+      }
+    }
+    if (a.op.kind === 'axis' || b.op.kind === 'axis') return null; // the axis cells have no drive yet
     if (a.op.kind === 'point' || b.op.kind === 'point') return null; // a point has no direction
     if (sameOperand(a.op, b.op)) return null;
     // the frozen segment × POINT-RUN owners keep their cells (they run earlier; defensive)
@@ -3344,7 +3379,7 @@ const planeRelGiven: Rule = (s0) => {
       const other = a.op.kind === 'segment' ? b.op : a.op;
       if (other.kind === 'plane-run') continue;
     }
-    if (rel === 'coincident' && (!planar(a.op) || !planar(b.op))) continue; // only planes coincide here
+    if (rel === 'coincident' && (!isPlanar(a.op) || !isPlanar(b.op))) continue; // only planes coincide here
     const canon = (op: Operand3): Operand3 => (op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) } : op);
     return [{ type: 'plane-rel', rel, a: canon(a.op), b: canon(b.op) }];
   }
@@ -3355,21 +3390,32 @@ const planeRelGiven: Rule = (s0) => {
  *  point-run) and `angleBetweenPlanes` (named π × π) do not already own. */
 const planeRelAngle: Rule = (s) => {
   const m =
-    s.match(new RegExp(`^ה?זו?וית\\s+(?:ש)?בין\\s+(.+?)\\s+(?:[לו]בין\\s+|ו-?\\s*|ל-?\\s*)(.+?)\\s*(?:היא|הוא|=|שווה\\s+ל?-?)\\s*(${NUM})\\s*°?$`)) ??
-    s.match(new RegExp(`^(?:the\\s+)?angle\\s+between\\s+(.+?)\\s+and\\s+(.+?)\\s*(?:is|=)\\s*(${NUM})\\s*°?$`, 'i'));
+    s.match(new RegExp(`^ה?זו?וית\\s+(?:ש)?בין\\s+(.+?)\\s+(?:[לו]בין\\s+|ו-?\\s*|ל-?\\s*)(.+?)\\s*(?:היא|הוא|=|שווה\\s+ל?-?)\\s*(${ANGLE_VAL})\\s*°?$`)) ??
+    s.match(new RegExp(`^(?:the\\s+)?angle\\s+between\\s+(.+?)\\s+and\\s+(.+?)\\s*(?:is|=)\\s*(${ANGLE_VAL})\\s*°?$`, 'i'));
   if (!m) return null;
-  const a = readOperand(m[1]);
-  const b = readOperand(m[2]);
-  if (!a || !b) return null;
-  const planar = (op: Operand3) => op.kind === 'plane-run' || op.kind === 'plane-named';
-  if (!planar(a.op) && !planar(b.op)) return null;
+  const sides = readRelationSides(m[1], m[2]);
+  if (!sides) return null;
+  const [a, b] = sides;
+  if (!isPlanar(a.op) && !isPlanar(b.op)) return null;
   if (a.op.kind === 'line' || b.op.kind === 'line') return null; // S2's cells
+  // #512: an ANGLE to the coordinate frame has no `coord-plane-rel` mode to drive it, so it stays a
+  // CLAIM — and the store's placement guard is what keeps an unfixed figure from refuting it (#536).
+  if ([a.op, b.op].some((op) => op.kind === 'axis')) return null; // the axis cells have no home yet
   if (a.op.kind === 'point' || b.op.kind === 'point') return null;
   if (sameOperand(a.op, b.op)) return null;
   // `linePlaneAngle` owns SEGMENT × point-run (its `line-plane-angle` lowering is frozen). Deferring
   // here rather than relying on rule order keeps the two from being a divergent shadow pair at all.
   if ((a.op.kind === 'segment' && b.op.kind === 'plane-run') || (b.op.kind === 'segment' && a.op.kind === 'plane-run')) return null;
+  // …and by the same discipline, `angleBetweenPlanes` owns NAMED π × NAMED π with a NUMERIC value: its
+  // `plane-angle` lowering is the one the parameter root-find and branch choice ride on. Teaching the
+  // operand seam the plural noun (#522) made this rule able to claim «הזווית בין המישורים π1 ו-π2 היא
+  // 45» for the first time, and the shadow-matrix HARD gate caught the pair immediately — the winner
+  // was unchanged, but two rules that read one sentence differently is a trap waiting on rule order.
+  // The LABELLED form is NOT that cell (`angleBetweenPlanes` reads numbers only), so it stays here.
+  if (a.op.kind === 'plane-named' && b.op.kind === 'plane-named' && !ANGLE_LABEL_RE.test(m[3])) return null;
   const canon = (op: Operand3): Operand3 => (op.kind === 'plane-named' ? { kind: 'plane-named', name: canonicalPlane(op.name) } : op);
+  // #523: a Greek NAME states which measure the question is about, not a value — mark, never drive
+  if (ANGLE_LABEL_RE.test(m[3])) return [{ type: 'plane-rel', rel: 'angle', label: m[3], a: canon(a.op), b: canon(b.op) }];
   return [{ type: 'plane-rel', rel: 'angle', deg: +m[3], a: canon(a.op), b: canon(b.op) }];
 };
 

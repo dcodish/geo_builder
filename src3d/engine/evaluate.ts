@@ -374,6 +374,11 @@ export interface Resolved3 {
   /** #487 (ADR-3D-124) — per FREE plane, how many of its 3 DOFs stayed SAMPLED this resolution. Derived
    *  by the same code that did the pinning, so the DOF cue can never disagree with the sampler. */
   freePlaneDofs: Map<string, number>;
+  /** #512 — did the landing funnel SAMPLE the figure's placement (translation or rotation)? Published
+   *  for the same reason `freePlaneDofs` is: a claim stated against the ABSOLUTE frame is a claim about
+   *  where the figure SITS, so refuting it on a placement the tool invented is a false accusation
+   *  (ADR-3D-138's class). Derived by the funnel itself, so it cannot disagree with what was sampled. */
+  placementSampled: boolean;
 }
 
 const linVal = (e: LinExpr, a: number): number => e.k + e.p * a;
@@ -959,6 +964,16 @@ const GAUGE_KINDS = new Set(['solid-vertex', 'on-segment', 'centroid', 'in-span'
 export function hasAbsoluteFrameObject(c: Construction3): boolean {
   if (c.planes.size > 0 || c.pins.length > 0) return true;
   for (const def of c.lines.values()) if (def.kind === 'parametric') return true;
+  // #512 — a stated relation to a COORDINATE PLANE or AXIS puts the figure in the absolute frame just
+  // as surely as an equation plane does: «BD' ⊥ מישור [xy]» is a statement about which way the solid
+  // FACES. The list enumerated the absolute objects that can be DECLARED and missed the frame itself,
+  // so a figure related to [xy] kept the canonical placement and the relation was judged against a
+  // position nothing had chosen — then reported as the student's error.
+  if (c.coordPlanePins.length > 0) return true;
+  for (const cl of c.claims) {
+    const ops = cl.type === 'plane-rel' || cl.type === 'distance-rel' || cl.type === 'mutual-rel' ? [cl.a, cl.b] : cl.type === 'line-rel' ? [cl.op] : [];
+    if (ops.some((op) => op.kind === 'plane-coord' || op.kind === 'axis')) return true;
+  }
   return absolutePointCount(c) > 0;
 }
 
@@ -1470,6 +1485,11 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     return axis;
   })();
 
+  // #512 — record what the funnel decided, for the store's honesty guard. A claim stated against the
+  // ABSOLUTE frame («BD' ⊥ [xy]») is a claim about where the figure SITS; if the placement it is
+  // measured against was invented here rather than fixed by a given, refuting it accuses the student
+  // of a wrong statement on the strength of an arbitrary choice — ADR-3D-138's class exactly.
+  const placementSampled = (translationFree || rotationFree) && c.solids.length > 0 && hasAbsoluteFrameObject(c);
   if ((translationFree || rotationFree || spinAxis) && c.solids.length > 0 && hasAbsoluteFrameObject(c)) {
     const gaugeIds: Id[] = [];
     for (const [id, def] of c.points) {
@@ -1756,6 +1776,7 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     revolutions,
     circles3,
     freePlaneDofs,
+    placementSampled,
   };
 }
 

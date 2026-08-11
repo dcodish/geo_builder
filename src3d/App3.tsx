@@ -117,6 +117,8 @@ function errorText(t: (k: string, o?: Record<string, unknown>) => string, err: S
       return t('err.notOnSegment', { id: err.id });
     case 'claim-refuted':
       return t('err.claimRefuted');
+    case 'placement-not-fixed':
+      return t('err.placementNotFixed');
     case 'vacuous-relation':
       return t('err.vacuousRelation');
     case 'plane-not-determined':

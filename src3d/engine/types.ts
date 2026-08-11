@@ -38,7 +38,14 @@ export type Operand3 =
   | { kind: 'vector'; name: string }
   | { kind: 'line'; name: string }
   | { kind: 'plane-run'; ids: Id[] }
-  | { kind: 'plane-named'; name: string };
+  | { kind: 'plane-named'; name: string }
+  // #512: the ABSOLUTE-frame operands. A coordinate plane was legal in exactly ONE grammatical
+  // position — the #324 rule's private tail, whose subject must be a point-ring — so «A על מישור [xy]»,
+  // «BD' ⊥ מישור [xy]» and the plane-angle operand all refused, ~8 unrelated-looking failures that are
+  // one missing member of this set. Unlike every other kind these resolve to a FIXED geometry, so they
+  // cannot fail to resolve; `axes` is stored normalised, so «[yx]» and «[xy]» are the same operand.
+  | { kind: 'plane-coord'; axes: 'xy' | 'yz' | 'xz' }
+  | { kind: 'axis'; axis: 'x' | 'y' | 'z' };
 
 export type VecAtom =
   | { kind: 'named'; name: string } // a declared vector, e.g. u
@@ -90,14 +97,14 @@ export type Claim3 =
   // #375: a POINT-RUN plane stated ⟂ a named LINE (see planeLinePerps)
   | { type: 'plane-line-perp'; ids: Id[]; line: string }
   // S2 (#378): ∥/⟂/angle where one side is a NAMED LINE — the claim twin of lineRels
-  | { type: 'line-rel'; rel: 'perp' | 'parallel' | 'angle'; deg?: number; op: Operand3; line: string }
+  | { type: 'line-rel'; rel: 'perp' | 'parallel' | 'angle'; deg?: number; label?: string; op: Operand3; line: string }
   // S4 (#378): the MUTUAL POSITION of two located objects, over the general operand pair — the
   // claim twin of `mutualRels`. (`lines-rel` above is the frozen V7-T3 segment-pair spelling; both
   // verdicts come from the one `mutualPosition` classifier, so they cannot disagree.)
   | { type: 'mutual-rel'; rel: MutualRel3; a: Operand3; b: Operand3 }
   // S3 (#378): a DIRECTION relation (⟂ / ∥ / a stated angle / coincident) where at least one side is
   // a PLANE — the claim twin of `planeRels`. Directional-only pairs keep their frozen owners.
-  | { type: 'plane-rel'; rel: PlaneRel3; deg?: number; a: Operand3; b: Operand3 }
+  | { type: 'plane-rel'; rel: PlaneRel3; deg?: number; label?: string; a: Operand3; b: Operand3 }
   // S5 (#378): a stated DISTANCE between two operands — «המרחק בין A למישור ABC הוא 6».
   | { type: 'distance-rel'; a: Operand3; b: Operand3; value: number }
   // #393/#335 (ADR-3D-107): magnitude of a vector EXPRESSION — |e1| = c·|e2| (a ratio,
@@ -697,7 +704,7 @@ export type Command3 =
   // residual that rotates the figure; an absolute op (line/plane-named) makes it a parameter
   // root-find when a symbolic direction is present, else a pure claim. `statedAsPlane` records the
   // ADR-3D-100 noun slip (the student called the line a plane) for the build-notice correction.
-  | { type: 'line-rel'; rel: 'perp' | 'parallel' | 'angle'; deg?: number; op: Operand3; line: string; statedAsPlane?: true }
+  | { type: 'line-rel'; rel: 'perp' | 'parallel' | 'angle'; deg?: number; label?: string; op: Operand3; line: string; statedAsPlane?: true }
   // S4 (#378): the MUTUAL POSITION of two located objects — «AB ו-CD מצטלבים» (skew), «נחתכים»
   // (intersecting), «מקבילים» (parallel), «מתלכדים» (coincident) over the general operand pair.
   // Lowered to a recorded claim ALWAYS (the final arbiter) plus, per the frame classifier:
@@ -710,7 +717,7 @@ export type Command3 =
   // למישור A'B'C'», «π1 ניצב ל-π2», «AB מקביל למישור π». Lowered to a recorded claim ALWAYS plus,
   // per the frame classifier: a similarity-invariant DRIVE when both sides ride the gauge, a pivot
   // residual when one is absolute, and the parameter root-find when both are (docs/26 §2.3).
-  | { type: 'plane-rel'; rel: PlaneRel3; deg?: number; a: Operand3; b: Operand3 }
+  | { type: 'plane-rel'; rel: PlaneRel3; deg?: number; label?: string; a: Operand3; b: Operand3 }
   // S5 (#378): a stated DISTANCE. Unlike every other relation in the program it carries UNITS, so
   // it PINS THE SCALE — a free-dim figure is driven to it, a determined one verifies (M1).
   | { type: 'distance-rel'; a: Operand3; b: Operand3; value: number }
@@ -857,6 +864,11 @@ export interface Construction3 {
    *  never a driver; the panel prints `label = X°` when the angle is seed-stable (angles are
    *  scale-free, so no scale gate — the ADR-3D-054 taxonomy). */
   linePlaneMarks: { a: Id; b: Id; plane: Id[]; label: string }[];
+  /** #523 — a NAMED angle between any two operands («הזווית בין המישור ABC למישור SBC היא α»). The
+   *  general twin of `linePlaneMarks`, whose (segment × point-run) lowering is frozen: a Greek name
+   *  states WHICH measure the question is about, never a value, so it marks and the panel derives its
+   *  degrees when the angle is seed-stable. */
+  relMarks: { a: Operand3; b: Operand3; label: string }[];
   /** Stated inequalities the DISPLAYED configuration must satisfy (ADR-3D-053) — see {@link Requirement3}. */
   requirements: Requirement3[];
   /** V2 — planes by equation, name → def (insertion-ordered). */
@@ -949,6 +961,7 @@ export const emptyConstruction3 = (): Construction3 => ({
   segments: [],
   angleMarks: [],
   linePlaneMarks: [],
+  relMarks: [],
   requirements: [],
   planes: new Map(),
   lines: new Map(),
@@ -1085,6 +1098,9 @@ export type EngineError3 =
   | { code: 'vacuous-relation' } // S4 (#378): a mutual position stated between an object and itself
   | { code: 'plane-not-determined'; id: string } // #487: this construct needs a plane with a stated equation — π is still free
   | { code: 'claim-refuted' } // the stated answer does not hold in the figure
+  // #512: a relation to the COORDINATE FRAME judged against a placement the funnel sampled — the
+  // statement may well be satisfiable; what is missing is a given that fixes where the figure sits.
+  | { code: 'placement-not-fixed' }
   // #442: only a TANGENTIAL polygon has an incircle, and every triangle is one. A best-fit circle for a
   // general quad would be tangent to nothing — refuse rather than draw a figure that lies.
   | { code: 'incircle-needs-triangle' };
