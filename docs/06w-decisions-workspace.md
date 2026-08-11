@@ -396,3 +396,20 @@ which rows can land directly on `main` versus which need a PR and the operator's
 distinction, not the priority, is usually what decides how much a session can actually close. **Batchability
 is an explicit sort key**, because the P3 queue is the evidence: these ten items were only worth doing as
 clusters sharing a root cause and one gate run, and that is precisely why they had accumulated.
+
+## ADR-W-011 — /status-update: the standard issue-queue report (#521)
+
+Operator (2026-08-11): asking for a list of issues must produce a STANDARD report, not an ad-hoc one —
+so reports are comparable across days and the next fix round is decidable in minutes. The shape is
+fixed by the skill (`.claude/skills/status-update/SKILL.md`): open issues grouped P1/P2/P3 and split by
+product, bugs/features/debt distinguished, a per-issue VALUE indicator and COMPLEXITY/RISK grade, the
+"waiting on you" section (needs-operator ∪ issues whose bodies pose unanswered rulings — the skill also
+back-fills the missing label, so the queue converges on the truth), and a recommended next-round
+composition (every P1 first; then a deliberate P2/P3 MIX — theme-affine P2 batches with quick P3 wins
+riding along, per the operator's explicit "good mix" instruction).
+
+Value and complexity are not stored on issues; the skill fixes the RUBRICS (value: prod honesty >
+prod-log demand > blocked work > capability > polish; complexity: the issue's own measured surface when
+present, else the layer, with RISK graded separately — a one-line fix in the solver is still risky) so
+two sessions grade the same issue the same way. The report is always built from the LIVE queue
+(`gh issue list`), never from session memory — the queue wins every disagreement.
