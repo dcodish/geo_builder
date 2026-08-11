@@ -3088,3 +3088,29 @@ moves DOWN, per the ratchet's own rule (lower when you sweep, never raise).
 agreement with the spelling that already worked, the family across coefficient/divisor/fraction
 radicands, the same atom serving a coordinate component (`C(√(2),1,0)` ≡ `C(√2,1,0)`), the honest
 refusal of `√(4*3)`, and byte-identical behaviour for every form that already parsed.
+
+### ADR-3D-137 — the diagonal noun carries its solid (#449)
+
+`אלכסון AC'` built; `אלכסון תיבה AC'` did not. **2 users**, filed F2 from the 2026-08-08 log triage and
+operator-approved then. `bareSegment`'s prefix admitted the diagonal noun but nothing after it, so the
+label group had to match `תיבה`, the rule declined, and every occurrence of the phrasing burnt a paid
+LLM call for a segment the tool draws natively.
+
+**No new construct.** A space diagonal IS a segment (the #72 ruling), so the command is the existing
+`segment3` and both phrasings lower to byte-identical output. The fix widens the prefix by an optional
+SOLID qualifier — `תיבה`/`קובייה`/`מנסרה`/`פירמידה`, with or without the definite article — kept as one
+shared fragment rather than a spelling inlined into the rule, plus the English
+`(space|body|main) diagonal (of the box)` forms.
+
+**Ordering was the only real risk and it is structurally absent:** `bareSegment` is the LAST rule, so
+every other lane has already had its chance, and `cubeOrBox` returns null on a two-token utterance —
+a solid DECLARATION (`תיבה ABCDA'B'C'D'`) can never be read as a diagonal. Locked as a no-theft test
+rather than argued.
+
+The catalog gains the phrasing (it is both the user-facing reference and the coverage map), which
+enrolls it in the catalog corpus gates automatically.
+
+**Locked** in `issue72-phrasing.test.ts` alongside gap 2, whose remainder this is: both phrasings emit
+the same command, every solid noun with and without the article, the English forms, an end-to-end build
+drawing the diagonal as ink on a real box, and the no-theft case (the box declaration and a plain
+segment untouched).

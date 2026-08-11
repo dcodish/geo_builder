@@ -241,6 +241,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // #72 (ADR-3D-039): the baseline log-triage phrasing batch
   { category: 'drawing', he: "נחבר את D'F", en: "connect D'F" },
   { category: 'drawing', he: "אלכסון BD'", en: "the diagonal BD'" },
+  // #449 (2 users): the same segment, with the solid named — the phrasing students actually type
+  { category: 'drawing', he: "אלכסון תיבה AC'", en: "the space diagonal of the box AC'" },
   // #438: the solid and its SPACE diagonal in one sentence (a bare «אלכסון» stays ambiguous — face or
   // space — and refuses honestly rather than guessing)
   { category: 'solids', he: 'תיבה מלבנית עם אלכסון תיבה', en: 'a box with a space diagonal' },

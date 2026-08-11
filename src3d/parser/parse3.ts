@@ -1508,11 +1508,21 @@ const heightFromApex: Rule = (s) => {
 /** A bare auxiliary segment: `AM` / `קטע AM` / `segment CA'` — plus the #72 prod forms: the
  *  connect-imperative (`נחבר את D'F`) and the diagonal noun (`אלכסון BD'` — a diagonal IS a
  *  segment, pure ink; the final-ם slip `אלכסום` admitted per the ADR-3D-035 מאונ[כך] precedent).
- *  Last rule — everything else wins first. */
+ *  Last rule — everything else wins first.
+ *
+ *  #449 (2 users, operator-approved from the 2026-08-08 triage): the diagonal noun may carry the SOLID
+ *  it belongs to. «אלכסון תיבה AC'» names exactly the segment «אלכסון AC'» names — a space diagonal IS
+ *  a segment (the #72 ruling) — but the qualifier was not admitted, so the label group had to match
+ *  «תיבה», the rule declined, and every occurrence burnt a paid LLM call. The solid nouns are one
+ *  shared fragment rather than a private spelling, and the English «(space|body|main) diagonal of the
+ *  box» forms join here. No ordering risk: this rule runs last, and `cubeOrBox` returns null on a
+ *  two-token utterance, so a solid DECLARATION can never be read as a diagonal. */
+const SOLID_QUALIFIER = String.raw`(?:ה?(?:תיב[הת]|קוביי?[הת]|מנסר[הת]|פירמיד[הת])\s+)`;
+const BARE_SEGMENT_RE = new RegExp(
+  String.raw`^(?:קטע\s+|העבירו\s+(?:את\s+)?|נ?חבר\s+(?:את\s+)?|ה?אלכסו[ןם]\s+${SOLID_QUALIFIER}?|segment\s+|draw\s+|connect\s+|join\s+|(?:the\s+)?(?:space|body|main)?\s*diagonal\s+(?:of\s+the\s+(?:box|cube|prism|pyramid)\s+)?)?([A-Z]\d*'?)([A-Z]\d*'?)\s*$`,
+);
 const bareSegment: Rule = (s) => {
-  const m = s.match(
-    /^(?:קטע\s+|העבירו\s+(?:את\s+)?|נ?חבר\s+(?:את\s+)?|ה?אלכסו[ןם]\s+|segment\s+|draw\s+|connect\s+|join\s+|(?:the\s+)?diagonal\s+)?([A-Z]\d*'?)([A-Z]\d*'?)\s*$/,
-  );
+  const m = s.match(BARE_SEGMENT_RE);
   if (!m) return null;
   const [, a, b] = m;
   if (a === b) return null;
