@@ -85,6 +85,26 @@ function seedForRequirements(facts: Fact3[], from: number): number | null {
   return firstSatisfyingSeed3(construction, from);
 }
 
+/**
+ * #508 — every NAMED plane a claim mentions, wherever it sits in that claim's shape. A STRUCTURAL walk
+ * rather than a switch over claim kinds: an enumeration of kinds is exactly what this issue was filed
+ * on, and a claim kind added later must not quietly escape the guard that keeps a free plane from
+ * producing a false accusation. Callers filter to the planes that are actually still undetermined.
+ */
+const freePlanesOf = (claim: unknown): string[] => {
+  const out: string[] = [];
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) return v.forEach(walk);
+    if (!v || typeof v !== 'object') return;
+    const o = v as Record<string, unknown>;
+    if (o.kind === 'plane-named' && typeof o.name === 'string') out.push(o.name);
+    if (typeof o.plane === 'string') out.push(o.plane);
+    for (const val of Object.values(o)) walk(val);
+  };
+  walk(claim);
+  return out;
+};
+
 export function derive3(facts: Fact3[], seed: number): Derived3 {
   let c: Construction3 = emptyConstruction3();
   const status: Record<string, FactStatus3> = {};
@@ -225,7 +245,15 @@ export function derive3(facts: Fact3[], seed: number): Derived3 {
           break;
         }
         if (!verifyClaim(claim, c, seed)) {
-          status[owner.factId] = { code: 'claim-refuted' };
+          // #508 — a claim about a FREE plane whose relevant DOF is still SAMPLED cannot be refuted:
+          // the configuration it "fails" in is one the tool invented, not one the student stated.
+          // Reporting `claim-refuted` there is a false accusation — «your distance is wrong» about a
+          // perfectly good given, purely because nothing had tried to move the plane's offset. The
+          // resolver now pins what it can (memberships, ∥/⟂, distance); this guard is the CLASS half,
+          // so a constraint kind it does not yet pin degrades to an honest "pin this plane first"
+          // instead of blaming the student. Named plane first, so the message can say which.
+          const undetermined = freePlanesOf(claim).find((p) => (resolved.freePlaneDofs.get(p) ?? 0) > 0);
+          status[owner.factId] = undetermined ? { code: 'plane-not-determined', id: undetermined } : { code: 'claim-refuted' };
           break;
         }
       }
