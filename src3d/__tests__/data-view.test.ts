@@ -187,3 +187,18 @@ describe('dataView — organize your data', () => {
     expect(p.points.some((s) => s.startsWith('A'))).toBe(false);
   });
 });
+
+// #517 × #510 — the operator's EXACT utterances (2026-08-11): value literals in bare injected points,
+// with the knowledge gates now deriving from the construction. The √/½ grammar lives on this branch
+// (ADR-3D-130); the decimal twin of this lock lives with ADR-3D-132.
+describe('#517 — the operator’s exact literal points print as facts', () => {
+  beforeEach(reset);
+
+  it('C(√2,1,0) and B(½,1,0): canvas labels and panel rows, surd/fraction tiers', () => {
+    ['C(√2,1,0)', 'B(½,1,0)'].forEach(submit);
+    expect(useGeo3.getState().lastError).toBeNull();
+    const p = panel();
+    expect(p.pointCoords.C).toEqual({ text: '(√2, 1, 0)', kind: 'fact' });
+    expect(p.pointCoords.B).toEqual({ text: '(1/2, 1, 0)', kind: 'fact' });
+  });
+});

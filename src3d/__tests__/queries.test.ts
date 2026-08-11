@@ -300,3 +300,14 @@ describe('#517 — bare injected points are a frame for the query lane', () => {
     expect(ans(["קובייה ABCDA'B'C'D'", 'P(0,0,9)', 'Q(0,0,3)'], '|AB|')).toMatchObject({ answer: null, note: 'scale' });
   });
 });
+
+// #517 × #510 — the operator's exact query on the exact literal points (2026-08-11).
+describe('#517 — the query lane answers CB on the operator’s literal points', () => {
+  beforeEach(reset);
+
+  it('CB answers in coordinates and |CB| as a number', () => {
+    // B − C = (½−√2, 0, 0); the difference has no exact surd/fraction form, so the decimal tier prints
+    expect(ans(['C(√2,1,0)', 'B(½,1,0)'], 'CB').answer).toBe('(-0.91, 0, 0)');
+    expect(ans(['C(√2,1,0)', 'B(½,1,0)'], '|CB|').answer).toBe('0.91');
+  });
+});

@@ -2825,6 +2825,42 @@ utterance; m/s/t yielding an identical line bar the echoed letter; the figure pa
 the components; the 2024-Q2 form byte-identical AND carrying no `runner`; the anchor-less #351 form; the
 same-letter collision deferred; the axis letter refused; and the echo carrying «m» at every seed.
 
+### ADR-3D-130 — A VALUE literal is one atom and one reader, and they travel together (#510)
+
+«|BD'| = √48» parses and the operator uses √ routinely; «C(√2,1,0)» refused. The tool OFFERS √ and ½ on
+its own symbol palette and accepted them in one slot while refusing them in another — the
+offered-but-unsupported asymmetry #493 was filed on, in a different position.
+
+**The filed plan was to widen the shared `NUM` atom, and measurement says that would have been worse than
+the bug.** About 47 rules compose from `NUM` — angles, ratios, radii, volumes, degree values — and every
+one reads its capture with `+` or `parseFloat`. A widened atom without a widened reader turns «√48» into
+**`NaN` inside a committed figure**, which is a silent wrong number where the defect was an honest
+refusal. So the mechanism is a PAIR: `VAL` (the lexical atom) and `literalValue` (its reader), introduced
+together and composed into the places the report names — the coordinate component, the vector injection,
+the pair injection. The injection LIST already composed from the component atom and inherited the fix for
+free, which is the argument for shared atoms working as intended.
+
+`literalValue` delegates to **`parseCoeff`**, the reader this family already had (the vec-rel coefficient
+lane: `5/3`, `0.5`, `½`, `√2`, `2√3`, `√6/4`). A second evaluator would have been a second set of
+malformed-input and rounding rules to keep in step — the chokepoint discipline of docs/17.
+
+**A malformed literal DECLINES rather than becoming an unknown.** «1/0» matches the atom lexically and
+evaluates to nothing. Before `VAL`, anything matching `COMP` parsed, so the rules read a null component
+as SYMBOLIC — left ungated, the student would state a value and the figure would claim not to know it,
+the honesty invariant inverted. `unreadableComp` makes those rules decline, all-or-nothing.
+
+**The symbolic branch keeps `NUM` deliberately.** Widening a coefficient or offset runs into the affine
+`SymComp` model itself, which is #509's territory and needs a design ruling rather than a lexical change.
+
+**Follow-up, filed not done:** migrating the remaining `NUM` consumers onto `VAL`, each with its reader,
+rule by rule. That is a ~47-site retype whose failure mode is a silent `NaN`, so it wants daylight and its
+own gate run — not a late sweep riding on this one.
+
+**Locked** in `value-literals.test.ts`: the whole accepted family with its values; the same literals
+reaching a vector, a pair and a list injection; the decimal forms byte-identical; the symbolic branch
+untouched (incl. `C(p^2,…)` still refused, deliberately); and the malformed-literal refusal. Catalog
+entry added, so the in-app commands panel documents it.
+
 ### ADR-3D-131 — a recognized ambiguity is a TYPED refusal, never a decline (#516; amends ADR-3D-129)
 
 Operator play of ADR-3D-129 (2026-08-11): the must-refuse control «l1:x=m(m-1, 5-m, -2)» **built** — the
