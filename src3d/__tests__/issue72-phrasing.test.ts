@@ -155,3 +155,48 @@ describe('#55 (ADR-3D-040): the coefficient form of the length/vector ambiguity'
     expect(cmd('AS = 12').some((c) => c.type === 'claim')).toBe(true); // numeric length given, not ambiguous
   });
 });
+
+/**
+ * #449 (ADR-3D-137) — gap 2's remainder, from the 2026-08-08 log triage (2 users, operator-approved):
+ * the diagonal noun may carry the SOLID it belongs to. «אלכסון תיבה AC'» names exactly the segment
+ * «אלכסון AC'» names — a space diagonal IS a segment (the #72 ruling) — but the qualifier was not
+ * admitted, so the label group had to match «תיבה» and the utterance escalated to the LLM.
+ */
+describe("#449 — «אלכסון תיבה AC'»: the diagonal noun carries its solid", () => {
+  it('the reported phrasing builds the SAME segment as the bare one', () => {
+    expect(cmd("אלכסון תיבה AC'")).toEqual(cmd("אלכסון AC'"));
+    expect(cmd("אלכסון תיבה AC'")).toEqual([{ type: 'segment3', a: 'A', b: "C'" }]);
+  });
+
+  it('every solid noun, with and without the definite article', () => {
+    for (const u of [
+      "אלכסון התיבה AC'",
+      "אלכסון קובייה AC'",
+      "אלכסון קוביה AC'",
+      "אלכסון הקובייה AC'",
+      "אלכסון מנסרה AC'",
+      "אלכסון פירמידה AC'",
+    ])
+      expect(cmd(u), u).toEqual([{ type: 'segment3', a: 'A', b: "C'" }]);
+  });
+
+  it('the English forms', () => {
+    for (const u of ["space diagonal AC'", "main diagonal AC'", "the space diagonal of the box AC'", "diagonal AC'"])
+      expect(cmd(u), u).toEqual([{ type: 'segment3', a: 'A', b: "C'" }]);
+  });
+
+  it('it builds end-to-end on a real box, drawn as ink', () => {
+    reset();
+    submit("תיבה ABCDA'B'C'D'");
+    submit("אלכסון תיבה AC'");
+    expect(state().lastError).toBeNull();
+    expect(state().facts).toHaveLength(2);
+    expect(derived().construction.segments.some(([a, b]) => (a === 'A' && b === "C'") || (a === "C'" && b === 'A'))).toBe(true);
+  });
+
+  it('no theft: the solid DECLARATION and a plain segment are untouched', () => {
+    expect(cmd("תיבה ABCDA'B'C'D'")).toEqual([{ type: 'solid', kind: 'box', ids: ['A', 'B', 'C', 'D', "A'", "B'", "C'", "D'"] }]);
+    expect(cmd('קטע AB')).toEqual([{ type: 'segment3', a: 'A', b: 'B' }]);
+    expect(cmd("AC'")).toEqual([{ type: 'segment3', a: 'A', b: "C'" }]);
+  });
+});

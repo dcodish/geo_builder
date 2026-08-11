@@ -1845,6 +1845,16 @@ exports[`3-D parser shadow-matrix — catalog corpus > winner rule per catalog u
   },
   {
     "lang": "en",
+    "text": "the space diagonal of the box AC'",
+    "winner": "bareSegment",
+  },
+  {
+    "lang": "he",
+    "text": "אלכסון תיבה AC'",
+    "winner": "bareSegment",
+  },
+  {
+    "lang": "en",
     "text": "a box with a space diagonal",
     "winner": "cubeOrBox",
   },
