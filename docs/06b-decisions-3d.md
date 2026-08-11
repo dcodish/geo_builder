@@ -3175,3 +3175,50 @@ at eight seeds, the DOF cue reading 2 (offset pinned, orientation free), both si
 seeds, the orientation still resampling, the same result with no solid in the figure, the second-distance
 case reading `plane-not-determined`, a DETERMINED plane still producing an ordinary `claim-refuted` (the
 guard did not swallow real refutations), and the unpinned + membership lanes unchanged.
+
+### ADR-3D-139 — a marker that names a point BINDS its own label, or the rule declines (#530, P1)
+
+Prod session `rsqkx2` (2026-08-11): «אלכסוני A'B'C'D' נחתכים בנקודהS» — an ordinary missing space. Prod
+answered `already-defined`, which was a **cover story**: the utterance did not fail to parse, it parsed
+into a **different figure**. The marker regex required `\s+`, did not match, and the code fell back to
+the token list — A′ became the crossing point and the quad **B′C′D′S**, a face the student never wrote,
+was assembled from letters lifted out of two different roles. Only the accident that A′ already existed
+turned it into a refusal; on a figure where it does not, this **builds a plausible wrong figure**, which
+is the P1 line in docs/22.
+
+**Root cause — an unanchored positional fallback after an optional marker.**
+`const [id, ...rest] = trailing ? [...] : toks` — when the marker fails, `id` silently becomes the FIRST
+label. The comment directly above that line records the same fallback biting once before, for the
+English point-last form: *"with it unmatched, the id fell back to the FIRST label and the rule built a
+garbage quad."* **That fix widened the marker VOCABULARY and left the fallback armed.** Fixing the
+spelling again would have been the third patch on the same line.
+
+**The fix is structural, and the vocabulary fix rides on top of it — not instead of it.**
+1. *Structural:* marker word present ⇒ `id` comes from the marker or the rule **declines** (escalates —
+   the LLM may still read it). It can never be sourced positionally. This closes the class including the
+   mistypes nobody has typed yet, which is why the lock is a PROPERTY over the rule (*for any utterance
+   carrying the crossing marker, the parse binds the marker's own label or returns null*) and not two
+   more strings.
+2. *Vocabulary:* the marker is now ONE shared fragment, `AT_POINT` = `בנקוד[הת]\s*`, used by all nine
+   sites that name a point this way. Hebrew glues the noun into the word, so «בנקודהS» is a keystroke
+   slip rather than a malformed sentence.
+
+**The sibling audit the issue asked for found a second, quieter member.** `circleTangentLine` read the
+same marker with its own `\s+` spelling into an OPTIONAL capture: «מעגל שמרכזו O משיק לישר AB בנקודהK»
+committed a tangent circle with `touch` undefined — **the student's K silently dropped, with a green ✓**.
+Not a wrong figure, but a lost given, and the honesty invariant forbids both. It is fixed by the shared
+fragment. `centroidRule` and the four anchored cut-readers were checked and are safe by construction
+(the label is a required capture in a fully-anchored sentence regex, so a failure is a decline), and they
+gained the tolerance anyway.
+
+**A real gap this exposed, filed rather than fixed here (#535).** `droppedNewLabels3` DOES report the
+dropped `K` — but the deterministic submit path never asks it. Its guard comment reasons that *"the
+rules parse the utterance itself, so the deterministic path needs no gate"*; the tangency case falsifies
+that assumption, since a rule parsed the utterance and dropped a label. Turning the gate on for the
+deterministic path is a change with a real false-positive surface (the ADR-430 measurement pattern), so
+it is scoped separately rather than bolted onto a P1.
+
+**Locked** in `at-point-marker.test.ts`: the reported utterance building the operator's figure (S at the
+midpoint of A′C′), the invented quad asserted absent by name, the PROPERTY over nine marker spellings,
+a marker-without-a-readable-label declining, the no-marker point-first forms still reading positionally,
+spaced ≡ glued at all eight remaining sites, and the tangency label no longer dropped.

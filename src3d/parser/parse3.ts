@@ -988,7 +988,7 @@ const centroidRule: Rule = (s) => {
   else {
     // point-LAST
     m =
-      s.match(new RegExp(`^(?:מפגש\\s+)?${MED}\\s+(?:של\\s+|ב)?${T}\\s*${RUN}\\s+(?:נפגשים|נפגשות|נחתכים|הוא|היא|=)\\s+(?:ב?נקוד[הת]\\s+)?${L}\\s*$`)) ??
+      s.match(new RegExp(`^(?:מפגש\\s+)?${MED}\\s+(?:של\\s+|ב)?${T}\\s*${RUN}\\s+(?:נפגשים|נפגשות|נחתכים|הוא|היא|=)\\s+(?:ב?נקוד[הת]\\s*)?${L}\\s*$`)) ??
       s.match(new RegExp(`^(?:the\\s+)?medians\\s+of\\s+${T}${RUN}\\s+(?:meet|intersect)\\s+(?:at\\s+)?(?:the\\s+)?(?:point\\s+)?${L}\\s*$`, 'i')) ??
       s.match(new RegExp(`^(?:the\\s+)?(?:centroid|intersection\\s+of\\s+the\\s+medians)\\s+of\\s+${T}${RUN}\\s+is\\s+(?:the\\s+)?(?:point\\s+)?${L}\\s*$`, 'i'));
     if (!m) return null;
@@ -1002,6 +1002,17 @@ const centroidRule: Rule = (s) => {
     { type: 'centroid3', id, of: [a, b, c] },
   ];
 };
+
+/**
+ * #530 — the «בנקודה X» marker that NAMES a construction's point, in ONE spelling. Hebrew glues the
+ * noun into the word, so «בנקודהS» is an ordinary keystroke slip, not a malformed sentence; the
+ * separator must therefore be optional. It was spelled `בנקודה\s+` independently at six sites, and
+ * each site failed silently in its own way — `diagIntersection` invented a quad from the leftover
+ * letters (#530, P1, reached prod), `circleTangentLine` DROPPED the student's tangency label and
+ * committed with a green ✓. One fragment, so the next rule that needs the marker inherits the
+ * tolerance instead of re-learning it one report at a time (the #494 clitic precedent).
+ */
+const AT_POINT = String.raw`בנקוד[הת]\s*`;
 
 /**
  * `E מפגש האלכסונים של הפאה ABCD` / `O נקודת חיתוך אלכסוני הבסיס` / `O = intersection
@@ -1027,7 +1038,22 @@ const diagIntersection: Rule = (s) => {
   // `…at O` and `…at point O` are the same marker (the Hebrew `בנקודה` carries the noun
   // inside the word, so the English noun was simply missing — with it unmatched, the id fell
   // back to the FIRST label and the rule built a garbage quad)
-  const trailing = s.match(/(?:בנקוד[הת]|at(?:\s+the)?(?:\s+point)?)\s+([A-Z]\d*'?)\s*$/i);
+  // #530 (P1) — the marker's OWN label is the only source of `id` once the marker word is present.
+  // The positional fallback below is safe only for a sentence with no marker at all («O מפגש אלכסוני
+  // ABCD», point FIRST). When the student wrote the point LAST and the marker failed to read, falling
+  // back to `toks` does not fail — it silently REINTERPRETS: «אלכסוני A'B'C'D' נחתכים בנקודהS» (an
+  // ordinary missing space) took A′ as the crossing and invented the quad B′C′D′S, a face the student
+  // never wrote, from letters lifted out of two different roles. It reached prod. The comment above
+  // records this same fallback biting once before, for the English point-last form — that fix widened
+  // the marker VOCABULARY and left the fallback armed, which is why this is the second occurrence.
+  //
+  // So the rule is structural, not another spelling: marker present ⇒ `id` comes from the marker or
+  // the rule DECLINES (escalate — the LLM may still read it), and it can never be sourced positionally.
+  // That closes the class including the mistypes nobody has produced yet. Tolerating the missing
+  // separator (`בנקוד[הת]\s*` — Hebrew glues the noun into the word, so «בנקודהS» is a natural slip)
+  // is ergonomics ON TOP of the guard, never instead of it.
+  const trailing = s.match(new RegExp(String.raw`(?:${AT_POINT}|at(?:\s+the)?(?:\s+point)?\s+)([A-Z]\d*'?)\s*$`, 'i'));
+  if (!trailing && /בנקוד[הת]|\bat\b/i.test(s)) return null;
   const [id, ...rest] = trailing ? [trailing[1], ...toks.filter((t) => t !== trailing[1])] : toks;
   // TWO EXPLICITLY NAMED DIAGONALS vs. a NAMED QUAD is decided by how the student GROUPED
   // the letters — `AC ו BD` is two runs of two, `ABCD` is one run of four ([ADR-3D-071](
@@ -1853,7 +1879,7 @@ const angleBetweenPlanes: Rule = (s) => {
 /** `מ-A מורידים אנך למישור π1 החותך אותו בנקודה B` / `from A drop a perpendicular to plane π1, it cuts it at B`. */
 const dropPerpToPlane: Rule = (s) => {
   const he = s.match(
-    new RegExp(`^מ-?([A-Z]\\d*'?)\\s+(?:מורידים|הורידו|מוריד|מעבירים|העבירו)\\s+אנך\\s+למישור\\s+(${PLANE_NAME.source})\\b.*?בנקודה\\s+([A-Z]\\d*'?)$`),
+    new RegExp(`^מ-?([A-Z]\\d*'?)\\s+(?:מורידים|הורידו|מוריד|מעבירים|העבירו)\\s+אנך\\s+למישור\\s+(${PLANE_NAME.source})\\b.*?${AT_POINT}([A-Z]\\d*'?)$`),
   );
   const en =
     he ??
@@ -1954,7 +1980,7 @@ const circleTangentLine: Rule = (s) => {
   const lname =
     s.match(new RegExp(`ל(?:ה?ישר\\s+)?(${LINE_NAME.source})(?![\\w'])`)) ??
     s.match(new RegExp(`tangent\\s+(?:to\\s+)?(?:the\\s+)?line\\s+(${LINE_NAME.source})`, 'i'));
-  const touch = (s.match(/(?:בנקודה|at)\s+([A-Z]\d*'?)/i) ?? [])[1];
+  const touch = (s.match(new RegExp(String.raw`(?:${AT_POINT}|at\s+)([A-Z]\d*'?)`, 'i')) ?? [])[1];
   const id = `circle-${centre}`;
   if (pair) {
     const line = `${pair[1]}${pair[2]}`;
@@ -1991,7 +2017,7 @@ const intersectionLine: Rule = (s) => {
 const dropPerpToLine: Rule = (s) => {
   // NOTE: `ℓ` is not a \w character, so `\b` after it never matches — use an explicit lookahead.
   const he = s.match(
-    new RegExp(`^מ-?([A-Z]\\d*'?)\\s+(?:מעבירים|העבירו|מורידים|הורידו)\\s+אנך\\s+לישר\\s+(${LINE_NAME.source})(?=[\\s,.]|$).*?בנקודה\\s+([A-Z]\\d*'?)$`),
+    new RegExp(`^מ-?([A-Z]\\d*'?)\\s+(?:מעבירים|העבירו|מורידים|הורידו)\\s+אנך\\s+לישר\\s+(${LINE_NAME.source})(?=[\\s,.]|$).*?${AT_POINT}([A-Z]\\d*'?)$`),
   );
   const en =
     he ?? s.match(new RegExp(`^from ([A-Z]\\d*'?) drop a perpendicular to (?:the )?line (${LINE_NAME.source})(?=[\\s,.]|$).*? at ([A-Z]\\d*'?)$`));
@@ -2164,7 +2190,7 @@ const lineCutsPlane: Rule = (s) => {
   const m =
     // verb frame — Hebrew / English
     s.match(
-      new RegExp(`^(?:${HE_LINE}\\s+)?${LINE_SIDE}\\s+(?:${CROSS_HE_VERB})\\s+(?:את\\s+)?(?:${HE_PLANE}\\s+)?${PLANE_SIDE}\\s+בנקודה\\s+${ID}$`),
+      new RegExp(`^(?:${HE_LINE}\\s+)?${LINE_SIDE}\\s+(?:${CROSS_HE_VERB})\\s+(?:את\\s+)?(?:${HE_PLANE}\\s+)?${PLANE_SIDE}\\s+${AT_POINT}${ID}$`),
     ) ??
     s.match(
       new RegExp(`^(?:line\\s+)?${LINE_SIDE}\\s+(?:${CROSS_EN_VERB})\\s+(?:the\\s+)?plane\\s+${PLANE_SIDE}\\s+at\\s+${ID}$`, 'i'),
@@ -2513,7 +2539,7 @@ const planeThroughBare: Rule = (s) => {
 const segLineCutsPointPlane: Rule = (s) => {
   const RUN = `(?:[A-Z]\\d*'?){3,4}`;
   const m =
-    s.match(new RegExp(`^הישר\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+חותך\\s+(?:את\\s+)?המישור\\s+(${RUN})\\s+בנקודה\\s+([A-Z]\\d*'?)$`)) ??
+    s.match(new RegExp(`^הישר\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+חותך\\s+(?:את\\s+)?המישור\\s+(${RUN})\\s+${AT_POINT}([A-Z]\\d*'?)$`)) ??
     s.match(new RegExp(`^line\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+cuts\\s+(?:the\\s+)?plane\\s+(${RUN})\\s+at\\s+([A-Z]\\d*'?)$`));
   if (!m) return null;
   const [, a, b, run, id] = m;
@@ -3063,7 +3089,7 @@ const planeCut: Rule = (s) => {
   if (!/מישור|\bplane\b/i.test(s)) return null;
   if (!/חות|חיתוך|נחתך|\bcuts?\b|intersect|\bmeets?\b/i.test(s)) return null;
   let m =
-    s.match(new RegExp(`(?:ה?מישור)\\s+(${PN})\\s+חות[ךכ]\\s+(?:את\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+(?:בנקודה\\s+|ב-?)([A-Z]\\d*'?)$`)) ??
+    s.match(new RegExp(`(?:ה?מישור)\\s+(${PN})\\s+חות[ךכ]\\s+(?:את\\s+)?([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+(?:${AT_POINT}|ב-?)([A-Z]\\d*'?)$`)) ??
     s.match(new RegExp(`plane\\s+(${PN})\\s+(?:cuts|intersects|meets)\\s+([A-Z]\\d*'?)([A-Z]\\d*'?)\\s+at\\s+([A-Z]\\d*'?)$`, "i"));
   if (m) return [{ type: "plane-cut", id: m[4], plane: canonicalPlane(m[1]), a: m[2], b: m[3] }];
   m =
