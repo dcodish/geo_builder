@@ -28,7 +28,7 @@ gh issue view <NN> --json body -q '.body' | head -3   # ← never skip: confirm 
 
 A heredoc into `--body "$(cat <<'EOF' … EOF)"` also works. The verify step is the part that matters — a filing failure here is silent and costs the whole diagnosis.
 
-**Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3`; one *app* — `2d` | `3d` | `server`; plus `needs-operator` when blocked on an operator decision.
+**Labels** (create-once, see §6): one *type* — `bug` | `feature` | `debt`; one *priority* — `P1` | `P2` | `P3`; one *app* — `2d` | `3d` | `server`; plus `needs-operator` when blocked on an operator decision, `auto-ok` when the operator has approved the issue's fix plan for autonomous execution (§2d — operator-applied ONLY), and `awaiting-play` on a fix-round's round issue until the operator validates the batch (§2d).
 
 **"Filed, not fixed" items in ADRs must also become issues** — an ADR sentence is documentation, an issue is a queue entry. (The historical backlog in [14-backlog.md](14-backlog.md) and ADR prose was partially migrated at adoption; sweep opportunistically.)
 
@@ -51,7 +51,7 @@ The operator raises issues **while testing**, often several per pass. If the rep
 3. **Write the analysis into the issue** (a comment or the body): root cause, the class it belongs to, a concrete fix plan (mechanism, files, tests, blast radius), open questions for the operator.
 4. **STOP — do not implement.** No branch, no code, no "it's a one-liner" exceptions. Reply to the operator with the classification + plan and move to the next report.
 
-Fixing happens in **dedicated fix sessions**: the operator opens one and picks issues off the queue by priority (`gh issue list` sorted P1→P3). Only then do the bug route (§3 steps 4–6) / feature route (§4 steps 3–7) run.
+Fixing happens in **dedicated fix sessions**: the operator opens one and picks issues off the queue by priority (`gh issue list` sorted P1→P3), or invokes an autonomous **fix round** over operator-approved plans (§2d). Only then do the bug route (§3 steps 4–6) / feature route (§4 steps 3–7) run.
 
 **Exceptions:** (a) the operator explicitly says to fix/build it *now* in this session; (b) a **P1 prod-down / honesty emergency** — drop-everything still applies, but say so before starting.
 
@@ -86,6 +86,26 @@ has had none of the diagnosis the queue is supposed to carry.
 **Route awareness.** The report says which rows can land directly on `main` (bug/debt) and which need a PR
 plus the operator's play-and-approve (feature, §4). That distinction, not the priority, is usually what
 decides how much can be closed in one session.
+
+## 2d. The fix round: autonomous execution of `auto-ok`'d plans (#543/#544, operator-approved 2026-08-12 — [ADR-W-012](06w-decisions-workspace.md))
+
+The operator-invoked batch loop that replaces one-at-a-time fix dispatch. Full procedure:
+**`.claude/skills/fix-round/SKILL.md`**; the contract in one paragraph:
+
+A round picks **3–5 work items** (a bundle of issues sharing one root cause counts as one item) from
+the open issues labeled **`auto-ok`** — the label only the operator applies, after reading the issue's
+fix plan; `needs-operator` disqualifies. Each item is fixed **at the root, per its plan**, in its own
+worktree under the full gates (ADR + rule-4 regression lock + full suite + `tsc` + build). Bugs land
+on `main` (`Fixes #NN`, §3), features become PRs the round **never merges** (§4). A plan that fails
+contact with the code is **escalated, never patched**: the docs/17 escalation template goes on the
+issue, `auto-ok` → `needs-operator`, and the round moves on. The round ends with ONE round issue
+labeled **`awaiting-play`** carrying the batch play sheet (Hebrew utterances per item); the operator
+plays the batch in one sitting and **closes the round issue as the validation signal**. Open P1s stop
+a round before it starts — a P1 is never taken silently. `/status-update`'s "Waiting on you" section
+surfaces the whole loop: plans awaiting `auto-ok`, PRs awaiting play, rounds awaiting validation.
+
+**Phase 2 (not yet built, not yet decided):** scheduled unattended rounds and their landing policy
+(bugs direct-to-main vs one-PR-per-round) wait on Phase 1's measured escalation rate ([ADR-W-012](06w-decisions-workspace.md)).
 
 ## 3. The bug route (operator reports something broken)
 

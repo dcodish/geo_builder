@@ -413,3 +413,31 @@ prod-log demand > blocked work > capability > polish; complexity: the issue's ow
 present, else the layer, with RISK graded separately — a one-line fix in the solver is still risky) so
 two sessions grade the same issue the same way. The report is always built from the LIVE queue
 (`gh issue list`), never from session memory — the queue wins every disagreement.
+
+## ADR-W-012 — /fix-round: autonomous execution of operator-approved fix plans (#543, #544)
+
+Operator (2026-08-12): dispatching fixes one at a time ("now fix this, now fix that") does not scale
+against a 66-issue queue, and per-fix validation interrupts too much. The automatable stage is **fix
+execution** — the one stage that is mechanical once triage (docs/22 §2b) has already written a
+root-cause fix plan into the issue. Intake (log-triage), triage, and validation keep their owners.
+
+The mechanism (`.claude/skills/fix-round/SKILL.md`, route in docs/22 §2d): eligibility is the
+**`auto-ok` label, applied only by the operator** after reading the plan — blessing a plan is a
+30-second read, and the label is the control knob that replaces per-fix dispatch. A round is **3–5
+work items** where a bundle of issues sharing one root cause counts as ONE item (operator ruling: the
+cap must never prevent a correct bundle). Each item runs in its own worktree under the full standing
+gates; bugs land on `main` (`Fixes #NN`), features become PRs the round never merges; open P1s stop
+the round before it starts. The **escalation exit** is what keeps standing rule 1 intact under loop
+pressure: a plan that fails contact with the code is commented back onto the issue
+(`auto-ok` → `needs-operator`) and skipped — the round executes plans, it never improvises one, and
+an escalated item is the mechanism working, not failing.
+
+Validation is batched, not skipped: the round ends with ONE round issue labeled **`awaiting-play`**
+carrying the play sheet (Hebrew utterances per item, landed/PR'd/escalated lists); the operator plays
+the batch in one sitting and closes the issue as the validation signal. `/status-update`'s "Waiting
+on you" section (#544) grew into the full attention surface — decisions, plans awaiting `auto-ok`,
+PRs awaiting play-and-approve, rounds awaiting validation — so one report feeds the whole loop.
+
+**Deliberately deferred (Phase 2):** scheduled/unattended runs, and their landing policy (bugs
+direct-to-main vs one-PR-per-round) — undecided until Phase 1's measured escalation rate provides the
+data. First live round only after the operator's home-PC work in flight on 2026-08-12 has landed.
