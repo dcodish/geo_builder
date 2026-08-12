@@ -1,6 +1,6 @@
 ---
 name: status-update
-description: The operator's STANDARD issue-queue report — open issues grouped P1/P2/P3 and split by product (2d/3d/server/workspace), bugs vs features vs debt distinguished, a value indicator and a complexity/risk grade per issue, the list of issues waiting on operator input, and a recommended composition for the next fix round. Use this whenever the operator asks for a list of issues, the open queue, project status, "what's open", "what should we fix next", "מה המצב", a status update, or wants to plan the next fix session — even if they don't say "status-update" by name.
+description: The operator's STANDARD issue-queue report — open issues grouped P1/P2/P3 and split by product (2d/3d/server/workspace), bugs vs features vs debt distinguished, a value indicator and a complexity/risk grade per issue, the full ATTENTION surface (decisions waiting on the operator, fix plans awaiting auto-ok, PRs awaiting play-and-approve, fix-round output awaiting validation), and a recommended composition for the next fix round. Use this whenever the operator asks for a list of issues, the open queue, project status, "what's open", "what should we fix next", "מה המצב", what needs their attention, a status update, or wants to plan the next fix session — even if they don't say "status-update" by name.
 ---
 
 # Status update — the standard issue-queue report
@@ -13,6 +13,7 @@ value/complexity grades come from the rubrics below so two sessions grade the sa
 
 ```sh
 gh issue list --state open --limit 200 --json number,title,labels,updatedAt,url
+gh pr list --state open --json number,title,headRefName,updatedAt,url
 ```
 
 For grading you also need the bodies of issues you don't already know. Fetch them in bulk (one call,
@@ -24,7 +25,8 @@ gh issue list --state open --limit 200 --json number,body
 
 Classify each issue from its labels: priority `P1`/`P2`/`P3` (an unlabeled priority is a triage bug —
 report it in a "mislabeled" line rather than guessing), type `bug`/`feature`/`debt`, product
-`2d`/`3d`/`server`/`workspace`, and `needs-operator`.
+`2d`/`3d`/`server`/`workspace`, and the attention labels: `needs-operator` (blocked on a decision),
+`auto-ok` (plan approved for `/fix-round`), `awaiting-play` (fix-round output not yet validated).
 
 ## Step 2 — grade each issue
 
@@ -55,7 +57,8 @@ section is information, not clutter):
 ```markdown
 # Issue queue — YYYY-MM-DD
 
-Open: N (P1: n / P2: n / P3: n) · bugs n · features n · debt n · needs-operator: n
+Open: N (P1: n / P2: n / P3: n) · bugs n · features n · debt n
+Attention: needs-operator n · plans awaiting auto-ok n · PRs awaiting play n · rounds awaiting play n
 Prod: <current prod tag> · undeployed on main: <none | short list>
 
 ## P1 — drop everything
@@ -68,16 +71,34 @@ Prod: <current prod tag> · undeployed on main: <none | short list>
 (same table shape)
 
 ## Waiting on you
-(one row per issue: #, what decision is needed, in one sentence — this is the section the operator
-acts on immediately, so the question must be readable without opening the issue)
+(the full attention surface, in four sub-lists — every row one sentence, readable without opening
+the issue; omit an empty sub-list with a one-line "none")
+
+### Decisions
+### Plans awaiting your auto-ok
+### PRs awaiting play-and-approve
+### Fix-round output awaiting validation
 
 ## Recommended next round
 ```
 
-**The "Waiting on you" section** is `needs-operator`-labeled issues PLUS any issue whose body or your
-comments explicitly pose an unanswered operator question (a ruling, an A/B choice, a scope decision) —
-the label lags reality, so scan for the questions, and add the label where it's missing (`gh issue
-edit N --add-label needs-operator`) so the queue converges on the truth.
+**The "Waiting on you" section** is the one the operator acts on immediately — it is the whole
+reason the report exists as a habit. Its four sub-lists:
+
+1. **Decisions** — `needs-operator`-labeled issues PLUS any issue whose body or your comments
+   explicitly pose an unanswered operator question (a ruling, an A/B choice, a scope decision) —
+   the label lags reality, so scan for the questions, and add the label where it's missing
+   (`gh issue edit N --add-label needs-operator`) so the queue converges on the truth.
+2. **Plans awaiting your `auto-ok`** — open issues that carry a concrete fix plan (root cause +
+   mechanism + files, per docs/22 §2b), are not `needs-operator`, and are not yet `auto-ok`'d:
+   the candidates that feed `/fix-round`. One row each: #, the plan's gist, complexity grade.
+   Blessing a plan is a 30-second read — surface it so the round never starves silently. An
+   issue with NO plan is not a candidate; it belongs in the tables, flagged per the honesty rule.
+3. **PRs awaiting play-and-approve** — every open PR (`gh pr list`): finished, unplayed work
+   (ADR-W-007). One row: PR#, what it delivers, which issues it closes.
+4. **Fix-round output awaiting validation** — open issues labeled `awaiting-play`: each is a
+   round's play sheet the operator has not yet worked through (closing it is the validation
+   signal — see the fix-round skill).
 
 **The recommendation** is a concrete next-round composition, not a restatement of the tables:
 - Every open P1 goes first, always, each with one line on why it can't wait.
