@@ -7061,3 +7061,19 @@ corpus scenario cannot express this fix; the round-#561 scenario on the #562 bra
 strengthened distinctness/seat assertions instead. Locks: the rescue (seat lands at B, all points
 distinct, |AB|=|BC| genuinely driven, full requirement bar), the pinned-seat mirror (an explicit
 ∠ACB=90 is never flipped), and the no-search baseline.
+
+**ADR-445 Amendment 1 (same day — the operator re-played and NOTHING had changed).** The seat tier was
+ordered after the reflection tier, and on the play figure (incircle group — several reflectable free
+points) the mask×seed product ate the worker's 12 s budget before the seat tier ran: the rescue
+arrived COLD at ~13.4 s, the live search aborted at 12 s and kept the collapse — while the suite
+stayed green because `SEARCH_BUDGET_MS` is **Infinity under vitest** (the exact issue-#19 trap, seat
+edition; the first ADR-445 locks proved the tier exists, not that production ever reaches it). Two
+changes: the seat tier moved BEFORE the reflection tier — a seat-caused failure is seed/mask-INVARIANT
+(the collapse fails at every seed and mask), so reflections can never rescue it and only starve it;
+measured ~5 s ordered first (zero cost for figures with no unpinned right triangle) — and the
+ordering is LOCKED structurally: `findValidConfig` gains dev tier instrumentation
+(`lastConfigTier`, the S0.2 `lastLadderStage` pattern), and `scenarios-props-budget.test.ts`
+asserts the rescue is produced by the **'seat' tier** — a wall-clock assertion under the real
+worker budget was tried first and flaked at 28 s under the suite's CPU contention (5 s solo),
+which is the same reason `SEARCH_BUDGET_MS` is Infinity in tests. The heavier two-circle edition
+of the lock rides the #546/#562 branch, whose grammar it needs.

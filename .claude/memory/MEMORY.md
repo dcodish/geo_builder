@@ -11,4 +11,4 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Memory in repo](memory-in-repo.md) — keep durable memory in the repo (docs/), not local memory, so it travels across computers
 - [Tool denials are observations](tool-denials-are-observations.md) — never report "I can't do X" from a denial without checking the permission config and retrying the canonical minimal command form
 - [Work PC / cross-machine](work-pc-cross-machine.md) — David switches work/home PCs; project syncs via git/GitHub (moved out of Dropbox 2026-07-23) — pick up cross-machine progress via git + the ADR-log tails at session start
-- [Pending triage recommendations](pending-triage-recommendations.md) — two hand-verified 2-D feature recommendations from the 2026-08-11 log-triage await operator approval (the full report is gitignored, work-PC only); delete once filed or declined
+- [Shared-tree branch races](shared-tree-branch-races.md) — re-verify the shared tree's branch in the SAME compound as any write git op there; a parallel session can switch it mid-flight (2026-08-13 near-miss)
