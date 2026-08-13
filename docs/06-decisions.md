@@ -6961,3 +6961,28 @@ Perf: the gate is pure string work at the seam, no replay cost. Locks: `llm.test
 + the end-to-end mocked-fetch prod instance), `issue-536-order-blame.test.ts` (refusal names the order;
 feasible mirror stays green), scenario `stated-betweenness-adb-holds-through-the-llm-lane` (the
 operator's exact sequence with the corrected lane).
+
+## ADR-442 — The deferral flex probe reads the ORDER family in RELATIVE units (#560)
+
+Found by the operator playing the ADR-441 fix: «ישר ABE» over E = mid(AB) — impossible in every
+configuration — parked as «הנתון נרשם אך לא משפיע» instead of refusing. `constraintIsPending`'s probe
+asks whether the failed constraint's residual MOVES across sampled configurations; a one-sided
+REGION residual is scale-proportional by construction (`collinear-order` ∝ the line span), so any
+figure with a size DOF makes it flex in MAGNITUDE while the violation fraction is invariant. The #420
+/ ADR-417 lesson ("flexing is not reachability") — the ORDER edition, closed the same way that ADR
+closed the metric one: where the conclusion is available, draw it.
+
+Class: **a one-sided REGION constraint whose violation only ever scales with the figure reads as
+"pending"** — every `ORDER_CONSTRAINT_TYPES` member can hit it on any figure with a size gauge.
+Mechanism: the probe divides an order-family residual by `constraintScale` (the ADR-033 Am.1
+relative-residual convention the solver itself minimises) before measuring spread; the metric
+families keep the raw probe verbatim — the ADR-104 deferral bet is theirs, and re-scaling them would
+change refusal behaviour across the whole deferral surface. A mixed statement (order + collinears)
+still defers through its non-order members exactly as before. The refusal flows through the existing
+honest route and, per ADR-441, names the order statement. `classify` shares the gate (ADR-385), so a
+previously-parked concluded order in a reloaded figure now reads as the hard error it is.
+
+**Sibling audit:** `src3d/` — grepped `constraintIsPending`/deferral: the 3-D lane has no ADR-104
+deferral machinery (statements apply or refuse), class not present. Locks: `deferral-gate.test.ts`
+(the impossible order refuses; the ADR-104 ⟂ control and the #420 metric pair stay), plus the
+ADR-441 locks unchanged.

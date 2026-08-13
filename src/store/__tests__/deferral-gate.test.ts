@@ -45,6 +45,15 @@ describe('deferralWorthwhile (#207, ADR-385)', () => {
     expect(deferralWorthwhile(prefix, lastCmds(prefix, 'CE אנך ל AB'))).toBe(true);
   });
 
+  it('a structurally impossible stated ORDER is NOT deferral-worthy — «ישר ABE» over E = mid(AB) (#560)', () => {
+    // The operator's play of the #536 fix: the step parked as «נרשם אך לא משפיע» instead of refusing.
+    // The raw flex probe read the order residual's SCALE-flex (∝ the line span, which moves with the
+    // square's free size) as relation-flex; the order family now probes the RELATIVE residual, which is
+    // invariant here — E is the midpoint in every configuration, so "B between A and E" never holds.
+    const prefix = factsOf(['ריבוע ABCD', 'E אמצע AB']);
+    expect(deferralWorthwhile(prefix, lastCmds(prefix, 'ישר ABE'))).toBe(false);
+  });
+
   it('a command group with no relation constraint at all is never deferral-worthy', () => {
     const prefix = factsOf(['AB']);
     expect(deferralWorthwhile(prefix, lastCmds(prefix, 'CD'))).toBe(false);

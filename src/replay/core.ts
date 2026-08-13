@@ -18,7 +18,7 @@ import { metricImpossibility } from '@/engine/metricFeasibility';
 import { computeValuesPanel, declaredLengthUnit, type QueryInput, type ValuesPanelResult } from '@/engine/valuesPanel';
 import { classifyShapesFromSamples, detectRelationsAcross, statedShapeEqualities } from '@/engine';
 import { formatMeasure } from '@/format';
-import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, withVariant, withReflectMask } from '@/engine';
+import { solveBudget, withSolveBudget, applyCommand, applySeed, applyStep, applyCoupledStep, baseSeedOf, branchCount, buildSymTab, checkGivens, crossingCounts, drawnCircles, drawnPointIds, findInkCrossings, resolveDrawnLines, constraintKey, constraintRefs, constraintScale, isOrderConstraint, convergedSamples, deepEqual, distinctSamples, emptyConstruction, evaluate, drivenConstraintsOf, expandInscribe, expandShapeVariant, freeDofCount, freeDofs, isGeoPoint, isMeasure, lowerOne, measureLabelText, circleMembers, firstCyclableBranch, cyclableVariant, pinsSoftVariant, reflectableFreePoints, REFLECT_MAX, directionHelperFreePoints, reflectAnchors, reflectMaskOf, requirementSamples, residual, ringSimple, variantCountOf, variantVertices, warmStartCarriers, withVariant, withReflectMask } from '@/engine';
 
 /** One entered fact. `enabled` is the selected/deselected state. */
 export interface Fact {
@@ -1205,7 +1205,15 @@ function constraintIsPending(cur: Construction, cmds: Command[]): boolean {
         // sample instead of crashing (`residual` would read a missing position). Such a constraint then
         // reads as NOT pending, so its failure surfaces as the honest hard error it is (ADR-236).
         if (constraintRefs(con).some((id) => !e.positions.has(id))) continue;
-        const r = residual(con, (id) => e.positions.get(id)!);
+        const get = (id: Id) => e.positions.get(id)!;
+        let r = residual(con, get);
+        // #560 (the #420 lesson, ORDER edition): a one-sided REGION residual is SCALE-proportional by
+        // construction (`collinear-order` ∝ the line span), so on any figure with a size DOF the raw
+        // residual flexes while the VIOLATION FRACTION is invariant — «ישר ABE» over E = mid(AB) read
+        // as "pending" though the stated order is impossible in every configuration. Probe the order
+        // family by its RELATIVE residual (the ADR-033 Am.1 convention the solver itself minimises);
+        // the metric families keep the raw probe untouched (the ADR-104 deferral bet is theirs).
+        if (isOrderConstraint(con)) r /= Math.max(constraintScale(con, get), 1e-9);
         if (Number.isFinite(r)) vals.push(r);
       }
     }
