@@ -101,6 +101,49 @@ describe('#448 — it steals nothing', () => {
   });
 });
 
+describe('#503 (ADR-3D-142) — the apex-less form and the imperative/relative-clause phrasing', () => {
+  it.each([
+    ['apex-less, the prod row', 'גובה הפירמידה'],
+    ['apex-less, definite של form', 'הגובה של הפירמידה'],
+    ['apex-less English', 'the height of the pyramid'],
+  ])('%s: «%s» derives the apex from the solid (apex-last)', (_label, line) => {
+    const { st, pos } = build(['פירמידה ABCD', line]);
+    expect(st.lastError, `«${line}» must build`).toBeNull();
+    const foot = autoFoot(pos, ['A', 'B', 'C', 'D']);
+    isHeightOnto(pos, 'D', foot, ['A', 'B', 'C']);
+  });
+
+  it.each([
+    ['the prod imperative + relative clause + base-with-solid-noun', 'שרטט גובה לפירמידה שיוצא מהקודקוד D לבסיס הפירמידה'],
+    ['imperative on the plain apex form', 'שרטט גובה לפירמידה מ-D'],
+    ['English mirror', 'draw a height of the pyramid that goes from vertex D to the base of the pyramid'],
+  ])('%s: «%s»', (_label, line) => {
+    const { st, pos } = build(['פירמידה ABCD', line]);
+    expect(st.lastError, `«${line}» must build`).toBeNull();
+    const foot = autoFoot(pos, ['A', 'B', 'C', 'D']);
+    isHeightOnto(pos, 'D', foot, ['A', 'B', 'C']);
+  });
+
+  it('the prod SESSION context — the label-less right-triangle-base pyramid, then the bare height', () => {
+    const { st, c } = build(['פירמידה עם בסיס משולש ישר זווית', 'גובה הפירמידה']);
+    expect(st.lastError, 'the exact prod pair must build').toBeNull();
+    // the height materialised: a segment from the solid's apex to a minted foot
+    const apex = c.solids[0].ids[c.solids[0].ids.length - 1];
+    expect(c.segments.some(([a, b]) => a === apex || b === apex), 'apex→foot segment drawn').toBe(true);
+  });
+
+  it('«גובה המנסרה» does NOT ride along — a prism has no apex to derive (ADR-052)', () => {
+    for (const line of ['גובה המנסרה', 'the height of the prism']) {
+      expect(parse3(line).ok, line).toBe(false);
+    }
+  });
+
+  it('the apex-less form beside TWO solids refuses as ambiguous', () => {
+    const { st } = build(['פירמידה ABCD', "תיבה EFGHE'F'G'H'", 'גובה הפירמידה']);
+    expect(st.lastError, 'two solids — no honest apex/base').not.toBeNull();
+  });
+});
+
 describe('#448 — a STATED base is honoured, never quietly swapped', () => {
   it('«לבסיס ABC» drops onto ABC even when it is not the solid\'s first face', () => {
     // The apex here is A and the named base is BCD — if apply resolved `solids[0].ids.slice(0,3)` it

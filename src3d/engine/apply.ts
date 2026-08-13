@@ -762,7 +762,22 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
       // #72: `אנך יורד מ-M לבסיס` — the ⟂ from a point onto the solid's BASE plane. The foot
       // carries no stated name (parse3 is context-free), so the first unused label is minted
       // HERE and the command delegates to the height-to-face foot machinery (V8-e).
-      const missing = missingPoint(c, [cmd.from, ...(cmd.face ?? [])]);
+      //
+      // #503 (ADR-3D-142): the APEX-LESS «גובה הפירמידה» carries no `from` — the apex is derived
+      // from the figure's SINGLE solid by the engine-wide layout convention (base ids first, apex
+      // LAST — exactly when `baseRingOf` covers all-but-one id). Several solids stay the honest
+      // ambiguity refusal, and a solid with no derivable apex (prism/box) refuses `bad-solid` —
+      // its height is not a vertex-to-base perpendicular, and guessing a vertex would assert a
+      // figure the student never stated (ADR-052).
+      if (!cmd.from && c.solids.length !== 1) return { ok: false, error: { code: 'unknown-plane', id: 'base' } };
+      let from = cmd.from;
+      if (!from) {
+        const s0 = c.solids[0];
+        const ring = baseRingOf(s0);
+        if (!ring || ring.length !== s0.ids.length - 1) return { ok: false, error: { code: 'bad-solid', kind: s0.kind } };
+        from = s0.ids[s0.ids.length - 1];
+      }
+      const missing = missingPoint(c, [from, ...(cmd.face ?? [])]);
       if (missing) return { ok: false, error: missing };
       // A STATED base wins (#448): «גובה מנקודה D לבסיס ABC» names the face, so resolving the solid's
       // first face instead would silently drop the student's own words onto a different plane. Only the
@@ -777,7 +792,7 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         }
       }
       if (!foot) return { ok: false, error: { code: 'already-defined', id: 'foot' } };
-      return applyCommand3(c, { type: 'height-to-face', id: foot, from: cmd.from, face });
+      return applyCommand3(c, { type: 'height-to-face', id: foot, from, face });
     }
 
     case 'point-in-span': {
