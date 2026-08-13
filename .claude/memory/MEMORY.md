@@ -12,4 +12,3 @@ which loads every session and has operator authority. One fact, one home — do 
 - [Tool denials are observations](tool-denials-are-observations.md) — never report "I can't do X" from a denial without checking the permission config and retrying the canonical minimal command form
 - [Work PC / cross-machine](work-pc-cross-machine.md) — David switches work/home PCs; project syncs via git/GitHub (moved out of Dropbox 2026-07-23) — pick up cross-machine progress via git + the ADR-log tails at session start
 - [Pending triage recommendations](pending-triage-recommendations.md) — two hand-verified 2-D feature recommendations from the 2026-08-11 log-triage await operator approval (the full report is gitignored, work-PC only); delete once filed or declined
-- [Home PC work in flight](home-pc-work-in-flight.md) — home PC holds untested/uncommitted changes (2026-08-12): do NOT run /fix-round or land queue fixes from the work PC until it lands; delete once pushed
