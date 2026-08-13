@@ -217,6 +217,25 @@ describe('#487 — honesty boundaries', () => {
   });
 });
 
+describe('#557 — the latent PLANE half of the pivot-staleness class (found via the line edition)', () => {
+  beforeEach(() => state().clear());
+
+  it('«π2 ∥ ABC» on a coordinate-injected cube: the normal follows the MOVED figure, claim green', () => {
+    // Before reresolveFreeObjects3, the free plane resolved pre-pivot against canonical positions;
+    // the pivot then rotated the cube to its stated coordinates and the ∥ claim failed against
+    // geometry the student had pinned correctly (reported as plane-not-determined).
+    build(['קובייה ABCD', 'A(0,0,0)', 'B(0,3,0)', 'מישור π2', 'המישור π2 מקביל למישור ABC']);
+    expect(state().facts, 'the relation must not be refused').toHaveLength(5);
+    for (const s of [0, 1, 2, 3, 4]) {
+      const d = derive3(state().facts, s);
+      const pl = d.resolved.planes.get('π2')!;
+      const [a, b, c0] = ['A', 'B', 'C'].map((id) => d.positions.get(id)!);
+      expect(misalignment(pl.n, cross3(sub3(b, a), sub3(c0, a))), `seed ${s}`).toBeLessThan(1e-6);
+      for (const f of state().facts) expect(d.status[f.id], `seed ${s}`).toBe('ok');
+    }
+  });
+});
+
 describe('#487 — the figure file round-trips a free plane', () => {
   it('save → load keeps the declaration and the auto-created membership', async () => {
     const { serializeFigure3, deserializeFigure3 } = await import('../store/figureFile3');

@@ -3351,3 +3351,20 @@ placement lane. Saves round-trip (`COMMAND_SAVEABLE`).
 two-member 0-DOF stability, cube-untouched stability, clash and typo refusals, the name-only echo, the
 round-trip), the updated #375 lock (auto-create vs honest refusal split), the seeded fixture
 `free-line-552.geo3.json` (the operator's exact sequence), and the catalog rows (guard-tested He+En).
+
+**Am. 1 (operator play, 2026-08-13) — free objects must hold against FINAL positions.** On the
+operator's coordinate-injected prism (A(0,0,0), B on the x-axis, |u|=3 …) «l⊥BCK» was refused
+`line-not-determined`. Root cause, and it is a CLASS that predates the line: free planes and lines
+resolve pre-pivot (the rider pass needs them), but the PIVOT and the LANDING FUNNEL then move every
+point to its stated coordinates — and nothing re-read the free objects afterwards, so the claim was
+verified against a direction pinned in the canonical frame, failed, and the guard blamed the student's
+correct statement. #487's tests never combined a free plane with an absolute-frame figure, which is
+where the plane half hid. Fixed at the root by `reresolveFreeObjects3`: after positions are final
+(post-pivot, post-funnel, post-`resolveLatePlanes`, after through-lines), free planes then lines
+re-resolve from them and exactly their own DEPENDENTS re-seat (riders — same sample keys, so a gauge
+figure is byte-identical — feet, line∩plane crossings; the plane-plane/derived-line passes run after
+and read the corrected objects). The figure itself never re-runs: the free subtree reads the figure,
+never the reverse. The rider placement routines moved from pass-local closures to module level
+(`seatOnPlaneRider` / `seatOnLineRider`) so the re-seat is the SAME code, not a copy. Locked by the
+#557 pivot tests in `free-line.test.ts` (verified red without the fix) and the plane twin in
+`free-plane.test.ts`.

@@ -1670,6 +1670,12 @@ export function resolve3(c: Construction3, seed: number): Resolved3 {
     if (a && b && dist3(a, b) > 1e-12) lines.set(name, { anchor: a, dir: sub3(b, a) });
   }
 
+  // ---- #557: FREE planes/lines re-resolve from the FINAL positions (the pivot/funnel may have
+  // moved every point they were pinned to), their dependents re-seated. Before the plane-plane and
+  // derived-line passes below, so those read the corrected free objects; a figure the pivot never
+  // moved re-resolves to the identical answer and nothing downstream changes.
+  reresolveFreeObjects3(c, seed, pos, planes, lines, freePlaneDofs, freeLineDofs);
+
   // ---- a second line pass: lines between point-planes only became resolvable now
   for (const [name] of c.lines) {
     if (lines.has(name)) continue;
@@ -1850,59 +1856,8 @@ function evaluateSolidsAndPoints(
   // ADR-3D-056 (#286): vec-defined points whose seg-perp/seg-par pin references a point placed LATER in
   // insertion order (the reference segment, or O) — deferred here, placed in a 2nd pass once it exists.
   const deferredSegPins: [Id, number][] = [];
-  const placeOnPlaneRider = (id: Id, def: Extract<PointDef, { kind: 'on-plane' }>): void => {
-    // a free point riding a named plane (ADR-3D-015): sampled u,v in an in-plane frame
-    // centred on the plane's own points (point-run) or the projected figure centroid
-    // (equation plane); a stated side adds a sampled offset along the +z-oriented normal.
-    // Only EARLIER points are read (insertion order), so adding later facts never moves it.
-    {
-      const pl = planes.get(def.plane) ?? planeFromPointRun(c, def.plane, pos);
-      if (!pl) return; // degenerate/unplaced plane — flagged downstream (not-coplanar)
-      const runIds = c.pointPlanes.get(def.plane);
-      const anchors = runIds?.map((q) => pos.get(q)).filter((q): q is Vec3 => q !== undefined);
-      const placed = [...pos.values()];
-      const centre0 = anchors?.length ? centroid3(anchors) : placed.length ? centroid3(placed) : v3(0, 0, 0);
-      const t0 = (dot3(pl.n, centre0) + pl.d) / dot3(pl.n, pl.n);
-      const centre = sub3(centre0, scale3(pl.n, t0)); // ⟂ projection onto the plane
-      let spread = 1.2;
-      for (const q of placed) spread = Math.max(spread, dist3(q, centre));
-      const nn = normalize3(pl.n);
-      const axisSeed = Math.abs(nn.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
-      const e1 = normalize3(cross3(nn, axisSeed));
-      const e2 = cross3(nn, e1);
-      const candidate = (k: number): Vec3 => {
-        const suf = k === 0 ? '' : `-${k}`;
-        const cu = sample(seed, `onplane-u-${id}${suf}`, -0.6, 0.6) * spread;
-        const cv = sample(seed, `onplane-v-${id}${suf}`, -0.6, 0.6) * spread;
-        return add3(centre, add3(scale3(e1, cu), scale3(e2, cv)));
-      };
-      // ADR-3D-080 (general position, the 2-D ADR-253 pattern): a rider parked next to an
-      // existing point reads as "on" it (operator: S on the top plane landed "on A"). Step
-      // deterministically to a clear spot; k = 0 keeps the legacy sample keys, so a figure
-      // whose rider already sits clear is byte-identical.
-      const sepOf = (q: Vec3): number => placed.reduce((m, r) => Math.min(m, dist3(q, r)), Infinity);
-      const minSep = 0.22 * spread;
-      let p = candidate(0);
-      if (sepOf(p) < minSep) {
-        let bestSep = sepOf(p);
-        for (let k = 1; k <= 11 && bestSep < minSep; k++) {
-          const q = candidate(k);
-          const sq = sepOf(q);
-          if (sq > bestSep) {
-            p = q;
-            bestSep = sq;
-          }
-        }
-      }
-      if (def.side) {
-        // "above" = the +z side; a vertical plane keeps its own orientation here and the
-        // derive-time check refuses the fact honestly (plane-side-undefined)
-        const up = nn.z < -1e-9 ? scale3(nn, -1) : nn;
-        p = add3(p, scale3(up, def.side * sample(seed, `onplane-h-${id}`, 0.45, 1.05) * spread));
-      }
-      pos.set(id, p);
-    }
-  };
+  const placeOnPlaneRider = (id: Id, def: Extract<PointDef, { kind: 'on-plane' }>): void =>
+    seatOnPlaneRider(c, seed, pos, planes, id, def);
   for (const [id, def] of c.points) {
     if (def.kind === 'solid-vertex' || def.kind === 'coord' || def.kind === 'rev-point') continue;
     if (def.kind === 'on-segment') {
@@ -1932,19 +1887,7 @@ function evaluateSolidsAndPoints(
       };
       pos.set(id, v3(comp('x'), comp('y'), comp('z')));
     } else if (def.kind === 'on-line') {
-      // a free point riding a named line (ADR-3D-031, the on-plane rider's line edition):
-      // sampled t along the unit direction around the figure centroid's ⟂ projection onto
-      // the line, spread-scaled; distinct ids sample distinct t (general position).
-      const ln = lines.get(def.line);
-      if (!ln || norm3(ln.dir) < 1e-12) continue; // unresolved/degenerate line — flagged downstream
-      const placed = [...pos.values()];
-      const centre0 = placed.length ? centroid3(placed) : ln.anchor;
-      const u = normalize3(ln.dir);
-      const centre = add3(ln.anchor, scale3(u, dot3(sub3(centre0, ln.anchor), u)));
-      let spread = 1.2;
-      for (const q of placed) spread = Math.max(spread, dist3(q, centre));
-      const t = sample(seed, `online-t-${id}`, -0.85, 0.85) * spread;
-      pos.set(id, add3(centre, scale3(u, t)));
+      seatOnLineRider(seed, pos, lines, id, def);
     } else if (def.kind === 'plane-cut') {
       // V8-b (G2): the point where a plane crosses segment a–b (the plane may be an
       // equation, a point-run, or a ⊥/∥ rel-plane — resolved from current positions)
@@ -2173,6 +2116,140 @@ function evaluateSolidsAndPoints(
     if (P) pos.set(id, P);
   }
 
+}
+
+/** A free point riding a named plane (ADR-3D-015): sampled u,v in an in-plane frame centred on the
+ *  plane's own points (point-run) or the projected figure centroid (equation plane); a stated side
+ *  adds a sampled offset along the +z-oriented normal. Only EARLIER points are read (insertion
+ *  order), so adding later facts never moves it. Module-level (not a pass-local closure) because the
+ *  post-pivot free-object re-seat (#557 play) must re-run it against FINAL positions. */
+function seatOnPlaneRider(
+  c: Construction3,
+  seed: number,
+  pos: Positions3,
+  planes: Map<string, ResolvedPlane>,
+  id: Id,
+  def: Extract<PointDef, { kind: 'on-plane' }>,
+): void {
+  const pl = planes.get(def.plane) ?? planeFromPointRun(c, def.plane, pos);
+  if (!pl) return; // degenerate/unplaced plane — flagged downstream (not-coplanar)
+  const runIds = c.pointPlanes.get(def.plane);
+  const anchors = runIds?.map((q) => pos.get(q)).filter((q): q is Vec3 => q !== undefined);
+  const placed = [...pos.values()];
+  const centre0 = anchors?.length ? centroid3(anchors) : placed.length ? centroid3(placed) : v3(0, 0, 0);
+  const t0 = (dot3(pl.n, centre0) + pl.d) / dot3(pl.n, pl.n);
+  const centre = sub3(centre0, scale3(pl.n, t0)); // ⟂ projection onto the plane
+  let spread = 1.2;
+  for (const q of placed) spread = Math.max(spread, dist3(q, centre));
+  const nn = normalize3(pl.n);
+  const axisSeed = Math.abs(nn.x) < 0.9 ? v3(1, 0, 0) : v3(0, 1, 0);
+  const e1 = normalize3(cross3(nn, axisSeed));
+  const e2 = cross3(nn, e1);
+  const candidate = (k: number): Vec3 => {
+    const suf = k === 0 ? '' : `-${k}`;
+    const cu = sample(seed, `onplane-u-${id}${suf}`, -0.6, 0.6) * spread;
+    const cv = sample(seed, `onplane-v-${id}${suf}`, -0.6, 0.6) * spread;
+    return add3(centre, add3(scale3(e1, cu), scale3(e2, cv)));
+  };
+  // ADR-3D-080 (general position, the 2-D ADR-253 pattern): a rider parked next to an
+  // existing point reads as "on" it (operator: S on the top plane landed "on A"). Step
+  // deterministically to a clear spot; k = 0 keeps the legacy sample keys, so a figure
+  // whose rider already sits clear is byte-identical.
+  const sepOf = (q: Vec3): number => placed.reduce((m, r) => Math.min(m, dist3(q, r)), Infinity);
+  const minSep = 0.22 * spread;
+  let p = candidate(0);
+  if (sepOf(p) < minSep) {
+    let bestSep = sepOf(p);
+    for (let k = 1; k <= 11 && bestSep < minSep; k++) {
+      const q = candidate(k);
+      const sq = sepOf(q);
+      if (sq > bestSep) {
+        p = q;
+        bestSep = sq;
+      }
+    }
+  }
+  if (def.side) {
+    // "above" = the +z side; a vertical plane keeps its own orientation here and the
+    // derive-time check refuses the fact honestly (plane-side-undefined)
+    const up = nn.z < -1e-9 ? scale3(nn, -1) : nn;
+    p = add3(p, scale3(up, def.side * sample(seed, `onplane-h-${id}`, 0.45, 1.05) * spread));
+  }
+  pos.set(id, p);
+}
+
+/** A free point riding a named line (ADR-3D-031, the on-plane rider's line edition): sampled t along
+ *  the unit direction around the figure centroid's ⟂ projection onto the line, spread-scaled.
+ *  Module-level for the same #557 reason as {@link seatOnPlaneRider}. */
+function seatOnLineRider(
+  seed: number,
+  pos: Positions3,
+  lines: Map<string, ResolvedLine>,
+  id: Id,
+  def: Extract<PointDef, { kind: 'on-line' }>,
+): void {
+  const ln = lines.get(def.line);
+  if (!ln || norm3(ln.dir) < 1e-12) return; // unresolved/degenerate line — flagged downstream
+  const placed = [...pos.values()];
+  const centre0 = placed.length ? centroid3(placed) : ln.anchor;
+  const u = normalize3(ln.dir);
+  const centre = add3(ln.anchor, scale3(u, dot3(sub3(centre0, ln.anchor), u)));
+  let spread = 1.2;
+  for (const q of placed) spread = Math.max(spread, dist3(q, centre));
+  const t = sample(seed, `online-t-${id}`, -0.85, 0.85) * spread;
+  pos.set(id, add3(centre, scale3(u, t)));
+}
+
+/**
+ * #557 (play finding on #552) — FREE objects must hold against FINAL positions.
+ *
+ * Free planes and lines resolve pre-pivot (the rider pass needs them), but on a figure with an
+ * absolute frame the PIVOT and the LANDING FUNNEL then move every point to its stated coordinates —
+ * and nothing re-read the free objects afterwards. A free line pinned «l⊥BCK» kept the
+ * canonical-frame direction, the claim was verified against the MOVED figure, failed, and the
+ * `line-not-determined` guard blamed a relation the student had stated correctly — a false
+ * accusation, on both the line and the (latent, #487) plane side of the class.
+ *
+ * So: after the figure's positions are final, resolve the free objects once more from them, and
+ * re-seat exactly the free objects' own DEPENDENTS — riders (same sample keys, so a gauge figure is
+ * byte-identical), feet, and line∩plane crossings. The figure itself never re-runs here: the free
+ * subtree reads the figure, never the reverse (the #487 one-way discipline).
+ */
+function reresolveFreeObjects3(
+  c: Construction3,
+  seed: number,
+  pos: Positions3,
+  planes: Map<string, ResolvedPlane>,
+  lines: Map<string, ResolvedLine>,
+  freePlaneDofs: Map<string, number>,
+  freeLineDofs: Map<string, number>,
+): void {
+  const movedP = resolveFreePlanes3(c, seed, pos, planes, lines, freePlaneDofs);
+  const movedL = resolveFreeLines3(c, seed, pos, planes, lines, freeLineDofs);
+  if (!movedP && !movedL) return;
+  const freePlane = (name: string): boolean => !!c.planes.get(name)?.free;
+  for (const [id, def] of c.points) {
+    if (def.kind === 'on-plane' && freePlane(def.plane)) seatOnPlaneRider(c, seed, pos, planes, id, def);
+    else if (def.kind === 'on-line' && isFreeLine3(c, def.line)) seatOnLineRider(seed, pos, lines, id, def);
+    else if (def.kind === 'foot-plane' && freePlane(def.plane)) {
+      const from = pos.get(def.from);
+      const pl = planes.get(def.plane);
+      if (from && pl) pos.set(id, footOnPlane(from, pl));
+    } else if (def.kind === 'foot-line' && isFreeLine3(c, def.line)) {
+      const from = pos.get(def.from);
+      const line = lines.get(def.line);
+      if (from && line) pos.set(id, footOnLine(from, line));
+    } else if (def.kind === 'line-plane' && (isFreeLine3(c, def.line) || freePlane(def.plane))) {
+      const line = lines.get(def.line);
+      const pl = planes.get(def.plane);
+      if (!line || !pl) continue;
+      const denom = dot3(pl.n, line.dir);
+      if (Math.abs(denom) > 1e-10 * Math.max(norm3(pl.n) * norm3(line.dir), 1e-12)) {
+        const t = -(dot3(pl.n, line.anchor) + pl.d) / denom;
+        pos.set(id, add3(line.anchor, scale3(line.dir, t)));
+      }
+    }
+  }
 }
 
 /**

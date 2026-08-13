@@ -176,6 +176,45 @@ describe('#552 — the operator’s relations: «l⊥BCK» / «l∥BCK» create 
   });
 });
 
+describe('#557 (operator play, 2026-08-13) — the relation holds on a PIVOT figure too', () => {
+  beforeEach(() => state().clear());
+
+  // The play finding: on a figure with an absolute frame (coordinates injected — the operator's
+  // prism had A(0,0,0), B on the x-axis, |u|=3 …) «l⊥BCK» was refused `line-not-determined`. The
+  // free line resolved PRE-pivot against canonical positions; the pivot then moved the figure and
+  // the claim was verified against geometry the student had pinned correctly. Class bug — the free
+  // PLANE had it latently too — fixed by `reresolveFreeObjects3` (final-positions re-resolution).
+  it('«l⊥ABC» on a coordinate-injected cube: the direction follows the MOVED figure, claim green', () => {
+    build(['קובייה ABCD', 'A(0,0,0)', 'B(0,3,0)', 'l⊥ABC']);
+    expect(state().facts, 'the relation must not be refused').toHaveLength(4);
+    for (const s of SEEDS) {
+      const d = derived(s);
+      const ln = d.resolved.lines.get('ℓ')!;
+      expect(misalignment(ln.dir, runNormalOf(['A', 'B', 'C'], s)), `seed ${s}`).toBeLessThan(1e-6);
+      for (const f of state().facts) expect(d.status[f.id], `seed ${s}`).toBe('ok');
+    }
+  });
+
+  it('the operator’s order — declare «l» FIRST, then relate — lands identically', () => {
+    build(['קובייה ABCD', 'A(0,0,0)', 'B(0,3,0)', 'l', 'l⊥ABC']);
+    expect(state().facts).toHaveLength(5);
+    const d = derived();
+    const ln = d.resolved.lines.get('ℓ')!;
+    expect(misalignment(ln.dir, runNormalOf(['A', 'B', 'C'], 0))).toBeLessThan(1e-6);
+    for (const f of state().facts) expect(d.status[f.id]).toBe('ok');
+  });
+
+  it('an on-line rider re-seats onto the corrected line (the dependent half of the class)', () => {
+    build(['קובייה ABCD', 'A(0,0,0)', 'B(0,3,0)', 'l⊥ABC', 'E על הישר l']);
+    for (const s of SEEDS) {
+      const d = derived(s);
+      const ln = d.resolved.lines.get('ℓ')!;
+      const e = d.positions.get('E')!;
+      expect(norm3(cross3(sub3(e, ln.anchor), normalize3(ln.dir))), `seed ${s}`).toBeLessThan(1e-7);
+    }
+  });
+});
+
 describe('#552 — members pin the anchor, then the whole line (M1)', () => {
   beforeEach(() => state().clear());
 
