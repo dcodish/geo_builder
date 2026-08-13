@@ -539,6 +539,11 @@ the givens verifier; exit 0 ⇔ every line parses deterministically and the figu
 Agent obligations: given-by-given accounting (an inexpressible given is reported, never dropped),
 expected-differences notes for unstated free DOFs, grammar gaps reported as **candidate** feature
 issues only (filing needs operator approval, docs/22), no live LLM calls, no repo writes.
+*(Amended 2026-08-13, same session: images uploaded IN-CHAT are invisible to a subagent — the parent
+conversation's image blocks do not travel. The agent contract therefore accepts a third input form, a
+**figure brief**: the invoking session, which can see the upload, transcribes the figure — labels,
+stated givens, markings, ambiguities — and passes the brief in the prompt; a file path remains the
+preferred route when one exists.)*
 
 **Consequences.** A textbook exercise becomes a proven, copy-pasteable sequence in one agent run, and
 the same sequences are one step from fixture/scenario locks (standing rule 4). The `scenario-pipeline`
