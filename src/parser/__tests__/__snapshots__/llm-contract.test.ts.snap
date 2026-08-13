@@ -188,6 +188,14 @@ exports[`PAR-10 (b) — supported catalog examples parse to stable command types
       "point-on-line",
     ],
   },
+  "ABCD": {
+    "en": [
+      "quadrilateral",
+    ],
+    "he": [
+      "quadrilateral",
+    ],
+  },
   "AC extended meets circle P at E": {
     "en": [
       "circle",

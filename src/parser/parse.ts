@@ -780,6 +780,33 @@ const quadrilateral = quadShape(/quadrilateral|quad|מרובע/gi, (ids) => ({ t
  *  the construction counterpart of `∠` for angles, so `△ABC` builds a triangle like `∠ABC` states an angle.) */
 const triangle = triShape(/triangle|משולש|[△▲]/gi, (ids) => ({ type: 'triangle', ids }));
 
+/**
+ * #505 ([ADR-444](docs/06-decisions.md#adr-444)) — a BARE 3–4 letter label run with no other token
+ * DECLARES the obvious shape: «ABC» → triangle, «ABCD»/«Abcd»/«abcd» → quadrilateral, one behaviour
+ * across casings (the prod student's very first utterance was `Abcd`, and the paid LLM had to build
+ * what this rule now builds free). The 2-D sibling of the 3-D bare-«π2» ruling (ADR-3D-124): a bare
+ * name declares the obvious object.
+ *
+ * Deliberate boundaries:
+ *  - DELEGATES to the noun rules (`משולש`/`מרובע`) with a synthesized utterance, so the lowering —
+ *    ids, defaults, idempotent `poly-…` identity — is byte-identical to the spelled-out form by
+ *    construction, and can never drift from it.
+ *  - Letters must be DISTINCT (a repeated letter is not a vertex run) and ALL NEW: a run over
+ *    EXISTING points is a STATEMENT about them — the «ADB» ordered-line lane (#536/ADR-441) — and
+ *    declaring a shape over it would co-opt the student's figure. Those stay with today's owners.
+ *  - A 2-letter run stays `bareSegment`'s (a bare «AB» is a segment, far more common than a shape);
+ *    5+ letters stay not-handled.
+ */
+const bareLabelRunShape: Rule = (s, ctx) => {
+  const m = s.match(/^\s*([A-Za-z]{3,4})\s*\.?\s*$/);
+  if (!m) return null;
+  const run = m[1].toUpperCase();
+  const ids = [...run];
+  if (new Set(ids).size !== ids.length) return null;
+  if (ids.some((id) => (ctx.points ?? []).includes(id))) return null;
+  return ids.length === 3 ? triangle(`משולש ${run}`, ctx) : quadrilateral(`מרובע ${run}`, ctx);
+};
+
 /** "kite ABCD" / "דלתון ABCD" ("עפיפון" folds to דלתון at normalizeUtterance, ADR-405) → a `shape-variant`
  *  whose equal-pair AXIS is a cyclable choice
  *  ([ADR-138](docs/06-decisions.md#adr-138)): variant 0 = axis AC (|AB|=|AD|, |CB|=|CD|), variant 1 = axis BD.
@@ -8086,6 +8113,7 @@ export const RULES: Rule[] = [
   pointByDistances,
   freePoint,
   bareFreePoint, // "נקודה A" / "point A" — a bare 2-DOF free point (no coords), after freePoint owns the coord form (#104)
+  bareLabelRunShape, // #505: a bare 3–4 letter run of NEW labels declares the shape («Abcd» → quadrilateral); 2 letters stay bareSegment's
   bareSegment, // LAST catch-all: a bare "AB" / "line AB" → draw the segment (after every keyword/structured rule)
   ambiguousCircleAsk, // #546 VERY LAST: an unbindable anonymous circle reference beside ≥2 circles ASKS instead of escalating — after every rule, so it steals nothing
 ];

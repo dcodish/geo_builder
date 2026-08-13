@@ -49,6 +49,7 @@ export const COMMAND_CATALOG: CommandDoc[] = [
   { category: 'shapes', supported: true, en: 'parallelogram ABCD', he: 'מקבילית ABCD', descEn: 'A parallelogram.', descHe: 'מקבילית.' },
   { category: 'shapes', supported: true, en: 'trapezoid ABCD', he: 'טרפז ABCD', descEn: 'A trapezoid (one pair of parallel sides).', descHe: 'טרפז (זוג צלעות מקבילות).' },
   { category: 'shapes', supported: true, en: 'quadrilateral ABCD', he: 'מרובע ABCD', descEn: 'A general quadrilateral.', descHe: 'מרובע כללי.' },
+  { category: 'shapes', supported: true, en: 'ABCD', he: 'ABCD', descEn: 'A bare run of 3–4 NEW letters declares the shape — ABC a triangle, ABCD a quadrilateral (any casing). Two letters stay a segment.', descHe: 'רצף חשוף של 3–4 אותיות חדשות מכריז על הצורה — ABC משולש, ABCD מרובע (בכל רישיות). שתי אותיות נשארות קטע.' },
   { category: 'shapes', supported: true, en: 'kite ABCD', he: 'דלתון ABCD', descEn: 'A kite — two pairs of equal adjacent sides (|AB|=|AD|, |CB|=|CD|).', descHe: 'דלתון — שני זוגות של צלעות סמוכות שוות (|AB|=|AD|, |CB|=|CD|).' },
   { category: 'shapes', supported: true, en: 'isosceles triangle ABC', he: 'משולש שווה שוקיים ABC', descEn: 'An isosceles triangle (|AB|=|AC|, apex A).', descHe: 'משולש שווה שוקיים (|AB|=|AC|, ראש A).' },
   { category: 'shapes', supported: true, en: 'isosceles triangle ABC (AB=AC)', he: 'ABC משולש שווה שוקיים (AB=AC)', descEn: 'A shape with its property in parentheses — the stated pair pins which sides are the legs.', descHe: 'צורה עם התכונה שלה בסוגריים — הזוג שנכתב קובע אילו צלעות הן השוקיים.' },

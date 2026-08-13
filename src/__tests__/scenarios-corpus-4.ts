@@ -2153,6 +2153,24 @@ export const SCENARIOS_4: Scenario[] = [
     },
   },
   {
+    id: 'bare-label-run-declares-quadrilateral',
+    title: '#505: the bare «Abcd» opener declares quadrilateral ABCD deterministically',
+    guards:
+      "prod session vgrm5pjb (2026-08-03): the student's very FIRST utterance was `Abcd` — no shape noun, mixed case — and only the paid LLM rescued it (built quadrilateral A B C D; the student continued happily). ADR-444: a bare 3–4 letter run of NEW labels declares the obvious shape, one behaviour across casings (`abcd` used to get a scope:unrelated brush-off while `Abcd` escalated — inconsistent), delegated to the noun rules so the lowering is byte-identical to «מרובע ABCD» by construction. Runs over EXISTING points stay statements (the #536 «ADB» ordered-line lane), 2-letter runs stay segments, 5+ stay not-handled — locked in bare-label-run.test.ts.",
+    steps: ['Abcd'],
+    check(fig) {
+      allStepsOk(fig);
+      const P = ['A', 'B', 'C', 'D'].map((id) => at(fig, id)); // the four vertices exist under UPPERCASE names
+      // the blanket convexity default holds for the declared quad: all turn signs agree
+      const signs = P.map((p, i) => {
+        const q = P[(i + 1) % 4];
+        const r = P[(i + 2) % 4];
+        return Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+      });
+      expect(new Set(signs).size, 'draws as a convex quadrilateral').toBe(1);
+    },
+  },
+  {
     id: 'bagrut-gchf-cyclic-tangent-parallel',
     title: 'bagrut: right △ABC (∠ACB=90°) + GCHF cyclic + AB tangent at F + AB∥GH + diameter from F cuts AC at E (#567)',
     guards:
