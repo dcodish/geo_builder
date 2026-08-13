@@ -7023,3 +7023,31 @@ rules that call the resolver before their own guards).
 Locks: `circle-ref-tiebreak.test.ts` (bind by membership per family, the vote picking the OTHER
 circle, the ask with its candidates, the one-circle/named/qualifier/bare-mention no-theft cases);
 scenario `anonymous-circle-binds-by-membership-beside-second-circle` (the prod figure end-to-end).
+
+## ADR-444 — A bare 3–4 letter label run declares the obvious shape (#505)
+
+Prod (session `vgrm5pjb`, log-triage R3, operator-approved 2026-08-10): the student's very first
+utterance was `Abcd` — no shape noun, mixed case. It escalated to the paid LLM, which built
+`quadrilateral A B C D` (plainly the intent; the student continued). Meanwhile `abcd` was refused
+`scope:unrelated` — three casings of one intent, three behaviours.
+
+Decision: a bare 3–4 letter Latin run with NOTHING else in the utterance DECLARES the obvious shape —
+`ABC` a triangle, `ABCD` a quadrilateral — after case-normalizing, one behaviour across casings. The
+2-D sibling of the 3-D bare-«π2» ruling (ADR-3D-124): a bare name declares the obvious object.
+
+Mechanism: one last-resort rule (`bareLabelRunShape`, registered just before `bareSegment`) that
+DELEGATES to the noun rules with a synthesized «משולש/מרובע <RUN>» — the lowering (ids, defaults,
+idempotent `poly-…` identity) is byte-identical to the spelled-out form by construction and cannot
+drift. Boundaries, each deliberate: letters must be DISTINCT (a repeated letter is no vertex run);
+letters must be ALL NEW — a run over existing points is a STATEMENT about them (the «ADB»
+ordered-line lane, #536/ADR-441) and stays with today's owners; a 2-letter run stays `bareSegment`'s;
+5+ letters stay not-handled. The scope register's `unrelated` claim on lowercase runs is resolved by
+construction — the parse now succeeds before scope classification ever runs.
+
+Known reading accepted: on an EMPTY figure a 4-letter run starting with S (`SABC`) reads as a
+quadrilateral, not the area notation — area notation binds to an existing triangle, which an empty
+figure cannot have.
+
+Locks: `bare-label-run.test.ts` (byte-identity to the noun forms across casings ×2 shapes, the
+segment/repeat/existing/5-letter boundaries); scenario `bare-label-run-declares-quadrilateral` (the
+prod opener end-to-end); catalog row (shapes).
