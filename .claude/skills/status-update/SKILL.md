@@ -113,6 +113,12 @@ reason the report exists as a habit. Its four sub-lists:
   (H-value S-complexity first), or risk isolation (don't put two L-risk solver items in one round).
 - Name what you deliberately deferred and why, in one line — the operator should see the shape of the
   choice, not just its result.
+- **Close with the one-reply arming line** (ADR-W-014): tell the operator that replying "approved"
+  (or "approved, but swap X for Y") arms exactly this composition — you then apply `auto-ok` to the
+  named issues **in the same turn**, each with an audit comment quoting the approval and its date,
+  and confirm the queue state back. Approval must be explicit and name/accept THIS batch — silence,
+  enthusiasm, or old prose approvals in issue bodies arm nothing. An operator edit ("also add #N")
+  is part of the approval; transcribe it as given.
 
 ## Grounding rules
 
