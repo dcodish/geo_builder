@@ -575,6 +575,16 @@ exports[`parser shadow-matrix — catalog corpus > winner rule per catalog utter
   },
   {
     "lang": "en",
+    "text": "ABCD",
+    "winner": "(none)",
+  },
+  {
+    "lang": "he",
+    "text": "ABCD",
+    "winner": "(none)",
+  },
+  {
+    "lang": "en",
     "text": "kite ABCD",
     "winner": "(anon)",
   },

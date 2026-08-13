@@ -7051,3 +7051,12 @@ figure cannot have.
 Locks: `bare-label-run.test.ts` (byte-identity to the noun forms across casings ×2 shapes, the
 segment/repeat/existing/5-letter boundaries); scenario `bare-label-run-declares-quadrilateral` (the
 prod opener end-to-end); catalog row (shapes).
+
+**Amendment (same change):** two locks moved DELIBERATELY. `bare-segment.test.ts` pinned «ABC» as
+not-handled ("ambiguous — left for the LLM") — superseded by this ruling; the lock now asserts the
+triangle (and still asserts it is never a SEGMENT, which is that file's own boundary). The 2-D
+shadow-matrix's "every supported catalog utterance is claimed" invariant probes under a permissive
+context that pre-places every capital — a freshness-gated declaration legitimately declines there, so
+the invariant gained an EMPTY-context fallback probe ("claimed under SOME honest context"). Both
+snapshot moves are additive-only (the new catalog row; winner "(none)" under the all-capitals context
+is pinned and explained).

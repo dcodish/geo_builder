@@ -52,7 +52,10 @@ describe('bare-segment shorthand', () => {
   it('rejects what is not a clean two-label token', () => {
     expect(types('A')).toEqual(['NOT-HANDLED']); // a single label is not a segment
     expect(types('AA')).toEqual(['NOT-HANDLED']); // degenerate
-    expect(types('ABC')).toEqual(['NOT-HANDLED']); // ambiguous (triangle? path?) — left for the LLM
+    // #505 (ADR-444): a bare 3-letter run of NEW labels now DECLARES the triangle (was: "ambiguous —
+    // left for the LLM"; the operator ruled a bare name declares the obvious object). Still never a
+    // SEGMENT — this rule's own boundary is unchanged, which is what this file locks.
+    expect(types('ABC')).toEqual(['triangle']);
   });
 
   it('⟂ (U+27C2) is accepted for perpendicular, like ⊥ (U+22A5)', () => {

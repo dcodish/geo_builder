@@ -101,7 +101,15 @@ describe('parser shadow-matrix — catalog corpus', () => {
     // A catalog construct is, by definition, supported — so a rule must claim it. If this fails, a shadow
     // or a keyword regression made a supported phrasing fall through to the LLM. (phase4 asserts .ok; this
     // asserts a deterministic rule — not the escalation path — owns it.)
-    const escalating = corpus.filter(({ text }) => analyze(text).winner === '(none)').map((c) => c.text);
+    // #505 (ADR-444): a FRESHNESS-GATED declaration (the bare label run — claims only NEW letters, so a
+    // run over existing points stays the #536 ordered-line lane's) legitimately declines under this
+    // file's permissive CTX, which pre-places every capital. Such a row gets a second probe under the
+    // EMPTY context before being counted as escalating — the invariant is "claimed under SOME honest
+    // context", not "claimed with every letter already taken".
+    const escalating = corpus
+      .filter(({ text }) => analyze(text).winner === '(none)')
+      .filter(({ text }) => analyze(text, {}).winner === '(none)')
+      .map((c) => c.text);
     expect(escalating).toEqual([]);
   });
 });
