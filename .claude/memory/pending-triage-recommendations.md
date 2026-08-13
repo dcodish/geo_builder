@@ -13,14 +13,11 @@ found **no NEW LIVE gaps**, but hand-verifying the UNVERIFIED cluster produced t
 recommendations that are **awaiting operator approval** and live only in the gitignored
 `reports/log-triage-recommendation-2026-08-11.md` on the work PC:
 
-1. ~~**Arc relations demand an explicit «במעגל O» anchor**~~ — **superseded and re-diagnosed 2026-08-11
-   (home PC), see `reports/log-triage-recommendation-2026-08-11-home.md` REC-1.** The anchor is NOT
-   required: «קשת AD = קשת BC» builds fine against a single anonymous circle at HEAD. The real
-   discriminator is the circle **count** — `existingCircleRef` (src/parser/parse.ts:345) ends with
-   `circles.length === 1 ? circles[0] : null`, so ANY anonymous «המעגל» reference dies the moment a
-   second circle exists (verified on triangle + circumcircle + incircle: tangent-at-a-point and arc
-   equality both not-handled; `מיתר AB` binds correctly because it uses `withCarrierMembership`/ADR-119
-   instead). Fix = a membership tie-break at that chokepoint + `ambiguous-circle` clarify. Still P2, 2d.
+1. ~~**Arc relations demand an explicit «במעגל O» anchor**~~ — superseded by REC-1, which was
+   **APPROVED and FILED 2026-08-13 as issue #546** (feature, P2, 2d). Operator ruled: membership
+   tie-break first (bind when the utterance's named points uniquely determine the circle, matching
+   the ADR-119 chord behavior), and an `ambiguous-circle` clarify telling the student to name the
+   circle when it stays ambiguous. The issue queue owns it now — nothing pending here.
 2. **Forward references between clauses of one utterance** (proposed P3, 2d). «F אמצע DO … O - חיתוך
    של AC ו-BD» — every clause parses alone (dash+של phrasing is covered); `splitStatements` applies
    left-to-right so a last-clause definition drops earlier clauses' points. Fix: topological clause
@@ -32,6 +29,11 @@ is not, and it is the only prod row in the window where the **LLM failed too**. 
 
 On approval: file as `feature` issues (ready-to-file text is in the reports) and build via the docs/22
 PR route. Once all are filed or declined, **delete this memory** — the issue queue takes over.
+
+Re-confirmed by the 2026-08-13 work-PC triage run: still no new 2-D gaps, and the tangent-cluster
+rows remain UNVERIFIED in the auto report (edit-action prefix). REC-1 was approved and filed that
+day (#546); **still pending an operator decision: item 2 (forward references between clauses) and
+REC-2 («המשיקים נחתכים בנקודה E», #546's sibling)**. SSH pull to the prod box worked again on 08-13.
 
 Context for a home-PC triage run: the surfaced ledger (#502) was committed/pushed 2026-08-11
 (`3430b60`), so carried rows will not re-surface as NEW. If the home scp ALSO fails, the droplet's
