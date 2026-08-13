@@ -35,6 +35,12 @@ Eligible = `auto-ok` AND a concrete fix plan in the body/comments AND not `needs
 An `auto-ok` issue with no real plan is a labeling error: record it in the ledger's Skipped
 section, leave a comment asking for triage, skip it — never invent the plan inline.
 
+`auto-ok` is valid two ways only (ADR-W-014, docs/22 §2d): applied by the operator's own hand,
+or applied by a session **transcribing an explicit operator batch approval**, in which case the
+issue MUST carry an audit comment quoting the approval. A label with no audit comment that the
+operator does not recognize is a labeling error → Skipped + a comment asking. The round itself
+NEVER applies `auto-ok` — composing and approving stay separate acts.
+
 - **Bundle** issues sharing one root cause or mechanism into a single work item (the plans say
   so when it's true — same class, same chokepoint). Bundling is encouraged when it is the right
   fix shape; the cap below never forbids a correct bundle.
@@ -147,6 +153,11 @@ executing now or crashed mid-flight.
 The final message: dev server already running, the URL (`http://localhost:5173/` — root, not
 `/geo-builder/`), the play sheet inline (the round issue is the durable copy), the escalation
 list, and honest gate results. Tests green is our gate, not the operator's.
+
+It ends with a **"waiting on you" digest** (ADR-W-014 — the operator must never have to ask
+what's blocked on them): open `needs-operator` decisions (one line each, the question itself),
+and remaining planned issues awaiting `auto-ok` (so the NEXT round can be armed with one
+reply). Keep it to one short list; `/status-update` stays the full surface.
 
 ## What a round NEVER does
 

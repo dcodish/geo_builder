@@ -113,9 +113,10 @@ Authoritative: [docs/22-workflow.md](docs/22-workflow.md) ([ADR-265](docs/06-dec
 `dcodish/geo_builder`, even when fixed in the same session). Labels: type `bug`/`feature`/`debt` + priority
 `P1` (prod honesty/correctness — drop everything) / `P2` (real input fails visibly — schedule by log-triage
 demand) / `P3` (polish/debt — batch) + product `2d`/`3d`/`server`/`workspace`; `needs-operator` when blocked
-on a decision; `auto-ok` (operator-applied ONLY) marks a fix plan approved for the autonomous `/fix-round`
-loop, whose round issues carry `awaiting-play` until the operator validates the batch
-([docs/22 §2d](docs/22-workflow.md), ADR-W-012). A "bug" diagnosed as a **missing capability is relabelled `feature` and treated as one** —
+on a decision; `auto-ok` (operator-**approved** ONLY — a session may apply it only as transcription of
+the operator's explicit batch approval, with an audit comment on the issue, ADR-W-014) marks a fix plan
+approved for the autonomous `/fix-round` loop, whose round issues carry `awaiting-play` until the
+operator validates the batch ([docs/22 §2d](docs/22-workflow.md), ADR-W-012). A "bug" diagnosed as a **missing capability is relabelled `feature` and treated as one** —
 never silently built under a bug's banner.
 
 - **Bugs:** diagnose per docs/17, fix at root, ADR + scenario, commit to `main` with `Fixes #NN`.

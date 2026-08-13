@@ -93,8 +93,15 @@ The operator-invoked batch loop that replaces one-at-a-time fix dispatch. Full p
 **`.claude/skills/fix-round/SKILL.md`**; the contract in one paragraph:
 
 A round picks **3–5 work items** (a bundle of issues sharing one root cause counts as one item) from
-the open issues labeled **`auto-ok`** — the label only the operator applies, after reading the issue's
-fix plan; `needs-operator` disqualifies. The round's ONE durable artifact, the **round issue**, is
+the open issues labeled **`auto-ok`** — the label records an **operator approval** of the issue's fix
+plan; `needs-operator` disqualifies. The approval is the operator's alone, but its *application* may be
+transcription ([ADR-W-014](06w-decisions-workspace.md)): when a session has presented a concrete batch
+(e.g. `/status-update`'s recommended round) and the operator replies with an explicit batch approval
+("approved", "okay, fix 1/2/3", including swaps), the session applies `auto-ok` to exactly the named
+issues and posts an **audit comment on each** quoting the approval and its date. A session never infers
+approval — not from silence, not from old prose in an issue body, only from an explicit operator
+statement naming or accepting a presented batch; and a bare `auto-ok` with neither an audit comment nor
+the operator's own hand behind it is a labeling error, not an eligibility. The round's ONE durable artifact, the **round issue**, is
 opened **at composition time** (label `in-round` — [ADR-W-013](06w-decisions-workspace.md)) carrying
 the announced composition plus the eligible-but-not-picked list, and is updated as each item resolves —
 a live ledger, so a crashed session leaves a discoverable round rather than orphaned commits. Each item

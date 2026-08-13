@@ -480,3 +480,36 @@ for mechanically enforced.
 the round pays one extra `gh issue create` at start and one `gh issue edit` per item. What it buys:
 plan-vs-outcome readable without the session chat, crash-safe rounds, one-hop evidence per landing,
 and an escalation-rate record that accumulates by construction.
+
+## ADR-W-014 — Batch approval: one operator okay arms a round; `auto-ok` may be transcribed, with an audit comment (#548)
+
+**Status:** accepted, 2026-08-13 · **Amends:** [ADR-W-012](#adr-w-012--fix-round-autonomous-execution-of-operator-approved-fix-plans-543-544)
+
+**Context.** The first live-round attempt starved on an empty `auto-ok` queue — while five issues
+(#546 #505 #504 #503 #392) carried the operator's approval **in prose** from earlier triage sessions.
+The approval had happened; only its transcription into the label had no owner, so the operator was
+being charged a second, per-issue approval act for decisions already made. The operator's ruling
+(2026-08-13, scoped via explicit A/B/C question): approval stays per-batch and explicit — **"batch
+okay per round"** — not standing class-based pre-approval, which remains the Phase-2 landing-policy
+question (#543) awaiting measured escalation rates.
+
+**Decision.** The `auto-ok` label records an **operator approval**; who types the `gh` command is
+transcription. When a session has presented a concrete composition (typically `/status-update`'s
+recommended round) and the operator replies with an explicit batch approval ("approved", "okay, fix
+1/2/3", with any swaps), the session applies `auto-ok` to exactly the named issues **in the same
+turn** and posts an **audit comment on each**, quoting the approval and its date. A session never
+infers approval — not from silence, not from prose in an issue body (prose approvals are surfaced as
+*candidates* and re-presented for a batch okay, exactly as the five above were backfilled via an
+explicit question). `/fix-round` treats a bare `auto-ok` with neither an audit comment nor the
+operator's own memory of applying it as a labeling error (Skipped + ask). The round itself still
+never applies the label — composing and approving remain separate acts. Every round's final message
+additionally carries a **"waiting on you" digest** (open `needs-operator` questions + plans awaiting
+`auto-ok`), so what is blocked on the operator reaches them without a separate report — their stated
+requirement ("if there are things waiting for my decision, I need to know").
+
+**Consequences.** The operator's cost per round drops from N label edits to one reply, on either PC
+(labels and audit comments live on GitHub, so the armed queue travels by construction). The audit
+comment preserves the paper trail ADR-W-013 noted cannot be enforced by actor identity — provenance
+is now readable on the issue itself. Touchpoints: docs/22 §2d, CLAUDE.md label glossary,
+`.claude/skills/status-update/SKILL.md` (the arming line), `.claude/skills/fix-round/SKILL.md`
+(Step 1 validity rule + Step 6 digest).
