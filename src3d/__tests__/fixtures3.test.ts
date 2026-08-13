@@ -48,6 +48,30 @@ const SEEDED: Record<string, string[]> = {
     'הישר k מקביל למישור BCK',
     'S על הישר k',
   ],
+  // #557 play (ADR-3D-141 Am. 1) — the operator's EXACT session that surfaced the pivot-staleness
+  // class: a coordinate-injected prism (the '4-vectors' bagrut figure), a declared bare «l», then
+  // «l⊥BCK» — the free line must hold against the pivot-placed figure, every fact green.
+  'free-line-552-play.geo3.json': [
+    'מנסרה ישרה שבסיסה משולש ישר זוית',
+    'זוית BAC=90',
+    'AB=u',
+    'AC=v',
+    "AA'=w",
+    'BE=0.2BC',
+    "B'E",
+    "EC'",
+    '|u|=3',
+    '|v|=4',
+    "B'E⊥C'E",
+    'A(0,0,0)',
+    'B על החלק החיובי של ציר x',
+    'C על החלק החיובי של ציר y',
+    "A' על החלק החיובי של ציר z",
+    "K אמצע AA'",
+    'המישור BCK',
+    'l',
+    'l⊥BCK',
+  ],
   'planes-2022-q2.geo3.json': [
     'המישור π1: z - 3 = 0',
     'המישור π2: ay + z - 8 = 0',
