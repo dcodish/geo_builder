@@ -410,10 +410,30 @@ const obliquePrism: Rule = (s) => {
   const stated = par || rhombus || square || rect || tri || quad;
   // #435: rightness read WITHOUT the base triangle's own qualifier (see rightPrism).
   const sr = withoutTriQualifier(s);
-  const barePrism = isPrism && !/ישרה/.test(sr) && !/\bright\b/i.test(sr) && stated;
+  // #392 ([ADR-3D-143](../../docs/06b-decisions-3d.md)): NO base noun at all — derive the base arity
+  // from the LABEL RUN when it is unambiguous: 2n labels (n = 3..4) whose second half mirrors the
+  // first with primes («מנסרה ABCA'B'C'» — a 6-label primed-mirror run fully determines a TRIANGULAR
+  // prism; no unstated assumption is needed). The derived base is the GENERAL triangle/quad — deriving
+  // a parallelogram or regularity would assert a property the student never stated (ADR-052) — and
+  // obliqueness stays the default (ADR-3D-089). A mismatched run (odd count, unmirrored primes, n≥5)
+  // keeps the honest not-handled/guidance.
+  const toks0 = firstLabelRun(s);
+  let derived: 3 | 4 | null = null;
+  if (isPrism && !stated && !named && (toks0.length === 6 || toks0.length === 8)) {
+    const n = toks0.length / 2;
+    const head = toks0.slice(0, n);
+    const tail = toks0.slice(n);
+    if (head.every(unprimed) && tail.join(' ') === primeAll(head).join(' ')) derived = n as 3 | 4;
+  }
+  const barePrism = isPrism && !/ישרה/.test(sr) && !/\bright\b/i.test(sr) && (stated || derived !== null);
   if (!named && !barePrism) return null;
   // The base template: a triangle/quad of its own, else the parallelogram carrying the family's constraints.
-  const kind: SolidKind = tri && !quad ? (equi ? 'prism3e' : 'prism3') : quad && !par && !rhombus && !square && !rect ? 'prism4g' : 'prism4';
+  const kind: SolidKind =
+    derived === 3 ? 'prism3'
+    : derived === 4 ? 'prism4g'
+    : tri && !quad ? (equi ? 'prism3e' : 'prism3')
+    : quad && !par && !rhombus && !square && !rect ? 'prism4g'
+    : 'prism4';
   const bn = kind === 'prism3' || kind === 'prism3e' ? 3 : 4;
   const base = ['A', 'B', 'C', 'D'].slice(0, bn);
   const toks = firstLabelRun(s);

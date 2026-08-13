@@ -31,6 +31,8 @@ export const COMMAND_CATALOG_3D: CatalogEntry3[] = [
   // #349 (ADR-3D-089): obliqueness is a MODIFIER of any prism kind, so the triangle / general-quad bases
   // build oblique too — the tilt is a free DOF and «המנסרה ישרה» pins it upright.
   { category: 'solids', he: 'מנסרה משולשת ABC', en: 'triangular prism ABC' },
+  // #392 (ADR-3D-143): no base noun — the primed-mirror label run itself derives the arity (oblique).
+  { category: 'solids', he: "מנסרה ABCA'B'C'", en: "prism ABCA'B'C'" },
   { category: 'solids', he: 'מנסרה שבסיסה משולש', en: 'prism with a triangle base' },
   { category: 'solids', he: 'מנסרה שבסיסה מרובע', en: 'prism with a quadrilateral base' },
   { category: 'solids', he: 'המנסרה ישרה', en: 'the prism is right' }, // #289 (M1): make the existing prism a right prism

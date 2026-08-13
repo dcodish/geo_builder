@@ -3398,3 +3398,22 @@ ambiguity refused, and the #448/#467 suites unchanged. Catalog: the two new rows
 
 The shadow-matrix snapshot moved ADDITIVELY only — the four new catalog rows won by `perpToBase`,
 their intended owner; no existing row changed hands (the ADR-3D-137 no-theft evidence).
+
+## ADR-3D-143 — Bare «מנסרה ABCA'B'C'»: the base arity is derived from the label run (#392)
+
+Prod (log-triage 2026-07-28, 1 user; operator approved 2026-07-29 — "ABCA'B'C' should create a
+triangular base"): «מנסרה ABCA'B'C'» was not-handled while «מנסרה משולשת …» built. A 2n-label run
+with a primed-mirror second half FULLY determines the base arity — no unstated assumption is needed —
+so requiring the base noun was pure ceremony.
+
+Decision: in `obliquePrism`, when NO base noun is present, a run of 2n labels (n = 3..4) whose second
+half mirrors the first with primes derives the kind — n=3 → `prism3`, n=4 → `prism4g` — as the
+GENERAL triangle/quad (deriving a parallelogram or regularity would assert a property the student
+never stated, ADR-052), oblique by default (ADR-3D-089), «המנסרה ישרה» composing as the #289 M1
+make-right. Mismatched runs — odd count, unmirrored primes, a primed head, n≥5 (the regular-base
+boundary) — keep the honest not-handled/guidance. The derived read lowers byte-identically to the
+spelled-out «מנסרה משולשת ABCA'B'C'» (locked), and the shadow-matrix snapshot moved additively only.
+
+Locks: `prism-label-arity.test.ts` (the He/En 6- and 8-label runs → kind/ids/oblique; the tilt
+genuinely FREE across seeds; «המנסרה ישרה» composing; four mismatch refusals; byte-identity to the
+stated-base form). Catalog: the bare-run row (He + En).
