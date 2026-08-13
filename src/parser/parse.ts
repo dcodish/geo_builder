@@ -33,6 +33,11 @@ export type ParseResult =
   // outer/inner qualifier and no disambiguating stated membership — WHICH circle is meant is the
   // student's to say ("המעגל החיצוני"/"the inner circle"), never a silent pick or an LLM guess.
   | { ok: false; reason: 'ambiguous-circle'; center: string }
+  // #546 (ADR-443): an ANONYMOUS circle reference («המעגל» with no centre named) in a circle-construct
+  // statement, beside ≥2 circles, that even the membership tie-break could not bind — WHICH circle is
+  // the student's to say (ADR-052), never a silent pick, never a paid LLM guess. `centers` are the
+  // referenceable candidates, so the message can name them.
+  | { ok: false; reason: 'ambiguous-circle-ref'; centers: string[] }
   // #354 (ADR-403): a CONTAINMENT with no container named («מעגל מוכל») on a figure that already has two or
   // more circles — which one contains it cannot be inferred and must not be guessed (ADR-052). With 0 or 1
   // circles the container IS determined (introduced / the single circle, ADR-376) and it builds; only the
@@ -203,7 +208,7 @@ const orientTouchCut = (s: string, ctx: ParseContext, center: string, touch: str
 /** A rule (or post-pass) recognised the input but needs the student to disambiguate (see `ParseResult`
  *  'ambiguous-angle' / 'ambiguous-circle'). Returned in place of commands; `parse` turns it into the
  *  matching `{ ok:false }` clarification result. */
-type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string };
+type Clarify = { clarify: 'ambiguous-angle'; vertex: string } | { clarify: 'ambiguous-circle'; center: string } | { clarify: 'ambiguous-circle-ref'; centers: string[] } | { clarify: 'ambiguous-container'; centers: string[] } | { clarify: 'tangents-exhausted'; kind: 'external' | 'internal' | 'any'; hint?: 'at-touch'; position?: 'disjoint' | 'ext-tangent' | 'intersecting' | 'int-tangent' | 'contained' } | { clarify: 'alias-taken'; name: string };
 type Rule = (s: string, ctx: ParseContext) => AnyCommand[] | null | 'stop' | Clarify;
 
 const up = (c: string): Id => c.toUpperCase();
@@ -308,7 +313,14 @@ const directionalCircleRef = (s: string, ctx: ParseContext): string | null => {
 };
 
 const resolveCenter = (s: string, ctx: ParseContext): string | null =>
-  circleCenter(s) ?? circumscribingRef(s, ctx) ?? directionalCircleRef(s, ctx) ?? (ctx.circles?.length === 1 ? ctx.circles[0] : null);
+  circleCenter(s) ??
+  circumscribingRef(s, ctx) ??
+  directionalCircleRef(s, ctx) ??
+  // #546 (ADR-443): the anonymous tail — exactly one circle binds as always (ADR-029), and beside
+  // SEVERAL the utterance's own member points may determine the circle (the membership tie-break).
+  // The `length === 1 ? [0] : null` idiom lived in THREE resolver helpers, not one — this tail, the
+  // `resolveMentionedCircle` twin, and `existingCircleRef` — so the tie-break lands in all three.
+  (ctx.circles?.length === 1 ? ctx.circles[0] : anonymousCircleOf(s, ctx));
 
 /** True when the utterance explicitly refers to a circle — named ("circle O") or definite ("the circle" / "המעגל"). */
 const mentionsCircle = (s: string): boolean => /circle|מעגל/i.test(s);
@@ -321,7 +333,11 @@ const mentionsCircle = (s: string): boolean => /circle|מעגל/i.test(s);
  * circle intersection. (Operator principle: with one circle in the diagram you needn't name it.)
  */
 const resolveMentionedCircle = (s: string, ctx: ParseContext): string | null =>
-  circleCenter(s) ?? circumscribingRef(s, ctx) ?? directionalCircleRef(s, ctx) ?? (mentionsCircle(s) && ctx.circles?.length === 1 ? ctx.circles[0] : null);
+  circleCenter(s) ??
+  circumscribingRef(s, ctx) ??
+  directionalCircleRef(s, ctx) ??
+  // #546 (ADR-443): the same anonymous tail as `resolveCenter`, behind this helper's mention gate.
+  (mentionsCircle(s) ? (ctx.circles?.length === 1 ? ctx.circles[0] : anonymousCircleOf(s, ctx)) : null);
 
 /**
  * Resolve the circle a construct rule acts on, INTRODUCING it when the reference has no referent yet —
@@ -352,6 +368,12 @@ const resolveMentionedCircle = (s: string, ctx: ParseContext): string | null =>
  * exactly ONE circle — that circle (ADR-029's operator principle: *with one circle in the diagram you
  * needn't name it*). A HIDDEN circle counts: a semicircle's circle is a circle, and `pointOnCircle`
  * already resolved to it, so a rule that did not was simply disagreeing with its siblings.
+ *
+ * #546 ([ADR-443](docs/06-decisions.md#adr-443)): beside SEVERAL circles an anonymous reference is not
+ * hopeless — the utterance's own named points often determine the circle. The membership TIE-BREAK
+ * (the #221 `commonHostCentre` idea, generalised to this seam so tangent-at-a-point, the arc family and
+ * every other routed rule inherit it at once) binds when the named points share a UNIQUE host. Still
+ * ambiguous stays null here; the `ambiguousCircleAsk` last-resort rule then ASKS instead of escalating.
  */
 const existingCircleRef = (s: string, ctx: ParseContext): string | null => {
   const namedRaw = circleCenter(s);
@@ -359,7 +381,28 @@ const existingCircleRef = (s: string, ctx: ParseContext): string | null => {
   const named = namedRaw && /^[A-Z]/.test(namedRaw) ? up(namedRaw) : null;
   const circles = (ctx.circles ?? []).filter((c) => !c.startsWith('~'));
   if (named) return circles.some((c) => up(c) === named) ? named : null;
-  return circles.length === 1 ? circles[0] : null;
+  if (circles.length === 1) return circles[0];
+  return circles.length > 1 ? anonymousCircleTieBreak(s, ctx, circles) : null;
+};
+
+/** The one circle EVERY informative utterance label lives on, or null. A label on no circle says nothing
+ *  (a fresh touch/crossing point); labels on circles vote by INTERSECTION — membership over position
+ *  (ADR-233/119). Unique survivor → that circle; none or several → null (genuinely ambiguous). */
+const anonymousCircleTieBreak = (s: string, ctx: ParseContext, circles: string[]): string | null => {
+  const pts = [...new Set((dropCircleRef(s).match(/[A-Za-z]\d*/g) ?? []).filter((t) => isUpperLabel(t)).map(up))];
+  let cand: string[] | null = null;
+  for (const p of pts) {
+    const hosts = circles.filter((c) => membersOfCenter(ctx, c).has(p));
+    if (hosts.length === 0) continue;
+    cand = cand === null ? hosts : cand.filter((c) => hosts.includes(c));
+  }
+  return cand && cand.length === 1 ? cand[0] : null;
+};
+
+/** The tie-break over the figure's referenceable circles — the shared tail of all three resolver helpers. */
+const anonymousCircleOf = (s: string, ctx: ParseContext): string | null => {
+  const circles = (ctx.circles ?? []).filter((c) => !c.startsWith('~'));
+  return circles.length > 1 ? anonymousCircleTieBreak(s, ctx, circles) : null;
 };
 
 const resolveOrIntroduceCircle = (s: string, ctx: ParseContext, opts?: { implied?: boolean }): { center: string; prepend: AnyCommand[] } | null => {
@@ -7851,6 +7894,27 @@ const unnamedSecant: Rule = (s, ctx) => {
   ];
 };
 
+/** #546 ([ADR-443](docs/06-decisions.md#adr-443)) — the ASK half of the anonymous-reference fix, LAST
+ *  resort by registration so it can steal nothing: a circle-CONSTRUCT statement whose anonymous circle
+ *  reference no rule (and no membership tie-break) could bind, beside ≥2 circles, ASKS which circle —
+ *  never `not-handled`, which would burn a paid LLM call on a construct the grammar owns, and never a
+ *  silent pick (ADR-052). Deliberately narrow gates:
+ *   - only the construct nouns that route through the ADR-029 seam (tangent/chord/diameter/arc/on-the-
+ *     circle) — a bare «מעגל» mention (area/radius/ratio talk) keeps its LLM path;
+ *   - OFF when a qualifier names its own resolver's channel (size/side/concentric/circum/contained —
+ *     those have their own rules, clarifies and fallbacks);
+ *   - OFF when a centre IS named (that rule failed for its own reason, not this ambiguity);
+ *   - OFF when the tie-break binds (then the construct rule itself was the gap — escalate as before). */
+const ambiguousCircleAsk: Rule = (s, ctx) => {
+  const circles = (ctx.circles ?? []).filter((c) => !c.startsWith('~'));
+  if (circles.length < 2) return null;
+  if (!/משיק|tangent|מיתר|chord|קוטר|diameter|קשת|\barc\b|על\s+ה?מעגל|on\s+the\s+circle/i.test(s)) return null;
+  if (/גדול|קטן|ימני|שמאלי|חיצוני|פנימי|חוסם|חסום|מוכל|outer|inner|\bright\b|\bleft\b|larger|smaller|circumscrib|inscrib|contained/i.test(s)) return null;
+  if (circleCenter(s)) return null;
+  if (anonymousCircleTieBreak(s, ctx, circles)) return null;
+  return { clarify: 'ambiguous-circle-ref', centers: circles.map((c) => (c.startsWith('@ctr-') ? c.slice(5) : c)) };
+};
+
 /** «[להוסיף את] מרכז המעגל» / "the centre of the circle" — REVEAL the single circle's hidden centre. */
 const showCenter: Rule = (s, ctx) => {
   if (!/cent(?:er|re)|מרכז/i.test(s) || !mentionsCircle(s)) return null;
@@ -8023,6 +8087,7 @@ export const RULES: Rule[] = [
   freePoint,
   bareFreePoint, // "נקודה A" / "point A" — a bare 2-DOF free point (no coords), after freePoint owns the coord form (#104)
   bareSegment, // LAST catch-all: a bare "AB" / "line AB" → draw the segment (after every keyword/structured rule)
+  ambiguousCircleAsk, // #546 VERY LAST: an unbindable anonymous circle reference beside ≥2 circles ASKS instead of escalating — after every rule, so it steals nothing
 ];
 
 /**
@@ -9052,7 +9117,11 @@ function parseResolved(s: string, ctx: ParseContext): ParseResult {
     return splitStatements(s, ctx) ?? regionSideFallback(s, ctx) ?? { ok: false, reason: 'not-handled' };
   }
   // A clarification (ambiguous-angle / ambiguous-circle) is a rule's genuine question — propagate it,
-  // never second-guess it with a split. Only a flat not-handled falls through to the clause fallback.
+  // never second-guess it with a split. Only a flat not-handled falls through to the clause fallback —
+  // EXCEPT the #546 anonymous-circle ask, which is a fallback-BOUNDARY question (its rule runs last
+  // precisely so it claims only what nothing else read): a compound utterance still gets its clause
+  // split first, and the ask stands only when no split parses either.
+  if (!whole.ok && whole.reason === 'ambiguous-circle-ref') return splitStatements(s, ctx) ?? regionSideFallback(s, ctx) ?? whole;
   if (whole.ok || whole.reason !== 'not-handled') return whole;
   return splitStatements(s, ctx) ?? regionSideFallback(s, ctx) ?? whole;
 }
@@ -9412,6 +9481,7 @@ function runRules(s: string, ctx: ParseContext): ParseResult {
     }
     // A clarification request (ambiguous single-vertex angle / ambiguous concentric-pair reference).
     if (res.clarify === 'ambiguous-angle') return { ok: false, reason: 'ambiguous-angle', vertex: res.vertex };
+    if (res.clarify === 'ambiguous-circle-ref') return { ok: false, reason: 'ambiguous-circle-ref', centers: res.centers };
     if (res.clarify === 'ambiguous-container') return { ok: false, reason: 'ambiguous-container', centers: res.centers };
     if (res.clarify === 'tangents-exhausted') return { ok: false, reason: 'tangents-exhausted', kind: res.kind, ...(res.hint ? { hint: res.hint } : {}), ...(res.position ? { position: res.position } : {}) };
     if (res.clarify === 'alias-taken') return { ok: false, reason: 'alias-taken', name: res.name };

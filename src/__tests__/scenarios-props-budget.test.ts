@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { replay, findValidConfig, searchResample, meetsRequirements, WORKER_SEARCH_BUDGET_MS } from '@/store/geoStore';
+import { lastConfigTier } from '@/replay/core';
 import { SCENARIOS, factsOf, at } from './scenarios-corpus';
 import type { Fact } from '@/store/geoStore';
 
@@ -53,5 +54,40 @@ describe('config searches get a generous budget off the main thread (issue #87)'
     const sc = SCENARIOS.find((s) => s.id === 'shared-endpoint-extension-either-side-default')!;
     expect(findValidConfig(structuredClone(factsOf(sc.steps)) as Fact[], 0, -1), 'expired budget gives up').toBeNull();
     expect(findValidConfig(structuredClone(factsOf(sc.steps)) as Fact[], 0, WORKER_SEARCH_BUDGET_MS), 'worker budget resolves it').not.toBeNull();
+  });
+
+  it('[#566 / ADR-445 Am. 1] the seat tier finds the rescue BEFORE the reflection tier runs', () => {
+    // The operator's play figure: with the seat tier ordered after the reflection tier, the mask×seed
+    // product ate the worker's 12 s and the rescue arrived cold at ~13.4 s — the live app kept the
+    // C-on-A collapse while the Infinity-budget suite stayed green (the issue-#19 trap, seat edition).
+    // A WALL-CLOCK assertion cannot live in the parallel suite (measured: 5 s solo, 28 s under CPU
+    // contention — a flake), so this locks the ORDERING itself via the tier instrumentation: the
+    // rescue must be produced by the 'seat' tier, i.e. before any reflection candidate was tried.
+    // The heavier two-circle edition rides the #546/#562 branch, whose grammar it needs.
+    const facts = structuredClone(
+      factsOf(['משולש ישר זווית ABC', 'משולש ABC חסום במעגל', 'משיק למעגל בנקודה B', 'קשת AB = קשת BC']),
+    ) as Fact[];
+    const found = findValidConfig(facts, 0);
+    expect(found, 'the seat flip is found').not.toBeNull();
+    expect(lastConfigTier, 'produced by the seat tier — ordered before the reflection sweep').toBe('seat');
+    expect(meetsRequirements(found!.facts, found!.seed)).toBe(true);
+  });
+
+  it('[#566 / ADR-445 Am. 1] the TWO-circle play figure (the #546 grammar): seat tier, before reflections', () => {
+    // The operator's exact round-#561 figure — the incircle group is what actually blew the 12 s
+    // worker budget when the seat tier ran after the mask×seed product. Same structural lock.
+    const facts = structuredClone(
+      factsOf([
+        'משולש ישר זווית ABC',
+        'משולש ABC חסום במעגל',
+        'מעגל חסום במשולש ABC',
+        'משיק למעגל בנקודה B',
+        'קשת AB = קשת BC',
+      ]),
+    ) as Fact[];
+    const found = findValidConfig(facts, 0);
+    expect(found, 'the seat flip is found on the full play figure').not.toBeNull();
+    expect(lastConfigTier, 'produced by the seat tier').toBe('seat');
+    expect(meetsRequirements(found!.facts, found!.seed)).toBe(true);
   });
 });

@@ -240,6 +240,15 @@ export async function runSubmit(utterance: string, deps: SubmitDeps): Promise<vo
     ui.setBusy(false);
     return;
   }
+  // #546 (ADR-443): a circle-construct statement whose ANONYMOUS circle reference could not be bound —
+  // ≥2 circles and even the membership tie-break says nothing — WHICH circle is the student's to say
+  // (ADR-052). Ask, naming the candidates; never a silent pick and never a paid LLM call that would guess.
+  if (!r.ok && r.reason === 'ambiguous-circle-ref') {
+    logDebug({ kind: 'input', utterance, locale, source: 'parser', result: `ambiguous-circle-ref:${r.centers.join(',')}` });
+    ui.setInputNote(t('input.ambiguousCircleRef', { circles: r.centers.join(', '), first: r.centers[0] ?? 'O' }));
+    ui.setBusy(false);
+    return;
+  }
   // #354: a containment whose CONTAINER was not named, on a figure with 2+ circles — which one contains it
   // is the student's to say (ADR-052), so ask instead of escalating to an LLM that could only guess.
   if (!r.ok && r.reason === 'ambiguous-container') {
