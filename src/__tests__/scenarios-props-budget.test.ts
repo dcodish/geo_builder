@@ -72,4 +72,22 @@ describe('config searches get a generous budget off the main thread (issue #87)'
     expect(lastConfigTier, 'produced by the seat tier — ordered before the reflection sweep').toBe('seat');
     expect(meetsRequirements(found!.facts, found!.seed)).toBe(true);
   });
+
+  it('[#566 / ADR-445 Am. 1] the TWO-circle play figure (the #546 grammar): seat tier, before reflections', () => {
+    // The operator's exact round-#561 figure — the incircle group is what actually blew the 12 s
+    // worker budget when the seat tier ran after the mask×seed product. Same structural lock.
+    const facts = structuredClone(
+      factsOf([
+        'משולש ישר זווית ABC',
+        'משולש ABC חסום במעגל',
+        'מעגל חסום במשולש ABC',
+        'משיק למעגל בנקודה B',
+        'קשת AB = קשת BC',
+      ]),
+    ) as Fact[];
+    const found = findValidConfig(facts, 0);
+    expect(found, 'the seat flip is found on the full play figure').not.toBeNull();
+    expect(lastConfigTier, 'produced by the seat tier').toBe('seat');
+    expect(meetsRequirements(found!.facts, found!.seed)).toBe(true);
+  });
 });
