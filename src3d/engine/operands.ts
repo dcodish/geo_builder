@@ -43,7 +43,17 @@ export interface AbsoluteCtx {
  * figure to MOVE ([ADR-3D-095]/[ADR-3D-100])? A named line/plane is absolute; everything named by
  * point ids rides the gauge.
  */
-export const isAbsolute = (op: Operand3): boolean => op.kind === 'line' || op.kind === 'plane-named';
+export const isAbsolute = (op: Operand3): boolean =>
+  op.kind === 'line' || op.kind === 'plane-named' || op.kind === 'plane-coord' || op.kind === 'axis';
+
+/**
+ * #512 — is this operand a PLANE? Asked by every rule that needs a plane on one side, and shared for
+ * the same reason the operand set itself is: each rule spelled `plane-run || plane-named` inline, so
+ * adding a third plane kind would have left the coordinate plane readable and still refused by ⟂ and
+ * ∥ — one missing set member surfacing again, one layer up.
+ */
+export const isPlanar = (op: Operand3): boolean =>
+  op.kind === 'plane-run' || op.kind === 'plane-named' || op.kind === 'plane-coord';
 
 /**
  * #500 (ADR-3D-124 Am. 2): is the operand fixed by its OWN definition — so a relation stated about it
@@ -69,6 +79,8 @@ export const operandLabel = (op: Operand3): string =>
   op.kind === 'point' ? op.id
   : op.kind === 'segment' ? `${op.a}${op.b}`
   : op.kind === 'plane-run' ? op.ids.join('')
+  : op.kind === 'plane-coord' ? `[${op.axes}]` // #512: the tool's own palette spelling
+  : op.kind === 'axis' ? op.axis
   : op.name;
 
 /** Resolve an operand to its geometry thunk. Null geometry (missing point, unknown name) at call time
@@ -111,6 +123,19 @@ export function resolveOperand(op: Operand3, c: Construction3, abs: AbsoluteCtx)
         if (norm3(n) < 1e-12) return null; // the run does not span a plane at these positions
         return { point: ring[0], normal: n, d: -(n.x * ring[0].x + n.y * ring[0].y + n.z * ring[0].z) };
       };
+    // #512 — the absolute frame. These are the one operand kind whose geometry does not depend on the
+    // figure at all, so unlike every other case the thunk can never return null: the xy-plane is z = 0
+    // and the x-axis is the line through the origin along x̂, in every configuration.
+    case 'plane-coord': {
+      const n = op.axes === 'xy' ? v3(0, 0, 1) : op.axes === 'yz' ? v3(1, 0, 0) : v3(0, 1, 0);
+      const geom: OperandGeom = { point: v3(0, 0, 0), normal: n, d: 0 };
+      return () => geom;
+    }
+    case 'axis': {
+      const dir = op.axis === 'x' ? v3(1, 0, 0) : op.axis === 'y' ? v3(0, 1, 0) : v3(0, 0, 1);
+      const geom: OperandGeom = { point: v3(0, 0, 0), dir };
+      return () => geom;
+    }
     case 'plane-named': {
       const pl = abs.planes.get(op.name);
       if (!pl) return () => null;
@@ -203,6 +228,24 @@ export function relDeviation(
   if (rel === 'parallel') return mixed ? cos : sin;
   const target = ((deg ?? 0) * Math.PI) / 180;
   return Math.abs(cos - (mixed ? Math.sin(target) : Math.cos(target)));
+}
+
+/**
+ * #523 — the MEASURED angle between any two operands, in degrees, by the same reading
+ * {@link relDeviation} checks against. Extracted rather than re-derived so a value the panel PRINTS
+ * and a value the verifier TESTS can never disagree — the `memberHolds3` / `paramIsKnowledge`
+ * precedent. The mixed line×plane pair reads `asin`, the same-type pairs `acos`, exactly as the
+ * deviation does; both are the undirected reading (≤ 90°), which is the textbook convention.
+ */
+export function angleBetweenOperands(a: OperandGeom, b: OperandGeom): number | null {
+  const ca = characteristic(a);
+  const cb = characteristic(b);
+  if (!ca || !cb) return null;
+  const den = norm3(ca.v) * norm3(cb.v);
+  if (den < 1e-12) return null;
+  const cos = Math.min(1, Math.abs(dot3(ca.v, cb.v)) / den);
+  const mixed = ca.planar !== cb.planar;
+  return ((mixed ? Math.asin(cos) : Math.acos(cos)) * 180) / Math.PI;
 }
 
 /**
@@ -412,6 +455,12 @@ export function sameOperand(a: Operand3, b: Operand3): boolean {
       const o = b as typeof a;
       return a.ids.length === o.ids.length && [...a.ids].sort().join() === [...o.ids].sort().join();
     }
+    // #512: `axes` is stored normalised, so structural identity is plain equality — «[yx]» and «[xy]»
+    // are the same operand and a relation stated between them is correctly refused as vacuous.
+    case 'plane-coord':
+      return a.axes === (b as typeof a).axes;
+    case 'axis':
+      return a.axis === (b as typeof a).axis;
   }
 }
 

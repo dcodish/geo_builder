@@ -17,7 +17,7 @@
 import { resolve3, scaleKnown3, translationPinned3, vectorFramePinned3 } from './evaluate';
 import { cross3, dot3, norm3, sub3, type Vec3 } from './vec3';
 import { figureSymbolsOf } from './types';
-import { distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, resolveOperand } from './operands';
+import { angleBetweenOperands, distanceBetween, figureExtent, mutualHolds, mutualSides, MUTUAL_VERIFY_TOL, operandLabel, planeCoincidenceDeviation, resolveOperand } from './operands';
 import type { Construction3, Id, MutualRel3, Operand3, Positions3 } from './types';
 
 /** Same local derivation as `evaluate.ts` — `vecDefs`' element type is not exported separately. */
@@ -683,6 +683,23 @@ export function dataView(c: Construction3, seed: number): DataPanel {
       if (Math.abs(d0 - d1) > 1e-4 * Math.max(d0, 1) || Math.abs(d0 - d2) > 1e-4 * Math.max(d0, 1)) continue;
       relations.push(`d(${opLabel(a)}, ${opLabel(b)}) = ${cleanMag(d0)}`);
     }
+  }
+
+  // #523 — a NAMED angle between any two operands («הזווית בין המישור ABC למישור SBC היא α»): the
+  // general twin of the `linePlaneMarks` loop above, printed under the SAME knowledge gate — the value
+  // appears only when every sampled configuration agrees, so a named angle the givens do not determine
+  // draws its name and no number. Measured by `angleBetweenOperands`, the function the claim verifier's
+  // `relDeviation` reads, so the printed value and the tested one cannot disagree.
+  for (const mk of c.relMarks) {
+    const degs = resolved.map((res) => {
+      const at = (id: Id) => res.positions.get(id) ?? null;
+      const abs = { lines: res.lines, planes: res.planes };
+      const ga = resolveOperand(mk.a, c, abs)(at);
+      const gb = resolveOperand(mk.b, c, abs)(at);
+      return ga && gb ? angleBetweenOperands(ga, gb) : null;
+    });
+    if (degs.every((d): d is number => d !== null) && degs.every((d) => Math.abs(d - degs[0]!) < 1e-4))
+      relations.push(`${mk.label} = ${cleanNum(degs[0]!, 1e-3)}°`);
   }
 
   // #94 — named-angle MARKERS (`∠SDB` / `∠SDB = α`): the measure, printed ONLY when it agrees across every

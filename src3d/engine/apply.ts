@@ -134,6 +134,7 @@ function clone(c: Construction3): Construction3 {
     solids: [...c.solids],
     points: new Map(c.points),
     linePlaneMarks: [...c.linePlaneMarks],
+    relMarks: [...c.relMarks],
     vectors: new Map(c.vectors),
     arrows: c.arrows.map(([f, t]) => [f, t] as [Id, Id]),
     segments: [...c.segments],
@@ -297,6 +298,11 @@ export function operandRefsError(c: Construction3, op: Operand3): EngineError3 |
       return c.vectors.has(op.name) ? null : { code: 'unknown-vector', id: op.name };
     case 'line':
       return c.lines.has(op.name) || c.pointLines.has(op.name) ? null : { code: 'unknown-line', id: op.name };
+    // #512: the coordinate frame names nothing the figure has to declare — it is always available, in
+    // every figure, which is the whole reason it needed no existence check and no new engine concept.
+    case 'plane-coord':
+    case 'axis':
+      return null;
     case 'plane-named':
       return c.planes.has(op.name) || c.pointPlanes.has(op.name) || c.relPlanes.has(op.name) ? null : { code: 'unknown-plane', id: op.name };
   }
@@ -957,6 +963,15 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
         const name = cmd.op.ids.join('');
         if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...cmd.op.ids]);
       }
+      // #523: a LABELLED angle NAMES the measure the question is about — «…היא α» states no value, so
+      // it must not drive and must not be verified as a claim; it marks, and the panel derives its
+      // degrees when the angle is seed-stable. Same semantics #319 gave the (segment × point-run)
+      // form, now reached from every operand pairing rather than the one rule that happened to get it.
+      if (cmd.label !== undefined) {
+        if (!next.relMarks.some((mk) => mk.label === cmd.label && sameOperand(mk.a, { kind: 'line', name: cmd.line }) && sameOperand(mk.b, cmd.op)))
+          next.relMarks.push({ a: { kind: 'line', name: cmd.line }, b: cmd.op, label: cmd.label });
+        return { ok: true, next };
+      }
       next.lineRels.push({
         rel: cmd.rel,
         ...(cmd.deg !== undefined ? { deg: cmd.deg } : {}),
@@ -1006,6 +1021,13 @@ function applyCommand3Inner(c: Construction3, cmd: Command3): ApplyResult3 {
           const name = op.ids.join('');
           if (!next.pointPlanes.has(name) && !next.planes.has(name)) next.pointPlanes.set(name, [...op.ids]);
         }
+      }
+      // #523: a LABELLED angle NAMES the measure rather than stating one — it marks, never drives or
+      // verifies (the #319 semantics, now reachable from every operand pairing).
+      if (cmd.label !== undefined) {
+        if (!next.relMarks.some((mk) => mk.label === cmd.label && sameOperand(mk.a, cmd.a) && sameOperand(mk.b, cmd.b)))
+          next.relMarks.push({ a: cmd.a, b: cmd.b, label: cmd.label });
+        return { ok: true, next };
       }
       // the DRIVE — only when both operands ride the gauge (an absolute side would have to MOVE the
       // figure, which is the pivot's lane; those instances stay claim-verified, see #386's sibling)

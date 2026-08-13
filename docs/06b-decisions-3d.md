@@ -3222,3 +3222,80 @@ it is scoped separately rather than bolted onto a P1.
 midpoint of A′C′), the invented quad asserted absent by name, the PROPERTY over nine marker spellings,
 a marker-without-a-readable-label declining, the no-marker point-first forms still reading positionally,
 spaced ≡ glued at all eight remaining sites, and the tangency label no longer dropped.
+
+### ADR-3D-140 — the angle OPERAND cluster: derive the operand, don't enumerate it (#522, #523, #524, #512, #534, #8)
+
+Six issues, one diagnosis. In each, a statement whose **twin builds** was refused the moment one
+coordinate of it changed — its NUMBER (singular → plural), its NOUN (מישור → פאה), its VALUE FORM
+(45 → α), or its PLANE KIND (ABC → [xy]) — and one layer down, the moment a free plane's stated angle
+was anything but the two endpoints the pin set happened to list. Every one is docs/17's *an enumeration
+is not a rule*, in the operand grammar rather than the refusal layer (ADR-3D-134's cluster) or the pin
+set (ADR-3D-138's).
+
+**#522 — number.** `NOUN` spelled the singular only, so `readOperand('המישורים ABC')` could not strip
+its noun and classified as no operand at all. Because the seam is SHARED, that single omission refused
+the plural form across angle, ⟂, ∥ **and** distance simultaneously — which is what makes it one defect
+and not four. Plurals are now an optional SUFFIX on each atom exactly as `ה?` is an optional prefix, and
+the CONJOINED subject (one noun heading two operands, with a plural predicate) is read once by
+`readOperandList` / `readRelationSides` at the seam. A per-rule fix here would have been the enumeration
+mistake again, one level up.
+
+**#524 — noun.** `פאה`/`בסיס` are how a bagrut question names the two planes of a dihedral: by role in
+the solid, not by point run. A face and a base ARE point-run planes, so nothing in the engine was
+missing — pure operand vocabulary, inherited by every relation family at once. `PERP_SPLIT` gained the
+feminine agreement «מאונכת» in the same breath: a predicate must be admitted wherever its subject can
+be, and `פאה` is feminine (∥ already carried its full set; ⟂ carried only the plural).
+
+**#523 — value form.** #319 gave the α NAMING form to `linePlaneAngle`'s value reader alone, so «…היא
+α» worked for exactly one operand pairing and refused the moment either side changed kind. The angle
+sentence is read by three parallel rules split by operand kind, so a value form added to one of them is
+a divergent shadow pair by construction. One `ANGLE_VAL` atom now serves all three, and a general
+`relMarks` carries a named angle over ANY operand pair. The panel derives its degrees through
+`angleBetweenOperands` — **extracted from `relDeviation`**, so the value PRINTED and the value TESTED
+cannot disagree (the `memberHolds3` precedent) — under the same knowledge gate as every derived value:
+a named angle the givens do not determine shows its name and no number.
+
+**#512 — plane kind.** A coordinate plane existed only as a special-cased tail inside the #324 rule,
+whose subject must be a point-ring, so ~8 unrelated-looking refusals were one missing member of the
+operand set. `Operand3` gains `plane-coord` and `axis`; they are the one kind whose geometry is
+figure-independent, so the resolver cannot fail. `isPlanar` is shared for the same reason the set is.
+The point-run cell lowers to the EXISTING `coord-plane-rel` command rather than a second spelling of one
+relation.
+
+**#534 — the pin set, again.** `resolveFreePlane` honoured `perp` and `parallel` and dropped `angle`.
+But those two ARE the line↔plane angle at its endpoints — «ℓ ⊥ π» is β = 90° (n ∥ û), «ℓ ∥ π» is β = 0°
+(n ⊥ û) — so the code enumerated the ends of a continuum and refused everything between. With |n̂| = 1,
+sin β = |n̂·û|, so the normal rides a CONE about the line at half-angle (90° − β); the half-angle is
+knowledge and the SPIN is not, so the spin is sampled and "show another configuration" walks the family.
+The endpoints now fall out of the general case instead of standing beside it.
+
+**#8 — and the exam gap closes on the vocabulary.** With #524 landed, «הזווית בין הפאה SBC לבסיס ABCD
+היא 60» drives the pyramid to exactly 60° with no new geometry at all. The in-face altitude likewise
+needed only the definite article and a trailing naming triangle on a construct that already existed.
+The apex-form remainder («הגובה מ-S לצלע BC») belongs to #343 and is left there.
+
+**Two hazards, both found by measurement and fixed rather than shipped.**
+1. *The shadow-matrix HARD gate earned its keep.* The moment the plural noun became readable,
+   `planeRelAngle` could claim «הזווית בין המישורים π1 ו-π2 היא 45» — which `angleBetweenPlanes` owns
+   with a different lowering (the parameter root-find and branch choice ride on it). The winner had not
+   changed, but two rules reading one sentence differently is a trap waiting on rule order. Resolved by
+   an explicit deferral, so **the pair is gone rather than allowlisted**.
+2. *A new operand re-created ADR-3D-138's false accusation.* Routing coordinate-frame relations through
+   the ordinary claim lane made «BD' ⊥ מישור [xy]» come back `claim-refuted` — yet it is satisfiable
+   (rotate the box until the diagonal stands vertical); nothing drives the figure's PLACEMENT, which is
+   the pivot's lane (#386). `hasAbsoluteFrameObject` now counts the frame itself (it had enumerated the
+   absolute objects that can be DECLARED and missed the frame), `Resolved3` publishes
+   `placementSampled`, and a frame claim judged against a placement the funnel INVENTED reports
+   `placement-not-fixed` — what is actually missing — instead of blaming the student. A parse-time
+   refusal was tried first and rejected: it also deferred pairings that verify perfectly well.
+
+**Left open, deliberately:** the standalone «מישור [xy]» declaration (it needs the operator's ruling on
+whether it should DRAW a reference plane), the axis relation cells, and a driving pin for
+gauge×frame ⟂/∥ — filed as #537 rather than half-built.
+
+**Locked** in `angle-operand-cluster.test.ts` (37 tests): every row of #522's table as a
+singular≡plural pair, #524's four namings plus the feminine predicate, #523's six pairings carrying the
+label with the numeric twin still driving and the determined/under-determined split, #512's parse table
+with the four #324 baselines asserted byte-identical and both sides of the placement guard, #534's angle
+holding to 1e-6 across five seeds with the spin resampling and both endpoints unchanged, and #8's
+dihedral driving to 60° with the altitude foot on BC and ⟂ to it.
