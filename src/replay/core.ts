@@ -363,6 +363,29 @@ function tailChoice(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides
   return runTail(fold, facts, seed, radiusOverrides);
 }
 
+/** #566 (ADR-445): the vertices an enabled EXPLICIT 90° statement names — the right-triangle seat's
+ *  PIN set. The ADR-163 reseat pre-scan and the ADR-445 config-search dimension consult this SAME set,
+ *  so the yield channel and the search can never disagree about which seats are the student's. */
+export function explicitRightAngleVerts(facts: Fact[], symtab?: ReturnType<typeof buildSymTab>): Set<Id> {
+  const st = symtab ?? buildSymTab(facts.filter((f) => f.enabled).map((f) => f.cmd));
+  return new Set<Id>(
+    facts
+      .filter((f) => f.enabled)
+      .flatMap((f) => lowerOne(f.cmd, st))
+      .filter((c): c is Extract<Command, { type: 'set-angle' }> => c.type === 'set-angle' && Math.abs(c.value - 90) < 1e-6)
+      .map((c) => c.vertex),
+  );
+}
+
+/** #566 (ADR-445): a right-triangle's EFFECTIVE ids — the explicit-90° reseat (ADR-163) always wins;
+ *  else the solve-chosen `rot` seats the right angle on the flipped vertex (last position). ONE helper
+ *  for the lowering and the knee mark, so the built angle and the drawn knee cannot disagree. */
+function rtEffectiveIds(cmd: Extract<AnyCommand, { type: 'right-triangle' }>, reseat?: [Id, Id, Id]): [Id, Id, Id] {
+  if (reseat) return reseat;
+  const [a, b, c] = cmd.ids;
+  return cmd.rot === 1 ? [b, c, a] : cmd.rot === 2 ? [a, c, b] : cmd.ids;
+}
+
 function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
   // Symbol table over the ENABLED facts, so a value given later (`x = 4`) resolves an
   // earlier `AB = 3x`, and two segments sharing a variable become a proportion (ADR-031).
@@ -394,13 +417,7 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
   // after the triangle): if an enabled explicit 90° set-angle names one of a right-triangle's vertices,
   // reorder its ids so that vertex is LAST (the structural right-angle vertex); the explicit angle then holds
   // as a passing check, not a conflict.
-  const rightAngleVerts = new Set<Id>(
-    facts
-      .filter((f) => f.enabled)
-      .flatMap((f) => lowerOne(f.cmd, symtab))
-      .filter((c): c is Extract<Command, { type: 'set-angle' }> => c.type === 'set-angle' && Math.abs(c.value - 90) < 1e-6)
-      .map((c) => c.vertex),
-  );
+  const rightAngleVerts = explicitRightAngleVerts(facts, symtab);
   const rtReorder = new Map<string, [Id, Id, Id]>();
   for (const f of facts) {
     if (!f.enabled || f.cmd.type !== 'right-triangle') continue;
@@ -680,9 +697,11 @@ function computeFold(facts: Fact[], hoistDepth = 0): FoldNode {
           expandShapeVariant(msSvMove.has(f.id) ? { ...f.cmd, ids: msSvMove.get(f.id)! } : f.cmd, explicitEqs, explicitOnSegs)
         : f.cmd.type === 'inscribe' ? expandInscribe(f.cmd, explicitOnSegs)
         : lowerOne(f.cmd, symtab);
-      // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see pre-scan).
+      // Re-seat a right-triangle's right angle onto the vertex the student explicitly set to 90° (see
+      // pre-scan), or — #566 (ADR-445) — onto the SOLVE-CHOSEN `rot` seat; the explicit pin always wins.
       const reseat = rtReorder.get(f.id);
-      if (reseat) engineCmds = engineCmds.map((ec) => (ec.type === 'right-triangle' ? { ...ec, ids: reseat } : ec));
+      if (reseat || (f.cmd.type === 'right-triangle' && f.cmd.rot))
+        engineCmds = engineCmds.map((ec) => (ec.type === 'right-triangle' ? { ...ec, ids: rtEffectiveIds(ec, reseat) } : ec));
       // Re-seat a midsegment default rider onto the side the student explicitly stated (ADR-412 pre-scan).
       const riderMove = msRiderMove.get(f.id);
       if (riderMove) engineCmds = engineCmds.map((ec) => (ec.type === 'point-on-segment' ? { ...ec, a: riderMove[0], b: riderMove[1] } : ec));
@@ -1085,7 +1104,7 @@ function runTail(fold: FoldNode, facts: Fact[], seed: number, radiusOverrides: R
     // Mark from the RESEATED right-triangle (ADR-163), so the right-angle knee is drawn at the vertex the
     // figure actually built the right angle at — not the original last id. Without this the knee sits on a
     // now-acute vertex (e.g. a leftover knee at C while ∠B is the real 90°).
-    const markCmd = rtReorder.has(f.id) && f.cmd.type === 'right-triangle' ? { ...f.cmd, ids: rtReorder.get(f.id)! } : f.cmd;
+    const markCmd = f.cmd.type === 'right-triangle' ? { ...f.cmd, ids: rtEffectiveIds(f.cmd, rtReorder.get(f.id)) } : f.cmd;
     const m = angleMarkFor(markCmd);
     if (!m || ![m.vertex, m.ray1, m.ray2].every((id) => e.ok && e.positions.has(id))) continue;
     // HONESTY GATE (ADR-223 Am.): a right-angle SQUARE (the "knee") is placed by the COMMAND'S INTENT
@@ -1505,14 +1524,24 @@ export function meetsRequirements(facts: Fact[], seed = 0, relaxExtensions = fal
  * CURRENT branch assignment is tried first and most widely; the combinatorics of alternative branches are
  * bounded. Deterministic.
  */
+/** #566 (ADR-445 Am. 1) — dev instrumentation, the S0.2 `lastLadderStage` pattern: WHICH tier of
+ *  `findValidConfig` produced the last returned config. Lets a test assert the tier ORDERING
+ *  deterministically — a wall-clock assertion on the real worker budget flaked at 28 s under the
+ *  suite's CPU contention (5 s solo), which is exactly why `SEARCH_BUDGET_MS` is Infinity in tests. */
+export let lastConfigTier: 'current' | 'relaxed' | 'sweep' | 'seat' | 'reflect' | 'branch' | null = null;
+
 export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_BUDGET_MS): { facts: Fact[]; seed: number } | null {
+  lastConfigTier = null;
   const deadline = Date.now() + budgetMs;
   const timeLeft = () => Math.max(0, deadline - Date.now());
   // First the targeted extension/reflection search (ADR-098/ADR-166): it explores the discrete apex
   // REFLECTION DOF (high seed bits) that the plain seed sweep below can't reach, so a segment-meet whose
   // apex points the wrong way is brought onto the segments in a handful of tries instead of by luck.
   const s0 = firstSatisfyingSeed(facts, fromSeed, 120, timeLeft());
-  if (meetsRequirements(facts, s0)) return { facts, seed: s0 };
+  if (meetsRequirements(facts, s0)) {
+    lastConfigTier = 'current';
+    return { facts, seed: s0 };
+  }
   // ADR-142 acceptance (issue #19 / ADR-267): `firstSatisfyingSeed` may have returned its shared-endpoint
   // FALLBACK — every seed it examined failed the strict extension direction, so the RELAXED bar is the right
   // validity test for s0. Checked BEFORE the strict sweep/branch tiers: when s0 is a fallback those tiers are
@@ -1520,14 +1549,59 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
   // and their cold replays would burn the remaining budget and bail to null past the very config in hand —
   // the exact starvation this ADR removes. When s0 simply failed OTHER requirement dimensions (violations,
   // convexity, distinctness), the relaxed check fails identically and the tiers below run as before.
-  if (meetsRequirements(facts, s0, true)) return { facts, seed: s0 };
+  if (meetsRequirements(facts, s0, true)) {
+    lastConfigTier = 'relaxed';
+    return { facts, seed: s0 };
+  }
   // The deadline is also ARMED inside the solve ladder (engine/solveBudget.ts, issue #59): the branch
   // tier below builds NEW fact content (branch rewrites), whose folds can hit the expensive recruit
   // ladder — the between-replay checks alone couldn't stop a single 30 s candidate.
   return withSolveBudget(deadline, () => {
     for (let s = fromSeed; s < fromSeed + 40; s++) {
       if (Date.now() > deadline) return null; // out of budget — caller keeps the current figure, amber
-      if (meetsRequirements(facts, s)) return { facts, seed: s };
+      if (meetsRequirements(facts, s)) {
+        lastConfigTier = 'sweep';
+        return { facts, seed: s };
+      }
+    }
+    // #566 (ADR-445, ordering per Am. 1): the RIGHT-ANGLE-SEAT dimension. «משולש ישר זווית ABC»
+    // leaves WHICH vertex is right unstated — the lowering defaults to the last id, and ADR-163
+    // yields it only to an explicit 90° statement. A later constraint can leave the DEFAULT seat
+    // satisfiable only DEGENERATELY (the #566 figure: with ∠C=90 the hypotenuse AB is a diameter, so
+    // «קשת AB = קשת BC» forces C onto A — every seed fails pointsDistinct) while another seat admits
+    // a real figure. An unstated choice is a discrete config dimension (ADR-052; the ADR-426
+    // reflection precedent): try the alternative seats via the solve-chosen `rot` field, returning
+    // REWRITTEN facts exactly like the branch tier below. A seat pinned by an explicit 90° (the
+    // ADR-163 channel, same pin set) is never flipped.
+    //
+    // This tier runs BEFORE the reflection tier (ADR-445 Am. 1): a seat-caused failure is
+    // seed/mask-INVARIANT (the #566 collapse fails at every seed and every mask), so the mask×seed
+    // product — the budget hog on multi-free-point figures — can never rescue it and would eat the
+    // worker's 12 s before this tier ran (measured: the rescue arrived at ~13.4 s ordered after,
+    // ~5 s ordered here; the suite's Infinity budget masked exactly this, which is why the
+    // production-budget lock in scenarios-props-budget.test.ts carries the figure). Cost when no
+    // unpinned right-triangle exists: zero (the list is empty).
+    const pinnedRA = explicitRightAngleVerts(facts);
+    const rtFacts = facts
+      .map((f, i) => ({ f, i }))
+      .filter(({ f }) => f.enabled && f.cmd.type === 'right-triangle' && !f.cmd.ids.some((id) => pinnedRA.has(id)))
+      .slice(0, 2); // bound the combinatorics, like the branch tier
+    for (const { f, i } of rtFacts) {
+      const cur = (f.cmd as { rot?: 1 | 2 }).rot ?? 0;
+      for (const rot of ([1, 2, 0] as const).filter((r) => r !== cur)) {
+        const fc = facts.map((g, idx) => {
+          if (idx !== i) return g;
+          const { rot: _prev, ...rest } = g.cmd as Extract<typeof g.cmd, { type: 'right-triangle' }>;
+          return { ...g, cmd: rot === 0 ? rest : { ...rest, rot } } as Fact;
+        });
+        for (let s = 0; s < 6; s++) {
+          if (Date.now() > deadline) return null;
+          if (meetsRequirements(fc, s)) {
+            lastConfigTier = 'seat';
+            return { facts: fc, seed: s };
+          }
+        }
+      }
     }
     // Discrete REFLECTION alternatives (#441). The sweep above varies only the CONTINUOUS jitter — the
     // base seed — while the reflection mask lives in the seed's HIGH bits (`REFLECT_STRIDE`). So a
@@ -1542,7 +1616,10 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
       for (let s = fromSeed; s < fromSeed + 6; s++) {
         if (Date.now() > deadline) return null;
         const sm = withReflectMask(m, s);
-        if (meetsRequirements(facts, sm)) return { facts, seed: sm };
+        if (meetsRequirements(facts, sm)) {
+          lastConfigTier = 'reflect';
+          return { facts, seed: sm };
+        }
       }
     }
     // Discrete branch alternatives — vary which intersection/side each branchable point takes.
@@ -1563,7 +1640,11 @@ export function findValidConfig(facts: Fact[], fromSeed = 0, budgetMs = SEARCH_B
         const k = branchy.findIndex((x) => x.i === idx);
         return k >= 0 ? ({ ...f, cmd: { ...f.cmd, branch: combo[k] } } as Fact) : f;
       });
-      for (let s = 0; s < 6; s++) if (meetsRequirements(fc, s)) return { facts: fc, seed: s };
+      for (let s = 0; s < 6; s++)
+        if (meetsRequirements(fc, s)) {
+          lastConfigTier = 'branch';
+          return { facts: fc, seed: s };
+        }
     }
     return null;
   });

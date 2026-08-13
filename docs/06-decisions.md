@@ -6986,3 +6986,57 @@ previously-parked concluded order in a reloaded figure now reads as the hard err
 deferral machinery (statements apply or refuse), class not present. Locks: `deferral-gate.test.ts`
 (the impossible order refuses; the ADR-104 ⟂ control and the #420 metric pair stay), plus the
 ADR-441 locks unchanged.
+
+## ADR-445 — The unstated right-angle SEAT yields: a config-search dimension, and an exhausted search is never silent (#566)
+
+Operator, playing round #561 (P1 — prod-reachable on the single-circle prefix): «משולש ישר זווית
+ABC» + «משולש ABC חסום במעגל» + «קשת AB = קשת BC» drew C collapsed onto A at EVERY seed
+(|AC| 0.003–0.04 against a span of 57), all statuses green, «נקבע במלואו». Two defects, one figure:
+
+**1 — The seat.** `right-triangle` puts the right angle at the LAST id structurally, and ADR-163
+yields that default only to an EXPLICIT 90° statement. But the seat is UNSTATED — and with ∠C=90 the
+hypotenuse AB is a diameter, so the arc equality is satisfiable only degenerately, while the seat B
+admits the real isosceles figure. Per ADR-052 an unstated choice is a configuration DIMENSION:
+`findValidConfig` gains a right-angle-seat tier (the ADR-426 reflection-tier precedent) that tries
+the two alternative seats through a solve-chosen `rot?: 1|2` field on the command — like `branch`,
+never parser-emitted, returned as rewritten facts exactly like the branch tier's. The ADR-163
+explicit pin wins always: both the reseat pre-scan and the search consult ONE exported pin set
+(`explicitRightAngleVerts`), so the channels cannot disagree. The lowering and the knee mark read
+one shared `rtEffectiveIds`, so the built angle and the drawn knee cannot diverge.
+
+**2 — The silence.** `meetsRequirements` was FALSE at every seed — `pointsDistinct` correctly
+rejected the collapse — but when `autoResolve`'s search exhausts, the app kept the invalid view with
+no signal (the "flagged amber" of ADR-106's docstring was never wired). `resolveAfterCommit` now
+surfaces `figure.noValidConfig` (He+En): the figure stays (keep-prior would erase a committed
+given), the student is told the drawing could not honour everything at once.
+
+**Deliberate scope:** the «show another configuration» resample search does not yet cycle the seat
+(only the post-commit rescue does); the solve-accept gate still admits the near-collapse basin
+(coincident VERTICES sit above `collapsedPolygon`'s collinearity tolerance) — with the seat
+dimension in place the search rescues it, and the accept-gate hardening (a coincident-vertex check
+routed through the failure ladder, so a PINNED impossible seat refuses at commit naming the
+statement) is follow-up work, not smuggled into a P1.
+
+**Lock layer (recorded deviation from rule 4's fixtures-first):** the exact prod sequence is locked
+in `issue-566.test.ts` over the harness's `factsOf` (the real parse path) but asserted at the
+`findValidConfig` layer — the scenario harness's plain replay never runs the app's autoResolve, so a
+corpus scenario cannot express this fix; the round-#561 scenario on the #562 branch gains the
+strengthened distinctness/seat assertions instead. Locks: the rescue (seat lands at B, all points
+distinct, |AB|=|BC| genuinely driven, full requirement bar), the pinned-seat mirror (an explicit
+∠ACB=90 is never flipped), and the no-search baseline.
+
+**ADR-445 Amendment 1 (same day — the operator re-played and NOTHING had changed).** The seat tier was
+ordered after the reflection tier, and on the play figure (incircle group — several reflectable free
+points) the mask×seed product ate the worker's 12 s budget before the seat tier ran: the rescue
+arrived COLD at ~13.4 s, the live search aborted at 12 s and kept the collapse — while the suite
+stayed green because `SEARCH_BUDGET_MS` is **Infinity under vitest** (the exact issue-#19 trap, seat
+edition; the first ADR-445 locks proved the tier exists, not that production ever reaches it). Two
+changes: the seat tier moved BEFORE the reflection tier — a seat-caused failure is seed/mask-INVARIANT
+(the collapse fails at every seed and mask), so reflections can never rescue it and only starve it;
+measured ~5 s ordered first (zero cost for figures with no unpinned right triangle) — and the
+ordering is LOCKED structurally: `findValidConfig` gains dev tier instrumentation
+(`lastConfigTier`, the S0.2 `lastLadderStage` pattern), and `scenarios-props-budget.test.ts`
+asserts the rescue is produced by the **'seat' tier** — a wall-clock assertion under the real
+worker budget was tried first and flaked at 28 s under the suite's CPU contention (5 s solo),
+which is the same reason `SEARCH_BUDGET_MS` is Infinity in tests. The heavier two-circle edition
+of the lock rides the #546/#562 branch, whose grammar it needs.
