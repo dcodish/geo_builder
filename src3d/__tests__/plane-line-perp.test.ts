@@ -89,9 +89,20 @@ describe('#375 — a point-run plane ⟂ a named line', () => {
     expect(seg.ok && (seg as any).commands.some((k: any) => k.type === 'claim' || k.type === 'seg-plane-rel')).toBe(true);
   });
 
-  it('an unknown line is refused, not silently dropped', () => {
+  it('#552 supersedes the refusal for CONVENTION names: an undeclared ℓ-name AUTO-CREATES a free line', () => {
+    // The original #375 lock: «ACD אנך לישר l7» with no l7 refused. With the free line (#552, the
+    // on-planes ruling-1 shape) the convention name now CREATES the line and the ⟂ pins its
+    // direction — same statement, the incremental flow instead of a dead end.
     submit('פירמידה משולשת ABCD');
     submit('ACD אנך לישר l7');
+    expect(state().lastError).toBeNull();
+    expect(derive3(state().facts, 0).construction.lines.get('ℓ7')?.kind).toBe('free');
+  });
+
+  it('…while an unknown NON-convention name still refuses, not silently dropped (#375’s honest half)', () => {
+    useGeo3.getState().clear();
+    submit('פירמידה משולשת ABCD');
+    submit('ACD אנך לישר q');
     expect(state().lastError).not.toBeNull();
   });
 

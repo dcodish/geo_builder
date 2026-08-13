@@ -3299,3 +3299,72 @@ label with the numeric twin still driving and the determined/under-determined sp
 with the four #324 baselines asserted byte-identical and both sides of the placement guard, #534's angle
 holding to 1e-6 across five seeds with the spin resampling and both endpoints unchanged, and #8's
 dihedral driving to 60° with the altitude foot on BC and ⟂ to it.
+
+### ADR-3D-141 — the FREE-standing named LINE: «ישר k» / bare «l1», pinned by stated relations (#552)
+
+The #487 free plane, line edition, and deliberately the same architecture at every layer. A student can
+now declare a line before anything about it is known — and a relation can conjure one — with its 4 DOFs
+(direction 2 + anchor 2) sampled per seed until givens pin them (ADR-052: an unstated direction or
+position is a free DOF, never a default).
+
+**Naming (operator request, 2026-08-13).** Convention names (`l`, `l1`, typed or ℓ-form, canonical
+`ℓ<digits?>`) may stand BARE — the ℓ-prefix marks a line exactly as the π-prefix marks a plane
+(#487 Am. 1). Any other single-letter name takes the NOUN («ישר k», «line k»), which is the student
+STATING the kind — the parser stays context-free and never guesses, so a bare «k» stays not-handled.
+At the operand seam this adds the one token the closed set cannot classify by shape alone (a single
+lowercase letter is both a vector name and an arbitrary line name): the noun breaks the tie **only
+there**, which does not touch the ADR-3D-100 mechanism — a noun still never overrides a decisive shape.
+
+**Creation (`free-line`, the on-planes ruling-1 shape).** «l⊥BCK» / «l ∥ BCK» / «B על הישר l1» on an
+undeclared CONVENTION name auto-creates the free line (`withFreeLines`, bounded by `FREE_LINE_TOKEN`);
+a non-convention name must be declared first — a typo refuses (`unknown-line`), never conjures. This
+supersedes #375's blanket unknown-line refusal for convention names only; its honest half (arbitrary
+names refuse) is retained and locked. Name clashes — a defined line, a through-line, a plane, or a
+named VECTOR (`ישר u` beside vector `u`) — refuse `already-defined`.
+
+**Resolution (`resolveFreeLine`).** Pins: ⊥ plane pins the direction outright; ∥ plane leaves one
+in-plane spin DOF; ∥/⊥ segment/line/vector pin/constrain likewise; a stated line↔plane or line↔line
+ANGLE puts the direction on a CONE — the #534 lesson applied from birth, with ⊥ and ∥ falling out as
+the cone's endpoints rather than standing beside it. An EXISTING point stated on the line pins the
+anchor (M1); two members ARE the line. Riders are placed by the line, never pins. The anchor of a
+crossing relation (⊥ / non-zero angle) is seated ON the related plane so the stated meeting is visible
+— still exactly 2 sampled DOFs, measured in-plane. `dof` is returned by the same code that pinned
+(the ADR-052 conformance rule), published as `freeLineDofs`, and joins the cue.
+
+**Routing (the load-bearing part).** `planeLinePerps` / `lineRels` entries whose line is FREE pin the
+LINE, never the figure's gauge or the parameter — `isFreeLine3` / `figurePlaneLinePerps` /
+`figureLineRels` filter them out of every pivot/gauge/parameter consumer (evaluate + solve3), exactly
+as `paramLinePerps` already excluded free-PLANE targets. Free planes resolve BEFORE free lines each
+fixpoint pass, and `resolveFreePlanes3`'s pin-gathering skips free-line directions: when both are free
+the plane LEADS and the line follows, deterministically — the mutual read cannot oscillate. Free lines
+join the #508 bounded fixpoint (a pinning member placed mid-pass re-runs the point pass).
+
+**Honesty.** The store's #508 class guard gains its line half: a claim judged against a free line whose
+DOFs are still sampled reports `line-not-determined` ("pin this line first"), never `claim-refuted`.
+The canvas echo for a free line is its NAME alone — a printed equation would assert sampled numbers
+(the ADR-052 canvas rule; the free plane's patch is the precedent). `hasAbsoluteFrameObject` does not
+count a free line (only parametric lines carry absolute data), so declaring one never flips the
+placement lane. Saves round-trip (`COMMAND_SAVEABLE`).
+
+**Locked** in `free-line.test.ts` (30 tests: both name shapes He+En, the operator's glued «l⊥BCK»,
+∥ and cone pins holding to 1e-6 across five seeds with the residual DOFs resampling, member pins, the
+two-member 0-DOF stability, cube-untouched stability, clash and typo refusals, the name-only echo, the
+round-trip), the updated #375 lock (auto-create vs honest refusal split), the seeded fixture
+`free-line-552.geo3.json` (the operator's exact sequence), and the catalog rows (guard-tested He+En).
+
+**Am. 1 (operator play, 2026-08-13) — free objects must hold against FINAL positions.** On the
+operator's coordinate-injected prism (A(0,0,0), B on the x-axis, |u|=3 …) «l⊥BCK» was refused
+`line-not-determined`. Root cause, and it is a CLASS that predates the line: free planes and lines
+resolve pre-pivot (the rider pass needs them), but the PIVOT and the LANDING FUNNEL then move every
+point to its stated coordinates — and nothing re-read the free objects afterwards, so the claim was
+verified against a direction pinned in the canonical frame, failed, and the guard blamed the student's
+correct statement. #487's tests never combined a free plane with an absolute-frame figure, which is
+where the plane half hid. Fixed at the root by `reresolveFreeObjects3`: after positions are final
+(post-pivot, post-funnel, post-`resolveLatePlanes`, after through-lines), free planes then lines
+re-resolve from them and exactly their own DEPENDENTS re-seat (riders — same sample keys, so a gauge
+figure is byte-identical — feet, line∩plane crossings; the plane-plane/derived-line passes run after
+and read the corrected objects). The figure itself never re-runs: the free subtree reads the figure,
+never the reverse. The rider placement routines moved from pass-local closures to module level
+(`seatOnPlaneRider` / `seatOnLineRider`) so the re-seat is the SAME code, not a copy. Locked by the
+#557 pivot tests in `free-line.test.ts` (verified red without the fix) and the plane twin in
+`free-plane.test.ts`.

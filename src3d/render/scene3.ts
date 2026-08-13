@@ -573,7 +573,12 @@ export function buildScene3(
       a: sub3(mid, scale3(dir, reach)),
       b: add3(mid, scale3(dir, reach)),
       form:
-        carriesParam && paramUnforced && def?.kind === 'parametric'
+        // #552: a FREE line's anchor/direction are SAMPLED, never knowledge — a printed equation
+        // would assert numbers the student never stated (the ADR-052 canvas rule), so the echo is
+        // the bare name. The free PLANE precedent: its patch carries a name, never an equation.
+        def?.kind === 'free'
+          ? name
+          : carriesParam && paramUnforced && def?.kind === 'parametric'
           ? `${name}: ${def.src}`
           // #422: the student's own running letter, when they chose one — the numeric echo used to
           // rewrite «m» back to «t», telling them their line in a notation they did not use.

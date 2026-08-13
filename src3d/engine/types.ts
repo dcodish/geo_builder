@@ -211,7 +211,14 @@ export type Line3Def =
   // internal-only, never displayed), anchor = the foot on line1 of the shortest connecting segment.
   | { kind: 'common-perp'; line1: string; line2: string }
   // V8-h (G8): the PROJECTION (`היטל`) of a line onto a plane — each point's ⟂ foot on the plane.
-  | { kind: 'line-projection'; line: string; plane: string };
+  | { kind: 'line-projection'; line: string; plane: string }
+  // #552 — a FREE line: declared by name only («ישר k», bare «l1»), nothing yet known about it.
+  // The #487 free-plane idea, line edition: direction (2 DOF) and anchor (2 DOF) are genuine ADR-052
+  // free DOFs, sampled per seed and pinned as memberships/relations accumulate (`resolveFreeLine`).
+  // Living inside `lines` is deliberate for the same reason the free plane lives in `planes`: every
+  // existence check, operand resolver and renderer sees it without enumeration edits — consumers that
+  // need the line's numbers as KNOWLEDGE (the parametric echo, the parameter machinery) gate on the kind.
+  | { kind: 'free' };
 
 /**
  * V8-b (G1): a plane defined by a ⊥/∥ RELATION to a segment/edge (not by points or an
@@ -557,6 +564,19 @@ export interface FreePlaneCommand {
   name: string;
 }
 
+/**
+ * #552 — «ישר k» / «line l1» / bare «l»: a FREE line declared before anything about it is known
+ * (the #487 shape, line edition). Convention names (`l`, `l1` → canonical `ℓ`, `ℓ1`) may stand bare —
+ * the ℓ-prefix is what marks them as lines, exactly as the π-prefix marks planes (#487 Am. 1); any
+ * other single-letter name REQUIRES the noun («ישר k»), which is what states the kind — the parser
+ * stays context-free. A relation naming an undeclared CONVENTION line auto-creates it through this
+ * same duality (the on-planes ruling-1 shape); a non-convention name must be declared first.
+ */
+export interface FreeLineCommand {
+  type: 'free-line';
+  name: string;
+}
+
 /** `הזווית בין המישורים היא 45°` — PINS the parameter (its roots are the figure's branches). */
 export interface PlaneAngleCommand {
   type: 'plane-angle';
@@ -724,6 +744,7 @@ export type Command3 =
   | ParamSignCommand
   | Plane3Command
   | FreePlaneCommand
+  | FreeLineCommand
   | PlaneAngleCommand
   | OnPlanesCommand
   | FootOnPlaneCommand
@@ -1097,6 +1118,7 @@ export type EngineError3 =
   | { code: 'bound-unsatisfiable'; id: Id } // #273: no sampled configuration puts the measure inside the stated bound
   | { code: 'vacuous-relation' } // S4 (#378): a mutual position stated between an object and itself
   | { code: 'plane-not-determined'; id: string } // #487: this construct needs a plane with a stated equation — π is still free
+  | { code: 'line-not-determined'; id: string } // #552: a claim judged against a free line whose relevant DOF is still sampled — pin it first, never accuse
   | { code: 'claim-refuted' } // the stated answer does not hold in the figure
   // #512: a relation to the COORDINATE FRAME judged against a placement the funnel sampled — the
   // statement may well be satisfiable; what is missing is a given that fixes where the figure sits.

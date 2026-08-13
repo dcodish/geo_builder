@@ -1,0 +1,329 @@
+{
+  "schemaVersion": 1,
+  "app": "3d-builder",
+  "savedAt": "2026-08-13T10:49:49.998Z",
+  "seed": 0,
+  "facts": [
+    {
+      "utterance": "מנסרה ישרה שבסיסה משולש ישר זוית",
+      "cmds": [
+        {
+          "type": "solid",
+          "kind": "prism3",
+          "ids": [
+            "A",
+            "B",
+            "C",
+            "A'",
+            "B'",
+            "C'"
+          ]
+        },
+        {
+          "type": "cos-angle",
+          "u": {
+            "kind": "pair",
+            "from": "B",
+            "to": "A"
+          },
+          "v": {
+            "kind": "pair",
+            "from": "B",
+            "to": "C"
+          },
+          "cos": 0,
+          "soft": true
+        }
+      ]
+    },
+    {
+      "utterance": "זוית BAC=90",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "B"
+        },
+        {
+          "type": "segment3",
+          "a": "A",
+          "b": "C"
+        },
+        {
+          "type": "claim",
+          "claim": {
+            "type": "angle-seg-eq",
+            "a1": "A",
+            "b1": "B",
+            "a2": "A",
+            "b2": "C",
+            "deg": 90
+          }
+        }
+      ]
+    },
+    {
+      "utterance": "AB=u",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "B",
+          "terms": [
+            {
+              "coeff": {
+                "k": 1,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "u"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AC=v",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "C",
+          "terms": [
+            {
+              "coeff": {
+                "k": 1,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "v"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "AA'=w",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "A",
+          "to": "A'",
+          "terms": [
+            {
+              "coeff": {
+                "k": 1,
+                "p": 0
+              },
+              "atom": {
+                "kind": "named",
+                "name": "w"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "BE=0.2BC",
+      "cmds": [
+        {
+          "type": "vec-rel",
+          "from": "B",
+          "to": "E",
+          "terms": [
+            {
+              "coeff": {
+                "k": 0.2,
+                "p": 0
+              },
+              "atom": {
+                "kind": "pair",
+                "from": "B",
+                "to": "C"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "B'E",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "B'",
+          "b": "E"
+        }
+      ]
+    },
+    {
+      "utterance": "EC'",
+      "cmds": [
+        {
+          "type": "segment3",
+          "a": "E",
+          "b": "C'"
+        }
+      ]
+    },
+    {
+      "utterance": "|u|=3",
+      "cmds": [
+        {
+          "type": "vec-mag",
+          "name": "u",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "utterance": "|v|=4",
+      "cmds": [
+        {
+          "type": "vec-mag",
+          "name": "v",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "utterance": "B'E⊥C'E",
+      "cmds": [
+        {
+          "type": "cos-angle",
+          "u": {
+            "kind": "pair",
+            "from": "B'",
+            "to": "E"
+          },
+          "v": {
+            "kind": "pair",
+            "from": "C'",
+            "to": "E"
+          },
+          "cos": 0
+        }
+      ]
+    },
+    {
+      "utterance": "A(0,0,0)",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A",
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "utterance": "B על החלק החיובי של ציר x",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "B",
+          "x": null,
+          "y": 0,
+          "z": 0
+        },
+        {
+          "type": "sign-given",
+          "id": "B",
+          "axis": "x",
+          "positive": true
+        }
+      ]
+    },
+    {
+      "utterance": "C על החלק החיובי של ציר y",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "C",
+          "x": 0,
+          "y": null,
+          "z": 0
+        },
+        {
+          "type": "sign-given",
+          "id": "C",
+          "axis": "y",
+          "positive": true
+        }
+      ]
+    },
+    {
+      "utterance": "A' על החלק החיובי של ציר z",
+      "cmds": [
+        {
+          "type": "point3",
+          "id": "A'",
+          "x": 0,
+          "y": 0,
+          "z": null
+        },
+        {
+          "type": "sign-given",
+          "id": "A'",
+          "axis": "z",
+          "positive": true
+        }
+      ]
+    },
+    {
+      "utterance": "K אמצע AA'",
+      "cmds": [
+        {
+          "type": "point-on-segment3",
+          "id": "K",
+          "a": "A",
+          "b": "A'",
+          "t": 0.5
+        }
+      ]
+    },
+    {
+      "utterance": "המישור BCK",
+      "cmds": [
+        {
+          "type": "plane-through",
+          "name": "BCK",
+          "ids": [
+            "B",
+            "C",
+            "K"
+          ]
+        }
+      ]
+    },
+    {
+      "utterance": "l",
+      "cmds": [
+        {
+          "type": "free-line",
+          "name": "ℓ"
+        }
+      ]
+    },
+    {
+      "utterance": "l⊥BCK",
+      "cmds": [
+        {
+          "type": "plane-line-perp",
+          "ids": [
+            "B",
+            "C",
+            "K"
+          ],
+          "line": "ℓ"
+        }
+      ]
+    }
+  ]
+}
