@@ -2170,4 +2170,46 @@ export const SCENARIOS_4: Scenario[] = [
       expect(new Set(signs).size, 'draws as a convex quadrilateral').toBe(1);
     },
   },
+  {
+    id: 'bagrut-gchf-cyclic-tangent-parallel',
+    title: 'bagrut: right △ABC (∠ACB=90°) + GCHF cyclic + AB tangent at F + AB∥GH + diameter from F cuts AC at E (#567)',
+    guards:
+      "the first figure certified end-to-end by the exercise-sequence agent (#567 / ADR-W-015, operator 2026-08-13, played and approved): a real bagrut exercise transcribed from the book image and verified line-by-line through the headless runner — locked so the certified 8-line sequence keeps building verifier-clean. Every line is deterministic grammar (no LLM step); the exercise states NO magnitudes, so scale and the leg proportions stay free DOFs (ADR-052) while the stated structure — GCHF concyclic, AB tangent exactly at F, AB∥GH, E on AC on the diameter from F — must hold in every configuration.",
+    steps: [
+      'משולש ישר-זווית ABC',
+      'נקודה F על AB',
+      'נקודה G על AC',
+      'נקודה H על CB',
+      'מרובע GCHF חסום במעגל',
+      'AB משיק למעגל בנקודה F',
+      'AB מקביל ל-GH',
+      'קוטר המעגל היוצא מנקודה F חותך את הצלע AC בנקודה E',
+    ],
+    check(fig) {
+      allStepsOk(fig);
+      const A = at(fig, 'A'), B = at(fig, 'B'), C = at(fig, 'C');
+      const F = at(fig, 'F'), G = at(fig, 'G'), H = at(fig, 'H');
+      const O = at(fig, 'O'), E = at(fig, 'E');
+      expect(Math.abs(angle(A, C, B) - 90), '∠ACB = 90°').toBeLessThan(0.5);
+      // G, C, H, F concyclic around the auto-named centre O
+      const r = dist(O, G);
+      expect(Math.abs(dist(O, C) - r) / r, 'C on the circle').toBeLessThan(1e-2);
+      expect(Math.abs(dist(O, H) - r) / r, 'H on the circle').toBeLessThan(1e-2);
+      expect(Math.abs(dist(O, F) - r) / r, 'F on the circle').toBeLessThan(1e-2);
+      // AB tangent at F: OF ⟂ AB
+      const dot = (B.x - A.x) * (F.x - O.x) + (B.y - A.y) * (F.y - O.y);
+      expect(Math.abs(dot) / (dist(A, B) * r), 'AB tangent at F (OF ⟂ AB)').toBeLessThan(1e-2);
+      // AB ∥ GH
+      const crossPar = (B.x - A.x) * (H.y - G.y) - (B.y - A.y) * (H.x - G.x);
+      expect(Math.abs(crossPar) / (dist(A, B) * dist(G, H)), 'AB ∥ GH').toBeLessThan(1e-2);
+      // E on segment AC, and on the diameter from F (F–O–E collinear)
+      const crossE = (C.x - A.x) * (E.y - A.y) - (C.y - A.y) * (E.x - A.x);
+      expect(Math.abs(crossE) / dist(A, C), 'E on line AC').toBeLessThan(1e-2);
+      const tE = ((E.x - A.x) * (C.x - A.x) + (E.y - A.y) * (C.y - A.y)) / (dist(A, C) * dist(A, C));
+      expect(tE, 'E inside segment AC').toBeGreaterThan(0);
+      expect(tE, 'E inside segment AC').toBeLessThan(1);
+      const crossD = (O.x - F.x) * (E.y - F.y) - (O.y - F.y) * (E.x - F.x);
+      expect(Math.abs(crossD) / (r * dist(F, E) + 1e-9), 'E on the diameter from F').toBeLessThan(1e-2);
+    },
+  },
 ];
